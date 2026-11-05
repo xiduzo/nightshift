@@ -124,6 +124,7 @@ export type {
 } from "./log";
 export {
 	ForeignRowsError,
+	fallbackKey,
 	followOwnStep,
 	MissingProjectError,
 	parseTranscript,
@@ -175,6 +176,7 @@ export type {
 	PlanInput,
 	PlannedRun,
 	SpaceEngine,
+	StepFallback,
 } from "./run";
 export {
 	createEngine,

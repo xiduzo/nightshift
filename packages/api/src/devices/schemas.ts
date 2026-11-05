@@ -49,6 +49,8 @@ const linkedHostSchema = z.object({
 const pairedDeviceSchema = z.object({
 	id: z.string(),
 	name: z.string(),
+	/** A development install: never a default or a fallback (ADR 17). */
+	dev: z.boolean().optional(),
 	platform: z.string(),
 	/** The Person who approved the pairing. */
 	ownerId: z.string(),

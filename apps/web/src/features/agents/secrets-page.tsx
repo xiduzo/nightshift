@@ -28,7 +28,7 @@ export function SecretsPage() {
 				<div className="mx-auto w-full max-w-4xl">
 					<PageHeading
 						title="Secrets"
-						description="Save the tokens and passwords your tools and Command nodes use. Make one Personal for all your computers, or keep it on this computer."
+						description="Save the tokens and passwords your tools and Command nodes use. Make one Personal for your own computers, or keep it on this computer. To use one on the Host, move it to the Space."
 					/>
 				</div>
 				<div className="mx-auto flex w-full max-w-4xl flex-col gap-10">

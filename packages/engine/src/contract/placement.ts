@@ -16,6 +16,8 @@ export type Placement = {
 	 * own Devices.
 	 */
 	offers?: string[];
+	/** A development install of Night Shift: only ever where someone names it (ADR 17). */
+	dev?: boolean;
 	/**
 	 * This computer when another Person owns it: that Person's name, as
 	 * the Host admin of a Host that keeps the Space. Absent on the others.

@@ -82,14 +82,10 @@ export type SpacesDeps = {
 	/** Stop, answer, signal, move, resume, restart and run again (`actions.ts`). */
 	actions: RunActions;
 	/**
-	 * Starts a run where its start place says (`start-place.ts`), for the
-	 * Person it runs for: here, or on the Host that keeps the Space.
+	 * Starts a run where its start place says (`start-place.ts`): here, or
+	 * on the Host that keeps the Space.
 	 */
-	startRun(
-		input: StartRunInput,
-		trigger: RunTrigger,
-		personId: string | null,
-	): Promise<RunSummary>;
+	startRun(input: StartRunInput, trigger: RunTrigger): Promise<RunSummary>;
 	/** A Space move (`projects-move.ts`). */
 	moveProjects(move: ProjectsMove): Promise<MovedProjects>;
 	/** Hides the worktree paths of runs on Devices the actor does not own. */
@@ -354,11 +350,7 @@ export function createSpaces(deps: SpacesDeps) {
 				await ready;
 				await projects.find(input.projectId, spaceId);
 				return (await deps.pathsFor(spaceId, actor))(
-					await deps.startRun(
-						input,
-						{ kind: "manual" },
-						actor?.personId ?? null,
-					),
+					await deps.startRun(input, { kind: "manual" }),
 				);
 			},
 

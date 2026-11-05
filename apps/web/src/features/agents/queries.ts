@@ -10,7 +10,7 @@ import type {
 	ModelProfileRow,
 	ProfileRow,
 } from "@/shared/api";
-import { orpc } from "@/shared/api";
+import { client, orpc } from "@/shared/api";
 
 export const profileQueries = {
 	/** Every profiles query. Invalidate it after a profile, a Connection or a CLI Tool changes. */
@@ -101,6 +101,39 @@ export const projectSecretMutations = {
 	moveIn: orpc.projects.moveSecretIn.mutationOptions,
 	/** From another of your devices: that device moves its own value. */
 	moveFromDevice: orpc.projects.moveSecretFromDevice.mutationOptions,
+};
+
+/** The secrets of the Space you work in (ADR 18). */
+export const spaceSecretQueries = {
+	/** Every list of Space secrets. Invalidate it after one is set, moved or removed. */
+	lists: () => orpc.projects.spaceSecrets.key(),
+	list: () => orpc.projects.spaceSecrets.queryOptions(),
+};
+
+export const spaceSecretMutations = {
+	/** From this computer or from Personal. */
+	moveIn: orpc.projects.moveSecretToSpace.mutationOptions,
+};
+
+/** What a list of shared secrets can do: a project's, or the Space's. */
+export type SharedSecretActions = {
+	set(input: { name: string; value: string }): Promise<void>;
+	remove(input: { name: string }): Promise<void>;
+	moveOut(input: { name: string; to: "personal" | "computer" }): Promise<void>;
+};
+
+export const projectSecretActions = (
+	projectId: string,
+): SharedSecretActions => ({
+	set: (input) => client.projects.setSecret({ projectId, ...input }),
+	remove: (input) => client.projects.removeSecret({ projectId, ...input }),
+	moveOut: (input) => client.projects.moveSecretOut({ projectId, ...input }),
+});
+
+export const spaceSecretActions: SharedSecretActions = {
+	set: (input) => client.projects.setSpaceSecret(input),
+	remove: (input) => client.projects.removeSpaceSecret(input),
+	moveOut: (input) => client.projects.moveSecretFromSpace(input),
 };
 
 export const cliToolQueries = {

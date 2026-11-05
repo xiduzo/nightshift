@@ -38,6 +38,7 @@ const runRowSchema = z.object({
 	 * before it drops it.
 	 */
 	deviceNames: z.string().nullable().default(null),
+	fallbacks: z.string().nullable().default(null),
 	createdAt: z.number(),
 });
 

@@ -211,7 +211,7 @@ function noDecider(
 
 /**
  * Which secret scopes a step's use reads (ADR 13): its run's Project
- * first, and no Personal secret under an Offer.
+ * and Space, and no Personal secret under an Offer.
  */
 function secretUse(run: StepRun | undefined, underOffer?: true): SecretUse {
 	return {

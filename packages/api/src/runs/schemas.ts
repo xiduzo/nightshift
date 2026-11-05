@@ -49,6 +49,7 @@ const runWarningKindSchema = z.enum([
 	"looping",
 	"base-ref",
 	"score",
+	"device-fallback",
 ]);
 
 /** How the End node that ended a run says it came out. */
@@ -615,6 +616,7 @@ export const placementSchema = exact<Placement>()(
 		name: z.string(),
 		thisDevice: z.boolean(),
 		offers: z.array(z.string()).optional(),
+		dev: z.boolean().optional(),
 		ownerName: z.string().optional(),
 		lastRun: z.boolean().optional(),
 		default: z.boolean().optional(),

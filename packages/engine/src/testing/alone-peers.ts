@@ -37,7 +37,7 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 
 	return {
 		placement: {
-			async plan({ start, project }) {
+			async plan({ start, project, byPerson }) {
 				const walker: PlacedDevice = {
 					device,
 					id: device.id,
@@ -60,10 +60,12 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 						flows: context.flows,
 					},
 					start.startedBy ?? context.ownerId(),
+					byPerson,
 				);
 			},
 			deviceFor: () => device,
 			deviceById: () => device,
+			fallbacksFor: () => [],
 			// No Device of the Person's but this computer.
 			moveTo: async () => null,
 			devicesFor: ownDevices,

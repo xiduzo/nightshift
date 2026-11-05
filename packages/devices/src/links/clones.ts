@@ -21,6 +21,8 @@ export function tellClones(deps: {
 	projects: Pick<PeerProjects, "clonedHere">;
 	/** This computer's Device name, as the Host shows it. */
 	deviceName(): Promise<string>;
+	/** This computer runs a development install: never a default or fallback (ADR 17). */
+	dev?: boolean;
 }): (client: HostClient, signal: AbortSignal) => Promise<void> {
 	return async (client, signal) => {
 		const deviceName = await deps.deviceName();
@@ -29,7 +31,12 @@ export function tellClones(deps: {
 			const projectIds = await deps.projects.clonedHere(spaceId);
 			try {
 				await client.sync.setClones(
-					{ spaceId, projectIds, deviceName },
+					{
+						spaceId,
+						projectIds,
+						deviceName,
+						...(deps.dev ? { dev: true } : {}),
+					},
 					{ signal },
 				);
 			} catch (error) {

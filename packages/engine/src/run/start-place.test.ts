@@ -55,86 +55,32 @@ const start = (more: { deviceId?: string; deviceName?: string } = {}) => ({
 });
 
 describe("who walks the run", () => {
-	test("in a Space a Host keeps, the Host, and the unplaced steps run where you are (decision 9)", async () => {
+	test("in a Space a Host keeps, the Host, and it hears where you started (decision 9, ADR 17)", async () => {
 		const p = places();
-		expect(await p.place("space-host", start(), "ada")).toEqual({
+		expect(await p.place("space-host", start())).toEqual({
 			walker: "host",
-			deviceId: HERE,
+			startedFrom: HERE,
 		});
-		expect(
-			await p.place("space-host", start({ deviceId: "laptop" }), "ada"),
-		).toEqual({ walker: "host", deviceId: "laptop" });
-		// The Host decides the rest: this computer asks for no default.
+		expect(await p.place("space-host", start({ deviceId: "laptop" }))).toEqual({
+			walker: "host",
+			startedFrom: HERE,
+			deviceId: "laptop",
+		});
 		expect(p.asked).toEqual([]);
 	});
 
 	test("a Device that cannot reach its Host walks the run itself (decision 10)", async () => {
 		const p = places({ reachable: false });
-		expect(await p.place("space-host", start(), "ada")).toEqual({
-			walker: "here",
-		});
-		expect(
-			await p.place("space-host", start({ deviceId: "laptop" }), "ada"),
-		).toEqual({ walker: "here", deviceId: "laptop" });
-	});
-
-	test("in a Space this Replica keeps, this computer, reachable Host or not", async () => {
-		const p = places({ list: [laptop] });
-		expect(await p.place("space-own", start(), "ada")).toEqual({
+		expect(await p.place("space-host", start())).toEqual({ walker: "here" });
+		expect(await p.place("space-host", start({ deviceId: "laptop" }))).toEqual({
 			walker: "here",
 			deviceId: "laptop",
 		});
 	});
-});
 
-describe("the Run's Device when the start names none", () => {
-	test("this computer when it has the project", async () => {
-		const p = places({ list: [here, laptop], lastRun: "laptop" });
-		expect(await p.place("space-own", start(), "ada")).toEqual({
-			walker: "here",
-		});
-	});
-
-	test("else the Device of the project's latest run, else one of the Person's own, else the first", async () => {
-		expect(
-			await places({ list: [laptop, desktop], lastRun: "desktop" }).place(
-				"space-own",
-				start(),
-				"ada",
-			),
-		).toEqual({ walker: "here", deviceId: "desktop" });
-		expect(
-			await places({ list: [kims, laptop] }).place("space-own", start(), "ada"),
-		).toEqual({ walker: "here", deviceId: "laptop" });
-		expect(
-			await places({ list: [kims] }).place("space-own", start(), "ada"),
-		).toEqual({ walker: "here", deviceId: "kims" });
-	});
-
-	test("a Host another Person owns that offers nothing is no default, not even as the latest run's", async () => {
-		const theirs = { ...here, offers: [] };
-		const p = places({ list: [theirs, laptop], lastRun: HERE });
-		expect(await p.place("space-own", start(), "ada")).toEqual({
-			walker: "here",
-			deviceId: "laptop",
-		});
-		// When it offers a profile, it is the default.
-		const offering = places({
-			list: [{ ...here, offers: ["claude"] }, laptop],
-		});
-		expect(await offering.place("space-own", start(), "ada")).toEqual({
-			walker: "here",
-		});
-	});
-
-	test("the Device a schedule names, or this computer for a start for nobody, asks for no default", async () => {
+	test("in a Space this Replica keeps, this computer: the plan decides the Device", async () => {
 		const p = places({ list: [laptop] });
-		expect(
-			await p.place("space-own", start({ deviceId: "desktop" }), "ada"),
-		).toEqual({ walker: "here", deviceId: "desktop" });
-		expect(await p.place("space-own", start(), null)).toEqual({
-			walker: "here",
-		});
+		expect(await p.place("space-own", start())).toEqual({ walker: "here" });
 		expect(p.asked).toEqual([]);
 	});
 });

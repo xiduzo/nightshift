@@ -84,6 +84,7 @@ export type HistoryRun = {
 	deviceId: string | null;
 	placements: string | null;
 	deviceNames: string | null;
+	fallbacks: string | null;
 	startedBy: string | null;
 	createdAt: number;
 };

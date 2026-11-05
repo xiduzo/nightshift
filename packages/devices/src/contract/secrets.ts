@@ -25,6 +25,9 @@ export const projectRefSchema = z.object({
 	projectId: z.string().min(1),
 });
 
+/** A Space, by its id: what every Space secret call names. */
+export const spaceRefSchema = z.object({ spaceId: z.string().min(1) });
+
 /** The run of a step that asks for its Project's secrets. */
 export const stepRunSchema = projectRefSchema.extend({
 	runId: z.string().min(1),

@@ -149,6 +149,8 @@ export type RunnerDeps = {
 	deviceFor(node: FlowNode, run: RunRow): Device;
 	/** A Device by id, for a run (`StepContext.deviceById`). */
 	deviceById(id: string, run: RunRow): Device;
+	/** The Devices a step can move to now (`StepContext.fallbacksFor`). */
+	fallbacksFor?(node: FlowNode, run: RunRow): Promise<Device[]>;
 	/** The run's flow snapshot and its called flows, parsed. */
 	flowOf(row: RunRow): Flow;
 	calledFlowsOf(row: RunRow): Record<string, Flow>;
@@ -317,6 +319,7 @@ export function createRunner(deps: RunnerDeps) {
 		settings: deps.settings,
 		deviceFor: deps.deviceFor,
 		deviceById: deps.deviceById,
+		...(deps.fallbacksFor ? { fallbacksFor: deps.fallbacksFor } : {}),
 		flowOf: deps.flowOf,
 		calledFlowsOf: deps.calledFlowsOf,
 		policyFor: deps.policyFor,

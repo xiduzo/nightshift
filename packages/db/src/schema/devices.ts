@@ -45,6 +45,11 @@ export const device = sqliteTable(
 		 * computer's owner is the Person Night Shift signs in for you.
 		 */
 		ownerId: text("owner_id"),
+		/**
+		 * A development install of Night Shift: never a default or a fallback
+		 * of a run (ADR 17). It runs a step only when a flow or a person names it.
+		 */
+		dev: integer("dev", { mode: "boolean" }).notNull().default(false),
 		/** This computer. At most one row has it. */
 		self: integer("self", { mode: "boolean" }).notNull().default(false),
 		createdAt: createdAt(),
@@ -306,4 +311,25 @@ export const projectSecret = sqliteTable(
 		setBy: text("set_by"),
 	},
 	(table) => [primaryKey({ columns: [table.projectId, table.name] })],
+);
+
+/**
+ * A Space's secret (ADR 18), as the Replica that keeps the Space keeps it:
+ * every step of a run in that Space can read it, on any Device.
+ */
+export const spaceSecret = sqliteTable(
+	"space_secret",
+	{
+		spaceId: spaceId(),
+		/** Its `${NAME}`. */
+		name: text("name").notNull(),
+		/** The value, encrypted, in base64. */
+		ciphertext: text("ciphertext").notNull(),
+		/** The AES-GCM nonce of `ciphertext`, in base64: a new one per write. */
+		iv: text("iv").notNull(),
+		setAt: integer("set_at", { mode: "timestamp_ms" }).notNull(),
+		/** The Person who set it last, as this computer knows them. */
+		setBy: text("set_by"),
+	},
+	(table) => [primaryKey({ columns: [table.spaceId, table.name] })],
 );

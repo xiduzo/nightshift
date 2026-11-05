@@ -127,6 +127,11 @@ export type StepContext = {
 	deviceFor(node: FlowNode, run: RunRow): Device;
 	/** A Device by id, as a step of the run reaches it: where its work is now, for a Hand-off. */
 	deviceById(id: string, run: RunRow): Device;
+	/**
+	 * The Devices that can take a step of `node` now, when its own is
+	 * offline, in the order of the run's plan (ADR 17). Default: none.
+	 */
+	fallbacksFor?(node: FlowNode, run: RunRow): Promise<Device[]>;
 	/** The run's abort signal: a person stopped the run. */
 	signal(): AbortSignal;
 	now(): number;

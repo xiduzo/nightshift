@@ -12,6 +12,7 @@ export type {
 	PlacedDevice,
 	PlanInput,
 	PlannedRun,
+	StepFallback,
 } from "./peers";
 export type { MoveRows } from "./projects-move";
 export { type PlanDevices, planNodes, UNREACHABLE_DEVICE } from "./run-plan";

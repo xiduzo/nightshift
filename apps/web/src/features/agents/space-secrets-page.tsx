@@ -23,11 +23,17 @@ import { projectQueries } from "@/features/projects";
 import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
 import { UsedBy } from "./connections/secret-parts";
 import { OtherDevicesSecrets } from "./other-device";
-import { otherDeviceQueries, projectSecretQueries } from "./queries";
+import {
+	otherDeviceQueries,
+	projectSecretQueries,
+	spaceSecretActions,
+	spaceSecretQueries,
+} from "./queries";
+import { SharedSecrets } from "./shared-secrets";
 
 /**
- * The Secrets page of the Space: the secrets of each project, and the
- * secrets saved on your other devices. This computer's own secrets and
+ * The Secrets page of the Space: its own secrets, those of each project,
+ * and the secrets saved on your other devices. This computer's own secrets and
  * the Personal ones are on the Secrets page of this computer.
  */
 export function SpaceSecretsPage() {
@@ -43,8 +49,8 @@ export function SpaceSecretsPage() {
 						title="Secrets"
 						description={
 							<>
-								The secrets of each project, and the secrets on your other
-								devices. Your Personal secrets are on the{" "}
+								The secrets of this Space and of each project, and the secrets
+								on your other devices. Your Personal secrets are on the{" "}
 								<Link
 									to="/secrets"
 									className="underline underline-offset-4 hover:text-foreground"
@@ -57,6 +63,24 @@ export function SpaceSecretsPage() {
 					/>
 				</div>
 				<div className="mx-auto flex w-full max-w-4xl flex-col gap-10">
+					<SharedSecrets
+						query={spaceSecretQueries.list()}
+						listKey={spaceSecretQueries.lists()}
+						actions={spaceSecretActions}
+						words={{
+							title: "Space secrets",
+							owner: "this Space",
+							trust:
+								"Everyone who can change flows in this Space can use it. The Host admin can read it.",
+							notShown: "The secrets of this Space are not shown",
+							emptyTitle: "No Space secrets yet",
+							emptyCanChange:
+								"Add one, or move one here from the Secrets page. Then every project in this Space can use it, also on the Host.",
+							emptyCannotChange:
+								"When a Member adds one, every project in this Space can use it.",
+							nothingUses: "Nothing in this Space uses it.",
+						}}
+					/>
 					<PageSection
 						title="Projects"
 						description="Every run of a project can use its secrets, on any device."

@@ -73,12 +73,18 @@ function repo(name: string): string {
 }
 
 /** A flow of the project, saved on that daemon. */
-async function flowIn(daemon: Daemon, name: string, nodes: unknown[]) {
+async function flowIn(
+	daemon: Daemon,
+	name: string,
+	nodes: unknown[],
+	devices?: string[],
+) {
 	await seedFlows(savesOn(daemon), projectId, {
 		[name]: {
 			version: 8,
 			inputs: [],
 			outputs: [],
+			...(devices ? { devices } : {}),
 			start: (nodes[0] as { id: string }).id,
 			nodes,
 			edges: nodes.slice(1).map((node, i) => ({
@@ -242,11 +248,16 @@ describe("nodes on two Devices", () => {
 	}, 90_000);
 
 	test("B starts a run with a node on A: A walks it, and the work moves both ways", async () => {
-		await flowIn(b, "visit", [
-			commits("here", "here.txt"),
-			commits("there", "there.txt", aDevice),
-			shell("back", "ls"),
-		]);
+		await flowIn(
+			b,
+			"visit",
+			[
+				commits("here", "here.txt"),
+				commits("there", "there.txt", aDevice),
+				shell("back", "ls"),
+			],
+			[bDevice],
+		);
 		// The Host walks it: the flow B saved reaches A first.
 		await waitFor(
 			async () => (await a.client.flows.list({ projectId })).map((f) => f.name),
@@ -273,33 +284,31 @@ describe("nodes on two Devices", () => {
 		expect(String(detail.steps[2]?.outputs.log_tail)).toContain("there.txt");
 	}, 90_000);
 
-	test("a node whose Device is offline sleeps, and continues when it is back", async () => {
+	test("a node whose Device goes offline moves to the next Device (ADR 17)", async () => {
 		await flowIn(a, "later", [
 			shell("first", "sleep 2"),
-			shell("there", "echo from B", bDevice),
+			shell("there", "echo moved", bDevice),
 		]);
 		const started = await a.client.runs.start({
 			projectId,
 			flowName: "later",
 		});
 		await stopDaemon(b);
-		const asleep = await waitFor(
-			() => a.client.runs.get({ runId: started.id }),
-			(r) => r.status === "sleeping",
-			30_000,
-		);
-		expect(asleep.steps[1]?.nodeId).toBe("there");
-		b = await startDaemon(root, "b", b.env, b.port);
 		await waitFor(
 			() => runOn(a, started.id),
 			(r) => r?.status === "finished",
 			60_000,
 		);
 		const detail = await a.client.runs.get({ runId: started.id });
-		expect(String(detail.steps[1]?.outputs.log_tail).trim()).toBe("from B");
+		expect(detail.steps[1]?.device?.thisDevice).toBe(true);
+		expect(String(detail.steps[1]?.outputs.log_tail).trim()).toBe("moved");
+		const warned = detail.warnings.find((w) => w.kind === "device-fallback");
+		expect(warned?.message).toContain("takes over this step");
+		expect(warned?.message).toContain("Space and project secrets work there.");
+		b = await startDaemon(root, "b", b.env, b.port);
 	}, 120_000);
 
-	test("a run on B while B is offline waits, makes its worktree on B when it is back, and both Replicas show it", async () => {
+	test("a run you pick for an offline B starts on another Device, and says so (ADR 17)", async () => {
 		await flowIn(a, "offline-start", [shell("where", "pwd")]);
 		const bId = (await b.client.devices.list()).thisComputer?.id as string;
 		await stopDaemon(b);
@@ -308,30 +317,14 @@ describe("nodes on two Devices", () => {
 			flowName: "offline-start",
 			deviceId: bId,
 		});
-		expect(started.branch).toBe("");
-		await waitFor(
-			() => a.client.runs.get({ runId: started.id }),
-			(r) => r.status === "sleeping",
-			30_000,
-		);
-		b = await startDaemon(root, "b", b.env, b.port);
+		expect(started.device.thisDevice).toBe(true);
 		const done = await waitFor(
 			() => runOn(a, started.id),
 			(r) => r?.status === "finished",
 			60_000,
 		);
-		expect(done?.branch).toStartWith("nightshift/");
-		const detail = await a.client.runs.get({ runId: started.id });
-		expect(String(detail.steps[0]?.outputs.log_tail).trim()).toStartWith(
-			realpathSync(root),
-		);
-		// B has the run from A's log: the branch comes from the event.
-		const onB = await waitFor(
-			() => runOn(b, started.id),
-			(r) => r?.status === "finished",
-			60_000,
-		);
-		expect(onB?.branch).toBe(done?.branch);
+		expect(done?.warnings.map((w) => w.kind)).toContain("device-fallback");
+		b = await startDaemon(root, "b", b.env, b.port);
 	}, 120_000);
 
 	test("B starts a flow it saved a moment ago: the Host waits for it and walks the run", async () => {

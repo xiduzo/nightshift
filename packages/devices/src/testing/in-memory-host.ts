@@ -122,6 +122,12 @@ export function inMemoryHost(deps: {
 						set: notServed,
 						remove: notServed,
 						take: notServed,
+						space: {
+							list: notServed,
+							set: notServed,
+							remove: notServed,
+							take: notServed,
+						},
 					},
 					secretMoves: deps.secretMoves ?? { move: notServed },
 				},

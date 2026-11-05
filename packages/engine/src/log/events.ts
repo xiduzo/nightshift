@@ -264,6 +264,11 @@ export type EnginePayloads = {
 	 * the next one fetched it into its own worktree of the run.
 	 * `worktreePath` is that worktree, on `to`.
 	 */
+	/** The step's Device was offline: the step runs on another Device of its plan (ADR 17). */
+	StepMoved: {
+		from: string;
+		to: string;
+	};
 	HandedOff: {
 		from: string;
 		to: string;
@@ -726,7 +731,8 @@ export type RunWarningKind =
 	| "stalled"
 	| "looping"
 	| "base-ref"
-	| "score";
+	| "score"
+	| "device-fallback";
 
 /**
  * The names Night Shift scores itself (`scores.ts` says what each means).

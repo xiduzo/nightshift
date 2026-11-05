@@ -72,22 +72,3 @@ export function hostOwnerHint(
 		? `This Host belongs to ${owner}. ${owner} has not offered it to this Space.`
 		: `This Host belongs to ${owner}. ${owner} offers ${choice.offers.join(", ")} to this Space.`;
 }
-
-/**
- * The place a run goes when the person does not choose: the one they
- * chose while it is still online, else the one `runs.placements` marks as
- * the default (the engine's one rule for every start), else the first.
- * A Host of an older version marks none.
- */
-export function defaultPlacement(
-	choices: readonly PlacementChoice[],
-	chosen: string | null,
-): PlacementChoice | null {
-	const online = choices.filter((choice) => choice.online);
-	return (
-		online.find((choice) => choice.deviceId === chosen) ??
-		online.find((choice) => choice.default) ??
-		online[0] ??
-		null
-	);
-}

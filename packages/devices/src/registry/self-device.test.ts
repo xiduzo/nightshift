@@ -116,8 +116,8 @@ describe("defaultSelfDeviceHost", () => {
 			dev: true,
 		});
 		expect(host.name).toBe("LE2316 (dev)");
-		// A dev Device that already has the host name keeps it.
-		expect(host.stale?.("LE2316")).toBe(false);
+		// A dev Device that still has the host name takes the new name (ADR 17).
+		expect(host.stale?.("LE2316")).toBe(true);
 		const named = defaultSelfDeviceHost({
 			env: { NIGHTSHIFT_DEVICE_NAME: "Studio" },
 			hostName: "LE2316",

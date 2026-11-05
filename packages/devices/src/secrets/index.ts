@@ -27,4 +27,5 @@ export {
 	type ProjectSecretsHost,
 } from "./project-host";
 export { createProjectSecretStore } from "./project-store";
+export { createSpaceSecretStore } from "./space-store";
 export { createPersonalSecretStore } from "./store";

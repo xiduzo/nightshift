@@ -15,5 +15,7 @@ export function placementDescription(
 	if (device?.offers !== undefined) {
 		return "Another person's device. The run can use only the profiles it offers to this Space.";
 	}
-	return "Pick one of your online devices with this project, or a device that others offer to this Space.";
+	if (device)
+		return "This device goes first. The flow's devices are its backups.";
+	return "Uses the devices the flow names, else your Host. This computer is the last backup.";
 }

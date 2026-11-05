@@ -115,19 +115,14 @@ describe("the node walk of a run's plan", () => {
 		const planned = await planNodes(
 			{
 				projectId: "p",
-				deviceId: "studio",
 				flow: flow([command("here"), command("there", "hetzner-1")]),
 			},
-			devices(),
+			{ ...devices(), keeperId: "studio" },
 			"the-person",
 		);
-		expect(planned.plan).toEqual({
+		expect(planned.plan).toMatchObject({
 			device: { id: "studio", name: "studio" },
 			named: { "hetzner-1": { id: "hetzner-1", name: "hetzner-1" } },
-			devices: {
-				studio: { id: "studio", name: "studio" },
-				"hetzner-1": { id: "hetzner-1", name: "hetzner-1" },
-			},
 			personId: "the-person",
 		});
 		expect(planned.run.id).toBe("studio");
@@ -367,10 +362,7 @@ describe("the node walk of a run's plan", () => {
 		const planned = await planNodes(
 			{
 				projectId: "p",
-				flow: flow([
-					command("plain", "away"),
-					profiled("work", { device: "away", profile: "own" }),
-				]),
+				flow: flow([profiled("work", { device: "away", profile: "own" })]),
 			},
 			offline,
 			"the-person",
@@ -378,7 +370,7 @@ describe("the node walk of a run's plan", () => {
 		expect(planned.groups.map((g) => [g.at.id, g.at.offline])).toEqual([
 			["away", true],
 		]);
-		expect(planned.flow.nodes[1]).toMatchObject({
+		expect(planned.flow.nodes[0]).toMatchObject({
 			profile: { device: "away", profile: "own" },
 			model: "sonnet",
 		});
@@ -430,46 +422,282 @@ describe("the node walk of a run's plan", () => {
 		);
 	});
 
-	test("refuses a Device nobody can reach, a node's Device the Space does not have, and a run's Device without the project", async () => {
+	test("refuses a Device nobody can reach when no other can take the run, and a run's Device without the project", async () => {
+		const noClone = at("this", { thisDevice: true, hasClone: false });
+		const alone: PlanDevices = {
+			...devices(),
+			walker: noClone,
+			byId: async () => null,
+			nodeDevice: async () => null,
+		};
 		await expect(
 			planNodes(
 				{ projectId: "p", deviceId: "gone", flow: flow([command("a")]) },
-				devices(),
+				alone,
 				"the-person",
 			),
 		).rejects.toThrow(UNREACHABLE_DEVICE);
 		await expect(
 			planNodes(
-				{
-					projectId: "p",
-					flow: flow([command("a", "nowhere"), command("b", "nowhere")]),
-				},
-				devices(),
-				"the-person",
-			),
-		).rejects.toThrow(
-			'The flow runs "a", "b" on a device that is not in this Space, or that you cannot use. Choose another device.',
-		);
-		await expect(
-			planNodes(
-				{ projectId: "p", flow: flow([command("a", "sold")]) },
-				{ ...devices(), deviceName: async () => "LE2316" },
-				"the-person",
-			),
-		).rejects.toThrow(
-			'The flow runs "a" on LE2316, which is not in this Space, or that you cannot use. Choose another device.',
-		);
-		const bare = devices();
-		await expect(
-			planNodes(
 				{ projectId: "p", deviceId: "bare", flow: flow([command("a")]) },
-				{
-					...bare,
-					byId: async () => at("bare", { hasClone: false }),
-				},
+				{ ...alone, byId: async () => at("bare", { hasClone: false }) },
 				"the-person",
 			),
 		).rejects.toThrow("bare does not have this project.");
+	});
+});
+
+describe("which Device takes a run's steps (ADR 17)", () => {
+	const host = at("host", { profiles: ["host-builder"] });
+	const laptop = at("laptop", { profiles: ["mac-builder"] });
+	const sleeping = at("sleeping", { offline: true, profiles: ["off-builder"] });
+	const walker = at("this", { thisDevice: true });
+	const all = [host, laptop, sleeping, walker];
+	const profiles: Record<
+		string,
+		{ id: string; name: string; kind: "agent" }[]
+	> = {
+		host: [{ id: "host-builder", name: "builder", kind: "agent" }],
+		laptop: [{ id: "mac-builder", name: "builder", kind: "agent" }],
+		sleeping: [{ id: "off-builder", name: "builder", kind: "agent" }],
+	};
+	const space: PlanDevices = {
+		walker,
+		keeperId: "host",
+		byId: async (id) => all.find((d) => d.id === id) ?? null,
+		nodeDevice: async (id) => all.find((d) => d.id === id) ?? null,
+		profilesOf: async (id) => profiles[id] ?? null,
+		lastKnown: async () =>
+			new Map([["off-builder", { name: "builder", settings: PROFILE }]]),
+		profileFor: () => null,
+		flows: async () => ({}),
+	};
+	const listed = (devices: string[], nodes: FlowNode[]) =>
+		({ ...flow(nodes), devices }) as Flow;
+
+	test("left empty: a flow without a list runs on the Host, and where you started is the fallback", async () => {
+		const planned = await planNodes(
+			{ projectId: "p", startedFrom: "laptop", flow: flow([command("a")]) },
+			space,
+			"me",
+		);
+		expect(planned.run.id).toBe("host");
+		expect(planned.plan.fallbacks?.run.map((d) => d.id)).toEqual(["laptop"]);
+		expect(planned.notes).toEqual([]);
+	});
+
+	test("left empty: the flow's list comes first, in its order", async () => {
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				startedFrom: "this",
+				flow: listed(["laptop", "host"], [command("a")]),
+			},
+			space,
+			"me",
+		);
+		expect(planned.run.id).toBe("laptop");
+		expect(planned.plan.fallbacks?.run.map((d) => d.id)).toEqual([
+			"host",
+			"this",
+		]);
+	});
+
+	test("an offline Device is passed over, and the run says why", async () => {
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				startedFrom: "this",
+				flow: listed(["sleeping", "laptop"], [command("a")]),
+			},
+			space,
+			"me",
+		);
+		expect(planned.run.id).toBe("laptop");
+		expect(planned.notes).toEqual([
+			"sleeping is offline. laptop takes over the run. Space and project secrets work there. Secrets saved only on another computer do not.",
+		]);
+		// It can still take a step when the run's Device goes away.
+		expect(planned.plan.fallbacks?.run.map((d) => d.id)).toContain("sleeping");
+	});
+
+	test("every Device offline: the steps wait for the first", async () => {
+		const offlineWalker = { ...walker, hasClone: true };
+		const planned = await planNodes(
+			{ projectId: "p", flow: listed(["sleeping"], [command("a")]) },
+			{
+				...space,
+				walker: offlineWalker,
+				lastResort: async () => [],
+				byId: async (id) => (id === "this" ? null : sleeping),
+			},
+			"me",
+			false,
+		);
+		// A schedule's run stays on the Device its start names (ADR 15).
+		expect(planned.run.id).toBe("this");
+	});
+
+	test("picked: your pick takes every node it can, also over the Device a node names", async () => {
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				deviceId: "laptop",
+				startedFrom: "this",
+				flow: flow([command("a"), command("b", "host")]),
+			},
+			space,
+			"me",
+		);
+		expect(planned.run.id).toBe("laptop");
+		expect(
+			planned.groups.map((g) => [g.at.id, g.nodes.map((n) => n.id)]),
+		).toEqual([["laptop", ["a", "b"]]]);
+	});
+
+	test("picked: a node with a profile takes your pick's profile of the same name", async () => {
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				deviceId: "laptop",
+				flow: flow([
+					profiled("work", { device: "host", profile: "host-builder" }),
+				]),
+			},
+			space,
+			"me",
+		);
+		expect(planned.flow.nodes[0]).toMatchObject({
+			profile: { device: "laptop", profile: "mac-builder" },
+		});
+	});
+
+	test("picked: a Device without that profile leaves the node on the Device it names", async () => {
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				deviceId: "this",
+				flow: flow([
+					profiled("work", { device: "host", profile: "host-builder" }),
+				]),
+			},
+			space,
+			"me",
+		);
+		expect(planned.flow.nodes[0]).toMatchObject({
+			profile: { device: "host", profile: "host-builder" },
+		});
+		expect(planned.notes).toEqual([
+			'this has no profile "builder". host takes over node "work". Space and project secrets work there. Secrets saved only on another computer do not.',
+		]);
+	});
+
+	test("the first Device of the order takes the run: no warning", async () => {
+		for (const start of [
+			{ startedFrom: "laptop" },
+			{ deviceId: "laptop", startedFrom: "this" },
+		]) {
+			const planned = await planNodes(
+				{ projectId: "p", ...start, flow: flow([command("a")]) },
+				space,
+				"me",
+			);
+			expect(planned.notes).toEqual([]);
+		}
+	});
+
+	test("a node's Device offline: it takes the next Device's profile of the same name, its own values too", async () => {
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				startedFrom: "this",
+				flow: listed(
+					["laptop"],
+					[profiled("work", { device: "sleeping", profile: "off-builder" })],
+				),
+			},
+			space,
+			"me",
+		);
+		expect(planned.flow.nodes[0]).toMatchObject({
+			profile: { device: "laptop", profile: "mac-builder" },
+		});
+		expect(planned.notes[0]).toBe(
+			'sleeping is offline. laptop takes over node "work". Space and project secrets work there. Secrets saved only on another computer do not.',
+		);
+	});
+
+	test("a node's Device that left the Space: it moves on, and the run says so", async () => {
+		const planned = await planNodes(
+			{ projectId: "p", flow: flow([command("a", "sold")]) },
+			space,
+			"me",
+		);
+		expect(planned.groups.map((g) => g.at.id)).toEqual(["host"]);
+		expect(planned.notes).toEqual([
+			'The device it names is not in this Space. host takes over node "a". Space and project secrets work there. Secrets saved only on another computer do not.',
+		]);
+	});
+
+	test("a schedule keeps its Device, and only a node that names one moves", async () => {
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				deviceId: "host",
+				flow: listed(["laptop"], [command("a"), command("b", "sleeping")]),
+			},
+			space,
+			"me",
+			false,
+		);
+		expect(planned.run.id).toBe("host");
+		expect(planned.plan.fallbacks?.run ?? []).toEqual([]);
+		expect(
+			planned.groups.map((g) => [g.at.id, g.nodes.map((n) => n.id)]),
+		).toEqual([
+			["host", ["a"]],
+			["laptop", ["b"]],
+		]);
+	});
+
+	test("a flow with a Service has no mid-run fallbacks: the Service stays on its Device", async () => {
+		const service = {
+			id: "s",
+			type: "service",
+			position: { x: 0, y: 0 },
+			start: "true",
+			ready: { command: "true" },
+		} as unknown as FlowNode;
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				startedFrom: "laptop",
+				flow: {
+					...flow([service, command("a")]),
+					edges: [{ id: "e0", from: "s", outcome: "ready", to: "a" }],
+				},
+			},
+			space,
+			"me",
+		);
+		expect(planned.plan.fallbacks).toBeUndefined();
+	});
+
+	test("the Host takes over: the warning says Personal secrets do not work there", async () => {
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				startedFrom: "this",
+				flow: listed(["sleeping", "host"], [command("a")]),
+			},
+			{ ...space, hostId: "host" },
+			"me",
+		);
+		expect(planned.run.id).toBe("host");
+		expect(planned.notes).toEqual([
+			"sleeping is offline. host takes over the run. Space and project secrets work there. Personal secrets and secrets saved on another computer do not.",
+		]);
+		expect(planned.plan.fallbacks?.hostId).toBe("host");
 	});
 });
 

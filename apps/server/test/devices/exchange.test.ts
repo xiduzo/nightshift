@@ -169,7 +169,11 @@ describe("the event log exchange", () => {
 		]);
 
 		// B starts a run; A walks it, and it waits at its Gate.
-		const started = await b.client.runs.start({ projectId, flow: gateFlow });
+		const started = await b.client.runs.start({
+			projectId,
+			flow: gateFlow,
+			deviceId: bId,
+		});
 		expect(started.walker).toMatchObject({ id: aId, thisDevice: false });
 		expect(started.device).toMatchObject({ id: bId, thisDevice: true });
 		await waitFor(

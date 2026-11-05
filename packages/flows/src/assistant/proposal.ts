@@ -93,6 +93,8 @@ const messages: DraftMessages = {
 		`There is no profile "${profile.profile}" on the device "${profile.device}". Use a device and a profile from list_profiles.`,
 	missingDevice: (id) =>
 		`There is no device with the id "${id}". Use a device id from list_profiles, or leave device out.`,
+	missingFlowDevice: () =>
+		"The flow's list of devices names a device that is not in this Space. Use a device id from list_profiles.",
 	programWithoutLogin: (program, tools) =>
 		`The command calls ${program}, which runs without a login. Call ${tools.join(" or ")} instead: ${tools.length === 1 ? "that CLI tool runs" : "those CLI tools run"} ${program} signed in. list_tools names them.`,
 	refusesCommands: (node, mode) =>

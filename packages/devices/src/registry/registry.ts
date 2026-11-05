@@ -45,6 +45,8 @@ export type DevicePresence = Map<string, number>;
 export type PairedDevice = {
 	id: string;
 	name: string;
+	/** A development install: never a default or a fallback (ADR 17). */
+	dev?: boolean;
 	platform: string;
 	/** The Person who approved the pairing: the Device's owner on this Host. */
 	ownerId: string;
@@ -68,6 +70,8 @@ export type PairedDevice = {
 };
 
 export type DeviceRegistry = {
+	/** What a paired Device says of itself when it links: its name, and whether it is a development install. */
+	describe(id: string, facts: { name: string; dev: boolean }): Promise<void>;
 	/**
 	 * Records a Device that paired with this Host, or paired again: its row
 	 * (access back on), and `DeviceJoined`. A Device id that is this Host's
@@ -166,6 +170,7 @@ export function createDeviceRegistry(deps: {
 		return {
 			id: row.id,
 			name: row.name,
+			...(row.dev ? { dev: true } : {}),
 			platform: row.platform,
 			ownerId: row.ownerId ?? "",
 			homeHost: row.homeHost,
@@ -262,6 +267,9 @@ export function createDeviceRegistry(deps: {
 			return toPaired(joined);
 		},
 
+		async describe(id, facts) {
+			await db.update(device).set(facts).where(eq(device.id, id));
+		},
 		async get(id) {
 			const found = await row(id);
 			return found ? toPaired(found) : null;

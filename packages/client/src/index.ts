@@ -192,7 +192,6 @@ export {
 	compactCount,
 	costLabel,
 	createRunQueries,
-	defaultPlacement,
 	explainRun,
 	type FileChange,
 	type FileTreeNode,

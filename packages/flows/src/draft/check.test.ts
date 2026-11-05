@@ -14,6 +14,7 @@ const messages: DraftMessages = {
 	missingConnection: (name) => `connection ${name}`,
 	missingProfile: (profile) => `profile ${profile.profile}`,
 	missingDevice: (name, node) => `${node.type} on ${name}`,
+	missingFlowDevice: () => "",
 	programWithoutLogin: (program, tools) =>
 		`${program} without ${tools.join(",")}`,
 	refusesCommands: (node, mode) => `${node.id} refuses commands in ${mode}`,

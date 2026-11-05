@@ -103,7 +103,13 @@ export type HostExchange = {
 	 */
 	setClones(
 		key: DeviceKeyAccess,
-		input: { spaceId: string; projectIds: string[]; deviceName: string },
+		input: {
+			spaceId: string;
+			projectIds: string[];
+			deviceName: string;
+			/** A development install (ADR 17). An older Device leaves it out. */
+			dev?: boolean | undefined;
+		},
 	): Promise<{ added: string[]; removed: string[] }>;
 	/**
 	 * Publishes an Offer of the key's Device into a Space of this Host (or
@@ -188,7 +194,7 @@ export type HostExchange = {
 	 */
 	startRun(
 		key: DeviceKeyAccess,
-		input: StartRunInput & { spaceId: string; deviceId: string },
+		input: StartRunInput & { spaceId: string },
 	): Promise<{ runId: string }>;
 	/** The key's Person's Devices for a project: online, with a Clone or not. */
 	devices(

@@ -60,7 +60,7 @@ export function createRunRelay(deps: {
 		 * Host walks it. Returns once the run's rows reached this Replica.
 		 */
 		async startOnHost(
-			input: StartRunInput & { deviceId: string },
+			input: StartRunInput,
 			spaceId: string,
 		): Promise<RunSummary> {
 			if (!relay) throw new HostUnreachableError();

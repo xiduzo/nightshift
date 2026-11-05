@@ -85,7 +85,7 @@ export type Relay = {
 	 * by the exchange.
 	 */
 	startRun(
-		input: StartRunInput & { spaceId: string; deviceId: string },
+		input: StartRunInput & { spaceId: string },
 	): Promise<{ runId: string }>;
 	/**
 	 * The leases of a Space a Host keeps, through that Host (ADR 7).

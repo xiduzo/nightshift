@@ -71,6 +71,7 @@ import {
 	createProjectSecretStore,
 	createProjectSecretsHost,
 	createSecretMovesHost,
+	createSpaceSecretStore,
 	devicePersonalSecrets,
 	deviceProjectSecrets,
 	deviceSecretMoves,
@@ -165,6 +166,8 @@ type Handover = {
 };
 
 export type DevicesDeps = {
+	/** This computer runs a development install of Night Shift (ADR 17). */
+	dev?: boolean;
 	auth: Auth;
 	db: Database;
 	/**
@@ -349,6 +352,8 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 					(profile) => offeredProfile(deps.profiles, profile)?.name ?? null,
 				),
 			ownProfiles: () => deps.profiles.list().map(profileChoice),
+			// Made below: asked while a run starts.
+			isHost: () => host.isHost(),
 			copies,
 			offerUse: handover.offerUse,
 			presence: handover.presence,
@@ -468,6 +473,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 						projects: engine.projects,
 						deviceName: async () =>
 							(await engine.devices.get(self.id))?.name ?? self.name,
+						dev: process.env.NIGHTSHIFT_DEV === "true",
 					}),
 				),
 			];
@@ -537,11 +543,14 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 	const personalStore = createPersonalSecretStore({ db, cipher });
 	/** The Project secrets this computer keeps: of the Spaces it keeps, as their Host or without one. */
 	const projectStore = createProjectSecretStore({ db, cipher });
+	/** The Space secrets this computer keeps: of the Spaces it keeps, as their Host or without one. */
+	const spaceStore = createSpaceSecretStore({ db, cipher });
 	const projectSecrets = deviceProjectSecrets({
 		db,
 		hostSpaces: engine.hostSpaces,
 		links: () => links,
 		store: projectStore,
+		spaceStore,
 		ownerId,
 	});
 	const personalSecrets = devicePersonalSecrets({
@@ -565,6 +574,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 			db,
 			registry: engine.devices,
 			store: projectStore,
+			spaceStore,
 			isHost: host.isHost,
 			hostOf: (spaceId) => engine.hostSpaces.hostOf(spaceId),
 			// The calls this Host sends to its placed Devices.

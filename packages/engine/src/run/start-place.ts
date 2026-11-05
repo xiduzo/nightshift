@@ -5,14 +5,13 @@ import type { PlacementPort } from "./peers";
  * Where a run goes when it starts: who walks it, and its Run's Device.
  *
  * - `host`: the Host that keeps the Space walks the run (ADR 1, decision
- *   9). This computer hands the start to it. `deviceId` is the Run's
- *   Device: the one the start names, else this computer, so the run's
- *   unplaced steps run where the person started it.
- * - `here`: this computer walks the run. `deviceId` is its Run's Device
- *   when that is another Device. Absent: this computer.
+ *   9). This computer hands the start to it, and says it is where the
+ *   person started: the last fallback. `deviceId` is the person's pick.
+ * - `here`: this computer walks the run. `deviceId` is the person's pick.
+ *   Absent: the flow says where the run goes (`device-order.ts`).
  */
 export type StartPlace =
-	| { walker: "host"; deviceId: string }
+	| { walker: "host"; startedFrom: string; deviceId?: string }
 	| { walker: "here"; deviceId?: string };
 
 export type StartPlaces = ReturnType<typeof createStartPlaces>;
@@ -49,12 +48,10 @@ function defaultOf(list: readonly Placement[]): Placement | null {
  *   reaches it (decision 9). Else this computer: the Replica that keeps
  *   the Space, or a Device that cannot reach its Host, which walks the
  *   run itself and the exchange sends it to the Host later (decision 10).
- * - The Run's Device: the Device the start names, by id (a schedule's
- *   start names the Replica that keeps the Space, ADR 15). Else the default among the Devices the Person may run the
- *   project on (`defaultOf`). A start for nobody runs on this computer.
+ * - The Run's Device: `device-order.ts` decides it when the run is planned.
  *
- * The Devices a person chooses from (`placements`) mark the same
- * default, so Start run shows where a run goes without a rule of its own.
+ * The Devices a person chooses from (`placements`) mark a default for a
+ * screen that must preselect one.
  */
 export function createStartPlaces(deps: {
 	/** Whether a Host keeps the Space, not this Replica (`DeviceDirectory`). */
@@ -84,15 +81,10 @@ export function createStartPlaces(deps: {
 		return list.map((p) => (p === chosen ? { ...p, default: true } : p));
 	}
 
-	/**
-	 * Where a start goes. `personId` is the Person it runs for: the one
-	 * who starts it, a schedule's Person, or this computer's owner; null
-	 * for nobody.
-	 */
+	/** Where a start goes. */
 	async function place(
 		spaceId: string,
 		start: StartRunInput,
-		personId: string | null,
 	): Promise<StartPlace> {
 		if (
 			(await deps.hostedElsewhere(spaceId)) &&
@@ -100,18 +92,12 @@ export function createStartPlaces(deps: {
 		) {
 			return {
 				walker: "host",
-				deviceId: start.deviceId ?? (await deps.walkerId()),
+				startedFrom: await deps.walkerId(),
+				...(start.deviceId !== undefined ? { deviceId: start.deviceId } : {}),
 			};
 		}
-		if (start.deviceId !== undefined) {
-			return { walker: "here", deviceId: start.deviceId };
-		}
-		if (personId === null) return { walker: "here" };
-		const chosen = (await placements(spaceId, personId, start.projectId)).find(
-			(p) => p.default,
-		);
-		return chosen && !chosen.thisDevice
-			? { walker: "here", deviceId: chosen.deviceId }
+		return start.deviceId !== undefined
+			? { walker: "here", deviceId: start.deviceId }
 			: { walker: "here" };
 	}
 

@@ -68,9 +68,18 @@ export { personFieldTypes } from "./person-fields";
 export { withoutPrivatePaths } from "./private-paths";
 export type { Derive, RunLog } from "./run-log";
 export { createRunLog } from "./run-log";
-export type { PlacedRun, PlannedDevice, RunPlan, RunRow } from "./run-row";
+export type {
+	FallbackDevice,
+	NodeFields,
+	PlacedRun,
+	PlannedDevice,
+	RunFallbacks,
+	RunPlan,
+	RunRow,
+} from "./run-row";
 export {
 	applyWalkerMoves,
+	fallbackKey,
 	getRunRow,
 	hasRunRow,
 	lastRunDevice,
@@ -83,6 +92,7 @@ export {
 	runsArriving,
 	spaceOfRun,
 	stepIdsOfRun,
+	takenOverSecrets,
 } from "./run-row";
 export {
 	type DerivedItem,

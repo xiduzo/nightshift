@@ -4,6 +4,7 @@ import {
 	type Actor,
 	type Device,
 	type DeviceProfile,
+	fallbackKey,
 	HostUnreachableError,
 	type NodeToPlace,
 	type OfferedPlacement,
@@ -17,6 +18,7 @@ import {
 	type PlanInput,
 	type PlannedRun,
 	planNodes,
+	type StepFallback,
 	UNREACHABLE_DEVICE,
 } from "@nightshift/engine";
 import type {
@@ -101,6 +103,8 @@ export type PlacementDeps = {
 	 * Default: itself.
 	 */
 	localFor?(run: PlacedRun): Device;
+	/** "Be a Host" is on here: a step on this computer reads no Personal secret. Default: no. */
+	isHost?(): boolean;
 	/** This computer's own Offers into a Space that are in force. Default: none. */
 	offersHere?(spaceId: string): Promise<DeviceOffer[]>;
 	/** This computer's profiles, for its owner. Default: unknown. */
@@ -242,8 +246,15 @@ export function createPlacement(deps: PlacementDeps) {
 				? await deps.relay
 						.devices({ spaceId, projectId })
 						.catch((error: unknown) => {
-							if (error instanceof HostUnreachableError) return null;
-							throw error;
+							// A refusal of the Host stands. A link that dropped, a fetch
+							// that failed: the Host cannot be reached now.
+							if (
+								error instanceof Refusal &&
+								!(error instanceof HostUnreachableError)
+							) {
+								throw error;
+							}
+							return null;
 						})
 				: [];
 			if (listed === null) {
@@ -302,6 +313,7 @@ export function createPlacement(deps: PlacementDeps) {
 				thisDevice: false,
 				online: await work.online(d.id, spaceId),
 				hasClone: withClone.has(d.id),
+				...(d.dev ? { dev: true } : {}),
 				...(profiles ? { profiles } : {}),
 			});
 		}
@@ -414,15 +426,18 @@ export function createPlacement(deps: PlacementDeps) {
 		personId: string,
 		projectId: string,
 	): Promise<Placement[]> {
-		return (await devicesFor(spaceId, personId, projectId))
-			.filter((d) => d.online && d.hasClone)
-			.map(({ deviceId, name, thisDevice, offers, ownerName }) => ({
-				deviceId,
-				name,
-				thisDevice,
-				...(offers ? { offers } : {}),
-				...(ownerName ? { ownerName } : {}),
-			}));
+		return (
+			(await devicesFor(spaceId, personId, projectId))
+				// A development install shows only on itself (ADR 17).
+				.filter((d) => d.online && d.hasClone && (!d.dev || d.thisDevice))
+				.map(({ deviceId, name, thisDevice, offers, ownerName }) => ({
+					deviceId,
+					name,
+					thisDevice,
+					...(offers ? { offers } : {}),
+					...(ownerName ? { ownerName } : {}),
+				}))
+		);
 	}
 
 	/**
@@ -572,6 +587,15 @@ export function createPlacement(deps: PlacementDeps) {
 						project.spaceId,
 						start.startedBy ?? (await selfOwnerId(db)),
 					);
+		let known: Promise<OwnDevice[]> | null = null;
+		const listed = () => {
+			if (personId === null) return Promise.resolve(null);
+			known ??= devicesFor(project.spaceId, personId, project.id);
+			return known;
+		};
+		const remoteHost = await hostSpaces.hostOf(project.spaceId);
+		const hostId =
+			remoteHost ?? (deps.isHost?.() ? await deps.walkerId() : null);
 		const planned = await planNodes(
 			start,
 			{
@@ -584,8 +608,22 @@ export function createPlacement(deps: PlacementDeps) {
 					(await registry.get(id))?.name ??
 					null,
 				flows: deps.flows,
+				keeperId:
+					(await hostSpaces.hostOf(project.spaceId)) ?? (await deps.walkerId()),
+				...(hostId ? { hostId } : {}),
+				profilesOf: async (id) =>
+					(await listed())?.find((d) => d.deviceId === id)?.profiles ?? null,
+				lastResort: async () =>
+					((await listed()) ?? [])
+						.filter((d) => d.online && d.hasClone && !d.dev)
+						.map((d) => d.deviceId)
+						.sort(
+							(a, b) =>
+								Number(b === input.lastRun) - Number(a === input.lastRun),
+						),
 			},
 			personId,
+			input.byPerson,
 		);
 		for (const { at, nodes } of planned.groups) {
 			if (!at.offered) continue;
@@ -652,9 +690,30 @@ export function createPlacement(deps: PlacementDeps) {
 		return { id: target.deviceId, name: target.name };
 	}
 
+	/**
+	 * Where a step of `node` can go when its Device cannot take it, as the
+	 * run's plan says (ADR 17). This reads the plan and decides nothing:
+	 * the engine asks each Device whether it can take the step now.
+	 */
+	function fallbacksFor(node: FlowNode, run: PlacedRun): StepFallback[] {
+		const { fallbacks } = run.plan;
+		if (!fallbacks) return [];
+		// A node that names a Device goes by its own list, even an empty one.
+		const placesItself =
+			isProfileRef(profileOf(node)) || nodeDevice(node) !== undefined;
+		const list = placesItself
+			? (fallbacks.nodes[fallbackKey(node)] ?? [])
+			: fallbacks.run;
+		return list.map((to) => ({
+			device: deviceById(to.id, run, to.name ?? undefined),
+			...(to.fields ? { fields: to.fields } : {}),
+		}));
+	}
+
 	return {
 		plan,
 		deviceFor,
+		fallbacksFor,
 		deviceById: (id: string, run: PlacedRun) => deviceById(id, run),
 		moveTo,
 		devicesFor,

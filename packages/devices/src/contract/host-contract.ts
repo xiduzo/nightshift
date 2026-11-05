@@ -37,6 +37,7 @@ import {
 	projectRefSchema,
 	projectSecretNameSchema,
 	secretMoveSchema,
+	spaceRefSchema,
 	stepRunSchema,
 } from "./secrets";
 import {
@@ -133,12 +134,9 @@ const leaseAnswerSchema = z.discriminatedUnion("kind", [
 	}),
 ]);
 
-/** A run start, as a Device asks its Host for its Person: the Host walks it, its steps on `deviceId`. */
+/** A run start, as a Device asks its Host for its Person: the Host walks it (ADR 17 says where its steps run). */
 const runStartInput = startRunInputSchema.and(
-	z.object({
-		spaceId: z.string().min(1),
-		deviceId: z.string().min(1).max(64),
-	}),
+	z.object({ spaceId: z.string().min(1) }),
 );
 
 /** An answer to a Gate, as a Device sends it. Typed by its name, so the declared types stay small. */
@@ -200,6 +198,7 @@ const ownDeviceSchema = exact<OwnDevice>()(
 		name: z.string(),
 		thisDevice: z.boolean(),
 		offers: z.array(z.string()).optional(),
+		dev: z.boolean().optional(),
 		ownerName: z.string().optional(),
 		online: z.boolean(),
 		hasClone: z.boolean(),
@@ -452,6 +451,7 @@ export const hostContract = {
 					spaceId: z.string().min(1),
 					projectIds: z.array(z.string().min(1)).max(1000),
 					deviceName,
+					dev: z.boolean().optional(),
 				}),
 			)
 			.output(
@@ -719,6 +719,36 @@ export const hostContract = {
 					"Gives a Device the value of a project secret to move it to another scope.",
 			})
 			.input(projectRefSchema.extend({ name: secretNameSchema }))
+			.output(described(z.string().nullable())),
+	},
+	/** A Space's secrets (ADR 18). A step reads them through `projectSecrets.values`. */
+	spaceSecrets: {
+		list: sync
+			.route({
+				summary:
+					"Lists the names of a Space's secrets, with when and by whom each was set.",
+			})
+			.input(spaceRefSchema)
+			.output(described(z.array(projectSecretNameSchema))),
+		set: sync
+			.route({ summary: "Saves a Space secret, or replaces its value." })
+			.input(
+				spaceRefSchema.extend({
+					name: secretNameSchema,
+					value: z.string().min(1).max(PERSONAL_SECRET_MAX),
+				}),
+			)
+			.output(described(z.void())),
+		remove: sync
+			.route({ summary: "Removes a Space secret." })
+			.input(spaceRefSchema.extend({ name: secretNameSchema }))
+			.output(described(z.void())),
+		take: sync
+			.route({
+				summary:
+					"Gives a Device the value of a Space secret to move it to another scope.",
+			})
+			.input(spaceRefSchema.extend({ name: secretNameSchema }))
 			.output(described(z.string().nullable())),
 	},
 	/**

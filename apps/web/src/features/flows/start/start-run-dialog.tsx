@@ -1,11 +1,9 @@
 import {
-	defaultPlacement,
 	type FlowUse,
 	filledInputs,
 	type InputTexts,
 	inputProblem,
 	missingInputs,
-	placementChoices,
 	rankFlowsByUse,
 	useRunActed,
 	waitedText,
@@ -74,6 +72,9 @@ import { flowQueries } from "../queries";
 import { BaseRefCombobox } from "./base-ref-combobox";
 import { FlowInputFields } from "./flow-input-fields";
 import { placementDescription } from "./placement-words";
+
+/** The Device field's choice for no device: the flow says where the run goes. */
+const AUTOMATIC = "__automatic__";
 
 const STORAGE_KEY = "nightshift:stop-time";
 const DEFAULT_TIME = "07:00";
@@ -223,16 +224,14 @@ function StartRunForm({
 		readStoredInputs(projectId, flowName, inputs),
 	);
 	const [baseRef, setBaseRef] = useState("");
-	// Where the steps run: this computer when it has the project, else the
-	// device of the project's latest run, else one of the person's own. A
-	// Host another person owns that offers them nothing is no default.
+	// Where the steps run: Automatic lets the flow decide. A device the person
+	// picks goes first, and the flow's devices are its backups.
 	const placements = useQuery(runQueries.placements(projectId));
-	const [chosenDevice, setChosenDevice] = useState<string | null>(null);
+	const [chosenDevice, setChosenDevice] = useState<string>(AUTOMATIC);
 	const devices = placements.data ?? [];
-	const device =
-		defaultPlacement(placementChoices(devices), chosenDevice) ?? undefined;
+	const device = devices.find((d) => d.deviceId === chosenDevice);
 	// One choice that is this computer: nothing to ask.
-	const askDevice = devices.length > 1 || (device && !device.thisDevice);
+	const askDevice = devices.length > 1 || devices[0]?.thisDevice === false;
 	const noDevice = placements.isSuccess && devices.length === 0;
 	const now = useNow(15_000);
 	// Recent branches of this project's runs: a night can go on from an open stack.
@@ -277,7 +276,7 @@ function StartRunForm({
 			...(Object.keys(filled).length === 0 ? {} : { inputs: filled }),
 			...(ref === "" ? {} : { baseRef: ref }),
 			...(at === null ? {} : { stopAt: at }),
-			...(device && !device.thisDevice ? { deviceId: device.deviceId } : {}),
+			...(device ? { deviceId: device.deviceId } : {}),
 		});
 	};
 
@@ -316,11 +315,14 @@ function StartRunForm({
 					<Field data-invalid={noDevice || undefined}>
 						<FieldLabel htmlFor={`${id}-device`}>Device</FieldLabel>
 						<Select
-							items={devices.map((d) => ({
-								value: d.deviceId,
-								label: placementLabel(d),
-							}))}
-							value={device?.deviceId ?? null}
+							items={[
+								{ value: AUTOMATIC, label: "Automatic" },
+								...devices.map((d) => ({
+									value: d.deviceId,
+									label: placementLabel(d),
+								})),
+							]}
+							value={device?.deviceId ?? AUTOMATIC}
 							onValueChange={(value) => {
 								if (value) setChosenDevice(value);
 							}}
@@ -334,6 +336,7 @@ function StartRunForm({
 								<SelectValue placeholder="No device" />
 							</SelectTrigger>
 							<SelectContent>
+								<SelectItem value={AUTOMATIC}>Automatic</SelectItem>
 								{[
 									{
 										label: "Your devices",

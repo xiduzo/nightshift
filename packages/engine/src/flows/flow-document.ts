@@ -121,6 +121,7 @@ const SCALAR_ORDER = [
 	"outputs",
 	"variables",
 	"policy",
+	"devices",
 	"start",
 ];
 

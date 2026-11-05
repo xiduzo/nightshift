@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-	defaultPlacement,
-	hostOwnerHint,
-	placementChoices,
-} from "./placements";
+import { hostOwnerHint, placementChoices } from "./placements";
 
 const host = { deviceId: "host", name: "Studio", thisDevice: true };
 const laptop = { deviceId: "laptop", name: "Laptop", thisDevice: false };
@@ -57,15 +53,6 @@ describe("where a run can go", () => {
 			true,
 			false,
 		]);
-		expect(defaultPlacement(choices, null)?.deviceId).toBe("desktop");
-		expect(defaultPlacement(choices, "host")?.deviceId).toBe("host");
-		// An offline choice is not where a run goes.
-		expect(defaultPlacement(choices, "pc")?.deviceId).toBe("desktop");
-		// A Host of an older version marks no default.
-		expect(
-			defaultPlacement(placementChoices([laptop, host]), null)?.deviceId,
-		).toBe("laptop");
-		expect(defaultPlacement(choices.slice(2), null)).toBeNull();
 	});
 });
 

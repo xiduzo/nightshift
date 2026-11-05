@@ -38,6 +38,7 @@ function withoutStartedBy() {
 		deviceId: _device,
 		placements: _placements,
 		deviceNames: _names,
+		fallbacks: _fallbacks,
 		flowRevision: _revision,
 		bodyFlowRevisions: _revisions,
 		...columns
@@ -49,10 +50,10 @@ function withoutStartedBy() {
 const NO_REVISIONS = { flowRevision: null, bodyFlowRevisions: "{}" };
 
 /**
- * A format 3 to 8 bundle: the live schema's tables. Format 3 has no
+ * A format 3 to 9 bundle: the live schema's tables. Format 3 has no
  * `started_by`, formats 3 and 4 no `device_id`, formats 3 to 5 no
- * `placements`, formats 3 to 6 no `device_names`, and formats 3 to 7 no
- * Flow revisions: read as none.
+ * `placements`, formats 3 to 6 no `device_names`, formats 3 to 7 no Flow
+ * revisions, and formats 3 to 8 no `fallbacks`: read as none.
  */
 export async function readRows(
 	db: Database,
@@ -61,7 +62,7 @@ export async function readRows(
 ): Promise<BundleRows> {
 	const columns = getColumns(run);
 	const [runRow] =
-		formatVersion >= 8
+		formatVersion >= 9
 			? await db.select().from(run).where(eq(run.id, runId))
 			: (
 					await db
@@ -73,6 +74,12 @@ export async function readRows(
 							...(formatVersion >= 7
 								? { deviceNames: columns.deviceNames }
 								: {}),
+							...(formatVersion >= 8
+								? {
+										flowRevision: columns.flowRevision,
+										bodyFlowRevisions: columns.bodyFlowRevisions,
+									}
+								: {}),
 						})
 						.from(run)
 						.where(eq(run.id, runId))
@@ -81,8 +88,9 @@ export async function readRows(
 					deviceId: null,
 					placements: null,
 					deviceNames: null,
-					...row,
+					fallbacks: null,
 					...NO_REVISIONS,
+					...row,
 				}));
 	const projectId = runRow?.projectId ?? "";
 	const [projectRow] = await db
@@ -159,6 +167,7 @@ export async function readFormat2(
 			deviceId: null,
 			placements: null,
 			deviceNames: null,
+			fallbacks: null,
 			...NO_REVISIONS,
 		},
 		steps: steps.map((s) => ({ ...s, ...space })),
@@ -236,6 +245,7 @@ export async function readFormat1(
 					deviceId: null,
 					placements: null,
 					deviceNames: null,
+					fallbacks: null,
 					...NO_REVISIONS,
 				}
 			: undefined,

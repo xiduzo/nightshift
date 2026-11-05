@@ -18,6 +18,7 @@ import {
 	type FlowScore,
 	type GateChoice,
 	type Hold,
+	planOf,
 	type RunState,
 	type RunWarningKind,
 	type Scope,
@@ -27,6 +28,7 @@ import {
 	type StepOutcome,
 	type StepOutputs,
 	scopeKey,
+	takenOverSecrets,
 	transcriptPath,
 } from "../log";
 import {
@@ -642,11 +644,12 @@ export async function beginStep(
 	// Asked once per step: the body works on this Device, and a new step
 	// records it. Its calls name the run: it reads the run's Project
 	// secrets for them (ADR 13).
-	const device = forRun(ctx.deviceFor(node, ctx.run), {
+	const stepRun = {
 		spaceId: ctx.run.spaceId,
 		projectId: ctx.run.projectId,
 		runId,
-	});
+	};
+	let device = forRun(ctx.deviceFor(node, ctx.run), stepRun);
 	const logged = runState ?? (await ctx.log.state(runId));
 	// The kind says which timers a step has: a Gate waits as long as it
 	// must, a Wait node keeps its own deadline across its sleeps, and only an
@@ -759,6 +762,15 @@ export async function beginStep(
 		if (!existing) throw new Error(`Step not found: ${start.stepId}`);
 		stepId = existing.id;
 		visit = existing.visit;
+		// A step that moved goes on where it moved to: its session and its
+		// work are there.
+		const movedTo = existing.moved ? existing.deviceId : null;
+		if (movedTo) {
+			const fallback = (await ctx.fallbacksFor?.(node, ctx.run))?.find(
+				(to) => to.id === movedTo,
+			);
+			device = forRun(fallback ?? ctx.deviceById(movedTo, ctx.run), stepRun);
+		}
 		if (start.kind === "reopen") {
 			await ctx.log.append({
 				type: "StepReopened",
@@ -1073,6 +1085,54 @@ function worktreeOn(
 }
 
 /**
+ * Moves a step whose Device is offline to the first fallback that can take
+ * it (ADR 17). The step stays when it has a session to continue, because a
+ * session lives on its Device. It also stays when the run's work is on an
+ * offline Device: the step would go on without it. Returns whether it moved.
+ */
+async function moveStep(
+	ctx: StepContext,
+	node: FlowNode,
+	step: OpenStep,
+	works: "worktree" | "device",
+): Promise<boolean> {
+	if (!ctx.fallbacksFor || (step.existing?.sessions.length ?? 0) > 0) {
+		return false;
+	}
+	const runState = await ctx.log.state(ctx.run.id);
+	const { holder } = deriveWorktrees(runState, ctx.run);
+	const holderOnline =
+		works !== "worktree" ||
+		(await ctx.deviceById(holder, ctx.run).state()).online;
+	const from = step.device;
+	for (const to of await ctx.fallbacksFor(node, ctx.run)) {
+		if (!holderOnline && !isDevice(ctx, holder, to)) continue;
+		step.device = forRun(to, {
+			spaceId: ctx.run.spaceId,
+			projectId: ctx.run.projectId,
+			runId: ctx.run.id,
+		});
+		await ctx.log.append({
+			type: "StepMoved",
+			runId: ctx.run.id,
+			stepId: step.stepId,
+			payload: { from: from.id, to: to.id },
+		});
+		await ctx.log.append({
+			type: "RunWarned",
+			runId: ctx.run.id,
+			stepId: step.stepId,
+			payload: {
+				kind: "device-fallback",
+				message: `${from.name} is offline. ${to.name} takes over this step. ${takenOverSecrets(to.id === planOf(ctx.run).fallbacks?.hostId)}`,
+			},
+		});
+		return true;
+	}
+	return false;
+}
+
+/**
  * What a step's Device must be before the body runs, or null when it is
  * ready. A step that needs a computer (`NodeKind.works`) sleeps while its
  * Device is offline (`device-offline`). A step that works in the worktree
@@ -1091,14 +1151,16 @@ export async function readyDevice(
 ): Promise<BodyResult | null> {
 	const works = ctx.kindOf(node).works(node);
 	if (works === null) return null;
-	const { device } = step;
 	const offline = (at: Device): BodyResult => ({
 		kind: "offline",
 		reason: "device-offline",
 		deviceId: at.id,
 		name: at.name,
 	});
-	if (!(await device.state()).online) return offline(device);
+	if (!(await step.device.state()).online) {
+		const moved = await moveStep(ctx, node, step, works);
+		if (!moved) return offline(step.device);
+	}
 	if (works !== "worktree") return null;
 	const fail = (error: string): BodyResult => ({
 		kind: "end",
@@ -1106,6 +1168,7 @@ export async function readyDevice(
 		outputs: { visit: step.visit },
 		error,
 	});
+	const { device } = step;
 	let runState = await ctx.log.state(ctx.run.id);
 	const made = await makeRunWorktree(ctx, runState);
 	if (made?.kind === "offline") return offline(made.at);

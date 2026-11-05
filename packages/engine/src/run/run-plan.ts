@@ -16,11 +16,13 @@ import {
 	withTierNode,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import type { StartRunInput } from "../contract";
+import type { DeviceProfile, StartRunInput } from "../contract";
 import { flowsForRun } from "../flows";
 import type { PlannedDevice } from "../log";
 import { NOT_ON_THIS_COMPUTER } from "../projects";
+import { chooseDevices, UNREACHABLE_DEVICE } from "./device-order";
 import type { PlacedDevice, PlannedRun } from "./peers";
+import { capabilitiesFor, refusalOf } from "./run-start";
 import { checkAddresses } from "./start-addresses";
 
 /**
@@ -80,11 +82,17 @@ export type PlanDevices = {
 	deviceName?(deviceId: string): Promise<string | null>;
 	/** The project's flows, from this Replica's flow document. */
 	flows(projectId: string): Promise<FlowSources>;
+	/** The Replica that keeps the Space: where a flow without a list runs (ADR 17). */
+	keeperId?: string;
+	/** The Host among the Devices: a step there reads no Personal secret. */
+	hostId?: string;
+	/** The Person's other Devices, for when no Device of the order can take the run. */
+	lastResort?(): Promise<readonly string[]>;
+	/** The profiles a run may use on a Device, by name too. Null when unknown. */
+	profilesOf?(deviceId: string): Promise<readonly DeviceProfile[] | null>;
 };
 
-/** The refusal of a Device this computer cannot reach: the devices' planner refuses with it too. */
-export const UNREACHABLE_DEVICE =
-	"That device cannot take runs from this computer. Pair it with this computer, or choose another device.";
+export { UNREACHABLE_DEVICE };
 
 /** The Device a node names by its id, if its kind runs on one. */
 function namedDevice(node: FlowNode): string | undefined {
@@ -96,7 +104,7 @@ function oldDeviceName(node: FlowNode): string | null {
 	return "device" in node ? legacyDeviceName(node.device) : null;
 }
 
-const planned = (at: PlacedDevice): PlannedDevice => ({
+const planned = (at: PlannedDevice): PlannedDevice => ({
 	id: at.id,
 	name: at.name,
 });
@@ -359,14 +367,23 @@ export async function planNodes(
 	start: StartRunInput,
 	devices: PlanDevices,
 	personId: string | null,
+	/** A person starts it: a Device the start names is their pick (ADR 17). */
+	byPerson = true,
 ): Promise<PlannedRun> {
 	const { walker } = devices;
-	let run = walker;
-	if (start.deviceId !== undefined) {
-		const found = await devices.byId(start.deviceId);
-		if (!found) throw new Refusal("invalid", UNREACHABLE_DEVICE);
-		run = found;
-	}
+	const loaded = flowsForRun(await devices.flows(start.projectId), start);
+	const calledNames = Object.keys(loaded.calledFlows);
+	const chosen = await chooseDevices(
+		[loaded.flow, ...Object.values(loaded.calledFlows)],
+		start,
+		byPerson,
+		{
+			...devices,
+			capabilities: (at, nodes) => capabilitiesFor(nodes, at.device),
+			refusal: refusalOf,
+		},
+	);
+	const { run } = chosen;
 	if (run !== walker && !run.hasClone) {
 		throw new Refusal(
 			"conflict",
@@ -376,13 +393,7 @@ export async function planNodes(
 	if (run === walker && !walker.hasClone) {
 		throw new Refusal("conflict", NOT_ON_THIS_COMPUTER);
 	}
-	const loaded = flowsForRun(await devices.flows(start.projectId), start);
-	const calledNames = Object.keys(loaded.calledFlows);
-	const { flows, named, byId } = await placeNodes(
-		[loaded.flow, ...Object.values(loaded.calledFlows)],
-		run,
-		devices,
-	);
+	const { flows, named, byId } = await placeNodes(chosen.flows, run, devices);
 	const [flow, ...called] = flows as [Flow, ...Flow[]];
 	const calledByName = new Map(
 		calledNames.map((name, i) => [name, called[i] as Flow]),
@@ -412,14 +423,19 @@ export async function planNodes(
 		}
 	};
 	group(flow, "", run);
+	const offPlan = chosen.fallbacks
+		? [...chosen.fallbacks.run, ...Object.values(chosen.fallbacks.nodes).flat()]
+		: [];
 	return {
+		notes: chosen.notes,
 		plan: {
+			...(chosen.fallbacks ? { fallbacks: chosen.fallbacks } : {}),
 			device: planned(run),
 			named: Object.fromEntries(
 				[...named].map(([id, at]) => [id, planned(at)]),
 			),
 			devices: Object.fromEntries(
-				[run, ...named.values(), ...byId.values()].map((at) => [
+				[...offPlan, run, ...named.values(), ...byId.values()].map((at) => [
 					at.id,
 					planned(at),
 				]),

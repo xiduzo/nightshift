@@ -264,6 +264,8 @@ const MESSAGES: DraftMessages = {
 	missingConnection: missingConnectionMessage,
 	missingProfile: missingProfileMessage,
 	missingDevice: (_id, node) => missingDeviceMessage(node),
+	missingFlowDevice: () =>
+		"This flow runs on a device that is no longer in this Space. Choose another device in the flow's settings.",
 	programWithoutLogin: programWithoutLoginMessage,
 	refusesCommands: refusesCommandsMessage,
 };

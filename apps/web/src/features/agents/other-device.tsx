@@ -138,7 +138,7 @@ export function OtherDevicesSecrets({ devices }: { devices: OtherDevice[] }) {
 	return (
 		<PageSection
 			title="On your other devices"
-			description="The secrets saved on each device. To use one on all your computers, move it to Personal."
+			description="The secrets saved on each device. To use one on your own computers, move it to Personal."
 		>
 			{devices.map((device) => (
 				<Card key={device.id} className="py-0">

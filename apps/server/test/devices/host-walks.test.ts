@@ -128,10 +128,11 @@ afterAll(async () => {
 });
 
 describe("who walks a run B starts", () => {
-	test("A walks it, its step runs on B, and B gets the value it kept", async () => {
+	test("A walks it, its step runs on the B you pick, and B gets the value it kept", async () => {
 		const started = await b.client.runs.start({
 			projectId,
 			flowName: "count",
+			deviceId: bId,
 		});
 		expect(started.walker).toMatchObject({ id: aId, thisDevice: false });
 		expect(started.device).toMatchObject({ id: bId, thisDevice: true });
@@ -205,7 +206,11 @@ describe("a run started on the Host, from a phone or a browser", () => {
 	}, 60_000);
 
 	test("runs its steps where the project's last run ran when the Host has no copy of it", async () => {
-		const fromB = await b.client.runs.start({ projectId, flowName: "count" });
+		const fromB = await b.client.runs.start({
+			projectId,
+			flowName: "count",
+			deviceId: bId,
+		});
 		await waitFor(
 			() => runOn(a, fromB.id),
 			(r) => r?.status === "finished",

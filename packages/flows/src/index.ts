@@ -163,6 +163,7 @@ export {
 	tierNode,
 	type VariableType,
 	variableTypeSchema,
+	withFlowDevices,
 	withTierNode,
 } from "./flow";
 export {

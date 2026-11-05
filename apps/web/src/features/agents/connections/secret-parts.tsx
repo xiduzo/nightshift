@@ -21,7 +21,7 @@ export const SCOPE: Record<
 > = {
 	personal: {
 		label: "Personal",
-		hint: "Your steps on all your computers can use it.",
+		hint: "Your steps on your own computers can use it. Steps on the Host cannot.",
 		icon: UserIcon,
 	},
 	computer: {

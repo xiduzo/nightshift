@@ -190,6 +190,117 @@ export const projectSecrets = {
 			),
 		),
 	/**
+	 * The secrets of the session's Space (ADR 18): every step of a run in the
+	 * Space can use them, on any device. The same rules as a project's.
+	 */
+	spaceSecrets: protectedProcedure
+		.route({
+			summary:
+				"Lists the secrets of the Space, with who set each, when, and the flows that use it.",
+		})
+		.output(output(projectSecretListSchema))
+		.handler(async ({ context }) => {
+			const canChange = await context.access.can({ flow: ["save"] });
+			let listed: Awaited<ReturnType<typeof context.connections.spaceSecrets>>;
+			try {
+				listed = await context.connections.spaceSecrets(
+					context.spaceId,
+					context.session.user.id,
+				);
+			} catch (error) {
+				if (!unreachable(error)) throw error;
+				return { secrets: [], available: false, canChange };
+			}
+			const use = await context.space.flowUse();
+			const connections = context.connections.list();
+			const { toolsBySecret, toolFlows } = cliToolsOfSecrets(context, use);
+			const names = (flows: readonly { flowName: string }[]) =>
+				flows.map((f) => f.flowName);
+			return {
+				secrets: listed.map((secret) => {
+					const tools = toolsBySecret.get(secret.name) ?? [];
+					return {
+						...secret,
+						flows: [
+							...new Set([
+								...names(use.secrets.get(secret.name) ?? []),
+								...connections
+									.filter((c) =>
+										c.variables.some((v) => v.name === secret.name),
+									)
+									.flatMap((c) => names(use.connections.get(c.name) ?? [])),
+								...tools.flatMap((tool) => names(toolFlows.get(tool) ?? [])),
+							]),
+						].sort(),
+						tools: [...tools].sort(),
+						webhooks: [
+							...new Set(names(use.webhooks.get(secret.name) ?? [])),
+						].sort(),
+					};
+				}),
+				available: true,
+				canChange,
+			};
+		}),
+	setSpaceSecret: permitted({ flow: ["save"] })
+		.route({
+			summary:
+				"Saves a secret of the Space, or replaces its value. The value never comes back.",
+		})
+		.output(output(z.void()))
+		.input(z.object({ name: secretNameSchema, value: z.string().min(1) }))
+		.handler(async ({ context, input }) =>
+			context.connections.setSpaceSecret(
+				context.spaceId,
+				input.name,
+				input.value,
+				context.session.user.id,
+			),
+		),
+	removeSpaceSecret: permitted({ flow: ["save"] })
+		.route({ summary: "Removes a secret of the Space." })
+		.output(output(z.void()))
+		.input(z.object({ name: secretNameSchema }))
+		.handler(async ({ context, input }) =>
+			context.connections.removeSpaceSecret(
+				context.spaceId,
+				input.name,
+				context.session.user.id,
+			),
+		),
+	/** Moves a secret of this computer, or a Personal one, into the session's Space. */
+	moveSecretToSpace: ownerSaving
+		.route({
+			summary:
+				"Moves a secret of this computer, or a Personal one, into the Space.",
+		})
+		.output(output(z.void()))
+		.input(z.object({ name: secretNameSchema, from: secretScopeSchema }))
+		.handler(async ({ context, input }) =>
+			context.connections.moveToSpace(
+				input.name,
+				input.from,
+				context.spaceId,
+				context.session.user.id,
+			),
+		),
+	/** Moves a secret of the Space to this computer, or to the owner's Personal secrets. */
+	moveSecretFromSpace: ownerSaving
+		.route({
+			summary:
+				"Moves a secret of the Space to this computer, or to its owner's Personal secrets.",
+		})
+		.output(output(z.void()))
+		.input(z.object({ name: secretNameSchema, to: secretScopeSchema }))
+		.handler(async ({ context, input }) =>
+			context.connections.moveFromSpace(
+				context.spaceId,
+				input.name,
+				input.to,
+				context.session.user.id,
+			),
+		),
+	/**
 	 * Moves a secret saved on another of the owner's devices into a project
 	 * of the session's Space (ADR 13, decision 7). That device reads its own
 	 * value, saves it in the project, then removes its copy: the value never

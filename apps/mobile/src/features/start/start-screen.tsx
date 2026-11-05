@@ -3,7 +3,6 @@ import {
 	createFlowQueries,
 	createProjectQueries,
 	createRunQueries,
-	defaultPlacement,
 	filledInputs,
 	type InputTexts,
 	inputProblem,
@@ -166,7 +165,9 @@ function NewRun({
 	const inputs = chosen?.inputs ?? [];
 	const { needed, more } = phoneInputs(inputs);
 	const choices = placementChoices(placements.data ?? [], devices.data ?? []);
-	const place = defaultPlacement(choices, chosenDevice);
+	const place =
+		choices.find((c) => c.online && c.deviceId === chosenDevice) ?? null;
+	const anyOnline = choices.some((c) => c.online);
 	const badJson = needed.filter(
 		(input) => inputProblem(input, values[input.name]) !== null,
 	);
@@ -175,7 +176,7 @@ function NewRun({
 		missing: missingInputs(inputs, values),
 		badJson,
 		placementsLoaded: placements.data !== undefined,
-		hasPlace: place !== null,
+		hasPlace: anyOnline,
 	});
 
 	const start = useMutation(
@@ -191,16 +192,19 @@ function NewRun({
 	);
 
 	const ready =
-		flowName !== null && chosen?.valid === true && blocker === null && place;
+		flowName !== null &&
+		chosen?.valid === true &&
+		blocker === null &&
+		anyOnline;
 
 	function startRun() {
-		if (!project || !flowName || !place) return;
+		if (!project || !flowName || !anyOnline) return;
 		const filled = filledInputs(needed, values);
 		start.mutate({
 			projectId: project.id,
 			flowName,
 			...(Object.keys(filled).length > 0 ? { inputs: filled } : {}),
-			...(place.thisDevice ? {} : { deviceId: place.deviceId }),
+			...(place ? { deviceId: place.deviceId } : {}),
 		});
 	}
 
@@ -346,7 +350,7 @@ function NewRun({
 								value={place?.deviceId ?? null}
 								onChange={setChosenDevice}
 							/>
-							{!place ? (
+							{!anyOnline ? (
 								<ErrorAlert
 									title="No computer can take this run now"
 									message="None of your computers with this project is online."

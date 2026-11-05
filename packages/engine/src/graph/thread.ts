@@ -79,6 +79,8 @@ export type ThreadDeps = {
 	deviceFor(node: FlowNode, run: RunRow): Device;
 	/** A Device by id, for a run (`StepContext.deviceById`). */
 	deviceById(id: string, run: RunRow): Device;
+	/** The Devices a step can move to now (`StepContext.fallbacksFor`). */
+	fallbacksFor?(node: FlowNode, run: RunRow): Promise<Device[]>;
 	/** The run's flow snapshot and its called flows, parsed. */
 	flowOf(row: RunRow): Flow;
 	calledFlowsOf(row: RunRow): Record<string, Flow>;
@@ -213,6 +215,7 @@ export function openThread(row: RunRow, deps: ThreadDeps): Thread {
 		recorder: (stepId) => deps.recorders.open(runId, stepId),
 		deviceFor: deps.deviceFor,
 		deviceById: deps.deviceById,
+		...(deps.fallbacksFor ? { fallbacksFor: deps.fallbacksFor } : {}),
 		signal: () => controller.signal,
 		now: deps.now,
 		minuteMs: deps.minuteMs,

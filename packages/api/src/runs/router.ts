@@ -111,8 +111,8 @@ export const runs = {
 		.output(output(z.array(artifactSchema)))
 		.handler(({ context, input }) => context.space.listArtifacts(input.runId)),
 	/**
-	 * Starts a flow file by name, or a flow given inline (a quick run), on
-	 * one of the Person's Devices (`placements`; default this computer).
+	 * Starts a flow file by name, or a flow given inline (a quick run). A
+	 * Device it names goes first. Without one, the flow says where (ADR 17).
 	 */
 	start: permitted({ run: ["start"] })
 		.route({

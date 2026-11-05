@@ -26,12 +26,15 @@ export type StartRunInput = {
 	 */
 	startedBy?: string;
 	/**
-	 * The Device the run's steps run on, and its worktree's home (its
-	 * Placement), by its id: one of the starter's Devices with a Clone of
-	 * the project (`listPlacements`), or the Replica that keeps the
-	 * Space for a schedule's run (ADR 15). Default: this computer.
+	 * The Device a person picks, by its id: one of their Devices with a
+	 * Clone of the project (`listPlacements`). It takes every step it can,
+	 * and the Devices the flow configures are its fallbacks (ADR 17). For a
+	 * schedule's run, the Replica that keeps the Space (ADR 15). Absent: the
+	 * flow says where the run goes.
 	 */
 	deviceId?: string;
+	/** The Device the person started from: the last fallback (ADR 17). Default: this computer. */
+	startedFrom?: string;
 } & (
 	| { flowName: string; flow?: never }
 	/** A flow that is not a file, for example a quick run. */
@@ -45,6 +48,7 @@ const startFields = {
 	stopAt: z.number().int().positive().optional(),
 	inputs: z.record(z.string(), z.json()).optional(),
 	deviceId: z.string().min(1).max(64).optional(),
+	startedFrom: z.string().min(1).max(64).optional(),
 };
 
 /**

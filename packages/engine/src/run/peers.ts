@@ -24,6 +24,7 @@ import type {
 	EnginePayloads,
 	EventWrites,
 	LandedScope,
+	NodeFields,
 	PlacedRun,
 	RunHistory,
 	RunPlan,
@@ -213,6 +214,11 @@ export type PlacementPort = {
 	/** A Device by id, for a step of the run: this computer, or another Device of its plan. */
 	deviceById(id: string, run: PlacedRun): Device;
 	/**
+	 * Where a step of `node` goes when its Device cannot take it, in order
+	 * (`RunFallbacks`, ADR 17). Empty for a run whose steps wait.
+	 */
+	fallbacksFor(node: FlowNode, run: PlacedRun): StepFallback[];
+	/**
 	 * The Device a run's walk moves to (`to`): one of the Person's own
 	 * Devices, not this computer, online. Null when it is not one of
 	 * theirs; throws the refusal when it is offline. A move keeps the plan:
@@ -243,6 +249,12 @@ export type PlacementPort = {
 	): Promise<Placement[]>;
 };
 
+/** A Device a step can move to, with the values of its profile of the same name. */
+export type StepFallback = {
+	device: Device;
+	fields?: NodeFields;
+};
+
 /** What a run's plan starts from (`PlacementPort.plan`). */
 export type PlanInput = {
 	start: StartRunInput;
@@ -254,11 +266,17 @@ export type PlanInput = {
 	 * Person as the Host of the Space knows them already.
 	 */
 	scheduled: boolean;
+	/** A person starts it: a Device the start names is their pick (ADR 17). */
+	byPerson: boolean;
+	/** The Device of the project's latest run: the first of the last resorts. Default: none. */
+	lastRun?: string | null;
 };
 
 /** A run's plan, with what run start goes on with. */
 export type PlannedRun = {
 	plan: RunPlan;
+	/** The Devices the plan passed over, and why: what the run warns about. */
+	notes: readonly string[];
 	/** The run's Device, where its worktree goes. */
 	run: PlacedDevice;
 	flow: Flow;

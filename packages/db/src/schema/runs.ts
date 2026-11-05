@@ -77,6 +77,11 @@ export const run = sqliteTable(
 		 */
 		deviceNames: text("device_names"),
 		/**
+		 * JSON: where a step goes when its Device cannot take it, in order
+		 * (`RunFallbacks`, ADR 17). Null: the step waits for its Device.
+		 */
+		fallbacks: text("fallbacks"),
+		/**
 		 * The Person who started the run: for a schedule, its Person, else
 		 * the owner of the Device that fired it. Null only for a run another
 		 * Replica walked before every run had a starter. No foreign key: a

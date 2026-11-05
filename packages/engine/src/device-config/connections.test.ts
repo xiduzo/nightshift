@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { connection } from "@nightshift/db/schema";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import {
@@ -10,6 +10,7 @@ import {
 	referencedVariables,
 	type SecretBackend,
 	type StepRun,
+	unreachableNote,
 } from "./connections";
 
 let sandbox: Sandbox;
@@ -1004,6 +1005,8 @@ function memoryProjects(initial: Record<string, Record<string, string>> = {}) {
 		}
 		return found;
 	};
+	/** Where a Space's secrets are, beside the Projects'. */
+	const spaceKey = (spaceId: string) => `space:${spaceId}`;
 	const port: ProjectSecrets = {
 		async list({ projectId }) {
 			check();
@@ -1044,6 +1047,28 @@ function memoryProjects(initial: Record<string, Record<string, string>> = {}) {
 				return value === undefined ? [] : [value];
 			});
 		},
+		space: {
+			async list(spaceId) {
+				check();
+				return [...of(spaceKey(spaceId)).keys()].sort().map((name) => ({
+					name,
+					setAt: 9,
+					setBy: { id: "ann", name: "Ann" },
+				}));
+			},
+			async set(spaceId, name, value) {
+				check();
+				of(spaceKey(spaceId)).set(name, value);
+			},
+			async remove(spaceId, name) {
+				check();
+				of(spaceKey(spaceId)).delete(name);
+			},
+			async take(spaceId, name) {
+				check();
+				return of(spaceKey(spaceId)).get(name) ?? null;
+			},
+		},
 	};
 	return { port, values, state };
 }
@@ -1057,6 +1082,8 @@ describe("Project secrets (ADR 13)", () => {
 		keychain?: Record<string, string>;
 		personal?: Record<string, string>;
 		projects?: Record<string, Record<string, string>>;
+		/** False: this computer is a Host. */
+		personalInUse?: boolean;
 	}) {
 		const keychain = memorySecrets();
 		const personal = memoryPersonal(options.personal);
@@ -1067,6 +1094,9 @@ describe("Project secrets (ADR 13)", () => {
 			secrets: keychain.backend,
 			personal: () => personal.port,
 			projects: () => projects.port,
+			...(options.personalInUse === false
+				? { personalInUse: () => false }
+				: {}),
 		});
 		for (const [name, value] of Object.entries(options.keychain ?? {})) {
 			await store.setSecret(name, value);
@@ -1074,27 +1104,75 @@ describe("Project secrets (ADR 13)", () => {
 		return { store, keychain, personal, projects };
 	}
 
-	test("a step's name reads its Project, then Personal, then this computer, then the environment", async () => {
+	test("a step's name reads Personal, then its Project, then this computer, then the environment (ADR 18)", async () => {
 		const { store, projects } = await scopedStore({
 			env: { A: "env-a", B: "env-b", C: "env-c", D: "env-d" },
 			keychain: { A: "computer-a", B: "computer-b", C: "computer-c" },
-			personal: { A: "personal-a", B: "personal-b" },
-			projects: { app: { A: "project-a" }, other: { B: "other-b" } },
+			personal: { A: "personal-a" },
+			projects: { app: { A: "project-a", B: "project-b" }, other: { C: "x" } },
 		});
 		expect(
 			await store.secretEnv(["A", "B", "C", "D"], { project: step }),
 		).toEqual({
 			ok: true,
-			env: { A: "project-a", B: "personal-b", C: "computer-c", D: "env-d" },
-			fromProject: ["A"],
+			env: { A: "personal-a", B: "project-b", C: "computer-c", D: "env-d" },
+			fromProject: ["B"],
 		});
 		// It asked for the step's run, and nothing of another Project.
 		expect(projects.state.asked).toEqual([step]);
 		// A use that is not a step's reads no Project secret.
-		expect(await store.secretEnv(["A"])).toEqual({
+		expect(await store.secretEnv(["B"])).toEqual({
 			ok: true,
-			env: { A: "personal-a" },
+			env: { B: "computer-b" },
 		});
+	});
+
+	test("on a Host, a step reads no Personal secret, and the refusal says where to move it (ADR 18)", async () => {
+		const { store, personal } = await scopedStore({
+			keychain: { C: "computer-c" },
+			personal: { MINE: "personal-mine", C: "personal-c", P: "personal-p" },
+			projects: { app: { P: "project-p" } },
+			personalInUse: false,
+		});
+		const read = spyOn(personal.port, "values");
+		const found = await store.secretEnv(["MINE", "C", "P"], { project: step });
+		expect(found).toMatchObject({
+			ok: false,
+			missing: ["MINE"],
+			personalHere: true,
+		});
+		expect(unreachableNote(found as { personalHere: boolean })).toContain(
+			"Move it to the Space or the project.",
+		);
+		const shared = await store.secretEnv(["C", "P"], { project: step });
+		expect(shared).toEqual({
+			ok: true,
+			env: { C: "computer-c", P: "project-p" },
+			fromProject: ["P"],
+		});
+		// It listed the names, and never read a value.
+		expect(read).not.toHaveBeenCalled();
+	});
+
+	test("a secret moves to the Space and back, and the old copy goes after the save (ADR 18)", async () => {
+		const { store, personal } = await scopedStore({
+			personal: { TOKEN: "personal-token" },
+		});
+		await store.moveToSpace("TOKEN", "personal", "space-1", "ann");
+		expect(await store.spaceSecrets("space-1", "ann")).toMatchObject([
+			{ name: "TOKEN" },
+		]);
+		expect((await personal.port.values(["TOKEN"])).TOKEN).toBeUndefined();
+
+		await store.moveFromSpace("space-1", "TOKEN", "computer", "ann");
+		expect(await store.spaceSecrets("space-1", "ann")).toEqual([]);
+		expect(await store.secretEnv(["TOKEN"])).toEqual({
+			ok: true,
+			env: { TOKEN: "personal-token" },
+		});
+		await expect(
+			store.moveToSpace("NOPE", "personal", "space-1", "ann"),
+		).rejects.toThrow("NOPE is not a Personal secret.");
 	});
 
 	test("an MCP server and a custom agent of a step read the Project's value", async () => {

@@ -5,6 +5,7 @@ import {
 	project,
 	projectSecret,
 	run,
+	spaceSecret,
 	user,
 } from "@nightshift/db/schema";
 import type { Device } from "@nightshift/engine";
@@ -22,10 +23,12 @@ import { deviceProjectSecrets, OWNER_ONLY } from "./project-device";
 import {
 	createProjectSecretsHost,
 	NOT_A_PROJECT_HERE,
+	NOT_A_SPACE_HERE,
 	NOT_IN_SPACE,
 	NOT_YOUR_STEP,
 } from "./project-host";
 import { createProjectSecretStore } from "./project-store";
+import { createSpaceSecretStore } from "./space-store";
 
 const KEY = "a-secrets-key-for-these-tests-0123456789";
 
@@ -85,6 +88,13 @@ afterEach(async () => {
 
 const store = () =>
 	createProjectSecretStore({
+		db: sandbox.db,
+		cipher: secretsCipher(KEY),
+		now: () => 1_000,
+	});
+
+const spaceStore = () =>
+	createSpaceSecretStore({
 		db: sandbox.db,
 		cipher: secretsCipher(KEY),
 		now: () => 1_000,
@@ -172,12 +182,14 @@ describe("the Host's half", () => {
 		} = {},
 	) {
 		const s = store();
+		const space = spaceStore();
 		const host = createProjectSecretsHost({
 			db: sandbox.db,
 			registry: {
 				get: async (id) => devices.find((d) => d.id === id) ?? null,
 			},
 			store: s,
+			spaceStore: space,
 			isHost: () => options.isHost ?? true,
 			hostOf: async () => options.keptBy ?? null,
 			work: {
@@ -192,10 +204,97 @@ describe("the Host's half", () => {
 			offersInto: async (deviceId) =>
 				(options.offering ?? []).includes(deviceId),
 		});
-		return { s, host };
+		return { s, space, host };
 	}
 
 	const app = () => ({ spaceId: sandbox.spaceId, projectId: "app" });
+
+	describe("a Space's secrets (ADR 18)", () => {
+		const spaceId = () => sandbox.spaceId;
+
+		test("a Member who saves Flows sets and takes them; Members list the names; others are refused", async () => {
+			const { space, host } = hostOver([
+				paired(),
+				paired({ id: "vivs-pc", ownerId: "viv" }),
+				paired({ id: "olgas-pc", ownerId: "olga" }),
+			]);
+			const ann = keyOf("laptop", "ann");
+			await host.space.set(ann, {
+				spaceId: spaceId(),
+				name: "TOKEN",
+				value: "space-token",
+			});
+			expect(await space.values(spaceId())).toEqual({ TOKEN: "space-token" });
+			expect(
+				await host.space.list(keyOf("vivs-pc", "viv"), { spaceId: spaceId() }),
+			).toMatchObject([{ name: "TOKEN", setBy: { id: "ann" } }]);
+			expect(
+				await host.space.take(ann, { spaceId: spaceId(), name: "TOKEN" }),
+			).toBe("space-token");
+
+			await expect(
+				host.space.set(keyOf("vivs-pc", "viv"), {
+					spaceId: spaceId(),
+					name: "TOKEN",
+					value: "x",
+				}),
+			).rejects.toThrow("Your role in this Space does not allow this.");
+			await expect(
+				host.space.take(keyOf("vivs-pc", "viv"), {
+					spaceId: spaceId(),
+					name: "TOKEN",
+				}),
+			).rejects.toThrow("Your role in this Space does not allow this.");
+			await expect(
+				host.space.list(keyOf("olgas-pc", "olga"), { spaceId: spaceId() }),
+			).rejects.toThrow(NOT_IN_SPACE);
+
+			await host.space.remove(ann, { spaceId: spaceId(), name: "TOKEN" });
+			expect(await space.values(spaceId())).toEqual({});
+		});
+
+		test("a step on its Device reads them with the Project's, and the Space's wins", async () => {
+			const { s, space, host } = hostOver([paired()]);
+			await s.set(app(), "SHARED", "from-project", "ann");
+			await s.set(app(), "ONLY_PROJECT", "project", "ann");
+			await space.set(spaceId(), "SHARED", "from-space", "ann");
+			await space.set(spaceId(), "ONLY_SPACE", "space", "ann");
+			placed = [{ deviceId: "laptop", runId: "run-app", projectId: "app" }];
+			expect(
+				await host.values(keyOf("laptop", "ann"), stepOf("run-app")),
+			).toEqual({
+				SHARED: "from-space",
+				ONLY_PROJECT: "project",
+				ONLY_SPACE: "space",
+			});
+			// A Device with no step of the run gets nothing of the Space either.
+			placed = [];
+			await expect(
+				host.values(keyOf("laptop", "ann"), stepOf("run-app")),
+			).rejects.toThrow(NOT_YOUR_STEP);
+		});
+
+		test("a value does not open as another Space's", async () => {
+			const space = spaceStore();
+			await space.set(spaceId(), "TOKEN", "secret-value", "ann");
+			const rows = await sandbox.db.select().from(spaceSecret);
+			expect(JSON.stringify(rows)).not.toContain("secret-value");
+			const [row] = rows;
+			await sandbox.db.delete(spaceSecret);
+			await sandbox.db.insert(spaceSecret).values({
+				...(row as typeof spaceSecret.$inferInsert),
+				spaceId: "other",
+			});
+			expect(await space.values("other")).toEqual({});
+		});
+
+		test("a Host that keeps no such Space refuses", async () => {
+			const { host } = hostOver([paired()], { keptBy: "another-host" });
+			await expect(
+				host.space.list(keyOf("laptop", "ann"), { spaceId: spaceId() }),
+			).rejects.toThrow(NOT_A_SPACE_HERE);
+		});
+	});
 
 	test("a Member who saves Flows sets a value; Members list names with who and when", async () => {
 		const { s, host } = hostOver([
@@ -439,6 +538,7 @@ describe("the Device's half", () => {
 			hostSpaces: { hostOf: async () => null },
 			links: () => linksTo(new Map()),
 			store: here,
+			spaceStore: spaceStore(),
 			ownerId,
 		});
 		const app = { spaceId: sandbox.spaceId, projectId: "app" };
@@ -466,6 +566,7 @@ describe("the Device's half", () => {
 	test("in a Space a Host keeps, each call goes there with this Device's key, as its owner only", async () => {
 		const hostSandbox = sandbox;
 		const hostStore = store();
+		const hostSpaceStore = spaceStore();
 		const placed = new Set<string>();
 		const host = inMemoryHost({
 			exchange: {} as HostExchange,
@@ -474,6 +575,7 @@ describe("the Device's half", () => {
 				db: hostSandbox.db,
 				registry: { get: async () => paired() },
 				store: hostStore,
+				spaceStore: hostSpaceStore,
 				isHost: () => true,
 				hostOf: async () => null,
 				work: {
@@ -489,6 +591,7 @@ describe("the Device's half", () => {
 			hostSpaces: { hostOf: async () => "host" },
 			links: () => linksTo(new Map([["host", client]])),
 			store: store(),
+			spaceStore: spaceStore(),
 			ownerId: "local-ann",
 		});
 		const app = { spaceId: sandbox.spaceId, projectId: "app" };
@@ -513,6 +616,27 @@ describe("the Device's half", () => {
 		});
 		// This computer keeps none of them: the kept values are the Host's.
 		expect(await projects.kept(app)).toEqual([]);
+		// A Space's secrets go the same way, and a step reads them with the Project's.
+		const spaceId = sandbox.spaceId;
+		await projects.space.set(spaceId, "TOKEN", "space-token", "local-ann");
+		expect(await hostSpaceStore.values(spaceId)).toEqual({
+			TOKEN: "space-token",
+		});
+		expect((await projects.space.list(spaceId, "local-ann"))[0]?.name).toBe(
+			"TOKEN",
+		);
+		expect(await projects.values(stepOf("run-app"))).toEqual({
+			DB_URL: "postgres://x",
+			TOKEN: "space-token",
+		});
+		expect(await projects.space.take(spaceId, "TOKEN", "local-ann")).toBe(
+			"space-token",
+		);
+		await expect(
+			projects.space.set(spaceId, "TOKEN", "y", "viv"),
+		).rejects.toThrow(OWNER_ONLY);
+		await projects.space.remove(spaceId, "TOKEN", "local-ann");
+		expect(await hostSpaceStore.values(spaceId)).toEqual({});
 		host.down();
 		await expect(projects.values(stepOf("run-app"))).rejects.toThrow();
 	});

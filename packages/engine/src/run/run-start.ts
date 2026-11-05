@@ -310,6 +310,7 @@ export function createRunStart(deps: RunStartDeps) {
 							project: projectRow,
 							runId,
 							scheduled: trigger.kind === "schedule",
+							byPerson: trigger.kind === "manual",
 						});
 						const startedBy = planned.plan.personId;
 						const { device } = planned.run;
@@ -402,6 +403,13 @@ export function createRunStart(deps: RunStartDeps) {
 								type: "RunWarned",
 								runId,
 								payload: { kind: "base-ref", message: made.warning },
+							});
+						}
+						for (const message of planned.notes) {
+							await log.append({
+								type: "RunWarned",
+								runId,
+								payload: { kind: "device-fallback", message },
 							});
 						}
 						started = { row, walkerId, device };

@@ -49,6 +49,7 @@ export const PATH_FIELDS = {
 	WorktreeCreated: ["worktreePath"],
 	WorktreeRemoved: ["worktreePath"],
 	HandedOff: ["worktreePath"],
+	StepMoved: [],
 	WalkerMoved: [],
 	WalkerArrived: [],
 	RunResumed: [],

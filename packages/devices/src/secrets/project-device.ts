@@ -6,8 +6,14 @@ import { eq } from "drizzle-orm";
 import type { HostClient } from "../contract";
 import type { DeviceLinks, HostSpaces } from "../links";
 import { askHost, PERSONAL_DEADLINE_MS } from "./device";
-import { NOT_YOUR_STEP, projectAccess, withNames } from "./project-host";
+import {
+	NOT_YOUR_STEP,
+	projectAccess,
+	spaceAccess,
+	withNames,
+} from "./project-host";
 import type { ProjectSecretStore } from "./project-store";
+import type { SpaceSecretStore } from "./space-store";
 
 /** What a person reads when the Host of the Space does not know Project secrets yet. */
 export const OLDER_HOST_PROJECT_SECRETS =
@@ -38,11 +44,12 @@ export function deviceProjectSecrets(deps: {
 	/** Lazy: the links are made after this. */
 	links(): Pick<DeviceLinks, "get">;
 	store: ProjectSecretStore;
+	spaceStore: SpaceSecretStore;
 	/** The Person who owns this computer: the only one who acts through its key. */
 	ownerId: string;
 	deadlineMs?: number;
 }): ProjectSecrets {
-	const { db, store } = deps;
+	const { db, store, spaceStore } = deps;
 	const options = {
 		deadlineMs: deps.deadlineMs ?? PERSONAL_DEADLINE_MS,
 		olderHost: OLDER_HOST_PROJECT_SECRETS,
@@ -75,6 +82,23 @@ export function deviceProjectSecrets(deps: {
 		return askHost(deps.links().get(hostId), onHost, options);
 	}
 
+	/** A change, or a list, of a Space's secrets by `personId`: as `asPerson`. */
+	async function inSpace<T>(
+		spaceId: string,
+		personId: string,
+		saves: boolean,
+		here: () => Promise<T>,
+		onHost: (client: HostClient) => Promise<T>,
+	): Promise<T> {
+		const hostId = await deps.hostSpaces.hostOf(spaceId);
+		if (hostId === null) {
+			await spaceAccess(db, deps.hostSpaces, spaceId, { personId, saves });
+			return here();
+		}
+		if (personId !== deps.ownerId) throw new Refusal("forbidden", OWNER_ONLY);
+		return askHost(deps.links().get(hostId), onHost, options);
+	}
+
 	return {
 		list: (at, personId) =>
 			asPerson(
@@ -99,7 +123,11 @@ export function deviceProjectSecrets(deps: {
 				if (row?.spaceId !== step.spaceId || row.projectId !== step.projectId) {
 					throw new Refusal("forbidden", NOT_YOUR_STEP);
 				}
-				return store.values(step.projectId, names);
+				// A step reads both: the Space's wins over the Project's (ADR 18).
+				return {
+					...(await store.values(step.projectId, names)),
+					...(await spaceStore.values(step.spaceId, names)),
+				};
 			}
 			return askHost(
 				link,
@@ -137,7 +165,44 @@ export function deviceProjectSecrets(deps: {
 			),
 		async kept(at, names) {
 			if ((await deps.hostSpaces.hostOf(at.spaceId)) !== null) return [];
-			return Object.values(await store.values(at.projectId, names));
+			return [
+				...Object.values(await spaceStore.values(at.spaceId, names)),
+				...Object.values(await store.values(at.projectId, names)),
+			];
+		},
+		space: {
+			list: (spaceId, personId) =>
+				inSpace(
+					spaceId,
+					personId,
+					false,
+					async () => withNames(db, await spaceStore.list(spaceId)),
+					(client) => client.spaceSecrets.list({ spaceId }),
+				),
+			set: (spaceId, name, value, personId) =>
+				inSpace(
+					spaceId,
+					personId,
+					true,
+					() => spaceStore.set(spaceId, name, value, personId),
+					(client) => client.spaceSecrets.set({ spaceId, name, value }),
+				),
+			remove: (spaceId, name, personId) =>
+				inSpace(
+					spaceId,
+					personId,
+					true,
+					() => spaceStore.remove(spaceId, name),
+					(client) => client.spaceSecrets.remove({ spaceId, name }),
+				),
+			take: (spaceId, name, personId) =>
+				inSpace(
+					spaceId,
+					personId,
+					true,
+					async () => (await spaceStore.values(spaceId, [name]))[name] ?? null,
+					(client) => client.spaceSecrets.take({ spaceId, name }),
+				),
 		},
 	};
 }

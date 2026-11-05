@@ -35,6 +35,8 @@ export type DraftMessages = {
 	missingProfile: (profile: ProfileRef) => string;
 	/** A Device the node names (`device`) by an id that no Device of the list has. */
 	missingDevice: (deviceId: string, node: FlowNode) => string;
+	/** A Device in the flow's "Runs on" list by an id that no Device of the list has. */
+	missingFlowDevice: () => string;
 	/** A program a command calls by its own name, such as `acli`, that only `tools` sign in to. */
 	programWithoutLogin: (program: string, tools: readonly string[]) => string;
 	/**
@@ -159,6 +161,10 @@ export function checkDraft(
 	}
 
 	if (devices) {
+		for (const id of flow.devices ?? []) {
+			if (devices.includes(id)) continue;
+			issues.push({ severity: "error", message: messages.missingFlowDevice() });
+		}
 		for (const node of flow.nodes) {
 			const id = "device" in node ? deviceIdOf(node.device) : undefined;
 			if (id === undefined || devices.includes(id)) continue;

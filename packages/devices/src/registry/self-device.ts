@@ -59,8 +59,8 @@ function addressName(addresses: string | undefined): string | null {
  *
  * A dev daemon (`dev`, NIGHTSHIFT_DEV) runs beside the desktop app on the
  * same computer: its default is "<host name> (dev)", so the two Devices do
- * not share a name. Only a new Device takes it: a dev Device named after
- * the host name keeps its name.
+ * not share a name (ADR 17). A dev Device still named after the host name
+ * takes it too.
  */
 export function defaultSelfDeviceHost(
 	opts: {
@@ -80,14 +80,12 @@ export function defaultSelfDeviceHost(
 		? addressName(env.NIGHTSHIFT_HOST_ADDRESSES) || "Host"
 		: raw;
 	const name = chosen || (opts.dev ? `${fallback} (dev)` : fallback);
-	// A dev Device named after the host name is not stale: renaming it would be silent.
-	const rawIsStale = !opts.dev || Boolean(chosen);
 	return {
 		name,
 		platform: opts.platform ?? process.platform,
 		stale: (current) =>
 			current !== name &&
-			((rawIsStale && current === raw) ||
+			(current === raw ||
 				(container && (isContainerId(current) || current === "Host"))),
 	};
 }

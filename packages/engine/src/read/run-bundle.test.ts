@@ -197,7 +197,7 @@ describe("exportRun", () => {
 
 		const opened = await openRunBundle(path);
 		expect(opened.meta).toMatchObject({
-			formatVersion: 8,
+			formatVersion: 9,
 			runId,
 			missingTranscripts: [],
 			redacted: 0,

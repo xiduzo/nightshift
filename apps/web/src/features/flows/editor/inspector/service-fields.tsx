@@ -18,7 +18,11 @@ import {
 } from "@nightshift/ui/components/toggle-group";
 import { useQuery } from "@tanstack/react-query";
 import { useId } from "react";
-import { connectionQueries, projectSecretQueries } from "@/features/agents";
+import {
+	connectionQueries,
+	projectSecretQueries,
+	spaceSecretQueries,
+} from "@/features/agents";
 import { Field, InspectorSection, Note, PositiveIntInput } from "../fields";
 import { SecretsField } from "../secrets-field";
 import { TemplateField } from "../template-field";
@@ -49,6 +53,11 @@ export function ServiceFields({
 	// The project's secrets: each step of its runs has them (ADR 13).
 	const projectSecrets = useQuery({
 		...projectSecretQueries.list(projectId),
+		select: (list) => list.secrets.map((secret) => secret.name),
+	}).data;
+	// The Space's secrets: every step of its runs has them too (ADR 18).
+	const spaceSecrets = useQuery({
+		...spaceSecretQueries.list(),
 		select: (list) => list.secrets.map((secret) => secret.name),
 	}).data;
 	const named = node.secrets ?? [];
@@ -241,7 +250,7 @@ export function ServiceFields({
 					id={`${id}-secrets`}
 					names={named}
 					secrets={secrets}
-					projectSecrets={projectSecrets}
+					projectSecrets={[...(projectSecrets ?? []), ...(spaceSecrets ?? [])]}
 					onChange={(names) =>
 						onChange(({ secrets: _, ...rest }) =>
 							names.length > 0 ? { ...rest, secrets: names } : rest,

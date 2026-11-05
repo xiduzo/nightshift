@@ -4,6 +4,7 @@ import {
 	callNodeSchema,
 	commandNodeSchema,
 	decisionNodeSchema,
+	deviceIdSchema,
 	endNodeSchema,
 	joinNodeSchema,
 	jsonSchemaSchema,
@@ -232,6 +233,9 @@ export const flowSectionSchema = z.object({
 	sections: z.array(z.string().min(1)).optional(),
 });
 
+/** The most Devices a flow's list names. */
+const MAX_FLOW_DEVICES = 8;
+
 export const flowSchema = z.object({
 	version: z.literal(FLOW_VERSION),
 	description: z.string().optional(),
@@ -241,6 +245,13 @@ export const flowSchema = z.object({
 	variables: z.array(flowVariableSchema).optional(),
 	/** Used when this flow is the top-level flow of a run. */
 	policy: policySchema.optional(),
+	/**
+	 * The Devices that run this flow's steps, by id, the first one first
+	 * (ADR 17). Each next Device is a fallback for one that cannot take the
+	 * steps. Optional, and no version change: without a list a run goes to
+	 * the Host, and a Night Shift that does not know it reads the flow the same.
+	 */
+	devices: z.array(deviceIdSchema).max(MAX_FLOW_DEVICES).optional(),
 	/** The node the flow starts at. */
 	start: nodeIdSchema,
 	nodes: z.array(flowNodeSchema),
@@ -254,6 +265,12 @@ export const flowSchema = z.object({
 });
 
 export type Flow = z.infer<typeof flowSchema>;
+
+/** The flow with this list of Devices. An empty list leaves the field out. */
+export function withFlowDevices(flow: Flow, devices: readonly string[]): Flow {
+	const { devices: _old, ...rest } = flow;
+	return devices.length > 0 ? { ...rest, devices: [...devices] } : rest;
+}
 /** What a flow file holds before defaults apply. Write files in this shape. */
 export type FlowInput = z.input<typeof flowSchema>;
 export type FlowNode = z.infer<typeof flowNodeSchema>;

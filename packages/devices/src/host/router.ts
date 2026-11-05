@@ -219,6 +219,20 @@ export const hostRouter = os.router({
 			context.devices.secretMoves.move(context.key, input),
 		),
 	},
+	spaceSecrets: {
+		list: keyed.spaceSecrets.list.handler(({ context, input }) =>
+			context.devices.projectSecrets.space.list(context.key, input),
+		),
+		set: keyed.spaceSecrets.set.handler(({ context, input }) =>
+			context.devices.projectSecrets.space.set(context.key, input),
+		),
+		remove: keyed.spaceSecrets.remove.handler(({ context, input }) =>
+			context.devices.projectSecrets.space.remove(context.key, input),
+		),
+		take: keyed.spaceSecrets.take.handler(({ context, input }) =>
+			context.devices.projectSecrets.space.take(context.key, input),
+		),
+	},
 	projectSecrets: {
 		list: keyed.projectSecrets.list.handler(({ context, input }) =>
 			context.devices.projectSecrets.list(context.key, input),

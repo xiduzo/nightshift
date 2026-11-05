@@ -1,5 +1,12 @@
 import type { Database } from "@nightshift/db";
 import { event, run, step } from "@nightshift/db/schema";
+import {
+	deviceIdOf,
+	type FlowNode,
+	isProfileRef,
+	type ProfileRef,
+	profileOf,
+} from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { LoggedEvent } from "./events";
@@ -33,7 +40,56 @@ export type RunPlan = {
 	 * run another Replica walked before every run had one.
 	 */
 	personId: string | null;
+	/** Where a step goes when its Device cannot take it (ADR 17). Absent: it waits. */
+	fallbacks?: RunFallbacks;
 };
+
+/** What a profile fills in on a node: a step on a fallback Device runs with its own. */
+export type NodeFields = {
+	harness?: string;
+	model?: string;
+	permissionMode?: string;
+	effort?: string;
+	clis?: string[];
+	connections?: string[];
+	decider?: string;
+	address?: unknown;
+};
+
+/** A Device a step can move to. A node with a profile has that Device's profile of the same name. */
+export type FallbackDevice = PlannedDevice & {
+	profile?: ProfileRef;
+	fields?: NodeFields;
+};
+
+/**
+ * Where a step goes when its Device cannot take it, in order: `nodes` for a
+ * node that names a Device, by `fallbackKey`, else `run`.
+ */
+export type RunFallbacks = {
+	run: FallbackDevice[];
+	nodes: Record<string, FallbackDevice[]>;
+	/** The Host among these Devices: a step there reads no Personal secret. */
+	hostId?: string;
+};
+
+/** What a person reads when a Device takes a step over: which secrets work there. */
+export function takenOverSecrets(toHost: boolean): string {
+	return toHost
+		? "Space and project secrets work there. Personal secrets and secrets saved on another computer do not."
+		: "Space and project secrets work there. Secrets saved only on another computer do not.";
+}
+
+/** The key of a node in `RunFallbacks.nodes`: its id and the Device it names. */
+export function fallbackKey(node: FlowNode): string {
+	const ref = profileOf(node);
+	const device = isProfileRef(ref)
+		? `${ref.device}\u0000${ref.profile}`
+		: "device" in node
+			? String(deviceIdOf(node.device))
+			: "";
+	return `${node.id}\u0000${device}`;
+}
 
 /** A Device of a run's plan. Its name is null for a run from before the plan kept names. */
 export type PlannedDevice = { id: string; name: string | null };
@@ -68,7 +124,8 @@ export function planOf(
 	row: Pick<
 		RunRow,
 		"deviceId" | "walkerId" | "placements" | "deviceNames" | "startedBy"
-	>,
+	> &
+		Partial<Pick<RunRow, "fallbacks">>,
 ): RunPlan {
 	const names = stringsOf(row.deviceNames);
 	const at = (id: string): PlannedDevice => ({ id, name: names[id] ?? null });
@@ -90,6 +147,9 @@ export function planOf(
 			].map((id) => [id, at(id)]),
 		),
 		personId: row.startedBy,
+		...(row.fallbacks
+			? { fallbacks: JSON.parse(row.fallbacks) as RunFallbacks }
+			: {}),
 	};
 }
 
@@ -123,7 +183,10 @@ export function placedRun(row: RunRow): PlacedRun {
  */
 export function planColumns(
 	plan: RunPlan,
-): Pick<RunRow, "deviceId" | "placements" | "deviceNames" | "startedBy"> {
+): Pick<
+	RunRow,
+	"deviceId" | "placements" | "deviceNames" | "startedBy" | "fallbacks"
+> {
 	const named = Object.entries(plan.named);
 	const names = Object.fromEntries(
 		[
@@ -142,6 +205,7 @@ export function planColumns(
 				: null,
 		deviceNames: Object.keys(names).length > 0 ? JSON.stringify(names) : null,
 		startedBy: plan.personId,
+		fallbacks: plan.fallbacks ? JSON.stringify(plan.fallbacks) : null,
 	};
 }
 

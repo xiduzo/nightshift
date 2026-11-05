@@ -1,7 +1,7 @@
 /** The execution port (`Device`): this computer (`localDevice`), commands and tool calls. A Device reached through a Host is `@nightshift/devices`' `remoteDevice`. */
 
 export { runCommand, tailOf } from "./command";
-export { forRun } from "./for-run";
+export { forRun, withProfileValues } from "./for-run";
 export { localDevice } from "./local";
 export {
 	createToolLaunchers,

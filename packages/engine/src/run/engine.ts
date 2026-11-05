@@ -1,5 +1,9 @@
 import { harnessFacts } from "@nightshift/agents/harness-facts";
-import { isCustomHarness, type Schedule } from "@nightshift/flows";
+import {
+	type FlowNode,
+	isCustomHarness,
+	type Schedule,
+} from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
 import { createArtifactStore } from "../artifacts";
@@ -10,6 +14,7 @@ import type {
 	MemberChange,
 	StartRunInput,
 } from "../contract";
+import { type Device, withProfileValues } from "../device";
 import {
 	defaultRunSettings,
 	lastKnownProfiles,
@@ -93,6 +98,7 @@ import { createServiceKeeper, serviceHolds } from "../services";
 import { listKeptValues, resetKeptValue } from "../variables";
 import { createRunActions } from "./actions";
 import type { EngineOptions } from "./engine-options";
+import type { StepFallback } from "./peers";
 import {
 	createProjectsMove,
 	type MovedProjects,
@@ -100,7 +106,7 @@ import {
 } from "./projects-move";
 import { createRecovery } from "./recovery";
 import { createRunRelay } from "./relay";
-import { createRunStart } from "./run-start";
+import { capabilitiesFor, createRunStart, refusalOf } from "./run-start";
 import { createSignals } from "./signals";
 import { createSpaces } from "./space";
 import type { SpaceEngine } from "./space-engine";
@@ -522,6 +528,22 @@ export function createEngine(
 		}),
 	]);
 
+	/** The Devices of a step's fallbacks that can take it now, in order (ADR 17). */
+	async function stepFallbacks(
+		node: FlowNode,
+		list: readonly StepFallback[],
+	): Promise<Device[]> {
+		const fit: Device[] = [];
+		for (const { device, fields } of list) {
+			if (!(await device.state()).online) continue;
+			const asThere = { ...node, ...fields } as FlowNode;
+			const has = await capabilitiesFor([asThere], device).catch(() => null);
+			if (!has || refusalOf([asThere], has) !== null) continue;
+			fit.push(fields ? withProfileValues(device, fields) : device);
+		}
+		return fit;
+	}
+
 	const runner = createRunner({
 		db,
 		log: runLog,
@@ -532,6 +554,8 @@ export function createEngine(
 		settings: runSettings,
 		deviceFor: (node, row) => placement.deviceFor(node, placedRun(row)),
 		deviceById: (id, row) => placement.deviceById(id, placedRun(row)),
+		fallbacksFor: (node, row) =>
+			stepFallbacks(node, placement.fallbacksFor(node, placedRun(row))),
 		flowOf: parseRunFlow,
 		calledFlowsOf: parseCalledFlows,
 		policyFor: (flow) => resolvePolicy(flow.policy, runSettings().policy),
@@ -640,7 +664,11 @@ export function createEngine(
 		runner,
 		now,
 		projectRow: (projectId) => projects.find(projectId),
-		plan: placement.plan,
+		plan: async (input) =>
+			placement.plan({
+				...input,
+				lastRun: await lastRunDevice(db, input.project.id),
+			}),
 		selfName: device.name,
 		memberName: membersName,
 	});
@@ -734,13 +762,15 @@ export function createEngine(
 	async function startRunWith(
 		input: StartRunInput,
 		trigger: RunTrigger,
-		personId: string | null,
 	): Promise<RunSummary> {
 		await ready;
 		const { spaceId } = await projects.find(input.projectId);
-		const place = await places.place(spaceId, input, personId);
+		const place = await places.place(spaceId, input);
 		if (place.walker === "host") {
-			return relay.startOnHost({ ...input, deviceId: place.deviceId }, spaceId);
+			return relay.startOnHost(
+				{ ...input, startedFrom: place.startedFrom },
+				spaceId,
+			);
 		}
 		const placed =
 			place.deviceId === undefined
@@ -763,19 +793,20 @@ export function createEngine(
 		const { spaceId } = await projects.find(input.projectId);
 		const deviceId =
 			(await directory.hostOf(spaceId)) ?? (await runLog.walkerId());
-		return startRunWith(
-			{ ...input, deviceId },
-			trigger,
-			input.startedBy ?? ownerId,
-		).catch((error: unknown) => {
-			if (error instanceof Refusal && error.message === NOT_ON_THIS_COMPUTER) {
-				throw new Refusal(
-					error.kind,
-					"The computer that runs schedules does not have this project. Add it there.",
-				);
-			}
-			throw error;
-		});
+		return startRunWith({ ...input, deviceId }, trigger).catch(
+			(error: unknown) => {
+				if (
+					error instanceof Refusal &&
+					error.message === NOT_ON_THIS_COMPUTER
+				) {
+					throw new Refusal(
+						error.kind,
+						"The computer that runs schedules does not have this project. Add it there.",
+					);
+				}
+				throw error;
+			},
+		);
 	}
 
 	/** A webhook schedule's signal: the project's runs this computer walks that wait for it. */

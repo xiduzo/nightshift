@@ -77,7 +77,12 @@ import type { SecretView } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import { useNow } from "@/shared/format";
 import { PageSection } from "@/shared/page";
-import { connectionMutations, connectionQueries } from "../queries";
+import {
+	connectionMutations,
+	connectionQueries,
+	spaceSecretMutations,
+	spaceSecretQueries,
+} from "../queries";
 import { MoveToProjectDialog } from "./move-to-project-dialog";
 import { OUTSIDE_HINT } from "./parts";
 import {
@@ -186,6 +191,7 @@ function secretColumns({
 	onSet,
 	onMove,
 	onMoveToProject,
+	onMoveToSpace,
 	onRemove,
 }: {
 	now: number;
@@ -194,6 +200,7 @@ function secretColumns({
 	onSet: (secret: SecretRef) => void;
 	onMove: (secret: SecretRef) => void;
 	onMoveToProject: (secret: SecretRef) => void;
+	onMoveToSpace: (secret: SecretRef) => void;
 	onRemove: (secret: SecretRef) => void;
 }) {
 	return column.columns([
@@ -279,6 +286,12 @@ function secretColumns({
 									</DropdownMenuItem>
 								) : null}
 								{secret.saved ? (
+									<DropdownMenuItem onClick={() => onMoveToSpace(ref)}>
+										<FolderInputIcon />
+										Move to this Space
+									</DropdownMenuItem>
+								) : null}
+								{secret.saved ? (
 									<>
 										<DropdownMenuSeparator />
 										<DropdownMenuItem
@@ -327,6 +340,20 @@ export function SecretsCard({
 				toast.success(`Moved ${name} to ${SCOPE[to].label}`);
 				void queryClient.invalidateQueries({
 					queryKey: connectionQueries.lists(),
+				});
+			},
+			onError: (error) => toast.error(`Not moved: ${error.message}`),
+		}),
+	);
+	const moveToSpace = useMutation(
+		spaceSecretMutations.moveIn({
+			onSuccess: (_, { name }) => {
+				toast.success(`Moved ${name} to this Space`);
+				void queryClient.invalidateQueries({
+					queryKey: connectionQueries.lists(),
+				});
+				void queryClient.invalidateQueries({
+					queryKey: spaceSecretQueries.lists(),
 				});
 			},
 			onError: (error) => toast.error(`Not moved: ${error.message}`),
@@ -397,6 +424,8 @@ export function SecretsCard({
 										to: ref.scope === "computer" ? "personal" : "computer",
 									}),
 								onMoveToProject: setToProject,
+								onMoveToSpace: (ref) =>
+									moveToSpace.mutate({ name: ref.name, from: ref.scope }),
 								onRemove: setRemoving,
 							})}
 							data={secrets}

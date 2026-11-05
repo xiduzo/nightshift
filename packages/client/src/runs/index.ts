@@ -54,7 +54,6 @@ export {
 	stoppedNotice,
 } from "./notice";
 export {
-	defaultPlacement,
 	hostOwnerHint,
 	type PlacementChoice,
 	placementChoices,

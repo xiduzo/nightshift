@@ -26,6 +26,8 @@ export type DeviceChoice = {
 	name: string;
 	thisDevice: boolean;
 	offers?: string[];
+	/** A development install: it shows only on itself, or when the node names it. */
+	dev?: boolean;
 };
 
 /**
@@ -113,10 +115,13 @@ export function DeviceField({
 	copy?: DeviceFieldCopy;
 	onChange: (device: string | undefined) => void;
 }) {
+	const chosen = deviceIdOf(value);
 	const listed = [
 		...new Map((devices ?? []).map((d) => [d.deviceId, d])).values(),
 	];
-	const chosen = deviceIdOf(value);
+	const shown = listed.filter(
+		(d) => !d.dev || d.thisDevice || d.deviceId === chosen,
+	);
 	const oldName = legacyDeviceName(value);
 	const unknown =
 		chosen !== undefined && !listed.some((d) => d.deviceId === chosen);
@@ -134,7 +139,7 @@ export function DeviceField({
 		...(unknown && chosen !== undefined
 			? [{ value: chosen, label: "A device that is not in this Space" }]
 			: []),
-		...listed.map((device) => ({
+		...shown.map((device) => ({
 			value: device.deviceId,
 			label: label(device),
 		})),

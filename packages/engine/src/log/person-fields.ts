@@ -41,6 +41,7 @@ export const PERSON_FIELDS = {
 	WorktreeCreated: [],
 	WorktreeRemoved: [],
 	HandedOff: [],
+	StepMoved: [],
 	WalkerMoved: ["by"],
 	WalkerArrived: [],
 	RunResumed: [],

@@ -14,6 +14,7 @@ import { useId } from "react";
 import { PanelHeader } from "@/shared/panel";
 import { DescriptionSuggest, InputsSuggest } from "../assistant/field-helpers";
 import { Field, InspectorSection, Note, PositiveIntInput } from "./fields";
+import { FlowDevicesField } from "./flow-devices-field";
 import { InputsEditor } from "./io/inputs-editor";
 import { OutputsEditor } from "./io/outputs-editor";
 import { VariablesEditor } from "./io/variables-editor";
@@ -138,6 +139,13 @@ export function FlowInspector({
 						))}
 					</NativeSelect>
 				</Field>
+				{projectId ? (
+					<FlowDevicesField
+						flow={flow}
+						projectId={projectId}
+						onChange={onChange}
+					/>
+				) : null}
 			</InspectorSection>
 
 			<InspectorSection

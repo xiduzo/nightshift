@@ -362,7 +362,11 @@ export async function* serveWork(
 				return;
 			case "callTool":
 				yield result(
-					await device.callTool({ ...withoutRun(call.input), ...run, signal }),
+					await device.callTool({
+						...withoutRun(call.input),
+						...run,
+						signal,
+					}),
 				);
 				return;
 			case "decide":

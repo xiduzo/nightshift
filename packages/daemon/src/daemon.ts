@@ -345,6 +345,7 @@ export async function createDaemon(
 		env: fallbacks,
 		secrets: await secretStore({ dataDir, ...keyStore }),
 		personal: () => personalSecrets,
+		personalInUse: () => !hostSettings().host,
 		projects: () => projectSecrets,
 	});
 	const { settings, connections, cliTools, profiles } = config;
@@ -568,6 +569,7 @@ export async function createDaemon(
 	 */
 	slots.handOver("nightshiftDevices", (handover) => handover.release());
 	const devices = await startDevices({
+		...(dev ? { dev: true } : {}),
 		auth,
 		db,
 		env,

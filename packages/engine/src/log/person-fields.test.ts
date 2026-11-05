@@ -78,6 +78,7 @@ const samples: { [T in EngineEventType]: EnginePayloads[T] } = {
 		branches: [],
 		by: "person",
 	},
+	StepMoved: { from: "device-a", to: "device-b" },
 	HandedOff: {
 		from: "d1",
 		to: "d2",

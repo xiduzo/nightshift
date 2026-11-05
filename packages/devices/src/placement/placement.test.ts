@@ -109,7 +109,8 @@ const bDevice = (projectOf: () => string) =>
 			clonePath: async (id) => (id === projectOf() ? b.repoPath : null),
 			findCli: (name) => (name === "git" ? "/usr/bin/git" : null),
 			// B has the profile "everywhere"; only A has "here_only".
-			profileFor: (name) => (name === "everywhere" ? PROFILE : null),
+			profileFor: (name) =>
+				name === "everywhere" || name === "b_only" ? PROFILE : null,
 			// Only B has the secret B_TOKEN.
 			secretEnv: async (names) => {
 				const missing = names.filter((name) => name !== "B_TOKEN");
@@ -456,15 +457,16 @@ describe("a run placed on another Device", () => {
 			homeHost: null,
 		});
 		online.add("device-d");
-		await expect(
-			space().startRun({
-				projectId,
-				flow: flow([command("hi", "echo hi")]),
-				startedBy: personId,
-				deviceId: "device-d",
-			}),
-		).rejects.toThrow("spare does not have this project.");
 		expect(await engine.space(a.spaceId).listRuns()).toEqual([]);
+		// A pick without the project moves on to a Device that has it (ADR 17).
+		const moved = await space().startRun({
+			projectId,
+			flow: flow([command("hi", "echo hi")]),
+			startedBy: personId,
+			deviceId: "device-d",
+		});
+		expect(moved.device).toMatchObject({ id: B });
+		await until(moved.id, "finished");
 	});
 });
 
@@ -712,14 +714,14 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		expect(run.steps[1]?.error).toContain("cannot move to studio-b");
 	});
 
-	test("a node whose Device is offline sleeps, and continues when it is back", async () => {
+	test("a node whose Device goes offline moves to the next Device of the plan (ADR 17)", async () => {
 		await shareRemote();
 		const started = await space().startRun({
 			projectId,
 			flow: flow(
 				[
 					command("first", "sleep 0.3"),
-					{ ...command("ask", "echo from B"), device: B },
+					{ ...command("ask", "echo moved"), device: B },
 				] as Flow["nodes"],
 				[{ id: "e1", from: "first", outcome: "pass", to: "ask" }],
 			),
@@ -727,8 +729,37 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		});
 		// It goes away after the start.
 		online.delete(B);
+		const run = await until(started.id, "finished");
+		expect(run.steps[1]?.nodeId).toBe("ask");
+		expect(run.steps[1]?.device?.id).toBe(started.device.id);
+		expect(String(run.steps[1]?.outputs.log_tail).trim()).toBe("moved");
+		expect(run.warnings.map((w) => w.message)).toContain(
+			"studio-b is offline. test takes over this step. Space and project secrets work there. Secrets saved only on another computer do not.",
+		);
+	}, 20_000);
+
+	test("a node with a profile no other Device has sleeps, and continues when its Device is back", async () => {
+		await shareRemote();
+		const started = await space().startRun({
+			projectId,
+			flow: flow(
+				[
+					command("first", "sleep 0.3"),
+					{
+						id: "work",
+						type: "agent",
+						position: { x: 0, y: 0 },
+						prompt: "Do the work.",
+						profile: { device: B, profile: "b_only" },
+					},
+				] as Flow["nodes"],
+				[{ id: "e1", from: "first", outcome: "pass", to: "work" }],
+			),
+			startedBy: personId,
+		});
+		online.delete(B);
 		const asleep = await until(started.id, "sleeping");
-		expect(asleep.steps[1]?.nodeId).toBe("ask");
+		expect(asleep.steps[1]?.nodeId).toBe("work");
 		const waited = (await a.db.select().from(event)).find(
 			(e) => e.type === "WaitStarted",
 		);
@@ -740,8 +771,7 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		});
 		online.add(B);
 		await engine.deviceBack(B);
-		const run = await until(started.id, "finished");
-		expect(String(run.steps[1]?.outputs.log_tail).trim()).toBe("from B");
+		await until(started.id, "finished");
 	}, 20_000);
 
 	test("a Subflow on B runs its steps there, whoever walks the run, and waits for B while it is offline", async () => {
@@ -804,7 +834,7 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		expect(String(inside?.outputs.log_tail).trim()).toBe("from B");
 	}, 20_000);
 
-	test("a node whose Device is offline at the start: the run starts, the step waits, and continues when it is back", async () => {
+	test("a node whose Device is offline at the start runs on the next Device, and the run says so (ADR 17)", async () => {
 		await shareRemote();
 		online.delete(B);
 		const started = await space().startRun({
@@ -812,18 +842,17 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 			flow: flow(
 				[
 					command("first", "true"),
-					{ ...command("ask", "echo from B"), device: B },
+					{ ...command("ask", "echo moved"), device: B },
 				] as Flow["nodes"],
 				[{ id: "e1", from: "first", outcome: "pass", to: "ask" }],
 			),
 			startedBy: personId,
 		});
-		const asleep = await until(started.id, "sleeping");
-		expect(asleep.steps[1]?.nodeId).toBe("ask");
-		online.add(B);
-		await engine.deviceBack(B);
 		const run = await until(started.id, "finished");
-		expect(String(run.steps[1]?.outputs.log_tail).trim()).toBe("from B");
+		expect(run.steps[1]?.device?.id).toBe(started.device.id);
+		expect(run.warnings.map((w) => w.message)).toContain(
+			'studio-b is offline. test takes over node "ask". Space and project secrets work there. Secrets saved only on another computer do not.',
+		);
 	}, 20_000);
 
 	test("a node whose Device stays offline waits up to the stop time, then the step stops", async () => {
@@ -832,13 +861,32 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		lifetime.abort();
 		await engine.dispose();
 		engine = peerEngine({ minuteMs: 50, now: clock.now });
+		const known = await openDeviceDocument({ db: a.db, deviceId: B });
+		await createProfileStore({ document: known }).save(
+			{
+				name: "b_only",
+				harness: "claude-code",
+				model: "sonnet",
+				permissionMode: "acceptEdits",
+				clis: [],
+				connections: [],
+			},
+			"b_only",
+		);
+		await known.close();
 		online.delete(B);
 		// Two retries a minute apart, then the stop time half a minute later.
 		const stopAt = clock.now() + 125;
 		const started = await space().startRun({
 			projectId,
 			flow: flow([
-				{ ...command("ask", "echo from B"), device: B },
+				{
+					id: "ask",
+					type: "agent",
+					position: { x: 0, y: 0 },
+					prompt: "Ask.",
+					profile: { device: B, profile: "b_only" },
+				},
 			] as Flow["nodes"]),
 			startedBy: personId,
 			stopAt,
@@ -859,14 +907,14 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		const documentOfB = await openDeviceDocument({ db: a.db, deviceId: B });
 		await createProfileStore({ document: documentOfB }).save(
 			{
-				name: "everywhere",
+				name: "b_only",
 				harness: "claude-code",
 				model: "sonnet",
 				permissionMode: "acceptEdits",
 				clis: [],
 				connections: [],
 			},
-			"everywhere",
+			"b_only",
 		);
 		await documentOfB.close();
 		online.delete(B);
@@ -891,13 +939,13 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		);
 		const started = await space().startRun({
 			projectId,
-			flow: work("everywhere"),
+			flow: work("b_only"),
 			startedBy: personId,
 		});
 		const asleep = await until(started.id, "sleeping");
 		expect(asleep.steps[0]?.nodeId).toBe("work");
 		expect(asleep.flow.nodes[0]).toMatchObject({
-			profile: { device: B, profile: "everywhere" },
+			profile: { device: B, profile: "b_only" },
 			model: "sonnet",
 		});
 		online.add(B);
@@ -906,18 +954,18 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		expect(run.steps[0]?.device?.id).toBe(B);
 	}, 20_000);
 
-	test("a node may not name a device its starter does not have", async () => {
+	test("a node that names a device nobody can use moves on, and the run says so (ADR 17)", async () => {
 		await shareRemote();
-		await expect(
-			space().startRun({
-				projectId,
-				flow: flow([
-					{ ...command("ask", "true"), device: "nowhere" },
-				] as Flow["nodes"]),
-				startedBy: personId,
-			}),
-		).rejects.toThrow(
-			'The flow runs "ask" on a device that is not in this Space, or that you cannot use. Choose another device.',
+		const started = await space().startRun({
+			projectId,
+			flow: flow([
+				{ ...command("ask", "true"), device: "nowhere" },
+			] as Flow["nodes"]),
+			startedBy: personId,
+		});
+		const run = await until(started.id, "finished");
+		expect(run.warnings.map((w) => w.message)).toContain(
+			'The device it names is not in this Space. test takes over node "ask". Space and project secrets work there. Secrets saved only on another computer do not.',
 		);
 	});
 
@@ -1019,7 +1067,7 @@ describe("a run's plan", () => {
 			startedBy: personId,
 		});
 		const row = await rowOf(started.id);
-		expect(placedRun(row).plan).toEqual({
+		expect(placedRun(row).plan).toMatchObject({
 			device: { id: started.device.id, name: "test" },
 			named: { [B]: { id: B, name: "studio-b" } },
 			devices: {
@@ -1032,6 +1080,32 @@ describe("a run's plan", () => {
 		expect(JSON.parse(row.placements ?? "{}")).toEqual({ [B]: B });
 		await space().act(started.id, { kind: "stop" });
 	});
+
+	test("a step whose work is only on an offline Device waits, even when another Device could take it", async () => {
+		await shareRemote();
+		const started = await space().startRun({
+			projectId,
+			flow: flow(
+				[
+					{ ...command("there", "echo on B"), device: B },
+					gate,
+					command("after", "echo on A"),
+				] as Flow["nodes"],
+				[
+					{ id: "e1", from: "there", outcome: "pass", to: "gate" },
+					{ id: "e2", from: "gate", outcome: "yes", to: "after" },
+				],
+			),
+			startedBy: personId,
+			deviceId: B,
+		});
+		const stepId = await openGate(started.id);
+		online.delete(B);
+		await space().act(started.id, { kind: "answer", stepId, choice: "yes" });
+		const asleep = await until(started.id, "sleeping");
+		expect(asleep.steps.at(-1)?.nodeId).toBe("after");
+		await space().act(started.id, { kind: "stop" });
+	}, 20_000);
 
 	test("the walk reads it: after a restart, with no list of Devices here, a step runs on the run's Device by its planned name", async () => {
 		const started = await space().startRun({

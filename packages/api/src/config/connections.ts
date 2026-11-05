@@ -25,6 +25,7 @@ import {
 	mcpToolsSchema,
 	secretScopeSchema,
 } from "./schemas";
+import { sharedSecretNames } from "./shared-secret-names";
 
 const checkTarget = z.enum(harnessNameSchema.options);
 
@@ -40,18 +41,10 @@ export const connections = {
 			connectionsInUse(
 				context,
 				await context.space.flowUse(),
-				// A project's own secrets win for its flows. When they cannot be
-				// read now, the flows stay listed.
-				(projectId) =>
-					context.connections
-						.projectSecrets(
-							{ spaceId: context.spaceId, projectId },
-							context.session.user.id,
-						)
-						.then(
-							(names) => new Set(names.map((secret) => secret.name)),
-							() => new Set<string>(),
-						),
+				// A project's and its Space's secrets cover its flows. When they
+				// cannot be read now, the flows stay listed.
+				async (projectId) =>
+					(await sharedSecretNames(context, projectId)) ?? new Set<string>(),
 			),
 		),
 	/** Runs `--version` and the login check of one CLI. Read-only. */

@@ -13,6 +13,7 @@ import {
 	cliToolSchema,
 	signInResultSchema,
 } from "./schemas";
+import { sharedSecretNames } from "./shared-secret-names";
 
 /**
  * CLI tools: programs on this computer that the agents may run. Agent nodes
@@ -29,16 +30,7 @@ export const cliTools = {
 		.handler(async ({ context }) =>
 			cliToolsInUse(context, await context.space.flowUse(), {
 				list: () => context.space.listProjects(),
-				secretNames: (projectId) =>
-					context.connections
-						.projectSecrets(
-							{ spaceId: context.spaceId, projectId },
-							context.session.user.id,
-						)
-						.then(
-							(names) => new Set(names.map((secret) => secret.name)),
-							() => null,
-						),
+				secretNames: (projectId) => sharedSecretNames(context, projectId),
 			}),
 		),
 	/** The programs this computer can run by name, to pick one from. */

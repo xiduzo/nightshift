@@ -61,6 +61,7 @@ function rowsOf(walkerId: string, projectId = "project-none"): RunRows {
 				deviceId: null,
 				placements: null,
 				deviceNames: null,
+				fallbacks: null,
 				createdAt: now(),
 			},
 		],
@@ -202,6 +203,7 @@ describe("a Host in memory", () => {
 				deviceId: null,
 				placements: null,
 				deviceNames: null,
+				fallbacks: null,
 			},
 		]);
 

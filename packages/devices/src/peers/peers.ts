@@ -55,6 +55,8 @@ export type PeerOptions = {
 	ownOffers?: () => readonly DeviceOffer[];
 	/** This computer's profiles, which its owner may use. Without it, unknown. */
 	ownProfiles?: () => readonly DeviceProfile[];
+	/** "Be a Host" is on here (`PlacementDeps.isHost`). */
+	isHost?: () => boolean;
 	/**
 	 * The copies of the documents of this computer's owner's other Devices
 	 * (`createDeviceCopies`): their names and profiles while the home Host
@@ -177,6 +179,7 @@ export function createPeers(
 		offersHere: admission.inForce,
 		...(options.ownProfiles ? { ownProfiles: options.ownProfiles } : {}),
 		...(options.copies ? { copies: options.copies } : {}),
+		...(options.isHost ? { isHost: options.isHost } : {}),
 		mayUseOffers: (spaceId, personId) =>
 			options.mayUseOffers?.(spaceId, personId) ?? Promise.resolve(false),
 	});

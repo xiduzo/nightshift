@@ -92,9 +92,10 @@ export type ProjectSecretName = {
 export type ProjectSecrets = {
 	list(project: ProjectRef, personId: string): Promise<ProjectSecretName[]>;
 	/**
-	 * The values of these names that are secrets of the run's Project, for
-	 * one step of it. Every value of the Project without `names` (to take
-	 * them out of the step's output). A name that is none is left out.
+	 * The values of these names that are secrets of the run's Project or
+	 * its Space, for one step of it. The Space's wins (ADR 18). Every value
+	 * without `names` (to take them out of the step's output). A name that
+	 * is none is left out.
 	 */
 	values(
 		run: StepRun,
@@ -117,12 +118,28 @@ export type ProjectSecrets = {
 		personId: string,
 	): Promise<string | null>;
 	/**
-	 * The values of the Project that this computer keeps itself: all of
-	 * them, or those of `names`. For an exported run, to take them out, and
+	 * The values of the Project and its Space that this computer keeps
+	 * itself, the Space's first: all of them, or those of `names`. For an exported run, to take them out, and
 	 * for a webhook, which no step asks for. Empty when another Host keeps
 	 * them.
 	 */
 	kept(project: ProjectRef, names?: readonly string[]): Promise<string[]>;
+	/** The secrets of a Space (ADR 18): every step of a run in the Space reads them through `values`. */
+	space: SpaceSecrets;
+};
+
+/** A Space's secrets, for the screens. Same rules as a Project's, for the whole Space. */
+export type SpaceSecrets = {
+	list(spaceId: string, personId: string): Promise<ProjectSecretName[]>;
+	set(
+		spaceId: string,
+		name: string,
+		value: string,
+		personId: string,
+	): Promise<void>;
+	remove(spaceId: string, name: string, personId: string): Promise<void>;
+	/** The value of a name, read to move it to another scope: it is never shown. */
+	take(spaceId: string, name: string, personId: string): Promise<string | null>;
 };
 
 /** What a person reads when a step needs Project secrets that cannot be read now. */
@@ -155,15 +172,25 @@ export function unreachableNote(found: NotRead): string {
 	return [
 		found.projectUnreachable ? ` ${PROJECT_UNREACHABLE}` : "",
 		found.unreachable ? ` ${PERSONAL_UNREACHABLE}` : "",
+		found.personalHere ? ` ${PERSONAL_ON_HOST}` : "",
 	].join("");
 }
 
 /**
  * Why a missing name may have a value after all: `unreachable`, the
  * Personal secrets could not be read now (`PERSONAL_UNREACHABLE`);
- * `projectUnreachable`, the Project's (`PROJECT_UNREACHABLE`).
+ * `projectUnreachable`, the Project's (`PROJECT_UNREACHABLE`);
+ * `personalHere`, it is a Personal secret and this computer is a Host.
  */
-type NotRead = { unreachable?: boolean; projectUnreachable?: boolean };
+type NotRead = {
+	unreachable?: boolean;
+	projectUnreachable?: boolean;
+	personalHere?: boolean;
+};
+
+/** Why a Personal secret has no value on a Host (ADR 18), and what to do. */
+const PERSONAL_ON_HOST =
+	"Personal secrets do not work on the Host. Move it to the Space or the project.";
 
 export type Connection = {
 	name: string;
@@ -301,6 +328,33 @@ export type ConnectionStore = {
 	 * Project (ADR 13, decision 7): it reads the value where it is, saves it
 	 * as the Project's, then removes the copy it moved from.
 	 */
+	/** The secrets of a Space (ADR 18): as `projectSecrets`, for the whole Space. */
+	spaceSecrets(spaceId: string, personId: string): Promise<ProjectSecretName[]>;
+	setSpaceSecret(
+		spaceId: string,
+		name: string,
+		value: string,
+		personId: string,
+	): Promise<void>;
+	removeSpaceSecret(
+		spaceId: string,
+		name: string,
+		personId: string,
+	): Promise<void>;
+	/** Moves a saved secret of this computer, or a Personal one, into a Space. */
+	moveToSpace(
+		name: string,
+		from: SecretScope,
+		spaceId: string,
+		personId: string,
+	): Promise<void>;
+	/** Moves a Space's secret to this computer, or to its owner's Personal secrets. */
+	moveFromSpace(
+		spaceId: string,
+		name: string,
+		to: SecretScope,
+		personId: string,
+	): Promise<void>;
 	moveToProject(
 		name: string,
 		from: SecretScope,
@@ -417,12 +471,19 @@ type Resolved = {
 	fromProject: ReadonlySet<string>;
 	unreachable: boolean;
 	projectUnreachable: boolean;
+	/** A name is a Personal secret, which works nowhere on this computer. */
+	personalHere: boolean;
 };
 
 /** The flags of `NotRead` that are set, to spread into a result. */
-const notRead = ({ unreachable, projectUnreachable }: Resolved): NotRead => ({
+const notRead = ({
+	unreachable,
+	projectUnreachable,
+	personalHere,
+}: Resolved): NotRead => ({
 	...(unreachable ? { unreachable } : {}),
 	...(projectUnreachable ? { projectUnreachable } : {}),
+	...(personalHere ? { personalHere } : {}),
 });
 
 export function createConnectionStore(options: {
@@ -435,6 +496,12 @@ export function createConnectionStore(options: {
 	 * this computer has no Personal scope.
 	 */
 	personal?: () => PersonalSecrets | null;
+	/**
+	 * Whether a use here reads Personal secrets. False on a Host: a Personal
+	 * secret stays on the Person's own computers (ADR 18). The Host only
+	 * keeps it for them. Default: yes.
+	 */
+	personalInUse?: () => boolean;
 	/**
 	 * The secrets of the Projects, read at each use. Null: not reachable
 	 * yet. Without it, this computer has no Project scope.
@@ -527,6 +594,7 @@ export function createConnectionStore(options: {
 		return port;
 	}
 	const hasPersonal = () => options.personal !== undefined;
+	const personalInUse = () => options.personalInUse?.() ?? true;
 	/**
 	 * Logs why the Personal secrets could not be read, once until the
 	 * reason changes: an older or offline Home Host would log every use.
@@ -620,14 +688,14 @@ export function createConnectionStore(options: {
 	}
 
 	/**
-	 * The values of `names` for one use, the most specific scope first
-	 * (ADR 13, decision 4): the run's Project (with `use.project`),
-	 * Personal (when `use` allows it), this computer's keychain, the
-	 * daemon's environment.
+	 * The values of `names` for one use, the Person's scope first (ADR 18):
+	 * Personal (when `use` allows it and this computer is no Host), the
+	 * run's Space and its Project (with `use.project`), this computer's
+	 * keychain, the daemon's environment.
 	 *
 	 * Fails closed: when the Project or the Personal secrets cannot be
 	 * read, a name this computer last knew as one of them has no value,
-	 * rather than a value of a wider scope. Other names still read the
+	 * rather than a value of another scope. Other names still read the
 	 * scopes that answered.
 	 */
 	async function resolve(
@@ -641,27 +709,6 @@ export function createConnectionStore(options: {
 			if (!secretView().has(name)) continue;
 			const value = await secrets.get(name);
 			if (value !== null) vars[name] = value;
-		}
-		let unreachable = false;
-		if (use.personal !== false && hasPersonal() && wanted.length > 0) {
-			try {
-				const found = await personalPort().values(wanted);
-				lastWarning = "";
-				for (const name of wanted) {
-					const value = found[name];
-					if (value === undefined) personalNames.delete(name);
-					else {
-						vars[name] = value;
-						if (!personalNames.has(name)) personalNames.set(name, 0);
-					}
-				}
-			} catch (error) {
-				unreachable = true;
-				warnOnce("read", error);
-				for (const name of wanted) {
-					if (personalNames.has(name)) delete vars[name];
-				}
-			}
 		}
 		let projectUnreachable = false;
 		if (use.project && hasProjects() && wanted.length > 0) {
@@ -685,7 +732,40 @@ export function createConnectionStore(options: {
 				}
 			}
 		}
-		return { vars, fromProject, unreachable, projectUnreachable };
+		let unreachable = false;
+		let personalHere = false;
+		if (use.personal !== false && hasPersonal() && wanted.length > 0) {
+			if (!personalInUse()) {
+				await listPersonal();
+				personalHere = wanted.some(
+					(name) => personalNames.has(name) && vars[name] === undefined,
+				);
+			} else {
+				try {
+					const found = await personalPort().values(wanted);
+					lastWarning = "";
+					for (const name of wanted) {
+						const value = found[name];
+						if (value === undefined) personalNames.delete(name);
+						else {
+							vars[name] = value;
+							fromProject.delete(name);
+							if (!personalNames.has(name)) personalNames.set(name, 0);
+						}
+					}
+				} catch (error) {
+					unreachable = true;
+					warnOnce("read", error);
+					for (const name of wanted) {
+						if (personalNames.has(name)) {
+							delete vars[name];
+							fromProject.delete(name);
+						}
+					}
+				}
+			}
+		}
+		return { vars, fromProject, unreachable, projectUnreachable, personalHere };
 	}
 
 	async function expandServers(
@@ -955,6 +1035,45 @@ export function createConnectionStore(options: {
 			await saveIn(to, name, value);
 			await projectPort().remove(project, name, personId);
 			projectNamesOf(project.projectId).delete(name);
+		},
+		async spaceSecrets(spaceId, personId) {
+			return projectPort().space.list(spaceId, personId);
+		},
+		async setSpaceSecret(spaceId, name, value, personId) {
+			secretNameSchema.parse(name);
+			if (value === "") throw new Refusal("invalid", "A secret needs a value.");
+			await projectPort().space.set(spaceId, name, value, personId);
+		},
+		async removeSpaceSecret(spaceId, name, personId) {
+			await projectPort().space.remove(spaceId, name, personId);
+		},
+		async moveToSpace(name, from, spaceId, personId) {
+			secretNameSchema.parse(name);
+			const value = await valueIn(from, name);
+			if (value === null) {
+				throw new Refusal(
+					"not-found",
+					from === "personal"
+						? `${name} is not a Personal secret.`
+						: `This computer has no saved value of ${name}.`,
+				);
+			}
+			// Saved in the Space first: a failure there keeps this copy.
+			await projectPort().space.set(spaceId, name, value, personId);
+			await removeIn(from, name);
+		},
+		async moveFromSpace(spaceId, name, to, personId) {
+			secretNameSchema.parse(name);
+			const value = await projectPort().space.take(spaceId, name, personId);
+			if (value === null) {
+				throw new Refusal(
+					"not-found",
+					`${name} is not a secret of this Space.`,
+				);
+			}
+			// Saved in its new scope first: a failure there keeps the Space's.
+			await saveIn(to, name, value);
+			await projectPort().space.remove(spaceId, name, personId);
 		},
 		async mcpServersFor(node, use) {
 			const servers: Record<string, McpServer> = {};

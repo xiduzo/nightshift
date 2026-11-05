@@ -170,10 +170,10 @@ describe("the Host walks a run a Device starts", () => {
 		await untilStatus(paired.host, run.id, "finished");
 	});
 
-	test("A walks it, its unplaced steps run on B, and B gets the run and its kept value", async () => {
+	test("A walks it, its unplaced steps run on the B you pick, and B gets the run and its kept value", async () => {
 		const started = await paired.device
 			.space(a.spaceId, { personId: paired.personId })
-			.startRun({ projectId, flowName: "count" });
+			.startRun({ projectId, flowName: "count", deviceId: b.deviceId });
 		expect(started.walker).toMatchObject({ id: a.deviceId, thisDevice: false });
 		expect(started.device).toMatchObject({ id: b.deviceId, thisDevice: true });
 

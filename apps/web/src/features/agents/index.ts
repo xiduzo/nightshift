@@ -24,6 +24,7 @@ export {
 	harnessQueries,
 	profileQueries,
 	projectSecretQueries,
+	spaceSecretQueries,
 } from "./queries";
 export { SecretsPage } from "./secrets-page";
 export { SpaceSecretsPage } from "./space-secrets-page";

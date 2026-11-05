@@ -150,6 +150,7 @@ export function devicesOf(name: string, flows: ProjectFlowMap): FlowDevices {
 	const walk = (flowName: string) => {
 		if (seen.has(flowName)) return;
 		seen.add(flowName);
+		for (const id of flows[flowName]?.devices ?? []) ids.add(id);
 		for (const node of flows[flowName]?.nodes ?? []) {
 			const profiles = nodeProfiles(node).filter(isProfileRef);
 			for (const profile of profiles) ids.add(profile.device);

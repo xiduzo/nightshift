@@ -14,6 +14,7 @@ import type { DeviceRegistry } from "../registry";
 import type { WorkHub } from "../work";
 import { NOT_YOUR_DEVICE } from "./host";
 import type { KeptProjectSecret, ProjectSecretStore } from "./project-store";
+import type { SpaceSecretStore } from "./space-store";
 
 /** The refusal of a project this Host does not keep, or that is not in the Space named. */
 export const NOT_A_PROJECT_HERE =
@@ -26,6 +27,10 @@ export const NOT_YOUR_STEP =
 /** The refusal of a Device whose Person takes no part in the Space. */
 export const NOT_IN_SPACE =
 	"This device takes no part in that Space. Ask an owner of the Space to invite you.";
+
+/** The refusal of a Space that another Host keeps. */
+export const NOT_A_SPACE_HERE =
+	"This computer does not keep that Space. Check that you work in the right Space.";
 
 type ProjectRef = { spaceId: string; projectId: string };
 type StepRun = ProjectRef & { runId: string };
@@ -71,7 +76,47 @@ export type ProjectSecretsHost = {
 		key: DeviceKeyAccess,
 		input: ProjectRef & { name: string },
 	): Promise<string | null>;
+	/** A Space's secrets (ADR 18): the same rules, for every project of the Space. */
+	space: {
+		list(
+			key: DeviceKeyAccess,
+			input: { spaceId: string },
+		): Promise<ProjectSecretName[]>;
+		set(
+			key: DeviceKeyAccess,
+			input: { spaceId: string; name: string; value: string },
+		): Promise<void>;
+		remove(
+			key: DeviceKeyAccess,
+			input: { spaceId: string; name: string },
+		): Promise<void>;
+		take(
+			key: DeviceKeyAccess,
+			input: { spaceId: string; name: string },
+		): Promise<string | null>;
+	};
 };
+
+/**
+ * The checks of a list or a change of a Space's secrets that this computer
+ * keeps: it keeps the Space, and `personId` is a Member there, whose role
+ * saves Flows when `saves`.
+ */
+export async function spaceAccess(
+	db: Database,
+	hostSpaces: { hostOf(spaceId: string): Promise<string | null> },
+	spaceId: string,
+	who: { personId: string; saves: boolean },
+): Promise<void> {
+	if ((await hostSpaces.hostOf(spaceId)) !== null) {
+		throw new Refusal("not-found", NOT_A_SPACE_HERE);
+	}
+	const role = await roleIn(db, who.personId, spaceId);
+	if (!role) throw new Refusal("forbidden", NOT_IN_SPACE);
+	if (who.saves && !roleAllows(role, { flow: ["save"] })) {
+		throw new Refusal("forbidden", ROLE_REFUSAL.message);
+	}
+}
 
 /**
  * The checks of a list or a change of a Project's secrets that this
@@ -134,6 +179,7 @@ export function createProjectSecretsHost(deps: {
 	db: Database;
 	registry: Pick<DeviceRegistry, "get">;
 	store: ProjectSecretStore;
+	spaceStore: SpaceSecretStore;
 	/** "Be a Host" is on now. */
 	isHost(): boolean;
 	/** The Host that keeps a Space, or null for one this computer keeps. */
@@ -173,6 +219,19 @@ export function createProjectSecretsHost(deps: {
 		});
 	}
 
+	/** The key's Person is a Member of the Space, and may save Flows there when `saves`. */
+	async function mayUseSpace(
+		key: DeviceKeyAccess,
+		spaceId: string,
+		saves: boolean,
+	): Promise<void> {
+		await admit(key);
+		await spaceAccess(db, hostSpaces, spaceId, {
+			personId: key.personId,
+			saves,
+		});
+	}
+
 	return {
 		async list(key, at) {
 			await mayUse(key, at, false);
@@ -203,7 +262,11 @@ export function createProjectSecretsHost(deps: {
 			) {
 				throw new Refusal("forbidden", NOT_IN_SPACE);
 			}
-			return deps.store.values(step.projectId, names);
+			// A step reads both: the Space's wins over the Project's (ADR 18).
+			return {
+				...(await deps.store.values(step.projectId, names)),
+				...(await deps.spaceStore.values(step.spaceId, names)),
+			};
 		},
 		async set(key, { name, value, ...at }) {
 			await mayUse(key, at, true);
@@ -216,6 +279,24 @@ export function createProjectSecretsHost(deps: {
 		async take(key, { name, ...at }) {
 			await mayUse(key, at, true);
 			return (await deps.store.values(at.projectId, [name]))[name] ?? null;
+		},
+		space: {
+			async list(key, { spaceId }) {
+				await mayUseSpace(key, spaceId, false);
+				return withNames(db, await deps.spaceStore.list(spaceId));
+			},
+			async set(key, { spaceId, name, value }) {
+				await mayUseSpace(key, spaceId, true);
+				await deps.spaceStore.set(spaceId, name, value, key.personId);
+			},
+			async remove(key, { spaceId, name }) {
+				await mayUseSpace(key, spaceId, true);
+				await deps.spaceStore.remove(spaceId, name);
+			},
+			async take(key, { spaceId, name }) {
+				await mayUseSpace(key, spaceId, true);
+				return (await deps.spaceStore.values(spaceId, [name]))[name] ?? null;
+			},
 		},
 	};
 }

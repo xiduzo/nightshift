@@ -160,6 +160,8 @@ export type DerivedStep = {
 	logPath: string | null;
 	/** The Device the step ran on (its Placement). Null before steps named it. */
 	deviceId: string | null;
+	/** Another Device took this step over while the run walked (ADR 17). */
+	moved?: true;
 	/** Its latest `StepStarted`. */
 	startedAt: number;
 	startSeq: number;
@@ -562,6 +564,17 @@ function apply(run: Draft, e: LoggedEvent): void {
 			run.worktree = e.payload;
 			run.moves.push({ kind: "created", ...logged(e) });
 			break;
+		case "StepMoved": {
+			const moved = e.stepId ? run.steps.get(e.stepId) : undefined;
+			if (moved && e.stepId) {
+				run.steps.set(e.stepId, {
+					...moved,
+					deviceId: e.payload.to,
+					moved: true,
+				});
+			}
+			break;
+		}
 		case "HandedOff":
 			run.moves.push({ kind: "handed-off", ...logged(e) });
 			break;
