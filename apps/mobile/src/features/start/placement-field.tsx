@@ -26,7 +26,7 @@ export function PlacementField({
 				{
 					value: AUTOMATIC,
 					title: "Automatic",
-					caption: "The devices the flow names, else your Host",
+					caption: "Each step runs where the flow says, else on your Host",
 					disabled: false,
 				},
 				...choices.map((choice) => ({

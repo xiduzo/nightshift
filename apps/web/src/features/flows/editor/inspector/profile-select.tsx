@@ -11,14 +11,17 @@ import {
 	type Profile,
 	type ProfileRef,
 } from "@nightshift/flows";
+import { Button } from "@nightshift/ui/components/button";
 import {
 	NativeSelect,
 	NativeSelectOptGroup,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { useQuery } from "@tanstack/react-query";
+import { PlusIcon, XIcon } from "lucide-react";
 import { profileQueries } from "@/features/agents";
 import { runQueries } from "@/features/runs/flows-port";
+import { Field } from "../fields";
 
 /** A profile a node can name: the pair, its name, and its Device. */
 export type ProfileChoice<P extends Profile> = {
@@ -26,6 +29,8 @@ export type ProfileChoice<P extends Profile> = {
 	name: string;
 	deviceName: string;
 	thisDevice: boolean;
+	/** A development install: not offered as a backup, except on itself. */
+	dev: boolean;
 	/** Its settings: known for this computer's profiles only. */
 	profile?: P;
 };
@@ -66,6 +71,7 @@ function useProfileChoices<P extends Profile & { id: string }>(
 					name: profile.name,
 					deviceName: device.name,
 					thisDevice: device.thisDevice,
+					dev: device.dev === true,
 					...(settings ? { profile: settings } : {}),
 				};
 			}),
@@ -207,5 +213,107 @@ export function ProfileSelect<P extends Profile>({
 				</NativeSelectOption>
 			) : null}
 		</NativeSelect>
+	);
+}
+
+/**
+ * The profiles that take a node's step when its own profile's computer
+ * cannot, first one first (ADR 19). Each row is a profile on one computer.
+ */
+export function ProfileBackupsField<P extends Profile>({
+	id,
+	profile,
+	fallbacks,
+	choices,
+	onChange,
+}: {
+	id: string;
+	profile: ProfileRef;
+	fallbacks: readonly ProfileRef[] | undefined;
+	choices: ProfileChoice<P>[];
+	onChange: (fallbacks: ProfileRef[] | undefined) => void;
+}) {
+	const chosen = fallbacks ?? [];
+	const taken = new Set([keyOf(profile), ...chosen.map(keyOf)]);
+	const open = choices.filter(
+		(choice) =>
+			!taken.has(keyOf(choice.ref)) && (!choice.dev || choice.thisDevice),
+	);
+	const set = (next: ProfileRef[]) =>
+		onChange(next.length > 0 ? next : undefined);
+	const missing = chosen.some(
+		(backup) => !choices.some((c) => keyOf(c.ref) === keyOf(backup)),
+	);
+	return (
+		<Field
+			id={id}
+			label="Backups"
+			optional
+			hint="The first backup that can run takes the step when this profile's computer cannot. Empty: the step waits for that computer."
+			error={
+				missing
+					? "A backup is no longer available. Remove it, or pick another profile."
+					: null
+			}
+		>
+			<div className="flex flex-col gap-2">
+				{chosen.map((backup, index) => {
+					const own = choices.find((c) => keyOf(c.ref) === keyOf(backup));
+					const name = own ? profileOnDevice(own) : "A profile";
+					return (
+						<div key={keyOf(backup)} className="flex items-center gap-2">
+							<NativeSelect
+								aria-label={`Backup ${index + 1}`}
+								className="w-full"
+								value={keyOf(backup)}
+								onChange={(event) => {
+									const next = choices.find(
+										(c) => keyOf(c.ref) === event.target.value,
+									);
+									if (!next) return;
+									set(chosen.map((b, i) => (i === index ? next.ref : b)));
+								}}
+							>
+								<NativeSelectOption value={keyOf(backup)}>
+									{own ? name : `${name} (not found)`}
+								</NativeSelectOption>
+								{open.map((choice) => (
+									<NativeSelectOption
+										key={keyOf(choice.ref)}
+										value={keyOf(choice.ref)}
+									>
+										{profileOnDevice(choice)}
+									</NativeSelectOption>
+								))}
+							</NativeSelect>
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon"
+								aria-label={`Remove ${name}`}
+								onClick={() => set(chosen.filter((_, i) => i !== index))}
+							>
+								<XIcon aria-hidden="true" />
+							</Button>
+						</div>
+					);
+				})}
+				{open[0] ? (
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						className="self-start"
+						onClick={() => {
+							const [first] = open;
+							if (first) set([...chosen, first.ref]);
+						}}
+					>
+						<PlusIcon data-icon="inline-start" />
+						Add backup
+					</Button>
+				) : null}
+			</div>
+		</Field>
 	);
 }

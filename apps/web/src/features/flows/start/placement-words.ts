@@ -16,6 +16,6 @@ export function placementDescription(
 		return "Another person's device. The run can use only the profiles it offers to this Space.";
 	}
 	if (device)
-		return "This device goes first. The flow's devices are its backups.";
-	return "Uses the devices the flow names, else your Host. This computer is the last backup.";
+		return "Steps without a profile run here first. A step with a profile runs on that profile's computer.";
+	return "A step with a profile runs on that profile's computer. Other steps use the flow's devices, else your Host.";
 }

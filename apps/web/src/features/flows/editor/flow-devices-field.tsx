@@ -16,8 +16,9 @@ import { missingDeviceMessage } from "../flow-draft";
 import { Field } from "./fields";
 
 /**
- * The devices that run a flow's steps, first one first. Each next device is
- * a backup for one that is offline or cannot run a step. An empty list means
+ * The devices that run a flow's steps without a profile, first one first.
+ * Each next device is a backup for one that is offline or cannot run a step.
+ * A step with a profile runs on that profile's device, then on its backups. An empty list means
  * the Host. A development install shows only on itself, or when the flow
  * names it already.
  */
@@ -53,7 +54,7 @@ export function FlowDevicesField({
 			id={id}
 			label="Runs on"
 			optional
-			hint="Night Shift uses the first device that can run the steps. Empty: your Host, then the computer you start from."
+			hint="Night Shift uses the first device that can run the steps without a profile. Empty: your Host, then the computer you start from."
 			error={missing ? missingDeviceMessage({ type: "command" }) : null}
 		>
 			<div className="flex flex-col gap-2">

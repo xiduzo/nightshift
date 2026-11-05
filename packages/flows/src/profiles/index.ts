@@ -5,6 +5,8 @@ export {
 	type AgentProfileSettings,
 	agentProfileSchema,
 	cascadeProblem,
+	everyProfileOf,
+	fallbacksOf,
 	isAgentProfile,
 	type ModelProfile,
 	type ModelProfileSettings,

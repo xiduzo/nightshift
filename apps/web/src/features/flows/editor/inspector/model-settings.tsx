@@ -7,6 +7,7 @@
 import {
 	type DecisionNode,
 	decisionDecider,
+	isProfileRef,
 	type ModelProfile,
 	type ValueNode,
 	valueDecider,
@@ -30,7 +31,9 @@ import { deciderQueries } from "@/features/agents";
 import { Field, InspectorSection } from "../fields";
 import { OverrideBadge } from "./agent-fields";
 import { deciderModelHint, withoutField } from "./model-defaults";
+import { backupsWithProfile } from "./profile-backups";
 import {
+	ProfileBackupsField,
 	type ProfileChoice,
 	ProfileSelect,
 	profileOnDevice,
@@ -49,10 +52,15 @@ function pickProfile<N extends DecisionNode | ValueNode>(
 	next: ProfileChoice<ModelProfile> | undefined,
 	before: ModelProfile | undefined,
 ): N {
-	const { profile: _profile, decider, model, ...rest } = node;
+	const { profile: _profile, decider, model, fallbacks, ...rest } = node;
 	if (next) {
 		const { device: _device, ...free } = rest;
-		return { ...free, profile: next.ref } as N;
+		const backups = backupsWithProfile(fallbacks, next.ref);
+		return {
+			...free,
+			profile: next.ref,
+			...(backups ? { fallbacks: backups } : {}),
+		} as N;
 	}
 	const keptDecider = decider ?? before?.decider;
 	const keptModel =
@@ -235,6 +243,20 @@ export function ModelSettings<N extends DecisionNode | ValueNode>({
 					}
 				/>
 			</Field>
+			{node.cascade === undefined && isProfileRef(node.profile) ? (
+				<ProfileBackupsField
+					id={`${id}-backups`}
+					profile={node.profile}
+					fallbacks={node.fallbacks}
+					choices={choices}
+					onChange={(fallbacks) =>
+						onChange((current) => {
+							const { fallbacks: _old, ...rest } = current;
+							return { ...rest, ...(fallbacks ? { fallbacks } : {}) } as N;
+						})
+					}
+				/>
+			) : null}
 			{named ? (
 				<Collapsible
 					defaultOpen={overrides > 0}

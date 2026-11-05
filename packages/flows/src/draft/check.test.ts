@@ -48,6 +48,27 @@ describe("checkDraft", () => {
 		expect(isSavable(flow)).toBe(false);
 	});
 
+	test("a backup its Device no longer has is marked on its node", () => {
+		const withBackup = {
+			...flow,
+			nodes: [
+				{
+					...(flow.nodes[0] as AgentNode),
+					fallbacks: [{ device: "host", profile: "gone" }],
+				},
+				flow.nodes[1],
+			],
+		} as Flow;
+		const { issues } = checkDraft(withBackup, messages, {
+			profiles: [{ device: "mac", profile: "night" }],
+		});
+		expect(issues).toContainEqual({
+			severity: "error",
+			message: "profile gone",
+			nodeId: "worker",
+		});
+	});
+
 	test("connections and profiles count only once they load", () => {
 		const loading = checkDraft(flow, messages).issues.map((i) => i.message);
 		expect(loading).not.toContain("connection github");

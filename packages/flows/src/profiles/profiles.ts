@@ -24,6 +24,7 @@ import {
 	modelAddressSchema,
 	type NodeProfile,
 	nameSchema,
+	type ProfileRef,
 	permissionModeSchema,
 	tierLabel,
 	type ValueNode,
@@ -145,6 +146,20 @@ export function nodeProfiles(node: FlowNode): NodeProfile[] {
 		const profile = profileOf(tier);
 		return profile === undefined ? [] : [profile];
 	});
+}
+
+/**
+ * The backups of a node with a profile, first one first (ADR 19). A node
+ * that does not read its profile has none.
+ */
+export function fallbacksOf(node: FlowNode): readonly ProfileRef[] {
+	if (!isProfileRef(profileOf(node))) return [];
+	return "fallbacks" in node ? (node.fallbacks ?? []) : [];
+}
+
+/** Every profile a flow depends on through a node: its own and its backups. */
+export function everyProfileOf(node: FlowNode): NodeProfile[] {
+	return [...nodeProfiles(node), ...fallbacksOf(node)];
 }
 
 /**

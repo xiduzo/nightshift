@@ -19,6 +19,7 @@ import {
 	nodeBase,
 	nodeProfileSchema,
 	placed,
+	profileFallbacksSchema,
 } from "./base";
 import {
 	ASK_TIER_CHOICES,
@@ -159,6 +160,11 @@ export const valueNodeSchema = z.object({
 	 * over it. A run resolves it when it starts.
 	 */
 	profile: nodeProfileSchema.optional(),
+	/**
+	 * The profiles that take this step when its own profile's Device cannot,
+	 * first one first (ADR 19). Unset: the step waits for its Device.
+	 */
+	fallbacks: profileFallbacksSchema.optional(),
 	/**
 	 * `by: "model"` only: a decider that can make a value
 	 * (`valueDeciderNameSchema`). Unset: the profile's, else OpenRouter
