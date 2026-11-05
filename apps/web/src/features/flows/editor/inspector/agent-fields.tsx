@@ -46,6 +46,7 @@ import { TemplateField } from "../template-field";
 import { AgentOutcomeSection } from "./agent-outcomes";
 import { CascadeSection } from "./cascade-fields";
 import { withoutField } from "./model-defaults";
+import { backupsWithProfile } from "./profile-backups";
 import {
 	ProfileBackupsField,
 	type ProfileChoice,
