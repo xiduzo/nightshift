@@ -222,6 +222,7 @@ export const joinProgressSchema = exact<JoinProgress>()(
 			hostName: z.string(),
 			role: hostRoleSchema,
 			hostAdmin: z.boolean().nullable(),
+			restart: z.boolean().optional(),
 		}),
 		z.object({ kind: z.literal("merge-preview"), preview: mergePreviewSchema }),
 		z.object({ kind: z.literal("merged"), result: mergeResultSchema }),

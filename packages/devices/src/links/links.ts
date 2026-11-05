@@ -1,4 +1,5 @@
 import type { HostClient, HostHello } from "../contract";
+import { DEV_STAYS_LOCAL, isLocalHost } from "./dev-link";
 import type { OpenDocumentChannel, SyncedDocument } from "./document-channel";
 import {
 	type DeviceKeyStore,
@@ -49,6 +50,8 @@ export function createDeviceLinks(deps: {
 	documents?(link: HostLink, hello: HostHello): Promise<SyncedDocument[]>;
 	/** The Host refused the key: this computer's access there was removed. */
 	revoked?(link: HostLink): Promise<void>;
+	/** A development install that stays off every Host but this computer's (ADR 20). */
+	localOnly?: boolean;
 	/**
 	 * Called once for each link it starts: what runs over it (the exchange
 	 * of run history, the work of placed steps), as the link's streams.
@@ -79,6 +82,10 @@ export function createDeviceLinks(deps: {
 	async function add(link: HostLink, key?: string) {
 		await stop(link.hostId);
 		if (link.revokedAt) return;
+		if (deps.localOnly && !isLocalHost(link.addresses)) {
+			console.warn(`Not connecting to ${link.name}: ${DEV_STAYS_LOCAL}`);
+			return;
+		}
 		const secret = key ?? (await deps.keys.get(link.hostId));
 		if (!secret) {
 			console.error(

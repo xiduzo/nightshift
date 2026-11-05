@@ -64,6 +64,17 @@ export const pairingRedeemedSchema = z.union([
 		personId: z.string(),
 		host: hostSchema,
 		/**
+		 * The Device the Host joined it as: another id than it asked for when
+		 * this computer already has a Device there (ADR 20). A Host of an
+		 * older version leaves it out.
+		 */
+		deviceId: z.string().optional(),
+		/**
+		 * The last event count of that Device on this Host. The install goes
+		 * on after it, so no new event of it has the number of an old one.
+		 */
+		walkerSeq: z.number().int().nonnegative().optional(),
+		/**
 		 * The Person who allowed it is the Host admin. When not, the Host
 		 * admin can read their personal runs there. A Host of an older
 		 * version leaves it out.

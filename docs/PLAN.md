@@ -246,7 +246,7 @@ bun run build:desktop  # the desktop app: apps/desktop/artifacts/*.dmg
 Flows and schedules are Night Shift data too, in the flow documents ([ADR 2](adr/0002-flows-are-night-shift-data.md)). A project holds no Night Shift files.
 
 - `bun run night` and the desktop app use the app data folder of the OS: `~/Library/Application Support/Night Shift` on macOS, `$XDG_DATA_HOME/nightshift` (else `~/.local/share/nightshift`) on Linux, `%APPDATA%\Night Shift` on Windows.
-- `bun run dev` sets `NIGHTSHIFT_DEV=true` and uses `.nightshift-dev/` in its own checkout (gitignored). A dev daemon never opens the night's database, and two checkouts never share one. The `db:push`, `db:studio` and `db:migrate` scripts open the same dev database.
+- `bun run dev` sets `NIGHTSHIFT_DEV=true` and uses `.nightshift-dev/` in its own checkout (gitignored). A dev daemon never opens the night's database, and two checkouts never share one. The `db:push`, `db:studio` and `db:migrate` scripts open the same dev database. It connects only to a Host on this computer, unless `NIGHTSHIFT_DEV_LINK_HOST=true` is set (ADR 20).
 - `NIGHTSHIFT_DATA_DIR` sets the folder for either one. `DATABASE_URL` sets only the database, for example a libsql server. Otherwise, leave it unset.
 - Night Shift never moves history from before for you: the checkout's `local.db`, `~/.nightshift/transcripts` and `~/.nightshift/logs`. The daemon names it at start. To copy it into the data directory:
   1. Stop the daemon.

@@ -260,3 +260,90 @@ describe("the links of a joining Device", () => {
 		expect(await store.get("host-a")).toBeNull();
 	});
 });
+
+describe("the computer of a Device", () => {
+	const FINGERPRINT = "a".repeat(64);
+	const joined = (id: string, owner = ownerId) =>
+		registry.join({ ...macbook, id, ownerId: owner, machine: FINGERPRINT });
+
+	test("finds the Device of the same owner on the same computer", async () => {
+		await joined("device-b");
+		expect(
+			(await registry.sameMachine(ownerId, FINGERPRINT, "new-install"))?.id,
+		).toBe("device-b");
+	});
+
+	test("never finds the Device that asks", async () => {
+		await joined("device-b");
+		expect(
+			await registry.sameMachine(ownerId, FINGERPRINT, "device-b"),
+		).toBeNull();
+	});
+
+	test("finds a removed Device, so pairing again brings it back", async () => {
+		await joined("device-b");
+		await registry.revoke("device-b");
+		expect(
+			(await registry.sameMachine(ownerId, FINGERPRINT, "new-install"))?.id,
+		).toBe("device-b");
+	});
+
+	test("prefers the Device with access over a removed one", async () => {
+		await joined("removed");
+		await registry.revoke("removed");
+		await joined("device-b");
+		expect(
+			(await registry.sameMachine(ownerId, FINGERPRINT, "new-install"))?.id,
+		).toBe("device-b");
+	});
+
+	test("never finds this Host's own row", async () => {
+		await sandbox.db
+			.update(device)
+			.set({ machine: FINGERPRINT })
+			.where(eq(device.self, true));
+		expect(
+			await registry.sameMachine(ownerId, FINGERPRINT, "new-install"),
+		).toBeNull();
+	});
+
+	test("a Device that links says its computer, and two with one computer stay apart", async () => {
+		await registry.join({ ...macbook, id: "one", ownerId });
+		await registry.join({ ...macbook, id: "two", ownerId });
+		expect(
+			await registry.sameMachine(ownerId, FINGERPRINT, "new-install"),
+		).toBeNull();
+		for (const id of ["one", "two"]) {
+			await registry.describe(id, {
+				name: id,
+				dev: false,
+				machine: FINGERPRINT,
+			});
+		}
+		expect(await registry.get("one")).not.toBeNull();
+		expect(await registry.get("two")).not.toBeNull();
+		expect(
+			await registry.sameMachine(ownerId, FINGERPRINT, "new-install"),
+		).not.toBeNull();
+	});
+
+	test("a Device that says nothing keeps its computer", async () => {
+		await joined("device-b");
+		await registry.describe("device-b", { name: "MacBook", dev: false });
+		expect(
+			(await registry.sameMachine(ownerId, FINGERPRINT, "new-install"))?.id,
+		).toBe("device-b");
+	});
+
+	test("a development install is never the computer", async () => {
+		await joined("device-b");
+		await registry.describe("device-b", {
+			name: "MacBook (dev)",
+			dev: true,
+			machine: FINGERPRINT,
+		});
+		expect(
+			await registry.sameMachine(ownerId, FINGERPRINT, "new-install"),
+		).toBeNull();
+	});
+});

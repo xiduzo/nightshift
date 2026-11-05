@@ -63,7 +63,11 @@ import {
 	type PeerEngineOptions,
 } from "./peers";
 import { listenHostname, ownCertificate, type Reach, reachFor } from "./reach";
-import { type DevicePresence, OFFLINE_AFTER_MS } from "./registry";
+import {
+	adoptSelfDevice,
+	type DevicePresence,
+	OFFLINE_AFTER_MS,
+} from "./registry";
 import { createRelay, createWorkRelay } from "./relay";
 import {
 	createPersonalSecretStore,
@@ -168,6 +172,10 @@ type Handover = {
 export type DevicesDeps = {
 	/** This computer runs a development install of Night Shift (ADR 17). */
 	dev?: boolean;
+	/** A development install may connect to a Host on another computer (ADR 20). */
+	devLinkHost?: boolean;
+	/** The fingerprint of this computer (ADR 20). Default: none. */
+	machine?: string | null;
 	auth: Auth;
 	db: Database;
 	/**
@@ -280,11 +288,11 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 	const fingerprint = certificate?.fingerprint ?? null;
 	const devicesPage = new URL("/devices", deps.env.CORS_ORIGIN).toString();
 	const hostLinks = createHostLinks(db);
-	const keyStore = await deviceKeyStore({
-		dataDir: deps.dataDir,
-		deviceId: self.id,
-		...deps.keyStore,
-	});
+	const keysOf = (deviceId: string) =>
+		deviceKeyStore({ dataDir: deps.dataDir, deviceId, ...deps.keyStore });
+	const keyStore = await keysOf(self.id);
+	const localOnly = deps.dev === true && deps.devLinkHost !== true;
+	const machine = deps.machine ?? null;
 
 	const handover = await takeOver(deps.kept);
 
@@ -414,6 +422,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		links: hostLinks,
 		keys: keyStore,
 		deviceId: self.id,
+		localOnly,
 		// The Spaces the Host lists: kept here as the Host's, their documents
 		// synced read-only, before run rows that name their projects arrive.
 		// The flow and knowledge documents of their Projects sync both ways.
@@ -474,6 +483,8 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 						deviceName: async () =>
 							(await engine.devices.get(self.id))?.name ?? self.name,
 						dev: process.env.NIGHTSHIFT_DEV === "true",
+						// A guest Host is another Person's: it never hears of this computer.
+						machine: hostLink.role === "home" ? machine : null,
 					}),
 				),
 			];
@@ -601,6 +612,12 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		}),
 		hostSpaces: engine.hostSpaces,
 		keys: keyStore,
+		identity: {
+			machine,
+			keysOf,
+			adopt: (deviceId, walkerSeq) => adoptSelfDevice(db, deviceId, walkerSeq),
+		},
+		localOnly,
 		settings: deps.settings,
 		self: { id: self.id, name: self.name, platform: process.platform },
 		reach,

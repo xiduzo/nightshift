@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { implement } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import { hostContract, type PairingRedeemed } from "../contract";
-import type { HostLink, HostLinks } from "./host-links";
+import { isLocalHost } from "./dev-link";
+import type { DeviceKeyStore, HostLink, HostLinks } from "./host-links";
 import { hostPage, joinHost } from "./join";
 
 /**
@@ -119,12 +120,15 @@ describe("joining a Host", () => {
  * Device asked for.
  */
 function pairingHost(joined: Joined) {
-	const asked: { home?: boolean }[] = [];
+	const asked: { home?: boolean; machine?: string }[] = [];
 	const host = implement(hostContract);
 	const handler = new RPCHandler({
 		pairing: {
 			start: host.pairing.start.handler(({ input }) => {
-				asked.push({ home: input.home });
+				asked.push({
+					home: input.home,
+					...(input.machine ? { machine: input.machine } : {}),
+				});
 				return {
 					deviceCode: "device-code",
 					userCode: "ABCD1234",
@@ -247,5 +251,164 @@ describe("the Host's page for the code", () => {
 	test("is left out when it is not a web page", () => {
 		expect(hostPage("javascript:alert(1)", "https://h.example")).toBeNull();
 		expect(hostPage("not a url", "https://h.example")).toBeNull();
+	});
+});
+
+describe("one computer is one Device", () => {
+	const FINGERPRINT = "a".repeat(64);
+
+	/** Joins with this computer's fingerprint, and keeps what happens to the keys and the Device. */
+	async function joinWithIdentity(url: string, role: "home" | "guest") {
+		const keys: Record<string, string> = {};
+		const adopted: [string, number][] = [];
+		const started: string[] = [];
+		const storeOf = (deviceId: string): DeviceKeyStore => ({
+			kind: "file",
+			get: async () => null,
+			set: async (hostId, key) => {
+				keys[`${deviceId}/${hostId}`] = key;
+			},
+			delete: async () => {},
+		});
+		const steps = [];
+		for await (const step of joinHost(
+			{
+				self: { id: "device-b", name: "laptop", platform: "darwin" },
+				links: {
+					home: async () => null,
+					save: async (link) => ({ ...link, createdAt: 0, revokedAt: null }),
+				},
+				keys: storeOf("device-b"),
+				started: (link: HostLink) => {
+					started.push(link.hostId);
+				},
+				sleep: async () => {},
+				identity: {
+					machine: FINGERPRINT,
+					keysOf: async (deviceId) => storeOf(deviceId),
+					adopt: async (deviceId, walkerSeq) => {
+						adopted.push([deviceId, walkerSeq]);
+					},
+				},
+			},
+			{ url, role },
+		)) {
+			steps.push(step);
+		}
+		return { steps, keys, adopted, started };
+	}
+
+	test("a home Host hears the computer's fingerprint; a guest Host does not", async () => {
+		const host = pairingHost({ ...joinedAnswer, deviceId: "device-b" });
+		try {
+			await joinWithIdentity(host.url, "home");
+			await joinWithIdentity(host.url, "guest");
+			expect(host.asked).toEqual([
+				{ home: true, machine: FINGERPRINT },
+				{ home: false },
+			]);
+		} finally {
+			host.server.stop(true);
+		}
+	});
+
+	test("a Host that keeps the Device id: the link starts, and no restart is needed", async () => {
+		const host = pairingHost({ ...joinedAnswer, deviceId: "device-b" });
+		try {
+			const { steps, keys, adopted, started } = await joinWithIdentity(
+				host.url,
+				"home",
+			);
+			expect(keys).toEqual({ "device-b/host-a": "device-key" });
+			expect(adopted).toEqual([]);
+			expect(started).toEqual(["host-a"]);
+			expect(steps.at(-1)).not.toHaveProperty("restart");
+		} finally {
+			host.server.stop(true);
+		}
+	});
+
+	test("a Host of an older version says no Device id: the install stays as it is", async () => {
+		const host = pairingHost(joinedAnswer);
+		try {
+			const { adopted, started } = await joinWithIdentity(host.url, "home");
+			expect(adopted).toEqual([]);
+			expect(started).toEqual(["host-a"]);
+		} finally {
+			host.server.stop(true);
+		}
+	});
+
+	test("a Host that knows this computer: the key goes under that Device, the link waits for a restart", async () => {
+		const host = pairingHost({
+			...joinedAnswer,
+			deviceId: "first",
+			walkerSeq: 42,
+		});
+		try {
+			const { steps, keys, adopted, started } = await joinWithIdentity(
+				host.url,
+				"home",
+			);
+			expect(keys).toEqual({ "first/host-a": "device-key" });
+			expect(adopted).toEqual([["first", 42]]);
+			expect(started).toEqual([]);
+			expect(steps.at(-1)).toMatchObject({ kind: "joined", restart: true });
+		} finally {
+			host.server.stop(true);
+		}
+	});
+});
+
+describe("a development install", () => {
+	const dev = (url: string, localOnly: boolean) =>
+		joinHost(
+			{
+				self: { id: "device-b", name: "laptop (dev)", platform: "darwin" },
+				links: {
+					home: async () => null,
+					save: async (link) => ({ ...link, createdAt: 0, revokedAt: null }),
+				},
+				keys: {
+					kind: "file",
+					get: async () => null,
+					set: async () => {},
+					delete: async () => {},
+				},
+				started: () => {},
+				sleep: async () => {},
+				localOnly,
+			},
+			{ url, role: "home" },
+		);
+
+	test("refuses a Host on another computer, and says how to allow it", async () => {
+		await expect(
+			dev("https://nightshift.example.com", true).next(),
+		).rejects.toThrow("NIGHTSHIFT_DEV_LINK_HOST=true");
+	});
+
+	test("pairs with a Host on this computer", async () => {
+		const host = pairingHost(joinedAnswer);
+		try {
+			const steps = [];
+			for await (const step of dev(host.url, true)) steps.push(step);
+			expect(steps.at(-1)).toMatchObject({ kind: "joined" });
+		} finally {
+			host.server.stop(true);
+		}
+	});
+});
+
+describe("isLocalHost", () => {
+	test("is true only when every address is on this computer", () => {
+		expect(
+			isLocalHost(["http://127.0.0.1:3000", "http://localhost:3000"]),
+		).toBe(true);
+		expect(
+			isLocalHost(["http://127.0.0.1:3000", "https://studio.example.com"]),
+		).toBe(false);
+		expect(isLocalHost(["not an address"])).toBe(false);
+		expect(isLocalHost([])).toBe(false);
 	});
 });

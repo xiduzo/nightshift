@@ -1,5 +1,6 @@
 /** The Devices: this computer's own Device row, and on a Host the Devices that paired with it, their presence and its audit. */
 
+export { machineFingerprint } from "./machine";
 export {
 	createDeviceRegistry,
 	type DevicePresence,
@@ -11,6 +12,7 @@ export {
 	type PairedDevice,
 } from "./registry";
 export {
+	adoptSelfDevice,
 	defaultSelfDeviceHost,
 	selfDevice,
 	selfOwnerId,

@@ -47,6 +47,11 @@ export type JoinProgress =
 			 * admin can read their personal runs. Null: the Host did not say.
 			 */
 			hostAdmin: boolean | null;
+			/**
+			 * This install took over the Device the Host knows this computer as
+			 * (ADR 20). It connects as that Device from its next start.
+			 */
+			restart?: boolean;
 	  }
 	/** After a join of a home Host: what the merge of Personal does, before it does it. */
 	| { kind: "merge-preview"; preview: MergePreview }

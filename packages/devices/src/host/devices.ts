@@ -12,6 +12,7 @@ import {
 	fromHost,
 	type HostLinks,
 	type HostSpaces,
+	type JoinDeps,
 	joinHost,
 } from "../links";
 import type { HomeMembership } from "../membership";
@@ -36,6 +37,10 @@ export function createDevices(deps: {
 	/** The Spaces this computer takes part in through each Host. */
 	hostSpaces: Pick<HostSpaces, "listed" | "hostOf">;
 	keys: DeviceKeyStore;
+	/** How a join says which computer this is, and takes over its Device (ADR 20). */
+	identity?: JoinDeps["identity"];
+	/** A development install that stays off every Host but this computer's (ADR 20). */
+	localOnly?: boolean;
 	settings: SettingsStore;
 	self: { id: string; name: string; platform: string };
 	/** Whom this daemon answers since it started. */
@@ -182,13 +187,16 @@ export function createDevices(deps: {
 					links: deps.hostLinks,
 					keys: deps.keys,
 					started: (link, key) => deps.links.add(link, key),
+					...(deps.identity ? { identity: deps.identity } : {}),
+					...(deps.localOnly ? { localOnly: true } : {}),
 				},
 				input,
 				signal,
 			)) {
 				yield step;
 				// Merge on join: Personal becomes one with the home Host's.
-				if (step.kind === "joined" && step.role === "home") {
+				// An install that starts again first merges from the Devices page.
+				if (step.kind === "joined" && step.role === "home" && !step.restart) {
 					yield* deps.membership.joined(step.hostId, signal);
 				}
 			}

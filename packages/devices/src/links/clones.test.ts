@@ -84,3 +84,28 @@ test("an older Host without setClones is left alone; another failure throws, for
 		})(failing, new AbortController().signal),
 	).rejects.toThrow("Unable to connect.");
 });
+
+test("says the computer's fingerprint when it has one, and nothing without one", async () => {
+	const told: { machine?: string | undefined }[] = [];
+	const client = partialHostClient({
+		sync: {
+			setClones: async (input: { machine?: string }) => {
+				told.push({ machine: input.machine });
+				return { added: [], removed: [] };
+			},
+		},
+	});
+	for (const machine of ["a".repeat(64), null]) {
+		const online = new AbortController();
+		const said = tellClones({
+			spaces: async () => [a.spaceId],
+			projects: paired.device.projects,
+			deviceName: async () => "B",
+			machine,
+		})(client, online.signal);
+		await Bun.sleep(20);
+		online.abort();
+		await said;
+	}
+	expect(told).toEqual([{ machine: "a".repeat(64) }, { machine: undefined }]);
+});

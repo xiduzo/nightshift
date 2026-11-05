@@ -115,6 +115,8 @@ const relay = procedure.meta({ key: "relay" });
 
 /** Ids that become Device ids on the Host. */
 const deviceId = z.string().regex(/^[\w-]{1,64}$/);
+/** A SHA-256 in hex: never the hardware id itself (ADR 20). */
+const machineFingerprintSchema = z.string().regex(/^[0-9a-f]{64}$/);
 const deviceName = z.string().trim().min(1).max(64);
 
 /** The rendered name of a lease. */
@@ -272,6 +274,8 @@ export const hostContract = {
 					deviceId,
 					name: deviceName,
 					platform: z.string().trim().min(1).max(32),
+					/** The fingerprint of its computer (ADR 20). Only to a home Host. */
+					machine: machineFingerprintSchema.optional(),
 					/** The Device asks this Host to be its home Host. An older Device leaves it out. */
 					home: z.boolean().optional(),
 				}),
@@ -452,6 +456,8 @@ export const hostContract = {
 					projectIds: z.array(z.string().min(1)).max(1000),
 					deviceName,
 					dev: z.boolean().optional(),
+					/** The fingerprint of its computer (ADR 20). Only to a home Host. */
+					machine: machineFingerprintSchema.optional(),
 				}),
 			)
 			.output(

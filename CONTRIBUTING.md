@@ -20,6 +20,8 @@ bun run dev:desktop    # the desktop app
 
 `bun run dev` keeps its data in `.nightshift-dev/`, apart from the Night Shift you use for real work. If you also run real nights from this checkout, change Night Shift in a separate git worktree. A code change then never reloads a run in the middle of the night.
 
+A development install connects only to a Host on this computer. It does not pair or connect with a Host on another computer, so it stays out of your real work ([ADR 20](docs/adr/0020-one-computer-is-one-device.md)). To test against a remote Host, set `NIGHTSHIFT_DEV_LINK_HOST=true`.
+
 ## Check your change
 
 ```bash

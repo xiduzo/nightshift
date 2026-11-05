@@ -36,6 +36,7 @@ import {
 	ExternalLinkIcon,
 	EyeIcon,
 	MergeIcon,
+	RotateCwIcon,
 	ShieldCheckIcon,
 } from "lucide-react";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
@@ -77,6 +78,8 @@ type Step =
 			hostAdmin: boolean | null;
 			merged: MergeResult | null;
 			notMerged: string | null;
+			/** This computer has a Device there already: it uses it after a restart. */
+			restart?: boolean;
 	  };
 
 /**
@@ -148,6 +151,17 @@ function JoinHostSteps({
 						queryKey: deviceQueries.overviewKey(),
 					});
 					hostName = next.hostName;
+					if (next.restart) {
+						setStep({
+							kind: "joined",
+							hostName: next.hostName,
+							hostAdmin: next.hostAdmin,
+							merged: null,
+							notMerged: null,
+							restart: true,
+						});
+						return;
+					}
 					if (next.role !== "home") break;
 					joined = {
 						kind: "merging",
@@ -323,10 +337,22 @@ function JoinedStep({ step }: { step: Extract<Step, { kind: "joined" }> }) {
 		<>
 			<DialogHeader>
 				<DialogTitle>Paired with {hostName}</DialogTitle>
-				<DialogDescription>
-					This computer stays connected to it.
-				</DialogDescription>
+				{step.restart ? null : (
+					<DialogDescription>
+						This computer stays connected to it.
+					</DialogDescription>
+				)}
 			</DialogHeader>
+			{step.restart ? (
+				<Alert>
+					<RotateCwIcon />
+					<AlertTitle>Restart Night Shift to finish</AlertTitle>
+					<AlertDescription>
+						{hostName} already knows this computer. Night Shift connects with
+						your profiles and tools from there after it starts again.
+					</AlertDescription>
+				</Alert>
+			) : null}
 			{step.merged ? (
 				<Alert>
 					<MergeIcon />
