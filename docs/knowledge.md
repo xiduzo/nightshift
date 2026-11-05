@@ -119,13 +119,13 @@ An agent reads this file first, so its size has limits:
 - PDF and Word files show no headings, so they cost a step's start nothing
   extra.
 
-Night Shift writes it again when an agent gets the folder and when the
-Knowledge page reads it, if a file is newer than the index or a file came or
-went. A sync does not need to write it. Each computer writes its own, and it
-never syncs.
+Night Shift writes it again when an agent gets the folder, if a file is newer
+than the index or a file came or went. So a folder that no agent got yet has no
+`INDEX.md`. A sync, a Command step and the Knowledge page do not write it. Each
+computer writes its own, and it never syncs.
 
 `learnings/` belongs to Night Shift. What agents propose to learn waits in
-`learnings/proposed/` until you accept it into `learnings/accepted/`. The
+`learnings/proposed/` until you keep it in `learnings/accepted/`. The
 index lists only the accepted ones.
 
 ### The Map

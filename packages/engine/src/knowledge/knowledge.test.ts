@@ -167,6 +167,28 @@ describe("a step's knowledge", () => {
 		expect(await a.paths()).toEqual(["wiki/Home.md", "wiki/Page.md"]);
 	});
 
+	test("only an agent that gets the folder writes INDEX.md: not the page, not a Command", async () => {
+		const a = await device(memoryHost());
+		await a.put("wiki/Home.md", "# Home\n\n## Start\n\nThe wiki.\n");
+		const index = join(a.dir, "INDEX.md");
+		const written = () =>
+			stat(index).then(
+				() => true,
+				() => false,
+			);
+
+		await a.knowledge.listing("p1");
+		await a.knowledge.search("p1", "wiki");
+		await (await a.knowledge.forCommand("p1")).done();
+		expect(await written()).toBe(false);
+
+		const agent = await a.knowledge.forSession({
+			knowledge: { projectId: "p1" },
+		});
+		expect(await readFile(index, "utf8")).toContain("wiki/Home.md");
+		await agent.done();
+	});
+
 	test("an agent reads a file its folder lacks by its hash, as the API does: text from a PDF too, never a proposal", async () => {
 		const host = memoryHost();
 		const a = await device(host);
