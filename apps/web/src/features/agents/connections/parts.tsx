@@ -70,7 +70,12 @@ export function OffMachineNote({ children }: { children: ReactNode }) {
 	);
 }
 
-export type CheckState = "ready" | "problem" | "missing" | "checking";
+export type CheckState =
+	| "ready"
+	| "problem"
+	| "missing"
+	| "needs-secret"
+	| "checking";
 
 const CHECK_STATE: Record<
 	Exclude<CheckState, "checking">,
@@ -93,9 +98,15 @@ const CHECK_STATE: Record<
 		className:
 			"border-status-waiting/40 bg-status-waiting/10 text-status-waiting",
 	},
+	"needs-secret": {
+		label: "Needs a secret",
+		icon: KeyRoundIcon,
+		className:
+			"border-status-waiting/40 bg-status-waiting/10 text-status-waiting",
+	},
 };
 
-/** Ready, Problem or Not found, for a CLI check. */
+/** Ready, Problem, Not found or Needs a secret, for a CLI check. */
 export function CheckBadge({ state }: { state: CheckState }) {
 	if (state === "checking") {
 		return (

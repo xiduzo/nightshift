@@ -147,6 +147,8 @@ export const connectionListSchema = z.object({
 			flows: z.array(flowRefSchema),
 			/** The CLI tools whose logins read it. */
 			tools: z.array(z.string()),
+			/** The flows a webhook schedule with this secret starts. */
+			webhooks: z.array(flowRefSchema),
 		}),
 	),
 	/** Whether the Person's Personal secrets could be read now. When not, the list has this computer's only. */
@@ -220,6 +222,20 @@ export const cliToolListSchema = z.array(
 		profiles: z.array(z.string()),
 		/** When its login last signed in (epoch ms). Null: never, or it has no sign-in. */
 		signedInAt: z.number().nullable(),
+		/** Where its login finds its secrets. Null: it has no login. */
+		loginState: z
+			.object({
+				signsInHere: z.boolean(),
+				projects: z.array(
+					z.object({
+						projectId: z.string(),
+						projectName: z.string(),
+						signedInAt: z.number().nullable(),
+					}),
+				),
+				missing: z.array(z.string()),
+			})
+			.nullable(),
 	}),
 );
 

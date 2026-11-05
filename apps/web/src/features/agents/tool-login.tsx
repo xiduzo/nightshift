@@ -17,6 +17,7 @@ import { Input } from "@nightshift/ui/components/input";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { CircleAlertIcon, KeyRoundIcon, WandSparklesIcon } from "lucide-react";
 import { useId } from "react";
 import { toast } from "sonner";
@@ -207,6 +208,9 @@ export function LoginSection({ tool }: { tool: CliTool }) {
 	const login = tool.login;
 	const result = signIn.data;
 	const variables = Object.entries(login?.env ?? {});
+	const state = tool.loginState;
+	const signsInHere =
+		login?.signIn !== undefined && state?.signsInHere !== false;
 
 	return (
 		<DetailSection
@@ -256,7 +260,7 @@ export function LoginSection({ tool }: { tool: CliTool }) {
 									},
 								]
 							: []),
-						...(login?.signIn
+						...(signsInHere
 							? [
 									{
 										label: "Signed in",
@@ -273,6 +277,35 @@ export function LoginSection({ tool }: { tool: CliTool }) {
 									},
 								]
 							: []),
+						...(state && state.projects.length > 0
+							? [
+									{
+										label: "Projects",
+										value: (
+											<ul className="flex flex-col gap-1">
+												{state.projects.map((project) => (
+													<li key={project.projectId}>
+														{project.projectName}:{" "}
+														{login?.signIn
+															? "signs in when a run of this project needs it."
+															: "reads its secret when a run of this project needs it."}
+														{project.signedInAt !== null ? (
+															<>
+																{" "}
+																Last signed in{" "}
+																<LocalTime at={project.signedInAt}>
+																	{formatRelative(project.signedInAt, now)}
+																</LocalTime>
+																.
+															</>
+														) : null}
+													</li>
+												))}
+											</ul>
+										),
+									},
+								]
+							: []),
 						...(tool.git
 							? [
 									{
@@ -283,7 +316,27 @@ export function LoginSection({ tool }: { tool: CliTool }) {
 							: []),
 					]}
 				/>
-				{login?.signIn ? (
+				{state && state.missing.length > 0 ? (
+					<Alert>
+						<KeyRoundIcon />
+						<AlertTitle>Needs a secret</AlertTitle>
+						<AlertDescription>
+							<p>
+								Save{" "}
+								<span className="font-mono">{state.missing.join(", ")}</span> on
+								the{" "}
+								<Link
+									to="/secrets"
+									className="underline underline-offset-4 hover:text-foreground"
+								>
+									Secrets page
+								</Link>
+								, or on the Secrets page of a project.
+							</p>
+						</AlertDescription>
+					</Alert>
+				) : null}
+				{signsInHere && state?.missing.length === 0 ? (
 					<div>
 						<Button
 							variant="outline"

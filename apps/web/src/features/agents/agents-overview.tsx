@@ -177,7 +177,7 @@ export function AgentsOverview({
 								to={{ kind: "cli", name: tool.name }}
 								title={<span className="font-mono">{tool.name}</span>}
 								description="CLI"
-								aside={<CliToolCheckBadge name={tool.name} />}
+								aside={<CliToolCheckBadge tool={tool} />}
 							/>
 						))}
 						{connections.map((connection) => (

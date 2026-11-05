@@ -146,12 +146,18 @@ function flowNamesOf(secret: SecretView): string[] {
 	return [...new Set(secret.flows.map((flow) => flow.flowName))];
 }
 
-/** What uses the secret: its connections and CLI tools, then its flows. */
+/** The flows a webhook schedule with the secret starts, each once. */
+function webhookFlowsOf(secret: SecretView): string[] {
+	return [...new Set(secret.webhooks.map((flow) => flow.flowName))];
+}
+
+/** What uses the secret: its connections and CLI tools, then its flows and webhooks. */
 function usersOf(secret: SecretView): string[] {
 	return [
 		...secret.usedBy,
 		...secret.tools,
 		...flowNamesOf(secret).map((name) => `${name} (flow)`),
+		...webhookFlowsOf(secret).map((name) => `${name} (webhook)`),
 	];
 }
 
@@ -670,6 +676,7 @@ function RemoveSecretDialog({
 	);
 	const usedBy = secret ? [...secret.usedBy, ...secret.tools] : [];
 	const flows = secret ? flowNamesOf(secret) : [];
+	const webhooks = secret ? webhookFlowsOf(secret) : [];
 	const users = secret ? usersOf(secret) : [];
 	const consequence =
 		users.length === 0
@@ -682,6 +689,9 @@ function RemoveSecretDialog({
 							: null,
 						flows.length > 0
 							? `Flows that use it (${flows.join(", ")}) stop before the command runs until you set it again.`
+							: null,
+						webhooks.length > 0
+							? `Webhooks of ${webhooks.join(", ")} stop working until you set it again.`
 							: null,
 					]
 						.filter(Boolean)

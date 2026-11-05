@@ -103,6 +103,11 @@ export const projectSecrets = {
 							]),
 						].sort(),
 						tools: [...tools].sort(),
+						webhooks: [
+							...new Set(
+								flowsOf(at.projectId, use.webhooks.get(secret.name) ?? []),
+							),
+						].sort(),
 					};
 				}),
 				available: true,

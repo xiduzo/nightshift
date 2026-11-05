@@ -19,6 +19,7 @@ const tool = (fields: Partial<CliTool> = {}): CliTool => ({
 	usedBy: [],
 	profiles: [],
 	signedInAt: null,
+	loginState: null,
 	...fields,
 });
 

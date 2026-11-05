@@ -794,7 +794,11 @@ export function createEngine(
 		now,
 		log: runLog,
 		flows: projectFlows,
-		secret: options.secret ?? (async (name) => process.env[name]),
+		secret: async (name, projectId) => {
+			if (!options.secret) return process.env[name];
+			const { spaceId } = await projects.find(projectId);
+			return options.secret(name, { spaceId, projectId });
+		},
 		firesHere,
 		// The Settings switch, and NIGHTSHIFT_SCHEDULER=off: no schedule starts.
 		enabled: () => options.scheduler !== false && runSettings().scheduler,

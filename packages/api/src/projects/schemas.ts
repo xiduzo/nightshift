@@ -215,6 +215,8 @@ export const projectSecretListSchema = z.object({
 			flows: z.array(z.string()),
 			/** The CLI tools of this computer whose logins read it, by name. */
 			tools: z.array(z.string()),
+			/** The flows a webhook schedule with this secret starts, by name. */
+			webhooks: z.array(z.string()),
 		}),
 	),
 	/** False: the Host of the Space could not be reached now, and the list is empty. */

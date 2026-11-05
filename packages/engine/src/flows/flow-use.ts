@@ -1,4 +1,10 @@
-import { isProfileRef, nodeProfiles, runsAs } from "@nightshift/flows";
+import {
+	isProfileRef,
+	nodeProfiles,
+	runsAs,
+	type Schedule,
+	webhookSecretName,
+} from "@nightshift/flows";
 import type { SpaceFlows } from "./space-flows";
 
 /** A flow file of a project of the Space. */
@@ -18,6 +24,8 @@ export type FlowRef = {
 export type FlowUse = {
 	connections: Map<string, FlowRef[]>;
 	clis: Map<string, FlowRef[]>;
+	/** By secret: the flows a webhook schedule with that secret starts. */
+	webhooks: Map<string, FlowRef[]>;
 	secrets: Map<string, FlowRef[]>;
 	profiles: Map<string, (FlowRef & { nodeIds: string[] })[]>;
 };
@@ -31,6 +39,9 @@ export function profileUseKey(deviceId: string, profileId: string): string {
 export type FlowReader = {
 	listProjects(): Promise<{ id: string; name: string }[]>;
 	flows: Pick<SpaceFlows, "list" | "get">;
+	listSchedules(projectId: string): Promise<{
+		schedules: readonly Pick<Schedule, "flow" | "webhook">[];
+	}>;
 };
 
 /**
@@ -42,7 +53,19 @@ export async function flowUse(space: FlowReader): Promise<FlowUse> {
 	const clis = new Map<string, FlowRef[]>();
 	const secrets = new Map<string, FlowRef[]>();
 	const profiles = new Map<string, (FlowRef & { nodeIds: string[] })[]>();
+	const webhooks = new Map<string, FlowRef[]>();
 	for (const project of await space.listProjects()) {
+		const listed = await space
+			.listSchedules(project.id)
+			.catch(() => ({ schedules: [] }));
+		for (const { flow, webhook } of listed.schedules) {
+			const name = webhookSecretName(webhook?.secret ?? "");
+			if (name === null || !flow) continue;
+			webhooks.set(name, [
+				...(webhooks.get(name) ?? []),
+				{ projectId: project.id, projectName: project.name, flowName: flow },
+			]);
+		}
 		const files = await space.flows.list(project.id).catch(() => []);
 		for (const file of files) {
 			const loaded = await space.flows
@@ -92,5 +115,5 @@ export async function flowUse(space: FlowReader): Promise<FlowUse> {
 			}
 		}
 	}
-	return { connections, clis, secrets, profiles };
+	return { connections, clis, webhooks, secrets, profiles };
 }

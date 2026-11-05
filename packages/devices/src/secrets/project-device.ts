@@ -135,9 +135,9 @@ export function deviceProjectSecrets(deps: {
 				async () => (await store.values(at.projectId, [name]))[name] ?? null,
 				(client) => client.projectSecrets.take({ ...at, name }),
 			),
-		async kept(at) {
+		async kept(at, names) {
 			if ((await deps.hostSpaces.hostOf(at.spaceId)) !== null) return [];
-			return Object.values(await store.values(at.projectId));
+			return Object.values(await store.values(at.projectId, names));
 		},
 	};
 }

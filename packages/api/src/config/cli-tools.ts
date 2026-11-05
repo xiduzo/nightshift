@@ -27,7 +27,19 @@ export const cliTools = {
 		})
 		.output(output(cliToolListSchema))
 		.handler(async ({ context }) =>
-			cliToolsInUse(context, await context.space.flowUse()),
+			cliToolsInUse(context, await context.space.flowUse(), {
+				list: () => context.space.listProjects(),
+				secretNames: (projectId) =>
+					context.connections
+						.projectSecrets(
+							{ spaceId: context.spaceId, projectId },
+							context.session.user.id,
+						)
+						.then(
+							(names) => new Set(names.map((secret) => secret.name)),
+							() => null,
+						),
+			}),
 		),
 	/** The programs this computer can run by name, to pick one from. */
 	programs: ownerProcedure

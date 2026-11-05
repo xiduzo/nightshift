@@ -39,7 +39,12 @@ export type ConnectionInUse = Connection & {
 };
 
 /** A secret, with the flows whose Command nodes name it and the CLI tools whose logins read it. */
-export type SecretInUse = SecretView & { flows: FlowRef[]; tools: string[] };
+export type SecretInUse = SecretView & {
+	flows: FlowRef[];
+	tools: string[];
+	/** The flows a webhook schedule with this secret starts. */
+	webhooks: FlowRef[];
+};
 
 /**
  * The connections and the secrets of this computer and of its Person
@@ -73,10 +78,11 @@ export async function connectionsInUse(
 	const { toolsBySecret, toolFlows } = cliToolsOfSecrets(config, use);
 	const listed = await config.connections.secrets([
 		...use.secrets.keys(),
+		...use.webhooks.keys(),
 		...toolsBySecret.keys(),
 	]);
 	const projectIds = new Set(
-		[...use.secrets.values(), ...toolFlows.values()]
+		[...use.secrets.values(), ...use.webhooks.values(), ...toolFlows.values()]
 			.flat()
 			.map((flow) => flow.projectId),
 	);
@@ -99,13 +105,17 @@ export async function connectionsInUse(
 		const flows = (use.secrets.get(secret.name) ?? []).filter(
 			(flow) => !covered(flow),
 		);
+		const webhooks = (use.webhooks.get(secret.name) ?? []).filter(
+			(flow) => !covered(flow),
+		);
 		const needed =
 			secret.saved ||
 			secret.inEnv ||
 			secret.usedBy.length > 0 ||
 			tools.length > 0 ||
-			flows.length > 0;
-		if (needed) secrets.push({ ...secret, flows, tools });
+			flows.length > 0 ||
+			webhooks.length > 0;
+		if (needed) secrets.push({ ...secret, flows, tools, webhooks });
 	}
 	return {
 		// After the secrets: a connection's variables read the Personal names as listed now.
@@ -155,30 +165,110 @@ export function cliToolsOfSecrets(
 	return { toolsBySecret, toolFlows };
 }
 
+/** Where a tool's login finds its secrets. */
+export type CliToolLoginState = {
+	/** This computer or the Personal secrets have every value: Sign in works here. */
+	signsInHere: boolean;
+	/** The projects that keep the values it does not have here. */
+	projects: {
+		projectId: string;
+		projectName: string;
+		/** When it last signed in for this project. Null: not yet, or it has no sign-in. */
+		signedInAt: number | null;
+	}[];
+	/** The secrets with no value it can use. Empty when one could not be read now. */
+	missing: string[];
+};
+
 /** A CLI tool, with the flows and the profiles that name it, and when its login last signed in. */
 export type CliToolInUse = CliTool & {
 	usedBy: FlowRef[];
 	profiles: string[];
 	signedInAt: number | null;
+	/** Null: the tool has no login. */
+	loginState: CliToolLoginState | null;
 };
 
 /** The CLI tools of this computer, with what uses each. */
-export function cliToolsInUse(
+export async function cliToolsInUse(
 	config: {
+		connections: Pick<ConnectionStore, "secrets">;
 		cliTools: Pick<CliToolStore, "list">;
 		profiles: Pick<ProfileStore, "list">;
 		toolLaunchers: Pick<ToolLaunchers, "signedInAt">;
 	},
 	use: FlowUse,
+	projects: {
+		list(): Promise<readonly { id: string; name: string }[]>;
+		/** The names of a project's secrets. Null: they cannot be read now. */
+		secretNames(projectId: string): Promise<ReadonlySet<string> | null>;
+	},
 ): Promise<CliToolInUse[]> {
+	const tools = config.cliTools.list();
+	const references = tools.flatMap((tool) =>
+		tool.login ? loginReferences(tool.login) : [],
+	);
+	const listed =
+		references.length > 0 ? await config.connections.secrets(references) : null;
+	const here = new Set(
+		(listed?.secrets ?? []).flatMap((secret) =>
+			secret.saved || secret.inEnv ? [secret.name] : [],
+		),
+	);
+	const kept =
+		references.length > 0
+			? await Promise.all(
+					(await projects.list()).map(async (project) => ({
+						project,
+						names: await projects.secretNames(project.id),
+					})),
+				)
+			: [];
+	const unknown =
+		listed?.personal === "unavailable" ||
+		kept.some(({ names }) => names === null);
+
+	async function loginStateOf(
+		tool: CliTool,
+	): Promise<CliToolLoginState | null> {
+		if (!tool.login) return null;
+		const signs = tool.login.signIn !== undefined;
+		const wanted = loginReferences(tool.login);
+		const notHere = wanted.filter((name) => !here.has(name));
+		const projectRows = await Promise.all(
+			kept.flatMap(({ project, names }) =>
+				names !== null &&
+				wanted.some((name) => names.has(name)) &&
+				notHere.every((name) => names.has(name))
+					? [
+							(async () => ({
+								projectId: project.id,
+								projectName: project.name,
+								signedInAt: signs
+									? await config.toolLaunchers.signedInAt(tool.name, project.id)
+									: null,
+							}))(),
+						]
+					: [],
+			),
+		);
+		return {
+			signsInHere:
+				notHere.length === 0 || (unknown && projectRows.length === 0),
+			projects: projectRows,
+			missing: !unknown && projectRows.length === 0 ? notHere : [],
+		};
+	}
+
 	return Promise.all(
-		config.cliTools.list().map(async (tool) => ({
+		tools.map(async (tool) => ({
 			...tool,
 			usedBy: use.clis.get(tool.name) ?? [],
 			profiles: profilesNaming(config.profiles, (p) => p.clis, tool.name),
 			signedInAt: tool.login?.signIn
 				? await config.toolLaunchers.signedInAt(tool.name)
 				: null,
+			loginState: await loginStateOf(tool),
 		})),
 	);
 }

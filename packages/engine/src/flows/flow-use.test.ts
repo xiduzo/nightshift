@@ -50,6 +50,16 @@ describe("flowUse", () => {
 		};
 		const reader: FlowReader = {
 			listProjects: async () => [project("p1", "App"), project("p2", "Site")],
+			listSchedules: async (projectId) => {
+				if (projectId === "p2") throw new Error("not on this computer");
+				return {
+					schedules: [
+						// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
+						{ flow: "night", webhook: { secret: "${HOOK}" } },
+						{ flow: "cron" },
+					],
+				};
+			},
 			flows: {
 				list: async (projectId) => {
 					if (projectId === "p2") throw new Error("not on this computer");
@@ -100,6 +110,9 @@ describe("flowUse", () => {
 			},
 		};
 		const use = await flowUse(reader);
+		expect([...use.webhooks]).toEqual([
+			["HOOK", [{ projectId: "p1", projectName: "App", flowName: "night" }]],
+		]);
 		const night = { projectId: "p1", projectName: "App", flowName: "night" };
 		expect(use.connections.get("gh")).toEqual([night]);
 		expect(use.connections.get("linear")).toEqual([night]);

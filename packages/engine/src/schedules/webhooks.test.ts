@@ -27,16 +27,21 @@ let controller: AbortController;
 let engine: Engine;
 let space: SpaceEngine;
 let projectId: string;
+let secretAsked: string[];
 
 beforeEach(async () => {
 	sandbox = await createSandbox();
+	secretAsked = [];
 	controller = new AbortController();
 	engine = createEngine(
 		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": fakeHarness() },
 			dataDir: sandbox.dataDir,
-			secret: async (name) => (name === "HOOK_SECRET" ? SECRET : undefined),
+			secret: async (name, project) => {
+				secretAsked.push(project.projectId);
+				return name === "HOOK_SECRET" ? SECRET : undefined;
+			},
 		}),
 		{ signal: controller.signal },
 	);
@@ -276,6 +281,13 @@ describe("a webhook schedule", () => {
 		]);
 	});
 
+	test("reads the secret for the schedule's project", async () => {
+		await setup([hook()]);
+		const payload = body({});
+		await send(payload, signed(payload));
+		expect(secretAsked).toEqual([projectId]);
+	});
+
 	test("a secret with no value refuses every webhook, and says so", async () => {
 		// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
 		await setup([hook({ webhook: { secret: "${OTHER}" } })]);
@@ -285,7 +297,7 @@ describe("a webhook schedule", () => {
 		});
 		const list = await space.listSchedules(projectId);
 		expect(list.schedules[0]?.deliveries[0]?.reason).toBe(
-			"The secret OTHER has no value on this computer. Add it on the Secrets page.",
+			"The secret OTHER has no value here. Add it on the project's Secrets page.",
 		);
 	});
 

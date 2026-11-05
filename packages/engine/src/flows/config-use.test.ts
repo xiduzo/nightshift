@@ -24,6 +24,7 @@ const flow = (flowName: string): FlowRef => ({
 const noUse = (): FlowUse => ({
 	connections: new Map(),
 	clis: new Map(),
+	webhooks: new Map(),
 	secrets: new Map(),
 	profiles: new Map(),
 });
@@ -273,6 +274,9 @@ describe("cliToolsInUse", () => {
 		const signedIn: string[] = [];
 		const listed = await cliToolsInUse(
 			{
+				connections: {
+					secrets: async () => ({ secrets: [], personal: "available" }),
+				},
 				cliTools: {
 					list: () => [
 						tool("jq"),
@@ -294,6 +298,7 @@ describe("cliToolsInUse", () => {
 				},
 			},
 			use,
+			{ list: async () => [], secretNames: async () => new Set() },
 		);
 		expect(
 			listed.map((t) => [t.name, t.usedBy, t.profiles, t.signedInAt]),
@@ -303,6 +308,112 @@ describe("cliToolsInUse", () => {
 		]);
 		// Only a tool with a sign-in has a time to read.
 		expect(signedIn).toEqual(["gh-work"]);
+	});
+});
+
+describe("cliToolsInUse: where a login finds its secrets", () => {
+	const acli = tool("acli-dimpact", {
+		program: "acli",
+		login: {
+			env: {},
+			folder: "HOME",
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
+			signIn: { command: "acli login", input: "${TOKEN}" },
+		},
+	});
+	const keez = { id: "keez", name: "KEEZ" };
+
+	async function stateOf(options: {
+		here?: boolean;
+		personal?: "available" | "unavailable";
+		keeps?: ReadonlySet<string> | null;
+	}) {
+		const [listed] = await cliToolsInUse(
+			{
+				connections: {
+					secrets: async () => ({
+						secrets: [
+							{
+								name: "TOKEN",
+								scope: "computer",
+								saved: options.here === true,
+								inEnv: false,
+								usedBy: [],
+								setAt: null,
+								usedAt: null,
+							},
+						],
+						personal: options.personal ?? "available",
+					}),
+				},
+				cliTools: { list: () => [acli] },
+				profiles: { list: () => [] },
+				toolLaunchers: {
+					signedInAt: async (_name, projectId) =>
+						projectId === "keez" ? 42 : null,
+				},
+			},
+			noUse(),
+			{
+				list: async () => [keez],
+				secretNames: async () =>
+					options.keeps === undefined ? new Set() : options.keeps,
+			},
+		);
+		return listed?.loginState;
+	}
+
+	test("a value here signs in here", async () => {
+		expect(await stateOf({ here: true })).toEqual({
+			signsInHere: true,
+			projects: [],
+			missing: [],
+		});
+	});
+
+	test("a project's token signs in for that project, not here", async () => {
+		expect(await stateOf({ keeps: new Set(["TOKEN"]) })).toEqual({
+			signsInHere: false,
+			projects: [{ projectId: "keez", projectName: "KEEZ", signedInAt: 42 }],
+			missing: [],
+		});
+	});
+
+	test("no value anywhere names the secret", async () => {
+		expect(await stateOf({})).toEqual({
+			signsInHere: false,
+			projects: [],
+			missing: ["TOKEN"],
+		});
+	});
+
+	test("secrets that cannot be read now never say a secret is missing", async () => {
+		const expected = { signsInHere: true, projects: [], missing: [] };
+		expect(await stateOf({ keeps: null })).toEqual(expected);
+		expect(await stateOf({ personal: "unavailable" })).toEqual(expected);
+	});
+});
+
+describe("connectionsInUse: webhooks", () => {
+	test("names the flow a webhook starts, unless its project keeps the secret", async () => {
+		const use = noUse();
+		use.webhooks.set("HOOK", [flow("deploy")]);
+		const listedWith = (kept: ReadonlySet<string>) =>
+			connectionsInUse(
+				{
+					connections: { list: () => [], secrets: secretsOf },
+					cliTools: { list: () => [] },
+					profiles: { list: () => [] },
+				},
+				use,
+				async () => kept,
+			);
+		const shown = await listedWith(new Set());
+		expect(shown.secrets.map((s) => [s.name, s.webhooks])).toEqual([
+			["HOOK", [flow("deploy")]],
+		]);
+		const covered = await listedWith(new Set(["HOOK"]));
+		expect(covered.secrets).toEqual([]);
 	});
 });
 

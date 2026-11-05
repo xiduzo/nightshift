@@ -593,8 +593,8 @@ export async function createDaemon(
 		scheduler:
 			env.NIGHTSHIFT_SCHEDULER === "off" ? false : { signal: scheduler.signal },
 		usage: telemetry,
-		// The secret a webhook schedule names: the keychain, then the environment.
-		secret: (name) => connections.secret(name),
+		// The secret a webhook schedule names: its project's first.
+		secret: (name, project) => connections.webhookSecret(name, project),
 		// The relay below is made once per process, before any access is removed.
 		disconnect: (deviceId) =>
 			hot.nightshiftSync?.disconnect(

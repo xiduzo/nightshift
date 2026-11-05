@@ -458,6 +458,8 @@ describe("the Device's half", () => {
 			projects.values(stepOf("run-site"), ["DB_URL"]),
 		).rejects.toThrow(NOT_YOUR_STEP);
 		expect(await projects.kept(app)).toEqual(["postgres://x"]);
+		expect(await projects.kept(app, ["DB_URL"])).toEqual(["postgres://x"]);
+		expect(await projects.kept(app, ["OTHER"])).toEqual([]);
 		expect(await projects.take(app, "DB_URL", "ann")).toBe("postgres://x");
 	});
 

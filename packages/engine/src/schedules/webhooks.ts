@@ -102,8 +102,8 @@ export type WebhooksDeps = {
 	log: RunLog;
 	/** The project's schedules and flows. Throws for a project it cannot read. */
 	flows: Pick<ProjectFlows, "flows" | "schedules">;
-	/** A secret's value by name: the keychain, then the environment. */
-	secret(name: string): Promise<string | undefined>;
+	/** A schedule's secret by name: its project's first. */
+	secret(name: string, projectId: string): Promise<string | undefined>;
 	/** Whether this Device takes the schedule's webhooks: the rule of its cron times. */
 	firesHere(projectId: string, schedule: Schedule): Promise<boolean>;
 	/** The Settings switch of every schedule. */
@@ -303,7 +303,9 @@ export function createWebhooks(deps: WebhooksDeps) {
 			const secretName = found
 				? webhookSecretName(found.schedule.webhook?.secret ?? "")
 				: null;
-			const secret = secretName ? await deps.secret(secretName) : undefined;
+			const secret = secretName
+				? await deps.secret(secretName, projectId)
+				: undefined;
 			// The same check for an unknown schedule: the answer takes as long.
 			const authentic = webhookAuthentic(headers, body, secret ?? NO_SECRET);
 			if (!found) return { answer: { kind: "not-found" }, done };
@@ -312,7 +314,7 @@ export function createWebhooks(deps: WebhooksDeps) {
 					projectId,
 					scheduleId,
 					at,
-					`The secret ${secretName ?? "of this schedule"} has no value on this computer. Add it on the Secrets page.`,
+					`The secret ${secretName ?? "of this schedule"} has no value here. Add it on the project's Secrets page.`,
 				);
 				return { answer: { kind: "not-found" }, done };
 			}

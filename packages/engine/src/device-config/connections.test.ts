@@ -1036,9 +1036,13 @@ function memoryProjects(initial: Record<string, Record<string, string>> = {}) {
 			check();
 			return of(projectId).get(name) ?? null;
 		},
-		async kept({ projectId }) {
+		async kept({ projectId }, names) {
 			check();
-			return [...of(projectId).values()];
+			const kept = of(projectId);
+			return (names ?? [...kept.keys()]).flatMap((name) => {
+				const value = kept.get(name);
+				return value === undefined ? [] : [value];
+			});
 		},
 	};
 	return { port, values, state };
@@ -1143,6 +1147,26 @@ describe("Project secrets (ADR 13)", () => {
 			fromProject: ["SHARED"],
 		});
 		expect(personal.state.calls).toBe(calls);
+	});
+
+	test("a webhook's secret reads its Project first, then as any other, and no step is asked for", async () => {
+		const { store, projects } = await scopedStore({
+			keychain: { HERE: "computer-value", SHARED: "computer-shared" },
+			projects: { app: { SHARED: "project-shared" } },
+		});
+		expect(await store.webhookSecret("SHARED", project)).toBe("project-shared");
+		expect(await store.webhookSecret("HERE", project)).toBe("computer-value");
+		expect(await store.webhookSecret("NOPE", project)).toBeUndefined();
+		expect(projects.state.asked).toEqual([]);
+	});
+
+	test("a webhook's secret has no value while its Project cannot be read", async () => {
+		const { store, projects } = await scopedStore({
+			keychain: { SHARED: "computer-shared" },
+			projects: { app: { SHARED: "project-shared" } },
+		});
+		projects.state.down = true;
+		expect(await store.webhookSecret("SHARED", project)).toBeUndefined();
 	});
 
 	test("fails closed: a Project name has no value while the Project's secrets cannot be read", async () => {

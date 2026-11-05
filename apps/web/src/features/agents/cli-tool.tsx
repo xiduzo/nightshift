@@ -80,12 +80,19 @@ export function useCliToolCheck(name: string) {
 	});
 }
 
-/** The badge of a CLI tool: ready, not found, or checking. */
-export function CliToolCheckBadge({ name }: { name: string }) {
-	const check = useCliToolCheck(name);
+/** The badge of a CLI tool: ready, not found, needs a secret, or checking. */
+export function CliToolCheckBadge({ tool }: { tool: CliTool }) {
+	const check = useCliToolCheck(tool.name);
 	if (check.error && !check.data) return <CheckBadge state="problem" />;
+	const state = check.isPending ? "checking" : checkState(check.data);
 	return (
-		<CheckBadge state={check.isPending ? "checking" : checkState(check.data)} />
+		<CheckBadge
+			state={
+				state === "ready" && tool.loginState?.missing.length
+					? "needs-secret"
+					: state
+			}
+		/>
 	);
 }
 

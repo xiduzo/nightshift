@@ -101,8 +101,8 @@ export type ToolLaunchers = {
 	): Promise<PreparedTools>;
 	/** Signs a tool's login in now, with its folder. */
 	signIn(name: string): Promise<SignInResult>;
-	/** When the tool last signed in, or null. */
-	signedInAt(name: string): Promise<number | null>;
+	/** When the tool last signed in, for one project when it names one, or null. */
+	signedInAt(name: string, projectId?: string): Promise<number | null>;
 	/** Removes a tool's folder, after the tool is removed. */
 	forget(name: string): Promise<void>;
 	/** The variables that logins read: no agent or command inherits them. */
@@ -524,8 +524,11 @@ export function createToolLaunchers(options: {
 			}
 			return ensureSignedIn(tool, tool.login, resolved, true);
 		},
-		async signedInAt(name) {
-			return (await readSignedIn(folderOf(name)))?.at ?? null;
+		async signedInAt(name, projectId) {
+			const folder = projectId
+				? projectFolderOf(name, projectId)
+				: folderOf(name);
+			return (await readSignedIn(folder))?.at ?? null;
 		},
 		async forget(name) {
 			const folders = await readdir(toolsFolder).catch(() => []);

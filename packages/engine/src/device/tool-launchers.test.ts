@@ -403,6 +403,15 @@ describe("a login with a Project's secret", () => {
 		await b.cleanup();
 	});
 
+	test("says when it signed in per project, apart from this computer's", async () => {
+		const tools = projectLaunchers(list, { a: "tok-a" });
+		const prepared = await tools.forCommand({ project: stepOf("a") });
+		await prepared.cleanup();
+		expect(await tools.signedInAt("acli-dimpact", "a")).toBe(1_000);
+		expect(await tools.signedInAt("acli-dimpact", "b")).toBeNull();
+		expect(await tools.signedInAt("acli-dimpact")).toBeNull();
+	});
+
 	test("forget removes the folders of its projects, not another tool's", async () => {
 		const tools = projectLaunchers(list, { a: "tok-a" });
 		const prepared = await tools.forCommand({ project: stepOf("a") });

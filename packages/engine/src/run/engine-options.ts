@@ -96,7 +96,10 @@ export type EngineOptions = {
 	 * `${NAME}`. The daemon passes its Secrets (the keychain, then the
 	 * environment). Default: the environment.
 	 */
-	secret?: (name: string) => Promise<string | undefined>;
+	secret?: (
+		name: string,
+		project: { spaceId: string; projectId: string },
+	) => Promise<string | undefined>;
 	/**
 	 * The rows of the packages above the engine that move with the runs of
 	 * a Space move (`Engine.moveProjects`), in its batch: the Commands of

@@ -104,7 +104,13 @@ function projectSecretColumns({
 		column.accessor("flows", {
 			header: "Used by",
 			cell: ({ row: { original } }) => (
-				<UsedBy users={[...original.tools, ...original.flows]} />
+				<UsedBy
+					users={[
+						...original.tools,
+						...original.flows,
+						...original.webhooks.map((flow) => `${flow} (webhook)`),
+					]}
+				/>
 			),
 			meta: { cellClassName: "font-mono text-muted-foreground" },
 		}),
@@ -499,6 +505,7 @@ function RemoveProjectSecretDialog({
 	);
 	const flows = secret?.flows ?? [];
 	const tools = secret?.tools ?? [];
+	const webhooks = secret?.webhooks ?? [];
 
 	return (
 		<AlertDialog open={secret !== null} onOpenChange={onOpenChange}>
@@ -509,7 +516,7 @@ function RemoveProjectSecretDialog({
 						{project.name}?
 					</AlertDialogTitle>
 					<AlertDialogDescription>
-						{flows.length === 0 && tools.length === 0
+						{flows.length === 0 && tools.length === 0 && webhooks.length === 0
 							? "Nothing in this project uses it."
 							: [
 									tools.length > 0
@@ -517,6 +524,9 @@ function RemoveProjectSecretDialog({
 										: null,
 									flows.length > 0
 										? `Flows that use it (${flows.join(", ")}) stop before the command runs, unless the computer that runs them has a secret of that name.`
+										: null,
+									webhooks.length > 0
+										? `Webhooks of ${webhooks.join(", ")} stop working until you set it again.`
 										: null,
 								]
 									.filter(Boolean)

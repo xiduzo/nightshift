@@ -117,10 +117,12 @@ export type ProjectSecrets = {
 		personId: string,
 	): Promise<string | null>;
 	/**
-	 * Every value of the Project that this computer keeps itself, to take
-	 * out of an exported run. Empty when another Host keeps them.
+	 * The values of the Project that this computer keeps itself: all of
+	 * them, or those of `names`. For an exported run, to take them out, and
+	 * for a webhook, which no step asks for. Empty when another Host keeps
+	 * them.
 	 */
-	kept(project: ProjectRef): Promise<string[]>;
+	kept(project: ProjectRef, names?: readonly string[]): Promise<string[]>;
 };
 
 /** What a person reads when a step needs Project secrets that cannot be read now. */
@@ -255,6 +257,12 @@ export type ConnectionStore = {
 	 * Personal, then the keychain, then the daemon's environment.
 	 */
 	secret(name: string, use?: SecretUse): Promise<string | undefined>;
+	/**
+	 * A webhook's secret: the Project's when this computer keeps it, then as
+	 * `secret`. No step asks for it, so no value comes from another Host.
+	 * Undefined while the Project's secrets cannot be read here.
+	 */
+	webhookSecret(name: string, project: ProjectRef): Promise<string | undefined>;
 	/** Where a secret's value comes from, as this computer knows the Personal names now. */
 	secretSource(name: string): SecretSource;
 	/** Saves a value in a scope. Default: this computer. */
@@ -848,6 +856,23 @@ export function createConnectionStore(options: {
 		},
 		async secret(name, use) {
 			const value = (await resolve([name], use)).vars[name];
+			if (value !== undefined) recordUse([name]);
+			return value;
+		},
+		async webhookSecret(name, project) {
+			if (hasProjects()) {
+				try {
+					const [value] = await projectPort().kept(project, [name]);
+					if (value !== undefined) {
+						recordUse([name]);
+						return value;
+					}
+				} catch (error) {
+					warnOnce("read", error, "Project");
+					return undefined;
+				}
+			}
+			const value = (await resolve([name])).vars[name];
 			if (value !== undefined) recordUse([name]);
 			return value;
 		},
