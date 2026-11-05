@@ -9,6 +9,7 @@ import {
 	nodeBase,
 	nodeProfileSchema,
 	placed,
+	profileFallbacksSchema,
 } from "./base";
 import {
 	checkCascade,
@@ -237,6 +238,11 @@ export const agentNodeSchema = z.object({
 	 * have refuses to start.
 	 */
 	profile: nodeProfileSchema.optional(),
+	/**
+	 * The profiles that take this step when its own profile's Device cannot,
+	 * first one first (ADR 19). Unset: the step waits for its Device.
+	 */
+	fallbacks: profileFallbacksSchema.optional(),
 	/**
 	 * The coding-agent CLI that runs the session. Each uses its own login.
 	 * Required without a profile. A custom agent is `acp:<slug>`.

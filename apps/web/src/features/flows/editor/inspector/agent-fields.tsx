@@ -1,9 +1,10 @@
 /** The fields of an Agent node: its profile, harness, model, prompt and task. */
-import type {
-	AgentNode,
-	AgentProfile,
-	Flow,
-	NodeOption,
+import {
+	type AgentNode,
+	type AgentProfile,
+	type Flow,
+	isProfileRef,
+	type NodeOption,
 } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
@@ -46,6 +47,8 @@ import { AgentOutcomeSection } from "./agent-outcomes";
 import { CascadeSection } from "./cascade-fields";
 import { withoutField } from "./model-defaults";
 import {
+	backupsWithProfile,
+	ProfileBackupsField,
 	type ProfileChoice,
 	ProfileSelect,
 	profileOnDevice,
@@ -71,9 +74,17 @@ function pickProfile(
 		model,
 		effort,
 		permissionMode,
+		fallbacks,
 		...rest
 	} = node;
-	if (next) return { ...rest, profile: next.ref };
+	if (next) {
+		const backups = backupsWithProfile(fallbacks, next.ref);
+		return {
+			...rest,
+			profile: next.ref,
+			...(backups ? { fallbacks: backups } : {}),
+		};
+	}
 	const kept: AgentNode = {
 		...rest,
 		...(device !== undefined ? { device } : {}),
@@ -353,6 +364,21 @@ export function AgentFields({
 						}
 					/>
 				</Field>
+
+				{node.cascade === undefined && isProfileRef(node.profile) ? (
+					<ProfileBackupsField
+						id={`${id}-backups`}
+						profile={node.profile}
+						fallbacks={node.fallbacks}
+						choices={choices}
+						onChange={(fallbacks) =>
+							onChange(({ fallbacks: _old, ...current }) => ({
+								...current,
+								...(fallbacks ? { fallbacks } : {}),
+							}))
+						}
+					/>
+				) : null}
 
 				{node.cascade !== undefined ? null : node.profile !== undefined ? (
 					<Collapsible

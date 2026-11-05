@@ -1,6 +1,6 @@
 import {
+	everyProfileOf,
 	isProfileRef,
-	nodeProfiles,
 	runsAs,
 	type Schedule,
 	webhookSecretName,
@@ -101,7 +101,7 @@ export async function flowUse(space: FlowReader): Promise<FlowUse> {
 			const byProfile = new Map<string, string[]>();
 			for (const node of loaded?.flow?.nodes ?? []) {
 				// A cascade names a profile per tier.
-				for (const profile of nodeProfiles(node).filter(isProfileRef)) {
+				for (const profile of everyProfileOf(node).filter(isProfileRef)) {
 					const key = profileUseKey(profile.device, profile.profile);
 					const ids = byProfile.get(key) ?? [];
 					if (!ids.includes(node.id)) byProfile.set(key, [...ids, node.id]);

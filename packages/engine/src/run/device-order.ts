@@ -2,12 +2,14 @@ import {
 	deviceIdOf,
 	type Flow,
 	type FlowNode,
+	fallbacksOf,
 	hasCascade,
 	isProfileRef,
 	type ProfileRef,
 	type ProfileSettings,
 	profileOf,
 	resolveNodeProfile,
+	sameProfileRef,
 	tierUsers,
 	withTierNode,
 } from "@nightshift/flows";
@@ -27,16 +29,18 @@ import type { PlacedDevice } from "./peers";
 /**
  * Which Device takes a run's steps, in one order for every start (ADR 17):
  *
- * - A person picks a Device: that Device first, then the Devices the flow
- *   configures. It takes every node it can.
- * - A person picks none: the node's own Device, then the flow's list, then
- *   the Device the person started from. A flow without a list means the
- *   Host that keeps the Space.
+ * - A node with a profile runs on that profile's Device, then on the backups
+ *   it lists (ADR 19). A profile always means its Device: Night Shift never
+ *   looks for a profile of the same name on another Device. A pick only
+ *   chooses among the profiles the node lists.
+ * - Other steps take the Device a person picks, then the node's own Device,
+ *   then the flow's list, then the Device the person started from. A flow
+ *   without a list means the Host that keeps the Space.
  * - A schedule's or a webhook's run keeps its Device (ADR 15). Only a node
- *   that names a Device has fallbacks.
+ *   that names a Device or a profile has fallbacks.
  *
- * A Device takes a step when it is online, has the project, has a profile
- * of the same name for a node that names one, and has what the node needs.
+ * A Device takes a step when it is online, has the project, and has what the
+ * node needs.
  * This module rewrites the nodes it moves: `placeNodes` then places the
  * flow as if the flow had named those Devices itself. The Devices it passes
  * over stay in the plan, so a step can move when its Device goes offline.
@@ -60,7 +64,7 @@ export type OrderDevices = {
 	keeperId?: string | undefined;
 	/** The Host among the Devices: a step there reads no Personal secret. */
 	hostId?: string | undefined;
-	/** The profiles a run of the Person may use on a Device. Null when unknown. */
+	/** The profiles a run of the Person may use on a Device, by id. Null when unknown. */
 	profilesOf?(deviceId: string): Promise<readonly DeviceProfile[] | null>;
 	profileFor(id: string): ProfileSettings | null;
 	lastKnown?(
@@ -77,6 +81,9 @@ export type OrderDevices = {
 	/** The first requirement the nodes fail on those capabilities (`refusalOf`). */
 	refusal(nodes: readonly FlowNode[], has: Capabilities): string | null;
 };
+
+/** A place a node may run: a Device, and for a node with a profile the pair. */
+type Candidate = { id: string; pair: ProfileRef | null; node: FlowNode };
 
 export type ChosenDevices = {
 	/** The flows, with the nodes that moved naming their new Device. */
@@ -288,79 +295,122 @@ export async function chooseDevices(
 		);
 	}
 
+	/** Where a node may run, first one first. A profile means its Device (ADR 19). */
+	function candidatesOf(node: FlowNode, pin: string): Candidate[] {
+		const ref = profileOf(node);
+		if (!isProfileRef(ref)) {
+			return unique(
+				!byPerson ? [pin, ...configured] : [pick, pin, ...configured, starter],
+			).map((id) => ({
+				id,
+				pair: null,
+				node: id === pin ? node : ({ ...node, device: id } as FlowNode),
+			}));
+		}
+		const pairs = [ref, ...fallbacksOf(node)];
+		// A pick only chooses among the profiles the node lists.
+		return [
+			...pairs.filter((pair) => pair.device === pick),
+			...pairs.filter((pair) => pair.device !== pick),
+		].map((pair) => ({
+			id: pair.device,
+			pair,
+			node: sameProfileRef(pair, ref)
+				? node
+				: ({ ...node, profile: pair } as FlowNode),
+		}));
+	}
+
+	/** Why a backup cannot be used at all, or null. A node's own profile is not asked. */
+	async function unusableBackup(
+		node: FlowNode,
+		at: PlacedDevice,
+		pair: ProfileRef,
+	): Promise<string | null> {
+		const own = profileOf(node);
+		if (isProfileRef(own) && sameProfileRef(pair, own)) return null;
+		if (at.offered) {
+			return at.offered.offers.some((offer) => offer.profile === pair.profile)
+				? null
+				: `${at.name} does not offer "${await profileName(pair)}"`;
+		}
+		const has = (await profilesOf(at.id))?.some((p) => p.id === pair.profile);
+		return has
+			? null
+			: `${at.name} has no profile "${await profileName(pair)}"`;
+	}
+
 	const fallbacks: Record<string, FallbackDevice[]> = {};
-	/** A node that says where it runs: the first Device of its order that can. */
+	/** A node that says where it runs: the first place of its order that can. */
 	async function placeOne(node: FlowNode): Promise<FlowNode> {
 		const pin = pinOf(node);
-		const ref = profileOf(node);
 		if (pin === undefined) return node;
-		const order = unique(
-			!byPerson ? [pin, ...configured] : [pick, pin, ...configured, starter],
-		);
-		const name = isProfileRef(ref) ? await profileName(ref) : null;
-		/** The node as it would run on a Device, or null when that has no such profile. */
-		const on = async (id: string): Promise<FlowNode | null> => {
-			if (id === pin) return node;
-			if (!isProfileRef(ref)) return { ...node, device: id } as FlowNode;
-			const found = (await profilesOf(id))?.find((p) => p.name === name);
-			if (!found) return null;
-			return {
-				...node,
-				profile: { device: id, profile: found.id },
-			} as FlowNode;
-		};
-		const options: { id: string; at: PlacedDevice; node: FlowNode }[] = [];
+		const candidates = candidatesOf(node, pin);
 		const unknownPin = !(await placed(pin, "node"));
-		const reasons = new Map<string, string>();
-		for (const id of order) {
+		const options: { candidate: Candidate; at: PlacedDevice }[] = [];
+		const reasons = new Map<Candidate, string>();
+		for (const candidate of candidates) {
+			const { id, pair } = candidate;
 			const at = await placed(id, "node");
-			const candidate = at && (await on(id));
-			if (at && !candidate)
-				reasons.set(id, `${at.name} has no profile "${name}"`);
-			if (!at || !candidate) continue;
-			// Another Person's Device: only the node's own, or the person's pick.
-			if (at.offered && id !== pin && id !== pick) continue;
-			options.push({ id, at, node: candidate });
+			if (!at) continue;
+			if (pair) {
+				const why = await unusableBackup(node, at, pair);
+				if (why !== null) {
+					reasons.set(candidate, why);
+					continue;
+				}
+			} else if (at.offered && id !== pin && id !== pick) {
+				// Another Person's Device: only the node's own, or the person's pick.
+				continue;
+			}
+			options.push({ candidate, at });
 		}
 		let chosen: (typeof options)[number] | null = null;
 		for (const option of options) {
-			const why = await unfit(option.at, [option.node]);
+			const why = await unfit(option.at, [option.candidate.node]);
 			if (why === null) {
 				chosen = option;
 				break;
 			}
-			reasons.set(option.id, why);
+			reasons.set(option.candidate, why);
 		}
-		// No Device fits: the node's own says why, or its steps wait for it.
-		const result = chosen?.node ?? node;
+		// Nothing fits: the node's own says why, or its steps wait for it.
+		const result = chosen?.candidate.node ?? node;
 		const resultId = pinOf(result);
-		if (chosen !== null && chosen.id !== order[0]) {
-			// Only the Devices before the one that took it say why.
+		if (chosen !== null && chosen.candidate !== candidates[0]) {
+			// Only the places before the one that took it say why.
 			const why = [
 				...(unknownPin ? ["The device it names is not in this Space"] : []),
-				...order
-					.slice(0, order.indexOf(chosen.id))
-					.flatMap((id) => reasons.get(id) ?? []),
+				...candidates
+					.slice(0, candidates.indexOf(chosen.candidate))
+					.flatMap((candidate) => reasons.get(candidate) ?? []),
 			]
 				.map((reason) => `${reason}. `)
 				.join("");
+			const taker = chosen.candidate.pair
+				? `${await profileName(chosen.candidate.pair)} on ${chosen.at.name}`
+				: chosen.at.name;
 			notes.push(
-				`${why}${chosen.at.name} takes over node "${node.id}". ${takenOverSecrets(chosen.id === devices.hostId)}`,
+				`${why}${taker} takes over node "${node.id}". ${takenOverSecrets(chosen.at.id === devices.hostId)}`,
 			);
 		}
 		const needsClone = kindOf(node).works(node) === "worktree";
 		const rest: FallbackDevice[] = [];
-		for (const { at, node: candidate } of options) {
+		for (const { at, candidate } of options) {
+			const { pair } = candidate;
 			if (at.id === resultId || at.offered) continue;
 			if (needsClone && !at.hasClone) continue;
 			const fallback: FallbackDevice = { id: at.id, name: at.name };
-			const own = profileOf(candidate);
-			if (isProfileRef(own)) {
-				const settings = await settingsOf(at, own.profile);
+			if (pair) {
+				const settings = await settingsOf(at, pair.profile);
 				if (!settings) continue;
-				const resolved = resolveNodeProfile(node, settings, name ?? undefined);
+				const resolved = resolveNodeProfile(
+					candidate.node,
+					settings,
+					await profileName(pair),
+				);
 				if ("problem" in resolved) continue;
-				fallback.profile = own;
+				fallback.profile = pair;
 				fallback.fields = fieldsOf(resolved.node);
 			}
 			rest.push(fallback);

@@ -302,6 +302,13 @@ export type ProfileRef = z.infer<typeof profileRefSchema>;
 export const nodeProfileSchema = z.union([profileRefSchema, nameSchema]);
 export type NodeProfile = z.infer<typeof nodeProfileSchema>;
 
+/**
+ * The profiles that take a node's step when its own profile's Device cannot
+ * (ADR 19), first one first. Each is a pair, so a person reads exactly what
+ * runs. Empty or unset: the step waits for its Device.
+ */
+export const profileFallbacksSchema = z.array(profileRefSchema).max(5);
+
 /** Whether a node's profile names the pair, not a name left from format 6. */
 export function isProfileRef(
 	profile: NodeProfile | undefined,
@@ -321,10 +328,17 @@ export function sameProfileRef(a: ProfileRef, b: ProfileRef): boolean {
  * "Agent".
  */
 export function checkNodeProfile(
-	node: { id: string; profile?: NodeProfile; device?: DeviceRef },
+	node: {
+		id: string;
+		profile?: NodeProfile;
+		device?: DeviceRef;
+		fallbacks?: readonly ProfileRef[];
+		cascade?: unknown;
+	},
 	title: string,
 	check: NodeCheck,
 ): void {
+	checkProfileFallbacks(node, title, check);
 	if (node.profile === undefined) return;
 	if (!isProfileRef(node.profile)) {
 		check.error(
@@ -336,6 +350,44 @@ export function checkNodeProfile(
 		check.error(
 			`${title} node "${node.id}" names a device and a profile. The step runs on the profile's device. Remove the device, or the profile.`,
 		);
+	}
+}
+
+/** A backup needs a profile to back up, and each is another profile. */
+function checkProfileFallbacks(
+	node: {
+		id: string;
+		profile?: NodeProfile;
+		fallbacks?: readonly ProfileRef[];
+		cascade?: unknown;
+	},
+	title: string,
+	check: NodeCheck,
+): void {
+	const fallbacks = node.fallbacks ?? [];
+	if (fallbacks.length === 0) return;
+	if (node.cascade !== undefined) {
+		check.error(
+			`${title} node "${node.id}" has a cascade and backup profiles. The next tier is the backup. Remove the backup profiles.`,
+		);
+		return;
+	}
+	const { profile } = node;
+	if (!isProfileRef(profile)) {
+		check.error(
+			`${title} node "${node.id}" has backup profiles, but no profile of its own. Pick a profile first.`,
+		);
+		return;
+	}
+	const seen: ProfileRef[] = [profile];
+	for (const fallback of fallbacks) {
+		if (seen.some((other) => sameProfileRef(other, fallback))) {
+			check.error(
+				`${title} node "${node.id}" names the same profile more than once. Remove the backup that repeats it.`,
+			);
+			return;
+		}
+		seen.push(fallback);
 	}
 }
 

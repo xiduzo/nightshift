@@ -88,7 +88,7 @@ export type PlanDevices = {
 	hostId?: string;
 	/** The Person's other Devices, for when no Device of the order can take the run. */
 	lastResort?(): Promise<readonly string[]>;
-	/** The profiles a run may use on a Device, by name too. Null when unknown. */
+	/** The profiles a run may use on a Device, by id. Null when unknown. */
 	profilesOf?(deviceId: string): Promise<readonly DeviceProfile[] | null>;
 };
 

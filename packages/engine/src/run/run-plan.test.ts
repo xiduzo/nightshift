@@ -86,6 +86,8 @@ const command = (id: string, device?: string) =>
 		...(device ? { device } : {}),
 	}) as FlowNode;
 
+const backedUp = (id: string, profile: ProfileRef, fallbacks: ProfileRef[]) =>
+	({ ...profiled(id, profile), fallbacks }) as FlowNode;
 const profiled = (id: string, profile: ProfileRef) =>
 	({
 		id,
@@ -555,30 +557,14 @@ describe("which Device takes a run's steps (ADR 17)", () => {
 		).toEqual([["laptop", ["a", "b"]]]);
 	});
 
-	test("picked: a node with a profile takes your pick's profile of the same name", async () => {
+	test("picked: a node with a profile stays on that profile's Device", async () => {
 		const planned = await planNodes(
 			{
 				projectId: "p",
 				deviceId: "laptop",
 				flow: flow([
 					profiled("work", { device: "host", profile: "host-builder" }),
-				]),
-			},
-			space,
-			"me",
-		);
-		expect(planned.flow.nodes[0]).toMatchObject({
-			profile: { device: "laptop", profile: "mac-builder" },
-		});
-	});
-
-	test("picked: a Device without that profile leaves the node on the Device it names", async () => {
-		const planned = await planNodes(
-			{
-				projectId: "p",
-				deviceId: "this",
-				flow: flow([
-					profiled("work", { device: "host", profile: "host-builder" }),
+					command("other"),
 				]),
 			},
 			space,
@@ -587,9 +573,28 @@ describe("which Device takes a run's steps (ADR 17)", () => {
 		expect(planned.flow.nodes[0]).toMatchObject({
 			profile: { device: "host", profile: "host-builder" },
 		});
-		expect(planned.notes).toEqual([
-			'this has no profile "builder". host takes over node "work". Space and project secrets work there. Secrets saved only on another computer do not.',
-		]);
+		expect(planned.run.id).toBe("laptop");
+		expect(planned.notes).toEqual([]);
+	});
+
+	test("picked: a pick chooses among the profiles a node lists", async () => {
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				deviceId: "laptop",
+				flow: flow([
+					backedUp("work", { device: "host", profile: "host-builder" }, [
+						{ device: "laptop", profile: "mac-builder" },
+					]),
+				]),
+			},
+			space,
+			"me",
+		);
+		expect(planned.flow.nodes[0]).toMatchObject({
+			profile: { device: "laptop", profile: "mac-builder" },
+		});
+		expect(planned.notes).toEqual([]);
 	});
 
 	test("the first Device of the order takes the run: no warning", async () => {
@@ -606,15 +611,37 @@ describe("which Device takes a run's steps (ADR 17)", () => {
 		}
 	});
 
-	test("a node's Device offline: it takes the next Device's profile of the same name, its own values too", async () => {
+	test("a node's Device offline: a profile of the same name on another Device never takes it", async () => {
 		const planned = await planNodes(
 			{
 				projectId: "p",
 				startedFrom: "this",
 				flow: listed(
-					["laptop"],
+					["laptop", "host"],
 					[profiled("work", { device: "sleeping", profile: "off-builder" })],
 				),
+			},
+			space,
+			"me",
+		);
+		expect(planned.flow.nodes[0]).toMatchObject({
+			profile: { device: "sleeping", profile: "off-builder" },
+		});
+		expect(planned.notes).toEqual([]);
+		expect(planned.plan.fallbacks?.nodes ?? {}).toEqual({});
+	});
+
+	test("a node's Device offline: its first backup that can takes it, and the run says so", async () => {
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				startedFrom: "this",
+				flow: flow([
+					backedUp("work", { device: "sleeping", profile: "off-builder" }, [
+						{ device: "laptop", profile: "mac-builder" },
+						{ device: "host", profile: "host-builder" },
+					]),
+				]),
 			},
 			space,
 			"me",
@@ -623,8 +650,54 @@ describe("which Device takes a run's steps (ADR 17)", () => {
 			profile: { device: "laptop", profile: "mac-builder" },
 		});
 		expect(planned.notes[0]).toBe(
-			'sleeping is offline. laptop takes over node "work". Space and project secrets work there. Secrets saved only on another computer do not.',
+			'sleeping is offline. builder on laptop takes over node "work". Space and project secrets work there. Secrets saved only on another computer do not.',
 		);
+	});
+
+	test("a backup its Device no longer has is passed over, and the run says why", async () => {
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				startedFrom: "this",
+				flow: flow([
+					backedUp("work", { device: "sleeping", profile: "off-builder" }, [
+						{ device: "laptop", profile: "gone" },
+						{ device: "host", profile: "host-builder" },
+					]),
+				]),
+			},
+			space,
+			"me",
+		);
+		expect(planned.flow.nodes[0]).toMatchObject({
+			profile: { device: "host", profile: "host-builder" },
+		});
+		expect(planned.notes[0]).toContain(
+			'laptop has no profile "gone". builder on host takes over node "work".',
+		);
+	});
+
+	test("a step that can move later keeps its backups in the plan as pairs", async () => {
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				startedFrom: "this",
+				flow: flow([
+					backedUp("work", { device: "host", profile: "host-builder" }, [
+						{ device: "laptop", profile: "mac-builder" },
+					]),
+				]),
+			},
+			{
+				...space,
+				nodeDevice: async (id) => all.find((d) => d.id === id) ?? null,
+			},
+			"me",
+		);
+		const moves = Object.values(planned.plan.fallbacks?.nodes ?? {}).flat();
+		expect(moves.map((to) => [to.id, to.profile])).toEqual([
+			["laptop", { device: "laptop", profile: "mac-builder" }],
+		]);
 	});
 
 	test("a node's Device that left the Space: it moves on, and the run says so", async () => {

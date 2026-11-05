@@ -30,7 +30,7 @@ describe("the Device field of Start run", () => {
 			"Another person's device. The run can use only the profiles it offers to this Space.",
 		);
 		expect(placementDescription({ thisDevice: false }, false)).toBe(
-			"This device goes first. The flow's devices are its backups.",
+			"Steps without a profile run here first. A step with a profile runs on that profile's computer.",
 		);
 		expect(placementDescription(undefined, true)).toBe(
 			"None of your devices with this project is online. Start the run when one is.",

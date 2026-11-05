@@ -11,6 +11,7 @@ import {
 	nodeBase,
 	nodeProfileSchema,
 	placed,
+	profileFallbacksSchema,
 } from "./base";
 import {
 	checkCascade,
@@ -86,6 +87,11 @@ export const decisionNodeSchema = z.object({
 	 * it starts.
 	 */
 	profile: nodeProfileSchema.optional(),
+	/**
+	 * The profiles that take this step when its own profile's Device cannot,
+	 * first one first (ADR 19). Unset: the step waits for its Device.
+	 */
+	fallbacks: profileFallbacksSchema.optional(),
 	/**
 	 * `by: "model"` only: the decision model that picks. Unset: the
 	 * profile's, else TypeSafe (`decisionDecider`). A Decision by a person
