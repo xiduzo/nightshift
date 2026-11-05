@@ -1,0 +1,83 @@
+# Builds the Insights app (deploy/insights/Dockerfile) and publishes it. The
+# server only pulls this image. It does not build the app: two builds of it on
+# the server on 2026-11-05 ended when every Swarm service there restarted.
+#
+# - Each push to main that changes the app publishes `latest` and `sha-<commit>`.
+# - Run it from the Actions tab to build now.
+#
+# It publishes to the GitHub Container Registry
+# (ghcr.io/<owner>/nightshift-insights), and to Docker Hub when the repository
+# variable DOCKERHUB_USERNAME and the secret DOCKERHUB_TOKEN are set.
+#
+# The team instance runs on linux/amd64. A deploy on Dokploy is still a manual
+# step: see docs/deploy/insights.md.
+name: Insights image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/insights/**
+      - packages/**
+      - deploy/insights/Dockerfile
+      - deploy/insights/Dockerfile.dockerignore
+      - bun.lock
+      - .github/workflows/insights-image.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: insights-image
+  cancel-in-progress: true
+
+env:
+  GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/nightshift-insights
+  DOCKERHUB_IMAGE: ${{ vars.DOCKERHUB_USERNAME && format('docker.io/{0}/nightshift-insights', vars.DOCKERHUB_USERNAME) || '' }}
+
+jobs:
+  publish:
+    name: Build and publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - uses: docker/login-action@v3
+        if: env.DOCKERHUB_IMAGE != ''
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.GHCR_IMAGE }}
+            ${{ env.DOCKERHUB_IMAGE }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/insights/Dockerfile
+          platforms: linux/amd64
+          pull: true
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=insights
+          cache-to: type=gha,scope=insights,mode=max
