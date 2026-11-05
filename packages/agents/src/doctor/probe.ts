@@ -5,6 +5,7 @@
  */
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
+import { findProgram } from "../port";
 
 const TIMEOUT_MS = 15_000;
 
@@ -45,7 +46,7 @@ export async function resolveBin(bin: string): Promise<string | null> {
 			return null;
 		}
 	}
-	return Bun.which(bin);
+	return findProgram(bin);
 }
 
 /** The first line of a text that is not blank, trimmed. */

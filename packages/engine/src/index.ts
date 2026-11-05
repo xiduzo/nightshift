@@ -89,6 +89,7 @@ export type {
 } from "./flows";
 export {
 	cliToolsInUse,
+	cliToolsOfSecrets,
 	connectionsInUse,
 	createFlowDocuments,
 	flowsForRun,

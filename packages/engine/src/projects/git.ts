@@ -1,3 +1,4 @@
+import { findProgram } from "@nightshift/agents/types";
 import { Refusal } from "@nightshift/refusal";
 
 /**
@@ -125,7 +126,7 @@ async function runGit(
 	args: string[],
 	options: GitRunOptions = {},
 ): Promise<GitResult> {
-	if (Bun.which("git") === null) throw new GitNotInstalledError();
+	if (findProgram("git") === null) throw new GitNotInstalledError();
 	return runProcess(["git", ...args], cwd, options);
 }
 
@@ -203,10 +204,11 @@ const PROBE_RETRY_MS = [200, 1_000, null] as const;
  * line tools are missing, so ask `xcode-select -p` first.
  */
 async function probeGit(): Promise<string | null> {
-	const path = Bun.which("git");
+	const path = findProgram("git");
 	if (path === null) return null;
 	if (process.platform === "darwin" && path === "/usr/bin/git") {
 		const tools = Bun.spawnSync(["xcode-select", "-p"], {
+			env: process.env,
 			stdout: "ignore",
 			stderr: "ignore",
 		});
@@ -239,6 +241,7 @@ async function runProgram(
 	argv: string[],
 ): Promise<{ exitCode: number; stderr: string }> {
 	const proc = Bun.spawn(argv, {
+		env: process.env,
 		stdin: "ignore",
 		stdout: "ignore",
 		stderr: "pipe",
@@ -274,7 +277,7 @@ const INSTALL_COMMANDS: Partial<
 export function systemGitInstaller(
 	deps: InstallerDeps = {
 		platform: process.platform,
-		which: (name) => Bun.which(name),
+		which: (name) => findProgram(name),
 		run: runProgram,
 	},
 ): GitInstaller {

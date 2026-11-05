@@ -213,6 +213,8 @@ export const projectSecretListSchema = z.object({
 		projectSecretSchema.extend({
 			/** The flows of the project that use it, by name. */
 			flows: z.array(z.string()),
+			/** The CLI tools of this computer whose logins read it, by name. */
+			tools: z.array(z.string()),
 		}),
 	),
 	/** False: the Host of the Space could not be reached now, and the list is empty. */

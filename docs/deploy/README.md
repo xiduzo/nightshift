@@ -173,7 +173,9 @@ Agents page, then the tool, then Edit:
   "Keep its own sign-in". Night Shift keeps a folder for the tool in the
   data folder, `/data/tools/<name>`. A variable points the program at that
   folder (`HOME` for acli). Its sign-in command runs there before the first
-  step, and again when a secret it reads changes. Give the token as the
+  step, and again when a secret it reads changes. A login that reads a
+  project's secret has its own folder per project,
+  `/data/tools/<name>@<project id>`. Give the token as the
   command's input, never in the command:
 
   ```text

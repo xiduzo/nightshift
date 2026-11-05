@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { startPriceUpdates, tanstackDecider } from "@nightshift/agents";
+import { findProgram } from "@nightshift/agents/types";
 import type { Context } from "@nightshift/api/context";
 import {
 	createAuth,
@@ -512,7 +513,7 @@ export async function createDaemon(
 		secretEnv: (names, use) => connections.secretEnv(names, use),
 		connectionNames: () => connections.names(),
 		cliNames: () => cliTools.names(),
-		findCli: (name) => Bun.which(cliTools.program(name)),
+		findCli: (name) => findProgram(cliTools.program(name)),
 		cliToolsFor: (names) => cliTools.guides(names),
 		toolLaunchers,
 		clonePath,
@@ -848,10 +849,10 @@ async function usageFacts(input: {
 	let agents = 0;
 	for (const name of Object.keys(HARNESS_BIN) as (keyof typeof HARNESS_BIN)[]) {
 		const bin = current[HARNESS_BIN[name]];
-		if (typeof bin === "string" && Bun.which(bin)) agents += 1;
+		if (typeof bin === "string" && findProgram(bin)) agents += 1;
 	}
 	for (const agent of current.customAgents) {
-		if (Bun.which(agent.command)) agents += 1;
+		if (findProgram(agent.command)) agents += 1;
 	}
 	const screens = await input.listScreens(input.ownerId);
 	const overview = await input.devices.overview({

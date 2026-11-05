@@ -1,3 +1,4 @@
+import { findProgram } from "@nightshift/agents/types";
 /**
  * The OS's sleep lock, behind a port. While a hold lives, this computer
  * does not go to sleep on its own. Each hold is a program that runs until
@@ -88,9 +89,10 @@ export function systemSleepLock(
 
 function bunLockPrograms(): LockPrograms {
 	return {
-		which: (name) => Bun.which(name),
+		which: (name) => findProgram(name),
 		spawn(command) {
 			const child = Bun.spawn([...command], {
+				env: process.env,
 				stdin: "ignore",
 				stdout: "ignore",
 				stderr: "ignore",

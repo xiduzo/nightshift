@@ -1,5 +1,6 @@
 import { realpath, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { findProgram } from "@nightshift/agents/types";
 import { KNOWLEDGE_SOURCE_KINDS } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 
@@ -71,7 +72,7 @@ export type ToolsDeps = {
 };
 
 const systemTools: ToolsDeps = {
-	which: (name) => Bun.which(name),
+	which: (name) => findProgram(name),
 	platform: process.platform,
 };
 

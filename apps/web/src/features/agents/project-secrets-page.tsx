@@ -103,7 +103,9 @@ function projectSecretColumns({
 		}),
 		column.accessor("flows", {
 			header: "Used by",
-			cell: ({ row }) => <UsedBy users={row.original.flows} />,
+			cell: ({ row: { original } }) => (
+				<UsedBy users={[...original.tools, ...original.flows]} />
+			),
 			meta: { cellClassName: "font-mono text-muted-foreground" },
 		}),
 		column.accessor("setAt", {
@@ -496,6 +498,7 @@ function RemoveProjectSecretDialog({
 		}),
 	);
 	const flows = secret?.flows ?? [];
+	const tools = secret?.tools ?? [];
 
 	return (
 		<AlertDialog open={secret !== null} onOpenChange={onOpenChange}>
@@ -506,9 +509,18 @@ function RemoveProjectSecretDialog({
 						{project.name}?
 					</AlertDialogTitle>
 					<AlertDialogDescription>
-						{flows.length === 0
-							? "No flow of this project uses it."
-							: `Flows that use it (${flows.join(", ")}) stop before the command runs, unless the computer that runs them has a secret of that name.`}
+						{flows.length === 0 && tools.length === 0
+							? "Nothing in this project uses it."
+							: [
+									tools.length > 0
+										? `${tools.join(", ")} will not sign in with it.`
+										: null,
+									flows.length > 0
+										? `Flows that use it (${flows.join(", ")}) stop before the command runs, unless the computer that runs them has a secret of that name.`
+										: null,
+								]
+									.filter(Boolean)
+									.join(" ")}
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<AlertDialogFooter>

@@ -1,4 +1,4 @@
-import { HostUnreachableError } from "@nightshift/engine";
+import { cliToolsOfSecrets, HostUnreachableError } from "@nightshift/engine";
 import { PROJECT_NOT_FOUND } from "@nightshift/engine/projects";
 import { secretNameSchema } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
@@ -78,10 +78,16 @@ export const projectSecrets = {
 			}
 			const use = await context.space.flowUse();
 			const connections = context.connections.list();
+			const { toolsBySecret, toolFlows } = cliToolsOfSecrets(context, use);
 			return {
 				secrets: listed.map((secret) => {
-					// The flows whose Command nodes name it, and those whose Agent
-					// and Tool nodes use a connection that reads it.
+					// The flows whose Command nodes name it, those whose Agent and
+					// Tool nodes use a connection that reads it, and those that use a
+					// CLI tool whose login reads it.
+					const tools = toolsBySecret.get(secret.name) ?? [];
+					const viaTools = tools.flatMap((tool) =>
+						flowsOf(at.projectId, toolFlows.get(tool) ?? []),
+					);
 					const viaConnections = connections
 						.filter((c) => c.variables.some((v) => v.name === secret.name))
 						.flatMap((c) =>
@@ -93,8 +99,10 @@ export const projectSecrets = {
 							...new Set([
 								...flowsOf(at.projectId, use.secrets.get(secret.name) ?? []),
 								...viaConnections,
+								...viaTools,
 							]),
 						].sort(),
+						tools: [...tools].sort(),
 					};
 				}),
 				available: true,

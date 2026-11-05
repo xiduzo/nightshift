@@ -1,4 +1,5 @@
 import { pathPrograms } from "@nightshift/agents";
+import { findProgram } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
 import {
 	type DeviceDocument,
@@ -35,10 +36,13 @@ export function reportDeviceFacts(deps: {
 			harnesses: () => {
 				const s = settings.current();
 				return Object.fromEntries([
-					...s.harnesses.map((name) => [name, Bun.which(s[HARNESS_BIN[name]])]),
+					...s.harnesses.map((name) => [
+						name,
+						findProgram(s[HARNESS_BIN[name]]),
+					]),
 					...s.customAgents.map((a) => [
 						`acp:${a.slug}` as const,
-						Bun.which(a.command),
+						findProgram(a.command),
 					]),
 				]);
 			},

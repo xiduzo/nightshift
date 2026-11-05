@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { findProgram } from "@nightshift/agents/types";
 import { Ollama } from "ollama";
 import type { ConnectionStore, SettingsStore } from "../device-config";
 import { type KnowledgeMeaning, ollamaMeaning } from "../knowledge";
@@ -73,7 +74,7 @@ export async function createOllama(deps: {
 	env: Record<string, string | undefined>;
 	/** Starts `ollama serve`: `Bun.spawn` by default. */
 	spawn?: SpawnOllama;
-	/** Finds a program on PATH: `Bun.which` by default. */
+	/** Finds a program on PATH: `findProgram` by default. */
 	which?: (name: string) => string | null;
 	fetch?: typeof fetch;
 	log?: (line: string) => void;
@@ -84,7 +85,7 @@ export async function createOllama(deps: {
 		secrets,
 		env,
 		spawn = bunSpawn,
-		which = (name) => Bun.which(name),
+		which = (name) => findProgram(name),
 		fetch: fetchImpl = fetch,
 		log = (line) => console.info(line),
 	} = deps;

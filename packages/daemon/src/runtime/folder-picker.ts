@@ -1,3 +1,4 @@
+import { findProgram } from "@nightshift/agents/types";
 import { Refusal } from "@nightshift/refusal";
 
 /** AppleScript's "User canceled." error number. */
@@ -8,7 +9,7 @@ const USER_CANCELED = "-128";
  * A Linux server or the Docker image cannot, so a project comes from GitHub there.
  */
 export function canChooseFolder(): boolean {
-	return process.platform === "darwin" && Bun.which("osascript") !== null;
+	return process.platform === "darwin" && findProgram("osascript") !== null;
 }
 
 /**

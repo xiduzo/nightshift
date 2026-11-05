@@ -23,9 +23,10 @@ export type Programs = {
 /** The programs of this computer, through Bun. */
 export function bunPrograms(): Programs {
 	return {
-		which: (name) => Bun.which(name),
+		which: (name) => Bun.which(name, { PATH: process.env.PATH ?? "" }),
 		spawn(command) {
 			const child = Bun.spawn([...command], {
+				env: process.env,
 				stdin: "ignore",
 				stdout: "pipe",
 				stderr: "ignore",

@@ -4,13 +4,14 @@ import {
 	chmod,
 	mkdir,
 	mkdtemp,
+	readdir,
 	readFile,
 	rm,
 	writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
-import { shellQuoteAlways } from "@nightshift/agents/types";
+import { findProgram, shellQuoteAlways } from "@nightshift/agents/types";
 import type { Login } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
 import {
@@ -33,11 +34,14 @@ import { redactText } from "./redact";
  *
  * A login with a folder of its own keeps it in `<data dir>/tools/<name>`.
  * Its sign-in command runs there before the first step, and again when a
- * value it reads changes. A tool with a git host makes git there ask the
+ * value it reads changes. A login that reads a Project's secret has a
+ * folder per Project, `<data dir>/tools/<name>@<project id>`: two Projects
+ * can run at once, each with its own account. A tool with a git host makes git there ask the
  * tool, through `GIT_CONFIG_COUNT`: no file changes.
  *
  * A command gets the launchers of every tool with a login, so `gh` in a
- * command signs in as the gh tool.
+ * command signs in as the gh tool. Its logins read the scopes of the
+ * command's run, as an agent's do.
  *
  * The variables that logins read are the guarded ones: no agent or
  * command gets them from Night Shift's own environment. A Command node
@@ -63,6 +67,8 @@ export type PreparedTools = {
 	values: string[];
 	/** Removes the launchers. Always call it when the step ends. */
 	cleanup: () => Promise<void>;
+	/** The tools a command runs without, and what to fix for each. */
+	leftOut: readonly { tool: string; message: string }[];
 };
 
 export type SignInResult = {
@@ -87,9 +93,12 @@ export type ToolLaunchers = {
 	/**
 	 * Prepares every CLI tool with a login, for a command: `gh` in the
 	 * command then runs as the gh tool. A tool that cannot run is left out,
-	 * and the program says what it misses.
+	 * and `leftOut` says why.
 	 */
-	forCommand(): Promise<PreparedTools>;
+	forCommand(
+		/** Which secret scopes the logins may read. Default: no Project's. */
+		use?: SecretUse,
+	): Promise<PreparedTools>;
 	/** Signs a tool's login in now, with its folder. */
 	signIn(name: string): Promise<SignInResult>;
 	/** When the tool last signed in, or null. */
@@ -123,7 +132,7 @@ export function createToolLaunchers(options: {
 	secretEnv: (names: readonly string[], use?: SecretUse) => Promise<SecretEnv>;
 	/** Night Shift's data folder: the logins' own folders go in `tools/`. */
 	dataDir: string;
-	/** Where a program is on this computer, or null. Default: `Bun.which`. */
+	/** Where a program is on this computer, or null. Default: `findProgram`. */
 	which?: (program: string) => string | null;
 	/** What a sign-in starts from, before the guarded variables go. */
 	env?: Readonly<Record<string, string | undefined>>;
@@ -135,12 +144,16 @@ export function createToolLaunchers(options: {
 		tools,
 		secretEnv,
 		dataDir,
-		which = (program: string) => Bun.which(program),
+		which = (program: string) => findProgram(program),
 		env = process.env,
 		now = timeNow,
 	} = options;
-	const folderOf = (name: string) => join(dataDir, "tools", name);
-	/** One sign-in at a time per tool: steps that start together wait for it. */
+	const toolsFolder = join(dataDir, "tools");
+	const folderOf = (name: string) => join(toolsFolder, name);
+	/** The folder of a login that reads a Project's secret. */
+	const projectFolderOf = (name: string, projectId: string) =>
+		join(toolsFolder, `${name}@${projectId}`);
+	/** One sign-in at a time per folder: steps that start together wait for it. */
 	const signingIn = new Map<string, Promise<SignInResult>>();
 
 	function guarded(): string[] {
@@ -164,6 +177,7 @@ export function createToolLaunchers(options: {
 				env: Record<string, string>;
 				input: string | undefined;
 				values: string[];
+				folder: string;
 		  }
 		| { ok: false; message: string }
 	> {
@@ -184,8 +198,11 @@ export function createToolLaunchers(options: {
 				expand(value, found.env),
 			]),
 		);
+		const folder =
+			use?.project && found.fromProject && found.fromProject.length > 0
+				? projectFolderOf(tool.name, use.project.projectId)
+				: folderOf(tool.name);
 		if (login.folder) {
-			const folder = folderOf(tool.name);
 			await mkdir(folder, { recursive: true, mode: 0o700 });
 			await chmod(folder, 0o700);
 			out[login.folder] = folder;
@@ -198,6 +215,7 @@ export function createToolLaunchers(options: {
 					? undefined
 					: expand(login.signIn.input, found.env),
 			values: Object.values(found.env).filter((value) => value !== ""),
+			folder,
 		};
 	}
 
@@ -217,11 +235,11 @@ export function createToolLaunchers(options: {
 			.digest("hex");
 
 	async function readSignedIn(
-		name: string,
+		folder: string,
 	): Promise<{ fingerprint: string; at: number } | null> {
 		try {
 			const parsed: unknown = JSON.parse(
-				await readFile(join(folderOf(name), SIGNED_IN_FILE), "utf8"),
+				await readFile(join(folder, SIGNED_IN_FILE), "utf8"),
 			);
 			if (
 				typeof parsed === "object" &&
@@ -247,6 +265,7 @@ export function createToolLaunchers(options: {
 			env: Record<string, string>;
 			input: string | undefined;
 			values: string[];
+			folder: string;
 		},
 	): Promise<SignInResult> {
 		const program = which(programOf(tool));
@@ -255,7 +274,7 @@ export function createToolLaunchers(options: {
 		for (const [key, value] of Object.entries(env)) {
 			if (value !== undefined && !hidden.has(key)) base[key] = value;
 		}
-		const folder = folderOf(tool.name);
+		const { folder } = resolved;
 		const { code, output } = await new Promise<{
 			code: number | null;
 			output: string;
@@ -316,21 +335,22 @@ export function createToolLaunchers(options: {
 			env: Record<string, string>;
 			input: string | undefined;
 			values: string[];
+			folder: string;
 		},
 		force: boolean,
 	): Promise<SignInResult> {
-		const running = signingIn.get(tool.name);
+		const running = signingIn.get(resolved.folder);
 		if (running) return running;
 		const signIn = login.signIn;
 		const done = (async (): Promise<SignInResult> => {
 			if (!signIn) return { ok: true, output: "", signedInAt: null };
-			const last = await readSignedIn(tool.name);
+			const last = await readSignedIn(resolved.folder);
 			if (!force && last?.fingerprint === fingerprint(login, resolved)) {
 				return { ok: true, output: "", signedInAt: last.at };
 			}
 			return runSignIn(tool, { ...login, signIn }, resolved);
-		})().finally(() => signingIn.delete(tool.name));
-		signingIn.set(tool.name, done);
+		})().finally(() => signingIn.delete(resolved.folder));
+		signingIn.set(resolved.folder, done);
 		return done;
 	}
 
@@ -353,8 +373,8 @@ export function createToolLaunchers(options: {
 	/**
 	 * The launchers and git settings of the tools `names`. Strict, the first
 	 * tool that cannot run stops the step, with what to fix. Not strict, that
-	 * tool is left out, and so is git's setting for a host two tools sign in
-	 * to: the step runs without them.
+	 * tool is left out with that message in `leftOut`, and so is git's
+	 * setting for a host two tools sign in to: the step runs without them.
 	 */
 	async function build(
 		names: readonly string[],
@@ -368,6 +388,7 @@ export function createToolLaunchers(options: {
 		}[] = [];
 		const git = new Map<string, { tool: string; helper: string }>();
 		const values: string[] = [];
+		const leftOut: { tool: string; message: string }[] = [];
 		/** Hosts that two tools sign in to: git keeps its own settings there. */
 		const shared = new Set<string>();
 		for (const name of new Set(names)) {
@@ -378,18 +399,18 @@ export function createToolLaunchers(options: {
 			const program = programOf(tool);
 			const path = which(program);
 			if (path === null) {
-				if (!strict) continue;
-				return {
-					ok: false,
-					message: `The CLI tool ${tool.name} runs ${program}, but this computer does not have it. Install ${program}, or change the tool.`,
-				};
+				const message = `The CLI tool ${tool.name} runs ${program}, but this computer does not have it. Install ${program}, or change the tool.`;
+				if (strict) return { ok: false, message };
+				leftOut.push({ tool: tool.name, message });
+				continue;
 			}
 			let vars: Record<string, string> = {};
 			if (tool.login) {
 				const resolved = await resolveLogin(tool, tool.login, use);
 				if (!resolved.ok) {
-					if (!strict) continue;
-					return resolved;
+					if (strict) return resolved;
+					leftOut.push({ tool: tool.name, message: resolved.message });
+					continue;
 				}
 				const signedIn = await ensureSignedIn(
 					tool,
@@ -398,11 +419,10 @@ export function createToolLaunchers(options: {
 					false,
 				);
 				if (!signedIn.ok) {
-					if (!strict) continue;
-					return {
-						ok: false,
-						message: `The CLI tool ${tool.name} could not sign in. ${signedIn.output || "Its sign-in command failed."} Check its login under Agents → Tools, then start the run again.`,
-					};
+					const message = `The CLI tool ${tool.name} could not sign in. ${signedIn.output || "Its sign-in command failed."} Check its login under Agents → Tools, then start the run again.`;
+					if (strict) return { ok: false, message };
+					leftOut.push({ tool: tool.name, message });
+					continue;
 				}
 				vars = resolved.env;
 				values.push(...resolved.values);
@@ -430,6 +450,7 @@ export function createToolLaunchers(options: {
 				env: {},
 				values: [],
 				cleanup: async () => {},
+				leftOut,
 			};
 		}
 		const folder =
@@ -464,6 +485,7 @@ export function createToolLaunchers(options: {
 				),
 				values: [...new Set(values)],
 				cleanup,
+				leftOut,
 			};
 		} catch (error) {
 			await cleanup();
@@ -474,11 +496,11 @@ export function createToolLaunchers(options: {
 	return {
 		guarded,
 		prepare: (names, use) => build(names, true, use),
-		async forCommand() {
+		async forCommand(use) {
 			const names = tools
 				.list()
 				.flatMap((tool) => (tool.login ? [tool.name] : []));
-			const built = await build(names, false);
+			const built = await build(names, false, use);
 			// Not strict: nothing stops it.
 			if (!built.ok) throw new Error(built.message);
 			return built;
@@ -494,15 +516,26 @@ export function createToolLaunchers(options: {
 			}
 			const resolved = await resolveLogin(tool, tool.login);
 			if (!resolved.ok) {
-				return { ok: false, output: resolved.message, signedInAt: null };
+				return {
+					ok: false,
+					output: `${resolved.message} If a project keeps it, Night Shift signs in when a run of that project needs the tool.`,
+					signedInAt: null,
+				};
 			}
 			return ensureSignedIn(tool, tool.login, resolved, true);
 		},
 		async signedInAt(name) {
-			return (await readSignedIn(name))?.at ?? null;
+			return (await readSignedIn(folderOf(name)))?.at ?? null;
 		},
 		async forget(name) {
-			await rm(folderOf(name), { recursive: true, force: true });
+			const folders = await readdir(toolsFolder).catch(() => []);
+			await Promise.all(
+				folders
+					.filter((folder) => folder === name || folder.startsWith(`${name}@`))
+					.map((folder) =>
+						rm(join(toolsFolder, folder), { recursive: true, force: true }),
+					),
+			);
 		},
 	};
 }

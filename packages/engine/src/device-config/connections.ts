@@ -362,7 +362,12 @@ export type ConnectionStore = {
  * value, and why a missing one may have a value after all (`NotRead`).
  */
 export type SecretEnv =
-	| { ok: true; env: Record<string, string> }
+	| {
+			ok: true;
+			env: Record<string, string>;
+			/** The names whose value is the run's Project's. */
+			fromProject?: string[];
+	  }
 	| ({ ok: false; missing: string[] } & NotRead);
 
 /** Values with `${NAME}` expanded, and the values read for them, or the names that have none. */
@@ -400,6 +405,8 @@ export const savedSecretSchema = z.union([
 /** The values read for a use, and which scopes could not be read. */
 type Resolved = {
 	vars: Record<string, string | undefined>;
+	/** The names whose value is the use's Project's. */
+	fromProject: ReadonlySet<string>;
 	unreachable: boolean;
 	projectUnreachable: boolean;
 };
@@ -621,6 +628,7 @@ export function createConnectionStore(options: {
 	): Promise<Resolved> {
 		const wanted = [...new Set(names)];
 		const vars: Record<string, string | undefined> = { ...env };
+		const fromProject = new Set<string>();
 		for (const name of wanted) {
 			if (!secretView().has(name)) continue;
 			const value = await secrets.get(name);
@@ -658,6 +666,7 @@ export function createConnectionStore(options: {
 					else {
 						vars[name] = value;
 						known.add(name);
+						fromProject.add(name);
 					}
 				}
 			} catch (error) {
@@ -668,7 +677,7 @@ export function createConnectionStore(options: {
 				}
 			}
 		}
-		return { vars, unreachable, projectUnreachable };
+		return { vars, fromProject, unreachable, projectUnreachable };
 	}
 
 	async function expandServers(
@@ -1005,7 +1014,13 @@ export function createConnectionStore(options: {
 				return { ok: false, missing, ...notRead(resolved) };
 			}
 			recordUse(names);
-			return { ok: true, env };
+			return {
+				ok: true,
+				env,
+				...(resolved.fromProject.size > 0
+					? { fromProject: [...resolved.fromProject] }
+					: {}),
+			};
 		},
 		onSecretsChange(listener) {
 			const observer = (event: { keysChanged: Set<string> }) => {

@@ -1,3 +1,4 @@
+import { findProgram } from "@nightshift/agents/types";
 import { Refusal } from "@nightshift/refusal";
 
 import { type GitResult, type GitRunOptions, runProcess } from "./git";
@@ -119,7 +120,7 @@ type GhDeps = {
 
 /** The `gh` program on this computer. */
 export function systemGitHubCli(
-	deps: GhDeps = { which: (name) => Bun.which(name), run: runProcess },
+	deps: GhDeps = { which: (name) => findProgram(name), run: runProcess },
 ): GitHubCli {
 	const gh = (args: string[], cwd: string, options: GitRunOptions = {}) =>
 		deps.run(["gh", ...args], cwd, {

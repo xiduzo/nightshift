@@ -70,33 +70,11 @@ export async function connectionsInUse(
 	secrets: SecretInUse[];
 	personal: SecretList["personal"];
 }> {
-	const toolsBySecret = new Map<string, string[]>();
-	for (const tool of config.cliTools.list()) {
-		for (const name of tool.login ? loginReferences(tool.login) : []) {
-			toolsBySecret.set(name, [...(toolsBySecret.get(name) ?? []), tool.name]);
-		}
-	}
+	const { toolsBySecret, toolFlows } = cliToolsOfSecrets(config, use);
 	const listed = await config.connections.secrets([
 		...use.secrets.keys(),
 		...toolsBySecret.keys(),
 	]);
-	// The flows that use a CLI tool: by name in an Agent node, or through
-	// an Agent Profile that names it.
-	const toolFlows = new Map<string, FlowRef[]>();
-	for (const tool of config.cliTools.list()) {
-		const viaProfiles = config.profiles
-			.list()
-			.filter((p) => isAgentProfile(p) && p.clis.includes(tool.name))
-			.flatMap((p) =>
-				[...use.profiles]
-					.filter(([key]) => key.endsWith(`/${p.id}`))
-					.flatMap(([, flows]) => flows),
-			);
-		toolFlows.set(tool.name, [
-			...(use.clis.get(tool.name) ?? []),
-			...viaProfiles,
-		]);
-	}
 	const projectIds = new Set(
 		[...use.secrets.values(), ...toolFlows.values()]
 			.flat()
@@ -139,6 +117,42 @@ export async function connectionsInUse(
 		secrets,
 		personal: listed.personal,
 	};
+}
+
+/**
+ * The CLI tools whose logins read each secret, and the flows that use each
+ * tool: by name in an Agent node, or through an Agent Profile that names it.
+ */
+export function cliToolsOfSecrets(
+	config: {
+		cliTools: Pick<CliToolStore, "list">;
+		profiles: Pick<ProfileStore, "list">;
+	},
+	use: FlowUse,
+): {
+	toolsBySecret: ReadonlyMap<string, readonly string[]>;
+	toolFlows: ReadonlyMap<string, readonly FlowRef[]>;
+} {
+	const toolsBySecret = new Map<string, string[]>();
+	const toolFlows = new Map<string, FlowRef[]>();
+	for (const tool of config.cliTools.list()) {
+		for (const name of tool.login ? loginReferences(tool.login) : []) {
+			toolsBySecret.set(name, [...(toolsBySecret.get(name) ?? []), tool.name]);
+		}
+		const viaProfiles = config.profiles
+			.list()
+			.filter((p) => isAgentProfile(p) && p.clis.includes(tool.name))
+			.flatMap((p) =>
+				[...use.profiles]
+					.filter(([key]) => key.endsWith(`/${p.id}`))
+					.flatMap(([, flows]) => flows),
+			);
+		toolFlows.set(tool.name, [
+			...(use.clis.get(tool.name) ?? []),
+			...viaProfiles,
+		]);
+	}
+	return { toolsBySecret, toolFlows };
 }
 
 /** A CLI tool, with the flows and the profiles that name it, and when its login last signed in. */

@@ -12,7 +12,7 @@ import type {
 	ValueInput,
 	ValueResult,
 } from "@nightshift/agents/types";
-import { foldContributions } from "@nightshift/agents/types";
+import { findProgram, foldContributions } from "@nightshift/agents/types";
 import {
 	type AgentHarnessName,
 	type AgentNode,
@@ -110,7 +110,7 @@ export type LocalDeviceDeps = {
 	connectionNames?: () => ReadonlySet<string>;
 	/** The CLI tools defined on this computer. */
 	cliNames?: () => ReadonlySet<string>;
-	/** Where a program is on this computer, or null. Default: `Bun.which`. */
+	/** Where a program is on this computer, or null. Default: `findProgram`. */
 	findCli?: (name: string) => string | null;
 	/**
 	 * What an agent learns about its CLI tools: each description and help.
@@ -220,6 +220,12 @@ function secretUse(run: StepRun | undefined, underOffer?: true): SecretUse {
 	};
 }
 
+/** Whether a command's text names a CLI tool, as a word of its own. */
+function namesTool(command: string, tool: string): boolean {
+	const name = tool.replace(/[.*+?^${}()|[\]\\]/g, (char) => `\\${char}`);
+	return new RegExp(`(^|[^\\w.-])${name}($|[^\\w.-])`).test(command);
+}
+
 /**
  * Why a command does not start: secrets it names that this computer does
  * not have, and why when the Personal secrets could not be read.
@@ -273,7 +279,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		pushRunBranch,
 	} = createWorktrees(git);
 	const snapshots = deps.snapshots ? createWorktreeSnapshots(git) : null;
-	const findCli = deps.findCli ?? ((name: string) => Bun.which(name));
+	const findCli = deps.findCli ?? ((name: string) => findProgram(name));
 	const mcpServersFor =
 		deps.mcpServersFor ??
 		(async (
@@ -511,7 +517,10 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				: null;
 		let tools: Awaited<ReturnType<ToolLaunchers["forCommand"]>> | null = null;
 		try {
-			tools = (await deps.toolLaunchers?.forCommand()) ?? null;
+			tools = (await deps.toolLaunchers?.forCommand(secretUse(run))) ?? null;
+			const leftOut = (tools?.leftOut ?? []).filter(({ tool }) =>
+				namesTool(command.command, tool),
+			);
 			const env: Record<string, string> = {
 				...known?.env,
 				...command.env,
@@ -525,7 +534,18 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			}
 			const hidden = [...Object.values(found.env), ...(tools?.values ?? [])];
 			const events = spawnCommand({ ...command, env }, scrub);
-			yield* hidden.length > 0 ? redactExec(events, hidden) : events;
+			for await (const event of hidden.length > 0
+				? redactExec(events, hidden)
+				: events) {
+				// Why the command failed, last in its output: a tool it names that
+				// could not run.
+				if (event.type === "exit" && event.exitCode !== 0) {
+					for (const { message } of leftOut) {
+						yield { type: "output", stream: "stderr", text: `${message}\n` };
+					}
+				}
+				yield event;
+			}
 		} finally {
 			await tools?.cleanup();
 			// What the command changed, a sync's files, go to the Space.

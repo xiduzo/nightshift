@@ -42,6 +42,7 @@ function device(deps: Partial<LocalDeviceDeps> = {}): Device {
 }
 
 const noTools = {
+	leftOut: [],
 	toolsPath: null,
 	env: {},
 	values: [],
@@ -280,6 +281,7 @@ describe("session", () => {
 					prepared.push([...names]);
 					return {
 						ok: true,
+						leftOut: [],
 						toolsPath: "/tmp/nightshift-tools-1",
 						env: { GIT_CONFIG_COUNT: "2" },
 						values: ["tok-work"],
@@ -875,6 +877,7 @@ describe("exec", () => {
 					prepare: async () => ({ ok: false, message: "unused" }),
 					forCommand: async () => ({
 						toolsPath: folder,
+						leftOut: [],
 						env: { GIT_CONFIG_COUNT: "0" },
 						values: ["tok-me"],
 						cleanup: async () => {
@@ -893,6 +896,64 @@ describe("exec", () => {
 			events.flatMap((e) => (e.type === "output" ? [e.text] : [])).join(""),
 		).toBe("api|••• 0");
 		expect(cleaned).toBe(true);
+	});
+
+	test("a command's tools read the scopes of its run", async () => {
+		const uses: unknown[] = [];
+		const step = { spaceId: "s", projectId: "p", runId: "r" };
+		await collect(
+			device({
+				toolLaunchers: {
+					prepare: async () => ({ ok: false, message: "unused" }),
+					forCommand: async (use) => {
+						uses.push(use);
+						return noTools;
+					},
+					guarded: () => [],
+				},
+			}).exec({
+				command: "true",
+				cwd: sandbox.repoPath,
+				run: step,
+				signal: new AbortController().signal,
+			}),
+		);
+		expect(uses).toEqual([{ project: step }]);
+	});
+
+	test("a failed command says why a tool it names could not run, and no other", async () => {
+		const tools = {
+			toolLaunchers: {
+				prepare: async () => ({ ok: false as const, message: "unused" }),
+				forCommand: async () => ({
+					...noTools,
+					leftOut: [
+						{ tool: "acli-dimpact", message: "Save ACLI_TOKEN." },
+						{ tool: "acli", message: "Not this one." },
+					],
+				}),
+				guarded: () => [],
+			},
+		};
+		const textOf = (events: readonly { type: string; text?: string }[]) =>
+			events.flatMap((e) => (e.type === "output" ? [e.text] : [])).join("");
+		const failed = await collect(
+			device(tools).exec({
+				command: "acli-dimpact jira; exit 127",
+				cwd: sandbox.repoPath,
+				signal: new AbortController().signal,
+			}),
+		);
+		expect(textOf(failed)).toContain("Save ACLI_TOKEN.\n");
+		expect(textOf(failed)).not.toContain("Not this one.");
+		const passed = await collect(
+			device(tools).exec({
+				command: "echo acli-dimpact",
+				cwd: sandbox.repoPath,
+				signal: new AbortController().signal,
+			}),
+		);
+		expect(textOf(passed)).toBe("acli-dimpact\n");
 	});
 
 	test("a secret this computer does not have refuses the command before it starts", async () => {

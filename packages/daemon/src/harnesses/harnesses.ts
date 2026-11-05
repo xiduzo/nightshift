@@ -15,6 +15,7 @@ import {
 	pathPrograms,
 	testMcpServer,
 } from "@nightshift/agents";
+import { findProgram } from "@nightshift/agents/types";
 import type { Context } from "@nightshift/api/context";
 import type { localDevice } from "@nightshift/engine";
 import {
@@ -142,7 +143,7 @@ export function localHarnesses(deps: {
 export function harnessLookup(
 	local: ReturnType<typeof localHarnesses>,
 	settings: Pick<SettingsStore, "current">,
-	which: (program: string) => string | null = (program) => Bun.which(program),
+	which: (program: string) => string | null = (program) => findProgram(program),
 ): {
 	harnessFor: (name: AgentHarnessName) => AgentHarness | undefined;
 	installed: (name: AgentHarnessName) => boolean;

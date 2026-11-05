@@ -1,7 +1,12 @@
 /** The flows and schedules of the Projects, in their flow documents (`ProjectFlows`), what a Person does with them in a Space (`SpaceFlows`), the flows a run starts from, and what uses this computer's configuration. */
 
 export { createCloneImports } from "./clone-imports";
-export { cliToolsInUse, connectionsInUse, profilesInUse } from "./config-use";
+export {
+	cliToolsInUse,
+	cliToolsOfSecrets,
+	connectionsInUse,
+	profilesInUse,
+} from "./config-use";
 export {
 	createFlowDocuments,
 	type FlowDocuments,

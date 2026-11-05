@@ -7,7 +7,12 @@ import type {
 	SecretList,
 	SecretView,
 } from "../device-config";
-import { cliToolsInUse, connectionsInUse, profilesInUse } from "./config-use";
+import {
+	cliToolsInUse,
+	cliToolsOfSecrets,
+	connectionsInUse,
+	profilesInUse,
+} from "./config-use";
 import { type FlowRef, type FlowUse, profileUseKey } from "./flow-use";
 
 const flow = (flowName: string): FlowRef => ({
@@ -67,6 +72,38 @@ const secretsOf = async (
 			usedAt: null,
 		}),
 	),
+});
+
+describe("cliToolsOfSecrets", () => {
+	test("names the tools whose logins read a secret, and the flows that use each tool", () => {
+		const use = noUse();
+		use.clis.set("acli-dimpact", [flow("nightly")]);
+		const login = {
+			env: {},
+			folder: "HOME",
+			signIn: { command: "acli login", input: "${TOKEN}" },
+		};
+		const { toolsBySecret, toolFlows } = cliToolsOfSecrets(
+			{
+				cliTools: {
+					list: () => [
+						{
+							name: "acli-dimpact",
+							program: "acli",
+							description: null,
+							login,
+							git: null,
+							updatedAt: 1,
+						},
+					],
+				},
+				profiles: { list: () => [] },
+			},
+			use,
+		);
+		expect(toolsBySecret.get("TOKEN")).toEqual(["acli-dimpact"]);
+		expect(toolFlows.get("acli-dimpact")).toEqual([flow("nightly")]);
+	});
 });
 
 describe("connectionsInUse", () => {

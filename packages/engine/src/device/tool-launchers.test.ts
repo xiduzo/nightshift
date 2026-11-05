@@ -328,7 +328,118 @@ test("guarded: the secrets that logins read", () => {
 	expect(set.guarded()).toEqual(["ACLI_TOKEN", "GH_ME"]);
 });
 
+/** A login that keeps its sign-in in its folder, and reads `${TOKEN}`. */
+const acliLogin = {
+	env: {},
+	folder: "HOME",
+	signIn: { command: "acli login", input: "${TOKEN}" },
+};
+
+/** Launchers whose `TOKEN` is the run's Project's: one per project in `tokens`. */
+function projectLaunchers(list: CliTool[], tokens: Record<string, string>) {
+	return createToolLaunchers({
+		tools: {
+			get: (name) => list.find((t) => t.name === name) ?? null,
+			list: () => list,
+		},
+		secretEnv: async (names, use): Promise<SecretEnv> => {
+			const token = use?.project ? tokens[use.project.projectId] : undefined;
+			if (token === undefined) return { ok: false, missing: [...names] };
+			return {
+				ok: true,
+				env: Object.fromEntries(names.map((n) => [n, token])),
+				fromProject: [...names],
+			};
+		},
+		dataDir,
+		which: (program) => (program === "acli" ? join(bin, program) : null),
+		env: { PATH: "/usr/bin:/bin" },
+		tempDir: temp,
+		now: () => 1_000,
+	});
+}
+
+const stepOf = (projectId: string) => ({
+	spaceId: "space",
+	projectId,
+	runId: "run",
+});
+
+describe("a login with a Project's secret", () => {
+	const list = [tool("acli-dimpact", { program: "acli", login: acliLogin })];
+
+	test("a command's tool signs in with the token of its run's project", async () => {
+		const prepared = await projectLaunchers(list, {
+			keez: "tok-keez",
+		}).forCommand({ project: stepOf("keez") });
+		expect(prepared.leftOut).toEqual([]);
+		expect(run(join(prepared.toolsPath ?? "", "acli-dimpact"), [])).toBe(
+			"tok-keez",
+		);
+		expect(prepared.values).toEqual(["tok-keez"]);
+		await prepared.cleanup();
+	});
+
+	test("an agent's tool does too", async () => {
+		const prepared = await projectLaunchers(list, {
+			keez: "tok-keez",
+		}).prepare(["acli-dimpact"], { project: stepOf("keez") });
+		if (!prepared.ok) throw new Error(prepared.message);
+		expect(run(join(prepared.toolsPath ?? "", "acli-dimpact"), [])).toBe(
+			"tok-keez",
+		);
+		await prepared.cleanup();
+	});
+
+	test("two projects at once each keep their own account", async () => {
+		const tools = projectLaunchers(list, { a: "tok-a", b: "tok-b" });
+		const [a, b] = await Promise.all([
+			tools.forCommand({ project: stepOf("a") }),
+			tools.forCommand({ project: stepOf("b") }),
+		]);
+		expect(run(join(a.toolsPath ?? "", "acli-dimpact"), [])).toBe("tok-a");
+		expect(run(join(b.toolsPath ?? "", "acli-dimpact"), [])).toBe("tok-b");
+		await a.cleanup();
+		await b.cleanup();
+	});
+
+	test("forget removes the folders of its projects, not another tool's", async () => {
+		const tools = projectLaunchers(list, { a: "tok-a" });
+		const prepared = await tools.forCommand({ project: stepOf("a") });
+		await prepared.cleanup();
+		await Bun.write(join(dataDir, "tools", "acli-dimpact-2", "keep"), "");
+		await tools.forget("acli-dimpact");
+		expect(await readdir(join(dataDir, "tools"))).toEqual(["acli-dimpact-2"]);
+	});
+
+	test("the sign-in of the tool's page says a project may keep the secret", async () => {
+		const result = await projectLaunchers(list, {}).signIn("acli-dimpact");
+		expect(result.ok).toBe(false);
+		expect(result.output).toContain("If a project keeps it");
+	});
+});
+
 describe("forCommand", () => {
+	test("a tool left out says why", async () => {
+		const prepared = await launchers(
+			[
+				tool("gh", { login: { env: { GH_TOKEN: "${GL}" } } }),
+				tool("gone", { program: "nope", login: { env: {} } }),
+			],
+			{},
+		).forCommand();
+		expect(prepared.leftOut).toEqual([
+			{
+				tool: "gh",
+				message: expect.stringContaining("needs the secret GL"),
+			},
+			{
+				tool: "gone",
+				message: expect.stringContaining("this computer does not have it"),
+			},
+		]);
+	});
+
 	test("every tool with a login gets a launcher; one that cannot run is left out", async () => {
 		const prepared = await launchers(
 			[

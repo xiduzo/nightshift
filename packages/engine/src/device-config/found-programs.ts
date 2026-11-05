@@ -1,3 +1,4 @@
+import { findProgram } from "@nightshift/agents/types";
 import {
 	HARNESS_CATALOG,
 	type HarnessName,
@@ -55,7 +56,7 @@ type Stores = Pick<
 /** Where a program is on this computer, or null. */
 type Which = (program: string) => string | null;
 
-const bunWhich: Which = (program) => Bun.which(program);
+const bunWhich: Which = (program) => findProgram(program);
 
 /** The programs found on this computer that are not set up yet: agents first. */
 export function foundPrograms(

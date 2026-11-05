@@ -1082,6 +1082,7 @@ describe("Project secrets (ADR 13)", () => {
 		).toEqual({
 			ok: true,
 			env: { A: "project-a", B: "personal-b", C: "computer-c", D: "env-d" },
+			fromProject: ["A"],
 		});
 		// It asked for the step's run, and nothing of another Project.
 		expect(projects.state.asked).toEqual([step]);
@@ -1136,7 +1137,11 @@ describe("Project secrets (ADR 13)", () => {
 		).toEqual({ ok: false, missing: ["MINE"] });
 		expect(
 			await store.secretEnv(["SHARED"], { personal: false, project: step }),
-		).toEqual({ ok: true, env: { SHARED: "project" } });
+		).toEqual({
+			ok: true,
+			env: { SHARED: "project" },
+			fromProject: ["SHARED"],
+		});
 		expect(personal.state.calls).toBe(calls);
 	});
 
