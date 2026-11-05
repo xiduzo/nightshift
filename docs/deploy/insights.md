@@ -47,7 +47,7 @@ is necessary to load a changed file, because a deploy replaces the file.
 
 1. Push the change to `main`.
 2. Wait for the workflow "Insights image" to finish.
-3. Deploy the compose `insights` in Dokploy. A push does not start this deploy.
+3. Deploy the compose `insights` in Dokploy. A push can also start a deploy, but that deploy can pull the image before the workflow ends.
 4. If `collector.yaml` changed, restart the Collector container.
 
 ## On Dokploy
