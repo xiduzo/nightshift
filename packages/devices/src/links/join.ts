@@ -6,6 +6,7 @@ import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import { hostCertificate } from "../reach";
 import { pause } from "./backoff";
+import { DEV_STAYS_LOCAL, isLocalAddress } from "./dev-link";
 import { hostClient } from "./host-client";
 import {
 	type DeviceKeyStore,
@@ -31,6 +32,24 @@ export type JoinDeps = {
 	keys: DeviceKeyStore;
 	/** The pairing is done: start the link. */
 	started(link: HostLink, key: string): void | Promise<void>;
+	/**
+	 * How this install tells a home Host which computer it is on, and takes
+	 * over the Device the Host knows that computer as (ADR 20). Left out: it
+	 * says nothing, and it stays the Device it is.
+	 */
+	identity?: {
+		/** This computer's fingerprint. Null: it has none. */
+		machine: string | null;
+		/** The key store of that Device: the keychain keeps keys per Device. */
+		keysOf(deviceId: string): Promise<DeviceKeyStore>;
+		/**
+		 * This install becomes that Device from its next start, and counts
+		 * its events on from `walkerSeq`, the last the Host has of it.
+		 */
+		adopt(deviceId: string, walkerSeq: number): Promise<void>;
+	};
+	/** A development install that stays off every Host but this computer's (ADR 20). */
+	localOnly?: boolean;
 	/** Waits between polls. Default: a timer that the signal ends. */
 	sleep?(ms: number, signal?: AbortSignal): Promise<void>;
 };
@@ -41,6 +60,9 @@ export async function* joinHost(
 	signal?: AbortSignal,
 ): AsyncGenerator<JoinProgress> {
 	const address = hostOrigin(input.url);
+	if (deps.localOnly && !isLocalAddress(address)) {
+		throw new Refusal("conflict", DEV_STAYS_LOCAL);
+	}
 	if (input.role === "home") {
 		const home = await deps.links.home();
 		if (home && !home.addresses.includes(address)) {
@@ -60,6 +82,10 @@ export async function* joinHost(
 				name: deps.self.name,
 				platform: deps.self.platform,
 				home: input.role === "home",
+				// A guest Host is another Person's: it never hears of this computer.
+				...(input.role === "home" && deps.identity?.machine
+					? { machine: deps.identity.machine }
+					: {}),
 			},
 			{ signal },
 		)
@@ -103,7 +129,18 @@ export async function* joinHost(
 					"The code expired. Run the pairing again.",
 				);
 			case "joined": {
-				await deps.keys.set(answer.host.id, answer.key);
+				// Another Device than this install: its key goes under that Device.
+				const adopted =
+					deps.identity &&
+					answer.deviceId !== undefined &&
+					answer.deviceId !== deps.self.id
+						? answer.deviceId
+						: null;
+				const keys =
+					adopted !== null && deps.identity
+						? await deps.identity.keysOf(adopted)
+						: deps.keys;
+				await keys.set(answer.host.id, answer.key);
 				const addresses = [...answer.host.addresses];
 				if (!addresses.includes(address)) addresses.push(address);
 				const link = await deps.links.save({
@@ -114,15 +151,21 @@ export async function* joinHost(
 					fingerprint: pinned?.fingerprint ?? null,
 					role: input.role,
 					personId: answer.personId,
-					keyStore: deps.keys.kind,
+					keyStore: keys.kind,
 				});
-				await deps.started(link, answer.key);
+				// Last: a failure before it leaves this install what it was.
+				if (adopted !== null) {
+					await deps.identity?.adopt(adopted, answer.walkerSeq ?? 0);
+				}
+				// This process keeps the old id, so that link waits for the next start.
+				else await deps.started(link, answer.key);
 				yield {
 					kind: "joined",
 					hostId: link.hostId,
 					hostName: link.name,
 					role: link.role,
 					hostAdmin: answer.hostAdmin ?? null,
+					...(adopted !== null ? { restart: true } : {}),
 				};
 				return;
 			}

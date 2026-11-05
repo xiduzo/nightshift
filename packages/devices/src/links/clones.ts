@@ -23,6 +23,8 @@ export function tellClones(deps: {
 	deviceName(): Promise<string>;
 	/** This computer runs a development install: never a default or fallback (ADR 17). */
 	dev?: boolean;
+	/** This computer's fingerprint, for a home Host only (ADR 20). */
+	machine?: string | null | undefined;
 }): (client: HostClient, signal: AbortSignal) => Promise<void> {
 	return async (client, signal) => {
 		const deviceName = await deps.deviceName();
@@ -36,6 +38,7 @@ export function tellClones(deps: {
 						projectIds,
 						deviceName,
 						...(deps.dev ? { dev: true } : {}),
+						...(deps.machine ? { machine: deps.machine } : {}),
 					},
 					{ signal },
 				);

@@ -20,6 +20,7 @@ export type DaemonEnv = Omit<AuthConfig, "BETTER_AUTH_SECRET"> & {
 	readonly DATABASE_URL?: string;
 	readonly NIGHTSHIFT_DATA_DIR?: string;
 	readonly NIGHTSHIFT_DEV?: string;
+	readonly NIGHTSHIFT_DEV_LINK_HOST?: string;
 	readonly NIGHTSHIFT_SCHEDULER?: string;
 	readonly NIGHTSHIFT_KEY_STORE?: string;
 	readonly NIGHTSHIFT_LISTEN?: string;

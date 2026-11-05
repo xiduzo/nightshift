@@ -10,7 +10,16 @@ import {
 	instantOrNull,
 	now as timeNow,
 } from "@nightshift/time";
-import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import {
+	and,
+	desc,
+	eq,
+	inArray,
+	isNotNull,
+	isNull,
+	ne,
+	sql,
+} from "drizzle-orm";
 
 /**
  * A paired Device whose Link says nothing for this long is offline: three
@@ -70,8 +79,27 @@ export type PairedDevice = {
 };
 
 export type DeviceRegistry = {
-	/** What a paired Device says of itself when it links: its name, and whether it is a development install. */
-	describe(id: string, facts: { name: string; dev: boolean }): Promise<void>;
+	/**
+	 * What a paired Device says of itself when it links: its name, whether
+	 * it is a development install, and the fingerprint of its computer. A
+	 * Device that says no fingerprint keeps the one it has. A development
+	 * install has none. Two Devices with one fingerprint stay as they are.
+	 */
+	describe(
+		id: string,
+		facts: { name: string; dev: boolean; machine?: string | undefined },
+	): Promise<void>;
+	/**
+	 * The Person's Device on the computer of this fingerprint, other than
+	 * `exceptId`: the one with access first, then the one seen last. A
+	 * removed Device counts: pairing again brings it back. Never another
+	 * Person's, a development install or this Host's own.
+	 */
+	sameMachine(
+		ownerId: string,
+		machine: string,
+		exceptId: string,
+	): Promise<PairedDevice | null>;
 	/**
 	 * Records a Device that paired with this Host, or paired again: its row
 	 * (access back on), and `DeviceJoined`. A Device id that is this Host's
@@ -83,6 +111,7 @@ export type DeviceRegistry = {
 		platform: string;
 		ownerId: string;
 		homeHost: string | null;
+		machine?: string | undefined;
 	}): Promise<PairedDevice>;
 	get(id: string): Promise<PairedDevice | null>;
 	/** The Person's paired Devices, revoked ones last. */
@@ -239,6 +268,7 @@ export function createDeviceRegistry(deps: {
 				ownerId: input.ownerId,
 				homeHost: input.homeHost,
 				revokedAt: null,
+				...(input.machine ? { machine: input.machine } : {}),
 			};
 			// The row and its event are one batch.
 			await logFact(
@@ -268,8 +298,34 @@ export function createDeviceRegistry(deps: {
 		},
 
 		async describe(id, facts) {
-			await db.update(device).set(facts).where(eq(device.id, id));
+			await db
+				.update(device)
+				.set({
+					name: facts.name,
+					dev: facts.dev,
+					machine: facts.dev ? null : facts.machine,
+				})
+				.where(eq(device.id, id));
 		},
+
+		async sameMachine(ownerId, machine, exceptId) {
+			const [found] = await db
+				.select()
+				.from(device)
+				.where(
+					and(
+						eq(device.ownerId, ownerId),
+						eq(device.machine, machine),
+						eq(device.self, false),
+						eq(device.dev, false),
+						ne(device.id, exceptId),
+					),
+				)
+				.orderBy(sql`${device.revokedAt} is not null`, desc(device.lastSeenAt))
+				.limit(1);
+			return found ? toPaired(found) : null;
+		},
+
 		async get(id) {
 			const found = await row(id);
 			return found ? toPaired(found) : null;

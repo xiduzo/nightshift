@@ -1,8 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { device } from "@nightshift/db/schema";
-import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
+import { clone, device, event, project } from "@nightshift/db/schema";
+import {
+	createRunLog,
+	createSandbox,
+	type Sandbox,
+} from "@nightshift/engine/testing";
 import { eq } from "drizzle-orm";
 import {
+	adoptSelfDevice,
 	defaultSelfDeviceHost,
 	hostDeviceName,
 	isContainerId,
@@ -132,5 +137,120 @@ describe("defaultSelfDeviceHost", () => {
 		expect(isContainerId("a".repeat(64))).toBe(true);
 		expect(isContainerId("hetzner-1")).toBe(false);
 		expect(isContainerId("CEA79743B08A")).toBe(false);
+	});
+});
+
+describe("adoptSelfDevice", () => {
+	test("this install becomes the Device, and its name and owner stay", async () => {
+		await sandbox.db.update(device).set({ name: "MacBook" });
+		const [before] = await sandbox.db.select().from(device);
+		await adoptSelfDevice(sandbox.db, "known-to-the-host");
+		const rows = await sandbox.db.select().from(device);
+		expect(rows).toHaveLength(1);
+		expect(rows[0]).toMatchObject({
+			id: "known-to-the-host",
+			self: true,
+			name: "MacBook",
+			ownerId: before?.ownerId,
+		});
+		expect((await selfDevice(sandbox.db, host)).id).toBe("known-to-the-host");
+	});
+
+	test("what names the id it had names the Device now", async () => {
+		const from = sandbox.deviceId;
+		await sandbox.db.insert(project).values({
+			id: "p1",
+			spaceId: sandbox.spaceId,
+			name: "p1",
+		});
+		await sandbox.db.insert(clone).values({
+			id: "c1",
+			spaceId: sandbox.spaceId,
+			projectId: "p1",
+			deviceId: from,
+			path: sandbox.repoPath,
+		});
+		await createRunLog(sandbox.db, { walkerId: from }).append({
+			type: "DeviceOnline",
+			payload: { deviceId: from },
+			spaceId: sandbox.spaceId,
+		});
+
+		await adoptSelfDevice(sandbox.db, "known-to-the-host");
+
+		expect(
+			await sandbox.db.select({ deviceId: clone.deviceId }).from(clone),
+		).toEqual([{ deviceId: "known-to-the-host" }]);
+		const walkers = await sandbox.db
+			.select({ walkerId: event.walkerId })
+			.from(event);
+		expect(walkers.length).toBeGreaterThan(0);
+		expect(walkers.every((e) => e.walkerId === "known-to-the-host")).toBe(true);
+	});
+
+	test("its events count on after the last the Host has, so the Host drops none", async () => {
+		const from = sandbox.deviceId;
+		const before = createRunLog(sandbox.db, { walkerId: from });
+		await before.append({
+			type: "DeviceOnline",
+			payload: { deviceId: from },
+			spaceId: sandbox.spaceId,
+		});
+		const lastOfMine = await sandbox.db
+			.select({ walkerSeq: event.walkerSeq })
+			.from(event)
+			.where(eq(event.walkerId, from));
+
+		await adoptSelfDevice(sandbox.db, "known-to-the-host", 500);
+
+		const moved = (
+			await sandbox.db
+				.select({ walkerSeq: event.walkerSeq })
+				.from(event)
+				.where(eq(event.walkerId, "known-to-the-host"))
+		).map((e) => e.walkerSeq);
+		expect(moved).toContain(500);
+		for (const { walkerSeq } of lastOfMine) {
+			expect(moved).toContain(walkerSeq + 500);
+		}
+		const next = await createRunLog(sandbox.db, {
+			walkerId: "known-to-the-host",
+		}).append({
+			type: "DeviceOnline",
+			payload: { deviceId: "known-to-the-host" },
+			spaceId: sandbox.spaceId,
+		});
+		expect(next.seq).toBeGreaterThan(0);
+		const highest = Math.max(
+			...(
+				await sandbox.db
+					.select({ walkerSeq: event.walkerSeq })
+					.from(event)
+					.where(eq(event.walkerId, "known-to-the-host"))
+			).map((e) => e.walkerSeq),
+		);
+		expect(highest).toBeGreaterThan(500);
+	});
+
+	test("with no events of its own, the next event still comes after the Host's", async () => {
+		await sandbox.db.delete(event);
+		await adoptSelfDevice(sandbox.db, "known-to-the-host", 7);
+		await createRunLog(sandbox.db, { walkerId: "known-to-the-host" }).append({
+			type: "DeviceOnline",
+			payload: { deviceId: "known-to-the-host" },
+			spaceId: sandbox.spaceId,
+		});
+		const counts = (
+			await sandbox.db
+				.select({ walkerSeq: event.walkerSeq })
+				.from(event)
+				.where(eq(event.walkerId, "known-to-the-host"))
+		).map((e) => e.walkerSeq);
+		expect(counts.sort((a, b) => a - b)).toEqual([7, 8]);
+	});
+
+	test("the same id changes nothing", async () => {
+		await adoptSelfDevice(sandbox.db, sandbox.deviceId);
+		expect((await selfDevice(sandbox.db, host)).id).toBe(sandbox.deviceId);
 	});
 });

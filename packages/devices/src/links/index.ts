@@ -20,7 +20,7 @@ export {
 	personInSpace,
 	personOnHost,
 } from "./host-spaces";
-export { joinHost } from "./join";
+export { type JoinDeps, joinHost } from "./join";
 export type { Link } from "./link";
 export {
 	createDeviceLinks,

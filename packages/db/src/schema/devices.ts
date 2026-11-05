@@ -50,6 +50,12 @@ export const device = sqliteTable(
 		 * of a run (ADR 17). It runs a step only when a flow or a person names it.
 		 */
 		dev: integer("dev", { mode: "boolean" }).notNull().default(false),
+		/**
+		 * On a home Host: the fingerprint of the Device's computer (ADR 20).
+		 * The same computer of the same owner that pairs again gets this
+		 * Device back. Null: not told, a container or a development install.
+		 */
+		machine: text("machine"),
 		/** This computer. At most one row has it. */
 		self: integer("self", { mode: "boolean" }).notNull().default(false),
 		createdAt: createdAt(),

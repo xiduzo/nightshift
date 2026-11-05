@@ -24,6 +24,7 @@ import {
 	defaultSelfDeviceHost,
 	deviceDirectory,
 	type HostClient,
+	machineFingerprint,
 	type OpenDocumentChannel,
 	selfDevice,
 	selfOwnerId,
@@ -570,6 +571,9 @@ export async function createDaemon(
 	slots.handOver("nightshiftDevices", (handover) => handover.release());
 	const devices = await startDevices({
 		...(dev ? { dev: true } : {}),
+		...(env.NIGHTSHIFT_DEV_LINK_HOST === "true" ? { devLinkHost: true } : {}),
+		// Test daemons on one computer are Devices of their own.
+		machine: env.NODE_ENV === "test" ? null : await machineFingerprint({ dev }),
 		auth,
 		db,
 		env,

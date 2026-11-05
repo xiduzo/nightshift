@@ -54,6 +54,7 @@ export type { Offers, OfferView, SpaceDeviceView } from "./offers";
 export { deviceDirectory, type PeerEngine } from "./peers";
 export {
 	defaultSelfDeviceHost,
+	machineFingerprint,
 	type PairedDevice,
 	selfDevice,
 	selfOwnerId,

@@ -1,14 +1,24 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { hostname } from "node:os";
+import { personalSpaceIdBySlug } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { device } from "@nightshift/db/schema";
-import { eq } from "drizzle-orm";
+import {
+	clone,
+	device,
+	event,
+	run,
+	runCommand,
+	runLease,
+	step,
+} from "@nightshift/db/schema";
+import { eq, sql } from "drizzle-orm";
 
 /**
  * This computer's Device: the one `device` row with `self` set. Its id is
- * random and never changes; it is the Walker of every run this computer
- * walks and the Device of its Clones. The migration that added the table
+ * random. It changes only when the install takes over the Device its home
+ * Host knows this computer as (`adoptSelfDevice`). It is the Walker of every
+ * run this computer walks and the Device of its Clones. The migration that added the table
  * made the row for a database that existed before; a database without one
  * gets it here.
  */
@@ -36,7 +46,7 @@ export function isContainerId(name: string): boolean {
 }
 
 /** Whether this process runs in a Docker or Podman container. */
-function inContainer(): boolean {
+export function inContainer(): boolean {
 	return existsSync("/.dockerenv") || existsSync("/run/.containerenv");
 }
 
@@ -159,4 +169,77 @@ export async function selfDevice(
 		})
 		.onConflictDoNothing();
 	return selfDevice(db, host);
+}
+
+/**
+ * This install becomes the Device its home Host knows this computer as
+ * (ADR 20): the `self` row, and every row that names the id it had. The
+ * running daemon still holds the old id, so it starts again to use it. A
+ * Device document under the old id stays in its row: the Host's copy of the
+ * adopted Device is the one that counts.
+ *
+ * `(walker_id, walker_seq)` is an event's identity everywhere, and a Host
+ * drops an event whose identity it knows. So this install's events count
+ * on from `lastSeq`, the last the Host has of that Device. A fact at that
+ * count holds the place: the next event takes the number after the highest.
+ */
+export async function adoptSelfDevice(
+	db: Database,
+	deviceId: string,
+	lastSeq = 0,
+): Promise<void> {
+	const [row] = await db.select().from(device).where(eq(device.self, true));
+	if (!row) throw new Error("This computer has no Device row yet.");
+	const from = row.id;
+	if (from === deviceId) return;
+	const spaceId = row.ownerId
+		? await personalSpaceIdBySlug(db, row.ownerId)
+		: null;
+	if (lastSeq > 0 && spaceId === null) {
+		throw new Error("This computer has no personal Space yet.");
+	}
+	await db.batch([
+		db.update(device).set({ self: false }).where(eq(device.id, from)),
+		db
+			.insert(device)
+			.values({ ...row, id: deviceId, self: true })
+			.onConflictDoUpdate({ target: device.id, set: { self: true } }),
+		db.update(clone).set({ deviceId }).where(eq(clone.deviceId, from)),
+		db.update(run).set({ walkerId: deviceId }).where(eq(run.walkerId, from)),
+		db.update(run).set({ deviceId }).where(eq(run.deviceId, from)),
+		db.update(step).set({ deviceId }).where(eq(step.deviceId, from)),
+		db
+			.update(event)
+			.set({
+				walkerId: deviceId,
+				walkerSeq: sql`${event.walkerSeq} + ${lastSeq}`,
+			})
+			.where(eq(event.walkerId, from)),
+		...(lastSeq > 0 && spaceId !== null
+			? [
+					db.insert(event).values({
+						spaceId,
+						type: "DeviceJoined",
+						payload: JSON.stringify({
+							deviceId,
+							name: row.name,
+							platform: row.platform,
+							ownerId: row.ownerId,
+							home: true,
+						}),
+						walkerId: deviceId,
+						walkerSeq: lastSeq,
+					}),
+				]
+			: []),
+		db
+			.update(runLease)
+			.set({ walkerId: deviceId })
+			.where(eq(runLease.walkerId, from)),
+		db
+			.update(runCommand)
+			.set({ walkerId: deviceId })
+			.where(eq(runCommand.walkerId, from)),
+		db.delete(device).where(eq(device.id, from)),
+	]);
 }

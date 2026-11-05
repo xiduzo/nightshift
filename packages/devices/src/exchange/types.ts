@@ -109,6 +109,8 @@ export type HostExchange = {
 			deviceName: string;
 			/** A development install (ADR 17). An older Device leaves it out. */
 			dev?: boolean | undefined;
+			/** The fingerprint of its computer (ADR 20). An older Device leaves it out. */
+			machine?: string | undefined;
 		},
 	): Promise<{ added: string[]; removed: string[] }>;
 	/**

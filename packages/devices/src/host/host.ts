@@ -14,9 +14,11 @@ import {
 	startPairing,
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
+import { event } from "@nightshift/db/schema";
 import type { SettingsStore } from "@nightshift/engine/device-config";
 import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
+import { eq, max } from "drizzle-orm";
 import {
 	type HostHello,
 	NOT_A_HOST,
@@ -41,6 +43,8 @@ type Pending = {
 	platform: string;
 	/** It asks this Host to be its home Host. Undefined: an older Device did not say. */
 	home?: boolean;
+	/** The fingerprint of its computer (ADR 20). Undefined: it did not say. */
+	machine?: string;
 	userCode: string;
 	expiresAt: number;
 };
@@ -112,6 +116,14 @@ export function createHost(deps: {
 				: [];
 		return [...host, ...others.map((d) => ({ id: d.id, name: d.name }))];
 	}
+	/** The last event count this Host has of a Walker. */
+	async function lastWalkerSeq(walkerId: string): Promise<number> {
+		const [row] = await deps.db
+			.select({ last: max(event.walkerSeq) })
+			.from(event)
+			.where(eq(event.walkerId, walkerId));
+		return row?.last ?? 0;
+	}
 	function prune() {
 		const now = timeNow();
 		for (const [code, p] of pending)
@@ -147,6 +159,7 @@ export function createHost(deps: {
 			name: string;
 			platform: string;
 			home?: boolean;
+			machine?: string;
 		}): Promise<PairingStart> {
 			requireHost();
 			if (input.deviceId === deps.self.id) {
@@ -186,12 +199,26 @@ export function createHost(deps: {
 			}
 			const asked = pending.get(input.deviceCode);
 			pending.delete(input.deviceCode);
+			// One computer is one Device (ADR 20): a home Device of the same
+			// owner on the same computer gets that Device back.
+			const machine = input.home ? asked?.machine : undefined;
+			const twin = machine
+				? await registry.sameMachine(answer.personId, machine, input.deviceId)
+				: null;
+			if (twin?.online) {
+				throw new Refusal(
+					"conflict",
+					`Night Shift on this computer is connected to ${deps.self.name} as ${twin.name}. Quit it, then pair again.`,
+				);
+			}
+			const adopted = twin && twin.id !== deps.self.id ? twin : null;
 			const paired = await registry.join({
-				id: input.deviceId,
+				id: adopted?.id ?? input.deviceId,
 				name: asked?.name ?? "Device",
 				platform: asked?.platform ?? "unknown",
 				ownerId: answer.personId,
 				homeHost: input.home ? input.address : null,
+				machine,
 			});
 			const { key } = await keys.issue({
 				personId: answer.personId,
@@ -202,6 +229,8 @@ export function createHost(deps: {
 				status: "joined",
 				key,
 				personId: answer.personId,
+				deviceId: paired.id,
+				...(adopted ? { walkerSeq: await lastWalkerSeq(adopted.id) } : {}),
 				host: who(),
 				hostAdmin: await isHostAdmin(deps.db, answer.personId),
 			};

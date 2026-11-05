@@ -373,6 +373,7 @@ export function createHostExchange(deps: {
 			await deps.registry.describe(key.deviceId, {
 				name: input.deviceName,
 				dev: input.dev === true,
+				machine: input.machine,
 			});
 			// Only the key's own Device: never another Device's Clones.
 			return engine.projects.setClones(input.spaceId, {
