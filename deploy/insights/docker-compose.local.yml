@@ -1,4 +1,4 @@
-# Publishes the Collector and the admin UI on one computer.
+# Builds the app and publishes the Collector and the admin UI on one computer.
 #
 #   docker compose -f deploy/insights/docker-compose.yml \
 #     -f deploy/insights/docker-compose.local.yml up -d --build
@@ -8,5 +8,9 @@ services:
     ports:
       - "4318:4318"
   insights:
+    build:
+      context: ../..
+      dockerfile: deploy/insights/Dockerfile
+    pull_policy: build
     ports:
       - "8787:8787"

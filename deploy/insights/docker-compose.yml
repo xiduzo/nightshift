@@ -40,9 +40,10 @@ services:
       - insights
 
   insights:
-    build:
-      context: ../..
-      dockerfile: deploy/insights/Dockerfile
+    # .github/workflows/insights-image.yml builds this image. Do not build
+    # the app on the server: see docs/deploy/insights.md.
+    image: ghcr.io/xiduzo/nightshift-insights:latest
+    pull_policy: always
     restart: unless-stopped
     environment:
       DATABASE_URL: postgres://insights:${INSIGHTS_DB_PASSWORD:?Set INSIGHTS_DB_PASSWORD}@postgres:5432/insights

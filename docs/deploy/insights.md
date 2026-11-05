@@ -11,7 +11,11 @@ The files are in [`deploy/insights/`](../../deploy/insights/):
 - [`Dockerfile`](../../deploy/insights/Dockerfile) builds the app.
 - [`collector.yaml`](../../deploy/insights/collector.yaml) is the Collector config.
 - [`docker-compose.yml`](../../deploy/insights/docker-compose.yml) runs Postgres, the Collector, and the app.
-- [`docker-compose.local.yml`](../../deploy/insights/docker-compose.local.yml) publishes the ports on one computer.
+- [`docker-compose.local.yml`](../../deploy/insights/docker-compose.local.yml) builds the app and publishes the ports on one computer.
+
+[`insights-image.yml`](../../.github/workflows/insights-image.yml) builds the app
+and publishes it as `ghcr.io/xiduzo/nightshift-insights`. The main compose file
+pulls that image.
 
 The team instance runs on Dokploy as the compose `insights` in the project `nightshift`.
 Ingest is `https://ingest.xiduzo.com/nightshift`. The admin UI is
@@ -31,6 +35,20 @@ docker compose -f deploy/insights/docker-compose.yml \
 The local file publishes the Collector on port 4318 and the admin UI on
 port 8787. The main file publishes no port. Postgres has no host port. The app accepts ingest on port 8788 only
 inside the compose network.
+
+## Update the team instance
+
+Do not build the app on the server. On 2026-11-05, two builds of the app ended
+about five minutes in, and every Swarm service on the server restarted each
+time. The cause is not established.
+
+The Collector reads `collector.yaml` from the checkout on the server. A restart
+is necessary to load a changed file, because a deploy replaces the file.
+
+1. Push the change to `main`.
+2. Wait for the workflow "Insights image" to finish.
+3. Deploy the compose `insights` in Dokploy. A push does not start this deploy.
+4. If `collector.yaml` changed, restart the Collector container.
 
 ## On Dokploy
 
