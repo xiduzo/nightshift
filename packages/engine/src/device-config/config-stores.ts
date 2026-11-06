@@ -33,23 +33,23 @@ export async function openConfigStores(options: {
 	 * the devices start. Without it, this computer has no Personal scope.
 	 */
 	personal?: () => PersonalSecrets | null;
-	/** Whether a use here reads Personal secrets: not on a Host (ADR 18). Default: yes. */
-	personalInUse?: () => boolean;
 	/**
 	 * The secrets of the Projects (ADR 13), read at each use. Null until
 	 * the devices start. Without it, this computer has no Project scope.
 	 */
 	projects?: () => ProjectSecrets | null;
 }): Promise<ConfigStores> {
-	const { document, env, secrets, personal, personalInUse, projects } = options;
+	const { document, env, secrets, personal, projects } = options;
+	const settings = createSettingsStore({ document, env });
 	const stores: ConfigStores = {
-		settings: createSettingsStore({ document, env }),
+		settings,
 		connections: createConnectionStore({
 			document,
 			env,
 			secrets,
+			// The Secret scope rule reads "Be a Host" from the settings (ADR 18).
+			host: () => settings.current().host,
 			...(personal ? { personal } : {}),
-			...(personalInUse ? { personalInUse } : {}),
 			...(projects ? { projects } : {}),
 		}),
 		cliTools: createCliToolStore({ document }),

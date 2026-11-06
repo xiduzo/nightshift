@@ -343,7 +343,7 @@ function projectLaunchers(list: CliTool[], tokens: Record<string, string>) {
 			list: () => list,
 		},
 		secretEnv: async (names, use): Promise<SecretEnv> => {
-			const token = use?.project ? tokens[use.project.projectId] : undefined;
+			const token = use?.run ? tokens[use.run.projectId] : undefined;
 			if (token === undefined) return { ok: false, missing: [...names] };
 			return {
 				ok: true,
@@ -371,7 +371,7 @@ describe("a login with a Project's secret", () => {
 	test("a command's tool signs in with the token of its run's project", async () => {
 		const prepared = await projectLaunchers(list, {
 			keez: "tok-keez",
-		}).forCommand({ project: stepOf("keez") });
+		}).forCommand({ run: stepOf("keez") });
 		expect(prepared.leftOut).toEqual([]);
 		expect(run(join(prepared.toolsPath ?? "", "acli-dimpact"), [])).toBe(
 			"tok-keez",
@@ -383,7 +383,7 @@ describe("a login with a Project's secret", () => {
 	test("an agent's tool does too", async () => {
 		const prepared = await projectLaunchers(list, {
 			keez: "tok-keez",
-		}).prepare(["acli-dimpact"], { project: stepOf("keez") });
+		}).prepare(["acli-dimpact"], { run: stepOf("keez") });
 		if (!prepared.ok) throw new Error(prepared.message);
 		expect(run(join(prepared.toolsPath ?? "", "acli-dimpact"), [])).toBe(
 			"tok-keez",
@@ -394,8 +394,8 @@ describe("a login with a Project's secret", () => {
 	test("two projects at once each keep their own account", async () => {
 		const tools = projectLaunchers(list, { a: "tok-a", b: "tok-b" });
 		const [a, b] = await Promise.all([
-			tools.forCommand({ project: stepOf("a") }),
-			tools.forCommand({ project: stepOf("b") }),
+			tools.forCommand({ run: stepOf("a") }),
+			tools.forCommand({ run: stepOf("b") }),
 		]);
 		expect(run(join(a.toolsPath ?? "", "acli-dimpact"), [])).toBe("tok-a");
 		expect(run(join(b.toolsPath ?? "", "acli-dimpact"), [])).toBe("tok-b");
@@ -405,7 +405,7 @@ describe("a login with a Project's secret", () => {
 
 	test("says when it signed in per project, apart from this computer's", async () => {
 		const tools = projectLaunchers(list, { a: "tok-a" });
-		const prepared = await tools.forCommand({ project: stepOf("a") });
+		const prepared = await tools.forCommand({ run: stepOf("a") });
 		await prepared.cleanup();
 		expect(await tools.signedInAt("acli-dimpact", "a")).toBe(1_000);
 		expect(await tools.signedInAt("acli-dimpact", "b")).toBeNull();
@@ -414,7 +414,7 @@ describe("a login with a Project's secret", () => {
 
 	test("forget removes the folders of its projects, not another tool's", async () => {
 		const tools = projectLaunchers(list, { a: "tok-a" });
-		const prepared = await tools.forCommand({ project: stepOf("a") });
+		const prepared = await tools.forCommand({ run: stepOf("a") });
 		await prepared.cleanup();
 		await Bun.write(join(dataDir, "tools", "acli-dimpact-2", "keep"), "");
 		await tools.forget("acli-dimpact");

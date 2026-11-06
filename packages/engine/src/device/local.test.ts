@@ -177,10 +177,10 @@ describe("session", () => {
 			);
 		await run({ underOffer: true });
 		expect(uses).toEqual([
-			["agent", { personal: false }],
-			["mcp", { personal: false }],
-			["tools", { personal: false }],
-			["mask", { personal: false }],
+			["agent", { underOffer: true }],
+			["mcp", { underOffer: true }],
+			["tools", { underOffer: true }],
+			["mask", { underOffer: true }],
 		]);
 		uses.length = 0;
 		await run({});
@@ -190,10 +190,10 @@ describe("session", () => {
 		uses.length = 0;
 		await run({ underOffer: true, run: step });
 		expect(uses.map(([, use]) => use)).toEqual([
-			{ personal: false, project: step },
-			{ personal: false, project: step },
-			{ personal: false, project: step },
-			{ personal: false, project: step },
+			{ run: step, underOffer: true },
+			{ run: step, underOffer: true },
+			{ run: step, underOffer: true },
+			{ run: step, underOffer: true },
 		]);
 	});
 
@@ -918,7 +918,7 @@ describe("exec", () => {
 				signal: new AbortController().signal,
 			}),
 		);
-		expect(uses).toEqual([{ project: step }]);
+		expect(uses).toEqual([{ run: step }]);
 	});
 
 	test("a failed command says why a tool it names could not run, and no other", async () => {
@@ -1009,7 +1009,7 @@ describe("exec", () => {
 				// Only the run's Project has DB_URL (ADR 13).
 				secretEnv: async (names, use) => {
 					uses.push(use);
-					return use?.project?.projectId === "app"
+					return use?.run?.projectId === "app"
 						? { ok: true, env: { DB_URL: "postgres://x" } }
 						: { ok: false, missing: [...names] };
 				},
@@ -1021,7 +1021,7 @@ describe("exec", () => {
 				signal: new AbortController().signal,
 			}),
 		);
-		expect(uses).toEqual([{ project: run }]);
+		expect(uses).toEqual([{ run }]);
 		expect(events).toContainEqual({
 			type: "output",
 			stream: "stdout",
@@ -1080,7 +1080,7 @@ describe("callTool", () => {
 			run,
 			signal: signal(),
 		});
-		expect(uses).toEqual([{ project: run }]);
+		expect(uses).toEqual([{ run }]);
 	});
 
 	test("refuses a connection it cannot resolve, without calling anything", async () => {

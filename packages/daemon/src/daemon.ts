@@ -346,7 +346,6 @@ export async function createDaemon(
 		env: fallbacks,
 		secrets: await secretStore({ dataDir, ...keyStore }),
 		personal: () => personalSecrets,
-		personalInUse: () => !hostSettings().host,
 		projects: () => projectSecrets,
 	});
 	const { settings, connections, cliTools, profiles } = config;
@@ -502,7 +501,7 @@ export async function createDaemon(
 		// keys from the secrets: the run's Project first, when a step asks.
 		decider: tanstackDecider({
 			secret: (name, run) =>
-				connections.secret(name, run ? { project: run } : undefined),
+				connections.secret(name, run ? { run } : undefined),
 			// The same Ollama search by meaning uses, with its headers.
 			ollama: () => {
 				const at = ollama.endpoint();
@@ -510,8 +509,7 @@ export async function createDaemon(
 			},
 		}),
 		mcpServersFor: (node, use) => connections.mcpServersFor(node, use),
-		// A Command node's secrets: the run's Project, Personal, then the
-		// keychain, then the environment.
+		// A Command node's secrets, from the scopes of its use.
 		secretEnv: (names, use) => connections.secretEnv(names, use),
 		connectionNames: () => connections.names(),
 		cliNames: () => cliTools.names(),

@@ -95,7 +95,7 @@ export function localHarnesses(deps: {
 		// applies to the next one. `${NAME}` in their env reads the secrets,
 		// then this computer's environment: once per session, and every value
 		// it reads comes back as `•••` in the session's output.
-		// Under an Offer (`use.personal` false), no Personal secret.
+		// `use` says where the session happens: the Secret scope rule reads it.
 		customHarness: (name, use) => {
 			const agent = settings
 				.current()

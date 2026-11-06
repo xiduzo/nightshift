@@ -69,16 +69,9 @@ export type FallbackDevice = PlannedDevice & {
 export type RunFallbacks = {
 	run: FallbackDevice[];
 	nodes: Record<string, FallbackDevice[]>;
-	/** The Host among these Devices: a step there reads no Personal secret. */
+	/** The Host among these Devices, for the words of a move (`takenOverSecrets`). */
 	hostId?: string;
 };
-
-/** What a person reads when a Device takes a step over: which secrets work there. */
-export function takenOverSecrets(toHost: boolean): string {
-	return toHost
-		? "Space and project secrets work there. Personal secrets and secrets saved on another computer do not."
-		: "Space and project secrets work there. Secrets saved only on another computer do not.";
-}
 
 /** The key of a node in `RunFallbacks.nodes`: its id and the Device it names. */
 export function fallbackKey(node: FlowNode): string {

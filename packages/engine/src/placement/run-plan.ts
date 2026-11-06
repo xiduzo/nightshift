@@ -83,7 +83,7 @@ export type PlanDevices = {
 	flows(projectId: string): Promise<FlowSources>;
 	/** The Replica that keeps the Space: where a flow without a list runs (ADR 17). */
 	keeperId?: string;
-	/** The Host among the Devices: a step there reads no Personal secret. */
+	/** The Host among the Devices, for the words of a move (`takenOverSecrets`). */
 	hostId?: string;
 	/** The Person's other Devices, for when no Device of the order can take the run. */
 	lastResort?(): Promise<readonly string[]>;

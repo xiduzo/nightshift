@@ -7,6 +7,7 @@ import type { HostClient } from "../contract";
 import type { DeviceLinks, HostSpaces } from "../links";
 import { askHost, PERSONAL_DEADLINE_MS } from "./device";
 import {
+	keptStepValues,
 	NOT_YOUR_STEP,
 	projectAccess,
 	spaceAccess,
@@ -123,11 +124,7 @@ export function deviceProjectSecrets(deps: {
 				if (row?.spaceId !== step.spaceId || row.projectId !== step.projectId) {
 					throw new Refusal("forbidden", NOT_YOUR_STEP);
 				}
-				// A step reads both: the Space's wins over the Project's (ADR 18).
-				return {
-					...(await store.values(step.projectId, names)),
-					...(await spaceStore.values(step.spaceId, names)),
-				};
+				return keptStepValues({ store, spaceStore }, step, names);
 			}
 			return askHost(
 				link,

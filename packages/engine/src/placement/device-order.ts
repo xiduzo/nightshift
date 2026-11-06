@@ -16,13 +16,13 @@ import {
 import { Refusal } from "@nightshift/refusal";
 import type { DeviceProfile, StartRunInput } from "../contract";
 import type { Capabilities } from "../device";
+import { takenOverSecrets } from "../device-config";
 import { kindOf } from "../graph";
 import {
 	type FallbackDevice,
 	fallbackKey,
 	type NodeFields,
 	type RunFallbacks,
-	takenOverSecrets,
 } from "../log";
 import { capabilitiesFor, unfit } from "./fit";
 import type { PlacedDevice } from "./port";
@@ -63,7 +63,7 @@ export type OrderDevices = {
 	lastResort?(): Promise<readonly string[]>;
 	/** The Replica that keeps the Space: the Host, else this computer. */
 	keeperId?: string | undefined;
-	/** The Host among the Devices: a step there reads no Personal secret. */
+	/** The Host among the Devices, for the words of a move (`takenOverSecrets`). */
 	hostId?: string | undefined;
 	/** The profiles a run of the Person may use on a Device, by id. Null when unknown. */
 	profilesOf?(deviceId: string): Promise<readonly DeviceProfile[] | null>;
@@ -244,7 +244,7 @@ export async function chooseDevices(
 	if (runTakenOver) {
 		const why = passedOver.map((reason) => `${reason}. `).join("");
 		notes.push(
-			`${why}${run.name} takes over the run. ${takenOverSecrets(runId === devices.hostId)}`,
+			`${why}${run.name} takes over the run. ${takenOverSecrets({ host: runId === devices.hostId })}`,
 		);
 	}
 
@@ -373,7 +373,7 @@ export async function chooseDevices(
 				? `${await profileName(chosen.candidate.pair)} on ${chosen.at.name}`
 				: chosen.at.name;
 			notes.push(
-				`${why}${taker} takes over node "${node.id}". ${takenOverSecrets(chosen.at.id === devices.hostId)}`,
+				`${why}${taker} takes over node "${node.id}". ${takenOverSecrets({ host: chosen.at.id === devices.hostId })}`,
 			);
 		}
 		const needsClone = kindOf(node).works(node) === "worktree";

@@ -74,8 +74,8 @@ export type LocalDeviceDeps = {
 	harnesses: Partial<Record<HarnessName, AgentHarness>>;
 	/**
 	 * The custom agents added on this computer (`acp:<slug>`), read at each
-	 * question. Undefined: none of that name. `use`: which secret scopes
-	 * its environment may read.
+	 * question. Undefined: none of that name. `use`: where the session
+	 * happens, for the Secret scope rule.
 	 */
 	customHarness?: (
 		name: CustomHarnessName,
@@ -94,16 +94,15 @@ export type LocalDeviceDeps = {
 	/**
 	 * An Agent node's MCP servers: its connections, with `${NAME}`
 	 * expanded. Default: none, and a node with connections is refused.
-	 * `use`: which secret scopes they may read (none Personal under an Offer).
+	 * `use`: where the step happens, for the Secret scope rule.
 	 */
 	mcpServersFor?: (
 		node: Pick<AgentNode, "connections">,
 		use?: SecretUse,
 	) => Promise<McpExpansion>;
 	/**
-	 * A Command node's secrets, by name: the run's Project, Personal, then
-	 * the keychain, then the daemon's environment. Default: `process.env`.
-	 * `use`: which scopes they may read.
+	 * A Command node's secrets, by name, from the scopes of `use`
+	 * (`secretScopes`). Default: `process.env`.
 	 */
 	secretEnv?: (names: readonly string[], use?: SecretUse) => Promise<SecretEnv>;
 	/** The connections defined on this computer. */
@@ -125,7 +124,8 @@ export type LocalDeviceDeps = {
 	/*
 	 * Every secret this Device reads for a step goes through `mcpServersFor`,
 	 * `secretEnv`, `toolLaunchers`, `customHarness`, the decider and
-	 * `secretValues`: the scopes of ADR 13 are the store's, not this file's.
+	 * `secretValues`. Which scopes each reads is the Secret scope rule's
+	 * (`secretScopes`), not this file's: it passes the facts of the use on.
 	 */
 	/**
 	 * The folder of a project's Clone on this computer, or null when it has
@@ -209,14 +209,11 @@ function noDecider(
 	};
 }
 
-/**
- * Which secret scopes a step's use reads (ADR 13): its run's Project
- * and Space, and no Personal secret under an Offer.
- */
-function secretUse(run: StepRun | undefined, underOffer?: true): SecretUse {
+/** The facts of a step's use of secrets, for the Secret scope rule (`secretScopes`). */
+function useOf(run: StepRun | undefined, underOffer?: true): SecretUse {
 	return {
-		...(underOffer ? { personal: false } : {}),
-		...(run ? { project: run } : {}),
+		...(run ? { run } : {}),
+		...(underOffer ? { underOffer } : {}),
 	};
 }
 
@@ -354,10 +351,9 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			run,
 			...rest
 		} = input;
-		// Another Person's step under an Offer reads no Personal secret of
-		// this computer's owner (ADR 13, decision 5). A step of a run reads
-		// its Project's secrets first.
-		const use = secretUse(run, underOffer);
+		// Where this session happens: the Secret scope rule decides what its
+		// `${NAME}` references read (ADR 13, ADR 18).
+		const use = useOf(run, underOffer);
 		const harness = harnessFor(name, use);
 		if (!harness) {
 			yield {
@@ -366,9 +362,8 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			};
 			return;
 		}
-		// `${NAME}` in env values and headers reads Personal, then the
-		// keychain, then the environment. The values go to the harness only,
-		// never into the log.
+		// `${NAME}` in env values and headers reads the scopes of `use`. The
+		// values go to the harness only, never into the log.
 		const mcp = await mcpServersFor(connections ? { connections } : {}, use);
 		if (!mcp.ok) {
 			yield { type: "refused", message: mcp.message };
@@ -482,8 +477,8 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 	}
 
 	/**
-	 * `sh -c` here. A command's secrets read the keychain, then the
-	 * environment, on this computer: one it does not have refuses the
+	 * `sh -c` here. A command's secrets come from the scopes of its use
+	 * (`secretScopes`), on this computer: one it does not have refuses the
 	 * command before it starts. Their values go to the command only; its
 	 * output has them as `•••` before it leaves this computer.
 	 *
@@ -500,7 +495,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		);
 		const found =
 			secrets.length > 0
-				? await secretEnv(secrets, secretUse(run))
+				? await secretEnv(secrets, useOf(run))
 				: { ok: true as const, env: {} };
 		if (!found.ok) {
 			yield {
@@ -517,7 +512,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				: null;
 		let tools: Awaited<ReturnType<ToolLaunchers["forCommand"]>> | null = null;
 		try {
-			tools = (await deps.toolLaunchers?.forCommand(secretUse(run))) ?? null;
+			tools = (await deps.toolLaunchers?.forCommand(useOf(run))) ?? null;
 			const leftOut = (tools?.leftOut ?? []).filter(({ tool }) =>
 				namesTool(command.command, tool),
 			);
@@ -599,7 +594,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			const { run, ...call } = input;
 			const mcp = await mcpServersFor(
 				{ connections: [call.connection] },
-				secretUse(run),
+				useOf(run),
 			);
 			if (!mcp.ok) return { kind: "refused", message: mcp.message };
 			const server = mcp.servers[call.connection];

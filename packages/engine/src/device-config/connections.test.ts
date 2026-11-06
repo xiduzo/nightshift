@@ -9,9 +9,9 @@ import {
 	type ProjectSecrets,
 	referencedVariables,
 	type SecretBackend,
-	type StepRun,
 	unreachableNote,
 } from "./connections";
+import type { StepRun } from "./secret-scopes";
 
 let sandbox: Sandbox;
 beforeEach(async () => {
@@ -850,9 +850,9 @@ describe("Personal secrets (ADR 13)", () => {
 		});
 		const calls = personal.state.calls;
 		expect(
-			await store.secretEnv(["SHARED", "ONLY_MINE"], { personal: false }),
+			await store.secretEnv(["SHARED", "ONLY_MINE"], { underOffer: true }),
 		).toEqual({ ok: false, missing: ["ONLY_MINE"] });
-		expect(await store.secretEnv(["SHARED"], { personal: false })).toEqual({
+		expect(await store.secretEnv(["SHARED"], { underOffer: true })).toEqual({
 			ok: true,
 			env: { SHARED: "computer" },
 		});
@@ -860,11 +860,13 @@ describe("Personal secrets (ADR 13)", () => {
 			(
 				await store.mcpServersFor(
 					{ connections: ["mine"] },
-					{ personal: false },
+					{ underOffer: true },
 				)
 			).ok,
 		).toBe(false);
-		expect(await store.secretValues({ personal: false })).toEqual(["computer"]);
+		expect(await store.secretValues({ underOffer: true })).toEqual([
+			"computer",
+		]);
 		// It never asked for them.
 		expect(personal.state.calls).toBe(calls);
 	});
@@ -1082,8 +1084,8 @@ describe("Project secrets (ADR 13)", () => {
 		keychain?: Record<string, string>;
 		personal?: Record<string, string>;
 		projects?: Record<string, Record<string, string>>;
-		/** False: this computer is a Host. */
-		personalInUse?: boolean;
+		/** True: this computer is a Host. */
+		host?: boolean;
 	}) {
 		const keychain = memorySecrets();
 		const personal = memoryPersonal(options.personal);
@@ -1094,9 +1096,7 @@ describe("Project secrets (ADR 13)", () => {
 			secrets: keychain.backend,
 			personal: () => personal.port,
 			projects: () => projects.port,
-			...(options.personalInUse === false
-				? { personalInUse: () => false }
-				: {}),
+			...(options.host ? { host: () => true } : {}),
 		});
 		for (const [name, value] of Object.entries(options.keychain ?? {})) {
 			await store.setSecret(name, value);
@@ -1111,9 +1111,7 @@ describe("Project secrets (ADR 13)", () => {
 			personal: { A: "personal-a" },
 			projects: { app: { A: "project-a", B: "project-b" }, other: { C: "x" } },
 		});
-		expect(
-			await store.secretEnv(["A", "B", "C", "D"], { project: step }),
-		).toEqual({
+		expect(await store.secretEnv(["A", "B", "C", "D"], { run: step })).toEqual({
 			ok: true,
 			env: { A: "personal-a", B: "project-b", C: "computer-c", D: "env-d" },
 			fromProject: ["B"],
@@ -1132,10 +1130,10 @@ describe("Project secrets (ADR 13)", () => {
 			keychain: { C: "computer-c" },
 			personal: { MINE: "personal-mine", C: "personal-c", P: "personal-p" },
 			projects: { app: { P: "project-p" } },
-			personalInUse: false,
+			host: true,
 		});
 		const read = spyOn(personal.port, "values");
-		const found = await store.secretEnv(["MINE", "C", "P"], { project: step });
+		const found = await store.secretEnv(["MINE", "C", "P"], { run: step });
 		expect(found).toMatchObject({
 			ok: false,
 			missing: ["MINE"],
@@ -1144,7 +1142,7 @@ describe("Project secrets (ADR 13)", () => {
 		expect(unreachableNote(found as { personalHere: boolean })).toContain(
 			"Move it to the Space or the project.",
 		);
-		const shared = await store.secretEnv(["C", "P"], { project: step });
+		const shared = await store.secretEnv(["C", "P"], { run: step });
 		expect(shared).toEqual({
 			ok: true,
 			env: { C: "computer-c", P: "project-p" },
@@ -1186,13 +1184,13 @@ describe("Project secrets (ADR 13)", () => {
 		});
 		const servers = await store.mcpServersFor(
 			{ connections: ["tracker"] },
-			{ project: step },
+			{ run: step },
 		);
 		expect(servers.ok && servers.servers.tracker).toMatchObject({
 			env: { T: "project" },
 		});
 		expect(
-			await store.expandEnv({ KEY: ref("TOKEN") }, { project: step }),
+			await store.expandEnv({ KEY: ref("TOKEN") }, { run: step }),
 		).toMatchObject({ ok: true, env: { KEY: "project" } });
 	});
 
@@ -1201,7 +1199,7 @@ describe("Project secrets (ADR 13)", () => {
 			keychain: { MODEL_KEY: "computer" },
 			projects: { app: { MODEL_KEY: "project" } },
 		});
-		expect(await store.secret("MODEL_KEY", { project: step })).toBe("project");
+		expect(await store.secret("MODEL_KEY", { run: step })).toBe("project");
 		expect(await store.secret("MODEL_KEY")).toBe("computer");
 	});
 
@@ -1213,12 +1211,12 @@ describe("Project secrets (ADR 13)", () => {
 		const calls = personal.state.calls;
 		expect(
 			await store.secretEnv(["SHARED", "MINE"], {
-				personal: false,
-				project: step,
+				run: step,
+				underOffer: true,
 			}),
 		).toEqual({ ok: false, missing: ["MINE"] });
 		expect(
-			await store.secretEnv(["SHARED"], { personal: false, project: step }),
+			await store.secretEnv(["SHARED"], { run: step, underOffer: true }),
 		).toEqual({
 			ok: true,
 			env: { SHARED: "project" },
@@ -1254,12 +1252,14 @@ describe("Project secrets (ADR 13)", () => {
 			projects: { app: { TOKEN: "project-token" } },
 		});
 		// This computer learns which names are the Project's at a use or a list.
-		await store.secretEnv(["TOKEN"], { project: step });
+		await store.secretEnv(["TOKEN"], { run: step });
 		projects.state.down = true;
-		expect(
-			await store.secretEnv(["TOKEN", "OTHER"], { project: step }),
-		).toEqual({ ok: false, missing: ["TOKEN"], projectUnreachable: true });
-		expect(await store.secretEnv(["OTHER"], { project: step })).toEqual({
+		expect(await store.secretEnv(["TOKEN", "OTHER"], { run: step })).toEqual({
+			ok: false,
+			missing: ["TOKEN"],
+			projectUnreachable: true,
+		});
+		expect(await store.secretEnv(["OTHER"], { run: step })).toEqual({
 			ok: true,
 			env: { OTHER: "env-other" },
 		});
@@ -1273,7 +1273,7 @@ describe("Project secrets (ADR 13)", () => {
 				other: { NOPE: "other-value" },
 			},
 		});
-		expect((await store.secretValues({ project: step })).sort()).toEqual([
+		expect((await store.secretValues({ run: step })).sort()).toEqual([
 			"computer-value",
 			"postgres://x",
 			"project-here",

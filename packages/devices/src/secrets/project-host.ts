@@ -157,6 +157,25 @@ async function keptHere(
 	}
 }
 
+/**
+ * The values of a step's names that this computer keeps: the Space's over
+ * the Project's (ADR 18), as one answer. The engine's Secret scope rule
+ * reads that answer as one scope, between Personal and this computer.
+ */
+export async function keptStepValues(
+	stores: {
+		store: Pick<ProjectSecretStore, "values">;
+		spaceStore: Pick<SpaceSecretStore, "values">;
+	},
+	step: StepRun,
+	names?: readonly string[],
+): Promise<Record<string, string>> {
+	return {
+		...(await stores.store.values(step.projectId, names)),
+		...(await stores.spaceStore.values(step.spaceId, names)),
+	};
+}
+
 /** The kept names, with the name of the Person who set each. */
 export async function withNames(
 	db: Database,
@@ -262,11 +281,7 @@ export function createProjectSecretsHost(deps: {
 			) {
 				throw new Refusal("forbidden", NOT_IN_SPACE);
 			}
-			// A step reads both: the Space's wins over the Project's (ADR 18).
-			return {
-				...(await deps.store.values(step.projectId, names)),
-				...(await deps.spaceStore.values(step.spaceId, names)),
-			};
+			return keptStepValues(deps, step, names);
 		},
 		async set(key, { name, value, ...at }) {
 			await mayUse(key, at, true);

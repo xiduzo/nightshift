@@ -7,9 +7,7 @@ export type {
 	ConnectionStore,
 	SecretEnv,
 	SecretList,
-	SecretUse,
 	SecretView,
-	StepRun,
 } from "./connections";
 export { unreachableNote } from "./connections";
 export {
@@ -20,6 +18,10 @@ export {
 } from "./device-copies";
 export type { McpExpansion } from "./mcp";
 export type { ProfileStore, ProfileView } from "./profiles";
-
+export {
+	type SecretUse,
+	type StepRun,
+	takenOverSecrets,
+} from "./secret-scopes";
 export type { RunSettings, SettingsStore } from "./settings";
 export { defaultRunSettings, isLoopbackHost } from "./settings";

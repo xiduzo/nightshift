@@ -95,7 +95,7 @@ export type PlacementDeps = {
 	 * Default: itself.
 	 */
 	localFor?(run: PlacedRun): Device;
-	/** "Be a Host" is on here: a step on this computer reads no Personal secret. Default: no. */
+	/** "Be a Host" is on here: this computer is the Host among the run's Devices. Default: no. */
 	isHost?(): boolean;
 	/** This computer's own Offers into a Space that are in force. Default: none. */
 	offersHere?(spaceId: string): Promise<DeviceOffer[]>;

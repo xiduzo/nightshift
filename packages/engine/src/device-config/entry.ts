@@ -13,14 +13,11 @@ export type {
 	Connection,
 	ConnectionStore,
 	PersonalSecrets,
-	ProjectRef,
 	ProjectSecretName,
 	ProjectSecrets,
 	SecretScope,
 	SecretSource,
-	SecretUse,
 	SecretView,
-	StepRun,
 } from "./connections";
 export {
 	connectionInputSchema,
@@ -58,6 +55,7 @@ export type { KeyStoreKind } from "./keychain";
 export { valueStore } from "./keychain";
 export type { ProfileStore, ProfileView } from "./profiles";
 export { profileChoice } from "./profiles";
+export type { ProjectRef, SecretUse, StepRun } from "./secret-scopes";
 export type {
 	SettingField,
 	SettingKey,

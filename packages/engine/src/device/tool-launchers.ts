@@ -87,7 +87,7 @@ export type ToolLaunchers = {
 	 */
 	prepare(
 		names: readonly string[],
-		/** Which secret scopes the logins may read. Default: every scope. */
+		/** Where the logins read their secrets (`secretScopes`). Default: outside a run. */
 		use?: SecretUse,
 	): Promise<({ ok: true } & PreparedTools) | { ok: false; message: string }>;
 	/**
@@ -96,7 +96,7 @@ export type ToolLaunchers = {
 	 * and `leftOut` says why.
 	 */
 	forCommand(
-		/** Which secret scopes the logins may read. Default: no Project's. */
+		/** Where the logins read their secrets (`secretScopes`). Default: outside a run. */
 		use?: SecretUse,
 	): Promise<PreparedTools>;
 	/** Signs a tool's login in now, with its folder. */
@@ -199,8 +199,8 @@ export function createToolLaunchers(options: {
 			]),
 		);
 		const folder =
-			use?.project && found.fromProject && found.fromProject.length > 0
-				? projectFolderOf(tool.name, use.project.projectId)
+			use?.run && found.fromProject && found.fromProject.length > 0
+				? projectFolderOf(tool.name, use.run.projectId)
 				: folderOf(tool.name);
 		if (login.folder) {
 			await mkdir(folder, { recursive: true, mode: 0o700 });

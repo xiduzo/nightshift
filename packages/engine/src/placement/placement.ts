@@ -6,7 +6,7 @@ import {
 	profileOf,
 } from "@nightshift/flows";
 import type { Device } from "../device";
-import type { StepRun } from "../device-config";
+import { type StepRun, takenOverSecrets } from "../device-config";
 import type { StepMove, StepPlacement } from "../graph";
 import {
 	type FallbackDevice,
@@ -16,7 +16,6 @@ import {
 	planOf,
 	type RunPlan,
 	type RunRow,
-	takenOverSecrets,
 } from "../log";
 import { deriveWorktrees } from "../read";
 import { capabilitiesFor, unfit } from "./fit";
@@ -202,7 +201,7 @@ export function createPlacement(deps: PlacementDeps) {
 				stepId,
 				payload: {
 					kind: "device-fallback",
-					message: `${from.name} is offline. ${to.name} takes over this step. ${takenOverSecrets(to.id === run.plan.fallbacks?.hostId)}`,
+					message: `${from.name} is offline. ${to.name} takes over this step. ${takenOverSecrets({ host: to.id === run.plan.fallbacks?.hostId })}`,
 				},
 			});
 			return to;

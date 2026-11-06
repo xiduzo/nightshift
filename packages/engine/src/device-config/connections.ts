@@ -12,15 +12,23 @@ import { z } from "zod";
 import { type DeviceDocument, mapView } from "./device-document";
 import { type KeyStoreKind, keychainValues, valueStore } from "./keychain";
 import { expandMcpServers, type McpExpansion } from "./mcp";
+import {
+	PERSONAL_ON_HOST,
+	type ProjectRef,
+	type SecretUse,
+	type StepRun,
+	secretScopes,
+} from "./secret-scopes";
 
 /**
  * Connections: MCP servers defined once in this Device's document, named
- * by Agent nodes. Secrets stay `${NAME}` references. A reference of a
- * step reads the secrets of its run's Project first (ADR 13: the Host that
- * keeps the Space keeps them, or this computer when it keeps the Space
- * itself), then the Person's Personal secrets (their Home Host, or this
- * computer when it has none), then the system keychain (a secret saved for
- * this computer on the Secrets page), then the daemon's environment.
+ * by Agent nodes. Secrets stay `${NAME}` references. A reference reads
+ * the scopes the Secret scope rule gives its use (`secretScopes`): the
+ * Person's Personal secrets (their Home Host, or this computer when it has
+ * none), the run's Space's and Project's (the Host that keeps the Space
+ * keeps them, or this computer when it keeps the Space itself), the system
+ * keychain (a secret saved for this computer on the Secrets page), then
+ * the daemon's environment.
  *
  * Values never reach the database, the document, the log or the UI: the
  * document holds the names of this computer's saved secrets only, with
@@ -51,25 +59,6 @@ export type SecretSource = "personal" | "keychain" | "env" | "missing";
  * computers.
  */
 export type SecretScope = "computer" | "personal";
-
-/** A Project, with the Space it is in. */
-export type ProjectRef = { spaceId: string; projectId: string };
-
-/**
- * The run a step works for: its Space, its Project and its id. A use of
- * that step may read the Project's secrets (ADR 13). The Host that keeps
- * them checks that the step runs on the Device that asks.
- */
-export type StepRun = ProjectRef & { runId: string };
-
-/**
- * Which scopes one use may read. `personal: false`: no Personal secret,
- * as for a session of another Person's run under an Offer (ADR 13,
- * decision 5). `project`: the run of the step, whose Project's secrets
- * come first. Without it, no Project secret. Default: Personal, this
- * computer and the environment.
- */
-export type SecretUse = { personal?: boolean; project?: StepRun };
 
 /** A Project secret as Members see it: its name, when it was set and by whom. Never its value. */
 export type ProjectSecretName = {
@@ -188,10 +177,6 @@ type NotRead = {
 	personalHere?: boolean;
 };
 
-/** Why a Personal secret has no value on a Host (ADR 18), and what to do. */
-const PERSONAL_ON_HOST =
-	"Personal secrets do not work on the Host. Move it to the Space or the project.";
-
 export type Connection = {
 	name: string;
 	description: string | null;
@@ -279,10 +264,7 @@ export type ConnectionStore = {
 	 * once per scope, Personal first.
 	 */
 	secrets(named?: Iterable<string>): Promise<SecretList>;
-	/**
-	 * A secret's value, to use: the run's Project (with `use.project`),
-	 * Personal, then the keychain, then the daemon's environment.
-	 */
+	/** A secret's value, to use: the scopes of `use` in their order (`secretScopes`). */
 	secret(name: string, use?: SecretUse): Promise<string | undefined>;
 	/**
 	 * A webhook's secret: the Project's when this computer keeps it, then as
@@ -384,10 +366,10 @@ export type ConnectionStore = {
 		target: { name: string } | { server: McpServer },
 	): Promise<{ expansion: McpExpansion; values: string[] }>;
 	/**
-	 * The values of the saved secrets (the Personal ones too, and every
-	 * secret of the run's Project with `use.project`) and of the variables
-	 * the connections reference, to take out of a session's output. Not a
-	 * use. Values that cannot be read now are left out.
+	 * The values of the saved secrets (the Personal ones when `use` reads
+	 * them, and every secret of its run's Space and Project) and of the
+	 * variables the connections reference, to take out of a session's
+	 * output. Not a use. Values that cannot be read now are left out.
 	 */
 	secretValues(use?: SecretUse): Promise<string[]>;
 	/**
@@ -411,10 +393,9 @@ export type ConnectionStore = {
 	 */
 	onSecretsChange(listener: () => void): () => void;
 	/**
-	 * Secrets by name, each as an environment variable of that name:
-	 * Personal, then the keychain, then the daemon's environment. A Command
-	 * node's `secrets`. `missing` names the ones with no value; then `env`
-	 * is not given.
+	 * Secrets by name, each as an environment variable of that name, from
+	 * the scopes of `use`. A Command node's `secrets`. `missing` names the
+	 * ones with no value; then `env` is not given.
 	 */
 	secretEnv(names: readonly string[], use?: SecretUse): Promise<SecretEnv>;
 };
@@ -496,12 +477,8 @@ export function createConnectionStore(options: {
 	 * this computer has no Personal scope.
 	 */
 	personal?: () => PersonalSecrets | null;
-	/**
-	 * Whether a use here reads Personal secrets. False on a Host: a Personal
-	 * secret stays on the Person's own computers (ADR 18). The Host only
-	 * keeps it for them. Default: yes.
-	 */
-	personalInUse?: () => boolean;
+	/** "Be a Host" is on here now: the Secret scope rule reads it. Default: no. */
+	host?: () => boolean;
 	/**
 	 * The secrets of the Projects, read at each use. Null: not reachable
 	 * yet. Without it, this computer has no Project scope.
@@ -594,7 +571,9 @@ export function createConnectionStore(options: {
 		return port;
 	}
 	const hasPersonal = () => options.personal !== undefined;
-	const personalInUse = () => options.personalInUse?.() ?? true;
+	/** The scopes a use reads here, by the one rule. */
+	const scopesOf = (use: SecretUse) =>
+		secretScopes(use, { host: options.host?.() ?? false });
 	/**
 	 * Logs why the Personal secrets could not be read, once until the
 	 * reason changes: an older or offline Home Host would log every use.
@@ -688,10 +667,10 @@ export function createConnectionStore(options: {
 	}
 
 	/**
-	 * The values of `names` for one use, the Person's scope first (ADR 18):
-	 * Personal (when `use` allows it and this computer is no Host), the
-	 * run's Space and its Project (with `use.project`), this computer's
-	 * keychain, the daemon's environment.
+	 * The values of `names` for one use, from the scopes the rule gives it
+	 * (`secretScopes`), the most specific last so that it wins: the
+	 * daemon's environment, this computer's keychain, the run's Space and
+	 * its Project, then Personal.
 	 *
 	 * Fails closed: when the Project or the Personal secrets cannot be
 	 * read, a name this computer last knew as one of them has no value,
@@ -702,6 +681,7 @@ export function createConnectionStore(options: {
 		names: Iterable<string>,
 		use: SecretUse = {},
 	): Promise<Resolved> {
+		const scopes = scopesOf(use);
 		const wanted = [...new Set(names)];
 		const vars: Record<string, string | undefined> = { ...env };
 		const fromProject = new Set<string>();
@@ -711,10 +691,10 @@ export function createConnectionStore(options: {
 			if (value !== null) vars[name] = value;
 		}
 		let projectUnreachable = false;
-		if (use.project && hasProjects() && wanted.length > 0) {
-			const known = projectNamesOf(use.project.projectId);
+		if (scopes.shared && hasProjects() && wanted.length > 0) {
+			const known = projectNamesOf(scopes.shared.projectId);
 			try {
-				const found = await projectPort().values(use.project, wanted);
+				const found = await projectPort().values(scopes.shared, wanted);
 				for (const name of wanted) {
 					const value = found[name];
 					if (value === undefined) known.delete(name);
@@ -734,8 +714,9 @@ export function createConnectionStore(options: {
 		}
 		let unreachable = false;
 		let personalHere = false;
-		if (use.personal !== false && hasPersonal() && wanted.length > 0) {
-			if (!personalInUse()) {
+		if (hasPersonal() && wanted.length > 0 && scopes.personal !== "offer") {
+			if (scopes.personal === "host") {
+				// The person learns that a Personal name works nowhere here.
 				await listPersonal();
 				personalHere = wanted.some(
 					(name) => personalNames.has(name) && vars[name] === undefined,
@@ -833,21 +814,24 @@ export function createConnectionStore(options: {
 		for (const c of connectionView().values()) {
 			for (const name of referencedVariables(c.server)) names.add(name);
 		}
-		// Every Personal value, when the use may read them: not a use of any.
-		if (use.personal !== false) {
+		// Every Personal value, when the use reads them: not a use of any.
+		const scopes = scopesOf(use);
+		if (scopes.personal === "read") {
 			for (const { name } of (await listPersonal()) ?? []) names.add(name);
 		}
 		// The names in the wider scopes: a Project value of the same name is
 		// one more value to take out, read below.
-		const { project, ...wider } = use;
+		const { run: _run, ...wider } = use;
 		const { vars } = await resolve(names, wider);
 		const values = [...names].flatMap((name) =>
 			vars[name] ? [vars[name]] : [],
 		);
-		// Every value of the run's Project.
-		if (project && hasProjects()) {
+		// Every value of the run's Space and Project.
+		if (scopes.shared && hasProjects()) {
 			try {
-				values.push(...Object.values(await projectPort().values(project)));
+				values.push(
+					...Object.values(await projectPort().values(scopes.shared)),
+				);
 			} catch (error) {
 				warnOnce("read", error, "Project");
 			}
