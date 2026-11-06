@@ -50,8 +50,8 @@ const REFUSAL_CODES: Record<RefusalKind, string> = {
  * - A `Refusal` is the status of its kind, with its own words.
  * - Anything else is a failure: a 500 with plain words. The error, with
  *   its stack and the procedure's path, goes to the log, never to the person.
- * A streaming handler throws after the middleware returned, so it passes
- * its errors through this itself.
+ * A streaming handler throws after the middleware returned, so `streamed`
+ * passes its errors through this.
  */
 export function readable(
 	error: unknown,
@@ -76,6 +76,33 @@ export function readable(
 		message: FAILURE_MESSAGE,
 		cause: error,
 	});
+}
+
+/**
+ * The handler of a streaming procedure. The middleware returned when the
+ * stream started, so an error of the stream goes through `readable` here,
+ * as it happens. The body gets a `signal` that ends when the client goes
+ * away, or when the stream ends: what the body watches stops then.
+ */
+export function streamed<
+	TArgs extends { signal?: AbortSignal; path: readonly string[] },
+	TItem,
+>(
+	body: (args: TArgs & { signal: AbortSignal }) => AsyncIterable<TItem>,
+): (args: TArgs) => AsyncGenerator<TItem, void, undefined> {
+	return async function* (args) {
+		const controller = new AbortController();
+		args.signal?.addEventListener("abort", () => controller.abort(), {
+			once: true,
+		});
+		try {
+			yield* body({ ...args, signal: controller.signal });
+		} catch (error) {
+			throw readable(error, args.path);
+		} finally {
+			controller.abort();
+		}
+	};
 }
 
 /** No session needed: the health check only. */
@@ -129,9 +156,16 @@ export function permitted(permissions: Permissions) {
 	});
 }
 
+/** The session's Person owns this computer: its configuration and its disk are theirs. */
+export function ownsThisComputer(
+	context: Pick<Context, "access" | "daemon">,
+): boolean {
+	return context.access.session?.user.id === context.daemon.device.ownerId;
+}
+
 /** Lets only the Person who owns this computer through. */
 export const ownerOnly = o.middleware(async ({ context, next }) => {
-	if (context.access.session?.user.id !== context.daemon.device.ownerId) {
+	if (!ownsThisComputer(context)) {
 		throw new ORPCError("FORBIDDEN", {
 			message: "Only the owner of this computer can see or change this.",
 		});

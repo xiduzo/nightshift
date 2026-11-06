@@ -1,7 +1,5 @@
 import { isAbsolute, join, relative } from "node:path";
 import type { ProjectRuns } from "@nightshift/engine";
-import { PROJECT_NOT_FOUND } from "@nightshift/engine/projects";
-import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
@@ -15,6 +13,7 @@ import {
 	protectedProcedure,
 } from "../procedures";
 import { runProcedure } from "../runs";
+import { projectProcedure } from "./project-space";
 import {
 	branchesSchema,
 	gitHubCloneSchema,
@@ -277,18 +276,16 @@ export const projects = {
 	 * it as its Clone here. The owner's: it is this computer's disk. Returns
 	 * at once: poll `copies`.
 	 */
-	copyHere: ownerProcedure
+	copyHere: projectProcedure(
+		z.object({ projectId: z.string() }),
+		ownerProcedure,
+	)
 		.route({
 			summary:
 				"Starts to copy a project from GitHub to this computer, as its Clone here.",
 		})
 		.output(output(z.void()))
-		.input(z.object({ projectId: z.string() }))
-		.handler(async ({ context, input }) => {
-			const projects = await context.space.listProjects();
-			if (!projects.some((project) => project.id === input.projectId)) {
-				throw new Refusal("not-found", PROJECT_NOT_FOUND);
-			}
+		.handler(({ context, input }) => {
 			// Not awaited: a copy may take minutes. `copies` says how it goes.
 			void context.projectSetup.copies
 				.copy(context.space, input.projectId)

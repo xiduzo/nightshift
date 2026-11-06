@@ -1,5 +1,5 @@
+import type { Permissions } from "@nightshift/auth";
 import { cliToolsOfSecrets, HostUnreachableError } from "@nightshift/engine";
-import { PROJECT_NOT_FOUND } from "@nightshift/engine/projects";
 import { secretNameSchema } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { z } from "zod";
@@ -7,25 +7,11 @@ import { z } from "zod";
 import { secretScopeSchema } from "../config";
 import { output } from "../output";
 import { ownerOnly, permitted, protectedProcedure } from "../procedures";
+import { projectProcedure } from "./project-space";
 import { projectSecretListSchema } from "./schemas";
 
 /** What the Project secret procedures share: the project, in the session's Space. */
 const projectInput = z.object({ projectId: z.string() });
-
-/** The project in the session's Space, or a refusal. */
-async function inSpace(
-	context: {
-		spaceId: string;
-		space: { listProjects(): Promise<{ id: string }[]> };
-	},
-	projectId: string,
-): Promise<{ spaceId: string; projectId: string }> {
-	const projects = await context.space.listProjects();
-	if (!projects.some((project) => project.id === projectId)) {
-		throw new Refusal("not-found", PROJECT_NOT_FOUND);
-	}
-	return { spaceId: context.spaceId, projectId };
-}
 
 /** The secrets could not be read now: the Host of the Space is away, or older. */
 function unreachable(error: unknown): boolean {
@@ -43,27 +29,31 @@ function flowsOf(
 	return flows.filter((f) => f.projectId === projectId).map((f) => f.flowName);
 }
 
+/** A role that saves Flows: it sets, replaces, moves and removes a project's secrets. */
+const SAVING = { flow: ["save"] } satisfies Permissions;
+
 /** A move that changes this computer's secrets or its owner's: the owner's, with a role that saves Flows. */
-const ownerSaving = permitted({ flow: ["save"] }).use(ownerOnly);
+const ownerSaving = permitted(SAVING).use(ownerOnly);
 
 /**
  * A Project's secrets (ADR 13): every Member sees their names, who set
  * each and when, and the flows of the project that use each. A Member
  * whose role saves Flows sets, replaces, moves and removes them. Nobody
  * reads a value back. The Host that keeps the Space keeps them: this
- * computer asks it, or keeps them itself for a Space it keeps.
+ * computer asks it, or keeps them itself for a Space it keeps. Each
+ * procedure keyed by a project checks it is the Space's first
+ * (`projectProcedure`), and passes the project on as `context.project`.
  */
 export const projectSecrets = {
-	secrets: protectedProcedure
+	secrets: projectProcedure(projectInput)
 		.route({
 			summary:
 				"Lists the secrets of a project, with who set each, when, and the flows that use it.",
 		})
 		.output(output(projectSecretListSchema))
-		.input(projectInput)
-		.handler(async ({ context, input }) => {
-			const at = await inSpace(context, input.projectId);
-			const canChange = await context.access.can({ flow: ["save"] });
+		.handler(async ({ context }) => {
+			const at = context.project;
+			const canChange = await context.access.can(SAVING);
 			let listed: Awaited<
 				ReturnType<typeof context.connections.projectSecrets>
 			>;
@@ -114,33 +104,32 @@ export const projectSecrets = {
 				canChange,
 			};
 		}),
-	setSecret: permitted({ flow: ["save"] })
+	setSecret: projectProcedure(
+		projectInput.extend({ name: secretNameSchema, value: z.string().min(1) }),
+		permitted(SAVING),
+	)
 		.route({
 			summary:
 				"Saves a secret of a project, or replaces its value. The value never comes back.",
 		})
 		.output(output(z.void()))
-		.input(
-			projectInput.extend({
-				name: secretNameSchema,
-				value: z.string().min(1),
-			}),
-		)
-		.handler(async ({ context, input }) =>
+		.handler(({ context, input }) =>
 			context.connections.setProjectSecret(
-				await inSpace(context, input.projectId),
+				context.project,
 				input.name,
 				input.value,
 				context.session.user.id,
 			),
 		),
-	removeSecret: permitted({ flow: ["save"] })
+	removeSecret: projectProcedure(
+		projectInput.extend({ name: secretNameSchema }),
+		permitted(SAVING),
+	)
 		.route({ summary: "Removes a secret of a project." })
 		.output(output(z.void()))
-		.input(projectInput.extend({ name: secretNameSchema }))
-		.handler(async ({ context, input }) =>
+		.handler(({ context, input }) =>
 			context.connections.removeProjectSecret(
-				await inSpace(context, input.projectId),
+				context.project,
 				input.name,
 				context.session.user.id,
 			),
@@ -150,18 +139,18 @@ export const projectSecrets = {
 	 * secrets (ADR 13, decision 7). It is saved there first: the project's
 	 * copy goes only after that.
 	 */
-	moveSecretOut: ownerSaving
+	moveSecretOut: projectProcedure(
+		projectInput.extend({ name: secretNameSchema, to: secretScopeSchema }),
+		ownerSaving,
+	)
 		.route({
 			summary:
 				"Moves a secret of a project to this computer, or to its owner's Personal secrets.",
 		})
 		.output(output(z.void()))
-		.input(
-			projectInput.extend({ name: secretNameSchema, to: secretScopeSchema }),
-		)
-		.handler(async ({ context, input }) =>
+		.handler(({ context, input }) =>
 			context.connections.moveFromProject(
-				await inSpace(context, input.projectId),
+				context.project,
 				input.name,
 				input.to,
 				context.session.user.id,
@@ -172,20 +161,20 @@ export const projectSecrets = {
 	 * project of the session's Space. It is saved in the project first:
 	 * the old copy goes only after that.
 	 */
-	moveSecretIn: ownerSaving
+	moveSecretIn: projectProcedure(
+		projectInput.extend({ name: secretNameSchema, from: secretScopeSchema }),
+		ownerSaving,
+	)
 		.route({
 			summary:
 				"Moves a secret of this computer, or a Personal one, into a project of the Space.",
 		})
 		.output(output(z.void()))
-		.input(
-			projectInput.extend({ name: secretNameSchema, from: secretScopeSchema }),
-		)
-		.handler(async ({ context, input }) =>
+		.handler(({ context, input }) =>
 			context.connections.moveToProject(
 				input.name,
 				input.from,
-				await inSpace(context, input.projectId),
+				context.project,
 				context.session.user.id,
 			),
 		),
@@ -200,7 +189,7 @@ export const projectSecrets = {
 		})
 		.output(output(projectSecretListSchema))
 		.handler(async ({ context }) => {
-			const canChange = await context.access.can({ flow: ["save"] });
+			const canChange = await context.access.can(SAVING);
 			let listed: Awaited<ReturnType<typeof context.connections.spaceSecrets>>;
 			try {
 				listed = await context.connections.spaceSecrets(
@@ -242,7 +231,7 @@ export const projectSecrets = {
 				canChange,
 			};
 		}),
-	setSpaceSecret: permitted({ flow: ["save"] })
+	setSpaceSecret: permitted(SAVING)
 		.route({
 			summary:
 				"Saves a secret of the Space, or replaces its value. The value never comes back.",
@@ -257,7 +246,7 @@ export const projectSecrets = {
 				context.session.user.id,
 			),
 		),
-	removeSpaceSecret: permitted({ flow: ["save"] })
+	removeSpaceSecret: permitted(SAVING)
 		.route({ summary: "Removes a secret of the Space." })
 		.output(output(z.void()))
 		.input(z.object({ name: secretNameSchema }))
@@ -306,22 +295,22 @@ export const projectSecrets = {
 	 * value, saves it in the project, then removes its copy: the value never
 	 * passes through this computer. Refused while that device is offline.
 	 */
-	moveSecretFromDevice: ownerSaving
+	moveSecretFromDevice: projectProcedure(
+		projectInput.extend({
+			name: secretNameSchema,
+			deviceId: z.string().min(1).max(64),
+		}),
+		ownerSaving,
+	)
 		.route({
 			summary:
 				"Moves a secret saved on another of your devices into a project of the Space. That device moves its own value.",
 		})
 		.output(output(z.void()))
-		.input(
-			projectInput.extend({
-				name: secretNameSchema,
-				deviceId: z.string().min(1).max(64),
-			}),
-		)
-		.handler(async ({ context, input }) =>
+		.handler(({ context, input }) =>
 			context.devices.moveSecretOn(input.deviceId, input.name, {
 				to: "project",
-				...(await inSpace(context, input.projectId)),
+				...context.project,
 			}),
 		),
 };

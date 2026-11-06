@@ -6,7 +6,7 @@ import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
 import { output, stream } from "../output";
-import { protectedProcedure, readable } from "../procedures";
+import { protectedProcedure, streamed } from "../procedures";
 import {
 	digestEntrySchema,
 	digestKeySchema,
@@ -31,25 +31,16 @@ export const notifications = {
 		})
 		.input(watchInputSchema)
 		.output(stream(notificationItemSchema))
-		.handler(async function* ({ context, input, signal, path }) {
-			const controller = new AbortController();
-			signal?.addEventListener("abort", () => controller.abort(), {
-				once: true,
-			});
-			try {
-				// A page on this computer itself: the desktop notification
-				// here waits while it is open.
-				yield* context.notifications.watch(
-					context.session.user.id,
-					controller.signal,
-					{ here: context.fromThisComputer, phone: input?.phone === true },
-				);
-			} catch (error) {
-				throw readable(error, path);
-			} finally {
-				controller.abort();
-			}
-		}),
+		.handler(
+			// A page on this computer itself: the desktop notification here
+			// waits while it is open.
+			streamed(({ context, input, signal }) =>
+				context.notifications.watch(context.session.user.id, signal, {
+					here: context.fromThisComputer,
+					phone: input?.phone === true,
+				}),
+			),
+		),
 	settings: {
 		get: protectedProcedure
 			.route({

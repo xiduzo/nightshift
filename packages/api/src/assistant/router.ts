@@ -2,20 +2,13 @@ import { chatRequestSchema, suggestionRequestSchema } from "@nightshift/flows";
 import { z } from "zod";
 
 import { stream } from "../output";
-import { ownerProcedure, readable } from "../procedures";
+import { ownerProcedure, streamed } from "../procedures";
 import { runProcedure } from "../runs";
 import {
 	chatEventSchema,
 	explanationEventSchema,
 	suggestionEventSchema,
 } from "./schemas";
-
-/** Ends the controller's signal when the client goes away. */
-function follow(signal: AbortSignal | undefined): AbortController {
-	const controller = new AbortController();
-	signal?.addEventListener("abort", () => controller.abort(), { once: true });
-	return controller;
-}
 
 /**
  * The assistant runs on this computer's own profiles and reads its Clone of
@@ -31,14 +24,11 @@ export const assistant = {
 		})
 		.input(suggestionRequestSchema)
 		.output(stream(suggestionEventSchema))
-		.handler(async function* ({ context, input, signal, path }) {
-			const controller = follow(signal);
-			try {
-				yield* context.assistant.suggest(input, controller.signal);
-			} catch (error) {
-				throw readable(error, path);
-			}
-		}),
+		.handler(
+			streamed(({ context, input, signal }) =>
+				context.assistant.suggest(input, signal),
+			),
+		),
 	chat: ownerProcedure
 		.route({
 			summary:
@@ -46,17 +36,14 @@ export const assistant = {
 		})
 		.input(chatRequestSchema)
 		.output(stream(chatEventSchema))
-		.handler(async function* ({ context, input, signal, path }) {
-			const controller = follow(signal);
-			try {
-				yield* context.assistant.chat(input, controller.signal, {
+		.handler(
+			streamed(({ context, input, signal }) =>
+				context.assistant.chat(input, signal, {
 					spaceId: context.spaceId,
 					personId: context.session.user.id,
-				});
-			} catch (error) {
-				throw readable(error, path);
-			}
-		}),
+				}),
+			),
+		),
 	/**
 	 * Why a run that stopped early did not finish, in one short answer, and
 	 * what the person can do. Unlike the chat, it is for a Member of the
@@ -71,15 +58,12 @@ export const assistant = {
 				"Streams one short answer: why a run that stopped early did not finish, and what the person can do.",
 		})
 		.output(stream(explanationEventSchema))
-		.handler(async function* ({ context, input, signal, path }) {
-			const controller = follow(signal);
-			try {
-				yield* context.assistant.explain(input.runId, controller.signal, {
+		.handler(
+			streamed(({ context, input, signal }) =>
+				context.assistant.explain(input.runId, signal, {
 					spaceId: context.spaceId,
 					personId: context.session.user.id,
-				});
-			} catch (error) {
-				throw readable(error, path);
-			}
-		}),
+				}),
+			),
+		),
 };

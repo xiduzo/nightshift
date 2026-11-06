@@ -4,13 +4,18 @@ import {
 	isTimeZone,
 	knowledgeSourceSchema,
 } from "@nightshift/flows";
-import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
 import type { Context } from "../context";
 import { flowIssueSchema } from "../flows";
 import { output } from "../output";
-import { permitted, protectedProcedure, refusalError } from "../procedures";
+import {
+	ownsThisComputer,
+	permitted,
+	protectedProcedure,
+	refusalError,
+} from "../procedures";
+import { projectIn, projectProcedure } from "../projects";
 import { runSummarySchema } from "../runs";
 import {
 	type KnowledgePage,
@@ -29,10 +34,7 @@ import {
 
 /** What the person may change: this computer's schedules are its owner's. */
 function rightsOf(context: Pick<Context, "access" | "daemon">) {
-	return {
-		schedules:
-			context.access.session?.user.id === context.daemon.device.ownerId,
-	};
+	return { schedules: ownsThisComputer(context) };
 }
 
 /**
@@ -61,41 +63,18 @@ const agentSchema = z.boolean().optional();
 /** The most of one file `knowledge.read` returns. */
 const READ_MAX_BYTES = 1024 * 1024;
 
-/** Refuses a project the Space does not have: cheap, for a search on each key. */
-async function knownProject(
-	space: { listProjects(): Promise<{ id: string }[]> },
-	projectId: string,
-): Promise<void> {
-	const projects = await space.listProjects();
-	if (!projects.some((project) => project.id === projectId)) {
-		throw new ORPCError("NOT_FOUND", {
-			message: "This Space has no such project.",
-		});
-	}
-}
+/** A project of the Space. */
+const projectInput = z.object({ projectId: z.string() });
 
 /** One step's proposed learnings that wait, in a project of the Space. */
-const learningInput = z.object({
-	projectId: z.string(),
-	id: z.string().min(1).max(300),
-});
-
-/** Keeps or deletes one step's proposed learnings of a project the person sees. */
-async function settle(
-	context: Pick<Context, "knowledge"> & {
-		space: { listProjects(): Promise<{ id: string }[]> };
-	},
-	input: z.infer<typeof learningInput>,
-	decision: "keep" | "delete",
-): Promise<void> {
-	await knownProject(context.space, input.projectId);
-	await context.knowledge.settleLearning(input.projectId, input.id, decision);
-}
+const learningInput = projectInput.extend({ id: z.string().min(1).max(300) });
 
 /**
  * A project's knowledge belongs to its Space (ADR 4): every Member of the
  * Space reads it, on any of its Devices and on its Host. A browser changes
- * it only through flows (the syncs) and the review of learnings.
+ * it only through flows (the syncs) and the review of learnings. Each
+ * procedure keyed by a project checks it is the Space's first
+ * (`projectProcedure`).
  */
 export const knowledge = {
 	/**
@@ -103,13 +82,12 @@ export const knowledge = {
 	 * a reconcile of this computer's folder), the flows that fill it, and
 	 * the learnings that wait for a person.
 	 */
-	get: protectedProcedure
+	get: projectProcedure(projectInput)
 		.route({
 			summary:
 				"Lists the files of a project's knowledge in its Space, and the flows of the project that fill it.",
 		})
 		.output(output(knowledgeSchema))
-		.input(z.object({ projectId: z.string() }))
 		.handler(async ({ context, input }): Promise<KnowledgePage> => {
 			const [save, remove, startRuns] = await Promise.all([
 				context.access.can(MAY.save),
@@ -127,32 +105,29 @@ export const knowledge = {
 	 * meets it: sources that need a look, learnings, questions that found
 	 * nothing and files no run used.
 	 */
-	review: protectedProcedure
+	review: projectProcedure(projectInput)
 		.route({
 			summary:
 				"Lists what waits for a person on a project's Knowledge page, in the order to meet it.",
 		})
 		.output(output(z.array(reviewTaskSchema)))
-		.input(z.object({ projectId: z.string() }))
-		.handler(async ({ context, input }) => {
-			await knownProject(context.space, input.projectId);
-			return context.knowledge.review(input.projectId, context.space);
-		}),
+		.handler(({ context, input }) =>
+			context.knowledge.review(input.projectId, context.space),
+		),
 	/**
 	 * The files of the project's knowledge, as its Space lists them, and
 	 * nothing about the flows that fill it: what an agent in a terminal
 	 * lists as its MCP resources.
 	 */
-	files: protectedProcedure
+	files: projectProcedure(projectInput)
 		.route({
 			summary: "Lists the files of a project's knowledge in its Space.",
 		})
 		.output(output(z.array(knowledgeFileSchema)))
-		.input(z.object({ projectId: z.string() }))
-		.handler(async ({ context, input }) => {
-			await knownProject(context.space, input.projectId);
-			return (await context.knowledge.listing(input.projectId)).files;
-		}),
+		.handler(
+			async ({ context, input }) =>
+				(await context.knowledge.listing(input.projectId)).files,
+		),
 	/**
 	 * The learnings agents proposed that wait for a person, newest first:
 	 * of one project, or of every project of the Space. Each is one step's
@@ -167,12 +142,9 @@ export const knowledge = {
 		.input(z.object({ projectId: z.string().optional() }).optional())
 		.handler(async ({ context, input }) => {
 			const projectId = input?.projectId;
-			if (projectId !== undefined) {
-				await knownProject(context.space, projectId);
-			}
 			const projectIds =
 				projectId !== undefined
-					? [projectId]
+					? [(await projectIn(context, projectId)).projectId]
 					: (await context.space.listProjects()).map(({ id }) => id);
 			const [learnings, mayDecide] = await Promise.all([
 				context.knowledge.learnings(projectIds),
@@ -185,22 +157,27 @@ export const knowledge = {
 	 * review of learnings does, it changes the knowledge, so it asks a
 	 * role that may start runs (ADR 4).
 	 */
-	keepLearning: permitted(MAY.changeKnowledge)
+	keepLearning: projectProcedure(learningInput, permitted(MAY.changeKnowledge))
 		.route({
 			summary:
 				"Keeps the learnings of one step in the project's knowledge, where agents read them.",
 		})
 		.output(output(z.void()))
-		.input(learningInput)
-		.handler(({ context, input }) => settle(context, input, "keep")),
+		.handler(({ context, input }) =>
+			context.knowledge.settleLearning(input.projectId, input.id, "keep"),
+		),
 	/** Deletes one step's proposed learnings. A role that may start runs, as for keep. */
-	deleteLearning: permitted(MAY.changeKnowledge)
+	deleteLearning: projectProcedure(
+		learningInput,
+		permitted(MAY.changeKnowledge),
+	)
 		.route({
 			summary: "Deletes the learnings of one step: agents never read them.",
 		})
 		.output(output(z.void()))
-		.input(learningInput)
-		.handler(({ context, input }) => settle(context, input, "delete")),
+		.handler(({ context, input }) =>
+			context.knowledge.settleLearning(input.projectId, input.id, "delete"),
+		),
 	/**
 	 * Adds a source to the project's knowledge, or changes one the page
 	 * added (`name`): its flow, which calls the kit with the values given
@@ -210,27 +187,26 @@ export const knowledge = {
 	 * schedule is this computer's owner's. Returns the flow's name and its
 	 * problems.
 	 */
-	saveSource: permitted(MAY.save)
+	saveSource: projectProcedure(
+		projectInput.extend({
+			/** The source to change. Unset: a new one. */
+			name: flowNameSchema.optional(),
+			source: knowledgeSourceSchema,
+			/** When it syncs on its own: a cron line. Null: never. Unset: as it was. */
+			keepUpToDate: z
+				.object({ cron: z.string().trim().min(1) })
+				.nullable()
+				.optional(),
+			timeZone: timeZoneSchema.optional(),
+		}),
+		permitted(MAY.save),
+	)
 		.route({
 			summary:
 				"Adds a source to a project's knowledge, or changes one: a flow that calls a knowledge kit, and its schedule.",
 		})
 		.output(
 			output(z.object({ name: z.string(), issues: z.array(flowIssueSchema) })),
-		)
-		.input(
-			z.object({
-				projectId: z.string(),
-				/** The source to change. Unset: a new one. */
-				name: flowNameSchema.optional(),
-				source: knowledgeSourceSchema,
-				/** When it syncs on its own: a cron line. Null: never. Unset: as it was. */
-				keepUpToDate: z
-					.object({ cron: z.string().trim().min(1) })
-					.nullable()
-					.optional(),
-				timeZone: timeZoneSchema.optional(),
-			}),
 		)
 		.handler(({ context, input }) => {
 			const { projectId, ...source } = input;
@@ -245,19 +221,15 @@ export const knowledge = {
 	 * files changes the knowledge, so it asks a role that may start runs
 	 * (ADR 4). Returns how many files it removed.
 	 */
-	removeSource: permitted(MAY.remove)
+	removeSource: projectProcedure(
+		projectInput.extend({ name: flowNameSchema, removeFiles: z.boolean() }),
+		permitted(MAY.remove),
+	)
 		.route({
 			summary:
 				"Removes a source from a project's knowledge: its flow, its schedules and, if asked, its files.",
 		})
 		.output(output(z.object({ removedFiles: z.number() })))
-		.input(
-			z.object({
-				projectId: z.string(),
-				name: flowNameSchema,
-				removeFiles: z.boolean(),
-			}),
-		)
 		.handler(async ({ context, input }) => {
 			// Removing files changes the knowledge: a role that may start runs (ADR 4).
 			if (
@@ -279,13 +251,15 @@ export const knowledge = {
 	 * Syncs a source the page added now: a run of its flow. A folder
 	 * source's Subflow runs on the computer that has the folder.
 	 */
-	syncSource: permitted(MAY.changeKnowledge)
+	syncSource: projectProcedure(
+		projectInput.extend({ name: flowNameSchema }),
+		permitted(MAY.changeKnowledge),
+	)
 		.route({
 			summary:
 				"Syncs a knowledge source now: starts a run of its flow where its schedule runs it.",
 		})
 		.output(output(runSummarySchema))
-		.input(z.object({ projectId: z.string(), name: flowNameSchema }))
 		.handler(({ context, input }) =>
 			context.knowledge
 				.sources(context.space)
@@ -299,216 +273,192 @@ export const knowledge = {
 	 * as a prefix. By meaning too, when Ollama on this computer has the
 	 * embedding model: both lists are fused by reciprocal rank.
 	 */
-	search: protectedProcedure
+	search: projectProcedure(
+		projectInput.extend({
+			query: z.string().max(1000),
+			limit: z.number().int().min(1).max(50).optional(),
+			agent: agentSchema,
+		}),
+	)
 		.route({
 			summary:
 				"Searches the files of a project's knowledge on this computer by keyword, and by meaning when it can, best match first.",
 		})
 		.output(output(z.array(knowledgeHitSchema)))
-		.input(
-			z.object({
-				projectId: z.string(),
-				query: z.string().max(1000),
-				limit: z.number().int().min(1).max(50).optional(),
-				agent: agentSchema,
-			}),
-		)
-		.handler(async ({ context, input }) => {
-			await knownProject(context.space, input.projectId);
-			return context.knowledge.search(input.projectId, input.query, {
+		.handler(({ context, input }) =>
+			context.knowledge.search(input.projectId, input.query, {
 				...(input.limit !== undefined ? { limit: input.limit } : {}),
 				...(input.agent ? { agent: true } : {}),
-			});
-		}),
+			}),
+		),
 	/**
 	 * Whether search by meaning works for the project on this computer:
 	 * off, waiting for Ollama or its model, preparing, or on.
 	 */
-	meaning: protectedProcedure
+	meaning: projectProcedure(projectInput)
 		.route({
 			summary:
 				"Says whether knowledge search finds by meaning on this computer, and how far its preparation is.",
 		})
 		.output(output(knowledgeMeaningSchema))
-		.input(z.object({ projectId: z.string() }))
-		.handler(async ({ context, input }) => {
-			await knownProject(context.space, input.projectId);
-			return context.knowledge.meaning(input.projectId);
-		}),
+		.handler(({ context, input }) =>
+			context.knowledge.meaning(input.projectId),
+		),
 	/**
 	 * One file of a project's knowledge, by its path: this computer's copy,
 	 * else its content by hash from the Space (its Host). Null: no such file.
 	 */
-	read: protectedProcedure
+	read: projectProcedure(
+		projectInput.extend({
+			path: z.string().min(1).max(1000),
+			maxBytes: z.number().int().min(1).max(READ_MAX_BYTES).optional(),
+			/** Start at a search hit's section, page or line. */
+			from: z
+				.object({
+					section: z.string().trim().min(1).max(500).optional(),
+					line: z.number().int().min(1).optional(),
+					page: z.number().int().min(1).optional(),
+				})
+				.optional(),
+			agent: agentSchema,
+		}),
+	)
 		.route({
 			summary:
 				"Reads one file of a project's knowledge, by its path in the knowledge.",
 		})
 		.output(output(knowledgeTextSchema.nullable()))
-		.input(
-			z.object({
-				projectId: z.string(),
-				path: z.string().min(1).max(1000),
-				maxBytes: z.number().int().min(1).max(READ_MAX_BYTES).optional(),
-				/** Start at a search hit's section, page or line. */
-				from: z
-					.object({
-						section: z.string().trim().min(1).max(500).optional(),
-						line: z.number().int().min(1).optional(),
-						page: z.number().int().min(1).optional(),
-					})
-					.optional(),
-				agent: agentSchema,
-			}),
-		)
-		.handler(async ({ context, input }) => {
-			await knownProject(context.space, input.projectId);
-			return context.knowledge.read(input.projectId, input.path, {
+		.handler(({ context, input }) =>
+			context.knowledge.read(input.projectId, input.path, {
 				maxBytes: input.maxBytes ?? READ_MAX_BYTES,
 				...(input.from ? { from: input.from } : {}),
 				...(input.agent ? { agent: true } : {}),
-			});
-		}),
+			}),
+		),
 	/**
 	 * The questions agents asked the project's knowledge, newest first, with
 	 * what each last asking found, and the project's question set: the
 	 * questions a person marked with the files that answer them.
 	 */
-	questions: protectedProcedure
+	questions: projectProcedure(
+		projectInput.extend({
+			limit: z.number().int().min(1).max(200).optional(),
+		}),
+	)
 		.route({
 			summary:
 				"Lists the questions agents asked a project's knowledge, what they found, and the project's question set.",
 		})
 		.output(output(knowledgeQuestionsSchema))
-		.input(
-			z.object({
-				projectId: z.string(),
-				limit: z.number().int().min(1).max(200).optional(),
-			}),
-		)
-		.handler(async ({ context, input }) => {
-			await knownProject(context.space, input.projectId);
-			return context.knowledge.questions(input.projectId, {
+		.handler(({ context, input }) =>
+			context.knowledge.questions(input.projectId, {
 				...(input.limit !== undefined ? { limit: input.limit } : {}),
-			});
-		}),
+			}),
+		),
 	/**
 	 * The Map of the project's knowledge: its files, the topics they share,
 	 * the questions that found them and the learnings that name their topics.
 	 * The procedure keeps the older name: it is on the wire.
 	 */
-	graph: protectedProcedure
+	graph: projectProcedure(projectInput)
 		.route({
 			summary:
 				"Gives the Map of a project's knowledge: its files, their topics, the files close in meaning, the questions that found them and the learnings that wait.",
 		})
 		.output(output(knowledgeMapSchema))
-		.input(z.object({ projectId: z.string() }))
-		.handler(async ({ context, input }) => {
-			await knownProject(context.space, input.projectId);
-			return context.knowledge.map(input.projectId);
-		}),
+		.handler(({ context, input }) => context.knowledge.map(input.projectId)),
 	/**
 	 * Marks a word as not a topic on the Map, or puts it back. The list syncs
 	 * with the knowledge, so every computer of the Space draws the same Map.
 	 * It changes the knowledge, so it asks a role that may start runs (ADR 4).
 	 * Returns the list.
 	 */
-	markNotTopic: permitted(MAY.changeKnowledge)
+	markNotTopic: projectProcedure(
+		projectInput.extend({
+			word: z.string().trim().min(1).max(200),
+			notTopic: z.boolean(),
+		}),
+		permitted(MAY.changeKnowledge),
+	)
 		.route({
 			summary:
 				"Marks a word as not a topic on a project's Map, or puts it back.",
 		})
 		.output(output(knowledgeMapSchema.shape.notTopics))
-		.input(
-			z.object({
-				projectId: z.string(),
-				word: z.string().trim().min(1).max(200),
-				notTopic: z.boolean(),
-			}),
-		)
-		.handler(async ({ context, input }) => {
-			await knownProject(context.space, input.projectId);
-			return context.knowledge.markNotTopic(input.projectId, {
+		.handler(({ context, input }) =>
+			context.knowledge.markNotTopic(input.projectId, {
 				word: input.word,
 				notTopic: input.notTopic,
 				by: context.session.user.id,
-			});
-		}),
+			}),
+		),
 	/**
 	 * Marks the files that answer a question an agent asked: the question
 	 * joins the project's question set, which syncs with the knowledge.
 	 * No files takes it out. It changes the knowledge, so it asks a role
 	 * that may start runs (ADR 4). Returns the set.
 	 */
-	markQuestion: permitted(MAY.changeKnowledge)
+	markQuestion: projectProcedure(
+		projectInput.extend({
+			query: z.string().trim().min(1).max(1000),
+			answers: z.array(z.string().min(1).max(1000)).max(20),
+		}),
+		permitted(MAY.changeKnowledge),
+	)
 		.route({
 			summary:
 				"Marks the files that answer a question agents asked, for the project's question set. No files takes the question out.",
 		})
 		.output(output(knowledgeQuestionsSchema.shape.set))
-		.input(
-			z.object({
-				projectId: z.string(),
-				query: z.string().trim().min(1).max(1000),
-				answers: z.array(z.string().min(1).max(1000)).max(20),
-			}),
-		)
-		.handler(async ({ context, input }) => {
-			await knownProject(context.space, input.projectId);
-			return context.knowledge.markQuestion(input.projectId, {
+		.handler(({ context, input }) =>
+			context.knowledge.markQuestion(input.projectId, {
 				query: input.query,
 				answers: input.answers,
 				by: context.session.user.id,
-			});
-		}),
+			}),
+		),
 	/**
 	 * Runs the project's question set against each way to search on this
 	 * computer: by words, by meaning, and both. Recall at 5, the rank of
 	 * each question's first right file, and what that says about search
 	 * by meaning for the project.
 	 */
-	evaluate: protectedProcedure
+	evaluate: projectProcedure(projectInput)
 		.route({
 			summary:
 				"Runs a project's question set against knowledge search by words, by meaning and both, and reports recall at 5.",
 		})
 		.output(output(knowledgeEvaluationSchema))
-		.input(z.object({ projectId: z.string() }))
-		.handler(async ({ context, input }) => {
-			await knownProject(context.space, input.projectId);
-			return context.knowledge.evaluate(input.projectId);
-		}),
+		.handler(({ context, input }) =>
+			context.knowledge.evaluate(input.projectId),
+		),
 	/**
 	 * Turns search by meaning on or off for the project, on every computer
 	 * of its Space. It changes the knowledge, so it asks a role that may
 	 * start runs (ADR 4).
 	 */
-	setMeaning: permitted(MAY.changeKnowledge)
+	setMeaning: projectProcedure(
+		projectInput.extend({ on: z.boolean() }),
+		permitted(MAY.changeKnowledge),
+	)
 		.route({
 			summary:
 				"Turns knowledge search by meaning on or off for a project, on every computer of its Space.",
 		})
 		.output(output(knowledgeMeaningSchema))
-		.input(z.object({ projectId: z.string(), on: z.boolean() }))
-		.handler(async ({ context, input }) => {
-			await knownProject(context.space, input.projectId);
-			return context.knowledge.setMeaning(input.projectId, input.on);
-		}),
+		.handler(({ context, input }) =>
+			context.knowledge.setMeaning(input.projectId, input.on),
+		),
 	/**
 	 * How often agents found and read each file of the project's knowledge
 	 * in the last 90 days, when a run last used it, and which files no run
 	 * used in 30 days.
 	 */
-	use: protectedProcedure
+	use: projectProcedure(projectInput)
 		.route({
 			summary:
 				"Says how often agents found and read each file of a project's knowledge, when a run last used it, and which files no run used lately.",
 		})
 		.output(output(knowledgeUseSchema))
-		.input(z.object({ projectId: z.string() }))
-		.handler(async ({ context, input }) => {
-			await knownProject(context.space, input.projectId);
-			return context.knowledge.use(input.projectId);
-		}),
+		.handler(({ context, input }) => context.knowledge.use(input.projectId)),
 };

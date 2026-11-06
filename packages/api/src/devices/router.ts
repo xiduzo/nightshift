@@ -4,7 +4,12 @@ import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
 import { output, stream } from "../output";
-import { ownerProcedure, protectedProcedure, readable } from "../procedures";
+import {
+	ownerProcedure,
+	ownsThisComputer,
+	protectedProcedure,
+	streamed,
+} from "../procedures";
 import { phonesOf, removePhone } from "./phones";
 import {
 	devicesOverviewSchema,
@@ -39,7 +44,7 @@ export const devices = {
 		.handler(({ context }) =>
 			context.devices.overview({
 				personId: context.session.user.id,
-				owner: context.session.user.id === context.daemon.device.ownerId,
+				owner: ownsThisComputer(context),
 			}),
 		),
 	/**
@@ -158,9 +163,7 @@ export const devices = {
 				? await context.devices.hostOf(context.spaceId)
 				: null;
 			if (hostId === null) return phonesOf(context.notifications, personId);
-			return personId === context.daemon.device.ownerId
-				? context.devices.phonesAt(hostId)
-				: [];
+			return ownsThisComputer(context) ? context.devices.phonesAt(hostId) : [];
 		}),
 	/** Signs out one of your phones on the Host of the session's Space. */
 	removePhone: protectedProcedure
@@ -177,7 +180,7 @@ export const devices = {
 			if (hostId === null) {
 				return removePhone(context.notifications, personId, input.id);
 			}
-			if (personId !== context.daemon.device.ownerId) {
+			if (!ownsThisComputer(context)) {
 				throw new ORPCError("FORBIDDEN", {
 					message: "Only the owner of this computer can do this here.",
 				});
@@ -249,11 +252,9 @@ export const devices = {
 				role: z.enum(["home", "guest"]).default("home"),
 			}),
 		)
-		.handler(async function* ({ context, input, signal, path }) {
-			try {
-				yield* context.devices.join(input, signal);
-			} catch (error) {
-				throw readable(error, path);
-			}
-		}),
+		.handler(
+			streamed(({ context, input, signal }) =>
+				context.devices.join(input, signal),
+			),
+		),
 };
