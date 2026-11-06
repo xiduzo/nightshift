@@ -1,22 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
 import { run } from "@nightshift/db/schema";
-import type { Flow, FlowNode, FlowNodeType } from "@nightshift/flows";
+import type { Flow } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
 import type { StartRunInput } from "../contract";
-import type { Capabilities, Device } from "../device";
-import {
-	kindOf,
-	kindOfType,
-	missingNames,
-	NODE_KINDS,
-	type NodeKind,
-	onDevice,
-	type Requirement,
-	type Runner,
-	resolveInputs,
-} from "../graph";
+import type { Device } from "../device";
+import { kindOf, type Runner, resolveInputs } from "../graph";
 import {
 	type InputValues,
 	planColumns,
@@ -25,6 +15,12 @@ import {
 	type RunTrigger,
 	runDueAt,
 } from "../log";
+import {
+	capabilitiesFor,
+	type PlacementPort,
+	type PlannedRun,
+	refusalOf,
+} from "../placement";
 import type { ListedProject } from "../projects";
 import {
 	gitAuthorOf,
@@ -33,7 +29,6 @@ import {
 	runFacts,
 	toSummary,
 } from "../read";
-import type { PlacementPort, PlannedRun } from "./peers";
 import { checkServiceDevices } from "./service-devices";
 
 /**
@@ -44,7 +39,8 @@ import { checkServiceDevices } from "./service-devices";
  *   flow and the flows it calls from the run's Device, places every node
  *   on a Device and resolves its profile there. `prepareRun` then asks
  *   every requirement whether each Device has what its nodes need (its
- *   `capabilities`: connections, CLI tools, harnesses, a decider). Neither
+ *   `capabilities`: connections, CLI tools, harnesses, a decider), with
+ *   the one fit check of Placement (`placement/fit.ts`). Neither
  *   writes anything; a refusal is an `Error` with the message the person
  *   sees, and a pass is a `PreparedRun`.
  * - `createRunStart(deps).start` is the start's Turn of the runner
@@ -55,83 +51,10 @@ import { checkServiceDevices } from "./service-devices";
  *   When the run's Device is offline, the row has no worktree and the run
  *   waits: its first step that works in the worktree makes it there when
  *   the Device is back (ADR 1, decision 11).
- *
- * The requirements are one function each (`Requirement`) and listed once,
- * in `REQUIREMENTS`, in the order the person sees them. The ones about one
- * kind live on that kind's descriptor (`NodeKind.requirements`: an Agent's
- * CLI tools and harness, a model Decision's and a model Value's
- * decider); the connections check is the one shared requirement, and it
- * asks each kind which connections its node names (`NodeKind.connections`).
- * This module switches on no node type to ask them.
  */
 
 const TITLE_MAX_CHARS = 80;
 const QUICK_RUN_TITLE = "Quick run";
-
-export type { Requirement } from "../graph";
-
-/** Every node names connections the Device has (Agent and Tool nodes do). */
-export const connectionsExist: Requirement = (nodes, has) => {
-	const unknown = missingNames(
-		nodes,
-		(node) => kindOf(node).connections(node),
-		new Set(has.connections),
-	);
-	if (unknown.length === 0) return null;
-	return unknown
-		.map(
-			({ name, nodeIds }) =>
-				`The flow uses the connection "${name}" (${nodeIds.join(", ")}), but no connection has that name${onDevice(has)}. Add it under Agents → Tools.`,
-		)
-		.join(" ");
-};
-
-/**
- * A kind's own requirements as ones over every node: each gets the nodes
- * of its kind only, so it switches on nothing.
- */
-function ofKind(kind: NodeKind): Requirement[] {
-	return kind.requirements.map(
-		(requirement) => (nodes, has) =>
-			requirement(
-				nodes.filter((n) => n.type === kind.type),
-				has,
-			),
-	);
-}
-
-/**
- * Every requirement, in the order a person sees them: the connections
- * every kind names first, then each kind's own, kind by kind in the
- * registry's order (`NODE_KINDS`).
- */
-export const REQUIREMENTS: readonly Requirement[] = [
-	connectionsExist,
-	...(Object.keys(NODE_KINDS) as FlowNodeType[]).flatMap((type) =>
-		ofKind(kindOfType(type)),
-	),
-];
-
-/** What the Device has for these nodes: its capabilities, with the programs the nodes name looked up. */
-export function capabilitiesFor(
-	nodes: readonly FlowNode[],
-	device: Pick<Device, "capabilities">,
-): Promise<Capabilities> {
-	const programs = new Set(nodes.flatMap((n) => kindOf(n).programs(n)));
-	return device.capabilities({ programs: [...programs] });
-}
-
-/** The first requirement these nodes fail, as the message that refuses the run; null when all pass. */
-export function refusalOf(
-	nodes: readonly FlowNode[],
-	has: Capabilities,
-): string | null {
-	for (const requirement of REQUIREMENTS) {
-		const why = requirement(nodes, has);
-		if (why !== null) return why;
-	}
-	return null;
-}
 
 /** The title of a run without a flow name: the first Agent prompt, cut short. */
 export function quickRunTitle(flow: Flow): string {

@@ -33,7 +33,7 @@ import type { Parked, RunStateValues } from "../state";
  * node's config passed through, so it checkpoints under the node's task
  * namespace and an interrupt inside it resumes inside it. The body's own
  * `StepContext` is the caller's with `flow` and `flowName` replaced, and
- * `deviceFor` when the Subflow names a computer.
+ * `placement.deviceFor` when the Subflow names a computer.
  *
  * How a body ends, in the walk's terms (`ScopeEnd` in engine.ts):
  *
@@ -95,7 +95,7 @@ export type BodyGraph = ReturnType<ReturnType<typeof compileFlow>["compile"]>;
  * `flowName`. A Subflow that names a computer (`device`) runs its steps
  * there: a body node that does not say where it runs (`placesItself`)
  * gets the Call node's Device, as the run's plan placed it. A Subflow
- * inside it asks the same `deviceFor`, so the nearest one that names a
+ * inside it asks the same `placement`, so the nearest one that names a
  * computer wins. The run's plan grouped the body's nodes on that Device,
  * so run start checked it has what they need (`planNodes`). Nothing else
  * is new: a step placed on another Device runs there as any placed
@@ -108,15 +108,25 @@ export function bodyGraph(
 	caller: CallNode,
 	called: Flow,
 ): BodyGraph {
-	const deviceFor: StepContext["deviceFor"] =
+	const placement: StepContext["placement"] =
 		caller.device === undefined
-			? ctx.deviceFor
-			: (node, run) => ctx.deviceFor(placesItself(node) ? node : caller, run);
+			? ctx.placement
+			: {
+					...ctx.placement,
+					// A body step that moved goes on where it moved to, by its own fallbacks.
+					deviceFor: (node, run, movedTo) =>
+						movedTo
+							? ctx.placement.deviceFor(node, run, movedTo)
+							: ctx.placement.deviceFor(
+									placesItself(node) ? node : caller,
+									run,
+								),
+				};
 	return compileFlow(called, {
 		...ctx,
 		flow: called,
 		flowName: caller.flow,
-		deviceFor,
+		placement,
 	}).compile();
 }
 

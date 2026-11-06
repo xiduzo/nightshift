@@ -1,11 +1,7 @@
 import type { OwnDevice } from "../contract";
 import { followOwnStep } from "../log";
-import {
-	type PeerContext,
-	type Peers,
-	type PlacedDevice,
-	planNodes,
-} from "../run";
+import { type PlacedDevice, planNodes } from "../placement";
+import type { PeerContext, Peers } from "../run";
 import type { PeersFactory } from "../run/peers";
 
 /**
@@ -63,9 +59,7 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 					byPerson,
 				);
 			},
-			deviceFor: () => device,
 			deviceById: () => device,
-			fallbacksFor: () => [],
 			// No Device of the Person's but this computer.
 			moveTo: async () => null,
 			devicesFor: ownDevices,

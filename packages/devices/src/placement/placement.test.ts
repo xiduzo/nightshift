@@ -1364,7 +1364,7 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 	});
 });
 
-describe("the walk, from the plan alone", () => {
+describe("a Device of the plan, by id", () => {
 	/** A's placement module, with no registry and no names it learned. */
 	const placementOfA = () =>
 		createPlacement({
@@ -1393,98 +1393,17 @@ describe("the walk, from the plan alone", () => {
 			...fields,
 		} as Parameters<typeof placedRun>[0]);
 
-	test("names each Device as the plan does, with no warm-up", () => {
+	test("is this computer by either of its ids, else a remote Device named as the plan says, as asked, or plainly", () => {
 		const placement = placementOfA();
-		expect(placement.deviceFor(command("x", "true"), row({})).name).toBe(
-			"studio-b",
+		expect(placement.deviceById(a.deviceId, row({})).id).toBe(a.deviceId);
+		const there = placement.deviceById(B, row({}));
+		expect([there.id, there.name]).toEqual([B, "studio-b"]);
+		expect(placement.deviceById("device-h", row({}), "hetzner").name).toBe(
+			"hetzner",
 		);
 		expect(
-			placement.deviceFor(
-				{
-					...command("y", "true"),
-					device: "device-h",
-				} as Flow["nodes"][number],
-				row({}),
-			).name,
-		).toBe("hetzner-1");
-	});
-
-	test("a run from before ids: its node names its Device by the name the plan keeps (ADR 14)", () => {
-		const placement = placementOfA();
-		const older = row({
-			placements: JSON.stringify({ "hetzner-1": "device-h" }),
-		});
-		// Its flow snapshot reads as format 8: the name is to choose again.
-		const at = placement.deviceFor(
-			{
-				...command("y", "true"),
-				device: { name: "hetzner-1" },
-			} as Flow["nodes"][number],
-			older,
-		);
-		expect([at.id, at.name]).toEqual(["device-h", "hetzner-1"]);
-	});
-
-	test("a run from before the plan kept names: by the node's name, and before Placement on its Walker", () => {
-		const placement = placementOfA();
-		const older = row({
-			placements: JSON.stringify({ "hetzner-1": "device-h" }),
-			deviceNames: null,
-		});
-		const named = placement.deviceFor(
-			{
-				...command("y", "true"),
-				device: { name: "hetzner-1" },
-			} as Flow["nodes"][number],
-			older,
-		);
-		expect([named.id, named.name]).toEqual(["device-h", "hetzner-1"]);
-		expect(placement.deviceFor(command("x", "true"), older).id).toBe(B);
-		expect(
-			placement.deviceFor(
-				command("x", "true"),
-				row({ deviceId: null, placements: null, deviceNames: null }),
-			).id,
-		).toBe(a.deviceId);
-	});
-
-	const agentOn = (device: string, profile = "builder") =>
-		({
-			id: "work",
-			type: "agent",
-			position: { x: 0, y: 0 },
-			prompt: "Work.",
-			profile: { device, profile },
-		}) as Flow["nodes"][number];
-
-	test("a node with a profile runs on its profile's Device by id: two Devices of one name keep their own steps", () => {
-		const placement = placementOfA();
-		const twins = row({
-			placements: null,
-			deviceNames: JSON.stringify({
-				[B]: "studio-b",
-				"twin-a": "twin",
-				"twin-b": "twin",
-			}),
-		});
-		const first = placement.deviceFor(agentOn("twin-a"), twins);
-		const second = placement.deviceFor(agentOn("twin-b"), twins);
-		expect([first.id, first.name]).toEqual(["twin-a", "twin"]);
-		expect([second.id, second.name]).toEqual(["twin-b", "twin"]);
-		expect(placement.deviceFor(agentOn(a.deviceId), twins).id).toBe(a.deviceId);
-	});
-
-	test("a run planned before steps were placed by id still reads: its copy names the profile's Device by name too", () => {
-		const placement = placementOfA();
-		const older = row({
-			placements: JSON.stringify({ "hetzner-1": "device-h" }),
-		});
-		const node = {
-			...agentOn("device-h"),
-			device: { name: "hetzner-1" },
-		} as Flow["nodes"][number];
-		const at = placement.deviceFor(node, older);
-		expect([at.id, at.name]).toEqual(["device-h", "hetzner-1"]);
+			placement.deviceById("device-h", row({ deviceNames: null })).name,
+		).toBe("The device of this step");
 	});
 });
 

@@ -17,7 +17,7 @@ import {
  */
 
 /** How long until the next local 07:00. At least a minute, at most a day. */
-export function msUntilMorning(at: number): number {
+function msUntilMorning(at: number): number {
 	let wait = nextClockTime(at, 7, 0) - at;
 	if (wait < 60_000) wait = nextClockTime(at + 60_000, 7, 0) - at;
 	if (wait < 60_000) wait = DAY_MS;
@@ -90,25 +90,41 @@ export function createPullRequestWatch(deps: {
 		);
 	}
 
-	return {
-		/** Scores every open pull request this computer walks. */
-		async score(): Promise<void> {
-			const walkerId = await log.walkerId();
-			const rows = await db
-				.selectDistinct({ runId: event.runId })
-				.from(event)
-				.innerJoin(run, eq(run.id, event.runId))
-				.where(
-					and(eq(event.type, "PullRequestOpened"), eq(run.walkerId, walkerId)),
-				);
-			for (const row of rows) {
-				if (!row.runId) continue;
-				try {
-					await scoreOne(row.runId, await log.state(row.runId));
-				} catch {
-					// The next morning tries this run again.
-				}
+	/** Scores every open pull request this computer walks. */
+	async function score(): Promise<void> {
+		const walkerId = await log.walkerId();
+		const rows = await db
+			.selectDistinct({ runId: event.runId })
+			.from(event)
+			.innerJoin(run, eq(run.id, event.runId))
+			.where(
+				and(eq(event.type, "PullRequestOpened"), eq(run.walkerId, walkerId)),
+			);
+		for (const row of rows) {
+			if (!row.runId) continue;
+			try {
+				await scoreOne(row.runId, await log.state(row.runId));
+			} catch {
+				// The next morning tries this run again.
 			}
-		},
-	};
+		}
+	}
+
+	/** Scores them each morning (`msUntilMorning`), until `signal` aborts. A morning that fails is tried again the next. */
+	function everyMorning(signal: AbortSignal): void {
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const arm = () => {
+			timer = setTimeout(() => {
+				void score().catch(() => {});
+				if (!signal.aborted) arm();
+			}, msUntilMorning(deps.now()));
+			timer.unref?.();
+		};
+		signal.addEventListener("abort", () => clearTimeout(timer), {
+			once: true,
+		});
+		arm();
+	}
+
+	return { score, everyMorning };
 }

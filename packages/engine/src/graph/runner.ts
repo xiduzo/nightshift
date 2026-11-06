@@ -3,12 +3,10 @@ import type { Database } from "@nightshift/db";
 import {
 	branchPlaces,
 	type Flow,
-	type FlowNode,
 	type JsonValue,
 	type ResolvedPolicy,
 } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
-import type { Device } from "../device";
 import type { RunSettings } from "../device-config";
 import {
 	type GateVia,
@@ -37,6 +35,7 @@ import {
 	createRecorders,
 	type LeaseTaker,
 	type ServiceRunner,
+	type StepPlacement,
 } from "./context";
 import { findOverdue } from "./deadlines";
 import { FencedError } from "./fence";
@@ -145,12 +144,8 @@ export type RunnerDeps = {
 	now(): number;
 	minuteMs: number;
 	settings(): RunSettings;
-	/** The Device a step of `node` runs on (`StepContext.deviceFor`). */
-	deviceFor(node: FlowNode, run: RunRow): Device;
-	/** A Device by id, for a run (`StepContext.deviceById`). */
-	deviceById(id: string, run: RunRow): Device;
-	/** The Devices a step can move to now (`StepContext.fallbacksFor`). */
-	fallbacksFor?(node: FlowNode, run: RunRow): Promise<Device[]>;
+	/** Where the runs' steps run (`StepContext.placement`). */
+	placement: StepPlacement;
 	/** The run's flow snapshot and its called flows, parsed. */
 	flowOf(row: RunRow): Flow;
 	calledFlowsOf(row: RunRow): Record<string, Flow>;
@@ -317,9 +312,7 @@ export function createRunner(deps: RunnerDeps) {
 		now: deps.now,
 		minuteMs: deps.minuteMs,
 		settings: deps.settings,
-		deviceFor: deps.deviceFor,
-		deviceById: deps.deviceById,
-		...(deps.fallbacksFor ? { fallbacksFor: deps.fallbacksFor } : {}),
+		placement: deps.placement,
 		flowOf: deps.flowOf,
 		calledFlowsOf: deps.calledFlowsOf,
 		policyFor: deps.policyFor,

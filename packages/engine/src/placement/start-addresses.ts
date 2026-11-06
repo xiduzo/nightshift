@@ -8,7 +8,7 @@ import {
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { type AddressCheck, addressKey } from "../device";
-import type { PlacedDevice } from "./peers";
+import type { PlacedDevice } from "./port";
 
 /**
  * A run asks each address its nodes name when it starts (ADR 5, decision

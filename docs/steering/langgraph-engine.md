@@ -256,15 +256,23 @@ packages/engine/src/
                            again.
   run/run-start.ts         Run start. prepareRun loads and validates the
                            flow and its called flows, resolves profiles and
-                           asks every requirement in REQUIREMENTS (the
-                           shared connections check, then each kind's own
-                           from its descriptor: CLI tools defined and
-                           installed, harnesses, the decider) whether this
-                           daemon has what the nodes need; it writes
-                           nothing. createRunStart(deps).start is the
-                           start's Turn: with the slot held, it creates the
-                           worktree and the run row, appends RunStarted and
-                           WorktreeCreated, and the runner drives.
+                           asks every requirement in REQUIREMENTS
+                           (placement/fit.ts: the shared connections check,
+                           then each kind's own from its descriptor: CLI
+                           tools defined and installed, harnesses, the
+                           decider) whether each Device has what its nodes
+                           need; it writes nothing. createRunStart(deps).start
+                           is the start's Turn: with the slot held, it
+                           creates the worktree and the run row, appends
+                           RunStarted and WorktreeCreated, and the runner
+                           drives.
+  placement/               Placement: the run plan (run-plan.ts,
+                           device-order.ts, over PlacementPort), the one fit
+                           check (fit.ts), and the walk's reader of the plan
+                           (placement.ts, createPlacement): the Device of a
+                           step now, a Device by id, and the move of a step
+                           whose Device is offline to a backup (ADR 17), with
+                           StepMoved and the run's warning.
   run/recovery.ts          createRecovery(deps): startup recovery only.
                            recoverInterruptedWork (a dead daemon's open
                            sessions, steps and runs become interrupted
@@ -1005,8 +1013,8 @@ module. Now the engine asks the descriptor:
 | `logsCommandOutput(node)` | `beginStep` | the three-kind `logPath` rule |
 | `timeBudget(node)` | `beginStep`, `abortEnd` | the Gate and Wait timeout rule, the Agent idle rule |
 | `cutShortOutputs(open, node, outcome)` | `closingEvents` (`graph/open-work.ts`) | the `nodeType` ternary of the stop, and recovery's raw outputs |
-| `connections(node)` | `run-start.connectionsExist` | the Agent-or-Tool branch |
-| `requirements` | `run-start.REQUIREMENTS` | the per-kind requirement functions |
+| `connections(node)` | `placement/fit.ts` `connectionsExist` | the Agent-or-Tool branch |
+| `requirements` | `placement/fit.ts` `REQUIREMENTS` | the per-kind requirement functions |
 
 The deletion test picked the members. A fact is on the descriptor only
 when it would come back in a caller if you deleted the switch there. A
@@ -1094,7 +1102,7 @@ type StepContext = {
   log: RunLog;                       // appendEvent; events(runId) for lookups
   bus: RunBus;
   recorder(stepId, path): Recorder;  // transcript writer, as openRecorder today
-  deviceFor(node, run): Device;      // the step's Device; the runner asks once per step
+  placement: StepPlacement;          // where the run's steps run (placement/): the Device of a step now, a Device by id, a move
   signal(): AbortSignal;             // the run's abort signal
   now(): number; minuteMs: number;
   dataDir: string;

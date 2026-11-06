@@ -24,7 +24,8 @@ import {
 	type RunFallbacks,
 	takenOverSecrets,
 } from "../log";
-import type { PlacedDevice } from "./peers";
+import { capabilitiesFor, unfit } from "./fit";
+import type { PlacedDevice } from "./port";
 
 /**
  * Which Device takes a run's steps, in one order for every start (ADR 17):
@@ -40,7 +41,7 @@ import type { PlacedDevice } from "./peers";
  *   that names a Device or a profile has fallbacks.
  *
  * A Device takes a step when it is online, has the project, and has what the
- * node needs.
+ * node needs (`fit.ts`: the one check, which a step's move asks again).
  * This module rewrites the nodes it moves: `placeNodes` then places the
  * flow as if the flow had named those Devices itself. The Devices it passes
  * over stay in the plan, so a step can move when its Device goes offline.
@@ -73,13 +74,6 @@ export type OrderDevices = {
 		string,
 		{ name: string; settings: ProfileSettings }
 	> | null>;
-	/** What a Device has for these nodes (`capabilitiesFor`). */
-	capabilities(
-		at: PlacedDevice,
-		nodes: readonly FlowNode[],
-	): Promise<Capabilities>;
-	/** The first requirement the nodes fail on those capabilities (`refusalOf`). */
-	refusal(nodes: readonly FlowNode[], has: Capabilities): string | null;
 };
 
 /** A place a node may run: a Device, and for a node with a profile the pair. */
@@ -178,37 +172,25 @@ export async function chooseDevices(
 		}
 		return at;
 	};
-	const capabilities = new Map<string, Promise<Capabilities>>();
-	/** Why a Device cannot take these nodes now, or null when it can. */
-	async function unfit(
-		at: PlacedDevice,
-		nodes: readonly FlowNode[],
-	): Promise<string | null> {
-		if (at.offline) return `${at.name} is offline`;
-		if (
-			!at.hasClone &&
-			nodes.some((node) => kindOf(node).works(node) === "worktree")
-		) {
-			return `${at.name} does not have this project`;
-		}
-		if (at.offered) return null;
+	const capabilities = new Map<string, Promise<Capabilities | null>>();
+	/** What a Device has for the flows' nodes, asked once per run. Null when this computer cannot reach it: it cannot take the step either. */
+	function capabilitiesOf(at: PlacedDevice): Promise<Capabilities | null> {
 		let has = capabilities.get(at.id);
 		if (!has) {
-			has = devices.capabilities(
-				at,
+			has = capabilitiesFor(
 				flows.flatMap((f) => f.nodes),
-			);
+				at.device,
+			).catch((error: unknown) => {
+				if (error instanceof Refusal) return null;
+				throw error;
+			});
 			capabilities.set(at.id, has);
 		}
-		// A Device this computer cannot reach cannot take the step either.
-		const known = await has.catch((error: unknown) => {
-			if (error instanceof Refusal) return null;
-			throw error;
-		});
-		if (known === null) return `${at.name} cannot be reached`;
-		const why = devices.refusal(nodes, known);
-		return why === null ? null : `${at.name}: ${why}`;
+		return has;
 	}
+	/** Why a Device cannot take these nodes now, or null when it can (`fit.ts`). */
+	const whyUnfit = (at: PlacedDevice, nodes: readonly FlowNode[]) =>
+		unfit(at, nodes, () => capabilitiesOf(at));
 
 	// The run's Device: the first in the order that can take all its nodes.
 	const runOrder = unique(
@@ -241,7 +223,7 @@ export async function chooseDevices(
 		firstPlacedId ??= id;
 		// Another Person's Device that offers nothing is no default.
 		if (at.offered?.offers.length === 0 && id !== pick) continue;
-		const why = await unfit(at, unplaced);
+		const why = await whyUnfit(at, unplaced);
 		if (why === null) {
 			run = at;
 			runId = id;
@@ -367,7 +349,7 @@ export async function chooseDevices(
 		}
 		let chosen: (typeof options)[number] | null = null;
 		for (const option of options) {
-			const why = await unfit(option.at, [option.candidate.node]);
+			const why = await whyUnfit(option.at, [option.candidate.node]);
 			if (why === null) {
 				chosen = option;
 				break;

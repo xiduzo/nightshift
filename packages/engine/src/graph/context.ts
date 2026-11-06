@@ -81,7 +81,7 @@ export type Recorder = {
 /**
  * What a node factory gets. One per run and per compiled flow: a Call
  * node compiles its called flow with `flow` and `flowName`
- * replaced (and `deviceFor`, for a Subflow that names a computer),
+ * replaced (and `placement`, for a Subflow that names a computer),
  * everything else shared. Per-invocation facts (the scope, the
  * element's `run` template fields) travel in `config.configurable`:
  *
@@ -119,19 +119,8 @@ export type StepContext = {
 	 * appending; `seq` continues the run's count.
 	 */
 	recorder(stepId: string): Promise<Recorder>;
-	/**
-	 * The Device a step of `node` runs on (its Placement). The step runner
-	 * asks once per step and hands the Device to the body; no body touches
-	 * a harness, a process, an MCP client or the decider itself.
-	 */
-	deviceFor(node: FlowNode, run: RunRow): Device;
-	/** A Device by id, as a step of the run reaches it: where its work is now, for a Hand-off. */
-	deviceById(id: string, run: RunRow): Device;
-	/**
-	 * The Devices that can take a step of `node` now, when its own is
-	 * offline, in the order of the run's plan (ADR 17). Default: none.
-	 */
-	fallbacksFor?(node: FlowNode, run: RunRow): Promise<Device[]>;
+	/** Where the run's steps run, as its plan says (`StepPlacement`). */
+	placement: StepPlacement;
 	/** The run's abort signal: a person stopped the run. */
 	signal(): AbortSignal;
 	now(): number;
@@ -159,6 +148,49 @@ export type StepContext = {
 	leases: LeaseTaker;
 	/** Starts and stops the services of Service nodes (ADR 9). */
 	services: ServiceRunner;
+};
+
+/**
+ * Placement, as a step asks it (`StepContext.placement`): where a step
+ * runs now, a Device of the run by id, and the move of a step whose
+ * Device went offline. The engine's Placement module (`placement/`)
+ * implements it over the run's plan; it decides nothing again.
+ */
+export type StepPlacement = {
+	/**
+	 * The Device a step of `node` runs on now, working for the run (its
+	 * calls name the run, ADR 13): the one the plan says, or where the step
+	 * moved to (`movedTo`: a step that goes on after a move, its session
+	 * and its work are there). The step runner asks once per step and hands
+	 * the Device to the body; no body touches a harness, a process, an MCP
+	 * client or the decider itself.
+	 */
+	deviceFor(node: FlowNode, run: RunRow, movedTo?: string | null): Device;
+	/** A Device of the run by id, working for the run: where its work is now (a Hand-off), the Device of a service. */
+	deviceById(id: string, run: RunRow): Device;
+	/**
+	 * Moves a step whose Device is offline to the first of its fallbacks
+	 * that can take it now (ADR 17), and logs `StepMoved` and the run's
+	 * warning through `log`. The new Device, working for the run, or null
+	 * when the step stays: it has a session to continue, or the run's work
+	 * is only on its offline Device.
+	 */
+	moveStep(input: StepMove): Promise<Device | null>;
+};
+
+/** A step to move (`StepPlacement.moveStep`). */
+export type StepMove = {
+	/** The thread's log: the writes go through its fence. */
+	log: Pick<RunLog, "append" | "state">;
+	node: FlowNode;
+	run: RunRow;
+	stepId: string;
+	/** The step's Device now, offline. */
+	from: Device;
+	/** The step has a harness session to continue: a session lives on its Device. */
+	hasSession: boolean;
+	/** The step works in the run's worktree: it stays with the run's work while the Device that has it is offline. */
+	inWorktree: boolean;
 };
 
 /** How a Lease node takes its lease, and how a run lets go of one when it leaves its Section (`StepContext.leases`). */

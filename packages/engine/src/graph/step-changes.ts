@@ -171,7 +171,7 @@ function sharesWorktree(
 	if (other.nodeType === "call") return false;
 	if (
 		other.deviceId !== null &&
-		ctx.deviceById(other.deviceId, ctx.run).id !== device.id
+		ctx.placement.deviceById(other.deviceId, ctx.run).id !== device.id
 	) {
 		return false;
 	}

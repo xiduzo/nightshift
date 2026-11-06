@@ -9,7 +9,7 @@ import {
 import { Refusal } from "@nightshift/refusal";
 
 import { kindOf } from "../graph";
-import type { PlannedRun } from "./peers";
+import type { PlannedRun } from "../placement";
 
 /**
  * One Device per service (ADR 9), with the Devices the plan placed each

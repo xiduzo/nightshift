@@ -15,6 +15,7 @@ import type { FlowInput } from "@nightshift/flows/testing";
 import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { localDevice } from "../device/local";
+import type { Device } from "../device/types";
 import { defaultRunSettings } from "../device-config/settings";
 import { compileFlow } from "../graph/compile";
 import {
@@ -50,6 +51,8 @@ import type {
 	LoggedEvent,
 } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";
+import type { PlacedRun } from "../log/run-row";
+import { createPlacement } from "../placement/placement";
 import { parseCalledFlows, parseRunFlow } from "../read/read-model";
 import {
 	type Sandbox,
@@ -188,6 +191,20 @@ export type StartOptions = {
 
 let runs = 0;
 
+/**
+ * Placement over the Devices a test gives it: every Device of a run's plan
+ * comes from `deviceById`, as the devices' port answers it. A test that
+ * fakes one Device gives `() => device`.
+ */
+export function placementOn(
+	deviceById: (id: string, run: PlacedRun) => Device,
+) {
+	return createPlacement({
+		device: { id: TEST_DEVICE_ID },
+		devices: { deviceById },
+	});
+}
+
 /** A run row, its log with `RunStarted`, and its Thread. */
 export async function startRun(
 	sandbox: Sandbox,
@@ -250,8 +267,7 @@ export async function startRun(
 		now: options.now ?? now,
 		minuteMs: MINUTE,
 		settings: defaultRunSettings,
-		deviceFor: device,
-		deviceById: device,
+		placement: placementOn(device),
 		flowOf: () => flow,
 		calledFlowsOf: () => flows,
 		// The flow's own numbers, else the built-in settings: as the engine does.

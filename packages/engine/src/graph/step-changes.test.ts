@@ -17,6 +17,7 @@ import {
 	flowOf,
 	type Harness,
 	payloads,
+	placementOn,
 	startRun,
 } from "../testing/graph";
 import {
@@ -129,8 +130,7 @@ describe("what a step changed in the worktree", () => {
 				throw new Error("No git here.");
 			},
 		});
-		h.ctx.deviceFor = broken;
-		h.ctx.deviceById = broken;
+		h.ctx.placement = placementOn(broken);
 		await drive(h, { inputs: {} });
 
 		expect(payloads(await h.events(), "StepEnded")[0]?.outcome).toBe("pass");

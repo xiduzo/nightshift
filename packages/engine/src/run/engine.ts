@@ -1,20 +1,9 @@
 import { harnessFacts } from "@nightshift/agents/harness-facts";
-import {
-	type FlowNode,
-	isCustomHarness,
-	type Schedule,
-} from "@nightshift/flows";
-import { Refusal } from "@nightshift/refusal";
+import { isCustomHarness, type Schedule } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
 import { createArtifactStore } from "../artifacts";
 import { createRunCopies, startCleanupJob } from "../cleanup";
-import type {
-	Actor,
-	LeaseHost,
-	MemberChange,
-	StartRunInput,
-} from "../contract";
-import { type Device, withProfileValues } from "../device";
+import type { Actor, LeaseHost, MemberChange } from "../contract";
 import {
 	defaultRunSettings,
 	lastKnownProfiles,
@@ -52,14 +41,11 @@ import {
 	type LandedScope,
 	lastRunDevice,
 	logMemberChange,
-	placedRun,
-	planOf,
 	type RunLog,
-	type RunRow,
-	type RunTrigger,
 	runIdsOfProject,
 	spaceOfRun,
 } from "../log";
+import { createPlacement } from "../placement";
 import {
 	createProjects,
 	createRunBranches,
@@ -67,7 +53,6 @@ import {
 	createWorktrees,
 	forgetSpaceRows,
 	memberName,
-	NOT_ON_THIS_COMPUTER,
 	spaceUsageOn,
 	systemGit,
 } from "../projects";
@@ -79,7 +64,6 @@ import {
 	parseCalledFlows,
 	parseRunFlow,
 	type RunHere,
-	type RunSummary,
 	type RunTrace,
 } from "../read";
 import {
@@ -89,7 +73,6 @@ import {
 	createScheduler,
 	createWebhooks,
 	DEFAULT_SCHEDULE_TICK_MS,
-	msUntilMorning,
 	type ScheduleMissed,
 	type WebhookAnswer,
 	type WebhookRequest,
@@ -98,7 +81,6 @@ import { createServiceKeeper, serviceHolds } from "../services";
 import { listKeptValues, resetKeptValue } from "../variables";
 import { createRunActions } from "./actions";
 import type { EngineOptions } from "./engine-options";
-import type { StepFallback } from "./peers";
 import {
 	createProjectsMove,
 	type MovedProjects,
@@ -106,7 +88,7 @@ import {
 } from "./projects-move";
 import { createRecovery } from "./recovery";
 import { createRunRelay } from "./relay";
-import { capabilitiesFor, createRunStart, refusalOf } from "./run-start";
+import { createRunStart } from "./run-start";
 import { createSignals } from "./signals";
 import { createSpaces } from "./space";
 import type { SpaceEngine } from "./space-engine";
@@ -125,7 +107,12 @@ import { wakeLeaseSleeps, wakeOfflineSleeps } from "./wake";
  * - `run-start.ts`: `startRun` validates, checks what this daemon has,
  *   writes `RunStarted` and hands the thread to the runner.
  * - `start-place.ts`: who walks a new run and its Run's Device, one rule
- *   for a person's, a schedule's and a webhook's start.
+ *   for a person's, a schedule's and a webhook's start, and the start
+ *   itself: here, or handed to the Host.
+ * - `placement/`: where each step runs. The plan a run starts with
+ *   (`planNodes`), the one fit check, and the walk's reader of the plan
+ *   (`createPlacement`): the Device of a step now, and its move when that
+ *   Device is offline (ADR 17).
  * - `recovery.ts`: startup recovery and the daemon's automatic resume.
  * - `space.ts`: what a person does in one Space (`SpaceEngine`, in
  *   `space-engine.ts`).
@@ -146,8 +133,8 @@ import { wakeLeaseSleeps, wakeOfflineSleeps } from "./wake";
  * - `projects/`: projects by remote and their Clones on this computer,
  *   over the git port. A project is defined in its Space document. Its
  *   `project` row is the document's projection.
- * - `peers` (`EngineOptions.peers`, the port in `peers.ts`):
- *   placement, Offers, the Host that keeps a Space and the runs walked
+ * - `peers` (`EngineOptions.peers`, the port in `peers.ts`): who a run's
+ *   Devices are, Offers, the Host that keeps a Space and the runs walked
  *   elsewhere. `@nightshift/devices` implements it over its Links.
  *
  * Spaces: `createEngine` returns the Device's engine. `space(id)` is what
@@ -346,12 +333,6 @@ export function createEngine(
 		options.spaceDocuments ?? createSpaceDocuments({ db, directory });
 	const flowDocuments = options.flowDocuments ?? createFlowDocuments({ db });
 
-	/** Whether a run's own worktree is on this computer, as its plan says. */
-	const placedHere = (row: RunRow) => {
-		const at = planOf(row).device.id;
-		return at === device.id || at === row.walkerId;
-	};
-
 	/** The Person who owns this computer (`directory.selfOwnerId`), read when the engine is ready. */
 	let ownerId: string | null = null;
 
@@ -433,7 +414,9 @@ export function createEngine(
 			await runLog.append(fact, writes);
 		},
 	});
-	const { placement, relay: hosts } = peers;
+	const { placement: devices, relay: hosts } = peers;
+	/** Where each run's steps run, as its plan says (`placement/`). */
+	const placement = createPlacement({ device, devices });
 
 	const git = options.git ?? systemGit();
 	const { listBranches } = createWorktrees(git);
@@ -521,28 +504,10 @@ export function createEngine(
 		serviceHolds({
 			keeper: services,
 			log: runLog,
-			deviceOf: async (runId, deviceId) => {
-				const row = await getRunRow(db, runId);
-				return placement.deviceById(deviceId, placedRun(row));
-			},
+			deviceOf: async (runId, deviceId) =>
+				placement.deviceById(deviceId, await getRunRow(db, runId)),
 		}),
 	]);
-
-	/** The Devices of a step's fallbacks that can take it now, in order (ADR 17). */
-	async function stepFallbacks(
-		node: FlowNode,
-		list: readonly StepFallback[],
-	): Promise<Device[]> {
-		const fit: Device[] = [];
-		for (const { device, fields } of list) {
-			if (!(await device.state()).online) continue;
-			const asThere = { ...node, ...fields } as FlowNode;
-			const has = await capabilitiesFor([asThere], device).catch(() => null);
-			if (!has || refusalOf([asThere], has) !== null) continue;
-			fit.push(fields ? withProfileValues(device, fields) : device);
-		}
-		return fit;
-	}
 
 	const runner = createRunner({
 		db,
@@ -552,10 +517,7 @@ export function createEngine(
 		now,
 		minuteMs,
 		settings: runSettings,
-		deviceFor: (node, row) => placement.deviceFor(node, placedRun(row)),
-		deviceById: (id, row) => placement.deviceById(id, placedRun(row)),
-		fallbacksFor: (node, row) =>
-			stepFallbacks(node, placement.fallbacksFor(node, placedRun(row))),
+		placement,
 		flowOf: parseRunFlow,
 		calledFlowsOf: parseCalledFlows,
 		policyFor: (flow) => resolvePolicy(flow.policy, runSettings().policy),
@@ -582,7 +544,7 @@ export function createEngine(
 		schedulerOn: options.scheduler !== false,
 		flowOf: parseRunFlow,
 		calledFlowsOf: parseCalledFlows,
-		placedElsewhere: (row) => !placedHere(row),
+		placedElsewhere: (row) => !placement.placedHere(row),
 		resumeGraceMs: internals.resumeGraceMs ?? DAEMON_RESUME_GRACE_MS,
 		signal,
 		holds: startHolds,
@@ -618,10 +580,6 @@ export function createEngine(
 	ready.catch(() => {});
 	ready.then(...settleReady);
 
-	/** Whether a Host keeps the Space, not this Replica. */
-	const hostedElsewhere = (spaceId: string) =>
-		directory.hostedElsewhere(spaceId);
-
 	/**
 	 * Brings the flows of format 6 of every Project whose Space this
 	 * Replica keeps to the current format, once (ADR 3). A failure is
@@ -630,7 +588,7 @@ export function createEngine(
 	async function upgradeKeptFlows(): Promise<void> {
 		try {
 			await projectFlows.upgrade(
-				async (spaceId) => !(await hostedElsewhere(spaceId)),
+				async (spaceId) => !(await directory.hostedElsewhere(spaceId)),
 			);
 		} catch (error) {
 			console.warn(
@@ -665,12 +623,36 @@ export function createEngine(
 		now,
 		projectRow: (projectId) => projects.find(projectId),
 		plan: async (input) =>
-			placement.plan({
+			devices.plan({
 				...input,
 				lastRun: await lastRunDevice(db, input.project.id),
 			}),
 		selfName: device.name,
 		memberName: membersName,
+	});
+
+	const relay = createRunRelay({
+		db,
+		log: runLog,
+		...(hosts ? { relay: hosts } : {}),
+		now,
+		listRuns: reads.listRuns,
+	});
+
+	/** Who walks a run and its Run's Device, and the start itself, for every start (`start-place.ts`). */
+	const places = createStartPlaces({
+		ready,
+		hostedElsewhere: (spaceId) => directory.hostedElsewhere(spaceId),
+		hostReachable: async (spaceId) =>
+			hosts ? hosts.reachable(spaceId) : false,
+		hostOf: (spaceId) => directory.hostOf(spaceId),
+		walkerId: () => runLog.walkerId(),
+		placements: devices.placements,
+		lastRunDevice: (projectId) => lastRunDevice(db, projectId),
+		spaceOf: async (projectId) => (await projects.find(projectId)).spaceId,
+		startOnHost: (input, spaceId) => relay.startOnHost(input, spaceId),
+		startHere: (spaceId, input, trigger) =>
+			startHolds.start(spaceId, () => runStart.start(input, trigger)),
 	});
 
 	// The Replica that keeps the Space fires every schedule of it (its Host,
@@ -679,7 +661,7 @@ export function createEngine(
 	// webhooks go to the same Replica.
 	const firesHere = async (projectId: string, _schedule: Schedule) => {
 		const row = await projects.find(projectId);
-		return !(await hostedElsewhere(row.spaceId));
+		return !(await directory.hostedElsewhere(row.spaceId));
 	};
 
 	const missedListeners = new Set<(missed: ScheduleMissed) => void>();
@@ -687,7 +669,7 @@ export function createEngine(
 		db,
 		now,
 		tickMs: internals.scheduleTickMs ?? DEFAULT_SCHEDULE_TICK_MS,
-		startRun: startForSchedule,
+		startRun: places.startForSchedule,
 		log: runLog,
 		// Also a project without a Clone here: its runs run on another Device.
 		projects: () => projects.listInSpace(),
@@ -716,96 +698,16 @@ export function createEngine(
 		usage: options.usage,
 		github: options.github ?? { viewPullRequest: async () => null },
 	});
-	let morningTimer: ReturnType<typeof setTimeout> | undefined;
-	const armMorning = () => {
-		morningTimer = setTimeout(() => {
-			void pullRequestWatch.score().catch(() => {});
-			if (!disposed) armMorning();
-		}, msUntilMorning(now()));
-		morningTimer.unref?.();
-	};
 	if (options.scheduler !== false) {
 		const schedulerSignal = options.scheduler?.signal;
-		signal.addEventListener(
-			"abort",
-			() => {
-				scheduler.stop();
-				clearTimeout(morningTimer);
-			},
-			{ once: true },
-		);
+		signal.addEventListener("abort", () => scheduler.stop(), { once: true });
 		ready.then(
 			() => {
 				if (disposed) return;
 				scheduler.start(schedulerSignal);
-				if (options.github) armMorning();
+				if (options.github) pullRequestWatch.everyMorning(signal);
 			},
 			() => {},
-		);
-	}
-
-	/** Who walks a run and its Run's Device, for every start (`start-place.ts`). */
-	const places = createStartPlaces({
-		hostedElsewhere,
-		hostReachable: async (spaceId) =>
-			hosts ? hosts.reachable(spaceId) : false,
-		walkerId: () => runLog.walkerId(),
-		placements: placement.placements,
-		lastRunDevice: (projectId) => lastRunDevice(db, projectId),
-	});
-
-	/**
-	 * Starts a run, for the Person it runs for, where its start place says:
-	 * the Host that keeps the Space walks it, or this computer does, on
-	 * the Run's Device the start names or the default one.
-	 */
-	async function startRunWith(
-		input: StartRunInput,
-		trigger: RunTrigger,
-	): Promise<RunSummary> {
-		await ready;
-		const { spaceId } = await projects.find(input.projectId);
-		const place = await places.place(spaceId, input);
-		if (place.walker === "host") {
-			return relay.startOnHost(
-				{ ...input, startedFrom: place.startedFrom },
-				spaceId,
-			);
-		}
-		const placed =
-			place.deviceId === undefined
-				? input
-				: { ...input, deviceId: place.deviceId };
-		return startHolds.start(spaceId, () => runStart.start(placed, trigger));
-	}
-
-	/**
-	 * A schedule's or a webhook's start, also Run now: for the schedule's
-	 * Person, else this computer's owner. It always runs on the Replica that
-	 * keeps the Space: its Host, or this computer in a Space without one
-	 * (ADR 15). A Host without a copy of the project refuses it. It does not
-	 * move to another Device.
-	 */
-	async function startForSchedule(
-		input: StartRunInput,
-		trigger: RunTrigger,
-	): Promise<RunSummary> {
-		const { spaceId } = await projects.find(input.projectId);
-		const deviceId =
-			(await directory.hostOf(spaceId)) ?? (await runLog.walkerId());
-		return startRunWith({ ...input, deviceId }, trigger).catch(
-			(error: unknown) => {
-				if (
-					error instanceof Refusal &&
-					error.message === NOT_ON_THIS_COMPUTER
-				) {
-					throw new Refusal(
-						error.kind,
-						"The computer that runs schedules does not have this project. Add it there.",
-					);
-				}
-				throw error;
-			},
 		);
 	}
 
@@ -833,18 +735,10 @@ export function createEngine(
 		firesHere,
 		// The Settings switch, and NIGHTSHIFT_SCHEDULER=off: no schedule starts.
 		enabled: () => options.scheduler !== false && runSettings().scheduler,
-		startRun: startForSchedule,
+		startRun: places.startForSchedule,
 		scorePullRequests: (projectId, webhook) =>
 			pullRequestScores.take(projectId, webhook),
 		signal: (projectId, signal) => signals.send(projectId, signal),
-	});
-
-	const relay = createRunRelay({
-		db,
-		log: runLog,
-		...(hosts ? { relay: hosts } : {}),
-		now,
-		listRuns: reads.listRuns,
 	});
 
 	const artifacts = createArtifactStore(dataDir);
@@ -860,7 +754,7 @@ export function createEngine(
 		device,
 		runRow: (runId) => getRunRow(db, runId),
 		flowOf: parseRunFlow,
-		placement,
+		placement: devices,
 		holds: startHolds,
 		leases,
 		...(options.usage ? { usage: options.usage } : {}),
@@ -920,7 +814,7 @@ export function createEngine(
 		runRow: (runId) => getRunRow(db, runId),
 		listBranches,
 		runCopies,
-		placement,
+		placement: devices,
 		placements: places.placements,
 		flows: createSpaceFlows({
 			ready,
@@ -949,7 +843,7 @@ export function createEngine(
 		reads,
 		artifacts,
 		actions,
-		startRun: startRunWith,
+		startRun: places.start,
 		moveProjects,
 		pathsFor: peers.pathsFor,
 	});

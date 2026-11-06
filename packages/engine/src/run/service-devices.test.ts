@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentNode, Flow, FlowNode, ServiceNode } from "@nightshift/flows";
 
-import type { PlacedDevice, PlannedRun } from "./peers";
+import type { PlacedDevice, PlannedRun } from "../placement";
 import { checkServiceDevices } from "./service-devices";
 
 /** One Device per service, with the Devices a plan placed the steps on. */

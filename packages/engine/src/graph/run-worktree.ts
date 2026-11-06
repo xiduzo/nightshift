@@ -56,7 +56,7 @@ export async function makeRunWorktree(
 
 async function make(ctx: StepContext): Promise<MadeWorktree> {
 	const row = ctx.run;
-	const at = ctx.deviceById(row.deviceId ?? row.walkerId, row);
+	const at = ctx.placement.deviceById(row.deviceId ?? row.walkerId, row);
 	if (!(await at.state()).online) return { kind: "offline", at };
 	const author = row.startedBy
 		? await gitAuthorOf(ctx.db, row.startedBy)

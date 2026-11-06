@@ -1,12 +1,6 @@
 import { Command, END } from "@langchain/langgraph";
 import type { Database } from "@nightshift/db";
-import type {
-	Flow,
-	FlowNode,
-	JsonValue,
-	ResolvedPolicy,
-} from "@nightshift/flows";
-import type { Device } from "../device";
+import type { Flow, JsonValue, ResolvedPolicy } from "@nightshift/flows";
 import type { RunSettings } from "../device-config";
 import {
 	provedEndReason,
@@ -25,6 +19,7 @@ import type {
 	LeaseTaker,
 	ServiceRunner,
 	StepContext,
+	StepPlacement,
 } from "./context";
 import { createFence, type Fence, FencedSaver, fencedLog } from "./fence";
 import { kindOf } from "./node-kinds";
@@ -75,12 +70,8 @@ export type ThreadDeps = {
 	now(): number;
 	minuteMs: number;
 	settings(): RunSettings;
-	/** The Device a step of `node` runs on (`StepContext.deviceFor`). */
-	deviceFor(node: FlowNode, run: RunRow): Device;
-	/** A Device by id, for a run (`StepContext.deviceById`). */
-	deviceById(id: string, run: RunRow): Device;
-	/** The Devices a step can move to now (`StepContext.fallbacksFor`). */
-	fallbacksFor?(node: FlowNode, run: RunRow): Promise<Device[]>;
+	/** Where the run's steps run (`StepContext.placement`). */
+	placement: StepPlacement;
 	/** The run's flow snapshot and its called flows, parsed. */
 	flowOf(row: RunRow): Flow;
 	calledFlowsOf(row: RunRow): Record<string, Flow>;
@@ -213,9 +204,7 @@ export function openThread(row: RunRow, deps: ThreadDeps): Thread {
 		log: fencedLog(deps.log, fence),
 		bus: deps.bus,
 		recorder: (stepId) => deps.recorders.open(runId, stepId),
-		deviceFor: deps.deviceFor,
-		deviceById: deps.deviceById,
-		...(deps.fallbacksFor ? { fallbacksFor: deps.fallbacksFor } : {}),
+		placement: deps.placement,
 		signal: () => controller.signal,
 		now: deps.now,
 		minuteMs: deps.minuteMs,

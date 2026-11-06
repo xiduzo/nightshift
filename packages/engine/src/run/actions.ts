@@ -31,6 +31,7 @@ import {
 	type RunRow,
 	type RunState,
 } from "../log";
+import type { PlacementPort } from "../placement";
 import {
 	deriveOpenGate,
 	deriveRunState,
@@ -39,7 +40,7 @@ import {
 } from "../read";
 import { RunRefusal, refuseUnless, whyNot } from "../run-status";
 import type { UsageNotes } from "../usage";
-import type { PlacementPort, RunsPort } from "./peers";
+import type { RunsPort } from "./peers";
 import type { RunRelay } from "./relay";
 import type { StartHolds } from "./start-holds";
 

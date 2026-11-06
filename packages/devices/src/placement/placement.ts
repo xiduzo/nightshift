@@ -4,7 +4,6 @@ import {
 	type Actor,
 	type Device,
 	type DeviceProfile,
-	fallbackKey,
 	HostUnreachableError,
 	type NodeToPlace,
 	type OfferedPlacement,
@@ -18,7 +17,6 @@ import {
 	type PlanInput,
 	type PlannedRun,
 	planNodes,
-	type StepFallback,
 	UNREACHABLE_DEVICE,
 } from "@nightshift/engine";
 import type {
@@ -30,14 +28,7 @@ import {
 	type ListedProject,
 	type SpaceDocuments,
 } from "@nightshift/engine/projects";
-import {
-	deviceIdOf,
-	type FlowNode,
-	type FlowSources,
-	isProfileRef,
-	legacyDeviceName,
-	profileOf,
-} from "@nightshift/flows";
+import type { FlowSources } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { HostRelay, WorkRelay } from "../contract";
 import { type HostSpaces, keptByHomeHost, personInSpace } from "../links";
@@ -54,8 +45,8 @@ import { type DeviceRegistry, selfOwnerId } from "../registry";
 import { remoteDevice } from "../work";
 
 /**
- * Placement: where a run's steps run, decided once when it starts. One
- * module owns both halves:
+ * The Devices Placement chooses among (the engine's `PlacementPort`): who
+ * a Person's Devices are in a Space, and a run's plan over them.
  *
  * - At run start (`plan`): the Person the run runs for, as the Host of its
  *   Space knows them; the run's Device (`deviceId`, else this computer);
@@ -68,10 +59,11 @@ import { remoteDevice } from "../work";
  *   time. The run's Device makes the run's worktree when it is back. On the Replica that keeps the Space the registry
  *   answers; on a Device in a Host's Space the Host does
  *   (`HostRelay.devices`). Run start keeps the plan on the run's row.
- * - While the run walks (`deviceFor`): the plan, as the engine reads it
- *   from the row (`PlacedRun`), and nothing decided again. Another Device is a
- *   `remoteDevice` over the work relay, named as the plan names it. A
- *   node with a profile runs on the Device of the id its profile names.
+ * - While the run walks (`deviceById`): a Device of the plan as the run
+ *   reaches it, and nothing decided again. Another Device is a
+ *   `remoteDevice` over the work relay, named as the plan names it. Which
+ *   Device a step runs on is the engine's reading of the plan
+ *   (`placement/` there).
  *
  * The placed Device checks every call again itself.
  */
@@ -148,15 +140,6 @@ const NO_STARTER_RELAY: WorkRelay = {
 	online: () => true,
 };
 
-/**
- * What a node writes as its Device, as the plan keys it: the Device's id,
- * or, for a run planned before ids, the name that plan kept (`named`).
- */
-function nodeDevice(node: FlowNode): string | undefined {
-	if (!("device" in node)) return undefined;
-	return deviceIdOf(node.device) ?? legacyDeviceName(node.device) ?? undefined;
-}
-
 export function createPlacement(deps: PlacementDeps) {
 	const { db, device, registry, documents, hostSpaces } = deps;
 	const work = deps.work ?? UNREACHABLE;
@@ -167,33 +150,19 @@ export function createPlacement(deps: PlacementDeps) {
 	}
 
 	/**
-	 * The Device a step of `node` runs on, as the run's plan says: its
-	 * profile's Device by id, else the Device it names, else the run's.
-	 * A run planned before ids keeps the Devices its nodes named by name.
+	 * A Device of a run by id, as the run reaches it (`PlacementPort.deviceById`):
+	 * this computer (through its Offer admission for another Person's run),
+	 * or another Device of its plan over the work relay, named as the plan
+	 * names it, else as `name` says.
 	 */
-	function deviceFor(node: FlowNode, run: PlacedRun): Device {
-		const ref = profileOf(node);
-		if (isProfileRef(ref)) return deviceById(ref.device, run);
-		const { plan } = run;
-		const key = nodeDevice(node);
-		const at =
-			(key !== undefined
-				? (plan.named[key] ?? plan.devices[key])
-				: undefined) ?? plan.device;
-		const oldName = "device" in node ? legacyDeviceName(node.device) : null;
-		return deviceById(at.id, run, at.name ?? oldName ?? undefined);
-	}
-
-	/** A Device by id, for a step of the run: this computer, or another Device of its plan. */
-	function deviceById(id: string, run: PlacedRun, named?: string): Device {
+	function deviceById(id: string, run: PlacedRun, name?: string): Device {
 		if (id === device.id || id === run.walkerId) {
 			return deps.localFor?.(run) ?? device;
 		}
 		const { plan } = run;
-		const name = plan.devices[id]?.name ?? named;
 		return remoteDevice(
 			plan.personId === null ? NO_STARTER_RELAY : work,
-			{ id, name: name ?? "The device of this step" },
+			{ id, name: name ?? plan.devices[id]?.name ?? "The device of this step" },
 			{
 				spaceId: run.spaceId,
 				projectId: run.projectId,
@@ -690,31 +659,9 @@ export function createPlacement(deps: PlacementDeps) {
 		return { id: target.deviceId, name: target.name };
 	}
 
-	/**
-	 * Where a step of `node` can go when its Device cannot take it, as the
-	 * run's plan says (ADR 17). This reads the plan and decides nothing:
-	 * the engine asks each Device whether it can take the step now.
-	 */
-	function fallbacksFor(node: FlowNode, run: PlacedRun): StepFallback[] {
-		const { fallbacks } = run.plan;
-		if (!fallbacks) return [];
-		// A node that names a Device goes by its own list, even an empty one.
-		const placesItself =
-			isProfileRef(profileOf(node)) || nodeDevice(node) !== undefined;
-		const list = placesItself
-			? (fallbacks.nodes[fallbackKey(node)] ?? [])
-			: fallbacks.run;
-		return list.map((to) => ({
-			device: deviceById(to.id, run, to.name ?? undefined),
-			...(to.fields ? { fields: to.fields } : {}),
-		}));
-	}
-
 	return {
 		plan,
-		deviceFor,
-		fallbacksFor,
-		deviceById: (id: string, run: PlacedRun) => deviceById(id, run),
+		deviceById,
 		moveTo,
 		devicesFor,
 		placements,

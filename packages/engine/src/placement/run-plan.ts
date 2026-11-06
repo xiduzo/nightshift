@@ -21,8 +21,7 @@ import { flowsForRun } from "../flows";
 import type { PlannedDevice } from "../log";
 import { NOT_ON_THIS_COMPUTER } from "../projects";
 import { chooseDevices, UNREACHABLE_DEVICE } from "./device-order";
-import type { PlacedDevice, PlannedRun } from "./peers";
-import { capabilitiesFor, refusalOf } from "./run-start";
+import type { PlacedDevice, PlannedRun } from "./port";
 import { checkAddresses } from "./start-addresses";
 
 /**
@@ -377,11 +376,7 @@ export async function planNodes(
 		[loaded.flow, ...Object.values(loaded.calledFlows)],
 		start,
 		byPerson,
-		{
-			...devices,
-			capabilities: (at, nodes) => capabilitiesFor(nodes, at.device),
-			refusal: refusalOf,
-		},
+		devices,
 	);
 	const { run } = chosen;
 	if (run !== walker && !run.hasClone) {

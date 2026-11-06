@@ -125,7 +125,6 @@ export type {
 } from "./log";
 export {
 	ForeignRowsError,
-	fallbackKey,
 	followOwnStep,
 	MissingProjectError,
 	parseTranscript,
@@ -141,6 +140,15 @@ export {
 	type OllamaService,
 	type OllamaStatus,
 } from "./ollama";
+export {
+	type OfferedPlacement,
+	type PlacedDevice,
+	type PlanDevices,
+	type PlanInput,
+	type PlannedRun,
+	planNodes,
+	UNREACHABLE_DEVICE,
+} from "./placement";
 export type {
 	FeedStep,
 	InboxAnsweredGate,
@@ -168,25 +176,13 @@ export type {
 	Engine,
 	EngineOptions,
 	MoveRows,
-	OfferedPlacement,
 	PeerContext,
 	PeerProfiles,
 	PeerProjects,
 	Peers,
-	PlacedDevice,
-	PlanInput,
-	PlannedRun,
 	SpaceEngine,
-	StepFallback,
 } from "./run";
-export {
-	createEngine,
-	GateClosedError,
-	type PlanDevices,
-	planNodes,
-	START_DEADLINE_MS,
-	UNREACHABLE_DEVICE,
-} from "./run";
+export { createEngine, GateClosedError, START_DEADLINE_MS } from "./run";
 export type {
 	ScheduleList,
 	ScheduleMissed,

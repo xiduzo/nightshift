@@ -7,6 +7,8 @@ export type {
 	ServiceBringUp,
 	ServiceBroughtUp,
 	ServiceRunner,
+	StepMove,
+	StepPlacement,
 	StopService,
 } from "./context";
 export { messageOf, onDevice } from "./context";

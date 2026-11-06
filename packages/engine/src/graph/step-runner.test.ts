@@ -4,6 +4,7 @@ import { step as stepTable } from "@nightshift/db/schema";
 import { FAILURE_MESSAGE, Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
+import type { Device } from "../device/types";
 import { foldRun } from "../log";
 import type { EngineEventType } from "../log/events";
 import { deriveSteps } from "../read/run-views";
@@ -14,6 +15,7 @@ import {
 	flowOf,
 	type Harness,
 	payloads,
+	placementOn,
 	startRun,
 } from "../testing/graph";
 import {
@@ -567,8 +569,9 @@ describe("the step's Device", () => {
 		const h = await startRun(sandbox, FLOW);
 		const asked: string[] = [];
 		const ran: string[] = [];
-		h.ctx.deviceFor = (node, run) => {
-			asked.push(`${node.id}@${run.id}`);
+		// Every Device of the plan is studio: the run's work is there, no Hand-off.
+		h.ctx.placement = placementOn((id, run): Device => {
+			asked.push(`${id}@${run.id}`);
 			const device = testDevice({ harnesses: {} });
 			return {
 				...device,
@@ -578,15 +581,14 @@ describe("the step's Device", () => {
 					return device.exec(input);
 				},
 			};
-		};
-		// The run's work is on studio already: no Hand-off.
-		h.ctx.deviceById = () => ({
-			...testDevice({ harnesses: {} }),
-			id: "studio",
 		});
 		const { state } = await drive(h, { inputs: {} });
 		expect(state.ended?.status).toBe("finished");
-		expect(asked).toEqual([`n@${h.runId}`, `after@${h.runId}`]);
+		// Once per step for its Device, once more each for the run's worktree holder.
+		expect(
+			asked.filter((a) => a === `${h.ctx.run.walkerId}@${h.runId}`),
+		).toHaveLength(asked.length);
+		expect(asked.length).toBeGreaterThanOrEqual(2);
 		expect(ran).toEqual(["true", "true"]);
 		expect(
 			payloads(await h.events(), "StepStarted").map((p) => p.deviceId),

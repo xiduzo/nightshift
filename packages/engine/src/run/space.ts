@@ -12,6 +12,7 @@ import {
 	type RunTrigger,
 	scopeKey,
 } from "../log";
+import type { PlacementPort } from "../placement";
 import {
 	type Branches,
 	type ListedProject,
@@ -31,7 +32,7 @@ import type { ScheduleFiles } from "../schedules";
 import { readServiceLog } from "../services";
 import type { KeptFlow, KeptValue } from "../variables";
 import type { RunActions } from "./actions";
-import type { PlacementPort, WithPaths } from "./peers";
+import type { WithPaths } from "./peers";
 import type { MovedProjects, ProjectsMove } from "./projects-move";
 import type { SpaceEngine } from "./space-engine";
 import type { StartPlaces } from "./start-place";

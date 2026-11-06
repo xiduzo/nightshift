@@ -435,7 +435,7 @@ function deviceOfService(
 	hold: { deviceId: string },
 ): Device | null {
 	try {
-		return ctx.deviceById(hold.deviceId, ctx.run);
+		return ctx.placement.deviceById(hold.deviceId, ctx.run);
 	} catch {
 		return null;
 	}
