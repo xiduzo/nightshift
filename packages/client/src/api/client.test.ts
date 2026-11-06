@@ -125,20 +125,32 @@ describe("calls made together", () => {
 
 	test("know every procedure that streams", () => {
 		const streaming: string[] = [];
+		/** A streaming procedure's output schema is an event iterator: oRPC marks it on the standard schema. */
+		const streams = (schema: unknown): boolean => {
+			const standard = (schema as { "~standard"?: object } | undefined)?.[
+				"~standard"
+			];
+			return (
+				standard !== undefined &&
+				Object.getOwnPropertySymbols(standard).some(
+					(mark) => mark.description === "ORPC_EVENT_ITERATOR_DETAILS",
+				)
+			);
+		};
 		const walk = (node: unknown, path: string[]) => {
 			if (!node || typeof node !== "object") return;
-			const procedure = (node as { "~orpc"?: { handler?: unknown } })["~orpc"];
+			const procedure = (node as { "~orpc"?: { outputSchema?: unknown } })[
+				"~orpc"
+			];
 			if (procedure) {
-				// A streaming procedure's handler yields its events.
-				if (procedure.handler?.constructor.name === "AsyncGeneratorFunction") {
-					streaming.push(path.join("."));
-				}
+				if (streams(procedure.outputSchema)) streaming.push(path.join("."));
 				return;
 			}
 			for (const [key, child] of Object.entries(node))
 				walk(child, [...path, key]);
 		};
 		walk(appRouter, []);
+		expect(streaming.length).toBeGreaterThan(0);
 		expect([...STREAMING_PROCEDURES].sort()).toEqual(streaming.sort());
 	});
 
