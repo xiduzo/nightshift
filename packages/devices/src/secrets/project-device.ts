@@ -1,3 +1,4 @@
+import { roleIn } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { run } from "@nightshift/db/schema";
 import type { ProjectSecrets } from "@nightshift/engine/device-config";
@@ -10,6 +11,7 @@ import {
 	keptStepValues,
 	NOT_YOUR_STEP,
 	projectAccess,
+	type SecretsAccess,
 	spaceAccess,
 	withNames,
 } from "./project-host";
@@ -62,6 +64,11 @@ export function deviceProjectSecrets(deps: {
 		return hostId === null ? null : deps.links().get(hostId);
 	}
 
+	/** `personId` as who lists or changes here: their role per Space, from this computer's member rows. */
+	function byPerson(personId: string, saves: boolean): SecretsAccess {
+		return { roleIn: (spaceId) => roleIn(db, personId, spaceId), saves };
+	}
+
 	/**
 	 * A change, or a list, by `personId`: here after the checks, else at the
 	 * Host. Through the Host, only the owner of this computer acts: the
@@ -76,7 +83,7 @@ export function deviceProjectSecrets(deps: {
 	): Promise<T> {
 		const hostId = await deps.hostSpaces.hostOf(at.spaceId);
 		if (hostId === null) {
-			await projectAccess(db, deps.hostSpaces, at, { personId, saves });
+			await projectAccess(db, deps.hostSpaces, at, byPerson(personId, saves));
 			return here();
 		}
 		if (personId !== deps.ownerId) throw new Refusal("forbidden", OWNER_ONLY);
@@ -93,7 +100,7 @@ export function deviceProjectSecrets(deps: {
 	): Promise<T> {
 		const hostId = await deps.hostSpaces.hostOf(spaceId);
 		if (hostId === null) {
-			await spaceAccess(db, deps.hostSpaces, spaceId, { personId, saves });
+			await spaceAccess(deps.hostSpaces, spaceId, byPerson(personId, saves));
 			return here();
 		}
 		if (personId !== deps.ownerId) throw new Refusal("forbidden", OWNER_ONLY);

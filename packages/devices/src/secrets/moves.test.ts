@@ -22,7 +22,7 @@ import {
 import type { HostExchange } from "../exchange";
 import type { HostLink } from "../links";
 import type { PairedDevice } from "../registry";
-import { partialHostClient } from "../testing";
+import { admitEvery, partialHostClient } from "../testing";
 import { linksTo } from "../testing/host-in-memory";
 import { inMemoryHost } from "../testing/in-memory-host";
 import { createWorkHub, createWorkServer, type WorkHub } from "../work";
@@ -230,10 +230,16 @@ function homeHost(own?: OwnSecrets) {
 	const host = inMemoryHost({
 		exchange: {} as HostExchange,
 		hello: () => Promise.reject(new Error("No hello in this test.")),
+		// The Host admits each key's Device as its registry has it.
+		admit: admitEvery((key) => {
+			const device = DEVICES.find((d) => d.id === key.deviceId);
+			return device
+				? { device: { name: device.name, homeHost: device.homeHost } }
+				: {};
+		}),
 		secretMoves: createSecretMovesHost({
 			registry,
 			work: hub,
-			isHost: () => true,
 			self: { id: "studio", ownerId: "ann", own },
 		}),
 	});
@@ -354,7 +360,7 @@ describe("moving a secret saved on another device", () => {
 		}
 	});
 
-	test("only the owner asks: another Person, a Device of another Person, a guest Device", async () => {
+	test("only the owner asks: a Device of another Person, or a guest Device", async () => {
 		const { hub, host } = homeHost();
 		const device = await laptop();
 		const detach = attach(hub, (request) =>
@@ -372,8 +378,6 @@ describe("moving a secret saved on another device", () => {
 				);
 			// Bob's PC, for Ann's laptop.
 			expect(await ask("pc", "bob")).toBe(NOT_YOUR_OTHER_DEVICE);
-			// A key that names another Person than the Device's owner.
-			expect(await ask("mac", "bob")).toContain("Pair it again");
 			// Ann's Mac that joined this Host as a guest.
 			expect(await ask("guest-mac", "ann")).toBe(NOT_HOME_FOR_MOVES);
 			// Nothing reached the laptop.

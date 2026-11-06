@@ -575,17 +575,11 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		host,
 		links,
 		hostLinks,
-		personalSecrets: createPersonalSecretsHost({
-			registry: engine.devices,
-			store: personalStore,
-			isHost: host.isHost,
-		}),
+		personalSecrets: createPersonalSecretsHost({ store: personalStore }),
 		projectSecrets: createProjectSecretsHost({
 			db,
-			registry: engine.devices,
 			store: projectStore,
 			spaceStore,
-			isHost: host.isHost,
 			hostOf: (spaceId) => engine.hostSpaces.hostOf(spaceId),
 			// The calls this Host sends to its placed Devices.
 			work: handover.hub,
@@ -598,7 +592,6 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		secretMoves: createSecretMovesHost({
 			registry: engine.devices,
 			work: handover.hub,
-			isHost: host.isHost,
 			self: { id: self.id, ownerId, own: deps.ownSecrets },
 		}),
 		// The owner's moves of a secret on another of their Devices.

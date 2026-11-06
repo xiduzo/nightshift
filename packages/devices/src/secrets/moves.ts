@@ -1,8 +1,7 @@
-import type { DeviceKeyAccess } from "@nightshift/auth";
 import type { ConnectionStore } from "@nightshift/engine/device-config";
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import {
-	NOT_A_HOST,
+	type Caller,
 	type SecretMove,
 	UNREADABLE_REQUEST,
 	type WorkRelay,
@@ -12,7 +11,6 @@ import {
 import type { DeviceLinks, HostLinks } from "../links";
 import type { DeviceRegistry } from "../registry";
 import { askHost, PERSONAL_DEADLINE_MS } from "./device";
-import { NOT_YOUR_DEVICE } from "./host";
 
 /**
  * Moves of a secret saved on another of the Person's Devices (ADR 13,
@@ -23,8 +21,8 @@ import { NOT_YOUR_DEVICE } from "./host";
  *   this computer. It asks its Home Host over its link, with its own key.
  *   On the Home Host itself, the call goes from its own work hub.
  * - The Home Host (`createSecretMovesHost`): only for a Device of the
- *   key's Person that calls it home, and only to another Device of that
- *   Person that calls it home too. It sends the target a secret call over
+ *   Caller's Person that calls it home, and only to another Device of
+ *   that Person that calls it home too. It sends the target a secret call over
  *   that Device's own work stream (`relayMove`). A Device that is offline
  *   is refused at once: nothing waits. A secret on the Home Host computer
  *   itself (its owner's Devices list it too) moves there, for its owner.
@@ -100,7 +98,7 @@ export type SecretMoves = {
 /** The Home Host's half, as the router serves it. */
 export type SecretMovesHost = {
 	move(
-		key: DeviceKeyAccess,
+		caller: Caller,
 		input: { deviceId: string; name: string; move: SecretMove },
 	): Promise<void>;
 };
@@ -176,13 +174,13 @@ function refusalOf(
 
 /**
  * This computer as a Home Host, as a paired Device asks it to move a
- * secret on another Device of the same Person. The Device that asks is
- * the key's Person's own, paired here with access, as its Home Host.
+ * secret on another Device of the same Person. The Host admitted the
+ * Caller before the call reached here (`Devices.admit`): its Device is
+ * the Caller's Person's own, paired here with access. This module adds
+ * one check: it calls this Host home.
  */
 export function createSecretMovesHost(
 	deps: RelayDeps & {
-		/** "Be a Host" is on now. */
-		isHost(): boolean;
 		/**
 		 * This Host as a Device of its owner: its Devices list it among
 		 * their owner's other Devices, and it moves its own secrets itself.
@@ -191,25 +189,16 @@ export function createSecretMovesHost(
 	},
 ): SecretMovesHost {
 	return {
-		async move(key, input) {
-			if (!deps.isHost()) throw new Refusal("unavailable", NOT_A_HOST);
-			const asking = await deps.registry.get(key.deviceId);
-			if (
-				!asking ||
-				asking.revokedAt !== null ||
-				asking.ownerId !== key.personId
-			) {
-				throw new Refusal("forbidden", NOT_YOUR_DEVICE);
-			}
-			if (asking.homeHost === null) {
+		async move(caller, input) {
+			if (caller.device.homeHost === null) {
 				throw new Refusal("forbidden", NOT_HOME_FOR_MOVES);
 			}
 			const { self } = deps;
 			if (input.deviceId !== self.id) {
-				return relayMove(deps, key.personId, input);
+				return relayMove(deps, caller.personId, input);
 			}
 			// The secret is on this Host: its owner's, moved here.
-			if (self.ownerId !== key.personId) {
+			if (self.ownerId !== caller.personId) {
 				throw new Refusal("not-found", NOT_YOUR_OTHER_DEVICE);
 			}
 			if (!self.own) throw new Refusal("unavailable", CANNOT_MOVE);

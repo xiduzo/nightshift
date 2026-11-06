@@ -1,18 +1,15 @@
 import {
-	type DeviceKeyAccess,
 	personNames,
 	ROLE_REFUSAL,
+	type Role,
 	roleAllows,
-	roleIn,
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { project, run } from "@nightshift/db/schema";
 import { Refusal } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
-import { NOT_A_HOST, type ProjectSecretName } from "../contract";
-import type { DeviceRegistry } from "../registry";
+import type { Caller, ProjectSecretName } from "../contract";
 import type { WorkHub } from "../work";
-import { NOT_YOUR_DEVICE } from "./host";
 import type { KeptProjectSecret, ProjectSecretStore } from "./project-store";
 import type { SpaceSecretStore } from "./space-store";
 
@@ -38,20 +35,19 @@ type StepRun = ProjectRef & { runId: string };
 /**
  * This computer as the Host that keeps a Space, as a paired Device asks
  * it for the secrets of the Space's Projects (ADR 13, decisions 2, 3
- * and 6). Every call checks, from this Host's own records, that:
- *
- * - "Be a Host" is on, and the key's Device is paired here, has access,
- *   and is its Person's own;
- * - this Host keeps the Space (another Host's Space is not its to serve),
- *   and the Project is in it.
+ * and 6). The Host admitted the Caller before the call reached here
+ * (`Devices.admit`): "Be a Host" is on, and its Device is paired here
+ * with access, as its Person's own. Every call checks, from this Host's
+ * own records, that it keeps the Space (another Host's Space is not its
+ * to serve), and that the Project is in it.
  *
  * Then, per call:
  *
- * - `list`: the key's Person is a Member of the Space.
+ * - `list`: the Caller's Person is a Member of the Space.
  * - `set`, `remove`, `take`: their role there saves Flows. `take` reads a
  *   value for a move only: the Device saves it elsewhere, then removes it.
  * - `values`, for a step: the run is of that Project in that Space, and
- *   its step runs on the key's Device now. That is, the work hub has a
+ *   its step runs on the Caller's Device now. That is, the work hub has a
  *   session, a command or a tool call of the run out to that Device
  *   (`WorkHub.placed`), or the Device walks the run itself and runs its
  *   steps there. The Device's Person is a Member of the Space, or the
@@ -59,81 +55,83 @@ type StepRun = ProjectRef & { runId: string };
  *   step under an Offer gets the run's Project secrets, for that run only.
  */
 export type ProjectSecretsHost = {
-	list(key: DeviceKeyAccess, input: ProjectRef): Promise<ProjectSecretName[]>;
+	list(caller: Caller, input: ProjectRef): Promise<ProjectSecretName[]>;
 	values(
-		key: DeviceKeyAccess,
+		caller: Caller,
 		input: StepRun & { names?: readonly string[] },
 	): Promise<Record<string, string>>;
 	set(
-		key: DeviceKeyAccess,
+		caller: Caller,
 		input: ProjectRef & { name: string; value: string },
 	): Promise<void>;
-	remove(
-		key: DeviceKeyAccess,
-		input: ProjectRef & { name: string },
-	): Promise<void>;
+	remove(caller: Caller, input: ProjectRef & { name: string }): Promise<void>;
 	take(
-		key: DeviceKeyAccess,
+		caller: Caller,
 		input: ProjectRef & { name: string },
 	): Promise<string | null>;
 	/** A Space's secrets (ADR 18): the same rules, for every project of the Space. */
 	space: {
 		list(
-			key: DeviceKeyAccess,
+			caller: Caller,
 			input: { spaceId: string },
 		): Promise<ProjectSecretName[]>;
 		set(
-			key: DeviceKeyAccess,
+			caller: Caller,
 			input: { spaceId: string; name: string; value: string },
 		): Promise<void>;
 		remove(
-			key: DeviceKeyAccess,
+			caller: Caller,
 			input: { spaceId: string; name: string },
 		): Promise<void>;
 		take(
-			key: DeviceKeyAccess,
+			caller: Caller,
 			input: { spaceId: string; name: string },
 		): Promise<string | null>;
 	};
 };
 
+/** Who lists or changes secrets: their role per Space, as the Caller reads it, and whether the call saves. */
+export type SecretsAccess = Pick<Caller, "roleIn"> & {
+	/** The call changes a value: the role must save Flows. */
+	saves: boolean;
+};
+
 /**
  * The checks of a list or a change of a Space's secrets that this computer
- * keeps: it keeps the Space, and `personId` is a Member there, whose role
- * saves Flows when `saves`.
+ * keeps: it keeps the Space, and `who` is a Member there, whose role
+ * saves Flows when `who.saves`.
  */
 export async function spaceAccess(
-	db: Database,
 	hostSpaces: { hostOf(spaceId: string): Promise<string | null> },
 	spaceId: string,
-	who: { personId: string; saves: boolean },
+	who: SecretsAccess,
 ): Promise<void> {
 	if ((await hostSpaces.hostOf(spaceId)) !== null) {
 		throw new Refusal("not-found", NOT_A_SPACE_HERE);
 	}
-	const role = await roleIn(db, who.personId, spaceId);
-	if (!role) throw new Refusal("forbidden", NOT_IN_SPACE);
-	if (who.saves && !roleAllows(role, { flow: ["save"] })) {
-		throw new Refusal("forbidden", ROLE_REFUSAL.message);
-	}
+	memberWhoSaves(await who.roleIn(spaceId), who.saves);
 }
 
 /**
  * The checks of a list or a change of a Project's secrets that this
  * computer keeps: it keeps the Space (no Host does), the Project is in
- * it, and `personId` is a Member there, whose role saves Flows when
- * `saves`.
+ * it, and `who` is a Member there, whose role saves Flows when
+ * `who.saves`.
  */
 export async function projectAccess(
 	db: Database,
 	hostSpaces: { hostOf(spaceId: string): Promise<string | null> },
 	at: ProjectRef,
-	who: { personId: string; saves: boolean },
+	who: SecretsAccess,
 ): Promise<void> {
 	await keptHere(db, hostSpaces, at);
-	const role = await roleIn(db, who.personId, at.spaceId);
+	memberWhoSaves(await who.roleIn(at.spaceId), who.saves);
+}
+
+/** Refuses a role that is no Member's, or one that does not save Flows when `saves`. */
+function memberWhoSaves(role: Role | null, saves: boolean): void {
 	if (!role) throw new Refusal("forbidden", NOT_IN_SPACE);
-	if (who.saves && !roleAllows(role, { flow: ["save"] })) {
+	if (saves && !roleAllows(role, { flow: ["save"] })) {
 		throw new Refusal("forbidden", ROLE_REFUSAL.message);
 	}
 }
@@ -196,11 +194,8 @@ export async function withNames(
 
 export function createProjectSecretsHost(deps: {
 	db: Database;
-	registry: Pick<DeviceRegistry, "get">;
 	store: ProjectSecretStore;
 	spaceStore: SpaceSecretStore;
-	/** "Be a Host" is on now. */
-	isHost(): boolean;
 	/** The Host that keeps a Space, or null for one this computer keeps. */
 	hostOf(spaceId: string): Promise<string | null>;
 	/** The calls of runs this Host walks or relays, to the Devices they are placed on. */
@@ -212,52 +207,30 @@ export function createProjectSecretsHost(deps: {
 
 	const hostSpaces = { hostOf: deps.hostOf };
 
-	/** The key's Device is paired here, has access, and is its Person's own. */
-	async function admit(key: DeviceKeyAccess): Promise<void> {
-		if (!deps.isHost()) throw new Refusal("unavailable", NOT_A_HOST);
-		const paired = await deps.registry.get(key.deviceId);
-		if (
-			!paired ||
-			paired.revokedAt !== null ||
-			paired.ownerId !== key.personId
-		) {
-			throw new Refusal("forbidden", NOT_YOUR_DEVICE);
-		}
-	}
-
-	/** The key's Person is a Member of the Space, and may save Flows there when `saves`. */
-	async function mayUse(
-		key: DeviceKeyAccess,
+	/** The Caller's Person is a Member of the Space, and may save Flows there when `saves`. */
+	function mayUse(
+		caller: Caller,
 		at: ProjectRef,
 		saves: boolean,
 	): Promise<void> {
-		await admit(key);
-		await projectAccess(db, hostSpaces, at, {
-			personId: key.personId,
-			saves,
-		});
+		return projectAccess(db, hostSpaces, at, { roleIn: caller.roleIn, saves });
 	}
 
-	/** The key's Person is a Member of the Space, and may save Flows there when `saves`. */
-	async function mayUseSpace(
-		key: DeviceKeyAccess,
+	/** The Caller's Person is a Member of the Space, and may save Flows there when `saves`. */
+	function mayUseSpace(
+		caller: Caller,
 		spaceId: string,
 		saves: boolean,
 	): Promise<void> {
-		await admit(key);
-		await spaceAccess(db, hostSpaces, spaceId, {
-			personId: key.personId,
-			saves,
-		});
+		return spaceAccess(hostSpaces, spaceId, { roleIn: caller.roleIn, saves });
 	}
 
 	return {
-		async list(key, at) {
-			await mayUse(key, at, false);
+		async list(caller, at) {
+			await mayUse(caller, at, false);
 			return withNames(db, await deps.store.list(at.projectId));
 		},
-		async values(key, { names, ...step }) {
-			await admit(key);
+		async values(caller, { names, ...step }) {
 			await keptHere(db, hostSpaces, step);
 			const [row] = await db
 				.select({
@@ -271,45 +244,48 @@ export function createProjectSecretsHost(deps: {
 				!row ||
 				row.spaceId !== step.spaceId ||
 				row.projectId !== step.projectId ||
-				!(row.walkerId === key.deviceId || deps.work.placed(key.deviceId, step))
+				!(
+					row.walkerId === caller.deviceId ||
+					deps.work.placed(caller.deviceId, step)
+				)
 			) {
 				throw new Refusal("forbidden", NOT_YOUR_STEP);
 			}
 			if (
-				!(await roleIn(db, key.personId, step.spaceId)) &&
-				!(await deps.offersInto(key.deviceId, step.spaceId))
+				!(await caller.member(step.spaceId)) &&
+				!(await deps.offersInto(caller.deviceId, step.spaceId))
 			) {
 				throw new Refusal("forbidden", NOT_IN_SPACE);
 			}
 			return keptStepValues(deps, step, names);
 		},
-		async set(key, { name, value, ...at }) {
-			await mayUse(key, at, true);
-			await deps.store.set(at, name, value, key.personId);
+		async set(caller, { name, value, ...at }) {
+			await mayUse(caller, at, true);
+			await deps.store.set(at, name, value, caller.personId);
 		},
-		async remove(key, { name, ...at }) {
-			await mayUse(key, at, true);
+		async remove(caller, { name, ...at }) {
+			await mayUse(caller, at, true);
 			await deps.store.remove(at.projectId, name);
 		},
-		async take(key, { name, ...at }) {
-			await mayUse(key, at, true);
+		async take(caller, { name, ...at }) {
+			await mayUse(caller, at, true);
 			return (await deps.store.values(at.projectId, [name]))[name] ?? null;
 		},
 		space: {
-			async list(key, { spaceId }) {
-				await mayUseSpace(key, spaceId, false);
+			async list(caller, { spaceId }) {
+				await mayUseSpace(caller, spaceId, false);
 				return withNames(db, await deps.spaceStore.list(spaceId));
 			},
-			async set(key, { spaceId, name, value }) {
-				await mayUseSpace(key, spaceId, true);
-				await deps.spaceStore.set(spaceId, name, value, key.personId);
+			async set(caller, { spaceId, name, value }) {
+				await mayUseSpace(caller, spaceId, true);
+				await deps.spaceStore.set(spaceId, name, value, caller.personId);
 			},
-			async remove(key, { spaceId, name }) {
-				await mayUseSpace(key, spaceId, true);
+			async remove(caller, { spaceId, name }) {
+				await mayUseSpace(caller, spaceId, true);
 				await deps.spaceStore.remove(spaceId, name);
 			},
-			async take(key, { spaceId, name }) {
-				await mayUseSpace(key, spaceId, true);
+			async take(caller, { spaceId, name }) {
+				await mayUseSpace(caller, spaceId, true);
 				return (await deps.spaceStore.values(spaceId, [name]))[name] ?? null;
 			},
 		},

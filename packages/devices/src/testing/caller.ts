@@ -48,17 +48,20 @@ export function callerOf(
 
 /**
  * An admission for a Host in memory without a registry: every key is a
- * paired Device of its Person, with the roles given, whatever permission
- * the procedure names. No key is UNAUTHORIZED, as on a Host. The Host's
- * own rules run with its own `admit` (`hostInMemory`).
+ * paired Device of its Person, with the facts given (one set, or one per
+ * key), whatever permission the procedure names. No key is UNAUTHORIZED,
+ * as on a Host. The Host's own rules run with its own `admit`
+ * (`hostInMemory`).
  */
-export function admitEvery(facts: CallerFacts = {}): Devices["admit"] {
+export function admitEvery(
+	facts: CallerFacts | ((key: DeviceKeyAccess) => CallerFacts) = {},
+): Devices["admit"] {
 	return async (key) => {
 		if (!key) {
 			throw new ORPCError("UNAUTHORIZED", {
 				message: "This device has no access here. Pair it again.",
 			});
 		}
-		return callerOf(key, facts);
+		return callerOf(key, typeof facts === "function" ? facts(key) : facts);
 	};
 }

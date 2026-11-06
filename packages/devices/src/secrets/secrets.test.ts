@@ -7,16 +7,12 @@ import { ORPCError } from "@orpc/server";
 import type { HostClient } from "../contract";
 import type { HostExchange } from "../exchange";
 import type { HostLink } from "../links";
-import type { PairedDevice } from "../registry";
+import { admitEvery, callerOf } from "../testing";
 import { linksTo } from "../testing/host-in-memory";
 import { inMemoryHost } from "../testing/in-memory-host";
 import { secretsCipher } from "./cipher";
 import { devicePersonalSecrets, OLDER_HOST_SECRETS } from "./device";
-import {
-	createPersonalSecretsHost,
-	NOT_YOUR_DEVICE,
-	NOT_YOUR_HOME_HOST,
-} from "./host";
+import { createPersonalSecretsHost, NOT_YOUR_HOME_HOST } from "./host";
 import { createPersonalSecretStore } from "./store";
 
 const KEY = "a-secrets-key-for-these-tests-0123456789";
@@ -99,22 +95,6 @@ describe("the store", () => {
 	});
 });
 
-/** A Device as this Host's registry has it. */
-function paired(fields: Partial<PairedDevice> = {}): PairedDevice {
-	return {
-		id: "laptop",
-		name: "Laptop",
-		platform: "darwin",
-		ownerId: "ann",
-		homeHost: "https://host.example.com",
-		lastSeenAt: null,
-		online: true,
-		pairedAt: 0,
-		revokedAt: null,
-		...fields,
-	};
-}
-
 /** A Device key of `deviceId`, for `personId`. */
 const keyOf = (deviceId: string, personId: string): DeviceKeyAccess => ({
 	keyId: `key-${deviceId}`,
@@ -123,91 +103,62 @@ const keyOf = (deviceId: string, personId: string): DeviceKeyAccess => ({
 	permissions: { sync: ["pull", "push"] },
 });
 
+const HOME = "https://host.example.com";
+
+/** The key's Device as this Host admitted it: paired here as its Home Host. */
+const home = (deviceId: string, personId: string) =>
+	callerOf(keyOf(deviceId, personId), { device: { homeHost: HOME } });
+
 describe("the Host's half: only the Person's own Devices that call it home", () => {
-	function hostOver(devices: PairedDevice[], isHost = true) {
+	function host() {
 		const s = store();
-		const host = createPersonalSecretsHost({
-			registry: {
-				get: async (id) => devices.find((d) => d.id === id) ?? null,
-			},
-			store: s,
-			isHost: () => isHost,
-		});
-		return { s, host };
+		return { s, host: createPersonalSecretsHost({ store: s }) };
 	}
 
 	test("a Device of the Person, paired here as home, sets and reads its Person's values", async () => {
-		const { s, host } = hostOver([paired()]);
-		const ann = keyOf("laptop", "ann");
-		await host.set(ann, { name: "GH_TOKEN", value: "ghp_ann" });
-		expect(await host.list(ann)).toEqual([{ name: "GH_TOKEN", setAt: 1_000 }]);
-		expect(await host.values(ann, { names: ["GH_TOKEN"] })).toEqual({
+		const { s, host: personal } = host();
+		const ann = home("laptop", "ann");
+		await personal.set(ann, { name: "GH_TOKEN", value: "ghp_ann" });
+		expect(await personal.list(ann)).toEqual([
+			{ name: "GH_TOKEN", setAt: 1_000 },
+		]);
+		expect(await personal.values(ann, { names: ["GH_TOKEN"] })).toEqual({
 			GH_TOKEN: "ghp_ann",
 		});
-		// Kept for the key's Person, set by its Device.
+		// Kept for the Caller's Person, set by its Device.
 		const [row] = await sandbox.db.select().from(personalSecret);
 		expect([row?.ownerId, row?.setBy]).toEqual(["ann", "laptop"]);
-		await host.remove(ann, { name: "GH_TOKEN" });
+		await personal.remove(ann, { name: "GH_TOKEN" });
 		expect(await s.list("ann")).toEqual([]);
 	});
 
 	test("another Person's Device never gets them: it reads its own Person's only", async () => {
-		const { s, host } = hostOver([
-			paired(),
-			paired({ id: "bobs-pc", ownerId: "bob" }),
-		]);
+		const { s, host: personal } = host();
 		await s.set("ann", "GH_TOKEN", "ghp_ann", null);
-		expect(
-			await host.values(keyOf("bobs-pc", "bob"), { names: ["GH_TOKEN"] }),
-		).toEqual({});
-		expect(await host.list(keyOf("bobs-pc", "bob"))).toEqual([]);
+		const bob = home("bobs-pc", "bob");
+		expect(await personal.values(bob, { names: ["GH_TOKEN"] })).toEqual({});
+		expect(await personal.list(bob)).toEqual([]);
 	});
 
-	test.each([
-		[
-			"a key whose Person does not own the Device",
-			keyOf("laptop", "bob"),
-			[paired()],
-			NOT_YOUR_DEVICE,
-		],
-		[
-			"a Device this Host does not know",
-			keyOf("other", "ann"),
-			[paired()],
-			NOT_YOUR_DEVICE,
-		],
-		[
-			"a Device whose access is removed",
-			keyOf("laptop", "ann"),
-			[paired({ revokedAt: 5 })],
-			NOT_YOUR_DEVICE,
-		],
-		[
-			"a Device that joined as a guest",
-			keyOf("laptop", "ann"),
-			[paired({ homeHost: null })],
-			NOT_YOUR_HOME_HOST,
-		],
-	] as const)("refuses %s", async (_, key, devices, words) => {
-		const { s, host } = hostOver([...devices]);
+	test("refuses a Device that joined as a guest: its Personal secrets stay with its home Host", async () => {
+		const { s, host: personal } = host();
 		await s.set("ann", "GH_TOKEN", "ghp_ann", null);
-		await expect(host.values(key, { names: ["GH_TOKEN"] })).rejects.toThrow(
-			words,
-		);
-		await expect(host.list(key)).rejects.toThrow(words);
+		const guest = callerOf(keyOf("laptop", "ann"), {
+			device: { homeHost: null },
+		});
 		await expect(
-			host.set(key, { name: "GH_TOKEN", value: "stolen" }),
-		).rejects.toThrow(words);
+			personal.values(guest, { names: ["GH_TOKEN"] }),
+		).rejects.toThrow(NOT_YOUR_HOME_HOST);
+		await expect(personal.list(guest)).rejects.toThrow(NOT_YOUR_HOME_HOST);
+		await expect(
+			personal.set(guest, { name: "GH_TOKEN", value: "stolen" }),
+		).rejects.toThrow(NOT_YOUR_HOME_HOST);
+		await expect(personal.remove(guest, { name: "GH_TOKEN" })).rejects.toThrow(
+			NOT_YOUR_HOME_HOST,
+		);
 		expect(await s.values("ann", ["GH_TOKEN"])).toEqual({
 			GH_TOKEN: "ghp_ann",
 		});
-	});
-
-	test("refuses every call while Be a Host is off", async () => {
-		const { host } = hostOver([paired()], false);
-		await expect(host.list(keyOf("laptop", "ann"))).rejects.toThrow(
-			"Be a Host",
-		);
 	});
 });
 
@@ -215,7 +166,7 @@ describe("the Device's half", () => {
 	const homeLink: HostLink = {
 		hostId: "host",
 		name: "Host",
-		addresses: ["https://host.example.com"],
+		addresses: [HOME],
 		certificate: null,
 		fingerprint: null,
 		role: "home",
@@ -252,11 +203,9 @@ describe("the Device's half", () => {
 			const host = inMemoryHost({
 				exchange: {} as HostExchange,
 				hello: () => Promise.reject(new Error("No hello in this test.")),
-				personalSecrets: createPersonalSecretsHost({
-					registry: { get: async () => paired() },
-					store: hostStore,
-					isHost: () => true,
-				}),
+				// The Host admits the laptop as paired here, as its Home Host.
+				admit: admitEvery({ device: { homeHost: HOME } }),
+				personalSecrets: createPersonalSecretsHost({ store: hostStore }),
 			});
 			const client = host.client(keyOf("laptop", "ann"));
 			const personal = devicePersonalSecrets({
