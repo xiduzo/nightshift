@@ -120,6 +120,7 @@ export function createDevices(deps: {
 		deny: (headers, code) => host.deny(headers, code),
 		revoke: (personId, deviceId) => host.revoke(personId, deviceId),
 		forget: (personId, deviceId) => host.forget(personId, deviceId),
+		admit: (key, need) => host.admit(key, need),
 		hello: (key) => host.hello(key),
 		personalSecrets: deps.personalSecrets,
 		projectSecrets: deps.projectSecrets,

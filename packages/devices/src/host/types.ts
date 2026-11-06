@@ -1,9 +1,10 @@
-import type { DeviceKeyAccess } from "@nightshift/auth";
+import type { DeviceKeyAccess, DeviceKeyPermission } from "@nightshift/auth";
 import type {
 	DeviceCopy,
 	KeyStoreKind,
 } from "@nightshift/engine/device-config";
 import type {
+	Caller,
 	HostHello,
 	LeaveResult,
 	MergePending,
@@ -117,6 +118,17 @@ export type Devices = {
 	revoke(personId: string, deviceId: string): Promise<void>;
 	/** Removes a Device whose access is gone from the list, for good. The Person's own Devices only. */
 	forget(personId: string, deviceId: string): Promise<void>;
+	/**
+	 * Admits a keyed call once: the key, when there is one that holds
+	 * `need` (the procedure's meta), of a Device paired here with access,
+	 * as its Person's own, on a computer that is a Host now. The Caller is
+	 * what every keyed procedure's implementation then takes
+	 * (`host/keyed-call.ts`).
+	 */
+	admit(
+		key: DeviceKeyAccess | null,
+		need: DeviceKeyPermission | undefined,
+	): Promise<Caller>;
 	/** A paired Device's link answered. */
 	hello(key: DeviceKeyAccess): Promise<HostHello>;
 	/** The Personal secrets this computer keeps as the Home Host of a paired Device's Person (ADR 13). */

@@ -76,7 +76,7 @@ beforeEach(async () => {
 		await paired.host.space(a.spaceId).addProject({ repoPath: a.repoPath })
 	).id;
 	await paired.projectOnDevice(projectId, { clone: true });
-	await paired.hostExchange.addClone(paired.key, {
+	await paired.hostExchange.addClone(await paired.caller(), {
 		spaceId: a.spaceId,
 		projectId,
 		deviceName: "B",

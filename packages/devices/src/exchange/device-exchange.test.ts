@@ -405,11 +405,13 @@ describe("the Device's exchange with its Host", () => {
 			stepId: step?.id as string,
 		};
 		const archived = (kind: "transcript" | "log" | "checkpoint") =>
-			paired.hostExchange.archiveGet(
-				paired.key,
-				kind === "checkpoint"
-					? { kind, spaceId: a.spaceId, runId: run.id }
-					: { kind, ...ref },
+			paired.caller().then((caller) =>
+				paired.hostExchange.archiveGet(caller, {
+					ref:
+						kind === "checkpoint"
+							? { kind, spaceId: a.spaceId, runId: run.id }
+							: { kind, ...ref },
+				}),
 			);
 		await waitFor(async () => (await archived("checkpoint")) !== null, {
 			label: "the walk state on A",
@@ -1373,9 +1375,9 @@ describe("live transcripts over the exchange", () => {
 		await untilStatus(paired.host, run.id, "stopped");
 		await waitFor(
 			async () =>
-				(await paired.hostExchange.archiveGet(paired.key, ref))?.includes(
-					"first part",
-				),
+				(
+					await paired.hostExchange.archiveGet(await paired.caller(), { ref })
+				)?.includes("first part"),
 			{ label: "the copy of the first end on A" },
 		);
 
@@ -1415,9 +1417,9 @@ describe("live transcripts over the exchange", () => {
 		release();
 		await waitFor(
 			async () =>
-				(await paired.hostExchange.archiveGet(paired.key, ref))?.includes(
-					"second part",
-				),
+				(
+					await paired.hostExchange.archiveGet(await paired.caller(), { ref })
+				)?.includes("second part"),
 			{ label: "the copy of the second end on A" },
 		);
 		const after = watchItems(viewer.engine, run.id);

@@ -19,7 +19,7 @@ import {
 	type TestEngineOptions,
 } from "@nightshift/engine/testing";
 import { now as timeNow } from "@nightshift/time";
-import type { HostRelay, WorkRelay } from "../contract";
+import type { Caller, HostRelay, WorkRelay } from "../contract";
 import type { HostExchange } from "../exchange";
 import type { SyncedDocument } from "../links";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
@@ -41,6 +41,8 @@ export type PairedDevice = {
 	log: RunLog;
 	/** Its Device key on A. */
 	key: DeviceKeyAccess;
+	/** Its key as A admits it, for a test that calls A's exchange directly. */
+	caller(): Promise<Caller>;
 	/** Its Space documents: its read-only copies of A's Spaces. */
 	documents: SpaceDocuments;
 	/** Its flow documents: the engine's. */
@@ -83,6 +85,8 @@ export type PairedReplicas = {
 	memory: MemoryHost;
 	/** B's Device key on A. */
 	key: DeviceKeyAccess;
+	/** B's key as A admits it (`PairedDevice.caller`). */
+	caller(): Promise<Caller>;
 	/** A's id, as B names its Host. */
 	hostId: string;
 	/** A's owner: B's Person on A. */
@@ -225,6 +229,7 @@ export async function pairedReplicas(
 			engine,
 			log,
 			key,
+			caller: () => replica.caller(key),
 			documents,
 			flows,
 			synced,
@@ -255,6 +260,7 @@ export async function pairedReplicas(
 		hostSynced: replica.synced,
 		memory,
 		key: paired.key,
+		caller: paired.caller,
 		hostId,
 		personId,
 		documents: paired.documents,

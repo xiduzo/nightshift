@@ -7,6 +7,7 @@
  */
 
 export type { ArchiveRef, KnowledgeRef } from "./archive";
+export type { Caller } from "./caller";
 export {
 	type HostClient,
 	type HostProcedureMeta,

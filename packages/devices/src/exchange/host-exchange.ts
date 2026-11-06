@@ -1,5 +1,4 @@
-import type { DeviceKeyAccess } from "@nightshift/auth";
-import { ROLE_REFUSAL, roleAllows, roleIn, spacesOf } from "@nightshift/auth";
+import type { Permissions } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import {
 	type Engine,
@@ -12,12 +11,7 @@ import {
 import { PROJECT_NOT_FOUND } from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/server";
-import {
-	type ArchiveRef,
-	NOT_A_HOST,
-	type SyncBatch,
-	type SyncCursors,
-} from "../contract";
+import type { ArchiveRef, Caller, SyncBatch, SyncCursors } from "../contract";
 import type { HostSpaces } from "../links";
 import type { EngineOffers, OfferAdmission } from "../offers";
 import type { DeviceRegistry } from "../registry";
@@ -35,8 +29,10 @@ import type { HostExchange } from "./types";
 /**
  * This computer as the Host of run history for its paired Devices: what
  * the Host's router (`hostRouter`) calls for `sync.*`, `archive.*` and
- * the work relay. Every call names a Device by its key; the Host answers
- * it in the name of the key's Person:
+ * the work relay. Every call comes as its Caller, the Device key the Host
+ * admitted once (`Devices.admit`); the Host answers it in the name of the
+ * Caller's Person, and asks the Caller only what the procedure needs of
+ * the Space: a role, a Membership.
  *
  * - It serves only rows of Spaces that Person is a Member of, and never a
  *   Device's own rows back to it. Its own Walker's rows are served the
@@ -62,6 +58,9 @@ import type { HostExchange } from "./types";
 /** How long a stream with nothing new waits before it looks again. */
 const STREAM_IDLE_MS = 20_000;
 
+/** The role every start of a run and every lease of a Space asks for. */
+const STARTS_RUNS: Permissions = { run: ["start"] };
+
 export function createHostExchange(deps: {
 	db: Database;
 	/**
@@ -83,37 +82,17 @@ export function createHostExchange(deps: {
 		/** Its Space archive: the knowledge content its Devices copy here, by hash (ADR 4). */
 		archive: Pick<SpaceArchive, "here">;
 	};
-	registry: DeviceRegistry;
+	/** The Devices paired here: the owners of the Walkers it serves, and what a Device says of itself. */
+	registry: Pick<DeviceRegistry, "get" | "describe">;
 	/** This Host's Device id: the Walker of its own runs. */
 	selfId: string;
 	/** The Person who owns this Host: the owner of its own Walker's paths. */
 	ownerId: string;
-	isHost(): boolean;
 	/** The calls of runs this Host walks, for the Devices they are placed on. */
 	work: WorkHub;
 }): HostExchange {
 	const { db, engine, registry } = deps;
 	const { exchange } = engine;
-
-	/** The Device may use the exchange: this is a Host, and the Device has access. */
-	async function admit(key: DeviceKeyAccess): Promise<void> {
-		if (!deps.isHost()) throw new Refusal("unavailable", NOT_A_HOST);
-		const paired = await registry.get(key.deviceId);
-		if (!paired || paired.revokedAt) {
-			throw new ORPCError("UNAUTHORIZED", {
-				message: "This device has no access here. Pair it again.",
-			});
-		}
-	}
-
-	/** The Spaces the key's Person is a Member of. */
-	async function memberSpaces(key: DeviceKeyAccess): Promise<string[]> {
-		return (await spacesOf(db, key.personId)).map((s) => s.id);
-	}
-
-	async function isMember(key: DeviceKeyAccess, spaceId: string) {
-		return (await roleIn(db, key.personId, spaceId)) !== null;
-	}
 
 	function forbidden(message: string): never {
 		throw new ORPCError("FORBIDDEN", { message });
@@ -127,16 +106,15 @@ export function createHostExchange(deps: {
 
 	/** The rows of `spaces` after `cursors` (default: the Person's Spaces), every Walker's but the Device's own. */
 	async function batch(
-		key: DeviceKeyAccess,
+		caller: Caller,
 		cursors: SyncCursors,
 		withCommands = true,
 		spaces?: readonly string[],
 	): Promise<SyncBatch> {
-		await admit(key);
 		const { rows, cursors: moved } = await exchange.rowsAfter({
-			spaces: spaces ?? (await memberSpaces(key)),
+			spaces: spaces ?? (await caller.spaces()),
 			cursors,
-			except: key.deviceId,
+			except: caller.deviceId,
 		});
 		const owners = new Map<string, string | null>();
 		for (const walkerId of new Set(rows.runs.map((r) => r.walkerId))) {
@@ -145,13 +123,13 @@ export function createHostExchange(deps: {
 		return {
 			rows: withoutPrivatePaths(
 				rows,
-				(walkerId) => owners.get(walkerId) === key.personId,
+				(walkerId) => owners.get(walkerId) === caller.personId,
 			),
 			cursors: moved,
 			commands: withCommands
-				? await exchange.commands.pendingFor(key.deviceId)
+				? await exchange.commands.pendingFor(caller.deviceId)
 				: [],
-			follows: exchange.feeds.wanted(key.deviceId),
+			follows: exchange.feeds.wanted(caller.deviceId),
 		};
 	}
 
@@ -203,24 +181,25 @@ export function createHostExchange(deps: {
 			.join();
 
 	return {
-		pull: batch,
+		pull: (caller, { cursors }) => batch(caller, cursors),
 
-		async *stream(key, input, signal) {
+		async *stream(caller, input, signal) {
 			let at = input.cursors;
 			const withCommands = input.commands !== false;
 			let sentCommands = "";
 			let sentFollows = "";
 			while (!signal?.aborted) {
-				const spaces = await memberSpaces(key);
+				// Read again each cycle: a long stream follows a change of Membership.
+				const spaces = await caller.spaces();
 				const cycle = new AbortController();
 				const signals = signal ? [signal, cycle.signal] : [cycle.signal];
 				// Listen before reading, so nothing lands unseen between the two.
-				const changed = change(AbortSignal.any(signals), key.deviceId, {
+				const changed = change(AbortSignal.any(signals), caller.deviceId, {
 					rows: spaces,
 					commands: withCommands,
 				});
 				try {
-					const next = await batch(key, at, withCommands, spaces);
+					const next = await batch(caller, at, withCommands, spaces);
 					const commands = next.commands.map((c) => c.id).join();
 					const follows = followsOf(next);
 					if (
@@ -241,19 +220,18 @@ export function createHostExchange(deps: {
 			}
 		},
 
-		async *commands(key, signal) {
+		async *commands(caller, signal) {
 			let sent: string | null = null;
 			while (!signal?.aborted) {
 				const cycle = new AbortController();
 				const signals = signal ? [signal, cycle.signal] : [cycle.signal];
 				// Listen before reading, so no Command is kept unseen between the two.
-				const changed = change(AbortSignal.any(signals), key.deviceId, {
+				const changed = change(AbortSignal.any(signals), caller.deviceId, {
 					rows: null,
 					commands: true,
 				});
 				try {
-					await admit(key);
-					const commands = await exchange.commands.pendingFor(key.deviceId);
+					const commands = await exchange.commands.pendingFor(caller.deviceId);
 					const ids = commands.map((c) => c.id).join();
 					if (ids !== sent) {
 						sent = ids;
@@ -267,15 +245,14 @@ export function createHostExchange(deps: {
 			}
 		},
 
-		async push(key, rows) {
-			await admit(key);
+		async push(caller, rows) {
 			try {
 				// Another Person's Device: its paths never land in this Replica.
 				const kept =
-					key.personId === deps.ownerId ? rows : withoutPrivatePaths(rows);
+					caller.personId === deps.ownerId ? rows : withoutPrivatePaths(rows);
 				const added = await exchange.ingest(kept, {
-					walker: key.deviceId,
-					spaces: await memberSpaces(key),
+					walker: caller.deviceId,
+					spaces: await caller.spaces(),
 				});
 				return { events: added.length };
 			} catch (error) {
@@ -289,139 +266,119 @@ export function createHostExchange(deps: {
 			}
 		},
 
-		async command(key, input) {
-			await admit(key);
+		async command(caller, input) {
 			const owner = await exchange.runOwner(input.runId);
-			if (!owner || !(await isMember(key, owner.spaceId))) {
+			if (!owner || !(await caller.member(owner.spaceId))) {
 				throw new Refusal("not-found", RUN_NOT_FOUND);
 			}
-			const role = await roleIn(db, key.personId, owner.spaceId);
-			if (!role || !roleAllows(role, permissionOf(input.kind))) {
-				forbidden(ROLE_REFUSAL.message);
-			}
+			await caller.may(owner.spaceId, permissionOf(input.kind));
 			if (owner.walkerId === deps.selfId) {
 				// This Host walks the run: the action is a local one.
 				await engine
-					.space(owner.spaceId, { personId: key.personId })
+					.space(owner.spaceId, { personId: caller.personId })
 					.act(input.runId, input);
 				return;
 			}
-			if (owner.walkerId === key.deviceId) {
+			if (owner.walkerId === caller.deviceId) {
 				forbidden("This device runs this run. Act on it there.");
 			}
 			await exchange.commands.enqueue({
 				...input,
 				spaceId: owner.spaceId,
 				walkerId: owner.walkerId,
-				personId: key.personId,
+				personId: caller.personId,
 			});
 		},
 
-		async commandDone(key, input) {
-			await admit(key);
-			await exchange.commands.done(input.id, key.deviceId, input.error);
+		async commandDone(caller, input) {
+			await exchange.commands.done(input.id, caller.deviceId, input.error);
 		},
 
-		async leaseTake(key, input) {
-			await mayLease(key, input.spaceId);
-			return engine.leases.take({ ...input, walkerId: key.deviceId });
+		async leaseTake(caller, input) {
+			await mayLease(caller, input.spaceId);
+			return engine.leases.take({ ...input, walkerId: caller.deviceId });
 		},
 
-		async leaseRenew(key, input) {
-			await mayLease(key, input.spaceId);
-			return engine.leases.renew({ ...input, walkerId: key.deviceId });
+		async leaseRenew(caller, input) {
+			await mayLease(caller, input.spaceId);
+			return engine.leases.renew({ ...input, walkerId: caller.deviceId });
 		},
 
-		async leaseRelease(key, input) {
-			await mayLease(key, input.spaceId);
-			await engine.leases.release({ ...input, walkerId: key.deviceId });
+		async leaseRelease(caller, input) {
+			await mayLease(caller, input.spaceId);
+			await engine.leases.release({ ...input, walkerId: caller.deviceId });
 		},
 
-		async addProject(key, input) {
-			await admit(key);
-			const role = await roleIn(db, key.personId, input.spaceId);
-			if (!role || !roleAllows(role, { project: ["add"] })) {
-				forbidden(ROLE_REFUSAL.message);
-			}
+		async addProject(caller, input) {
+			await caller.may(input.spaceId, { project: ["add"] });
 			return engine.projects.addFromRemote(input.spaceId, {
 				name: input.name,
 				remote: input.remote,
 			});
 		},
 
-		async addClone(key, input) {
-			await admit(key);
-			const role = await roleIn(db, key.personId, input.spaceId);
-			if (!role || !roleAllows(role, { project: ["add"] })) {
-				forbidden(ROLE_REFUSAL.message);
-			}
+		async addClone(caller, input) {
+			await caller.may(input.spaceId, { project: ["add"] });
 			await engine.projects.recordClone(input.spaceId, {
 				projectId: input.projectId,
-				deviceId: key.deviceId,
+				deviceId: caller.deviceId,
 				deviceName: input.deviceName,
 			});
 		},
 
-		async setClones(key, input) {
-			await admit(key);
-			const role = await roleIn(db, key.personId, input.spaceId);
-			if (!role || !roleAllows(role, { project: ["add"] })) {
-				forbidden(ROLE_REFUSAL.message);
-			}
+		async setClones(caller, input) {
+			await caller.may(input.spaceId, { project: ["add"] });
 			// The Device's own name and kind, as it says them each time it links.
-			await deps.registry.describe(key.deviceId, {
+			await registry.describe(caller.deviceId, {
 				name: input.deviceName,
 				dev: input.dev === true,
 				machine: input.machine,
 			});
-			// Only the key's own Device: never another Device's Clones.
+			// Only the Caller's own Device: never another Device's Clones.
 			return engine.projects.setClones(input.spaceId, {
-				deviceId: key.deviceId,
+				deviceId: caller.deviceId,
 				deviceName: input.deviceName,
 				projectIds: input.projectIds,
 			});
 		},
 
-		async offer(key, input) {
-			await admit(key);
-			const role = await roleIn(db, key.personId, input.spaceId);
-			if (!role || !roleAllows(role, { offer: ["make"] })) {
-				forbidden("Your role in this Space does not let you offer profiles.");
-			}
+		async offer(caller, input) {
+			await caller.may(
+				input.spaceId,
+				{ offer: ["make"] },
+				"Your role in this Space does not let you offer profiles.",
+			);
 			await engine.offers.publish({
 				...input,
 				profileName: input.profileName ?? input.profile,
-				deviceId: key.deviceId,
-				by: key.personId,
+				deviceId: caller.deviceId,
+				by: caller.personId,
 			});
 		},
 
-		async withdrawOffer(key, input) {
-			await admit(key);
+		async withdrawOffer(caller, input) {
 			// The Device's owner withdraws its own Offer, whatever their role now.
-			if (!(await isMember(key, input.spaceId))) {
+			if (!(await caller.member(input.spaceId))) {
 				throw new Refusal("not-found", "That Space does not exist.");
 			}
 			await engine.offers.withdraw({
 				...input,
-				deviceId: key.deviceId,
-				by: key.personId,
+				deviceId: caller.deviceId,
+				by: caller.personId,
 			});
 		},
 
-		async archivePut(key, ref, content, stamp) {
-			await admit(key);
-			await ownRun(key, ref);
+		async archivePut(caller, { ref, content, stamp }) {
+			await ownRun(caller, ref);
 			await exchange.archive.write(ref, content, stamp);
 		},
 
-		async archiveGet(key, ref) {
-			await admit(key);
+		async archiveGet(caller, { ref }) {
 			const owner = await exchange.runOwner(ref.runId);
 			if (
 				!owner ||
 				owner.spaceId !== ref.spaceId ||
-				!(await isMember(key, owner.spaceId))
+				!(await caller.member(owner.spaceId))
 			) {
 				return null;
 			}
@@ -436,13 +393,11 @@ export function createHostExchange(deps: {
 				: exchange.archive.read(ref);
 		},
 
-		async knowledgePut(key, { spaceId, sha256, content }) {
-			await admit(key);
-			const role = await roleIn(db, key.personId, spaceId);
-			if (!role) throw new Refusal("not-found", "That Space does not exist.");
-			if (!roleAllows(role, { run: ["start"] })) {
-				forbidden(ROLE_REFUSAL.message);
+		async knowledgePut(caller, { spaceId, sha256, content }) {
+			if (!(await caller.member(spaceId))) {
+				throw new Refusal("not-found", "That Space does not exist.");
 			}
+			await caller.may(spaceId, STARTS_RUNS);
 			// A Space another Host keeps is not this Host's to keep.
 			if ((await engine.hostSpaces.hostOf(spaceId)) !== null) {
 				throw new Refusal(
@@ -456,10 +411,9 @@ export function createHostExchange(deps: {
 			});
 		},
 
-		async knowledgeGet(key, { spaceId, sha256 }) {
-			await admit(key);
+		async knowledgeGet(caller, { spaceId, sha256 }) {
 			if (
-				!(await isMember(key, spaceId)) ||
+				!(await caller.member(spaceId)) ||
 				(await engine.hostSpaces.hostOf(spaceId)) !== null
 			) {
 				return null;
@@ -472,15 +426,14 @@ export function createHostExchange(deps: {
 			return content ? Buffer.from(content).toString("base64") : null;
 		},
 
-		async *archiveFollow(key, { step, afterSeq }, signal) {
-			await admit(key);
+		async *archiveFollow(caller, { step, afterSeq }, signal) {
 			const owner = await exchange.runOwner(step.runId);
 			const found = await exchange.stepOwner(step.stepId);
 			if (
 				!owner ||
 				owner.spaceId !== step.spaceId ||
 				found?.runId !== step.runId ||
-				!(await isMember(key, owner.spaceId))
+				!(await caller.member(owner.spaceId))
 			) {
 				forbidden("You are not a member of the Space of this run.");
 			}
@@ -491,53 +444,47 @@ export function createHostExchange(deps: {
 			);
 		},
 
-		async archiveTail(key, { step, entries, ended }) {
-			await admit(key);
-			await ownRun(key, { kind: "transcript", ...step });
-			exchange.feeds.deliver(key.deviceId, step, entries, ended);
+		async archiveTail(caller, { step, entries, ended }) {
+			await ownRun(caller, { kind: "transcript", ...step });
+			exchange.feeds.deliver(caller.deviceId, step, entries, ended);
 		},
 
-		async *work(key, input, signal) {
-			await admit(key);
+		async *work(caller, input, signal) {
 			yield* deps.work.take(
-				key.deviceId,
+				caller.deviceId,
 				signal ?? new AbortController().signal,
 				input.running,
 			);
 		},
 
-		async workReply(key, input) {
-			await admit(key);
-			return { known: deps.work.reply(key.deviceId, input) };
+		async workReply(caller, input) {
+			return { known: deps.work.reply(caller.deviceId, input) };
 		},
 
-		async startRun(key, input) {
-			await admit(key);
+		async startRun(caller, input) {
 			const { spaceId, ...start } = input;
-			await mayStart(key, spaceId);
+			await caller.may(spaceId, STARTS_RUNS);
 			const run = await engine
-				.space(spaceId, { personId: key.personId })
-				.startRun({ ...start, startedBy: key.personId });
+				.space(spaceId, { personId: caller.personId })
+				.startRun({ ...start, startedBy: caller.personId });
 			return { runId: run.id };
 		},
 
-		async devices(key, input) {
-			await admit(key);
-			if (!(await isMember(key, input.spaceId))) {
+		async devices(caller, input) {
+			if (!(await caller.member(input.spaceId))) {
 				throw new Refusal("not-found", PROJECT_NOT_FOUND);
 			}
 			return engine
-				.space(input.spaceId, { personId: key.personId })
+				.space(input.spaceId, { personId: caller.personId })
 				.listDevices(input.projectId);
 		},
 
-		async *call(key, { deviceId, request }, signal) {
-			await admit(key);
+		async *call(caller, { deviceId, request }, signal) {
 			// The Walker asks in the name of its run's Person: its own.
-			if (request.personId !== key.personId) {
+			if (request.personId !== caller.personId) {
 				forbidden("A device may ask only for its own Person's runs.");
 			}
-			await mayStart(key, request.spaceId);
+			await caller.may(request.spaceId, STARTS_RUNS);
 			if (deviceId === deps.selfId) {
 				// Its owner's run, or another Person's through its Offers.
 				yield* engine.admission.serve(
@@ -551,7 +498,7 @@ export function createHostExchange(deps: {
 			if (
 				!paired ||
 				paired.revokedAt ||
-				(paired.ownerId !== key.personId &&
+				(paired.ownerId !== caller.personId &&
 					!(await offersInto(deviceId, request.spaceId)))
 			) {
 				yield {
@@ -565,11 +512,9 @@ export function createHostExchange(deps: {
 			yield* deps.work.call(deviceId, request, signal);
 		},
 
-		async mergePersonal(key, input) {
-			await admit(key);
-			const paired = await registry.get(key.deviceId);
+		async mergePersonal(caller, input) {
 			// A Guest Host never merges: it keeps only shared Spaces.
-			if (!paired?.homeHost) {
+			if (!caller.device.homeHost) {
 				throw new Refusal(
 					"forbidden",
 					"This Host is not the home Host of this device. Only a home Host takes its personal Space.",
@@ -582,21 +527,20 @@ export function createHostExchange(deps: {
 					hostedElsewhere: async (spaceId) =>
 						(await engine.hostSpaces.hostOf(spaceId)) !== null,
 				},
-				key,
-				{ name: paired.name },
+				caller,
+				{ name: caller.device.name },
 				input,
 			);
 		},
 
-		async reachable(key, deviceId) {
-			await admit(key);
+		async reachable(caller, { deviceId }) {
 			if (deviceId === deps.selfId) return true;
 			const paired = await registry.get(deviceId);
 			if (!paired || paired.revokedAt) return false;
-			if (paired.ownerId !== key.personId) {
+			if (paired.ownerId !== caller.personId) {
 				// Another Person's: only one that offers to a Space of theirs.
 				let offering = false;
-				for (const space of await memberSpaces(key)) {
+				for (const space of await caller.spaces()) {
 					if (await offersInto(deviceId, space)) offering = true;
 				}
 				if (!offering) return false;
@@ -616,33 +560,24 @@ export function createHostExchange(deps: {
 	 * Refuses a lease call for a Space another Host keeps (its leases are
 	 * that Host's), and for a Person whose role there does not start runs.
 	 */
-	async function mayLease(key: DeviceKeyAccess, spaceId: string) {
-		await admit(key);
+	async function mayLease(caller: Caller, spaceId: string) {
 		if ((await engine.hostSpaces.hostOf(spaceId)) !== null) {
 			forbidden("Another computer keeps the leases of this Space.");
 		}
-		await mayStart(key, spaceId);
-	}
-
-	/** Refuses a Person whose role in the Space does not start runs. */
-	async function mayStart(key: DeviceKeyAccess, spaceId: string) {
-		const role = await roleIn(db, key.personId, spaceId);
-		if (!role || !roleAllows(role, { run: ["start"] })) {
-			forbidden(ROLE_REFUSAL.message);
-		}
+		await caller.may(spaceId, STARTS_RUNS);
 	}
 
 	/** The archive takes a run's files from its Walker only, in its owner's Spaces. */
-	async function ownRun(key: DeviceKeyAccess, ref: ArchiveRef): Promise<void> {
+	async function ownRun(caller: Caller, ref: ArchiveRef): Promise<void> {
 		const owner = await exchange.runOwner(ref.runId);
 		const step =
 			ref.kind === "checkpoint" ? null : await exchange.stepOwner(ref.stepId);
 		if (
 			!owner ||
-			owner.walkerId !== key.deviceId ||
+			owner.walkerId !== caller.deviceId ||
 			owner.spaceId !== ref.spaceId ||
 			(ref.kind !== "checkpoint" && step?.runId !== ref.runId) ||
-			!(await isMember(key, owner.spaceId))
+			!(await caller.member(owner.spaceId))
 		) {
 			forbidden("A device may only archive the runs it walks.");
 		}

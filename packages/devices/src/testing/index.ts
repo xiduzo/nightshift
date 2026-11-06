@@ -7,6 +7,7 @@
  * (`pairedReplicas`).
  */
 
+export { admitEvery, type CallerFacts, callerOf } from "./caller";
 export {
 	inMemoryHost,
 	inMemoryHostClient,

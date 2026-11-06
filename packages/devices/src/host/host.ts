@@ -26,6 +26,7 @@ import {
 	type PairingStart,
 } from "../contract";
 import { type DeviceRegistry, selfOwnerId } from "../registry";
+import { admission } from "./keyed-call";
 import type { PairingReviewView } from "./types";
 
 /**
@@ -133,6 +134,8 @@ export function createHost(deps: {
 	return {
 		isHost,
 		registry,
+		/** A keyed call of a paired Device, admitted once (`Devices.admit`). */
+		admit: admission({ db: deps.db, registry, isHost }),
 
 		/** The Device key of a request (`Authorization: Bearer`), resolved. */
 		async keyOf(headers: Headers): Promise<DeviceKeyAccess | null> {

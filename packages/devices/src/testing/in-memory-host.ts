@@ -4,6 +4,7 @@ import { createRouterClient, ORPCError } from "@orpc/server";
 import { type HostClient, type HostHello, hostContract } from "../contract";
 import type { HostExchange } from "../exchange";
 import {
+	type Devices,
 	type HostPeerContext,
 	hostRouter,
 	type ServedDocuments,
@@ -14,6 +15,7 @@ import type {
 	ProjectSecretsHost,
 	SecretMovesHost,
 } from "../secrets";
+import { admitEvery } from "./caller";
 import { memoryDocuments } from "./memory-documents";
 
 /**
@@ -67,6 +69,13 @@ type Procedure = (input: unknown, options?: CallOptions) => Promise<unknown>;
 
 export function inMemoryHost(deps: {
 	exchange: HostExchange;
+	/**
+	 * The Host's admission of a keyed call (`Devices.admit`): the key
+	 * rules, this computer as a Host, the Device as paired. Default: every
+	 * key is a paired Device of its Person, a Member of no Space
+	 * (`admitEvery`).
+	 */
+	admit?: Devices["admit"];
 	/** `link.hello` and `link.heartbeat`: the Host's answer for the key (`Host.hello`). */
 	hello(key: DeviceKeyAccess): Promise<HostHello>;
 	/** `link.leave`: the Host removes the Device's access (`Host.revoke`). Default: not served. */
@@ -107,6 +116,7 @@ export function inMemoryHost(deps: {
 				deviceKey: read(),
 				exchange: deps.exchange,
 				devices: {
+					admit: deps.admit ?? admitEvery(),
 					hello: deps.hello,
 					startPairing: notServed,
 					redeemPairing: notServed,

@@ -5,6 +5,7 @@ import {
 	roleAllows,
 	type Session,
 } from "@nightshift/auth";
+import { admitEvery } from "@nightshift/devices/testing";
 import type { SpaceEngine } from "@nightshift/engine";
 
 import type { Context, Services } from "../context";
@@ -91,10 +92,17 @@ function signedOut(): RequestAccess {
  * another computer, on a Host that does not require two-factor sign-in,
  * unless the fields say otherwise. The Space view that every procedure in
  * a Space opens (`engine.space`) is a stub too, unless the test gives one.
+ * A Device key the fields carry is admitted as a paired Device's.
  */
 export function testContext(fields: TestContextFields = {}): Context {
 	const given: TestContextFields = {
 		...fields,
+		// The peer protocol admits every Device key a test gives, as a Host
+		// does a paired Device's, unless the test says otherwise.
+		devices: {
+			admit: admitEvery(),
+			...fields.devices,
+		},
 		engine: {
 			space: () => stub<SpaceEngine>("Space view"),
 			...fields.engine,

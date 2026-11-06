@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import type { Auth, DeviceKeyAccess } from "@nightshift/auth";
+import type { Auth } from "@nightshift/auth";
 import { createAuthSandbox } from "@nightshift/auth/testing";
 import { event, runCommand, user } from "@nightshift/db/schema";
 import {
@@ -349,15 +349,19 @@ describe("the devices runtime across a reload", () => {
 			woken.push(`after ${deviceId}`);
 		};
 
-		const key: DeviceKeyAccess = {
-			keyId: "key-c",
-			deviceId: "device-c",
-			personId,
-			permissions: { relay: ["serve"] },
-		};
+		// C's call, as the Host after the reload admits it.
+		const caller = await second.devices.admit(
+			{
+				keyId: "key-c",
+				deviceId: "device-c",
+				personId,
+				permissions: { relay: ["serve"] },
+			},
+			"relay",
+		);
 		const taking = new AbortController();
 		const deliveries = second.hostExchange
-			.work(key, { running: [] }, taking.signal)
+			.work(caller, { running: [] }, taking.signal)
 			[Symbol.asyncIterator]();
 		const next = deliveries.next();
 		await waitFor(() => woken.length > 0, { label: "the wake" });

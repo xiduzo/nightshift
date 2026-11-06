@@ -394,7 +394,6 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		registry: engine.devices,
 		selfId: self.id,
 		ownerId,
-		isHost: host.isHost,
 		work: handover.hub,
 	});
 

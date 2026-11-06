@@ -3,6 +3,7 @@ import { HostUnreachableError } from "@nightshift/engine";
 import { FAILURE_MESSAGE, Refusal } from "@nightshift/refusal";
 import { createRouterClient, ORPCError } from "@orpc/server";
 
+import { admitEvery } from "../testing";
 import { type HostPeerContext, hostRouter } from "./router";
 
 /**
@@ -19,14 +20,14 @@ async function errorOf(thrown: Error): Promise<ORPCError<string, unknown>> {
 			keyId: "key-1",
 			deviceId: "device-1",
 			personId: "person-1",
-			permissions: { relay: ["use"] },
+			permissions: { relay: ["serve"] },
 		},
 		exchange: {
 			reachable: async () => {
 				throw thrown;
 			},
 		},
-		devices: {},
+		devices: { admit: admitEvery() },
 		phones: {},
 	} as unknown as HostPeerContext;
 	const host = createRouterClient(hostRouter, { context });
@@ -49,6 +50,16 @@ describe("the Host's errors on the wire", () => {
 				data: { kind },
 			});
 		}
+	});
+
+	test("a refusal of kind not-found never travels as NOT_FOUND: that code means an older Host", async () => {
+		// The Device side reads a NOT_FOUND (404) as a Host too old to serve
+		// the procedure (`links/from-host.ts`), so a Host that cannot find
+		// what a Device names says so as a BAD_REQUEST with the kind.
+		const error = await errorOf(new Refusal("not-found", "No such run."));
+		expect(error.code).toBe("BAD_REQUEST");
+		expect(error.status).toBe(400);
+		expect(error.data).toEqual({ kind: "not-found" });
 	});
 
 	test("a Host out of reach keeps its own code", async () => {

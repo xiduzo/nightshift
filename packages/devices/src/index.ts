@@ -12,6 +12,7 @@
 
 export {
 	type ArchiveRef,
+	type Caller,
 	type FollowWant,
 	type HostClient,
 	type HostHello,

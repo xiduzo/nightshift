@@ -140,12 +140,12 @@ describe("leases across Devices", () => {
 		const c = await createSandbox();
 		try {
 			const other = await paired.pair(c, "C");
-			await paired.hostExchange.leaseRelease(other.key, {
+			await paired.hostExchange.leaseRelease(await other.caller(), {
 				spaceId: a.spaceId,
 				runId: run.id,
 			});
 			expect(
-				await paired.hostExchange.leaseRenew(other.key, {
+				await paired.hostExchange.leaseRenew(await other.caller(), {
 					spaceId: a.spaceId,
 					runId: run.id,
 					names: ["zac-docker-stack"],

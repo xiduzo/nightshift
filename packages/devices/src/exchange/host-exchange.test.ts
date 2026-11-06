@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import type { DeviceKeyAccess } from "@nightshift/auth";
+import type { Role } from "@nightshift/auth";
 import {
 	event,
-	member,
 	organization,
 	project as projectTable,
 	run as runTable,
@@ -21,11 +20,10 @@ import {
 } from "@nightshift/engine/testing";
 import { asDate, now as timeNow } from "@nightshift/time";
 import { ORPCError } from "@orpc/server";
-import { eq } from "drizzle-orm";
-import type { SyncBatch } from "../contract";
+import type { Caller, SyncBatch } from "../contract";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
-import type { DeviceRegistry } from "../registry";
-import { withPeers } from "../testing";
+import type { DeviceRegistry, PairedDevice } from "../registry";
+import { callerOf, withPeers } from "../testing";
 import { createWorkHub } from "../work";
 import { createHostExchange } from "./host-exchange";
 
@@ -61,17 +59,10 @@ beforeEach(async () => {
 	);
 	const [owner] = await sandbox.db.select().from(user);
 	ownerId = owner?.id as string;
-	// A colleague, Member of the owner's Space.
+	// A colleague: a Member of the owner's Space, as their Caller says.
 	await sandbox.db
 		.insert(user)
 		.values({ id: "colleague", name: "Colleague", email: "c@example.invalid" });
-	await sandbox.db.insert(member).values({
-		id: "m-colleague",
-		organizationId: sandbox.spaceId,
-		userId: "colleague",
-		role: "member",
-		createdAt: asDate(),
-	});
 	projectId = (
 		await engine
 			.space(sandbox.spaceId)
@@ -80,25 +71,50 @@ beforeEach(async () => {
 });
 afterEach(() => sandbox.cleanup());
 
-/** Devices paired here: one of the owner's, one of the colleague's. */
-const registry = {
-	async get(id: string) {
-		const owners: Record<string, string> = {
-			"device-mine": ownerId,
-			"device-colleague": "colleague",
-			// Paired here, but its Person is in none of the owner's Spaces.
-			"device-stranger": "stranger",
-		};
-		return owners[id] ? { id, ownerId: owners[id], revokedAt: null } : null;
-	},
-} as unknown as DeviceRegistry;
-
-const keyOf = (deviceId: string, personId: string): DeviceKeyAccess => ({
-	keyId: `key-${deviceId}`,
-	deviceId,
-	personId,
-	permissions: { sync: ["pull", "push"], archive: ["put", "get"] },
+/** The owner of each Device paired here. The stranger's Person is in none of the owner's Spaces. */
+const owners = (): Record<string, string> => ({
+	"device-mine": ownerId,
+	"device-colleague": "colleague",
+	"device-stranger": "stranger",
 });
+
+/** The Devices paired here, as the Host reads the owners of the Walkers it serves. */
+const registry: Pick<DeviceRegistry, "get" | "describe"> = {
+	async get(id: string): Promise<PairedDevice | null> {
+		const ownerId = owners()[id];
+		if (!ownerId) return null;
+		return {
+			id,
+			name: id,
+			platform: "test",
+			ownerId,
+			homeHost: null,
+			lastSeenAt: null,
+			online: true,
+			pairedAt: 0,
+			revokedAt: null,
+		};
+	},
+	describe: async () => {},
+};
+
+/** The role each Person has in the owner's Space: the owner owns it, the colleague is a Member, the stranger nothing. */
+const roleOf = (personId: string): Role | null =>
+	personId === ownerId ? "owner" : personId === "colleague" ? "member" : null;
+
+/** A Device's call, admitted: its key, and its Person's role in the owner's Space (`role` overrides). */
+function keyOf(deviceId: string, personId: string, role?: Role): Caller {
+	const found = role ?? roleOf(personId);
+	return callerOf(
+		{
+			keyId: `key-${deviceId}`,
+			deviceId,
+			personId,
+			permissions: { sync: ["pull", "push"], archive: ["put", "get"] },
+		},
+		{ roles: found ? { [sandbox.spaceId]: found } : {} },
+	);
+}
 
 function host() {
 	return createHostExchange({
@@ -107,7 +123,6 @@ function host() {
 		registry,
 		selfId: sandbox.deviceId,
 		ownerId,
-		isHost: () => true,
 		work: createWorkHub(),
 	});
 }
@@ -139,11 +154,12 @@ describe("a Walker's paths", () => {
 				(await engine.space(sandbox.spaceId).getRun(started.id)).status ===
 				"finished",
 		);
-		const mine = await host().pull(keyOf("device-mine", ownerId), {});
-		const theirs = await host().pull(
-			keyOf("device-colleague", "colleague"),
-			{},
-		);
+		const mine = await host().pull(keyOf("device-mine", ownerId), {
+			cursors: {},
+		});
+		const theirs = await host().pull(keyOf("device-colleague", "colleague"), {
+			cursors: {},
+		});
 		const payload = (rows: typeof mine.rows, type: string) =>
 			JSON.parse(rows.events.find((e) => e.type === type)?.payload ?? "{}");
 
@@ -327,7 +343,7 @@ describe("live transcripts", () => {
 		const step = await colleagueRun();
 		const exchange = host();
 		const walker = keyOf("device-colleague", "colleague");
-		expect((await exchange.pull(walker, {})).follows).toEqual([]);
+		expect((await exchange.pull(walker, { cursors: {} })).follows).toEqual([]);
 
 		const controller = new AbortController();
 		const got: number[] = [];
@@ -342,9 +358,10 @@ describe("live transcripts", () => {
 		})();
 		// The Walker's stream now names the step.
 		await waitFor(
-			async () => (await exchange.pull(walker, {})).follows.length === 1,
+			async () =>
+				(await exchange.pull(walker, { cursors: {} })).follows.length === 1,
 		);
-		expect((await exchange.pull(walker, {})).follows).toEqual([
+		expect((await exchange.pull(walker, { cursors: {} })).follows).toEqual([
 			{ ...step, afterSeq: 0 },
 		]);
 
@@ -370,7 +387,7 @@ describe("live transcripts", () => {
 		});
 		await following;
 		expect(got).toEqual([1, 2, 3]);
-		expect((await exchange.pull(walker, {})).follows).toEqual([]);
+		expect((await exchange.pull(walker, { cursors: {} })).follows).toEqual([]);
 		controller.abort();
 	});
 
@@ -408,25 +425,27 @@ describe("live transcripts", () => {
 		const ref = { kind: "transcript" as const, ...step };
 
 		await logged("StepEnded", 2);
-		await exchange.archivePut(walker, ref, "first end", {
-			opening: 1,
-			ended: true,
+		await exchange.archivePut(walker, {
+			ref,
+			content: "first end",
+			stamp: { opening: 1, ended: true },
 		});
-		expect(await exchange.archiveGet(reader, ref)).toBe("first end");
+		expect(await exchange.archiveGet(reader, { ref })).toBe("first end");
 
 		// Reopened and ended again: its rows are here, its copy not yet.
 		await logged("StepReopened", 3);
 		await logged("StepEnded", 4);
-		expect(await exchange.archiveGet(reader, ref)).toBeNull();
-		await exchange.archivePut(walker, ref, "second end", {
-			opening: 2,
-			ended: true,
+		expect(await exchange.archiveGet(reader, { ref })).toBeNull();
+		await exchange.archivePut(walker, {
+			ref,
+			content: "second end",
+			stamp: { opening: 2, ended: true },
 		});
-		expect(await exchange.archiveGet(reader, ref)).toBe("second end");
+		expect(await exchange.archiveGet(reader, { ref })).toBe("second end");
 
 		// A Walker of an older version puts no stamp: its copy is served.
-		await exchange.archivePut(walker, ref, "unstamped");
-		expect(await exchange.archiveGet(reader, ref)).toBe("unstamped");
+		await exchange.archivePut(walker, { ref, content: "unstamped" });
+		expect(await exchange.archiveGet(reader, { ref })).toBe("unstamped");
 	});
 
 	test("a Person who is not a Member of the run's Space is refused", async () => {
@@ -442,7 +461,11 @@ describe("live transcripts", () => {
 		};
 		await expect(follow()).rejects.toThrow("not a member");
 		expect(
-			(await host().pull(keyOf("device-colleague", "colleague"), {})).follows,
+			(
+				await host().pull(keyOf("device-colleague", "colleague"), {
+					cursors: {},
+				})
+			).follows,
 		).toEqual([]);
 	});
 });
@@ -577,13 +600,9 @@ describe("a Project a Device asks for", () => {
 			}),
 		).toEqual(added);
 
-		await sandbox.db
-			.update(member)
-			.set({ role: "viewer" })
-			.where(eq(member.userId, "colleague"));
-		const refused = (key: DeviceKeyAccess) =>
+		const refused = (caller: Caller) =>
 			host()
-				.addProject(key, {
+				.addProject(caller, {
 					spaceId: sandbox.spaceId,
 					name: "tools",
 					remote: "github.com/acme/tools",
@@ -592,7 +611,10 @@ describe("a Project a Device asks for", () => {
 					() => null,
 					(error: unknown) => error,
 				);
-		expect(await refused(colleague)).toBeInstanceOf(ORPCError);
+		// The colleague as a viewer now, and a Person who is no Member.
+		expect(
+			await refused(keyOf("device-colleague", "colleague", "viewer")),
+		).toBeInstanceOf(ORPCError);
 		expect(await refused(keyOf("device-stranger", "stranger"))).toBeTruthy();
 		expect(document.projects.size).toBe(2);
 	});

@@ -23,7 +23,7 @@ import {
 	type TestEngineOptions,
 } from "@nightshift/engine/testing";
 import { now } from "@nightshift/time";
-import type { HostClient, HostHello, WorkRelay } from "../contract";
+import type { Caller, HostClient, HostHello, WorkRelay } from "../contract";
 import { createHostExchange, type HostExchange } from "../exchange";
 import { createHost, servedDocuments } from "../host";
 import {
@@ -64,6 +64,8 @@ export type HostReplica = {
 	personId: string;
 	/** A's answer to a Device with this key (`link.hello`). */
 	hello(key: DeviceKeyAccess): Promise<HostHello>;
+	/** The key as A admits a `sync` call with it: what A's exchange takes in a test that calls it directly. */
+	caller(key: DeviceKeyAccess): Promise<Caller>;
 	/** A's registry takes a Device of A's owner, as pairing does: its key on A. */
 	join(deviceId: string, name: string): Promise<DeviceKeyAccess>;
 	/** The token a Device sends with its key: A's relay knows it once the Device joined. */
@@ -158,7 +160,6 @@ export async function hostInMemory(
 		registry: host.devices,
 		selfId: a.deviceId,
 		ownerId: personId,
-		isHost: asHost.isHost,
 		work: createWorkHub(),
 	});
 	/** The Device keys A knows, by their token: what `Host.syncKey` verifies. */
@@ -166,6 +167,7 @@ export async function hostInMemory(
 	const token = (key: DeviceKeyAccess) => `nsd_memory-${key.deviceId}`;
 	const memory = inMemoryHost({
 		exchange: hostExchange,
+		admit: asHost.admit,
 		hello: asHost.hello,
 		revoke: asHost.revoke,
 		documents: servedDocuments({
@@ -192,6 +194,7 @@ export async function hostInMemory(
 		hostId,
 		personId,
 		hello: asHost.hello,
+		caller: (key) => asHost.admit(key, "sync"),
 		token,
 		async join(deviceId, name) {
 			await host.devices.join({

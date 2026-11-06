@@ -19,8 +19,8 @@ import { eq } from "drizzle-orm";
 import type { WorkReply } from "../contract";
 import { createHostExchange } from "../exchange";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
-import { type DeviceRegistry, selfOwnerId } from "../registry";
-import { withPeers } from "../testing";
+import { selfOwnerId } from "../registry";
+import { callerOf, withPeers } from "../testing";
 import { createWorkHub } from "../work";
 import { type DeviceOffer, offerRefusal, spaceOffers } from "./offers";
 
@@ -359,27 +359,27 @@ describe("another Person's run on the computer that walks it", () => {
 		const host = createHostExchange({
 			db: sandbox.db,
 			engine,
-			registry: {
-				get: async (id: string) =>
-					id === "device-carol"
-						? { id, ownerId: carol, revokedAt: null }
-						: null,
-			} as unknown as DeviceRegistry,
+			// The Host reads only the owners of the Walkers it serves: none here.
+			registry: { get: async () => null, describe: async () => {} },
 			selfId: sandbox.deviceId,
 			ownerId: owner?.id as string,
-			isHost: () => true,
 			work: createWorkHub(),
 		});
+		// Carol's Device, admitted: a Member of the Space.
+		const carolsDevice = callerOf(
+			{
+				keyId: "key-carol",
+				deviceId: "device-carol",
+				personId: carol,
+				permissions: {},
+			},
+			{ roles: { [sandbox.spaceId]: "member" } },
+		);
 		const other = "beefcafe-0000-0000-0000-000000000000";
 		const replies: WorkReply[] = [];
 		void (async () => {
 			for await (const reply of host.call(
-				{
-					keyId: "key-carol",
-					deviceId: "device-carol",
-					personId: carol,
-					permissions: {},
-				},
+				carolsDevice,
 				{
 					deviceId: sandbox.deviceId,
 					request: {
