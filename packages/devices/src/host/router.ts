@@ -100,12 +100,21 @@ export const hostRouter = os.router({
 		pull: keyed.sync.pull.handler(({ context, input }) =>
 			context.exchange.pull(context.caller, input),
 		),
-		stream: keyed.sync.stream.handler(({ context, input, signal }) =>
-			context.exchange.stream(context.caller, input, signal),
-		),
-		commands: keyed.sync.commands.handler(({ context, signal }) =>
-			context.exchange.commands(context.caller, signal),
-		),
+		// A stream's handler yields: the web client reads that shape to keep a
+		// stream out of a batch.
+		stream: keyed.sync.stream.handler(async function* ({
+			context,
+			input,
+			signal,
+		}) {
+			yield* context.exchange.stream(context.caller, input, signal);
+		}),
+		commands: keyed.sync.commands.handler(async function* ({
+			context,
+			signal,
+		}) {
+			yield* context.exchange.commands(context.caller, signal);
+		}),
 		push: keyed.sync.push.handler(({ context, input }) =>
 			context.exchange.push(context.caller, input),
 		),
@@ -164,9 +173,13 @@ export const hostRouter = os.router({
 		knowledgeGet: keyed.archive.knowledgeGet.handler(({ context, input }) =>
 			context.exchange.knowledgeGet(context.caller, input),
 		),
-		follow: keyed.archive.follow.handler(({ context, input, signal }) =>
-			context.exchange.archiveFollow(context.caller, input, signal),
-		),
+		follow: keyed.archive.follow.handler(async function* ({
+			context,
+			input,
+			signal,
+		}) {
+			yield* context.exchange.archiveFollow(context.caller, input, signal);
+		}),
 		tail: keyed.archive.tail.handler(({ context, input }) =>
 			context.exchange.archiveTail(context.caller, {
 				...input,
@@ -224,11 +237,19 @@ export const hostRouter = os.router({
 		),
 	},
 	devices: {
-		work: keyed.devices.work.handler(({ context, input, signal }) =>
-			context.exchange.work(context.caller, input, signal),
-		),
-		call: keyed.devices.call.handler(({ context, input, signal }) =>
-			context.exchange.call(
+		work: keyed.devices.work.handler(async function* ({
+			context,
+			input,
+			signal,
+		}) {
+			yield* context.exchange.work(context.caller, input, signal);
+		}),
+		call: keyed.devices.call.handler(async function* ({
+			context,
+			input,
+			signal,
+		}) {
+			yield* context.exchange.call(
 				context.caller,
 				{
 					deviceId: input.deviceId,
@@ -236,8 +257,8 @@ export const hostRouter = os.router({
 					request: input.request as unknown as WorkRequest,
 				},
 				signal,
-			),
-		),
+			);
+		}),
 		reachable: keyed.devices.reachable.handler(({ context, input }) =>
 			context.exchange.reachable(context.caller, input),
 		),
