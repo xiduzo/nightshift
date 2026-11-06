@@ -150,7 +150,10 @@ export async function pairedReplicas(
 			documents: synced,
 		});
 		const flows = createFlowDocuments({ db: sandbox.db, documents: synced });
-		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		const log = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
 		// The Device's link to A syncs its documents over A's channel in memory.
 		const channel = memory.documentChannel({
 			address: "memory",

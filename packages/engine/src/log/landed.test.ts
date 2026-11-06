@@ -45,7 +45,10 @@ beforeEach(async () => {
 			walkerId: sandbox.deviceId,
 		})),
 	);
-	log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+	log = createRunLog(sandbox.db, {
+		walkerId: sandbox.deviceId,
+		dataDir: sandbox.dataDir,
+	});
 });
 afterEach(async () => {
 	for (const feed of feeds.splice(0)) feed.close();

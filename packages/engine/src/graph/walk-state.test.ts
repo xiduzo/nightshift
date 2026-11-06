@@ -84,7 +84,12 @@ async function computer() {
 				return alonePeers(ctx);
 			},
 		}),
-		{ runLog: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }) },
+		{
+			runLog: createRunLog(sandbox.db, {
+				walkerId: sandbox.deviceId,
+				dataDir: sandbox.dataDir,
+			}),
+		},
 	);
 	if (!context) throw new Error("The engine made no peers.");
 	return { sandbox, engine, space: engine.space(sandbox.spaceId), context };
@@ -126,10 +131,12 @@ async function checkpointRows(sandbox: Sandbox, runId: string) {
 
 /** The walks of a database the engine does not run on: an import only. */
 function walksOf(sandbox: Sandbox) {
-	const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+	const log = createRunLog(sandbox.db, {
+		walkerId: sandbox.deviceId,
+		dataDir: sandbox.dataDir,
+	});
 	return createRunWalks({
 		db: sandbox.db,
-		dataDir: sandbox.dataDir,
 		log,
 		history: createRunHistory({
 			db: sandbox.db,

@@ -826,7 +826,12 @@ describe("the Device's exchange with its Host", () => {
 				scheduler: false,
 				spaceDocuments: paired.documents,
 			}),
-			{ runLog: createRunLog(b.db, { walkerId: b.deviceId }) },
+			{
+				runLog: createRunLog(b.db, {
+					walkerId: b.deviceId,
+					dataDir: b.dataDir,
+				}),
+			},
 		);
 		const counting: PeerEngine = {
 			...fresh,

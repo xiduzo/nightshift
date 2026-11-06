@@ -134,7 +134,9 @@ export async function hostInMemory(
 				flows,
 			}),
 		}),
-		{ runLog: createRunLog(a.db, { walkerId: a.deviceId }) },
+		{
+			runLog: createRunLog(a.db, { walkerId: a.deviceId, dataDir: a.dataDir }),
+		},
 	);
 	// A as a Host, with "Be a Host" on: its own answer to a link. It serves
 	// no pairing here, so it needs no Better Auth.

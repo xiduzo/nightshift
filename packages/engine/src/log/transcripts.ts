@@ -8,8 +8,38 @@ import type { TranscriptEntry } from "./step-events";
  * Transcripts are NDJSON files on disk, one per step:
  * `<dataDir>/transcripts/<runId>/<stepId>.ndjson`. `seq` increases by one
  * per run, across steps and sessions. A command step also keeps its full
- * output as plain text in `<dataDir>/logs/<runId>/<stepId>.log`.
+ * output as plain text in `<dataDir>/logs/<runId>/<stepId>.log`. This
+ * module is the one place that knows the layout: a reader or writer
+ * outside the log names a step's files through `RunFiles` (the run log's
+ * `files`, or `runFiles` for a tool that works on a data folder).
  */
+
+/** The files of one run's steps on this computer. */
+export type RunFiles = {
+	/** Where this computer writes the step's transcript. */
+	transcript(stepId: string): string;
+	/**
+	 * The step's transcript to read here: this computer's own file, else
+	 * the one at `rowPath`, the path the step's row names (another Walker's
+	 * data folder after "Move to …", or a run moved before this rule).
+	 */
+	transcriptToRead(stepId: string, rowPath: string): string;
+	/** A command step's full output, as plain text. */
+	commandLog(stepId: string): string;
+	/** A Service step's log: what its process prints while it runs. */
+	serviceLog(stepId: string): string;
+};
+
+/** The files of the run's steps under `dataDir`. */
+export function runFiles(dataDir: string, runId: string): RunFiles {
+	return {
+		transcript: (stepId) => transcriptPath(dataDir, runId, stepId),
+		transcriptToRead: (stepId, rowPath) =>
+			transcriptToRead(dataDir, runId, stepId, rowPath),
+		commandLog: (stepId) => commandLogPath(dataDir, runId, stepId),
+		serviceLog: (stepId) => serviceLogPath(dataDir, runId, stepId),
+	};
+}
 
 export function transcriptPath(
 	dataDir: string,

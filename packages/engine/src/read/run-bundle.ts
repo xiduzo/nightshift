@@ -20,8 +20,8 @@ import {
 import {
 	type LoggedEvent,
 	parseEventRow,
+	runFiles,
 	type TranscriptEntry,
-	transcriptToRead,
 } from "../log";
 import { readFormat1, readFormat2, readRows } from "./bundle-rows";
 
@@ -117,7 +117,7 @@ export type RunBundleSummary = {
  */
 export async function exportRun(options: {
 	db: Database;
-	/** This computer's data folder, where the steps' transcripts are (`transcriptToRead`). */
+	/** This computer's data folder, where the steps' transcripts are (`runFiles`). */
 	dataDir: string;
 	runId: string;
 	spaceId: string;
@@ -183,7 +183,10 @@ export async function exportRun(options: {
 		const missing: string[] = [];
 		for (const s of steps) {
 			const lines = await readTranscriptLines(
-				transcriptToRead(options.dataDir, runId, s.id, s.transcriptPath),
+				runFiles(options.dataDir, runId).transcriptToRead(
+					s.id,
+					s.transcriptPath,
+				),
 			);
 			if (!lines) {
 				missing.push(s.id);

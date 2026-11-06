@@ -4,7 +4,6 @@ import {
 	type DerivedSession,
 	type DerivedStep,
 	type EnginePayloads,
-	getRunRow,
 	provedEndReason,
 	type RunBus,
 	type RunLog,
@@ -279,7 +278,7 @@ async function runFlowsOf(
 	runId: string,
 ): Promise<RunFlows | null> {
 	try {
-		const row = await getRunRow(deps.db, runId);
+		const row = await deps.log.row(runId);
 		return { flow: deps.flowOf(row), called: deps.calledFlowsOf(row) };
 	} catch (error) {
 		console.warn(

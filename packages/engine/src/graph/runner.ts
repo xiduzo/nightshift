@@ -10,7 +10,6 @@ import { Refusal, wordsFor } from "@nightshift/refusal";
 import type { RunSettings } from "../device-config";
 import {
 	type GateVia,
-	getRunRow,
 	provedEndReason,
 	type ResumedBy,
 	type RunBus,
@@ -302,7 +301,7 @@ const isGoing = (status: RunStatus) =>
 export function createRunner(deps: RunnerDeps) {
 	const { db, log, bus } = deps;
 	const open = deps.openThread ?? openThread;
-	const recorders = createRecorders({ db, bus, dataDir: deps.dataDir });
+	const recorders = createRecorders({ db, bus, log });
 	const threadDeps: ThreadDeps = {
 		db,
 		log,
@@ -1051,7 +1050,7 @@ export function createRunner(deps: RunnerDeps) {
 		const overdue = await findOverdue(
 			runState,
 			{ now: deps.now(), graceMs, minuteMs: deps.minuteMs },
-			{ runId, dataDir: deps.dataDir },
+			log.files(runId),
 		);
 		if (!overdue) return UNCHANGED;
 		const walk = walkOf(runId);
@@ -1071,8 +1070,8 @@ export function createRunner(deps: RunnerDeps) {
 		turn: TurnState,
 	): Promise<Taken> {
 		if (intent.kind === "start") return startTurn(runId, intent);
-		const row = await getRunRow(db, runId);
-		if (row.walkerId !== (await log.walkerId())) {
+		const row = await log.row(runId);
+		if (!(await log.walkedHere(row))) {
 			// The sweep and startup recovery look at runs; they refuse nothing.
 			if (intent.kind === "overdue" || intent.kind === "prune") {
 				return UNCHANGED;
@@ -1175,8 +1174,8 @@ export function createRunner(deps: RunnerDeps) {
 		options: { arrival?: boolean } = {},
 	): Promise<T> {
 		return inTurn(runId, async () => {
-			const row = await getRunRow(db, runId);
-			if (row.walkerId !== (await log.walkerId())) {
+			const row = await log.row(runId);
+			if (!(await log.walkedHere(row))) {
 				throw new RunRefusal("walked-elsewhere", WALKED_ELSEWHERE);
 			}
 			if (!options.arrival && (await arriving(runId))) {

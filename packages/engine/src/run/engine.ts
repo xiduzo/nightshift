@@ -328,7 +328,10 @@ export function createEngine(
 	const bus = createRunBus();
 	const runLog =
 		internals.runLog ??
-		createRunLog(db, { walkerId: options.walkerId || directory.selfId });
+		createRunLog(db, {
+			walkerId: options.walkerId || directory.selfId,
+			dataDir,
+		});
 	const documents =
 		options.spaceDocuments ?? createSpaceDocuments({ db, directory });
 	const flowDocuments = options.flowDocuments ?? createFlowDocuments({ db });
@@ -350,7 +353,7 @@ export function createEngine(
 	const landed = createLandedFeed({ db, log: runLog });
 	const history = createRunHistory({ db, dataDir, log: runLog, bus, landed });
 	/** The walk state of the runs this computer walks, as files (`graph/walk-state.ts`). */
-	const walks = createRunWalks({ db, dataDir, log: runLog, history });
+	const walks = createRunWalks({ db, log: runLog, history });
 
 	/**
 	 * The other Devices and Hosts (`Peers`): where steps run, Offers, the
@@ -752,7 +755,6 @@ export function createEngine(
 		archive: peers.runs,
 		walks,
 		device,
-		runRow: (runId) => getRunRow(db, runId),
 		flowOf: parseRunFlow,
 		placement: devices,
 		holds: startHolds,

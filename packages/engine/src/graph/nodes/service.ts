@@ -12,12 +12,7 @@ import {
 	type TemplateContext,
 } from "@nightshift/flows";
 
-import {
-	type HoldSection,
-	type ServiceSpec,
-	type StepOutputs,
-	serviceLogPath,
-} from "../../log";
+import type { HoldSection, ServiceSpec, StepOutputs } from "../../log";
 import {
 	endedAtReason,
 	type NodeAction,
@@ -144,7 +139,7 @@ async function bringUp(
 		here: step.device.id === ctx.run.walkerId,
 		cwd: step.worktree,
 		spec,
-		logPath: serviceLogPath(ctx.dataDir, runId, stepId),
+		logPath: ctx.log.files(runId).serviceLog(stepId),
 		signal,
 		onStarted: async ({ pid, startedAt }) => {
 			await ctx.log.append({
@@ -157,7 +152,7 @@ async function bringUp(
 					...(section ? { section } : {}),
 					deviceId: step.device.id,
 					cwd: step.worktree,
-					logPath: serviceLogPath(ctx.dataDir, runId, stepId),
+					logPath: ctx.log.files(runId).serviceLog(stepId),
 					pid,
 					startedAt,
 					spec,

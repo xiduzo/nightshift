@@ -73,8 +73,6 @@ export type RunActionsDeps = {
 	walks: Pick<RunWalks, "exportWalk">;
 	/** This computer as a Device. */
 	device: { id: string };
-	/** The run's row, or "not found". */
-	runRow(runId: string): Promise<RunRow>;
 	/** The run's flow, from its snapshot. */
 	flowOf(row: RunRow): Flow;
 	/**
@@ -200,7 +198,7 @@ export function createRunActions(deps: RunActionsDeps) {
 
 	/** The run's row when it is in the Space, else "not found": the action's one read of it. */
 	async function rowIn(spaceId: string, runId: string): Promise<RunRow> {
-		const row = await deps.runRow(runId);
+		const row = await log.row(runId);
 		if (row.spaceId !== spaceId) throw new Refusal("not-found", RUN_NOT_FOUND);
 		return row;
 	}
@@ -499,7 +497,7 @@ export function createRunActions(deps: RunActionsDeps) {
 		): Promise<void> {
 			const request = requestOf(action);
 			const row = await rowIn(spaceId, runId);
-			if (row.walkerId !== (await log.walkerId())) {
+			if (!(await log.walkedHere(row))) {
 				return onWalker(row, actor, request);
 			}
 			return here(row, actor, request);
@@ -518,7 +516,7 @@ export function createRunActions(deps: RunActionsDeps) {
 		): Promise<OwnDevice[]> {
 			const row = await rowIn(spaceId, runId);
 			if (!actor) throw signedOut();
-			const walkedHere = row.walkerId === (await log.walkerId());
+			const walkedHere = await log.walkedHere(row);
 			return (
 				await deps.placement.devicesFor(
 					row.spaceId,

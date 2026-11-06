@@ -94,7 +94,12 @@ function makeSpace() {
 			scheduler: false,
 			peers,
 		}),
-		{ runLog: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }) },
+		{
+			runLog: createRunLog(sandbox.db, {
+				walkerId: sandbox.deviceId,
+				dataDir: sandbox.dataDir,
+			}),
+		},
 	).space(sandbox.spaceId, actor);
 }
 

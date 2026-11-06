@@ -232,7 +232,10 @@ export async function startRun(
 		baseRef: "main",
 		walkerId: sandbox.deviceId,
 	});
-	const log = createRunLog(db, { walkerId: sandbox.deviceId });
+	const log = createRunLog(db, {
+		walkerId: sandbox.deviceId,
+		dataDir: sandbox.dataDir,
+	});
 	await log.append({
 		type: "RunStarted",
 		runId,
@@ -262,7 +265,7 @@ export async function startRun(
 		db,
 		log,
 		bus,
-		recorders: createRecorders({ db, bus, dataDir: sandbox.dataDir }),
+		recorders: createRecorders({ db, bus, log }),
 		dataDir: sandbox.dataDir,
 		now: options.now ?? now,
 		minuteMs: MINUTE,

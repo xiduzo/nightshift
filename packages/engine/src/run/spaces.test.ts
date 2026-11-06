@@ -62,7 +62,10 @@ afterEach(async () => {
 });
 
 function makeEngine(internals: EngineInternals = {}): Engine {
-	const runLog = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+	const runLog = createRunLog(sandbox.db, {
+		walkerId: sandbox.deviceId,
+		dataDir: sandbox.dataDir,
+	});
 	runLogs.push(runLog);
 	return createEngine(
 		withDevice({

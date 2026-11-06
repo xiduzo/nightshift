@@ -104,7 +104,10 @@ function engineOf(
 }
 
 function runLogFor(sandbox: Sandbox) {
-	const runLog = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+	const runLog = createRunLog(sandbox.db, {
+		walkerId: sandbox.deviceId,
+		dataDir: sandbox.dataDir,
+	});
 	runLogs.set(sandbox, runLog);
 	return runLog;
 }
@@ -957,7 +960,10 @@ describe("the Spaces of a Host", () => {
 
 describe("run logs", () => {
 	test("an ingested event is in the run log as on disk", async () => {
-		const runLog = createRunLog(b.db, { walkerId: b.deviceId });
+		const runLog = createRunLog(b.db, {
+			walkerId: b.deviceId,
+			dataDir: b.dataDir,
+		});
 		const engineA = engineOf(a);
 		const engineB = createPeerEngine(
 			withPeers({

@@ -27,7 +27,7 @@ let host: Host;
 beforeEach(async () => {
 	people = await createAuthSandbox();
 	dataDir = mkdtempSync(join(tmpdir(), "nightshift-host-"));
-	const log = createRunLog(people.db, { walkerId: "host-a" });
+	const log = createRunLog(people.db, { walkerId: "host-a", dataDir });
 	host = createHost({
 		auth: people.auth,
 		db: people.db,

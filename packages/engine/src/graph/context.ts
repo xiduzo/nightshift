@@ -31,8 +31,6 @@ import {
 	type StepEvent,
 	type StepOutputs,
 	type TranscriptEntry,
-	transcriptPath,
-	transcriptToRead,
 } from "../log";
 import type { RunResult } from "../run-status";
 import type { UsageNotes } from "../usage";
@@ -422,9 +420,10 @@ export function stepFailure(error: unknown, where: string): string {
 export function createRecorders(input: {
 	db: Database;
 	bus: RunBus;
-	dataDir: string;
+	/** Names the files of a run's steps on this computer. */
+	log: Pick<RunLog, "files">;
 }) {
-	const { db, bus, dataDir } = input;
+	const { db, bus, log } = input;
 	/** The last transcript seq written per run. Loaded from disk on first use. */
 	const lastSeqs = new Map<string, number>();
 	/** The last seq another Walker wrote of a run moved here: its files are not on this disk. */
@@ -438,7 +437,9 @@ export function createRecorders(input: {
 			.from(step)
 			.where(eq(step.runId, runId));
 		const entries = await readRunTranscript(
-			rows.map((r) => transcriptToRead(dataDir, runId, r.id, r.transcriptPath)),
+			rows.map((r) =>
+				log.files(runId).transcriptToRead(r.id, r.transcriptPath),
+			),
 		);
 		const last = entries.at(-1)?.seq ?? 0;
 		// A step of this run may have written meanwhile; keep the larger.
@@ -465,9 +466,7 @@ export function createRecorders(input: {
 		},
 		async open(runId: string, stepId: string): Promise<Recorder> {
 			await lastSeqOf(runId);
-			const writer = openTranscriptWriter(
-				transcriptPath(dataDir, runId, stepId),
-			);
+			const writer = openTranscriptWriter(log.files(runId).transcript(stepId));
 			return {
 				record(sessionId, stepEvent) {
 					const seq = (lastSeqs.get(runId) ?? 0) + 1;

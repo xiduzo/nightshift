@@ -14,7 +14,7 @@ import {
 import { iso, nextClockTime, parseInstant } from "@nightshift/time";
 
 import { runCommand, tailOf } from "../../device";
-import { commandLogPath, type StepOutputs } from "../../log";
+import type { StepOutputs } from "../../log";
 import {
 	endedAtReason,
 	type NodeAction,
@@ -350,7 +350,7 @@ async function poll(
 		cwd: step.worktree,
 		env,
 		outputFile: true,
-		logPath: commandLogPath(ctx.dataDir, ctx.run.id, step.stepId),
+		logPath: ctx.log.files(ctx.run.id).commandLog(step.stepId),
 		signal: step.signal,
 		onOutput: (stream, text) =>
 			step.record(null, { type: "command-output", stream, text }),
@@ -405,7 +405,7 @@ function sleep(node: WaitNode, wait: Omit<OwnWait, "reason">): BodyResult {
 
 /** The tail of the step's log file: every try of the command, appended. */
 async function lastTail(ctx: StepContext, step: StepHandle): Promise<string> {
-	const file = Bun.file(commandLogPath(ctx.dataDir, ctx.run.id, step.stepId));
+	const file = Bun.file(ctx.log.files(ctx.run.id).commandLog(step.stepId));
 	return (await file.exists()) ? tailOf(await file.text()) : "";
 }
 

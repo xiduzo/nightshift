@@ -1,7 +1,7 @@
 import type { FlowNode } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import type { Device } from "../device";
-import { type DerivedStep, readTranscriptFile, transcriptToRead } from "../log";
+import { type DerivedStep, readTranscriptFile } from "../log";
 import { deriveSteps } from "../read";
 import { messageOf, type StepContext } from "./context";
 import type { OpenStep } from "./step-runner";
@@ -123,12 +123,9 @@ async function recorded(
 } | null> {
 	try {
 		const entries = await readTranscriptFile(
-			transcriptToRead(
-				ctx.dataDir,
-				ctx.run.id,
-				step.stepId,
-				step.existing?.transcriptPath ?? "",
-			),
+			ctx.log
+				.files(ctx.run.id)
+				.transcriptToRead(step.stepId, step.existing?.transcriptPath ?? ""),
 		);
 		let start: { tree: string; at: number } | null = null;
 		let last: string | null = null;

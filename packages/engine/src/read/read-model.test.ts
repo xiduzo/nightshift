@@ -43,7 +43,10 @@ beforeEach(async () => {
 		baseRef: "main",
 		walkerId: sandbox.deviceId,
 	});
-	log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+	log = createRunLog(sandbox.db, {
+		walkerId: sandbox.deviceId,
+		dataDir: sandbox.dataDir,
+	});
 	bus = createRunBus();
 	reads = createReadModel({
 		db: sandbox.db,

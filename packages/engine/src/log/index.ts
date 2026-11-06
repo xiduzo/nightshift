@@ -119,14 +119,12 @@ export type {
 	WorktreeFileChange,
 } from "./step-events";
 export {
-	commandLogPath,
 	lastEntryAt,
 	openTranscriptWriter,
 	parseTranscript,
+	type RunFiles,
 	readRunTranscript,
 	readTranscriptFile,
-	serviceLogPath,
-	transcriptPath,
-	transcriptToRead,
+	runFiles,
 } from "./transcripts";
 export { worktreeRemovals } from "./worktree-removals";

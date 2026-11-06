@@ -12,7 +12,6 @@ import { eq } from "drizzle-orm";
 import type { Device } from "../device";
 import { type KnowledgeUseEvent, knowledgeUseEvent } from "../knowledge";
 import {
-	commandLogPath,
 	type DerivedStep,
 	type EnginePayloads,
 	type FlowScore,
@@ -27,7 +26,6 @@ import {
 	type StepOutcome,
 	type StepOutputs,
 	scopeKey,
-	transcriptPath,
 } from "../log";
 import {
 	deriveBudgetSpend,
@@ -713,10 +711,10 @@ export async function beginStep(
 			}
 		}
 		stepId = randomUUID();
-		path = transcriptPath(ctx.dataDir, runId, stepId);
+		path = ctx.log.files(runId).transcript(stepId);
 		visit = positionOf(state, logged, scope).nextVisit(node);
 		const logPath = ctx.kindOf(node).logsCommandOutput(node)
-			? commandLogPath(ctx.dataDir, runId, stepId)
+			? ctx.log.files(runId).commandLog(stepId)
 			: null;
 		// The row and its event are one batch: a stop lands before or after both.
 		await ctx.log.append(

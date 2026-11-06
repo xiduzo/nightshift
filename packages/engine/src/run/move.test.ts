@@ -147,7 +147,12 @@ async function computer(
 			scheduler: false,
 			peers,
 		}),
-		{ runLog: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }) },
+		{
+			runLog: createRunLog(sandbox.db, {
+				walkerId: sandbox.deviceId,
+				dataDir: sandbox.dataDir,
+			}),
+		},
 	);
 	if (!context) throw new Error("The engine made no peers.");
 	return { sandbox, engine, context };

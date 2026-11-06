@@ -12,7 +12,6 @@ import {
 	type RunLog,
 	readTranscriptFile,
 	stepIdsOfRun,
-	transcriptPath,
 } from "../log";
 
 /*
@@ -70,12 +69,11 @@ export type RunWalks = WalkFiles & {
 
 export function createRunWalks(deps: {
 	db: Database;
-	/** This computer's data folder, where its steps' transcripts are. */
-	dataDir: string;
-	log: Pick<RunLog, "walkerId" | "derive">;
+	/** Also names the files of a run's steps on this computer (`files`). */
+	log: Pick<RunLog, "walkerId" | "derive" | "files">;
 	history: Pick<RunHistory, "runOwner" | "ownStepFiles">;
 }): RunWalks {
-	const { db, dataDir, log, history } = deps;
+	const { db, log, history } = deps;
 
 	/** The run's Space when this computer walks it, else null. */
 	async function ownSpace(runId: string): Promise<string | null> {
@@ -180,7 +178,7 @@ export function createRunWalks(deps: {
 			.where(eq(step.id, stepId));
 		if (!row || row.runId !== runId) return;
 		// Not the row's path: that names the old Walker's data folder.
-		const path = transcriptPath(dataDir, runId, stepId);
+		const path = log.files(runId).transcript(stepId);
 		// A run moved back finds its own older part here: the copy goes further.
 		const lastOf = (entries: readonly { seq: number }[]) =>
 			entries.at(-1)?.seq ?? 0;

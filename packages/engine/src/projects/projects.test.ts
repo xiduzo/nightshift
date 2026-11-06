@@ -36,7 +36,10 @@ afterEach(async () => {
 const projectsOf = (over: SpaceDocuments = documents) =>
 	createProjects({
 		db: sandbox.db,
-		log: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }),
+		log: createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		}),
 		deviceId: async () => sandbox.deviceId,
 		documents: over,
 		directory: aloneDirectory(sandbox.db),
@@ -315,7 +318,10 @@ describe("what the peers ask of the Projects", () => {
 		};
 		const projects = createProjects({
 			db: sandbox.db,
-			log: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }),
+			log: createRunLog(sandbox.db, {
+				walkerId: sandbox.deviceId,
+				dataDir: sandbox.dataDir,
+			}),
 			deviceId: async () => sandbox.deviceId,
 			documents: replica,
 			directory,

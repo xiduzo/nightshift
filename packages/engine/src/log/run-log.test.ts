@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { join } from "node:path";
 import type { Database } from "@nightshift/db";
 import { event, project, run } from "@nightshift/db/schema";
 import { asc, eq } from "drizzle-orm";
@@ -6,6 +7,7 @@ import { asc, eq } from "drizzle-orm";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { type EventInput, type LoggedEvent, parseEventRow } from "./events";
 import { createRunLog } from "./run-log";
+import { RUN_NOT_FOUND } from "./run-row";
 import { foldRun, type RunState } from "./run-state";
 
 let sandbox: Sandbox;
@@ -119,7 +121,10 @@ const edge = (runId: string, n: number): EventInput<"EdgeTaken"> => ({
 
 describe("run log", () => {
 	test("an append is kept as committed, with its seq and time", async () => {
-		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		const log = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
 		await log.append(started("r1"));
 		expect(await log.events("r1")).toEqual(await fromDb("r1"));
 		const logged = await log.append(edge("r1", 1));
@@ -129,7 +134,10 @@ describe("run log", () => {
 	});
 
 	test("a run it forgets is read from the database again, with what changed there", async () => {
-		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		const log = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
 		await log.append(started("r1"));
 		// Kept in memory once read.
 		expect(await log.events("r1")).toHaveLength(1);
@@ -151,7 +159,10 @@ describe("run log", () => {
 	});
 
 	test("a read is a copy: a later append does not change it", async () => {
-		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		const log = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
 		await log.append(started("r1"));
 		const before = await log.events("r1");
 		await log.append(edge("r1", 1));
@@ -160,7 +171,10 @@ describe("run log", () => {
 	});
 
 	test("concurrent appends to one run keep seq order", async () => {
-		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		const log = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
 		await log.append(started("r1"));
 		await log.events("r1");
 		await Promise.all(
@@ -181,6 +195,7 @@ describe("run log", () => {
 		});
 		const log = createRunLog(heldReads(sandbox.db, held), {
 			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
 		});
 		await log.append(started("r1"));
 		const read = log.events("r1");
@@ -197,6 +212,7 @@ describe("run log", () => {
 		});
 		const log = createRunLog(heldReads(sandbox.db, held), {
 			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
 		});
 		const count = (run: RunState) => eventsIn(run);
 		await log.append(started("r1"));
@@ -208,7 +224,10 @@ describe("run log", () => {
 	});
 
 	test("an append that throws leaves the log as it was", async () => {
-		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		const log = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
 		await log.append(started("r1"));
 		await log.events("r1");
 		await sandbox.db.$client.execute(
@@ -222,7 +241,10 @@ describe("run log", () => {
 	});
 
 	test("an append and the rows it names land in one batch, or not at all", async () => {
-		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		const log = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
 		const projectRow = (id: string) =>
 			sandbox.db
 				.insert(project)
@@ -255,6 +277,7 @@ describe("run log", () => {
 	test("ended runs are dropped least recently used first; open runs stay", async () => {
 		const log = createRunLog(sandbox.db, {
 			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
 			maxIdleEvents: 4,
 		});
 		await log.append(started("open"));
@@ -285,6 +308,7 @@ describe("run log", () => {
 	test("derive keeps its value until the run's next append", async () => {
 		const log = createRunLog(sandbox.db, {
 			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
 			maxIdleEvents: 0,
 		});
 		let calls = 0;
@@ -316,10 +340,14 @@ describe("run log", () => {
 
 	test("reads at once of a log not in memory read it once, and derive once", async () => {
 		const { db, counter } = countedReads(sandbox.db);
-		await createRunLog(sandbox.db, { walkerId: sandbox.deviceId }).append(
-			started("r1"),
-		);
-		const log = createRunLog(db, { walkerId: sandbox.deviceId });
+		await createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		}).append(started("r1"));
+		const log = createRunLog(db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
 		let calls = 0;
 		const count = (run: RunState) => {
 			calls++;
@@ -341,7 +369,10 @@ describe("run log", () => {
 	});
 
 	test("every watcher of a run shares one derivation per append", async () => {
-		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		const log = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
 		let calls = 0;
 		const count = (run: RunState) => {
 			calls++;
@@ -363,7 +394,10 @@ describe("run log", () => {
 
 describe("the run state", () => {
 	test("each append applies its event to the state; a state given out never changes", async () => {
-		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		const log = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
 		await log.append(started("r1"));
 		const before = await log.state("r1");
 		const kept = structuredClone(before);
@@ -408,8 +442,14 @@ describe("event identity: (walker, walker seq)", () => {
 			.orderBy(asc(event.seq));
 
 	test("each Walker counts its own events from 1; the local seq orders them all", async () => {
-		const here = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
-		const studio = createRunLog(sandbox.db, { walkerId: "studio" });
+		const here = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
+		const studio = createRunLog(sandbox.db, {
+			walkerId: "studio",
+			dataDir: sandbox.dataDir,
+		});
 		await here.append(started("r1"));
 		await studio.append(started("r2"));
 		await here.append(edge("r1", 1));
@@ -427,7 +467,10 @@ describe("event identity: (walker, walker seq)", () => {
 	});
 
 	test("appends at once never share a number", async () => {
-		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		const log = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
 		await Promise.all(
 			Array.from({ length: 20 }, (_, i) => log.append(edge(`r${i % 3}`, i))),
 		);
@@ -435,5 +478,44 @@ describe("event identity: (walker, walker seq)", () => {
 		expect(numbers.toSorted((a, b) => a - b)).toEqual(
 			Array.from({ length: 20 }, (_, i) => i + 1),
 		);
+	});
+});
+
+describe("the log's doors to a run's row and files", () => {
+	test("files names the files of a run's steps under this computer's data folder", () => {
+		const log = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
+		const files = log.files("r1");
+		const own = join(sandbox.dataDir, "transcripts", "r1", "s1.ndjson");
+		expect(files.transcript("s1")).toBe(own);
+		expect(files.commandLog("s1")).toBe(
+			join(sandbox.dataDir, "logs", "r1", "s1.log"),
+		);
+		expect(files.serviceLog("s1")).toBe(
+			join(sandbox.dataDir, "logs", "r1", "s1.service.log"),
+		);
+		// A row without a path, or with this computer's, reads the own file.
+		expect(files.transcriptToRead("s1", "")).toBe(own);
+		expect(files.transcriptToRead("s1", own)).toBe(own);
+	});
+
+	test("row gives the run's row, and refuses a run that is not here", async () => {
+		const log = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
+		expect((await log.row("r1")).id).toBe("r1");
+		expect(log.row("missing")).rejects.toThrow(RUN_NOT_FOUND);
+	});
+
+	test("walkedHere says whether a run's row names this log's Walker", async () => {
+		const log = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
+		expect(await log.walkedHere({ walkerId: sandbox.deviceId })).toBe(true);
+		expect(await log.walkedHere({ walkerId: "studio" })).toBe(false);
 	});
 });

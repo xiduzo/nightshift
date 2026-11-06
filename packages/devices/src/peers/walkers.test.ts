@@ -66,7 +66,12 @@ function engineOf(sandbox: Sandbox, documents?: SpaceDocuments): PeerEngine {
 			scheduler: false,
 			...(documents ? { spaceDocuments: documents } : {}),
 		}),
-		{ runLog: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }) },
+		{
+			runLog: createRunLog(sandbox.db, {
+				walkerId: sandbox.deviceId,
+				dataDir: sandbox.dataDir,
+			}),
+		},
 	);
 }
 

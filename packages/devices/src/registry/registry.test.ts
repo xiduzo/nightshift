@@ -19,7 +19,10 @@ let clock: number;
 let registry: DeviceRegistry;
 
 function newRegistry() {
-	const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+	const log = createRunLog(sandbox.db, {
+		walkerId: sandbox.deviceId,
+		dataDir: sandbox.dataDir,
+	});
 	return createDeviceRegistry({
 		db: sandbox.db,
 		logFact: async (fact, writes) => {

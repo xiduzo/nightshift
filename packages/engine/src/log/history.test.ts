@@ -22,7 +22,10 @@ import { createRunLog, type RunLog } from "./run-log";
 type Replica = { sandbox: Sandbox; log: RunLog; history: RunHistory };
 
 function replicaOf(sandbox: Sandbox): Replica {
-	const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+	const log = createRunLog(sandbox.db, {
+		walkerId: sandbox.deviceId,
+		dataDir: sandbox.dataDir,
+	});
 	const bus = createRunBus();
 	return {
 		sandbox,

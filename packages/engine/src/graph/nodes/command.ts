@@ -8,7 +8,7 @@ import {
 } from "@nightshift/flows";
 
 import { runCommand } from "../../device";
-import { commandLogPath, flowScores, type StepOutputs } from "../../log";
+import { flowScores, type StepOutputs } from "../../log";
 import {
 	endedAtReason,
 	type NodeAction,
@@ -115,7 +115,7 @@ async function runShell(
 		outputFile: true,
 		// A sync flow writes the project's knowledge: `NS_KNOWLEDGE`.
 		knowledge: { projectId: ctx.run.projectId },
-		logPath: commandLogPath(ctx.dataDir, ctx.run.id, stepId),
+		logPath: ctx.log.files(ctx.run.id).commandLog(stepId),
 		signal,
 		onOutput: (stream, text) => {
 			if (json && stream === "stdout") stdout += text;

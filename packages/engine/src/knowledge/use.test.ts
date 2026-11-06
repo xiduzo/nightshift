@@ -27,7 +27,10 @@ async function setup() {
 			.insert(project)
 			.values({ id, spaceId: sandbox.spaceId, name: id });
 	}
-	const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+	const log = createRunLog(sandbox.db, {
+		walkerId: sandbox.deviceId,
+		dataDir: sandbox.dataDir,
+	});
 	return { db: sandbox.db, log, sandbox };
 }
 

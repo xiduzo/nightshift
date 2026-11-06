@@ -42,7 +42,10 @@ beforeEach(async () => {
 	from = sandbox.spaceId;
 	to = await otherSpace(sandbox.db, "Home");
 	walker = sandbox.deviceId;
-	log = createRunLog(sandbox.db, { walkerId: walker });
+	log = createRunLog(sandbox.db, {
+		walkerId: walker,
+		dataDir: sandbox.dataDir,
+	});
 	await sandbox.db
 		.insert(device)
 		.values({ id: STUDIO, name: "studio", platform: "linux" });

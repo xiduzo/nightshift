@@ -380,7 +380,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 	});
 	const mapMemo = createMapMemo();
 	/** Facts of a project with no run: an agent's use through the MCP server. No landing feed reads them. */
-	const log = createRunLog(db, { walkerId: device.id });
+	const log = createRunLog(db, { walkerId: device.id, dataDir: deps.dataDir });
 
 	/** Logs an agent's use; a failed write does not fail the answer. */
 	async function logged(projectId: string, use: KnowledgeUse): Promise<void> {

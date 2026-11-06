@@ -11,16 +11,15 @@ import {
 } from "@nightshift/flows";
 
 import { runCommand } from "../../device";
-import {
-	commandLogPath,
-	type DerivedStep,
-	type EnginePayloads,
-	type InputValues,
-	type ItemFacts,
-	type RunState,
-	type Scope,
-	type StepOutcome,
-	type StepOutputs,
+import type {
+	DerivedStep,
+	EnginePayloads,
+	InputValues,
+	ItemFacts,
+	RunState,
+	Scope,
+	StepOutcome,
+	StepOutputs,
 } from "../../log";
 import { itemBranchName } from "../../projects";
 import { itemStates } from "../../read";
@@ -503,7 +502,7 @@ async function readSource(
 				command,
 				cwd: worktree,
 				env,
-				logPath: commandLogPath(ctx.dataDir, ctx.run.id, step.stepId),
+				logPath: ctx.log.files(ctx.run.id).commandLog(step.stepId),
 				signal: ctx.signal(),
 				onOutput: (stream, text) => {
 					if (stream === "stdout") stdout += text;

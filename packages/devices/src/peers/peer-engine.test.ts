@@ -88,7 +88,10 @@ function engineOf(
 		{
 			runLog:
 				options.runLog ??
-				createRunLog(sandbox.db, { walkerId: sandbox.deviceId }),
+				createRunLog(sandbox.db, {
+					walkerId: sandbox.deviceId,
+					dataDir: sandbox.dataDir,
+				}),
 		},
 	);
 	engines.push(engine);
@@ -293,7 +296,10 @@ describe("a disposed engine", () => {
 	}
 
 	test("tries no more to take over a run that moves here: the next engine takes it over", async () => {
-		const logA = createRunLog(a.db, { walkerId: a.deviceId });
+		const logA = createRunLog(a.db, {
+			walkerId: a.deviceId,
+			dataDir: a.dataDir,
+		});
 		const engineA = engineOf(a, { runLog: logA });
 		let archive = new Map<string, string>();
 		const relay = relayOf(() => archive);

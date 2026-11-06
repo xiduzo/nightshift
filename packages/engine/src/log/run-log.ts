@@ -15,7 +15,9 @@ import {
 	landedEvent,
 	parseEventRow,
 } from "./events";
+import { getRunRow, type RunRow } from "./run-row";
 import { foldRun, nextState, type RunState } from "./run-state";
+import { type RunFiles, runFiles } from "./transcripts";
 
 /**
  * The event log of each run, kept in memory by the daemon that writes it.
@@ -48,6 +50,9 @@ import { foldRun, nextState, type RunState } from "./run-state";
  * - `onLanded` tells a listener about every event that landed, appended or
  *   ingested, with its Space and Walker: the landed feed (`landed.ts`)
  *   is its one reader.
+ * - The log is the one door to the rest of a run's facts for the walk and
+ *   the actions: its row (`row`), whether this computer walks it
+ *   (`walkedHere`) and the files of its steps on this computer (`files`).
  */
 
 /** An event another Walker wrote, as the exchange carries it. */
@@ -79,6 +84,8 @@ export type RunLogOptions = {
 	 * database's own Device, `DeviceDirectory.selfId`).
 	 */
 	walkerId: string | (() => Promise<string>);
+	/** This computer's data folder, where the files of its runs' steps are (`files`). */
+	dataDir: string;
 };
 
 const DEFAULT_MAX_IDLE_EVENTS = 20_000;
@@ -340,6 +347,21 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 
 		/** The Device that appends: the Walker of the runs this log writes. */
 		walkerId,
+
+		/** The run's row. Refuses (`not-found`) a run that is not here. */
+		row(runId: string): Promise<RunRow> {
+			return getRunRow(db, runId);
+		},
+
+		/** Whether this computer walks the run: its row names this log's Walker. */
+		async walkedHere(row: Pick<RunRow, "walkerId">): Promise<boolean> {
+			return row.walkerId === (await walkerId());
+		},
+
+		/** The files of the run's steps on this computer. */
+		files(runId: string): RunFiles {
+			return runFiles(options.dataDir, runId);
+		},
 
 		/**
 		 * Appends one event as the Walker's next, in one batch with `writes`

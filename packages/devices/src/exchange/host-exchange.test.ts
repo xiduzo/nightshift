@@ -41,7 +41,10 @@ let ownerId: string;
 let projectId: string;
 beforeEach(async () => {
 	sandbox = await createSandbox();
-	runLog = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+	runLog = createRunLog(sandbox.db, {
+		walkerId: sandbox.deviceId,
+		dataDir: sandbox.dataDir,
+	});
 	documents = createSpaceDocuments({
 		db: sandbox.db,
 		directory: deviceDirectory(sandbox.db),

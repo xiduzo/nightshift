@@ -170,7 +170,10 @@ describe("adoptSelfDevice", () => {
 			deviceId: from,
 			path: sandbox.repoPath,
 		});
-		await createRunLog(sandbox.db, { walkerId: from }).append({
+		await createRunLog(sandbox.db, {
+			walkerId: from,
+			dataDir: sandbox.dataDir,
+		}).append({
 			type: "DeviceOnline",
 			payload: { deviceId: from },
 			spaceId: sandbox.spaceId,
@@ -190,7 +193,10 @@ describe("adoptSelfDevice", () => {
 
 	test("its events count on after the last the Host has, so the Host drops none", async () => {
 		const from = sandbox.deviceId;
-		const before = createRunLog(sandbox.db, { walkerId: from });
+		const before = createRunLog(sandbox.db, {
+			walkerId: from,
+			dataDir: sandbox.dataDir,
+		});
 		await before.append({
 			type: "DeviceOnline",
 			payload: { deviceId: from },
@@ -215,6 +221,7 @@ describe("adoptSelfDevice", () => {
 		}
 		const next = await createRunLog(sandbox.db, {
 			walkerId: "known-to-the-host",
+			dataDir: sandbox.dataDir,
 		}).append({
 			type: "DeviceOnline",
 			payload: { deviceId: "known-to-the-host" },
@@ -235,7 +242,10 @@ describe("adoptSelfDevice", () => {
 	test("with no events of its own, the next event still comes after the Host's", async () => {
 		await sandbox.db.delete(event);
 		await adoptSelfDevice(sandbox.db, "known-to-the-host", 7);
-		await createRunLog(sandbox.db, { walkerId: "known-to-the-host" }).append({
+		await createRunLog(sandbox.db, {
+			walkerId: "known-to-the-host",
+			dataDir: sandbox.dataDir,
+		}).append({
 			type: "DeviceOnline",
 			payload: { deviceId: "known-to-the-host" },
 			spaceId: sandbox.spaceId,

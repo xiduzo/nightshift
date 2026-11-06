@@ -27,7 +27,6 @@ import { now } from "@nightshift/time";
 import { createArtifactStore } from "../../artifacts";
 import { runCommand, type SessionEvent, type SessionInput } from "../../device";
 import {
-	commandLogPath,
 	type EnginePayloads,
 	type RunState,
 	type StepOutputs,
@@ -225,7 +224,7 @@ async function checkTry(
 		command,
 		cwd: step.worktree,
 		env,
-		logPath: commandLogPath(ctx.dataDir, ctx.run.id, step.stepId),
+		logPath: ctx.log.files(ctx.run.id).commandLog(step.stepId),
 		signal: step.signal,
 		onOutput: (stream, text) =>
 			step.record(null, { type: "command-output", stream, text }),

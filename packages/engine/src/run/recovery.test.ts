@@ -293,7 +293,10 @@ describe("startup recovery: what a dead daemon's work ends with", () => {
 			): Promise<void>;
 		}) => Promise<void>,
 	) {
-		const runLog = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		const runLog = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
 		const push = async <T extends EngineEventType>(
 			type: T,
 			payload: EnginePayloads[T],
@@ -327,7 +330,10 @@ describe("startup recovery: what a dead daemon's work ends with", () => {
 
 	/** Runs startup recovery on a new daemon (resume off) and returns the run's log after it. */
 	async function recover(flowOf: (row: { flow: string }) => Flow) {
-		const runLog = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		const runLog = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
 		const bus = createRunBus();
 		told = [];
 		holdsHeard = [];

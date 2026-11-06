@@ -91,7 +91,10 @@ function makeDaemon(
 	options: Parameters<typeof makeEngine>[1] = {},
 	internals: EngineInternals = {},
 ): Engine {
-	const runLog = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+	const runLog = createRunLog(sandbox.db, {
+		walkerId: sandbox.deviceId,
+		dataDir: sandbox.dataDir,
+	});
 	runLogs.push(runLog);
 	return createEngine(
 		withDevice({
@@ -959,7 +962,10 @@ describe("runs", () => {
 describe("stop and resume", () => {
 	test("stop ends a run the log says runs when its drive could not log the end", async () => {
 		// The run log fails the first RunEnded: the drive ends, the run does not.
-		const inner = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		const inner = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
 		runLogs.push(inner);
 		let failed = false;
 		const runLog: RunLog = {
@@ -1166,7 +1172,10 @@ describe("stop and resume", () => {
 		async (_name, reenter) => {
 			// The log holds `RunResumed` back until the test lets it go: the
 			// re-entry is half done when the stop comes.
-			const inner = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+			const inner = createRunLog(sandbox.db, {
+				walkerId: sandbox.deviceId,
+				dataDir: sandbox.dataDir,
+			});
 			runLogs.push(inner);
 			let release = () => {};
 			let held: Promise<void> | null = null;
