@@ -1,19 +1,14 @@
 import {
 	type FlowDocuments,
 	HostUnreachableError,
-	OlderHostError,
+	OLDER_HOST,
 	START_DEADLINE_MS,
 	type WalkFile,
 } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import type { HostClient, HostRelay, InStep } from "../contract";
 import type { RunCommands } from "../exchange";
-import {
-	type DeviceLinks,
-	fromHost,
-	type HostSpaces,
-	isOlderHost,
-} from "../links";
+import type { DeviceLinks, HostSpaces } from "../links";
 import type { DeviceRegistry } from "../registry";
 import { createSpaceRoutes } from "./route";
 
@@ -29,27 +24,11 @@ import { createSpaceRoutes } from "./route";
  * - A Host that cannot be reached: every call throws
  *   `HostUnreachableError`. The person tries again later.
  *
- * The Host's errors come back in this computer's words (`fromHost`): its
+ * The Host's errors come back in this computer's words: the Link's. Its
  * refusals keep their words and their kind, and a key the Host no longer
- * knows asks the person to pair this computer again.
+ * knows asks the person to pair this computer again. Each call here adds
+ * only what a Host of a version without its procedure says.
  */
-/**
- * A knowledge call to a Host: a Host of a version before knowledge in the
- * Space (ADR 4) does not know the procedure, and says so as a Host of an
- * older version does (`isOlderHost`). That is `OlderHostError`, not a
- * failed sync. Its other errors in this computer's words (`fromHost`).
- */
-async function knowledgeCall<T>(
-	client: HostClient,
-	use: (client: HostClient) => Promise<T>,
-): Promise<T> {
-	try {
-		return await use(client);
-	} catch (error) {
-		if (isOlderHost(error)) throw new OlderHostError();
-		throw fromHost(error);
-	}
-}
 
 /** What a person reads when the Host that keeps the Space cannot add a project for this computer. */
 export const OLDER_HOST_PROJECTS =
@@ -58,26 +37,6 @@ export const OLDER_HOST_PROJECTS =
 /** What a run reads when the Host that keeps its Space does not know leases. */
 export const OLDER_HOST_LEASES =
 	"The computer that keeps this Space runs an older version of Night Shift. Update Night Shift there to use a Lease node.";
-
-/**
- * A lease call to the Host that keeps the Space (ADR 7). A Host of a
- * version before leases does not know the procedure: the run reads that
- * it must update the Host. A call the network cuts is a Host that cannot
- * be reached, so the run waits for it, as it does without a Link.
- */
-async function leaseCall<T>(
-	client: HostClient,
-	use: (client: HostClient) => Promise<T>,
-): Promise<T> {
-	try {
-		return await use(client);
-	} catch (error) {
-		if (isOlderHost(error)) throw new Refusal("unavailable", OLDER_HOST_LEASES);
-		const mine = fromHost(error);
-		if (mine instanceof Refusal) throw mine;
-		throw new HostUnreachableError();
-	}
-}
 
 export function createRelay(deps: {
 	/** Lazy: the engine is made with this relay. */
@@ -109,11 +68,26 @@ export function createRelay(deps: {
 		return (await link.inStep(names, options)) ? "in step" : "timed out";
 	}
 
-	/** The client of the Host that keeps the Space. Throws when that Host cannot be reached. */
-	async function hostClient(spaceId: string): Promise<HostClient> {
-		const to = await route(spaceId);
-		if (to.at !== "host") throw new HostUnreachableError();
-		return to.client;
+	/**
+	 * A lease call to the Host that keeps the Space (ADR 7). A Host of a
+	 * version before leases does not know the procedure: the run reads that
+	 * it must update the Host. A call the network cuts, or that does not
+	 * settle in time, is a Host that cannot be reached, so the run waits
+	 * for it, as it does without a Link.
+	 */
+	async function leaseCall<T>(
+		spaceId: string,
+		use: (client: HostClient) => Promise<T>,
+	): Promise<T> {
+		try {
+			return await onHost(spaceId, use, {
+				olderHost: OLDER_HOST_LEASES,
+				late: () => new HostUnreachableError(),
+			});
+		} catch (error) {
+			if (error instanceof Refusal) throw error;
+			throw new HostUnreachableError();
+		}
 	}
 
 	return {
@@ -137,16 +111,11 @@ export function createRelay(deps: {
 
 		async addProject({ spaceId, name, remote }) {
 			// The Host adds it in the name of the key's Person.
-			return onHost(spaceId, async (client) => {
-				try {
-					return await client.sync.addProject({ spaceId, name, remote });
-				} catch (error) {
-					if (isOlderHost(error)) {
-						throw new Refusal("unavailable", OLDER_HOST_PROJECTS);
-					}
-					throw error;
-				}
-			});
+			return onHost(
+				spaceId,
+				(client) => client.sync.addProject({ spaceId, name, remote }),
+				{ olderHost: OLDER_HOST_PROJECTS },
+			);
 		},
 
 		async addClone({ spaceId, projectId, deviceName }) {
@@ -171,10 +140,12 @@ export function createRelay(deps: {
 			if (ref.kind !== "content") {
 				return to.ask((client) => client.archive.get({ ref }));
 			}
-			// Knowledge content travels in base64.
+			// Knowledge content travels in base64. A Host of a version before
+			// knowledge in the Space (ADR 4) says so: not a failed sync.
 			const { spaceId, sha256 } = ref;
-			const content = await knowledgeCall(to.client, (client) =>
-				client.archive.knowledgeGet({ spaceId, sha256 }),
+			const content = await to.ask(
+				(client) => client.archive.knowledgeGet({ spaceId, sha256 }),
+				{ olderHost: OLDER_HOST },
 			);
 			return content === null
 				? null
@@ -190,8 +161,9 @@ export function createRelay(deps: {
 				const content = Buffer.from(entry.content as Uint8Array).toString(
 					"base64",
 				);
-				await knowledgeCall(to.client, (client) =>
-					client.archive.knowledgePut({ spaceId, sha256, content }),
+				await to.ask(
+					(client) => client.archive.knowledgePut({ spaceId, sha256, content }),
+					{ olderHost: OLDER_HOST },
 				);
 			} else {
 				const { ref, content, stamp } = entry as WalkFile;
@@ -203,14 +175,9 @@ export function createRelay(deps: {
 		},
 
 		async *follow(step, afterSeq, signal) {
-			const entries = await onHost(step.spaceId, (client) =>
+			yield* await onHost(step.spaceId, (client) =>
 				client.archive.follow({ step, afterSeq }, { signal }),
 			);
-			try {
-				yield* entries;
-			} catch (error) {
-				throw fromHost(error);
-			}
 		},
 
 		inStep,
@@ -247,9 +214,12 @@ export function createRelay(deps: {
 			return to.ask(
 				(client, signal) => client.sync.startRun(start, { signal }),
 				{
-					ms: START_DEADLINE_MS + 30_000,
-					words:
-						"The computer that keeps this Space did not answer in time. Check the run list, then start the run again.",
+					deadlineMs: START_DEADLINE_MS + 30_000,
+					late: () =>
+						new Refusal(
+							"unavailable",
+							"The computer that keeps this Space did not answer in time. Check the run list, then start the run again.",
+						),
 				},
 			);
 		},
@@ -257,17 +227,15 @@ export function createRelay(deps: {
 		leases: {
 			async take({ walkerId: _walker, ...take }) {
 				// The Host takes it for the key's Device, its Walker.
-				return leaseCall(await hostClient(take.spaceId), (client) =>
-					client.leases.take(take),
-				);
+				return leaseCall(take.spaceId, (client) => client.leases.take(take));
 			},
 			async renew({ spaceId, runId, names }) {
-				return leaseCall(await hostClient(spaceId), (client) =>
+				return leaseCall(spaceId, (client) =>
 					client.leases.renew({ spaceId, runId, names: [...names] }),
 				);
 			},
 			async release({ spaceId, runId, names }) {
-				await leaseCall(await hostClient(spaceId), (client) =>
+				await leaseCall(spaceId, (client) =>
 					client.leases.release({
 						spaceId,
 						runId,

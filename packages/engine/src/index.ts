@@ -39,6 +39,7 @@ export {
 	COMMAND_KINDS,
 	HOST_UNREACHABLE,
 	HostUnreachableError,
+	OLDER_HOST,
 	OlderHostError,
 	permissionOf,
 	runCommandSchema,

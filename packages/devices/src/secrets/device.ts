@@ -1,14 +1,7 @@
 import { HostUnreachableError } from "@nightshift/engine";
 import type { PersonalSecrets } from "@nightshift/engine/device-config";
-import { Refusal } from "@nightshift/refusal";
 import type { HostClient } from "../contract";
-import {
-	type DeviceLinks,
-	fromHost,
-	type HostLinks,
-	isOlderHost,
-	type Link,
-} from "../links";
+import type { DeviceLinks, HostLinks, Link } from "../links";
 import type { PersonalSecretStore } from "./store";
 
 /** What a person reads when their Home Host does not know Personal secrets yet. */
@@ -32,7 +25,7 @@ export const PERSONAL_DEADLINE_MS = 20_000;
  * A Host that cannot be reached, or does not answer within
  * `PERSONAL_DEADLINE_MS`, throws `HostUnreachableError`: a step then reads
  * the secret as missing (fails closed). The Host's refusals come back in
- * this computer's words (`fromHost`).
+ * this computer's words: the Link's.
  */
 export function devicePersonalSecrets(deps: {
 	hostLinks: Pick<HostLinks, "home">;
@@ -88,9 +81,8 @@ export function devicePersonalSecrets(deps: {
 
 /**
  * One call of a Host over its link, for a secret: within `deadlineMs`,
- * else `HostUnreachableError`, as is a Host without a link here. The
- * Host's refusals come back in this computer's words (`fromHost`), and
- * a Host of a version without the call says `olderHost`.
+ * else `HostUnreachableError`, as is a Host without a link here. A Host
+ * of a version without the call says `olderHost`.
  */
 export async function askHost<T>(
 	link: Pick<Link, "call"> | undefined,
@@ -98,20 +90,8 @@ export async function askHost<T>(
 	options: { deadlineMs: number; olderHost: string },
 ): Promise<T> {
 	if (!link) throw new HostUnreachableError();
-	let timer: Timer | undefined;
-	const late = new Promise<never>((_, reject) => {
-		timer = setTimeout(
-			() => reject(new HostUnreachableError()),
-			options.deadlineMs,
-		);
-		timer.unref?.();
+	return link.call(onHost, {
+		...options,
+		late: () => new HostUnreachableError(),
 	});
-	try {
-		return await Promise.race([link.call(onHost), late]);
-	} catch (error) {
-		if (isOlderHost(error)) throw new Refusal("unavailable", options.olderHost);
-		throw fromHost(error);
-	} finally {
-		clearTimeout(timer);
-	}
 }

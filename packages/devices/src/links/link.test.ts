@@ -1,15 +1,20 @@
 import { describe, expect, test } from "bun:test";
 import type { SyncAccess } from "@nightshift/auth";
-import { HostUnreachableError } from "@nightshift/engine";
+import { HostUnreachableError, OlderHostError } from "@nightshift/engine";
 import { now } from "@nightshift/time";
 import { ORPCError } from "@orpc/client";
 import * as Y from "yjs";
-import type { HostHello } from "../contract";
+import type { HostClient, HostHello } from "../contract";
 import { memoryDocuments, partialHostClient } from "../testing";
+import { NotPairedError } from "./from-host";
 import type { HostLink } from "./host-links";
 import { firstAnswering, httpsLink, type LinkState } from "./link";
 
-/** The Link's own logic, over fake Hosts: no network. */
+/**
+ * The Link's own logic, over fake Hosts: no network. The fake Hosts
+ * answer as the wire does (`ORPCError`): what the link hands out answers
+ * in this computer's words.
+ */
 
 const LINK: HostLink = {
 	hostId: "host-a",
@@ -300,9 +305,9 @@ describe("httpsLink", () => {
 		console.error = () => {};
 		try {
 			// The owner removes this computer's access while the stream runs.
-			link.stream("refused", async () => {
+			link.stream("refused", async (client) => {
 				refuse = true;
-				throw new ORPCError("UNAUTHORIZED");
+				await client.link.heartbeat();
 			});
 			await until(() => link.state().status === "revoked");
 			expect(link.client()).toBeNull();
@@ -310,6 +315,93 @@ describe("httpsLink", () => {
 			console.error = errors;
 			await link.close();
 		}
+	});
+
+	describe("hands out the Host's procedures in this computer's words", () => {
+		/** A Host whose `sync.addProject` answers as `answer` says now. */
+		function hostWith(answer: () => Promise<never>) {
+			const clientFor = () =>
+				partialHostClient({
+					link: {
+						hello: async () => hello([]),
+						heartbeat: async () => hello([]),
+					},
+					sync: { addProject: () => answer() },
+				});
+			return httpsLink({
+				link: LINK,
+				key: "nsd_key",
+				clientFor,
+				heartbeatMs: 60_000,
+			});
+		}
+		const add = (client: HostClient) =>
+			client.sync.addProject({ spaceId: "s", name: "app", remote: "r" });
+
+		test("a call, a stream and the client itself: an older Host says the caller's words, a refusal keeps the Host's", async () => {
+			let answer: () => Promise<never> = () =>
+				Promise.reject(new ORPCError("NOT_FOUND"));
+			const link = hostWith(() => answer());
+			try {
+				const client = await link.ready();
+				const older = await link
+					.call(add, { olderHost: "Update the studio." })
+					.catch((error: unknown) => error);
+				expect(older).toBeInstanceOf(OlderHostError);
+				expect(older).toMatchObject({
+					kind: "unavailable",
+					message: "Update the studio.",
+				});
+				await expect(add(client)).rejects.toBeInstanceOf(OlderHostError);
+				let seen: unknown;
+				const stop = link.stream("test", async (given) => {
+					seen = await add(given).catch((error: unknown) => error);
+				});
+				await until(() => seen !== undefined);
+				stop();
+				expect(seen).toBeInstanceOf(OlderHostError);
+
+				answer = () =>
+					Promise.reject(
+						new ORPCError("BAD_REQUEST", {
+							message: "Not like this.",
+							data: { kind: "invalid" },
+						}),
+					);
+				await expect(link.call(add)).rejects.toMatchObject({
+					kind: "invalid",
+					message: "Not like this.",
+				});
+			} finally {
+				await link.close();
+			}
+		});
+
+		test("a call the Host refuses for the key says to pair again, and the link asks the Host now", async () => {
+			let refuse = false;
+			const host = fakeHost({
+				"https://studio.local": () =>
+					refuse
+						? Promise.reject(new ORPCError("UNAUTHORIZED"))
+						: Promise.resolve(hello([])),
+			});
+			const link = httpsLink({
+				link: LINK,
+				key: "nsd_key",
+				clientFor: host.clientFor,
+				heartbeatMs: 60_000,
+			});
+			try {
+				await link.ready();
+				refuse = true;
+				await expect(
+					link.call((client) => client.link.heartbeat()),
+				).rejects.toBeInstanceOf(NotPairedError);
+				await until(() => link.state().status === "revoked");
+			} finally {
+				await link.close();
+			}
+		});
 	});
 
 	test("a call rejects at once while the link is offline; ready waits for it, and ends when it closes", async () => {

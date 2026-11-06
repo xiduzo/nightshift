@@ -1,7 +1,6 @@
 import type { DeviceCopies } from "@nightshift/engine/device-config";
 import { FAILURE_MESSAGE, Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
-import { ORPCError } from "@orpc/client";
 import type {
 	LeaveResult,
 	MergePending,
@@ -9,13 +8,14 @@ import type {
 	MergeResult,
 	SplitResult,
 } from "../contract";
-import type {
-	DeviceKeyStore,
-	DeviceLinks,
-	HostLinks,
-	HostRole,
-	JoinProgress,
-	Link,
+import {
+	type DeviceKeyStore,
+	type DeviceLinks,
+	type HostLinks,
+	type HostRole,
+	type JoinProgress,
+	type Link,
+	NotPairedError,
 } from "../links";
 import { MERGE_WORDS, type MergeDeps, mergeSteps } from "./merge";
 import { membershipRecord } from "./record";
@@ -300,6 +300,6 @@ async function tell(link: Link | undefined): Promise<boolean> {
 		return true;
 	} catch (error) {
 		// A Host that no longer knows this computer let it go already.
-		return error instanceof ORPCError && error.code === "UNAUTHORIZED";
+		return error instanceof NotPairedError;
 	}
 }

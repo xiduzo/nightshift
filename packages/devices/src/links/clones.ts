@@ -1,7 +1,6 @@
-import type { PeerProjects } from "@nightshift/engine";
-import { ORPCError } from "@orpc/client";
+import { OlderHostError, type PeerProjects } from "@nightshift/engine";
+import { Refusal } from "@nightshift/refusal";
 import type { HostClient } from "../contract";
-import { isOlderHost } from "./from-host";
 
 /**
  * What a Device tells a Host of its Clones each time its link comes
@@ -12,8 +11,9 @@ import { isOlderHost } from "./from-host";
  *
  * Run it as a stream of the link (`Link.stream`): it says it once, then
  * waits until the link drops. A failure throws, and the link tries again
- * after its backoff. An older Host, which has no `setClones`, and a Space
- * where the person may not add projects are left alone.
+ * after its backoff. An older Host, which has no `setClones`
+ * (`OlderHostError`), and a Space where the person may not add projects
+ * (a refusal, `forbidden`) are left alone.
  */
 export function tellClones(deps: {
 	/** The Spaces this Host keeps for this computer (`HostSpaces.ofHost`). */
@@ -43,8 +43,8 @@ export function tellClones(deps: {
 					{ signal },
 				);
 			} catch (error) {
-				if (isOlderHost(error)) break;
-				if (error instanceof ORPCError && error.code === "FORBIDDEN") continue;
+				if (error instanceof OlderHostError) break;
+				if (error instanceof Refusal && error.kind === "forbidden") continue;
 				throw error;
 			}
 		}

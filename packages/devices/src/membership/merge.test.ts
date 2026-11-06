@@ -15,7 +15,7 @@ import {
 	user,
 	ydoc,
 } from "@nightshift/db/schema";
-import { createFlowDocuments } from "@nightshift/engine";
+import { createFlowDocuments, OlderHostError } from "@nightshift/engine";
 import {
 	createSandbox,
 	mustGit,
@@ -26,7 +26,6 @@ import {
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import { ORPCError } from "@orpc/client";
 import { eq } from "drizzle-orm";
 import * as Y from "yjs";
 import type { HostClient } from "../contract";
@@ -696,10 +695,12 @@ describe("the merge of Personal", () => {
 	test("an older Host without the merge refuses it politely", async () => {
 		const { link } = online({ push: false });
 		await ready(link);
+		// The Link says so for a Host that does not know the procedure, with
+		// the words the caller gives for it.
 		const older: Link = {
 			...link,
-			call: () =>
-				Promise.reject(new ORPCError("NOT_FOUND", { message: "Not found" })),
+			call: (_use, options) =>
+				Promise.reject(new OlderHostError(options?.olderHost)),
 		};
 
 		await expect(merger(older).preview()).rejects.toThrow(

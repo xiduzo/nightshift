@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import { documentName, type Engine } from "@nightshift/engine";
+import { documentName, type Engine, OlderHostError } from "@nightshift/engine";
 import type { HostClient, RunCommand, RunRows } from "../contract";
-import { type HostSpaces, isOlderHost, type Link, pause } from "../links";
+import { type HostSpaces, type Link, pause } from "../links";
 import { isEmpty, MissingProjectError, mergeCursors } from "./rows";
 import type { RunHistoryExchange } from "./run-history";
 
@@ -273,7 +273,7 @@ export function createDeviceExchange(deps: {
 		try {
 			stream = await client.sync.commands({}, { signal });
 		} catch (error) {
-			if (!isOlderHost(error)) throw error;
+			if (!(error instanceof OlderHostError)) throw error;
 			// Its Commands come with the rows. It may be updated meanwhile:
 			// ask again in an hour.
 			await pause(OLDER_HOST_WAIT_MS, signal);

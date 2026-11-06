@@ -1,4 +1,5 @@
 import type { DeviceKeyAccess } from "@nightshift/auth";
+import { Refusal } from "@nightshift/refusal";
 import { createRouterClient, ORPCError } from "@orpc/server";
 import { type HostClient, type HostHello, hostContract } from "../contract";
 import type { HostExchange } from "../exchange";
@@ -134,9 +135,7 @@ export function inMemoryHost(deps: {
 				phones: {
 					list: async () => [],
 					remove: async () => {
-						throw new ORPCError("NOT_FOUND", {
-							message: "This Host keeps no phones.",
-						});
+						throw new Refusal("not-found", "This Host keeps no phones.");
 					},
 				},
 			}),

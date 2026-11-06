@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { clone } from "@nightshift/db/schema";
+import { OlderHostError } from "@nightshift/engine";
 import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
-import { ORPCError } from "@orpc/client";
+import { Refusal } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
 import type { HostClient } from "../contract";
 import { partialHostClient } from "../testing";
@@ -63,13 +64,23 @@ test("a Clone the Host missed heals when the link comes online, and one the Devi
 	expect(await devicesWithClone(projectId)).not.toContain(b.deviceId);
 });
 
-test("an older Host without setClones is left alone; another failure throws, for the link to try again", async () => {
+test("an older Host without setClones, or a Space where the person may not add projects, is left alone; another failure throws, for the link to try again", async () => {
+	// The Host's answers come as the link hands them out: in this computer's words.
 	const older = partialHostClient({
 		sync: {
-			setClones: () => Promise.reject(new ORPCError("NOT_FOUND")),
+			setClones: () => Promise.reject(new OlderHostError()),
 		},
 	});
 	await tellOnce(older);
+	const forbidden = partialHostClient({
+		sync: {
+			setClones: () =>
+				Promise.reject(
+					new Refusal("forbidden", "Your role does not add projects."),
+				),
+		},
+	});
+	await tellOnce(forbidden);
 
 	const failing = partialHostClient({
 		sync: {

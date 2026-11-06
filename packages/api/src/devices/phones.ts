@@ -1,6 +1,6 @@
 import type { HostPhones, PhoneView } from "@nightshift/devices";
 import type { Notifications } from "@nightshift/notifications";
-import { ORPCError } from "@orpc/server";
+import { Refusal } from "@nightshift/refusal";
 
 /**
  * A Person's phones on this computer: the Night Shift app signed in here,
@@ -24,7 +24,12 @@ export async function phonesOf(
 		}));
 }
 
-/** Signs out one of the Person's phones here. */
+/**
+ * Signs out one of the Person's phones here. A phone that is not theirs
+ * is a refusal (`not-found`): the API answers it with 404, and a Device's
+ * Host sends it as a refusal with its kind, never as a NOT_FOUND, which a
+ * Device reads as a Host that does not know the procedure.
+ */
 export async function removePhone(
 	notifications: Notifications,
 	personId: string,
@@ -32,10 +37,10 @@ export async function removePhone(
 ): Promise<void> {
 	const phones = await phonesOf(notifications, personId);
 	if (!phones.some((phone) => phone.id === id)) {
-		throw new ORPCError("NOT_FOUND", {
-			message:
-				"This phone is not in your list. Reload the page to see the list.",
-		});
+		throw new Refusal(
+			"not-found",
+			"This phone is not in your list. Reload the page to see the list.",
+		);
 	}
 	await notifications.targets.remove(personId, id);
 }

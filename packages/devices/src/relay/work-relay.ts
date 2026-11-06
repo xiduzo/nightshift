@@ -1,7 +1,7 @@
 import { HOST_UNREACHABLE } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import type { WorkRelay } from "../contract";
-import { type DeviceLinks, fromHost, type HostSpaces } from "../links";
+import type { DeviceLinks, HostSpaces } from "../links";
 import type { WorkHub } from "../work";
 import { createSpaceRoutes } from "./route";
 
@@ -55,10 +55,9 @@ export function createWorkRelay(deps: {
 				for await (const reply of replies) yield reply;
 			} catch (error) {
 				if (signal?.aborted) return;
-				// A refusal of the Host keeps its words. Anything else is the
-				// Host gone quiet: plain words, and the details go to the log.
-				const refused = fromHost(error);
-				if (!(refused instanceof Refusal)) {
+				// A refusal of the Host keeps its words (the Link's). Anything else
+				// is the Host gone quiet: plain words, and the details go to the log.
+				if (!(error instanceof Refusal)) {
 					console.warn(
 						`[devices] the Host ${to.hostId} stopped answering a call:`,
 						error,
@@ -67,8 +66,8 @@ export function createWorkRelay(deps: {
 				yield {
 					kind: "error",
 					message:
-						refused instanceof Refusal
-							? refused.message
+						error instanceof Refusal
+							? error.message
 							: "The computer that keeps this Space stopped answering.",
 					offline: true,
 				};

@@ -23,14 +23,7 @@ import type {
 	MergeState,
 } from "../contract";
 import type { RunHistoryExchange } from "../exchange";
-import {
-	type DeviceLinks,
-	fromHost,
-	type HostLinks,
-	type HostSpaces,
-	isOlderHost,
-	type Link,
-} from "../links";
+import type { DeviceLinks, HostLinks, HostSpaces, Link } from "../links";
 import { backupDatabase } from "./backup";
 import type { MembershipRecord, MergeRow, MergeTarget } from "./record";
 
@@ -245,33 +238,30 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 	): Promise<HostAnswer> {
 		const projects = await engine.projects.ofSpace(from);
 		try {
-			return await link.call((client) =>
-				client.sync.mergePersonal({
-					personId: deps.ownerId,
-					projects: projects.map((p) => ({
-						id: p.id,
-						name: p.name,
-						remote: p.remote,
-						createdAt: p.createdAt,
-						removedAt: p.removedAt,
-						clone: p.clone,
-					})),
-					join: [...joined],
-					dryRun,
-				}),
+			return await link.call(
+				(client) =>
+					client.sync.mergePersonal({
+						personId: deps.ownerId,
+						projects: projects.map((p) => ({
+							id: p.id,
+							name: p.name,
+							remote: p.remote,
+							createdAt: p.createdAt,
+							removedAt: p.removedAt,
+							clone: p.clone,
+						})),
+						join: [...joined],
+						dryRun,
+					}),
+				{ olderHost: MERGE_WORDS.olderHost },
 			);
 		} catch (error) {
-			if (isOlderHost(error)) {
-				throw new Refusal("unavailable", MERGE_WORDS.olderHost, {
-					cause: error,
-				});
-			}
 			if (error instanceof HostUnreachableError) {
 				throw new Refusal("unavailable", MERGE_WORDS.offline, {
 					cause: error,
 				});
 			}
-			throw fromHost(error);
+			throw error;
 		}
 	}
 

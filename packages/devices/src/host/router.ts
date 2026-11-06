@@ -29,7 +29,7 @@ import type { Devices } from "./types";
 /** The phones of a Person on this Host, as the API reads them from their push targets. */
 export type HostPhones = {
 	list(personId: string): Promise<PhoneView[]>;
-	/** Signs one of them out. Refuses (NOT_FOUND) a phone that is not the Person's. */
+	/** Signs one of them out. Refuses (`not-found`) a phone that is not the Person's. */
 	remove(personId: string, id: string): Promise<void>;
 };
 

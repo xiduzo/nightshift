@@ -249,11 +249,13 @@ describe("a Host's phones over a Device's link", () => {
 
 		const phones = await call(appRouter.link.phones, undefined, { context });
 		expect(phones.map((p) => p.id)).toEqual([adaPhone.id]);
+		// A refusal goes to a Device with its kind, never as a NOT_FOUND: that
+		// says a Host of an older version, which does not know the procedure.
 		expect(
 			await errorOf(
 				call(appRouter.link.removePhone, { id: bobPhone.id }, { context }),
 			),
-		).toBe("NOT_FOUND");
+		).toBe("BAD_REQUEST");
 		await call(appRouter.link.removePhone, { id: adaPhone.id }, { context });
 		expect(await call(appRouter.link.phones, undefined, { context })).toEqual(
 			[],

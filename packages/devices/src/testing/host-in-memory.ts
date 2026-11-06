@@ -32,6 +32,8 @@ import {
 	type Link,
 	type OpenDocumentChannel,
 } from "../links";
+// What a Link is made of, for its fake in memory: a test helper may reach past the barrel.
+import { hostCall, translated } from "../links/from-host";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { createRelay } from "../relay";
 import { createWorkHub } from "../work";
@@ -242,37 +244,41 @@ const noAuth = new Proxy({} as Auth, {
 /**
  * Links that are always online, one per Host: what a relay reads. They
  * run no streams: a test of the exchange starts its own `httpsLink`.
- * `inStep` asks the Host's document channel (`channels`), as a real link
- * does: a link without one cannot answer it.
+ * The Host's answers come in this computer's words, as over a real link
+ * (`translated`, `hostCall`). `inStep` asks the Host's document channel
+ * (`channels`), as a real link does: a link without one cannot answer it.
  */
 export function linksTo(
 	clients: Map<string, HostClient>,
 	channels: Map<string, ReturnType<OpenDocumentChannel>> = new Map(),
 ): DeviceLinks {
-	const linkOf = (hostId: string, client: HostClient): Link => ({
-		hostId,
-		state: () => ({ status: "online", address: "memory", since: 0 }),
-		client: () => client,
-		stream: () => {
-			throw new Error("This link runs no streams in memory.");
-		},
-		call: (use) => use(client),
-		ready: async () => client,
-		check: () => {},
-		async inStep(names, options = {}) {
-			const channel = channels.get(hostId);
-			if (!channel) {
-				throw new Error("This link in memory syncs no documents.");
-			}
-			const end = now() + (options.timeoutMs ?? 10_000);
-			while (true) {
-				if (channel.inStep(names)) return true;
-				if (now() >= end || options.signal?.aborted) return false;
-				await Bun.sleep(20);
-			}
-		},
-		close: async () => {},
-	});
+	const linkOf = (hostId: string, raw: HostClient): Link => {
+		const client = translated(raw);
+		return {
+			hostId,
+			state: () => ({ status: "online", address: "memory", since: 0 }),
+			client: () => client,
+			stream: () => {
+				throw new Error("This link runs no streams in memory.");
+			},
+			call: (use, options) => hostCall(client, use, options),
+			ready: async () => client,
+			check: () => {},
+			async inStep(names, options = {}) {
+				const channel = channels.get(hostId);
+				if (!channel) {
+					throw new Error("This link in memory syncs no documents.");
+				}
+				const end = now() + (options.timeoutMs ?? 10_000);
+				while (true) {
+					if (channel.inStep(names)) return true;
+					if (now() >= end || options.signal?.aborted) return false;
+					await Bun.sleep(20);
+				}
+			},
+			close: async () => {},
+		};
+	};
 	return {
 		start: async () => {},
 		add: async () => {},

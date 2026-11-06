@@ -9,6 +9,12 @@ import {
 	type OpenDocumentChannel,
 	type SyncedDocument,
 } from "./document-channel";
+import {
+	type CallOptions,
+	hostCall,
+	NotPairedError,
+	translated,
+} from "./from-host";
 import { hostClient } from "./host-client";
 import type { HostLink } from "./host-links";
 import type { LinkStatus } from "./types";
@@ -34,6 +40,15 @@ import type { LinkStatus } from "./types";
  *   syncing.
  * - Every document goes over one channel per link.
  *
+ * The link translates every answer of the Host (`from-host.ts`). The
+ * procedures it hands out (`client`, `ready`, a stream's, a call's)
+ * answer in this computer's words: a refusal keeps the Host's words and
+ * its kind, `HostUnreachableError` says the Host cannot be reached,
+ * `OlderHostError` that it does not know the procedure, and
+ * `NotPairedError` that it no longer knows this computer's key. No caller
+ * reads the wire's codes. Only the link's own hello and heartbeat do:
+ * they decide whether the key is still good.
+ *
  * The link owns the life of every call over it. A long call (the exchange
  * of run history, the work of placed steps) is a named `stream`: it runs
  * while the link is online, and the link starts it again after a drop or
@@ -43,7 +58,7 @@ import type { LinkStatus } from "./types";
 export type Link = {
 	readonly hostId: string;
 	state(): LinkState;
-	/** The Host's procedures at the address that answers, with the key. Null while offline. */
+	/** The Host's procedures at the address that answers, with the key, in this computer's words. Null while offline. */
 	client(): HostClient | null;
 	/**
 	 * Keeps `open` running while the link is online. It starts when the
@@ -58,8 +73,17 @@ export type Link = {
 		name: string,
 		open: (client: HostClient, signal: AbortSignal) => Promise<void>,
 	): () => void;
-	/** One call on the Host. Rejects at once with `HostUnreachableError` while the link is offline. */
-	call<T>(use: (client: HostClient) => Promise<T>): Promise<T>;
+	/**
+	 * One call on the Host. Rejects at once with `HostUnreachableError`
+	 * while the link is offline, and with the deadline's error when the
+	 * call does not settle in time (`CallOptions`): then `signal` aborts.
+	 * A Host of a version without the procedure says the caller's words
+	 * for it (`olderHost`).
+	 */
+	call<T>(
+		use: (client: HostClient, signal: AbortSignal) => Promise<T>,
+		options?: CallOptions,
+	): Promise<T>;
 	/**
 	 * The Host's procedures as soon as the link is online. Rejects when
 	 * `signal` aborts, or the link closes or is revoked.
@@ -150,21 +174,12 @@ export async function firstAnswering<T>(
 	throw last;
 }
 
-/** The Host answered, and refused the key. */
+/** The Host answered a hello or a heartbeat, and refused the key. The link's own reading of the wire. */
 export function isRefusal(error: unknown): boolean {
 	return (
 		error instanceof ORPCError &&
 		(error.code === "UNAUTHORIZED" || error.code === "FORBIDDEN")
 	);
-}
-
-/**
- * The Host does not know the key (its access was removed): the link asks
- * the Host at once instead of at the next heartbeat. A call the Host does
- * not allow (`FORBIDDEN`) is not this: the key is still good.
- */
-function isUnknownKey(error: unknown): boolean {
-	return error instanceof ORPCError && error.code === "UNAUTHORIZED";
 }
 
 /** A stream of the link: what it runs, and how long it waits after a failure. */
@@ -196,6 +211,9 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 
 	let addresses = [...link.addresses];
 	let state: LinkState = { status: "connecting", address: null, since: now() };
+	/** The Host at the address that answers, as the link's own hello and heartbeat call it: the wire's codes. */
+	let wire: HostClient | null = null;
+	/** The same, in this computer's words: what the link hands out. */
 	let current: HostClient | null = null;
 	const openChannel = options.documentChannel ?? hocuspocusChannel;
 	let channel: DocumentChannel | null = null;
@@ -288,7 +306,9 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 			if (failure === null) {
 				if (well) continue;
 			} else {
-				if (isUnknownKey(failure)) check();
+				// The Host no longer knows the key: ask it at once instead of at
+				// the next heartbeat. A call it does not allow is not this.
+				if (failure instanceof NotPairedError) check();
 				const said = String(failure);
 				if (stream.logged !== said) {
 					stream.logged = said;
@@ -328,8 +348,14 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 				AbortSignal.timeout(answerTimeoutMs),
 			]),
 		});
-		current = client;
+		wire = client;
+		current = translated(client);
 		return hello;
+	}
+
+	function lose() {
+		wire = null;
+		current = null;
 	}
 
 	async function run() {
@@ -339,7 +365,7 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 				const { address, value } = await firstAnswering(addresses, answer);
 				if (options.deviceId && value.deviceId !== options.deviceId) {
 					// Every call with this key would act as the other Device.
-					current = null;
+					lose();
 					setState("revoked", null);
 					const said = `The key for ${link.name} belongs to another Night Shift on this computer. Pair this computer with ${link.name} again.`;
 					console.error(said);
@@ -354,20 +380,17 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 				while (!stop.signal.aborted) {
 					await wait(heartbeatMs);
 					if (stop.signal.aborted) break;
-					const hello = await (current as HostClient).link.heartbeat(
-						undefined,
-						{
-							signal: AbortSignal.any([
-								stop.signal,
-								AbortSignal.timeout(answerTimeoutMs),
-							]),
-						},
-					);
+					const hello = await (wire as HostClient).link.heartbeat(undefined, {
+						signal: AbortSignal.any([
+							stop.signal,
+							AbortSignal.timeout(answerTimeoutMs),
+						]),
+					});
 					learn(hello, address);
 					await syncDocuments(address, hello);
 				}
 			} catch (error) {
-				current = null;
+				lose();
 				goOffline();
 				stopDocuments();
 				if (stop.signal.aborted) break;
@@ -406,13 +429,14 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 				streams.delete(stream);
 			};
 		},
-		async call(use) {
+		async call(use, options) {
 			const client = current;
 			if (!client) throw new HostUnreachableError();
 			try {
-				return await use(client);
+				return await hostCall(client, use, options);
 			} catch (error) {
-				if (isUnknownKey(error)) check();
+				// The Host no longer knows the key: ask it now.
+				if (error instanceof NotPairedError) check();
 				throw error;
 			}
 		},
@@ -461,7 +485,7 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 			stop.abort();
 			goOffline();
 			stopDocuments();
-			current = null;
+			lose();
 			for (const stream of streams) stream.stopped.abort();
 			streams.clear();
 			endWaits(`The link to ${link.name} is closed.`);

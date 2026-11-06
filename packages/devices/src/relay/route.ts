@@ -1,7 +1,6 @@
 import { HostUnreachableError } from "@nightshift/engine";
-import { Refusal } from "@nightshift/refusal";
 import type { HostClient } from "../contract";
-import { type DeviceLinks, fromHost } from "../links";
+import type { CallOptions, DeviceLinks } from "../links";
 
 /**
  * Where a call for a Space goes now:
@@ -10,6 +9,9 @@ import { type DeviceLinks, fromHost } from "../links";
  *   Host with this Device's key. `ask` makes one call for a person.
  * - `unreachable`: a Host keeps it, and this computer has no online Link
  *   to it now (no Link, or the Link is offline).
+ *
+ * The Host's answers come in this computer's words: the Link's
+ * (`Link.client`, `Link.call`).
  */
 export type SpaceRoute =
 	| { at: "here" }
@@ -17,30 +19,13 @@ export type SpaceRoute =
 			at: "host";
 			hostId: string;
 			client: HostClient;
-			/**
-			 * One call on the Host for a person: the Host's errors in this
-			 * computer's words (`fromHost`). It gives up after its deadline
-			 * (`AskOptions`), and `use` may pass the signal to the call.
-			 */
+			/** One call on the Host for a person: `Link.call`, with its deadline (`CallOptions`). */
 			ask<T>(
 				use: (client: HostClient, signal: AbortSignal) => Promise<T>,
-				options?: AskOptions,
+				options?: CallOptions,
 			): Promise<T>;
 	  }
 	| { at: "unreachable"; hostId: string };
-
-/** How long one call on the Host may take before it settles, and the words when it does not. */
-export type AskOptions = { ms?: number; words?: string };
-
-/**
- * How long a call on the Host may take by default. A call that opens a
- * stream settles when the stream opens, so the stream itself has no limit.
- */
-export const ASK_DEADLINE_MS = 2 * 60_000;
-
-/** A call on the Host that did not settle in time. */
-export const HOST_TOO_SLOW =
-	"The computer that keeps this Space did not answer in time. Try again in a moment.";
 
 export type SpaceRoutes = {
 	/** Where a call for the Space goes now. It reads the Link at the moment of the call. */
@@ -48,13 +33,12 @@ export type SpaceRoutes = {
 	/**
 	 * One call for a person on the Host that keeps the Space. Throws
 	 * `HostUnreachableError` when that Host cannot be reached, and for a
-	 * Space this Replica keeps: no Host takes an action for it. The Host's
-	 * errors come back in this computer's words (`fromHost`).
+	 * Space this Replica keeps: no Host takes an action for it.
 	 */
 	onHost<T>(
 		spaceId: string,
 		use: (client: HostClient, signal: AbortSignal) => Promise<T>,
-		options?: AskOptions,
+		options?: CallOptions,
 	): Promise<T>;
 };
 
@@ -72,33 +56,14 @@ export function createSpaceRoutes(deps: {
 	async function route(spaceId: string): Promise<SpaceRoute> {
 		const hostId = await deps.hostOf(spaceId);
 		if (hostId === null) return { at: "here" };
-		const client = deps.links().get(hostId)?.client();
-		if (!client) return { at: "unreachable", hostId };
+		const link = deps.links().get(hostId);
+		const client = link?.client();
+		if (!link || !client) return { at: "unreachable", hostId };
 		return {
 			at: "host",
 			hostId,
 			client,
-			async ask(use, options = {}) {
-				// Aborted only when the deadline passes first: a stream that
-				// opened in time runs on.
-				const late = new AbortController();
-				let timer: Timer | undefined;
-				const deadline = new Promise<never>((_, reject) => {
-					timer = setTimeout(() => {
-						// The refusal first: the aborted call then rejects too, but too late to win the race.
-						reject(new Refusal("unavailable", options.words ?? HOST_TOO_SLOW));
-						late.abort();
-					}, options.ms ?? ASK_DEADLINE_MS);
-					timer.unref?.();
-				});
-				try {
-					return await Promise.race([use(client, late.signal), deadline]);
-				} catch (error) {
-					throw fromHost(error);
-				} finally {
-					clearTimeout(timer);
-				}
-			},
+			ask: (use, options) => link.call(use, options),
 		};
 	}
 

@@ -1,6 +1,7 @@
 import { describe, expect, spyOn, test } from "bun:test";
 import {
 	HostUnreachableError,
+	OLDER_HOST,
 	OlderHostError,
 	type OwnDevice,
 	type TranscriptEntry,
@@ -8,10 +9,9 @@ import {
 } from "@nightshift/engine";
 import { createSandbox } from "@nightshift/engine/testing";
 import { Refusal } from "@nightshift/refusal";
-import { ORPCError } from "@orpc/client";
 import type { HostClient, WorkReply, WorkRequest } from "../contract";
 import type { DeviceLinks } from "../links";
-import { NOT_PAIRED } from "../links/from-host";
+import { hostCall, NOT_PAIRED, translated } from "../links/from-host";
 import { pairedReplicas } from "../testing";
 import { createRelay, OLDER_HOST_PROJECTS } from "./relay";
 import { createSpaceRoutes } from "./route";
@@ -126,8 +126,9 @@ type InStepFake = {
 
 /**
  * Links by Host: a client is an online Link, null an offline one, no key
- * no Link. `inStep` says whether the documents are in step with the Host
- * (default: at once).
+ * no Link. The Host's answers come in this computer's words, as over a
+ * real Link (`translated`, `hostCall`). `inStep` says whether the
+ * documents are in step with the Host (default: at once).
  */
 function fakeLinks(
 	clients: Record<string, HostClient | null>,
@@ -136,7 +137,8 @@ function fakeLinks(
 	return {
 		get(hostId) {
 			if (!(hostId in clients)) return undefined;
-			const client = clients[hostId] ?? null;
+			const raw = clients[hostId] ?? null;
+			const client = raw && translated(raw);
 			return {
 				hostId,
 				state: () => ({
@@ -147,10 +149,12 @@ function fakeLinks(
 				client: () => client,
 				// The relays read `client()` only.
 				stream: () => () => {},
-				call: (use) =>
-					client ? use(client) : Promise.reject(new Error("offline")),
+				call: (use, options) =>
+					client
+						? hostCall(client, use, options)
+						: Promise.reject(new HostUnreachableError()),
 				ready: async () => {
-					if (!client) throw new Error("offline");
+					if (!client) throw new HostUnreachableError();
 					return client;
 				},
 				check: () => {},
@@ -289,7 +293,6 @@ describe("the Space route", () => {
 		expect(await routes.route("space-team")).toMatchObject({
 			at: "host",
 			hostId: "host-1",
-			client: host.client,
 		});
 		// No Link to the Host, and a Link that is offline.
 		expect(await routes.route("space-gone")).toEqual({
@@ -314,56 +317,16 @@ describe("the Space route", () => {
 	});
 
 	test("the Host's procedures only while it can be reached", async () => {
-		expect(await routes.onHost("space-team", async (c) => c)).toBe(host.client);
+		const input = { spaceId: "space-team", projectId: "project-1" };
+		expect(
+			await routes.onHost("space-team", (c) => c.sync.devices(input)),
+		).toEqual(LISTED);
+		expect(host.taken).toEqual([{ procedure: "sync.devices", input }]);
 		for (const spaceId of ["space-gone", "space-off", "space-own"]) {
 			await expect(
 				routes.onHost(spaceId, async (c) => c),
 			).rejects.toBeInstanceOf(HostUnreachableError);
 		}
-	});
-
-	test("a call for a person gets the Host's errors in this computer's words", async () => {
-		const refused = (error: unknown) =>
-			routes.onHost("space-team", async () => {
-				throw error;
-			});
-		// The Host no longer knows the key: pair again, never "sign in".
-		await expect(
-			refused(new ORPCError("UNAUTHORIZED", { message: "Pair it again." })),
-		).rejects.toMatchObject({ kind: "conflict", message: NOT_PAIRED });
-		const lost = new TypeError("The network connection was lost.");
-		await expect(refused(lost)).rejects.toBe(lost);
-	});
-
-	test("a call the Host never answers gives up after its deadline, and its signal aborts", async () => {
-		let aborted = false;
-		await expect(
-			routes.onHost(
-				"space-team",
-				(_client, signal) =>
-					new Promise((_, reject) => {
-						signal.addEventListener("abort", () => {
-							aborted = true;
-							reject(new Error("aborted"));
-						});
-					}),
-				{ ms: 20, words: "Too slow." },
-			),
-		).rejects.toMatchObject({ kind: "unavailable", message: "Too slow." });
-		expect(aborted).toBe(true);
-	});
-
-	test("a call that settles in time keeps its signal: a stream it opened runs on", async () => {
-		let signal: AbortSignal | undefined;
-		await routes.onHost(
-			"space-team",
-			async (_client, given) => {
-				signal = given;
-			},
-			{ ms: 20 },
-		);
-		await Bun.sleep(40);
-		expect(signal?.aborted).toBe(false);
 	});
 });
 
@@ -527,9 +490,10 @@ describe("the relay, for a Space a Host keeps", () => {
 
 	test("a Host of an older version, which cannot add a project, says to update it", async () => {
 		const host = fakeHost();
+		// The Link says so for a Host that does not know the procedure.
 		Object.assign(host.client.sync, {
 			addProject: async () => {
-				throw new ORPCError("NOT_FOUND", { message: "Not found" });
+				throw new OlderHostError();
 			},
 		});
 		const { relay } = relayWith(host);
@@ -548,21 +512,22 @@ describe("the relay, for a Space a Host keeps", () => {
 			host.client as unknown as { archive: Record<string, unknown> }
 		).archive;
 		const unknown = async () => {
-			throw new ORPCError("NOT_FOUND", { message: "Not found" });
+			throw new OlderHostError();
 		};
 		archive.knowledgePut = unknown;
 		archive.knowledgeGet = unknown;
 		const { relay } = relayWith(host);
 		const act = actions(relay, "space-team");
-		await expect(act.contentPut()).rejects.toBeInstanceOf(OlderHostError);
-		await expect(act.contentGet()).rejects.toBeInstanceOf(OlderHostError);
+		for (const call of [act.contentPut, act.contentGet]) {
+			const older = await call().catch((error: unknown) => error);
+			expect(older).toBeInstanceOf(OlderHostError);
+			// The engine's own words for knowledge it cannot share yet.
+			expect(older).toMatchObject({ message: OLDER_HOST });
+		}
 
 		// A refusal of a Host of this version keeps its words.
 		archive.knowledgePut = async () => {
-			throw new ORPCError("BAD_REQUEST", {
-				message: "That Space does not exist.",
-				data: { kind: "not-found" },
-			});
+			throw new Refusal("not-found", "That Space does not exist.");
 		};
 		await expect(act.contentPut()).rejects.toMatchObject({
 			kind: "not-found",
@@ -753,9 +718,10 @@ describe("the work relay", () => {
 		const host = fakeHost({
 			// biome-ignore lint/correctness/useYield: the stream fails before its first reply.
 			async *replies() {
-				throw new ORPCError("FORBIDDEN", {
-					message: "A device may ask only for its own Person's runs.",
-				});
+				throw new Refusal(
+					"forbidden",
+					"A device may ask only for its own Person's runs.",
+				);
 			},
 		});
 		const { relay } = workRelayWith(host);
