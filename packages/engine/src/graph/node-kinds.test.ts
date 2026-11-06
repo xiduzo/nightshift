@@ -489,7 +489,7 @@ describe("cutShortOutputs: what a cut ends an open step with", () => {
 describe("connections and requirements: what run start asks", () => {
 	/** A Device with nothing: no harness, connection, CLI tool, program or decider. */
 	const has = () =>
-		testDevice({ harnesses: {}, findCli: () => null }).capabilities({
+		testDevice({ harnesses: {}, which: () => null }).capabilities({
 			programs: ["gh"],
 		});
 

@@ -15,6 +15,7 @@ export type {
 	Device,
 	ExecEvent,
 	ExecInput,
+	GitAuthor,
 	OfferedSessionInput,
 	RunRef,
 	SessionEvent,

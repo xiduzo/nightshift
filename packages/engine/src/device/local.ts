@@ -15,21 +15,19 @@ import type {
 import { findProgram, foldContributions } from "@nightshift/agents/types";
 import {
 	type AgentHarnessName,
-	type AgentNode,
 	type CustomHarnessName,
 	deciderNameSchema,
 	type FlowSources,
 	isCustomHarness,
-	type ProfileSettings,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 
 import type { ArtifactStore } from "../artifacts";
 import {
-	type CliToolGuide,
+	type CliToolStore,
+	type ConnectionStore,
 	cliToolsInstruction,
-	type McpExpansion,
-	type SecretEnv,
+	type ProfileStore,
 	type SecretUse,
 	type StepRun,
 	unreachableNote,
@@ -61,11 +59,21 @@ import {
 	type ToolResult,
 } from "./types";
 
+/** What the Device reads of this computer's connections and secrets. */
+export type DeviceConnections = Pick<
+	ConnectionStore,
+	"names" | "mcpServersFor" | "secretEnv"
+>;
+
+/** What the Device reads of this computer's CLI tools. */
+export type DeviceCliTools = Pick<CliToolStore, "names" | "program" | "guides">;
+
 /**
  * Everything on this computer a step body may touch: the harnesses, the
- * decider, the MCP connections with their secrets, the CLI tools, `sh -c`
- * and git worktrees. `createDaemon` (`@nightshift/daemon`) wires it from the daemon's stores; a
- * test wires it over fakes.
+ * decider, this computer's configuration as its stores (connections and
+ * secrets, CLI tools, Agent Profiles), `sh -c` and git worktrees.
+ * `createDaemon` (`@nightshift/daemon`) wires it from the daemon's stores;
+ * a test wires it over the same stores, or fakes of them.
  */
 export type LocalDeviceDeps = {
 	id: string;
@@ -92,40 +100,34 @@ export type LocalDeviceDeps = {
 	/** Decides Decision nodes and makes values for Value nodes. */
 	decider?: Decider;
 	/**
-	 * An Agent node's MCP servers: its connections, with `${NAME}`
-	 * expanded. Default: none, and a node with connections is refused.
-	 * `use`: where the step happens, for the Secret scope rule.
+	 * This computer's connections and secrets (`ConnectionStore`): an Agent
+	 * node's MCP servers with `${NAME}` expanded, a Command node's secrets
+	 * by name, from the scopes of the use (`secretScopes`). Without it:
+	 * no connections, and a node with connections is refused; a command's
+	 * secrets come from `process.env`.
 	 */
-	mcpServersFor?: (
-		node: Pick<AgentNode, "connections">,
-		use?: SecretUse,
-	) => Promise<McpExpansion>;
+	connections?: DeviceConnections;
 	/**
-	 * A Command node's secrets, by name, from the scopes of `use`
-	 * (`secretScopes`). Default: `process.env`.
+	 * This computer's CLI tools (`CliToolStore`): their names, the program
+	 * each runs, and what an agent learns about them (each description and
+	 * help, after a new session's prompt). Without it: none is defined,
+	 * and a tool runs the program of its name.
 	 */
-	secretEnv?: (names: readonly string[], use?: SecretUse) => Promise<SecretEnv>;
-	/** The connections defined on this computer. */
-	connectionNames?: () => ReadonlySet<string>;
-	/** The CLI tools defined on this computer. */
-	cliNames?: () => ReadonlySet<string>;
+	cliTools?: DeviceCliTools;
+	/** This computer's Agent Profiles (`ProfileStore`), by id. Without it: none. */
+	profiles?: Pick<ProfileStore, "settingsFor">;
 	/** Where a program is on this computer, or null. Default: `findProgram`. */
-	findCli?: (name: string) => string | null;
-	/**
-	 * What an agent learns about its CLI tools: each description and help.
-	 * A new session gets them after its prompt. Without it, nothing.
-	 */
-	cliToolsFor?: (names: readonly string[]) => Promise<CliToolGuide[]>;
+	which?: (program: string) => string | null;
 	/**
 	 * The CLI tools' launchers and logins (`createToolLaunchers`). Without
 	 * it, a tool runs the program of its name with this computer's sign-in.
 	 */
 	toolLaunchers?: Pick<ToolLaunchers, "prepare" | "forCommand" | "guarded">;
 	/*
-	 * Every secret this Device reads for a step goes through `mcpServersFor`,
-	 * `secretEnv`, `toolLaunchers`, `customHarness`, the decider and
-	 * `secretValues`. Which scopes each reads is the Secret scope rule's
-	 * (`secretScopes`), not this file's: it passes the facts of the use on.
+	 * Every secret this Device reads for a step goes through `connections`,
+	 * `toolLaunchers`, `customHarness`, the decider and `secretValues`.
+	 * Which scopes each reads is the Secret scope rule's (`secretScopes`),
+	 * not this file's: it passes the facts of the use on.
 	 */
 	/**
 	 * The folder of a project's Clone on this computer, or null when it has
@@ -148,8 +150,6 @@ export type LocalDeviceDeps = {
 	 * `worktreeChanges`). The daemon's does. Without it, it has neither.
 	 */
 	snapshots?: boolean;
-	/** A profile defined on this computer, by its id, or null. */
-	profileFor?: (id: string) => ProfileSettings | null;
 	/**
 	 * Where a session keeps its artifacts, and reads the files of the run's
 	 * answers. Without it, sessions keep none and get none.
@@ -208,6 +208,29 @@ function noDecider(
 		costUsd: null,
 	};
 }
+
+/** A Device without connections: a node with connections is refused, and a command's secrets come from the environment. */
+const NO_CONNECTIONS: DeviceConnections = {
+	names: () => new Set(),
+	async mcpServersFor(node, _use) {
+		return (node.connections ?? []).length > 0
+			? {
+					ok: false,
+					message: `The node uses connections (${node.connections?.join(", ")}), but there are none. Add them under Agents → Tools.`,
+				}
+			: { ok: true, servers: {} };
+	},
+	async secretEnv(names, _use) {
+		const missing = names.filter((name) => process.env[name] === undefined);
+		if (missing.length > 0) return { ok: false, missing };
+		return {
+			ok: true,
+			env: Object.fromEntries(
+				names.map((name) => [name, process.env[name] ?? ""]),
+			),
+		};
+	},
+};
 
 /** The facts of a step's use of secrets, for the Secret scope rule (`secretScopes`). */
 function useOf(run: StepRun | undefined, underOffer?: true): SecretUse {
@@ -276,31 +299,11 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		pushRunBranch,
 	} = createWorktrees(git);
 	const snapshots = deps.snapshots ? createWorktreeSnapshots(git) : null;
-	const findCli = deps.findCli ?? ((name: string) => findProgram(name));
-	const mcpServersFor =
-		deps.mcpServersFor ??
-		(async (
-			node: Pick<AgentNode, "connections">,
-			_use?: SecretUse,
-		): Promise<McpExpansion> =>
-			(node.connections ?? []).length > 0
-				? {
-						ok: false,
-						message: `The node uses connections (${node.connections?.join(", ")}), but there are none. Add them under Agents → Tools.`,
-					}
-				: { ok: true, servers: {} });
-	const secretEnv =
-		deps.secretEnv ??
-		(async (names: readonly string[], _use?: SecretUse): Promise<SecretEnv> => {
-			const missing = names.filter((name) => process.env[name] === undefined);
-			if (missing.length > 0) return { ok: false, missing };
-			return {
-				ok: true,
-				env: Object.fromEntries(
-					names.map((name) => [name, process.env[name] ?? ""]),
-				),
-			};
-		});
+	const which = deps.which ?? ((program: string) => findProgram(program));
+	const { cliTools } = deps;
+	/** Where the program of a CLI tool is: the tool's program, else the program of its name. */
+	const findCli = (name: string) => which(cliTools?.program(name) ?? name);
+	const connections: DeviceConnections = deps.connections ?? NO_CONNECTIONS;
 
 	/** The harness of that name, when it is added and built. */
 	const harnessFor = (
@@ -341,7 +344,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		}
 		const {
 			harness: name,
-			connections,
+			connections: _connections,
 			clis,
 			artifacts,
 			knowledge: _knowledge,
@@ -364,7 +367,10 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		}
 		// `${NAME}` in env values and headers reads the scopes of `use`. The
 		// values go to the harness only, never into the log.
-		const mcp = await mcpServersFor(connections ? { connections } : {}, use);
+		const mcp = await connections.mcpServersFor(
+			input.connections ? { connections: input.connections } : {},
+			use,
+		);
 		if (!mcp.ok) {
 			yield { type: "refused", message: mcp.message };
 			return;
@@ -387,8 +393,8 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			// A new session learns its CLI tools after the prompt. A resumed
 			// session has them already.
 			const guide =
-				!input.resumeSessionId && withClis && deps.cliToolsFor
-					? cliToolsInstruction(await deps.cliToolsFor(clis))
+				!input.resumeSessionId && withClis && cliTools
+					? cliToolsInstruction(await cliTools.guides(clis))
 					: "";
 			const guarded = deps.toolLaunchers?.guarded() ?? [];
 			// The knowledge as the Space has it now, before the agent reads it.
@@ -495,7 +501,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		);
 		const found =
 			secrets.length > 0
-				? await secretEnv(secrets, useOf(run))
+				? await connections.secretEnv(secrets, useOf(run))
 				: { ok: true as const, env: {} };
 		if (!found.ok) {
 			yield {
@@ -566,14 +572,14 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 					...(Object.keys(harnesses) as HarnessName[]),
 					...(deps.customHarnessNames?.() ?? []),
 				].filter((name) => harnessFor(name) !== undefined),
-				connections: [...(deps.connectionNames?.() ?? [])],
-				clis: [...(deps.cliNames?.() ?? [])],
+				connections: [...connections.names()],
+				clis: [...(cliTools?.names() ?? [])],
 				programs: Object.fromEntries(
 					(query.programs ?? []).map((name) => [name, findCli(name)]),
 				),
 				profiles: Object.fromEntries(
 					(query.profiles ?? []).flatMap((id) => {
-						const profile = deps.profileFor?.(id) ?? null;
+						const profile = deps.profiles?.settingsFor(id) ?? null;
 						return profile ? [[id, profile]] : [];
 					}),
 				),
@@ -592,7 +598,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		exec,
 		async callTool(input): Promise<ToolResult> {
 			const { run, ...call } = input;
-			const mcp = await mcpServersFor(
+			const mcp = await connections.mcpServersFor(
 				{ connections: [call.connection] },
 				useOf(run),
 			);

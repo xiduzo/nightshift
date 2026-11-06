@@ -6,6 +6,7 @@ import type {
 	AgentEvent,
 	AgentHarness,
 	AgentSessionInput,
+	McpServerConfig,
 } from "@nightshift/agents/types";
 import { createDb, type Database } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
@@ -13,7 +14,12 @@ import { device, event, organization } from "@nightshift/db/schema";
 import { asDate, now } from "@nightshift/time";
 import { asc, eq, sql } from "drizzle-orm";
 import type { DeviceDirectory } from "../contract/directory";
-import { type LocalDeviceDeps, localDevice } from "../device/local";
+import {
+	type DeviceCliTools,
+	type DeviceConnections,
+	type LocalDeviceDeps,
+	localDevice,
+} from "../device/local";
 import type { Device } from "../device/types";
 import {
 	type DeviceDocument,
@@ -69,11 +75,9 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 		customHarness,
 		customHarnessNames,
 		decider,
-		mcpServersFor,
-		connectionNames,
-		cliNames,
-		findCli,
-		cliToolsFor,
+		connections,
+		cliTools,
+		which,
 		clonePath,
 		git,
 		knowledge,
@@ -94,11 +98,11 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 				customHarness,
 				customHarnessNames,
 				decider,
-				mcpServersFor,
-				connectionNames,
-				cliNames,
-				findCli,
-				cliToolsFor,
+				connections,
+				cliTools,
+				// The engine's profiles are this Device's too, as on the daemon.
+				...(engine.profiles ? { profiles: engine.profiles } : {}),
+				which,
 				// The Clones of the database's own Device, as the daemon wires it.
 				clonePath: clonePath ?? clonePathOf(engine.db, directory.selfId),
 				git,
@@ -106,6 +110,89 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 			},
 			deviceId,
 		),
+	};
+}
+
+/**
+ * This computer's connections for a test, by name: each name in `servers`
+ * expands to its server, a name the node asks for and the test did not
+ * give is left out. A command's secrets come from `secrets`; without
+ * them, from the environment, as on a computer with no saved secret.
+ */
+export function connectionsOf(
+	input: {
+		names?: readonly string[];
+		servers?: Record<string, McpServerConfig>;
+		secrets?: Record<string, string>;
+	} = {},
+): DeviceConnections {
+	const servers = input.servers ?? {};
+	const names = new Set([...(input.names ?? []), ...Object.keys(servers)]);
+	const values = input.secrets;
+	return {
+		names: () => names,
+		async mcpServersFor(node) {
+			const asked = node.connections ?? [];
+			return {
+				ok: true,
+				servers: Object.fromEntries(
+					asked.flatMap((name) => {
+						const server = servers[name];
+						return server ? [[name, server]] : [];
+					}),
+				),
+			};
+		},
+		async secretEnv(asked) {
+			const valueFor = (name: string) =>
+				values ? values[name] : process.env[name];
+			const missing = asked.filter((name) => valueFor(name) === undefined);
+			if (missing.length > 0) return { ok: false, missing };
+			return {
+				ok: true,
+				env: Object.fromEntries(
+					asked.map((name) => [name, valueFor(name) ?? ""]),
+				),
+			};
+		},
+	};
+}
+
+/**
+ * This computer's CLI tools for a test: by name, each running the program
+ * of its name unless `program` says another. An agent learns about a tool
+ * only when the test gives its `description` or `help`: a tool named
+ * alone adds nothing to a session's prompt.
+ */
+export function cliToolsOf(
+	tools:
+		| readonly string[]
+		| Record<
+				string,
+				{ program?: string; description?: string | null; help?: string | null }
+		  >,
+): DeviceCliTools {
+	const byName: Record<
+		string,
+		{ program?: string; description?: string | null; help?: string | null }
+	> = Array.isArray(tools)
+		? Object.fromEntries((tools as readonly string[]).map((name) => [name, {}]))
+		: (tools as Record<string, { program?: string }>);
+	return {
+		names: () => new Set(Object.keys(byName)),
+		program: (name) => byName[name]?.program ?? name,
+		guides: async (names) =>
+			names.flatMap((name) => {
+				const tool = byName[name];
+				if (!tool?.description && !tool?.help) return [];
+				return [
+					{
+						name,
+						description: tool.description ?? null,
+						help: tool.help ?? null,
+					},
+				];
+			}),
 	};
 }
 

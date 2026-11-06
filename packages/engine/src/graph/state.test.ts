@@ -144,14 +144,17 @@ describe("the stop time in the state", () => {
 
 		// The daemon dies as the step opens: the thread is pending at the
 		// node, the log has the step, and the checkpoint has the stop time.
-		const recorder = h.ctx.recorder;
-		h.ctx.recorder = async () => {
-			throw new Error("the daemon died");
+		const { recorders } = h.ctx;
+		h.ctx.recorders = {
+			...recorders,
+			open: async () => {
+				throw new Error("the daemon died");
+			},
 		};
 		await expect(drive(h, { inputs: {}, stopAt })).rejects.toThrow(
 			"the daemon died",
 		);
-		h.ctx.recorder = recorder;
+		h.ctx.recorders = recorders;
 		const dead = await h.graph().getState(h.config);
 		expect(dead.next).toEqual(["worker"]);
 		expect(dead.values.stopAt).toBe(stopAt);

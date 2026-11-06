@@ -14,6 +14,7 @@ import {
 import type { FlowInput } from "@nightshift/flows/testing";
 import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
+import { createArtifactStore } from "../artifacts/store";
 import { localDevice } from "../device/local";
 import type { Device } from "../device/types";
 import { defaultRunSettings } from "../device-config/settings";
@@ -23,8 +24,9 @@ import {
 	type LeaseTaker,
 	type ServiceRunner,
 	type StepContext,
+	type StepShared,
 } from "../graph/context";
-import { resolvePolicy } from "../graph/policy";
+import { kindOf } from "../graph/node-kinds";
 import { createRunner, type Runner, type RunnerDeps } from "../graph/runner";
 import {
 	heldOf,
@@ -53,8 +55,11 @@ import type {
 import { createRunLog, type RunLog } from "../log/run-log";
 import type { PlacedRun } from "../log/run-row";
 import { createPlacement } from "../placement/placement";
+import { gitAuthorOf } from "../read/people";
 import { parseCalledFlows, parseRunFlow } from "../read/read-model";
+import { keptValues } from "../variables/kept";
 import {
+	connectionsOf,
 	type Sandbox,
 	TEST_DEVICE_ID,
 	type TestDeviceDeps,
@@ -168,8 +173,8 @@ export type StartOptions = {
 	/** The name the Device adds `harness` under. Default `claude-code`. */
 	harnessName?: HarnessName;
 	decider?: Decider;
-	/** The Device's connections; default: none, and no node servers. */
-	mcpServersFor?: TestDeviceDeps["mcpServersFor"];
+	/** The Device's connections; default: none, and no node servers (`connectionsOf`). */
+	connections?: TestDeviceDeps["connections"];
 	/** The called flows, by name. */
 	flows?: Record<string, Flow>;
 	/** The run's abort signal; read at each use, so a test can swap it. */
@@ -190,6 +195,23 @@ export type StartOptions = {
 };
 
 let runs = 0;
+
+/** A Device without services: a Service step fails with this. */
+const NO_SERVICES: ServiceRunner = {
+	bringUp: async () => {
+		throw new Error("This computer runs no services.");
+	},
+	stop: async () => {},
+	tail: () => "",
+};
+
+/** A Device without leases: a Lease step fails with this. */
+const NO_LEASES: LeaseTaker = {
+	take: async () => {
+		throw new Error("This computer keeps no leases.");
+	},
+	release: async () => {},
+};
 
 /**
  * Placement over the Devices a test gives it: every Device of a run's plan
@@ -255,28 +277,32 @@ export async function startRun(
 			? { [options.harnessName ?? "claude-code"]: options.harness }
 			: {},
 		...(options.decider ? { decider: options.decider } : {}),
-		mcpServersFor:
-			options.mcpServersFor ?? (async () => ({ ok: true, servers: {} })),
+		connections: options.connections ?? connectionsOf(),
 		...(options.knowledge ? { knowledge: options.knowledge } : {}),
 	};
 	const device = () =>
 		localDevice({ id: TEST_DEVICE_ID, name: "test", ...local });
-	const deps: ThreadDeps = {
-		db,
+	// What a step may touch, as the engine makes it once.
+	const shared: StepShared = {
 		log,
 		bus,
 		recorders: createRecorders({ db, bus, log }),
-		dataDir: sandbox.dataDir,
+		placement: placementOn(device),
 		now: options.now ?? now,
 		minuteMs: MINUTE,
 		settings: defaultRunSettings,
-		placement: placementOn(device),
+		kindOf,
+		leases: options.leases ?? NO_LEASES,
+		services: options.services ?? NO_SERVICES,
+		artifacts: createArtifactStore(sandbox.dataDir),
+		keptValues: (kept) => keptValues(db, kept),
+		gitAuthor: (personId) => gitAuthorOf(db, personId),
+	};
+	const deps: ThreadDeps = {
+		shared,
+		db,
 		flowOf: () => flow,
 		calledFlowsOf: () => flows,
-		// The flow's own numbers, else the built-in settings: as the engine does.
-		policyFor: (f) => resolvePolicy(f.policy, defaultRunSettings().policy),
-		...(options.leases ? { leases: options.leases } : {}),
-		...(options.services ? { services: options.services } : {}),
 	};
 	const thread = openThread(row, deps);
 	const { ctx, saver } = thread;
@@ -362,12 +388,17 @@ export const payloads = <T extends EngineEventType>(
  */
 export function testRunner(
 	h: Harness,
-	overrides: Partial<RunnerDeps> = {},
+	overrides: Partial<Omit<RunnerDeps, "shared">> & {
+		/** What a step may touch, with these members replaced. */
+		shared?: Partial<StepShared>;
+	} = {},
 ): Runner {
+	const { shared, ...rest } = overrides;
 	return createRunner({
 		...h.deps,
 		flowOf: parseRunFlow,
 		calledFlowsOf: parseCalledFlows,
-		...overrides,
+		...rest,
+		shared: { ...h.deps.shared, ...shared },
 	});
 }

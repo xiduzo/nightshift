@@ -20,9 +20,11 @@ import {
 } from "../flows";
 import {
 	combineHolds,
+	createRecorders,
 	createRunner,
 	createRunWalks,
-	resolvePolicy,
+	kindOf,
+	type StepShared,
 } from "../graph";
 import {
 	createLeaseKeeper,
@@ -58,6 +60,7 @@ import {
 } from "../projects";
 import {
 	createReadModel,
+	gitAuthorOf,
 	type LandedFact,
 	landedFacts,
 	namesOf,
@@ -78,7 +81,7 @@ import {
 	type WebhookRequest,
 } from "../schedules";
 import { createServiceKeeper, serviceHolds } from "../services";
-import { listKeptValues, resetKeptValue } from "../variables";
+import { keptValues, listKeptValues, resetKeptValue } from "../variables";
 import { createRunActions } from "./actions";
 import type { EngineOptions } from "./engine-options";
 import {
@@ -512,23 +515,32 @@ export function createEngine(
 		}),
 	]);
 
-	const runner = createRunner({
-		db,
+	/** The files runs keep for the person: an agent's artifacts, the answers' files. */
+	const artifacts = createArtifactStore(dataDir);
+	/** What a step may touch on this computer, the same for every run. */
+	const shared: StepShared = {
 		log: runLog,
 		bus,
-		dataDir,
+		recorders: createRecorders({ db, bus, log: runLog }),
+		placement,
 		now,
 		minuteMs,
 		settings: runSettings,
-		placement,
-		flowOf: parseRunFlow,
-		calledFlowsOf: parseCalledFlows,
-		policyFor: (flow) => resolvePolicy(flow.policy, runSettings().policy),
-		signal,
-		holds: runHolds,
+		kindOf,
 		leases,
 		services,
-		usage: options.usage,
+		artifacts,
+		keptValues: (flow) => keptValues(db, flow),
+		gitAuthor: (personId) => gitAuthorOf(db, personId),
+		...(options.usage ? { usage: options.usage } : {}),
+	};
+	const runner = createRunner({
+		shared,
+		db,
+		flowOf: parseRunFlow,
+		calledFlowsOf: parseCalledFlows,
+		signal,
+		holds: runHolds,
 		...(internals.overdueSweepMs !== undefined
 			? { overdueSweepMs: internals.overdueSweepMs }
 			: {}),
@@ -744,7 +756,6 @@ export function createEngine(
 		signal: (projectId, signal) => signals.send(projectId, signal),
 	});
 
-	const artifacts = createArtifactStore(dataDir);
 	const actions = createRunActions({
 		db,
 		log: runLog,

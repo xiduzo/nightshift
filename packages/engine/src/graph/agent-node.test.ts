@@ -27,7 +27,11 @@ import {
 	startRun,
 } from "../testing/graph";
 import { testKnowledge } from "../testing/knowledge";
-import { createSandbox, type Sandbox } from "../testing/test-support";
+import {
+	cliToolsOf,
+	createSandbox,
+	type Sandbox,
+} from "../testing/test-support";
 import { DEFAULT_RESUME_PROMPT } from "./context";
 import { ASK_CHOICES } from "./nodes/agent-ask";
 
@@ -792,13 +796,16 @@ describe("the Agent node", () => {
 			{ harness },
 		);
 		const asked: string[][] = [];
-		h.local.cliToolsFor = async (names) => {
-			asked.push([...names]);
-			return names.map((name) => ({
-				name,
-				description: "Jira issues",
-				help: "Usage: acli <command>",
-			}));
+		h.local.cliTools = {
+			...cliToolsOf([]),
+			guides: async (names) => {
+				asked.push([...names]);
+				return names.map((name) => ({
+					name,
+					description: "Jira issues",
+					help: "Usage: acli <command>",
+				}));
+			},
 		};
 		await drive(h, { inputs: {} });
 		expect(asked).toEqual([["acli"]]);
@@ -829,8 +836,11 @@ describe("the Agent node", () => {
 			}),
 			{ harness },
 		);
-		h.local.cliToolsFor = async () => {
-			throw new Error("not asked in plan mode");
+		h.local.cliTools = {
+			...cliToolsOf([]),
+			guides: async () => {
+				throw new Error("not asked in plan mode");
+			},
 		};
 		await drive(h, { inputs: {} });
 		expect(harness.calls[0]?.prompt).toBe("Work on worker: ");

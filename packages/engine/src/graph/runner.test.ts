@@ -24,12 +24,7 @@ import {
 	scriptedHarness,
 	waitFor,
 } from "../testing/test-support";
-import {
-	ENGINE_FAILED,
-	RELEASED,
-	type Runner,
-	type RunnerDeps,
-} from "./runner";
+import { ENGINE_FAILED, RELEASED, type Runner } from "./runner";
 import { openThread } from "./thread";
 
 /**
@@ -66,12 +61,19 @@ const gate = (id: string) => ({
 });
 
 /** A run of `flow`, and a runner over it with a run cap of `cap`. */
-async function setup(flow: Flow, cap = 2, overrides: Partial<RunnerDeps> = {}) {
+async function setup(
+	flow: Flow,
+	cap = 2,
+	overrides: Parameters<typeof testRunner>[1] = {},
+) {
 	const scripted = scriptedHarness();
 	const h = await startRun(sandbox, flow, { harness: scripted.harness });
 	const runner = testRunner(h, {
-		settings: () => ({ ...defaultRunSettings(), maxConcurrentRuns: cap }),
 		...overrides,
+		shared: {
+			settings: () => ({ ...defaultRunSettings(), maxConcurrentRuns: cap }),
+			...overrides.shared,
+		},
 	});
 	runners.push(runner);
 	return { h, runner, sessions: scripted.sessions };
@@ -195,14 +197,16 @@ describe("take: a stop", () => {
 		const h = await startRun(sandbox, flowOf([command("check", "true")]));
 		let failed = false;
 		const runner = testRunner(h, {
-			log: {
-				...h.log,
-				async append(event, writes) {
-					if (event.type === "RunEnded" && !failed) {
-						failed = true;
-						throw new Error("The disk is full.");
-					}
-					return h.log.append(event, writes);
+			shared: {
+				log: {
+					...h.log,
+					async append(event, writes) {
+						if (event.type === "RunEnded" && !failed) {
+							failed = true;
+							throw new Error("The disk is full.");
+						}
+						return h.log.append(event, writes);
+					},
 				},
 			},
 		});
@@ -310,11 +314,11 @@ describe("take: a drive's time and a thread that cannot move", () => {
 				agent("worker", "Build it", { timeoutMinutes: 60, idleMinutes: 600 }),
 			]),
 			2,
-			{ now: () => now },
+			{ shared: { now: () => now } },
 		);
 		await start(runner, h.runId);
 		await waitFor(() => sessions[0]);
-		const minute = h.deps.minuteMs;
+		const minute = h.deps.shared.minuteMs;
 		now += 61 * minute;
 		expect(
 			await runner.take(h.runId, { kind: "overdue", graceMs: minute }),
@@ -331,7 +335,7 @@ describe("take: a drive's time and a thread that cannot move", () => {
 	test("the sweep: a run whose Turn is slow holds back only its own check, not another run's", async () => {
 		let now = timeNow();
 		const { h, runner, sessions } = await setup(worker(), 2, {
-			now: () => now,
+			shared: { now: () => now },
 			overdueSweepMs: 10,
 		});
 		await start(runner, h.runId);
@@ -349,7 +353,7 @@ describe("take: a drive's time and a thread that cannot move", () => {
 		);
 		await start(runner, late);
 		await waitFor(() => sessions[1]);
-		now += 62 * h.deps.minuteMs;
+		now += 62 * h.deps.shared.minuteMs;
 
 		await waitFor(async () => (await statusOf(h, late)) === "failed", {
 			label: "the sweep to end the late run",

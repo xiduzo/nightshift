@@ -1,11 +1,6 @@
 import type { Device } from "../device";
 import type { RunState } from "../log";
-import {
-	awaitsWorktree,
-	gitAuthorOf,
-	type RunWorktree,
-	runWorktree,
-} from "../read";
+import { awaitsWorktree, type RunWorktree, runWorktree } from "../read";
 import type { StepContext } from "./context";
 
 /**
@@ -58,9 +53,7 @@ async function make(ctx: StepContext): Promise<MadeWorktree> {
 	const row = ctx.run;
 	const at = ctx.placement.deviceById(row.deviceId ?? row.walkerId, row);
 	if (!(await at.state()).online) return { kind: "offline", at };
-	const author = row.startedBy
-		? await gitAuthorOf(ctx.db, row.startedBy)
-		: null;
+	const author = row.startedBy ? await ctx.gitAuthor(row.startedBy) : null;
 	let worktree: RunWorktree;
 	let warning: string | undefined;
 	try {

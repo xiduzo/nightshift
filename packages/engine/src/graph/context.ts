@@ -14,8 +14,9 @@ import type {
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
+import type { ArtifactStore } from "../artifacts";
 import type { LeaseAnswer } from "../contract";
-import type { Capabilities, Device } from "../device";
+import type { Capabilities, Device, GitAuthor } from "../device";
 import type { RunSettings } from "../device-config";
 import {
 	type DerivedStep,
@@ -40,11 +41,11 @@ import type { ResumeRules } from "./resume-point";
 import type { RunEvent, RunStateValues } from "./state";
 
 /**
- * What every node factory gets (`StepContext`) and what every node module
- * gives back (`NodeKind`, the descriptor the registry in `node-kinds.ts`
- * lists), the transcript recorders,
- * the template context and the stop time as a graph sees it. The step
- * lifecycle itself (the entry checks, the `step` row,
+ * What every step may touch (`StepShared`), what every node factory gets
+ * (`StepContext`) and what every node module gives back (`NodeKind`, the
+ * descriptor the registry in `node-kinds.ts` lists), the transcript
+ * recorders, the template context and the stop time as a graph sees it.
+ * The step lifecycle itself (the entry checks,
  * `StepStarted`/`StepReopened`/`StepEnded`, the timers, the abort
  * translation, the routing) is the step runner's (`graph/step-runner.ts`);
  * a step's sleep and wake are the sleep module's (`graph/sleep.ts`). The
@@ -77,19 +78,65 @@ export type Recorder = {
 };
 
 /**
- * What a node factory gets. One per run and per compiled flow: a Call
- * node compiles its called flow with `flow` and `flowName`
- * replaced (and `placement`, for a Subflow that names a computer),
- * everything else shared. Per-invocation facts (the scope, the
- * element's `run` template fields) travel in `config.configurable`:
+ * What a step may touch on this computer, the same for every run: the
+ * engine makes it once (`createEngine`), the runner hands it to every
+ * Thread, and a Thread adds the run's own (`StepContext`). Each member
+ * takes the run it works for; none is the database or a folder on disk.
+ */
+export type StepShared = {
+	/**
+	 * `append` writes a fact in one batch with the rows it implies and the
+	 * rows it names: a stop never leaves a row without its event. In a
+	 * StepContext it is the thread's fenced one (`fence.ts`).
+	 * `events(runId)` reads the log for lookups.
+	 */
+	log: RunLog;
+	bus: RunBus;
+	/** The transcript recorders of this computer's runs: `open(runId, stepId)` appends in its data folder. */
+	recorders: Recorders;
+	/** Where the run's steps run, as its plan says (`StepPlacement`). */
+	placement: StepPlacement;
+	now(): number;
+	/** How long one minute of a timeout or a policy wait lasts. 60 000 in production. */
+	minuteMs: number;
+	settings(): RunSettings;
+	/** Anonymous usage, when this computer records it. */
+	usage?: UsageNotes;
+	/**
+	 * The descriptor of a node's kind (`node-kinds.ts`). The registry comes
+	 * in by the context, so the engine around the nodes never imports the
+	 * node modules: they import it.
+	 */
+	kindOf(node: FlowNode): NodeKind;
+	/**
+	 * Takes a lease of the run's Space for the run (ADR 7): the engine's
+	 * keeper, which asks this Replica's store or the Space's Host.
+	 */
+	leases: LeaseTaker;
+	/** Starts and stops the services of Service nodes (ADR 9). */
+	services: ServiceRunner;
+	/** The files a run keeps for the person: an agent's artifacts, the files of the run's answers. */
+	artifacts: Pick<ArtifactStore, "answerFiles" | "save">;
+	/** The kept values a flow's run starts from, by name (`variables/`). */
+	keptValues(flow: KeptFlow): Promise<Record<string, JsonValue>>;
+	/** The git identity of a Person, for the worktree a Device adds; null when the repository keeps its own. */
+	gitAuthor(personId: string): Promise<GitAuthor | null>;
+};
+
+/**
+ * What a node factory gets: what every step may touch (`StepShared`),
+ * and the run's own. One per run and per compiled flow: a Call node
+ * compiles its called flow with `flow` and `flowName` replaced (and
+ * `placement`, for a Subflow that names a computer), everything else
+ * shared. Per-invocation facts (the scope, the element's `run` template
+ * fields) travel in `config.configurable`:
  *
  * - `configurable.scope: Scope | null`: the calling step and element, null
  *   at the top level. Body nodes stamp it on their events (design rule 6).
  * - `configurable.run?: { branch, base_branch, index }`: the `{{run.*}}`
  *   fields of a Call element (`each`); absent at the top level.
  */
-export type StepContext = {
-	db: Database;
+export type StepContext = StepShared & {
 	/** The run: id, project, worktree, branch, base ref, flow snapshots. */
 	run: RunRow;
 	/** The flow this graph was compiled from. */
@@ -105,47 +152,13 @@ export type StepContext = {
 	 * current numbers, in bodies too.
 	 */
 	policy(): ResolvedPolicy;
-	/**
-	 * `append` writes a fact, through the drive's fence (`fence.ts`), in one
-	 * batch with the row it names: a stop never leaves a row without its
-	 * event. `events(runId)` reads the log for lookups.
-	 */
-	log: RunLog;
-	bus: RunBus;
-	/**
-	 * Opens a step's transcript in this computer's data folder for
-	 * appending; `seq` continues the run's count.
-	 */
-	recorder(stepId: string): Promise<Recorder>;
-	/** Where the run's steps run, as its plan says (`StepPlacement`). */
-	placement: StepPlacement;
 	/** The run's abort signal: a person stopped the run. */
 	signal(): AbortSignal;
-	now(): number;
-	/** How long one minute of a timeout or a policy wait lasts. 60 000 in production. */
-	minuteMs: number;
-	dataDir: string;
-	settings(): RunSettings;
-	/** Anonymous usage, when this computer records it. */
-	usage?: UsageNotes;
-	/**
-	 * The descriptor of a node's kind (`node-kinds.ts`). The registry comes
-	 * in by the context, so the engine around the nodes never imports the
-	 * node modules: they import it.
-	 */
-	kindOf(node: FlowNode): NodeKind;
 	/**
 	 * The race of the `first` Joins of this thread and the running steps of
 	 * branches it may stop (`branches.ts`). A body shares its caller's.
 	 */
 	races: Races;
-	/**
-	 * Takes a lease of the run's Space for the run (ADR 7): the engine's
-	 * keeper, which asks this Replica's store or the Space's Host.
-	 */
-	leases: LeaseTaker;
-	/** Starts and stops the services of Service nodes (ADR 9). */
-	services: ServiceRunner;
 };
 
 /**
@@ -417,6 +430,8 @@ export function stepFailure(error: unknown, where: string): string {
  * of the run (ported from `openRecorder` and `lastSeqOf`). The runner makes
  * one per daemon and binds `StepContext.recorder` to the run.
  */
+export type Recorders = ReturnType<typeof createRecorders>;
+
 export function createRecorders(input: {
 	db: Database;
 	bus: RunBus;

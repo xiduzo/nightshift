@@ -6,6 +6,6 @@ export {
 	keptValues,
 	listKeptValues,
 	resetKeptValue,
-	saveKeptValues,
+	saveKeptOfStep,
 	saveKeptWrites,
 } from "./kept";

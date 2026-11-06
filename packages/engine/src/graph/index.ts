@@ -9,16 +9,16 @@ export type {
 	ServiceRunner,
 	StepMove,
 	StepPlacement,
+	StepShared,
 	StopService,
 } from "./context";
-export { messageOf, onDevice } from "./context";
+export { createRecorders, messageOf, onDevice } from "./context";
 export { combineHolds, type RunHolds } from "./holds";
 export { resolveInputs } from "./inputs";
 export { kindOf, kindOfType, NODE_KINDS } from "./node-kinds";
 export { missingNames } from "./nodes/agent";
 export { closeOpenWork, openWork } from "./open-work";
 export { askAnswerProblem } from "./output-schema";
-export { resolvePolicy } from "./policy";
 export { rerunNodeRefusal } from "./reentry";
 export type { Runner } from "./runner";
 export { createRunner } from "./runner";

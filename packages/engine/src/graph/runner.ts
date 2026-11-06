@@ -1,18 +1,10 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { Database } from "@nightshift/db";
-import {
-	branchPlaces,
-	type Flow,
-	type JsonValue,
-	type ResolvedPolicy,
-} from "@nightshift/flows";
+import { branchPlaces, type JsonValue } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
-import type { RunSettings } from "../device-config";
 import {
 	type GateVia,
 	provedEndReason,
 	type ResumedBy,
-	type RunBus,
 	type RunEnding,
 	type RunEndReason,
 	type RunLog,
@@ -29,13 +21,6 @@ import {
 	STILL_RUNNING,
 	WALKED_ELSEWHERE,
 } from "../run-status";
-import type { UsageNotes } from "../usage";
-import {
-	createRecorders,
-	type LeaseTaker,
-	type ServiceRunner,
-	type StepPlacement,
-} from "./context";
 import { findOverdue } from "./deadlines";
 import { FencedError } from "./fence";
 import { letGo, NO_HOLDS, type RunHolds } from "./holds";
@@ -135,21 +120,8 @@ import {
  * stop of a run share one state per run, so they stay in one module.
  */
 
-export type RunnerDeps = {
-	db: Database;
-	log: RunLog;
-	bus: RunBus;
-	dataDir: string;
-	now(): number;
-	minuteMs: number;
-	settings(): RunSettings;
-	/** Where the runs' steps run (`StepContext.placement`). */
-	placement: StepPlacement;
-	/** The run's flow snapshot and its called flows, parsed. */
-	flowOf(row: RunRow): Flow;
-	calledFlowsOf(row: RunRow): Record<string, Flow>;
-	/** The flow's own policy numbers, else the daemon's settings. */
-	policyFor(flow: Flow): ResolvedPolicy;
+/** What the runner takes: what every Thread is opened with, and the runner's own. */
+export type RunnerDeps = ThreadDeps & {
 	/** Aborting it clears the wake timers, the cap queue and the sweep: the daemon dies. */
 	signal?: AbortSignal;
 	/** How often the runner looks for steps past their time limits. Default 5 000 ms. */
@@ -158,12 +130,6 @@ export type RunnerDeps = {
 	openThread?: typeof openThread;
 	/** What runs hold for a scope (leases): let go on every end of a run. Default: nothing. */
 	holds?: RunHolds;
-	/** Takes the leases of Lease nodes. Default: none can be taken. */
-	leases?: LeaseTaker;
-	/** Starts and stops the services of Service nodes. Default: none. */
-	services?: ServiceRunner;
-	/** Anonymous usage, when this computer records it. */
-	usage?: UsageNotes;
 };
 
 /** What a start's Turn prepares once its slot is held: the run row, its inputs, its stop time and when it was due. */
@@ -299,29 +265,11 @@ const isGoing = (status: RunStatus) =>
 	status === "running" || status === "waiting" || status === "sleeping";
 
 export function createRunner(deps: RunnerDeps) {
-	const { db, log, bus } = deps;
+	const { db, shared } = deps;
+	const { log, bus, recorders } = shared;
 	const open = deps.openThread ?? openThread;
-	const recorders = createRecorders({ db, bus, log });
-	const threadDeps: ThreadDeps = {
-		db,
-		log,
-		bus,
-		recorders,
-		dataDir: deps.dataDir,
-		now: deps.now,
-		minuteMs: deps.minuteMs,
-		settings: deps.settings,
-		placement: deps.placement,
-		flowOf: deps.flowOf,
-		calledFlowsOf: deps.calledFlowsOf,
-		policyFor: deps.policyFor,
-		...(deps.leases ? { leases: deps.leases } : {}),
-		...(deps.services ? { services: deps.services } : {}),
-		...(deps.usage ? { usage: deps.usage } : {}),
-	};
 	const holds = deps.holds ?? NO_HOLDS;
 	const closeDeps: CloseDeps = {
-		db,
 		log,
 		bus,
 		flowOf: deps.flowOf,
@@ -346,7 +294,7 @@ export function createRunner(deps: RunnerDeps) {
 	const outside = <T>(fn: () => T): T => turnOf.exit(fn);
 
 	const sleeps = createSleeps({
-		now: deps.now,
+		now: shared.now,
 		wake: (runId) =>
 			outside(() => {
 				take(
@@ -430,7 +378,7 @@ export function createRunner(deps: RunnerDeps) {
 	function threadOf(row: RunRow): Thread {
 		const cached = threads.get(row.id);
 		if (cached) return cached;
-		const thread = open(row, threadDeps);
+		const thread = open(row, deps);
 		threads.set(row.id, thread);
 		return thread;
 	}
@@ -512,7 +460,7 @@ export function createRunner(deps: RunnerDeps) {
 		options: TakeOptions,
 	): boolean {
 		if (slots.has(runId)) throw new RunRefusal("not-now", STILL_RUNNING);
-		const runCap = deps.settings().maxConcurrentRuns;
+		const runCap = shared.settings().maxConcurrentRuns;
 		if (slots.size >= runCap) {
 			if (options.whenFull === "queue") {
 				capQueue.set(
@@ -796,7 +744,7 @@ export function createRunner(deps: RunnerDeps) {
 			run: await log.state(runId),
 			thread: await thread.snapshot(),
 			request,
-			now: deps.now(),
+			now: shared.now(),
 		});
 		if (released) throw new Refusal("unavailable", RELEASED);
 		// What it held, it takes again before its next step, or it stays where it is.
@@ -895,7 +843,7 @@ export function createRunner(deps: RunnerDeps) {
 		// Parallel branches may wait at several Gates: the first deadline is due.
 		const gate = firstDeadline(runState);
 		if (!gate) return UNCHANGED;
-		if (deps.now() < gate.deadline.at) {
+		if (shared.now() < gate.deadline.at) {
 			sleeps.schedule(row.id, gate.deadline.at);
 			return UNCHANGED;
 		}
@@ -926,7 +874,7 @@ export function createRunner(deps: RunnerDeps) {
 	): Promise<Taken> {
 		const runId = row.id;
 		const at = await threadOf(row).state();
-		const plan = planWake(runState, at, how, deps.now());
+		const plan = planWake(runState, at, how, shared.now());
 		if (plan.kind === "not-sleeping") return UNCHANGED;
 		if (plan.kind === "too-soon") {
 			sleeps.schedule(runId, plan.until);
@@ -1049,7 +997,7 @@ export function createRunner(deps: RunnerDeps) {
 		if (runState.status !== "running") return UNCHANGED;
 		const overdue = await findOverdue(
 			runState,
-			{ now: deps.now(), graceMs, minuteMs: deps.minuteMs },
+			{ now: shared.now(), graceMs, minuteMs: shared.minuteMs },
 			log.files(runId),
 		);
 		if (!overdue) return UNCHANGED;
@@ -1088,10 +1036,7 @@ export function createRunner(deps: RunnerDeps) {
 		}
 		if (intent.kind === "prune") {
 			// The thread opens for the prune only: a resume opens its own.
-			await pruneThread(
-				() => threads.get(runId) ?? open(row, threadDeps),
-				runId,
-			);
+			await pruneThread(() => threads.get(runId) ?? open(row, deps), runId);
 			return UNCHANGED;
 		}
 		const runState = await log.state(runId);
@@ -1208,7 +1153,7 @@ export function createRunner(deps: RunnerDeps) {
 		for (const runId of slots.keys()) {
 			if (checking.has(runId)) continue;
 			checking.add(runId);
-			take(runId, { kind: "overdue", graceMs: deps.minuteMs })
+			take(runId, { kind: "overdue", graceMs: shared.minuteMs })
 				.catch((error) => {
 					console.error(
 						`[engine] could not check the time of run ${runId}`,

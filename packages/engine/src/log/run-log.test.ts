@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import type { Database } from "@nightshift/db";
-import { event, project, run } from "@nightshift/db/schema";
+import {
+	agentSession,
+	event,
+	keptVariable,
+	project,
+	run,
+	step,
+} from "@nightshift/db/schema";
 import { asc, eq } from "drizzle-orm";
 
 import { createSandbox, type Sandbox } from "../testing/test-support";
@@ -389,6 +396,126 @@ describe("run log", () => {
 			);
 			expect(calls).toBe(n);
 		}
+	});
+});
+
+describe("the rows an event implies", () => {
+	const stepRow = (id: string) =>
+		sandbox.db.select().from(step).where(eq(step.id, id));
+	const sessionRow = (id: string) =>
+		sandbox.db.select().from(agentSession).where(eq(agentSession.id, id));
+	const started = (stepId: string) =>
+		({
+			type: "StepStarted",
+			runId: "r1",
+			stepId,
+			payload: {
+				nodeId: "n",
+				nodeType: "agent",
+				visit: 1,
+				transcriptPath: `/t/${stepId}.ndjson`,
+				logPath: null,
+				scope: null,
+				deviceId: "d-here",
+			},
+		}) satisfies EventInput<"StepStarted">;
+
+	test("StepStarted writes the step's row, SessionStarted the session's, HarnessSessionAssigned its harness id", async () => {
+		const log = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
+		await log.append(started("s1"));
+		expect(await stepRow("s1")).toMatchObject([
+			{
+				id: "s1",
+				spaceId: sandbox.spaceId,
+				runId: "r1",
+				nodeId: "n",
+				nodeType: "agent",
+				visit: 1,
+				transcriptPath: "/t/s1.ndjson",
+				deviceId: "d-here",
+			},
+		]);
+		await log.append({
+			type: "SessionStarted",
+			runId: "r1",
+			stepId: "s1",
+			sessionId: "s1-a",
+			payload: { prompt: "Go", resumeSessionId: null, harness: "claude-code" },
+		});
+		expect(await sessionRow("s1-a")).toMatchObject([
+			{
+				id: "s1-a",
+				spaceId: sandbox.spaceId,
+				runId: "r1",
+				stepId: "s1",
+				prompt: "Go",
+				harnessSessionId: null,
+			},
+		]);
+		await log.append({
+			type: "HarnessSessionAssigned",
+			runId: "r1",
+			stepId: "s1",
+			sessionId: "s1-a",
+			payload: { harnessSessionId: "h-1", model: "sonnet" },
+		});
+		expect((await sessionRow("s1-a"))[0]?.harnessSessionId).toBe("h-1");
+	});
+
+	test("StepEnded saves the kept values it names, for the run's project; the row and the event land together", async () => {
+		const log = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
+		await log.append(started("s1"));
+		await log.append({
+			type: "StepEnded",
+			runId: "r1",
+			stepId: "s1",
+			payload: {
+				outcome: "pass",
+				outputs: {},
+				error: null,
+				variables: { count: 2, scratch: "x" },
+				kept: { flowName: "nightly", names: ["count"] },
+			},
+		});
+		const kept = await sandbox.db.select().from(keptVariable);
+		expect(kept).toMatchObject([
+			{
+				spaceId: sandbox.spaceId,
+				projectId: "p",
+				flowName: "nightly",
+				name: "count",
+				value: "2",
+				runId: "r1",
+				stepId: "s1",
+			},
+		]);
+	});
+
+	test("a row written before its event stays as it was", async () => {
+		const log = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		});
+		await sandbox.db.insert(step).values({
+			id: "s1",
+			spaceId: sandbox.spaceId,
+			runId: "r1",
+			nodeId: "earlier",
+			nodeType: "command",
+			visit: 1,
+			transcriptPath: "/t/own.ndjson",
+		});
+		await log.append(started("s1"));
+		expect(await stepRow("s1")).toMatchObject([
+			{ nodeId: "earlier", transcriptPath: "/t/own.ndjson" },
+		]);
+		expect((await fromDb("r1")).map((e) => e.type)).toEqual(["StepStarted"]);
 	});
 });
 

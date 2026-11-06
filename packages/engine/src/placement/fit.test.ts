@@ -12,7 +12,12 @@ import type { Capabilities } from "../device/types";
 import { AGENT, cliToolsInstalled, harnessesAdded } from "../graph/nodes/agent";
 import { DECISION, modelDecisionsHaveDecider } from "../graph/nodes/decision";
 import { modelValuesHaveDecider, VALUE } from "../graph/nodes/value";
-import { type TestDeviceDeps, testDevice } from "../testing/test-support";
+import {
+	cliToolsOf,
+	connectionsOf,
+	type TestDeviceDeps,
+	testDevice,
+} from "../testing/test-support";
 import { connectionsExist, REQUIREMENTS, refusalOf, unfit } from "./fit";
 
 /**
@@ -42,9 +47,9 @@ function has(overrides: Partial<TestDeviceDeps> = {}): Promise<Capabilities> {
 		harnesses: Object.fromEntries(
 			Object.keys(HARNESS_LABELS).map((name) => [name, harness]),
 		),
-		connectionNames: () => new Set(["github"]),
-		cliNames: () => new Set(["gh"]),
-		findCli: () => "/usr/bin/tool",
+		connections: connectionsOf({ names: ["github"] }),
+		cliTools: cliToolsOf(["gh"]),
+		which: () => "/usr/bin/tool",
 		decider: {
 			defaultModel: defaultDeciderModel,
 			decide: async () => ({}) as never,
@@ -89,8 +94,8 @@ describe("REQUIREMENTS", () => {
 	test("refusalOf answers with the first failing requirement", async () => {
 		const nodes = [agent("a", { connections: ["jira"], clis: ["acli"] })];
 		const daemon = await has({
-			connectionNames: () => new Set(),
-			cliNames: () => new Set(),
+			connections: connectionsOf(),
+			cliTools: cliToolsOf([]),
 		});
 		expect(refusalOf(nodes, daemon)).toBe(connectionsExist(nodes, daemon));
 	});
@@ -163,7 +168,7 @@ describe("cliToolsInstalled", () => {
 			agent("b", { clis: ["jq"] }),
 		];
 		const daemon = await has({
-			findCli: (name) => (name === "gh" ? "/gh" : null),
+			which: (name) => (name === "gh" ? "/gh" : null),
 		});
 		expect(cliToolsInstalled(nodes, daemon)).toBe(
 			'The flow uses the CLI tool "jq", but this computer does not have it. Install jq, or remove it from the flow.',

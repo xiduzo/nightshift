@@ -1,5 +1,5 @@
 import type { Database } from "@nightshift/db";
-import { keptVariable } from "@nightshift/db/schema";
+import { keptVariable, run } from "@nightshift/db/schema";
 import type { Flow, JsonValue } from "@nightshift/flows";
 import { asDate, instant } from "@nightshift/time";
 import { and, asc, eq, lt, sql } from "drizzle-orm";
@@ -88,23 +88,40 @@ export async function keptValues(
 }
 
 /**
- * The statements that save a step's writes of kept variables, for the
- * batch of its `StepEnded`. Only the names in `kept` are saved.
+ * The statements that save the kept writes of a step this Walker ended, as
+ * its `StepEnded` names them (`kept`, `variables`), in the batch of that
+ * event (`log/event-rows.ts`). The flow's Space and Project are the run's,
+ * read in the same statement. The latest write wins, as between two steps.
  */
-export function saveKeptValues(
+export function saveKeptOfStep(
 	db: Database,
-	flow: KeptFlow,
-	kept: ReadonlySet<string>,
-	written: Readonly<Record<string, JsonValue>>,
-	by: { runId: string; stepId: string },
+	step: {
+		runId: string;
+		stepId: string;
+		flowName: string;
+		names: readonly string[];
+		variables: Readonly<Record<string, JsonValue>>;
+	},
 ): BatchItem<"sqlite">[] {
-	return Object.entries(written)
-		.filter(([name]) => kept.has(name))
-		.map(([name, value]) => {
-			const json = JSON.stringify(value);
-			return db
+	const { runId, stepId, flowName } = step;
+	const spaceId = sql<string>`(select ${run.spaceId} from ${run} where ${run.id} = ${runId})`;
+	const projectId = sql<string>`(select ${run.projectId} from ${run} where ${run.id} = ${runId})`;
+	return step.names.flatMap((name) => {
+		const value = step.variables[name];
+		if (value === undefined) return [];
+		const json = JSON.stringify(value);
+		return [
+			db
 				.insert(keptVariable)
-				.values({ ...flow, name, value: json, ...by })
+				.values({
+					spaceId,
+					projectId,
+					flowName,
+					name,
+					value: json,
+					runId,
+					stepId,
+				})
 				.onConflictDoUpdate({
 					target: [
 						keptVariable.projectId,
@@ -113,13 +130,14 @@ export function saveKeptValues(
 					],
 					set: {
 						value: json,
-						runId: by.runId,
-						stepId: by.stepId,
-						spaceId: flow.spaceId,
+						runId,
+						stepId,
+						spaceId,
 						updatedAt: sql`(cast(unixepoch('subsecond') * 1000 as integer))`,
 					},
-				});
-		});
+				}),
+		];
+	});
 }
 
 /**

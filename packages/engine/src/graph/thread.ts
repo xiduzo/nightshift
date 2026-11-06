@@ -1,28 +1,18 @@
 import { Command, END } from "@langchain/langgraph";
 import type { Database } from "@nightshift/db";
-import type { Flow, JsonValue, ResolvedPolicy } from "@nightshift/flows";
-import type { RunSettings } from "../device-config";
+import type { Flow, JsonValue } from "@nightshift/flows";
 import {
 	provedEndReason,
-	type RunBus,
 	type RunEnding,
 	type RunEndReason,
-	type RunLog,
 	type RunRow,
 } from "../log";
 import type { RunResult } from "../run-status";
-import type { UsageNotes } from "../usage";
 import { createRaces } from "./branches";
 import { compileFlow } from "./compile";
-import type {
-	createRecorders,
-	LeaseTaker,
-	ServiceRunner,
-	StepContext,
-	StepPlacement,
-} from "./context";
+import type { StepContext, StepShared } from "./context";
 import { createFence, type Fence, FencedSaver, fencedLog } from "./fence";
-import { kindOf } from "./node-kinds";
+import { resolvePolicy } from "./policy";
 import type {
 	Ended,
 	Parked,
@@ -39,9 +29,10 @@ import type {
  * while the run is likely to go on soon. The node tests open theirs the
  * same way (`testing/graph.ts`), so they drive the loop production drives.
  *
- * - `openThread` is the one StepContext builder of the package. Every
- *   write of the thread goes through its fence: the log in `ctx` and the
- *   saver (`fence.ts`).
+ * - `openThread` is the one StepContext builder of the package: what
+ *   every step may touch (`deps.shared`) plus the run's own. Every write
+ *   of the thread goes through its fence: the log in `ctx` and the saver
+ *   (`fence.ts`).
  * - `driveGraph` is the one stream loop. It streams with
  *   `durability: "sync"` and no recursion limit (the step cap is the
  *   walk's own, from the log). Only the root namespace's `__interrupt__`
@@ -58,48 +49,15 @@ export type RunGraph = ReturnType<ReturnType<typeof compileFlow>["compile"]>;
 /** What one drive streams into the graph: inputs, `null`, or a `Command`. */
 export type StreamInput = Parameters<RunGraph["stream"]>[0];
 
-/** What a Thread needs to build its StepContext and its saver. */
+/** What a Thread is opened with: what every step may touch, and its own. */
 export type ThreadDeps = {
+	/** What a step may touch on this computer (`StepShared`). The Thread fences its log: `ctx.log` is the fenced one. */
+	shared: StepShared;
+	/** The database of the checkpoint saver. */
 	db: Database;
-	/** The run log. The Thread fences it: `ctx.log` is the fenced one. */
-	log: RunLog;
-	bus: RunBus;
-	/** The transcript recorders, shared by every thread of the runner. */
-	recorders: Pick<ReturnType<typeof createRecorders>, "open">;
-	dataDir: string;
-	now(): number;
-	minuteMs: number;
-	settings(): RunSettings;
-	/** Where the run's steps run (`StepContext.placement`). */
-	placement: StepPlacement;
 	/** The run's flow snapshot and its called flows, parsed. */
 	flowOf(row: RunRow): Flow;
 	calledFlowsOf(row: RunRow): Record<string, Flow>;
-	/** The flow's own policy numbers, else the daemon's settings. */
-	policyFor(flow: Flow): ResolvedPolicy;
-	/** Takes the leases of Lease nodes (`StepContext.leases`). Default: none can be taken. */
-	leases?: LeaseTaker;
-	/** Starts and stops the services of Service nodes (`StepContext.services`). Default: none. */
-	services?: ServiceRunner;
-	/** Anonymous usage, when this computer records it. */
-	usage?: UsageNotes;
-};
-
-/** A thread without services: a Service step fails with this. */
-const NO_SERVICES: ServiceRunner = {
-	bringUp: async () => {
-		throw new Error("This computer runs no services.");
-	},
-	stop: async () => {},
-	tail: () => "",
-};
-
-/** A thread without leases: a Lease step fails with this. */
-const NO_LEASES: LeaseTaker = {
-	take: async () => {
-		throw new Error("This computer keeps no leases.");
-	},
-	release: async () => {},
 };
 
 /** One interrupt the thread sits at, with the id a resume answers it by. */
@@ -193,28 +151,18 @@ export function openThread(row: RunRow, deps: ThreadDeps): Thread {
 	const flow = deps.flowOf(row);
 	const fence = createFence(runId);
 	let controller = new AbortController();
+	const { shared } = deps;
 	const ctx: StepContext = {
-		db: deps.db,
+		...shared,
+		log: fencedLog(shared.log, fence),
 		run: row,
 		flow,
 		flowName: row.flowName ?? row.title,
 		flows: deps.calledFlowsOf(row),
 		// Resolved at each use: the settings may change while the thread is open.
-		policy: () => deps.policyFor(flow),
-		log: fencedLog(deps.log, fence),
-		bus: deps.bus,
-		recorder: (stepId) => deps.recorders.open(runId, stepId),
-		placement: deps.placement,
+		policy: () => resolvePolicy(flow.policy, shared.settings().policy),
 		signal: () => controller.signal,
-		now: deps.now,
-		minuteMs: deps.minuteMs,
-		dataDir: deps.dataDir,
-		settings: deps.settings,
-		kindOf,
 		races: createRaces(),
-		leases: deps.leases ?? NO_LEASES,
-		services: deps.services ?? NO_SERVICES,
-		...(deps.usage ? { usage: deps.usage } : {}),
 	};
 	const saver = new FencedSaver(deps.db, fence);
 	const graph = compileFlow(flow, ctx).compile({ checkpointer: saver });

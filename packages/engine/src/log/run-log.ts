@@ -4,6 +4,7 @@ import { asDate } from "@nightshift/time";
 import { asc, eq, inArray } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { stampedAppend } from "./command-stamp";
+import { withImpliedRows } from "./event-rows";
 import {
 	appendEventRow,
 	type EngineEventType,
@@ -26,10 +27,10 @@ import { type RunFiles, runFiles } from "./transcripts";
  *
  * - A run's log is read from the database once, on its first use. Reads
  *   at once share one query per run: a log being read is never read twice.
- * - `append` writes the event first, in one batch with the rows it names,
- *   and keeps it only once the batch committed: nothing is kept (or
- *   published by the caller) before it is durable. A write that throws
- *   leaves the copy as it was.
+ * - `append` writes the event first, in one batch with the rows it
+ *   implies (`event-rows.ts`) and the rows it names, and keeps it only once
+ *   the batch committed: nothing is kept (or published by the caller)
+ *   before it is durable. A write that throws leaves the copy as it was.
  * - Open runs (running, waiting, sleeping) stay in memory. The logs of ended
  *   runs are dropped, least recently used first, beyond `maxIdleEvents`.
  * - Each run's log is folded once into its run state (`run-state.ts`),
@@ -364,8 +365,10 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 		},
 
 		/**
-		 * Appends one event as the Walker's next, in one batch with `writes`
-		 * (the row the event names, say). It is kept only after the batch
+		 * Appends one event as the Walker's next, in one batch with the rows
+		 * it implies (`event-rows.ts`: a step's row, a session's row and
+		 * harness id, a step's kept values) and with `writes` (a row the log
+		 * does not know, say the run's). It is kept only after the batch
 		 * committed, with the seq and time the database gave it.
 		 */
 		async append<T extends EngineEventType>(
@@ -374,7 +377,12 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 		): Promise<LoggedEvent> {
 			const walker = await walkerId();
 			const row = await stampedAppend(input.runId, input.payload, (payload) =>
-				appendEventRow(db, { ...input, payload }, walker, writes),
+				appendEventRow(
+					db,
+					{ ...input, payload },
+					walker,
+					withImpliedRows(db, input, writes),
+				),
 			);
 			const logged = parseEventRow(row);
 			keep(logged);

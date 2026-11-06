@@ -113,11 +113,12 @@ packages/engine/src/
                            goto })`; or ends the flow (the kind's
                            isChosenEnd and endReason); or parks
                            (parkCommand). parkNode, the node ids, scopeOf.
-  graph/context.ts         StepContext (below, with kindOf: the registry,
-                           given by the runner), NodeKind (the descriptor a
-                           node module gives back, with PLAIN_KIND, the
-                           facts most kinds share), the recorders, the
-                           template context, stopAtOf.
+  graph/context.ts         StepShared (what a step may touch, the same for
+                           every run) and StepContext (below, with kindOf:
+                           the registry, given by the engine), NodeKind
+                           (the descriptor a node module gives back, with
+                           PLAIN_KIND, the facts most kinds share), the
+                           recorders, the template context, stopAtOf.
   graph/step-runner.ts     The step runner (below): runStep() owns the step
                            lifecycle every node shares, from the resume
                            point to route(); beginStep/OpenStep is the lower
@@ -204,8 +205,9 @@ packages/engine/src/
                            inside out, with each kind's cutShortOutputs)
                            and closeOpenWork (appends them, tells the bus).
   graph/thread.ts          One Run's Thread: openThread() builds the one
-                           StepContext, the fenced log and checkpoint saver,
-                           and compiles the flow; driveGraph() is the one
+                           StepContext from StepShared and the run's own,
+                           the fenced log and checkpoint saver, and
+                           compiles the flow; driveGraph() is the one
                            stream loop (root interrupts only, no recursion
                            limit); endingOf() says what RunEnded a drive's
                            outcome asks for; inputOf() builds the LangGraph
@@ -1092,26 +1094,37 @@ and `call-each.test.ts` go through `createEngine`.
 ## StepContext (what a node factory gets)
 
 ```ts
-type StepContext = {
-  db: Database;
-  run: RunRow;                      // id, projectId, worktreePath, branch, baseRef, flow snapshot
+// What a step may touch on this computer, the same for every run. createEngine makes it once.
+type StepShared = {
+  log: RunLog;                       // append writes a fact with the rows it implies; events(runId) for lookups
+  bus: RunBus;
+  recorders: Recorders;              // open(runId, stepId): the step's transcript writer
+  placement: StepPlacement;          // where the run's steps run (placement/): the Device of a step now, a Device by id, a move
+  now(): number; minuteMs: number;
+  settings(): RunSettings;
+  kindOf(node): NodeKind;            // the registry, given by the engine
+  leases: LeaseTaker; services: ServiceRunner;
+  artifacts: Pick<ArtifactStore, "answerFiles" | "save">;
+  keptValues(flow): Promise<Record<string, JsonValue>>;   // what an earlier run kept
+  gitAuthor(personId): Promise<GitAuthor | null>;          // for the worktree a Device adds
+  usage?: UsageNotes;
+};
+// The run's own, added by its Thread (openThread).
+type StepContext = StepShared & {
+  run: RunRow;                       // id, projectId, worktreePath, branch, baseRef, flow snapshot
   flow: Flow;                        // the flow this graph was compiled from
   flowName: string;                  // {{run.flow}}
   flows: Record<string, Flow>;       // called flows by name
   policy(): ResolvedPolicy;          // resolved at each use, like settings()
-  log: RunLog;                       // appendEvent; events(runId) for lookups
-  bus: RunBus;
-  recorder(stepId, path): Recorder;  // transcript writer, as openRecorder today
-  placement: StepPlacement;          // where the run's steps run (placement/): the Device of a step now, a Device by id, a move
   signal(): AbortSignal;             // the run's abort signal
-  now(): number; minuteMs: number;
-  dataDir: string;
-  settings(): RunSettings;
+  races: Races;
 };
 ```
 
 A node factory is `(node, ctx) => (state, config) => Promise<Command>`.
-Only the step runner reads `db`: it writes the `step` and `agent_session`
-rows. The node modules read the rest. A body touches a computer only
-through `step.device` (`device/types.ts`): sessions, commands, tool calls,
-the decider.
+No member is the database or a folder on disk. The log writes the rows an
+event implies with the event (`log/event-rows.ts`): the `step` row of
+`StepStarted`, the `agent_session` row of `SessionStarted`, its harness id,
+the kept values of `StepEnded`. A body touches a computer only through
+`step.device` (`device/types.ts`): sessions, commands, tool calls, the
+decider.

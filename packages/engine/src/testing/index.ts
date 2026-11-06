@@ -25,6 +25,7 @@ export { testKnowledge } from "./knowledge";
 export { runEvents } from "./run-events";
 export { seedFlows } from "./seed-flows";
 export {
+	connectionsOf,
 	createSandbox,
 	expectRunLogsInSync,
 	mustGit,

@@ -135,11 +135,14 @@ describe("driveGraph", () => {
 		// comes then, and the step goes on to start its session.
 		const opening = Promise.withResolvers<void>();
 		let waiting = false;
-		const recorder = h.ctx.recorder;
-		h.ctx.recorder = async (stepId) => {
-			waiting = true;
-			await opening.promise;
-			return recorder(stepId);
+		const { recorders } = h.ctx;
+		h.ctx.recorders = {
+			...recorders,
+			open: async (runId, stepId) => {
+				waiting = true;
+				await opening.promise;
+				return recorders.open(runId, stepId);
+			},
 		};
 		const controller = new AbortController();
 		const driving = h.thread.drive({ inputs: {} }, { controller });

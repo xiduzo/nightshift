@@ -24,6 +24,7 @@ import { createRunLog, type RunLog } from "../log/run-log";
 import type { RunDetail, StepSummary } from "../read/views";
 import { seedFlowFolder } from "../testing/seed-flows";
 import {
+	cliToolsOf,
 	createSandbox,
 	expectRunLogsInSync,
 	mustGit,
@@ -72,8 +73,8 @@ function makeEngine(
 			harnesses: { "claude-code": harness },
 			dataDir: sandbox.dataDir,
 			// The format 1 flows had the GitHub tool set: now the CLI tool gh.
-			cliNames: () => new Set(["gh"]),
-			findCli: (name) => `/usr/local/bin/${name}`,
+			cliTools: cliToolsOf(["gh"]),
+			which: (name) => `/usr/local/bin/${name}`,
 			...options,
 		}),
 		{ runLog },

@@ -437,14 +437,17 @@ describe("the Decision node", () => {
 
 		// The wake re-entered the node, and the daemon died before the decider
 		// answered: the checkpoint is after the wait node, the step is open.
-		const recorder = h.ctx.recorder;
-		h.ctx.recorder = async () => {
-			throw new Error("the daemon died");
+		const { recorders } = h.ctx;
+		h.ctx.recorders = {
+			...recorders,
+			open: async () => {
+				throw new Error("the daemon died");
+			},
 		};
 		await expect(
 			drive(h, new Command({ resume: { kind: "wake", early: false } })),
 		).rejects.toThrow("the daemon died");
-		h.ctx.recorder = recorder;
+		h.ctx.recorders = recorders;
 		const dead = await h.graph().getState(h.config);
 		expect(dead.next).toEqual(["decide"]);
 		expect(calls).toHaveLength(1);
@@ -712,12 +715,15 @@ describe("the Decision node decided by a rule", () => {
 				edges: [],
 			}),
 		);
-		const recorder = h.ctx.recorder;
-		h.ctx.recorder = async () => {
-			throw new Error("the daemon died");
+		const { recorders } = h.ctx;
+		h.ctx.recorders = {
+			...recorders,
+			open: async () => {
+				throw new Error("the daemon died");
+			},
 		};
 		await expect(drive(h, { inputs: {} })).rejects.toThrow("the daemon died");
-		h.ctx.recorder = recorder;
+		h.ctx.recorders = recorders;
 		const [first] = deriveSteps(foldRun(await h.events()));
 		expect(first).toMatchObject({ nodeId: "pick", visit: 1, endedAt: null });
 

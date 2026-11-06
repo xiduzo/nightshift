@@ -36,6 +36,7 @@ import type { RunDetail, RunStreamItem } from "../read/views";
 import type { RunStatus } from "../run-status";
 import { seedFlowFolder } from "../testing/seed-flows";
 import {
+	cliToolsOf,
 	createSandbox,
 	expectRunLogsInSync,
 	holdSpace,
@@ -77,8 +78,8 @@ function makeEngine(
 		| "decider"
 		| "settings"
 		| "scheduler"
-		| "cliNames"
-		| "findCli"
+		| "cliTools"
+		| "which"
 	> = {},
 	internals: EngineInternals = {},
 ): SpaceEngine {
@@ -3231,8 +3232,8 @@ describe("a full flow", () => {
 		const engine = makeEngine(harness, {
 			decider,
 			maxConcurrentRuns: 1,
-			cliNames: () => new Set(["gh"]),
-			findCli: (name) => `/usr/local/bin/${name}`,
+			cliTools: cliToolsOf(["gh"]),
+			which: (name) => `/usr/local/bin/${name}`,
 		});
 		const flow = flowOf(
 			[

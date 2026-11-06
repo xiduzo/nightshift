@@ -24,7 +24,6 @@ import {
 	resolvedAgent,
 } from "@nightshift/flows";
 import { now } from "@nightshift/time";
-import { createArtifactStore } from "../../artifacts";
 import { runCommand, type SessionEvent, type SessionInput } from "../../device";
 import {
 	type EnginePayloads,
@@ -559,7 +558,7 @@ async function runSession(
 	}
 	const maxTurns = turnLimit(ctx, node);
 	// The files people added to the run's answers go to the Device that runs it.
-	const files = await createArtifactStore(ctx.dataDir).answerFiles(ctx.run.id);
+	const files = await ctx.artifacts.answerFiles(ctx.run.id);
 	const common = {
 		cwd: step.worktree,
 		prompt,

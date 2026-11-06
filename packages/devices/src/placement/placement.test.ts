@@ -29,6 +29,7 @@ import {
 } from "@nightshift/engine/projects";
 import type { RunStatus } from "@nightshift/engine/run-status";
 import {
+	connectionsOf,
 	createProfileStore,
 	createSandbox,
 	mustGit,
@@ -107,17 +108,14 @@ const bDevice = (projectOf: () => string) =>
 		{
 			harnesses: { "claude-code": fakeHarness(reportingScript("pass")) },
 			clonePath: async (id) => (id === projectOf() ? b.repoPath : null),
-			findCli: (name) => (name === "git" ? "/usr/bin/git" : null),
+			which: (name) => (name === "git" ? "/usr/bin/git" : null),
 			// B has the profile "everywhere"; only A has "here_only".
-			profileFor: (name) =>
-				name === "everywhere" || name === "b_only" ? PROFILE : null,
-			// Only B has the secret B_TOKEN.
-			secretEnv: async (names) => {
-				const missing = names.filter((name) => name !== "B_TOKEN");
-				return missing.length > 0
-					? { ok: false, missing }
-					: { ok: true, env: { B_TOKEN: "b-only-token" } };
+			profiles: {
+				settingsFor: (name) =>
+					name === "everywhere" || name === "b_only" ? PROFILE : null,
 			},
+			// Only B has the secret B_TOKEN.
+			connections: connectionsOf({ secrets: { B_TOKEN: "b-only-token" } }),
 		},
 		B,
 	);

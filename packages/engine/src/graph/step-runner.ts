@@ -1,14 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { Command, type LangGraphRunnableConfig } from "@langchain/langgraph";
 import type { CostSource } from "@nightshift/agents/pricing";
-import { agentSession, step as stepTable } from "@nightshift/db/schema";
 import {
 	applyVariableWrites,
 	type FlowNode,
 	type TemplateContext,
 	type VariableResult,
 } from "@nightshift/flows";
-import { eq } from "drizzle-orm";
 import type { Device } from "../device";
 import { type KnowledgeUseEvent, knowledgeUseEvent } from "../knowledge";
 import {
@@ -27,13 +25,8 @@ import {
 	type StepOutputs,
 	scopeKey,
 } from "../log";
-import {
-	deriveBudgetSpend,
-	deriveWorktrees,
-	gitAuthorOf,
-	pullRequestOf,
-} from "../read";
-import { keptNames, saveKeptValues } from "../variables";
+import { deriveBudgetSpend, deriveWorktrees, pullRequestOf } from "../read";
+import { keptNames } from "../variables";
 import { OUTRUN_ERROR, outrun, placeOf } from "./branches";
 import { budgetPassed, runBudget } from "./budget";
 import {
@@ -716,39 +709,24 @@ export async function beginStep(
 		const logPath = ctx.kindOf(node).logsCommandOutput(node)
 			? ctx.log.files(runId).commandLog(stepId)
 			: null;
-		// The row and its event are one batch: a stop lands before or after both.
-		await ctx.log.append(
-			{
-				type: "StepStarted",
-				runId,
-				stepId,
-				payload: {
-					nodeId: node.id,
-					nodeType: node.type,
-					visit,
-					transcriptPath: path,
-					logPath,
-					scope,
-					deviceId: device.id,
-					...budget,
-				},
+		// The log writes the step's row with its event, in one batch: a stop
+		// lands before or after both. `deviceId` is the Device the step runs
+		// on (its Placement), not the Walker.
+		await ctx.log.append({
+			type: "StepStarted",
+			runId,
+			stepId,
+			payload: {
+				nodeId: node.id,
+				nodeType: node.type,
+				visit,
+				transcriptPath: path,
+				logPath,
+				scope,
+				deviceId: device.id,
+				...budget,
 			},
-			{
-				before: [
-					ctx.db.insert(stepTable).values({
-						id: stepId,
-						spaceId: ctx.run.spaceId,
-						runId,
-						nodeId: node.id,
-						nodeType: node.type,
-						visit,
-						transcriptPath: path,
-						// The Device the step runs on (its Placement), not the Walker.
-						deviceId: device.id,
-					}),
-				],
-			},
-		);
+		});
 	} else {
 		existing = logged.steps.get(start.stepId) ?? null;
 		if (!existing) throw new Error(`Step not found: ${start.stepId}`);
@@ -781,7 +759,7 @@ export async function beginStep(
 		});
 	}
 
-	const recorder = await ctx.recorder(stepId);
+	const recorder = await ctx.recorders.open(runId, stepId);
 
 	// The step's own signal: a stop of the run, the node's time budget, or
 	// no activity for too long.
@@ -873,47 +851,25 @@ export async function beginStep(
 		},
 		async session(started) {
 			const sessionId = randomUUID();
-			await ctx.log.append(
-				{
-					type: "SessionStarted",
-					runId,
-					stepId,
-					sessionId,
-					payload: started,
-				},
-				{
-					before: [
-						ctx.db.insert(agentSession).values({
-							id: sessionId,
-							spaceId: ctx.run.spaceId,
-							runId,
-							stepId,
-							prompt: started.prompt,
-						}),
-					],
-				},
-			);
+			// The log writes the session's row with its event.
+			await ctx.log.append({
+				type: "SessionStarted",
+				runId,
+				stepId,
+				sessionId,
+				payload: started,
+			});
 			changed();
 			return {
 				id: sessionId,
 				async assigned(harnessSessionId, model) {
-					await ctx.log.append(
-						{
-							type: "HarnessSessionAssigned",
-							runId,
-							stepId,
-							sessionId,
-							payload: { harnessSessionId, model },
-						},
-						{
-							before: [
-								ctx.db
-									.update(agentSession)
-									.set({ harnessSessionId })
-									.where(eq(agentSession.id, sessionId)),
-							],
-						},
-					);
+					await ctx.log.append({
+						type: "HarnessSessionAssigned",
+						runId,
+						stepId,
+						sessionId,
+						payload: { harnessSessionId, model },
+					});
 					changed();
 				},
 				async spent(payload) {
@@ -957,21 +913,14 @@ export async function beginStep(
 				written.ok && Object.keys(written.values).length > 0
 					? written.values
 					: undefined;
-			// A write of a kept variable saves it for the next run, in the
-			// same batch as the step's end.
+			// A write of a kept variable saves it for the next run: the log
+			// writes the values `kept` names, in the batch of the step's end.
 			const keptFlow = variables ? keptFlowOf(ctx, scope) : null;
 			const keptWritten =
 				variables && keptFlow
 					? Object.keys(variables).filter((name) =>
 							keptNames(ctx.flow).has(name),
 						)
-					: [];
-			const saveKept =
-				variables && keptFlow
-					? saveKeptValues(ctx.db, keptFlow, keptNames(ctx.flow), variables, {
-							runId,
-							stepId,
-						})
 					: [];
 			const opened = pullRequestOf(outputs);
 			if (opened) {
@@ -982,30 +931,27 @@ export async function beginStep(
 				});
 				ctx.usage?.note({ kind: "pull-request-opened", runId });
 			}
-			await ctx.log.append(
-				{
-					type: "StepEnded",
-					runId,
-					stepId,
-					payload: {
-						outcome,
-						outputs,
-						error,
-						...(variables ? { variables } : {}),
-						...(keptFlow && keptWritten.length > 0
-							? {
-									kept: { flowName: keptFlow.flowName, names: keptWritten },
-								}
-							: {}),
-						...(extra?.costUsd !== undefined ? { costUsd: extra.costUsd } : {}),
-						...(extra?.costSource !== undefined
-							? { costSource: extra.costSource }
-							: {}),
-						...(written.ok && extra?.guard ? { guard: extra.guard } : {}),
-					},
+			await ctx.log.append({
+				type: "StepEnded",
+				runId,
+				stepId,
+				payload: {
+					outcome,
+					outputs,
+					error,
+					...(variables ? { variables } : {}),
+					...(keptFlow && keptWritten.length > 0
+						? {
+								kept: { flowName: keptFlow.flowName, names: keptWritten },
+							}
+						: {}),
+					...(extra?.costUsd !== undefined ? { costUsd: extra.costUsd } : {}),
+					...(extra?.costSource !== undefined
+						? { costSource: extra.costSource }
+						: {}),
+					...(written.ok && extra?.guard ? { guard: extra.guard } : {}),
 				},
-				saveKept.length > 0 ? { before: saveKept } : undefined,
-			);
+			});
 			changed();
 			emit(config, {
 				type: "step-ended",
@@ -1153,7 +1099,7 @@ export async function readyDevice(
 		);
 	}
 	const author = ctx.run.startedBy
-		? await gitAuthorOf(ctx.db, ctx.run.startedBy)
+		? await ctx.gitAuthor(ctx.run.startedBy)
 		: null;
 	let worktree: { worktreePath: string };
 	try {

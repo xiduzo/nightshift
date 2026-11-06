@@ -15,7 +15,11 @@ import {
 	payloads,
 	startRun,
 } from "../testing/graph";
-import { createSandbox, type Sandbox } from "../testing/test-support";
+import {
+	connectionsOf,
+	createSandbox,
+	type Sandbox,
+} from "../testing/test-support";
 import { dataOf } from "./nodes/tool";
 
 /**
@@ -62,13 +66,16 @@ async function start(
 		harness: fakeHarness(),
 		...options,
 	});
-	h.local.mcpServersFor = async (node) =>
-		(node.connections ?? []).includes("tracker")
-			? { ok: true, servers: { tracker: fakeMcp } }
-			: {
-					ok: false,
-					message: `There is no connection named "${node.connections?.[0]}". Add it under Agents → Tools, or remove it from the node.`,
-				};
+	h.local.connections = {
+		...connectionsOf({ names: ["tracker"] }),
+		mcpServersFor: async (node) =>
+			(node.connections ?? []).includes("tracker")
+				? { ok: true, servers: { tracker: fakeMcp } }
+				: {
+						ok: false,
+						message: `There is no connection named "${node.connections?.[0]}". Add it under Agents → Tools, or remove it from the node.`,
+					},
+	};
 	return h;
 }
 
@@ -304,8 +311,7 @@ describe("the Tool node", () => {
 
 	test("a server that cannot be reached fails the step with a readable error", async () => {
 		const h = await start(flowOf([tool("file", "say", { text: "hi" })]));
-		h.local.mcpServersFor = async () => ({
-			ok: true,
+		h.local.connections = connectionsOf({
 			servers: {
 				tracker: { command: "/nonexistent/mcp-server", args: [], env: {} },
 			},

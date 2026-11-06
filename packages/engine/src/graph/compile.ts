@@ -6,7 +6,7 @@ import {
 	StateGraph,
 } from "@langchain/langgraph";
 import { type Flow, initialVariables } from "@nightshift/flows";
-import { keptNames, keptValues } from "../variables";
+import { keptNames } from "../variables";
 import { keptFlowOf, type StepContext, templateContext } from "./context";
 import { dataProblem } from "./output-schema";
 import {
@@ -106,7 +106,7 @@ function variablesNode(flow: Flow, ctx: StepContext) {
 			flow,
 			templateContext(ctx, state, config),
 			dataProblem,
-			kept && keptNames(flow).size > 0 ? await keptValues(ctx.db, kept) : {},
+			kept && keptNames(flow).size > 0 ? await ctx.keptValues(kept) : {},
 		);
 		const start = flow.nodes.find((node) => node.id === flow.start);
 		if (!result.ok) {

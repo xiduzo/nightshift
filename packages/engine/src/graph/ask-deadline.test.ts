@@ -66,7 +66,7 @@ async function setup(flow: Flow) {
 	const clock = { now: T0 };
 	const now = () => clock.now;
 	const h = await startRun(sandbox, flow, { now });
-	const runner = testRunner(h, { now });
+	const runner = testRunner(h, { shared: { now } });
 	runners.push(runner);
 	await runner.take(h.runId, {
 		kind: "start",

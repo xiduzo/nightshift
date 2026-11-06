@@ -508,21 +508,16 @@ export async function createDaemon(
 				return { host: at.address, headers: at.headers };
 			},
 		}),
-		mcpServersFor: (node, use) => connections.mcpServersFor(node, use),
-		// A Command node's secrets, from the scopes of its use.
-		secretEnv: (names, use) => connections.secretEnv(names, use),
-		connectionNames: () => connections.names(),
-		cliNames: () => cliTools.names(),
-		findCli: (name) => findProgram(cliTools.program(name)),
-		cliToolsFor: (names) => cliTools.guides(names),
+		// This computer's configuration, as the stores of its Device document.
+		connections,
+		cliTools,
+		profiles,
 		toolLaunchers,
 		clonePath,
 		// The flows another Device's older Walker asks this one for: the
 		// engine's (made below, before anyone can ask), a flow of format 6
 		// as the Device that saved it named its profiles.
 		flows: (projectId) => devices.engine.flows.flows(projectId),
-		// Its profiles, for a run placed here from another Device.
-		profileFor: (ref) => profiles.settingsFor(ref),
 		// The files agents keep for the person, next to the run history.
 		artifacts: createArtifactStore(dataDir),
 		// The projects' knowledge, outside every repository, in step with the Space.

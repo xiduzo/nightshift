@@ -1,6 +1,6 @@
 /** This computer's configuration in its Device document: settings, connections and secrets, CLI tools, Agent Profiles, MCP servers. */
 
-export type { CliTool, CliToolGuide, CliToolStore } from "./cli-tools";
+export type { CliTool, CliToolStore } from "./cli-tools";
 export { cliToolsInstruction, programOf } from "./cli-tools";
 export type {
 	Connection,
@@ -16,7 +16,6 @@ export {
 	storedDeviceCopy,
 	storedDevices,
 } from "./device-copies";
-export type { McpExpansion } from "./mcp";
 export type { ProfileStore, ProfileView } from "./profiles";
 export {
 	type SecretUse,

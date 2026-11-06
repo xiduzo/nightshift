@@ -1,4 +1,3 @@
-import type { Database } from "@nightshift/db";
 import type { Flow, FlowNode } from "@nightshift/flows";
 import {
 	type DerivedSession,
@@ -229,7 +228,6 @@ export function closingEvents(
 }
 
 export type CloseDeps = {
-	db: Database;
 	log: RunLog;
 	bus: RunBus;
 	flowOf(row: RunRow): Flow;

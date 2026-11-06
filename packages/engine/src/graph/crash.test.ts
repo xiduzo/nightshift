@@ -269,9 +269,8 @@ async function recover(runner: Runner, h: Harness): Promise<void> {
 	if (open.endsRun || open.steps.length > 0 || open.sessions.length > 0) {
 		await closeOpenWork(
 			{
-				db: sandbox.db,
 				log: h.log,
-				bus: h.deps.bus,
+				bus: h.deps.shared.bus,
 				flowOf: parseRunFlow,
 				calledFlowsOf: parseCalledFlows,
 			},

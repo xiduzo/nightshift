@@ -1191,20 +1191,23 @@ describe("the Call node with each", () => {
 		);
 		// The daemon dies while element 2's second step starts (after its
 		// StepStarted, before its session).
-		const recorder = h.ctx.recorder;
+		const { recorders } = h.ctx;
 		let crashes = 1;
-		h.ctx.recorder = async (stepId) => {
-			const own = deriveSteps(foldRun(await h.events())).find(
-				(s) => s.id === stepId,
-			);
-			if (
-				own?.nodeId === "second" &&
-				own.scope?.itemId === "2" &&
-				crashes-- > 0
-			) {
-				throw new Error("the daemon died");
-			}
-			return recorder(stepId);
+		h.ctx.recorders = {
+			...recorders,
+			open: async (runId, stepId) => {
+				const own = deriveSteps(foldRun(await h.events())).find(
+					(s) => s.id === stepId,
+				);
+				if (
+					own?.nodeId === "second" &&
+					own.scope?.itemId === "2" &&
+					crashes-- > 0
+				) {
+					throw new Error("the daemon died");
+				}
+				return recorders.open(runId, stepId);
+			},
 		};
 		await expect(drive(h, { inputs: {} })).rejects.toThrow("the daemon died");
 		expect(harness.calls.map((c) => c.prompt)).toEqual([

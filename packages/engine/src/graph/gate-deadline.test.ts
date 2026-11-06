@@ -68,7 +68,7 @@ async function setup(flow: Flow) {
 	const clock = { now: T0 };
 	const now = () => clock.now;
 	const h = await startRun(sandbox, flow, { now });
-	const runner = testRunner(h, { now });
+	const runner = testRunner(h, { shared: { now } });
 	runners.push(runner);
 	await runner.take(h.runId, {
 		kind: "start",
@@ -205,7 +205,7 @@ describe("a Gate with a deadline", () => {
 		);
 		await runner.release();
 		clock.now = T0 + 45 * MINUTE;
-		const next = testRunner(h, { now: () => clock.now });
+		const next = testRunner(h, { shared: { now: () => clock.now } });
 		runners.push(next);
 		next.restore(h.runId, foldRun(await h.events()));
 		await waitFor(async () => (await statusOf(h)) === "finished");

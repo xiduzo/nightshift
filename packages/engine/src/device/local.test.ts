@@ -9,16 +9,38 @@ import {
 } from "@nightshift/agents/testing";
 import type { Decider, McpServerConfig } from "@nightshift/agents/types";
 
+import {
+	type CliToolStore,
+	createCliToolStore,
+} from "../device-config/cli-tools";
+import {
+	type ConnectionInput,
+	type ConnectionStore,
+	createConnectionStore,
+	type PersonalSecrets,
+	type ProjectSecrets,
+	type SecretBackend,
+} from "../device-config/connections";
 import { testKnowledge } from "../testing/knowledge";
-import { createSandbox, mustGit, type Sandbox } from "../testing/test-support";
+import {
+	connectionsOf,
+	createSandbox,
+	mustGit,
+	type Sandbox,
+} from "../testing/test-support";
 import { type LocalDeviceDeps, localDevice } from "./local";
 import type { Device, ExecEvent, SessionEvent, SessionInput } from "./types";
 
 /**
  * This computer as a Device, through the port only: what it reports, and
  * each call a step body makes, over fakes (harnesses, a decider, the MCP
- * fixture server) and a real `sh` and git.
+ * fixture server), this computer's own configuration stores (connections
+ * and secrets, CLI tools) over the sandbox's Device document, and a real
+ * `sh` and git.
  */
+
+/** A `${NAME}` reference, as a connection's env holds it. */
+const ref = (name: string) => `\${${name}}`;
 
 const fakeMcp: McpServerConfig = {
 	command: process.execPath,
@@ -40,6 +62,87 @@ afterEach(async () => {
 function device(deps: Partial<LocalDeviceDeps> = {}): Device {
 	return localDevice({ id: "d1", name: "studio", harnesses: {}, ...deps });
 }
+
+/** Secrets saved on this computer, in memory. */
+function memorySecrets(): SecretBackend {
+	const values = new Map<string, string>();
+	return {
+		get: async (name) => values.get(name) ?? null,
+		set: async (name, value) => {
+			values.set(name, value);
+		},
+		delete: async (name) => {
+			values.delete(name);
+		},
+	};
+}
+
+/**
+ * This computer's connections and secrets, as a daemon start opens them:
+ * over the sandbox's Device document, with `secrets` saved on this
+ * computer and `connections` saved on the Connections page.
+ */
+async function connectionsHere(
+	input: {
+		secrets?: Record<string, string>;
+		connections?: ConnectionInput[];
+		personal?: () => PersonalSecrets | null;
+		projects?: () => ProjectSecrets | null;
+	} = {},
+): Promise<ConnectionStore> {
+	const store = createConnectionStore({
+		document: await sandbox.openDocument(),
+		env: {},
+		secrets: memorySecrets(),
+		...(input.personal ? { personal: input.personal } : {}),
+		...(input.projects ? { projects: input.projects } : {}),
+	});
+	await store.load();
+	for (const [name, value] of Object.entries(input.secrets ?? {})) {
+		await store.setSecret(name, value);
+	}
+	for (const connection of input.connections ?? []) {
+		await store.save(connection);
+	}
+	return store;
+}
+
+/** This computer's CLI tools, as a daemon start opens them; `help` is each program's own help. */
+async function cliToolsHere(
+	names: readonly string[],
+	help: (program: string) => Promise<string | null> = async () => null,
+): Promise<CliToolStore> {
+	const store = createCliToolStore({
+		document: await sandbox.openDocument(),
+		help,
+	});
+	await store.load();
+	for (const name of names) await store.save({ name });
+	return store;
+}
+
+/** A Personal or Project secrets port that cannot be reached now. */
+const offline = () => {
+	throw new Error("offline");
+};
+const personalOffline = (): PersonalSecrets => ({
+	list: offline,
+	values: offline,
+	set: offline,
+	remove: offline,
+});
+/** The Projects' secrets, as a Host answers them: `values` for each run's Project; the rest is not asked here. */
+const projectsOf = (
+	values: ProjectSecrets["values"] = offline,
+): ProjectSecrets => ({
+	list: offline,
+	values,
+	set: offline,
+	remove: offline,
+	take: offline,
+	kept: offline,
+	space: { list: offline, set: offline, remove: offline, take: offline },
+});
 
 const noTools = {
 	leftOut: [],
@@ -79,9 +182,13 @@ describe("what the Device reports", () => {
 		const d = device({
 			harnesses: { "claude-code": fakeHarness(), codex: fakeHarness() },
 			harnessNames: () => new Set(["codex"]),
-			connectionNames: () => new Set(["jira"]),
-			cliNames: () => new Set(["gh"]),
-			findCli: (name) => (name === "gh" ? "/usr/bin/gh" : null),
+			connections: await connectionsHere({
+				connections: [
+					{ name: "jira", server: { url: "http://jira.test/mcp" } },
+				],
+			}),
+			cliTools: await cliToolsHere(["gh"]),
+			which: (name) => (name === "gh" ? "/usr/bin/gh" : null),
 			decider: fakeDecider([]),
 		});
 		const caps = await d.capabilities({ programs: ["gh", "jq"] });
@@ -135,12 +242,25 @@ describe("session", () => {
 		const harness = fakeHarness();
 		const d = device({
 			harnesses: { "claude-code": harness },
-			mcpServersFor: async () => ({ ok: false, message: "Save JIRA_TOKEN." }),
+			connections: await connectionsHere({
+				connections: [
+					{
+						name: "jira",
+						server: { command: "jira-mcp", env: { TOKEN: ref("JIRA_TOKEN") } },
+					},
+				],
+			}),
 		});
 		const events = await collect(
 			d.session(sessionInput({ connections: ["jira"] })),
 		);
-		expect(events).toEqual([{ type: "refused", message: "Save JIRA_TOKEN." }]);
+		expect(events).toEqual([
+			{
+				type: "refused",
+				message:
+					'The MCP server "jira" needs the secret JIRA_TOKEN, but it is not saved. Save it on the Secrets page, or remove the reference.',
+			},
+		]);
 		expect(harness.calls).toHaveLength(0);
 	});
 
@@ -152,9 +272,12 @@ describe("session", () => {
 				uses.push(["agent", use]);
 				return fakeHarness();
 			},
-			mcpServersFor: async (_node, use) => {
-				uses.push(["mcp", use]);
-				return { ok: true, servers: {} };
+			connections: {
+				...connectionsOf(),
+				mcpServersFor: async (_node, use) => {
+					uses.push(["mcp", use]);
+					return { ok: true, servers: {} };
+				},
 			},
 			toolLaunchers: {
 				prepare: async (_names, use) => {
@@ -221,23 +344,16 @@ describe("session", () => {
 
 	test("hands the harness the expanded servers and a new session's CLI tools", async () => {
 		const harness = fakeHarness();
-		const asked: string[][] = [];
+		const asked: string[] = [];
 		const d = device({
 			harnesses: { "claude-code": harness },
-			mcpServersFor: async (node) => ({
-				ok: true,
-				servers: Object.fromEntries(
-					(node.connections ?? []).map((c) => [c, fakeMcp]),
-				),
+			connections: await connectionsHere({
+				connections: [{ name: "tracker", server: fakeMcp }],
 			}),
-			cliToolsFor: async (names) => {
-				asked.push([...names]);
-				return names.map((name) => ({
-					name,
-					description: null,
-					help: `${name} --help`,
-				}));
-			},
+			cliTools: await cliToolsHere(["gh"], async (program) => {
+				asked.push(program);
+				return `${program} --help`;
+			}),
 		});
 		await collect(
 			d.session(sessionInput({ connections: ["tracker"], clis: ["gh"] })),
@@ -257,7 +373,7 @@ describe("session", () => {
 		expect(resumed?.prompt).toBe("Go on.");
 		expect(resumed?.mcpServers).toBeUndefined();
 		expect(plan?.prompt).toBe("Work.");
-		expect(asked).toEqual([["gh"]]);
+		expect(asked).toEqual(["gh"]);
 	});
 
 	test("CLI tools with logins: launchers, git settings and guarded secrets reach the harness; values come back as •••", async () => {
@@ -488,10 +604,15 @@ describe("session", () => {
 				},
 				values: ["glc-otlp-key"],
 			}),
-			mcpServersFor: async () => ({
-				ok: true,
-				servers: { tracker: fakeMcp },
-				values: ["mcp-key-123"],
+			// The connection's `${MCP_KEY}` reads the secret saved here.
+			connections: await connectionsHere({
+				secrets: { MCP_KEY: "mcp-key-123" },
+				connections: [
+					{
+						name: "tracker",
+						server: { ...fakeMcp, env: { KEY: ref("MCP_KEY") } },
+					},
+				],
 			}),
 			secretValues: async () => ["saved-key-456"],
 		});
@@ -787,26 +908,17 @@ describe("exec", () => {
 		});
 	});
 
-	const secrets = (
+	/** This computer's connections, with these secrets saved on it. */
+	const secrets = async (
 		values: Record<string, string>,
-	): Partial<LocalDeviceDeps> => ({
-		secretEnv: async (names) => {
-			const missing = names.filter((name) => values[name] === undefined);
-			return missing.length > 0
-				? { ok: false, missing }
-				: {
-						ok: true,
-						env: Object.fromEntries(
-							names.map((name) => [name, values[name] ?? ""]),
-						),
-					};
-		},
+	): Promise<Partial<LocalDeviceDeps>> => ({
+		connections: await connectionsHere({ secrets: values }),
 	});
 
 	test("a secret reaches the command under its own name, and its value comes back as •••", async () => {
 		const events = await collect(
 			device(
-				secrets({ ZAC_USER: "behandelaar", ZAC_PASSWORD: "s3cr3t!" }),
+				await secrets({ ZAC_USER: "behandelaar", ZAC_PASSWORD: "s3cr3t!" }),
 			).exec({
 				command:
 					'[ "$ZAC_PASSWORD" = "s3cr3t!" ] && echo "user $ZAC_USER pass $ZAC_PASSWORD" && echo "$ZAC_PASSWORD" >&2',
@@ -835,7 +947,7 @@ describe("exec", () => {
 		process.env.NIGHTSHIFT_TEST_LOGIN = "from-env";
 		try {
 			const d = device({
-				...secrets({ NIGHTSHIFT_TEST_LOGIN: "from-env" }),
+				...(await secrets({ NIGHTSHIFT_TEST_LOGIN: "from-env" })),
 				toolLaunchers: {
 					prepare: async () => ({ ok: false, message: "unused" }),
 					forCommand: async () => noTools,
@@ -959,7 +1071,7 @@ describe("exec", () => {
 	test("a secret this computer does not have refuses the command before it starts", async () => {
 		const marker = join(sandbox.repoPath, "ran");
 		const events = await collect(
-			device(secrets({ ZAC_USER: "behandelaar" })).exec({
+			device(await secrets({ ZAC_USER: "behandelaar" })).exec({
 				command: `touch ${marker}`,
 				cwd: sandbox.repoPath,
 				secrets: ["ZAC_USER", "ZAC_PASSWORD"],
@@ -979,11 +1091,7 @@ describe("exec", () => {
 	test("a Personal secret that cannot be read now refuses the command, and says why", async () => {
 		const events = await collect(
 			device({
-				secretEnv: async () => ({
-					ok: false,
-					missing: ["GH_TOKEN"],
-					unreachable: true,
-				}),
+				connections: await connectionsHere({ personal: personalOffline }),
 			}).exec({
 				command: "true",
 				cwd: sandbox.repoPath,
@@ -1003,16 +1111,17 @@ describe("exec", () => {
 	const run = { spaceId: "space-1", projectId: "app", runId: "run-1" };
 
 	test("a command of a run reads its Project's secrets: a Project secret counts as saved", async () => {
-		const uses: unknown[] = [];
+		const asked: unknown[] = [];
 		const events = await collect(
 			device({
 				// Only the run's Project has DB_URL (ADR 13).
-				secretEnv: async (names, use) => {
-					uses.push(use);
-					return use?.run?.projectId === "app"
-						? { ok: true, env: { DB_URL: "postgres://x" } }
-						: { ok: false, missing: [...names] };
-				},
+				connections: await connectionsHere({
+					projects: () =>
+						projectsOf(async (step): Promise<Record<string, string>> => {
+							asked.push(step);
+							return step.projectId === "app" ? { DB_URL: "postgres://x" } : {};
+						}),
+				}),
 			}).exec({
 				command: 'echo "url $DB_URL"',
 				cwd: sandbox.repoPath,
@@ -1021,7 +1130,7 @@ describe("exec", () => {
 				signal: new AbortController().signal,
 			}),
 		);
-		expect(uses).toEqual([{ run }]);
+		expect(asked).toEqual([run]);
 		expect(events).toContainEqual({
 			type: "output",
 			stream: "stdout",
@@ -1033,11 +1142,7 @@ describe("exec", () => {
 	test("a Project's secrets that cannot be read now refuse the command, and say why", async () => {
 		const events = await collect(
 			device({
-				secretEnv: async () => ({
-					ok: false,
-					missing: ["DB_URL"],
-					projectUnreachable: true,
-				}),
+				connections: await connectionsHere({ projects: () => projectsOf() }),
 			}).exec({
 				command: "true",
 				cwd: sandbox.repoPath,
@@ -1057,11 +1162,11 @@ describe("exec", () => {
 });
 
 describe("callTool", () => {
-	const tracker = (): Partial<LocalDeviceDeps> => ({
-		mcpServersFor: async (node) =>
-			(node.connections ?? []).includes("tracker")
-				? { ok: true, servers: { tracker: fakeMcp } }
-				: { ok: false, message: "No such connection." },
+	/** This computer with the connection "tracker": the MCP fixture server. */
+	const tracker = async (): Promise<Partial<LocalDeviceDeps>> => ({
+		connections: await connectionsHere({
+			connections: [{ name: "tracker", server: fakeMcp }],
+		}),
 	});
 	const signal = () => new AbortController().signal;
 
@@ -1069,9 +1174,12 @@ describe("callTool", () => {
 		const uses: unknown[] = [];
 		const run = { spaceId: "space-1", projectId: "app", runId: "run-1" };
 		await device({
-			mcpServersFor: async (_node, use) => {
-				uses.push(use);
-				return { ok: false, message: "No such connection." };
+			connections: {
+				...connectionsOf(),
+				mcpServersFor: async (_node, use) => {
+					uses.push(use);
+					return { ok: false, message: "No such connection." };
+				},
 			},
 		}).callTool({
 			connection: "jira",
@@ -1085,17 +1193,21 @@ describe("callTool", () => {
 
 	test("refuses a connection it cannot resolve, without calling anything", async () => {
 		expect(
-			await device(tracker()).callTool({
+			await device(await tracker()).callTool({
 				connection: "jira",
 				tool: "say",
 				arguments: {},
 				signal: signal(),
 			}),
-		).toEqual({ kind: "refused", message: "No such connection." });
+		).toEqual({
+			kind: "refused",
+			message:
+				'There is no connection named "jira". Add it under Agents → Tools, or remove it from the node.',
+		});
 	});
 
 	test("calls the tool with the arguments typed by its schema", async () => {
-		const result = await device(tracker()).callTool({
+		const result = await device(await tracker()).callTool({
 			connection: "tracker",
 			tool: "list_json",
 			arguments: { count: "1" },
@@ -1111,7 +1223,7 @@ describe("callTool", () => {
 	});
 
 	test("a tool the server does not have fails before any arguments are sent", async () => {
-		const result = await device(tracker()).callTool({
+		const result = await device(await tracker()).callTool({
 			connection: "tracker",
 			tool: "nope",
 			arguments: {},

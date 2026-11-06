@@ -16,6 +16,8 @@ import {
 } from "../device-config/settings";
 import type { RunDetail } from "../read/views";
 import {
+	cliToolsOf,
+	connectionsOf,
 	createSandbox,
 	type Sandbox,
 	scriptedHarness,
@@ -41,7 +43,7 @@ function makeEngine(
 	harness: AgentHarness,
 	options: Pick<
 		TestEngineOptions,
-		"settings" | "mcpServersFor" | "connectionNames" | "cliNames" | "findCli"
+		"settings" | "connections" | "cliTools" | "which"
 	> = {},
 	internals: EngineInternals = {},
 ): SpaceEngine {
@@ -126,8 +128,7 @@ describe("connections at the start", () => {
 	test("a flow that names a connection the daemon does not have refuses to start", async () => {
 		const harness = fakeHarness();
 		const engine = makeEngine(harness, {
-			connectionNames: () => new Set(["tracker"]),
-			mcpServersFor: async () => ({ ok: true, servers: {} }),
+			connections: connectionsOf({ names: ["tracker"] }),
 		});
 		await expect(
 			engine.startRun({
@@ -149,8 +150,7 @@ describe("connections at the start", () => {
 
 	test("a Tool node that names a connection the daemon does not have refuses to start too", async () => {
 		const engine = makeEngine(fakeHarness(), {
-			connectionNames: () => new Set(["tracker"]),
-			mcpServersFor: async () => ({ ok: true, servers: {} }),
+			connections: connectionsOf({ names: ["tracker"] }),
 		});
 		const file: ToolNode = {
 			id: "file",
@@ -190,8 +190,7 @@ describe("connections at the start", () => {
 	test("the names are read at each start", async () => {
 		const names = new Set<string>();
 		const engine = makeEngine(fakeHarness(), {
-			connectionNames: () => names,
-			mcpServersFor: async () => ({ ok: true, servers: {} }),
+			connections: { ...connectionsOf(), names: () => names },
 		});
 		const input = {
 			projectId: await projectId(engine),
@@ -208,8 +207,8 @@ describe("CLI tools at the start", () => {
 	test("a CLI tool the daemon does not define starts: this computer has it", async () => {
 		const harness = fakeHarness();
 		const engine = makeEngine(harness, {
-			cliNames: () => new Set(["gh"]),
-			findCli: (name) => `/bin/${name}`,
+			cliTools: cliToolsOf(["gh"]),
+			which: (name) => `/bin/${name}`,
 		});
 		const run = await engine.startRun({
 			projectId: await projectId(engine),
@@ -221,8 +220,8 @@ describe("CLI tools at the start", () => {
 
 	test("a flow that names a CLI tool this computer does not have refuses to start", async () => {
 		const engine = makeEngine(fakeHarness(), {
-			cliNames: () => new Set(["gh", "aws"]),
-			findCli: (name) => (name === "gh" ? "/bin/gh" : null),
+			cliTools: cliToolsOf(["gh", "aws"]),
+			which: (name) => (name === "gh" ? "/bin/gh" : null),
 		});
 		await expect(
 			engine.startRun({
@@ -237,8 +236,8 @@ describe("CLI tools at the start", () => {
 	test("the session gets the node's CLI tools", async () => {
 		const harness = fakeHarness();
 		const engine = makeEngine(harness, {
-			cliNames: () => new Set(["gh"]),
-			findCli: (name) => `/bin/${name}`,
+			cliTools: cliToolsOf(["gh"]),
+			which: (name) => `/bin/${name}`,
 		});
 		const run = await engine.startRun({
 			projectId: await projectId(engine),
@@ -254,8 +253,8 @@ describe("CLI tools at the start", () => {
 	test("a CLI tool needs no definition, but this computer must have it", async () => {
 		const harness = fakeHarness();
 		const engine = makeEngine(harness, {
-			cliNames: () => new Set(["gh"]),
-			findCli: (name) => (name === "jq" ? null : `/bin/${name}`),
+			cliTools: cliToolsOf(["gh"]),
+			which: (name) => (name === "jq" ? null : `/bin/${name}`),
 		});
 		const id = await projectId(engine);
 		const run = await engine.startRun({
@@ -288,10 +287,12 @@ describe("mcpServersFor", () => {
 			},
 		};
 		const engine = makeEngine(harness, {
-			connectionNames: () => new Set(["tracker"]),
-			async mcpServersFor(node): Promise<McpExpansion> {
-				asked.push(node);
-				return { ok: true, servers };
+			connections: {
+				...connectionsOf({ names: ["tracker"] }),
+				async mcpServersFor(node): Promise<McpExpansion> {
+					asked.push(node);
+					return { ok: true, servers };
+				},
 			},
 		});
 		const run = await engine.startRun({
@@ -306,11 +307,13 @@ describe("mcpServersFor", () => {
 	test("a refusal from mcpServersFor fails the step with its message", async () => {
 		const harness = fakeHarness();
 		const engine = makeEngine(harness, {
-			connectionNames: () => new Set(["tracker"]),
-			mcpServersFor: async () => ({
-				ok: false,
-				message: "The MCP server tracker reads TRACKER_TOKEN.",
-			}),
+			connections: {
+				...connectionsOf({ names: ["tracker"] }),
+				mcpServersFor: async () => ({
+					ok: false,
+					message: "The MCP server tracker reads TRACKER_TOKEN.",
+				}),
+			},
 		});
 		const run = await engine.startRun({
 			projectId: await projectId(engine),
@@ -321,25 +324,6 @@ describe("mcpServersFor", () => {
 		expect(detail.steps[0]).toMatchObject({
 			outcome: "error",
 			error: "The MCP server tracker reads TRACKER_TOKEN.",
-		});
-		expect(harness.calls).toHaveLength(0);
-	});
-
-	test("without mcpServersFor, a node with connections fails its step with a clear error", async () => {
-		const harness = fakeHarness();
-		const engine = makeEngine(harness, {
-			connectionNames: () => new Set(["tracker", "docs"]),
-		});
-		const run = await engine.startRun({
-			projectId: await projectId(engine),
-			flow: flowOf([agent("worker", { connections: ["tracker", "docs"] })]),
-		});
-		const detail = await waitForEnd(engine, run.id);
-		expect(detail.status).toBe("failed");
-		expect(detail.steps[0]).toMatchObject({
-			outcome: "error",
-			error:
-				"The node uses connections (tracker, docs), but there are none. Add them under Agents → Tools.",
 		});
 		expect(harness.calls).toHaveLength(0);
 	});

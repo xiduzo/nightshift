@@ -17,7 +17,6 @@ import {
 	type ValueNode,
 	withChoices,
 } from "@nightshift/flows";
-import { createArtifactStore } from "../../../artifacts";
 import type { GateChoice, StepOutputs } from "../../../log";
 import type { NodeAction, StepContext } from "../../context";
 import { interruptNode } from "../../interrupt";
@@ -240,7 +239,7 @@ function keeper(
 	ctx: StepContext,
 	step: OpenStep,
 ): (source: AttachmentSource) => Promise<AskAttachment> {
-	const store = createArtifactStore(ctx.dataDir);
+	const store = ctx.artifacts;
 	return async (source) => {
 		attachmentProblem(source, step.worktree);
 		const url = source.url?.trim() ?? "";

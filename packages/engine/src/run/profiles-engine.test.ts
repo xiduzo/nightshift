@@ -11,6 +11,7 @@ import type {
 import { createProfileStore } from "../device-config/profiles";
 import type { RunDetail } from "../read/views";
 import {
+	cliToolsOf,
 	createSandbox,
 	type Sandbox,
 	type TestEngineOptions,
@@ -43,7 +44,7 @@ function makeEngine(
 	harnesses: Partial<Record<HarnessName, AgentHarness>>,
 	options: Pick<
 		TestEngineOptions,
-		"profileFor" | "harnessNames" | "cliNames" | "findCli" | "decider"
+		"profileFor" | "harnessNames" | "cliTools" | "which" | "decider"
 	> = {},
 ): SpaceEngine {
 	return createEngine(
@@ -52,8 +53,8 @@ function makeEngine(
 			harnesses,
 			dataDir: sandbox.dataDir,
 			scheduler: false,
-			cliNames: () => new Set(["gh"]),
-			findCli: (name) => `/usr/local/bin/${name}`,
+			cliTools: cliToolsOf(["gh"]),
+			which: (name) => `/usr/local/bin/${name}`,
 			...options,
 		}),
 	).space(sandbox.spaceId);

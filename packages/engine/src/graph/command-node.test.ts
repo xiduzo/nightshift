@@ -11,6 +11,7 @@ import { deriveSteps } from "../read/run-views";
 import { drive, flowOf, held, payloads, startRun } from "../testing/graph";
 import { testKnowledge } from "../testing/knowledge";
 import {
+	connectionsOf,
 	createSandbox,
 	type Sandbox,
 	TEST_DEVICE_ID,
@@ -406,16 +407,7 @@ describe("the Command node", () => {
 	describe("secrets", () => {
 		const secrets = { ZAC_USER: "behandelaar", ZAC_PASSWORD: "s3cr3t-pw" };
 		const withSecrets = (h: Awaited<ReturnType<typeof startRun>>) => {
-			h.local.secretEnv = async (names) => {
-				const missing = names.filter((name) => !(name in secrets));
-				if (missing.length > 0) return { ok: false, missing };
-				return {
-					ok: true,
-					env: Object.fromEntries(
-						names.map((name) => [name, secrets[name as keyof typeof secrets]]),
-					),
-				};
-			};
+			h.local.connections = connectionsOf({ secrets });
 			return h;
 		};
 
