@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { defaultRunSettings } from "../device-config/settings";
 import { foldRun } from "../log";
 import { getRunRow } from "../log/run-row";
-import { deriveOpenGate, deriveRunState, deriveSteps } from "../read/run-views";
+import { deriveSteps } from "../read/run-views";
 import { WALKED_ELSEWHERE } from "../run-status";
 import {
 	agent,
@@ -97,7 +97,7 @@ const start = (runner: Runner, runId: string, before?: Promise<void>) =>
 	});
 
 const statusOf = async (h: Harness, runId = h.runId) =>
-	deriveRunState(await h.log.state(runId)).status;
+	(await h.log.state(runId)).status;
 
 /** A promise the test settles by hand. */
 function latch() {
@@ -232,7 +232,7 @@ describe("take: the run cap", () => {
 		const busy = await another(worker());
 		await start(runner, busy);
 		await waitFor(() => sessions[0]);
-		const stepId = deriveOpenGate(foldRun(await h.events()))?.stepId as string;
+		const stepId = foldRun(await h.events()).gate?.stepId as string;
 		const answer = {
 			kind: "answer" as const,
 			stepId,
@@ -241,7 +241,7 @@ describe("take: the run cap", () => {
 		};
 
 		await expect(runner.take(h.runId, answer)).rejects.toThrow("run cap");
-		expect(deriveOpenGate(foldRun(await h.events()))?.stepId).toBe(stepId);
+		expect(foldRun(await h.events()).gate?.stepId).toBe(stepId);
 
 		await runner.take(busy, { kind: "stop" });
 		expect(await runner.take(h.runId, answer)).toEqual({ kind: "driving" });
@@ -249,7 +249,7 @@ describe("take: the run cap", () => {
 			(s) => s.id === stepId,
 		);
 		expect(gateStep?.endedAt).not.toBeNull();
-		expect(deriveOpenGate(foldRun(await h.events()))).toBeNull();
+		expect(foldRun(await h.events()).gate).toBeNull();
 	});
 
 	test("Turns queued on a full cap retry in order, each once, when a slot frees (I10)", async () => {
@@ -507,8 +507,7 @@ describe("a run keeps only the checkpoints a re-entry reads", () => {
 
 		await runner.take(h.runId, { kind: "resume", by: "person" });
 		await waitFor(async () => (await statusOf(h)) === "waiting");
-		const gateStep = deriveOpenGate(foldRun(await h.events()))
-			?.stepId as string;
+		const gateStep = foldRun(await h.events()).gate?.stepId as string;
 		await runner.take(h.runId, {
 			kind: "answer",
 			stepId: gateStep,

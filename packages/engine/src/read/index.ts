@@ -29,9 +29,6 @@ export {
 	deriveBudgetSpend,
 	deriveInputs,
 	deriveNodeOutputs,
-	deriveOpenGate,
-	deriveRunState,
-	deriveSleep,
 	deriveStepClocks,
 	deriveSteps,
 	deriveTraversals,
@@ -44,7 +41,6 @@ export {
 	parkedSteps,
 	type RunWorktree,
 	runWorktree,
-	type SleepFact,
 	withEnclosing,
 } from "./run-views";
 export type {

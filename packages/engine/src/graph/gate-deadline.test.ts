@@ -4,7 +4,7 @@ import { hourOf, parseInstant } from "@nightshift/time";
 import { foldRun } from "../log";
 import { getRunRow } from "../log/run-row";
 import { readTranscriptFile } from "../log/transcripts";
-import { deriveOpenGate, deriveRunState, deriveSteps } from "../read/run-views";
+import { deriveSteps } from "../read/run-views";
 import {
 	command,
 	drive,
@@ -78,12 +78,11 @@ async function setup(flow: Flow) {
 			stopAt: null,
 		}),
 	});
-	await waitFor(async () => deriveOpenGate(foldRun(await h.events())));
+	await waitFor(async () => foldRun(await h.events()).gate);
 	return { h, runner, clock };
 }
 
-const statusOf = async (h: Harness) =>
-	deriveRunState(foldRun(await h.events())).status;
+const statusOf = async (h: Harness) => foldRun(await h.events()).status;
 
 describe("a Gate with a deadline", () => {
 	test("logs when it is due and what it chooses, from minutes after it opens", async () => {
@@ -96,7 +95,7 @@ describe("a Gate with a deadline", () => {
 				deadline: { at: T0 + 90 * MINUTE, choose: "keep" },
 			},
 		]);
-		expect(deriveOpenGate(foldRun(events))?.deadline).toEqual({
+		expect(foldRun(events).gate?.deadline).toEqual({
 			at: T0 + 90 * MINUTE,
 			choose: "keep",
 		});
@@ -104,8 +103,7 @@ describe("a Gate with a deadline", () => {
 
 	test("a time of day is the next one after the Gate opens", async () => {
 		const { h } = await setup(keepFlow({ at: "07:00", choose: "keep" }));
-		const due = deriveOpenGate(foldRun(await h.events()))?.deadline
-			?.at as number;
+		const due = foldRun(await h.events()).gate?.deadline?.at as number;
 		expect(hourOf(due)).toBe(7);
 		expect(due).toBeGreaterThan(T0);
 		expect(due - T0).toBeLessThan(24 * 60 * 60 * 1000);
@@ -115,7 +113,7 @@ describe("a Gate with a deadline", () => {
 		const { h, runner, clock } = await setup(
 			keepFlow({ minutes: 30, choose: "keep" }),
 		);
-		const stepId = deriveOpenGate(foldRun(await h.events()))?.stepId as string;
+		const stepId = foldRun(await h.events()).gate?.stepId as string;
 
 		// A timer before the deadline changes nothing.
 		clock.now = T0 + 29 * MINUTE;
@@ -169,7 +167,7 @@ describe("a Gate with a deadline", () => {
 		const { h, runner, clock } = await setup(
 			keepFlow({ minutes: 30, choose: "keep" }),
 		);
-		const stepId = deriveOpenGate(foldRun(await h.events()))?.stepId as string;
+		const stepId = foldRun(await h.events()).gate?.stepId as string;
 		await runner.take(h.runId, {
 			kind: "answer",
 			stepId,

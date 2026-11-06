@@ -5,10 +5,10 @@ import {
 	foldRun,
 	type LoggedEvent,
 	NO_COST,
-	type RunStatus,
 	type Scope,
 	sessionCost,
 } from "../log";
+import type { RunStatus } from "../run-status";
 import { runEvents as log } from "../testing/run-events";
 import { runFacts } from "./read-model";
 import { deriveScores } from "./run-metrics";
@@ -19,13 +19,9 @@ import {
 	deriveBudgetSpend,
 	deriveCalledTraversals,
 	deriveNodeOutputs,
-	deriveOpenGate,
-	deriveRunState,
-	deriveSleep,
 	deriveSteps,
 	deriveTraversals,
 	deriveVariables,
-	deriveWarnings,
 	deriveWorktrees,
 	isOpenStatus,
 	lastHarnessSession,
@@ -40,23 +36,20 @@ import {
  * Every test builds a log, folds it, and reads the state or a view.
  */
 
-describe("deriveRunState", () => {
+describe("the run's status and end", () => {
 	test("a run without a start is interrupted", () => {
-		expect(deriveRunState(foldRun([]))).toEqual({
-			status: "interrupted",
-			reason: null,
-			result: null,
-			endReason: null,
-		});
+		expect(foldRun([])).toMatchObject({ status: "interrupted", end: null });
 	});
 
 	test("a started run without an end is running", () => {
-		expect(deriveRunState(log().runStarted().state()).status).toBe("running");
+		expect(log().runStarted().state().status).toBe("running");
 	});
 
 	test("the end gives the status and the reason", () => {
 		const { events } = log().runStarted().ended("failed", "edge e1 at max");
-		expect(deriveRunState(foldRun(events))).toEqual({
+		const state = foldRun(events);
+		expect(state.status).toBe("failed");
+		expect(state.end).toMatchObject({
 			status: "failed",
 			reason: "edge e1 at max",
 			result: null,
@@ -68,14 +61,14 @@ describe("deriveRunState", () => {
 		const nothing = log()
 			.runStarted()
 			.ended("finished", "No open issues", "nothing-to-do");
-		expect(deriveRunState(foldRun(nothing.events))).toEqual({
+		expect(foldRun(nothing.events).end).toMatchObject({
 			status: "finished",
 			reason: "No open issues",
 			result: "nothing-to-do",
 			endReason: "finished",
 		});
 		const chosen = log().runStarted().ended("failed", null, "failed");
-		expect(deriveRunState(foldRun(chosen.events))).toEqual({
+		expect(foldRun(chosen.events).end).toMatchObject({
 			status: "failed",
 			reason: null,
 			result: "failed",
@@ -85,13 +78,16 @@ describe("deriveRunState", () => {
 
 	test("a resume after an end makes the run running again", () => {
 		const b = log().runStarted().ended("stopped").resumed("worker");
-		expect(deriveRunState(foldRun(b.events)).status).toBe("running");
+		expect(foldRun(b.events)).toMatchObject({ status: "running", end: null });
 		b.ended("finished");
-		expect(deriveRunState(foldRun(b.events))).toEqual({
+		expect(foldRun(b.events)).toMatchObject({
 			status: "finished",
-			reason: null,
-			result: null,
-			endReason: "finished",
+			end: {
+				status: "finished",
+				reason: null,
+				result: null,
+				endReason: "finished",
+			},
 		});
 	});
 });
@@ -342,9 +338,10 @@ test("a cost tally knows what it does not know", () => {
 		missing: 2,
 		calls: 3,
 	});
-	expect(deriveWarnings(foldRun(events))).toEqual([
+	expect(runFacts(foldRun(events)).warnings).toEqual([
 		{
 			stepId: "s1",
+			nodeId: "worker",
 			kind: "cost-unknown",
 			message: "Not known.",
 			at: expect.any(Number),
@@ -431,13 +428,8 @@ describe("gates", () => {
 			.runStarted()
 			.stepStarted("s1", "gate")
 			.gateOpened("s1", "Ship PR 12?");
-		expect(deriveRunState(foldRun(b.events))).toEqual({
-			status: "waiting",
-			reason: null,
-			result: null,
-			endReason: null,
-		});
-		expect(deriveOpenGate(foldRun(b.events))).toEqual({
+		expect(foldRun(b.events)).toMatchObject({ status: "waiting", end: null });
+		expect(foldRun(b.events).gate).toEqual({
 			stepId: "s1",
 			nodeId: "gate",
 			visit: 1,
@@ -453,8 +445,8 @@ describe("gates", () => {
 		);
 
 		b.stepEnded("s1", "approve", { note: "yes", visit: 1 });
-		expect(deriveOpenGate(foldRun(b.events))).toBeNull();
-		expect(deriveRunState(foldRun(b.events)).status).toBe("running");
+		expect(foldRun(b.events).gate).toBeNull();
+		expect(foldRun(b.events).status).toBe("running");
 		expect(deriveNodeOutputs(foldRun(b.events)).gate).toEqual({
 			outcome: "approve",
 			note: "yes",
@@ -467,7 +459,7 @@ describe("gates", () => {
 			.runStarted()
 			.stepStarted("s1", "gate")
 			.gateOpened("s1", "Ship it?", true);
-		expect(deriveOpenGate(foldRun(b.events))?.lockScreen).toBe(true);
+		expect(foldRun(b.events).gate?.lockScreen).toBe(true);
 		expect(deriveSteps(foldRun(b.events))[0]?.gate?.lockScreen).toBe(true);
 	});
 
@@ -507,8 +499,8 @@ describe("gates", () => {
 
 	test("a Gate step that never opened is not waiting", () => {
 		const { events } = log().runStarted().stepStarted("s1", "gate");
-		expect(deriveOpenGate(foldRun(events))).toBeNull();
-		expect(deriveRunState(foldRun(events)).status).toBe("running");
+		expect(foldRun(events).gate).toBeNull();
+		expect(foldRun(events).status).toBe("running");
 		// Recovery interrupts it like any other open step: it is not parked.
 		expect(parkedSteps(foldRun(events))).toEqual([]);
 	});
@@ -519,8 +511,8 @@ describe("gates", () => {
 			.stepStarted("s1", "gate")
 			.gateOpened("s1")
 			.ended("failed", "broken log");
-		expect(deriveOpenGate(foldRun(events))).toBeNull();
-		expect(deriveRunState(foldRun(events)).status).toBe("failed");
+		expect(foldRun(events).gate).toBeNull();
+		expect(foldRun(events).status).toBe("failed");
 	});
 
 	test("a waiting run is not lost work: recovery leaves it open", () => {
@@ -530,7 +522,7 @@ describe("gates", () => {
 			.stepEnded("s1", "pass")
 			.stepStarted("s2", "gate")
 			.gateOpened("s2");
-		expect(deriveRunState(foldRun(events)).status).toBe("waiting");
+		expect(foldRun(events).status).toBe("waiting");
 		expect(parkedSteps(foldRun(events)).map((s) => s.id)).toEqual(["s2"]);
 	});
 
@@ -541,8 +533,8 @@ describe("gates", () => {
 			.gateOpened("s1")
 			.stepEnded("s1", "stopped", { note: "", visit: 1 })
 			.ended("stopped");
-		expect(deriveOpenGate(foldRun(events))).toBeNull();
-		expect(deriveRunState(foldRun(events)).status).toBe("stopped");
+		expect(foldRun(events).gate).toBeNull();
+		expect(foldRun(events).status).toBe("stopped");
 	});
 });
 
@@ -784,8 +776,8 @@ describe("Call scopes", () => {
 			{ reason: "usage-limit", until: 5000, message: "limit", since: 1 },
 			{ stepId: "w" },
 		);
-		expect(deriveRunState(foldRun(b.events)).status).toBe("sleeping");
-		expect(deriveSleep(foldRun(b.events))).toMatchObject({
+		expect(foldRun(b.events).status).toBe("sleeping");
+		expect(foldRun(b.events).sleep).toMatchObject({
 			stepId: "w",
 			until: 5000,
 		});
@@ -796,7 +788,7 @@ describe("Call scopes", () => {
 		]);
 
 		b.push("WaitEnded", { early: false }, { stepId: "w" });
-		expect(deriveRunState(foldRun(b.events)).status).toBe("running");
+		expect(foldRun(b.events).status).toBe("running");
 		expect(parkedSteps(foldRun(b.events))).toEqual([]);
 	});
 
@@ -1107,7 +1099,7 @@ describe("one place decides when a step ends", () => {
 		expect(deriveSteps(run)[0]?.sleeps).toEqual([
 			{ from: 1002, to: null, reason: "signal", signal: "deploy", opening: 0 },
 		]);
-		expect(deriveSleep(run)).toMatchObject({ signal: "deploy", until: null });
+		expect(run.sleep).toMatchObject({ signal: "deploy", until: null });
 	});
 
 	test("the scores are kept in log order", () => {

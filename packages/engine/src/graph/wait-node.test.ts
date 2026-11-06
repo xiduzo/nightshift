@@ -6,7 +6,7 @@ import { parseInstant, now as timeNow } from "@nightshift/time";
 import { atLocal } from "@nightshift/time/testing";
 import { foldRun } from "../log";
 import { readTranscriptFile } from "../log/transcripts";
-import { deriveSleep, deriveSteps } from "../read/run-views";
+import { deriveSteps } from "../read/run-views";
 import {
 	command,
 	drive,
@@ -390,7 +390,7 @@ describe("the Wait node", () => {
 			signal: "deployed",
 		});
 		// The engine refuses a signal of another name from the log alone.
-		expect(deriveSleep(foldRun(await h.events()))).toMatchObject({
+		expect(foldRun(await h.events()).sleep).toMatchObject({
 			signal: "deployed",
 			until: null,
 		});
@@ -475,7 +475,7 @@ describe("the Wait node", () => {
 			signal: "ci-done",
 			signalRules: rules,
 		});
-		expect(deriveSleep(foldRun(await h.events()))?.signalRules).toEqual(rules);
+		expect(foldRun(await h.events()).sleep?.signalRules).toEqual(rules);
 
 		const signal = async (conclusion: string) => {
 			time.advance(2);

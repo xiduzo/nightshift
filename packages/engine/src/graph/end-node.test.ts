@@ -3,7 +3,7 @@ import type { EndNode } from "@nightshift/flows";
 import { foldRun } from "../log";
 
 import { readTranscriptFile } from "../log/transcripts";
-import { deriveRunState, deriveSteps } from "../read/run-views";
+import { deriveSteps } from "../read/run-views";
 import {
 	command,
 	drive,
@@ -127,7 +127,7 @@ describe("the End node", () => {
 				result: "failed",
 			},
 		});
-		expect(deriveRunState(foldRun(await h.events()))).toEqual({
+		expect(foldRun(await h.events()).end).toMatchObject({
 			status: "failed",
 			reason: null,
 			result: "failed",

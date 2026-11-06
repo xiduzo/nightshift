@@ -22,10 +22,10 @@ import type {
 import type { FlowInput } from "@nightshift/flows/testing";
 import { now } from "@nightshift/time";
 import { asc, eq } from "drizzle-orm";
-import type { RunStatus } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";
 import type { TranscriptEntry } from "../log/step-events";
 import type { RunDetail, RunStreamItem, StepSummary } from "../read/views";
+import type { RunStatus } from "../run-status";
 import { seedFlowFolder, seedFlows } from "../testing/seed-flows";
 import {
 	createSandbox,

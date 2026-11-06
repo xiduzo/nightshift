@@ -16,7 +16,7 @@ import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { foldRun } from "../log";
 import { readTranscriptFile } from "../log/transcripts";
-import { deriveOpenGate, deriveSteps } from "../read/run-views";
+import { deriveSteps } from "../read/run-views";
 import {
 	agent as agentNode,
 	drive,
@@ -1271,7 +1271,7 @@ describe("an Agent that asks a person", () => {
 		expect(payloads(asked, "GateOpened")).toEqual([
 			{ question, choices: [...ASK_CHOICES] },
 		]);
-		expect(deriveOpenGate(foldRun(asked))).toMatchObject({
+		expect(foldRun(asked).gate).toMatchObject({
 			stepId,
 			nodeId: "worker",
 		});
@@ -1296,7 +1296,7 @@ describe("an Agent that asks a person", () => {
 			// Every Agent step has the run policy's idle limit.
 			{ prompt: "Use Postgres.", idleMs: 15 * MINUTE },
 		]);
-		expect(deriveOpenGate(foldRun(after))).toBeNull();
+		expect(foldRun(after).gate).toBeNull();
 		expect(payloads(after, "StepEnded")).toEqual([
 			{
 				outcome: "pass",

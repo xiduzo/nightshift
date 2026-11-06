@@ -10,9 +10,9 @@ import type { LeaseKeeper } from "./keeper";
  * run holds none.
  */
 function heldLeases(state: RunState): readonly Hold[] {
-	const ended = state.latest?.ended;
-	if (!ended) return state.holds;
-	return ended.status === "interrupted" ? state.endedHolding : [];
+	const { end } = state;
+	if (!end) return state.holds;
+	return end.status === "interrupted" ? state.endedHolding : [];
 }
 
 /**
@@ -60,7 +60,7 @@ export async function leasesLost(
 	names: readonly string[],
 ): Promise<void> {
 	const state = await deps.log.state(runId);
-	if (state.latest?.ended) return;
+	if (state.end) return;
 	for (const hold of state.holds) {
 		if (hold.kind !== "lease" || !names.includes(hold.name)) continue;
 		await deps.log.append({

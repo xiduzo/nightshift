@@ -18,7 +18,6 @@ import {
 	type RunLog,
 	type RunRow,
 	type RunState,
-	type RunStatus,
 	type Scope,
 	type StepOutcome,
 	scopeKey,
@@ -26,6 +25,7 @@ import {
 	type TranscriptEntry,
 	type WaitReason,
 } from "../log";
+import type { RunStatus } from "../run-status";
 import { inboxOrder } from "./inbox";
 import { type MemberName, namesOf, runPerson } from "./people";
 import { deriveScores, runMetrics, stepMetrics } from "./run-metrics";
@@ -33,18 +33,12 @@ import { type RunTrace, runTrace } from "./run-trace";
 import { followRunTranscript, type StepEntries } from "./run-transcript";
 import {
 	deriveCalledTraversals,
-	deriveEndedAt,
 	deriveInputs,
 	deriveLeases,
-	deriveOpenGate,
-	deriveResumes,
-	deriveRunState,
 	deriveServices,
-	deriveSleep,
 	deriveSteps,
 	deriveTraversals,
 	deriveTrigger,
-	deriveWarnings,
 	isOpenStatus,
 	lastHarnessSession,
 	sumCost,
@@ -58,6 +52,7 @@ import type {
 	RunDetail,
 	RunDevice,
 	RunPage,
+	RunResume,
 	RunStreamItem,
 	RunSummary,
 	RunWalker,
@@ -145,16 +140,15 @@ export function parseCalledFlows(row: RunRow): Record<string, Flow> {
  */
 export function runFacts(run: RunState) {
 	const steps = deriveSteps(run);
-	const state = deriveRunState(run);
-	const open = isOpenStatus(state.status);
-	const sleep = state.status === "sleeping" ? deriveSleep(run) : null;
+	const { status, end, sleep } = run;
+	const open = isOpenStatus(status);
 	const cost = sumCost(run);
-	const endedAt = deriveEndedAt(run);
+	const endedAt = end?.at ?? null;
 	return {
-		status: state.status,
-		reason: state.reason,
-		endReason: state.endReason,
-		result: state.result,
+		status,
+		reason: end?.reason ?? null,
+		endReason: end?.endReason ?? null,
+		result: end?.result ?? null,
 		wakeAt: sleep?.until ?? null,
 		signal: sleep?.signal ?? null,
 		/** What the run sleeps for. Only `RunHere` carries it, not the summary. */
@@ -196,10 +190,11 @@ export type RunFacts = ReturnType<typeof runFacts>;
 
 /** The run's status, or null for a run the log has nothing on. */
 function knownStatus(run: RunState): RunStatus | null {
-	return run.lastSeq === Number.NEGATIVE_INFINITY
-		? null
-		: deriveRunState(run).status;
+	return run.lastSeq === Number.NEGATIVE_INFINITY ? null : run.status;
 }
+
+/** The Gate a run waits at, kept per run by the log until its next append. */
+const openGate = (run: RunState) => run.gate;
 
 /** A run's status and whether it is on this computer (`ReadModel.runHere`). */
 export type RunHere = {
@@ -224,14 +219,25 @@ function costFields(cost: CostTally) {
 	};
 }
 
-/** The run's warnings, each with the node of its step. */
+/** The run's warnings in the order they were logged, each with the node of its step. */
 function runWarnings(run: RunState): RunWarning[] {
-	return deriveWarnings(run).map((w) => ({
-		kind: w.kind,
-		message: w.message,
-		stepId: w.stepId,
-		nodeId: w.stepId ? (run.steps.get(w.stepId)?.nodeId ?? null) : null,
-		at: w.at,
+	return run.warnings.map((e) => ({
+		kind: e.payload.kind,
+		message: e.payload.message,
+		stepId: e.stepId,
+		nodeId: e.stepId ? (run.steps.get(e.stepId)?.nodeId ?? null) : null,
+		at: e.at,
+	}));
+}
+
+/** Every resume of the run, oldest first. */
+function runResumes(run: RunState): RunResume[] {
+	return run.resumes.map((e) => ({
+		at: e.at,
+		by: e.payload.by ?? "person",
+		nodeId: e.payload.nodeId,
+		reason: e.payload.reason ?? null,
+		action: e.payload.action ?? "resume",
 	}));
 }
 
@@ -535,7 +541,7 @@ export function toRunDetail(
 		traversals: deriveTraversals(run),
 		calledTraversals: deriveCalledTraversals(run),
 		takeOverCommand: takeOverCommand(summary.worktreePath, last, harnessOf),
-		resumes: deriveResumes(run),
+		resumes: runResumes(run),
 		commands,
 		variables: [...run.variableChanges],
 		leases: deriveLeases(run),
@@ -837,7 +843,7 @@ export function createReadModel(deps: ReadModelDeps) {
 			rows
 				.map((r) => r.run.id)
 				.filter((id) => facts.get(id)?.status === "waiting"),
-			deriveOpenGate,
+			openGate,
 		);
 		const withGate = rows.filter((r) => open.has(r.run.id));
 		const walkers = await deps.walkers(

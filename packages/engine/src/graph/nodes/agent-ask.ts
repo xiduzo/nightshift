@@ -1,7 +1,6 @@
 import { Command } from "@langchain/langgraph";
 import type { AgentNode } from "@nightshift/flows";
 import type { GateChoice, StepOutputs } from "../../log";
-import { deriveSteps } from "../../read";
 import {
 	DEFAULT_RESUME_PROMPT,
 	type NodeAction,
@@ -139,7 +138,7 @@ async function stoppedStep(
 	pending: PendingGate,
 ): Promise<{ end: StepEnd; update: RunStateUpdate; prompt: string | null }> {
 	const runState = await ctx.log.state(ctx.run.id);
-	const step = deriveSteps(runState).find((s) => s.id === pending.stepId);
+	const step = runState.steps.get(pending.stepId);
 	const outputs = { ...askOutputs(pending), outcome: "stopped" };
 	return {
 		end: {

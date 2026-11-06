@@ -29,11 +29,11 @@ import {
 	defaultRunSettings,
 	type RunSettings,
 } from "../device-config/settings";
-import type { RunStatus } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";
 import type { TranscriptEntry } from "../log/step-events";
 import type { LandedFact } from "../read/landed-facts";
 import type { RunDetail, RunStreamItem } from "../read/views";
+import type { RunStatus } from "../run-status";
 import { seedFlowFolder } from "../testing/seed-flows";
 import {
 	createSandbox,

@@ -3,7 +3,7 @@ import type { Flow, ValueNode } from "@nightshift/flows";
 import { parseInstant } from "@nightshift/time";
 import { foldRun } from "../log";
 import { getRunRow } from "../log/run-row";
-import { deriveOpenGate, deriveRunState, deriveSteps } from "../read/run-views";
+import { deriveSteps } from "../read/run-views";
 import {
 	command,
 	edge,
@@ -76,12 +76,11 @@ async function setup(flow: Flow) {
 			stopAt: null,
 		}),
 	});
-	await waitFor(async () => deriveOpenGate(foldRun(await h.events())));
+	await waitFor(async () => foldRun(await h.events()).gate);
 	return { h, runner, clock };
 }
 
-const statusOf = async (h: Harness) =>
-	deriveRunState(foldRun(await h.events())).status;
+const statusOf = async (h: Harness) => foldRun(await h.events()).status;
 
 describe("an Ask with a deadline", () => {
 	test("logs its form and when it is due, and at the deadline takes the default", async () => {
@@ -95,7 +94,7 @@ describe("an Ask with a deadline", () => {
 			deadline: { at: T0 + 30 * MINUTE, choose: "answer" },
 			form: { default: { size: "m" } },
 		});
-		const stepId = deriveOpenGate(foldRun(await h.events()))?.stepId;
+		const stepId = foldRun(await h.events()).gate?.stepId;
 
 		clock.now = T0 + 30 * MINUTE;
 		await runner.take(h.runId, { kind: "wake", early: false });
@@ -131,7 +130,7 @@ describe("an Ask with a deadline", () => {
 		const { h, runner, clock } = await setup(
 			askFlow(ask({ default: { size: "m" } })),
 		);
-		const stepId = deriveOpenGate(foldRun(await h.events()))?.stepId as string;
+		const stepId = foldRun(await h.events()).gate?.stepId as string;
 		await runner.take(h.runId, {
 			kind: "answer",
 			stepId,

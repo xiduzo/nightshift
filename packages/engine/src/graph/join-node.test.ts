@@ -8,7 +8,7 @@ import type { FlowInput } from "@nightshift/flows/testing";
 import { now } from "@nightshift/time";
 import { foldRun } from "../log";
 import { getRunRow } from "../log/run-row";
-import { deriveOpenGate, deriveRunState, deriveSteps } from "../read";
+import { deriveSteps } from "../read";
 import {
 	agent,
 	command,
@@ -248,7 +248,7 @@ describe("a Join that waits for the first", () => {
 			false,
 		);
 		expect(heldOf(driven.state.pending)).toEqual({});
-		expect(deriveRunState(foldRun(events)).status).toBe("running");
+		expect(foldRun(events).status).toBe("running");
 	});
 });
 
@@ -491,7 +491,7 @@ describe("a Gate on a branch", () => {
 				}),
 			});
 			const gate = await waitFor(
-				async () => deriveOpenGate(foldRun(await h.events())) ?? false,
+				async () => foldRun(await h.events()).gate ?? false,
 				{ label: "the Gate to open" },
 			);
 			if (runner.isActive(h.runId)) {
@@ -527,8 +527,7 @@ async function settle(
 ): Promise<void> {
 	await waitFor(
 		async () =>
-			!runner.isActive(h.runId) &&
-			deriveRunState(foldRun(await h.events())).status === status,
+			!runner.isActive(h.runId) && foldRun(await h.events()).status === status,
 		{ label: `the run to be ${status}`, timeoutMs: 20_000 },
 	);
 }

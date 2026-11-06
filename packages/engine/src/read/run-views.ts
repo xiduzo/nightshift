@@ -1,103 +1,36 @@
 import type { AgentHarnessName } from "@nightshift/agents/types";
-import type {
-	AskForm,
-	ItemState,
-	JsonValue,
-	NodeOutputs,
-} from "@nightshift/flows";
+import type { ItemState, JsonValue, NodeOutputs } from "@nightshift/flows";
 import {
 	addCost,
 	type CostTally,
 	type DerivedStep,
-	type GateChoice,
 	type GateDeadline,
 	type InputValues,
 	NO_COST,
-	provedEndReason,
-	type RunEndReason,
-	type RunResult,
+	type OpenGateFact,
 	type RunRow,
 	type RunState,
-	type RunStatus,
 	type RunTrigger,
-	type RunWarningKind,
 	scopeKey,
 	sessionCost,
 	visitKey,
-	type WaitReason,
 } from "../log";
-import type { RunLease, RunResume, RunService, ScopeTraversals } from "./views";
+import type { RunStatus } from "../run-status";
+import type { RunLease, RunService, ScopeTraversals } from "./views";
 
 /**
- * Views of a run's state (`RunState`, one fold of its event log): its
- * status and end, its sleep, Gates, stop time, resumes, inputs, steps,
- * variables, cost and the clocks of its running steps. None of them walks
- * the log: the run state is the one place that reads the events.
+ * Views of a run's state (`RunState`, one fold of its event log): what
+ * the screens and the walk read beyond its folded facts. The status, the
+ * end, the open Gates and the sleep are fields of the state. Here are the
+ * projections of it: the steps as a list, the leases, the services, the
+ * inputs, the variables, the cost and the clocks of its running steps.
+ * None of them walks the log: the run state is the one place that reads
+ * the events.
  */
-
-/** One warning of a run, in the order they were logged. */
-export type DerivedWarning = {
-	stepId: string | null;
-	kind: RunWarningKind;
-	message: string;
-	at: number;
-};
-
-export function deriveWarnings(run: RunState): DerivedWarning[] {
-	return run.warnings.map((e) => ({
-		stepId: e.stepId,
-		kind: e.payload.kind,
-		message: e.payload.message,
-		at: e.at,
-	}));
-}
 
 /** The steps in the order they started. */
 export function deriveSteps(run: RunState): DerivedStep[] {
 	return [...run.steps.values()];
-}
-
-/**
- * The run's status and why it ended. The latest of `RunStarted`,
- * `RunResumed` and `RunEnded` decides: an end gives its status, a start or a
- * resume means the run is `running`, `waiting` while a Gate is open, or
- * `sleeping` while a step waits for a usage limit or the network. A run
- * with none of them (the daemon died while it created the run) is
- * `interrupted`. `result`: the status of the End node that ended the run,
- * else null.
- */
-export function deriveRunState(run: RunState): {
-	status: RunStatus;
-	reason: string | null;
-	result: RunResult | null;
-	endReason: RunEndReason | null;
-} {
-	const { latest } = run;
-	const open = (status: RunStatus) => ({
-		status,
-		reason: null,
-		result: null,
-		endReason: null,
-	});
-	if (!latest) return open("interrupted");
-	if (latest.ended) {
-		const ended = latest.ended;
-		return {
-			status: ended.status,
-			reason: ended.reason,
-			result: ended.result ?? null,
-			endReason:
-				ended.endReason ??
-				provedEndReason({
-					status: ended.status,
-					reason: ended.reason,
-					result: ended.result ?? null,
-				}),
-		};
-	}
-	if (deriveOpenGate(run)) return open("waiting");
-	if (deriveSleep(run)) return open("sleeping");
-	return open("running");
 }
 
 /** Whether a run with this status is still open: at work, waiting at a Gate, or asleep. */
@@ -105,17 +38,12 @@ export function isOpenStatus(status: RunStatus): boolean {
 	return status === "running" || status === "waiting" || status === "sleeping";
 }
 
-/** When the run ended: the time of its `RunEnded`, or null while it is open again or never ended. */
-export function deriveEndedAt(run: RunState): number | null {
-	return run.latest?.ended ? run.latest.at : null;
-}
-
 /**
  * The services of the run (ADR 9): those that run now, oldest first. An
  * ended run shows those that ran until its end, stopped.
  */
 export function deriveServices(run: RunState): RunService[] {
-	const running = !run.latest?.ended;
+	const running = run.end === null;
 	const holds = running ? run.holds : run.endedHolding;
 	return holds.flatMap((hold) =>
 		hold.kind === "service"
@@ -153,7 +81,7 @@ export function deriveLeases(run: RunState): RunLease[] {
 				]
 			: [],
 	);
-	const sleep = deriveSleep(run);
+	const { sleep } = run;
 	const lease = run.wait?.payload.lease;
 	const step = sleep ? run.steps.get(sleep.stepId) : undefined;
 	if (sleep?.reason !== "lease" || !lease || !step) return held;
@@ -171,41 +99,6 @@ export function deriveLeases(run: RunState): RunLease[] {
 					: { runId: lease.holder, title: lease.holderTitle ?? "" },
 		},
 	];
-}
-
-export type SleepFact = {
-	stepId: string;
-	reason: WaitReason;
-	/** When the step continues; null while it waits for a signal with no timeout. */
-	until: number | null;
-	message: string;
-	/** The signal the step waits for, else null. */
-	signal: string | null;
-	/** The key a webhook signal must have to wake it, else null: any does. */
-	signalKey: string | null;
-	/** The rules one of which a webhook signal must match to wake it; empty: any does. */
-	signalRules: { outcome: string; when: string }[];
-};
-
-/**
- * The wait the run sleeps in: the latest `WaitStarted` of the current walk
- * with no `WaitEnded` after it, on a step that is still open, while the run
- * has not ended.
- */
-export function deriveSleep(run: RunState): SleepFact | null {
-	const { wait } = run;
-	if (!wait?.stepId || !run.latest || run.latest.ended) return null;
-	const step = run.steps.get(wait.stepId);
-	if (!step || step.endedAt !== null) return null;
-	return {
-		stepId: wait.stepId,
-		reason: wait.payload.reason,
-		until: wait.payload.until,
-		message: wait.payload.message,
-		signal: wait.payload.signal ?? null,
-		signalKey: wait.payload.signalKey ?? null,
-		signalRules: wait.payload.signalRules ?? [],
-	};
 }
 
 /** Where a run works: its worktree on the run's Device, its branch and the commit it started from. */
@@ -254,17 +147,6 @@ export function deriveWorktrees(
 		paths.set(holder, move.payload.worktreePath);
 	}
 	return { holder, paths };
-}
-
-/** Every resume of the run, oldest first. */
-export function deriveResumes(run: RunState): RunResume[] {
-	return run.resumes.map((e) => ({
-		at: e.at,
-		by: e.payload.by ?? "person",
-		nodeId: e.payload.nodeId,
-		reason: e.payload.reason ?? null,
-		action: e.payload.action ?? "resume",
-	}));
 }
 
 /** The values of the top-level flow's inputs (the params of a run from before flow format 2). */
@@ -326,67 +208,12 @@ export function deriveBudgetSpend(run: RunState): CostTally {
 	return total;
 }
 
-export type OpenGateFact = {
-	stepId: string;
-	nodeId: string;
-	visit: number;
-	question: string;
-	choices: GateChoice[];
-	/** The flow author let a person answer this Gate from the lock screen. */
-	lockScreen: boolean;
-	openedAt: number;
-	/** When nobody answered by then, the Gate takes an option. Null without one. */
-	deadline: GateDeadline | null;
-	/** An Ask (ADR 10): the form the answer fills in. Null on every other Gate. */
-	form: AskForm | null;
-};
-
-/**
- * The Gate the run waits at: a Gate step that opened and has not ended,
- * while the run has not ended. A Gate step that started but never wrote
- * `GateOpened` (the daemon died in between) is not open: recovery
- * interrupts it like any other step. Parallel branches may wait at
- * several: this is the latest (`deriveOpenGates` has them all).
- */
-export function deriveOpenGate(run: RunState): OpenGateFact | null {
-	return deriveOpenGates(run).at(-1) ?? null;
-}
-
-/** Every Gate the run waits at, in the order the steps started: one per branch that waits. */
-export function deriveOpenGates(run: RunState): OpenGateFact[] {
-	const { latest } = run;
-	if (!latest || latest.ended) return [];
-	const gates: OpenGateFact[] = [];
-	for (const step of run.steps.values()) {
-		const { gate } = step;
-		if (
-			step.endedAt === null &&
-			gate !== null &&
-			gate.openedSeq > step.openedSeq &&
-			gate.openedSeq > latest.seq
-		) {
-			gates.push({
-				stepId: step.id,
-				nodeId: step.nodeId,
-				visit: step.visit,
-				question: gate.question,
-				choices: gate.choices,
-				lockScreen: gate.lockScreen,
-				openedAt: gate.openedAt,
-				deadline: gate.deadline,
-				form: gate.form,
-			});
-		}
-	}
-	return gates;
-}
-
 /** The open Gate whose deadline comes first, or null when no open Gate has one. */
 export function firstDeadline(
 	run: RunState,
 ): (OpenGateFact & { deadline: GateDeadline }) | null {
 	let first: (OpenGateFact & { deadline: GateDeadline }) | null = null;
-	for (const gate of deriveOpenGates(run)) {
+	for (const gate of run.gates) {
 		const { deadline } = gate;
 		if (deadline && (!first || deadline.at < first.deadline.at)) {
 			first = { ...gate, deadline };
@@ -401,7 +228,7 @@ export function firstDeadline(
  * parked. These steps stay open while the run waits or sleeps.
  */
 export function parkedSteps(run: RunState): DerivedStep[] {
-	const stepId = deriveOpenGate(run)?.stepId ?? deriveSleep(run)?.stepId;
+	const stepId = run.gate?.stepId ?? run.sleep?.stepId;
 	return stepId ? withEnclosing(run, stepId) : [];
 }
 
@@ -425,7 +252,7 @@ export type StepClock = {
  * start again each time its node enters (`DerivedStep.clock`).
  */
 export function deriveStepClocks(run: RunState): StepClock[] {
-	if (!run.latest || run.latest.ended) return [];
+	if (!run.latest || run.end) return [];
 	const parked = new Set(parkedSteps(run).map((s) => s.id));
 	const clocks: StepClock[] = [];
 	for (const step of run.steps.values()) {

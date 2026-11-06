@@ -236,7 +236,7 @@ export type RunBundle = {
 	run: typeof run.$inferSelect;
 	steps: (typeof step.$inferSelect)[];
 	sessions: (typeof agentSession.$inferSelect)[];
-	/** The run's events, oldest first, ready for `deriveRunState`, `deriveSteps` and the rest. */
+	/** The run's events, oldest first, ready for `foldRun`. */
 	events: LoggedEvent[];
 	/** Transcript entries ordered by seq: one step's, or the whole run's. */
 	transcript(stepId?: string): Promise<TranscriptEntry[]>;

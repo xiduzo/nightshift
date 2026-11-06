@@ -9,7 +9,7 @@ import type {
 	RunLog,
 	RunState,
 } from "../log";
-import { deriveRunState, deriveSleep, firstDeadline } from "../read";
+import { firstDeadline } from "../read";
 import {
 	DEFAULT_RESUME_PROMPT,
 	type NodeAction,
@@ -451,7 +451,7 @@ export function planWake(
 	how: Wake,
 	now: number,
 ): WakePlan {
-	if (deriveRunState(run).status !== "sleeping") {
+	if (run.status !== "sleeping") {
 		return { kind: "not-sleeping" };
 	}
 	if (at.kind !== "interrupted") return { kind: "not-sleeping" };
@@ -602,7 +602,7 @@ export function createSleeps(deps: SleepDeps) {
 	 * it fires.
 	 */
 	function restore(runId: string, run: RunState): void {
-		const sleeping = deriveSleep(run);
+		const sleeping = run.sleep;
 		if (sleeping?.until != null) schedule(runId, sleeping.until);
 		const deadline = firstDeadline(run)?.deadline;
 		if (deadline) schedule(runId, deadline.at);

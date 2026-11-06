@@ -1,5 +1,5 @@
-import type { RunStatus } from "../log";
 import { NIGHT_RANGES, type NightRange, type RunSummary } from "../read";
+import type { RunStatus } from "../run-status";
 
 /**
  * The dashboard's numbers, computed from the runs on the server: the stat

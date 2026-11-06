@@ -20,12 +20,7 @@ import {
 } from "../testing/test-support";
 import { UNKNOWN_DEVICE, UNKNOWN_SPACE } from "./bundle-rows";
 import { exportRun, openRunBundle } from "./run-bundle";
-import {
-	deriveNodeOutputs,
-	deriveRunState,
-	deriveSteps,
-	sumCost,
-} from "./run-views";
+import { deriveNodeOutputs, deriveSteps, sumCost } from "./run-views";
 
 const SECRET = "sk-test-0123456789";
 
@@ -211,10 +206,8 @@ describe("exportRun", () => {
 		expect(opened.run.spaceId).toBe(sandbox.spaceId);
 		expect(opened.clones[0]?.path).toBe(sandbox.repoPath);
 		expect(opened.events).toEqual(live);
-		expect(deriveRunState(foldRun(opened.events))).toEqual(
-			deriveRunState(foldRun(live)),
-		);
-		expect(deriveRunState(foldRun(opened.events)).status).toBe("finished");
+		expect(foldRun(opened.events).end).toEqual(foldRun(live).end);
+		expect(foldRun(opened.events).status).toBe("finished");
 		expect(deriveSteps(foldRun(opened.events))).toEqual(
 			deriveSteps(foldRun(live)),
 		);
@@ -284,7 +277,7 @@ describe("exportRun", () => {
 		expect(opened.run.spaceId).toBe(UNKNOWN_SPACE);
 		expect(opened.steps.map((s) => s.deviceId)).toEqual([null, null]);
 		expect(opened.events).toEqual(live);
-		expect(deriveRunState(foldRun(opened.events)).status).toBe("finished");
+		expect(foldRun(opened.events).status).toBe("finished");
 		expect(sumCost(foldRun(opened.events)).usd).toBe(0.25);
 		opened.close();
 	});
@@ -507,7 +500,7 @@ describe("exportRun", () => {
 		expect(text).toContain("TOKEN=•••");
 		expect(text).not.toContain(SECRET);
 		expect(opened.sessions[0]?.prompt).toContain("Fix it.");
-		expect(deriveRunState(foldRun(opened.events)).status).toBe("finished");
+		expect(foldRun(opened.events).status).toBe("finished");
 		opened.close();
 	});
 

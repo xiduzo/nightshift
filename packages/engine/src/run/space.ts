@@ -22,12 +22,7 @@ import {
 	setSpaceUsage,
 	toProject,
 } from "../projects";
-import {
-	deriveRunState,
-	type ReadModel,
-	type RunStreamItem,
-	type RunSummary,
-} from "../read";
+import type { ReadModel, RunStreamItem, RunSummary } from "../read";
 import type { ScheduleFiles } from "../schedules";
 import { readServiceLog } from "../services";
 import type { KeptFlow, KeptValue } from "../variables";
@@ -221,7 +216,7 @@ export function createSpaces(deps: SpacesDeps) {
 				await projects.find(projectId, spaceId);
 				const runIds = await noActiveRun(projectId, "remove the project");
 				for (const runId of runIds) {
-					const status = deriveRunState(await log.state(runId)).status;
+					const status = (await log.state(runId)).status;
 					if (status === "waiting") {
 						throw new Refusal(
 							"conflict",

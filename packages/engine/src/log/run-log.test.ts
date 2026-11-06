@@ -3,7 +3,6 @@ import type { Database } from "@nightshift/db";
 import { event, project, run } from "@nightshift/db/schema";
 import { asc, eq } from "drizzle-orm";
 
-import { deriveRunState } from "../read/run-views";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { type EventInput, type LoggedEvent, parseEventRow } from "./events";
 import { createRunLog } from "./run-log";
@@ -40,7 +39,7 @@ const eventsIn = (run: RunState) =>
 	run.ends.length +
 	(run.edges.get("")?.taken.length ?? 0);
 
-const statusOf = (run: RunState) => deriveRunState(run).status;
+const statusOf = (run: RunState) => run.status;
 
 async function fromDb(runId: string): Promise<LoggedEvent[]> {
 	const rows = await sandbox.db

@@ -4,7 +4,7 @@ import type { LeaseNode } from "@nightshift/flows";
 import { HostUnreachableError } from "../contract";
 import { createLeaseKeeper, createLeaseStore } from "../leases";
 import { foldRun } from "../log";
-import { deriveSleep, deriveSteps } from "../read/run-views";
+import { deriveSteps } from "../read/run-views";
 import {
 	drive,
 	flowOf,
@@ -125,7 +125,7 @@ describe("the Lease node", () => {
 			reason: "lease",
 			until: now + MINUTE,
 		});
-		const sleep = deriveSleep(foldRun(await h.events()));
+		const sleep = foldRun(await h.events()).sleep;
 		expect(sleep?.message).toBe(
 			'Waits for the lease "branch:feature/x". The run "Fix" holds it.',
 		);
@@ -211,7 +211,7 @@ describe("the Lease node", () => {
 		const h = await leaseRun(lease({ waitMinutes: 1 }), leases);
 		const first = await drive(h, { inputs: { branch: "feature/x" } });
 		expect(first.parked[0]).toMatchObject({ reason: "lease" });
-		expect(deriveSleep(foldRun(await h.events()))?.message).toBe(
+		expect(foldRun(await h.events()).sleep?.message).toBe(
 			'Waits for the computer that keeps this Space, to take the lease "branch:feature/x".',
 		);
 		now += 3 * MINUTE;

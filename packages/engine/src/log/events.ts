@@ -905,9 +905,6 @@ export function groupByRun(
 	return grouped;
 }
 
-/** Derived from the event log, never stored (`run-status/`). */
-export type { RunResult, RunStatus };
-
 /**
  * How one visit of a node ended: one of the node's outcomes (`pass`, a
  * Decision label, a Gate choice, …) or one of the reserved values below.

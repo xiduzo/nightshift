@@ -364,8 +364,8 @@ packages/engine/src/
       entry and parks at `wait__<nodeId>`.
    4. The wait node interrupts `{ kind: "wait", until, reason }`.
    5. The runner gives the interrupt to `sleeps.schedule` for the wake
-      timer. At startup, recovery rebuilds the timers from `deriveSleep`
-      through `runner.restore`.
+      timer. At startup, recovery rebuilds the timers from the run state's
+      `sleep` through `runner.restore`.
    6. A wake is a Turn (`runner.take(runId, { kind: "wake", ... })`):
       `WaitEnded`, the transcript `wake`, then
       `Command({ resume: { kind: "wake", early, prompt } })`.
@@ -916,8 +916,8 @@ The daemon side is the runner's wake Turn over three parts of this module:
   holds a slot.
 - `createSleeps(deps)`, one per runner, holds the timers.
   `schedule(runId, until)` sets one. A timer that fires gives the run to
-  the runner's wake Turn. `restore(runId, events)` sets the timer from
-  `deriveSleep` for a run that slept when the last daemon died (the log
+  the runner's wake Turn. `restore(runId, runState)` sets the timer from
+  the run state's `sleep` for a run that slept when the last daemon died (the log
   stays the restart source). `forget(runId)` drops it. The runner calls it
   before `closeOpenWork`.
 

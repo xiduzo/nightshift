@@ -61,7 +61,7 @@ export function combineHolds(parts: readonly RunHolds[]): RunHolds {
 				try {
 					await part.resuming(row, run, at);
 				} catch (error) {
-					const status = run.latest?.ended?.status ?? "failed";
+					const status = run.end?.status ?? "failed";
 					await Promise.allSettled(
 						parts.slice(0, i).map((done) => done.ended(row.id, status)),
 					);

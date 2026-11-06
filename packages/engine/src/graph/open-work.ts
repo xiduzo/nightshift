@@ -12,13 +12,7 @@ import {
 	type RunState,
 	type StepOutputs,
 } from "../log";
-import {
-	deriveRunState,
-	deriveSteps,
-	isOpenStatus,
-	parkedSteps,
-	withEnclosing,
-} from "../read";
+import { deriveSteps, isOpenStatus, parkedSteps, withEnclosing } from "../read";
 import { type CutShortOutcome, type NodeKind, PLAIN_KIND } from "./context";
 import type { Overdue } from "./deadlines";
 import { letGo, type RunHolds } from "./holds";
@@ -73,7 +67,7 @@ export function openWork(runState: RunState, cut: CutShort["kind"]): OpenWork {
 	const parked = new Set(
 		cut === "interrupted" ? parkedSteps(runState).map((s) => s.id) : [],
 	);
-	const status = deriveRunState(runState).status;
+	const { status } = runState;
 	return {
 		sessions: [...runState.sessions.values()].filter((s) => s.ending === null),
 		steps: deriveSteps(runState)

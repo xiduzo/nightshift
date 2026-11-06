@@ -32,12 +32,7 @@ import {
 	type RunState,
 } from "../log";
 import type { PlacementPort } from "../placement";
-import {
-	deriveOpenGate,
-	deriveRunState,
-	deriveSleep,
-	deriveSteps,
-} from "../read";
+import { deriveSteps } from "../read";
 import { RunRefusal, refuseUnless, whyNot } from "../run-status";
 import type { UsageNotes } from "../usage";
 import type { RunsPort } from "./peers";
@@ -129,8 +124,8 @@ function refuseAnswer(
 		files?: readonly AnswerFile[];
 	},
 ): void {
-	const why = whyNot("answer", deriveRunState(runState).status, true);
-	const gate = deriveOpenGate(runState);
+	const why = whyNot("answer", runState.status, true);
+	const { gate } = runState;
 	if (why !== null || !gate) {
 		throw new GateClosedError(why ?? "This run does not wait at a Gate.");
 	}
@@ -168,8 +163,8 @@ function refuseRelease(runState: RunState, name: string): void {
 
 /** Throws unless the run sleeps in a Wait node that waits for the Signal `name`. */
 function refuseSignal(runState: RunState, name: string): void {
-	refuseUnless("signal", deriveRunState(runState).status, true);
-	if (deriveSleep(runState)?.signal !== name) {
+	refuseUnless("signal", runState.status, true);
+	if (runState.sleep?.signal !== name) {
 		throw new RunRefusal(
 			"wrong-signal",
 			"This run does not wait for that signal.",
@@ -182,8 +177,7 @@ function refuseSignal(runState: RunState, name: string): void {
  * step, or `stepId` is not the step that runs.
  */
 function refuseRestart(runState: RunState, stepId: string | undefined): void {
-	const { status, result } = deriveRunState(runState);
-	refuseUnless("restart", status, true, result);
+	refuseUnless("restart", runState.status, true, runState.end?.result);
 	const open = deriveSteps(runState).filter((s) => s.endedAt === null);
 	if (open.length === 0) {
 		throw new RunRefusal(
@@ -222,7 +216,8 @@ export function createRunActions(deps: RunActionsDeps) {
 		request: RunActionRequest,
 	): Promise<void> {
 		const runState = await log.state(row.id);
-		const { status, result } = deriveRunState(runState);
+		const { status } = runState;
+		const result = runState.end?.result ?? null;
 		switch (request.kind) {
 			case "stop":
 				// A run that has ended has nothing to stop.
@@ -300,8 +295,7 @@ export function createRunActions(deps: RunActionsDeps) {
 		}
 		const request = when === "after-step";
 		await runner.hold(row.id, async ({ runState }) => {
-			if (whyNot("stop", deriveRunState(runState).status, true) !== null)
-				return;
+			if (whyNot("stop", runState.status, true) !== null) return;
 			if (runState.stopAfterStep === request) return;
 			await log.append({
 				type: request ? "StopAfterStepRequested" : "StopAfterStepCancelled",
@@ -332,8 +326,12 @@ export function createRunActions(deps: RunActionsDeps) {
 		}
 		await runner.hold(runId, async ({ runState, active }) => {
 			// A Turn that holds a slot is in the middle of a step too.
-			const { status, result } = deriveRunState(runState);
-			refuseUnless("move", active ? "running" : status, true, result);
+			refuseUnless(
+				"move",
+				active ? "running" : runState.status,
+				true,
+				runState.end?.result,
+			);
 			// The plan stays: only the Walker changes. A Device that is
 			// offline is the planner's refusal.
 			if (!(await deps.placement.moveTo(placedRun(row), actor, to))) {
@@ -438,8 +436,12 @@ export function createRunActions(deps: RunActionsDeps) {
 						},
 						{
 							check: (runState) => {
-								const { status, result } = deriveRunState(runState);
-								refuseUnless("resume", status, true, result);
+								refuseUnless(
+									"resume",
+									runState.status,
+									true,
+									runState.end?.result,
+								);
 							},
 						},
 					),
@@ -472,8 +474,7 @@ export function createRunActions(deps: RunActionsDeps) {
 						runId,
 						{ kind: "rerun", by: "person", ...rerun },
 						{
-							check: (runState) =>
-								refuseUnless("rerun", deriveRunState(runState).status, true),
+							check: (runState) => refuseUnless("rerun", runState.status, true),
 						},
 					),
 				);

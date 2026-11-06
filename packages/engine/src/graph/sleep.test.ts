@@ -10,7 +10,7 @@ import type { WaitNode } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
 import { foldRun } from "../log";
 import { readTranscriptFile } from "../log/transcripts";
-import { deriveRunState, deriveSleep, deriveSteps } from "../read/run-views";
+import { deriveSteps } from "../read/run-views";
 import {
 	agent,
 	command,
@@ -194,7 +194,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 				prompt: DEFAULT_RESUME_PROMPT,
 			},
 		});
-		expect(deriveRunState(foldRun(await h.events())).status).toBe("sleeping");
+		expect(foldRun(await h.events()).status).toBe("sleeping");
 
 		// A timer that fires before its time wakes nothing.
 		const d = daemon(h, time);
@@ -505,8 +505,8 @@ describe("the sleep module: a Wait node's own wait", () => {
 		});
 		// The step is open, and the log alone says the run sleeps and until when.
 		expect(deriveSteps(foldRun(await h.events()))[0]?.endedAt).toBeNull();
-		expect(deriveRunState(foldRun(await h.events())).status).toBe("sleeping");
-		expect(deriveSleep(foldRun(await h.events()))).toMatchObject({
+		expect(foldRun(await h.events()).status).toBe("sleeping");
+		expect(foldRun(await h.events()).sleep).toMatchObject({
 			stepId,
 			reason: "duration",
 			until: time.now() + 15 * MINUTE,

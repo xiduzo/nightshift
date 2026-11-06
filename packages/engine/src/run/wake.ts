@@ -1,7 +1,14 @@
 import type { Database } from "@nightshift/db";
 import type { Runner } from "../graph";
-import { type RunLog, runIdsWalkedBy, type WaitReason } from "../log";
-import { deriveSleep } from "../read";
+import {
+	type RunLog,
+	type RunState,
+	runIdsWalkedBy,
+	type WaitReason,
+} from "../log";
+
+/** The wait a run sleeps in, kept per run by the log until its next append. */
+const sleepOf = (run: RunState) => run.sleep;
 
 type WakeDeps = {
 	db: Database;
@@ -17,7 +24,7 @@ async function wakeSleepsFor(
 	const self = await deps.log.walkerId();
 	const sleeping = await deps.log.derive(
 		await runIdsWalkedBy(deps.db, self),
-		deriveSleep,
+		sleepOf,
 	);
 	for (const [runId, sleep] of sleeping) {
 		if (sleep?.reason !== reason) continue;

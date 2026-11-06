@@ -1,5 +1,5 @@
-import type { RunStatus } from "../log";
 import { isOpenStatus, type RunSummary } from "../read";
+import type { RunStatus } from "../run-status";
 import {
 	type DashboardRun,
 	type KnownCost,

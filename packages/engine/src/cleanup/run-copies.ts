@@ -4,7 +4,6 @@ import {
 	RUN_NOT_FOUND,
 	type RunLog,
 	type RunRow,
-	type RunStatus,
 	worktreeRemovals,
 } from "../log";
 import type {
@@ -14,6 +13,7 @@ import type {
 	RunCopyState,
 } from "../projects";
 import { isOpenStatus, type RunSummary } from "../read";
+import type { RunStatus } from "../run-status";
 import {
 	cleanupTime,
 	hasLeftovers,

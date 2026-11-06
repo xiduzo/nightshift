@@ -1,16 +1,11 @@
 import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
 import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import type { CallEachNode, Flow } from "@nightshift/flows";
-import type { LoggedEvent, RunStatus } from "../log";
+import type { LoggedEvent } from "../log";
 import { foldRun } from "../log";
 import { getRunRow } from "../log/run-row";
-import {
-	deriveOpenGate,
-	deriveRunState,
-	deriveSteps,
-	parseCalledFlows,
-	parseRunFlow,
-} from "../read";
+import { deriveSteps, parseCalledFlows, parseRunFlow } from "../read";
+import type { RunStatus } from "../run-status";
 import {
 	agent,
 	edge,
@@ -248,7 +243,7 @@ afterAll(async () => {
 const harness = () => fakeHarness({ ...reportingScript("pass"), delayMs: 0 });
 
 const statusOf = async (h: Harness): Promise<RunStatus> =>
-	deriveRunState(foldRun(await h.events())).status;
+	foldRun(await h.events()).status;
 
 /** The run once no drive holds it: its status, or "dead" when its daemon died. */
 async function settled(
@@ -340,7 +335,7 @@ async function walk(
 			}
 			if (status === "finished") break;
 			if (status === "waiting") {
-				const gate = deriveOpenGate(foldRun(await h.events()));
+				const gate = foldRun(await h.events()).gate;
 				if (!gate) throw new Error("No open Gate.");
 				faulty.state.answering = true;
 				try {

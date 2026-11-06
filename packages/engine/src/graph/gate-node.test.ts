@@ -3,7 +3,7 @@ import { Command } from "@langchain/langgraph";
 import { foldRun } from "../log";
 import type { GateChoice } from "../log/events";
 import { readTranscriptFile } from "../log/transcripts";
-import { deriveOpenGate, deriveSteps } from "../read/run-views";
+import { deriveSteps } from "../read/run-views";
 import {
 	command,
 	drive,
@@ -141,7 +141,7 @@ describe("the Gate node", () => {
 		]);
 		expect(logged.find((e) => e.type === "GateOpened")?.stepId).toBe(stepId);
 		expect(gateStep).toMatchObject({ outcome: null, endedAt: null });
-		expect(deriveOpenGate(foldRun(logged))).toMatchObject({
+		expect(foldRun(logged).gate).toMatchObject({
 			stepId,
 			nodeId: "gate",
 			visit: 1,
@@ -238,7 +238,7 @@ describe("the Gate node", () => {
 				scope: null,
 			},
 		]);
-		expect(deriveOpenGate(foldRun(after))).toBeNull();
+		expect(foldRun(after).gate).toBeNull();
 		expect(
 			(await readTranscriptFile(gateStep?.transcriptPath as string)).map(
 				(e) => e.event,
@@ -300,13 +300,11 @@ describe("the Gate node", () => {
 		expect(payloads(logged, "GateOpened")).toEqual([
 			{ question: "Ready?", choices: CHOICES, lockScreen: true },
 		]);
-		expect(deriveOpenGate(foldRun(logged))?.lockScreen).toBe(true);
+		expect(foldRun(logged).gate?.lockScreen).toBe(true);
 
 		const plain = await startRun(sandbox, gateFlow());
 		await drive(plain, { inputs: { task: "it" } });
-		expect(deriveOpenGate(foldRun(await plain.events()))?.lockScreen).toBe(
-			false,
-		);
+		expect(foldRun(await plain.events()).gate?.lockScreen).toBe(false);
 	});
 
 	test("an answer without a note, and a choice without an edge, is a chosen end", async () => {
@@ -471,7 +469,7 @@ describe("the Gate node", () => {
 			nodeType: "decision",
 			visit: 2,
 		});
-		expect(deriveOpenGate(foldRun(logged))).toMatchObject({
+		expect(foldRun(logged).gate).toMatchObject({
 			stepId: second,
 			visit: 2,
 		});

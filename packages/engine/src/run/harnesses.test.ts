@@ -4,7 +4,7 @@ import { type FakeHarness, fakeHarness } from "@nightshift/agents/testing";
 import type { HarnessName } from "@nightshift/agents/types";
 import type { AgentNode, Flow, FlowEdge } from "@nightshift/flows";
 import { expandMcpServers } from "../device-config/mcp";
-import type { RunStatus } from "../log/events";
+import type { RunStatus } from "../run-status";
 import {
 	createSandbox,
 	type Sandbox,

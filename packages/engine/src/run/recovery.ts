@@ -24,7 +24,7 @@ import {
 	runsArriving,
 	spaceOfRun,
 } from "../log";
-import { awaitsWorktree, deriveRunState, runWorktree } from "../read";
+import { awaitsWorktree, runWorktree } from "../read";
 import type { StartHolds } from "./start-holds";
 
 /**
@@ -247,7 +247,7 @@ export function createRecovery(deps: RecoveryDeps) {
 			}
 			if (open.endsRun && !why) toResume.push(runId);
 			if (open.endsRun && why) await notContinuing(runId);
-			// A sleeping run gets its timer back from the log (`deriveSleep`).
+			// A sleeping run gets its timer back from the log (`RunState.sleep`).
 			if (!open.endsRun) runner.restore(runId, runState);
 		}
 	}
@@ -285,10 +285,7 @@ export function createRecovery(deps: RecoveryDeps) {
 				async () => {
 					if (disposed) return;
 					const runState = await log.state(runId);
-					if (
-						runner.isActive(runId) ||
-						deriveRunState(runState).status !== "interrupted"
-					) {
+					if (runner.isActive(runId) || runState.status !== "interrupted") {
 						return;
 					}
 					const why = await daemonResumeBlock(runId, runState, deps);

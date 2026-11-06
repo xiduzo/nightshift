@@ -14,8 +14,6 @@ import type {
 	ResumeAction,
 	ResumedBy,
 	RunEndReason,
-	RunResult,
-	RunStatus,
 	RunTrigger,
 	RunWarningKind,
 	Scope,
@@ -24,6 +22,7 @@ import type {
 	TranscriptEntry,
 	VariableChange,
 } from "../log";
+import type { RunResult, RunStatus } from "../run-status";
 import type { RunMetrics } from "./run-metrics";
 
 /**

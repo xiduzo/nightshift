@@ -17,10 +17,10 @@ import {
 	type LoggedEvent,
 	parseEventRow,
 	type RunLog,
-	type RunStatus,
 	type RunTrigger,
 } from "../log";
 import type { RunSummary } from "../read";
+import type { RunStatus } from "../run-status";
 import type { UsageNotes } from "../usage";
 import type { WebhookDelivery } from "./webhooks";
 

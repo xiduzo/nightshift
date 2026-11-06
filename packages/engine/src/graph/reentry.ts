@@ -1,22 +1,19 @@
 import type { Flow } from "@nightshift/flows";
-import type {
-	EnginePayloads,
-	ResumedBy,
-	RunResult,
-	RunState,
-	RunStatus,
-	Scope,
-} from "../log";
+import type { EnginePayloads, ResumedBy, RunState, Scope } from "../log";
 import { runDueAt } from "../log";
 import {
 	deriveInputs,
 	deriveNodeOutputs,
-	deriveRunState,
 	deriveSteps,
 	deriveTraversals,
 	deriveVariables,
 } from "../read";
-import { RunRefusal, refuseUnless } from "../run-status";
+import {
+	RunRefusal,
+	type RunResult,
+	type RunStatus,
+	refuseUnless,
+} from "../run-status";
 import { placeOf } from "./branches";
 import { DEFAULT_RESUME_PROMPT } from "./context";
 import { sessionOf } from "./resume-point";
@@ -149,9 +146,8 @@ function branchTarget(
 		({ value }) => value.kind === "parked" && placeOf(flow, value.nodeId),
 	)?.value;
 	if (parked?.kind !== "parked") return null;
-	const step = parked.stepId
-		? deriveSteps(run).find((s) => s.id === parked.stepId && !s.scope)
-		: undefined;
+	const found = parked.stepId ? run.steps.get(parked.stepId) : undefined;
+	const step = found && !found.scope ? found : undefined;
 	const continued =
 		step?.nodeType === "agent" && sessionOf(step) !== null ? step : null;
 	return {
@@ -245,8 +241,7 @@ export function planReentry(input: {
 		const refusal = rerunNodeRefusal(flow, request.nodeId);
 		if (refusal) throw new RunRefusal("unknown-node", refusal);
 	}
-	const { status, result } = deriveRunState(run);
-	refuseLive(request.kind, status, result);
+	refuseLive(request.kind, run.status, run.end?.result ?? null);
 	if (request.kind === "rerun") {
 		return planRerun(flow, run, thread, request, clearStopAt, cleared);
 	}
@@ -334,7 +329,7 @@ function planRerun(
 	const last =
 		request.stepId === undefined
 			? positionOf(thread.values, run, null).latest({ id: nodeId })
-			: deriveSteps(run).find((s) => s.id === request.stepId);
+			: run.steps.get(request.stepId);
 	if (
 		request.stepId !== undefined &&
 		(last?.nodeId !== nodeId || last.scope !== null)

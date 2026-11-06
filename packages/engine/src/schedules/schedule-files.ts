@@ -2,8 +2,8 @@ import type { Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { Actor, OffersPort } from "../contract";
 import type { ProjectFlows } from "../flows";
-import type { RunStatus } from "../log";
 import type { RunSummary } from "../read";
+import type { RunStatus } from "../run-status";
 import type { UsageNotes } from "../usage";
 import {
 	pausedAt,

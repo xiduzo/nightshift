@@ -6,6 +6,7 @@ import type {
 	JsonValue,
 	NodeOutputs,
 } from "@nightshift/flows";
+import type { RunResult, RunStatus } from "../run-status";
 import {
 	addCost,
 	type CostTally,
@@ -13,13 +14,16 @@ import {
 	sessionCost,
 	stepEndCost,
 } from "./cost";
+import { provedEndReason, type RunEndReason } from "./end-reason";
 import {
+	type EngineEventType,
 	type EnginePayloads,
 	type GateChoice,
 	type GateDeadline,
 	type InputValues,
 	type ItemFacts,
 	type LoggedEvent,
+	type RunEnding,
 	type Scope,
 	type StepOutcome,
 	type StepOutputs,
@@ -37,6 +41,13 @@ import { type AnsweredBy, answeredBy } from "./scores";
  * (where a run is, what it spent, which step sleeps). This module is the
  * one place that decides what an event means for a run. Among others:
  *
+ * - The run's status is a folded fact (`status`), with the end that stands
+ *   (`end`), the Gates it waits at (`gates`, `gate`) and the wait it sleeps
+ *   in (`sleep`). The latest of `RunStarted`, `RunResumed` and `RunEnded`
+ *   decides: an end gives its status; else the run is `waiting` while a
+ *   Gate is open, `sleeping` while a step waits for a usage limit, the
+ *   network or a Device, and `running` otherwise. A run with no run event
+ *   (the daemon died while it created the run) is `interrupted`.
  * - A step opens when it starts (`StepStarted`) and again at each reopen
  *   (`StepReopened`). A second `StepStarted` of the same step is a new
  *   opening too, and its start facts replace the earlier ones. Each opening
@@ -250,19 +261,81 @@ export type ScopeEdges = {
 /** One end of the run: the walk from `openedAt` (its start or a resume) to `at`. */
 export type RunEndFact = Logged<"RunEnded"> & { openedAt: number };
 
+/** The end that stands: the run's latest `RunEnded`, with why it ended. */
+export type RunEnd = {
+	seq: number;
+	at: number;
+	status: RunEnding;
+	reason: string | null;
+	/** The status of the End node that ended the run, else null. */
+	result: RunResult | null;
+	/** Why it ended, as the log proves it (`provedEndReason` for an end logged without one). */
+	endReason: RunEndReason;
+};
+
+/** A Gate the run waits at, as the log tells it. */
+export type OpenGateFact = {
+	stepId: string;
+	nodeId: string;
+	visit: number;
+	question: string;
+	choices: GateChoice[];
+	/** The flow author let a person answer this Gate from the lock screen. */
+	lockScreen: boolean;
+	openedAt: number;
+	/** When nobody answered by then, the Gate takes an option. Null without one. */
+	deadline: GateDeadline | null;
+	/** An Ask (ADR 10): the form the answer fills in. Null on every other Gate. */
+	form: AskForm | null;
+};
+
+/** The wait the run sleeps in, as the log tells it. */
+export type SleepFact = {
+	stepId: string;
+	reason: WaitReason;
+	/** When the step continues; null while it waits for a signal with no timeout. */
+	until: number | null;
+	message: string;
+	/** The signal the step waits for, else null. */
+	signal: string | null;
+	/** The key a webhook signal must have to wake it, else null: any does. */
+	signalKey: string | null;
+	/** The rules one of which a webhook signal must match to wake it; empty: any does. */
+	signalRules: { outcome: string; when: string }[];
+};
+
 export type RunState = {
 	/** The run of the log: the first event's that names one. */
 	runId: string | null;
 	/** The seq of the latest event folded in. */
 	lastSeq: number;
+	/**
+	 * The run's status. An end gives its status; a run with no run event is
+	 * `interrupted`; else `waiting` with a Gate open, `sleeping` in a wait,
+	 * `running` otherwise.
+	 */
+	status: RunStatus;
+	/** The end that stands. Null while the run is open, or has no run event. */
+	end: RunEnd | null;
+	/**
+	 * The Gates the run waits at, in the order their steps started: one per
+	 * branch that waits. A Gate step that started but never wrote
+	 * `GateOpened` (the daemon died in between) is not open: recovery
+	 * interrupts it like any other step. Empty once the run ended.
+	 */
+	gates: readonly OpenGateFact[];
+	/** The Gate the run waits at: the latest of `gates`, or null. */
+	gate: OpenGateFact | null;
+	/**
+	 * The wait the run sleeps in: the latest `WaitStarted` of the current
+	 * walk with no `WaitEnded` after it, on a step that is still open, while
+	 * the run has not ended. Null otherwise.
+	 */
+	sleep: SleepFact | null;
 	/** The run's first `RunStarted`. */
 	started: Logged<"RunStarted"> | null;
-	/** The latest `RunStarted`, `RunResumed` or `RunEnded`; `ended` when it is a `RunEnded`. */
-	latest: {
-		seq: number;
-		at: number;
-		ended: EnginePayloads["RunEnded"] | null;
-	} | null;
+	/** The latest `RunStarted`, `RunResumed` or `RunEnded`. */
+	latest: { seq: number; at: number } | null;
 	/** The latest `RunStarted` or `RunResumed`: when the current walk began. */
 	walk: { seq: number; at: number } | null;
 	/** The budget counts what was spent after this seq: the run's start, or a person's latest resume. -1 before. */
@@ -341,6 +414,11 @@ function emptyState(): Draft {
 	return {
 		runId: null,
 		lastSeq: Number.NEGATIVE_INFINITY,
+		status: "interrupted",
+		end: null,
+		gates: [],
+		gate: null,
+		sleep: null,
 		started: null,
 		latest: null,
 		walk: null,
@@ -390,6 +468,7 @@ type Draft = {
 function draftOf(state: RunState): Draft {
 	return {
 		...state,
+		gates: [...state.gates],
 		ends: [...state.ends],
 		resumes: [...state.resumes],
 		warnings: [...state.warnings],
@@ -502,6 +581,7 @@ function apply(run: Draft, e: LoggedEvent): void {
 		case "RunResumed":
 		case "RunEnded":
 			applyRunEvent(run, e);
+			settleRun(run);
 			return;
 		case "RunWarned":
 			run.warnings.push(logged(e));
@@ -624,6 +704,90 @@ function apply(run: Draft, e: LoggedEvent): void {
 	if (e.sessionId) applySessionEvent(run, e, e.sessionId);
 	if (e.stepId) applyStepEvent(run, e, e.stepId);
 	enterCallers(run, e);
+	if (RUN_FACT_EVENTS.has(e.type)) settleRun(run);
+}
+
+/**
+ * The events after which the run's folded facts (`status`, `gates`,
+ * `sleep`) can differ: a run event, an opening or end of a step, a Gate
+ * opened, a wait begun or ended. Any other event changes none of them.
+ */
+const RUN_FACT_EVENTS: ReadonlySet<EngineEventType> = new Set<EngineEventType>([
+	"RunStarted",
+	"RunResumed",
+	"RunEnded",
+	"StepStarted",
+	"StepReopened",
+	"StepEnded",
+	"GateOpened",
+	"WaitStarted",
+	"WaitEnded",
+]);
+
+/** The run's folded facts set again from its steps, its wait and its latest run event. */
+function settleRun(run: Draft): void {
+	run.gates = openGatesOf(run);
+	run.gate = run.gates.at(-1) ?? null;
+	run.sleep = sleepOf(run);
+	run.status = run.end
+		? run.end.status
+		: !run.latest
+			? "interrupted"
+			: run.gate
+				? "waiting"
+				: run.sleep
+					? "sleeping"
+					: "running";
+}
+
+/**
+ * Every Gate the run waits at, in the order the steps started: a Gate step
+ * that opened since its latest opening and since the latest run event, and
+ * has not ended, while the run has not ended.
+ */
+function openGatesOf(run: Draft): OpenGateFact[] {
+	const { latest } = run;
+	if (!latest || run.end) return [];
+	const gates: OpenGateFact[] = [];
+	for (const step of run.steps.values()) {
+		const { gate } = step;
+		if (
+			step.endedAt === null &&
+			gate !== null &&
+			gate.openedSeq > step.openedSeq &&
+			gate.openedSeq > latest.seq
+		) {
+			gates.push({
+				stepId: step.id,
+				nodeId: step.nodeId,
+				visit: step.visit,
+				question: gate.question,
+				choices: gate.choices,
+				lockScreen: gate.lockScreen,
+				openedAt: gate.openedAt,
+				deadline: gate.deadline,
+				form: gate.form,
+			});
+		}
+	}
+	return gates;
+}
+
+/** The wait the run sleeps in (`RunState.sleep`), or null. */
+function sleepOf(run: Draft): SleepFact | null {
+	const { wait } = run;
+	if (!wait?.stepId || !run.latest || run.end) return null;
+	const step = run.steps.get(wait.stepId);
+	if (!step || step.endedAt !== null) return null;
+	return {
+		stepId: wait.stepId,
+		reason: wait.payload.reason,
+		until: wait.payload.until,
+		message: wait.payload.message,
+		signal: wait.payload.signal ?? null,
+		signalKey: wait.payload.signalKey ?? null,
+		signalRules: wait.payload.signalRules ?? [],
+	};
 }
 
 function applyRunEvent(
@@ -638,19 +802,27 @@ function applyRunEvent(
 			run.steps.set(id, { ...step, sleeps, gateWaits });
 		}
 	}
-	run.latest = {
-		seq: e.seq,
-		at: e.at,
-		ended: e.type === "RunEnded" ? e.payload : null,
-	};
+	run.latest = { seq: e.seq, at: e.at };
 	run.wait = null;
 	if (e.type === "RunEnded") {
+		const { status, reason, result } = e.payload;
+		run.end = {
+			seq: e.seq,
+			at: e.at,
+			status,
+			reason,
+			result: result ?? null,
+			endReason:
+				e.payload.endReason ??
+				provedEndReason({ status, reason, result: result ?? null }),
+		};
 		run.ends.push({ ...logged(e), openedAt: run.walk?.at ?? e.at });
 		// An ended run holds nothing: the engine let go of it.
 		run.endedHolding = run.holds;
 		run.holds = [];
 		return;
 	}
+	run.end = null;
 	if (e.type === "RunResumed") run.endedHolding = [];
 	run.walk = { seq: e.seq, at: e.at };
 	run.stopAfterStep = false;

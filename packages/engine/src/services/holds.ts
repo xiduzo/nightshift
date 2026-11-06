@@ -59,7 +59,7 @@ export function serviceHolds(deps: {
 				(hold): hold is ServiceHold => hold.kind === "service",
 			);
 			// Only an interrupted run did not stop them when it ended.
-			if (run.latest?.ended?.status === "interrupted") {
+			if (run.end?.status === "interrupted") {
 				await stopAll(row.id, services);
 			}
 			const parentOf = (stepId: string) => {
