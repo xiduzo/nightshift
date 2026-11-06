@@ -7,6 +7,7 @@ import {
 	type LoggedEvent,
 	type PeerContext,
 	parseTranscript,
+	permissionOf,
 	type SpaceArchive,
 	type WalkFile,
 } from "@nightshift/engine";
@@ -15,12 +16,7 @@ import { Refusal, wordsFor } from "@nightshift/refusal";
 import { eq, sql } from "drizzle-orm";
 import type { ArchiveRef, RunCommand, RunRows, SyncCursors } from "../contract";
 import type { HostSpaces } from "../links";
-import {
-	applyRunCommand,
-	COMMAND_PERMISSION,
-	createRunCommands,
-	type RunCommands,
-} from "./commands";
+import { createRunCommands, type RunCommands } from "./commands";
 import {
 	createTranscriptFeeds,
 	type FeedPorts,
@@ -371,15 +367,15 @@ export function createRunHistoryExchange(deps: {
 				await documents.open(command.spaceId),
 				command.personId,
 			);
-			if (!role || !roleAllows(role, COMMAND_PERMISSION[command.kind])) {
+			if (!role || !roleAllows(role, permissionOf(command.kind))) {
 				return "The person who asked may not do this in this Space.";
 			}
 			try {
+				// Applied like the person's own action: the Walker writes the run's events.
 				await history.applying(command, () =>
-					applyRunCommand(
-						engine.space(command.spaceId, { personId: command.personId }),
-						command,
-					),
+					engine
+						.space(command.spaceId, { personId: command.personId })
+						.act(command.runId, command),
 				);
 				return null;
 			} catch (error) {

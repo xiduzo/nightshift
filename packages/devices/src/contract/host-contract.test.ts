@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { hostContract } from "./host-contract";
+import { commandBatchSchema } from "./sync";
 
 /**
  * The Host's contract is the wire format between daemons of different
@@ -96,5 +97,54 @@ describe("the Host's contract", () => {
 			expect(route.summary?.includes("\n"), path).toBe(false);
 			expect(outputSchema, path).toBeDefined();
 		}
+	});
+
+	test("keeps the Command shapes older Devices send, and reads back", async () => {
+		// Each kind, with every field an older Device may send, as it sent it.
+		const older = [
+			{
+				kind: "gate.resolve",
+				payload: {
+					stepId: "step-1",
+					choice: "approve",
+					note: "Looks right.",
+					data: { variant: "calm" },
+					files: [
+						{ name: "note.md", mediaType: "text/markdown", content: "aGk=" },
+					],
+					via: "lock_screen",
+				},
+			},
+			{ kind: "signal.send", payload: { name: "deploy-done" } },
+			{ kind: "run.stop", payload: {} },
+			{ kind: "run.stop", payload: { when: "cancel-after-step" } },
+			{ kind: "run.move", payload: { to: "laptop" } },
+			{ kind: "run.resume", payload: {} },
+			{ kind: "run.resume", payload: { prompt: "Go on." } },
+			{ kind: "lease.release", payload: { name: "docker" } },
+			{ kind: "run.useful", payload: { useful: false } },
+		];
+		const input = hostContract.sync.command["~orpc"].inputSchema;
+		expect(input).toBeDefined();
+		for (const command of older) {
+			const sent = { runId: "run-1", ...command };
+			const result = await input?.["~standard"].validate(sent);
+			expect(
+				result && "issues" in result ? result.issues : undefined,
+				command.kind,
+			).toBeUndefined();
+		}
+		const kept = {
+			id: "command-1",
+			spaceId: "space-1",
+			runId: "run-1",
+			walkerId: "laptop",
+			personId: "person-1",
+			createdAt: 1_700_000_000_000,
+		};
+		const batch = commandBatchSchema.safeParse({
+			commands: older.map((command) => ({ ...kept, ...command })),
+		});
+		expect(batch.error?.issues).toBeUndefined();
 	});
 });

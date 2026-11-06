@@ -1,4 +1,4 @@
-import { startRunInputSchema } from "@nightshift/engine";
+import { permissionOf, startRunInputSchema } from "@nightshift/engine";
 import { labelSchema } from "@nightshift/flows";
 import { z } from "zod";
 
@@ -126,9 +126,10 @@ export const runs = {
 				startedBy: context.session.user.id,
 			}),
 		),
-	useful: runProcedure(z.object({ runId: z.string(), useful: z.boolean() }), {
-		run: ["stop"],
-	})
+	useful: runProcedure(
+		z.object({ runId: z.string(), useful: z.boolean() }),
+		permissionOf("useful"),
+	)
 		.route({
 			summary: "Records whether you found the pull request of this run useful.",
 		})
@@ -144,7 +145,7 @@ export const runs = {
 			runId: z.string(),
 			when: z.enum(["now", "after-step", "cancel-after-step"]).optional(),
 		}),
-		{ run: ["stop"] },
+		permissionOf("stop"),
 	)
 		.route({ summary: "Stops a run now, or after its running step." })
 		.output(output(z.void()))
@@ -157,7 +158,7 @@ export const runs = {
 	 */
 	move: runProcedure(
 		z.object({ runId: z.string(), deviceId: z.string().min(1).max(64) }),
-		{ run: ["move"] },
+		permissionOf("move"),
 	)
 		.route({
 			summary: "Moves the walk of a run to another of the Person's Devices.",
@@ -172,7 +173,7 @@ export const runs = {
 	 */
 	releaseLease: runProcedure(
 		z.object({ runId: z.string(), name: z.string().min(1).max(500) }),
-		{ run: ["stop"] },
+		permissionOf("release-lease"),
 	)
 		.route({
 			summary: "Lets go of a lease a run holds, so another run can take it.",
@@ -217,7 +218,7 @@ export const runs = {
 		),
 	resume: runProcedure(
 		z.object({ runId: z.string(), prompt: z.string().min(1).optional() }),
-		{ run: ["resume"] },
+		permissionOf("resume"),
 	)
 		.route({
 			summary:
@@ -237,7 +238,7 @@ export const runs = {
 			stepId: z.string().min(1).optional(),
 			prompt: z.string().min(1).optional(),
 		}),
-		{ run: ["stop", "resume"] },
+		permissionOf("restart"),
 	)
 		.route({
 			summary: "Stops the running step of a run and starts it again at once.",
@@ -264,7 +265,7 @@ export const runs = {
 			prompt: z.string().min(1).optional(),
 			fresh: z.boolean().optional(),
 		}),
-		{ run: ["resume"] },
+		permissionOf("rerun"),
 	)
 		.route({ summary: "Runs a run again from one node of its own flow." })
 		.output(output(z.void()))
@@ -301,9 +302,10 @@ export const runs = {
 			}
 		}),
 	/** Sends a signal to a run whose Wait node waits for it. */
-	signal: runProcedure(z.object({ runId: z.string(), name: labelSchema }), {
-		signal: ["send"],
-	})
+	signal: runProcedure(
+		z.object({ runId: z.string(), name: labelSchema }),
+		permissionOf("signal"),
+	)
 		.route({ summary: "Sends a signal to a run whose Wait node waits for it." })
 		.output(output(z.void()))
 		.handler(({ context, input }) =>

@@ -5,6 +5,8 @@ import type {
 	NodeToPlace,
 	OwnDevice,
 	Placement,
+	RunActionRequest,
+	RunCommandInput,
 	StartRunInput,
 } from "../contract";
 import type { FlowUse, SpaceFlows } from "../flows";
@@ -21,7 +23,6 @@ import type {
 } from "../read";
 import type { ScheduleList, SchedulePause } from "../schedules";
 import type { KeptValue } from "../variables";
-import type { RunActionRequest } from "./actions";
 
 /** The engine as a person in one Space sees it: the API layer only calls this. */
 export interface SpaceEngine {
@@ -208,12 +209,14 @@ export interface SpaceEngine {
 	/**
 	 * What the person asks of a run (`run/actions.ts`): stop it, answer its
 	 * Gate, send its signal, move its Walk, resume it, restart its step or
-	 * walk it again from a node. Each action refuses what the run does not
-	 * allow now (`run-status/`, the rule the screens read too) with a
-	 * `RunRefusal`. On a run another Device walks, a stop, an answer, a
-	 * signal and a move travel to its Walker; the rest are refused.
+	 * walk it again from a node. In the person's words, or as the Command
+	 * that carried it to this Walker (`contract/command.ts`): the same
+	 * action. Each action refuses what the run does not allow now
+	 * (`run-status/`, the rule the screens read too) with a `RunRefusal`.
+	 * On a run another Device walks, a stop, an answer, a signal and a move
+	 * travel to its Walker; the rest are refused.
 	 */
-	act(runId: string, request: RunActionRequest): Promise<void>;
+	act(runId: string, action: RunActionRequest | RunCommandInput): Promise<void>;
 	/**
 	 * The actor's own Devices the run can move to now: online, and not its
 	 * Walker. From the run's own Space, whichever Space the person works in.

@@ -1,13 +1,11 @@
 import type { DeviceKeyPermission } from "@nightshift/auth";
 import {
-	type GateResolvePayload,
 	type OwnDevice,
+	runCommandSchema,
 	startRunInputSchema,
 	type TranscriptEntry,
 } from "@nightshift/engine";
 import {
-	answerFilesSchema,
-	labelSchema,
 	nameSchema,
 	permissionModeSchema,
 	secretNameSchema,
@@ -141,57 +139,8 @@ const runStartInput = startRunInputSchema.and(
 	z.object({ spaceId: z.string().min(1) }),
 );
 
-/** An answer to a Gate, as a Device sends it. Typed by its name, so the declared types stay small. */
-const gateResolveInput: z.ZodType<GateResolvePayload> = z.object({
-	stepId: z.string().min(1),
-	choice: z.string().min(1),
-	note: z.string().optional(),
-	/** The answer to an Ask (ADR 10): the data of its form. */
-	data: z.json().optional(),
-	files: answerFilesSchema.optional(),
-	via: z.enum(["web", "phone", "lock_screen", "_OTHER"]).optional(),
-});
-
-/** A person's action on a run another Device walks, as a Device sends it. */
-const runCommandInput = z.discriminatedUnion("kind", [
-	z.object({
-		runId: z.string().min(1),
-		kind: z.literal("gate.resolve"),
-		payload: gateResolveInput,
-	}),
-	z.object({
-		runId: z.string().min(1),
-		kind: z.literal("signal.send"),
-		payload: z.object({ name: labelSchema }),
-	}),
-	z.object({
-		runId: z.string().min(1),
-		kind: z.literal("run.stop"),
-		payload: z.object({
-			when: z.enum(["now", "after-step", "cancel-after-step"]).optional(),
-		}),
-	}),
-	z.object({
-		runId: z.string().min(1),
-		kind: z.literal("run.move"),
-		payload: z.object({ to: z.string().min(1).max(64) }),
-	}),
-	z.object({
-		runId: z.string().min(1),
-		kind: z.literal("run.resume"),
-		payload: z.object({ prompt: z.string().min(1).optional() }),
-	}),
-	z.object({
-		runId: z.string().min(1),
-		kind: z.literal("lease.release"),
-		payload: z.object({ name: z.string().min(1).max(500) }),
-	}),
-	z.object({
-		runId: z.string().min(1),
-		kind: z.literal("run.useful"),
-		payload: z.object({ useful: z.boolean() }),
-	}),
-]);
+/** A person's action on a run another Device walks, as a Device sends it: the Command, with its run. */
+const runCommandInput = runCommandSchema({ runId: z.string().min(1) });
 
 /** One of the Person's Devices, with whether it is online and has a Clone. */
 const ownDeviceSchema = exact<OwnDevice>()(

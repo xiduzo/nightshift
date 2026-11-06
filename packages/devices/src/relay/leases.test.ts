@@ -6,7 +6,6 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow, FlowEdge, FlowNode, LeaseNode } from "@nightshift/flows";
-import { applyRunCommand } from "../exchange/commands";
 import { type PairedReplicas, pairedReplicas } from "../testing";
 
 /**
@@ -163,9 +162,9 @@ describe("leases across Devices", () => {
 			.space(a.spaceId)
 			.startRun({ projectId, flow: holding });
 		await statusOn(paired.device, run.id, "sleeping");
-		await applyRunCommand(paired.device.space(a.spaceId), {
+		// As the Walker applies it: the Command as it came.
+		await paired.device.space(a.spaceId).act(run.id, {
 			kind: "lease.release",
-			runId: run.id,
 			payload: { name: "zac-docker-stack" },
 		});
 		await waitFor(async () => (await leasesOnA()).length === 0, {

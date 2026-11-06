@@ -4,6 +4,7 @@ import type { Database } from "@nightshift/db";
 import {
 	type Engine,
 	type PeerProjects,
+	permissionOf,
 	RUN_NOT_FOUND,
 	type SpaceArchive,
 	withoutPrivatePaths,
@@ -21,7 +22,6 @@ import type { HostSpaces } from "../links";
 import type { EngineOffers, OfferAdmission } from "../offers";
 import type { DeviceRegistry } from "../registry";
 import type { WorkHub } from "../work";
-import { applyRunCommand, COMMAND_PERMISSION } from "./commands";
 import { mergePersonalHere } from "./personal-merge";
 import {
 	ForeignRowsError,
@@ -296,15 +296,14 @@ export function createHostExchange(deps: {
 				throw new Refusal("not-found", RUN_NOT_FOUND);
 			}
 			const role = await roleIn(db, key.personId, owner.spaceId);
-			if (!role || !roleAllows(role, COMMAND_PERMISSION[input.kind])) {
+			if (!role || !roleAllows(role, permissionOf(input.kind))) {
 				forbidden(ROLE_REFUSAL.message);
 			}
 			if (owner.walkerId === deps.selfId) {
 				// This Host walks the run: the action is a local one.
-				await applyRunCommand(
-					engine.space(owner.spaceId, { personId: key.personId }),
-					input,
-				);
+				await engine
+					.space(owner.spaceId, { personId: key.personId })
+					.act(input.runId, input);
 				return;
 			}
 			if (owner.walkerId === key.deviceId) {

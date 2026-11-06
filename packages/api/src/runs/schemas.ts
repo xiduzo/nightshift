@@ -1,5 +1,6 @@
 import {
 	type Artifact,
+	COMMAND_KINDS,
 	type OwnDevice,
 	type Placement,
 	RUN_END_REASONS,
@@ -322,15 +323,7 @@ export const runDetailSchema = exact<RunDetail>()(
 		commands: z.array(
 			z.object({
 				id: z.string(),
-				kind: z.enum([
-					"gate.resolve",
-					"signal.send",
-					"run.stop",
-					"run.move",
-					"run.resume",
-					"lease.release",
-					"run.useful",
-				]),
+				kind: z.enum(COMMAND_KINDS),
 				createdAt: z.number(),
 			}),
 		),

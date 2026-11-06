@@ -1,5 +1,5 @@
-import type { AnswerFile, JsonValue } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import type { RunCommandInput } from "./command";
 import type { LeaseHost } from "./leases";
 import type { StartRunInput } from "./start-run";
 
@@ -94,36 +94,3 @@ export type Relay = {
 	 */
 	leases?: LeaseHost;
 };
-
-/** An answer to a Gate, on its way to the Walker. An interface, so the declared types stay small. */
-export interface GateResolvePayload {
-	stepId: string;
-	choice: string;
-	note?: string;
-	/** The answer to an Ask (ADR 10): the data of its form. */
-	data?: JsonValue;
-	/** The files the person added to the answer. */
-	files?: AnswerFile[];
-	/** Where the answer came from. */
-	via?: "web" | "phone" | "lock_screen" | "_OTHER";
-}
-
-/** A command as the engine asks for it: a person's action on a run another Device walks. */
-export type RunCommandInput =
-	| { kind: "gate.resolve"; payload: GateResolvePayload }
-	| { kind: "signal.send"; payload: { name: string } }
-	| {
-			kind: "run.stop";
-			payload: { when?: "now" | "after-step" | "cancel-after-step" };
-	  }
-	/** Another Device walks the run from here on. */
-	| { kind: "run.move"; payload: { to: string } }
-	/** The run continues at its last step, with an optional follow-up prompt. */
-	| { kind: "run.resume"; payload: { prompt?: string } }
-	/** A person lets go of a lease the run holds (ADR 7). */
-	| { kind: "lease.release"; payload: { name: string } }
-	/** Whether the person found the run's pull request useful. */
-	| { kind: "run.useful"; payload: { useful: boolean } };
-
-/** What a command does. */
-export type RunCommandKind = RunCommandInput["kind"];

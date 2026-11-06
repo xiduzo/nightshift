@@ -1,4 +1,4 @@
-import { answeredOf, inboxOf } from "@nightshift/engine";
+import { answeredOf, inboxOf, permissionOf } from "@nightshift/engine";
 import { now } from "@nightshift/time";
 import { z } from "zod";
 
@@ -33,7 +33,7 @@ export const gates = {
 		.handler(({ context }) =>
 			answeredOf(context, context.session.user.id, now()),
 		),
-	resolve: runProcedure(gateAnswerSchema, { gate: ["resolve"] })
+	resolve: runProcedure(gateAnswerSchema, permissionOf("answer"))
 		.errors(answerRefusals)
 		.route({
 			summary:

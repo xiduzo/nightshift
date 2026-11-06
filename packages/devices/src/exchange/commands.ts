@@ -1,37 +1,22 @@
 import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
 import { runCommand } from "@nightshift/db/schema";
-import type {
-	MoveRows,
-	RunCommandInput,
-	RunCommandKind,
-	SpaceEngine,
-} from "@nightshift/engine";
+import type { MoveRows, RunCommandInput } from "@nightshift/engine";
 import { asDate, instant } from "@nightshift/time";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { RunCommand } from "../contract";
 
 /**
- * Commands: a person's action on a run that another Device walks. The
- * Walker is the only writer of its run's events, so an answer to a Gate, a
- * signal, a stop or a resume travels to it as a command, and the Walker applies it
- * like a local action. The Host keeps a command (`run_command`) until the
- * Walker reports it applied, or why not; a command to a Walker that is
+ * The queue of Commands a Host keeps: a person's action on a run that
+ * another Device walks. The Walker is the only writer of its run's
+ * events, so an answer to a Gate, a signal, a stop or a resume travels to
+ * it as a Command, and the Walker applies it like a local action
+ * (`SpaceEngine.act`). The Host keeps a Command (`run_command`) until the
+ * Walker reports it applied, or why not; a Command to a Walker that is
  * offline waits, and shows as pending. The Walker's log says which
- * commands it applied (`RunHistoryExchange.apply`).
+ * Commands it applied (`RunHistoryExchange.apply`). The kinds, their
+ * permission and their wire shape are the engine's (`contract/command.ts`).
  */
-
-/** The permission each kind needs in the run's Space. */
-export const COMMAND_PERMISSION = {
-	"gate.resolve": { gate: ["resolve"] },
-	"signal.send": { signal: ["send"] },
-	"run.stop": { run: ["stop"] },
-	"run.move": { run: ["move"] },
-	"run.resume": { run: ["resume"] },
-	// Letting go of a lease cuts into the run, as a stop does.
-	"lease.release": { run: ["stop"] },
-	"run.useful": { run: ["stop"] },
-} as const satisfies Record<RunCommandKind, Record<string, string[]>>;
 
 /**
  * The Commands of the runs a Space move takes along (`MoveRows`, the
@@ -163,34 +148,4 @@ export function createRunCommands(deps: { db: Database }) {
 			return () => listeners.delete(listener);
 		},
 	};
-}
-
-/**
- * Applies a command like the person's own action, through the Space's
- * engine: on the Walker, that writes the run's events.
- */
-export async function applyRunCommand(
-	space: SpaceEngine,
-	command: RunCommandInput & { runId: string },
-): Promise<void> {
-	const { runId } = command;
-	switch (command.kind) {
-		case "gate.resolve":
-			return space.act(runId, { kind: "answer", ...command.payload });
-		case "signal.send":
-			return space.act(runId, { kind: "signal", ...command.payload });
-		case "run.stop":
-			return space.act(runId, { kind: "stop", ...command.payload });
-		case "run.move":
-			return space.act(runId, { kind: "move", ...command.payload });
-		case "run.resume":
-			return space.act(runId, { kind: "resume", ...command.payload });
-		case "lease.release":
-			return space.act(runId, { kind: "release-lease", ...command.payload });
-		case "run.useful":
-			return space.act(runId, {
-				kind: "useful",
-				useful: command.payload.useful,
-			});
-	}
 }

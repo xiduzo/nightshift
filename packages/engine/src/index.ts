@@ -25,7 +25,6 @@ export type {
 	Actor,
 	DeviceDirectory,
 	DeviceProfile,
-	GateResolvePayload,
 	LeaseAnswer,
 	LeaseHost,
 	LeaseTake,
@@ -34,13 +33,15 @@ export type {
 	Placement,
 	Relay,
 	RunCommandInput,
-	RunCommandKind,
 	StartRunInput,
 } from "./contract";
 export {
+	COMMAND_KINDS,
 	HOST_UNREACHABLE,
 	HostUnreachableError,
 	OlderHostError,
+	permissionOf,
+	runCommandSchema,
 	startRunInputSchema,
 } from "./contract";
 export {

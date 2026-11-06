@@ -1,9 +1,8 @@
-import type {
-	FeedStep,
-	GateResolvePayload,
-	RunCommandInput,
+import {
+	type FeedStep,
+	type RunCommandInput,
+	runCommandSchema,
 } from "@nightshift/engine";
-import { answerFilesSchema } from "@nightshift/flows";
 import { z } from "zod";
 import { exact } from "./described";
 import {
@@ -61,67 +60,17 @@ export type SyncBatch = {
 	follows: FollowWant[];
 };
 
-const commandFields = {
-	id: z.string(),
-	spaceId: z.string(),
-	runId: z.string(),
-	walkerId: z.string(),
-	/** Who asked, on the Host. */
-	personId: z.string(),
-	createdAt: z.number(),
-};
-
-/** An answer to a Gate, on its way to the Walker. Typed by its name, so the declared types stay small. */
-const gateResolvePayload: z.ZodType<GateResolvePayload> = z.object({
-	stepId: z.string(),
-	choice: z.string(),
-	note: z.string().optional(),
-	data: z.json().optional(),
-	files: answerFilesSchema.optional(),
-	via: z.enum(["web", "phone", "lock_screen", "_OTHER"]).optional(),
-});
-
-/** A person's action on a run another Device walks, on its way to that Walker. */
-const runCommandSchema = exact<RunCommand>()(
-	z.discriminatedUnion("kind", [
-		z.object({
-			kind: z.literal("gate.resolve"),
-			payload: gateResolvePayload,
-			...commandFields,
-		}),
-		z.object({
-			kind: z.literal("signal.send"),
-			payload: z.object({ name: z.string() }),
-			...commandFields,
-		}),
-		z.object({
-			kind: z.literal("run.stop"),
-			payload: z.object({
-				when: z.enum(["now", "after-step", "cancel-after-step"]).optional(),
-			}),
-			...commandFields,
-		}),
-		z.object({
-			kind: z.literal("run.move"),
-			payload: z.object({ to: z.string() }),
-			...commandFields,
-		}),
-		z.object({
-			kind: z.literal("run.resume"),
-			payload: z.object({ prompt: z.string().optional() }),
-			...commandFields,
-		}),
-		z.object({
-			kind: z.literal("lease.release"),
-			payload: z.object({ name: z.string() }),
-			...commandFields,
-		}),
-		z.object({
-			kind: z.literal("run.useful"),
-			payload: z.object({ useful: z.boolean() }),
-			...commandFields,
-		}),
-	]),
+/** A person's action on a run another Device walks, on its way to that Walker: the Command, with its row. */
+const keptCommandSchema = exact<RunCommand>()(
+	runCommandSchema({
+		id: z.string(),
+		spaceId: z.string(),
+		runId: z.string(),
+		walkerId: z.string(),
+		/** Who asked, on the Host. */
+		personId: z.string(),
+		createdAt: z.number(),
+	}),
 );
 
 /**
@@ -133,7 +82,7 @@ export type CommandBatch = { commands: RunCommand[] };
 
 /** The Commands that wait for a Device, as the Host describes them (`CommandBatch`). */
 export const commandBatchSchema = exact<CommandBatch>()(
-	z.object({ commands: z.array(runCommandSchema) }),
+	z.object({ commands: z.array(keptCommandSchema) }),
 );
 
 /** One answer of the exchange, as the Host describes it (`SyncBatch`). */
@@ -141,7 +90,7 @@ export const syncBatchSchema = exact<SyncBatch>()(
 	z.object({
 		rows: runRowsSchema,
 		cursors: syncCursorsSchema,
-		commands: z.array(runCommandSchema),
+		commands: z.array(keptCommandSchema),
 		follows: z.array(followWantSchema),
 	}),
 );

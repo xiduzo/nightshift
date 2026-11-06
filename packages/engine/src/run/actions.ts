@@ -8,7 +8,14 @@ import {
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { ArtifactStore } from "../artifacts";
-import type { Actor, OwnDevice } from "../contract";
+import {
+	type Actor,
+	commandOf,
+	type OwnDevice,
+	type RunActionRequest,
+	type RunCommandInput,
+	requestOf,
+} from "../contract";
 import {
 	askAnswerProblem,
 	type Runner,
@@ -17,7 +24,6 @@ import {
 } from "../graph";
 import {
 	applyWalkerMoves,
-	type GateVia,
 	placedRun,
 	RUN_NOT_FOUND,
 	type RunBus,
@@ -40,8 +46,10 @@ import type { StartHolds } from "./start-holds";
 /**
  * What a person does to a run: stop it, answer its Gate, send its Signal,
  * move it, resume it, restart its step, or run it again from a node. One
- * entry, `act`. It reads the run's row once (its Space and its Walker),
- * then either hands the action to the run's Walker as a Command
+ * entry, `act`, that takes the action in the person's words or as the
+ * Command that carried it to this Walker (`contract/command.ts`, the one
+ * home of the kinds). It reads the run's row once (its Space and its
+ * Walker), then either hands the action to the run's Walker as a Command
  * (`relay.ts`) or takes it here as a Turn of the runner (`runner.take`,
  * or `runner.hold` for an action that drives nothing).
  *
@@ -54,89 +62,6 @@ import type { StartHolds } from "./start-holds";
  * is the only writer of its run's events. A stop, an answer, a Signal and
  * a move and a resume travel to it. Only the Walker restarts or reruns.
  */
-
-/** One action a person asks of a run (`SpaceEngine.act`). */
-export type RunActionRequest =
-	/**
-	 * `now` (default): aborts the running step, closes an open Gate or ends
-	 * a sleep, and ends the run as `stopped`. `after-step`: lets the running
-	 * step finish, then ends the run as `stopped` before the next step.
-	 * `cancel-after-step`: withdraws an `after-step` stop. No-op when
-	 * nothing runs, waits or sleeps.
-	 */
-	| { kind: "stop"; when?: "now" | "after-step" | "cancel-after-step" }
-	/**
-	 * Answers an open Gate with one of its choices and continues the walk
-	 * on that outcome. Fails when the step is not an open Gate or the
-	 * choice is not one of its choices. An Ask (ADR 10) takes `data`, the
-	 * data of its form: it fails when the data does not match the form.
-	 * `files` go with the answer: the Walker keeps them with the run's
-	 * artifacts, and each agent session of the run after it gets them.
-	 */
-	| {
-			kind: "answer";
-			stepId: string;
-			choice: string;
-			note?: string;
-			data?: JsonValue;
-			files?: AnswerFile[];
-			/** Where the answer came from. Absent stores `_OTHER`. */
-			via?: GateVia;
-	  }
-	/**
-	 * Records whether you found the pull request of this run useful.
-	 * One tap. A later tap replaces it.
-	 */
-	| { kind: "useful"; useful: boolean }
-	/**
-	 * A signal to a run whose Wait node waits for it: the step ends `done`
-	 * and the walk goes on. Fails when the run does not wait for a signal
-	 * of that name.
-	 */
-	| { kind: "signal"; name: string }
-	/**
-	 * Moves the run's Walk to another of the actor's Devices
-	 * (`WalkerMoved`): this computer archives the run's checkpoint and
-	 * files and stops walking it; the new Walker resumes from the archive.
-	 * Only a run that is not in the middle of a step.
-	 */
-	| { kind: "move"; to: string }
-	/**
-	 * Lets go of the lease `name` that the run holds (ADR 7): the next run
-	 * that waits for it takes it. The run goes on, and does not take it
-	 * again. Fails when the run does not hold it.
-	 */
-	| { kind: "release-lease"; name: string }
-	/**
-	 * Continues a stopped, failed or interrupted run at its last step's
-	 * node (inside a Call with `each`, at the same item). A finished run
-	 * reopens its last step. A sleeping run wakes at once. An Agent node
-	 * with a harness session continues that session with the prompt
-	 * (default "Continue where you left off."). Any other node runs again.
-	 * Edge counts carry over. Fails while the run is running.
-	 */
-	| { kind: "resume"; prompt?: string }
-	/**
-	 * Stops the running step and continues it at once, as a stop now and a
-	 * resume would, with nothing in between. Only while a step runs; with
-	 * `stepId`, only while that step runs.
-	 */
-	| { kind: "restart"; stepId?: string; prompt?: string }
-	/**
-	 * Walks a run that is not going (failed, stopped, interrupted or
-	 * finished) again from `nodeId`, a node of the run's own flow, with a
-	 * new visit of it; the steps after it follow as the flow routes.
-	 * Inputs, outputs and edge counts carry over. An Agent node continues
-	 * the session of its step `stepId` (default: its latest) with the
-	 * prompt, or with `fresh` starts a new session with its own prompt.
-	 */
-	| {
-			kind: "rerun";
-			nodeId: string;
-			stepId?: string;
-			prompt?: string;
-			fresh?: boolean;
-	  };
 
 export type RunActionsDeps = {
 	/** Lets go of a run's leases (`LeaseKeeper.release`). */
@@ -301,10 +226,7 @@ export function createRunActions(deps: RunActionsDeps) {
 			case "stop":
 				// A run that has ended has nothing to stop.
 				if (whyNot("stop", status, false) !== null) return;
-				return relay.send(row, actor, {
-					kind: "run.stop",
-					payload: request.when ? { when: request.when } : {},
-				});
+				break;
 			case "answer": {
 				refuseAnswer(runState, request);
 				const pending =
@@ -314,37 +236,17 @@ export function createRunActions(deps: RunActionsDeps) {
 						"An answer to this Gate is already on its way to the device that runs it.",
 					);
 				}
-				const { stepId, choice, note, data, files, via } = request;
-				return relay.send(row, actor, {
-					kind: "gate.resolve",
-					payload: {
-						stepId,
-						choice,
-						...(note ? { note } : {}),
-						...(data !== undefined ? { data } : {}),
-						...(files && files.length > 0 ? { files } : {}),
-						...(via ? { via } : {}),
-					},
-				});
+				break;
 			}
 			case "useful":
-				return relay.send(row, actor, {
-					kind: "run.useful",
-					payload: { useful: request.useful },
-				});
+				break;
 			case "signal":
 				refuseSignal(runState, request.name);
-				return relay.send(row, actor, {
-					kind: "signal.send",
-					payload: { name: request.name },
-				});
+				break;
 			case "move":
 				if (!actor) throw signedOut();
 				refuseUnless("move", status, false, result);
-				return relay.send(row, actor, {
-					kind: "run.move",
-					payload: { to: request.to },
-				});
+				break;
 			case "resume": {
 				refuseUnless("resume", status, false, result);
 				const pending =
@@ -355,20 +257,17 @@ export function createRunActions(deps: RunActionsDeps) {
 						"A resume of this run is already on its way to the device that runs it.",
 					);
 				}
-				return relay.send(row, actor, {
-					kind: "run.resume",
-					payload: request.prompt ? { prompt: request.prompt } : {},
-				});
+				break;
 			}
 			case "release-lease":
 				refuseRelease(runState, request.name);
-				return relay.send(row, actor, {
-					kind: "lease.release",
-					payload: { name: request.name },
-				});
+				break;
 			default:
 				refuseUnless(request.kind, status, false, result);
 		}
+		// The checks above let it travel: the request, as the wire carries it.
+		const command = commandOf(request);
+		if (command) return relay.send(row, actor, command);
 	}
 
 	/**
@@ -584,17 +483,19 @@ export function createRunActions(deps: RunActionsDeps) {
 
 	return {
 		/**
-		 * Does what `request` asks of the run, as `actor`, in the Space: here
-		 * as a Turn of the runner, or on another Walker as a Command. Throws
-		 * a `RunRefusal` when the run does not allow it, and "not found" for
-		 * a run of another Space.
+		 * Does what `action` asks of the run, as `actor`, in the Space: here
+		 * as a Turn of the runner, or on another Walker as a Command. The
+		 * action comes in the person's words, or as the Command that carried
+		 * it here. Throws a `RunRefusal` when the run does not allow it, and
+		 * "not found" for a run of another Space.
 		 */
 		async act(
 			spaceId: string,
 			actor: Actor | undefined,
 			runId: string,
-			request: RunActionRequest,
+			action: RunActionRequest | RunCommandInput,
 		): Promise<void> {
+			const request = requestOf(action);
 			const row = await rowIn(spaceId, runId);
 			if (row.walkerId !== (await log.walkerId())) {
 				return onWalker(row, actor, request);
