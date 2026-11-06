@@ -12,6 +12,11 @@ import {
 	PortTakenError,
 	startDaemon,
 } from "../features/daemon";
+import {
+	type DownloadState,
+	downloadScript,
+	externalUrl,
+} from "../features/external";
 import { electrobunNotifier, trackWindow } from "../features/notifications";
 import { startUpdates } from "../features/updates";
 
@@ -226,6 +231,23 @@ tray.on("tray-clicked", (event) => {
 ApplicationMenu.on("application-menu-clicked", (event) => {
 	onAction((event as { data: { action: string } }).data.action);
 });
+// A link to a new window opens in the person's browser.
+Electrobun.events.on("new-window-open", (event: unknown) => {
+	const opened = externalUrl(
+		(event as { data?: { detail?: unknown } }).data?.detail,
+	);
+	if (opened) Utils.openExternal(opened);
+});
+// A download goes to the Downloads folder. The page says so.
+for (const state of ["started", "completed", "failed"] as DownloadState[]) {
+	Electrobun.events.on(`download-${state}`, (event: unknown) => {
+		const script = downloadScript(
+			state,
+			(event as { data?: { detail?: unknown } }).data?.detail,
+		);
+		if (script) mainWindow?.webview.executeJavascript(script);
+	});
+}
 // A click on the Dock icon opens the window again.
 Electrobun.events.on("reopen", () => showWindow());
 

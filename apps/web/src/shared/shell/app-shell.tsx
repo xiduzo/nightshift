@@ -13,6 +13,7 @@ import { UsageNotice } from "@/features/settings";
 import { SpaceTabs } from "@/features/spaces";
 
 import { AppSidebar } from "./app-sidebar";
+import { DesktopDownloads } from "./desktop-downloads";
 import { TabBadge } from "./use-tab-badge";
 
 /**
@@ -47,6 +48,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 			{outsideApp || !appMayShow ? null : (
 				<>
 					<NotificationStream />
+					<DesktopDownloads />
 					<SpaceTabs />
 					<TabBadge />
 					<UsageNotice />
