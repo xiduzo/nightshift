@@ -2,6 +2,8 @@
 
 - [Get started](Get-started.md)
 - [Flows and nodes](Flows-and-nodes.md)
+- [Community flows](Community-flows.md)
+- [Ideas](Ideas.md)
 - [Agents and profiles](Agents-and-profiles.md)
 - [Runs and schedules](Runs-and-schedules.md)
 - [Gates and the inbox](Gates-and-the-inbox.md)

@@ -1,0 +1,203 @@
+{
+	"version": 8,
+	"description": "An agent updates the components of the project to match one Figma frame, and your check proves the change. You keep the change or drop it.",
+	"inputs": [
+		{
+			"name": "frame",
+			"type": "text",
+			"label": "Figma frame",
+			"description": "A link to the frame, or its node id, for example 12:34.",
+			"required": true
+		},
+		{
+			"name": "check",
+			"type": "text",
+			"label": "Check",
+			"description": "The shell command that proves the change, for example the tests.",
+			"required": true
+		}
+	],
+	"outputs": [
+		{
+			"name": "summary",
+			"value": "{{update.summary}}",
+			"description": "What the agent reports it changed."
+		}
+	],
+	"start": "node_id",
+	"nodes": [
+		{
+			"id": "node_id",
+			"label": "Find the frame",
+			"position": {
+				"x": 0,
+				"y": 0
+			},
+			"type": "value",
+			"by": "rule",
+			"expression": "(\n  $link := $match(frame, /node-id=([0-9]+)(?:-|:|%3A)([0-9]+)/i)[0];\n  $bare := $match($trim(frame), /^([0-9]+)[-:]([0-9]+)$/)[0];\n  $found := $exists($link) ? $link : $bare;\n  { \"id\": $exists($found) ? $found.groups[0] & \":\" & $found.groups[1] : \"\" }\n)",
+			"output": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "string",
+						"pattern": "^[0-9]+:[0-9]+$"
+					}
+				},
+				"required": ["id"]
+			}
+		},
+		{
+			"id": "bad_frame",
+			"label": "Not a frame",
+			"position": {
+				"x": 320,
+				"y": 200
+			},
+			"type": "end",
+			"status": "failed",
+			"message": "Give a link to a Figma frame, or a node id such as 12:34."
+		},
+		{
+			"id": "design",
+			"label": "Read the frame",
+			"position": {
+				"x": 320,
+				"y": 0
+			},
+			"type": "tool",
+			"connection": "figma",
+			"tool": "get_design_context",
+			"arguments": {
+				"nodeId": "{{node_id.data.id}}"
+			},
+			"timeoutMinutes": 5
+		},
+		{
+			"id": "update",
+			"label": "Update the components",
+			"position": {
+				"x": 640,
+				"y": 0
+			},
+			"type": "agent",
+			"prompt": "Make the components of this project match a Figma frame. Figma gave this design context for the frame {{node_id.data.id}}:\n\n{{design.text}}\n\nThe code in it is a reference, not code to paste. Find the components of the project that the frame shows, and update their layout, spacing, colors, type and text. Use the project's own components, design tokens and styles. Add a component only when the project has none for a part of the frame. Do not change what the frame does not show.\n\nWhen you are done, `{{check}}` must pass. Run it yourself before you report. When you cannot make it pass, report `fail`. Do not commit: a person looks at the change first. In your summary, name each component you changed and what changed. Nobody is awake: do not ask a question, decide.",
+			"permissionMode": "auto",
+			"effort": "high",
+			"session": "fresh",
+			"timeoutMinutes": 60,
+			"idleMinutes": 20,
+			"cascade": [
+				{
+					"label": "sonnet",
+					"harness": "claude-code",
+					"model": "sonnet",
+					"tries": 2
+				},
+				{
+					"label": "opus",
+					"harness": "claude-code",
+					"model": "opus"
+				}
+			]
+		},
+		{
+			"id": "prove",
+			"label": "Run the check",
+			"position": {
+				"x": 960,
+				"y": 0
+			},
+			"type": "command",
+			"command": "sh -c \"{{check}}\"",
+			"timeoutMinutes": 30
+		},
+		{
+			"id": "confirm",
+			"label": "Keep the change?",
+			"position": {
+				"x": 1280,
+				"y": 0
+			},
+			"type": "decision",
+			"prompt": "The agent changed the components to match the frame {{node_id.data.id}}:\n\n{{update.summary}}\n\nThe check `{{check}}` passed. Keep the change?",
+			"options": [
+				{
+					"name": "keep",
+					"description": "Commit the change."
+				},
+				{
+					"name": "drop",
+					"description": "Commit nothing."
+				}
+			],
+			"by": "person"
+		},
+		{
+			"id": "commit",
+			"label": "Commit",
+			"position": {
+				"x": 1600,
+				"y": 0
+			},
+			"type": "command",
+			"command": "set -e\ngit add -A\nif git diff --cached --quiet; then\n\techo 'Nothing changed.'\n\texit 0\nfi\ngit commit -m \"figma-to-code: frame {{node_id.data.id}}\" -m \"{{frame}}\" -m \"{{update.summary}}\"",
+			"timeoutMinutes": 5
+		},
+		{
+			"id": "dropped",
+			"label": "Dropped",
+			"position": {
+				"x": 1600,
+				"y": 200
+			},
+			"type": "end",
+			"status": "done",
+			"message": "You dropped the change. Nothing is committed."
+		}
+	],
+	"edges": [
+		{
+			"id": "node_id-pass-design",
+			"from": "node_id",
+			"outcome": "pass",
+			"to": "design"
+		},
+		{
+			"id": "node_id-fail-bad_frame",
+			"from": "node_id",
+			"outcome": "fail",
+			"to": "bad_frame"
+		},
+		{
+			"id": "design-pass-update",
+			"from": "design",
+			"outcome": "pass",
+			"to": "update"
+		},
+		{
+			"id": "update-pass-prove",
+			"from": "update",
+			"outcome": "pass",
+			"to": "prove"
+		},
+		{
+			"id": "prove-pass-confirm",
+			"from": "prove",
+			"outcome": "pass",
+			"to": "confirm"
+		},
+		{
+			"id": "confirm-keep-commit",
+			"from": "confirm",
+			"outcome": "keep",
+			"to": "commit"
+		},
+		{
+			"id": "confirm-drop-dropped",
+			"from": "confirm",
+			"outcome": "drop",
+			"to": "dropped"
+		}
+	]
+}

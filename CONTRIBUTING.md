@@ -46,6 +46,10 @@ Durable docs use plain, short sentences in the active voice (ASD-STE100 style).
 
 The user guide is the [GitHub wiki](https://github.com/xiduzo/nightshift/wiki). Change it in [docs/wiki/](docs/wiki/), never on the wiki itself: a workflow publishes `docs/wiki/` when it lands on `main`. Some tables in the docs come from the code. After you change a node type, a kit, a starter, an agent, a CLI command, or an MCP tool, run `bun run docs:reference`.
 
+## Share a flow
+
+A flow that does its work for you can help other people. Add it to [community/](community/) in a pull request. [community/README.md](community/README.md) gives the steps and the rules. The flow is self-contained, holds no client content, and names a secret only as `${NAME}`.
+
 ## Pull requests
 
 - Keep one change per pull request. When work builds in layers, open a stack of small pull requests with [`gh stack`](https://github.com/github/gh-stack).

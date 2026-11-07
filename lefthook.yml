@@ -50,6 +50,7 @@ pre-commit:
     - name: docs reference
       glob:
         - "*.md"
+        - "community/**"
         - "packages/flows/src/kits/**"
         - "packages/flows/src/starters/**"
         - "packages/flows/src/harnesses/**"

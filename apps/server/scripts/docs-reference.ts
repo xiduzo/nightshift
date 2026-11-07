@@ -21,25 +21,50 @@
  *     ...
  *     <!-- /checked:nodes -->
  *
+ * A generator gets the path of the file it fills: the `needs` block of
+ * `community/<name>/README.md` reads the `flow.json` next to it.
+ *
+ * It also checks each flow of `community/`: the flow must load as an import
+ * loads it and pass the check of a save, with no user path and no Keychain.
+ *
  * CI runs it with --check (.github/workflows/ci.yml). The wiki workflow
  * publishes docs/wiki/ (.github/workflows/wiki.yml).
  */
 
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { type TerminalPort, terminalTools } from "@nightshift/agents";
 import {
+	type AgentNode,
+	calledFlowNames,
+	cascadeOf,
+	type DeciderName,
+	decisionDecider,
+	FLOW_VERSION,
+	type Flow,
+	type FlowNode,
+	flowSchema,
 	HARNESS_CATALOG,
+	isCustomHarness,
+	isKitName,
 	isKnowledgeKit,
 	kitList,
+	migrateFlow,
 	NODE_TYPE_LABEL,
+	type ProjectFlowMap,
+	proposalIssues,
 	starterList,
+	tierNode,
+	valueDecider,
 } from "@nightshift/flows";
 
 const ROOT = join(import.meta.dir, "../../..");
 const CLI = join(ROOT, "apps/server/src/cli.ts");
 const COMMAND = "bun run docs:reference";
+const COMMUNITY = join(ROOT, "community");
+const COMMUNITY_URL =
+	"https://github.com/xiduzo/nightshift/tree/main/community";
 
 /** Escapes a value for one cell of a markdown table. */
 export function cell(value: string): string {
@@ -126,14 +151,262 @@ function mcpToolNames(): string[] {
 	return terminalTools({} as TerminalPort).map((tool) => tool.name);
 }
 
-/** What each generated block holds, by its name. */
-export const GENERATED: Record<string, () => string> = {
+/** One kind of thing a flow needs, and the names of what it needs of that kind. */
+export type Need = { kind: string; names: string[] };
+
+/** Every node of a flow as it runs: a node with a cascade once per tier. */
+function runningNodes(flow: Flow): FlowNode[] {
+	return flow.nodes.flatMap((node) => {
+		const tiers = (cascadeOf(node) ?? [])
+			.map((_, index) => tierNode(node, index))
+			.filter((tier): tier is FlowNode => tier !== null);
+		return tiers.length > 0 ? tiers : [node];
+	});
+}
+
+function agentOf(node: AgentNode): string {
+	if (node.harness === undefined) return "an Agent Profile";
+	const harness = isCustomHarness(node.harness)
+		? `\`${node.harness}\``
+		: HARNESS_CATALOG[node.harness].label;
+	return node.model ? `${harness} · \`${node.model}\`` : harness;
+}
+
+function modelOf(node: {
+	profile?: unknown;
+	model?: string;
+	decider: DeciderName;
+}): string {
+	if (node.profile !== undefined) return "a Model Profile";
+	return node.model
+		? `\`${node.decider}\` · \`${node.model}\``
+		: `\`${node.decider}\``;
+}
+
+const code = (names: Iterable<string>) =>
+	[...names].map((name) => `\`${name}\``);
+
+/**
+ * What a flow needs on the computer that runs it: its agents and models,
+ * CLI tools, secrets, connections (MCP servers), kits, the flows it calls,
+ * and skills. Only the kinds it needs, each name once.
+ */
+export function flowNeeds(flow: Flow): Need[] {
+	const agents = new Set<string>();
+	const models = new Set<string>();
+	const clis = new Set<string>();
+	const secrets = new Set<string>();
+	const connections = new Set<string>();
+	const kits = new Set<string>();
+	const flows = new Set<string>();
+	const skills = new Set<string>();
+	for (const node of runningNodes(flow)) {
+		switch (node.type) {
+			case "agent":
+				agents.add(agentOf(node));
+				for (const cli of node.clis ?? []) clis.add(cli);
+				for (const name of node.connections ?? []) connections.add(name);
+				if (node.skill !== undefined) skills.add(node.skill);
+				break;
+			case "decision":
+				if (node.by === "model")
+					models.add(modelOf({ ...node, decider: decisionDecider(node) }));
+				break;
+			case "value":
+				if (node.by === "model")
+					models.add(modelOf({ ...node, decider: valueDecider(node) }));
+				break;
+			case "command":
+			case "service":
+				for (const name of node.secrets ?? []) secrets.add(name);
+				break;
+			case "tool":
+				connections.add(node.connection);
+				break;
+			case "call":
+				for (const name of calledFlowNames(node))
+					(isKitName(name) ? kits : flows).add(name);
+				break;
+		}
+	}
+	const needs: Need[] = [
+		{ kind: "Agents", names: [...agents] },
+		{ kind: "Models", names: [...models] },
+		{ kind: "CLI tools", names: code(clis) },
+		{ kind: "Secrets", names: [...secrets].map((name) => `\`\${${name}}\``) },
+		{ kind: "Connections (MCP servers)", names: code(connections) },
+		{ kind: "Kits", names: code(kits) },
+		{ kind: "Flows it calls", names: code(flows) },
+		{ kind: "Skills", names: code(skills) },
+	];
+	return needs.filter((need) => need.names.length > 0);
+}
+
+/** The `needs` block: one line per kind. */
+export function needsList(needs: readonly Need[]): string {
+	if (needs.length === 0) return "- Night Shift only.";
+	return needs
+		.map((need) => `- ${need.kind}: ${need.names.join(", ")}`)
+		.join("\n");
+}
+
+/** One flow of `community/`: the flow, or null when it does not load, and its problems. */
+export type CommunityFlow = {
+	name: string;
+	flow: Flow | null;
+	problems: string[];
+};
+
+/**
+ * Text that ties a flow to one computer: a user's own folder or the macOS
+ * Keychain. A shared flow names a secret instead.
+ */
+const BREACHES: readonly { pattern: RegExp; message: string }[] = [
+	{
+		pattern: /\/Users\/|\/home\//,
+		message:
+			"It names a folder of one user (/Users/ or /home/). Use a path in the project.",
+	},
+	{
+		pattern: /~\//,
+		message: "It names a home folder (~/). Use a path in the project.",
+	},
+	{
+		pattern: /keychain|find-(?:generic|internet)-password/i,
+		message:
+			"It reads the Keychain. Name a secret in the secrets of the Command node instead.",
+	},
+];
+
+function errorText(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
+/** A flow file's JSON at the current format, or null when it does not parse. */
+function currentFlow(json: unknown): Flow | null {
+	const parsed = flowSchema.safeParse(migrateFlow(json));
+	return parsed.success ? parsed.data : null;
+}
+
+/**
+ * One flow of `community/` from the text of its `flow.json`. It loads as an
+ * import loads a file (JSON, then `migrateFlow`) and must pass the check a
+ * save makes (`proposalIssues`, which `check_flow` calls). `flows` are the
+ * flows it may call, by name.
+ */
+export function loadCommunityFlow(
+	name: string,
+	text: string,
+	flows: ProjectFlowMap = {},
+): CommunityFlow {
+	const problems = BREACHES.filter(({ pattern }) => pattern.test(text)).map(
+		({ message }) => message,
+	);
+	let json: unknown;
+	try {
+		json = JSON.parse(text);
+	} catch (error) {
+		problems.push(`It is not valid JSON: ${errorText(error)}`);
+		return { name, flow: null, problems };
+	}
+	const migrated = migrateFlow(json);
+	const version = (migrated as { version?: unknown } | null)?.version;
+	if (typeof version === "number" && version > FLOW_VERSION) {
+		problems.push(
+			`Its format is ${version}, and Night Shift reads up to format ${FLOW_VERSION}.`,
+		);
+		return { name, flow: null, problems };
+	}
+	// No profiles or connections to check against, so the base is never
+	// read: the flow stands in for it, as `check_flow` does for a new flow.
+	const errors = proposalIssues(migrated as Flow, migrated, { flows, name })
+		.filter((issue) => issue.severity === "error")
+		.map((issue) => issue.message);
+	problems.push(...errors);
+	const flow = errors.length === 0 ? currentFlow(json) : null;
+	return { name, flow, problems };
+}
+
+/** The folders of `dir` that hold a `flow.json`, by name. */
+function communityNames(dir: string): string[] {
+	if (!existsSync(dir)) return [];
+	return readdirSync(dir, { withFileTypes: true })
+		.filter(
+			(entry) =>
+				entry.isDirectory() && existsSync(join(dir, entry.name, "flow.json")),
+		)
+		.map((entry) => entry.name)
+		.sort();
+}
+
+/**
+ * Every flow of `community/`, checked. A flow may call a starter or another
+ * community flow, as a project that imported them would have it.
+ */
+export function communityFlows(dir: string = COMMUNITY): CommunityFlow[] {
+	const files = communityNames(dir).map((name) => ({
+		name,
+		text: readFileSync(join(dir, name, "flow.json"), "utf8"),
+	}));
+	const callable: Record<string, Flow | null> = {};
+	for (const starter of starterList())
+		callable[starter.name] = currentFlow(starter.source);
+	for (const { name, text } of files) {
+		try {
+			callable[name] = currentFlow(JSON.parse(text));
+		} catch {
+			callable[name] = null;
+		}
+	}
+	return files.map(({ name, text }) => loadCommunityFlow(name, text, callable));
+}
+
+/** The `needs` block of `community/<name>/README.md`, from the `flow.json` next to it. */
+function needsOf(file: string): string {
+	const dir = dirname(file);
+	const path = join(dir, "flow.json");
+	if (!existsSync(path)) throw new Error("needs a flow.json next to it.");
+	const { flow } = loadCommunityFlow(basename(dir), readFileSync(path, "utf8"));
+	// The check of the community flows names why: `main` prints it.
+	if (flow === null) throw new Error("reads a flow.json that does not load.");
+	return needsList(flowNeeds(flow));
+}
+
+/** The community flows for the wiki: each links to its folder. */
+export function communityTable(flows: readonly CommunityFlow[]): string {
+	const rows = flows.flatMap(({ name, flow }) => {
+		if (flow === null) return [];
+		const needs = flowNeeds(flow);
+		return [
+			[
+				`[\`${name}\`](${COMMUNITY_URL}/${name})`,
+				cell(flow.description ?? ""),
+				needs.length === 0
+					? "Night Shift only."
+					: cell(
+							needs
+								.map((need) => `${need.kind}: ${need.names.join(", ")}.`)
+								.join(" "),
+						),
+			],
+		];
+	});
+	return table(["Flow", "Does", "Needs"], rows);
+}
+
+/**
+ * What each generated block holds, by its name. A generator gets the path
+ * of the file it fills.
+ */
+export const GENERATED: Record<string, (file: string) => string> = {
 	kits: () => kitsTable(false),
 	"knowledge-kits": () => kitsTable(true),
 	starters: startersTable,
 	harnesses: harnessesTable,
 	cli: () => cliHelp(["help"]),
 	"cli-flows": () => cliHelp(["flows", "--help"]),
+	needs: needsOf,
+	community: () => communityTable(communityFlows()),
 };
 
 /** What each checked table must name, by its name. */
@@ -141,6 +414,7 @@ export const CHECKED: Record<string, () => string[]> = {
 	nodes: () => Object.values(NODE_TYPE_LABEL),
 	starters: () => starterList().map((starter) => starter.name),
 	"mcp-tools": mcpToolNames,
+	community: () => communityNames(COMMUNITY),
 };
 
 /** A block: its kind, name and note, and the body between its markers (may be empty). */
@@ -151,12 +425,16 @@ export type Problem = { block: string; message: string };
 
 /**
  * Writes every generated block of `text` and checks every checked table.
- * Pure but for the sources: it takes them as arguments.
+ * Pure but for the sources: it takes them as arguments. `file` is the path
+ * of the file that holds `text`, for a generator that reads next to it. A
+ * generator that throws leaves its block as it is, and its message is a
+ * problem.
  */
 export function fill(
 	text: string,
-	generated: Record<string, () => string>,
+	generated: Record<string, (file: string) => string>,
 	checked: Record<string, () => string[]>,
+	file = "",
 ): { text: string; problems: Problem[] } {
 	const problems: Problem[] = [];
 	const filled = text.replace(
@@ -178,7 +456,14 @@ export function fill(
 					});
 					return whole;
 				}
-				return `<!-- ${block}${note} -->\n${render()}\n<!-- /${block} -->`;
+				let body: string;
+				try {
+					body = render(file);
+				} catch (error) {
+					problems.push({ block, message: errorText(error) });
+					return whole;
+				}
+				return `<!-- ${block}${note} -->\n${body}\n<!-- /${block} -->`;
 			}
 			const expected = checked[name];
 			if (!expected) {
@@ -249,7 +534,7 @@ function main(): void {
 			!before.includes("<!-- checked:")
 		)
 			continue;
-		const { text, problems } = fill(before, GENERATED, CHECKED);
+		const { text, problems } = fill(before, GENERATED, CHECKED, path);
 		for (const problem of problems) {
 			failed = true;
 			lines.push(`${file}: ${problem.block} ${problem.message}`);
@@ -261,6 +546,12 @@ function main(): void {
 		} else {
 			writeFileSync(path, text);
 			lines.push(`${file}: written.`);
+		}
+	}
+	for (const { name, problems } of communityFlows()) {
+		for (const problem of problems) {
+			failed = true;
+			lines.push(`community/${name}/flow.json: ${problem}`);
 		}
 	}
 	for (const line of lines) console.log(line);
