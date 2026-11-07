@@ -6,8 +6,8 @@
 			"name": "glob",
 			"type": "text",
 			"label": "Files",
-			"description": "A glob, relative to the project folder, for example `src/**/*.ts`.",
-			"default": "src/**/*.ts"
+			"description": "A glob, relative to the project folder, for example src/**/*.ts or docs/**/*.md.",
+			"required": true
 		},
 		{
 			"name": "instruction",

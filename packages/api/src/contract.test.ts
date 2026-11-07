@@ -14,7 +14,7 @@ import {
 	waitFor,
 	withDevice,
 } from "@nightshift/engine/testing";
-import { type Flow, singleAgentFlow } from "@nightshift/flows";
+import { type Flow, singleAgentFlow, starterList } from "@nightshift/flows";
 import {
 	createInAppChannel,
 	createNotifications,
@@ -561,7 +561,7 @@ describe("replies of a real engine", () => {
 		expect(mismatches).toEqual([]);
 	});
 
-	test("a project added with the starters has them as its flows", async () => {
+	test("a project added with the starters has them and their helpers as its flows", async () => {
 		const repoPath = join(sandbox.root, "with-starters");
 		await mkdir(repoPath, { recursive: true });
 		for (const args of [
@@ -589,8 +589,12 @@ describe("replies of a real engine", () => {
 		const flows = (await read(appRouter.flows.list, {
 			projectId: project.id,
 		})) as { name: string }[];
-		expect(flows.map((flow) => flow.name)).toContain("implement-and-check");
-		expect(flows).toHaveLength(7);
+		expect(flows.map((flow) => flow.name).sort()).toEqual(
+			starterList()
+				.map((starter) => starter.name)
+				.sort(),
+		);
+		expect(flows.map((flow) => flow.name)).toContain("build-task");
 		expect(mismatches).toEqual([]);
 	});
 });

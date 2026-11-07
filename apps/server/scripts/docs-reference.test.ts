@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { cell, fill, firstColumnNames, table } from "./docs-reference";
+import { starterList } from "@nightshift/flows";
+import {
+	CHECKED,
+	cell,
+	fill,
+	firstColumnNames,
+	GENERATED,
+	table,
+} from "./docs-reference";
 
 const generated = { kits: () => table(["Kit"], [["`kit:a`"]]) };
 const checked = { nodes: () => ["Agent", "Wait"] };
@@ -81,5 +89,22 @@ describe("firstColumnNames", () => {
 describe("cell", () => {
 	test("keeps a table cell on one line and escapes a pipe", () => {
 		expect(cell("a | b\nc  d")).toBe("a \\| b c d");
+	});
+});
+
+describe("the starters", () => {
+	test("name only the starters a person sees, and a parent row names its helper", () => {
+		const listed = CHECKED.starters?.() ?? [];
+		const rendered = GENERATED.starters?.() ?? "";
+		expect(firstColumnNames(rendered)).toEqual(listed);
+		const helpers = starterList().filter((starter) => starter.partOf);
+		expect(helpers.length).toBeGreaterThan(0);
+		for (const helper of helpers) {
+			expect(listed).not.toContain(helper.name);
+			const parentRow = rendered
+				.split("\n")
+				.find((row) => row.startsWith(`| \`${helper.partOf}\` |`));
+			expect(parentRow).toContain(`It comes with \`${helper.name}\`.`);
+		}
 	});
 });

@@ -69,8 +69,13 @@ function kitsTable(knowledge: boolean): string {
 type StarterInput = { name: string; default?: unknown };
 type StarterSource = { description?: string; inputs?: StarterInput[] };
 
+/** The starters a person sees. A helper (`partOf`) installs with its parent. */
+function listedStarters() {
+	return starterList().filter((starter) => starter.partOf === undefined);
+}
+
 function startersTable(): string {
-	const rows = starterList().map((starter) => {
+	const rows = listedStarters().map((starter) => {
 		const source = starter.source as StarterSource;
 		const inputs = (source.inputs ?? [])
 			.map((input) =>
@@ -79,9 +84,14 @@ function startersTable(): string {
 					: `\`${input.name}\` (default \`${String(input.default)}\`)`,
 			)
 			.join(", ");
+		const helpers = starterList()
+			.filter((helper) => helper.partOf === starter.name)
+			.map((helper) => `\`${helper.name}\``);
+		const comesWith =
+			helpers.length > 0 ? ` It comes with ${helpers.join(" and ")}.` : "";
 		return [
 			`\`${starter.name}\``,
-			cell(source.description ?? ""),
+			cell(`${source.description ?? ""}${comesWith}`),
 			inputs || "none",
 		];
 	});
@@ -139,7 +149,7 @@ export const GENERATED: Record<string, () => string> = {
 /** What each checked table must name, by its name. */
 export const CHECKED: Record<string, () => string[]> = {
 	nodes: () => Object.values(NODE_TYPE_LABEL),
-	starters: () => starterList().map((starter) => starter.name),
+	starters: () => listedStarters().map((starter) => starter.name),
 	"mcp-tools": mcpToolNames,
 };
 

@@ -13,8 +13,8 @@
 			"name": "check",
 			"type": "text",
 			"label": "Check",
-			"description": "The shell command that proves each task, for example the tests.",
-			"default": "bun test"
+			"description": "The shell command that proves each task, for example npm test, bun test or pytest.",
+			"required": true
 		}
 	],
 	"outputs": [

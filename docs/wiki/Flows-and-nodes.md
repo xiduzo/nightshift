@@ -138,18 +138,15 @@ The knowledge kits are on the [Knowledge](Knowledge.md#sources) page.
 
 ## Starter flows
 
-When you add a project, Night Shift saves these flows into it. Change them to fit the project. A flow that calls another flow needs that flow in the project too.
+When you add a project, Night Shift saves these flows into it, with the flows they call. Change them to fit the project.
 
 <!-- generated:starters: bun run docs:reference writes this table from the code. Do not edit it here. -->
 | Flow | Does | Inputs |
 | --- | --- | --- |
-| `implement-and-check` | An agent builds a task, and a check proves it after each try. Sonnet tries up to 3 times, each try with the last failure. Then Opus tries. | `task`, `check` (default `bun test`) |
-| `build-task` | Builds and checks one task of a plan. plan-and-build runs it once for each task. | `item`, `check` (default `bun test`) |
-| `plan-and-build` | An agent splits your goal into small tasks. Night Shift builds and checks each task on top of the one before. An agent then reviews the result. | `goal`, `check` (default `bun test`) |
-| `review-pr` | An agent reviews a pull request. You read the review, and Night Shift posts it on GitHub when you agree. | `pr` |
-| `edit-file` | An agent applies an instruction to one file. per-file runs it once for each file. | `item`, `instruction` |
+| `implement-and-check` | An agent builds a task, and a check proves it after each try. Sonnet tries up to 3 times, each try with the last failure. Then Opus tries. | `task`, `check` |
+| `plan-and-build` | An agent splits your goal into small tasks. Night Shift builds and checks each task on top of the one before. An agent then reviews the result. It comes with `build-task`. | `goal`, `check` |
 | `review-learnings` | Asks you about what agents proposed to learn about the project. What you keep goes into its knowledge, and agents read it in later runs. Schedule it, or run it from the Knowledge page. | none |
-| `per-file` | An agent applies the same instruction to each file that matches a glob. Night Shift then commits all changes at once. | `glob` (default `src/**/*.ts`), `instruction` |
+| `per-file` | An agent applies the same instruction to each file that matches a glob. Night Shift then commits all changes at once. It comes with `edit-file`. | `glob`, `instruction` |
 <!-- /generated:starters -->
 
-To add a starter later, import its file from [packages/flows/src/starters/flows/](https://github.com/xiduzo/nightshift/tree/main/packages/flows/src/starters/flows).
+To add a starter later, import its file from [packages/flows/src/starters/flows/](https://github.com/xiduzo/nightshift/tree/main/packages/flows/src/starters/flows). A flow that calls another flow needs that flow in the project too.

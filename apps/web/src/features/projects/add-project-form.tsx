@@ -315,7 +315,7 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 						</FieldLabel>
 						<FieldDescription>
 							Small flows to change and run, for example implement and check, or
-							review a pull request.
+							plan and build.
 						</FieldDescription>
 					</FieldContent>
 				</Field>
