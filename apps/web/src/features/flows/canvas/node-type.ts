@@ -54,7 +54,7 @@ export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
 	value: {
 		label: NODE_TYPE_LABEL.value,
 		icon: VariableIcon,
-		blurb: "Makes a value from a rule or a model.",
+		blurb: "Makes a value from a rule, a model, or you.",
 	},
 	wait: {
 		label: NODE_TYPE_LABEL.wait,

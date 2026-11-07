@@ -314,8 +314,8 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 							Add the starter flows
 						</FieldLabel>
 						<FieldDescription>
-							Six small flows to change and run, for example implement and
-							check, or review a pull request.
+							Small flows to change and run, for example implement and check, or
+							review a pull request.
 						</FieldDescription>
 					</FieldContent>
 				</Field>
