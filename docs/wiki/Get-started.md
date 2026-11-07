@@ -43,7 +43,7 @@ Run nights with `bun run night`, and change Night Shift in a separate git worktr
 
 ## Your first run
 
-1. **Add a project.** Choose its folder, or copy a repository from GitHub. Leave **Add the starter flows** checked. The seven [starter flows](Flows-and-nodes.md#starter-flows) arrive in the project. Night Shift keeps the flows outside your repository.
+1. **Add a project.** Choose its folder, or copy a repository from GitHub. Leave **Add the starter flows** checked. The seven [starter flows](Flows-and-nodes.md#starter-flows) arrive in the project. If you have agent profiles, choose one for each agent that the flows name. Night Shift keeps the flows outside your repository.
 2. **Add your agents.** The Agents page shows the agent CLIs (`claude`, `codex`, `opencode`, `pi`) and tools (`gh`, `acli`) that it finds on this computer. Choose **Add profile** or **Add tool** for each one you want. See [Agents and profiles](Agents-and-profiles.md).
 3. **Open `implement-and-check`.** Set the check to your project's test command.
 4. **Start a run** with a small task. Follow the transcript of each step live.

@@ -7,6 +7,7 @@ export {
 	recordFrom,
 	rowsFrom,
 } from "./connections/key-value-rows";
+export { FlowAgentsStep, useFlowAgents } from "./flow-agents-step";
 export type { HarnessName } from "./harnesses";
 export {
 	HARNESSES,

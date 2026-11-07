@@ -1,3 +1,5 @@
+import { type Flow, flowSchema, migrateFlow } from "../flow";
+import { type FlowAgent, flowAgents } from "../profiles";
 import buildTask from "./flows/build-task.json";
 import editFile from "./flows/edit-file.json";
 import implementAndCheck from "./flows/implement-and-check.json";
@@ -30,4 +32,16 @@ const STARTERS: readonly Starter[] = [
 /** Every starter. */
 export function starterList(): readonly Starter[] {
 	return STARTERS;
+}
+
+/**
+ * The agents the starters name, each once. Adding the starters to a
+ * project asks which of the person's profiles takes each one.
+ */
+export function starterAgents(): FlowAgent[] {
+	const flows = STARTERS.flatMap((starter): Flow[] => {
+		const parsed = flowSchema.safeParse(migrateFlow(starter.source));
+		return parsed.success ? [parsed.data] : [];
+	});
+	return flowAgents(flows);
 }

@@ -1,4 +1,5 @@
 import {
+	type AgentChoice,
 	canonicalFlowJson,
 	diffFlows,
 	FLOW_VERSION,
@@ -19,6 +20,7 @@ import {
 	parsedFlows,
 	starterList,
 	suffixedName,
+	withAgentProfiles,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { UsageNotes } from "../usage";
@@ -99,6 +101,12 @@ export type FlowExport = { fileName: string; json: string };
 /** A flow that an import or a copy saved: its name there, and its problems. */
 export type SavedFlow = { name: string; issues: FlowIssue[] };
 
+/**
+ * What an import changes in the flows it saves: `agents` puts the
+ * person's own profiles in place of the agents a flow names.
+ */
+export type FlowImportOptions = { agents?: readonly AgentChoice[] };
+
 /** What an import of the starters did: the names it saved, and the names the project had already. */
 export type StarterImport = { imported: string[]; skipped: string[] };
 
@@ -145,14 +153,22 @@ export type SpaceFlows = {
 	 * revision of kind `import`. An older format is brought up to date
 	 * first. A name the project has already gets a suffix (`-2`).
 	 */
-	import(projectId: string, name: string, json: string): Promise<SavedFlow>;
+	import(
+		projectId: string,
+		name: string,
+		json: string,
+		options?: FlowImportOptions,
+	): Promise<SavedFlow>;
 	/**
 	 * Saves the starters that ship with Night Shift as flows of the
 	 * project, each a revision of kind `import`. A starter whose name the
 	 * project has already is skipped: its flow stays as it is, and no
 	 * starter takes another name, as the starters call each other by name.
 	 */
-	importStarters(projectId: string): Promise<StarterImport>;
+	importStarters(
+		projectId: string,
+		options?: FlowImportOptions,
+	): Promise<StarterImport>;
 	/**
 	 * Copies the flow into a project of this Space as `to.name`, a
 	 * revision of kind `copy` there. The flows it calls stay behind: the
@@ -343,11 +359,14 @@ export function createSpaceFlows(
 				return { fileName: `${name}.json`, json: canonicalFlowJson(flow) };
 			},
 
-			async import(projectId, name, json) {
+			async import(projectId, name, json, options = {}) {
 				await inSpace(projectId);
-				const flow = importedFlow(
-					json,
-					await deps.migration?.({ spaceId, personId: personId ?? null }),
+				const flow = withAgentProfiles(
+					importedFlow(
+						json,
+						await deps.migration?.({ spaceId, personId: personId ?? null }),
+					),
+					options.agents ?? [],
 				);
 				const free = suffixedName(name, namesOf(await flows.flows(projectId)));
 				const issues = await flows.save(projectId, free, flow, {
@@ -358,7 +377,7 @@ export function createSpaceFlows(
 				return { name: free, issues };
 			},
 
-			async importStarters(projectId) {
+			async importStarters(projectId, options = {}) {
 				await inSpace(projectId);
 				const migration = await deps.migration?.({
 					spaceId,
@@ -374,7 +393,10 @@ export function createSpaceFlows(
 					await flows.save(
 						projectId,
 						starter.name,
-						migratedFlow(starter.source, migration),
+						withAgentProfiles(
+							migratedFlow(starter.source, migration),
+							options.agents ?? [],
+						),
 						{ kind: "import", personId },
 					);
 					deps.usage?.note({

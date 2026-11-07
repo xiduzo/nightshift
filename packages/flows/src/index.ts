@@ -344,12 +344,16 @@ export {
 	withChoices,
 } from "./nodes";
 export {
+	type AgentChoice,
 	type AgentProfile,
 	type AgentProfileSettings,
+	agentKey,
 	agentProfileSchema,
 	cascadeProblem,
 	everyProfileOf,
+	type FlowAgent,
 	fallbacksOf,
+	flowAgents,
 	isAgentProfile,
 	type ModelProfile,
 	type ModelProfileSettings,
@@ -358,6 +362,7 @@ export {
 	type Profile,
 	type ProfileSettings,
 	placesItself,
+	prefilledProfile,
 	profileLabel,
 	profileOf,
 	profileSchema,
@@ -367,6 +372,7 @@ export {
 	resolveNodeProfile,
 	runsAs,
 	tierUsers,
+	withAgentProfiles,
 } from "./profiles";
 export { githubSubIssuesCommand } from "./recipes";
 export {
@@ -406,7 +412,7 @@ export {
 	sectionOf,
 	sectionPath,
 } from "./sections";
-export { type Starter, starterList } from "./starters";
+export { type Starter, starterAgents, starterList } from "./starters";
 export {
 	acceptsValue,
 	applyVariableWrites,

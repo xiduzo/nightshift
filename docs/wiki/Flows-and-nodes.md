@@ -104,7 +104,7 @@ Two or more edges on one outcome run their branches at once. A Join waits for th
 - **Issues** at the bottom of the canvas lists the errors and warnings of the flow.
 - **Revisions.** Every save is a revision. You see who saved what, and from which computer. You can restore an earlier revision.
 
-Night Shift keeps your flows. A team repository needs no Night Shift files. To move a flow, export it and import it in another project.
+Night Shift keeps your flows. A team repository needs no Night Shift files. To move a flow, export it and import it in another project. The import asks which of your profiles takes each agent of the flow.
 
 ## Build a flow with an agent
 
@@ -138,7 +138,7 @@ The knowledge kits are on the [Knowledge](Knowledge.md#sources) page.
 
 ## Starter flows
 
-When you add a project, Night Shift saves these flows into it. Change them to fit the project. A flow that calls another flow needs that flow in the project too.
+When you add a project, Night Shift saves these flows into it. You choose which of your profiles takes each agent of the flows. Change them to fit the project. A flow that calls another flow needs that flow in the project too.
 
 <!-- generated:starters: bun run docs:reference writes this table from the code. Do not edit it here. -->
 | Flow | Does | Inputs |

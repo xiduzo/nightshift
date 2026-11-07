@@ -1,3 +1,4 @@
+import { starterAgents } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import { Checkbox } from "@nightshift/ui/components/checkbox";
 import {
@@ -32,12 +33,19 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FolderGitIcon, FolderOpenIcon, PlusIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
+import {
+	FlowAgentsStep,
+	useFlowAgents,
+} from "@/features/agents/flow-agents-step";
 import { GitHubCopyStatus, GitHubRepoField } from "./github-repo-field";
 import { ProjectReadiness } from "./project-readiness";
 import { projectMutations, projectQueries } from "./queries";
 
 /** Where a new project comes from: a folder on this computer, or a GitHub repository. */
 type Source = "folder" | "github";
+
+/** The agents the starter flows name: you choose a profile for each. */
+const STARTER_AGENTS = starterAgents();
 
 /** Adds a folder or a GitHub repository as a project, in a dialog, after its readiness check. */
 export function AddProjectDialog({
@@ -69,6 +77,7 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 	const [repo, setRepo] = useState("");
 	const [name, setName] = useState("");
 	const [starters, setStarters] = useState(true);
+	const agents = useFlowAgents(STARTER_AGENTS);
 	/** The person asked to add the GitHub repository: add it once its copy is ready. */
 	const [addWhenReady, setAddWhenReady] = useState(false);
 
@@ -139,6 +148,7 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 			repoPath,
 			name: name.trim() || (source === "github" ? repoName : undefined),
 			starters,
+			agents: starters ? agents.choices : undefined,
 		});
 
 	// Add the repository as soon as its copy is ready, when the person asked for it.
@@ -319,6 +329,7 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 						</FieldDescription>
 					</FieldContent>
 				</Field>
+				{starters ? <FlowAgentsStep step={agents} /> : null}
 				{addProject.error ? (
 					<FieldError>{addProject.error.message}</FieldError>
 				) : null}

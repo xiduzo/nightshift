@@ -5,6 +5,7 @@ import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
 import { timeZoneSchema } from "../dashboard";
+import { agentChoices, agentChoicesSchema } from "../flows";
 import { output } from "../output";
 import {
 	ownerOnly,
@@ -73,9 +74,13 @@ export const projects = {
 				name: z.string().min(1).optional(),
 				/** Also save the starter flows into the project. A flow it has already stays. */
 				starters: z.boolean().optional(),
+				/** Your profiles in place of the agents the starters name. */
+				agents: agentChoicesSchema.optional(),
 			}),
 		)
 		.handler(async ({ context, input }) => {
+			// A choice that does not fit refuses before the project is added.
+			const agents = input.starters ? agentChoices(context, input.agents) : [];
 			const project = await context.space.addProject({
 				repoPath: input.repoPath,
 				name: input.name,
@@ -84,7 +89,10 @@ export const projects = {
 			if (input.starters) {
 				// The project is added: a failed import leaves it, without the starters.
 				try {
-					const imported = await context.space.flows.importStarters(project.id);
+					const imported = await context.space.flows.importStarters(
+						project.id,
+						{ agents },
+					);
 					starters = imported.imported.length;
 				} catch (error) {
 					console.warn(
