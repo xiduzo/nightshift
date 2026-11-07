@@ -8,6 +8,8 @@ This wiki is the user guide. It tells you how to install Night Shift, draw flows
 | --- | --- |
 | [Get started](Get-started.md) | Install the desktop app, the Docker image, or a clone. Add a project and run a starter flow. |
 | [Flows and nodes](Flows-and-nodes.md) | Outcomes, cascades, every node type, templates, Sections, kits, and starter flows. |
+| [Community flows](Community-flows.md) | Flows that people share: what each one needs, how to import one, and how to share yours. |
+| [Ideas](Ideas.md) | Flows that nobody has built yet. Build one and share it. |
 | [Agents and profiles](Agents-and-profiles.md) | The coding agents that Night Shift runs, profiles, backups, CLI tools, and connections. |
 | [Runs and schedules](Runs-and-schedules.md) | Start a run, schedule a night, start a flow from a webhook, and resume a run. |
 | [Gates and the inbox](Gates-and-the-inbox.md) | Gates, Asks, deadlines, files in an answer, and the Daily digest. |
