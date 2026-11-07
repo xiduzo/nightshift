@@ -4,11 +4,15 @@ import { basename, join, resolve } from "node:path";
 import { chooseProject } from "@nightshift/agents";
 import type { AppRouterClient } from "@nightshift/api";
 import {
+	agentKey,
 	canonicalFlowJson,
+	type FlowAgent,
 	type FlowIssue,
+	flowAgents,
 	flowNameOfFile,
 	flowNameSchema,
 	parseFlow,
+	prefilledProfile,
 } from "@nightshift/flows";
 import { iso } from "@nightshift/time";
 import { ORPCError } from "@orpc/client";
@@ -34,10 +38,14 @@ export const FLOWS_USAGE = `Usage:
                                               as <name>: a new flow, or a new revision.
   nightshift flows export <name> [--out <file or folder>]
                                               The flow as a file to import elsewhere.
-  nightshift flows import <file> [--name <name>]
+  nightshift flows import <file> [--name <name>] [--agent <agent>=<profile>]...
                                               Save the flow of the file as a new flow.
                                               A name the project has gets a suffix.
-                                              Prints the name it got.
+                                              Prints the name it got. One of your
+                                              profiles takes each agent the flow names:
+                                              the same harness and model, else the same
+                                              harness, else your first profile. Prints
+                                              each choice.
   nightshift flows revisions <name> [--json]  The revisions of the flow, newest first.
   nightshift flows revision <name> <id> [--out <file>]
                                               One revision of the flow as JSON.
@@ -46,7 +54,14 @@ Options:
   --project <id, name or folder>  The project. Default: the project of this folder.
   --daemon <address>              Where Night Shift runs. NIGHTSHIFT_DAEMON_URL,
                                   default http://localhost:$PORT.
+  --agent <agent>=<profile>       With import: the profile for one agent of the flow,
+                                  for example claude-code:opus=reviewer. Repeat it
+                                  for each agent you choose.
+  --keep-agents                   With import: keep the agents the flow names.
 `;
+
+/** `--agent claude-code:opus=reviewer`: the profile, by its name, for one agent of the flow. */
+export type AgentOverride = { agent: string; profile: string };
 
 export type FlowsAction =
 	| { action: "list"; json: boolean }
@@ -54,8 +69,17 @@ export type FlowsAction =
 	/** `file` null: read stdin. */
 	| { action: "save"; name: string; file: string | null }
 	| { action: "export"; name: string; out: string | null }
-	/** `file` null: read stdin, and `name` is required. */
-	| { action: "import"; file: string | null; name: string | null }
+	/**
+	 * `file` null: read stdin, and `name` is required. `agents`: the
+	 * profiles the person chose. `keepAgents`: no profile replaces an agent.
+	 */
+	| {
+			action: "import";
+			file: string | null;
+			name: string | null;
+			agents: AgentOverride[];
+			keepAgents: boolean;
+	  }
 	| { action: "revisions"; name: string; json: boolean }
 	| {
 			action: "revision";
@@ -88,9 +112,11 @@ export function flowsOptions(
 	let out: string | null = null;
 	let as: string | null = null;
 	let json = false;
+	const agents: AgentOverride[] = [];
+	let keepAgents = false;
 	while (args.length > 0) {
 		const arg = args.shift() as string;
-		const takes = ["--project", "--daemon", "--out", "--name"];
+		const takes = ["--project", "--daemon", "--out", "--name", "--agent"];
 		if (takes.includes(arg)) {
 			const value = args.shift();
 			if (!value) return { error: `${arg} needs a value.` };
@@ -99,8 +125,17 @@ export function flowsOptions(
 				project = existsSync(resolve(cwd, value)) ? resolve(cwd, value) : value;
 			} else if (arg === "--daemon") daemon = value;
 			else if (arg === "--out") out = resolve(cwd, value);
-			else as = value;
+			else if (arg === "--agent") {
+				const override = agentOverride(value);
+				if (override === null) {
+					return {
+						error: `--agent needs an agent and a profile, for example claude-code:opus=reviewer. "${value}" is not one.`,
+					};
+				}
+				agents.push(override);
+			} else as = value;
 		} else if (arg === "--json") json = true;
+		else if (arg === "--keep-agents") keepAgents = true;
 		else if (arg.startsWith("--"))
 			return { error: `There is no option ${arg}.` };
 		else positional.push(arg);
@@ -126,6 +161,13 @@ export function flowsOptions(
 			? { error: `Too many arguments: ${rest.join(" ")}.` }
 			: null;
 	};
+
+	if ((agents.length > 0 || keepAgents) && action !== "import") {
+		return { error: "--agent and --keep-agents work with import only." };
+	}
+	if (agents.length > 0 && keepAgents) {
+		return { error: "Use --agent or --keep-agents, not both." };
+	}
 
 	let command: FlowsAction | { error: string };
 	switch (action) {
@@ -171,6 +213,8 @@ export function flowsOptions(
 					action,
 					file: from,
 					name: named?.name ?? null,
+					agents,
+					keepAgents,
 				};
 			}
 			break;
@@ -205,6 +249,19 @@ export function flowsOptions(
 	};
 }
 
+/**
+ * `claude-code:opus=reviewer` as the agent and the profile's name. The
+ * last `=` splits them: a profile's name has none.
+ */
+function agentOverride(value: string): AgentOverride | null {
+	const at = value.lastIndexOf("=");
+	const agent = value.slice(0, at).trim();
+	const profile = value.slice(at + 1).trim();
+	return at > 0 && agent.includes(":") && profile !== ""
+		? { agent, profile }
+		: null;
+}
+
 /** What `runFlows` reads and writes besides Night Shift. */
 export type FlowsIo = {
 	/** Writes to stdout as it is. */
@@ -217,7 +274,10 @@ export type FlowsIo = {
 	isFolder(path: string): boolean;
 };
 
-export type FlowsClient = Pick<AppRouterClient, "projects" | "flows">;
+export type FlowsClient = Pick<
+	AppRouterClient,
+	"projects" | "flows" | "profiles"
+>;
 
 /** The process's stdin, stdout, stderr and files. */
 export const processIo: FlowsIo = {
@@ -268,6 +328,85 @@ function flowOfText(io: FlowsIo, text: string, from: string | null) {
 		return null;
 	}
 	return parsed.flow;
+}
+
+/** The agents of the flow in a text. None when it is not a flow: the import says why. */
+function agentsOfText(text: string): FlowAgent[] {
+	try {
+		const parsed = parseFlow(JSON.parse(text));
+		return parsed.flow ? flowAgents([parsed.flow]) : [];
+	} catch {
+		return [];
+	}
+}
+
+/** One choice of the import: your profile, by its id, for an agent of the flow. */
+type AgentChoiceInput = FlowAgent & { profile: string };
+
+/**
+ * Your profile for each agent of the flow: the one `--agent` names, else
+ * the prefilled one. The lines say what it chose. Null after a problem
+ * went to stderr.
+ */
+async function chooseAgents(
+	client: FlowsClient,
+	io: FlowsIo,
+	text: string,
+	command: Extract<FlowsAction, { action: "import" }>,
+): Promise<{ choices: AgentChoiceInput[]; lines: string[] } | null> {
+	const agents = agentsOfText(text);
+	const keys = agents.map(agentKey);
+	const named = keys.length > 0 ? keys.join(", ") : "none";
+	const unknown = command.agents.find((each) => !keys.includes(each.agent));
+	if (unknown) {
+		io.err(
+			`The flow does not name the agent ${unknown.agent}. Its agents: ${named}.`,
+		);
+		return null;
+	}
+	if (agents.length === 0) return { choices: [], lines: [] };
+	if (command.keepAgents) {
+		return { choices: [], lines: [`Keeps its agents: ${named}.`] };
+	}
+	// Only the owner of this computer sees its profiles: others keep the agents.
+	const profiles = await client.profiles.list().then(
+		(rows) => rows.flatMap((row) => ("harness" in row ? [row] : [])),
+		() => [],
+	);
+	if (profiles.length === 0) {
+		if (command.agents.length > 0) {
+			io.err(
+				"This computer has no agent profiles yet. Add one on the Agents page, or leave out --agent.",
+			);
+			return null;
+		}
+		return {
+			choices: [],
+			lines: [
+				`Keeps its agents: ${named}. Add an agent profile to choose your own.`,
+			],
+		};
+	}
+	const choices: AgentChoiceInput[] = [];
+	const lines: string[] = [];
+	for (const agent of agents) {
+		const key = agentKey(agent);
+		const wanted = command.agents.find((each) => each.agent === key)?.profile;
+		const profile =
+			wanted === undefined
+				? prefilledProfile(agent, profiles)
+				: (profiles.find((each) => each.name === wanted) ??
+					profiles.find((each) => each.id === wanted));
+		if (profile === undefined) {
+			io.err(
+				`This computer has no agent profile "${wanted}". Its profiles: ${profiles.map((each) => each.name).join(", ")}.`,
+			);
+			return null;
+		}
+		choices.push({ ...agent, profile: profile.id });
+		lines.push(`${key} -> ${profile.name} (${agentKey(profile)})`);
+	}
+	return { choices, lines };
 }
 
 function changeSummary(
@@ -374,7 +513,15 @@ export async function runFlows(
 			const text = await io.read(command.file);
 			const name =
 				command.name ?? flowNameOfFile(basename(command.file as string));
-			const saved = await client.flows.import({ projectId, name, json: text });
+			const chosen = await chooseAgents(client, io, text, command);
+			if (chosen === null) return 1;
+			const saved = await client.flows.import({
+				projectId,
+				name,
+				json: text,
+				agents: chosen.choices,
+			});
+			for (const line of chosen.lines) io.err(line);
 			report(io, saved.issues);
 			io.out(`${saved.name}\n`);
 			return 0;

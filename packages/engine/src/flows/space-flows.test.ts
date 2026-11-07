@@ -287,6 +287,43 @@ describe("moving a flow between projects", () => {
 		expect((await files.importStarters(PROJECT)).imported).toEqual([]);
 	});
 
+	test("the starters take the profiles the person chose for their agents", async () => {
+		const builder = { device: "laptop", profile: "builder" };
+		const reviewer = { device: "laptop", profile: "reviewer" };
+		await files.importStarters(PROJECT, {
+			agents: [
+				{
+					agent: { harness: "claude-code", model: "sonnet" },
+					profile: builder,
+				},
+				{ agent: { harness: "claude-code", model: "opus" }, profile: reviewer },
+			],
+		});
+		const loaded = await files.get(PROJECT, "implement-and-check");
+		const [node] = loaded.flow?.nodes ?? [];
+		expect(node?.type === "agent" ? node.cascade : null).toMatchObject([
+			{ label: "sonnet", profile: builder },
+			{ label: "opus", profile: reviewer },
+		]);
+		const edit = (await files.get(PROJECT, "edit-file")).flow;
+		const named = edit?.nodes.find((each) => each.type === "agent");
+		expect(named).toMatchObject({ profile: builder, permissionMode: "auto" });
+		expect(named).not.toHaveProperty("harness");
+	});
+
+	test("an import puts the chosen profile in place of an agent", async () => {
+		const { json } = await files
+			.save(PROJECT, "build", quick("Fix it"))
+			.then(() => files.export(PROJECT, "build"));
+		const profile = { device: "laptop", profile: "builder" };
+		await files.import(OTHER, "build", json, {
+			agents: [{ agent: { harness: "claude-code", model: "sonnet" }, profile }],
+		});
+		const [node] = (await files.get(OTHER, "build")).flow?.nodes ?? [];
+		expect(node).toMatchObject({ profile, permissionMode: "acceptEdits" });
+		expect(node).not.toHaveProperty("model");
+	});
+
 	test("an import brings a flow of an older format up to date", async () => {
 		const flow = quick("Fix it");
 		const old = JSON.stringify({ ...flow, version: 5 });

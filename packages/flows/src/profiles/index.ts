@@ -1,6 +1,14 @@
 /** Profiles: an Agent Profile (a harness, a model and its tools) or a Model Profile (a decider and its model) under one name, on a computer. */
 
 export {
+	type AgentChoice,
+	agentKey,
+	type FlowAgent,
+	flowAgents,
+	prefilledProfile,
+	withAgentProfiles,
+} from "./flow-agents";
+export {
 	type AgentProfile,
 	type AgentProfileSettings,
 	agentProfileSchema,

@@ -399,7 +399,7 @@ const ROUTES: Route[] = [
 	route("flows.revision", { ...flowRef, revisionId: "rev", against: "old" }, "session", "space.flows.revision", ["p1", "night", "rev", "old"]),
 	route("flows.restore", { ...flowRef, revisionId: "rev" }, SAVE, "space.flows.restore", ["p1", "night", "rev"]),
 	route("flows.export", flowRef, "session", "space.flows.export", ["p1", "night"]),
-	route("flows.import", { ...flowRef, json: "{}" }, SAVE, "space.flows.import", ["p1", "night", "{}"]),
+	route("flows.import", { ...flowRef, json: "{}" }, SAVE, "space.flows.import", ["p1", "night", "{}", { agents: [] }]),
 	route("flows.copy", { ...flowRef, toProjectId: "p2", as: "copy" }, SAVE, "space.flows.copy", ["p1", "night", { projectId: "p2", name: "copy" }]),
 	// Gates: the Needs-you inbox.
 	route("gates.list", undefined, "session"),

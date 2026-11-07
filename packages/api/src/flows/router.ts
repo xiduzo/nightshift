@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { output } from "../output";
 import { ownerProcedure, permitted, protectedProcedure } from "../procedures";
+import { agentChoices, agentChoicesSchema } from "./agent-choices";
 import {
 	flowExportSchema,
 	flowIssueSchema,
@@ -171,10 +172,14 @@ export const flows = {
 			flowRef.extend({
 				/** The contents of the file. */
 				json: z.string().max(MAX_FLOW_JSON),
+				/** Your profiles in place of the agents the flow names. */
+				agents: agentChoicesSchema.optional(),
 			}),
 		)
 		.handler(({ context, input }) =>
-			context.space.flows.import(input.projectId, input.name, input.json),
+			context.space.flows.import(input.projectId, input.name, input.json, {
+				agents: agentChoices(context, input.agents),
+			}),
 		),
 	copy: permitted({ flow: ["save"] })
 		.route({

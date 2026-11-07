@@ -171,6 +171,13 @@ export const PEER_PORTS: Record<
 			// answer. The run page imports the gate question and answer.
 			"features/runs": "queries",
 		},
+		"features/projects": {
+			// Adding the starter flows asks which of your profiles takes each
+			// agent they name. The agents pages import projects (a project's
+			// secrets), so the agents barrel would close a cycle. The step
+			// imports only the agents' queries and harnesses.
+			"features/agents": "flow-agents-step",
+		},
 	},
 };
 

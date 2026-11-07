@@ -80,6 +80,8 @@ nightshift flows revision fix-issue <id>     # one earlier revision as JSON
 
 The commands use the project of the current folder.
 
+An import gives each agent of the flow to one of your profiles, and `--agent claude-code:opus=reviewer` chooses another.
+
 <!-- generated:cli-flows: bun run docs:reference writes this from `nightshift flows --help`. Do not edit it here. -->
 ```text
 Usage:
@@ -90,10 +92,14 @@ Usage:
                                               as <name>: a new flow, or a new revision.
   nightshift flows export <name> [--out <file or folder>]
                                               The flow as a file to import elsewhere.
-  nightshift flows import <file> [--name <name>]
+  nightshift flows import <file> [--name <name>] [--agent <agent>=<profile>]...
                                               Save the flow of the file as a new flow.
                                               A name the project has gets a suffix.
-                                              Prints the name it got.
+                                              Prints the name it got. One of your
+                                              profiles takes each agent the flow names:
+                                              the same harness and model, else the same
+                                              harness, else your first profile. Prints
+                                              each choice.
   nightshift flows revisions <name> [--json]  The revisions of the flow, newest first.
   nightshift flows revision <name> <id> [--out <file>]
                                               One revision of the flow as JSON.
@@ -102,6 +108,10 @@ Options:
   --project <id, name or folder>  The project. Default: the project of this folder.
   --daemon <address>              Where Night Shift runs. NIGHTSHIFT_DAEMON_URL,
                                   default http://localhost:$PORT.
+  --agent <agent>=<profile>       With import: the profile for one agent of the flow,
+                                  for example claude-code:opus=reviewer. Repeat it
+                                  for each agent you choose.
+  --keep-agents                   With import: keep the agents the flow names.
 ```
 <!-- /generated:cli-flows -->
 
