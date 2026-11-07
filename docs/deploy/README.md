@@ -59,7 +59,7 @@ nightshift serve --data-dir /var/lib/nightshift \
 - `--host-address` makes it a Host. Repeat it for each address.
 - `--listen 127.0.0.1` keeps it off the network when the way out (Caddy,
   Tailscale Serve, cloudflared) runs on the same computer.
-- `nightshift serve --help` lists every option. Each option also has an
+- `nightshift help` lists every option. Each option also has an
   environment variable.
 
 Three ready-made setups are in [`deploy/`](../../deploy/):
@@ -161,8 +161,10 @@ Give each CLI tool its login in Night Shift, not in the image. Open the
 Agents page, then the tool, then Edit:
 
 - **Login → variables.** A value can read a secret, for example
-  `GH_TOKEN = ${GH_WORK_TOKEN}`. Save the secret on the Secrets page,
-  or set it in the environment of the container.
+  `GH_TOKEN = ${GH_WORK_TOKEN}`. On a Host, save the secret on the
+  **Project secrets** or **Space secrets** page, or as **This computer** on
+  the Host's Secrets page. A Personal secret does not work on a Host. You
+  can also set it in the environment of the container.
 - **Several accounts of one program.** Add one tool per account: `gh` and
   `gh-work` both run the program `gh`, each with its own token. The agent
   types the tool's name. Say which account it is in the description.
@@ -277,8 +279,14 @@ A server has no keychain. Night Shift reads secrets from files instead:
   the secrets folder. The secrets folder is `NIGHTSHIFT_SECRETS_DIR` (for
   example `/run/secrets` in Docker), else the credentials folder of systemd
   (`LoadCredential=`).
-- A secret you save on the Secrets page, and the access to your Hosts,
+- A secret you save as **This computer**, and the access to your Hosts,
   go in the data folder, in files only the Night Shift user can read.
+- Personal, Project and Space secrets go in the database, sealed with the
+  secrets key. The key is `NIGHTSHIFT_SECRETS_KEY`, else the file in
+  `NIGHTSHIFT_SECRETS_KEY_FILE`, else `NIGHTSHIFT_SECRETS_KEY` in the
+  secrets folder. Without any of these, Night Shift makes one in the data
+  folder (`secrets-key`). A new key cannot open what the old one sealed.
+  Back up the key, the auth secret and the database together.
 
 ### Sign in to a Host without a screen
 

@@ -34,10 +34,12 @@ without a probability can only pick. It cannot tell how sure it is.
   `X-Api-Key: ${PROXY_KEY}`.
 
 A profile belongs to one computer
-([ADR 3](../adr/0003-a-profile-belongs-to-one-device.md)). The steps that
-use it run there. So that computer must reach the address, and it reads
-the secrets from its own Secrets page. A flow names the profile, never the
-address.
+([ADR 3](../adr/0003-a-profile-belongs-to-one-device.md),
+[ADR 19](../adr/0019-a-profile-means-its-device.md)). The steps that use it
+run there. So that computer must reach the address. A step reads the key
+from the Space's or the project's secrets, or from that computer's own
+(**This computer**) secrets. A Personal secret does not work on a Host. A
+flow names the profile, never the address.
 
 ## Check the address
 
@@ -57,8 +59,9 @@ The profile jev uses the address http://openjev:8080 (triage). Nothing
 answers there. Start the server, or change the address on the Agents page.
 ```
 
-Night Shift does not ask a computer that is offline. Its steps wait for
-it, and each step checks again when it runs.
+Night Shift does not ask a computer that is offline. A node can list
+**Backups**: other profiles, on other computers. The first backup that can
+take the step runs it. A node without backups waits for its computer.
 
 ## OpenJev on the Host network
 
@@ -87,8 +90,10 @@ CPU. Run one in a container on the same network as the Host.
 
 2. Start it: `docker compose up -d openjev`. The first start downloads the
    weights into the volume.
-3. If you set `OPENJEV_API_KEY`, save the same key on the Host's Secrets
-   page, for example as `OPENJEV_API_KEY`.
+3. If you set `OPENJEV_API_KEY`, save the same key in Night Shift, for
+   example as `OPENJEV_API_KEY`. Save it as **This computer** on the Host's
+   Secrets page, or on the **Space secrets** page. A Personal secret does
+   not work on the Host.
 4. On the Host's Agents page, add a Model Profile on **OpenJev**. Set the
    base URL to `http://openjev:8080`, the name of the service on the
    compose network.
@@ -120,7 +125,8 @@ MLX. The 4-bit weights need about 16 GB of memory.
    starts the run.
 
 The Host cannot reach `127.0.0.1` of the Mac, and it does not have to.
-When the Mac is offline, the step waits for it.
+When the Mac is offline, the step waits for it, unless the node lists a
+backup profile on another computer.
 
 ## Another OpenAI-compatible server
 

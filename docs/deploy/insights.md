@@ -54,12 +54,16 @@ is necessary to load a changed file, because a deploy replaces the file.
 
 These steps are for you to do on the server.
 
-1. Create a Dokploy project named "Night Shift Insights".
-2. Add Postgres, the Collector, and the app from
+1. Create a Dokploy project, for example `nightshift`.
+2. Add a compose, for example `insights`, from
    [`deploy/insights/docker-compose.yml`](../../deploy/insights/docker-compose.yml).
-3. Set `INSIGHTS_DB_PASSWORD` and `INSIGHTS_AUTH_SECRET` in the project
+   It holds Postgres, the Collector, and the app.
+3. Set `INSIGHTS_DB_PASSWORD` and `INSIGHTS_AUTH_SECRET` in the compose
    environment. Set `INSIGHTS_ADMIN_EMAIL` and `INSIGHTS_ADMIN_PASSWORD` for
    the first admin. The app creates that admin only while no account exists.
+   To sign in with GitHub, also set `INSIGHTS_GITHUB_CLIENT_ID`,
+   `INSIGHTS_GITHUB_CLIENT_SECRET`, and the allowed logins in
+   `INSIGHTS_GITHUB_LOGINS`.
 4. Add the domain `ingest.example.com` (an example) on the Collector,
    container port 4318, path `/nightshift`, with strip path on. Other
    sources can use other paths on the same name later.
@@ -84,6 +88,7 @@ Cloudflare Access is free for up to 50 users.
 
 14. Add a WAF rate limit on the ingest host of 60 requests a minute per IP.
 15. Enable daily backups for the Postgres service in Dokploy.
+
 Released builds of Night Shift send to `https://ingest.xiduzo.com/nightshift`.
 That default is in `usageEndpoint()` of `@nightshift/telemetry` (see
 [ADR 12](../adr/0012-released-builds-send-usage-to-the-team-ingest.md)).
@@ -95,5 +100,7 @@ A run from source sends nothing.
     of [`deploy/Dockerfile`](../../deploy/Dockerfile), or set the
     repository variable `NIGHTSHIFT_USAGE_ENDPOINT`.
 
-A Host sends usage unless `NIGHTSHIFT_USAGE` is `off`. The Host compose
-file shows that line as a comment.
+A Host records usage by default. It sends only after someone sees the
+usage notice in its web UI, or when `NIGHTSHIFT_USAGE` is `on`. To stop
+it, set `NIGHTSHIFT_USAGE=off` or `DO_NOT_TRACK=1`. The Host compose file
+shows that line as a comment.

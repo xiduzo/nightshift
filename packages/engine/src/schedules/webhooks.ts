@@ -50,7 +50,8 @@ import type { RunSummary } from "../read";
  *
  * The same Device that fires a schedule's cron times takes its webhooks
  * (`firesHere`): the Space's Host, else the one Device of a Space without
- * a Host. The Device the schedule names runs the run.
+ * a Host. The run starts on that Device too (ADR 15): a schedule names no
+ * Device.
  */
 
 /** A webhook as the HTTP server hands it over. */

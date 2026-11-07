@@ -20,8 +20,10 @@ In Night Shift, open **Settings → Monitoring**:
 3. If your tool asks for JSON, change the **Format**. Else keep protobuf.
 4. If your tool needs an API key, add a **Header**, for example
    `Authorization` with the value `Bearer ${GRAFANA_TOKEN}`. Save the key
-   itself on the Secrets page as `GRAFANA_TOKEN`. A value that is not
-   secret, such as a tenant id, can stay as written.
+   itself on the Secrets page as `GRAFANA_TOKEN`. On a Host, save it as
+   **This computer**, or set it in the environment. The export does not
+   read Space or Project secrets. A value that is not secret, such as a
+   tenant id, can stay as written.
 
 A header keeps only the `${NAME}` reference. The key stays in the secrets,
 and the record of a step shows it as `•••`. Headers saved by an older

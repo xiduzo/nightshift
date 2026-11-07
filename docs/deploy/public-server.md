@@ -62,8 +62,10 @@ minutes:
 }
 ```
 
-The times are in nanoseconds, as Docker takes them. The image has no
-`curl`, so test with `nightshift health`, not with a web request.
+The times are in nanoseconds, as Docker takes them. Test with
+`nightshift health`, not with a web request to `/health`. `/health` can
+answer while the timers of Night Shift have stopped. `nightshift health`
+reads the heartbeat in the database.
 
 ### Updates: stop the old container first
 

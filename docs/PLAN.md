@@ -178,7 +178,7 @@ Status: built. Agent outcomes run in real nights. The starters validate, but non
 
 Proves: a night starts without a person.
 
-Status: built. Tested with a fake clock: no double fires, no overlap with a run of the same schedule that still runs, catch-up within 15 minutes, or within the late window of a schedule (`lateMinutes`). Schedules start real nights since 2026-10-20. The Host of a Space fires its schedules.
+Status: built. Tested with a fake clock: no double fires, no overlap with a run of the same schedule that still runs, catch-up within 15 minutes, or within the late window of a schedule (`lateMinutes`). Schedules start real nights since 2026-10-20. The Host of a Space fires its schedules. Since 2026-11-04 the run also starts on the Host ([ADR 15](adr/0015-a-schedule-always-runs-on-the-host.md)), and a node that names another Device hands its step there.
 
 ### Slice 8 — More harnesses and tools
 
@@ -200,7 +200,7 @@ Real nights so far run on Claude Code only.
 
 ### Then
 
-A flow library to share, server mode, Windows.
+Server mode is built: the Host, its Spaces and its Offers ([docs/research/devices.md](research/devices.md), [docs/deploy/](deploy/)). The next phase is in [docs/research/next-phase-2026-11.md](research/next-phase-2026-11.md). Still open: a flow library to share, and Windows.
 
 ## 6. Setup
 
@@ -372,20 +372,20 @@ Settings, connections and secrets stay out. The values of saved secrets, and of 
 ## 7. Open items
 
 - Our own TanStack AI tools reach a Claude Code session over MCP as `mcp__tanstack__<name>` (Slice 2, the `report_step` tool). Claude Code's plan mode denies them. So a plan-mode Claude Code node reports with a text line instead. OpenCode allows them in every mode. Codex is unverified.
-- Session resume works through the adapter (Slice 1). The usage-limit reset time is parsed from the harness's raw messages, but no real usage limit has tested it yet.
+- Session resume works through the adapter (Slice 1). The usage-limit reset time is parsed from the harness's raw messages. Real usage limits tested it on 2026-10-19 and 2026-10-25.
 - The desktop window loads the prerendered TanStack Start build from `views://mainview`. Routes with parameters (a run page) are not prerendered: a reload there may not find the page. Navigation inside the app works.
 - The desktop app has no icon (`apps/desktop/icon.iconset`), no signing and no notarization yet. When a daemon holds the lease on another port, the app quits at start with only a log line.
 - The decider runs Claude Code with no built-in tools (`--tools "" --strict-mcp-config`). `@tanstack/ai-claude-code` 0.9 cannot pass that next to several bridged tools. So we append the flags to the `claude` executable string, which the adapter splits on spaces. Check again on every adapter upgrade, and ask upstream for an option.
 - An item cut short by a stop or a daemon death shows `failed` with a reason until the run resumes. After a daemon death, that resume comes on its own a few seconds later. The item then continues. Consider `stopped` and `interrupted` item states.
 - `timeoutMinutes` on a Subflow node with `each` is not enforced. Every step inside the body keeps its own limit.
 - Item branches are `nightshift/<run8>-<id>-<title>`: git cannot nest a branch under the run branch `nightshift/<run8>`.
-- Usage-limit and network sleeps are tested with fakes only. The first real usage limit at night is the real test.
+- Network sleeps are tested with fakes only. Usage-limit sleeps ran for real on 2026-10-19 and 2026-10-25.
 - `@tanstack/ai-opencode` 0.5 drives OpenCode 1.x servers only (verified with 1.19.2). OpenCode 2.x serves a different API. Point the OpenCode harness at a 1.x `opencode` until the adapter catches up. The harness works around four adapter quirks: an empty first tool input, the prompt echoed as text, a finish held until the next heartbeat, and abort teardown. Report them upstream.
 - The Codex harness is tested against a fake `codex` only. The event shapes, `exec resume`, error wording and the TOML MCP overrides are unverified. In `workspace-write`, commits from a linked worktree may need the git common dir in `additionalDirectories`.
 - The take-over commands for OpenCode (`opencode --session <id>`) and Codex (`codex resume <id>`) come from the CLI docs. Neither was run against a real session.
-- Slices 5 to 8 have not run a real night. The first scheduled night, the first planner that feeds a Subflow with `each`, and the first OpenCode or Codex step are the real tests.
+- Slices 5 to 8 run real nights since 2026-10-18. The first planner that feeds a Subflow with `each`, and the first OpenCode or Codex step, are still the real tests of slices 6 and 8.
 - Schedule catch-up looks only at the latest missed cron time. Earlier missed times are dropped without a log entry. So a daemon that was down for two nights starts at most one run.
-- Every daemon runs the scheduler, a dev daemon too. A project added to both databases starts its schedules twice. Consider a switch to turn the scheduler off in development.
+- In a Space with a Host, only the Host fires schedules ([ADR 15](adr/0015-a-schedule-always-runs-on-the-host.md)). A dev daemon without a Host still fires the schedules of its own database. `NIGHTSHIFT_SCHEDULER=off` turns its scheduler off.
 - An MCP `${NAME}` that the daemon lacks fails the step when it starts, not the run at its start. A night finds out at that node. The Agents page shows each variable as Keychain, Environment or Missing. A start check could refuse the run instead.
 - Secrets use the macOS keychain through `Bun.secrets`. A packaged desktop build signs a different binary. Check that it can read items saved by the `bun` daemon.
 - The lease fences on the heartbeat only. A daemon that lost the lease can still write for up to one heartbeat (10 s) before it exits. The stale check compares the heartbeat with this machine's clock. Two machines on one remote database need clocks that agree within the stale window.
