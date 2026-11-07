@@ -114,10 +114,11 @@ function startersTable(): string {
 			.map((helper) => `\`${helper.name}\``);
 		const comesWith =
 			helpers.length > 0 ? ` It comes with ${helpers.join(" and ")}.` : "";
+		// A default may hold a `|` (a regular expression): `cell` escapes it.
 		return [
 			`\`${starter.name}\``,
 			cell(`${source.description ?? ""}${comesWith}`),
-			inputs || "none",
+			cell(inputs) || "none",
 		];
 	});
 	return table(["Flow", "Does", "Inputs"], rows);

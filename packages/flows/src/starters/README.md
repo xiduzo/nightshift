@@ -6,7 +6,7 @@ Small, self-contained flows that ship with Night Shift. Change them to fit a pro
 
 A starter meets all four rules. A flow that needs a vendor account or an MCP server goes to [`community/`](../../../../community/) at the root of the repository.
 
-1. **It fits any project.** No input has a default, because a default fits only some projects. Each input is required. The description of a command or a glob gives examples, such as `npm test` or `pytest`.
+1. **It fits any project.** No default names a language or its tools. An input without a default is required. The description of a command or a glob gives examples, such as `npm test` or `pytest`.
 2. **It needs one agent login only.** It uses no `gh`, no other vendor CLI, no secret, and no MCP server.
 3. **It is self-contained.** It uses no local scripts, no user paths, no Keychain, and no user skills.
 4. **It starts on its own.** A helper flow that only a parent calls installs with its parent. `partOf` in `starters.ts` names that parent. No list that a person sees shows the helper as a starter.
@@ -20,6 +20,9 @@ A starter meets all four rules. A flow that needs a vendor account or an MCP ser
 | `plan-and-build` | `goal`, `check` (for example `npm test`) | A planner returns tasks (`{ id, title, details, dependsOn }`) or asks you through a Gate when the goal is unclear. Each task runs the helper `build-task` on its own branch, stacked on the last one, in `dependsOn` order. `build-task` calls `implement-and-check` with `task` bound to `{{item.title}}: {{item.details}}`. A reviewer ends on `approved` or `changes-requested` with a list of `issues`. |
 | `per-file` | `glob` (for example `docs/**/*.md`), `instruction` | Runs the helper `edit-file` once per file that matches the glob, all on one branch, then commits once. In `edit-file`, one agent applies the instruction to `{{item.path}}` and does not commit. |
 | `review-learnings` | none | A Gate shows what agents proposed to learn about the project. What you keep goes into its [knowledge](../../../../docs/knowledge.md), and agents read it in later runs. |
+| `watch-logs` | `logs`, `pattern` (default `error\|exception\|fatal\|panic`), `check` | A Command with no model runs `logs` and keeps the lines that match `pattern`. It drops each line whose fingerprint (the line without numbers, ids and times) is in `watch-logs/seen.txt` of the knowledge. Thus no agent runs when nothing is new. An Agent with a cascade, Sonnet then Opus, ends on `found`, `noise`, or `fail` when no tier finds the cause. On `found`, a Gate asks you to `fix` (a call of `implement-and-check` with `check`) or `ignore`. `noise`, `ignore` and a fix that passes add the fingerprints to the seen file. |
+| `scout-and-pick` | `topic`, `count` (default `3`) | A Sonnet agent searches the knowledge and the web. It reports up to `count` candidates (`{ name, label, description }`), or `none`. An Ask shows them, and you pick one or leave it empty. A rule Branch ends the run when you pick none. An Agent with a cascade, Sonnet then Opus, writes a report as data, and a Command saves it as `scout/<name>.md` in the knowledge. |
+| `draft-slides` | `source`, `file` (default `slides.md`) | An Agent with a cascade, Sonnet then Opus, reports a Marp deck in its data. A Gate shows the deck: `keep`, or `revise` with a note that the next draft reads. The `revise` edge has a max of 3, and a fourth `revise` ends the run as failed. On `keep`, a Command writes `file` and commits it. |
 <!-- /checked:starters -->
 
 ## Use them

@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 
+import { FLOW_VERSION, type Flow } from "../flow";
+import { parseFlow } from "../validate";
 import { starterList } from "./starters";
 
 type StarterSource = {
@@ -74,12 +76,15 @@ describe("the starters", () => {
 		}
 	});
 
-	test("it fits any project: the person gives every input, as no default fits all", () => {
+	test("it fits any project: no default names a language or its tools, and an input without one is required", () => {
+		const specific =
+			/\b(bun|npm|pnpm|yarn|npx|node|deno|pytest|python|pip|cargo|go|mvn|gradle|make|dotnet)\b|\.(ts|tsx|js|jsx|py|rb|go|rs|java|kt|cs)\b/;
 		for (const { name } of starterList()) {
 			for (const input of source(name).inputs) {
 				const label = `${name}: ${input.name}`;
-				expect(input.default, label).toBeUndefined();
-				expect(input.required, label).toBe(true);
+				if (input.default === undefined)
+					expect(input.required, label).toBe(true);
+				else expect(String(input.default), label).not.toMatch(specific);
 			}
 		}
 	});
@@ -94,6 +99,50 @@ describe("the starters", () => {
 				expect(node.type, name).not.toBe("tool");
 				expect(node.clis ?? [], name).toEqual([]);
 				expect(node.connections ?? [], name).toEqual([]);
+			}
+		}
+	});
+
+	test("each starter comes to the current format with no errors", () => {
+		const flows: Record<string, Flow | null> = Object.fromEntries(
+			starterList().map(({ name, source }) => [name, parseFlow(source).flow]),
+		);
+		for (const { name, source } of starterList()) {
+			const { flow, issues } = parseFlow(source, { flows, name });
+			expect({
+				name,
+				version: flow?.version,
+				errors: issues.filter((issue) => issue.severity === "error"),
+			}).toEqual({ name, version: FLOW_VERSION, errors: [] });
+		}
+	});
+
+	test("a starter needs Claude Code only: no secret, connection, profile, device or decision model", () => {
+		for (const { name, source } of starterList()) {
+			const nodes = parseFlow(source).flow?.nodes ?? [];
+			for (const node of nodes) {
+				const tiers = "cascade" in node ? (node.cascade ?? []) : [];
+				for (const part of [node, ...tiers] as Record<string, unknown>[]) {
+					expect({
+						name,
+						node: node.id,
+						secrets: part.secrets,
+						connections: part.connections,
+						profile: part.profile,
+						device: part.device,
+						model: part.by === "model",
+						harness: part.harness ?? "claude-code",
+					}).toEqual({
+						name,
+						node: node.id,
+						secrets: undefined,
+						connections: undefined,
+						profile: undefined,
+						device: undefined,
+						model: false,
+						harness: "claude-code",
+					});
+				}
 			}
 		}
 	});

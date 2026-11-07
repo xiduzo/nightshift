@@ -1,0 +1,151 @@
+{
+	"version": 6,
+	"description": "An agent drafts a slide deck, and you keep it or ask for changes. Night Shift commits the deck you keep.",
+	"inputs": [
+		{
+			"name": "source",
+			"type": "text",
+			"label": "Source",
+			"description": "What the deck is about: notes, the text of a ticket, a file in the project, or a git range such as `v1.2..HEAD`.",
+			"required": true
+		},
+		{
+			"name": "file",
+			"type": "text",
+			"label": "Deck file",
+			"default": "slides.md"
+		}
+	],
+	"outputs": [
+		{
+			"name": "deck",
+			"value": "{{draft.data.deck}}",
+			"description": "The last draft of the deck."
+		}
+	],
+	"start": "draft",
+	"nodes": [
+		{
+			"id": "draft",
+			"label": "Draft the deck",
+			"position": {
+				"x": 0,
+				"y": 0
+			},
+			"type": "agent",
+			"prompt": "Draft a slide deck about this:\n\n{{source}}\n\nWhen it names a file or a git range, read it in the project of your working directory. Do not change any file.\n\nWrite Marp Markdown: front matter with `marp: true`, then `---` between slides. Give each slide a title and at most five short lines. Report the whole deck in `deck`.\n\nYour last draft and what the person wants changed, both empty on the first draft:\n\n{{draft.data.deck}}\n\n{{review.note}}",
+			"permissionMode": "auto",
+			"session": "fresh",
+			"timeoutMinutes": 30,
+			"cascade": [
+				{
+					"label": "sonnet",
+					"harness": "claude-code",
+					"model": "sonnet"
+				},
+				{
+					"label": "opus",
+					"harness": "claude-code",
+					"model": "opus"
+				}
+			],
+			"output": {
+				"type": "object",
+				"properties": {
+					"deck": {
+						"type": "string",
+						"pattern": "marp: true"
+					}
+				},
+				"required": ["deck"]
+			}
+		},
+		{
+			"id": "review",
+			"label": "Keep or change?",
+			"position": {
+				"x": 320,
+				"y": 0
+			},
+			"type": "decision",
+			"prompt": "Keep this deck, or write in the note what to change.\n\nDeck:\n\n```markdown\n{{draft.data.deck}}\n```",
+			"options": [
+				{
+					"name": "keep",
+					"description": "Save the deck in the project and commit it.",
+					"color": "green"
+				},
+				{
+					"name": "revise",
+					"description": "An agent changes the deck to follow your note. You can ask 3 times.",
+					"color": "amber"
+				}
+			],
+			"by": "person"
+		},
+		{
+			"id": "save",
+			"label": "Save and commit",
+			"position": {
+				"x": 640,
+				"y": 0
+			},
+			"type": "command",
+			"command": "# Writes the deck you kept to the project and commits it.\nset -e\nmkdir -p \"$(dirname \"{{file}}\")\"\nprintf '%s\\n' \"{{draft.data.deck}}\" > \"{{file}}\"\ngit add -- \"{{file}}\"\nif git diff --cached --quiet; then\n\techo 'Nothing changed.'\n\texit 0\nfi\ngit commit -q -m \"draft-slides: {{file}}\"",
+			"timeoutMinutes": 5
+		},
+		{
+			"id": "done",
+			"position": {
+				"x": 960,
+				"y": 0
+			},
+			"type": "end",
+			"status": "done",
+			"message": "Saved the deck in {{file}}."
+		},
+		{
+			"id": "too_many",
+			"position": {
+				"x": 640,
+				"y": 200
+			},
+			"type": "end",
+			"status": "failed",
+			"message": "You asked for changes 3 times. Start a new run, and add your notes to the source."
+		}
+	],
+	"edges": [
+		{
+			"id": "draft-pass-review",
+			"from": "draft",
+			"outcome": "pass",
+			"to": "review"
+		},
+		{
+			"id": "review-keep-save",
+			"from": "review",
+			"outcome": "keep",
+			"to": "save"
+		},
+		{
+			"id": "review-revise-draft",
+			"from": "review",
+			"outcome": "revise",
+			"to": "draft",
+			"max": 3
+		},
+		{
+			"id": "review-revise-too_many",
+			"from": "review",
+			"outcome": "revise",
+			"to": "too_many"
+		},
+		{
+			"id": "save-pass-done",
+			"from": "save",
+			"outcome": "pass",
+			"to": "done"
+		}
+	]
+}
