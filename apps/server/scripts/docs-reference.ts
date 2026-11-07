@@ -79,10 +79,11 @@ function startersTable(): string {
 					: `\`${input.name}\` (default \`${String(input.default)}\`)`,
 			)
 			.join(", ");
+		// A default may hold a `|` (a regular expression): `cell` escapes it.
 		return [
 			`\`${starter.name}\``,
 			cell(source.description ?? ""),
-			inputs || "none",
+			cell(inputs) || "none",
 		];
 	});
 	return table(["Flow", "Does", "Inputs"], rows);

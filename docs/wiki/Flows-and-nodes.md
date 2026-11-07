@@ -150,6 +150,9 @@ When you add a project, Night Shift saves these flows into it. Change them to fi
 | `edit-file` | An agent applies an instruction to one file. per-file runs it once for each file. | `item`, `instruction` |
 | `review-learnings` | Asks you about what agents proposed to learn about the project. What you keep goes into its knowledge, and agents read it in later runs. Schedule it, or run it from the Knowledge page. | none |
 | `per-file` | An agent applies the same instruction to each file that matches a glob. Night Shift then commits all changes at once. | `glob` (default `src/**/*.ts`), `instruction` |
+| `watch-logs` | Finds new errors in your logs without a model. An agent looks for the cause, and you decide if an agent fixes it. | `logs`, `pattern` (default `error\|exception\|fatal\|panic`), `check` |
+| `scout-and-pick` | An agent finds candidates for a topic, and you pick one. Another agent writes a report on it to the project's knowledge, for agents to read later. | `topic`, `count` (default `3`) |
+| `draft-slides` | An agent drafts a slide deck, and you keep it or ask for changes. Night Shift commits the deck you keep. | `source`, `file` (default `slides.md`) |
 <!-- /generated:starters -->
 
 To add a starter later, import its file from [packages/flows/src/starters/flows/](https://github.com/xiduzo/nightshift/tree/main/packages/flows/src/starters/flows).

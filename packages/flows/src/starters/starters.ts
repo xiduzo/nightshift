@@ -1,10 +1,13 @@
 import buildTask from "./flows/build-task.json";
+import draftSlides from "./flows/draft-slides.json";
 import editFile from "./flows/edit-file.json";
 import implementAndCheck from "./flows/implement-and-check.json";
 import perFile from "./flows/per-file.json";
 import planAndBuild from "./flows/plan-and-build.json";
 import reviewLearnings from "./flows/review-learnings.json";
 import reviewPr from "./flows/review-pr.json";
+import scoutAndPick from "./flows/scout-and-pick.json";
+import watchLogs from "./flows/watch-logs.json";
 
 /**
  * Starters: small flows that ship with Night Shift, for a person to change.
@@ -25,6 +28,9 @@ const STARTERS: readonly Starter[] = [
 	{ name: "edit-file", source: editFile },
 	{ name: "review-learnings", source: reviewLearnings },
 	{ name: "per-file", source: perFile },
+	{ name: "watch-logs", source: watchLogs },
+	{ name: "scout-and-pick", source: scoutAndPick },
+	{ name: "draft-slides", source: draftSlides },
 ];
 
 /** Every starter. */

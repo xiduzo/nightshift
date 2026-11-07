@@ -14,7 +14,7 @@ import {
 	waitFor,
 	withDevice,
 } from "@nightshift/engine/testing";
-import { type Flow, singleAgentFlow } from "@nightshift/flows";
+import { type Flow, singleAgentFlow, starterList } from "@nightshift/flows";
 import {
 	createInAppChannel,
 	createNotifications,
@@ -590,7 +590,7 @@ describe("replies of a real engine", () => {
 			projectId: project.id,
 		})) as { name: string }[];
 		expect(flows.map((flow) => flow.name)).toContain("implement-and-check");
-		expect(flows).toHaveLength(7);
+		expect(flows).toHaveLength(starterList().length);
 		expect(mismatches).toEqual([]);
 	});
 });

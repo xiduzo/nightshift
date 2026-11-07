@@ -1,0 +1,279 @@
+{
+	"version": 6,
+	"description": "Finds new errors in your logs without a model. An agent looks for the cause, and you decide if an agent fixes it.",
+	"inputs": [
+		{
+			"name": "logs",
+			"type": "text",
+			"label": "Logs command",
+			"description": "A command that prints recent log lines, for example `tail -n 500 log/app.log`, `docker compose logs --since 1h app` or `journalctl -u app --since \"1 hour ago\"`.",
+			"required": true
+		},
+		{
+			"name": "pattern",
+			"type": "text",
+			"label": "Error pattern",
+			"description": "Lines that match this regular expression count as errors. Case does not matter.",
+			"default": "error|exception|fatal|panic"
+		},
+		{
+			"name": "check",
+			"type": "text",
+			"label": "Check",
+			"description": "The command that proves a fix, for example `npm test`, `pytest` or `go test ./...`.",
+			"required": true
+		}
+	],
+	"outputs": [
+		{
+			"name": "finding",
+			"value": "{{investigate.data}}",
+			"description": "The summary, cause, fix and severity of the new errors."
+		}
+	],
+	"start": "read",
+	"nodes": [
+		{
+			"id": "read",
+			"label": "Read the logs",
+			"position": {
+				"x": 0,
+				"y": 0
+			},
+			"type": "command",
+			"command": "# No model in this step. It keeps the lines that match, as fingerprints\n# without numbers, ids and times, and drops the fingerprints seen before.\nset -eu\nseen=\"${NS_KNOWLEDGE:-}/watch-logs/seen.txt\"\n[ -f \"$seen\" ] || seen=/dev/null\ntmp=$(mktemp -d)\ntrap 'rm -rf \"$tmp\"' EXIT\nif ! sh -c \"{{logs}}\" > \"$tmp/log\" 2>&1; then\n\techo \"The logs command failed:\"\n\ttail -n 20 \"$tmp/log\"\n\texit 1\nfi\nexport LC_ALL=C\ntr '\\t' ' ' < \"$tmp/log\" | tr -d '\\000-\\010\\013-\\037\\177' \\\n\t| { grep -Ei -e \"{{pattern}}\" || true; } > \"$tmp/hits\"\nsed -E -e 's/[0-9a-fA-F]{8}-[0-9a-fA-F-]{27}/<id>/g' \\\n\t-e 's/0x[0-9a-fA-F]+|[0-9a-fA-F]{16,}/<id>/g' \\\n\t-e 's/[0-9]+/<n>/g' -e 's/ +/ /g' -e 's/^ //' -e 's/ $//' \\\n\t\"$tmp/hits\" > \"$tmp/prints\"\n# One example line per new fingerprint, at most 50.\npaste \"$tmp/prints\" \"$tmp/hits\" \\\n\t| awk -F '\\t' 'FILENAME == ARGV[1] { seen[$0] = 1; next } !($1 in seen) && !($1 in shown) { shown[$1] = 1; print }' \"$seen\" - \\\n\t| head -n 50 > \"$tmp/new\"\nif [ ! -s \"$tmp/new\" ]; then\n\techo \"No new errors.\"\n\texit 0\nfi\n# The lines on stdin as one JSON string.\njson() {\n\tsed -e 's/\\\\/\\\\\\\\/g' -e 's/\"/\\\\\"/g' \\\n\t\t| awk 'BEGIN { printf \"\\\"\" } { printf \"%s%s\", (NR > 1 ? \"\\\\n\" : \"\"), $0 } END { print \"\\\"\" }'\n}\ncount=$(wc -l < \"$tmp/new\" | tr -d ' ')\necho \"$count new kinds of error.\"\nprintf '{\"outcome\":\"new\",\"count\":%s,\"lines\":%s,\"fingerprints\":%s}\\n' \"$count\" \\\n\t\"$(cut -f 2- \"$tmp/new\" | json)\" \"$(cut -f 1 \"$tmp/new\" | json)\" > \"$NS_OUTPUT\"",
+			"timeoutMinutes": 10,
+			"exits": [
+				{
+					"name": "new",
+					"code": "data",
+					"description": "New errors to look at.",
+					"color": "orange"
+				},
+				{
+					"name": "quiet",
+					"code": 0,
+					"description": "No new errors.",
+					"color": "green"
+				},
+				{
+					"name": "fail",
+					"description": "The logs command failed.",
+					"color": "red"
+				}
+			]
+		},
+		{
+			"id": "quiet",
+			"position": {
+				"x": 320,
+				"y": 200
+			},
+			"type": "end",
+			"status": "nothing-to-do",
+			"message": "No new errors."
+		},
+		{
+			"id": "investigate",
+			"label": "Find the cause",
+			"position": {
+				"x": 320,
+				"y": 0
+			},
+			"type": "agent",
+			"prompt": "These lines are new in the logs of this project, one line per kind of error:\n\n```\n{{read.data.lines}}\n```\n\nFind their cause in the code of your working directory. Read the code and its git history. Do not change any file.\n\nReport one outcome:\n- `found`: a real problem. Propose the smallest fix.\n- `noise`: expected or harmless. Say why in `cause`.\n- `fail`: you cannot find the cause. Say what you checked in `cause`.\n\nAlways fill in `summary` (one sentence: what goes wrong), `cause`, `fix` (\"None.\" when nothing needs a fix) and `severity`.",
+			"permissionMode": "auto",
+			"effort": "high",
+			"session": "fresh",
+			"timeoutMinutes": 30,
+			"cascade": [
+				{
+					"label": "sonnet",
+					"harness": "claude-code",
+					"model": "sonnet"
+				},
+				{
+					"label": "opus",
+					"harness": "claude-code",
+					"model": "opus"
+				}
+			],
+			"outcomes": [
+				{
+					"name": "found",
+					"description": "The errors point to a real problem.",
+					"color": "orange"
+				},
+				{
+					"name": "noise",
+					"description": "The errors are expected or harmless.",
+					"color": "gray"
+				},
+				{
+					"name": "fail",
+					"description": "You cannot find the cause.",
+					"color": "red"
+				}
+			],
+			"output": {
+				"type": "object",
+				"properties": {
+					"summary": {
+						"type": "string"
+					},
+					"cause": {
+						"type": "string"
+					},
+					"fix": {
+						"type": "string"
+					},
+					"severity": {
+						"type": "string",
+						"enum": ["low", "medium", "high"]
+					}
+				},
+				"required": ["summary", "cause", "fix", "severity"]
+			}
+		},
+		{
+			"id": "unsolved",
+			"position": {
+				"x": 640,
+				"y": 400
+			},
+			"type": "end",
+			"status": "failed",
+			"message": "No agent found the cause of the new errors."
+		},
+		{
+			"id": "decide",
+			"label": "Fix or ignore?",
+			"position": {
+				"x": 640,
+				"y": 0
+			},
+			"type": "decision",
+			"prompt": "New errors in your logs: {{investigate.data.summary}}\n\nSeverity: {{investigate.data.severity}}\n\nCause: {{investigate.data.cause}}\n\nProposed fix: {{investigate.data.fix}}\n\nLog lines:\n\n```\n{{read.data.lines}}\n```",
+			"options": [
+				{
+					"name": "fix",
+					"description": "An agent makes the fix and runs your check. It reads your note.",
+					"color": "green"
+				},
+				{
+					"name": "ignore",
+					"description": "Night Shift does not show these errors again.",
+					"color": "gray"
+				}
+			],
+			"by": "person"
+		},
+		{
+			"id": "fix",
+			"label": "Fix and check",
+			"position": {
+				"x": 960,
+				"y": 0
+			},
+			"type": "call",
+			"flow": "implement-and-check",
+			"inputs": {
+				"task": "Fix this problem from the logs: {{investigate.data.summary}}\n\nCause: {{investigate.data.cause}}\n\nProposed fix: {{investigate.data.fix}}\n\nNote from the person: {{decide.note}}",
+				"check": "{{check}}"
+			}
+		},
+		{
+			"id": "fix_failed",
+			"position": {
+				"x": 1280,
+				"y": 200
+			},
+			"type": "end",
+			"status": "failed",
+			"message": "The fix did not pass your check. The next run looks at these errors again."
+		},
+		{
+			"id": "remember",
+			"label": "Remember these errors",
+			"position": {
+				"x": 1280,
+				"y": 0
+			},
+			"type": "command",
+			"command": "# Adds the fingerprints to the list that later runs skip.\nset -eu\nif [ -z \"${NS_KNOWLEDGE:-}\" ]; then\n\techo \"This step needs the project's knowledge folder.\"\n\texit 1\nfi\nseen=\"$NS_KNOWLEDGE/watch-logs/seen.txt\"\nmkdir -p \"$NS_KNOWLEDGE/watch-logs\"\nif [ ! -f \"$seen\" ]; then\n\techo \"# Log errors that watch-logs does not show again, one per line.\" > \"$seen\"\nfi\nprintf '%s\\n' \"{{read.data.fingerprints}}\" >> \"$seen\"\necho \"Added {{read.data.count}} kinds of error to watch-logs/seen.txt.\"",
+			"timeoutMinutes": 5
+		},
+		{
+			"id": "done",
+			"position": {
+				"x": 1600,
+				"y": 0
+			},
+			"type": "end",
+			"status": "done",
+			"message": "New errors: {{investigate.data.summary}}"
+		}
+	],
+	"edges": [
+		{
+			"id": "read-new-investigate",
+			"from": "read",
+			"outcome": "new",
+			"to": "investigate"
+		},
+		{
+			"id": "read-quiet-quiet",
+			"from": "read",
+			"outcome": "quiet",
+			"to": "quiet"
+		},
+		{
+			"id": "investigate-found-decide",
+			"from": "investigate",
+			"outcome": "found",
+			"to": "decide"
+		},
+		{
+			"id": "investigate-noise-remember",
+			"from": "investigate",
+			"outcome": "noise",
+			"to": "remember"
+		},
+		{
+			"id": "investigate-fail-unsolved",
+			"from": "investigate",
+			"outcome": "fail",
+			"to": "unsolved"
+		},
+		{
+			"id": "decide-fix-fix",
+			"from": "decide",
+			"outcome": "fix",
+			"to": "fix"
+		},
+		{
+			"id": "decide-ignore-remember",
+			"from": "decide",
+			"outcome": "ignore",
+			"to": "remember"
+		},
+		{
+			"id": "fix-pass-remember",
+			"from": "fix",
+			"outcome": "pass",
+			"to": "remember"
+		},
+		{
+			"id": "fix-fail-fix_failed",
+			"from": "fix",
+			"outcome": "fail",
+			"to": "fix_failed"
+		},
+		{
+			"id": "remember-pass-done",
+			"from": "remember",
+			"outcome": "pass",
+			"to": "done"
+		}
+	]
+}

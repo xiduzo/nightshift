@@ -1,0 +1,251 @@
+{
+	"version": 6,
+	"description": "An agent finds candidates for a topic, and you pick one. Another agent writes a report on it to the project's knowledge, for agents to read later.",
+	"inputs": [
+		{
+			"name": "topic",
+			"type": "text",
+			"label": "Topic",
+			"description": "What to look for, for example \"PDF libraries for Bun\", \"open issues worth a first fix\" or \"papers on model routing\".",
+			"required": true
+		},
+		{
+			"name": "count",
+			"type": "number",
+			"label": "Number of candidates",
+			"default": "3"
+		}
+	],
+	"outputs": [
+		{
+			"name": "candidates",
+			"value": "{{scout.data.candidates}}",
+			"description": "What the scout found."
+		},
+		{
+			"name": "pick",
+			"value": "{{pick.data.pick}}",
+			"description": "The name of the candidate you picked."
+		}
+	],
+	"start": "scout",
+	"nodes": [
+		{
+			"id": "scout",
+			"label": "Find candidates",
+			"position": {
+				"x": 0,
+				"y": 0
+			},
+			"type": "agent",
+			"prompt": "Find candidates for this topic:\n\n{{topic}}\n\nSearch the project's knowledge first, then the web if you can. Skip what `scout/` in the knowledge already covers. Do not change any file.\n\nReport `found` with 1 to {{count}} candidates, the best first. Give each a `name` (a short id of lowercase letters, digits and -), a `label` (its title) and a `description`: why it fits this project in one or two sentences, then its link on a new line. Report `none` with an empty list when nothing fits, and say why in the summary.",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"permissionMode": "auto",
+			"session": "fresh",
+			"timeoutMinutes": 30,
+			"outcomes": [
+				{
+					"name": "found",
+					"description": "The candidates are in the data.",
+					"color": "green"
+				},
+				{
+					"name": "none",
+					"description": "Nothing fits. The summary says why.",
+					"color": "gray"
+				}
+			],
+			"output": {
+				"type": "object",
+				"properties": {
+					"candidates": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"name": {
+									"type": "string"
+								},
+								"label": {
+									"type": "string"
+								},
+								"description": {
+									"type": "string"
+								}
+							},
+							"required": ["name", "label", "description"]
+						}
+					}
+				},
+				"required": ["candidates"]
+			}
+		},
+		{
+			"id": "nothing",
+			"position": {
+				"x": 320,
+				"y": 200
+			},
+			"type": "end",
+			"status": "nothing-to-do",
+			"message": "Nothing found: {{scout.summary}}"
+		},
+		{
+			"id": "pick",
+			"label": "Pick one",
+			"position": {
+				"x": 320,
+				"y": 0
+			},
+			"type": "value",
+			"by": "person",
+			"prompt": "Which candidate for \"{{topic}}\" do you want a report on?",
+			"output": {
+				"type": "object",
+				"properties": {
+					"pick": {
+						"type": "string",
+						"title": "Candidate",
+						"description": "Leave it empty to stop here."
+					}
+				}
+			},
+			"choices": {
+				"from": "{{scout.data.candidates}}",
+				"field": "pick"
+			}
+		},
+		{
+			"id": "picked",
+			"label": "Picked one?",
+			"position": {
+				"x": 640,
+				"y": 0
+			},
+			"type": "decision",
+			"prompt": "Ends the run when you picked none.",
+			"options": [
+				{
+					"name": "picked",
+					"description": "Write the report.",
+					"when": "$type(pick.data.pick) = \"string\" and pick.data.pick != \"\""
+				},
+				{
+					"name": "none",
+					"description": "You picked none. The run ends."
+				}
+			],
+			"by": "rule"
+		},
+		{
+			"id": "skipped",
+			"position": {
+				"x": 960,
+				"y": 200
+			},
+			"type": "end",
+			"status": "nothing-to-do",
+			"message": "You picked none of the candidates."
+		},
+		{
+			"id": "write",
+			"label": "Write the report",
+			"position": {
+				"x": 960,
+				"y": 0
+			},
+			"type": "agent",
+			"prompt": "Write a report on the candidate `{{pick.data.pick}}` for this topic:\n\n{{topic}}\n\nThe candidates:\n\n{{scout.data.candidates}}\n\nRead the source behind its link. Write for an agent of a later run: what it is, how it fits this project, how to start, and the risks. Give the link of each source. Do not change any file.\n\nReport the report as Markdown in `markdown`, with a `#` title on the first line.",
+			"permissionMode": "auto",
+			"session": "fresh",
+			"timeoutMinutes": 30,
+			"cascade": [
+				{
+					"label": "sonnet",
+					"harness": "claude-code",
+					"model": "sonnet"
+				},
+				{
+					"label": "opus",
+					"harness": "claude-code",
+					"model": "opus"
+				}
+			],
+			"output": {
+				"type": "object",
+				"properties": {
+					"markdown": {
+						"type": "string"
+					}
+				},
+				"required": ["markdown"]
+			}
+		},
+		{
+			"id": "save",
+			"label": "Save to the knowledge",
+			"position": {
+				"x": 1280,
+				"y": 0
+			},
+			"type": "command",
+			"command": "# Saves the report in the project's knowledge, where agents read it later.\nset -eu\nif [ -z \"${NS_KNOWLEDGE:-}\" ]; then\n\techo \"This step needs the project's knowledge folder.\"\n\texit 1\nfi\nname=$(printf '%s' \"{{pick.data.pick}}\" | LC_ALL=C tr 'A-Z' 'a-z' | LC_ALL=C tr -c 'a-z0-9-' '-')\n[ -n \"$name\" ] || name=pick\nmkdir -p \"$NS_KNOWLEDGE/scout\"\nprintf '%s\\n' \"{{write.data.markdown}}\" > \"$NS_KNOWLEDGE/scout/$name.md\"\necho \"Saved scout/$name.md in the knowledge.\"",
+			"timeoutMinutes": 5
+		},
+		{
+			"id": "done",
+			"position": {
+				"x": 1600,
+				"y": 0
+			},
+			"type": "end",
+			"status": "done",
+			"message": "Saved the report on {{pick.data.pick}} to the knowledge."
+		}
+	],
+	"edges": [
+		{
+			"id": "scout-found-pick",
+			"from": "scout",
+			"outcome": "found",
+			"to": "pick"
+		},
+		{
+			"id": "scout-none-nothing",
+			"from": "scout",
+			"outcome": "none",
+			"to": "nothing"
+		},
+		{
+			"id": "pick-pass-picked",
+			"from": "pick",
+			"outcome": "pass",
+			"to": "picked"
+		},
+		{
+			"id": "picked-picked-write",
+			"from": "picked",
+			"outcome": "picked",
+			"to": "write"
+		},
+		{
+			"id": "picked-none-skipped",
+			"from": "picked",
+			"outcome": "none",
+			"to": "skipped"
+		},
+		{
+			"id": "write-pass-save",
+			"from": "write",
+			"outcome": "pass",
+			"to": "save"
+		},
+		{
+			"id": "save-pass-done",
+			"from": "save",
+			"outcome": "pass",
+			"to": "done"
+		}
+	]
+}
