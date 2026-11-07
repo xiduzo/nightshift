@@ -19,7 +19,7 @@ Draw once how your agents and you work together. Night Shift runs it on your own
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/flow-editor-dark.png">
-  <img src="docs/assets/flow-editor.png" alt="The Night Shift flow editor with a flow on the canvas and the settings of the selected step on the right.">
+  <img src="docs/assets/flow-editor.png" alt="The watch-logs flow in the Night Shift editor. A rule reads the logs, an agent finds the cause, and a Gate asks you before a fix. On the right, the agent's cascade: Sonnet first, then Opus.">
 </picture>
 
 ## Why
