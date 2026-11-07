@@ -13,7 +13,7 @@ You wake up to a stack of pull requests and a short list of decisions that need 
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178c6?logo=typescript&logoColor=fff)](https://www.typescriptlang.org)
 ![Platform: macOS · Linux](https://img.shields.io/badge/platform-macOS%20%C2%B7%20Linux-lightgrey)
 
-[Quick start](#quick-start) · [How it works](#how-it-works) · [Your computers](#your-computers-a-host-and-your-phone) · [Starter flows](packages/flows/src/starters/) · [Plan](docs/PLAN.md) · [Contributing](CONTRIBUTING.md)
+[Quick start](#quick-start) · [How it works](#how-it-works) · [User guide](https://github.com/xiduzo/nightshift/wiki) · [Starter flows](https://github.com/xiduzo/nightshift/wiki/Flows-and-nodes#starter-flows) · [Plan](docs/PLAN.md) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -29,7 +29,7 @@ If you work with coding agents, you run the same pipeline again and again: build
 Night Shift turns the pipeline into a flow that you draw. The engine owns the order, the retries, the loop limits, and the stop time. Agents do the work. You answer only at a gate.
 
 - **Local first.** Every session, branch, and token stays on your own computers. Agents run with your own CLI logins.
-- **The engine decides, the model advises.** A model never adds a node or changes the graph. Every loop has a maximum count.
+- **The engine decides, the model advises.** During a run, a model never adds a node or changes the graph. Every loop has a maximum count.
 - **Flows stay out of your repo.** Night Shift keeps your flows and schedules, so a team repo needs no Night Shift files. Every save is a revision. You see who changed what, and you can restore an earlier one ([ADR 2](docs/adr/0002-flows-are-night-shift-data.md)).
 - **No built-in method.** Spec-driven, issue-driven, or one file at a time: each method is another flow.
 
@@ -52,65 +52,50 @@ flowchart LR
   build -- "done / halted" --> review
 ```
 
-A step can climb a **cascade**: it tries a cheap tier first, and moves up when a try does not hold. The [`implement-and-check`](packages/flows/src/starters/flows/implement-and-check.json) starter is one Agent with a cascade. Sonnet tries up to 3 times, then Opus. After each try, the check `bun test` runs. A try holds only when the check passes. Each try gets the failure of the try before.
+A step can climb a **cascade**: it tries a cheap tier first, and moves up when a try does not hold. The [`implement-and-check`](packages/flows/src/starters/flows/implement-and-check.json) starter is one Agent with a cascade. Sonnet tries up to 3 times, then Opus. After each try, the check `bun test` runs. A try holds only when the check passes. Each try gets the failure of the try before. The last tier of a cascade can be you.
 
 Steps are nodes. Each node type does one job:
 
+<!-- checked:nodes: every node type has one row. bun run docs:reference checks it. -->
 | Node | Does |
 | --- | --- |
-| **Agent** | Runs one coding-agent session with a prompt or a skill. Ends with an outcome and, if you ask, data that matches a JSON schema. It can ask you a question and continue with your answer. A cascade tries cheap agents first, with a check after each try. |
-| **Command** | Runs a shell command in the project, for example the tests. Template values arrive as environment variables, never as shell text. JSON it writes to `$NS_OUTPUT` is its data, and can pick its outcome. `$NS_KNOWLEDGE` is the project's [knowledge](docs/knowledge.md) folder. |
+| **Agent** | Runs one coding-agent session with a prompt or a skill. Ends with an outcome and, if you ask, data that matches a JSON schema. |
+| **Command** | Runs a shell command in the project, for example the tests. Template values arrive as environment variables, never as shell text. |
 | **Tool** | Calls one tool of an MCP server with typed arguments. No model in the loop. |
-| **Decision** | Picks one of its options. You choose who picks: a person (a **Gate** in your inbox, with an optional deadline), a rule (a **Branch**, a JSONata expression), or a model. A model's pick below a confidence you set goes to a stronger model, or to you. |
-| **Value** | Makes data that matches a JSON schema, from a rule, a model or a person. A person gets an **Ask**: a form in your inbox, with choices that an earlier step made, and their screenshots and links. |
+| **Decision** | Picks one of its options. A person picks it (a **Gate**), a rule picks it (a **Branch**), or a model picks it. |
+| **Value** | Makes data that matches a JSON schema, from a rule, a model, or a person (an **Ask**). |
 | **Wait** | Waits for a duration, a time, a command that passes, or a signal, for example from a webhook. |
-| **Subflow** | Runs another flow or a **kit**, once or once per item in a list. The list can come from a planner's output or a command such as `gh`. |
+| **Subflow** | Runs another flow or a kit, once or once per item in a list. |
 | **Join** | Waits for the branches that run at once, all of them or the first. |
+| **Lease** | Lets one run at a time do the next steps, for example one deploy at a time. |
+| **Service** | Starts a Docker Compose stack, a dev server, or a model server for the next steps, and stops it after. |
 | **End** | Ends the run on purpose: done, nothing to do, or failed, with one line that says why. |
+<!-- /checked:nodes -->
 
-A flow declares inputs and outputs, like a function. Steps read earlier values through templates such as `{{verify.log_tail}}` or `{{planner.data.tasks}}`. Two or more edges on one outcome run their branches at once. A variable can keep its value from one run to the next.
+[Flows and nodes](https://github.com/xiduzo/nightshift/wiki/Flows-and-nodes) in the user guide tells each node in full, with the kits and the starter flows.
 
-A large flow stays readable. Put related nodes in a **Section**, a box on the canvas that you zoom into. A Section can hold other Sections. Choose Lay out, and Night Shift arranges the nodes for you. The editor has undo, redo, copy, and paste.
+## What you get
 
-### Build a flow with an agent
-
-You do not have to draw every node yourself. An agent helps you in the editor, on your own logins:
-
-- **Chat beside the canvas.** Tell the agent what the flow must do. It proposes the changes, and the canvas marks each node and edge that it adds, removes, or changes. You keep the proposal or drop it.
-- **Suggest on each field.** A prompt, the outcomes, a rule, a command, or the output fields: one click gives a suggestion that fits the flow.
-- **Ask why.** When a run does not finish, the run page asks an agent why, and the agent reads the run for you.
-
-You choose the agent that answers. An agent in a terminal gets the same help through `nightshift mcp` (see [Drive Night Shift from a terminal or an agent](#drive-night-shift-from-a-terminal-or-an-agent)).
-
-### Agents on your own logins
-
-An Agent node names the coding agent it runs on. One flow can mix them.
-
-| Agent | Status |
-| --- | --- |
-| Claude Code | Verified |
-| OpenCode | Needs a 1.x build |
-| Codex | Not yet verified |
-| Grok Build | Not yet verified |
-| pi | Through the Agent Client Protocol. Needs pi 0.81 or later. Runs local models through Ollama |
-| Any other agent that speaks the Agent Client Protocol | Add it as a custom agent with its command, for example `goose acp` |
-| GitHub Copilot, Gemini CLI, Cursor | Through the Agent Client Protocol, not yet verified |
-
-A node can add connections (MCP servers) and CLI tools such as `gh`. Each CLI tool runs with its own login, so one program can run as two accounts, for example `gh` and `gh-work`. Profiles hold an agent's setup, or the model of a Decision, under one name. You make them on the Agents page of each computer. A profile belongs to that computer, and a node names the profile and its computer, for example "builder on LE2316" ([ADR 3](docs/adr/0003-a-profile-belongs-to-one-device.md)).
-
-Night Shift knows no issue tracker: GitHub, Linear, or Jira is a command in your flow. Kits are small flows that ship with Night Shift, on `git`, `gh` and `acli`: create a branch, open a draft pull request, wait for CI, finish the pull request, move a Jira work item. A Subflow runs one as `kit:github/publish-draft-pr`.
-
-### Runs that survive the night
-
-- **Schedules** start a flow at a set time and stop it at a stop time, for example 22:00 to 07:00. A schedule can also start when a webhook arrives, for example when a pull request opens, or wake a Wait when CI is done. A schedule names the computer where its run runs. When you have a Host, the Host starts every schedule.
-- **A computer that goes offline does not end the run.** A step on that computer waits for it until the stop time, and Night Shift tells you.
-- **Run policy** handles fresh retries with the failure log, a rescue by a stronger model, network grace, and usage-limit waits that resume the same session.
-- **Each run works in its own copy of your project**, so your checkout stays clean.
-- **Gates** wait in a "Needs you" inbox. An unattended run never blocks on a question in the middle of a session. A Gate with a deadline picks an option for you when nobody answers in time.
+- **[Build a flow with an agent.](https://github.com/xiduzo/nightshift/wiki/Flows-and-nodes#build-a-flow-with-an-agent)** Chat beside the canvas, a Suggest button on each field, and "Ask an agent why" when a run ends early.
+- **[Agents on your own logins.](https://github.com/xiduzo/nightshift/wiki/Agents-and-profiles)** Claude Code, OpenCode, Codex, pi, and any agent that speaks the Agent Client Protocol. One flow can mix them.
+- **[Runs that survive the night.](https://github.com/xiduzo/nightshift/wiki/Runs-and-schedules)** Schedules with a stop time, webhooks, a budget, usage-limit waits that continue the same session, and resume.
+- **[Gates in your inbox.](https://github.com/xiduzo/nightshift/wiki/Gates-and-the-inbox)** A run never blocks on a question in the middle of a session. A Gate with a deadline picks for you.
+- **[Knowledge.](https://github.com/xiduzo/nightshift/wiki/Knowledge)** The files your agents read besides the code: a wiki, web pages, Jira, Confluence. Agents propose what they learned, and you keep it.
+- **[Your computers and a Host.](https://github.com/xiduzo/nightshift/wiki/Computers-and-Hosts)** Each step runs where you place it. A Host runs every schedule, and Spaces share projects with a team.
+- **[Your phone.](https://github.com/xiduzo/nightshift/wiki/Phone-app)** Follow the night live, and answer Gates. Some Gates take an answer from the lock screen.
+- **[A terminal or an agent.](https://github.com/xiduzo/nightshift/wiki/Terminal-and-MCP)** `nightshift flows` and `nightshift mcp` read and save flows, start runs, and answer Gates.
 
 ## Quick start
 
-You need macOS or Linux, [Bun](https://bun.sh) 1.3, git, and at least one coding-agent CLI that you have logged in to (for example `claude`).
+Night Shift is pre-alpha. Pick one way to run it:
+
+| Way | For |
+| --- | --- |
+| **The desktop app** | Your own computer. Download it from the [nightly release](https://github.com/xiduzo/nightshift/releases/tag/nightly): macOS (Apple silicon) or Linux (x64). It updates itself. |
+| **The Docker image** | A Host on a server: `ghcr.io/xiduzo/nightshift:nightly`. See [docs/deploy/](docs/deploy/). |
+| **From source** | Work on Night Shift itself. See below. |
+
+To run from source, you need macOS or Linux, [Bun](https://bun.sh) 1.3, git, and one coding-agent CLI that you are logged in to, such as `claude`.
 
 ```bash
 git clone https://github.com/xiduzo/nightshift.git
@@ -119,91 +104,23 @@ bun install
 bun run dev            # web UI on :3001, API on :3000, with hot reload
 ```
 
-You need no `.env` file to start. Outside production, Night Shift makes its own auth secret once and says so in its log.
-
 Then, in the web UI at http://localhost:3001:
 
-1. **Add a project.** Choose its folder, or copy a repository from GitHub. Leave "Add the starter flows" checked: the seven [starter flows](packages/flows/src/starters/) arrive in the project. Night Shift keeps the flows and writes nothing into your repository.
-2. **Add your agents.** The Agents page shows the agent CLIs and tools that Night Shift finds on this computer (`claude`, `codex`, `opencode`, `pi`, `gh`, `acli`). Choose Add profile or Add tool for each one you want.
+1. **Add a project.** Choose its folder, or copy a repository from GitHub. Leave "Add the starter flows" checked.
+2. **Add your agents.** The Agents page shows the agent CLIs and tools that it finds on this computer. Add a profile for each one you want.
 3. **Run a starter.** Open `implement-and-check`, set the check to your project's test command, and start a run with a small task.
 
-| Command | Use it to |
-| --- | --- |
-| `bun run dev` | Work on Night Shift itself, with hot reload. Data stays in `.nightshift-dev/`. |
-| `bun run night` | Run real nights from a stable build that does not reload. Data stays in the OS app data folder. |
-| `bun run dev:desktop` | Start the desktop app. |
-| `bun run build:desktop` | Build the desktop app in `apps/desktop/build/`. Releases are in [docs/releasing.md](docs/releasing.md). |
+[Get started](https://github.com/xiduzo/nightshift/wiki/Get-started) in the user guide has the macOS first-open step, `bun run night` for real nights, and where Night Shift keeps its data.
 
-> [!TIP]
-> Run nights with `bun run night` and develop in a separate git worktree. A code change then never reloads Night Shift in the middle of a night.
+## Usage data
 
-### Starter flows
-
-| Flow | Does |
-| --- | --- |
-| `implement-and-check` | One Agent with a cascade: Sonnet up to 3 tries, then Opus. A check runs after each try. |
-| `plan-and-build` | A planner splits a goal into tasks. Each task gets its own stacked branch, in dependency order. A reviewer ends it. |
-| `build-task` | Builds one task of `plan-and-build`. |
-| `review-pr` | An agent reviews a pull request. A gate asks you before the agent posts the review. |
-| `per-file` | Applies one instruction to every file that matches a glob. |
-| `edit-file` | Edits one file of `per-file`. |
-
-Night Shift saves all seven into a project when you add it. A flow that calls another flow needs that flow in the project too. See [packages/flows/src/starters/](packages/flows/src/starters/).
-
-### Drive Night Shift from a terminal or an agent
-
-A person or an agent in a terminal reads and saves flows through `nightshift`, never as files. Night Shift must run on this computer. Night Shift checks each save and keeps it as a new revision of the flow.
-
-```bash
-nightshift flows list                        # name, steps, errors, description
-nightshift flows get fix-issue > fix.json    # the flow as JSON
-nightshift flows save fix-issue fix.json     # or from stdin; prints its problems
-nightshift flows export fix-issue --out ./   # a file to import elsewhere
-nightshift flows import fix-issue.json       # a new flow; a taken name gets a suffix
-nightshift flows revisions fix-issue         # who saved what, newest first
-```
-
-The commands use the project of the current folder. `--project <id, name or folder>` picks another one.
-
-`nightshift mcp` gives an agent (Claude Code, Codex, an orchestrator) the same flows, the runs of a night, and a project's knowledge as MCP tools. Add it to Claude Code with `claude mcp add nightshift -- nightshift mcp`.
-
-| Tool | What it does |
-| --- | --- |
-| `list_projects`, `list_flows`, `get_flow` | Read the projects and their flows. |
-| `list_profiles`, `list_tools`, `list_skills` | Look up the names a node may use. |
-| `check_flow`, `save_flow` | Check a flow, and save it when it has no errors. |
-| `start_run` | Start a saved flow with its inputs. |
-| `list_runs` | The newest runs: by status, and since a time. Each with its cost and pull request. |
-| `get_run` | One run: its status, cost, pull request, steps, and why it failed. |
-| `stop_run` | Stop a run now, or after the step that runs now. |
-| `needs_me` | The Gates that wait for you, in every project, with the question and the options. |
-| `answer_gate` | Answer a Gate with one of its options and a note. The run continues. |
-| `get_digest` | What happened since a time: the runs that ended, and the Gates that wait. |
-| `search_knowledge` | Search the project's knowledge by keyword, and by meaning when Ollama runs: the best files, each with its path, section and an excerpt. |
-| `read_knowledge` | Read one file of the knowledge by its path. |
-
-To start a flow from another tool, such as GitHub Actions, n8n or Zapier, send a webhook to a schedule. See [docs/deploy/triggers.md](docs/deploy/triggers.md).
-
-## Your computers, a Host, and your phone
-
-Night Shift runs on each of your computers. To join them, run one of them as a **Host**.
-
-`nightshift` is Night Shift in one file: the server, the web UI, and the database. It runs on Linux (x64, arm64) and macOS (arm64), with Docker and systemd recipes. Your other computers reach the Host over your LAN, Tailscale, a public server, or a tunnel. See [docs/deploy/](docs/deploy/).
-
-- **Pair a computer.** Run `nightshift join <host>` on the computer, or choose Settings → This computer → Join a Host. Allow the code on the Host. `nightshift leave` ends the pairing.
-- **One Personal everywhere.** When a computer joins its home Host, its personal projects and flows move into your Personal there. You see the same Personal on all your computers and on your phone ([ADR 1](docs/adr/0001-one-personal-space-per-home-host.md)).
-- **Spaces for a team.** A Space shares projects, runs, and gates with the people you invite. Each person gets a role: owner, admin, member, or viewer.
-- **Offers.** You decide which of your agent profiles a Space can use. Each Offer sets the widest permission mode and how many sessions run at once.
-- **Each step runs where you place it.** A node names a profile and its computer. Night Shift moves the work of the run between the computers for you.
-- **The Host copies your GitHub projects.** It then runs work without one of your computers. A private repository needs `gh` and a `GH_TOKEN` on the Host.
-
-The **phone app** connects to your Host. Start a flow with its inputs, follow a run live, and answer a gate. A push notification tells you when a gate waits for you or when a run ends.
+A released build of Night Shift (the desktop app and the Docker image) sends anonymous usage events to the Night Shift team. A run from source sends nothing. The events are a closed list, with no names, paths, prompts, or code. Turn usage off in Settings, or set `NIGHTSHIFT_USAGE=off` or `DO_NOT_TRACK=1`. [docs/usage-data.md](docs/usage-data.md) lists every event and field ([ADR 11](docs/adr/0011-night-shift-sends-anonymous-usage-by-default.md)).
 
 ## Status
 
 Night Shift is **pre-alpha**. It is built in public, for its author first, and it changes fast. Expect breaking changes to the flow format and the database.
 
-Night Shift has run a real project every night since 2026-10-16.
+Night Shift has run a real project every night since 2026-10-16. On 2026-10-25 a flow ran a full Epic overnight to its end.
 
 - [x] One flow runs a full Epic overnight and replaces the script it grew from.
 - [ ] Night Shift builds Night Shift: its own work runs through its own flows.
@@ -213,22 +130,27 @@ The concept, the decisions, and the delivery order are in [docs/PLAN.md](docs/PL
 
 ## Documentation
 
+The [user guide](https://github.com/xiduzo/nightshift/wiki) is the GitHub wiki. Its pages live in [docs/wiki/](docs/wiki/), and a workflow publishes them. The repository holds the docs for people who build or run Night Shift:
+
 | Document | What is in it |
 | --- | --- |
 | [docs/PLAN.md](docs/PLAN.md) | The concept, the settled decisions, the architecture, and the setup. |
-| [docs/knowledge.md](docs/knowledge.md) | What agents read besides the code, and the kits that fill it. |
+| [docs/knowledge.md](docs/knowledge.md) | How the knowledge syncs, how search works, and the kits that fill it. |
 | [docs/glossary.md](docs/glossary.md) | One name for one thing: flow, run, step, node, gate, and more. |
+| [docs/usage-data.md](docs/usage-data.md) | Every usage event a released build sends, and how to turn it off. |
 | [docs/steering/](docs/steering/) | The vision, and the technical, QA, and design rules every change follows. |
 | [docs/adr/](docs/adr/) | The architecture decisions, one record each. |
 | [docs/deploy/](docs/deploy/) | Run Night Shift on a server and reach it from your other computers. |
 | [docs/deploy/triggers.md](docs/deploy/triggers.md) | Start a flow from GitHub Actions, n8n, Zapier or a script, with a signed webhook. |
 | [docs/deploy/services.md](docs/deploy/services.md) | Start a Docker Compose stack or a dev server for the steps of a run, and let Night Shift stop it. |
-| [docs/releasing.md](docs/releasing.md) | Release the desktop app and the phone app. |
+| [docs/deploy/local-models.md](docs/deploy/local-models.md) | Let a Decision or a Value use a model on your own server. |
+| [docs/deploy/monitoring.md](docs/deploy/monitoring.md) | Send the traces and metrics of your runs to your own OpenTelemetry tool. |
+| [docs/releasing.md](docs/releasing.md) | Release the desktop app and the Docker image. |
 | [docs/research/](docs/research/) | Spikes and design notes behind the bigger decisions. |
 
 ## Built with
 
-[Bun](https://bun.sh) · [TanStack Start](https://tanstack.com/start) and [TanStack AI](https://tanstack.com/ai) · [React Flow](https://reactflow.dev) · [LangGraph](https://github.com/langchain-ai/langgraphjs) · [Yjs](https://yjs.dev) · [Hono](https://hono.dev) · [oRPC](https://orpc.unnoq.com) · [Drizzle](https://orm.drizzle.team) on libsql · [Better Auth](https://better-auth.com) · [shadcn/ui](https://ui.shadcn.com) · [Electrobun](https://electrobun.dev) · [Expo](https://expo.dev) and [React Native Reusables](https://reactnativereusables.com)
+[Bun](https://bun.sh) · [TanStack Start](https://tanstack.com/start) and [TanStack AI](https://tanstack.com/ai) · [React Flow](https://reactflow.dev) with [ELK](https://eclipse.dev/elk/) · [LangGraph](https://github.com/langchain-ai/langgraphjs) and [LangChain.js](https://js.langchain.com) · [Yjs](https://yjs.dev) and [Hocuspocus](https://tiptap.dev/docs/hocuspocus) · [Hono](https://hono.dev) · [oRPC](https://orpc.unnoq.com) · [Drizzle](https://orm.drizzle.team) on libsql · [Better Auth](https://better-auth.com) · [JSONata](https://jsonata.org) · [Model Context Protocol](https://modelcontextprotocol.io) · [Agent Client Protocol](https://agentclientprotocol.com) · [Ollama](https://ollama.com) · [OpenTelemetry](https://opentelemetry.io) · [shadcn/ui](https://ui.shadcn.com) · [Electrobun](https://electrobun.dev) · [Expo](https://expo.dev) and [React Native Reusables](https://reactnativereusables.com)
 
 ## Contributing
 

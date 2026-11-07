@@ -46,6 +46,19 @@ pre-commit:
         - "*.{ts,tsx}"
         - "scripts/time-debt.txt"
       run: bun scripts/check-time.ts
+    # The reference tables of the docs match the code.
+    - name: docs reference
+      glob:
+        - "*.md"
+        - "packages/flows/src/kits/**"
+        - "packages/flows/src/starters/**"
+        - "packages/flows/src/harnesses/**"
+        - "packages/flows/src/flow/node.ts"
+        - "packages/agents/src/assistant/**"
+        - "packages/agents/src/knowledge/**"
+        - "apps/server/src/features/cli/**"
+        - "apps/server/scripts/docs-reference.ts"
+      run: bun run docs:reference --check
     - name: check tests
       glob:
         - "scripts/check-*.ts"

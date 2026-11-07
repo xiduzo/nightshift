@@ -1,0 +1,39 @@
+# Publishes docs/wiki/ to the GitHub wiki of this repository. The repository
+# is the source: the wiki is a copy, and an edit made on the wiki is lost at
+# the next publish. docs/wiki/README.md becomes the wiki's Home page, and a
+# link to `Page.md` becomes a link to the wiki page `Page`. A link to a file
+# outside docs/wiki/ must be a full https://github.com URL.
+#
+# CI checks the generated tables of the pages (bun run docs:reference --check).
+name: Wiki
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/wiki/**
+      - .github/workflows/wiki.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wiki
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Publish the wiki
+    runs-on: ubuntu-24.04
+    permissions:
+      # Pushes to the .wiki.git repository of this repository.
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      # Pinned to the commit of v5.0.6: this action gets write access.
+      - uses: Andrew-Chen-Wang/github-wiki-action@1bbb4280446f9630e8e21a18012cbacf3b0f992e # v5.0.6
+        with:
+          path: docs/wiki/
+          disable-empty-commits: true

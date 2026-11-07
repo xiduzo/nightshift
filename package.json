@@ -51,6 +51,7 @@
 	"scripts": {
 		"dev": "turbo run dev --filter='!insights'",
 		"night": "bun scripts/night.ts",
+		"docs:reference": "bun apps/server/scripts/docs-reference.ts",
 		"icons": "bun scripts/icons.ts",
 		"build": "turbo run build --filter='!desktop' && turbo run build -F desktop",
 		"check-types": "turbo run check-types",

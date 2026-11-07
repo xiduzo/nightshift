@@ -1,7 +1,8 @@
 # Starter flows
 
-Small, self-contained flows that ship with Night Shift. Change them to fit a project. The files are format version 6. Night Shift brings them to the current format, version 7, when you import them. Each one runs unattended: the agents use Claude Code in `auto` permission mode, and only a Gate waits for a person.
+Small, self-contained flows that ship with Night Shift. Change them to fit a project. The files are format version 6. Night Shift brings them to the current format, version 8, when you import them. Each one runs unattended: the agents use Claude Code in `auto` permission mode, and only a Gate waits for a person.
 
+<!-- checked:starters: every starter has one row. bun run docs:reference checks it. -->
 | Flow | Inputs | Does |
 | --- | --- | --- |
 | `implement-and-check` | `task`, `check` (default `bun test`) | One Agent with a cascade: Sonnet up to 3 tries, then Opus. After each try, its check runs `check` and fails on uncommitted changes. The next try gets the failure. The output `tier` says which tier finished. |
@@ -11,6 +12,7 @@ Small, self-contained flows that ship with Night Shift. Change them to fit a pro
 | `per-file` | `glob` (default `src/**/*.ts`), `instruction` | Runs `edit-file` once per file that matches the glob, all on one branch, then commits once. |
 | `edit-file` | `item` (a file), `instruction` | The body of `per-file`: one agent applies the instruction to `{{item.path}}` and does not commit. |
 | `review-learnings` | none | A Gate shows what agents proposed to learn about the project. What you keep goes into its [knowledge](../../../../docs/knowledge.md), and agents read it in later runs. |
+<!-- /checked:starters -->
 
 ## Use them
 

@@ -125,6 +125,18 @@ the same rules as the UI copy, in STE-flavored mode (`ste-writing` skill).
   ("continues", "the Secrets page").
 - **Records stay as written.** `docs/research/` and `docs/adr/` record past
   decisions. Do not rewrite them.
+- **The user guide is `docs/wiki/`.** `.github/workflows/wiki.yml` publishes
+  it to the GitHub wiki. Never edit the wiki itself. The pages are for the
+  person who uses Night Shift: they follow the UI copy rules, with no
+  internals. Write a page link as `Page.md`. Write a link to any other file
+  of the repository as a full `https://github.com/xiduzo/nightshift/...` URL.
+  No `> [!NOTE]` alerts: the wiki shows them as text.
+- **Generated and checked blocks.** `<!-- generated:NAME -->` blocks come
+  from the code: run `bun run docs:reference`, never edit them by hand. A
+  `<!-- checked:NAME -->` table must name every item of the code. When you
+  add a node type, a kit, a starter, an agent, a CLI command or an MCP
+  tool, update the docs in the same change. CI runs
+  `bun run docs:reference --check`.
 
 <!-- BEGIN:turborepo-agent-rules -->
 

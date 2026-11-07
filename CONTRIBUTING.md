@@ -13,8 +13,8 @@ Thank you for your interest. Night Shift is pre-alpha and built for its author f
 ```bash
 bun install
 bun lefthook install   # git hooks: format, lint, the layer and vertical checks on commit
-bun run dev            # web UI and API with hot reload, no .env needed
-bun run dev:mobile     # the phone app, in Expo
+bun run dev            # web UI, API and phone app with hot reload, no .env needed
+bun run dev:mobile     # the phone app alone, in Expo
 bun run dev:desktop    # the desktop app
 ```
 
@@ -30,6 +30,7 @@ bun run check-types    # TypeScript
 bun run check          # Biome: lint and format
 bun scripts/check-layers.ts      # packages depend only on lower layers
 bun scripts/check-verticals.ts   # imports go through a vertical's barrel
+bun run docs:reference --check   # the tables in the docs match the code
 ```
 
 ## The rules
@@ -42,6 +43,8 @@ Every change follows the steering documents:
 - [DESIGN.md](docs/steering/DESIGN.md) and [AGENTS.md](AGENTS.md): the UI is built from shadcn/ui components only, and UI copy tells the person what happens, not how Night Shift works inside.
 
 Durable docs use plain, short sentences in the active voice (ASD-STE100 style).
+
+The user guide is the [GitHub wiki](https://github.com/xiduzo/nightshift/wiki). Change it in [docs/wiki/](docs/wiki/), never on the wiki itself: a workflow publishes `docs/wiki/` when it lands on `main`. Some tables in the docs come from the code. After you change a node type, a kit, a starter, an agent, a CLI command, or an MCP tool, run `bun run docs:reference`.
 
 ## Pull requests
 

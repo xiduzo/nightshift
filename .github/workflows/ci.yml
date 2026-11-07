@@ -75,6 +75,11 @@ jobs:
       - name: Clock
         run: bun scripts/check-time.ts
 
+      # The kits, starters, agents, CLI help and MCP tools in the docs match
+      # the code (apps/server/scripts/docs-reference.ts).
+      - name: Docs reference
+        run: bun run docs:reference --check
+
       - name: Tests of the checks
         run: bun test ./scripts/
 

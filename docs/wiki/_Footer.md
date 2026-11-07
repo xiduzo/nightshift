@@ -1,0 +1,1 @@
+This wiki comes from [`docs/wiki/`](https://github.com/xiduzo/nightshift/tree/main/docs/wiki) in the repository. To change a page, open a pull request there. An edit made here is lost at the next publish.
