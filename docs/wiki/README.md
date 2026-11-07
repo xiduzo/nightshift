@@ -1,8 +1,10 @@
 # Night Shift
 
-Night Shift runs your coding-agent pipeline as a flow that you draw. It runs on your own computers while you sleep. You wake up to pull requests and a short list of decisions that need you.
+Stop babysitting your agents. Draw once how your agents and you work together. Night Shift runs it on your own computers, day and night, and asks you only what needs you.
 
-This wiki is the user guide. It tells you how to install Night Shift, draw flows, schedule nights, and answer what waits for you.
+In a flow, work climbs a ladder: a cheap agent tries, a strong agent rescues it, and you are the last rung. Choices climb too: a rule, a decision model, a large model, and then you.
+
+This wiki is the user guide. It tells you how to install Night Shift, draw flows, run them, and answer what waits for you.
 
 | Page | What is in it |
 | --- | --- |

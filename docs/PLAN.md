@@ -1,16 +1,18 @@
 # Night Shift — Plan
 
-> A personal workbench to draw agent flows and run them unattended.
+> Stop babysitting your agents: draw how they work once, and let Night Shift run it.
 
 This document records the concept, the decisions behind it, the architecture and the delivery order. The steering documents in `docs/steering/` hold the durable rules. This plan holds the route.
 
 ## 1. What Night Shift is
 
-Night Shift is a workbench for one developer. You draw a flow in a graph editor. Each node is a step: an agent session with a prompt and/or a skill, a shell command, a decision, or a gate. The engine runs the flow on your machine, with your own CLI logins, while you sleep. In the morning you read a stack of pull requests and the open gates.
+Night Shift is a flow builder for people who work with coding agents. You draw a flow in a graph editor. Each node is a step: an agent session with a prompt or a skill, a command, a tool call, a decision, or a Gate. The engine runs the flow on your own computers, with your own CLI logins. It starts on a schedule, from a webhook, or when you click Run. You act only at a Gate.
 
-Night Shift replaces `night-shift.py`, the script in `rpgdotexe/tools/night-shift/`. The script hardcodes one pipeline: worker, check, retry, rescue, pull request, checkpoint. Night Shift turns that pipeline into a flow that you can see and change. The script keeps running the nights until a flow runs a full Epic.
+Work and choices climb a ladder. A cheap agent tries first, a strong agent rescues it, and you are the last rung. A rule makes the choices it can, then a decision model, then a large model, then you. Every step records its cost, so you tune a flow by its cost and its benefit.
 
-Night Shift is for its author first. A team, a server mode and other methods come only after the personal tool works every night.
+Night Shift replaced `night-shift.py`, the script in `rpgdotexe/tools/night-shift/`. The script hardcoded one pipeline: worker, check, retry, rescue, pull request, checkpoint. On 2026-10-25 a flow ran a full Epic, and the script retired.
+
+Night Shift was for its author first. It ran the author's work every night since 2026-10-16. Since 2026-11-07 it is for other people who work with agents too.
 
 ## 2. Decisions
 
@@ -200,7 +202,18 @@ Real nights so far run on Claude Code only.
 
 ### Then
 
-Server mode is built: the Host, its Spaces and its Offers ([docs/research/devices.md](research/devices.md), [docs/deploy/](deploy/)). The next phase is in [docs/research/next-phase-2026-11.md](research/next-phase-2026-11.md). Still open: a flow library to share, and Windows.
+Server mode is built: the Host, its Spaces and its Offers ([docs/research/devices.md](research/devices.md), [docs/deploy/](deploy/)). The next phase is in [docs/research/next-phase-2026-11.md](research/next-phase-2026-11.md). Still open:
+
+- **A flow library to share.** It starts as the [`community/`](../community/) folder. A separate repository or a gallery in the app can come later.
+- **Cost and benefit insight.** A run shows what each step cost. A person cannot see yet:
+  - how often each tier of a cascade holds, and what it costs
+  - the cost per useful result, such as a merged pull request
+  - how much of their own attention a flow takes
+  - what a subscription really costs, beyond the API price of the work
+  - how close a running run is to its budget
+  - how often the guards stop a flow
+  - whether a model's confidence matches the outcome
+- **Windows.**
 
 ## 6. Setup
 
