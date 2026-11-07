@@ -350,7 +350,7 @@ describe("cell", () => {
 describe("the starters", () => {
 	test("name only the starters a person sees, and a parent row names its helper", () => {
 		const listed = CHECKED.starters?.() ?? [];
-		const rendered = GENERATED.starters?.() ?? "";
+		const rendered = GENERATED.starters?.("README.md") ?? "";
 		expect(firstColumnNames(rendered)).toEqual(listed);
 		const helpers = starterList().filter((starter) => starter.partOf);
 		expect(helpers.length).toBeGreaterThan(0);

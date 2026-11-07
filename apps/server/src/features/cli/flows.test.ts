@@ -6,6 +6,7 @@ import {
 	type FlowsIo,
 	type FlowsOptions,
 	flowsOptions,
+	importedFileName,
 	runFlows,
 } from "./flows";
 
@@ -240,5 +241,20 @@ describe("nightshift flows import and your agents", () => {
 		expect(profile.err).toEqual([
 			'This computer has no agent profile "triage". Its profiles: builder, deep.',
 		]);
+	});
+});
+
+describe("importedFileName", () => {
+	test("a flow.json takes the name of its folder", () => {
+		expect(importedFileName("community/review-pr/flow.json")).toBe(
+			"review-pr.json",
+		);
+		expect(importedFileName("/tmp/figma-to-code/Flow.JSON")).toBe(
+			"figma-to-code.json",
+		);
+	});
+
+	test("any other file keeps its own name", () => {
+		expect(importedFileName("exports/fix-issue.json")).toBe("fix-issue.json");
 	});
 });

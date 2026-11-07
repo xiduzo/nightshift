@@ -1,6 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { chooseProject } from "@nightshift/agents";
 import type { AppRouterClient } from "@nightshift/api";
 import {
@@ -512,7 +512,8 @@ export async function runFlows(
 		case "import": {
 			const text = await io.read(command.file);
 			const name =
-				command.name ?? flowNameOfFile(basename(command.file as string));
+				command.name ??
+				flowNameOfFile(importedFileName(command.file as string));
 			const chosen = await chooseAgents(client, io, text, command);
 			if (chosen === null) return 1;
 			const saved = await client.flows.import({
@@ -593,4 +594,15 @@ export async function flowsCommand(argv: string[], program: string) {
 		);
 		process.exitCode = 1;
 	}
+}
+
+/**
+ * The file name that names an imported flow. A `flow.json` takes the name of
+ * its folder, as in `community/<name>/flow.json`.
+ */
+export function importedFileName(file: string): string {
+	const name = basename(file);
+	return name.toLowerCase() === "flow.json"
+		? `${basename(dirname(resolve(file)))}.json`
+		: name;
 }

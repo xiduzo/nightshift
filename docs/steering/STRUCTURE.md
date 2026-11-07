@@ -170,7 +170,7 @@ Two exceptions exist, as in yapyap. `scripts/check-verticals.ts` lists each one 
 
 The check fails on a leaf contract or a peer port that nothing uses any more, so neither outlives its reason.
 
-Today there is one leaf contract: `features/updates/update-feeds.ts` in `apps/desktop`. The build config (`electrobun.config.ts`) reads the feeds. The barrel of `updates` loads `electrobun/main`, which only the app's main process can load. There are nine peer ports, all in `apps/web` (section 5).
+Today there is one leaf contract: `features/updates/update-feeds.ts` in `apps/desktop`. The build config (`electrobun.config.ts`) reads the feeds. The barrel of `updates` loads `electrobun/main`, which only the app's main process can load. There are ten peer ports, all in `apps/web` (section 5).
 
 ### Growth
 
@@ -222,6 +222,7 @@ Imports point one way, so no barrel closes a cycle. Biome's `noImportCycles` fai
   - `gates` reads `runs/queries`.
   - `agents` reads `devices/queries` (the Offers of a profile).
   - The Flows page reads `schedules/queries` and `dashboard/queries` (what starts each flow, its last runs).
+  - `projects` reaches `agents/flow-agents-step` when you add a project: you choose which of your agents takes each agent of the starter flows.
 - `devices` and `runs` show each other (the Walker of a run, the runs of an Offer). `devices` reaches the run status badge through a peer port. `flows` reaches the run queries and the status icon through one port, `runs/flows-port.ts` (start a run, a flow's last runs).
 - A concept goes to the vertical that owns it in `docs/glossary.md`, not to its biggest user. Outcomes are declared by flow nodes, so `outcome-badge` is in `flows/canvas`. The Walker is a Device, so `walker-badge` is in `devices`.
 
