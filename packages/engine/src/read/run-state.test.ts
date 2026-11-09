@@ -439,6 +439,7 @@ describe("gates", () => {
 			openedAt: b.events.at(-1)?.at ?? 0,
 			deadline: null,
 			form: null,
+			branchesWork: false,
 		});
 		expect(deriveSteps(foldRun(b.events))[0]?.gate?.question).toBe(
 			"Ship PR 12?",
@@ -452,6 +453,17 @@ describe("gates", () => {
 			note: "yes",
 			visit: 1,
 		});
+	});
+
+	test("a Gate says when a step on another branch still works", () => {
+		const b = log()
+			.runStarted()
+			.stepStarted("s1", "gate")
+			.stepStarted("s2", "work")
+			.gateOpened("s1", "Ship it?");
+		expect(foldRun(b.events).gate?.branchesWork).toBe(true);
+		b.stepEnded("s2", "done", { visit: 1 });
+		expect(foldRun(b.events).gate?.branchesWork).toBe(false);
 	});
 
 	test("a Gate the author marked for the lock screen says so while it is open", () => {

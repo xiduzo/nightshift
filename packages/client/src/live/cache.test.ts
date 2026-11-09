@@ -320,6 +320,18 @@ describe("the live cache follows the Host", () => {
 		}
 	});
 
+	test("a change of a run whose Gate waits for another branch reads the Gates again too", async () => {
+		const { queryClient, live, stale, timers } = setUp();
+		queryClient.setQueryData(gatesKey, [
+			{ ...gate("r1", "a"), branchesWork: true },
+			gate("r2", "b"),
+		]);
+		const { host } = follow(live);
+		await host.send(runChanged);
+		timers.due(300);
+		expect(stale()).toEqual(sorted(["gates", ...RUN_1]));
+	});
+
 	test("a pause tonight that begins or ends reads the schedules again, and nothing else", async () => {
 		const { live, stale, timers } = setUp();
 		const { host } = follow(live);

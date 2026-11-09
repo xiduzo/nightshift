@@ -42,6 +42,11 @@ export const openGateSchema = exact<OpenGate>()(
 		walker: runWalkerSchema,
 		/** An answer is on its way to the Walker. */
 		answerPending: z.boolean(),
+		/**
+		 * A step on another branch of the run still works. The run takes
+		 * no answer until that step ends.
+		 */
+		branchesWork: z.boolean(),
 	}),
 );
 

@@ -98,6 +98,7 @@ export {
 export {
 	CASCADE_TEMPLATE_FIELDS,
 	cascadeOutputFields,
+	GATE_TITLE_MAX,
 	type GateDeadline,
 	isPersonTier,
 	type PersonTier,

@@ -167,3 +167,53 @@ describe("deadline", () => {
 		});
 	});
 });
+
+describe("title", () => {
+	const flow = (node: DecisionNode) =>
+		flowSchema.safeParse({
+			version: FLOW_VERSION,
+			start: node.id,
+			nodes: [node],
+			edges: [],
+		});
+	const errors = (node: DecisionNode) => {
+		const parsed = flow(node);
+		if (!parsed.success) throw parsed.error;
+		return validateFlow(parsed.data)
+			.filter((issue) => issue.severity === "error")
+			.map((issue) => issue.message);
+	};
+
+	test("is optional, and a flow file of today's version keeps it", () => {
+		expect(parse(gate()).title).toBeUndefined();
+		expect(parse(gate({ title: "Merge the green ones?" })).title).toBe(
+			"Merge the green ones?",
+		);
+	});
+
+	test("is one line of at most 80 characters", () => {
+		expect(flow(gate({ title: "x".repeat(80) })).success).toBe(true);
+		expect(flow(gate({ title: "x".repeat(81) })).success).toBe(false);
+		expect(flow(gate({ title: "Merge?\nAll of them" })).success).toBe(false);
+		expect(flow(gate({ title: "  " })).success).toBe(false);
+	});
+
+	test("belongs to a person: a rule or a model has none", () => {
+		expect(errors(gate({ title: "Merge?" }))).toEqual([]);
+		expect(
+			errors(
+				gate({
+					by: "rule",
+					title: "Merge?",
+					options: [{ name: "approve", when: "true" }, { name: "reject" }],
+				}),
+			),
+		).toEqual([expect.stringContaining("has a title")]);
+	});
+
+	test("a switch away from a person drops it", () => {
+		expect(
+			withDecidedBy(gate({ title: "Merge?" }), "rule").title,
+		).toBeUndefined();
+	});
+});

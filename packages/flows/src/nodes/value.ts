@@ -24,7 +24,9 @@ import {
 import {
 	ASK_TIER_CHOICES,
 	checkCascade,
+	checkGateTitle,
 	checkModelTier,
+	gateTitleSchema,
 	isPersonTier,
 	personTierSchema,
 	tierBase,
@@ -141,6 +143,13 @@ export const valueNodeSchema = z.object({
 	 */
 	expression: z.string().optional(),
 	/**
+	 * `by: "person"` only: the Ask's short title, one line of at most 80
+	 * characters. The inbox shows it as the heading, and the prompt below
+	 * it. Unset: the first paragraph of the prompt is the heading.
+	 * Supports templates.
+	 */
+	title: gateTitleSchema.optional(),
+	/**
 	 * `by: "model"`: the brief for the model. `by: "person"`: the question
 	 * above the form. Supports templates.
 	 */
@@ -208,6 +217,7 @@ export function checkValueNode(node: ValueNode, check: NodeCheck): void {
 	checkModelAddress(node, "Value", check);
 	checkValueCascade(node, check);
 	if (node.prompt !== undefined) check.template(node.prompt, "prompt");
+	checkGateTitle(node, "Value", check);
 }
 
 /**

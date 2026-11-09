@@ -1,4 +1,4 @@
-import type { JsonValue } from "../nodes";
+import { GATE_TITLE_MAX, type JsonValue } from "../nodes";
 import type { TemplateContext, TemplateRef } from "./context";
 
 /**
@@ -156,6 +156,27 @@ export function renderReadable(text: string, context: TemplateContext): string {
 		if (rendered !== null) lines.push(rendered);
 	}
 	return lines.join("\n").replace(/\n{3,}/g, "\n\n");
+}
+
+/**
+ * The question a Gate or an Ask shows: its title, rendered on one line
+ * and cut at `GATE_TITLE_MAX`, then its prompt, rendered readable. The
+ * inbox reads the first paragraph as the heading. Without a title the
+ * prompt alone, as before.
+ */
+export function renderGateQuestion(
+	node: { title?: string | undefined; prompt?: string | undefined },
+	context: TemplateContext,
+): string {
+	const prompt = renderReadable(node.prompt ?? "", context);
+	if (node.title === undefined) return prompt;
+	const line = renderTemplate(node.title, context).replace(/\s+/g, " ").trim();
+	if (line === "") return prompt;
+	const title =
+		line.length > GATE_TITLE_MAX
+			? `${line.slice(0, GATE_TITLE_MAX - 1).trimEnd()}…`
+			: line;
+	return prompt.trim() === "" ? title : `${title}\n\n${prompt}`;
 }
 
 /** Whether the template is exactly one reference, whitespace around it allowed. */

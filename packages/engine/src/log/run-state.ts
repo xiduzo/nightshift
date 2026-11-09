@@ -287,6 +287,11 @@ export type OpenGateFact = {
 	deadline: GateDeadline | null;
 	/** An Ask (ADR 10): the form the answer fills in. Null on every other Gate. */
 	form: AskForm | null;
+	/**
+	 * A step on another branch of the run still works. The run takes no
+	 * answer until that step ends.
+	 */
+	branchesWork: boolean;
 };
 
 /** The wait the run sleeps in, as the log tells it. */
@@ -749,14 +754,24 @@ function openGatesOf(run: Draft): OpenGateFact[] {
 	const { latest } = run;
 	if (!latest || run.end) return [];
 	const gates: OpenGateFact[] = [];
+	const asking = (step: DerivedStep) =>
+		step.gate !== null &&
+		step.gate.openedSeq > step.openedSeq &&
+		step.gate.openedSeq > latest.seq;
+	// A step that runs, not one that asks or sleeps: its branch still works.
+	let branchesWork = false;
 	for (const step of run.steps.values()) {
-		const { gate } = step;
 		if (
 			step.endedAt === null &&
-			gate !== null &&
-			gate.openedSeq > step.openedSeq &&
-			gate.openedSeq > latest.seq
+			!asking(step) &&
+			step.id !== run.wait?.stepId
 		) {
+			branchesWork = true;
+		}
+	}
+	for (const step of run.steps.values()) {
+		const { gate } = step;
+		if (step.endedAt === null && gate !== null && asking(step)) {
 			gates.push({
 				stepId: step.id,
 				nodeId: step.nodeId,
@@ -767,6 +782,7 @@ function openGatesOf(run: Draft): OpenGateFact[] {
 				openedAt: gate.openedAt,
 				deadline: gate.deadline,
 				form: gate.form,
+				branchesWork,
 			});
 		}
 	}

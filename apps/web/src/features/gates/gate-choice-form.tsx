@@ -32,6 +32,8 @@ export function GateChoiceForm({
 	/** The heading that names the choices. */
 	labelledBy: string;
 }) {
+	// Another branch still works: you can pick and write, the send waits.
+	const held = gate.branchesWork;
 	const id = useId();
 	const [choice, setChoice] = useState<string | null>(null);
 	const [note, setNote] = useState("");
@@ -41,7 +43,7 @@ export function GateChoiceForm({
 	const busy = resolve.isPending || reading;
 
 	const send = async () => {
-		if (!choice || busy || files.problem) return;
+		if (!choice || held || busy || files.problem) return;
 		const trimmed = note.trim();
 		setReading(true);
 		const attached = await files.read().finally(() => setReading(false));
@@ -116,7 +118,7 @@ export function GateChoiceForm({
 			</Field>
 			<AnswerFilesField files={files} disabled={busy} />
 			<Button
-				disabled={!choice || busy || files.problem !== null}
+				disabled={!choice || held || busy || files.problem !== null}
 				onClick={send}
 			>
 				{busy ? <Spinner data-icon="inline-start" /> : null}

@@ -20,6 +20,7 @@ import { Field, InspectorSection, Note } from "../fields";
 import { TemplateField } from "../template-field";
 import { CascadeSection } from "./cascade-fields";
 import { GateDeadlineSection } from "./gate-deadline-fields";
+import { GateTitleField } from "./gate-title-field";
 import { lockScreenHint } from "./lock-screen-hint";
 import { ModelSettings } from "./model-settings";
 import { NodeOptionsField } from "./node-options-field";
@@ -133,6 +134,19 @@ export function DecisionFields({
 						})}
 					</ToggleGroup>
 				</Field>
+				{by === "person" ? (
+					<GateTitleField
+						id={`${id}-title`}
+						flow={flow}
+						nodeId={node.id}
+						title={node.title}
+						onChange={(title) =>
+							onChange(({ title: _, ...current }) =>
+								title === undefined ? current : { ...current, title },
+							)
+						}
+					/>
+				) : null}
 				<TemplateField
 					id={`${id}-prompt`}
 					language="markdown"

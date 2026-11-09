@@ -91,7 +91,7 @@ Outcomes: its exits (`pass`, `fail` without `exits`). Outputs: `outcome`, `exit_
 
 ### decision
 
-Picks one of its `options` (each `{ name, description }`); the option is the outcome. `by`: `person`, `rule`, `model`. `person` is a Gate: `prompt` is the question, and the run waits for the answer. A Gate may have `deadline: { at: "07:00", choose: "keep" }` (or `minutes` instead of `at`, counted from when it opens): when nobody answered by then, it takes the option `choose`. `rule` is a Branch: each option but the last has `when`, a JSONata rule; the first that holds wins, the last option has no rule and is the default. `model`: a small model reads `prompt` and picks; it reads `profile`, or `decider` (typesafe, openrouter, openai, ollaya, ollama, openjev, compatible) and `model`, all optional.
+Picks one of its `options` (each `{ name, description }`); the option is the outcome. `by`: `person`, `rule`, `model`. `person` is a Gate: `prompt` is the question, and the run waits for the answer. Give it a `title`: one line, at most 80 characters, the heading in the inbox. Lists go in the prompt. A Gate may have `deadline: { at: "07:00", choose: "keep" }` (or `minutes` instead of `at`, counted from when it opens): when nobody answered by then, it takes the option `choose`. `rule` is a Branch: each option but the last has `when`, a JSONata rule; the first that holds wins, the last option has no rule and is the default. `model`: a small model reads `prompt` and picks; it reads `profile`, or `decider` (typesafe, openrouter, openai, ollaya, ollama, openjev, compatible) and `model`, all optional.
 
 Outcomes: its options. Outputs: `outcome`, `note`, `visit`.
 
@@ -181,7 +181,7 @@ Climb from a cheap try to a strong one with a `cascade`, not with a loop of node
 
 ## Asks
 
-A Value with `by: "person"` is an Ask: a form in the Needs-you inbox, drawn from `output`. A string is a text field, an `enum` a choice, an array of `enum` a choice of several, a boolean a switch, a number a number field. Each `description` is the hint under its field. The answer must match the schema, and it is the step's `data`. A Gate stays the router: put a Decision by a rule after an Ask to route on its data, or a Subflow with `each` to work on each chosen item.
+A Value with `by: "person"` is an Ask: a form in the Needs-you inbox, drawn from `output`. It takes a `title` too. A string is a text field, an `enum` a choice, an array of `enum` a choice of several, a boolean a switch, a number a number field. Each `description` is the hint under its field. The answer must match the schema, and it is the step's `data`. A Gate stays the router: put a Decision by a rule after an Ask to route on its data, or a Subflow with `each` to work on each chosen item.
 
 - `choices: { from, field }`: `from` is a template that renders a list of `{ name, label, description?, attachments? }`, such as `{{designer.data.variants}}`. The names become the `enum` of the output field `field`: a string field is one choice, an array of strings a choice of several.
 - `attachments`: `[{ path | url, label? }]`. A `path` is a file in the run's copy of the project: Night Shift keeps it with the run, so the web and the phone show it. A `url` is a link. A choice's `attachments` take the same shape.

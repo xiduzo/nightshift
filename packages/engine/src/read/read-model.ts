@@ -881,6 +881,7 @@ export function createReadModel(deps: ReadModelDeps) {
 				form: gate.form,
 				walker,
 				answerPending,
+				branchesWork: gate.branchesWork,
 			});
 		}
 		return inboxOrder(gates);

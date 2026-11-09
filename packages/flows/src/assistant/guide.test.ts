@@ -111,8 +111,9 @@ describe("flowAuthoringGuide", () => {
 		// and `{{run.due_at}}`, so a monthly run does not skip its day.
 		// 4470: an Agent's knowledge as a list of folders. 4500: the
 		// `scores` a Command writes (one sentence), so a flow can say what
-		// it achieved.
-		expect(words).toBeLessThan(4500);
+		// it achieved. 4520: the \`title\` of a Gate and an Ask, the
+		// heading in the inbox.
+		expect(words).toBeLessThan(4520);
 	});
 });
 

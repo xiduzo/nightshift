@@ -26,6 +26,7 @@ export {
 export { templatesInLiteralShellText } from "./shell-quotes";
 export {
 	renderCommand,
+	renderGateQuestion,
 	renderReadable,
 	renderTemplate,
 	renderValue,

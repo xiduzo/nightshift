@@ -53,6 +53,7 @@ import {
 	Eye,
 	GitPullRequest,
 	Globe,
+	Loader,
 	type LucideIcon,
 	SquareTerminal,
 	Ticket,
@@ -260,7 +261,7 @@ function OpenGateScreen({
 						action={{
 							label: "Send",
 							onPress: send,
-							disabled: !chosen || noteMissing,
+							disabled: !chosen || noteMissing || gate.branchesWork,
 							busy: answer.checking || answer.sending,
 							busyLabel: answer.checking ? "Checking…" : "Sending…",
 							variant:
@@ -393,6 +394,15 @@ function OpenGateScreen({
 						</Alert>
 					) : (
 						<>
+							{gate.branchesWork ? (
+								<Alert icon={Loader}>
+									<AlertTitle>The run is still busy</AlertTitle>
+									<AlertDescription>
+										Another branch of this run still works. You can send your
+										answer when its step ends.
+									</AlertDescription>
+								</Alert>
+							) : null}
 							<ChoiceCards
 								choices={gate.choices}
 								routes={routes}

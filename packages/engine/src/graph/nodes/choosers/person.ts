@@ -4,7 +4,7 @@ import {
 	type DecisionNode,
 	type FlowNode,
 	optionProblem,
-	renderReadable,
+	renderGateQuestion,
 	renderTemplate,
 	type TemplateContext,
 } from "@nightshift/flows";
@@ -72,7 +72,7 @@ import { type Chooser, decisionOutputs, gateChoices } from "./chooser";
  */
 export function personChooser(node: DecisionNode, ctx: StepContext): Chooser {
 	return gateChooser(node, ctx, {
-		question: (tctx) => renderReadable(node.prompt, tctx),
+		question: (tctx) => renderGateQuestion(node, tctx),
 		choices: gateChoices(node),
 		lockScreen: node.lockScreen === true,
 		deadline: node.deadline,

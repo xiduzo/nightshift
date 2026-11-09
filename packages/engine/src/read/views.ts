@@ -444,6 +444,11 @@ export type OpenGate = {
 	walker: RunWalker;
 	/** An answer is on its way to the Walker. */
 	answerPending: boolean;
+	/**
+	 * A step on another branch of the run still works. The run takes no
+	 * answer until that step ends.
+	 */
+	branchesWork: boolean;
 };
 
 /**

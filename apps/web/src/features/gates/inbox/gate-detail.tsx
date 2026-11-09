@@ -14,13 +14,16 @@ import {
 	ItemMedia,
 	ItemTitle,
 } from "@nightshift/ui/components/item";
+import { ScrollArea } from "@nightshift/ui/components/scroll-area";
 import { Separator } from "@nightshift/ui/components/separator";
+import { cn } from "@nightshift/ui/lib/utils";
 import { Link } from "@tanstack/react-router";
 import {
 	ChevronRightIcon,
 	HandIcon,
 	HistoryIcon,
 	HourglassIcon,
+	LoaderIcon,
 	LockIcon,
 } from "lucide-react";
 import { useId } from "react";
@@ -104,10 +107,18 @@ export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 				<aside className="flex flex-col gap-6 lg:sticky lg:top-8 lg:self-start">
 					<section className="flex flex-col gap-2">
 						<h2 className="font-medium text-sm">Check first</h2>
+						{links.length > 0 ? (
+							// A long list scrolls: the answer stays in view.
+							<ScrollArea className="max-h-80 [&>[data-slot=scroll-area-viewport]]:max-h-80">
+								{/* Room for the scrollbar once the list scrolls (more than four). */}
+								<ItemGroup className={cn("gap-2", links.length > 4 && "pr-3")}>
+									{links.map((link) => (
+										<GateLinkItem key={link.url} link={link} />
+									))}
+								</ItemGroup>
+							</ScrollArea>
+						) : null}
 						<ItemGroup className="gap-2">
-							{links.map((link) => (
-								<GateLinkItem key={link.url} link={link} />
-							))}
 							<Item
 								variant="outline"
 								size="sm"
@@ -138,6 +149,16 @@ export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 						<h2 id={answerId} className="font-medium text-sm">
 							Your answer
 						</h2>
+						{gate.canAnswer && gate.branchesWork ? (
+							<Alert>
+								<LoaderIcon />
+								<AlertTitle>The run is still busy</AlertTitle>
+								<AlertDescription>
+									Another branch of this run still works. You can send your
+									answer when its step ends.
+								</AlertDescription>
+							</Alert>
+						) : null}
 						{gate.canAnswer && gate.form ? (
 							<AskForm
 								runId={gate.runId}
@@ -146,6 +167,7 @@ export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 								deadline={gate.deadline}
 								runTitle={gate.runTitle}
 								filesHere={gate.walker.thisDevice}
+								held={gate.branchesWork}
 							/>
 						) : gate.canAnswer ? (
 							<GateChoiceForm gate={gate} labelledBy={answerId} />

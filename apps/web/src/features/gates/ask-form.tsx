@@ -55,6 +55,7 @@ export function AskForm({
 	runTitle,
 	walkerName,
 	filesHere,
+	held = false,
 	className,
 }: {
 	runId: string;
@@ -66,6 +67,8 @@ export function AskForm({
 	walkerName?: string;
 	/** The run's files are on this computer, so its images show. */
 	filesHere: boolean;
+	/** The run takes no answer yet: you can fill in the form, but not send it. */
+	held?: boolean;
 	className?: string;
 }) {
 	const id = useId();
@@ -84,7 +87,7 @@ export function AskForm({
 
 	const send = async () => {
 		setTried(true);
-		if (busy || "problem" in answer || files.problem) return;
+		if (held || busy || "problem" in answer || files.problem) return;
 		setReading(true);
 		const attached = await files.read().finally(() => setReading(false));
 		resolve.mutate({
@@ -132,7 +135,7 @@ export function AskForm({
 			{tried && "problem" in answer ? (
 				<FieldError>{answer.problem}</FieldError>
 			) : null}
-			<Button type="submit" disabled={busy || files.problem !== null}>
+			<Button type="submit" disabled={held || busy || files.problem !== null}>
 				{busy ? <Spinner data-icon="inline-start" /> : null}
 				Send answer
 			</Button>

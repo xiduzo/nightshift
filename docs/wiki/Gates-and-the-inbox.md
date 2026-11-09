@@ -6,10 +6,13 @@ An unattended run never blocks on a question in the middle of a session. What ne
 
 A Gate is a Decision that a person picks. It shows the question and its options. The run continues on the option that you pick.
 
+- **A title.** A short title of at most 80 characters is the heading in the inbox. The question below it holds the details and the lists.
 - **A note.** Add a note to your answer. The next steps read it.
 - **Files.** Add up to 10 files to an answer, 10 MB together. The next agent steps of the run get them.
 - **A deadline.** A Gate with a deadline picks its option for you when nobody answers in time.
 - **The lock screen.** A Gate with two options can allow an answer from the lock screen of your phone.
+
+In a run with parallel branches, a Gate can open while a step on another branch still works. The inbox then shows that the run is busy. You can pick your answer, and you send it when that step ends.
 
 An Agent can ask you a question too. Its question opens a Gate, and your answer goes back to the same session.
 
@@ -17,6 +20,7 @@ An Agent can ask you a question too. Its question opens a Gate, and your answer 
 
 An Ask is a Value that a person makes. It is a form in your inbox. Its fields come from a JSON schema.
 
+- An Ask can have a title, as a Gate can.
 - An earlier step can make the choices of a field.
 - An Ask can show files from the run's copy of the project, and links. An image shows inline.
 - An Ask with a deadline takes its default value when nobody answers in time. Without a default, the step fails.

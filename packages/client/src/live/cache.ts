@@ -222,6 +222,14 @@ export function createLiveCache({
 	/** Stops the poll of the open Gates. Null while the stream is live, or nothing follows. */
 	let stopPoll: (() => void) | null = null;
 
+	/** The run has an open Gate that waits for another branch of the run. */
+	function holdsGate(runId: string): boolean {
+		const open = queryClient.getQueryData<OpenGate[]>(openKey);
+		return (
+			open?.some((gate) => gate.runId === runId && gate.branchesWork) ?? false
+		);
+	}
+
 	function invalidate(queryKey: readonly unknown[]) {
 		void queryClient.invalidateQueries({ queryKey });
 	}
@@ -246,6 +254,8 @@ export function createLiveCache({
 				continue;
 			}
 			pending.lists = true;
+			// A Gate on hold opens to answers when its run's other branch ends.
+			if (one.kind === "run" && holdsGate(one.runId)) pending.gates = true;
 			if (one.kind === "runs") {
 				pending.everyRun = true;
 			} else {

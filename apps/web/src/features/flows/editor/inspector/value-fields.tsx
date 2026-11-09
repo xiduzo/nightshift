@@ -13,6 +13,7 @@ import { OutputSchemaField } from "../output-schema-field";
 import { TemplateField } from "../template-field";
 import { AskFields } from "./ask-fields";
 import { CascadeSection } from "./cascade-fields";
+import { GateTitleField } from "./gate-title-field";
 import { ModelSettings } from "./model-settings";
 
 const VALUE_BY: { by: ValueNode["by"]; label: string }[] = [
@@ -111,29 +112,44 @@ export function ValueFields({
 						</div>
 					</Field>
 				) : (
-					<TemplateField
-						id={`${id}-prompt`}
-						language="markdown"
-						label={by === "person" ? "Question" : "Prompt"}
-						hint={
-							by === "person"
-								? "What the person answers. Give the context they need to decide."
-								: "Say what to make, and give the context it needs."
-						}
-						flow={flow}
-						nodeId={node.id}
-						value={prompt}
-						invalid={prompt.trim() === ""}
-						placeholder={
-							by === "person"
-								? "Which design should the agent build?"
-								: "List the failing tests in {{check.log_tail}}."
-						}
-						assist="prompt"
-						onChange={(text) =>
-							onChange((current) => ({ ...current, prompt: text }))
-						}
-					/>
+					<>
+						{by === "person" ? (
+							<GateTitleField
+								id={`${id}-title`}
+								flow={flow}
+								nodeId={node.id}
+								title={node.title}
+								onChange={(title) =>
+									onChange(({ title: _, ...current }) =>
+										title === undefined ? current : { ...current, title },
+									)
+								}
+							/>
+						) : null}
+						<TemplateField
+							id={`${id}-prompt`}
+							language="markdown"
+							label={by === "person" ? "Question" : "Prompt"}
+							hint={
+								by === "person"
+									? "What the person answers. Give the context they need to decide."
+									: "Say what to make, and give the context it needs."
+							}
+							flow={flow}
+							nodeId={node.id}
+							value={prompt}
+							invalid={prompt.trim() === ""}
+							placeholder={
+								by === "person"
+									? "Which design should the agent build?"
+									: "List the failing tests in {{check.log_tail}}."
+							}
+							assist="prompt"
+							onChange={(text) =>
+								onChange((current) => ({ ...current, prompt: text }))
+							}
+						/>
+					</>
 				)}
 				{by === "rule" ? (
 					<Note>

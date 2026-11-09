@@ -95,8 +95,8 @@ export function gateNode(id: string, position: Position): DecisionNode {
 }
 
 /**
- * Changes who decides. A rule's `when` fields go, and `lockScreen` and
- * `deadline` go when a person no longer decides. Switched to a model, the
+ * Changes who decides. A rule's `when` fields go, and `title`,
+ * `lockScreen` and `deadline` go when a person no longer decides. Switched to a model, the
  * node starts on the decider from Settings and that decider's default
  * model; switched away, the profile, the decider and the model go, as
  * only a model reads them.
@@ -119,6 +119,8 @@ export function withDecidedBy(
 		profile: _profile,
 		// Only a model climbs a cascade: a switch drops it.
 		cascade: _cascade,
+		// Only a person sees a title.
+		title: _title,
 		...rest
 	} = node;
 	if (by === "model") {
@@ -201,6 +203,8 @@ export function withValueBy(node: ValueNode, by: ValueBy): ValueNode {
 		attachments: _attachments,
 		deadline: _deadline,
 		default: _default,
+		// Only a person sees a title.
+		title: _title,
 		...rest
 	} = node;
 	if (by !== "model") return { ...rest, by };

@@ -15,8 +15,10 @@ import {
 } from "./base";
 import {
 	checkCascade,
+	checkGateTitle,
 	checkModelTier,
 	gateDeadlineSchema,
+	gateTitleSchema,
 	isPersonTier,
 	personTierSchema,
 	probabilityProblem,
@@ -72,6 +74,13 @@ export const decisionNodeSchema = z.object({
 	/** `by: "model"` only: where the model is asked. */
 	...placed,
 	type: z.literal("decision"),
+	/**
+	 * `by: "person"` only: the Gate's short title, one line of at most 80
+	 * characters ("Merge the green pull requests?"). The inbox shows it as
+	 * the heading, and the prompt below it. Unset: the first paragraph of
+	 * the prompt is the heading. Supports templates.
+	 */
+	title: gateTitleSchema.optional(),
 	/**
 	 * The question for a person, the brief for a model, or a note on what
 	 * the rule checks. Supports templates.
@@ -183,6 +192,7 @@ export function checkDecisionNode(node: DecisionNode, check: NodeCheck): void {
 		checkNodeProfile(node, "Decision", check);
 	}
 	check.template(node.prompt, "prompt");
+	checkGateTitle(node, "Decision", check);
 }
 
 /**

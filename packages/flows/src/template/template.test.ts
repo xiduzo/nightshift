@@ -3,6 +3,7 @@ import type { TemplateContext } from "./context";
 import {
 	lookupRef,
 	renderCommand,
+	renderGateQuestion,
 	renderReadable,
 	renderTemplate,
 	renderValue,
@@ -356,5 +357,32 @@ describe("renderReadable", () => {
 		const text =
 			"Epic {{epic}}, {{planner.data.count}} tasks, done {{planner.data.tasks.1.done}}";
 		expect(renderReadable(text, context)).toBe(renderTemplate(text, context));
+	});
+});
+
+describe("renderGateQuestion", () => {
+	test("puts the title as its own first paragraph above the prompt", () => {
+		expect(
+			renderGateQuestion(
+				{ title: "Fix {{check.outcome}}?", prompt: "Log:\n{{check.log_tail}}" },
+				context,
+			),
+		).toBe("Fix fail?\n\nLog:\n1 test failed");
+	});
+
+	test("without a title, the prompt alone", () => {
+		expect(renderGateQuestion({ prompt: "Ship it?" }, context)).toBe(
+			"Ship it?",
+		);
+	});
+
+	test("keeps a rendered title on one line and cuts it at 80 characters", () => {
+		const title = renderGateQuestion(
+			{ title: "{{long}}", prompt: "" },
+			{ ...context, inputs: { long: `a\n${"b".repeat(100)}` } },
+		);
+		expect(title).not.toContain("\n");
+		expect(title).toHaveLength(80);
+		expect(title.endsWith("…")).toBe(true);
 	});
 });

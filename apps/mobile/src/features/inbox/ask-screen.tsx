@@ -19,7 +19,13 @@ import { Icon } from "@nightshift/ui-native/components/ui/icon";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import type { Href } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import { CircleCheck, ExternalLink, Eye, Globe } from "lucide-react-native";
+import {
+	CircleCheck,
+	ExternalLink,
+	Eye,
+	Globe,
+	Loader,
+} from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
 
@@ -102,7 +108,7 @@ export function AskScreen({
 						action={{
 							label: "Send",
 							onPress: send,
-							disabled: false,
+							disabled: gate.branchesWork,
 							busy: answer.checking || answer.sending,
 							busyLabel: answer.checking ? "Checking…" : "Sending…",
 							variant: "default",
@@ -182,6 +188,15 @@ export function AskScreen({
 						</Alert>
 					) : native ? (
 						<>
+							{gate.branchesWork ? (
+								<Alert icon={Loader}>
+									<AlertTitle>The run is still busy</AlertTitle>
+									<AlertDescription>
+										Another branch of this run still works. You can send your
+										answer when its step ends.
+									</AlertDescription>
+								</Alert>
+							) : null}
 							<AskFields
 								form={form}
 								values={values}

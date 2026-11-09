@@ -18,6 +18,21 @@ import {
  * says what its tiers name; this file holds what they share.
  */
 
+/** The longest title of a Gate, in characters. The inbox shows it as one heading. */
+export const GATE_TITLE_MAX = 80;
+
+/**
+ * The short title of a Gate: what the person decides, on one line, as
+ * a heading above the question. Supports templates. The inbox cuts a
+ * rendered title that is longer than `GATE_TITLE_MAX`.
+ */
+export const gateTitleSchema = z
+	.string()
+	.trim()
+	.min(1)
+	.max(GATE_TITLE_MAX)
+	.regex(/^[^\n]*$/, "A title is one line.");
+
 /**
  * When a Gate stops waiting, in the same forms as a Wait node: `at`, a
  * template that renders a date and time (`2026-10-18T07:00`) or a time of
@@ -220,4 +235,22 @@ export function probabilityProblem(input: {
 		return `The tier "${input.label}" of Decision node "${input.nodeId}" uses ${decider}, which gives no probability, so it cannot test a minimum confidence. Remove the minimum confidence.`;
 	}
 	return null;
+}
+
+/**
+ * A title belongs to a Gate: a node a person decides. Its templates read
+ * known names.
+ */
+export function checkGateTitle(
+	node: { id: string; by: string; title?: string | undefined },
+	kind: "Decision" | "Value",
+	check: NodeCheck,
+): void {
+	if (node.title === undefined) return;
+	if (node.by !== "person") {
+		check.error(
+			`${kind} node "${node.id}" has a title, but a person does not answer it. Only a person sees the title. Remove the title, or let a person decide.`,
+		);
+	}
+	check.template(node.title, "title");
 }
