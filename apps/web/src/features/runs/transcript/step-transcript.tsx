@@ -15,22 +15,8 @@ import {
 	MarkerContent,
 	MarkerIcon,
 } from "@nightshift/ui/components/marker";
-import {
-	MessageScroller,
-	MessageScrollerButton,
-	MessageScrollerContent,
-	MessageScrollerItem,
-	MessageScrollerProvider,
-	MessageScrollerViewport,
-} from "@nightshift/ui/components/message-scroller";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import {
-	CircleXIcon,
-	CopyIcon,
-	ListChecksIcon,
-	MessagesSquareIcon,
-	SendIcon,
-} from "lucide-react";
+import { CircleXIcon, CopyIcon, ListChecksIcon, SendIcon } from "lucide-react";
 import { memo, type ReactNode, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -40,7 +26,6 @@ import {
 	GateQuestion as GateQuestionText,
 } from "@/features/gates";
 import type { RunSummary, SessionSummary, StepSummary } from "@/shared/api";
-import { SectionTitle } from "../components/step-console";
 import { useOpenedStep } from "../hooks/use-opened-step";
 import { CommandExit, CommandLog, CommandRun } from "./items/command-items";
 import {
@@ -78,7 +63,8 @@ import {
 } from "./transcript-rows";
 
 /**
- * The transcript of one step. An agent step reads as a conversation: session
+ * The transcript of one step, inline in the run's story: the story scrolls,
+ * not the transcript. An agent step reads as a conversation: session
  * boundaries with their prompt, messages, tool calls, and the step report. A
  * command step reads as a terminal log. A decision step shows what the model
  * was asked and what it picked, or which rule held. A gate step shows its
@@ -203,14 +189,9 @@ export function StepTranscript({
 	const picked = transcript.items.filter((item) => selected.has(item.key));
 
 	return (
-		<>
-			<div className="flex h-9 shrink-0 items-center gap-2 border-b bg-background px-4">
-				<MessagesSquareIcon
-					className="size-3.5 text-muted-foreground"
-					aria-hidden="true"
-				/>
-				<SectionTitle id="step-transcript-heading">Transcript</SectionTitle>
-				<div className="ml-auto flex items-center gap-1">
+		<div className="flex min-w-0 flex-col gap-3">
+			<div className="flex h-7 items-center justify-end gap-1">
+				<div className="flex items-center gap-1">
 					{selecting ? (
 						<>
 							<span className="px-2 text-muted-foreground text-xs tabular-nums">
@@ -256,7 +237,7 @@ export function StepTranscript({
 				</div>
 			</div>
 			{openGate ? (
-				<div className="flex shrink-0 flex-col gap-4 border-b p-4">
+				<div className="flex flex-col gap-4 rounded-xl border p-4">
 					<GateQuestionText question={openGate.question} />
 					{answerPending ? (
 						<Alert>
@@ -288,140 +269,130 @@ export function StepTranscript({
 					)}
 				</div>
 			) : null}
-			<MessageScrollerProvider autoScroll defaultScrollPosition="end">
-				<MessageScroller className="min-h-0">
-					<MessageScrollerViewport aria-label={`Transcript of ${step.nodeId}`}>
-						<MessageScrollerContent
-							aria-live="off"
-							className="mx-auto w-full max-w-3xl gap-4 px-4 py-5 md:px-6"
-						>
-							{rows.map((row, index) => {
-								const key = rowKey(row);
-								return (
-									<MessageScrollerItem key={key} messageId={key}>
-										<Selectable
-											on={selecting}
-											checked={rowItems(row).every((item) =>
-												selected.has(item.key),
-											)}
-											onCheckedChange={(checked, range) =>
-												select(index, checked, range)
-											}
-										>
-											{row.kind === "tool-calls" ? (
-												<ToolCallsGroup
-													items={row.items}
-													running={running}
-													projectRoot={projectRoot}
-												/>
-											) : row.kind === "command" ? (
-												<CommandRun
-													command={row.command}
-													{...(row.log ? { log: row.log } : {})}
-													{...(row.exit ? { exit: row.exit } : {})}
-													running={running}
-												/>
-											) : row.item.kind === "gate-open" &&
-												row.item.key === openGateKey &&
-												step.gate?.form ? (
-												<div className="flex flex-col gap-4 rounded-xl border p-4">
-													<GateQuestionText question={row.item.question} />
-													<AskForm
-														runId={runId}
-														stepId={step.id}
-														form={step.gate.form}
-														deadline={step.gate.deadline}
-														filesHere={!elsewhere}
-														{...(elsewhere ? { walkerName: elsewhere } : {})}
-													/>
-												</div>
-											) : row.item.kind === "gate-open" &&
-												row.item.key === openGateKey ? (
-												<GateConfirmation
-													runId={runId}
-													stepId={step.id}
-													question={row.item.question}
-													choices={row.item.choices}
-													deadline={row.item.deadline ?? null}
-													openedAt={row.item.at}
-													{...(elsewhere ? { walkerName: elsewhere } : {})}
-												/>
-											) : (
-												<TranscriptItemView
-													item={row.item}
-													projectRoot={projectRoot}
-													node={node}
-													itemTitle={
-														row.item.kind === "item-end"
-															? itemTitles.get(row.item.itemId)
-															: undefined
-													}
-													running={running}
-													session={
-														row.item.sessionId
-															? sessionsById.get(row.item.sessionId)
-															: undefined
-													}
-													sessionNumber={
-														row.item.sessionId
-															? sessionNumbers.get(row.item.sessionId)
-															: undefined
-													}
-												/>
-											)}
-										</Selectable>
-									</MessageScrollerItem>
-								);
-							})}
-							{pendingSessions.map((session) => (
-								<MessageScrollerItem
-									key={`pending:${session.id}`}
-									messageId={`pending:${session.id}`}
-								>
-									<SessionBoundary
-										number={sessionNumbers.get(session.id)}
-										at={session.createdAt}
-										prompt={session.prompt ?? ""}
+			<div
+				role="log"
+				aria-live="off"
+				aria-label={`Transcript of ${step.nodeId}`}
+				className="flex min-w-0 flex-col gap-4"
+			>
+				{rows.map((row, index) => {
+					const key = rowKey(row);
+					return (
+						<div key={key} className="min-w-0">
+							<Selectable
+								on={selecting}
+								checked={rowItems(row).every((item) => selected.has(item.key))}
+								onCheckedChange={(checked, range) =>
+									select(index, checked, range)
+								}
+							>
+								{row.kind === "tool-calls" ? (
+									<ToolCallsGroup
+										items={row.items}
+										running={running}
+										projectRoot={projectRoot}
 									/>
-								</MessageScrollerItem>
-							))}
-							{isEmpty ? (
-								<Marker className="justify-center py-10 text-xs">
-									{connecting ? (
-										<MarkerIcon>
-											<Spinner className="size-3.5" />
-										</MarkerIcon>
-									) : null}
-									<MarkerContent>
-										{connecting ? "Loading transcript…" : "No transcript yet."}
-									</MarkerContent>
-								</Marker>
-							) : null}
-							{step.error ? (
-								<Alert variant="destructive">
-									<CircleXIcon aria-hidden="true" />
-									<AlertTitle>The step failed</AlertTitle>
-									<AlertDescription className="whitespace-pre-wrap break-words font-mono text-xs">
-										{step.error}
-									</AlertDescription>
-								</Alert>
-							) : null}
-							{running && !gateOpen ? (
-								<Marker className="text-xs">
-									<MarkerIcon>
-										<Spinner className="size-3.5 text-status-running" />
-									</MarkerIcon>
-									<MarkerContent className="text-status-running">
-										{RUNNING_TEXT[step.nodeType]}
-									</MarkerContent>
-								</Marker>
-							) : null}
-						</MessageScrollerContent>
-					</MessageScrollerViewport>
-					<MessageScrollerButton />
-				</MessageScroller>
-			</MessageScrollerProvider>
-		</>
+								) : row.kind === "command" ? (
+									<CommandRun
+										command={row.command}
+										{...(row.log ? { log: row.log } : {})}
+										{...(row.exit ? { exit: row.exit } : {})}
+										running={running}
+									/>
+								) : row.item.kind === "gate-open" &&
+									row.item.key === openGateKey &&
+									step.gate?.form ? (
+									<div className="flex flex-col gap-4 rounded-xl border p-4">
+										<GateQuestionText question={row.item.question} />
+										<AskForm
+											runId={runId}
+											stepId={step.id}
+											form={step.gate.form}
+											deadline={step.gate.deadline}
+											filesHere={!elsewhere}
+											{...(elsewhere ? { walkerName: elsewhere } : {})}
+										/>
+									</div>
+								) : row.item.kind === "gate-open" &&
+									row.item.key === openGateKey ? (
+									<GateConfirmation
+										runId={runId}
+										stepId={step.id}
+										question={row.item.question}
+										choices={row.item.choices}
+										deadline={row.item.deadline ?? null}
+										openedAt={row.item.at}
+										{...(elsewhere ? { walkerName: elsewhere } : {})}
+									/>
+								) : (
+									<TranscriptItemView
+										item={row.item}
+										projectRoot={projectRoot}
+										node={node}
+										itemTitle={
+											row.item.kind === "item-end"
+												? itemTitles.get(row.item.itemId)
+												: undefined
+										}
+										running={running}
+										session={
+											row.item.sessionId
+												? sessionsById.get(row.item.sessionId)
+												: undefined
+										}
+										sessionNumber={
+											row.item.sessionId
+												? sessionNumbers.get(row.item.sessionId)
+												: undefined
+										}
+									/>
+								)}
+							</Selectable>
+						</div>
+					);
+				})}
+				{pendingSessions.map((session) => (
+					<div key={`pending:${session.id}`} className="min-w-0">
+						<SessionBoundary
+							number={sessionNumbers.get(session.id)}
+							at={session.createdAt}
+							prompt={session.prompt ?? ""}
+						/>
+					</div>
+				))}
+				{isEmpty ? (
+					<Marker className="justify-center py-10 text-xs">
+						{connecting ? (
+							<MarkerIcon>
+								<Spinner className="size-3.5" />
+							</MarkerIcon>
+						) : null}
+						<MarkerContent>
+							{connecting ? "Loading transcript…" : "No transcript yet."}
+						</MarkerContent>
+					</Marker>
+				) : null}
+				{step.error ? (
+					<Alert variant="destructive">
+						<CircleXIcon aria-hidden="true" />
+						<AlertTitle>The step failed</AlertTitle>
+						<AlertDescription className="whitespace-pre-wrap break-words font-mono text-xs">
+							{step.error}
+						</AlertDescription>
+					</Alert>
+				) : null}
+				{running && !gateOpen ? (
+					<Marker className="text-xs">
+						<MarkerIcon>
+							<Spinner className="size-3.5 text-status-running" />
+						</MarkerIcon>
+						<MarkerContent className="text-status-running">
+							{RUNNING_TEXT[step.nodeType]}
+						</MarkerContent>
+					</Marker>
+				) : null}
+			</div>
+		</div>
 	);
 }
 

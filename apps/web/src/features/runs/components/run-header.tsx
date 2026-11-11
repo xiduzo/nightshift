@@ -6,7 +6,12 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
-import { AlarmClockIcon, SendIcon, SkipForwardIcon } from "lucide-react";
+import {
+	AlarmClockIcon,
+	SendIcon,
+	SkipForwardIcon,
+	WorkflowIcon,
+} from "lucide-react";
 import { WalkerBadge, walkerName } from "@/features/devices";
 import type { RunDetail, RunStatus, StepSummary } from "@/shared/api";
 import { dayWord, formatTime, hoverTime } from "@/shared/format";
@@ -15,22 +20,17 @@ import { useWorkTime } from "./elapsed";
 import { RunStatusBadge } from "./run-status-badge";
 
 /**
- * The run on one line: its title, status and stop plans, and how long it ran
- * and what it cost. The rest of its facts sit in `RunDetails`
+ * The run on one line: its title, and how long it ran and what it cost.
+ * Its state sits in `RunBadges`, the rest of its facts in `RunDetails`
  * (`run-details.tsx`).
  */
 export function RunTitle({
 	run,
 	steps,
-	status,
-	reconnecting,
 }: {
 	run: RunDetail;
 	steps: StepSummary[];
-	status: RunStatus;
-	reconnecting: boolean;
 }) {
-	const stoppable = runActions(status, run.walker.thisDevice, run.result).stop;
 	const time = useWorkTime(steps, run.createdAt);
 	const tokens = tokensLabel(run.metrics?.tokens);
 
@@ -39,44 +39,6 @@ export function RunTitle({
 			<h1 className="min-w-0 truncate font-semibold text-lg tracking-tight">
 				{run.title}
 			</h1>
-			<div aria-live="polite" className="flex flex-wrap items-center gap-2">
-				<RunStatusBadge status={status} result={run.result} />
-				<WalkerBadge walker={run.device} />
-				{run.commands.length > 0 ? (
-					<Badge
-						variant="outline"
-						title={`It applies when ${walkerName(run.walker)} is online.`}
-					>
-						<SendIcon aria-hidden="true" />
-						Sent to {walkerName(run.walker)}
-					</Badge>
-				) : null}
-				{stoppable && run.stopAfterStep ? (
-					<Badge
-						variant="outline"
-						className="border-status-stopped/40 text-status-stopped"
-						title="The running step finishes, then the run stops."
-					>
-						<SkipForwardIcon aria-hidden="true" />
-						Stops after this step
-					</Badge>
-				) : null}
-				{stoppable && run.stopAt ? (
-					<Badge
-						variant="outline"
-						title={`No new step starts after ${hoverTime(run.stopAt)}.`}
-					>
-						<AlarmClockIcon aria-hidden="true" />
-						Stops {dayWord(run.stopAt)} {formatTime(run.stopAt)}
-					</Badge>
-				) : null}
-				{reconnecting ? (
-					<span className="flex items-center gap-1.5 text-muted-foreground text-xs">
-						<Spinner className="size-3" />
-						Reconnecting…
-					</span>
-				) : null}
-			</div>
 			<p className="ml-auto shrink-0 text-muted-foreground text-sm tabular-nums">
 				{time.waited || time.slept ? (
 					<Tooltip>
@@ -110,6 +72,70 @@ export function RunTitle({
 				<span className="sr-only">cost </span>
 				<CostText cost={run} />
 			</p>
+		</div>
+	);
+}
+
+/**
+ * The run's state as badges, in a fixed order: what every run has first,
+ * then what comes and goes. The flow, the device that runs it, its status,
+ * then an answer on its way, the stop plans and a lost connection.
+ */
+export function RunBadges({
+	run,
+	status,
+	reconnecting,
+}: {
+	run: RunDetail;
+	status: RunStatus;
+	reconnecting: boolean;
+}) {
+	const stoppable = runActions(status, run.walker.thisDevice, run.result).stop;
+	return (
+		<div
+			aria-live="polite"
+			className="flex min-w-0 flex-wrap items-center gap-2"
+		>
+			<Badge variant="outline" className="max-w-64 font-mono">
+				<WorkflowIcon aria-hidden="true" />
+				<span className="truncate">{run.flowName ?? "Quick run"}</span>
+			</Badge>
+			<WalkerBadge walker={run.device} />
+			<RunStatusBadge status={status} result={run.result} />
+			{run.commands.length > 0 ? (
+				<Badge
+					variant="outline"
+					title={`It applies when ${walkerName(run.walker)} is online.`}
+				>
+					<SendIcon aria-hidden="true" />
+					Sent to {walkerName(run.walker)}
+				</Badge>
+			) : null}
+			{stoppable && run.stopAfterStep ? (
+				<Badge
+					variant="outline"
+					className="border-status-stopped/40 text-status-stopped"
+					title="The running step finishes, then the run stops."
+				>
+					<SkipForwardIcon aria-hidden="true" />
+					Stops after this step
+				</Badge>
+			) : null}
+			{stoppable && run.stopAt ? (
+				<Badge
+					variant="outline"
+					title={`No new step starts after ${hoverTime(run.stopAt)}.`}
+				>
+					<AlarmClockIcon aria-hidden="true" />
+					Stops {dayWord(run.stopAt)} {formatTime(run.stopAt)}
+				</Badge>
+			) : null}
+			{reconnecting ? (
+				<Badge variant="outline" className="text-muted-foreground">
+					<Spinner aria-hidden="true" />
+					Reconnecting…
+				</Badge>
+			) : null}
 		</div>
 	);
 }

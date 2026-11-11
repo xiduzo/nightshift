@@ -23,8 +23,6 @@ export {
 	formatTime,
 	formatTokens,
 	nextOccurrence,
-	noCostYet,
-	sumKnownCost,
 	truncate,
 	typicalCostSentence,
 } from "./format";

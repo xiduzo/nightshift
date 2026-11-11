@@ -31,6 +31,7 @@ import {
 	PlayIcon,
 	RotateCcwIcon,
 	SkipForwardIcon,
+	WaypointsIcon,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -61,12 +62,15 @@ export function RunActions({
 	status,
 	steps,
 	onShowStep,
+	onShowFlow,
 }: {
 	run: RunDetail;
 	status: RunStatus;
 	/** The run's steps as they stand, live. */
 	steps: StepSummary[];
 	onShowStep: (stepId: string) => void;
+	/** Opens the run on its flow. */
+	onShowFlow: () => void;
 }) {
 	const [confirmingStop, setConfirmingStop] = useState(false);
 	const [restarting, setRestarting] = useState(false);
@@ -111,7 +115,6 @@ export function RunActions({
 	};
 
 	const others = running || takeOverCommand || move.offered || here;
-	const hasMenu = allows.stop || others;
 
 	return (
 		<>
@@ -161,93 +164,95 @@ export function RunActions({
 						Details
 					</Button>
 				)}
-				{hasMenu ? (
-					<DropdownMenu>
-						<DropdownMenuTrigger
-							render={
-								<Button
-									variant={stopFirst ? "destructive" : "outline"}
-									size="icon-sm"
-									className={cn(stopFirst && "border-l-destructive/30")}
-									aria-label="More actions"
-									disabled={stopPending !== null || move.pending}
-								/>
-							}
-						>
-							{move.pending ? <Spinner /> : <ChevronDownIcon />}
-						</DropdownMenuTrigger>
-						<DropdownMenuContent align="end" className="w-64">
-							{allows.stop ? (
-								<>
+				<DropdownMenu>
+					<DropdownMenuTrigger
+						render={
+							<Button
+								variant={stopFirst ? "destructive" : "outline"}
+								size="icon-sm"
+								className={cn(stopFirst && "border-l-destructive/30")}
+								aria-label="More actions"
+								disabled={stopPending !== null || move.pending}
+							/>
+						}
+					>
+						{move.pending ? <Spinner /> : <ChevronDownIcon />}
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end" className="w-64">
+						{allows.stop ? (
+							<>
+								<DropdownMenuItem
+									variant="destructive"
+									onClick={() => setConfirmingStop(true)}
+								>
+									<CircleStopIcon />
+									<ActionText
+										label="Stop now"
+										hint="Cancels the running step."
+									/>
+								</DropdownMenuItem>
+								{run.stopAfterStep ? null : (
 									<DropdownMenuItem
-										variant="destructive"
-										onClick={() => setConfirmingStop(true)}
+										onClick={() =>
+											stopRun.mutate({ runId: run.id, when: "after-step" })
+										}
 									>
-										<CircleStopIcon />
+										<SkipForwardIcon />
 										<ActionText
-											label="Stop now"
-											hint="Cancels the running step."
+											label="Stop after this step"
+											hint="The running step finishes, then the run stops."
 										/>
 									</DropdownMenuItem>
-									{run.stopAfterStep ? null : (
-										<DropdownMenuItem
-											onClick={() =>
-												stopRun.mutate({ runId: run.id, when: "after-step" })
-											}
-										>
-											<SkipForwardIcon />
-											<ActionText
-												label="Stop after this step"
-												hint="The running step finishes, then the run stops."
-											/>
-										</DropdownMenuItem>
-									)}
-									{others ? <DropdownMenuSeparator /> : null}
-								</>
-							) : null}
-							{running ? (
-								<DropdownMenuItem onClick={() => setRestarting(true)}>
-									<RotateCcwIcon />
-									<ActionText
-										label="Restart step"
-										hint="Stops the running step and starts it again."
-									/>
-								</DropdownMenuItem>
-							) : null}
-							{takeOverCommand ? (
-								<DropdownMenuItem onClick={takeOver}>
-									<ClipboardCopyIcon />
-									<ActionText
-										label="Take over"
-										hint="Copies a command to paste in a terminal."
-									/>
-								</DropdownMenuItem>
-							) : null}
-							{move.offered ? <MoveSubmenu move={move} /> : null}
-							{here ? (
-								<DropdownMenuItem
-									render={
-										<a
-											href={`${SERVER_URL}/api/runs/${run.id}/export`}
-											download
-										/>
-									}
-								>
-									<DownloadIcon />
-									<ActionText
-										label="Export"
-										hint="The file has no saved secrets. A transcript shows all that the agents read or wrote, so check it before you share it."
-									/>
-								</DropdownMenuItem>
-							) : null}
-							<DropdownMenuSeparator />
-							<DropdownMenuItem onClick={() => setDetailsOpen(true)}>
-								<InfoIcon />
-								Details
+								)}
+								{others ? <DropdownMenuSeparator /> : null}
+							</>
+						) : null}
+						{running ? (
+							<DropdownMenuItem onClick={() => setRestarting(true)}>
+								<RotateCcwIcon />
+								<ActionText
+									label="Restart step"
+									hint="Stops the running step and starts it again."
+								/>
 							</DropdownMenuItem>
-						</DropdownMenuContent>
-					</DropdownMenu>
-				) : null}
+						) : null}
+						{takeOverCommand ? (
+							<DropdownMenuItem onClick={takeOver}>
+								<ClipboardCopyIcon />
+								<ActionText
+									label="Take over"
+									hint="Copies a command to paste in a terminal."
+								/>
+							</DropdownMenuItem>
+						) : null}
+						{move.offered ? <MoveSubmenu move={move} /> : null}
+						{here ? (
+							<DropdownMenuItem
+								render={
+									<a
+										href={`${SERVER_URL}/api/runs/${run.id}/export`}
+										download
+									/>
+								}
+							>
+								<DownloadIcon />
+								<ActionText
+									label="Export"
+									hint="The file has no saved secrets. A transcript shows all that the agents read or wrote, so check it before you share it."
+								/>
+							</DropdownMenuItem>
+						) : null}
+						{allows.stop || others ? <DropdownMenuSeparator /> : null}
+						<DropdownMenuItem onClick={onShowFlow}>
+							<WaypointsIcon />
+							Show flow
+						</DropdownMenuItem>
+						<DropdownMenuItem onClick={() => setDetailsOpen(true)}>
+							<InfoIcon />
+							Details
+						</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
 			</ButtonGroup>
 			<AlertDialog open={confirmingStop} onOpenChange={setConfirmingStop}>
 				<AlertDialogContent>

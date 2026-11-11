@@ -30,6 +30,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@nightshift/ui/components/table";
+import { cn } from "@nightshift/ui/lib/utils";
 import { VariableIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -61,10 +62,13 @@ export function RunVariables({
 	run,
 	steps,
 	onShowStep,
+	className,
 }: {
 	run: RunDetail;
 	steps: StepSummary[];
 	onShowStep: (stepId: string) => void;
+	/** The tables' wrapper, to drop its padding in the run's sidebar. */
+	className?: string;
 }) {
 	const groups = useMemo(() => variableGroups(run, steps), [run, steps]);
 	/** The open variable: its group's key and its name. */
@@ -96,7 +100,7 @@ export function RunVariables({
 
 	return (
 		<>
-			<div className="flex flex-col gap-4 p-3">
+			<div className={cn("flex flex-col gap-4 p-3", className)}>
 				{groups.map((group) => (
 					<VariableTable
 						key={group.key}

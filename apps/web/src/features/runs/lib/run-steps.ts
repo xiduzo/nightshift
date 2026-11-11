@@ -41,25 +41,6 @@ export function stepsIn(
 	return steps.filter((step) => scopeKey(step.scope) === key);
 }
 
-/** The steps in a scope and in the scopes nested under it. */
-export function stepsUnder(
-	steps: readonly StepSummary[],
-	scope: ItemScope,
-): StepSummary[] {
-	if (!scope) return [...steps];
-	const byId = new Map(steps.map((step) => [step.id, step]));
-	const key = scopeKey(scope);
-	const inside = (step: StepSummary): boolean => {
-		let current: StepSummary | undefined = step;
-		while (current?.scope) {
-			if (scopeKey(current.scope) === key) return true;
-			current = byId.get(current.scope.parentStepId);
-		}
-		return false;
-	};
-	return steps.filter(inside);
-}
-
 /**
  * The step that stands for `step` in `scope`: the step itself when it is
  * directly in the scope, else its calling ancestor that is. Undefined when
@@ -146,11 +127,6 @@ export function calledFlowOf(
 ): Flow | undefined {
 	const name = calledFlowName(run, steps, parentStep);
 	return name === undefined ? undefined : run.calledFlows[name];
-}
-
-/** Whether a step calls a flow, so other steps nest under it. */
-export function callsFlow(step: StepSummary): boolean {
-	return step.nodeType === "call";
 }
 
 /**

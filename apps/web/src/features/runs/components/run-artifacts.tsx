@@ -25,6 +25,15 @@ import {
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@nightshift/ui/components/table";
+import { cn } from "@nightshift/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import {
 	DownloadIcon,
@@ -87,11 +96,17 @@ export function RunArtifacts({
 	steps,
 	artifacts,
 	onShowStep,
+	layout = "grid",
+	className,
 }: {
 	run: RunDetail;
 	steps: StepSummary[];
 	artifacts: Artifact[];
 	onShowStep: (stepId: string) => void;
+	/** Tiles with previews, or a compact table of one row per file. */
+	layout?: "grid" | "table";
+	/** The grid's classes, to drop its padding inside a step of the story. */
+	className?: string;
 }) {
 	const [openId, setOpenId] = useState<string | null>(null);
 	const open = artifacts.find((artifact) => artifact.id === openId);
@@ -116,16 +131,30 @@ export function RunArtifacts({
 
 	return (
 		<>
-			<div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-3 p-3">
-				{artifacts.map((artifact) => (
-					<ArtifactTile
-						key={artifact.id}
-						runId={run.id}
-						artifact={artifact}
-						onOpen={() => setOpenId(artifact.id)}
-					/>
-				))}
-			</div>
+			{layout === "table" ? (
+				<ArtifactTable
+					runId={run.id}
+					artifacts={artifacts}
+					onOpen={setOpenId}
+					className={className}
+				/>
+			) : (
+				<div
+					className={cn(
+						"grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-3 p-3",
+						className,
+					)}
+				>
+					{artifacts.map((artifact) => (
+						<ArtifactTile
+							key={artifact.id}
+							runId={run.id}
+							artifact={artifact}
+							onOpen={() => setOpenId(artifact.id)}
+						/>
+					))}
+				</div>
+			)}
 			<Dialog
 				open={open !== undefined}
 				onOpenChange={(next) => {
@@ -147,6 +176,67 @@ export function RunArtifacts({
 				</DialogContent>
 			</Dialog>
 		</>
+	);
+}
+
+/** One row per artifact: its kind, and its title, which opens it large. */
+function ArtifactTable({
+	runId,
+	artifacts,
+	onOpen,
+	className,
+}: {
+	runId: string;
+	artifacts: Artifact[];
+	onOpen: (artifactId: string) => void;
+	className?: string;
+}) {
+	return (
+		<Table className={cn("text-xs", className)}>
+			<TableHeader>
+				<TableRow>
+					<TableHead>Artifact</TableHead>
+					<TableHead>
+						<span className="sr-only">Download</span>
+					</TableHead>
+				</TableRow>
+			</TableHeader>
+			<TableBody>
+				{artifacts.map((artifact) => {
+					const Icon = KIND_ICON[kindOf(artifact)];
+					return (
+						<TableRow key={artifact.id}>
+							<TableCell className="w-full max-w-0">
+								<Button
+									variant="link"
+									size="xs"
+									className="h-auto max-w-full justify-start px-0"
+									title={`Open ${artifact.title}`}
+									onClick={() => onOpen(artifact.id)}
+								>
+									<Icon data-icon="inline-start" aria-hidden="true" />
+									<span className="truncate">{artifact.title}</span>
+								</Button>
+							</TableCell>
+							<TableCell className="w-0 p-0">
+								<Button
+									variant="ghost"
+									size="icon-xs"
+									aria-label={`Download ${artifact.title}`}
+									title="Download"
+									nativeButton={false}
+									render={
+										<a href={artifactUrl(runId, artifact, true)} download />
+									}
+								>
+									<DownloadIcon />
+								</Button>
+							</TableCell>
+						</TableRow>
+					);
+				})}
+			</TableBody>
+		</Table>
 	);
 }
 

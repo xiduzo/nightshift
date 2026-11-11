@@ -10,9 +10,10 @@ import {
 	TraceTitle,
 } from "@nightshift/ui/components/trace";
 import { BookOpenIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import type { StepSummary } from "@/shared/api";
 
-type Source = NonNullable<StepSummary["sources"]>[number];
+export type Source = NonNullable<StepSummary["sources"]>[number];
 
 /** Where in the file: its section, and the page of a PDF. */
 function spotOf(source: Source): string | null {
@@ -50,27 +51,44 @@ export function StepSources({ sources }: { sources: Source[] }) {
 						</TraceLine>
 					</TraceCollapsibleTrigger>
 					<TraceCollapsibleContent>
-						<ul className="flex flex-col gap-2">
-							{sources.map((source) => {
-								const spot = spotOf(source);
-								return (
-									<li key={source.path} className="flex flex-col gap-0.5">
-										<span className="flex flex-wrap items-center gap-2">
-											<span className="break-all font-mono text-foreground text-xs">
-												{source.path}
-											</span>
-											<Badge variant={source.read ? "secondary" : "outline"}>
-												{source.read ? "Read" : "Found"}
-											</Badge>
-										</span>
-										{spot ? <span className="text-xs">{spot}</span> : null}
-									</li>
-								);
-							})}
-						</ul>
+						<SourceList sources={sources} />
 					</TraceCollapsibleContent>
 				</TraceCollapsible>
 			</Trace>
 		</section>
+	);
+}
+
+/** Each source file once: its path, whether the agent read it or only found it, and where in it. */
+export function SourceList({
+	sources,
+	note,
+}: {
+	sources: Source[];
+	/** A line under a file, such as the steps that used it. */
+	note?: (source: Source) => ReactNode;
+}) {
+	return (
+		<ul className="flex flex-col gap-2">
+			{sources.map((source) => {
+				const spot = spotOf(source);
+				return (
+					<li key={source.path} className="flex flex-col gap-0.5">
+						<span className="flex flex-wrap items-center gap-2">
+							<span className="break-all font-mono text-foreground text-xs">
+								{source.path}
+							</span>
+							<Badge variant={source.read ? "secondary" : "outline"}>
+								{source.read ? "Read" : "Found"}
+							</Badge>
+						</span>
+						{spot ? (
+							<span className="text-muted-foreground text-xs">{spot}</span>
+						) : null}
+						{note?.(source)}
+					</li>
+				);
+			})}
+		</ul>
 	);
 }

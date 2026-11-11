@@ -31,7 +31,7 @@ export function formatTime(epochMs: number): string {
 }
 
 /** A step that runs and has not reported any spend yet: its cost is not known. */
-export function noCostYet(step: {
+function noCostYet(step: {
 	endedAt: number | null;
 	costCalls: number;
 }): boolean {

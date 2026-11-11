@@ -1,5 +1,4 @@
 import { askWhy, mergeSteps, runActions } from "@nightshift/client";
-import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
@@ -10,129 +9,89 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
+import { MessageScrollerProvider } from "@nightshift/ui/components/message-scroller";
 import {
-	ResizableHandle,
-	ResizablePanel,
-	ResizablePanelGroup,
-} from "@nightshift/ui/components/resizable";
-import { ScrollArea } from "@nightshift/ui/components/scroll-area";
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetHeader,
+	SheetTitle,
+} from "@nightshift/ui/components/sheet";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
-import {
-	Tabs,
-	TabsContent,
-	TabsList,
-	TabsTrigger,
-} from "@nightshift/ui/components/tabs";
-import { cn } from "@nightshift/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowDownToLineIcon, SearchXIcon, WorkflowIcon } from "lucide-react";
-import {
-	type ComponentProps,
-	useEffect,
-	useEffectEvent,
-	useMemo,
-	useRef,
-	useState,
-} from "react";
+import { SearchXIcon } from "lucide-react";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import { deviceQueries } from "@/features/devices";
 import { projectQueries } from "@/features/projects";
+import type { StepSummary } from "@/shared/api";
 import { useMediaQuery } from "@/shared/media-query";
 import { type Crumb, SiteHeader } from "@/shared/page";
+import { useLastSeen } from "../hooks/use-last-seen";
 import { useRunStream } from "../hooks/use-run-stream";
 import {
 	calledFlowName,
 	calledFlowOf,
 	type ItemScope,
-	nodeOfStep,
+	sameScope,
 	stepAtScope,
-	stepOutcomeColor,
-	stepRunsEach,
 	stepsIn,
-	stepsUnder,
 	traversalsIn,
 } from "../lib/run-steps";
 import { runQueries } from "../queries";
-import { StepTranscript } from "../transcript/step-transcript";
-import { emptyTranscript } from "../transcript/transcript";
 import { AskWhyButton } from "./ask-why-button";
 import { RunActions } from "./run-actions";
-import { RunArtifacts } from "./run-artifacts";
 import { FocusBreadcrumb, StepContext } from "./run-focus";
 import { RunGraph } from "./run-graph";
-import { RunTitle } from "./run-header";
+import { RunBadges, RunTitle } from "./run-header";
 import { RunLeases } from "./run-leases";
 import { RunServices } from "./run-services";
+import { RunSidebar } from "./run-sidebar";
 import { RunStatusPanel } from "./run-status-panel";
-import { RunVariables, variableCount } from "./run-variables";
+import { RunStory, type StepPick } from "./run-story";
 import { RunWarnings } from "./run-warnings";
 import { StepRowMenu } from "./step-actions";
-import { CONSOLE_BAR_PX, StepConsole } from "./step-console";
-import { StepSummary as StepSummaryView } from "./step-summary";
-import { StepTimeline } from "./step-timeline";
 
 const DESKTOP = "(min-width: 1024px)";
 
-/** The tabs of the run's card. */
-type RunTab = "steps" | "flow" | "variables" | "artifacts";
-
-/** The closed console's panel: its bar, and the gaps above and below its card. */
-const CONSOLE_CLOSED_PX = CONSOLE_BAR_PX + 8 + 16;
-
-/** The imperative handle of a resizable panel: collapse, expand, resize. */
-type PanelHandle = NonNullable<
-	Extract<
-		NonNullable<ComponentProps<typeof ResizablePanel>["panelRef"]>,
-		{ current: unknown }
-	>["current"]
->;
-
 /**
- * A run: its steps, the flow behind them, its variables and artifacts are
- * tabs of one card, under what the run does now. The selected step sits in a
- * console along the bottom: one line, or open on its summary, transcript and
- * outputs. The run's facts open from the header.
+ * A run as a story: every step in the order it ran, told like a chat, ending
+ * on what the run does now. Beside it, at a fixed width: the visits, the
+ * inputs and the variables. The flow opens on request. "Follow latest"
+ * keeps the newest step in view.
  */
 export function RunPage({
 	runId,
 	stepId,
 }: {
 	runId: string;
-	/** The step to open the run at, with its console open. */
+	/** The step to open the run at. */
 	stepId?: string;
 }) {
+	// The story keeps the newest step in view while you are at its end.
+	// A link to a step opens the run there instead.
+	return (
+		<MessageScrollerProvider
+			autoScroll
+			defaultScrollPosition={stepId === undefined ? "end" : "start"}
+		>
+			<RunPageBody runId={runId} stepId={stepId} />
+		</MessageScrollerProvider>
+	);
+}
+
+function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 	const run = useQuery(runQueries.get(runId));
 	const projects = useQuery(projectQueries.list());
 	// This computer, for its owner only: the assistant is the owner's.
 	const devices = useQuery(deviceQueries.overview());
 	const stream = useRunStream(runId);
 	const desktop = useMediaQuery(DESKTOP);
-	/** Null follows the latest step as the run walks. */
-	const [pickedStepId, setPickedStepId] = useState<string | null>(
-		stepId ?? null,
-	);
-	/** The call in focus (a Call step, or one of its elements): the steps and the graph narrow to it. */
+	const seen = useLastSeen(runId);
+	const [pick, setPick] = useState<StepPick | null>(null);
+	/** The call in focus (a Call step, or one of its elements): the story and the graph narrow to it. */
 	const [focus, setFocus] = useState<ItemScope>(null);
-	const [consoleOpen, setConsoleOpen] = useState(stepId !== undefined);
-	const [tab, setTab] = useState<RunTab>("steps");
-	const consolePanel = useRef<PanelHandle>(null);
-	/** The height the console last had open, to open it at again. */
-	const consoleSize = useRef<string>("45%");
-
-	// A link to a step of this run (`?step=`) selects it and opens the
-	// console, also when the page is open already. Only a new link does:
-	// the person's own picks after it stay.
-	const openLinkedStep = useEffectEvent((id: string) => {
-		setFocus(null);
-		setTab("steps");
-		setPickedStepId(id);
-		setConsoleOpen(true);
-		const panel = consolePanel.current;
-		if (panel?.isCollapsed()) panel.resize(consoleSize.current);
-	});
-	useEffect(() => {
-		if (stepId !== undefined) openLinkedStep(stepId);
-	}, [stepId]);
+	const [flowOpen, setFlowOpen] = useState(false);
 
 	const steps = useMemo(
 		() => mergeSteps(run.data?.steps ?? [], stream.steps),
@@ -143,6 +102,24 @@ export function RunPage({
 	const artifacts = useQuery(
 		runQueries.artifacts(runId, liveStatus === "running"),
 	);
+
+	/** Scrolls the story to a step, and narrows it to the call the step is in. */
+	const showStep = (id: string) => {
+		const step = steps.find((candidate) => candidate.id === id);
+		if (step && !sameScope(step.scope, focus)) setFocus(step.scope);
+		setPick((current) => ({ stepId: id, seq: (current?.seq ?? 0) + 1 }));
+	};
+
+	// A link to a step of this run (`?step=`) scrolls to it, also when the
+	// page is open already. Only a new link does: the person's own picks
+	// after it stay. It waits for the steps, to know the call it is in.
+	const openLinkedStep = useEffectEvent((id: string) => {
+		if (steps.some((step) => step.id === id)) showStep(id);
+	});
+	const loaded = steps.length > 0;
+	useEffect(() => {
+		if (stepId !== undefined && loaded) openLinkedStep(stepId);
+	}, [stepId, loaded]);
 
 	if (run.isLoading) {
 		return (
@@ -211,13 +188,7 @@ export function RunPage({
 		project,
 		owner: devices.data ? devices.data.thisComputer !== null : undefined,
 	});
-	// In focus: only the item's steps, nested ones included.
-	const visible = stepsUnder(steps, focus);
-	const selectedStep =
-		steps.find((step) => step.id === pickedStepId) ??
-		visible[visible.length - 1];
-	const lastStep = steps[steps.length - 1];
-	const variables = variableCount(runData, steps);
+	const story = stepsIn(steps, focus);
 	const artifactList = artifacts.data ?? [];
 	// A run that is not going runs again from a step, on the device that runs it.
 	const rerunnable = runActions(
@@ -230,6 +201,10 @@ export function RunPage({
 			warning.stepId ? [warning.stepId] : [],
 		),
 	);
+	const pickedStep = pick
+		? steps.find((step) => step.id === pick.stepId)
+		: undefined;
+	const lastStep = steps[steps.length - 1];
 
 	// The newest step of a gate without an outcome is the one the run waits at.
 	const openGate =
@@ -254,39 +229,23 @@ export function RunPage({
 	const graphFlowName = focusStep
 		? calledFlowName(runData, steps, focusStep)
 		: runData.flowName;
-	const graphSelected = selectedStep
-		? stepAtScope(steps, selectedStep, graphScope)
+	const graphStep = pickedStep ?? lastStep;
+	const graphSelected = graphStep
+		? stepAtScope(steps, graphStep, graphScope)
 		: undefined;
 
 	const selectNode = (nodeId: string) => {
 		const latest = [...graphSteps]
 			.reverse()
 			.find((step) => step.nodeId === nodeId);
-		if (latest) setPickedStepId(latest.id);
+		if (!latest) return;
+		setFlowOpen(false);
+		showStep(latest.id);
 	};
 
 	const selectItem = (scope: ItemScope) => {
 		setFocus(scope);
-		// Show the item's latest step; the whole run follows the latest again.
-		setPickedStepId(
-			scope ? (stepsUnder(steps, scope).at(-1)?.id ?? null) : null,
-		);
-	};
-
-	/** Opens or closes the console. On a desktop it is a panel that drags too. */
-	const showConsole = (open: boolean) => {
-		setConsoleOpen(open);
-		const panel = consolePanel.current;
-		if (!panel) return;
-		if (open && panel.isCollapsed()) panel.resize(consoleSize.current);
-		if (!open && !panel.isCollapsed()) panel.collapse();
-	};
-
-	const showGate = () => {
-		if (!openGate) return;
-		setFocus(null);
-		setPickedStepId(openGate.id);
-		showConsole(true);
+		setPick(null);
 	};
 
 	// A run of another of your Spaces opens here too. Its project page
@@ -315,129 +274,8 @@ export function RunPage({
 		{ label: runData.title },
 	];
 
-	/** A tab's scroll area: the card's height on a desktop, a fixed height on a phone. */
-	const tabScroll = cn(
-		"min-h-0 flex-1",
-		!desktop && "max-h-96 [&>[data-slot=scroll-area-viewport]]:max-h-96",
-	);
-	const tabCount = (count: number) => (
-		<Badge variant="secondary" className="tabular-nums">
-			{count}
-		</Badge>
-	);
-
-	const runPane = (
-		<Tabs
-			value={tab}
-			onValueChange={(next) => setTab(next as RunTab)}
-			aria-label="The run"
-			className={cn("gap-0", desktop && "h-full")}
-		>
-			<div className="flex h-11 shrink-0 items-center gap-2 border-b px-3">
-				<TabsList variant="line" className="-mb-px">
-					<TabsTrigger value="steps">
-						Steps
-						{tabCount(visible.length)}
-					</TabsTrigger>
-					<TabsTrigger value="flow">Flow</TabsTrigger>
-					<TabsTrigger value="variables">
-						Variables
-						{variables > 0 ? tabCount(variables) : null}
-					</TabsTrigger>
-					<TabsTrigger value="artifacts">
-						Artifacts
-						{artifactList.length > 0 ? tabCount(artifactList.length) : null}
-					</TabsTrigger>
-				</TabsList>
-				{tab === "steps" && pickedStepId ? (
-					<Button
-						variant="ghost"
-						size="xs"
-						className="ml-auto"
-						title="Follow the latest step"
-						aria-label="Follow latest"
-						onClick={() => setPickedStepId(null)}
-					>
-						<ArrowDownToLineIcon data-icon="inline-start" />
-						<span className="hidden xl:inline">Follow latest</span>
-					</Button>
-				) : null}
-			</div>
-			<TabsContent value="steps" className="flex min-h-0 flex-1 flex-col">
-				<ScrollArea className={tabScroll}>
-					<StepTimeline
-						steps={steps}
-						scope={focus}
-						runStatus={status}
-						selectedStepId={selectedStep?.id ?? null}
-						selectedItem={focus}
-						revealStepId={stepId ?? null}
-						onSelect={setPickedStepId}
-						onSelectItem={selectItem}
-						calledName={(step) => calledFlowName(runData, steps, step)}
-						runsEach={(step) => stepRunsEach(runData, steps, step)}
-						outcomeColor={(step) => stepOutcomeColor(runData, steps, step)}
-						warnedStepIds={warnedStepIds}
-						stepAction={
-							rerunnable
-								? (step) => <StepRowMenu runId={runData.id} step={step} />
-								: undefined
-						}
-					/>
-				</ScrollArea>
-			</TabsContent>
-			<TabsContent
-				value="flow"
-				className={cn(
-					"relative min-h-0 flex-1 overflow-hidden rounded-b-xl bg-muted/40 dark:bg-muted/20",
-					!desktop && "h-96 flex-none",
-				)}
-			>
-				<RunGraph
-					key={
-						graphScope
-							? `${graphScope.parentStepId}:${graphScope.itemId ?? ""}`
-							: "top"
-					}
-					flow={graphFlow}
-					steps={graphSteps}
-					runStatus={status}
-					traversals={graphTraversals}
-					routesKey={
-						!graphScope && runData.flowName
-							? `${runData.projectId}/${runData.flowName}`
-							: undefined
-					}
-					selectedNodeId={graphSelected?.nodeId ?? null}
-					onSelectNode={selectNode}
-					label={graphScope ? "The flow of the call in focus" : undefined}
-					flowLabel={graphFlowName ?? undefined}
-				/>
-			</TabsContent>
-			<TabsContent value="variables" className="flex min-h-0 flex-1 flex-col">
-				<ScrollArea className={tabScroll}>
-					<RunVariables
-						run={runData}
-						steps={steps}
-						onShowStep={setPickedStepId}
-					/>
-				</ScrollArea>
-			</TabsContent>
-			<TabsContent value="artifacts" className="flex min-h-0 flex-1 flex-col">
-				<ScrollArea className={tabScroll}>
-					<RunArtifacts
-						run={runData}
-						steps={steps}
-						artifacts={artifactList}
-						onShowStep={setPickedStepId}
-					/>
-				</ScrollArea>
-			</TabsContent>
-		</Tabs>
-	);
-
-	/** What the run does now, and what went wrong along the way. */
-	const statusPane = (
+	/** What the run does now, and what went wrong along the way: the end of the story. */
+	const ending = (
 		<>
 			<RunStatusPanel
 				// Opens again when the status changes.
@@ -445,7 +283,9 @@ export function RunPage({
 				run={runData}
 				status={status}
 				openGateNodeId={openGate?.nodeId ?? null}
-				onShowGate={showGate}
+				onShowGate={() => {
+					if (openGate) showStep(openGate.id);
+				}}
 				wait={stream.transcript.lastWait}
 				lastStep={lastStep}
 				askWhy={
@@ -456,75 +296,88 @@ export function RunPage({
 			/>
 			<RunLeases run={runData} />
 			<RunServices run={runData} />
-			<RunWarnings warnings={runData.warnings} onShowStep={setPickedStepId} />
+			<RunWarnings warnings={runData.warnings} onShowStep={showStep} />
 		</>
 	);
 
-	const stepConsole = (
-		<StepConsole
-			step={selectedStep}
-			runStatus={status}
-			open={consoleOpen}
-			onOpenChange={showConsole}
-			empty={status === "running" ? "Waiting for the first step…" : "No steps."}
-			outcomeColor={
-				selectedStep
-					? stepOutcomeColor(runData, steps, selectedStep)
+	const storyView = (
+		<RunStory
+			run={runData}
+			steps={steps}
+			story={story}
+			status={status}
+			transcripts={stream.transcript.steps}
+			artifacts={artifactList}
+			connecting={stream.connection === "connecting"}
+			seen={seen}
+			pick={pick}
+			warnedStepIds={warnedStepIds}
+			focus={focus}
+			onSelectItem={selectItem}
+			onShowStep={showStep}
+			stepAction={
+				rerunnable
+					? (step: StepSummary) => (
+							<StepRowMenu runId={runData.id} step={step} />
+						)
 					: undefined
 			}
-			className="h-full"
-			summary={
-				selectedStep ? (
-					<StepSummaryView
+			stepContext={(step: StepSummary) =>
+				step.scope ? (
+					<StepContext
 						run={runData}
 						steps={steps}
-						step={selectedStep}
-						focus={focus}
-						onSelectItem={selectItem}
-						context={
-							selectedStep.scope ? (
-								<StepContext
-									run={runData}
-									steps={steps}
-									step={selectedStep}
-									onSelect={selectItem}
-								/>
-							) : undefined
-						}
+						step={step}
+						onSelect={selectItem}
 					/>
-				) : null
+				) : undefined
 			}
-			items={
-				selectedStep
-					? (stream.transcript.steps.get(selectedStep.id) ?? emptyTranscript)
-							.items
-					: emptyTranscript.items
-			}
-			changes={
-				selectedStep
-					? stream.transcript.steps.get(selectedStep.id)?.changes
-					: undefined
-			}
-			projectRoot={runData.worktreePath}
-			transcript={
-				selectedStep ? (
-					<StepTranscript
-						key={selectedStep.id}
-						runId={runData.id}
-						step={selectedStep}
-						transcript={
-							stream.transcript.steps.get(selectedStep.id) ?? emptyTranscript
+			ending={ending}
+		/>
+	);
+
+	const flowSheet = (
+		<Sheet open={flowOpen} onOpenChange={setFlowOpen}>
+			<SheetContent className="gap-0 data-[side=right]:w-[min(90vw,64rem)] data-[side=right]:sm:max-w-none">
+				<SheetHeader className="border-b">
+					<SheetTitle>The flow of this run</SheetTitle>
+					<SheetDescription>
+						Pick a node to show its step in the story.
+					</SheetDescription>
+				</SheetHeader>
+				<div className="relative min-h-0 flex-1 bg-muted/40 dark:bg-muted/20">
+					<RunGraph
+						key={
+							graphScope
+								? `${graphScope.parentStepId}:${graphScope.itemId ?? ""}`
+								: "top"
 						}
-						projectRoot={runData.worktreePath}
-						connecting={stream.connection === "connecting"}
-						walker={runData.walker}
-						node={nodeOfStep(runData, steps, selectedStep)}
-						answerPending={runData.commands.some(
-							(c) => c.kind === "gate.resolve",
-						)}
+						flow={graphFlow}
+						steps={graphSteps}
+						runStatus={status}
+						traversals={graphTraversals}
+						routesKey={
+							!graphScope && runData.flowName
+								? `${runData.projectId}/${runData.flowName}`
+								: undefined
+						}
+						selectedNodeId={graphSelected?.nodeId ?? null}
+						onSelectNode={selectNode}
+						label={graphScope ? "The flow of the call in focus" : undefined}
+						flowLabel={graphFlowName ?? undefined}
 					/>
-				) : null
-			}
+				</div>
+			</SheetContent>
+		</Sheet>
+	);
+
+	const sidebar = (
+		<RunSidebar
+			run={runData}
+			steps={steps}
+			artifacts={artifactList}
+			onShowStep={showStep}
+			className={desktop ? undefined : "w-full border-t border-l-0"}
 		/>
 	);
 
@@ -536,78 +389,44 @@ export function RunPage({
 					run={runData}
 					status={status}
 					steps={steps}
-					onShowStep={setPickedStepId}
+					onShowStep={showStep}
+					onShowFlow={() => setFlowOpen(true)}
 				/>
 			</SiteHeader>
 			<div className="flex flex-1 flex-col lg:h-[calc(100svh-3.5rem)] lg:min-h-0 lg:flex-none">
-				<RunTitle
-					run={runData}
-					steps={steps}
-					status={status}
-					reconnecting={stream.connection === "reconnecting"}
-				/>
-				<div className="flex h-6 min-w-0 items-center gap-2 px-3 text-sm lg:px-5">
-					<WorkflowIcon
-						className="size-4 shrink-0 text-muted-foreground"
-						aria-hidden="true"
-					/>
-					<FocusBreadcrumb
+				<RunTitle run={runData} steps={steps} />
+				<div className="flex min-h-9 min-w-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-3 pb-3 text-sm lg:px-5">
+					<RunBadges
 						run={runData}
-						steps={steps}
-						focus={focus}
-						onSelect={selectItem}
+						status={status}
+						reconnecting={stream.connection === "reconnecting"}
 					/>
+					{focus ? (
+						// Inside a call: the way back up to the run's own flow.
+						<FocusBreadcrumb
+							run={runData}
+							steps={steps}
+							focus={focus}
+							onSelect={selectItem}
+						/>
+					) : null}
 				</div>
 				{desktop ? (
-					<ResizablePanelGroup
-						orientation="vertical"
-						className="min-h-[28rem] flex-1"
-					>
-						<ResizablePanel
-							minSize="25%"
-							className="flex min-h-0 min-w-0 flex-col gap-3 px-4 pt-3 pb-2"
-						>
-							<div className="flex flex-col gap-3 empty:hidden">
-								{statusPane}
-							</div>
-							<Card className="min-h-0 flex-1 gap-0 py-0">{runPane}</Card>
-						</ResizablePanel>
-						<ResizableHandle
-							withHandle
-							className="bg-transparent focus-visible:bg-ring"
-						/>
-						<ResizablePanel
-							panelRef={consolePanel}
-							collapsible
-							collapsedSize={CONSOLE_CLOSED_PX}
-							minSize={220}
-							defaultSize={
-								consoleOpen ? consoleSize.current : CONSOLE_CLOSED_PX
-							}
-							className="min-h-0 px-4 pt-2 pb-4"
-							onResize={(size) => {
-								const open = size.inPixels > CONSOLE_CLOSED_PX + 1;
-								if (open) consoleSize.current = `${size.asPercentage}%`;
-								setConsoleOpen(open);
-							}}
-						>
-							<Card className="h-full gap-0 py-0">{stepConsole}</Card>
-						</ResizablePanel>
-					</ResizablePanelGroup>
+					<div className="flex min-h-0 flex-1">
+						<div className="flex min-h-0 min-w-0 flex-1 flex-col">
+							{storyView}
+						</div>
+						{sidebar}
+					</div>
 				) : (
-					<div className="flex flex-col gap-3 p-3">
-						{statusPane}
-						<Card className="gap-0 py-0">{runPane}</Card>
-						<Card
-							className={cn(
-								"gap-0 py-0",
-								consoleOpen && "h-[85svh] min-h-[32rem]",
-							)}
-						>
-							{stepConsole}
-						</Card>
+					<div className="flex flex-col">
+						<div className="flex h-[80svh] min-h-[28rem] flex-col">
+							{storyView}
+						</div>
+						{sidebar}
 					</div>
 				)}
+				{flowSheet}
 			</div>
 		</>
 	);

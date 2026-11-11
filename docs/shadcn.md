@@ -74,7 +74,7 @@ CLI when you need them.
 | ✓ [Tabs](https://ui.shadcn.com/docs/components/tabs) | Switch between views of one thing (a schedule's Time and days / Cron line, a run's Steps / Flow / Variables / Artifacts, the node inspector's Work / Results / Setup, the inbox's Waiting for you / Daily digest). `variant="line"` for underline tabs. |
 | ✓ [Separator](https://ui.shadcn.com/docs/components/separator) | A thin rule between sections or toolbar items. |
 | ✓ [Scroll Area](https://ui.shadcn.com/docs/components/scroll-area) | A scroll region with styled scrollbars (transcripts, long lists in a fixed height). |
-| ✓ [Resizable](https://ui.shadcn.com/docs/components/resizable) | Panels with a drag handle between them. On a run: the run's tabs above, and the step console below, a `collapsible` panel whose collapsed size is its one-line bar. |
+| ✓ [Resizable](https://ui.shadcn.com/docs/components/resizable) | Panels with a drag handle between them. Not on a run: its story and its sidebar have a fixed layout. |
 
 ### Overlays and dialogs
 
@@ -138,7 +138,7 @@ yet. Read the source with `shadcn view <name>`.
 | --- | --- |
 | ✓ `message` | One chat message: `Message`, `MessageAvatar`, `MessageHeader`, `MessageContent`, `MessageFooter`, `MessageGroup`. |
 | ✓ `bubble` | A chat bubble around message text, with `BubbleGroup` and `BubbleReactions`. |
-| ✓ `message-scroller` | A chat scroll area that sticks to the bottom while new content streams, with a "jump to latest" button. |
+| ✓ `message-scroller` | A chat scroll area that sticks to the bottom while new content streams, with a "jump to latest" button. The run's story: one item per step. It follows the newest step while you are at its end. A node in the flow (Show flow in the run's menu) scrolls to its step. |
 | ✓ `attachment` | A file or link attached to a message: media, title, description, actions. The files of an Ask, a run's artifacts, and the files you add to the answer of a Gate, each with a Remove action (`features/gates/answer-files.tsx`). |
 | ✓ `marker` | An inline marker in a conversation: a system note, a divider, a status line. |
 | ✓ `trace` | A collapsible line of agent activity (a tool call, a thinking step) with icon, title and description. The base of the Chain of Thought, Terminal, Tool, Reasoning and Subagent patterns in a run's transcript. |
@@ -154,10 +154,10 @@ not add the AI SDK.
 
 | Pattern | What it is for |
 | --- | --- |
-| [Plan](https://ui.shadcn.com/docs/ai-elements/base/plan) | Steps known up front, each done, running or pending, the title counting the done ones. On `Trace`. The agent's to-do list in the step console (`features/runs/components/step-plan.tsx`, from `stepTodos` in `@nightshift/client`). |
-| [Task](https://ui.shadcn.com/docs/ai-elements/base/task) | A collapsible list under one title. On `Trace`. What a step's agent proposed to learn about the project, in the step console: the Gate words of Review learnings as the title, the count of notes, the notes, and what happens to them next (`features/runs/components/step-learnings.tsx`, from `stepLearnings`). |
-| [Sources](https://ui.shadcn.com/docs/ai-elements/base/sources) | The sources an answer used, behind one "Used N sources" line. On `Trace`. The knowledge files a step's agent used, in the step console: the files it read first, then the top hits of its searches, each with its section and page and a "Read" or "Found" `Badge` (`features/runs/components/step-sources.tsx`, from the step's `sources`, which the engine takes from the agent's searches and reads). |
-| [Queue](https://ui.shadcn.com/docs/ai-elements/base/queue) | A to-do list split into what remains and what is done. Not used: the step console shows the agent's list as a Plan, in the agent's own order. |
+| [Plan](https://ui.shadcn.com/docs/ai-elements/base/plan) | Steps known up front, each done, running or pending, the title counting the done ones. On `Trace`. The agent's to-do list in a step of the run's story (`features/runs/components/step-plan.tsx`, from `stepTodos` in `@nightshift/client`). |
+| [Task](https://ui.shadcn.com/docs/ai-elements/base/task) | A collapsible list under one title. On `Trace`. What a step's agent proposed to learn about the project, in a step of the run's story: the Gate words of Review learnings as the title, the count of notes, the notes, and what happens to them next (`features/runs/components/step-learnings.tsx`, from `stepLearnings`). |
+| [Sources](https://ui.shadcn.com/docs/ai-elements/base/sources) | The sources an answer used, behind one "Used N sources" line. On `Trace`. The knowledge files a step's agent used, in a step of the run's story: the files it read first, then the top hits of its searches, each with its section and page and a "Read" or "Found" `Badge` (`features/runs/components/step-sources.tsx`, from the step's `sources`, which the engine takes from the agent's searches and reads). |
+| [Queue](https://ui.shadcn.com/docs/ai-elements/base/queue) | A to-do list split into what remains and what is done. Not used: the run's story shows the agent's list as a Plan, in the agent's own order. |
 | [File Tree](https://ui.shadcn.com/docs/ai-elements/base/file-tree) | Files in folders: a `Collapsible` per folder, a ghost `Button` per file. The files a step changed: its agent's edits, and every changed file in the run's copy of the project (commands, formatters, lockfiles, a Command step's files). An Agent step's file that no edit tool changed gets a "By command" `Badge`. Each file opens a Sheet with its diff as `DiffLines` (`shared/code`): `CodeBlockLine` added and removed lines, added ones tinted green. A wrapped line hangs at its own indent, in the Shiki colors of the file's extension. A file with the agent's edits and the whole diff shows both as `Tabs` ("All changes", "Each edit"). Quiet notes say when other steps ran at the same time or a diff is cut short (`features/runs/components/changed-files.tsx`, from `changedFiles` and `fileTree` in `@nightshift/client`, over the step's last `worktree-changes`). |
 | [Context](https://ui.shadcn.com/docs/ai-elements/base/context) | The tokens used: an outline `Button` that opens a `HoverCard`, with a `Progress` bar of the context window when the size is known. `UsageContext` (`shared/usage`): the button shows the tokens and the cost, and the card splits input, cache, output and cost. No harness reports a context window yet, so it has no bar. The Tokens fact of a step, and the footer of an answer in the flow chat (`features/flows/chat/chat-panel.tsx`). |
 | [Chain of Thought](https://ui.shadcn.com/docs/ai-elements/base/chain-of-thought) | Steps folded behind one summary line that opens on them. On `Trace`, open while the last step runs. Two or more tool calls in a row in a run's transcript: "Ran 6 commands · read 3 files" (`features/runs/transcript/items/tool-calls-group.tsx`, from `groupToolCalls` and `toolCallsSummary` in `@nightshift/client`). The thoughts around and between those calls are steps inside the group. The phone shows the same line. |
@@ -223,7 +223,7 @@ files into the app. Then adapt the copy. Browse them at
 | A message in the page | Alert |
 | A form | Field, FieldGroup, FieldSet with the matching control |
 | Two or more views of one thing | Tabs, or Toggle Group for a compact switch |
-| A run's transcript | message, marker and the Chain of Thought, Terminal, Test Results, Stack Trace, Tool, Reasoning, Subagent, Checkpoint and Confirmation patterns (trace, code-block, item) inside message-scroller |
+| A run's story | per step a separator `Marker` (Checkpoint) with its name, time and outcome, or one `Trace` line for a step you saw already; a red separator `Marker` for "New since you looked"; then the transcript: message, marker and the Chain of Thought, Terminal, Test Results, Stack Trace, Tool, Reasoning, Subagent, Checkpoint and Confirmation patterns (trace, code-block, item) inside message-scroller |
 | Confirm before a destructive step | Alert Dialog |
 | Feedback after an action | Sonner `toast()` |
 | Long content in a fixed box | Scroll Area |

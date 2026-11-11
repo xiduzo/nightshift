@@ -3,7 +3,6 @@
 export type { FlowCanvasNode, NodeRunState } from "./canvas/flow-node";
 export {
 	END_STATUS_LABEL,
-	hasCost,
 	NODE_TYPE,
 } from "./canvas/node-type";
 export {

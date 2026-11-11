@@ -39,3 +39,8 @@ export function WorkTime({
 }) {
 	return <>{useWorkTime(steps, start).active}</>;
 }
+
+/** How long the step took, counting up while it runs and standing still while its Gate waits. */
+export function StepDuration({ step }: { step: StepSummary }) {
+	return <WorkTime steps={[step]} start={step.startedAt} />;
+}
