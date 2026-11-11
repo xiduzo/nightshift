@@ -45,6 +45,8 @@ export const notificationSettings = sqliteTable("notification_settings", {
 	screens: text("screens").notNull().default("{}"),
 	/** How long a push to a phone or a closed browser waits while a screen is open. */
 	holdMinutes: integer("hold_minutes").notNull().default(3),
+	/** JSON: the Gate urgencies that push, `["now"]`. A Gate of another urgency only shows in the inbox. */
+	pushUrgencies: text("push_urgencies").notNull().default('["now"]'),
 	updatedAt: updatedAt(),
 });
 

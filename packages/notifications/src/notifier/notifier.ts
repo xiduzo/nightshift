@@ -3,6 +3,7 @@ import {
 	type LandedFact,
 	type ScheduleMissed,
 } from "@nightshift/engine";
+import type { GateUrgency } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
 import {
 	deviceWaitWords,
@@ -25,6 +26,7 @@ import type { Claim, Delivery, DeliveryLog, NoticeKind } from "../deliveries";
 import {
 	inQuietHours,
 	type NotificationSettings,
+	pushesUrgency,
 	type SettingsStore,
 } from "../settings";
 import type { PushTarget, TargetStore } from "../targets";
@@ -263,6 +265,8 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			inApp?: boolean;
 			people?: readonly string[];
 			words?: (settings: NotificationSettings) => NoticeWords;
+			/** A Gate's urgency: only the urgencies the Person chose push. */
+			urgency?: GateUrgency;
 		} = {},
 	): Promise<void> {
 		const inApp = options.inApp ?? true;
@@ -280,7 +284,12 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 					message(kind, key, ids, alert, words),
 				);
 			}
-			if (wanted) {
+			// A Gate of an urgency the Person does not push for: the inbox only.
+			const pushes =
+				wanted &&
+				(options.urgency === undefined ||
+					pushesUrgency(settings, options.urgency));
+			if (pushes) {
 				await push(
 					{
 						personId,
@@ -443,8 +452,8 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 				const gate = parseGateKey(key);
 				if (gate) told.add(gate.runId);
 			}
-			for (const { key, runId, stepId } of opened) {
-				await tell("gate-opened", key, { spaceId, runId, stepId });
+			for (const { key, runId, stepId, urgency } of opened) {
+				await tell("gate-opened", key, { spaceId, runId, stepId }, { urgency });
 				told.add(runId);
 			}
 			// The other Members' screens hear of the wait as a run that changed.

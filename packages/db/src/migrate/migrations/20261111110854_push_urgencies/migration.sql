@@ -1,0 +1,1 @@
+ALTER TABLE `notification_settings` ADD `push_urgencies` text DEFAULT '["now"]' NOT NULL;

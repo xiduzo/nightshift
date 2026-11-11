@@ -14,6 +14,7 @@ const saved: NotificationSettings = {
 	timeZone: "Europe/Amsterdam",
 	screens: { web: true, expo: true, desktop: true },
 	holdMinutes: 3,
+	pushUrgencies: ["now"],
 };
 
 describe("applySettingsPatch", () => {
@@ -36,6 +37,19 @@ describe("applySettingsPatch", () => {
 			...saved,
 			holdMinutes: 0,
 		});
+	});
+
+	test("replaces the urgencies that push, in order; leaving them out keeps them", () => {
+		expect(
+			applySettingsPatch(saved, { pushUrgencies: ["later", "now"] })
+				.pushUrgencies,
+		).toEqual(["now", "later"]);
+		expect(
+			applySettingsPatch(saved, { pushUrgencies: [] }).pushUrgencies,
+		).toEqual([]);
+		expect(applySettingsPatch(saved, { holdMinutes: 1 }).pushUrgencies).toEqual(
+			["now"],
+		);
 	});
 
 	test("replaces the time zone and merges a screen", () => {

@@ -1,8 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Database } from "@nightshift/db";
+import { notificationSettings } from "@nightshift/db/schema";
 import { utc } from "@nightshift/time/testing";
+import { eq } from "drizzle-orm";
 import { testDatabase } from "../testing/database";
-import { createSettingsStore, defaultSettings, inQuietHours } from "./settings";
+import {
+	createSettingsStore,
+	defaultSettings,
+	inQuietHours,
+	pushesUrgency,
+} from "./settings";
 
 let db: Database;
 let cleanup: () => void;
@@ -66,6 +73,7 @@ describe("the settings store", () => {
 			quietHours: null,
 			screens: { web: true, expo: true, desktop: true },
 			holdMinutes: 3,
+			pushUrgencies: ["now"],
 		});
 	});
 
@@ -86,6 +94,50 @@ describe("the settings store", () => {
 		expect((await store.save("ada", { quietHours: null })).quietHours).toBe(
 			null,
 		);
+	});
+
+	test("the urgencies that push: a round trip, once each, in order", async () => {
+		const store = createSettingsStore(db, { timeZone: "UTC" });
+		const saved = await store.save("ada", {
+			pushUrgencies: ["later", "now", "later"],
+		});
+		expect(saved.pushUrgencies).toEqual(["now", "later"]);
+		expect((await store.get("ada")).pushUrgencies).toEqual(["now", "later"]);
+		expect(pushesUrgency(saved, "later")).toBe(true);
+		expect(pushesUrgency(saved, "today")).toBe(false);
+
+		expect(
+			(await store.save("ada", { pushUrgencies: [] })).pushUrgencies,
+		).toEqual([]);
+		await expect(
+			store.save("ada", { pushUrgencies: ["soon" as "now"] }),
+		).rejects.toThrow();
+	});
+
+	test("a save without the urgencies keeps them: an older phone app sends none", async () => {
+		const store = createSettingsStore(db, { timeZone: "UTC" });
+		await store.save("ada", { pushUrgencies: ["now", "today"] });
+		const saved = await store.save("ada", { holdMinutes: 5 });
+		expect(saved.pushUrgencies).toEqual(["now", "today"]);
+		expect((await store.get("ada")).pushUrgencies).toEqual(["now", "today"]);
+	});
+
+	test("a row from before the urgencies, or one it cannot read, pushes only for now", async () => {
+		const store = createSettingsStore(db, { timeZone: "UTC" });
+		await db.insert(notificationSettings).values({ personId: "ada" });
+		expect((await store.get("ada")).pushUrgencies).toEqual(["now"]);
+
+		await db
+			.update(notificationSettings)
+			.set({ pushUrgencies: "not json" })
+			.where(eq(notificationSettings.personId, "ada"));
+		expect((await store.get("ada")).pushUrgencies).toEqual(["now"]);
+
+		await db
+			.update(notificationSettings)
+			.set({ pushUrgencies: '["soon"]' })
+			.where(eq(notificationSettings.personId, "ada"));
+		expect((await store.get("ada")).pushUrgencies).toEqual(["now"]);
 	});
 
 	test("refuses a time or a time zone it cannot read", async () => {

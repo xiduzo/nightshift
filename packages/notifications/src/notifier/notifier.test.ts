@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Database } from "@nightshift/db";
 import type { LandedFact } from "@nightshift/engine";
 import type { LandedChange } from "@nightshift/engine/testing";
+import type { GateUrgency } from "@nightshift/flows";
 import { utc } from "@nightshift/time/testing";
 import {
 	createInAppChannel,
@@ -135,18 +136,33 @@ function landed(runId: string, what: What, spaceId = SPACE): LandedFact {
 	return { spaceId, runId, seq, changes: "summary", ...what } as LandedFact;
 }
 
-/** A Gate opens: the engine reads it open from now on, and its event lands. */
+/**
+ * A Gate opens: the engine reads it open from now on, and its event lands.
+ * `urgency`: `now` by default, the one urgency that pushes by default.
+ * Null: the fact names none.
+ */
 async function openGate(
 	runId: string,
 	stepId: string,
 	spaceId = SPACE,
-	facts: Omit<OpenGateRef, "runId" | "stepId"> = {},
+	{
+		urgency = "now",
+		...facts
+	}: Omit<OpenGateRef, "runId" | "stepId"> & {
+		urgency?: GateUrgency | null;
+	} = {},
 ) {
 	events.setOpen(spaceId, [
 		...(await events.source.openGates(spaceId)),
 		{ runId, stepId, ...facts },
 	]);
-	events.land([landed(runId, { kind: "gate-opened", stepId }, spaceId)]);
+	events.land([
+		landed(
+			runId,
+			{ kind: "gate-opened", stepId, ...(urgency ? { urgency } : {}) },
+			spaceId,
+		),
+	]);
 	await notifier.idle();
 }
 
@@ -399,6 +415,77 @@ describe("this computer's desktop", () => {
 		await notifier.tick();
 
 		expect(web.calls).toEqual([]);
+	});
+});
+
+describe("push by urgency", () => {
+	test("by default only a Gate for now pushes; the inbox and its count get every Gate", async () => {
+		await notifier.start();
+		const ada = await register("ada", "web");
+		const phone = await register("ada", "expo");
+		const own = await register("ada", "desktop");
+		const screen = openScreen("ada", { phone: true });
+
+		await openGate("run-1", "now", SPACE, { urgency: "now" });
+		await openGate("run-2", "today", SPACE, { urgency: "today" });
+		await openGate("run-3", "later", SPACE, { urgency: "later" });
+		// A fact without an urgency reads as today.
+		await openGate("run-4", "none", SPACE, { urgency: null });
+		await closeScreens();
+		await notifier.tick();
+
+		expect(sentTo(web)).toEqual([`${ada.id}:run-1:now`]);
+		expect(sentTo(expo)).toEqual([`${phone.id}:run-1:now`]);
+		expect(sentTo(desktop)).toEqual([`${own.id}:run-1:now`]);
+		expect(screen.map((i) => i.kind === "gate-opened" && i.key)).toEqual([
+			"run-1:now",
+			"run-2:today",
+			"run-3:later",
+			"run-4:none",
+		]);
+		expect(await deliveries.live("run-2:today")).toEqual([]);
+	});
+
+	test("a Person who pushes for today gets those Gates too, and later stays in the inbox", async () => {
+		await notifier.start();
+		const ada = await register("ada", "web");
+		const bob = await register("bob", "web");
+		await settings.save("ada", { pushUrgencies: ["now", "today"] });
+
+		await openGate("run-1", "today", SPACE, { urgency: "today" });
+		await openGate("run-2", "later", SPACE, { urgency: "later" });
+
+		expect(sentTo(web)).toEqual([`${ada.id}:run-1:today`]);
+		expect(sentTo(web)).not.toContain(`${bob.id}:run-1:today`);
+	});
+
+	test("no urgency chosen: no Gate pushes, other events still do", async () => {
+		await notifier.start();
+		const ada = await register("ada", "web");
+		await settings.save("ada", { pushUrgencies: [] });
+
+		await openGate("run-1", "step-1", SPACE, { urgency: "now" });
+		await endRun("run-2", "failed");
+
+		expect(sentTo(web)).toEqual([`${ada.id}:run-2:end:${seq}`]);
+	});
+
+	test("quiet hours still hold a Gate of an urgency that pushes", async () => {
+		await notifier.start();
+		const ada = await register("ada", "web");
+		await settings.save("ada", {
+			quietHours: { start: "22:00", end: "07:00" },
+			pushUrgencies: ["today"],
+		});
+		clock = utc(2026, 9, 21, 23, 0);
+
+		await openGate("run-1", "today", SPACE, { urgency: "today" });
+		await openGate("run-2", "now", SPACE, { urgency: "now" });
+		expect(web.calls).toEqual([]);
+
+		clock = utc(2026, 9, 22, 7, 0);
+		await notifier.tick();
+		expect(sentTo(web)).toEqual([`${ada.id}:run-1:today`]);
 	});
 });
 
@@ -781,7 +868,13 @@ describe("once per key", () => {
 		await register("ada", "web");
 
 		await openGate("run-1", "step-1");
-		events.land([landed("run-1", { kind: "gate-opened", stepId: "step-1" })]);
+		events.land([
+			landed("run-1", {
+				kind: "gate-opened",
+				stepId: "step-1",
+				urgency: "now",
+			}),
+		]);
 		await notifier.idle();
 
 		expect(web.sent()).toHaveLength(1);
@@ -841,7 +934,13 @@ describe("once per key", () => {
 		});
 		await notifier.start();
 		events.setOpen(SPACE, [{ runId: "run-1", stepId: "step-1" }]);
-		events.land([landed("run-1", { kind: "gate-opened", stepId: "step-1" })]);
+		events.land([
+			landed("run-1", {
+				kind: "gate-opened",
+				stepId: "step-1",
+				urgency: "now",
+			}),
+		]);
 		await waitForClaim("run-1:step-1");
 		notifier.stop();
 
@@ -868,7 +967,13 @@ describe("once per key", () => {
 		});
 		await notifier.start();
 		events.setOpen(SPACE, [{ runId: "run-1", stepId: "step-1" }]);
-		events.land([landed("run-1", { kind: "gate-opened", stepId: "step-1" })]);
+		events.land([
+			landed("run-1", {
+				kind: "gate-opened",
+				stepId: "step-1",
+				urgency: "now",
+			}),
+		]);
 		await waitForClaim("run-1:step-1");
 
 		const next = makeNotifier();
@@ -886,7 +991,13 @@ describe("once per key", () => {
 		});
 		await notifier.start();
 		events.setOpen(SPACE, [{ runId: "run-1", stepId: "step-1" }]);
-		events.land([landed("run-1", { kind: "gate-opened", stepId: "step-1" })]);
+		events.land([
+			landed("run-1", {
+				kind: "gate-opened",
+				stepId: "step-1",
+				urgency: "now",
+			}),
+		]);
 		await waitForClaim("run-1:step-1");
 		notifier.stop();
 

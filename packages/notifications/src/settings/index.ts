@@ -9,5 +9,6 @@ export {
 	type NotificationSettingsPatch,
 	notificationSettingsPatchSchema,
 	notificationSettingsSchema,
+	pushesUrgency,
 	type SettingsStore,
 } from "./settings";

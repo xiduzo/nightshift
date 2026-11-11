@@ -1,4 +1,5 @@
 import type { LandedFact } from "@nightshift/engine";
+import { DEFAULT_GATE_URGENCY, type GateUrgency } from "@nightshift/flows";
 
 import { gateKey, parseGateKey } from "../contract";
 import type { OpenGateRef } from "./sources";
@@ -6,7 +7,13 @@ import type { OpenGateRef } from "./sources";
 /** What a landing did to the Gates of one Space. */
 export type GateChanges = {
 	/** Gates that opened and are still open: tell them. */
-	opened: { key: string; runId: string; stepId: string }[];
+	opened: {
+		key: string;
+		runId: string;
+		stepId: string;
+		/** How soon it needs an answer: `today` when the fact names none. */
+		urgency: GateUrgency;
+	}[];
 	/** Gates that no longer wait: take their notifications back. */
 	closed: string[];
 };
@@ -60,8 +67,12 @@ export function createGateTracker(
 		async apply(spaceId, facts) {
 			const keys = known.get(spaceId) ?? new Set<string>();
 			known.set(spaceId, keys);
-			const asked = new Set(
-				facts.flatMap((f) => (f.kind === "gate-opened" ? [gateKey(f)] : [])),
+			const asked = new Map(
+				facts.flatMap((f) =>
+					f.kind === "gate-opened"
+						? [[gateKey(f), f.urgency ?? DEFAULT_GATE_URGENCY] as const]
+						: [],
+				),
 			);
 			const runsWithGates = new Set(
 				[...keys].map((key) => parseGateKey(key)?.runId),
@@ -73,11 +84,11 @@ export function createGateTracker(
 			const closed = [...keys].filter((key) => !now.has(key));
 			for (const key of closed) keys.delete(key);
 			const opened: GateChanges["opened"] = [];
-			for (const key of asked) {
+			for (const [key, urgency] of asked) {
 				const gate = parseGateKey(key);
 				if (!gate || !now.has(key) || keys.has(key)) continue;
 				keys.add(key);
-				opened.push({ key, ...gate });
+				opened.push({ key, ...gate, urgency });
 			}
 			return { opened, closed };
 		},

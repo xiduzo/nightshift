@@ -1,9 +1,12 @@
+import { GATE_URGENCIES } from "@nightshift/flows";
+
 import type { ApiQueryUtils } from "../api";
 import type { NotificationSettings, NotificationSettingsPatch } from "./types";
 
 /**
  * The settings with a change applied, as the Host saves them: events and
- * screens merge, the rest replaces. A screen shows it before the Host answers.
+ * screens merge, the rest replaces. The urgencies that push keep the order
+ * now, today, later. A screen shows it before the Host answers.
  */
 export function applySettingsPatch(
 	settings: NotificationSettings,
@@ -16,6 +19,9 @@ export function applySettingsPatch(
 		timeZone: patch.timeZone ?? settings.timeZone,
 		screens: { ...settings.screens, ...patch.screens },
 		holdMinutes: patch.holdMinutes ?? settings.holdMinutes,
+		pushUrgencies: patch.pushUrgencies
+			? GATE_URGENCIES.filter((u) => patch.pushUrgencies?.includes(u))
+			: settings.pushUrgencies,
 	};
 }
 

@@ -1,5 +1,10 @@
 import type { Database } from "@nightshift/db";
 import { notificationSettings } from "@nightshift/db/schema";
+import {
+	GATE_URGENCIES,
+	type GateUrgency,
+	gateUrgencySchema,
+} from "@nightshift/flows";
 import { asDate, isTimeZone, localZone, minuteOfDay } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -46,6 +51,22 @@ const screensSchema = z.object({
 	desktop: z.boolean(),
 });
 
+/**
+ * The Gate urgencies that push. A Gate of another urgency shows in the
+ * inbox and counts on the badge, without a push. Empty: no Gate pushes.
+ */
+const pushUrgenciesSchema = z
+	.array(gateUrgencySchema)
+	.max(GATE_URGENCIES.length);
+
+/** The Gate urgencies that push by default: only a Gate that needs an answer now. */
+export const DEFAULT_PUSH_URGENCIES: readonly GateUrgency[] = ["now"];
+
+/** The urgencies once each, in the order now, today, later. */
+function urgenciesOf(list: readonly GateUrgency[]): GateUrgency[] {
+	return GATE_URGENCIES.filter((urgency) => list.includes(urgency));
+}
+
 export const notificationSettingsSchema = z.object({
 	events: eventsSchema,
 	/** No pushes in this daily window. Null: no quiet hours. */
@@ -55,6 +76,8 @@ export const notificationSettingsSchema = z.object({
 	screens: screensSchema,
 	/** How long a push to a phone or a closed browser waits while a screen is open, in minutes. */
 	holdMinutes: z.number().int().min(0).max(60),
+	/** The Gate urgencies that push to phones, browsers and the desktop app. */
+	pushUrgencies: pushUrgenciesSchema,
 });
 export type NotificationSettings = z.infer<typeof notificationSettingsSchema>;
 
@@ -66,6 +89,8 @@ export const notificationSettingsPatchSchema = z
 		timeZone: timeZoneSchema.optional(),
 		screens: screensSchema.partial().optional(),
 		holdMinutes: notificationSettingsSchema.shape.holdMinutes.optional(),
+		/** Absent: as it was. An older phone app saves without it. */
+		pushUrgencies: pushUrgenciesSchema.optional(),
 	})
 	.strict();
 export type NotificationSettingsPatch = z.infer<
@@ -122,6 +147,7 @@ export function defaultSettings(
 		timeZone,
 		screens: { web: true, expo: true, desktop: true },
 		holdMinutes: DEFAULT_HOLD_MINUTES,
+		pushUrgencies: [...DEFAULT_PUSH_URGENCIES],
 	};
 }
 
@@ -137,6 +163,7 @@ export function applyPatch(
 		timeZone: patch.timeZone ?? current.timeZone,
 		screens: { ...current.screens, ...patch.screens },
 		holdMinutes: patch.holdMinutes ?? current.holdMinutes,
+		pushUrgencies: urgenciesOf(patch.pushUrgencies ?? current.pushUrgencies),
 	});
 }
 
@@ -144,6 +171,14 @@ const minutesOf = (time: string) => {
 	const [hour = 0, minute = 0] = time.split(":").map(Number);
 	return hour * 60 + minute;
 };
+
+/** Whether a Gate of this urgency pushes to the Person's screens. */
+export function pushesUrgency(
+	settings: Pick<NotificationSettings, "pushUrgencies">,
+	urgency: GateUrgency,
+): boolean {
+	return settings.pushUrgencies.includes(urgency);
+}
 
 /**
  * Whether `at` is in the Person's quiet hours. A window that ends before
@@ -193,6 +228,11 @@ export function createSettingsStore(
 			timeZone: isTimeZone(row.timeZone) ? row.timeZone : fallbackZone,
 			screens: { ...defaults.screens, ...screens },
 			holdMinutes: row.holdMinutes,
+			pushUrgencies: urgenciesOf(
+				pushUrgenciesSchema
+					.catch([...DEFAULT_PUSH_URGENCIES])
+					.parse(safeJson(row.pushUrgencies, null)),
+			),
 		};
 	}
 
@@ -208,6 +248,7 @@ export function createSettingsStore(
 			timeZone: settings.timeZone,
 			screens: JSON.stringify(settings.screens),
 			holdMinutes: settings.holdMinutes,
+			pushUrgencies: JSON.stringify(settings.pushUrgencies),
 			updatedAt: asDate(),
 		};
 	}
@@ -274,10 +315,10 @@ export function createSettingsStore(
 	};
 }
 
-function safeJson(text: string): unknown {
+function safeJson(text: string, fallback: unknown = {}): unknown {
 	try {
 		return JSON.parse(text);
 	} catch {
-		return {};
+		return fallback;
 	}
 }

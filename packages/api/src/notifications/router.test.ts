@@ -169,6 +169,37 @@ describe("notifications", () => {
 		).toBe(null);
 	});
 
+	test("the urgencies that push: Now by default, a save changes them, a save without them keeps them", async () => {
+		const ada = await contextFor((await sandbox.signUp("Ada")).headers);
+		const { settings } = appRouter.notifications;
+
+		expect(
+			(await call(settings.get, undefined, { context: ada })).pushUrgencies,
+		).toEqual(["now"]);
+		const saved = await call(
+			settings.save,
+			{ pushUrgencies: ["today", "now"] },
+			{ context: ada },
+		);
+		expect(saved.pushUrgencies).toEqual(["now", "today"]);
+		// An older phone app saves without the field.
+		const older = await call(
+			settings.save,
+			{ holdMinutes: 5 },
+			{ context: ada },
+		);
+		expect(older.pushUrgencies).toEqual(["now", "today"]);
+		expect(
+			await errorOf(
+				call(
+					settings.save,
+					{ pushUrgencies: ["soon" as "now"] },
+					{ context: ada },
+				),
+			),
+		).toBe("BAD_REQUEST");
+	});
+
 	test("a Person lists and removes only their own screens", async () => {
 		const ada = await contextFor((await sandbox.signUp("Ada")).headers);
 		const bob = await contextFor((await sandbox.signUp("Bob")).headers);

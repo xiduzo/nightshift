@@ -46,7 +46,9 @@ describe("the gate tracker", () => {
 		const review = { runId: "r1", stepId: "review", lockScreen: true };
 		set([review]);
 		expect(await tracker.apply(SPACE, [gateOpened("r1", "review")])).toEqual({
-			opened: [{ key: "r1:review", runId: "r1", stepId: "review" }],
+			opened: [
+				{ key: "r1:review", runId: "r1", stepId: "review", urgency: "today" },
+			],
 			closed: [],
 		});
 		expect(tracker.isOpen(SPACE, "r1:review")).toBe(true);
@@ -55,6 +57,15 @@ describe("the gate tracker", () => {
 		expect(
 			(await tracker.apply(SPACE, [gateOpened("r1", "review")])).opened,
 		).toEqual([]);
+	});
+
+	test("a Gate opens with the urgency of its fact", async () => {
+		const { tracker, set } = engine();
+		set([{ runId: "r1", stepId: "review" }]);
+		const fact = { ...gateOpened("r1", "review"), urgency: "now" as const };
+		expect((await tracker.apply(SPACE, [fact])).opened).toEqual([
+			{ key: "r1:review", runId: "r1", stepId: "review", urgency: "now" },
+		]);
 	});
 
 	test("a known Gate missing from the read closes", async () => {
@@ -89,7 +100,9 @@ describe("the gate tracker", () => {
 		expect((await tracker.apply(SPACE, [stepEnded("r1")])).opened).toEqual([]);
 		expect(
 			(await tracker.apply(SPACE, [gateOpened("r2", "ship")])).opened,
-		).toEqual([{ key: "r2:ship", runId: "r2", stepId: "ship" }]);
+		).toEqual([
+			{ key: "r2:ship", runId: "r2", stepId: "ship", urgency: "today" },
+		]);
 	});
 
 	test("the baseline knows every open Gate of each Space", async () => {
