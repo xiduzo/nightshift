@@ -147,6 +147,13 @@ function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 			],
 		]);
 	}
+	if (node.type === "since-last-run") {
+		return new Map([
+			["new", node.value === undefined ? "Something is new" : "The first run"],
+			["changed", "Something changed"],
+			["same", node.value === undefined ? "Nothing new" : "No change"],
+		]);
+	}
 	if (node.type === "join") {
 		return new Map([
 			[
@@ -624,6 +631,7 @@ export const nodeTypes: NodeTypes = {
 	join: FlowNodeCard,
 	lease: FlowNodeCard,
 	service: FlowNodeCard,
+	"since-last-run": FlowNodeCard,
 } satisfies Record<FlowNodeType, unknown>;
 
 /** The computer a Subflow's steps run on, by its name. */

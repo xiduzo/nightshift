@@ -19,4 +19,5 @@ export const flowMutations = {
 	import: orpc.flows.import.mutationOptions,
 	copy: orpc.flows.copy.mutationOptions,
 	resetKept: orpc.flows.resetKept.mutationOptions,
+	forgetMemory: orpc.flows.forgetMemory.mutationOptions,
 };

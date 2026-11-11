@@ -39,6 +39,7 @@ import { EndFields } from "./end-fields";
 import { JoinFields } from "./join-fields";
 import { LeaseFields } from "./lease-fields";
 import { ServiceFields } from "./service-fields";
+import { SinceLastRunFields } from "./since-last-run-fields";
 import { ToolFields } from "./tool-fields";
 import { ValueFields } from "./value-fields";
 import { WaitFields } from "./wait-fields";
@@ -306,6 +307,20 @@ export function NodeInspector({
 					/>
 				) : null}
 
+				{node.type === "since-last-run" ? (
+					<SinceLastRunFields
+						projectId={projectId}
+						flowName={calledFlows.flowName}
+						flow={flow}
+						node={node}
+						onChange={(change) =>
+							onChange((current) =>
+								current.type === "since-last-run" ? change(current) : current,
+							)
+						}
+					/>
+				) : null}
+
 				{node.type === "agent" ? (
 					<AgentAdvanced
 						projectId={projectId}
@@ -339,10 +354,11 @@ export function NodeInspector({
 					</InspectorSection>
 				) : null}
 
-				{/* A Gate (a Decision decided by you) has a deadline instead of limits; an End and a Join take no time; a Lease waits as long as it says, and a Service as its ready check says. */}
+				{/* A Gate (a Decision decided by you) has a deadline instead of limits; an End, a Join and a Since last run take no time; a Lease waits as long as it says, and a Service as its ready check says. */}
 				{(node.type === "decision" && node.by === "person") ||
 				node.type === "end" ||
 				node.type === "join" ||
+				node.type === "since-last-run" ||
 				node.type === "lease" ||
 				node.type === "service" ? null : (
 					<InspectorSection

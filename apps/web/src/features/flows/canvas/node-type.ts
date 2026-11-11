@@ -11,6 +11,7 @@ import {
 import {
 	BotIcon,
 	BracesIcon,
+	DiffIcon,
 	FlagIcon,
 	HandIcon,
 	HourglassIcon,
@@ -85,6 +86,11 @@ export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
 		label: NODE_TYPE_LABEL.service,
 		icon: ServerIcon,
 		blurb: "Starts a stack or server for the next steps, and stops it after.",
+	},
+	"since-last-run": {
+		label: NODE_TYPE_LABEL["since-last-run"],
+		icon: DiffIcon,
+		blurb: "Finds what is new or changed since the last run.",
 	},
 };
 

@@ -230,7 +230,8 @@ export type StepKindIconName =
 	| "flag"
 	| "merge"
 	| "lock"
-	| "server";
+	| "server"
+	| "diff";
 
 /** What kind of step it is: its name (the one of `@nightshift/flows`) and icon. */
 export type StepKind = { label: string; icon: StepKindIconName };
@@ -247,6 +248,7 @@ const NODE_ICON: Record<StepSummary["nodeType"], StepKindIconName> = {
 	join: "merge",
 	lease: "lock",
 	service: "server",
+	"since-last-run": "diff",
 };
 
 /** The kind of a step. A Decision that asks a person is a Gate. */

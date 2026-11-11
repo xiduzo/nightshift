@@ -49,6 +49,7 @@ import {
 	SessionError,
 	SessionFinished,
 } from "./items/session-items";
+import { SinceLastRunCard } from "./items/since-last-run-items";
 import { isSubagentCall, SubagentRun } from "./items/subagent";
 import { ToolCallRow } from "./items/tool-call-row";
 import { ToolCallsGroup } from "./items/tool-calls-group";
@@ -449,6 +450,7 @@ const RUNNING_TEXT: Record<StepSummary["nodeType"], string> = {
 	join: "Waiting for the branches…",
 	lease: "Taking the lease…",
 	service: "Starting the service…",
+	"since-last-run": "Comparing with the last run…",
 };
 
 const TranscriptItemView = memo(function TranscriptItemView({
@@ -532,5 +534,7 @@ const TranscriptItemView = memo(function TranscriptItemView({
 			return <LeaseCard item={item} />;
 		case "service":
 			return <ServiceCard item={item} />;
+		case "since-last-run":
+			return <SinceLastRunCard item={item} />;
 	}
 });

@@ -128,6 +128,8 @@ export function itemToMarkdown(item: TranscriptItem, context: Context): string {
 				: item.state === "ready"
 					? "**Service:** ready"
 					: `**Service:** not ready${item.reason ? `. ${item.reason}` : ""}`;
+		case "since-last-run":
+			return `**Since last run:** ${item.new} new, ${item.changed} changed, ${item.same} the same${item.firstRun ? " (first run)" : ""}`;
 		case "lease":
 			return item.held
 				? `**Lease:** took \`${item.name}\``

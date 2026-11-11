@@ -444,6 +444,18 @@ function applyStepEntries(
 					reason: event.reason ?? null,
 				});
 				break;
+			case "since-last-run":
+				push({
+					...base,
+					kind: "since-last-run",
+					key: `since-last-run:${entry.seq}`,
+					new: event.new,
+					changed: event.changed,
+					same: event.same,
+					firstRun: event.firstRun,
+					remembers: event.remembers,
+				});
+				break;
 			case "lease":
 				push({
 					...base,

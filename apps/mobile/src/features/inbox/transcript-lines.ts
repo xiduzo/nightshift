@@ -185,6 +185,13 @@ export function transcriptLines(
 								: `The service did not get ready. ${event.reason ?? ""}`.trim(),
 				});
 				break;
+			case "since-last-run":
+				push({
+					key: `since-last-run:${seq}`,
+					kind: "night-shift",
+					text: `${event.new} new, ${event.changed} changed, ${event.same} the same since the last run.`,
+				});
+				break;
 			case "lease":
 				push({
 					key: `lease:${seq}`,

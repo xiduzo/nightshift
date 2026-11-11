@@ -160,6 +160,18 @@ export type ServiceItem = ItemBase & {
 	reason: string | null;
 };
 
+/** A Since last run step: how much of what it saw is new, changed and the same. */
+export type SinceLastRunItem = ItemBase & {
+	kind: "since-last-run";
+	new: number;
+	changed: number;
+	same: number;
+	/** It remembered nothing yet. */
+	firstRun: boolean;
+	/** False in a run without a saved flow: it remembers nothing. */
+	remembers: boolean;
+};
+
 /** A Call step with `each` read its source. */
 export type ItemsReadItem = ItemBase & {
 	kind: "items-read";
@@ -240,4 +252,5 @@ export type TranscriptItem =
 	| ExitItem
 	| EndItem
 	| LeaseItem
-	| ServiceItem;
+	| ServiceItem
+	| SinceLastRunItem;
