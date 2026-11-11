@@ -14,6 +14,7 @@ import {
 	BracesIcon,
 	DiffIcon,
 	FlagIcon,
+	GlobeIcon,
 	HandIcon,
 	HourglassIcon,
 	LockIcon,
@@ -61,7 +62,7 @@ export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
 	wait: {
 		label: NODE_TYPE_LABEL.wait,
 		icon: HourglassIcon,
-		blurb: "Waits for a time, a command to pass, or a signal.",
+		blurb: "Waits for a time, a command to pass, a signal, or a URL.",
 	},
 	tool: {
 		label: NODE_TYPE_LABEL.tool,
@@ -98,6 +99,11 @@ export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
 		icon: ArrowRightLeftIcon,
 		blurb:
 			"Turns CSV, YAML, XML, a feed or a Markdown table into JSON, and back.",
+	},
+	"web-request": {
+		label: NODE_TYPE_LABEL["web-request"],
+		icon: GlobeIcon,
+		blurb: "Sends one request to a web address and reads the answer.",
 	},
 };
 

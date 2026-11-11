@@ -181,6 +181,20 @@ export type SinceLastRunItem = ItemBase & {
 	remembers: boolean;
 };
 
+/**
+ * A web request of a Web request step, or of a Wait for a URL, and its
+ * answer: `status` is undefined until it comes, null when none came
+ * (`text` says why), else the status with its text.
+ */
+export type WebRequestItem = ItemBase & {
+	kind: "web-request";
+	method: string;
+	url: string;
+	status?: number | null;
+	text?: string;
+	bytes?: number | null;
+};
+
 /** A Call step with `each` read its source. */
 export type ItemsReadItem = ItemBase & {
 	kind: "items-read";
@@ -263,4 +277,5 @@ export type TranscriptItem =
 	| LeaseItem
 	| ServiceItem
 	| SinceLastRunItem
-	| ConvertItem;
+	| ConvertItem
+	| WebRequestItem;

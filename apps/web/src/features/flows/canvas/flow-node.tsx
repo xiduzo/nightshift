@@ -138,6 +138,12 @@ function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 			["fail", "The value does not fit the format"],
 		]);
 	}
+	if (node.type === "web-request") {
+		return new Map([
+			["pass", "The server answered 2xx"],
+			["fail", "Any other answer, or none"],
+		]);
+	}
 	if (node.type === "service") {
 		return new Map([
 			["ready", "The service is ready"],
@@ -200,6 +206,7 @@ const WAIT_DONE: Record<WaitUntil["kind"], string> = {
 	command: "The command passed",
 	signal: "The signal came",
 	any: "The signal came, or the command passed",
+	url: "The URL answered",
 };
 
 /** Below this zoom a node's text is too small to read, so the node shows its
@@ -522,6 +529,20 @@ const FlowNodeCard = memo(function FlowNodeCard({
 					</div>
 				) : null}
 
+				{node.type === "web-request" ? (
+					<div className="-mt-1 flex min-w-0 items-center gap-1 px-2.5 pb-2 text-[11px] text-muted-foreground">
+						<span className="shrink-0 font-mono">{node.method}</span>
+						<span
+							className="truncate font-mono"
+							title={node.urlSecret ?? node.url}
+						>
+							{node.urlSecret !== undefined
+								? `The URL in ${node.urlSecret || "a secret"}`
+								: node.url || "No URL yet"}
+						</span>
+					</div>
+				) : null}
+
 				{node.type === "end" ? (
 					<EndRow
 						status={node.status}
@@ -654,6 +675,7 @@ export const nodeTypes: NodeTypes = {
 	service: FlowNodeCard,
 	"since-last-run": FlowNodeCard,
 	convert: FlowNodeCard,
+	"web-request": FlowNodeCard,
 } satisfies Record<FlowNodeType, unknown>;
 
 /** The computer a Subflow's steps run on, by its name. */

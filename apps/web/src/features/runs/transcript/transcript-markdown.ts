@@ -129,6 +129,14 @@ export function itemToMarkdown(item: TranscriptItem, context: Context): string {
 				? `**Could not convert** ${pair}: ${item.problem}`
 				: `**Converted** ${pair}`;
 		}
+		case "web-request":
+			return `**${item.method}** \`${item.url}\`${
+				item.status === undefined
+					? ""
+					: item.status === null
+						? `: ${item.text ?? ""}`
+						: `: ${item.status} ${item.text ?? ""}`.trimEnd()
+			}`;
 		case "service":
 			return item.state === "starting"
 				? `**Service:** starts \`${item.command ?? ""}\``

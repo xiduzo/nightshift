@@ -49,6 +49,7 @@ const SLEEP_REASON: Record<CurrentWait["reason"], string> = {
 	time: "The flow waits for a time.",
 	command: "The flow waits for a command to pass.",
 	signal: "The flow waits for a signal.",
+	url: "The flow waits for a URL to answer.",
 	"device-offline": "The device of the next step is offline.",
 	lease: "The flow waits for a lease another run holds.",
 };

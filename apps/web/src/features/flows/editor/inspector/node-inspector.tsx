@@ -44,6 +44,7 @@ import { SinceLastRunFields } from "./since-last-run-fields";
 import { ToolFields } from "./tool-fields";
 import { ValueFields } from "./value-fields";
 import { WaitFields } from "./wait-fields";
+import { WebRequestFields } from "./web-request-fields";
 
 export function NodeInspector({
 	projectId,
@@ -255,6 +256,18 @@ export function NodeInspector({
 						onChange={(change) =>
 							onChange((current) =>
 								current.type === "tool" ? change(current) : current,
+							)
+						}
+					/>
+				) : null}
+
+				{node.type === "web-request" ? (
+					<WebRequestFields
+						flow={flow}
+						node={node}
+						onChange={(change) =>
+							onChange((current) =>
+								current.type === "web-request" ? change(current) : current,
 							)
 						}
 					/>

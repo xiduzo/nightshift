@@ -12,6 +12,7 @@ import { useCommandToolField } from "../cli-tools-field";
 import { Field, InspectorSection, Note, PositiveIntInput } from "../fields";
 import { TemplateField } from "../template-field";
 import { NodeOptionsField } from "./node-options-field";
+import { NamedTemplates } from "./web-request-fields";
 
 const KIND_ORDER: WaitUntil["kind"][] = [
 	"duration",
@@ -19,6 +20,7 @@ const KIND_ORDER: WaitUntil["kind"][] = [
 	"command",
 	"signal",
 	"any",
+	"url",
 ];
 
 const KIND_HINT: Record<WaitUntil["kind"], string> = {
@@ -28,6 +30,7 @@ const KIND_HINT: Record<WaitUntil["kind"], string> = {
 	signal:
 		"The step waits until someone sends the run this signal, or a webhook of this project does.",
 	any: "The step waits for the signal, and runs the command now and then in case the signal does not come.",
+	url: "The step asks the URL now and then until it answers 2xx, then continues.",
 };
 
 /** Who picks a Wait's outcome, by what it waits for. Unset: nothing can. */
@@ -37,6 +40,7 @@ const OUTCOMES_HINT: Partial<Record<WaitUntil["kind"], string>> = {
 	signal:
 		"A webhook ends the wait on the first outcome whose rule holds. A webhook that matches no rule does not continue the step.",
 	any: 'The command picks one with {"outcome": "name"} in "$NS_OUTPUT". A webhook picks the first outcome whose rule holds.',
+	url: "The answer ends the wait on the first outcome whose rule holds. An answer that matches no rule asks again later.",
 };
 
 /** What a Wait node waits for, the fields of that kind, and its outcomes. */
@@ -62,6 +66,7 @@ export function WaitFields({
 	const outcomesHint = OUTCOMES_HINT[until.kind];
 	const polls = until.kind === "command" || until.kind === "any";
 	const hasSignal = until.kind === "signal" || until.kind === "any";
+	const asksUrl = until.kind === "url";
 
 	return (
 		<>
@@ -139,6 +144,50 @@ export function WaitFields({
 					/>
 				) : null}
 
+				{until.kind === "url" ? (
+					<>
+						<TemplateField
+							id={`${id}-url`}
+							label="URL"
+							hint="Write ${API_KEY} to use a secret."
+							flow={flow}
+							nodeId={node.id}
+							value={until.url}
+							placeholder="https://status.example.com/jobs/{{job}}"
+							multiline={false}
+							invalid={until.url.trim() === ""}
+							onChange={(url) => setUntil({ ...until, url })}
+						/>
+						<Field id={`${id}-url-every`} label="Every (minutes)">
+							<PositiveIntInput
+								id={`${id}-url-every`}
+								value={until.everyMinutes}
+								placeholder="5"
+								onChange={(everyMinutes) =>
+									setUntil({ ...until, everyMinutes: everyMinutes ?? 0 })
+								}
+							/>
+						</Field>
+						<NamedTemplates
+							flow={flow}
+							nodeId={node.id}
+							legend="Headers"
+							what="header"
+							namePlaceholder="Authorization"
+							valuePlaceholder="Bearer ${API_TOKEN}"
+							values={until.headers ?? {}}
+							onChange={(headers) => {
+								const { headers: _, ...rest } = until;
+								setUntil(
+									Object.keys(headers).length === 0
+										? rest
+										: { ...rest, headers },
+								);
+							}}
+						/>
+					</>
+				) : null}
+
 				{until.kind === "any" ? (
 					<>
 						<SignalFields
@@ -175,6 +224,11 @@ export function WaitFields({
 							{polls && hasSignal ? " or the webhook" : null},{" "}
 							<code>{`{{${node.id}.data}}`}</code>
 						</>
+					) : asksUrl ? (
+						<>
+							{" "}
+							and the body of the answer, <code>{`{{${node.id}.data}}`}</code>
+						</>
 					) : null}
 					.
 				</Note>
@@ -186,8 +240,12 @@ export function WaitFields({
 					kind="outcome"
 					node={node}
 					min={0}
-					rules={hasSignal}
-					rulePlaceholder='event.body.conclusion = "success"'
+					rules={hasSignal || asksUrl}
+					rulePlaceholder={
+						asksUrl
+							? 'data.state = "done"'
+							: 'event.body.conclusion = "success"'
+					}
 					hint={
 						outcomesHint ??
 						"A Wait for a duration or a time ends done. Remove these outcomes."

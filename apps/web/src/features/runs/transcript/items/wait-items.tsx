@@ -22,6 +22,7 @@ const WAIT_TITLE: Record<WaitItem["reason"], string> = {
 	command: "Waiting for a command to pass",
 	signal: "Waiting for a signal",
 	any: "Waiting for a signal or a command",
+	url: "Waiting for a URL",
 	"device-offline": "Waiting for a device",
 	lease: "Waiting for a lease",
 };
@@ -65,6 +66,8 @@ export function WaitCard({ item }: { item: WaitItem }) {
 			</>
 		) : item.reason === "lease" ? (
 			<>Asks for the lease again{at ? <> at {at}</> : null}.</>
+		) : item.reason === "url" ? (
+			<>Asks the URL again{at ? <> at {at}</> : null}.</>
 		) : item.reason === "device-offline" ? (
 			<>
 				Checks for the device again

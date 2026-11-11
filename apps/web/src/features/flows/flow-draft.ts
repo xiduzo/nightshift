@@ -29,6 +29,7 @@ export const WAIT_KINDS: Record<WaitUntil["kind"], string> = {
 	command: "A command",
 	signal: "A signal",
 	any: "A signal or a command",
+	url: "A URL",
 };
 
 /** How each kind of list source reads in a picker. */

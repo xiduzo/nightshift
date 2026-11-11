@@ -55,6 +55,7 @@ import { isSubagentCall, SubagentRun } from "./items/subagent";
 import { ToolCallRow } from "./items/tool-call-row";
 import { ToolCallsGroup } from "./items/tool-calls-group";
 import { WaitCard, WakeMarker } from "./items/wait-items";
+import { WebRequestCard } from "./items/web-request-items";
 import type { TranscriptState } from "./transcript";
 import type { TranscriptItem } from "./transcript-items";
 import { markdownContext, transcriptToMarkdown } from "./transcript-markdown";
@@ -453,6 +454,7 @@ const RUNNING_TEXT: Record<StepSummary["nodeType"], string> = {
 	service: "Starting the service…",
 	"since-last-run": "Comparing with the last run…",
 	convert: "Converting…",
+	"web-request": "Sending the request…",
 };
 
 const TranscriptItemView = memo(function TranscriptItemView({
@@ -540,5 +542,7 @@ const TranscriptItemView = memo(function TranscriptItemView({
 			return <SinceLastRunCard item={item} />;
 		case "convert":
 			return <ConvertCard item={item} />;
+		case "web-request":
+			return <WebRequestCard item={item} />;
 	}
 });

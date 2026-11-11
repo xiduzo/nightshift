@@ -296,6 +296,25 @@ function HostSettings({ computer }: { computer: ThisComputer }) {
 							}
 						/>
 					</Field>
+					<Field orientation="horizontal">
+						<FieldContent>
+							<FieldLabel htmlFor={`${id}-private-requests`}>
+								Web requests reach this network
+							</FieldLabel>
+							<FieldDescription>
+								Let Web request steps reach this computer and its private
+								network. Off: they reach public addresses only.
+							</FieldDescription>
+						</FieldContent>
+						<Switch
+							id={`${id}-private-requests`}
+							checked={settings.data?.values.webRequestsPrivateNetwork ?? false}
+							disabled={!settings.data || save.isPending}
+							onCheckedChange={(checked) =>
+								save.mutate({ webRequestsPrivateNetwork: checked })
+							}
+						/>
+					</Field>
 					<Field data-invalid={wrong ? true : undefined}>
 						<FieldContent>
 							<FieldLabel htmlFor={`${id}-addresses`}>Addresses</FieldLabel>

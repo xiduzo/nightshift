@@ -17,6 +17,7 @@ const ITEMS: PaletteItem[] = [
 	"agent",
 	"command",
 	"tool",
+	"web-request",
 	"gate",
 	"branch",
 	"value",

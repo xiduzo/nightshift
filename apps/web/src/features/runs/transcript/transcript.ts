@@ -10,6 +10,7 @@ import type {
 	ToolItem,
 	TranscriptItem,
 	WaitReason,
+	WebRequestItem,
 } from "./transcript-items";
 
 /**
@@ -445,6 +446,36 @@ function applyStepEntries(
 					problem: event.problem,
 				});
 				break;
+			case "web-request":
+				push({
+					...base,
+					kind: "web-request",
+					key: `web-request:${entry.seq}`,
+					method: event.method,
+					url: event.url,
+				});
+				break;
+			case "web-response": {
+				let open: WebRequestItem | undefined;
+				for (let at = items.length - 1; at >= 0 && !open; at--) {
+					const candidate = items[at];
+					if (
+						candidate?.kind === "web-request" &&
+						candidate.status === undefined
+					) {
+						open = candidate;
+					}
+				}
+				if (open) {
+					update<WebRequestItem>(open.key, (item) => ({
+						...item,
+						status: event.status,
+						text: event.text,
+						bytes: event.bytes,
+					}));
+				}
+				break;
+			}
 			case "service":
 				push({
 					...base,
