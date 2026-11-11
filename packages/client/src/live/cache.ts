@@ -288,10 +288,12 @@ export function createLiveCache({
 				invalidate(runs.getKey());
 				invalidate(runs.stepKey());
 				invalidate(runs.artifactsKey());
+				invalidate(runs.filesKey());
 			} else {
 				for (const runId of details) invalidate(runs.getKey(runId));
 				for (const runId of steps) invalidate(runs.stepKey(runId));
 				for (const runId of files) invalidate(runs.artifactsKey(runId));
+				for (const runId of files) invalidate(runs.filesKey(runId));
 			}
 			if (lists) {
 				invalidate(runs.lists());

@@ -87,6 +87,8 @@ const KEYS = {
 	step2: runs.step("r2", "b").queryKey,
 	files1: runs.artifacts("r1", true).queryKey,
 	files2: runs.artifacts("r2", true).queryKey,
+	folder1: runs.files("r1", true).queryKey,
+	folder2: runs.files("r2", true).queryKey,
 	devices: runs.devices("p1").queryKey,
 	placements: runs.placements("p1").queryKey,
 	moveTargets: runs.moveTargets("r1").queryKey,
@@ -112,6 +114,7 @@ const RUN_1: Name[] = [
 	"run1",
 	"step1",
 	"files1",
+	"folder1",
 	"dashboard",
 	"flowHealth",
 	"schedules",
@@ -124,6 +127,7 @@ const EVERYTHING: Name[] = [
 	"run2",
 	"step2",
 	"files2",
+	"folder2",
 	"knowledge",
 ];
 const NOTHING: Name[] = [];
@@ -357,7 +361,9 @@ describe("the live cache follows the Host", () => {
 		};
 		await host.send(runChanged, { ...runChanged, runId: "r2" }, runChanged);
 		timers.due(300);
-		expect(stale()).toEqual(sorted([...RUN_1, "run2", "step2", "files2"]));
+		expect(stale()).toEqual(
+			sorted([...RUN_1, "run2", "step2", "files2", "folder2"]),
+		);
 		// Each run's detail, opened steps and files once, then the lists, the dashboard, the schedules, the projects.
 		expect(reads).toEqual([
 			runs.getKey("r1"),
@@ -366,6 +372,8 @@ describe("the live cache follows the Host", () => {
 			runs.stepKey("r2"),
 			runs.artifactsKey("r1"),
 			runs.artifactsKey("r2"),
+			runs.filesKey("r1"),
+			runs.filesKey("r2"),
 			runs.lists(),
 			orpc.dashboard.key(),
 			orpc.schedules.list.key(),

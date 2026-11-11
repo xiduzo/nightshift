@@ -5,8 +5,9 @@ import { runPlaceholder } from "./placeholder";
 import type { RunStatus, RunSummary } from "./types";
 
 /**
- * How often a run's files are read again while it runs: an agent keeps a
- * file in the middle of a step, and no stream item says so.
+ * How often a run's files (its artifacts, the files in its run folder) are
+ * read again while it runs: a step writes a file in the middle of its
+ * work, and no stream item says so.
  */
 const ARTIFACTS_POLL_MS = 15_000;
 
@@ -59,6 +60,9 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 		/** The files of one run, or of every run without `runId`: to read them again. */
 		artifactsKey: (runId?: string) =>
 			orpc.runs.artifacts.key(runId === undefined ? {} : { input: { runId } }),
+		/** The files in the run folder of one run, or of every run without `runId`: to read them again. */
+		filesKey: (runId?: string) =>
+			orpc.runs.files.key(runId === undefined ? {} : { input: { runId } }),
 		/**
 		 * The end of a service's log (ADR 9). It reads again every 2 s while
 		 * the service runs. A failed read does not toast.
@@ -143,6 +147,18 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 		/** The files a run's agents kept. Polls while the run runs, so a new one shows. */
 		artifacts: (runId: string, live: boolean) => ({
 			...orpc.runs.artifacts.queryOptions({ input: { runId } }),
+			refetchInterval: live ? ARTIFACTS_POLL_MS : (false as const),
+			meta: { quietRefetchErrors: true },
+		}),
+		/**
+		 * The files in the folder of a run of a project without a folder, on
+		 * the computer that answers, and when the cleanup removes them
+		 * (`cleanupAt`). Polls while the run runs, so a new file shows. Each
+		 * file is at `/api/runs/<runId>/files/<path>`, each part of its path
+		 * encoded.
+		 */
+		files: (runId: string, live: boolean) => ({
+			...orpc.runs.files.queryOptions({ input: { runId } }),
 			refetchInterval: live ? ARTIFACTS_POLL_MS : (false as const),
 			meta: { quietRefetchErrors: true },
 		}),
