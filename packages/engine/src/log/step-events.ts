@@ -71,6 +71,21 @@ export type ServiceEvent = {
 	reason?: string;
 };
 
+/**
+ * What a Since last run step writes to its transcript: how many of what it
+ * saw are new, changed and the same, whether it remembered nothing yet
+ * (`firstRun`), and whether it remembers at all (`remembers`: false in a
+ * run of a flow that is not saved).
+ */
+export type SinceLastRunEvent = {
+	type: "since-last-run";
+	firstRun: boolean;
+	remembers: boolean;
+	new: number;
+	changed: number;
+	same: number;
+};
+
 /** What a Call step with `each` writes to its transcript. */
 export type ForEachEvent =
 	| { type: "items-read"; count: number; open: number }
@@ -212,6 +227,7 @@ export type StepEvent =
 	| EndEvent
 	| LeaseEvent
 	| ServiceEvent
+	| SinceLastRunEvent
 	| WorktreeEvent;
 
 /**

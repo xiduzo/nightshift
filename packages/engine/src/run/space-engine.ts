@@ -10,6 +10,7 @@ import type {
 	StartRunInput,
 } from "../contract";
 import type { FlowUse, SpaceFlows } from "../flows";
+import type { NodeMemory } from "../memory";
 import type { Branches, Project } from "../projects";
 import type {
 	AnsweredGate,
@@ -125,6 +126,21 @@ export interface SpaceEngine {
 		projectId: string,
 		flowName: string,
 		name: string,
+	): Promise<void>;
+	/**
+	 * What the Since last run nodes remember between runs of the flow on
+	 * this computer: one entry per node and scope.
+	 */
+	listNodeMemory(projectId: string, flowName: string): Promise<NodeMemory[]>;
+	/**
+	 * Forgets what a Since last run node saw, in every scope or in one: the
+	 * next run of the flow is its first run again.
+	 */
+	forgetNodeMemory(
+		projectId: string,
+		flowName: string,
+		node: string,
+		scope?: string,
 	): Promise<void>;
 	/**
 	 * Who uses what, from every flow of the Space's projects: the flows that

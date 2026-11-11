@@ -5,6 +5,7 @@ import {
 	device,
 	event,
 	keptVariable,
+	nodeMemory,
 	project,
 	run,
 	step,
@@ -413,6 +414,56 @@ describe("spaceMoveBatch", () => {
 			{ name: "newer-here", value: JSON.stringify("dup") },
 			{ name: "newer-there", value: JSON.stringify("hosted") },
 			{ name: "only-here", value: JSON.stringify("dup") },
+		]);
+	});
+
+	test("what a Since last run node saw moves with its project, and a key both projects have keeps the latest", async () => {
+		await seed({ hostedRow: true });
+		const remember = (
+			projectId: string,
+			spaceId: string,
+			itemKey: string,
+			hash: string,
+			updatedAt: number,
+		) =>
+			sandbox.db.insert(nodeMemory).values({
+				spaceId,
+				projectId,
+				rootFlow: "triage",
+				nodePath: "fresh",
+				scope: "",
+				itemKey,
+				hash,
+				runId: "r",
+				stepId: "s",
+				updatedAt: asDate(updatedAt),
+			});
+		await remember("mine", from, "a", "mine", 1);
+		await remember("dup", from, "newer-here", "dup", 20);
+		await remember("dup", from, "newer-there", "dup", 10);
+		await remember("hosted", to, "newer-here", "hosted", 10);
+		await remember("hosted", to, "newer-there", "hosted", 20);
+		await runMove();
+
+		expect(
+			await sandbox.db
+				.select({
+					projectId: nodeMemory.projectId,
+					spaceId: nodeMemory.spaceId,
+					itemKey: nodeMemory.itemKey,
+					hash: nodeMemory.hash,
+				})
+				.from(nodeMemory)
+				.orderBy(asc(nodeMemory.projectId), asc(nodeMemory.itemKey)),
+		).toEqual([
+			{ projectId: "hosted", spaceId: to, itemKey: "newer-here", hash: "dup" },
+			{
+				projectId: "hosted",
+				spaceId: to,
+				itemKey: "newer-there",
+				hash: "hosted",
+			},
+			{ projectId: "mine", spaceId: to, itemKey: "a", hash: "mine" },
 		]);
 	});
 

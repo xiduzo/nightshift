@@ -12,6 +12,7 @@ import {
 	type RunTrigger,
 	scopeKey,
 } from "../log";
+import type { MemoryFlow, NodeMemory } from "../memory";
 import type { PlacementPort } from "../placement";
 import {
 	type Branches,
@@ -70,6 +71,11 @@ export type SpacesDeps = {
 	kept: {
 		list(flow: KeptFlow): Promise<KeptValue[]>;
 		reset(flow: KeptFlow, name: string): Promise<void>;
+	};
+	/** What the Since last run nodes of a project's flows saw, on this computer. */
+	memory: {
+		list(flow: MemoryFlow): Promise<NodeMemory[]>;
+		forget(flow: MemoryFlow, node: string, scope?: string): Promise<void>;
 	};
 	scheduleFiles: ScheduleFiles;
 	reads: ReadModel;
@@ -292,6 +298,18 @@ export function createSpaces(deps: SpacesDeps) {
 				await ready;
 				await projects.find(projectId, spaceId);
 				await deps.kept.reset({ spaceId, projectId, flowName }, name);
+			},
+
+			async listNodeMemory(projectId, flowName) {
+				await ready;
+				await projects.find(projectId, spaceId);
+				return deps.memory.list({ spaceId, projectId, flowName });
+			},
+
+			async forgetNodeMemory(projectId, flowName, node, scope) {
+				await ready;
+				await projects.find(projectId, spaceId);
+				await deps.memory.forget({ spaceId, projectId, flowName }, node, scope);
 			},
 
 			flows: deps.flows(spaceId, actor?.personId),

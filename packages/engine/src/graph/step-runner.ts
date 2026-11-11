@@ -25,6 +25,7 @@ import {
 	type StepOutputs,
 	scopeKey,
 } from "../log";
+import type { StepMemory } from "../memory";
 import { deriveBudgetSpend, deriveWorktrees, pullRequestOf } from "../read";
 import { keptNames } from "../variables";
 import { OUTRUN_ERROR, outrun, placeOf } from "./branches";
@@ -223,6 +224,8 @@ export type OpenStep = StepHandle & {
 			skipWrites?: boolean;
 			/** The guard that stopped the step. */
 			guard?: StepGuard;
+			/** What a Since last run step saw new or changed: saved with `StepEnded`. */
+			memory?: StepMemory;
 		},
 	): Promise<StepEnd>;
 	/** Closes the recorder and the timers but leaves the step open in the log (a wait). */
@@ -256,6 +259,11 @@ export type BodyEnd = {
 	 * step, after its `StepEnded`, as a Gate's answer is scored.
 	 */
 	scores?: readonly FlowScore[];
+	/**
+	 * What a Since last run step saw new or changed: `StepEnded.memory`,
+	 * saved in its batch. Left out when the step ends `error` instead.
+	 */
+	memory?: StepMemory;
 };
 
 /**
@@ -422,7 +430,10 @@ export async function runStep(
 		outcome: StepOutcome,
 		outputs: StepOutputs,
 		error: string | null,
-		costs: ReturnType<typeof extraOf> & { guard?: StepGuard },
+		costs: ReturnType<typeof extraOf> & {
+			guard?: StepGuard;
+			memory?: StepMemory;
+		},
 		scores: readonly FlowScore[] = [],
 	): Promise<Command> => {
 		const climbing = spec.climb?.climbs({ outcome, outputs, error }) ?? false;
@@ -448,7 +459,10 @@ export async function runStep(
 				result.outcome,
 				{ ...result.outputs, outcome: result.outcome },
 				result.error,
-				extraOf(result),
+				{
+					...extraOf(result),
+					...(result.memory ? { memory: result.memory } : {}),
+				},
 				result.scores,
 			);
 		case "aborted": {
@@ -957,6 +971,8 @@ export async function beginStep(
 						? { costSource: extra.costSource }
 						: {}),
 					...(written.ok && extra?.guard ? { guard: extra.guard } : {}),
+					// A step that ends `error` instead runs again: it saw nothing yet.
+					...(written.ok && extra?.memory ? { memory: extra.memory } : {}),
 				},
 			});
 			changed();

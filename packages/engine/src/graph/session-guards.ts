@@ -81,7 +81,7 @@ export function sessionGuards(options: {
 }
 
 /** JSON with the keys of every object sorted: two equal inputs give one text. */
-function canonicalJson(value: unknown): string {
+export function canonicalJson(value: unknown): string {
 	return JSON.stringify(sorted(value)) ?? "undefined";
 }
 

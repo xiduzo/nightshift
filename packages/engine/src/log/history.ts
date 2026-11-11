@@ -15,6 +15,7 @@ import {
 	or,
 	sql,
 } from "drizzle-orm";
+import { type MemoryWrite, type StepMemory, saveMemoryWrites } from "../memory";
 import { type KeptWrite, saveKeptWrites } from "../variables";
 import type { BusItem, RunBus } from "./bus";
 import { asCommand } from "./command-stamp";
@@ -378,35 +379,49 @@ export function createRunHistory(deps: {
 		if (runIds.length > 0) after.push(followWalkerMoves(db, runIds));
 		// The Walker's own copy of this fact, filled here from the fact.
 		if (sessionIds.length > 0) after.push(fillHarnessSessions(sessionIds));
-		// The next run here starts from the kept values the Walker saved.
-		after.push(...saveKeptWrites(db, await keptWritesOf(rows)));
+		// The next run here starts from the kept values the Walker saved, and
+		// compares with what its Since last run nodes saw.
+		const writes = await stepWritesOf(rows);
+		after.push(
+			...saveKeptWrites(db, writes.kept),
+			...saveMemoryWrites(db, writes.memory),
+		);
 		const added = await log.ingest(rows.events, { before, after });
 		publish(added);
 		return added;
 	}
 
 	/**
-	 * The writes of kept variables in the batch's new `StepEnded` events,
-	 * each with its run's project. An event this Replica has already is
-	 * left out, so a kept value a person reset here stays reset.
+	 * The writes of kept variables and the memory of Since last run nodes
+	 * in the batch's new `StepEnded` events, each with its run's project.
+	 * An event this Replica has already is left out, so a kept value or a
+	 * memory a person reset here stays reset.
 	 */
-	async function keptWritesOf(rows: HistoryRows): Promise<KeptWrite[]> {
+	async function stepWritesOf(
+		rows: HistoryRows,
+	): Promise<{ kept: KeptWrite[]; memory: MemoryWrite[] }> {
 		const ended = rows.events.flatMap((e) => {
 			if (e.type !== "StepEnded" || e.stepId === null) return [];
 			const payload = JSON.parse(e.payload) as {
 				variables?: Record<string, JsonValue>;
 				kept?: { flowName: string; names: string[] };
+				memory?: StepMemory;
 			};
-			if (!payload.kept || !payload.variables) return [];
 			const values: Record<string, JsonValue> = {};
-			for (const name of payload.kept.names) {
-				const value = payload.variables[name];
-				if (value !== undefined) values[name] = value;
+			if (payload.kept && payload.variables) {
+				for (const name of payload.kept.names) {
+					const value = payload.variables[name];
+					if (value !== undefined) values[name] = value;
+				}
 			}
-			if (Object.keys(values).length === 0) return [];
-			return [{ e, flowName: payload.kept.flowName, values }];
+			const kept =
+				payload.kept && Object.keys(values).length > 0
+					? { flowName: payload.kept.flowName, values }
+					: null;
+			if (!kept && !payload.memory) return [];
+			return [{ e, kept, memory: payload.memory ?? null }];
 		});
-		if (ended.length === 0) return [];
+		if (ended.length === 0) return { kept: [], memory: [] };
 		const known = new Set(
 			(
 				await db
@@ -427,7 +442,7 @@ export function createRunHistory(deps: {
 		const fresh = ended.filter(
 			({ e }) => !known.has(`${e.walkerId}\n${e.walkerSeq}`),
 		);
-		if (fresh.length === 0) return [];
+		if (fresh.length === 0) return { kept: [], memory: [] };
 		const runIds = [...new Set(fresh.map(({ e }) => e.runId))];
 		const projectOf = new Map(rows.runs.map((r) => [r.id, r.projectId]));
 		const unknown = runIds.filter((id) => !projectOf.has(id));
@@ -439,19 +454,38 @@ export function createRunHistory(deps: {
 				projectOf.set(r.id, r.projectId);
 			}
 		}
-		return fresh.flatMap(({ e, flowName, values }) => {
+		const kept: KeptWrite[] = [];
+		const memory: MemoryWrite[] = [];
+		for (const write of fresh) {
+			const { e } = write;
 			const projectId = projectOf.get(e.runId);
-			if (projectId === undefined) return [];
-			return [
-				{
-					flow: { spaceId: e.spaceId, projectId, flowName },
-					values,
+			if (projectId === undefined) continue;
+			const stepId = e.stepId as string;
+			if (write.kept) {
+				kept.push({
+					flow: {
+						spaceId: e.spaceId,
+						projectId,
+						flowName: write.kept.flowName,
+					},
+					values: write.kept.values,
 					runId: e.runId,
-					stepId: e.stepId as string,
+					stepId,
 					at: e.at,
-				},
-			];
-		});
+				});
+			}
+			if (write.memory) {
+				memory.push({
+					spaceId: e.spaceId,
+					projectId,
+					memory: write.memory,
+					runId: e.runId,
+					stepId,
+					at: e.at,
+				});
+			}
+		}
+		return { kept, memory };
 	}
 
 	/**

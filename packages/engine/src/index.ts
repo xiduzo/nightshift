@@ -131,6 +131,7 @@ export {
 	RUN_NOT_FOUND,
 	withoutPrivatePaths,
 } from "./log";
+export type { NodeMemory } from "./memory";
 export {
 	createOllama,
 	type OllamaEndpoint,

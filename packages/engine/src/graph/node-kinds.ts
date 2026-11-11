@@ -9,6 +9,7 @@ import { END } from "./nodes/end";
 import { JOIN } from "./nodes/join";
 import { LEASE } from "./nodes/lease";
 import { SERVICE } from "./nodes/service";
+import { SINCE_LAST_RUN } from "./nodes/since-last-run";
 import { TOOL } from "./nodes/tool";
 import { VALUE } from "./nodes/value";
 import { WAIT } from "./nodes/wait";
@@ -65,6 +66,7 @@ export const NODE_KINDS: { readonly [T in FlowNodeType]: KindOf<T> } = {
 	join: JOIN,
 	lease: LEASE,
 	service: SERVICE,
+	"since-last-run": SINCE_LAST_RUN,
 };
 
 /**

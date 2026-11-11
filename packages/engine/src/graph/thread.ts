@@ -159,6 +159,7 @@ export function openThread(row: RunRow, deps: ThreadDeps): Thread {
 		flow,
 		flowName: row.flowName ?? row.title,
 		flows: deps.calledFlowsOf(row),
+		callPath: [],
 		// Resolved at each use: the settings may change while the thread is open.
 		policy: () => resolvePolicy(flow.policy, shared.settings().policy),
 		signal: () => controller.signal,

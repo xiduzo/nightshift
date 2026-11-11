@@ -47,6 +47,7 @@ import {
 	runIdsOfProject,
 	spaceOfRun,
 } from "../log";
+import { forgetMemory, listMemory, readMemory } from "../memory";
 import { createPlacement } from "../placement";
 import {
 	createProjects,
@@ -541,6 +542,7 @@ export function createEngine(
 		services,
 		artifacts,
 		keptValues: (flow) => keptValues(db, flow),
+		remembered: (at) => readMemory(db, at),
 		gitAuthor: (personId) => gitAuthorOf(db, personId),
 		...(options.usage ? { usage: options.usage } : {}),
 	};
@@ -863,6 +865,10 @@ export function createEngine(
 		kept: {
 			list: (flow) => listKeptValues(db, flow),
 			reset: (flow, name) => resetKeptValue(db, flow, name),
+		},
+		memory: {
+			list: (flow) => listMemory(db, flow),
+			forget: (flow, node, scope) => forgetMemory(db, flow, node, scope),
 		},
 		scheduleFiles: createScheduleFiles({
 			now,

@@ -55,6 +55,7 @@ import type {
 } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";
 import type { PlacedRun } from "../log/run-row";
+import { readMemory } from "../memory";
 import { createPlacement } from "../placement/placement";
 import { gitAuthorOf } from "../read/people";
 import { parseCalledFlows, parseRunFlow } from "../read/read-model";
@@ -297,6 +298,7 @@ export async function startRun(
 		services: options.services ?? NO_SERVICES,
 		artifacts: createArtifactStore(sandbox.dataDir),
 		keptValues: (kept) => keptValues(db, kept),
+		remembered: (at) => readMemory(db, at),
 		gitAuthor: (personId) => gitAuthorOf(db, personId),
 	};
 	const deps: ThreadDeps = {

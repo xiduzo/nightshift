@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { agentSession, project, run, step } from "@nightshift/db/schema";
-import { eq } from "drizzle-orm";
+import {
+	agentSession,
+	nodeMemory,
+	project,
+	run,
+	step,
+} from "@nightshift/db/schema";
+import { asDate, now } from "@nightshift/time";
+import { asc, eq } from "drizzle-orm";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { createRunBus } from "./bus";
 import {
@@ -206,6 +213,59 @@ describe("a batch that lands", () => {
 			.from(agentSession)
 			.where(eq(agentSession.id, sessionId));
 		expect(session?.harnessSessionId).toBe("harness-1");
+	});
+
+	test("saves what a Since last run step saw, on both Replicas; a key saved here later stays", async () => {
+		const { stepId } = await walkOnA("r1");
+		await a.log.append({
+			type: "StepEnded",
+			runId: "r1",
+			stepId,
+			payload: {
+				outcome: "new",
+				outputs: {},
+				error: null,
+				memory: {
+					rootFlow: "feeds",
+					nodePath: "read/fresh",
+					scope: "",
+					items: { a: "h-a", b: "h-b" },
+				},
+			},
+		});
+		const memoryOf = (replica: Replica) =>
+			replica.sandbox.db
+				.select({
+					spaceId: nodeMemory.spaceId,
+					projectId: nodeMemory.projectId,
+					itemKey: nodeMemory.itemKey,
+					hash: nodeMemory.hash,
+				})
+				.from(nodeMemory)
+				.orderBy(asc(nodeMemory.itemKey));
+		expect(await memoryOf(a)).toEqual([
+			{ spaceId, projectId: "p", itemKey: "a", hash: "h-a" },
+			{ spaceId, projectId: "p", itemKey: "b", hash: "h-b" },
+		]);
+
+		await projectOnB();
+		await b.sandbox.db.insert(nodeMemory).values({
+			spaceId,
+			projectId: "p",
+			rootFlow: "feeds",
+			nodePath: "read/fresh",
+			scope: "",
+			itemKey: "b",
+			hash: "h-b-later",
+			runId: "r0",
+			stepId: "s0",
+			updatedAt: asDate(now() + 60_000),
+		});
+		await b.history.ingest(await rowsOfA());
+		expect(await memoryOf(b)).toEqual([
+			{ spaceId, projectId: "p", itemKey: "a", hash: "h-a" },
+			{ spaceId, projectId: "p", itemKey: "b", hash: "h-b-later" },
+		]);
 	});
 
 	test("waits for its project, and refuses a row of another Walker or Space", async () => {

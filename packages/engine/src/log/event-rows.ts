@@ -2,6 +2,7 @@ import type { Database } from "@nightshift/db";
 import { agentSession, run, step } from "@nightshift/db/schema";
 import { eq, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
+import { saveMemoryOfStep } from "../memory";
 import { saveKeptOfStep } from "../variables";
 import type {
 	EngineEventType,
@@ -14,7 +15,7 @@ import type {
  * The rows an event of this Walker implies, written in the batch of its
  * append (`RunLog.append`): the step row of `StepStarted`, the session row
  * of `SessionStarted`, the harness id of `HarnessSessionAssigned`, and the
- * kept values a `StepEnded` names. The step runner appends the event and
+ * kept values and the memory a `StepEnded` names. The step runner appends the event and
  * never touches the rows, as for the events another Walker wrote
  * (`history.ts`: its rows come with the batch, its harness ids and kept
  * values from the events). A row that is there already stays: a test
@@ -100,18 +101,23 @@ function impliedRows(
 		}
 		case "StepEnded": {
 			const payload = input.payload as EnginePayloads["StepEnded"];
-			if (!stepId || !payload.kept || !payload.variables) {
-				return { before: [], after: [] };
-			}
+			if (!stepId) return { before: [], after: [] };
 			return {
 				before: [],
-				after: saveKeptOfStep(db, {
-					runId,
-					stepId,
-					flowName: payload.kept.flowName,
-					names: payload.kept.names,
-					variables: payload.variables,
-				}),
+				after: [
+					...(payload.kept && payload.variables
+						? saveKeptOfStep(db, {
+								runId,
+								stepId,
+								flowName: payload.kept.flowName,
+								names: payload.kept.names,
+								variables: payload.variables,
+							})
+						: []),
+					...(payload.memory
+						? saveMemoryOfStep(db, { runId, stepId, memory: payload.memory })
+						: []),
+				],
 			};
 		}
 		default:

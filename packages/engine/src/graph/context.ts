@@ -33,6 +33,7 @@ import {
 	type StepOutputs,
 	type TranscriptEntry,
 } from "../log";
+import type { MemoryAt, Remembered } from "../memory";
 import type { RunResult } from "../run-status";
 import type { UsageNotes } from "../usage";
 import type { KeptFlow } from "../variables";
@@ -119,6 +120,8 @@ export type StepShared = {
 	artifacts: Pick<ArtifactStore, "answerFiles" | "save">;
 	/** The kept values a flow's run starts from, by name (`variables/`). */
 	keptValues(flow: KeptFlow): Promise<Record<string, JsonValue>>;
+	/** What a Since last run node remembers for one scope, by key (`memory/`). Empty: a first run. */
+	remembered(at: MemoryAt): Promise<Map<string, Remembered>>;
 	/** The git identity of a Person, for the worktree a Device adds; null when the repository keeps its own. */
 	gitAuthor(personId: string): Promise<GitAuthor | null>;
 };
@@ -145,6 +148,12 @@ export type StepContext = StepShared & {
 	flowName: string;
 	/** The run's called flows by name (the bodies of Call nodes). */
 	flows: Record<string, Flow>;
+	/**
+	 * The Call nodes from the run's flow to this graph's flow, outermost
+	 * first: empty at the top level. A Since last run node remembers under
+	 * it, so two Subflow nodes that call one flow keep their own memory.
+	 */
+	callPath: readonly string[];
 	/**
 	 * The run's policy, resolved at each use like `settings()`: a thread
 	 * that stays compiled across a settings change (a run at a Gate for

@@ -11,6 +11,7 @@ import type {
 	LeaseNode,
 	Outcome,
 	ServiceNode,
+	SinceLastRunNode,
 	ToolNode,
 	ValueNode,
 	WaitNode,
@@ -77,6 +78,13 @@ const service = (fields: Record<string, unknown> = {}) =>
 		...fields,
 	});
 
+const sinceLastRun = (fields: Record<string, unknown> = {}) =>
+	node<SinceLastRunNode>({
+		type: "since-last-run",
+		items: "{{feed.data.items}}",
+		...fields,
+	});
+
 const ALL_TYPES: FlowNodeType[] = [
 	"agent",
 	"command",
@@ -89,6 +97,7 @@ const ALL_TYPES: FlowNodeType[] = [
 	"join",
 	"lease",
 	"service",
+	"since-last-run",
 ];
 
 describe("NODE_KINDS", () => {
@@ -112,6 +121,7 @@ describe("NODE_KINDS", () => {
 			join(),
 			lease(),
 			service(),
+			sinceLastRun(),
 		]) {
 			expect(kindOf(n)).toBe(kindOfType(n.type));
 		}
@@ -139,6 +149,7 @@ describe("make and resumeRules", () => {
 			[join(), RESUME_RULES.fresh],
 			[lease(), RESUME_RULES.wait],
 			[service(), RESUME_RULES.fresh],
+			[sinceLastRun(), RESUME_RULES.fresh],
 		];
 		for (const [n, rules] of table) {
 			expect(typeof kindOf(n).make).toBe("function");
@@ -186,6 +197,7 @@ describe("aux: the auxiliary graph nodes compile.ts adds", () => {
 		expect(auxKinds(callEach())).toEqual([]);
 		expect(auxKinds(decision("rule"))).toEqual([]);
 		expect(auxKinds(value("rule"))).toEqual([]);
+		expect(auxKinds(sinceLastRun())).toEqual([]);
 	});
 });
 
@@ -261,6 +273,14 @@ describe("isChosenEnd and endReason: what route() does with no edge", () => {
 		expect(chosen(service(), "failed")).toBe(false);
 	});
 
+	test("every outcome of a Since last run node is a chosen end, with a reason", () => {
+		for (const outcome of ["new", "changed", "same"]) {
+			expect(chosen(sinceLastRun(), outcome)).toBe(true);
+			expect(reason(sinceLastRun(), outcome)).toBe(endedAt(outcome));
+		}
+		expect(chosen(sinceLastRun(), "pass")).toBe(false);
+	});
+
 	test("a Join that is done ends the flow plainly", () => {
 		expect(chosen(join(), "done")).toBe(true);
 		expect(reason(join(), "done")).toBeNull();
@@ -313,6 +333,9 @@ describe("endedLabel: a Call's `ended` for the node its flow ended at", () => {
 			"yes",
 		);
 		expect(kindOf(own).endedLabel(own, "shipped")).toBe("shipped");
+		expect(kindOf(sinceLastRun()).endedLabel(sinceLastRun(), "new")).toBe(
+			"new",
+		);
 		expect(
 			kindOf(end("nothing-to-do")).endedLabel(
 				end("nothing-to-do"),
@@ -472,6 +495,7 @@ describe("cutShortOutputs: what a cut ends an open step with", () => {
 			"end",
 			"lease",
 			"service",
+			"since-last-run",
 		] as const) {
 			for (const outcome of OUTCOMES) {
 				expect(
@@ -568,5 +592,6 @@ describe("works: what a step needs of its Device", () => {
 		expect(works(callEach())).toBe("worktree");
 		expect(works(call())).toBeNull();
 		expect(works(end())).toBeNull();
+		expect(works(sinceLastRun())).toBeNull();
 	});
 });

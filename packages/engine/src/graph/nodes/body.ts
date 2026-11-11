@@ -126,6 +126,7 @@ export function bodyGraph(
 		...ctx,
 		flow: called,
 		flowName: caller.flow,
+		callPath: [...ctx.callPath, caller.id],
 		placement,
 	}).compile();
 }

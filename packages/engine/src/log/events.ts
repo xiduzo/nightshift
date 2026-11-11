@@ -23,6 +23,7 @@ import type {
 import { instant, iso } from "@nightshift/time";
 import { sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
+import type { StepMemory } from "../memory";
 import type { RunResult, RunStatus } from "../run-status";
 import type { RunEndReason, StepGuard } from "./end-reason";
 import { upgradePayload } from "./upgrade-payload";
@@ -402,6 +403,14 @@ export type EnginePayloads = {
 		 * older logs.
 		 */
 		kept?: { flowName: string; names: string[] };
+		/**
+		 * What a Since last run step saw new or changed (only the changes),
+		 * and the node it is the memory of: another Replica saves it from
+		 * this event too. Absent for every other step, when nothing was new
+		 * or changed, in a run of a flow that is not saved, and in older
+		 * logs.
+		 */
+		memory?: StepMemory;
 	};
 	/**
 	 * The variables of a flow when it starts (each `initial`, or a kept

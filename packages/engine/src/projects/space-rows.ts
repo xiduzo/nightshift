@@ -5,6 +5,7 @@ import {
 	clone,
 	event,
 	keptVariable,
+	nodeMemory,
 	project,
 	run,
 	step,
@@ -37,16 +38,16 @@ import { personFieldTypes } from "../log";
  *
  * What moves with a Project: its row, its Clones, its runs with their
  * steps, Agent sessions and events, the facts of no run that name it
- * (`ProjectAdded`, a schedule's `ScheduleFired`, a webhook), and its kept
- * variables. The Space document and the flow documents are Yjs documents,
+ * (`ProjectAdded`, a schedule's `ScheduleFired`, a webhook), its kept
+ * variables, and what its Since last run nodes saw (`node_memory`). The Space document and the flow documents are Yjs documents,
  * not rows: the caller changes those after the batch.
  *
  * - `projectMap` names each Project to move, by its id in `from`, with
  *   its id in `to`: its own, or the id of the Project of `to` with the
  *   same remote (`project_remote_idx` holds one Project per remote on a
  *   Replica). A Project that maps onto another one gives it its Clones,
- *   runs, events and kept variables, and its own row goes. A kept
- *   variable that both have keeps the latest write. The Project of `to`
+ *   runs, events, kept variables and memory, and its own row goes. A kept
+ *   variable or a remembered key that both have keeps the latest write. The Project of `to`
  *   gets a row when this Replica has none yet.
  * - `personMap` gives a Person of `from` their id in `to`: the runs'
  *   `started_by`, and each field of a moved event that names a Person
@@ -278,6 +279,10 @@ export async function spaceMoveBatch(
 			.update(keptVariable)
 			.set({ spaceId: to })
 			.where(inArray(keptVariable.projectId, keptIds)),
+		db
+			.update(nodeMemory)
+			.set({ spaceId: to })
+			.where(inArray(nodeMemory.projectId, keptIds)),
 	);
 
 	const otherClone = alias(clone, "other_clone");
@@ -295,6 +300,26 @@ export async function spaceMoveBatch(
 						eq(otherKept.name, sql.raw(`"kept_variable"."name"`)),
 						newer
 							? gt(otherKept.updatedAt, sql.raw(`"kept_variable"."updated_at"`))
+							: undefined,
+					),
+				),
+		);
+	const otherMemory = alias(nodeMemory, "other_memory");
+	/** Another remembered key of `projectId` with the same flow, node, scope and key as the row being changed. */
+	const sameMemory = (projectId: string, newer: boolean) =>
+		exists(
+			db
+				.select({ one: sql`1` })
+				.from(otherMemory)
+				.where(
+					and(
+						eq(otherMemory.projectId, projectId),
+						eq(otherMemory.rootFlow, sql.raw(`"node_memory"."root_flow"`)),
+						eq(otherMemory.nodePath, sql.raw(`"node_memory"."node_path"`)),
+						eq(otherMemory.scope, sql.raw(`"node_memory"."scope"`)),
+						eq(otherMemory.itemKey, sql.raw(`"node_memory"."item_key"`)),
+						newer
+							? gt(otherMemory.updatedAt, sql.raw(`"node_memory"."updated_at"`))
 							: undefined,
 					),
 				),
@@ -333,6 +358,19 @@ export async function spaceMoveBatch(
 				.update(keptVariable)
 				.set({ spaceId: to, projectId: target })
 				.where(eq(keptVariable.projectId, source)),
+			// The same for what a Since last run node saw, key by key.
+			db
+				.delete(nodeMemory)
+				.where(and(eq(nodeMemory.projectId, target), sameMemory(source, true))),
+			db
+				.delete(nodeMemory)
+				.where(
+					and(eq(nodeMemory.projectId, source), sameMemory(target, false)),
+				),
+			db
+				.update(nodeMemory)
+				.set({ spaceId: to, projectId: target })
+				.where(eq(nodeMemory.projectId, source)),
 		);
 	}
 
