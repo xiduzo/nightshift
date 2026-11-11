@@ -68,7 +68,7 @@ const command = (id: string, line: string): FlowNode => ({
 	type: "command",
 	position: { x: 0, y: 0 },
 	command: line,
-	output: "text",
+	stdout: "text",
 });
 
 const agent = (id: string): FlowNode => ({
