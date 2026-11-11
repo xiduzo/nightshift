@@ -426,6 +426,7 @@ const ROUTES: Route[] = [
 	route("runs.step", { ...run, stepId: "s" }, "session", "space.getStep", ["r", "s"]),
 	route("runs.serviceLog", { ...run, nodeId: "n", scopeKey: "k" }, "session", "space.serviceLog", ["r", { nodeId: "n", scopeKey: "k" }]),
 	route("runs.artifacts", run, "session", "space.listArtifacts", ["r"]),
+	route("runs.files", run, "session", "space.listRunFiles", ["r"]),
 	route("runs.start", { ...project, flowName: "night" }, START, "space.startRun", [{ projectId: "p1", flowName: "night", startedBy: PERSON }]),
 	route("runs.useful", { ...run, useful: true }, STOP, "space.act.useful", ["r", { kind: "useful", useful: true }]),
 	route("runs.stop", { ...run, when: "now" }, STOP, "space.act.stop", ["r", { kind: "stop", when: "now" }]),

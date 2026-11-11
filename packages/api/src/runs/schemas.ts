@@ -6,6 +6,7 @@ import {
 	type Placement,
 	RUN_END_REASONS,
 	type RunDetail,
+	type RunFiles,
 	type RunStreamItem,
 	type RunSummary,
 	type StepDetail,
@@ -675,5 +676,33 @@ export const artifactSchema = exact<Artifact>()(
 		savedAt: z.number(),
 		/** `answer`: a person added it to the answer of the Gate `stepId`. */
 		from: z.literal("answer").optional(),
+	}),
+);
+
+/**
+ * The files of a run of a project without a folder in its folder on this
+ * computer, and when the cleanup removes them. Fetch one at
+ * `GET /api/runs/:id/files/<path>`.
+ */
+export const runFilesSchema = exact<RunFiles>()(
+	z.object({
+		/** The run works in a run folder, and its folder is on this computer. */
+		here: z.boolean(),
+		/** By path, with `/` between folders. */
+		files: z.array(
+			z.object({
+				path: z.string(),
+				size: z.number(),
+				modifiedAt: z.number(),
+			}),
+		),
+		/** The folder holds more entries than the list shows. */
+		more: z.boolean(),
+		/** When the cleanup removes the folder. Null while the run goes on, or when the cleanup is off. */
+		cleanupAt: z.number().nullable(),
+		/** When this computer removed the folder, and who. */
+		removed: z
+			.object({ at: z.number(), by: z.enum(["person", "cleanup"]) })
+			.nullable(),
 	}),
 );

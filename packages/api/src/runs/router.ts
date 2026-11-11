@@ -10,6 +10,7 @@ import {
 	ownDeviceSchema,
 	placementSchema,
 	runDetailSchema,
+	runFilesSchema,
 	runStatusSchema,
 	runStreamItemSchema,
 	runSummarySchema,
@@ -110,6 +111,19 @@ export const runs = {
 		.route({ summary: "Lists the files the agents of a run kept." })
 		.output(output(z.array(artifactSchema)))
 		.handler(({ context, input }) => context.space.listArtifacts(input.runId)),
+	/**
+	 * The files in the folder of a run of a project without a folder, on
+	 * this computer, and when the cleanup removes them. Empty for a run
+	 * that works in a copy of the project. Fetch one at
+	 * `GET /api/runs/:id/files/<path>`.
+	 */
+	files: runProcedure(z.object({ runId: z.string() }))
+		.route({
+			summary:
+				"Lists the files in the folder of a run of a project without a folder, and when they are removed.",
+		})
+		.output(output(runFilesSchema))
+		.handler(({ context, input }) => context.space.listRunFiles(input.runId)),
 	/**
 	 * Starts a flow file by name, or a flow given inline (a quick run). A
 	 * Device it names goes first. Without one, the flow says where (ADR 17).
