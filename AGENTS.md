@@ -89,6 +89,9 @@ Use the `ux-copy` and `ste-writing` skills.
 - **Keep the product words** from `docs/glossary.md`: flow, run, step, node,
   gate, schedule, profile, connection, secret, input, output, outcome. One
   name for one thing.
+- **Any domain.** Night Shift is domain-neutral. Examples span research,
+  monitoring, outreach, ops, content and code. They never default to code
+  or pull requests.
 - **Technical fields stay technical, with an example.** A cron field, a JSON
   value, a shell command, an MCP server, `{{template}}` and `${NAME}` syntax
   keep their words. Give one short example, not a definition.
