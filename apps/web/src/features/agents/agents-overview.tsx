@@ -143,7 +143,7 @@ export function AgentsOverview({
 
 				<PageSection
 					title="Harnesses"
-					description="The coding agents a profile runs on."
+					description="The agents a profile runs on."
 					actions={<AddButton onClick={onAddHarness}>Add harness</AddButton>}
 				>
 					<ItemGroup className="gap-2">

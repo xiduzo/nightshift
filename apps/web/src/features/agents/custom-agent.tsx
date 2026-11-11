@@ -178,8 +178,8 @@ function CustomAgentForm({
 					{agent ? `Edit ${agent.label}` : "Add a custom agent"}
 				</DialogTitle>
 				<DialogDescription>
-					Any coding agent that supports the Agent Client Protocol. Night Shift
-					starts it with this command.
+					Any agent that supports the Agent Client Protocol. Night Shift starts
+					it with this command.
 				</DialogDescription>
 			</DialogHeader>
 

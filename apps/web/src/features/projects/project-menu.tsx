@@ -136,7 +136,7 @@ export function ProjectMenu({
 							Remove {project.name} from Night Shift?
 						</AlertDialogTitle>
 						<AlertDialogDescription>
-							Night Shift forgets the project and its runs. The repository at{" "}
+							Night Shift forgets the project and its runs. The folder at{" "}
 							<span className="font-mono">{projectFolder(project)}</span> stays
 							as it is.
 						</AlertDialogDescription>

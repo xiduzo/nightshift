@@ -72,7 +72,7 @@ export function KnowledgeOverviewPage() {
 	return (
 		<KnowledgeSection
 			title="Knowledge"
-			description="What your agents read besides the code. Every computer in this Space gets the same files."
+			description="What your agents read besides the project folder. Every computer in this Space gets the same files."
 			actions={<AddSourceButton />}
 		>
 			{nothing ? (

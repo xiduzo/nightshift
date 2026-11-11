@@ -225,8 +225,8 @@ export function HarnessPicker({
 				<DialogHeader>
 					<DialogTitle>Add a harness</DialogTitle>
 					<DialogDescription>
-						Pick the coding agent your profiles use. It runs on this computer
-						with your own login.
+						Pick the agent your profiles use. It runs on this computer with your
+						own login.
 					</DialogDescription>
 				</DialogHeader>
 				<ItemGroup className="gap-2">
@@ -279,8 +279,8 @@ export function HarnessPicker({
 						<ItemContent>
 							<ItemTitle>Custom agent</ItemTitle>
 							<ItemDescription className="text-xs">
-								Any coding agent that supports the Agent Client Protocol, such
-								as Goose or Qwen Code.
+								Any agent that supports the Agent Client Protocol, such as Goose
+								or Qwen Code.
 							</ItemDescription>
 						</ItemContent>
 					</Item>

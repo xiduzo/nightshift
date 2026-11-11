@@ -238,7 +238,7 @@ export function ComputerDetail({
 			{computer.thisDevice ? (
 				<>
 					<DetailSection
-						title="Coding agents"
+						title="Agents"
 						description="The profiles and tools of this computer."
 					>
 						<Button

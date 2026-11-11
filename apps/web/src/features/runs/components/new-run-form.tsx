@@ -278,7 +278,7 @@ export function QuickRunDialog({
 										<TriangleAlertIcon aria-hidden="true" />
 										<AlertDescription className="text-status-interrupted">
 											The agent runs every tool, shell commands included,
-											without asking. Use it only on a repository you trust.
+											without asking. Use it only on a project you trust.
 										</AlertDescription>
 									</Alert>
 								) : null}

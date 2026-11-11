@@ -34,7 +34,7 @@ export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
 	agent: {
 		label: NODE_TYPE_LABEL.agent,
 		icon: BotIcon,
-		blurb: "A coding agent works on a task.",
+		blurb: "An agent works on a task.",
 	},
 	command: {
 		label: NODE_TYPE_LABEL.command,
