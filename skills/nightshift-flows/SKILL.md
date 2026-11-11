@@ -74,15 +74,15 @@ The node types: `agent`, `command`, `decision`, `call`, `value`, `wait`, `tool`,
 
 ### agent
 
-A coding-agent session. `prompt` (template) or `skill` (runs `/<skill> <prompt>`). Name a `profile`, or set `harness` (claude-code, opencode, codex, grok-build, copilot, gemini, cursor, pi, or `acp:<slug>`), `model` and `permissionMode` (default, acceptEdits, auto, bypassPermissions, plan) yourself. A profile is better: it names one computer, and the step runs there. Optional: `fallbacks` (profiles as `{ device, profile }`, first one first, that take the step when the profile's computer cannot; without them the step waits for that computer), `effort`, `session` (`fresh`, or `resume` to continue its last session on a later visit), `clis` (programs it may run, for example `gh`), `connections`, `idleMinutes`, `maxTurns`, `knowledge` (the project's knowledge folder: unset gives it when it has files, `false` never, a list of its folders such as `["books", "learnings/accepted"]` gives a copy of those only, search included), `output` (a JSON Schema for an object: the agent must report `data` that matches it), `outcomes` (its own outcomes, each `{ name, description }`; replaces the default ones), `ask: "person"`. With `ask: "person"`, an agent that needs input asks a person in a Gate and takes no edge: "answer" sends the person's note to the same session, "stop" ends the step `fail`. Do not draw a `needs-input` edge then, and do not build that loop with a Gate yourself.
+An agent session. `prompt` (template) or `skill` (runs `/<skill> <prompt>`). Name a `profile`, or set `harness` (claude-code, opencode, codex, grok-build, copilot, gemini, cursor, pi, or `acp:<slug>`), `model` and `permissionMode` (default, acceptEdits, auto, bypassPermissions, plan) yourself. A profile is better: it names one computer, and the step runs there. Optional: `fallbacks` (profiles as `{ device, profile }`, first one first, that take the step when the profile's computer cannot; without them the step waits for that computer), `effort`, `session` (`fresh`, or `resume` to continue its last session on a later visit), `clis` (programs it may run, for example `gh`), `connections`, `idleMinutes`, `maxTurns`, `knowledge` (the project's knowledge folder: unset gives it when it has files, `false` never, a list of its folders such as `["books", "learnings/accepted"]` gives a copy of those only, search included), `output` (a JSON Schema for an object: the agent must report `data` that matches it), `outcomes` (its own outcomes, each `{ name, description }`; replaces the default ones), `ask: "person"`. With `ask: "person"`, an agent that needs input asks a person in a Gate and takes no edge: "answer" sends the person's note to the same session, "stop" ends the step `fail`. Do not draw a `needs-input` edge then, and do not build that loop with a Gate yourself.
 
 Outcomes: `pass`, `fail`, `needs-input` unless it lists its own. Outputs: `outcome`, `output`, `summary`, `data`, `note`, `visit`, `session_id`.
 
-`{"id":"build","type":"agent","position":{"x":0,"y":0},"profile":{"device":"8c1e4f2a-6b0d-4a7e-9f3c-2d5b7e9a1c4f","profile":"worker"},"prompt":"Build {{task}}. Earlier failures: {{vars.failures}}","output":{"type":"object","properties":{"files":{"type":"array","items":{"type":"string"}}}}}`
+`{"id":"scout","type":"agent","position":{"x":0,"y":0},"profile":{"device":"8c1e4f2a-6b0d-4a7e-9f3c-2d5b7e9a1c4f","profile":"worker"},"prompt":"Find news on {{topic}}. Already reported: {{vars.seen}}","output":{"type":"object","properties":{"links":{"type":"array","items":{"type":"string"}}}}}`
 
 ### command
 
-A shell command in the project. Its output is the log. To hand on data, it writes JSON to the file named by `$NS_OUTPUT`, which becomes `data`: `echo '{"count": 3}' > "$NS_OUTPUT"`. Data with an `outcome` that names one of its exits ends the step on that exit, whatever the exit code; else the exit code picks the outcome. `exits` lists `{ name, code }`; an exit with `"code": "data"` is picked by the data only; one exit without `code` catches every other code and goes last. Without `exits`: `pass` on 0, `fail` on any other code. Data with `scores` (names to numbers of 0 or more, `{"scores": {"replicated": 1}}`) scores the run, and Flow health shows each name. `output: "json"` reads the JSON printed on stdout instead, when `$NS_OUTPUT` stays empty. `secrets` names secrets that reach the command as environment variables. `$NS_KNOWLEDGE` is the project's knowledge folder, which agents read: a sync writes markdown there. A template value reaches the shell as an environment variable, never as shell text, so quote it: `echo "{{build.summary}}"`. Use double quotes or a heredoc without quotes (`<<EOF`). Single quotes and a quoted heredoc (`<<'EOF'`) stop the shell from filling in the value: the command gets the variable's name. Call a CLI tool with a login (`signsIn` in list_tools) by its name to run its program signed in: `acli-dimpact jira`, not `acli jira`.
+A shell command in the project. Its output is the log. To hand on data, it writes JSON to the file named by `$NS_OUTPUT`, which becomes `data`: `echo '{"count": 3}' > "$NS_OUTPUT"`. Data with an `outcome` that names one of its exits ends the step on that exit, whatever the exit code; else the exit code picks the outcome. `exits` lists `{ name, code }`; an exit with `"code": "data"` is picked by the data only; one exit without `code` catches every other code and goes last. Without `exits`: `pass` on 0, `fail` on any other code. Data with `scores` (names to numbers of 0 or more, `{"scores": {"replicated": 1}}`) scores the run, and Flow health shows each name. `output: "json"` reads the JSON printed on stdout instead, when `$NS_OUTPUT` stays empty. `secrets` names secrets that reach the command as environment variables. `$NS_KNOWLEDGE` is the project's knowledge folder, which agents read: a sync writes markdown there. A template value reaches the shell as an environment variable, never as shell text, so quote it: `echo "{{build.summary}}"`. Use double quotes or a heredoc without quotes (`<<EOF`). Single quotes and a quoted heredoc (`<<'EOF'`) stop the shell from filling in the value: the command gets the variable's name. Call a CLI tool with a login (`signsIn` in list_tools) by its name to run its program signed in: `acli-work jira`, not `acli jira`.
 
 Outcomes: its exits (`pass`, `fail` without `exits`). Outputs: `outcome`, `exit_code`, `log_tail`, `data`, `visit`.
 
@@ -94,7 +94,7 @@ Picks one of its `options` (each `{ name, description }`); the option is the out
 
 Outcomes: its options. Outputs: `outcome`, `note`, `visit`.
 
-`{"id":"approve","type":"decision","position":{"x":0,"y":0},"by":"person","prompt":"Open a pull request for {{task}}?","options":[{"name":"yes"},{"name":"no"}]}`
+`{"id":"approve","type":"decision","position":{"x":0,"y":0},"by":"person","prompt":"Send the offer to {{lead}}?","options":[{"name":"yes"},{"name":"no"}]}`
 
 ### call
 
@@ -134,7 +134,7 @@ Ends the run on purpose. `status`: `done`, `nothing-to-do`, `failed`. `message` 
 
 Outcomes: none, the run ends here. Outputs: `outcome`, `message`, `visit`.
 
-`{"id":"no_work","type":"end","position":{"x":0,"y":0},"status":"nothing-to-do","message":"No open issues for {{label}}"}`
+`{"id":"no_work","type":"end","position":{"x":0,"y":0},"status":"nothing-to-do","message":"Nothing new about {{topic}}"}`
 
 ### join
 
@@ -146,7 +146,7 @@ Outcomes: `done`. Outputs: `outcome`, `data`, `visit`.
 
 ### lease
 
-Lets one run of the Space at a time do the steps after it, also across computers. `name` is a template: `branch:{{pr.data.head}}`. Night Shift lets go of the lease when the run ends, however it ends. `waitMinutes`: how long it waits for a busy lease (unset: 0). `ttlMinutes` (default 30): how long it outlives a computer that is gone. `scope: { section: <id> }` lets go when the run leaves that Section, which holds the node. Draw a `busy` edge, for example to an End with `nothing-to-do`: without one, `busy` fails the run.
+Lets one run of the Space at a time do the steps after it, also across computers. `name` is a template: `branch:{{pr.data.head}}`, `account:{{account}}`. Night Shift lets go of the lease when the run ends, however it ends. `waitMinutes`: how long it waits for a busy lease (unset: 0). `ttlMinutes` (default 30): how long it outlives a computer that is gone. `scope: { section: <id> }` lets go when the run leaves that Section, which holds the node. Draw a `busy` edge, for example to an End with `nothing-to-do`: without one, `busy` fails the run.
 
 Outcomes: `held`, `busy`. Outputs: `outcome`, `name`, `holder`, `holder_title`, `waited_minutes`, `visit`.
 
@@ -228,7 +228,7 @@ A cron time missed while Night Shift was off still starts up to `lateMinutes` la
 
 ## Kits
 
-A kit is a flow that ships with Night Shift: Commands on `git`, `gh` or `acli`. A Subflow runs one by name (`"flow": "kit:github/publish-draft-pr"`) and reads its outputs (`{{publish.url}}`). Kits end at End nodes: `ended` and `end_message` say how. Prefer a kit to writing the same commands. Inputs with * are required. The `kit:jira` kits take that CLI tool as `tool`.
+A kit is a flow that ships with Night Shift: Commands on `git`, `gh`, `acli` or `curl`. A Subflow runs one by name (`"flow": "kit:github/publish-draft-pr"`) and reads its outputs (`{{publish.url}}`). Kits end at End nodes: `ended` and `end_message` say how. Prefer a kit to writing the same commands. Inputs with * are required. The `kit:jira` kits take that CLI tool as `tool`.
 
 - `kit:github/create-branch` (name*, from) → branch, created, sha: Switches to a new branch with the name you give.
 - `kit:github/finish-pr` (pr*, action, comment) → number, url, state: Marks a pull request ready for review, or closes it.
@@ -270,7 +270,7 @@ Group a flow of more than about six nodes into Sections, one per phase of the wo
 - Every Agent node has a profile, or a harness, model and permission mode. Use only profiles, connections, CLI tools and flows that exist: look them up, do not invent names or ids.
 - Every loop has an edge with `max`.
 - A flow of more than about six nodes has Sections, one per phase, without warnings.
-- Prefer a Command node to an Agent node when a shell command can do the job: it is fast, free and repeatable. Ask a person with a Gate before a step that others see (a pull request, a message).
+- Prefer a Command node to an Agent node when a shell command can do the job: it is fast, free and repeatable. Ask a person with a Gate before a step that others see (a message, a post, a pull request).
 
 ## Example: build, test, fix, ask
 
@@ -426,26 +426,26 @@ Group a flow of more than about six nodes into Sections, one per phase of the wo
 }
 ```
 
-## Example: plan, then build each task
+## Example: find sources, then summarize each
 
-This one calls the flow `build-task`, which takes an input `item`.
+This one calls the flow `summarize-source`, which takes an input `item`.
 
 ```json
 {
  "version": 8,
- "description": "Plans a feature, then builds each task in its own branch.",
+ "description": "Finds sources on a topic, then summarizes each one.",
  "inputs": [
   {
-   "name": "feature",
+   "name": "topic",
    "type": "text",
    "required": true
   }
  ],
  "outputs": [],
- "start": "plan",
+ "start": "find",
  "nodes": [
   {
-   "id": "plan",
+   "id": "find",
    "type": "agent",
    "position": {
     "x": 0,
@@ -453,33 +453,33 @@ This one calls the flow `build-task`, which takes an input `item`.
    },
    "profile": {
     "device": "8c1e4f2a-6b0d-4a7e-9f3c-2d5b7e9a1c4f",
-    "profile": "planner"
+    "profile": "researcher"
    },
-   "prompt": "Split {{feature}} into small tasks. Change no files.",
+   "prompt": "Find recent sources on {{topic}}. Change no files.",
    "outcomes": [
     {
-     "name": "planned",
-     "description": "The tasks are ready."
+     "name": "found",
+     "description": "The sources are ready."
     },
     {
      "name": "unclear",
-     "description": "The feature needs more detail."
+     "description": "The topic needs more detail."
     }
    ],
    "output": {
     "type": "object",
     "required": [
-     "tasks"
+     "sources"
     ],
     "properties": {
-     "tasks": {
+     "sources": {
       "type": "array",
       "items": {
        "type": "object",
        "required": [
         "id",
         "title",
-        "details"
+        "url"
        ],
        "properties": {
         "id": {
@@ -488,7 +488,7 @@ This one calls the flow `build-task`, which takes an input `item`.
         "title": {
          "type": "string"
         },
-        "details": {
+        "url": {
          "type": "string"
         }
        }
@@ -498,35 +498,35 @@ This one calls the flow `build-task`, which takes an input `item`.
    }
   },
   {
-   "id": "build_all",
+   "id": "read_all",
    "type": "call",
    "position": {
     "x": 300,
     "y": 0
    },
-   "flow": "build-task",
+   "flow": "summarize-source",
    "inputs": {},
    "each": {
     "source": {
      "kind": "json",
-     "value": "{{plan.data.tasks}}"
+     "value": "{{find.data.sources}}"
     },
     "as": "item"
    }
   },
   {
-   "id": "all_done",
+   "id": "all_read",
    "type": "decision",
    "position": {
     "x": 600,
     "y": 0
    },
    "by": "rule",
-   "prompt": "Did every task finish?",
+   "prompt": "Did every source finish?",
    "options": [
     {
      "name": "clean",
-     "when": "build_all.failed_count = 0"
+     "when": "read_all.failed_count = 0"
     },
     {
      "name": "failures"
@@ -542,27 +542,27 @@ This one calls the flow `build-task`, which takes an input `item`.
    },
    "profile": {
     "device": "8c1e4f2a-6b0d-4a7e-9f3c-2d5b7e9a1c4f",
-    "profile": "worker"
+    "profile": "researcher"
    },
-   "prompt": "These tasks failed:\n{{build_all.summary}}\nWrite a short report for the team."
+   "prompt": "These sources failed:\n{{read_all.summary}}\nWrite a short note on what is missing."
   }
  ],
  "edges": [
   {
-   "id": "plan-planned-build_all",
-   "from": "plan",
-   "outcome": "planned",
-   "to": "build_all"
+   "id": "find-found-read_all",
+   "from": "find",
+   "outcome": "found",
+   "to": "read_all"
   },
   {
-   "id": "build_all-done-all_done",
-   "from": "build_all",
+   "id": "read_all-done-all_read",
+   "from": "read_all",
    "outcome": "done",
-   "to": "all_done"
+   "to": "all_read"
   },
   {
-   "id": "all_done-failures-report",
-   "from": "all_done",
+   "id": "all_read-failures-report",
+   "from": "all_read",
    "outcome": "failures",
    "to": "report"
   }
@@ -570,11 +570,11 @@ This one calls the flow `build-task`, which takes an input `item`.
  "sections": [
   {
    "id": "work",
-   "label": "Build",
+   "label": "Read",
    "color": "blue",
    "nodes": [
-    "build_all",
-    "all_done"
+    "read_all",
+    "all_read"
    ]
   }
  ]

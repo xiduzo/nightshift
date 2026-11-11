@@ -61,14 +61,14 @@ const EXAMPLE_DEVICE = "8c1e4f2a-6b0d-4a7e-9f3c-2d5b7e9a1c4f";
  */
 export const sampleNodes = {
 	agent: {
-		id: "build",
+		id: "scout",
 		type: "agent",
 		position: at,
 		profile: { device: EXAMPLE_DEVICE, profile: "worker" },
-		prompt: "Build {{task}}. Earlier failures: {{vars.failures}}",
+		prompt: "Find news on {{topic}}. Already reported: {{vars.seen}}",
 		output: {
 			type: "object",
-			properties: { files: { type: "array", items: { type: "string" } } },
+			properties: { links: { type: "array", items: { type: "string" } } },
 		},
 	},
 	command: {
@@ -94,7 +94,7 @@ export const sampleNodes = {
 		type: "decision",
 		position: at,
 		by: "person",
-		prompt: "Open a pull request for {{task}}?",
+		prompt: "Send the offer to {{lead}}?",
 		options: [{ name: "yes" }, { name: "no" }],
 	},
 	value: {
@@ -130,7 +130,7 @@ export const sampleNodes = {
 		type: "end",
 		position: at,
 		status: "nothing-to-do",
-		message: "No open issues for {{label}}",
+		message: "Nothing new about {{topic}}",
 	},
 	join: {
 		id: "reviewed",
@@ -157,8 +157,8 @@ export const sampleNodes = {
 
 /** What each node type is for, and the fields it adds to the common ones. */
 const nodeText: Record<FlowNodeType, string> = {
-	agent: `A coding-agent session. \`prompt\` (template) or \`skill\` (runs \`/<skill> <prompt>\`). Name a \`profile\`, or set \`harness\` (${harnessNameSchema.options.join(", ")}, or \`acp:<slug>\`), \`model\` and \`permissionMode\` (${permissionModeSchema.options.join(", ")}) yourself. A profile is better: it names one computer, and the step runs there. Optional: \`fallbacks\` (profiles as \`{ device, profile }\`, first one first, that take the step when the profile's computer cannot; without them the step waits for that computer), \`effort\`, \`session\` (\`fresh\`, or \`resume\` to continue its last session on a later visit), \`clis\` (programs it may run, for example \`gh\`), \`connections\`, \`idleMinutes\`, \`maxTurns\`, \`knowledge\` (the project's knowledge folder: unset gives it when it has files, \`false\` never, a list of its folders such as \`["books", "${ACCEPTED_LEARNINGS_DIR}"]\` gives a copy of those only, search included), \`output\` (a JSON Schema for an object: the agent must report \`data\` that matches it), \`outcomes\` (its own outcomes, each \`{ name, description }\`; replaces the default ones), \`ask: "person"\`. With \`ask: "person"\`, an agent that needs input asks a person in a Gate and takes no edge: "answer" sends the person's note to the same session, "stop" ends the step \`fail\`. Do not draw a \`needs-input\` edge then, and do not build that loop with a Gate yourself.`,
-	command: `A shell command in the project. Its output is the log. To hand on data, it writes JSON to the file named by \`$NS_OUTPUT\`, which becomes \`data\`: \`echo '{"count": 3}' > "$NS_OUTPUT"\`. Data with an \`outcome\` that names one of its exits ends the step on that exit, whatever the exit code; else the exit code picks the outcome. \`exits\` lists \`{ name, code }\`; an exit with \`"code": "data"\` is picked by the data only; one exit without \`code\` catches every other code and goes last. Without \`exits\`: \`pass\` on 0, \`fail\` on any other code. Data with \`scores\` (names to numbers of 0 or more, \`{"scores": {"replicated": 1}}\`) scores the run, and Flow health shows each name. \`output: "json"\` reads the JSON printed on stdout instead, when \`$NS_OUTPUT\` stays empty. \`secrets\` names secrets that reach the command as environment variables. \`$NS_KNOWLEDGE\` is the project's knowledge folder, which agents read: a sync writes markdown there. A template value reaches the shell as an environment variable, never as shell text, so quote it: \`echo "{{build.summary}}"\`. Use double quotes or a heredoc without quotes (\`<<EOF\`). Single quotes and a quoted heredoc (\`<<'EOF'\`) stop the shell from filling in the value: the command gets the variable's name. Call a CLI tool with a login (\`signsIn\` in list_tools) by its name to run its program signed in: \`acli-dimpact jira\`, not \`acli jira\`.`,
+	agent: `An agent session. \`prompt\` (template) or \`skill\` (runs \`/<skill> <prompt>\`). Name a \`profile\`, or set \`harness\` (${harnessNameSchema.options.join(", ")}, or \`acp:<slug>\`), \`model\` and \`permissionMode\` (${permissionModeSchema.options.join(", ")}) yourself. A profile is better: it names one computer, and the step runs there. Optional: \`fallbacks\` (profiles as \`{ device, profile }\`, first one first, that take the step when the profile's computer cannot; without them the step waits for that computer), \`effort\`, \`session\` (\`fresh\`, or \`resume\` to continue its last session on a later visit), \`clis\` (programs it may run, for example \`gh\`), \`connections\`, \`idleMinutes\`, \`maxTurns\`, \`knowledge\` (the project's knowledge folder: unset gives it when it has files, \`false\` never, a list of its folders such as \`["books", "${ACCEPTED_LEARNINGS_DIR}"]\` gives a copy of those only, search included), \`output\` (a JSON Schema for an object: the agent must report \`data\` that matches it), \`outcomes\` (its own outcomes, each \`{ name, description }\`; replaces the default ones), \`ask: "person"\`. With \`ask: "person"\`, an agent that needs input asks a person in a Gate and takes no edge: "answer" sends the person's note to the same session, "stop" ends the step \`fail\`. Do not draw a \`needs-input\` edge then, and do not build that loop with a Gate yourself.`,
+	command: `A shell command in the project. Its output is the log. To hand on data, it writes JSON to the file named by \`$NS_OUTPUT\`, which becomes \`data\`: \`echo '{"count": 3}' > "$NS_OUTPUT"\`. Data with an \`outcome\` that names one of its exits ends the step on that exit, whatever the exit code; else the exit code picks the outcome. \`exits\` lists \`{ name, code }\`; an exit with \`"code": "data"\` is picked by the data only; one exit without \`code\` catches every other code and goes last. Without \`exits\`: \`pass\` on 0, \`fail\` on any other code. Data with \`scores\` (names to numbers of 0 or more, \`{"scores": {"replicated": 1}}\`) scores the run, and Flow health shows each name. \`output: "json"\` reads the JSON printed on stdout instead, when \`$NS_OUTPUT\` stays empty. \`secrets\` names secrets that reach the command as environment variables. \`$NS_KNOWLEDGE\` is the project's knowledge folder, which agents read: a sync writes markdown there. A template value reaches the shell as an environment variable, never as shell text, so quote it: \`echo "{{build.summary}}"\`. Use double quotes or a heredoc without quotes (\`<<EOF\`). Single quotes and a quoted heredoc (\`<<'EOF'\`) stop the shell from filling in the value: the command gets the variable's name. Call a CLI tool with a login (\`signsIn\` in list_tools) by its name to run its program signed in: \`acli-work jira\`, not \`acli jira\`.`,
 	tool: "Calls one tool of a connection (an MCP server of this computer), with no model. `connection`, `tool`, and `arguments` (a template per argument). `data` is the structured result.",
 	decision: `Picks one of its \`options\` (each \`{ name, description }\`); the option is the outcome. \`by\`: ${decisionNodeSchema.shape.by.options.map((by) => `\`${by}\``).join(", ")}. \`person\` is a Gate: \`prompt\` is the question, and the run waits for the answer. Give it a \`title\`: one line, at most ${GATE_TITLE_MAX} characters, the heading in the inbox. Lists go in the prompt. A Gate may have \`deadline: { at: "07:00", choose: "keep" }\` (or \`minutes\` instead of \`at\`, counted from when it opens): when nobody answered by then, it takes the option \`choose\`. A Gate takes a brief too (see Briefs). \`rule\` is a Branch: each option but the last has \`when\`, a JSONata rule; the first that holds wins, the last option has no rule and is the default. \`model\`: a small model reads \`prompt\` and picks; it reads \`profile\`, or \`decider\` (${deciderNameSchema.options.join(", ")}) and \`model\`, all optional.`,
 	value: `Makes \`data\` that matches \`output\` (a JSON Schema for an object). \`by: "rule"\` with \`expression\` (JSONata over the run's values), \`by: "model"\` with \`prompt\` and optionally a \`profile\` or a \`decider\` that can make a value (${valueDeciderNameSchema.options.join(", ")}), or \`by: "person"\` (an Ask, see Asks) with \`prompt\` as the question. Use it to compute or reshape a value, often with \`set\`.`,
@@ -168,7 +168,7 @@ const nodeText: Record<FlowNodeType, string> = {
 			", ",
 		)} (\`{ kind: "duration", minutes }\`, \`{ kind: "time", at: "07:00" }\`, \`{ kind: "command", command, everyMinutes }\` until it exits 0, \`{ kind: "signal", name, key? }\`, \`{ kind: "any", signal: { name, key? }, command: { command, everyMinutes } }\`: whichever ends it first). \`timeoutMinutes\` ends it \`timeout\`. A signal comes from a person on the run page, or from a webhook schedule of the project: then \`data\` holds the webhook (\`{{wait_ci.data.body.check_suite.conclusion}}\`). With \`key\` (a template, for example \`{{pr}}\`), only a webhook whose signal key is that text wakes it. \`outcomes\` (each \`{ name, when? }\`, each with an edge) are more ways out than \`done\`. The command picks one: it writes \`{ "outcome": "red" }\` to \`$NS_OUTPUT\` and exits 0; an unlisted outcome or another exit code polls again. A signal picks the first outcome whose \`when\` (JSONata over \`event\`) holds; a webhook that matches no rule does not wake it.`,
 	lease:
-		"Lets one run of the Space at a time do the steps after it, also across computers. `name` is a template: `branch:{{pr.data.head}}`. Night Shift lets go of the lease when the run ends, however it ends. `waitMinutes`: how long it waits for a busy lease (unset: 0). `ttlMinutes` (default 30): how long it outlives a computer that is gone. `scope: { section: <id> }` lets go when the run leaves that Section, which holds the node. Draw a `busy` edge, for example to an End with `nothing-to-do`: without one, `busy` fails the run.",
+		"Lets one run of the Space at a time do the steps after it, also across computers. `name` is a template: `branch:{{pr.data.head}}`, `account:{{account}}`. Night Shift lets go of the lease when the run ends, however it ends. `waitMinutes`: how long it waits for a busy lease (unset: 0). `ttlMinutes` (default 30): how long it outlives a computer that is gone. `scope: { section: <id> }` lets go when the run leaves that Section, which holds the node. Draw a `busy` edge, for example to an End with `nothing-to-do`: without one, `busy` fails the run.",
 	service:
 		"Starts a process that keeps running while the steps after it work: a Docker Compose stack, a dev server. `start` runs in the background in the project. `ready` is a `command` (exit 0) or a `url` (answers 2xx), tried every `everySeconds` (default 2) up to `timeoutMinutes` (default 5). A ready command can write JSON to `$NS_OUTPUT`, read later as `{{stack.data.url}}`. `{{stack.log_tail}}` gives the last lines of its log. Night Shift stops it when the run ends, however it ends: with `stop` when it has one (`docker compose down`), else by ending its processes. `scope: { section: <id> }` stops it when the run leaves that Section, which holds the node. Every step in its scope runs on its computer. A service on a fixed port goes after a Lease on that port. `secrets` as on a Command. Without a `failed` edge, a service that does not get ready fails the run.",
 	join: `Where parallel branches meet. \`wait\`: \`all\` (default), or \`first\` (stops the other branches). \`data\` holds each branch's \`data\` by the node it came from: \`{{reviewed.data.security}}\`.`,
@@ -279,37 +279,37 @@ export const fixLoopExample: FlowInput = {
 	],
 };
 
-/** The second example: plan, then build each small task in a subflow. */
-export const planEachExample: FlowInput = {
+/** The second example: find sources, then summarize each one in a subflow. */
+export const findEachExample: FlowInput = {
 	version: FLOW_VERSION,
-	description: "Plans a feature, then builds each task in its own branch.",
-	inputs: [{ name: "feature", type: "text", required: true }],
+	description: "Finds sources on a topic, then summarizes each one.",
+	inputs: [{ name: "topic", type: "text", required: true }],
 	outputs: [],
-	start: "plan",
+	start: "find",
 	nodes: [
 		{
-			id: "plan",
+			id: "find",
 			type: "agent",
 			position: { x: 0, y: 0 },
-			profile: { device: EXAMPLE_DEVICE, profile: "planner" },
-			prompt: "Split {{feature}} into small tasks. Change no files.",
+			profile: { device: EXAMPLE_DEVICE, profile: "researcher" },
+			prompt: "Find recent sources on {{topic}}. Change no files.",
 			outcomes: [
-				{ name: "planned", description: "The tasks are ready." },
-				{ name: "unclear", description: "The feature needs more detail." },
+				{ name: "found", description: "The sources are ready." },
+				{ name: "unclear", description: "The topic needs more detail." },
 			],
 			output: {
 				type: "object",
-				required: ["tasks"],
+				required: ["sources"],
 				properties: {
-					tasks: {
+					sources: {
 						type: "array",
 						items: {
 							type: "object",
-							required: ["id", "title", "details"],
+							required: ["id", "title", "url"],
 							properties: {
 								id: { type: "string" },
 								title: { type: "string" },
-								details: { type: "string" },
+								url: { type: "string" },
 							},
 						},
 					},
@@ -317,24 +317,24 @@ export const planEachExample: FlowInput = {
 			},
 		},
 		{
-			id: "build_all",
+			id: "read_all",
 			type: "call",
 			position: { x: 300, y: 0 },
-			flow: "build-task",
+			flow: "summarize-source",
 			inputs: {},
 			each: {
-				source: { kind: "json", value: "{{plan.data.tasks}}" },
+				source: { kind: "json", value: "{{find.data.sources}}" },
 				as: "item",
 			},
 		},
 		{
-			id: "all_done",
+			id: "all_read",
 			type: "decision",
 			position: { x: 600, y: 0 },
 			by: "rule",
-			prompt: "Did every task finish?",
+			prompt: "Did every source finish?",
 			options: [
-				{ name: "clean", when: "build_all.failed_count = 0" },
+				{ name: "clean", when: "read_all.failed_count = 0" },
 				{ name: "failures" },
 			],
 		},
@@ -342,27 +342,27 @@ export const planEachExample: FlowInput = {
 			id: "report",
 			type: "agent",
 			position: { x: 900, y: 0 },
-			profile: { device: EXAMPLE_DEVICE, profile: "worker" },
+			profile: { device: EXAMPLE_DEVICE, profile: "researcher" },
 			prompt:
-				"These tasks failed:\n{{build_all.summary}}\nWrite a short report for the team.",
+				"These sources failed:\n{{read_all.summary}}\nWrite a short note on what is missing.",
 		},
 	],
 	edges: [
 		{
-			id: "plan-planned-build_all",
-			from: "plan",
-			outcome: "planned",
-			to: "build_all",
+			id: "find-found-read_all",
+			from: "find",
+			outcome: "found",
+			to: "read_all",
 		},
 		{
-			id: "build_all-done-all_done",
-			from: "build_all",
+			id: "read_all-done-all_read",
+			from: "read_all",
 			outcome: "done",
-			to: "all_done",
+			to: "all_read",
 		},
 		{
-			id: "all_done-failures-report",
-			from: "all_done",
+			id: "all_read-failures-report",
+			from: "all_read",
 			outcome: "failures",
 			to: "report",
 		},
@@ -370,9 +370,9 @@ export const planEachExample: FlowInput = {
 	sections: [
 		{
 			id: "work",
-			label: "Build",
+			label: "Read",
 			color: "blue",
-			nodes: ["build_all", "all_done"],
+			nodes: ["read_all", "all_read"],
 		},
 	],
 };
@@ -484,7 +484,7 @@ A cron time missed while Night Shift was off still starts up to \`lateMinutes\` 
 
 ## Kits
 
-A kit is a flow that ships with Night Shift: Commands on \`git\`, \`gh\` or \`acli\`. A Subflow runs one by name (\`"flow": "kit:github/publish-draft-pr"\`) and reads its outputs (\`{{publish.url}}\`). Kits end at End nodes: \`ended\` and \`end_message\` say how. Prefer a kit to writing the same commands. Inputs with * are required. The \`kit:jira\` kits take that CLI tool as \`tool\`.
+A kit is a flow that ships with Night Shift: Commands on \`git\`, \`gh\`, \`acli\` or \`curl\`. A Subflow runs one by name (\`"flow": "kit:github/publish-draft-pr"\`) and reads its outputs (\`{{publish.url}}\`). Kits end at End nodes: \`ended\` and \`end_message\` say how. Prefer a kit to writing the same commands. Inputs with * are required. The \`kit:jira\` kits take that CLI tool as \`tool\`.
 
 ${kitList().map(kitLine).join("\n")}
 
@@ -513,7 +513,7 @@ Group a flow of more than about six nodes into Sections, one per phase of the wo
 - Every Agent node has a profile, or a harness, model and permission mode. Use only profiles, connections, CLI tools and flows that exist: look them up, do not invent names or ids.
 - Every loop has an edge with \`max\`.
 - A flow of more than about six nodes has Sections, one per phase, without warnings.
-- Prefer a Command node to an Agent node when a shell command can do the job: it is fast, free and repeatable. Ask a person with a Gate before a step that others see (a pull request, a message).
+- Prefer a Command node to an Agent node when a shell command can do the job: it is fast, free and repeatable. Ask a person with a Gate before a step that others see (a message, a post, a pull request).
 
 ## Example: build, test, fix, ask
 
@@ -521,12 +521,12 @@ Group a flow of more than about six nodes into Sections, one per phase of the wo
 ${JSON.stringify(fixLoopExample, null, 1)}
 \`\`\`
 
-## Example: plan, then build each task
+## Example: find sources, then summarize each
 
-This one calls the flow \`build-task\`, which takes an input \`item\`.
+This one calls the flow \`summarize-source\`, which takes an input \`item\`.
 
 \`\`\`json
-${JSON.stringify(planEachExample, null, 1)}
+${JSON.stringify(findEachExample, null, 1)}
 \`\`\`
 `;
 }

@@ -10,16 +10,16 @@ import {
 import { reservedOutcomes } from "../nodes";
 import { validateFlow } from "../validate";
 import {
+	findEachExample,
 	fixLoopExample,
 	flowAuthoringGuide,
-	planEachExample,
 	sampleNodes,
 } from "./guide";
 
 const guide = flowAuthoringGuide();
 
-/** The flow `planEachExample` calls: it takes one task as `item`. */
-const buildTask: Flow = flowSchema.parse({
+/** The flow `findEachExample` calls: it takes one source as `item`. */
+const summarizeSource: Flow = flowSchema.parse({
 	version: 8,
 	inputs: [{ name: "item", type: "json", required: true }],
 	start: "work",
@@ -32,7 +32,7 @@ const buildTask: Flow = flowSchema.parse({
 				device: "8c1e4f2a-6b0d-4a7e-9f3c-2d5b7e9a1c4f",
 				profile: "worker",
 			},
-			prompt: "Do {{item.title}}: {{item.details}}",
+			prompt: "Summarize {{item.title}}: {{item.url}}",
 		},
 	],
 	edges: [],
@@ -46,15 +46,15 @@ describe("the examples of the guide", () => {
 		expect(issues.map((i) => i.nodeId)).toEqual(["approve"]);
 	});
 
-	test("plan and build each task is valid, with its called flow", () => {
-		const flow = flowSchema.parse(planEachExample);
+	test("find and summarize each source is valid, with its called flow", () => {
+		const flow = flowSchema.parse(findEachExample);
 		const issues = validateFlow(flow, {
-			flows: { "build-task": buildTask },
-			name: "plan-and-build",
+			flows: { "summarize-source": summarizeSource },
+			name: "find-and-summarize",
 		});
 		expect(issues.filter((i) => i.severity === "error")).toEqual([]);
 		// Only the outcomes that end the run on purpose.
-		expect(issues.map((i) => i.nodeId)).toEqual(["plan", "all_done"]);
+		expect(issues.map((i) => i.nodeId)).toEqual(["find", "all_read"]);
 	});
 
 	test("each sample node is a valid node of its type", () => {
@@ -71,7 +71,7 @@ describe("the examples of the guide", () => {
 
 	test("the guide shows the examples as they are", () => {
 		expect(guide).toContain(JSON.stringify(fixLoopExample, null, 1));
-		expect(guide).toContain(JSON.stringify(planEachExample, null, 1));
+		expect(guide).toContain(JSON.stringify(findEachExample, null, 1));
 	});
 });
 
