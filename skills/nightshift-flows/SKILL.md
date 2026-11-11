@@ -90,7 +90,7 @@ Outcomes: its exits (`pass`, `fail` without `exits`). Outputs: `outcome`, `exit_
 
 ### decision
 
-Picks one of its `options` (each `{ name, description }`); the option is the outcome. `by`: `person`, `rule`, `model`. `person` is a Gate: `prompt` is the question, and the run waits for the answer. Give it a `title`: one line, at most 80 characters, the heading in the inbox. Lists go in the prompt. A Gate may have `deadline: { at: "07:00", choose: "keep" }` (or `minutes` instead of `at`, counted from when it opens): when nobody answered by then, it takes the option `choose`. `rule` is a Branch: each option but the last has `when`, a JSONata rule; the first that holds wins, the last option has no rule and is the default. `model`: a small model reads `prompt` and picks; it reads `profile`, or `decider` (typesafe, openrouter, openai, ollaya, ollama, openjev, compatible) and `model`, all optional.
+Picks one of its `options` (each `{ name, description }`); the option is the outcome. `by`: `person`, `rule`, `model`. `person` is a Gate: `prompt` is the question, and the run waits for the answer. Give it a `title`: one line, at most 80 characters, the heading in the inbox. Lists go in the prompt. A Gate may have `deadline: { at: "07:00", choose: "keep" }` (or `minutes` instead of `at`, counted from when it opens): when nobody answered by then, it takes the option `choose`. A Gate takes a brief too (see Briefs). `rule` is a Branch: each option but the last has `when`, a JSONata rule; the first that holds wins, the last option has no rule and is the default. `model`: a small model reads `prompt` and picks; it reads `profile`, or `decider` (typesafe, openrouter, openai, ollaya, ollama, openjev, compatible) and `model`, all optional.
 
 Outcomes: its options. Outputs: `outcome`, `note`, `visit`.
 
@@ -174,7 +174,7 @@ Climb from a cheap try to a strong one with a `cascade`, not with a loop of node
 - Decision tier: `profile` and `minConfidence` (0 to 1). `ollama` and `compatible` give no probability: last model tier only.
 - Value tier: `profile` and `accept`, JSONata over `data`.
 - Subflow tier: `flow` and `inputs`.
-- The last tier can be `{ "person": true, "deadline"? }`: a Gate. On a Value it is an Ask that starts with the best answer of the models; its deadline `choose` is `accept` (that answer) or `fail`.
+- The last tier can be `{ "person": true, "deadline"? }`: a Gate. On a Value it is an Ask that starts with the best answer of the models; its deadline `choose` is `accept` (that answer) or `fail`. The person tier takes the brief fields too (see Briefs); without them the inbox shows what each tier picked, and recommends the surest pick.
 
 `{{cascade.tier}}`, `{{cascade.try}}` and `{{cascade.previous.summary}}` read in the node's own templates. Later nodes read `tier` and `tries` (a Decision also `confidence`). A Decision with a cascade and no person tier can end `fail`.
 
@@ -187,6 +187,15 @@ A Value with `by: "person"` is an Ask: a form in the Needs-you inbox, drawn from
 - `deadline: { at | minutes }` and `default`: the data the Ask takes when nobody answers. The default must match the schema.
 
 The phone answers a form of text, choices, switches and numbers. Any other field opens the form on the web.
+
+## Briefs
+
+A Gate, a person tier and an Ask take a brief. Every field is optional and takes templates. A model fills what you leave empty, unless `fillBrief: false`.
+
+- `urgency`: `now` (work is blocked), `today` (the run waits) or `later`, or a template like `{{triage.data.urgency}}`. Set it on every Gate.
+- `situation`: why a person must decide, one or two sentences.
+- `background`: what is done or checked. A `- ` line is one item. End one with ` (source: build)`.
+- `recommend: { option, reason? }` (a Decision only) and `impact` on each option: what picking it does. When an earlier step knows them, read it: `{ option: "{{review.data.verdict}}" }`.
 
 ## Parallel branches
 

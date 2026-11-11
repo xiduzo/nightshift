@@ -96,7 +96,8 @@ export function gateNode(id: string, position: Position): DecisionNode {
 
 /**
  * Changes who decides. A rule's `when` fields go, and `title`,
- * `lockScreen` and `deadline` go when a person no longer decides. Switched to a model, the
+ * `lockScreen`, `deadline`, the brief and the options' impacts go when a
+ * person no longer decides. Switched to a model, the
  * node starts on the decider from Settings and that decider's default
  * model; switched away, the profile, the decider and the model go, as
  * only a model reads them.
@@ -107,13 +108,20 @@ export function withDecidedBy(
 	defaults: NodeDefaults = {},
 ): DecisionNode {
 	if (by === node.by) return node;
-	const options =
-		by === "rule"
-			? node.options
-			: node.options.map(({ when: _, ...option }) => option);
+	const options = node.options.map(({ when, impact, ...option }) => ({
+		...option,
+		...(by === "rule" && when !== undefined ? { when } : {}),
+		...(by === "person" && impact !== undefined ? { impact } : {}),
+	}));
 	const {
 		lockScreen,
 		deadline,
+		// Only a person reads the brief.
+		urgency,
+		situation,
+		background,
+		recommend,
+		fillBrief,
 		decider: _decider,
 		model: _model,
 		profile: _profile,
@@ -135,9 +143,27 @@ export function withDecidedBy(
 		...rest,
 		...(by === "person" && lockScreen !== undefined ? { lockScreen } : {}),
 		...(by === "person" && deadline !== undefined ? { deadline } : {}),
+		...(by === "person"
+			? withoutUndefined({
+					urgency,
+					situation,
+					background,
+					recommend,
+					fillBrief,
+				})
+			: {}),
 		by,
 		options,
 	};
+}
+
+/** The fields that are set. */
+function withoutUndefined<T extends Record<string, unknown>>(
+	fields: T,
+): Partial<T> {
+	return Object.fromEntries(
+		Object.entries(fields).filter(([, value]) => value !== undefined),
+	) as Partial<T>;
 }
 
 /** Ends the run as done, with no message yet. */
@@ -190,7 +216,8 @@ export function valueNode(id: string, position: Position): ValueNode {
  * when their mode comes back. A model starts on the first decider that can
  * make a value; a rule or a person drops the profile, the decider and the
  * model, as only a model reads them. Only a person reads the choices, the
- * attachments, the deadline and the default: another maker drops them.
+ * attachments, the deadline, the default and the brief: another maker
+ * drops them.
  */
 export function withValueBy(node: ValueNode, by: ValueBy): ValueNode {
 	if (by === node.by) return node;
@@ -203,8 +230,12 @@ export function withValueBy(node: ValueNode, by: ValueBy): ValueNode {
 		attachments: _attachments,
 		deadline: _deadline,
 		default: _default,
-		// Only a person sees a title.
+		// Only a person sees a title and the brief.
 		title: _title,
+		urgency: _urgency,
+		situation: _situation,
+		background: _background,
+		fillBrief: _fillBrief,
 		...rest
 	} = node;
 	if (by !== "model") return { ...rest, by };

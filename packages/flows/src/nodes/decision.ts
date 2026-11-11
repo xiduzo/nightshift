@@ -25,7 +25,12 @@ import {
 	tierBase,
 	tierLabel,
 } from "./cascade";
-import { checkOptions, option } from "./outcomes";
+import {
+	checkGateBrief,
+	gateBriefFields,
+	gateRecommendField,
+} from "./gate-brief";
+import { checkOptions, decisionOption } from "./outcomes";
 
 /**
  * The Decision node: it picks one of its options, decided by a person (a
@@ -87,7 +92,7 @@ export const decisionNodeSchema = z.object({
 	 */
 	prompt: z.string(),
 	/** The options to pick from. Each one is an outcome, with its own edge. */
-	options: z.array(option).min(1),
+	options: z.array(decisionOption).min(1),
 	by: decidedBySchema,
 	/**
 	 * `by: "model"` only: a Model Profile of one Device, by the Device's id
@@ -130,6 +135,13 @@ export const decisionNodeSchema = z.object({
 	 * waits as long as it must.
 	 */
 	deadline: gateDeadlineSchema.optional(),
+	/**
+	 * `by: "person"` only: the brief the inbox shows above the question
+	 * (`urgency`, `situation`, `background`, `fillBrief`, ADR 21).
+	 */
+	...gateBriefFields,
+	/** `by: "person"` only: the option the flow recommends, and why (ADR 21). */
+	...gateRecommendField,
 	/**
 	 * `by: "model"` only: the tiers a model climbs (ADR 6). The first tier
 	 * picks; a pick below its `minConfidence` goes to the next tier. The
@@ -193,6 +205,38 @@ export function checkDecisionNode(node: DecisionNode, check: NodeCheck): void {
 	}
 	check.template(node.prompt, "prompt");
 	checkGateTitle(node, "Decision", check);
+	checkDecisionBrief(node, check);
+}
+
+/**
+ * The brief and the impacts of the options belong to a Gate: a Decision a
+ * person decides. A Decision a model decides gives impacts only when its
+ * cascade ends with a person, who reads them.
+ */
+function checkDecisionBrief(node: DecisionNode, check: NodeCheck): void {
+	const options = node.options.map((option) => option.name);
+	checkGateBrief(
+		node,
+		{
+			subject: `Decision node "${node.id}"`,
+			asks: node.by === "person",
+			options,
+			fix: "let a person decide",
+		},
+		check,
+	);
+	const personTier = (node.cascade ?? []).some((tier) => isPersonTier(tier));
+	const read = node.by === "person" || (node.by === "model" && personTier);
+	for (const option of node.options) {
+		if (option.impact === undefined) continue;
+		if (!read) {
+			check.error(
+				`Decision node "${node.id}" gives an impact on the option "${option.name}", but a person does not answer it. Only a person reads the impact. Remove it, or let a person decide.`,
+			);
+			return;
+		}
+		check.template(option.impact, `impact of "${option.name}"`);
+	}
 }
 
 /**
@@ -226,7 +270,11 @@ function checkDecisionCascade(node: DecisionNode, check: NodeCheck): void {
 		);
 	}
 	const options = node.options.map((option) => option.name);
-	checkCascade(node, { title: "Decision", personChoices: options }, check);
+	checkCascade(
+		node,
+		{ title: "Decision", personChoices: options, recommendOptions: options },
+		check,
+	);
 	const lastModel = tiers.findLastIndex((tier) => !isPersonTier(tier));
 	tiers.forEach((tier, index) => {
 		if (isPersonTier(tier)) return;

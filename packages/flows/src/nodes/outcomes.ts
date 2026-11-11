@@ -46,6 +46,17 @@ export const option = z.object({
 export type Option = z.infer<typeof option>;
 
 /**
+ * An option of a Decision. A person answers it (a Gate, or the person tier
+ * of a cascade): `impact` says what happens when the person picks it, under
+ * the option in the inbox. Templates. Unset: a model may write it as the
+ * Gate opens (`fillBrief`).
+ */
+export const decisionOption = option.extend({
+	impact: z.string().optional(),
+});
+export type DecisionOption = z.infer<typeof decisionOption>;
+
+/**
  * Why `name` is not an option of the node, or null when it is one. The one
  * check for an answer from a person, a model or a rule: the engine, the
  * Gate API and the model's `decide` tool all use it.

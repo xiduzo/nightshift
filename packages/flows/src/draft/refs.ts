@@ -1,6 +1,6 @@
 /** Renames in templates, rules and expressions. */
 import type { Flow, FlowNode } from "../flow";
-import type { ListSource } from "../nodes";
+import type { GateBriefFields, ListSource } from "../nodes";
 import type { TemplateRef } from "../template";
 import { templateRefs } from "../template";
 
@@ -174,6 +174,30 @@ function rewriteSource(
 	}
 }
 
+/** The brief fields of a Gate's node with their templates rewritten: only the fields it sets. */
+function rewriteBrief(
+	node: GateBriefFields,
+	rewrite: (text: string) => string,
+): GateBriefFields {
+	const { urgency, situation, background, recommend } = node;
+	return {
+		...(urgency === undefined ? {} : { urgency: rewrite(urgency) }),
+		...(situation === undefined ? {} : { situation: rewrite(situation) }),
+		...(background === undefined ? {} : { background: rewrite(background) }),
+		...(recommend === undefined
+			? {}
+			: {
+					recommend: {
+						...recommend,
+						option: rewrite(recommend.option),
+						...(recommend.reason === undefined
+							? {}
+							: { reason: rewrite(recommend.reason) }),
+					},
+				}),
+	};
+}
+
 /**
  * Applies `rewrite` to every template of the node: a prompt, a command, a question, a list source, the bindings
  * of a called flow's inputs, and the values of its variable writes.
@@ -209,6 +233,12 @@ export function rewriteOwnTemplates(
 				...(node.deadline?.at !== undefined
 					? { deadline: { ...node.deadline, at: rewrite(node.deadline.at) } }
 					: {}),
+				...rewriteBrief(node, rewrite),
+				options: node.options.map((option) =>
+					option.impact === undefined
+						? option
+						: { ...option, impact: rewrite(option.impact) },
+				),
 			};
 		case "end":
 			return node.message === undefined
@@ -231,9 +261,11 @@ export function rewriteOwnTemplates(
 			};
 		case "value":
 			// The expression reads names bare, as a Decision's rules do: not a template.
-			return node.prompt === undefined
-				? node
-				: { ...node, prompt: rewrite(node.prompt) };
+			return {
+				...node,
+				...(node.prompt === undefined ? {} : { prompt: rewrite(node.prompt) }),
+				...rewriteBrief(node, rewrite),
+			};
 		case "wait":
 			switch (node.until.kind) {
 				case "time":

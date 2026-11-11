@@ -32,6 +32,7 @@ import {
 	tierBase,
 	tierLabel,
 } from "./cascade";
+import { checkGateBrief, gateBriefFields } from "./gate-brief";
 
 /** The Value node: it makes `data` that matches its output schema, by a rule, a model or a person. */
 
@@ -163,6 +164,11 @@ export const valueNodeSchema = z.object({
 	/** `by: "person"` only: the data the Ask takes at its deadline. It must match the output schema. */
 	default: z.json().optional(),
 	/**
+	 * `by: "person"` only: the brief the inbox shows above the form
+	 * (`urgency`, `situation`, `background`, `fillBrief`, ADR 21).
+	 */
+	...gateBriefFields,
+	/**
 	 * `by: "model"` only: a Model Profile of one Device, by the Device's id
 	 * and the profile's id, that names the decider and its model. Its
 	 * decider must make values. The node's own `decider` and `model` win
@@ -218,6 +224,16 @@ export function checkValueNode(node: ValueNode, check: NodeCheck): void {
 	checkValueCascade(node, check);
 	if (node.prompt !== undefined) check.template(node.prompt, "prompt");
 	checkGateTitle(node, "Value", check);
+	checkGateBrief(
+		node,
+		{
+			subject: `Value node "${node.id}"`,
+			asks: node.by === "person",
+			options: null,
+			fix: "let a person make it",
+		},
+		check,
+	);
 }
 
 /**

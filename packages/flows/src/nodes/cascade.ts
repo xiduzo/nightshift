@@ -9,6 +9,12 @@ import {
 	type NodeCheck,
 	type NodeProfile,
 } from "./base";
+import {
+	checkGateBrief,
+	type GateRecommend,
+	gateBriefFields,
+	gateRecommendField,
+} from "./gate-brief";
 
 /**
  * A cascade (ADR 6): a list of tiers on an Agent, a Decision or a Value
@@ -60,18 +66,27 @@ export const tierBase = {
  * pick and probability, and the person picks an option. An Agent's or a
  * Call's offers "try-again" (one more try on the last tier, with the
  * person's note) and "stop". A deadline chooses for nobody, as on a Gate.
+ * The brief fields work as on a Gate (`gate-brief.ts`); only a Decision's
+ * person tier takes `recommend`.
  */
 /** The last tier of a cascade as a person. Named, so the declared types stay small. */
 export interface PersonTier {
 	person: true;
 	label?: string;
 	deadline?: GateDeadline;
+	urgency?: string;
+	situation?: string;
+	background?: string;
+	recommend?: GateRecommend;
+	fillBrief?: boolean;
 }
 
 export const personTierSchema: z.ZodType<PersonTier> = z.object({
 	person: z.literal(true),
 	label: tierBase.label,
 	deadline: gateDeadlineSchema.optional(),
+	...gateBriefFields,
+	...gateRecommendField,
 });
 
 /** The choices of the person tier of an Agent or a Call. */
@@ -114,6 +129,8 @@ export type CascadeWords = {
 	 * the retry choices of an Agent or a Call, or what a Value's Ask takes.
 	 */
 	personChoices: readonly string[];
+	/** A Decision: the options its person tier may recommend. Unset: it recommends none. */
+	recommendOptions?: readonly string[];
 };
 
 /**
@@ -144,6 +161,16 @@ export function checkCascade(
 			);
 		}
 		checkTierDeadline(node.id, tier, words.personChoices, check);
+		checkGateBrief(
+			tier,
+			{
+				subject: `The person tier of "${node.id}"`,
+				asks: true,
+				options: words.recommendOptions ?? null,
+				fix: "",
+			},
+			check,
+		);
 	});
 }
 

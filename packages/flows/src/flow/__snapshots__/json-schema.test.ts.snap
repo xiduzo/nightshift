@@ -146,6 +146,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                     "anyOf": [
                       {
                         "properties": {
+                          "background": {
+                            "type": "string",
+                          },
                           "deadline": {
                             "properties": {
                               "at": {
@@ -166,6 +169,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                             ],
                             "type": "object",
                           },
+                          "fillBrief": {
+                            "type": "boolean",
+                          },
                           "label": {
                             "maxLength": 40,
                             "minLength": 1,
@@ -174,6 +180,28 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                           "person": {
                             "const": true,
                             "type": "boolean",
+                          },
+                          "recommend": {
+                            "properties": {
+                              "option": {
+                                "minLength": 1,
+                                "type": "string",
+                              },
+                              "reason": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "option",
+                            ],
+                            "type": "object",
+                          },
+                          "situation": {
+                            "type": "string",
+                          },
+                          "urgency": {
+                            "minLength": 1,
+                            "type": "string",
                           },
                         },
                         "required": [
@@ -778,6 +806,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   ],
                   "type": "object",
                 },
+                "background": {
+                  "type": "string",
+                },
                 "by": {
                   "enum": [
                     "person",
@@ -791,6 +822,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                     "anyOf": [
                       {
                         "properties": {
+                          "background": {
+                            "type": "string",
+                          },
                           "deadline": {
                             "properties": {
                               "at": {
@@ -811,6 +845,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                             ],
                             "type": "object",
                           },
+                          "fillBrief": {
+                            "type": "boolean",
+                          },
                           "label": {
                             "maxLength": 40,
                             "minLength": 1,
@@ -819,6 +856,28 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                           "person": {
                             "const": true,
                             "type": "boolean",
+                          },
+                          "recommend": {
+                            "properties": {
+                              "option": {
+                                "minLength": 1,
+                                "type": "string",
+                              },
+                              "reason": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "option",
+                            ],
+                            "type": "object",
+                          },
+                          "situation": {
+                            "type": "string",
+                          },
+                          "urgency": {
+                            "minLength": 1,
+                            "type": "string",
                           },
                         },
                         "required": [
@@ -1000,6 +1059,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   "maxItems": 5,
                   "type": "array",
                 },
+                "fillBrief": {
+                  "type": "boolean",
+                },
                 "id": {
                   "pattern": "^[a-z][a-z0-9_]{0,39}$",
                   "type": "string",
@@ -1037,6 +1099,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                         "type": "string",
                       },
                       "description": {
+                        "type": "string",
+                      },
+                      "impact": {
                         "type": "string",
                       },
                       "name": {
@@ -1100,6 +1165,21 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                 "prompt": {
                   "type": "string",
                 },
+                "recommend": {
+                  "properties": {
+                    "option": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    "reason": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "option",
+                  ],
+                  "type": "object",
+                },
                 "set": {
                   "items": {
                     "properties": {
@@ -1128,6 +1208,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   },
                   "type": "array",
                 },
+                "situation": {
+                  "type": "string",
+                },
                 "timeoutMinutes": {
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991,
@@ -1141,6 +1224,10 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                 },
                 "type": {
                   "const": "decision",
+                  "type": "string",
+                },
+                "urgency": {
+                  "minLength": 1,
                   "type": "string",
                 },
               },
@@ -1161,6 +1248,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                     "anyOf": [
                       {
                         "properties": {
+                          "background": {
+                            "type": "string",
+                          },
                           "deadline": {
                             "properties": {
                               "at": {
@@ -1181,6 +1271,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                             ],
                             "type": "object",
                           },
+                          "fillBrief": {
+                            "type": "boolean",
+                          },
                           "label": {
                             "maxLength": 40,
                             "minLength": 1,
@@ -1189,6 +1282,28 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                           "person": {
                             "const": true,
                             "type": "boolean",
+                          },
+                          "recommend": {
+                            "properties": {
+                              "option": {
+                                "minLength": 1,
+                                "type": "string",
+                              },
+                              "reason": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "option",
+                            ],
+                            "type": "object",
+                          },
+                          "situation": {
+                            "type": "string",
+                          },
+                          "urgency": {
+                            "minLength": 1,
+                            "type": "string",
                           },
                         },
                         "required": [
@@ -1476,6 +1591,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   "maxItems": 20,
                   "type": "array",
                 },
+                "background": {
+                  "type": "string",
+                },
                 "by": {
                   "enum": [
                     "rule",
@@ -1489,6 +1607,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                     "anyOf": [
                       {
                         "properties": {
+                          "background": {
+                            "type": "string",
+                          },
                           "deadline": {
                             "properties": {
                               "at": {
@@ -1509,6 +1630,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                             ],
                             "type": "object",
                           },
+                          "fillBrief": {
+                            "type": "boolean",
+                          },
                           "label": {
                             "maxLength": 40,
                             "minLength": 1,
@@ -1517,6 +1641,28 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                           "person": {
                             "const": true,
                             "type": "boolean",
+                          },
+                          "recommend": {
+                            "properties": {
+                              "option": {
+                                "minLength": 1,
+                                "type": "string",
+                              },
+                              "reason": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "option",
+                            ],
+                            "type": "object",
+                          },
+                          "situation": {
+                            "type": "string",
+                          },
+                          "urgency": {
+                            "minLength": 1,
+                            "type": "string",
                           },
                         },
                         "required": [
@@ -1712,6 +1858,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   "maxItems": 5,
                   "type": "array",
                 },
+                "fillBrief": {
+                  "type": "boolean",
+                },
                 "id": {
                   "pattern": "^[a-z][a-z0-9_]{0,39}$",
                   "type": "string",
@@ -1803,6 +1952,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   },
                   "type": "array",
                 },
+                "situation": {
+                  "type": "string",
+                },
                 "timeoutMinutes": {
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991,
@@ -1816,6 +1968,10 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                 },
                 "type": {
                   "const": "value",
+                  "type": "string",
+                },
+                "urgency": {
+                  "minLength": 1,
                   "type": "string",
                 },
               },
@@ -2932,6 +3088,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                       {
                         "additionalProperties": false,
                         "properties": {
+                          "background": {
+                            "type": "string",
+                          },
                           "deadline": {
                             "additionalProperties": false,
                             "properties": {
@@ -2953,6 +3112,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                             ],
                             "type": "object",
                           },
+                          "fillBrief": {
+                            "type": "boolean",
+                          },
                           "label": {
                             "maxLength": 40,
                             "minLength": 1,
@@ -2961,6 +3123,29 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                           "person": {
                             "const": true,
                             "type": "boolean",
+                          },
+                          "recommend": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "option": {
+                                "minLength": 1,
+                                "type": "string",
+                              },
+                              "reason": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "option",
+                            ],
+                            "type": "object",
+                          },
+                          "situation": {
+                            "type": "string",
+                          },
+                          "urgency": {
+                            "minLength": 1,
+                            "type": "string",
                           },
                         },
                         "required": [
@@ -3580,6 +3765,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   ],
                   "type": "object",
                 },
+                "background": {
+                  "type": "string",
+                },
                 "by": {
                   "enum": [
                     "person",
@@ -3594,6 +3782,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                       {
                         "additionalProperties": false,
                         "properties": {
+                          "background": {
+                            "type": "string",
+                          },
                           "deadline": {
                             "additionalProperties": false,
                             "properties": {
@@ -3615,6 +3806,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                             ],
                             "type": "object",
                           },
+                          "fillBrief": {
+                            "type": "boolean",
+                          },
                           "label": {
                             "maxLength": 40,
                             "minLength": 1,
@@ -3623,6 +3817,29 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                           "person": {
                             "const": true,
                             "type": "boolean",
+                          },
+                          "recommend": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "option": {
+                                "minLength": 1,
+                                "type": "string",
+                              },
+                              "reason": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "option",
+                            ],
+                            "type": "object",
+                          },
+                          "situation": {
+                            "type": "string",
+                          },
+                          "urgency": {
+                            "minLength": 1,
+                            "type": "string",
                           },
                         },
                         "required": [
@@ -3809,6 +4026,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   "maxItems": 5,
                   "type": "array",
                 },
+                "fillBrief": {
+                  "type": "boolean",
+                },
                 "id": {
                   "pattern": "^[a-z][a-z0-9_]{0,39}$",
                   "type": "string",
@@ -3847,6 +4067,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                         "type": "string",
                       },
                       "description": {
+                        "type": "string",
+                      },
+                      "impact": {
                         "type": "string",
                       },
                       "name": {
@@ -3912,6 +4135,22 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                 "prompt": {
                   "type": "string",
                 },
+                "recommend": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "option": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    "reason": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "option",
+                  ],
+                  "type": "object",
+                },
                 "set": {
                   "items": {
                     "additionalProperties": false,
@@ -3941,6 +4180,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   },
                   "type": "array",
                 },
+                "situation": {
+                  "type": "string",
+                },
                 "timeoutMinutes": {
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991,
@@ -3954,6 +4196,10 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                 },
                 "type": {
                   "const": "decision",
+                  "type": "string",
+                },
+                "urgency": {
+                  "minLength": 1,
                   "type": "string",
                 },
               },
@@ -3976,6 +4222,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                       {
                         "additionalProperties": false,
                         "properties": {
+                          "background": {
+                            "type": "string",
+                          },
                           "deadline": {
                             "additionalProperties": false,
                             "properties": {
@@ -3997,6 +4246,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                             ],
                             "type": "object",
                           },
+                          "fillBrief": {
+                            "type": "boolean",
+                          },
                           "label": {
                             "maxLength": 40,
                             "minLength": 1,
@@ -4005,6 +4257,29 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                           "person": {
                             "const": true,
                             "type": "boolean",
+                          },
+                          "recommend": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "option": {
+                                "minLength": 1,
+                                "type": "string",
+                              },
+                              "reason": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "option",
+                            ],
+                            "type": "object",
+                          },
+                          "situation": {
+                            "type": "string",
+                          },
+                          "urgency": {
+                            "minLength": 1,
+                            "type": "string",
                           },
                         },
                         "required": [
@@ -4305,6 +4580,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   "maxItems": 20,
                   "type": "array",
                 },
+                "background": {
+                  "type": "string",
+                },
                 "by": {
                   "enum": [
                     "rule",
@@ -4319,6 +4597,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                       {
                         "additionalProperties": false,
                         "properties": {
+                          "background": {
+                            "type": "string",
+                          },
                           "deadline": {
                             "additionalProperties": false,
                             "properties": {
@@ -4340,6 +4621,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                             ],
                             "type": "object",
                           },
+                          "fillBrief": {
+                            "type": "boolean",
+                          },
                           "label": {
                             "maxLength": 40,
                             "minLength": 1,
@@ -4348,6 +4632,29 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                           "person": {
                             "const": true,
                             "type": "boolean",
+                          },
+                          "recommend": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "option": {
+                                "minLength": 1,
+                                "type": "string",
+                              },
+                              "reason": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "option",
+                            ],
+                            "type": "object",
+                          },
+                          "situation": {
+                            "type": "string",
+                          },
+                          "urgency": {
+                            "minLength": 1,
+                            "type": "string",
                           },
                         },
                         "required": [
@@ -4549,6 +4856,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   "maxItems": 5,
                   "type": "array",
                 },
+                "fillBrief": {
+                  "type": "boolean",
+                },
                 "id": {
                   "pattern": "^[a-z][a-z0-9_]{0,39}$",
                   "type": "string",
@@ -4643,6 +4953,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   },
                   "type": "array",
                 },
+                "situation": {
+                  "type": "string",
+                },
                 "timeoutMinutes": {
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991,
@@ -4656,6 +4969,10 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                 },
                 "type": {
                   "const": "value",
+                  "type": "string",
+                },
+                "urgency": {
+                  "minLength": 1,
                   "type": "string",
                 },
               },
@@ -6608,7 +6925,7 @@ exports[`published schemas customAgentSchema as JSON Schema 1`] = `
 exports[`published schemas every published schema as a JSON Schema hash 1`] = `
 {
   "agentHarnessSchema": "d12cc5d7f05c6d4a3a3619d72791c31de7a482d1090430b563bf01d4149f9471",
-  "agentNodeSchema": "5195e4bda23b245e27b65b4edaf5395dc5fc0b56d8eed1785ee7d0e49985f67d",
+  "agentNodeSchema": "7c4b202eee7a15d54c9bd9e1b8e7f964268268e51c580b9e5aca5be6d89c5cdb",
   "agentProfileSchema": "bed949397866c087d61cfac1a7ada6bb6b9f11d13b232be0c56b0d150bf20ee8",
   "agentProfileSettingsSchema": "2f3c17fcdbfcbd3f4b0eadb835d385be7b3bc847d4239148743aa6777b42077a",
   "agentTierSchema": "adbfb5ff1e0cd15b8f217bdc0015d321fa6a03f41c130deefa2d36eb4b4e7803",
@@ -6619,10 +6936,10 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "assistantAgentSchema": "36bfe28d5f2ea9f04d7ede5e9b04c55b639f78d55df97c28163748894aa7622f",
   "attachmentSourceSchema": "e63152c9f939d53092f05c55ddd5ea845d0590d46db2407cff64b1f3cccdbf96",
   "callEachSchema": "9beea47d254094b6284537655fecbbddd2721f074705bffb1c0b45fb9109f0d7",
-  "callNodeSchema": "a92ff681a2dde5454bedf7d4052cabeaffe4c32b65d3de2bda3e49890dc87924",
+  "callNodeSchema": "856424b932b2bdf5e466e4df2fefb72963a974a3c5f8eaeeb7cb85cde6c12095",
   "callTierSchema": "00472b8d815f172216c3976c44d8148ab36a7690a4b331f344112daf0a7ade18",
   "calledFlowNameSchema": "41a733acacaf6fd4a56ce1af8652a762a9eae1a70888ac38628091b417b7f999",
-  "chatRequestSchema": "7c8015163e0a52a03a43b22376927bcb34232db5995c2ec91f7dc11bbceece17",
+  "chatRequestSchema": "cf9f8b3fd4c1a807ec5efc369f80f4e17d4ca3cb417c3fcb0dada09a4b875107",
   "choiceItemSchema": "55d6a793593f2331affa67faa389d61df03d4029c01b7a7443f9a98834f63da7",
   "cliNameSchema": "51a3ab3696b70b9bee33bc67a8d7cb8f1ae494ccef5ccc7e73878b93fb22c12c",
   "commandExitSchema": "81c5c7ed3b70f87931cdd1b3beb8943305b5a7b50e6f5840b9d885ba920e88a3",
@@ -6633,7 +6950,8 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "customHarnessSchema": "340fd5e4d3041404dcebc63ea2a312d8dba0e6b3c15d5b50b154df7a8f58ddb7",
   "decidedBySchema": "ba1eaed1ee91e185e0fe25e4b3ab48ebc800aac50bbe3b6f3762a1ddd7c5e6fe",
   "deciderNameSchema": "4338c2d9e635bf58f12c7dbe4716a305d0f6f491819629502015bd6a25a672c3",
-  "decisionNodeSchema": "ad9516c4996c1fc6b72403f19d2266dfd30dffa12e547d586d4fe6a32eedff99",
+  "decisionNodeSchema": "175d09ef567867471ddc0376fdbe46a6406b44a85b103276db03d8f35c9b2e05",
+  "decisionOption": "3070a0e67a686dc7d26ddc419c6a0bccfdaacd98c3173ddddf15b654f939d33c",
   "decisionTierSchema": "0640dc95d8a504367bbc6ccd14507b9721833cb53cd7d347ba4bb67e612d35b1",
   "deviceIdSchema": "820fe226529741d835b24c469237f8080025c3aa5e9f8bae4f05aac3fd0c4278",
   "deviceRefSchema": "0b21339207fc034737426bd8f8e9be60c3592126d0a9889793283eaeae885141",
@@ -6644,13 +6962,15 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "flowInputSchema": "c4327eae5fd47880a975ba515ace6c59b99e4872d70d039dbe0e13f3b78794dd",
   "flowInputTypeSchema": "01b4ffbb09aa8ea76514a7d2ec8b814bc6d444afe04c4387819be8a08a4b10a4",
   "flowNameSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
-  "flowNodeSchema": "79cc7500abf44875c3045b1f0288eb031f555b28b1b49e5db912c409d70a7ab6",
+  "flowNodeSchema": "beac5002b1954ea6e631b1258d08c2dd6bef055d4678b232ae0a2d49dcdca006",
   "flowOutputSchema": "5cac9a44d87581c7f53da7394228745dfd952219f5dfd90f3620c516c272edb7",
-  "flowSchema": "33c90465bddb892d7e9b06f514ed050400b2b4d51536ed89ac55a879bd8eb011",
+  "flowSchema": "283212050225a2e6e988e725650f83aec9a75e11372115d0f4890591707f73ee",
   "flowSectionSchema": "3cd74de667afdadb6253862ee3c7d71ee76f3e26c484bc8a0eb4fba4ccca8beb",
   "flowVariableSchema": "6b94624e39154287f7234674d738fc66c15683391478c2b601a0393a3dcad746",
   "gateDeadlineSchema": "38c3b76b2cfed3b1040f87955aaa7f44d377f298f682ced37e6c784c5096de76",
+  "gateRecommendSchema": "1625e499a8aecc9c4778989ee2efce3cdbd291de35dc1ab3108a6243dbff9693",
   "gateTitleSchema": "868ac5132b39a7aef07c87c805be74b2b5e452efe87b389da42895899ca33177",
+  "gateUrgencySchema": "90c4d40c709e637a17002c513e719b6baa5b5083a8a7fdec76860c63982baa9b",
   "harnessNameSchema": "5680ae13dedd38277934574bb77ad18e9ec2d67a68bd7c7266e1c5ebd57d3318",
   "holdScopeSchema": "47fd66656ee0ff7df34c3f1528163054d56c860ff60f82a5b6f35d5a67457347",
   "joinNodeSchema": "149611b69a818d7b5837bd61e50478be6ebf8529b579f81e68f766a3e874e75d",
@@ -6677,7 +6997,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "outcomeColorSchema": "a08d55161170d015984cde21947f73357d874c2c1469cf21d5df857936510817",
   "outcomeSchema": "71f189789579b92afec5143845c2121d3d596711dad7343aa3a39aeb378953bc",
   "permissionModeSchema": "759773decf0c9f4a4772f09d6bb1732999436b3b8f7b763134ae9a4b7478b3bd",
-  "personTierSchema": "8a46dbdb8b2ab3d01267ca29c3a6aa54ef27e714696f40ffe828658696d240c3",
+  "personTierSchema": "9d80c61466abdf1ec04e5221887f7d907c46f6382d470c0a6548424cfb982e95",
   "policySchema": "fedfbecaffb7cf8c448cefd0ace896279f26e28d10f7d633245dd2876451a7b1",
   "profileFallbacksSchema": "6586b192b24414d6bd4bd2a83675be72e4e64d0e51f7e91858a7e77d260163ed",
   "profileRefSchema": "c7fda85c2da98330849db69ce0ddf66f6963b19edf33ce234237888cf5366222",
@@ -6693,14 +7013,14 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "serviceNodeSchema": "9211b5d36df35c8c8817938f33ae12184604bda7dffef8c0bcf4854b09a349d6",
   "serviceReadySchema": "6844b7f89e0f30cfd776eb620d2ff7ad2f06ac7f4e908b6752b84ca055ebe2da",
   "suggestionKindSchema": "3e43d01e11142bb468d0231629bcc69236a97420b5675b96fe46f4c74492955f",
-  "suggestionRequestSchema": "d8c417132039d308bb5894934b734f6c40bc52e8b8ade5ead50f410c7c2d0ab8",
+  "suggestionRequestSchema": "88c66f2f61bfb87eb43c8a70d89295ddabe1dc927503a1caa5bfb5801f05e488",
   "suggestionSchema": "7eb8ae685355788f149a1e214b0a1a055a94eddb94303c2150896d480fb3aea1",
   "textRangeSchema": "f4f1728b7fbe3eeb75cd4b9e3609d9349b8ce81db2bc7f521acb8351d420c77e",
   "timeOfDaySchema": "8684ebbaf52e062cf5e284260d4f3a9bc9583a4a7a3db8007313edc210ccccae",
   "toolNodeSchema": "ab17407b99c7a73fba6ebbc1890f98c6c635273d066b1079a3bd1fefdb08af42",
   "valueBySchema": "734362a1538da072596d7625d304b5faefdd8a62e7364e3eb5b22bff1a98739f",
   "valueDeciderNameSchema": "1361d0968d68d449cc2f2a7659681f2bacff35a15c5fe94ac1f5f6777b100a48",
-  "valueNodeSchema": "053df4c898e88a682bbc4cb05ca4eb1f8ed8f74d933e0bf295792dda3b4645e2",
+  "valueNodeSchema": "072a37acd39c7da260ed650e2c707f33332f5a6e0df044c547f8be9b3dd6919d",
   "valueTierSchema": "283dcc80e09de2a2b3783c1b1330999bceecf200da194633e7c3d997ba2b07b3",
   "variableTypeSchema": "1117a60eccb8c2baefec4e9cebcf2c4a387a033ded5c8a7071a9474221fa733c",
   "variableWriteSchema": "2c39a4e86bcbb12e591793c1361222cd3dd9380833ce702eef65f3ca45cee0a2",

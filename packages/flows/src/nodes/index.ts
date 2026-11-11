@@ -139,6 +139,15 @@ export {
 	endStatusSchema,
 } from "./end";
 export {
+	DEFAULT_GATE_URGENCY,
+	GATE_URGENCIES,
+	type GateBriefFields,
+	type GateRecommend,
+	type GateUrgency,
+	gateUrgencySchema,
+	isGateUrgency,
+} from "./gate-brief";
+export {
 	type JoinNode,
 	type JoinWait,
 	joinNodeSchema,

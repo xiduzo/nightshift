@@ -112,8 +112,9 @@ describe("flowAuthoringGuide", () => {
 		// 4470: an Agent's knowledge as a list of folders. 4500: the
 		// `scores` a Command writes (one sentence), so a flow can say what
 		// it achieved. 4520: the \`title\` of a Gate and an Ask, the
-		// heading in the inbox.
-		expect(words).toBeLessThan(4520);
+		// heading in the inbox. 4680: the brief of a Gate (urgency,
+		// situation, background, recommendation, impacts).
+		expect(words).toBeLessThan(4680);
 	});
 });
 
