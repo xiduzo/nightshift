@@ -13,36 +13,28 @@ import {
 	Stats,
 } from "@/shared/page";
 
-/** Pull requests, gate answers, and phone or desktop. */
-export function MorningsPage() {
-	const query = useQuery(orpc.mornings.queryOptions({ input: {} }));
+/** Useful runs, Gate answers, and what became of pull requests. */
+export function FeedbackPage() {
+	const query = useQuery(orpc.feedback.queryOptions({ input: {} }));
 	const data = query.data;
 	return (
 		<Page
-			title="Mornings"
-			detail="See pull requests and how fast gates get an answer."
+			title="Feedback"
+			detail="See which runs people found useful and how fast Gates get an answer."
 		>
 			<LoadState pending={query.isPending} error={query.isError}>
 				{data ? (
 					<>
 						<Stats>
-							<Stat label="Opened" value={count(data.opened)} />
-							<Stat label="Merged" value={count(data.merged)} />
-							<Stat label="Closed" value={count(data.closed)} />
-							<Stat label="Reverted" value={count(data.reverted)} />
+							<Stat label="Finished runs" value={count(data.finished)} />
+							<Stat label="Answered" value={count(data.answered)} />
+							<Stat label="Useful" value={count(data.useful)} />
+							<Stat label="Useful rate" value={percent(data.usefulRate)} />
 						</Stats>
 						<Stats>
 							<Stat
-								label="Merged pull request rate"
-								value={percent(data.mergedRate)}
-							/>
-							<Stat
-								label="Reverted within 7 days"
-								value={percent(data.revertedRate)}
-							/>
-							<Stat
-								label="Cost per kept pull request"
-								value={dollars(data.costPerMergedPullRequest)}
+								label="Cost per useful result"
+								value={dollars(data.costPerUsefulResult)}
 							/>
 							<Stat
 								label="Median gate wait"
@@ -63,27 +55,40 @@ export function MorningsPage() {
 								]}
 							/>
 						</Section>
-						<Section title="Pull requests by week">
-							{data.byInstallWeek.length === 0 ? (
+						<Section title="Pull requests">
+							<p className="text-muted-foreground text-sm">
+								Only a schedule that scores pull requests sends these.
+							</p>
+							<Stats>
+								<Stat label="Merged" value={count(data.pullRequests.merged)} />
+								<Stat label="Closed" value={count(data.pullRequests.closed)} />
+								<Stat
+									label="Reverted within 7 days"
+									value={count(data.pullRequests.revertedWithin7Days)}
+								/>
+								<Stat
+									label="Reverted rate"
+									value={percent(data.pullRequests.revertedRate)}
+								/>
+							</Stats>
+							{data.pullRequests.byInstallWeek.length === 0 ? (
 								<EmptyNote title="No pull request is recorded yet." />
 							) : (
 								<Columns
 									headers={[
 										"Install",
 										"Week",
-										"Opened",
 										"Merged",
 										"Closed",
 										"Reverted",
 										"Flag",
 									]}
-									rows={data.byInstallWeek.map((row) => [
+									rows={data.pullRequests.byInstallWeek.map((row) => [
 										row.installId,
 										row.week,
-										count(row.opened),
 										count(row.merged),
 										count(row.closed),
-										count(row.reverted),
+										count(row.revertedWithin7Days),
 										row.flagged ? (
 											<Badge key={row.installId}>Flagged</Badge>
 										) : (

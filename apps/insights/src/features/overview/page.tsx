@@ -19,14 +19,14 @@ import {
 	Stats,
 } from "@/shared/page";
 
-/** Active installs, nights, merge rate, cost, and flagged installs. */
+/** Active installs, days with runs, useful runs, cost, and flagged installs. */
 export function OverviewPage() {
 	const query = useQuery(orpc.overview.queryOptions({ input: {} }));
 	const data = query.data;
 	return (
 		<Page
 			title="Overview"
-			detail="See active installs, nights, and pull requests this week."
+			detail="See active installs, days with runs, and the runs people found useful."
 		>
 			<LoadState pending={query.isPending} error={query.isError}>
 				{data ? (
@@ -37,17 +37,19 @@ export function OverviewPage() {
 								value={count(data.activeInstallsThisWeek)}
 							/>
 							<Stat
-								label="Nights with runs"
-								value={count(data.nightsWithRunsThisWeek)}
+								label="Days with runs this week"
+								value={count(data.daysWithRunsThisWeek)}
 							/>
+							<Stat label="Useful rate" value={percent(data.usefulRate)} />
 							<Stat
-								label="Merged pull request rate"
-								value={percent(data.mergedRate)}
+								label="Cost per useful result"
+								value={dollars(data.costPerUsefulResult)}
 							/>
-							<Stat
-								label="Cost per kept pull request"
-								value={dollars(data.costPerMergedPullRequest)}
-							/>
+						</Stats>
+						<Stats>
+							<Stat label="Finished runs" value={count(data.finishedRuns)} />
+							<Stat label="Useful runs" value={count(data.usefulRuns)} />
+							<Stat label="Needed you" value={percent(data.neededYouRate)} />
 						</Stats>
 						<Section title="Flagged installs">
 							<p className="text-muted-foreground text-sm">

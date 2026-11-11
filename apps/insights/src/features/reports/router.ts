@@ -1,8 +1,8 @@
 import {
-	firstNight,
+	days,
+	feedback,
+	funnel,
 	mix,
-	mornings,
-	nights,
 	overview,
 	retention,
 } from "@nightshift/insights";
@@ -10,11 +10,11 @@ import {
 import { signedIn } from "@/shared/rpc";
 
 import {
+	daysSchema,
 	emptyInput,
-	firstNightSchema,
+	feedbackSchema,
+	funnelSchema,
 	mixSchema,
-	morningsSchema,
-	nightsSchema,
 	overviewSchema,
 	retentionSchema,
 } from "./schemas";
@@ -24,34 +24,34 @@ export const adminRouter = {
 	overview: signedIn
 		.route({
 			summary:
-				"Shows active installs, nights, merge rate, cost, and flagged installs.",
+				"Shows active installs, days with runs, useful runs, cost, and flagged installs.",
 		})
 		.input(emptyInput)
 		.output(overviewSchema)
 		.handler(({ context }) => overview(context.db)),
-	firstNight: signedIn
+	funnel: signedIn
 		.route({
 			summary:
 				"Shows the setup steps, the time between them, and where installs stop.",
 		})
 		.input(emptyInput)
-		.output(firstNightSchema)
-		.handler(({ context }) => firstNight(context.db)),
-	nights: signedIn
+		.output(funnelSchema)
+		.handler(({ context }) => funnel(context.db)),
+	days: signedIn
+		.route({
+			summary: "Shows runs per day, how runs end, and which guards stop them.",
+		})
+		.input(emptyInput)
+		.output(daysSchema)
+		.handler(({ context }) => days(context.db)),
+	feedback: signedIn
 		.route({
 			summary:
-				"Shows runs per night, how runs end, and which guards stop them.",
+				"Shows useful runs, gate answers, phone or desktop, and pull requests.",
 		})
 		.input(emptyInput)
-		.output(nightsSchema)
-		.handler(({ context }) => nights(context.db)),
-	mornings: signedIn
-		.route({
-			summary: "Shows pull requests, gate answers, and phone or desktop.",
-		})
-		.input(emptyInput)
-		.output(morningsSchema)
-		.handler(({ context }) => mornings(context.db)),
+		.output(feedbackSchema)
+		.handler(({ context }) => feedback(context.db)),
 	mix: signedIn
 		.route({
 			summary: "Shows agents, systems, desktop or Host, and versions.",

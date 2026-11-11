@@ -1,1 +1,0 @@
-export { NightsPage } from "./page";

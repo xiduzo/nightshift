@@ -26,11 +26,11 @@ export function RetentionPage() {
 					<>
 						<Stats>
 							<Stat
-								label="Nights per install"
+								label="Days with runs per install"
 								value={
-									data.nightsPerWeek == null
+									data.daysPerWeek == null
 										? "No rate yet"
-										: count(data.nightsPerWeek)
+										: count(data.daysPerWeek)
 								}
 							/>
 							<Stat
@@ -47,17 +47,17 @@ export function RetentionPage() {
 										"Week",
 										"Active installs",
 										"Installs with runs",
-										"Nights",
-										"Nights per install",
+										"Days with runs",
+										"Days per install",
 									]}
 									rows={data.weeks.map((row) => [
 										row.week,
 										count(row.activeInstalls),
 										count(row.installsWithRuns),
-										count(row.nights),
-										row.nightsPerInstall == null
+										count(row.days),
+										row.daysPerInstall == null
 											? "No rate yet"
-											: count(row.nightsPerInstall),
+											: count(row.daysPerInstall),
 									])}
 								/>
 							)}

@@ -1,7 +1,7 @@
 import { asc } from "drizzle-orm";
 
 import type { InsightsDb } from "../client";
-import { usageCohort, usageNightsPerWeek, usageWeek } from "../schema";
+import { usageCohort, usageDaysPerWeek, usageWeek } from "../schema";
 import { asNumber, asNumberOrNull, ratio } from "./numbers";
 
 export type Retention = {
@@ -11,13 +11,13 @@ export type Retention = {
 		activeInstalls: number;
 		/** Installs with a run that week. */
 		installsWithRuns: number;
-		/** Install-nights with a run. */
-		nights: number;
-		/** Run-nights divided by installs that ran. Null when none ran. */
-		nightsPerInstall: number | null;
+		/** Install-days with a run. */
+		days: number;
+		/** Days with a run divided by installs that ran. Null when none ran. */
+		daysPerInstall: number | null;
 	}[];
-	/** Mean of `nightsPerInstall` across weeks that had a run. Null when none did. */
-	nightsPerWeek: number | null;
+	/** Mean of `daysPerInstall` across weeks that had a run. Null when none did. */
+	daysPerWeek: number | null;
 	/**
 	 * Installs with a run in week 4, divided by the cohort, across cohorts old
 	 * enough to have a week 4. Null when no cohort is that old.
@@ -37,7 +37,7 @@ export async function retention(db: InsightsDb): Promise<Retention> {
 		.select()
 		.from(usageCohort)
 		.orderBy(asc(usageCohort.week));
-	const [pace] = await db.select().from(usageNightsPerWeek);
+	const [pace] = await db.select().from(usageDaysPerWeek);
 	let matureSize = 0;
 	let matureRetained = 0;
 	let anyMature = false;
@@ -58,16 +58,16 @@ export async function retention(db: InsightsDb): Promise<Retention> {
 	return {
 		weeks: weeks.map((row) => {
 			const installsWithRuns = asNumber(row.installsWithRuns);
-			const nights = asNumber(row.nights);
+			const days = asNumber(row.days);
 			return {
 				week: row.week,
 				activeInstalls: asNumber(row.activeInstalls),
 				installsWithRuns,
-				nights,
-				nightsPerInstall: ratio(nights, installsWithRuns),
+				days,
+				daysPerInstall: ratio(days, installsWithRuns),
 			};
 		}),
-		nightsPerWeek: asNumberOrNull(pace?.nightsPerWeek),
+		daysPerWeek: asNumberOrNull(pace?.daysPerWeek),
 		week4Retention: anyMature ? ratio(matureRetained, matureSize) : null,
 		cohorts: cohortRows,
 	};

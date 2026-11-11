@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { ATTR, USAGE_EVENT } from "@nightshift/semconv";
+import { ATTR, RETIRED_USAGE_EVENT, USAGE_EVENT } from "@nightshift/semconv";
 
 import { attribute } from "../schema/keys";
 import { readLogs } from "./payload";
@@ -99,4 +99,54 @@ test("a body that is not JSON or not logs fails without the body", () => {
 	expect(() => readLogs({ resourceSpans: [] }, { country: null })).toThrow(
 		"Logs payload is not an OTLP logs request.",
 	);
+});
+
+test("a retired event of an older build is accepted next to the event that replaced it", () => {
+	const RUN_ID = attribute(USAGE_EVENT.runScored, "run.id");
+	const SCORE = attribute(USAGE_EVENT.runScored, "score.name");
+	const VALUE = attribute(USAGE_EVENT.runScored, "score.value");
+	const USEFUL = attribute(RETIRED_USAGE_EVENT.pullRequestUseful, "useful");
+	const UNKNOWN = ["night", "shift.pull_request.merged"].join("");
+	const read = readLogs(
+		logs([
+			{
+				name: RETIRED_USAGE_EVENT.pullRequestUseful,
+				attributes: [
+					{ key: RUN_ID, value: { stringValue: "0123456789abcdef" } },
+					{ key: USEFUL, value: { boolValue: true } },
+				],
+			},
+			{
+				name: USAGE_EVENT.runScored,
+				attributes: [
+					{ key: RUN_ID, value: { stringValue: "0123456789abcdef" } },
+					{ key: SCORE, value: { stringValue: "useful" } },
+					{ key: VALUE, value: { doubleValue: 0 } },
+				],
+			},
+			{
+				name: USAGE_EVENT.runScored,
+				attributes: [
+					{ key: RUN_ID, value: { stringValue: "0123456789abcdef" } },
+					{ key: SCORE, value: { stringValue: "a-flow-name" } },
+					{ key: VALUE, value: { doubleValue: 1 } },
+				],
+			},
+			{ name: UNKNOWN },
+		]),
+		{ country: null },
+	);
+	expect(read.rows.map((row) => row.eventName)).toEqual([
+		RETIRED_USAGE_EVENT.pullRequestUseful,
+		USAGE_EVENT.runScored,
+	]);
+	expect(read.rows[1]?.attributes).toEqual({
+		[RUN_ID]: "0123456789abcdef",
+		[SCORE]: "useful",
+		[VALUE]: 0,
+	});
+	expect(read.refusals).toEqual([
+		{ eventName: USAGE_EVENT.runScored, rule: INGEST_RULE.wrongType },
+		{ eventName: UNKNOWN, rule: INGEST_RULE.unknownEvent },
+	]);
 });

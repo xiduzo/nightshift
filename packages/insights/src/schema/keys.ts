@@ -99,8 +99,7 @@ export function ident(name: string): SQL {
 }
 
 export const RUN = USAGE_EVENT.runEnded;
-export const OPENED = RETIRED_USAGE_EVENT.pullRequestOpened;
-export const OUTCOME = RETIRED_USAGE_EVENT.pullRequestOutcome;
+export const SCORED = USAGE_EVENT.runScored;
 export const GATE = USAGE_EVENT.gateAnswered;
 export const ACTIVE = USAGE_EVENT.installActive;
 export const STARTED = USAGE_EVENT.installStarted;
@@ -110,15 +109,34 @@ export const PROJECT = USAGE_EVENT.projectAdded;
 export const CHECKED = USAGE_EVENT.projectChecked;
 export const SCHEDULE = USAGE_EVENT.scheduleChanged;
 
+/** Older builds send these instead of `SCORED` (ADR 24). */
+export const RETIRED_OUTCOME = RETIRED_USAGE_EVENT.pullRequestOutcome;
+export const RETIRED_USEFUL = RETIRED_USAGE_EVENT.pullRequestUseful;
+
 export const FINISHED = member(RUN, "run.status", "finished");
-export const MERGED = member(OUTCOME, "pull_request.outcome", "merged");
-export const CLOSED = member(OUTCOME, "pull_request.outcome", "closed");
-export const REVERTED = member(OUTCOME, "pull_request.outcome", "reverted");
+export const USEFUL = member(SCORED, "score.name", "useful");
+export const MERGED = member(SCORED, "score.name", "pr_merged");
+export const CLOSED = member(SCORED, "score.name", "pr_closed");
+export const REVERTED = member(SCORED, "score.name", "reverted_within_7d");
+export const OTHER_SCORE = member(SCORED, "score.name", "_OTHER");
 export const BY_PERSON = member(GATE, "gate.by", "person");
 export const BY_DEADLINE = member(GATE, "gate.by", "deadline");
 export const VIA_PHONE = member(GATE, "gate.via", "phone");
 export const VIA_WEB = member(GATE, "gate.via", "web");
 export const VIA_LOCK = member(GATE, "gate.via", "lock_screen");
 
-/** Hours in seven days. A revert inside this window is rework. */
-export const REWORK_HOURS = 24 * 7;
+/** A retired pull request outcome, and the score a newer build sends for it. */
+export const RETIRED_SCORE: readonly { outcome: string; score: string }[] = [
+	{
+		outcome: member(RETIRED_OUTCOME, "pull_request.outcome", "merged"),
+		score: MERGED,
+	},
+	{
+		outcome: member(RETIRED_OUTCOME, "pull_request.outcome", "closed"),
+		score: CLOSED,
+	},
+	{
+		outcome: member(RETIRED_OUTCOME, "pull_request.outcome", "reverted"),
+		score: REVERTED,
+	},
+];

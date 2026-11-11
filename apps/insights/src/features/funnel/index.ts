@@ -1,0 +1,1 @@
+export { FunnelPage } from "./page";

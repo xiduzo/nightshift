@@ -1,4 +1,4 @@
-export { usageFact, usageFlaggedInstall } from "./fact";
+export { usageFact, usageFlaggedInstall, usageUsefulRun } from "./fact";
 export {
 	usageFunnelInstall,
 	usageFunnelStep,
@@ -12,8 +12,8 @@ export {
 	usageGuard,
 	usageHost,
 	usageOs,
+	usageRunDay,
 	usageRunEnding,
-	usageRunNight,
 	usageStarter,
 	usageVersion,
 } from "./groups";
@@ -22,6 +22,7 @@ export {
 	usageGates,
 	usagePullRequestTotals,
 	usagePullRequestWeek,
+	usageRunTotals,
 	usageThisWeek,
 } from "./totals";
-export { usageCohort, usageNightsPerWeek, usageWeek } from "./weeks";
+export { usageCohort, usageDaysPerWeek, usageWeek } from "./weeks";

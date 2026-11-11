@@ -16,11 +16,11 @@ import {
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
 	CalendarClockIcon,
+	CalendarDaysIcon,
+	FunnelIcon,
 	HouseIcon,
 	MonitorSmartphoneIcon,
-	MoonIcon,
-	SunIcon,
-	WorkflowIcon,
+	ThumbsUpIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -28,9 +28,9 @@ import { authClient } from "@/shared/api";
 
 const ITEMS = [
 	{ to: "/", label: "Overview", icon: HouseIcon },
-	{ to: "/first-night", label: "First night", icon: WorkflowIcon },
-	{ to: "/nights", label: "Nights", icon: MoonIcon },
-	{ to: "/mornings", label: "Mornings", icon: SunIcon },
+	{ to: "/funnel", label: "Funnel", icon: FunnelIcon },
+	{ to: "/days", label: "Days", icon: CalendarDaysIcon },
+	{ to: "/feedback", label: "Feedback", icon: ThumbsUpIcon },
 	{ to: "/mix", label: "Mix", icon: MonitorSmartphoneIcon },
 	{ to: "/retention", label: "Retention", icon: CalendarClockIcon },
 ] as const;

@@ -13,11 +13,10 @@ const STEPS = [
 	"schedule",
 	"run",
 	"finished",
-	"pull_request",
-	"merged",
+	"useful",
 ] as const;
 
-export type FirstNight = {
+export type Funnel = {
 	/**
 	 * The setup funnel, in order. `stopped` is the installs whose next step
 	 * never happened. The last step has no next step, so its `stopped` is 0.
@@ -31,11 +30,11 @@ export type FirstNight = {
 	}[];
 	/** From install to the first finished run, even when a setup step was skipped. */
 	medianSecondsToFirstFinishedRun: number | null;
-	/** From install to the first merged pull request. */
-	medianSecondsToFirstMergedPullRequest: number | null;
+	/** From install to the first run a person found useful. */
+	medianSecondsToFirstUsefulRun: number | null;
 };
 
-export async function firstNight(db: InsightsDb): Promise<FirstNight> {
+export async function funnel(db: InsightsDb): Promise<Funnel> {
 	const steps = await db
 		.select()
 		.from(usageFunnelStep)
@@ -58,8 +57,6 @@ export async function firstNight(db: InsightsDb): Promise<FirstNight> {
 		medianSecondsToFirstFinishedRun: asNumberOrNull(
 			time?.medianSecondsToFinished,
 		),
-		medianSecondsToFirstMergedPullRequest: asNumberOrNull(
-			time?.medianSecondsToMerged,
-		),
+		medianSecondsToFirstUsefulRun: asNumberOrNull(time?.medianSecondsToUseful),
 	};
 }

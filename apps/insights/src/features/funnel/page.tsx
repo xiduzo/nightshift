@@ -21,19 +21,18 @@ const STEP_LABEL = {
 	schedule: "Schedule",
 	run: "First run",
 	finished: "Finished run",
-	pull_request: "Pull request",
-	merged: "Merged pull request",
+	useful: "Useful run",
 } as const;
 
 /** The setup funnel, the time between steps, and where installs stop. */
-export function FirstNightPage() {
-	const query = useQuery(orpc.firstNight.queryOptions({ input: {} }));
+export function FunnelPage() {
+	const query = useQuery(orpc.funnel.queryOptions({ input: {} }));
 	const data = query.data;
 	const stopped = data?.steps.find((step) => step.stopped > 0);
 	return (
 		<Page
-			title="First night"
-			detail="See each step from install to a merged pull request."
+			title="Funnel"
+			detail="See each step from install to a run that a person found useful."
 		>
 			<LoadState pending={query.isPending} error={query.isError}>
 				{data ? (
@@ -44,8 +43,8 @@ export function FirstNightPage() {
 								value={duration(data.medianSecondsToFirstFinishedRun)}
 							/>
 							<Stat
-								label="Time to a merged pull request"
-								value={duration(data.medianSecondsToFirstMergedPullRequest)}
+								label="Time to a useful run"
+								value={duration(data.medianSecondsToFirstUsefulRun)}
 							/>
 						</Stats>
 						<Section title="Steps">

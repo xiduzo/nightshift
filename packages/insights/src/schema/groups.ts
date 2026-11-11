@@ -144,13 +144,13 @@ export const usageStarter = pgView("usage_starter", {
 	GROUP BY 1, 2
 `);
 
-/** Runs on each UTC night. */
-export const usageRunNight = pgView("usage_run_night", {
-	night: text("night").notNull(),
+/** Runs on each UTC day. */
+export const usageRunDay = pgView("usage_run_day", {
+	day: text("day").notNull(),
 	runs: integer("runs").notNull(),
 }).as(sql`
 	SELECT
-		to_char((event_time AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS night,
+		to_char((event_time AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS day,
 		count(*)::int AS runs
 	FROM ${usageFact}
 	WHERE ${eventIs(RUN)}

@@ -1,12 +1,12 @@
 import { asc, desc } from "drizzle-orm";
 
 import type { InsightsDb } from "../client";
-import { usageGuard, usageRunEnding, usageRunNight } from "../schema";
+import { usageGuard, usageRunDay, usageRunEnding } from "../schema";
 import { asNumber, ratio } from "./numbers";
 
-export type Nights = {
-	/** Runs on each UTC night, oldest first. */
-	runsPerNight: { night: string; runs: number }[];
+export type Days = {
+	/** Runs on each UTC day, oldest first. */
+	runsPerDay: { day: string; runs: number }[];
 	/** How runs end. A missing reason is null. */
 	endings: { endReason: string | null; runs: number }[];
 	/**
@@ -16,11 +16,11 @@ export type Nights = {
 	guards: { guard: string; runs: number; share: number | null }[];
 };
 
-export async function nights(db: InsightsDb): Promise<Nights> {
-	const nightsRows = await db
+export async function days(db: InsightsDb): Promise<Days> {
+	const dayRows = await db
 		.select()
-		.from(usageRunNight)
-		.orderBy(asc(usageRunNight.night));
+		.from(usageRunDay)
+		.orderBy(asc(usageRunDay.day));
 	const endings = await db
 		.select()
 		.from(usageRunEnding)
@@ -28,8 +28,8 @@ export async function nights(db: InsightsDb): Promise<Nights> {
 	const guardRows = await db.select().from(usageGuard);
 	const total = endings.reduce((sum, row) => sum + asNumber(row.runs), 0);
 	return {
-		runsPerNight: nightsRows.map((row) => ({
-			night: row.night,
+		runsPerDay: dayRows.map((row) => ({
+			day: row.day,
 			runs: asNumber(row.runs),
 		})),
 		endings: endings.map((row) => ({

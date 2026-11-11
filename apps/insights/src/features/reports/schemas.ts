@@ -11,23 +11,23 @@ const step = z.enum([
 	"schedule",
 	"run",
 	"finished",
-	"pull_request",
-	"merged",
+	"useful",
 ]);
 
 export const emptyInput = z.object({});
 
 export const overviewSchema = z.object({
 	activeInstallsThisWeek: count,
-	nightsWithRunsThisWeek: count,
-	openedPullRequests: count,
-	mergedPullRequests: count,
-	mergedRate: rate,
-	costPerMergedPullRequest: rate,
+	daysWithRunsThisWeek: count,
+	finishedRuns: count,
+	usefulRuns: count,
+	usefulRate: rate,
+	costPerUsefulResult: rate,
+	neededYouRate: rate,
 	flaggedInstallIds: z.array(z.string()),
 });
 
-export const firstNightSchema = z.object({
+export const funnelSchema = z.object({
 	steps: z.array(
 		z.object({
 			step,
@@ -38,35 +38,21 @@ export const firstNightSchema = z.object({
 		}),
 	),
 	medianSecondsToFirstFinishedRun: rate,
-	medianSecondsToFirstMergedPullRequest: rate,
+	medianSecondsToFirstUsefulRun: rate,
 });
 
-export const nightsSchema = z.object({
-	runsPerNight: z.array(z.object({ night: z.string(), runs: count })),
+export const daysSchema = z.object({
+	runsPerDay: z.array(z.object({ day: z.string(), runs: count })),
 	endings: z.array(z.object({ endReason: z.string().nullable(), runs: count })),
 	guards: z.array(z.object({ guard: z.string(), runs: count, share: rate })),
 });
 
-export const morningsSchema = z.object({
-	opened: count,
-	merged: count,
-	closed: count,
-	reverted: count,
-	revertedWithin7Days: count,
-	mergedRate: rate,
-	revertedRate: rate,
-	costPerMergedPullRequest: rate,
-	byInstallWeek: z.array(
-		z.object({
-			installId: z.string(),
-			week: z.string(),
-			opened: count,
-			merged: count,
-			closed: count,
-			reverted: count,
-			flagged: z.boolean(),
-		}),
-	),
+export const feedbackSchema = z.object({
+	finished: count,
+	answered: count,
+	useful: count,
+	usefulRate: rate,
+	costPerUsefulResult: rate,
 	gates: z.object({
 		byPerson: count,
 		byDeadline: count,
@@ -76,6 +62,22 @@ export const morningsSchema = z.object({
 		web: count,
 		lockScreen: count,
 		other: count,
+	}),
+	pullRequests: z.object({
+		merged: count,
+		closed: count,
+		revertedWithin7Days: count,
+		revertedRate: rate,
+		byInstallWeek: z.array(
+			z.object({
+				installId: z.string(),
+				week: z.string(),
+				merged: count,
+				closed: count,
+				revertedWithin7Days: count,
+				flagged: z.boolean(),
+			}),
+		),
 	}),
 });
 
@@ -103,11 +105,11 @@ export const retentionSchema = z.object({
 			week: z.string(),
 			activeInstalls: count,
 			installsWithRuns: count,
-			nights: count,
-			nightsPerInstall: rate,
+			days: count,
+			daysPerInstall: rate,
 		}),
 	),
-	nightsPerWeek: rate,
+	daysPerWeek: rate,
 	week4Retention: rate,
 	cohorts: z.array(
 		z.object({

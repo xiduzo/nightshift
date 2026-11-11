@@ -1,0 +1,1 @@
+export { DaysPage } from "./page";

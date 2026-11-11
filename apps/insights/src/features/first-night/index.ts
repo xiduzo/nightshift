@@ -1,1 +1,0 @@
-export { FirstNightPage } from "./page";

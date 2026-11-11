@@ -18,23 +18,24 @@ type Proof =
 	| {
 			ready: true;
 			installs: number;
-			openedPullRequests: number;
-			mergedPullRequests: number;
-			mergedRate: number | null;
-			revertedWithin7Days: number;
-			revertedRate: number | null;
-			costPerMergedPullRequest: number | null;
-			medianSecondsToFirstFinishedRun: number | null;
-			medianSecondsToFirstMergedPullRequest: number | null;
-			shareWithTwoOrMoreAgents: number | null;
 			weeklyActiveInstalls: number;
-			nightsPerWeek: number | null;
+			usefulRuns: number;
+			usefulRate: number | null;
+			costPerUsefulResult: number | null;
+			neededYouRate: number | null;
+			medianSecondsToFirstFinishedRun: number | null;
+			medianSecondsToFirstUsefulRun: number | null;
+			shareWithTwoOrMoreAgents: number | null;
+			daysPerWeek: number | null;
 			week4Retention: number | null;
 			gatesByPerson: number;
 			gatesByDeadline: number;
 			medianGateWaitSeconds: number | null;
 			phoneAnswers: number;
 			desktopAnswers: number;
+			mergedPullRequests: number;
+			revertedWithin7Days: number;
+			revertedRate: number | null;
 			firstFlowStarters: {
 				starter: string | null;
 				from: string | null;
@@ -44,26 +45,27 @@ type Proof =
 
 const COUNTS = [
 	"installs",
-	"openedPullRequests",
-	"mergedPullRequests",
-	"revertedWithin7Days",
 	"weeklyActiveInstalls",
+	"usefulRuns",
 	"gatesByPerson",
 	"gatesByDeadline",
 	"phoneAnswers",
 	"desktopAnswers",
+	"mergedPullRequests",
+	"revertedWithin7Days",
 ] as const;
 
 const RATES = [
-	"mergedRate",
-	"revertedRate",
-	"costPerMergedPullRequest",
+	"usefulRate",
+	"costPerUsefulResult",
+	"neededYouRate",
 	"medianSecondsToFirstFinishedRun",
-	"medianSecondsToFirstMergedPullRequest",
+	"medianSecondsToFirstUsefulRun",
 	"shareWithTwoOrMoreAgents",
-	"nightsPerWeek",
+	"daysPerWeek",
 	"week4Retention",
 	"medianGateWaitSeconds",
+	"revertedRate",
 ] as const;
 
 /** The public numbers. An install id is never shown. */
@@ -96,43 +98,35 @@ export function ProofPage() {
 								label="Active installs this week"
 								value={count(data.weeklyActiveInstalls)}
 							/>
+							<Stat label="Useful rate" value={percent(data.usefulRate)} />
 							<Stat
-								label="Merged pull request rate"
-								value={percent(data.mergedRate)}
-							/>
-							<Stat
-								label="Cost per kept pull request"
-								value={dollars(data.costPerMergedPullRequest)}
+								label="Cost per useful result"
+								value={dollars(data.costPerUsefulResult)}
 							/>
 						</Stats>
 						<Stats>
-							<Stat label="Opened" value={count(data.openedPullRequests)} />
-							<Stat label="Merged" value={count(data.mergedPullRequests)} />
-							<Stat
-								label="Reverted within 7 days"
-								value={count(data.revertedWithin7Days)}
-							/>
-							<Stat label="Reverted rate" value={percent(data.revertedRate)} />
-						</Stats>
-						<Stats>
+							<Stat label="Useful runs" value={count(data.usefulRuns)} />
+							<Stat label="Needed you" value={percent(data.neededYouRate)} />
 							<Stat
 								label="Time to a finished run"
 								value={duration(data.medianSecondsToFirstFinishedRun)}
 							/>
 							<Stat
-								label="Time to a merged pull request"
-								value={duration(data.medianSecondsToFirstMergedPullRequest)}
+								label="Time to a useful run"
+								value={duration(data.medianSecondsToFirstUsefulRun)}
 							/>
+						</Stats>
+						<Stats>
 							<Stat
 								label="Two or more agents"
 								value={percent(data.shareWithTwoOrMoreAgents)}
 							/>
 							<Stat
-								label="Nights per install"
+								label="Days with runs per install"
 								value={
-									data.nightsPerWeek == null
+									data.daysPerWeek == null
 										? "No rate yet"
-										: count(data.nightsPerWeek)
+										: count(data.daysPerWeek)
 								}
 							/>
 						</Stats>
@@ -158,6 +152,22 @@ export function ProofPage() {
 							<Stat label="Phone" value={count(data.phoneAnswers)} />
 							<Stat label="Desktop" value={count(data.desktopAnswers)} />
 						</Stats>
+						<Section title="Pull requests">
+							<p className="text-muted-foreground text-sm">
+								Only a schedule that scores pull requests sends these.
+							</p>
+							<Stats>
+								<Stat label="Merged" value={count(data.mergedPullRequests)} />
+								<Stat
+									label="Reverted within 7 days"
+									value={count(data.revertedWithin7Days)}
+								/>
+								<Stat
+									label="Reverted rate"
+									value={percent(data.revertedRate)}
+								/>
+							</Stats>
+						</Section>
 						<Section title="First flow">
 							{data.firstFlowStarters.length === 0 ? (
 								<EmptyNote title="No flow is recorded yet." />

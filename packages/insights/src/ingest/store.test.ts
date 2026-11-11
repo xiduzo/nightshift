@@ -1,13 +1,13 @@
 import { expect, test } from "bun:test";
 import { PGlite } from "@electric-sql/pglite";
-import { ATTR, USAGE_EVENT } from "@nightshift/semconv";
+import { ATTR, RETIRED_USAGE_EVENT, USAGE_EVENT } from "@nightshift/semconv";
 import { now } from "@nightshift/time";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 
 import type { InsightsDb } from "../client";
 import { migrationsFolder } from "../migrate/migrate";
-import { firstNight, overview, publicNumbers } from "../queries";
+import { feedback, funnel, overview, publicNumbers } from "../queries";
 import { usageEvent } from "../schema";
 import { attribute } from "../schema/keys";
 import { ingestLogs } from "./ingest";
@@ -78,7 +78,7 @@ test("an accepted event is inserted and four installs are not enough to publish"
 	expect(await publicNumbers(db)).toEqual({ ready: false });
 	const home = await overview(db);
 	expect(home.activeInstallsThisWeek).toBe(1);
-	expect(home.nightsWithRunsThisWeek).toBe(0);
+	expect(home.daysWithRunsThisWeek).toBe(0);
 	expect(home.flaggedInstallIds).toEqual([]);
 }, 30_000);
 
@@ -91,10 +91,12 @@ test("five installs publish the proof numbers and show where the funnel stops", 
 	expect(numbers.ready).toBe(true);
 	if (!numbers.ready) return;
 	expect(numbers.installs).toBe(5);
-	expect(numbers.mergedRate).toBeNull();
+	expect(numbers.usefulRate).toBeNull();
+	expect(numbers.costPerUsefulResult).toBeNull();
+	expect(numbers.neededYouRate).toBeNull();
 	expect(numbers.shareWithTwoOrMoreAgents).toBe(0);
-	const funnel = await firstNight(db);
-	expect(funnel.steps.map((step) => step.step)).toEqual([
+	const steps = await funnel(db);
+	expect(steps.steps.map((step) => step.step)).toEqual([
 		"install",
 		"agent",
 		"project",
@@ -103,10 +105,141 @@ test("five installs publish the proof numbers and show where the funnel stops", 
 		"schedule",
 		"run",
 		"finished",
-		"pull_request",
-		"merged",
+		"useful",
 	]);
-	expect(funnel.steps[0]).toMatchObject({ installs: 5, stopped: 5 });
-	expect(funnel.steps[1]?.installs).toBe(0);
-	expect(funnel.medianSecondsToFirstFinishedRun).toBeNull();
+	expect(steps.steps[0]).toMatchObject({ installs: 5, stopped: 5 });
+	expect(steps.steps[1]?.installs).toBe(0);
+	expect(steps.medianSecondsToFirstFinishedRun).toBeNull();
+}, 30_000);
+
+type Value = string | number | boolean | string[];
+
+function otlpValue(field: Value): Record<string, unknown> {
+	if (Array.isArray(field)) {
+		return { arrayValue: { values: field.map((item) => otlpValue(item)) } };
+	}
+	if (typeof field === "string") return { stringValue: field };
+	if (typeof field === "boolean") return { boolValue: field };
+	return { doubleValue: field };
+}
+
+/** One install's events, one minute apart from `start`, in order. */
+function events(
+	installId: string,
+	start: number,
+	records: { name: string; fields?: Record<string, Value> }[],
+) {
+	return {
+		resourceLogs: [
+			{
+				resource: {
+					attributes: [
+						{ key: ATTR.serviceInstance, value: { stringValue: installId } },
+					],
+				},
+				scopeLogs: [
+					{
+						logRecords: records.map((record, index) => ({
+							timeUnixNano: (
+								BigInt(start + index * 60_000) * 1_000_000n
+							).toString(),
+							attributes: [
+								{ key: "event.name", value: { stringValue: record.name } },
+								...Object.entries(record.fields ?? {}).map(([key, field]) => ({
+									key,
+									value: otlpValue(field),
+								})),
+							],
+						})),
+					},
+				],
+			},
+		],
+	};
+}
+
+test("useful runs read old and new events as one answer per run, and the code scorer counts both", async () => {
+	const db = await database();
+	const RUN = USAGE_EVENT.runEnded;
+	const SCORED = USAGE_EVENT.runScored;
+	const OLD_USEFUL = RETIRED_USAGE_EVENT.pullRequestUseful;
+	const OLD_OUTCOME = RETIRED_USAGE_EVENT.pullRequestOutcome;
+	const ended = (cost: number, neededYou?: boolean) => ({
+		name: RUN,
+		fields: {
+			[attribute(RUN, "run.trigger")]: "manual",
+			[attribute(RUN, "run.status")]: "finished",
+			[attribute(RUN, "end_reason")]: "finished",
+			[attribute(RUN, "run.duration")]: 60,
+			[attribute(RUN, "cost_usd")]: cost,
+			[attribute(RUN, "flow.id")]: "0123456789abcdef",
+			[attribute(RUN, "node_kinds")]: ["agent"],
+			...(neededYou === undefined
+				? {}
+				: { [attribute(RUN, "needed_you")]: neededYou }),
+		},
+	});
+	const scored = (runId: string, score: string, value: number) => ({
+		name: SCORED,
+		fields: {
+			[attribute(SCORED, "run.id")]: runId,
+			[attribute(SCORED, "score.name")]: score,
+			[attribute(SCORED, "score.value")]: value,
+		},
+	});
+	const start = now() - 60 * 60_000;
+	const result = await ingestLogs(
+		db,
+		events("install-1", start, [
+			{
+				name: USAGE_EVENT.installStarted,
+				fields: { [ENTRY]: "desktop", [HOST]: false },
+			},
+			// An older build: no needed_you, and the retired events.
+			ended(1),
+			{
+				name: OLD_USEFUL,
+				fields: {
+					[attribute(OLD_USEFUL, "run.id")]: "run-a",
+					[attribute(OLD_USEFUL, "useful")]: true,
+				},
+			},
+			{
+				name: OLD_OUTCOME,
+				fields: {
+					[attribute(OLD_OUTCOME, "pull_request.outcome")]: "merged",
+					[attribute(OLD_OUTCOME, "pull_request.hours")]: 5,
+				},
+			},
+			// The same install after the update: run-a's answer changes to no.
+			ended(2, true),
+			scored("run-a", "useful", 0),
+			scored("run-b", "useful", 1),
+			scored("run-b", "pr_merged", 1),
+			scored("run-b", "reverted_within_7d", 1),
+		]),
+		{ country: null },
+	);
+	expect(result.refused).toBe(0);
+
+	expect(await overview(db)).toMatchObject({
+		finishedRuns: 2,
+		usefulRuns: 1,
+		usefulRate: 0.5,
+		costPerUsefulResult: 3,
+		neededYouRate: 1,
+	});
+	const said = await feedback(db);
+	expect(said).toMatchObject({ answered: 2, useful: 1 });
+	expect(said.pullRequests).toMatchObject({
+		merged: 2,
+		closed: 0,
+		revertedWithin7Days: 1,
+		revertedRate: 0.5,
+	});
+	expect(said.pullRequests.byInstallWeek.length).toBeGreaterThan(0);
+	// The first yes, two minutes after the install, is the first useful run.
+	const steps = await funnel(db);
+	expect(steps.medianSecondsToFirstUsefulRun).toBe(120);
+	expect(steps.medianSecondsToFirstFinishedRun).toBe(60);
 }, 30_000);

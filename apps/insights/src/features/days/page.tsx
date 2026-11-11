@@ -4,26 +4,26 @@ import { orpc } from "@/shared/api";
 import { count, percent } from "@/shared/format";
 import { Columns, EmptyNote, LoadState, Page, Section } from "@/shared/page";
 
-/** Runs per night, how runs end, and which guards stop them. */
-export function NightsPage() {
-	const query = useQuery(orpc.nights.queryOptions({ input: {} }));
+/** Runs per day, how runs end, and which guards stop them. */
+export function DaysPage() {
+	const query = useQuery(orpc.days.queryOptions({ input: {} }));
 	const data = query.data;
 	return (
 		<Page
-			title="Nights"
-			detail="See runs per night, how runs end, and which guards stop them."
+			title="Days"
+			detail="See runs per day, how runs end, and which guards stop them."
 		>
 			<LoadState pending={query.isPending} error={query.isError}>
 				{data ? (
 					<>
-						<Section title="Runs per night">
-							{data.runsPerNight.length === 0 ? (
+						<Section title="Runs per day">
+							{data.runsPerDay.length === 0 ? (
 								<EmptyNote title="No run is recorded yet." />
 							) : (
 								<Columns
-									headers={["Night", "Runs"]}
-									rows={data.runsPerNight.map((row) => [
-										row.night,
+									headers={["Day (UTC)", "Runs"]}
+									rows={data.runsPerDay.map((row) => [
+										row.day,
 										count(row.runs),
 									])}
 								/>

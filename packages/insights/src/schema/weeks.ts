@@ -18,28 +18,28 @@ const weekSelect = sql`
 		count(DISTINCT install_id) FILTER (WHERE ${eventIs(RUN)})::int AS installs_with_runs,
 		count(DISTINCT (install_id, (event_time AT TIME ZONE 'UTC')::date)) FILTER (
 			WHERE ${eventIs(RUN)}
-		)::int AS nights
+		)::int AS days
 	FROM ${usageFact}
 	WHERE install_id IS NOT NULL
 	GROUP BY 1
 `;
 
-/** One UTC week: installs that sent anything, installs that ran, and run-nights. */
+/** One UTC week: installs that sent anything, installs that ran, and days with a run. */
 export const usageWeek = pgView("usage_week", {
 	week: text("week").notNull(),
 	activeInstalls: integer("active_installs").notNull(),
 	installsWithRuns: integer("installs_with_runs").notNull(),
-	nights: integer("nights").notNull(),
+	days: integer("days").notNull(),
 }).as(weekSelect);
 
 /**
- * Mean run-nights per install, across weeks that had a run.
+ * Mean days with a run per install, across weeks that had a run.
  * Null when no week had a run.
  */
-export const usageNightsPerWeek = pgView("usage_nights_per_week", {
-	nightsPerWeek: doublePrecision("nights_per_week"),
+export const usageDaysPerWeek = pgView("usage_days_per_week", {
+	daysPerWeek: doublePrecision("days_per_week"),
 }).as(sql`
-	SELECT avg(nights::double precision / installs_with_runs) AS nights_per_week
+	SELECT avg(days::double precision / installs_with_runs) AS days_per_week
 	FROM (${weekSelect}) weeks
 	WHERE installs_with_runs > 0
 `);

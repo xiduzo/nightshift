@@ -16,13 +16,11 @@ import {
 	FLOW,
 	ident,
 	lit,
-	MERGED,
-	OPENED,
-	OUTCOME,
 	PROJECT,
 	RUN,
 	SCHEDULE,
 	STARTED,
+	USEFUL,
 } from "./keys";
 
 const STEPS = [
@@ -34,12 +32,7 @@ const STEPS = [
 	{ id: "schedule", column: "step_schedule", previous: "step_flow" },
 	{ id: "run", column: "step_run", previous: "step_schedule" },
 	{ id: "finished", column: "step_finished", previous: "step_run" },
-	{
-		id: "pull_request",
-		column: "step_pull_request",
-		previous: "step_finished",
-	},
-	{ id: "merged", column: "step_merged", previous: "step_pull_request" },
+	{ id: "useful", column: "step_useful", previous: "step_finished" },
 ] as const;
 
 function consecutive(): SQL {
@@ -67,11 +60,7 @@ export const usageFunnelInstall = pgView("usage_funnel_install", {
 		withTimezone: true,
 		mode: "date",
 	}),
-	stepPullRequest: timestamp("step_pull_request", {
-		withTimezone: true,
-		mode: "date",
-	}),
-	stepMerged: timestamp("step_merged", { withTimezone: true, mode: "date" }),
+	stepUseful: timestamp("step_useful", { withTimezone: true, mode: "date" }),
 	consecutive: integer("consecutive").notNull(),
 }).as(sql`
 	SELECT
@@ -84,8 +73,7 @@ export const usageFunnelInstall = pgView("usage_funnel_install", {
 		step_schedule,
 		step_run,
 		step_finished,
-		step_pull_request,
-		step_merged,
+		step_useful,
 		${consecutive()} AS consecutive
 	FROM (
 		SELECT
@@ -98,8 +86,7 @@ export const usageFunnelInstall = pgView("usage_funnel_install", {
 			min(event_time) FILTER (WHERE ${eventIs(SCHEDULE)}) AS step_schedule,
 			min(event_time) FILTER (WHERE ${eventIs(RUN)}) AS step_run,
 			min(event_time) FILTER (WHERE ${eventIs(RUN)} AND run_status = ${lit(FINISHED)}) AS step_finished,
-			min(event_time) FILTER (WHERE ${eventIs(OPENED)}) AS step_pull_request,
-			min(event_time) FILTER (WHERE ${eventIs(OUTCOME)} AND pr_outcome = ${lit(MERGED)}) AS step_merged
+			min(event_time) FILTER (WHERE score_name = ${lit(USEFUL)} AND score_value > 0) AS step_useful
 		FROM ${usageFact}
 		WHERE install_id IS NOT NULL
 		GROUP BY install_id
@@ -145,12 +132,12 @@ export const usageFunnelStep = pgView("usage_funnel_step", {
 );
 
 /**
- * Median time from install to the first finished run, and to the first
- * merged pull request. A skipped setup step still counts.
+ * Median time from install to the first finished run, and to the first run
+ * a person found useful. A skipped setup step still counts.
  */
 export const usageTimeToFirst = pgView("usage_time_to_first", {
 	medianSecondsToFinished: doublePrecision("median_seconds_to_finished"),
-	medianSecondsToMerged: doublePrecision("median_seconds_to_merged"),
+	medianSecondsToUseful: doublePrecision("median_seconds_to_useful"),
 }).as(sql`
 	SELECT
 		(percentile_cont(0.5) WITHIN GROUP (
@@ -161,11 +148,11 @@ export const usageTimeToFirst = pgView("usage_time_to_first", {
 				AND step_finished >= step_install
 		))::double precision AS median_seconds_to_finished,
 		(percentile_cont(0.5) WITHIN GROUP (
-			ORDER BY extract(epoch FROM (step_merged - step_install))
+			ORDER BY extract(epoch FROM (step_useful - step_install))
 		) FILTER (
 			WHERE step_install IS NOT NULL
-				AND step_merged IS NOT NULL
-				AND step_merged >= step_install
-		))::double precision AS median_seconds_to_merged
+				AND step_useful IS NOT NULL
+				AND step_useful >= step_install
+		))::double precision AS median_seconds_to_useful
 	FROM ${usageFunnelInstall}
 `);
