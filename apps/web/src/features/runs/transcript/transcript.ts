@@ -434,6 +434,17 @@ function applyStepEntries(
 					message: event.message,
 				});
 				break;
+			case "convert":
+				push({
+					...base,
+					kind: "convert",
+					key: `convert:${entry.seq}`,
+					from: event.from,
+					to: event.to,
+					bytes: event.bytes,
+					problem: event.problem,
+				});
+				break;
 			case "service":
 				push({
 					...base,

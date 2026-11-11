@@ -9,6 +9,7 @@ import {
 	type ValueBy,
 } from "@nightshift/flows";
 import {
+	ArrowRightLeftIcon,
 	BotIcon,
 	BracesIcon,
 	DiffIcon,
@@ -91,6 +92,12 @@ export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
 		label: NODE_TYPE_LABEL["since-last-run"],
 		icon: DiffIcon,
 		blurb: "Finds what is new or changed since the last run.",
+	},
+	convert: {
+		label: NODE_TYPE_LABEL.convert,
+		icon: ArrowRightLeftIcon,
+		blurb:
+			"Turns CSV, YAML, XML, a feed or a Markdown table into JSON, and back.",
 	},
 };
 

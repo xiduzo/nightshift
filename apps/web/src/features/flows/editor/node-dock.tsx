@@ -21,6 +21,7 @@ const ITEMS: PaletteItem[] = [
 	"branch",
 	"value",
 	"since-last-run",
+	"convert",
 	"wait",
 	"lease",
 	"service",

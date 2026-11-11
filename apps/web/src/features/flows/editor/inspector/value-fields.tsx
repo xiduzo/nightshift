@@ -21,6 +21,7 @@ import { CascadeSection } from "./cascade-fields";
 import { GateBriefSection, withBrief } from "./gate-brief-fields";
 import { GateTitleField } from "./gate-title-field";
 import { ModelSettings } from "./model-settings";
+import { ValuePresetMenu } from "./value-presets";
 
 const VALUE_BY: { by: ValueNode["by"]; label: string }[] = [
 	{ by: "rule", label: "A rule" },
@@ -113,7 +114,18 @@ export function ValueFields({
 								onChange((current) => ({ ...current, expression: text }));
 							}}
 						/>
-						<div className="self-start">
+						<div className="flex flex-wrap items-center gap-2 self-start">
+							<ValuePresetMenu
+								flow={flow}
+								node={node}
+								onUse={({ expression: made, output }) =>
+									onChange(({ outputInferred: _, ...current }) => ({
+										...current,
+										expression: made,
+										output,
+									}))
+								}
+							/>
 							<ExpressionSuggest node={node} />
 						</div>
 					</Field>

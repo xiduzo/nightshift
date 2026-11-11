@@ -1,5 +1,6 @@
 import type { StepSummary } from "@/shared/api";
 import { LEARNINGS_TITLE, stepLearnings } from "../lib/step-learnings";
+import { convertFormatLabel } from "./items/convert-items";
 import { thoughtTitle } from "./transcript";
 import type { TranscriptItem } from "./transcript-items";
 
@@ -122,6 +123,12 @@ export function itemToMarkdown(item: TranscriptItem, context: Context): string {
 			return `**${item.byDeadline ? "Picked at the deadline" : "Answer"}:** \`${item.choice}\`${item.note.trim() ? `\n\n${quote(item.note)}` : ""}`;
 		case "end":
 			return `**Ended:** ${END_WORDS[item.status]}${item.message ? `. ${item.message}` : ""}`;
+		case "convert": {
+			const pair = `${convertFormatLabel(item.from)} to ${convertFormatLabel(item.to)}`;
+			return item.problem
+				? `**Could not convert** ${pair}: ${item.problem}`
+				: `**Converted** ${pair}`;
+		}
 		case "service":
 			return item.state === "starting"
 				? `**Service:** starts \`${item.command ?? ""}\``

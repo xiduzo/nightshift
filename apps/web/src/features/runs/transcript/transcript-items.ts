@@ -150,6 +150,15 @@ export type LeaseItem = ItemBase & {
 	holderTitle: string | null;
 };
 
+/** A Convert step converted its value, or why it could not. */
+export type ConvertItem = ItemBase & {
+	kind: "convert";
+	from: string;
+	to: string;
+	bytes: number;
+	problem: string | null;
+};
+
 /** A Service step starts its service, it is ready, or it did not get ready. */
 export type ServiceItem = ItemBase & {
 	kind: "service";
@@ -253,4 +262,5 @@ export type TranscriptItem =
 	| EndItem
 	| LeaseItem
 	| ServiceItem
-	| SinceLastRunItem;
+	| SinceLastRunItem
+	| ConvertItem;

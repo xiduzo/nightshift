@@ -34,6 +34,7 @@ import { AgentFields } from "./agent-fields";
 import { CallFields } from "./call-fields";
 import type { CalledFlowSupport } from "./called-flow-fields";
 import { CommandFields } from "./command-fields";
+import { ConvertFields } from "./convert-fields";
 import { DecisionFields } from "./decision-fields";
 import { EndFields } from "./end-fields";
 import { JoinFields } from "./join-fields";
@@ -294,6 +295,18 @@ export function NodeInspector({
 					/>
 				) : null}
 
+				{node.type === "convert" ? (
+					<ConvertFields
+						flow={flow}
+						node={node}
+						onChange={(change) =>
+							onChange((current) =>
+								current.type === "convert" ? change(current) : current,
+							)
+						}
+					/>
+				) : null}
+
 				{node.type === "service" ? (
 					<ServiceFields
 						projectId={projectId}
@@ -354,9 +367,10 @@ export function NodeInspector({
 					</InspectorSection>
 				) : null}
 
-				{/* A Gate (a Decision decided by you) has a deadline instead of limits; an End, a Join and a Since last run take no time; a Lease waits as long as it says, and a Service as its ready check says. */}
+				{/* A Gate (a Decision decided by you) has a deadline instead of limits; an End, a Join, a Since last run and a Convert take no time (a Convert has its own size limit); a Lease waits as long as it says, and a Service as its ready check says. */}
 				{(node.type === "decision" && node.by === "person") ||
 				node.type === "end" ||
+				node.type === "convert" ||
 				node.type === "join" ||
 				node.type === "since-last-run" ||
 				node.type === "lease" ||

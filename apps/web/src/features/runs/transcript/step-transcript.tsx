@@ -28,6 +28,7 @@ import {
 import type { RunSummary, SessionSummary, StepSummary } from "@/shared/api";
 import { useOpenedStep } from "../hooks/use-opened-step";
 import { CommandExit, CommandLog, CommandRun } from "./items/command-items";
+import { ConvertCard } from "./items/convert-items";
 import {
 	DecisionAsk,
 	DecisionCard,
@@ -451,6 +452,7 @@ const RUNNING_TEXT: Record<StepSummary["nodeType"], string> = {
 	lease: "Taking the lease…",
 	service: "Starting the service…",
 	"since-last-run": "Comparing with the last run…",
+	convert: "Converting…",
 };
 
 const TranscriptItemView = memo(function TranscriptItemView({
@@ -536,5 +538,7 @@ const TranscriptItemView = memo(function TranscriptItemView({
 			return <ServiceCard item={item} />;
 		case "since-last-run":
 			return <SinceLastRunCard item={item} />;
+		case "convert":
+			return <ConvertCard item={item} />;
 	}
 });

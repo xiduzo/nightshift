@@ -1,4 +1,5 @@
 import {
+	CONVERT_FORMAT_LABEL,
 	commandExits,
 	DATA_EXIT_CODE,
 	type DeviceRef,
@@ -29,6 +30,7 @@ import {
 	useUpdateNodeInternals,
 } from "@xyflow/react";
 import {
+	ArrowRightLeftIcon,
 	CircleAlertIcon,
 	LockIcon,
 	MonitorIcon,
@@ -128,6 +130,12 @@ function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 		return new Map([
 			["pass", "The tool answered"],
 			["fail", "It reported an error"],
+		]);
+	}
+	if (node.type === "convert") {
+		return new Map([
+			["pass", "It converted the value"],
+			["fail", "The value does not fit the format"],
 		]);
 	}
 	if (node.type === "service") {
@@ -492,6 +500,19 @@ const FlowNodeCard = memo(function FlowNodeCard({
 					</div>
 				) : null}
 
+				{node.type === "convert" ? (
+					<div className="-mt-1 flex min-w-0 items-center gap-1 px-2.5 pb-2 text-[11px] text-muted-foreground">
+						<ArrowRightLeftIcon
+							className="size-3 shrink-0"
+							aria-hidden="true"
+						/>
+						<span className="truncate">
+							{CONVERT_FORMAT_LABEL[node.from]} to{" "}
+							{CONVERT_FORMAT_LABEL[node.to]}
+						</span>
+					</div>
+				) : null}
+
 				{node.type === "service" ? (
 					<div className="-mt-1 flex min-w-0 items-center gap-1 px-2.5 pb-2 text-[11px] text-muted-foreground">
 						<ServerIcon className="size-3 shrink-0" aria-hidden="true" />
@@ -632,6 +653,7 @@ export const nodeTypes: NodeTypes = {
 	lease: FlowNodeCard,
 	service: FlowNodeCard,
 	"since-last-run": FlowNodeCard,
+	convert: FlowNodeCard,
 } satisfies Record<FlowNodeType, unknown>;
 
 /** The computer a Subflow's steps run on, by its name. */
