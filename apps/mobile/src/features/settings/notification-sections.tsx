@@ -24,6 +24,7 @@ import {
 	type Choice,
 	DEFAULT_PUSH_URGENCIES,
 	HOURS,
+	isLastPushUrgency,
 	phoneTimeZone,
 	pushUrgenciesWith,
 } from "./notification-choices";
@@ -140,7 +141,7 @@ function PushForSection({ value, onChange }: SectionProps) {
 						key={urgency}
 						title={URGENCY_LABEL[urgency]}
 						checked={levels.includes(urgency)}
-						disabled={off}
+						disabled={off || isLastPushUrgency(levels, urgency)}
 						onChange={(on) =>
 							onChange({
 								pushUrgencies: pushUrgenciesWith(levels, urgency, on),

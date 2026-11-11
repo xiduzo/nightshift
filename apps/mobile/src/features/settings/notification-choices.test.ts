@@ -1,7 +1,11 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
 
-import { HOURS, pushUrgenciesWith } from "./notification-choices";
+import {
+	HOURS,
+	isLastPushUrgency,
+	pushUrgenciesWith,
+} from "./notification-choices";
 
 describe("the choices of Settings", () => {
 	test("offers every hour of the day", () => {
@@ -22,6 +26,18 @@ describe("Push for", () => {
 		expect(pushUrgenciesWith(["now", "today"], "now", false)).toEqual([
 			"today",
 		]);
-		expect(pushUrgenciesWith(["now"], "now", false)).toEqual([]);
+	});
+
+	test("keeps the last level on, as the web does", () => {
+		expect(pushUrgenciesWith(["now"], "now", false)).toEqual(["now"]);
+		expect(pushUrgenciesWith(["later"], "later", false)).toEqual(["later"]);
+	});
+
+	test("knows the last level that is on, so its switch is off limits", () => {
+		expect(isLastPushUrgency(["now"], "now")).toBe(true);
+		expect(isLastPushUrgency(["now"], "today")).toBe(false);
+		expect(isLastPushUrgency(["now", "today"], "now")).toBe(false);
+		// A list a Host saved empty leaves every switch free to turn on.
+		expect(isLastPushUrgency([], "now")).toBe(false);
 	});
 });

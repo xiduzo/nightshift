@@ -26,15 +26,29 @@ export function phoneTimeZone(): string {
 export const DEFAULT_PUSH_URGENCIES: readonly GateUrgency[] = ["now"];
 
 /**
+ * Whether `urgency` is the only level that is on. Its switch stays on, as
+ * on the web: turning off every Gate push is the Gates switch.
+ */
+export function isLastPushUrgency(
+	current: readonly GateUrgency[],
+	urgency: GateUrgency,
+): boolean {
+	return current.length === 1 && current[0] === urgency;
+}
+
+/**
  * The urgencies that push a Gate after one switch of "Push for" changes,
- * in the order now, today, later.
+ * in the order now, today, later. The last level that is on stays on.
  */
 export function pushUrgenciesWith(
 	current: readonly GateUrgency[],
 	urgency: GateUrgency,
 	on: boolean,
 ): GateUrgency[] {
-	return URGENCIES.filter((level) =>
+	const next = URGENCIES.filter((level) =>
 		level === urgency ? on : current.includes(level),
 	);
+	return next.length > 0
+		? next
+		: URGENCIES.filter((level) => current.includes(level));
 }
