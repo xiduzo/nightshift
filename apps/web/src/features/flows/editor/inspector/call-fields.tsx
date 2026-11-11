@@ -125,6 +125,7 @@ export function CallFields({
 			) : (
 				<CascadeSection
 					projectId=""
+					flow={flow}
 					node={node}
 					flowNames={Object.keys(support.flows ?? {})
 						.filter((name) => name !== support.flowName)

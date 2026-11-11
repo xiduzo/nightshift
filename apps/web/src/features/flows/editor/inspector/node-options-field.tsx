@@ -32,6 +32,7 @@ export function NodeOptionsField<T extends OptionNode>({
 	min,
 	hint,
 	rules = false,
+	impacts = false,
 	rulePlaceholder,
 	lead,
 	onChange,
@@ -48,6 +49,8 @@ export function NodeOptionsField<T extends OptionNode>({
 	hint: string;
 	/** Each option takes a rule (a Decision decided by a rule). */
 	rules?: boolean;
+	/** Each option takes its impact (a Decision a person answers). */
+	impacts?: boolean;
 	/** The placeholder of every rule, when it is not a Decision's. */
 	rulePlaceholder?: string;
 	/** Above the hint, such as who picks the outcome. */
@@ -107,6 +110,18 @@ export function NodeOptionsField<T extends OptionNode>({
 										if (at !== index) return option;
 										const { when: _, ...rest } = option;
 										return when === undefined ? rest : { ...rest, when };
+									}),
+								)
+						: undefined
+				}
+				onImpact={
+					impacts
+						? (index, impact) =>
+								change((list) =>
+									list.map((option, at) => {
+										if (at !== index) return option;
+										const { impact: _, ...rest } = option;
+										return impact === undefined ? rest : { ...rest, impact };
 									}),
 								)
 						: undefined

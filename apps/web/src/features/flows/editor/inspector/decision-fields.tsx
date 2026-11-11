@@ -1,5 +1,10 @@
 /** The fields of a Decision node: who decides, the prompt, the options, and for a Gate the lock screen. */
-import { type DecisionNode, type Flow, withDecidedBy } from "@nightshift/flows";
+import {
+	type DecisionNode,
+	type Flow,
+	isPersonTier,
+	withDecidedBy,
+} from "@nightshift/flows";
 import {
 	FieldContent,
 	FieldDescription,
@@ -19,6 +24,7 @@ import { DECIDED_BY_ICON } from "../../canvas/node-type";
 import { Field, InspectorSection, Note } from "../fields";
 import { TemplateField } from "../template-field";
 import { CascadeSection } from "./cascade-fields";
+import { GateBriefSection, withBrief } from "./gate-brief-fields";
 import { GateDeadlineSection } from "./gate-deadline-fields";
 import { GateTitleField } from "./gate-title-field";
 import { lockScreenHint } from "./lock-screen-hint";
@@ -86,6 +92,11 @@ export function DecisionFields({
 			: by === "model"
 				? "The model picks one. Each option gets its own edge. Describe when to pick it."
 				: "Night Shift picks the first option from the top whose rule holds. Leave the last option without a rule. Night Shift picks it when no rule holds.";
+
+	// A person reads the impacts: on a Gate, or when the cascade ends with one.
+	const personReads =
+		by === "person" ||
+		(by === "model" && (node.cascade ?? []).some((tier) => isPersonTier(tier)));
 
 	// Settings → New nodes: the decider a node starts on when a model decides it.
 	const settings = useQuery(settingsQueries.get());
@@ -192,6 +203,16 @@ export function DecisionFields({
 				) : null}
 			</InspectorSection>
 
+			{by === "person" ? (
+				<GateBriefSection
+					flow={flow}
+					nodeId={node.id}
+					fields={node}
+					options={node.options.map((option) => option.name)}
+					onChange={(brief) => onChange((current) => withBrief(current, brief))}
+				/>
+			) : null}
+
 			<NodeOptionsField
 				id={`${id}-options`}
 				kind="option"
@@ -199,6 +220,7 @@ export function DecisionFields({
 				min={1}
 				hint={optionsHint}
 				rules={by === "rule"}
+				impacts={personReads}
 				onChange={onChange}
 				onRenameOutcome={onRenameOutcome}
 				onRemoveOutcome={onRemoveOutcome}
@@ -233,7 +255,12 @@ export function DecisionFields({
 				<ModelSettings projectId={projectId} node={node} onChange={onChange} />
 			) : null}
 			{by === "model" ? (
-				<CascadeSection projectId={projectId} node={node} onChange={onChange} />
+				<CascadeSection
+					projectId={projectId}
+					flow={flow}
+					node={node}
+					onChange={onChange}
+				/>
 			) : null}
 		</>
 	);

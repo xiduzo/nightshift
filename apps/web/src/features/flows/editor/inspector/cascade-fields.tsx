@@ -9,6 +9,7 @@ import {
 	type CallTier,
 	type CascadeNode,
 	type DecisionTier,
+	type Flow,
 	isPersonTier,
 	kitList,
 	type PersonTier,
@@ -38,6 +39,7 @@ import { Switch } from "@nightshift/ui/components/switch";
 import { ArrowDownIcon, ArrowUpIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useId } from "react";
 import { Field, InspectorSection, Note, PositiveIntInput } from "../fields";
+import { GateBriefSection, withBrief } from "./gate-brief-fields";
 import {
 	ProfileSelect,
 	profileProblem,
@@ -133,11 +135,14 @@ function withTiers<N extends CascadeNode>(
 
 export function CascadeSection<N extends CascadeNode>({
 	projectId,
+	flow,
 	node,
 	flowNames,
 	onChange,
 }: {
 	projectId: string;
+	/** The flow: the person tier's brief takes templates. */
+	flow: Flow;
 	node: N;
 	/** A Subflow's choices for a tier: the project's other flows. */
 	flowNames?: readonly string[];
@@ -181,155 +186,177 @@ export function CascadeSection<N extends CascadeNode>({
 		});
 
 	return (
-		<InspectorSection
-			title="Cascade"
-			tab="setup"
-			description={`A try that does not hold tries again, then moves to the next tier. Later nodes read the tier that held as {{${node.id}.tier}}.`}
-		>
-			<ItemGroup className="gap-2">
-				{models.map((tier, index) => (
-					<TierItem
-						// The tiers have no ids: the position is the key.
-						key={`${index}-${models.length}`}
-						projectId={projectId}
-						node={node}
-						tier={tier}
-						index={index}
-						count={models.length}
-						flowNames={flowNames}
-						onChange={(patch) =>
+		<>
+			<InspectorSection
+				title="Cascade"
+				tab="setup"
+				description={`A try that does not hold tries again, then moves to the next tier. Later nodes read the tier that held as {{${node.id}.tier}}.`}
+			>
+				<ItemGroup className="gap-2">
+					{models.map((tier, index) => (
+						<TierItem
+							// The tiers have no ids: the position is the key.
+							key={`${index}-${models.length}`}
+							projectId={projectId}
+							node={node}
+							tier={tier}
+							index={index}
+							count={models.length}
+							flowNames={flowNames}
+							onChange={(patch) =>
+								change((all) =>
+									all.map((each, at) =>
+										at === index
+											? (Object.fromEntries(
+													Object.entries({ ...each, ...patch }).filter(
+														([, value]) => value !== undefined,
+													),
+												) as Tier)
+											: each,
+									),
+								)
+							}
+							onClear={(key) =>
+								change((all) =>
+									all.map((each, at) => {
+										if (at !== index) return each;
+										const { [key]: _gone, ...rest } = each as Record<
+											string,
+											unknown
+										>;
+										return rest as Tier;
+									}),
+								)
+							}
+							onMove={(by) => move(index, by)}
+							onRemove={() =>
+								change((all) => all.filter((_each, at) => at !== index))
+							}
+						/>
+					))}
+				</ItemGroup>
+				<Button
+					variant="outline"
+					size="sm"
+					className="w-fit"
+					disabled={tiers.length >= 8}
+					onClick={() =>
+						change((all) => {
+							const last = all.filter((tier) => !isPersonTier(tier)).at(-1);
+							const { label: _label, ...copy } = (last ?? {}) as ModelTier;
+							const at = person ? all.length - 1 : all.length;
+							return [...all.slice(0, at), copy, ...all.slice(at)];
+						})
+					}
+				>
+					<PlusIcon data-icon="inline-start" />
+					Add tier
+				</Button>
+
+				<ShadcnField orientation="horizontal" className="items-start">
+					<Switch
+						id={`${id}-person`}
+						checked={person !== undefined}
+						className="mt-0.5"
+						aria-describedby={`${id}-person-hint`}
+						onCheckedChange={(on) =>
 							change((all) =>
-								all.map((each, at) =>
-									at === index
-										? (Object.fromEntries(
-												Object.entries({ ...each, ...patch }).filter(
-													([, value]) => value !== undefined,
-												),
-											) as Tier)
-										: each,
-								),
+								on
+									? [
+											...all.filter((tier) => !isPersonTier(tier)),
+											{ person: true },
+										]
+									: all.filter((tier) => !isPersonTier(tier)),
 							)
 						}
-						onClear={(key) =>
+					/>
+					<FieldContent>
+						<FieldLabel htmlFor={`${id}-person`}>
+							Ask me when no tier holds
+						</FieldLabel>
+						<FieldDescription id={`${id}-person-hint`} className="text-xs">
+							{node.type === "decision"
+								? "A Gate shows what each tier picked. You pick the option."
+								: node.type === "value"
+									? "A form shows what each try did, filled in with the best answer. You correct it and send it."
+									: "A Gate shows what each try did. You can try once more on the last tier, with a note, or stop."}
+						</FieldDescription>
+					</FieldContent>
+				</ShadcnField>
+				{person ? (
+					<PersonDeadline
+						id={`${id}-deadline`}
+						node={node}
+						tier={person}
+						onChange={(deadline) =>
 							change((all) =>
-								all.map((each, at) => {
-									if (at !== index) return each;
-									const { [key]: _gone, ...rest } = each as Record<
-										string,
-										unknown
-									>;
-									return rest as Tier;
+								all.map((tier) => {
+									if (!isPersonTier(tier)) return tier;
+									const { deadline: _old, ...rest } = tier;
+									return deadline ? { ...rest, deadline } : rest;
 								}),
 							)
 						}
-						onMove={(by) => move(index, by)}
-						onRemove={() =>
-							change((all) => all.filter((_each, at) => at !== index))
-						}
 					/>
-				))}
-			</ItemGroup>
-			<Button
-				variant="outline"
-				size="sm"
-				className="w-fit"
-				disabled={tiers.length >= 8}
-				onClick={() =>
-					change((all) => {
-						const last = all.filter((tier) => !isPersonTier(tier)).at(-1);
-						const { label: _label, ...copy } = (last ?? {}) as ModelTier;
-						const at = person ? all.length - 1 : all.length;
-						return [...all.slice(0, at), copy, ...all.slice(at)];
-					})
-				}
-			>
-				<PlusIcon data-icon="inline-start" />
-				Add tier
-			</Button>
+				) : null}
 
-			<ShadcnField orientation="horizontal" className="items-start">
-				<Switch
-					id={`${id}-person`}
-					checked={person !== undefined}
-					className="mt-0.5"
-					aria-describedby={`${id}-person-hint`}
-					onCheckedChange={(on) =>
-						change((all) =>
-							on
-								? [
-										...all.filter((tier) => !isPersonTier(tier)),
-										{ person: true },
-									]
-								: all.filter((tier) => !isPersonTier(tier)),
-						)
-					}
-				/>
-				<FieldContent>
-					<FieldLabel htmlFor={`${id}-person`}>
-						Ask me when no tier holds
-					</FieldLabel>
-					<FieldDescription id={`${id}-person-hint`} className="text-xs">
-						{node.type === "decision"
-							? "A Gate shows what each tier picked. You pick the option."
-							: node.type === "value"
-								? "A form shows what each try did, filled in with the best answer. You correct it and send it."
-								: "A Gate shows what each try did. You can try once more on the last tier, with a note, or stop."}
-					</FieldDescription>
-				</FieldContent>
-			</ShadcnField>
-			{person ? (
-				<PersonDeadline
-					id={`${id}-deadline`}
-					node={node}
-					tier={person}
-					onChange={(deadline) =>
-						change((all) =>
-							all.map((tier) => {
-								if (!isPersonTier(tier)) return tier;
-								const { deadline: _old, ...rest } = tier;
-								return deadline ? { ...rest, deadline } : rest;
-							}),
-						)
-					}
-				/>
-			) : null}
-
-			{node.type === "agent" ? (
-				<Field
-					id={`${id}-check`}
-					label="Check"
-					optional
-					hint="A command that runs after each try that passes, in the run's copy of the project. The try holds only when it exits 0."
-				>
-					<Input
+				{node.type === "agent" ? (
+					<Field
 						id={`${id}-check`}
-						className="font-mono"
-						value={node.check ?? ""}
-						placeholder="bun test"
-						aria-describedby={`${id}-check-hint`}
-						onChange={(event) => {
-							const check = event.target.value;
-							onChange((current) => {
-								const { check: _old, ...rest } = current as N & {
-									check?: string;
-								};
-								return (check.trim() === "" ? rest : { ...rest, check }) as N;
-							});
-						}}
-					/>
-				</Field>
-			) : null}
+						label="Check"
+						optional
+						hint="A command that runs after each try that passes, in the run's copy of the project. The try holds only when it exits 0."
+					>
+						<Input
+							id={`${id}-check`}
+							className="font-mono"
+							value={node.check ?? ""}
+							placeholder="bun test"
+							aria-describedby={`${id}-check-hint`}
+							onChange={(event) => {
+								const check = event.target.value;
+								onChange((current) => {
+									const { check: _old, ...rest } = current as N & {
+										check?: string;
+									};
+									return (check.trim() === "" ? rest : { ...rest, check }) as N;
+								});
+							}}
+						/>
+					</Field>
+				) : null}
 
-			<Button
-				variant="ghost"
-				size="sm"
-				className="-ml-2 w-fit text-muted-foreground"
-				onClick={() => onChange((current) => withoutCascade(current))}
-			>
-				<Trash2Icon data-icon="inline-start" />
-				Remove the cascade
-			</Button>
-		</InspectorSection>
+				<Button
+					variant="ghost"
+					size="sm"
+					className="-ml-2 w-fit text-muted-foreground"
+					onClick={() => onChange((current) => withoutCascade(current))}
+				>
+					<Trash2Icon data-icon="inline-start" />
+					Remove the cascade
+				</Button>
+			</InspectorSection>
+			{person ? (
+				<GateBriefSection
+					flow={flow}
+					nodeId={node.id}
+					fields={person}
+					options={
+						node.type === "decision"
+							? node.options.map((option) => option.name)
+							: null
+					}
+					tab="setup"
+					onChange={(brief) =>
+						change((all) =>
+							all.map((tier) =>
+								isPersonTier(tier) ? withBrief(tier, brief) : tier,
+							),
+						)
+					}
+				/>
+			) : null}
+		</>
 	);
 }
 

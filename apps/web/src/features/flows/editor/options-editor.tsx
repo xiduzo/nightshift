@@ -51,6 +51,7 @@ const RESERVED: readonly string[] = reservedOutcomes;
  * `onMove` it edits a plain list of names, for example a Subflow's halt-on
  * labels. With `onCode`, each row also takes an exit code (a Command node).
  * With `onColor`, each row also takes a colour for its handle and edges.
+ * With `onImpact`, each row also takes what happens when a person picks it.
  */
 export function OptionsEditor({
 	kind,
@@ -64,6 +65,7 @@ export function OptionsEditor({
 	rulePlaceholder,
 	onCode,
 	onColor,
+	onImpact,
 	onAdd,
 	addControl,
 	onRemove,
@@ -90,6 +92,8 @@ export function OptionsEditor({
 	onCode?: (index: number, code: NodeOption["code"]) => void;
 	/** The colour of each row. Undefined goes back to the one from its name. */
 	onColor?: (index: number, color: OutcomeColor | undefined) => void;
+	/** A Decision a person answers: what happens when they pick each option. */
+	onImpact?: (index: number, impact: string | undefined) => void;
 	onAdd: (option: NodeOption) => void;
 	/** Replaces the add button, for example with a menu of common entries. */
 	addControl?: ReactNode;
@@ -131,6 +135,9 @@ export function OptionsEditor({
 						rulePlaceholder={rulePlaceholder}
 						onCode={onCode ? (code) => onCode(index, code) : undefined}
 						onColor={onColor ? (color) => onColor(index, color) : undefined}
+						onImpact={
+							onImpact ? (impact) => onImpact(index, impact) : undefined
+						}
 						onRemove={() => onRemove(index)}
 						onMove={onMove ? (to) => onMove(index, to) : undefined}
 					/>
@@ -169,6 +176,7 @@ function OptionRow({
 	rulePlaceholder,
 	onCode,
 	onColor,
+	onImpact,
 	onRemove,
 	onMove,
 }: {
@@ -186,6 +194,7 @@ function OptionRow({
 	rulePlaceholder?: string;
 	onCode?: (code: NodeOption["code"]) => void;
 	onColor?: (color: OutcomeColor | undefined) => void;
+	onImpact?: (impact: string | undefined) => void;
 	onRemove: () => void;
 	onMove?: (to: number) => void;
 }) {
@@ -352,6 +361,20 @@ function OptionRow({
 					onChange={(event) => {
 						const description = event.target.value;
 						onDescribe(description || undefined);
+					}}
+				/>
+			) : null}
+			{onImpact ? (
+				<Input
+					id={`${id}-impact`}
+					value={option.impact ?? ""}
+					aria-label={`Impact of ${position}`}
+					placeholder="What happens when you pick it (optional)"
+					className="h-8 text-xs"
+					autoComplete="off"
+					onChange={(event) => {
+						const impact = event.target.value;
+						onImpact(impact.trim() === "" ? undefined : impact);
 					}}
 				/>
 			) : null}

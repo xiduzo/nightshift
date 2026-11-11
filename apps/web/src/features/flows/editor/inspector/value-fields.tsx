@@ -13,6 +13,7 @@ import { OutputSchemaField } from "../output-schema-field";
 import { TemplateField } from "../template-field";
 import { AskFields } from "./ask-fields";
 import { CascadeSection } from "./cascade-fields";
+import { GateBriefSection, withBrief } from "./gate-brief-fields";
 import { GateTitleField } from "./gate-title-field";
 import { ModelSettings } from "./model-settings";
 
@@ -184,13 +185,27 @@ export function ValueFields({
 			</InspectorSection>
 
 			{by === "person" ? (
+				<GateBriefSection
+					flow={flow}
+					nodeId={node.id}
+					fields={node}
+					options={null}
+					onChange={(brief) => onChange((current) => withBrief(current, brief))}
+				/>
+			) : null}
+			{by === "person" ? (
 				<AskFields flow={flow} node={node} onChange={onChange} />
 			) : null}
 			{by === "model" && node.cascade === undefined ? (
 				<ModelSettings projectId={projectId} node={node} onChange={onChange} />
 			) : null}
 			{by === "model" ? (
-				<CascadeSection projectId={projectId} node={node} onChange={onChange} />
+				<CascadeSection
+					projectId={projectId}
+					flow={flow}
+					node={node}
+					onChange={onChange}
+				/>
 			) : null}
 		</>
 	);

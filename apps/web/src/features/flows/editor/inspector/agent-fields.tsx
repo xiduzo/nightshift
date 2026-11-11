@@ -547,7 +547,12 @@ export function AgentFields({
 				onSetOutcomes={onSetOutcomes}
 			/>
 
-			<CascadeSection projectId={projectId} node={node} onChange={onChange} />
+			<CascadeSection
+				projectId={projectId}
+				flow={flow}
+				node={node}
+				onChange={onChange}
+			/>
 		</>
 	);
 }
