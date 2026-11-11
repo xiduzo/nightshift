@@ -53,6 +53,15 @@ describe("askWhy", () => {
 		});
 	});
 
+	test("a project without a folder is on every computer: it is ready", () => {
+		expect(
+			askWhy({
+				...base,
+				project: { id: "p1", repoPath: null, folder: false },
+			}),
+		).toEqual({ kind: "ready", projectId: "p1", flowName: "build" });
+	});
+
 	test("waits for the owner check before it offers the action", () => {
 		expect(askWhy({ ...base, owner: undefined }).kind).toBe("hidden");
 	});

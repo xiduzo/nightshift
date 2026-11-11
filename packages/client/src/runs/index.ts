@@ -108,6 +108,7 @@ export type {
 	ItemState,
 	ItemSummary,
 	RunDetail,
+	RunFiles,
 	RunResult,
 	RunStatus,
 	RunSummary,

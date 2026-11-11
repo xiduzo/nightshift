@@ -17,7 +17,9 @@ export type AskWhy =
 /**
  * The chat about the run runs on this computer's own profiles, in its copy
  * of the project, and may propose a change to the flow: only for the owner
- * of this computer, for a run of a flow file of a project here.
+ * of this computer, for a run of a flow file of a project here. A project
+ * without a folder (ADR 22) is on every computer: the chat works in a
+ * folder of its own.
  */
 export function askWhy({
 	status,
@@ -28,8 +30,13 @@ export function askWhy({
 	status: RunStatus;
 	/** The flow the run ran, or null for a run without a flow file. */
 	flowName: string | null;
-	/** The run's project in the Space you work in, or undefined when it is not there. */
-	project: { id: string; repoPath: string | null } | undefined;
+	/**
+	 * The run's project in the Space you work in, or undefined when it is
+	 * not there. `folder` false: it has no folder. An older Host sends none.
+	 */
+	project:
+		| { id: string; repoPath: string | null; folder?: boolean }
+		| undefined;
 	/** You own this computer. Undefined while that loads. */
 	owner: boolean | undefined;
 }): AskWhy {
@@ -40,7 +47,8 @@ export function askWhy({
 			kind: "disabled",
 			reason: "Only the owner of this computer can ask an agent here.",
 		};
-	if (project.repoPath === null)
+	// Not `hasFolder` of projects: that vertical reads runs (a cycle).
+	if (project.repoPath === null && project.folder !== false)
 		return {
 			kind: "disabled",
 			reason:

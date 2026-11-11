@@ -1,4 +1,5 @@
-/** Projects: their query options and view types. */
+/** Projects: their query options, whether one has a folder, and their view types. */
 
+export { hasFolder } from "./folder";
 export { createProjectQueries } from "./queries";
 export type { GitInstall, Project, ProjectCheck, RunCopy } from "./types";

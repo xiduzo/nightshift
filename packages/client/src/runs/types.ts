@@ -7,6 +7,8 @@ export type RunDetail = ApiOutputs["runs"]["get"];
 export type StepSummary = RunDetail["steps"][number];
 /** A file a run's agent kept for the person. */
 export type Artifact = ApiOutputs["runs"]["artifacts"][number];
+/** The files in a run's own folder (a project without a folder), and when they go. */
+export type RunFiles = ApiOutputs["runs"]["files"];
 export type SessionSummary = StepSummary["sessions"][number];
 /** One item of a Call step's visit (`each`). */
 export type ItemSummary = StepSummary["items"][number];

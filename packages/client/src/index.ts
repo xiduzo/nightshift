@@ -169,6 +169,7 @@ export {
 export {
 	createProjectQueries,
 	type GitInstall,
+	hasFolder,
 	type Project,
 	type ProjectCheck,
 	type RunCopy,
@@ -226,6 +227,7 @@ export {
 	type RunActing,
 	type RunActions,
 	type RunDetail,
+	type RunFiles,
 	type RunResult,
 	type RunStatus,
 	type RunStreamConnection,
