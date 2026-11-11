@@ -8,6 +8,7 @@ import {
 	nameSchema,
 	nodeBase,
 	nodeProfileSchema,
+	outputInferredSchema,
 	placed,
 	profileFallbacksSchema,
 } from "./base";
@@ -317,6 +318,8 @@ export const agentNodeSchema = z.object({
 	 * it as `{{<node>.data}}` or a path into it, for example `{{planner.data.tasks}}`.
 	 */
 	output: jsonSchemaSchema.optional(),
+	/** Night Shift inferred `output` from a real output (`outputInferredSchema`). */
+	outputInferred: outputInferredSchema,
 	/**
 	 * The tiers the agent climbs (ADR 6): each tier's agent is tried up to
 	 * its `tries`, then the next tier's. A try holds when the agent ends

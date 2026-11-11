@@ -1,5 +1,6 @@
 import type { Flow, FlowNode } from "../flow";
 import { CASCADE_TEMPLATE_FIELDS } from "../nodes";
+import { RESERVED_DATA_KEYS, schemaAt } from "../shapes";
 import {
 	ruleNames,
 	ruleProblem,
@@ -8,7 +9,11 @@ import {
 	templateRefs,
 } from "../template";
 import type { At, ProjectFlowMap, Report } from "./issues";
-import { readsName, type TemplateScope } from "./template-scope";
+import {
+	readsName,
+	type TemplateField,
+	type TemplateScope,
+} from "./template-scope";
 
 /** The references of templates and rules: what they may read, and the checks of each one. */
 
@@ -24,6 +29,11 @@ export type Scope = {
 	readVars: Set<string>;
 	/** The node whose templates are checked has a cascade: it reads `{{cascade.*}}` (ADR 6). */
 	cascade?: boolean;
+	/**
+	 * Reports a warning: a path below a JSON field that its shape lacks
+	 * (`checkShapePath`). A flow with warnings still runs.
+	 */
+	warning: Report;
 };
 
 /**
@@ -130,7 +140,8 @@ function checkRuleReads(
 /**
  * Each reference names `run`, an input, `vars` or a node, and reads what
  * the template scope (`templateScope`) lists: one of its fields first, and
- * deeper keys only below a JSON field.
+ * deeper keys only below a JSON field. Deeper keys that the field's shape
+ * lacks are a warning (`checkShapePath`).
  */
 export function checkTemplate(
 	text: string,
@@ -182,6 +193,8 @@ export function checkRef(
 					`${uses}, but the variable "${field}" is ${type}: it takes no path. Write {{vars.${field}}}, or make it json.`,
 					at,
 				);
+			} else {
+				checkShapePath(variable, deeper, uses, at, scope, false);
 			}
 		}
 		return;
@@ -228,7 +241,39 @@ export function checkRef(
 		);
 	} else if (deeper.length > 0 && !read.json) {
 		error(`${uses}, but ${ref.name}.${field} is text: it takes no path.`, at);
+	} else {
+		checkShapePath(read, deeper, uses, at, scope, field === "data");
 	}
+}
+
+/**
+ * A path below a JSON field that its shape lacks is a warning: the value
+ * may still hold it, and a node's shape can be inferred from one run. A
+ * shape that does not say (`{}`, no properties, `anyOf`) takes any path.
+ * Below a node's `data`, the keys a command writes for Night Shift
+ * (`RESERVED_DATA_KEYS`) never warn.
+ */
+function checkShapePath(
+	field: TemplateField,
+	deeper: readonly string[],
+	uses: string,
+	at: At,
+	scope: Scope,
+	data: boolean,
+): void {
+	if (deeper.length === 0 || !field.json || field.schema === undefined) return;
+	const reserved: readonly string[] = RESERVED_DATA_KEYS;
+	if (data && reserved.includes(deeper[0] ?? "")) return;
+	const found = schemaAt(field.schema, deeper);
+	if (found.kind !== "missing") return;
+	const place = [field.ref, ...deeper.slice(0, found.index)].join(".");
+	const key = deeper[found.index];
+	scope.warning(
+		found.keys.length > 0
+			? `${uses}, but ${place} has no field "${key}". Use one of: ${found.keys.join(", ")}.`
+			: `${uses}, but the shape of ${place} has no field "${key}".`,
+		at,
+	);
 }
 
 /**

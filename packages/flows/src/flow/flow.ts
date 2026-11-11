@@ -141,19 +141,32 @@ export const flowInputSchema = z.object({
 	required: z.boolean().optional(),
 });
 
+/**
+ * The type of a variable. `json` is any JSON value, held to `schema` when
+ * the variable has one.
+ */
+export const variableTypeSchema = z.enum(["text", "number", "boolean", "json"]);
+
 /** A value the flow returns, rendered from a template when the flow ends. */
 export const flowOutputSchema = z.object({
 	name: nameSchema,
 	/** A template. One reference keeps its JSON value: `{{review.data}}`. */
 	value: z.string(),
 	description: z.string().optional(),
+	/**
+	 * What the output holds, as a variable's type: the caller's templates
+	 * read its shape (`{{sub.plan.tasks}}`). Unset: any value, as before
+	 * format 9.
+	 */
+	type: variableTypeSchema.optional(),
+	/** `json` only: a JSON Schema for the value. */
+	schema: jsonSchemaSchema.optional(),
+	/**
+	 * Night Shift inferred `type` and `schema` from a real run: no person
+	 * wrote or confirmed them. Unset: a person did.
+	 */
+	inferred: z.literal(true).optional(),
 });
-
-/**
- * The type of a variable. `json` is any JSON value, held to `schema` when
- * the variable has one.
- */
-export const variableTypeSchema = z.enum(["text", "number", "boolean", "json"]);
 
 /**
  * Where a kept variable lives between runs. `project`: one value per flow

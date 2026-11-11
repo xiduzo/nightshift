@@ -6,9 +6,9 @@ import {
 	fromJsonSchema,
 	shapeIsValid,
 	toJsonSchema,
-} from "./schema-builder";
+} from "./shape";
 
-describe("schema builder", () => {
+describe("shapes", () => {
 	test("round-trips a nested object, keeping order, required and descriptions", () => {
 		const schema = {
 			type: "object",
@@ -48,6 +48,22 @@ describe("schema builder", () => {
 		const shape = fromJsonSchema(schema);
 		if (!shape) throw new Error("not shown");
 		expect(toJsonSchema(shape)).toEqual(schema);
+	});
+
+	test("a file is a string of the format file, and round-trips", () => {
+		const schema = {
+			type: "string",
+			format: "file",
+			description: "The report.",
+		};
+		expect(fromJsonSchema(schema)).toEqual({
+			kind: "file",
+			description: "The report.",
+		});
+		const shape = fromJsonSchema(schema);
+		if (!shape) throw new Error("not shown");
+		expect(toJsonSchema(shape)).toEqual(schema);
+		expect(fromJsonSchema({ type: "string", format: "date" })).toBeNull();
 	});
 
 	test("reads an object without a type from its properties", () => {

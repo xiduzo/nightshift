@@ -501,6 +501,10 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   },
                   "type": "object",
                 },
+                "outputInferred": {
+                  "const": true,
+                  "type": "boolean",
+                },
                 "permissionMode": {
                   "enum": [
                     "default",
@@ -707,6 +711,10 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                     "type": "string",
                   },
                   "type": "object",
+                },
+                "outputInferred": {
+                  "const": true,
+                  "type": "boolean",
                 },
                 "position": {
                   "properties": {
@@ -1886,6 +1894,10 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   },
                   "type": "object",
                 },
+                "outputInferred": {
+                  "const": true,
+                  "type": "boolean",
+                },
                 "position": {
                   "properties": {
                     "x": {
@@ -2278,6 +2290,17 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                 },
                 "label": {
                   "type": "string",
+                },
+                "output": {
+                  "additionalProperties": {},
+                  "propertyNames": {
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "outputInferred": {
+                  "const": true,
+                  "type": "boolean",
                 },
                 "position": {
                   "properties": {
@@ -2770,8 +2793,28 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
             "description": {
               "type": "string",
             },
+            "inferred": {
+              "const": true,
+              "type": "boolean",
+            },
             "name": {
               "pattern": "^[a-z][a-z0-9_]{0,39}$",
+              "type": "string",
+            },
+            "schema": {
+              "additionalProperties": {},
+              "propertyNames": {
+                "type": "string",
+              },
+              "type": "object",
+            },
+            "type": {
+              "enum": [
+                "text",
+                "number",
+                "boolean",
+                "json",
+              ],
               "type": "string",
             },
             "value": {
@@ -3456,6 +3499,10 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   },
                   "type": "object",
                 },
+                "outputInferred": {
+                  "const": true,
+                  "type": "boolean",
+                },
                 "permissionMode": {
                   "enum": [
                     "default",
@@ -3668,6 +3715,10 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                     "type": "string",
                   },
                   "type": "object",
+                },
+                "outputInferred": {
+                  "const": true,
+                  "type": "boolean",
                 },
                 "position": {
                   "additionalProperties": false,
@@ -4891,6 +4942,10 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   },
                   "type": "object",
                 },
+                "outputInferred": {
+                  "const": true,
+                  "type": "boolean",
+                },
                 "position": {
                   "additionalProperties": false,
                   "properties": {
@@ -5298,6 +5353,17 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                 },
                 "label": {
                   "type": "string",
+                },
+                "output": {
+                  "additionalProperties": {},
+                  "propertyNames": {
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "outputInferred": {
+                  "const": true,
+                  "type": "boolean",
                 },
                 "position": {
                   "additionalProperties": false,
@@ -5810,8 +5876,28 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
             "description": {
               "type": "string",
             },
+            "inferred": {
+              "const": true,
+              "type": "boolean",
+            },
             "name": {
               "pattern": "^[a-z][a-z0-9_]{0,39}$",
+              "type": "string",
+            },
+            "schema": {
+              "additionalProperties": {},
+              "propertyNames": {
+                "type": "string",
+              },
+              "type": "object",
+            },
+            "type": {
+              "enum": [
+                "text",
+                "number",
+                "boolean",
+                "json",
+              ],
               "type": "string",
             },
             "value": {
@@ -6939,7 +7025,7 @@ exports[`published schemas customAgentSchema as JSON Schema 1`] = `
 exports[`published schemas every published schema as a JSON Schema hash 1`] = `
 {
   "agentHarnessSchema": "d12cc5d7f05c6d4a3a3619d72791c31de7a482d1090430b563bf01d4149f9471",
-  "agentNodeSchema": "7c4b202eee7a15d54c9bd9e1b8e7f964268268e51c580b9e5aca5be6d89c5cdb",
+  "agentNodeSchema": "e59c7eec9d4eff3a996e7a7d95660a9fe931b32eb6b073e06949b31f7d6cb995",
   "agentProfileSchema": "bed949397866c087d61cfac1a7ada6bb6b9f11d13b232be0c56b0d150bf20ee8",
   "agentProfileSettingsSchema": "2f3c17fcdbfcbd3f4b0eadb835d385be7b3bc847d4239148743aa6777b42077a",
   "agentTierSchema": "adbfb5ff1e0cd15b8f217bdc0015d321fa6a03f41c130deefa2d36eb4b4e7803",
@@ -6953,11 +7039,11 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "callNodeSchema": "856424b932b2bdf5e466e4df2fefb72963a974a3c5f8eaeeb7cb85cde6c12095",
   "callTierSchema": "00472b8d815f172216c3976c44d8148ab36a7690a4b331f344112daf0a7ade18",
   "calledFlowNameSchema": "41a733acacaf6fd4a56ce1af8652a762a9eae1a70888ac38628091b417b7f999",
-  "chatRequestSchema": "4cb0c8060c918c7e00bf633d66f9ce81481a953e1f42f45d0767d88dfd8c6c23",
+  "chatRequestSchema": "b15e1bbce659af78864a3bca26201605343bd5e6a96bf2b6001b9689813e8361",
   "choiceItemSchema": "55d6a793593f2331affa67faa389d61df03d4029c01b7a7443f9a98834f63da7",
   "cliNameSchema": "51a3ab3696b70b9bee33bc67a8d7cb8f1ae494ccef5ccc7e73878b93fb22c12c",
   "commandExitSchema": "81c5c7ed3b70f87931cdd1b3beb8943305b5a7b50e6f5840b9d885ba920e88a3",
-  "commandNodeSchema": "85335807a39063d65cf00c0b7c050b8877a4cbcd4c774b7cc044ed6e0a0561e9",
+  "commandNodeSchema": "21952faadd85b1b63eb15fd986434e2a397ec832d651bedaa6504bec44797b3d",
   "commandSourceSchema": "29be5c28ca62374751ca03afaf9cd232962ffa7e0220220d34e0f64a0f2f3ecb",
   "customAgentSchema": "695fcb6e79464055898109624fe9bfb29190a3dccb2c722e26f4d9bdb622d425",
   "customAgentSlugSchema": "85b706ff2ef51fed369fb25c81f938328d9771d8a396bc7f1ed876637543e94a",
@@ -6976,9 +7062,9 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "flowInputSchema": "c4327eae5fd47880a975ba515ace6c59b99e4872d70d039dbe0e13f3b78794dd",
   "flowInputTypeSchema": "01b4ffbb09aa8ea76514a7d2ec8b814bc6d444afe04c4387819be8a08a4b10a4",
   "flowNameSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
-  "flowNodeSchema": "3aa024d183a067bd4818a64cfac5f3147a3bf15d5772c0db648b7b93ae01fdc1",
-  "flowOutputSchema": "5cac9a44d87581c7f53da7394228745dfd952219f5dfd90f3620c516c272edb7",
-  "flowSchema": "6d0f407ee45b2de155d19410c4a62aad79114f229a1a1924f3f9408e07727dd4",
+  "flowNodeSchema": "079d39af161854a045ce1293578464e6ec7eb18499e79cb64d0149fdd616aefd",
+  "flowOutputSchema": "00a461c38cec41ea7ca8d914b037ae0722db17dea81b0f0d179910fe87722b5f",
+  "flowSchema": "d0d59317e1a713115922c9127ab6b8f396d375c2f642c7691afd293ca3b25f59",
   "flowSectionSchema": "3cd74de667afdadb6253862ee3c7d71ee76f3e26c484bc8a0eb4fba4ccca8beb",
   "flowVariableSchema": "6b94624e39154287f7234674d738fc66c15683391478c2b601a0393a3dcad746",
   "gateDeadlineSchema": "38c3b76b2cfed3b1040f87955aaa7f44d377f298f682ced37e6c784c5096de76",
@@ -7010,6 +7096,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "option": "6bf55e601c5096c5094c68aa7ec3842acb0de882ce5552afb5e23334595396d9",
   "outcomeColorSchema": "a08d55161170d015984cde21947f73357d874c2c1469cf21d5df857936510817",
   "outcomeSchema": "71f189789579b92afec5143845c2121d3d596711dad7343aa3a39aeb378953bc",
+  "outputInferredSchema": "4c68b1a7097781a1cec26621324283e942646f6a0b758ce2767d29cf3119eece",
   "permissionModeSchema": "759773decf0c9f4a4772f09d6bb1732999436b3b8f7b763134ae9a4b7478b3bd",
   "personTierSchema": "9d80c61466abdf1ec04e5221887f7d907c46f6382d470c0a6548424cfb982e95",
   "policySchema": "fedfbecaffb7cf8c448cefd0ace896279f26e28d10f7d633245dd2876451a7b1",
@@ -7027,14 +7114,14 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "serviceNodeSchema": "9211b5d36df35c8c8817938f33ae12184604bda7dffef8c0bcf4854b09a349d6",
   "serviceReadySchema": "6844b7f89e0f30cfd776eb620d2ff7ad2f06ac7f4e908b6752b84ca055ebe2da",
   "suggestionKindSchema": "3e43d01e11142bb468d0231629bcc69236a97420b5675b96fe46f4c74492955f",
-  "suggestionRequestSchema": "3838b99b095561b64d6047c8e434ffa964072460dafbb2e0da7c09d866958b2e",
+  "suggestionRequestSchema": "378be85a704cfae7d3b93c34925aa91268e0be2b36799dc4a244ab7b401c857a",
   "suggestionSchema": "7eb8ae685355788f149a1e214b0a1a055a94eddb94303c2150896d480fb3aea1",
   "textRangeSchema": "f4f1728b7fbe3eeb75cd4b9e3609d9349b8ce81db2bc7f521acb8351d420c77e",
   "timeOfDaySchema": "8684ebbaf52e062cf5e284260d4f3a9bc9583a4a7a3db8007313edc210ccccae",
-  "toolNodeSchema": "ab17407b99c7a73fba6ebbc1890f98c6c635273d066b1079a3bd1fefdb08af42",
+  "toolNodeSchema": "0e3866e38f776b4ec18173f5af121c4f6fef0ee65c88f14ee51edaa94c259609",
   "valueBySchema": "734362a1538da072596d7625d304b5faefdd8a62e7364e3eb5b22bff1a98739f",
   "valueDeciderNameSchema": "1361d0968d68d449cc2f2a7659681f2bacff35a15c5fe94ac1f5f6777b100a48",
-  "valueNodeSchema": "072a37acd39c7da260ed650e2c707f33332f5a6e0df044c547f8be9b3dd6919d",
+  "valueNodeSchema": "1b7c8ae992e250d62192eab9f0a978845f7d4c2367e2e6bb018b1f2f54842c59",
   "valueTierSchema": "283dcc80e09de2a2b3783c1b1330999bceecf200da194633e7c3d997ba2b07b3",
   "variableTypeSchema": "1117a60eccb8c2baefec4e9cebcf2c4a387a033ded5c8a7071a9474221fa733c",
   "variableWriteSchema": "2c39a4e86bcbb12e591793c1361222cd3dd9380833ce702eef65f3ca45cee0a2",

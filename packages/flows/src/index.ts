@@ -144,7 +144,10 @@ export {
 	migrateToolSets,
 	type NextEdge,
 	type NextEdgeInput,
+	NODE_FAMILIES,
+	NODE_FAMILY,
 	NODE_TYPE_LABEL,
+	type NodeFamily,
 	nextEdge,
 	nodeOutcomes,
 	type Outcome,
@@ -420,6 +423,18 @@ export {
 	sectionOf,
 	sectionPath,
 } from "./sections";
+export {
+	emptyShape,
+	FILE_FORMAT,
+	fieldNameProblem,
+	fromJsonSchema,
+	type SchemaField,
+	type SchemaShape,
+	SHAPE_KINDS,
+	type ShapeKind,
+	shapeIsValid,
+	toJsonSchema,
+} from "./shapes";
 export { type Starter, starterAgents, starterList } from "./starters";
 export {
 	acceptsValue,

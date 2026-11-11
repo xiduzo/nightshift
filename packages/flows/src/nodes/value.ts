@@ -18,6 +18,7 @@ import {
 	type NodeProfile,
 	nodeBase,
 	nodeProfileSchema,
+	outputInferredSchema,
 	placed,
 	profileFallbacksSchema,
 } from "./base";
@@ -137,6 +138,8 @@ export const valueNodeSchema = z.object({
 	by: valueBySchema,
 	/** A JSON Schema for `data`. The step passes only with data that matches it. */
 	output: jsonSchemaSchema,
+	/** Night Shift inferred `output` from a real output (`outputInferredSchema`). */
+	outputInferred: outputInferredSchema,
 	/**
 	 * `by: "rule"` only: a JSONata expression over the run's values, the same
 	 * context a Decision's rule reads (`ruleContext`), for example

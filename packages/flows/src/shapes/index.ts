@@ -1,0 +1,26 @@
+/**
+ * Shapes: what an output field, an input, a variable or a flow output
+ * holds, as JSON Schema, and the editor's model of it (text, number, yes
+ * or no, choice, file, list, record). The checks of a flow read a
+ * template's path into these shapes.
+ */
+
+export { schemaAt } from "./at";
+export {
+	inputShape,
+	outputFieldShape,
+	RESERVED_DATA_KEYS,
+	variableShape,
+} from "./fields";
+export {
+	emptyShape,
+	FILE_FORMAT,
+	fieldNameProblem,
+	fromJsonSchema,
+	type SchemaField,
+	type SchemaShape,
+	SHAPE_KINDS,
+	type ShapeKind,
+	shapeIsValid,
+	toJsonSchema,
+} from "./shape";

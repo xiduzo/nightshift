@@ -1,7 +1,8 @@
 /**
- * A small, zod-like model of the JSON Schemas the output builder can show:
- * text, numbers, yes/no, a choice of strings, lists and objects. The flow
- * file keeps JSON Schema; this model is only how the editor shows it.
+ * A small, zod-like model of the JSON Schemas the editor can show as a
+ * shape: text, numbers, yes or no, a choice of strings, a file, lists and
+ * records. The flow file keeps JSON Schema. This model is how the editor
+ * shows and builds it.
  */
 
 type Schema = Record<string, unknown>;
@@ -12,11 +13,15 @@ export type ShapeKind =
 	| "integer"
 	| "boolean"
 	| "choice"
+	| "file"
 	| "list"
 	| "object";
 
 export type SchemaShape =
-	| { kind: "text" | "number" | "integer" | "boolean"; description?: string }
+	| {
+			kind: "text" | "number" | "integer" | "boolean" | "file";
+			description?: string;
+	  }
 	| { kind: "choice"; values: string[]; description?: string }
 	| { kind: "list"; items: SchemaShape; description?: string }
 	| { kind: "object"; fields: SchemaField[]; description?: string };
@@ -35,9 +40,16 @@ export const SHAPE_KINDS: { kind: ShapeKind; label: string }[] = [
 	{ kind: "integer", label: "Whole number" },
 	{ kind: "boolean", label: "Yes or no" },
 	{ kind: "choice", label: "Choice" },
+	{ kind: "file", label: "File" },
 	{ kind: "list", label: "List" },
-	{ kind: "object", label: "Object" },
+	{ kind: "object", label: "Record" },
 ];
+
+/**
+ * The JSON Schema `format` of a file: a string that names a file the run
+ * wrote. The engine's schema checks know it.
+ */
+export const FILE_FORMAT = "file";
 
 const SIMPLE_TYPES = {
 	text: "string",
@@ -67,6 +79,10 @@ export function toJsonSchema(shape: SchemaShape): Schema {
 		case "choice":
 			schema.type = "string";
 			schema.enum = [...shape.values];
+			break;
+		case "file":
+			schema.type = "string";
+			schema.format = FILE_FORMAT;
 			break;
 		case "list":
 			schema.type = "array";
@@ -102,7 +118,7 @@ function onlyKeys(schema: Schema, allowed: readonly string[]): boolean {
 
 /**
  * The shape of a JSON Schema, or null when it uses something the builder
- * cannot show (anyOf, $ref, formats, limits and so on).
+ * cannot show (anyOf, $ref, formats other than a file, limits and so on).
  */
 export function fromJsonSchema(schema: unknown): SchemaShape | null {
 	if (!isRecord(schema)) return null;
@@ -113,6 +129,12 @@ export function fromJsonSchema(schema: unknown): SchemaShape | null {
 
 	switch (type) {
 		case "string": {
+			if ("format" in schema) {
+				return schema.format === FILE_FORMAT &&
+					onlyKeys(schema, ["type", "description", "format"])
+					? { kind: "file", ...base }
+					: null;
+			}
 			if (!("enum" in schema)) {
 				return onlyKeys(schema, ["type", "description"])
 					? { kind: "text", ...base }

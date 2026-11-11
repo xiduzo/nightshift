@@ -273,6 +273,12 @@ export function checkOutputs(scope: Scope, error: Report): void {
 				{},
 			);
 		}
+		if (output.schema !== undefined && output.type !== "json") {
+			error(
+				`The output "${name}" has a schema, but only a json output takes one. Make it json, or remove the schema.`,
+				{},
+			);
+		}
 		checkTemplate(
 			output.value,
 			`The value of output "${name}"`,

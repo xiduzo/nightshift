@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { type NodeCheck, nameSchema, nodeBase, placed } from "./base";
+import {
+	jsonSchemaSchema,
+	type NodeCheck,
+	nameSchema,
+	nodeBase,
+	outputInferredSchema,
+	placed,
+} from "./base";
 
 /**
  * Calls one tool of a Connection (an MCP server defined once on this
@@ -23,6 +30,14 @@ export const toolNodeSchema = z.object({
 	 * object or array: then the text is read as that.
 	 */
 	arguments: z.record(z.string(), z.string()).default({}),
+	/**
+	 * A JSON Schema for the step's `data`, as on an Agent node. Later nodes
+	 * read its fields (`{{lookup.data.items}}`). Unset: the data has no
+	 * declared shape.
+	 */
+	output: jsonSchemaSchema.optional(),
+	/** Night Shift inferred `output` from a real output (`outputInferredSchema`). */
+	outputInferred: outputInferredSchema,
 });
 export type ToolNode = z.infer<typeof toolNodeSchema>;
 

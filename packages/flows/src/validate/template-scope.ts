@@ -7,6 +7,7 @@ import {
 } from "../flow";
 import { isKitName, kitFlow } from "../kits";
 import { commandHasData } from "../nodes";
+import { inputShape, outputFieldShape, variableShape } from "../shapes";
 import { runFields } from "../template";
 import type { ProjectFlowMap } from "./issues";
 
@@ -27,8 +28,16 @@ export type TemplateField = {
 	description?: string;
 	/** An output of the flow a Subflow node calls. */
 	output?: boolean;
-	/** The keys the node's output schema names below this field, as suggestions. Any path below a JSON field passes. */
+	/** The keys its shape names below this field, as suggestions. */
 	keys?: readonly TemplateField[];
+	/**
+	 * What the field holds, as JSON Schema, when Night Shift knows it: an
+	 * output field's shape, a node's own `output` schema, an input's or a
+	 * variable's type. A path below a JSON field that the shape lacks is a
+	 * warning, never an error: `{}` and a shape without properties take any
+	 * path.
+	 */
+	schema?: Record<string, unknown>;
 };
 
 /** A node's fields, as `{{id.field}}` reads them. */
@@ -59,9 +68,10 @@ export type TemplateScopeOptions = {
 
 /**
  * What a template in `flow` may read: its inputs, its variables, each
- * node's output fields, and the run's fields. A Command node has `data`
- * only with `stdout: "json"`. A Subflow node without `each` adds the
- * outputs of the flow it calls, which hold JSON.
+ * node's output fields, and the run's fields, each with its shape. A
+ * Command node has `data` only when it writes to `$NS_OUTPUT`, prints JSON
+ * (`stdout: "json"`) or has an `output` schema. A Subflow node without
+ * `each` adds the outputs of the flow it calls, which hold JSON.
  */
 export function templateScope(
 	flow: Flow,
@@ -72,19 +82,29 @@ export function templateScope(
 		ref: `run.${name}`,
 		json: false,
 	}));
-	const inputs = flow.inputs.map((input) => ({
-		name: input.name,
-		ref: input.name,
-		json: input.type === "json",
-		...described(input.description ?? input.label),
-	}));
+	const inputs = flow.inputs.map((input) =>
+		withShape(
+			{
+				name: input.name,
+				ref: input.name,
+				json: input.type === "json",
+				...described(input.description ?? input.label),
+			},
+			inputShape(input),
+		),
+	);
 	if (options.initialValue) return { inputs, vars: null, nodes: [], run };
-	const vars = (flow.variables ?? []).map((variable) => ({
-		name: variable.name,
-		ref: `vars.${variable.name}`,
-		json: variable.type === "json",
-		...described(variable.description),
-	}));
+	const vars = (flow.variables ?? []).map((variable) =>
+		withShape(
+			{
+				name: variable.name,
+				ref: `vars.${variable.name}`,
+				json: variable.type === "json",
+				...described(variable.description),
+			},
+			variableShape(variable),
+		),
+	);
 	// The first node with an id wins, as in the checks of a flow.
 	const nodes = new Map<string, TemplateNode>();
 	for (const node of flow.nodes) {
@@ -127,16 +147,20 @@ function templateNode(
 		}
 		const own: readonly string[] = nodeOutputFields(node);
 		const fields = nodeOutputFields(node, called).map((name) => {
-			if (own.includes(name)) return field(name);
+			const shape = outputFieldShape(node, name, called);
+			if (own.includes(name)) return withShape(field(name), shape);
 			const output = called.outputs.find(
 				(candidate) => candidate.name === name,
 			);
-			return {
-				...field(name),
-				json: true,
-				output: true,
-				...described(output?.description),
-			};
+			return withShape(
+				{
+					...field(name),
+					json: true,
+					output: true,
+					...described(output?.description),
+				},
+				shape,
+			);
 		});
 		return { id: node.id, fields, open: false };
 	}
@@ -145,14 +169,21 @@ function templateNode(
 			(name) =>
 				!(node.type === "command" && name === "data" && !commandHasData(node)),
 		)
-		.map((name) => {
-			const keys =
-				name === "data" && (node.type === "agent" || node.type === "value")
-					? schemaFields(node.output, `${node.id}.data`)
-					: [];
-			return keys.length > 0 ? { ...field(name), keys } : field(name);
-		});
+		.map((name) => withShape(field(name), outputFieldShape(node, name)));
 	return { id: node.id, fields, open: false };
+}
+
+/**
+ * The field with its shape, and with the keys the shape names below it as
+ * suggestions when it holds JSON.
+ */
+function withShape(
+	field: TemplateField,
+	schema: Record<string, unknown> | undefined,
+): TemplateField {
+	if (schema === undefined) return field;
+	const keys = field.json ? schemaFields(schema, field.ref) : [];
+	return keys.length > 0 ? { ...field, schema, keys } : { ...field, schema };
 }
 
 /**
@@ -171,7 +202,7 @@ export function calledFlow(
 
 /**
  * The top-level keys of a JSON Schema object, with whether each holds
- * JSON, as fields below the reference `base` (`plan.data`).
+ * JSON and its shape, as fields below the reference `base` (`plan.data`).
  */
 export function schemaFields(schema: unknown, base: string): TemplateField[] {
 	if (!schema || typeof schema !== "object") return [];
@@ -180,14 +211,16 @@ export function schemaFields(schema: unknown, base: string): TemplateField[] {
 	return Object.entries(properties as Record<string, unknown>)
 		.filter(([name]) => /^[A-Za-z0-9_-]+$/.test(name))
 		.map(([name, field]) => {
-			const type =
-				field && typeof field === "object"
-					? (field as { type?: unknown }).type
+			const shape =
+				field && typeof field === "object" && !Array.isArray(field)
+					? (field as Record<string, unknown>)
 					: undefined;
+			const type = shape?.type;
 			return {
 				name,
 				ref: `${base}.${name}`,
 				json: type === "array" || type === "object",
+				...(shape === undefined ? {} : { schema: shape }),
 			};
 		});
 }

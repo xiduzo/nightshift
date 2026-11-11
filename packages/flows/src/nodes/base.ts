@@ -219,6 +219,14 @@ export function checkModelAddress(
 /** A JSON Schema object (draft 2020-12 subset), kept as data. */
 export const jsonSchemaSchema = z.record(z.string(), z.unknown());
 
+/**
+ * Marks a node's `output` schema that Night Shift inferred from a real
+ * output: no person wrote or confirmed it. A template path it lacks is a
+ * warning, and a run does not fail on it. Unset: a person wrote or
+ * confirmed the schema. An edit or a confirm in the editor removes it.
+ */
+export const outputInferredSchema = z.literal(true).optional();
+
 /** A JSON Schema for an object: `type: "object"`, or `properties`. */
 export function isObjectSchema(schema: Record<string, unknown>): boolean {
 	return (

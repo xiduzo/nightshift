@@ -1,4 +1,11 @@
-import { schemaFields } from "@nightshift/flows";
+import {
+	fromJsonSchema,
+	type SchemaShape,
+	SHAPE_KINDS,
+	schemaFields,
+	shapeIsValid,
+	toJsonSchema,
+} from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Field,
@@ -16,13 +23,6 @@ import { LargerTextarea } from "@/shared/larger-window";
 import { OutputSuggest } from "../assistant/field-helpers";
 
 import { Note } from "./fields";
-import {
-	fromJsonSchema,
-	type SchemaShape,
-	SHAPE_KINDS,
-	shapeIsValid,
-	toJsonSchema,
-} from "./lib/schema-builder";
 import { FieldsEditor, KindSelect, ShapeDetails } from "./schema-builder";
 
 type Schema = Record<string, unknown>;
@@ -30,12 +30,12 @@ type Mode = "fields" | "json";
 
 const PRESETS: { label: string; schema: Schema; object: boolean }[] = [
 	{
-		label: "List of strings",
+		label: "List of text",
 		schema: { type: "array", items: { type: "string" } },
 		object: false,
 	},
 	{
-		label: "Object with fields",
+		label: "Record with fields",
 		schema: {
 			type: "object",
 			properties: {

@@ -143,7 +143,7 @@ function refsOf(scope: TemplateScope): string[] {
 describe("the template scope", () => {
 	test("lists the inputs, the variables, each node's fields and the run's", () => {
 		const scope = templateScope(mainFlow(), { flows });
-		expect(scope.inputs).toEqual([
+		expect(scope.inputs).toMatchObject([
 			{
 				name: "topic",
 				ref: "topic",
@@ -152,7 +152,7 @@ describe("the template scope", () => {
 			},
 			{ name: "spec", ref: "spec", json: true, description: "Spec" },
 		]);
-		expect(scope.vars).toEqual([
+		expect(scope.vars).toMatchObject([
 			{ name: "tries", ref: "vars.tries", json: false },
 			{
 				name: "plan",
@@ -188,7 +188,7 @@ describe("the template scope", () => {
 			scope.nodes
 				.find((node) => node.id === id)
 				?.fields.find((field) => field.name === "data");
-		expect(data("planner")).toEqual({
+		expect(data("planner")).toMatchObject({
 			name: "data",
 			ref: "planner.data",
 			json: true,
@@ -207,7 +207,7 @@ describe("the template scope", () => {
 			templateScope(mainFlow(), { flows: known }).nodes.find(
 				(node) => node.id === "sub",
 			);
-		expect(sub(flows)).toEqual({
+		expect(sub(flows)).toMatchObject({
 			id: "sub",
 			open: false,
 			fields: [
@@ -306,5 +306,123 @@ describe("the checks accept what the scope lists", () => {
 			'The initial value of variable "tries" uses {{list.outcome}}. It can read the inputs and run only: no step ran yet.',
 		]);
 		expect(initialOf("{{run.nope}}")).toHaveLength(1);
+	});
+});
+
+describe("shape warnings", () => {
+	/** The issues of `flow` about a path its shape lacks, by severity. */
+	function shapeIssues(flow: Flow): string[] {
+		return validateFlow(flow, { flows, name: "main" })
+			.filter((issue) => issue.message.includes("has no field"))
+			.map((issue) => `${issue.severity}: ${issue.message}`);
+	}
+
+	test("a path below data that the output schema lacks is a warning, with the keys it has", () => {
+		expect(
+			shapeIssues(mainFlow("echo {{planner.data.taks}} {{size.data.size}}")),
+		).toEqual([
+			'warning: The command of "use" uses {{planner.data.taks}}, but planner.data has no field "taks". Use one of: tasks, title.',
+		]);
+	});
+
+	test("a path into text, or a name into a list, is a warning too", () => {
+		expect(
+			shapeIssues(
+				mainFlow("echo {{planner.data.title.first}} {{planner.data.tasks.x}}"),
+			),
+		).toEqual([
+			'warning: The command of "use" uses {{planner.data.title.first}}, but the shape of planner.data.title has no field "first".',
+			'warning: The command of "use" uses {{planner.data.tasks.x}}, but the shape of planner.data.tasks has no field "x".',
+		]);
+	});
+
+	test("a shape that does not say, an input of type json and the keys a command writes for Night Shift never warn", () => {
+		expect(
+			shapeIssues(
+				mainFlow(
+					"echo {{planner.data.tasks.0.anything}} {{read.data.x}} {{spec.a.b}} {{sub.verdict.x}} {{vars.plan.x}}",
+				),
+			),
+		).toEqual([]);
+		const typed = mainFlow("echo {{read.data.outcome}} {{read.data.scores.n}}");
+		const withSchema: Flow = {
+			...typed,
+			nodes: typed.nodes.map((node) =>
+				node.id === "read" && node.type === "command"
+					? { ...node, output: { type: "object", properties: {} } }
+					: node,
+			),
+		};
+		expect(shapeIssues(withSchema)).toEqual([]);
+	});
+
+	test("a command's output schema, a variable's schema and a called flow's output schema give shapes", () => {
+		const flow = mainFlow(
+			"echo {{read.data.count}} {{read.data.cnt}} {{vars.plan.steps}} {{sub.verdict.ok}}",
+		);
+		const typed: Flow = {
+			...flow,
+			variables: [
+				{ name: "tries", type: "number" },
+				{
+					name: "plan",
+					type: "json",
+					schema: { type: "object", properties: { steps: { type: "array" } } },
+				},
+			],
+			nodes: flow.nodes.map((node) =>
+				node.id === "read" && node.type === "command"
+					? {
+							...node,
+							output: {
+								type: "object",
+								properties: { count: { type: "integer" } },
+							},
+							outputInferred: true,
+						}
+					: node,
+			),
+		};
+		const typedReview: Flow = {
+			...review,
+			outputs: [
+				{
+					name: "verdict",
+					value: "{{look.log_tail}}",
+					type: "json",
+					schema: { type: "object", properties: { pass: { type: "boolean" } } },
+				},
+			],
+		};
+		expect(
+			validateFlow(typed, { flows: { ...flows, review: typedReview } })
+				.filter((issue) => issue.message.includes("has no field"))
+				.map((issue) => issue.message),
+		).toEqual([
+			'The command of "use" uses {{read.data.cnt}}, but read.data has no field "cnt". Use one of: count.',
+			'The command of "use" uses {{sub.verdict.ok}}, but sub.verdict has no field "ok". Use one of: pass.',
+		]);
+		const read = templateScope(typed, { flows })
+			.nodes.find((node) => node.id === "read")
+			?.fields.find((field) => field.name === "data");
+		expect(read?.keys?.map((key) => key.ref)).toEqual(["read.data.count"]);
+	});
+
+	test("only a json output takes a schema", () => {
+		expect(
+			validateFlow({
+				...review,
+				outputs: [
+					{
+						name: "verdict",
+						value: "{{look.log_tail}}",
+						type: "text",
+						schema: { type: "object" },
+					},
+				],
+			}).map((issue) => issue.message),
+		).toContain(
+			'The output "verdict" has a schema, but only a json output takes one. Make it json, or remove the schema.',
+		);
 	});
 });

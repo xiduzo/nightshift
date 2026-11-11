@@ -1,3 +1,11 @@
+import {
+	emptyShape,
+	fieldNameProblem,
+	type SchemaField,
+	type SchemaShape,
+	SHAPE_KINDS,
+	type ShapeKind,
+} from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import { Checkbox } from "@nightshift/ui/components/checkbox";
 import { Field, FieldError, FieldLabel } from "@nightshift/ui/components/field";
@@ -9,15 +17,6 @@ import {
 } from "@nightshift/ui/components/native-select";
 import { PlusIcon, XIcon } from "lucide-react";
 import { type ReactNode, useEffect, useId, useState } from "react";
-
-import {
-	emptyShape,
-	fieldNameProblem,
-	type SchemaField,
-	type SchemaShape,
-	SHAPE_KINDS,
-	type ShapeKind,
-} from "./lib/schema-builder";
 
 /** A field name that is not taken yet: field, field_2, field_3 … */
 function freshName(fields: readonly SchemaField[]): string {
@@ -64,7 +63,7 @@ export function KindSelect({
 
 /**
  * What a shape holds beyond its type: the values of a Choice, the element
- * of a List, the fields of an Object. Nothing for the simple types.
+ * of a List, the fields of a Record. Nothing for the simple types.
  */
 export function ShapeDetails({
 	shape,

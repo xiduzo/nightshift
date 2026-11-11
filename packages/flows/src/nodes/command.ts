@@ -4,6 +4,7 @@ import {
 	labelSchema,
 	type NodeCheck,
 	nodeBase,
+	outputInferredSchema,
 	placed,
 	secretNameSchema,
 } from "./base";
@@ -137,6 +138,8 @@ export const commandNodeSchema = z.object({
 	 * has no declared shape.
 	 */
 	output: jsonSchemaSchema.optional(),
+	/** Night Shift inferred `output` from a real output (`outputInferredSchema`). */
+	outputInferred: outputInferredSchema,
 	/**
 	 * The outcome per exit code, each with an edge. A code without an exit
 	 * ends on the catch-all; without a catch-all the step errors. An exit
@@ -215,12 +218,17 @@ export function isChosenExit(
 
 /**
  * Whether later nodes can read the command's `data`: it prints JSON
- * (`stdout: "json"`), or it names `$NS_OUTPUT`, the file for its data.
+ * (`stdout: "json"`), it names `$NS_OUTPUT`, the file for its data, or
+ * its `output` schema says what the data holds.
  */
 export function commandHasData(
-	node: Pick<CommandNode, "command" | "stdout">,
+	node: Pick<CommandNode, "command" | "stdout" | "output">,
 ): boolean {
-	return node.stdout === "json" || node.command.includes("NS_OUTPUT");
+	return (
+		node.stdout === "json" ||
+		node.output !== undefined ||
+		node.command.includes("NS_OUTPUT")
+	);
 }
 
 /**

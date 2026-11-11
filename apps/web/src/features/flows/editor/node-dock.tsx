@@ -1,3 +1,4 @@
+import { NODE_FAMILIES, NODE_FAMILY, type NodeFamily } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Tooltip,
@@ -8,12 +9,11 @@ import { cn } from "@nightshift/ui/lib/utils";
 import { type PaletteItem, paletteMeta } from "../canvas/node-type";
 
 /**
- * In groups: do, decide, shape, wait (a Wait, a Lease), compose, end
- * (docs/research/foundational-nodes.md §5). A Decision shows twice, as the
- * words people look for: a Gate (you decide) and a Branch (a rule decides).
- * A Decision by a model is the same node, set in the inspector.
+ * Every palette item. A Decision shows twice, as the words people look
+ * for: a Gate (you decide) and a Branch (a rule decides). A Decision by a
+ * model is the same node, set in the inspector.
  */
-const PALETTE: PaletteItem[] = [
+const ITEMS: PaletteItem[] = [
 	"agent",
 	"command",
 	"tool",
@@ -27,6 +27,18 @@ const PALETTE: PaletteItem[] = [
 	"join",
 	"end",
 ];
+
+/** The family of a palette item: a Gate and a Branch are Decisions. */
+function familyOf(item: PaletteItem): NodeFamily {
+	return item === "gate" || item === "branch"
+		? NODE_FAMILY.decision
+		: NODE_FAMILY[item];
+}
+
+/** The items by family (`NODE_FAMILIES`): do, decide, shape, hold, compose. */
+const PALETTE: PaletteItem[] = NODE_FAMILIES.flatMap((family) =>
+	ITEMS.filter((item) => familyOf(item) === family),
+);
 
 /** The drag data of a palette item on its way from the dock to the canvas. */
 export const NODE_DRAG_TYPE = "application/x-nightshift-node";

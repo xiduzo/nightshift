@@ -61,7 +61,7 @@ A flow is a directed graph of nodes and edges. Night Shift keeps it in the proje
 `{ version: 9, description?, inputs, outputs, variables?, start, nodes, edges, sections?, policy? }`
 
 - `inputs`: `{ name, type: "text" | "number" | "boolean" | "choice" | "json", label?, description?, default?, required?, options? }`. The start dialog shows a field per type: a number field, a switch, a list to pick from. `choice` needs `options` (a list of text) and gives the picked text. A default is text: `"45"`, `"true"`, one of the options, or JSON text. Use `boolean` for yes/no, `number` for counts and minutes, `choice` for a fixed list. A `json` input takes a path: `{{item.title}}`.
-- `outputs`: `{ name, value, description? }`. `value` is a template, rendered when the flow ends.
+- `outputs`: `{ name, value, description?, type?, schema? }`. `value` is a template, rendered when the flow ends. `type` and `schema` as on a variable tell callers its shape.
 - `variables`: `{ name, type, initial?, schema?, description?, keep? }`, `type` one of `text`, `number`, `boolean`, `json`.
 - `policy`: optional. `maxSteps` caps the steps of a run. `budgetUsd` stops the run when its known cost, at API prices, passes it. `maxTurns` and `idleMinutes` (default 15) limit each Agent step. A node may set its own. The stop time ends no running step. Only its own `timeoutMinutes` ends a long Command.
 - `sections`: frames in the editor only, see below.
@@ -122,7 +122,7 @@ Outcomes: `done`, `timeout`. Outputs: `outcome`, `waited_minutes`, `log_tail`, `
 
 ### tool
 
-Calls one tool of a connection (an MCP server of this computer), with no model. `connection`, `tool`, and `arguments` (a template per argument). `data` is the structured result.
+Calls one tool of a connection (an MCP server of this computer), with no model. `connection`, `tool`, and `arguments` (a template per argument). `data` is the structured result, and `output` its optional JSON Schema.
 
 Outcomes: `pass`, `fail`. Outputs: `outcome`, `data`, `text`, `visit`.
 
@@ -210,7 +210,7 @@ Prompts, commands, arguments, input bindings, outputs and variable values are te
 - `{{vars.failures}}`: a variable.
 - `{{run.branch}}`: a field of the run: `branch`, `base_branch`, `index`, `worktree`, `base_ref`, `flow`, `due_at`.
 
-A template that is only one reference keeps its JSON value (an array stays an array). The validator checks every reference: read only inputs, variables, run fields and output fields that exist.
+A template that is only one reference keeps its JSON value (an array stays an array). The validator checks every reference: read only inputs, variables, run fields and output fields that exist. A path that an `output` schema lacks is a warning.
 
 Rules (a Decision's `when`, a Value's `expression`, a write's `expression`) are JSONata over the same values, without braces: `check.exit_code = 0 and vars.tries < 3`.
 

@@ -114,8 +114,10 @@ describe("flowAuthoringGuide", () => {
 		// `scores` a Command writes (one sentence), so a flow can say what
 		// it achieved. 4520: the \`title\` of a Gate and an Ask, the
 		// heading in the inbox. 4680: the brief of a Gate (urgency,
-		// situation, background, recommendation, impacts).
-		expect(words).toBeLessThan(4680);
+		// situation, background, recommendation, impacts). 4720: format 9,
+		// a Command's `stdout` and the `output` schema of a Command, a Tool
+		// and a flow output.
+		expect(words).toBeLessThan(4720);
 	});
 });
 

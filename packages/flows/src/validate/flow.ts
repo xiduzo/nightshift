@@ -128,6 +128,7 @@ function validateIn(
 		flows,
 		template: templateScope(flow, { flows }),
 		readVars: new Set(),
+		warning,
 	};
 	checkInputs(flow, nodes, error);
 	checkVariables(scope, error);

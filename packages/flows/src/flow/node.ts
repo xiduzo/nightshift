@@ -49,6 +49,36 @@ export const NODE_TYPE_LABEL = {
 } as const satisfies Record<FlowNodeType, string>;
 
 /**
+ * The families of node types, by their role, in the order the editor
+ * shows them. Do: work that changes something or fetches it. Decide: pick
+ * a way on. Shape: make a value from other values. Hold: wait for a time,
+ * a turn or a process. Compose: run other flows, meet, and end.
+ */
+export const NODE_FAMILIES = [
+	"do",
+	"decide",
+	"shape",
+	"hold",
+	"compose",
+] as const;
+export type NodeFamily = (typeof NODE_FAMILIES)[number];
+
+/** The family of each node type. A new node type names its family here. */
+export const NODE_FAMILY = {
+	agent: "do",
+	command: "do",
+	tool: "do",
+	decision: "decide",
+	value: "shape",
+	wait: "hold",
+	lease: "hold",
+	service: "hold",
+	call: "compose",
+	join: "compose",
+	end: "compose",
+} as const satisfies Record<FlowNodeType, NodeFamily>;
+
+/**
  * What a person calls a Decision, by who decides it. You decide a Gate, a
  * rule decides a Branch. A Decision by a model keeps the plain name.
  */

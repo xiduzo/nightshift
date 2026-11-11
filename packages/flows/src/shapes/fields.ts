@@ -1,0 +1,202 @@
+import type {
+	Flow,
+	FlowInputDef,
+	FlowNode,
+	FlowNodeType,
+	FlowOutputDef,
+	FlowVariableDef,
+	outputFieldsByType,
+} from "../flow";
+import type {
+	callEachOutputFields,
+	cascadeOutputFields,
+	confidenceField,
+} from "../nodes";
+
+/**
+ * The shape of each output field a later node reads (`{{check.exit_code}}`),
+ * as JSON Schema. `{}` is any JSON value: a template may take any path
+ * below it. A node's own `output` schema types one of its fields
+ * (`TYPED_OUTPUT_FIELD`).
+ */
+
+type Schema = Record<string, unknown>;
+
+const text: Schema = { type: "string" };
+const whole: Schema = { type: "integer" };
+const number: Schema = { type: "number" };
+const anything: Schema = {};
+
+type FieldShapes<T extends FlowNodeType> = Record<
+	(typeof outputFieldsByType)[T][number],
+	Schema
+>;
+
+/** The shape of each output field, per node type, before a node's own `output` schema. */
+export const OUTPUT_FIELD_SHAPES: { [T in FlowNodeType]: FieldShapes<T> } = {
+	agent: {
+		outcome: text,
+		output: text,
+		summary: text,
+		data: anything,
+		note: text,
+		visit: whole,
+		session_id: text,
+	},
+	command: {
+		outcome: text,
+		exit_code: whole,
+		log_tail: text,
+		data: anything,
+		visit: whole,
+	},
+	decision: { outcome: text, note: text, visit: whole },
+	call: { outcome: text, ended: text, end_message: text, visit: whole },
+	value: { outcome: text, data: anything, note: text, visit: whole },
+	wait: {
+		outcome: text,
+		waited_minutes: number,
+		log_tail: text,
+		data: anything,
+		visit: whole,
+	},
+	tool: { outcome: text, data: anything, text, visit: whole },
+	end: { outcome: text, message: text, visit: whole },
+	join: { outcome: text, data: { type: "object" }, visit: whole },
+	lease: {
+		outcome: text,
+		name: text,
+		holder: text,
+		holder_title: text,
+		waited_minutes: number,
+		visit: whole,
+	},
+	service: { outcome: text, data: anything, log_tail: text, visit: whole },
+};
+
+/** The fields of a Call node with `each`. */
+const CALL_EACH_FIELD_SHAPES: Record<
+	(typeof callEachOutputFields)[number],
+	Schema
+> = {
+	outcome: text,
+	done_count: whole,
+	failed_count: whole,
+	blocked_count: whole,
+	waiting_count: whole,
+	summary: text,
+	results: {
+		type: "array",
+		items: {
+			type: "object",
+			properties: {
+				id: text,
+				title: text,
+				state: text,
+				reason: text,
+				outputs: { type: "object" },
+			},
+		},
+	},
+	visit: whole,
+};
+
+/** The fields a cascade adds to its node's step (ADR 6). */
+const CASCADE_FIELD_SHAPES: Record<
+	(typeof cascadeOutputFields)[number] | typeof confidenceField,
+	Schema
+> = { tier: text, tries: whole, confidence: number };
+
+/**
+ * The output field that a node's own `output` schema types: the data of
+ * an Agent's report, of a Value, of a command, of a tool. A node type not
+ * listed has no `output` schema.
+ */
+export const TYPED_OUTPUT_FIELD = {
+	agent: "data",
+	value: "data",
+	command: "data",
+	tool: "data",
+} as const satisfies Partial<Record<FlowNodeType, string>>;
+
+/**
+ * Keys that a node's data may hold whatever its schema says: a command
+ * writes `outcome` to pick an exit and `scores` to score the run. A path
+ * that starts with one never warns.
+ */
+export const RESERVED_DATA_KEYS = ["outcome", "scores"] as const;
+
+/**
+ * The shape of one output field of `node`, by its name: the node's own
+ * `output` schema for its typed field, else the field's shape. A field of
+ * the flow a Call node calls takes that output's shape (`flowOutputShape`).
+ * Undefined for a name the node does not have.
+ */
+export function outputFieldShape(
+	node: FlowNode,
+	field: string,
+	called?: Flow | null,
+): Schema | undefined {
+	if (node.type === "call" && node.each !== undefined) {
+		return own(CALL_EACH_FIELD_SHAPES, field);
+	}
+	const typed: string | undefined =
+		TYPED_OUTPUT_FIELD[node.type as keyof typeof TYPED_OUTPUT_FIELD];
+	if (typed === field && "output" in node && node.output !== undefined) {
+		return node.output;
+	}
+	const shape =
+		own<Schema>(OUTPUT_FIELD_SHAPES[node.type], field) ??
+		own(CASCADE_FIELD_SHAPES, field);
+	if (shape !== undefined || node.type !== "call" || !called) return shape;
+	const output = called.outputs.find((candidate) => candidate.name === field);
+	return output === undefined ? undefined : flowOutputShape(output);
+}
+
+/**
+ * The shape of a flow output: its `schema` when its type is `json`, else
+ * its type. An output without a type holds any JSON value.
+ */
+export function flowOutputShape(output: FlowOutputDef): Schema {
+	if (output.type === undefined) return anything;
+	return typeShape(output.type, output.schema);
+}
+
+/** The shape of a variable: its type, and its `schema` when it is `json`. */
+export function variableShape(variable: FlowVariableDef): Schema {
+	return typeShape(variable.type, variable.schema);
+}
+
+/** The shape of a flow input: its type, the options of a choice. */
+export function inputShape(input: FlowInputDef): Schema {
+	switch (input.type) {
+		case "choice":
+			return input.options && input.options.length > 0
+				? { type: "string", enum: [...input.options] }
+				: text;
+		case "json":
+			return anything;
+		default:
+			return typeShape(input.type);
+	}
+}
+
+function typeShape(
+	type: "text" | "number" | "boolean" | "json",
+	schema?: Schema,
+): Schema {
+	switch (type) {
+		case "text":
+			return text;
+		case "number":
+			return number;
+		case "boolean":
+			return { type: "boolean" };
+		case "json":
+			return schema ?? anything;
+	}
+}
+
+function own<T>(record: Record<string, T>, key: string): T | undefined {
+	return Object.hasOwn(record, key) ? record[key] : undefined;
+}

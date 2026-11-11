@@ -1,4 +1,4 @@
-import type { AskForm } from "@nightshift/flows";
+import { type AskForm, FILE_FORMAT } from "@nightshift/flows";
 import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js";
 
 /**
@@ -8,6 +8,9 @@ import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js";
  */
 
 const ajv = new Ajv2020({ allErrors: true, strict: false });
+// A file shape (`{ "type": "string", "format": "file" }`) names a file the
+// run wrote. Any string passes.
+ajv.addFormat(FILE_FORMAT, true);
 /** Compiled schemas by their JSON text: a flow's schemas rarely change. */
 const compiled = new Map<string, ValidateFunction>();
 
