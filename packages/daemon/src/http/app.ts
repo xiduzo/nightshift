@@ -23,6 +23,7 @@ import { type HttpServices, requestContexts } from "./context";
 import { desktopOrigins } from "./origins";
 import { decodedRequest, UnreadableBody } from "./request-encoding";
 import { runExportResponse } from "./run-export";
+import { runFileNotFound, runFileResponse } from "./run-file";
 import type { DaemonServe } from "./serve";
 import { peerAddress } from "./this-computer";
 import { webhookResponse } from "./webhook";
@@ -41,7 +42,8 @@ const API_REFERENCE_PAGES = new Set([
 
 /**
  * What Bun serves: the Hono app (the health check, the webhooks of
- * schedules, Better Auth, the run export, run artifacts, the procedures),
+ * schedules, Better Auth, the run export, run artifacts, the files of run
+ * folders, the procedures),
  * and the sync WebSocket beside it. Bun upgrades
  * the socket itself, so the sync path never reaches Hono.
  */
@@ -176,6 +178,22 @@ export function createHttp(
 			c.req.raw,
 			runId,
 			c.req.param("artifactId"),
+		);
+	});
+
+	// A file, not an oRPC call: one file in the folder of a run of a project
+	// without a folder, on this computer, for a Member of the run's Space
+	// (`runAccess`), as an artifact. `*` is its path in the folder.
+	app.get("/api/runs/:id/files/*", async (c) => {
+		const runId = c.req.param("id");
+		const found = await runAccess({ access: await access(c), engine }, runId);
+		if (!found.allowed) {
+			return found.code === "NOT_FOUND" ? runFileNotFound() : refused(c, found);
+		}
+		return runFileResponse(
+			engine.space(found.spaceId, { personId: found.session.user.id }),
+			c.req.raw,
+			runId,
 		);
 	});
 
