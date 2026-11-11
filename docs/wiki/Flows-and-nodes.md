@@ -32,6 +32,7 @@ flowchart LR
 | **Tool** | Calls one tool of an MCP server with typed arguments. No model in the loop. |
 | **Decision** | Picks one of its options. A person picks it in a **Gate**, a rule picks it in a **Branch**, or a model picks it. |
 | **Value** | Makes data that matches a JSON schema, from a rule, a model, or a person. A person gets an **Ask**: a form in the inbox. |
+| **Convert** | Turns CSV, YAML, XML, a feed or a Markdown table into JSON, and JSON back into text. It also turns HTML into plain text. It uses no model. |
 | **Wait** | Waits for a duration, a time, a command that passes, a signal, or the first of a signal and a command. |
 | **Subflow** | Runs another flow or a kit, once or once per item in a list. |
 | **Join** | Waits for the branches that run at once: all of them, or the first. The first stops the others. |
@@ -83,6 +84,23 @@ For most choices, start with a small decision model, such as TypeSafe Jev. It is
 
 A pick below the confidence that you set goes to the next tier of the [cascade](#cascade): a large model, or you. To run a decider on your own server, see [A model on your own server](https://github.com/xiduzo/nightshift/blob/main/docs/deploy/local-models.md).
 
+### Value presets
+
+A Value made by a rule can start from a preset. Under the expression, choose **Start from**: Filter, Pick fields, Sort, Limit, or Remove duplicates. Pick a list of an earlier step and fill in the fields. Night Shift writes the expression and the output for you, and you can change them after.
+
+The data is a record with one list: `{{small.data.items}}`. The list must come from a step whose output has a shape, such as a Convert node.
+
+### Convert
+
+A Convert node reads text of one format into JSON, or writes JSON as text. One side is always JSON, apart from HTML to text. To go from CSV to YAML, use two Convert nodes.
+
+- **CSV and Markdown tables** give one record per row, with text in each column. A number stays text: `007` stays `007`. Night Shift finds the delimiter of a CSV file, or you set it.
+- **Feeds** give the same fields for RSS, Atom and JSON Feed. Each item has `id`, `title`, `link`, `summary`, `content`, `published`, `updated`, `authors` and `categories`. A later step reads `{{news.data.items}}`.
+- **XML** gives a record per element. An attribute is `@name`.
+- **HTML to text** keeps headings, paragraphs, lists and the address of each link.
+
+The value can have at most 1 MB. Raise the size limit of the node up to 10 MB. A value that does not fit its format ends the step `fail`, and `{{<node>.note}}` says why.
+
 ### Wait
 
 A Wait ends on its own outcomes. A command or a signal can pick one. Every Wait has a timeout. A signal comes from a webhook schedule, by name and key. See [Runs and schedules](Runs-and-schedules.md#webhooks).
@@ -128,14 +146,14 @@ A variable with **Keep between runs** starts each run with the value that the la
 
 ### Data shapes
 
-Data has a shape: text, a number, yes or no, a choice, a file, a list, or a record with named fields. You set the shape in the **Output** of an Agent, a Value, a Command, or a Tool. A flow output can have a type too, so the node that calls the flow knows what it holds.
+Data has a shape: text, a number, yes or no, a choice, a file, a list, or a record with named fields. You set the shape in the **Output** of an Agent, a Value, a Command, or a Tool. A Convert node gives the shape of its format. A flow output can have a type too, so the node that calls the flow knows what it holds.
 
 When a template reads a field that the shape does not have, such as `{{planner.data.taks}}`, the editor shows a warning. The run still starts.
 
 You do not have to write a shape. When a node has none, Night Shift takes it from the first run that gives data. The editor marks it **Inferred from a run**.
 
 - **Confirm** keeps the shape as it is. An edit or an applied **Suggest** confirms it too.
-- A shape that you wrote or confirmed holds every run. When the data does not fit, an Agent, a Command, or a Tool stops with an error. A Value ends on `fail`.
+- A shape that you wrote or confirmed holds every run. When the data does not fit, an Agent, a Command, or a Tool stops with an error. A Value or a Convert ends on `fail`.
 - An inferred shape only warns. The run shows the warning and goes on.
 - A Tool takes the shape that its MCP server gives for the tool's answer, marked as inferred.
 - A kit and a **Quick run** keep no shape.
