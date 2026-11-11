@@ -626,7 +626,7 @@ describe("after a restart, in a Space a Host keeps", () => {
 			.space(sandbox.spaceId)
 			.startRun({ projectId: project, flow: holdingFlow({ ttlMinutes: 2 }) });
 		await statusOf(first.space(sandbox.spaceId), run.id, "sleeping");
-		expect(await holders(at)).toEqual({ "zac-docker-stack": run.id });
+		expect(await holders(at)).toEqual({ "docker-stack": run.id });
 		const firstExpiry = await expiryOf();
 		// The first daemon dies a minute and a half after its last renewal.
 		dies.abort();
@@ -650,7 +650,7 @@ describe("after a restart, in a Space a Host keeps", () => {
 			expect(await expiryOf()).toBeGreaterThan(firstExpiry);
 			// Past the first ttl, before the new daemon's first minute is up.
 			at += 60_000;
-			expect(await holders(at)).toEqual({ "zac-docker-stack": run.id });
+			expect(await holders(at)).toEqual({ "docker-stack": run.id });
 		} finally {
 			ends.abort();
 		}
