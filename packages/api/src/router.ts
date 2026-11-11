@@ -51,8 +51,12 @@ const peerRoutes = {
 	spaceSecrets: hostPeer.spaceSecrets,
 };
 
-/** What the screens call, and the Devices procedures of a paired Device. */
-const screenRoutes = {
+/**
+ * What the screens call about the work: Spaces, projects, flows, runs and
+ * what they need of a person. Split from the configuration routes for the
+ * same reason as `peerRoutes` (TS7056).
+ */
+const workRoutes = {
 	healthCheck: publicProcedure
 		.route({ summary: "Answers OK while Night Shift runs." })
 		.output(output(z.string()))
@@ -69,6 +73,10 @@ const screenRoutes = {
 	runs,
 	notifications,
 	dashboard,
+};
+
+/** What the screens call about this computer and its Devices, and the Devices procedures of a paired Device. */
+const configRoutes = {
 	settings,
 	usage,
 	connections,
@@ -89,8 +97,11 @@ const screenRoutes = {
  * nesting are the wire format (`/rpc/runs/list`): the web app, OpenAPI and
  * the paired Devices all go through it.
  */
-export const appRouter: typeof screenRoutes & typeof peerRoutes = {
-	...screenRoutes,
+export const appRouter: typeof workRoutes &
+	typeof configRoutes &
+	typeof peerRoutes = {
+	...workRoutes,
+	...configRoutes,
 	...peerRoutes,
 };
 export type AppRouterClient = RouterClient<typeof appRouter>;
