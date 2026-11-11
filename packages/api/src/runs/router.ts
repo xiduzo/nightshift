@@ -131,7 +131,7 @@ export const runs = {
 		permissionOf("useful"),
 	)
 		.route({
-			summary: "Records whether you found the pull request of this run useful.",
+			summary: "Records whether you found this run useful.",
 		})
 		.output(output(z.void()))
 		.handler(({ context, input }) =>

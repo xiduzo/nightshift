@@ -295,7 +295,7 @@ function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 					)
 				}
 			/>
-			<RunUseful run={runData} />
+			<RunUseful run={runData} status={status} />
 			<RunLeases run={runData} />
 			<RunServices run={runData} />
 			<RunWarnings warnings={runData.warnings} onShowStep={showStep} />

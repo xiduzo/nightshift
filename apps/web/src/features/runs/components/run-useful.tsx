@@ -1,4 +1,14 @@
 import {
+	knownUseful,
+	rememberedUseful,
+	rememberUseful,
+	USEFUL_ERROR,
+	USEFUL_HINT,
+	USEFUL_QUESTION,
+	usefulLabel,
+	usefulView,
+} from "@nightshift/client";
+import {
 	Item,
 	ItemActions,
 	ItemContent,
@@ -11,28 +21,28 @@ import {
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
 import { useMutation } from "@tanstack/react-query";
-import { GitPullRequestIcon } from "lucide-react";
+import {
+	MessageCircleQuestionMarkIcon,
+	ThumbsDownIcon,
+	ThumbsUpIcon,
+} from "lucide-react";
 import { useId, useRef, useState } from "react";
 
-import type { RunDetail } from "@/shared/api";
+import type { RunDetail, RunStatus } from "@/shared/api";
 import { runMutations } from "../queries";
-import {
-	knownUseful,
-	rememberedUseful,
-	rememberUseful,
-	USEFUL_ERROR,
-	USEFUL_HINT,
-	USEFUL_QUESTION,
-	usefulLabel,
-	usefulView,
-} from "../useful";
 
 /**
- * One tap on the pull request a run opened: was it useful? It sits at the
- * end of the run's story. After it lands, it shows the choice and does not
- * ask again.
+ * One tap on a finished run: was it useful? It sits at the end of the
+ * run's story. After it lands, it shows the choice and does not ask again.
+ * `status` is the one the page shows, the live one too.
  */
-export function RunUseful({ run }: { run: RunDetail }) {
+export function RunUseful({
+	run,
+	status,
+}: {
+	run: RunDetail;
+	status: RunStatus;
+}) {
 	const id = useId();
 	const [sending, setSending] = useState<boolean | null>(null);
 	const [failed, setFailed] = useState(false);
@@ -40,9 +50,8 @@ export function RunUseful({ run }: { run: RunDetail }) {
 	const [, setSaved] = useState(0);
 	const busy = useRef(false);
 	const mark = useMutation(runMutations.useful());
-	const prUrl = run.metrics?.prUrl ?? null;
 	const known = knownUseful(run.metrics?.scores, rememberedUseful(run.id));
-	const view = usefulView(prUrl, known);
+	const view = usefulView(status, known);
 	if (view === "hidden") return null;
 
 	const choose = (useful: boolean) => {
@@ -72,7 +81,7 @@ export function RunUseful({ run }: { run: RunDetail }) {
 		return (
 			<Item variant="outline" size="sm">
 				<ItemMedia variant="icon">
-					<GitPullRequestIcon />
+					{view === "yes" ? <ThumbsUpIcon /> : <ThumbsDownIcon />}
 				</ItemMedia>
 				<ItemContent>
 					<ItemTitle>{usefulLabel(view)}</ItemTitle>
@@ -84,7 +93,7 @@ export function RunUseful({ run }: { run: RunDetail }) {
 	return (
 		<Item variant="outline" size="sm">
 			<ItemMedia variant="icon">
-				<GitPullRequestIcon />
+				<MessageCircleQuestionMarkIcon />
 			</ItemMedia>
 			<ItemContent>
 				<ItemTitle id={id}>{USEFUL_QUESTION}</ItemTitle>

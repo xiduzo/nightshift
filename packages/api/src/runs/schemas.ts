@@ -131,9 +131,10 @@ const metricsSchema = z.object({
 	/** How often agents searched and read the project's knowledge. Older Hosts send none. */
 	knowledge: z.object({ searches: z.number(), reads: z.number() }).optional(),
 	/**
-	 * The feedback on a run: each Gate answered, and what became of its pull
-	 * request. Older Hosts send none. A score's name is an open list: a
-	 * newer peer's name passes. Older Hosts send no `by`.
+	 * The feedback on a run: each Gate answered, whether a person found it
+	 * `useful`, what became of its pull request, and the flow's own scores.
+	 * Older Hosts send none, or the useful answer as `pr_useful`. A score's
+	 * name is an open list: a newer peer's name passes. Older Hosts send no `by`.
 	 */
 	scores: z
 		.array(

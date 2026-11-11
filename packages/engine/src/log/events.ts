@@ -658,8 +658,8 @@ export type EnginePayloads = {
 	PullRequestOpened: { url: string };
 	/**
 	 * Feedback on what a run did: a Gate was answered, on the Gate's step,
-	 * what became of the run's pull request, whether a person found that
-	 * pull request useful, or a name a Command step wrote in its data
+	 * whether a person found the run useful, what became of the run's pull
+	 * request, or a name a Command step wrote in its data
 	 * (`scores`), on that step. What each name, value and `by` means is in
 	 * `scores.ts`. The metrics and the export count them.
 	 */
@@ -788,9 +788,11 @@ export type RunWarningKind =
  */
 export type ScoreName =
 	| "gate_decision"
+	| "useful"
 	| "pr_merged"
 	| "pr_closed"
 	| "reverted_within_7d"
+	/** The older name of `useful`. Kept: older logs have it. Nothing writes it now. */
 	| "pr_useful";
 
 /** Where a Gate answer came from. `_OTHER` when the caller did not say. */

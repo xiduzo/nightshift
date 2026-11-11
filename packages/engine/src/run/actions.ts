@@ -370,7 +370,7 @@ export function createRunActions(deps: RunActionsDeps) {
 					runId,
 					stepId: null,
 					payload: {
-						score: "pr_useful",
+						score: "useful",
 						value: request.useful ? 1 : 0,
 						label: null,
 					},

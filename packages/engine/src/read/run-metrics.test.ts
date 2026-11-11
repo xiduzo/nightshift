@@ -252,6 +252,20 @@ describe("runMetrics", () => {
 			},
 		]);
 	});
+
+	test("names a useful answer useful, an older log's pr_useful too", () => {
+		const { events } = night()
+			.at(1400)
+			.push("Scored", { score: "pr_useful", value: 1, label: null })
+			.at(1500)
+			.push("Scored", { score: "useful", value: 0, label: null });
+		expect(
+			runFacts(foldRun(events)).metrics.scores?.map((s) => [s.score, s.value]),
+		).toEqual([
+			["useful", 1],
+			["useful", 0],
+		]);
+	});
 });
 
 describe("the knowledge agents used", () => {

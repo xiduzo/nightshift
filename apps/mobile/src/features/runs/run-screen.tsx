@@ -301,7 +301,7 @@ function RunBody({
 					/>
 				) : null}
 				<AskWhyCard runId={run.id} status={status} />
-				<RunUseful run={run} />
+				<RunUseful run={run} status={status} />
 				<FollowOnLockScreen runId={run.id} ended={ended} />
 				<RunActionFailure act={act} />
 			</View>

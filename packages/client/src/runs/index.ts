@@ -119,3 +119,13 @@ export type {
 	WorktreeChangesEvent,
 } from "./types";
 export { useNow } from "./use-now";
+export {
+	knownUseful,
+	rememberedUseful,
+	rememberUseful,
+	USEFUL_ERROR,
+	USEFUL_HINT,
+	USEFUL_QUESTION,
+	usefulLabel,
+	usefulView,
+} from "./useful";

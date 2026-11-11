@@ -15,25 +15,31 @@ function words(text: string): number {
 	return text.split(/\s+/).filter(Boolean).length;
 }
 
-const pull = "https://github.com/acme/site/pull/7";
-const useful = (value: number) => ({ score: "pr_useful", value });
+const useful = (value: number) => ({ score: "useful", value });
 
 describe("Useful on the run page", () => {
-	test("hides the question when the run opened no pull request", () => {
-		expect(usefulView(null, null)).toBe("hidden");
-		expect(usefulView("", null)).toBe("hidden");
-		expect(usefulView(undefined, null)).toBe("hidden");
+	test("asks only on a finished run, with or without a pull request", () => {
+		expect(usefulView("finished", null)).toBe("ask");
+		for (const status of [
+			"running",
+			"waiting",
+			"failed",
+			"stopped",
+			"interrupted",
+		] as const) {
+			expect(usefulView(status, null)).toBe("hidden");
+			expect(usefulView(status, true)).toBe("hidden");
+		}
 	});
 
 	test("asks once, then shows the choice", () => {
-		expect(usefulView(pull, null)).toBe("ask");
-		expect(usefulView(pull, true)).toBe("yes");
-		expect(usefulView(pull, false)).toBe("no");
-		expect(usefulLabel("yes")).toBe("You found this pull request useful");
-		expect(usefulLabel("no")).toBe("You found this pull request not useful");
+		expect(usefulView("finished", true)).toBe("yes");
+		expect(usefulView("finished", false)).toBe("no");
+		expect(usefulLabel("yes")).toBe("You found this run useful.");
+		expect(usefulLabel("no")).toBe("You did not find this run useful.");
 	});
 
-	test("reads the last saved answer, and a tap in this window wins", () => {
+	test("reads the last saved answer, and a tap in this app wins", () => {
 		expect(knownUseful([useful(1)], null)).toBe(true);
 		expect(knownUseful([useful(0)], null)).toBe(false);
 		expect(knownUseful([useful(1), useful(0)], null)).toBe(false);
@@ -42,10 +48,14 @@ describe("Useful on the run page", () => {
 		expect(knownUseful([useful(1)], false)).toBe(false);
 	});
 
+	test("reads the answer an older Host sends as pr_useful", () => {
+		expect(knownUseful([{ score: "pr_useful", value: 1 }], null)).toBe(true);
+	});
+
 	test("remembers a tap for that run", () => {
-		rememberUseful("run-remember-web", false);
-		expect(rememberedUseful("run-remember-web")).toBe(false);
-		expect(rememberedUseful("run-other-web")).toBeNull();
+		rememberUseful("run-remember", false);
+		expect(rememberedUseful("run-remember")).toBe(false);
+		expect(rememberedUseful("run-other")).toBeNull();
 	});
 
 	test("the words are short and plain", () => {

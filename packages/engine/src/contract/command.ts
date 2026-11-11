@@ -62,8 +62,8 @@ export type RunActionRequest =
 			via?: AnswerVia;
 	  }
 	/**
-	 * Records whether you found the pull request of this run useful.
-	 * One tap. A later tap replaces it.
+	 * Records whether you found this run useful: the score `useful` on
+	 * the run. One tap. A later tap replaces it.
 	 */
 	| { kind: "useful"; useful: boolean }
 	/**

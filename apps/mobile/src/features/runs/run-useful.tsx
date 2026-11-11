@@ -1,4 +1,16 @@
-import { createRunQueries, type RunDetail } from "@nightshift/client";
+import {
+	createRunQueries,
+	knownUseful,
+	type RunDetail,
+	type RunStatus,
+	rememberedUseful,
+	rememberUseful,
+	USEFUL_ERROR,
+	USEFUL_HINT,
+	USEFUL_QUESTION,
+	usefulLabel,
+	usefulView,
+} from "@nightshift/client";
 import { Button } from "@nightshift/ui-native/components/ui/button";
 import { Card, CardContent } from "@nightshift/ui-native/components/ui/card";
 import { Text } from "@nightshift/ui-native/components/ui/text";
@@ -7,22 +19,19 @@ import { useRef, useState } from "react";
 import { View } from "react-native";
 
 import { useHostQueries } from "@/features/host";
-import {
-	knownUseful,
-	rememberedUseful,
-	rememberUseful,
-	USEFUL_ERROR,
-	USEFUL_HINT,
-	USEFUL_QUESTION,
-	usefulLabel,
-	usefulView,
-} from "./useful";
 
 /**
- * One tap on the pull request a run opened: was it useful? After it
- * lands, the card shows the choice and does not ask again.
+ * One tap on a finished run: was it useful? After it lands, the card
+ * shows the choice and does not ask again. `status` is the one the screen
+ * shows, an action on its way too.
  */
-export function RunUseful({ run }: { run: RunDetail }) {
+export function RunUseful({
+	run,
+	status,
+}: {
+	run: RunDetail;
+	status: RunStatus;
+}) {
 	const queries = useHostQueries(createRunQueries);
 	const [sending, setSending] = useState<boolean | null>(null);
 	const [failed, setFailed] = useState(false);
@@ -31,7 +40,7 @@ export function RunUseful({ run }: { run: RunDetail }) {
 	const busy = useRef(false);
 	const mark = useMutation(queries.useful());
 	const known = knownUseful(run.metrics?.scores, rememberedUseful(run.id));
-	const view = usefulView(run.metrics?.prUrl, known);
+	const view = usefulView(status, known);
 
 	const choose = (useful: boolean) => {
 		if (busy.current) return;
