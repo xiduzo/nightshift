@@ -7,6 +7,8 @@
 **Stop babysitting your agents.**<br>
 Draw once how your agents and you work together. Night Shift runs it on your own machines, day and night, and asks you only what needs you.
 
+A workflow builder like n8n or Zapier. A step can be an agent that works for an hour, and a choice can go to a small decision model.
+
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)](#status)
 [![Built with Bun](https://img.shields.io/badge/built%20with-Bun-f9f1e1?logo=bun&logoColor=000)](https://bun.sh)
@@ -24,24 +26,26 @@ Draw once how your agents and you work together. Night Shift runs it on your own
 
 ## Why
 
-You already work with coding agents. So you watch them. You approve a step, paste an error back, start a stronger model, and check the result. The agents do the work, but you still work the shift.
+Agents can research a market, watch a service, write a newsletter, or fix a bug. But you still start each one, check what it made, and choose what comes next. The agents do the work, and you work the shift.
 
-Night Shift lets you engineer that work once. You draw a flow: which agent does which step, which check proves it, what it may cost, and which choices need you. Night Shift runs it on a schedule, from a webhook, or when you click Run. You answer only at a Gate.
+Night Shift lets you engineer that work once. You draw a flow: which agent does which step, which check proves it, what it may cost, and which choices need you. Rules and decision models make the other choices. Night Shift runs the flow on a schedule, from a webhook, or when you click Run. You answer only at a Gate.
 
 Every run shows what each step cost and how far each ladder climbed. So you tune a flow like any other system you build.
 
-- **Your machines, your logins.** Sessions, branches, and tokens stay on your own computers. Agents run on the subscriptions that you already pay for.
+- **Your machines, your logins.** Runs, their files, and your logins stay on your own computers. Agents run on the subscriptions that you already pay for.
 - **The engine decides, the model advises.** A model never adds a step or changes the flow. Every loop has a maximum.
-- **Flows stay out of your repo.** Every save is a revision. You see who changed what, and you can restore an earlier one.
+- **Flows stay out of your project.** Every save is a revision. You see who changed what, and you can restore an earlier one.
 
 ## Two ladders
 
 In a flow, each job goes to the cheapest rung that does it well.
 
 - **Work climbs.** A cheap agent tries first. When a try fails its check, a strong agent tries with the failure. The last rung can be you.
-- **Choices climb.** A rule makes the choices it can. A small [decision model](docs/deploy/local-models.md), such as jev, makes the next ones in milliseconds. A large model or you make the rest.
+- **Choices climb.** A rule makes the choices it can. A small [decision model](https://github.com/xiduzo/nightshift/wiki/Flows-and-nodes#deciders), such as TypeSafe Jev, makes the next ones. It is fast and cheap, and it can only pick one of the options that you gave. A large model or you make the rest.
 
-This is the [`watch-logs`](https://github.com/xiduzo/nightshift/wiki/Flows-and-nodes#starter-flows) starter. A rule wakes an agent only for a new error, and you decide on the fix:
+A Gate is where a ladder reaches you. It has two jobs. It is the fallback when a ladder runs out or a decision model is not sure. And it asks for your approval before an act that you cannot undo, such as a sent mail, a published post, or a merge.
+
+This is the [`watch-logs`](https://github.com/xiduzo/nightshift/wiki/Flows-and-nodes#starter-flows) starter. It watches something, here your logs. A rule wakes an agent only for what is new, and a Gate asks you before Night Shift acts:
 
 ```mermaid
 flowchart LR
@@ -61,7 +65,7 @@ flowchart LR
   fix -- pass --> remember
 ```
 
-A flow has eleven node types, from an Agent session to a Lease that lets one run at a time deploy. [Flows and nodes](https://github.com/xiduzo/nightshift/wiki/Flows-and-nodes) in the user guide tells each one.
+The same shape can watch a feed, a price, or a status page. A flow has eleven node types, from an Agent session to a Wait for a webhook. [Flows and nodes](https://github.com/xiduzo/nightshift/wiki/Flows-and-nodes) in the user guide tells each one.
 
 ## Flows to run
 
@@ -92,7 +96,7 @@ More flows wait on the [Ideas](https://github.com/xiduzo/nightshift/wiki/Ideas) 
 
 ## Next to n8n and Zapier
 
-n8n and Zapier connect apps. A step there is an app call or one model call. In Night Shift, a step can be an agent session that works for an hour in its own copy of your project. Use them together. n8n or Zapier can start a flow with a [signed webhook](docs/deploy/triggers.md), and a Command step can send the result back.
+Night Shift has no app catalog. A flow reaches an app through its CLI, an HTTP call, a webhook, or the agent's own tools. Use n8n or Zapier together with Night Shift. They can start a flow with a [signed webhook](docs/deploy/triggers.md), and a Command step can send the result back.
 
 ## Quick start
 
@@ -114,8 +118,8 @@ bun run dev            # web UI on :3001, API on :3000
 Then, in Night Shift:
 
 1. **Add your agents.** The Agents page shows the agent CLIs that it finds on this computer, such as `claude`, `codex`, or `pi`. Add a profile for each one that you want.
-2. **Add a project.** Choose its folder, or copy a repository from GitHub. Keep "Add the starter flows" on, and choose which of your agents runs each part.
-3. **Run a starter.** Open `implement-and-check`, enter your test command as the check, and start a run with a small task.
+2. **Add a project.** Choose its folder, or copy a repository from GitHub. A folder without git gets a **Set up git** button. Keep "Add the starter flows" on, and choose which of your agents runs each part.
+3. **Run a starter.** Open `scout-and-pick`, and start a run with a topic you care about. Night Shift asks you to pick one of the candidates that an agent finds. Another agent then writes a report on your pick into the project's knowledge.
 
 [Get started](https://github.com/xiduzo/nightshift/wiki/Get-started) in the user guide tells the rest.
 
@@ -125,7 +129,7 @@ Night Shift is pre-alpha and built in public. It has run a real project every ni
 
 ## Usage data
 
-A released build sends anonymous usage events to the Night Shift team. A run from source sends nothing. The events have no names, paths, prompts, or code. Turn usage off in Settings, or set `NIGHTSHIFT_USAGE=off` or `DO_NOT_TRACK=1`. [docs/usage-data.md](docs/usage-data.md) lists every event.
+A released build sends anonymous usage events to the Night Shift team. A run from source sends nothing. The events have no names, paths, prompts, or file contents. Turn usage off in Settings, or set `NIGHTSHIFT_USAGE=off` or `DO_NOT_TRACK=1`. [docs/usage-data.md](docs/usage-data.md) lists every event.
 
 ## Documentation
 
