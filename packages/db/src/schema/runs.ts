@@ -222,6 +222,63 @@ export const keptVariable = sqliteTable(
 	],
 );
 
+// Owner: `@nightshift/engine` `memory/`: `graph/` saves what a Since last
+// run node saw with its step, and `run/` lists and forgets it for a person.
+
+/**
+ * What a Since last run node saw: one row per key it remembers, by
+ * project, the run's top flow, the node's path (the Subflow nodes from the
+ * top flow, then the node) and the scope it rendered. A list keeps the
+ * hash of each item's compared fields, a value keeps the value itself
+ * (key ""). Each step saves only what it saw new or changed, in the batch
+ * of its `StepEnded`, so the latest write wins per key. Every other
+ * Replica saves it again from the `StepEnded` the exchange brings. A node
+ * keeps at most 10,000 keys: the oldest go first. Forget removes the rows.
+ */
+export const nodeMemory = sqliteTable(
+	"node_memory",
+	{
+		spaceId: spaceId(),
+		projectId: text("project_id")
+			.notNull()
+			.references(() => project.id),
+		/** The flow file the run started from: a called flow remembers under its caller's. */
+		rootFlow: text("root_flow").notNull(),
+		/** The Subflow nodes from the top flow, then the node, joined with "/". */
+		nodePath: text("node_path").notNull(),
+		/** The rendered scope, "" without one. */
+		scope: text("scope").notNull(),
+		/** An item's key as text, "" for a value. */
+		itemKey: text("item_key").notNull(),
+		/** The hash of an item's compared fields. Null for a value. */
+		hash: text("hash"),
+		/** JSON-encoded value. Null for an item. */
+		value: text("value"),
+		/** The run and step that saw it last. No foreign keys, like the event log. */
+		runId: text("run_id").notNull(),
+		stepId: text("step_id").notNull(),
+		updatedAt: updatedAt(),
+	},
+	(table) => [
+		primaryKey({
+			columns: [
+				table.projectId,
+				table.rootFlow,
+				table.nodePath,
+				table.scope,
+				table.itemKey,
+			],
+		}),
+		index("node_memory_spaceId_idx").on(table.spaceId),
+		index("node_memory_node_idx").on(
+			table.projectId,
+			table.rootFlow,
+			table.nodePath,
+			table.updatedAt,
+		),
+	],
+);
+
 // Owner: `@nightshift/engine` `leases/`: a Lease node takes a row, the
 // engine renews and releases it (ADR 7).
 
