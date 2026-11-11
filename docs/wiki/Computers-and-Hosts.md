@@ -95,3 +95,11 @@ A Host copies each project with a `github.com` remote, so it can run work withou
 
 - A private repository needs `gh` signed in on the Host. In Docker, set `GH_TOKEN` in the container.
 - To stop it, turn off **Copy every project** under Settings → This computer, or set `NIGHTSHIFT_COPY_PROJECTS=off`.
+
+## A project without a folder
+
+A [project without a folder](Get-started.md#a-project-without-a-folder) needs no copy on any computer. So the Host runs its schedules without GitHub, and every computer of the Space can run its steps.
+
+- Each computer that runs a step works in a folder of its own for that run. See [The files of a run](Runs-and-schedules.md#the-files-of-a-run).
+- A step that works in that folder does not move to a backup. It waits for its computer.
+- To add such a project in a Space that a Host keeps, the Host needs a recent Night Shift.

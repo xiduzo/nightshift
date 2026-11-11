@@ -33,6 +33,7 @@ Night Shift lets you engineer that work once. You draw a flow: which agent does 
 Every run shows what each step cost and how far each ladder climbed. So you tune a flow like any other system you build.
 
 - **Your machines, your logins.** Runs, their files, and your logins stay on your own computers. Agents run on the subscriptions that you already pay for.
+- **A project is a place for a body of work.** It holds the flows, schedules, knowledge, secrets, and runs of that work. Its folder is optional. Research or outreach often needs no folder.
 - **The engine decides, the model advises.** A model never adds a step or changes the flow. Every loop has a maximum.
 - **Flows stay out of your project.** Every save is a revision. You see who changed what, and you can restore an earlier one.
 

@@ -44,7 +44,7 @@ Run your real flows with `bun run night`, and change Night Shift in a separate g
 ## Your first run
 
 1. **Add your agents.** The Agents page shows the agent CLIs (`claude`, `codex`, `opencode`, `pi`) and tools (`gh`, `acli`) that it finds on this computer. Choose **Add profile** or **Add tool** for each one you want. See [Agents and profiles](Agents-and-profiles.md).
-2. **Add a project.** Choose its folder, or copy a repository from GitHub. A project can hold any files: notes, documents, data, or code.
+2. **Add a project.** Choose its folder, or copy a repository from GitHub. A project can hold any files: notes, documents, data, or code. Only a project with a folder gets the starter flows, so use a folder for this first run.
 3. **Set up git if Night Shift asks.** Night Shift keeps the history of your project folder with git, and gives each run its own copy. For a folder without git, choose **Set up git**. Night Shift saves every file in a first commit. Runs do not change the files in your folder.
 4. **Keep the starter flows.** Leave **Add the starter flows** checked. Then choose which of your agents runs each part of the [starter flows](Flows-and-nodes.md#starter-flows). Night Shift keeps the flows outside your project folder.
 5. **Start `scout-and-pick`** with a topic that you want to know more about, for example "podcast hosting services" or "PDF libraries for Bun". An agent searches the project's knowledge and the web for candidates.
@@ -52,6 +52,17 @@ Run your real flows with `bun run night`, and change Night Shift in a separate g
 7. **Read the report.** Another agent writes it into the project's knowledge. Open **Knowledge**, then **Files**, and look in the `scout` folder.
 
 When a flow does what you want, give it a schedule. See [Runs and schedules](Runs-and-schedules.md).
+
+## A project without a folder
+
+A project is a place for a body of work: its flows, schedules, knowledge, secrets, and runs. Its folder is optional. Choose **No folder** in **Add project** for work that needs no files of its own, such as research or outreach. You give it only a name.
+
+- Each run starts in an empty folder of its own. The run page shows the files that the run wrote. See [The files of a run](Runs-and-schedules.md#the-files-of-a-run).
+- To keep a value for the next run, use a variable with **Keep between runs**, or the project's [knowledge](Knowledge.md).
+- It has no starter flows, no branches, and no **Start from**.
+- A Host needs no copy of it. See [Computers and Hosts](Computers-and-Hosts.md#a-project-without-a-folder).
+
+A project keeps its folder, or the lack of one. To give the work a folder later, add the folder as a new project.
 
 ## Usage data
 

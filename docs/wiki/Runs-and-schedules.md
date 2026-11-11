@@ -2,16 +2,27 @@
 
 ## Start a run
 
-- **Run** in the flow editor starts the flow. The start dialog asks for its inputs and the branch to start from.
+- **Run** in the flow editor starts the flow. The start dialog asks for its inputs. In a project with a folder, it also asks for the branch to start from.
 - **Quick run** on a project starts one Agent from a prompt, with no flow. It can also pick a flow, with the most used flows first.
 - A [schedule](#schedules) or a [webhook](#webhooks) starts a run without you.
 - An agent in a terminal starts a run with the `start_run` tool. See [Terminal and MCP](Terminal-and-MCP.md).
 
 Each run works in its own copy of your project, on a branch named `nightshift/…`. Runs do not change the files in your folder. A run on a branch starts from its newest commit on the remote. When the local branch has commits that the remote does not have, the local branch wins.
 
+A run of a project without a folder starts in an empty folder of its own, with no branch. See [The files of a run](#the-files-of-a-run).
+
 You follow each step live: its transcript, the files that it changed, its cost, and its tokens.
 
 When a run finishes, the run page asks "Was this run useful?". The phone asks too. Flow health uses the answers to show what a useful result costs.
+
+## The files of a run
+
+A run of a [project without a folder](Get-started.md#a-project-without-a-folder) works in an empty folder of its own. **Files** on the run page lists what the run wrote there. Open a file in a new tab, or download it. Every Member of the Space can see them.
+
+- The files stay on the computer that ran the steps. Open the run there to see them.
+- When the steps run on two computers, each computer has a folder of its own. The run tells you so when it starts.
+- The next run does not see them. To keep a value for the next run, use a variable with **Keep between runs**, or the project's [knowledge](Knowledge.md).
+- With **Clean up old runs** on in **Settings**, Night Shift removes the files some days after the run ends. **Clean up after** sets the days, 90 by default. The run page shows the date.
 
 ## Stop and resume
 
@@ -32,7 +43,7 @@ A flow's schedules are on the **Flows** page. Click what starts the flow on its 
 - **One run at a time.** A schedule does not start while its last run still runs.
 - **Pause tonight** and **Run now** are on the phone too.
 
-A Host without a copy of the project refuses the start. The schedule shows why. When you leave a Host, Night Shift pauses every schedule that is on, because the Host still runs them.
+A Host without a copy of the project refuses the start. The schedule shows why. A project without a folder needs no copy. When you leave a Host, Night Shift pauses every schedule that is on, because the Host still runs them.
 
 ## Webhooks
 

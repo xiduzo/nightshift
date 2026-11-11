@@ -10,7 +10,7 @@ A released build of Night Shift sends these events to the Night Shift team. A ru
 | --- | --- |
 | `nightshift.install.started` | `nightshift.install.entry` (`desktop`, `server`, `_OTHER`). `nightshift.install.host` (boolean). |
 | `nightshift.agent.checked` | `gen_ai.provider.name`. `nightshift.agent.harness` (`claude-code`, `opencode`, `codex`, `grok-build`, `copilot`, `gemini`, `cursor`, `pi`, `_OTHER`). `nightshift.agent.installed` (boolean). `nightshift.agent.signed_in` (`signed_in`, `signed_out`, `unknown`). |
-| `nightshift.project.added` | `nightshift.project.source` (`folder`, `github`, `none`, `_OTHER`). `nightshift.project.has_remote` (boolean). `nightshift.project.starters` (int). |
+| `nightshift.project.added` | `nightshift.project.source` (`folder`, `github`, `none` for a project without a folder, `_OTHER`). `nightshift.project.has_remote` (boolean). `nightshift.project.starters` (int). |
 | `nightshift.project.checked` | One field per check: `git`, `folder`, `commit`, `identity`, `tools`. Each is `ok`, `failed` or `skipped`. |
 | `nightshift.flow.created` | `nightshift.flow.from` (`starter`, `blank`, `import`, `copy`, `_OTHER`). `nightshift.flow.starter` when the flow comes from a starter: its name, or `_OTHER`. |
 | `nightshift.schedule.changed` | `nightshift.schedule.enabled`, `nightshift.schedule.webhook` and `nightshift.schedule.score_pull_requests` (booleans). |

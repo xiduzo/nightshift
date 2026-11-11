@@ -52,6 +52,10 @@ The flow names a computer that left the Space. Open the node, and choose another
 
 Another install of the same computer is online. One computer is one Device, and only one Night Shift at a time can be that Device. Quit the other install, then pair again.
 
+### "Update Night Shift" for a project without a folder
+
+The computer or the Host runs an older version of Night Shift. It cannot add a project without a folder, or run the steps of one. Update Night Shift there.
+
 ### A development install does not connect to the Host
 
 By design, a development install (`bun run dev`) pairs and connects only with a Host on the same computer. To test against a remote Host, set `NIGHTSHIFT_DEV_LINK_HOST=true`.
@@ -64,7 +68,7 @@ Night Shift starts a missed time only within the schedule's late window. The def
 
 ### The schedule says the Host has no copy of the project
 
-A schedule's run starts on the Host, so the Host needs the project. A Host copies a project with a GitHub remote by itself. A private repository needs `gh` signed in on the Host. See [The Host copies your GitHub projects](Computers-and-Hosts.md#the-host-copies-your-github-projects).
+A schedule's run starts on the Host, so the Host needs the project. A Host copies a project with a GitHub remote by itself. A project without a folder needs no copy. A private repository needs `gh` signed in on the Host. See [The Host copies your GitHub projects](Computers-and-Hosts.md#the-host-copies-your-github-projects).
 
 ## Knowledge
 

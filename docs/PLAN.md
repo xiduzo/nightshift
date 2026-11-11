@@ -291,6 +291,8 @@ Each failed step has a fix. A fix runs only after you confirm it.
 
 A run refuses to start in a project that is not ready (`checkProjectFolder` in `packages/engine/src/projects/project-setup.ts`).
 
+A project without a folder has nothing to check. The **No folder** tab of Add project asks only for a name (`projects.addWithoutFolder`, ADR 22).
+
 **Lease.** One daemon per database. A daemon takes the lease (the `daemon_lease` row) before it recovers interrupted work or starts the scheduler. It writes a heartbeat every 10 seconds. A second daemon on the same database refuses to start. It prints the holder's host, pid and start time, and exits with code 1.
 
 The lease is free in three cases:

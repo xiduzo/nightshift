@@ -24,6 +24,8 @@ Knowledge is the files that your agents read besides the project files: notes, w
 | `kit:knowledge/web` | Copies web pages into the project's knowledge as markdown. It needs no account. Each page gets a file named after its address. A page that cannot be read does not stop the others. | `urls`, `folder` |
 <!-- /generated:knowledge-kits -->
 
+**Project files** copies from the project's own folder, so only a project with a folder offers it.
+
 Any flow that writes markdown into `$NS_KNOWLEDGE` is a source too.
 
 ## Learnings
