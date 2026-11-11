@@ -964,3 +964,97 @@ describe("one flow in detail", () => {
 		expect(range.failing.rows[2]?.fixedAt).toBe(NOW - HOUR / 2);
 	});
 });
+
+describe("what a useful result costs", () => {
+	const answer = (value: number, score = "useful") => ({
+		score,
+		value,
+		label: null,
+		stepId: null,
+		at: NOW,
+		by: null,
+	});
+	const scored = (scores: ReturnType<typeof answer>[]) => ({
+		wallMs: 1,
+		agentMs: 1,
+		gateWaitMs: 0,
+		tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		costBasis: "billed" as const,
+		prUrl: null,
+		scores,
+	});
+
+	test("divides what all the flow's own runs cost by the useful ones", () => {
+		const runs = [
+			aRun({ id: "yes", costUsd: 2, metrics: scored([answer(1)]) }),
+			// The last answer counts.
+			aRun({ id: "no", costUsd: 1, metrics: scored([answer(1), answer(0)]) }),
+			// An older Host names the answer pr_useful.
+			aRun({
+				id: "old",
+				costUsd: 1,
+				metrics: scored([answer(1, "pr_useful")]),
+			}),
+			// No answer, and it did not finish: its cost counts all the same.
+			aRun({ id: "failed", status: "failed", costUsd: 1.5 }),
+			aRun({ id: "unknown", costUsd: 0.5, costMissing: 1 }),
+			// Its runs as a subflow have no answer of their own.
+			aRun({
+				flowName: "deploy",
+				costUsd: 9,
+				metrics: scored([answer(1)]),
+				subflows: [
+					{
+						flowName: "night",
+						status: "finished",
+						costUsd: 4,
+						costEstimated: false,
+						costMissing: 0,
+						costCalls: 1,
+						startedAt: NOW - HOUR,
+						endedAt: NOW - HOUR / 2,
+					},
+				],
+			}),
+		];
+		const expected = {
+			answered: 3,
+			useful: 2,
+			costPerUseful: { costUsd: 3, costEstimated: false, costMissing: 1 },
+		};
+
+		const range = summarizeFlow("night", runs, {
+			now: NOW,
+			timeZone: "UTC",
+		}).ranges[0];
+		expect(range?.useful).toEqual(expected);
+		// The answer has its own numbers: it is not a score row.
+		expect(range?.scores).toEqual([]);
+
+		const rows =
+			daysOf(summarize(runs, project(["deploy", "night"])), 7).flows?.rows ??
+			[];
+		expect(rows.find((row) => row.name === "night")?.useful).toEqual(expected);
+		expect(rows.find((row) => row.name === "deploy")?.useful).toEqual({
+			answered: 1,
+			useful: 1,
+			costPerUseful: { costUsd: 9, costEstimated: false, costMissing: 0 },
+		});
+	});
+
+	test("has no cost per useful result while no run was useful", () => {
+		const range = summarizeFlow(
+			"night",
+			[
+				aRun({ costUsd: 2, metrics: scored([answer(0)]) }),
+				aRun({ costUsd: 1 }),
+			],
+			{ now: NOW, timeZone: "UTC" },
+		).ranges[0];
+		expect(range?.useful).toEqual({
+			answered: 1,
+			useful: 0,
+			costPerUseful: null,
+		});
+	});
+});

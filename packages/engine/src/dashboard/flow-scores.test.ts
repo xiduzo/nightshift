@@ -16,7 +16,8 @@ import { projectDashboard } from "./spaces";
 
 /**
  * A flow scores its own runs: a Command step writes `scores` in its data,
- * and the flow's Flow health row and its detail show them, per name.
+ * and the flow's Flow health row and its detail show them, per name. A
+ * person's useful answer has numbers of its own in the row.
  */
 
 let sandbox: Sandbox;
@@ -123,4 +124,40 @@ test("a flow whose Command writes scores shows them in its Flow health row after
 		["held_post_publication", 1, null, stepId],
 	]);
 	expect(run.warnings).toEqual([]);
+});
+
+test("a person's answer to Was this run useful? is the score useful, and Flow health counts it", async () => {
+	await seedFlows(space, projectId, { replicate: replicateFlow });
+	const first = await finishedRun("1");
+	const second = await finishedRun("0");
+
+	await space.act(first, { kind: "useful", useful: false });
+	await space.act(first, { kind: "useful", useful: true });
+	await space.act(second, { kind: "useful", useful: false });
+
+	const run = await space.getRun(first);
+	expect(
+		run.metrics?.scores
+			?.filter((s) => s.stepId === null)
+			.map((s) => [s.score, s.value]),
+	).toEqual([
+		["useful", 0],
+		["useful", 1],
+	]);
+
+	const dashboard = await projectDashboard(space, projectId, {
+		now: now(),
+		timeZone: "UTC",
+	});
+	const row = dashboard.flowHealth?.rows.find((r) => r.name === "replicate");
+	// The flow asks no agent: a useful result cost nothing.
+	expect(row?.useful).toEqual({
+		answered: 2,
+		useful: 1,
+		costPerUseful: { costUsd: 0, costEstimated: false, costMissing: 0 },
+	});
+	expect(row?.scores?.map((score) => score.name)).toEqual([
+		"held_post_publication",
+		"replicated",
+	]);
 });

@@ -1,6 +1,6 @@
 import type { RunScore } from "../log";
 import type { RunSummary } from "../read";
-import { finishedShare } from "../run-status";
+import { finishedShare, usefulAnswer } from "../run-status";
 import { dayStart, lastDays } from "./clock";
 import {
 	countStatuses,
@@ -16,6 +16,7 @@ import {
 	type FlowRange,
 	type FlowRun,
 	type FlowScoreRow,
+	type FlowUseful,
 	type FlowWarning,
 	LAST_FLOW_RUNS,
 	type LastFlowRun,
@@ -123,14 +124,25 @@ function toFlowRun({
 }
 
 /**
+ * Scores with numbers of their own: left out of the score rows. A run
+ * score names the useful answer `useful`. `pr_useful` is its older name.
+ */
+const NOT_IN_SCORE_ROWS: ReadonlySet<string> = new Set([
+	"gate_decision",
+	"useful",
+	"pr_useful",
+]);
+
+/**
  * The scores of the runs, one row per name, the most scored first. A
- * Gate's answer is left out: the Gates have their own numbers.
+ * Gate's answer and the useful answer are left out: they have their own
+ * numbers.
  */
 function scoresOf(runs: readonly PlacedFlowRun[]): FlowScoreRow[] {
 	const byName = new Map<string, FlowScoreRow & { runIds: Set<string> }>();
 	for (const run of runs) {
 		for (const { score, value, at } of run.scores) {
-			if (score === "gate_decision") continue;
+			if (NOT_IN_SCORE_ROWS.has(score)) continue;
 			const row = byName.get(score) ?? {
 				name: score,
 				runs: 0,
@@ -155,10 +167,31 @@ function scoresOf(runs: readonly PlacedFlowRun[]): FlowScoreRow[] {
 }
 
 /**
+ * What people answered to "Was this run useful?" about the flow's own
+ * runs, and what a useful result cost: what all of them cost together,
+ * those that did not finish included, divided by the useful ones. A run as
+ * a subflow has no answer of its own, and its cost is in its caller's.
+ */
+function usefulOf(runs: readonly PlacedFlowRun[]): FlowUseful {
+	const own = runs.filter((run) => run.calledBy === null);
+	const answers = own.map((run) => usefulAnswer(run.scores));
+	const answered = answers.filter((answer) => answer !== null).length;
+	const useful = answers.filter((answer) => answer === true).length;
+	const spent = sumKnownCost(own);
+	return {
+		answered,
+		useful,
+		costPerUseful:
+			useful > 0 ? { ...spent, costUsd: spent.costUsd / useful } : null,
+	};
+}
+
+/**
  * Each flow over the last `days` days: its last runs, how often it
- * finished, and what a finished run costs. A stopped run did not finish, so it counts
- * against it. A flow a Subflow node ran counts too, inside the run that
- * called it. The busiest flows first, then the one that ran last.
+ * finished, what a finished run costs, and what a useful result costs. A
+ * stopped run did not finish, so it counts against it. A flow a Subflow
+ * node ran counts too, inside the run that called it. The busiest flows
+ * first, then the one that ran last.
  */
 export function flowHealthRows(
 	flows: readonly string[],
@@ -205,6 +238,7 @@ export function flowHealthRows(
 				tokens: unfinished.reduce((total, run) => total + (run.tokens ?? 0), 0),
 			},
 			scores: scoresOf(recent),
+			useful: usefulOf(recent),
 		};
 	});
 	return topRows(
@@ -340,14 +374,15 @@ function flowRange(
 		whyUnfinished: topRows(whyUnfinished(unfinished)),
 		warningRows: topRows(warningsOf(inRange)),
 		scores: scoresOf(inRange),
+		useful: usefulOf(inRange),
 		latest: inRange.slice(-OVERVIEW_ROWS).reverse().map(toFlowRun),
 	};
 }
 
 /**
  * One flow in detail, for each day range: runs per day, what each run
- * cost, why runs did not finish, and the latest runs. Runs as a subflow
- * count, as in its Flow health row.
+ * cost, what a useful result cost, why runs did not finish, and the latest
+ * runs. Runs as a subflow count, as in its Flow health row.
  */
 export function summarizeFlow(
 	name: string,

@@ -85,6 +85,13 @@ const flowScoreRowSchema = z.object({
 	latest: z.object({ value: z.number(), at: z.number(), runId: z.string() }),
 });
 
+/** What people answered to "Was this run useful?" about a flow's own runs. */
+const flowUsefulSchema = z.object({
+	answered: z.number(),
+	useful: z.number(),
+	costPerUseful: knownCostSchema.nullable(),
+});
+
 const flowHealthRowSchema = z.object({
 	name: z.string(),
 	last: lastFlowRunSchema.nullable(),
@@ -103,6 +110,7 @@ const flowHealthRowSchema = z.object({
 	unknownCost: z.number(),
 	freeRuns: z.number(),
 	scores: z.array(flowScoreRowSchema).optional(),
+	useful: flowUsefulSchema.optional(),
 });
 
 const nightTotalsSchema = z.object({
@@ -379,6 +387,7 @@ export const flowHealthDetailSchema = exact<FlowHealthDetail>()(
 					}),
 				),
 				scores: z.array(flowScoreRowSchema).optional(),
+				useful: flowUsefulSchema.optional(),
 				latest: z.array(flowRunSchema),
 			}),
 		),

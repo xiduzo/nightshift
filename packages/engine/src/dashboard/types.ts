@@ -400,13 +400,33 @@ export type FlowHealthRow = {
 	freeRuns: number;
 	/** Its runs' scores in the last days, the most scored first. Empty when none scored. Older Hosts send none. */
 	scores?: FlowScoreRow[];
+	/** What people answered to "Was this run useful?" in the last days. Older Hosts send none. */
+	useful?: FlowUseful;
+};
+
+/**
+ * What people answered to "Was this run useful?" about a flow's runs over
+ * some days, and what a useful result cost. Only the flow's own runs
+ * count: a run as a subflow has no answer of its own.
+ */
+export type FlowUseful = {
+	/** Runs with an answer. */
+	answered: number;
+	/** Runs whose last answer is yes. */
+	useful: number;
+	/**
+	 * What all its runs in the days cost together, those that did not
+	 * finish included, divided by `useful`. Null when no run was useful.
+	 */
+	costPerUseful: KnownCost | null;
 };
 
 /**
  * One score name of a flow's runs over some days: what its Command
- * steps wrote, and what became of its pull requests. A Gate's answer is
- * left out: the Gates have their own numbers. Only the flow's own runs
- * count, not its runs as a subflow.
+ * steps wrote, and what became of its pull requests (the optional scorer
+ * for code). A Gate's answer and the useful answer are left out: they have
+ * their own numbers. Only the flow's own runs count, not its runs as a
+ * subflow.
  */
 export type FlowScoreRow = {
 	name: string;
@@ -539,6 +559,8 @@ export type FlowRange = {
 	warningRows: TopRows<FlowWarning>;
 	/** The most scored first. Empty when no run scored. Older Hosts send none. */
 	scores?: FlowScoreRow[];
+	/** What people answered to "Was this run useful?". Older Hosts send none. */
+	useful?: FlowUseful;
 	/** The newest first. */
 	latest: FlowRun[];
 };

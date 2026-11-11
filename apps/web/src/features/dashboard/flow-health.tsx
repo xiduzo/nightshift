@@ -22,6 +22,7 @@ import {
 	costHalfSentence,
 	costWithTokens,
 	formatCost,
+	formatKnownCost,
 	formatRelative,
 	typicalCostSentence,
 	useNow,
@@ -32,10 +33,11 @@ import { projectFlowsQuery } from "./queries";
 
 /**
  * Each flow over the page's range: the status of its last runs, its runs
- * and how many finished, and what a finished run costs. A stopped run did
- * not finish, so it counts against it. A flow a Subflow node ran counts
- * too, inside the run that called it. Under its name: the computers its
- * steps need. A row opens the details of its flow.
+ * and how many finished, what a finished run costs, and what a useful
+ * result costs. A stopped run did not finish, so it counts against it. A
+ * flow a Subflow node ran counts too, inside the run that called it. Under
+ * its name: the computers its steps need. A row opens the details of its
+ * flow.
  */
 export function FlowHealthTable({
 	project,
@@ -142,11 +144,72 @@ function flowHealthColumns(
 				/>
 			),
 			meta: {
-				headClassName: "pr-6 text-right w-56",
+				headClassName: "text-right w-56",
+				cellClassName: "text-right tabular-nums",
+			},
+		}),
+		column.accessor((row) => row.useful?.costPerUseful?.costUsd, {
+			id: "perUseful",
+			header: "Per useful result",
+			enableSorting: true,
+			sortUndefined: "last",
+			cell: ({ row: { original } }) => <UsefulCell useful={original.useful} />,
+			meta: {
+				headClassName: "pr-6 text-right w-40",
 				cellClassName: "pr-6 text-right tabular-nums",
 			},
 		}),
 	]);
+}
+
+/**
+ * What a useful result costs: what all the flow's runs cost together,
+ * divided by the runs people found useful. Under it, how many of the
+ * answered runs were useful. An older Host sends nothing: a dash.
+ */
+function UsefulCell({ useful }: { useful: FlowHealthRow["useful"] }) {
+	if (!useful) return "—";
+	const lines =
+		useful.answered === 0
+			? ["No answers yet.", 'Answer "Was this run useful?" on a finished run.']
+			: useful.costPerUseful === null
+				? [
+						"No run was useful yet.",
+						useful.answered === 1
+							? "1 run has an answer."
+							: `${useful.answered} runs have an answer.`,
+					]
+				: [
+						"What all runs of this flow cost, divided by the useful runs.",
+						`${useful.useful} of ${useful.answered} runs with an answer were useful.`,
+					];
+	return (
+		<Tooltip>
+			<TooltipTrigger
+				render={<span className="inline-flex flex-col items-end gap-1" />}
+			>
+				<span
+					className={
+						useful.costPerUseful === null ? "text-muted-foreground" : "text-sm"
+					}
+				>
+					{useful.costPerUseful === null
+						? "—"
+						: formatKnownCost(useful.costPerUseful)}
+				</span>
+				{useful.answered > 0 ? (
+					<span className="text-muted-foreground text-xs">
+						{useful.useful} of {useful.answered} useful
+					</span>
+				) : null}
+			</TooltipTrigger>
+			<TooltipContent className="flex flex-col items-start gap-0.5 tabular-nums">
+				{lines.map((line) => (
+					<span key={line}>{line}</span>
+				))}
+			</TooltipContent>
+		</Tooltip>
+	);
 }
 
 /** The computers the steps of a flow run on. Nothing when it names none. */

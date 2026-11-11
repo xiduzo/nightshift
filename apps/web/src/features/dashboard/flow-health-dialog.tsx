@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowRightIcon } from "lucide-react";
 import { useState } from "react";
-import type { NightRange, Project } from "@/shared/api";
+import type { FlowRange, NightRange, Project } from "@/shared/api";
 import {
 	costHalfSentence,
 	costWithTokens,
@@ -38,8 +38,9 @@ type Tab = "overview" | "cost" | "problems" | "runs";
 
 /**
  * One flow in detail, behind its Flow health row, in tabs so each view stays
- * small: an overview with runs per day and the runs' scores, what each run cost against the
- * median, why runs did not finish, and the latest runs. One range drives
+ * small: an overview with what a useful result costs, runs per day and the
+ * runs' scores, what each run cost against the median, why runs did not
+ * finish, and the latest runs. One range drives
  * every tab. Runs as a subflow count, as in the row.
  */
 export function FlowHealthDialog({
@@ -122,7 +123,7 @@ function FlowHealthDetails({
 				) : (
 					<>
 						<DetailsTabContent value="overview">
-							<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+							<div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
 								<Stat
 									label="Runs"
 									value={String(inRange.runs)}
@@ -142,6 +143,17 @@ function FlowHealthDetails({
 									hint={`${inRange.finished} of ${inRange.ended} ended runs`}
 								/>
 								<Stat
+									label="Typical length"
+									value={
+										inRange.length ? formatDuration(inRange.length.median) : "—"
+									}
+									hint={
+										inRange.length && inRange.length.count > 1
+											? `Half take ${formatDuration(inRange.length.q1)} to ${formatDuration(inRange.length.q3)}`
+											: undefined
+									}
+								/>
+								<Stat
 									label="Per finished run"
 									value={
 										inRange.cost
@@ -158,15 +170,13 @@ function FlowHealthDetails({
 									}
 								/>
 								<Stat
-									label="Typical length"
+									label="Per useful result"
 									value={
-										inRange.length ? formatDuration(inRange.length.median) : "—"
+										inRange.useful?.costPerUseful
+											? formatKnownCost(inRange.useful.costPerUseful)
+											: "—"
 									}
-									hint={
-										inRange.length && inRange.length.count > 1
-											? `Half take ${formatDuration(inRange.length.q1)} to ${formatDuration(inRange.length.q3)}`
-											: undefined
-									}
+									hint={usefulHint(inRange.useful)}
 								/>
 							</div>
 							<RunsPerDay
@@ -289,4 +299,11 @@ function FlowHealthDetails({
 			</DialogFooter>
 		</>
 	);
+}
+
+/** Under "Per useful result": how many runs with an answer were useful. */
+function usefulHint(useful: FlowRange["useful"]): string | undefined {
+	if (!useful) return undefined;
+	if (useful.answered === 0) return "No answers yet";
+	return `${useful.useful} of ${useful.answered} runs with an answer were useful`;
 }
