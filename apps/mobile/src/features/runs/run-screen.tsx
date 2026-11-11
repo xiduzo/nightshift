@@ -44,11 +44,11 @@ import {
 	SquareTerminal,
 } from "lucide-react-native";
 import { useCallback, useState } from "react";
-import { Share, View } from "react-native";
+import { View } from "react-native";
 
 import { FollowOnLockScreen } from "@/features/glance";
 import { useHost, useHostQueries } from "@/features/host";
-import { GateRow } from "@/features/inbox";
+import { GateRow, useShareTakeOver } from "@/features/inbox";
 import { ErrorAlert } from "@/shared/feedback";
 import { formatTime } from "@/shared/format";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
@@ -597,7 +597,9 @@ function Details({
 							))}
 						</View>
 					) : null}
-					{command ? <TakeOver command={command} computer={computer} /> : null}
+					{command ? (
+						<TakeOver runId={runId} command={command} computer={computer} />
+					) : null}
 				</>
 			) : null}
 		</View>
@@ -606,15 +608,19 @@ function Details({
 
 /**
  * The command that opens the agent's session of this run in a terminal,
- * in mono. Touch and hold it to copy it, or share it.
+ * in mono. Touch and hold it to copy it, or share it. A share tells Night
+ * Shift you took the run over: Needed you counts it.
  */
 function TakeOver({
+	runId,
 	command,
 	computer,
 }: {
+	runId: string;
 	command: string;
 	computer: string;
 }) {
+	const share = useShareTakeOver(runId, command);
 	return (
 		<Card className="py-4">
 			<CardContent className="gap-3 px-4">
@@ -637,7 +643,7 @@ function TakeOver({
 					size="lg"
 					variant="outline"
 					className="h-auto min-h-11 py-2"
-					onPress={() => void Share.share({ message: command })}
+					onPress={share}
 					accessibilityHint="Opens the share sheet. Choose Copy to paste the command in a terminal."
 				>
 					<Icon as={ShareIcon} />

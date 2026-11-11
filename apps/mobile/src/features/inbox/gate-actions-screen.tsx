@@ -2,12 +2,12 @@ import { createRunQueries } from "@nightshift/client";
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { CirclePlay, Share2, SquareTerminal } from "lucide-react-native";
-import { Share } from "react-native";
 
 import { useHostQueries } from "@/features/host";
 import { ListGroup, ListRow } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
+import { useShareTakeOver } from "./use-share-take-over";
 
 /**
  * The "More" sheet of a Gate: open its run, read the transcript, or share
@@ -18,6 +18,7 @@ export function GateActionsScreen() {
 	const runQueries = useHostQueries(createRunQueries);
 	const run = useQuery({ ...runQueries.get(runId), ...useWhileFocused() });
 	const command = run.data?.takeOverCommand ?? null;
+	const share = useShareTakeOver(runId, command);
 
 	return (
 		<Screen summary={run.data?.title}>
@@ -49,7 +50,7 @@ export function GateActionsScreen() {
 						caption={[{ text: command, mono: true }]}
 						detail="Run it in a terminal on your computer to continue by hand."
 						chevron={false}
-						onPress={() => void Share.share({ message: command })}
+						onPress={share}
 						accessibilityHint="Opens the share sheet with the command"
 					/>
 				) : null}
