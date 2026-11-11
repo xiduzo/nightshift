@@ -576,6 +576,14 @@ export function createEngine(
 			console.warn("[engine] could not read the leases of the runs", error);
 		})
 		.then(() => recovery.recoverInterruptedWork())
+		// Those leases are renewed at once, not a minute from now: the last
+		// daemon renewed them up to a minute before it stopped, and a lease of
+		// 2 minutes would expire first. After recovery, so a run it ended
+		// interrupted takes back a lease it lost when it continues. The start
+		// does not wait for a Host that answers late.
+		.then(() => {
+			void leases.renewAll();
+		})
 		// Every Space's document: Projects from before it are imported once.
 		.then(() => documents.openAll())
 		.then(() =>

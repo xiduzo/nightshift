@@ -474,6 +474,36 @@ describe("a run that resumes takes its leases again", () => {
  * renewal late cannot let it expire.
  */
 describe("after a restart", () => {
+	test("given a run that sleeps holding a lease of 2 minutes, when a new daemon starts, then it renews the lease at once, not a minute later", async () => {
+		let at = now();
+		// Real minutes: no renewal timer fires while the test runs.
+		const clock = { now: () => at, minuteMs: 60_000 };
+		const dies = new AbortController();
+		const first = makeEngine(undefined, {}, { ...clock, signal: dies.signal });
+		const run = await holdingRun(
+			first,
+			holdingFlow({ ttlMinutes: 2 }),
+			clock.now,
+		);
+		const firstExpiry = await expiryOf();
+		// The first daemon dies a minute and a half after its last renewal.
+		dies.abort();
+		at += 90_000;
+		const ends = new AbortController();
+		const second = makeEngine(undefined, {}, { ...clock, signal: ends.signal });
+		try {
+			expect((await second.getRun(run.id)).status).toBe("sleeping");
+			await waitFor(async () => (await expiryOf()) > firstExpiry, {
+				label: "the new daemon to renew the lease",
+			});
+			// Past the first ttl, before the new daemon's first minute is up.
+			at += 60_000;
+			expect(await holders(at)).toEqual({ "zac-docker-stack": run.id });
+		} finally {
+			ends.abort();
+		}
+	});
+
 	test("given a run that sleeps holding a short lease, when a new daemon starts, then it renews the lease every minute so it does not expire", async () => {
 		let at = now();
 		const clock = () => at;
