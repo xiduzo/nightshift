@@ -75,6 +75,13 @@ export const OUTPUT_FIELD_SHAPES: { [T in FlowNodeType]: FieldShapes<T> } = {
 	service: { outcome: text, data: anything, log_tail: text, visit: whole },
 	"since-last-run": { outcome: text, data: sinceData(false), visit: whole },
 	convert: { outcome: text, data: anything, text, note: text, visit: whole },
+	"web-request": {
+		outcome: text,
+		status: whole,
+		headers: { type: "object", additionalProperties: text },
+		body: anything,
+		visit: whole,
+	},
 };
 
 /** The data of a Since last run node: the new and changed items, and with a value also `previous` and `current`. */
@@ -136,6 +143,7 @@ export const TYPED_OUTPUT_FIELD = {
 	command: "data",
 	tool: "data",
 	convert: "data",
+	"web-request": "body",
 } as const satisfies Partial<Record<FlowNodeType, string>>;
 
 /**

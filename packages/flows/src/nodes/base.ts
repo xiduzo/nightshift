@@ -129,6 +129,19 @@ export function deciderMeasuresProbability(name: DeciderName): boolean {
 /** A header name, as HTTP allows it. */
 const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
 
+/**
+ * The headers of a request a node makes (a Web request, a Wait for a URL):
+ * one template per header name. `${NAME}` reads a secret.
+ */
+export const requestHeadersSchema = z
+	.record(
+		z.string().regex(HEADER_NAME, "Use a header name such as Authorization."),
+		z.string(),
+	)
+	.refine((headers) => Object.keys(headers).length <= 32, {
+		message: "Use at most 32 headers.",
+	});
+
 /** An `http://` or `https://` URL without a query or a fragment. */
 function isServerUrl(value: string): boolean {
 	try {

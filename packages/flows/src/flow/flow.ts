@@ -18,6 +18,7 @@ import {
 	toolNodeSchema,
 	valueNodeSchema,
 	waitNodeSchema,
+	webRequestNodeSchema,
 } from "../nodes";
 
 /**
@@ -50,6 +51,7 @@ export const flowNodeSchema = z.discriminatedUnion("type", [
 	serviceNodeSchema,
 	sinceLastRunNodeSchema,
 	convertNodeSchema,
+	webRequestNodeSchema,
 ]);
 
 export const outcomeSchema = labelSchema;

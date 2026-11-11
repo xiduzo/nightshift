@@ -26,6 +26,7 @@ import {
 	valueDeciderNameSchema,
 	type WaitNode,
 	type WaitUntil,
+	type WebRequestNode,
 } from "../nodes";
 import { typedOutput } from "../shapes";
 
@@ -282,6 +283,8 @@ export function emptyUntil(kind: WaitUntil["kind"]): WaitUntil {
 				signal: { name: "" },
 				command: { command: "", everyMinutes: 10 },
 			};
+		case "url":
+			return { kind: "url", url: "", everyMinutes: 5 };
 	}
 }
 
@@ -295,6 +298,11 @@ export function toolNode(id: string, position: Position): ToolNode {
 		tool: "",
 		arguments: {},
 	};
+}
+
+/** A GET to a URL that starts empty; the issues panel asks for it. */
+export function webRequestNode(id: string, position: Position): WebRequestNode {
+	return { id, type: "web-request", position, method: "GET", url: "" };
 }
 
 /** The name starts empty; the issues panel asks for it. It does not wait. */

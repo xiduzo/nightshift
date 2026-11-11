@@ -24,6 +24,8 @@ import {
 	valueOutputFields,
 	waitOutcomes,
 	waitOutputFields,
+	webRequestOutcomes,
+	webRequestOutputFields,
 } from "../nodes";
 import type { Flow, FlowNode, FlowNodeType, Outcome } from "./flow";
 
@@ -51,6 +53,7 @@ export const NODE_TYPE_LABEL = {
 	service: "Service",
 	"since-last-run": "Since last run",
 	convert: "Convert",
+	"web-request": "Web request",
 } as const satisfies Record<FlowNodeType, string>;
 
 /**
@@ -73,6 +76,7 @@ export const NODE_FAMILY = {
 	agent: "do",
 	command: "do",
 	tool: "do",
+	"web-request": "do",
 	decision: "decide",
 	value: "shape",
 	"since-last-run": "shape",
@@ -167,6 +171,8 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 			return sinceLastRunOutcomes;
 		case "convert":
 			return ["pass", "fail"] satisfies BuiltInOutcome[];
+		case "web-request":
+			return webRequestOutcomes;
 	}
 }
 
@@ -211,10 +217,15 @@ export const outputFieldsByType = {
 	service: serviceOutputFields,
 	"since-last-run": sinceLastRunOutputFields,
 	convert: convertOutputFields,
+	"web-request": webRequestOutputFields,
 } as const satisfies Record<FlowNodeType, readonly string[]>;
 
-/** Output fields that hold JSON, so a template may take a path below them. A Join's `data` holds one entry per branch. */
-export const jsonOutputFields = ["data", "results"] as const;
+/**
+ * Output fields that hold JSON, so a template may take a path below them.
+ * A Join's `data` holds one entry per branch. A Web request's `headers`
+ * and `body` hold its answer.
+ */
+export const jsonOutputFields = ["data", "results", "headers", "body"] as const;
 
 /**
  * The fields a later node can read from `node`: `outputFieldsByType`

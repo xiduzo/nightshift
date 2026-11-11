@@ -1,6 +1,6 @@
 /** Renames in templates, rules and expressions. */
 import type { Flow, FlowNode } from "../flow";
-import type { GateBriefFields, ListSource } from "../nodes";
+import type { GateBriefFields, ListSource, WebRequestNode } from "../nodes";
 import type { TemplateRef } from "../template";
 import { templateRefs } from "../template";
 
@@ -165,6 +165,31 @@ function rewriteBindings(
 	);
 }
 
+/** A Web request's templates: its URL, its URL secret, its query, headers and body. */
+function rewriteWebRequest(
+	node: WebRequestNode,
+	rewrite: (text: string) => string,
+): WebRequestNode {
+	const { url, urlSecret, query, headers, body } = node;
+	return {
+		...node,
+		...(url === undefined ? {} : { url: rewrite(url) }),
+		...(urlSecret === undefined ? {} : { urlSecret: rewrite(urlSecret) }),
+		...(query === undefined ? {} : { query: rewriteBindings(query, rewrite) }),
+		...(headers === undefined
+			? {}
+			: { headers: rewriteBindings(headers, rewrite) }),
+		...(body === undefined
+			? {}
+			: {
+					body:
+						body.kind === "form"
+							? { ...body, fields: rewriteBindings(body.fields, rewrite) }
+							: { ...body, value: rewrite(body.value) },
+				}),
+	};
+}
+
 function rewriteSource(
 	source: ListSource,
 	rewrite: (text: string) => string,
@@ -295,6 +320,17 @@ export function rewriteOwnTemplates(
 						},
 					};
 				}
+				case "url":
+					return {
+						...node,
+						until: {
+							...node.until,
+							url: rewrite(node.until.url),
+							...(node.until.headers
+								? { headers: rewriteBindings(node.until.headers, rewrite) }
+								: {}),
+						},
+					};
 				default:
 					return node;
 			}
@@ -329,6 +365,8 @@ export function rewriteOwnTemplates(
 				...(node.value === undefined ? {} : { value: rewrite(node.value) }),
 				...(node.scope === undefined ? {} : { scope: rewrite(node.scope) }),
 			};
+		case "web-request":
+			return rewriteWebRequest(node, rewrite);
 	}
 }
 

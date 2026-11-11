@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { labelSchema, type NodeCheck, nodeBase } from "./base";
+import {
+	labelSchema,
+	type NodeCheck,
+	nodeBase,
+	requestHeadersSchema,
+} from "./base";
 import { checkOptions, type Option, option } from "./outcomes";
 
 /** The Wait node: it sleeps until a time, a command passes, or a signal arrives. */
@@ -27,7 +32,10 @@ const waitSignalFields = {
  * project's runs. With `key` (a template), only a webhook signal whose key
  * is the rendered text wakes it; a signal sent to the run by its id always
  * does. `any`: a signal and a command, whichever ends the wait first, such
- * as a webhook with a command every 10 minutes as a backup.
+ * as a webhook with a command every 10 minutes as a backup. `url`: a GET
+ * of `url` (a template, `${NAME}` reads a secret) every `everyMinutes`,
+ * from the step's computer, until it answers 2xx. Its `data` is the body
+ * of that answer.
  */
 export const waitUntilSchema = z.discriminatedUnion("kind", [
 	z.object({
@@ -42,6 +50,13 @@ export const waitUntilSchema = z.discriminatedUnion("kind", [
 		signal: z.object(waitSignalFields),
 		command: z.object(waitCommandFields),
 	}),
+	z.object({
+		kind: z.literal("url"),
+		url: z.string().min(1),
+		everyMinutes: z.number().int().positive(),
+		/** One template per header, as on a Web request node. */
+		headers: requestHeadersSchema.optional(),
+	}),
 ]);
 export type WaitUntil = z.infer<typeof waitUntilSchema>;
 
@@ -55,6 +70,13 @@ export function waitCommandOf(until: WaitUntil): WaitCommand | null {
 	if (until.kind === "command") return until;
 	if (until.kind === "any") return until.command;
 	return null;
+}
+
+/** The URL a Wait polls, or null when it polls none. */
+export function waitUrlOf(
+	until: WaitUntil,
+): Extract<WaitUntil, { kind: "url" }> | null {
+	return until.kind === "url" ? until : null;
 }
 
 /** The signal the Wait waits for, or null when it waits for none. */
@@ -75,8 +97,10 @@ export function waitSignalOf(until: WaitUntil): WaitSignal | null {
  * one: it writes `{ "outcome": "red" }` to `$NS_OUTPUT` and exits 0
  * (`commandWaitOutcome`). A signal picks one by rule: the first outcome
  * whose `when` (JSONata over `event`, the signal's data) holds. A webhook
- * signal that matches no rule does not wake the Wait. Without `outcomes`,
- * the Wait works as before.
+ * signal that matches no rule does not wake the Wait. A polled URL picks
+ * one by rule too: the first outcome whose `when` (JSONata over `data`,
+ * the body of a 2xx answer) holds. When none holds, it polls again.
+ * Without `outcomes`, the Wait works as before.
  */
 export const waitNodeSchema = z.object({
 	...nodeBase,
@@ -95,8 +119,9 @@ export function waitOutcomes(node: Pick<WaitNode, "outcomes">): Option[] {
 }
 
 /**
- * The rules a signal picks an outcome by, in order: the Wait's outcomes
- * that have a `when`. Empty: any signal of the name ends the wait `done`.
+ * The rules a signal (or a polled URL's answer) picks an outcome by, in
+ * order: the Wait's outcomes that have a `when`. Empty: any signal of the
+ * name, or any 2xx answer, ends the wait `done`.
  */
 export function signalRules(
 	node: Pick<WaitNode, "outcomes">,
@@ -142,7 +167,7 @@ export function commandWaitOutcome(
 	return { kind: "again", picked };
 }
 
-/** waited_minutes: how long the step waited. log_tail: the last output of a command it waited on. data: the JSON the command wrote to `$NS_OUTPUT`, or the webhook event (`{ body, headers }`) that sent its signal. */
+/** waited_minutes: how long the step waited. log_tail: the last output of a command it waited on. data: the JSON the command wrote to `$NS_OUTPUT`, the webhook event (`{ body, headers }`) that sent its signal, or the body of the URL's answer. */
 export const waitOutputFields = [
 	"outcome",
 	"waited_minutes",
@@ -175,6 +200,26 @@ export function checkWaitNode(node: WaitNode, check: NodeCheck): void {
 			);
 		}
 	}
+	const url = waitUrlOf(until);
+	if (url) {
+		check.template(url.url, "URL");
+		for (const [name, value] of Object.entries(url.headers ?? {})) {
+			check.template(value, `header "${name}"`);
+		}
+		if (!/^(https?:\/\/|\{\{|\$\{)/i.test(url.url.trim())) {
+			check.error(
+				`Wait node "${node.id}": the URL must start with http:// or https://, for example https://status.example.com/job/42.`,
+			);
+		}
+		if (
+			node.timeoutMinutes !== undefined &&
+			node.timeoutMinutes <= url.everyMinutes
+		) {
+			check.error(
+				`Wait node "${node.id}" asks its URL every ${url.everyMinutes} min but times out after ${node.timeoutMinutes} min. Give it a longer timeout than the interval.`,
+			);
+		}
+	}
 }
 
 /**
@@ -184,14 +229,15 @@ export function checkWaitNode(node: WaitNode, check: NodeCheck): void {
  * takes no rule. A signal picks by rule: each rule is valid and reads only
  * `event`, and on a signal wait an outcome without one is never picked.
  * On an `any` wait, the command picks any outcome and the signal picks the
- * ones with a rule. One without an edge ends the run there: a warning.
+ * ones with a rule. A polled URL picks by a rule over `data`, as a signal
+ * does over `event`. One without an edge ends the run there: a warning.
  */
 function checkWaitOutcomes(node: WaitNode, check: NodeCheck): void {
 	if (node.outcomes === undefined) return;
 	const kind = node.until.kind;
 	if (kind === "duration" || kind === "time") {
 		check.error(
-			`Wait node "${node.id}" lists outcomes, but only a command or a signal can pick one. Remove the outcomes, or wait for a command or a signal.`,
+			`Wait node "${node.id}" lists outcomes, but only a command, a signal or a URL can pick one. Remove the outcomes, or wait for one of those.`,
 		);
 		return;
 	}
@@ -212,6 +258,12 @@ function checkWaitOutcomes(node: WaitNode, check: NodeCheck): void {
 			check.warning(
 				`Wait node "${node.id}" has no rule for "${outcome.name}": a signal never ends the wait there. Give it a rule.`,
 			);
+		} else if (kind === "url" && when === "") {
+			check.warning(
+				`Wait node "${node.id}" has no rule for "${outcome.name}": an answer never ends the wait there. Give it a rule.`,
+			);
+		} else if (kind === "url") {
+			check.dataRule(when, `The rule of "${outcome.name}" of "${node.id}"`);
 		} else if (when !== "") {
 			check.eventRule(when, `The rule of "${outcome.name}" of "${node.id}"`);
 		}

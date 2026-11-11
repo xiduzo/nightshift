@@ -12,6 +12,7 @@ import {
 	checkToolNode,
 	checkValueNode,
 	checkWaitNode,
+	checkWebRequestNode,
 	type NodeCheck,
 } from "../nodes";
 import { nodesWithin, sectionPath } from "../sections";
@@ -109,6 +110,9 @@ export function checkNode(
 			break;
 		case "convert":
 			checkConvertNode(node, check);
+			break;
+		case "web-request":
+			checkWebRequestNode(node, check);
 			break;
 	}
 }

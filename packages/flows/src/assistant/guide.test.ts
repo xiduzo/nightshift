@@ -117,8 +117,9 @@ describe("flowAuthoringGuide", () => {
 		// situation, background, recommendation, impacts). 4720: format 9,
 		// a Command's `stdout` and the `output` schema of a Command, a Tool
 		// and a flow output. 4770: the Since last run node. 4840: the Convert
-		// node, with its pairs and the fields of a feed item.
-		expect(words).toBeLessThan(4840);
+		// node, with its pairs and the fields of a feed item. 4920: the Web
+		// request node and a Wait for a URL.
+		expect(words).toBeLessThan(4920);
 	});
 });
 

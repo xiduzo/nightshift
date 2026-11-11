@@ -28,6 +28,7 @@ import {
 	toolNode,
 	valueNode,
 	waitNode,
+	webRequestNode,
 } from "./nodes";
 import { renameRefs, rewriteFlowTemplates } from "./refs";
 import { sectionsWithoutNode, sectionsWithRenamedNode } from "./sections";
@@ -98,6 +99,7 @@ const NEW_NODE: Record<
 	service: { id: "service", create: serviceNode },
 	"since-last-run": { id: "since-last-run", create: sinceLastRunNode },
 	convert: { id: "convert", create: convertNode },
+	"web-request": { id: "fetch", create: webRequestNode },
 };
 
 /** Adds a node of `type`; a new Agent node starts with `defaults`. */

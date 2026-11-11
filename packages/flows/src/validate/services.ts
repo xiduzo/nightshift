@@ -89,6 +89,7 @@ function runsOnDevice(node: FlowNode): boolean {
 		case "agent":
 		case "command":
 		case "tool":
+		case "web-request":
 		case "service":
 		case "call":
 			return true;
@@ -96,7 +97,11 @@ function runsOnDevice(node: FlowNode): boolean {
 		case "value":
 			return node.by === "model";
 		case "wait":
-			return node.until.kind === "command" || node.until.kind === "any";
+			return (
+				node.until.kind === "command" ||
+				node.until.kind === "any" ||
+				node.until.kind === "url"
+			);
 		case "end":
 		case "join":
 		case "lease":

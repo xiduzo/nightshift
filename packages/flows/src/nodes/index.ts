@@ -234,4 +234,20 @@ export {
 	waitOutcomes,
 	waitOutputFields,
 	waitSignalOf,
+	waitUrlOf,
 } from "./wait";
+export {
+	checkWebRequestNode,
+	DEFAULT_WEB_REQUEST_MAX_BYTES,
+	DEFAULT_WEB_REQUEST_TIMEOUT_SECONDS,
+	MAX_WEB_REQUEST_BYTES,
+	type SecretPart,
+	secretParts,
+	WEB_REQUEST_METHODS,
+	type WebRequestBody,
+	type WebRequestMethod,
+	type WebRequestNode,
+	webRequestNodeSchema,
+	webRequestOutcomes,
+	webRequestOutputFields,
+} from "./web-request";

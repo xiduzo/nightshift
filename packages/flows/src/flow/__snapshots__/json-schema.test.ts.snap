@@ -2234,6 +2234,39 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                       ],
                       "type": "object",
                     },
+                    {
+                      "properties": {
+                        "everyMinutes": {
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "type": "integer",
+                        },
+                        "headers": {
+                          "additionalProperties": {
+                            "type": "string",
+                          },
+                          "propertyNames": {
+                            "pattern": "^[!#$%&'*+.^_\`|~0-9A-Za-z-]+$",
+                            "type": "string",
+                          },
+                          "type": "object",
+                        },
+                        "kind": {
+                          "const": "url",
+                          "type": "string",
+                        },
+                        "url": {
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "url",
+                        "everyMinutes",
+                      ],
+                      "type": "object",
+                    },
                   ],
                 },
               },
@@ -3003,6 +3036,221 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                 "from",
                 "to",
                 "value",
+              ],
+              "type": "object",
+            },
+            {
+              "properties": {
+                "body": {
+                  "oneOf": [
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "json",
+                          "type": "string",
+                        },
+                        "value": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "value",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "properties": {
+                        "contentType": {
+                          "maxLength": 200,
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        "kind": {
+                          "const": "text",
+                          "type": "string",
+                        },
+                        "value": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "value",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "properties": {
+                        "fields": {
+                          "additionalProperties": {
+                            "type": "string",
+                          },
+                          "propertyNames": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "type": "object",
+                        },
+                        "kind": {
+                          "const": "form",
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "fields",
+                      ],
+                      "type": "object",
+                    },
+                  ],
+                },
+                "device": {
+                  "anyOf": [
+                    {
+                      "maxLength": 128,
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "name": {
+                          "maxLength": 64,
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "name",
+                      ],
+                      "type": "object",
+                    },
+                  ],
+                },
+                "headers": {
+                  "additionalProperties": {
+                    "type": "string",
+                  },
+                  "propertyNames": {
+                    "pattern": "^[!#$%&'*+.^_\`|~0-9A-Za-z-]+$",
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "label": {
+                  "type": "string",
+                },
+                "maxBytes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 10485760,
+                  "type": "integer",
+                },
+                "method": {
+                  "default": "GET",
+                  "enum": [
+                    "GET",
+                    "POST",
+                    "PUT",
+                    "PATCH",
+                    "DELETE",
+                    "HEAD",
+                  ],
+                  "type": "string",
+                },
+                "output": {
+                  "additionalProperties": {},
+                  "propertyNames": {
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "outputInferred": {
+                  "const": true,
+                  "type": "boolean",
+                },
+                "position": {
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "query": {
+                  "additionalProperties": {
+                    "type": "string",
+                  },
+                  "propertyNames": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "set": {
+                  "items": {
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                      },
+                      "on": {
+                        "items": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "value": {
+                        "type": "string",
+                      },
+                      "variable": {
+                        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "variable",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "timeoutMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "timeoutSeconds": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 600,
+                  "type": "integer",
+                },
+                "type": {
+                  "const": "web-request",
+                  "type": "string",
+                },
+                "url": {
+                  "type": "string",
+                },
+                "urlSecret": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "id",
+                "position",
+                "type",
               ],
               "type": "object",
             },
@@ -5520,6 +5768,40 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                       ],
                       "type": "object",
                     },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "everyMinutes": {
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "type": "integer",
+                        },
+                        "headers": {
+                          "additionalProperties": {
+                            "type": "string",
+                          },
+                          "propertyNames": {
+                            "pattern": "^[!#$%&'*+.^_\`|~0-9A-Za-z-]+$",
+                            "type": "string",
+                          },
+                          "type": "object",
+                        },
+                        "kind": {
+                          "const": "url",
+                          "type": "string",
+                        },
+                        "url": {
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "url",
+                        "everyMinutes",
+                      ],
+                      "type": "object",
+                    },
                   ],
                 },
               },
@@ -6315,6 +6597,228 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                 "from",
                 "to",
                 "value",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "body": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "json",
+                          "type": "string",
+                        },
+                        "value": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "value",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "contentType": {
+                          "maxLength": 200,
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        "kind": {
+                          "const": "text",
+                          "type": "string",
+                        },
+                        "value": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "value",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "fields": {
+                          "additionalProperties": {
+                            "type": "string",
+                          },
+                          "propertyNames": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "type": "object",
+                        },
+                        "kind": {
+                          "const": "form",
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "fields",
+                      ],
+                      "type": "object",
+                    },
+                  ],
+                },
+                "device": {
+                  "anyOf": [
+                    {
+                      "maxLength": 128,
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "name": {
+                          "maxLength": 64,
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "name",
+                      ],
+                      "type": "object",
+                    },
+                  ],
+                },
+                "headers": {
+                  "additionalProperties": {
+                    "type": "string",
+                  },
+                  "propertyNames": {
+                    "pattern": "^[!#$%&'*+.^_\`|~0-9A-Za-z-]+$",
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "label": {
+                  "type": "string",
+                },
+                "maxBytes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 10485760,
+                  "type": "integer",
+                },
+                "method": {
+                  "default": "GET",
+                  "enum": [
+                    "GET",
+                    "POST",
+                    "PUT",
+                    "PATCH",
+                    "DELETE",
+                    "HEAD",
+                  ],
+                  "type": "string",
+                },
+                "output": {
+                  "additionalProperties": {},
+                  "propertyNames": {
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "outputInferred": {
+                  "const": true,
+                  "type": "boolean",
+                },
+                "position": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "query": {
+                  "additionalProperties": {
+                    "type": "string",
+                  },
+                  "propertyNames": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "set": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                      },
+                      "on": {
+                        "items": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "value": {
+                        "type": "string",
+                      },
+                      "variable": {
+                        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "variable",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "timeoutMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "timeoutSeconds": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 600,
+                  "type": "integer",
+                },
+                "type": {
+                  "const": "web-request",
+                  "type": "string",
+                },
+                "url": {
+                  "type": "string",
+                },
+                "urlSecret": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "id",
+                "position",
+                "type",
+                "method",
               ],
               "type": "object",
             },
@@ -7493,7 +7997,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "callNodeSchema": "856424b932b2bdf5e466e4df2fefb72963a974a3c5f8eaeeb7cb85cde6c12095",
   "callTierSchema": "00472b8d815f172216c3976c44d8148ab36a7690a4b331f344112daf0a7ade18",
   "calledFlowNameSchema": "41a733acacaf6fd4a56ce1af8652a762a9eae1a70888ac38628091b417b7f999",
-  "chatRequestSchema": "b4482daecbaaaba0f6d240d5c379a932773c5ac3e7eaa993c09851895a07a087",
+  "chatRequestSchema": "9efc94adae266f2dbd6b9ea71630ccba1df696daac2b86eaa51a4968b153ef3f",
   "choiceItemSchema": "55d6a793593f2331affa67faa389d61df03d4029c01b7a7443f9a98834f63da7",
   "cliNameSchema": "51a3ab3696b70b9bee33bc67a8d7cb8f1ae494ccef5ccc7e73878b93fb22c12c",
   "commandExitSchema": "81c5c7ed3b70f87931cdd1b3beb8943305b5a7b50e6f5840b9d885ba920e88a3",
@@ -7518,9 +8022,9 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "flowInputSchema": "c4327eae5fd47880a975ba515ace6c59b99e4872d70d039dbe0e13f3b78794dd",
   "flowInputTypeSchema": "01b4ffbb09aa8ea76514a7d2ec8b814bc6d444afe04c4387819be8a08a4b10a4",
   "flowNameSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
-  "flowNodeSchema": "1dacd701c95b4230af1d96625a0a58403ca1322e991439814df6e2ffa108920d",
+  "flowNodeSchema": "cd1ac04e5119bcc04a91ce908ace34d9f8203620f6f0d17887b37871ae938876",
   "flowOutputSchema": "00a461c38cec41ea7ca8d914b037ae0722db17dea81b0f0d179910fe87722b5f",
-  "flowSchema": "d20b297d70a90fe94964bc8864468e78ec4c11e84e601bfb1c5d64501f67a841",
+  "flowSchema": "906089fe0005f156340b6f04da8b64505c558030b36b02fbf4359cc0e1c460f3",
   "flowSectionSchema": "3cd74de667afdadb6253862ee3c7d71ee76f3e26c484bc8a0eb4fba4ccca8beb",
   "flowVariableSchema": "6b94624e39154287f7234674d738fc66c15683391478c2b601a0393a3dcad746",
   "gateDeadlineSchema": "38c3b76b2cfed3b1040f87955aaa7f44d377f298f682ced37e6c784c5096de76",
@@ -7560,6 +8064,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "profileRefSchema": "c7fda85c2da98330849db69ce0ddf66f6963b19edf33ce234237888cf5366222",
   "profileSchema": "c85890b1cbf0dbf0c6e8c78e3841b86358311f25b9a9f9635e18f42412a9e128",
   "profileSettingsSchema": "bcb870acdfc1cf67f41fdb26110ffb5ca1caa25fc9eedbb4e011efe094e59fd3",
+  "requestHeadersSchema": "b7c562096f1e16f0d057211754d9253b5d3a33b946fac1e152d24ee19fa1e2cb",
   "scheduleIdSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
   "scheduleSchema": "848da5f6cd24123e8881067d605c303e5521fbbd8bba02d7004eae61fae5ef40",
   "scheduleSignalSchema": "72340129c840cb54c596990620242a4a89780d13706772bdabc77b1f8ebf3dad",
@@ -7572,7 +8077,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "sinceLastRunFirstSchema": "3086ef5ab6fbbf88de9766973e2780a10fe7b97d02741aec12bcd64aef75efb1",
   "sinceLastRunNodeSchema": "a430589b8cef5f49dd7d3281a88cb7a9feea6487e81ee7d2fecaf8ca4097a450",
   "suggestionKindSchema": "3e43d01e11142bb468d0231629bcc69236a97420b5675b96fe46f4c74492955f",
-  "suggestionRequestSchema": "fdd2129d815ea0173a2c8f3bd9151ef08a88cb4800fdc22a0cdb0ff7172bfe03",
+  "suggestionRequestSchema": "9d58fba9bb110fa5c4d7cc92e1ad28a7ed616ab52bea94470652b21fe323c6c4",
   "suggestionSchema": "7eb8ae685355788f149a1e214b0a1a055a94eddb94303c2150896d480fb3aea1",
   "textRangeSchema": "f4f1728b7fbe3eeb75cd4b9e3609d9349b8ce81db2bc7f521acb8351d420c77e",
   "timeOfDaySchema": "8684ebbaf52e062cf5e284260d4f3a9bc9583a4a7a3db8007313edc210ccccae",
@@ -7583,8 +8088,10 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "valueTierSchema": "283dcc80e09de2a2b3783c1b1330999bceecf200da194633e7c3d997ba2b07b3",
   "variableTypeSchema": "1117a60eccb8c2baefec4e9cebcf2c4a387a033ded5c8a7071a9474221fa733c",
   "variableWriteSchema": "2c39a4e86bcbb12e591793c1361222cd3dd9380833ce702eef65f3ca45cee0a2",
-  "waitNodeSchema": "38b0da541b71acb64e8ef7e2877924632c1ab931e0e3afe3e9886d51b78a5a4b",
-  "waitUntilSchema": "9c2a843c81bc019274441c8367e4d67315cc15d1dce415b8811ab1b27e7f8606",
+  "waitNodeSchema": "9695895bd024bbf6a4f3e97df621b71906c15562254eaef84fd3f137ce9a2fe6",
+  "waitUntilSchema": "8cdb4d2517e481f1645b4ea29de70c9e48749c0702275e9e793c5cd74c51f10f",
+  "webRequestBodySchema": "4b7ddecb2bbd3b9fa43a1adee0ec8c4dcb30ca2dc5de3f34f2ecf9c37d19b545",
+  "webRequestNodeSchema": "0b35b93f7a8301a20d5b29506707399e189f0256a1f33751d78652e50e88d63e",
   "webhookSecretSchema": "a0a552b5d82356dc8e33835d829408eb750ffa1fb7ea4f2f1d38c75ff5d2ccf6",
 }
 `;
@@ -8689,7 +9196,7 @@ exports[`published schemas a flow that is not valid gives the same schema issues
       "severity": "error",
     },
     {
-      "message": "nodes.1.until.kind: Invalid discriminator value. Expected 'duration' | 'time' | 'command' | 'signal' | 'any'",
+      "message": "nodes.1.until.kind: Invalid discriminator value. Expected 'duration' | 'time' | 'command' | 'signal' | 'any' | 'url'",
       "severity": "error",
     },
     {

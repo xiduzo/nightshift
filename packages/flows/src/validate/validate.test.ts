@@ -2535,7 +2535,7 @@ describe("validateFlow: wait nodes", () => {
 		).toEqual([
 			[
 				"later",
-				'Wait node "later" lists outcomes, but only a command or a signal can pick one. Remove the outcomes, or wait for a command or a signal.',
+				'Wait node "later" lists outcomes, but only a command, a signal or a URL can pick one. Remove the outcomes, or wait for one of those.',
 			],
 			[
 				"ci",

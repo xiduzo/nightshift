@@ -70,7 +70,7 @@ Names (node ids, inputs, variables): lowercase letters, digits and `_`, starting
 
 ## Nodes
 
-The node types: `agent`, `command`, `decision`, `call`, `value`, `wait`, `tool`, `end`, `join`, `lease`, `service`, `since-last-run`, `convert`. Every node has `id`, `type`, `position: { x, y }`, and optional `label` (shown in the editor), `timeoutMinutes` and `set` (variable writes). Lay the nodes out left to right, about 300 apart on x, and put a loop's way back below the main line.
+The node types: `agent`, `command`, `decision`, `call`, `value`, `wait`, `tool`, `end`, `join`, `lease`, `service`, `since-last-run`, `convert`, `web-request`. Every node has `id`, `type`, `position: { x, y }`, and optional `label` (shown in the editor), `timeoutMinutes` and `set` (variable writes). Lay the nodes out left to right, about 300 apart on x, and put a loop's way back below the main line.
 
 ### agent
 
@@ -114,7 +114,7 @@ Outcomes: `pass`, `fail`. Outputs: `outcome`, `data`, `note`, `visit`.
 
 ### wait
 
-Waits, then ends `done`. `until` is one of: `duration`, `time`, `command`, `signal`, `any` (`{ kind: "duration", minutes }`, `{ kind: "time", at: "07:00" }`, `{ kind: "command", command, everyMinutes }` until it exits 0, `{ kind: "signal", name, key? }`, `{ kind: "any", signal: { name, key? }, command: { command, everyMinutes } }`: whichever ends it first). `timeoutMinutes` ends it `timeout`. A signal comes from a person on the run page, or from a webhook schedule of the project: then `data` holds the webhook (`{{wait_ci.data.body.check_suite.conclusion}}`). With `key` (a template, for example `{{pr}}`), only a webhook whose signal key is that text wakes it. `outcomes` (each `{ name, when? }`, each with an edge) are more ways out than `done`. The command picks one: it writes `{ "outcome": "red" }` to `$NS_OUTPUT` and exits 0; an unlisted outcome or another exit code polls again. A signal picks the first outcome whose `when` (JSONata over `event`) holds; a webhook that matches no rule does not wake it.
+Waits, then ends `done`. `until` is one of: `duration`, `time`, `command`, `signal`, `any`, `url` (`{ kind: "duration", minutes }`, `{ kind: "time", at: "07:00" }`, `{ kind: "command", command, everyMinutes }` until it exits 0, `{ kind: "signal", name, key? }`, `{ kind: "any", signal: { name, key? }, command: { command, everyMinutes } }`: whichever ends it first, `{ kind: "url", url, everyMinutes, headers? }` until it answers 2xx, with the body as `data`). `timeoutMinutes` ends it `timeout`. A signal comes from a person on the run page, or from a webhook schedule of the project: then `data` holds the webhook (`{{wait_ci.data.body.check_suite.conclusion}}`). With `key` (a template, for example `{{pr}}`), only a webhook whose signal key is that text wakes it. `outcomes` (each `{ name, when? }`, each with an edge) are more ways out than `done`. The command picks one: it writes `{ "outcome": "red" }` to `$NS_OUTPUT` and exits 0; an unlisted outcome or another exit code polls again. A signal picks the first outcome whose `when` (JSONata over `event`) holds; a webhook that matches no rule does not wake it. A URL picks by `when` over `data`.
 
 Outcomes: `done`, `timeout`. Outputs: `outcome`, `waited_minutes`, `log_tail`, `data`, `visit`.
 
@@ -175,6 +175,14 @@ Converts `value` (a template) `from` a format `to` another, with no model: `csv`
 Outcomes: `pass`, `fail`. Outputs: `outcome`, `data`, `text`, `note`, `visit`.
 
 `{"id":"news","type":"convert","position":{"x":0,"y":0},"from":"feed","to":"json","value":"{{fetch.body}}"}`
+
+### web-request
+
+One HTTP request, with no shell. `url`, or `urlSecret`: a secret that holds the URL. `method` (default GET), `query`, `headers`, `body` (`{ kind: "json", value }`, `text` or `form`). `${NAME}` in its own text reads a secret. `pass` on 2xx, else `fail`. It waits out 429 and 5xx. `output` types `body`.
+
+Outcomes: `pass`, `fail`. Outputs: `outcome`, `status`, `headers`, `body`, `visit`.
+
+`{"id":"fetch","type":"web-request","position":{"x":0,"y":0},"url":"https://api.example.com/items","query":{"q":"{{topic}}"},"headers":{"Authorization":"Bearer ${API_TOKEN}"}}`
 
 ## Edges, outcomes and loops
 
