@@ -1,3 +1,4 @@
+import { neededReasonsText, neededShare } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import { DialogFooter } from "@nightshift/ui/components/dialog";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
@@ -38,7 +39,8 @@ type Tab = "overview" | "cost" | "problems" | "runs";
 
 /**
  * One flow in detail, behind its Flow health row, in tabs so each view stays
- * small: an overview with what a useful result costs, runs per day and the
+ * small: an overview with what a useful result costs and how often its
+ * runs needed you, runs per day and the
  * runs' scores, what each run cost against the median, why runs did not
  * finish, and the latest runs. One range drives
  * every tab. Runs as a subflow count, as in the row.
@@ -178,6 +180,11 @@ function FlowHealthDetails({
 									}
 									hint={usefulHint(inRange.useful)}
 								/>
+								<Stat
+									label="Needed you"
+									value={neededValue(inRange.neededYou)}
+									hint={neededHint(inRange.neededYou)}
+								/>
 							</div>
 							<RunsPerDay
 								perNight={inRange.perNight}
@@ -302,6 +309,21 @@ function FlowHealthDetails({
 }
 
 /** Under "Per useful result": how many runs with an answer were useful. */
+/** The share of the flow's own runs that needed you, or a dash. */
+function neededValue(neededYou: FlowRange["neededYou"]): string {
+	const share = neededYou
+		? neededShare({ runs: neededYou.runs, neededYou: neededYou.needed })
+		: null;
+	return share === null ? "—" : `${share}%`;
+}
+
+/** Why the flow's runs needed you. An older Host sends nothing. */
+function neededHint(neededYou: FlowRange["neededYou"]): string | undefined {
+	if (!neededYou || neededYou.runs === 0) return undefined;
+	if (neededYou.needed === 0) return "Every run ran without you";
+	return neededReasonsText(neededYou.reasons);
+}
+
 function usefulHint(useful: FlowRange["useful"]): string | undefined {
 	if (!useful) return undefined;
 	if (useful.answered === 0) return "No answers yet";

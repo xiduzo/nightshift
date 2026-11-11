@@ -23,4 +23,5 @@ export const runMutations = {
 	move: orpc.runs.move.mutationOptions,
 	releaseLease: orpc.runs.releaseLease.mutationOptions,
 	useful: orpc.runs.useful.mutationOptions,
+	takeOver: orpc.runs.takeOver.mutationOptions,
 };

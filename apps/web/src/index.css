@@ -86,9 +86,9 @@
 	--metric-spend: var(--color-violet-600);
 	--metric-spend-tile: var(--color-violet-200);
 	--metric-spend-tile-foreground: var(--color-violet-800);
-	--metric-gates: var(--color-amber-600);
-	--metric-gates-tile: var(--color-amber-200);
-	--metric-gates-tile-foreground: var(--color-amber-800);
+	--metric-needed: var(--color-amber-600);
+	--metric-needed-tile: var(--color-amber-200);
+	--metric-needed-tile-foreground: var(--color-amber-800);
 }
 
 .dark {
@@ -101,9 +101,9 @@
 	--metric-spend: var(--color-violet-400);
 	--metric-spend-tile: var(--color-violet-400);
 	--metric-spend-tile-foreground: var(--color-violet-950);
-	--metric-gates: var(--color-amber-400);
-	--metric-gates-tile: var(--color-amber-400);
-	--metric-gates-tile-foreground: var(--color-amber-950);
+	--metric-needed: var(--color-amber-400);
+	--metric-needed-tile: var(--color-amber-400);
+	--metric-needed-tile-foreground: var(--color-amber-950);
 }
 
 @theme inline {

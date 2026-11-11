@@ -7,9 +7,22 @@ import type { DashboardSummary, NightRange, NightsRange } from "./types";
  * them, the phone shows them as a glance.
  */
 
-export type ConsoleMetric = "runs" | "finished" | "spend" | "gates";
+export type ConsoleMetric = "runs" | "finished" | "spend" | "needed";
 
 type Totals = Omit<NightsRange["totals"], "perNight">;
+
+/**
+ * The share of runs started that needed you, in whole percent: a person
+ * answered a Gate or an Ask, resumed, stopped, or took one over. Null
+ * without runs, and from an older Host that does not count it.
+ */
+export function neededShare(totals: {
+	runs: number;
+	neededYou?: number;
+}): number | null {
+	if (totals.neededYou === undefined || totals.runs === 0) return null;
+	return Math.round((totals.neededYou / totals.runs) * 100);
+}
 
 export const CONSOLE_METRICS: readonly {
 	key: ConsoleMetric;
@@ -17,30 +30,36 @@ export const CONSOLE_METRICS: readonly {
 	format: (value: number | null) => string;
 	/** The value of a period or a day. Null when it has none. */
 	of: (totals: Totals) => number | null;
+	/** A percent from 0 to 100: its change is in points. */
+	share: boolean;
 }[] = [
 	{
 		key: "runs",
 		label: "Runs",
 		format: (value) => String(value ?? 0),
 		of: (totals) => totals.runs,
+		share: false,
 	},
 	{
 		key: "finished",
 		label: "Finished",
 		format: (value) => (value === null ? "—" : `${value}%`),
 		of: (totals) => finishedShare(totals.finished, totals.ended),
+		share: true,
 	},
 	{
 		key: "spend",
 		label: "Spend",
 		format: (value) => formatCost(value ?? 0),
 		of: (totals) => totals.costUsd,
+		share: false,
 	},
 	{
-		key: "gates",
-		label: "Gates asked",
-		format: (value) => String(value ?? 0),
-		of: (totals) => totals.gates,
+		key: "needed",
+		label: "Needed you",
+		format: (value) => (value === null ? "—" : `${value}%`),
+		of: neededShare,
+		share: true,
 	},
 ];
 
@@ -94,12 +113,22 @@ export function changeOf(
 		return { trend: "flat", text: "Nothing to compare with yet", short: "new" };
 	}
 	if (value === null) {
-		return { trend: "flat", text: "No runs ended in these days", short: "—" };
+		return {
+			trend: "flat",
+			text:
+				metric === "needed"
+					? "Not known for these days"
+					: "No runs ended in these days",
+			short: "—",
+		};
 	}
 	if (before === null) {
 		return {
 			trend: "flat",
-			text: "No runs ended in the days before",
+			text:
+				metric === "needed"
+					? "Not known for the days before"
+					: "No runs ended in the days before",
 			short: "—",
 		};
 	}
@@ -112,10 +141,11 @@ export function changeOf(
 	}
 	const amount =
 		metric === "spend" ? formatCost(Math.abs(delta)) : String(Math.abs(delta));
-	const unit = metric === "finished" ? " points" : "";
+	const share =
+		CONSOLE_METRICS.find((each) => each.key === metric)?.share ?? false;
 	return {
 		trend: delta > 0 ? "up" : "down",
-		text: `${amount}${unit} ${delta > 0 ? "more" : "less"} than the days before`,
-		short: `${delta > 0 ? "+" : "−"}${amount}${metric === "finished" ? " pts" : ""}`,
+		text: `${amount}${share ? " points" : ""} ${delta > 0 ? "more" : "less"} than the days before`,
+		short: `${delta > 0 ? "+" : "−"}${amount}${share ? " pts" : ""}`,
 	};
 }

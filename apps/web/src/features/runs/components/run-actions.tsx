@@ -96,6 +96,8 @@ export function RunActions({
 				),
 		}),
 	);
+	// Needed you counts a take-over. Nothing waits for it: an older Host does not know it.
+	const tookOver = useMutation(runMutations.takeOver());
 	const stopPending = stopRun.isPending
 		? (stopRun.variables?.when ?? "now")
 		: null;
@@ -104,6 +106,7 @@ export function RunActions({
 
 	const takeOver = async () => {
 		if (!takeOverCommand) return;
+		tookOver.mutate({ runId: run.id });
 		try {
 			await navigator.clipboard.writeText(takeOverCommand);
 			toast.success("Command copied. Paste it in a terminal to take over.");

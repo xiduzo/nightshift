@@ -8,9 +8,11 @@ export {
 	consoleNumbers,
 	consoleValues,
 	daysOf,
+	neededShare,
 } from "./console";
 export { dayLabel } from "./day-label";
 export { shortReason } from "./failing";
+export { neededReasonLabel, neededReasonsText } from "./needed";
 export { createDashboardQueries, readerTimeZone } from "./queries";
 export type {
 	DashboardSummary,

@@ -75,6 +75,7 @@ export function MetricStrip({
 									rows={metrics.rows}
 									metric={metric.key}
 									color={metric.color}
+									share={metric.share}
 									compared={metrics.compared}
 								/>
 							) : null}
@@ -91,11 +92,14 @@ function Sparkline({
 	rows,
 	metric,
 	color,
+	share,
 	compared,
 }: {
 	rows: MetricRow[];
 	metric: Metric;
 	color: string;
+	/** A percent: the line runs from 0 to 100. */
+	share: boolean;
 	compared: boolean;
 }) {
 	const config = { [metric]: { label: metric, color } } satisfies ChartConfig;
@@ -106,7 +110,7 @@ function Sparkline({
 			aria-hidden="true"
 		>
 			<LineChart data={rows} margin={{ top: 2, bottom: 2, left: 0, right: 0 }}>
-				<YAxis hide domain={metric === "finished" ? [0, 100] : [0, "auto"]} />
+				<YAxis hide domain={share ? [0, 100] : [0, "auto"]} />
 				{compared ? (
 					<Line
 						dataKey={`before_${metric}`}

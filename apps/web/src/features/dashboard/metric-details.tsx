@@ -1,14 +1,14 @@
 import { useOpenGates } from "@/features/gates";
 import type { DashboardSummary, NightRange, Project } from "@/shared/api";
-import { GatesDialog } from "./gates-dialog";
 import type { Metric } from "./metrics";
+import { NeededYouDialog } from "./needed-you-dialog";
 import { RunsDialog } from "./runs-dialog";
 import { SpendDialog } from "./spend-dialog";
 
 /**
  * The details of a number, at the page's range: Runs and Finished open the
- * runs (Finished on the failed ones), Spend and Gates their own. Without a
- * project, over every project.
+ * runs (Finished on the failed ones), Spend and Needed you their own.
+ * Without a project, over every project.
  */
 export function MetricDetails({
 	metric,
@@ -35,9 +35,9 @@ export function MetricDetails({
 	};
 
 	if (metric === "spend") return <SpendDialog {...props} />;
-	if (metric === "gates") {
+	if (metric === "needed") {
 		return (
-			<GatesDialog
+			<NeededYouDialog
 				{...props}
 				gates={
 					gates.data?.filter(

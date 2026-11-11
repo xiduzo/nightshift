@@ -1,3 +1,4 @@
+import { neededReasonsText, neededShare } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import {
@@ -33,8 +34,9 @@ import { projectFlowsQuery } from "./queries";
 
 /**
  * Each flow over the page's range: the status of its last runs, its runs
- * and how many finished, what a finished run costs, and what a useful
- * result costs. A stopped run did not finish, so it counts against it. A
+ * and how many finished, what a finished run costs, what a useful result
+ * costs, and how often its runs needed you. A stopped run did not finish,
+ * so it counts against it. A
  * flow a Subflow node ran counts too, inside the run that called it. Under
  * its name: the computers its steps need. A row opens the details of its
  * flow.
@@ -155,11 +157,64 @@ function flowHealthColumns(
 			sortUndefined: "last",
 			cell: ({ row: { original } }) => <UsefulCell useful={original.useful} />,
 			meta: {
-				headClassName: "pr-6 text-right w-40",
+				headClassName: "text-right w-40",
+				cellClassName: "text-right tabular-nums",
+			},
+		}),
+		column.accessor((row) => neededOf(row.neededYou) ?? undefined, {
+			id: "neededYou",
+			header: "Needed you",
+			enableSorting: true,
+			sortUndefined: "last",
+			cell: ({ row: { original } }) => (
+				<NeededYouCell neededYou={original.neededYou} />
+			),
+			meta: {
+				headClassName: "pr-6 text-right w-32",
 				cellClassName: "pr-6 text-right tabular-nums",
 			},
 		}),
 	]);
+}
+
+/** The share of a flow's own runs that needed you. Null without runs, or from an older Host. */
+function neededOf(neededYou: FlowHealthRow["neededYou"]): number | null {
+	return neededYou
+		? neededShare({ runs: neededYou.runs, neededYou: neededYou.needed })
+		: null;
+}
+
+/**
+ * How often a person stepped in on the flow's own runs, as a share, and
+ * why in the tooltip. An older Host sends nothing: a dash.
+ */
+function NeededYouCell({
+	neededYou,
+}: {
+	neededYou: FlowHealthRow["neededYou"];
+}) {
+	const share = neededOf(neededYou);
+	if (!neededYou || share === null) {
+		return <span className="text-muted-foreground">—</span>;
+	}
+	return (
+		<Tooltip>
+			<TooltipTrigger
+				render={<span className="inline-flex flex-col items-end gap-1" />}
+			>
+				<span className="text-sm">{share}%</span>
+				<span className="text-muted-foreground text-xs">
+					{neededYou.needed} of {neededYou.runs}{" "}
+					{neededYou.runs === 1 ? "run" : "runs"}
+				</span>
+			</TooltipTrigger>
+			<TooltipContent className="max-w-64 tabular-nums">
+				{neededYou.needed === 0
+					? "Every run of this flow ran without you."
+					: neededReasonsText(neededYou.reasons)}
+			</TooltipContent>
+		</Tooltip>
+	);
 }
 
 /**

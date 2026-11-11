@@ -55,7 +55,7 @@ export function MetricsChart({
 							axisLine={false}
 							width={48}
 							allowDecimals={metric.key === "spend"}
-							domain={metric.key === "finished" ? [0, 100] : [0, "auto"]}
+							domain={metric.share ? [0, 100] : [0, "auto"]}
 							tickFormatter={(value: number) => metric.format(value)}
 						/>
 					))}

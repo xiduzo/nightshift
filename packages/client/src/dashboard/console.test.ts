@@ -12,6 +12,7 @@ const totals = (
 	costUsd: 0,
 	tokens: 0,
 	gates: 0,
+	neededYou: 0,
 	perNight: [],
 	...over,
 });
@@ -28,19 +29,27 @@ const range = (
 	}) as NightsRange;
 
 describe("consoleNumbers", () => {
-	test("counts runs, the share that finished, spend and Gates, now and before", () => {
+	test("counts runs, the share that finished, spend and the share that needed you, now and before", () => {
 		const numbers = consoleNumbers(
 			range(
 				7,
-				{ runs: 10, ended: 8, finished: 6, costUsd: 1.5, gates: 3 },
-				{ runs: 4, ended: 4, finished: 4, costUsd: 2, gates: 0 },
+				{ runs: 10, ended: 8, finished: 6, costUsd: 1.5, neededYou: 3 },
+				{ runs: 4, ended: 4, finished: 4, costUsd: 2, neededYou: 0 },
 			),
 		);
 		expect(numbers).toEqual({
-			values: { runs: 10, finished: 75, spend: 1.5, gates: 3 },
-			before: { runs: 4, finished: 100, spend: 2, gates: 0 },
+			values: { runs: 10, finished: 75, spend: 1.5, needed: 30 },
+			before: { runs: 4, finished: 100, spend: 2, needed: 0 },
 			compared: true,
 		});
+	});
+
+	test("has no share that needed you without runs, or from an older Host", () => {
+		expect(consoleNumbers(range(7, {}, {})).values.needed).toBeNull();
+		const older = consoleNumbers(
+			range(7, { runs: 5, neededYou: undefined }, {}),
+		);
+		expect(older.values.needed).toBeNull();
 	});
 
 	test("has no share without ended runs, and nothing to compare without runs before", () => {
@@ -73,7 +82,12 @@ describe("changeOf", () => {
 			short: "−15 pts",
 		});
 		expect(changeOf("spend", 1, 1.5).short).toBe("−$0.50");
-		expect(changeOf("gates", 2, 2).text).toBe("Same as the days before");
+		expect(changeOf("needed", 20, 30)).toEqual({
+			trend: "down",
+			text: "10 points less than the days before",
+			short: "−10 pts",
+		});
+		expect(changeOf("needed", 25, 25).text).toBe("Same as the days before");
 	});
 
 	test("says when there is nothing to set the number against", () => {
@@ -83,5 +97,6 @@ describe("changeOf", () => {
 		expect(changeOf("finished", 50, null).text).toBe(
 			"No runs ended in the days before",
 		);
+		expect(changeOf("needed", null, 20).text).toBe("Not known for these days");
 	});
 });
