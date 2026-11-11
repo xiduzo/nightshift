@@ -417,6 +417,14 @@ export type EnginePayloads = {
 		 * logs.
 		 */
 		memory?: StepMemory;
+		/**
+		 * The shapes of the step's data, by output field (`data`), when its
+		 * node has no output schema yet: the Walker keeps them on the node,
+		 * marked inferred (`ProjectFlows.keepShapes`). Absent when the node
+		 * has a schema, the step gave no data, its flow keeps none (a kit, a
+		 * quick run), and in older logs.
+		 */
+		shapes?: Record<string, Record<string, unknown>>;
 	};
 	/**
 	 * The variables of a flow when it starts (each `initial`, or a kept
@@ -804,8 +812,11 @@ export type KnowledgeVia = "step" | "mcp";
  * same tool call with the same input three times in a row). `base-ref`:
  * the run does not start from the newest commit of its base branch (the
  * fetch failed, or the branch went apart from the remote's). `score`: a
- * Command step wrote a score Night Shift left out (`scores.ts`). A reader
- * treats the kinds as an open list: a later build may add one.
+ * Command step wrote a score Night Shift left out (`scores.ts`). `shape`:
+ * a step's data does not match the output schema Night Shift inferred
+ * from an earlier run (`outputVerdict`): no person confirmed it, so the
+ * step goes on. A reader treats the kinds as an open list: a later build
+ * may add one.
  */
 export type RunWarningKind =
 	| "cost-unknown"
@@ -815,7 +826,8 @@ export type RunWarningKind =
 	| "looping"
 	| "base-ref"
 	| "score"
-	| "device-fallback";
+	| "device-fallback"
+	| "shape";
 
 /**
  * The names Night Shift scores itself (`scores.ts` says what each means).

@@ -201,6 +201,8 @@ export type StartOptions = {
 	 * start. Its first step that works in a folder makes it.
 	 */
 	runFolder?: true;
+	/** Keeps the shapes a step gave on its node; default: nothing keeps them. */
+	keepShapes?: StepShared["keepShapes"];
 };
 
 let runs = 0;
@@ -308,6 +310,7 @@ export async function startRun(
 		artifacts: createArtifactStore(sandbox.dataDir),
 		keptValues: (kept) => keptValues(db, kept),
 		remembered: (at) => readMemory(db, at),
+		...(options.keepShapes ? { keepShapes: options.keepShapes } : {}),
 		gitAuthor: (personId) => gitAuthorOf(db, personId),
 	};
 	const deps: ThreadDeps = {

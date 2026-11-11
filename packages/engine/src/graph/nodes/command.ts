@@ -17,6 +17,7 @@ import {
 	type StepContext,
 } from "../context";
 import { parseCommandJson } from "../each";
+import { outputVerdict } from "../output-schema";
 import { RESUME_RULES } from "../resume-point";
 import { type BodyResult, runStep, type StepHandle } from "../step-runner";
 
@@ -47,7 +48,10 @@ import { type BodyResult, runStep, type StepHandle } from "../step-runner";
  * the JSON, and output that is not JSON ends on the catch-all too. Data
  * with `scores` (`{"scores": {"replicated": 1}}`) scores the run: one
  * `Scored` per name on the step, after it ends (`flowScores`). An entry
- * Night Shift cannot keep is a warning (`score`), not a failed step.
+ * Night Shift cannot keep is a warning (`score`), not a failed step. Data
+ * that does not match the node's `output` schema errors the step when a
+ * person wrote or confirmed the schema, and warns (`shape`) when Night
+ * Shift inferred it (`outputVerdict`).
  *
  * Every visit is new (`RESUME_RULES.fresh`): a parked or interrupted
  * Command step has nothing to continue, so a resume starts the next visit.
@@ -166,6 +170,16 @@ async function runShell(
 		} catch {
 			return endOn(null, NOT_JSON_REASON);
 		}
+	}
+	// Data against the node's schema: one a person wrote or confirmed
+	// errors the step on a mismatch, an inferred one warns. A command that
+	// wrote no data is not checked: an exit that fails often writes none.
+	if (outputs.data !== undefined) {
+		const verdict = outputVerdict(node, outputs.data);
+		if (verdict.kind === "broken") {
+			return end(verdict.outcome, outputs, verdict.message);
+		}
+		if (verdict.kind === "warning") await step.warn("shape", verdict.message);
 	}
 	// The data's `scores`: logged after the step ends. One the step cannot
 	// keep is a warning, never a failed step.

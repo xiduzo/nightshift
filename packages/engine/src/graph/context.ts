@@ -122,6 +122,17 @@ export type StepShared = {
 	keptValues(flow: KeptFlow): Promise<Record<string, JsonValue>>;
 	/** What a Since last run node remembers for one scope, by key (`memory/`). Empty: a first run. */
 	remembered(at: MemoryAt): Promise<Map<string, Remembered>>;
+	/**
+	 * Keeps the shapes of a step's data on its node of `flow`, marked
+	 * inferred, while the node has no output schema
+	 * (`ProjectFlows.keepShapes`, `kept-shapes.ts`). Absent: nothing keeps
+	 * them.
+	 */
+	keepShapes?(
+		flow: KeptFlow,
+		node: Pick<FlowNode, "id" | "type">,
+		shapes: Record<string, Record<string, unknown>>,
+	): Promise<void>;
 	/** The git identity of a Person, for the worktree a Device adds; null when the repository keeps its own. */
 	gitAuthor(personId: string): Promise<GitAuthor | null>;
 };

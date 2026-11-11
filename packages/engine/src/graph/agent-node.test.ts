@@ -652,6 +652,35 @@ describe("the Agent node", () => {
 		);
 	});
 
+	test("data that does not match an inferred schema warns, and the step goes on", async () => {
+		const output = {
+			type: "object",
+			required: ["n"],
+			properties: { n: { type: "number" } },
+		};
+		const harness = fakeHarness(reportingScript("pass", "Done", { n: "x" }));
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "worker",
+				nodes: [agent("worker", { output, outputInferred: true })],
+				edges: [],
+			}),
+			{ harness },
+		);
+		const { parked, state } = await drive(h, { inputs: {} });
+		expect(parked).toEqual([]);
+		expect(state.nodes.worker).toMatchObject({
+			outcome: "pass",
+			data: { n: "x" },
+		});
+		const [warned] = payloads(await h.events(), "RunWarned");
+		expect(warned).toMatchObject({ kind: "shape" });
+		expect(warned?.message).toStartWith(
+			"The agent's data does not match the output schema: data/n must be number.",
+		);
+	});
+
 	test("a usage limit parks the run at the wait node; a wake on a new compile over the same saver continues the same step and session", async () => {
 		const resetAt = now() + 60 * MINUTE;
 		const harness = fakeHarness((_input: AgentSessionInput, call: number) =>

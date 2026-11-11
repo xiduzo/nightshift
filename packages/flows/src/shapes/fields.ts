@@ -142,6 +142,33 @@ export const TYPED_OUTPUT_FIELD = {
  */
 export const RESERVED_DATA_KEYS = ["outcome", "scores"] as const;
 
+/** A node's own `output` schema, and the output field it types (`typedOutput`). */
+export type TypedOutput = {
+	/** The output field the schema types: `data`. */
+	field: string;
+	/** Undefined: the node has no schema yet. */
+	schema: Schema | undefined;
+	/** Night Shift inferred the schema from a run, and no person confirmed it. */
+	inferred: boolean;
+};
+
+/**
+ * The `output` schema of `node`, for a node type that has one
+ * (`TYPED_OUTPUT_FIELD`), else null. A schema that a person wrote or
+ * confirmed holds a run to it. An inferred one only warns.
+ */
+export function typedOutput(node: FlowNode): TypedOutput | null {
+	const field: string | undefined =
+		TYPED_OUTPUT_FIELD[node.type as keyof typeof TYPED_OUTPUT_FIELD];
+	if (field === undefined) return null;
+	const own = node as { output?: Schema; outputInferred?: true };
+	return {
+		field,
+		schema: own.output,
+		inferred: own.output !== undefined && own.outputInferred === true,
+	};
+}
+
 /**
  * The shape of one output field of `node`, by its name: the node's own
  * `output` schema for its typed field, else the field's shape. A field of
@@ -159,10 +186,9 @@ export function outputFieldShape(
 	if (node.type === "since-last-run" && node.value !== undefined) {
 		if (field === "data") return sinceData(true);
 	}
-	const typed: string | undefined =
-		TYPED_OUTPUT_FIELD[node.type as keyof typeof TYPED_OUTPUT_FIELD];
-	if (typed === field && "output" in node && node.output !== undefined) {
-		return node.output;
+	const typed = typedOutput(node);
+	if (typed?.field === field && typed.schema !== undefined) {
+		return typed.schema;
 	}
 	const shape =
 		own<Schema>(OUTPUT_FIELD_SHAPES[node.type], field) ??

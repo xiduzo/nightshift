@@ -13,6 +13,7 @@ import {
 	PLAIN_KIND,
 	type StepContext,
 } from "../context";
+import { outputVerdict } from "../output-schema";
 import { RESUME_RULES } from "../resume-point";
 import { type BodyResult, runStep, type StepHandle } from "../step-runner";
 
@@ -26,7 +27,9 @@ import { type BodyResult, runStep, type StepHandle } from "../step-runner";
  * and the answer. `pass` when the tool answered without `isError`; `fail` on
  * `isError`, an unknown tool or a transport failure. Outputs: `data` (the
  * structured content, else the JSON the text holds, else null), `text`
- * (the text content joined) and `visit`.
+ * (the text content joined) and `visit`. Data that does not match the
+ * node's `output` schema errors the step when a person wrote or confirmed
+ * the schema, and warns when Night Shift inferred it (`outputVerdict`).
  *
  * A stop of the run or the node's time budget aborts the step's signal,
  * which closes the client. Every visit is new (`RESUME_RULES.fresh`): a
@@ -106,6 +109,16 @@ async function callTool(node: ToolNode, step: StepHandle): Promise<BodyResult> {
 	});
 	const outputs: StepOutputs = { ...empty, data, text: result.text };
 	if (signal.aborted) return { kind: "aborted", outputs };
+	// Data against the node's schema: one a person wrote or confirmed
+	// errors the step on a mismatch, an inferred one warns. A call that
+	// gave no data, or failed, is not checked.
+	if (data !== null && !result.isError) {
+		const verdict = outputVerdict(node, data);
+		if (verdict.kind === "broken") {
+			return end(verdict.outcome, outputs, verdict.message);
+		}
+		if (verdict.kind === "warning") await step.warn("shape", verdict.message);
+	}
 	return end(
 		result.isError ? "fail" : "pass",
 		outputs,

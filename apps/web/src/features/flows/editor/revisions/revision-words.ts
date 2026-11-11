@@ -9,6 +9,7 @@ export const REVISION_KIND_LABEL: Record<FlowRevisionItem["kind"], string> = {
 	copy: "Copied in",
 	merge: "Merged",
 	upgrade: "Updated by Night Shift",
+	infer: "Shape from a run",
 };
 
 /** Who made a revision and on which computer: "Ada on MacBook". */

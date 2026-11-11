@@ -188,7 +188,11 @@ const outputKind: KindPrompt = {
 			"",
 			"Rules:",
 			"- Keep the fields the rest of the flow reads (below), with a type that fits how they are read.",
-			"- Add the fields the node's prompt asks the agent to report.",
+			node.type === "command"
+				? "- Add the fields the command writes to `$NS_OUTPUT`, or prints as JSON."
+				: node.type === "tool"
+					? "- Add the fields the tool answers with."
+					: "- Add the fields the node's prompt asks the agent to report.",
 			"- Give each property a short `description`. Prefer simple types: string, number, boolean, arrays and objects of those.",
 			"- Keep it small: only fields someone reads or the person asked for.",
 			"",

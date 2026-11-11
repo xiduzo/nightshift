@@ -40,8 +40,9 @@ export const runStatusSchema = z.enum([
 /**
  * What a run warning is about: a cost that is not known, a guard of the
  * run policy (the budget, a turn limit, no activity, a loop), a run that
- * does not start from the newest commit of its base branch, or a score a
- * Command step wrote that Night Shift left out.
+ * does not start from the newest commit of its base branch, a score a
+ * Command step wrote that Night Shift left out, or data that does not
+ * match a shape Night Shift inferred from an earlier run.
  */
 const runWarningKindSchema = z.enum([
 	"cost-unknown",
@@ -52,6 +53,7 @@ const runWarningKindSchema = z.enum([
 	"base-ref",
 	"score",
 	"device-fallback",
+	"shape",
 ]);
 
 /** How the End node that ended a run says it came out. */

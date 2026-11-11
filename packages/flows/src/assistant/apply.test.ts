@@ -73,33 +73,45 @@ describe("applySuggestion", () => {
 		expect(plan && promptOf(plan)).toBe("New.");
 	});
 
-	test("a node without a prompt or an output keeps the flow as it is", () => {
+	test("a node without a prompt keeps the flow as it is", () => {
 		expect(
 			applySuggestion(flow, "check", { kind: "prompt", text: "x", note: "" }),
 		).toBe(flow);
 		expect(
 			applySuggestion(flow, "nope", { kind: "prompt", text: "x", note: "" }),
 		).toBe(flow);
-		const output = applySuggestion(flow, "check", {
-			kind: "output",
-			output: { type: "object" },
-			note: "",
-		});
-		expect(nodeOf(output, "check")).toEqual(nodeOf(flow, "check"));
 	});
 
-	test("an output replaces the node's output schema", () => {
+	test("an output replaces the node's output schema, of a command too", () => {
 		const schema = {
 			type: "object",
 			properties: { url: { type: "string" } },
 		};
-		const next = applySuggestion(flow, "plan", {
+		for (const id of ["plan", "check"]) {
+			const next = applySuggestion(flow, id, {
+				kind: "output",
+				output: schema,
+				note: "",
+			});
+			expect(nodeOf(next, id)).toMatchObject({ output: schema });
+		}
+	});
+
+	test("an applied output counts as confirmed: the inferred mark goes", () => {
+		const inferred: Flow = {
+			...flow,
+			nodes: flow.nodes.map((node) =>
+				node.id === "check"
+					? { ...node, output: { type: "object" }, outputInferred: true }
+					: node,
+			),
+		};
+		const next = applySuggestion(inferred, "check", {
 			kind: "output",
-			output: schema,
+			output: { type: "object" },
 			note: "",
 		});
-		const plan = nodeOf(next, "plan");
-		expect(plan?.type === "agent" ? plan.output : undefined).toEqual(schema);
+		expect(nodeOf(next, "check")).not.toHaveProperty("outputInferred");
 	});
 
 	test("set replaces the writes and declares only the missing variables", () => {

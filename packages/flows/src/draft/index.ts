@@ -52,6 +52,7 @@ export {
 	type Position,
 	withConnections,
 	withDecidedBy,
+	withOutputSchema,
 	withValueBy,
 	withWrites,
 } from "./nodes";

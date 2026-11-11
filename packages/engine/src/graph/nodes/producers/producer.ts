@@ -1,7 +1,7 @@
 import type { JsonValue, ValueNode } from "@nightshift/flows";
 import type { StepOutputs } from "../../../log";
 import type { NodeAction } from "../../context";
-import { dataProblem } from "../../output-schema";
+import { outputVerdict } from "../../output-schema";
 import type { BodyEnd, StepHandle } from "../../step-runner";
 
 /*
@@ -29,24 +29,23 @@ export function valueOutputs(
 
 /**
  * The end of a step with the value made: `pass` with the data when it
- * matches the node's output schema, else `fail` with why in `note`. The
- * transcript gets the `value` entry either way.
+ * matches the node's output schema, else `fail` with why in `note`. A
+ * schema Night Shift inferred (`outputInferred`) does not fail the step:
+ * it passes, and the run warns (`outputVerdict`). The transcript gets the
+ * `value` entry either way.
  */
-export function endWithValue(
+export async function endWithValue(
 	step: StepHandle,
 	node: ValueNode,
 	made: unknown,
 	note: string,
 	extra?: Pick<BodyEnd, "costUsd" | "costSource">,
-): BodyEnd {
-	const problem = dataProblem(node.output, made);
-	if (problem !== null) {
-		return endWithoutValue(
-			step,
-			`The value does not match the output schema: ${problem}.`,
-			extra,
-		);
+): Promise<BodyEnd> {
+	const verdict = outputVerdict(node, made);
+	if (verdict.kind === "broken") {
+		return endWithoutValue(step, verdict.message, extra);
 	}
+	if (verdict.kind === "warning") await step.warn("shape", verdict.message);
 	const data = made as JsonValue;
 	step.record(null, { type: "value", data, problem: null });
 	return {

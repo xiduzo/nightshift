@@ -338,6 +338,84 @@ describe("the flow document", () => {
 		]);
 	});
 
+	describe("keepShapes (Q40)", () => {
+		const shape = {
+			type: "object",
+			properties: { title: { type: "string" } },
+		};
+		const agentA = { id: "a", type: "agent" };
+
+		test("keeps the shape on a node without a schema, marked inferred, with one revision of kind infer", async () => {
+			await laptop.flows.save(of, "build", twoNodes(), { personId: "person" });
+			clock.at = 7_000;
+			expect(
+				await laptop.flows.keepShapes(of, "build", agentA, { data: shape }),
+			).toBe(true);
+			const { build } = await read(laptop);
+			expect(build?.nodes.find((node) => node.id === "a")).toMatchObject({
+				output: shape,
+				outputInferred: true,
+			});
+			// The other node and the rest of the flow stay as they were.
+			expect(build?.nodes.find((node) => node.id === "b")).not.toHaveProperty(
+				"output",
+			);
+			const revisions = await laptop.flows.revisions(of, "build");
+			expect(revisions.map((r) => [r.kind, r.personId, r.at])).toEqual([
+				["save", "person", 1_000],
+				["infer", null, 7_000],
+			]);
+			expect(revisions[1]?.flow).toEqual(build as Flow);
+			expect((await laptop.flows.flows(of)).build).toMatchObject({
+				revision: revisions[1]?.id,
+			});
+		});
+
+		test("a person's schema wins: a node with one, or another type, gets none", async () => {
+			const flow = twoNodes();
+			await laptop.flows.save(of, "build", {
+				...flow,
+				nodes: flow.nodes.map((node) =>
+					node.id === "a" ? { ...node, output: { type: "object" } } : node,
+				),
+			});
+			expect(
+				await laptop.flows.keepShapes(of, "build", agentA, { data: shape }),
+			).toBe(false);
+			expect(
+				await laptop.flows.keepShapes(
+					of,
+					"build",
+					{ id: "b", type: "command" },
+					{ data: shape },
+				),
+			).toBe(false);
+			expect(
+				await laptop.flows.keepShapes(of, "gone", agentA, { data: shape }),
+			).toBe(false);
+			expect(
+				(await laptop.flows.revisions(of, "build")).map((r) => r.kind),
+			).toEqual(["save"]);
+		});
+
+		test("an edit of another node on another Device merges with it", async () => {
+			await laptop.flows.save(of, "build", twoNodes());
+			await sync(laptop, desktop);
+			await laptop.flows.keepShapes(of, "build", agentA, { data: shape });
+			await desktop.flows.save(
+				of,
+				"build",
+				withPrompt(twoNodes(), "b", "Desktop"),
+			);
+			await sync(laptop, desktop);
+			const { build } = await read(laptop);
+			expect(promptOf(build, "b")).toBe("Desktop");
+			expect(build?.nodes.find((node) => node.id === "a")).toMatchObject({
+				outputInferred: true,
+			});
+		});
+	});
+
 	test("the first revisions of one flow on two Devices are both kept", async () => {
 		const document = await laptop.document();
 		await saveFlow(document, {

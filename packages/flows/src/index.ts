@@ -432,12 +432,15 @@ export {
 	FILE_FORMAT,
 	fieldNameProblem,
 	fromJsonSchema,
+	inferSchema,
+	RESERVED_DATA_KEYS,
 	type SchemaField,
 	type SchemaShape,
 	SHAPE_KINDS,
 	type ShapeKind,
 	shapeIsValid,
 	toJsonSchema,
+	typedOutput,
 } from "./shapes";
 export { type Starter, starterAgents, starterList } from "./starters";
 export {

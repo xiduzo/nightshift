@@ -883,4 +883,165 @@ describe("the Command node", () => {
 			});
 		});
 	});
+
+	describe("typed output (Q40)", () => {
+		const schema = {
+			type: "object",
+			properties: { tests: { type: "integer" } },
+			required: ["tests"],
+		};
+
+		test("a node without a schema gives the shape of its data, and the Walker keeps it", async () => {
+			const kept: unknown[] = [];
+			const h = await startRun(
+				sandbox,
+				flowOf({
+					start: "check",
+					nodes: [
+						command(
+							"check",
+							`echo '{"tests": 3, "outcome": "pass", "names": ["a"]}' > "$NS_OUTPUT"`,
+						),
+					],
+					edges: [],
+				}),
+				{
+					flowName: "nightly",
+					keepShapes: async (flow, node, shapes) => {
+						kept.push({ flow, node, shapes });
+					},
+				},
+			);
+			await drive(h, { inputs: {} });
+			const shapes = {
+				data: {
+					type: "object",
+					properties: {
+						tests: { type: "integer" },
+						names: { type: "array", items: { type: "string" } },
+					},
+				},
+			};
+			expect(payloads(await h.events(), "StepEnded")[0]?.shapes).toEqual(
+				shapes,
+			);
+			expect(kept).toEqual([
+				{
+					flow: {
+						spaceId: sandbox.spaceId,
+						projectId: "project-1",
+						flowName: "nightly",
+					},
+					node: { id: "check", type: "command" },
+					shapes,
+				},
+			]);
+		});
+
+		test("a quick run, a node with a schema and a step without data keep no shape", async () => {
+			const kept: unknown[] = [];
+			const keepShapes = async () => {
+				kept.push(1);
+			};
+			const data = `echo '{"tests": 3}' > "$NS_OUTPUT"`;
+			const runs = [
+				await startRun(
+					sandbox,
+					flowOf({ start: "a", nodes: [command("a", data)], edges: [] }),
+					{ keepShapes },
+				),
+				await startRun(
+					sandbox,
+					flowOf({
+						start: "a",
+						nodes: [command("a", data, { output: schema })],
+						edges: [],
+					}),
+					{ flowName: "nightly", keepShapes },
+				),
+				await startRun(
+					sandbox,
+					flowOf({ start: "a", nodes: [command("a", "true")], edges: [] }),
+					{ flowName: "nightly", keepShapes },
+				),
+			];
+			for (const h of runs) {
+				await drive(h, { inputs: {} });
+				expect(
+					payloads(await h.events(), "StepEnded")[0]?.shapes,
+				).toBeUndefined();
+			}
+			expect(kept).toEqual([]);
+		});
+
+		test("data that does not fit a schema a person wrote errors the step", async () => {
+			const h = await startRun(
+				sandbox,
+				flowOf({
+					start: "check",
+					nodes: [
+						command("check", `echo '{"tests": "three"}' > "$NS_OUTPUT"`, {
+							output: schema,
+						}),
+					],
+					edges: [],
+				}),
+			);
+			const { parked } = await drive(h, { inputs: {} });
+			expect(parked).toHaveLength(1);
+			const [ended] = payloads(await h.events(), "StepEnded");
+			expect(ended?.outcome).toBe("error");
+			expect(ended?.error).toBe(
+				"The command's data does not match the output schema: data/tests must be integer.",
+			);
+		});
+
+		test("data that does not fit an inferred schema warns, and the step goes on", async () => {
+			const h = await startRun(
+				sandbox,
+				flowOf({
+					start: "check",
+					nodes: [
+						command("check", `echo '{"tests": "three"}' > "$NS_OUTPUT"`, {
+							output: schema,
+							outputInferred: true,
+						}),
+					],
+					edges: [],
+				}),
+			);
+			const { parked, state } = await drive(h, { inputs: {} });
+			expect(parked).toEqual([]);
+			expect(state.nodes.check?.outcome).toBe("pass");
+			const logged = await h.events();
+			const [warned] = payloads(logged, "RunWarned");
+			expect(warned?.kind).toBe("shape");
+			expect(warned?.message).toStartWith(
+				"The command's data does not match the output schema: data/tests must be integer.",
+			);
+			// On the step, so the run page can show it.
+			const stepId = logged.find((e) => e.type === "StepEnded")?.stepId;
+			expect(stepId).toBeString();
+			expect(logged.find((e) => e.type === "RunWarned")?.stepId).toBe(stepId);
+		});
+
+		test("the keys the data may always hold do not break a schema", async () => {
+			const h = await startRun(
+				sandbox,
+				flowOf({
+					start: "check",
+					nodes: [
+						command(
+							"check",
+							`echo '{"tests": 3, "outcome": "pass", "scores": {"found": 1}}' > "$NS_OUTPUT"`,
+							{ output: { ...schema, additionalProperties: false } },
+						),
+					],
+					edges: [],
+				}),
+			);
+			const { state } = await drive(h, { inputs: {} });
+			expect(state.nodes.check?.outcome).toBe("pass");
+		});
+	});
 });

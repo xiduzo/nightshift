@@ -56,7 +56,7 @@ import {
 } from "../context";
 import { sessionCostUnknown } from "../cost";
 import { briefOf } from "../gate-brief";
-import { checkOutputData, normalizeOutputData } from "../output-schema";
+import { normalizeOutputData, outputVerdict } from "../output-schema";
 import { RESUME_RULES, rerunEntryOf, type StepEntry } from "../resume-point";
 import { scopeOf } from "../route";
 import { heldStep } from "../run-position";
@@ -872,10 +872,10 @@ async function runSession(
 				),
 			};
 		}
-		if (node.output) {
-			const problem = checkOutputData(node.output, finalReport.data);
-			if (problem) return stepError(problem);
-		}
+		// A schema a person wrote holds the data to it, an inferred one warns.
+		const verdict = outputVerdict(node, finalReport.data);
+		if (verdict.kind === "broken") return stepError(verdict.message);
+		if (verdict.kind === "warning") await step.warn("shape", verdict.message);
 		return end(
 			finalReport.outcome,
 			{ ...outputs, outcome: finalReport.outcome },
@@ -889,7 +889,9 @@ async function runSession(
 				`The agent finished with no step report. This node needs one of its outcomes: ${agentOutcomes(node).join(", ")}.`,
 			);
 		}
-		if (node.output) {
+		const verdict = outputVerdict(node, undefined);
+		if (verdict.kind === "warning") await step.warn("shape", verdict.message);
+		if (verdict.kind === "broken") {
 			return stepError(
 				"The agent finished with no step report, so it gave no data for the output schema.",
 			);

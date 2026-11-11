@@ -5,6 +5,7 @@ import {
 	FLOW_VERSION,
 	type Flow,
 	type FlowMigration,
+	type FlowNode,
 	type FlowSource,
 	type FlowSources,
 	flowNameSchema,
@@ -14,6 +15,7 @@ import {
 	type Schedule,
 	scheduleSchema,
 	suffixedName,
+	typedOutput,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import * as Y from "yjs";
@@ -90,7 +92,10 @@ function mapsOf(document: FlowDocument): FlowMaps {
 
 /**
  * Why a revision exists. `upgrade`: Night Shift brought the flow to a newer
- * format (`upgradeFlows`), nobody changed it.
+ * format (`upgradeFlows`), nobody changed it. `infer`: Night Shift kept the
+ * shape of a run's data on a node that had no output schema (`keepShapes`).
+ * An older Night Shift does not read an `infer` revision: it leaves it out
+ * of the list.
  */
 export const revisionKinds = [
 	"save",
@@ -99,6 +104,7 @@ export const revisionKinds = [
 	"merge",
 	"copy",
 	"upgrade",
+	"infer",
 ] as const;
 export type RevisionKind = (typeof revisionKinds)[number];
 
@@ -479,6 +485,68 @@ export async function saveFlow(
 		});
 	}
 	return { flowId, revisionId };
+}
+
+/**
+ * Keeps the shapes of a run's step on its node of the flow of that name:
+ * the node's `output` becomes the shape of the field it types, marked
+ * inferred (`outputInferred`), with one revision of kind `infer` by Night
+ * Shift on `deviceId`. Writes only that node, so an edit of another node
+ * merges with it. Writes nothing when the flow is gone, of another format
+ * (a newer Night Shift saved it, or it waits for its upgrade), or the node
+ * is gone, of another type, or has a schema already: a person's schema
+ * always wins. Returns the revision's id, or null.
+ */
+export async function keepShapes(
+	document: FlowDocument,
+	input: {
+		name: string;
+		node: { id: string; type: string };
+		shapes: Record<string, Record<string, unknown>>;
+		deviceId: string;
+		at: number;
+	},
+): Promise<string | null> {
+	const scan = scanFlows(document);
+	const found = scan.entries.find((entry) => entry.name === input.name);
+	if (!found || found.newer || found.map.get("version") !== FLOW_VERSION) {
+		return null;
+	}
+	const store = found.map.get("nodes") as Y.Map<unknown>;
+	const stored = store.get(input.node.id);
+	if (typeof stored !== "object" || stored === null) return null;
+	const node = stored as FlowNode;
+	if (node.type !== input.node.type) return null;
+	const typed = typedOutput(node);
+	if (typed === null || typed.schema !== undefined) return null;
+	const shape = input.shapes[typed.field];
+	if (shape === undefined) return null;
+
+	await document.current.change(() => {
+		store.set(
+			input.node.id,
+			plain({ ...node, output: shape, outputInferred: true }),
+		);
+		// A copy reads again once its original changes: it goes, its revisions stay.
+		for (const copy of scan.copies.get(found.flowId) ?? []) {
+			mapsOf(document).flows.delete(copy);
+		}
+	});
+	const revisionId = randomUUID();
+	const flow = flowJson(found.map);
+	await document.history.change(() => {
+		document.history.doc.getArray(found.flowId).push([
+			plain({
+				id: revisionId,
+				at: input.at,
+				personId: null,
+				deviceId: input.deviceId,
+				kind: "infer",
+				flow: { ...flow, version: FLOW_VERSION },
+			} satisfies FlowRevision),
+		]);
+	});
+	return revisionId;
 }
 
 /** Removes the flow of that name. Its revisions stay. Refuses (`not-found`) a flow that does not exist. */

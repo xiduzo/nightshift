@@ -25,6 +25,7 @@ import {
 	flowNotices,
 	flowRevisions,
 	flowSources,
+	keepShapes,
 	mergeFlowDocuments,
 	olderFormat,
 	planFlowMerge,
@@ -85,6 +86,19 @@ export type ProjectFlows = {
 	): Promise<FlowIssue[]>;
 	/** Removes a flow. Its revisions stay. Refuses (`not-found`) a flow that does not exist. */
 	remove(projectId: string, name: string): Promise<void>;
+	/**
+	 * Keeps the shapes of a run's step on its node, as an output schema
+	 * marked inferred, with one revision of kind `infer` by Night Shift on
+	 * this Device. Only while the node has no schema, on a flow of this
+	 * format: anything else writes nothing. The Walker calls it when a
+	 * step ends with `shapes`. Returns whether it wrote a revision.
+	 */
+	keepShapes(
+		projectId: string,
+		name: string,
+		node: { id: string; type: string },
+		shapes: Record<string, Record<string, unknown>>,
+	): Promise<boolean>;
 	/**
 	 * The revisions of the flow of that name, oldest first. Empty for a
 	 * flow that does not exist.
@@ -212,6 +226,17 @@ export function createProjectFlows(deps: ProjectFlowsDeps): ProjectFlows {
 
 		async remove(projectId, name) {
 			await removeFlow(await documentOf(projectId), name);
+		},
+
+		async keepShapes(projectId, name, node, shapes) {
+			const revisionId = await keepShapes(await documentOf(projectId), {
+				name,
+				node,
+				shapes,
+				deviceId: await deviceId(),
+				at: now(),
+			});
+			return revisionId !== null;
 		},
 
 		async revisions(projectId, name) {

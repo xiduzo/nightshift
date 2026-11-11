@@ -545,6 +545,15 @@ export function createEngine(
 		artifacts,
 		keptValues: (flow) => keptValues(db, flow),
 		remembered: (at) => readMemory(db, at),
+		// The Walker keeps the shape of a step's data on its node (Q40).
+		keepShapes: async (flow, node, shapes) => {
+			await projectFlows.keepShapes(
+				flow.projectId,
+				flow.flowName,
+				node,
+				shapes,
+			);
+		},
 		gitAuthor: (personId) => gitAuthorOf(db, personId),
 		...(options.usage ? { usage: options.usage } : {}),
 	};

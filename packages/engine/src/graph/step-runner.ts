@@ -43,6 +43,7 @@ import {
 } from "./context";
 import { openGate } from "./gate";
 import type { WrittenBrief } from "./gate-brief";
+import { keepShapes, stepShapes } from "./kept-shapes";
 import { dataProblem } from "./output-schema";
 import {
 	entryOf,
@@ -948,6 +949,11 @@ export async function beginStep(
 							keptNames(ctx.flow).has(name),
 						)
 					: [];
+			// The shapes of the step's data, for a node with no schema yet:
+			// the Walker keeps them on the node after the end (`kept-shapes.ts`).
+			const shapes = extra?.skipWrites
+				? undefined
+				: stepShapes(ctx, node, scope, outcome, outputs);
 			const opened = pullRequestOf(outputs);
 			if (opened) {
 				await ctx.log.append({
@@ -977,8 +983,10 @@ export async function beginStep(
 					...(written.ok && extra?.guard ? { guard: extra.guard } : {}),
 					// A step that ends `error` instead runs again: it saw nothing yet.
 					...(written.ok && extra?.memory ? { memory: extra.memory } : {}),
+					...(shapes ? { shapes } : {}),
 				},
 			});
+			if (shapes) await keepShapes(ctx, scope, node, shapes);
 			changed();
 			emit(config, {
 				type: "step-ended",

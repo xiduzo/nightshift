@@ -11,6 +11,7 @@ import {
 	setVariables,
 	updateNode,
 	withOptions,
+	withOutputSchema,
 	withWrites,
 } from "../draft";
 import {
@@ -21,6 +22,7 @@ import {
 	nodeOutcomes,
 } from "../flow";
 import type { VariableWrite } from "../nodes";
+import { typedOutput } from "../shapes";
 import type {
 	SuggestedOutcome,
 	Suggestion,
@@ -67,7 +69,7 @@ export function takesSuggestion(node: FlowNode, kind: SuggestionKind): boolean {
 		case "prompt":
 			return promptOf(node) !== undefined;
 		case "output":
-			return node.type === "agent" || node.type === "value";
+			return typedOutput(node) !== null;
 		case "set":
 			return true;
 		case "outcomes":
@@ -90,7 +92,8 @@ export function takesSuggestion(node: FlowNode, kind: SuggestionKind): boolean {
  * The flow with `suggestion` applied to node `nodeId`, or to the flow:
  * - `prompt`: its text replaces `selection` in the node's prompt, or the
  *   whole prompt without one;
- * - `output`: the node's output schema (an Agent or a Value node);
+ * - `output`: the node's output schema (an Agent, a Value, a Command or
+ *   a Tool node), confirmed: a person applies it;
  * - `set`: the node's variable writes, and the variables they need that
  *   the flow does not declare yet, added after the ones it has;
  * - `outcomes`: an Agent's own outcomes or a Decision's options, with the
@@ -130,10 +133,9 @@ export function applySuggestion(
 			);
 		}
 		case "output":
+			// A person applies it: the schema counts as confirmed.
 			return updateNode(flow, nodeId, (current) =>
-				current.type === "agent" || current.type === "value"
-					? { ...current, output: suggestion.output }
-					: current,
+				withOutputSchema(current, suggestion.output),
 			);
 		case "set": {
 			const withSet = updateNode(flow, nodeId, (current) =>

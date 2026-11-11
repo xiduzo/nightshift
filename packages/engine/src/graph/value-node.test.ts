@@ -175,6 +175,26 @@ describe("the Value node made by a rule", () => {
 		});
 	});
 
+	test("a result that does not match an inferred schema passes, and the run warns", async () => {
+		const h = await startRun(
+			sandbox,
+			around(byRule("small", '{ "small": "a" }', { outputInferred: true })),
+		);
+		const { state } = await drive(h, { inputs: { tasks } });
+		expect(state.ended?.nodeId).toBe("done");
+		const logged = await h.events();
+		expect(payloads(logged, "StepEnded")[0]?.outputs.data).toEqual({
+			small: "a",
+		});
+		expect(payloads(logged, "RunWarned")).toEqual([
+			{
+				kind: "shape",
+				message:
+					"The value does not match the output schema: data/small must be array. Night Shift took this shape from an earlier run. Confirm it or change it in the editor.",
+			},
+		]);
+	});
+
 	test("an expression that throws fails the step with JSONata's message", async () => {
 		const h = await startRun(
 			sandbox,

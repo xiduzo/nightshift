@@ -10,8 +10,10 @@ export {
 	inputShape,
 	outputFieldShape,
 	RESERVED_DATA_KEYS,
+	typedOutput,
 	variableShape,
 } from "./fields";
+export { inferSchema } from "./infer";
 export {
 	emptyShape,
 	FILE_FORMAT,

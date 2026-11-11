@@ -26,6 +26,7 @@ import {
 	type WaitNode,
 	type WaitUntil,
 } from "../nodes";
+import { typedOutput } from "../shapes";
 
 export type Position = { x: number; y: number };
 
@@ -337,6 +338,27 @@ export function withWrites<T extends FlowNode>(
 ): T {
 	const { set: _, ...rest } = node;
 	return (set.length > 0 ? { ...rest, set } : rest) as T;
+}
+
+/**
+ * The node with the output schema a person set: it counts as confirmed,
+ * so a schema Night Shift inferred loses its mark (`outputInferred`).
+ * Pass the node's own schema to confirm it as it is. Undefined removes the
+ * schema, except on a Value node, which keeps the one it has. A node type
+ * without an output schema (`typedOutput`) stays as it is.
+ */
+export function withOutputSchema<T extends FlowNode>(
+	node: T,
+	output: Record<string, unknown> | undefined,
+): T {
+	if (typedOutput(node) === null) return node;
+	const {
+		output: kept,
+		outputInferred: _,
+		...rest
+	} = node as T & { output?: Record<string, unknown>; outputInferred?: true };
+	const schema = output ?? (node.type === "value" ? kept : undefined);
+	return (schema === undefined ? rest : { ...rest, output: schema }) as T;
 }
 
 /** A new flow: one Agent node named `worker`. */

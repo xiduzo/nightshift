@@ -290,6 +290,26 @@ describe("the suggestion prompts", () => {
 		expect(text).toContain("- `risky`: read by node `gate`");
 	});
 
+	test("the output kind of a command asks for the data it writes", () => {
+		const withCommand = flowSchema.parse({
+			...flow,
+			nodes: [
+				...flow.nodes,
+				{
+					id: "count",
+					type: "command",
+					position: { x: 0, y: 300 },
+					command: "wc -l notes.md",
+				},
+			],
+		});
+		const text = suggestionPrompt(
+			request({ flow: withCommand, nodeId: "count", kind: "output" }),
+		);
+		expect(text).toContain("the command writes to `$NS_OUTPUT`");
+		expect(text).not.toContain("prompt asks the agent");
+	});
+
 	test("the set kind lists the node's outcomes", () => {
 		const text = suggestionPrompt(request({ kind: "set" }));
 		expect(text).toContain("`pass`, `fail`, `needs-input`");

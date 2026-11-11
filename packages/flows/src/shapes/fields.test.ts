@@ -11,6 +11,7 @@ import {
 	inputShape,
 	OUTPUT_FIELD_SHAPES,
 	outputFieldShape,
+	typedOutput,
 } from "./fields";
 
 const at = { x: 0, y: 0 };
@@ -41,6 +42,24 @@ describe("output field shapes", () => {
 		expect(outputFieldShape(check, "data")).toBe(output);
 		expect(outputFieldShape(check, "exit_code")).toEqual({ type: "integer" });
 		expect(outputFieldShape(check, "nope")).toBeUndefined();
+	});
+
+	test("typedOutput: the schema, the field it types, and whether Night Shift inferred it", () => {
+		const output = { type: "object" };
+		const node = (fields: Record<string, unknown>) =>
+			({ id: "n", position: at, ...fields }) as FlowNode;
+		expect(typedOutput(node({ type: "command", command: "x" }))).toEqual({
+			field: "data",
+			schema: undefined,
+			inferred: false,
+		});
+		expect(
+			typedOutput(node({ type: "tool", output, outputInferred: true })),
+		).toEqual({ field: "data", schema: output, inferred: true });
+		expect(typedOutput(node({ type: "agent", output }))).toMatchObject({
+			inferred: false,
+		});
+		expect(typedOutput(node({ type: "end" }))).toBeNull();
 	});
 
 	test("a Call node reads the shapes of the flow it calls, and with each its results", () => {
