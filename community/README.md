@@ -6,6 +6,8 @@ A starter flow of Night Shift needs one agent login and nothing else. A communit
 
 This folder is a first step to a flow library that the community runs. Its shape can change.
 
+To share a flow with one person, you need no pull request. Export it in the flow editor with **Export as file**, and send the file. The other person chooses **Import flow** on the Flows page of their project.
+
 <!-- checked:community: every folder with a flow.json has one row. bun run docs:reference checks it. -->
 | Flow | Does |
 | --- | --- |

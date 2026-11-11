@@ -27,7 +27,16 @@ The flows are in the [community folder](https://github.com/xiduzo/nightshift/tre
 
 ## Share your flow
 
-When a flow does its work for you, share it. Add it to the community folder in a pull request. [Contributing](https://github.com/xiduzo/nightshift/blob/main/CONTRIBUTING.md#share-a-flow) gives the steps and the rules.
+When a flow does its work for you, share it. There are two ways.
+
+**Send the file to one person:**
+
+1. Open the flow in the editor.
+2. Open its ⋯ menu, and choose **Export as file**.
+3. Send the file.
+4. The other person chooses **Import flow** on the Flows page of their project, and picks the file. Night Shift asks which of their profiles takes each agent of the flow.
+
+**Share it with everyone:** add it to the community folder in a pull request. [Contributing](https://github.com/xiduzo/nightshift/blob/main/CONTRIBUTING.md#share-a-flow) gives the steps and the rules.
 
 A shared flow runs on each computer that has what it needs. It holds no paths of your own, no Keychain, and no content of a client. It names a secret only as `${NAME}`.
 

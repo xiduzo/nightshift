@@ -1,6 +1,6 @@
 # Contributing to Night Shift
 
-Thank you for your interest. Night Shift is pre-alpha and built for its author first. Read this before you start work.
+Thank you for your interest. Night Shift is pre-alpha. Read this before you start work.
 
 ## Before you start
 
@@ -18,7 +18,7 @@ bun run dev:mobile     # the phone app alone, in Expo
 bun run dev:desktop    # the desktop app
 ```
 
-`bun run dev` keeps its data in `.nightshift-dev/`, apart from the Night Shift you use for real work. If you also run real nights from this checkout, change Night Shift in a separate git worktree. A code change then never reloads a run in the middle of the night.
+`bun run dev` keeps its data in `.nightshift-dev/`, apart from the Night Shift you use for real work. If you also run your real flows from this checkout, change Night Shift in a separate git worktree. A code change then never reloads Night Shift while a run works.
 
 A development install connects only to a Host on this computer. It does not pair or connect with a Host on another computer, so it stays out of your real work ([ADR 20](docs/adr/0020-one-computer-is-one-device.md)). To test against a remote Host, set `NIGHTSHIFT_DEV_LINK_HOST=true`.
 
@@ -48,7 +48,10 @@ The user guide is the [GitHub wiki](https://github.com/xiduzo/nightshift/wiki). 
 
 ## Share a flow
 
-A flow that does its work for you can help other people. Add it to [community/](community/) in a pull request. [community/README.md](community/README.md) gives the steps and the rules. The flow is self-contained, holds no client content, and names a secret only as `${NAME}`.
+A flow that does its work for you can help other people. There are two ways to share it:
+
+- **Send the file to one person.** In the flow editor, open the ⋯ menu and choose **Export as file**. The other person chooses **Import flow** on the Flows page of their project. You need no pull request.
+- **Share it with everyone.** Add it to [community/](community/) in a pull request. [community/README.md](community/README.md) gives the steps and the rules. The flow is self-contained, holds no client content, and names a secret only as `${NAME}`.
 
 ## Pull requests
 

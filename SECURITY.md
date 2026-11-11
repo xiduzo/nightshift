@@ -1,6 +1,6 @@
 # Security
 
-Night Shift runs coding agents on your computer with your own logins. A flow can also run shell commands. Report a security problem privately.
+Night Shift runs agents on your computer with your own logins. A flow can also run shell commands. Report a security problem privately.
 
 ## Report a problem
 
