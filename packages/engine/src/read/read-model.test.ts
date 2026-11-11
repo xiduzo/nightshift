@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { project, run } from "@nightshift/db/schema";
-import { asDate, now } from "@nightshift/time";
+import { asDate, now, parseInstant } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import {
 	createRunBus,
@@ -310,7 +310,7 @@ describe("the read model", () => {
 			last: { id: "r2", title: "Second" },
 			nextWakeAt: null,
 		});
-		// Both runs started tonight: every night range counts them.
+		// Both runs started today: every range of days counts them.
 		expect(counts.get("p")?.nights).toEqual(
 			([7, 30, 90] as const).map((nights) => ({
 				nights,
@@ -320,5 +320,29 @@ describe("the read model", () => {
 		);
 		// A project without runs is not in it.
 		expect(counts.has("q")).toBe(false);
+	});
+
+	test("a project's last days start at midnight on the reader's clock", async () => {
+		// 23:30 UTC on 3 November is 00:30 on 4 November in Amsterdam (UTC+1).
+		await sandbox.db
+			.update(run)
+			.set({ createdAt: asDate(parseInstant("2026-11-03T23:30:00Z")) })
+			.where(eq(run.id, "r1"));
+		// The last 7 days end on 10 November: they start on 4 November.
+		const at = parseInstant("2026-11-10T12:00:00Z");
+		const week = async (timeZone: string) =>
+			(await reads.projectRuns(sandbox.spaceId, { now: at, timeZone }))
+				.get("p")
+				?.nights?.map(({ nights, total }) => [nights, total]);
+		expect(await week("UTC")).toEqual([
+			[7, 0],
+			[30, 1],
+			[90, 1],
+		]);
+		expect(await week("Europe/Amsterdam")).toEqual([
+			[7, 1],
+			[30, 1],
+			[90, 1],
+		]);
 	});
 });

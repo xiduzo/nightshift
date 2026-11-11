@@ -1,6 +1,6 @@
 import type { RunSummary } from "../read";
-import { DAY_MS, HOUR_MS, lastHours, nightOf } from "./clock";
-import { FLOW_HEALTH_NIGHTS, flowHealthRows } from "./flow-health";
+import { DAY_MS, dayStart, HOUR_MS, lastHours } from "./clock";
+import { FLOW_HEALTH_DAYS, flowHealthRows } from "./flow-health";
 import { askedGates, nightsRange, type PlacedRun } from "./nights";
 import {
 	isOpen,
@@ -45,7 +45,7 @@ export type DashboardScope =
 
 export type DashboardOptions = {
 	now: number;
-	/** The reader's time zone (IANA): where a night's noon falls. */
+	/** The reader's time zone (IANA): where a day's midnight falls. */
 	timeZone: string;
 	scope: DashboardScope;
 };
@@ -271,8 +271,8 @@ function activityOf(
 	};
 }
 
-/** The latest night with runs, its newest runs first. */
-function lastNightOf(runs: readonly PlacedRun[]): NightOutput | null {
+/** The latest day with runs, its newest runs first. */
+function lastDayOf(runs: readonly PlacedRun[]): NightOutput | null {
 	const newest = runs.reduce<PlacedRun | undefined>(
 		(latest, placed) =>
 			latest === undefined || placed.run.createdAt > latest.run.createdAt
@@ -281,15 +281,15 @@ function lastNightOf(runs: readonly PlacedRun[]): NightOutput | null {
 		undefined,
 	);
 	if (!newest) return null;
-	const ofNight = runs
-		.filter(({ night }) => night === newest.night)
+	const ofDay = runs
+		.filter(({ day }) => day === newest.day)
 		.sort((a, b) => b.run.createdAt - a.run.createdAt);
 	return {
-		night: newest.night,
-		runs: ofNight.length,
-		cost: sumKnownCost(ofNight.map(({ run }) => run)),
-		tokens: ofNight.reduce((sum, { run }) => sum + usedTokens(run), 0),
-		latest: ofNight
+		night: newest.day,
+		runs: ofDay.length,
+		cost: sumKnownCost(ofDay.map(({ run }) => run)),
+		tokens: ofDay.reduce((sum, { run }) => sum + usedTokens(run), 0),
+		latest: ofDay
 			.slice(0, OVERVIEW_ROWS)
 			.map(({ run, group }) => ({ ...run, group })),
 	};
@@ -318,7 +318,7 @@ function upNextOf(runs: readonly RunSummary[], now: number): UpcomingRun[] {
 
 /**
  * The dashboard of `runs`: the stat cards and their details for every
- * range a toggle offers, what the latest night produced, what comes next,
+ * range a toggle offers, what the latest day produced, what comes next,
  * and (for one project) the health of its flows.
  */
 export function summarizeDashboard(
@@ -329,7 +329,7 @@ export function summarizeDashboard(
 	const group = groupOf(scope);
 	const placed: PlacedRun[] = runs.map((run) => ({
 		run,
-		night: nightOf(run.createdAt, timeZone),
+		day: dayStart(run.createdAt, timeZone),
 		group: group(run),
 	}));
 	const gates = askedGates(placed, now, timeZone);
@@ -357,8 +357,8 @@ export function summarizeDashboard(
 					? flowHealthRows(scope.flows, runs, now, timeZone, range)
 					: null,
 		})),
-		healthNights: FLOW_HEALTH_NIGHTS,
-		lastNight: lastNightOf(placed),
+		healthNights: FLOW_HEALTH_DAYS,
+		lastNight: lastDayOf(placed),
 		upNext: upNextOf(runs, now),
 		flowHealth:
 			scope.kind === "project"

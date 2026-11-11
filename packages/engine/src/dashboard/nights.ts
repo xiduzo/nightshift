@@ -1,5 +1,5 @@
 import type { RunSummary } from "../read";
-import { lastNights, nightOf } from "./clock";
+import { dayStart, lastDays } from "./clock";
 import {
 	countStatuses,
 	hasEnded,
@@ -32,11 +32,11 @@ const MAX_SPEND_GROUPS = 4;
 /** The order the Gates chart stacks the states in. */
 const GATE_STATES: GateState[] = ["answered", "unanswered", "waiting"];
 
-/** A run with its night and its group, worked out once. */
-export type PlacedRun = { run: RunSummary; night: number; group: string };
+/** A run with the start of its day and its group, worked out once. */
+export type PlacedRun = { run: RunSummary; day: number; group: string };
 
-/** A Gate a run asked, with the night it opened in. */
-type PlacedGate = AskedGate & { night: number };
+/** A Gate a run asked, with the start of the day it opened in. */
+type PlacedGate = AskedGate & { day: number };
 
 /**
  * Every Gate the runs asked. A Gate is answered when a person chose its
@@ -63,7 +63,7 @@ export function askedGates(
 				runTitle: run.title,
 				group,
 				openedAt: gate.openedAt,
-				night: nightOf(gate.openedAt, timeZone),
+				day: dayStart(gate.openedAt, timeZone),
 				state,
 				wait:
 					gate.closedAt !== null
@@ -76,27 +76,30 @@ export function askedGates(
 	);
 }
 
-/** Counts per night of `items`, by `keyOf`, with a zero for each of `keys`. */
-function perNight<T extends { night: number }>(
-	nights: readonly number[],
+/**
+ * Counts per day of `items`, by `keyOf`, with a zero for each of `keys`.
+ * The wire still names a day `night`.
+ */
+function perDay<T extends { day: number }>(
+	days: readonly number[],
 	items: readonly T[],
 	keys: readonly string[],
 	countOf: (item: T) => { key: string; value: number },
 ): NightCounts[] {
-	return nights.map((night) => {
+	return days.map((day) => {
 		const counts: Record<string, number> = {};
 		for (const key of keys) counts[key] = 0;
 		for (const item of items) {
-			if (item.night !== night) continue;
+			if (item.day !== day) continue;
 			const { key, value } = countOf(item);
 			counts[key] = (counts[key] ?? 0) + value;
 		}
-		return { night, counts };
+		return { night: day, counts };
 	});
 }
 
-/** Spend per night, stacked by group, the dearest runs and the totals. */
-function spendOf(nights: readonly number[], inRange: PlacedRun[]): SpendRange {
+/** Spend per day, stacked by group, the dearest runs and the totals. */
+function spendOf(days: readonly number[], inRange: PlacedRun[]): SpendRange {
 	const byLabel = new Map<
 		string,
 		{
@@ -154,11 +157,11 @@ function spendOf(nights: readonly number[], inRange: PlacedRun[]): SpendRange {
 		total: inRange.reduce((sum, { run }) => sum + run.costUsd, 0),
 		tokens: inRange.reduce((sum, { run }) => sum + usedTokens(run), 0),
 		runs: inRange.length,
-		nightsWithRuns: new Set(inRange.map(({ night }) => night)).size,
+		nightsWithRuns: new Set(inRange.map(({ day }) => day)).size,
 		unknown: inRange.filter(({ run }) => run.costMissing > 0).length,
 		groups,
-		perNight: perNight(
-			nights,
+		perNight: perDay(
+			days,
 			inRange,
 			groups.map((group) => group.key),
 			({ run, group }) => ({
@@ -166,8 +169,8 @@ function spendOf(nights: readonly number[], inRange: PlacedRun[]): SpendRange {
 				value: run.costUsd,
 			}),
 		),
-		tokensPerNight: perNight(
-			nights,
+		tokensPerNight: perDay(
+			days,
 			inRange,
 			groups.map((group) => group.key),
 			({ run, group }) => ({
@@ -183,8 +186,8 @@ function spendOf(nights: readonly number[], inRange: PlacedRun[]): SpendRange {
 	};
 }
 
-/** How runs went: per night by status, per group, and the failures. */
-function runsOf(nights: readonly number[], inRange: PlacedRun[]): RunsRange {
+/** How runs went: per day by status, per group, and the failures. */
+function runsOf(days: readonly number[], inRange: PlacedRun[]): RunsRange {
 	const ended = inRange.filter(
 		({ run }) => run.status === "finished" || run.status === "failed",
 	);
@@ -224,10 +227,10 @@ function runsOf(nights: readonly number[], inRange: PlacedRun[]): RunsRange {
 		runs: inRange.length,
 		ended: ended.length,
 		finished: ended.filter(({ run }) => run.status === "finished").length,
-		nightsWithRuns: new Set(inRange.map(({ night }) => night)).size,
+		nightsWithRuns: new Set(inRange.map(({ day }) => day)).size,
 		statuses,
-		perNight: perNight(
-			nights,
+		perNight: perDay(
+			days,
 			inRange,
 			statuses.map(({ status }) => status),
 			({ run }) => ({ key: run.status, value: 1 }),
@@ -286,8 +289,8 @@ function waitsOf(gates: readonly AskedGate[]): number[] {
 	return gates.flatMap((gate) => (gate.wait === null ? [] : [gate.wait]));
 }
 
-/** The Gates asked: per night by state, per group, and the latest. */
-function gatesOf(nights: readonly number[], asked: PlacedGate[]): GatesRange {
+/** The Gates asked: per day by state, per group, and the latest. */
+function gatesOf(days: readonly number[], asked: PlacedGate[]): GatesRange {
 	const answered = asked.filter((gate) => gate.state === "answered");
 	const byLabel = new Map<string, PlacedGate[]>();
 	for (const gate of asked) {
@@ -322,7 +325,7 @@ function gatesOf(nights: readonly number[], asked: PlacedGate[]): GatesRange {
 		unanswered: asked.filter((gate) => gate.state === "unanswered").length,
 		answerTime: spreadOf(waitsOf(answered)),
 		states,
-		perNight: perNight(nights, asked, states, (gate) => ({
+		perNight: perDay(days, asked, states, (gate) => ({
 			key: gate.state,
 			value: 1,
 		})),
@@ -330,32 +333,32 @@ function gatesOf(nights: readonly number[], asked: PlacedGate[]): GatesRange {
 		latest: asked
 			.slice(-OVERVIEW_ROWS)
 			.reverse()
-			.map(({ night: _night, ...gate }) => gate),
+			.map(({ day: _day, ...gate }) => gate),
 	};
 }
 
-/** The headline numbers of `nights`, per night and in all. */
+/** The headline numbers of `days`, per day and in all. */
 function totalsOf(
-	nights: readonly number[],
+	days: readonly number[],
 	runs: readonly PlacedRun[],
 	gates: readonly PlacedGate[],
 ): PeriodTotals {
-	const perNight = nights.map((night): NightTotals => {
-		const ofNight = runs.filter((placed) => placed.night === night);
-		const finished = ofNight.filter(({ run }) => run.status === "finished");
-		const failed = ofNight.filter(({ run }) => run.status === "failed");
+	const perNight = days.map((day): NightTotals => {
+		const ofDay = runs.filter((placed) => placed.day === day);
+		const finished = ofDay.filter(({ run }) => run.status === "finished");
+		const failed = ofDay.filter(({ run }) => run.status === "failed");
 		return {
-			night,
-			runs: ofNight.length,
+			night: day,
+			runs: ofDay.length,
 			ended: finished.length + failed.length,
 			finished: finished.length,
-			costUsd: ofNight.reduce((sum, { run }) => sum + run.costUsd, 0),
-			tokens: ofNight.reduce((sum, { run }) => sum + usedTokens(run), 0),
-			gates: gates.filter((gate) => gate.night === night).length,
+			costUsd: ofDay.reduce((sum, { run }) => sum + run.costUsd, 0),
+			tokens: ofDay.reduce((sum, { run }) => sum + usedTokens(run), 0),
+			gates: gates.filter((gate) => gate.day === day).length,
 		};
 	});
 	const sum = (key: keyof Omit<NightTotals, "night">) =>
-		perNight.reduce((total, night) => total + night[key], 0);
+		perNight.reduce((total, day) => total + day[key], 0);
 	return {
 		runs: sum("runs"),
 		ended: sum("ended"),
@@ -368,9 +371,9 @@ function totalsOf(
 }
 
 /**
- * Spend, runs and Gates over the last `range` nights, and the headline
- * numbers of the `range` nights before. Flow health is the caller's: it
- * needs the flows.
+ * Spend, runs and Gates over the last `range` days, today included, and
+ * the headline numbers of the `range` days before. Flow health is the
+ * caller's: it needs the flows.
  */
 export function nightsRange(
 	range: NightRange,
@@ -379,19 +382,19 @@ export function nightsRange(
 	now: number,
 	timeZone: string,
 ): Omit<NightsRange, "flows"> {
-	const both = lastNights(range * 2, now, timeZone);
-	const nights = both.slice(range);
-	const first = nights[0] ?? 0;
-	const inRange = runs.filter(({ night }) => night >= first);
+	const both = lastDays(range * 2, now, timeZone);
+	const days = both.slice(range);
+	const first = days[0] ?? 0;
+	const inRange = runs.filter(({ day }) => day >= first);
 	const asked = gates
-		.filter((gate) => gate.night >= first)
+		.filter((gate) => gate.day >= first)
 		.sort((a, b) => a.openedAt - b.openedAt);
 	return {
 		nights: range,
-		spend: spendOf(nights, inRange),
-		runs: runsOf(nights, inRange),
-		gates: gatesOf(nights, asked),
-		totals: totalsOf(nights, inRange, asked),
+		spend: spendOf(days, inRange),
+		runs: runsOf(days, inRange),
+		gates: gatesOf(days, asked),
+		totals: totalsOf(days, inRange, asked),
 		before: totalsOf(both.slice(0, range), runs, gates),
 	};
 }

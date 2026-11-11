@@ -13,7 +13,7 @@ import { runStatusSchema, runSummarySchema } from "../runs";
  * engine's types exactly (`exact`).
  */
 
-/** The reader's time zone: where a night's noon falls. Default UTC. */
+/** The reader's time zone: where a day's midnight falls. Default UTC. */
 export const timeZoneSchema = z
 	.string()
 	.refine(isTimeZone, {
@@ -321,7 +321,7 @@ const flowRunSchema = z.object({
 	warnings: z.number(),
 });
 
-/** One flow of a project in detail, per night range. */
+/** One flow of a project in detail, per range of days. */
 export const flowHealthDetailSchema = exact<FlowHealthDetail>()(
 	z.object({
 		name: z.string(),

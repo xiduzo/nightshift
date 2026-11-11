@@ -21,7 +21,6 @@ import {
 	getMinutes,
 	getMonth,
 	getYear,
-	set,
 	startOfDay,
 	startOfHour,
 } from "date-fns";
@@ -203,29 +202,21 @@ export function atLocal(
 	);
 }
 
-/** The noon that starts the night `at` falls in, on the clock of `timeZone`. */
-export function nightOf(at: Instant, timeZone: string): Instant {
-	const inZone = zone(timeZone);
-	const noon = set(
-		startOfDay(at, inZone),
-		{ hours: 12, minutes: 0, seconds: 0, milliseconds: 0 },
-		inZone,
-	);
-	return (
-		getHours(at, inZone) < 12 ? addDays(noon, -1, inZone) : noon
-	).getTime();
-}
-
-/** The starts of the last `count` nights, oldest first, ending with tonight. */
-export function lastNights(
+/**
+ * The starts of the last `count` days on the clock of `timeZone`, oldest
+ * first, ending with today. Each is the start of its day (`dayStart`):
+ * midnight, or the first minute after it where a clock change skips
+ * midnight. A day across a clock change lasts 23 or 25 hours.
+ */
+export function lastDays(
 	count: number,
 	at: Instant,
 	timeZone: string,
 ): Instant[] {
 	const inZone = zone(timeZone);
-	const tonight = nightOf(at, timeZone);
+	const today = startOfDay(at, inZone);
 	return Array.from({ length: count }, (_, index) =>
-		addDays(tonight, -(count - 1 - index), inZone).getTime(),
+		startOfDay(addDays(today, -(count - 1 - index), inZone), inZone).getTime(),
 	);
 }
 
@@ -242,7 +233,10 @@ export function lastHours(
 	);
 }
 
-/** Midnight that starts the calendar day of `at` in `timeZone`. */
+/**
+ * Midnight that starts the calendar day of `at` in `timeZone`. Where a
+ * clock change skips midnight, the first minute of the day after it.
+ */
 export function dayStart(at: Instant, timeZone: string = localZone()): Instant {
 	return startOfDay(at, zone(timeZone)).getTime();
 }

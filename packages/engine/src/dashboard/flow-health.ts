@@ -1,7 +1,7 @@
 import type { RunScore } from "../log";
 import type { RunSummary } from "../read";
 import { finishedShare } from "../run-status";
-import { lastNights, nightOf } from "./clock";
+import { dayStart, lastDays } from "./clock";
 import {
 	countStatuses,
 	hasEnded,
@@ -28,15 +28,15 @@ import {
 	type UnfinishedReason,
 } from "./types";
 
-/** The nights a Flow health row covers. */
-export const FLOW_HEALTH_NIGHTS: NightRange = 30;
+/** The days a Flow health row covers. */
+export const FLOW_HEALTH_DAYS: NightRange = 30;
 
-/** A run of a flow with its warnings, its scores and the night it started in. */
+/** A run of a flow with its warnings, its scores and the start of the day it started in. */
 type PlacedFlowRun = Omit<FlowRun, "warnings"> & {
 	warnings: RunSummary["warnings"];
 	/** Its scores. A subflow run has none: they are in the run that called it. */
 	scores: RunScore[];
-	night: number;
+	day: number;
 };
 
 /** The runs of the flow `name` in `runs`, on their own and as a subflow. */
@@ -62,7 +62,7 @@ function runsOf(
 						reason: run.reason,
 						warnings: run.warnings,
 						scores: run.metrics?.scores ?? [],
-						night: nightOf(run.createdAt, timeZone),
+						day: dayStart(run.createdAt, timeZone),
 					},
 				]
 			: []),
@@ -82,7 +82,7 @@ function runsOf(
 				reason: null,
 				warnings: [],
 				scores: [],
-				night: nightOf(subflow.startedAt, timeZone),
+				day: dayStart(subflow.startedAt, timeZone),
 			})),
 	]);
 }
@@ -115,7 +115,7 @@ function finishedCostOf(finished: readonly PlacedFlowRun[]): {
 }
 
 function toFlowRun({
-	night: _night,
+	day: _day,
 	scores: _scores,
 	...run
 }: PlacedFlowRun): FlowRun {
@@ -155,7 +155,7 @@ function scoresOf(runs: readonly PlacedFlowRun[]): FlowScoreRow[] {
 }
 
 /**
- * Each flow over the last `nights` nights: its last runs, how often it
+ * Each flow over the last `days` days: its last runs, how often it
  * finished, and what a finished run costs. A stopped run did not finish, so it counts
  * against it. A flow a Subflow node ran counts too, inside the run that
  * called it. The busiest flows first, then the one that ran last.
@@ -165,9 +165,9 @@ export function flowHealthRows(
 	runs: readonly RunSummary[],
 	now: number,
 	timeZone: string,
-	nights: NightRange = FLOW_HEALTH_NIGHTS,
+	days: NightRange = FLOW_HEALTH_DAYS,
 ): TopRows<FlowHealthRow> {
-	const first = lastNights(nights, now, timeZone)[0] ?? 0;
+	const first = lastDays(days, now, timeZone)[0] ?? 0;
 	const rows = flows.map((name): FlowHealthRow => {
 		const mine = runsOf(name, runs, timeZone);
 		const lastRuns = [...mine]
@@ -180,7 +180,7 @@ export function flowHealthRows(
 					startedAt: run.startedAt,
 				}),
 			);
-		const recent = mine.filter((run) => run.night >= first);
+		const recent = mine.filter((run) => run.day >= first);
 		const ended = recent.filter(hasEnded);
 		const finished = ended.filter((run) => run.status === "finished");
 		// A run that failed early spent next to nothing, which would drag down
@@ -269,17 +269,17 @@ function warningsOf(runs: readonly PlacedFlowRun[]): FlowWarning[] {
 		.map(({ runIds: _runIds, ...row }) => row);
 }
 
-/** One flow over the last `range` nights. */
+/** One flow over the last `range` days. */
 function flowRange(
 	range: NightRange,
 	mine: readonly PlacedFlowRun[],
 	now: number,
 	timeZone: string,
 ): FlowRange {
-	const nights = lastNights(range, now, timeZone);
-	const first = nights[0] ?? 0;
+	const days = lastDays(range, now, timeZone);
+	const first = days[0] ?? 0;
 	const inRange = mine
-		.filter((run) => run.night >= first)
+		.filter((run) => run.day >= first)
 		.sort((a, b) => a.startedAt - b.startedAt);
 	const ended = inRange.filter(hasEnded);
 	const finished = ended.filter((run) => run.status === "finished");
@@ -290,14 +290,13 @@ function flowRange(
 		undefined,
 	);
 	const { cost, tokenUse } = finishedCostOf(finished);
-	const perNight: NightCounts[] = nights.map((night) => {
+	const perNight: NightCounts[] = days.map((day) => {
 		const counts: Record<string, number> = {};
 		for (const { status } of statuses) counts[status] = 0;
 		for (const run of inRange) {
-			if (run.night === night)
-				counts[run.status] = (counts[run.status] ?? 0) + 1;
+			if (run.day === day) counts[run.status] = (counts[run.status] ?? 0) + 1;
 		}
-		return { night, counts };
+		return { night: day, counts };
 	});
 	return {
 		nights: range,
@@ -333,7 +332,7 @@ function flowRange(
 		endedRuns: ended.map((run) => ({
 			runId: run.runId,
 			startedAt: run.startedAt,
-			night: run.night,
+			night: run.day,
 			costUsd: run.costUsd,
 			tokens: run.tokens,
 			status: run.status,
@@ -346,7 +345,7 @@ function flowRange(
 }
 
 /**
- * One flow in detail, for each night range: runs per night, what each run
+ * One flow in detail, for each day range: runs per day, what each run
  * cost, why runs did not finish, and the latest runs. Runs as a subflow
  * count, as in its Flow health row.
  */

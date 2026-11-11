@@ -243,7 +243,10 @@ export type RunSummary = {
 	metrics?: RunMetrics;
 };
 
-/** The night ranges the dashboard and the sidebar offer: 7, 30 or 90 nights. */
+/**
+ * The day ranges the dashboard and the sidebar offer: 7, 30 or 90 days.
+ * The name stays `night`: the wire key it types is `nights`.
+ */
 export const NIGHT_RANGES = [7, 30, 90] as const;
 export type NightRange = (typeof NIGHT_RANGES)[number];
 
@@ -253,7 +256,7 @@ export type ProjectRuns = {
 	/** How many runs have each status. A status no run has is left out. */
 	statuses: Partial<Record<RunStatus, number>>;
 	/**
-	 * The same counts over the last 7, 30 and 90 nights, on the reader's
+	 * The same counts over the last 7, 30 and 90 days, on the reader's
 	 * clock, as the dashboard counts them. Older Hosts send none.
 	 */
 	nights?: {

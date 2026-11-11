@@ -47,7 +47,7 @@ export const projects = {
 		.input(
 			z
 				.object({
-					/** The reader's time zone: the nights of a project's runs fall on its clock. */
+					/** The reader's time zone: the days of a project's runs fall on its clock. */
 					timeZone: timeZoneSchema,
 				})
 				.default({ timeZone: "UTC" }),

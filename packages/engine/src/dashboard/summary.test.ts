@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseInstant } from "@nightshift/time";
+import { iso, parseInstant } from "@nightshift/time";
 import type { RunSummary } from "../read";
 import { summarizeFlow } from "./flow-health";
 import { projectDashboard, spacesDashboard } from "./spaces";
@@ -7,13 +7,13 @@ import { type DashboardScope, summarizeDashboard } from "./summary";
 
 /**
  * The dashboard's numbers, from runs built for each test. The clock is UTC
- * and stands at 15:00, so tonight started three hours ago.
+ * and stands at 15:00, so today started fifteen hours ago.
  */
 
 const HOUR = 60 * 60 * 1000;
 const NOW = parseInstant("2026-10-21T15:00:00Z");
-const TONIGHT = parseInstant("2026-10-21T12:00:00Z");
-const NIGHT = 24 * HOUR;
+const TODAY = parseInstant("2026-10-21T00:00:00Z");
+const DAY = 24 * HOUR;
 
 let next = 0;
 
@@ -67,9 +67,9 @@ function summarize(runs: RunSummary[], scope: DashboardScope = project()) {
 	return summarizeDashboard(runs, { now: NOW, timeZone: "UTC", scope });
 }
 
-function nightsOf(summary: ReturnType<typeof summarize>, nights: 7 | 30 | 90) {
-	const range = summary.nights.find((r) => r.nights === nights);
-	if (!range) throw new Error(`no range of ${nights} nights`);
+function daysOf(summary: ReturnType<typeof summarize>, days: 7 | 30 | 90) {
+	const range = summary.nights.find((r) => r.nights === days);
+	if (!range) throw new Error(`no range of ${days} days`);
 	return range;
 }
 
@@ -292,15 +292,15 @@ describe("the activity details", () => {
 	});
 });
 
-describe("spend over a night range", () => {
-	test("stacks the top four groups per night and folds the rest into one", () => {
+describe("spend over a range of days", () => {
+	test("stacks the top four groups per day and folds the rest into one", () => {
 		const runs = ["a", "b", "c", "d", "e", "f"].map((flowName, index) =>
 			aRun({ flowName, costUsd: 6 - index, createdAt: NOW - HOUR }),
 		);
 		runs.push(
-			aRun({ flowName: "a", costUsd: 1, createdAt: TONIGHT - NIGHT + HOUR }),
+			aRun({ flowName: "a", costUsd: 1, createdAt: TODAY - DAY + HOUR }),
 		);
-		const spend = nightsOf(summarize(runs), 7).spend;
+		const spend = daysOf(summarize(runs), 7).spend;
 		expect(spend.groups).toEqual([
 			{
 				key: "g0",
@@ -353,15 +353,15 @@ describe("spend over a night range", () => {
 		expect(spend.nightsWithRuns).toBe(2);
 		expect(spend.perNight).toHaveLength(7);
 		expect(spend.perNight.at(-1)).toEqual({
-			night: TONIGHT,
+			night: TODAY,
 			counts: { g0: 6, g1: 5, g2: 4, g3: 3, other: 3 },
 		});
 		expect(spend.perNight.at(-2)?.counts.g0).toBe(1);
 		expect(spend.priciest.map((run) => run.costUsd)).toEqual([6, 5, 4, 3, 2]);
 	});
 
-	test("adds the tokens a run reported to the spend and the night totals", () => {
-		const range = nightsOf(
+	test("adds the tokens a run reported to the spend and the day totals", () => {
+		const range = daysOf(
 			summarize([
 				aRun({
 					costUsd: 1.2,
@@ -384,11 +384,11 @@ describe("spend over a night range", () => {
 		expect(range.totals.perNight.at(-1)?.tokens).toBe(12_345);
 	});
 
-	test("counts the runs whose cost is not known, and leaves out older nights", () => {
-		const spend = nightsOf(
+	test("counts the runs whose cost is not known, and leaves out older days", () => {
+		const spend = daysOf(
 			summarize([
 				aRun({ costUsd: 1, costMissing: 2 }),
-				aRun({ costUsd: 3, createdAt: TONIGHT - 10 * NIGHT }),
+				aRun({ costUsd: 3, createdAt: TODAY - 10 * DAY }),
 			]),
 			7,
 		).spend;
@@ -397,7 +397,7 @@ describe("spend over a night range", () => {
 	});
 
 	test("tells what the runs that did not finish spent", () => {
-		const spend = nightsOf(
+		const spend = daysOf(
 			summarize([
 				aRun({ status: "finished", costUsd: 4 }),
 				aRun({ status: "failed", costUsd: 2 }),
@@ -418,7 +418,7 @@ describe("spend over a night range", () => {
 			all({ p1: "website" }),
 		);
 		expect(
-			nightsOf(summary, 30).spend.groups.map((group) => group.label),
+			daysOf(summary, 30).spend.groups.map((group) => group.label),
 		).toEqual(["website", "Removed"]);
 		expect(summary.flowHealth).toBeNull();
 	});
@@ -450,7 +450,7 @@ describe("the dashboard of Spaces and of one project", () => {
 		);
 		expect(summary.cards.lastDay.runs).toBe(2);
 		expect(
-			nightsOf(summary, 30).spend.groups.map((group) => group.label),
+			daysOf(summary, 30).spend.groups.map((group) => group.label),
 		).toEqual(["website", "shop"]);
 	});
 
@@ -467,7 +467,7 @@ describe("the dashboard of Spaces and of one project", () => {
 		expect(summary.flowHealth?.rows.map((row) => row.name)).toContain("fix");
 	});
 
-	test("says the nights Flow health covers: one of its night ranges", async () => {
+	test("says the days Flow health covers: one of its ranges of days", async () => {
 		const space = aSpace([aRun({ projectId: "p1" })], { p1: "website" });
 		const read = { now: NOW, timeZone: "UTC" };
 		for (const summary of [
@@ -482,9 +482,9 @@ describe("the dashboard of Spaces and of one project", () => {
 	});
 });
 
-describe("runs over a night range", () => {
-	test("count outcomes per night and per flow, and list the failures newest first", () => {
-		const range = nightsOf(
+describe("runs over a range of days", () => {
+	test("count outcomes per day and per flow, and list the failures newest first", () => {
+		const range = daysOf(
 			summarize([
 				aRun({ flowName: "night", status: "finished" }),
 				aRun({ flowName: "night", status: "failed", createdAt: NOW - HOUR }),
@@ -525,7 +525,7 @@ describe("runs over a night range", () => {
 	});
 
 	test("tell how the flow did after each failure", () => {
-		const range = nightsOf(
+		const range = daysOf(
 			summarize([
 				aRun({
 					id: "early",
@@ -559,31 +559,31 @@ describe("runs over a night range", () => {
 	});
 });
 
-describe("the totals of a night range", () => {
-	test("count runs, outcomes, spend and Gates, and the same nights just before", () => {
+describe("the totals of a range of days", () => {
+	test("count runs, outcomes, spend and Gates, and the same days just before", () => {
 		const summary = summarize([
 			aRun({
 				status: "finished",
 				costUsd: 2,
-				createdAt: TONIGHT + HOUR,
+				createdAt: TODAY + HOUR,
 				gates: [
 					{
-						openedAt: TONIGHT + HOUR,
-						closedAt: TONIGHT + 2 * HOUR,
+						openedAt: TODAY + HOUR,
+						closedAt: TODAY + 2 * HOUR,
 						answeredBy: null,
 					},
 				],
 			}),
-			aRun({ status: "failed", costUsd: 1, createdAt: TONIGHT - 3 * NIGHT }),
+			aRun({ status: "failed", costUsd: 1, createdAt: TODAY - 3 * DAY }),
 			// Stopped: a run, not one that ended for the finished share.
-			aRun({ status: "stopped", createdAt: TONIGHT - 6 * NIGHT }),
-			// The 7 nights before.
-			aRun({ status: "finished", costUsd: 4, createdAt: TONIGHT - 8 * NIGHT }),
-			aRun({ status: "failed", createdAt: TONIGHT - 13 * NIGHT }),
+			aRun({ status: "stopped", createdAt: TODAY - 6 * DAY }),
+			// The 7 days before.
+			aRun({ status: "finished", costUsd: 4, createdAt: TODAY - 8 * DAY }),
+			aRun({ status: "failed", createdAt: TODAY - 13 * DAY }),
 			// Older than both: in neither.
-			aRun({ status: "finished", costUsd: 9, createdAt: TONIGHT - 14 * NIGHT }),
+			aRun({ status: "finished", costUsd: 9, createdAt: TODAY - 14 * DAY }),
 		]);
-		const { totals, before } = nightsOf(summary, 7);
+		const { totals, before } = daysOf(summary, 7);
 		expect(totals).toMatchObject({
 			runs: 3,
 			ended: 2,
@@ -594,7 +594,7 @@ describe("the totals of a night range", () => {
 		});
 		expect(totals.perNight).toHaveLength(7);
 		expect(totals.perNight.at(-1)).toEqual({
-			night: TONIGHT,
+			night: TODAY,
 			runs: 1,
 			ended: 1,
 			finished: 1,
@@ -610,27 +610,65 @@ describe("the totals of a night range", () => {
 			tokens: 0,
 			gates: 0,
 		});
-		expect(before.perNight[0]?.night).toBe(TONIGHT - 13 * NIGHT);
-		expect(before.perNight.at(-1)?.night).toBe(TONIGHT - 7 * NIGHT);
+		expect(before.perNight[0]?.night).toBe(TODAY - 13 * DAY);
+		expect(before.perNight.at(-1)?.night).toBe(TODAY - 7 * DAY);
+	});
+
+	test("count a day from midnight to midnight on the reader's clock", () => {
+		// 23:30 and 00:30 UTC, the night into 21 October.
+		const runs = [
+			aRun({ id: "late", createdAt: TODAY - HOUR / 2 }),
+			aRun({ id: "early", createdAt: TODAY + HOUR / 2 }),
+		];
+		const inUtc = daysOf(summarize(runs), 7).totals.perNight;
+		expect(inUtc.at(-1)).toMatchObject({ night: TODAY, runs: 1 });
+		expect(inUtc.at(-2)).toMatchObject({ night: TODAY - DAY, runs: 1 });
+		// In Amsterdam (UTC+2) both are on 21 October, which began at 22:00 UTC.
+		const inAmsterdam = summarizeDashboard(runs, {
+			now: NOW,
+			timeZone: "Europe/Amsterdam",
+			scope: project(),
+		});
+		const days = daysOf(inAmsterdam, 7).totals.perNight;
+		expect(days.at(-1)).toMatchObject({ night: TODAY - 2 * HOUR, runs: 2 });
+		expect(inAmsterdam.lastNight?.night).toBe(TODAY - 2 * HOUR);
+		expect(inAmsterdam.lastNight?.runs).toBe(2);
+	});
+
+	test("the days before reach over a clock change, a day of 25 hours", () => {
+		// Amsterdam leaves summer time on 25 October 2026.
+		const now = parseInstant("2026-10-27T10:00:00Z");
+		const summary = summarizeDashboard(
+			[aRun({ createdAt: parseInstant("2026-10-25T22:30:00Z") })],
+			{ now, timeZone: "Europe/Amsterdam", scope: project() },
+		);
+		const { totals } = daysOf(summary, 7);
+		expect(totals.perNight.map((day) => iso(day.night)).slice(-3)).toEqual([
+			"2026-10-24T22:00:00.000Z",
+			"2026-10-25T23:00:00.000Z",
+			"2026-10-26T23:00:00.000Z",
+		]);
+		// 23:30 on 25 October in Amsterdam: the day of 25 hours.
+		expect(totals.perNight.at(-3)?.runs).toBe(1);
 	});
 
 	test("give Flow health per range on a project, and none over all projects", () => {
 		const summary = summarize(
 			[
-				aRun({ flowName: "night", createdAt: TONIGHT + HOUR }),
-				aRun({ flowName: "night", createdAt: TONIGHT - 20 * NIGHT }),
+				aRun({ flowName: "night", createdAt: TODAY + HOUR }),
+				aRun({ flowName: "night", createdAt: TODAY - 20 * DAY }),
 			],
 			project(["night"]),
 		);
-		expect(nightsOf(summary, 7).flows?.rows[0]?.runs).toBe(1);
-		expect(nightsOf(summary, 30).flows?.rows[0]?.runs).toBe(2);
-		expect(nightsOf(summarize([], all({})), 7).flows).toBeNull();
+		expect(daysOf(summary, 7).flows?.rows[0]?.runs).toBe(1);
+		expect(daysOf(summary, 30).flows?.rows[0]?.runs).toBe(2);
+		expect(daysOf(summarize([], all({})), 7).flows).toBeNull();
 	});
 });
 
-describe("Gates over a night range", () => {
+describe("Gates over a range of days", () => {
 	test("tell answered, not answered and waiting Gates apart, and how fast you answered", () => {
-		const range = nightsOf(
+		const range = daysOf(
 			summarize([
 				aRun({
 					status: "finished",
@@ -705,13 +743,13 @@ describe("Gates over a night range", () => {
 });
 
 describe("the project dashboard", () => {
-	test("shows the latest night with runs, its newest runs first", () => {
+	test("shows the latest day with runs, its newest runs first", () => {
 		const summary = summarize([
-			aRun({ id: "old", createdAt: TONIGHT - NIGHT, costUsd: 9 }),
-			aRun({ id: "late", createdAt: TONIGHT + HOUR, costUsd: 1 }),
-			aRun({ id: "later", createdAt: TONIGHT + 2 * HOUR, costUsd: 2 }),
+			aRun({ id: "old", createdAt: TODAY - DAY, costUsd: 9 }),
+			aRun({ id: "late", createdAt: TODAY + HOUR, costUsd: 1 }),
+			aRun({ id: "later", createdAt: TODAY + 2 * HOUR, costUsd: 2 }),
 		]);
-		expect(summary.lastNight?.night).toBe(TONIGHT);
+		expect(summary.lastNight?.night).toBe(TODAY);
 		expect(summary.lastNight?.runs).toBe(2);
 		expect(summary.lastNight?.cost.costUsd).toBe(3);
 		expect(summary.lastNight?.latest.map((run) => run.id)).toEqual([
@@ -783,20 +821,20 @@ describe("the project dashboard", () => {
 		expect(summary.flowHealth?.count).toBe(3);
 	});
 
-	test("gives each flow its last ten runs, newest first, of any night", () => {
+	test("gives each flow its last ten runs, newest first, of any day", () => {
 		const summary = summarize(
 			Array.from({ length: 12 }, (_, index) =>
 				aRun({
 					id: `r${index}`,
 					flowName: "night",
 					status: index % 2 === 0 ? "finished" : "failed",
-					// One a night, the newest first; most older than 7 nights.
-					createdAt: NOW - HOUR - index * NIGHT,
+					// One a day, the newest first; most older than 7 days.
+					createdAt: NOW - HOUR - index * DAY,
 				}),
 			),
 			project(["night"]),
 		);
-		const row = nightsOf(summary, 7).flows?.rows[0];
+		const row = daysOf(summary, 7).flows?.rows[0];
 		expect(row?.lastRuns.map((run) => run.runId)).toEqual(
 			Array.from({ length: 10 }, (_, index) => `r${index}`),
 		);
@@ -879,7 +917,7 @@ describe("one flow in detail", () => {
 	});
 
 	test("list the failing flows once each, the ones that still fail first", () => {
-		const range = nightsOf(
+		const range = daysOf(
 			summarize([
 				aRun({
 					flowName: "night",

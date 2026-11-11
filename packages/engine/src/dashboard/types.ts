@@ -3,12 +3,17 @@ import type { RunStatus } from "../run-status";
 
 /**
  * The dashboard's numbers, computed from the runs on the server: the stat
- * cards and their details, what the night produced, what comes next, and
- * the health of each flow. Each range a toggle offers is computed, so a
- * toggle needs no new request.
+ * cards and their details, what the latest day produced, what comes next,
+ * and the health of each flow. Each range a toggle offers is computed, so
+ * a toggle needs no new request.
+ *
+ * A day runs from midnight to midnight on the reader's clock. The wire
+ * keys still say night (`nights`, `perNight`, `night`, `lastNight`,
+ * `healthNights`, `nightsWithRuns`), and so do the types named after
+ * them: other phone and Host builds read those keys.
  */
 
-/** The night ranges the details offer: 7, 30 or 90 nights. */
+/** The day ranges the details offer: 7, 30 or 90 days. */
 export { NIGHT_RANGES, type NightRange };
 
 /** The hour ranges of the activity details: a day, two, a week. */
@@ -62,7 +67,10 @@ export type TopRows<T> = { rows: T[]; count: number };
 /** How many runs have one status. */
 export type StatusCount = { status: RunStatus; count: number };
 
-/** One night and a count per key: a status, a Gate state, a spend group. */
+/**
+ * One day and a count per key: a status, a Gate state, a spend group.
+ * `night` is the start of the day.
+ */
 export type NightCounts = { night: number; counts: Record<string, number> };
 
 /** One hour of the stat cards' small charts, the last 24 hours. */
@@ -163,14 +171,15 @@ export type SpendRange = {
 	tokens: number;
 	/** Runs started in the range. */
 	runs: number;
+	/** The days in the range with a run. */
 	nightsWithRuns: number;
 	/** Runs with a step that did not report its cost. */
 	unknown: number;
 	/** The groups ranked by spend: the top four, then the rest as one. */
 	groups: SpendGroup[];
-	/** Spend per night per group key, oldest first. */
+	/** Spend per day per group key, oldest first. */
 	perNight: NightCounts[];
-	/** Tokens per night per group key, the same nights and keys as `perNight`. */
+	/** Tokens per day per group key, the same days and keys as `perNight`. */
 	tokensPerNight: NightCounts[];
 	/** The runs that cost the most, the dearest first. */
 	priciest: DashboardRun[];
@@ -189,7 +198,7 @@ export type FailedRun = DashboardRun & {
 
 /**
  * The failures of one flow in a range: one row per flow, not per run, so
- * a flow that fails each night shows once.
+ * a flow that fails each day shows once.
  */
 export type FailingFlow = {
 	/** The project and the flow: `<projectId>/<flow>`. */
@@ -224,10 +233,11 @@ export type RunsRange = {
 	/** Of them, the ones that finished or failed. */
 	ended: number;
 	finished: number;
+	/** The days in the range with a run. */
 	nightsWithRuns: number;
 	/** How many runs have each status: live first, without the empty ones. */
 	statuses: StatusCount[];
-	/** Runs per night per status, oldest first. */
+	/** Runs per day per status, oldest first. */
 	perNight: NightCounts[];
 	/** The most runs first. */
 	groups: TopRows<RunsGroup>;
@@ -283,7 +293,7 @@ export type GatesRange = {
 	answerTime: Spread | null;
 	/** The states that occur, in the order the chart stacks them. */
 	states: GateState[];
-	/** Gates asked per night per state, oldest first. */
+	/** Gates asked per day per state, oldest first. */
 	perNight: NightCounts[];
 	/** The most asked first. */
 	groups: TopRows<GatesGroup>;
@@ -291,8 +301,9 @@ export type GatesRange = {
 	latest: AskedGate[];
 };
 
-/** The headline numbers of one night: runs, how they ended, spend, Gates. */
+/** The headline numbers of one day: runs, how they ended, spend, Gates. */
 export type NightTotals = {
+	/** The start of the day. */
 	night: number;
 	runs: number;
 	/** Runs that finished or failed. */
@@ -306,31 +317,32 @@ export type NightTotals = {
 	gates: number;
 };
 
-/** The headline numbers of a period, and per night, oldest first. */
+/** The headline numbers of a period, and per day, oldest first. */
 export type PeriodTotals = Omit<NightTotals, "night"> & {
 	perNight: NightTotals[];
 };
 
-/** The details over the last `nights` nights. */
+/** The details over the last `nights` days, today included. */
 export type NightsRange = {
+	/** How many days. */
 	nights: NightRange;
 	spend: SpendRange;
 	runs: RunsRange;
 	gates: GatesRange;
-	/** The headline numbers over these nights. */
+	/** The headline numbers over these days. */
 	totals: PeriodTotals;
 	/**
-	 * The same numbers over as many nights just before: what every number
+	 * The same numbers over as many days just before: what every number
 	 * compares with.
 	 */
 	before: PeriodTotals;
-	/** Flow health over these nights, on a project's dashboard. */
+	/** Flow health over these days, on a project's dashboard. */
 	flows: TopRows<FlowHealthRow> | null;
 };
 
-/** What the latest night with runs produced. */
+/** What the latest day with runs produced. */
 export type NightOutput = {
-	/** The noon the night starts. */
+	/** The start of the day: its midnight on the reader's clock. */
 	night: number;
 	runs: number;
 	cost: KnownCost;
@@ -361,13 +373,13 @@ export type LastFlowRun = {
 /** How many of a flow's last runs a Flow health row carries. */
 export const LAST_FLOW_RUNS = 10;
 
-/** One row of Flow health: a flow over the last nights. */
+/** One row of Flow health: a flow over the last days. */
 export type FlowHealthRow = {
 	name: string;
 	last: LastFlowRun | null;
-	/** Its last runs, at most {@link LAST_FLOW_RUNS}, newest first, of any night. */
+	/** Its last runs, at most {@link LAST_FLOW_RUNS}, newest first, of any day. */
 	lastRuns: LastFlowRun[];
-	/** Runs in the last nights, on its own and as a subflow. */
+	/** Runs in the last days, on its own and as a subflow. */
 	runs: number;
 	finished: number;
 	ended: number;
@@ -386,12 +398,12 @@ export type FlowHealthRow = {
 	unknownCost: number;
 	/** Finished runs that asked no agent or model: not in `cost`. */
 	freeRuns: number;
-	/** Its runs' scores in the last nights, the most scored first. Empty when none scored. Older Hosts send none. */
+	/** Its runs' scores in the last days, the most scored first. Empty when none scored. Older Hosts send none. */
 	scores?: FlowScoreRow[];
 };
 
 /**
- * One score name of a flow's runs over some nights: what its Command
+ * One score name of a flow's runs over some days: what its Command
  * steps wrote, and what became of its pull requests. A Gate's answer is
  * left out: the Gates have their own numbers. Only the flow's own runs
  * count, not its runs as a subflow.
@@ -419,14 +431,15 @@ export type DashboardSummary = {
 	/** The runs at work, waiting or asleep: the oldest first. */
 	open: TopRows<DashboardRun> & { running: number; nextWakeAt: number | null };
 	activity: ActivityRange[];
+	/** The details per day range. */
 	nights: NightsRange[];
 	/**
-	 * The nights Flow health covers (`flowHealth`). It is one of the ranges
+	 * The days Flow health covers (`flowHealth`). It is one of the ranges
 	 * of `nights`: a screen that shows how the projects did over the same
 	 * window picks that range.
 	 */
 	healthNights: NightRange;
-	/** Null without runs. */
+	/** The latest day with runs. Null without runs. */
 	lastNight: NightOutput | null;
 	/** The soonest wake-ups and stop times. */
 	upNext: UpcomingRun[];
@@ -480,7 +493,7 @@ export type FlowWarning = {
 	last: { runId: string; at: number };
 };
 
-/** One flow over the last `nights` nights. */
+/** One flow over the last `nights` days, today included. */
 export type FlowRange = {
 	nights: NightRange;
 	runs: number;
@@ -507,13 +520,13 @@ export type FlowRange = {
 	dearest: { costUsd: number; startedAt: number; tokens: number | null } | null;
 	warnings: number;
 	statuses: StatusCount[];
-	/** Runs per night per status, oldest first. */
+	/** Runs per day per status, oldest first. */
 	perNight: NightCounts[];
 	/** Every ended run, oldest first: what it cost. */
 	endedRuns: {
 		runId: string;
 		startedAt: number;
-		/** The night it started in. */
+		/** The start of the day it started in. */
 		night: number;
 		costUsd: number;
 		/** Tokens it used. Null when it did not report any. */
