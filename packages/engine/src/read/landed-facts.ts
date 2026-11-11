@@ -76,6 +76,8 @@ const SUMMARY_CHANGES: ReadonlySet<EngineEventType> = new Set([
 	"StopRequested",
 	"StopAfterStepRequested",
 	"StopAfterStepCancelled",
+	// A run needed you: what its summary counts.
+	"RunTakenOver",
 ]);
 
 function changeOf(type: EngineEventType): LandedChange {

@@ -190,7 +190,7 @@ function faultyThreads(fault: Fault | null) {
 			throw new Error("the daemon died");
 		}
 		if (!state.answering) {
-			await state.runner?.take(state.runId, { kind: "stop" });
+			await state.runner?.take(state.runId, { kind: "stop", by: "person" });
 		}
 	}
 	const open: typeof openThread = (row, deps) => {

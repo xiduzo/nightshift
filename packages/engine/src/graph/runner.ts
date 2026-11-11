@@ -11,6 +11,7 @@ import {
 	type RunRow,
 	type RunState,
 	runsArriving,
+	type StoppedBy,
 } from "../log";
 import { deriveSteps, firstDeadline } from "../read";
 import {
@@ -176,8 +177,8 @@ export type Intent =
 			prompt?: string;
 			fresh?: boolean;
 	  }
-	/** Stops the run now, whatever its drive does. */
-	| { kind: "stop" }
+	/** Stops the run now, whatever its drive does: a person, or the daemon (an Offer ended). */
+	| { kind: "stop"; by: StoppedBy }
 	/** Ends the running step when it ran past its time budget or idle limit by `graceMs`. */
 	| { kind: "overdue"; graceMs: number }
 	/**
@@ -945,7 +946,11 @@ export function createRunner(deps: RunnerDeps) {
 			drive(row, inputOf({ kind: "continue" }));
 			throw new RestartTooLate(status);
 		}
-		await log.append({ type: "StopRequested", runId, payload: {} });
+		await log.append({
+			type: "StopRequested",
+			runId,
+			payload: { by: intent.by, restart: true },
+		});
 		await halt(row, { kind: "stopped" });
 		await reenter(row, {
 			kind: "resume",
@@ -964,7 +969,11 @@ export function createRunner(deps: RunnerDeps) {
 	 * closed the same way: nothing else can end it. Waits on no drive and no
 	 * timer: a harness that hangs cannot hold a stop.
 	 */
-	async function stopTurn(row: RunRow, turn: TurnState): Promise<Taken> {
+	async function stopTurn(
+		row: RunRow,
+		intent: Extract<Intent, { kind: "stop" }>,
+		turn: TurnState,
+	): Promise<Taken> {
 		const runId = row.id;
 		const walk = walkOf(runId);
 		if (walk) {
@@ -973,7 +982,11 @@ export function createRunner(deps: RunnerDeps) {
 		}
 		const status = (await log.state(runId)).status;
 		if (!walk && !isGoing(status)) return UNCHANGED;
-		await log.append({ type: "StopRequested", runId, payload: {} });
+		await log.append({
+			type: "StopRequested",
+			runId,
+			payload: { by: intent.by },
+		});
 		// A drive may have ended the run before the stop took it.
 		if (!isGoing(status)) return UNCHANGED;
 		await halt(row, { kind: "stopped" });
@@ -1059,7 +1072,11 @@ export function createRunner(deps: RunnerDeps) {
 						row,
 						runState,
 						intent,
-						{ early: true, ...(prompt !== undefined ? { prompt } : {}) },
+						{
+							early: true,
+							by: request.by,
+							...(prompt !== undefined ? { prompt } : {}),
+						},
 						options,
 					);
 				}
@@ -1077,7 +1094,7 @@ export function createRunner(deps: RunnerDeps) {
 			case "restart":
 				return restartTurn(row, intent, turn);
 			case "stop":
-				return stopTurn(row, turn);
+				return stopTurn(row, intent, turn);
 			case "overdue":
 				return overdueTurn(row, runState, intent.graceMs, turn);
 		}

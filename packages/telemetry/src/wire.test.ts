@@ -421,6 +421,8 @@ describe("the export to monitoring", () => {
 			[ATTR.deviceId]: DEVICE,
 			[ATTR.status]: "finished",
 			[ATTR.trigger]: "schedule",
+			// Nobody answered its Gate: the run ran on its own.
+			[ATTR.neededYou]: false,
 		});
 		expect(run.resource.attributes).toMatchObject({
 			[ATTR.serviceName]: SERVICE_NAME,
@@ -473,8 +475,12 @@ describe("the export to monitoring", () => {
 		expect(
 			points
 				.get(METRIC.runOutcome.name)
-				?.map((p) => [p.attributes[ATTR.status], p.value]),
-		).toEqual([["finished", 1]]);
+				?.map((p) => [
+					p.attributes[ATTR.status],
+					p.attributes[ATTR.neededYou],
+					p.value,
+				]),
+		).toEqual([["finished", false, 1]]);
 		const runDuration = points.get(METRIC.workflowDuration.name)?.[0]
 			?.value as Histogram;
 		expect(runDuration.count).toBe(1);
@@ -520,6 +526,39 @@ describe("the export to monitoring", () => {
 		expect(sum(cost, { [ATTR.costBasis]: "billed" })).toBe(0);
 		expect(sum(cost, { [ATTR.costBasis]: "estimated" })).toBeCloseTo(0.45);
 		expect(sum(cost, { [ATTR.agent]: "codex" })).toBeCloseTo(0.4);
+	});
+
+	test("a run a person stepped in on says so on its span and its outcome", async () => {
+		const run = runEvents("run-1")
+			.at(T + 1_000)
+			.runStarted({ projectId: "p1", flowName: "triage" })
+			.at(T + 1_100)
+			.stepStarted("s-gate", "ship", 1, {
+				nodeType: "decision",
+				deviceId: DEVICE,
+			})
+			.gateOpened("s-gate")
+			.at(T + 2_000)
+			.push(
+				"Scored",
+				{ score: "gate_decision", value: 1, label: "approve", by: "person" },
+				{ stepId: "s-gate" },
+			)
+			.stepEnded("s-gate", "approve")
+			.at(T + 2_100)
+			.ended("finished");
+		const h = await setup({}, run);
+		h.landRun();
+		await h.done();
+		const span = byName(h.spans(), "invoke_workflow triage");
+		expect(span.attributes[ATTR.neededYou]).toBe(true);
+		expect(
+			h
+				.points()
+				.get(METRIC.runOutcome.name)
+				?.map((p) => [p.attributes[ATTR.neededYou], p.value]),
+		).toEqual([[true, 1]]);
+		assertConforms(exported(h.spans(), h.resources()));
 	});
 
 	test("a Gate's answer counts as a score, with who chose", async () => {

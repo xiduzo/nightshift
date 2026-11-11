@@ -1,4 +1,9 @@
-import { NIGHT_RANGES, type NightRange, type RunSummary } from "../read";
+import {
+	type NeededYouReason,
+	NIGHT_RANGES,
+	type NightRange,
+	type RunSummary,
+} from "../read";
 import type { RunStatus } from "../run-status";
 
 /**
@@ -301,7 +306,51 @@ export type GatesRange = {
 	latest: AskedGate[];
 };
 
-/** The headline numbers of one day: runs, how they ended, spend, Gates. */
+/** Why runs needed you: one reason, and how many runs had it. */
+export type NeededReasonCount = { reason: NeededYouReason; runs: number };
+
+/** A run that needed you, in a list. */
+export type NeededRun = {
+	runId: string;
+	runTitle: string;
+	/** Its flow, or its project over all projects. */
+	group: string;
+	createdAt: number;
+	/** Why: each reason once, in the order they first happened. */
+	reasons: NeededYouReason[];
+};
+
+/** The runs of one flow or project that needed you in a range. */
+export type NeededGroup = {
+	label: string;
+	/** Runs started in the range. */
+	runs: number;
+	/** Of them, the runs a person stepped in on. */
+	needed: number;
+	/** Why, the most runs first. */
+	reasons: NeededReasonCount[];
+};
+
+/**
+ * How often the runs started in a range needed you, and why: a person
+ * answered a Gate or an Ask, resumed, stopped, or took a run over.
+ */
+export type NeededRange = {
+	/** Runs started in the range. */
+	runs: number;
+	/** Of them, the runs a person stepped in on. */
+	needed: number;
+	/** Why, the most runs first. A run with two reasons counts under both. */
+	reasons: NeededReasonCount[];
+	/** Per day: the runs that needed you (`needed`) and the runs that did not (`alone`), oldest first. */
+	perNight: NightCounts[];
+	/** The groups with a run that needed you, the most first. */
+	groups: TopRows<NeededGroup>;
+	/** The newest runs that needed you first. */
+	latest: NeededRun[];
+};
+
+/** The headline numbers of one day: runs, how they ended, spend, Gates, Needed you. */
 export type NightTotals = {
 	/** The start of the day. */
 	night: number;
@@ -315,6 +364,12 @@ export type NightTotals = {
 	tokens: number;
 	/** Gates the runs asked. */
 	gates: number;
+	/**
+	 * The runs that started this day and needed you: a person answered a
+	 * Gate or an Ask, resumed, stopped, or took one over. Older Hosts send
+	 * none.
+	 */
+	neededYou?: number;
 };
 
 /** The headline numbers of a period, and per day, oldest first. */
@@ -329,6 +384,8 @@ export type NightsRange = {
 	spend: SpendRange;
 	runs: RunsRange;
 	gates: GatesRange;
+	/** How often the runs needed you, and why. Older Hosts send none. */
+	needed?: NeededRange;
 	/** The headline numbers over these days. */
 	totals: PeriodTotals;
 	/**
@@ -402,6 +459,21 @@ export type FlowHealthRow = {
 	scores?: FlowScoreRow[];
 	/** What people answered to "Was this run useful?" in the last days. Older Hosts send none. */
 	useful?: FlowUseful;
+	/** How often its runs needed you in the last days, and why. Older Hosts send none. */
+	neededYou?: FlowNeededYou;
+};
+
+/**
+ * How often a flow's runs needed you over some days, and why. Only its
+ * own runs count: a run as a subflow counts in the run that called it.
+ */
+export type FlowNeededYou = {
+	/** Its own runs in the days. */
+	runs: number;
+	/** Of them, the runs a person stepped in on. */
+	needed: number;
+	/** Why, the most runs first. */
+	reasons: NeededReasonCount[];
 };
 
 /**
@@ -561,6 +633,8 @@ export type FlowRange = {
 	scores?: FlowScoreRow[];
 	/** What people answered to "Was this run useful?". Older Hosts send none. */
 	useful?: FlowUseful;
+	/** How often its runs needed you, and why. Older Hosts send none. */
+	neededYou?: FlowNeededYou;
 	/** The newest first. */
 	latest: FlowRun[];
 };

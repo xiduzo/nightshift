@@ -41,6 +41,7 @@ export type {
 	StepBudget,
 	StepOutcome,
 	StepOutputs,
+	StoppedBy,
 	WaitReason,
 } from "./events";
 export { groupByRun, parseEventRow, runDueAt, scopeKey } from "./events";
@@ -98,12 +99,14 @@ export {
 	type DerivedItem,
 	type DerivedSession,
 	type DerivedStep,
+	type EarlyWake,
 	foldRun,
 	type KnowledgeUseFact,
 	type OpenGateFact,
 	type RunState,
 	type SleepFact,
 	type StepSleep,
+	type StopFact,
 	type VariableChange,
 	visitKey,
 } from "./run-state";

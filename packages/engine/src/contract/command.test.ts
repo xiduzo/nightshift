@@ -40,6 +40,7 @@ const requests: {
 	resume: { kind: "resume", prompt: "Go on." },
 	restart: { kind: "restart", stepId: "step-2", prompt: "Again." },
 	rerun: { kind: "rerun", nodeId: "build", fresh: true },
+	"take-over": { kind: "take-over" },
 };
 
 const actions = Object.keys(requests) as RunActionKind[];
@@ -72,6 +73,8 @@ describe("the Command", () => {
 		}
 		expect(commandOf(requests.useful)).not.toBeNull();
 		expect(commandOf(requests["release-lease"])).not.toBeNull();
+		// A take-over is logged where the run is walked: it never travels.
+		expect(commandOf(requests["take-over"])).toBeNull();
 	});
 
 	test("is the request on the wire, and the request again at the Walker", () => {
@@ -99,6 +102,7 @@ describe("the Command", () => {
 		}
 		expect(permissionOf("answer")).toEqual({ gate: ["resolve"] });
 		expect(permissionOf("restart")).toEqual({ run: ["stop", "resume"] });
+		expect(permissionOf("take-over")).toEqual({ run: ["resume"] });
 	});
 
 	test("parses on the wire with what its carrier adds", () => {

@@ -73,6 +73,7 @@ function trace(): RunTrace {
 				status: "finished",
 				reason: `see ${SECRET_EMAIL} at ${SECRET_PATH}`,
 				first: true,
+				neededYou: false,
 			},
 		],
 		steps: [
@@ -113,6 +114,7 @@ function trace(): RunTrace {
 				],
 			},
 		],
+		neededYou: [],
 	};
 }
 
@@ -198,6 +200,41 @@ test("a run that ends guard.turns does not emit _OTHER for that reason", async (
 		const body = JSON.stringify((await usage.outbox()).waiting);
 		expect(body).toContain("guard.turns");
 		expect(body).not.toContain("_OTHER");
+		await usage.stop();
+	} finally {
+		await close();
+	}
+});
+
+test("a run's end says whether a person stepped in", async () => {
+	const { db, close } = await openDb();
+	try {
+		const usage = createUsage({
+			db,
+			settings: switches(true, true),
+			policy: async () => true,
+		});
+		const ended = (seq: number): LandedFact => ({
+			kind: "run-ended",
+			spaceId: "space-1",
+			runId: SECRET_RUN,
+			seq,
+			changes: "summary",
+			status: "finished",
+		});
+		await usage.take([ended(1)], async () => trace());
+		const needed = trace();
+		const end = needed.ends[0];
+		if (!end) throw new Error("missing end");
+		needed.ends[0] = { ...end, neededYou: true };
+		await usage.take([ended(1)], async () => needed);
+		await usage.settled();
+		const name = USAGE_EVENT.runEnded;
+		const sent = (await usage.outbox()).waiting as Record<string, unknown>[];
+		expect(sent.map((event) => event[attr(name, "run.needed_you")])).toEqual([
+			false,
+			true,
+		]);
 		await usage.stop();
 	} finally {
 		await close();

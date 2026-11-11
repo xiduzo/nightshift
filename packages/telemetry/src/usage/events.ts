@@ -80,6 +80,7 @@ export function runEndedEvent(
 		"run.cost_usd": runCost(trace),
 		"run.duration": secondsOf(end.at - end.openedAt),
 		"run.end_reason": endReason(end),
+		"run.needed_you": end.neededYou,
 		"run.node_kinds": nodeKinds(trace),
 		"run.status": status,
 		"run.trigger": listed(RUN, "run.trigger", trace.trigger, "_OTHER"),

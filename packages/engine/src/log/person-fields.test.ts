@@ -146,9 +146,10 @@ const samples: { [T in EngineEventType]: EnginePayloads[T] } = {
 	},
 	ServiceStopped: { nodeId: "stack", scope: null, why: "scope" },
 	WaitEnded: { early: false },
-	StopRequested: {},
+	StopRequested: { by: "person" },
 	StopAfterStepRequested: {},
 	StopAfterStepCancelled: {},
+	RunTakenOver: { by: LOCAL, harness: "claude-code" },
 	RunEnded: { status: "finished", reason: null },
 	RunWarned: { kind: "cost-unknown", message: "Unknown cost" },
 	PullRequestOpened: { url: "https://github.com/acme/app/pull/1" },
@@ -256,6 +257,7 @@ describe("person fields", () => {
 			"OfferMade",
 			"OfferWithdrawn",
 			"WalkerMoved",
+			"RunTakenOver",
 		]);
 		expect([...fields.keys()].sort()).toEqual([
 			"by",

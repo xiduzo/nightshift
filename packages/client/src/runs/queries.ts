@@ -156,6 +156,12 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 			}),
 		/** Records whether you found this run useful. */
 		useful: () => orpc.runs.useful.mutationOptions(),
+		/**
+		 * Records that you took the run over by hand: you copied or shared
+		 * its take-over command. Call it without waiting and ignore an
+		 * error: an older Host does not know it.
+		 */
+		takeOver: () => orpc.runs.takeOver.mutationOptions(),
 		/** The person's own Devices the run can move to now, from the run's own Space ("Move to…"). */
 		moveTargets: (runId: string) =>
 			orpc.runs.moveTargets.queryOptions({ input: { runId } }),

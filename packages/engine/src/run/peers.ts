@@ -174,7 +174,10 @@ export type PeerRuns = WalkFiles & {
 	stepStamp(step: FeedStep): Promise<CopyStamp | null>;
 	/** This computer walks a run another Device moved here, from now on. */
 	takeOver(runId: string): Promise<void>;
-	/** Stops a run this computer walks: its running step ends as stopped. */
+	/**
+	 * Stops a run this computer walks: its running step ends as stopped.
+	 * Night Shift stops it (an Offer ended), not a person.
+	 */
 	stop(runId: string): Promise<void>;
 };
 

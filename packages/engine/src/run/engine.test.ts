@@ -1346,6 +1346,8 @@ describe("restart a step", () => {
 				action: "restart",
 			},
 		]);
+		// The stop of a restart is its resume: the run needed you once.
+		expect(detail.neededYou?.map((act) => act.reason)).toEqual(["resumed"]);
 		expect(detail.costUsd).toBeCloseTo(0.25);
 	});
 

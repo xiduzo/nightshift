@@ -116,7 +116,7 @@ describe("landedFacts", () => {
 		).toMatchObject([{ kind: "other", changes: "summary" }]);
 	});
 
-	test("a list of runs changes when a run starts, sleeps, wakes, moves, stops, ends, or a step starts or ends", () => {
+	test("a list of runs changes when a run starts, sleeps, wakes, moves, stops, ends, a step starts or ends, or a person takes it over", () => {
 		const types = [
 			"RunStarted",
 			"RunResumed",
@@ -132,6 +132,7 @@ describe("landedFacts", () => {
 			"StopRequested",
 			"StopAfterStepRequested",
 			"StopAfterStepCancelled",
+			"RunTakenOver",
 		] as const;
 		const facts = landedFacts(
 			types.map((type) =>

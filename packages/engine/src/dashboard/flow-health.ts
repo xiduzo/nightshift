@@ -1,7 +1,8 @@
 import type { RunScore } from "../log";
-import type { RunSummary } from "../read";
+import type { NeededYouReason, RunSummary } from "../read";
 import { finishedShare, usefulAnswer } from "../run-status";
 import { dayStart, lastDays } from "./clock";
+import { countReasons, neededReasons } from "./needed";
 import {
 	countStatuses,
 	hasEnded,
@@ -13,6 +14,7 @@ import {
 import {
 	type FlowHealthDetail,
 	type FlowHealthRow,
+	type FlowNeededYou,
 	type FlowRange,
 	type FlowRun,
 	type FlowScoreRow,
@@ -32,11 +34,13 @@ import {
 /** The days a Flow health row covers. */
 export const FLOW_HEALTH_DAYS: NightRange = 30;
 
-/** A run of a flow with its warnings, its scores and the start of the day it started in. */
+/** A run of a flow with its warnings, its scores, why it needed you and the start of the day it started in. */
 type PlacedFlowRun = Omit<FlowRun, "warnings"> & {
 	warnings: RunSummary["warnings"];
 	/** Its scores. A subflow run has none: they are in the run that called it. */
 	scores: RunScore[];
+	/** Why it needed you. A subflow run has none: they are in the run that called it. */
+	needed: NeededYouReason[];
 	day: number;
 };
 
@@ -63,6 +67,7 @@ function runsOf(
 						reason: run.reason,
 						warnings: run.warnings,
 						scores: run.metrics?.scores ?? [],
+						needed: neededReasons(run),
 						day: dayStart(run.createdAt, timeZone),
 					},
 				]
@@ -83,6 +88,7 @@ function runsOf(
 				reason: null,
 				warnings: [],
 				scores: [],
+				needed: [],
 				day: dayStart(subflow.startedAt, timeZone),
 			})),
 	]);
@@ -118,6 +124,7 @@ function finishedCostOf(finished: readonly PlacedFlowRun[]): {
 function toFlowRun({
 	day: _day,
 	scores: _scores,
+	needed: _needed,
 	...run
 }: PlacedFlowRun): FlowRun {
 	return { ...run, warnings: run.warnings.length };
@@ -187,8 +194,23 @@ function usefulOf(runs: readonly PlacedFlowRun[]): FlowUseful {
 }
 
 /**
+ * How often the flow's own runs needed you, and why. A run as a subflow
+ * counts in the run that called it.
+ */
+function neededYouOf(runs: readonly PlacedFlowRun[]): FlowNeededYou {
+	const own = runs.filter((run) => run.calledBy === null);
+	const needed = own.filter((run) => run.needed.length > 0);
+	return {
+		runs: own.length,
+		needed: needed.length,
+		reasons: countReasons(needed.map((run) => run.needed)),
+	};
+}
+
+/**
  * Each flow over the last `days` days: its last runs, how often it
- * finished, what a finished run costs, and what a useful result costs. A
+ * finished, what a finished run costs, what a useful result costs, and
+ * how often its runs needed you. A
  * stopped run did not finish, so it counts against it. A flow a Subflow
  * node ran counts too, inside the run that called it. The busiest flows
  * first, then the one that ran last.
@@ -239,6 +261,7 @@ export function flowHealthRows(
 			},
 			scores: scoresOf(recent),
 			useful: usefulOf(recent),
+			neededYou: neededYouOf(recent),
 		};
 	});
 	return topRows(
@@ -375,6 +398,7 @@ function flowRange(
 		warningRows: topRows(warningsOf(inRange)),
 		scores: scoresOf(inRange),
 		useful: usefulOf(inRange),
+		neededYou: neededYouOf(inRange),
 		latest: inRange.slice(-OVERVIEW_ROWS).reverse().map(toFlowRun),
 	};
 }

@@ -133,7 +133,7 @@ describe("take: one Turn at a time per run", () => {
 		const { h, runner, sessions } = await setup(worker());
 		const prepared = latch();
 		const starting = start(runner, h.runId, prepared.opened);
-		const stopping = runner.take(h.runId, { kind: "stop" });
+		const stopping = runner.take(h.runId, { kind: "stop", by: "person" });
 		await Bun.sleep(20);
 		expect(runner.isActive(h.runId)).toBe(true);
 		prepared.open();
@@ -149,28 +149,35 @@ describe("take: one Turn at a time per run", () => {
 		const { h, runner, sessions } = await setup(worker());
 		await start(runner, h.runId);
 		await waitFor(() => sessions[0]);
-		await runner.take(h.runId, { kind: "stop" });
+		await runner.take(h.runId, { kind: "stop", by: "person" });
 		const [resumed, stopped] = await Promise.all([
 			runner.take(h.runId, { kind: "resume", by: "person" }),
-			runner.take(h.runId, { kind: "stop" }),
+			runner.take(h.runId, { kind: "stop", by: "person" }),
 		]);
 		expect(resumed).toEqual({ kind: "driving" });
 		expect(stopped).toEqual({ kind: "halted" });
 		expect(await statusOf(h)).toBe("stopped");
+		// Each stop says who made it.
 		expect(
-			(await h.events()).filter((e) => e.type === "StopRequested"),
-		).toHaveLength(2);
+			(await h.events())
+				.filter((e) => e.type === "StopRequested")
+				.map((e) => e.payload),
+		).toEqual([{ by: "person" }, { by: "person" }]);
 	});
 
 	test("a take inside a Turn of the same run throws; one of another run goes (I11)", async () => {
 		const { h, runner } = await setup(worker());
 		const other = await another(worker());
 		await expect(
-			runner.hold(h.runId, () => runner.take(h.runId, { kind: "stop" })),
+			runner.hold(h.runId, () =>
+				runner.take(h.runId, { kind: "stop", by: "person" }),
+			),
 		).rejects.toThrow("cannot wait for another Turn of the same run");
 		// The other run started, and no drive holds it: the stop ends it.
 		await expect(
-			runner.hold(h.runId, () => runner.take(other, { kind: "stop" })),
+			runner.hold(h.runId, () =>
+				runner.take(other, { kind: "stop", by: "person" }),
+			),
 		).resolves.toEqual({ kind: "halted" });
 	});
 
@@ -180,9 +187,9 @@ describe("take: one Turn at a time per run", () => {
 			.update(run)
 			.set({ walkerId: "another-device" })
 			.where(eq(run.id, h.runId));
-		await expect(runner.take(h.runId, { kind: "stop" })).rejects.toThrow(
-			WALKED_ELSEWHERE,
-		);
+		await expect(
+			runner.take(h.runId, { kind: "stop", by: "person" }),
+		).rejects.toThrow(WALKED_ELSEWHERE);
 		await expect(runner.hold(h.runId, async () => {})).rejects.toThrow(
 			WALKED_ELSEWHERE,
 		);
@@ -217,12 +224,12 @@ describe("take: a stop", () => {
 		});
 		expect(await statusOf(h)).toBe("running");
 
-		expect(await runner.take(h.runId, { kind: "stop" })).toEqual({
+		expect(await runner.take(h.runId, { kind: "stop", by: "person" })).toEqual({
 			kind: "halted",
 		});
 		expect(await statusOf(h)).toBe("stopped");
 		// A second stop has nothing left to end.
-		expect(await runner.take(h.runId, { kind: "stop" })).toEqual({
+		expect(await runner.take(h.runId, { kind: "stop", by: "person" })).toEqual({
 			kind: "unchanged",
 		});
 	});
@@ -247,7 +254,7 @@ describe("take: the run cap", () => {
 		await expect(runner.take(h.runId, answer)).rejects.toThrow("run cap");
 		expect(foldRun(await h.events()).gate?.stepId).toBe(stepId);
 
-		await runner.take(busy, { kind: "stop" });
+		await runner.take(busy, { kind: "stop", by: "person" });
 		expect(await runner.take(h.runId, answer)).toEqual({ kind: "driving" });
 		const gateStep = deriveSteps(foldRun(await h.events())).find(
 			(s) => s.id === stepId,
@@ -263,7 +270,7 @@ describe("take: the run cap", () => {
 		for (const runId of [first, second]) {
 			await start(runner, runId);
 			await waitFor(() => sessions.length > 0);
-			await runner.take(runId, { kind: "stop" });
+			await runner.take(runId, { kind: "stop", by: "person" });
 		}
 		await start(runner, h.runId);
 		const retried: string[] = [];
@@ -276,7 +283,7 @@ describe("take: the run cap", () => {
 				),
 			).toEqual({ kind: "queued" });
 		}
-		await runner.take(h.runId, { kind: "stop" });
+		await runner.take(h.runId, { kind: "stop", by: "person" });
 		expect(retried).toEqual([first, second]);
 	});
 
@@ -285,7 +292,7 @@ describe("take: the run cap", () => {
 		const queued = await another(worker());
 		await start(runner, queued);
 		await waitFor(() => sessions[0]);
-		await runner.take(queued, { kind: "stop" });
+		await runner.take(queued, { kind: "stop", by: "person" });
 		await start(runner, h.runId);
 		await waitFor(() => sessions[1]);
 		expect(
@@ -295,7 +302,7 @@ describe("take: the run cap", () => {
 				{ whenFull: "queue" },
 			),
 		).toEqual({ kind: "queued" });
-		await runner.take(h.runId, { kind: "stop" });
+		await runner.take(h.runId, { kind: "stop", by: "person" });
 		// The Turn holds the slot before it appends RunResumed (I5).
 		const resumed = async () =>
 			(await h.log.events(queued)).filter((e) => e.type === "RunResumed");
@@ -375,7 +382,7 @@ describe("take: a drive's time and a thread that cannot move", () => {
 		});
 		await start(runner, h.runId);
 		await waitFor(() => sessions[0]);
-		await runner.take(h.runId, { kind: "stop" });
+		await runner.take(h.runId, { kind: "stop", by: "person" });
 		const logged = spyOn(console, "error").mockImplementation(() => {});
 		await expect(
 			runner.take(h.runId, { kind: "rerun", by: "person", nodeId: "worker" }),
@@ -502,7 +509,7 @@ describe("a run keeps only the checkpoints a re-entry reads", () => {
 		});
 		expect(Object.keys(parked)).toHaveLength(2);
 
-		await runner.take(h.runId, { kind: "stop" });
+		await runner.take(h.runId, { kind: "stop", by: "person" });
 		const kept = await checkpoints(h.runId);
 		expect(kept[""]).toBe(1);
 		const bodies = Object.keys(kept).filter((ns) => ns !== "");
@@ -546,12 +553,12 @@ describe("release: the handover to a new engine (I7)", () => {
 			return "done";
 		});
 		await waitFor(() => held);
-		const queued = runner.take(h.runId, { kind: "stop" });
+		const queued = runner.take(h.runId, { kind: "stop", by: "person" });
 
 		const releasing = runner.release();
-		await expect(runner.take(h.runId, { kind: "stop" })).rejects.toThrow(
-			RELEASED,
-		);
+		await expect(
+			runner.take(h.runId, { kind: "stop", by: "person" }),
+		).rejects.toThrow(RELEASED);
 		await expect(runner.hold(h.runId, async () => {})).rejects.toThrow(
 			RELEASED,
 		);

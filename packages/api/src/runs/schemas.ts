@@ -1,6 +1,7 @@
 import {
 	type Artifact,
 	COMMAND_KINDS,
+	NEEDED_YOU_REASONS,
 	type OwnDevice,
 	type Placement,
 	RUN_END_REASONS,
@@ -107,6 +108,12 @@ const answeredBySchema = z
 	.nullable()
 	.default(null);
 
+/**
+ * Why a run needed you: a person answered a Gate or an Ask, resumed,
+ * stopped, or took the run over.
+ */
+export const neededYouReasonSchema = z.enum(NEEDED_YOU_REASONS);
+
 /** A time a step slept; `to` is null while it sleeps. Older Hosts send no sleeps. */
 const sleepSchema = z.object({ from: z.number(), to: z.number().nullable() });
 
@@ -202,6 +209,10 @@ export const runSummarySchema = exact<RunSummary>()(
 				answeredBy: answeredBySchema,
 			}),
 		),
+		/** Each time a person stepped in, oldest first. Older Hosts send none. */
+		neededYou: z
+			.array(z.object({ reason: neededYouReasonSchema, at: z.number() }))
+			.optional(),
 		sleeps: z.array(sleepSchema).optional(),
 		metrics: metricsSchema.optional(),
 	}),

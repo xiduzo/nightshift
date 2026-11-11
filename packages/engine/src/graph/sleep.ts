@@ -5,6 +5,7 @@ import type {
 	DerivedStep,
 	LeaseWait,
 	PolicyWaitReason,
+	ResumedBy,
 	RunBus,
 	RunLog,
 	RunState,
@@ -413,13 +414,16 @@ const MAX_TIMER_MS = 2 ** 31 - 1;
 
 /**
  * How a sleep ends: the timer, a person early (with a follow-up), or a
- * signal, with the webhook event that sent it as `data`.
+ * signal, with the webhook event that sent it as `data`. `by`: who ended
+ * it early without a signal, a person or the daemon (a Device came back,
+ * a lease went).
  */
 export type Wake = {
 	early: boolean;
 	prompt?: string;
 	signal?: string;
 	data?: JsonValue;
+	by?: ResumedBy;
 };
 
 /** What a wake does to a run, from its log and its thread (`planWake`). */
@@ -531,11 +535,14 @@ export async function recordWake(
 ): Promise<void> {
 	const { step } = plan;
 	const signal = how.signal !== undefined ? { signal: how.signal } : {};
+	// Who woke it counts only without a signal: the signal says what woke it.
+	const by =
+		how.early && how.signal === undefined && how.by ? { by: how.by } : {};
 	await deps.log.append({
 		type: "WaitEnded",
 		runId,
 		stepId: step.id,
-		payload: { early: how.early, ...signal },
+		payload: { early: how.early, ...signal, ...by },
 	});
 	const recorder = await deps.recorders.open(runId, step.id);
 	try {

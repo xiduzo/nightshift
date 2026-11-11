@@ -28,7 +28,9 @@ async function wakeSleepsFor(
 	);
 	for (const [runId, sleep] of sleeping) {
 		if (sleep?.reason !== reason) continue;
-		deps.runner.take(runId, { kind: "wake", early: true }).catch(() => {});
+		deps.runner
+			.take(runId, { kind: "wake", early: true, by: "daemon" })
+			.catch(() => {});
 	}
 }
 

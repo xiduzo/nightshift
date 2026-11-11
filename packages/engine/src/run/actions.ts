@@ -32,8 +32,13 @@ import {
 	type RunState,
 } from "../log";
 import type { PlacementPort } from "../placement";
-import { deriveSteps } from "../read";
-import { RunRefusal, refuseUnless, whyNot } from "../run-status";
+import { deriveSteps, lastHarnessSession } from "../read";
+import {
+	RunRefusal,
+	refuseUnless,
+	WALKED_ELSEWHERE,
+	whyNot,
+} from "../run-status";
 import type { UsageNotes } from "../usage";
 import type { RunsPort } from "./peers";
 import type { RunRelay } from "./relay";
@@ -41,7 +46,8 @@ import type { StartHolds } from "./start-holds";
 
 /**
  * What a person does to a run: stop it, answer its Gate, send its Signal,
- * move it, resume it, restart its step, or run it again from a node. One
+ * move it, resume it, restart its step, run it again from a node, or take
+ * it over by hand. One
  * entry, `act`, that takes the action in the person's words or as the
  * Command that carried it to this Walker (`contract/command.ts`, the one
  * home of the kinds). It reads the run's row once (its Space and its
@@ -256,6 +262,9 @@ export function createRunActions(deps: RunActionsDeps) {
 			case "release-lease":
 				refuseRelease(runState, request.name);
 				break;
+			case "take-over":
+				// Only the Walker logs it: a screen offers it only there.
+				throw new RunRefusal("walked-elsewhere", WALKED_ELSEWHERE);
 			default:
 				refuseUnless(request.kind, status, false, result);
 		}
@@ -282,13 +291,44 @@ export function createRunActions(deps: RunActionsDeps) {
 		await deps.leases.release(row.id, [name]);
 	}
 
+	/**
+	 * A person took the run over by hand: logs `RunTakenOver` on the step
+	 * of its last harness session, in a Turn that drives nothing. Once per
+	 * step and person in a walk: a second copy of the command adds nothing.
+	 * A run with no harness session has nothing to take over.
+	 */
+	async function takeOver(
+		row: RunRow,
+		actor: Actor | undefined,
+	): Promise<void> {
+		const by = actor?.personId ?? null;
+		await runner.hold(row.id, async ({ runState }) => {
+			const last = lastHarnessSession(runState);
+			if (!last?.stepId) return;
+			const walkFrom = runState.walk?.seq ?? Number.NEGATIVE_INFINITY;
+			const again = runState.takeOvers.some(
+				(taken) =>
+					taken.seq > walkFrom &&
+					taken.stepId === last.stepId &&
+					taken.payload.by === by,
+			);
+			if (again) return;
+			await log.append({
+				type: "RunTakenOver",
+				runId: row.id,
+				stepId: last.stepId,
+				payload: { by, harness: last.harness },
+			});
+		});
+	}
+
 	/** Stops the run now, or after its running step (`hold`: a Turn that drives nothing). */
 	async function stop(
 		row: RunRow,
 		when: "now" | "after-step" | "cancel-after-step" | undefined,
 	): Promise<void> {
 		if (when !== "after-step" && when !== "cancel-after-step") {
-			await runner.take(row.id, { kind: "stop" });
+			await runner.take(row.id, { kind: "stop", by: "person" });
 			return;
 		}
 		const request = when === "after-step";
@@ -421,6 +461,8 @@ export function createRunActions(deps: RunActionsDeps) {
 				return move(row, actor, request.to);
 			case "release-lease":
 				return releaseLease(row, request.name);
+			case "take-over":
+				return takeOver(row, actor);
 			case "resume":
 				// `RunResumed` before the thread moves; a sleeping run wakes.
 				await deps.holds.start(row.spaceId, () =>

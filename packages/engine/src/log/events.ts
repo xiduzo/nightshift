@@ -173,6 +173,8 @@ export type LeaseWait = {
 
 /** Who resumed a run: a person, or the daemon after a restart. */
 export type ResumedBy = "person" | "daemon";
+/** Who stopped a run: a person, or the daemon (the Offer a step ran under ended). */
+export type StoppedBy = "person" | "daemon";
 /** What a `RunResumed` did beyond a resume (`RunResumed.action`). */
 export type ResumeAction = "restart" | "rerun";
 
@@ -622,9 +624,28 @@ export type EnginePayloads = {
 		scope: Scope | null;
 		why: "scope" | "failed" | "stopped";
 	};
-	/** The wait is over: the step continues. `early` when a person resumed the run; `signal` when one arrived. */
-	WaitEnded: { early: boolean; signal?: string };
-	StopRequested: Record<string, never>;
+	/**
+	 * The wait is over: the step continues. `early` when a person resumed
+	 * the run, a signal arrived, or Night Shift looked again (a Device came
+	 * back, a lease went); `signal` when one arrived. `by`: who ended it
+	 * early without a signal. Absent in older logs, on a signal and on a
+	 * timer.
+	 */
+	WaitEnded: { early: boolean; signal?: string; by?: ResumedBy };
+	/**
+	 * The run stops now. `by`: a person, or Night Shift itself (the Offer
+	 * the step ran under ended). Absent in older logs: a person.
+	 * `restart`: the stop of a restart (`RunResumed` with the action
+	 * `restart` follows). Absent in older logs: that `RunResumed` tells.
+	 */
+	StopRequested: { by?: StoppedBy; restart?: true };
+	/**
+	 * A person took the run over by hand: they copied or shared the
+	 * command that opens its last harness session (`by`, null when nobody
+	 * signed in did). On the step of that session. A fact of what a person
+	 * did, not of the walk: the run goes on as it was.
+	 */
+	RunTakenOver: { by: string | null; harness: AgentHarnessName };
 	/** A person asked to stop the run before its next step or item. */
 	StopAfterStepRequested: Record<string, never>;
 	/** A person withdrew the stop after the step: the run goes on. */

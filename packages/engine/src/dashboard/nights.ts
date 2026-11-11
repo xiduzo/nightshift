@@ -1,5 +1,6 @@
 import type { RunSummary } from "../read";
 import { dayStart, lastDays } from "./clock";
+import { neededRange, neededReasons } from "./needed";
 import {
 	countStatuses,
 	hasEnded,
@@ -355,10 +356,12 @@ function totalsOf(
 			costUsd: ofDay.reduce((sum, { run }) => sum + run.costUsd, 0),
 			tokens: ofDay.reduce((sum, { run }) => sum + usedTokens(run), 0),
 			gates: gates.filter((gate) => gate.day === day).length,
+			neededYou: ofDay.filter(({ run }) => neededReasons(run).length > 0)
+				.length,
 		};
 	});
 	const sum = (key: keyof Omit<NightTotals, "night">) =>
-		perNight.reduce((total, day) => total + day[key], 0);
+		perNight.reduce((total, day) => total + (day[key] ?? 0), 0);
 	return {
 		runs: sum("runs"),
 		ended: sum("ended"),
@@ -366,14 +369,15 @@ function totalsOf(
 		costUsd: sum("costUsd"),
 		tokens: sum("tokens"),
 		gates: sum("gates"),
+		neededYou: sum("neededYou"),
 		perNight,
 	};
 }
 
 /**
- * Spend, runs and Gates over the last `range` days, today included, and
- * the headline numbers of the `range` days before. Flow health is the
- * caller's: it needs the flows.
+ * Spend, runs, Gates and Needed you over the last `range` days, today
+ * included, and the headline numbers of the `range` days before. Flow
+ * health is the caller's: it needs the flows.
  */
 export function nightsRange(
 	range: NightRange,
@@ -394,6 +398,17 @@ export function nightsRange(
 		spend: spendOf(days, inRange),
 		runs: runsOf(days, inRange),
 		gates: gatesOf(days, asked),
+		needed: neededRange(
+			days,
+			inRange.map(({ run, day, group }) => ({
+				runId: run.id,
+				title: run.title,
+				createdAt: run.createdAt,
+				day,
+				group,
+				reasons: neededReasons(run),
+			})),
+		),
 		totals: totalsOf(days, inRange, asked),
 		before: totalsOf(both.slice(0, range), runs, gates),
 	};

@@ -114,7 +114,14 @@ export type RunActionRequest =
 			stepId?: string;
 			prompt?: string;
 			fresh?: boolean;
-	  };
+	  }
+	/**
+	 * A person took the run over by hand: they copied or shared the command
+	 * that opens its last harness session. The Walker logs it
+	 * (`RunTakenOver`), once per step and person in a walk. The run goes on
+	 * as it was. A screen offers it only where the run is walked.
+	 */
+	| { kind: "take-over" };
 
 /** The name of an action, in the person's words. */
 export type RunActionKind = RunActionRequest["kind"];
@@ -134,6 +141,7 @@ const COMMAND_OF = {
 	resume: "run.resume",
 	restart: null,
 	rerun: null,
+	"take-over": null,
 } as const satisfies Record<RunActionKind, RunCommandKind | null>;
 
 /**
@@ -152,6 +160,8 @@ const NEEDS: Record<RunActionKind, Permissions> = {
 	resume: { run: ["resume"] },
 	restart: { run: ["stop", "resume"] },
 	rerun: { run: ["resume"] },
+	// Taking a run over by hand continues it, as a resume does.
+	"take-over": { run: ["resume"] },
 };
 
 /** The action each Command kind carries: `COMMAND_OF` read the other way. */

@@ -6,7 +6,11 @@ import {
 import { z } from "zod";
 
 import { exact } from "../output";
-import { runStatusSchema, runSummarySchema } from "../runs";
+import {
+	neededYouReasonSchema,
+	runStatusSchema,
+	runSummarySchema,
+} from "../runs";
 
 /**
  * The input and output schemas of the dashboard. The outputs mirror the
@@ -85,6 +89,19 @@ const flowScoreRowSchema = z.object({
 	latest: z.object({ value: z.number(), at: z.number(), runId: z.string() }),
 });
 
+/** Why runs needed you: one reason, and how many runs had it. */
+const neededReasonCountSchema = z.object({
+	reason: neededYouReasonSchema,
+	runs: z.number(),
+});
+
+/** How often a flow's own runs needed you, and why. */
+const flowNeededYouSchema = z.object({
+	runs: z.number(),
+	needed: z.number(),
+	reasons: z.array(neededReasonCountSchema),
+});
+
 /** What people answered to "Was this run useful?" about a flow's own runs. */
 const flowUsefulSchema = z.object({
 	answered: z.number(),
@@ -111,6 +128,7 @@ const flowHealthRowSchema = z.object({
 	freeRuns: z.number(),
 	scores: z.array(flowScoreRowSchema).optional(),
 	useful: flowUsefulSchema.optional(),
+	neededYou: flowNeededYouSchema.optional(),
 });
 
 const nightTotalsSchema = z.object({
@@ -121,6 +139,8 @@ const nightTotalsSchema = z.object({
 	costUsd: z.number(),
 	tokens: z.number(),
 	gates: z.number(),
+	/** The runs that needed you. Older Hosts send none. */
+	neededYou: z.number().optional(),
 });
 
 const periodTotalsSchema = nightTotalsSchema.omit({ night: true }).extend({
@@ -223,6 +243,32 @@ const nightsRangeSchema = z.object({
 			}),
 		),
 	}),
+	/** How often the runs needed you, and why. Older Hosts send none. */
+	needed: z
+		.object({
+			runs: z.number(),
+			needed: z.number(),
+			reasons: z.array(neededReasonCountSchema),
+			perNight: z.array(nightCountsSchema),
+			groups: topRows(
+				z.object({
+					label: z.string(),
+					runs: z.number(),
+					needed: z.number(),
+					reasons: z.array(neededReasonCountSchema),
+				}),
+			),
+			latest: z.array(
+				z.object({
+					runId: z.string(),
+					runTitle: z.string(),
+					group: z.string(),
+					createdAt: z.number(),
+					reasons: z.array(neededYouReasonSchema),
+				}),
+			),
+		})
+		.optional(),
 	totals: periodTotalsSchema,
 	before: periodTotalsSchema,
 	flows: topRows(flowHealthRowSchema).nullable(),
@@ -388,6 +434,7 @@ export const flowHealthDetailSchema = exact<FlowHealthDetail>()(
 				),
 				scores: z.array(flowScoreRowSchema).optional(),
 				useful: flowUsefulSchema.optional(),
+				neededYou: flowNeededYouSchema.optional(),
 				latest: z.array(flowRunSchema),
 			}),
 		),

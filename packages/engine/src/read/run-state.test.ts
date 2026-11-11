@@ -191,6 +191,7 @@ test("harness session lookups", () => {
 	expect(lastHarnessSession(foldRun(events))).toEqual({
 		harness: "claude-code",
 		harnessSessionId: "h-2",
+		stepId: "s2",
 	});
 });
 

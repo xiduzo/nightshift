@@ -77,6 +77,7 @@ export const PATH_FIELDS = {
 	StopRequested: [],
 	StopAfterStepRequested: [],
 	StopAfterStepCancelled: [],
+	RunTakenOver: [],
 	RunEnded: [],
 	RunWarned: [],
 	PullRequestOpened: [],

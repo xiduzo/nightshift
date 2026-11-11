@@ -31,6 +31,7 @@ import {
 	type Scope,
 	type StepOutcome,
 	type StepOutputs,
+	type StoppedBy,
 	scopeKey,
 	type WaitReason,
 } from "./events";
@@ -143,6 +144,10 @@ export type GateWait = PartSpan & {
 	answeredBy: AnsweredBy | null;
 	/** The option it took (the score's label). */
 	answer: string | null;
+	/** When its option was chosen (the score's time). Absent while nobody chose one. */
+	answeredAt?: number;
+	/** An Ask (ADR 10): the Gate had a form to fill in. Absent on every other Gate. */
+	ask?: true;
 };
 
 /** A time a step slept, and what for: a reason, and the signal of a Wait node on one (else null). */
@@ -270,6 +275,24 @@ export type ScopeEdges = {
 	taken: readonly Logged<"EdgeTaken">[];
 };
 
+/**
+ * A stop of the run (`RunState.stops`): a stop now (`StopRequested`), or a
+ * stop after the running step that nobody withdrew.
+ */
+export type StopFact = {
+	seq: number;
+	at: number;
+	/** Who stopped it. Null in older logs: a person did. */
+	by: StoppedBy | null;
+	/** The stop of a restart. False in older logs: the `RunResumed` after it tells. */
+	restart: boolean;
+	/** A stop after the running step (`StopAfterStepRequested`), not a stop now. */
+	afterStep: boolean;
+};
+
+/** A wait that ended before its time (`WaitEnded` with `early`), and what its step slept for. Null: the log does not say. */
+export type EarlyWake = Logged<"WaitEnded"> & { reason: WaitReason | null };
+
 /** One end of the run: the walk from `openedAt` (its start or a resume) to `at`. */
 export type RunEndFact = Logged<"RunEnded"> & { openedAt: number };
 
@@ -370,6 +393,12 @@ export type RunState = {
 	stopAt: number | null;
 	/** A person asked to stop after the running step, since the current walk began. */
 	stopAfterStep: boolean;
+	/** Every stop of the run, oldest first: now, or after the running step when nobody withdrew it. */
+	stops: readonly StopFact[];
+	/** Every time a person took the run over by hand (`RunTakenOver`), oldest first. */
+	takeOvers: readonly Logged<"RunTakenOver">[];
+	/** Every wait that ended before its time, oldest first: a person, a signal, or Night Shift woke it. */
+	earlyWakes: readonly EarlyWake[];
 	/** The steps the current walk started. */
 	stepsSinceWalk: number;
 	warnings: readonly Logged<"RunWarned">[];
@@ -449,6 +478,9 @@ function emptyState(): Draft {
 		daemonResumes: 0,
 		stopAt: null,
 		stopAfterStep: false,
+		stops: [],
+		takeOvers: [],
+		earlyWakes: [],
 		stepsSinceWalk: 0,
 		warnings: [],
 		scores: [],
@@ -492,6 +524,9 @@ function draftOf(state: RunState): Draft {
 		gates: [...state.gates],
 		ends: [...state.ends],
 		resumes: [...state.resumes],
+		stops: [...state.stops],
+		takeOvers: [...state.takeOvers],
+		earlyWakes: [...state.earlyWakes],
 		warnings: [...state.warnings],
 		scores: [...state.scores],
 		moves: [...state.moves],
@@ -670,11 +705,34 @@ function apply(run: Draft, e: LoggedEvent): void {
 		case "PullRequestOpened":
 			run.pullRequest = { url: e.payload.url, at: e.at };
 			break;
+		case "StopRequested":
+			run.stops.push({
+				seq: e.seq,
+				at: e.at,
+				by: e.payload.by ?? null,
+				restart: e.payload.restart === true,
+				afterStep: false,
+			});
+			break;
 		case "StopAfterStepRequested":
 			run.stopAfterStep = true;
+			run.stops.push({
+				seq: e.seq,
+				at: e.at,
+				by: "person",
+				restart: false,
+				afterStep: true,
+			});
 			break;
-		case "StopAfterStepCancelled":
+		case "StopAfterStepCancelled": {
 			run.stopAfterStep = false;
+			// A person withdrew it: the run did not stop after all.
+			const withdrawn = run.stops.findLastIndex((stop) => stop.afterStep);
+			if (withdrawn >= 0) run.stops.splice(withdrawn, 1);
+			break;
+		}
+		case "RunTakenOver":
+			run.takeOvers.push(logged(e));
 			break;
 		case "WorktreeCreated":
 			run.worktree = e.payload;
@@ -733,9 +791,17 @@ function apply(run: Draft, e: LoggedEvent): void {
 		case "WaitStarted":
 			run.wait = logged(e);
 			break;
-		case "WaitEnded":
-			if (run.wait && run.wait.stepId === e.stepId) run.wait = null;
+		case "WaitEnded": {
+			const ended = run.wait && run.wait.stepId === e.stepId ? run.wait : null;
+			if (e.payload.early) {
+				run.earlyWakes.push({
+					...logged(e),
+					reason: ended?.payload.reason ?? null,
+				});
+			}
+			if (ended) run.wait = null;
 			break;
+		}
 	}
 	if (e.sessionId) applySessionEvent(run, e, e.sessionId);
 	if (e.stepId) applyStepEvent(run, e, e.stepId);
@@ -987,7 +1053,12 @@ function applyStepEvent(run: Draft, e: LoggedEvent, stepId: string): void {
 					...step,
 					gateWaits: [
 						...step.gateWaits.slice(0, -1),
-						{ ...wait, answeredBy: by, answer: e.payload.label },
+						{
+							...wait,
+							answeredBy: by,
+							answer: e.payload.label,
+							answeredAt: e.at,
+						},
 					],
 				};
 			}
@@ -1060,6 +1131,7 @@ function applyStepEvent(run: Draft, e: LoggedEvent, stepId: string): void {
 							...(briefCost ? { briefCost } : {}),
 							answeredBy: null,
 							answer: null,
+							...(e.payload.form ? { ask: true as const } : {}),
 						},
 					],
 				};

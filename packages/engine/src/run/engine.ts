@@ -421,8 +421,9 @@ export function createEngine(
 					{ db, log: runLog, runner, archive: peers.runs, walks },
 					runId,
 				),
+			// The Offer the run's step ran under ended: Night Shift stops it, not a person.
 			stop: async (runId) => {
-				await runner.take(runId, { kind: "stop" });
+				await runner.take(runId, { kind: "stop", by: "daemon" });
 			},
 		},
 		async logFact(fact, writes) {

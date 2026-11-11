@@ -295,6 +295,24 @@ export const runs = {
 				}),
 			),
 		),
+	/**
+	 * You copied or shared the command that takes the run over by hand.
+	 * The run's Walker logs it once: Needed you counts it. A screen calls
+	 * it without waiting and ignores a refusal: an older Host does not
+	 * know it.
+	 */
+	takeOver: runProcedure(
+		z.object({ runId: z.string() }),
+		permissionOf("take-over"),
+	)
+		.route({
+			summary:
+				"Records that you took a run over by hand with its take-over command.",
+		})
+		.output(output(z.void()))
+		.handler(({ context, input }) =>
+			context.space.act(input.runId, { kind: "take-over" }),
+		),
 	/** Sends a signal to a run whose Wait node waits for it. */
 	signal: runProcedure(
 		z.object({ runId: z.string(), name: labelSchema }),

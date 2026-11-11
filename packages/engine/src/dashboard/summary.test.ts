@@ -574,7 +574,12 @@ describe("the totals of a range of days", () => {
 					},
 				],
 			}),
-			aRun({ status: "failed", costUsd: 1, createdAt: TODAY - 3 * DAY }),
+			aRun({
+				status: "failed",
+				costUsd: 1,
+				createdAt: TODAY - 3 * DAY,
+				neededYou: [{ reason: "resumed", at: TODAY - 2 * DAY }],
+			}),
 			// Stopped: a run, not one that ended for the finished share.
 			aRun({ status: "stopped", createdAt: TODAY - 6 * DAY }),
 			// The 7 days before.
@@ -591,6 +596,7 @@ describe("the totals of a range of days", () => {
 			costUsd: 3,
 			tokens: 0,
 			gates: 1,
+			neededYou: 1,
 		});
 		expect(totals.perNight).toHaveLength(7);
 		expect(totals.perNight.at(-1)).toEqual({
@@ -601,6 +607,7 @@ describe("the totals of a range of days", () => {
 			costUsd: 2,
 			tokens: 0,
 			gates: 1,
+			neededYou: 0,
 		});
 		expect(before).toMatchObject({
 			runs: 2,
@@ -609,9 +616,99 @@ describe("the totals of a range of days", () => {
 			costUsd: 4,
 			tokens: 0,
 			gates: 0,
+			neededYou: 0,
 		});
 		expect(before.perNight[0]?.night).toBe(TODAY - 13 * DAY);
 		expect(before.perNight.at(-1)?.night).toBe(TODAY - 7 * DAY);
+	});
+
+	test("count the runs that needed you by the day they started, and why", () => {
+		const summary = summarize(
+			[
+				aRun({
+					id: "answered",
+					flowName: "triage",
+					createdAt: TODAY + HOUR,
+					neededYou: [
+						{ reason: "gate", at: TODAY + 2 * HOUR },
+						{ reason: "gate", at: TODAY + 3 * HOUR },
+						{ reason: "took-over", at: TODAY + 4 * HOUR },
+					],
+				}),
+				// Started yesterday, resumed today: it counts on the day it started.
+				aRun({
+					id: "resumed",
+					flowName: "triage",
+					createdAt: TODAY - DAY + HOUR,
+					neededYou: [{ reason: "resumed", at: TODAY + HOUR }],
+				}),
+				aRun({ id: "alone", flowName: "digest", createdAt: TODAY + HOUR }),
+				// From an older Host: it says nothing, so it needed nobody.
+				aRun({ id: "old", flowName: "digest", createdAt: TODAY - DAY }),
+			],
+			project(["triage", "digest"]),
+		);
+		const range = daysOf(summary, 7);
+		expect(range.totals.neededYou).toBe(2);
+		expect(range.totals.perNight.at(-1)).toMatchObject({
+			runs: 2,
+			neededYou: 1,
+		});
+		expect(range.totals.perNight.at(-2)).toMatchObject({
+			runs: 2,
+			neededYou: 1,
+		});
+		expect(range.needed).toMatchObject({
+			runs: 4,
+			needed: 2,
+			reasons: [
+				{ reason: "gate", runs: 1 },
+				{ reason: "resumed", runs: 1 },
+				{ reason: "took-over", runs: 1 },
+			],
+			groups: {
+				rows: [{ label: "triage", runs: 2, needed: 2 }],
+				count: 1,
+			},
+		});
+		expect(range.needed?.perNight.at(-1)).toEqual({
+			night: TODAY,
+			counts: { needed: 1, alone: 1 },
+		});
+		expect(range.needed?.latest).toEqual([
+			{
+				runId: "answered",
+				runTitle: expect.any(String),
+				group: "triage",
+				createdAt: TODAY + HOUR,
+				reasons: ["gate", "took-over"],
+			},
+			{
+				runId: "resumed",
+				runTitle: expect.any(String),
+				group: "triage",
+				createdAt: TODAY - DAY + HOUR,
+				reasons: ["resumed"],
+			},
+		]);
+		// Flow health: the flow's own runs, the share and why.
+		expect(
+			summary.flowHealth?.rows.map((row) => [row.name, row.neededYou]),
+		).toEqual([
+			[
+				"triage",
+				{
+					runs: 2,
+					needed: 2,
+					reasons: [
+						{ reason: "gate", runs: 1 },
+						{ reason: "resumed", runs: 1 },
+						{ reason: "took-over", runs: 1 },
+					],
+				},
+			],
+			["digest", { runs: 2, needed: 0, reasons: [] }],
+		]);
 	});
 
 	test("count a day from midnight to midnight on the reader's clock", () => {

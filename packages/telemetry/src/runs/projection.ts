@@ -362,6 +362,7 @@ export function createRunProjection(deps: {
 				[ATTR.status]: end.status,
 				...(end.reason ? { [ATTR.reason]: end.reason } : {}),
 				...(end.first ? {} : { [ATTR.resumed]: true }),
+				[ATTR.neededYou]: end.neededYou,
 				...(failed ? { [ATTR.errorType]: errorTypeOf(end.endReason) } : {}),
 			},
 			error: failed ? (end.reason ?? "failed") : null,
@@ -374,7 +375,11 @@ export function createRunProjection(deps: {
 			[ATTR.status]: end.status,
 			...(failed ? { [ATTR.errorType]: errorTypeOf(end.endReason) } : {}),
 		});
-		m.runOutcome.add(1, { ...point, [ATTR.status]: end.status });
+		m.runOutcome.add(1, {
+			...point,
+			[ATTR.status]: end.status,
+			[ATTR.neededYou]: end.neededYou,
+		});
 	}
 
 	function scored(

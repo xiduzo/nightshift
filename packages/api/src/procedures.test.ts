@@ -437,6 +437,7 @@ const ROUTES: Route[] = [
 	route("runs.rerun", { ...run, nodeId: "worker", prompt: "Again.", fresh: true }, RESUME, "space.act.rerun", ["r", { kind: "rerun", nodeId: "worker", prompt: "Again.", fresh: true }]),
 	route("runs.watch", run, "session", "space.watchRun", ["r", { signal: any, afterSeq: undefined }]),
 	route("runs.signal", { ...run, name: "go" }, { signal: ["send"] }, "space.act.signal", ["r", { kind: "signal", name: "go" }]),
+	route("runs.takeOver", run, RESUME, "space.act.take-over", ["r", { kind: "take-over" }]),
 	// Notifications: the Person's own.
 	route("notifications.watch", undefined, "session", "notifications.watch", [PERSON, any, { here: false, phone: false }]),
 	route("notifications.settings.get", undefined, "session", "notifications.settings.get", [PERSON]),

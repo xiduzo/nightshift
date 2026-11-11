@@ -1,4 +1,4 @@
-/** The read model: the pure projections of the event log, the landed facts, the Needs-you inbox, the run views, cost, the Persons a run names, and the run bundle. */
+/** The read model: the pure projections of the event log, the landed facts, the Needs-you inbox, what a person did to a run (Needed you), the run views, cost, the Persons a run names, and the run bundle. */
 
 export {
 	answeredOf,
@@ -9,6 +9,10 @@ export {
 	lockScreenRefusal,
 } from "./inbox";
 export { type LandedFact, landedFacts } from "./landed-facts";
+export {
+	NEEDED_YOU_REASONS,
+	type NeededYouReason,
+} from "./needed-you";
 export { gitAuthorOf, namesOf } from "./people";
 export type { ReadModel, RunHere } from "./read-model";
 export {
@@ -37,6 +41,7 @@ export {
 	firstDeadline,
 	isOpenStatus,
 	itemStates,
+	lastHarnessSession,
 	lastHarnessSessionOfNode,
 	parkedSteps,
 	type RunWorktree,

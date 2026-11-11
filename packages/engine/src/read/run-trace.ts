@@ -11,6 +11,7 @@ import {
 	sessionCost,
 	type WaitReason,
 } from "../log";
+import { type NeededYou, neededYouOf } from "./needed-you";
 import {
 	type CostBasis,
 	costBasis,
@@ -22,7 +23,8 @@ import { deriveSteps, deriveTrigger } from "./run-views";
 /**
  * A run as an export to monitoring reads it: its walks and steps with the
  * times each opened and ended, and per part of a step the sessions with
- * their harness, model, tokens and cost, the Gates' waits and the sleeps. A view of the run
+ * their harness, model, tokens and cost, the Gates' waits and the sleeps,
+ * and each time a person stepped in. A view of the run
  * state, like the run metrics beside it, so a reader outside the engine
  * never reads an event's type or payload. Nothing here is stored.
  *
@@ -42,6 +44,8 @@ export type TraceRunEnd = {
 	endReason?: string | null;
 	/** The run's first end. A resumed run ends again. */
 	first: boolean;
+	/** A person stepped in by this end: answered a Gate or an Ask, resumed, stopped, or took the run over. */
+	neededYou: boolean;
 };
 
 /**
@@ -118,12 +122,15 @@ export type RunTrace = {
 	startedAt: number | null;
 	ends: TraceRunEnd[];
 	steps: TraceStep[];
+	/** Each time a person stepped in, oldest first. An end needed you when one came before it. */
+	neededYou: NeededYou[];
 };
 
 /** The run as monitoring reads it, from its run state. Null for a log with no run. */
 export function runTrace(run: RunState): RunTrace | null {
 	if (!run.runId) return null;
 	const started = run.started;
+	const neededYou = neededYouOf(run);
 	return {
 		runId: run.runId,
 		projectId: started?.payload.projectId ?? null,
@@ -138,6 +145,7 @@ export function runTrace(run: RunState): RunTrace | null {
 			reason: end.payload.reason,
 			endReason: end.payload.endReason ?? null,
 			first: i === 0,
+			neededYou: neededYou.some((act) => act.at <= end.at),
 		})),
 		steps: deriveSteps(run).map((step) => ({
 			id: step.id,
@@ -149,6 +157,7 @@ export function runTrace(run: RunState): RunTrace | null {
 			startedAt: step.startedAt,
 			ends: stepEnds(step),
 		})),
+		neededYou,
 	};
 }
 

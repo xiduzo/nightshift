@@ -243,11 +243,14 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		await drive(h, { inputs: {} });
 		const d = daemon(h, time);
 		time.advance(1);
-		await d.wake({ early: true, prompt: "Hurry up." });
+		await d.wake({ early: true, prompt: "Hurry up.", by: "person" });
 		expect(d.resumed).toEqual([
 			{ kind: "wake", early: true, prompt: "Hurry up." },
 		]);
-		expect(payloads(await h.events(), "WaitEnded")).toEqual([{ early: true }]);
+		// Who woke it is logged: a person's early wake counts as Needed you.
+		expect(payloads(await h.events(), "WaitEnded")).toEqual([
+			{ early: true, by: "person" },
+		]);
 		await d.driven();
 		expect(payloads(await h.events(), "SessionStarted")[1]).toMatchObject({
 			prompt: "Hurry up.",

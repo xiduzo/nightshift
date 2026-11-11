@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { fakeHarness } from "@nightshift/agents/testing";
-import type { CommandNode, DecisionNode, Flow } from "@nightshift/flows";
+import type {
+	AgentNode,
+	CommandNode,
+	DecisionNode,
+	Flow,
+} from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import type { Relay } from "../contract";
 import { createRunLog } from "../log/run-log";
@@ -48,6 +53,25 @@ const gateFlow: Flow = {
 	start: "build",
 	nodes: [build, gate],
 	edges: [{ id: "e1", from: "build", outcome: "pass", to: "gate" }],
+};
+
+const worker: AgentNode = {
+	id: "worker",
+	type: "agent",
+	position: { x: 0, y: 0 },
+	prompt: "Write the summary.",
+	harness: "claude-code",
+	model: "sonnet",
+	permissionMode: "acceptEdits",
+	session: "fresh",
+};
+
+/** worker → gate: an agent session to take over, then a Gate that holds the run. */
+const agentFlow: Flow = {
+	...gateFlow,
+	start: "worker",
+	nodes: [worker, gate],
+	edges: [{ id: "e1", from: "worker", outcome: "pass", to: "gate" }],
 };
 
 const actor = { personId: "the-person" };
@@ -105,13 +129,13 @@ function makeSpace() {
 	).space(sandbox.spaceId, actor);
 }
 
-/** A run of the gate flow, waiting at its Gate. */
-async function waitingRun() {
+/** A run of the gate flow (or `flow`), waiting at its Gate. */
+async function waitingRun(flow: Flow = gateFlow) {
 	const space = makeSpace();
 	const { id: projectId } = await space.addProject({
 		repoPath: sandbox.repoPath,
 	});
-	const run = await space.startRun({ projectId, flow: gateFlow });
+	const run = await space.startRun({ projectId, flow });
 	await waitFor(async () => (await space.getRun(run.id)).status === "waiting", {
 		label: "the run to wait at the Gate",
 	});
@@ -157,10 +181,11 @@ describe("an action on a run another Device walks", () => {
 		const { space, runId } = await waitingRun();
 		await space.act(runId, { kind: "move", to: laptop.id });
 
-		// Only the Walker restarts or reruns.
+		// Only the Walker restarts, reruns or logs a take-over.
 		for (const action of [
 			{ kind: "restart" },
 			{ kind: "rerun", nodeId: "build" },
+			{ kind: "take-over" },
 		] as const) {
 			const refusal = await space.act(runId, action).catch((e) => e);
 			expect(refusal).toBeInstanceOf(RunRefusal);
@@ -172,6 +197,40 @@ describe("an action on a run another Device walks", () => {
 			.catch((e) => e);
 		expect(signal).toBeInstanceOf(RunRefusal);
 		expect(sent).toEqual([]);
+	});
+});
+
+describe("a take-over", () => {
+	test("is logged once on the step of the last agent session, in the person's name", async () => {
+		const { space, runId } = await waitingRun(agentFlow);
+		await space.act(runId, { kind: "take-over" });
+		// A second copy of the command adds nothing.
+		await space.act(runId, { kind: "take-over" });
+		const run = await space.getRun(runId);
+		const workerStep = run.steps.find((s) => s.nodeId === "worker");
+		expect(run.neededYou).toEqual([
+			{ reason: "took-over", at: expect.any(Number) },
+		]);
+		const state = await createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+		}).state(runId);
+		expect(
+			state.takeOvers.map(({ stepId, payload }) => ({ stepId, ...payload })),
+		).toEqual([
+			{
+				stepId: workerStep?.id ?? null,
+				by: actor.personId,
+				harness: "claude-code",
+			},
+		]);
+		expect(run.status).toBe("waiting");
+	});
+
+	test("of a run without an agent session logs nothing", async () => {
+		const { space, runId } = await waitingRun();
+		await space.act(runId, { kind: "take-over" });
+		expect((await space.getRun(runId)).neededYou).toEqual([]);
 	});
 });
 

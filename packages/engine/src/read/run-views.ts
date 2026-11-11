@@ -310,15 +310,24 @@ export function lastHarnessSessionOfNode(
 	return last?.id ?? null;
 }
 
-/** The run's latest session that has a harness session id. */
-export function lastHarnessSession(
-	run: RunState,
-): { harness: AgentHarnessName; harnessSessionId: string } | null {
-	let found: { harness: AgentHarnessName; harnessSessionId: string } | null =
-		null;
+/** The run's latest session that has a harness session id, with its step. */
+export function lastHarnessSession(run: RunState): {
+	harness: AgentHarnessName;
+	harnessSessionId: string;
+	stepId: string | null;
+} | null {
+	let found: {
+		harness: AgentHarnessName;
+		harnessSessionId: string;
+		stepId: string | null;
+	} | null = null;
 	for (const s of run.sessions.values()) {
 		if (s.harnessSessionId) {
-			found = { harness: s.harness, harnessSessionId: s.harnessSessionId };
+			found = {
+				harness: s.harness,
+				harnessSessionId: s.harnessSessionId,
+				stepId: s.stepId,
+			};
 		}
 	}
 	return found;

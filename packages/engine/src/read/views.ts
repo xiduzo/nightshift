@@ -25,6 +25,7 @@ import type {
 	VariableChange,
 } from "../log";
 import type { RunResult, RunStatus } from "../run-status";
+import type { NeededYou } from "./needed-you";
 import type { RunMetrics } from "./run-metrics";
 
 /**
@@ -230,6 +231,12 @@ export type RunSummary = {
 		closedAt: number | null;
 		answeredBy: AnsweredBy | null;
 	}[];
+	/**
+	 * Each time a person stepped in, oldest first: answered a Gate or an
+	 * Ask, resumed, stopped, or took the run over. Empty: the run needed
+	 * nobody. Older Hosts send none.
+	 */
+	neededYou?: NeededYou[];
 	/**
 	 * Every time a step of the run slept, also in called flows, oldest
 	 * first. `to` is null while it sleeps. Older Hosts send none.
