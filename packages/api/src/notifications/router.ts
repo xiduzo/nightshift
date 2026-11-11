@@ -8,9 +8,6 @@ import { z } from "zod";
 import { output, stream } from "../output";
 import { protectedProcedure, streamed } from "../procedures";
 import {
-	digestEntrySchema,
-	digestKeySchema,
-	digestSchema,
 	notificationItemSchema,
 	pushTargetSchema,
 	settingsSchema,
@@ -102,84 +99,6 @@ export const notifications = {
 					throw new ORPCError("NOT_FOUND", {
 						message:
 							"This phone or browser is not in your list. Reload the page to see the list.",
-					});
-				}
-			}),
-	},
-	digest: {
-		latest: protectedProcedure
-			.route({
-				summary:
-					"Reads your last morning digest again: the runs that ended before it, with status, cost and pull request, and the Gates that wait now.",
-			})
-			.output(output(digestSchema.nullable()))
-			.handler(({ context }) =>
-				context.notifications.digest.latest(context.session.user.id),
-			),
-		since: protectedProcedure
-			.route({
-				summary:
-					"Reads a digest now: the runs that ended since a time (default: your last digest), with status, cost and pull request, and the Gates that wait now.",
-			})
-			.input(
-				z
-					.object({
-						/** Epoch ms. Left out: since your last digest, or a day back. */
-						since: z.number().int().min(0).optional(),
-					})
-					.optional(),
-			)
-			.output(output(digestSchema.nullable()))
-			.handler(({ context, input }) =>
-				context.notifications.digest.since(
-					context.session.user.id,
-					input?.since,
-				),
-			),
-	},
-	digests: {
-		list: protectedProcedure
-			.route({
-				summary:
-					"Lists your digests of the last 90 days, newest first: what each said, and whether you opened it.",
-			})
-			.output(output(z.array(digestEntrySchema)))
-			.handler(({ context }) =>
-				context.notifications.digest.list(context.session.user.id),
-			),
-		get: protectedProcedure
-			.route({
-				summary:
-					"Reads one of your digests again: what it said, and the runs that ended before it.",
-			})
-			.input(digestKeySchema)
-			.output(output(digestSchema))
-			.handler(async ({ context, input }) => {
-				const digest = await context.notifications.digest.of(
-					context.session.user.id,
-					input.key,
-				);
-				if (!digest) {
-					throw new ORPCError("NOT_FOUND", {
-						message:
-							"This digest is no longer in your inbox. The inbox keeps 90 days.",
-					});
-				}
-				return digest;
-			}),
-		markRead: protectedProcedure
-			.route({ summary: "Marks one of your digests read." })
-			.input(digestKeySchema)
-			.output(output(z.void()))
-			.handler(async ({ context, input }) => {
-				const known = await context.notifications.digest.markRead(
-					context.session.user.id,
-					input.key,
-				);
-				if (!known) {
-					throw new ORPCError("NOT_FOUND", {
-						message:
-							"This digest is no longer in your inbox. The inbox keeps 90 days.",
 					});
 				}
 			}),

@@ -19,14 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ErrorAlert } from "@/shared/feedback";
 import { ListGroup, SectionHead, SwitchRow } from "@/shared/list";
-import {
-	type Choice,
-	digestOptions,
-	digestPatch,
-	digestValue,
-	HOURS,
-	phoneTimeZone,
-} from "./notification-choices";
+import { type Choice, HOURS, phoneTimeZone } from "./notification-choices";
 import {
 	useNotificationSettings,
 	useSaveNotificationSettings,
@@ -36,9 +29,8 @@ import {
 const DEFAULT_QUIET = { start: "22:00", end: "07:00" };
 
 /**
- * The person's notification settings, in three sections: the morning
- * digest, what Night Shift tells them about, and quiet hours. They apply
- * on every screen. Each change saves at once.
+ * The person's notification settings, in two sections: what Night Shift
+ * tells them about, and quiet hours. They apply on every screen. Each change saves at once.
  */
 export function NotificationSections() {
 	const settings = useNotificationSettings();
@@ -47,7 +39,6 @@ export function NotificationSections() {
 	if (settings.data) {
 		return (
 			<>
-				<DigestSection value={settings.data} onChange={save} />
 				<TellMeSection value={settings.data} onChange={save} />
 				<QuietSection value={settings.data} onChange={save} />
 			</>
@@ -74,31 +65,6 @@ type SectionProps = {
 	value: NotificationSettings;
 	onChange(patch: NotificationSettingsPatch): void;
 };
-
-/**
- * When the morning digest comes, or off. Without quiet hours, the time
- * zone comes from the phone with each change, as it does when you turn
- * quiet hours on.
- */
-function DigestSection({ value, onChange }: SectionProps) {
-	const zone = value.quietHours ? {} : { timeZone: phoneTimeZone() };
-	const otherZone = value.timeZone !== phoneTimeZone();
-	return (
-		<View className="gap-3">
-			<SectionHead title="Morning digest" />
-			<OptionSelect
-				label="It comes at"
-				options={digestOptions(value)}
-				value={digestValue(value)}
-				onChange={(choice) => onChange({ ...digestPatch(choice), ...zone })}
-			/>
-			<Text variant="muted" className="text-muted-foreground">
-				What the night did, in one notification.
-				{otherZone ? ` The time is in ${value.timeZone}.` : ""}
-			</Text>
-		</View>
-	);
-}
 
 /** Which events reach the person, and whether phones get them at all. */
 function TellMeSection({ value, onChange }: SectionProps) {

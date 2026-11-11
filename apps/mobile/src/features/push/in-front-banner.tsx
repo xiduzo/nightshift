@@ -13,7 +13,6 @@ import {
 	Hand,
 	type LucideIcon,
 	MonitorSmartphone,
-	Sunrise,
 } from "lucide-react-native";
 import { useEffect } from "react";
 import { Pressable } from "react-native";
@@ -43,7 +42,6 @@ const LOOK: Record<PushData["kind"], { icon: LucideIcon; tone: Tone | null }> =
 		"run-failed": { icon: CircleX, tone: "failed" },
 		"device-wait": { icon: MonitorSmartphone, tone: "waiting" },
 		"schedule-missed": { icon: CalendarX, tone: "failed" },
-		digest: { icon: Sunrise, tone: null },
 	};
 
 /**

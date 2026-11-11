@@ -4,7 +4,6 @@ import type { NotificationMessage } from "../channels";
 import { expoMessage, expoWithdrawMessage } from "../channels/expo";
 import {
 	deviceWaitKey,
-	digestKey,
 	gateKey,
 	isGateKey,
 	type PushData,
@@ -65,14 +64,6 @@ describe("a notification key", () => {
 		expect(parseDeviceWaitKey("run-1:build")).toBeNull();
 		expect(parseGateKey(key)).toBeNull();
 		expect(isGateKey(key)).toBe(false);
-	});
-
-	test("a digest's key is its day, and is no Gate", () => {
-		const key = digestKey("2026-10-21");
-		expect(key).toBe("digest:2026-10-21");
-		expect(parseKey(key)).toEqual({ kind: "digest", day: "2026-10-21" });
-		expect(isGateKey(key)).toBe(false);
-		expect(parseKey("digest:today")).toBeNull();
 	});
 
 	test("a key Night Shift does not make names nothing", () => {
@@ -185,7 +176,7 @@ describe("where a tap goes", () => {
 
 	test("anything else, or a push without its ids, opens the inbox", () => {
 		expect(at("gates-waiting", null)).toBe("/inbox");
-		expect(at("digest", null)).toBe("/inbox");
+		expect(at("schedule-missed", null)).toBe("/inbox");
 		expect(at("run-finished", null)).toBe("/inbox");
 		expect(at("gate-opened", "run-1")).toBe("/inbox");
 		expect(at("gate-opened", null, "review")).toBe("/inbox");
@@ -230,13 +221,12 @@ describe("from the Host to the phone", () => {
 				count: 2,
 			}),
 			message({
-				kind: "digest",
-				key: "digest:2026-10-21",
-				spaceId: null,
+				kind: "schedule-missed",
+				key: "missed:p1:s1:5",
 				runId: null,
 				stepId: null,
-				title: "Night Shift: last night",
-				body: "3 runs finished, 1 failed. $4.20 spent.",
+				title: "A schedule did not start",
+				body: "Triage was due at 22:30.",
 			}),
 		];
 		for (const one of sent) {
@@ -245,22 +235,21 @@ describe("from the Host to the phone", () => {
 		}
 	});
 
-	test("a digest goes to the runs channel and opens the inbox", () => {
+	test("a missed schedule goes to the runs channel and opens the inbox", () => {
 		const push = expoMessage(
 			"token",
 			message({
-				kind: "digest",
-				key: "digest:2026-10-21",
-				spaceId: null,
+				kind: "schedule-missed",
+				key: "missed:p1:s1:5",
 				runId: null,
 				stepId: null,
-				title: "Night Shift: last night",
-				body: "1 run finished.",
+				title: "A schedule did not start",
+				body: "Triage was due at 22:30.",
 			}),
 		);
 		expect(push).toMatchObject({
-			title: "Night Shift: last night",
-			body: "1 run finished.",
+			title: "A schedule did not start",
+			body: "Triage was due at 22:30.",
 			categoryId: "gate-open",
 			channelId: "runs",
 			priority: "normal",

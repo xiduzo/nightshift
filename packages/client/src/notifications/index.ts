@@ -4,7 +4,6 @@
  * contract (keys, push data, where a tap goes).
  */
 
-export { DIGEST_CHOICES, digestAtTime, digestShown } from "./digest";
 export { PHONE_DELAYS, phoneDelayLabel } from "./phone-delay";
 export {
 	gateKey,
@@ -27,8 +26,6 @@ export {
 export { describeNotice } from "./rules";
 export { followNotifications, type NotificationWatchClient } from "./stream";
 export type {
-	Digest,
-	DigestEntry,
 	NotificationItem,
 	NotificationScreen,
 	NotificationSettings,

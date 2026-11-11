@@ -7,7 +7,6 @@
 
 export {
 	deviceWaitKey,
-	digestKey,
 	gateKey,
 	isGateKey,
 	parseDeviceWaitKey,

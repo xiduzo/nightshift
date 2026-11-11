@@ -443,11 +443,6 @@ const ROUTES: Route[] = [
 	route("notifications.targets.list", undefined, "session", "notifications.targets.list", [PERSON]),
 	route("notifications.targets.register", screen, "session", "notifications.targets.register", [PERSON, like(screen), `session-${PERSON}`]),
 	route("notifications.targets.remove", { id: "t1" }, "session", "notifications.targets.remove", [PERSON, "t1"]),
-	route("notifications.digest.latest", undefined, "session", "notifications.digest.latest", [PERSON]),
-	route("notifications.digest.since", { since: 0 }, "session", "notifications.digest.since", [PERSON, 0]),
-	route("notifications.digests.list", undefined, "session", "notifications.digest.list", [PERSON]),
-	route("notifications.digests.get", { key: "k" }, "session", "notifications.digest.of", [PERSON, "k"]),
-	route("notifications.digests.markRead", { key: "k" }, "session", "notifications.digest.markRead", [PERSON, "k"]),
 	route("notifications.webPush.key", undefined, "session", "notifications.webPush.publicKey", []),
 	// The dashboard.
 	route("dashboard.summary", { everySpace: false }, "session", ["space.listRuns", "space.listProjects"]),

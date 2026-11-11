@@ -1,7 +1,7 @@
 import type { Database } from "@nightshift/db";
 import { notificationDelivery } from "@nightshift/db/schema";
 import { asDate, instant, instantOrNull } from "@nightshift/time";
-import { and, desc, eq, gte, inArray, isNull, lt, not, or } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, not, or } from "drizzle-orm";
 
 /**
  * The delivery log: what the notifier did with each event for each
@@ -13,9 +13,7 @@ import { and, desc, eq, gte, inArray, isNull, lt, not, or } from "drizzle-orm";
 
 /**
  * What a notification tells. `device-wait`: a step waits for a Device that
- * is offline. `digest`: the runs that ended since the last digest, and the
- * Gates that wait, once a day. A digest spans Spaces and runs: its entry
- * has an empty `spaceId` and `runId`. `schedule-missed`: a schedule did
+ * is offline. `schedule-missed`: a schedule did
  * not start its run, because its time was missed by more than it allows.
  * It names no run: its entry has an empty `runId`.
  */
@@ -24,8 +22,7 @@ export type NoticeKind =
 	| "run-finished"
 	| "run-failed"
 	| "device-wait"
-	| "schedule-missed"
-	| "digest";
+	| "schedule-missed";
 
 /**
  * `sending`: claimed, and going out to `heldFor` now. A crash before it
@@ -66,8 +63,6 @@ export type Delivery = {
 	createdAt: number;
 	sentAt: number | null;
 	withdrawnAt: number | null;
-	/** When the Person opened it in the inbox: a digest. Null: unread. */
-	readAt: number | null;
 };
 
 /** A new entry of the log. Without `title` and `body`: the sentence of its kind. */
@@ -108,7 +103,6 @@ export function createDeliveryLog(db: Database) {
 			createdAt: instant(row.createdAt),
 			sentAt: instantOrNull(row.sentAt),
 			withdrawnAt: instantOrNull(row.withdrawnAt),
-			readAt: instantOrNull(row.readAt),
 		};
 	}
 
@@ -233,26 +227,6 @@ export function createDeliveryLog(db: Database) {
 			return rows.map(toDelivery);
 		},
 
-		/** The Person's entries of one kind, newest first: their digests. */
-		async ofPerson(
-			personId: string,
-			kind: NoticeKind,
-			limit: number,
-		): Promise<Delivery[]> {
-			const rows = await db
-				.select()
-				.from(notificationDelivery)
-				.where(
-					and(
-						eq(notificationDelivery.personId, personId),
-						eq(notificationDelivery.kind, kind),
-					),
-				)
-				.orderBy(desc(notificationDelivery.createdAt))
-				.limit(limit);
-			return rows.map(toDelivery);
-		},
-
 		/** The Person's entries of one kind made at `since` or later, newest first. */
 		async ofPersonSince(
 			personId: string,
@@ -271,32 +245,6 @@ export function createDeliveryLog(db: Database) {
 				)
 				.orderBy(desc(notificationDelivery.createdAt));
 			return rows.map(toDelivery);
-		},
-
-		/** Marks the Person's entry read. False: they have no such entry. */
-		async markRead(personId: string, key: string, at: number) {
-			const rows = await db
-				.update(notificationDelivery)
-				.set({ readAt: asDate(at) })
-				.where(
-					and(
-						eq(notificationDelivery.personId, personId),
-						eq(notificationDelivery.key, key),
-						isNull(notificationDelivery.readAt),
-					),
-				)
-				.returning({ key: notificationDelivery.key });
-			if (rows.length > 0) return true;
-			const [known] = await db
-				.select({ key: notificationDelivery.key })
-				.from(notificationDelivery)
-				.where(
-					and(
-						eq(notificationDelivery.personId, personId),
-						eq(notificationDelivery.key, key),
-					),
-				);
-			return known !== undefined;
 		},
 
 		/**

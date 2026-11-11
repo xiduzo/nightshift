@@ -7,8 +7,8 @@ import { ThisPhoneCard } from "./this-phone-card";
 
 /**
  * Settings: who is signed in to which Host, notifications on this phone,
- * the morning digest, what Night Shift tells you about, quiet hours, the
- * appearance, and this phone.
+ * what Night Shift tells you about, quiet hours, the appearance, and this
+ * phone.
  */
 export function SettingsScreen() {
 	return (

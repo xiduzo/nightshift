@@ -18,7 +18,6 @@ import { type Flow, singleAgentFlow, starterList } from "@nightshift/flows";
 import {
 	createInAppChannel,
 	createNotifications,
-	engineDigestSource,
 	engineRunEvents,
 	type Notifications,
 } from "@nightshift/notifications";
@@ -161,7 +160,6 @@ describe("replies of a real engine", () => {
 			events: engineRunEvents(engine),
 			sendsFor: async () => true,
 			inApp,
-			digests: engineDigestSource(engine),
 		});
 		await notifications.start();
 		context = testContext({
@@ -456,7 +454,7 @@ describe("replies of a real engine", () => {
 			statuses: ["finished", "failed"],
 		})) as { id: string; endedAt: number | null; metrics?: unknown }[];
 		expect(page.map((r) => r.id)).toEqual([started.id]);
-		// The run list carries the run's metrics: the digest and the Runs table read them.
+		// The run list carries the run's metrics: the Runs table reads them.
 		expect(page[0]?.metrics).toEqual({
 			wallMs: expect.any(Number),
 			agentMs: expect.any(Number),
@@ -506,11 +504,6 @@ describe("replies of a real engine", () => {
 		})) as { copies: { runId: string }[] };
 		expect(copies.copies.map((c) => c.runId)).toEqual([started.id]);
 		await read(appRouter.gates.list);
-		// A digest read now (its `to` is now: two replies differ): the run that ended is its one line.
-		const digest = (await reply(appRouter.notifications.digest.since, {
-			since: 0,
-		})) as { runs: { runId: string }[] } | null;
-		expect(digest?.runs.map((r) => r.runId)).toEqual([started.id]);
 		const heard = await notices;
 		for (const notice of heard) {
 			expect(

@@ -1,9 +1,4 @@
-import {
-	DIGEST_CHOICES,
-	digestAtTime,
-	PHONE_DELAYS,
-	phoneDelayLabel,
-} from "@nightshift/client";
+import { PHONE_DELAYS, phoneDelayLabel } from "@nightshift/client";
 import {
 	Alert,
 	AlertAction,
@@ -107,7 +102,7 @@ function timeZones(current: string): string[] {
 
 /**
  * Your notification settings, on every screen: which events, quiet hours,
- * the morning digest, which kinds of screen, and how long a phone waits. Each change saves at
+ * which kinds of screen, and how long a phone waits. Each change saves at
  * once. Then the phones and browsers that can notify you.
  */
 export function NotificationSettingsCard() {
@@ -230,8 +225,6 @@ function SettingsForm({ data }: { data: NotificationSettings }) {
 						</FieldGroup>
 					</FieldSet>
 					<FieldSeparator />
-					<DigestField data={data} />
-					<FieldSeparator />
 					<FieldSet>
 						<FieldLegend>Where Night Shift tells you</FieldLegend>
 						<FieldDescription>
@@ -297,73 +290,7 @@ function SettingsForm({ data }: { data: NotificationSettings }) {
 	);
 }
 
-/**
- * The morning digest: off, when quiet hours end, or at a time. Without
- * quiet hours it comes at its time, so the time shows then too.
- */
-function DigestField({ data }: { data: NotificationSettings }) {
-	const id = useId();
-	const save = useSaveSettings();
-	const { when, time } = data.digest;
-	const atTime = digestAtTime(data);
-	return (
-		<FieldSet>
-			<FieldGroup>
-				<Field>
-					<FieldLabel htmlFor={`${id}-digest`}>Morning digest</FieldLabel>
-					<Select
-						items={DIGEST_CHOICES}
-						value={when}
-						onValueChange={(next) => {
-							if (next) save.mutate({ digest: { when: next } });
-						}}
-					>
-						<SelectTrigger
-							id={`${id}-digest`}
-							className="w-full sm:w-56"
-							aria-describedby={`${id}-digest-description`}
-						>
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectGroup>
-								{DIGEST_CHOICES.map((item) => (
-									<SelectItem key={item.value} value={item.value}>
-										{item.label}
-									</SelectItem>
-								))}
-							</SelectGroup>
-						</SelectContent>
-					</Select>
-					<FieldDescription id={`${id}-digest-description`}>
-						One notification a day about ended runs and waiting Gates. It skips
-						days with nothing new.
-						{when === "quiet-hours-end" && !data.quietHours
-							? ` You have no quiet hours, so it comes at ${time}.`
-							: null}
-					</FieldDescription>
-				</Field>
-				{atTime ? (
-					<div className="grid gap-4 sm:grid-cols-3">
-						<TimeField
-							label="Time"
-							value={time}
-							onSave={(next) => save.mutate({ digest: { time: next } })}
-						/>
-						{data.quietHours ? null : (
-							<TimeZoneField
-								value={data.timeZone}
-								onSave={(zone) => save.mutate({ timeZone: zone })}
-							/>
-						)}
-					</div>
-				) : null}
-			</FieldGroup>
-		</FieldSet>
-	);
-}
-
-/** Your time zone: quiet hours and the digest's time are in it. */
+/** Your time zone: quiet hours are in it. */
 function TimeZoneField({
 	value,
 	onSave,

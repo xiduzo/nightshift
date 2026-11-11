@@ -16,7 +16,6 @@ export function applySettingsPatch(
 		timeZone: patch.timeZone ?? settings.timeZone,
 		screens: { ...settings.screens, ...patch.screens },
 		holdMinutes: patch.holdMinutes ?? settings.holdMinutes,
-		digest: { ...settings.digest, ...patch.digest },
 	};
 }
 
@@ -29,16 +28,6 @@ export function createNotificationQueries(orpc: ApiQueryUtils) {
 		settings: () => orpc.notifications.settings.get.queryOptions(),
 		/** The browsers, phones and desktop apps that get the person's notifications. */
 		screens: () => orpc.notifications.targets.list.queryOptions(),
-		/** The person's last morning digest, read again now. Null: none went out yet. */
-		digest: () => orpc.notifications.digest.latest.queryOptions(),
-		/** The person's digests of the last 90 days, newest first, each read or unread. */
-		digests: () => ({
-			...orpc.notifications.digests.list.queryOptions(),
-			refetchOnWindowFocus: "always" as const,
-		}),
-		/** One digest of the list, read again: what it said and the runs that ended before it. */
-		digestOf: (key: string) =>
-			orpc.notifications.digests.get.queryOptions({ input: { key } }),
 		/** The public key a browser subscribes with. Null: no browser notifications. */
 		webPushKey: () => ({
 			...orpc.notifications.webPush.key.queryOptions(),

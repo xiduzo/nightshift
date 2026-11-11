@@ -116,8 +116,7 @@ function urgencyOf(
 	if (
 		kind === "run-failed" ||
 		kind === "device-wait" ||
-		kind === "schedule-missed" ||
-		kind === "digest"
+		kind === "schedule-missed"
 	) {
 		return "normal";
 	}

@@ -45,13 +45,6 @@ export const notificationSettings = sqliteTable("notification_settings", {
 	screens: text("screens").notNull().default("{}"),
 	/** How long a push to a phone or a closed browser waits while a screen is open. */
 	holdMinutes: integer("hold_minutes").notNull().default(3),
-	/**
-	 * When the morning digest goes out: `off`, `quiet-hours-end` (at the
-	 * end of quiet hours, else at `digest_time`) or `time` (at `digest_time`).
-	 */
-	digestWhen: text("digest_when").notNull().default("quiet-hours-end"),
-	/** The digest's time of day, `HH:MM` in `time_zone`. */
-	digestTime: text("digest_time").notNull().default("08:00"),
 	updatedAt: updatedAt(),
 });
 
@@ -93,18 +86,16 @@ export const pushTarget = sqliteTable(
  * What the notifier did with one event for one Person: sent, held or
  * withdrawn. Keyed by the event (`runId:stepId` for a Gate,
  * `runId:end:<seq>` for a run that ended, `runId:wait:<stepId>` for a
- * step that waits for a Device, `digest:<date>` for the morning
- * digest), so a notification goes out once and can be withdrawn on every
- * screen that got it.
+ * step that waits for a Device), so a notification goes out once and can
+ * be withdrawn on every screen that got it.
  */
 export const notificationDelivery = sqliteTable(
 	"notification_delivery",
 	{
 		personId: text("person_id").notNull(),
 		key: text("key").notNull(),
-		/** `gate-opened`, `run-finished`, `run-failed`, `device-wait` or `digest`. */
+		/** `gate-opened`, `run-finished`, `run-failed`, `device-wait` or `schedule-missed`. */
 		kind: text("kind").notNull(),
-		/** Empty for a digest, which spans Spaces and runs. */
 		spaceId: text("space_id").notNull(),
 		runId: text("run_id").notNull(),
 		/** The Gate's step, or the step that waits. Null for a run. */
@@ -131,8 +122,6 @@ export const notificationDelivery = sqliteTable(
 		createdAt: createdAt(),
 		sentAt: integer("sent_at", { mode: "timestamp_ms" }),
 		withdrawnAt: integer("withdrawn_at", { mode: "timestamp_ms" }),
-		/** When the Person opened it in the inbox: a digest. Null: unread. */
-		readAt: integer("read_at", { mode: "timestamp_ms" }),
 	},
 	(table) => [
 		primaryKey({ columns: [table.personId, table.key] }),

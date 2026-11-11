@@ -23,7 +23,6 @@ export type { KnowledgeMap } from "./map";
 export { type KnowledgeMeaning, ollamaMeaning } from "./meaning";
 export type { KnowledgeQuestion } from "./questions";
 export type { KnowledgeHit, KnowledgeMeaningStatus } from "./search";
-export { knowledgeSourceProblems, type SourceProblem } from "./sources";
 export type { KnowledgeRequest, KnowledgeUseEvent } from "./step-knowledge";
 export {
 	type AskedQuestion,

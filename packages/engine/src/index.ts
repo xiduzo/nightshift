@@ -112,9 +112,7 @@ export {
 	type KnowledgeQuestion,
 	type KnowledgeText,
 	type KnowledgeUseReport,
-	knowledgeSourceProblems,
 	LOCAL_ONLY_BYTES,
-	type SourceProblem,
 	type WaitingLearning,
 } from "./knowledge";
 export type {

@@ -5,5 +5,4 @@
  */
 
 export { NotificationSettingsCard } from "./components/notification-settings-card";
-export { notificationMutations, notificationQueries } from "./queries";
 export { NotificationStream } from "./use-notification-stream";

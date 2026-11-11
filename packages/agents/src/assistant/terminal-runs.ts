@@ -18,7 +18,6 @@ export const RUN_TOOLS = {
 	stopRun: "stop_run",
 	needsMe: "needs_me",
 	answerGate: "answer_gate",
-	getDigest: "get_digest",
 } as const;
 
 /** The statuses a run can have, as `list_runs` filters them. */
@@ -84,25 +83,6 @@ export type TerminalGate = {
 	answerPending: boolean;
 };
 
-/** A digest: the runs that ended in a window, and the Gates that wait now. */
-export type TerminalDigest = {
-	/** Epoch ms. */
-	from: number;
-	/** "3 runs finished, 1 failed. $4.20 spent. 1 Gate waits for you." */
-	body: string;
-	/** Newest first. */
-	runs: {
-		runId: string;
-		title: string;
-		/** "Finished", "Nothing to do", "Failed", "Stopped". */
-		statusText: string;
-		/** The cost, why it ended, what went wrong. */
-		detail: string | null;
-		prUrl: string | null;
-	}[];
-	gates: { runId: string; stepId: string; title: string }[];
-};
-
 /** What the run tools read and do: Night Shift on this computer. */
 export type TerminalRunPort = {
 	flows(projectId: string): Promise<ProjectFlowMap>;
@@ -131,8 +111,6 @@ export type TerminalRunPort = {
 		choice: string;
 		note?: string;
 	}): Promise<void>;
-	/** The digest since `since` (epoch ms), or since your last digest. Null: nothing to say. */
-	digest(since?: number): Promise<TerminalDigest | null>;
 	/** Where a person opens the run, at the step when given. */
 	runLink(runId: string, stepId?: string): string;
 };
@@ -488,48 +466,6 @@ export function terminalRunTools(
 				...(words !== null ? { note: words } : {}),
 			});
 			return `Answered "${choice.name}" to the Gate of "${gate.runTitle}". The run continues. Follow it at ${port.runLink(gate.runId, gate.stepId)}`;
-		}),
-		toolDefinition({
-			name: RUN_TOOLS.getDigest,
-			description:
-				"What happened since a time: one line per run that ended (status, cost, pull request or why it ended) and the Gates that wait now. Without `since`: since your last morning digest. Use it to report on a night.",
-			inputSchema: {
-				type: "object",
-				properties: {
-					since: {
-						...sinceProperty,
-						description: `The runs that ended after this time. ${sinceProperty.description}`,
-					},
-				},
-			},
-		}).server(async (args: unknown) => {
-			const since = sinceOf(field(args, "since"), now());
-			const digest = await port.digest(since);
-			const when =
-				since === undefined ? "your last digest" : (isoOrNull(since) as string);
-			if (!digest) return `No run ended since ${when}, and no Gate waits.`;
-			const lines = [`Since ${isoOrNull(digest.from)}: ${digest.body}`];
-			if (digest.runs.length > 0) {
-				lines.push("", "Runs:");
-				for (const run of digest.runs) {
-					const parts = [
-						run.statusText,
-						...(run.detail ? [run.detail] : []),
-						...(run.prUrl ? [`Pull request: ${run.prUrl}`] : []),
-					];
-					lines.push(`- ${run.title} (run ${run.runId}): ${parts.join(" · ")}`);
-				}
-			}
-			if (digest.gates.length > 0) {
-				lines.push(
-					"",
-					`Gates that wait (${RUN_TOOLS.needsMe} has their questions):`,
-				);
-				for (const gate of digest.gates) {
-					lines.push(`- ${gate.title} (gate ${gateIdOf(gate)})`);
-				}
-			}
-			return lines.join("\n");
 		}),
 	];
 }

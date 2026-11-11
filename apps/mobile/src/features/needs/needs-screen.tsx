@@ -22,7 +22,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
 
 import { useHostQueries, useSignedIn } from "@/features/host";
-import { DigestSection, GateRow, useLastDigest } from "@/features/inbox";
+import { GateRow } from "@/features/inbox";
 import { LearningRow } from "@/features/learnings";
 import { PushCard } from "@/features/push";
 import { leaveRun, unleaveRun } from "@/features/runs";
@@ -79,12 +79,7 @@ export function NeedsScreen() {
 	const needs = useNeedsYou(subscribed);
 	const projectQueries = useHostQueries(createProjectQueries);
 	const projects = useQuery({ ...projectQueries.list(), subscribed });
-	const digest = useLastDigest(subscribed);
-	const refresh = useScreenRefresh([
-		needs.refetch,
-		projects.refetch,
-		digest.refetch,
-	]);
+	const refresh = useScreenRefresh([needs.refetch, projects.refetch]);
 	const retry = useRetryRuns();
 	const { onKeep, onDelete, failure: settleFailure } = needs.learnings;
 	const [left, setLeft] = useState<{ runId: string; title: string } | null>(
@@ -204,7 +199,6 @@ export function NeedsScreen() {
 							</Button>
 						</Alert>
 					) : null}
-					<DigestSection digest={digest.data} />
 					{needs.gatesError ? (
 						<ErrorAlert
 							title="Your Gates did not load"

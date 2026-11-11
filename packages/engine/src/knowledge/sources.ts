@@ -5,7 +5,6 @@ import {
 	type FlowIssue,
 	type KnowledgeSource,
 	knowledgeKitsOf,
-	knowledgeSourceKind,
 	legacyDeviceName,
 	REVIEW_LEARNINGS_KIT,
 	type Schedule,
@@ -130,18 +129,6 @@ function syncHealth(
 			return "failed";
 	}
 }
-
-/** A source of a project whose last sync needs a person, for the morning digest. */
-export type SourceProblem = {
-	projectId: string;
-	projectName: string;
-	/** The flow that syncs it. */
-	flow: string;
-	/** What it syncs, for a person: the kind of a source the page added, else the flow's name. */
-	label: string;
-	health: NonNullable<SyncHealth>;
-	lastRun: NonNullable<KnowledgeSync["lastRun"]>;
-};
 
 /** What the person's role allows on the sources of this project, as the API checked it. */
 type SourcePermissions = {
@@ -492,54 +479,4 @@ export function knowledgeSources<Run extends SourceRun>(
 			});
 		},
 	};
-}
-
-/**
- * The sources of a Space's projects whose last sync needs a person
- * (`syncHealth`), for the morning digest: no reconcile, no files. A
- * project the Space cannot read is left out.
- */
-export async function knowledgeSourceProblems(
-	space: Pick<SourcesSpace, "flows" | "listRuns"> & {
-		listProjects(): Promise<{ id: string; name: string }[]>;
-	},
-	now: number = timeNow(),
-): Promise<SourceProblem[]> {
-	const problems: SourceProblem[] = [];
-	for (const project of await space.listProjects()) {
-		const read = await Promise.all([
-			space.flows.map(project.id),
-			space.listRuns({ projectId: project.id, limit: LAST_RUNS }),
-		]).catch((error: unknown) => {
-			if (error instanceof Refusal) return null;
-			throw error;
-		});
-		if (!read) continue;
-		const [flows, runs] = read;
-		for (const [flow, parsed] of Object.entries(flows).sort(([a], [b]) =>
-			a.localeCompare(b),
-		)) {
-			const kits = parsed ? knowledgeKitsOf(parsed) : [];
-			if (!kits.some((kit) => kit !== REVIEW_LEARNINGS_KIT)) continue;
-			const last = runs.find((run) => run.flowName === flow);
-			if (!last) continue;
-			const lastRun = {
-				id: last.id,
-				status: last.status,
-				at: last.endedAt ?? last.createdAt,
-			};
-			const health = syncHealth(lastRun, now);
-			if (!health) continue;
-			const source = parsed ? sourceOf(parsed) : null;
-			problems.push({
-				projectId: project.id,
-				projectName: project.name,
-				flow,
-				label: source ? knowledgeSourceKind(source.kit).label : flow,
-				health,
-				lastRun,
-			});
-		}
-	}
-	return problems;
 }

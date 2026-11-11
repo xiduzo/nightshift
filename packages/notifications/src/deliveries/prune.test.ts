@@ -27,19 +27,19 @@ test("pruning removes old entries, but keeps a Gate or a wait that can still rea
 			{ status },
 			at,
 		);
-	await add("digest:old", "digest", "sent", 10);
+	await add("missed:old", "schedule-missed", "sent", 10);
 	await add("run:old", "run-finished", "sent", 10);
 	await add("gate:old-closed", "gate-opened", "withdrawn", 10);
 	await add("gate:old-open", "gate-opened", "sent", 10);
 	await add("wait:old-live", "device-wait", "held", 10);
-	await add("digest:new", "digest", "sent", 100);
+	await add("missed:new", "schedule-missed", "sent", 100);
 
 	expect(await log.prune(50)).toBe(3);
 	const left = [
-		...(await log.ofPersonSince("ada", "digest", 0)),
+		...(await log.ofPersonSince("ada", "schedule-missed", 0)),
 		...(await log.ofPersonSince("ada", "gate-opened", 0)),
 		...(await log.ofPersonSince("ada", "device-wait", 0)),
 		...(await log.ofPersonSince("ada", "run-finished", 0)),
 	].map((row) => row.key);
-	expect(left.sort()).toEqual(["digest:new", "gate:old-open", "wait:old-live"]);
+	expect(left.sort()).toEqual(["gate:old-open", "missed:new", "wait:old-live"]);
 });

@@ -19,8 +19,8 @@ import { defaultDaemonUrl } from "./join";
  * stdio for an agent in a terminal (Claude Code, Codex, …), with the
  * authoring tools of the chat in the flow editor (draw, check and save a
  * flow, start a run) and the run side of a night: list, read and stop
- * runs, the Gates that wait and their answers, and the digest; and search
- * and read the project's knowledge on this computer. Add it to
+ * runs, and the Gates that wait and their answers; and search and read
+ * the project's knowledge on this computer. Add it to
  * Claude Code with
  * `claude mcp add nightshift -- nightshift mcp`.
  *
@@ -38,7 +38,7 @@ import { defaultDaemonUrl } from "./join";
 const NOT_RUNNING =
 	"Night Shift is not running on this computer. Start it, then try again.";
 
-const INSTRUCTIONS = `Night Shift's tools: build flows, and drive the runs of a night. Night Shift keeps the flows of a project as its own data, not as files: read and save them only with these tools. Write flows as the nightshift-flows skill says. Look names up with list_profiles, list_tools and list_skills: a node names a profile by the device and profile ids that list_profiles gives. To change a flow, start from get_flow and keep the positions and Sections of what you do not change. Group a flow of more than about six nodes into Sections, one per phase. Check a flow with check_flow, then save it with save_flow. Start a saved flow with start_run. Follow runs with list_runs and get_run, and stop one with stop_run. A Gate waits for a person: needs_me lists the Gates that wait, with their questions and options. Answer one with answer_gate only with the option the person chose. get_digest says what happened since a time. ${KNOWLEDGE_TERMINAL_INSTRUCTION}`;
+const INSTRUCTIONS = `Night Shift's tools: build flows, and drive the runs of a night. Night Shift keeps the flows of a project as its own data, not as files: read and save them only with these tools. Write flows as the nightshift-flows skill says. Look names up with list_profiles, list_tools and list_skills: a node names a profile by the device and profile ids that list_profiles gives. To change a flow, start from get_flow and keep the positions and Sections of what you do not change. Group a flow of more than about six nodes into Sections, one per phase. Check a flow with check_flow, then save it with save_flow. Start a saved flow with start_run. Follow runs with list_runs and get_run, and stop one with stop_run. A Gate waits for a person: needs_me lists the Gates that wait, with their questions and options. Answer one with answer_gate only with the option the person chose. ${KNOWLEDGE_TERMINAL_INSTRUCTION}`;
 
 export type McpOptions = {
 	daemon: string;
@@ -249,12 +249,6 @@ export function apiPort(
 		stopRun: (runId, when) => g(() => client.runs.stop({ runId, when })),
 		gates: () => g(() => client.gates.list()),
 		answerGate: (answer) => g(() => client.gates.resolve(answer)),
-		digest: (since) =>
-			g(() =>
-				client.notifications.digest.since(
-					since === undefined ? undefined : { since },
-				),
-			),
 		searchKnowledge: (projectId, query, limit) =>
 			g(() =>
 				client.knowledge.search({ projectId, query, limit, agent: true }),

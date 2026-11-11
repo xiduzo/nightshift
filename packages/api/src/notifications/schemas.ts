@@ -1,9 +1,4 @@
 import {
-	type Digest,
-	type DigestEntry,
-	type DigestGate,
-	type DigestKnowledgeSource,
-	type DigestRun,
 	type InAppItem,
 	type NotificationSettings,
 	notificationSettingsSchema,
@@ -13,7 +8,6 @@ import {
 import { z } from "zod";
 
 import { exact } from "../output";
-import { runStatusSchema } from "../runs";
 
 /** A Person's notification settings: which events, quiet hours, which screens, the phone delay. */
 export const settingsSchema = exact<NotificationSettings>()(
@@ -117,72 +111,6 @@ export const notificationItemSchema = exact<InAppItem>()(
 		}),
 	]),
 );
-
-const digestRunSchema = exact<DigestRun>()(
-	z.object({
-		runId: z.string(),
-		spaceId: z.string(),
-		/** The flow and the run's inputs, or "Quick run · <prompt>". */
-		title: z.string(),
-		status: runStatusSchema,
-		/** "Finished", "Nothing to do", "Failed", "Stopped". */
-		statusText: z.string(),
-		/** The cost with how sure it is, why it ended, what went wrong. */
-		detail: z.string().nullable(),
-		prUrl: z.string().nullable(),
-		endedAt: z.number(),
-	}),
-);
-
-const digestGateSchema = exact<DigestGate>()(
-	z.object({
-		spaceId: z.string(),
-		runId: z.string(),
-		stepId: z.string(),
-		title: z.string(),
-	}),
-);
-
-const digestKnowledgeSourceSchema = exact<DigestKnowledgeSource>()(
-	z.object({
-		spaceId: z.string(),
-		projectId: z.string(),
-		/** The source and its project. */
-		title: z.string(),
-		/** "Last sync failed", "Not synced in a week". */
-		statusText: z.string(),
-		/** Its last run. */
-		runId: z.string(),
-	}),
-);
-
-/** The last morning digest: the runs that ended before it, the Gates that wait now, and the knowledge sources that need you. */
-export const digestSchema = exact<Digest>()(
-	z.object({
-		from: z.number(),
-		to: z.number(),
-		title: z.string(),
-		body: z.string(),
-		runs: z.array(digestRunSchema),
-		gates: z.array(digestGateSchema),
-		sources: z.array(digestKnowledgeSourceSchema),
-	}),
-);
-
-/** One digest in the inbox list: what its push said, and whether you opened it. */
-export const digestEntrySchema = exact<DigestEntry>()(
-	z.object({
-		/** Opens it again (`digest.of`). */
-		key: z.string(),
-		at: z.number(),
-		title: z.string(),
-		body: z.string(),
-		read: z.boolean(),
-	}),
-);
-
-/** One digest of the list, by its key. */
-export const digestKeySchema = z.object({ key: z.string().min(1) });
 
 /** Who follows the stream. Optional, so an older screen sends nothing. */
 export const watchInputSchema = z

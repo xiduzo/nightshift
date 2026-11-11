@@ -18,8 +18,8 @@ import type {
 /** One item of the in-app stream. */
 export type InAppItem =
 	| {
-			/** A digest has no item: a screen reads it when it shows the inbox. A missed schedule is a push only. */
-			kind: Exclude<NoticeKind, "digest" | "schedule-missed">;
+			/** A missed schedule is a push only. */
+			kind: Exclude<NoticeKind, "schedule-missed">;
 			key: string;
 			spaceId: string;
 			runId: string;
@@ -168,7 +168,6 @@ export function createInAppChannel(
 		async send(target, message: NotificationMessage) {
 			if (
 				message.kind === "gates-waiting" ||
-				message.kind === "digest" ||
 				message.kind === "schedule-missed" ||
 				message.spaceId === null ||
 				message.runId === null

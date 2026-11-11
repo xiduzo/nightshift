@@ -99,25 +99,24 @@ describe("the desktop channel", () => {
 		});
 	});
 
-	test("a digest says its sum and opens the inbox", async () => {
+	test("a missed schedule says when it was due and opens the inbox", async () => {
 		const { notifier, desktop } = channel({
 			window: { focused: true, path: "/runs" },
 		});
 		await desktop.send(target(), {
 			...gate,
-			kind: "digest",
-			key: "digest:2026-10-21",
-			spaceId: null,
+			kind: "schedule-missed",
+			key: "missed:p1:s1:5",
 			runId: null,
 			stepId: null,
-			title: "Night Shift: last night",
-			body: "3 runs finished, 1 failed. $4.20 spent.",
+			title: "A schedule did not start",
+			body: "Triage was due at 22:30.",
 		});
 		expect(notifier.shown).toEqual([
 			{
-				id: "digest:2026-10-21",
-				title: "Night Shift: last night",
-				body: "3 runs finished, 1 failed. $4.20 spent.",
+				id: "missed:p1:s1:5",
+				title: "A schedule did not start",
+				body: "Triage was due at 22:30.",
 				open: "/inbox",
 			},
 		]);

@@ -26,14 +26,6 @@ export {
 	systemDesktopNotifier,
 } from "./desktop";
 export {
-	type Digest,
-	type DigestEntry,
-	type DigestGate,
-	type DigestKnowledgeSource,
-	type DigestRun,
-	engineDigestSource,
-} from "./digest";
-export {
 	engineRunEvents,
 	oneSenderPerSpace,
 	type RunEventSource,

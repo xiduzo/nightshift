@@ -1,10 +1,8 @@
-/** A Person's notification settings: which events, quiet hours, which screens, the phone delay, the digest. */
+/** A Person's notification settings: which events, quiet hours, which screens, and the phone delay. */
 
 export {
 	type ComputerSwitches,
 	createSettingsStore,
-	digestDay,
-	digestTime,
 	eventsOfSwitches,
 	inQuietHours,
 	type NotificationSettings,

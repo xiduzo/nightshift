@@ -15,7 +15,7 @@ import type { AnsweredGate, OpenGate } from "./views";
 export type InboxGate = OpenGate & { spaceName: string; canAnswer: boolean };
 
 /**
- * How long the inbox keeps what it showed: answered Gates and digests.
+ * How long the inbox keeps what it showed: answered Gates.
  * The same 90 days as runs (`cleanUpAfterDays`).
  */
 export const INBOX_KEEP_MS = 90 * 24 * 60 * 60_000;

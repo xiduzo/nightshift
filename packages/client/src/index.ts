@@ -146,11 +146,6 @@ export {
 export {
 	applySettingsPatch,
 	createNotificationQueries,
-	DIGEST_CHOICES,
-	type Digest,
-	type DigestEntry,
-	digestAtTime,
-	digestShown,
 	type NotificationScreen,
 	type NotificationSettings,
 	type NotificationSettingsPatch,

@@ -69,7 +69,6 @@ function fakePort(
 		stopRun: async () => {},
 		gates: async () => [],
 		answerGate: async () => {},
-		digest: async () => null,
 		searchKnowledge: async () => [],
 		readKnowledge: async () => null,
 		knowledgeFiles: async () => [],
@@ -110,7 +109,6 @@ describe("nightshift mcp tools", () => {
 		expect(names).toEqual([
 			"answer_gate",
 			"check_flow",
-			"get_digest",
 			"get_flow",
 			"get_run",
 			"list_flows",
@@ -461,62 +459,6 @@ describe("the run tools of nightshift mcp", () => {
 				note: "Rename the button.",
 			},
 		]);
-	});
-
-	test("get_digest says what happened since a time, or since the last digest", async () => {
-		const asked: unknown[] = [];
-		const { call } = await connect(
-			fakePort({
-				digest: async (since) => {
-					asked.push(since);
-					if (since === NOW) return null;
-					return {
-						from: since ?? NOW - 10 * HOUR,
-						body: "1 run finished, 1 failed. About $1.40 spent. 1 Gate waits for you.",
-						runs: [
-							{
-								runId: "run-1",
-								title: "existing · login",
-								statusText: "Finished",
-								detail: "$1.00",
-								prUrl: "https://github.com/acme/app/pull/7",
-							},
-							{
-								runId: "run-2",
-								title: "existing · site",
-								statusText: "Failed",
-								detail: "about $0.40 · The tests failed.",
-								prUrl: null,
-							},
-						],
-						gates: [
-							{ runId: "run-3", stepId: "step-1", title: "existing · menu" },
-						],
-					};
-				},
-			}),
-			{ now: () => NOW },
-		);
-		expect((await call("get_digest")).text).toBe(
-			[
-				`Since ${iso(NOW - 10 * HOUR)}: 1 run finished, 1 failed. About $1.40 spent. 1 Gate waits for you.`,
-				"",
-				"Runs:",
-				"- existing · login (run run-1): Finished · $1.00 · Pull request: https://github.com/acme/app/pull/7",
-				"- existing · site (run run-2): Failed · about $0.40 · The tests failed.",
-				"",
-				"Gates that wait (needs_me has their questions):",
-				"- existing · menu (gate run-3:step-1)",
-			].join("\n"),
-		);
-		await call("get_digest", { since: "12h" });
-		expect((await call("get_digest", { since: "0h" })).text).toBe(
-			`No run ended since ${iso(NOW)}, and no Gate waits.`,
-		);
-		expect(asked).toEqual([undefined, NOW - 12 * HOUR, NOW]);
-		expect((await call("get_digest", { since: "yesterday" })).isError).toBe(
-			true,
-		);
 	});
 });
 

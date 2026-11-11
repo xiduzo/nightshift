@@ -1,12 +1,5 @@
-import {
-	endSession,
-	roleAllows,
-	roleIn,
-	spaceIds,
-	spacesOf,
-} from "@nightshift/auth";
+import { endSession, roleAllows, roleIn, spaceIds } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { INBOX_KEEP_MS } from "@nightshift/engine";
 import { now as timeNow } from "@nightshift/time";
 import {
 	createVapidKeyStore,
@@ -19,18 +12,10 @@ import {
 	type WebPushSender,
 } from "./channels";
 import { createDeliveryLog } from "./deliveries";
-import {
-	type Digest,
-	type DigestEntry,
-	type DigestSource,
-	digestFrom,
-	readDigest,
-} from "./digest";
 import { createNotifier, type RunEventSource, spaceAudience } from "./notifier";
 import {
 	type ComputerSwitches,
 	createSettingsStore,
-	digestTime,
 	eventsOfSwitches,
 	type NotificationSettings,
 	type NotificationSettingsPatch,
@@ -57,8 +42,6 @@ export type NotificationsOptions = {
 	inApp: InAppChannel;
 	/** The push channels this daemon has. Default: none, the in-app stream only. `stop` stops them too. */
 	push?: PushChannels;
-	/** The runs and Gates the morning digest reads. Absent: no digest. */
-	digests?: DigestSource;
 	/**
 	 * Web Push from this daemon, with the VAPID keys it keeps (made once).
 	 * `subject`: an `https:` URL or a `mailto:` address that push services
@@ -122,34 +105,6 @@ export type Notifications = {
 		/** The public VAPID key a browser subscribes with. Null: this daemon sends no Web Push. */
 		publicKey(): Promise<string | null>;
 	};
-	digest: {
-		/**
-		 * The Person's last digest, read again now: the runs that ended
-		 * between the digest before it and it, and the Gates that wait now,
-		 * in every Space the Person is in. Null: no digest went out yet.
-		 */
-		latest(personId: string): Promise<Digest | null>;
-		/**
-		 * A digest read now: the runs that ended after `from` (default: at
-		 * the last digest the Person got, or a day back, a week at most) and the Gates that wait
-		 * now, in every Space the Person is in. Null: no run ended and no
-		 * Gate waits.
-		 */
-		since(personId: string, from?: number): Promise<Digest | null>;
-		/**
-		 * The digests that said something in the last 90 days, newest
-		 * first: what each push said, and whether the Person opened it.
-		 */
-		list(personId: string): Promise<DigestEntry[]>;
-		/**
-		 * One digest of the list, read again: what its push said, and the
-		 * runs that ended between the digest before it and it. Null: no
-		 * such digest in the last 90 days.
-		 */
-		of(personId: string, key: string): Promise<Digest | null>;
-		/** Marks one of the Person's digests read. False: no such digest. */
-		markRead(personId: string, key: string): Promise<boolean>;
-	};
 	/**
 	 * Tells the open screens of every Member of the Space that a project's
 	 * schedules changed without a run (a pause tonight). Quiet: no push.
@@ -208,7 +163,6 @@ export function createNotifications(
 		deliveries,
 		inApp: options.inApp,
 		push,
-		...(options.digests ? { digests: options.digests } : {}),
 		now,
 		...(options.tickMs ? { tickMs: options.tickMs } : {}),
 	});
@@ -239,94 +193,6 @@ export function createNotifications(
 		},
 		webPush: {
 			publicKey: async () => (vapid ? (await vapid.get()).publicKey : null),
-		},
-		digest: {
-			async latest(personId) {
-				const source = options.digests;
-				if (!source) return null;
-				const rows = await deliveries.ofPerson(personId, "digest", 14);
-				const index = rows.findIndex((row) => row.title !== null);
-				const row = rows[index];
-				if (!row) return null;
-				const spaces = (await spacesOf(db, personId)).map((space) => space.id);
-				return readDigest(source, spaces, {
-					from: digestFrom(rows[index + 1]?.createdAt ?? null, row.createdAt),
-					to: row.createdAt,
-					time: digestTime(await settings.get(personId)),
-				});
-			},
-			async since(personId, from) {
-				const source = options.digests;
-				if (!source) return null;
-				const to = now();
-				// The last digest the Person got: a row without a title said nothing.
-				const last = (await deliveries.ofPerson(personId, "digest", 14)).find(
-					(row) => row.title !== null,
-				);
-				const start = from ?? digestFrom(last?.createdAt ?? null, to);
-				const spaces = (await spacesOf(db, personId)).map((space) => space.id);
-				return readDigest(source, spaces, {
-					from: start,
-					to,
-					time: digestTime(await settings.get(personId)),
-				});
-			},
-			async list(personId) {
-				const rows = await deliveries.ofPersonSince(
-					personId,
-					"digest",
-					now() - INBOX_KEEP_MS,
-				);
-				return rows.flatMap((row) =>
-					row.title === null
-						? []
-						: [
-								{
-									key: row.key,
-									at: row.createdAt,
-									title: row.title,
-									body: row.body ?? "",
-									read: row.readAt !== null,
-								},
-							],
-				);
-			},
-			async of(personId, key) {
-				const source = options.digests;
-				if (!source) return null;
-				// One more than the window: the digest before the oldest one sets where it starts.
-				const rows = await deliveries.ofPersonSince(
-					personId,
-					"digest",
-					now() - INBOX_KEEP_MS - 8 * 24 * 60 * 60_000,
-				);
-				const index = rows.findIndex((row) => row.key === key);
-				const row = rows[index];
-				if (!row || row.title === null) return null;
-				if (row.createdAt < now() - INBOX_KEEP_MS) return null;
-				const spaces = (await spacesOf(db, personId)).map((space) => space.id);
-				const digest = await readDigest(
-					source,
-					spaces,
-					{
-						from: digestFrom(rows[index + 1]?.createdAt ?? null, row.createdAt),
-						to: row.createdAt,
-						time: digestTime(await settings.get(personId)),
-					},
-					true,
-				);
-				// What the push said then, also when no run of it is left to show.
-				return {
-					from: digest?.from ?? row.createdAt,
-					to: row.createdAt,
-					runs: digest?.runs ?? [],
-					gates: [],
-					sources: [],
-					title: row.title,
-					body: row.body ?? "",
-				};
-			},
-			markRead: (personId, key) => deliveries.markRead(personId, key, now()),
 		},
 		async schedulesChanged(spaceId, projectId) {
 			for (const personId of await audience(spaceId)) {
