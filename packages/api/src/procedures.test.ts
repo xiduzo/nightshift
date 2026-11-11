@@ -335,6 +335,7 @@ const ROUTES: Route[] = [
 	// Projects.
 	route("projects.list", undefined, "session", ["space.listProjects", "space.projectRuns"]),
 	route("projects.add", { repoPath: "/repo" }, { project: ["add"] }, ["space.addProject", "usage.note"], [{ repoPath: "/repo", name: undefined }]),
+	route("projects.addWithoutFolder", { name: " Leads " }, { project: ["add"] }, "space.addProjectWithoutFolder", [{ name: "Leads" }]),
 	route("projects.branches", project, "session", "space.listBranches", ["p1"]),
 	route("projects.runCopies", project, "owner", "space.listRunCopies", ["p1"]),
 	route("projects.removeRunCopy", run, "owner", "space.removeRunCopy", ["r", { force: undefined }]),

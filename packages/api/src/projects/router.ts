@@ -108,6 +108,20 @@ export const projects = {
 			});
 			return project;
 		}),
+	/**
+	 * A project without a folder (ADR 22): no remote and no Clone, so no
+	 * computer needs a copy of it. In a Space a Host keeps, the Host adds it.
+	 */
+	addWithoutFolder: permitted({ project: ["add"] })
+		.route({
+			summary:
+				"Adds a project without a folder to the Space. No computer needs a copy of it.",
+		})
+		.output(output(projectSchema))
+		.input(z.object({ name: z.string().trim().min(1).max(100) }))
+		.handler(({ context, input }) =>
+			context.space.addProjectWithoutFolder({ name: input.name }),
+		),
 	/** The local and remote branches of the clone, for "Start from". Read-only, no fetch. */
 	branches: protectedProcedure
 		.route({

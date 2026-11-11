@@ -219,6 +219,7 @@ describe("replies of a real engine", () => {
 			repoPath: sandbox.repoPath,
 		})) as { id: string };
 		const projectId = project.id;
+		await reply(appRouter.projects.addWithoutFolder, { name: "Leads" });
 		await read(appRouter.projects.list);
 		await read(appRouter.projects.branches, { projectId });
 
