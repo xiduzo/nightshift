@@ -119,9 +119,18 @@ export const projects = {
 		})
 		.output(output(projectSchema))
 		.input(z.object({ name: z.string().trim().min(1).max(100) }))
-		.handler(({ context, input }) =>
-			context.space.addProjectWithoutFolder({ name: input.name }),
-		),
+		.handler(async ({ context, input }) => {
+			const project = await context.space.addProjectWithoutFolder({
+				name: input.name,
+			});
+			context.usage.note({
+				kind: "project-added",
+				source: "none",
+				hasRemote: false,
+				starters: 0,
+			});
+			return project;
+		}),
 	/** The local and remote branches of the clone, for "Start from". Read-only, no fetch. */
 	branches: protectedProcedure
 		.route({
