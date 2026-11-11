@@ -172,7 +172,7 @@ export const flowOutputSchema = z.object({
 
 /**
  * Where a kept variable lives between runs. `project`: one value per flow
- * and variable in the project, on the computer that runs the flow.
+ * and variable in the project, shared by every computer of its Space.
  */
 const variableKeepSchema = z.enum(["project"]);
 

@@ -9,8 +9,10 @@ import type { LeaseKeeper } from "./keeper";
  * (`RunHolds`):
  *
  * - On every end of the run they go. An interrupted run keeps them for
- *   its resume, and renews nothing until it continues, so a run that never
- *   does loses them after their ttl. One that does not continue lets go.
+ *   its resume: the keeper goes on renewing them until the run continues,
+ *   or until startup recovery tells `notContinuing` and the run lets go.
+ *   A lease that nobody renews (this computer is gone) expires after its
+ *   ttl.
  * - A run that resumes takes back the leases it held when it ended, of
  *   the scopes its re-entry node is inside, and logs each again
  *   (`LeaseTaken` with `again`). Another run that holds one now refuses
