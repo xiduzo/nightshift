@@ -9,6 +9,7 @@ import {
 	type ChoiceItem,
 	choiceItemSchema,
 	type GateDeadline as DeadlineSpec,
+	type GateBriefFields,
 	type JsonValue,
 	renderGateQuestion,
 	renderTemplate,
@@ -19,6 +20,7 @@ import {
 } from "@nightshift/flows";
 import type { GateChoice, StepOutputs } from "../../../log";
 import type { NodeAction, StepContext } from "../../context";
+import type { BriefSpec } from "../../gate-brief";
 import { interruptNode } from "../../interrupt";
 import { askAnswerProblem } from "../../output-schema";
 import { route } from "../../route";
@@ -67,6 +69,10 @@ export type AskHow = {
 	default?: JsonValue;
 	outputs?: StepOutputs;
 	climb?: true;
+	/** The brief fields (ADR 21), else the node's: the person tier gives its own. */
+	brief?: GateBriefFields;
+	/** What the engine knows of the background when the flow writes none: the tries. */
+	known?: BriefSpec["known"];
 };
 
 /** The one choice of an Ask's Gate: an older screen shows it, and the engine asks for the data. */
@@ -93,6 +99,11 @@ export function askGate(
 		...(deadline ? { deadline } : {}),
 		outputs: { ...how.outputs, data: null },
 		...(how.climb ? { climb: true as const } : {}),
+		brief: {
+			fields: how.brief ?? node,
+			recommends: false,
+			...(how.known ? { known: how.known } : {}),
+		},
 		form: (step) =>
 			askForm(node, ctx, step, {
 				...(how.prefill !== undefined ? { prefill: how.prefill } : {}),

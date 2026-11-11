@@ -1,6 +1,7 @@
 import type { AskForm } from "@nightshift/flows";
 import type { GateChoice, GateDeadline, GateVia, StepEvent } from "../log";
 import type { StepContext } from "./context";
+import { saysAnything, type WrittenBrief } from "./gate-brief";
 
 /**
  * Opens a Gate on a step that stays open: a person answers it. Two nodes
@@ -13,7 +14,8 @@ import type { StepContext } from "./context";
  * dies before the transcript line is written. A Gate with a `deadline` (a
  * Decision's, worked out as it opens) logs it with the Gate: the runner
  * sets its timer from there. An Ask (a Value made by a person, ADR 10)
- * logs its form with the Gate.
+ * logs its form with the Gate. Its brief (ADR 21) goes with it when it
+ * says anything, with the cost of the model that wrote part of it.
  */
 export async function openGate(
 	ctx: Pick<StepContext, "log" | "bus" | "run">,
@@ -27,10 +29,12 @@ export async function openGate(
 		lockScreen?: boolean;
 		deadline?: GateDeadline | null;
 		form?: AskForm;
+		brief?: WrittenBrief | null;
 	},
 ): Promise<void> {
 	const { stepId } = step;
-	const { question, choices } = gate;
+	const { question, brief } = gate;
+	const choices = brief?.choices ?? gate.choices;
 	const due = gate.deadline ? { deadline: gate.deadline } : {};
 	await ctx.log.append({
 		type: "GateOpened",
@@ -42,6 +46,17 @@ export async function openGate(
 			...(gate.lockScreen === true ? { lockScreen: true as const } : {}),
 			...due,
 			...(gate.form ? { form: gate.form } : {}),
+			...(brief && saysAnything(brief)
+				? { urgency: brief.urgency, brief: brief.brief }
+				: {}),
+			...(brief?.cost
+				? {
+						briefCostUsd: brief.cost.costUsd,
+						...(brief.cost.costSource !== undefined
+							? { briefCostSource: brief.cost.costSource }
+							: {}),
+					}
+				: {}),
 		},
 	});
 	step.record(null, { type: "gate-open", question, choices, ...due });

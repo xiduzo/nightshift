@@ -13,6 +13,7 @@ import { event, project, run } from "@nightshift/db/schema";
 import type {
 	AskForm,
 	FlowNodeType,
+	GateUrgency,
 	ItemState,
 	JsonValue,
 	Outcome,
@@ -71,6 +72,36 @@ export type GateChoice = {
 	color?: OutcomeColor;
 	/** The choice needs a note: the answer an Agent goes on with. */
 	needsNote?: true;
+	/**
+	 * What happens when a person picks it (ADR 21): the option's `impact`
+	 * rendered, or what a model wrote. Absent: nobody wrote one.
+	 */
+	impact?: string;
+};
+
+/** A part of a Gate's brief that a model can write (ADR 21). */
+export type GateBriefPart =
+	| "urgency"
+	| "situation"
+	| "background"
+	| "recommendation"
+	| "impacts";
+
+/** One item of a Gate's background: what is done, and where the fact comes from. */
+export type GateBackgroundItem = { text: string; source: string | null };
+
+/**
+ * The brief of a Gate (ADR 21): why a person must decide, what is already
+ * done, which option the flow recommends, and who set the urgency. The
+ * flow writes it, a model fills the parts the flow left empty, and
+ * `byModel` names those parts. The impacts live on the choices.
+ */
+export type GateBrief = {
+	urgencyBy: "flow" | "model" | "default";
+	situation: string | null;
+	background: GateBackgroundItem[];
+	recommendation: { option: string | null; reason: string | null } | null;
+	byModel: GateBriefPart[];
 };
 
 /**
@@ -392,6 +423,20 @@ export type EnginePayloads = {
 		/** The rendered question. */
 		question: string;
 		choices: GateChoice[];
+		/**
+		 * How soon it needs an answer, and its brief (ADR 21). Written only
+		 * when the flow or a model set any of it, so absent in older logs and
+		 * on a Gate with nothing to say: those read as `today`, set by
+		 * default, with an empty brief.
+		 */
+		urgency?: GateUrgency;
+		brief?: GateBrief;
+		/**
+		 * What the model that wrote the brief cost, as a decider's cost on
+		 * `StepEnded`. Absent: no model was asked.
+		 */
+		briefCostUsd?: number | null;
+		briefCostSource?: CostSource | null;
 		/**
 		 * The flow author marked this Gate to be answered from the lock
 		 * screen (`lockScreen` on its Decision). Written only when true, so

@@ -7,8 +7,10 @@ import {
 } from "@nightshift/flows";
 import {
 	climbAt,
+	climbBackground,
 	climbLines,
 	climbOutputs,
+	climbRecommendation,
 	climbValues,
 	tierAt,
 } from "../cascade";
@@ -24,7 +26,12 @@ import {
 import { RESUME_RULES, type ResumeRules } from "../resume-point";
 import { type Chooser, decisionOutputs, gateChoices } from "./choosers/chooser";
 import { modelChooser } from "./choosers/model";
-import { gateAskNode, gateChooser, personChooser } from "./choosers/person";
+import {
+	decisionBrief,
+	gateAskNode,
+	gateChooser,
+	personChooser,
+} from "./choosers/person";
 import { ruleChooser } from "./choosers/rule";
 
 /**
@@ -65,6 +72,8 @@ function climbingDecision(node: DecisionNode, ctx: StepContext): NodeAction {
 			);
 		}
 		if (tier.kind === "person") {
+			// Without the flow's words: what each tier picked, and the surest pick.
+			const recommend = climbRecommendation(at.trail);
 			return gateChooser(node, ctx, {
 				question: (tctx) =>
 					climbQuestion(
@@ -78,6 +87,10 @@ function climbingDecision(node: DecisionNode, ctx: StepContext): NodeAction {
 				deadline: tier.tier.deadline,
 				outputs: climbOutputs(node, at),
 				climb: true,
+				brief: decisionBrief(node, tier.tier, {
+					background: climbBackground(at.trail),
+					...(recommend ? { recommend } : {}),
+				}),
 			})(state, config);
 		}
 		return modelChooser(tier.node as DecisionNode, ctx, {

@@ -27,6 +27,7 @@ import { learningNotes } from "@nightshift/flows";
 import { toolDefinition } from "@tanstack/ai";
 import { LEARNINGS_FIELD_DESCRIPTION, LEARNINGS_RULE } from "../knowledge";
 import type {
+	AgentAskBrief,
 	AgentSessionInput,
 	StepReportOutcome,
 	StepReportSpec,
@@ -53,6 +54,8 @@ export type StepReport = {
 	data?: unknown;
 	/** Only when the rules allow learnings, and the agent gave some. */
 	learnings?: string[];
+	/** Only when the agent may ask a person, and it gave a brief. */
+	ask?: AgentAskBrief;
 };
 
 /** The line prefix of a text report. */
@@ -98,6 +101,8 @@ export type ReportRules = {
 	withOutcome: boolean;
 	/** The agent may add short notes it learned (`learnings`). */
 	learnings?: boolean;
+	/** The agent may ask a person: the brief of its question (`ask`), and the person's choices. */
+	ask?: { outcome: string; choices: string[] };
 };
 
 /** The rules of `stepReport: true`. */
@@ -121,6 +126,7 @@ export function reportRules(
 		withOutcome: stepReport.outcome !== false,
 		...(stepReport.output ? { output: stepReport.output } : {}),
 		...(stepReport.learnings ? { learnings: true } : {}),
+		...(stepReport.ask ? { ask: stepReport.ask } : {}),
 	};
 }
 
@@ -158,7 +164,13 @@ export function toolReportInstruction(rules: ReportRules): string {
 				]
 			: []),
 		...(rules.learnings ? [LEARNINGS_RULE] : []),
+		...(rules.ask ? [askRule(rules.ask.outcome)] : []),
 	].join(" ");
+}
+
+/** What the agent is asked to give with a question for a person. */
+function askRule(outcome: string): string {
+	return `When you report "${outcome}", also fill \`ask\`: how urgent the question is, why a person must decide, what you already did or checked, the choice you recommend, and what each choice does. Leave out what you do not know.`;
 }
 
 /** The prompt instruction for the text channel (plan mode). */
@@ -286,7 +298,7 @@ export function parseStepReport(
 	rules: ReportRules = DEFAULT_RULES,
 ): StepReport | undefined {
 	if (typeof input !== "object" || input === null) return undefined;
-	const { outcome, summary, data, learnings } = input as Record<
+	const { outcome, summary, data, learnings, ask } = input as Record<
 		string,
 		unknown
 	>;
@@ -297,11 +309,111 @@ export function parseStepReport(
 	if (typeof summary !== "string") return undefined;
 	if (rules.output && data === undefined) return undefined;
 	const notes = rules.learnings ? learningsOf(learnings) : [];
+	const brief =
+		rules.ask && outcome === rules.ask.outcome ? askBriefOf(ask) : undefined;
 	return {
 		outcome: rules.withOutcome ? (outcome as string) : "",
 		summary: summary.trim(),
 		...(rules.output ? { data: unwrapJsonText(data, rules.output) } : {}),
 		...(notes.length > 0 ? { learnings: notes } : {}),
+		...(brief ? { ask: brief } : {}),
+	};
+}
+
+/** The longest text of one part of an agent's brief. */
+const MAX_BRIEF_TEXT = 2000;
+/** The most background items an agent's brief keeps. */
+const MAX_BACKGROUND = 20;
+
+/**
+ * The brief of an agent's question, as far as it is valid: each part that
+ * is text of the right shape is kept, the rest is left out. Undefined
+ * when nothing is left. A report never fails over its brief.
+ */
+function askBriefOf(value: unknown): AgentAskBrief | undefined {
+	if (typeof value !== "object" || value === null) return undefined;
+	const raw = value as Record<string, unknown>;
+	const text = (part: unknown): string | undefined => {
+		if (typeof part !== "string" || part.trim() === "") return undefined;
+		const trimmed = part.trim();
+		return trimmed.length > MAX_BRIEF_TEXT
+			? `${trimmed.slice(0, MAX_BRIEF_TEXT - 1)}…`
+			: trimmed;
+	};
+	const brief: AgentAskBrief = {};
+	const urgency = text(raw.urgency);
+	if (urgency) brief.urgency = urgency;
+	const situation = text(raw.situation);
+	if (situation) brief.situation = situation;
+	if (Array.isArray(raw.background)) {
+		const items = raw.background
+			.map(text)
+			.filter((item): item is string => item !== undefined)
+			.slice(0, MAX_BACKGROUND);
+		if (items.length > 0) brief.background = items;
+	}
+	const recommend = raw.recommend as Record<string, unknown> | undefined;
+	const choice = text(recommend?.choice);
+	if (choice) {
+		const reason = text(recommend?.reason);
+		brief.recommend = { choice, ...(reason ? { reason } : {}) };
+	}
+	if (typeof raw.impacts === "object" && raw.impacts !== null) {
+		const impacts = Object.fromEntries(
+			Object.entries(raw.impacts).flatMap(([name, impact]) => {
+				const said = text(impact);
+				return said ? [[name, said]] : [];
+			}),
+		);
+		if (Object.keys(impacts).length > 0) brief.impacts = impacts;
+	}
+	return Object.keys(brief).length > 0 ? brief : undefined;
+}
+
+/** The `ask` property of the tool's input: the brief of the agent's question for a person. */
+function askInputSchema(ask: NonNullable<ReportRules["ask"]>) {
+	return {
+		type: "object",
+		description: `Only with the outcome "${ask.outcome}": what the person reads before they answer. Every part is optional.`,
+		properties: {
+			urgency: {
+				type: "string",
+				enum: ["now", "today", "later"],
+				description:
+					'"now": work is blocked or something breaks until the person answers. "today": the run waits, nothing breaks. "later": nothing waits on the answer.',
+			},
+			situation: {
+				type: "string",
+				description: "Why a person must decide, in one or two sentences.",
+			},
+			background: {
+				type: "array",
+				items: { type: "string" },
+				maxItems: MAX_BACKGROUND,
+				description:
+					"What you already decided, checked or did, one fact per item. End an item with (source: X) to say where the fact comes from.",
+			},
+			recommend: {
+				type: "object",
+				properties: {
+					choice: { type: "string", enum: ask.choices },
+					reason: { type: "string" },
+				},
+				required: ["choice"],
+				additionalProperties: false,
+				description: "The choice you recommend, and why in one sentence.",
+			},
+			impacts: {
+				type: "object",
+				properties: Object.fromEntries(
+					ask.choices.map((choice) => [choice, { type: "string" }]),
+				),
+				additionalProperties: false,
+				description:
+					"For each choice, one sentence on what happens when the person picks it.",
+			},
+		},
+		additionalProperties: false,
 	};
 }
 
@@ -400,6 +512,7 @@ export function reportInputSchema(rules: ReportRules): Record<string, unknown> {
 					},
 				}
 			: {}),
+		...(rules.ask ? { ask: askInputSchema(rules.ask) } : {}),
 	};
 	const required = rules.withOutcome ? ["outcome", "summary"] : ["summary"];
 	if (!rules.output) {
@@ -448,6 +561,9 @@ export function reportStepTool(
 		"summary: string",
 		...(rules.output ? ["data: (see the schema)"] : []),
 		...(rules.learnings ? ["learnings?: string[]"] : []),
+		...(rules.ask
+			? ["ask?: { urgency, situation, background, recommend, impacts }"]
+			: []),
 	].join(", ");
 	return toolDefinition({
 		name: REPORT_TOOL_NAME,

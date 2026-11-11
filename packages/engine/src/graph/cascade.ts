@@ -10,7 +10,12 @@ import {
 	tierLabel,
 	tierNode,
 } from "@nightshift/flows";
-import type { GateChoice, StepOutcome, StepOutputs } from "../log";
+import type {
+	GateBackgroundItem,
+	GateChoice,
+	StepOutcome,
+	StepOutputs,
+} from "../log";
 import type { StepEnd } from "./route";
 import { commitVisit } from "./run-position";
 import type {
@@ -260,23 +265,60 @@ export const RETRY_GATE_CHOICES: readonly GateChoice[] = [
 	},
 ];
 
+/** One try of the climb in words: the tier, its pick and probability, or what went wrong. */
+function tryLine(done: CascadeTry): string {
+	const where = done.try > 1 ? `${done.tier} (try ${done.try})` : done.tier;
+	if (done.pick !== undefined) {
+		const sure =
+			done.confidence === undefined
+				? ""
+				: ` with ${Math.round(done.confidence * 100)}%`;
+		return `${where} picked ${done.pick}${sure}.`;
+	}
+	const said = done.summary.split("\n")[0]?.trim() ?? "";
+	return `${where} ended ${done.outcome}${said === "" ? "." : `: ${said}`}`;
+}
+
 /**
  * What the person tier shows of the climb: one line per try, with the
  * tier, its pick and probability, or what went wrong.
  */
 export function climbLines(trail: readonly CascadeTry[]): string {
-	return trail
-		.map((done) => {
-			const where = done.try > 1 ? `${done.tier} (try ${done.try})` : done.tier;
-			if (done.pick !== undefined) {
-				const sure =
-					done.confidence === undefined
-						? ""
-						: ` with ${Math.round(done.confidence * 100)}%`;
-				return `- ${where} picked ${done.pick}${sure}.`;
-			}
-			const said = done.summary.split("\n")[0]?.trim() ?? "";
-			return `- ${where} ended ${done.outcome}${said === "" ? "." : `: ${said}`}`;
-		})
-		.join("\n");
+	return trail.map((done) => `- ${tryLine(done)}`).join("\n");
+}
+
+/**
+ * The background of the person tier's Gate when the flow writes none (ADR
+ * 21): what each try did, one item per try, with its tier as the source.
+ */
+export function climbBackground(
+	trail: readonly CascadeTry[],
+): GateBackgroundItem[] {
+	return trail.map((done) => ({ text: tryLine(done), source: done.tier }));
+}
+
+/**
+ * The recommendation of a Decision's person tier when the flow writes
+ * none (ADR 21): the pick of the most confident try, else the latest
+ * pick. Undefined when no try picked.
+ */
+export function climbRecommendation(
+	trail: readonly CascadeTry[],
+): { option: string; reason: string } | undefined {
+	const picks = trail.filter((done) => done.pick !== undefined);
+	const best = picks.reduce<CascadeTry | undefined>(
+		(top, done) =>
+			top === undefined || (done.confidence ?? -1) >= (top.confidence ?? -1)
+				? done
+				: top,
+		undefined,
+	);
+	if (best?.pick === undefined) return undefined;
+	return {
+		option: best.pick,
+		reason:
+			best.confidence === undefined
+				? `The tier ${best.tier} picked it.`
+				: `The tier ${best.tier} was the most sure: ${Math.round(best.confidence * 100)}%.`,
+	};
 }

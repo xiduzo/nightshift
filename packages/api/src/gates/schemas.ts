@@ -3,11 +3,44 @@ import type {
 	InboxGate,
 	OpenGate,
 } from "@nightshift/engine";
-import { answerFilesSchema, askFormSchema } from "@nightshift/flows";
+import {
+	answerFilesSchema,
+	askFormSchema,
+	gateUrgencySchema,
+} from "@nightshift/flows";
 import { z } from "zod";
 
 import { exact } from "../output";
 import { gateChoiceSchema, gateDeadlineSchema, runWalkerSchema } from "../runs";
+
+/** What a model can write of a Gate's brief. */
+const briefPartSchema = z.enum([
+	"urgency",
+	"situation",
+	"background",
+	"recommendation",
+	"impacts",
+]);
+
+/**
+ * The brief of a Gate (ADR 21): who set its urgency, why a person must
+ * decide, what is already done (each item with where it comes from), the
+ * option the flow recommends, and the parts a model wrote. An empty part
+ * is null or an empty list.
+ */
+const gateBriefSchema = z.object({
+	/** Who set the urgency: the flow, a model, or nobody (`today`). */
+	urgencyBy: z.enum(["flow", "model", "default"]),
+	situation: z.string().nullable(),
+	background: z.array(
+		z.object({ text: z.string(), source: z.string().nullable() }),
+	),
+	recommendation: z
+		.object({ option: z.string().nullable(), reason: z.string().nullable() })
+		.nullable(),
+	/** The parts a model wrote, so the inbox can say so. */
+	byModel: z.array(briefPartSchema),
+});
 
 /** A Gate that waits for a person: what it asks, and its choices. */
 export const openGateSchema = exact<OpenGate>()(
@@ -24,7 +57,12 @@ export const openGateSchema = exact<OpenGate>()(
 		nodeId: z.string(),
 		/** The rendered question. */
 		question: z.string(),
+		/** Its options, each with what happens when you pick it (`impact`). */
 		choices: z.array(gateChoiceSchema),
+		/** How soon it needs an answer: now, today or later (when you have time). */
+		urgency: gateUrgencySchema,
+		/** Why you decide, what is done, and the option the flow recommends. */
+		brief: gateBriefSchema,
 		/**
 		 * The flow author let a person answer this Gate from the lock screen:
 		 * a notification may show its options as buttons. Otherwise the
@@ -72,6 +110,7 @@ export const answeredGateSchema = exact<InboxAnsweredGate>()(
 			stepId: true,
 			nodeId: true,
 			question: true,
+			urgency: true,
 			openedAt: true,
 		})
 		.extend({

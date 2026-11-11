@@ -76,6 +76,8 @@ export const gateChoiceSchema = z.object({
 	color: outcomeColorSchema.optional(),
 	/** The choice needs a note: the answer an Agent goes on with. */
 	needsNote: z.literal(true).optional(),
+	/** What happens when a person picks it. Absent: nobody wrote one. */
+	impact: z.string().optional(),
 });
 
 const runTriggerSchema = z.discriminatedUnion("kind", [
@@ -441,6 +443,18 @@ const stepEventSchema = z.discriminatedUnion("type", [
 		data: z.unknown().optional(),
 		/** What the agent proposed to learn about the project. */
 		learnings: z.array(z.string()).optional(),
+		/** The brief the agent gave with its question for a person. */
+		ask: z
+			.object({
+				urgency: z.string().optional(),
+				situation: z.string().optional(),
+				background: z.array(z.string()).optional(),
+				recommend: z
+					.object({ choice: z.string(), reason: z.string().optional() })
+					.optional(),
+				impacts: z.record(z.string(), z.string()).optional(),
+			})
+			.optional(),
 	}),
 	z.object({ type: z.literal("usage"), usage: agentUsageSchema }),
 	z.object({

@@ -1,3 +1,4 @@
+import { DEFAULT_GATE_URGENCY, type GateUrgency } from "@nightshift/flows";
 import {
 	type EngineEventType,
 	type LandedRunEvent,
@@ -33,7 +34,16 @@ export type LandedFact = {
 	seq: number;
 	changes: LandedChange;
 } & (
-	| { kind: "gate-opened"; stepId: string }
+	| {
+			kind: "gate-opened";
+			stepId: string;
+			/**
+			 * How soon the Gate needs an answer (ADR 21): a push may go only
+			 * for some. The engine always sets it (`today` for a Gate without
+			 * one); a fact made elsewhere may leave it out, which reads as `today`.
+			 */
+			urgency?: GateUrgency;
+	  }
 	| {
 			kind: "wait-started";
 			stepId: string;
@@ -96,7 +106,12 @@ function landedFact(e: LandedRunEvent): LandedFact {
 	if (stepId === null) return { ...base, kind: "other" };
 	switch (e.type) {
 		case "GateOpened":
-			return { ...base, kind: "gate-opened", stepId };
+			return {
+				...base,
+				kind: "gate-opened",
+				stepId,
+				urgency: e.payload.urgency ?? DEFAULT_GATE_URGENCY,
+			};
 		case "WaitStarted":
 			return {
 				...base,

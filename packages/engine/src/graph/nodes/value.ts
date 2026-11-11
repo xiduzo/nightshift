@@ -9,6 +9,7 @@ import {
 } from "@nightshift/flows";
 import {
 	climbAt,
+	climbBackground,
 	climbLines,
 	climbOutputs,
 	climbValues,
@@ -124,6 +125,8 @@ function personTierAsk(
 			: {}),
 		outputs: climbOutputs(node, at),
 		climb: true,
+		brief: tier,
+		known: { background: climbBackground(at.trail) },
 	});
 }
 

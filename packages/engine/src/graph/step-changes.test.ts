@@ -260,6 +260,7 @@ describe("activeBetween", () => {
 					to: 20,
 					opening: 0,
 					question: "Ship it?",
+					urgency: "today",
 					answeredBy: null,
 					answer: null,
 				},

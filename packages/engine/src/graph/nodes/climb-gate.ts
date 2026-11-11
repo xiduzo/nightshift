@@ -2,6 +2,7 @@ import { Command, type LangGraphRunnableConfig } from "@langchain/langgraph";
 import type { CascadeNode, PersonTier } from "@nightshift/flows";
 import {
 	climbAt,
+	climbBackground,
 	climbCommand,
 	climbLines,
 	climbOutputs,
@@ -47,6 +48,11 @@ function retryAsk(
 			...(last?.log_tail !== undefined ? { log_tail: last.log_tail } : {}),
 		},
 		climb: true,
+		brief: {
+			fields: tier,
+			recommends: false,
+			known: { background: climbBackground(at.trail) },
+		},
 	};
 }
 

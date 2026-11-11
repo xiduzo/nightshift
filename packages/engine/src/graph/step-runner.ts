@@ -41,6 +41,7 @@ import {
 	templateContext,
 } from "./context";
 import { openGate } from "./gate";
+import type { WrittenBrief } from "./gate-brief";
 import { dataProblem } from "./output-schema";
 import {
 	entryOf,
@@ -295,6 +296,8 @@ export type BodyResult =
 			question: string;
 			choices: GateChoice[];
 			outputs: StepOutputs;
+			/** The brief the agent gave with its question (ADR 21). */
+			brief?: Omit<WrittenBrief, "cost">;
 	  };
 
 /** What a node tells the runner: how it re-enters, what its body does, what an empty end looks like. */
@@ -522,8 +525,13 @@ async function askPerson(
 	ask: Extract<BodyResult, { kind: "ask" }>,
 ): Promise<Command> {
 	const { stepId, visit } = step;
+	const choices = ask.brief?.choices ?? ask.choices;
 	try {
-		await openGate(ctx, step, ask);
+		await openGate(ctx, step, {
+			question: ask.question,
+			choices,
+			...(ask.brief ? { brief: { ...ask.brief, cost: null } } : {}),
+		});
 	} catch (error) {
 		const end = await step.end(
 			"error",
@@ -539,7 +547,7 @@ async function askPerson(
 		nodeId: node.id,
 		visit,
 		question: ask.question,
-		choices: ask.choices,
+		choices,
 		outputs: ask.outputs,
 	};
 	return new Command({ update: { pending }, goto: askNodeId(node.id) });

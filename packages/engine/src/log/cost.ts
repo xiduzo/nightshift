@@ -1,3 +1,4 @@
+import type { CostSource } from "@nightshift/agents/pricing";
 import type { EnginePayloads } from "./events";
 import type { DerivedSession } from "./run-state";
 
@@ -65,15 +66,24 @@ export function sessionCost(
 
 /** What a step spent outside sessions (a decider), from its `StepEnded`. */
 export function stepEndCost(payload: EnginePayloads["StepEnded"]): CostTally {
-	if (payload.costUsd == null) {
+	return deciderCost(payload.costUsd, payload.costSource);
+}
+
+/**
+ * What one model call outside a session cost: a decider at a step's end,
+ * or the model that wrote a Gate's brief (`GateOpened`).
+ */
+export function deciderCost(
+	costUsd: number | null | undefined,
+	costSource: CostSource | null | undefined,
+): CostTally {
+	if (costUsd == null) {
 		// Absent: nothing was asked. Null: the decider answered without a cost.
-		return payload.costSource === null
-			? { ...NO_COST, missing: 1, calls: 1 }
-			: NO_COST;
+		return costSource === null ? { ...NO_COST, missing: 1, calls: 1 } : NO_COST;
 	}
 	return {
-		usd: payload.costUsd,
-		estimated: payload.costSource === "estimated",
+		usd: costUsd,
+		estimated: costSource === "estimated",
 		missing: 0,
 		calls: 1,
 	};

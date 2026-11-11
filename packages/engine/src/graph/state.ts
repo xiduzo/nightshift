@@ -138,6 +138,8 @@ const pendingGateSchema = z.object({
 			description: z.string().optional(),
 			color: outcomeColorSchema.optional(),
 			needsNote: z.literal(true).optional(),
+			/** What happens when a person picks it (ADR 21). */
+			impact: z.string().optional(),
 		}),
 	),
 	/**

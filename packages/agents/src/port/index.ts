@@ -8,6 +8,7 @@ export { foldContributions } from "./contributions";
 export { findProgram } from "./find-program";
 export { shellQuote, shellQuoteAlways } from "./shell-quote";
 export type {
+	AgentAskBrief,
 	AgentErrorKind,
 	AgentEvent,
 	AgentHarness,

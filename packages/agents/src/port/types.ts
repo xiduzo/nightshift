@@ -211,6 +211,26 @@ export type StepReportSpec = {
 	 * agent that reads the project's knowledge.
 	 */
 	learnings?: boolean;
+	/**
+	 * The agent may ask a person: with the outcome `outcome` its report
+	 * may carry `ask`, the brief of its question (ADR 21), whose
+	 * recommendation and impacts name the person's `choices`.
+	 */
+	ask?: { outcome: string; choices: string[] };
+};
+
+/**
+ * The brief an agent gives with a question for a person (ADR 21). Every
+ * part is optional. `urgency` is `now`, `today` or `later` (anything else
+ * is left out by the engine), and an item of `background` may end with
+ * ` (source: X)`.
+ */
+export type AgentAskBrief = {
+	urgency?: string;
+	situation?: string;
+	background?: string[];
+	recommend?: { choice: string; reason?: string };
+	impacts?: Record<string, string>;
 };
 
 /**
@@ -267,6 +287,8 @@ export type AgentEvent =
 			data?: unknown;
 			/** What the agent proposes to learn, when the spec allows it. */
 			learnings?: string[];
+			/** The brief of the agent's question for a person, when the spec allows one. */
+			ask?: AgentAskBrief;
 	  }
 	/**
 	 * What the session has used so far: a running total, not a step. Only

@@ -17,6 +17,7 @@ import type {
 } from "../../../log";
 import { messageOf, type NodeAction, type StepContext } from "../../context";
 import { openGate, scoreGate } from "../../gate";
+import { type BriefSpec, writeBrief } from "../../gate-brief";
 import { interruptNode } from "../../interrupt";
 import { RESUME_RULES, resumePoint } from "../../resume-point";
 import {
@@ -76,7 +77,28 @@ export function personChooser(node: DecisionNode, ctx: StepContext): Chooser {
 		choices: gateChoices(node),
 		lockScreen: node.lockScreen === true,
 		deadline: node.deadline,
+		brief: decisionBrief(node, node),
 	});
+}
+
+/**
+ * The brief of a Decision's Gate (ADR 21): the brief fields of `fields`
+ * (the node, or its person tier) and the impacts of the node's options.
+ * `known` is what the engine knows besides the author.
+ */
+export function decisionBrief(
+	node: DecisionNode,
+	fields: BriefSpec["fields"],
+	known?: BriefSpec["known"],
+): BriefSpec {
+	return {
+		fields,
+		impacts: Object.fromEntries(
+			node.options.map((option) => [option.name, option.impact]),
+		),
+		recommends: true,
+		...(known ? { known } : {}),
+	};
 }
 
 /**
@@ -86,7 +108,8 @@ export function personChooser(node: DecisionNode, ctx: StepContext): Chooser {
  * no timers (`untimed`), its `outputs` are the fields its end keeps, and
  * `climb` marks its Gate for the ask node. An Ask (a Value made by a
  * person, ADR 10) makes its `form` as it opens: the choices of the run and
- * the attachments the run keeps.
+ * the attachments the run keeps. `brief` is what the node says about its
+ * brief (ADR 21): the Gate writes it as it opens (`writeBrief`).
  */
 export type GateAsk = {
 	question: (tctx: TemplateContext) => string;
@@ -96,6 +119,7 @@ export type GateAsk = {
 	outputs?: StepOutputs;
 	climb?: true;
 	form?: (step: OpenStep) => Promise<AskForm>;
+	brief?: BriefSpec;
 };
 
 /** Opens a Gate on a new step of `node` (or finds the one open) and jumps to the node's ask node. */
@@ -272,14 +296,26 @@ async function open(
 			ctx.minuteMs,
 		);
 		const form = ask.form ? await ask.form(step) : null;
+		// The deadline counts from before the model writes the brief.
+		const brief = ask.brief
+			? await writeBrief(ctx, step, { question, choices, spec: ask.brief })
+			: null;
 		await openGate(ctx, step, {
 			question,
 			choices,
 			lockScreen: ask.lockScreen === true,
 			deadline,
 			...(form ? { form } : {}),
+			brief,
 		});
-		return { stepId, visit, question, choices, deadline, form };
+		return {
+			stepId,
+			visit,
+			question,
+			choices: brief?.choices ?? choices,
+			deadline,
+			form,
+		};
 	} finally {
 		step.leaveOpen();
 	}

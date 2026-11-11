@@ -1275,6 +1275,7 @@ describe("an Agent that asks a person", () => {
 						"You need a person to answer before you can go on. Put your questions in your final message.",
 				},
 			],
+			ask: { outcome: "needs-input", choices: ["answer", "stop"] },
 		});
 		const asked = await h.events();
 		expect(own).toMatchObject({ endedAt: null, outcome: null });
@@ -1376,6 +1377,7 @@ describe("an Agent that asks a person", () => {
 						"You need a person to answer before you can go on. Put your questions in your final message.",
 				},
 			],
+			ask: { outcome: "needs-input", choices: ["answer", "stop"] },
 		});
 	});
 

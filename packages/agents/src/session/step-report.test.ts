@@ -517,3 +517,59 @@ describe("learnings", () => {
 		});
 	});
 });
+
+describe("the brief of a question for a person (ask)", () => {
+	const rules = reportRules({
+		outcomes: [{ name: "pass" }, { name: "needs-input" }],
+		ask: { outcome: "needs-input", choices: ["answer", "stop"] },
+	}) as ReportRules;
+
+	test("the tool takes it as an optional object, and the prompt asks for it", () => {
+		const schema = reportInputSchema(rules) as {
+			properties: Record<string, { type: string }>;
+			required: string[];
+		};
+		expect(schema.properties.ask?.type).toBe("object");
+		expect(schema.required).toEqual(["outcome", "summary"]);
+		expect(toolReportInstruction(rules)).toContain(
+			'When you report "needs-input", also fill `ask`',
+		);
+		const plain = reportInputSchema(DEFAULT_RULES) as {
+			properties: Record<string, unknown>;
+		};
+		expect(plain.properties.ask).toBeUndefined();
+	});
+
+	test("a needs-input report keeps the parts of the right shape", () => {
+		const parsed = parseStepReport(
+			{
+				outcome: "needs-input",
+				summary: "Which one?",
+				ask: {
+					urgency: "now",
+					situation: "  ",
+					background: ["Checked CI (source: CI)", 3, ""],
+					recommend: { choice: "answer", reason: "Pick one." },
+					impacts: { stop: "It fails.", answer: 7 },
+				},
+			},
+			rules,
+		);
+		expect(parsed?.ask).toEqual({
+			urgency: "now",
+			background: ["Checked CI (source: CI)"],
+			recommend: { choice: "answer", reason: "Pick one." },
+			impacts: { stop: "It fails." },
+		});
+	});
+
+	test("another outcome, or rules without ask, keep no brief", () => {
+		const ask = { urgency: "now" };
+		expect(
+			parseStepReport({ outcome: "pass", summary: "Done.", ask }, rules)?.ask,
+		).toBeUndefined();
+		expect(
+			parseStepReport({ outcome: "needs-input", summary: "?", ask })?.ask,
+		).toBeUndefined();
+	});
+});

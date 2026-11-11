@@ -1,15 +1,18 @@
 import type { AgentHarnessName } from "@nightshift/agents/types";
-import type {
-	AskForm,
-	FlowNodeType,
-	ItemState,
-	JsonValue,
-	NodeOutputs,
+import {
+	type AskForm,
+	DEFAULT_GATE_URGENCY,
+	type FlowNodeType,
+	type GateUrgency,
+	type ItemState,
+	type JsonValue,
+	type NodeOutputs,
 } from "@nightshift/flows";
 import type { RunResult, RunStatus } from "../run-status";
 import {
 	addCost,
 	type CostTally,
+	deciderCost,
 	NO_COST,
 	sessionCost,
 	stepEndCost,
@@ -18,6 +21,7 @@ import { provedEndReason, type RunEndReason } from "./end-reason";
 import {
 	type EngineEventType,
 	type EnginePayloads,
+	type GateBrief,
 	type GateChoice,
 	type GateDeadline,
 	type InputValues,
@@ -132,6 +136,10 @@ type PartSpan = StepSleep & { opening: number };
 export type GateWait = PartSpan & {
 	/** The rendered question of the `GateOpened` that began the wait. */
 	question: string;
+	/** How soon it needed an answer (ADR 21). `today` in logs from before. */
+	urgency: GateUrgency;
+	/** What the model that wrote its brief cost. Absent: no model was asked. */
+	briefCost?: CostTally;
 	answeredBy: AnsweredBy | null;
 	/** The option it took (the score's label). */
 	answer: string | null;
@@ -196,6 +204,10 @@ export type DerivedStep = {
 	gate: {
 		question: string;
 		choices: GateChoice[];
+		/** How soon it needs an answer (ADR 21). */
+		urgency: GateUrgency;
+		/** Why a person decides, what is done, what the flow recommends (ADR 21). */
+		brief: GateBrief;
 		/** The flow author let a person answer this Gate from the lock screen. */
 		lockScreen: boolean;
 		openedAt: number;
@@ -280,6 +292,10 @@ export type OpenGateFact = {
 	visit: number;
 	question: string;
 	choices: GateChoice[];
+	/** How soon it needs an answer (ADR 21). */
+	urgency: GateUrgency;
+	/** Why a person decides, what is done, what the flow recommends (ADR 21). */
+	brief: GateBrief;
 	/** The flow author let a person answer this Gate from the lock screen. */
 	lockScreen: boolean;
 	openedAt: number;
@@ -523,6 +539,17 @@ function logged<E extends LoggedEvent>(
 	return { seq: e.seq, at: e.at, stepId: e.stepId, payload: e.payload };
 }
 
+/** The brief of a Gate that nobody wrote: what an older log reads as (ADR 21). */
+function emptyGateBrief(): GateBrief {
+	return {
+		urgencyBy: "default",
+		situation: null,
+		background: [],
+		recommendation: null,
+		byModel: [],
+	};
+}
+
 /** The step with its derived fields set again from its openings, sessions and items. */
 function settle(step: DerivedStep): DerivedStep {
 	const current = step.openings.at(-1);
@@ -542,6 +569,10 @@ function settle(step: DerivedStep): DerivedStep {
 	}
 	for (const session of step.sessions)
 		cost = addCost(cost, sessionCost(session));
+	// The model that wrote a Gate's brief (ADR 21).
+	for (const wait of step.gateWaits) {
+		if (wait.briefCost) cost = addCost(cost, wait.briefCost);
+	}
 	const endedAt = end?.at ?? null;
 	const outcome = end?.payload.outcome ?? null;
 	return {
@@ -778,6 +809,8 @@ function openGatesOf(run: Draft): OpenGateFact[] {
 				visit: step.visit,
 				question: gate.question,
 				choices: gate.choices,
+				urgency: gate.urgency,
+				brief: gate.brief,
 				lockScreen: gate.lockScreen,
 				openedAt: gate.openedAt,
 				deadline: gate.deadline,
@@ -1007,6 +1040,11 @@ function applyStepEvent(run: Draft, e: LoggedEvent, stepId: string): void {
 			break;
 		case "GateOpened": {
 			const wait = step.gateWaits.at(-1);
+			const urgency = e.payload.urgency ?? DEFAULT_GATE_URGENCY;
+			const briefCost =
+				e.payload.briefCostUsd === undefined
+					? undefined
+					: deciderCost(e.payload.briefCostUsd, e.payload.briefCostSource);
 			// Asked again while the Gate waits (a new daemon): the same wait.
 			if (!wait || wait.to !== null) {
 				step = {
@@ -1018,9 +1056,22 @@ function applyStepEvent(run: Draft, e: LoggedEvent, stepId: string): void {
 							to: null,
 							opening: step.openings.length - 1,
 							question: e.payload.question,
+							urgency,
+							...(briefCost ? { briefCost } : {}),
 							answeredBy: null,
 							answer: null,
 						},
+					],
+				};
+			} else if (briefCost) {
+				const sum = wait.briefCost
+					? addCost(wait.briefCost, briefCost)
+					: briefCost;
+				step = {
+					...step,
+					gateWaits: [
+						...step.gateWaits.slice(0, -1),
+						{ ...wait, briefCost: sum },
 					],
 				};
 			}
@@ -1029,6 +1080,8 @@ function applyStepEvent(run: Draft, e: LoggedEvent, stepId: string): void {
 				gate: {
 					question: e.payload.question,
 					choices: e.payload.choices,
+					urgency,
+					brief: e.payload.brief ?? emptyGateBrief(),
 					lockScreen: e.payload.lockScreen === true,
 					openedAt: e.at,
 					openedSeq: e.seq,

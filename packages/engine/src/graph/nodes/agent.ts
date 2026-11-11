@@ -5,6 +5,7 @@ import {
 } from "@nightshift/agents/harness-facts";
 import { settleCost } from "@nightshift/agents/pricing";
 import type {
+	AgentAskBrief,
 	AgentHarnessName,
 	AgentSessionInput,
 	AgentUsage,
@@ -54,6 +55,7 @@ import {
 	stepFailure,
 } from "../context";
 import { sessionCostUnknown } from "../cost";
+import { briefOf } from "../gate-brief";
 import { checkOutputData, normalizeOutputData } from "../output-schema";
 import { RESUME_RULES, rerunEntryOf, type StepEntry } from "../resume-point";
 import { scopeOf } from "../route";
@@ -445,6 +447,12 @@ function stepReportOf(node: AgentNode): AgentSessionInput["stepReport"] {
 				? [...own.filter((o) => o.name !== ASK_OUTCOME.name), ASK_OUTCOME]
 				: own;
 	}
+	if (node.ask === "person") {
+		spec.ask = {
+			outcome: ASK_OUTCOME.name,
+			choices: ASK_CHOICES.map((choice) => choice.name),
+		};
+	}
 	if (node.output) spec.output = node.output;
 	return spec;
 }
@@ -484,6 +492,7 @@ type AgentReport = {
 	outcome: StepReportOutcome;
 	summary: string;
 	data?: unknown;
+	ask?: AgentAskBrief;
 };
 
 type SessionEnding = EnginePayloads["SessionEnded"];
@@ -710,6 +719,7 @@ async function runSession(
 					outcome: agentEvent.outcome,
 					summary: agentEvent.summary,
 					data: agentEvent.data,
+					...(agentEvent.ask ? { ask: agentEvent.ask } : {}),
 				};
 				break;
 			case "finished":
@@ -836,11 +846,30 @@ async function runSession(
 		}
 		// It asks a person: no edge, a Gate. Its data may wait for the answer.
 		if (node.ask === "person" && finalReport.outcome === ASK_OUTCOME.name) {
+			const ask = finalReport.ask ?? {};
 			return {
 				kind: "ask",
 				question: askQuestion(finalReport.summary, output),
 				choices: [...ASK_CHOICES],
 				outputs: { ...outputs, outcome: ASK_OUTCOME.name },
+				// The agent's own brief (ADR 21): no model call for its question.
+				brief: briefOf(
+					{
+						...ask,
+						...(ask.recommend
+							? {
+									recommend: {
+										option: ask.recommend.choice,
+										...(ask.recommend.reason
+											? { reason: ask.recommend.reason }
+											: {}),
+									},
+								}
+							: {}),
+					},
+					ASK_CHOICES,
+					true,
+				),
 			};
 		}
 		if (node.output) {

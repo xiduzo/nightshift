@@ -2,6 +2,7 @@ import type {
 	AskForm,
 	Flow,
 	FlowNodeType,
+	GateUrgency,
 	ItemState,
 	JsonValue,
 } from "@nightshift/flows";
@@ -9,6 +10,7 @@ import type { RunCommandKind } from "../contract";
 import type { StepSource } from "../knowledge";
 import type {
 	AnsweredBy,
+	GateBrief,
 	GateChoice,
 	GateDeadline,
 	ResumeAction,
@@ -426,7 +428,15 @@ export type OpenGate = {
 	nodeId: string;
 	/** The rendered question. */
 	question: string;
+	/** Its options, each with what happens when a person picks it (`impact`). */
 	choices: GateChoice[];
+	/**
+	 * How soon it needs an answer (ADR 21): the inbox groups it under Now,
+	 * Today or When you have time. `today` when nobody set one.
+	 */
+	urgency: GateUrgency;
+	/** Why a person decides, what is done, and what the flow recommends (ADR 21). */
+	brief: GateBrief;
 	/**
 	 * The flow author let a person answer this Gate from the lock screen: a
 	 * notification may show its options as buttons. Otherwise the answer
@@ -466,6 +476,7 @@ export type AnsweredGate = Pick<
 	| "stepId"
 	| "nodeId"
 	| "question"
+	| "urgency"
 	| "openedAt"
 > & {
 	closedAt: number;
