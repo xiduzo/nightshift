@@ -7,9 +7,7 @@ export const Route = createFileRoute("/")({
 	validateSearch: (
 		search: Record<string, unknown>,
 	): { range?: (typeof PAGE_RANGES)[number] } => ({
-		range: PAGE_RANGES.find(
-			(nights) => String(nights) === String(search.range),
-		),
+		range: PAGE_RANGES.find((days) => String(days) === String(search.range)),
 	}),
 	loader: ({ context }) => preloadHomePage(context.queryClient),
 	component: HomeRoute,

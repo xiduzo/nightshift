@@ -61,7 +61,7 @@ export function ProjectTables({
 
 					<TabsContent value="failures">
 						{range ? (
-							<FailuresTable failed={range.runs.failed} nights={range.nights} />
+							<FailuresTable failed={range.runs.failed} days={range.nights} />
 						) : null}
 					</TabsContent>
 

@@ -9,7 +9,7 @@ import { TrendIcon } from "./trend-icon";
 /**
  * The four numbers on top, flush in one row. A tile switches its number
  * on the chart on or off and fills with a light shade of its colour while
- * on. Each says how it moved against the nights before, and opens its
+ * on. Each says how it moved against the days before, and opens its
  * details.
  */
 export function MetricTiles({
@@ -24,7 +24,7 @@ export function MetricTiles({
 	/** Undefined while they load. */
 	values: MetricValues | undefined;
 	before: MetricValues | undefined;
-	/** False while the nights before had no runs to compare with. */
+	/** False while the days before had no runs to compare with. */
 	compared: boolean;
 	on: Metric[];
 	onChange: (on: Metric[]) => void;
@@ -107,7 +107,7 @@ export function MetricTiles({
 	);
 }
 
-/** How a number moved against the same nights just before, in a sentence. */
+/** How a number moved against the same days just before, in a sentence. */
 function Change({
 	metric,
 	value,

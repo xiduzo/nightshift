@@ -1,4 +1,4 @@
-import { finishedShare, nightsOf } from "@nightshift/client";
+import { daysOf, finishedShare } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	ChartContainer,
@@ -29,25 +29,25 @@ import type {
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import { formatRelative, useNow } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
+import { dayChartRows } from "./days";
 import {
 	ChartSection,
+	DayRangeToggle,
 	DetailsDialog,
 	DetailsEmpty,
 	DetailsHeader,
 	DetailsTabContent,
 	DetailsTabs,
 	MoreRows,
-	NightRangeToggle,
 	Stat,
 	Swatch,
 } from "./details";
-import { nightChartRows } from "./nights";
 import { RUN_STATUS_CHART } from "./run-statuses";
 
 type Tab = "overview" | "groups" | "failed";
 
 /**
- * How runs went, in detail, in tabs like Flow health: runs per night stacked
+ * How runs went, in detail, in tabs like Flow health: runs per day stacked
  * by status, the share that finished per flow (or per project over all of
  * them), and the latest failures. One range drives every tab. Behind the
  * "Runs, last 24 h" card.
@@ -65,7 +65,7 @@ export function RunsDialog({
 	summary: DashboardSummary;
 	/** One project; otherwise all of them. */
 	project?: Project;
-	/** The range it opens at: the page's. Default 30 nights. */
+	/** The range it opens at: the page's. Default 30 days. */
 	initialRange?: NightRange;
 	/** The tab it opens at. Default Overview. */
 	initialTab?: Tab;
@@ -100,11 +100,11 @@ function RunsDetails({
 	const [range, setRange] = useState<NightRange>(initialRange);
 	const [tab, setTab] = useState<Tab>(initialTab);
 	const lastDay = summary.cards.lastDay;
-	const inRange: NightsRange["runs"] = nightsOf(summary, range).runs;
+	const inRange: NightsRange["runs"] = daysOf(summary, range).runs;
 	const { ended, finished, nightsWithRuns, groups, failed } = inRange;
 	// Only the statuses that occur, in the donut's order: live first.
 	const statuses = inRange.statuses.map(({ status }) => status);
-	const rows = nightChartRows(inRange.perNight);
+	const rows = dayChartRows(inRange.perNight);
 	const config = Object.fromEntries(
 		statuses.map((status) => [status, RUN_STATUS_CHART[status]]),
 	);
@@ -122,7 +122,7 @@ function RunsDetails({
 				value={tab}
 				onValueChange={setTab}
 				toggle={
-					<NightRangeToggle
+					<DayRangeToggle
 						ranges={summary.nights.map((n) => n.nights)}
 						value={range}
 						onValueChange={setRange}
@@ -143,7 +143,7 @@ function RunsDetails({
 						<Stat
 							label="Runs"
 							value={String(inRange.runs)}
-							hint={`Last ${range} nights`}
+							hint={`Last ${range} days`}
 						/>
 						<Stat
 							label="Finished"
@@ -155,22 +155,19 @@ function RunsDetails({
 							hint={`${finished} of ${ended} ended runs`}
 						/>
 						<Stat
-							label="Per night"
+							label="Per day"
 							value={
 								nightsWithRuns > 0
 									? (inRange.runs / nightsWithRuns).toFixed(1)
 									: "—"
 							}
-							hint="Nights with runs"
+							hint="Days with runs"
 						/>
 					</div>
 
-					<ChartSection
-						title="History"
-						hint="Runs per night, noon to noon, by status"
-					>
+					<ChartSection title="History" hint="Runs per day, by status">
 						{inRange.runs === 0 ? (
-							<DetailsEmpty>No runs in the last {range} nights.</DetailsEmpty>
+							<DetailsEmpty>No runs in the last {range} days.</DetailsEmpty>
 						) : (
 							<ChartContainer
 								config={config}
@@ -238,7 +235,7 @@ function RunsDetails({
 						hint={`The top ${groups.rows.length}, the most runs first`}
 					>
 						{groups.count === 0 ? (
-							<DetailsEmpty>No runs in the last {range} nights.</DetailsEmpty>
+							<DetailsEmpty>No runs in the last {range} days.</DetailsEmpty>
 						) : (
 							<>
 								<DataTable
@@ -262,7 +259,7 @@ function RunsDetails({
 					>
 						{failed.count === 0 ? (
 							<DetailsEmpty>
-								No run failed in the last {range} nights.
+								No run failed in the last {range} days.
 							</DetailsEmpty>
 						) : (
 							<>

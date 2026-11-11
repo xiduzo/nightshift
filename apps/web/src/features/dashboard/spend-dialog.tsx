@@ -1,4 +1,4 @@
-import { nightsOf } from "@nightshift/client";
+import { daysOf } from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
@@ -35,24 +35,24 @@ import {
 	useNow,
 } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
+import { dayChartRows } from "./days";
 import {
 	ChartSection,
+	DayRangeToggle,
 	DetailsDialog,
 	DetailsEmpty,
 	DetailsHeader,
 	DetailsTabContent,
 	DetailsTabs,
-	NightRangeToggle,
 	Stat,
 	Swatch,
 } from "./details";
-import { nightChartRows } from "./nights";
 
 type Tab = "overview" | "groups" | "priciest";
 
 /**
  * What runs cost, in detail, in tabs like Flow health: the last day,
- * averages, spend per night stacked by flow (or by project over all of
+ * averages, spend per day stacked by flow (or by project over all of
  * them), and the most expensive runs. One range drives every tab.
  */
 export function SpendDialog({
@@ -68,7 +68,7 @@ export function SpendDialog({
 	summary: DashboardSummary;
 	/** One project; otherwise all of them. */
 	project?: Project;
-	/** The range it opens at: the page's. Default 30 nights. */
+	/** The range it opens at: the page's. Default 30 days. */
 	initialRange?: NightRange;
 	/** The tab it opens at. Default Overview. */
 	initialTab?: Tab;
@@ -102,15 +102,15 @@ function SpendDetails({
 	const now = useNow(60_000);
 	const [range, setRange] = useState<NightRange>(initialRange);
 	const [tab, setTab] = useState<Tab>(initialTab);
-	const history = nightsOf(summary, range).spend;
+	const history = daysOf(summary, range).spend;
 	const lastDay = summary.cards.lastDay;
 	// Runs with a step whose cost is not known: the totals leave that step out.
 	const { unknown, priciest } = history;
 	const latest = lastDay.latestAt;
-	const rows = history.perNight.map((night, index) => {
+	const rows = history.perNight.map((day, index) => {
 		const tokens = history.tokensPerNight[index]?.counts ?? {};
 		return {
-			...(nightChartRows([night])[0] ?? {}),
+			...(dayChartRows([day])[0] ?? {}),
 			...Object.fromEntries(
 				Object.entries(tokens).map(([key, value]) => [`${key}Tokens`, value]),
 			),
@@ -142,7 +142,7 @@ function SpendDetails({
 				value={tab}
 				onValueChange={setTab}
 				toggle={
-					<NightRangeToggle
+					<DayRangeToggle
 						ranges={summary.nights.map((n) => n.nights)}
 						value={range}
 						onValueChange={setRange}
@@ -156,8 +156,8 @@ function SpendDetails({
 							<AlertTitle>Some costs are not known</AlertTitle>
 							<AlertDescription>
 								{unknown === 1
-									? `1 run in the last ${range} nights has a step that did not report its cost.`
-									: `${unknown} runs in the last ${range} nights have a step that did not report its cost.`}{" "}
+									? `1 run in the last ${range} days has a step that did not report its cost.`
+									: `${unknown} runs in the last ${range} days have a step that did not report its cost.`}{" "}
 								The totals do not include those steps. Open the run to see which
 								step.
 							</AlertDescription>
@@ -192,7 +192,7 @@ function SpendDetails({
 						<Stat
 							label="Spent"
 							value={costWithTokens(formatCost(history.total), history.tokens)}
-							hint={`Last ${range} nights`}
+							hint={`Last ${range} days`}
 						/>
 						<Stat
 							label="Per run"
@@ -207,7 +207,7 @@ function SpendDetails({
 							hint="Average"
 						/>
 						<Stat
-							label="Per night"
+							label="Per day"
 							value={
 								history.nightsWithRuns > 0
 									? costWithTokens(
@@ -216,16 +216,16 @@ function SpendDetails({
 										)
 									: "—"
 							}
-							hint="Nights with runs"
+							hint="Days with runs"
 						/>
 					</div>
 
 					<ChartSection
 						title="History"
-						hint={`Per night, noon to noon, by ${project ? "flow" : "project"}`}
+						hint={`Per day, by ${project ? "flow" : "project"}`}
 					>
 						{history.total === 0 ? (
-							<DetailsEmpty>No spend in the last {range} nights.</DetailsEmpty>
+							<DetailsEmpty>No spend in the last {range} days.</DetailsEmpty>
 						) : (
 							<ChartContainer
 								config={config}
@@ -302,7 +302,7 @@ function SpendDetails({
 						hint="The most spend first"
 					>
 						{history.groups.length === 0 ? (
-							<DetailsEmpty>No runs in the last {range} nights.</DetailsEmpty>
+							<DetailsEmpty>No runs in the last {range} days.</DetailsEmpty>
 						) : (
 							<DataTable
 								columns={spendColumns(
@@ -322,10 +322,10 @@ function SpendDetails({
 				<DetailsTabContent value="priciest">
 					<ChartSection
 						title="Most expensive runs"
-						hint={`The top ${priciest.length} of the last ${range} nights`}
+						hint={`The top ${priciest.length} of the last ${range} days`}
 					>
 						{priciest.length === 0 ? (
-							<DetailsEmpty>No spend in the last {range} nights.</DetailsEmpty>
+							<DetailsEmpty>No spend in the last {range} days.</DetailsEmpty>
 						) : (
 							<ItemGroup className="gap-1">
 								{priciest.map((run) => (

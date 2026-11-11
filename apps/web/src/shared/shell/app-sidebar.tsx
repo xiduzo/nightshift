@@ -213,7 +213,7 @@ function ProjectItem({ project, range }: { project: Project; range: number }) {
 	const running = (project.runs?.statuses.running ?? 0) > 0;
 	const inRange = project.runs?.nights?.find((r) => r.nights === range);
 	const runs = inRange
-		? `Last ${range} nights: ${describeRunStatuses(inRange)}`
+		? `Last ${range} days: ${describeRunStatuses(inRange)}`
 		: null;
 	const label = [project.name, runs, running ? "A run is in progress" : null]
 		.filter(Boolean)

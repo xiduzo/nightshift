@@ -204,10 +204,10 @@ export function DetailsTabContent({
 }
 
 /**
- * "7n 30n 90n": the ranges over nights the dashboard reply has
+ * "7d 30d 90d": the ranges of days the dashboard reply has
  * (`summary.nights`, a flow's `ranges`). The engine decides them.
  */
-export function NightRangeToggle({
+export function DayRangeToggle({
 	ranges,
 	value,
 	onValueChange,
@@ -221,13 +221,13 @@ export function NightRangeToggle({
 			ranges={ranges}
 			value={value}
 			onValueChange={onValueChange}
-			short={(nights) => `${nights}n`}
-			long={(nights) => `Last ${nights} nights`}
+			short={(days) => `${days}d`}
+			long={(days) => `Last ${days} days`}
 		/>
 	);
 }
 
-/** One of a few ranges, as a toggle group: "7n 30n 90n" or "24h 48h 7d". */
+/** One of a few ranges, as a toggle group: "7d 30d 90d". */
 export function RangeToggle<Range extends number>({
 	ranges,
 	value,
@@ -238,9 +238,9 @@ export function RangeToggle<Range extends number>({
 	ranges: readonly Range[];
 	value: Range;
 	onValueChange: (range: Range) => void;
-	/** The button text, "30n". */
+	/** The button text, "30d". */
 	short: (range: Range) => string;
-	/** What a screen reader hears, "Last 30 nights". */
+	/** What a screen reader hears, "Last 30 days". */
 	long: (range: Range) => string;
 }) {
 	return (

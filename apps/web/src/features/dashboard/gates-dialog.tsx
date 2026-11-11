@@ -1,4 +1,4 @@
-import { gateParts, nightsOf, waitedText } from "@nightshift/client";
+import { daysOf, gateParts, waitedText } from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
@@ -32,19 +32,19 @@ import { DataTable, dataTableColumns } from "@/shared/data-table";
 import { formatRelative, useNow } from "@/shared/format";
 import { InlineMarkdown } from "@/shared/markdown";
 import { LocalTime } from "@/shared/time";
+import { dayChartRows } from "./days";
 import {
 	ChartSection,
+	DayRangeToggle,
 	DetailsDialog,
 	DetailsEmpty,
 	DetailsHeader,
 	DetailsTabContent,
 	DetailsTabs,
 	MoreRows,
-	NightRangeToggle,
 	Stat,
 	Swatch,
 } from "./details";
-import { nightChartRows } from "./nights";
 import { OVERVIEW_ROWS } from "./overview";
 
 type Tab = "overview" | "waiting" | "groups" | "latest";
@@ -60,7 +60,7 @@ type GatesRange = NightsRange["gates"];
 
 /**
  * What waits for you, in detail, in tabs like Flow health: the open Gates,
- * how many Gates runs asked per night and how fast you answered, per flow
+ * how many Gates runs asked per day and how fast you answered, per flow
  * (or per project over all of them), and the latest. One range drives
  * every tab but the open Gates. Behind the "Waiting for you" card.
  */
@@ -80,7 +80,7 @@ export function GatesDialog({
 	/** The numbers of `project` when given: the Gates its runs asked. */
 	summary: DashboardSummary;
 	project?: Project;
-	/** The range it opens at: the page's. Default 30 nights. */
+	/** The range it opens at: the page's. Default 30 days. */
 	initialRange?: NightRange;
 	/** The tab it opens at. Default Overview. */
 	initialTab?: Tab;
@@ -119,7 +119,7 @@ function GatesDetails({
 	const [range, setRange] = useState<NightRange>(initialRange);
 	const [tab, setTab] = useState<Tab>(initialTab);
 	const oldest = waiting[0];
-	const asked = nightsOf(summary, range).gates;
+	const asked = daysOf(summary, range).gates;
 	const { answerTime, runsAsking, groups } = asked;
 
 	return (
@@ -136,7 +136,7 @@ function GatesDetails({
 				value={tab}
 				onValueChange={setTab}
 				toggle={
-					<NightRangeToggle
+					<DayRangeToggle
 						ranges={summary.nights.map((n) => n.nights)}
 						value={range}
 						onValueChange={setRange}
@@ -174,7 +174,7 @@ function GatesDetails({
 							hint="The run ended while it waited"
 						/>
 					</div>
-					<AskedPerNight gates={asked} range={range} />
+					<AskedPerDay gates={asked} range={range} />
 				</DetailsTabContent>
 
 				<DetailsTabContent value="waiting">
@@ -233,7 +233,7 @@ function GatesDetails({
 					>
 						{groups.count === 0 ? (
 							<DetailsEmpty>
-								No run asked you anything in the last {range} nights.
+								No run asked you anything in the last {range} days.
 							</DetailsEmpty>
 						) : (
 							<>
@@ -258,7 +258,7 @@ function GatesDetails({
 					>
 						{asked.asked === 0 ? (
 							<DetailsEmpty>
-								No run asked you anything in the last {range} nights.
+								No run asked you anything in the last {range} days.
 							</DetailsEmpty>
 						) : (
 							<ItemGroup className="gap-1">
@@ -317,8 +317,8 @@ function GatesDetails({
 	);
 }
 
-/** Gates asked per night, stacked by how they stand. */
-function AskedPerNight({
+/** Gates asked per day, stacked by how they stand. */
+function AskedPerDay({
 	gates,
 	range,
 }: {
@@ -326,18 +326,15 @@ function AskedPerNight({
 	range: NightRange;
 }) {
 	const { states } = gates;
-	const rows = nightChartRows(gates.perNight);
+	const rows = dayChartRows(gates.perNight);
 	const config = Object.fromEntries(
 		states.map((state) => [state, STATE_CHART[state]]),
 	);
 	return (
-		<ChartSection
-			title="History"
-			hint="Gates asked per night, noon to noon, by status"
-		>
+		<ChartSection title="History" hint="Gates asked per day, by status">
 			{gates.asked === 0 ? (
 				<DetailsEmpty>
-					No run asked you anything in the last {range} nights.
+					No run asked you anything in the last {range} days.
 				</DetailsEmpty>
 			) : (
 				<ChartContainer config={config} className="aspect-auto h-48 w-full">

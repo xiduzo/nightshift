@@ -178,7 +178,7 @@ export function HomeLanes({
 						<ArrowUpRightIcon data-icon="inline-end" />
 					</Button>
 				}
-				empty={`No run failed in the last ${range} nights.`}
+				empty={`No run failed in the last ${range} days.`}
 				hidden={failed ? failed.failing.count - failed.failing.rows.length : 0}
 				where="in Details"
 			>

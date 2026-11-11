@@ -14,8 +14,9 @@ function isRun(value: unknown, runId: string): value is RunSummary {
 
 /**
  * The run in what one list query holds: a list of runs, the pages of a
- * list, or the dashboard's runs of last night (full summaries, with their
- * group). The dashboard's open rows are not full runs, so they do not count.
+ * list, or the dashboard's runs of the latest day (full summaries, with
+ * their group). The dashboard's open rows are not full runs, so they do
+ * not count.
  */
 function runIn(data: unknown, runId: string): RunSummary | undefined {
 	const lists: unknown[][] = [];

@@ -6,7 +6,7 @@ export function createProjectQueries(orpc: ApiQueryUtils) {
 	return {
 		/** Every projects query. Invalidate it after a project changes. */
 		all: () => orpc.projects.key(),
-		/** The projects of the active Space, each with the counts of its runs, per night range on the reader's clock. */
+		/** The projects of the active Space, each with the counts of its runs, per range of days on the reader's clock. */
 		list: () =>
 			orpc.projects.list.queryOptions({
 				input: { timeZone: readerTimeZone() },

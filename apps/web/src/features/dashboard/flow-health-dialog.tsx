@@ -17,15 +17,15 @@ import {
 } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import {
+	DayRangeToggle,
 	DetailsDialog,
 	DetailsEmpty,
 	DetailsHeader,
 	DetailsTabContent,
 	DetailsTabs,
-	NightRangeToggle,
 	Stat,
 } from "./details";
-import { CostPerRun, RunsPerNight } from "./flow-health-charts";
+import { CostPerRun, RunsPerDay } from "./flow-health-charts";
 import {
 	LatestRuns,
 	Scores,
@@ -38,7 +38,7 @@ type Tab = "overview" | "cost" | "problems" | "runs";
 
 /**
  * One flow in detail, behind its Flow health row, in tabs so each view stays
- * small: an overview with runs per night and the runs' scores, what each run cost against the
+ * small: an overview with runs per day and the runs' scores, what each run cost against the
  * median, why runs did not finish, and the latest runs. One range drives
  * every tab. Runs as a subflow count, as in the row.
  */
@@ -99,7 +99,7 @@ function FlowHealthDetails({
 				value={tab}
 				onValueChange={setTab}
 				toggle={
-					<NightRangeToggle
+					<DayRangeToggle
 						ranges={detail.data?.ranges.map((r) => r.nights) ?? []}
 						value={range}
 						onValueChange={setRange}
@@ -117,7 +117,7 @@ function FlowHealthDetails({
 					</div>
 				) : inRange.runs === 0 ? (
 					<DetailsEmpty>
-						This flow did not run in the last {range} nights.
+						This flow did not run in the last {range} days.
 					</DetailsEmpty>
 				) : (
 					<>
@@ -169,7 +169,7 @@ function FlowHealthDetails({
 									}
 								/>
 							</div>
-							<RunsPerNight
+							<RunsPerDay
 								perNight={inRange.perNight}
 								statuses={inRange.statuses}
 							/>
@@ -232,8 +232,7 @@ function FlowHealthDetails({
 						<DetailsTabContent value="problems">
 							{unfinished + warnings === 0 ? (
 								<DetailsEmpty>
-									Every run in the last {range} nights finished, without
-									warnings.
+									Every run in the last {range} days finished, without warnings.
 								</DetailsEmpty>
 							) : null}
 							{unfinished > 0 ? (

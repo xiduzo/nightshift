@@ -8,9 +8,9 @@ import { costWithTokens } from "@/shared/format";
 import { METRICS, METRICS_CHART, type Metric, type MetricRow } from "./metrics";
 
 /**
- * The metrics that are on, one line each per night, and the same nights
+ * The metrics that are on, one line each per day, and the same days
  * just before as a dashed line. The first two get an axis, left and right.
- * While the nights before had no runs, it draws no dashed lines and says so.
+ * While the days before had no runs, it draws no dashed lines and says so.
  */
 export function MetricsChart({
 	rows,
@@ -24,7 +24,7 @@ export function MetricsChart({
 	if (on.length === 0) {
 		return (
 			<p className="flex h-72 items-center justify-center text-muted-foreground text-sm">
-				Choose a number above to see it per night.
+				Choose a number above to see it per day.
 			</p>
 		);
 	}
@@ -129,14 +129,14 @@ export function MetricsChart({
 			</ChartContainer>
 			{compared ? null : (
 				<p className="text-center text-muted-foreground text-xs">
-					The nights before had no runs. There is nothing to compare with yet.
+					The days before had no runs. There is nothing to compare with yet.
 				</p>
 			)}
 		</div>
 	);
 }
 
-/** One metric in the tooltip: its night, and the night as far back. */
+/** One metric in the tooltip: its day, and the day as far back. */
 function TooltipLine({
 	label,
 	color,

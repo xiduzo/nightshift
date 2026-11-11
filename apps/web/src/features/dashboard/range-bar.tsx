@@ -26,17 +26,17 @@ export function RangeBar({
 			aria-label="Range"
 			value={[String(value)]}
 			onValueChange={(next) => {
-				const range = PAGE_RANGES.find((nights) => String(nights) === next[0]);
+				const range = PAGE_RANGES.find((days) => String(days) === next[0]);
 				if (range) onValueChange(range);
 			}}
 		>
-			{PAGE_RANGES.map((nights) => (
+			{PAGE_RANGES.map((days) => (
 				<ToggleGroupItem
-					key={nights}
-					value={String(nights)}
+					key={days}
+					value={String(days)}
 					className="aria-pressed:bg-secondary"
 				>
-					{nights} nights
+					{days} days
 				</ToggleGroupItem>
 			))}
 		</ToggleGroup>

@@ -10,12 +10,12 @@ import { CellLines } from "./table-cells";
 
 type SpendGroup = NightsRange["spend"]["groups"][number];
 
-/** A spend group with what it spent each night, oldest first. */
-type SpendRow = SpendGroup & { nights: number[]; tokenNights: number[] };
+/** A spend group with what it spent each day, oldest first. */
+type SpendRow = SpendGroup & { days: number[]; tokenDays: number[] };
 
 /**
  * What each flow spent, the most first: its share of the spend, what it
- * spent each night, what a run costs, and how much went to runs that did
+ * spent each day, what a run costs, and how much went to runs that did
  * not finish. That last part bought nothing.
  */
 export function SpendTable({ spend }: { spend: NightsRange["spend"] }) {
@@ -29,10 +29,8 @@ export function SpendTable({ spend }: { spend: NightsRange["spend"] }) {
 	const rows = spend.groups.map(
 		(group): SpendRow => ({
 			...group,
-			nights: spend.perNight.map((night) => night.counts[group.key] ?? 0),
-			tokenNights: spend.tokensPerNight.map(
-				(night) => night.counts[group.key] ?? 0,
-			),
+			days: spend.perNight.map((day) => day.counts[group.key] ?? 0),
+			tokenDays: spend.tokensPerNight.map((day) => day.counts[group.key] ?? 0),
 		}),
 	);
 	return (
@@ -64,13 +62,10 @@ function spendColumns(total: number) {
 			meta: { headClassName: "pl-6", cellClassName: "pl-6" },
 		}),
 		column.display({
-			id: "nights",
-			header: "Per night",
+			id: "days",
+			header: "Per day",
 			cell: ({ row: { original } }) => (
-				<NightBars
-					nights={original.nights}
-					tokenNights={original.tokenNights}
-				/>
+				<DayBars days={original.days} tokenDays={original.tokenDays} />
 			),
 		}),
 		column.accessor((group) => group.total / group.runs, {
@@ -122,21 +117,15 @@ const BAR_GAP = 1;
 const BARS_HEIGHT = 20;
 
 /**
- * A small bar per night of what a flow spent, oldest first. Each row runs
- * from zero to its own dearest night: one shared scale would squash the
+ * A small bar per day of what a flow spent, oldest first. Each row runs
+ * from zero to its own dearest day: one shared scale would squash the
  * cheap flows flat. Their share of the spend says how they compare.
  */
-function NightBars({
-	nights,
-	tokenNights,
-}: {
-	nights: number[];
-	tokenNights: number[];
-}) {
-	const max = Math.max(...nights, 0);
-	const peak = nights.indexOf(max);
-	const spentOn = nights.filter((usd) => usd > 0).length;
-	const width = nights.length * (BAR_WIDTH + BAR_GAP);
+function DayBars({ days, tokenDays }: { days: number[]; tokenDays: number[] }) {
+	const max = Math.max(...days, 0);
+	const peak = days.indexOf(max);
+	const spentOn = days.filter((usd) => usd > 0).length;
+	const width = days.length * (BAR_WIDTH + BAR_GAP);
 	return (
 		<Tooltip>
 			<TooltipTrigger render={<span className="inline-flex" />}>
@@ -146,7 +135,7 @@ function NightBars({
 					viewBox={`0 0 ${width} ${BARS_HEIGHT}`}
 					aria-hidden="true"
 				>
-					{nights.map((usd, index) => {
+					{days.map((usd, index) => {
 						const height =
 							max > 0 && usd > 0 ? Math.max((usd / max) * BARS_HEIGHT, 2) : 1;
 						return (
@@ -165,12 +154,12 @@ function NightBars({
 			</TooltipTrigger>
 			<TooltipContent className="flex flex-col items-start gap-0.5 tabular-nums">
 				<span>
-					Spent on {spentOn} of {nights.length} nights.
+					Spent on {spentOn} of {days.length} days.
 				</span>
 				{max > 0 ? (
 					<span>
-						The most in one night:{" "}
-						{costWithTokens(formatCost(max), tokenNights[peak] ?? 0)}.
+						The most in one day:{" "}
+						{costWithTokens(formatCost(max), tokenDays[peak] ?? 0)}.
 					</span>
 				) : null}
 			</TooltipContent>

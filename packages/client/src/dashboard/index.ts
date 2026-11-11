@@ -7,7 +7,7 @@ export {
 	changeOf,
 	consoleNumbers,
 	consoleValues,
-	nightsOf,
+	daysOf,
 } from "./console";
 export { shortReason } from "./failing";
 export { createDashboardQueries, readerTimeZone } from "./queries";

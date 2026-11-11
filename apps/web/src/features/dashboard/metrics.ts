@@ -8,12 +8,12 @@ import {
 import type { ChartConfig } from "@nightshift/ui/components/chart";
 
 import type { NightsRange } from "@/shared/api";
-import { formatNight, formatNightShort } from "./nights";
+import { formatDayShort, formatDayTitle } from "./days";
 
 /**
  * The four numbers on top of a project's page, after Search Console: each
  * a tile you switch on to plot it, over the page's range, beside the same
- * nights just before. The numbers come from the client, the colours from
+ * days just before. The numbers come from the client, the colours from
  * the theme.
  */
 
@@ -25,17 +25,17 @@ export const METRICS = CONSOLE_METRICS.map((metric) => ({
 	color: `var(--metric-${metric.key})`,
 }));
 
-/** Each metric, and the same metric over the nights before, dashed. */
+/** Each metric, and the same metric over the days before, dashed. */
 export const METRICS_CHART = Object.fromEntries(
 	METRICS.flatMap(({ key, label, color }) => [
 		[key, { label, color }],
-		[`before_${key}`, { label: `${label}, the nights before`, color }],
+		[`before_${key}`, { label: `${label}, the days before`, color }],
 	]),
 ) satisfies ChartConfig;
 
 export type MetricValues = ConsoleValues;
 
-/** One night of the chart: its value per metric, and the night as far back. */
+/** One day of the chart: its value per metric, and the day as far back. */
 export type MetricRow = {
 	label: string;
 	title: string;
@@ -45,8 +45,8 @@ export type MetricRow = {
 	Partial<Record<`before_${Metric}`, number | null>>;
 
 /**
- * The metrics of a range: per night for the chart, in all, and before.
- * `compared` is false while the nights before had no runs at all, so there
+ * The metrics of a range: per day for the chart, in all, and before.
+ * `compared` is false while the days before had no runs at all, so there
  * is nothing to set them against yet.
  */
 export function metricsOf(range: NightsRange): {
@@ -57,13 +57,13 @@ export function metricsOf(range: NightsRange): {
 	spendTokens: number;
 	spendTokensBefore: number;
 } {
-	const rows = range.totals.perNight.map((night, index): MetricRow => {
+	const rows = range.totals.perNight.map((day, index): MetricRow => {
 		const before = range.before.perNight[index];
 		return {
-			label: formatNightShort(night.night),
-			title: formatNight(night.night),
-			...consoleValues(night),
-			spendTokens: night.tokens,
+			label: formatDayShort(day.night),
+			title: formatDayTitle(day.night),
+			...consoleValues(day),
+			spendTokens: day.tokens,
 			...(before
 				? {
 						...Object.fromEntries(

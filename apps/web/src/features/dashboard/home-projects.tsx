@@ -1,4 +1,4 @@
-import { nightsOf } from "@nightshift/client";
+import { daysOf } from "@nightshift/client";
 import {
 	Card,
 	CardContent,
@@ -78,7 +78,7 @@ export function HomeProjects({
 									</ItemTitle>
 									<LastRuns
 										runs={lastRunsOf(
-											summary ? nightsOf(summary, range) : undefined,
+											summary ? daysOf(summary, range) : undefined,
 										)}
 										range={range}
 										now={now}
@@ -97,9 +97,9 @@ export function HomeProjects({
 }
 
 /** A project's last runs over all its flows, newest first. */
-function lastRunsOf(nights: NightsRange | undefined): LastRun[] {
+function lastRunsOf(days: NightsRange | undefined): LastRun[] {
 	const seen = new Set<string>();
-	return (nights?.flows?.rows ?? [])
+	return (days?.flows?.rows ?? [])
 		.flatMap((flow) =>
 			flow.lastRuns.map((run) => ({ ...run, flow: flow.name })),
 		)
@@ -122,7 +122,7 @@ function LastRuns({
 	if (!last) {
 		return (
 			<span className="text-muted-foreground text-xs">
-				No runs in the last {range} nights
+				No runs in the last {range} days
 			</span>
 		);
 	}

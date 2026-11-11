@@ -15,16 +15,16 @@ type FailedRun = NightsRange["runs"]["failed"]["rows"][number];
  */
 export function FailuresTable({
 	failed,
-	nights,
+	days,
 }: {
 	failed: NightsRange["runs"]["failed"];
-	nights: number;
+	days: number;
 }) {
 	const now = useNow(60_000);
 	if (failed.count === 0) {
 		return (
 			<p className="py-6 text-center text-muted-foreground text-sm">
-				No run failed in the last {nights} nights.
+				No run failed in the last {days} days.
 			</p>
 		);
 	}

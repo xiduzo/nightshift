@@ -8,9 +8,9 @@ type Range = (typeof PAGE_RANGES)[number];
 const RANGED_ROUTES = new Set<string>(["/", "/projects/$projectId/"]);
 
 /**
- * The night range of the project donuts in the sidebar. It follows the
+ * The range of days of the project donuts in the sidebar. It follows the
  * range row of Home and of a project's page, and keeps the last one on
- * the other pages. 7 nights until you choose one.
+ * the other pages. 7 days until you choose one.
  */
 export function useSidebarRange(): Range {
 	const onPage = useRouterState({
@@ -18,7 +18,7 @@ export function useSidebarRange(): Range {
 			const match = state.matches.find((m) => RANGED_ROUTES.has(m.routeId));
 			if (!match) return undefined;
 			const { range } = match.search as { range?: Range };
-			return PAGE_RANGES.find((nights) => nights === range) ?? 7;
+			return PAGE_RANGES.find((days) => days === range) ?? 7;
 		},
 	});
 	const [kept, setKept] = useState<Range>(7);

@@ -3,7 +3,7 @@ import type { DashboardSummary, NightRange, NightsRange } from "./types";
 
 /**
  * The four numbers of a project's Console, after Search Console: each over
- * a range of nights, beside the same nights just before. The desktop plots
+ * a range of days, beside the same days just before. The desktop plots
  * them, the phone shows them as a glance.
  */
 
@@ -15,7 +15,7 @@ export const CONSOLE_METRICS: readonly {
 	key: ConsoleMetric;
 	label: string;
 	format: (value: number | null) => string;
-	/** The value of a period or a night. Null when it has none. */
+	/** The value of a period or a day. Null when it has none. */
 	of: (totals: Totals) => number | null;
 }[] = [
 	{
@@ -46,7 +46,7 @@ export const CONSOLE_METRICS: readonly {
 
 export type ConsoleValues = Record<ConsoleMetric, number | null>;
 
-/** The value of each metric over a period or a night. */
+/** The value of each metric over a period or a day. */
 export function consoleValues(totals: Totals): ConsoleValues {
 	return Object.fromEntries(
 		CONSOLE_METRICS.map((metric) => [metric.key, metric.of(totals)]),
@@ -54,8 +54,8 @@ export function consoleValues(totals: Totals): ConsoleValues {
 }
 
 /**
- * The numbers of a range, and of the nights just before. `compared` is
- * false while the nights before had no runs at all, so there is nothing to
+ * The numbers of a range, and of the days just before. `compared` is
+ * false while the days before had no runs at all, so there is nothing to
  * set them against yet.
  */
 export function consoleNumbers(range: NightsRange): {
@@ -70,19 +70,19 @@ export function consoleNumbers(range: NightsRange): {
 	};
 }
 
-/** The part of the dashboard's numbers a range picks. */
-export function nightsOf(
+/** The part of the dashboard's numbers a range of days picks. */
+export function daysOf(
 	summary: DashboardSummary,
 	range: NightRange,
 ): NightsRange {
-	const found = summary.nights.find((nights) => nights.nights === range);
-	if (!found) throw new Error(`The dashboard has no range of ${range} nights.`);
+	const found = summary.nights.find((days) => days.nights === range);
+	if (!found) throw new Error(`The dashboard has no range of ${range} days.`);
 	return found;
 }
 
 /**
- * How a number moved against the same nights just before: a sentence, and
- * a short form for a tight row. Undefined `before` means the nights before
+ * How a number moved against the same days just before: a sentence, and
+ * a short form for a tight row. Undefined `before` means the days before
  * had no runs at all.
  */
 export function changeOf(
@@ -94,28 +94,28 @@ export function changeOf(
 		return { trend: "flat", text: "Nothing to compare with yet", short: "new" };
 	}
 	if (value === null) {
-		return { trend: "flat", text: "No runs ended in these nights", short: "—" };
+		return { trend: "flat", text: "No runs ended in these days", short: "—" };
 	}
 	if (before === null) {
 		return {
 			trend: "flat",
-			text: "No runs ended in the nights before",
+			text: "No runs ended in the days before",
 			short: "—",
 		};
 	}
 	if (before === 0 && value > 0) {
-		return { trend: "up", text: "None in the nights before", short: "new" };
+		return { trend: "up", text: "None in the days before", short: "new" };
 	}
 	const delta = value - before;
 	if (Math.abs(delta) < 0.005) {
-		return { trend: "flat", text: "Same as the nights before", short: "same" };
+		return { trend: "flat", text: "Same as the days before", short: "same" };
 	}
 	const amount =
 		metric === "spend" ? formatCost(Math.abs(delta)) : String(Math.abs(delta));
 	const unit = metric === "finished" ? " points" : "";
 	return {
 		trend: delta > 0 ? "up" : "down",
-		text: `${amount}${unit} ${delta > 0 ? "more" : "less"} than the nights before`,
+		text: `${amount}${unit} ${delta > 0 ? "more" : "less"} than the days before`,
 		short: `${delta > 0 ? "+" : "−"}${amount}${metric === "finished" ? " pts" : ""}`,
 	};
 }

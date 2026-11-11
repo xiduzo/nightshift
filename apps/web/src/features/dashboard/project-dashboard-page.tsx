@@ -1,4 +1,4 @@
-import { nightsOf } from "@nightshift/client";
+import { daysOf } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import { Card, CardContent } from "@nightshift/ui/components/card";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
@@ -24,7 +24,7 @@ import { RangeBar } from "./range-bar";
 
 /**
  * The project's root, after the Performance page of Search Console: one
- * range for the whole page, four numbers that each compare with the nights
+ * range for the whole page, four numbers that each compare with the days
  * before, one chart of the ones you switch on, and the lists under it.
  * What runs or waits now shows only when there is something.
  */
@@ -42,8 +42,8 @@ export function ProjectDashboardPage({
 	const [on, setOn] = useState<Metric[]>(["runs", "finished"]);
 	// The metric stays while the dialog closes, so its body does not go blank.
 	const [details, setDetails] = useState<{ metric: Metric; open: boolean }>();
-	const nights = summary.data ? nightsOf(summary.data, range) : undefined;
-	const metrics = nights ? metricsOf(nights) : undefined;
+	const days = summary.data ? daysOf(summary.data, range) : undefined;
+	const metrics = days ? metricsOf(days) : undefined;
 
 	return (
 		<ProjectPage projectId={projectId}>
@@ -92,7 +92,7 @@ export function ProjectDashboardPage({
 							)}
 						</CardContent>
 					</Card>
-					<ProjectTables project={project} range={nights} />
+					<ProjectTables project={project} range={days} />
 
 					{summary.data && details ? (
 						<MetricDetails

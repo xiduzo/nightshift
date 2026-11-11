@@ -1,4 +1,4 @@
-import { nightsOf } from "@nightshift/client";
+import { daysOf } from "@nightshift/client";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useOpenGates } from "@/features/gates";
@@ -33,13 +33,13 @@ export function HomePage({
 	const openRuns = useQuery(runQueries.open());
 	// The metric stays while the dialog closes, so its body does not go blank.
 	const [details, setDetails] = useState<{ metric: Metric; open: boolean }>();
-	const nights = summary.data ? nightsOf(summary.data, range) : undefined;
-	const metrics = nights ? metricsOf(nights) : undefined;
+	const days = summary.data ? daysOf(summary.data, range) : undefined;
+	const metrics = days ? metricsOf(days) : undefined;
 	const running = (openRuns.data ?? []).filter(
 		(run) => run.status === "running" || run.status === "sleeping",
 	);
 	const waiting = gates.data?.length ?? 0;
-	const failing = nights?.runs.stillFailing ?? 0;
+	const failing = days?.runs.stillFailing ?? 0;
 
 	return (
 		<>
@@ -48,7 +48,7 @@ export function HomePage({
 				<PageHeading
 					title="Home"
 					description={
-						!nights
+						!days
 							? "What runs now, what waits for you and what failed in all your projects."
 							: needsYou(waiting, failing)
 					}
@@ -61,7 +61,7 @@ export function HomePage({
 				<HomeLanes
 					running={running}
 					gates={gates.data ?? []}
-					failed={nights?.runs}
+					failed={days?.runs}
 					projects={projects.data}
 					range={range}
 					isLoading={openRuns.isLoading || gates.isLoading}

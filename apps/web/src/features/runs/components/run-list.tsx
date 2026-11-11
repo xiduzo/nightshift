@@ -69,7 +69,7 @@ export function RunList({
 	pageSize?: number;
 	/** There are more runs than the list holds: load them. */
 	more?: { load: () => void; loading: boolean };
-	/** Show when each run started ("10:37 PM"), for the runs of one night. */
+	/** Show when each run started ("10:37 PM"), for the runs of one day. */
 	clockTimes?: boolean;
 }) {
 	if (isLoading) {

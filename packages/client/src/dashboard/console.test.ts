@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { changeOf, consoleNumbers, nightsOf } from "./console";
+import { changeOf, consoleNumbers, daysOf } from "./console";
 import type { DashboardSummary, NightsRange } from "./types";
 
 const totals = (
@@ -50,38 +50,38 @@ describe("consoleNumbers", () => {
 	});
 });
 
-describe("nightsOf", () => {
+describe("daysOf", () => {
 	test("picks the range, and says when the server has none", () => {
 		const summary = {
 			nights: [range(7, {}, {}), range(30, { runs: 5 }, {})],
 		} as unknown as DashboardSummary;
-		expect(nightsOf(summary, 30).totals.runs).toBe(5);
-		expect(() => nightsOf(summary, 90)).toThrow("no range of 90 nights");
+		expect(daysOf(summary, 30).totals.runs).toBe(5);
+		expect(() => daysOf(summary, 90)).toThrow("no range of 90 days");
 	});
 });
 
 describe("changeOf", () => {
-	test("says how a number moved against the nights before", () => {
+	test("says how a number moved against the days before", () => {
 		expect(changeOf("runs", 12, 9)).toEqual({
 			trend: "up",
-			text: "3 more than the nights before",
+			text: "3 more than the days before",
 			short: "+3",
 		});
 		expect(changeOf("finished", 60, 75)).toEqual({
 			trend: "down",
-			text: "15 points less than the nights before",
+			text: "15 points less than the days before",
 			short: "−15 pts",
 		});
 		expect(changeOf("spend", 1, 1.5).short).toBe("−$0.50");
-		expect(changeOf("gates", 2, 2).text).toBe("Same as the nights before");
+		expect(changeOf("gates", 2, 2).text).toBe("Same as the days before");
 	});
 
 	test("says when there is nothing to set the number against", () => {
 		expect(changeOf("runs", 3, undefined).short).toBe("new");
-		expect(changeOf("runs", 3, 0).text).toBe("None in the nights before");
+		expect(changeOf("runs", 3, 0).text).toBe("None in the days before");
 		expect(changeOf("finished", null, 50).short).toBe("—");
 		expect(changeOf("finished", 50, null).text).toBe(
-			"No runs ended in the nights before",
+			"No runs ended in the days before",
 		);
 	});
 });

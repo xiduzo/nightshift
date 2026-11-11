@@ -11,9 +11,7 @@ export const Route = createFileRoute("/projects/$projectId/")({
 	validateSearch: (
 		search: Record<string, unknown>,
 	): { range?: (typeof PAGE_RANGES)[number] } => ({
-		range: PAGE_RANGES.find(
-			(nights) => String(nights) === String(search.range),
-		),
+		range: PAGE_RANGES.find((days) => String(days) === String(search.range)),
 	}),
 	loader: ({ context, params }) =>
 		preloadProjectDashboardPage(context.queryClient, params.projectId),

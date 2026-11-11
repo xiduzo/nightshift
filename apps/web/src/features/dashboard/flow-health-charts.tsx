@@ -1,4 +1,4 @@
-/** The charts of a flow's health: runs per night and cost per run. */
+/** The charts of a flow's health: runs per day and cost per run. */
 import {
 	ChartContainer,
 	ChartTooltip,
@@ -20,12 +20,12 @@ import {
 	hoverTime,
 	typicalCostSentence,
 } from "@/shared/format";
+import { dayChartRows, formatDayShort } from "./days";
 import { ChartSection, DetailsEmpty, Swatch } from "./details";
-import { formatNightShort, nightChartRows } from "./nights";
 import { RUN_STATUS_CHART } from "./run-statuses";
 
-/** Runs per night, stacked by status, like the Runs details. */
-export function RunsPerNight({
+/** Runs per day, stacked by status, like the Runs details. */
+export function RunsPerDay({
 	perNight,
 	statuses: counts,
 }: {
@@ -34,15 +34,12 @@ export function RunsPerNight({
 	statuses: FlowRange["statuses"];
 }) {
 	const statuses = counts.map(({ status }) => status);
-	const rows = nightChartRows(perNight);
+	const rows = dayChartRows(perNight);
 	const config = Object.fromEntries(
 		statuses.map((status) => [status, RUN_STATUS_CHART[status]]),
 	);
 	return (
-		<ChartSection
-			title="History"
-			hint="Runs per night, noon to noon, by status"
-		>
+		<ChartSection title="History" hint="Runs per day, by status">
 			<ChartContainer config={config} className="aspect-auto h-48 w-full">
 				<BarChart data={rows} margin={{ left: 0, right: 0 }}>
 					<CartesianGrid vertical={false} />
@@ -112,7 +109,7 @@ export function CostPerRun({
 }) {
 	const rows = runs.map((run, index) => ({
 		key: `${run.runId}-${index}`,
-		label: formatNightShort(run.night),
+		label: formatDayShort(run.night),
 		title: hoverTime(run.startedAt),
 		costUsd: run.costUsd,
 		tokens: run.tokens,

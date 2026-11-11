@@ -16,8 +16,8 @@ import {
 import { TrendIcon } from "./trend-icon";
 
 /**
- * Home's four numbers in one slim row, each with a small line per night
- * and the nights before dashed. A number opens its details.
+ * Home's four numbers in one slim row, each with a small line per day
+ * and the days before dashed. A number opens its details.
  */
 export function MetricStrip({
 	metrics,
@@ -86,7 +86,7 @@ export function MetricStrip({
 	);
 }
 
-/** One metric per night, small, with the nights before dashed. */
+/** One metric per day, small, with the days before dashed. */
 function Sparkline({
 	rows,
 	metric,
