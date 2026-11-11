@@ -45,7 +45,7 @@ flowchart LR
 
 - **Prompt and skill.** With a skill, the agent gets `/<skill> <prompt>`.
 - **Outcomes.** An Agent can declare its own outcomes, such as `found` and `noise`, in place of `pass` and `fail`.
-- **Output.** A JSON schema for the step's data. A step whose data does not match the schema fails.
+- **Output.** The shape of the step's data. See [Data shapes](#data-shapes).
 - **Ask a person.** An agent that needs input opens a Gate. Your answer goes back to the same session.
 - **Backups.** Other profiles, on other computers, that take the step when its computer is offline. See [Agents and profiles](Agents-and-profiles.md#backups).
 
@@ -63,6 +63,7 @@ A Decision or a Value that a model decides can have a cascade too. A model's pic
 - Secrets arrive as environment variables too.
 - JSON that the command writes to `$NS_OUTPUT` is its data. `{"outcome": "approved"}` picks the outcome.
 - A command that prints JSON can give that as its data. Set **What it prints** to **JSON** (`"stdout": "json"` in the flow file).
+- **Data shape** in its **Output** says what that data holds. See [Data shapes](#data-shapes).
 - `{"scores": {"found": 4}}` in that data scores the run. Flow health shows the scores of each flow.
 - `$NS_KNOWLEDGE` is the project's [knowledge](Knowledge.md) folder.
 
@@ -121,11 +122,23 @@ Steps read earlier values through templates:
 - `{{planner.data.tasks}}`: a field of the data of the step `planner`.
 - `{{run.branch}}`: a fact of the run.
 
-Data has a shape: text, a number, yes or no, a choice, a file, a list, or a record with named fields. You set the shape in the **Output** of an Agent or a Value. When a template reads a field that the shape does not have, such as `{{planner.data.taks}}`, the editor shows a warning. The run still starts.
-
 Two or more edges on one outcome run their branches at once. A Join waits for them.
 
 A variable with **Keep between runs** starts each run with the value that the last run left. Use it to remember a value between runs. For the items of a list, use a [Since last run](#since-last-run) node.
+
+### Data shapes
+
+Data has a shape: text, a number, yes or no, a choice, a file, a list, or a record with named fields. You set the shape in the **Output** of an Agent, a Value, a Command, or a Tool. A flow output can have a type too, so the node that calls the flow knows what it holds.
+
+When a template reads a field that the shape does not have, such as `{{planner.data.taks}}`, the editor shows a warning. The run still starts.
+
+You do not have to write a shape. When a node has none, Night Shift takes it from the first run that gives data. The editor marks it **Inferred from a run**.
+
+- **Confirm** keeps the shape as it is. An edit or an applied **Suggest** confirms it too.
+- A shape that you wrote or confirmed holds every run. When the data does not fit, an Agent, a Command, or a Tool stops with an error. A Value ends on `fail`.
+- An inferred shape only warns. The run shows the warning and goes on.
+- A Tool takes the shape that its MCP server gives for the tool's answer, marked as inferred.
+- A kit and a **Quick run** keep no shape.
 
 ## The editor
 
@@ -133,7 +146,7 @@ A variable with **Keep between runs** starts each run with the value that the la
 - **Auto layout** arranges the nodes for you.
 - **Undo, redo, cut, copy, and paste** work with the keyboard.
 - **Issues** at the bottom of the canvas lists the errors and warnings of the flow.
-- **Revisions.** Every save is a revision. You see who saved what, and from which computer. You can restore an earlier revision.
+- **Revisions.** Every save is a revision. You see who saved what, and from which computer. You can restore an earlier revision. When Night Shift takes a shape from a run, that is a revision too: **Shape from a run**.
 
 Night Shift keeps your flows outside your project folder. Your project needs no Night Shift files. To move a flow, open its ⋯ menu in the editor and choose **Export as file**. Then choose **Import flow** on the Flows page of another project. The import asks which of your profiles takes each agent of the flow.
 
