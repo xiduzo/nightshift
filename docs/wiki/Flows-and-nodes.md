@@ -77,7 +77,7 @@ A Web request sends one request from the computer of its step, and reads the ans
 - **Query, headers and body.** Each value is a template. The body is JSON, text or a form. In JSON, put each template in quotes: `"{{plan.data.tasks}}"`. A quoted template that is one reference keeps its JSON value.
 - **Secrets.** Write `${API_TOKEN}` in the node's own text, for example in the header `Authorization: Bearer ${API_TOKEN}`. The computer of the step fills it in. A value that a template gives is never filled in, so data from a webhook cannot read your secrets. The answer shows each secret value as `•••`.
 - **Outcomes.** `pass` on a 2xx answer. `fail` on any other answer, or on an answer that is too large. When the server says it is busy (429) or fails (5xx), the step waits and asks again, as an agent does at a usage limit.
-- **Outputs.** `{{fetch.status}}`, `{{fetch.headers.content-type}}` and `{{fetch.body}}`. The body is JSON when the server sends JSON, else text. Later nodes read a field of it: `{{fetch.body.items}}`.
+- **Outputs.** `{{fetch.status}}`, `{{fetch.headers.content-type}}` and `{{fetch.body}}`. The body is JSON when the server sends JSON, else text. Later nodes read a field of it: `{{fetch.body.items}}`. Its **Body shape** says what the body of a 2xx answer holds. See [Data shapes](#data-shapes).
 - **Limits.** The step waits 30 seconds for an answer, and keeps up to 1 MB of it. You can set up to 10 minutes and 10 MB.
 
 On a Host, a Web request reaches public addresses only. To let it reach the Host itself and its private network, turn on **Web requests reach this network** in the Host settings. No request reaches a link-local or a cloud metadata address.
@@ -169,14 +169,14 @@ A variable with **Keep between runs** starts each run with the value that the la
 
 ### Data shapes
 
-Data has a shape: text, a number, yes or no, a choice, a file, a list, or a record with named fields. You set the shape in the **Output** of an Agent, a Value, a Command, or a Tool. A Convert node gives the shape of its format. A flow output can have a type too, so the node that calls the flow knows what it holds.
+Data has a shape: text, a number, yes or no, a choice, a file, a list, or a record with named fields. You set the shape in the **Output** of an Agent, a Value, a Command, or a Tool, and the **Body shape** of a Web request. A Convert node gives the shape of its format. A flow output can have a type too, so the node that calls the flow knows what it holds.
 
 When a template reads a field that the shape does not have, such as `{{planner.data.taks}}`, the editor shows a warning. The run still starts.
 
 You do not have to write a shape. When a node has none, Night Shift takes it from the first run that gives data. The editor marks it **Inferred from a run**.
 
 - **Confirm** keeps the shape as it is. An edit or an applied **Suggest** confirms it too.
-- A shape that you wrote or confirmed holds every run. When the data does not fit, an Agent, a Command, or a Tool stops with an error. A Value or a Convert ends on `fail`.
+- A shape that you wrote or confirmed holds every run. When the data does not fit, an Agent, a Command, a Tool, or a Web request stops with an error. A Value or a Convert ends on `fail`.
 - An inferred shape only warns. The run shows the warning and goes on.
 - A Tool takes the shape that its MCP server gives for the tool's answer, marked as inferred.
 - A kit and a **Quick run** keep no shape.
