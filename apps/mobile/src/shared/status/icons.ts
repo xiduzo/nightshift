@@ -1,4 +1,5 @@
 import {
+	ArrowRightLeft,
 	Bot,
 	CircleAlert,
 	CircleCheck,
@@ -51,6 +52,7 @@ const ICONS: Record<StatusIconName | StepKindIconName, LucideIcon> = {
 	lock: Lock,
 	server: Server,
 	diff: Diff,
+	convert: ArrowRightLeft,
 };
 
 /** The lucide icon of a status or a step kind. */

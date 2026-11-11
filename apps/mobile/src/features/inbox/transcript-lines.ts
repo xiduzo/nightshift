@@ -6,6 +6,7 @@ import {
 	type TranscriptEntry,
 	toolCallsSummary,
 } from "@nightshift/client";
+import { CONVERT_FORMAT_LABEL } from "@nightshift/flows";
 
 /**
  * A run's transcript as lines to read on a phone: what each agent said,
@@ -192,6 +193,17 @@ export function transcriptLines(
 					text: `${event.new} new, ${event.changed} changed, ${event.same} the same since the last run.`,
 				});
 				break;
+			case "convert": {
+				const pair = `${formatLabel(event.from)} to ${formatLabel(event.to)}`;
+				push({
+					key: `convert:${seq}`,
+					kind: "night-shift",
+					text: event.problem
+						? `Could not convert ${pair}. ${event.problem}`
+						: `Converted ${pair}.`,
+				});
+				break;
+			}
 			case "lease":
 				push({
 					key: `lease:${seq}`,
@@ -227,4 +239,11 @@ export function transcriptLines(
 	);
 	if (kept.at(-1)?.kind === "step") kept.pop();
 	return kept.slice(-MAX_LINES);
+}
+
+/** A Convert step's format as a person reads it, from the id the step logged. */
+function formatLabel(format: string): string {
+	return Object.hasOwn(CONVERT_FORMAT_LABEL, format)
+		? CONVERT_FORMAT_LABEL[format as keyof typeof CONVERT_FORMAT_LABEL]
+		: format;
 }
