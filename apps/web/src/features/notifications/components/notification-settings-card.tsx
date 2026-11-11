@@ -16,6 +16,7 @@ import {
 	FieldLegend,
 	FieldSeparator,
 	FieldSet,
+	FieldTitle,
 } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
 import {
@@ -29,6 +30,10 @@ import {
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
+import {
+	ToggleGroup,
+	ToggleGroupItem,
+} from "@nightshift/ui/components/toggle-group";
 import { useQuery } from "@tanstack/react-query";
 import { BellOffIcon, CircleAlertIcon, SquarePlusIcon } from "lucide-react";
 import { useId, useMemo } from "react";
@@ -36,6 +41,12 @@ import { toast } from "sonner";
 
 import type { NotificationSettings } from "@/shared/api";
 import { PageSection } from "@/shared/page";
+import {
+	type GateUrgency,
+	URGENCIES,
+	URGENCY_LABEL,
+	UrgencyMarker,
+} from "@/shared/urgency";
 import { browserPushErrorText } from "../browser";
 import { notificationQueries } from "../queries";
 import { useBrowserPush } from "../use-browser-push";
@@ -174,6 +185,12 @@ function SettingsForm({ data }: { data: NotificationSettings }) {
 									/>
 								</Field>
 							))}
+							{data.events.gateOpened ? (
+								<PushForField
+									value={data.pushUrgencies}
+									onSave={(pushUrgencies) => save.mutate({ pushUrgencies })}
+								/>
+							) : null}
 						</FieldGroup>
 					</FieldSet>
 					<FieldSeparator />
@@ -287,6 +304,50 @@ function SettingsForm({ data }: { data: NotificationSettings }) {
 				</FieldGroup>
 			</CardContent>
 		</Card>
+	);
+}
+
+/**
+ * The Gate urgencies that send a notification. A Gate of another level
+ * waits in the inbox only. One level at least stays on: to stop them all,
+ * turn off "A Gate waits for you".
+ */
+function PushForField({
+	value,
+	onSave,
+}: {
+	value: GateUrgency[];
+	onSave: (value: GateUrgency[]) => void;
+}) {
+	const id = useId();
+	return (
+		<Field>
+			<FieldTitle id={id}>Push for</FieldTitle>
+			<ToggleGroup
+				multiple
+				variant="outline"
+				size="sm"
+				spacing={0}
+				aria-labelledby={id}
+				aria-describedby={`${id}-description`}
+				value={value}
+				onValueChange={(next: string[]) => {
+					const levels = URGENCIES.filter((level) => next.includes(level));
+					if (levels.length > 0) onSave(levels);
+				}}
+				className="flex-wrap"
+			>
+				{URGENCIES.map((level) => (
+					<ToggleGroupItem key={level} value={level}>
+						<UrgencyMarker urgency={level} />
+						{URGENCY_LABEL[level]}
+					</ToggleGroupItem>
+				))}
+			</ToggleGroup>
+			<FieldDescription id={`${id}-description`}>
+				Gates of the other levels wait in your inbox without a notification.
+			</FieldDescription>
+		</Field>
 	);
 }
 
