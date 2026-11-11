@@ -243,6 +243,33 @@ describe("assistant.suggest", () => {
 		expect(harness.calls[0]?.permissionMode).toBe("default");
 	});
 
+	test("for a project without a folder, works in the assistant's own folder (ADR 22)", async () => {
+		const harness = fakeHarness({
+			steps: [
+				{
+					type: "report",
+					outcome: "",
+					summary: "Shorter.",
+					data: { text: "Plan {{issue}}." },
+				},
+			],
+		});
+		const noFolder = {
+			clonePath: async () => null,
+			withoutFolder: async (projectId: string) => projectId === "p1",
+			ownFolder: async () => "/data/assistant",
+			harnessFor: () => harness,
+		};
+		expect((await suggest(createAssistant(deps(noFolder)))).at(-1)).toEqual({
+			type: "done",
+		});
+		expect(harness.calls[0]?.cwd).toBe("/data/assistant");
+		// A project with a folder that is not here stays not here.
+		expect(
+			await suggest(createAssistant(deps(noFolder)), { projectId: "p2" }),
+		).toEqual([{ type: "error", message: NO_CLONE }]);
+	});
+
 	test("ends with an error the person can act on", async () => {
 		expect(
 			await suggest(createAssistant(deps({ clonePath: async () => null }))),
@@ -355,6 +382,24 @@ describe("assistant.chat", () => {
 		expect(input?.cwd).toBe("/repo");
 		expect(input?.readOnly).toBe(true);
 		expect(input?.tools?.map((t) => t.name)).toContain("propose_flow");
+	});
+
+	test("for a project without a folder, chats in the assistant's own folder (ADR 22)", async () => {
+		const harness = fakeHarness({
+			steps: [{ type: "text", text: "Done." }],
+		});
+		const events = await chat(
+			createAssistant(
+				deps({
+					clonePath: async () => null,
+					withoutFolder: async () => true,
+					ownFolder: async () => "/data/assistant",
+					harnessFor: () => harness,
+				}),
+			),
+		);
+		expect(events.at(-1)).toEqual({ type: "done" });
+		expect(harness.calls[0]?.cwd).toBe("/data/assistant");
 	});
 
 	test("a later message on the thread resumes its session; an unknown thread starts anew", async () => {

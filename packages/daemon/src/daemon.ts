@@ -38,6 +38,7 @@ import {
 	createKnowledge,
 	createKnowledgeFolderLocks,
 	createOllama,
+	createRunFolders,
 	createSpaceArchive,
 	createSyncedDocuments,
 	createToolLaunchers,
@@ -59,6 +60,7 @@ import {
 	createSpaceDocuments,
 	setUpGit,
 	systemGitInstaller,
+	withoutFolderOf,
 } from "@nightshift/engine/projects";
 import { deliveryMoves } from "@nightshift/notifications";
 import { createTelemetry } from "@nightshift/telemetry";
@@ -514,6 +516,9 @@ export async function createDaemon(
 		profiles,
 		toolLaunchers,
 		clonePath,
+		// A run of a project without a folder works in a folder of its own
+		// here, next to the run history (ADR 22).
+		runFolders: createRunFolders(dataDir),
 		// The flows another Device's older Walker asks this one for: the
 		// engine's (made below, before anyone can ask), a flow of format 6
 		// as the Device that saved it named its profiles.
@@ -764,6 +769,7 @@ export async function createDaemon(
 			settings,
 			...harnessLookup(harnesses, settings),
 			clonePath,
+			withoutFolder: withoutFolderOf(db),
 			space: ({ spaceId, personId }) => engine.space(spaceId, { personId }),
 			cliTools,
 			connections,

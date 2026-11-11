@@ -44,6 +44,11 @@ export type AssistantDeps = {
 	installed: (name: AgentHarnessName) => boolean;
 	/** The folder of the project's Clone on this computer (in that Space), or null. */
 	clonePath: (projectId: string, spaceId?: string) => Promise<string | null>;
+	/**
+	 * Whether the project has no folder (ADR 22): Suggest and the chat work
+	 * for it in the assistant's own folder. Without it: every project has one.
+	 */
+	withoutFolder?: (projectId: string) => Promise<boolean>;
 	/** The engine as the Person sees the Space: the project's flows and runs. */
 	space: (scope: AssistantScope) => AuthoringSpace;
 	cliTools: Pick<CliToolStore, "list">;
@@ -54,8 +59,8 @@ export type AssistantDeps = {
 	threads?: ThreadStore;
 	/**
 	 * An empty folder of the assistant's own, for an explanation of a run
-	 * whose project has no Clone here: the run says most of it. Without
-	 * it, such a run cannot be explained here.
+	 * whose project has no Clone here (the run says most of it), and for a
+	 * project without a folder. Without it, neither can be answered here.
 	 */
 	ownFolder?: () => Promise<string>;
 };
@@ -232,6 +237,22 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 	const threads = deps.threads ?? createThreadStore();
 	const skills = deps.skills ?? installedSkills;
 
+	/**
+	 * Where the assistant works for a project: its Clone here, or its own
+	 * folder for a project without one (ADR 22). Null: not on this computer.
+	 */
+	async function workFolder(
+		projectId: string,
+		spaceId?: string,
+	): Promise<string | null> {
+		const clone = await deps.clonePath(projectId, spaceId);
+		if (clone !== null) return clone;
+		if (!deps.ownFolder || !(await deps.withoutFolder?.(projectId))) {
+			return null;
+		}
+		return deps.ownFolder();
+	}
+
 	/** The thread a message continues, when it still can. */
 	const continued = (request: ChatRequest): ChatThread | null => {
 		const thread = request.threadId ? threads.get(request.threadId) : null;
@@ -254,7 +275,7 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 				yield { type: "error", message: harness.error };
 				return;
 			}
-			const cwd = await deps.clonePath(request.projectId);
+			const cwd = await workFolder(request.projectId);
 			if (cwd === null) {
 				yield { type: "error", message: NO_CLONE };
 				return;
@@ -295,7 +316,7 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 				yield { type: "error", message: harness.error };
 				return;
 			}
-			const cwd = await deps.clonePath(request.projectId, scope.spaceId);
+			const cwd = await workFolder(request.projectId, scope.spaceId);
 			if (cwd === null) {
 				yield { type: "error", message: NO_CLONE };
 				return;
