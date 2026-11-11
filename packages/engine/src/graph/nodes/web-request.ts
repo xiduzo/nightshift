@@ -26,6 +26,7 @@ import {
 	PLAIN_KIND,
 	type StepContext,
 } from "../context";
+import { outputVerdict } from "../output-schema";
 import { RESUME_RULES } from "../resume-point";
 import { type BodyResult, runStep, type StepHandle } from "../step-runner";
 
@@ -43,7 +44,10 @@ import { type BodyResult, runStep, type StepHandle } from "../step-runner";
  * does, until the `Retry-After` the server sends. A 5xx, a server that
  * cannot be reached or does not answer in time waits as the network does;
  * the run policy's grace bounds both. Outputs: `status`, `headers`, `body`
- * (JSON when the server says JSON, else text) and `visit`.
+ * (JSON when the server says JSON, else text) and `visit`. The body of a
+ * 2xx answer that does not match the node's `output` schema errors the
+ * step when a person wrote or confirmed the schema, and warns when Night
+ * Shift inferred it (`outputVerdict`).
  *
  * Every visit is new (`RESUME_RULES.fresh`); a step that waits continues
  * and asks again.
@@ -364,6 +368,16 @@ async function sendWebRequest(
 		body: response.body,
 	};
 	const ok = response.status >= 200 && response.status < 300;
+	// The `output` schema types the body of a 2xx answer: one a person
+	// wrote or confirmed errors the step on a mismatch, an inferred one
+	// warns. Another answer is not checked.
+	if (ok) {
+		const verdict = outputVerdict(node, response.body);
+		if (verdict.kind === "broken") {
+			return end(verdict.outcome, outputs, verdict.message);
+		}
+		if (verdict.kind === "warning") await step.warn("shape", verdict.message);
+	}
 	return end(
 		ok ? "pass" : "fail",
 		outputs,

@@ -142,6 +142,56 @@ describe("the Web request node", () => {
 		});
 	});
 
+	test("a body that does not match a confirmed shape errors the step, an inferred one warns", async () => {
+		const output = {
+			type: "object",
+			properties: { items: { type: "array" } },
+		};
+		answers["/items"] = [Response.json({ items: "none" })];
+		const confirmed = await startRun(
+			sandbox,
+			flowOf([request("fetch", { output })]),
+		);
+		await drive(confirmed, {});
+		expect(payloads(await confirmed.events(), "StepEnded")[0]).toMatchObject({
+			outcome: "error",
+			error:
+				"The body of the answer does not match the output schema: data/items must be array.",
+		});
+
+		answers["/items"] = [Response.json({ items: "none" })];
+		const inferred = await startRun(
+			sandbox,
+			flowOf([request("fetch", { output, outputInferred: true })]),
+		);
+		await drive(inferred, {});
+		const logged = await inferred.events();
+		expect(payloads(logged, "StepEnded")[0]).toMatchObject({
+			outcome: "pass",
+		});
+		expect(payloads(logged, "RunWarned")).toEqual([
+			{
+				kind: "shape",
+				message:
+					"The body of the answer does not match the output schema: data/items must be array. Night Shift took this shape from an earlier run. Confirm it or change it in the editor.",
+			},
+		]);
+	});
+
+	test("a flow's step without a shape ends with the shape of its body", async () => {
+		answers["/items"] = [Response.json({ items: ["a"] })];
+		const h = await startRun(sandbox, flowOf([request("fetch")]), {
+			flowName: "news",
+		});
+		await drive(h, {});
+		expect(payloads(await h.events(), "StepEnded")[0]?.shapes).toEqual({
+			body: {
+				type: "object",
+				properties: { items: { type: "array", items: { type: "string" } } },
+			},
+		});
+	});
+
 	test("waits out a 429 until its Retry-After, then asks again", async () => {
 		answers["/items"] = [
 			new Response("slow down", {

@@ -75,16 +75,18 @@ const escapeRegExp = (text: string) =>
 	text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
- * The keys of `nodeId`'s `data` that the rest of the flow reads: in
- * templates (`{{plan.data.tasks}}`), rules and expressions (`plan.data.ok`),
- * and the flow's outputs. Each key with who reads it.
+ * The keys of `nodeId`'s `data` (or another output `field`, such as a
+ * Web request's `body`) that the rest of the flow reads: in templates
+ * (`{{plan.data.tasks}}`), rules and expressions (`plan.data.ok`), and
+ * the flow's outputs. Each key with who reads it.
  */
 export function dataReaders(
 	flow: Flow,
 	nodeId: string,
+	field = "data",
 ): { key: string; readers: string[] }[] {
 	const pattern = new RegExp(
-		`(?<![A-Za-z0-9_.])${escapeRegExp(nodeId)}\\.data\\.([A-Za-z0-9_-]+)`,
+		`(?<![A-Za-z0-9_.])${escapeRegExp(nodeId)}\\.${field}\\.([A-Za-z0-9_-]+)`,
 		"g",
 	);
 	const found = new Map<string, Set<string>>();

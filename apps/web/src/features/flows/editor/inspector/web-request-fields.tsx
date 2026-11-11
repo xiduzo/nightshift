@@ -5,7 +5,6 @@ import {
 	type Flow,
 	MAX_WEB_REQUEST_BYTES,
 	WEB_REQUEST_METHODS,
-	type WebRequestBody,
 	type WebRequestMethod,
 	type WebRequestNode,
 } from "@nightshift/flows";
@@ -28,7 +27,9 @@ import { PlusIcon, XIcon } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { Field, InspectorSection, Note, PositiveIntInput } from "../fields";
 import { TemplateField } from "../template-field";
+import { DataShapeSection } from "./data-shape-section";
 
+type WebRequestBody = NonNullable<WebRequestNode["body"]>;
 type BodyKind = WebRequestBody["kind"] | "none";
 
 const BODY_KINDS: { value: BodyKind; label: string }[] = [
@@ -307,6 +308,8 @@ export function WebRequestFields({
 					<code>{`{{${node.id}.headers.content-type}}`}</code>.
 				</Note>
 			</InspectorSection>
+
+			<DataShapeSection node={node} onChange={onChange} label="Body shape" />
 
 			<InspectorSection title="Answer" tab="setup" defaultOpen={false}>
 				<Field

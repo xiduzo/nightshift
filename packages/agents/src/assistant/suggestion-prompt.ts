@@ -15,6 +15,7 @@ import {
 	nodeOutcomes,
 	type SuggestionKind,
 	type SuggestionRequest,
+	typedOutput,
 	waitCommandOf,
 } from "@nightshift/flows";
 import type { ProjectFacts } from "./project-facts";
@@ -181,10 +182,11 @@ const promptKind: KindPrompt = {
 const outputKind: KindPrompt = {
 	what: "an output schema",
 	task: ({ flow, node }) => {
-		const readers = dataReaders(flow, node.id);
+		const field = typedOutput(node)?.field ?? "data";
+		const readers = dataReaders(flow, node.id, field);
 		const current = (node as { output?: unknown }).output;
 		return [
-			`Write the node's output schema: a JSON Schema for an object (\`"type": "object"\`, \`properties\`, \`required\`). The step's \`data\` must match it, and the rest of the flow reads it as \`{{${node.id}.data.<field>}}\`.`,
+			`Write the node's output schema: a JSON Schema for an object (\`"type": "object"\`, \`properties\`, \`required\`). The step's \`${field}\` must match it, and the rest of the flow reads it as \`{{${node.id}.${field}.<field>}}\`.`,
 			"",
 			"Rules:",
 			"- Keep the fields the rest of the flow reads (below), with a type that fits how they are read.",
@@ -192,7 +194,9 @@ const outputKind: KindPrompt = {
 				? "- Add the fields the command writes to `$NS_OUTPUT`, or prints as JSON."
 				: node.type === "tool"
 					? "- Add the fields the tool answers with."
-					: "- Add the fields the node's prompt asks the agent to report.",
+					: node.type === "web-request"
+						? "- Add the fields of the JSON body the server answers with."
+						: "- Add the fields the node's prompt asks the agent to report.",
 			"- Give each property a short `description`. Prefer simple types: string, number, boolean, arrays and objects of those.",
 			"- Keep it small: only fields someone reads or the person asked for.",
 			"",
