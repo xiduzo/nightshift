@@ -136,7 +136,7 @@ function harnessesTable(): string {
 			"Agent",
 			"Login and model",
 			"Night Shift's own tools",
-			"Where your code goes",
+			"Where your files go",
 		],
 		rows,
 	);

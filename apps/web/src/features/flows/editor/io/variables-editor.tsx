@@ -283,8 +283,8 @@ function VariableRow({
 						Keep between runs
 					</FieldLabel>
 					<FieldDescription id={`${id}-keep-hint`} className="text-xs">
-						Each run starts from the value the last run left, for example a list
-						of skipped issues.
+						Each run starts from the value the last run left, for example the
+						links it already reported.
 					</FieldDescription>
 				</FieldContent>
 			</ShadcnField>

@@ -324,8 +324,8 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 							Add the starter flows
 						</FieldLabel>
 						<FieldDescription>
-							Small flows to change and run, for example implement and check, or
-							plan and build.
+							Small flows to change and run, for example scout and pick, or
+							draft slides.
 						</FieldDescription>
 					</FieldContent>
 				</Field>

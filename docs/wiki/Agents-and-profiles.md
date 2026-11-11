@@ -5,7 +5,7 @@ An Agent node names the agent that it runs on. Agents run with your own CLI logi
 ## Agents
 
 <!-- generated:harnesses: bun run docs:reference writes this table from the code. Do not edit it here. -->
-| Agent | Login and model | Night Shift's own tools | Where your code goes |
+| Agent | Login and model | Night Shift's own tools | Where your files go |
 | --- | --- | --- | --- |
 | **Claude Code** | Uses your Claude login. Model: an alias such as sonnet, or a full model id. | Yes | Prompts and your project's files go to Anthropic under your Claude login. |
 | **OpenCode** | Needs OpenCode 1.x. Version 2.x does not work yet. Model: provider/model. | Yes | Prompts and project files go to the model provider set in OpenCode. |
