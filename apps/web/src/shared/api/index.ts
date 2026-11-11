@@ -37,6 +37,7 @@ export type {
 	ProjectCheck,
 	RunCopy,
 	RunDetail,
+	RunFiles,
 	RunStatus,
 	RunSummary,
 	ScheduleIssue,

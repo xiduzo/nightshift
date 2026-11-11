@@ -10,20 +10,24 @@ import {
 } from "@nightshift/ui/components/table";
 import { cn } from "@nightshift/ui/lib/utils";
 import type { ReactNode } from "react";
-import type { Artifact, RunDetail, StepSummary } from "@/shared/api";
+import type { Artifact, RunDetail, RunFiles, StepSummary } from "@/shared/api";
+import { showsRunFiles } from "../lib/run-files";
 import { RunArtifacts } from "./run-artifacts";
+import { RunFilesList } from "./run-files";
 import { RunVariables, ValuePreview, variableCount } from "./run-variables";
 import { type Source, SourceList } from "./step-sources";
 
 /**
  * Beside the run's story, at a fixed width: the inputs the run started
- * with, its variables now, the artifacts its agents kept and the knowledge
- * they used. Each part shows only when the run has it.
+ * with, its variables now, the artifacts its agents kept, the files in its
+ * own folder (a project without a folder) and the knowledge they used.
+ * Each part shows only when the run has it.
  */
 export function RunSidebar({
 	run,
 	steps,
 	artifacts,
+	files,
 	onShowStep,
 	className,
 }: {
@@ -32,6 +36,8 @@ export function RunSidebar({
 	steps: StepSummary[];
 	/** The files the run's agents kept. */
 	artifacts: Artifact[];
+	/** The files in the run's own folder. Undefined for a run in a copy of the project. */
+	files?: RunFiles;
 	onShowStep: (stepId: string) => void;
 	className?: string;
 }) {
@@ -42,6 +48,7 @@ export function RunSidebar({
 		inputs.length === 0 &&
 		variables === 0 &&
 		artifacts.length === 0 &&
+		!showsRunFiles(files) &&
 		knowledge.length === 0
 	) {
 		return null;
@@ -103,6 +110,14 @@ export function RunSidebar({
 							/>
 						</Section>
 					) : null}
+					{showsRunFiles(files) ? (
+						<Section
+							title="Files"
+							count={files.here ? files.files.length : undefined}
+						>
+							<RunFilesList run={run} files={files} />
+						</Section>
+					) : null}
 					{knowledge.length > 0 ? (
 						<Section title="Knowledge" count={knowledge.length}>
 							<SourceList
@@ -142,7 +157,8 @@ function Section({
 	children,
 }: {
 	title: string;
-	count: number;
+	/** Left out when there is nothing to count here. */
+	count?: number;
 	hint?: string;
 	children: ReactNode;
 }) {
@@ -150,9 +166,11 @@ function Section({
 		<section aria-label={title} className="flex flex-col gap-2">
 			<h2 className="flex items-center gap-2 font-semibold text-sm">
 				{title}
-				<Badge variant="secondary" className="tabular-nums">
-					{count}
-				</Badge>
+				{count === undefined ? null : (
+					<Badge variant="secondary" className="tabular-nums">
+						{count}
+					</Badge>
+				)}
 			</h2>
 			{hint ? <p className="text-muted-foreground text-xs">{hint}</p> : null}
 			{children}

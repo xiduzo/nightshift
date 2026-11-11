@@ -289,12 +289,15 @@ function RunFacts({ run }: { run: RunSummary }) {
 					</span>
 				</Fact>
 			) : null}
-			<Fact
-				label={`Branch ${run.branch}`}
-				copy={{ what: "branch name", value: run.branch }}
-			>
-				<GitBranchIcon />
-			</Fact>
+			{/* No branch yet (its computer was offline), or none at all (a project without a folder). */}
+			{run.branch ? (
+				<Fact
+					label={`Branch ${run.branch}`}
+					copy={{ what: "branch name", value: run.branch }}
+				>
+					<GitBranchIcon />
+				</Fact>
+			) : null}
 		</div>
 	);
 }

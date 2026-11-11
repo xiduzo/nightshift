@@ -103,6 +103,11 @@ function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 	const artifacts = useQuery(
 		runQueries.artifacts(runId, liveStatus === "running"),
 	);
+	// Only a run of a project without a folder has a folder of its own.
+	const files = useQuery({
+		...runQueries.files(runId, liveStatus === "running"),
+		enabled: run.data?.runFolder === true,
+	});
 
 	/** Scrolls the story to a step, and narrows it to the call the step is in. */
 	const showStep = (id: string) => {
@@ -378,6 +383,7 @@ function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 			run={runData}
 			steps={steps}
 			artifacts={artifactList}
+			files={runData.runFolder ? files.data : undefined}
 			onShowStep={showStep}
 			className={desktop ? undefined : "w-full border-t border-l-0"}
 		/>

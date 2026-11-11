@@ -181,24 +181,31 @@ function OverviewSection({
 	);
 }
 
-/** The branch the run works on, and the computer and folder it runs in. */
+/**
+ * The branch the run works on, and the computer and folder it runs in. A
+ * run of a project without a folder has no branch and no base.
+ */
 function WhereSection({ run }: { run: RunDetail }) {
 	return (
 		<InspectorSection title="Where it runs">
 			<dl className="flex flex-col gap-3">
 				{/* A run whose computer was offline at the start has no branch yet. */}
-				{run.branch ? (
+				{run.branch && !run.runFolder ? (
 					<Fact label="Branch">
 						<CopyValue label="branch" value={run.branch} />
 					</Fact>
 				) : null}
-				<Fact label="Base">
-					<CopyValue
-						label="base"
-						value={run.baseRef}
-						short={SHA.test(run.baseRef) ? run.baseRef.slice(0, 12) : undefined}
-					/>
-				</Fact>
+				{run.runFolder ? null : (
+					<Fact label="Base">
+						<CopyValue
+							label="base"
+							value={run.baseRef}
+							short={
+								SHA.test(run.baseRef) ? run.baseRef.slice(0, 12) : undefined
+							}
+						/>
+					</Fact>
+				)}
 				<Fact label="Runs on">
 					<MonitorIcon
 						className="size-3.5 shrink-0 text-muted-foreground"
