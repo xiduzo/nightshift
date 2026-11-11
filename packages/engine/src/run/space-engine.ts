@@ -43,6 +43,12 @@ export interface SpaceEngine {
 	 */
 	addProject(input: { repoPath: string; name?: string }): Promise<Project>;
 	/**
+	 * Adds a project without a folder (ADR 22): it has no remote and no
+	 * Clone, and each of its runs gets an empty folder of its own. In a
+	 * Space a Host keeps, the Host adds it.
+	 */
+	addProjectWithoutFolder(input: { name: string }): Promise<Project>;
+	/**
 	 * Makes a git repository on this computer the project's folder here:
 	 * its first one, or in place of the one it has. The folder must hold
 	 * the project's repository. Fails while a run of it runs here.

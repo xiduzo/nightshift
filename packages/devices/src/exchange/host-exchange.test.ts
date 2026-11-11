@@ -621,6 +621,40 @@ describe("a Project a Device asks for", () => {
 		expect(await refused(keyOf("device-stranger", "stranger"))).toBeTruthy();
 		expect(document.projects.size).toBe(2);
 	});
+
+	test("a Member adds one without a folder; a viewer is refused", async () => {
+		const colleague = keyOf("device-colleague", "colleague");
+		const added = await host().addWithoutFolder(colleague, {
+			spaceId: sandbox.spaceId,
+			name: "Leads",
+		});
+		const document = await documents.open(sandbox.spaceId);
+		expect(document.projects.get(added.projectId)).toMatchObject({
+			name: "Leads",
+			remote: null,
+			folder: false,
+		});
+		// Each call adds another one.
+		const again = await host().addWithoutFolder(colleague, {
+			spaceId: sandbox.spaceId,
+			name: "Leads",
+		});
+		expect(again.projectId).not.toBe(added.projectId);
+
+		const error = await host()
+			.addWithoutFolder(keyOf("device-colleague", "colleague", "viewer"), {
+				spaceId: sandbox.spaceId,
+				name: "Feeds",
+			})
+			.then(
+				() => null,
+				(e: unknown) => e,
+			);
+		expect(error).toBeInstanceOf(ORPCError);
+		expect((error as ORPCError<string, unknown>).code).toBe("FORBIDDEN");
+		// The project of the setup, and the two.
+		expect(document.projects.size).toBe(3);
+	});
 });
 
 describe("a Device's stream of rows", () => {

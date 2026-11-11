@@ -99,6 +99,22 @@ describe("sync.mergePersonal", () => {
 		expect(project?.clones.map((c) => c.deviceId)).toEqual([b.deviceId]);
 	});
 
+	test("a project without a folder stays one; an older Device's project has a folder", async () => {
+		await call().mergePersonal({
+			personId: localPerson,
+			projects: [
+				local("p-feeds", null, { clone: false, folder: false }),
+				local("p-older", null),
+			],
+		});
+
+		const projects = await paired.host.space(a.spaceId).listProjects();
+		expect(projects.map((p) => [p.id, p.folder, p.clones])).toEqual([
+			["p-feeds", false, []],
+			["p-older", true, [expect.objectContaining({ deviceId: b.deviceId })]],
+		]);
+	});
+
 	test("a dry run answers the same and changes nothing", async () => {
 		const answer = await call().mergePersonal({
 			personId: localPerson,

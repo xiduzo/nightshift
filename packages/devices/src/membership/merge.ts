@@ -249,6 +249,7 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 							createdAt: p.createdAt,
 							removedAt: p.removedAt,
 							clone: p.clone,
+							folder: p.folder,
 						})),
 						join: [...joined],
 						dryRun,

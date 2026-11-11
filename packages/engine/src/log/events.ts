@@ -184,6 +184,8 @@ export type EnginePayloads = {
 		repoPath?: string;
 		/** The normalised `origin`, null without one. Absent before Clones. */
 		remote?: string | null;
+		/** False: a project without a folder (ADR 22). Absent: one with a folder. */
+		folder?: false;
 	};
 	ProjectRemoved: { projectId: string };
 	/** `addProject` on the path of a removed project. */

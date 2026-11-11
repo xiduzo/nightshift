@@ -153,6 +153,14 @@ export function createSpaces(deps: SpacesDeps) {
 				return added;
 			},
 
+			async addProjectWithoutFolder(input) {
+				await ready;
+				const row = await projects.addWithoutFolder(input, spaceId);
+				const [added] = await withClones(spaceId, [row]);
+				if (!added) throw new Error("Could not add the project.");
+				return added;
+			},
+
 			async useProjectFolder(projectId, repoPath) {
 				await ready;
 				const current = await projects.find(projectId, spaceId);

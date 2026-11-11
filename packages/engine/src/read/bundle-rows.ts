@@ -49,11 +49,18 @@ function withoutStartedBy() {
 /** What a run of a bundle from before Flow revisions has of them. */
 const NO_REVISIONS = { flowRevision: null, bodyFlowRevisions: "{}" };
 
+/** The project's columns of a bundle from before ADR 22: its project has a folder. */
+function withoutFolder() {
+	const { folder: _folder, ...columns } = getColumns(project);
+	return columns;
+}
+
 /**
- * A format 3 to 9 bundle: the live schema's tables. Format 3 has no
+ * A format 3 to 10 bundle: the live schema's tables. Format 3 has no
  * `started_by`, formats 3 and 4 no `device_id`, formats 3 to 5 no
  * `placements`, formats 3 to 6 no `device_names`, formats 3 to 7 no Flow
- * revisions, and formats 3 to 8 no `fallbacks`: read as none.
+ * revisions, and formats 3 to 8 no `fallbacks`: read as none. Formats 3
+ * to 9 have no project `folder`: their project has one.
  */
 export async function readRows(
 	db: Database,
@@ -93,10 +100,15 @@ export async function readRows(
 					...row,
 				}));
 	const projectId = runRow?.projectId ?? "";
-	const [projectRow] = await db
-		.select()
-		.from(project)
-		.where(eq(project.id, projectId));
+	const [projectRow] =
+		formatVersion >= 10
+			? await db.select().from(project).where(eq(project.id, projectId))
+			: (
+					await db
+						.select(withoutFolder())
+						.from(project)
+						.where(eq(project.id, projectId))
+				).map((row) => ({ ...row, folder: true }));
 	return {
 		project: projectRow,
 		clones: await db.select().from(clone).where(eq(clone.projectId, projectId)),
@@ -135,7 +147,7 @@ export async function readFormat2(
 		.where(eq(run.id, runId));
 	const projectId = runRow?.projectId ?? "";
 	const [projectRow] = await db
-		.select(withoutSpace(getColumns(project)))
+		.select(withoutSpace(withoutFolder()))
 		.from(project)
 		.where(eq(project.id, projectId));
 	const clones = await db
@@ -158,7 +170,7 @@ export async function readFormat2(
 		.where(eq(event.runId, runId))
 		.orderBy(asc(event.seq));
 	return {
-		project: projectRow && { ...projectRow, ...space },
+		project: projectRow && { ...projectRow, ...space, folder: true },
 		clones: clones.map((c) => ({ ...c, ...space })),
 		run: runRow && {
 			...runRow,
@@ -193,9 +205,7 @@ export async function readFormat1(
 		walkerSeq: _walkerSeq,
 		...eventColumns
 	} = withoutSpace(getColumns(event));
-	const { remote: _remote, ...projectColumns } = withoutSpace(
-		getColumns(project),
-	);
+	const { remote: _remote, ...projectColumns } = withoutSpace(withoutFolder());
 
 	const [runRow] = await db
 		.select(runColumns)
@@ -221,6 +231,7 @@ export async function readFormat1(
 			...space,
 			name: projectRow.name,
 			remote: null,
+			folder: true,
 			createdAt: projectRow.createdAt,
 			removedAt: projectRow.removedAt,
 		},

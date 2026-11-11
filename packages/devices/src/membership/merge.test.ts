@@ -264,6 +264,22 @@ describe("the merge of Personal", () => {
 		expect(row?.state).toBe("pushed");
 	});
 
+	test("a project without a folder stays one on the Host", async () => {
+		const leads = await paired.device
+			.space(b.spaceId)
+			.addProjectWithoutFolder({ name: "Leads" });
+		const { link } = online();
+		await ready(link);
+
+		const result = await merger(link).merge();
+
+		expect(result).toMatchObject({ state: "pushed", projects: 1 });
+		const [onA] = await paired.host.space(a.spaceId).listProjects();
+		expect(onA).toMatchObject({ id: leads.id, folder: false, clones: [] });
+		const [onB] = await paired.device.space(a.spaceId).listProjects();
+		expect(onB).toMatchObject({ id: leads.id, folder: false });
+	});
+
 	test("the commands of the moved runs move with them, in the name of the Person as the Host knows them", async () => {
 		const { runId } = await projectWithRun();
 		await b.db.insert(runCommand).values([

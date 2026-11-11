@@ -16,6 +16,8 @@ export const personalProjectSchema = z.object({
 	removedAt: z.number().int().nullable(),
 	/** The Device has a Clone of it. */
 	clone: z.boolean(),
+	/** False: a project without a folder (ADR 22). An older Device sends none: it has one. */
+	folder: z.boolean().optional(),
 });
 export type PersonalProject = z.infer<typeof personalProjectSchema>;
 

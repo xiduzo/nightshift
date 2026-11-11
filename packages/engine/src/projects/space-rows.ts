@@ -181,6 +181,7 @@ export async function spaceMoveBatch(
 					spaceId: to,
 					name: row.name,
 					remote: null,
+					folder: row.folder,
 					createdAt: row.createdAt,
 					removedAt: row.removedAt,
 				})
@@ -398,6 +399,8 @@ export type MovingProject = {
 	spaceId: string;
 	name: string;
 	remote: string | null;
+	/** False: a project without a folder (ADR 22). */
+	folder: boolean;
 	createdAt: number;
 	removedAt: number | null;
 };
@@ -407,6 +410,7 @@ const movingColumns = {
 	spaceId: project.spaceId,
 	name: project.name,
 	remote: project.remote,
+	folder: project.folder,
 	createdAt: project.createdAt,
 	removedAt: project.removedAt,
 };
@@ -416,6 +420,7 @@ function moving(row: {
 	spaceId: string;
 	name: string;
 	remote: string | null;
+	folder: boolean;
 	createdAt: Date;
 	removedAt: Date | null;
 }): MovingProject {

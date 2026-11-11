@@ -129,10 +129,13 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 		if (here > 0) throw new Refusal("conflict", SPLIT_WORDS.notDone(here));
 	}
 
-	/** The Projects that come along: a Clone here, or a run this computer walked. */
+	/**
+	 * The Projects that come along: a Clone here, a run this computer
+	 * walked, or no folder: every Device has a project without one (ADR 22).
+	 */
 	async function projectsHere(from: string): Promise<string[]> {
 		return (await engine.projects.ofSpace(from))
-			.filter((p) => p.clone || p.walked)
+			.filter((p) => p.clone || p.walked || !p.folder)
 			.map((p) => p.id);
 	}
 

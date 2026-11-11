@@ -13,7 +13,11 @@ import type { HostClient, WorkReply, WorkRequest } from "../contract";
 import type { DeviceLinks } from "../links";
 import { hostCall, NOT_PAIRED, translated } from "../links/from-host";
 import { pairedReplicas } from "../testing";
-import { createRelay, OLDER_HOST_PROJECTS } from "./relay";
+import {
+	createRelay,
+	OLDER_HOST_NO_FOLDER,
+	OLDER_HOST_PROJECTS,
+} from "./relay";
 import { createSpaceRoutes } from "./route";
 import { createWorkRelay } from "./work-relay";
 
@@ -74,6 +78,9 @@ function fakeHost(
 		sync: {
 			command: take("sync.command", undefined),
 			addProject: take("sync.addProject", { projectId: "project-on-host" }),
+			addWithoutFolder: take("sync.addWithoutFolder", {
+				projectId: "folderless-on-host",
+			}),
 			addClone: take("sync.addClone", undefined),
 			offer: take("sync.offer", undefined),
 			withdrawOffer: take("sync.withdrawOffer", undefined),
@@ -504,6 +511,30 @@ describe("the relay, for a Space a Host keeps", () => {
 				remote: "github.com/acme/app",
 			}),
 		).rejects.toThrow(OLDER_HOST_PROJECTS);
+	});
+
+	test("a project without a folder goes to the Host, and an older Host says to update it", async () => {
+		const host = fakeHost();
+		const { relay } = relayWith(host);
+		expect(
+			await relay.addWithoutFolder({ spaceId: "space-team", name: "Leads" }),
+		).toEqual({ projectId: "folderless-on-host" });
+		expect(host.taken).toEqual([
+			{
+				procedure: "sync.addWithoutFolder",
+				input: { spaceId: "space-team", name: "Leads" },
+			},
+		]);
+
+		// The Link says so for a Host that does not know the procedure.
+		Object.assign(host.client.sync, {
+			addWithoutFolder: async () => {
+				throw new OlderHostError();
+			},
+		});
+		await expect(
+			relay.addWithoutFolder({ spaceId: "space-team", name: "Leads" }),
+		).rejects.toThrow(OLDER_HOST_NO_FOLDER);
 	});
 
 	test("a Host of an older version, which does not know the knowledge procedures, says so: not a failed sync", async () => {

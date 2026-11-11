@@ -90,6 +90,15 @@ export type HostExchange = {
 		caller: Caller,
 		input: { spaceId: string; name: string; remote: string },
 	): Promise<{ projectId: string }>;
+	/**
+	 * Adds a Project without a folder to a Space of this Host for the
+	 * Caller's Person (`PeerProjects.defineWithoutFolder`, ADR 22). Needs
+	 * `project.add` there.
+	 */
+	addWithoutFolder(
+		caller: Caller,
+		input: { spaceId: string; name: string },
+	): Promise<{ projectId: string }>;
 	/** Records the Device's Clone of a Project in a Space of this Host. */
 	addClone(
 		caller: Caller,

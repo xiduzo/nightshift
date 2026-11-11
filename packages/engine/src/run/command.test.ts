@@ -69,6 +69,7 @@ function makeSpace() {
 			sent.push(command);
 		},
 		addProject: () => Promise.reject(new Error("Not in this test.")),
+		addWithoutFolder: () => Promise.reject(new Error("Not in this test.")),
 		addClone: () => Promise.reject(new Error("Not in this test.")),
 		reachable: async () => false,
 		startRun: () => Promise.reject(new Error("Not in this test.")),

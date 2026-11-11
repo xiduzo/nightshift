@@ -21,6 +21,7 @@ import {
 	type SpaceDocuments,
 	type SpaceProject,
 	spaceProjectSchema,
+	withoutFolder,
 } from "./space-document";
 import {
 	type MovingProject,
@@ -30,14 +31,18 @@ import {
 import { createWorktrees } from "./worktrees";
 
 /**
- * Projects by remote, and their Clones on this computer. A Project is a
- * repository by its normalised `origin`; a Clone is that repository's
- * folder on one Device. This computer has at most one Clone of a Project,
- * and the engine works in it: `repoPath` of a `ProjectRow` is that folder.
+ * Projects by remote, and their Clones on this computer. A Project with a
+ * folder is a repository by its normalised `origin`; a Clone is that
+ * repository's folder on one Device. This computer has at most one Clone
+ * of a Project, and the engine works in it: `repoPath` of a `ProjectRow`
+ * is that folder.
  *
  * - Adding a folder whose `origin` names a Project already known makes a
  *   Clone of it, not a second Project. A folder without a remote is a
  *   Project of its own, on this computer only.
+ * - A Project without a folder (`folder` false, ADR 22) has no remote and
+ *   no Clone, on any Device: `addWithoutFolder` adds one. It never gets a
+ *   folder: `useFolder` refuses it, and a Clone of it is never recorded.
  * - A Project is in exactly one Space. A folder or a remote that is a
  *   Project of another Space is refused, never joined across Spaces.
  * - `readRemotes` fills in the remote of the Projects that have none, from
@@ -71,6 +76,10 @@ export const HOSTED_NEEDS_REMOTE =
 
 /** A project that is not in the Space, or that a person removed. */
 export const PROJECT_NOT_FOUND = "Night Shift cannot find this project.";
+
+/** A folder for a project without one: it cannot get one (ADR 22). */
+export const NO_FOLDER =
+	"This project has no folder, and it cannot get one. Add the folder as a new project instead.";
 
 /** A project row with the path of its Clone on this computer. */
 export type ProjectRow = typeof project.$inferSelect & { repoPath: string };
@@ -119,7 +128,7 @@ export type ProjectsDeps = {
 	/** The names of Devices, and the Spaces a Host keeps. */
 	directory: Pick<DeviceDirectory, "names" | "hostedElsewhere">;
 	/** The Hosts: a Project or a Clone in a Space a Host keeps is added through it. */
-	relay?: Pick<Relay, "addClone" | "addProject">;
+	relay?: Pick<Relay, "addClone" | "addProject" | "addWithoutFolder">;
 	/** The git port, for a clone's top folder and remote. Default: the git programs on this computer. */
 	git?: Git;
 };
@@ -167,6 +176,7 @@ export function toProject(
 		name: row.name,
 		repoPath: row.repoPath,
 		remote: row.remote,
+		folder: row.folder,
 		createdAt: instant(row.createdAt),
 		clones,
 	};
@@ -320,6 +330,41 @@ export function createProjects(deps: ProjectsDeps) {
 		return row;
 	}
 
+	/**
+	 * Defines a new Project without a folder in the Space's document,
+	 * which this Replica keeps: for a person here (`addWithoutFolder`),
+	 * and on a Host for a Device that asks it. Each call adds another
+	 * Project: a name may repeat.
+	 */
+	async function defineWithoutFolder(
+		spaceId: string,
+		input: { name: string },
+	): Promise<{ projectId: string }> {
+		const document = await documents.open(spaceId);
+		if (document.hostedElsewhere) {
+			throw new Refusal("conflict", HOSTED_ELSEWHERE);
+		}
+		const id = randomUUID();
+		const now = timeNow();
+		await document.change(() => {
+			document.projects.set(id, {
+				name: input.name,
+				remote: null,
+				folder: false,
+				createdAt: now,
+				removedAt: null,
+				updatedAt: now,
+			} satisfies SpaceProject);
+		});
+		const [row] = await db.select().from(project).where(eq(project.id, id));
+		if (!row) throw new Error("Could not add the project.");
+		await log.append({
+			type: "ProjectAdded",
+			payload: { projectId: id, name: input.name, remote: null, folder: false },
+		});
+		return { projectId: id };
+	}
+
 	/** Only the Space's projects; every Space's without one (background work). */
 	const inSpace = (spaceId: string | undefined) =>
 		spaceId === undefined ? undefined : eq(project.spaceId, spaceId);
@@ -469,6 +514,7 @@ export function createProjects(deps: ProjectsDeps) {
 				document.projects.set(id, {
 					name,
 					remote,
+					folder: true,
 					createdAt: now,
 					removedAt: null,
 					updatedAt: now,
@@ -502,6 +548,7 @@ export function createProjects(deps: ProjectsDeps) {
 			if (row.removedAt !== null || row.spaceId !== spaceId) {
 				throw new Refusal("not-found", PROJECT_NOT_FOUND);
 			}
+			if (!row.folder) throw new Refusal("conflict", NO_FOLDER);
 			const path = await resolveRepoTopLevel(repoPath);
 			const deviceId = await deps.deviceId();
 			const [taken] = await withClone(eq(clone.path, path));
@@ -557,6 +604,7 @@ export function createProjects(deps: ProjectsDeps) {
 				document.projects.set(id, {
 					name: input.name,
 					remote,
+					folder: true,
 					createdAt: now,
 					removedAt: null,
 					updatedAt: now,
@@ -570,6 +618,40 @@ export function createProjects(deps: ProjectsDeps) {
 			});
 			return { projectId: id };
 		},
+
+		/**
+		 * A new Project without a folder in the Space (ADR 22): no remote,
+		 * no Clone, on any Device. In a Space a Host keeps, the Host adds it
+		 * (`relay.addWithoutFolder`), and its row is kept here at once: the
+		 * Space document brings the same entry a moment later.
+		 */
+		async addWithoutFolder(
+			input: { name: string },
+			spaceId: string,
+		): Promise<ListedProject> {
+			if (await directory.hostedElsewhere(spaceId)) {
+				if (!deps.relay) throw new Refusal("conflict", HOSTED_ELSEWHERE);
+				const { projectId } = await deps.relay.addWithoutFolder({
+					spaceId,
+					name: input.name,
+				});
+				await db
+					.insert(project)
+					.values({
+						id: projectId,
+						spaceId,
+						name: input.name,
+						remote: null,
+						folder: false,
+					})
+					.onConflictDoNothing();
+				return { ...(await rowOf(projectId)), repoPath: null };
+			}
+			const { projectId } = await defineWithoutFolder(spaceId, input);
+			return { ...(await rowOf(projectId)), repoPath: null };
+		},
+
+		defineWithoutFolder,
 
 		/** Marks a project removed. Its runs, events and Clones stay. */
 		async remove(projectId: string): Promise<void> {
@@ -689,6 +771,10 @@ export function createProjects(deps: ProjectsDeps) {
 			) {
 				throw new Refusal("not-found", PROJECT_NOT_FOUND);
 			}
+			// An older Device may give a folder to a project without one.
+			if (withoutFolder(document, record.projectId)) {
+				throw new Refusal("conflict", NO_FOLDER);
+			}
 			await document.change(() => recordClone(document, record));
 		},
 
@@ -705,8 +791,9 @@ export function createProjects(deps: ProjectsDeps) {
 		/**
 		 * Makes a Device's Clones in the Space's document exactly the
 		 * Projects it says it has: on the Host that keeps the Space. A
-		 * Project the document lacks is left out. When they are in step, the
-		 * document does not change: the Device may say it again and again.
+		 * Project the document lacks is left out, and so is one without a
+		 * folder. When they are in step, the document does not change: the
+		 * Device may say it again and again.
 		 * Refused as not found when this Replica does not keep the Space.
 		 */
 		async setClones(
@@ -722,7 +809,9 @@ export function createProjects(deps: ProjectsDeps) {
 				throw new Refusal("not-found", PROJECT_NOT_FOUND);
 			}
 			const has = new Set(
-				input.projectIds.filter((id) => document.projects.has(id)),
+				input.projectIds.filter(
+					(id) => document.projects.has(id) && !withoutFolder(document, id),
+				),
 			);
 			const known = new Set(deviceEntries(document, input.deviceId).projectIds);
 			const added = [...has].filter((id) => !known.has(id));
@@ -816,6 +905,11 @@ export type Project = {
 	repoPath: string | null;
 	/** The normalised `origin` (`github.com/acme/app`), null without one. */
 	remote: string | null;
+	/**
+	 * False: the project has no folder (ADR 22). It has no remote and no
+	 * Clone, and each of its runs gets an empty folder of its own.
+	 */
+	folder: boolean;
 	createdAt: number;
 	/** The Devices with a Clone of it, from the Space document: this one first. */
 	clones: ProjectClone[];

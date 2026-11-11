@@ -34,6 +34,10 @@ import { createSpaceRoutes } from "./route";
 export const OLDER_HOST_PROJECTS =
 	"Your Host runs an older version of Night Shift. Update Night Shift there, or add this repository on your Host.";
 
+/** What a person reads when the Host that keeps the Space cannot add a project without a folder. */
+export const OLDER_HOST_NO_FOLDER =
+	"Your Host runs an older version of Night Shift. Update Night Shift there to add a project without a folder.";
+
 /** What a run reads when the Host that keeps its Space does not know leases. */
 export const OLDER_HOST_LEASES =
 	"The computer that keeps this Space runs an older version of Night Shift. Update Night Shift there to use a Lease node.";
@@ -115,6 +119,15 @@ export function createRelay(deps: {
 				spaceId,
 				(client) => client.sync.addProject({ spaceId, name, remote }),
 				{ olderHost: OLDER_HOST_PROJECTS },
+			);
+		},
+
+		async addWithoutFolder({ spaceId, name }) {
+			// The Host adds it in the name of the key's Person.
+			return onHost(
+				spaceId,
+				(client) => client.sync.addWithoutFolder({ spaceId, name }),
+				{ olderHost: OLDER_HOST_NO_FOLDER },
 			);
 		},
 

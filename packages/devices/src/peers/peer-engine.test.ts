@@ -216,6 +216,7 @@ describe("a schedule in a Space a Host keeps", () => {
 		const relay: HostRelay = {
 			command: async () => {},
 			addProject: async () => ({ projectId: "p" }),
+			addWithoutFolder: async () => ({ projectId: "p" }),
 			addClone: async () => {},
 			reachable: async () => true,
 			archiveGet: async () => null,
@@ -266,6 +267,7 @@ describe("a disposed engine", () => {
 		return {
 			command: async () => {},
 			addProject: async () => ({ projectId: "p" }),
+			addWithoutFolder: async () => ({ projectId: "p" }),
 			addClone: async () => {},
 			reachable: async () => false,
 			archiveGet: async (ref) =>

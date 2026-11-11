@@ -192,7 +192,7 @@ describe("exportRun", () => {
 
 		const opened = await openRunBundle(path);
 		expect(opened.meta).toMatchObject({
-			formatVersion: 9,
+			formatVersion: 10,
 			runId,
 			missingTranscripts: [],
 			redacted: 0,
@@ -309,6 +309,36 @@ describe("exportRun", () => {
 		expect(opened.meta.formatVersion).toBe(3);
 		expect(opened.run.startedBy).toBeNull();
 		expect(opened.run.spaceId).toBe(sandbox.spaceId);
+		opened.close();
+	});
+
+	test("a format 9 bundle still opens: its project has a folder", async () => {
+		const runId = await finishedRun();
+		const path = join(sandbox.root, "run.nightshift.sqlite");
+		await exportRun({
+			db: sandbox.db,
+			dataDir: sandbox.dataDir,
+			runId,
+			spaceId: sandbox.spaceId,
+			path,
+		});
+		// What a Night Shift before projects without a folder wrote.
+		const file = createDb(
+			{ DATABASE_URL: `file:${path}` },
+			{ singleFile: true },
+		);
+		for (const statement of [
+			"ALTER TABLE project DROP COLUMN folder",
+			"UPDATE bundle SET value = '9' WHERE key = 'format_version'",
+		]) {
+			await file.run(sql.raw(statement));
+		}
+		file.$client.close();
+
+		const opened = await openRunBundle(path);
+		expect(opened.meta.formatVersion).toBe(9);
+		expect(opened.project?.folder).toBe(true);
+		expect(opened.clones[0]?.path).toBe(sandbox.repoPath);
 		opened.close();
 	});
 

@@ -120,7 +120,8 @@ export type PeerFact = {
  * a Device's personal Space (`ofSpace`, `matching`), the Clones
  * (`clones`, `clonePath`, and `clonedHere` that a Device tells its Host),
  * and on a Host, a Device's Clones, a Project it asks for and the
- * Projects it takes (`recordClone`, `setClones`, `addFromRemote`, `take`).
+ * Projects it takes (`recordClone`, `setClones`, `addFromRemote`,
+ * `defineWithoutFolder`, `take`).
  */
 export type PeerProjects = Pick<
 	Projects,
@@ -134,6 +135,7 @@ export type PeerProjects = Pick<
 	| "clonedHere"
 	| "forgetDevice"
 	| "addFromRemote"
+	| "defineWithoutFolder"
 	| "take"
 >;
 

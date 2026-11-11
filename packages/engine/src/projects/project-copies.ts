@@ -9,8 +9,8 @@ import { normaliseRemote } from "./remote";
 
 /**
  * Copies projects to this computer from GitHub. A Host copies every
- * project of its Spaces that has a GitHub remote and no Clone here
- * (`sweep`), so its schedules and chats can use the project without a
+ * project of its Spaces that has a folder, a GitHub remote and no Clone
+ * here (`sweep`), so its schedules and chats can use the project without a
  * person adding a folder there. A person can copy one project here too
  * (`copy`). A copy is a clone in Night Shift's projects folder
  * (`GitHubClones`), added as a Clone of the project: its `origin` is the
@@ -35,12 +35,13 @@ export type CopySpace = {
 export type ProjectCopies = {
 	/**
 	 * Copies the project to this computer now, also after a failed try.
-	 * Resolves when it is done (null) or failed (the copy).
+	 * Resolves when it is done (null) or failed (the copy). Refuses a
+	 * project without a folder.
 	 */
 	copy(space: CopySpace, projectId: string): Promise<ProjectCopy | null>;
 	/** The copies to this computer that run or failed. */
 	list(): ProjectCopy[];
-	/** When `enabled`: copies each project of each Space that has no Clone here. */
+	/** When `enabled`: copies each project of each Space that has a folder and no Clone here. */
 	sweep(): Promise<void>;
 	/** Sweeps now, then every `intervalMs`. */
 	start(): void;
@@ -52,6 +53,10 @@ export const NOT_ON_GITHUB =
 
 export const NO_REMOTE =
 	"This project has no remote repository. Add its folder on this computer instead.";
+
+/** A project without a folder (ADR 22): its runs need no copy. */
+const NOTHING_TO_COPY =
+	"This project has no folder, so there is nothing to copy to this computer.";
 
 /** How often a Host looks for projects it has no Clone of. */
 export const SWEEP_INTERVAL_MS = 60_000;
@@ -175,8 +180,15 @@ export function createProjectCopies(deps: {
 			if (!deps.enabled()) return;
 			const space = deps.space(spaceId);
 			for (const project of await space.listProjects()) {
-				// A project without a remote is only on the computer that has its folder.
-				if (project.repoPath !== null || project.remote === null) continue;
+				// A project without a remote is only on the computer that has its
+				// folder. A project without a folder has nothing to copy.
+				if (
+					!project.folder ||
+					project.repoPath !== null ||
+					project.remote === null
+				) {
+					continue;
+				}
 				const failure = failed.get(project.id);
 				if (failure && failure.retryAt > now()) continue;
 				// One at a time: a Host may have many projects to copy.
@@ -191,6 +203,7 @@ export function createProjectCopies(deps: {
 				(p) => p.id === projectId,
 			);
 			if (!project) throw new Refusal("not-found", PROJECT_NOT_FOUND);
+			if (!project.folder) throw new Refusal("conflict", NOTHING_TO_COPY);
 			if (project.repoPath !== null) return null;
 			return begin(space, project);
 		},

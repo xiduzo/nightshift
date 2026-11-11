@@ -213,6 +213,40 @@ describe("projection", () => {
 		await waitFor(async () => projected.length === 2);
 	});
 
+	test("whether a project has a folder reaches its row: an entry from before says nothing and has one", async () => {
+		const document = await documents.open(sandbox.spaceId);
+		const entry = {
+			name: "older",
+			remote: null,
+			createdAt: 1,
+			removedAt: null,
+			updatedAt: 1,
+		};
+		asClient(document.doc, () => {
+			document.projects.set("p1", entry);
+			document.projects.set("p2", { ...entry, name: "feeds", folder: false });
+		});
+		const folders = () =>
+			sandbox.db
+				.select({ id: project.id, folder: project.folder })
+				.from(project)
+				.orderBy(asc(project.id));
+		await waitFor(async () => (await folders()).length === 2);
+		expect(await folders()).toEqual([
+			{ id: "p1", folder: true },
+			{ id: "p2", folder: false },
+		]);
+		expect(spaceProjects(document).get("p1")?.folder).toBe(true);
+
+		// A row from before the document comes in with its folder.
+		const team = await otherSpace(sandbox.db, "Team");
+		await sandbox.db
+			.insert(project)
+			.values({ id: "p3", spaceId: team, name: "leads", folder: false });
+		const imported = await documents.open(team);
+		expect(imported.projects.get("p3")).toMatchObject({ folder: false });
+	});
+
 	test("an entry for a project of another Space does not take its row", async () => {
 		const elsewhere = await otherSpace(sandbox.db);
 		await sandbox.db

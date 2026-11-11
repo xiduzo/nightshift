@@ -37,7 +37,8 @@ import { readFormat1, readFormat2, readRows } from "./bundle-rows";
  */
 
 /**
- * The format this Night Shift writes. 9: the run's fallback Devices.
+ * The format this Night Shift writes. 10: whether the project has a
+ * folder (ADR 22). 9: the run's fallback Devices.
  * 8: the run's Flow revisions.
  * 7: the names of the run's Devices.
  * 6: the Devices the run's nodes name.
@@ -46,10 +47,10 @@ import { readFormat1, readFormat2, readRows } from "./bundle-rows";
  * Clones; the Walker on runs, steps and events. Format 1 to 3 bundles
  * still open: see `openRunBundle`.
  */
-export const RUN_BUNDLE_FORMAT_VERSION = 9;
+export const RUN_BUNDLE_FORMAT_VERSION = 10;
 
 /** The formats `openRunBundle` reads. */
-const READABLE_FORMATS = [1, 2, 3, 4, 5, 6, 7, 8, RUN_BUNDLE_FORMAT_VERSION];
+const READABLE_FORMATS = [1, 2, 3, 4, 5, 6, 7, 8, 9, RUN_BUNDLE_FORMAT_VERSION];
 
 /** What stands in for a secret value that a bundle leaves out. */
 const MASK = "•••";
@@ -80,7 +81,7 @@ const createdAt =
 /** The live schema's columns, without foreign keys: a bundle is never written again. */
 const DDL = [
 	"CREATE TABLE `bundle` (`key` text PRIMARY KEY, `value` text NOT NULL)",
-	`CREATE TABLE \`project\` (\`id\` text PRIMARY KEY, \`space_id\` text NOT NULL, \`name\` text NOT NULL, \`remote\` text, ${createdAt}, \`removed_at\` integer)`,
+	`CREATE TABLE \`project\` (\`id\` text PRIMARY KEY, \`space_id\` text NOT NULL, \`name\` text NOT NULL, \`remote\` text, \`folder\` integer DEFAULT true NOT NULL, ${createdAt}, \`removed_at\` integer)`,
 	`CREATE TABLE \`clone\` (\`id\` text PRIMARY KEY, \`space_id\` text NOT NULL, \`project_id\` text NOT NULL, \`device_id\` text NOT NULL, \`path\` text NOT NULL, ${createdAt})`,
 	`CREATE TABLE \`run\` (\`id\` text PRIMARY KEY, \`space_id\` text NOT NULL, \`project_id\` text NOT NULL, \`flow_name\` text, \`flow\` text NOT NULL, \`body_flows\` text DEFAULT '{}' NOT NULL, \`flow_revision\` text, \`body_flow_revisions\` text DEFAULT '{}' NOT NULL, \`title\` text NOT NULL, \`worktree_path\` text NOT NULL, \`branch\` text NOT NULL, \`base_ref\` text NOT NULL, \`walker_id\` text NOT NULL, \`device_id\` text, \`placements\` text, \`device_names\` text, \`fallbacks\` text, \`started_by\` text, ${createdAt})`,
 	`CREATE TABLE \`step\` (\`id\` text PRIMARY KEY, \`space_id\` text NOT NULL, \`run_id\` text NOT NULL, \`node_id\` text NOT NULL, \`node_type\` text NOT NULL, \`visit\` integer NOT NULL, \`transcript_path\` text NOT NULL, \`device_id\` text, ${createdAt})`,

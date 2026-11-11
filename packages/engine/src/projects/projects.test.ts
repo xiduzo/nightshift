@@ -14,6 +14,7 @@ import {
 import {
 	createProjects,
 	HOSTED_NEEDS_REMOTE,
+	NO_FOLDER,
 	PROJECT_NOT_FOUND,
 } from "./projects";
 import { normaliseRemote } from "./remote";
@@ -296,6 +297,152 @@ describe("the folder of a project here", () => {
 	});
 });
 
+describe("a project without a folder", () => {
+	test("has no remote and no Clone, in the Space document and its row", async () => {
+		const projects = projectsOf();
+		const added = await projects.addWithoutFolder(
+			{ name: "Market watch" },
+			sandbox.spaceId,
+		);
+		expect(added).toMatchObject({
+			name: "Market watch",
+			spaceId: sandbox.spaceId,
+			remote: null,
+			folder: false,
+			repoPath: null,
+		});
+		const document = await documents.open(sandbox.spaceId);
+		expect(document.projects.get(added.id)).toMatchObject({
+			name: "Market watch",
+			remote: null,
+			folder: false,
+		});
+		expect(await projects.find(added.id, sandbox.spaceId)).toMatchObject({
+			folder: false,
+			repoPath: null,
+		});
+		expect(await projects.clones(sandbox.spaceId, added.id)).toEqual([]);
+		expect(await clones()).toEqual([]);
+		const [logged] = await sandbox.db
+			.select({ payload: event.payload })
+			.from(event)
+			.where(eq(event.type, "ProjectAdded"));
+		expect(JSON.parse(logged?.payload ?? "{}")).toEqual({
+			projectId: added.id,
+			name: "Market watch",
+			remote: null,
+			folder: false,
+		});
+
+		// A second one of the same name is another project.
+		const again = await projects.addWithoutFolder(
+			{ name: "Market watch" },
+			sandbox.spaceId,
+		);
+		expect(again.id).not.toBe(added.id);
+	});
+
+	test("a project with a folder says so in the Space document", async () => {
+		const projects = projectsOf();
+		const app = await projects.add(
+			{ repoPath: await repo("app") },
+			sandbox.spaceId,
+		);
+		expect(app.folder).toBe(true);
+		const document = await documents.open(sandbox.spaceId);
+		expect(document.projects.get(app.id)).toMatchObject({ folder: true });
+	});
+
+	test("never gets a folder: useFolder refuses it", async () => {
+		const projects = projectsOf();
+		const added = await projects.addWithoutFolder(
+			{ name: "Feeds" },
+			sandbox.spaceId,
+		);
+		await expect(
+			projects.useFolder(added.id, await repo("feeds"), sandbox.spaceId),
+		).rejects.toThrow(NO_FOLDER);
+		expect(await clones()).toEqual([]);
+	});
+
+	test("never gets a Clone from another Device", async () => {
+		const projects = projectsOf();
+		const added = await projects.addWithoutFolder(
+			{ name: "Feeds" },
+			sandbox.spaceId,
+		);
+		const record = {
+			projectId: added.id,
+			deviceId: "studio",
+			deviceName: "Studio",
+		};
+		await expect(projects.recordClone(sandbox.spaceId, record)).rejects.toThrow(
+			NO_FOLDER,
+		);
+		expect(
+			await projects.setClones(sandbox.spaceId, {
+				deviceId: "studio",
+				deviceName: "Studio",
+				projectIds: [added.id],
+			}),
+		).toEqual({ added: [], removed: [] });
+		await projects.take(sandbox.spaceId, { clones: [record] });
+		expect(await projects.clones(sandbox.spaceId, added.id)).toEqual([]);
+	});
+
+	test("in a Space a Host keeps, the Host adds it, and its row is here at once", async () => {
+		const team = await otherSpace(sandbox.db, "Team");
+		const replica = createSpaceDocuments({
+			db: sandbox.db,
+			directory: {
+				...aloneDirectory(sandbox.db),
+				hostedElsewhere: async (id) => id === team,
+			},
+		});
+		const asked: unknown[] = [];
+		const projects = createProjects({
+			db: sandbox.db,
+			log: createRunLog(sandbox.db, {
+				walkerId: sandbox.deviceId,
+				dataDir: sandbox.dataDir,
+			}),
+			deviceId: async () => sandbox.deviceId,
+			documents: replica,
+			directory: {
+				...aloneDirectory(sandbox.db),
+				hostedElsewhere: async (id: string) => id === team,
+			},
+			relay: {
+				addProject: () => Promise.reject(new Error("Not in this test.")),
+				async addWithoutFolder(input) {
+					asked.push(input);
+					return { projectId: "from-host" };
+				},
+				addClone: () => Promise.reject(new Error("Not in this test.")),
+			},
+		});
+		try {
+			const added = await projects.addWithoutFolder({ name: "Leads" }, team);
+			expect(asked).toEqual([{ spaceId: team, name: "Leads" }]);
+			expect(added).toMatchObject({
+				id: "from-host",
+				spaceId: team,
+				name: "Leads",
+				folder: false,
+				repoPath: null,
+			});
+			// This Replica never writes the Host's document.
+			expect((await replica.open(team)).projects.size).toBe(0);
+			// The Host's half refuses a Space this Replica does not keep.
+			await expect(
+				projects.defineWithoutFolder(team, { name: "Leads" }),
+			).rejects.toThrow("Your Host keeps the projects of this Space.");
+		} finally {
+			await replica.flush();
+		}
+	});
+});
+
 describe("what the peers ask of the Projects", () => {
 	/** The Space documents of a Replica whose Space `spaceId` a Host keeps. */
 	function keptElsewhere(spaceId: string): SpaceDocuments {
@@ -329,6 +476,10 @@ describe("what the peers ask of the Projects", () => {
 				async addProject(input) {
 					asked.push({ addProject: input });
 					return { projectId: "from-host" };
+				},
+				async addWithoutFolder(input) {
+					asked.push({ addWithoutFolder: input });
+					return { projectId: "without-folder" };
 				},
 				async addClone(input) {
 					asked.push({ addClone: input.projectId });
@@ -599,10 +750,18 @@ describe("what the peers ask of the Projects", () => {
 					id: app.id,
 					name: "not this name",
 					remote: null,
+					folder: true,
 					createdAt: 1,
 					removedAt: null,
 				},
-				{ id: "lib", name: "lib", remote: null, createdAt: 2, removedAt: null },
+				{
+					id: "lib",
+					name: "lib",
+					remote: null,
+					folder: true,
+					createdAt: 2,
+					removedAt: null,
+				},
 			],
 			restore: [app.id],
 			clones: [{ projectId: "lib", deviceId: "studio", deviceName: "Studio" }],
@@ -633,6 +792,7 @@ describe("what the peers ask of the Projects", () => {
 						id: "lib",
 						name: "lib",
 						remote: null,
+						folder: true,
 						createdAt: 2,
 						removedAt: null,
 					},
@@ -669,20 +829,28 @@ describe("what the peers ask of the Projects", () => {
 		);
 		await projects.take(sandbox.spaceId, {
 			define: [
-				{ id: "lib", name: "lib", remote: null, createdAt: 2, removedAt: null },
+				{
+					id: "lib",
+					name: "lib",
+					remote: null,
+					folder: false,
+					createdAt: 2,
+					removedAt: null,
+				},
 			],
 		});
 
-		// Oldest first: lib is older.
+		// Oldest first: lib is older. A merge and a split carry its folder.
 		expect(
 			(await projects.ofSpace(sandbox.spaceId)).map((p) => [
 				p.id,
 				p.clone,
 				p.walked,
+				p.folder,
 			]),
 		).toEqual([
-			["lib", false, false],
-			[app.id, true, false],
+			["lib", false, false, false],
+			[app.id, true, false, true],
 		]);
 		expect(
 			(
@@ -691,9 +859,14 @@ describe("what the peers ask of the Projects", () => {
 					remotes: ["github.com/acme/app"],
 				})
 			)
-				.map((p) => p.id)
+				.map((p) => [p.id, p.folder])
 				.sort(),
-		).toEqual([app.id, "lib"].sort());
+		).toEqual(
+			[
+				[app.id, true],
+				["lib", false],
+			].sort(),
+		);
 		expect(await projects.matching({})).toEqual([]);
 	});
 });

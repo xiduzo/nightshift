@@ -20,7 +20,9 @@ import {
  * engine (the procedures check their role and the engine logs an event);
  * the relay serves it to them read-only. The Replica keeps it in `ydoc`.
  *
- * - `projects`: id → `{ name, remote, createdAt, removedAt, updatedAt }`.
+ * - `projects`: id → `{ name, remote, folder, createdAt, removedAt, updatedAt }`.
+ *   `folder` false: a project without a folder, which has no Clone (ADR
+ *   22). An entry from before it has a folder.
  * - `clones`: `<project id>/<device id>` → `{ projectId, deviceId, addedAt }`.
  *   That a Device has a Clone, never where: the path stays in the
  *   Device's own data (its `clone` row and its Device document).
@@ -58,6 +60,8 @@ export type SpaceDocument = PersistedDocument & {
 export const spaceProjectSchema = z.object({
 	name: z.string().min(1),
 	remote: z.string().nullable(),
+	/** Absent in an entry from before ADR 22: the project has a folder. */
+	folder: z.boolean().default(true),
 	createdAt: z.number(),
 	removedAt: z.number().nullable(),
 	updatedAt: z.number(),
@@ -171,11 +175,24 @@ export function projectClones(
 		});
 }
 
-/** Records, in a change, that a Device has a Clone of a Project. */
+/** Whether the document's entry of the Project says it has no folder (ADR 22). */
+export function withoutFolder(
+	document: SpaceDocument,
+	projectId: string,
+): boolean {
+	const parsed = spaceProjectSchema.safeParse(document.projects.get(projectId));
+	return parsed.success && !parsed.data.folder;
+}
+
+/**
+ * Records, in a change, that a Device has a Clone of a Project. A Project
+ * without a folder never has one: nothing is recorded.
+ */
 export function recordClone(
 	document: SpaceDocument,
 	clone: { projectId: string; deviceId: string; deviceName: string },
 ): void {
+	if (withoutFolder(document, clone.projectId)) return;
 	const key = cloneKey(clone.projectId, clone.deviceId);
 	if (!document.clones.has(key)) {
 		document.clones.set(key, {
@@ -387,6 +404,7 @@ export function projectEntry(row: typeof project.$inferSelect): SpaceProject {
 	return {
 		name: row.name,
 		remote: row.remote,
+		folder: row.folder,
 		createdAt: instant(row.createdAt),
 		removedAt: instantOrNull(row.removedAt),
 		updatedAt: now(),
@@ -395,7 +413,7 @@ export function projectEntry(row: typeof project.$inferSelect): SpaceProject {
 
 /**
  * Brings the `project` rows in line with the document: a new entry makes
- * a row, a changed one updates it (name, remote, removed). A row of
+ * a row, a changed one updates it (name, remote, folder, removed). A row of
  * another Space is left alone, and so is an entry the rows refuse (a
  * remote another Project has): the next change tries again. True when
  * a row was written.
@@ -425,6 +443,7 @@ export async function projectSpace(
 					spaceId: document.spaceId,
 					name: entry.name,
 					remote: entry.remote,
+					folder: entry.folder,
 					createdAt: asDate(entry.createdAt),
 					removedAt,
 				});
@@ -435,13 +454,19 @@ export async function projectSpace(
 			if (
 				row.name === entry.name &&
 				row.remote === entry.remote &&
+				row.folder === entry.folder &&
 				instantOrNull(row.removedAt) === entry.removedAt
 			) {
 				continue;
 			}
 			await db
 				.update(project)
-				.set({ name: entry.name, remote: entry.remote, removedAt })
+				.set({
+					name: entry.name,
+					remote: entry.remote,
+					folder: entry.folder,
+					removedAt,
+				})
 				.where(eq(project.id, id));
 			changed = true;
 		} catch (error) {

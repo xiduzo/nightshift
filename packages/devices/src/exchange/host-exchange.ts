@@ -76,7 +76,12 @@ export function createHostExchange(deps: {
 		admission: Pick<OfferAdmission, "serve">;
 		projects: Pick<
 			PeerProjects,
-			"recordClone" | "setClones" | "addFromRemote" | "matching" | "take"
+			| "recordClone"
+			| "setClones"
+			| "addFromRemote"
+			| "defineWithoutFolder"
+			| "matching"
+			| "take"
 		>;
 		hostSpaces: Pick<HostSpaces, "hostOf">;
 		/** Its Space archive: the knowledge content its Devices copy here, by hash (ADR 4). */
@@ -314,6 +319,13 @@ export function createHostExchange(deps: {
 			return engine.projects.addFromRemote(input.spaceId, {
 				name: input.name,
 				remote: input.remote,
+			});
+		},
+
+		async addWithoutFolder(caller, input) {
+			await caller.may(input.spaceId, { project: ["add"] });
+			return engine.projects.defineWithoutFolder(input.spaceId, {
+				name: input.name,
 			});
 		},
 

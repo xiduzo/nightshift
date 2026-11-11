@@ -381,6 +381,7 @@ describe("a batch and what follows from it", () => {
 		return {
 			command: async () => {},
 			addProject: async () => ({ projectId: "p" }),
+			addWithoutFolder: async () => ({ projectId: "p" }),
 			addClone: async () => {},
 			reachable: async () => false,
 			archiveGet: async (ref) => (ref.kind === "content" ? null : archive(ref)),
@@ -724,6 +725,7 @@ describe("a run walked elsewhere", () => {
 				sent.push(command);
 			},
 			addProject: async () => ({ projectId: "p" }),
+			addWithoutFolder: async () => ({ projectId: "p" }),
 			addClone: async () => {},
 			reachable: async () => false,
 			archiveGet: async () => null,
@@ -803,6 +805,7 @@ describe("a run walked elsewhere", () => {
 		const relay: Relay = {
 			command: async () => {},
 			addProject: async () => ({ projectId: "p" }),
+			addWithoutFolder: async () => ({ projectId: "p" }),
 			addClone: async () => {},
 			reachable: async () => false,
 			archiveGet: async (ref) => {

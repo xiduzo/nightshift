@@ -381,6 +381,8 @@ export function createEngine(
 			clonedHere: (spaceId) => projects.clonedHere(spaceId),
 			forgetDevice: (deviceId) => projects.forgetDevice(deviceId),
 			addFromRemote: (spaceId, input) => projects.addFromRemote(spaceId, input),
+			defineWithoutFolder: (spaceId, input) =>
+				projects.defineWithoutFolder(spaceId, input),
 			take: (spaceId, taken) => projects.take(spaceId, taken),
 		},
 		flows: (projectId) => projectFlows.flows(projectId),

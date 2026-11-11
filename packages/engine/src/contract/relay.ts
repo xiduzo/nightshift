@@ -72,6 +72,16 @@ export type Relay = {
 		name: string;
 		remote: string;
 	}): Promise<{ projectId: string }>;
+	/**
+	 * Adds a Project without a folder (ADR 22) to a Space a Host keeps,
+	 * through that Host: the Host defines it in the Space document. Returns
+	 * the Project's id. Each call adds another Project. A Host of a version
+	 * before ADR 22 refuses it with `OlderHostError`.
+	 */
+	addWithoutFolder(input: {
+		spaceId: string;
+		name: string;
+	}): Promise<{ projectId: string }>;
 	/** Records this Device's Clone in a Space a Host keeps, through that Host. */
 	addClone(input: {
 		spaceId: string;

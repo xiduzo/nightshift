@@ -373,6 +373,23 @@ export const hostContract = {
 				}),
 			)
 			.output(described(z.object({ projectId: z.string() }))),
+		/**
+		 * A Person on the Device adds a Project without a folder to a Space
+		 * here (ADR 22): this Host defines it. Each call adds another
+		 * Project. An older Host has none: the Device says to update it.
+		 */
+		addWithoutFolder: sync
+			.route({
+				summary:
+					"Adds a project without a folder to a Space here for a paired Device.",
+			})
+			.input(
+				z.object({
+					spaceId: z.string().min(1),
+					name: z.string().trim().min(1).max(200),
+				}),
+			)
+			.output(described(z.object({ projectId: z.string() }))),
 		/** The Device has a Clone of a Project of a Space here. */
 		addClone: sync
 			.route({

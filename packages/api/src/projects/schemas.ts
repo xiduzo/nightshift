@@ -24,6 +24,12 @@ export const projectSchema = exact<Project>()(
 		repoPath: z.string().nullable(),
 		/** The normalised `origin`, for example `github.com/acme/app`. */
 		remote: z.string().nullable(),
+		/**
+		 * False: the project has no folder (ADR 22). Each of its runs gets an
+		 * empty folder of its own. A Host from before ADR 22 sends none: read
+		 * that as true.
+		 */
+		folder: z.boolean(),
 		createdAt: z.number(),
 		clones: z.array(
 			z.object({

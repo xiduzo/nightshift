@@ -139,6 +139,10 @@ export const hostRouter = os.router({
 		addProject: keyed.sync.addProject.handler(({ context, input }) =>
 			context.exchange.addProject(context.caller, input),
 		),
+		addWithoutFolder: keyed.sync.addWithoutFolder.handler(
+			({ context, input }) =>
+				context.exchange.addWithoutFolder(context.caller, input),
+		),
 		addClone: keyed.sync.addClone.handler(({ context, input }) =>
 			context.exchange.addClone(context.caller, input),
 		),

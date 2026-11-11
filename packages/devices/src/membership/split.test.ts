@@ -405,6 +405,29 @@ describe("leaving the home Host keeps a copy", () => {
 		).toHaveLength(1);
 	});
 
+	test("a project without a folder comes along: every Device has it", async () => {
+		const { projectId } = await mergedIntoA();
+		const leads = await paired.host
+			.space(a.spaceId)
+			.addProjectWithoutFolder({ name: "Leads" });
+		await paired.projectOnDevice(leads.id);
+		await revoke();
+
+		const result = await splitter().revoked(home);
+
+		expect(result).toMatchObject({ state: "done", projects: 2 });
+		const own = result?.spaceId as string;
+		const projects = await paired.device.space(own).listProjects();
+		expect(
+			projects.map((p) => [p.id, p.folder, p.repoPath !== null]).sort(),
+		).toEqual(
+			[
+				[projectId, true, true],
+				[leads.id, false, false],
+			].sort(),
+		);
+	});
+
 	test("a schedule that is on is paused on B after the split, without its Person; turned on, it has a next start", async () => {
 		const { projectId } = await mergedIntoA();
 		// What A saved: a schedule for the Person.

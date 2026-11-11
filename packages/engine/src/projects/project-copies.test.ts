@@ -21,12 +21,13 @@ afterEach(async () => {
 	await rm(root, { recursive: true, force: true });
 });
 
-function project(id: string, remote: string | null): Project {
+function project(id: string, remote: string | null, folder = true): Project {
 	return {
 		id,
 		name: id,
 		repoPath: null,
 		remote,
+		folder,
 		createdAt: 0,
 		clones: [],
 	};
@@ -145,6 +146,21 @@ describe("sweep", () => {
 
 		await service.copy(space, "app");
 		expect(asked).toHaveLength(3);
+	});
+
+	test("skips a project without a folder: it has nothing to copy", async () => {
+		// Even with a remote, as a Space document of a newer version may say.
+		const space = fakeSpace([project("feeds", "github.com/acme/feeds", false)]);
+		const { service, asked } = copies(space, async () => {
+			throw new Error("not called");
+		});
+		await service.sweep();
+		expect(asked).toEqual([]);
+		expect(service.list()).toEqual([]);
+		await expect(service.copy(space, "feeds")).rejects.toThrow(
+			"This project has no folder",
+		);
+		expect(asked).toEqual([]);
 	});
 
 	test("says a project from another git host cannot be copied", async () => {
