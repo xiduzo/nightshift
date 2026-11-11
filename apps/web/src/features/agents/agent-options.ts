@@ -1,9 +1,12 @@
 import { effortSchema } from "@nightshift/flows";
 import type { Effort, PermissionMode } from "@/shared/api";
 
-/** The permission modes an Agent node or a profile can run in, most useful for nights first. */
+/** The permission modes an Agent node or a profile can run in, most useful for runs without you first. */
 export const PERMISSION_MODES: { value: PermissionMode; label: string }[] = [
-	{ value: "auto", label: "Auto (approves safe actions, for nights)" },
+	{
+		value: "auto",
+		label: "Auto (approves safe actions, for runs without you)",
+	},
 	{ value: "acceptEdits", label: "Accept edits (no shell commands)" },
 	{ value: "default", label: "Ask for each tool" },
 	{ value: "plan", label: "Plan only" },

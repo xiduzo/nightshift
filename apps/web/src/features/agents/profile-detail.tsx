@@ -294,7 +294,7 @@ export function ProfileDetail({
 							id={`${id}-desc`}
 							rows={2}
 							value={draft.description ?? ""}
-							placeholder="Implements one trace overnight: edits, runs the tests, pushes."
+							placeholder="Works alone on one task: edits files, runs the checks, reports."
 							onChange={(event) => set({ description: event.target.value })}
 						/>
 					</Field>
@@ -303,7 +303,7 @@ export function ProfileDetail({
 
 			<DetailSection
 				title="Runs on"
-				description="The coding agent and the model this profile uses."
+				description="The agent and the model this profile uses."
 			>
 				<FieldGroup>
 					<RadioGroup
@@ -381,7 +381,7 @@ export function ProfileDetail({
 
 			<DetailSection
 				title="Permissions"
-				description="What the agent can do without asking you. At night, nobody is there to answer."
+				description="What the agent can do without asking you. Often nobody is there to answer."
 			>
 				<Field>
 					<FieldLabel htmlFor={`${id}-perm`} className="sr-only">

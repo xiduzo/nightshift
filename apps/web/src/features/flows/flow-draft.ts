@@ -86,7 +86,7 @@ export function refusesCommandsMessage(
 	mode: "acceptEdits" | "default",
 ): string {
 	const name = mode === "acceptEdits" ? "Accept edits" : "Ask for each tool";
-	return `${name} runs no commands at night, such as git commit, except its CLI tools. Pick Auto for this node or its profile.`;
+	return `${name} runs no commands without you, such as git commit, except its CLI tools. Pick Auto for this node or its profile.`;
 }
 
 /** One `{{…}}` a template can use. */

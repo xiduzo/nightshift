@@ -259,7 +259,7 @@ export function ModelProfileDetail({
 							id={`${id}-desc`}
 							rows={2}
 							value={draft.description}
-							placeholder="Small, cheap calls: is the build green, which task is next."
+							placeholder="Small, cheap calls: is this new, which task is next."
 							onChange={(event) => set({ description: event.target.value })}
 						/>
 					</Field>

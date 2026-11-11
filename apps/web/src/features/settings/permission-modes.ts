@@ -2,7 +2,7 @@ import type { PermissionMode } from "@/shared/api";
 
 /**
  * The permission modes as the settings page offers them for the default
- * agent: a short label and what each one means at night. The Agents page
+ * agent: a short label and what each one means for a run without you. The Agents page
  * and the flow editor use the one-line labels of `PERMISSION_MODES` in
  * the agents vertical.
  */
@@ -14,7 +14,8 @@ export const PERMISSION_MODES: {
 	{
 		value: "auto",
 		label: "Auto",
-		description: "Claude Code approves safe actions itself. Made for nights.",
+		description:
+			"Claude Code approves safe actions itself. Made for runs without you.",
 	},
 	{
 		value: "acceptEdits",
@@ -24,13 +25,12 @@ export const PERMISSION_MODES: {
 	{
 		value: "default",
 		label: "Ask for each tool",
-		description:
-			"Asks before each tool. At night nobody answers, so the agent stops.",
+		description: "Asks before each tool. Without you there, the agent stops.",
 	},
 	{
 		value: "plan",
 		label: "Plan only",
-		description: "Reads the code and writes a plan. Changes nothing.",
+		description: "Reads the project and writes a plan. Changes nothing.",
 	},
 	{
 		value: "bypassPermissions",
