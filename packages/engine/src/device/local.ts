@@ -41,6 +41,7 @@ import {
 	NOT_ON_THIS_COMPUTER,
 	systemGit,
 } from "../projects";
+import type { RunFolders } from "../run-folders";
 import { spawnCommand } from "./command";
 import { redactExec, redactSession } from "./redact";
 import { callServerTool } from "./tool-call";
@@ -135,6 +136,12 @@ export type LocalDeviceDeps = {
 	 */
 	clonePath?: (projectId: string) => Promise<string | null>;
 	/**
+	 * The runs' own folders on this computer (ADR 22): a run of a project
+	 * without a folder works in its folder here. Without it, this computer
+	 * cannot run such a project.
+	 */
+	runFolders?: Pick<RunFolders, "make">;
+	/**
 	 * The project's flows: its flow document (ADR 2), for a Walker of an
 	 * older Night Shift that asks this Device for them. Without it: none.
 	 */
@@ -188,6 +195,16 @@ export type LocalDeviceDeps = {
 	 */
 	secretValues?: (use?: SecretUse) => Promise<readonly string[]>;
 };
+
+/** The run's own folder here, as the Device port answers it: no branch, no base. */
+function runFolderOf(
+	runFolders: Pick<RunFolders, "make">,
+): NonNullable<Device["runFolder"]> {
+	return async (run) => {
+		const { path, made } = await runFolders.make(run.id);
+		return { worktreePath: path, branch: "", baseRef: "", made };
+	};
+}
 
 /** What an agent learns about the files a person added to the run's answers. */
 function answerFilesInstruction(paths: readonly string[]): string {
@@ -641,6 +658,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				...(run.author ? { author: run.author } : {}),
 			});
 		},
+		...(deps.runFolders ? { runFolder: runFolderOf(deps.runFolders) } : {}),
 		handOff: ({ cwd, runBranch }) => pushRunBranch(cwd, runBranch),
 		async receiveHandOff({ run, branch, commit }) {
 			return pullRunBranch({

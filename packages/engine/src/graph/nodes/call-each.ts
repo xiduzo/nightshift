@@ -233,7 +233,9 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 		const { each } = node;
 		const as = each.as ?? "item";
 		const haltOn = each.haltOn ?? ["halt"];
-		const perItem = (each.branch ?? "per-item") === "per-item";
+		// A run folder has no git, so no item branches: the items share it (ADR 22).
+		const perItem =
+			(each.branch ?? "per-item") === "per-item" && !runState.runFolder;
 		const worktree = step.worktree;
 
 		let element: Element;

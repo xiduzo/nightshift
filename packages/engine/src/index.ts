@@ -60,6 +60,7 @@ export type {
 	ExecEvent,
 	ExecInput,
 	OfferedSessionInput,
+	RunFolder,
 	RunRef,
 	SessionEvent,
 	SessionInput,
@@ -183,6 +184,7 @@ export type {
 	SpaceEngine,
 } from "./run";
 export { createEngine, GateClosedError, START_DEADLINE_MS } from "./run";
+export { createRunFolders, noRunFolders } from "./run-folders";
 export type {
 	ScheduleList,
 	ScheduleMissed,

@@ -70,6 +70,7 @@ import {
 	type RunHere,
 	type RunTrace,
 } from "../read";
+import { createRunFolders } from "../run-folders";
 import {
 	createPullRequestScores,
 	createPullRequestWatch,
@@ -393,6 +394,7 @@ export function createEngine(
 				projects.defineWithoutFolder(spaceId, input),
 			take: (spaceId, taken) => projects.take(spaceId, taken),
 		},
+		runFolders: createRunFolders(dataDir),
 		flows: (projectId) => projectFlows.flows(projectId),
 		profiles: {
 			here: options.profileFor ?? (() => null),

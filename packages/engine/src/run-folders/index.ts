@@ -1,0 +1,7 @@
+/** Run folders: where a run of a project without a folder works, on each Device of its steps (ADR 22). */
+
+export {
+	createRunFolders,
+	noRunFolders,
+	type RunFolders,
+} from "./run-folders";

@@ -930,6 +930,27 @@ describe("the run's worktree", () => {
 		});
 	});
 
+	test("a run folder has no branch: it is there once the event names it (ADR 22)", () => {
+		const folder = {
+			worktreePath: "/data/run-folders/r1",
+			branch: "",
+			baseRef: "",
+		};
+		const started = log().runStarted({ runFolder: true });
+		expect(foldRun(started.events).runFolder).toBe(true);
+		expect(foldRun(log().runStarted().events).runFolder).toBe(false);
+		const none = { worktreePath: "", branch: "", baseRef: "" };
+		expect(awaitsWorktree(none, foldRun(started.events))).toBe(true);
+		const made = started.push("WorktreeCreated", folder).events;
+		expect(awaitsWorktree(none, foldRun(made))).toBe(false);
+		// Made at the start: the row has it too.
+		expect(awaitsWorktree(folder, foldRun(made))).toBe(false);
+		expect(runFacts(foldRun(made)).runFolder).toBe(true);
+		expect("runFolder" in runFacts(foldRun(log().runStarted().events))).toBe(
+			false,
+		);
+	});
+
 	test("an old run without the event reads its worktree from its row", () => {
 		const events = log().runStarted().events;
 		expect(awaitsWorktree(made, foldRun(events))).toBe(false);

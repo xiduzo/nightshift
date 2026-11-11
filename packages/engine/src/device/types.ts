@@ -75,6 +75,13 @@ export type Device = {
 	 */
 	worktree(run: RunRef): Promise<Worktree>;
 	/**
+	 * The run's own folder on this Device, made when it is not there: a run
+	 * of a project without a folder works in it (ADR 22). It has no git, so
+	 * no branch and no base. Absent: this Device cannot run such a project
+	 * (a test's). A Device of an older Night Shift refuses the call.
+	 */
+	runFolder?(run: RunRef): Promise<RunFolder>;
+	/**
 	 * A Call item's branch in the worktree at `cwd`: `name`, else the first
 	 * free `name-2`, `name-3`, …, made at `base` (null: the checked-out
 	 * branch, else `fallback`) and checked out. Refuses a dirty worktree.
@@ -397,4 +404,16 @@ export type Worktree = {
 	 * older Device, and when the run starts from the newest commit.
 	 */
 	warning?: string;
+};
+
+/**
+ * A run's own folder on a Device (`Device.runFolder`): its path as
+ * `worktreePath`, with no branch and no base (both `""`). `made`: the
+ * Device made it just now, so a folder the run had there is gone.
+ */
+export type RunFolder = Pick<
+	Worktree,
+	"worktreePath" | "branch" | "baseRef"
+> & {
+	made: boolean;
 };

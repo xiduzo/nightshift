@@ -21,7 +21,8 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 			name: device.name,
 			thisDevice: true,
 			online: true,
-			hasClone: project.repoPath !== null,
+			// A project without a folder needs no Clone (ADR 22).
+			hasClone: project.repoPath !== null || project.folder === false,
 		};
 	}
 
@@ -39,7 +40,7 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 					id: device.id,
 					name: device.name,
 					thisDevice: true,
-					hasClone: project.repoPath !== null,
+					hasClone: project.repoPath !== null || project.folder === false,
 				};
 				const self = await context.walkerId();
 				// No other Device: the node walk refuses every other one.

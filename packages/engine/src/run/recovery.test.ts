@@ -237,6 +237,17 @@ describe("daemonResumeBlock", () => {
 		).toBe("the copy of the project it worked in is gone.");
 	});
 
+	test("a run folder that is gone does not stop it: its next step makes it again (ADR 22)", async () => {
+		await insertRun(join(sandbox.root, "gone"), flow, {}, "");
+		const inRunFolder = {
+			...started(),
+			payload: { ...started().payload, runFolder: true },
+		};
+		expect(
+			await daemonResumeBlock(RUN_ID, foldRun(logOf(inRunFolder)), deps()),
+		).toBeNull();
+	});
+
 	test("a check that throws is a reason, not a crash", async () => {
 		await insertRun(sandbox.repoPath);
 		expect(

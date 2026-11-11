@@ -405,7 +405,12 @@ export type RunState = {
 	scores: readonly Logged<"Scored">[];
 	/** The latest pull request a step of the run opened. Null until one does. */
 	pullRequest: { url: string; at: number } | null;
-	/** The latest `WorktreeCreated`. */
+	/**
+	 * The run works in a run folder of its own on each Device, not in a
+	 * copy of the project (`RunStarted.runFolder`, ADR 22).
+	 */
+	runFolder: boolean;
+	/** The latest `WorktreeCreated`: for a run folder, its folder on the run's Device. */
 	worktree: EnginePayloads["WorktreeCreated"] | null;
 	/** Where the run's work went: each `WorktreeCreated` and `HandedOff`, oldest first. */
 	moves: readonly (
@@ -485,6 +490,7 @@ function emptyState(): Draft {
 		warnings: [],
 		scores: [],
 		pullRequest: null,
+		runFolder: false,
 		worktree: null,
 		moves: [],
 		edges: new Map(),
@@ -944,6 +950,7 @@ function applyRunEvent(
 	run.stepsSinceWalk = 0;
 	if (e.type === "RunStarted") {
 		run.started ??= logged(e);
+		run.runFolder = run.started.payload.runFolder === true;
 		run.stopAt = e.payload.stopAt ?? null;
 		run.daemonResumes = 0;
 		run.budgetFrom = e.seq;

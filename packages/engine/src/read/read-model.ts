@@ -178,6 +178,7 @@ export function runFacts(run: RunState) {
 			.sort((a, b) => a.from - b.from),
 		/** The worktree the log names: a run row has none when its Device was offline at the start. */
 		worktree: run.worktree,
+		...(run.runFolder ? { runFolder: true } : {}),
 		metrics: runMetrics(
 			steps,
 			cost,

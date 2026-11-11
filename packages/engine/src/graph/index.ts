@@ -20,6 +20,7 @@ export { missingNames } from "./nodes/agent";
 export { closeOpenWork, openWork } from "./open-work";
 export { askAnswerProblem } from "./output-schema";
 export { rerunNodeRefusal } from "./reentry";
+export { runFolderOn } from "./run-worktree";
 export type { Runner } from "./runner";
 export { createRunner } from "./runner";
 export {

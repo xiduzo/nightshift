@@ -341,6 +341,37 @@ describe("the Call node with each", () => {
 		expect(await mustGit(wt, ["show", "HEAD^:item-1.txt"])).toBe(RUN_BRANCH);
 	});
 
+	test("in a run folder, the elements share the folder: no branch per element (ADR 22)", async () => {
+		const build = body([
+			command("write", 'echo "{{run.branch}}" > "item-{{item.id}}.txt" && ls'),
+		]);
+		const h = await startRun(
+			sandbox,
+			flowOf([
+				callEach(
+					"loop",
+					"build",
+					json([
+						{ id: "1", title: "a" },
+						{ id: "2", title: "b" },
+					]),
+				),
+			]),
+			{ harness: fakeHarness(), flows: { build }, runFolder: true },
+		);
+		const { state } = await drive(h, { inputs: {} });
+		expect(state.ended?.outcome).toBe("done");
+		const steps = deriveSteps(foldRun(await h.events()));
+		expect(loopStep(steps).items.map((i) => [i.branch, i.baseBranch])).toEqual([
+			[null, null],
+			[null, null],
+		]);
+		const writes = steps.filter((s) => s.nodeId === "write");
+		expect(writes.at(-1)?.outputs?.log_tail).toBe("item-1.txt\nitem-2.txt");
+		const folder = join(sandbox.dataDir, "run-folders", h.runId);
+		expect(existsSync(join(folder, "item-2.txt"))).toBe(true);
+	});
+
 	test("a failed element blocks its dependents, and the loop goes on with free work", async () => {
 		const build = body([
 			command("check", `test "{{item.id}}" != 1 && ${commitItem}`),

@@ -4,9 +4,11 @@ import type { Device } from "../device";
 import {
 	fallbackKey,
 	foldRun,
+	type LoggedEvent,
 	type RunFallbacks,
 	type RunLog,
 	type RunRow,
+	type RunState,
 } from "../log";
 import type { EngineEventType, EventInput } from "../log/events";
 import { testDevice } from "../testing/test-support";
@@ -402,5 +404,53 @@ describe("the move of a step whose Device is offline (ADR 17)", () => {
 		).toBeNull();
 		// A step that needs a computer, not the worktree, moves.
 		expect((await move(placement, run, command("x"))).to?.id).toBe(A);
+	});
+
+	test("a step in a run folder stays: the folder does not move, also when the run's Device is online (ADR 22)", async () => {
+		const onH = command("x", { device: H });
+		const run = planned({
+			run: [],
+			nodes: { [fallbackKey(onH)]: [{ id: A, name: "here" }] },
+		});
+		const placement = placementOver([], { [H]: false });
+		const inRunFolder = foldRun([
+			{
+				seq: 1,
+				runId: "run-1",
+				stepId: null,
+				sessionId: null,
+				type: "RunStarted",
+				payload: {
+					projectId: PROJECT,
+					flowName: null,
+					title: "t",
+					start: "x",
+					runFolder: true,
+				},
+				at: 1,
+			} as LoggedEvent,
+		]);
+		const appended: Appended[] = [];
+		const moveIn = (state: RunState, inWorktree: boolean) =>
+			placement.moveStep({
+				log: {
+					append: async (event: Appended) => {
+						appended.push(event);
+						return event;
+					},
+					state: async () => state,
+				} as unknown as Pick<RunLog, "append" | "state">,
+				node: onH,
+				run,
+				stepId: "step-1",
+				from: placement.deviceFor(onH, run),
+				hasSession: false,
+				inWorktree,
+			});
+		expect(await moveIn(inRunFolder, true)).toBeNull();
+		expect(appended).toEqual([]);
+		// A step that needs no folder moves, and so does one in a copy of the project.
+		expect((await moveIn(inRunFolder, false))?.id).toBe(A);
+		expect((await moveIn(foldRun([]), true))?.id).toBe(A);
 	});
 });

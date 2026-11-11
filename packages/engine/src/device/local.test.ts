@@ -21,6 +21,7 @@ import {
 	type ProjectSecrets,
 	type SecretBackend,
 } from "../device-config/connections";
+import { createRunFolders } from "../run-folders/run-folders";
 import { testKnowledge } from "../testing/knowledge";
 import {
 	connectionsOf,
@@ -1304,5 +1305,23 @@ describe("worktree", () => {
 			baseRef: (await mustGit(sandbox.repoPath, ["rev-parse", "HEAD"])).trim(),
 		});
 		expect(existsSync(join(worktree.worktreePath, "README.md"))).toBe(true);
+	});
+});
+
+describe("runFolder", () => {
+	test("makes the run's own empty folder in the data folder once, with no branch and no base (ADR 22)", async () => {
+		const runFolders = createRunFolders(sandbox.dataDir);
+		const run = { id: "abcdef12-0000-0000-0000-000000000000", projectId: "p" };
+		const here = device({ runFolders });
+		expect(await here.runFolder?.(run)).toEqual({
+			worktreePath: runFolders.path(run.id),
+			branch: "",
+			baseRef: "",
+			made: true,
+		});
+		expect(existsSync(runFolders.path(run.id))).toBe(true);
+		expect((await here.runFolder?.(run))?.made).toBe(false);
+		// Without the run folders, this computer cannot run such a project.
+		expect(device().runFolder).toBeUndefined();
 	});
 });

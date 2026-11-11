@@ -183,7 +183,10 @@ export function createPlacement(deps: PlacementDeps) {
 		// A session lives on its Device.
 		if (input.hasSession) return null;
 		const run = placedRun(row);
-		const { holder } = deriveWorktrees(await log.state(row.id), row);
+		const state = await log.state(row.id);
+		// A run folder does not move (ADR 22): a step that works in it waits for its Device.
+		if (input.inWorktree && state.runFolder) return null;
+		const { holder } = deriveWorktrees(state, row);
 		// The run's work is only on an offline Device: the step would go on without it.
 		const holderOnline =
 			!input.inWorktree || (await deviceOf(holder, run).state()).online;

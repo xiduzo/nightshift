@@ -17,6 +17,7 @@ export type {
 	ExecInput,
 	GitAuthor,
 	OfferedSessionInput,
+	RunFolder,
 	RunRef,
 	SessionEvent,
 	SessionInput,

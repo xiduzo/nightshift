@@ -59,6 +59,7 @@ import { readMemory } from "../memory";
 import { createPlacement } from "../placement/placement";
 import { gitAuthorOf } from "../read/people";
 import { parseCalledFlows, parseRunFlow } from "../read/read-model";
+import { createRunFolders } from "../run-folders/run-folders";
 import { keptValues } from "../variables/kept";
 import {
 	connectionsOf,
@@ -194,6 +195,12 @@ export type StartOptions = {
 	leases?: LeaseTaker;
 	/** Starts and stops the services of Service nodes; default: none. */
 	services?: ServiceRunner;
+	/**
+	 * A run of a project without a folder (ADR 22): `RunStarted` says so,
+	 * and the row has no folder yet, as when its Device was offline at the
+	 * start. Its first step that works in a folder makes it.
+	 */
+	runFolder?: true;
 };
 
 let runs = 0;
@@ -251,9 +258,9 @@ export async function startRun(
 		flow: JSON.stringify(flow),
 		bodyFlows: JSON.stringify(flows),
 		title: "test",
-		worktreePath: sandbox.repoPath,
-		branch: options.branch ?? "nightshift/test",
-		baseRef: "main",
+		worktreePath: options.runFolder ? "" : sandbox.repoPath,
+		branch: options.runFolder ? "" : (options.branch ?? "nightshift/test"),
+		baseRef: options.runFolder ? "" : "main",
 		walkerId: sandbox.deviceId,
 	});
 	const log = createRunLog(db, {
@@ -269,6 +276,7 @@ export async function startRun(
 			title: "test",
 			start: flow.start,
 			inputs: options.inputs ?? {},
+			...(options.runFolder ? { runFolder: true as const } : {}),
 		},
 	});
 	const bus = createRunBus();
@@ -281,6 +289,7 @@ export async function startRun(
 		...(options.decider ? { decider: options.decider } : {}),
 		connections: options.connections ?? connectionsOf(),
 		...(options.knowledge ? { knowledge: options.knowledge } : {}),
+		runFolders: createRunFolders(sandbox.dataDir),
 	};
 	const device = () =>
 		localDevice({ id: TEST_DEVICE_ID, name: "test", ...local });

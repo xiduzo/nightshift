@@ -172,6 +172,7 @@ export const runSummarySchema = exact<RunSummary>()(
 		worktreePath: z.string(),
 		branch: z.string(),
 		baseRef: z.string(),
+		runFolder: z.boolean().optional(),
 		status: runStatusSchema,
 		reason: z.string().nullable(),
 		endReason: z.enum(RUN_END_REASONS).nullable().optional(),

@@ -118,6 +118,23 @@ export function clonePathOf(
 	};
 }
 
+/**
+ * Whether a project has no folder (ADR 22): no Device has a Clone of it,
+ * so what works for it here works in a folder of its own. False for a
+ * project this Replica does not know, or that a person removed.
+ */
+export function withoutFolderOf(
+	db: Database,
+): (projectId: string) => Promise<boolean> {
+	return async (projectId) => {
+		const [row] = await db
+			.select({ folder: project.folder })
+			.from(project)
+			.where(and(eq(project.id, projectId), isNull(project.removedAt)));
+		return row?.folder === false;
+	};
+}
+
 export type ProjectsDeps = {
 	db: Database;
 	log: RunLog;

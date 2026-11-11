@@ -16,6 +16,7 @@ import {
 	HOSTED_NEEDS_REMOTE,
 	NO_FOLDER,
 	PROJECT_NOT_FOUND,
+	withoutFolderOf,
 } from "./projects";
 import { normaliseRemote } from "./remote";
 import { createSpaceDocuments, type SpaceDocuments } from "./space-document";
@@ -340,6 +341,7 @@ describe("a project without a folder", () => {
 			sandbox.spaceId,
 		);
 		expect(again.id).not.toBe(added.id);
+		expect(await withoutFolderOf(sandbox.db)(added.id)).toBe(true);
 	});
 
 	test("a project with a folder says so in the Space document", async () => {
@@ -349,6 +351,8 @@ describe("a project without a folder", () => {
 			sandbox.spaceId,
 		);
 		expect(app.folder).toBe(true);
+		expect(await withoutFolderOf(sandbox.db)(app.id)).toBe(false);
+		expect(await withoutFolderOf(sandbox.db)("unknown")).toBe(false);
 		const document = await documents.open(sandbox.spaceId);
 		expect(document.projects.get(app.id)).toMatchObject({ folder: true });
 	});

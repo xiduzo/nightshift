@@ -15,6 +15,7 @@ import type {
 import type { PlacementPort } from "../placement";
 import type { Projects, SpaceDocuments } from "../projects";
 import type { FeedStep, PendingCommand, RunWalker } from "../read";
+import type { RunFolders } from "../run-folders";
 
 /**
  * The port of the other Devices and Hosts (`Peers`). The run engine walks
@@ -71,6 +72,11 @@ export type PeerContext = {
 	documents: SpaceDocuments;
 	/** The Projects and their Clones, as the peers read and record them. */
 	projects: PeerProjects;
+	/**
+	 * The runs' own folders on this computer (ADR 22): the one folder a
+	 * call of a run of a project without a folder may work in here.
+	 */
+	runFolders: Pick<RunFolders, "path">;
 	/** The project's flows, from this Replica's flow document: what a run starts from. */
 	flows(projectId: string): Promise<FlowSources>;
 	/** The profiles of this computer, and of the Devices whose documents this Replica keeps. */

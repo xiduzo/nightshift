@@ -278,6 +278,12 @@ export type EnginePayloads = {
 		 * Absent before Members.
 		 */
 		startedBy?: string | null;
+		/**
+		 * The run's project has no folder (ADR 22): the run works in a run
+		 * folder of its own on each Device of its steps, with no branch and
+		 * no base. Absent: it works in its own copy of the project.
+		 */
+		runFolder?: true;
 	};
 	WorktreeCreated: { worktreePath: string; branch: string; baseRef: string };
 	/**

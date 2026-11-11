@@ -21,7 +21,7 @@ export {
 export type { ProjectReadiness } from "./project-setup";
 export { checkProjectFolder, setUpGit } from "./project-setup";
 export type { ListedProject, Project, TakenProjects } from "./projects";
-export { clonePathOf, PROJECT_NOT_FOUND } from "./projects";
+export { clonePathOf, PROJECT_NOT_FOUND, withoutFolderOf } from "./projects";
 export type { SpaceDocument, SpaceDocuments } from "./space-document";
 export {
 	createSpaceDocuments,

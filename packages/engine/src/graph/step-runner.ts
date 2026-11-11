@@ -61,7 +61,11 @@ import {
 	scopeOf,
 } from "./route";
 import { positionOf } from "./run-position";
-import { makeRunWorktree, withLoggedWorktree } from "./run-worktree";
+import {
+	makeRunWorktree,
+	readyRunFolder,
+	withLoggedWorktree,
+} from "./run-worktree";
 import {
 	type DeviceWait,
 	type OwnWait,
@@ -1052,7 +1056,9 @@ function worktreeOn(
  * run's work gets it by a Hand-off first: the Device that has it pushes
  * the branch (a worktree with uncommitted changes fails the step: nothing
  * is committed for you), this one fetches it into its own worktree of the
- * run, and the Walker logs `HandedOff`.
+ * run, and the Walker logs `HandedOff`. A run of a project without a
+ * folder has no Hand-off: the step works in the run folder of its own
+ * Device (`readyRunFolder`, ADR 22).
  */
 export async function readyDevice(
 	ctx: StepContext,
@@ -1089,6 +1095,16 @@ export async function readyDevice(
 	});
 	const { device } = step;
 	let runState = await ctx.log.state(ctx.run.id);
+	if (runState.runFolder) {
+		const notReady = await readyRunFolder(ctx, step, runState);
+		if (notReady?.kind === "offline") return offline(notReady.at);
+		if (notReady?.kind === "refused") {
+			return fail(
+				`${notReady.at.name} could not make the run's folder. ${stepFailure(notReady.error, `the run folder of run ${ctx.run.id}`)}`,
+			);
+		}
+		return null;
+	}
 	const made = await makeRunWorktree(ctx, runState);
 	if (made?.kind === "offline") return offline(made.at);
 	if (made?.kind === "refused") {

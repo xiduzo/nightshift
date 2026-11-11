@@ -34,6 +34,7 @@ import type { Engine } from "../run/engine";
 import type { EngineOptions } from "../run/engine-options";
 import type { PeersFactory } from "../run/peers";
 import type { SpaceEngine } from "../run/space-engine";
+import { createRunFolders } from "../run-folders/run-folders";
 import { aloneDirectory, ownDevice } from "./alone-directory";
 import { alonePeers } from "./alone-peers";
 
@@ -79,6 +80,7 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 		cliTools,
 		which,
 		clonePath,
+		runFolders,
 		git,
 		knowledge,
 		deviceId,
@@ -105,6 +107,8 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 				which,
 				// The Clones of the database's own Device, as the daemon wires it.
 				clonePath: clonePath ?? clonePathOf(engine.db, directory.selfId),
+				// The runs' own folders in the engine's data folder, as on the daemon.
+				runFolders: runFolders ?? createRunFolders(engine.dataDir),
 				git,
 				...(knowledge ? { knowledge } : {}),
 			},

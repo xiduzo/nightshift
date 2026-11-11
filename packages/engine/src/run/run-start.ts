@@ -5,8 +5,8 @@ import type { Flow } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
 import type { StartRunInput } from "../contract";
-import type { Device } from "../device";
-import { kindOf, type Runner, resolveInputs } from "../graph";
+import type { Device, RunFolder, Worktree } from "../device";
+import { kindOf, type Runner, resolveInputs, runFolderOn } from "../graph";
 import {
 	type InputValues,
 	planColumns,
@@ -51,7 +51,14 @@ import { checkServiceDevices } from "./service-devices";
  *   When the run's Device is offline, the row has no worktree and the run
  *   waits: its first step that works in the worktree makes it there when
  *   the Device is back (ADR 1, decision 11).
+ * - A run of a project without a folder (ADR 22) gets a run folder on its
+ *   Device instead (`Device.runFolder`): empty, with no branch and no
+ *   base. `RunStarted.runFolder` says so to every reader.
  */
+
+/** A base for a run of a project without a folder: it has no branches. */
+export const NO_BRANCHES =
+	"A project without a folder has no branches. Leave Start from empty.";
 
 const TITLE_MAX_CHARS = 80;
 const QUICK_RUN_TITLE = "Quick run";
@@ -75,7 +82,33 @@ export type PreparedRun = {
 	inputs: InputValues;
 	title: string;
 	stopAt: number | null;
+	/** What the run warns about from the start, beyond the plan's notes. */
+	notes: string[];
 };
+
+/** Names as a person reads a list of them: "a", "a and b", "a, b and c". */
+function listOf(names: readonly string[]): string {
+	if (names.length <= 1) return names.join("");
+	return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+/**
+ * The note of a run in run folders whose folder steps sit on more than
+ * one Device: each has its own folder, with its own files (ADR 22). None
+ * when they share one Device.
+ */
+function runFolderNotes(groups: PlannedRun["groups"]): string[] {
+	const names = new Map<string, string>();
+	for (const { at, nodes } of groups) {
+		if (nodes.some((n) => kindOf(n).works(n) === "worktree")) {
+			names.set(at.id, at.name);
+		}
+	}
+	if (names.size < 2) return [];
+	return [
+		`The steps of this run work in folders on ${listOf([...names.values()])}. Each device has its own folder, so the files of one are not on the other.`,
+	];
+}
 
 /**
  * Checks a planned run before anything is written, in the order the person
@@ -86,15 +119,20 @@ export type PreparedRun = {
  * Device whose nodes work in the worktree
  * has a Clone; the stop time is ahead; the inputs resolve. Throws the
  * refusal, returns the prepared run. A Device checks its Clone is ready
- * when it adds the worktree, before the run is written.
+ * when it adds the worktree, before the run is written. A run of a
+ * project without a folder (`runFolder`) takes no base.
  */
 export async function prepareRun(
 	input: StartRunInput,
 	planned: PlannedRun,
 	deps: { now(): number },
+	runFolder = false,
 ): Promise<PreparedRun> {
 	const { flow, flowName, flowRevision, calledFlows, calledFlowRevisions } =
 		planned;
+	if (runFolder && input.baseRef !== undefined) {
+		throw new Refusal("invalid", NO_BRANCHES);
+	}
 	for (const { at, nodes } of planned.groups) {
 		// An offline Device checks each call itself when it is back.
 		const refusal =
@@ -138,6 +176,7 @@ export async function prepareRun(
 		inputs,
 		title,
 		stopAt: input.stopAt ?? null,
+		notes: runFolder ? runFolderNotes(planned.groups) : [],
 	};
 }
 
@@ -237,7 +276,9 @@ export function createRunStart(deps: RunStartDeps) {
 						});
 						const startedBy = planned.plan.personId;
 						const { device } = planned.run;
-						const prepared = await prepareRun(input, planned, deps);
+						// A project without a folder: the run works in a run folder (ADR 22).
+						const runFolder = projectRow.folder === false;
+						const prepared = await prepareRun(input, planned, deps, runFolder);
 						const {
 							flow,
 							flowName,
@@ -248,20 +289,26 @@ export function createRunStart(deps: RunStartDeps) {
 							title,
 						} = prepared;
 						const authorId = input.startedBy ?? startedBy;
-						const author = authorId ? await gitAuthorOf(db, authorId) : null;
+						const author =
+							authorId && !runFolder ? await gitAuthorOf(db, authorId) : null;
 						// The worktree lives on the run's Device. An offline one makes it
 						// when it is back: until then the row keeps the base the person
-						// asked for, and no branch.
-						const made = planned.run.offline
+						// asked for, and no branch. So does a run folder.
+						const made: Worktree | RunFolder | null = planned.run.offline
 							? null
-							: await device.worktree({
-									id: runId,
-									projectId: projectRow.id,
-									...(input.baseRef !== undefined
-										? { baseRef: input.baseRef }
-										: {}),
-									...(author ? { author } : {}),
-								});
+							: runFolder
+								? await runFolderOn(device, {
+										id: runId,
+										projectId: projectRow.id,
+									})
+								: await device.worktree({
+										id: runId,
+										projectId: projectRow.id,
+										...(input.baseRef !== undefined
+											? { baseRef: input.baseRef }
+											: {}),
+										...(author ? { author } : {}),
+									});
 						// A base branch the Device could not bring up to date is a warning, not part of the worktree.
 						const worktree = made && {
 							worktreePath: made.worktreePath,
@@ -287,6 +334,7 @@ export function createRunStart(deps: RunStartDeps) {
 									inputs,
 									trigger,
 									startedBy,
+									...(runFolder ? { runFolder: true as const } : {}),
 								},
 							},
 							{
@@ -321,14 +369,14 @@ export function createRunStart(deps: RunStartDeps) {
 								payload: worktree,
 							});
 						}
-						if (made?.warning) {
+						if (made && "warning" in made && made.warning) {
 							await log.append({
 								type: "RunWarned",
 								runId,
 								payload: { kind: "base-ref", message: made.warning },
 							});
 						}
-						for (const message of planned.notes) {
+						for (const message of [...planned.notes, ...prepared.notes]) {
 							await log.append({
 								type: "RunWarned",
 								runId,

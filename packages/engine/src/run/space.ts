@@ -17,6 +17,7 @@ import type { PlacementPort } from "../placement";
 import {
 	type Branches,
 	type ListedProject,
+	NOT_ON_THIS_COMPUTER,
 	PROJECT_NOT_FOUND,
 	type Projects,
 	type SpaceDocuments,
@@ -428,8 +429,12 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async saveSchedules(projectId, schedules, timeZone) {
 				await ready;
-				// A project without a Clone here is refused before the Offers check.
-				await projects.get(projectId, spaceId);
+				// A project without a Clone here is refused before the Offers
+				// check. A project without a folder needs none (ADR 22).
+				const row = await projects.find(projectId, spaceId);
+				if (row.folder && row.repoPath === null) {
+					throw new Refusal("conflict", NOT_ON_THIS_COMPUTER);
+				}
 				return deps.scheduleFiles.save(
 					spaceId,
 					projectId,

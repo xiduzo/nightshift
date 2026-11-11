@@ -113,6 +113,9 @@ export async function daemonResumeBlock(
 		// A run placed on another Device has its worktree there: that Device
 		// says when it is gone.
 		if (deps.placedElsewhere?.(row)) return null;
+		// A run folder that is gone is made again, empty, by the next step
+		// that works in it, and the run warns (ADR 22).
+		if (runState.runFolder) return null;
 		// A run whose Device was offline at the start has no worktree yet: a step makes it.
 		if (awaitsWorktree(row, runState)) return null;
 		const worktree = await stat(runWorktree(row, runState).worktreePath).catch(

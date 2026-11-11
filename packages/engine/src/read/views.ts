@@ -180,6 +180,12 @@ export type RunSummary = {
 	worktreePath: string;
 	branch: string;
 	baseRef: string;
+	/**
+	 * The run's project has no folder (ADR 22): the run works in a run
+	 * folder of its own, with no branch and no base. Absent: it works in its
+	 * own copy of the project, and so does a run from an older Host.
+	 */
+	runFolder?: boolean;
 	status: RunStatus;
 	/**
 	 * Why the run failed, or which Decision label or Gate choice ended it,

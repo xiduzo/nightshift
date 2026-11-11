@@ -124,9 +124,12 @@ export function runWorktree(row: RunWorktree, run: RunState): RunWorktree {
 /**
  * The run has no worktree yet: its Device was offline when it started, and
  * no step made it since. Every worktree has a branch, and the exchange
- * never empties one, so an empty branch says it on every Replica.
+ * never empties one, so an empty branch says it on every Replica. A run
+ * folder has no branch (ADR 22): it is there once `WorktreeCreated` names
+ * it on the run's Device.
  */
 export function awaitsWorktree(row: RunWorktree, run: RunState): boolean {
+	if (run.runFolder) return run.worktree === null && row.worktreePath === "";
 	return runWorktree(row, run).branch === "";
 }
 

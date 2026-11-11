@@ -26,6 +26,7 @@ import type { OpenStep } from "./step-runner";
  * - A snapshot never fails a step. A Device that takes none (a test's, an
  *   older Night Shift's) or a worktree too large for one: the step shows
  *   its agent's own edits only, and the log says why.
+ * - A run folder has no git (ADR 22): a step there takes no snapshot.
  */
 
 /** How long a snapshot may take before the step goes on without it. */
@@ -51,6 +52,7 @@ export async function watchChanges(
 	step: OpenStep,
 ): Promise<ChangesWatch | null> {
 	if (ctx.kindOf(node).works(node) !== "worktree") return null;
+	if (step.runState.runFolder) return null;
 	const { device } = step;
 	const { snapshotWorktree, worktreeChanges } = device;
 	if (!snapshotWorktree || !worktreeChanges) return null;
