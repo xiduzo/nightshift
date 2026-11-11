@@ -120,6 +120,17 @@ export {
 	STANDARD_EXIT_CODES,
 } from "./command";
 export {
+	CONVERT_FORMAT_LABEL,
+	CONVERT_PAIRS,
+	type ConvertFormat,
+	type ConvertNode,
+	checkConvertNode,
+	convertNodeSchema,
+	convertOutputFields,
+	DEFAULT_CONVERT_MAX_BYTES,
+	MAX_CONVERT_BYTES,
+} from "./convert";
+export {
 	checkDecisionNode,
 	confidenceField,
 	type DecidedBy,

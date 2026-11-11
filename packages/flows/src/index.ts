@@ -252,8 +252,12 @@ export {
 	type CallNode,
 	type CallTier,
 	type ChoiceItem,
+	CONVERT_FORMAT_LABEL,
+	CONVERT_PAIRS,
 	type CommandExit,
 	type CommandNode,
+	type ConvertFormat,
+	type ConvertNode,
 	type CustomAgent,
 	type CustomHarnessName,
 	calledFlowNames,
@@ -268,6 +272,7 @@ export {
 	customHarnessName,
 	customHarnessSchema,
 	DATA_EXIT_CODE,
+	DEFAULT_CONVERT_MAX_BYTES,
 	DEFAULT_GATE_URGENCY,
 	DEFAULT_LEASE_TTL_MINUTES,
 	DEFAULT_SERVICE_EVERY_SECONDS,
@@ -318,6 +323,7 @@ export {
 	loginSchema,
 	MAX_ANSWER_FILES,
 	MAX_ANSWER_FILES_BYTES,
+	MAX_CONVERT_BYTES,
 	MAX_MEMORY_KEYS,
 	type McpServer,
 	type ModelAddress,
@@ -360,6 +366,17 @@ export {
 	watchesValue,
 	withChoices,
 } from "./nodes";
+export {
+	FILTER_COMPARES,
+	type FilterCompare,
+	itemFields,
+	type PresetSource,
+	presetSources,
+	VALUE_PRESETS,
+	type ValuePresetInput,
+	type ValuePresetName,
+	valuePreset,
+} from "./presets";
 export {
 	type AgentChoice,
 	type AgentProfile,
@@ -430,6 +447,7 @@ export {
 	sectionPath,
 } from "./sections";
 export {
+	convertDataShape,
 	emptyShape,
 	FILE_FORMAT,
 	fieldNameProblem,

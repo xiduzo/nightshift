@@ -6,6 +6,7 @@
  */
 
 export { schemaAt } from "./at";
+export { convertDataShape, FEED_ITEM_KEYS } from "./convert";
 export {
 	inputShape,
 	outputFieldShape,

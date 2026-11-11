@@ -21,6 +21,7 @@ import {
 } from "../flow";
 import { ACCEPTED_LEARNINGS_DIR, type Kit, kitList } from "../kits";
 import {
+	CONVERT_PAIRS,
 	callEachOutputFields,
 	deciderNameSchema,
 	decisionNodeSchema,
@@ -34,6 +35,7 @@ import {
 	valueDeciderNameSchema,
 	waitNodeSchema,
 } from "../nodes";
+import { FEED_ITEM_KEYS } from "../shapes";
 import { runFields } from "../template";
 
 const at = { x: 0, y: 0 };
@@ -160,6 +162,14 @@ export const sampleNodes = {
 		items: "{{feed.data.items}}",
 		key: "link",
 	},
+	convert: {
+		id: "news",
+		type: "convert",
+		position: at,
+		from: "feed",
+		to: "json",
+		value: "{{fetch.body}}",
+	},
 } as const satisfies Record<FlowNodeType, NodeInput>;
 
 /** What each node type is for, and the fields it adds to the common ones. */
@@ -183,6 +193,7 @@ const nodeText: Record<FlowNodeType, string> = {
 	join: `Where parallel branches meet. \`wait\`: \`all\` (default), or \`first\` (stops the other branches). \`data\` holds each branch's \`data\` by the node it came from: \`{{reviewed.data.security}}\`.`,
 	call: `Shown as Subflow. Runs another flow of the project (\`flow\`, its name), or a kit (\`kit:github/publish-draft-pr\`, see Kits), with \`inputs\` bound to templates. With \`each\`, it runs the flow once per element of a list: \`source\` is \`{ kind: "json", value }\` or \`{ kind: "command", command }\` (prints a JSON array); the element goes to the input named by \`as\`. A parameter sweep is one Command that loops, not one element per set. Without \`each\` its outputs are the called flow's outputs too. A called flow that ends at an End node ends the Subflow \`pass\` (\`done\`, \`nothing-to-do\`) or \`fail\` (\`failed\`); \`ended\` holds the End's status and \`end_message\` its message. With \`device\` (a computer's id, as \`list_profiles\` gives it), its steps run on that computer wherever the run runs.`,
 	end: `Ends the run on purpose. \`status\`: ${endStatusSchema.options.map((status) => `\`${status}\``).join(", ")}. \`message\` (template) is one line for a person: the runs list and the notification show it. \`nothing-to-do\` is for a run that found no work: it is not a failure. \`failed\` fails the run on purpose. No edge leaves an End node.`,
+	convert: `Converts \`value\` (a template) \`from\` a format \`to\` another, with no model: ${CONVERT_PAIRS.map((pair) => `\`${pair.from}\`→\`${pair.to}\``).join(", ")}. JSON comes out as \`data\`, text as \`text\`. A feed (RSS or Atom) gives \`{ title, link, items }\`, each item with ${FEED_ITEM_KEYS.map((key) => `\`${key}\``).join(", ")}.`,
 };
 
 const code = (names: readonly string[]) =>

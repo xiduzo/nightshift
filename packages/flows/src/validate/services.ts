@@ -101,6 +101,7 @@ function runsOnDevice(node: FlowNode): boolean {
 		case "join":
 		case "lease":
 		case "since-last-run":
+		case "convert":
 			return false;
 	}
 }

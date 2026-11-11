@@ -70,7 +70,7 @@ Names (node ids, inputs, variables): lowercase letters, digits and `_`, starting
 
 ## Nodes
 
-The node types: `agent`, `command`, `decision`, `call`, `value`, `wait`, `tool`, `end`, `join`, `lease`, `service`, `since-last-run`. Every node has `id`, `type`, `position: { x, y }`, and optional `label` (shown in the editor), `timeoutMinutes` and `set` (variable writes). Lay the nodes out left to right, about 300 apart on x, and put a loop's way back below the main line.
+The node types: `agent`, `command`, `decision`, `call`, `value`, `wait`, `tool`, `end`, `join`, `lease`, `service`, `since-last-run`, `convert`. Every node has `id`, `type`, `position: { x, y }`, and optional `label` (shown in the editor), `timeoutMinutes` and `set` (variable writes). Lay the nodes out left to right, about 300 apart on x, and put a loop's way back below the main line.
 
 ### agent
 
@@ -167,6 +167,14 @@ Remembers what it saw, so a later run gets only what is new. `items` (list templ
 Outcomes: `new`, `changed`, `same`. Outputs: `outcome`, `data`, `visit`.
 
 `{"id":"fresh","type":"since-last-run","position":{"x":0,"y":0},"items":"{{feed.data.items}}","key":"link"}`
+
+### convert
+
+Converts `value` (a template) `from` a format `to` another, with no model: `csv`→`json`, `json`→`csv`, `yaml`→`json`, `json`→`yaml`, `xml`→`json`, `json`→`xml`, `feed`→`json`, `markdown-table`→`json`, `json`→`markdown-table`, `html`→`text`. JSON comes out as `data`, text as `text`. A feed (RSS or Atom) gives `{ title, link, items }`, each item with `id`, `title`, `link`, `summary`, `content`, `published`, `updated`, `authors`, `categories`.
+
+Outcomes: `pass`, `fail`. Outputs: `outcome`, `data`, `text`, `note`, `visit`.
+
+`{"id":"news","type":"convert","position":{"x":0,"y":0},"from":"feed","to":"json","value":"{{fetch.body}}"}`
 
 ## Edges, outcomes and loops
 

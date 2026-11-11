@@ -428,6 +428,7 @@ function endsFlow(node: FlowNode, outcome: string): boolean {
 			return outcome === "pass" || outcome === "done";
 		case "value":
 		case "tool":
+		case "convert":
 			return outcome === "pass";
 		case "end":
 			// A Section with an End node does not become a Subflow (`end-node`).

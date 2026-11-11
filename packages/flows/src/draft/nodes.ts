@@ -6,6 +6,7 @@ import {
 	type CallEach,
 	type CallNode,
 	type CommandNode,
+	type ConvertNode,
 	canMakeValue,
 	DEFAULT_COMMAND_EXITS,
 	type DecidedBy,
@@ -315,6 +316,14 @@ export function sinceLastRunNode(
 	position: Position,
 ): SinceLastRunNode {
 	return { id, type: "since-last-run", position, items: "" };
+}
+
+/**
+ * A conversion starts from CSV to JSON with no value; the issues panel
+ * asks for it.
+ */
+export function convertNode(id: string, position: Position): ConvertNode {
+	return { id, type: "convert", position, from: "csv", to: "json", value: "" };
 }
 
 /** A Join waits for every branch until the person picks `first`. */

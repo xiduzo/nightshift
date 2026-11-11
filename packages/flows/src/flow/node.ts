@@ -7,6 +7,7 @@ import {
 	commandExits,
 	commandOutputFields,
 	confidenceField,
+	convertOutputFields,
 	type DecidedBy,
 	decisionOutputFields,
 	endOutputFields,
@@ -49,6 +50,7 @@ export const NODE_TYPE_LABEL = {
 	lease: "Lease",
 	service: "Service",
 	"since-last-run": "Since last run",
+	convert: "Convert",
 } as const satisfies Record<FlowNodeType, string>;
 
 /**
@@ -74,6 +76,7 @@ export const NODE_FAMILY = {
 	decision: "decide",
 	value: "shape",
 	"since-last-run": "shape",
+	convert: "shape",
 	wait: "hold",
 	lease: "hold",
 	service: "hold",
@@ -162,6 +165,8 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 			return serviceOutcomes;
 		case "since-last-run":
 			return sinceLastRunOutcomes;
+		case "convert":
+			return ["pass", "fail"] satisfies BuiltInOutcome[];
 	}
 }
 
@@ -205,6 +210,7 @@ export const outputFieldsByType = {
 	lease: leaseOutputFields,
 	service: serviceOutputFields,
 	"since-last-run": sinceLastRunOutputFields,
+	convert: convertOutputFields,
 } as const satisfies Record<FlowNodeType, readonly string[]>;
 
 /** Output fields that hold JSON, so a template may take a path below them. A Join's `data` holds one entry per branch. */

@@ -300,6 +300,8 @@ export function rewriteOwnTemplates(
 			}
 		case "tool":
 			return { ...node, arguments: rewriteBindings(node.arguments, rewrite) };
+		case "convert":
+			return { ...node, value: rewrite(node.value) };
 		case "join":
 			return node;
 		case "lease":

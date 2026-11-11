@@ -15,6 +15,7 @@ import {
 	agentNode,
 	callNode,
 	commandNode,
+	convertNode,
 	decisionNode,
 	endNode,
 	gateNode,
@@ -96,6 +97,7 @@ const NEW_NODE: Record<
 	lease: { id: "lease", create: leaseNode },
 	service: { id: "service", create: serviceNode },
 	"since-last-run": { id: "since-last-run", create: sinceLastRunNode },
+	convert: { id: "convert", create: convertNode },
 };
 
 /** Adds a node of `type`; a new Agent node starts with `defaults`. */

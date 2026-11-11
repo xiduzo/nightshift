@@ -12,6 +12,7 @@ import type {
 	cascadeOutputFields,
 	confidenceField,
 } from "../nodes";
+import { convertDataShape } from "./convert";
 
 /**
  * The shape of each output field a later node reads (`{{check.exit_code}}`),
@@ -73,6 +74,7 @@ export const OUTPUT_FIELD_SHAPES: { [T in FlowNodeType]: FieldShapes<T> } = {
 	},
 	service: { outcome: text, data: anything, log_tail: text, visit: whole },
 	"since-last-run": { outcome: text, data: sinceData(false), visit: whole },
+	convert: { outcome: text, data: anything, text, note: text, visit: whole },
 };
 
 /** The data of a Since last run node: the new and changed items, and with a value also `previous` and `current`. */
@@ -125,14 +127,15 @@ const CASCADE_FIELD_SHAPES: Record<
 
 /**
  * The output field that a node's own `output` schema types: the data of
- * an Agent's report, of a Value, of a command, of a tool. A node type not
- * listed has no `output` schema.
+ * an Agent's report, of a Value, of a command, of a tool, of a conversion
+ * to JSON. A node type not listed has no `output` schema.
  */
 export const TYPED_OUTPUT_FIELD = {
 	agent: "data",
 	value: "data",
 	command: "data",
 	tool: "data",
+	convert: "data",
 } as const satisfies Partial<Record<FlowNodeType, string>>;
 
 /**
@@ -189,6 +192,10 @@ export function outputFieldShape(
 	const typed = typedOutput(node);
 	if (typed?.field === field && typed.schema !== undefined) {
 		return typed.schema;
+	}
+	// A Convert node's data has the shape of the format it reads.
+	if (node.type === "convert" && field === "data") {
+		return convertDataShape(node);
 	}
 	const shape =
 		own<Schema>(OUTPUT_FIELD_SHAPES[node.type], field) ??

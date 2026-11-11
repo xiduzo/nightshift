@@ -3,6 +3,7 @@ import {
 	agentNodeSchema,
 	callNodeSchema,
 	commandNodeSchema,
+	convertNodeSchema,
 	decisionNodeSchema,
 	deviceIdSchema,
 	endNodeSchema,
@@ -48,6 +49,7 @@ export const flowNodeSchema = z.discriminatedUnion("type", [
 	leaseNodeSchema,
 	serviceNodeSchema,
 	sinceLastRunNodeSchema,
+	convertNodeSchema,
 ]);
 
 export const outcomeSchema = labelSchema;

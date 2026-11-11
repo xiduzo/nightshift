@@ -3,6 +3,7 @@ import {
 	checkAgentNode,
 	checkCallNode,
 	checkCommandNode,
+	checkConvertNode,
 	checkDecisionNode,
 	checkEndNode,
 	checkLeaseNode,
@@ -105,6 +106,9 @@ export function checkNode(
 			break;
 		case "since-last-run":
 			checkSinceLastRunNode(node, check);
+			break;
+		case "convert":
+			checkConvertNode(node, check);
 			break;
 	}
 }
