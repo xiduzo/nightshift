@@ -244,7 +244,6 @@ export {
 	type SecretPart,
 	secretParts,
 	WEB_REQUEST_METHODS,
-	type WebRequestBody,
 	type WebRequestMethod,
 	type WebRequestNode,
 	webRequestNodeSchema,

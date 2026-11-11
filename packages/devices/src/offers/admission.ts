@@ -397,6 +397,7 @@ export function createOfferAdmission(deps: {
 					yield* (await pick()).exec(input);
 				},
 				callTool: async (input) => (await pick()).callTool(input),
+				request: async (input) => (await pick()).request(input),
 				decide: (async (input: Parameters<Device["decide"]>[0]) =>
 					(await pick()).decide(input as never)) as Device["decide"],
 				worktree: async (run) => (await pick()).worktree(run),

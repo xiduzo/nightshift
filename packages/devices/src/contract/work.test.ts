@@ -120,6 +120,34 @@ const calls: WorkRequest[] = [
 	{
 		...forRun,
 		call: {
+			kind: "request",
+			input: {
+				method: "POST",
+				url: [{ text: "https://api.example.com/items" }],
+				query: [{ name: "q", value: [{ text: "rain" }] }],
+				headers: [
+					{
+						name: "Authorization",
+						value: [{ text: "Bearer " }, { secret: "API_TOKEN" }],
+					},
+				],
+				body: {
+					kind: "text",
+					contentType: "application/json",
+					text: [
+						{ text: '{"key":"' },
+						{ secret: "API_TOKEN", escape: "json" },
+						{ text: '"}' },
+					],
+				},
+				timeoutMs: 30_000,
+				maxBytes: 1_048_576,
+			},
+		},
+	},
+	{
+		...forRun,
+		call: {
 			kind: "decide",
 			input: {
 				decider: "openai",
@@ -150,6 +178,23 @@ describe("the work relay's output schema", () => {
 			const delivery = { kind: "call", id: "call-1", request };
 			expect(workDeliverySchema.safeParse(delivery).error).toBeUndefined();
 		}
+	});
+
+	test("refuses a secret part that is not the name of a secret", () => {
+		const request: WorkRequest = {
+			...forRun,
+			call: {
+				kind: "request",
+				input: {
+					method: "GET",
+					url: [{ secret: "not a name" }],
+					timeoutMs: 1_000,
+					maxBytes: 1_000,
+				},
+			},
+		};
+		const delivery = { kind: "call", id: "call-1", request };
+		expect(workDeliverySchema.safeParse(delivery).success).toBe(false);
 	});
 
 	test("refuses a call it does not know", () => {

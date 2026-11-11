@@ -367,7 +367,6 @@ export {
 	type WaitNode,
 	type WaitUntil,
 	WEB_REQUEST_METHODS,
-	type WebRequestBody,
 	type WebRequestMethod,
 	type WebRequestNode,
 	waitCommandOf,

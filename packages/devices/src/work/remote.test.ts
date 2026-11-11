@@ -4,11 +4,18 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createRunFolders, type Device } from "@nightshift/engine";
 import {
+	connectionsOf,
 	createSandbox,
 	type Sandbox,
 	testDevice,
 } from "@nightshift/engine/testing";
-import { UNREADABLE_REQUEST, type WorkFor, type WorkRelay } from "../contract";
+import {
+	UNREADABLE_REQUEST,
+	type WorkFor,
+	type WorkRelay,
+	type WorkRequest,
+	workRequestSchema,
+} from "../contract";
 import { CALL_DEADLINES_MS, remoteDevice, serveWork } from "./remote";
 
 /**
@@ -82,6 +89,126 @@ describe("the snapshots of a remote Device", () => {
 		await expect(
 			device.snapshotWorktree?.({ cwd: sandbox.repoPath }),
 		).rejects.toThrow("does not tell what a step changed");
+	});
+});
+
+/**
+ * A relay that sends each call and reply as JSON, as the Host's hub does,
+ * and checks the call as the placed Device reads it.
+ */
+function wireTo(device: Device): WorkRelay {
+	return {
+		async *call(_id, request, signal) {
+			const sent = JSON.parse(JSON.stringify(request)) as WorkRequest;
+			// What the placed Device reads first: a call of a kind it knows.
+			const checked = workRequestSchema.safeParse(sent);
+			if (!checked.success) throw new Error(checked.error.message);
+			for await (const reply of serveWork(
+				device,
+				sent,
+				signal ?? new AbortController().signal,
+			)) {
+				yield JSON.parse(JSON.stringify(reply));
+			}
+		},
+		online: () => true,
+	};
+}
+
+describe("a web request on a remote Device", () => {
+	test("crosses the wire with its secrets by name, and comes back with their values masked", async () => {
+		const seen: string[] = [];
+		const server = Bun.serve({
+			port: 0,
+			hostname: "127.0.0.1",
+			fetch(request) {
+				seen.push(request.headers.get("authorization") ?? "");
+				return Response.json({ echo: request.headers.get("authorization") });
+			},
+		});
+		try {
+			const placed = testDevice({
+				harnesses: {},
+				connections: connectionsOf({ secrets: { API_TOKEN: "tok-9" } }),
+			});
+			const device = remoteDevice(
+				wireTo(placed),
+				{ id: "laptop", name: "laptop" },
+				FOR_RUN,
+			);
+			const result = await device.request({
+				method: "GET",
+				url: [{ text: `http://127.0.0.1:${server.port}/items` }],
+				headers: [
+					{
+						name: "Authorization",
+						value: [{ text: "Bearer " }, { secret: "API_TOKEN" }],
+					},
+				],
+				timeoutMs: 5_000,
+				maxBytes: 1_024,
+				signal: new AbortController().signal,
+			});
+			expect(seen).toEqual(["Bearer tok-9"]);
+			expect(result).toMatchObject({
+				kind: "answered",
+				response: { status: 200, body: { echo: "Bearer •••" } },
+			});
+		} finally {
+			server.stop(true);
+		}
+	});
+
+	test("a Device of an older Night Shift says to update it", async () => {
+		const older: WorkRelay = {
+			async *call() {
+				yield { kind: "error", message: UNREADABLE_REQUEST };
+			},
+			online: () => true,
+		};
+		const device = remoteDevice(
+			older,
+			{ id: "laptop", name: "laptop" },
+			FOR_RUN,
+		);
+		expect(
+			await device.request({
+				method: "GET",
+				url: [{ text: "https://api.example.com" }],
+				timeoutMs: 1_000,
+				maxBytes: 1_024,
+				signal: new AbortController().signal,
+			}),
+		).toEqual({
+			kind: "refused",
+			message:
+				"laptop runs an older version of Night Shift. Update Night Shift on laptop.",
+		});
+	});
+
+	test("a Device that cannot answer is a network failure", async () => {
+		const gone: WorkRelay = {
+			async *call() {},
+			online: () => true,
+		};
+		const device = remoteDevice(
+			gone,
+			{ id: "laptop", name: "laptop" },
+			FOR_RUN,
+		);
+		expect(
+			await device.request({
+				method: "GET",
+				url: [{ text: "https://api.example.com" }],
+				timeoutMs: 1_000,
+				maxBytes: 1_024,
+				signal: new AbortController().signal,
+			}),
+		).toEqual({
+			kind: "failed",
+			message: "laptop stopped answering before the step ended.",
+			network: true,
+		});
 	});
 });
 

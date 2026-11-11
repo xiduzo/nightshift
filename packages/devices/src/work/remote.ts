@@ -15,6 +15,7 @@ import {
 	type SessionEvent,
 	type SessionInput,
 	type ToolResult,
+	type WebRequestResult,
 	type Worktree,
 	type WorktreeChanges,
 } from "@nightshift/engine";
@@ -75,7 +76,8 @@ function noAnswer(name: string): string {
 /**
  * How long a call that answers once may take. A call lost on the way, or
  * a Device that hangs, then ends with a refusal and frees what waits for
- * it, such as a run's start. Calls a step runs (`decide`, `callTool`) have
+ * it, such as a run's start. Calls a step runs (`decide`, `callTool`,
+ * `request`) have
  * their own limits through the step's signal.
  */
 export const CALL_DEADLINES_MS: Partial<Record<WorkCall["kind"], number>> = {
@@ -240,6 +242,33 @@ export function remoteDevice(
 				};
 			}
 		},
+		/**
+		 * A web request on that Device. A Device of an older Night Shift
+		 * cannot read the call: run start refuses it first (its
+		 * capabilities say no `requests`), and the call says to update it.
+		 * One that went away is a network failure: the step waits for it.
+		 */
+		async request(input): Promise<WebRequestResult> {
+			const { signal, ...rest } = input;
+			try {
+				return await once<WebRequestResult>(
+					{ kind: "request", input: rest },
+					signal,
+				);
+			} catch (error) {
+				if (error instanceof Refusal && error.message === UNREADABLE_REQUEST) {
+					return {
+						kind: "refused",
+						message: `${device.name} runs an older version of Night Shift. Update Night Shift on ${device.name}.`,
+					};
+				}
+				return {
+					kind: "failed",
+					message: failureWords(error, `a web request on ${device.name}`),
+					network: true,
+				};
+			}
+		},
 		decide,
 		worktree: (run) => once<Worktree>({ kind: "worktree", run }),
 		// A Device of an older Night Shift cannot read the call: it says to update it.
@@ -384,6 +413,15 @@ export async function* serveWork(
 			case "callTool":
 				yield result(
 					await device.callTool({
+						...withoutRun(call.input),
+						...run,
+						signal,
+					}),
+				);
+				return;
+			case "request":
+				yield result(
+					await device.request({
 						...withoutRun(call.input),
 						...run,
 						signal,

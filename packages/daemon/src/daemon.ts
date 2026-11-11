@@ -537,6 +537,12 @@ export async function createDaemon(
 			...(await connections.secretValues(use)),
 			...ollama.endpoint().secretValues,
 		],
+		// A Host reaches this computer and its network only when its
+		// Settings allow it: it serves every Member of its Spaces.
+		privateNetwork: () => {
+			const current = settings.current();
+			return !current.host || current.webRequestsPrivateNetwork;
+		},
 	});
 
 	/**

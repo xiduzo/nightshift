@@ -61,7 +61,7 @@ export type WorkHub = WorkRelay & {
 	): boolean;
 	/**
 	 * Whether a step's call of the run goes to the Device now: a session,
-	 * a command, a tool call or a decider call this hub sent there (or holds for it) and
+	 * a command, a tool call, a web request or a decider call this hub sent there (or holds for it) and
 	 * that has not ended. What the Host checks before it gives the
 	 * Device the run's Project secrets (ADR 13).
 	 */
@@ -76,6 +76,7 @@ const STEP_CALLS: ReadonlySet<string> = new Set([
 	"session",
 	"exec",
 	"callTool",
+	"request",
 	"decide",
 ]);
 

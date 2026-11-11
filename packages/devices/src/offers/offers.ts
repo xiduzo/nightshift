@@ -12,6 +12,7 @@ import {
 	nameSchema,
 	type permissionModeSchema,
 	waitCommandOf,
+	waitUrlOf,
 } from "@nightshift/flows";
 import { z } from "zod";
 import { offerCapsSchema } from "../contract";
@@ -248,13 +249,16 @@ function touchesDevice(node: FlowNode): boolean {
 		case "agent":
 		case "command":
 		case "tool":
+		case "web-request":
 		case "service":
 			return true;
 		case "decision":
 		case "value":
 			return node.by === "model";
 		case "wait":
-			return waitCommandOf(node.until) !== null;
+			return (
+				waitCommandOf(node.until) !== null || waitUrlOf(node.until) !== null
+			);
 		case "call":
 			return node.each?.source.kind === "command";
 		case "end":

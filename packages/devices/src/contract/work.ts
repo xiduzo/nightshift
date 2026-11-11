@@ -6,14 +6,17 @@ import type {
 	RunRef,
 	SessionInput,
 	ToolCallInput,
+	WebRequestInput,
 } from "@nightshift/engine";
 import {
 	agentHarnessSchema,
 	deciderNameSchema,
 	effortSchema,
+	MAX_WEB_REQUEST_BYTES,
 	modelAddressSchema,
 	permissionModeSchema,
 	secretNameSchema,
+	WEB_REQUEST_METHODS,
 } from "@nightshift/flows";
 import { z } from "zod";
 import { exact } from "./described";
@@ -60,6 +63,7 @@ export type WorkCall =
 	  }
 	| { kind: "exec"; input: Omit<ExecInput, "signal"> }
 	| { kind: "callTool"; input: Omit<ToolCallInput, "signal"> }
+	| { kind: "request"; input: Omit<WebRequestInput, "signal"> }
 	| {
 			kind: "decide";
 			input: Omit<DecisionInput, "signal"> | Omit<ValueInput, "signal">;
@@ -91,6 +95,7 @@ export const WORK_KINDS = [
 	"exec",
 	"callTool",
 	"decide",
+	"request",
 ] as const satisfies readonly WorkCall["kind"][];
 
 /**
@@ -297,6 +302,46 @@ const decideInputSchema = z.union([
 	}),
 ]);
 
+/** A text a web request sends, as parts: text, or a secret the Device fills in. */
+const requestTextSchema = z
+	.array(
+		z.union([
+			z.object({ text: z.string() }),
+			z.object({
+				secret: secretNameSchema,
+				escape: z.literal("json").optional(),
+			}),
+		]),
+	)
+	.readonly();
+
+/** A query value, a header or a form field of a web request. */
+const requestFieldsSchema = z
+	.array(z.object({ name: z.string(), value: requestTextSchema }))
+	.readonly();
+
+/** A web request (a Web request node, a Wait for a URL), its secrets by name. */
+const webRequestInputSchema = z.object({
+	method: z.enum(WEB_REQUEST_METHODS),
+	url: requestTextSchema,
+	query: requestFieldsSchema.optional(),
+	headers: requestFieldsSchema.optional(),
+	body: z
+		.discriminatedUnion("kind", [
+			z.object({
+				kind: z.literal("text"),
+				contentType: z.string(),
+				text: requestTextSchema,
+			}),
+			z.object({ kind: z.literal("form"), fields: requestFieldsSchema }),
+		])
+		.optional(),
+	timeoutMs: z.number().int().positive(),
+	/** A Walker never asks a Device to keep more than a node may. */
+	maxBytes: z.number().int().positive().max(MAX_WEB_REQUEST_BYTES),
+	run: stepRunSchema.optional(),
+});
+
 /** One call of the Device port, as plain data: the call without its signal. */
 const workCallSchema = z.discriminatedUnion("kind", [
 	z.object({ kind: z.literal("capabilities"), query: capabilityQuerySchema }),
@@ -358,6 +403,7 @@ const workCallSchema = z.discriminatedUnion("kind", [
 		}),
 	}),
 	z.object({ kind: z.literal("decide"), input: decideInputSchema }),
+	z.object({ kind: z.literal("request"), input: webRequestInputSchema }),
 	secretRequestSchema.shape.call,
 ]);
 

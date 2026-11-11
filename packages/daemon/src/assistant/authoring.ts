@@ -286,6 +286,12 @@ function lineOf(event: TranscriptEntry["event"]): string {
 				: `Lease: ${event.name} is held by run ${event.holder ?? "unknown"}`;
 		case "since-last-run":
 			return `Since last run: ${event.new} new, ${event.changed} changed, ${event.same} the same${event.firstRun ? " (first run)" : ""}${event.remembers ? "" : ", remembers nothing"}`;
+		case "web-request":
+			return `Web request: ${event.method} ${cut(event.url, 300)}`;
+		case "web-response":
+			return event.status === null
+				? `Web response: none. ${event.text}`
+				: `Web response: ${event.status} ${event.text}`.trim();
 		default:
 			return "";
 	}
