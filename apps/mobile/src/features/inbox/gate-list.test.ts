@@ -1,10 +1,11 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
-import type { OpenGate } from "@nightshift/client";
+import { formatTime, type OpenGate } from "@nightshift/client";
 
 import { choicesText, gateRowText, nextGate } from "./gate-list";
 
 const MIN = 60_000;
+const DAY = 24 * 60 * MIN;
 
 function gate(fields: Partial<OpenGate>): OpenGate {
 	return {
@@ -51,9 +52,54 @@ describe("gateRowText", () => {
 			title: "Ship the fix?",
 			choices: "2 choices",
 			nodeId: "review",
+			situation: "",
 			waited: "12 min",
+			due: null,
 			pullRequest: false,
 		});
+	});
+
+	test("the situation of the brief on one line, before the question", () => {
+		const row = gateRowText(
+			gate({
+				question: "Ship the fix?\n\nThe tests pass.",
+				brief: {
+					urgencyBy: "flow",
+					situation: "\nThe **release** waits for this.\nIt goes out at noon.",
+					background: [],
+					recommendation: null,
+					byModel: [],
+				},
+			}),
+			0,
+		);
+		expect(row.situation).toBe("The release waits for this.");
+	});
+
+	test("without a situation: the first line of the question below its title", () => {
+		const row = gateRowText(
+			gate({ question: "Ship the fix?\n\nThe *tests* pass.\nAll 12." }),
+			0,
+		);
+		expect(row.situation).toBe("The tests pass.");
+	});
+
+	test("a Host without the brief, and a question of one line: no situation", () => {
+		expect(gateRowText(gate({}), 0).situation).toBe("");
+	});
+
+	test("a Gate with a deadline says when it needs an answer", () => {
+		const now = 1_800_000_000_000;
+		const today = gateRowText(
+			gate({ deadline: { at: now, choose: "keep" } }),
+			now,
+		);
+		expect(today.due).toBe(`by ${formatTime(now)}`);
+		const later = gateRowText(
+			gate({ deadline: { at: now + 3 * DAY, choose: "keep" } }),
+			now,
+		);
+		expect(later.due).toStartWith(`by ${formatTime(now + 3 * DAY)} on `);
 	});
 
 	test("the headline shows without Markdown marks", () => {

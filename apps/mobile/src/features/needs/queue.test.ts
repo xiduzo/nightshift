@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import type { OpenGate, RunSummary } from "@nightshift/client";
 
 import {
+	firstDeadline,
 	gateOrder,
 	gatesForYou,
 	headIndices,
@@ -59,6 +60,19 @@ describe("gatesForYou and gateOrder", () => {
 			"none-new",
 		]);
 	});
+
+	test("the Gates for now first, whatever their deadline", () => {
+		const gates = [
+			gate({ runId: "later", urgency: "later" }),
+			gate({ runId: "soon", deadline: { at: 10 * MIN, choose: "keep" } }),
+			gate({ runId: "now", urgency: "now" }),
+		];
+		expect(gateOrder(gates).map((g) => g.runId)).toEqual([
+			"now",
+			"soon",
+			"later",
+		]);
+	});
 });
 
 describe("needsItems", () => {
@@ -99,13 +113,43 @@ describe("needsRows", () => {
 					: `${row.key}:${row.first}:${row.last}`,
 			),
 		).toEqual([
-			"head:gate:1:true",
+			"head:today:1:true",
 			"gate:g:s1:true:true",
 			"head:learning:2:false",
 			"learning:web:l1:true:false",
 			"learning:web:l2:false:true",
 		]);
 		expect(headIndices(rows)).toEqual([0, 2]);
+	});
+
+	test("the Gates split by urgency: now, today, when you have time", () => {
+		const rows = needsRows(
+			needsItems<L>({
+				gates: [
+					gate({ runId: "later", urgency: "later" }),
+					gate({ runId: "old" }),
+					gate({ runId: "today", urgency: "today", openedAt: 5 }),
+					gate({ runId: "now", urgency: "now", openedAt: 9 }),
+				],
+				runs: [run("x")],
+				learnings: undefined,
+			}),
+		);
+		expect(
+			rows.map((row) =>
+				row.kind === "head" ? `head:${row.section}:${row.count}` : row.key,
+			),
+		).toEqual([
+			"head:now:1",
+			"gate:now:s1",
+			"head:today:2",
+			"gate:old:s1",
+			"gate:today:s1",
+			"head:later:1",
+			"gate:later:s1",
+			"head:run:1",
+			"run:x",
+		]);
 	});
 
 	test("nothing waits: no rows", () => {
@@ -125,6 +169,21 @@ describe("needsSummary", () => {
 		});
 		expect(needsSummary(items, time)).toBe(
 			"3 things. The first Gate closes at t30.",
+		);
+	});
+
+	test("the first deadline of any Gate, also when a Gate for now has none", () => {
+		const items = needsItems<L>({
+			gates: [
+				gate({ runId: "a", urgency: "now" }),
+				gate({ runId: "b", deadline: { at: 30 * MIN, choose: "keep" } }),
+			],
+			runs: undefined,
+			learnings: undefined,
+		});
+		expect(firstDeadline(items)).toBe(30 * MIN);
+		expect(needsSummary(items, time)).toBe(
+			"2 things. The first Gate closes at t30.",
 		);
 	});
 

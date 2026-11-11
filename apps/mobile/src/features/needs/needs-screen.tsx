@@ -33,7 +33,9 @@ import { TabRootHeader } from "@/shared/header";
 import { CellSeparator, ListCell } from "@/shared/list";
 import { ScreenList } from "@/shared/page";
 import { useScreenRefresh, useWhileFocused } from "@/shared/refresh";
+import { URGENCY_LABEL } from "@/shared/urgency";
 import {
+	firstDeadline,
 	headIndices,
 	type NeedsRow,
 	type NeedsSection,
@@ -50,9 +52,17 @@ const UNDO_MS = 10_000;
 
 /** The head of each section: its title and what you do with it. */
 const SECTION_HEAD: Record<NeedsSection, { title: string; hint: string }> = {
-	gate: {
-		title: "Gates",
-		hint: "Answer before the deadline. Then Night Shift picks for you.",
+	now: {
+		title: URGENCY_LABEL.now,
+		hint: "Answer these first.",
+	},
+	today: {
+		title: URGENCY_LABEL.today,
+		hint: "Answer these before the day ends.",
+	},
+	later: {
+		title: URGENCY_LABEL.later,
+		hint: "Nothing here is urgent.",
 	},
 	run: {
 		title: "Runs that stopped",
@@ -67,8 +77,9 @@ const SECTION_HEAD: Record<NeedsSection, { title: string; hint: string }> = {
 type Row = NeedsRow<WaitingLearning>;
 
 /**
- * The Needs you tab: everything that waits for you, in three sections.
- * The Gates you may answer, the first to close first. The runs that
+ * The Needs you tab: everything that waits for you, in sections. The
+ * Gates you may answer, by urgency (Now, Today, When you have time), in
+ * each the first to close first. The runs that
  * stopped in the last day, with Retry or Resume and Leave it. The
  * learnings to keep or delete. A section's head stays at the top while
  * its rows scroll under it.
@@ -119,7 +130,7 @@ export function NeedsScreen() {
 				case "gate":
 					return (
 						<ListCell first={item.first} last={item.last}>
-							<GateRow gate={item.gate} />
+							<GateRow gate={item.gate} urgency={false} />
 						</ListCell>
 					);
 				case "run":
@@ -150,9 +161,7 @@ export function NeedsScreen() {
 		[projectNames, sends, onRetry, onLeave, onKeep, onDelete],
 	);
 
-	const firstGate = needs.items.find((item) => item.kind === "gate");
-	const firstDeadline =
-		firstGate?.kind === "gate" ? firstGate.gate.deadline?.at : undefined;
+	const firstAt = firstDeadline(needs.items);
 
 	const empty =
 		!needs.loading &&
@@ -175,9 +184,7 @@ export function NeedsScreen() {
 					? needsSummary(needs.items, formatTime)
 					: undefined
 			}
-			summaryHint={
-				firstDeadline === undefined ? undefined : hoverTime(firstDeadline)
-			}
+			summaryHint={firstAt === undefined ? undefined : hoverTime(firstAt)}
 			header={
 				<>
 					<TabRootHeader name={person.name} />

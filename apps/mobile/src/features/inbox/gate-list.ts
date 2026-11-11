@@ -1,4 +1,6 @@
 import {
+	type ContextItem,
+	deadlineWhen,
 	gateParts,
 	gateRun,
 	type OpenGate,
@@ -25,8 +27,15 @@ export type GateRowText = {
 	/** "2 choices", then the node id in mono. */
 	choices: string;
 	nodeId: string;
+	/**
+	 * Why you decide, on one line: the Gate's situation, or else the first
+	 * line of its question below the headline. Empty when it has neither.
+	 */
+	situation: string;
 	/** "12 min" */
 	waited: string;
+	/** When it needs an answer: "by 12:00", "by 07:00 tomorrow". Null without a deadline. */
+	due: string | null;
 	/** The question links a pull request: the row shows its icon. */
 	pullRequest: boolean;
 };
@@ -41,19 +50,45 @@ export function gateRowText(
 		| "choices"
 		| "nodeId"
 		| "openedAt"
+		| "deadline"
+		| "brief"
 	>,
 	now: number,
 ): GateRowText {
-	const { headline, links } = gateParts(gate.question);
+	const { headline, context, links } = gateParts(gate.question);
 	const { flow } = gateRun(gate);
 	return {
 		overline: `${gate.projectName} · ${flow}`,
 		title: plainText(headline),
 		choices: choicesText(gate.choices.length),
 		nodeId: gate.nodeId,
+		situation: firstLine(gate.brief?.situation ?? "") || firstText(context),
 		waited: waitedText(now - gate.openedAt),
+		due: gate.deadline ? dueText(gate.deadline.at, now) : null,
 		pullRequest: links.some((link) => link.kind === "pull"),
 	};
+}
+
+/** The first line of a text that is not empty, as plain text. */
+function firstLine(text: string): string {
+	const line = text.split("\n").find((part) => part.trim() !== "");
+	return line ? plainText(line) : "";
+}
+
+/** The first line of the question's prose below its headline. Code and labelled values do not count. */
+function firstText(context: readonly ContextItem[]): string {
+	for (const item of context) {
+		if (item.kind !== "text" || item.label !== null) continue;
+		const line = firstLine(item.value);
+		if (line) return line;
+	}
+	return "";
+}
+
+/** When a deadline falls, short for a row: "by 12:00", "by 07:00 tomorrow". */
+function dueText(at: number, now: number): string {
+	const { time, day } = deadlineWhen(at, now);
+	return `by ${time}${day}`;
 }
 
 /**
