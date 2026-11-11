@@ -183,10 +183,16 @@ function PresetForm({
 		() => presetSources(templateScope(flow, { flows }), node.id),
 		[flow, flows, node.id],
 	);
-	const [values, setValues] = useState<FormValues>(() => ({
-		...START,
-		source: sources[0]?.ref ?? "",
-	}));
+	// Filter and Sort start on the first field of an item; Remove duplicates on the whole item.
+	const firstField = (ref: string) => {
+		if (preset === "unique") return "";
+		const item = sources.find((candidate) => candidate.ref === ref)?.item;
+		return item ? (itemFields(item)[0] ?? "") : "";
+	};
+	const [values, setValues] = useState<FormValues>(() => {
+		const ref = sources[0]?.ref ?? "";
+		return { ...START, source: ref, field: firstField(ref) };
+	});
 	const set = (change: Partial<FormValues>) =>
 		setValues((current) => ({ ...current, ...change }));
 	const source: PresetSource | undefined = sources.find(
@@ -221,7 +227,11 @@ function PresetForm({
 						value={values.source}
 						disabled={sources.length === 0}
 						onChange={(event) =>
-							set({ source: event.target.value, field: "", fields: [] })
+							set({
+								source: event.target.value,
+								field: firstField(event.target.value),
+								fields: [],
+							})
 						}
 					>
 						{sources.map((candidate) => (
