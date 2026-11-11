@@ -167,24 +167,35 @@ async function endOf(engine: SpaceEngine, runId: string): Promise<RunDetail> {
 	);
 }
 
-/** The run that holds each lease of the Space now. */
-async function holders(): Promise<Record<string, string>> {
+/** The run that holds each lease of the Space at `at`: now, or the engine's clock. */
+async function holders(at = now()): Promise<Record<string, string>> {
 	const rows = await sandbox.db.select().from(runLease);
 	return Object.fromEntries(
 		rows
-			.filter((row) => instant(row.expiresAt) > now())
+			.filter((row) => instant(row.expiresAt) > at)
 			.map((row) => [row.name, row.runId]),
 	);
 }
 
+/** When the lease expires unless its run renews it. 0 when no run holds it. */
+async function expiryOf(name = "zac-docker-stack"): Promise<number> {
+	const rows = await sandbox.db.select().from(runLease);
+	const row = rows.find((lease) => lease.name === name);
+	return row ? instant(row.expiresAt) : 0;
+}
+
 /** Starts a run that takes the lease and sleeps holding it. */
-async function holdingRun(engine: SpaceEngine, flow = holdingFlow()) {
+async function holdingRun(
+	engine: SpaceEngine,
+	flow = holdingFlow(),
+	clock: () => number = now,
+) {
 	const run = await engine.startRun({
 		projectId: await projectId(engine),
 		flow,
 	});
 	await statusOf(engine, run.id, "sleeping");
-	expect(await holders()).toEqual({ "zac-docker-stack": run.id });
+	expect(await holders(clock())).toEqual({ "zac-docker-stack": run.id });
 	return run;
 }
 
@@ -303,6 +314,49 @@ describe("the engine lets go of a lease on every end", () => {
 		expect((await endOf(second, run.id)).status).toBe("finished");
 		expect(await holders()).toEqual({});
 	});
+
+	test("given a run the daemon died in, when its lease expired before a new daemon started, then the run takes the lease back when it continues", async () => {
+		let at = now();
+		// Real minutes: no renewal timer fires while the test runs.
+		const clock = { now: () => at, minuteMs: 60_000 };
+		const dying = scriptedHarness({ hang: true });
+		const dies = new AbortController();
+		const first = makeEngine(
+			dying.harness,
+			{},
+			{ ...clock, signal: dies.signal },
+		);
+		const run = await first.startRun({
+			projectId: await projectId(first),
+			flow: flowOf(
+				[lease({ ttlMinutes: 2 }), work],
+				[edge("own", "held", "work")],
+			),
+		});
+		await waitFor(() => dying.sessions[0], { label: "the session" });
+		dies.abort();
+		// No daemon runs for three minutes: the lease expires.
+		at += 3 * 60_000;
+		expect(await holders(at)).toEqual({});
+
+		const { harness, sessions } = scriptedHarness();
+		const ends = new AbortController();
+		const second = makeEngine(
+			harness,
+			{},
+			{ ...clock, resumeGraceMs: 0, signal: ends.signal },
+		);
+		try {
+			const resumed = await waitFor(() => sessions[0], {
+				label: "the resume",
+			});
+			expect(await holders(at)).toEqual({ "zac-docker-stack": run.id });
+			resumed.finish();
+			expect((await endOf(second, run.id)).status).toBe("finished");
+		} finally {
+			ends.abort();
+		}
+	});
 });
 
 const settingsWith = (patch: Partial<RunSettings>) => (): RunSettings => ({
@@ -414,18 +468,44 @@ describe("a run that resumes takes its leases again", () => {
 	});
 });
 
+/**
+ * The engines of these tests run on a clock that moves only when the test
+ * moves it. A lease expires on that clock, so a busy machine that fires a
+ * renewal late cannot let it expire.
+ */
 describe("after a restart", () => {
-	test("given a run that sleeps holding a short lease, when a new daemon starts, then it renews the lease so it does not expire", async () => {
+	test("given a run that sleeps holding a short lease, when a new daemon starts, then it renews the lease every minute so it does not expire", async () => {
+		let at = now();
+		const clock = () => at;
 		const dies = new AbortController();
-		const first = makeEngine(undefined, {}, { signal: dies.signal });
-		const run = await holdingRun(first, holdingFlow({ ttlMinutes: 2 }));
+		const first = makeEngine(
+			undefined,
+			{},
+			{ now: clock, signal: dies.signal },
+		);
+		const run = await holdingRun(first, holdingFlow({ ttlMinutes: 2 }), clock);
 		// The first daemon dies: its renewals go with it.
 		dies.abort();
-		const second = makeEngine();
-		expect((await second.getRun(run.id)).status).toBe("sleeping");
-		// Ten ttls later the lease is still the run's.
-		await Bun.sleep(20 * MINUTE_MS);
-		expect(await holders()).toEqual({ "zac-docker-stack": run.id });
+		const ends = new AbortController();
+		const second = makeEngine(
+			undefined,
+			{},
+			{ now: clock, signal: ends.signal },
+		);
+		try {
+			expect((await second.getRun(run.id)).status).toBe("sleeping");
+			// Five ttls later the lease is still the run's: the new daemon
+			// renewed it each minute.
+			for (let minute = 1; minute <= 10; minute++) {
+				at += MINUTE_MS;
+				await waitFor(async () => (await expiryOf()) >= at + 2 * MINUTE_MS, {
+					label: `the renewal of minute ${minute}`,
+				});
+			}
+			expect(await holders(at)).toEqual({ "zac-docker-stack": run.id });
+		} finally {
+			ends.abort();
+		}
 	});
 });
 
