@@ -255,6 +255,13 @@ export interface Engine {
 	 */
 	deviceBack(deviceId: string): Promise<void>;
 	/**
+	 * This computer's link to a Host is online again: the leases of the
+	 * runs it walks are renewed now, not at the next minute. The renewal
+	 * at the start does not reach a Host before its link is up. It waits
+	 * for recovery, as that renewal does.
+	 */
+	hostBack(): Promise<void>;
+	/**
 	 * Asks GitHub about each pull request a run on this computer opened,
 	 * until it is merged or closed. Does nothing when this computer has no
 	 * `gh`. The morning check calls this; a test can call it too.
@@ -571,16 +578,18 @@ export function createEngine(
 	// The leases the runs here held when the last daemon stopped are renewed
 	// from now on: before recovery, which lets go of those of the runs that
 	// do not continue.
-	const ready = trackHeldLeases({ db, log: runLog, keeper: leases })
+	const recovered = trackHeldLeases({ db, log: runLog, keeper: leases })
 		.catch((error) => {
 			console.warn("[engine] could not read the leases of the runs", error);
 		})
-		.then(() => recovery.recoverInterruptedWork())
+		.then(() => recovery.recoverInterruptedWork());
+	const ready = recovered
 		// Those leases are renewed at once, not a minute from now: the last
 		// daemon renewed them up to a minute before it stopped, and a lease of
 		// 2 minutes would expire first. After recovery, so a run it ended
 		// interrupted takes back a lease it lost when it continues. The start
-		// does not wait for a Host that answers late.
+		// does not wait for a Host that answers late. A Host whose link is not
+		// up yet gets the renewal when it is (`hostBack`).
 		.then(() => {
 			void leases.renewAll();
 		})
@@ -917,6 +926,11 @@ export function createEngine(
 		async deviceBack(_deviceId) {
 			await ready;
 			await wakeOfflineSleeps({ db, log: runLog, runner });
+		},
+		async hostBack() {
+			// After recovery, as at the start. Not after the rest of `ready`.
+			await recovered;
+			await leases.renewAll();
 		},
 		async scoreOpenPullRequests() {
 			await ready;

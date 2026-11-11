@@ -11,12 +11,16 @@ import type {
 } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { instant, now } from "@nightshift/time";
+import { HostUnreachableError, type Relay } from "../contract";
 import {
 	defaultRunSettings,
 	type RunSettings,
 } from "../device-config/settings";
+import { createLeaseStore } from "../leases";
 import { createRunLog, type RunLog } from "../log/run-log";
 import type { RunDetail } from "../read/views";
+import { aloneDirectory } from "../testing/alone-directory";
+import { alonePeers } from "../testing/alone-peers";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -26,7 +30,8 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
-import { createEngine, type EngineInternals } from "./engine";
+import { createEngine, type Engine, type EngineInternals } from "./engine";
+import type { PeersFactory } from "./peers";
 import type { SpaceEngine } from "./space-engine";
 
 /**
@@ -532,6 +537,119 @@ describe("after a restart", () => {
 					label: `the renewal of minute ${minute}`,
 				});
 			}
+			expect(await holders(at)).toEqual({ "zac-docker-stack": run.id });
+		} finally {
+			ends.abort();
+		}
+	});
+});
+
+/**
+ * A Host that keeps the Space and its leases, behind a link the test
+ * takes down and brings up. Its leases are a store over this database, on
+ * the engine's clock, so `holders` and `expiryOf` read them. It walks no
+ * run: a start asks whether it reaches the Host, and every run of the test
+ * is walked here.
+ */
+function hostKeeping(clock: () => number) {
+	const store = createLeaseStore({ db: sandbox.db, now: clock });
+	const link = { up: true, renewals: 0 };
+	const away = () => Promise.reject(new HostUnreachableError());
+	const over = <T>(call: () => Promise<T>) => (link.up ? call() : away());
+	const relay: Relay = {
+		command: away,
+		addProject: away,
+		addWithoutFolder: away,
+		addClone: away,
+		startRun: away,
+		reachable: async () => false,
+		leases: {
+			take: (take) => over(() => store.take(take)),
+			renew(input) {
+				link.renewals++;
+				return over(() => store.renew(input));
+			},
+			release: (input) => over(() => store.release(input)),
+		},
+	};
+	let keeps = false;
+	const peers: PeersFactory = (context) => ({ ...alonePeers(context), relay });
+	return {
+		link,
+		/** From now on the Host keeps the Space: its project is added before. */
+		keep() {
+			keeps = true;
+		},
+		peers,
+		directory: {
+			...aloneDirectory(sandbox.db),
+			hostedElsewhere: async () => keeps,
+			hostOf: async () => (keeps ? "host" : null),
+		},
+	};
+}
+
+/** An engine whose Space a Host keeps: the whole engine, not one Space's view. */
+function engineWith(
+	host: ReturnType<typeof hostKeeping>,
+	internals: EngineInternals,
+): Engine {
+	const runLog = createRunLog(sandbox.db, {
+		walkerId: sandbox.deviceId,
+		dataDir: sandbox.dataDir,
+	});
+	runLogs.push(runLog);
+	return createEngine(
+		withDevice({
+			db: sandbox.db,
+			harnesses: { "claude-code": scriptedHarness().harness },
+			deviceId: sandbox.deviceId,
+			dataDir: sandbox.dataDir,
+			peers: host.peers,
+			directory: host.directory,
+		}),
+		{ runLog, minuteMs: MINUTE_MS, ...internals },
+	);
+}
+
+describe("after a restart, in a Space a Host keeps", () => {
+	test("given a run that sleeps holding a lease of 2 minutes, when the link to the Host comes up after the new daemon started, then it renews the lease at once, not a minute later", async () => {
+		let at = now();
+		// Real minutes: no renewal timer fires while the test runs.
+		const clock = { now: () => at, minuteMs: 60_000 };
+		const host = hostKeeping(clock.now);
+		const dies = new AbortController();
+		const first = engineWith(host, { ...clock, signal: dies.signal });
+		const project = await projectId(first.space(sandbox.spaceId));
+		host.keep();
+		const run = await first
+			.space(sandbox.spaceId)
+			.startRun({ projectId: project, flow: holdingFlow({ ttlMinutes: 2 }) });
+		await statusOf(first.space(sandbox.spaceId), run.id, "sleeping");
+		expect(await holders(at)).toEqual({ "zac-docker-stack": run.id });
+		const firstExpiry = await expiryOf();
+		// The first daemon dies a minute and a half after its last renewal.
+		dies.abort();
+		at += 90_000;
+		// The new daemon starts while its link to the Host is down.
+		host.link.up = false;
+		const before = host.link.renewals;
+		const ends = new AbortController();
+		const second = engineWith(host, { ...clock, signal: ends.signal });
+		try {
+			const space = second.space(sandbox.spaceId);
+			expect((await space.getRun(run.id)).status).toBe("sleeping");
+			// The renewal at the start does not reach the Host.
+			await waitFor(() => host.link.renewals > before, {
+				label: "the renewal at the start",
+			});
+			expect(await expiryOf()).toBe(firstExpiry);
+			// The link comes up: the Device tells the engine.
+			host.link.up = true;
+			await second.hostBack();
+			expect(await expiryOf()).toBeGreaterThan(firstExpiry);
+			// Past the first ttl, before the new daemon's first minute is up.
+			at += 60_000;
 			expect(await holders(at)).toEqual({ "zac-docker-stack": run.id });
 		} finally {
 			ends.abort();
