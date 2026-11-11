@@ -64,7 +64,7 @@ Last updated: 2026-11-11
 - A step runs in one repo. A cross-repo change is two steps.
 - Put a tenant id on every row: `space_id`, the Space (a Better Auth organization). No query of a person crosses a Space. Only background work (the walk, recovery, the scheduler) reads every Space. It writes each row with its own Space.
 - Validate every flow with the published zod schema before a run starts. A schema error stops the run.
-- The app holds secrets in the OS keychain. Prefer the CLI's own login over a stored token.
+- A secret has a scope: Personal, the Space, the Project or this computer (ADR 13, ADR 18). The Host keeps the first three, encrypted. A computer without a Host keeps them itself. A secret of this computer stays in its OS keychain. Prefer the CLI's own login over a stored token.
 - A step that runs unattended ends with a structured report. It never waits for a person mid-session.
 - No PTY. A session is a structured event stream.
 
