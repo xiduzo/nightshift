@@ -1,6 +1,6 @@
 # Agents and profiles
 
-An Agent node names the coding agent that it runs on. Agents run with your own CLI logins. One flow can mix them.
+An Agent node names the agent that it runs on. Agents run with your own CLI logins. One flow can mix them.
 
 ## Agents
 
@@ -17,15 +17,15 @@ An Agent node names the coding agent that it runs on. Agents run with your own C
 | **pi** | Needs pi 0.81 or later. Model: provider/model, for example ollama/qwen3-coder:latest. | No | Prompts and code go to the model provider set in pi. With a local model, they stay on this computer. |
 <!-- /generated:harnesses -->
 
-Every real night so far runs on Claude Code. pi is verified with an Ollama model.
+All real work so far runs on Claude Code. pi is verified with an Ollama model.
 
-"Night Shift's own tools" are the tools that Night Shift gives a session, such as knowledge search. An agent without them still works on the code.
+"Night Shift's own tools" are the tools that Night Shift gives a session, such as knowledge search. An agent without them still works on the project files.
 
 Any other agent that speaks the Agent Client Protocol works too. Add it on the Agents page as a custom agent, with its command, for example `goose acp`.
 
 ## Profiles
 
-A profile holds an agent's setup under one name: the agent, the model, the effort, and the permission mode. A Model Profile holds the model of a Decision or a Value. You make profiles on the Agents page of each computer.
+A profile holds an agent's setup under one name: the agent, the model, the effort, and the permission mode. A Model Profile holds the [decider](Flows-and-nodes.md#deciders) and the model of a Decision or a Value. Deciders include TypeSafe Jev, OpenAI Decisions, and Ollama on this computer. You make profiles on the Agents page of each computer.
 
 A profile belongs to its computer. A node names the profile and its computer, for example "builder on LE2316". Night Shift never looks for a profile of the same name on another computer.
 
@@ -33,7 +33,7 @@ A Model Profile can name an address, for a model on your own server. See [A mode
 
 ### Permission modes
 
-An unattended night needs **Auto**. Auto approves safe actions, such as tests, reads, and edits, and blocks risky ones.
+A run without you needs **Auto**. Auto approves safe actions, such as tests, reads, and edits, and blocks risky ones.
 
 **Accept edits** and **Ask for each tool** cannot run shell commands, such as `git commit`, when nobody is there to approve them. The flow editor warns about an Agent node whose profile uses one of these modes.
 

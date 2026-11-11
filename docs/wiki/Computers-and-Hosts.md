@@ -57,7 +57,7 @@ A Space shares projects, runs, Gates, and secrets with the people you invite. Ea
 | Owner | Everything an admin can, and delete the Space. |
 | Admin | Everything a member can. Invite people, change roles, and remove Members on the Members page. |
 | Member | Start runs, answer Gates, add projects, and save flows. |
-| Viewer | Read only. |
+| Viewer | Read only. A viewer sees Gates, but cannot answer them. |
 
 A Host is invitation-only. Nobody makes an account without an invitation link from a Member.
 

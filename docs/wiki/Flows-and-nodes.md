@@ -2,21 +2,24 @@
 
 A flow is a graph of steps. Each step is a node. Each edge leaves a node on a named outcome, such as `pass`, `fail`, or `approved`. The engine walks the graph. A model never adds a node or changes the graph during a run, and every loop has a maximum count.
 
-This is the `plan-and-build` starter:
+This is the `scout-and-pick` starter. An agent finds candidates for a topic, you pick one, and another agent writes a report on it:
 
 ```mermaid
 flowchart LR
-  planner["🤖 Plan"]
-  clarify["✋ Gate<br/><sub>the goal is unclear</sub>"]
-  any_tasks["⑂ Any tasks?"]
-  build["⤵ Build each task<br/><sub>build-task</sub>"]
-  review["🤖 Review"]
+  scout["🤖 Find candidates"]
+  nothing["⏹ Nothing found"]
+  pick["✋ Ask<br/><sub>pick one</sub>"]
+  picked["⑂ Picked one?<br/><sub>a rule</sub>"]
+  skipped["⏹ You picked none"]
+  write["🤖 Write the report<br/><sub>Sonnet, then Opus</sub>"]
+  save["⚙ Save to the knowledge"]
 
-  planner -- planned --> any_tasks
-  planner -- unclear --> clarify
-  clarify -- answered --> planner
-  any_tasks -- has-tasks --> build
-  build -- "done / halted" --> review
+  scout -- none --> nothing
+  scout -- found --> pick
+  pick -- pass --> picked
+  picked -- none --> skipped
+  picked -- picked --> write
+  write -- pass --> save
 ```
 
 ## Node types
@@ -24,8 +27,8 @@ flowchart LR
 <!-- checked:nodes: every node type has one row. bun run docs:reference checks it. -->
 | Node | Does |
 | --- | --- |
-| **Agent** | Runs one coding-agent session with a prompt, and optionally a skill. Ends with an outcome and, if you ask, data that matches a JSON schema. It can ask you a question and continue the same session with your answer. |
-| **Command** | Runs a shell command in the project, for example the tests. Its exit code picks the outcome. |
+| **Agent** | Runs one agent session with a prompt, and optionally a skill. Ends with an outcome and, if you ask, data that matches a JSON schema. It can ask you a question and continue the same session with your answer. |
+| **Command** | Runs a shell command in the project, for example `curl` to call an API, or the tests. Its exit code picks the outcome. |
 | **Tool** | Calls one tool of an MCP server with typed arguments. No model in the loop. |
 | **Decision** | Picks one of its options. A person picks it in a **Gate**, a rule picks it in a **Branch**, or a model picks it. |
 | **Value** | Makes data that matches a JSON schema, from a rule, a model, or a person. A person gets an **Ask**: a form in the inbox. |
@@ -40,7 +43,7 @@ flowchart LR
 ### Agent
 
 - **Prompt and skill.** With a skill, the agent gets `/<skill> <prompt>`.
-- **Outcomes.** An Agent can declare its own outcomes, such as `approved` and `changes-requested`, in place of `pass` and `fail`.
+- **Outcomes.** An Agent can declare its own outcomes, such as `found` and `noise`, in place of `pass` and `fail`.
 - **Output.** A JSON schema for the step's data. A step whose data does not match the schema fails.
 - **Ask a person.** An agent that needs input opens a Gate. Your answer goes back to the same session.
 - **Backups.** Other profiles, on other computers, that take the step when its computer is offline. See [Agents and profiles](Agents-and-profiles.md#backups).
@@ -58,7 +61,7 @@ A Decision or a Value that a model decides can have a cascade too. A model's pic
 - Template values arrive as environment variables, never as shell text. So `sh -c "{{check}}"` runs the input `check` as a command, and a value cannot inject shell code.
 - Secrets arrive as environment variables too.
 - JSON that the command writes to `$NS_OUTPUT` is its data. `{"outcome": "approved"}` picks the outcome.
-- `{"scores": {"coverage": 81}}` in that data scores the run. Flow health shows the scores of each flow.
+- `{"scores": {"found": 4}}` in that data scores the run. Flow health shows the scores of each flow.
 - `$NS_KNOWLEDGE` is the project's [knowledge](Knowledge.md) folder.
 
 ### Decision
@@ -67,7 +70,15 @@ A Decision or a Value that a model decides can have a cascade too. A model's pic
 | --- | --- | --- |
 | A person | **Gate** | You pick an option in the inbox or on the phone. A deadline picks an option for you when nobody answers in time. |
 | A rule | **Branch** | It takes the first option whose JSONata rule holds. |
-| A model | **Decision** | A model picks an option, with its confidence. |
+| A model | **Decision** | A [decider](#deciders) picks an option, with its confidence. |
+
+### Deciders
+
+A decider is the model of a Decision or a Value that a model decides. You choose it in a Model Profile on the Agents page.
+
+For most choices, start with a small decision model, such as TypeSafe Jev. It is fast and cheap, because it only picks. In a Decision, it can pick only one of the node's options. It writes no text and adds no step.
+
+A pick below the confidence that you set goes to the next tier of the [cascade](#cascade): a large model, or you. To run a decider on your own server, see [A model on your own server](https://github.com/xiduzo/nightshift/blob/main/docs/deploy/local-models.md).
 
 ### Wait
 
@@ -75,7 +86,7 @@ A Wait ends on its own outcomes. A command or a signal can pick one. Every Wait 
 
 ### Subflow
 
-A Subflow runs another flow of the project, or a kit. With a list, it runs the flow once per item. The list can come from a planner's data, such as `{{planner.data.tasks}}`, from a command such as `gh`, or from the files that match a glob. Each item can get its own branch, stacked on the item before, or all items share one branch.
+A Subflow runs another flow of the project, or a kit. With a list, it runs the flow once per item. The list can come from a planner's data, such as `{{planner.data.tasks}}`. It can also come from a command such as `gh` or `curl`, or from the files that match a glob. Each item can get its own branch, stacked on the item before, or all items share one branch.
 
 ### Lease and Service
 
@@ -94,7 +105,9 @@ Steps read earlier values through templates:
 - `{{planner.data.tasks}}`: a field of the data of the step `planner`.
 - `{{run.branch}}`: a fact of the run.
 
-Two or more edges on one outcome run their branches at once. A Join waits for them. A variable can keep its value from one run to the next.
+Two or more edges on one outcome run their branches at once. A Join waits for them.
+
+A variable with **Keep between runs** starts each run with the value that the last run left. Use it to remember what a run saw already.
 
 ## The editor
 
@@ -104,7 +117,7 @@ Two or more edges on one outcome run their branches at once. A Join waits for th
 - **Issues** at the bottom of the canvas lists the errors and warnings of the flow.
 - **Revisions.** Every save is a revision. You see who saved what, and from which computer. You can restore an earlier revision.
 
-Night Shift keeps your flows. A team repository needs no Night Shift files. To move a flow, export it and import it in another project. The import asks which of your profiles takes each agent of the flow.
+Night Shift keeps your flows outside your project folder. Your project needs no Night Shift files. To move a flow, open its ⋯ menu in the editor and choose **Export as file**. Then choose **Import flow** on the Flows page of another project. The import asks which of your profiles takes each agent of the flow.
 
 ## Build a flow with an agent
 
@@ -120,7 +133,7 @@ You choose the agent that answers: a profile, or an agent and a model.
 
 Kits are small flows that ship with Night Shift. A Subflow runs one by its name, for example `kit:github/publish-draft-pr`. To change a kit, copy it into the project. The copy is a flow of your own.
 
-Night Shift knows no issue tracker. GitHub, Linear, or Jira is a command in your flow, and the kits wrap the common ones on `git`, `gh`, and `acli`.
+Night Shift has no app catalog. An app is a command in your flow, such as `gh`, `acli`, or `curl`, or a tool of the agent. The kits wrap common steps on `git`, `gh`, and `acli`.
 
 <!-- generated:kits: bun run docs:reference writes this table from the code. Do not edit it here. -->
 | Kit | Does | Inputs |

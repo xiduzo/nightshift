@@ -6,6 +6,15 @@ An unattended run never blocks on a question in the middle of a session. What ne
 
 A Gate is a Decision that a person picks. It shows the question and its options. The run continues on the option that you pick.
 
+A Gate has two jobs:
+
+- **Fallback.** A rule and a decider make the choices that they can. A Gate gets the rest: the ladder ran out, or a decider was not sure enough.
+- **Approval.** You say yes before an act that you cannot undo, such as a sent mail, a published post, or a merge.
+
+Give every other choice to a rule or a decider. A Gate on every result puts you back in the loop. See [Deciders](Flows-and-nodes.md#deciders).
+
+A Gate holds more than a question:
+
 - **A title.** A short title of at most 80 characters is the heading in the inbox. The question below it holds the details and the lists.
 - **A note.** Add a note to your answer. The next steps read it.
 - **Files.** Add up to 10 files to an answer, 10 MB together. The next agent steps of the run get them.
@@ -39,12 +48,14 @@ The phone answers simple Asks too.
 
 ## The inbox
 
+Every person in a Space gets its Gates and Asks in their inbox. An owner, an admin, or a member can answer. A viewer sees them, but cannot answer. See [Spaces](Computers-and-Hosts.md#spaces).
+
 The inbox shows the Gates and Asks that wait for you, in every project. They are in three groups: Now, Today and When you have time. The oldest Gate is first in each group. Below them are the Gates that you answered. Night Shift keeps answered Gates for 90 days.
 
 Open a Gate to read its brief. Your answer is on the right: pick an option, add a note if you want, then send. The option that the flow recommends has a badge.
 
 A Gate sends a notification only for the levels that you choose. Go to Settings, Notifications, and set **Push for**. The default is Now. A Gate of another level waits in the inbox without a notification.
 
-Home shows what happened in the night: the runs that ended, and what still waits.
+Home shows what needs you in every project: the runs that work now, the Gates that wait, and the flows that failed.
 
 An agent in a terminal reads the same inbox with the `needs_me` tool, and answers a Gate with `answer_gate`. See [Terminal and MCP](Terminal-and-MCP.md).
