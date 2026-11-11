@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+	<title>Example log</title>
+	<subtitle>Notes from the team</subtitle>
+	<id>urn:example:log</id>
+	<updated>2026-11-10T09:00:00Z</updated>
+	<link rel="self" href="https://example.com/log.atom"/>
+	<link rel="alternate" href="https://example.com/log"/>
+	<entry>
+		<title>Release 2.0</title>
+		<id>urn:example:log:2</id>
+		<link rel="alternate" href="https://example.com/log/2"/>
+		<published>2026-11-09T12:00:00+01:00</published>
+		<updated>2026-11-10T09:00:00Z</updated>
+		<summary>What is new in 2.0</summary>
+		<content type="html">&lt;ul&gt;&lt;li&gt;Faster&lt;/li&gt;&lt;/ul&gt;</content>
+		<author><name>Bo</name></author>
+		<category term="release" label="Releases"/>
+	</entry>
+</feed>

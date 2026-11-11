@@ -3,6 +3,7 @@ import type {
 	AgentNode,
 	CallNode,
 	CommandNode,
+	ConvertNode,
 	DecisionNode,
 	EndNode,
 	FlowNode,
@@ -77,6 +78,8 @@ const service = (fields: Record<string, unknown> = {}) =>
 		ready: { url: "http://127.0.0.1:8080" },
 		...fields,
 	});
+const convert = () =>
+	node<ConvertNode>({ type: "convert", from: "csv", to: "json", value: "a" });
 
 const sinceLastRun = (fields: Record<string, unknown> = {}) =>
 	node<SinceLastRunNode>({
@@ -98,6 +101,7 @@ const ALL_TYPES: FlowNodeType[] = [
 	"lease",
 	"service",
 	"since-last-run",
+	"convert",
 ];
 
 describe("NODE_KINDS", () => {
@@ -122,6 +126,7 @@ describe("NODE_KINDS", () => {
 			lease(),
 			service(),
 			sinceLastRun(),
+			convert(),
 		]) {
 			expect(kindOf(n)).toBe(kindOfType(n.type));
 		}
@@ -150,6 +155,7 @@ describe("make and resumeRules", () => {
 			[lease(), RESUME_RULES.wait],
 			[service(), RESUME_RULES.fresh],
 			[sinceLastRun(), RESUME_RULES.fresh],
+			[convert(), RESUME_RULES.fresh],
 		];
 		for (const [n, rules] of table) {
 			expect(typeof kindOf(n).make).toBe("function");
@@ -198,6 +204,7 @@ describe("aux: the auxiliary graph nodes compile.ts adds", () => {
 		expect(auxKinds(decision("rule"))).toEqual([]);
 		expect(auxKinds(value("rule"))).toEqual([]);
 		expect(auxKinds(sinceLastRun())).toEqual([]);
+		expect(auxKinds(convert())).toEqual([]);
 	});
 });
 
@@ -211,7 +218,13 @@ describe("isChosenEnd and endReason: what route() does with no edge", () => {
 	const endedAt = (outcome: string) => `Ended at node "n" with "${outcome}".`;
 
 	test("pass is a chosen end and the plain end for an Agent, a Tool and a Value; fail and needs-input are not", () => {
-		for (const n of [agent(), tool(), value("rule"), value("model")]) {
+		for (const n of [
+			agent(),
+			tool(),
+			value("rule"),
+			value("model"),
+			convert(),
+		]) {
 			expect(chosen(n, "pass")).toBe(true);
 			expect(reason(n, "pass")).toBeNull();
 			expect(chosen(n, "fail")).toBe(false);
@@ -593,5 +606,6 @@ describe("works: what a step needs of its Device", () => {
 		expect(works(call())).toBeNull();
 		expect(works(end())).toBeNull();
 		expect(works(sinceLastRun())).toBeNull();
+		expect(works(convert())).toBeNull();
 	});
 });

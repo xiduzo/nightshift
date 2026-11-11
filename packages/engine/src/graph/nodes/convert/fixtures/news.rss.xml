@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+	<channel>
+		<title>Example news</title>
+		<link>https://example.com/</link>
+		<description>What happened today</description>
+		<item>
+			<title>The park opens</title>
+			<link>https://example.com/park</link>
+			<description>&lt;p&gt;The new park opens on Saturday.&lt;/p&gt;</description>
+			<content:encoded><![CDATA[<p>The new park opens on <b>Saturday</b>.</p>]]></content:encoded>
+			<guid isPermaLink="false">news-1</guid>
+			<pubDate>Tue, 10 Nov 2026 08:30:00 GMT</pubDate>
+			<dc:creator>Ann Lee</dc:creator>
+			<category>city</category>
+		</item>
+		<item>
+			<title>Rates stay the same</title>
+			<link>https://example.com/rates</link>
+			<pubDate>not a date</pubDate>
+		</item>
+	</channel>
+</rss>

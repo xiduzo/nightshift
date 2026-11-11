@@ -149,6 +149,19 @@ export type ValueEvent =
 	| { type: "value"; data: JsonValue | null; problem: string | null };
 
 /**
+ * What a Convert step writes to its transcript: the formats, how many bytes
+ * it read, and why it made nothing (`problem`), or null. The result itself
+ * is in the step's outputs.
+ */
+export type ConvertEvent = {
+	type: "convert";
+	from: string;
+	to: string;
+	bytes: number;
+	problem: string | null;
+};
+
+/**
  * What a Tool step writes to its transcript: the call it makes (arguments
  * rendered, never the server's config) and what the tool answered. `data`
  * is the structured content, else the JSON the text holds, else null.
@@ -223,6 +236,7 @@ export type StepEvent =
 	| ForEachEvent
 	| WaitEvent
 	| ValueEvent
+	| ConvertEvent
 	| ToolEvent
 	| EndEvent
 	| LeaseEvent

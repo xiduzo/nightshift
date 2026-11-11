@@ -1,0 +1,17 @@
+{
+	"version": "https://jsonfeed.org/version/1.1",
+	"title": "Example notes",
+	"home_page_url": "https://example.com/notes",
+	"description": "Short notes",
+	"items": [
+		{
+			"id": "note-3",
+			"url": "https://example.com/notes/3",
+			"title": "A note",
+			"content_text": "Plain text of the note.",
+			"date_published": "2026-11-07T10:00:00Z",
+			"authors": [{ "name": "Dee" }],
+			"tags": ["misc", "ideas"]
+		}
+	]
+}

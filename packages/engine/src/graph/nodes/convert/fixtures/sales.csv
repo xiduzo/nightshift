@@ -1,0 +1,6 @@
+﻿region;amount;note
+north;007;"first; with a delimiter"
+south;80;"two
+lines"
+
+east;15

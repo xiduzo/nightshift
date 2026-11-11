@@ -262,6 +262,10 @@ function lineOf(event: TranscriptEntry["event"]): string {
 			return `Answer: ${event.choice}${event.note ? `. ${event.note}` : ""}`;
 		case "value":
 			return event.problem ? `Value problem: ${event.problem}` : "";
+		case "convert":
+			return event.problem
+				? `Convert ${event.from} to ${event.to} failed: ${event.problem}`
+				: `Converted ${event.from} to ${event.to} (${event.bytes} bytes)`;
 		case "tool-called":
 			return `${event.isError ? "tool error: " : ""}${cut(event.text, 300)}`;
 		case "wait":

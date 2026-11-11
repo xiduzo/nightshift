@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<order id="A-1" status="open">
+	<customer>Ann &amp; Co</customer>
+	<line sku="007">Tea</line>
+	<line sku="008">Cups</line>
+	<total>012.50</total>
+</order>

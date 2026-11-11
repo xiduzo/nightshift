@@ -270,6 +270,7 @@ const stepSummarySchema = z.object({
 		"lease",
 		"service",
 		"since-last-run",
+		"convert",
 	]),
 	visit: z.number(),
 	startedAt: z.number(),
@@ -568,6 +569,13 @@ const stepEventSchema = z.discriminatedUnion("type", [
 	z.object({
 		type: z.literal("value"),
 		data: z.json(),
+		problem: z.string().nullable(),
+	}),
+	z.object({
+		type: z.literal("convert"),
+		from: z.string(),
+		to: z.string(),
+		bytes: z.number(),
 		problem: z.string().nullable(),
 	}),
 	z.object({

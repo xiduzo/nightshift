@@ -28,8 +28,17 @@
 		"@nightshift/time": "workspace:*",
 		"ajv": "^8.20.0",
 		"drizzle-orm": "catalog:",
+		"fast-xml-parser": "5.11.2",
+		"feedsmith": "3.0.1",
+		"html-to-text": "10.0.1",
 		"mammoth": "1.13.0",
+		"markdown-table": "3.0.4",
+		"mdast-util-from-markdown": "2.1.0",
+		"mdast-util-gfm-table": "2.0.0",
+		"mdast-util-to-string": "4.0.0",
+		"micromark-extension-gfm-table": "2.1.2",
 		"ollama": "0.6.4",
+		"papaparse": "5.7.0",
 		"unpdf": "2.1.0",
 		"yjs": "catalog:",
 		"zod": "catalog:"
@@ -37,6 +46,9 @@
 	"devDependencies": {
 		"@nightshift/config": "workspace:*",
 		"@types/bun": "catalog:",
+		"@types/html-to-text": "9.0.4",
+		"@types/mdast": "4.0.4",
+		"@types/papaparse": "5.5.2",
 		"typescript": "catalog:"
 	}
 }

@@ -1,0 +1,11 @@
+# Settings of a watcher
+name: prices
+every_minutes: 30
+sources:
+  - url: https://example.com/a
+    tags: [shop, eu]
+  - url: https://example.com/b
+notify: true
+note: |
+  Two lines
+  of text

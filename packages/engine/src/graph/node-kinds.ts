@@ -4,6 +4,7 @@ import type { NodeKind } from "./context";
 import { AGENT } from "./nodes/agent";
 import { CALL } from "./nodes/call";
 import { COMMAND } from "./nodes/command";
+import { CONVERT } from "./nodes/convert/convert";
 import { DECISION } from "./nodes/decision";
 import { END } from "./nodes/end";
 import { JOIN } from "./nodes/join";
@@ -67,6 +68,7 @@ export const NODE_KINDS: { readonly [T in FlowNodeType]: KindOf<T> } = {
 	lease: LEASE,
 	service: SERVICE,
 	"since-last-run": SINCE_LAST_RUN,
+	convert: CONVERT,
 };
 
 /**
