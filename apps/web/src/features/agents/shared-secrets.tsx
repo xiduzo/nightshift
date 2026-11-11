@@ -78,7 +78,7 @@ import { connectionQueries, type SharedSecretActions } from "./queries";
 export type SharedSecretWords = {
 	/** The section's title. */
 	title: string;
-	/** Who the secrets belong to, in a title: "KEEZ", "this Space". */
+	/** Who the secrets belong to, in a title: "Acme", "this Space". */
 	owner: string;
 	/** What a person who can change the flows can do with it: they read it before they save one. */
 	trust: string;

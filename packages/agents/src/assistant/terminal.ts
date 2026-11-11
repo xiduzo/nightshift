@@ -250,7 +250,7 @@ export function terminalTools(
 		toolDefinition({
 			name: AUTHORING_TOOLS.listTools,
 			description:
-				"The CLI tools (an Agent node's `clis`) and connections (its `connections`, a Tool node's `connection`) of this computer. A command calls a CLI tool with a login (`signsIn`) by its name, such as acli-dimpact, to run its program signed in.",
+				"The CLI tools (an Agent node's `clis`) and connections (its `connections`, a Tool node's `connection`) of this computer. A command calls a CLI tool with a login (`signsIn`) by its name, such as acli-work, to run its program signed in.",
 			inputSchema: { type: "object", properties: {} },
 		}).server(async () => JSON.stringify(await port.tools(), null, 2)),
 		toolDefinition({

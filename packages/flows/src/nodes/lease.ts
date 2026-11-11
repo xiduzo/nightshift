@@ -9,7 +9,7 @@ import { holdScopeSchema, type NodeCheck, nodeBase } from "./base";
 
 /**
  * Takes the lease `name`, a template (`branch:{{pr.data.head}}`,
- * `zac-docker-stack`). Only one run of the Space holds a name at a time:
+ * `docker-stack`). Only one run of the Space holds a name at a time:
  * runs on different Devices of the Space take turns too. A run that holds
  * the name takes it again at once.
  *

@@ -31,7 +31,7 @@ export function commandOf(node: FlowNode): string | undefined {
 
 /**
  * The programs the node's command calls by their own name, such as `acli`,
- * that only tools of another name sign in to, such as `acli-dimpact`. A
+ * that only tools of another name sign in to, such as `acli-work`. A
  * command gets a tool with a login under the tool's name, so `acli` runs
  * without one. A tool named after its program, with a login, signs it in.
  */

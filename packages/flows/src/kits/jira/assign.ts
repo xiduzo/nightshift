@@ -23,7 +23,7 @@ export const jiraAssignKit: FlowInput = {
 			name: "tool",
 			type: "text",
 			description:
-				"The CLI tool that runs acli signed in, for example acli-dimpact. Each CLI tool with a login is one account.",
+				"The CLI tool that runs acli signed in, for example acli-work. Each CLI tool with a login is one account.",
 			default: "acli",
 		},
 	],

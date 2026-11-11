@@ -237,7 +237,7 @@ export const runLease = sqliteTable(
 	"run_lease",
 	{
 		spaceId: spaceId(),
-		/** The rendered name: `branch:feature/x`, `zac-docker-stack`. */
+		/** The rendered name: `branch:feature/x`, `docker-stack`. */
 		name: text("name").notNull(),
 		/** The run that holds it. No foreign key: the run may live on another Replica. */
 		runId: text("run_id").notNull(),
