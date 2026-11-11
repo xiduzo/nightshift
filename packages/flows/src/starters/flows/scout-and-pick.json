@@ -6,7 +6,7 @@
 			"name": "topic",
 			"type": "text",
 			"label": "Topic",
-			"description": "What to look for, for example \"PDF libraries for Bun\", \"open issues worth a first fix\" or \"papers on model routing\".",
+			"description": "What to look for, for example \"PDF libraries for Bun\", \"venues for a team day\" or \"papers on model routing\".",
 			"required": true
 		},
 		{
