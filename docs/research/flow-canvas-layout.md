@@ -90,7 +90,7 @@ gives real nesting with a contract. See §3.6 for the staged path.
 
 ### 1.4 The feature-factory flow, in numbers
 
-From `.nightshift/flows/feature-factory.json` in the ZAC clone:
+From `.nightshift/flows/feature-factory.json` in the client clone:
 
 - 20 nodes and 36 edges, but only 28 distinct node pairs. Six pairs carry
   14 edges between them: `design → spec` ×4 (found, none, unavailable,

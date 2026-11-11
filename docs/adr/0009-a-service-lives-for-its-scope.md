@@ -44,7 +44,7 @@ A service with a fixed port goes inside a Lease
 
 - A flow that tests against a local stack is: Lease, Service, the tests,
   and nothing to clean up by hand.
-- A kit per project can bring up its stack, for example a `zac/stack-up`
+- A kit per project can bring up its stack, for example a `acme/stack-up`
   flow. The kit's flow holds the commands, and the engine holds the
   life cycle.
 - A Service is not a deploy tool. A process that must outlive the run

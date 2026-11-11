@@ -18,7 +18,7 @@ stops the run, when the step fails, or when the computer restarts.
 ## Decision
 
 1. **A Lease node takes a named lease.** The name is a template, for
-   example `branch:{{pr.data.head}}` or `zac-docker-stack`. Only one run of
+   example `branch:{{pr.data.head}}` or `docker-stack`. Only one run of
    the Space holds a name at a time.
 2. **The Home Host keeps the leases.** Runs on different Devices of one
    Space exclude each other. A Device without the Host waits for it, as
