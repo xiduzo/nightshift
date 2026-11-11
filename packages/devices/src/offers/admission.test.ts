@@ -1,9 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { hostLink, user } from "@nightshift/db/schema";
-import type { Device, PlacedRun, SessionInput } from "@nightshift/engine";
+import {
+	createRunFolders,
+	type Device,
+	type PlacedRun,
+	type SessionInput,
+} from "@nightshift/engine";
 import {
 	createSpaceDocuments,
+	type ListedProject,
 	type SpaceDocuments,
 	worktreeLocation,
 } from "@nightshift/engine/projects";
@@ -35,11 +41,15 @@ const SPACE = "space-team";
 const ME = "person-on-host";
 const RUN = "abcdef12-0000-0000-0000-000000000000";
 const DEVICE = { id: "device-b", name: "hetzner-1" };
+/** A project of the Space without a folder (ADR 22): its runs work in a run folder. */
+const NO_FOLDER = "p-no-folder";
 
 let sandbox: Sandbox;
 let documents: SpaceDocuments;
 let admission: OfferAdmission;
 let worktree: string;
+/** The run's own run folder here, for a run of `NO_FOLDER`. */
+let runFolder: string;
 /** This computer's own Offers (its Device document), per test. */
 let own: DeviceOffer[];
 /** The calls this computer's Device ran. */
@@ -98,6 +108,10 @@ const device = {
 			baseRef: "main",
 		};
 	},
+	async runFolder() {
+		ran.push({ kind: "runFolder" });
+		return { worktreePath: runFolder, branch: "", baseRef: "", made: true };
+	},
 	async handOff() {
 		ran.push({ kind: "handOff" });
 		return { commit: "c", branch: "b" };
@@ -151,15 +165,30 @@ beforeEach(async () => {
 		carol: "member",
 	});
 	worktree = worktreeLocation(sandbox.repoPath, RUN.slice(0, 8)).worktreePath;
+	const runFolders = createRunFolders(sandbox.dataDir);
+	runFolder = runFolders.path(RUN);
 	admission = createOfferAdmission({
 		db: sandbox.db,
 		device,
 		documents,
-		// Its Clone of the Space's project.
+		// Its Clone of the Space's project, and a project without a folder.
 		projects: {
 			clonePath: async (projectId, spaceId) =>
 				projectId === "p1" && spaceId === SPACE ? sandbox.repoPath : null,
+			async find(projectId, spaceId) {
+				if (
+					spaceId !== SPACE ||
+					(projectId !== "p1" && projectId !== NO_FOLDER)
+				) {
+					throw new Error("Night Shift cannot find this project.");
+				}
+				return {
+					id: projectId,
+					folder: projectId === "p1",
+				} as ListedProject;
+			},
 		},
+		runFolders,
 		ownOffers: () => own,
 		// "coder", and "builder" that a test renames to "coder": by id.
 		profileFor: (id) =>
@@ -397,6 +426,34 @@ for (const [path, call] of Object.entries(paths)) {
 				"snapshotWorktree",
 				"worktreeChanges",
 			]);
+		});
+
+		test("another Person's run of a project without a folder: its run folder is its own folder, with no git work", async () => {
+			await offer();
+			const noFolder = (call: WorkRequest["call"]) =>
+				request({ projectId: NO_FOLDER, call });
+			expect(
+				await outcome(
+					noFolder({
+						kind: "runFolder",
+						run: { id: RUN, projectId: NO_FOLDER },
+					}),
+				),
+			).toBe("served");
+			expect(
+				await outcome(
+					noFolder(offered("Do the work.", { cwd: join(runFolder, "notes") })),
+				),
+			).toBe("served");
+			expect(await outcome(noFolder(offered()))).toBe(
+				"This device works only in the run's own folder.",
+			);
+			expect(
+				await outcome(noFolder({ kind: "snapshotWorktree", cwd: runFolder })),
+			).toBe(
+				"This project has no folder. Its runs work in a folder of their own, without git.",
+			);
+			expect(ran.map((r) => r.kind)).toEqual(["runFolder", "session"]);
 		});
 
 		test("an offered session runs the profile as its owner set it, the mode no wider than the cap", async () => {
@@ -647,6 +704,51 @@ describe("Offer admission, its owner's run", () => {
 				}),
 			),
 		).toBe("This device adds a folder only for the run that asks.");
+	});
+
+	test("a project without a folder needs no Clone: served in the run's run folder only", async () => {
+		const noFolder = (call: WorkRequest["call"]) =>
+			mine({ projectId: NO_FOLDER, call });
+		expect(
+			await serve(
+				noFolder({ kind: "runFolder", run: { id: RUN, projectId: NO_FOLDER } }),
+			),
+		).toBe("served");
+		expect(await serve(noFolder(exec(runFolder)))).toBe("served");
+		expect(await serve(noFolder(exec(join(runFolder, "out"))))).toBe("served");
+		for (const cwd of [worktree, `${runFolder}-other`, sandbox.dataDir]) {
+			expect(await serve(noFolder(exec(cwd)))).toBe(
+				"This device works only in the run's own folder.",
+			);
+		}
+		expect(
+			await serve(
+				noFolder({
+					kind: "runFolder",
+					run: { id: "another-run", projectId: NO_FOLDER },
+				}),
+			),
+		).toBe("This device adds a folder only for the run that asks.");
+		for (const call of [
+			{ kind: "worktree", run: { id: RUN, projectId: NO_FOLDER } },
+			{ kind: "handOff", cwd: runFolder, runBranch: "nightshift/abcdef12" },
+			{ kind: "worktreeChanges", cwd: runFolder, from: "tree-1" },
+		] as WorkRequest["call"][]) {
+			expect(await serve(noFolder(call))).toBe(
+				"This project has no folder. Its runs work in a folder of their own, without git.",
+			);
+		}
+		// A project with a folder works in its own copy instead.
+		expect(
+			await serve(
+				mine({
+					call: { kind: "runFolder", run: { id: RUN, projectId: "p1" } },
+				}),
+			),
+		).toBe(
+			"This project has a folder. Its runs work in their own copy of the project.",
+		);
+		expect(ran.map((r) => r.kind)).toEqual(["runFolder", "exec", "exec"]);
 	});
 
 	test("walked here, it is this computer as is: no Offer is in play", async () => {

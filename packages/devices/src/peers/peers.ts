@@ -154,6 +154,7 @@ export function createPeers(
 		device,
 		documents,
 		projects: context.projects,
+		runFolders: context.runFolders,
 		...(options.ownOffers ? { ownOffers: options.ownOffers } : {}),
 		profileFor: context.profiles.here,
 		...(options.offerUse ? { use: options.offerUse } : {}),

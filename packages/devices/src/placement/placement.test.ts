@@ -13,6 +13,7 @@ import {
 	user,
 } from "@nightshift/db/schema";
 import {
+	createRunFolders,
 	documentRows,
 	HostUnreachableError,
 	type OwnDevice,
@@ -117,6 +118,8 @@ const bDevice = (projectOf: () => string) =>
 			},
 			// Only B has the secret B_TOKEN.
 			connections: connectionsOf({ secrets: { B_TOKEN: "b-only-token" } }),
+			// B's own run folders, in its data folder (ADR 22).
+			runFolders: createRunFolders(b.dataDir),
 		},
 		B,
 	);
@@ -603,6 +606,61 @@ describe("a run whose Device is offline at the start", () => {
 		expect(run.branch).toBe("");
 		expect(await typesOf(started.id)).not.toContain("WorktreeCreated");
 	}, 20_000);
+});
+
+describe("a run of a project without a folder", () => {
+	test("works in a run folder of its own on each Device of its steps, with no Hand-off (ADR 22)", async () => {
+		const research = await space().addProjectWithoutFolder({
+			name: "Research",
+		});
+		// Every Device has the project: no Clone is needed.
+		expect(
+			(await space().listPlacements(research.id)).map((p) => p.deviceId),
+		).toContain(B);
+		const started = await space().startRun({
+			projectId: research.id,
+			flow: flow(
+				[
+					command("write", "pwd && echo notes > notes.txt", { device: B }),
+					command("read", "pwd && ls"),
+				],
+				[{ id: "e1", from: "write", outcome: "pass", to: "read" }],
+			),
+			startedBy: personId,
+		});
+		// The run's folder is on its Device, in that Device's data folder,
+		// with no branch and no base. B makes its own.
+		const onA = createRunFolders(a.dataDir).path(started.id);
+		const onB = createRunFolders(b.dataDir).path(started.id);
+		expect(started).toMatchObject({ runFolder: true, branch: "", baseRef: "" });
+		const created = (await a.db.select().from(event)).filter(
+			(e) => e.runId === started.id && e.type === "WorktreeCreated",
+		);
+		expect(created.map((e) => JSON.parse(e.payload))).toEqual([
+			{ worktreePath: onA, branch: "", baseRef: "" },
+		]);
+		const run = await until(started.id, "finished");
+		expect(run.steps.map((s) => [s.nodeId, s.device?.id])).toEqual([
+			["write", B],
+			["read", run.device.id],
+		]);
+		expect(String(run.steps[0]?.outputs.log_tail).trim()).toBe(onB);
+		// A has a folder of its own: B's file is not there.
+		expect(String(run.steps[1]?.outputs.log_tail).trim()).toBe(onA);
+		expect(existsSync(join(onB, "notes.txt"))).toBe(true);
+		expect(existsSync(join(onA, "notes.txt"))).toBe(false);
+		expect(
+			(await a.db.select().from(event)).filter((e) => e.type === "HandedOff"),
+		).toEqual([]);
+		const kinds = requests.map((r) => r.call.kind);
+		expect(kinds).toContain("runFolder");
+		expect(kinds).not.toContain("worktree");
+		expect(kinds).not.toContain("snapshotWorktree");
+		// The run says from the start that each Device has its own folder.
+		expect(run.warnings.map((w) => w.message)).toContain(
+			"The steps of this run work in folders on studio-b and test. Each device has its own folder, so the files of one are not on the other.",
+		);
+	});
 });
 
 describe("nodes placed on Devices, with the Hand-off", () => {
@@ -1241,6 +1299,8 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 	async function deviceInHostSpace(options: {
 		role?: "home" | "guest";
 		devices?: () => Promise<OwnDevice[]>;
+		/** The project has a folder. Default: yes. */
+		folder?: boolean;
 	}) {
 		await b.db.insert(hostLink).values({
 			hostId: HOST,
@@ -1271,7 +1331,8 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 			hostSpaces: createHostSpaces(b.db),
 			// The laptop has a Clone, as the Space document B keeps says.
 			projects: {
-				find: async () => ({ repoPath: null }) as ListedProject,
+				find: async () =>
+					({ repoPath: null, folder: options.folder ?? true }) as ListedProject,
 				clones: async (_spaceId, projectId) =>
 					projectId === "p-shared"
 						? [{ deviceId: "laptop", deviceName: "laptop.local" }]
@@ -1341,6 +1402,27 @@ describe("the owner's other Devices in a Space of the home Host", () => {
 		expect(devices.slice(1).map((d) => [d.deviceId, d.profiles])).toEqual([
 			["laptop", LAPTOP_PROFILES],
 			["theirs", undefined],
+		]);
+		await spaceDocuments.flush();
+	});
+
+	test("a project without a folder: every Device has it, also when a Host of an older version says no (ADR 22)", async () => {
+		const { placement, spaceDocuments } = await deviceInHostSpace({
+			folder: false,
+			devices: async () => [
+				{
+					deviceId: "laptop",
+					name: "Laptop",
+					thisDevice: false,
+					online: true,
+					hasClone: false,
+				},
+			],
+		});
+		const devices = await placement.devicesFor(SPACE, ON_HOST, "p-research");
+		expect(devices.map((d) => [d.deviceId, d.hasClone])).toEqual([
+			[b.deviceId, true],
+			["laptop", true],
 		]);
 		await spaceDocuments.flush();
 	});

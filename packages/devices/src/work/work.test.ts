@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { clone, hostLink, project, user } from "@nightshift/db/schema";
-import type { Device, SessionInput } from "@nightshift/engine";
+import {
+	createRunFolders,
+	type Device,
+	type SessionInput,
+} from "@nightshift/engine";
 import {
 	createSpaceDocuments,
 	type SpaceDocuments,
@@ -219,6 +223,7 @@ describe("the work server", () => {
 			device,
 			documents,
 			projects: engine.projects,
+			runFolders: createRunFolders(sandbox.dataDir),
 			ownOffers: () => own,
 			profileFor: (name) =>
 				name === "coder"

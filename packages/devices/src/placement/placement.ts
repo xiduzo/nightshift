@@ -66,7 +66,15 @@ import { remoteDevice } from "../work";
  *   (`placement/` there).
  *
  * The placed Device checks every call again itself.
+ *
+ * A project without a folder needs no Clone (ADR 22): every Device "has"
+ * it (`hasClone`), also in the list of a Host of a version before it.
  */
+
+/** Whether a Device can work for the project: it has a Clone, or the project needs none (ADR 22). */
+function hasProject(project: ListedProject, hasClone: boolean): boolean {
+	return hasClone || project.folder === false;
+}
 
 export type PlacementDeps = {
 	db: Database;
@@ -206,7 +214,7 @@ export function createPlacement(deps: PlacementDeps) {
 			name: device.name,
 			thisDevice: true,
 			online: true,
-			hasClone: project.repoPath !== null,
+			hasClone: hasProject(project, project.repoPath !== null),
 			...(deps.ownProfiles ? { profiles: [...deps.ownProfiles()] } : {}),
 		};
 		if ((await hostSpaces.hostOf(spaceId)) !== null) {
@@ -243,7 +251,7 @@ export function createPlacement(deps: PlacementDeps) {
 							copy.name ?? deviceNameIn(document, copy.deviceId) ?? "Device",
 						thisDevice: false,
 						online: false,
-						hasClone: withClone.has(copy.deviceId),
+						hasClone: hasProject(project, withClone.has(copy.deviceId)),
 						profiles: copy.profiles,
 					})),
 				];
@@ -263,6 +271,8 @@ export function createPlacement(deps: PlacementDeps) {
 						return {
 							...d,
 							thisDevice: false,
+							// A Host of a version before ADR 22 says no for a project without a folder.
+							hasClone: hasProject(project, d.hasClone),
 							...(profiles ? { profiles } : {}),
 						};
 					}),
@@ -281,7 +291,7 @@ export function createPlacement(deps: PlacementDeps) {
 				name: d.name,
 				thisDevice: false,
 				online: await work.online(d.id, spaceId),
-				hasClone: withClone.has(d.id),
+				hasClone: hasProject(project, withClone.has(d.id)),
 				...(d.dev ? { dev: true } : {}),
 				...(profiles ? { profiles } : {}),
 			});
@@ -302,6 +312,7 @@ export function createPlacement(deps: PlacementDeps) {
 		projectId: string,
 		own: readonly OwnDevice[],
 	): Promise<OwnDevice[]> {
+		const project = await deps.projects.find(projectId, spaceId);
 		const document = await documents.open(spaceId);
 		const withClone = new Set(
 			(await deps.projects.clones(spaceId, projectId)).map((c) => c.deviceId),
@@ -341,7 +352,7 @@ export function createPlacement(deps: PlacementDeps) {
 				offers,
 				profiles,
 				online: await work.online(id, spaceId),
-				hasClone: withClone.has(id),
+				hasClone: hasProject(project, withClone.has(id)),
 			});
 		}
 		return others;
@@ -432,7 +443,7 @@ export function createPlacement(deps: PlacementDeps) {
 			id: device.id,
 			name: device.name,
 			thisDevice: true,
-			hasClone: project.repoPath !== null,
+			hasClone: hasProject(project, project.repoPath !== null),
 			// Another Person's run here uses this computer through its Offers.
 			...(starter !== null && starter !== owner
 				? {

@@ -4,26 +4,29 @@ import type {
 	ValueInput,
 	ValueResult,
 } from "@nightshift/agents/types";
-import type {
-	Capabilities,
-	Device,
-	ExecEvent,
-	ExecInput,
-	OfferedSessionInput,
-	SessionEvent,
-	SessionInput,
-	ToolResult,
-	Worktree,
-	WorktreeChanges,
+import {
+	type Capabilities,
+	type Device,
+	type ExecEvent,
+	type ExecInput,
+	noRunFolders,
+	type OfferedSessionInput,
+	type RunFolder,
+	type SessionEvent,
+	type SessionInput,
+	type ToolResult,
+	type Worktree,
+	type WorktreeChanges,
 } from "@nightshift/engine";
 import type { FlowSources } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
-import type {
-	WorkCall,
-	WorkFor,
-	WorkRelay,
-	WorkReply,
-	WorkRequest,
+import {
+	UNREADABLE_REQUEST,
+	type WorkCall,
+	type WorkFor,
+	type WorkRelay,
+	type WorkReply,
+	type WorkRequest,
 } from "../contract";
 
 /**
@@ -81,6 +84,7 @@ export const CALL_DEADLINES_MS: Partial<Record<WorkCall["kind"], number>> = {
 	itemBranch: 2 * 60_000,
 	snapshotWorktree: 2 * 60_000,
 	worktreeChanges: 2 * 60_000,
+	runFolder: 60_000,
 	// Git work on a large project can take minutes.
 	worktree: 3 * 60_000,
 	handOff: 3 * 60_000,
@@ -238,6 +242,17 @@ export function remoteDevice(
 		},
 		decide,
 		worktree: (run) => once<Worktree>({ kind: "worktree", run }),
+		// A Device of an older Night Shift cannot read the call: it says to update it.
+		async runFolder(run) {
+			try {
+				return await once<RunFolder>({ kind: "runFolder", run });
+			} catch (error) {
+				if (error instanceof Refusal && error.message === UNREADABLE_REQUEST) {
+					throw new Refusal("conflict", noRunFolders(device.name));
+				}
+				throw error;
+			}
+		},
 		handOff: (input) =>
 			once<{ commit: string; branch: string }>({ kind: "handOff", ...input }),
 		receiveHandOff: (input) =>
@@ -301,6 +316,12 @@ export async function* serveWork(
 				return;
 			case "worktree":
 				yield result(await device.worktree(call.run));
+				return;
+			case "runFolder":
+				if (!device.runFolder) {
+					throw new Refusal("conflict", noRunFolders(device.name));
+				}
+				yield result(await device.runFolder(call.run));
 				return;
 			case "itemBranch":
 				yield result(

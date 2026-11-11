@@ -3,8 +3,10 @@ import type { Database } from "@nightshift/db";
 import type {
 	Device,
 	OfferedSessionInput,
+	PeerContext,
 	PeerProjects,
 	PlacedRun,
+	RunRef,
 	SessionInput,
 } from "@nightshift/engine";
 import {
@@ -48,7 +50,8 @@ import {
  * - The call is one an Offer allows: a session of an offered profile, or
  *   the run's own folder work (`offeredCallRefusal`).
  * - The call works in this computer's Clone of the project, and only in
- *   the run's own worktree.
+ *   the run's own worktree. For a project without a folder (ADR 22): only
+ *   in the run's own run folder here, and with no git work.
  * - An offered session runs the profile as its owner set it, with the
  *   permission mode no wider than the Offer's cap (`offeredSession`), and
  *   waits for one of the Offer's sessions while it runs its session cap.
@@ -114,8 +117,13 @@ export function createOfferAdmission(deps: {
 	/** This computer as a Device: it serves every admitted call. */
 	device: Device;
 	documents: SpaceDocuments;
-	/** The folder of a project's Clone on this computer: a call that works in it needs one. */
-	projects: Pick<PeerProjects, "clonePath">;
+	/**
+	 * The folder of a project's Clone on this computer: a call that works in
+	 * it needs one. A project without a folder needs none (`find`).
+	 */
+	projects: Pick<PeerProjects, "clonePath" | "find">;
+	/** The runs' own folders here: where a run of a project without a folder works. */
+	runFolders: PeerContext["runFolders"];
 	/**
 	 * This computer's own Offers (its Device document), with the names
 	 * their profiles have now. Without it, none.
@@ -195,29 +203,70 @@ export function createOfferAdmission(deps: {
 			if (refusal !== null) return refuse(refusal);
 		}
 		if (!NEEDS_CLONE.has(call.kind)) return { offers };
-		const repoPath = await deps.projects.clonePath(projectId, spaceId);
-		if (repoPath === null) {
-			return refuse(
-				"This device does not have this project. Add its folder there first.",
-			);
-		}
+		const own = await ownFolder(request);
+		if ("refusal" in own) return own;
 		if (
-			(call.kind === "worktree" || call.kind === "receiveHandOff") &&
+			(call.kind === "worktree" ||
+				call.kind === "receiveHandOff" ||
+				call.kind === "runFolder") &&
 			(call.run.id !== runId || call.run.projectId !== projectId)
 		) {
 			return refuse("This device adds a folder only for the run that asks.");
 		}
 		const cwd = cwdOf(call);
 		if (cwd !== null) {
-			const own =
-				runId === null
-					? null
-					: worktreeLocation(repoPath, runId.slice(0, 8)).worktreePath;
-			if (own === null || (cwd !== own && !cwd.startsWith(`${own}/`))) {
+			const { folder } = own;
+			if (
+				folder === null ||
+				(cwd !== folder && !cwd.startsWith(`${folder}/`))
+			) {
 				return refuse("This device works only in the run's own folder.");
 			}
 		}
 		return { offers };
+	}
+
+	/**
+	 * The one folder the run's calls may work in here: its worktree in this
+	 * computer's Clone of the project, or for a project without a folder
+	 * its run folder (ADR 22), which takes no git work. Null before the run
+	 * exists. Refused without a Clone, and for a call of the other kind.
+	 */
+	async function ownFolder(
+		request: WorkRequest,
+	): Promise<{ refusal: string } | { folder: string | null }> {
+		const { spaceId, projectId, runId, call } = request;
+		const project = await deps.projects
+			.find(projectId, spaceId)
+			.catch(() => null);
+		if (project?.folder === false) {
+			if (GIT_CALLS.has(call.kind)) {
+				return {
+					refusal:
+						"This project has no folder. Its runs work in a folder of their own, without git.",
+				};
+			}
+			return { folder: runId === null ? null : deps.runFolders.path(runId) };
+		}
+		if (call.kind === "runFolder") {
+			return {
+				refusal:
+					"This project has a folder. Its runs work in their own copy of the project.",
+			};
+		}
+		const repoPath = await deps.projects.clonePath(projectId, spaceId);
+		if (repoPath === null) {
+			return {
+				refusal:
+					"This device does not have this project. Add its folder there first.",
+			};
+		}
+		return {
+			folder:
+				runId === null
+					? null
+					: worktreeLocation(repoPath, runId.slice(0, 8)).worktreePath,
+		};
 	}
 
 	async function* serve(
@@ -351,6 +400,13 @@ export function createOfferAdmission(deps: {
 				decide: (async (input: Parameters<Device["decide"]>[0]) =>
 					(await pick()).decide(input as never)) as Device["decide"],
 				worktree: async (run) => (await pick()).worktree(run),
+				// Only when this computer makes run folders.
+				...(device.runFolder
+					? {
+							runFolder: async (run: RunRef) =>
+								runFoldersOf(await pick()).runFolder(run),
+						}
+					: {}),
 				handOff: async (input) => (await pick()).handOff(input),
 				receiveHandOff: async (input) => (await pick()).receiveHandOff(input),
 				itemBranch: async (input) => (await pick()).itemBranch(input),
@@ -388,10 +444,21 @@ function snapshotsOf(
 	return { snapshotWorktree, worktreeChanges };
 }
 
-/** The calls that work in the project's Clone; a model or a tool needs none. */
+/**
+ * The run folder call of a Device. `deviceFor` has it only when this
+ * computer has it, and its admitted path always does.
+ */
+function runFoldersOf(device: Device): Required<Pick<Device, "runFolder">> {
+	const { runFolder } = device;
+	if (!runFolder) throw new Error(`${device.name} makes no run folders.`);
+	return { runFolder };
+}
+
+/** The calls that work in the project's Clone, or its run folder; a model or a tool needs none. */
 const NEEDS_CLONE: ReadonlySet<WorkCall["kind"]> = new Set([
 	"flows",
 	"worktree",
+	"runFolder",
 	"itemBranch",
 	"handOff",
 	"receiveHandOff",
@@ -399,6 +466,16 @@ const NEEDS_CLONE: ReadonlySet<WorkCall["kind"]> = new Set([
 	"worktreeChanges",
 	"session",
 	"exec",
+]);
+
+/** The calls that work with git: a project without a folder has none (ADR 22). */
+const GIT_CALLS: ReadonlySet<WorkCall["kind"]> = new Set([
+	"worktree",
+	"itemBranch",
+	"handOff",
+	"receiveHandOff",
+	"snapshotWorktree",
+	"worktreeChanges",
 ]);
 
 /** The folder a call works in, for the calls that name one. */
@@ -437,6 +514,7 @@ function offeredCallRefusal(
 	switch (call.kind) {
 		case "flows":
 		case "worktree":
+		case "runFolder":
 		case "itemBranch":
 		case "handOff":
 		case "receiveHandOff":

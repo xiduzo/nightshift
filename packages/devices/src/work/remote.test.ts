@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { Device } from "@nightshift/engine";
+import { createRunFolders, type Device } from "@nightshift/engine";
 import {
 	createSandbox,
 	type Sandbox,
 	testDevice,
 } from "@nightshift/engine/testing";
-import type { WorkFor, WorkRelay } from "../contract";
+import { UNREADABLE_REQUEST, type WorkFor, type WorkRelay } from "../contract";
 import { CALL_DEADLINES_MS, remoteDevice, serveWork } from "./remote";
 
 /**
@@ -111,6 +112,53 @@ describe("a call to a remote Device that never answers", () => {
 			expect(cancelled).toBe(true);
 		} finally {
 			CALL_DEADLINES_MS.capabilities = before;
+		}
+	});
+});
+
+describe("the run folder of a remote Device", () => {
+	test("is made there once, with no branch and no base", async () => {
+		const folders = createRunFolders(sandbox.dataDir);
+		const placed = testDevice({ harnesses: {}, runFolders: folders });
+		const device = remoteDevice(
+			relayTo(placed),
+			{ id: "laptop", name: "laptop" },
+			FOR_RUN,
+		);
+		const run = { id: "run-1", projectId: "project-1" };
+		expect(await device.runFolder?.(run)).toEqual({
+			worktreePath: folders.path("run-1"),
+			branch: "",
+			baseRef: "",
+			made: true,
+		});
+		expect(existsSync(folders.path("run-1"))).toBe(true);
+		expect((await device.runFolder?.(run))?.made).toBe(false);
+	});
+
+	test("on a Device that makes none, or of an older Night Shift, says to update it", async () => {
+		const run = { id: "run-1", projectId: "project-1" };
+		// The placed Device names itself: the test's is "test".
+		const none = remoteDevice(
+			relayTo(testDevice({ harnesses: {} })),
+			{ id: "test", name: "test" },
+			FOR_RUN,
+		);
+		const older = remoteDevice(
+			{
+				async *call() {
+					// What an older Device answers to a call it cannot read.
+					yield { kind: "error", message: UNREADABLE_REQUEST };
+				},
+				online: () => true,
+			},
+			{ id: "laptop", name: "laptop" },
+			FOR_RUN,
+		);
+		for (const device of [none, older]) {
+			await expect(device.runFolder?.(run)).rejects.toThrow(
+				`Update Night Shift on ${device.name} to run projects without a folder.`,
+			);
 		}
 	});
 });
