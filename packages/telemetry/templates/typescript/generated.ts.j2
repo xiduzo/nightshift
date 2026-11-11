@@ -128,6 +128,7 @@ export const ATTR = {
 	status: "nightshift.run.status",
 	reason: "nightshift.run.reason",
 	resumed: "nightshift.run.resumed",
+	neededYou: "nightshift.run.needed_you",
 	gateWaitMs: "nightshift.gate.wait_ms",
 	waitReason: "nightshift.wait.reason",
 	knowledgeSearches: "nightshift.knowledge.searches",
@@ -141,7 +142,6 @@ export const ATTR = {
 	score: "nightshift.score.name",
 	scoreLabel: "nightshift.score.label",
 	scoreBy: "nightshift.score.by",
-	prOutcome: "nightshift.pull_request.outcome",
 	errorType: "error.type",
 	serviceName: "service.name",
 	serviceInstance: "service.instance.id",
@@ -184,7 +184,6 @@ export const METRIC = {
 	retries: { name: "nightshift.retries", unit: "{step}" },
 	gateWait: { name: "nightshift.gate.wait", unit: "s" },
 	runOutcome: { name: "nightshift.run.outcome", unit: "{run}" },
-	prOutcome: { name: "nightshift.pr.outcome", unit: "{pull_request}" },
 	score: { name: "nightshift.score", unit: "{score}" },
 } as const;
 
@@ -235,7 +234,7 @@ export const TOKEN_MODALITY = {
 /** The name of the service every span and point comes from. */
 export const SERVICE_NAME = "nightshift";
 
-/** Usage event names. Phase 1 emits them. Phase 0 only validates one. */
+/** The usage events this build sends. */
 export const USAGE_EVENT = {
 	installStarted: "nightshift.install.started",
 	agentChecked: "nightshift.agent.checked",
@@ -248,12 +247,21 @@ export const USAGE_EVENT = {
 	scheduleFired: "nightshift.schedule.fired",
 	scheduleSkipped: "nightshift.schedule.skipped",
 	gateAnswered: "nightshift.gate.answered",
-	pullRequestOpened: "nightshift.pull_request.opened",
-	pullRequestOutcome: "nightshift.pull_request.outcome",
-	pullRequestUseful: "nightshift.pull_request.useful",
+	runScored: "nightshift.run.scored",
 	installActive: "nightshift.install.active",
 	knowledgeDocumentMeasured: "nightshift.knowledge.document_measured",
 	processCrashed: "nightshift.process.crashed",
+} as const;
+
+/**
+ * Usage events no build of this version sends. The registry keeps them,
+ * deprecated, while older builds still send them, so the ingest accepts
+ * them and Insights reads their history (ADR 24).
+ */
+export const RETIRED_USAGE_EVENT = {
+	pullRequestOpened: "nightshift.pull_request.opened",
+	pullRequestOutcome: "nightshift.pull_request.outcome",
+	pullRequestUseful: "nightshift.pull_request.useful",
 } as const;
 
 /** A closed schema for each usage event. */

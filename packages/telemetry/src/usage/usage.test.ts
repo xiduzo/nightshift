@@ -5,11 +5,17 @@ import { join } from "node:path";
 import { createDb, type Database } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 import type { LandedFact, RunTrace } from "@nightshift/engine";
-import { USAGE_EVENT } from "@nightshift/semconv";
+import { NODE_TYPE_LABEL, starterList } from "@nightshift/flows";
+import {
+	RETIRED_USAGE_EVENT,
+	USAGE_EVENT,
+	usageEventSchema,
+} from "@nightshift/semconv";
 import { parseInstant } from "@nightshift/time";
 
 import { hashId } from "./anonymize";
-import { attr } from "./fields";
+import { momentEvent } from "./events";
+import { attr, known } from "./fields";
 import type { WaitingEvent } from "./outbox";
 import {
 	keepEvent,
@@ -138,7 +144,12 @@ test("a flow name, a path, an email and a raw run id never appear in the stored 
 			},
 		];
 		await usage.take(facts, async () => trace());
-		usage.note({ kind: "pull-request-opened", runId: SECRET_RUN });
+		usage.note({
+			kind: "run-scored",
+			runId: SECRET_RUN,
+			score: "useful",
+			value: 1,
+		});
 		await usage.settled();
 		const waiting = (await usage.outbox()).waiting;
 		expect(waiting).toHaveLength(3);
@@ -205,11 +216,21 @@ test("an HMAC is stable for one key and changes after the id is reset", async ()
 			settings: switches(true, true),
 			policy: async () => true,
 		});
-		usage.note({ kind: "pull-request-opened", runId: SECRET_RUN });
+		usage.note({
+			kind: "run-scored",
+			runId: SECRET_RUN,
+			score: "useful",
+			value: 1,
+		});
 		await usage.settled();
 		const before = JSON.stringify((await usage.outbox()).waiting);
 		await usage.resetId();
-		usage.note({ kind: "pull-request-opened", runId: SECRET_RUN });
+		usage.note({
+			kind: "run-scored",
+			runId: SECRET_RUN,
+			score: "useful",
+			value: 1,
+		});
 		await usage.settled();
 		const after = (await usage.outbox()).waiting;
 		expect(after).toHaveLength(2);
@@ -369,4 +390,80 @@ test("an explicit usage env of on may send before the notice is seen", async () 
 	} finally {
 		await close();
 	}
+});
+
+const PLATFORM = { os: "darwin", arch: "arm64", version: "1.0.0" };
+
+test("a useful answer leaves as run.scored, under one name for old and new logs", () => {
+	const name = USAGE_EVENT.runScored;
+	const answer = momentEvent(
+		{ kind: "run-scored", runId: SECRET_RUN, score: "pr_useful", value: 0 },
+		"key",
+		PLATFORM,
+	);
+	expect(answer).toEqual({
+		name,
+		[attr(name, "run.id")]: hashId("key", SECRET_RUN),
+		[attr(name, "score.name")]: "useful",
+		[attr(name, "score.value")]: 0,
+	});
+	const merged = momentEvent(
+		{
+			kind: "run-scored",
+			runId: SECRET_RUN,
+			score: "pr_merged",
+			value: 1,
+			elapsedMs: 90 * 60_000 + 400,
+		},
+		"key",
+		PLATFORM,
+	);
+	expect(merged?.[attr(name, "score.name")]).toBe("pr_merged");
+	expect(merged?.[attr(name, "score.hours")]).toBe(1.5);
+	const own = momentEvent(
+		{
+			kind: "run-scored",
+			runId: SECRET_RUN,
+			score: "replicated",
+			value: 0.333,
+		},
+		"key",
+		PLATFORM,
+	);
+	expect(own?.[attr(name, "score.name")]).toBe("_OTHER");
+	expect(own?.[attr(name, "score.value")]).toBe(0.33);
+	expect(JSON.stringify([answer, merged, own])).not.toContain(SECRET_RUN);
+});
+
+test("a flow from a starter the registry does not list sends _OTHER, not nothing", () => {
+	const name = USAGE_EVENT.flowCreated;
+	const event = momentEvent(
+		{ kind: "flow-created", from: "starter", starter: "a-newer-starter" },
+		"key",
+		PLATFORM,
+	);
+	expect(event?.[attr(name, "flow.starter")]).toBe("_OTHER");
+});
+
+test("every starter and every node type is a member of its closed list", () => {
+	const starters = starterList()
+		.map((starter) => starter.name)
+		.filter(
+			(starter) =>
+				known(USAGE_EVENT.flowCreated, "flow.starter", starter) !== starter,
+		);
+	expect(starters).toEqual([]);
+	const kinds = Object.keys(NODE_TYPE_LABEL).filter(
+		(kind) => known(USAGE_EVENT.stepEnded, "node.kind", kind) !== kind,
+	);
+	expect(kinds).toEqual([]);
+});
+
+test("every usage event in the registry is sent or retired, never both", () => {
+	const sent: string[] = Object.values(USAGE_EVENT);
+	const retired: string[] = Object.values(RETIRED_USAGE_EVENT);
+	expect(sent.filter((name) => retired.includes(name))).toEqual([]);
+	expect([...sent, ...retired].sort()).toEqual(
+		Object.keys(usageEventSchema).sort(),
+	);
 });

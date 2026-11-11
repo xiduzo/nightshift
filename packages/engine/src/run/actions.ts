@@ -376,9 +376,10 @@ export function createRunActions(deps: RunActionsDeps) {
 					},
 				});
 				deps.usage?.note({
-					kind: "pull-request-useful",
+					kind: "run-scored",
 					runId,
-					useful: request.useful,
+					score: "useful",
+					value: request.useful ? 1 : 0,
 				});
 				return;
 			case "answer":

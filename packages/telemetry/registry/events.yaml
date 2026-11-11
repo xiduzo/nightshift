@@ -87,6 +87,8 @@ events:
         requirement_level: required
       - ref: nightshift.run.node_kinds
         requirement_level: required
+      - ref: nightshift.run.needed_you
+        requirement_level: recommended
 
   - name: nightshift.step.ended
     brief: A step ended.
@@ -144,9 +146,27 @@ events:
       - ref: nightshift.gate.is_form
         requirement_level: required
 
+  - name: nightshift.run.scored
+    brief: A run got a score. A person said whether it was useful, or the code scorer saw what became of its pull request.
+    stability: development
+    attributes:
+      - ref: nightshift.run.id
+        requirement_level: required
+      - ref: nightshift.score.name
+        requirement_level: required
+      - ref: nightshift.score.value
+        requirement_level: required
+      - ref: nightshift.score.hours
+        requirement_level: recommended
+
   - name: nightshift.pull_request.opened
     brief: A run opened a pull request.
     stability: development
+    deprecated:
+      reason: obsoleted
+      note: >
+        Retired. A newer build sends nightshift.run.scored. The registry keeps
+        the event while older builds send it (ADR 24).
     attributes:
       - ref: nightshift.run.id
         requirement_level: required
@@ -154,6 +174,11 @@ events:
   - name: nightshift.pull_request.outcome
     brief: A pull request was merged, closed, or reverted.
     stability: development
+    deprecated:
+      reason: obsoleted
+      note: >
+        Retired. A newer build sends nightshift.run.scored. The registry keeps
+        the event while older builds send it (ADR 24).
     attributes:
       - ref: nightshift.pull_request.outcome
         requirement_level: required
@@ -163,6 +188,11 @@ events:
   - name: nightshift.pull_request.useful
     brief: You said whether a pull request was useful.
     stability: development
+    deprecated:
+      reason: obsoleted
+      note: >
+        Retired. A newer build sends nightshift.run.scored. The registry keeps
+        the event while older builds send it (ADR 24).
     attributes:
       - ref: nightshift.run.id
         requirement_level: required

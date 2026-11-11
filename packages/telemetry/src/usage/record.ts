@@ -106,7 +106,6 @@ export function createUsage(deps: {
 	const interval = deps.intervalMs ?? USAGE_INTERVAL_MS;
 	let policy = deps.policy ?? (async () => false);
 	let lastSentAt = 0;
-	const opened = new Set<string>();
 	let queue: Promise<void> = Promise.resolve();
 
 	const enqueue = (work: () => Promise<void>): Promise<void> => {
@@ -224,13 +223,7 @@ export function createUsage(deps: {
 	return {
 		note(moment) {
 			void enqueue(async () => {
-				if (moment.kind === "pull-request-opened" && opened.has(moment.runId))
-					return;
-				const stored = await store((key) =>
-					momentEvent(moment, key, platform()),
-				);
-				if (stored && moment.kind === "pull-request-opened")
-					opened.add(moment.runId);
+				await store((key) => momentEvent(moment, key, platform()));
 			});
 		},
 		take(facts, read) {
@@ -272,7 +265,6 @@ export function createUsage(deps: {
 		catalog: usageCatalog,
 		resetId() {
 			return enqueue(async () => {
-				opened.clear();
 				await replaceIdentity(deps.db);
 			}).then(() => ({ ok: true as const }));
 		},

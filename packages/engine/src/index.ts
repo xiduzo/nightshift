@@ -127,7 +127,6 @@ export {
 	followOwnStep,
 	MissingProjectError,
 	parseTranscript,
-	pullRequestOutcome,
 	RUN_END_REASONS,
 	RUN_NOT_FOUND,
 	withoutPrivatePaths,

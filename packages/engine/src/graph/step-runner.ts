@@ -937,7 +937,6 @@ export async function beginStep(
 					runId,
 					payload: { url: opened },
 				});
-				ctx.usage?.note({ kind: "pull-request-opened", runId });
 			}
 			await ctx.log.append({
 				type: "StepEnded",

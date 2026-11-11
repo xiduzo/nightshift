@@ -11,7 +11,7 @@
 		"to": "now"
 	},
 	"refresh": "5m",
-	"description": "The runs Night Shift sends with Settings \u2192 Monitoring: outcomes, time, cost, tokens, retries, Gate waits and scores.",
+	"description": "The runs Night Shift sends with Settings → Monitoring: outcomes, useful runs, the runs that needed you, time, cost, tokens, retries, Gate waits and scores.",
 	"templating": {
 		"list": [
 			{
@@ -83,7 +83,7 @@
 			"gridPos": {
 				"x": 0,
 				"y": 0,
-				"w": 6,
+				"w": 4,
 				"h": 4
 			},
 			"targets": [
@@ -122,9 +122,9 @@
 				"uid": "${datasource}"
 			},
 			"gridPos": {
-				"x": 6,
+				"x": 4,
 				"y": 0,
-				"w": 6,
+				"w": 4,
 				"h": 4
 			},
 			"targets": [
@@ -154,6 +154,90 @@
 			}
 		},
 		{
+			"id": 15,
+			"type": "stat",
+			"title": "Useful runs",
+			"description": "Runs a person found useful. A no adds nothing. An older Night Shift names the score pr_useful.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${datasource}"
+			},
+			"gridPos": {
+				"x": 8,
+				"y": 0,
+				"w": 4,
+				"h": 4
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "sum(increase(nightshift_score_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\", nightshift_score_name=~\"useful|pr_useful\"}[$__range])) or vector(0)",
+					"legendFormat": "useful"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {},
+				"overrides": []
+			},
+			"options": {
+				"reduceOptions": {
+					"calcs": ["lastNotNull"],
+					"fields": "",
+					"values": false
+				},
+				"colorMode": "value",
+				"graphMode": "none",
+				"textMode": "auto"
+			}
+		},
+		{
+			"id": 16,
+			"type": "stat",
+			"title": "Needed you",
+			"description": "The share of ended runs where a person stepped in: answered a Gate or an Ask, resumed, stopped or took over the run.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${datasource}"
+			},
+			"gridPos": {
+				"x": 12,
+				"y": 0,
+				"w": 4,
+				"h": 4
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "(sum(increase(nightshift_run_outcome_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\", nightshift_run_needed_you=\"true\"}[$__range])) or vector(0)) / sum(increase(nightshift_run_outcome_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__range]))",
+					"legendFormat": "needed you"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"unit": "percentunit"
+				},
+				"overrides": []
+			},
+			"options": {
+				"reduceOptions": {
+					"calcs": ["lastNotNull"],
+					"fields": "",
+					"values": false
+				},
+				"colorMode": "value",
+				"graphMode": "none",
+				"textMode": "auto"
+			}
+		},
+		{
 			"id": 3,
 			"type": "stat",
 			"title": "Cost",
@@ -163,9 +247,9 @@
 				"uid": "${datasource}"
 			},
 			"gridPos": {
-				"x": 12,
+				"x": 16,
 				"y": 0,
-				"w": 6,
+				"w": 4,
 				"h": 4
 			},
 			"targets": [
@@ -206,9 +290,9 @@
 				"uid": "${datasource}"
 			},
 			"gridPos": {
-				"x": 18,
+				"x": 20,
 				"y": 0,
-				"w": 6,
+				"w": 4,
 				"h": 4
 			},
 			"targets": [
@@ -719,7 +803,7 @@
 			"id": 14,
 			"type": "barchart",
 			"title": "Pull requests",
-			"description": "What became of the pull requests runs opened, as GitHub's webhook told it.",
+			"description": "What became of the pull requests runs opened. Only a schedule that scores pull requests writes these scores.",
 			"datasource": {
 				"type": "prometheus",
 				"uid": "${datasource}"
@@ -737,8 +821,8 @@
 						"type": "prometheus",
 						"uid": "${datasource}"
 					},
-					"expr": "sum by (nightshift_pull_request_outcome) (increase(nightshift_pr_outcome_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__range]))",
-					"legendFormat": "{{nightshift_pull_request_outcome}}",
+					"expr": "sum by (nightshift_score_name) (increase(nightshift_score_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\", nightshift_score_name=~\"pr_merged|pr_closed|reverted_within_7d\"}[$__range]))",
+					"legendFormat": "{{nightshift_score_name}}",
 					"instant": true,
 					"format": "table"
 				}

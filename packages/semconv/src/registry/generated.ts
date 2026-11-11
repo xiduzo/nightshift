@@ -125,6 +125,9 @@ export const REGISTRY = {
 				"edit-file",
 				"review-learnings",
 				"per-file",
+				"watch-logs",
+				"scout-and-pick",
+				"draft-slides",
 				"_OTHER",
 			],
 		},
@@ -207,6 +210,9 @@ export const REGISTRY = {
 				"join",
 				"lease",
 				"service",
+				"web-request",
+				"since-last-run",
+				"convert",
 				"_OTHER",
 			],
 		},
@@ -245,7 +251,7 @@ export const REGISTRY = {
 		},
 		"nightshift.project.source": {
 			type: "string",
-			members: ["folder", "github", "_OTHER"],
+			members: ["folder", "github", "none", "_OTHER"],
 		},
 		"nightshift.project.starters": {
 			type: "int",
@@ -286,6 +292,9 @@ export const REGISTRY = {
 		"nightshift.run.id": {
 			type: "string",
 		},
+		"nightshift.run.needed_you": {
+			type: "boolean",
+		},
 		"nightshift.run.node_kinds": {
 			type: "string[]",
 		},
@@ -320,11 +329,25 @@ export const REGISTRY = {
 			type: "string",
 			members: ["person", "deadline"],
 		},
+		"nightshift.score.hours": {
+			type: "double",
+		},
 		"nightshift.score.label": {
 			type: "string",
 		},
 		"nightshift.score.name": {
 			type: "string",
+			members: [
+				"gate_decision",
+				"useful",
+				"pr_merged",
+				"pr_closed",
+				"reverted_within_7d",
+				"_OTHER",
+			],
+		},
+		"nightshift.score.value": {
+			type: "double",
 		},
 		"nightshift.step.guard": {
 			type: "string",
@@ -609,11 +632,6 @@ export const REGISTRY = {
 			unit: "s",
 			required: [],
 		},
-		"nightshift.pr.outcome": {
-			instrument: "counter",
-			unit: "{pull_request}",
-			required: ["nightshift.pull_request.outcome"],
-		},
 		"nightshift.retries": {
 			instrument: "counter",
 			unit: "{step}",
@@ -736,6 +754,7 @@ export const REGISTRY = {
 				"nightshift.flow.id",
 				"nightshift.project.id",
 				"nightshift.run.id",
+				"nightshift.run.needed_you",
 				"nightshift.run.reason",
 				"nightshift.run.resumed",
 				"nightshift.run.status",
@@ -799,6 +818,7 @@ export const ATTR = {
 	status: "nightshift.run.status",
 	reason: "nightshift.run.reason",
 	resumed: "nightshift.run.resumed",
+	neededYou: "nightshift.run.needed_you",
 	gateWaitMs: "nightshift.gate.wait_ms",
 	waitReason: "nightshift.wait.reason",
 	knowledgeSearches: "nightshift.knowledge.searches",
@@ -812,7 +832,6 @@ export const ATTR = {
 	score: "nightshift.score.name",
 	scoreLabel: "nightshift.score.label",
 	scoreBy: "nightshift.score.by",
-	prOutcome: "nightshift.pull_request.outcome",
 	errorType: "error.type",
 	serviceName: "service.name",
 	serviceInstance: "service.instance.id",
@@ -855,7 +874,6 @@ export const METRIC = {
 	retries: { name: "nightshift.retries", unit: "{step}" },
 	gateWait: { name: "nightshift.gate.wait", unit: "s" },
 	runOutcome: { name: "nightshift.run.outcome", unit: "{run}" },
-	prOutcome: { name: "nightshift.pr.outcome", unit: "{pull_request}" },
 	score: { name: "nightshift.score", unit: "{score}" },
 } as const;
 
@@ -906,7 +924,7 @@ export const TOKEN_MODALITY = {
 /** The name of the service every span and point comes from. */
 export const SERVICE_NAME = "nightshift";
 
-/** Usage event names. Phase 1 emits them. Phase 0 only validates one. */
+/** The usage events this build sends. */
 export const USAGE_EVENT = {
 	installStarted: "nightshift.install.started",
 	agentChecked: "nightshift.agent.checked",
@@ -919,12 +937,21 @@ export const USAGE_EVENT = {
 	scheduleFired: "nightshift.schedule.fired",
 	scheduleSkipped: "nightshift.schedule.skipped",
 	gateAnswered: "nightshift.gate.answered",
-	pullRequestOpened: "nightshift.pull_request.opened",
-	pullRequestOutcome: "nightshift.pull_request.outcome",
-	pullRequestUseful: "nightshift.pull_request.useful",
+	runScored: "nightshift.run.scored",
 	installActive: "nightshift.install.active",
 	knowledgeDocumentMeasured: "nightshift.knowledge.document_measured",
 	processCrashed: "nightshift.process.crashed",
+} as const;
+
+/**
+ * Usage events no build of this version sends. The registry keeps them,
+ * deprecated, while older builds still send them, so the ingest accepts
+ * them and Insights reads their history (ADR 24).
+ */
+export const RETIRED_USAGE_EVENT = {
+	pullRequestOpened: "nightshift.pull_request.opened",
+	pullRequestOutcome: "nightshift.pull_request.outcome",
+	pullRequestUseful: "nightshift.pull_request.useful",
 } as const;
 
 /** A closed schema for each usage event. */
@@ -988,6 +1015,9 @@ export const usageEventSchema = {
 					"edit-file",
 					"review-learnings",
 					"per-file",
+					"watch-logs",
+					"scout-and-pick",
+					"draft-slides",
 					"_OTHER",
 				])
 				.optional(),
@@ -1062,7 +1092,12 @@ export const usageEventSchema = {
 		.object({
 			name: z.literal("nightshift.project.added"),
 			"nightshift.project.has_remote": z.boolean(),
-			"nightshift.project.source": z.enum(["folder", "github", "_OTHER"]),
+			"nightshift.project.source": z.enum([
+				"folder",
+				"github",
+				"none",
+				"_OTHER",
+			]),
 			"nightshift.project.starters": z.number().int(),
 		})
 		.strict(),
@@ -1121,6 +1156,7 @@ export const usageEventSchema = {
 				"stopped_by_person",
 				"_OTHER",
 			]),
+			"nightshift.run.needed_you": z.boolean().optional(),
 			"nightshift.run.node_kinds": z.array(z.string()),
 			"nightshift.run.status": z.enum([
 				"finished",
@@ -1135,6 +1171,22 @@ export const usageEventSchema = {
 				"webhook",
 				"_OTHER",
 			]),
+		})
+		.strict(),
+	"nightshift.run.scored": z
+		.object({
+			name: z.literal("nightshift.run.scored"),
+			"nightshift.run.id": z.string(),
+			"nightshift.score.hours": z.number().optional(),
+			"nightshift.score.name": z.enum([
+				"gate_decision",
+				"useful",
+				"pr_merged",
+				"pr_closed",
+				"reverted_within_7d",
+				"_OTHER",
+			]),
+			"nightshift.score.value": z.number(),
 		})
 		.strict(),
 	"nightshift.schedule.changed": z
@@ -1215,6 +1267,9 @@ export const usageEventSchema = {
 				"join",
 				"lease",
 				"service",
+				"web-request",
+				"since-last-run",
+				"convert",
 				"_OTHER",
 			]),
 			"nightshift.step.guard": z

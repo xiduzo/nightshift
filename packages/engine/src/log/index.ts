@@ -111,7 +111,6 @@ export {
 	type AnsweredBy,
 	type FlowScore,
 	flowScores,
-	pullRequestOutcome,
 	type RunScore,
 	runScore,
 } from "./scores";

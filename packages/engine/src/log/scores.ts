@@ -68,20 +68,6 @@ export function runScore(e: {
 	};
 }
 
-/** What became of a pull request, as a score of it says. */
-export type PullRequestOutcome = "merged" | "closed" | "reverted";
-
-const PULL_REQUEST_OUTCOMES: Readonly<Record<string, PullRequestOutcome>> = {
-	pr_merged: "merged",
-	pr_closed: "closed",
-	reverted_within_7d: "reverted",
-};
-
-/** What became of the run's pull request, when the score tells it. Else null. */
-export function pullRequestOutcome(score: string): PullRequestOutcome | null {
-	return PULL_REQUEST_OUTCOMES[score] ?? null;
-}
-
 /** The names Night Shift writes itself. A flow may not write them. */
 const OWN_SCORES: ReadonlySet<string> = new Set<ScoreName>([
 	"gate_decision",

@@ -120,6 +120,8 @@ span_refinements:
         requirement_level: recommended
       - ref: nightshift.run.resumed
         requirement_level: recommended
+      - ref: nightshift.run.needed_you
+        requirement_level: recommended
       - ref: error.type
         requirement_level:
           conditionally_required: If the run failed.

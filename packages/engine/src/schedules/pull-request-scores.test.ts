@@ -12,10 +12,13 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
+import type { UsageMoment } from "../usage";
 import {
+	type PullRequestScoresDeps,
 	pullRequestKey,
 	pullRequestNews,
 	REVERT_WINDOW_MS,
+	recordPullRequestScore,
 } from "./pull-request-scores";
 
 /** Pull request scores: GitHub's webhooks tell what became of a run's pull request. */
@@ -37,6 +40,36 @@ const push = (ref: string, messages: string[]) => ({
 	ref,
 	repository: { default_branch: "main" },
 	commits: messages.map((message) => ({ message })),
+});
+
+describe("recordPullRequestScore", () => {
+	test("notes the score as a score of its run, with the hours from the pull request", async () => {
+		const moments: UsageMoment[] = [];
+		const appended: unknown[] = [];
+		const log = {
+			append: async (event: unknown) => {
+				appended.push(event);
+			},
+			state: async () => ({ pullRequest: { at: 1_000 }, started: { at: 0 } }),
+		} as unknown as PullRequestScoresDeps["log"];
+		const usage = { note: (moment: UsageMoment) => moments.push(moment) };
+		await recordPullRequestScore(
+			{ log, now: () => 7_201_000, usage },
+			"run-1",
+			"pr_merged",
+			MERGE_SHA,
+		);
+		expect(appended).toHaveLength(1);
+		expect(moments).toEqual([
+			{
+				kind: "run-scored",
+				runId: "run-1",
+				score: "pr_merged",
+				value: 1,
+				elapsedMs: 7_200_000,
+			},
+		]);
+	});
 });
 
 describe("pullRequestNews", () => {

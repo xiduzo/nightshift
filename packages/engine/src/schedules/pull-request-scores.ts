@@ -142,11 +142,14 @@ export async function recordPullRequestScore(
 	});
 	const state = await deps.log.state(runId);
 	const opened = state.pullRequest?.at ?? state.started?.at;
-	if (opened === undefined) return;
 	deps.usage?.note({
-		kind: "pull-request-outcome",
-		outcome: score,
-		elapsedMs: Math.max(0, (outcomeAt ?? deps.now()) - opened),
+		kind: "run-scored",
+		runId,
+		score,
+		value: 1,
+		...(opened === undefined
+			? {}
+			: { elapsedMs: Math.max(0, (outcomeAt ?? deps.now()) - opened) }),
 	});
 }
 

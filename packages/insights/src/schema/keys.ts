@@ -1,4 +1,8 @@
-import { USAGE_EVENT, usageEventSchema } from "@nightshift/semconv";
+import {
+	RETIRED_USAGE_EVENT,
+	USAGE_EVENT,
+	usageEventSchema,
+} from "@nightshift/semconv";
 import { type SQL, sql } from "drizzle-orm";
 
 /** A usage event name, as the generated schema keys it. */
@@ -95,8 +99,8 @@ export function ident(name: string): SQL {
 }
 
 export const RUN = USAGE_EVENT.runEnded;
-export const OPENED = USAGE_EVENT.pullRequestOpened;
-export const OUTCOME = USAGE_EVENT.pullRequestOutcome;
+export const OPENED = RETIRED_USAGE_EVENT.pullRequestOpened;
+export const OUTCOME = RETIRED_USAGE_EVENT.pullRequestOutcome;
 export const GATE = USAGE_EVENT.gateAnswered;
 export const ACTIVE = USAGE_EVENT.installActive;
 export const STARTED = USAGE_EVENT.installStarted;

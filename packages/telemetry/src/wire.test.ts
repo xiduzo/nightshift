@@ -595,12 +595,10 @@ describe("the export to monitoring", () => {
 				value: 1,
 			},
 		]);
-		// Not a pull request: no outcome.
-		expect(sum(h.points().get(METRIC.prOutcome.name))).toBe(0);
 		assertConforms(exported(h.spans(), h.resources()));
 	});
 
-	test("a pull request's scores count, and as what became of it", async () => {
+	test("a pull request's scores count under their names, and no other metric tells them", async () => {
 		const run = nightRun()
 			.push("Scored", {
 				score: "pr_merged",
@@ -615,15 +613,16 @@ describe("the export to monitoring", () => {
 		const h = await setup({}, run);
 		h.landRun();
 		await h.done();
-		const outcomes = h.points().get(METRIC.prOutcome.name);
-		expect(sum(outcomes, { [ATTR.prOutcome]: "merged" })).toBe(1);
-		expect(sum(outcomes, { [ATTR.prOutcome]: "reverted" })).toBe(1);
-		expect(sum(outcomes, { [ATTR.prOutcome]: "closed" })).toBe(0);
-		expect(
-			sum(h.points().get(METRIC.score.name), {
-				[ATTR.score]: "pr_merged",
-			}),
-		).toBe(1);
+		const scores = h.points().get(METRIC.score.name);
+		expect(sum(scores, { [ATTR.score]: "pr_merged" })).toBe(1);
+		expect(sum(scores, { [ATTR.score]: "reverted_within_7d" })).toBe(1);
+		expect(sum(scores, { [ATTR.score]: "pr_closed" })).toBe(0);
+		const named = new Set<string>(
+			Object.values(METRIC).map((metric) => metric.name),
+		);
+		expect([...h.points().keys()].filter((name) => !named.has(name))).toEqual(
+			[],
+		);
 	});
 
 	test("an API request is a trace of its own while the export is on, and nothing after", async () => {

@@ -34,6 +34,9 @@ attributes:
         - { id: join, value: join, brief: A Join step., stability: development }
         - { id: lease, value: lease, brief: A Lease step., stability: development }
         - { id: service, value: service, brief: A Service step., stability: development }
+        - { id: web_request, value: web-request, brief: A Web request step., stability: development }
+        - { id: since_last_run, value: since-last-run, brief: A Since last run step., stability: development }
+        - { id: convert, value: convert, brief: A Convert step., stability: development }
         - { id: other, value: _OTHER, brief: A node kind outside this list., stability: development }
     brief: The kind of node.
     stability: development
@@ -133,6 +136,10 @@ attributes:
     type: boolean
     brief: Whether this end is a later end of a resumed run.
     stability: development
+  - key: nightshift.run.needed_you
+    type: boolean
+    brief: Whether a person stepped in. They answered a Gate or an Ask, resumed, stopped or took over the run.
+    stability: development
   - key: nightshift.run.duration
     type: double
     brief: How long the run took, in seconds.
@@ -199,8 +206,26 @@ attributes:
     brief: How often the step read a file of the project's knowledge.
     stability: development
   - key: nightshift.score.name
-    type: string
+    type:
+      members:
+        - { id: gate_decision, value: gate_decision, brief: A Gate's answer., stability: development }
+        - { id: useful, value: useful, brief: Whether a person found the run useful., stability: development }
+        - { id: pr_merged, value: pr_merged, brief: The run's pull request merged., stability: development }
+        - { id: pr_closed, value: pr_closed, brief: The run's pull request closed without a merge., stability: development }
+        - { id: reverted_within_7d, value: reverted_within_7d, brief: A commit reverted the run's pull request within 7 days., stability: development }
+        - { id: other, value: _OTHER, brief: A score outside this list., stability: development }
     brief: Which score this point is.
+    note: >
+      The export to monitoring sends the name a flow gives its own score.
+      A usage event sends _OTHER for it.
+    stability: development
+  - key: nightshift.score.value
+    type: double
+    brief: The value of a score. A yes or a fact that happened is 1. A no is 0.
+    stability: development
+  - key: nightshift.score.hours
+    type: double
+    brief: Hours from the work to its score. A pull request score counts from when the run opened it.
     stability: development
   - key: nightshift.score.label
     type: string
@@ -222,14 +247,29 @@ attributes:
         - { id: other, value: _OTHER, brief: An outcome outside this list., stability: development }
     brief: What became of a pull request.
     stability: development
+    deprecated:
+      reason: obsoleted
+      note: >
+        Retired. A newer build sends nightshift.run.scored. The registry keeps
+        the key while older builds send it (ADR 24).
   - key: nightshift.pull_request.hours
     type: double
     brief: Hours from open to the pull request outcome.
     stability: development
+    deprecated:
+      reason: obsoleted
+      note: >
+        Retired. A newer build sends nightshift.run.scored. The registry keeps
+        the key while older builds send it (ADR 24).
   - key: nightshift.pull_request.useful
     type: boolean
     brief: Whether you found the pull request useful.
     stability: development
+    deprecated:
+      reason: obsoleted
+      note: >
+        Retired. A newer build sends nightshift.run.scored. The registry keeps
+        the key while older builds send it (ADR 24).
   - key: nightshift.install.entry
     type:
       members:
@@ -247,6 +287,7 @@ attributes:
       members:
         - { id: folder, value: folder, brief: A folder on this computer., stability: development }
         - { id: github, value: github, brief: A GitHub repository., stability: development }
+        - { id: none, value: none, brief: A project without a folder., stability: development }
         - { id: other, value: _OTHER, brief: A source outside this list., stability: development }
     brief: Where a project was added from.
     stability: development
@@ -322,10 +363,13 @@ attributes:
         - { id: implement_and_check, value: implement-and-check, brief: The implement-and-check starter., stability: development }
         - { id: build_task, value: build-task, brief: The build-task starter., stability: development }
         - { id: plan_and_build, value: plan-and-build, brief: The plan-and-build starter., stability: development }
-        - { id: review_pr, value: review-pr, brief: The review-pr starter., stability: development }
+        - { id: review_pr, value: review-pr, brief: The review-pr starter. Retired. Older builds still send it., stability: development }
         - { id: edit_file, value: edit-file, brief: The edit-file starter., stability: development }
         - { id: review_learnings, value: review-learnings, brief: The review-learnings starter., stability: development }
         - { id: per_file, value: per-file, brief: The per-file starter., stability: development }
+        - { id: watch_logs, value: watch-logs, brief: The watch-logs starter., stability: development }
+        - { id: scout_and_pick, value: scout-and-pick, brief: The scout-and-pick starter., stability: development }
+        - { id: draft_slides, value: draft-slides, brief: The draft-slides starter., stability: development }
         - { id: other, value: _OTHER, brief: A starter outside this list., stability: development }
     brief: Which starter a flow was created from.
     stability: development

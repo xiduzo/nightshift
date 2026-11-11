@@ -75,6 +75,7 @@ processors:
       - nightshift.run.duration
       - nightshift.run.end_reason
       - nightshift.run.id
+      - nightshift.run.needed_you
       - nightshift.run.node_kinds
       - nightshift.run.status
       - nightshift.run.trigger
@@ -82,6 +83,9 @@ processors:
       - nightshift.schedule.score_pull_requests
       - nightshift.schedule.skip_reason
       - nightshift.schedule.webhook
+      - nightshift.score.hours
+      - nightshift.score.name
+      - nightshift.score.value
       - nightshift.step.guard
       - nightshift.step.result
       - nightshift.step.visit

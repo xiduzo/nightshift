@@ -178,7 +178,12 @@ export function momentEvent(
 	switch (moment.kind) {
 		case "flow-created": {
 			const starter = moment.starter
-				? known(USAGE_EVENT.flowCreated, "flow.starter", moment.starter)
+				? listed(
+						USAGE_EVENT.flowCreated,
+						"flow.starter",
+						moment.starter,
+						"_OTHER",
+					)
 				: undefined;
 			return draft(USAGE_EVENT.flowCreated, {
 				"flow.from": listed(
@@ -225,24 +230,20 @@ export function momentEvent(
 				),
 				"gate.wait": secondsOf(moment.waitMs),
 			});
-		case "pull-request-opened":
-			return draft(USAGE_EVENT.pullRequestOpened, {
+		case "run-scored":
+			return draft(USAGE_EVENT.runScored, {
 				"run.id": hashId(key, moment.runId),
-			});
-		case "pull-request-outcome":
-			return draft(USAGE_EVENT.pullRequestOutcome, {
-				"pull_request.hours": hoursOf(moment.elapsedMs),
-				"pull_request.outcome": listed(
-					USAGE_EVENT.pullRequestOutcome,
-					"pull_request.outcome",
-					prOutcome(moment.outcome),
+				"score.name": listed(
+					USAGE_EVENT.runScored,
+					"score.name",
+					scoreName(moment.score),
 					"_OTHER",
 				),
-			});
-		case "pull-request-useful":
-			return draft(USAGE_EVENT.pullRequestUseful, {
-				"run.id": hashId(key, moment.runId),
-				"pull_request.useful": moment.useful,
+				"score.value": scoreValue(moment.value),
+				"score.hours":
+					moment.elapsedMs === undefined
+						? undefined
+						: hoursOf(moment.elapsedMs),
 			});
 		case "project-added":
 			return draft(USAGE_EVENT.projectAdded, {
@@ -327,9 +328,13 @@ export function momentEvent(
 	}
 }
 
-function prOutcome(score: string): string {
-	if (score === "pr_merged") return "merged";
-	if (score === "pr_closed") return "closed";
-	if (score === "reverted_within_7d") return "reverted";
-	return "_OTHER";
+/** A score's value: 0 or more, rounded to two decimals. */
+function scoreValue(value: number): number {
+	if (!Number.isFinite(value)) return 0;
+	return Math.round(Math.max(0, value) * 100) / 100;
+}
+
+/** An older log names the useful answer `pr_useful`. It is the same score. */
+function scoreName(score: string): string {
+	return score === "pr_useful" ? "useful" : score;
 }

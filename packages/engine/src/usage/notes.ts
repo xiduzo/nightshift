@@ -21,9 +21,19 @@ export type UsageMoment =
 			hasDeadline: boolean;
 			isForm: boolean;
 	  }
-	| { kind: "pull-request-opened"; runId: string }
-	| { kind: "pull-request-outcome"; outcome: string; elapsedMs: number }
-	| { kind: "pull-request-useful"; runId: string; useful: boolean }
+	| {
+			/**
+			 * A score of a run: a person's useful answer (`useful`, 1 or 0) or
+			 * what became of its pull request (`pr_merged`, `pr_closed`,
+			 * `reverted_within_7d`). `elapsedMs` runs from when the run
+			 * opened the pull request, or started.
+			 */
+			kind: "run-scored";
+			runId: string;
+			score: string;
+			value: number;
+			elapsedMs?: number;
+	  }
 	| {
 			kind: "project-added";
 			source: string;

@@ -87,22 +87,8 @@ metrics:
     attributes:
       - ref: nightshift.run.status
         requirement_level: required
-      - ref: nightshift.project.id
+      - ref: nightshift.run.needed_you
         requirement_level: recommended
-      - ref: nightshift.flow.id
-        requirement_level: recommended
-      - ref: nightshift.device.id
-        requirement_level: recommended
-
-  - name: nightshift.pr.outcome
-    requirement_level: recommended
-    instrument: counter
-    unit: "{pull_request}"
-    brief: What became of the pull requests runs opened.
-    stability: development
-    attributes:
-      - ref: nightshift.pull_request.outcome
-        requirement_level: required
       - ref: nightshift.project.id
         requirement_level: recommended
       - ref: nightshift.flow.id
@@ -114,7 +100,10 @@ metrics:
     requirement_level: recommended
     instrument: counter
     unit: "{score}"
-    brief: Feedback on runs. Gate answers, pull request outcomes, and the scores a flow writes.
+    brief: Feedback on runs. Gate answers, useful answers, what became of a pull request, and the scores a flow writes.
+    note: >
+      A no to "Was this run useful?" adds 0. A changed answer adds its new
+      value again. The run keeps only the latest answer.
     stability: development
     attributes:
       - ref: nightshift.score.name

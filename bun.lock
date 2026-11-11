@@ -499,6 +499,7 @@
       },
       "devDependencies": {
         "@nightshift/config": "workspace:*",
+        "@nightshift/flows": "workspace:*",
         "@orpc/server": "catalog:",
         "@types/bun": "catalog:",
         "typescript": "catalog:",
