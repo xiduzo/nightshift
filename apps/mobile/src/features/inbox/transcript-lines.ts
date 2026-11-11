@@ -204,6 +204,23 @@ export function transcriptLines(
 				});
 				break;
 			}
+			case "web-request":
+				push({
+					key: `web-request:${seq}`,
+					kind: "night-shift",
+					text: `Asks ${event.method} ${event.url}`,
+				});
+				break;
+			case "web-response":
+				push({
+					key: `web-response:${seq}`,
+					kind: "night-shift",
+					text:
+						event.status === null
+							? `No answer. ${event.text}`.trim()
+							: `The server answered ${event.status} ${event.text}`.trim(),
+				});
+				break;
 			case "lease":
 				push({
 					key: `lease:${seq}`,

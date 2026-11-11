@@ -9,6 +9,7 @@ import {
 	CircleX,
 	Diff,
 	Flag,
+	Globe,
 	Hand,
 	Hourglass,
 	LoaderCircle,
@@ -53,6 +54,7 @@ const ICONS: Record<StatusIconName | StepKindIconName, LucideIcon> = {
 	server: Server,
 	diff: Diff,
 	convert: ArrowRightLeft,
+	globe: Globe,
 };
 
 /** The lucide icon of a status or a step kind. */
