@@ -188,6 +188,17 @@ describe("the lease keeper", () => {
 		expect(lost).toHaveLength(1);
 	});
 
+	test("given two renewals at once, as a minute's and a Host's that comes online, when the lease expired, then the run hears it once", async () => {
+		const keeper = keeperFor();
+		await keeper.take(run("run-a", "hosted"), {
+			name: "stack",
+			ttlMinutes: 10,
+		});
+		now += 11 * MINUTE;
+		await Promise.all([keeper.renewAll(), keeper.renewAll()]);
+		expect(lost).toEqual([{ runId: "run-a", names: ["stack"] }]);
+	});
+
 	test("given leases a run held before a restart, when they are tracked, then the keeper renews them", async () => {
 		await keeperFor().take(run("run-a"), { name: "stack", ttlMinutes: 10 });
 		const restarted = keeperFor();

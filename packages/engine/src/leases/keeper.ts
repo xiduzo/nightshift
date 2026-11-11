@@ -102,14 +102,20 @@ export function createLeaseKeeper(deps: {
 		if (released?.here) deps.onFreed?.();
 	}
 
-	/** Renews every lease this computer's runs hold. A run that lost one hears of it. */
+	/**
+	 * Renews every lease this computer's runs hold. A run that lost one
+	 * hears of it once, also from two renewals at once (a minute's, and one
+	 * for a Host whose link comes online).
+	 */
 	async function renewAll(): Promise<void> {
 		for (const [runId, { spaceId, names }] of [...holding]) {
 			try {
 				const renewed = await atKeeper(spaceId, (host) =>
 					host.renew({ spaceId, runId, names: [...names] }),
 				);
-				const lost = renewed?.value ?? [];
+				// What another renewal told the run of is no longer held here.
+				const held = holding.get(runId)?.names;
+				const lost = (renewed?.value ?? []).filter((name) => held?.has(name));
 				if (lost.length === 0) continue;
 				forget(runId, lost);
 				await deps.onLost?.(runId, lost);
