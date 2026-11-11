@@ -55,5 +55,8 @@ export function createFlowQueries(orpc: ApiQueryUtils) {
 		/** The values a flow's kept variables carry from one run to the next. */
 		kept: (projectId: string, name: string) =>
 			orpc.flows.kept.queryOptions({ input: { projectId, name } }),
+		/** What the flow's Since last run nodes remember from one run to the next. */
+		memory: (projectId: string, name: string) =>
+			orpc.flows.memory.queryOptions({ input: { projectId, name } }),
 	};
 }

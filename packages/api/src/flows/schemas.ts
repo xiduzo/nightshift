@@ -4,6 +4,7 @@ import {
 	type FlowRevisionItem,
 	type FlowRevisionView,
 	type KeptValue,
+	type NodeMemory,
 	revisionKinds,
 	type SavedFlow,
 } from "@nightshift/engine";
@@ -79,6 +80,18 @@ export const keptValueSchema = exact<KeptValue>()(
 	z.object({
 		name: z.string(),
 		value: z.json(),
+		runId: z.string(),
+		updatedAt: z.number(),
+	}),
+);
+
+/** What a Since last run node remembers between runs on this computer, for one scope. */
+export const nodeMemorySchema = exact<NodeMemory>()(
+	z.object({
+		node: z.string(),
+		scope: z.string(),
+		keys: z.number(),
+		value: z.json().optional(),
 		runId: z.string(),
 		updatedAt: z.number(),
 	}),

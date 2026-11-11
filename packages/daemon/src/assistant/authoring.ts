@@ -280,6 +280,8 @@ function lineOf(event: TranscriptEntry["event"]): string {
 			return event.held
 				? `Lease: took ${event.name}`
 				: `Lease: ${event.name} is held by run ${event.holder ?? "unknown"}`;
+		case "since-last-run":
+			return `Since last run: ${event.new} new, ${event.changed} changed, ${event.same} the same${event.firstRun ? " (first run)" : ""}${event.remembers ? "" : ", remembers nothing"}`;
 		default:
 			return "";
 	}

@@ -13,6 +13,7 @@ import {
 	flowRevisionViewSchema,
 	keptValueSchema,
 	loadedFlowSchema,
+	nodeMemorySchema,
 	savedFlowSchema,
 } from "./schemas";
 
@@ -80,6 +81,37 @@ export const flows = {
 		.input(flowRef.extend({ variable: nameSchema }))
 		.handler(({ context, input }) =>
 			context.space.resetKeptValue(input.projectId, input.name, input.variable),
+		),
+	/** What the flow's Since last run nodes remember from one run to the next. */
+	memory: protectedProcedure
+		.route({
+			summary:
+				"Lists what the Since last run nodes of a flow remember between runs on this computer, per node and scope.",
+		})
+		.output(output(z.array(nodeMemorySchema)))
+		.input(flowRef)
+		.handler(({ context, input }) =>
+			context.space.listNodeMemory(input.projectId, input.name),
+		),
+	forgetMemory: ownerProcedure
+		.route({
+			summary:
+				"Forgets what a Since last run node of a flow saw, in every scope or in one: its next run is a first run.",
+		})
+		.output(output(z.void()))
+		.input(
+			flowRef.extend({
+				node: z.string().min(1).max(1000),
+				scope: z.string().max(1000).optional(),
+			}),
+		)
+		.handler(({ context, input }) =>
+			context.space.forgetNodeMemory(
+				input.projectId,
+				input.name,
+				input.node,
+				input.scope,
+			),
 		),
 	/** What the import on upgrade did that a person must know, oldest first. */
 	notices: protectedProcedure

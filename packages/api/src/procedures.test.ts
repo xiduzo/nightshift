@@ -393,6 +393,8 @@ const ROUTES: Route[] = [
 	route("flows.save", { ...flowRef, flow }, SAVE, "space.flows.save", ["p1", "night", flow]),
 	route("flows.kept", flowRef, "session", "space.listKeptValues", ["p1", "night"]),
 	route("flows.resetKept", { ...flowRef, variable: "count" }, "owner", "space.resetKeptValue", ["p1", "night", "count"]),
+	route("flows.memory", flowRef, "session", "space.listNodeMemory", ["p1", "night"]),
+	route("flows.forgetMemory", { ...flowRef, node: "call/fresh", scope: "feed" }, "owner", "space.forgetNodeMemory", ["p1", "night", "call/fresh", "feed"]),
 	route("flows.notices", project, "session", "space.flows.notices", ["p1"]),
 	route("flows.dismissNotice", { ...project, id: "n1" }, "owner", "space.flows.dismissNotice", ["p1", "n1"]),
 	route("flows.remove", flowRef, { flow: ["remove"] }, "space.flows.remove", ["p1", "night"]),

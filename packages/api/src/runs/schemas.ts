@@ -265,6 +265,7 @@ const stepSummarySchema = z.object({
 		"join",
 		"lease",
 		"service",
+		"since-last-run",
 	]),
 	visit: z.number(),
 	startedAt: z.number(),
@@ -594,6 +595,14 @@ const stepEventSchema = z.discriminatedUnion("type", [
 		state: z.enum(["starting", "ready", "failed"]),
 		command: z.string().optional(),
 		reason: z.string().optional(),
+	}),
+	z.object({
+		type: z.literal("since-last-run"),
+		firstRun: z.boolean(),
+		remembers: z.boolean(),
+		new: z.number(),
+		changed: z.number(),
+		same: z.number(),
 	}),
 	z.object({ type: z.literal("worktree-snapshot"), tree: z.string() }),
 	z.object({
