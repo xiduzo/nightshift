@@ -257,8 +257,8 @@ export function SinceLastRunFields({
 					</NativeSelect>
 				</Field>
 				<Note>
-					Draw an edge for <code>new</code>, <code>changed</code> and{" "}
-					<code>same</code> where the run goes on. <code>data.new</code> and{" "}
+					Draw an edge for each outcome that continues the run: <code>new</code>
+					, <code>changed</code> or <code>same</code>. <code>data.new</code> and{" "}
 					<code>data.changed</code> hold the items.
 				</Note>
 			</InspectorSection>
@@ -283,7 +283,7 @@ function MemorySection({
 	const forget = useMutation(
 		flowMutations.forgetMemory({
 			onSuccess: () => {
-				toast.success("Forgotten. The next run finds everything again.");
+				toast.success("Forgotten. The next run is a first run.");
 				void queryClient.invalidateQueries({ queryKey: query.queryKey });
 			},
 			onError: (error) => toast.error(`Could not forget: ${error.message}`),
