@@ -279,7 +279,7 @@ function CommandFields({
 				flow={flow}
 				nodeId={node.id}
 				value={command.command}
-				placeholder="gh pr checks 42"
+				placeholder="curl -sf https://example.com/health"
 				invalid={command.command.trim() === ""}
 				error={commandTools.error}
 				tools={commandTools.tools}

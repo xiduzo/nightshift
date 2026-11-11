@@ -190,7 +190,7 @@ export function PromptSuggest({
 								"Make it shorter",
 							]
 				}
-				placeholder="What should it do? For example: ask for a test plan too."
+				placeholder="What should it do? For example: ask for the sources too."
 				selection={selection}
 				blocked={() =>
 					value === base
@@ -264,7 +264,7 @@ export function SetSuggest({ node }: { node: FlowNode }) {
 					"Save the outcome",
 				],
 				placeholder:
-					"What should the flow remember? For example: the pull request link.",
+					"What should the flow remember? For example: the links it already reported.",
 			}}
 			preview={(suggestion, assistant) =>
 				suggestion.kind === "set" ? (
@@ -298,7 +298,7 @@ export function OutcomesSuggest({ node }: { node: AgentNode | DecisionNode }) {
 								"The agent proposes the options from the question and from where the flow goes next. A renamed option keeps its edges.",
 							picks: ["Fit the next steps", "Yes or no", "Add a way to stop"],
 							placeholder:
-								"What can be picked? For example: merge, ask for changes, or close.",
+								"What can be picked? For example: send, edit first, or skip.",
 						}
 					: {
 							label: "Suggest outcomes",
@@ -311,7 +311,7 @@ export function OutcomesSuggest({ node }: { node: AgentNode | DecisionNode }) {
 								"Keep pass and fail",
 							],
 							placeholder:
-								"How can this step end? For example: fixed, cannot reproduce, or needs a person.",
+								"How can this step end? For example: found, nothing new, or needs a person.",
 						}
 			}
 			preview={(suggestion, assistant) =>
@@ -343,7 +343,7 @@ export function RulesSuggest({ node }: { node: DecisionNode }) {
 					"Check the data fields",
 				],
 				placeholder:
-					"When should each option win? For example: ship when the check exits 0.",
+					"When should each option win? For example: report when the price is below 100.",
 			}}
 			preview={(suggestion, assistant) =>
 				suggestion.kind === "rules" ? (
@@ -405,12 +405,12 @@ export function CommandSuggest({ node }: { node: FlowNode }) {
 							description:
 								"The agent reads the project and proposes a command that lists the items. The flow runs once for each item.",
 							picks: [
-								"Sub-issues of an issue",
 								"Open issues with a label",
+								"Rows of a CSV file",
 								"Tasks in a checklist file",
 							],
 							placeholder:
-								"Which items should run? For example: the open issues with the label ready.",
+								"Which items should run? For example: the files in a folder.",
 						}
 					: node.type === "wait"
 						? {
@@ -424,16 +424,20 @@ export function CommandSuggest({ node }: { node: FlowNode }) {
 									"Wait for a file",
 								],
 								placeholder:
-									"What do you wait for? For example: the checks of the pull request.",
+									"What do you wait for? For example: the website to answer again.",
 							}
 						: {
 								label: "Suggest command",
 								title: "Suggest a command",
 								description:
 									"The agent reads the project's scripts and proposes a command for this step.",
-								picks: ["Run the tests", "Run the linter", "Build the project"],
+								picks: [
+									"Run the tests",
+									"Download a file",
+									"Build the project",
+								],
 								placeholder:
-									"What should it run? For example: the type check of the web app.",
+									"What should it run? For example: download the newest price list.",
 							}
 			}
 			preview={(suggestion) =>
@@ -534,7 +538,7 @@ export function InputsSuggest() {
 					"Mark the required ones",
 				],
 				placeholder:
-					"What should a run ask for? For example: the issue number.",
+					"What should a run ask for? For example: a topic and a date.",
 			}}
 			preview={(suggestion, assistant) =>
 				suggestion.kind === "inputs" ? (

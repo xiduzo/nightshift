@@ -115,7 +115,7 @@ export function GateBriefSection({
 				nodeId={nodeId}
 				value={fields.situation ?? ""}
 				className="font-sans text-sm"
-				placeholder="The tests pass, but the change touches billing."
+				placeholder="The reply is ready, but it offers a refund."
 				onChange={(value) => onChange(set("situation", text(value)))}
 			/>
 			<TemplateField
@@ -126,7 +126,9 @@ export function GateBriefSection({
 				nodeId={nodeId}
 				value={fields.background ?? ""}
 				className="font-sans text-sm"
-				placeholder={"- The tests pass (source: CI)\n- {{review.summary}}"}
+				placeholder={
+					"- The order came 5 days late (source: orders)\n- {{review.summary}}"
+				}
 				onChange={(value) => onChange(set("background", text(value)))}
 			/>
 			{options ? (
@@ -330,7 +332,7 @@ function RecommendFields({
 					nodeId={nodeId}
 					value={recommend.reason ?? ""}
 					multiline={false}
-					placeholder="The change is small and the tests pass."
+					placeholder="The refund is small and the order was late."
 					onChange={(next) =>
 						onChange((current) => {
 							if (!current.recommend) return current;

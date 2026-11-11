@@ -507,7 +507,7 @@ function Composer({
 			) : null}
 			<PromptInput
 				label="Message to the agent"
-				placeholder="Example: Run the tests after the build, and ask me before you open a pull request."
+				placeholder="Example: Each morning, find news on my topic, and ask me before you send it."
 				value={text}
 				onValueChange={setText}
 				onSubmit={(value) => {

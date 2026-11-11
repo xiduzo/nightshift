@@ -171,7 +171,7 @@ function MakeSubflowForm({
 					id={`${id}-name`}
 					value={name}
 					onChange={(event) => setName(event.target.value)}
-					placeholder="code-review"
+					placeholder="write-report"
 					className="font-mono"
 					autoComplete="off"
 					spellCheck={false}

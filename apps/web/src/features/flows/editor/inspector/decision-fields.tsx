@@ -68,16 +68,14 @@ export function DecisionFields({
 			? {
 					label: "Question",
 					hint: "Write the question in Markdown, with the context you need to answer. It shows in the Needs-you inbox.",
-					placeholder:
-						"The worker opened {{worker.summary}}. Merge it and continue?",
+					placeholder: "The agent wrote a reply: {{draft.summary}}. Send it?",
 					invalid: node.prompt.trim() === "",
 				}
 			: by === "model"
 				? {
 						label: "Prompt",
 						hint: "Say what to decide, and give the context it needs. The model picks one option and says why.",
-						placeholder:
-							"Read {{check.log_tail}}. Is the build green enough to open a pull request?",
+						placeholder: "Read {{news.summary}}. Is this news worth a report?",
 						invalid: node.prompt.trim() === "",
 					}
 				: {

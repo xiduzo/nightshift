@@ -61,7 +61,7 @@ export function EndFields({
 				flow={flow}
 				nodeId={node.id}
 				value={node.message ?? ""}
-				placeholder="No open issues for {{label}}"
+				placeholder="Nothing new about {{topic}}"
 				multiline={false}
 				onChange={(message) =>
 					onChange(({ message: _, ...current }) =>

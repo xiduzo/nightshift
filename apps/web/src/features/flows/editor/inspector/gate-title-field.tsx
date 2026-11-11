@@ -36,7 +36,7 @@ export function GateTitleField({
 					? `Use at most ${GATE_TITLE_MAX} characters. Put the details in the question.`
 					: null
 			}
-			placeholder="Merge the green pull requests?"
+			placeholder="Send the reply to the customer?"
 			onChange={(text) => {
 				const line = text.replace(/\s*\n\s*/g, " ");
 				onChange(line.trim() === "" ? undefined : line);

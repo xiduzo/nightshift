@@ -41,7 +41,7 @@ export function LeaseFields({
 				flow={flow}
 				nodeId={node.id}
 				value={node.name}
-				placeholder="branch:{{pr.data.head}}"
+				placeholder="account:{{account}}"
 				multiline={false}
 				invalid={node.name.trim() === ""}
 				onChange={(name) => onChange((current) => ({ ...current, name }))}
