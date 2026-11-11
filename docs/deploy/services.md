@@ -45,13 +45,13 @@ tests against it and asks an agent to explain a failure.
 ```json
 {
   "nodes": [
-    { "id": "ports", "type": "lease", "name": "zac-docker-stack", "waitMinutes": 60 },
+    { "id": "ports", "type": "lease", "name": "docker-stack", "waitMinutes": 60 },
     {
       "id": "stack",
       "type": "service",
-      "start": "docker compose -p zac-e2e up -d",
+      "start": "docker compose -p acme-e2e up -d",
       "ready": { "url": "http://127.0.0.1:8080/health", "everySeconds": 5, "timeoutMinutes": 10 },
-      "stop": "docker compose -p zac-e2e down -v"
+      "stop": "docker compose -p acme-e2e down -v"
     },
     { "id": "tests", "type": "command", "command": "BASE_URL=http://127.0.0.1:8080 bun run test:e2e" },
     {
@@ -83,7 +83,7 @@ command. This check passes when the server answers, and writes the address
 as the step's data:
 
 ```sh
-port="$(docker compose -p zac-e2e port web 8080 | cut -d: -f2)"
+port="$(docker compose -p acme-e2e port web 8080 | cut -d: -f2)"
 curl -fs "http://127.0.0.1:$port/health" > /dev/null &&
   printf '{"url": "http://127.0.0.1:%s"}' "$port" > "$NS_OUTPUT"
 ```

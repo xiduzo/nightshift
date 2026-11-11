@@ -168,7 +168,7 @@ Agents page, then the tool, then Edit:
 - **Several accounts of one program.** Add one tool per account: `gh` and
   `gh-work` both run the program `gh`, each with its own token. The agent
   types the tool's name. Say which account it is in the description.
-  A command also uses the tool's name: `acli-dimpact jira ...`, not
+  A command also uses the tool's name: `acli-work jira ...`, not
   `acli jira ...`. The second one runs without the login. The flow editor
   warns about such a command, and lists the tools you can insert.
 - **A program that keeps its sign-in in a file**, such as acli: turn on
@@ -182,10 +182,10 @@ Agents page, then the tool, then Edit:
 
   ```text
   Program          acli
-  Name             acli-dimpact
+  Name             acli-work
   Folder variable  HOME
-  Sign-in command  acli jira auth login --site dimpact.atlassian.net --email you@example.com --token
-  Input            ${DIMPACT_ATLASSIAN_TOKEN}
+  Sign-in command  acli jira auth login --site example.atlassian.net --email you@example.com --token
+  Input            ${ACLI_WORK_TOKEN}
   ```
 
 - **Git host.** In the steps that have the tool, `git push` to this host
