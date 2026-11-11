@@ -7,7 +7,6 @@
 
 export {
 	asDate,
-	atWall,
 	DAY_MS,
 	dayKey,
 	dayStart,
@@ -26,7 +25,6 @@ export {
 	now,
 	parseInstant,
 	type Wall,
-	type WallTime,
 	wall,
 } from "./clock";
 export {
@@ -39,5 +37,6 @@ export {
 	formatTime,
 	formatWeekday,
 	formatWeekdayDate,
+	formatWeekdayDateYear,
 	hoverTime,
 } from "./format";

@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import type { DashboardSummary } from "@nightshift/client";
 
-import { nightsFacts } from "./console";
+import { daysFacts } from "./console";
 
 type Nights = DashboardSummary["nights"][number];
 type Totals = Nights["totals"];
@@ -27,10 +27,10 @@ function summaryOf(
 	} as unknown as DashboardSummary;
 }
 
-describe("nightsFacts", () => {
+describe("daysFacts", () => {
 	test("shows the runs, the share that finished and the spend of last week", () => {
 		expect(
-			nightsFacts(
+			daysFacts(
 				summaryOf(7, {
 					runs: 9,
 					ended: 8,
@@ -46,8 +46,8 @@ describe("nightsFacts", () => {
 		]);
 	});
 
-	test("has no share without an ended run, and is null when the Host does not count the nights", () => {
-		expect(nightsFacts(summaryOf(7, {}))?.[1]?.value).toBe("—");
-		expect(nightsFacts(summaryOf(30, { runs: 1 }))).toBeNull();
+	test("has no share without an ended run, and is null when the Host does not count the days", () => {
+		expect(daysFacts(summaryOf(7, {}))?.[1]?.value).toBe("—");
+		expect(daysFacts(summaryOf(30, { runs: 1 }))).toBeNull();
 	});
 });

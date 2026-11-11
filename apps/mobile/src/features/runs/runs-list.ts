@@ -1,6 +1,6 @@
 import {
-	atWall,
 	costLabel,
+	dayLabel,
 	flowLabel,
 	hasEnded,
 	type RunStatus,
@@ -13,7 +13,7 @@ import { matches, queryWords } from "@/shared/match";
 
 /**
  * The Runs tab without React Native: its status chips and their counts,
- * the runs a chip and a search show, the nights that group them, and the
+ * the runs a chip and a search show, the days that group them, and the
  * line under each run.
  */
 
@@ -162,93 +162,30 @@ export function shownRuns<
 /** How many runs the list reads at first, and how many more it reads each time you scroll near the end. */
 export const RUNS_PAGE = 30;
 
-const DAY = 24 * 60 * 60_000;
-
-/** A night starts at noon: a run that starts before noon belongs to the night before. */
-const NOON = 12;
-
-const WEEKDAYS = [
-	"Sunday",
-	"Monday",
-	"Tuesday",
-	"Wednesday",
-	"Thursday",
-	"Friday",
-	"Saturday",
-] as const;
-
-const MONTHS = [
-	"January",
-	"February",
-	"March",
-	"April",
-	"May",
-	"June",
-	"July",
-	"August",
-	"September",
-	"October",
-	"November",
-	"December",
-] as const;
-
 function clock(at: number): string {
 	const shown = wall(at);
 	return `${String(shown.hour).padStart(2, "0")}:${String(shown.minute).padStart(2, "0")}`;
 }
 
-/** The evening a moment belongs to: midnight that starts that day, on this phone. */
-function eveningOf(at: number): number {
-	const shown = wall(at);
-	const day = shown.hour < NOON ? shown.day - 1 : shown.day;
-	return atWall({ year: shown.year, month: shown.month, day });
-}
+/** The runs of one day, under its heading. */
+export type Day<T> = { label: string; runs: T[] };
 
 /**
- * The night a run started in, in local time. A night runs from noon to
- * the next noon: "Today" since noon today, "Last night" from noon
- * yesterday, then "Thursday night" for the week before, then "Night of
- * 24 October".
+ * Runs, newest first, grouped by the day they started in on this phone:
+ * "Today", "Yesterday", then the weekday and date.
  */
-export function nightLabel(startedAt: number, now: number): string {
-	const today = wall(now);
-	const noonToday = atWall({
-		year: today.year,
-		month: today.month,
-		day: today.day,
-		hour: NOON,
-	});
-	if (startedAt >= noonToday) return "Today";
-	const evening = eveningOf(startedAt);
-	const startOfToday = atWall({
-		year: today.year,
-		month: today.month,
-		day: today.day,
-	});
-	const days = Math.round((startOfToday - evening) / DAY);
-	const shown = wall(evening);
-	if (days <= 1) return "Last night";
-	if (days < 7) return `${WEEKDAYS[shown.weekday]} night`;
-	const year = shown.year === today.year ? "" : ` ${shown.year}`;
-	return `Night of ${shown.day} ${MONTHS[shown.month - 1]}${year}`;
-}
-
-/** The runs of one night, under its heading. */
-export type Night<T> = { label: string; runs: T[] };
-
-/** Runs, newest first, grouped by the night they started in. */
-export function byNight<T extends Pick<RunSummary, "createdAt">>(
+export function byDay<T extends Pick<RunSummary, "createdAt">>(
 	runs: readonly T[],
 	now: number,
-): Night<T>[] {
-	const nights: Night<T>[] = [];
+): Day<T>[] {
+	const days: Day<T>[] = [];
 	for (const run of runs) {
-		const label = nightLabel(run.createdAt, now);
-		const last = nights.at(-1);
+		const label = dayLabel(run.createdAt, now);
+		const last = days.at(-1);
 		if (last?.label === label) last.runs.push(run);
-		else nights.push({ label, runs: [run] });
+		else days.push({ label, runs: [run] });
 	}
-	return nights;
+	return days;
 }
 
 /**

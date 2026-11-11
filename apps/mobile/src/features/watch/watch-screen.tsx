@@ -2,6 +2,7 @@ import {
 	createDashboardQueries,
 	createProjectQueries,
 	type DashboardSummary,
+	dayLabel,
 	hoverTime,
 } from "@nightshift/client";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
@@ -26,16 +27,16 @@ import { TabRootHeader } from "@/shared/header";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { useScreenRefresh, useWhileFocused } from "@/shared/refresh";
+import { DayTiles } from "./day-tiles";
 import {
+	dayLine,
+	dayNumbers,
+	dayOutput,
 	leadText,
-	nightLine,
-	nightNumbers,
-	nightOutput,
 	runningNow,
 	todayLine,
-} from "./last-night";
-import { NightTiles } from "./night-tiles";
-import { NeedsItemRow, NightRunRow } from "./watch-rows";
+} from "./latest-day";
+import { NeedsItemRow, WatchRunRow } from "./watch-rows";
 
 /** The Runs tab, showing only the runs on their way. */
 const RUNNING_RUNS: Href = { pathname: "/runs", params: { filter: "running" } };
@@ -44,7 +45,7 @@ const RUNNING_RUNS: Href = { pathname: "/runs", params: { filter: "running" } };
 const NEEDS_SHOWN = 3;
 
 /**
- * Watch: does something need you, how last night went, what runs now and
+ * Watch: does something need you, how the latest day went, what runs now and
  * what runs tonight, over every Space you are in. In the header, the
  * avatar opens Settings and + starts a run.
  */
@@ -75,7 +76,7 @@ export function WatchScreen() {
 		[projects.data],
 	);
 	const data = summary.data;
-	const numbers = data ? nightNumbers(data) : undefined;
+	const numbers = data ? dayNumbers(data) : undefined;
 	const leadGate = needs.items.find((item) => item.kind === "gate");
 	const leadAt =
 		leadGate?.kind === "gate" ? leadGate.gate.deadline?.at : undefined;
@@ -100,7 +101,11 @@ export function WatchScreen() {
 					</Text>
 					{numbers && data?.lastNight ? (
 						<Text className="text-muted-foreground text-sm">
-							{nightLine(numbers, data.lastNight.runs)}
+							{dayLine(
+								numbers,
+								data.lastNight.runs,
+								dayLabel(data.lastNight.night, now),
+							)}
 						</Text>
 					) : null}
 				</View>
@@ -153,12 +158,12 @@ export function WatchScreen() {
 
 			{data ? (
 				<>
-					<LastNightSection data={data} now={now} />
+					<LatestDaySection data={data} now={now} />
 					<RunningSection data={data} now={now} />
 				</>
 			) : summary.isError ? (
 				<ErrorAlert
-					title="Last night did not load"
+					title="Your runs did not load"
 					message={summary.error.message}
 					fix="Check that this phone is online, then try again."
 					onRetry={() => void summary.refetch()}
@@ -177,29 +182,32 @@ function Section({ children }: { children: ReactNode }) {
 	return <View className="mt-4 gap-3">{children}</View>;
 }
 
-/** Last night: its numbers, and the runs that ended, at most four. */
-function LastNightSection({
+/**
+ * The latest day with runs, under its name ("Today", "Yesterday", "Wed 15
+ * Oct"): its numbers, and the runs that ended, at most four.
+ */
+function LatestDaySection({
 	data,
 	now,
 }: {
 	data: DashboardSummary;
 	now: number;
 }) {
-	const numbers = nightNumbers(data);
-	const ended = nightOutput(data);
+	const numbers = dayNumbers(data);
+	const ended = dayOutput(data);
 	return (
 		<Section>
 			<SectionHead
-				title="Last night"
+				title={data.lastNight ? dayLabel(data.lastNight.night, now) : "Today"}
 				seeAll={{ href: "/runs", label: "All runs" }}
 			/>
 			{numbers ? (
 				<>
-					<NightTiles numbers={numbers} />
+					<DayTiles numbers={numbers} />
 					{ended.length > 0 ? (
 						<ListGroup>
 							{ended.map((run) => (
-								<NightRunRow key={run.id} run={run} now={now} />
+								<WatchRunRow key={run.id} run={run} now={now} />
 							))}
 						</ListGroup>
 					) : null}
@@ -209,7 +217,7 @@ function LastNightSection({
 					<ListRow
 						icon={MoonStar}
 						title="No runs yet"
-						caption="Start a flow tonight. In the morning you see here how it went."
+						caption="Tap + to start a run. You see here how it went."
 					/>
 				</ListGroup>
 			)}
@@ -239,7 +247,7 @@ function RunningSection({
 			{runs.length > 0 ? (
 				<ListGroup>
 					{runs.map((run) => (
-						<NightRunRow key={run.id} run={run} now={now} />
+						<WatchRunRow key={run.id} run={run} now={now} />
 					))}
 				</ListGroup>
 			) : data.open.running > 0 ? (

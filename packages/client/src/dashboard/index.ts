@@ -9,6 +9,7 @@ export {
 	consoleValues,
 	daysOf,
 } from "./console";
+export { dayLabel } from "./day-label";
 export { shortReason } from "./failing";
 export { createDashboardQueries, readerTimeZone } from "./queries";
 export type {

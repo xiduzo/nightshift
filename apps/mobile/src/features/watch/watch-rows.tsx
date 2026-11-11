@@ -17,14 +17,14 @@ import { GateRow } from "@/features/inbox";
 import { formatTime } from "@/shared/format";
 import { ListRow } from "@/shared/list";
 import { runStatusLook } from "@/shared/tone";
-import type { NightRun } from "./last-night";
+import type { WatchRun } from "./latest-day";
 
 /**
- * A run of last night or one at work now: its status, title and project.
+ * A run of the latest day or one at work now: its status, title and project.
  * A run at work shows how long it has been at work, an ended one when it
  * started and what it cost.
  */
-export function NightRunRow({ run, now }: { run: NightRun; now: number }) {
+export function WatchRunRow({ run, now }: { run: WatchRun; now: number }) {
 	const look = runStatusLook(run.status);
 	const atWork = run.status === "running" || run.status === "waiting";
 	const prefetch = useRunPrefetch(useSignedIn().host.orpc);

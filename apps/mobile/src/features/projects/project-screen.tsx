@@ -31,7 +31,7 @@ import { HeaderToolbar } from "@/shared/header";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { useScreenRefresh, useWhileFocused } from "@/shared/refresh";
-import { NightsGlance } from "./nights-glance";
+import { DaysGlance } from "./days-glance";
 import { remoteUrl } from "./remote";
 
 /** How many runs the page shows. "All runs" opens the rest. */
@@ -46,7 +46,7 @@ function newestFirst(runs: RunSummary[]): RunSummary[] {
 }
 
 /**
- * One project, at a glance: what needs you in it, how its last 7 nights
+ * One project, at a glance: what needs you in it, how its last 7 days
  * went and its newest runs. New run starts a run in it.
  */
 export function ProjectScreen({ projectId }: { projectId: string }) {
@@ -78,7 +78,7 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 				<>
 					<ProjectHeader project={project} />
 					<NeedsYou projectId={projectId} />
-					<NightsGlance summary={summary.data} failed={summary.isError} />
+					<DaysGlance summary={summary.data} failed={summary.isError} />
 					<View className="gap-3">
 						<SectionHead
 							title="Runs"
@@ -185,7 +185,7 @@ function ProjectHeader({ project }: { project: Project }) {
 
 /**
  * What waits for you in the project: its open Gates, the runs that
- * stopped last night, and the learnings to check. Each row opens where
+ * stopped in the last 24 hours, and the learnings to check. Each row opens where
  * you act on it.
  */
 function NeedsYou({ projectId }: { projectId: string }) {

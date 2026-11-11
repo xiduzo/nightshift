@@ -4,10 +4,10 @@ import { View } from "react-native";
 
 import { SectionHead } from "@/shared/list";
 import { FactGrid, FactTile } from "@/shared/tiles";
-import { GLANCE_NIGHTS, nightsFacts } from "./console";
+import { daysFacts, GLANCE_DAYS } from "./console";
 
 /** How the project did last week: its runs, the share that finished and what they cost. */
-export function NightsGlance({
+export function DaysGlance({
 	summary,
 	failed,
 }: {
@@ -16,7 +16,7 @@ export function NightsGlance({
 	/** The numbers did not load: the glance stays out. */
 	failed: boolean;
 }) {
-	const title = `Last ${GLANCE_NIGHTS} nights`;
+	const title = `Last ${GLANCE_DAYS} days`;
 	if (!summary) {
 		if (failed) return null;
 		return (
@@ -26,7 +26,7 @@ export function NightsGlance({
 			</View>
 		);
 	}
-	const facts = nightsFacts(summary);
+	const facts = daysFacts(summary);
 	if (!facts) return null;
 	return (
 		<View className="gap-3">

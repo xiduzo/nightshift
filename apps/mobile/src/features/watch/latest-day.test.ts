@@ -3,24 +3,24 @@ import { describe, expect, test } from "bun:test";
 import type { DashboardSummary } from "@nightshift/client";
 import { atLocal, utc } from "@nightshift/client/testing";
 import {
+	dayLine,
+	dayNumbers,
+	dayOutput,
 	type LeadItem,
 	leadText,
-	type NightRun,
-	nightLine,
-	nightNumbers,
-	nightOutput,
 	runningNow,
 	todayLine,
-} from "./last-night";
+	type WatchRun,
+} from "./latest-day";
 
-type LastNight = NonNullable<DashboardSummary["lastNight"]>;
-type Nights = DashboardSummary["nights"][number];
+type LatestDay = NonNullable<DashboardSummary["lastNight"]>;
+type Days = DashboardSummary["nights"][number];
 
 const HOUR = 3_600_000;
-const NIGHT = utc(2026, 9, 22, 12);
+const DAY = utc(2026, 9, 22);
 
-/** Writes a time as hours after the night's noon: "+6". */
-const time = (at: number) => `+${(at - NIGHT) / HOUR}`;
+/** Writes a time as hours after the day's midnight: "+6". */
+const time = (at: number) => `+${(at - DAY) / HOUR}`;
 
 const cost = (costUsd: number, costMissing = 0) => ({
 	costUsd,
@@ -28,12 +28,12 @@ const cost = (costUsd: number, costMissing = 0) => ({
 	costMissing,
 });
 
-function run(id: string, over: Partial<NightRun> = {}): NightRun {
+function run(id: string, over: Partial<WatchRun> = {}): WatchRun {
 	return {
 		id,
 		title: id,
 		status: "finished",
-		createdAt: NIGHT + 6 * HOUR,
+		createdAt: DAY + 6 * HOUR,
 		reason: null,
 		wakeAt: null,
 		branch: `nightshift/${id}`,
@@ -46,24 +46,24 @@ function run(id: string, over: Partial<NightRun> = {}): NightRun {
 	};
 }
 
-/** The night's runs are whole runs: the phone reads only their NightRun part. */
-function lastNight(latest: NightRun[], runs = latest.length): LastNight {
+/** The day's runs are whole runs: the phone reads only their WatchRun part. */
+function latestDay(latest: WatchRun[], runs = latest.length): LatestDay {
 	return {
-		night: NIGHT,
+		night: DAY,
 		runs,
 		cost: cost(1.5),
 		tokens: 0,
-		latest: latest as unknown as LastNight["latest"],
+		latest: latest as unknown as LatestDay["latest"],
 	};
 }
 
-function nights(range: Nights["nights"], perNight: Nights["runs"]["perNight"]) {
-	return { nights: range, runs: { perNight } } as unknown as Nights;
+function days(range: Days["nights"], perNight: Days["runs"]["perNight"]) {
+	return { nights: range, runs: { perNight } } as unknown as Days;
 }
 
 function summary(over: Partial<DashboardSummary> = {}): DashboardSummary {
 	return {
-		at: NIGHT + 20 * HOUR,
+		at: DAY + 20 * HOUR,
 		recent: [],
 		open: { rows: [], count: 0, running: 0, nextWakeAt: null },
 		activity: [],
@@ -75,20 +75,20 @@ function summary(over: Partial<DashboardSummary> = {}): DashboardSummary {
 	} as DashboardSummary;
 }
 
-describe("nightNumbers", () => {
+describe("dayNumbers", () => {
 	test("has nothing without runs", () => {
-		expect(nightNumbers(summary())).toBeNull();
+		expect(dayNumbers(summary())).toBeNull();
 	});
 
-	test("counts the night from its night range, and gives its cost", () => {
-		const numbers = nightNumbers(
+	test("counts the day from its range of days, and gives its cost", () => {
+		const numbers = dayNumbers(
 			summary({
-				lastNight: lastNight([run("a")], 9),
+				lastNight: latestDay([run("a")], 9),
 				nights: [
-					nights(7, [
-						{ night: NIGHT - 24 * HOUR, counts: { finished: 5 } },
+					days(7, [
+						{ night: DAY - 24 * HOUR, counts: { finished: 5 } },
 						{
-							night: NIGHT,
+							night: DAY,
 							counts: {
 								finished: 6,
 								failed: 2,
@@ -110,10 +110,10 @@ describe("nightNumbers", () => {
 		});
 	});
 
-	test("counts a night older than every range from its runs, when it lists them all", () => {
-		const numbers = nightNumbers(
+	test("counts a day older than every range from its runs, when it lists them all", () => {
+		const numbers = dayNumbers(
 			summary({
-				lastNight: lastNight([
+				lastNight: latestDay([
 					run("a"),
 					run("b", { status: "failed" }),
 					run("c", { status: "stopped" }),
@@ -128,9 +128,9 @@ describe("nightNumbers", () => {
 		});
 	});
 
-	test("does not guess the counts when it lists part of an old night", () => {
-		const numbers = nightNumbers(
-			summary({ lastNight: lastNight([run("a")], 8) }),
+	test("does not guess the counts when it lists part of an old day", () => {
+		const numbers = dayNumbers(
+			summary({ lastNight: latestDay([run("a")], 8) }),
 		);
 		expect(numbers).toMatchObject({
 			finished: null,
@@ -141,15 +141,15 @@ describe("nightNumbers", () => {
 });
 
 describe("runningNow", () => {
-	test("joins the open runs and the night's runs at work, once each, the newest first", () => {
-		const old = run("old", { status: "running", createdAt: NIGHT });
-		const fresh = run("fresh", { status: "running", createdAt: NIGHT + HOUR });
+	test("joins the open runs and the day's runs at work, once each, the newest first", () => {
+		const old = run("old", { status: "running", createdAt: DAY });
+		const fresh = run("fresh", { status: "running", createdAt: DAY + HOUR });
 		const list = runningNow(
 			summary({
 				open: {
 					rows: [
 						old,
-						run("gate", { status: "waiting", createdAt: NIGHT + 2 * HOUR }),
+						run("gate", { status: "waiting", createdAt: DAY + 2 * HOUR }),
 						run("asleep", { status: "sleeping" }),
 						fresh,
 					],
@@ -157,18 +157,18 @@ describe("runningNow", () => {
 					running: 2,
 					nextWakeAt: null,
 				},
-				lastNight: lastNight([fresh, run("done")]),
+				lastNight: latestDay([fresh, run("done")]),
 			}),
 		);
 		expect(list.map((r) => r.id)).toEqual(["gate", "fresh", "old"]);
 	});
 });
 
-describe("nightOutput", () => {
-	test("lists the night's runs that ended, in the summary's order", () => {
-		const list = nightOutput(
+describe("dayOutput", () => {
+	test("lists the day's runs that ended, in the summary's order", () => {
+		const list = dayOutput(
 			summary({
-				lastNight: lastNight([
+				lastNight: latestDay([
 					run("going", { status: "running" }),
 					run("failed", { status: "failed" }),
 					run("asleep", { status: "sleeping" }),
@@ -182,16 +182,16 @@ describe("nightOutput", () => {
 	});
 
 	test("lists at most four", () => {
-		const list = nightOutput(
+		const list = dayOutput(
 			summary({
-				lastNight: lastNight(["a", "b", "c", "d", "e"].map((id) => run(id))),
+				lastNight: latestDay(["a", "b", "c", "d", "e"].map((id) => run(id))),
 			}),
 		);
 		expect(list.map((r) => r.id)).toEqual(["a", "b", "c", "d"]);
 	});
 });
 
-describe("nightLine", () => {
+describe("dayLine", () => {
 	const unknown = {
 		finished: null,
 		failed: null,
@@ -200,16 +200,16 @@ describe("nightLine", () => {
 		costCaption: "",
 	};
 
-	test("counts what finished, failed and stopped", () => {
+	test("names the day and counts what finished, failed and stopped", () => {
 		const numbers = { ...unknown, finished: 4, failed: 1, stopped: 1 };
-		expect(nightLine(numbers, 6)).toBe(
-			"Last night: 4 finished, 1 failed, 1 stopped.",
+		expect(dayLine(numbers, 6, "Today")).toBe(
+			"Today: 4 finished, 1 failed, 1 stopped.",
 		);
 	});
 
 	test("gives the runs when the counts are not known", () => {
-		expect(nightLine(unknown, 12)).toBe("Last night: 12 runs.");
-		expect(nightLine(unknown, 1)).toBe("Last night: 1 run.");
+		expect(dayLine(unknown, 12, "Yesterday")).toBe("Yesterday: 12 runs.");
+		expect(dayLine(unknown, 1, "Wed 21 Oct")).toBe("Wed 21 Oct: 1 run.");
 	});
 });
 
@@ -236,9 +236,9 @@ describe("leadText", () => {
 
 	test("counts the Gates and gives the first deadline", () => {
 		expect(
-			leadText([gate(NIGHT + 19 * HOUR), gate(null), { kind: "run" }], time),
+			leadText([gate(DAY + 19 * HOUR), gate(null), { kind: "run" }], time),
 		).toBe("2 Gates wait for you. Answer the first by +19.");
-		expect(leadText([gate(NIGHT + 19 * HOUR)], time)).toBe(
+		expect(leadText([gate(DAY + 19 * HOUR)], time)).toBe(
 			"1 Gate waits for you. Answer it by +19.",
 		);
 	});

@@ -118,7 +118,7 @@ export function StatTile({
 	);
 }
 
-/** StatTiles two by two: the numbers of "Last night". */
+/** StatTiles two by two: the numbers of the latest day on Watch. */
 export function StatGrid({ children }: { children: ReactNode }) {
 	return <TwoColumns>{children}</TwoColumns>;
 }

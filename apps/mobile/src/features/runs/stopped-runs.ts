@@ -8,7 +8,7 @@ import { useLeftRuns } from "./left-runs";
 /** The statuses of a run that ended before its work was done. */
 const STOPPED = ["failed", "stopped", "interrupted"] as const;
 
-/** How far back a run that stopped still needs you: one night and a morning. */
+/** How far back a run that stopped still needs you: the last 24 hours. */
 const STOPPED_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /** At most this many: older ones wait in Runs. */

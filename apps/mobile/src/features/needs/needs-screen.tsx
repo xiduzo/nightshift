@@ -255,7 +255,7 @@ export function NeedsScreen() {
 									onPress={() => router.navigate("/")}
 									className="h-auto min-h-11 py-2"
 								>
-									<Text>See last night</Text>
+									<Text>See your latest runs</Text>
 								</Button>
 							</EmptyState>
 							<PushCard />

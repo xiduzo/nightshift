@@ -6,7 +6,7 @@ import {
 } from "lucide-react-native";
 
 import { StatGrid, StatTile } from "@/shared/tiles";
-import type { NightNumbers } from "./last-night";
+import type { DayNumbers } from "./latest-day";
 
 function shown(count: number | null | undefined): string | undefined {
 	if (count === undefined) return undefined;
@@ -14,15 +14,15 @@ function shown(count: number | null | undefined): string | undefined {
 }
 
 /**
- * The numbers of last night, two by two: finished, failed and stopped
- * runs, and what the night cost. Skeletons while they load. A tap on a
- * count opens Runs with that filter.
+ * The numbers of the latest day with runs, two by two: finished, failed
+ * and stopped runs, and what the day cost. Skeletons while they load. A
+ * tap on a count opens Runs with that filter.
  */
-export function NightTiles({
+export function DayTiles({
 	numbers,
 }: {
 	/** Undefined while the summary loads. */
-	numbers: NightNumbers | undefined;
+	numbers: DayNumbers | undefined;
 }) {
 	const finished = numbers?.finished;
 	const failed = numbers?.failed;
@@ -35,7 +35,7 @@ export function NightTiles({
 				icon={CircleCheck}
 				tone={finished ? "finished" : "neutral"}
 				href={{ pathname: "/runs", params: { filter: "finished" } }}
-				accessibilityHint="Opens every finished run, not only last night's"
+				accessibilityHint="Opens every finished run, not only this day's"
 			/>
 			<StatTile
 				value={numbers ? shown(failed) : undefined}
@@ -43,7 +43,7 @@ export function NightTiles({
 				icon={CircleX}
 				tone={failed ? "failed" : "neutral"}
 				href={{ pathname: "/runs", params: { filter: "failed" } }}
-				accessibilityHint="Opens every failed or interrupted run, not only last night's"
+				accessibilityHint="Opens every failed or interrupted run, not only this day's"
 			/>
 			<StatTile
 				value={numbers ? shown(stopped) : undefined}
@@ -51,7 +51,7 @@ export function NightTiles({
 				icon={CircleStop}
 				tone={stopped ? "stopped" : "neutral"}
 				href={{ pathname: "/runs", params: { filter: "stopped" } }}
-				accessibilityHint="Opens every stopped run, not only last night's"
+				accessibilityHint="Opens every stopped run, not only this day's"
 			/>
 			<StatTile
 				value={numbers?.cost}

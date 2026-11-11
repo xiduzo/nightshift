@@ -5,7 +5,6 @@
 
 export {
 	asDate,
-	atWall,
 	dayStart,
 	formatDateTime,
 	formatDay,
@@ -15,6 +14,7 @@ export {
 	formatTime,
 	formatWeekday,
 	formatWeekdayDate,
+	formatWeekdayDateYear,
 	hourOf,
 	hoverTime,
 	iso,

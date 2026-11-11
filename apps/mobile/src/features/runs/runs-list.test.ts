@@ -1,14 +1,14 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
 import type { RunStatus, RunSummary } from "@nightshift/client";
+import { formatWeekdayDate } from "@nightshift/client";
 import { atLocal } from "@nightshift/client/testing";
 import {
-	byNight,
+	byDay,
 	countedFilters,
 	filterCounts,
 	filterStatuses,
 	inFilter,
-	nightLabel,
 	runFilterOf,
 	runMeta,
 	runPlace,
@@ -149,49 +149,21 @@ describe("shownRuns", () => {
 	});
 });
 
-describe("nightLabel", () => {
-	const at = (day: number, hour: number, minute = 0) =>
-		atLocal(2026, 9, day, hour, minute);
-
-	test("a night runs from noon to noon", () => {
-		expect(nightLabel(at(31, 6, 40), NOW)).toBe("Last night");
-		expect(nightLabel(at(30, 23, 10), NOW)).toBe("Last night");
-		expect(nightLabel(at(30, 12, 0), NOW)).toBe("Last night");
-		expect(nightLabel(at(30, 11, 59), NOW)).toBe("Thursday night");
-	});
-
-	test("since noon today is Today", () => {
-		const afternoon = at(31, 15, 0);
-		expect(nightLabel(at(31, 13, 0), afternoon)).toBe("Today");
-		expect(nightLabel(at(31, 9, 0), afternoon)).toBe("Last night");
-		expect(nightLabel(at(30, 22, 0), afternoon)).toBe("Last night");
-	});
-
-	test("the week before by its weekday, older nights by their date", () => {
-		expect(nightLabel(at(29, 1, 0), NOW)).toBe("Wednesday night");
-		expect(nightLabel(at(26, 2, 0), NOW)).toBe("Sunday night");
-		expect(nightLabel(at(24, 22, 0), NOW)).toBe("Night of 24 October");
-		expect(nightLabel(atLocal(2025, 11, 30, 23), NOW)).toBe(
-			"Night of 30 December 2025",
-		);
-	});
-});
-
-describe("byNight", () => {
-	test("groups runs, newest first, under the night they started in", () => {
+describe("byDay", () => {
+	test("groups runs, newest first, under the day they started in", () => {
 		const runs = [
 			run({ id: "late", status: "running", createdAt: NOW - 30 * MIN }),
-			run({ id: "early", status: "finished", createdAt: NOW - 8 * 60 * MIN }),
-			run({ id: "before", status: "failed", createdAt: NOW - 30 * 60 * MIN }),
+			run({ id: "early", status: "finished", createdAt: NOW - 7 * 60 * MIN }),
+			run({ id: "evening", status: "failed", createdAt: NOW - 9 * 60 * MIN }),
+			run({ id: "before", status: "failed", createdAt: NOW - 50 * 60 * MIN }),
 		];
+		const thursday = NOW - 50 * 60 * MIN;
 		expect(
-			byNight(runs, NOW).map((night) => [
-				night.label,
-				night.runs.map((r) => r.id),
-			]),
+			byDay(runs, NOW).map((day) => [day.label, day.runs.map((r) => r.id)]),
 		).toEqual([
-			["Last night", ["late", "early"]],
-			["Thursday night", ["before"]],
+			["Today", ["late", "early"]],
+			["Yesterday", ["evening"]],
+			[formatWeekdayDate(thursday), ["before"]],
 		]);
 	});
 });

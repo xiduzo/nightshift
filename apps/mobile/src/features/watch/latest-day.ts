@@ -6,21 +6,21 @@ import {
 } from "@nightshift/client";
 
 /** A run in a dashboard list: its title, status, start, branch and project. */
-export type NightRun = DashboardSummary["open"]["rows"][number];
+export type WatchRun = DashboardSummary["open"]["rows"][number];
 
 function plural(count: number, one: string, many: string): string {
 	return `${count} ${count === 1 ? one : many}`;
 }
 
-/** "12.3K tokens of 9 runs", or "Of 9 runs" when the night used none. */
-function nightCaption(tokens: number, runs: number): string {
+/** "12.3K tokens of 9 runs", or "Of 9 runs" when the day used none. */
+function dayCaption(tokens: number, runs: number): string {
 	const used = tokensLabel(tokens);
 	const count = plural(runs, "run", "runs");
 	return used ? `${used} of ${count}` : `Of ${count}`;
 }
 
-/** The numbers of "Last night". Null where the summary does not tell. */
-export type NightNumbers = {
+/** The numbers of the latest day with runs. Null where the summary does not tell. */
+export type DayNumbers = {
 	finished: number | null;
 	/** Failed and interrupted runs, as the Runs tab's Failed chip counts them. */
 	failed: number | null;
@@ -31,44 +31,48 @@ export type NightNumbers = {
 };
 
 /**
- * How the latest night with runs went: how many of its runs finished,
- * failed and stopped, and what they cost. The counts come from the night
- * ranges. A night older than every range is counted from its runs, when
+ * How the latest day with runs went: how many of its runs finished,
+ * failed and stopped, and what they cost. The counts come from the ranges
+ * of days. A day older than every range is counted from its runs, when
  * the summary lists them all. Null without runs.
  */
-export function nightNumbers(summary: DashboardSummary): NightNumbers | null {
-	const night = summary.lastNight;
-	if (!night) return null;
+export function dayNumbers(summary: DashboardSummary): DayNumbers | null {
+	const day = summary.lastNight;
+	if (!day) return null;
 	const counts = summary.nights
 		.flatMap((range) => range.runs.perNight)
-		.find((entry) => entry.night === night.night)?.counts;
-	const complete = night.latest.length >= night.runs;
+		.find((entry) => entry.night === day.night)?.counts;
+	const complete = day.latest.length >= day.runs;
 	const count = (...statuses: string[]): number | null =>
 		counts
 			? statuses.reduce((sum, status) => sum + (counts[status] ?? 0), 0)
 			: complete
-				? night.latest.filter((run) => statuses.includes(run.status)).length
+				? day.latest.filter((run) => statuses.includes(run.status)).length
 				: null;
 	return {
 		finished: count("finished"),
 		failed: count("failed", "interrupted"),
 		stopped: count("stopped"),
-		cost: formatKnownCost(night.cost),
-		costCaption: nightCaption(night.tokens, night.runs),
+		cost: formatKnownCost(day.cost),
+		costCaption: dayCaption(day.tokens, day.runs),
 	};
 }
 
 /**
- * The muted line under the lead: "Last night: 4 finished, 1 failed, 1
- * stopped." When the summary does not tell the counts: "Last night: 12
- * runs."
+ * The muted line under the lead, with the name of the day ("Today",
+ * "Yesterday", "Wed 15 Oct"): "Today: 4 finished, 1 failed, 1 stopped."
+ * When the summary does not tell the counts: "Today: 12 runs."
  */
-export function nightLine(numbers: NightNumbers, runs: number): string {
+export function dayLine(
+	numbers: DayNumbers,
+	runs: number,
+	day: string,
+): string {
 	const { finished, failed, stopped } = numbers;
 	if (finished === null || failed === null || stopped === null) {
-		return `Last night: ${plural(runs, "run", "runs")}.`;
+		return `${day}: ${plural(runs, "run", "runs")}.`;
 	}
-	return `Last night: ${finished} finished, ${failed} failed, ${stopped} stopped.`;
+	return `${day}: ${finished} finished, ${failed} failed, ${stopped} stopped.`;
 }
 
 /** What waits for you, as the lead needs it: a Gate with its deadline, or something else. */
@@ -128,10 +132,10 @@ function runTokens(run: {
 
 /**
  * The runs at work now, running or waiting, the newest first. The summary
- * lists the oldest open runs and the newest runs of the last night: a run
+ * lists the oldest open runs and the newest runs of the latest day: a run
  * in neither is behind "Runs".
  */
-export function runningNow(summary: DashboardSummary): NightRun[] {
+export function runningNow(summary: DashboardSummary): WatchRun[] {
 	const seen = new Set<string>();
 	return [...summary.open.rows, ...(summary.lastNight?.latest ?? [])]
 		.filter((run) => {
@@ -143,8 +147,8 @@ export function runningNow(summary: DashboardSummary): NightRun[] {
 		.map((run) => ({ ...run, tokens: runTokens(run) }));
 }
 
-/** The runs of the last night that ended, newest first, at most `limit`. */
-export function nightOutput(summary: DashboardSummary, limit = 4): NightRun[] {
+/** The runs of the latest day that ended, newest first, at most `limit`. */
+export function dayOutput(summary: DashboardSummary, limit = 4): WatchRun[] {
 	return (summary.lastNight?.latest ?? [])
 		.filter((run) => !LIVE.has(run.status))
 		.slice(0, limit)

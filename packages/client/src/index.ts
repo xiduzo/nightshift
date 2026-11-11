@@ -33,6 +33,7 @@ export {
 	consoleValues,
 	createDashboardQueries,
 	type DashboardSummary,
+	dayLabel,
 	daysOf,
 	type FailingFlow,
 	type FlowHealthRow,
@@ -301,7 +302,6 @@ export {
 } from "./spaces";
 export {
 	asDate,
-	atWall,
 	formatDateTime,
 	formatDay,
 	formatDayTime,

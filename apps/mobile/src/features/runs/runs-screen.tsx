@@ -32,7 +32,7 @@ import { ScreenList } from "@/shared/page";
 import { useScreenRefresh, useWhileFocused } from "@/shared/refresh";
 import { RunRow } from "./run-row";
 import {
-	byNight,
+	byDay,
 	countedFilters,
 	filterCounts,
 	filterStatuses,
@@ -43,9 +43,9 @@ import {
 	shownRuns,
 } from "./runs-list";
 
-/** One item of the list: the heading of a night, or a run in that night's card. */
+/** One item of the list: the heading of a day, or a run in that day's card. */
 type Item =
-	| { kind: "night"; label: string; count: number }
+	| { kind: "day"; label: string; count: number }
 	| { kind: "run"; item: RunSummary; first: boolean; last: boolean };
 
 /**
@@ -80,7 +80,7 @@ function projectHref(projectId: string): Href {
 
 /**
  * The runs of the Space you chose in the header, newest first and grouped
- * by night. Search them by title, flow or project, and pick a status or a
+ * by day. Search them by title, flow or project, and pick a status or a
  * project with the chips. Pull down, or come back to the tab, to read them
  * again. The next page reads as you scroll near the end.
  */
@@ -103,7 +103,7 @@ export function RunsScreen() {
 	const refresh = useScreenRefresh([runs.refetch, projects.refetch]);
 	const [query, setQuery] = useState("");
 	const searching = query.trim() !== "";
-	// The night headings change at noon.
+	// The day headings change at midnight.
 	const now = useClock(60_000);
 
 	const projectNames = useMemo(
@@ -136,9 +136,9 @@ export function RunsScreen() {
 	);
 	const items = useMemo(
 		() =>
-			byNight(shown, now).flatMap((night): Item[] => [
-				{ kind: "night", label: night.label, count: night.runs.length },
-				...cellsOf(night.runs).map((cell) => ({
+			byDay(shown, now).flatMap((day): Item[] => [
+				{ kind: "day", label: day.label, count: day.runs.length },
+				...cellsOf(day.runs).map((cell) => ({
 					kind: "run" as const,
 					...cell,
 				})),
@@ -151,7 +151,7 @@ export function RunsScreen() {
 
 	const renderItem = useCallback(
 		({ item }: ListRenderItemInfo<Item>) =>
-			item.kind === "night" ? (
+			item.kind === "day" ? (
 				<View className="pt-4 pb-3">
 					<SectionHead
 						title={item.label}
@@ -274,7 +274,7 @@ export function RunsScreen() {
 									<ListRow
 										icon={Folder}
 										title={projectName}
-										caption="See what needs you there and the last 7 nights"
+										caption="See what needs you there and the last 7 days"
 										href={projectHref(projectId)}
 										accessibilityHint="Opens the project"
 									/>
@@ -307,7 +307,7 @@ export function RunsScreen() {
 }
 
 function itemKey(item: Item): string {
-	return item.kind === "night" ? `night:${item.label}` : item.item.id;
+	return item.kind === "day" ? `day:${item.label}` : item.item.id;
 }
 
 function itemType(item: Item): Item["kind"] {
