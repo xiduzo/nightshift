@@ -6,7 +6,9 @@ This document records the concept, the decisions behind it, the architecture and
 
 ## 1. What Night Shift is
 
-Night Shift is a workflow builder like n8n and Zapier, with low-level control. A step can be an agent that works for an hour, and a choice can be a decider. A flow can do any work: research, monitoring, outreach, operations, content, or code. You draw the flow in a graph editor, or you describe it and an agent drafts it. Each node is a step: an agent session with a prompt or a skill, a command, a tool call, a decision, or a Gate. The engine runs the flow on your own computers, with your own CLI logins. It starts on a schedule, from a webhook, or when you click Run. You act only at a Gate.
+Night Shift is a workflow builder like n8n and Zapier, with low-level control. A step can be an agent that works for an hour, and a choice can be a decider. A flow can do any work: research, monitoring, outreach, operations, content, or code.
+
+You draw the flow in a graph editor, or you describe it and an agent drafts it. Each node is a step: an agent session with a prompt or a skill, a command, a tool call, a decision, or a Gate. The engine runs the flow on your own computers, with your own CLI logins. It starts on a schedule, from a webhook, or when you click Run. You act only at a Gate.
 
 Night Shift has no app catalog. A flow reaches an app through its CLI, HTTP, webhooks, MCP, or the agent's own tools.
 

@@ -6,7 +6,9 @@ Last updated: 2026-11-11
 
 ## Product Purpose
 
-People hand work to agents, and then they spend their time watching them. They approve a step, paste an error back, start a stronger model, and check the result. Night Shift lets them engineer that loop once, as a flow that they draw or describe. A flow can do any work: research, monitoring, outreach, operations, content, or code. Each step is an agent session, a command, a tool call, a decision, or a Gate. Work climbs a ladder of agents. Choices climb a ladder of deciders: a rule, a decision model, a large model, a person. The engine owns the order, the retries, the limits and the cost.
+People hand work to agents, and then they spend their time watching them. They approve a step, paste an error back, start a stronger model, and check the result. Night Shift lets them engineer that loop once, as a flow that they draw or describe. A flow can do any work: research, monitoring, outreach, operations, content, or code.
+
+Each step is an agent session, a command, a tool call, a decision, or a Gate. Work climbs a ladder of agents. Choices climb a ladder of deciders: a rule, a decision model, a large model, a person. The engine owns the order, the retries, the limits and the cost.
 
 The person engineers the loop and is its last rung. They are the final fallback when the ladders run out, and the approver before an act that cannot be undone. A person acts only at a Gate, and the aim is a flow that needs them less with each change.
 
