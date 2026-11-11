@@ -6,7 +6,7 @@ import {
 	nodeOutcomes,
 	outputFieldsByType,
 } from "../flow";
-import { outputFieldShape } from "../shapes/fields";
+import { outputFieldShape, typedOutput } from "../shapes/fields";
 import { validateFlow } from "../validate";
 import type { CommandNode } from "./command";
 import {
@@ -210,6 +210,23 @@ describe("the shape of a Convert node's data", () => {
 		expect(outputFieldShape(convert("rows"), "text")).toEqual({
 			type: "string",
 		});
+	});
+});
+
+describe("the schema a Convert node holds its data to", () => {
+	test("is its own output, else its format's shape, which counts as written; to text it has none", () => {
+		expect(typedOutput(convert("rows"))).toEqual({
+			field: "data",
+			schema: convertShape({}),
+			inferred: false,
+		});
+		const output = { type: "array", items: { type: "object" } };
+		expect(
+			typedOutput(convert("rows", { output, outputInferred: true })),
+		).toEqual({ field: "data", schema: output, inferred: true });
+		expect(
+			typedOutput(convert("rows", { from: "html", to: "text" })),
+		).toBeNull();
 	});
 });
 

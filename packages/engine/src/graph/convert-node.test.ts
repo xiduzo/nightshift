@@ -118,7 +118,7 @@ describe("the Convert node", () => {
 		);
 	});
 
-	test("a confirmed output schema fails data that does not match; an inferred one leaves it to the format's shape", async () => {
+	test("an output schema a person wrote fails data that does not match; an inferred one only warns", async () => {
 		const output = {
 			type: "array",
 			items: { type: "object", required: ["email"] },
@@ -127,7 +127,7 @@ describe("the Convert node", () => {
 		const strict = await drive(confirmed, { inputs: { sheet: SHEET } });
 		expect(strict.state.nodes.rows?.outcome).toBe("fail");
 		expect(strict.state.nodes.rows?.note).toBe(
-			"The data does not match the output schema: data/0 must have required property 'email'; data/1 must have required property 'email'.",
+			"The converted data does not match the output schema: data/0 must have required property 'email'; data/1 must have required property 'email'.",
 		);
 		const inferred = await startRun(
 			sandbox,
@@ -135,6 +135,25 @@ describe("the Convert node", () => {
 		);
 		const loose = await drive(inferred, { inputs: { sheet: SHEET } });
 		expect(loose.state.nodes.rows?.outcome).toBe("pass");
+		const [warned] = payloads(await inferred.events(), "RunWarned");
+		expect(warned).toMatchObject({ kind: "shape" });
+		expect(warned?.message).toStartWith(
+			"The converted data does not match the output schema: data/0 must have required property 'email'",
+		);
+	});
+
+	test("the format's own shape counts as written: Night Shift infers no shape for a Convert node", async () => {
+		const kept: unknown[] = [];
+		const h = await startRun(sandbox, around(convert()), {
+			keepShapes: async (_flow, node, shapes) => {
+				kept.push({ node, shapes });
+			},
+		});
+		await drive(h, { inputs: { sheet: SHEET } });
+		expect(kept).toEqual([]);
+		expect(payloads(await h.events(), "StepEnded")[0]).not.toHaveProperty(
+			"shapes",
+		);
 	});
 
 	test("a Value preset reads the rows a Convert node made", async () => {

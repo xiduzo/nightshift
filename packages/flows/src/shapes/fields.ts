@@ -164,6 +164,17 @@ export function typedOutput(node: FlowNode): TypedOutput | null {
 	const field: string | undefined =
 		TYPED_OUTPUT_FIELD[node.type as keyof typeof TYPED_OUTPUT_FIELD];
 	if (field === undefined) return null;
+	if (node.type === "convert") {
+		// To text there is no data. To JSON, the format's own shape holds when
+		// the node names none: Night Shift wrote it, so it counts as written,
+		// and Night Shift infers nothing for a Convert node.
+		if (node.to !== "json") return null;
+		return {
+			field,
+			schema: node.output ?? convertDataShape(node),
+			inferred: node.output !== undefined && node.outputInferred === true,
+		};
+	}
 	const own = node as { output?: Schema; outputInferred?: true };
 	return {
 		field,

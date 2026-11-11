@@ -7,6 +7,7 @@ import {
 	DEFAULT_CONVERT_MAX_BYTES,
 	type Flow,
 	MAX_CONVERT_BYTES,
+	withOutputSchema,
 } from "@nightshift/flows";
 import { Input } from "@nightshift/ui/components/input";
 import {
@@ -155,10 +156,12 @@ export function ConvertFields({
 						nodeId={node.id}
 						output={node.output}
 						description="Empty: the data has the shape of the format. The step fails when the data does not fit."
+						inferred={node.outputInferred === true}
+						onConfirm={() =>
+							onChange((current) => withOutputSchema(current, current.output))
+						}
 						onChange={(output) =>
-							onChange(({ output: _, outputInferred: __, ...current }) =>
-								output === undefined ? current : { ...current, output },
-							)
+							onChange((current) => withOutputSchema(current, output))
 						}
 					/>
 				</InspectorSection>

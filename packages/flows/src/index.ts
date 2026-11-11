@@ -447,7 +447,6 @@ export {
 	sectionPath,
 } from "./sections";
 export {
-	convertDataShape,
 	emptyShape,
 	FILE_FORMAT,
 	fieldNameProblem,

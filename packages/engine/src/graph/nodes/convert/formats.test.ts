@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import {
 	type ConvertNode,
-	convertDataShape,
 	type JsonValue,
+	typedOutput,
 } from "@nightshift/flows";
 import { dataProblem } from "../../output-schema";
 import { type Converted, convertValue } from "./formats";
@@ -12,7 +12,7 @@ import { ConvertProblem } from "./problem";
 /**
  * Each format on a fixture of its own: what it reads into, and that the
  * data matches the shape the format declares in `@nightshift/flows`
- * (`convertDataShape`), so a later node's template paths hold.
+ * (`typedOutput`), so a later node's template paths hold.
  */
 
 const fixture = (name: string) =>
@@ -24,7 +24,16 @@ type Pair = Pick<ConvertNode, "from" | "to" | "delimiter">;
 function read(pair: Pair, text: string): JsonValue {
 	const made = convertValue(pair, { text });
 	if (made.kind !== "data") throw new Error("expected data");
-	expect(dataProblem(convertDataShape(pair), made.data)).toBeNull();
+	const node: ConvertNode = {
+		id: "convert",
+		type: "convert",
+		position: { x: 0, y: 0 },
+		value: "",
+		...pair,
+	};
+	const schema = typedOutput(node)?.schema;
+	expect(schema).toBeDefined();
+	expect(dataProblem(schema ?? {}, made.data)).toBeNull();
 	return made.data;
 }
 

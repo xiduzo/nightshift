@@ -1,6 +1,5 @@
 import {
 	type ConvertNode,
-	convertDataShape,
 	DEFAULT_CONVERT_MAX_BYTES,
 	type JsonValue,
 	renderTemplate,
@@ -14,7 +13,7 @@ import {
 	PLAIN_KIND,
 	type StepContext,
 } from "../../context";
-import { dataProblem, schemaProblem } from "../../output-schema";
+import { outputVerdict } from "../../output-schema";
 import { RESUME_RULES } from "../../resume-point";
 import { type BodyEnd, runStep, type StepHandle } from "../../step-runner";
 import { type Converted, convertValue } from "./formats";
@@ -28,17 +27,19 @@ import { ConvertProblem } from "./problem";
  * step opens, converts and ends in one go, like a Value by rule.
  *
  * `pass` with `data` (to JSON) or `text`; `fail` with why in `note` when
- * the value is too big, does not fit its format, or its data does not
- * match the schema: the node's own `output` when a person wrote or
- * confirmed it, else the format's own shape (`convertDataShape`). An
- * `output` that is not a valid JSON Schema is the flow's mistake: `error`.
+ * the value is too big or does not fit its format. Data to JSON holds to
+ * its schema (`outputVerdict`): the node's own `output`, else the shape
+ * its format declares (`typedOutput` of `@nightshift/flows`), which counts
+ * as written. Data that does not fit ends the step `fail` (a Shape node),
+ * an inferred `output` only warns, and an `output` that is not a valid
+ * JSON Schema is the flow's mistake: `error`.
  */
 export function convertNode(node: ConvertNode, ctx: StepContext): NodeAction {
 	return (state, config) =>
 		runStep(ctx, node, state, config, {
 			rules: RESUME_RULES.fresh,
 			outputs: (step) => convertOutputs("", step.visit),
-			body: async (step) => convertStep(node, step),
+			body: (step) => convertStep(node, step),
 		});
 }
 
@@ -50,7 +51,10 @@ export const CONVERT: NodeKind<ConvertNode> = {
 	resumeRules: () => RESUME_RULES.fresh,
 };
 
-function convertStep(node: ConvertNode, step: StepHandle): BodyEnd {
+async function convertStep(
+	node: ConvertNode,
+	step: StepHandle,
+): Promise<BodyEnd> {
 	const value = inputOf(node, step.tctx);
 	const bytes = "json" in value ? sizeOf(value.json) : byteLength(value.text);
 	const record = (problem: string | null) =>
@@ -77,17 +81,6 @@ function convertStep(node: ConvertNode, step: StepHandle): BodyEnd {
 		);
 	}
 	if ("problem" in value) return fail(value.problem);
-	const schema = schemaOf(node);
-	const invalid = schemaProblem(schema);
-	if (invalid !== null) {
-		record(invalid);
-		return {
-			kind: "end",
-			outcome: "error",
-			outputs: convertOutputs("error", step.visit, { note: invalid }),
-			error: invalid,
-		};
-	}
 	let made: Converted;
 	try {
 		made = convertValue(node, value);
@@ -96,10 +89,19 @@ function convertStep(node: ConvertNode, step: StepHandle): BodyEnd {
 		throw error;
 	}
 	if (made.kind === "data") {
-		const problem = dataProblem(schema, made.data);
-		if (problem !== null) {
-			return fail(`The data does not match the output schema: ${problem}.`);
+		const verdict = outputVerdict(node, made.data);
+		if (verdict.kind === "broken") {
+			record(verdict.message);
+			return {
+				kind: "end",
+				outcome: verdict.outcome,
+				outputs: convertOutputs(verdict.outcome, step.visit, {
+					note: verdict.message,
+				}),
+				error: verdict.outcome === "error" ? verdict.message : null,
+			};
 		}
+		if (verdict.kind === "warning") await step.warn("shape", verdict.message);
 	}
 	record(null);
 	return {
@@ -133,16 +135,6 @@ function inputOf(
 			problem: `The value is not valid JSON: ${error instanceof Error ? error.message : String(error)}.`,
 		};
 	}
-}
-
-/**
- * What the data must match: the node's own `output` when a person wrote
- * or confirmed it, else the shape of the format it reads.
- */
-function schemaOf(node: ConvertNode): Record<string, unknown> {
-	return node.output !== undefined && node.outputInferred !== true
-		? node.output
-		: convertDataShape(node);
 }
 
 function convertOutputs(

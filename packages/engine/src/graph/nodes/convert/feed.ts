@@ -14,7 +14,7 @@ import { ConvertProblem } from "./problem";
 
 /**
  * A feed with feedsmith: RSS, Atom, RDF or JSON Feed, read into one fixed
- * shape (`FEED_ITEM_KEYS` and `convertDataShape` of `@nightshift/flows`),
+ * shape (`FEED_ITEM_KEYS` and `typedOutput` of `@nightshift/flows`),
  * so a later node reads `{{news.data.items}}` the same for each kind.
  * Every field is text, "" when the feed leaves it out. A date is ISO 8601
  * when it reads as one, else the feed's own text.

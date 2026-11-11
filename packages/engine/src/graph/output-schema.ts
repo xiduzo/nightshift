@@ -90,6 +90,7 @@ const DATA_WORDS: Partial<Record<FlowNode["type"], string>> = {
 	value: "The value",
 	command: "The command's data",
 	tool: "The tool's data",
+	convert: "The converted data",
 };
 
 /** Null when `data` matches the schema, else what is wrong, in one line. */
