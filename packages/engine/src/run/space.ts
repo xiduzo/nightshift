@@ -1,7 +1,7 @@
 import { Refusal } from "@nightshift/refusal";
 
 import type { ArtifactStore } from "../artifacts";
-import type { RunCopiesService } from "../cleanup";
+import type { RunCopiesService, RunFilesService } from "../cleanup";
 import type { Actor, StartRunInput } from "../contract";
 import { flowUse, type SpaceFlows } from "../flows";
 import type { Runner } from "../graph";
@@ -61,6 +61,8 @@ export type SpacesDeps = {
 		RunCopiesService,
 		"list" | "removeRunCopy" | "deleteRunBranches"
 	>;
+	/** The files of run folders on this computer. */
+	runFiles: Pick<RunFilesService, "list" | "file">;
 	placement: Pick<PlacementPort, "devicesFor">;
 	/** The Devices a run of the project can run on, the default marked (`start-place.ts`). */
 	placements: StartPlaces["placements"];
@@ -251,6 +253,9 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async listBranches(projectId) {
 				await ready;
+				// A project without a folder has no branches (ADR 22).
+				const found = await projects.find(projectId, spaceId);
+				if (!found.folder) return { current: null, local: [], remote: [] };
 				const row = await projects.get(projectId, spaceId);
 				return deps.listBranches(row.repoPath);
 			},
@@ -367,6 +372,18 @@ export function createSpaces(deps: SpacesDeps) {
 				await ready;
 				await getRunRow(runId, spaceId);
 				return deps.artifacts.file(runId, artifactId);
+			},
+
+			async listRunFiles(runId) {
+				await ready;
+				await getRunRow(runId, spaceId);
+				return deps.runFiles.list(runId);
+			},
+
+			async runFile(runId, path) {
+				await ready;
+				await getRunRow(runId, spaceId);
+				return deps.runFiles.file(runId, path);
 			},
 
 			async startRun(input: StartRunInput) {

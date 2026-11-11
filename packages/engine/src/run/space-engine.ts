@@ -1,6 +1,6 @@
 import type { Schedule, ScheduleIssue } from "@nightshift/flows";
 import type { Artifact } from "../artifacts";
-import type { RunCopies } from "../cleanup";
+import type { RunCopies, RunFiles } from "../cleanup";
 import type {
 	NodeToPlace,
 	OwnDevice,
@@ -22,6 +22,7 @@ import type {
 	RunSummary,
 	StepDetail,
 } from "../read";
+import type { RunFile } from "../run-folders";
 import type { ScheduleList, SchedulePause } from "../schedules";
 import type { KeptValue } from "../variables";
 
@@ -83,7 +84,10 @@ export interface SpaceEngine {
 	 */
 	listDevices(projectId: string, forNode?: NodeToPlace): Promise<OwnDevice[]>;
 
-	/** The local and remote branches of the project's clone, newest first. A run can start from one. */
+	/**
+	 * The local and remote branches of the project's clone, newest first.
+	 * A run can start from one. None for a project without a folder.
+	 */
 	listBranches(projectId: string): Promise<Branches>;
 
 	/**
@@ -221,6 +225,21 @@ export interface SpaceEngine {
 		runId: string,
 		artifactId: string,
 	): Promise<{ artifact: Artifact; path: string } | null>;
+	/**
+	 * The files of a run of a project without a folder (ADR 22) in its
+	 * folder on this computer, and when the cleanup removes them. Empty for
+	 * a run that works in a copy of the project.
+	 */
+	listRunFiles(runId: string): Promise<RunFiles>;
+	/**
+	 * One file of the run's folder on this computer (`path` with `/`
+	 * between folders) and where it is. Null when there is none at that
+	 * path, or a link is on the way.
+	 */
+	runFile(
+		runId: string,
+		path: string,
+	): Promise<{ file: RunFile; path: string } | null>;
 
 	/**
 	 * Validates the flow (refuses one with errors), snapshots it, creates the

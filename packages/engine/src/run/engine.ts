@@ -2,7 +2,7 @@ import { harnessFacts } from "@nightshift/agents/harness-facts";
 import { isCustomHarness, type Schedule } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
 import { createArtifactStore } from "../artifacts";
-import { createRunCopies, startCleanupJob } from "../cleanup";
+import { createRunCopies, createRunFiles, startCleanupJob } from "../cleanup";
 import type { Actor, LeaseHost, MemberChange } from "../contract";
 import {
 	defaultRunSettings,
@@ -134,7 +134,8 @@ import { wakeLeaseSleeps, wakeOfflineSleeps } from "./wake";
  *   (`SpaceFlows`, `SpaceEngine.flows`), and the import of a Clone's
  *   folder from before it. `schedules/`: the scheduler and the webhooks.
  * - `cleanup/`: what ended runs left on this computer (worktrees and
- *   branches), their removal, and the scheduled sweep.
+ *   branches, the files of run folders), their removal, and the
+ *   scheduled sweep.
  * - `projects/`: projects by remote and their Clones on this computer,
  *   over the git port. A project is defined in its Space document. Its
  *   `project` row is the document's projection.
@@ -308,9 +309,9 @@ export type EngineInternals = {
 	runLog?: RunLog;
 	/** How often the runner looks for steps past their time limits that their timers missed. Default 5 000 ms. */
 	overdueSweepMs?: number;
-	/** How long after the engine is ready the cleanup of run copies first sweeps. Default 60 000 ms. */
+	/** How long after the engine is ready the cleanup of run copies and run folders first sweeps. Default 60 000 ms. */
 	cleanupDelayMs?: number;
-	/** How often the cleanup of run copies sweeps. Default 6 h. */
+	/** How often the cleanup of run copies and run folders sweeps. Default 6 h. */
 	cleanupEveryMs?: number;
 };
 
@@ -367,6 +368,9 @@ export function createEngine(
 	/** The walk state of the runs this computer walks, as files (`graph/walk-state.ts`). */
 	const walks = createRunWalks({ db, log: runLog, history });
 
+	/** The run folders on this computer: where runs of projects without a folder work (ADR 22). */
+	const runFolders = createRunFolders(dataDir);
+
 	/**
 	 * The other Devices and Hosts (`Peers`): where steps run, Offers, the
 	 * Host that keeps a Space, and the runs walked elsewhere.
@@ -394,7 +398,7 @@ export function createEngine(
 				projects.defineWithoutFolder(spaceId, input),
 			take: (spaceId, taken) => projects.take(spaceId, taken),
 		},
-		runFolders: createRunFolders(dataDir),
+		runFolders,
 		flows: (projectId) => projectFlows.flows(projectId),
 		profiles: {
 			here: options.profileFor ?? (() => null),
@@ -819,8 +823,19 @@ export function createEngine(
 		now,
 		settings: runSettings,
 	});
+	/** The files of run folders on this computer, and the scheduled cleanup of the folders. */
+	const runFiles = createRunFiles({
+		db,
+		log: runLog,
+		folders: runFolders,
+		runRow: (runId) => getRunRow(db, runId),
+		runState: (runId) => runLog.state(runId),
+		isActive: (runId) => runner.isActive(runId),
+		now,
+		settings: runSettings,
+	});
 	startCleanupJob({
-		sweep: runCopies.sweep,
+		sweeps: { "run copies": runCopies.sweep, "run folders": runFiles.sweep },
 		ready,
 		signal,
 		...(internals.cleanupDelayMs !== undefined
@@ -860,6 +875,7 @@ export function createEngine(
 		runRow: (runId) => getRunRow(db, runId),
 		listBranches,
 		runCopies,
+		runFiles,
 		placement: devices,
 		placements: places.placements,
 		flows: createSpaceFlows({

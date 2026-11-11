@@ -39,3 +39,14 @@ export function cleanupTime(
 ): number {
 	return (run.endedAt ?? run.createdAt) + afterDays * DAY_MS;
 }
+
+/**
+ * When the scheduled cleanup may remove the run folder of a run this
+ * computer does not know: `afterDays` after its last change.
+ */
+export function lastChangeCleanupTime(
+	lastChange: number,
+	afterDays: number,
+): number {
+	return lastChange + afterDays * DAY_MS;
+}

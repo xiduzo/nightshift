@@ -205,10 +205,13 @@ const DEFS = {
 		fromEnv: onOff,
 	} satisfies Def<boolean>,
 	/**
-	 * The cleanup of run worktrees and branches on this computer: an ended
-	 * run's worktree and local branches go once the run is
-	 * `cleanUpAfterDays` old, and only when its work is merged or pushed
-	 * and nothing is left uncommitted (`cleanup/`).
+	 * The cleanup of what runs leave on this computer (`cleanup/`), once an
+	 * ended run is `cleanUpAfterDays` old. A run's worktree and local
+	 * branches go only when its work is merged or pushed and nothing is
+	 * left uncommitted. A run folder (a run of a project without a folder,
+	 * ADR 22) goes with its files, whatever is in it. The folder of a run
+	 * this computer does not know goes `cleanUpAfterDays` after its last
+	 * change. An open run keeps all of it.
 	 */
 	cleanUpRuns: {
 		schema: z.boolean(),

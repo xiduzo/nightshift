@@ -6,10 +6,16 @@ import { cleanupTime, isSafeToRemove } from "./safety";
 test("sweeps after the delay and then on its interval, survives a failed sweep, and stops with the signal", async () => {
 	const controller = new AbortController();
 	let sweeps = 0;
+	let folders = 0;
 	startCleanupJob({
-		sweep: async () => {
-			sweeps++;
-			if (sweeps === 1) throw new Error("git is gone");
+		sweeps: {
+			"run copies": async () => {
+				sweeps++;
+				if (sweeps === 1) throw new Error("git is gone");
+			},
+			"run folders": async () => {
+				folders++;
+			},
 		},
 		ready: Promise.resolve(),
 		signal: controller.signal,
@@ -18,6 +24,8 @@ test("sweeps after the delay and then on its interval, survives a failed sweep, 
 	});
 	// The first sweep fails; the interval still brings the next two.
 	await waitFor(() => sweeps >= 3, { label: "three sweeps" });
+	// The run copies failed once: the run folders were swept all the same.
+	expect(folders).toBeGreaterThanOrEqual(2);
 	controller.abort();
 	const stopped = sweeps;
 	await Bun.sleep(40);
@@ -30,12 +38,14 @@ test("never sweeps twice at once, nor when the engine did not start", async () =
 	let most = 0;
 	let started = 0;
 	startCleanupJob({
-		sweep: async () => {
-			started++;
-			running++;
-			most = Math.max(most, running);
-			await Bun.sleep(30);
-			running--;
+		sweeps: {
+			"run copies": async () => {
+				started++;
+				running++;
+				most = Math.max(most, running);
+				await Bun.sleep(30);
+				running--;
+			},
 		},
 		ready: Promise.resolve(),
 		signal: controller.signal,
@@ -44,8 +54,10 @@ test("never sweeps twice at once, nor when the engine did not start", async () =
 	});
 	let never = 0;
 	startCleanupJob({
-		sweep: async () => {
-			never++;
+		sweeps: {
+			"run copies": async () => {
+				never++;
+			},
 		},
 		ready: Promise.reject(new Error("no database")),
 		signal: controller.signal,
