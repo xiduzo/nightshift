@@ -17,7 +17,7 @@ Your phone needs a [Host](Computers-and-Hosts.md#run-a-host).
 
 | Tab | Shows |
 | --- | --- |
-| **Watch** | The runs of tonight, live. Pause tonight's schedules, or run one now. |
+| **Watch** | What needs you, how your latest day of runs went, and what runs now. Pause tonight's schedules, or run one now. |
 | **Needs you** | The Gates and Asks that wait, with their count. |
 | **Runs** | The runs, their steps, transcripts, and changed files. |
 
@@ -25,7 +25,7 @@ Your phone needs a [Host](Computers-and-Hosts.md#run-a-host).
 - **Start a flow** with its inputs.
 - **The lock screen.** Approve or reject a Gate with two options, when its node allows it.
 - **A Live Activity** follows a run on the lock screen.
-- **A widget** shows the night on the home screen.
+- **A widget** shows on the home screen how many Gates wait and how your latest runs went.
 
 ## Notifications
 

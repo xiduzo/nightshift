@@ -63,4 +63,4 @@ A computer that goes offline does not end the run:
 
 ## Flow health
 
-Flow health shows each flow's runs per night, their cost against the median, why runs failed, and the scores that its commands gave. A Command scores a run with `{"scores": {"found": 4}}` in its data. See [Command](Flows-and-nodes.md#command).
+Flow health shows each flow's runs per day, their cost against the median, why runs failed, and the scores that its commands gave. A Command scores a run with `{"scores": {"found": 4}}` in its data. See [Command](Flows-and-nodes.md#command).

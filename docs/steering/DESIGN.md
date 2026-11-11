@@ -7,7 +7,7 @@ Last updated: 2026-11-11
 ## Design Principles
 
 1. **Show the facts, not a mood** — Every status on screen comes from a fact the user can open: an event, a step's output, a check. No spinner without a session behind it.
-2. **The gate is the product** — The "Needs you" inbox is the most important screen. Its list, as in a mail app, shows the open gates of every Space you are in, grouped by urgency: Now, Today, When you have time. The oldest is first in each group. An answered gate does not go away: it moves to "Answered" below, dimmed, for 90 days. Home sums up the night. The open gate reads as a handover on the left: who asks, the title, then Situation, Background and Recommendation, then the details and links. Your answer is on the right: the options as cards, each with what it does, and a note. The right side stays in place while you read. To resolve a gate takes two actions: pick a choice, then send. Nothing goes out by accident.
+2. **The gate is the product** — The "Needs you" inbox is the most important screen. Its list, as in a mail app, shows the open gates of every Space you are in, grouped by urgency: Now, Today, When you have time. The oldest is first in each group. An answered gate does not go away: it moves to "Answered" below, dimmed, for 90 days. Home sums up the day. The open gate reads as a handover on the left: who asks, the title, then Situation, Background and Recommendation, then the details and links. Your answer is on the right: the options as cards, each with what it does, and a note. The right side stays in place while you read. To resolve a gate takes two actions: pick a choice, then send. Nothing goes out by accident.
 3. **Calm by default** — An unattended run is quiet. The UI shows only changes that need a person. Noise goes to the transcript. A notification goes out only for a gate, a finished run, a failed run or a step that waits for an offline device. It goes only to the screens the person chose, outside their quiet hours.
 4. **Night Shift's words, the flow's content** — The UI names what Night Shift does in the glossary's words: flow, run, step, Gate. The words of a method or a domain (Epic, Trace, a lead) show only as the content of a flow: its names, prompts and outputs. No screen belongs to one method.
 5. **Readable for anyone** — No terminal metaphors. A session is a transcript. A takeover is a button that copies a command.
@@ -75,10 +75,10 @@ An overview shows **at most 5 rows** in a list or table: the Failed lane on Home
 
 A project's page reads like the Performance page of Search Console. Keep its shape:
 
-- One range for the whole page, on top: 7, 30 or 90 nights, in the URL (`?range=30`). No section has a range of its own.
-- Four metric tiles in one row: Runs, Finished, Spend, Gates asked. A tile turns its line on the chart on or off. A tile that is on fills with a light shade of its line's color, and its text is a dark shade (`--metric-<key>-tile` tokens, one pair per theme). Each tile always says how its number moved against the same nights just before. That is not a choice.
-- One line chart of the tiles that are on, with the nights before as a dashed line. The tooltip puts the number before in brackets after each number, not on a row of its own.
-- When the nights before had no runs, there is nothing to compare. The tiles and the chart say so, and the chart draws no dashed lines.
+- One range for the whole page, on top: 7, 30 or 90 days, in the URL (`?range=30`). A day runs from midnight to midnight on your clock. No section has a range of its own.
+- Four metric tiles in one row: Runs, Finished, Spend, Gates asked. A tile turns its line on the chart on or off. A tile that is on fills with a light shade of its line's color, and its text is a dark shade (`--metric-<key>-tile` tokens, one pair per theme). Each tile always says how its number moved against the same days just before. That is not a choice.
+- One line chart of the tiles that are on, with the days before as a dashed line. The tooltip puts the number before in brackets after each number, not on a row of its own.
+- When the days before had no runs, there is nothing to compare. The tiles and the chart say so, and the chart draws no dashed lines.
 - One card with tabs under the chart. Each tab is an overview list (see Overview lists).
 - What runs or waits now shows in one slim line, only when there is something.
 - **Details** on a tile opens the details dialog of that number at the page's range.
@@ -88,8 +88,8 @@ A project's page reads like the Performance page of Search Console. Keep its sha
 
 Home answers "what needs me" over every project. The heading says how many Gates wait and how many flows still fail in the range. Keep its shape:
 
-- The same range as a project's page, on top: 7, 30 or 90 nights, in the URL (`?range=30`).
-- The four numbers in one slim strip: Runs, Finished, Spend, Gates asked. Each has a small line per night, with the nights before dashed. Each says how it moved against them. A number opens its details dialog.
+- The same range as a project's page, on top: 7, 30 or 90 days, in the URL (`?range=30`).
+- The four numbers in one slim strip: Runs, Finished, Spend, Gates asked. Each has a small line per day, with the days before dashed. Each says how it moved against them. A number opens its details dialog.
 - Three lanes in the order you act on them: Running now, Waiting for you, Failed. The lanes have the same height: the height of the tallest. Each has a count. A lane with nothing shows one line that says so.
 - A row is one line: what it is and one fact (when, or how often). The rest shows in a hover card. Long text truncates. It never wraps the row.
 - Waiting for you and Failed show at most 5 rows (see Overview lists). The rest is one link away: the inbox, or **Details**.
