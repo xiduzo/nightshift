@@ -74,6 +74,7 @@ export {
 	type InputTexts,
 	inputProblem,
 	isOptional,
+	looseSchedules,
 	missingInputs,
 } from "./flows";
 export {

@@ -34,7 +34,6 @@ import { Link, useMatchRoute } from "@tanstack/react-router";
 import {
 	BookOpenIcon,
 	BotIcon,
-	CalendarClockIcon,
 	ChevronsUpDownIcon,
 	CircleUserRoundIcon,
 	FolderIcon,
@@ -169,7 +168,6 @@ function NavProjects({ projects }: { projects: Project[] | undefined }) {
 type ProjectPageRoute =
 	| "/projects/$projectId/flows"
 	| "/projects/$projectId/runs"
-	| "/projects/$projectId/schedules"
 	| "/projects/$projectId/knowledge"
 	| "/projects/$projectId/secrets"
 	| "/projects/$projectId/branches";
@@ -181,11 +179,6 @@ const PROJECT_PAGES: {
 }[] = [
 	{ to: "/projects/$projectId/flows", label: "Flows", icon: WorkflowIcon },
 	{ to: "/projects/$projectId/runs", label: "Runs", icon: HistoryIcon },
-	{
-		to: "/projects/$projectId/schedules",
-		label: "Schedules",
-		icon: CalendarClockIcon,
-	},
 	{
 		to: "/projects/$projectId/knowledge",
 		label: "Knowledge",

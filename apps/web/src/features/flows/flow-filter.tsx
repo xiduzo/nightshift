@@ -1,117 +1,67 @@
 import type { FlowOverview } from "@nightshift/client";
-import { Badge } from "@nightshift/ui/components/badge";
 import {
 	InputGroup,
 	InputGroupAddon,
 	InputGroupInput,
 } from "@nightshift/ui/components/input-group";
-import {
-	ToggleGroup,
-	ToggleGroupItem,
-} from "@nightshift/ui/components/toggle-group";
 import { SearchIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
-type Filter = "all" | "own" | "subflow" | "hand" | "look";
-
 /**
- * The filters of the Flows page. They can overlap: a scheduled flow can
- * also be a Subflow. A flow with only paused schedules runs only by hand.
- */
-const FILTERS: {
-	value: Filter;
-	label: string;
-	test: (overview: FlowOverview) => boolean;
-}[] = [
-	{ value: "all", label: "All", test: () => true },
-	{
-		value: "own",
-		label: "Start on their own",
-		test: (overview) => overview.startsOnItsOwn,
-	},
-	{
-		value: "subflow",
-		label: "Subflows",
-		test: (overview) => overview.flow.callers.length > 0,
-	},
-	{
-		value: "hand",
-		label: "Only by hand",
-		test: (overview) =>
-			!overview.startsOnItsOwn && overview.flow.callers.length === 0,
-	},
-	{
-		value: "look",
-		label: "Need a look",
-		test: (overview) => overview.problem !== null,
-	},
-];
-
-/**
- * A search on name and description, and the filters, with how many flows
- * each one keeps. Returns the flows they leave and the bar that sets them.
+ * A search on the name and description of the flows. Returns the flows it
+ * leaves and the field that sets it, for the page heading.
  */
 export function useFlowFilter(overviews: FlowOverview[] | undefined): {
 	shown: FlowOverview[];
-	filtered: boolean;
-	bar: ReactNode;
+	search: ReactNode;
 } {
 	const [query, setQuery] = useState("");
-	const [filter, setFilter] = useState<Filter>("all");
-	const all = overviews ?? [];
-	const test = FILTERS.find((f) => f.value === filter)?.test ?? (() => true);
 	const needle = query.trim().toLowerCase();
-	const shown = all.filter(
+	const shown = (overviews ?? []).filter(
 		(overview) =>
-			test(overview) &&
-			(needle === "" ||
-				overview.flow.name.toLowerCase().includes(needle) ||
-				(overview.flow.description ?? "").toLowerCase().includes(needle)),
+			needle === "" ||
+			overview.flow.name.toLowerCase().includes(needle) ||
+			(overview.flow.description ?? "").toLowerCase().includes(needle),
 	);
 
-	const bar = (
-		<div className="flex flex-wrap items-center gap-2">
-			<InputGroup className="w-full sm:w-64">
-				<InputGroupAddon>
-					<SearchIcon aria-hidden="true" />
-				</InputGroupAddon>
-				<InputGroupInput
-					value={query}
-					onChange={(event) => setQuery(event.target.value)}
-					placeholder="Search flows"
-					aria-label="Search flows"
-				/>
-			</InputGroup>
-			<ToggleGroup
-				variant="outline"
-				size="sm"
-				spacing={0}
-				value={[filter]}
-				onValueChange={(next) => {
-					const [value] = next as Filter[];
-					if (value) setFilter(value);
-				}}
-				aria-label="Show flows"
-			>
-				{FILTERS.map((f) => {
-					const count = all.filter(f.test).length;
-					return (
-						<ToggleGroupItem key={f.value} value={f.value}>
-							{f.label}
-							{f.value !== "all" && count > 0 ? (
-								<Badge
-									variant={f.value === "look" ? "destructive" : "secondary"}
-									className="tabular-nums"
-								>
-									{count}
-								</Badge>
-							) : null}
-						</ToggleGroupItem>
-					);
-				})}
-			</ToggleGroup>
-		</div>
+	const search = (
+		<InputGroup className="w-40 sm:w-64">
+			<InputGroupAddon>
+				<SearchIcon aria-hidden="true" />
+			</InputGroupAddon>
+			<InputGroupInput
+				type="search"
+				value={query}
+				onChange={(event) => setQuery(event.target.value)}
+				placeholder="Find a flow"
+				aria-label="Find a flow"
+			/>
+		</InputGroup>
 	);
 
-	return { shown, filtered: needle !== "" || filter !== "all", bar };
+	return { shown, search };
+}
+
+/** "6 flows. 2 start on a schedule, 1 on a webhook." */
+export function flowsSummary(overviews: readonly FlowOverview[]): string {
+	const on = (kind: "schedule" | "webhook") =>
+		overviews.filter((overview) =>
+			overview.starts.some(
+				(start) =>
+					start.kind !== "subflow" &&
+					start.kind === kind &&
+					start.schedule.enabled,
+			),
+		).length;
+	const total = `${overviews.length} ${overviews.length === 1 ? "flow" : "flows"}.`;
+	const parts = [
+		{ n: on("schedule"), what: "on a schedule" },
+		{ n: on("webhook"), what: "on a webhook" },
+	].filter((part) => part.n > 0);
+	if (parts.length === 0) return `${total} You start each one by hand.`;
+	const said = parts.map(
+		(part, index) =>
+			`${part.n}${index === 0 ? (part.n === 1 ? " starts" : " start") : ""} ${part.what}`,
+	);
+	return `${total} ${said.join(", ")}.`;
 }

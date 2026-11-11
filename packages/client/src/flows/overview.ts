@@ -4,12 +4,14 @@ import type { ScheduleSummary } from "../schedules";
 import type { FlowListItem } from "./types";
 
 /**
- * One way a flow starts besides a person running it: a schedule, a
- * webhook, or a Subflow node in another flow.
+ * One way a flow starts or continues besides a person: a schedule, a
+ * webhook, a webhook that wakes its waiting runs (`signal`), or a
+ * Subflow node in another flow.
  */
 export type FlowStart =
 	| { kind: "schedule"; schedule: ScheduleSummary }
 	| { kind: "webhook"; schedule: ScheduleSummary }
+	| { kind: "signal"; schedule: ScheduleSummary }
 	| { kind: "subflow"; caller: string };
 
 /** Why a flow needs a look, or null. */
@@ -23,9 +25,12 @@ export type FlowOverview = {
 	flow: FlowListItem;
 	/**
 	 * Every way it starts besides you: its schedules and webhooks that are
-	 * on (the next start first), the paused ones, then the flows that run it.
+	 * on (the next start first), the paused ones, the webhooks that wake
+	 * its waiting runs, then the flows that run it.
 	 */
 	starts: FlowStart[];
+	/** Its schedules, in the order of `starts`: the ones that start it, then the ones that wake it. */
+	schedules: ScheduleSummary[];
 	/** It starts on its own: a schedule or a webhook of it is on. */
 	startsOnItsOwn: boolean;
 	/** Its last runs, newest first, and how many of the ended ones finished. */
@@ -55,6 +60,7 @@ export function flowOverviews(
 					(a.nextAt ?? Number.POSITIVE_INFINITY) -
 						(b.nextAt ?? Number.POSITIVE_INFINITY),
 			);
+		const wakers = schedules.filter((schedule) => wakes(schedule, flow));
 		const starts: FlowStart[] = [
 			...own.map(
 				(schedule): FlowStart =>
@@ -62,6 +68,7 @@ export function flowOverviews(
 						? { kind: "webhook", schedule }
 						: { kind: "schedule", schedule },
 			),
+			...wakers.map((schedule): FlowStart => ({ kind: "signal", schedule })),
 			...flow.callers.map((caller): FlowStart => ({ kind: "subflow", caller })),
 		];
 		const lastRuns = healthOf.get(flow.name)?.lastRuns ?? [];
@@ -69,6 +76,7 @@ export function flowOverviews(
 		return {
 			flow,
 			starts,
+			schedules: [...own, ...wakers],
 			startsOnItsOwn: own.some((schedule) => schedule.enabled),
 			lastRuns,
 			ended: ended.length,
@@ -76,6 +84,31 @@ export function flowOverviews(
 			problem: problemOf(flow, lastRuns[0]?.status),
 		};
 	});
+}
+
+/** A webhook that starts no flow and sends a signal one of the flow's Waits waits for. */
+function wakes(schedule: ScheduleSummary, flow: FlowListItem): boolean {
+	return (
+		schedule.flow === undefined &&
+		schedule.signal !== undefined &&
+		flow.signals.includes(schedule.signal.name)
+	);
+}
+
+/**
+ * The schedules no flow holds: one that names a flow the project lacks,
+ * and a webhook whose signal no Wait waits for. The Flows page lists them
+ * apart, so you can fix or remove them.
+ */
+export function looseSchedules(
+	flows: readonly FlowListItem[],
+	schedules: readonly ScheduleSummary[],
+): ScheduleSummary[] {
+	return schedules.filter((schedule) =>
+		schedule.flow === undefined
+			? !flows.some((flow) => wakes(schedule, flow))
+			: !flows.some((flow) => flow.name === schedule.flow),
+	);
 }
 
 function problemOf(

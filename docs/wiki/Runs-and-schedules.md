@@ -21,6 +21,8 @@ You follow each step live: its transcript, the files that it changed, its cost, 
 
 A schedule starts a flow with its inputs at a time of day or on a cron line, for example `0 22 * * 1-5`. It stops the run at its stop time, for example 07:00.
 
+A flow's schedules are on the **Flows** page. Click what starts the flow on its card, or open its ⋯ menu and choose **Schedules**. There you add, change, pause or remove them.
+
 - **The Host runs every schedule.** In a Space without a Host, this computer runs them. A step still runs on the computer that its node names.
 - **A missed time still starts** within the schedule's late window. The default window is 15 minutes, and it can be up to 7 days. The run gets the time it was due as `{{run.due_at}}`.
 - **Past the late window,** Night Shift skips the time and tells the people of the Space that the schedule did not start.
@@ -31,7 +33,7 @@ A Host without a copy of the project refuses the start. The schedule shows why. 
 
 ## Webhooks
 
-A schedule can start when a webhook arrives, in place of a time. Use it to start a flow from GitHub Actions, n8n, Zapier, or a script. A webhook can also wake a Wait with a signal, for example when CI is done.
+A schedule can start when a webhook arrives, in place of a time. Use it to start a flow from GitHub Actions, n8n, Zapier, or a script. A webhook can also wake a Wait with a signal, for example when CI is done. That webhook shows with the flow that waits for the signal.
 
 Each webhook schedule has its own address and a secret. Night Shift accepts a request only with a valid signature (`X-Hub-Signature-256`) or with the secret as a bearer token. See [Start a flow from another tool](https://github.com/xiduzo/nightshift/blob/main/docs/deploy/triggers.md).
 

@@ -197,13 +197,13 @@ apps/web/src/
     shell/                 the app frame (AppShell): theme, sidebar, toasts, the notifications stream, the tab badge
     format/  time/  code/  data-table/  media-query/   other named cross-cutting pieces, each with a barrel
   features/
-    <vertical>/            projects, flows, runs, gates, schedules, agents, devices, notifications, settings, spaces, access, dashboard
+    <vertical>/            projects, flows, runs, gates, agents, devices, notifications, settings, spaces, access, dashboard
       index.ts             the barrel: the only public surface
       queries.ts           query and mutation option factories, polling rules (or queries/ + mutations/)
       <name>-page.tsx      the page a route renders
       types.ts             this vertical's slice of the API types, when contract.ts is not enough
       components/ hooks/ lib/   when the vertical is big enough
-    flows/                 canvas/, editor/ (+ inspector/ one file per node type, io/, lib/), start/ (Start run, the flow's inputs)
+    flows/                 canvas/, editor/ (+ inspector/ one file per node type, io/, lib/), start/ (Start run, the flow's inputs), schedules/ (a flow's schedules and webhooks)
     runs/                  components/ (+ run-page.tsx, details/), hooks/, lib/, transcript/ (+ items/ per group of item kinds)
     settings/              settings-page.tsx, components/ (one file per card), hooks/use-settings-form.ts
     agents/                connections/ (MCP servers, CLI tools and secrets, on the Agents page)
@@ -216,12 +216,12 @@ Imports point one way, so no barrel closes a cycle. Biome's `noImportCycles` fai
 - Routes and `router.tsx` may import any vertical, through its barrel.
 - `shared/shell` composes the features. It is the only shared piece that imports a feature. No feature and no other shared piece imports it. Only the routes and the entry files do. The check enforces this, tests included.
 - The other shared pieces import no feature (checked, tests included). Every feature may use them. When a shared piece needs a feature's rule, `router.tsx` passes it in. Example: `createQueryClient` takes `sendToAccess` from `access`, which sends a refused session to sign in.
-- The features, from the bottom: `access`, `spaces`, `projects`, `agents`, then `flows`, `devices`, `gates`, `runs`, then `notifications`, then `settings`, `schedules` and `dashboard`. A feature imports only features below it. The notifications stream follows the Host for every page, so `notifications` sits above the pages it keeps live. The Settings page shows projects, flows, runs, agent defaults and the notification settings, so `settings` sits above them.
+- The features, from the bottom: `access`, `spaces`, `projects`, `agents`, then `flows`, `devices`, `gates`, `runs`, then `notifications`, then `settings` and `dashboard`. A feature imports only features below it. The notifications stream follows the Host for every page, so `notifications` sits above the pages it keeps live. The Settings page shows projects, flows, runs, agent defaults and the notification settings, so `settings` sits above them.
 - Data can go the other way. Examples: the flow editor reads the settings, and the inbox lists runs. A vertical below the owner of the data imports the owner's `queries.ts` through a peer port (`scripts/check-verticals.ts`), not its barrel. A `queries.ts` imports only `shared/api`, so the port closes no cycle. The check fails on a port that imports another feature. The ports today:
   - `agents`, `flows` and `devices` read `settings/queries`.
   - `gates` reads `runs/queries`.
   - `agents` reads `devices/queries` (the Offers of a profile).
-  - The Flows page reads `schedules/queries` and `dashboard/queries` (what starts each flow, its last runs).
+  - The Flows page reads `dashboard/queries` (each flow's last runs).
   - `projects` reaches `agents/flow-agents-step` when you add a project: you choose which of your agents takes each agent of the starter flows.
 - `devices` and `runs` show each other (the Walker of a run, the runs of an Offer). `devices` reaches the run status badge through a peer port. `flows` reaches the run queries and the status icon through one port, `runs/flows-port.ts` (start a run, a flow's last runs).
 - A concept goes to the vertical that owns it in `docs/glossary.md`, not to its biggest user. Outcomes are declared by flow nodes, so `outcome-badge` is in `flows/canvas`. The Walker is a Device, so `walker-badge` is in `devices`.

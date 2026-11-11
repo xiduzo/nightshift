@@ -56,7 +56,7 @@ CLI when you need them.
 | ✓ [Radio Group](https://ui.shadcn.com/docs/components/radio-group) | One choice from a few visible options. As cards (`FieldLabel` around a horizontal `Field`): a profile's harness, a Gate's choices in the inbox. |
 | ✓ [Select](https://ui.shadcn.com/docs/components/select) | One choice from a list, in a styled popup. |
 | ✓ [Native Select](https://ui.shadcn.com/docs/components/native-select) | One choice through the browser's own `<select>`. Good on touch screens and in dense forms. |
-| ✓ [Switch](https://ui.shadcn.com/docs/components/switch) | An on/off setting that applies at once (a schedule on or off, a Call node's "Run once per item", each notification setting). |
+| ✓ [Switch](https://ui.shadcn.com/docs/components/switch) | An on/off setting that applies at once (a Call node's "Run once per item", each notification setting). |
 | [Slider](https://ui.shadcn.com/docs/components/slider) | A number in a range. |
 | [Calendar](https://ui.shadcn.com/docs/components/calendar) | Pick a date or range on a month grid. |
 | [Date Picker](https://ui.shadcn.com/docs/components/date-picker) | A button or input that opens a Calendar in a Popover. |
@@ -82,7 +82,7 @@ CLI when you need them.
 | --- | --- |
 | ✓ [Dialog](https://ui.shadcn.com/docs/components/dialog) | A modal task: start a run, edit a schedule. |
 | ✓ [Alert Dialog](https://ui.shadcn.com/docs/components/alert-dialog) | Confirm a destructive or irreversible step (stop a run, delete a flow). |
-| ✓ [Sheet](https://ui.shadcn.com/docs/components/sheet) | A panel that slides in from an edge: details beside a list, a run's facts (branch, worktree, times), a flow's revisions in the editor, what an agent changed in one file, the mobile sidebar. |
+| ✓ [Sheet](https://ui.shadcn.com/docs/components/sheet) | A panel that slides in from an edge: details beside a list, a run's facts (branch, worktree, times), a flow's revisions in the editor, a flow's schedules on the Flows page, what an agent changed in one file, the mobile sidebar. |
 | [Drawer](https://ui.shadcn.com/docs/components/drawer) | A bottom sheet for mobile (Vaul). |
 | ✓ [Popover](https://ui.shadcn.com/docs/components/popover) | Small floating content on click: a picker, a short form, the flow editor's issues, the variables a template field offers after `{{`. |
 | ✓ [Tooltip](https://ui.shadcn.com/docs/components/tooltip) | A short label on hover or focus, mostly for icon buttons. The hint of an inspector field, behind an info icon beside its label. Needs `TooltipProvider` (in the root). |

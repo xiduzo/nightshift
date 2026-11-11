@@ -54,14 +54,12 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { type Machine, useSpaceMachines } from "@/features/devices";
-import {
-	BaseRefCombobox,
-	FlowInputFields,
-	flowQueries,
-} from "@/features/flows";
 import { CopyProjectHere, projectQueries } from "@/features/projects";
 import { formatDayTime } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
+import { flowQueries } from "../queries";
+import { BaseRefCombobox } from "../start/base-ref-combobox";
+import { FlowInputFields } from "../start/flow-input-fields";
 import { scheduleQueries } from "./queries";
 import {
 	WebhookFields,
@@ -168,6 +166,7 @@ export function ScheduleDialog({
 	onOpenChange,
 	projectId,
 	schedule,
+	flow,
 	takenIds,
 	saving,
 	onSave,
@@ -177,6 +176,8 @@ export function ScheduleDialog({
 	projectId: string;
 	/** Null adds a new schedule. */
 	schedule: Schedule | null;
+	/** The flow a new schedule starts, until you pick another. */
+	flow?: string;
 	/** The ids of the other schedules. */
 	takenIds: readonly string[];
 	saving: boolean;
@@ -189,6 +190,7 @@ export function ScheduleDialog({
 					<ScheduleForm
 						projectId={projectId}
 						schedule={schedule}
+						flow={flow}
 						takenIds={takenIds}
 						saving={saving}
 						onSave={onSave}
@@ -241,12 +243,14 @@ function webhookProblem(webhook: WebhookForm, startsFlow: boolean) {
 function ScheduleForm({
 	projectId,
 	schedule,
+	flow: firstFlow,
 	takenIds,
 	saving,
 	onSave,
 }: {
 	projectId: string;
 	schedule: Schedule | null;
+	flow?: string;
 	takenIds: readonly string[];
 	saving: boolean;
 	onSave: (schedule: Schedule) => void;
@@ -258,7 +262,9 @@ function ScheduleForm({
 		schedule?.webhook ? "webhook" : "times",
 	);
 	const [webhook, setWebhook] = useState(() => initialWebhook(schedule));
-	const [flow, setFlow] = useState(schedule ? (schedule.flow ?? NO_FLOW) : "");
+	const [flow, setFlow] = useState(
+		schedule ? (schedule.flow ?? NO_FLOW) : (firstFlow ?? ""),
+	);
 	// No flow: a webhook that only wakes waiting runs.
 	const startsFlow = !(trigger === "webhook" && flow === NO_FLOW);
 	// Until the person picks one: the first flow that runs.

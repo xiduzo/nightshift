@@ -59,6 +59,8 @@ export const flowListItemSchema = exact<FlowListItem>()(
 		),
 		/** Its Gates: Decisions a person decides. */
 		gateCount: z.number(),
+		/** The signals its Wait nodes wait for, by name. */
+		signals: z.array(z.string()),
 	}),
 );
 

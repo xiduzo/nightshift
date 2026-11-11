@@ -53,6 +53,8 @@ export type FlowListItem = FlowFile & {
 	nodeTypes: { type: FlowNodeType; count: number }[];
 	/** Its Gates: Decisions a person decides. A run waits for you there. */
 	gateCount: number;
+	/** The signals its Wait nodes wait for, by name, sorted. A webhook that sends one wakes its runs. */
+	signals: string[];
 };
 
 /**

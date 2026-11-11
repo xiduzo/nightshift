@@ -4,13 +4,12 @@ import {
 	type FlowStart,
 } from "@nightshift/client";
 import { describeCron } from "@nightshift/flows";
-import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Card,
+	CardAction,
 	CardContent,
 	CardDescription,
-	CardFooter,
 	CardHeader,
 	CardTitle,
 } from "@nightshift/ui/components/card";
@@ -31,389 +30,315 @@ import { Link } from "@tanstack/react-router";
 import {
 	CalendarClockIcon,
 	CircleAlertIcon,
-	FileWarningIcon,
 	HandIcon,
 	type LucideIcon,
 	MoreHorizontalIcon,
 	PencilIcon,
 	PlayIcon,
+	RadioIcon,
 	Trash2Icon,
-	UserRoundIcon,
 	WebhookIcon,
 	WorkflowIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import {
-	MachineBadge,
-	neededMachines,
-	useSpaceMachines,
-} from "@/features/devices";
-import { RunStatusIcon } from "@/features/runs/flows-port";
-import { hoverTime } from "@/shared/format";
-import { NODE_TYPE } from "./canvas/node-type";
+import { neededMachines, useSpaceMachines } from "@/features/devices";
+import { RunBars } from "@/features/runs/flows-port";
+import { formatDayTime } from "@/shared/format";
 
 /**
- * One flow on the Flows page. It answers four questions in order: what it
- * is, what starts it besides you, what is in it, and how its last runs
- * went. Run and the menu sit in the footer. The card opens the editor.
+ * One flow on the Flows page: what it is, what starts it, and how its
+ * last runs went. A line says what blocks it: errors in the flow, or a
+ * computer it needs that is offline. Run, Edit and Delete are in the menu.
  */
 export function FlowCard({
 	projectId,
 	overview,
 	onRun,
+	onSchedules,
 	onDelete,
 }: {
 	projectId: string;
 	overview: FlowOverview;
 	onRun: () => void;
+	/** Opens the flow's schedules. */
+	onSchedules: () => void;
 	onDelete: () => void;
 }) {
 	const { flow } = overview;
 	return (
-		<Card
-			size="sm"
-			className="relative transition-colors hover:bg-muted/40 has-[a[data-stretched]:focus-visible]:ring-2 has-[a[data-stretched]:focus-visible]:ring-ring/50"
-		>
+		<Card className="[--card-spacing:--spacing(5)]">
 			<CardHeader>
-				<CardTitle className="flex min-w-0 items-center gap-2">
-					{/* The link covers the card, so the card is one target. */}
+				<CardTitle className="min-w-0 truncate">
 					<Link
 						to="/projects/$projectId/flows/$name"
 						params={{ projectId, name: flow.name }}
-						data-stretched=""
-						className="truncate font-mono outline-none after:absolute after:inset-0"
+						className="underline-offset-4 hover:underline"
 					>
 						{flow.name}
 					</Link>
-					<ProblemBadge problem={overview.problem} />
 				</CardTitle>
 				<CardDescription className="line-clamp-2">
 					{flow.description ?? "No description"}
 				</CardDescription>
+				<CardAction>
+					<FlowMenu
+						projectId={projectId}
+						overview={overview}
+						onRun={onRun}
+						onSchedules={onSchedules}
+						onDelete={onDelete}
+					/>
+				</CardAction>
 			</CardHeader>
-			<CardContent className="flex flex-col gap-3">
-				<Part label="Started by">
-					<div className="relative z-10 flex flex-wrap gap-1">
-						<StartChips starts={overview.starts} />
-					</div>
-				</Part>
-				<Steps overview={overview} />
+			<CardContent className="flex flex-col gap-3.5">
+				<Starts starts={overview.starts} onSchedules={onSchedules} />
 				<LastRuns overview={overview} />
+				<Blockers overview={overview} />
 			</CardContent>
-			<CardFooter className="mt-auto gap-2 border-t">
-				<span className="min-w-0 truncate font-mono text-muted-foreground text-xs">
-					{flow.inputs.length > 0 ? (
-						<>
-							<span className="sr-only">Inputs: </span>
-							{flow.inputs
-								.map((input) => `${input.name}${input.required ? "" : "?"}`)
-								.join(", ")}
-						</>
-					) : (
-						"No inputs"
-					)}
-				</span>
-				<FlowActions
-					projectId={projectId}
-					overview={overview}
-					onRun={onRun}
-					onDelete={onDelete}
-				/>
-			</CardFooter>
 		</Card>
 	);
 }
 
-function Part({ label, children }: { label: string; children: ReactNode }) {
+/** One fact of the card: a small icon and a short text. */
+function Fact({
+	icon: Icon,
+	className,
+	children,
+}: {
+	icon: LucideIcon;
+	className?: string;
+	children: ReactNode;
+}) {
 	return (
-		<div className="flex flex-col gap-1.5">
-			<span className="font-medium text-muted-foreground text-xs">{label}</span>
+		<span className={cn("inline-flex items-center gap-1.5 text-xs", className)}>
+			<Icon
+				className="size-3.5 shrink-0 text-muted-foreground"
+				aria-hidden="true"
+			/>
 			{children}
-		</div>
+		</span>
 	);
 }
 
 const START_ICON: Record<FlowStart["kind"], LucideIcon> = {
 	schedule: CalendarClockIcon,
 	webhook: WebhookIcon,
+	signal: RadioIcon,
 	subflow: WorkflowIcon,
 };
 
-/** A short name for a way it starts: "Daily 22:00", "Webhook", "In night". */
+/** A short name for a way it starts: "Every day at 22:00", "Webhook", "Wakes on ci-done", "In night". */
 function startText(start: FlowStart): string {
 	if (start.kind === "subflow") return `In ${start.caller}`;
 	if (start.kind === "webhook") return "Webhook";
+	if (start.kind === "signal") {
+		return `Wakes on ${start.schedule.signal?.name ?? "a webhook"}`;
+	}
 	if (!start.schedule.cron) return "Never";
-	const text = describeCron(start.schedule.cron)
-		.replace(/^every day at /, "daily ")
-		.replace(/^weekdays at /, "weekdays ");
+	const text = describeCron(start.schedule.cron);
 	return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-/** What the chip's tooltip says: the whole schedule, or who runs it. */
-function startHint(
-	start: FlowStart,
-	machines: ReturnType<typeof useSpaceMachines>,
-): string {
+/** What a start's tooltip says: when it starts next, or who runs it. */
+function startHint(start: FlowStart): string {
 	if (start.kind === "subflow") {
 		return `A Subflow node in ${start.caller} runs this flow.`;
 	}
 	if (!start.schedule.enabled) return "This schedule is paused.";
 	if (start.kind === "webhook") return "Starts when a webhook arrives.";
+	if (start.kind === "signal") {
+		return "A webhook wakes the runs that wait for this signal.";
+	}
 	const { nextAt } = start.schedule;
 	return nextAt === null
 		? "No next start."
-		: `Starts next on ${hoverTime(nextAt, {
-				zone: start.schedule.timeZone,
-				device: machines?.starter.name,
-			})}.`;
+		: `Starts next on ${formatDayTime(nextAt)}.`;
 }
 
-/** Every way the flow starts besides you, one chip each. */
-function StartChips({ starts }: { starts: FlowStart[] }) {
-	const machines = useSpaceMachines();
+/**
+ * What starts it: a schedule, a webhook, another flow, or only you. Each
+ * one opens the flow's schedules, where you add, change or pause them.
+ */
+function Starts({
+	starts,
+	onSchedules,
+}: {
+	starts: FlowOverview["starts"];
+	onSchedules: () => void;
+}) {
+	const opener = (label: string) => (
+		<Button
+			variant="link"
+			size="xs"
+			className="h-auto p-0 text-foreground"
+			onClick={onSchedules}
+			aria-label={label}
+		/>
+	);
 	if (starts.length === 0) {
 		return (
-			<Badge variant="outline" className="font-normal text-muted-foreground">
-				<HandIcon aria-hidden="true" />
-				Only by hand
-			</Badge>
+			<span className="inline-flex">
+				<Tooltip>
+					<TooltipTrigger render={opener("By hand. Add a schedule.")}>
+						<Fact icon={HandIcon}>By hand</Fact>
+					</TooltipTrigger>
+					<TooltipContent>
+						You start it. Add a schedule to run it on its own.
+					</TooltipContent>
+				</Tooltip>
+			</span>
 		);
 	}
-	return starts.map((start, index) => {
-		const Icon = START_ICON[start.kind];
-		const paused = start.kind !== "subflow" && !start.schedule.enabled;
-		return (
-			<Tooltip key={index}>
-				<TooltipTrigger
-					render={
-						<Badge
-							variant={paused ? "outline" : "secondary"}
-							className={cn(
-								"font-normal",
-								start.kind === "subflow" && "font-mono",
-								paused && "text-muted-foreground line-through",
-							)}
-						/>
-					}
-				>
-					<Icon aria-hidden="true" />
-					{startText(start)}
-					{paused ? <span className="sr-only"> (paused)</span> : null}
-				</TooltipTrigger>
-				<TooltipContent>{startHint(start, machines)}</TooltipContent>
-			</Tooltip>
-		);
-	});
+	return (
+		<div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+			{starts.map((start, index) => {
+				const paused = start.kind !== "subflow" && !start.schedule.enabled;
+				const label = `${startText(start)}${paused ? " (paused)" : ""}`;
+				return (
+					<Tooltip key={index}>
+						<TooltipTrigger
+							render={
+								start.kind === "subflow" ? (
+									<span className="inline-flex" />
+								) : (
+									opener(label)
+								)
+							}
+							aria-label={label}
+						>
+							<Fact
+								icon={START_ICON[start.kind]}
+								className={cn(
+									start.kind === "subflow" && "font-mono",
+									paused && "text-muted-foreground line-through",
+								)}
+							>
+								{startText(start)}
+							</Fact>
+						</TooltipTrigger>
+						<TooltipContent>{startHint(start)}</TooltipContent>
+					</Tooltip>
+				);
+			})}
+		</div>
+	);
 }
 
-/** Its node types with a count each, whether a run asks you, and the computers it needs. */
-function Steps({ overview }: { overview: FlowOverview }) {
-	const { flow } = overview;
+/** Its last runs as bars, oldest on the left, so the newest sits at the end. */
+function LastRuns({ overview }: { overview: FlowOverview }) {
+	const { lastRuns } = overview;
+	return (
+		<div className="flex flex-col gap-1.5">
+			<span className="text-muted-foreground text-xs">
+				{lastRuns.length === 0 ? "Never run" : "Last runs"}
+			</span>
+			{lastRuns.length > 0 ? (
+				<RunBars
+					runs={[...lastRuns].reverse().map((run) => ({
+						runId: run.runId,
+						status: run.status,
+						hint: formatDayTime(run.startedAt),
+					}))}
+				/>
+			) : (
+				<div className="h-4" />
+			)}
+		</div>
+	);
+}
+
+/** Why a run cannot start or finish now: errors in the flow, or an offline computer. */
+function Blockers({ overview }: { overview: FlowOverview }) {
+	const { flow, problem } = overview;
 	const machines = useSpaceMachines();
 	// The run's own computer is the one you start it on: only what the flow names.
-	const needs = machines ? neededMachines(machines, false, flow.devices) : [];
-	if (flow.nodeTypes.length === 0) return null;
+	const offline = (
+		machines ? neededMachines(machines, false, flow.devices) : []
+	).filter((machine) => machine.online === false);
+	const lines = [
+		problem?.kind === "does-not-load"
+			? "This flow does not load. Open it to see why."
+			: problem?.kind === "errors"
+				? `${problem.count} ${problem.count === 1 ? "error" : "errors"} in this flow. Fix them in the editor.`
+				: null,
+		...offline.map(
+			(machine) =>
+				`${machine.name} is offline. Its steps cannot run until it is back.`,
+		),
+	].filter((line): line is string => line !== null);
+	if (lines.length === 0) return null;
 	return (
-		<Part label="Steps">
-			<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground text-xs">
-				{flow.nodeTypes.map(({ type, count }) => {
-					const { icon: Icon, label } = NODE_TYPE[type];
-					return (
-						<Tooltip key={type}>
-							<TooltipTrigger
-								render={
-									<span className="relative z-10 inline-flex items-center gap-1 tabular-nums" />
-								}
-							>
-								<Icon className="size-3.5" aria-hidden="true" />
-								{count}
-								<span className="sr-only">{label}</span>
-							</TooltipTrigger>
-							<TooltipContent>
-								{label}: {count}
-							</TooltipContent>
-						</Tooltip>
-					);
-				})}
-				{flow.gateCount > 0 ? (
-					<span className="inline-flex items-center gap-1 text-foreground">
-						<UserRoundIcon className="size-3.5" aria-hidden="true" />
-						Asks you {flow.gateCount === 1 ? "once" : `${flow.gateCount} times`}
-					</span>
-				) : null}
-			</div>
-			{needs.length > 0 ? (
-				<div className="flex flex-wrap items-center gap-1.5 text-muted-foreground text-xs">
-					<span>Needs</span>
-					{needs.map((machine) => (
-						<MachineBadge
-							key={machine.name}
-							machine={machine}
-							label="Steps of this flow run here."
-							className="relative z-10"
-						/>
-					))}
-				</div>
-			) : null}
-		</Part>
+		<ul className="flex flex-col gap-0.5">
+			{lines.map((line) => (
+				<li
+					key={line}
+					className="flex items-start gap-1.5 text-destructive text-xs"
+				>
+					<CircleAlertIcon
+						className="mt-px size-3.5 shrink-0"
+						aria-hidden="true"
+					/>
+					{line}
+				</li>
+			))}
+		</ul>
 	);
 }
 
-/** The status of its last runs, newest first, and how many that ended finished. */
-function LastRuns({ overview }: { overview: FlowOverview }) {
-	const { lastRuns, ended, finished } = overview;
-	if (lastRuns.length === 0) {
-		return (
-			<Part label="Last runs">
-				<span className="text-muted-foreground text-xs">Never run</span>
-			</Part>
-		);
-	}
-	return (
-		<Part
-			label={
-				lastRuns.length === 1 ? "Last run" : `Last ${lastRuns.length} runs`
-			}
-		>
-			<div className="flex items-end justify-between gap-2">
-				<div className="flex items-center gap-0.5">
-					{lastRuns.map((run, index) => (
-						<Link
-							// A run that calls the flow twice shows twice.
-							key={`${run.runId}-${index}`}
-							to="/runs/$runId"
-							params={{ runId: run.runId }}
-							className="relative z-10 rounded-sm p-0.5 hover:bg-muted"
-						>
-							<RunStatusIcon status={run.status} className="[&>svg]:size-3.5" />
-						</Link>
-					))}
-				</div>
-				{ended > 0 ? (
-					<div className="flex flex-col items-end gap-0.5 tabular-nums">
-						<span className="font-medium text-lg leading-none">
-							{Math.round((finished / ended) * 100)}%
-						</span>
-						<span className="text-muted-foreground text-xs">
-							{finished} of {ended} finished
-						</span>
-					</div>
-				) : null}
-			</div>
-		</Part>
-	);
-}
-
-function ProblemBadge({ problem }: { problem: FlowOverview["problem"] }) {
-	if (!problem) return null;
-	if (problem.kind === "does-not-load") {
-		return (
-			<Badge variant="destructive">
-				<FileWarningIcon aria-hidden="true" />
-				Does not load
-			</Badge>
-		);
-	}
-	if (problem.kind === "errors") {
-		return (
-			<Badge variant="destructive">
-				<CircleAlertIcon aria-hidden="true" />
-				{problem.count} {problem.count === 1 ? "error" : "errors"}
-			</Badge>
-		);
-	}
-	return (
-		<Badge variant="outline">
-			<CircleAlertIcon aria-hidden="true" />
-			Last run failed
-		</Badge>
-	);
-}
-
-/** Run, and a menu to edit, see the schedules or delete. */
-function FlowActions({
+/** Run, Edit, its schedules, and Delete. */
+function FlowMenu({
 	projectId,
 	overview,
 	onRun,
+	onSchedules,
 	onDelete,
 }: {
 	projectId: string;
 	overview: FlowOverview;
 	onRun: () => void;
+	onSchedules: () => void;
 	onDelete: () => void;
 }) {
 	const { flow } = overview;
-	const blockedBy = canStart(flow)
-		? null
-		: flow.nodeCount === null
-			? "This flow does not load. Open it to see why."
-			: "Fix the errors in the editor first.";
 	return (
-		<div className="relative z-10 ml-auto flex items-center gap-1">
-			<Tooltip>
-				<TooltipTrigger
-					render={
-						// A disabled button gets no hover; the span keeps the tooltip.
-						<span className="inline-flex" />
-					}
-				>
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
 					<Button
-						size="sm"
-						disabled={blockedBy !== null}
-						aria-label={`Run ${flow.name}`}
-						onClick={onRun}
-					>
-						<PlayIcon data-icon="inline-start" />
-						Run
-					</Button>
-				</TooltipTrigger>
-				<TooltipContent>
-					{blockedBy ?? "Start a run of this flow"}
-				</TooltipContent>
-			</Tooltip>
-			<DropdownMenu>
-				<DropdownMenuTrigger
+						variant="ghost"
+						size="icon-sm"
+						aria-label={`More for ${flow.name}`}
+					/>
+				}
+			>
+				<MoreHorizontalIcon />
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end">
+				<DropdownMenuItem disabled={!canStart(flow)} onClick={onRun}>
+					<PlayIcon />
+					Run
+				</DropdownMenuItem>
+				<DropdownMenuItem
 					render={
-						<Button
-							variant="ghost"
-							size="icon-sm"
-							aria-label={`More for ${flow.name}`}
+						<Link
+							to="/projects/$projectId/flows/$name"
+							params={{ projectId, name: flow.name }}
 						/>
 					}
 				>
-					<MoreHorizontalIcon />
-				</DropdownMenuTrigger>
-				<DropdownMenuContent align="end">
-					<DropdownMenuItem
-						render={
-							<Link
-								to="/projects/$projectId/flows/$name"
-								params={{ projectId, name: flow.name }}
-							/>
-						}
-					>
-						<PencilIcon />
-						Edit
-					</DropdownMenuItem>
-					<DropdownMenuItem
-						render={
-							<Link
-								to="/projects/$projectId/schedules"
-								params={{ projectId }}
-							/>
-						}
-					>
-						<CalendarClockIcon />
-						Schedules
-					</DropdownMenuItem>
-					<DropdownMenuSeparator />
-					<DropdownMenuItem variant="destructive" onClick={onDelete}>
-						<Trash2Icon />
-						Delete
-					</DropdownMenuItem>
-				</DropdownMenuContent>
-			</DropdownMenu>
-		</div>
+					<PencilIcon />
+					Edit
+				</DropdownMenuItem>
+				<DropdownMenuItem onClick={onSchedules}>
+					<CalendarClockIcon />
+					Schedules
+				</DropdownMenuItem>
+				<DropdownMenuSeparator />
+				<DropdownMenuItem variant="destructive" onClick={onDelete}>
+					<Trash2Icon />
+					Delete
+				</DropdownMenuItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }

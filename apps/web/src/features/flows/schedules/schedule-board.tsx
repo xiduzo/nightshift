@@ -5,7 +5,6 @@ import {
 	scheduleWhen,
 } from "@nightshift/client";
 import type { Schedule } from "@nightshift/flows";
-import { Alert, AlertDescription } from "@nightshift/ui/components/alert";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -17,40 +16,36 @@ import {
 	AlertDialogTitle,
 } from "@nightshift/ui/components/alert-dialog";
 import { Button } from "@nightshift/ui/components/button";
-import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
 	Empty,
-	EmptyContent,
 	EmptyDescription,
 	EmptyHeader,
-	EmptyMedia,
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
-import { Skeleton } from "@nightshift/ui/components/skeleton";
+import {
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetFooter,
+	SheetHeader,
+	SheetTitle,
+} from "@nightshift/ui/components/sheet";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import {
-	CalendarClockIcon,
-	CircleAlertIcon,
-	PlusIcon,
-	PowerOffIcon,
-} from "lucide-react";
-import { useState } from "react";
+import { PlusIcon } from "lucide-react";
+import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import {
 	type Machine,
 	neededMachines,
 	useSpaceMachines,
 } from "@/features/devices";
-import { flowQueries } from "@/features/flows";
-import { runQueries } from "@/features/runs";
-import { settingsQueries } from "@/features/settings";
+import { runQueries } from "@/features/runs/flows-port";
 import type { ScheduleSummary } from "@/shared/api";
 import { useNow } from "@/shared/format";
-import { PageHeading } from "@/shared/page";
+import { flowQueries } from "../queries";
 import { scheduleMutations, scheduleQueries } from "./queries";
-import { IssueLines, ScheduleCard } from "./schedule-card";
+import { ScheduleCard } from "./schedule-card";
 import { ScheduleDialog } from "./schedule-dialog";
 import { WebhookDialog } from "./webhook-deliveries";
 
@@ -71,37 +66,46 @@ const LAST_RUNS = 10;
 /** The project's newest runs, to find each schedule's last runs in. */
 const RECENT_RUNS = 200;
 
-/** The schedules that are on first, each by its next start. */
-function byNextStart(schedules: readonly ScheduleSummary[]): ScheduleSummary[] {
-	return [...schedules].sort(
-		(a, b) =>
-			Number(b.enabled) - Number(a.enabled) ||
-			(a.nextAt ?? Number.POSITIVE_INFINITY) -
-				(b.nextAt ?? Number.POSITIVE_INFINITY),
-	);
-}
+/** The schedules of a project, as the Flows page shows and changes them. */
+export type ScheduleBoard = {
+	/** Every schedule of the project. Empty while they load. */
+	schedules: ScheduleSummary[];
+	/** A card for each of `schedules`. `describe` says what one does, where the flow around it does not. */
+	cards: (
+		schedules: readonly ScheduleSummary[],
+		describe?: (schedule: ScheduleSummary) => ReactNode,
+	) => ReactNode;
+	/** Opens the dialog for a new schedule of `flow`. */
+	add: (flow?: string) => void;
+	/** The dialogs to add, edit and remove one, and a webhook's address. */
+	dialogs: ReactNode;
+};
 
 /**
- * The project's schedules, one card each: what starts when, the next
- * start, and how its last runs went. Pause, edit, add, remove.
+ * Reads and changes the project's schedules. All of them save as one
+ * list, so pausing one also sends the others as they are. `showRuns`
+ * reads the runs the cards need, only while a card shows.
  */
-export function ScheduleList({ projectId }: { projectId: string }) {
+export function useScheduleBoard(
+	projectId: string,
+	showRuns: boolean,
+): ScheduleBoard {
 	const queryClient = useQueryClient();
 	const now = useNow(30_000);
 	const list = useQuery(scheduleQueries.listLive(projectId));
-	const [editing, setEditing] = useState<{ schedule: Schedule | null } | null>(
-		null,
-	);
+	const [editing, setEditing] = useState<{
+		schedule: Schedule | null;
+		flow?: string;
+	} | null>(null);
 	const [toDelete, setToDelete] = useState<ScheduleSummary | null>(null);
 	const [hookOf, setHookOf] = useState<string | null>(null);
 	const schedules = list.data?.schedules ?? [];
-	// Settings → Runs can turn the scheduler off; then no schedule starts.
-	const settings = useQuery(settingsQueries.get());
-	const schedulerOff = settings.data ? !settings.data.values.scheduler : false;
-	const schedulerLock = settings.data?.fields.scheduler.locked;
 	const machines = useSpaceMachines();
 	const flows = useQuery(flowQueries.list(projectId));
-	const runs = useQuery(runQueries.ofProject(projectId, RECENT_RUNS));
+	const runs = useQuery({
+		...runQueries.ofProject(projectId, RECENT_RUNS),
+		enabled: showRuns,
+	});
 	/** The computers each schedule's run needs. Empty while they load. */
 	const needs = (schedule: ScheduleSummary): Machine[] =>
 		machines
@@ -147,123 +151,31 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 		saveAll(next, () => setEditing(null));
 	};
 
-	return (
-		<section
-			aria-labelledby="schedules-heading"
-			className="flex flex-col gap-4"
-		>
-			<PageHeading
-				id="schedules-heading"
-				title="Schedules"
-				description={
-					machines?.starterIsHost
-						? `Flows that start on their own, at set times or when a webhook arrives. ${machines.starter.name}, the Host, starts them.`
-						: "Flows that start on their own, at set times or when a webhook arrives."
+	const cards: ScheduleBoard["cards"] = (shown, describe) =>
+		shown.map((schedule) => (
+			<ScheduleCard
+				key={schedule.id}
+				schedule={schedule}
+				description={describe?.(schedule)}
+				lastRuns={scheduleLastRuns(runs.data ?? [], schedule.id, LAST_RUNS)}
+				needs={needs(schedule)}
+				now={now}
+				busy={save.isPending}
+				onToggle={(enabled) =>
+					saveAll(
+						schedules.map((s) =>
+							s.id === schedule.id ? { ...plain(s), enabled } : plain(s),
+						),
+					)
 				}
-				actions={
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={list.isLoading}
-						onClick={() => setEditing({ schedule: null })}
-					>
-						<PlusIcon data-icon="inline-start" />
-						<span className="max-sm:sr-only">New schedule</span>
-					</Button>
-				}
+				onEdit={() => setEditing({ schedule: plain(schedule) })}
+				onDelete={() => setToDelete(schedule)}
+				onWebhook={() => setHookOf(schedule.id)}
 			/>
-			{list.data && list.data.issues.length > 0 ? (
-				<Alert>
-					<CircleAlertIcon aria-hidden="true" />
-					<AlertDescription>
-						<IssueLines issues={list.data.issues} />
-					</AlertDescription>
-				</Alert>
-			) : null}
+		));
 
-			{schedulerOff && schedules.length > 0 ? (
-				<Alert>
-					<PowerOffIcon aria-hidden="true" />
-					<AlertDescription>
-						{schedulerLock ?? (
-							<>
-								Schedules are paused. No flow starts on its own. Turn them on in{" "}
-								<Link to="/settings" className="underline underline-offset-4">
-									Settings
-								</Link>
-								.
-							</>
-						)}
-					</AlertDescription>
-				</Alert>
-			) : null}
-
-			{list.isLoading ? (
-				<div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-					<Skeleton className="h-64 w-full" />
-					<Skeleton className="h-64 w-full" />
-				</div>
-			) : schedules.length === 0 ? (
-				<Card>
-					<CardContent>
-						<Empty>
-							<EmptyHeader>
-								<EmptyMedia variant="icon">
-									<CalendarClockIcon aria-hidden="true" />
-								</EmptyMedia>
-								<EmptyTitle>No schedules</EmptyTitle>
-								<EmptyDescription>
-									{list.error
-										? list.error.message
-										: "Let a flow run on its own, for example every night from 22:00 to 07:00."}
-								</EmptyDescription>
-							</EmptyHeader>
-							{list.error ? null : (
-								<EmptyContent>
-									<Button onClick={() => setEditing({ schedule: null })}>
-										<PlusIcon data-icon="inline-start" />
-										New schedule
-									</Button>
-								</EmptyContent>
-							)}
-						</Empty>
-					</CardContent>
-				</Card>
-			) : (
-				<div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-					{byNextStart(schedules).map((schedule) => (
-						<ScheduleCard
-							key={schedule.id}
-							projectId={projectId}
-							schedule={schedule}
-							description={
-								flows.data?.find((flow) => flow.name === schedule.flow)
-									?.description ?? null
-							}
-							lastRuns={scheduleLastRuns(
-								runs.data ?? [],
-								schedule.id,
-								LAST_RUNS,
-							)}
-							needs={needs(schedule)}
-							now={now}
-							schedulerOff={schedulerOff}
-							busy={save.isPending}
-							onToggle={(enabled) =>
-								saveAll(
-									schedules.map((s) =>
-										s.id === schedule.id ? { ...plain(s), enabled } : plain(s),
-									),
-								)
-							}
-							onEdit={() => setEditing({ schedule: plain(schedule) })}
-							onDelete={() => setToDelete(schedule)}
-							onWebhook={() => setHookOf(schedule.id)}
-						/>
-					))}
-				</div>
-			)}
-
+	const dialogs = (
+		<>
 			<ScheduleDialog
 				open={editing !== null}
 				onOpenChange={(open) => {
@@ -271,6 +183,7 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 				}}
 				projectId={projectId}
 				schedule={editing?.schedule ?? null}
+				flow={editing?.flow}
 				takenIds={schedules
 					.map((s) => s.id)
 					.filter((id) => id !== editing?.schedule?.id)}
@@ -324,6 +237,67 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
-		</section>
+		</>
+	);
+
+	return {
+		schedules,
+		cards,
+		add: (flow) => setEditing({ schedule: null, flow }),
+		dialogs,
+	};
+}
+
+/**
+ * The schedules of one flow in a side panel: what starts it, and the
+ * webhooks that wake its waiting runs. Add one at the bottom.
+ */
+export function FlowSchedulesSheet({
+	flowName,
+	open,
+	onOpenChange,
+	schedules,
+	board,
+}: {
+	flowName: string;
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	schedules: readonly ScheduleSummary[];
+	board: ScheduleBoard;
+}) {
+	return (
+		<Sheet open={open} onOpenChange={onOpenChange}>
+			<SheetContent className="data-[side=right]:sm:max-w-md">
+				<SheetHeader className="border-b">
+					<SheetTitle className="font-mono">{flowName}</SheetTitle>
+					<SheetDescription>
+						What starts this flow, and the webhooks that wake its waiting runs.
+					</SheetDescription>
+				</SheetHeader>
+				<div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4">
+					{schedules.length === 0 ? (
+						<Empty>
+							<EmptyHeader>
+								<EmptyTitle>No schedules</EmptyTitle>
+								<EmptyDescription>
+									You start this flow by hand. Add a schedule to run it at set
+									times or when a webhook arrives.
+								</EmptyDescription>
+							</EmptyHeader>
+						</Empty>
+					) : (
+						board.cards(schedules)
+					)}
+				</div>
+				<SheetFooter className="border-t">
+					<Button onClick={() => board.add(flowName)}>
+						<PlusIcon data-icon="inline-start" />
+						Add schedule
+					</Button>
+				</SheetFooter>
+				{/* Inside the panel, so its dialogs open on top of it. */}
+				{open ? board.dialogs : null}
+			</SheetContent>
+		</Sheet>
 	);
 }

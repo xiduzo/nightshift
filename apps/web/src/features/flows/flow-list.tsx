@@ -1,5 +1,6 @@
-import { flowOverviews } from "@nightshift/client";
+import { flowOverviews, looseSchedules } from "@nightshift/client";
 import { flowNameSchema, newFlow } from "@nightshift/flows";
+import { Alert, AlertDescription } from "@nightshift/ui/components/alert";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -39,28 +40,39 @@ import { Input } from "@nightshift/ui/components/input";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
-import { PlusIcon, WorkflowIcon } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import {
+	CircleAlertIcon,
+	PlusIcon,
+	PowerOffIcon,
+	WorkflowIcon,
+} from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { dashboardQueries } from "@/features/dashboard/queries";
-import { scheduleQueries } from "@/features/schedules/queries";
 import { settingsQueries } from "@/features/settings/queries";
 import type { FlowListItem } from "@/shared/api";
 import { PageHeading } from "@/shared/page";
 
 import { chatSearch } from "./chat/chat-link";
 import { FlowCard } from "./flow-card";
-import { useFlowFilter } from "./flow-filter";
+import { flowsSummary, useFlowFilter } from "./flow-filter";
 import { FlowNotices } from "./flow-notices";
 import { ImportFlowButton } from "./move/import-flow-button";
 import { flowMutations, flowQueries } from "./queries";
+import { scheduleQueries } from "./schedules/queries";
+import {
+	FlowSchedulesSheet,
+	useScheduleBoard,
+} from "./schedules/schedule-board";
+import { IssueLines } from "./schedules/schedule-card";
 import { StartRunDialog } from "./start/start-run-dialog";
 
 /**
  * The project's flows as a grid of cards (`FlowCard`): what each is, what
- * starts it, what is in it and how its last runs went. A search and
- * filters above them. Run one, open it in the editor, add or delete one.
+ * starts it and how its last runs went. A search in the heading. Run one,
+ * open it in the editor, add or delete one. A flow's schedules open in a
+ * side panel. Schedules that no flow holds show below the flows.
  */
 export function FlowList({ projectId }: { projectId: string }) {
 	const queryClient = useQueryClient();
@@ -77,6 +89,23 @@ export function FlowList({ projectId }: { projectId: string }) {
 			)
 		: undefined;
 	const filter = useFlowFilter(overviews);
+	const loose =
+		flows.data && schedules.data
+			? looseSchedules(flows.data, schedules.data.schedules)
+			: [];
+	// The flow whose schedules show in the side panel.
+	const [schedulesOf, setSchedulesOf] = useState<{
+		name: string;
+		open: boolean;
+	} | null>(null);
+	const board = useScheduleBoard(
+		projectId,
+		schedulesOf?.open === true || loose.length > 0,
+	);
+	// Settings → Runs can turn the scheduler off; then no schedule starts.
+	const settings = useQuery(settingsQueries.get());
+	const schedulerOff = settings.data ? !settings.data.values.scheduler : false;
+	const schedulerLock = settings.data?.fields.scheduler.locked;
 	const [creating, setCreating] = useState(false);
 	const [toDelete, setToDelete] = useState<FlowListItem | null>(null);
 	// The flow to start. Kept after the dialog closes, so it does not empty while it fades.
@@ -101,15 +130,16 @@ export function FlowList({ projectId }: { projectId: string }) {
 			<PageHeading
 				id="flows-heading"
 				title="Flows"
-				description="Night Shift runs the steps of a flow for you. Run a flow, or open it to edit."
+				description={
+					overviews && overviews.length > 0
+						? flowsSummary(overviews)
+						: "Night Shift runs the steps of a flow for you."
+				}
 				actions={
 					<>
+						{overviews && overviews.length > 0 ? filter.search : null}
 						<ImportFlowButton projectId={projectId} />
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={() => setCreating(true)}
-						>
+						<Button onClick={() => setCreating(true)}>
 							<PlusIcon data-icon="inline-start" />
 							New flow
 						</Button>
@@ -118,6 +148,32 @@ export function FlowList({ projectId }: { projectId: string }) {
 			/>
 
 			<FlowNotices projectId={projectId} />
+
+			{schedules.data && schedules.data.issues.length > 0 ? (
+				<Alert>
+					<CircleAlertIcon aria-hidden="true" />
+					<AlertDescription>
+						<IssueLines issues={schedules.data.issues} />
+					</AlertDescription>
+				</Alert>
+			) : null}
+
+			{schedulerOff && board.schedules.length > 0 ? (
+				<Alert>
+					<PowerOffIcon aria-hidden="true" />
+					<AlertDescription>
+						{schedulerLock ?? (
+							<>
+								Schedules are paused. No flow starts on its own. Turn them on in{" "}
+								<Link to="/settings" className="underline underline-offset-4">
+									Settings
+								</Link>
+								.
+							</>
+						)}
+					</AlertDescription>
+				</Alert>
+			) : null}
 
 			{flows.isLoading ? (
 				<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -149,35 +205,75 @@ export function FlowList({ projectId }: { projectId: string }) {
 						</Empty>
 					</CardContent>
 				</Card>
+			) : filter.shown.length === 0 ? (
+				<Empty className="border">
+					<EmptyHeader>
+						<EmptyTitle>No flows match</EmptyTitle>
+						<EmptyDescription>Try another search.</EmptyDescription>
+					</EmptyHeader>
+				</Empty>
 			) : (
-				<>
-					{filter.bar}
-					{filter.shown.length === 0 ? (
-						<Empty className="border">
-							<EmptyHeader>
-								<EmptyTitle>No flows match</EmptyTitle>
-								<EmptyDescription>
-									Try another search or filter.
-								</EmptyDescription>
-							</EmptyHeader>
-						</Empty>
-					) : (
-						<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-							{filter.shown.map((overview) => (
-								<FlowCard
-									key={overview.flow.name}
-									projectId={projectId}
-									overview={overview}
-									onRun={() =>
-										setStarting({ name: overview.flow.name, open: true })
-									}
-									onDelete={() => setToDelete(overview.flow)}
-								/>
-							))}
-						</div>
-					)}
-				</>
+				<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+					{filter.shown.map((overview) => (
+						<FlowCard
+							key={overview.flow.name}
+							projectId={projectId}
+							overview={overview}
+							onRun={() =>
+								setStarting({ name: overview.flow.name, open: true })
+							}
+							onSchedules={() =>
+								setSchedulesOf({ name: overview.flow.name, open: true })
+							}
+							onDelete={() => setToDelete(overview.flow)}
+						/>
+					))}
+				</div>
 			)}
+
+			{loose.length > 0 ? (
+				<section
+					aria-labelledby="loose-schedules-heading"
+					className="flex flex-col gap-3"
+				>
+					<div className="flex flex-col gap-1">
+						<h2 id="loose-schedules-heading" className="font-medium text-sm">
+							Schedules without a flow
+						</h2>
+						<p className="text-muted-foreground text-sm">
+							These start no flow of this project. Change them, or remove them.
+						</p>
+					</div>
+					<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+						{board.cards(loose, (schedule) =>
+							schedule.flow ? (
+								<>
+									Starts <span className="font-mono">{schedule.flow}</span>.
+									This flow is not in the project.
+								</>
+							) : null,
+						)}
+					</div>
+				</section>
+			) : null}
+
+			{schedulesOf ? (
+				<FlowSchedulesSheet
+					flowName={schedulesOf.name}
+					open={schedulesOf.open}
+					onOpenChange={(open) =>
+						setSchedulesOf((current) => (current ? { ...current, open } : null))
+					}
+					schedules={
+						overviews?.find(
+							(overview) => overview.flow.name === schedulesOf.name,
+						)?.schedules ?? []
+					}
+					board={board}
+				/>
+			) : null}
+			{/* The panel holds the dialogs while it is open. */}
+			{schedulesOf?.open ? null : board.dialogs}
 
 			<NewFlowDialog
 				open={creating}

@@ -11,6 +11,7 @@ import {
 	deviceIdOf,
 	flowNameSchema,
 	isProfileRef,
+	waitSignalOf,
 } from "../nodes";
 import { nodeProfiles } from "../profiles";
 import type { ScheduleFlowInfo } from "../schedules";
@@ -121,13 +122,18 @@ export function callersOf(name: string, flows: ProjectFlowMap): string[] {
 		.sort();
 }
 
-/** A flow's nodes by type, the most first, without End nodes, and its Gates. */
+/** A flow's nodes by type, the most first, without End nodes, its Gates, and the signals its Waits wait for. */
 function nodesOf(
 	flow: Flow | null,
-): Pick<FlowListItem, "nodeTypes" | "gateCount"> {
+): Pick<FlowListItem, "nodeTypes" | "gateCount" | "signals"> {
 	const counts = new Map<FlowNodeType, number>();
 	let gateCount = 0;
+	const signals = new Set<string>();
 	for (const node of flow?.nodes ?? []) {
+		if (node.type === "wait") {
+			const signal = waitSignalOf(node.until);
+			if (signal) signals.add(signal.name);
+		}
 		if (node.type !== "end") {
 			counts.set(node.type, (counts.get(node.type) ?? 0) + 1);
 		}
@@ -136,7 +142,7 @@ function nodesOf(
 	const nodeTypes = [...counts]
 		.map(([type, count]) => ({ type, count }))
 		.sort((a, b) => b.count - a.count);
-	return { nodeTypes, gateCount };
+	return { nodeTypes, gateCount, signals: [...signals].sort() };
 }
 
 /**

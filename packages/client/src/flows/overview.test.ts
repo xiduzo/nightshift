@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { FlowHealthRow } from "../dashboard";
 import type { ScheduleSummary } from "../schedules";
-import { flowOverviews } from "./overview";
+import { flowOverviews, looseSchedules } from "./overview";
 import type { FlowListItem } from "./types";
 
 const flow = (
@@ -19,6 +19,7 @@ const flow = (
 	devices: { ids: [] },
 	nodeTypes: [],
 	gateCount: 0,
+	signals: [],
 	...extra,
 });
 
@@ -139,5 +140,41 @@ describe("flowOverviews", () => {
 			{ kind: "last-run-failed" },
 			null,
 		]);
+	});
+
+	test("a webhook that only sends a signal sits with each flow whose Wait waits for it", () => {
+		const wake = schedule({
+			id: "ci",
+			flow: undefined,
+			cron: undefined,
+			signal: { name: "ci-done" },
+		});
+		const [listens, deaf] = flowOverviews(
+			[flow("listens", { signals: ["ci-done"] }), flow("deaf")],
+			[wake],
+			[],
+		);
+		expect(listens?.starts).toEqual([{ kind: "signal", schedule: wake }]);
+		expect(listens?.schedules).toEqual([wake]);
+		expect(listens?.startsOnItsOwn).toBe(false);
+		expect(deaf?.schedules).toEqual([]);
+	});
+});
+
+describe("looseSchedules", () => {
+	test("finds a schedule of a missing flow and a signal no Wait waits for", () => {
+		const flows = [flow("nightly", { signals: ["ci-done"] })];
+		expect(
+			looseSchedules(flows, [
+				schedule({ id: "fine" }),
+				schedule({ id: "gone", flow: "deleted" }),
+				schedule({ id: "heard", flow: undefined, signal: { name: "ci-done" } }),
+				schedule({
+					id: "unheard",
+					flow: undefined,
+					signal: { name: "deploy" },
+				}),
+			]).map((s) => s.id),
+		).toEqual(["gone", "unheard"]);
 	});
 });

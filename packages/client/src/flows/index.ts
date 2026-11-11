@@ -12,6 +12,7 @@ export {
 	type FlowProblem,
 	type FlowStart,
 	flowOverviews,
+	looseSchedules,
 } from "./overview";
 export { createFlowQueries } from "./queries";
 export { canStart } from "./start";

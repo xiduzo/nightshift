@@ -70,6 +70,7 @@ describe("listFlowSources", () => {
 				devices: { ids: [] },
 				nodeTypes: [{ type: "agent", count: 1 }],
 				gateCount: 0,
+				signals: [],
 			},
 			{
 				name: "broken",
@@ -82,6 +83,7 @@ describe("listFlowSources", () => {
 				devices: { ids: [] },
 				nodeTypes: [],
 				gateCount: 0,
+				signals: [],
 			},
 			{
 				name: "quick",
@@ -94,6 +96,7 @@ describe("listFlowSources", () => {
 				devices: { ids: [] },
 				nodeTypes: [{ type: "agent", count: 1 }],
 				gateCount: 0,
+				signals: [],
 			},
 			{
 				name: "zeta",
@@ -106,6 +109,7 @@ describe("listFlowSources", () => {
 				devices: { ids: [] },
 				nodeTypes: [{ type: "call", count: 1 }],
 				gateCount: 0,
+				signals: [],
 			},
 		]);
 	});
@@ -150,6 +154,7 @@ describe("listFlowSources", () => {
 				{ type: "command", count: 1 },
 			],
 			gateCount: 2,
+			signals: [],
 		});
 	});
 

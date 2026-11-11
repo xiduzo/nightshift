@@ -159,9 +159,6 @@ export const PEER_PORTS: Record<
 			// The Flows page shows each flow's last runs with their status.
 			// The run page imports the flow canvas.
 			"features/runs": "flows-port",
-			// The Flows page shows the schedules that start each flow. The
-			// schedules page picks a flow from the flow list.
-			"features/schedules": "queries",
 			// The Flows page shows each flow's last runs (Flow health). The
 			// project's dashboard lists the flows.
 			"features/dashboard": "queries",
