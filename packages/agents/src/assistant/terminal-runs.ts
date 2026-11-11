@@ -72,7 +72,21 @@ export type TerminalGate = {
 	runTitle: string;
 	/** The question, as the flow wrote it for this run. */
 	question: string;
-	choices: { name: string; description?: string; needsNote?: true }[];
+	choices: {
+		name: string;
+		description?: string;
+		needsNote?: true;
+		/** What happens when the person picks it. */
+		impact?: string;
+	}[];
+	/** How soon it needs an answer. */
+	urgency: "now" | "today" | "later";
+	/** Why a person decides, what is done, and the option the flow recommends. */
+	brief: {
+		situation: string | null;
+		background: { text: string; source: string | null }[];
+		recommendation: { option: string | null; reason: string | null } | null;
+	};
 	/** Epoch ms. */
 	openedAt: number;
 	/** When nobody answers by `at`, Night Shift takes `choose`. */
@@ -348,7 +362,7 @@ export function terminalRunTools(
 		toolDefinition({
 			name: RUN_TOOLS.needsMe,
 			description:
-				"The Gates that wait for a person, in every project, oldest first: the question, the options, and how long it waited. Use it to see what blocks a night, then answer a Gate with answer_gate when the person tells you what to choose.",
+				"The Gates that wait for a person, in every project, oldest first: how urgent each is (now, today or later), the situation, the background, the recommended option, the question, the options with what each does, and how long it waited. Use it to see what blocks a night, then answer a Gate with answer_gate when the person tells you what to choose.",
 			inputSchema: {
 				type: "object",
 				properties: {
@@ -381,10 +395,32 @@ export function terminalRunTools(
 					project: gate.projectName,
 					flow: gate.flowName,
 					run: gate.runTitle,
+					urgency: gate.urgency,
+					...(gate.brief.situation ? { situation: gate.brief.situation } : {}),
+					...(gate.brief.background.length > 0
+						? {
+								background: gate.brief.background.map((item) =>
+									item.source
+										? `${item.text} (source: ${item.source})`
+										: item.text,
+								),
+							}
+						: {}),
+					...(gate.brief.recommendation?.option
+						? {
+								recommended: {
+									option: gate.brief.recommendation.option,
+									...(gate.brief.recommendation.reason
+										? { reason: gate.brief.recommendation.reason }
+										: {}),
+								},
+							}
+						: {}),
 					question: gate.question,
 					options: gate.choices.map((choice) => ({
 						option: choice.name,
 						...(choice.description ? { description: choice.description } : {}),
+						...(choice.impact ? { impact: choice.impact } : {}),
 						...(choice.needsNote ? { needsNote: true } : {}),
 					})),
 					waitingSince: isoOrNull(gate.openedAt),

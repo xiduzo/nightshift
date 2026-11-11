@@ -12,6 +12,16 @@ A Gate is a Decision that a person picks. It shows the question and its options.
 - **A deadline.** A Gate with a deadline picks its option for you when nobody answers in time.
 - **The lock screen.** A Gate with two options can allow an answer from the lock screen of your phone.
 
+Each Gate also has an urgency and a brief. They help you decide fast.
+
+- **Urgency.** "Now", "Today" or "When you have time". The inbox groups the Gates by it. A Gate without one is "Today".
+- **Situation.** Why a person must decide.
+- **Background.** What is already decided, checked or done. An item can name where its fact comes from.
+- **Recommendation.** The option the flow recommends, and why.
+- **Impact.** Under each option: what happens when you pick it.
+
+The flow can write each part. Night Shift writes the parts the flow leaves empty when the Gate opens, and the inbox says so. A flow can turn this off for a Gate. An Ask and an Agent's question have an urgency, a situation and a background too.
+
 In a run with parallel branches, a Gate can open while a step on another branch still works. The inbox then shows that the run is busy. You can pick your answer, and you send it when that step ends.
 
 An Agent can ask you a question too. Its question opens a Gate, and your answer goes back to the same session.

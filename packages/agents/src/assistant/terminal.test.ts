@@ -245,6 +245,8 @@ function gate(over: Partial<TerminalGate> = {}): TerminalGate {
 			{ name: "merge", description: "Merge it" },
 			{ name: "change", needsNote: true },
 		],
+		urgency: "today",
+		brief: { situation: null, background: [], recommendation: null },
 		openedAt: NOW - 2 * HOUR,
 		deadline: null,
 		canAnswer: true,
@@ -371,6 +373,19 @@ describe("the run tools of nightshift mcp", () => {
 				gates: async () => [
 					gate({
 						deadline: { at: NOW + HOUR, choose: "merge" },
+						urgency: "now",
+						brief: {
+							situation: "The release waits for it.",
+							background: [
+								{ text: "The tests pass.", source: "CI" },
+								{ text: "Two people reviewed it.", source: null },
+							],
+							recommendation: { option: "merge", reason: "It is green." },
+						},
+						choices: [
+							{ name: "merge", description: "Merge it", impact: "It ships." },
+							{ name: "change", needsNote: true },
+						],
 					}),
 					gate({ runId: "run-2", projectId: "p2", projectName: "Site" }),
 					gate({ runId: "run-3", answerPending: true }),
@@ -388,9 +403,13 @@ describe("the run tools of nightshift mcp", () => {
 			project: "App",
 			flow: "existing",
 			run: "existing · login",
+			urgency: "now",
+			situation: "The release waits for it.",
+			background: ["The tests pass. (source: CI)", "Two people reviewed it."],
+			recommended: { option: "merge", reason: "It is green." },
 			question: "Merge the pull request?",
 			options: [
-				{ option: "merge", description: "Merge it" },
+				{ option: "merge", description: "Merge it", impact: "It ships." },
 				{ option: "change", needsNote: true },
 			],
 			waitingSince: iso(NOW - 2 * HOUR),
