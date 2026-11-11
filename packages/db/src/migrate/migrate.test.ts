@@ -332,3 +332,18 @@ describe("migration run_flow_revisions", () => {
 		).toEqual([{ flow_revision: null, body_flow_revisions: "{}" }]);
 	});
 });
+
+describe("migration project_folder", () => {
+	test("every project from before has a folder", async () => {
+		const db = await databaseBefore("project_folder");
+		await db.run(
+			sql.raw(
+				"INSERT INTO project (id, space_id, name, remote) VALUES ('p1', 's', 'app', 'github.com/acme/app')",
+			),
+		);
+		await migrateDb(db);
+		expect(await rows(db, "SELECT id, folder FROM project")).toEqual([
+			{ id: "p1", folder: 1 },
+		]);
+	});
+});

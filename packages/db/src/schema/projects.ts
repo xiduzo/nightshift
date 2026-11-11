@@ -13,8 +13,9 @@ import { device } from "./devices";
 // their Clones.
 
 /**
- * A repository that runs can start in, by its remote. Its folders are its
- * Clones, one per Device at most.
+ * A container of flows, schedules, knowledge, secrets and runs (ADR 22).
+ * With a folder, it is a repository by its remote, and its folders are its
+ * Clones, one per Device at most. Without one, it has no Clone.
  */
 export const project = sqliteTable(
 	"project",
@@ -27,8 +28,14 @@ export const project = sqliteTable(
 		 * The `origin` URL, normalised (`github.com/owner/repo`), so the ssh
 		 * and https URLs of one repository are one Project. Null for a
 		 * repository without a remote: that Project has one Clone, for good.
+		 * Null too for a project without a folder.
 		 */
 		remote: text("remote"),
+		/**
+		 * False: the project has no folder and no Clone (ADR 22). Each of its
+		 * runs gets an empty folder of its own. Every project from before has one.
+		 */
+		folder: integer("folder", { mode: "boolean" }).notNull().default(true),
 		createdAt: createdAt(),
 		/** Set when a person removed the project. Its runs and events stay. Adding its folder again clears it. */
 		removedAt: integer("removed_at", { mode: "timestamp_ms" }),

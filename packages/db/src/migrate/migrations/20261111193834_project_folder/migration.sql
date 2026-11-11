@@ -1,0 +1,1 @@
+ALTER TABLE `project` ADD `folder` integer DEFAULT true NOT NULL;
