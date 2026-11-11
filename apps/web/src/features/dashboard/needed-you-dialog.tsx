@@ -166,13 +166,18 @@ function NeededYouDetails({
 				}
 			>
 				<DetailsTabContent value="overview">
-					<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+					<div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
 						<Stat
 							label="Needed you"
 							value={share === null ? "—" : `${share}%`}
 							hint={
 								needed ? `${needed.needed} of ${needed.runs} runs` : "Not known"
 							}
+						/>
+						<Stat
+							label="On their own"
+							value={needed ? String(needed.runs - needed.needed) : "—"}
+							hint="Runs that needed nobody"
 						/>
 						<Stat
 							label="Waiting now"
@@ -182,22 +187,6 @@ function NeededYouDetails({
 									? `The oldest for ${waitedText(now - oldest.openedAt)}`
 									: "Nothing needs you"
 							}
-						/>
-						<Stat
-							label="Gates asked"
-							value={String(asked.asked)}
-							hint={
-								asked.runsAsking === 1
-									? "By 1 run"
-									: `By ${asked.runsAsking} runs`
-							}
-						/>
-						<Stat
-							label="Typical answer"
-							value={
-								asked.answerTime ? waitedText(asked.answerTime.median) : "—"
-							}
-							hint={`${asked.answered} answered`}
 						/>
 					</div>
 					<Reasons needed={needed} range={range} />
