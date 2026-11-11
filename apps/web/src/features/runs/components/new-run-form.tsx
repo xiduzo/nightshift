@@ -46,6 +46,7 @@ import {
 import { useId, useState } from "react";
 import { EFFORTS, ModelCombobox, PERMISSION_MODES } from "@/features/agents";
 import { PickFlowRunForm } from "@/features/flows";
+import { useHasFolder } from "@/features/projects";
 import type { Effort, PermissionMode } from "@/shared/api";
 import { orpc } from "@/shared/api";
 import { LargerTextarea } from "@/shared/larger-window";
@@ -78,6 +79,8 @@ export function QuickRunDialog({
 		useState<PermissionMode>("acceptEdits");
 	const [effort, setEffort] = useState<Effort | "">("");
 	const [baseRef, setBaseRef] = useState("");
+	// A project without a folder has no branches: nothing to start from.
+	const withFolder = useHasFolder(projectId);
 	const [flowError, setFlowError] = useState<string | null>(null);
 	const [mode, setMode] = useState<QuickRunMode>("flow");
 	const [flowName, setFlowName] = useState<string | null>(null);
@@ -114,7 +117,7 @@ export function QuickRunDialog({
 		startRun.mutate({
 			projectId,
 			flow,
-			baseRef: baseRef.trim() || undefined,
+			baseRef: (withFolder && baseRef.trim()) || undefined,
 		});
 	};
 
@@ -124,8 +127,9 @@ export function QuickRunDialog({
 				<DialogHeader>
 					<DialogTitle>Quick run</DialogTitle>
 					<DialogDescription>
-						Run a flow, or give one agent a prompt. The run works on a new
-						branch in its own copy of the project.
+						{withFolder
+							? "Run a flow, or give one agent a prompt. The run works on a new branch in its own copy of the project."
+							: "Run a flow, or give one agent a prompt."}
 					</DialogDescription>
 				</DialogHeader>
 
@@ -251,23 +255,25 @@ export function QuickRunDialog({
 											))}
 										</NativeSelect>
 									</Field>
-									<Field>
-										<FieldLabel htmlFor={`${id}-base-ref`}>
-											Start from{" "}
-											<span className="font-normal text-muted-foreground">
-												(optional)
-											</span>
-										</FieldLabel>
-										<Input
-											id={`${id}-base-ref`}
-											value={baseRef}
-											onChange={(event) => setBaseRef(event.target.value)}
-											placeholder="The current branch"
-											className="font-mono"
-											autoComplete="off"
-											spellCheck={false}
-										/>
-									</Field>
+									{withFolder ? (
+										<Field>
+											<FieldLabel htmlFor={`${id}-base-ref`}>
+												Start from{" "}
+												<span className="font-normal text-muted-foreground">
+													(optional)
+												</span>
+											</FieldLabel>
+											<Input
+												id={`${id}-base-ref`}
+												value={baseRef}
+												onChange={(event) => setBaseRef(event.target.value)}
+												placeholder="The current branch"
+												className="font-mono"
+												autoComplete="off"
+												spellCheck={false}
+											/>
+										</Field>
+									) : null}
 								</div>
 
 								{permissionMode === "bypassPermissions" ? (

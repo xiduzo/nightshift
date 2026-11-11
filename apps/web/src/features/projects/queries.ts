@@ -8,6 +8,7 @@ export const projectQueries = createProjectQueries(orpc);
 
 export const projectMutations = {
 	add: orpc.projects.add.mutationOptions,
+	addWithoutFolder: orpc.projects.addWithoutFolder.mutationOptions,
 	remove: orpc.projects.remove.mutationOptions,
 	rename: orpc.projects.rename.mutationOptions,
 	move: orpc.projects.move.mutationOptions,

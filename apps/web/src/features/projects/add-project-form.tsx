@@ -41,13 +41,19 @@ import { GitHubCopyStatus, GitHubRepoField } from "./github-repo-field";
 import { ProjectReadiness } from "./project-readiness";
 import { projectMutations, projectQueries } from "./queries";
 
-/** Where a new project comes from: a folder on this computer, or a GitHub repository. */
-type Source = "folder" | "github";
+/**
+ * Where a new project comes from: a folder on this computer, a GitHub
+ * repository, or nothing (a project without a folder, ADR 22).
+ */
+type Source = "folder" | "github" | "none";
 
 /** The agents the starter flows name: you choose a profile for each. */
 const STARTER_AGENTS = starterAgents();
 
-/** Adds a folder or a GitHub repository as a project, in a dialog, after its readiness check. */
+/**
+ * Adds a folder or a GitHub repository as a project, in a dialog, after its
+ * readiness check. Or a project without a folder, by its name only.
+ */
 export function AddProjectDialog({
 	open,
 	onOpenChange,
@@ -71,7 +77,13 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 	// Until the server answers, assume the folder picker: most computers are Macs.
 	const folderPicker = sources.data?.folderPicker ?? true;
 	const [chosen, setChosen] = useState<Source | null>(null);
-	const source: Source = folderPicker ? (chosen ?? "folder") : "github";
+	// Without a folder picker, a folder cannot be chosen: GitHub comes first.
+	const source: Source =
+		chosen === "none" || chosen === "github"
+			? chosen
+			: folderPicker
+				? "folder"
+				: "github";
 
 	const [folderPath, setFolderPath] = useState("");
 	const [repo, setRepo] = useState("");
@@ -107,7 +119,8 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 			: null);
 	const gitHubPath = copy?.state === "done" ? copy.path : "";
 
-	const repoPath = source === "folder" ? folderPath : gitHubPath;
+	const repoPath =
+		source === "folder" ? folderPath : source === "github" ? gitHubPath : "";
 
 	const addProject = useMutation(
 		projectMutations.add({
@@ -122,6 +135,20 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 				setRepo("");
 				setName("");
 				startCopy.reset();
+				void queryClient.invalidateQueries({
+					queryKey: projectQueries.all(),
+				});
+				onAdded?.();
+			},
+		}),
+	);
+
+	// A project without a folder: a name, and nothing to check or copy.
+	const addWithoutFolder = useMutation(
+		projectMutations.addWithoutFolder({
+			onSuccess: (project) => {
+				toast.success(`Added ${project.name}`);
+				setName("");
 				void queryClient.invalidateQueries({
 					queryKey: projectQueries.all(),
 				});
@@ -162,6 +189,12 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 	});
 
 	const submit = () => {
+		if (source === "none") {
+			if (name.trim() && !addWithoutFolder.isPending) {
+				addWithoutFolder.mutate({ name: name.trim() });
+			}
+			return;
+		}
 		if (source === "folder") {
 			if (folderPath && ready) add();
 			return;
@@ -175,13 +208,16 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 		startCopy.mutate({ repo: repo.trim() });
 	};
 
-	const busy = addProject.isPending || (source === "github" && copying);
+	const adding = addProject.isPending || addWithoutFolder.isPending;
+	const busy = adding || (source === "github" && copying);
 	const canSubmit =
-		source === "folder"
-			? Boolean(folderPath) && ready
-			: gitHubPath
-				? ready
-				: repo.trim() !== "";
+		source === "none"
+			? name.trim() !== ""
+			: source === "folder"
+				? Boolean(folderPath) && ready
+				: gitHubPath
+					? ready
+					: repo.trim() !== "";
 
 	return (
 		<form
@@ -195,23 +231,24 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 				<DialogTitle>Add project</DialogTitle>
 				<DialogDescription>
 					{folderPicker
-						? "Choose a folder on this computer, or copy a repository from GitHub. Runs do not change the files in your folder."
-						: "Copy a repository from GitHub to this computer."}
+						? "Choose a folder on this computer, copy a repository from GitHub, or start without a folder. Runs do not change the files in your folder."
+						: "Copy a repository from GitHub to this computer, or start without a folder."}
 				</DialogDescription>
 			</DialogHeader>
 			<FieldGroup className="gap-5">
-				{folderPicker ? (
-					<Tabs
-						value={source}
-						onValueChange={(next) => setChosen(next as Source)}
-					>
-						<TabsList className="w-full">
+				<Tabs
+					value={source}
+					onValueChange={(next) => setChosen(next as Source)}
+				>
+					<TabsList className="w-full">
+						{folderPicker ? (
 							<TabsTrigger value="folder">Folder</TabsTrigger>
-							<TabsTrigger value="github">GitHub</TabsTrigger>
-						</TabsList>
-					</Tabs>
-				) : null}
-				{source === "folder" ? (
+						) : null}
+						<TabsTrigger value="github">GitHub</TabsTrigger>
+						<TabsTrigger value="none">No folder</TabsTrigger>
+					</TabsList>
+				</Tabs>
+				{source === "none" ? null : source === "folder" ? (
 					<Field data-invalid={chooseFolder.error ? true : undefined}>
 						<FieldLabel>Folder</FieldLabel>
 						{folderPath ? (
@@ -300,38 +337,46 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 				) : null}
 				<Field>
 					<FieldLabel htmlFor={`${id}-name`}>
-						Name{" "}
-						<span className="font-normal text-muted-foreground">
-							(optional)
-						</span>
+						Name
+						{source === "none" ? null : (
+							<>
+								{" "}
+								<span className="font-normal text-muted-foreground">
+									(optional)
+								</span>
+							</>
+						)}
 					</FieldLabel>
 					<Input
 						id={`${id}-name`}
 						value={name}
 						onChange={(event) => setName(event.target.value)}
-						placeholder={defaultName || "Project name"}
+						placeholder={(source !== "none" && defaultName) || "Project name"}
 						autoComplete="off"
+						required={source === "none"}
+						maxLength={source === "none" ? 100 : undefined}
+						aria-describedby={source === "none" ? `${id}-name-hint` : undefined}
 					/>
-				</Field>
-				<Field orientation="horizontal">
-					<Checkbox
-						id={`${id}-starters`}
-						checked={starters}
-						onCheckedChange={(checked) => setStarters(checked === true)}
-					/>
-					<FieldContent>
-						<FieldLabel htmlFor={`${id}-starters`}>
-							Add the starter flows
-						</FieldLabel>
-						<FieldDescription>
-							Small flows to change and run, for example scout and pick, or
-							draft slides.
+					{source === "none" ? (
+						<FieldDescription id={`${id}-name-hint`}>
+							For work that needs no files of its own, such as research or
+							outreach. Each run starts with no files.
 						</FieldDescription>
-					</FieldContent>
+					) : null}
 				</Field>
-				{starters ? <FlowAgentsStep step={agents} /> : null}
+				{source === "none" ? null : (
+					<StartersField
+						id={`${id}-starters`}
+						starters={starters}
+						onStartersChange={setStarters}
+						agents={agents}
+					/>
+				)}
 				{addProject.error ? (
 					<FieldError>{addProject.error.message}</FieldError>
+				) : null}
+				{addWithoutFolder.error ? (
+					<FieldError>{addWithoutFolder.error.message}</FieldError>
 				) : null}
 			</FieldGroup>
 			<DialogFooter>
@@ -344,7 +389,7 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 					) : (
 						<PlusIcon data-icon="inline-start" />
 					)}
-					{addProject.isPending
+					{adding
 						? "Adding…"
 						: source === "github" && copying
 							? "Copying…"
@@ -352,5 +397,38 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 				</Button>
 			</DialogFooter>
 		</form>
+	);
+}
+
+/** The starter flows to add with a project, and the agent for each of them. */
+function StartersField({
+	id,
+	starters,
+	onStartersChange,
+	agents,
+}: {
+	id: string;
+	starters: boolean;
+	onStartersChange: (starters: boolean) => void;
+	agents: ReturnType<typeof useFlowAgents>;
+}) {
+	return (
+		<>
+			<Field orientation="horizontal">
+				<Checkbox
+					id={id}
+					checked={starters}
+					onCheckedChange={(checked) => onStartersChange(checked === true)}
+				/>
+				<FieldContent>
+					<FieldLabel htmlFor={id}>Add the starter flows</FieldLabel>
+					<FieldDescription>
+						Small flows to change and run, for example scout and pick, or draft
+						slides.
+					</FieldDescription>
+				</FieldContent>
+			</Field>
+			{starters ? <FlowAgentsStep step={agents} /> : null}
+		</>
 	);
 }

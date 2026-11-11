@@ -55,7 +55,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CopyProjectHere, projectQueries } from "@/features/projects";
+import { CopyProjectHere, notHere, projectQueries } from "@/features/projects";
 import { hoverTime } from "@/shared/format";
 import { SiteHeader } from "@/shared/page";
 import { FlowAssistantContext } from "../assistant/flow-assistant";
@@ -933,7 +933,7 @@ function Editor({
 								<FlowChatPanel
 									{...chat.panel}
 									notice={
-										project?.repoPath === null ? (
+										project && notHere(project) ? (
 											<CopyProjectHere project={project} />
 										) : null
 									}

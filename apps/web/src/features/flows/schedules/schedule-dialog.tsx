@@ -1,6 +1,7 @@
 import {
 	canStart,
 	filledInputs,
+	hasFolder,
 	type InputTexts,
 	inputProblem,
 	missingInputs,
@@ -151,8 +152,16 @@ function freeId(flow: string, taken: readonly string[]): string {
 	}
 }
 
-/** Whether a computer has a copy of the project. True when this computer cannot tell. */
-function hasProject(machine: Machine | null, projectId: string): boolean {
+/**
+ * Whether a computer has a copy of the project. True when this computer
+ * cannot tell, and for a project without a folder: it needs no copy.
+ */
+function hasProject(
+	machine: Machine | null,
+	projectId: string,
+	withFolder: boolean,
+): boolean {
+	if (!withFolder) return true;
 	return machine?.projectIds?.includes(projectId) ?? true;
 }
 
@@ -290,6 +299,9 @@ function ScheduleForm({
 		(p) => p.id === projectId,
 	);
 	const runsOnMachine = machines?.starter ?? null;
+	// A project without a folder: no copy to wait for, no branch to start from.
+	const withFolder = project ? hasFolder(project) : true;
+	const here = hasProject(runsOnMachine, projectId, withFolder);
 
 	const chosenItem = startsFlow
 		? list.data?.find((item) => item.name === chosen)
@@ -342,7 +354,7 @@ function ScheduleForm({
 
 	const save = () => {
 		if (problem !== null || saving) return;
-		const ref = baseRef.trim();
+		const ref = withFolder ? baseRef.trim() : "";
 		const shared = {
 			id: scheduleId,
 			...(stop.on ? { stopAt: stop.time } : {}),
@@ -679,14 +691,10 @@ function ScheduleForm({
 				) : null}
 
 				{machines ? (
-					<Field
-						data-invalid={!hasProject(runsOnMachine, projectId) || undefined}
-					>
-						{!hasProject(runsOnMachine, projectId) &&
-						runsOnMachine?.thisDevice &&
-						project ? (
+					<Field data-invalid={!here || undefined}>
+						{!here && runsOnMachine?.thisDevice && project ? (
 							<CopyProjectHere project={project} />
-						) : !hasProject(runsOnMachine, projectId) ? (
+						) : !here ? (
 							<FieldError>
 								{runsOnMachine?.name} does not have this project. The schedule
 								cannot start until it does.
@@ -706,21 +714,23 @@ function ScheduleForm({
 					</Field>
 				) : null}
 
-				<Field>
-					<FieldLabel htmlFor={`${id}-base`}>
-						Start from
-						<span className="font-normal text-muted-foreground">
-							(optional)
-						</span>
-					</FieldLabel>
-					<BaseRefCombobox
-						id={`${id}-base`}
-						projectId={projectId}
-						value={baseRef}
-						placeholder="The current branch"
-						onChange={setBaseRef}
-					/>
-				</Field>
+				{withFolder ? (
+					<Field>
+						<FieldLabel htmlFor={`${id}-base`}>
+							Start from
+							<span className="font-normal text-muted-foreground">
+								(optional)
+							</span>
+						</FieldLabel>
+						<BaseRefCombobox
+							id={`${id}-base`}
+							projectId={projectId}
+							value={baseRef}
+							placeholder="The current branch"
+							onChange={setBaseRef}
+						/>
+					</Field>
+				) : null}
 			</FieldGroup>
 
 			<DialogFooter className="items-center">

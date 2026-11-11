@@ -21,7 +21,10 @@ import {
 
 const CLEANUP_KEYS = ["cleanUpAfterDays"] as const;
 
-/** The scheduled cleanup of what ended runs left on this computer. */
+/**
+ * The scheduled cleanup of what ended runs left on this computer: their
+ * copies of the project, and the files of runs without a project folder.
+ */
 export function CleanupCard({ data }: { data: SettingsView }) {
 	const form = useSettingsForm(data, CLEANUP_KEYS, {
 		title: "Cleanup",
@@ -47,7 +50,8 @@ export function CleanupCard({ data }: { data: SettingsView }) {
 									</FieldLabel>
 									<FieldDescription>
 										Remove a run once its work is merged or pushed. Branches on
-										origin stay. Remove other runs on the Branches page.
+										origin stay. Remove other runs on the Branches page. In a
+										project without a folder, the files of a run always go.
 									</FieldDescription>
 								</FieldContent>
 								<Switch

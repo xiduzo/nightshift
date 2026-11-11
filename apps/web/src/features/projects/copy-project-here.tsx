@@ -15,6 +15,7 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import type { Project } from "@/shared/api";
 import { useChooseProjectFolder } from "./choose-project-folder";
+import { notHere } from "./projects";
 import { projectMutations, projectQueries } from "./queries";
 
 /** Whether Night Shift can copy the project from GitHub: its remote is there. */
@@ -27,11 +28,13 @@ function onGitHub(project: Pick<Project, "remote">): boolean {
  * it failed. Null when none runs or failed. A copy that ends refreshes the
  * projects: it is a Clone here now, or a problem.
  */
-export function useProjectCopy(project: Pick<Project, "id" | "repoPath">) {
+export function useProjectCopy(
+	project: Pick<Project, "id" | "repoPath" | "folder">,
+) {
 	const queryClient = useQueryClient();
 	const copies = useQuery({
 		...projectQueries.copies(),
-		enabled: project.repoPath === null,
+		enabled: notHere(project),
 	});
 	const copy = copies.data?.find((c) => c.projectId === project.id) ?? null;
 	const copying = copy?.state === "copying";
@@ -49,7 +52,7 @@ export function useProjectCopy(project: Pick<Project, "id" | "repoPath">) {
  * A project that is not on this computer yet: how its copy from GitHub
  * goes, a button to copy it now or try again, and one to choose a copy
  * the person already has. A Host copies each project on its own. Nothing
- * when the project is here.
+ * when the project is here, or has no folder to copy.
  */
 export function CopyProjectHere({
 	project,
@@ -71,7 +74,7 @@ export function CopyProjectHere({
 		}),
 	);
 
-	if (project.repoPath !== null) return null;
+	if (!notHere(project)) return null;
 	const busy = copy?.state === "copying" || start.isPending;
 	const canCopy = onGitHub(project);
 

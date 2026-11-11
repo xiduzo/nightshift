@@ -1,3 +1,4 @@
+import { hasFolder } from "@nightshift/client";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { cn } from "@nightshift/ui/lib/utils";
 import type { Project } from "@/shared/api";
@@ -6,7 +7,8 @@ import { projectFolder } from "./projects";
 
 /**
  * Under a project's name: its folder on this computer, else how its copy
- * from GitHub goes, so a person sees it without looking for it.
+ * from GitHub goes, so a person sees it without looking for it. A project
+ * without a folder says so.
  */
 export function ProjectFolderLine({
 	project,
@@ -16,6 +18,13 @@ export function ProjectFolderLine({
 	className?: string;
 }) {
 	const copy = useProjectCopy(project);
+	if (!hasFolder(project)) {
+		return (
+			<span className={cn("block", className)}>
+				No folder. Each run starts in an empty folder of its own.
+			</span>
+		);
+	}
 	if (copy?.state === "copying") {
 		return (
 			<span

@@ -48,6 +48,7 @@ import { UsersIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { FlowInputFields } from "@/features/flows";
+import { useHasFolder } from "@/features/projects";
 import { orpc } from "@/shared/api";
 import { knowledgeMutations, knowledgeQueries } from "./queries";
 
@@ -168,6 +169,11 @@ function SourceForm({
 	);
 	const [syncNow, setSyncNow] = useState(startRuns);
 	const kind = knowledgeSourceKind(kit);
+	// A project without a folder has no files of its own to copy.
+	const withFolder = useHasFolder(projectId);
+	const kinds = KNOWLEDGE_SOURCE_KINDS.filter(
+		(option) => withFolder || !option.needsFolder || option.kit === kit,
+	);
 	// A folder source of another computer stays there: say which one.
 	const elsewhere =
 		edited?.computer && !edited.computer.here ? edited.computer.name : null;
@@ -271,7 +277,7 @@ function SourceForm({
 						disabled={edited !== null}
 						className="grid gap-2 sm:grid-cols-2"
 					>
-						{KNOWLEDGE_SOURCE_KINDS.map((option) => (
+						{kinds.map((option) => (
 							<FieldLabel key={option.kit} htmlFor={`${id}-${option.kit}`}>
 								<Field orientation="horizontal">
 									<FieldContent>

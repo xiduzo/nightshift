@@ -59,6 +59,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { PlayIcon, WorkflowIcon } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
+import { useHasFolder } from "@/features/projects";
 import { runMutations, runQueries } from "@/features/runs/flows-port";
 import { orpc } from "@/shared/api";
 import {
@@ -165,13 +166,14 @@ function typedInputs(inputs: FlowInputDef[], values: InputValues): InputValues {
 	return typed;
 }
 
-/**
- * Starts a flow file in a new worktree: its inputs, the ref to start from,
- * and an optional stop time.
- */
 /** The runs whose branches "Start from" offers. */
 const RECENT_RUNS = 12;
 
+/**
+ * Starts a flow file in a new worktree: its inputs, the ref to start from,
+ * and an optional stop time. A project without a folder has no ref to
+ * start from.
+ */
 export function StartRunDialog({
 	open,
 	onOpenChange,
@@ -224,6 +226,8 @@ function StartRunForm({
 		readStoredInputs(projectId, flowName, inputs),
 	);
 	const [baseRef, setBaseRef] = useState("");
+	// A project without a folder has no branches: nothing to start from.
+	const withFolder = useHasFolder(projectId);
 	// Where the steps run: Automatic lets the flow decide. A device the person
 	// picks goes first, and the flow's devices are its backups.
 	const placements = useQuery(runQueries.placements(projectId));
@@ -235,7 +239,10 @@ function StartRunForm({
 	const noDevice = placements.isSuccess && devices.length === 0;
 	const now = useNow(15_000);
 	// Recent branches of this project's runs: a night can go on from an open stack.
-	const runs = useQuery(runQueries.ofProject(projectId, RECENT_RUNS));
+	const runs = useQuery({
+		...runQueries.ofProject(projectId, RECENT_RUNS),
+		enabled: withFolder,
+	});
 	const recentRefs = [
 		...new Set((runs.data ?? []).flatMap((run) => [run.branch, run.baseRef])),
 	].slice(0, 12);
@@ -267,7 +274,7 @@ function StartRunForm({
 		const filled = filledInputs(inputs, values);
 		if (inputs.length > 0)
 			writeStoredInputs(projectId, flowName, typedInputs(inputs, values));
-		const ref = baseRef.trim();
+		const ref = withFolder ? baseRef.trim() : "";
 		// Computed at the click, so a dialog left open does not start with a stale time.
 		const at = stop.on ? nextOccurrence(stop.time) : null;
 		startRun.mutate({
@@ -294,8 +301,9 @@ function StartRunForm({
 						Run <span className="font-mono">{flowName}</span>
 					</DialogTitle>
 					<DialogDescription>
-						The run works on a new branch in its own copy of the project. You
-						can stop it at any time.
+						{withFolder
+							? "The run works on a new branch in its own copy of the project. You can stop it at any time."
+							: "You can stop the run at any time."}
 					</DialogDescription>
 				</DialogHeader>
 			)}
@@ -369,30 +377,32 @@ function StartRunForm({
 					</Field>
 				) : null}
 
-				<Field>
-					<FieldLabel htmlFor={`${id}-base`}>
-						Start from
-						<span className="font-normal text-muted-foreground">
-							(optional)
-						</span>
-					</FieldLabel>
-					<BaseRefCombobox
-						id={`${id}-base`}
-						projectId={projectId}
-						value={baseRef}
-						recent={recentRefs}
-						placeholder={
-							lastBase
-								? `The current branch (last: ${lastBase})`
-								: "The current branch"
-						}
-						describedBy={`${id}-base-hint`}
-						onChange={setBaseRef}
-					/>
-					<FieldDescription id={`${id}-base-hint`}>
-						A branch, tag or commit, for example the top of an open stack.
-					</FieldDescription>
-				</Field>
+				{withFolder ? (
+					<Field>
+						<FieldLabel htmlFor={`${id}-base`}>
+							Start from
+							<span className="font-normal text-muted-foreground">
+								(optional)
+							</span>
+						</FieldLabel>
+						<BaseRefCombobox
+							id={`${id}-base`}
+							projectId={projectId}
+							value={baseRef}
+							recent={recentRefs}
+							placeholder={
+								lastBase
+									? `The current branch (last: ${lastBase})`
+									: "The current branch"
+							}
+							describedBy={`${id}-base-hint`}
+							onChange={setBaseRef}
+						/>
+						<FieldDescription id={`${id}-base-hint`}>
+							A branch, tag or commit, for example the top of an open stack.
+						</FieldDescription>
+					</Field>
+				) : null}
 
 				<Field
 					orientation="horizontal"

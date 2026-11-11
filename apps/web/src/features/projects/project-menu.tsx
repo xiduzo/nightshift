@@ -1,3 +1,4 @@
+import { hasFolder } from "@nightshift/client";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -39,7 +40,8 @@ import { projectMutations } from "./queries";
 /**
  * The ⋯ menu of a project: the computers that have it, its folder here,
  * rename it, move it to another Space, or remove it. `children` are items above these, such
- * as "Open project".
+ * as "Open project". A project without a folder has no computers and no
+ * folder to choose.
  */
 export function ProjectMenu({
 	project,
@@ -53,6 +55,7 @@ export function ProjectMenu({
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const folder = useChooseProjectFolder(project);
+	const withFolder = hasFolder(project);
 	const [dialog, setDialog] = useState<
 		"computers" | "rename" | "move" | "remove" | null
 	>(null);
@@ -88,11 +91,13 @@ export function ProjectMenu({
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end" className="w-44">
 					{children}
-					<DropdownMenuItem onClick={() => setDialog("computers")}>
-						<MonitorIcon aria-hidden="true" />
-						Computers…
-					</DropdownMenuItem>
-					{folder.available ? (
+					{withFolder ? (
+						<DropdownMenuItem onClick={() => setDialog("computers")}>
+							<MonitorIcon aria-hidden="true" />
+							Computers…
+						</DropdownMenuItem>
+					) : null}
+					{withFolder && folder.available ? (
 						<DropdownMenuItem disabled={folder.busy} onClick={folder.choose}>
 							<FolderOpenIcon aria-hidden="true" />
 							{project.repoPath === null ? "Choose folder…" : "Change folder…"}
@@ -136,9 +141,15 @@ export function ProjectMenu({
 							Remove {project.name} from Night Shift?
 						</AlertDialogTitle>
 						<AlertDialogDescription>
-							Night Shift forgets the project and its runs. The folder at{" "}
-							<span className="font-mono">{projectFolder(project)}</span> stays
-							as it is.
+							Night Shift forgets the project and its runs.
+							{withFolder ? (
+								<>
+									{" "}
+									The folder at{" "}
+									<span className="font-mono">{projectFolder(project)}</span>{" "}
+									stays as it is.
+								</>
+							) : null}
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

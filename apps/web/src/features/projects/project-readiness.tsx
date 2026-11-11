@@ -52,7 +52,7 @@ const STEP_TITLE: Record<Step["id"], string> = {
 
 const STEP_OK: Record<Step["id"], string> = {
 	git: "Git is installed.",
-	folder: "The folder uses git.",
+	folder: "Night Shift keeps the history of this folder.",
 	commit: "The project has a commit.",
 	identity: "Git knows your name and email.",
 	tools: "The tools are installed.",
@@ -314,7 +314,7 @@ function SetUpGitDialog({
 	const setUpGit = useMutation(
 		projectMutations.setUpGit({
 			onSuccess: () => {
-				toast.success("Git is set up in this folder");
+				toast.success("Night Shift keeps the history of this folder");
 				onDone();
 			},
 		}),
@@ -340,8 +340,8 @@ function SetUpGitDialog({
 					<AlertDialogHeader>
 						<AlertDialogTitle>Set up git in this folder?</AlertDialogTitle>
 						<AlertDialogDescription>
-							Night Shift turns on git here and saves every file in a first
-							commit. Files that git ignores stay out.
+							Night Shift keeps the history of this folder. It saves every file
+							now as the first version. Files that git ignores stay out.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					{needsIdentity ? (
