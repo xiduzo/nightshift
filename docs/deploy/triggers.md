@@ -105,9 +105,8 @@ a revert, so Night Shift reads two facts that GitHub sends anyway:
 
 Night Shift never asks GitHub. Only the runs that the computer which takes
 the webhook walks get a score. In a Space with a Host, that is the Host.
-The scores show on the run, and they go to your
-[monitoring](monitoring.md) as `nightshift.score` and
-`nightshift.pr.outcome`.
+The scores show on the run. They go to your [monitoring](monitoring.md)
+as `nightshift.score` points with these names.
 
 ## 2. Prove that you know the secret
 
