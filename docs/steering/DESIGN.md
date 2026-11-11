@@ -76,7 +76,7 @@ An overview shows **at most 5 rows** in a list or table: the Failed lane on Home
 A project's page reads like the Performance page of Search Console. Keep its shape:
 
 - One range for the whole page, on top: 7, 30 or 90 days, in the URL (`?range=30`). A day runs from midnight to midnight on your clock. No section has a range of its own.
-- Four metric tiles in one row: Runs, Finished, Spend, Gates asked. A tile turns its line on the chart on or off. A tile that is on fills with a light shade of its line's color, and its text is a dark shade (`--metric-<key>-tile` tokens, one pair per theme). Each tile always says how its number moved against the same days just before. That is not a choice.
+- Four metric tiles in one row: Runs, Finished, Spend, Needed you. Needed you is the share of the runs started in the range that a person stepped in on (answered, resumed, stopped or took over). Its change is in points, like Finished. A tile turns its line on the chart on or off. A tile that is on fills with a light shade of its line's color, and its text is a dark shade (`--metric-<key>-tile` tokens, one pair per theme). Each tile always says how its number moved against the same days just before. That is not a choice.
 - One line chart of the tiles that are on, with the days before as a dashed line. The tooltip puts the number before in brackets after each number, not on a row of its own.
 - When the days before had no runs, there is nothing to compare. The tiles and the chart say so, and the chart draws no dashed lines.
 - One card with tabs under the chart. Each tab is an overview list (see Overview lists).
@@ -89,7 +89,7 @@ A project's page reads like the Performance page of Search Console. Keep its sha
 Home answers "what needs me" over every project. The heading says how many Gates wait and how many flows still fail in the range. Keep its shape:
 
 - The same range as a project's page, on top: 7, 30 or 90 days, in the URL (`?range=30`).
-- The four numbers in one slim strip: Runs, Finished, Spend, Gates asked. Each has a small line per day, with the days before dashed. Each says how it moved against them. A number opens its details dialog.
+- The four numbers in one slim strip: Runs, Finished, Spend, Needed you. Each has a small line per day, with the days before dashed. Each says how it moved against them. A number opens its details dialog.
 - Three lanes in the order you act on them: Running now, Waiting for you, Failed. The lanes have the same height: the height of the tallest. Each has a count. A lane with nothing shows one line that says so.
 - A row is one line: what it is and one fact (when, or how often). The rest shows in a hover card. Long text truncates. It never wraps the row.
 - Waiting for you and Failed show at most 5 rows (see Overview lists). The rest is one link away: the inbox, or **Details**.

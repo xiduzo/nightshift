@@ -18,6 +18,7 @@ When a run finishes, the run page asks "Was this run useful?". The phone asks to
 - **Stop** a run now, or after the step that runs now.
 - **Resume** a stopped, failed, or interrupted run at its last step. You can resume it from any computer of its Space. A viewer cannot resume a run.
 - A run that a restart interrupted resumes by itself a few seconds after Night Shift starts again, unless its [run policy](#run-policy) says to wait for you.
+- **Take over** copies the command that continues the agent's work in a terminal, on the computer that runs the run. On the phone, you share it.
 
 ## Schedules
 
@@ -66,3 +67,7 @@ A computer that goes offline does not end the run:
 Flow health shows each flow's runs per day, their cost against the median, why runs failed, and the scores that its commands gave. A Command scores a run with `{"scores": {"found": 4}}` in its data. See [Command](Flows-and-nodes.md#command).
 
 **Per useful result** shows what all runs of a flow cost, divided by the runs that people found useful. Runs that failed or that nobody answered count in the cost too. Under it, you see how many runs with an answer were useful.
+
+**Needed you** shows the share of a flow's runs that a person stepped in on. A person answered a Gate or an Ask, resumed, stopped, or took over the run. Point at the share to see why. When the share falls, the flow needs you less.
+
+Home and each project page show the same number for all runs. Open **Needed you** to see why runs needed you, the runs that did, and the Gates that they asked.
