@@ -6,13 +6,17 @@ This document records the concept, the decisions behind it, the architecture and
 
 ## 1. What Night Shift is
 
-Night Shift is a flow builder for people who work with coding agents. You draw a flow in a graph editor. Each node is a step: an agent session with a prompt or a skill, a command, a tool call, a decision, or a Gate. The engine runs the flow on your own computers, with your own CLI logins. It starts on a schedule, from a webhook, or when you click Run. You act only at a Gate.
+Night Shift is a workflow builder like n8n and Zapier, with low-level control. A step can be an agent that works for an hour, and a choice can be a decider. A flow can do any work: research, monitoring, outreach, operations, content, or code. You draw the flow in a graph editor, or you describe it and an agent drafts it. Each node is a step: an agent session with a prompt or a skill, a command, a tool call, a decision, or a Gate. The engine runs the flow on your own computers, with your own CLI logins. It starts on a schedule, from a webhook, or when you click Run. You act only at a Gate.
+
+Night Shift has no app catalog. A flow reaches an app through its CLI, HTTP, webhooks, MCP, or the agent's own tools.
 
 Work and choices climb a ladder. A cheap agent tries first, a strong agent rescues it, and you are the last rung. A rule makes the choices it can, then a decision model, then a large model, then you. Every step records its cost, so you tune a flow by its cost and its benefit.
 
+You engineer the loop once, and then you leave it. You stay its last rung: the fallback when a ladder runs out, and the approver before an act that cannot be undone. A Gate that fires is a signal to improve the flow, so that it needs you less with each change.
+
 Night Shift replaced `night-shift.py`, the script in `rpgdotexe/tools/night-shift/`. The script hardcoded one pipeline: worker, check, retry, rescue, pull request, checkpoint. On 2026-10-25 a flow ran a full Epic, and the script retired.
 
-Night Shift was for its author first. It ran the author's work every night since 2026-10-16. Since 2026-11-07 it is for other people who work with agents too.
+Night Shift was for its author first. It ran the author's work every night since 2026-10-16. Since 2026-11-07 it is for other people who work with agents too. Since 2026-11-11 it is for anyone who builds a loop of work, technical or not. Code is one domain among many.
 
 ## 2. Decisions
 
@@ -20,7 +24,7 @@ Each row is a settled decision. Change a row only with a new ADR.
 
 | Topic | Decision |
 | --- | --- |
-| Users | One developer: the author. Better Auth stays, and local mode creates one user and one session automatically. |
+| Users | Anyone in a Space. A Person signs in with Better Auth, and local mode creates one user and one session automatically. A Space is a Better Auth organization. Each Member has a role: owner, admin, member or viewer. An owner, an admin or a member answers the Gates of the Space, and a viewer only reads ([docs/research/devices.md](research/devices.md), [ADR 1](adr/0001-one-personal-space-per-home-host.md)). |
 | The method | The flow is the method. No method packages and no `method.json`. A WTF night is one flow among others. |
 | Flows | A directed graph that you edit in React Flow (`@xyflow/react`). A flow is Night Shift data, not a file in the repo: a Yjs document in the Space that keeps its Project, with a published zod schema. Every save is a Flow revision. People edit flows in the editor. Agents edit them through `nightshift mcp` and the `nightshift` CLI ([ADR 2](adr/0002-flows-are-night-shift-data.md)). Night Shift knows no method and no tracker. GitHub, WTF and the rpgdotexe night are flows, CLI tools and commands, never engine concepts. |
 | Flow I/O | A flow declares **inputs** and **outputs**, like a function. Night Shift asks for the inputs of the top-level flow when a run starts. A Subflow node calls a flow once with bound inputs. With `each`, it calls the flow once per list element, bound to an input. The outputs come back to the caller. Version 1 files (with `params` and `input: "item"`) migrate on load. |
@@ -33,7 +37,7 @@ Each row is a settled decision. Change a row only with a new ADR.
 | Lists | A Subflow with `each` reads a list from a source: a JSON value (often another node's output), a command that prints JSON, or files that match a glob. An issue tracker is a command on its CLI (`gh`, `glab`, `acli`). Suggest command writes one for the project. An element is any JSON value. An object element may carry `id`, `title`, `dependsOn` and `done`. The rest is free. |
 | Triggers | A run starts by hand, or from a schedule of the project. An example: every night at 22:00 with a stop time of 07:00. The Space keeps its schedules with its flows ([ADR 2](adr/0002-flows-are-night-shift-data.md)). A schedule that names no Device fires once, on the Host of its Space ([ADR 1](adr/0001-one-personal-space-per-home-host.md)). |
 | GitHub | GitHub is a CLI tool (`gh`) and a list command that Suggest command writes (the sub-issues of an issue, the issues with a label). An Agent node that lists `gh` runs it with the user's login, or with the tool's own login. `gh-work` runs `gh` with its own token: several accounts of one program. A Command node or a list source runs it in the worktree. Nothing in the engine knows GitHub. |
-| Tools | A flow reaches the outside world through the CLI and MCP, as equals. A Command node runs a CLI. A Tool node calls one tool of a Connection (an MCP server defined once on the daemon, secrets as `${NAME}`). It takes arguments from templates and gets a typed result, with no model in the loop. An Agent node gives the same Connections to its session. Nothing in the engine knows any service. |
+| Tools | A flow reaches the outside world through foundational means, as equals: the CLI, MCP, HTTP and webhooks. Foundational means no integration settings of a vendor, so Night Shift has no vendor nodes (ADR 23). A Command node runs a CLI, also `curl` for HTTP. A Schedule's webhook lets the outside world start a run or send it a Signal. A Tool node calls one tool of a Connection (an MCP server defined once on the daemon, secrets as `${NAME}`). It takes arguments from templates and gets a typed result, with no model in the loop. An Agent node gives the same Connections to its session. Nothing in the engine knows any service. |
 | Decisions | A Decision node picks one of its options. A field of the node says who picks: you (a Gate, in the Needs-you inbox), a rule, or a model (the decider). A rule is a JSONata expression per option over the run's values, deterministic and free. The three sit behind one seam in the engine. The decider is a TanStack AI decision model through `decide()`. The default is TypeSafe Jev. The others are Jev on OpenRouter, OpenAI Decisions, Ollaya on this computer, and Ollama on this computer (any pulled chat model, no key). Each has its API key as a secret. Other deciders plug in behind the same interface. |
 | Values | A Value node is the twin of a Decision. A Decision picks a label. A Value makes `data` that matches a JSON Schema. A field of the node says who makes it: a rule (a JSONata expression over the run's values, deterministic and free) or a model (the decider's chat model through TanStack AI `chat()` with the schema as `outputSchema`). Only deciders with a text adapter make values: Jev on OpenRouter, OpenAI Decisions and Ollama. TypeSafe and Ollaya only decide. The engine checks the data against the schema: `pass` with the data, `fail` with why. A person makes it with an Ask (ADR 10): a form in the Needs-you inbox, drawn from the schema, with choices from the run and their files and links. |
 | Run policy | Ported from the script: a fresh session with a tight brief on retry, rescue by a stronger profile, blocked propagation, network grace, usage-limit waits that resume the same session, and a stop time. A wait that would end after the stop time does not start: the run stops at once, and a resume continues the step. Policy is engine code. A flow only sets its numbers. |
@@ -207,13 +211,15 @@ Server mode is built: the Host, its Spaces and its Offers ([docs/research/device
 - **A flow library to share.** It starts as the [`community/`](../community/) folder. A separate repository or a gallery in the app can come later.
 - **Cost and benefit insight.** A run shows what each step cost. A person cannot see yet:
   - how often each tier of a cascade holds, and what it costs
-  - the cost per useful result, such as a merged pull request
+  - the cost per useful result, such as a run that a person marked useful
   - how much of their own attention a flow takes
   - what a subscription really costs, beyond the API price of the work
   - how close a running run is to its budget
   - how often the guards stop a flow
   - whether a model's confidence matches the outcome
 - **Windows.**
+
+**Any domain.** On 2026-11-11 the owner settled what Night Shift is now: domain-neutral, for anyone, with the person out of the loop. Three waves follow. They make a project's folder optional, type every node's output, and add the nodes Web request, Since last run and Convert. They count how often a run needed you and whether it was useful, and a run can end with a report. The editor groups nodes by family, and a guided setup installs an agent and a decider. [docs/research/any-domain-2026-11.md](research/any-domain-2026-11.md) lists the decisions and tracks the progress.
 
 ## 6. Setup
 
@@ -366,7 +372,7 @@ NIGHTSHIFT_CODEX_BIN=/path/to/codex
 - The database keeps only the names of saved secrets. A missing variable fails the step with its name. Values never go into the flow file, the database or the logs.
 - "Test" connects to a server, lists its tools and disconnects.
 
-A Command node reads secrets too. `"secrets": ["ZAC_USER", "ZAC_PASSWORD"]` gives the command each one as an environment variable of the same name.
+A Command node reads secrets too. `"secrets": ["API_USER", "API_PASSWORD"]` gives the command each one as an environment variable of the same name.
 
 - The node sends only the names. The Device that runs the step reads the values in the same order: its keychain, then its daemon's environment. So a step on another computer uses that computer's secrets.
 - A secret the Device lacks errors the step before the command runs.
