@@ -11,7 +11,7 @@ Each run works in its own copy of your project, on a branch named `nightshift/â€
 
 You follow each step live: its transcript, the files that it changed, its cost, and its tokens.
 
-When a run opened a pull request, the run page asks "Was this pull request useful?". Your answer helps Night Shift learn which runs are worth the cost.
+When a run finishes, the run page asks "Was this run useful?". The phone asks too. Flow health uses the answers to show what a useful result costs.
 
 ## Stop and resume
 
@@ -64,3 +64,5 @@ A computer that goes offline does not end the run:
 ## Flow health
 
 Flow health shows each flow's runs per day, their cost against the median, why runs failed, and the scores that its commands gave. A Command scores a run with `{"scores": {"found": 4}}` in its data. See [Command](Flows-and-nodes.md#command).
+
+**Per useful result** shows what all runs of a flow cost, divided by the runs that people found useful. Runs that failed or that nobody answered count in the cost too. Under it, you see how many runs with an answer were useful.
