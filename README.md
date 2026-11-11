@@ -66,7 +66,7 @@ flowchart LR
   fix -- pass --> remember
 ```
 
-The same shape can watch a feed, a price, or a status page. A flow has thirteen node types, from an Agent session to a Wait for a webhook. [Flows and nodes](https://github.com/xiduzo/nightshift/wiki/Flows-and-nodes) in the user guide tells each one.
+The same shape can watch a feed, a price, or a status page. A flow has fourteen node types, from an Agent session to a Web request and a Wait for a webhook. [Flows and nodes](https://github.com/xiduzo/nightshift/wiki/Flows-and-nodes) in the user guide tells each one.
 
 ## Flows to run
 

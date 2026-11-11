@@ -103,3 +103,10 @@ A [project without a folder](Get-started.md#a-project-without-a-folder) needs no
 - Each computer that runs a step works in a folder of its own for that run. See [The files of a run](Runs-and-schedules.md#the-files-of-a-run).
 - A step that works in that folder does not move to a backup. It waits for its computer.
 - To add such a project in a Space that a Host keeps, the Host needs a recent Night Shift.
+
+## Web requests from a Host
+
+A Web request and a Wait for a URL on a Host reach public addresses only. The Host runs the flows of every Member of its Spaces, so its own network stays closed by default.
+
+- To let them reach the Host itself and its private network, turn on **Web requests reach this network** under Settings → This computer, or set `NIGHTSHIFT_WEB_REQUESTS_PRIVATE_NETWORK=on`.
+- No web request reaches a link-local or a cloud metadata address, on any computer.

@@ -222,6 +222,15 @@ on the Host to see why it failed. "Try again" there copies it at once.
 - **Turn it off** under Settings → This computer → Copy every project, or
   with `NIGHTSHIFT_COPY_PROJECTS=off`.
 
+### Web requests stay off the Host's network
+
+A Web request node and a Wait for a URL on the Host reach public addresses
+only. Loopback, private (RFC 1918), unique local and carrier-grade NAT
+addresses are closed, and link-local and cloud metadata addresses are
+always closed. To let flows reach a service next to the Host, turn on
+Settings → This computer → Web requests reach this network, or set
+`NIGHTSHIFT_WEB_REQUESTS_PRIVATE_NETWORK=on`. See `SECURITY.md`.
+
 ### Keep it running
 
 Night Shift can stop responding while it still answers web requests. Each

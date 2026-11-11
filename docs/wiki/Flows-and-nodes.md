@@ -30,10 +30,11 @@ flowchart LR
 | **Agent** | Runs one agent session with a prompt, and optionally a skill. Ends with an outcome and, if you ask, data that matches a JSON schema. It can ask you a question and continue the same session with your answer. |
 | **Command** | Runs a shell command in the project, for example `curl` to call an API, or the tests. Its exit code picks the outcome. |
 | **Tool** | Calls one tool of an MCP server with typed arguments. No model in the loop. |
+| **Web request** | Sends one request to a web address and gives the answer as data: its status, headers and body. No shell and no project folder. |
 | **Decision** | Picks one of its options. A person picks it in a **Gate**, a rule picks it in a **Branch**, or a model picks it. |
 | **Value** | Makes data that matches a JSON schema, from a rule, a model, or a person. A person gets an **Ask**: a form in the inbox. |
 | **Convert** | Turns CSV, YAML, XML, a feed or a Markdown table into JSON, and JSON back into text. It also turns HTML into plain text. It uses no model. |
-| **Wait** | Waits for a duration, a time, a command that passes, a signal, or the first of a signal and a command. |
+| **Wait** | Waits for a duration, a time, a command that passes, a signal, the first of a signal and a command, or a URL that answers. |
 | **Subflow** | Runs another flow or a kit, once or once per item in a list. |
 | **Join** | Waits for the branches that run at once: all of them, or the first. The first stops the others. |
 | **Lease** | Lets one run at a time do the next steps, for example one deploy at a time. Runs on other computers of the Space take turns too. |
@@ -67,6 +68,19 @@ A Decision or a Value that a model decides can have a cascade too. A model's pic
 - **Data shape** in its **Output** says what that data holds. See [Data shapes](#data-shapes).
 - `{"scores": {"found": 4}}` in that data scores the run. Flow health shows the scores of each flow.
 - `$NS_KNOWLEDGE` is the project's [knowledge](Knowledge.md) folder.
+
+### Web request
+
+A Web request sends one request from the computer of its step, and reads the answer.
+
+- **Address.** A URL such as `https://api.example.com/items`, or a secret that holds the whole URL. Use a secret for a webhook address, because the address is its key. Night Shift never shows it.
+- **Query, headers and body.** Each value is a template. The body is JSON, text or a form. In JSON, put each template in quotes: `"{{plan.data.tasks}}"`. A quoted template that is one reference keeps its JSON value.
+- **Secrets.** Write `${API_TOKEN}` in the node's own text, for example in the header `Authorization: Bearer ${API_TOKEN}`. The computer of the step fills it in. A value that a template gives is never filled in, so data from a webhook cannot read your secrets. The answer shows each secret value as `•••`.
+- **Outcomes.** `pass` on a 2xx answer. `fail` on any other answer, or on an answer that is too large. When the server says it is busy (429) or fails (5xx), the step waits and asks again, as an agent does at a usage limit.
+- **Outputs.** `{{fetch.status}}`, `{{fetch.headers.content-type}}` and `{{fetch.body}}`. The body is JSON when the server sends JSON, else text. Later nodes read a field of it: `{{fetch.body.items}}`.
+- **Limits.** The step waits 30 seconds for an answer, and keeps up to 1 MB of it. You can set up to 10 minutes and 10 MB.
+
+On a Host, a Web request reaches public addresses only. To let it reach the Host itself and its private network, turn on **Web requests reach this network** in the Host settings. No request reaches a link-local or a cloud metadata address.
 
 ### Decision
 
@@ -103,7 +117,16 @@ The value can have at most 1 MB. Raise the size limit of the node up to 10 MB. A
 
 ### Wait
 
-A Wait ends on its own outcomes. A command or a signal can pick one. Every Wait has a timeout. A signal comes from a webhook schedule, by name and key. See [Runs and schedules](Runs-and-schedules.md#webhooks).
+A Wait waits for one of these:
+
+- a duration, such as 15 minutes;
+- a time, such as `07:00`;
+- a command that passes, run every few minutes;
+- a signal, from the run page or from a webhook;
+- a signal or a command, whichever comes first;
+- a URL that answers 2xx, asked every few minutes, for example a status page of a job. The body of the answer is its data.
+
+A Wait ends on its own outcomes. A command, a signal or a URL can pick one. A rule over the answer of a URL reads it as `data`: `data.state = "done"`. Every Wait has a timeout. A signal comes from a webhook schedule, by name and key. See [Runs and schedules](Runs-and-schedules.md#webhooks).
 
 ### Subflow
 

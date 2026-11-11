@@ -26,6 +26,18 @@ Examples:
 - A run that uses another person's agent profile without an Offer, or in a wider permission mode than the Offer allows.
 - A webhook that starts a run or wakes a Wait without the schedule's secret.
 - A paired computer or a phone that acts for a person it does not belong to.
+- A Web request that reaches an address its computer does not allow (see below), or that fills in a secret from a template value.
+
+## Web requests
+
+A Web request node and a Wait for a URL send HTTP requests from the computer of their step. Night Shift checks every address that the host name resolves to, and the address of every redirect, before it connects. It follows at most 5 redirects.
+
+- **Never:** link-local addresses (`169.254.0.0/16`, `fe80::/10`, where cloud metadata services live), the cloud metadata addresses `fd00:ec2::254` and `100.100.100.200`, `0.0.0.0` and `::`, broadcast, multicast and reserved ranges. An IPv6 address that holds an IPv4 address counts as that IPv4 address.
+- **On a Host, only when its Settings allow it:** loopback, private (RFC 1918), unique local (`fc00::/7`) and carrier-grade NAT (`100.64.0.0/10`) addresses. The switch is **Web requests reach this network** in the Host settings, or `NIGHTSHIFT_WEB_REQUESTS_PRIVATE_NETWORK=on`. It is off by default, because a Host runs the flows of every Member of its Spaces. A computer that is not a Host may reach them: they are its person's own network.
+- **Secrets:** a `${NAME}` in the node's own text reads a secret on that computer. A value that a template renders is never filled in. A header with a secret, and `Authorization` and `Cookie`, do not follow a redirect to another server. The answer and every message show the secret values as `•••`.
+- **Size:** a step keeps at most 1 MB of an answer by default, and 10 MB at most. Every Replica of the Space keeps the step's outputs.
+
+DNS rebinding stays a risk. Night Shift resolves the name to check it, and the request resolves it again when it connects. A name that answers with another address the second time gets past the check.
 
 ## Known dependency findings
 
