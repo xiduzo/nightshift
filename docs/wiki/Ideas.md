@@ -4,50 +4,68 @@ The flows on this page do not exist yet. Each one is an idea. Anyone can build o
 
 When you build an idea, remove it from this page in the same pull request.
 
+Each idea climbs the ladder. A rule, or a check for what is new, comes first, so most runs end without a model. A decider makes the next choices, and an agent does the work. A Gate asks you only when the ladder runs out, or before an act that you cannot undo.
+
+## Keep a market brief up to date
+
+A schedule starts the flow each Monday. A Command reads the pages of the products and the companies that you follow. A rule keeps only the pages that changed since the last run. When nothing changed, the run ends. A decider sorts each change: it matters to you, or it does not. An agent adds what matters to a brief in the project's knowledge.
+
+The run only writes a file for you to read, so no Gate asks first.
+
+It could use: a schedule, a Command with `curl`, a variable kept between runs, a Branch, a decider, the knowledge.
+
+## Follow new papers on a topic
+
+A schedule starts the flow each morning. A Command gets the newest papers of a search with `curl`. A rule drops the papers that an earlier run saw. A decider reads the abstract of each new paper, and picks: on your topic, or not. An agent writes a summary of each paper on your topic, in plain words, into the knowledge.
+
+The run only writes files for you to read, so no Gate asks first.
+
+It could use: a schedule, a Command with `curl` and `jq`, a variable kept between runs, a Subflow per paper, a decider, the knowledge.
+
+## Watch prices you care about
+
+A schedule starts the flow each morning. A Command reads the prices with `curl` and `jq`. A rule keeps the prices that fell below your limit since the last run. When there are none, the run ends. A decider looks at each hit, and picks: a real offer, or noise, such as another size or a used item.
+
+For each real offer, a Command sends you a message with the link, through the incoming webhook of your chat app. The message goes only to you, so no Gate asks first. No agent runs at all.
+
+It could use: a schedule, a Command with `curl` and `jq`, a variable kept between runs, a decider, a secret for the webhook address.
+
+## Check your backups each morning
+
+A schedule starts the flow each morning. A Command lists the newest backups, with their time and size. A rule passes when each backup is new, and about as large as the one before. Then the run ends, and nobody hears about it.
+
+When the rule fails, a Command starts the backup again. When that fails too, an agent reads the logs and finds the cause. A Gate with the urgency Now then shows you the cause, and asks what to do. This Gate is the fallback: the ladder ran out.
+
+It could use: a schedule, a Command, a Branch, an Agent, a Gate with the urgency Now.
+
+## Reorder supplies that run low
+
+A schedule starts the flow each morning. A Command reads your stock with `curl`, from your shop or a spreadsheet. A rule keeps the items below their minimum. When no item is low, the run ends. A decider picks for each low item: order now, or wait for the next order from that supplier. An agent drafts one order per supplier, from the sales of the last weeks.
+
+A Gate shows you each order before Night Shift sends it, because you cannot undo a sent order. A Command then sends it with `curl`.
+
+It could use: a schedule, a Command with `curl` and `jq`, a Branch, a decider, an Agent, a Gate, a secret.
+
+## Find and contact new leads
+
+A schedule starts the flow each week. An agent searches the web for companies that fit the description that you give. A rule drops the companies that an earlier run found. A decider picks for each new company: a good fit, or not. An agent writes a short, personal first mail to each good fit.
+
+A Gate shows you each mail before Night Shift sends it, because you cannot undo a sent mail. When you trust the drafts, give the Gate a cascade. A decider then approves the clear mails first, and you see only the rest.
+
+It could use: a schedule, an Agent, a variable kept between runs, a decider, a Gate with a cascade, a Command with `curl`, a secret.
+
+## Draft the weekly newsletter
+
+A schedule starts the flow each Friday. A Command reads the links that you saved this week in a notes file. A rule ends the run when there are fewer than three. An agent writes the draft in your voice, from your earlier issues in the knowledge. A decider checks the draft against your rules, and picks: ready, or one more try with a stronger agent.
+
+A Gate shows you the draft before Night Shift publishes it, because every reader gets it at once. A Command then publishes it with `curl`.
+
+It could use: a schedule, `kit:knowledge/folder`, a Branch, an Agent, a decider, a Gate, a Command with `curl`, a secret.
+
 ## Triage new issues each morning
 
-A schedule starts the flow each morning. An agent reads the issues opened since the day before. It proposes labels, finds duplicates, and drafts a question where details are missing. A Gate shows you the proposal before anything changes on GitHub.
+A schedule starts the flow each morning. A Command lists the issues opened since the last run with `gh`. When there are none, the run ends. A rule labels each issue that uses one of your templates. A decider picks a label for each other issue. You can change a label later, so labels need no Gate.
 
-It could use: a schedule, the CLI tool `gh`.
+An agent drafts a question for each issue that misses details. A Gate shows you each question before Night Shift posts it for the person who opened the issue.
 
-## Write release notes from merged pull requests
-
-An agent reads the pull requests merged since the last release. It writes release notes for the people who use the product, not for the people who build it. A Gate shows you the draft. When you keep it, Night Shift saves a draft release on GitHub.
-
-It could use: the CLI tool `gh`.
-
-## Keep translated docs up to date
-
-When a doc in the source language changes, an agent updates the same doc in each other language. It changes only the parts that changed in the source. A Gate shows you the changes, so a person who reads the language can check them.
-
-It could use: a webhook schedule on each push, `git`.
-
-## Turn meeting notes into tasks
-
-You give the notes of a meeting. An agent finds the decisions and the tasks, each with an owner and a date. An Ask lets you choose the tasks to keep. Night Shift then files each task in your tracker.
-
-It could use: an Ask, the CLI tool of your tracker.
-
-## Watch a changelog you depend on
-
-Each week, Night Shift reads the changelog of a tool or a service that your project uses. An agent tells you which changes touch your project, and why. When a change needs work, it opens an issue.
-
-It could use: a schedule, `curl`, the CLI tool `gh`.
-
-## Summarize the week for your team
-
-Each Friday, an agent reads the work merged this week, the open issues, and the runs that failed. It writes a short summary in plain words for people who do not read code. A Gate shows you the summary before Night Shift posts it.
-
-It could use: a schedule, the CLI tool `gh`.
-
-## Draft answers to new questions from your docs
-
-When a person asks a question in GitHub Discussions, an agent looks for the answer in your docs. It drafts a reply with links to the pages it used. A Gate shows you the draft, and you choose to post it or not.
-
-It could use: a webhook schedule, the CLI tool `gh`.
-
-## Find broken links in your docs
-
-Each week, a command checks every link in your docs. An agent fixes the links that moved, and lists the links it cannot fix. A Gate shows you the changes before Night Shift commits them.
-
-It could use: a schedule, `curl`.
+It could use: a schedule, the CLI tool `gh`, a Branch, a decider, a Subflow per issue, an Agent, a Gate.
