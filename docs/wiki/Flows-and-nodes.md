@@ -106,6 +106,8 @@ Steps read earlier values through templates:
 - `{{planner.data.tasks}}`: a field of the data of the step `planner`.
 - `{{run.branch}}`: a fact of the run.
 
+Data has a shape: text, a number, yes or no, a choice, a file, a list, or a record with named fields. You set the shape in the **Output** of an Agent or a Value. When a template reads a field that the shape does not have, such as `{{planner.data.taks}}`, the editor shows a warning. The run still starts.
+
 Two or more edges on one outcome run their branches at once. A Join waits for them.
 
 A variable with **Keep between runs** starts each run with the value that the last run left. Use it to remember what a run saw already.
