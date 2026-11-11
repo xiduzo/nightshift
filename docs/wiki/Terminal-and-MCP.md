@@ -139,7 +139,6 @@ From a clone, put the full `bun` command after `--`.
 | `stop_run` | Stop a run now, or after the step that runs now. |
 | `needs_me` | The Gates that wait for you, in every project, with the question and the options. |
 | `answer_gate` | Answer a Gate with one of its options and a note. The run continues. |
-| `get_digest` | What happened since a time: the runs that ended, and the Gates that wait. |
 | `search_knowledge` | Search the project's knowledge by keyword, and by meaning when Ollama runs. Gives the best files, each with its path, section, and an excerpt. |
 | `read_knowledge` | Read one file of the knowledge by its path. |
 <!-- /checked:mcp-tools -->

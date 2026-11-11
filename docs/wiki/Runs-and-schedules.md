@@ -11,6 +11,8 @@ Each run works in its own copy of your project, on a branch named `nightshift/â€
 
 You follow each step live: its transcript, the files that it changed, its cost, and its tokens.
 
+When a run opened a pull request, the run page asks "Was this pull request useful?". Your answer helps Night Shift learn which runs are worth the cost.
+
 ## Stop and resume
 
 - **Stop** a run now, or after the step that runs now.

@@ -32,7 +32,6 @@ In a terminal, the `nightshift` MCP server (`nightshift mcp`) has these tools. N
 - `stop_run` (`run`, `when`: `now` or `after-step`): stops a run. Stop one only when the person asked you to.
 - `needs_me`: the Gates that wait for a person, in every project, with the question and the options.
 - `answer_gate` (`gate`, `option`, `note`): answers one of them, and the run goes on. Answer only with the option the person chose.
-- `get_digest` (`since`): one line per run that ended since a time, and the Gates that wait. Without `since`: since the last morning digest.
 - `search_knowledge` (`query`, `limit`): the files of the project's knowledge (a wiki, web pages, work items) that best match the words, each with its path, title and an excerpt. Every word must match, else some of them. `"a phrase"` keeps words together, `word*` matches a start.
 - `read_knowledge` (`path`): one file of the knowledge, by the path `search_knowledge` gives.
 

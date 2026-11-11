@@ -14,7 +14,7 @@ This wiki is the user guide. It tells you how to install Night Shift, draw flows
 | [Ideas](Ideas.md) | Flows that nobody has built yet. Build one and share it. |
 | [Agents and profiles](Agents-and-profiles.md) | The coding agents that Night Shift runs, profiles, backups, CLI tools, and connections. |
 | [Runs and schedules](Runs-and-schedules.md) | Start a run, schedule a night, start a flow from a webhook, and resume a run. |
-| [Gates and the inbox](Gates-and-the-inbox.md) | Gates, Asks, deadlines, files in an answer, and the Daily digest. |
+| [Gates and the inbox](Gates-and-the-inbox.md) | Gates, Asks, deadlines, and files in an answer. |
 | [Knowledge](Knowledge.md) | The files that agents read besides the code, and how to fill them. |
 | [Computers and Hosts](Computers-and-Hosts.md) | Pair your computers with a Host. Spaces, Offers, and secrets. |
 | [Phone app](Phone-app.md) | Watch the night and answer Gates from your phone. |

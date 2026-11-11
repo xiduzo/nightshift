@@ -35,4 +35,3 @@ A push tells you what waits, and nothing more:
 - A run finished, or failed.
 - A step waits for a computer that is offline.
 - A schedule did not start.
-- The Daily digest is ready.

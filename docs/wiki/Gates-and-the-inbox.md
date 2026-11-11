@@ -29,11 +29,8 @@ The phone answers simple Asks too.
 
 ## The inbox
 
-| Tab | Shows |
-| --- | --- |
-| **Waiting for you** | The Gates and Asks that wait, in every project. |
-| **Daily digest** | What happened since the last digest: the runs that ended, and what still waits. |
+The inbox shows the Gates and Asks that wait for you, in every project. Below them are the Gates that you answered. Night Shift keeps answered Gates for 90 days.
 
-Night Shift keeps answered Gates and digests for 90 days.
+Home shows what happened in the night: the runs that ended, and what still waits.
 
 An agent in a terminal reads the same inbox with the `needs_me` tool, and answers a Gate with `answer_gate`. See [Terminal and MCP](Terminal-and-MCP.md).

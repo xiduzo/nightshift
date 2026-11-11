@@ -324,9 +324,8 @@ checks everything first and removes the files first. While a run changes
 the knowledge, it refuses: the source stays, and you can try again.
 
 When the last sync of a source failed, the page shows an alert above the
-sources, and the morning digest has a line for it. A source whose last
-sync ended more than 7 days ago shows **Out of date**. The digest names
-it too, but such a source alone sends no digest.
+sources. A source whose last sync ended more than 7 days ago shows
+**Out of date**.
 
 A folder exists on one computer only. A folder source names the computer
 where you added it on its Subflow node (`device`, **Runs on** in the
