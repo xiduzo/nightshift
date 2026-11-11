@@ -181,7 +181,8 @@ export function linkCaption(look: LinkLook): string[] {
 
 /**
  * The one sentence under the status line: the open Gate's question, where
- * the run is now, why it ended, or what it made.
+ * the run is now, why it ended, or the pull requests it made. None for a
+ * finished run without an End message or a pull request: the status says it.
  */
 export function runVerdict({
 	status,
@@ -212,7 +213,7 @@ export function runVerdict({
 			return `It waits on ${computer} and continues by itself.`;
 		case "finished":
 			if (notice?.gist) return notice.gist;
-			if (pullRequests === 0) return "It finished without a pull request.";
+			if (pullRequests === 0) return null;
 			return pullRequests === 1
 				? "It made 1 pull request."
 				: `It made ${pullRequests} pull requests.`;

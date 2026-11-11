@@ -119,7 +119,7 @@ describe("linkLook", () => {
 		const pr = linkLook("https://github.com/xiduzo/nightshift/pull/415");
 		expect(pr).toEqual({ pullRequest: true, number: "#415", site: "GitHub" });
 		expect(linkCaption(pr)).toEqual(["Pull request", "opens on GitHub"]);
-		const ticket = linkLook("https://www.example.com/browse/ZAC-1");
+		const ticket = linkLook("https://www.example.com/browse/APP-1");
 		expect(ticket).toEqual({
 			pullRequest: false,
 			number: null,
@@ -154,9 +154,7 @@ describe("runVerdict", () => {
 				notice: { gist: "The tests failed." },
 			}),
 		).toBe("The tests failed.");
-		expect(runVerdict({ ...base, status: "finished" })).toBe(
-			"It finished without a pull request.",
-		);
+		expect(runVerdict({ ...base, status: "finished" })).toBeNull();
 		expect(runVerdict({ ...base, status: "finished", pullRequests: 2 })).toBe(
 			"It made 2 pull requests.",
 		);
@@ -226,7 +224,7 @@ describe("primaryAction and moreActions", () => {
 			primaryAction({
 				...finished,
 				links: [
-					link("https://example.com/browse/ZAC-1"),
+					link("https://example.com/browse/APP-1"),
 					link("https://github.com/a/b/pull/415"),
 				],
 			}),
