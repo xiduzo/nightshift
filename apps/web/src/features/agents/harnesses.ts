@@ -79,7 +79,7 @@ export function customAgentInfo(
 		defaultModel: "default",
 		models: ["default"],
 		setting: null,
-		offMachine: `Prompts and code go wherever ${label} sends them.`,
+		offMachine: `Prompts and project files go wherever ${label} sends them.`,
 	};
 }
 

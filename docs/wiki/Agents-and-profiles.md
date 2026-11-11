@@ -7,14 +7,14 @@ An Agent node names the agent that it runs on. Agents run with your own CLI logi
 <!-- generated:harnesses: bun run docs:reference writes this table from the code. Do not edit it here. -->
 | Agent | Login and model | Night Shift's own tools | Where your code goes |
 | --- | --- | --- | --- |
-| **Claude Code** | Uses your Claude login. Model: an alias such as sonnet, or a full model id. | Yes | Prompts and your project's code go to Anthropic under your Claude login. |
-| **OpenCode** | Needs OpenCode 1.x. Version 2.x does not work yet. Model: provider/model. | Yes | Prompts and code go to the model provider set in OpenCode. |
-| **Codex** | Not fully tested yet. Uses your Codex login. | Yes | Prompts and code go to OpenAI under your Codex login. |
-| **Grok Build** | Not fully tested yet. Run grok login once to use your Grok login. | No | Prompts and code go to xAI under your Grok login. |
-| **GitHub Copilot** | Not fully tested yet. Uses your GitHub login. Model default: the model set in Copilot. | Yes | Prompts and code go to GitHub Copilot under your GitHub login. |
-| **Gemini CLI** | Not fully tested yet. Uses your Gemini CLI login. Model default: the model set in Gemini CLI. | Yes | Prompts and code go to Google under your Gemini CLI login. |
-| **Cursor** | Not fully tested yet. Run agent login once to use your Cursor login. | Yes | Prompts and code go to Cursor under your Cursor login. |
-| **pi** | Needs pi 0.81 or later. Model: provider/model, for example ollama/qwen3-coder:latest. | No | Prompts and code go to the model provider set in pi. With a local model, they stay on this computer. |
+| **Claude Code** | Uses your Claude login. Model: an alias such as sonnet, or a full model id. | Yes | Prompts and your project's files go to Anthropic under your Claude login. |
+| **OpenCode** | Needs OpenCode 1.x. Version 2.x does not work yet. Model: provider/model. | Yes | Prompts and project files go to the model provider set in OpenCode. |
+| **Codex** | Not fully tested yet. Uses your Codex login. | Yes | Prompts and project files go to OpenAI under your Codex login. |
+| **Grok Build** | Not fully tested yet. Run grok login once to use your Grok login. | No | Prompts and project files go to xAI under your Grok login. |
+| **GitHub Copilot** | Not fully tested yet. Uses your GitHub login. Model default: the model set in Copilot. | Yes | Prompts and project files go to GitHub Copilot under your GitHub login. |
+| **Gemini CLI** | Not fully tested yet. Uses your Gemini CLI login. Model default: the model set in Gemini CLI. | Yes | Prompts and project files go to Google under your Gemini CLI login. |
+| **Cursor** | Not fully tested yet. Run agent login once to use your Cursor login. | Yes | Prompts and project files go to Cursor under your Cursor login. |
+| **pi** | Needs pi 0.81 or later. Model: provider/model, for example ollama/qwen3-coder:latest. | No | Prompts and project files go to the model provider set in pi. With a local model, they stay on this computer. |
 <!-- /generated:harnesses -->
 
 All real work so far runs on Claude Code. pi is verified with an Ollama model.

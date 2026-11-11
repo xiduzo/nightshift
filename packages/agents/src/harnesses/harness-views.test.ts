@@ -37,7 +37,7 @@ describe("harnessViews", () => {
 			initials: "KI",
 			pkg: "@tanstack/ai-acp",
 			note: "Model default: the model set in Kiro. You can type another model it offers.",
-			offMachine: "Prompts and code go wherever Kiro sends them.",
+			offMachine: "Prompts and project files go wherever Kiro sends them.",
 			defaultModel: "default",
 			models: ["default"],
 			listing: null,

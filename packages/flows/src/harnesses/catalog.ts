@@ -25,7 +25,7 @@ export type HarnessCatalogEntry = {
 	 * knows works too. The adapter's full list is in `@nightshift/agents`.
 	 */
 	suggestedModels: readonly string[];
-	/** Where prompts and code go. */
+	/** Where prompts and project files go. */
 	offMachine: string;
 	/** The setting of this computer that holds the path of its CLI. */
 	binSetting: `${string}Bin`;
@@ -46,7 +46,7 @@ export const HARNESS_CATALOG = {
 		defaultModel: "sonnet",
 		suggestedModels: ["sonnet", "opus", "haiku"],
 		offMachine:
-			"Prompts and your project's code go to Anthropic under your Claude login.",
+			"Prompts and your project's files go to Anthropic under your Claude login.",
 		binSetting: "claudeBin",
 		tools: true,
 	},
@@ -63,7 +63,8 @@ export const HARNESS_CATALOG = {
 			"openai/gpt-5.1-codex",
 			"google/gemini-3-pro-preview",
 		],
-		offMachine: "Prompts and code go to the model provider set in OpenCode.",
+		offMachine:
+			"Prompts and project files go to the model provider set in OpenCode.",
 		binSetting: "opencodeBin",
 		tools: true,
 	},
@@ -80,7 +81,8 @@ export const HARNESS_CATALOG = {
 			"gpt-5.1-codex-mini",
 			"gpt-5.1",
 		],
-		offMachine: "Prompts and code go to OpenAI under your Codex login.",
+		offMachine:
+			"Prompts and project files go to OpenAI under your Codex login.",
 		binSetting: "codexBin",
 		tools: true,
 	},
@@ -91,7 +93,7 @@ export const HARNESS_CATALOG = {
 		note: "Not fully tested yet. Run grok login once to use your Grok login.",
 		defaultModel: "grok-build",
 		suggestedModels: ["grok-build", "grok-build-0.1", "composer-2.5"],
-		offMachine: "Prompts and code go to xAI under your Grok login.",
+		offMachine: "Prompts and project files go to xAI under your Grok login.",
 		binSetting: "grokBin",
 		tools: false,
 	},
@@ -103,7 +105,7 @@ export const HARNESS_CATALOG = {
 		defaultModel: AGENT_DEFAULT,
 		suggestedModels: [AGENT_DEFAULT],
 		offMachine:
-			"Prompts and code go to GitHub Copilot under your GitHub login.",
+			"Prompts and project files go to GitHub Copilot under your GitHub login.",
 		binSetting: "copilotBin",
 		tools: true,
 	},
@@ -114,7 +116,8 @@ export const HARNESS_CATALOG = {
 		note: "Not fully tested yet. Uses your Gemini CLI login. Model default: the model set in Gemini CLI.",
 		defaultModel: AGENT_DEFAULT,
 		suggestedModels: [AGENT_DEFAULT],
-		offMachine: "Prompts and code go to Google under your Gemini CLI login.",
+		offMachine:
+			"Prompts and project files go to Google under your Gemini CLI login.",
 		binSetting: "geminiBin",
 		tools: true,
 	},
@@ -125,7 +128,8 @@ export const HARNESS_CATALOG = {
 		note: "Not fully tested yet. Run agent login once to use your Cursor login.",
 		defaultModel: AGENT_DEFAULT,
 		suggestedModels: [AGENT_DEFAULT],
-		offMachine: "Prompts and code go to Cursor under your Cursor login.",
+		offMachine:
+			"Prompts and project files go to Cursor under your Cursor login.",
 		binSetting: "cursorBin",
 		tools: true,
 	},
@@ -137,7 +141,7 @@ export const HARNESS_CATALOG = {
 		defaultModel: AGENT_DEFAULT,
 		suggestedModels: [AGENT_DEFAULT],
 		offMachine:
-			"Prompts and code go to the model provider set in pi. With a local model, they stay on this computer.",
+			"Prompts and project files go to the model provider set in pi. With a local model, they stay on this computer.",
 		binSetting: "piBin",
 		tools: false,
 	},

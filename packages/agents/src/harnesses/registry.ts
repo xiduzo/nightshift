@@ -185,7 +185,7 @@ export function harnessViews<Setting, Source>(input: {
 			initials: agent.label.slice(0, 2).toUpperCase(),
 			pkg: "@tanstack/ai-acp",
 			note: `Model default: the model set in ${agent.label}. You can type another model it offers.`,
-			offMachine: `Prompts and code go wherever ${agent.label} sends them.`,
+			offMachine: `Prompts and project files go wherever ${agent.label} sends them.`,
 			defaultModel: ACP_DEFAULT_MODEL,
 			models: [ACP_DEFAULT_MODEL],
 			listing: null,
