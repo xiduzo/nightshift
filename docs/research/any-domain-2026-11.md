@@ -169,13 +169,14 @@ One line per lane. The orchestrator adds the commits on main.
 
 | Item | State | Where |
 | --- | --- | --- |
-| W0a The record, ADR 22, ADR 23 | In progress | |
-| W0b Steering docs, PLAN, glossary, AGENTS.md | In progress | |
-| W0c README, wiki, CONTRIBUTING, SECURITY | In progress | |
-| W0d UI copy: web, phone, server, assistant | In progress | |
-| A Optional project folder, run folder | Not started | |
-| B Typed outputs, Web request, Since last run, Convert, kits | Not started | |
-| C Metrics vocabulary, useful, Needed you, days | Not started | |
+| W0a The record, ADR 22, ADR 23 | Done, on main | 42d5c321, bdc21f54, b4acf6f2 |
+| W0b Steering docs, PLAN, glossary, AGENTS.md | Done, on main | fb0446d0 to 96a664ab |
+| W0c README, wiki, CONTRIBUTING, SECURITY | Done, on main | c93e6245 to 9762d893 |
+| W0d UI copy: web, phone, server, assistant | Done, on main | 65e9dacb to 32306782 |
+| W0e Neutral names, stale facts, a ladder-first assistant | Not started | |
+| A Optional project folder, run folder | In progress: A1 (data model and API). Then A2 run folders, A3 files and removal, A4 web and docs | |
+| B Typed outputs, Web request, Since last run, Convert, kits | In progress: B1 (format 9, shapes, families). Then B2 to B5 | |
+| C Metrics vocabulary, useful, Needed you, days | In progress: C1 (one vocabulary, ADR 24) and C4 (days). Then C2 useful, C3 Needed you | |
 | D Add-node dialog by family, viewers, dotted links | Not started | |
 | E Reports | Not started | |
 | F Where the work landed, flow metrics | Not started | |
@@ -187,3 +188,18 @@ One line per lane. The orchestrator adds the commits on main.
 ## Findings
 
 The orchestrator adds findings as lanes report.
+
+Wave 0 (on main 32306782, 2026-11-11):
+
+- The README and the wiki now start a first run with `scout-and-pick`. It needs only a topic, not a test command.
+- The repository About and topics changed: `coding-agents`, `developer-tools` and `human-in-the-loop` are out. `workflow-automation`, `autonomous-agents` and `human-on-the-loop` are in.
+- Test fixtures and a few docs still name private projects. Lane W0e replaces them with neutral names.
+- Three tests fail under heavy load and pass alone: a lease renewal after a restart, the session cap of an Offer, and the folders of an Agent node's knowledge. They are flaky, not broken.
+
+For wave 1 (from the plans):
+
+- Command already has a field `output` (`text` or `json`). Format 9 renames it to `stdout`, and `output` becomes the output schema, as on Agent and Value.
+- A kept variable is per project and shared across the Space, through the step events. Since last run keeps its memory the same way, in its own table.
+- A run of a project without a folder needs no new run column. The run start event carries the fact.
+- The usage ingest refuses a whole record with an unknown event or attribute. The ingest must be updated before a release sends the new vocabulary (ADR 24).
+- A new flow format must reach the Host before a laptop saves it, because every schedule runs on the Host.
