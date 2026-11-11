@@ -6,9 +6,9 @@ export type GateLink = {
 	url: string;
 	/** What the flow called it ("Draft pull request"), or a name from the URL. */
 	label: string;
-	/** Short form: "#7515", "PZ-12908", "example.com". */
+	/** Short form: "#7515", "APP-12908", "example.com". */
 	short: string;
-	/** Where it lives: "infonl/dimpact-zaakafhandelcomponent", "github.com". */
+	/** Where it lives: "acme/app", "github.com". */
 	where: string;
 	kind: "pull" | "issue" | "ticket" | "web";
 };
@@ -16,7 +16,7 @@ export type GateLink = {
 const URL_PATTERN = /https?:\/\/[^\s<>()"'`\]]+/g;
 /** A line that holds only a link: `Draft pull request: https://…`, `- https://…`. */
 const LINK_LINE = /^\s*(?:[-*]\s*)?(?:([^\n:]{1,48}):\s*)?(https?:\/\/\S+)\s*$/;
-/** A Jira-style key in a path: `/browse/PZ-12908`. */
+/** A Jira-style key in a path: `/browse/APP-12908`. */
 const TICKET_PATH = /\/browse\/([A-Z][A-Z0-9]+-\d+)/;
 
 /** Sentence punctuation after a URL is not part of it. */
