@@ -19,7 +19,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ErrorAlert } from "@/shared/feedback";
 import { ListGroup, SectionHead, SwitchRow } from "@/shared/list";
-import { type Choice, HOURS, phoneTimeZone } from "./notification-choices";
+import { URGENCIES, URGENCY_LABEL } from "@/shared/urgency";
+import {
+	type Choice,
+	DEFAULT_PUSH_URGENCIES,
+	HOURS,
+	phoneTimeZone,
+	pushUrgenciesWith,
+} from "./notification-choices";
 import {
 	useNotificationSettings,
 	useSaveNotificationSettings,
@@ -29,8 +36,8 @@ import {
 const DEFAULT_QUIET = { start: "22:00", end: "07:00" };
 
 /**
- * The person's notification settings, in two sections: what Night Shift
- * tells them about, and quiet hours. They apply on every screen. Each change saves at once.
+ * The person's notification settings, in three sections: what Night Shift
+ * tells them about, which Gates send a notification, and quiet hours. They apply on every screen. Each change saves at once.
  */
 export function NotificationSections() {
 	const settings = useNotificationSettings();
@@ -40,6 +47,7 @@ export function NotificationSections() {
 		return (
 			<>
 				<TellMeSection value={settings.data} onChange={save} />
+				<PushForSection value={settings.data} onChange={save} />
 				<QuietSection value={settings.data} onChange={save} />
 			</>
 		);
@@ -104,6 +112,42 @@ function TellMeSection({ value, onChange }: SectionProps) {
 					checked={value.screens.expo}
 					onChange={(on) => onChange({ screens: { expo: on } })}
 				/>
+			</ListGroup>
+		</View>
+	);
+}
+
+/**
+ * Which Gates send a notification, by how soon they need you. The other
+ * Gates still show in Needs you and count on the badge.
+ */
+function PushForSection({ value, onChange }: SectionProps) {
+	const levels = value.pushUrgencies ?? DEFAULT_PUSH_URGENCIES;
+	const off = !value.events.gateOpened;
+	return (
+		<View className="gap-3">
+			<SectionHead
+				title="Push for"
+				hint={
+					off
+						? "Turn on Gates above to choose."
+						: "The Gates that send a notification. The others still show in Needs you."
+				}
+			/>
+			<ListGroup>
+				{URGENCIES.map((urgency) => (
+					<SwitchRow
+						key={urgency}
+						title={URGENCY_LABEL[urgency]}
+						checked={levels.includes(urgency)}
+						disabled={off}
+						onChange={(on) =>
+							onChange({
+								pushUrgencies: pushUrgenciesWith(levels, urgency, on),
+							})
+						}
+					/>
+				))}
 			</ListGroup>
 		</View>
 	);
