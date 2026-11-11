@@ -7,7 +7,7 @@
 - A [schedule](#schedules) or a [webhook](#webhooks) starts a run without you.
 - An agent in a terminal starts a run with the `start_run` tool. See [Terminal and MCP](Terminal-and-MCP.md).
 
-Each run works in its own copy of your project, on a branch named `nightshift/…`. Your checkout stays clean. A run on a branch starts from its newest commit on the remote. When the local branch has commits that the remote does not have, the local branch wins.
+Each run works in its own copy of your project, on a branch named `nightshift/…`. Runs do not change the files in your folder. A run on a branch starts from its newest commit on the remote. When the local branch has commits that the remote does not have, the local branch wins.
 
 You follow each step live: its transcript, the files that it changed, its cost, and its tokens.
 
@@ -35,13 +35,13 @@ A Host without a copy of the project refuses the start. The schedule shows why. 
 
 ## Webhooks
 
-A schedule can start when a webhook arrives, in place of a time. Use it to start a flow from GitHub Actions, n8n, Zapier, or a script. A webhook can also wake a Wait with a signal, for example when CI is done. That webhook shows with the flow that waits for the signal.
+A schedule can start when a webhook arrives, in place of a time. Use it to start a flow from GitHub Actions, n8n, Zapier, or a script. A webhook can also wake a Wait with a signal, for example when a build is done or a reply arrives. That webhook shows with the flow that waits for the signal.
 
 Each webhook schedule has its own address and a secret. Night Shift accepts a request only with a valid signature (`X-Hub-Signature-256`) or with the secret as a bearer token. See [Start a flow from another tool](https://github.com/xiduzo/nightshift/blob/main/docs/deploy/triggers.md).
 
 ## Run policy
 
-The policy of a flow keeps a night safe. A value that the flow leaves out comes from **Settings → Run policy** of the computer.
+The policy of a flow keeps a run without you safe. A value that the flow leaves out comes from **Settings → Run policy** of the computer.
 
 | Limit | What it does |
 | --- | --- |
@@ -63,4 +63,4 @@ A computer that goes offline does not end the run:
 
 ## Flow health
 
-Flow health shows each flow's runs per night, their cost against the median, why runs failed, and the scores that its commands gave. A Command scores a run with `{"scores": {"coverage": 81}}` in its data. See [Command](Flows-and-nodes.md#command).
+Flow health shows each flow's runs per night, their cost against the median, why runs failed, and the scores that its commands gave. A Command scores a run with `{"scores": {"found": 4}}` in its data. See [Command](Flows-and-nodes.md#command).

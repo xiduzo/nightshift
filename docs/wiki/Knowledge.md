@@ -1,6 +1,6 @@
 # Knowledge
 
-Knowledge is the files that your agents read besides the code: a wiki, web pages, Jira work items, Confluence pages, notes. Night Shift keeps them per project, outside the repository. Every computer of the project's Space works on the same files.
+Knowledge is the files that your agents read besides the project files: notes, web pages, a wiki, Jira work items, Confluence pages. Night Shift keeps them per project, outside the project folder. Every computer of the project's Space works on the same files.
 
 ## What an agent gets
 

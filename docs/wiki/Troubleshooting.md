@@ -26,7 +26,7 @@ Night Shift needs pi 0.81 or later. Update pi.
 
 The flow names a custom agent that this computer does not have. Add it under Agents, or pick another agent on the node.
 
-### An agent cannot commit or run a command at night
+### An agent cannot commit or run a command when nobody watches
 
 Its profile is in **Accept edits** or **Ask for each tool** mode. Those modes cannot run shell commands when nobody approves them. The flow editor warns about it. Set the profile to **Auto**. See [Permission modes](Agents-and-profiles.md#permission-modes).
 

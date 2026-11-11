@@ -69,13 +69,13 @@ else one Night Shift makes once in the data folder.
 Night Shift checks each save and keeps it as a new revision of the flow.
 
 ```bash
-nightshift flows list                        # name, steps, errors, description
-nightshift flows get fix-issue > fix.json    # the flow as JSON
-nightshift flows save fix-issue fix.json     # or from stdin, and prints its problems
-nightshift flows export fix-issue --out ./   # a file to import elsewhere
-nightshift flows import fix-issue.json       # a new flow, and a taken name gets a suffix
-nightshift flows revisions fix-issue         # who saved what, newest first
-nightshift flows revision fix-issue <id>     # one earlier revision as JSON
+nightshift flows list                             # name, steps, errors, description
+nightshift flows get weekly-brief > brief.json    # the flow as JSON
+nightshift flows save weekly-brief brief.json     # or from stdin, and prints its problems
+nightshift flows export weekly-brief --out ./     # a file to import elsewhere
+nightshift flows import weekly-brief.json         # a new flow, and a taken name gets a suffix
+nightshift flows revisions weekly-brief           # who saved what, newest first
+nightshift flows revision weekly-brief <id>       # one earlier revision as JSON
 ```
 
 The commands use the project of the current folder.
@@ -117,7 +117,7 @@ Options:
 
 ## MCP for an agent
 
-`nightshift mcp` gives an agent the same flows, the runs of a night, and a project's knowledge as MCP tools. The agent can be Claude Code, Codex, or an orchestrator.
+`nightshift mcp` gives an agent the same flows, the runs, and a project's knowledge as MCP tools. The agent can be Claude Code, Codex, or an orchestrator.
 
 Add it to Claude Code:
 

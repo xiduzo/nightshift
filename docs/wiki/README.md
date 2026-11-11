@@ -2,22 +2,24 @@
 
 Stop babysitting your agents. Draw once how your agents and you work together. Night Shift runs it on your own computers, day and night, and asks you only what needs you.
 
-In a flow, work climbs a ladder: a cheap agent tries, a strong agent rescues it, and you are the last rung. Choices climb too: a rule, a decision model, a large model, and then you.
+Night Shift is a workflow builder like n8n or Zapier. A step can be an agent that works for an hour. A choice can go to a small decision model.
+
+In a flow, work climbs a ladder: a cheap agent tries, a strong agent rescues it, and you are the last rung. Choices climb too: a rule, a decision model, a large model, and then you. A Gate asks you only when the ladder runs out, or before an act that you cannot undo.
 
 This wiki is the user guide. It tells you how to install Night Shift, draw flows, run them, and answer what waits for you.
 
 | Page | What is in it |
 | --- | --- |
 | [Get started](Get-started.md) | Install the desktop app, the Docker image, or a clone. Add a project and run a starter flow. |
-| [Flows and nodes](Flows-and-nodes.md) | Outcomes, cascades, every node type, templates, Sections, kits, and starter flows. |
+| [Flows and nodes](Flows-and-nodes.md) | Outcomes, cascades, deciders, every node type, templates, Sections, kits, and starter flows. |
 | [Community flows](Community-flows.md) | Flows that people share: what each one needs, how to import one, and how to share yours. |
 | [Ideas](Ideas.md) | Flows that nobody has built yet. Build one and share it. |
-| [Agents and profiles](Agents-and-profiles.md) | The coding agents that Night Shift runs, profiles, backups, CLI tools, and connections. |
-| [Runs and schedules](Runs-and-schedules.md) | Start a run, schedule a night, start a flow from a webhook, and resume a run. |
-| [Gates and the inbox](Gates-and-the-inbox.md) | Gates, Asks, deadlines, and files in an answer. |
-| [Knowledge](Knowledge.md) | The files that agents read besides the code, and how to fill them. |
+| [Agents and profiles](Agents-and-profiles.md) | The agents that Night Shift runs, profiles, backups, CLI tools, and connections. |
+| [Runs and schedules](Runs-and-schedules.md) | Start a run, schedule a flow, start a flow from a webhook, and resume a run. |
+| [Gates and the inbox](Gates-and-the-inbox.md) | What a Gate is for, who answers it, Asks, and deadlines. |
+| [Knowledge](Knowledge.md) | The files that agents read besides the project files, and how to fill them. |
 | [Computers and Hosts](Computers-and-Hosts.md) | Pair your computers with a Host. Spaces, Offers, and secrets. |
-| [Phone app](Phone-app.md) | Watch the night and answer Gates from your phone. |
+| [Phone app](Phone-app.md) | Follow your runs and answer Gates from your phone. |
 | [Terminal and MCP](Terminal-and-MCP.md) | The `nightshift` command, and the MCP tools for an agent in a terminal. |
 | [Troubleshooting](Troubleshooting.md) | What a message means, and how to fix it. |
 

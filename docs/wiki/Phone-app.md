@@ -1,6 +1,6 @@
 # Phone app
 
-The phone app is the night watch. You draw and change flows on your computer. On the phone you follow the night and answer what waits for you.
+The phone app is the night watch. You draw and change flows on your computer. On the phone you follow your runs and answer what waits for you.
 
 The phone app is in a closed test. It is not in the App Store or Google Play yet.
 
