@@ -191,7 +191,7 @@ describe("checkDraft", () => {
 			start: "list",
 		};
 		const cliTools = [
-			{ name: "acli-dimpact", program: "acli", signsIn: true },
+			{ name: "acli-work", program: "acli", signsIn: true },
 			{ name: "gh", program: null, signsIn: true },
 		];
 		const loading = checkDraft(draft, messages).issues;
@@ -203,7 +203,7 @@ describe("checkDraft", () => {
 		).toEqual([
 			{
 				severity: "warning",
-				message: "acli without acli-dimpact",
+				message: "acli without acli-work",
 				nodeId: "list",
 			},
 		]);

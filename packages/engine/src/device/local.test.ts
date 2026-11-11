@@ -918,15 +918,15 @@ describe("exec", () => {
 
 	test("a secret reaches the command under its own name, and its value comes back as •••", async () => {
 		const events = await collect(
-			device(
-				await secrets({ ZAC_USER: "behandelaar", ZAC_PASSWORD: "s3cr3t!" }),
-			).exec({
-				command:
-					'[ "$ZAC_PASSWORD" = "s3cr3t!" ] && echo "user $ZAC_USER pass $ZAC_PASSWORD" && echo "$ZAC_PASSWORD" >&2',
-				cwd: sandbox.repoPath,
-				secrets: ["ZAC_USER", "ZAC_PASSWORD"],
-				signal: new AbortController().signal,
-			}),
+			device(await secrets({ API_USER: "jdoe", API_PASSWORD: "s3cr3t!" })).exec(
+				{
+					command:
+						'[ "$API_PASSWORD" = "s3cr3t!" ] && echo "user $API_USER pass $API_PASSWORD" && echo "$API_PASSWORD" >&2',
+					cwd: sandbox.repoPath,
+					secrets: ["API_USER", "API_PASSWORD"],
+					signal: new AbortController().signal,
+				},
+			),
 		);
 		const out = (stream: "stdout" | "stderr") =>
 			events
@@ -1041,7 +1041,7 @@ describe("exec", () => {
 				forCommand: async () => ({
 					...noTools,
 					leftOut: [
-						{ tool: "acli-dimpact", message: "Save ACLI_TOKEN." },
+						{ tool: "acli-work", message: "Save ACLI_TOKEN." },
 						{ tool: "acli", message: "Not this one." },
 					],
 				}),
@@ -1052,7 +1052,7 @@ describe("exec", () => {
 			events.flatMap((e) => (e.type === "output" ? [e.text] : [])).join("");
 		const failed = await collect(
 			device(tools).exec({
-				command: "acli-dimpact jira; exit 127",
+				command: "acli-work jira; exit 127",
 				cwd: sandbox.repoPath,
 				signal: new AbortController().signal,
 			}),
@@ -1061,21 +1061,21 @@ describe("exec", () => {
 		expect(textOf(failed)).not.toContain("Not this one.");
 		const passed = await collect(
 			device(tools).exec({
-				command: "echo acli-dimpact",
+				command: "echo acli-work",
 				cwd: sandbox.repoPath,
 				signal: new AbortController().signal,
 			}),
 		);
-		expect(textOf(passed)).toBe("acli-dimpact\n");
+		expect(textOf(passed)).toBe("acli-work\n");
 	});
 
 	test("a secret this computer does not have refuses the command before it starts", async () => {
 		const marker = join(sandbox.repoPath, "ran");
 		const events = await collect(
-			device(await secrets({ ZAC_USER: "behandelaar" })).exec({
+			device(await secrets({ API_USER: "jdoe" })).exec({
 				command: `touch ${marker}`,
 				cwd: sandbox.repoPath,
-				secrets: ["ZAC_USER", "ZAC_PASSWORD"],
+				secrets: ["API_USER", "API_PASSWORD"],
 				signal: new AbortController().signal,
 			}),
 		);
@@ -1083,7 +1083,7 @@ describe("exec", () => {
 			{
 				type: "refused",
 				message:
-					"The command needs the secret ZAC_PASSWORD, but it is not saved. Save it on the Secrets page, or remove it from the node.",
+					"The command needs the secret API_PASSWORD, but it is not saved. Save it on the Secrets page, or remove it from the node.",
 			},
 		]);
 		expect(existsSync(marker)).toBe(false);

@@ -6,7 +6,7 @@ import { initialsOf } from "./initials";
 test("takes the first letter of the first two words", () => {
 	expect(initialsOf("Sam Boer")).toBe("SB");
 	expect(initialsOf("api-server")).toBe("AS");
-	expect(initialsOf("  zaak afhandel component ")).toBe("ZA");
+	expect(initialsOf("  zebra admin component ")).toBe("ZA");
 });
 
 test("takes two letters of a single word", () => {

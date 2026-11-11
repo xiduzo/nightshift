@@ -10,7 +10,7 @@ import {
 } from "./tool-login-draft";
 
 const tool = (fields: Partial<CliTool> = {}): CliTool => ({
-	name: "acli-dimpact",
+	name: "acli-work",
 	program: "acli",
 	description: null,
 	login: null,
@@ -32,7 +32,7 @@ describe("the login draft", () => {
 
 	test("a saved login comes back as it was", () => {
 		const login = {
-			env: { SITE: "dimpact" },
+			env: { SITE: "example" },
 			folder: "HOME",
 			signIn: { command: "acli jira auth login --token", input: "${T}" },
 		};
@@ -73,10 +73,10 @@ describe("the usual logins", () => {
 	});
 
 	test("acli: its own folder in HOME and a sign-in that reads the token as input", () => {
-		expect(loginPreset("acli", "acli-dimpact")).toMatchObject({
+		expect(loginPreset("acli", "acli-work")).toMatchObject({
 			ownFolder: true,
 			folder: "HOME",
-			signInInput: "${ACLI_DIMPACT_TOKEN}",
+			signInInput: "${ACLI_WORK_TOKEN}",
 		});
 	});
 

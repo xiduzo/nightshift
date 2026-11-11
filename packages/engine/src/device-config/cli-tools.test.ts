@@ -93,13 +93,13 @@ describe("createCliToolStore", () => {
 			git: { host: "GitHub.com" },
 		});
 		await store.save({
-			name: "acli-dimpact",
+			name: "acli-work",
 			program: "acli",
 			login: {
 				folder: "HOME",
 				signIn: {
 					command: "acli jira auth login --token",
-					input: "${DIMPACT_TOKEN}",
+					input: "${ACLI_WORK_TOKEN}",
 				},
 			},
 		});
@@ -111,12 +111,12 @@ describe("createCliToolStore", () => {
 			login: { env: { GH_TOKEN: "${GH_WORK_TOKEN}" } },
 			git: { host: "github.com", helper: "auth git-credential" },
 		});
-		expect(again.get("acli-dimpact")?.login).toEqual({
+		expect(again.get("acli-work")?.login).toEqual({
 			env: {},
 			folder: "HOME",
 			signIn: {
 				command: "acli jira auth login --token",
-				input: "${DIMPACT_TOKEN}",
+				input: "${ACLI_WORK_TOKEN}",
 			},
 		});
 	});

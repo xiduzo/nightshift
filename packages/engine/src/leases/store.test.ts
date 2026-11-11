@@ -98,25 +98,25 @@ describe("the lease store", () => {
 
 	test("given a lease that expired or went to another run, when its old holder renews, then it hears that it lost it", async () => {
 		await take("run-a", { ttlMs: 5 * MINUTE });
-		await take("run-a", { name: "zac-docker-stack", ttlMs: 5 * MINUTE });
+		await take("run-a", { name: "docker-stack", ttlMs: 5 * MINUTE });
 		now += 5 * MINUTE;
 		await take("run-b");
 		expect(
 			await store.renew({
 				spaceId: "space-1",
 				runId: "run-a",
-				names: ["branch:feature/x", "zac-docker-stack"],
+				names: ["branch:feature/x", "docker-stack"],
 			}),
-		).toEqual(["branch:feature/x", "zac-docker-stack"]);
+		).toEqual(["branch:feature/x", "docker-stack"]);
 	});
 
 	test("given a run that holds two leases, when it releases one by name, then only that one is free", async () => {
 		await take("run-a");
-		await take("run-a", { name: "zac-docker-stack" });
+		await take("run-a", { name: "docker-stack" });
 		await store.release({
 			spaceId: "space-1",
 			runId: "run-a",
-			names: ["zac-docker-stack"],
+			names: ["docker-stack"],
 		});
 		expect((await store.list("space-1")).map((lease) => lease.name)).toEqual([
 			"branch:feature/x",
@@ -125,7 +125,7 @@ describe("the lease store", () => {
 
 	test("given a run that holds leases, when it releases all, then none is left, and another run's stays", async () => {
 		await take("run-a");
-		await take("run-a", { name: "zac-docker-stack" });
+		await take("run-a", { name: "docker-stack" });
 		await take("run-b", { name: "ollama" });
 		await store.release({ spaceId: "space-1", runId: "run-a" });
 		expect((await store.list("space-1")).map((lease) => lease.runId)).toEqual([

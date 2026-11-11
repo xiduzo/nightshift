@@ -331,17 +331,17 @@ describe("the merge of Personal", () => {
 	});
 
 	test("the author's shape: two Persons, two Spaces, the Host's Personal empty", async () => {
-		const dimpact = await repoWithRemote(
+		const acme = await repoWithRemote(
 			b,
-			"dimpact-zaakafhandelcomponent",
-			"https://github.com/infonl/dimpact-zaakafhandelcomponent.git",
+			"acme-app",
+			"https://github.com/acme/acme-app.git",
 		);
 		const rpg = await repoWithRemote(
 			b,
 			"rpgdotexe",
 			"https://github.com/xiduzo/rpgdotexe.git",
 		);
-		const first = await projectWithRun(dimpact);
+		const first = await projectWithRun(acme);
 		const second = await projectWithRun(rpg);
 		expect(localPerson).not.toBe(paired.personId);
 		expect(b.spaceId).not.toBe(a.spaceId);
@@ -354,7 +354,7 @@ describe("the merge of Personal", () => {
 
 		const preview = await merger(link).preview();
 		expect(preview.projects.map((p) => [p.name, p.into, p.runs])).toEqual([
-			["dimpact-zaakafhandelcomponent", "new", 1],
+			["acme-app", "new", 1],
 			["rpgdotexe", "new", 1],
 		]);
 		const result = await merger(link).merge();
@@ -363,7 +363,7 @@ describe("the merge of Personal", () => {
 		const onA = await paired.host.space(a.spaceId).listProjects();
 		expect(onA.map((p) => [p.id, p.remote]).sort()).toEqual(
 			[
-				[first.projectId, "github.com/infonl/dimpact-zaakafhandelcomponent"],
+				[first.projectId, "github.com/acme/acme-app"],
 				[second.projectId, "github.com/xiduzo/rpgdotexe"],
 			].sort(),
 		);

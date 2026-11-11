@@ -261,9 +261,9 @@ describe("replies of a real engine", () => {
 					id: "login",
 					type: "command",
 					position: { x: 0, y: 200 },
-					command: 'curl -u "$ZAC_USER:$ZAC_PASSWORD" https://zac.test',
+					command: 'curl -u "$API_USER:$API_PASSWORD" https://api.test',
 					stdout: "text",
-					secrets: ["ZAC_USER", "ZAC_PASSWORD"],
+					secrets: ["API_USER", "API_PASSWORD"],
 				},
 			],
 			edges: [{ id: "e1", from: "agent", outcome: "pass", to: "login" }],
@@ -347,8 +347,8 @@ describe("replies of a real engine", () => {
 
 		await read(appRouter.profiles.list);
 		await reply(appRouter.connections.setSecret, {
-			name: "ZAC_USER",
-			value: "behandelaar",
+			name: "API_USER",
+			value: "jdoe",
 		});
 		const list = (await read(appRouter.connections.list)) as {
 			secrets: { name: string; saved: boolean; flows: unknown[] }[];
@@ -357,26 +357,26 @@ describe("replies of a real engine", () => {
 		// when it was set (only a saved one) and used (not yet).
 		const toolsFlow = { projectId, projectName: expect.any(String) };
 		expect(list.secrets).toEqual([
-			// A secret only a CLI tool's login reads.
 			expect.objectContaining({
-				name: "GH_WORK_TOKEN",
-				saved: false,
-				flows: [],
-				tools: ["gh-work"],
-			}),
-			expect.objectContaining({
-				name: "ZAC_PASSWORD",
+				name: "API_PASSWORD",
 				saved: false,
 				flows: [{ ...toolsFlow, flowName: "tools" }],
 				setAt: null,
 				usedAt: null,
 			}),
 			expect.objectContaining({
-				name: "ZAC_USER",
+				name: "API_USER",
 				saved: true,
 				flows: [{ ...toolsFlow, flowName: "tools" }],
 				setAt: expect.any(Number),
 				usedAt: null,
+			}),
+			// A secret only a CLI tool's login reads.
+			expect.objectContaining({
+				name: "GH_WORK_TOKEN",
+				saved: false,
+				flows: [],
+				tools: ["gh-work"],
 			}),
 		]);
 		await read(appRouter.cliTools.list);

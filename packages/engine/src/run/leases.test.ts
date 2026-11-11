@@ -83,7 +83,7 @@ const lease = (extra: Partial<LeaseNode> = {}): LeaseNode => ({
 	id: "own",
 	type: "lease",
 	position: at,
-	name: "zac-docker-stack",
+	name: "docker-stack",
 	...extra,
 });
 const waitFor_ = (name: string): WaitNode => ({
@@ -183,7 +183,7 @@ async function holders(at = now()): Promise<Record<string, string>> {
 }
 
 /** When the lease expires unless its run renews it. 0 when no run holds it. */
-async function expiryOf(name = "zac-docker-stack"): Promise<number> {
+async function expiryOf(name = "docker-stack"): Promise<number> {
 	const rows = await sandbox.db.select().from(runLease);
 	const row = rows.find((lease) => lease.name === name);
 	return row ? instant(row.expiresAt) : 0;
@@ -200,7 +200,7 @@ async function holdingRun(
 		flow,
 	});
 	await statusOf(engine, run.id, "sleeping");
-	expect(await holders(clock())).toEqual({ "zac-docker-stack": run.id });
+	expect(await holders(clock())).toEqual({ "docker-stack": run.id });
 	return run;
 }
 
@@ -219,7 +219,7 @@ describe("two runs and one lease", () => {
 			holder: first.id,
 			holder_title: first.title,
 		});
-		expect(await holders()).toEqual({ "zac-docker-stack": first.id });
+		expect(await holders()).toEqual({ "docker-stack": first.id });
 	});
 
 	test("given a run that waits for the lease, when the holder ends, then the waiting run takes it at once", async () => {
@@ -287,7 +287,7 @@ describe("the engine lets go of a lease on every end", () => {
 		});
 		await waitFor(() => dying.sessions[0], { label: "the session" });
 		dies.abort();
-		expect(await holders()).toEqual({ "zac-docker-stack": run.id });
+		expect(await holders()).toEqual({ "docker-stack": run.id });
 
 		const second = makeEngine(
 			scriptedHarness().harness,
@@ -314,7 +314,7 @@ describe("the engine lets go of a lease on every end", () => {
 		const { harness, sessions } = scriptedHarness();
 		const second = makeEngine(harness, {}, { resumeGraceMs: 0 });
 		const resumed = await waitFor(() => sessions[0], { label: "the resume" });
-		expect(await holders()).toEqual({ "zac-docker-stack": run.id });
+		expect(await holders()).toEqual({ "docker-stack": run.id });
 		resumed.finish();
 		expect((await endOf(second, run.id)).status).toBe("finished");
 		expect(await holders()).toEqual({});
@@ -355,7 +355,7 @@ describe("the engine lets go of a lease on every end", () => {
 			const resumed = await waitFor(() => sessions[0], {
 				label: "the resume",
 			});
-			expect(await holders(at)).toEqual({ "zac-docker-stack": run.id });
+			expect(await holders(at)).toEqual({ "docker-stack": run.id });
 			resumed.finish();
 			expect((await endOf(second, run.id)).status).toBe("finished");
 		} finally {
@@ -405,14 +405,14 @@ describe("a lease holds for its scope", () => {
 			[
 				"LeaseTaken",
 				{
-					name: "zac-docker-stack",
+					name: "docker-stack",
 					nodeId: "own",
 					ttlMinutes: 30,
 					scope: null,
 					section: { id: "deploy", nodes: ["own", "up"] },
 				},
 			],
-			["LeaseReleased", { name: "zac-docker-stack", why: "scope" }],
+			["LeaseReleased", { name: "docker-stack", why: "scope" }],
 		]);
 	});
 });
@@ -442,7 +442,7 @@ describe("a run that resumes takes its leases again", () => {
 
 		const second = await holdingRun(engine);
 		await expect(engine.act(first.id, { kind: "resume" })).rejects.toThrow(
-			`holds the lease "zac-docker-stack" now. Resume this run when that run lets go of it.`,
+			`holds the lease "docker-stack" now. Resume this run when that run lets go of it.`,
 		);
 		expect((await engine.getRun(first.id)).status).toBe("failed");
 
@@ -460,9 +460,9 @@ describe("a run that resumes takes its leases again", () => {
 		expect(
 			events.filter((e) => e.type === "LeaseTaken").map((e) => e.payload),
 		).toEqual([
-			{ name: "zac-docker-stack", nodeId: "own", ttlMinutes: 30, scope: null },
+			{ name: "docker-stack", nodeId: "own", ttlMinutes: 30, scope: null },
 			{
-				name: "zac-docker-stack",
+				name: "docker-stack",
 				nodeId: "own",
 				ttlMinutes: 30,
 				scope: null,
@@ -503,7 +503,7 @@ describe("after a restart", () => {
 			});
 			// Past the first ttl, before the new daemon's first minute is up.
 			at += 60_000;
-			expect(await holders(at)).toEqual({ "zac-docker-stack": run.id });
+			expect(await holders(at)).toEqual({ "docker-stack": run.id });
 		} finally {
 			ends.abort();
 		}
@@ -537,7 +537,7 @@ describe("after a restart", () => {
 					label: `the renewal of minute ${minute}`,
 				});
 			}
-			expect(await holders(at)).toEqual({ "zac-docker-stack": run.id });
+			expect(await holders(at)).toEqual({ "docker-stack": run.id });
 		} finally {
 			ends.abort();
 		}
@@ -668,7 +668,7 @@ describe("people see and release leases", () => {
 		await statusOf(engine, second.id, "sleeping");
 		expect((await engine.getRun(first.id)).leases).toEqual([
 			{
-				name: "zac-docker-stack",
+				name: "docker-stack",
 				state: "held",
 				nodeId: "own",
 				section: null,
@@ -678,7 +678,7 @@ describe("people see and release leases", () => {
 		]);
 		expect((await engine.getRun(second.id)).leases).toEqual([
 			{
-				name: "zac-docker-stack",
+				name: "docker-stack",
 				state: "waiting",
 				nodeId: "own",
 				section: null,
@@ -698,7 +698,7 @@ describe("people see and release leases", () => {
 		await statusOf(engine, second.id, "sleeping");
 		await engine.act(first.id, {
 			kind: "release-lease",
-			name: "zac-docker-stack",
+			name: "docker-stack",
 		});
 		expect((await endOf(engine, second.id)).result).toBe("done");
 		const detail = await engine.getRun(first.id);
@@ -707,11 +707,9 @@ describe("people see and release leases", () => {
 		const events = await (runLogs[0] as RunLog).events(first.id);
 		expect(
 			events.flatMap((e) => (e.type === "LeaseReleased" ? [e.payload] : [])),
-		).toEqual([{ name: "zac-docker-stack", why: "person" }]);
+		).toEqual([{ name: "docker-stack", why: "person" }]);
 		await expect(
-			engine.act(first.id, { kind: "release-lease", name: "zac-docker-stack" }),
-		).rejects.toThrow(
-			'This run does not hold the lease "zac-docker-stack" now.',
-		);
+			engine.act(first.id, { kind: "release-lease", name: "docker-stack" }),
+		).rejects.toThrow('This run does not hold the lease "docker-stack" now.');
 	});
 });

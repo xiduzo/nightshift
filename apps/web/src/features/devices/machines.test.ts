@@ -48,7 +48,7 @@ const device = (id: string, extra: Partial<SpaceDevice> = {}): SpaceDevice => ({
 	...extra,
 });
 
-const keez = { projectId: "keez", projectName: "KEEZ" };
+const acme = { projectId: "acme", projectName: "Acme" };
 
 const machinesOf = (
 	linked: LinkedHost[],
@@ -69,7 +69,7 @@ describe("spaceMachines", () => {
 	test("in a Space a Host keeps, the Host starts the schedules, with its link's status", () => {
 		const machines = machinesOf(
 			[host("offline")],
-			[device("self", { name: "LE2316", thisDevice: true, clones: [keez] })],
+			[device("self", { name: "LE2316", thisDevice: true, clones: [acme] })],
 		);
 		expect(machines.starterIsHost).toBe(true);
 		expect(machines.starter).toMatchObject({
@@ -78,7 +78,7 @@ describe("spaceMachines", () => {
 			lastSeenAt: 7,
 			projectIds: [],
 		});
-		expect(machines.byId("self")?.projectIds).toEqual(["keez"]);
+		expect(machines.byId("self")?.projectIds).toEqual(["acme"]);
 	});
 
 	test("a Host with a copy of a project is a computer of the Space too", () => {
@@ -86,13 +86,13 @@ describe("spaceMachines", () => {
 			[host()],
 			[
 				device("self", { name: "LE2316", thisDevice: true }),
-				device("host-1", { name: "hetzner-1", clones: [keez] }),
+				device("host-1", { name: "hetzner-1", clones: [acme] }),
 			],
 		);
 		expect(machines.starter).toMatchObject({
 			id: "host-1",
 			online: true,
-			projectIds: ["keez"],
+			projectIds: ["acme"],
 		});
 		// A flow that names the Host sees its link's status too.
 		expect(machines.byId("host-1")?.online).toBe(true);

@@ -170,8 +170,8 @@ describe("prepare", () => {
 });
 
 describe("a login with a folder of its own", () => {
-	const acli = (input = "${DIMPACT_TOKEN}") =>
-		tool("acli-dimpact", {
+	const acli = (input = "${ACLI_WORK_TOKEN}") =>
+		tool("acli-work", {
 			program: "acli",
 			login: {
 				env: {},
@@ -181,51 +181,49 @@ describe("a login with a folder of its own", () => {
 		});
 
 	test("signs in once in its folder, with the token on stdin, and the launcher uses that folder", async () => {
-		const set = launchers([acli()], { DIMPACT_TOKEN: "tok-1" });
-		const first = await set.prepare(["acli-dimpact"]);
+		const set = launchers([acli()], { ACLI_WORK_TOKEN: "tok-1" });
+		const first = await set.prepare(["acli-work"]);
 		if (!first.ok) throw new Error(first.message);
-		const folder = join(dataDir, "tools", "acli-dimpact");
+		const folder = join(dataDir, "tools", "acli-work");
 		expect(await readFile(join(folder, "token"), "utf8")).toBe("tok-1");
 		expect((await stat(folder)).mode & 0o777).toBe(0o700);
-		expect(run(join(first.toolsPath ?? "", "acli-dimpact"), [])).toBe("tok-1");
-		expect(await set.signedInAt("acli-dimpact")).toBe(1_000);
+		expect(run(join(first.toolsPath ?? "", "acli-work"), [])).toBe("tok-1");
+		expect(await set.signedInAt("acli-work")).toBe(1_000);
 		await first.cleanup();
 
 		// The same values: no new sign-in.
 		await writeFile(join(folder, "token"), "kept");
-		const second = await set.prepare(["acli-dimpact"]);
+		const second = await set.prepare(["acli-work"]);
 		if (!second.ok) throw new Error(second.message);
 		expect(await readFile(join(folder, "token"), "utf8")).toBe("kept");
 		await second.cleanup();
 	});
 
 	test("a changed secret signs in again", async () => {
-		const folder = join(dataDir, "tools", "acli-dimpact");
+		const folder = join(dataDir, "tools", "acli-work");
 		const before = await launchers([acli()], {
-			DIMPACT_TOKEN: "tok-1",
-		}).prepare(["acli-dimpact"]);
+			ACLI_WORK_TOKEN: "tok-1",
+		}).prepare(["acli-work"]);
 		if (before.ok) await before.cleanup();
-		const after = await launchers([acli()], { DIMPACT_TOKEN: "tok-2" }).prepare(
-			["acli-dimpact"],
-		);
+		const after = await launchers([acli()], {
+			ACLI_WORK_TOKEN: "tok-2",
+		}).prepare(["acli-work"]);
 		if (after.ok) await after.cleanup();
 		expect(await readFile(join(folder, "token"), "utf8")).toBe("tok-2");
 	});
 
 	test("a failed sign-in stops the step with its output, values as •••", async () => {
-		const prepared = await launchers([acli("bad")], {}).prepare([
-			"acli-dimpact",
-		]);
+		const prepared = await launchers([acli("bad")], {}).prepare(["acli-work"]);
 		expect(prepared).toMatchObject({ ok: false });
 		if (prepared.ok) return;
 		expect(prepared.message).toBe(
-			"The CLI tool acli-dimpact could not sign in. token bad was refused Check its login under Agents → Tools, then start the run again.",
+			"The CLI tool acli-work could not sign in. token bad was refused Check its login under Agents → Tools, then start the run again.",
 		);
 	});
 
 	test("its output masks the secret values", async () => {
-		const set = launchers([acli()], { DIMPACT_TOKEN: "bad" });
-		const result = await set.signIn("acli-dimpact");
+		const set = launchers([acli()], { ACLI_WORK_TOKEN: "bad" });
+		const result = await set.signIn("acli-work");
 		expect(result).toEqual({
 			ok: false,
 			output: "token ••• was refused",
@@ -234,13 +232,11 @@ describe("a login with a folder of its own", () => {
 	});
 
 	test("forget removes its folder", async () => {
-		const set = launchers([acli()], { DIMPACT_TOKEN: "tok-1" });
-		const prepared = await set.prepare(["acli-dimpact"]);
+		const set = launchers([acli()], { ACLI_WORK_TOKEN: "tok-1" });
+		const prepared = await set.prepare(["acli-work"]);
 		if (prepared.ok) await prepared.cleanup();
-		await set.forget("acli-dimpact");
-		await expect(
-			stat(join(dataDir, "tools", "acli-dimpact")),
-		).rejects.toThrow();
+		await set.forget("acli-work");
+		await expect(stat(join(dataDir, "tools", "acli-work"))).rejects.toThrow();
 	});
 });
 
@@ -366,27 +362,27 @@ const stepOf = (projectId: string) => ({
 });
 
 describe("a login with a Project's secret", () => {
-	const list = [tool("acli-dimpact", { program: "acli", login: acliLogin })];
+	const list = [tool("acli-work", { program: "acli", login: acliLogin })];
 
 	test("a command's tool signs in with the token of its run's project", async () => {
 		const prepared = await projectLaunchers(list, {
-			keez: "tok-keez",
-		}).forCommand({ run: stepOf("keez") });
+			acme: "tok-acme",
+		}).forCommand({ run: stepOf("acme") });
 		expect(prepared.leftOut).toEqual([]);
-		expect(run(join(prepared.toolsPath ?? "", "acli-dimpact"), [])).toBe(
-			"tok-keez",
+		expect(run(join(prepared.toolsPath ?? "", "acli-work"), [])).toBe(
+			"tok-acme",
 		);
-		expect(prepared.values).toEqual(["tok-keez"]);
+		expect(prepared.values).toEqual(["tok-acme"]);
 		await prepared.cleanup();
 	});
 
 	test("an agent's tool does too", async () => {
 		const prepared = await projectLaunchers(list, {
-			keez: "tok-keez",
-		}).prepare(["acli-dimpact"], { run: stepOf("keez") });
+			acme: "tok-acme",
+		}).prepare(["acli-work"], { run: stepOf("acme") });
 		if (!prepared.ok) throw new Error(prepared.message);
-		expect(run(join(prepared.toolsPath ?? "", "acli-dimpact"), [])).toBe(
-			"tok-keez",
+		expect(run(join(prepared.toolsPath ?? "", "acli-work"), [])).toBe(
+			"tok-acme",
 		);
 		await prepared.cleanup();
 	});
@@ -397,8 +393,8 @@ describe("a login with a Project's secret", () => {
 			tools.forCommand({ run: stepOf("a") }),
 			tools.forCommand({ run: stepOf("b") }),
 		]);
-		expect(run(join(a.toolsPath ?? "", "acli-dimpact"), [])).toBe("tok-a");
-		expect(run(join(b.toolsPath ?? "", "acli-dimpact"), [])).toBe("tok-b");
+		expect(run(join(a.toolsPath ?? "", "acli-work"), [])).toBe("tok-a");
+		expect(run(join(b.toolsPath ?? "", "acli-work"), [])).toBe("tok-b");
 		await a.cleanup();
 		await b.cleanup();
 	});
@@ -407,22 +403,22 @@ describe("a login with a Project's secret", () => {
 		const tools = projectLaunchers(list, { a: "tok-a" });
 		const prepared = await tools.forCommand({ run: stepOf("a") });
 		await prepared.cleanup();
-		expect(await tools.signedInAt("acli-dimpact", "a")).toBe(1_000);
-		expect(await tools.signedInAt("acli-dimpact", "b")).toBeNull();
-		expect(await tools.signedInAt("acli-dimpact")).toBeNull();
+		expect(await tools.signedInAt("acli-work", "a")).toBe(1_000);
+		expect(await tools.signedInAt("acli-work", "b")).toBeNull();
+		expect(await tools.signedInAt("acli-work")).toBeNull();
 	});
 
 	test("forget removes the folders of its projects, not another tool's", async () => {
 		const tools = projectLaunchers(list, { a: "tok-a" });
 		const prepared = await tools.forCommand({ run: stepOf("a") });
 		await prepared.cleanup();
-		await Bun.write(join(dataDir, "tools", "acli-dimpact-2", "keep"), "");
-		await tools.forget("acli-dimpact");
-		expect(await readdir(join(dataDir, "tools"))).toEqual(["acli-dimpact-2"]);
+		await Bun.write(join(dataDir, "tools", "acli-work-2", "keep"), "");
+		await tools.forget("acli-work");
+		expect(await readdir(join(dataDir, "tools"))).toEqual(["acli-work-2"]);
 	});
 
 	test("the sign-in of the tool's page says a project may keep the secret", async () => {
-		const result = await projectLaunchers(list, {}).signIn("acli-dimpact");
+		const result = await projectLaunchers(list, {}).signIn("acli-work");
 		expect(result.ok).toBe(false);
 		expect(result.output).toContain("If a project keeps it");
 	});
@@ -474,7 +470,7 @@ describe("forCommand", () => {
 	test("a failed sign-in leaves the tool out", async () => {
 		const prepared = await launchers(
 			[
-				tool("acli-dimpact", {
+				tool("acli-work", {
 					program: "acli",
 					login: {
 						env: {},

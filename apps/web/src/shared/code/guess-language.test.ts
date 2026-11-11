@@ -59,7 +59,7 @@ describe("guessLanguage", () => {
 
 describe("languageOfPath", () => {
 	test("is the file's extension", () => {
-		expect(languageOfPath("src/itest/ZaakTest.kt")).toBe("kt");
+		expect(languageOfPath("src/itest/CaseTest.kt")).toBe("kt");
 		expect(languageOfPath("/work/a/Main.JAVA")).toBe("java");
 		expect(languageOfPath("web/app.config.ts")).toBe("ts");
 	});

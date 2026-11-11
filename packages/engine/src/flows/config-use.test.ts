@@ -78,7 +78,7 @@ const secretsOf = async (
 describe("cliToolsOfSecrets", () => {
 	test("names the tools whose logins read a secret, and the flows that use each tool", () => {
 		const use = noUse();
-		use.clis.set("acli-dimpact", [flow("nightly")]);
+		use.clis.set("acli-work", [flow("nightly")]);
 		const login = {
 			env: {},
 			folder: "HOME",
@@ -89,7 +89,7 @@ describe("cliToolsOfSecrets", () => {
 				cliTools: {
 					list: () => [
 						{
-							name: "acli-dimpact",
+							name: "acli-work",
 							program: "acli",
 							description: null,
 							login,
@@ -102,8 +102,8 @@ describe("cliToolsOfSecrets", () => {
 			},
 			use,
 		);
-		expect(toolsBySecret.get("TOKEN")).toEqual(["acli-dimpact"]);
-		expect(toolFlows.get("acli-dimpact")).toEqual([flow("nightly")]);
+		expect(toolsBySecret.get("TOKEN")).toEqual(["acli-work"]);
+		expect(toolFlows.get("acli-work")).toEqual([flow("nightly")]);
 	});
 });
 
@@ -139,7 +139,7 @@ describe("connectionsInUse", () => {
 
 	test("lists a secret a Command node or a CLI tool's login names, with what reads it", async () => {
 		const use = noUse();
-		use.secrets.set("ZAC_USER", [flow("tools")]);
+		use.secrets.set("API_USER", [flow("tools")]);
 		const listed = await connectionsInUse(
 			{
 				connections: { list: () => [], secrets: secretsOf },
@@ -151,7 +151,7 @@ describe("connectionsInUse", () => {
 								env: { GH_TOKEN: "${GH_WORK_TOKEN}" },
 								folder: "GH_CONFIG_DIR",
 								// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
-								signIn: { command: "gh auth login", input: "${ZAC_USER}" },
+								signIn: { command: "gh auth login", input: "${API_USER}" },
 							},
 						}),
 						tool("jq"),
@@ -162,8 +162,8 @@ describe("connectionsInUse", () => {
 			use,
 		);
 		expect(listed.secrets.map((s) => [s.name, s.flows, s.tools])).toEqual([
+			["API_USER", [flow("tools")], ["gh-work"]],
 			["GH_WORK_TOKEN", [], ["gh-work"]],
-			["ZAC_USER", [flow("tools")], ["gh-work"]],
 		]);
 	});
 
@@ -312,7 +312,7 @@ describe("cliToolsInUse", () => {
 });
 
 describe("cliToolsInUse: where a login finds its secrets", () => {
-	const acli = tool("acli-dimpact", {
+	const acli = tool("acli-work", {
 		program: "acli",
 		login: {
 			env: {},
@@ -321,7 +321,7 @@ describe("cliToolsInUse: where a login finds its secrets", () => {
 			signIn: { command: "acli login", input: "${TOKEN}" },
 		},
 	});
-	const keez = { id: "keez", name: "KEEZ" };
+	const acme = { id: "acme", name: "Acme" };
 
 	async function stateOf(options: {
 		here?: boolean;
@@ -350,12 +350,12 @@ describe("cliToolsInUse: where a login finds its secrets", () => {
 				profiles: { list: () => [] },
 				toolLaunchers: {
 					signedInAt: async (_name, projectId) =>
-						projectId === "keez" ? 42 : null,
+						projectId === "acme" ? 42 : null,
 				},
 			},
 			noUse(),
 			{
-				list: async () => [keez],
+				list: async () => [acme],
 				secretNames: async () =>
 					options.keeps === undefined ? new Set() : options.keeps,
 			},
@@ -374,7 +374,7 @@ describe("cliToolsInUse: where a login finds its secrets", () => {
 	test("a project's token signs in for that project, not here", async () => {
 		expect(await stateOf({ keeps: new Set(["TOKEN"]) })).toEqual({
 			signsInHere: false,
-			projects: [{ projectId: "keez", projectName: "KEEZ", signedInAt: 42 }],
+			projects: [{ projectId: "acme", projectName: "Acme", signedInAt: 42 }],
 			missing: [],
 		});
 	});

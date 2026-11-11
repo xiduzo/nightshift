@@ -40,8 +40,8 @@ describe("flowUse", () => {
 				// A name left from format 6 names no profile yet.
 				{ id: "old", type: "agent", profile: "fast" },
 				{ id: "file", type: "tool", connection: "linear" },
-				{ id: "login", type: "command", secrets: ["ZAC_USER", "ZAC_PW"] },
-				{ id: "again", type: "command", secrets: ["ZAC_USER"] },
+				{ id: "login", type: "command", secrets: ["API_USER", "API_PW"] },
+				{ id: "again", type: "command", secrets: ["API_USER"] },
 			]),
 			day: loaded("day", [
 				{ id: "a", type: "agent", profile: { device: "mac", profile: "slow" } },
@@ -120,8 +120,8 @@ describe("flowUse", () => {
 		expect(use.connections.get("gh")).toEqual([night]);
 		expect(use.connections.get("linear")).toEqual([night]);
 		expect(use.clis.get("jq")).toEqual([night]);
-		expect(use.secrets.get("ZAC_USER")).toEqual([night]);
-		expect(use.secrets.get("ZAC_PW")).toEqual([night]);
+		expect(use.secrets.get("API_USER")).toEqual([night]);
+		expect(use.secrets.get("API_PW")).toEqual([night]);
 		expect(use.secrets.size).toBe(2);
 		expect(use.profiles.get(profileUseKey("mac", "fast"))).toEqual([
 			{ ...night, nodeIds: ["plan", "fix"] },

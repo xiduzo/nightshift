@@ -405,7 +405,7 @@ describe("the Command node", () => {
 	});
 
 	describe("secrets", () => {
-		const secrets = { ZAC_USER: "behandelaar", ZAC_PASSWORD: "s3cr3t-pw" };
+		const secrets = { API_USER: "jdoe", API_PASSWORD: "s3cr3t-pw" };
 		const withSecrets = (h: Awaited<ReturnType<typeof startRun>>) => {
 			h.local.connections = connectionsOf({ secrets });
 			return h;
@@ -421,8 +421,8 @@ describe("the Command node", () => {
 							command(
 								"login",
 								// The command checks the value it got; the output prints it.
-								`[ "$ZAC_PASSWORD" = "s3cr3t-pw" ] && printf '{"user": "%s", "token": "%s"}\\n' "$ZAC_USER" "$ZAC_PASSWORD" && echo "$ZAC_PASSWORD" >&2`,
-								{ stdout: "json", secrets: ["ZAC_USER", "ZAC_PASSWORD"] },
+								`[ "$API_PASSWORD" = "s3cr3t-pw" ] && printf '{"user": "%s", "token": "%s"}\\n' "$API_USER" "$API_PASSWORD" && echo "$API_PASSWORD" >&2`,
+								{ stdout: "json", secrets: ["API_USER", "API_PASSWORD"] },
 							),
 						],
 						edges: [],
@@ -455,7 +455,7 @@ describe("the Command node", () => {
 			const log = await readFile(derived?.logPath as string, "utf8");
 			expect(log).toContain("•••");
 			expect(log).not.toContain("s3cr3t-pw");
-			expect(log).not.toContain("behandelaar");
+			expect(log).not.toContain("jdoe");
 		});
 
 		test("a secret value the command writes to NS_OUTPUT is ••• in data", async () => {
@@ -467,8 +467,8 @@ describe("the Command node", () => {
 						nodes: [
 							command(
 								"login",
-								`printf '{"token": "%s"}' "$ZAC_PASSWORD" > "$NS_OUTPUT"`,
-								{ secrets: ["ZAC_PASSWORD"] },
+								`printf '{"token": "%s"}' "$API_PASSWORD" > "$NS_OUTPUT"`,
+								{ secrets: ["API_PASSWORD"] },
 							),
 						],
 						edges: [],
@@ -489,7 +489,7 @@ describe("the Command node", () => {
 						start: "login",
 						nodes: [
 							command("login", `touch ${marker}`, {
-								secrets: ["ZAC_USER", "ZAC_BEHANDELAAR_PASSWORD"],
+								secrets: ["API_USER", "API_SUPPORT_PASSWORD"],
 							}),
 						],
 						edges: [],
@@ -498,7 +498,7 @@ describe("the Command node", () => {
 			);
 			const { parked } = await drive(h, { inputs: {} });
 			const reason =
-				"The command needs the secret ZAC_BEHANDELAAR_PASSWORD, but it is not saved. Save it on the Secrets page, or remove it from the node.";
+				"The command needs the secret API_SUPPORT_PASSWORD, but it is not saved. Save it on the Secrets page, or remove it from the node.";
 			expect(parked[0]).toMatchObject({
 				status: "failed",
 				reason: `Node "login" failed: ${reason}`,

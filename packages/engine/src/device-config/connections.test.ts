@@ -310,16 +310,16 @@ describe("secrets", () => {
 		});
 		// A name only a Command node uses is listed too.
 		expect(
-			(await listed(store, ["ZAC_USER", "TEAM"])).map((s) => [
+			(await listed(store, ["API_USER", "TEAM"])).map((s) => [
 				s.name,
 				s.usedBy,
 			]),
 		).toEqual([
+			["API_USER", []],
 			["DOCS_TOKEN", ["docs", "wiki"]],
 			["ORPHAN", []],
 			["TEAM", ["docs"]],
 			["TRACKER_TOKEN", ["tracker"]],
-			["ZAC_USER", []],
 		]);
 	});
 
@@ -391,17 +391,17 @@ describe("secrets", () => {
 	test("secretEnv: each name as itself, the keychain over the environment, or the names that are missing", async () => {
 		const secrets = memorySecrets();
 		const { store } = await makeStore(
-			{ ZAC_USER: "env-user", ZAC_PASSWORD: "env-pw", PATH: "/bin" },
+			{ API_USER: "env-user", API_PASSWORD: "env-pw", PATH: "/bin" },
 			secrets,
 		);
-		await store.setSecret("ZAC_PASSWORD", "keychain-pw");
-		expect(await store.secretEnv(["ZAC_USER", "ZAC_PASSWORD"])).toEqual({
+		await store.setSecret("API_PASSWORD", "keychain-pw");
+		expect(await store.secretEnv(["API_USER", "API_PASSWORD"])).toEqual({
 			ok: true,
-			env: { ZAC_USER: "env-user", ZAC_PASSWORD: "keychain-pw" },
+			env: { API_USER: "env-user", API_PASSWORD: "keychain-pw" },
 		});
 		expect(
-			await store.secretEnv(["ZAC_PASSWORD", "ZAC_ADMIN", "ZAC_ROOT"]),
-		).toEqual({ ok: false, missing: ["ZAC_ADMIN", "ZAC_ROOT"] });
+			await store.secretEnv(["API_PASSWORD", "API_ADMIN", "API_ROOT"]),
+		).toEqual({ ok: false, missing: ["API_ADMIN", "API_ROOT"] });
 	});
 });
 

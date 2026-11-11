@@ -37,7 +37,7 @@ const lease: LeaseNode = {
 	id: "own",
 	type: "lease",
 	position: at,
-	name: "zac-docker-stack",
+	name: "docker-stack",
 };
 const edge = (from: string, outcome: string, to: string): FlowEdge => ({
 	id: `${from}-${outcome}`,
@@ -122,7 +122,7 @@ describe("leases across Devices", () => {
 			.startRun({ projectId, flow: holding });
 		await statusOn(paired.device, run.id, "sleeping");
 		expect(await leasesOnA()).toEqual([
-			{ name: "zac-docker-stack", runId: run.id, walkerId: b.deviceId },
+			{ name: "docker-stack", runId: run.id, walkerId: b.deviceId },
 		]);
 		// B has no lease of its own for A's Space.
 		expect(await b.db.select().from(runLease)).toEqual([]);
@@ -149,9 +149,9 @@ describe("leases across Devices", () => {
 				await paired.hostExchange.leaseRenew(await other.caller(), {
 					spaceId: a.spaceId,
 					runId: run.id,
-					names: ["zac-docker-stack"],
+					names: ["docker-stack"],
 				}),
-			).toEqual(["zac-docker-stack"]);
+			).toEqual(["docker-stack"]);
 			expect(await leasesOnA()).toHaveLength(1);
 		} finally {
 			await c.cleanup();
@@ -166,7 +166,7 @@ describe("leases across Devices", () => {
 		// As the Walker applies it: the Command as it came.
 		await paired.device.space(a.spaceId).act(run.id, {
 			kind: "lease.release",
-			payload: { name: "zac-docker-stack" },
+			payload: { name: "docker-stack" },
 		});
 		await waitFor(async () => (await leasesOnA()).length === 0, {
 			label: "A to let go of the lease",

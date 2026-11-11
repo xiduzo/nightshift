@@ -3,8 +3,8 @@ import type { FlowNode } from "../flow";
 import { type CliToolRef, programsWithoutLogin } from "./cli-programs";
 import { commandNode } from "./nodes";
 
-const dimpact: CliToolRef = {
-	name: "acli-dimpact",
+const work: CliToolRef = {
+	name: "acli-work",
 	program: "acli",
 	signsIn: true,
 };
@@ -14,14 +14,14 @@ const command = (text: string): FlowNode => ({
 	command: text,
 });
 
-const programs = (text: string, tools: CliToolRef[] = [dimpact]) =>
+const programs = (text: string, tools: CliToolRef[] = [work]) =>
 	programsWithoutLogin(command(text), tools).map((found) => found.program);
 
 describe("programsWithoutLogin", () => {
 	test("a program called by its own name, with its login only under another name", () => {
 		expect(
-			programsWithoutLogin(command("acli jira workitem search"), [dimpact]),
-		).toEqual([{ program: "acli", tools: ["acli-dimpact"] }]);
+			programsWithoutLogin(command("acli jira workitem search"), [work]),
+		).toEqual([{ program: "acli", tools: ["acli-work"] }]);
 	});
 
 	test("finds the call where the shell runs it", () => {
@@ -41,7 +41,7 @@ describe("programsWithoutLogin", () => {
 
 	test("the tool's own name, a path, a word in text or a comment is no call", () => {
 		for (const text of [
-			"acli-dimpact jira workitem search",
+			"acli-work jira workitem search",
 			'"{{vars.jira_tool}}" jira workitem search',
 			"/usr/local/bin/acli jira",
 			"echo 'run acli later'",
@@ -55,19 +55,19 @@ describe("programsWithoutLogin", () => {
 
 	test("a tool named after its program signs it in", () => {
 		const plain: CliToolRef = { name: "acli", program: null, signsIn: true };
-		expect(programs("acli jira", [dimpact, plain])).toEqual([]);
+		expect(programs("acli jira", [work, plain])).toEqual([]);
 	});
 
 	test("a tool without a login does not count", () => {
-		const unsigned: CliToolRef = { ...dimpact, signsIn: false };
+		const unsigned: CliToolRef = { ...work, signsIn: false };
 		expect(programs("acli jira", [unsigned])).toEqual([]);
 	});
 
 	test("names every tool that signs in to the program", () => {
-		const info: CliToolRef = { ...dimpact, name: "acli-info" };
-		expect(programsWithoutLogin(command("acli jira"), [info, dimpact])).toEqual(
-			[{ program: "acli", tools: ["acli-dimpact", "acli-info"] }],
-		);
+		const second: CliToolRef = { ...work, name: "acli-work-2" };
+		expect(programsWithoutLogin(command("acli jira"), [second, work])).toEqual([
+			{ program: "acli", tools: ["acli-work", "acli-work-2"] },
+		]);
 	});
 
 	test("reads the command a Wait runs", () => {
@@ -81,6 +81,6 @@ describe("programsWithoutLogin", () => {
 				everyMinutes: 5,
 			},
 		};
-		expect(programsWithoutLogin(wait, [dimpact])).toHaveLength(1);
+		expect(programsWithoutLogin(wait, [work])).toHaveLength(1);
 	});
 });

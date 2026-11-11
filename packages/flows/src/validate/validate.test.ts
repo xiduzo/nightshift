@@ -1562,15 +1562,15 @@ describe("validateFlow: Command secrets", () => {
 		flow([command("check", { secrets })], [], "check");
 
 	test("secrets with valid names parse", () => {
-		const result = parseFlow(f(["ZAC_BEHANDELAAR_USER", "_token", "a1"]));
+		const result = parseFlow(f(["API_SUPPORT_USER", "_token", "a1"]));
 		expect(result.issues).toEqual([]);
 		expect(result.flow?.nodes[0]).toMatchObject({
-			secrets: ["ZAC_BEHANDELAAR_USER", "_token", "a1"],
+			secrets: ["API_SUPPORT_USER", "_token", "a1"],
 		});
 	});
 
 	test("a name that is not a valid secret name is a schema error", () => {
-		for (const name of ["1ST", "ZAC-USER", "$ZAC_USER", ""]) {
+		for (const name of ["1ST", "API-USER", "$API_USER", ""]) {
 			const result = parseFlow(f([name]));
 			expect(result.flow).toBeNull();
 			expect(result.issues.map((issue) => issue.message)).toEqual([
@@ -1581,11 +1581,11 @@ describe("validateFlow: Command secrets", () => {
 
 	test("a secret named more than once is an error", () => {
 		expect(
-			errors(validateFlow(f(["ZAC_USER", "ZAC_PASSWORD", "ZAC_USER"]))).map(
+			errors(validateFlow(f(["API_USER", "API_PASSWORD", "API_USER"]))).map(
 				(issue) => issue.message,
 			),
 		).toEqual([
-			'Command node "check" names the secret ZAC_USER more than once.',
+			'Command node "check" names the secret API_USER more than once.',
 		]);
 	});
 });

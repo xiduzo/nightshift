@@ -124,7 +124,7 @@ beforeEach(async () => {
 	await mkdir(bin);
 	await mkdir(fixtures);
 	await writeFile(log, "");
-	for (const name of ["gh", "acli", "acli-dimpact"]) {
+	for (const name of ["gh", "acli", "acli-work"]) {
 		await writeFile(join(bin, name), STUB);
 		await chmod(join(bin, name), 0o755);
 	}
@@ -755,16 +755,16 @@ describe("kit:jira", () => {
 	test("runs the CLI tool it is given, as that tool's account", async () => {
 		await step(kit("kit:jira/assign"), "assign", {
 			key: "PROJ-1",
-			tool: "acli-dimpact",
+			tool: "acli-work",
 		});
 		await step(kit("kit:jira/move"), "move", {
 			key: "PROJ-1",
 			status: "Done",
-			tool: "acli-dimpact",
+			tool: "acli-work",
 		});
 		expect(await calls()).toEqual([
-			"acli-dimpact jira workitem assign --key PROJ-1 --assignee @me --yes",
-			"acli-dimpact jira workitem transition --key PROJ-1 --status Done --yes",
+			"acli-work jira workitem assign --key PROJ-1 --assignee @me --yes",
+			"acli-work jira workitem transition --key PROJ-1 --status Done --yes",
 		]);
 	});
 });
@@ -1020,7 +1020,7 @@ describe("the knowledge kits", () => {
 		});
 		const ran = await step(kit("kit:knowledge/jira"), "sync", {
 			keys: "PROJ-1, PROJ-2",
-			tool: "acli-dimpact",
+			tool: "acli-work",
 		});
 		expect(ran.outcome).toBe("synced");
 		expect(ran.data).toEqual({ files: 2 });
@@ -1028,8 +1028,8 @@ describe("the knowledge kits", () => {
 			"# PROJ-1: Log in\n\nType: Story\nStatus: To Do\n\nA person logs in.\n\nWith a password.\n\n\n",
 		);
 		expect(await calls()).toEqual([
-			"acli-dimpact jira workitem view PROJ-1 --json",
-			"acli-dimpact jira workitem view PROJ-2 --json",
+			"acli-work jira workitem view PROJ-1 --json",
+			"acli-work jira workitem view PROJ-2 --json",
 		]);
 	});
 

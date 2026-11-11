@@ -40,8 +40,8 @@ describe("waitedText", () => {
 describe("gateRun", () => {
 	test("names the flow, and what sets this run apart", () => {
 		expect(
-			gateRun({ flowName: "ship", runTitle: "ship · ticket PZ-12" }),
-		).toEqual({ flow: "ship", detail: "ticket PZ-12" });
+			gateRun({ flowName: "ship", runTitle: "ship · ticket TICKET-12" }),
+		).toEqual({ flow: "ship", detail: "ticket TICKET-12" });
 	});
 
 	test("a flow run without inputs has no detail", () => {

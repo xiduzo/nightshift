@@ -24,7 +24,7 @@ const thisComputer = (hosts: LinkedHost[] = []): ThisComputer => ({
 
 const linked = (spaces: string[]): LinkedHost => ({
 	hostId: "host-1",
-	name: "infonl-studio",
+	name: "studio-mac",
 	role: "guest",
 	homeHost: false,
 	addresses: ["https://studio.example.com"],
@@ -101,7 +101,7 @@ describe("spaceView", () => {
 		});
 		expect(view.host).toMatchObject({
 			kind: "linked",
-			host: { name: "infonl-studio" },
+			host: { name: "studio-mac" },
 		});
 		// A computer paired here is not in a Space another Host keeps.
 		expect(view.yours.map((c) => c.id)).toEqual(["self"]);

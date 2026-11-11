@@ -47,7 +47,7 @@ function offersWith(paired: Record<string, object>) {
 			listProjects: async () => [
 				{
 					id: "p1",
-					name: "zac",
+					name: "acme",
 					clones: [
 						{ deviceId: "self", deviceName: null, thisDevice: true },
 						{ deviceId: "studio", deviceName: "studio", thisDevice: false },
