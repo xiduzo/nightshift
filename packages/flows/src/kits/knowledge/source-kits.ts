@@ -144,6 +144,7 @@ mv "$part" "$dest"`,
 		flowName: "knowledge-project-files",
 		main: "from",
 		lines: ["from"],
+		needsFolder: true,
 		programs: [],
 		description:
 			"Copies files of the project into its knowledge, also files that git ignores, such as private notes. It replaces what the folder had.",

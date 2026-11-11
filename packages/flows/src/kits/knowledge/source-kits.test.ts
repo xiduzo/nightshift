@@ -30,6 +30,14 @@ describe("the list of sources", () => {
 		]);
 	});
 
+	test("only Project files needs the project's folder: a project without one cannot use it", () => {
+		expect(
+			KNOWLEDGE_SOURCE_KINDS.filter((kind) => kind.needsFolder).map(
+				(kind) => kind.kit,
+			),
+		).toEqual(["kit:knowledge/files"]);
+	});
+
 	test("every kind names the programs its kit's commands run, of those the readiness check knows", () => {
 		for (const kind of KNOWLEDGE_SOURCE_KINDS) {
 			const commands = (kitFlow(kind.kit)?.nodes ?? [])

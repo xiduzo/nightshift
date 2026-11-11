@@ -67,6 +67,8 @@ type SyncSource<Name extends string, Input extends string> = {
 	lines: readonly NoInfer<Input>[];
 	/** It reads a folder of one computer: its runs belong on that Device. */
 	local?: true;
+	/** It reads the project's own folder: a project without one (ADR 22) cannot use it. */
+	needsFolder?: true;
 	/** What its script runs. A CLI tool the person picks (`acli`) has its own check. */
 	programs: readonly SourceProgram[];
 	/** The kit's description. */
@@ -103,6 +105,8 @@ export type SourceKind<Kit extends string> = {
 	main: string;
 	lines: readonly string[];
 	local: boolean;
+	/** It reads the project's own folder: not offered for a project without one. */
+	needsFolder: boolean;
 	/** The programs to name when they are missing. */
 	programs: readonly string[];
 };
@@ -149,6 +153,7 @@ export function defineSyncKit<
 			main: source.main,
 			lines: source.lines,
 			local: source.local ?? false,
+			needsFolder: source.needsFolder ?? false,
 			programs: source.programs.map((program) => program.name),
 		},
 		flow: {

@@ -40,6 +40,7 @@ describe("defineSyncKit", () => {
 			main: "from",
 			lines: ["from"],
 			local: false,
+			needsFolder: false,
 			programs: ["curl", "jq"],
 		});
 		const parsed = flowSchema.parse(flow);
