@@ -56,7 +56,7 @@ export function nodeEdits(
 	// Dropping a label drops its edges too: say so, and offer to put them back.
 	const removeSelectedOutcome = (node: FlowNode) => (index: number) => {
 		const result = removeOutcome(draft, node.id, index);
-		const { option, dropped } = result;
+		const { option, dropped, cleared } = result;
 		if (!option) return;
 		setDraft((current) => removeOutcome(current, node.id, index).flow);
 		if (dropped.length === 0) return;
@@ -71,7 +71,7 @@ export function nodeEdits(
 					label: "Undo",
 					onClick: () =>
 						setDraft((current) =>
-							restoreOutcome(current, node.id, index, option, dropped),
+							restoreOutcome(current, node.id, index, option, dropped, cleared),
 						),
 				},
 			},

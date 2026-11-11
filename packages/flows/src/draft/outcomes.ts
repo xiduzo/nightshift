@@ -15,6 +15,10 @@ import {
 	type CommandNode,
 	commandExits,
 	type DecisionNode,
+	type DecisionTier,
+	type GateRecommend,
+	isPersonTier,
+	type PersonTier,
 	type WaitNode,
 } from "../nodes";
 import { updateNode } from "./graph";
@@ -77,9 +81,85 @@ function changeOptions(
 	);
 }
 
+/** Where a Decision held a recommendation: the node itself (`tier: null`) or a cascade tier. */
+export interface ClearedRecommend {
+	tier: number | null;
+	recommend: GateRecommend;
+}
+
+type GatePart = DecisionNode | PersonTier;
+
+/**
+ * Applies `change` to the node's own fields and to each person tier of its
+ * cascade: the places that may name an option in `recommend` and in
+ * `deadline.choose`.
+ */
+function changeGateParts(
+	node: DecisionNode,
+	change: <T extends GatePart>(part: T, tier: number | null) => T,
+): DecisionNode {
+	const own = change(node, null);
+	if (!own.cascade) return own;
+	return {
+		...own,
+		cascade: own.cascade.map((tier: DecisionTier | PersonTier, at) =>
+			isPersonTier(tier) ? change(tier, at) : tier,
+		),
+	};
+}
+
+/**
+ * A Decision's recommendation and deadline follow an option rename when
+ * they name the old option. A template stays as it is.
+ */
+function renameInGate(
+	node: DecisionNode,
+	from: string,
+	to: string,
+): DecisionNode {
+	return changeGateParts(node, (part) => {
+		let next = part;
+		if (next.recommend?.option === from) {
+			next = { ...next, recommend: { ...next.recommend, option: to } };
+		}
+		if (next.deadline?.choose === from) {
+			next = { ...next, deadline: { ...next.deadline, choose: to } };
+		}
+		return next;
+	});
+}
+
+/** Removes each recommendation of a Decision that names `name`, and returns them, for an undo. */
+function clearRecommends(
+	node: DecisionNode,
+	name: string,
+): { node: DecisionNode; cleared: ClearedRecommend[] } {
+	const cleared: ClearedRecommend[] = [];
+	const next = changeGateParts(node, (part, tier) => {
+		if (part.recommend?.option !== name) return part;
+		cleared.push({ tier, recommend: part.recommend });
+		const { recommend: _, ...rest } = part;
+		return rest as typeof part;
+	});
+	return { node: next, cleared };
+}
+
+/** Puts cleared recommendations back where the node has none now. */
+function restoreRecommends(
+	node: DecisionNode,
+	cleared: ClearedRecommend[],
+): DecisionNode {
+	return changeGateParts(node, (part, tier) => {
+		const back = cleared.find((entry) => entry.tier === tier);
+		if (!back || part.recommend) return part;
+		return { ...part, recommend: back.recommend };
+	});
+}
+
 /**
  * Renames a Decision label, a Gate choice or an Agent's own outcome, and
- * moves the node's edges on that outcome along with it.
+ * moves the node's edges on that outcome along with it. A Decision's
+ * `recommend.option` and `deadline.choose` that name it follow too.
  */
 export function renameOutcome(
 	flow: Flow,
@@ -91,11 +171,19 @@ export function renameOutcome(
 	if (!node || !isOptionNode(node)) return flow;
 	const from = nodeOptions(node)[index]?.name;
 	if (from === undefined || from === to) return flow;
-	const next = changeOptions(flow, nodeId, (options) =>
+	const renamed = changeOptions(flow, nodeId, (options) =>
 		options.map((option, at) =>
 			at === index ? { ...option, name: to } : option,
 		),
 	);
+	const next =
+		node.type === "decision"
+			? updateNode(renamed, nodeId, (current) =>
+					current.type === "decision"
+						? renameInGate(current, from, to)
+						: current,
+				)
+			: renamed;
 	return {
 		...next,
 		edges: next.edges.map((edge) =>
@@ -108,21 +196,27 @@ export function renameOutcome(
 
 /**
  * Removes a Decision label, a Gate choice or an Agent's own outcome, and the
- * node's edges on it (unless another option keeps the same name). Returns
- * what it removed, for an undo.
+ * node's edges on it (unless another option keeps the same name). A
+ * Decision's `recommend` that names it goes too. Returns what it removed,
+ * for an undo.
  */
 export function removeOutcome(
 	flow: Flow,
 	nodeId: string,
 	index: number,
-): { flow: Flow; option: NodeOption | null; dropped: FlowEdge[] } {
+): {
+	flow: Flow;
+	option: NodeOption | null;
+	dropped: FlowEdge[];
+	cleared: ClearedRecommend[];
+} {
 	const node = flow.nodes.find((candidate) => candidate.id === nodeId);
 	if (!node || !isOptionNode(node)) {
-		return { flow, option: null, dropped: [] };
+		return { flow, option: null, dropped: [], cleared: [] };
 	}
 	const options = nodeOptions(node);
 	const option = options[index];
-	if (!option) return { flow, option: null, dropped: [] };
+	if (!option) return { flow, option: null, dropped: [], cleared: [] };
 	const stillThere = options.some(
 		(other, at) => at !== index && other.name === option.name,
 	);
@@ -131,9 +225,19 @@ export function removeOutcome(
 		: flow.edges.filter(
 				(edge) => edge.from === nodeId && edge.outcome === option.name,
 			);
-	const next = changeOptions(flow, nodeId, (list) =>
+	const removed = changeOptions(flow, nodeId, (list) =>
 		list.filter((_, at) => at !== index),
 	);
+	let cleared: ClearedRecommend[] = [];
+	const next =
+		node.type === "decision" && !stillThere
+			? updateNode(removed, nodeId, (current) => {
+					if (current.type !== "decision") return current;
+					const result = clearRecommends(current, option.name);
+					cleared = result.cleared;
+					return result.node;
+				})
+			: removed;
 	return {
 		flow: {
 			...next,
@@ -141,6 +245,7 @@ export function removeOutcome(
 		},
 		option,
 		dropped,
+		cleared,
 	};
 }
 
@@ -155,9 +260,10 @@ function restoreEdges(flow: Flow, dropped: FlowEdge[]): Flow {
 }
 
 /**
- * Undoes `removeOutcome`: puts the option back at its place and the dropped
- * edges whose nodes still exist. Does nothing when the node is gone or the
- * name is taken again.
+ * Undoes `removeOutcome`: puts the option back at its place, the dropped
+ * edges whose nodes still exist and the cleared recommendations where the
+ * node has none now. Does nothing when the node is gone or the name is
+ * taken again.
  */
 export function restoreOutcome(
 	flow: Flow,
@@ -165,17 +271,26 @@ export function restoreOutcome(
 	index: number,
 	option: NodeOption,
 	dropped: FlowEdge[],
+	cleared: ClearedRecommend[] = [],
 ): Flow {
 	const node = flow.nodes.find((candidate) => candidate.id === nodeId);
 	if (!node || !isOptionNode(node)) return flow;
 	if (nodeOptions(node).some((other) => other.name === option.name)) {
 		return flow;
 	}
-	const next = changeOptions(flow, nodeId, (options) => [
+	const back = changeOptions(flow, nodeId, (options) => [
 		...options.slice(0, index),
 		option,
 		...options.slice(index),
 	]);
+	const next =
+		cleared.length > 0
+			? updateNode(back, nodeId, (current) =>
+					current.type === "decision"
+						? restoreRecommends(current, cleared)
+						: current,
+				)
+			: back;
 	return restoreEdges(next, dropped);
 }
 
