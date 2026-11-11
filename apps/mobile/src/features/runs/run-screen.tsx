@@ -81,6 +81,7 @@ import {
 	runVerdict,
 	sizeLabel,
 } from "./run-facts";
+import { RunUseful } from "./run-useful";
 import { type PhoneLiveRun, usePhoneLiveRun } from "./use-live-run";
 
 /**
@@ -300,6 +301,7 @@ function RunBody({
 					/>
 				) : null}
 				<AskWhyCard runId={run.id} status={status} />
+				<RunUseful run={run} />
 				<FollowOnLockScreen runId={run.id} ended={ended} />
 				<RunActionFailure act={act} />
 			</View>

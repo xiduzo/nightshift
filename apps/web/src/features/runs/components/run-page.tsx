@@ -49,6 +49,7 @@ import { RunServices } from "./run-services";
 import { RunSidebar } from "./run-sidebar";
 import { RunStatusPanel } from "./run-status-panel";
 import { RunStory, type StepPick } from "./run-story";
+import { RunUseful } from "./run-useful";
 import { RunWarnings } from "./run-warnings";
 import { StepRowMenu } from "./step-actions";
 
@@ -294,6 +295,7 @@ function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 					)
 				}
 			/>
+			<RunUseful run={runData} />
 			<RunLeases run={runData} />
 			<RunServices run={runData} />
 			<RunWarnings warnings={runData.warnings} onShowStep={showStep} />

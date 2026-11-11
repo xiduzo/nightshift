@@ -10,7 +10,6 @@
 import { createRunQueries } from "@nightshift/client";
 
 import { orpc } from "@/shared/api";
-import { usefulOptions } from "./useful-mutation";
 
 export const runQueries = createRunQueries(orpc);
 
@@ -23,5 +22,5 @@ export const runMutations = {
 	rerun: orpc.runs.rerun.mutationOptions,
 	move: orpc.runs.move.mutationOptions,
 	releaseLease: orpc.runs.releaseLease.mutationOptions,
-	useful: (options?: object) => usefulOptions(orpc, runQueries, options),
+	useful: orpc.runs.useful.mutationOptions,
 };
