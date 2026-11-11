@@ -17,12 +17,18 @@ export type {
 	ExecInput,
 	GitAuthor,
 	OfferedSessionInput,
+	RequestField,
+	RequestPart,
+	RequestText,
 	RunFolder,
 	RunRef,
 	SessionEvent,
 	SessionInput,
 	ToolCallInput,
 	ToolResult,
+	WebRequestInput,
+	WebRequestResult,
+	WebResponse,
 	Worktree,
 } from "./types";
 export { addressKey } from "./types";

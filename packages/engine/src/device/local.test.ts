@@ -8,6 +8,7 @@ import {
 	fixturePath,
 } from "@nightshift/agents/testing";
 import type { Decider, McpServerConfig } from "@nightshift/agents/types";
+import { FLOW_VERSION } from "@nightshift/flows";
 
 import {
 	type CliToolStore,
@@ -220,6 +221,13 @@ describe("what the Device reports", () => {
 		expect(
 			(await device({ decider: textless }).capabilities()).decider?.values,
 		).toBe(false);
+	});
+
+	test("that it sends web requests, and the newest flow format it reads", async () => {
+		expect(await device().capabilities()).toMatchObject({
+			requests: true,
+			flowVersion: FLOW_VERSION,
+		});
 	});
 });
 

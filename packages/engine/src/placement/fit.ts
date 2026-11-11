@@ -1,4 +1,8 @@
-import type { FlowNode, FlowNodeType } from "@nightshift/flows";
+import {
+	FLOW_VERSION,
+	type FlowNode,
+	type FlowNodeType,
+} from "@nightshift/flows";
 import type { Capabilities, Device } from "../device";
 import {
 	kindOf,
@@ -26,6 +30,31 @@ import {
  * asks each kind which connections its node names (`NodeKind.connections`).
  * This module switches on no node type to ask them.
  */
+
+/**
+ * The flow format a Device reads when it does not say: the last one before
+ * Devices advertised theirs (`Capabilities.flowVersion`).
+ */
+export const UNADVERTISED_FLOW_VERSION = 8;
+
+/**
+ * The Device reads this build's flow format: one of an older Night Shift
+ * may not know a field or a node of the flow, so no step goes there and no
+ * run moves there. A Device that does not say reads format 8. One rule for
+ * every flow, not only for one that uses what format 9 added: it is the
+ * simpler safe rule, and an update fixes it.
+ */
+export const readsTheFlow: Requirement = (_nodes, has) => {
+	if ((has.flowVersion ?? UNADVERTISED_FLOW_VERSION) >= FLOW_VERSION) {
+		return null;
+	}
+	return olderNightShift(has.elsewhere ?? "this computer");
+};
+
+/** Why a Device of an older Night Shift cannot take the run, or its walk. */
+export function olderNightShift(name: string): string {
+	return `${name} runs an older version of Night Shift. Update Night Shift on ${name}.`;
+}
 
 /** Every node names connections the Device has (Agent and Tool nodes do). */
 export const connectionsExist: Requirement = (nodes, has) => {
@@ -58,11 +87,12 @@ function ofKind(kind: NodeKind): Requirement[] {
 }
 
 /**
- * Every requirement, in the order a person sees them: the connections
- * every kind names first, then each kind's own, kind by kind in the
- * registry's order (`NODE_KINDS`).
+ * Every requirement, in the order a person sees them: the flow format
+ * first, then the connections every kind names, then each kind's own,
+ * kind by kind in the registry's order (`NODE_KINDS`).
  */
 export const REQUIREMENTS: readonly Requirement[] = [
+	readsTheFlow,
 	connectionsExist,
 	...(Object.keys(NODE_KINDS) as FlowNodeType[]).flatMap((type) =>
 		ofKind(kindOfType(type)),

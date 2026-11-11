@@ -357,6 +357,19 @@ const DEFS = {
 		fromEnv: onOff,
 	} satisfies Def<boolean>,
 	/**
+	 * "Web requests reach this network": a Host's Web request steps and
+	 * Waits for a URL may reach this computer (loopback) and its private
+	 * network (RFC 1918, unique local, carrier-grade NAT). Off by default:
+	 * a Host serves every Member of its Spaces. A computer that is not a
+	 * Host always may (`device/web-addresses.ts`).
+	 */
+	webRequestsPrivateNetwork: {
+		schema: z.boolean(),
+		default: false,
+		env: "NIGHTSHIFT_WEB_REQUESTS_PRIVATE_NETWORK",
+		fromEnv: onOff,
+	} satisfies Def<boolean>,
+	/**
 	 * "Copy every project": a Host copies each project of its Spaces that
 	 * has a GitHub remote and no Clone on it yet (`ProjectCopies`). Only a
 	 * Host does: it runs every schedule.

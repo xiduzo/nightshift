@@ -1,4 +1,5 @@
 import {
+	acceptsValue,
 	commandWaitOutcome,
 	isOwnWaitOutcome,
 	type JsonValue,
@@ -8,8 +9,10 @@ import {
 	signalRules,
 	type WaitCommand,
 	type WaitNode,
+	type WaitUntil,
 	waitCommandOf,
 	waitSignalOf,
+	waitUrlOf,
 } from "@nightshift/flows";
 import { iso, nextClockTime, parseInstant } from "@nightshift/time";
 
@@ -27,6 +30,12 @@ import { heldStep } from "../run-position";
 import { type OwnWait, pendingWaitOf } from "../sleep";
 import type { PendingWait } from "../state";
 import { type BodyResult, runStep, type StepHandle } from "../step-runner";
+import {
+	sendsRequests,
+	shownUrl,
+	statusLine,
+	urlWaitRequest,
+} from "./web-request";
 
 /**
  * The Wait node: the first node whose whole job is the engine's park-and-wake
@@ -47,6 +56,10 @@ import { type BodyResult, runStep, type StepHandle } from "../step-runner";
  * - `command`: the command runs again; exit 0 is `done`, or the outcome
  *   its data picks from the node's `outcomes` (`commandWaitOutcome`), else
  *   the step sleeps `everyMinutes` more and tries again;
+ * - `url`: the Device asks the URL again (`Device.request`); a 2xx answer
+ *   is `done` with its body as `data`, or the first of the node's
+ *   `outcomes` whose rule holds over that body; any other answer, or one
+ *   that matches no rule, sleeps `everyMinutes` more and asks again;
  * - `signal`: `done` when the wake is that signal (`pending.signal`), with
  *   the event of the webhook that sent it as `data`; else the step keeps
  *   waiting. A `key` is rendered when the wait starts and logged with it
@@ -97,7 +110,20 @@ export const WAIT: NodeKind<WaitNode> = {
 	...PLAIN_KIND,
 	type: "wait",
 	make: waitStepNode,
-	works: (node) => (waitCommandOf(node.until) ? "worktree" : null),
+	works: (node) =>
+		waitCommandOf(node.until)
+			? "worktree"
+			: waitUrlOf(node.until)
+				? "device"
+				: null,
+	requirements: [
+		(nodes, has) =>
+			sendsRequests(
+				"The flow waits for a URL",
+				nodes.filter((node) => waitUrlOf(node.until) !== null),
+				has,
+			),
+	],
 	resumeRules: () => RESUME_RULES.wait,
 	aux: () => [{ kind: "wait" }],
 	isChosenEnd: (node, outcome) =>
@@ -249,6 +275,17 @@ async function pollOrWait(
 	outputs: StepOutputs,
 	deadline: number | null,
 ): Promise<BodyResult> {
+	const url = waitUrlOf(node.until);
+	if (url !== null) {
+		const asked = await askUrl(node, step, url, outputs);
+		if (asked.kind !== "again") return asked;
+		const minutes = url.everyMinutes;
+		return sleep(node, {
+			until: ctx.now() + minutes * ctx.minuteMs,
+			deadline,
+			message: `${asked.why} Asks again in ${minutes} min.`,
+		});
+	}
 	const polled = waitCommandOf(node.until);
 	if (polled === null) {
 		return sleep(node, ownWait(ctx, node, step, deadline, null, null));
@@ -304,6 +341,97 @@ function ownWait(
 		message: parts.join(" "),
 		...signalFields,
 	};
+}
+
+/** Why a URL's answer did not end the wait, as a sentence. */
+type AskAgain = { kind: "again"; why: string };
+
+/** A message as a sentence of its own: a capital first letter, a period last. */
+function sentence(text: string): string {
+	const trimmed = text.trim();
+	const capital = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+	return /[.!?]$/.test(capital) ? capital : `${capital}.`;
+}
+
+/**
+ * Asks the URL once from the step's Device, as a Web request node does
+ * (`Device.request`), and records the request and the answer. A 2xx
+ * answer ends the wait `done` with its body as `data`, or on the first of
+ * the node's outcomes whose rule holds over that body; one that matches
+ * no rule, any other answer, and a failure to reach the server ask again.
+ * A request the Device refuses (a secret it does not have, an address it
+ * may not reach) ends the step `error`.
+ */
+async function askUrl(
+	node: WaitNode,
+	step: StepHandle,
+	url: Extract<WaitUntil, { kind: "url" }>,
+	outputs: StepOutputs,
+): Promise<BodyResult | AskAgain> {
+	const input = urlWaitRequest(url.url, url.headers, step.tctx, step.signal);
+	step.record(null, {
+		type: "web-request",
+		method: "GET",
+		url: shownUrl(input),
+	});
+	const result = await step.device.request(input);
+	if (step.signal.aborted) return { kind: "aborted", outputs };
+	if (result.kind === "refused") {
+		return { kind: "end", outcome: "error", outputs, error: result.message };
+	}
+	if (result.kind === "failed") {
+		step.record(null, {
+			type: "web-response",
+			status: null,
+			text: result.message,
+			bytes: null,
+		});
+		return { kind: "again", why: sentence(result.message) };
+	}
+	const { response } = result;
+	step.record(null, {
+		type: "web-response",
+		status: response.status,
+		text: response.statusText,
+		bytes: response.bytes,
+	});
+	if (response.status < 200 || response.status >= 300) {
+		return {
+			kind: "again",
+			why: `The URL answered ${statusLine(response)}.`,
+		};
+	}
+	const picked = await dataPick(node, response.body);
+	if (picked === null) {
+		return { kind: "again", why: "The answer matched no rule." };
+	}
+	return {
+		kind: "end",
+		outcome: picked,
+		outputs: { ...outputs, data: response.body },
+		error: null,
+	};
+}
+
+/**
+ * The outcome a URL's answer picks: `done` when the node has no rules,
+ * else the first outcome whose rule holds over the body as `data`, or
+ * null when none holds. A rule that fails on this body does not hold.
+ */
+async function dataPick(
+	node: WaitNode,
+	data: JsonValue,
+): Promise<string | null> {
+	const rules = signalRules(node);
+	if (rules.length === 0) return "done";
+	for (const rule of rules) {
+		try {
+			if (await acceptsValue(rule.when, data)) return rule.outcome;
+		} catch {
+			// A rule that fails on this answer does not pick its outcome.
+		}
+	}
+	return null;
 }
 
 /** Why a poll did not end the wait. */

@@ -80,13 +80,14 @@ function stepRun(row: RunRow): StepRun {
 	return { spaceId: row.spaceId, projectId: row.projectId, runId: row.id };
 }
 
-/** A Device working for one run: each session, command, tool call and decider call names the run. Everything else is the Device as is. */
+/** A Device working for one run: each session, command, tool call, web request and decider call names the run. Everything else is the Device as is. */
 function forRun(device: Device, run: StepRun): Device {
 	return {
 		...device,
 		session: (input) => device.session({ ...input, run }),
 		exec: (input) => device.exec({ ...input, run }),
 		callTool: (input) => device.callTool({ ...input, run }),
+		request: (input) => device.request({ ...input, run }),
 		// A decision or a value: the overloads take either input.
 		decide: ((input: Parameters<Device["decide"]>[0]) =>
 			device.decide({ ...input, run } as never)) as Device["decide"],

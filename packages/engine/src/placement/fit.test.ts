@@ -2,11 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { HARNESS_LABELS } from "@nightshift/agents/harness-facts";
 import { defaultDeciderModel } from "@nightshift/agents/testing";
 import type { AgentHarness, Decider } from "@nightshift/agents/types";
-import type {
-	AgentNode,
-	DecisionNode,
-	FlowNode,
-	ValueNode,
+import {
+	type AgentNode,
+	type DecisionNode,
+	FLOW_VERSION,
+	type FlowNode,
+	type ValueNode,
 } from "@nightshift/flows";
 import type { Capabilities } from "../device/types";
 import { AGENT, cliToolsInstalled, harnessesAdded } from "../graph/nodes/agent";
@@ -18,7 +19,13 @@ import {
 	type TestDeviceDeps,
 	testDevice,
 } from "../testing/test-support";
-import { connectionsExist, REQUIREMENTS, refusalOf, unfit } from "./fit";
+import {
+	connectionsExist,
+	REQUIREMENTS,
+	readsTheFlow,
+	refusalOf,
+	unfit,
+} from "./fit";
 
 /**
  * The fit check of Placement: the requirements, each over a test Device's
@@ -60,12 +67,29 @@ function has(overrides: Partial<TestDeviceDeps> = {}): Promise<Capabilities> {
 }
 
 describe("REQUIREMENTS", () => {
-	test("lists the shared connections check, then every kind's own, once each", async () => {
-		expect(REQUIREMENTS[0]).toBe(connectionsExist);
-		expect(REQUIREMENTS).toHaveLength(5);
+	test("lists the flow format and the shared connections check, then every kind's own, once each", async () => {
+		expect(REQUIREMENTS[0]).toBe(readsTheFlow);
+		expect(REQUIREMENTS[1]).toBe(connectionsExist);
+		// The Agent's two, the model Decision's, the model Value's, a Wait for
+		// a URL's and the Web request's.
+		expect(REQUIREMENTS).toHaveLength(8);
 		expect(AGENT.requirements).toEqual([cliToolsInstalled, harnessesAdded]);
 		expect(DECISION.requirements).toEqual([modelDecisionsHaveDecider]);
 		expect(VALUE.requirements).toEqual([modelValuesHaveDecider]);
+	});
+
+	test("a Device of an older Night Shift takes no step of this build's flows", async () => {
+		const older = { ...(await has()), elsewhere: "nas" };
+		delete older.flowVersion;
+		expect(refusalOf([decision("d", "rule")], older)).toBe(
+			"nas runs an older version of Night Shift. Update Night Shift on nas.",
+		);
+		expect(
+			refusalOf([decision("d", "rule")], {
+				...older,
+				flowVersion: FLOW_VERSION,
+			}),
+		).toBeNull();
 	});
 
 	test("a kind's requirement sees its own nodes only", async () => {

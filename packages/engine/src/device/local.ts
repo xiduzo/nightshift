@@ -17,8 +17,10 @@ import {
 	type AgentHarnessName,
 	type CustomHarnessName,
 	deciderNameSchema,
+	FLOW_VERSION,
 	type FlowSources,
 	isCustomHarness,
+	type JsonValue,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 
@@ -43,7 +45,7 @@ import {
 } from "../projects";
 import type { RunFolders } from "../run-folders";
 import { spawnCommand } from "./command";
-import { redactExec, redactSession } from "./redact";
+import { redactExec, redactSession, redactText } from "./redact";
 import { callServerTool } from "./tool-call";
 import type { ToolLaunchers } from "./tool-launchers";
 import {
@@ -55,10 +57,14 @@ import {
 	type ExecEvent,
 	type ExecInput,
 	type OfferedSessionInput,
+	type RequestText,
 	type SessionEvent,
 	type SessionInput,
 	type ToolResult,
+	type WebRequestInput,
+	type WebRequestResult,
 } from "./types";
+import { type OutgoingRequest, sendRequest } from "./web-request";
 
 /** What the Device reads of this computer's connections and secrets. */
 export type DeviceConnections = Pick<
@@ -194,6 +200,14 @@ export type LocalDeviceDeps = {
 	 * logins, its MCP servers' and `sessionEnv`'s).
 	 */
 	secretValues?: (use?: SecretUse) => Promise<readonly string[]>;
+	/**
+	 * Whether a web request from this computer may reach loopback and
+	 * private addresses (`web-addresses.ts`), read at each request. A
+	 * Host's Settings decide it there. Without it: they may, as on a laptop.
+	 */
+	privateNetwork?: () => boolean;
+	/** The addresses of a host name, for a test. Default: the system's resolver. */
+	resolve?: (hostname: string) => Promise<string[]>;
 };
 
 /** The run's own folder here, as the Device port answers it: no branch, no base. */
@@ -270,12 +284,151 @@ function namesTool(command: string, tool: string): boolean {
 function missingSecretsMessage(
 	missing: readonly string[],
 	found: Parameters<typeof unreachableNote>[0] = {},
+	subject = "The command",
 ): string {
 	const [noun, isNot, it] =
 		missing.length === 1
 			? ["secret", "it is", "it"]
 			: ["secrets", "they are", "them"];
-	return `The command needs the ${noun} ${missing.join(", ")}, but ${isNot} not saved. Save ${it} on the Secrets page, or remove ${it} from the node.${unreachableNote(found)}`;
+	return `${subject} needs the ${noun} ${missing.join(", ")}, but ${isNot} not saved. Save ${it} on the Secrets page, or remove ${it} from the node.${unreachableNote(found)}`;
+}
+
+/** The secrets a request names, each once. */
+function requestSecretNames(
+	input: Omit<WebRequestInput, "signal" | "run">,
+): string[] {
+	const texts: RequestText[] = [
+		input.url,
+		...(input.query ?? []).map((field) => field.value),
+		...(input.headers ?? []).map((field) => field.value),
+		...(input.body === undefined
+			? []
+			: input.body.kind === "text"
+				? [input.body.text]
+				: input.body.fields.map((field) => field.value)),
+	];
+	return [
+		...new Set(
+			texts.flatMap((text) =>
+				text.flatMap((part) => ("secret" in part ? [part.secret] : [])),
+			),
+		),
+	];
+}
+
+/** A request text with its secrets filled in. */
+function filled(text: RequestText, env: Record<string, string>): string {
+	return text
+		.map((part) => {
+			if ("text" in part) return part.text;
+			const value = env[part.secret] ?? "";
+			return part.escape === "json"
+				? JSON.stringify(value).slice(1, -1)
+				: value;
+		})
+		.join("");
+}
+
+/** Whether a text holds a secret. */
+function holdsSecret(text: RequestText): boolean {
+	return text.some((part) => "secret" in part);
+}
+
+/** The request as it goes out: every secret filled in, the query on the URL, the form encoded. */
+function outgoing(
+	input: Omit<WebRequestInput, "run">,
+	env: Record<string, string>,
+): OutgoingRequest {
+	let url = filled(input.url, env);
+	const query = (input.query ?? []).map(
+		(field) => [field.name, filled(field.value, env)] as [string, string],
+	);
+	if (query.length > 0) {
+		try {
+			const parsed = new URL(url);
+			for (const [name, value] of query)
+				parsed.searchParams.append(name, value);
+			url = parsed.toString();
+		} catch {
+			// Not a URL: `sendRequest` refuses it.
+		}
+	}
+	const body = input.body;
+	return {
+		method: input.method,
+		url,
+		headers: (input.headers ?? []).map((field) => ({
+			name: field.name,
+			value: filled(field.value, env),
+			secret: holdsSecret(field.value),
+		})),
+		...(body === undefined
+			? {}
+			: body.kind === "text"
+				? {
+						body: {
+							contentType: body.contentType,
+							text: filled(body.text, env),
+						},
+					}
+				: {
+						body: {
+							contentType: "application/x-www-form-urlencoded",
+							text: new URLSearchParams(
+								body.fields.map((field): [string, string] => [
+									field.name,
+									filled(field.value, env),
+								]),
+							).toString(),
+						},
+					}),
+		timeoutMs: input.timeoutMs,
+		maxBytes: input.maxBytes,
+		showHost: !holdsSecret(input.url),
+		signal: input.signal,
+	};
+}
+
+/** The result with the secret values in `values` masked: its messages, headers and body. */
+function redactRequest(
+	result: WebRequestResult,
+	values: readonly string[],
+): WebRequestResult {
+	if (values.length === 0) return result;
+	if (result.kind !== "answered") {
+		return { ...result, message: redactText(result.message, values) };
+	}
+	const { response } = result;
+	return {
+		kind: "answered",
+		response: {
+			...response,
+			statusText: redactText(response.statusText, values),
+			headers: Object.fromEntries(
+				Object.entries(response.headers).map(([name, value]) => [
+					name,
+					redactText(value, values),
+				]),
+			),
+			body: redactJson(response.body, values),
+		},
+	};
+}
+
+/** Every string of a JSON value, keys included, with the secret values masked. */
+function redactJson(value: JsonValue, values: readonly string[]): JsonValue {
+	if (typeof value === "string") return redactText(value, values);
+	if (Array.isArray(value))
+		return value.map((item) => redactJson(item, values));
+	if (typeof value === "object" && value !== null) {
+		return Object.fromEntries(
+			Object.entries(value).map(([key, item]) => [
+				redactText(key, values),
+				redactJson(item, values),
+			]),
+		);
+	}
+	return value;
 }
 
 /** The session's `saveArtifact`: copies the file and tells the agent it is kept. */
@@ -601,6 +754,8 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 					}),
 				),
 				decider: deciderFacts,
+				requests: true,
+				flowVersion: FLOW_VERSION,
 				...(query.addresses?.length && decider?.checkAddress
 					? {
 							addresses: await checkAddresses(
@@ -628,6 +783,31 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				};
 			}
 			return callServerTool(server, call);
+		},
+		/**
+		 * A web request from here. Its secrets come from the scopes of its
+		 * use, as a command's do: one this computer does not have refuses it
+		 * before anything is sent. Their values go to the request only, and
+		 * come back masked in the answer and in every message.
+		 */
+		async request(input): Promise<WebRequestResult> {
+			const { run, ...call } = input;
+			const names = requestSecretNames(call);
+			const found =
+				names.length > 0
+					? await connections.secretEnv(names, useOf(run))
+					: { ok: true as const, env: {} };
+			if (!found.ok) {
+				return {
+					kind: "refused",
+					message: missingSecretsMessage(found.missing, found, "The request"),
+				};
+			}
+			const result = await sendRequest(outgoing(call, found.env), {
+				privateNetwork: deps.privateNetwork?.() ?? true,
+				...(deps.resolve ? { resolve: deps.resolve } : {}),
+			});
+			return redactRequest(result, Object.values(found.env));
 		},
 		decide,
 		flows: async (projectId) => deps.flows?.(projectId) ?? {},

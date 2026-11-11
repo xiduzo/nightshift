@@ -78,11 +78,14 @@ const keyOf = (ref: WalkRef) =>
 	);
 
 let sandboxes: Sandbox[];
+/** The flow format the Device a run moves to reads; undefined: this build's. */
+let targetReads: number | undefined;
 /** The archive both computers keep a Space in. */
 let archive: Map<string, string>;
 /** The stamps of the files in `archive`. */
 let stamps: Map<string, WalkFile["stamp"]>;
 beforeEach(() => {
+	targetReads = undefined;
 	sandboxes = [];
 	archive = new Map();
 	stamps = new Map();
@@ -109,6 +112,17 @@ async function computer(
 			...alone,
 			placement: {
 				...alone.placement,
+				// The Device a run moves to, as it says what it reads.
+				deviceById(id, run, name) {
+					const device = alone.placement.deviceById(id, run, name);
+					return {
+						...device,
+						capabilities: async (query) => ({
+							...(await device.capabilities(query)),
+							flowVersion: targetReads ?? FLOW_VERSION,
+						}),
+					};
+				},
 				// The planner's answer (`PlacementPort.moveTo`): one of the
 				// others, refused while it is offline.
 				async moveTo(_row, _actor, to) {
@@ -558,6 +572,19 @@ describe("a run that moves to another Device", () => {
 		await expect(
 			spaceOf(a, a).act(runId, { kind: "move", to: b.sandbox.deviceId }),
 		).rejects.toThrow("The planner refuses it.");
+		expect(archive.size).toBe(0);
+		await spaceOf(a, a).act(runId, { kind: "stop" });
+	});
+
+	test("is refused to a Device of an older Night Shift, and keeps nothing", async () => {
+		const { a, b } = await pair();
+		const { runId } = await waitingOn(a);
+		targetReads = FLOW_VERSION - 1;
+		await expect(
+			spaceOf(a, a).act(runId, { kind: "move", to: b.sandbox.deviceId }),
+		).rejects.toThrow(
+			"laptop runs an older version of Night Shift. Update Night Shift on laptop.",
+		);
 		expect(archive.size).toBe(0);
 		await spaceOf(a, a).act(runId, { kind: "stop" });
 	});

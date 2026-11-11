@@ -55,6 +55,7 @@ function fakeDevice(
 		session: seen("session") as unknown as Device["session"],
 		exec: seen("exec") as unknown as Device["exec"],
 		callTool: seen("callTool") as unknown as Device["callTool"],
+		request: seen("request") as unknown as Device["request"],
 		decide: seen("decide") as unknown as Device["decide"],
 	};
 }
@@ -215,7 +216,7 @@ describe("the Device of a step, from the plan alone", () => {
 });
 
 describe("a Device works for the run", () => {
-	test("each session, command, tool call and decision names the run (ADR 13)", async () => {
+	test("each session, command, tool call, web request and decision names the run (ADR 13)", async () => {
 		const calls: Call[] = [];
 		const placement = placementOver(calls);
 		const signal = new AbortController().signal;
@@ -225,6 +226,7 @@ describe("a Device works for the run", () => {
 			() => device.exec({ command: "true", cwd: "/work", signal }),
 			() => device.session({ prompt: "Work." } as never),
 			() => byId.callTool({ connection: "c", tool: "t" } as never),
+			() => byId.request({ method: "GET", url: [] } as never),
 			() => byId.decide({ prompt: "?" } as never),
 		];
 		for (const ask of asks) {
@@ -238,6 +240,7 @@ describe("a Device works for the run", () => {
 			[B, "exec", RUN],
 			[B, "session", RUN],
 			[H, "callTool", RUN],
+			[H, "request", RUN],
 			[H, "decide", RUN],
 		]);
 	});

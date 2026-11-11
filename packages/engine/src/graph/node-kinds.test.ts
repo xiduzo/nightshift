@@ -16,6 +16,7 @@ import type {
 	ToolNode,
 	ValueNode,
 	WaitNode,
+	WebRequestNode,
 } from "@nightshift/flows";
 
 import type { DerivedItem, DerivedStep } from "../log";
@@ -88,6 +89,14 @@ const sinceLastRun = (fields: Record<string, unknown> = {}) =>
 		...fields,
 	});
 
+const webRequest = (fields: Record<string, unknown> = {}) =>
+	node<WebRequestNode>({
+		type: "web-request",
+		method: "GET",
+		url: "https://api.example.com/items",
+		...fields,
+	});
+
 const ALL_TYPES: FlowNodeType[] = [
 	"agent",
 	"command",
@@ -102,6 +111,7 @@ const ALL_TYPES: FlowNodeType[] = [
 	"service",
 	"since-last-run",
 	"convert",
+	"web-request",
 ];
 
 describe("NODE_KINDS", () => {
@@ -127,6 +137,7 @@ describe("NODE_KINDS", () => {
 			service(),
 			sinceLastRun(),
 			convert(),
+			webRequest(),
 		]) {
 			expect(kindOf(n)).toBe(kindOfType(n.type));
 		}
@@ -156,6 +167,7 @@ describe("make and resumeRules", () => {
 			[service(), RESUME_RULES.fresh],
 			[sinceLastRun(), RESUME_RULES.fresh],
 			[convert(), RESUME_RULES.fresh],
+			[webRequest(), RESUME_RULES.fresh],
 		];
 		for (const [n, rules] of table) {
 			expect(typeof kindOf(n).make).toBe("function");
@@ -173,6 +185,7 @@ describe("aux: the auxiliary graph nodes compile.ts adds", () => {
 	test("an Agent, a model Decision, a model Value, a Wait, a Lease and a Service have a wait node", () => {
 		expect(auxKinds(lease())).toEqual(["wait"]);
 		expect(auxKinds(service())).toEqual(["wait"]);
+		expect(auxKinds(webRequest())).toEqual(["wait"]);
 		expect(auxKinds(agent())).toEqual(["wait"]);
 		expect(auxKinds(decision("model"))).toEqual(["wait"]);
 		expect(auxKinds(value("model"))).toEqual(["wait"]);
@@ -509,6 +522,7 @@ describe("cutShortOutputs: what a cut ends an open step with", () => {
 			"lease",
 			"service",
 			"since-last-run",
+			"web-request",
 		] as const) {
 			for (const outcome of OUTCOMES) {
 				expect(
@@ -583,10 +597,44 @@ describe("connections and requirements: what run start asks", () => {
 		).toEqual([null]);
 	});
 
-	test("a Command, a Tool, a Wait, a Call and an End require nothing of their own", async () => {
-		for (const type of ["command", "tool", "wait", "call", "end"] as const) {
+	test("a Command, a Tool, a Call and an End require nothing of their own", async () => {
+		for (const type of ["command", "tool", "call", "end"] as const) {
 			expect(NODE_KINDS[type].requirements).toEqual([]);
 		}
+	});
+
+	test("a Web request and a Wait for a URL require a Device that sends web requests", async () => {
+		const older = { ...(await has()), requests: undefined, elsewhere: "nas" };
+		expect(
+			NODE_KINDS["web-request"].requirements.map((r) =>
+				r([webRequest({ id: "fetch" })], older),
+			),
+		).toEqual([
+			"The flow sends web requests (fetch), but nas runs an older version of Night Shift. Update Night Shift on nas.",
+		]);
+		const url = wait({
+			kind: "url",
+			url: "https://x.example",
+			everyMinutes: 5,
+		});
+		expect(
+			NODE_KINDS.wait.requirements.map((r) =>
+				r([url, wait({ kind: "duration", minutes: 1 })], older),
+			),
+		).toEqual([
+			"The flow waits for a URL (n), but nas runs an older version of Night Shift. Update Night Shift on nas.",
+		]);
+		expect(
+			NODE_KINDS.wait.requirements.map((r) =>
+				r([wait({ kind: "duration", minutes: 1 })], older),
+			),
+		).toEqual([null]);
+		const caps = await has();
+		expect(
+			NODE_KINDS["web-request"].requirements.map((r) =>
+				r([webRequest()], caps),
+			),
+		).toEqual([null]);
 	});
 });
 
@@ -597,6 +645,10 @@ describe("works: what a step needs of its Device", () => {
 		expect(works(command())).toBe("worktree");
 		expect(works(service())).toBe("worktree");
 		expect(works(tool())).toBe("device");
+		expect(works(webRequest())).toBe("device");
+		expect(
+			works(wait({ kind: "url", url: "https://x.example", everyMinutes: 5 })),
+		).toBe("device");
 		expect(works(decision("model"))).toBe("device");
 		expect(works(decision("person"))).toBeNull();
 		expect(works(value("model"))).toBe("device");

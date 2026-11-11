@@ -2,6 +2,7 @@ import type { Database } from "@nightshift/db";
 import {
 	type AnswerFile,
 	answerFilesProblem,
+	FLOW_VERSION,
 	type Flow,
 	type JsonValue,
 	optionProblem,
@@ -31,7 +32,11 @@ import {
 	type RunRow,
 	type RunState,
 } from "../log";
-import type { PlacementPort } from "../placement";
+import {
+	olderNightShift,
+	type PlacementPort,
+	UNADVERTISED_FLOW_VERSION,
+} from "../placement";
 import { deriveSteps, lastHarnessSession } from "../read";
 import {
 	RunRefusal,
@@ -85,12 +90,32 @@ export type RunActionsDeps = {
 	 * Where the walk may move (`moveTo`: one of the Person's own Devices,
 	 * online), and the Person's Devices to offer for it (`devicesFor`).
 	 */
-	placement: Pick<PlacementPort, "moveTo" | "devicesFor">;
+	placement: Pick<PlacementPort, "moveTo" | "devicesFor" | "deviceById">;
 	/** A resume, a restart and a run again make the run active: refused while its Space's Projects move. */
 	holds: Pick<StartHolds, "start">;
 	/** Anonymous usage, when this computer records it. */
 	usage?: UsageNotes;
 };
+
+/**
+ * The newest flow format of a run's flows, as its row keeps them: the
+ * format a Walker must read to walk it. A snapshot that does not read
+ * counts as this build's format.
+ */
+function snapshotVersion(row: Pick<RunRow, "flow" | "bodyFlows">): number {
+	try {
+		const flow = JSON.parse(row.flow) as { version?: unknown };
+		const called = Object.values(
+			JSON.parse(row.bodyFlows) as Record<string, { version?: unknown }>,
+		);
+		const versions = [flow, ...called].map((f) =>
+			typeof f?.version === "number" ? f.version : FLOW_VERSION,
+		);
+		return Math.max(...versions);
+	} catch {
+		return FLOW_VERSION;
+	}
+}
 
 /**
  * An answer to a Gate that no longer waits: someone answered it, its run
@@ -372,11 +397,21 @@ export function createRunActions(deps: RunActionsDeps) {
 			);
 			// The plan stays: only the Walker changes. A Device that is
 			// offline is the planner's refusal.
-			if (!(await deps.placement.moveTo(placedRun(row), actor, to))) {
+			const target = await deps.placement.moveTo(placedRun(row), actor, to);
+			if (!target) {
 				throw new RunRefusal(
 					"not-your-device",
 					"That device is not one of yours.",
 				);
+			}
+			// The new Walker reads the run's flows: an older Night Shift may not.
+			const has = await deps.placement
+				.deviceById(target.id, placedRun(row), target.name)
+				.capabilities();
+			if (
+				(has.flowVersion ?? UNADVERTISED_FLOW_VERSION) < snapshotVersion(row)
+			) {
+				throw new Refusal("conflict", olderNightShift(target.name));
 			}
 			await deps.archive.keepWalk(await deps.walks.exportWalk(runId));
 			runner.forget(runId);

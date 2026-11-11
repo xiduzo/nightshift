@@ -14,6 +14,7 @@ import { SINCE_LAST_RUN } from "./nodes/since-last-run";
 import { TOOL } from "./nodes/tool";
 import { VALUE } from "./nodes/value";
 import { WAIT } from "./nodes/wait";
+import { WEB_REQUEST } from "./nodes/web-request";
 
 /**
  * The node-kind descriptor and its registry: the one seam between a node
@@ -69,6 +70,7 @@ export const NODE_KINDS: { readonly [T in FlowNodeType]: KindOf<T> } = {
 	service: SERVICE,
 	"since-last-run": SINCE_LAST_RUN,
 	convert: CONVERT,
+	"web-request": WEB_REQUEST,
 };
 
 /**

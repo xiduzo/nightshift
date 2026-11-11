@@ -119,6 +119,7 @@ export type WaitEvent =
 				| "command"
 				| "signal"
 				| "any"
+				| "url"
 				| "device-offline"
 				| "lease";
 			until: number | null;
@@ -178,6 +179,21 @@ export type ToolEvent =
 			isError: boolean;
 			text: string;
 			data: JsonValue | null;
+	  };
+
+/**
+ * What a Web request step, and each try of a Wait for a URL, writes to its
+ * transcript: the request it sends (the URL with its query, a secret as
+ * `${NAME}`, never its value), then the answer: its status, or null and
+ * why no answer came. `text` is the status text, or that reason.
+ */
+export type WebRequestEvent =
+	| { type: "web-request"; method: string; url: string }
+	| {
+			type: "web-response";
+			status: number | null;
+			text: string;
+			bytes: number | null;
 	  };
 
 /**
@@ -242,6 +258,7 @@ export type StepEvent =
 	| LeaseEvent
 	| ServiceEvent
 	| SinceLastRunEvent
+	| WebRequestEvent
 	| WorktreeEvent;
 
 /**

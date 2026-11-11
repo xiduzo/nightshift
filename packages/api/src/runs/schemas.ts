@@ -271,6 +271,7 @@ const stepSummarySchema = z.object({
 		"service",
 		"since-last-run",
 		"convert",
+		"web-request",
 	]),
 	visit: z.number(),
 	startedAt: z.number(),
@@ -550,6 +551,7 @@ const stepEventSchema = z.discriminatedUnion("type", [
 			"signal",
 			"command",
 			"any",
+			"url",
 			"usage-limit",
 			"network",
 			"device-offline",
@@ -615,6 +617,17 @@ const stepEventSchema = z.discriminatedUnion("type", [
 		new: z.number(),
 		changed: z.number(),
 		same: z.number(),
+	}),
+	z.object({
+		type: z.literal("web-request"),
+		method: z.string(),
+		url: z.string(),
+	}),
+	z.object({
+		type: z.literal("web-response"),
+		status: z.number().nullable(),
+		text: z.string(),
+		bytes: z.number().nullable(),
 	}),
 	z.object({ type: z.literal("worktree-snapshot"), tree: z.string() }),
 	z.object({

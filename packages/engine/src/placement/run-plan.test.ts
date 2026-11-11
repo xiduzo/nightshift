@@ -43,6 +43,7 @@ function at(
 		capabilities: async (query: { profiles?: string[] }) => {
 			if (options.offline) throw new Error(`${id} is offline.`);
 			return {
+				flowVersion: FLOW_VERSION,
 				profiles: Object.fromEntries(
 					(query.profiles ?? [])
 						.filter((name) => profiles.includes(name))
@@ -810,6 +811,7 @@ describe("the addresses of a run's Model Profiles", () => {
 			}) => {
 				if (query.addresses) asked.push([id, ...query.addresses]);
 				return {
+					flowVersion: FLOW_VERSION,
 					profiles: Object.fromEntries(
 						(query.profiles ?? []).map((name) => [name, jev]),
 					),

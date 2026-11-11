@@ -66,6 +66,8 @@ export type {
 	SessionInput,
 	ToolCallInput,
 	ToolResult,
+	WebRequestInput,
+	WebRequestResult,
 	Worktree,
 } from "./device";
 export {

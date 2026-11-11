@@ -31,6 +31,7 @@
 		"fast-xml-parser": "5.11.2",
 		"feedsmith": "3.0.1",
 		"html-to-text": "10.0.1",
+		"ipaddr.js": "2.2.0",
 		"mammoth": "1.13.0",
 		"markdown-table": "3.0.4",
 		"mdast-util-from-markdown": "2.1.0",
