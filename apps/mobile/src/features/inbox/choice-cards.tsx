@@ -11,23 +11,28 @@ import { cn } from "@nightshift/ui-native/lib/utils";
 import { ArrowRight, CircleStop, TriangleAlert } from "lucide-react-native";
 import { Pressable, View } from "react-native";
 
+import { choiceLine } from "./brief-view";
 import { isDestructive, routeNote, routeText } from "./gate-view";
 
 /**
- * The options of a Gate as cards in a RadioGroup: each with its name, its
- * description and where it leads. A red option shows in the destructive
+ * The options of a Gate as cards in a RadioGroup: each with its name, a
+ * "Recommended" Badge on the option the flow recommends, what happens
+ * when you pick it (or else its description) and where it leads. A red option shows in the destructive
  * color. Tapping a card chooses it; the bar at the bottom sends it.
  */
 export function ChoiceCards({
 	choices,
 	routes,
 	chosen,
+	recommended = null,
 	onChoose,
 	disabled,
 }: {
 	choices: readonly GateChoice[];
 	routes: ReadonlyMap<string, ChoiceRoute>;
 	chosen: string | null;
+	/** The name of the option the flow recommends. */
+	recommended?: string | null;
 	onChoose: (name: string) => void;
 	disabled: boolean;
 }) {
@@ -44,6 +49,7 @@ export function ChoiceCards({
 					choice={choice}
 					route={routes.get(choice.name)}
 					selected={chosen === choice.name}
+					recommended={recommended === choice.name}
 					onPress={() => onChoose(choice.name)}
 					disabled={disabled}
 				/>
@@ -56,12 +62,14 @@ function ChoiceCard({
 	choice,
 	route,
 	selected,
+	recommended,
 	onPress,
 	disabled,
 }: {
 	choice: GateChoice;
 	route: ChoiceRoute | undefined;
 	selected: boolean;
+	recommended: boolean;
 	onPress: () => void;
 	disabled: boolean;
 }) {
@@ -70,6 +78,7 @@ function ChoiceCard({
 	const ends = route?.kind === "end" || route?.kind === "limit";
 	const next = route?.kind === "node" ? routeText(route) : null;
 	const note = routeNote(route);
+	const line = choiceLine(choice);
 	return (
 		<Pressable
 			onPress={onPress}
@@ -78,7 +87,8 @@ function ChoiceCard({
 			accessibilityState={{ checked: selected, disabled }}
 			accessibilityLabel={[
 				choice.name,
-				choice.description,
+				recommended ? "Recommended" : null,
+				line,
 				routeText(route),
 				note,
 			]
@@ -111,11 +121,14 @@ function ChoiceCard({
 						>
 							{choice.name}
 						</Text>
+						{recommended ? (
+							<Badge className="ml-auto">
+								<Text>Recommended</Text>
+							</Badge>
+						) : null}
 					</View>
-					{choice.description ? (
-						<Text className="text-muted-foreground text-sm">
-							{choice.description}
-						</Text>
+					{line ? (
+						<Text className="text-muted-foreground text-sm">{line}</Text>
 					) : null}
 					{next ? (
 						<View className="flex-row items-start gap-1.5">

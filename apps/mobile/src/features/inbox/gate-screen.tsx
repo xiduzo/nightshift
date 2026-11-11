@@ -71,6 +71,8 @@ import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
 import { AskScreen } from "./ask-screen";
+import { BriefSections } from "./brief-sections";
+import { briefView, IMPACTS_BY_NIGHT_SHIFT } from "./brief-view";
 import { ChoiceCards } from "./choice-cards";
 import { Breadcrumbs } from "./gate-breadcrumbs";
 import { nextGate } from "./gate-list";
@@ -212,6 +214,7 @@ function OpenGateScreen({
 	const routes = choiceRoutes(run.data, gate, gate.choices, labels);
 	const answer = useGateAnswer(gate, { onSent, onGone });
 	const [confirming, setConfirming] = useState(false);
+	const brief = briefView(gate);
 
 	const chosen = gate.choices.find((choice) => choice.name === answer.choice);
 	// An agent that asks continues with the note: its answer needs one.
@@ -333,6 +336,8 @@ function OpenGateScreen({
 				/>
 			) : null}
 
+			<BriefSections brief={brief} />
+
 			<QuestionSections context={context} />
 
 			<View className="gap-2">
@@ -407,9 +412,15 @@ function OpenGateScreen({
 								choices={gate.choices}
 								routes={routes}
 								chosen={answer.choice}
+								recommended={brief.recommendation?.option}
 								onChoose={answer.choose}
 								disabled={answer.busy}
 							/>
+							{brief.impactsByModel ? (
+								<Text className="text-muted-foreground text-xs">
+									{IMPACTS_BY_NIGHT_SHIFT}
+								</Text>
+							) : null}
 							{gate.deadline ? <GateDeadline deadline={gate.deadline} /> : null}
 							<View className="gap-2">
 								<Label nativeID="gate-note">

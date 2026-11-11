@@ -36,6 +36,8 @@ import { Screen } from "@/shared/page";
 import { AskFields } from "./ask-fields";
 import { AskFiles } from "./ask-files";
 import { askSentSummary, askWebUrl } from "./ask-view";
+import { BriefSections } from "./brief-sections";
+import { briefView } from "./brief-view";
 import { Breadcrumbs } from "./gate-breadcrumbs";
 import { nextGate } from "./gate-list";
 import { GateStatus } from "./gate-times";
@@ -47,7 +49,8 @@ import { SentCard } from "./sent-card";
 import { type GoneRefusal, useGateAnswer } from "./use-gate-answer";
 
 /**
- * One open Ask (ADR 10), to answer it: a form drawn from the output schema.
+ * One open Ask (ADR 10), to answer it: its brief (Situation, Background),
+ * then a form drawn from the output schema.
  * The phone draws a form of text, choices, switches and numbers itself;
  * any other form opens its page in Night Shift on the web. The images of a
  * run the Host walks show inline. The phone checks that it is you before
@@ -150,6 +153,8 @@ export function AskScreen({
 					next={nextGate(inbox, gate)}
 				/>
 			) : null}
+
+			<BriefSections brief={briefView(gate)} />
 
 			<QuestionSections context={context} />
 
