@@ -6,8 +6,8 @@ import type { OpenGate } from "@/shared/api";
 import { LocalTime } from "@/shared/time";
 
 /**
- * What happens to a Gate with a deadline when nobody answers: "Night Shift
- * picks keep at 07:00 tomorrow". The time and day read as on the phone
+ * A Gate's deadline, and what happens when nobody answers: "Answer before
+ * 07:00 tomorrow. Then Night Shift picks keep". The time and day read as on the phone
  * (deadlineWhen of @nightshift/client). Nothing for a Gate without one.
  */
 export function GateDeadline({
@@ -28,18 +28,18 @@ export function GateDeadline({
 		>
 			<AlarmClockIcon className="mt-px size-3.5 shrink-0" aria-hidden="true" />
 			<span>
-				If nobody answers, Night Shift picks{" "}
-				<span className="font-medium font-mono text-foreground">
-					{outcomeLabel(deadline.choose)}
-				</span>{" "}
-				at{" "}
+				Answer before{" "}
 				<LocalTime
 					at={deadline.at}
 					className="font-medium text-foreground tabular-nums"
 				>
 					{time}
 				</LocalTime>
-				{day}.
+				{day}. Then Night Shift picks{" "}
+				<span className="font-medium font-mono text-foreground">
+					{outcomeLabel(deadline.choose)}
+				</span>
+				.
 			</span>
 		</p>
 	);

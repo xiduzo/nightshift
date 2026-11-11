@@ -50,6 +50,7 @@ import type {
 } from "@/shared/api";
 import { formatRelative, formatTime, useNow } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
+import { UrgencyMarker } from "@/shared/urgency";
 import { OVERVIEW_ROWS } from "./overview";
 
 /**
@@ -143,7 +144,12 @@ export function HomeLanes({
 					<LaneRow
 						key={`${gate.runId}-${gate.stepId}`}
 						link={<Link to="/inbox" search={{ gate: gate.stepId }} />}
-						title={<span className="truncate">{gate.question}</span>}
+						title={
+							<span className="flex min-w-0 items-center gap-1.5">
+								<UrgencyMarker urgency={gate.urgency} />
+								<span className="truncate">{gate.question}</span>
+							</span>
+						}
 						meta={
 							<LocalTime at={gate.openedAt}>
 								{formatRelative(gate.openedAt, now)}

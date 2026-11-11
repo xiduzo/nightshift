@@ -5,4 +5,5 @@
  */
 
 export { NotificationSettingsCard } from "./components/notification-settings-card";
+export { usePushUrgencies } from "./push-urgencies";
 export { NotificationStream } from "./use-notification-stream";

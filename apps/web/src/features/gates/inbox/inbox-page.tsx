@@ -1,6 +1,6 @@
 import {
+	deadlineWhen,
 	gateParts,
-	gateRun,
 	runActions,
 	useRunActed,
 	waitedText,
@@ -13,6 +13,10 @@ import {
 } from "@nightshift/ui/components/alert";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
+import {
+	ButtonGroup,
+	ButtonGroupText,
+} from "@nightshift/ui/components/button-group";
 import {
 	Empty,
 	EmptyContent,
@@ -41,15 +45,17 @@ import {
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
+	ChevronDownIcon,
+	ChevronUpIcon,
 	CircleAlertIcon,
 	FolderIcon,
-	HandIcon,
 	InboxIcon,
 	MoonIcon,
 	SunriseIcon,
 } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { usePushUrgencies } from "@/features/notifications";
 import { projectQueries } from "@/features/projects";
 import { runMutations, runQueries } from "@/features/runs/queries";
 import type { OpenGate, RunSummary } from "@/shared/api";
@@ -58,17 +64,20 @@ import { formatCountdown, formatTime, useNow } from "@/shared/format";
 import { InlineMarkdown } from "@/shared/markdown";
 import { SiteHeader } from "@/shared/page";
 import { LocalTime } from "@/shared/time";
+import { URGENCY_LABEL, UrgencyMarker } from "@/shared/urgency";
 import { gateQueries } from "../queries";
 import { useOpenGates } from "../use-open-gates";
 import { AnsweredGateDetail, AnsweredGateNavItem } from "./answered-gate";
 import { GateDetail } from "./gate-detail";
-import { groupByProject } from "./group-gates";
+import { ladderOf, reachText, rowLine } from "./ladder";
 
 /**
- * The inbox: a list and a detail, as a mail app has. The list: the open
- * Gates of every Space you are in, grouped by project and oldest first,
- * the sleeping runs, then the Gates that closed in the last 90 days. The
- * selected item shows on the right. Each pane scrolls on its own.
+ * The inbox: a list and a detail, as a mail app has. The list is a
+ * ladder: the open Gates of every Space you are in, grouped Now, Today and
+ * When you have time, the oldest first in each. Then the sleeping runs,
+ * then the Gates that closed in the last 90 days. The selected item shows
+ * on the right as a handover, with your answer beside it. Each pane
+ * scrolls on its own.
  */
 export function InboxPage({
 	gateId,
@@ -88,8 +97,11 @@ export function InboxPage({
 		.filter((run) => run.status === "sleeping")
 		.sort((a, b) => (a.wakeAt ?? 0) - (b.wakeAt ?? 0));
 
-	const open = gates.data ?? [];
+	const pushUrgencies = usePushUrgencies();
+
 	const closed = answered.data ?? [];
+	const ladder = ladderOf(gates.data ?? []);
+	const open = ladder.flatMap((group) => group.gates);
 
 	const selectedOpen =
 		open.find((g) => g.stepId === gateId) ??
@@ -97,7 +109,7 @@ export function InboxPage({
 	const selectedClosed = selectedOpen
 		? undefined
 		: (closed.find((g) => g.stepId === gateId) ?? closed[0]);
-	const byProject = groupByProject(open);
+	const position = selectedOpen ? open.indexOf(selectedOpen) : -1;
 
 	// The Gate you look at closed (you answered it): go on to the next one that waits.
 	const wasOpen = useRef(new Set<string>());
@@ -112,7 +124,39 @@ export function InboxPage({
 
 	return (
 		<>
-			<SiteHeader crumbs={[{ label: "Inbox" }]} />
+			<SiteHeader crumbs={[{ label: "Inbox" }]}>
+				{position >= 0 ? (
+					<ButtonGroup aria-label="Gates that wait">
+						<ButtonGroupText className="text-muted-foreground text-xs tabular-nums">
+							{position + 1} of {open.length} waiting
+						</ButtonGroupText>
+						<Button
+							variant="outline"
+							size="icon-sm"
+							aria-label="Previous Gate"
+							disabled={position === 0}
+							onClick={() => {
+								const prev = open[position - 1];
+								if (prev) onSelect(prev.stepId);
+							}}
+						>
+							<ChevronUpIcon />
+						</Button>
+						<Button
+							variant="outline"
+							size="icon-sm"
+							aria-label="Next Gate"
+							disabled={position === open.length - 1}
+							onClick={() => {
+								const next = open[position + 1];
+								if (next) onSelect(next.stepId);
+							}}
+						>
+							<ChevronDownIcon />
+						</Button>
+					</ButtonGroup>
+				) : null}
+			</SiteHeader>
 			<div className="flex h-[calc(100svh-3.5rem)] min-h-0">
 				<nav
 					aria-label="Inbox"
@@ -126,15 +170,20 @@ export function InboxPage({
 							decision.
 						</p>
 					) : (
-						byProject.map(([projectId, list], index) => (
-							<Fragment key={projectId}>
+						ladder.map(({ urgency, gates: list }, index) => (
+							<Fragment key={urgency}>
 								{index > 0 ? <Separator /> : null}
 								<NavGroup
-									title={list[0]?.projectName ?? "Project"}
-									hint={`${list.length} ${list.length === 1 ? "Gate waits" : "Gates wait"}`}
+									title={
+										<span className="flex items-center gap-1.5">
+											<UrgencyMarker urgency={urgency} />
+											{URGENCY_LABEL[urgency]}
+										</span>
+									}
+									hint={reachText(urgency, pushUrgencies)}
 									aside={
-										<Badge variant="outline" className="max-w-24 truncate">
-											{list[0]?.spaceName}
+										<Badge variant="outline" className="tabular-nums">
+											{list.length}
 										</Badge>
 									}
 								>
@@ -249,8 +298,8 @@ function NavGroup({
 	aside,
 	children,
 }: {
-	title: string;
-	hint: string;
+	title: ReactNode;
+	hint: string | null;
 	aside?: ReactNode;
 	children: ReactNode;
 }) {
@@ -259,7 +308,9 @@ function NavGroup({
 			<div className="flex items-center justify-between gap-2 px-2">
 				<div className="min-w-0">
 					<h3 className="truncate font-medium text-sm">{title}</h3>
-					<p className="text-muted-foreground text-xs">{hint}</p>
+					{hint ? (
+						<p className="text-muted-foreground text-xs">{hint}</p>
+					) : null}
 				</div>
 				{aside}
 			</div>
@@ -280,7 +331,7 @@ function GateNavItem({
 	onClick: () => void;
 }) {
 	const { headline } = gateParts(gate.question);
-	const { flow, detail } = gateRun(gate);
+	const line = rowLine(gate);
 	return (
 		<Item
 			size="xs"
@@ -294,24 +345,40 @@ function GateNavItem({
 			}
 			onClick={onClick}
 		>
-			<ItemMedia variant="icon" className="self-start text-status-waiting">
-				<HandIcon />
-			</ItemMedia>
 			<ItemContent className="min-w-0">
 				<ItemTitle className="w-full">
 					<span className="line-clamp-2">
 						<InlineMarkdown text={headline} links={false} />
 					</span>
 				</ItemTitle>
+				{line ? (
+					<ItemDescription className="line-clamp-1 text-xs">
+						<InlineMarkdown text={line} links={false} />
+					</ItemDescription>
+				) : null}
 				<ItemDescription className="truncate text-xs">
-					<span className="font-medium">{flow}</span>
-					{detail ? ` · ${detail}` : null} ·{" "}
-					<span className="text-status-waiting tabular-nums">
-						{waitedText(now - gate.openedAt)}
-					</span>
+					{gate.projectName} ·{" "}
+					{gate.deadline ? (
+						<DueText at={gate.deadline.at} now={now} />
+					) : (
+						<span className="text-status-waiting tabular-nums">
+							{waitedText(now - gate.openedAt)}
+						</span>
+					)}
 				</ItemDescription>
 			</ItemContent>
 		</Item>
+	);
+}
+
+/** "due 12:00", "due 07:00 tomorrow": when a Gate with a deadline needs its answer. */
+function DueText({ at, now }: { at: number; now: number }) {
+	const { time, day } = deadlineWhen(at, now);
+	return (
+		<LocalTime at={at} className="font-medium text-status-waiting tabular-nums">
+			due {time}
+			{day}
+		</LocalTime>
 	);
 }
 

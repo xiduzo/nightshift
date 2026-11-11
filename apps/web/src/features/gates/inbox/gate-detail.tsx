@@ -6,6 +6,12 @@ import {
 } from "@nightshift/ui/components/alert";
 import { Badge } from "@nightshift/ui/components/badge";
 import {
+	Card,
+	CardContent,
+	CardHeader,
+	CardTitle,
+} from "@nightshift/ui/components/card";
+import {
 	Item,
 	ItemActions,
 	ItemContent,
@@ -20,7 +26,6 @@ import { cn } from "@nightshift/ui/lib/utils";
 import { Link } from "@tanstack/react-router";
 import {
 	ChevronRightIcon,
-	HandIcon,
 	HistoryIcon,
 	HourglassIcon,
 	LoaderIcon,
@@ -30,35 +35,42 @@ import { useId } from "react";
 import type { OpenGate } from "@/shared/api";
 import { InlineMarkdown } from "@/shared/markdown";
 import { LocalTime } from "@/shared/time";
+import { URGENCY_LABEL, UrgencyMarker } from "@/shared/urgency";
 import { AskAttachments } from "../ask-attachments";
 import { AskForm } from "../ask-form";
 import { GateChoiceForm } from "../gate-choice-form";
 import { GateLinkItem } from "../gate-link-item";
 import { ContextList } from "../gate-question";
-import { GateWhere } from "./gate-where";
+import { WrittenByModel } from "../written-by-model";
+import { GateHandover } from "./gate-handover";
+import { GateFrom } from "./gate-where";
 
 /**
- * One open Gate in the inbox pane. What happened on the left; the links to
- * check and the answer on the right, in place while you read. A Gate of
- * any of your Spaces is answered here, and its run opens from here. An
- * Ask shows its files with what happened, and its form as the answer.
+ * One open Gate in the inbox pane, as a handover. On the left: who asks,
+ * the title, then why you decide, what is done and what the flow
+ * recommends, then the question's details and the links to check. On the
+ * right, in place while you read: your answer. A Gate of any of your
+ * Spaces is answered here. An Ask shows its files with the details, and
+ * its form as the answer.
  */
 export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 	const answerId = useId();
 	const { headline, context, links } = gateParts(gate.question);
+	const urgencyByModel = gate.brief.byModel.includes("urgency");
 
 	return (
-		<div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 pt-8 pb-16 md:px-8">
-			<header className="flex items-start gap-4">
-				<div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-status-waiting/10 text-status-waiting [&_svg]:size-5">
-					<HandIcon aria-hidden="true" />
-				</div>
-				<div className="flex min-w-0 flex-1 flex-col gap-1.5">
-					<GateWhere gate={gate} />
+		<div className="mx-auto grid w-full max-w-6xl gap-10 px-4 pt-8 pb-16 md:px-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+			<article className="flex min-w-0 flex-col gap-8">
+				<header className="flex min-w-0 flex-col gap-2">
+					<GateFrom gate={gate} />
 					<h1 className="whitespace-pre-wrap text-balance break-words font-semibold text-xl leading-snug tracking-tight">
 						<InlineMarkdown text={headline} />
 					</h1>
 					<div className="flex flex-wrap items-center gap-2 text-muted-foreground text-sm">
+						<Badge variant="outline">
+							<UrgencyMarker urgency={gate.urgency} />
+							{URGENCY_LABEL[gate.urgency]}
+						</Badge>
 						<Badge
 							variant="outline"
 							className="border-status-waiting/40 bg-status-waiting/10 text-status-waiting"
@@ -69,86 +81,74 @@ export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 								{waitedText(now - gate.openedAt)}
 							</LocalTime>
 						</Badge>
-						<span>
-							{gate.flowName ? (
-								<>
-									Flow <span className="font-mono">{gate.flowName}</span>
-								</>
-							) : (
-								"Quick run"
-							)}
-						</span>
-						<span>
-							{gate.form ? "Ask" : "Gate"}{" "}
-							<span className="font-mono">{gate.nodeId}</span>
-						</span>
-					</div>
-				</div>
-			</header>
-			<Separator />
-			<div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
-				<section className="flex min-w-0 flex-col gap-3">
-					<h2 className="font-medium text-sm">What happened</h2>
-					{context.length > 0 ? (
-						<ContextList items={context} plain />
-					) : gate.form?.attachments ? null : (
-						<p className="text-muted-foreground text-sm">
-							The Gate asks only its question.
-						</p>
-					)}
-					{gate.form?.attachments ? (
-						<AskAttachments
-							runId={gate.runId}
-							attachments={gate.form.attachments}
-							filesHere={gate.walker.thisDevice}
-						/>
-					) : null}
-				</section>
-				<aside className="flex flex-col gap-6 lg:sticky lg:top-8 lg:self-start">
-					<section className="flex flex-col gap-2">
-						<h2 className="font-medium text-sm">Check first</h2>
-						{links.length > 0 ? (
-							// A long list scrolls: the answer stays in view.
-							<ScrollArea className="max-h-80 [&>[data-slot=scroll-area-viewport]]:max-h-80">
-								{/* Room for the scrollbar once the list scrolls (more than four). */}
-								<ItemGroup className={cn("gap-2", links.length > 4 && "pr-3")}>
-									{links.map((link) => (
-										<GateLinkItem key={link.url} link={link} />
-									))}
-								</ItemGroup>
-							</ScrollArea>
+						{urgencyByModel ? (
+							<WrittenByModel>Urgency set by Night Shift</WrittenByModel>
 						) : null}
-						<ItemGroup className="gap-2">
-							<Item
-								variant="outline"
-								size="sm"
-								render={
-									<Link to="/runs/$runId" params={{ runId: gate.runId }} />
-								}
-							>
-								<ItemMedia variant="icon">
-									<HistoryIcon />
-								</ItemMedia>
-								<ItemContent className="min-w-0">
-									<ItemTitle>Open the run</ItemTitle>
-									<ItemDescription className="truncate text-xs">
-										Its steps, outputs and transcript
-									</ItemDescription>
-								</ItemContent>
-								<ItemActions>
-									<ChevronRightIcon
-										className="size-3.5 text-muted-foreground"
-										aria-hidden="true"
-									/>
-								</ItemActions>
-							</Item>
-						</ItemGroup>
-					</section>
-					<Separator />
-					<section className="flex flex-col gap-3">
-						<h2 id={answerId} className="font-medium text-sm">
-							Your answer
+					</div>
+				</header>
+				<GateHandover brief={gate.brief} />
+				{context.length > 0 || gate.form?.attachments ? (
+					<section className="flex min-w-0 flex-col gap-3">
+						<Separator />
+						<h2 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+							Details
 						</h2>
+						{context.length > 0 ? <ContextList items={context} plain /> : null}
+						{gate.form?.attachments ? (
+							<AskAttachments
+								runId={gate.runId}
+								attachments={gate.form.attachments}
+								filesHere={gate.walker.thisDevice}
+							/>
+						) : null}
+					</section>
+				) : null}
+				<section className="flex flex-col gap-2">
+					<h2 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+						Check first
+					</h2>
+					{links.length > 0 ? (
+						// A long list scrolls: the rest of the page stays in view.
+						<ScrollArea className="max-h-80 [&>[data-slot=scroll-area-viewport]]:max-h-80">
+							{/* Room for the scrollbar once the list scrolls (more than four). */}
+							<ItemGroup className={cn("gap-2", links.length > 4 && "pr-3")}>
+								{links.map((link) => (
+									<GateLinkItem key={link.url} link={link} />
+								))}
+							</ItemGroup>
+						</ScrollArea>
+					) : null}
+					<ItemGroup className="gap-2">
+						<Item
+							variant="outline"
+							size="sm"
+							render={<Link to="/runs/$runId" params={{ runId: gate.runId }} />}
+						>
+							<ItemMedia variant="icon">
+								<HistoryIcon />
+							</ItemMedia>
+							<ItemContent className="min-w-0">
+								<ItemTitle>Open the run</ItemTitle>
+								<ItemDescription className="truncate text-xs">
+									Its steps, outputs and transcript
+								</ItemDescription>
+							</ItemContent>
+							<ItemActions>
+								<ChevronRightIcon
+									className="size-3.5 text-muted-foreground"
+									aria-hidden="true"
+								/>
+							</ItemActions>
+						</Item>
+					</ItemGroup>
+				</section>
+			</article>
+			<aside className="flex flex-col gap-4 lg:sticky lg:top-8 lg:self-start">
+				<Card size="sm">
+					<CardHeader>
+						<CardTitle id={answerId}>Your answer</CardTitle>
+					</CardHeader>
+					<CardContent className="flex flex-col gap-4">
 						{gate.canAnswer && gate.branchesWork ? (
 							<Alert>
 								<LoaderIcon />
@@ -182,9 +182,9 @@ export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 								</AlertDescription>
 							</Alert>
 						)}
-					</section>
-				</aside>
-			</div>
+					</CardContent>
+				</Card>
+			</aside>
 		</div>
 	);
 }

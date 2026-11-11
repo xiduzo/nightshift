@@ -20,6 +20,7 @@ import {
 import { formatRelative } from "@/shared/format";
 import { InlineMarkdown } from "@/shared/markdown";
 import { LocalTime } from "@/shared/time";
+import { UrgencyMarker } from "@/shared/urgency";
 import { ContextList } from "../gate-question";
 import { GateWhere } from "./gate-where";
 
@@ -74,9 +75,12 @@ export function AnsweredGateNavItem({
 						<InlineMarkdown text={headline} links={false} />
 					</span>
 				</ItemTitle>
-				<ItemDescription className="truncate text-xs">
-					<span className="font-medium">{flow}</span> · {answerText(gate)} ·{" "}
-					{formatRelative(gate.closedAt, now)}
+				<ItemDescription className="flex items-center gap-1 text-xs">
+					<UrgencyMarker urgency={gate.urgency} quiet />
+					<span className="min-w-0 truncate">
+						<span className="font-medium">{flow}</span> · {answerText(gate)} ·{" "}
+						{formatRelative(gate.closedAt, now)}
+					</span>
 				</ItemDescription>
 			</ItemContent>
 		</Item>

@@ -39,7 +39,11 @@ The phone answers simple Asks too.
 
 ## The inbox
 
-The inbox shows the Gates and Asks that wait for you, in every project. Below them are the Gates that you answered. Night Shift keeps answered Gates for 90 days.
+The inbox shows the Gates and Asks that wait for you, in every project. They are in three groups: Now, Today and When you have time. The oldest Gate is first in each group. Below them are the Gates that you answered. Night Shift keeps answered Gates for 90 days.
+
+Open a Gate to read its brief. Your answer is on the right: pick an option, add a note if you want, then send. The option that the flow recommends has a badge.
+
+A Gate sends a notification only for the levels that you choose. Go to Settings, Notifications, and set **Push for**. The default is Now. A Gate of another level waits in the inbox without a notification.
 
 Home shows what happened in the night: the runs that ended, and what still waits.
 

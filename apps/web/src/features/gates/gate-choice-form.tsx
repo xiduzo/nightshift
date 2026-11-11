@@ -1,3 +1,4 @@
+import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Field,
@@ -19,10 +20,13 @@ import { LargerTextarea } from "@/shared/larger-window";
 import { AnswerFilesField, useAnswerFiles } from "./answer-files";
 import { GateDeadline } from "./gate-deadline";
 import { useResolveGate } from "./use-resolve-gate";
+import { WrittenByModel } from "./written-by-model";
 
 /**
  * Answers an open Gate in two steps: pick a choice from the cards, add a
  * note and files if you want, then send. Nothing goes out before the send.
+ * Each card says what happens when you pick it, and the option the brief
+ * recommends has a badge.
  */
 export function GateChoiceForm({
 	gate,
@@ -41,6 +45,10 @@ export function GateChoiceForm({
 	const [reading, setReading] = useState(false);
 	const resolve = useResolveGate({ runTitle: gate.runTitle });
 	const busy = resolve.isPending || reading;
+	const recommended = gate.brief.recommendation?.option ?? null;
+	const impactsByModel =
+		gate.brief.byModel.includes("impacts") &&
+		gate.choices.some((option) => option.impact);
 
 	const send = async () => {
 		if (!choice || held || busy || files.problem) return;
@@ -69,20 +77,26 @@ export function GateChoiceForm({
 				{gate.choices.map((option) => {
 					const style = outcomeStyle(option.name, option.color);
 					const Icon = style.icon;
+					const what = option.impact ?? option.description;
 					return (
 						<FieldLabel key={option.name} htmlFor={`${id}-${option.name}`}>
 							<Field orientation="horizontal">
 								<FieldContent>
-									<FieldTitle className="font-mono">
+									<FieldTitle className="flex-wrap font-mono">
 										<Icon
 											className={cn("size-3.5", style.text)}
 											aria-hidden="true"
 										/>
 										{outcomeLabel(option.name)}
+										{option.name === recommended ? (
+											<Badge variant="secondary" className="font-sans">
+												Recommended
+											</Badge>
+										) : null}
 									</FieldTitle>
-									{option.description ? (
+									{what ? (
 										<FieldDescription className="text-xs">
-											{option.description}
+											{what}
 										</FieldDescription>
 									) : null}
 								</FieldContent>
@@ -95,6 +109,9 @@ export function GateChoiceForm({
 					);
 				})}
 			</RadioGroup>
+			{impactsByModel ? (
+				<WrittenByModel>Night Shift wrote what each answer does</WrittenByModel>
+			) : null}
 			<Field className="gap-2">
 				<FieldLabel htmlFor={`${id}-note`}>
 					Note
