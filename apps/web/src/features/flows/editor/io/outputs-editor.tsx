@@ -5,17 +5,48 @@ import {
 	outputFieldsByType,
 	setOutputs,
 	uniqueOutputName,
+	type VariableType,
+	variableTypeSchema,
 } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import { Input } from "@nightshift/ui/components/input";
 import { Item } from "@nightshift/ui/components/item";
+import {
+	NativeSelect,
+	NativeSelectOption,
+} from "@nightshift/ui/components/native-select";
 import { PlusIcon } from "lucide-react";
 import { useId, useState } from "react";
+import { OutputSchemaField } from "../output-schema-field";
 import { TemplateField } from "../template-field";
 import { type Change, move, NameInput, RowButtons } from "./io-rows";
 
 /** Fields a Subflow node has on its own; an output may not shadow them. */
 const RESERVED_OUTPUTS: readonly string[] = outputFieldsByType.call;
+
+/** What each type of an output holds, for its select. No type: any value. */
+const OUTPUT_TYPES: Record<VariableType, string> = {
+	text: "text",
+	number: "number",
+	boolean: "yes or no",
+	json: "json",
+};
+
+/**
+ * The output with this type and, for `json`, this schema. A person set
+ * them: an inferred type counts as confirmed (no `inferred`).
+ */
+function withType(
+	output: FlowOutputDef,
+	type: VariableType | undefined,
+	schema: Record<string, unknown> | undefined,
+): FlowOutputDef {
+	const { type: _, schema: __, inferred: ___, ...rest } = output;
+	if (type === undefined) return rest;
+	return type === "json" && schema !== undefined
+		? { ...rest, type, schema }
+		: { ...rest, type };
+}
 
 /**
  * The flow's outputs: values it returns to the Call node that calls
@@ -81,6 +112,34 @@ export function OutputsEditor({
 										return null;
 									}}
 								>
+									<div className="w-24 shrink-0">
+										<NativeSelect
+											id={`${rowId}-type`}
+											size="sm"
+											value={output.type ?? ""}
+											aria-label={`Type of ${position}`}
+											className="w-full font-mono text-xs"
+											onChange={(event) => {
+												const picked = event.target.value;
+												update(index, (current) =>
+													withType(
+														current,
+														picked === ""
+															? undefined
+															: (picked as VariableType),
+														current.schema,
+													),
+												);
+											}}
+										>
+											<NativeSelectOption value="">any</NativeSelectOption>
+											{variableTypeSchema.options.map((type) => (
+												<NativeSelectOption key={type} value={type}>
+													{OUTPUT_TYPES[type]}
+												</NativeSelectOption>
+											))}
+										</NativeSelect>
+									</div>
 									<RowButtons
 										name={output.name}
 										noun="output"
@@ -127,6 +186,21 @@ export function OutputsEditor({
 										);
 									}}
 								/>
+								{output.type === "json" ? (
+									<OutputSchemaField
+										id={`${rowId}-schema`}
+										nodeId={output.name}
+										reference={`call.${output.name}`}
+										label="Shape"
+										output={output.schema}
+										description="The node that calls this flow reads its fields."
+										onChange={(schema) =>
+											update(index, (current) =>
+												withType(current, "json", schema),
+											)
+										}
+									/>
+								) : null}
 							</Item>
 						);
 					})}

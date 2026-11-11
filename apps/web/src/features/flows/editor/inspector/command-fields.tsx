@@ -1,4 +1,4 @@
-/** The fields of a Command node: the command, its output, its secrets and its exit codes. */
+/** The fields of a Command node: the command, its output and its shape, its secrets and its exit codes. */
 import {
 	type CommandNode,
 	commandExits,
@@ -37,6 +37,7 @@ import { useCommandToolField } from "../cli-tools-field";
 import { Field, InspectorSection, Note } from "../fields";
 import { SecretsField } from "../secrets-field";
 import { TemplateField } from "../template-field";
+import { DataShapeSection } from "./data-shape-section";
 import { NodeOptionsField } from "./node-options-field";
 
 /** What a Command node keeps of its output, in the order the toggle shows them. */
@@ -177,6 +178,8 @@ export function CommandFields({
 					</ToggleGroup>
 				</Field>
 			</InspectorSection>
+
+			<DataShapeSection node={node} onChange={onChange} />
 
 			<InspectorSection
 				title="Secrets"

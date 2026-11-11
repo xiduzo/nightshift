@@ -53,6 +53,7 @@ export {
 	withConnections,
 	withDecidedBy,
 	withOutputSchema,
+	withTool,
 	withValueBy,
 	withWrites,
 } from "./nodes";

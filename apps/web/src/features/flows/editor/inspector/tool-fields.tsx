@@ -1,4 +1,4 @@
-import type { Flow, ToolNode } from "@nightshift/flows";
+import { type Flow, type ToolNode, withTool } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	FieldDescription,
@@ -21,11 +21,13 @@ import { missingConnectionMessage } from "../../flow-draft";
 import { connectionKind, type DaemonConnection } from "../connections-field";
 import { Field, InspectorSection, Note } from "../fields";
 import { TemplateField } from "../template-field";
+import { DataShapeSection } from "./data-shape-section";
 
 /**
  * The Tool node's inspector: the connection, the tool (listed from the
  * connection when it answers, typed when it does not), and one field per
  * argument of the tool's input schema, plus any argument you add yourself.
+ * Then the shape of the tool's data.
  */
 export function ToolFields({
 	flow,
@@ -62,145 +64,158 @@ export function ToolFields({
 		(tools.isError || !tools.data?.ok);
 
 	return (
-		<InspectorSection title="Tool">
-			<Field
-				id={`${id}-connection`}
-				label="MCP server"
-				error={missing ? missingConnectionMessage(node.connection) : null}
-				hint={
-					noServers ? undefined : (
-						<>
-							An MCP server you add once under{" "}
-							<Link to="/agents" search={{ item: undefined }}>
-								Agents → Tools
-							</Link>
-							.
-						</>
-					)
-				}
-			>
-				{connections === undefined ? (
-					<Skeleton className="h-9 w-full" aria-busy="true" />
-				) : noServers ? (
-					<Note>
-						This computer has no MCP servers yet. Programs such as gh are not
-						MCP servers. Run them in a Command node, or give them to an Agent
-						node.{" "}
-						<Link
-							to="/agents"
-							search={{ item: undefined }}
-							className="text-foreground underline underline-offset-4 hover:text-primary"
-						>
-							Add an MCP server under Agents → Tools
-						</Link>
-						.
-					</Note>
-				) : (
-					<NativeSelect
-						id={`${id}-connection`}
-						className="font-mono"
-						value={node.connection}
-						aria-invalid={!picked || missing}
-						aria-describedby={`${id}-connection-hint`}
-						onChange={(event) => {
-							const connection = event.target.value;
-							onChange((current) =>
-								connection === current.connection
-									? current
-									: { ...current, connection, tool: "", arguments: {} },
-							);
-						}}
-					>
-						<NativeSelectOption value="">Pick an MCP server</NativeSelectOption>
-						{connections.map((connection) => (
-							<NativeSelectOption key={connection.name} value={connection.name}>
-								{connection.name} · {connectionKind(connection)}
-							</NativeSelectOption>
-						))}
-						{missing ? (
-							<NativeSelectOption value={node.connection}>
-								{node.connection} (not found)
-							</NativeSelectOption>
-						) : null}
-					</NativeSelect>
-				)}
-			</Field>
-
-			{picked ? (
+		<>
+			<InspectorSection title="Tool">
 				<Field
-					id={`${id}-tool`}
-					label="Tool"
+					id={`${id}-connection`}
+					label="MCP server"
+					error={missing ? missingConnectionMessage(node.connection) : null}
 					hint={
-						tool?.description ??
-						(cannotList
-							? "Could not list the tools. Type the tool name."
-							: tools.isPending && !missing
-								? "Loading the tools…"
-								: listed && listed.length === 0
-									? "This MCP server has no tools."
-									: undefined)
+						noServers ? undefined : (
+							<>
+								An MCP server you add once under{" "}
+								<Link to="/agents" search={{ item: undefined }}>
+									Agents → Tools
+								</Link>
+								.
+							</>
+						)
 					}
 				>
-					{listed && listed.length > 0 ? (
+					{connections === undefined ? (
+						<Skeleton className="h-9 w-full" aria-busy="true" />
+					) : noServers ? (
+						<Note>
+							This computer has no MCP servers yet. Programs such as gh are not
+							MCP servers. Run them in a Command node, or give them to an Agent
+							node.{" "}
+							<Link
+								to="/agents"
+								search={{ item: undefined }}
+								className="text-foreground underline underline-offset-4 hover:text-primary"
+							>
+								Add an MCP server under Agents → Tools
+							</Link>
+							.
+						</Note>
+					) : (
 						<NativeSelect
-							id={`${id}-tool`}
+							id={`${id}-connection`}
 							className="font-mono"
-							value={node.tool}
-							aria-invalid={node.tool === ""}
-							aria-describedby={`${id}-tool-hint`}
+							value={node.connection}
+							aria-invalid={!picked || missing}
+							aria-describedby={`${id}-connection-hint`}
 							onChange={(event) => {
-								const name = event.target.value;
-								onChange((current) => ({ ...current, tool: name }));
+								const connection = event.target.value;
+								onChange((current) =>
+									connection === current.connection
+										? current
+										: { ...current, connection, tool: "", arguments: {} },
+								);
 							}}
 						>
-							<NativeSelectOption value="">Pick a tool</NativeSelectOption>
-							{listed.map((t) => (
-								<NativeSelectOption key={t.name} value={t.name}>
-									{t.name}
+							<NativeSelectOption value="">
+								Pick an MCP server
+							</NativeSelectOption>
+							{connections.map((connection) => (
+								<NativeSelectOption
+									key={connection.name}
+									value={connection.name}
+								>
+									{connection.name} · {connectionKind(connection)}
 								</NativeSelectOption>
 							))}
-							{node.tool !== "" && !tool ? (
-								<NativeSelectOption value={node.tool}>
-									{node.tool} (not listed)
+							{missing ? (
+								<NativeSelectOption value={node.connection}>
+									{node.connection} (not found)
 								</NativeSelectOption>
 							) : null}
 						</NativeSelect>
-					) : (
-						<Input
-							id={`${id}-tool`}
-							value={node.tool}
-							placeholder="create_issue"
-							className="font-mono"
-							autoComplete="off"
-							spellCheck={false}
-							aria-invalid={node.tool === ""}
-							aria-describedby={`${id}-tool-hint`}
-							onChange={(event) => {
-								const name = event.target.value;
-								onChange((current) => ({ ...current, tool: name }));
-							}}
-						/>
 					)}
 				</Field>
-			) : null}
 
-			{picked && node.tool !== "" ? (
-				<Arguments
-					flow={flow}
-					node={node}
-					schema={tool?.inputSchema ?? null}
-					onChange={(args) =>
-						onChange((current) => ({ ...current, arguments: args }))
-					}
-				/>
-			) : null}
+				{picked ? (
+					<Field
+						id={`${id}-tool`}
+						label="Tool"
+						hint={
+							tool?.description ??
+							(cannotList
+								? "Could not list the tools. Type the tool name."
+								: tools.isPending && !missing
+									? "Loading the tools…"
+									: listed && listed.length === 0
+										? "This MCP server has no tools."
+										: undefined)
+						}
+					>
+						{listed && listed.length > 0 ? (
+							<NativeSelect
+								id={`${id}-tool`}
+								className="font-mono"
+								value={node.tool}
+								aria-invalid={node.tool === ""}
+								aria-describedby={`${id}-tool-hint`}
+								onChange={(event) => {
+									const name = event.target.value;
+									// The tool's own shape of its answer, marked inferred.
+									const shape = listed.find(
+										(t) => t.name === name,
+									)?.outputSchema;
+									onChange((current) => withTool(current, name, shape));
+								}}
+							>
+								<NativeSelectOption value="">Pick a tool</NativeSelectOption>
+								{listed.map((t) => (
+									<NativeSelectOption key={t.name} value={t.name}>
+										{t.name}
+									</NativeSelectOption>
+								))}
+								{node.tool !== "" && !tool ? (
+									<NativeSelectOption value={node.tool}>
+										{node.tool} (not listed)
+									</NativeSelectOption>
+								) : null}
+							</NativeSelect>
+						) : (
+							<Input
+								id={`${id}-tool`}
+								value={node.tool}
+								placeholder="create_issue"
+								className="font-mono"
+								autoComplete="off"
+								spellCheck={false}
+								aria-invalid={node.tool === ""}
+								aria-describedby={`${id}-tool-hint`}
+								onChange={(event) => {
+									const name = event.target.value;
+									onChange((current) => ({ ...current, tool: name }));
+								}}
+							/>
+						)}
+					</Field>
+				) : null}
 
-			<Note>
-				Later nodes read <code>{`{{${node.id}.data}}`}</code> (the tool's answer
-				as JSON, with a path) and <code>{`{{${node.id}.text}}`}</code> (its
-				text).
-			</Note>
-		</InspectorSection>
+				{picked && node.tool !== "" ? (
+					<Arguments
+						flow={flow}
+						node={node}
+						schema={tool?.inputSchema ?? null}
+						onChange={(args) =>
+							onChange((current) => ({ ...current, arguments: args }))
+						}
+					/>
+				) : null}
+
+				<Note>
+					Later nodes read <code>{`{{${node.id}.data}}`}</code> (the tool's
+					answer as JSON, with a path) and <code>{`{{${node.id}.text}}`}</code>{" "}
+					(its text).
+				</Note>
+			</InspectorSection>
+
+			<DataShapeSection node={node} onChange={onChange} />
+		</>
 	);
 }
 

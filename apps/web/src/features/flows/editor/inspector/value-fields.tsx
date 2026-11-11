@@ -1,5 +1,10 @@
 /** The fields of a Value node: who makes the value, and its schema. */
-import { type Flow, type ValueNode, withValueBy } from "@nightshift/flows";
+import {
+	type Flow,
+	type ValueNode,
+	withOutputSchema,
+	withValueBy,
+} from "@nightshift/flows";
 import {
 	ToggleGroup,
 	ToggleGroupItem,
@@ -176,10 +181,12 @@ export function ValueFields({
 					required
 					assist
 					description="The shape of the data this node makes. The step fails when the result does not fit."
+					inferred={node.outputInferred === true}
+					onConfirm={() =>
+						onChange((current) => withOutputSchema(current, current.output))
+					}
 					onChange={(output) =>
-						onChange((current) =>
-							output === undefined ? current : { ...current, output },
-						)
+						onChange((current) => withOutputSchema(current, output))
 					}
 				/>
 			</InspectorSection>

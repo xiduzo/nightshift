@@ -183,6 +183,8 @@ const mcpToolInfoSchema = exact<McpToolInfo>()(
 		name: z.string(),
 		description: z.string().nullable(),
 		inputSchema: z.record(z.string(), z.unknown()),
+		/** The shape of the tool's structured content, when the server gives one. */
+		outputSchema: z.record(z.string(), z.unknown()).optional(),
 	}),
 );
 

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { McpServerConfig } from "../port/types";
 import { fixturePath } from "../testing";
-import { callMcpTool, listMcpTools, withMcpClient } from "./mcp";
+import { callMcpTool, listMcpTools, toolInfo, withMcpClient } from "./mcp";
 import { testMcpServer } from "./mcp-test";
 
 /** The shared MCP client against the fake stdio server in `testing/fixtures/fake-mcp.ts`. */
@@ -12,6 +12,18 @@ export const fakeMcpConfig = (
 	command: process.execPath,
 	args: [fixturePath("fake-mcp.ts")],
 	env,
+});
+
+describe("toolInfo", () => {
+	test("keeps the shape of the tool's answer when the server gives one", () => {
+		const outputSchema = { type: "object", properties: { id: {} } };
+		expect(
+			toolInfo({ name: "find", inputSchema: {}, outputSchema }),
+		).toMatchObject({ outputSchema });
+		expect(toolInfo({ name: "find", inputSchema: {} })).not.toHaveProperty(
+			"outputSchema",
+		);
+	});
 });
 
 describe("the MCP client", () => {

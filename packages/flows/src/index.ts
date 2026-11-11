@@ -115,6 +115,8 @@ export {
 	withConnections,
 	withDecidedBy,
 	withOptions,
+	withOutputSchema,
+	withTool,
 	withValueBy,
 	withWrites,
 } from "./draft";

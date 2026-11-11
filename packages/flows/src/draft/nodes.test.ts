@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { FlowNode } from "../flow";
-import { withOutputSchema } from "./nodes";
+import type { ToolNode } from "../nodes";
+import { withOutputSchema, withTool } from "./nodes";
 
 describe("withOutputSchema", () => {
 	const at = { x: 0, y: 0 };
@@ -51,5 +52,36 @@ describe("withOutputSchema", () => {
 	test("a node type without an output schema stays as it is", () => {
 		const end = { id: "end", type: "end", position: at } as FlowNode;
 		expect(withOutputSchema(end, output)).toBe(end);
+	});
+});
+
+describe("withTool", () => {
+	const tool: ToolNode = {
+		id: "lookup",
+		type: "tool",
+		position: { x: 0, y: 0 },
+		connection: "docs",
+		tool: "",
+		arguments: {},
+	};
+	const shape = { type: "object", properties: { items: { type: "array" } } };
+
+	test("the tool's own shape of its answer becomes the node's, marked inferred", () => {
+		expect(withTool(tool, "search", shape)).toEqual({
+			...tool,
+			tool: "search",
+			output: shape,
+			outputInferred: true,
+		});
+	});
+
+	test("another tool drops an inferred shape, and a person's shape stays", () => {
+		const inferred = withTool(tool, "search", shape);
+		expect(withTool(inferred, "fetch")).toEqual({ ...tool, tool: "fetch" });
+		const written = { ...tool, output: { type: "array" } };
+		expect(withTool(written, "search", shape)).toEqual({
+			...written,
+			tool: "search",
+		});
 	});
 });

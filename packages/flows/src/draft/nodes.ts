@@ -361,6 +361,26 @@ export function withOutputSchema<T extends FlowNode>(
 	return (schema === undefined ? rest : { ...rest, output: schema }) as T;
 }
 
+/**
+ * The Tool node with the tool of that name. The shape the server gives
+ * for the tool's answer (`outputSchema`) becomes the node's output schema,
+ * marked inferred: no person wrote it. A schema a person wrote or
+ * confirmed stays. An inferred one of another tool goes.
+ */
+export function withTool(
+	node: ToolNode,
+	tool: string,
+	outputSchema?: Record<string, unknown>,
+): ToolNode {
+	if (node.output !== undefined && node.outputInferred !== true) {
+		return { ...node, tool };
+	}
+	const { output: _, outputInferred: __, ...rest } = node;
+	return outputSchema === undefined
+		? { ...rest, tool }
+		: { ...rest, tool, output: outputSchema, outputInferred: true };
+}
+
 /** A new flow: one Agent node named `worker`. */
 export function newFlow(defaults?: NodeDefaults): Flow {
 	return {

@@ -1,5 +1,9 @@
 /** The advanced section of an Agent node. */
-import { type AgentNode, withConnections } from "@nightshift/flows";
+import {
+	type AgentNode,
+	withConnections,
+	withOutputSchema,
+} from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import {
 	NativeSelect,
@@ -95,7 +99,9 @@ export function AgentAdvanced({
 				defaultOpen={node.output !== undefined}
 				aside={
 					node.output !== undefined ? (
-						<Badge variant="secondary">schema</Badge>
+						<Badge variant={node.outputInferred ? "outline" : "secondary"}>
+							{node.outputInferred ? "inferred" : "schema"}
+						</Badge>
 					) : null
 				}
 			>
@@ -106,10 +112,12 @@ export function AgentAdvanced({
 					rootObject
 					assist
 					description="The data the agent reports, besides its outcome and a summary. The step fails when the data does not fit."
+					inferred={node.outputInferred === true}
+					onConfirm={() =>
+						onChange((current) => withOutputSchema(current, current.output))
+					}
 					onChange={(output) =>
-						onChange(({ output: _, ...rest }) =>
-							output === undefined ? rest : { ...rest, output },
-						)
+						onChange((current) => withOutputSchema(current, output))
 					}
 				/>
 			</InspectorSection>

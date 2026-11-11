@@ -6,6 +6,7 @@ import {
 	shapeIsValid,
 	toJsonSchema,
 } from "@nightshift/flows";
+import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Field,
@@ -14,9 +15,17 @@ import {
 	FieldLabel,
 } from "@nightshift/ui/components/field";
 import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemTitle,
+} from "@nightshift/ui/components/item";
+import {
 	ToggleGroup,
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
+import { CheckIcon, PencilIcon } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { LargerTextarea } from "@/shared/larger-window";
 
@@ -87,10 +96,51 @@ function shapeOf(
 }
 
 /**
- * The shape of the `data` of an Agent's step report, or of the value a Value
- * node makes (`required`, with its own `description`). Two views of one
- * JSON Schema: fields to fill in, like a zod object, or the JSON itself for
- * what the fields cannot show. Commits only a complete schema.
+ * A shape Night Shift inferred from a run, until a person confirms it:
+ * the mark, what it means, and Confirm and Edit. Editing confirms too.
+ */
+function InferredShape({
+	onConfirm,
+	onEdit,
+}: {
+	onConfirm: () => void;
+	/** Shows the editor. Absent: the shape is edited beside it. */
+	onEdit?: () => void;
+}) {
+	return (
+		<Item variant="outline" size="sm" className="items-start bg-card">
+			<ItemContent className="gap-1">
+				<ItemTitle>
+					<Badge variant="outline">Inferred from a run</Badge>
+				</ItemTitle>
+				<ItemDescription className="text-xs">
+					Night Shift took this shape from a run. Until you confirm it, data
+					that does not fit only gives a warning.
+				</ItemDescription>
+			</ItemContent>
+			<ItemActions className="flex-col items-stretch">
+				<Button size="xs" onClick={onConfirm}>
+					<CheckIcon data-icon="inline-start" />
+					Confirm
+				</Button>
+				{onEdit ? (
+					<Button size="xs" variant="outline" onClick={onEdit}>
+						<PencilIcon data-icon="inline-start" />
+						Edit
+					</Button>
+				) : null}
+			</ItemActions>
+		</Item>
+	);
+}
+
+/**
+ * The shape of the `data` of an Agent's step report, of the value a Value
+ * node makes (`required`, with its own `description`), or of a command's or
+ * a tool's data. Two views of one JSON Schema: fields to fill in, like a
+ * zod object, or the JSON itself for what the fields cannot show. Commits
+ * only a complete schema. A schema Night Shift inferred (`inferred`) shows
+ * as such, with Confirm and Edit, until a person confirms or edits it.
  */
 export function OutputSchemaField({
 	id,
@@ -104,6 +154,8 @@ export function OutputSchemaField({
 	reference,
 	children,
 	assist = false,
+	inferred = false,
+	onConfirm,
 }: {
 	id: string;
 	nodeId: string;
@@ -123,7 +175,12 @@ export function OutputSchemaField({
 	children?: ReactNode;
 	/** The node's own output: "Suggest fields" asks an agent for them. */
 	assist?: boolean;
+	/** Night Shift inferred the schema from a run, and no person confirmed it. */
+	inferred?: boolean;
+	/** Confirms an inferred schema as it is. */
+	onConfirm?: () => void;
 }) {
+	const [editing, setEditing] = useState(false);
 	const [mode, setMode] = useState<Mode>(() =>
 		shapeOf(output, rootObject) ? "fields" : "json",
 	);
@@ -169,6 +226,36 @@ export function OutputSchemaField({
 		<OutputSuggest nodeId={nodeId} output={output} />
 	) : null;
 	const fields = schemaFields(output, base);
+	const reads =
+		output === undefined || fields.length === 0 ? null : (
+			<>
+				Later nodes read <code className="font-mono">{`{{${base}}}`}</code> or a
+				field:{" "}
+				{fields.map((field, index) => (
+					<span key={field.name}>
+						{index > 0 ? ", " : null}
+						<code className="font-mono">{`{{${field.ref}}}`}</code>
+					</span>
+				))}
+				. A list feeds a Subflow that runs once per item.
+			</>
+		);
+	const unconfirmed = inferred && onConfirm !== undefined;
+
+	// An inferred shape shows what later nodes read, until Edit opens it.
+	if (unconfirmed && !editing) {
+		return (
+			<Field className="gap-2">
+				<FieldLabel id={`${id}-label`}>{label}</FieldLabel>
+				<InferredShape onConfirm={onConfirm} onEdit={() => setEditing(true)} />
+				{reads ? (
+					<FieldDescription className="text-xs [&_code]:font-mono">
+						{reads}
+					</FieldDescription>
+				) : null}
+			</Field>
+		);
+	}
 
 	return (
 		<Field className="gap-2" data-invalid={error !== null ? true : undefined}>
@@ -178,6 +265,7 @@ export function OutputSchemaField({
 					<span className="font-normal text-muted-foreground">(optional)</span>
 				)}
 			</FieldLabel>
+			{unconfirmed ? <InferredShape onConfirm={onConfirm} /> : null}
 			<ToggleGroup
 				variant="outline"
 				size="sm"
@@ -305,21 +393,7 @@ export function OutputSchemaField({
 					id={`${id}-hint`}
 					className="text-xs [&_code]:font-mono"
 				>
-					{output === undefined || fields.length === 0 ? (
-						description
-					) : (
-						<>
-							Later nodes read{" "}
-							<code className="font-mono">{`{{${base}}}`}</code> or a field:{" "}
-							{fields.map((field, index) => (
-								<span key={field.name}>
-									{index > 0 ? ", " : null}
-									<code className="font-mono">{`{{${field.ref}}}`}</code>
-								</span>
-							))}
-							. A list feeds a Subflow that runs once per item.
-						</>
-					)}
+					{reads ?? description}
 				</FieldDescription>
 			)}
 		</Field>

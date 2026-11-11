@@ -18,11 +18,16 @@ import type { McpServerConfig } from "../port";
 
 export const MCP_TIMEOUT_MS = 20_000;
 
-/** A tool as the server lists it. `inputSchema` is a JSON Schema object. */
+/**
+ * A tool as the server lists it. `inputSchema` is a JSON Schema object.
+ * `outputSchema`, when the server gives one, is the shape of the tool's
+ * structured content.
+ */
 export type McpToolInfo = {
 	name: string;
 	description: string | null;
 	inputSchema: Record<string, unknown>;
+	outputSchema?: Record<string, unknown>;
 };
 
 export type McpToolCall = {
@@ -131,6 +136,7 @@ export function toolInfo(tool: {
 	name: string;
 	description?: string;
 	inputSchema: unknown;
+	outputSchema?: unknown;
 }): McpToolInfo {
 	return {
 		name: tool.name,
@@ -139,6 +145,9 @@ export function toolInfo(tool: {
 			tool.inputSchema && typeof tool.inputSchema === "object"
 				? (tool.inputSchema as Record<string, unknown>)
 				: { type: "object" },
+		...(tool.outputSchema && typeof tool.outputSchema === "object"
+			? { outputSchema: tool.outputSchema as Record<string, unknown> }
+			: {}),
 	};
 }
 
