@@ -116,8 +116,8 @@ describe("flowAuthoringGuide", () => {
 		// heading in the inbox. 4680: the brief of a Gate (urgency,
 		// situation, background, recommendation, impacts). 4720: format 9,
 		// a Command's `stdout` and the `output` schema of a Command, a Tool
-		// and a flow output.
-		expect(words).toBeLessThan(4720);
+		// and a flow output. 4770: the Since last run node.
+		expect(words).toBeLessThan(4770);
 	});
 });
 

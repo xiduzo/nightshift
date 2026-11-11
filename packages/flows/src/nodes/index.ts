@@ -181,6 +181,16 @@ export {
 	serviceSection,
 } from "./service";
 export {
+	checkSinceLastRunNode,
+	MAX_MEMORY_KEYS,
+	memoryPath,
+	type SinceLastRunNode,
+	sinceLastRunNodeSchema,
+	sinceLastRunOutcomes,
+	sinceLastRunOutputFields,
+	watchesValue,
+} from "./since-last-run";
+export {
 	checkToolNode,
 	type ToolNode,
 	toolNodeSchema,

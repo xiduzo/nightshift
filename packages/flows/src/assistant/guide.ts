@@ -153,6 +153,13 @@ export const sampleNodes = {
 		ready: { url: "http://127.0.0.1:8080/health", timeoutMinutes: 5 },
 		stop: "docker compose down",
 	},
+	"since-last-run": {
+		id: "fresh",
+		type: "since-last-run",
+		position: at,
+		items: "{{feed.data.items}}",
+		key: "link",
+	},
 } as const satisfies Record<FlowNodeType, NodeInput>;
 
 /** What each node type is for, and the fields it adds to the common ones. */
@@ -171,6 +178,8 @@ const nodeText: Record<FlowNodeType, string> = {
 		"Lets one run of the Space at a time do the steps after it, also across computers. `name` is a template: `branch:{{pr.data.head}}`, `account:{{account}}`. Night Shift lets go of the lease when the run ends, however it ends. `waitMinutes`: how long it waits for a busy lease (unset: 0). `ttlMinutes` (default 30): how long it outlives a computer that is gone. `scope: { section: <id> }` lets go when the run leaves that Section, which holds the node. Draw a `busy` edge, for example to an End with `nothing-to-do`: without one, `busy` fails the run.",
 	service:
 		"Starts a process that keeps running while the steps after it work: a Docker Compose stack, a dev server. `start` runs in the background in the project. `ready` is a `command` (exit 0) or a `url` (answers 2xx), tried every `everySeconds` (default 2) up to `timeoutMinutes` (default 5). A ready command can write JSON to `$NS_OUTPUT`, read later as `{{stack.data.url}}`. `{{stack.log_tail}}` gives the last lines of its log. Night Shift stops it when the run ends, however it ends: with `stop` when it has one (`docker compose down`), else by ending its processes. `scope: { section: <id> }` stops it when the run leaves that Section, which holds the node. Every step in its scope runs on its computer. A service on a fixed port goes after a Lease on that port. `secrets` as on a Command. Without a `failed` edge, a service that does not get ready fails the run.",
+	"since-last-run":
+		'Remembers what it saw, so a later run gets only what is new. `items` (list template) and `key` (path in each item; unset: the item), optional `compare` (the paths that count). Or `value` (template) and optional `when` (JSONata over `previous` and `current`). `scope` (template) splits the memory. `firstRun: "same"`: nothing is new on the first run. `data`: `new`, `changed`, `same_count`, `first_run`.',
 	join: `Where parallel branches meet. \`wait\`: \`all\` (default), or \`first\` (stops the other branches). \`data\` holds each branch's \`data\` by the node it came from: \`{{reviewed.data.security}}\`.`,
 	call: `Shown as Subflow. Runs another flow of the project (\`flow\`, its name), or a kit (\`kit:github/publish-draft-pr\`, see Kits), with \`inputs\` bound to templates. With \`each\`, it runs the flow once per element of a list: \`source\` is \`{ kind: "json", value }\` or \`{ kind: "command", command }\` (prints a JSON array); the element goes to the input named by \`as\`. A parameter sweep is one Command that loops, not one element per set. Without \`each\` its outputs are the called flow's outputs too. A called flow that ends at an End node ends the Subflow \`pass\` (\`done\`, \`nothing-to-do\`) or \`fail\` (\`failed\`); \`ended\` holds the End's status and \`end_message\` its message. With \`device\` (a computer's id, as \`list_profiles\` gives it), its steps run on that computer wherever the run runs.`,
 	end: `Ends the run on purpose. \`status\`: ${endStatusSchema.options.map((status) => `\`${status}\``).join(", ")}. \`message\` (template) is one line for a person: the runs list and the notification show it. \`nothing-to-do\` is for a run that found no work: it is not a failure. \`failed\` fails the run on purpose. No edge leaves an End node.`,

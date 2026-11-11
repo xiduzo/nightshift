@@ -72,7 +72,23 @@ export const OUTPUT_FIELD_SHAPES: { [T in FlowNodeType]: FieldShapes<T> } = {
 		visit: whole,
 	},
 	service: { outcome: text, data: anything, log_tail: text, visit: whole },
+	"since-last-run": { outcome: text, data: sinceData(false), visit: whole },
 };
+
+/** The data of a Since last run node: the new and changed items, and with a value also `previous` and `current`. */
+function sinceData(value: boolean): Schema {
+	const properties: Record<string, Schema> = {
+		new: { type: "array" },
+		changed: { type: "array" },
+		same_count: whole,
+		first_run: { type: "boolean" },
+	};
+	if (value) {
+		properties.previous = anything;
+		properties.current = anything;
+	}
+	return { type: "object", properties };
+}
 
 /** The fields of a Call node with `each`. */
 const CALL_EACH_FIELD_SHAPES: Record<
@@ -139,6 +155,9 @@ export function outputFieldShape(
 ): Schema | undefined {
 	if (node.type === "call" && node.each !== undefined) {
 		return own(CALL_EACH_FIELD_SHAPES, field);
+	}
+	if (node.type === "since-last-run" && node.value !== undefined) {
+		if (field === "data") return sinceData(true);
 	}
 	const typed: string | undefined =
 		TYPED_OUTPUT_FIELD[node.type as keyof typeof TYPED_OUTPUT_FIELD];

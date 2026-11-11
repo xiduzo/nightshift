@@ -38,15 +38,21 @@ export function isTruthy(value: unknown): boolean {
 }
 
 /**
- * Evaluates one rule against the context. Throws when the expression does
- * not parse or fails while it runs; the message is JSONata's.
+ * Evaluates one rule against the context, and the names of `also` (a Since
+ * last run node's `previous` and `current`), which win over the context's.
+ * Throws when the expression does not parse or fails while it runs; the
+ * message is JSONata's.
  */
 export async function evaluateRule(
 	expr: string,
 	context: TemplateContext,
+	also: Record<string, JsonValue> = {},
 ): Promise<JsonValue | undefined> {
 	const compiled = jsonata(expr);
-	const result: unknown = await compiled.evaluate(ruleContext(context));
+	const result: unknown = await compiled.evaluate({
+		...ruleContext(context),
+		...also,
+	});
 	return result as JsonValue | undefined;
 }
 

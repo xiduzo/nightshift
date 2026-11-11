@@ -38,7 +38,7 @@ export type Scope = {
 
 /**
  * A rule (a JSONata expression) must be valid, and read only known names
- * (`checkRuleReads`). `subject` starts each message.
+ * (`checkRuleReads`), or a name of `also`. `subject` starts each message.
  */
 export function checkRule(
 	expr: string,
@@ -46,13 +46,14 @@ export function checkRule(
 	at: At,
 	scope: Scope,
 	error: Report,
+	also: readonly string[] = [],
 ): void {
 	const problem = ruleProblem(expr);
 	if (problem !== null) {
 		error(`${subject} is not valid: ${problem}`, at);
 		return;
 	}
-	checkRuleReads(expr, subject, at, scope, error);
+	checkRuleReads(expr, subject, at, scope, error, also);
 }
 
 /**
@@ -116,9 +117,10 @@ function checkRuleReads(
 	at: At,
 	scope: Scope,
 	error: Report,
+	also: readonly string[] = [],
 ): void {
 	for (const name of ruleNames(expr)) {
-		if (!readsName(scope.template, name)) {
+		if (!also.includes(name) && !readsName(scope.template, name)) {
 			error(
 				`${subject} reads "${name}", but there is no node or input "${name}".`,
 				at,

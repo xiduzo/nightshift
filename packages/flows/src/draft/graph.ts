@@ -23,6 +23,7 @@ import {
 	type NodeDefaults,
 	type Position,
 	serviceNode,
+	sinceLastRunNode,
 	toolNode,
 	valueNode,
 	waitNode,
@@ -94,6 +95,7 @@ const NEW_NODE: Record<
 	join: { id: "join", create: joinNode },
 	lease: { id: "lease", create: leaseNode },
 	service: { id: "service", create: serviceNode },
+	"since-last-run": { id: "since-last-run", create: sinceLastRunNode },
 };
 
 /** Adds a node of `type`; a new Agent node starts with `defaults`. */

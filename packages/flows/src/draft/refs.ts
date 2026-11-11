@@ -114,6 +114,9 @@ export function renameVariable(flow: Flow, index: number, to: string): Flow {
 		if (next.type === "value" && next.expression !== undefined) {
 			next = { ...next, expression: rule(next.expression) };
 		}
+		if (next.type === "since-last-run" && next.when !== undefined) {
+			next = { ...next, when: rule(next.when) };
+		}
 		if (next.set) {
 			next = {
 				...next,
@@ -315,6 +318,14 @@ export function rewriteOwnTemplates(
 						: {}),
 				},
 				...(node.stop !== undefined ? { stop: rewrite(node.stop) } : {}),
+			};
+		case "since-last-run":
+			// The rule reads names bare, as a Decision's rules do: not a template.
+			return {
+				...node,
+				...(node.items === undefined ? {} : { items: rewrite(node.items) }),
+				...(node.value === undefined ? {} : { value: rewrite(node.value) }),
+				...(node.scope === undefined ? {} : { scope: rewrite(node.scope) }),
 			};
 	}
 }

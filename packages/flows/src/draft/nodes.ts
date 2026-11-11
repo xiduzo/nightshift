@@ -16,6 +16,7 @@ import {
 	type LeaseNode,
 	type ListSource,
 	type ServiceNode,
+	type SinceLastRunNode,
 	type ToolNode,
 	type ValueBy,
 	type ValueDeciderName,
@@ -305,6 +306,14 @@ export function leaseNode(id: string, position: Position): LeaseNode {
  */
 export function serviceNode(id: string, position: Position): ServiceNode {
 	return { id, type: "service", position, start: "", ready: { url: "" } };
+}
+
+/** A Since last run node starts with an empty list; the issues panel asks for it. */
+export function sinceLastRunNode(
+	id: string,
+	position: Position,
+): SinceLastRunNode {
+	return { id, type: "since-last-run", position, items: "" };
 }
 
 /** A Join waits for every branch until the person picks `first`. */

@@ -70,7 +70,7 @@ Names (node ids, inputs, variables): lowercase letters, digits and `_`, starting
 
 ## Nodes
 
-The node types: `agent`, `command`, `decision`, `call`, `value`, `wait`, `tool`, `end`, `join`, `lease`, `service`. Every node has `id`, `type`, `position: { x, y }`, and optional `label` (shown in the editor), `timeoutMinutes` and `set` (variable writes). Lay the nodes out left to right, about 300 apart on x, and put a loop's way back below the main line.
+The node types: `agent`, `command`, `decision`, `call`, `value`, `wait`, `tool`, `end`, `join`, `lease`, `service`, `since-last-run`. Every node has `id`, `type`, `position: { x, y }`, and optional `label` (shown in the editor), `timeoutMinutes` and `set` (variable writes). Lay the nodes out left to right, about 300 apart on x, and put a loop's way back below the main line.
 
 ### agent
 
@@ -159,6 +159,14 @@ Starts a process that keeps running while the steps after it work: a Docker Comp
 Outcomes: `ready`, `failed`. Outputs: `outcome`, `data`, `log_tail`, `visit`.
 
 `{"id":"stack","type":"service","position":{"x":0,"y":0},"start":"docker compose up -d","ready":{"url":"http://127.0.0.1:8080/health","timeoutMinutes":5},"stop":"docker compose down"}`
+
+### since-last-run
+
+Remembers what it saw, so a later run gets only what is new. `items` (list template) and `key` (path in each item; unset: the item), optional `compare` (the paths that count). Or `value` (template) and optional `when` (JSONata over `previous` and `current`). `scope` (template) splits the memory. `firstRun: "same"`: nothing is new on the first run. `data`: `new`, `changed`, `same_count`, `first_run`.
+
+Outcomes: `new`, `changed`, `same`. Outputs: `outcome`, `data`, `visit`.
+
+`{"id":"fresh","type":"since-last-run","position":{"x":0,"y":0},"items":"{{feed.data.items}}","key":"link"}`
 
 ## Edges, outcomes and loops
 

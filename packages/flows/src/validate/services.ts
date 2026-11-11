@@ -100,6 +100,7 @@ function runsOnDevice(node: FlowNode): boolean {
 		case "end":
 		case "join":
 		case "lease":
+		case "since-last-run":
 			return false;
 	}
 }

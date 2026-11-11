@@ -455,8 +455,9 @@ export type NodeCheck = {
 	/**
 	 * Checks that a rule (a JSONata expression) is valid and reads known
 	 * names. `subject` starts each message: `The expression of "pick"`.
+	 * `also`: the names the rule reads besides the flow's (`previous`).
 	 */
-	rule: (expr: string, subject: string) => void;
+	rule: (expr: string, subject: string, also?: readonly string[]) => void;
 	/**
 	 * Checks that a rule over a signal's data (`event.body.action`) is valid
 	 * and reads only `event`. `subject` starts each message.

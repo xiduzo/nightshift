@@ -438,12 +438,16 @@ function endsFlow(node: FlowNode, outcome: string): boolean {
 			return outcome === "held";
 		case "service":
 			return outcome === "ready";
+		case "since-last-run":
+			return true;
 	}
 }
 
 /** The label a Call reports in `ended` when its flow ends at this node: the engine's `endedLabel`. */
 function endedLabel(node: FlowNode, outcome: string): string {
-	if (node.type === "decision") return outcome;
+	if (node.type === "decision" || node.type === "since-last-run") {
+		return outcome;
+	}
 	if (node.type === "agent" && ownAgentLabel(node, outcome)) return outcome;
 	return "";
 }

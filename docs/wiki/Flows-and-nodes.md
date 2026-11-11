@@ -37,6 +37,7 @@ flowchart LR
 | **Join** | Waits for the branches that run at once: all of them, or the first. The first stops the others. |
 | **Lease** | Lets one run at a time do the next steps, for example one deploy at a time. Runs on other computers of the Space take turns too. |
 | **Service** | Starts a Docker Compose stack, a dev server, or a model server for the next steps, and stops it after. |
+| **Since last run** | Remembers what it saw, and finds what is new or changed since the last run. It also watches one value, such as a price that passes a limit. |
 | **End** | Ends the run on purpose: done, nothing to do, or failed, with one line that says why. |
 <!-- /checked:nodes -->
 
@@ -95,6 +96,20 @@ A **Lease** takes a named lease of the Space, for example `deploy` or `branch:{{
 
 A **Service** starts a process for the next steps and stops it when the run leaves its scope. It is ready when a command exits 0, or when a URL answers with a 2xx status. See [Services](https://github.com/xiduzo/nightshift/blob/main/docs/deploy/services.md).
 
+### Since last run
+
+A **Since last run** node remembers what it saw. The next run gets only what is new or changed.
+
+- **A list.** Give it a list, such as `{{feed.data.items}}`, and the key of an item, such as `link`. An item with a key it never saw is new. An item with other fields than last time is changed. **Compare** sets the fields that count.
+- **A value.** Give it one value, such as `{{price.data.usd}}`. A rule over `previous` and `current` says when it changed: `current > 100 and previous <= 100`. Without a rule, any change counts.
+- **Outcomes.** `new` when anything is new, else `changed`, else `same`. Each one ends the run when no edge leaves on it.
+- **Data.** `{{fresh.data.new}}` and `{{fresh.data.changed}}` hold the items. `first_run` is true when it remembered nothing yet.
+- **The first run.** On its first run, everything is new. Set **First run** to **Nothing is new** to only remember what is there.
+- **Scope.** A scope, such as `{{feed_url}}`, gives each value its own memory. Two Subflows that call the same flow each have their own memory too.
+- **Forget what it saw.** The node remembers what it saw when its step ends. A later step that fails does not undo that. To see everything again, select the node and click **Forget what it saw**. The next run is a first run.
+
+It remembers up to 10,000 items, and forgets the oldest first. A quick run remembers nothing.
+
 ## Inputs, outputs, and templates
 
 A flow declares inputs and outputs, like a function. The start dialog asks for the inputs.
@@ -110,7 +125,7 @@ Data has a shape: text, a number, yes or no, a choice, a file, a list, or a reco
 
 Two or more edges on one outcome run their branches at once. A Join waits for them.
 
-A variable with **Keep between runs** starts each run with the value that the last run left. Use it to remember what a run saw already.
+A variable with **Keep between runs** starts each run with the value that the last run left. Use it to remember a value between runs. For the items of a list, use a [Since last run](#since-last-run) node.
 
 ## The editor
 

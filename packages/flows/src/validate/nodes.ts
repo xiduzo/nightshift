@@ -7,6 +7,7 @@ import {
 	checkEndNode,
 	checkLeaseNode,
 	checkServiceNode,
+	checkSinceLastRunNode,
 	checkToolNode,
 	checkValueNode,
 	checkWaitNode,
@@ -55,7 +56,8 @@ export function checkNode(
 				);
 			}
 		},
-		rule: (expr, subject) => checkRule(expr, subject, at, scope, error),
+		rule: (expr, subject, also) =>
+			checkRule(expr, subject, at, scope, error, also),
 		eventRule: (expr, subject) => checkEventRule(expr, subject, at, error),
 		dataRule: (expr, subject) => checkDataRule(expr, subject, at, error),
 		routed: (outcome) =>
@@ -100,6 +102,9 @@ export function checkNode(
 			break;
 		case "service":
 			checkServiceNode(node, check);
+			break;
+		case "since-last-run":
+			checkSinceLastRunNode(node, check);
 			break;
 	}
 }
