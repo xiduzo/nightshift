@@ -486,6 +486,28 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 						machine: hostLink.role === "home" ? machine : null,
 					}),
 				),
+				// The leases of the runs here, each time the link comes online:
+				// the renewal at the start did not reach a Host whose link was not
+				// up yet. Once per online period. The link does not wait for it,
+				// and a renewal that fails waits for the next minute's.
+				link.stream(
+					"Renewing the leases of this computer's runs",
+					async (_client, signal) => {
+						engine.hostBack().catch((error) => {
+							console.warn(
+								`The leases were not renewed when the link to ${hostLink.name} came online:`,
+								error,
+							);
+						});
+						await new Promise<void>((resolve) => {
+							if (signal.aborted) resolve();
+							else
+								signal.addEventListener("abort", () => resolve(), {
+									once: true,
+								});
+						});
+					},
+				),
 			];
 			return () => {
 				for (const stop of stops) stop();

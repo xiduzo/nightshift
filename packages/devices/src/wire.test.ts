@@ -649,6 +649,64 @@ describe("the devices runtime across a reload", () => {
 	});
 });
 
+/** A's procedures behind a network the test takes down and brings up. */
+function behind(network: { up: boolean; refused: number; answered: number }) {
+	const over = <Call extends (...args: never[]) => Promise<unknown>>(
+		call: Call,
+	): Call =>
+		((...args: never[]) => {
+			if (!network.up) {
+				network.refused++;
+				return Promise.reject(new TypeError("Unable to connect."));
+			}
+			network.answered++;
+			return call(...args);
+		}) as unknown as Call;
+	return (address: string): HostClient => {
+		const client = toA(address);
+		return {
+			...client,
+			link: {
+				...client.link,
+				hello: over(client.link.hello),
+				heartbeat: over(client.link.heartbeat),
+			},
+		};
+	};
+}
+
+describe("a Device's link to its Host", () => {
+	test("each time the link comes online, the engine renews the leases of its runs: once, not at every heartbeat", async () => {
+		const network = { up: false, refused: 0, answered: 0 };
+		const runtime = await startB({ clientFor: behind(network) });
+		let backs = 0;
+		runtime.engine.hostBack = async () => {
+			backs++;
+		};
+		// Down at the start: the link tries, and the engine hears nothing.
+		await waitFor(() => network.refused > 0, { label: "a try while down" });
+		expect(backs).toBe(0);
+
+		network.up = true;
+		await waitFor(() => backs === 1, { label: "the link online" });
+		const answered = network.answered;
+		await waitFor(() => network.answered >= answered + 3, {
+			label: "three heartbeats",
+		});
+		expect(backs).toBe(1);
+
+		// Down, then up again: once more.
+		network.up = false;
+		const refused = network.refused;
+		await waitFor(() => network.refused > refused + 1, {
+			label: "the link offline",
+		});
+		expect(backs).toBe(1);
+		network.up = true;
+		await waitFor(() => backs === 2, { label: "the link online again" });
+	});
+});
+
 describe("the documents a Device syncs with a Host", () => {
 	test("each Space document, and the flow and knowledge documents of every Project in it; over the home link, its own document and the copies too", async () => {
 		const space = await paired.documents.open(a.spaceId);
