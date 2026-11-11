@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { type Flow, type FlowInput, flowSchema } from "../flow";
+import { FLOW_VERSION, type Flow, type FlowInput, flowSchema } from "../flow";
 import { diffFlows, flowDiffSummary } from "./diff";
 
 const base: FlowInput = {
-	version: 8,
+	version: FLOW_VERSION,
 	description: "Builds and checks.",
 	inputs: [{ name: "task", type: "text" }],
 	outputs: [{ name: "summary", value: "{{build.summary}}" }],

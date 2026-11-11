@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fixturePath } from "@nightshift/agents/testing";
 import { seedFlows } from "@nightshift/engine/testing";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
 import {
 	type Daemon,
@@ -77,7 +78,7 @@ function repo(name: string): string {
 async function saveFlow(name: string, nodes: unknown[], edges: unknown[] = []) {
 	await seedFlows(savesOn(a), projectId, {
 		[name]: {
-			version: 8,
+			version: FLOW_VERSION,
 			inputs: [],
 			outputs: [],
 			start: (nodes[0] as { id: string }).id,
@@ -194,7 +195,7 @@ describe("a run placed on another Device", () => {
 					type: "command",
 					position: { x: 0, y: 0 },
 					command: "pwd",
-					output: "text",
+					stdout: "text",
 				},
 				agentNode,
 			],
@@ -298,7 +299,7 @@ describe("a run placed on another Device", () => {
 				type: "command",
 				position: { x: 0, y: 0 },
 				command: "echo hi",
-				output: "text",
+				stdout: "text",
 			},
 		]);
 		await expect(

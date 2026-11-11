@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { seedFlows } from "@nightshift/engine/testing";
-
+import { FLOW_VERSION } from "@nightshift/flows";
 import {
 	type Daemon,
 	pair,
@@ -96,7 +96,7 @@ beforeAll(async () => {
 	// One command that counts the runs of the flow in a kept variable.
 	await seedFlows(savesOn(a), projectId, {
 		count: {
-			version: 8,
+			version: FLOW_VERSION,
 			inputs: [],
 			outputs: [],
 			start: "count",
@@ -109,7 +109,7 @@ beforeAll(async () => {
 					type: "command",
 					position: { x: 0, y: 0 },
 					command: "pwd",
-					output: "text",
+					stdout: "text",
 					set: [{ variable: "runs", expression: "vars.runs + 1" }],
 				},
 			],

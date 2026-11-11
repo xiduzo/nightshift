@@ -19,6 +19,7 @@ import type {
 	Flow,
 	FlowEdge,
 } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import type { FlowInput } from "@nightshift/flows/testing";
 import { now } from "@nightshift/time";
 import { asc, eq } from "drizzle-orm";
@@ -103,7 +104,7 @@ function command(id: string, cmd: string): CommandNode {
 		type: "command",
 		position: { x: 0, y: 0 },
 		command: cmd,
-		output: "text",
+		stdout: "text",
 	};
 }
 
@@ -161,7 +162,7 @@ function flowOf(
 	extra: Partial<Flow> = {},
 ): Flow {
 	return {
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createHmac } from "node:crypto";
 import { fakeHarness } from "@nightshift/agents/testing";
 import type { Flow, Schedule, WebhookEvent } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { createEngine, type Engine } from "../run/engine";
 import type { SpaceEngine } from "../run/space-engine";
@@ -169,7 +170,7 @@ afterEach(async () => {
 
 /** Opens the pull request `{{pr}}`: `gh pr create` prints its address last. */
 const openerFlow: Flow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [{ name: "pr", type: "text" }],
 	outputs: [],
 	start: "open",
@@ -179,7 +180,7 @@ const openerFlow: Flow = {
 			type: "command",
 			position: { x: 0, y: 0 },
 			command: 'echo "Creating pull request"; echo "{{pr}}"',
-			output: "text",
+			stdout: "text",
 		},
 	],
 	edges: [],

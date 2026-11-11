@@ -140,7 +140,7 @@ describe("the Device of a step, from the plan alone", () => {
 	test("a run from before ids: its node names its Device by the name the plan keeps (ADR 14)", () => {
 		const placement = placementOver([]);
 		const older = row({ placements: JSON.stringify({ "hetzner-1": H }) });
-		// Its flow snapshot reads as format 8: the name is to choose again.
+		// Its flow snapshot reads as the current format: the name is to choose again.
 		const at = placement.deviceFor(
 			command("y", { device: { name: "hetzner-1" } }),
 			older,

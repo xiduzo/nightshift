@@ -71,7 +71,7 @@ function mainFlow(use = "true"): Flow {
 				type: "command",
 				position: at,
 				command: "cat plan.json",
-				output: "json",
+				stdout: "json",
 			},
 			{
 				id: "size",

@@ -60,7 +60,7 @@ export type TemplateScopeOptions = {
 /**
  * What a template in `flow` may read: its inputs, its variables, each
  * node's output fields, and the run's fields. A Command node has `data`
- * only with `output: "json"`. A Subflow node without `each` adds the
+ * only with `stdout: "json"`. A Subflow node without `each` adds the
  * outputs of the flow it calls, which hold JSON.
  */
 export function templateScope(

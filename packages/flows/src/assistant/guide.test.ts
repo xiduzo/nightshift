@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+	FLOW_VERSION,
 	type Flow,
 	type FlowNodeType,
 	flowSchema,
@@ -20,7 +21,7 @@ const guide = flowAuthoringGuide();
 
 /** The flow `findEachExample` calls: it takes one source as `item`. */
 const summarizeSource: Flow = flowSchema.parse({
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [{ name: "item", type: "json", required: true }],
 	start: "work",
 	nodes: [
@@ -60,7 +61,7 @@ describe("the examples of the guide", () => {
 	test("each sample node is a valid node of its type", () => {
 		for (const [type, node] of Object.entries(sampleNodes)) {
 			const parsed = flowSchema.safeParse({
-				version: 8,
+				version: FLOW_VERSION,
 				start: node.id,
 				nodes: [node],
 				edges: [],

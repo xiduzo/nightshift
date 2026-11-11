@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Flow, FlowNode } from "../flow";
+import { FLOW_VERSION } from "../flow";
 import type { ValueNode } from "../nodes";
 import { validateFlow } from "./flow";
 import type { FlowIssue } from "./issues";
@@ -33,12 +34,12 @@ const designer: FlowNode = {
 	type: "command",
 	position: at,
 	command: "make-variants",
-	output: "json",
+	stdout: "json",
 };
 
 function flow(nodes: FlowNode[]): Flow {
 	return {
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [{ name: "issue", type: "text" }],
 		outputs: [],
 		start: nodes[0]?.id ?? "",

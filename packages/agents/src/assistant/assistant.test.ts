@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	FLOW_VERSION,
 	type Flow,
 	flowSchema,
 	type SuggestionEvent,
@@ -24,7 +25,7 @@ import {
 import { suggestionPrompt } from "./suggestion-prompt";
 
 const flow: Flow = flowSchema.parse({
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [{ name: "issue", type: "text", description: "The issue to fix" }],
 	variables: [{ name: "tries", type: "number" }],
 	start: "plan",

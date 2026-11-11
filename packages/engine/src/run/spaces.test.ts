@@ -11,6 +11,7 @@ import {
 	step,
 } from "@nightshift/db/schema";
 import type { DecisionNode, Flow } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import { createRunLog, type RunLog } from "../log/run-log";
 import {
@@ -92,7 +93,7 @@ const gate: DecisionNode = {
 
 /** An Agent step, then a Gate: the run waits with a step, a session and events. */
 const flow: Flow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: "work",

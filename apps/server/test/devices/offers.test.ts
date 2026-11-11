@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { fixturePath } from "@nightshift/agents/testing";
 import type { AppRouterClient } from "@nightshift/api";
 import { seedFlows } from "@nightshift/engine/testing";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
@@ -93,7 +94,7 @@ function repo(name: string): string {
 async function saveFlow(name: string, agent: Record<string, unknown>) {
 	await seedFlows(savesOn(a), projectId, {
 		[name]: {
-			version: 8,
+			version: FLOW_VERSION,
 			inputs: [],
 			outputs: [],
 			start: "work",

@@ -46,6 +46,10 @@ import { gitFilesCommand, githubSubIssuesCommand } from "../recipes";
  * cannot bring to one id becomes `{ name }`: the check asks to choose the
  * device again.
  *
+ * Version 8 → 9 (`migrateV8`): output fields get a shape. A Command node's
+ * `output` (`"text"` or `"json"`, what it prints) moves to `stdout`, and
+ * `output` is its optional output schema, as on an Agent or a Value node.
+ *
  * Any version:
  * - The built-in tool set `tools: ["github"]` → the CLI tool `clis: ["gh"]`
  *   (see `migrateToolSets`).
@@ -72,6 +76,9 @@ export function migrateFlow(json: unknown, migration?: FlowMigration): unknown {
 	}
 	if (isRecord(current) && current.version === 7) {
 		current = migrateV7(current, migration);
+	}
+	if (isRecord(current) && current.version === 8) {
+		current = migrateV8(current);
 	}
 	if (!isRecord(current) || !Array.isArray(current.nodes)) return current;
 	let changed = false;
@@ -169,6 +176,33 @@ export function migrateV7(
 		version: 8,
 		...(nodes === undefined ? {} : { nodes }),
 	};
+}
+
+/**
+ * Version 8 → 9. A Command node's `output` said what the command prints:
+ * `"text"` or `"json"`. It moves to `stdout`, so `output` can be the
+ * node's output schema, as on an Agent or a Value node. A Command node
+ * without `output` stays as it was: `stdout` defaults to `"text"`.
+ */
+export function migrateV8(
+	json: Record<string, unknown>,
+): Record<string, unknown> {
+	const nodes = Array.isArray(json.nodes)
+		? json.nodes.map(migrateCommandOutput)
+		: json.nodes;
+	return {
+		...json,
+		version: 9,
+		...(nodes === undefined ? {} : { nodes }),
+	};
+}
+
+function migrateCommandOutput(json: unknown): unknown {
+	if (!isRecord(json) || json.type !== "command" || !("output" in json)) {
+		return json;
+	}
+	const { output, ...rest } = json;
+	return typeof output === "string" ? { ...rest, stdout: output } : rest;
 }
 
 /** A Device's name as format 8 names it: its id, else `{ name }` to choose again. */

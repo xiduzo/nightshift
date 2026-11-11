@@ -61,6 +61,7 @@ A Decision or a Value that a model decides can have a cascade too. A model's pic
 - Template values arrive as environment variables, never as shell text. So `sh -c "{{check}}"` runs the input `check` as a command, and a value cannot inject shell code.
 - Secrets arrive as environment variables too.
 - JSON that the command writes to `$NS_OUTPUT` is its data. `{"outcome": "approved"}` picks the outcome.
+- A command that prints JSON can give that as its data. Set **What it prints** to **JSON** (`"stdout": "json"` in the flow file).
 - `{"scores": {"found": 4}}` in that data scores the run. Flow health shows the scores of each flow.
 - `$NS_KNOWLEDGE` is the project's [knowledge](Knowledge.md) folder.
 

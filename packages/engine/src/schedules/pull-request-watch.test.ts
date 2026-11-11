@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { fakeHarness } from "@nightshift/agents/testing";
 import { event } from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { iso, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import type { PullRequestView } from "../projects";
@@ -24,7 +25,7 @@ const PR = "https://github.com/acme/app/pull/12";
 const MERGE_SHA = "0123456789abcdef0123456789abcdef01234567";
 
 const openerFlow: Flow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [{ name: "pr", type: "text" }],
 	outputs: [],
 	start: "open",
@@ -34,7 +35,7 @@ const openerFlow: Flow = {
 			type: "command",
 			position: { x: 0, y: 0 },
 			command: 'echo "Creating pull request"; echo "{{pr}}"',
-			output: "text",
+			stdout: "text",
 		},
 	],
 	edges: [],

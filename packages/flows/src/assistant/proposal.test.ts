@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { type Flow, type FlowInput, flowSchema } from "../flow";
+import { FLOW_VERSION, type Flow, type FlowInput, flowSchema } from "../flow";
 import type { FlowIssue } from "../validate";
 import { proposalIssues } from "./proposal";
 
 const valid: FlowInput = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [{ name: "task", type: "text" }],
 	start: "build",
 	nodes: [
@@ -29,7 +29,7 @@ const valid: FlowInput = {
 };
 
 const draft: Flow = flowSchema.parse({
-	version: 8,
+	version: FLOW_VERSION,
 	start: "only",
 	nodes: [
 		{
@@ -56,7 +56,7 @@ describe("proposalIssues", () => {
 		for (const proposal of [null, "flow", { ...valid, version: 4 }, {}]) {
 			const issues = proposalIssues(draft, proposal);
 			expect(issues).toHaveLength(1);
-			expect(issues[0]?.message).toContain('"version": 8');
+			expect(issues[0]?.message).toContain(`"version": ${FLOW_VERSION}`);
 		}
 	});
 
@@ -129,7 +129,7 @@ describe("proposalIssues", () => {
 
 	test("a Call node checks the flows of the project", () => {
 		const proposal: FlowInput = {
-			version: 8,
+			version: FLOW_VERSION,
 			start: "sub",
 			nodes: [
 				{
@@ -148,7 +148,7 @@ describe("proposalIssues", () => {
 
 	test("a flow that calls itself, by its own name", () => {
 		const proposal: FlowInput = {
-			version: 8,
+			version: FLOW_VERSION,
 			start: "again",
 			nodes: [
 				{ id: "again", type: "call", position: { x: 0, y: 0 }, flow: "me" },

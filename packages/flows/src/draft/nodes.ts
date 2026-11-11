@@ -65,7 +65,7 @@ export function commandNode(id: string, position: Position): CommandNode {
 		type: "command",
 		position,
 		command: "",
-		output: "text",
+		stdout: "text",
 		exits: DEFAULT_COMMAND_EXITS.map((exit) => ({ ...exit })),
 	};
 }

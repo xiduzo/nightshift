@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	FLOW_VERSION,
 	flowSchema,
 	type SuggestionEvent,
 	type SuggestionRequest,
@@ -14,7 +15,7 @@ const request: SuggestionRequest = {
 	projectId: "p",
 	flowName: "f",
 	flow: flowSchema.parse({
-		version: 8,
+		version: FLOW_VERSION,
 		start: "a",
 		nodes: [
 			{

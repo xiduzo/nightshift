@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type Flow, flowSchema } from "../flow";
+import { FLOW_VERSION, type Flow, flowSchema } from "../flow";
 import {
 	nodesWithin,
 	parentSection,
@@ -20,7 +20,7 @@ const command = (id: string) => ({
  * a → b → c → d → e. Outer holds b and Inner; Inner holds c and d.
  */
 const nested: Flow = flowSchema.parse({
-	version: 8,
+	version: FLOW_VERSION,
 	start: "a",
 	nodes: ["a", "b", "c", "d", "e"].map(command),
 	edges: [

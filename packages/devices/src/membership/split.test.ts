@@ -23,6 +23,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/client";
 import { eq } from "drizzle-orm";
@@ -66,7 +67,7 @@ afterEach(async () => {
 });
 
 const quickFlow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: "hello",
@@ -76,7 +77,7 @@ const quickFlow = {
 			type: "command",
 			position: { x: 0, y: 0 },
 			command: "echo hello",
-			output: "text",
+			stdout: "text",
 		},
 	],
 	edges: [],

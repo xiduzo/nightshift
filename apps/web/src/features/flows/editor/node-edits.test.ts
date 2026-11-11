@@ -20,7 +20,7 @@ const flow: Flow = flowSchema.parse({
 			type: "command",
 			position: { x: 0, y: 0 },
 			command: "echo {{topic}}",
-			output: "text",
+			stdout: "text",
 			set: [{ variable: "tries", value: "1" }],
 		},
 		{
@@ -28,7 +28,7 @@ const flow: Flow = flowSchema.parse({
 			type: "command",
 			position: { x: 0, y: 0 },
 			command: "echo",
-			output: "text",
+			stdout: "text",
 		},
 	],
 	edges: [{ id: "e1", from: "build", outcome: "pass", to: "check" }],

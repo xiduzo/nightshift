@@ -54,11 +54,11 @@ Night Shift's tools cannot save a schedule or a profile:
 
 # Writing Night Shift flows
 
-A flow is a directed graph of nodes and edges. Night Shift keeps it in the project, under its name. A run starts at `start`, runs one node (a step), and follows the edge for the outcome that step ended with. A run ends when no edge leaves on that outcome. A flow is a function: it takes `inputs` and returns `outputs`. Write version 8. The model never changes the graph at run time.
+A flow is a directed graph of nodes and edges. Night Shift keeps it in the project, under its name. A run starts at `start`, runs one node (a step), and follows the edge for the outcome that step ended with. A run ends when no edge leaves on that outcome. A flow is a function: it takes `inputs` and returns `outputs`. Write version 9. The model never changes the graph at run time.
 
 ## The file
 
-`{ version: 8, description?, inputs, outputs, variables?, start, nodes, edges, sections?, policy? }`
+`{ version: 9, description?, inputs, outputs, variables?, start, nodes, edges, sections?, policy? }`
 
 - `inputs`: `{ name, type: "text" | "number" | "boolean" | "choice" | "json", label?, description?, default?, required?, options? }`. The start dialog shows a field per type: a number field, a switch, a list to pick from. `choice` needs `options` (a list of text) and gives the picked text. A default is text: `"45"`, `"true"`, one of the options, or JSON text. Use `boolean` for yes/no, `number` for counts and minutes, `choice` for a fixed list. A `json` input takes a path: `{{item.title}}`.
 - `outputs`: `{ name, value, description? }`. `value` is a template, rendered when the flow ends.
@@ -82,7 +82,7 @@ Outcomes: `pass`, `fail`, `needs-input` unless it lists its own. Outputs: `outco
 
 ### command
 
-A shell command in the project. Its output is the log. To hand on data, it writes JSON to the file named by `$NS_OUTPUT`, which becomes `data`: `echo '{"count": 3}' > "$NS_OUTPUT"`. Data with an `outcome` that names one of its exits ends the step on that exit, whatever the exit code; else the exit code picks the outcome. `exits` lists `{ name, code }`; an exit with `"code": "data"` is picked by the data only; one exit without `code` catches every other code and goes last. Without `exits`: `pass` on 0, `fail` on any other code. Data with `scores` (names to numbers of 0 or more, `{"scores": {"replicated": 1}}`) scores the run, and Flow health shows each name. `output: "json"` reads the JSON printed on stdout instead, when `$NS_OUTPUT` stays empty. `secrets` names secrets that reach the command as environment variables. `$NS_KNOWLEDGE` is the project's knowledge folder, which agents read: a sync writes markdown there. A template value reaches the shell as an environment variable, never as shell text, so quote it: `echo "{{build.summary}}"`. Use double quotes or a heredoc without quotes (`<<EOF`). Single quotes and a quoted heredoc (`<<'EOF'`) stop the shell from filling in the value: the command gets the variable's name. Call a CLI tool with a login (`signsIn` in list_tools) by its name to run its program signed in: `acli-work jira`, not `acli jira`.
+A shell command in the project. Its output is the log. To hand on data, it writes JSON to the file named by `$NS_OUTPUT`, which becomes `data`: `echo '{"count": 3}' > "$NS_OUTPUT"`. Data with an `outcome` that names one of its exits ends the step on that exit, whatever the exit code; else the exit code picks the outcome. `exits` lists `{ name, code }`; an exit with `"code": "data"` is picked by the data only; one exit without `code` catches every other code and goes last. Without `exits`: `pass` on 0, `fail` on any other code. Data with `scores` (names to numbers of 0 or more, `{"scores": {"replicated": 1}}`) scores the run, and Flow health shows each name. `stdout: "json"` reads the JSON printed on stdout instead, when `$NS_OUTPUT` stays empty. `output` is an optional JSON Schema for `data`. `secrets` names secrets that reach the command as environment variables. `$NS_KNOWLEDGE` is the project's knowledge folder, which agents read: a sync writes markdown there. A template value reaches the shell as an environment variable, never as shell text, so quote it: `echo "{{build.summary}}"`. Use double quotes or a heredoc without quotes (`<<EOF`). Single quotes and a quoted heredoc (`<<'EOF'`) stop the shell from filling in the value: the command gets the variable's name. Call a CLI tool with a login (`signsIn` in list_tools) by its name to run its program signed in: `acli-work jira`, not `acli jira`.
 
 Outcomes: its exits (`pass`, `fail` without `exits`). Outputs: `outcome`, `exit_code`, `log_tail`, `data`, `visit`.
 
@@ -266,7 +266,7 @@ Group a flow of more than about six nodes into Sections, one per phase of the wo
 
 ## Checklist
 
-- `version` is 8, `start` names a node, every edge connects known nodes on an outcome its source can end with.
+- `version` is 9, `start` names a node, every edge connects known nodes on an outcome its source can end with.
 - Every Agent node has a profile, or a harness, model and permission mode. Use only profiles, connections, CLI tools and flows that exist: look them up, do not invent names or ids.
 - Every loop has an edge with `max`.
 - A flow of more than about six nodes has Sections, one per phase, without warnings.
@@ -276,7 +276,7 @@ Group a flow of more than about six nodes into Sections, one per phase of the wo
 
 ```json
 {
- "version": 8,
+ "version": 9,
  "description": "Builds a task, runs the tests, fixes failures, then asks.",
  "inputs": [
   {
@@ -432,7 +432,7 @@ This one calls the flow `summarize-source`, which takes an input `item`.
 
 ```json
 {
- "version": 8,
+ "version": 9,
  "description": "Finds sources on a topic, then summarizes each one.",
  "inputs": [
   {

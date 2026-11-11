@@ -18,6 +18,7 @@ import {
 	type Sandbox,
 	waitFor,
 } from "@nightshift/engine/testing";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { asDate, now as timeNow } from "@nightshift/time";
 import { ORPCError } from "@orpc/server";
 import type { Caller, SyncBatch } from "../contract";
@@ -131,7 +132,7 @@ function host() {
 }
 
 const commandFlow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: "hello",
@@ -141,7 +142,7 @@ const commandFlow = {
 			type: "command",
 			position: { x: 0, y: 0 },
 			command: "echo hello",
-			output: "text",
+			stdout: "text",
 		},
 	],
 	edges: [],

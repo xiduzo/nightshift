@@ -4,6 +4,7 @@ import { readFile, rm } from "node:fs/promises";
 import { fakeHarness } from "@nightshift/agents/testing";
 import { lgCheckpoint, lgWrite, run, step } from "@nightshift/db/schema";
 import type { CommandNode, DecisionNode, Flow } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { asc, eq } from "drizzle-orm";
 import type { WalkFile } from "../archive";
 import { createRunHistory, ForeignRowsError } from "../log";
@@ -30,7 +31,7 @@ const command = (id: string, cmd: string): CommandNode => ({
 	type: "command",
 	position: { x: 0, y: 0 },
 	command: cmd,
-	output: "text",
+	stdout: "text",
 });
 
 const gate: DecisionNode = {
@@ -45,7 +46,7 @@ const gate: DecisionNode = {
 
 /** build → gate (approve → ship). */
 const gateFlow: Flow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: "build",

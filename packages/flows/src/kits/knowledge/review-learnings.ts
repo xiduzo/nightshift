@@ -38,7 +38,7 @@ done`;
  * waited stays for the next review.
  */
 export const knowledgeReviewLearningsKit: FlowInput = {
-	version: 8,
+	version: 9,
 	description:
 		"Shows what agents proposed to learn about the project, and asks you to keep or delete it. Agents read what you keep.",
 	inputs: [],

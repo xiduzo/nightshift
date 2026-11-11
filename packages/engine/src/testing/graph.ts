@@ -7,6 +7,7 @@ import { project, run } from "@nightshift/db/schema";
 import {
 	type AgentNode,
 	type CommandNode,
+	FLOW_VERSION,
 	type Flow,
 	type FlowEdge,
 	flowSchema,
@@ -100,7 +101,7 @@ export const command = (
 	type: "command",
 	position: { x: 0, y: 0 },
 	command: cmd,
-	output: "text",
+	stdout: "text",
 	...extra,
 });
 
@@ -130,14 +131,14 @@ export function flowOf(
 ): Flow {
 	if (Array.isArray(input)) {
 		return flowSchema.parse({
-			version: 8,
+			version: FLOW_VERSION,
 			start: input[0]?.id ?? "",
 			nodes: input,
 			edges,
 			...extra,
 		});
 	}
-	return flowSchema.parse({ version: 8, ...input });
+	return flowSchema.parse({ version: FLOW_VERSION, ...input });
 }
 
 /** How long one minute of a timeout or a policy wait lasts in these tests. */

@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { Flow, FlowEdge, FlowNode } from "../flow";
-import { nodeOutcomes, nodeOutputFields, tierNode } from "../flow";
+import {
+	FLOW_VERSION,
+	nodeOutcomes,
+	nodeOutputFields,
+	tierNode,
+} from "../flow";
 import type { AgentNode, CallNode, DecisionNode, ValueNode } from "../nodes";
 import { validateFlow } from "./flow";
 import type { FlowIssue } from "./issues";
@@ -78,7 +83,7 @@ function call(extra: Partial<CallNode> = {}): CallNode {
 
 function flow(nodes: FlowNode[], edges: FlowEdge[] = []): Flow {
 	return {
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [{ name: "issue", type: "text" }],
 		outputs: [],
 		start: nodes[0]?.id ?? "",
@@ -91,7 +96,7 @@ const errors = (issues: FlowIssue[]) =>
 	issues.filter((issue) => issue.severity === "error").map((i) => i.message);
 
 const body = (...inputs: string[]): Flow => ({
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: inputs.map((name) => ({ name, type: "text" as const })),
 	outputs: [],
 	start: "work",
@@ -101,7 +106,7 @@ const body = (...inputs: string[]): Flow => ({
 			type: "command",
 			position: at,
 			command: "true",
-			output: "text",
+			stdout: "text",
 		},
 	],
 	edges: [],

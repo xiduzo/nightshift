@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { type ExplanationEvent, flowSchema } from "@nightshift/flows";
+import {
+	type ExplanationEvent,
+	FLOW_VERSION,
+	flowSchema,
+} from "@nightshift/flows";
 import { failingScript, fakeHarness } from "../testing/fake";
 import { explainRun, explanationPrompt } from "./explain";
 import type { AuthoringRun } from "./tools";
@@ -10,7 +14,7 @@ const run: AuthoringRun = {
 	reason: "The step `test` failed.",
 	inputs: {},
 	flow: flowSchema.parse({
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [],
 		start: "test",
 		nodes: [

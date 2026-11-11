@@ -435,7 +435,7 @@ const commandKind: KindPrompt = {
 		];
 		if (node.type === "command") {
 			lines.push(
-				node.output === "json"
+				node.stdout === "json"
 					? "- The node keeps the output as JSON: the command must print one JSON value on stdout."
 					: "- Later nodes read the last lines of the output.",
 				"",

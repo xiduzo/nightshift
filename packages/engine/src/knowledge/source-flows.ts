@@ -1,5 +1,6 @@
 import {
 	type DeviceRef,
+	FLOW_VERSION,
 	type Flow,
 	flowNameSchema,
 	flowSchema,
@@ -96,7 +97,7 @@ function sourceFlow(
 ) {
 	const kind = knowledgeSourceKind(kit);
 	return flowSchema.parse({
-		version: 8,
+		version: FLOW_VERSION,
 		description: `Knowledge: ${kind.label}. Edit it on the Knowledge page.`,
 		start: "sync",
 		nodes: [

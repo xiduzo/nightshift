@@ -16,7 +16,7 @@ import type {
 	SuggestionEvent,
 	SuggestionRequest,
 } from "@nightshift/flows";
-import { flowSchema } from "@nightshift/flows";
+import { FLOW_VERSION, flowSchema } from "@nightshift/flows";
 import type { FlowInput } from "@nightshift/flows/testing";
 import { now } from "@nightshift/time";
 import { call } from "@orpc/server";
@@ -138,7 +138,7 @@ describe("pickAgent", () => {
 });
 
 const flow: FlowInput = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [{ name: "issue", type: "text" }],
 	start: "plan",
 	nodes: [

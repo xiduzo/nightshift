@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { fakeHarness } from "@nightshift/agents/testing";
 import { device, event, run } from "@nightshift/db/schema";
 import type { Flow, Schedule } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { iso } from "@nightshift/time";
 import { atLocal, utc } from "@nightshift/time/testing";
@@ -84,7 +85,7 @@ function startDaemon(
 
 function commandFlow(command = "echo night", extra: Partial<Flow> = {}): Flow {
 	return {
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [{ name: "epic", type: "text" }],
 		outputs: [],
 		start: "work",
@@ -94,7 +95,7 @@ function commandFlow(command = "echo night", extra: Partial<Flow> = {}): Flow {
 				type: "command",
 				position: { x: 0, y: 0 },
 				command,
-				output: "text",
+				stdout: "text",
 			},
 		],
 		edges: [],
@@ -105,7 +106,7 @@ function commandFlow(command = "echo night", extra: Partial<Flow> = {}): Flow {
 /** Waits at a Gate until a person answers: a run that stays open. */
 function gateFlow(): Flow {
 	return {
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [],
 		outputs: [],
 		start: "ask",

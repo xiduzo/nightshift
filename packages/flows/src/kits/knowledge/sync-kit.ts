@@ -152,7 +152,7 @@ export function defineSyncKit<
 			programs: source.programs.map((program) => program.name),
 		},
 		flow: {
-			version: 8,
+			version: 9,
 			description: source.description,
 			inputs: [
 				...source.inputs,

@@ -18,6 +18,7 @@ import type {
 	ServiceNode,
 	WaitNode,
 } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import {
 	defaultRunSettings,
 	type RunSettings,
@@ -118,7 +119,7 @@ const command = (id: string, text: string): CommandNode => ({
 	type: "command",
 	position: at,
 	command: text,
-	output: "text",
+	stdout: "text",
 });
 
 /** Reads the stack's address and its log, as a test against the stack does. */
@@ -143,7 +144,7 @@ const edge = (from: string, outcome: string, to: string): FlowEdge => ({
 });
 
 const flowOf = (nodes: FlowNode[], edges: FlowEdge[]): Flow => ({
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: nodes[0]?.id ?? "",

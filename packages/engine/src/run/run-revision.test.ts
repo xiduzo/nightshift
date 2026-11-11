@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { fakeHarness } from "@nightshift/agents/testing";
 import { event, run } from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { and, eq } from "drizzle-orm";
 import * as Y from "yjs";
 import { createProjectFlows } from "../flows";
@@ -21,7 +22,7 @@ import { createEngine } from "./engine";
 /** A Run records the Flow revision it runs, and those of the flows it calls (ADR 2). */
 
 const flowOf = (nodes: Flow["nodes"]): Flow => ({
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: nodes[0]?.id ?? "",
@@ -44,7 +45,7 @@ const helper = flowOf([
 		type: "command",
 		position: { x: 0, y: 0 },
 		command: "echo hello",
-		output: "text",
+		stdout: "text",
 	},
 ]);
 

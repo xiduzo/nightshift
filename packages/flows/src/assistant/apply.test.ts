@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type Flow, flowSchema } from "../flow";
+import { FLOW_VERSION, type Flow, flowSchema } from "../flow";
 import {
 	applySuggestion,
 	outputChanges,
@@ -9,7 +9,7 @@ import {
 } from "./apply";
 
 const flow: Flow = flowSchema.parse({
-	version: 8,
+	version: FLOW_VERSION,
 	start: "plan",
 	inputs: [{ name: "ticket", type: "text" }],
 	variables: [{ name: "tries", type: "number" }],

@@ -6,6 +6,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow, FlowEdge, FlowNode, LeaseNode } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { type PairedReplicas, pairedReplicas } from "../testing";
 
 /**
@@ -45,7 +46,7 @@ const edge = (from: string, outcome: string, to: string): FlowEdge => ({
 	to,
 });
 const flowOf = (nodes: FlowNode[], edges: FlowEdge[]): Flow => ({
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: nodes[0]?.id ?? "",

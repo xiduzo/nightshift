@@ -9,6 +9,7 @@ import type {
 	LeaseNode,
 	WaitNode,
 } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { instant, now } from "@nightshift/time";
 import {
 	defaultRunSettings,
@@ -93,7 +94,7 @@ const edge = (from: string, outcome: string, to: string): FlowEdge => ({
 	to,
 });
 const flowOf = (nodes: FlowNode[], edges: FlowEdge[]): Flow => ({
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: nodes[0]?.id ?? "",
@@ -250,7 +251,7 @@ describe("the engine lets go of a lease on every end", () => {
 						type: "command",
 						position: at,
 						command: "exit 3",
-						output: "text",
+						stdout: "text",
 					},
 				],
 				[edge("own", "held", "check")],
@@ -323,7 +324,7 @@ describe("a lease holds for its scope", () => {
 							type: "command",
 							position: at,
 							command: "true",
-							output: "text",
+							stdout: "text",
 						},
 						waitFor_("go"),
 					],
@@ -371,7 +372,7 @@ describe("a run that resumes takes its leases again", () => {
 						type: "command",
 						position: at,
 						command: `test -f ${marker}`,
-						output: "text",
+						stdout: "text",
 					},
 				],
 				[edge("own", "held", "check")],

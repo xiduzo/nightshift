@@ -40,7 +40,7 @@ import { TemplateField } from "../template-field";
 import { NodeOptionsField } from "./node-options-field";
 
 /** What a Command node keeps of its output, in the order the toggle shows them. */
-const COMMAND_OUTPUTS: { value: CommandNode["output"]; label: string }[] = [
+const COMMAND_OUTPUTS: { value: CommandNode["stdout"]; label: string }[] = [
 	{ value: "text", label: "Text" },
 	{ value: "json", label: "JSON" },
 ];
@@ -130,10 +130,10 @@ export function CommandFields({
 					action={<CommandSuggest node={node} />}
 				/>
 				<Field
-					id={`${id}-output`}
-					label="Output"
+					id={`${id}-stdout`}
+					label="What it prints"
 					hint={
-						node.output === "json" ? (
+						node.stdout === "json" ? (
 							<>
 								The command prints JSON. Later nodes read it as{" "}
 								<code className="font-mono">{`{{${node.id}.data.tests}}`}</code>
@@ -156,13 +156,13 @@ export function CommandFields({
 						variant="outline"
 						size="sm"
 						spacing={0}
-						aria-label="Output"
-						aria-describedby={`${id}-output-hint`}
+						aria-label="What it prints"
+						aria-describedby={`${id}-stdout-hint`}
 						className="w-full"
-						value={[node.output]}
+						value={[node.stdout]}
 						onValueChange={(value) => {
-							const output = value[0] as CommandNode["output"] | undefined;
-							if (output) onChange((current) => ({ ...current, output }));
+							const stdout = value[0] as CommandNode["stdout"] | undefined;
+							if (stdout) onChange((current) => ({ ...current, stdout }));
 						}}
 					>
 						{COMMAND_OUTPUTS.map((entry) => (

@@ -9,6 +9,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { asDate, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import type { WorkRelay } from "../contract";
@@ -34,7 +35,7 @@ let stop: () => Promise<void>;
 
 /** One command that counts its runs in a kept variable. */
 const countFlow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: "count",
@@ -45,7 +46,7 @@ const countFlow = {
 			type: "command",
 			position: { x: 0, y: 0 },
 			command: "pwd",
-			output: "text",
+			stdout: "text",
 			set: [{ variable: "runs", expression: "vars.runs + 1" }],
 		},
 	],

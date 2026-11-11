@@ -12,6 +12,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { withPeers } from "../testing";
@@ -38,7 +39,7 @@ const HOST = "the-host";
 
 /** A Gate: the run waits, so the open Gates name its Walker too. */
 const gateFlow: Flow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: "ship",

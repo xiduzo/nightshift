@@ -18,6 +18,7 @@ import {
 	type AgentNode,
 	type CommandNode,
 	type DecisionNode,
+	FLOW_VERSION,
 	type Flow,
 	type FlowEdge,
 	singleAgentFlow,
@@ -134,7 +135,7 @@ function command(id: string, cmd: string): CommandNode {
 		type: "command",
 		position: { x: 0, y: 0 },
 		command: cmd,
-		output: "text",
+		stdout: "text",
 	};
 }
 
@@ -152,7 +153,7 @@ function edge(
 
 function flowOf(nodes: Flow["nodes"], edges: FlowEdge[] = []): Flow {
 	return {
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",

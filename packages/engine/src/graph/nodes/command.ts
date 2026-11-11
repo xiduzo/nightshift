@@ -40,10 +40,10 @@ import { type BodyResult, runStep, type StepHandle } from "../step-runner";
  *
  * The data: the Device gives the command a new, empty file named in
  * `NS_OUTPUT`. What the command wrote there is parsed as one JSON value
- * into `data` (`{{check.data.tests}}`), whatever `output` says and
+ * into `data` (`{{check.data.tests}}`), whatever `stdout` says and
  * whatever the exit code, so stdout stays a log. A file that is not JSON
  * ends the step on the catch-all. An empty file leaves the older way:
- * with `output: "json"` and exit 0, what the command printed on stdout is
+ * with `stdout: "json"` and exit 0, what the command printed on stdout is
  * the JSON, and output that is not JSON ends on the catch-all too. Data
  * with `scores` (`{"scores": {"replicated": 1}}`) scores the run: one
  * `Scored` per name on the step, after it ends (`flowScores`). An entry
@@ -101,7 +101,7 @@ async function runShell(
 	): BodyResult => ({ kind: "end", outcome, outputs, error });
 	const { command, env } = renderCommand(node.command, step.tctx);
 	step.record(null, { type: "command-start", command });
-	const json = node.output === "json";
+	const json = node.stdout === "json";
 	let stdout = "";
 	const result = await runCommand(step.device, {
 		command,

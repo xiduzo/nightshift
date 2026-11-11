@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type Flow, flowSchema, starterList } from "@nightshift/flows";
+import {
+	FLOW_VERSION,
+	type Flow,
+	flowSchema,
+	starterList,
+} from "@nightshift/flows";
 import {
 	CHECKED,
 	cell,
@@ -25,7 +30,7 @@ function commandFile(
 	extra: Record<string, unknown> = {},
 ): Record<string, unknown> {
 	return {
-		version: 8,
+		version: FLOW_VERSION,
 		description: "Says hello.",
 		start: "hello",
 		nodes: [
@@ -131,7 +136,7 @@ describe("fill", () => {
 describe("flowNeeds", () => {
 	test("lists each kind a flow needs once, each tier of a cascade on its own", () => {
 		const flow: Flow = flowSchema.parse({
-			version: 8,
+			version: FLOW_VERSION,
 			start: "build",
 			nodes: [
 				{
@@ -224,7 +229,7 @@ describe("loadCommunityFlow", () => {
 			fileOf({ ...commandFile(), version: 6 }),
 		);
 		expect(problems).toEqual([]);
-		expect(flow?.version).toBe(8);
+		expect(flow?.version).toBe(FLOW_VERSION);
 	});
 
 	test("names a file that is not JSON, or of a newer format", () => {
@@ -236,7 +241,9 @@ describe("loadCommunityFlow", () => {
 		).toEqual({
 			name: "a",
 			flow: null,
-			problems: ["Its format is 99, and Night Shift reads up to format 8."],
+			problems: [
+				`Its format is 99, and Night Shift reads up to format ${FLOW_VERSION}.`,
+			],
 		});
 	});
 
@@ -273,7 +280,7 @@ describe("communityFlows", () => {
 			writeFileSync(join(dir, name, "flow.json"), fileOf(json));
 		};
 		const caller = (flow: string) => ({
-			version: 8,
+			version: FLOW_VERSION,
 			start: "call",
 			nodes: [
 				{

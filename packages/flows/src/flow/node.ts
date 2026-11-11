@@ -151,7 +151,7 @@ export function outcomeColor(
 /**
  * The fields a later node can read with `{{<nodeId>.<field>}}`. A field of a
  * node that has not run yet renders as an empty string. `data` (Agent,
- * Value, and a Command with `output: "json"`) and `results` (a Call with
+ * Value, and a Command with `stdout: "json"`) and `results` (a Call with
  * `each`) hold JSON and take a deeper path. A Call node's fields depend on
  * `each`, and without it the node also has the outputs of the flow it calls:
  * use `nodeOutputFields`.

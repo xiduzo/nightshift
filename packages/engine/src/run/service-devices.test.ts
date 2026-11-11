@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentNode, Flow, FlowNode, ServiceNode } from "@nightshift/flows";
-
+import { FLOW_VERSION } from "@nightshift/flows";
 import type { PlacedDevice, PlannedRun } from "../placement";
 import { checkServiceDevices } from "./service-devices";
 
@@ -41,7 +41,7 @@ function plan(
 	sections: Flow["sections"] = undefined,
 ): PlannedRun {
 	const flow: Flow = {
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [],
 		outputs: [],
 		start: "stack",

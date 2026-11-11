@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { Flow, FlowEdge, FlowNode } from "../flow";
-import { flowSchema, nodeOutcomes, outputFieldsByType } from "../flow";
+import {
+	FLOW_VERSION,
+	flowSchema,
+	nodeOutcomes,
+	outputFieldsByType,
+} from "../flow";
 import type {
 	AgentNode,
 	CallEach,
@@ -37,7 +42,7 @@ function command(id: string, extra: Partial<CommandNode> = {}): CommandNode {
 		type: "command",
 		position: { x: 0, y: 0 },
 		command: "bun test",
-		output: "text",
+		stdout: "text",
 		...extra,
 	};
 }
@@ -149,7 +154,14 @@ function edge(
 }
 
 function flow(nodes: FlowNode[], edges: FlowEdge[], start = "worker"): Flow {
-	return { version: 8, inputs: [], outputs: [], start, nodes, edges };
+	return {
+		version: FLOW_VERSION,
+		inputs: [],
+		outputs: [],
+		start,
+		nodes,
+		edges,
+	};
 }
 
 const errors = (issues: FlowIssue[]) =>
@@ -1164,7 +1176,7 @@ describe("parseFlow", () => {
 
 	test("turns schema errors into one issue per zod issue, with the path", () => {
 		const result = parseFlow({
-			version: 8,
+			version: FLOW_VERSION,
 			start: "Worker",
 			nodes: [{ ...agent("worker"), model: "" }],
 			edges: [{ id: "a", from: "worker", outcome: "Maybe", to: "check" }],
@@ -1507,20 +1519,20 @@ describe("validateFlow: agent outcomes and output", () => {
 });
 
 describe("validateFlow: Command output", () => {
-	const f = (output: CommandNode["output"], prompt: string): Flow =>
+	const f = (stdout: CommandNode["stdout"], prompt: string): Flow =>
 		flow(
-			[command("check", { output }), agent("worker", { prompt })],
+			[command("check", { stdout }), agent("worker", { prompt })],
 			[edge("a", "check", "pass", "worker")],
 			"check",
 		);
 
-	test("with output json, data and a path below it are read", () => {
+	test("with stdout json, data and a path below it are read", () => {
 		expect(
 			validateFlow(f("json", "{{check.data}} {{check.data.tests.0}}")),
 		).toEqual([]);
 	});
 
-	test("with output text, data is an error that says how to fix it", () => {
+	test("with stdout text, data is an error that says how to fix it", () => {
 		expect(
 			errors(validateFlow(f("text", "{{check.data.tests}}"))).map(
 				(issue) => issue.message,
@@ -1531,7 +1543,7 @@ describe("validateFlow: Command output", () => {
 		expect(validateFlow(f("text", "{{check.log_tail}}"))).toEqual([]);
 	});
 
-	test("a command that writes to $NS_OUTPUT has data, whatever its output", () => {
+	test("a command that writes to $NS_OUTPUT has data, whatever its stdout", () => {
 		const flow = f("text", "{{check.data.tests}}");
 		const writes = {
 			...flow,
@@ -2144,7 +2156,7 @@ describe("validateFlow: Call", () => {
 describe("parseFlow with options", () => {
 	test("passes the options to validateFlow", () => {
 		const json = {
-			version: 8,
+			version: FLOW_VERSION,
 			start: "each",
 			nodes: [
 				{
@@ -2181,7 +2193,7 @@ describe("parseFlow with options", () => {
 		});
 		expect(parsed.issues).toEqual([]);
 		expect(parsed.flow).toMatchObject({
-			version: 8,
+			version: FLOW_VERSION,
 			inputs: [{ name: "epic", type: "text", required: true }],
 			nodes: [{ prompt: "Epic {{epic}}" }],
 		});

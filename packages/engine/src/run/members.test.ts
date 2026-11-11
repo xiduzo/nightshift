@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { fakeHarness } from "@nightshift/agents/testing";
 import { device, event, user } from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { and, eq, isNull } from "drizzle-orm";
 import { parseEventRow } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";
@@ -71,7 +72,7 @@ function makeEngine(): Engine {
 
 /** A Gate only: the run waits, and nothing touches the worktree. */
 const flow: Flow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: "ship",

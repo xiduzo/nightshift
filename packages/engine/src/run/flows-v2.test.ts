@@ -16,7 +16,7 @@ import type {
 	Flow,
 	FlowEdge,
 } from "@nightshift/flows";
-import { parseFlow } from "@nightshift/flows";
+import { FLOW_VERSION, parseFlow } from "@nightshift/flows";
 import type { FlowInput } from "@nightshift/flows/testing";
 import { saverFor } from "../graph/checkpointer";
 import { appendEvent } from "../log/events";
@@ -105,7 +105,7 @@ function command(id: string, cmd: string): CommandNode {
 		type: "command",
 		position: { x: 0, y: 0 },
 		command: cmd,
-		output: "text",
+		stdout: "text",
 	};
 }
 
@@ -147,7 +147,7 @@ function flowOf(
 	extra: Partial<Flow> = {},
 ): Flow {
 	return {
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",
@@ -1265,7 +1265,7 @@ describe("flow format 1", () => {
 			inputs: { epic: "7" },
 		});
 		const loaded = await engine.getRun(runId);
-		expect(loaded.flow.version).toBe(8);
+		expect(loaded.flow.version).toBe(FLOW_VERSION);
 		expect(loaded.flow.inputs).toEqual([
 			expect.objectContaining({ name: "epic", type: "text", required: true }),
 		]);

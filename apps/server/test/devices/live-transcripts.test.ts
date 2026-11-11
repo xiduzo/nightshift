@@ -3,8 +3,8 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AppRouterClient } from "@nightshift/api";
+import { FLOW_VERSION } from "@nightshift/flows";
 import type { InferClientInputs } from "@orpc/client";
-
 import {
 	type Daemon,
 	pair,
@@ -67,7 +67,7 @@ async function repo(name: string): Promise<string> {
 /** One command step that prints, waits for `marker`, and prints again. */
 function slowFlow(marker: string): Flow {
 	return {
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [],
 		outputs: [],
 		start: "build",
@@ -77,7 +77,7 @@ function slowFlow(marker: string): Flow {
 				type: "command",
 				position: { x: 0, y: 0 },
 				command: `echo first line; while [ ! -f '${marker}' ]; do sleep 0.1; done; echo second line`,
-				output: "text",
+				stdout: "text",
 			},
 		],
 		edges: [],

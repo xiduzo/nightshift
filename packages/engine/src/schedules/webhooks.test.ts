@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import { fakeHarness } from "@nightshift/agents/testing";
 import { event } from "@nightshift/db/schema";
 import type { Flow, Schedule } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import { parseEventRow } from "../log/events";
 import { createEngine, type Engine } from "../run/engine";
@@ -54,7 +55,7 @@ afterEach(async () => {
 });
 
 const echoFlow: Flow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [
 		{ name: "pr", type: "text" },
 		{ name: "body", type: "json" },
@@ -67,7 +68,7 @@ const echoFlow: Flow = {
 			type: "command",
 			position: { x: 0, y: 0 },
 			command: 'echo "{{pr}}"',
-			output: "text",
+			stdout: "text",
 		},
 	],
 	edges: [],
@@ -75,7 +76,7 @@ const echoFlow: Flow = {
 
 /** Waits for the signal `ci-done` with the run's own `pr` as the key. */
 const waitFlow: Flow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [{ name: "pr", type: "text" }],
 	outputs: [],
 	start: "ci",

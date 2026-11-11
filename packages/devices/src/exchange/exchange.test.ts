@@ -23,6 +23,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { and, eq, max, sql } from "drizzle-orm";
 import type { HostRelay as Relay, RunCommand } from "../contract";
@@ -53,7 +54,7 @@ const HOST = "the-host";
 
 /** A command, then a Gate. */
 const gateFlow: Flow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: "hello",
@@ -63,7 +64,7 @@ const gateFlow: Flow = {
 			type: "command",
 			position: { x: 0, y: 0 },
 			command: "echo hello",
-			output: "text",
+			stdout: "text",
 		},
 		{
 			id: "ship",
@@ -232,7 +233,7 @@ describe("the run history exchange", () => {
 		const run = await engineA.space(a.spaceId).startRun({
 			projectId,
 			flow: {
-				version: 8,
+				version: FLOW_VERSION,
 				inputs: [],
 				outputs: [],
 				start: "agent",

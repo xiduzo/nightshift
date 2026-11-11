@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import {
+	FLOW_VERSION,
 	type Flow,
 	type FlowIssue,
 	flowSchema,
@@ -15,7 +16,7 @@ import { terminalResources } from "./terminal-resources";
 import type { TerminalGate, TerminalRunSummary } from "./terminal-runs";
 
 const flow: Flow = flowSchema.parse({
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [{ name: "issue", type: "text" }],
 	outputs: [],
 	start: "build",

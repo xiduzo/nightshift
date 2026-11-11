@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AppRouterClient } from "@nightshift/api";
 import type { RunSummary } from "@nightshift/engine";
+import { FLOW_VERSION } from "@nightshift/flows";
 import type { InferClientInputs } from "@orpc/client";
-
 import {
 	type Daemon,
 	pair,
@@ -73,7 +73,7 @@ async function repo(name: string): Promise<string> {
 
 /** A command, then a Gate: B's run waits for an answer. */
 const gateFlow: Flow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: "hello",
@@ -83,7 +83,7 @@ const gateFlow: Flow = {
 			type: "command",
 			position: { x: 0, y: 0 },
 			command: "echo hello from B",
-			output: "text",
+			stdout: "text",
 		},
 		{
 			id: "ship",

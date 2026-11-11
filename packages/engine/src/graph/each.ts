@@ -44,7 +44,7 @@ export function jsonSourceItems(
 
 /**
  * Parses what a command printed as one JSON value: a Command node with
- * `output: "json"`, or a command source. Throws with a readable message.
+ * `stdout: "json"`, or a command source. Throws with a readable message.
  */
 export function parseCommandJson(stdout: string, what: string): JsonValue {
 	try {

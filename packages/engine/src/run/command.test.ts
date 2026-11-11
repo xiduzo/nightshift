@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { fakeHarness } from "@nightshift/agents/testing";
 import type { CommandNode, DecisionNode, Flow } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import type { Relay } from "../contract";
 import { createRunLog } from "../log/run-log";
 import { RunRefusal } from "../run-status";
@@ -26,7 +27,7 @@ const build: CommandNode = {
 	type: "command",
 	position: { x: 0, y: 0 },
 	command: "echo built",
-	output: "text",
+	stdout: "text",
 };
 
 const gate: DecisionNode = {
@@ -41,7 +42,7 @@ const gate: DecisionNode = {
 
 /** build → gate. The answer ends the run. */
 const gateFlow: Flow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: "build",

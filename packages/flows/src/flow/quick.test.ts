@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { validateFlow } from "../validate";
-import { flowSchema } from "./flow";
+import { FLOW_VERSION, flowSchema } from "./flow";
 import { singleAgentFlow } from "./quick";
 
 describe("singleAgentFlow", () => {
@@ -11,7 +11,7 @@ describe("singleAgentFlow", () => {
 			permissionMode: "acceptEdits",
 		});
 		expect(flow).toEqual({
-			version: 8,
+			version: FLOW_VERSION,
 			inputs: [],
 			outputs: [],
 			start: "agent",

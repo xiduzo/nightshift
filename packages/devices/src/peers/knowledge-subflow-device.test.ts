@@ -11,6 +11,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import type { WorkRelay } from "../contract";
 import { type PairedReplicas, pairedReplicas } from "../testing";
 import { serveWork } from "../work";
@@ -103,7 +104,7 @@ describe("a Subflow that names a computer", () => {
 		const started = await space().startRun({
 			projectId,
 			flow: {
-				version: 8,
+				version: FLOW_VERSION,
 				inputs: [],
 				outputs: [],
 				start: "sync",

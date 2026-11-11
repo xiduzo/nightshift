@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { type Flow, type FlowInput, flowSchema } from "../flow";
+import { FLOW_VERSION, type Flow, type FlowInput, flowSchema } from "../flow";
 import { validateFlow } from "../validate";
 import {
 	planSubflowFromSection,
@@ -66,7 +66,7 @@ const command = (id: string, cmd = "true", extra: object = {}) => ({
 	...extra,
 });
 const flowOf = (input: Omit<FlowInput, "version">): Flow =>
-	flowSchema.parse({ version: 8, ...input });
+	flowSchema.parse({ version: FLOW_VERSION, ...input });
 
 describe("planSubflowFromSection on the build flow", () => {
 	test("Build: three exits through a Decision, the variables written back, outputs for the nodes outside", () => {

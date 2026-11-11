@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { fakeHarness } from "@nightshift/agents/testing";
 import type { Flow } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { createEngine, type Engine } from "../run/engine";
 import type { SpaceEngine } from "../run/space-engine";
@@ -45,7 +46,7 @@ afterEach(async () => {
 
 /** Replicates a paper: `held` is whether it held up after publication. */
 const replicateFlow: Flow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [{ name: "held", type: "text" }],
 	outputs: [],
 	start: "replicate",
@@ -56,7 +57,7 @@ const replicateFlow: Flow = {
 			position: { x: 0, y: 0 },
 			command:
 				'printf \'{"scores": {"replicated": 1, "held_post_publication": %s}}\' "{{held}}" > "$NS_OUTPUT"',
-			output: "text",
+			stdout: "text",
 		},
 	],
 	edges: [],

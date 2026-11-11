@@ -312,7 +312,7 @@ describe("the Command node", () => {
 				start: "check",
 				nodes: [
 					command("check", `echo '{"tests": 3, "names": ["a", "b"]}'`, {
-						output: "json",
+						stdout: "json",
 					}),
 					command(
 						"report",
@@ -348,7 +348,7 @@ describe("the Command node", () => {
 			flowOf({
 				start: "check",
 				nodes: [
-					command("check", "echo not json", { output: "json" }),
+					command("check", "echo not json", { stdout: "json" }),
 					command("after", "true"),
 				],
 				edges: [{ id: "e1", from: "check", outcome: "fail", to: "after" }],
@@ -422,7 +422,7 @@ describe("the Command node", () => {
 								"login",
 								// The command checks the value it got; the output prints it.
 								`[ "$ZAC_PASSWORD" = "s3cr3t-pw" ] && printf '{"user": "%s", "token": "%s"}\\n' "$ZAC_USER" "$ZAC_PASSWORD" && echo "$ZAC_PASSWORD" >&2`,
-								{ output: "json", secrets: ["ZAC_USER", "ZAC_PASSWORD"] },
+								{ stdout: "json", secrets: ["ZAC_USER", "ZAC_PASSWORD"] },
 							),
 						],
 						edges: [],
@@ -627,7 +627,7 @@ describe("the Command node", () => {
 				flowOf({
 					start: "check",
 					nodes: [
-						command("check", "echo not json", { output: "json", exits }),
+						command("check", "echo not json", { stdout: "json", exits }),
 						command("after", "true"),
 					],
 					edges: [{ id: "e1", from: "check", outcome: "other", to: "after" }],
@@ -677,10 +677,10 @@ describe("the Command node", () => {
 						command(
 							"file",
 							`echo '{"from": "stdout"}'; echo '{"from": "file"}' > "$NS_OUTPUT"`,
-							{ output: "json" },
+							{ stdout: "json" },
 						),
 						command("printed", `echo '{"from": "stdout"}'`, {
-							output: "json",
+							stdout: "json",
 						}),
 					],
 					edges: [{ id: "e1", from: "file", outcome: "pass", to: "printed" }],
@@ -851,7 +851,7 @@ describe("the Command node", () => {
 					nodes: [
 						command("branch", `echo '{"outcome": "exists"}'`, {
 							exits,
-							output: "json",
+							stdout: "json",
 						}),
 					],
 					edges: [],

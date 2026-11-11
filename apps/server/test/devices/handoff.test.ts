@@ -10,7 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { seedFlows } from "@nightshift/engine/testing";
-
+import { FLOW_VERSION } from "@nightshift/flows";
 import {
 	type Daemon,
 	pair,
@@ -81,7 +81,7 @@ async function flowIn(
 ) {
 	await seedFlows(savesOn(daemon), projectId, {
 		[name]: {
-			version: 8,
+			version: FLOW_VERSION,
 			inputs: [],
 			outputs: [],
 			...(devices ? { devices } : {}),
@@ -107,7 +107,7 @@ function commits(id: string, file: string, device?: string) {
 		type: "command",
 		position: { x: 0, y: 0 },
 		command: `echo ${file} > ${file} && git add ${file} && ${IDENTITY} commit -q -m ${file} && ls`,
-		output: "text",
+		stdout: "text",
 		...(device ? { device } : {}),
 	};
 }
@@ -118,7 +118,7 @@ function shell(id: string, command: string, device?: string) {
 		type: "command",
 		position: { x: 0, y: 0 },
 		command,
-		output: "text",
+		stdout: "text",
 		...(device ? { device } : {}),
 	};
 }

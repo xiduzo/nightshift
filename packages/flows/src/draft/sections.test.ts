@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type Flow, flowSchema } from "../flow";
+import { FLOW_VERSION, type Flow, flowSchema } from "../flow";
 import { removeNode, renameNode } from "./graph";
 import { addSection, removeSection, updateSection } from "./sections";
 
@@ -12,7 +12,7 @@ const command = (id: string) => ({
 
 /** a → b → c → d. */
 const chain: Flow = flowSchema.parse({
-	version: 8,
+	version: FLOW_VERSION,
 	start: "a",
 	nodes: ["a", "b", "c", "d"].map(command),
 	edges: [

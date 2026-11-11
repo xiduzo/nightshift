@@ -6,7 +6,7 @@ import { decisionDecider } from "../nodes";
 import { gitFilesCommand, githubSubIssuesCommand } from "../recipes";
 import { renderCommand, templateRefs } from "../template";
 import { parseFlow, validateFlow } from "../validate";
-import { type Flow, flowSchema } from "./flow";
+import { FLOW_VERSION, type Flow, flowSchema } from "./flow";
 import { type FlowMigration, migrateFlow } from "./migrate";
 
 const agent = {
@@ -88,7 +88,7 @@ const v1Body = {
 
 describe("migrateFlow", () => {
 	test("leaves anything that is not a version 1 object alone", () => {
-		for (const value of [null, "x", 3, [1], { version: 8 }, {}]) {
+		for (const value of [null, "x", 3, [1], { version: FLOW_VERSION }, {}]) {
 			expect(migrateFlow(value)).toBe(value);
 		}
 	});
@@ -107,7 +107,7 @@ describe("migrateFlow", () => {
 
 	test("input item becomes a required json input; there are no outputs", () => {
 		const flow = migrateFlow(v1Body) as Record<string, unknown>;
-		expect(flow.version).toBe(8);
+		expect(flow.version).toBe(FLOW_VERSION);
 		expect(flow.inputs).toEqual([
 			{ name: "item", type: "json", required: true },
 		]);
@@ -194,7 +194,7 @@ describe("migrateFlow", () => {
 			edges: [],
 		});
 		expect(flow).toMatchObject({
-			version: 8,
+			version: FLOW_VERSION,
 			inputs: [
 				{ name: "epic", label: "Epic", required: true, type: "text" },
 				{ name: "base", default: "main", type: "text" },
@@ -329,7 +329,7 @@ describe("the rpgdotexe night, as version 1", () => {
 
 describe("migrateFlow: tool sets", () => {
 	const current = (nodes: unknown[]) => ({
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [],
 		outputs: [],
 		start: "work",
@@ -405,7 +405,7 @@ describe("migrateFlow: tool sets", () => {
 
 describe("migrateFlow: list sources", () => {
 	const current = (source: unknown) => ({
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [{ name: "epic", type: "text", required: true }],
 		outputs: [],
 		start: "each",
@@ -674,7 +674,7 @@ describe("migrateFlow: version 2 → 3, Decision and Gate", () => {
 
 	test("a Gate becomes a Decision decided by you; a Decision one decided by a model, off the Claude Code decider", () => {
 		const flow = migrateFlow(v2()) as { version: number; nodes: unknown[] };
-		expect(flow.version).toBe(8);
+		expect(flow.version).toBe(FLOW_VERSION);
 		expect(flow.nodes[1]).toEqual({
 			id: "decide",
 			type: "decision",
@@ -719,7 +719,7 @@ describe("migrateFlow: version 2 → 3, Decision and Gate", () => {
 
 	test("a version 1 flow goes through both steps", () => {
 		const flow = flowSchema.parse(migrateFlow(v1Body));
-		expect(flow.version).toBe(8);
+		expect(flow.version).toBe(FLOW_VERSION);
 		expect(flow.nodes.find((n) => n.id === "decide")).toMatchObject({
 			type: "decision",
 			by: "model",
@@ -791,7 +791,7 @@ describe("migrateFlow: version 3 → 4, Call", () => {
 
 	test("a Subflow node becomes a Call node; a For Each node a Call node with each", () => {
 		const flow = migrateFlow(v3()) as { version: number; nodes: unknown[] };
-		expect(flow.version).toBe(8);
+		expect(flow.version).toBe(FLOW_VERSION);
 		expect(flow.nodes[0]).toEqual({
 			id: "sub",
 			label: "Review",
@@ -862,7 +862,7 @@ describe("migrateFlow: version 3 → 4, Call", () => {
 
 	test("a version 1 flow goes through every step", () => {
 		const flow = flowSchema.parse(migrateFlow(v1Body));
-		expect(flow.version).toBe(8);
+		expect(flow.version).toBe(FLOW_VERSION);
 		expect(flow.nodes.map((n) => n.type)).toEqual([
 			"command",
 			"agent",
@@ -924,7 +924,7 @@ describe("migrateFlow: version 5 → 6, deciders and the files source", () => {
 				},
 			]),
 		) as { version: number; nodes: Record<string, unknown>[] };
-		expect(flow.version).toBe(8);
+		expect(flow.version).toBe(FLOW_VERSION);
 		expect(
 			flow.nodes.map((node) => [node.id, node.decider, node.model]),
 		).toEqual([
@@ -1030,7 +1030,7 @@ describe("migrateFlow: version 5 → 6, Agent nodes", () => {
 				{ ...agent, id: "none", prompt: "Go.", nodeClis: [] },
 			]),
 		) as { version: number; nodes: Record<string, unknown>[] };
-		expect(flow.version).toBe(8);
+		expect(flow.version).toBe(FLOW_VERSION);
 		expect(flow.nodes[0]).toEqual({
 			...agent,
 			id: "build",
@@ -1084,7 +1084,7 @@ describe("migrateFlow: version 5 → 6, edges a fan-out would take", () => {
 
 	test("an edge without a max after another one on the same outcome goes: version 5 never took it", () => {
 		const flow = migrateFlow(v5()) as { version: number; edges: unknown[] };
-		expect(flow.version).toBe(8);
+		expect(flow.version).toBe(FLOW_VERSION);
 		expect(flow.edges.map((edge) => (edge as { id: string }).id)).toEqual([
 			"a",
 			"b",
@@ -1148,7 +1148,7 @@ describe("migrateFlow: version 6 to 7, a node names a device's profile", () => {
 		const flow = flowSchema.parse(
 			migrateFlow(v6([builder, triage]), migration),
 		);
-		expect(flow.version).toBe(8);
+		expect(flow.version).toBe(FLOW_VERSION);
 		expect(flow.nodes[0]).toMatchObject({
 			profile: { device: "mac", profile: "maker" },
 		});
@@ -1199,9 +1199,9 @@ describe("migrateFlow: version 6 to 7, a node names a device's profile", () => {
 		]);
 	});
 
-	test("without a migration every node keeps its name, and the flow reads as version 8", () => {
+	test("without a migration every node keeps its name, and the flow reads as the current version", () => {
 		const flow = flowSchema.parse(migrateFlow(v6([builder])));
-		expect(flow.version).toBe(8);
+		expect(flow.version).toBe(FLOW_VERSION);
 		expect(flow.nodes[0]).toMatchObject({ profile: "builder" });
 	});
 
@@ -1259,7 +1259,7 @@ describe("migrateFlow: version 7 to 8, a node names its device by id", () => {
 				migration,
 			),
 		);
-		expect(flow.version).toBe(8);
+		expect(flow.version).toBe(FLOW_VERSION);
 		expect(flow.nodes.map((node) => "device" in node && node.device)).toEqual([
 			"mac-id",
 			"mac-id",
@@ -1295,7 +1295,7 @@ describe("migrateFlow: version 7 to 8, a node names its device by id", () => {
 		expect(flow.nodes[0]).toMatchObject({ device: { name: "MacBook" } });
 	});
 
-	test("a node without a device does not change, and a flow of version 8 stays as it is", () => {
+	test("a node without a device does not change, and a flow of the current version stays as it is", () => {
 		const once = migrateFlow(v7([run]), migration) as { nodes: unknown[] };
 		expect(once.nodes[0]).toEqual(run);
 		expect(migrateFlow(once, migration)).toBe(once);
@@ -1309,5 +1309,65 @@ describe("migrateFlow: version 7 to 8, a node names its device by id", () => {
 			),
 		);
 		expect(flow.nodes[0]).toMatchObject({ device: "mac-id" });
+	});
+});
+
+describe("migrateFlow: version 8 to 9, a Command node's output moves to stdout", () => {
+	const v8 = (nodes: Record<string, unknown>[]) => ({
+		version: 8,
+		inputs: [],
+		outputs: [],
+		start: nodes[0]?.id ?? "check",
+		nodes,
+		edges: [],
+	});
+	const check = {
+		id: "check",
+		type: "command",
+		position: { x: 0, y: 0 },
+		command: "bun test --reporter json",
+	};
+	const plan = {
+		id: "plan",
+		type: "agent",
+		position: { x: 0, y: 0 },
+		prompt: "Plan it.",
+		output: { type: "object", properties: { tasks: { type: "array" } } },
+	};
+
+	test("what a command prints moves to stdout, and output is free for a schema", () => {
+		const flow = flowSchema.parse(
+			migrateFlow(
+				v8([
+					{ ...check, output: "json" },
+					{ ...check, id: "log", output: "text" },
+				]),
+			),
+		);
+		expect(flow.version).toBe(9);
+		expect(flow.nodes[0]).toMatchObject({ stdout: "json" });
+		expect(flow.nodes[1]).toMatchObject({ stdout: "text" });
+		expect(flow.nodes.map((node) => "output" in node)).toEqual([false, false]);
+	});
+
+	test("a Command node without output reads its stdout as text, and other nodes keep their output schema", () => {
+		const once = migrateFlow(v8([check, plan])) as { nodes: unknown[] };
+		expect(once.nodes).toEqual([check, plan]);
+		const flow = flowSchema.parse(once);
+		expect(flow.nodes[0]).toMatchObject({ stdout: "text" });
+		expect(flow.nodes[1]).toMatchObject({ output: plan.output });
+	});
+
+	test("a flow of version 9 stays as it is", () => {
+		const once = migrateFlow(v8([{ ...check, output: "json" }]));
+		expect(migrateFlow(once)).toBe(once);
+	});
+
+	test("an older flow goes on to 9 too", () => {
+		const flow = flowSchema.parse(
+			migrateFlow({ ...v8([{ ...check, output: "json" }]), version: 7 }),
+		);
+		expect(flow.version).toBe(9);
+		expect(flow.nodes[0]).toMatchObject({ stdout: "json" });
 	});
 });

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { fakeHarness } from "@nightshift/agents/testing";
 import { event } from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { defaultRunSettings } from "../device-config/settings";
@@ -68,7 +69,7 @@ function startDaemon(
 
 function commandFlow(command: string): Flow {
 	return {
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [],
 		outputs: [],
 		start: "work",
@@ -78,7 +79,7 @@ function commandFlow(command: string): Flow {
 				type: "command",
 				position: { x: 0, y: 0 },
 				command,
-				output: "text",
+				stdout: "text",
 			},
 		],
 		edges: [],
@@ -192,7 +193,7 @@ describe("the overview and the actions of a person", () => {
 		const started = await engine.startRun({
 			projectId: project.id,
 			flow: {
-				version: 8,
+				version: FLOW_VERSION,
 				inputs: [],
 				outputs: [],
 				start: "ask",

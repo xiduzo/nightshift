@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fakeHarness } from "@nightshift/agents/testing";
 import type { CommandNode, Flow, FlowEdge, ValueNode } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { createRunLog, type RunLog } from "../log/run-log";
 import {
 	createSandbox,
@@ -69,7 +70,7 @@ const designer: CommandNode = {
 	type: "command",
 	position: at,
 	command: `echo '${JSON.stringify({ variants: VARIANTS })}'`,
-	output: "json",
+	stdout: "json",
 };
 
 const output = {
@@ -103,7 +104,7 @@ const builder: CommandNode = {
 	type: "command",
 	position: at,
 	command: 'echo "build {{pick.data.variant}}: {{pick.data.comment}}"',
-	output: "text",
+	stdout: "text",
 };
 
 function flowOf(nodes: Flow["nodes"]): Flow {
@@ -114,7 +115,7 @@ function flowOf(nodes: Flow["nodes"]): Flow {
 		to: node.id,
 	}));
 	return {
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [],
 		outputs: [],
 		start: "designer",

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+	jsonSchemaSchema,
 	labelSchema,
 	type NodeCheck,
 	nodeBase,
@@ -116,7 +117,7 @@ export const commandNodeSchema = z.object({
 	 *
 	 * `$NS_OUTPUT` names a new, empty file for the step's data, as
 	 * `$GITHUB_OUTPUT` does in GitHub Actions. JSON written there is the
-	 * step's `data`, whatever `output` says and whatever the exit code; a
+	 * step's `data`, whatever `stdout` says and whatever the exit code; a
 	 * file that is not valid JSON ends the step on the catch-all. stdout
 	 * stays the log. Data that is an object with an `outcome` that names
 	 * one of the node's exits ends the step on that exit (`dataExitFor`).
@@ -129,7 +130,13 @@ export const commandNodeSchema = z.object({
 	 * (`{{check.data.tests}}`); output that is not JSON ends the step on
 	 * the catch-all exit. The older way: one stray `echo` breaks it.
 	 */
-	output: z.enum(["text", "json"]).default("text"),
+	stdout: z.enum(["text", "json"]).default("text"),
+	/**
+	 * A JSON Schema for the step's `data`, as on an Agent or a Value node.
+	 * Later nodes read its fields (`{{check.data.tests}}`). Unset: the data
+	 * has no declared shape.
+	 */
+	output: jsonSchemaSchema.optional(),
 	/**
 	 * The outcome per exit code, each with an edge. A code without an exit
 	 * ends on the catch-all; without a catch-all the step errors. An exit
@@ -139,7 +146,7 @@ export const commandNodeSchema = z.object({
 	exits: z.array(commandExitSchema).min(1).optional(),
 	/**
 	 * Secrets by name (the Secrets page): each reaches the command as an
-	 * environment variable of the same name (`"$ZAC_USER"`). The Device that
+	 * environment variable of the same name (`"$API_USER"`). The Device that
 	 * runs the step reads them: its keychain, then its daemon's environment.
 	 * A secret it does not have errors the step before the command runs.
 	 * Their values become `•••` in the step's output, log tail and data.
@@ -208,18 +215,18 @@ export function isChosenExit(
 
 /**
  * Whether later nodes can read the command's `data`: it prints JSON
- * (`output: "json"`), or it names `$NS_OUTPUT`, the file for its data.
+ * (`stdout: "json"`), or it names `$NS_OUTPUT`, the file for its data.
  */
 export function commandHasData(
-	node: Pick<CommandNode, "command" | "output">,
+	node: Pick<CommandNode, "command" | "stdout">,
 ): boolean {
-	return node.output === "json" || node.command.includes("NS_OUTPUT");
+	return node.stdout === "json" || node.command.includes("NS_OUTPUT");
 }
 
 /**
  * log_tail: the last lines of stdout and stderr together. data: the JSON
  * the command wrote to `$NS_OUTPUT`, else the JSON it printed with
- * `output: "json"`.
+ * `stdout: "json"`.
  */
 export const commandOutputFields = [
 	"outcome",

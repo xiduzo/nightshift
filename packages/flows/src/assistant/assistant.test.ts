@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { FLOW_VERSION } from "../flow";
 import { chatRequestSchema, suggestionRequestSchema } from "./assistant";
 
 const flow = {
-	version: 8,
+	version: FLOW_VERSION,
 	start: "plan",
 	nodes: [
 		{

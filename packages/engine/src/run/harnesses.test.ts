@@ -3,6 +3,7 @@ import { harnessFacts } from "@nightshift/agents/harness-facts";
 import { type FakeHarness, fakeHarness } from "@nightshift/agents/testing";
 import type { HarnessName } from "@nightshift/agents/types";
 import type { AgentNode, Flow, FlowEdge } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { expandMcpServers } from "../device-config/mcp";
 import type { RunStatus } from "../run-status";
 import {
@@ -58,7 +59,7 @@ function agent(id: string, extra: Partial<AgentNode> = {}): AgentNode {
 
 function flowOf(nodes: AgentNode[], edges: FlowEdge[] = []): Flow {
 	return {
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",

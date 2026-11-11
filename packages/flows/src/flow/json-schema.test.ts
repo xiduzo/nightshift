@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import * as flows from "../index";
+import { FLOW_VERSION } from "./flow";
 
 /**
  * The schemas of the package, as JSON Schema. A move of a schema between
@@ -80,7 +81,7 @@ describe("published schemas", () => {
 	test("a flow that is not valid gives the same schema issues", () => {
 		expect(
 			flows.parseFlow({
-				version: 8,
+				version: FLOW_VERSION,
 				start: "Bad",
 				nodes: [
 					{ id: "a", type: "agent", position: { x: 0, y: 0 }, prompt: 1 },

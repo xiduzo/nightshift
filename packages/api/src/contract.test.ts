@@ -262,7 +262,7 @@ describe("replies of a real engine", () => {
 					type: "command",
 					position: { x: 0, y: 200 },
 					command: 'curl -u "$ZAC_USER:$ZAC_PASSWORD" https://zac.test',
-					output: "text",
+					stdout: "text",
 					secrets: ["ZAC_USER", "ZAC_PASSWORD"],
 				},
 			],

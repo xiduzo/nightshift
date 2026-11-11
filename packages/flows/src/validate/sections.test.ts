@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type Flow, type FlowSection, flowSchema } from "../flow";
+import { FLOW_VERSION, type Flow, type FlowSection, flowSchema } from "../flow";
 import { parseFlow, validateFlow } from "./flow";
 
 const command = (id: string) => ({
@@ -12,7 +12,7 @@ const command = (id: string) => ({
 /** a → b → c → d, and a fails to e. */
 const flowWith = (sections: FlowSection[]): Flow =>
 	flowSchema.parse({
-		version: 8,
+		version: FLOW_VERSION,
 		start: "a",
 		nodes: ["a", "b", "c", "d", "e"].map(command),
 		edges: [

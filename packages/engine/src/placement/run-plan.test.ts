@@ -82,7 +82,7 @@ const command = (id: string, device?: string) =>
 		type: "command",
 		position: { x: 0, y: 0 },
 		command: "true",
-		output: "text",
+		stdout: "text",
 		...(device ? { device } : {}),
 	}) as FlowNode;
 

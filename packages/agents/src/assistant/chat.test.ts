@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
 	type ChatRequest,
+	FLOW_VERSION,
 	type Flow,
 	type FlowProposal,
 	flowSchema,
@@ -23,7 +24,7 @@ import {
 } from "./tools";
 
 const draft: Flow = flowSchema.parse({
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [{ name: "issue", type: "text" }],
 	start: "build",
 	nodes: [

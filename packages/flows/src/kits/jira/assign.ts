@@ -2,7 +2,7 @@ import type { FlowInput } from "../../flow";
 
 /** `kit:jira/assign`: assigns a Jira work item, with the Atlassian CLI (`acli`). */
 export const jiraAssignKit: FlowInput = {
-	version: 8,
+	version: 9,
 	description:
 		"Assigns a Jira work item to a person, or to you. Needs a CLI tool that runs the Atlassian CLI signed in.",
 	inputs: [

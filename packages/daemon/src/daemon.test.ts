@@ -11,8 +11,8 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
-
 import { createDaemon, type Daemon, type DaemonOutside } from "./daemon";
 import { type DaemonEnv, hot, processDatabase } from "./runtime";
 import type { SocketData } from "./sync";
@@ -98,7 +98,7 @@ async function rpc<T>(daemon: Daemon, path: string, input?: unknown) {
 
 /** One Command node: what the Host's run walks. */
 const echoFlow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: "echo",
@@ -108,7 +108,7 @@ const echoFlow = {
 			type: "command",
 			position: { x: 0, y: 0 },
 			command: "echo paired",
-			output: "text",
+			stdout: "text",
 		},
 	],
 	edges: [],

@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+	FLOW_VERSION,
 	type Flow,
 	flowSchema,
 	type SuggestionRequest,
@@ -17,7 +18,7 @@ import {
 import { suggestionPrompt } from "./suggestion-prompt";
 
 const flow: Flow = flowSchema.parse({
-	version: 8,
+	version: FLOW_VERSION,
 	start: "review",
 	inputs: [{ name: "pr", type: "text" }],
 	nodes: [

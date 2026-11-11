@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { type Flow, flowSchema, migrateFlow } from "../flow";
+import { FLOW_VERSION, type Flow, flowSchema, migrateFlow } from "../flow";
 import { canMakeSection, sectionBoundary, sectionOf } from "./shape";
 
 /** The 20-node flow of the canvas research, as a person wrote it. */
@@ -34,7 +34,7 @@ const edge = (from: string, outcome: string, to: string) => ({
  * alone.
  */
 const small: Flow = flowSchema.parse({
-	version: 8,
+	version: FLOW_VERSION,
 	start: "a",
 	nodes: ["a", "b", "c", "d", "e", "f"].map(command),
 	edges: [

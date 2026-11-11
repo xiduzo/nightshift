@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	FLOW_VERSION,
 	type Flow,
 	flowSchema,
 	nodeOutcomes,
@@ -29,13 +30,13 @@ function command(id: string): CommandNode {
 		type: "command",
 		position: { x: 0, y: 0 },
 		command: "true",
-		output: "text",
+		stdout: "text",
 	};
 }
 
 function flowOf(nodes: Flow["nodes"], edges: Flow["edges"] = []): Flow {
 	return {
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",
@@ -47,7 +48,7 @@ function flowOf(nodes: Flow["nodes"], edges: Flow["edges"] = []): Flow {
 describe("the Tool node schema", () => {
 	test("parses with its connection, tool and arguments; arguments default to none", () => {
 		const parsed = flowSchema.parse({
-			version: 8,
+			version: FLOW_VERSION,
 			start: "file",
 			nodes: [
 				{
@@ -66,7 +67,7 @@ describe("the Tool node schema", () => {
 	test("refuses an empty tool name and a connection that is not a name", () => {
 		const bad = (node: Record<string, unknown>) =>
 			flowSchema.safeParse({
-				version: 8,
+				version: FLOW_VERSION,
 				start: "file",
 				nodes: [
 					{ id: "file", type: "tool", position: { x: 0, y: 0 }, ...node },
@@ -175,7 +176,7 @@ describe("validateFlow: Tool", () => {
 
 	test("a Tool node whose tool name is blank is an error", () => {
 		const { flow, issues } = parseFlow({
-			version: 8,
+			version: FLOW_VERSION,
 			start: "file",
 			nodes: [
 				{

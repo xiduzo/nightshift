@@ -136,7 +136,7 @@ describe("listFlowSources", () => {
 					type: "command",
 					position: { x: 0, y: 0 },
 					command: "bun test",
-					output: "text",
+					stdout: "text",
 				},
 				{
 					id: "end",

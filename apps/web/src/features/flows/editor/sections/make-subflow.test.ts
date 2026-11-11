@@ -28,7 +28,7 @@ const flow: Flow = {
 			type: "command",
 			position: { x: index * 300, y: 0 },
 			command: "true",
-			output: "text",
+			stdout: "text",
 		}),
 	),
 	edges: [

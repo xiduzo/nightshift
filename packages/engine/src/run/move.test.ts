@@ -9,6 +9,7 @@ import type {
 	Flow,
 	WaitNode,
 } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { iso, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import type { WalkFile, WalkRef } from "../archive";
@@ -41,7 +42,7 @@ const command = (id: string, cmd: string): CommandNode => ({
 	type: "command",
 	position: { x: 0, y: 0 },
 	command: cmd,
-	output: "text",
+	stdout: "text",
 });
 
 const gate: DecisionNode = {
@@ -55,7 +56,7 @@ const gate: DecisionNode = {
 };
 
 const flowOf = (nodes: Flow["nodes"], edges: Flow["edges"] = []): Flow => ({
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: nodes[0]?.id ?? "",

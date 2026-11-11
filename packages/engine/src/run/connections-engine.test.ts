@@ -9,6 +9,7 @@ import type {
 	Policy,
 	ToolNode,
 } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import type { McpExpansion } from "../device-config/mcp";
 import {
 	defaultRunSettings,
@@ -79,7 +80,7 @@ function command(id: string, cmd: string): CommandNode {
 		type: "command",
 		position: { x: 0, y: 0 },
 		command: cmd,
-		output: "text",
+		stdout: "text",
 	};
 }
 
@@ -89,7 +90,7 @@ function flowOf(
 	policy?: Policy,
 ): Flow {
 	return {
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",

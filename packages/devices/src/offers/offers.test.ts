@@ -13,6 +13,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { AgentProfileSettings, Flow, FlowNode } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { asDate, now } from "@nightshift/time";
 import { atLocal } from "@nightshift/time/testing";
 import { eq } from "drizzle-orm";
@@ -154,7 +155,7 @@ describe("another Person's run on the computer that walks it", () => {
 	const carol = "person-carol";
 
 	const flow = (prompt: string, extra: Record<string, unknown> = {}): Flow => ({
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [],
 		outputs: [],
 		start: "work",
@@ -493,7 +494,7 @@ describe("a schedule that runs on another Person's computer", () => {
 			repoPath: sandbox.repoPath,
 		});
 		await owner.flows.save(projectId, "night", {
-			version: 8,
+			version: FLOW_VERSION,
 			inputs: [],
 			outputs: [],
 			start: "work",

@@ -20,6 +20,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { asDate, now as timeNow } from "@nightshift/time";
 import { ORPCError } from "@orpc/client";
 import { and, eq } from "drizzle-orm";
@@ -144,7 +145,7 @@ const status = (period: { link: Link }) => period.link.state().status;
 
 /** A command, then a Gate. */
 const gateFlow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: "hello",
@@ -154,7 +155,7 @@ const gateFlow = {
 			type: "command",
 			position: { x: 0, y: 0 },
 			command: "echo hello",
-			output: "text",
+			stdout: "text",
 		},
 		{
 			id: "ship",
@@ -171,7 +172,7 @@ const gateFlow = {
 
 /** One Agent step. */
 const agentFlow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: "work",
@@ -192,7 +193,7 @@ const agentFlow = {
 
 /** One command step: a run that ends on its own. */
 const quickFlow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: "hello",
@@ -202,7 +203,7 @@ const quickFlow = {
 			type: "command",
 			position: { x: 0, y: 0 },
 			command: "echo while the Host was away",
-			output: "text",
+			stdout: "text",
 		},
 	],
 	edges: [],
@@ -210,7 +211,7 @@ const quickFlow = {
 
 /** The body of `forEachFlow`: it prints the item. */
 const sayFlow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [{ name: "item", type: "json", required: true }],
 	outputs: [],
 	start: "say",
@@ -220,7 +221,7 @@ const sayFlow = {
 			type: "command",
 			position: { x: 0, y: 0 },
 			command: "echo item {{item.id}}",
-			output: "text",
+			stdout: "text",
 		},
 	],
 	edges: [],
@@ -229,7 +230,7 @@ const sayFlow = {
 /** A For Each over three items; its body is `say` (`sayFlow`). */
 function forEachFlow(): Flow {
 	return {
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [],
 		outputs: [],
 		start: "loop",
@@ -258,7 +259,7 @@ function forEachFlow(): Flow {
 /** One command that prints, waits for a file, and prints again. */
 function slowFlow(marker: string): Flow {
 	return {
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [],
 		outputs: [],
 		start: "build",
@@ -268,7 +269,7 @@ function slowFlow(marker: string): Flow {
 				type: "command",
 				position: { x: 0, y: 0 },
 				command: `echo first; while [ ! -f '${marker}' ]; do sleep 0.05; done; echo second`,
-				output: "text",
+				stdout: "text",
 			},
 		],
 		edges: [],

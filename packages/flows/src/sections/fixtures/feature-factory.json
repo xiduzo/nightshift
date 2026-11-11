@@ -1,5 +1,5 @@
 {
-	"version": 8,
+	"version": 9,
 	"description": "A neutral copy of the shape of a build flow: intake, spec, build, review, ship.",
 	"inputs": [
 		{
@@ -54,7 +54,7 @@
 				"y": 328
 			},
 			"command": "prepare \"{{issue}}\"",
-			"output": "json",
+			"stdout": "json",
 			"exits": [
 				{
 					"name": "ready",
@@ -77,7 +77,7 @@
 				"y": 472
 			},
 			"command": "echo \"Busy: {{branch.data.key}}\"",
-			"output": "text"
+			"stdout": "text"
 		},
 		{
 			"id": "design",
@@ -87,7 +87,7 @@
 				"y": 192
 			},
 			"command": "designs \"{{branch.data.key}}\"",
-			"output": "json",
+			"stdout": "json",
 			"exits": [
 				{
 					"name": "found",
@@ -155,7 +155,7 @@
 				"y": 0
 			},
 			"command": "check-spec \"{{spec.data.name}}\"",
-			"output": "json",
+			"stdout": "json",
 			"exits": [
 				{
 					"name": "valid",
@@ -220,7 +220,7 @@
 				"y": 920
 			},
 			"command": "check-layers \"{{vars.spec_commit}}\"",
-			"output": "json",
+			"stdout": "json",
 			"exits": [
 				{
 					"name": "ordered",
@@ -243,7 +243,7 @@
 				"y": 920
 			},
 			"command": "check-scope",
-			"output": "text",
+			"stdout": "text",
 			"exits": [
 				{
 					"name": "frontend",
@@ -420,7 +420,7 @@
 				"y": 856
 			},
 			"command": "publish \"{{build.data.layers}}\"",
-			"output": "json"
+			"stdout": "json"
 		},
 		{
 			"id": "route",
@@ -473,7 +473,7 @@
 				"y": 1320
 			},
 			"command": "ready \"{{publish.data.prs}}\"",
-			"output": "text"
+			"stdout": "text"
 		},
 		{
 			"id": "close",
@@ -483,7 +483,7 @@
 				"y": 888
 			},
 			"command": "close \"{{publish.data.prs}}\" \"{{human.note}}\"",
-			"output": "text"
+			"stdout": "text"
 		}
 	],
 	"edges": [

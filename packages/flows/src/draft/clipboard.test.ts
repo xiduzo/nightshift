@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type Flow, flowSchema } from "../flow";
+import { FLOW_VERSION, type Flow, flowSchema } from "../flow";
 import { copyNodes, pasteNodes } from "./clipboard";
 
 const command = (id: string, command = "true") => ({
@@ -11,7 +11,7 @@ const command = (id: string, command = "true") => ({
 
 /** a → b → c, with b reading a and c in a Section of its own. */
 const chain: Flow = flowSchema.parse({
-	version: 8,
+	version: FLOW_VERSION,
 	start: "a",
 	nodes: [command("a"), command("b", "echo {{ a.stdout }}"), command("c")],
 	edges: [

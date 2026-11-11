@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { Flow, FlowNode } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { flowsForRun } from "./run-flows";
 
 const flowOf = (calls: string[]): Flow => ({
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: calls.length > 0 ? "call_0" : "hello",
@@ -25,7 +26,7 @@ const flowOf = (calls: string[]): Flow => ({
 						type: "command",
 						position: { x: 0, y: 0 },
 						command: "echo hello",
-						output: "text",
+						stdout: "text",
 					},
 				],
 	edges: [],

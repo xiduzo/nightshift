@@ -93,7 +93,7 @@ describe("a fan-out into a Join that waits for all", () => {
 			fanOut([
 				agent("review", "Review it", { output: findings }),
 				command("check", "sleep 0.15; echo '{\"ok\":true}'", {
-					output: "json",
+					stdout: "json",
 				}),
 			]),
 			{ harness },
@@ -224,7 +224,7 @@ describe("a Join that waits for the first", () => {
 			sandbox,
 			fanOut(
 				[
-					command("fast", 'echo \'{"who":"fast"}\'', { output: "json" }),
+					command("fast", 'echo \'{"who":"fast"}\'', { stdout: "json" }),
 					command("slow", "sleep 20"),
 				],
 				"first",
@@ -258,7 +258,7 @@ describe("a failing branch", () => {
 		const h = await startRun(
 			sandbox,
 			fanOut([
-				command("good", "echo '{\"n\":1}'", { output: "json" }),
+				command("good", "echo '{\"n\":1}'", { stdout: "json" }),
 				command("bad", `test -f ${flag}`),
 			]),
 		);

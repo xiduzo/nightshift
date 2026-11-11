@@ -41,6 +41,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow, ProfileRef } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { asDate } from "@nightshift/time";
 import { atLocal } from "@nightshift/time/testing";
 import { and, eq } from "drizzle-orm";
@@ -222,7 +223,7 @@ function peerEngine(
 
 const flow = (nodes: Flow["nodes"], edges: Flow["edges"] = []): Flow =>
 	({
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "a",
@@ -236,7 +237,7 @@ const command = (id: string, line: string, extra: object = {}) =>
 		type: "command",
 		position: { x: 0, y: 0 },
 		command: line,
-		output: "text",
+		stdout: "text",
 		...extra,
 	}) as Flow["nodes"][number];
 

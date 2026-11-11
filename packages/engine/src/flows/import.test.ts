@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
+	FLOW_VERSION,
 	type Flow,
 	flowSchema,
 	parsedFlows,
@@ -34,7 +35,7 @@ import { trackedState } from "./legacy-folder";
 /** A flow of one Command node that says `word`, and calls `calls` after it when given. */
 function flow(word: string, calls?: string): Flow {
 	return flowSchema.parse({
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [],
 		outputs: [],
 		start: "say",
@@ -44,7 +45,7 @@ function flow(word: string, calls?: string): Flow {
 				type: "command",
 				position: { x: 0, y: 0 },
 				command: `echo ${word}`,
-				output: "text",
+				stdout: "text",
 			},
 			...(calls
 				? [

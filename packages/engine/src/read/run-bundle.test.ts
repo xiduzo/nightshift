@@ -6,6 +6,7 @@ import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import { createDb } from "@nightshift/db";
 import { event, run, step } from "@nightshift/db/schema";
 import type { AgentNode, CommandNode, Flow } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { asc, eq, sql } from "drizzle-orm";
 import { foldRun } from "../log";
 import { parseEventRow } from "../log/events";
@@ -47,10 +48,10 @@ const check: CommandNode = {
 	type: "command",
 	position: { x: 0, y: 0 },
 	command: "echo checked",
-	output: "text",
+	stdout: "text",
 };
 const flow: Flow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: "work",

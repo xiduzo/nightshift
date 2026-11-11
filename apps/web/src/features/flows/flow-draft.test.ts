@@ -23,7 +23,7 @@ const flow: Flow = flowSchema.parse({
 			type: "command",
 			position: { x: 0, y: 0 },
 			command: 'echo "{{vars.tries}} {{vars.tries_2}} {{ vars.plan.steps }}"',
-			output: "text",
+			stdout: "text",
 			set: [
 				{ variable: "tries", expression: "vars.tries + 1" },
 				{ variable: "plan", value: "{{vars.plan}}" },

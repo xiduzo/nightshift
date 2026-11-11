@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { type FlowInput, flowSchema } from "../flow";
+import { FLOW_VERSION, type FlowInput, flowSchema } from "../flow";
 import { kitList } from "../kits";
 import { parseFlow, validateFlow } from "./flow";
 
 /** A flow that calls `flow` once with `inputs`, then ends and echoes `{{pr.url}}`. */
 function caller(flow: string, inputs: Record<string, string>): FlowInput {
 	return {
-		version: 8,
+		version: FLOW_VERSION,
 		start: "pr",
 		nodes: [
 			{ id: "pr", type: "call", position: { x: 0, y: 0 }, flow, inputs },

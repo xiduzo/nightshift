@@ -15,6 +15,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { asDate, now } from "@nightshift/time";
 import { eq, max } from "drizzle-orm";
 import type { HostRelay } from "../contract";
@@ -46,7 +47,7 @@ afterEach(async () => {
 
 /** A command, then a Gate: the run waits with a step that has a transcript. */
 const gateFlow: Flow = {
-	version: 8,
+	version: FLOW_VERSION,
 	inputs: [],
 	outputs: [],
 	start: "hello",
@@ -56,7 +57,7 @@ const gateFlow: Flow = {
 			type: "command",
 			position: { x: 0, y: 0 },
 			command: "echo hello",
-			output: "text",
+			stdout: "text",
 		},
 		{
 			id: "ship",

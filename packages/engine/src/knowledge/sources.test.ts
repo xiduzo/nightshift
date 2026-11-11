@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { type Flow, flowSchema, type Schedule } from "@nightshift/flows";
+import {
+	FLOW_VERSION,
+	type Flow,
+	flowSchema,
+	type Schedule,
+} from "@nightshift/flows";
 import type { SpaceEngine } from "../run";
 import { createEngine, type Engine } from "../run";
 import { testKnowledge } from "../testing/knowledge";
@@ -70,7 +75,7 @@ function sourcesOn(
 
 const callFlow = (kit: string, inputs: Record<string, string>): Flow =>
 	flowSchema.parse({
-		version: 8,
+		version: FLOW_VERSION,
 		start: "sync",
 		nodes: [
 			{ id: "sync", type: "call", position: { x: 0, y: 0 }, flow: kit, inputs },
@@ -81,7 +86,7 @@ const callFlow = (kit: string, inputs: Record<string, string>): Flow =>
 /** A flow that calls a kit and does more: one the editor drew, not the page. */
 const drawnFlow = (kit: string, inputs: Record<string, string> = {}): Flow =>
 	flowSchema.parse({
-		version: 8,
+		version: FLOW_VERSION,
 		start: "sync",
 		nodes: [
 			{ id: "sync", type: "call", position: { x: 0, y: 0 }, flow: kit, inputs },

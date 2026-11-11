@@ -8,6 +8,7 @@ import type {
 	Flow,
 	FlowEdge,
 } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
 import { createProfileStore } from "../device-config/profiles";
 import type { RunDetail } from "../read/views";
 import {
@@ -80,7 +81,7 @@ function flowOf(
 	edges: FlowEdge[] = [],
 ): Flow {
 	return {
-		version: 8,
+		version: FLOW_VERSION,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",
