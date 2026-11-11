@@ -411,7 +411,7 @@ A flow is a directed graph of nodes and edges. Night Shift keeps it in the proje
 
 \`{ version: ${FLOW_VERSION}, description?, inputs, outputs, variables?, start, nodes, edges, sections?, policy? }\`
 
-- \`inputs\`: \`{ name, type: "text" | "number" | "boolean" | "choice" | "json", label?, description?, default?, required?, options? }\`. The start dialog shows a field per type: a number field, a switch, a list to pick from. \`choice\` needs \`options\` (a list of text) and gives the picked text. A default is text: \`"45"\`, \`"true"\`, one of the options, or JSON text. Use \`boolean\` for yes/no, \`number\` for counts and minutes, \`choice\` for a fixed list. A \`json\` input takes a path: \`{{item.title}}\`.
+- \`inputs\`: \`{ name, type: "text" | "number" | "boolean" | "choice" | "json", label?, description?, default?, required?, options? }\`. The start dialog shows a field per type. \`choice\` needs \`options\` (a list of text) and gives the picked text. A default is text: \`"45"\`, \`"true"\`, one of the options, or JSON text. Use \`boolean\` for yes/no, \`number\` for counts and minutes, \`choice\` for a fixed list. A \`json\` input takes a path: \`{{item.title}}\`.
 - \`outputs\`: \`{ name, value, description?, type?, schema? }\`. \`value\` is a template, rendered when the flow ends. \`type\` and \`schema\` as on a variable tell callers its shape.
 - \`variables\`: \`{ name, type, initial?, schema?, description?, keep? }\`, \`type\` one of ${code(variableTypeSchema.options)}.
 - \`policy\`: optional. \`maxSteps\` caps the steps of a run. \`budgetUsd\` stops the run when its known cost, at API prices, passes it. \`maxTurns\` and \`idleMinutes\` (default 15) limit each Agent step. A node may set its own. The stop time ends no running step. Only its own \`timeoutMinutes\` ends a long Command.
@@ -427,7 +427,7 @@ ${types.map(nodeSection).join("\n\n")}
 
 ## Edges, outcomes and loops
 
-An edge is \`{ id, from, outcome, to, max? }\`. It leaves \`from\` when its step ends with \`outcome\`. Use ids such as \`check-fail-fix\`. Each outcome a node can end with needs an edge, else the run ends there: on \`fail\` or \`needs-input\` that ends it as failed. To end the run on purpose, lead the edge to an End node: it says why the run ended (\`nothing-to-do\`, \`failed\`) in one line.
+An edge is \`{ id, from, outcome, to, max? }\`. It leaves \`from\` when its step ends with \`outcome\`. Each outcome a node can end with needs an edge, else the run ends there: on \`fail\` or \`needs-input\` that ends it as failed. To end the run on purpose, lead the edge to an End node: it says why the run ended (\`nothing-to-do\`, \`failed\`) in one line.
 
 Every loop needs at least one edge with \`max\`: how often a run may take that edge. A Gate in a loop needs one too. Put \`max\` on the edge that goes back (\`check-fail-fix\`, max 3). When every edge for an outcome reached its max, the run fails there. Several edges with \`max\` may leave on one outcome: the run takes the first, in file order, that has not reached its max, and one last edge without \`max\` is the way on after them (fix three times, then ask a person). Every node must be reachable from \`start\`.
 
@@ -483,7 +483,7 @@ Rules (a Decision's \`when\`, a Value's \`expression\`, a write's \`expression\`
 
 A variable is a named, typed value the flow keeps while it runs. Declare it in \`variables\`. \`initial\` is a template over the inputs and \`run\` only. Read it as \`{{vars.name}}\`. A node changes it with \`set\`, a list of \`{ variable, value | expression, on? }\`: exactly one of \`value\` (a template) or \`expression\` (JSONata), and \`on\` lists the outcomes that write (unset: every outcome). Writes apply in order when the step ends. The node's own id reads the step that just ended. Each flow, each Subflow and each element of a Subflow with \`each\` has its own variables. A value that does not fit the type ends the step with an error.
 
-\`"keep": "project"\` keeps a variable between runs: memory for the next run, such as the issues a flow skipped. A run starts from the value the last write of this flow left in this project, else from \`initial\`. Each write saves it. A Subflow keeps its own, by its flow name. A kept value that no longer fits the type starts from \`initial\`. A person can reset a kept value on the flow's page. Check for duplicates with JSONata over the list: \`item.number in vars.skipped\`.
+\`"keep": "project"\` keeps a variable between runs: memory for the next run, such as the issues a flow skipped. A run starts from the value the last write of this flow left in this project, else from \`initial\`. Each write saves it. A Subflow keeps its own, by its flow name. A kept value that no longer fits the type starts from \`initial\`. Check for duplicates with JSONata over the list: \`item.number in vars.skipped\`.
 
 ## Schedules and webhooks
 
@@ -505,7 +505,7 @@ An Agent Profile (the Agent fields \`harness\`, \`model\`, \`permissionMode\`, �
 
 ## Sections
 
-\`{ id, label, color?, description?, nodes, sections? }\`: a box around nodes, for the editor only. The canvas shows a Section as one box, and the person opens it to see its nodes. \`sections\` lists the ids of the Sections inside it. A node is in one Section at most: the lowest one that holds it. A Section is inside one other at most. Colours: ${code(sectionColors)}. Outcome colours: ${code(outcomeColors)}.
+\`{ id, label, color?, description?, nodes, sections? }\`: a box around nodes, for the editor only. \`sections\` lists the ids of the Sections inside it. A node is in one Section at most: the lowest one that holds it. A Section is inside one other at most. Colours: ${code(sectionColors)}. Outcome colours: ${code(outcomeColors)}.
 
 Group a flow of more than about six nodes into Sections, one per phase of the work a person knows: "Pick the work", "Fix and check", "Review", "Ship". Put a node you add in the Section of its phase.
 
@@ -522,7 +522,8 @@ Group a flow of more than about six nodes into Sections, one per phase of the wo
 - Every Agent node has a profile, or a harness, model and permission mode. Use only profiles, connections, CLI tools and flows that exist: look them up, do not invent names or ids.
 - Every loop has an edge with \`max\`.
 - A flow of more than about six nodes has Sections, one per phase, without warnings.
-- Prefer a Command node to an Agent node when a shell command can do the job: it is fast, free and repeatable. Ask a person with a Gate before a step that others see (a message, a post, a pull request).
+- Prefer a Command node to an Agent node when a shell command can do the job: it is fast, free and repeatable.
+- Choices climb rule → model → person. Use a Decision by \`rule\` when a rule can decide, else by \`model\` with a person as the last cascade tier. Use a Gate only as a fallback (low confidence, the ladder ran out) or to approve an act that cannot be undone (send, publish, pay, merge).
 
 ## Example: build, test, fix, ask
 
