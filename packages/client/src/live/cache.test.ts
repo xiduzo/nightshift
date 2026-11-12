@@ -341,18 +341,22 @@ describe("the live cache follows the Host", () => {
 		expect(stale()).toEqual(sorted(["gates", ...RUN_1]));
 	});
 
-	test("a run that ends or changes reads that run, the lists, the dashboard, the schedules and the projects again", async () => {
-		for (const item of [
-			ended("run-finished"),
-			ended("run-failed"),
-			runChanged,
-		]) {
+	test("a run that changes reads that run, the lists, the dashboard, the schedules and the projects again", async () => {
+		const { live, stale, timers } = setUp();
+		const { host } = follow(live);
+		await host.send(runChanged);
+		timers.due(300);
+		// Not the Gates, not another run, not the Devices of a project.
+		expect(stale()).toEqual(sorted(RUN_1));
+	});
+
+	test("a run that ends reads the same, and the Knowledge page's sources: it may have synced one", async () => {
+		for (const item of [ended("run-finished"), ended("run-failed")]) {
 			const { live, stale, timers } = setUp();
 			const { host } = follow(live);
 			await host.send(item);
 			timers.due(300);
-			// Not the Gates, not another run, not the Devices of a project.
-			expect(stale()).toEqual(sorted(RUN_1));
+			expect(stale()).toEqual(sorted([...RUN_1, "knowledge"]));
 		}
 	});
 
@@ -685,7 +689,9 @@ describe("the live cache follows the Host", () => {
 		timers.due(300);
 		expect(called).toEqual(["runs.get", "gates.list"]);
 		// The run's detail and the open Gates are fresh; the rest of the run is read again.
-		expect(stale()).toEqual(sorted(RUN_1.filter((name) => name !== "run1")));
+		expect(stale()).toEqual(
+			sorted([...RUN_1.filter((name) => name !== "run1"), "knowledge"]),
+		);
 	});
 
 	test("an item that does not alert shows nothing", async () => {

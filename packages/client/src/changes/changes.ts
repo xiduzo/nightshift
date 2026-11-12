@@ -28,9 +28,16 @@ export type DocumentKind =
  * What a write changes: a synced document, or a write the stream tells
  * without one. `runs`: a run started, changed or ended. `projects`: a Host
  * changed the Space's projects. `pause`: a pause tonight began or ended.
- * `learnings`: a person kept or deleted learnings.
+ * `learnings`: a person kept or deleted learnings. `sources`: a run of a
+ * knowledge source started or ended.
  */
-export type Change = DocumentKind | "runs" | "projects" | "pause" | "learnings";
+export type Change =
+	| DocumentKind
+	| "runs"
+	| "projects"
+	| "pause"
+	| "learnings"
+	| "sources";
 
 /** The reads a change makes stale. */
 type Stale = {
@@ -73,6 +80,9 @@ const STALE: {
 		also: [["projects"], ["dashboard"], ["schedules", "list"]],
 	},
 	pause: { also: [["schedules", "list"]] },
+	// The Knowledge page shows each source's last sync. Its list reconciles
+	// the folder first, so not every change of a run reads it.
+	sources: { also: [["knowledge", "get"]] },
 	// The Knowledge page counts the learnings that wait.
 	learnings: {
 		also: [

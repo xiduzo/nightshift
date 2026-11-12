@@ -107,13 +107,14 @@ function readsForDocument(name: string): readonly Read[] {
  * What an item of `notifications.watch` reads again. A Gate that opens or
  * closes changes the inbox and the run it waits in. A run that ends or
  * changes changes that run; a Gate that closes with it sends its own
- * `gate-closed`. An item of a kind this screen does not know reads
+ * `gate-closed`. A run that ends also ends the sync of a knowledge source. An item of a kind this screen does not know reads
  * everything.
  */
 function readsAfter(item: NotificationItem): readonly Read[] {
 	switch (item.kind) {
 		case "run-finished":
 		case "run-failed":
+			return [...ofRun(item.runId), changed("sources")];
 		case "run-changed":
 		case "device-wait":
 		case "wait-ended":
