@@ -100,7 +100,7 @@ A pick below the confidence that you set goes to the next tier of the [cascade](
 
 ### Value presets
 
-A Value made by a rule can start from a preset. Under the expression, choose **Start from**: Filter, Pick fields, Sort, Limit, or Remove duplicates. Pick a list of an earlier step and fill in the fields. Night Shift writes the expression and the output for you, and you can change them after.
+A Value made by a rule can start from a preset. Under the expression, choose **Start from**: Filter, Pick fields, Sort, Limit, or Remove duplicates. Pick a list of an earlier step and fill in the fields. Night Shift writes the expression and the output for you, and you can change them after. The add-node dialog has the presets too, under **Shape**: each adds a new Value.
 
 The data is a record with one list: `{{small.data.items}}`. The list must come from a step whose output has a shape, such as a Convert node.
 
@@ -183,6 +183,9 @@ You do not have to write a shape. When a node has none, Night Shift takes it fro
 
 ## The editor
 
+- **Add a node.** Click the canvas and press **Tab**, or double-click an empty spot of the canvas. Type what you need, such as "http", "approve" or "csv", and pick a node. The buttons on the left of the canvas add nodes too. The first one opens the same search. Drag any other one to place it.
+- **Families.** The nodes are in families by their role, each with its own color: **Do** (Agent, Command, Tool, Web request), **Decide** (Gate, Branch), **Shape** (Value, the Value presets, Since last run, Convert), **Hold** (Wait, Lease, Service), and **Compose** (Subflow, Join, End).
+- **Takes a value.** A Branch, a Value, a Value preset, Since last run and Convert take a value. Select a node first, then add one of them. It goes after that node and reads its output. An edge comes from the first outcome of that node, if that outcome has no edge yet.
 - **Sections.** Put related nodes in a Section, a box on the canvas that you zoom into. A Section can hold other Sections. You can move a Section into a flow of its own.
 - **Auto layout** arranges the nodes for you.
 - **Undo, redo, cut, copy, and paste** work with the keyboard.

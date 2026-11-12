@@ -90,7 +90,7 @@ CLI when you need them.
 | ✓ [Context Menu](https://ui.shadcn.com/docs/components/context-menu) | A right-click menu (canvas nodes). |
 | ✓ [Dropdown Menu](https://ui.shadcn.com/docs/components/dropdown-menu) | Actions behind a button ("…" menus, user menu). |
 | [Menubar](https://ui.shadcn.com/docs/components/menubar) | A desktop-app menubar (File, Edit, View). |
-| ✓ [Command](https://ui.shadcn.com/docs/components/command) | A searchable list of commands. `CommandDialog` is a ⌘K palette. The list of variables a template field offers after `{{`. |
+| ✓ [Command](https://ui.shadcn.com/docs/components/command) | A searchable list of commands. `CommandDialog` is the add-node dialog of the flow editor (Tab, a double-click on the canvas, or the dock's first button): one group per family, with the Value presets under Shape (`features/flows/editor/add-node/`). The list of variables a template field offers after `{{`. |
 
 ### Feedback and status
 
@@ -117,7 +117,7 @@ CLI when you need them.
 | [Aspect Ratio](https://ui.shadcn.com/docs/components/aspect-ratio) | Keeps media at a fixed ratio. |
 | [Typography](https://ui.shadcn.com/docs/components/typography) | Class recipes for headings, paragraphs, lists, blockquotes and inline code. Copy the classes. There is nothing to install. |
 | ✓ [Item](https://ui.shadcn.com/docs/components/item) | One row of a list with media, title, description and actions: `ItemGroup`, `ItemMedia`, `ItemContent`, `ItemTitle`, `ItemDescription`, `ItemActions`. Runs in a list, gates, projects, settings rows, the links of a Gate, the phones and browsers that can notify you. |
-| ✓ [Kbd](https://ui.shadcn.com/docs/components/kbd) | A keyboard key or shortcut (⌘K, the keys of the Review page of Knowledge). |
+| ✓ [Kbd](https://ui.shadcn.com/docs/components/kbd) | A keyboard key or shortcut (⌘K, Tab on the node dock's Add a node, the keys of the Review page of Knowledge). |
 
 ### More
 
@@ -230,6 +230,6 @@ files into the app. Then adapt the copy. Browse them at
 
 Custom components are for what shadcn does not cover. In Night Shift that is
 the flow canvas (React Flow nodes and edges, and the node dock of shadcn
-Buttons over it) and domain wrappers that compose shadcn pieces, such as a
+Buttons over it, in the family tints) and domain wrappers that compose shadcn pieces, such as a
 run-status badge. Build them from shadcn components and theme tokens, never
 with a parallel set of styles.

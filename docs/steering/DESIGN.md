@@ -34,8 +34,9 @@ Tokens live in `packages/ui/src/styles/globals.css` as CSS custom properties in 
 | `--border`, `--input`, `--ring` | `oklch(0.922 0 0)` / `oklch(1 0 0 / 10%)` | Edges and focus |
 | `--chart-1` … `--chart-5` | blue scale | Cost and run history charts |
 | `--sidebar-*` | mirrors the page set | Project navigation |
+| `--family-do`, `-decide`, `-shape`, `-hold`, `-compose` | indigo 600 / 400, fuchsia 600 / 400, teal 700 / 400, sky 600 / 400, `--muted-foreground` | The family of a node type on its icon tile: the editor canvas, the node dock and the add-node dialog. A run view shows the run status instead. Each icon keeps 3:1 on its tile. |
 
-The palette is neutral. Status colors (running, blocked, needs you, verified) are not yet defined. Add them as tokens before a screen hardcodes a color.
+The palette is neutral. The web app adds its run status, outcome, metric and family colors as tokens in `apps/web/src/index.css`. Add a color as a token before a screen hardcodes it.
 
 ### Typography
 
