@@ -2,6 +2,7 @@ import { type KnownProfile, policyFromSettings } from "@nightshift/flows";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { connectionQueries } from "@/features/agents";
+import { useHasFolder } from "@/features/projects";
 import { runQueries } from "@/features/runs/flows-port";
 import { settingsQueries } from "@/features/settings/queries";
 import { useProjectFlows } from "../use-project-flows";
@@ -10,9 +11,10 @@ import { useCommandTools } from "./cli-tools-field";
 /**
  * What the editor reads besides the draft: the project's other flows, the
  * settings (new-node defaults, run policy), the connections and each
- * Device's profiles a node may name, and the CLI tools commands call. Each
- * part is undefined while it loads. A node's Device field
- * asks for the devices that node may name itself.
+ * Device's profiles a node may name, the CLI tools commands call, and
+ * whether the project has a folder. Each part is undefined while it loads,
+ * but the folder: true until the project says it has none. A node's
+ * Device field asks for the devices that node may name itself.
  */
 export function useEditorData(projectId: string, name: string) {
 	// The other flow files, for Call nodes. The draft stands in for this one.
@@ -63,7 +65,10 @@ export function useEditorData(projectId: string, name: string) {
 		[devices.data],
 	);
 	const cliTools = useCommandTools().refs;
+	// A step that needs the project's folder warns in a project without one.
+	const folder = useHasFolder(projectId);
 	return {
+		folder,
 		deviceNames,
 		projectFlows,
 		nodeDefaults,

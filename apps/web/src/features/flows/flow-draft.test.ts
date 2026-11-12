@@ -3,6 +3,7 @@ import type { NodeSample } from "@nightshift/client";
 import { FLOW_VERSION, type Flow, flowSchema } from "@nightshift/flows";
 
 import {
+	checkFlow,
 	completeTemplate,
 	matchVariables,
 	openTemplate,
@@ -164,5 +165,54 @@ describe("what each variable held in the newest run", () => {
 				group.variables.every((variable) => variable.sample === undefined),
 			),
 		).toBe(true);
+	});
+});
+
+describe("checkFlow: a project without a folder", () => {
+	const draft: Flow = flowSchema.parse({
+		version: FLOW_VERSION,
+		start: "publish",
+		nodes: [
+			{
+				id: "publish",
+				type: "call",
+				position: { x: 0, y: 0 },
+				flow: "kit:github/publish-draft-pr",
+				inputs: { title: "Notes" },
+			},
+			{
+				id: "note",
+				type: "command",
+				position: { x: 0, y: 0 },
+				command: 'echo "{{run.branch}}"',
+			},
+		],
+		edges: [],
+	});
+	const warnings = (folder?: boolean) =>
+		checkFlow(draft, {}, "ship", undefined, undefined, undefined, folder)
+			.issues.filter((issue) => issue.severity === "warning")
+			.filter((issue) => issue.message.includes("folder"));
+
+	test("each step that needs the folder warns, in the editor's words", () => {
+		expect(warnings(false)).toEqual([
+			{
+				severity: "warning",
+				message:
+					'"Publish a draft pull request" works in the project\'s folder. This project has no folder, so this step fails.',
+				nodeId: "publish",
+			},
+			{
+				severity: "warning",
+				message:
+					"{{run.branch}} is always empty. A project without a folder has no branches.",
+				nodeId: "note",
+			},
+		]);
+	});
+
+	test("a project with a folder, or one that is still loading, gets no warning", () => {
+		expect(warnings(true)).toEqual([]);
+		expect(warnings()).toEqual([]);
 	});
 });

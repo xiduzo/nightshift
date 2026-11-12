@@ -228,6 +228,7 @@ function Editor({
 		profileRefs,
 		cliTools,
 		deviceNames,
+		folder,
 	} = useEditorData(projectId, name);
 	// The pins and skips of a test run, kept in this browser.
 	const testMarks = useTestMarks({ projectId, flowName: name, flow: draft });
@@ -249,8 +250,17 @@ function Editor({
 				connectionNames,
 				profileRefs,
 				cliTools,
+				folder,
 			),
-		[draft, projectFlows.flows, name, connectionNames, profileRefs, cliTools],
+		[
+			draft,
+			projectFlows.flows,
+			name,
+			connectionNames,
+			profileRefs,
+			cliTools,
+			folder,
+		],
 	);
 	const [starting, setStarting] = useState(false);
 	const savable = useMemo(() => isSavable(draft), [draft]);
@@ -635,8 +645,17 @@ function Editor({
 				connectionNames,
 				profileRefs,
 				cliTools,
+				folder,
 			),
-		[preview, projectFlows.flows, name, connectionNames, profileRefs, cliTools],
+		[
+			preview,
+			projectFlows.flows,
+			name,
+			connectionNames,
+			profileRefs,
+			cliTools,
+			folder,
+		],
 	);
 
 	const inspector = selectedNode ? (

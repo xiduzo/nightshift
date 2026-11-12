@@ -11,6 +11,7 @@ import {
 	type Flow,
 	type FlowCheck,
 	type FlowNode,
+	type FolderNeed,
 	isOptionNode,
 	type KnownProfile,
 	type ListSource,
@@ -92,6 +93,24 @@ export function refusesCommandsMessage(
 ): string {
 	const name = mode === "acceptEdits" ? "Accept edits" : "Ask for each tool";
 	return `${name} runs no commands without you, such as git commit, except its CLI tools. Pick Auto for this node or its profile.`;
+}
+
+/**
+ * What the editor says about a node that needs the project's folder, in a
+ * project without one: the step fails, or reads nothing, when a run
+ * reaches it.
+ */
+export function needsFolderMessage(need: FolderNeed): string {
+	switch (need.kind) {
+		case "kit":
+			return `"${need.label}" works in the project's folder. This project has no folder, so this step fails.`;
+		case "flow":
+			return `"${need.flow}" has a step that needs the project's folder. This project has no folder, so that step fails.`;
+		case "git":
+			return "This command runs git, but this project has no folder. Each run starts in an empty folder of its own.";
+		case "branch":
+			return `{{run.${need.field}}} is always empty. A project without a folder has no branches.`;
+	}
 }
 
 /** One `{{…}}` a template can use. */
@@ -333,6 +352,7 @@ const MESSAGES: DraftMessages = {
 		"This flow runs on a device that is no longer in this Space. Choose another device in the flow's settings.",
 	programWithoutLogin: programWithoutLoginMessage,
 	refusesCommands: refusesCommandsMessage,
+	needsFolder: needsFolderMessage,
 };
 
 /** A `{{` the cursor is in: where it starts, and the name typed after it so far. */
@@ -395,7 +415,8 @@ export function completeTemplate(
  * `connections` holds the names of the daemon's connections, and
  * `profiles` the profiles a node may name, each on its device, with the
  * devices whose profiles this computer cannot tell, and `cliTools` the CLI
- * tools; leave them out while they load.
+ * tools; leave them out while they load. `folder`: whether the project
+ * has a folder. False warns at each step that needs one.
  */
 export function checkFlow(
 	flow: Flow,
@@ -409,12 +430,14 @@ export function checkFlow(
 		deviceIds: readonly string[];
 	},
 	cliTools?: readonly CliToolRef[],
+	folder?: boolean,
 ): FlowCheck {
 	return checkDraft(flow, MESSAGES, {
 		flows,
 		name,
 		connections,
 		cliTools,
+		folder,
 		...(profiles
 			? {
 					profiles: profiles.known,
