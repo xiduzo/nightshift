@@ -3,9 +3,9 @@ import { Card } from "@nightshift/ui-native/components/ui/card";
 import { View } from "react-native";
 
 import { SectionHead } from "@/shared/list";
+import { CodeBlock, Markdown } from "@/shared/markdown";
 import { FactGrid, FactTile } from "@/shared/tiles";
 import { questionSections } from "./gate-view";
-import { CodeBlock, Markdown } from "./markdown";
 
 /**
  * What a Gate shows below its headline: the rest of the question, short

@@ -1,5 +1,5 @@
 /**
- * What the Markdown of a Gate shows, without React Native: where a link
+ * What Markdown on the phone shows, without React Native: where a link
  * opens, the color of each line of a diff, and a list item's marker.
  */
 

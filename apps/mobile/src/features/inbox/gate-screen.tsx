@@ -68,6 +68,7 @@ import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
 import { HeaderToolbar } from "@/shared/header";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
+import { InlineMarkdown } from "@/shared/markdown";
 import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
 import { AskScreen } from "./ask-screen";
@@ -85,7 +86,6 @@ import {
 	sentText,
 	stepsHint,
 } from "./gate-view";
-import { InlineMarkdown } from "./markdown";
 import { ProblemAlert } from "./problem-alert";
 import { QuestionSections } from "./question-sections";
 import { SentCard } from "./sent-card";

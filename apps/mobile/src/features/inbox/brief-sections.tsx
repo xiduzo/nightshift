@@ -8,8 +8,8 @@ import { Fragment } from "react";
 import { View } from "react-native";
 
 import { SectionHead } from "@/shared/list";
+import { InlineMarkdown, Markdown } from "@/shared/markdown";
 import { type BriefView, WRITTEN_BY_NIGHT_SHIFT } from "./brief-view";
-import { InlineMarkdown, Markdown } from "./markdown";
 
 /**
  * The brief of a Gate, above its question: Situation (why you decide),
