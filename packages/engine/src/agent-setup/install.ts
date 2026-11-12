@@ -4,9 +4,10 @@ import { plainText, tailOf } from "./plain-text";
 import type { SetupSpawn } from "./spawn";
 
 /**
- * The install of an agent CLI with its vendor's own script (ADR 25). What
- * runs comes only from the harness's fixed setup data, never from a
- * request: `curl -fsSL <script> | <shell>`, as the vendor documents it. It
+ * The install of a program with a fixed command: an agent CLI with its
+ * vendor's own script (ADR 25), or Ollama with Homebrew (`decider.ts`).
+ * What runs comes only from fixed setup data, never from a request: for an
+ * agent `curl -fsSL <script> | <shell>`, as the vendor documents it. It
  * runs without input and without a terminal, so it cannot ask for a
  * password: it never runs as an administrator. A timeout stops it.
  */
@@ -37,20 +38,24 @@ export type RunningInstall = {
 	ended: Promise<InstallEnd>;
 };
 
-/** Starts the vendor's installer in the home folder. Throws when it cannot start. */
+/**
+ * Starts an install in the home folder: `command`, the exact text the
+ * person read, with `extraEnv` on top of `env`. Throws when it cannot start.
+ */
 export function startInstall(input: {
-	setup: HarnessSetupFacts;
+	command: string;
+	extraEnv?: Readonly<Record<string, string>>;
 	spawn: SetupSpawn;
 	home: string;
 	env: Readonly<Record<string, string | undefined>>;
 	timeoutMs?: number;
 }): RunningInstall {
-	const { setup, spawn, home, env } = input;
+	const { command, spawn, home, env } = input;
 	let output = "";
 	let stopped: "timeout" | "stop" | null = null;
-	const proc = spawn(["/bin/sh", "-c", installCommand(setup)], {
+	const proc = spawn(["/bin/sh", "-c", command], {
 		cwd: home,
-		env: { ...env, ...setup.installEnv },
+		env: { ...env, ...input.extraEnv },
 		io: "pipes",
 		input: false,
 		onOutput: (text) => {

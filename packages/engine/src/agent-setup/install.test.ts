@@ -21,7 +21,8 @@ describe("the install of an agent CLI", () => {
 	test("starts it in the home folder, without input, with the vendor's variables", async () => {
 		const { spawn, started } = fakeSpawn();
 		const run = startInstall({
-			setup: codex,
+			command: installCommand(codex),
+			extraEnv: codex.installEnv,
 			spawn,
 			home: "/home/ada",
 			env: { PATH: "/usr/bin", HOME: "/home/ada" },
@@ -53,7 +54,12 @@ describe("the install of an agent CLI", () => {
 
 	test("a failed install keeps the end of its output, without colors", async () => {
 		const { spawn, started } = fakeSpawn();
-		const run = startInstall({ setup: claude, spawn, home: "/h", env: {} });
+		const run = startInstall({
+			command: installCommand(claude),
+			spawn,
+			home: "/h",
+			env: {},
+		});
 		const proc = started[0];
 		if (!proc) throw new Error("The install did not start.");
 		proc.print(`${"downloading…\n".repeat(400)}`);
@@ -75,7 +81,7 @@ describe("the install of an agent CLI", () => {
 	test("a timeout stops the installer and every program it started", async () => {
 		const { spawn, started } = fakeSpawn((proc) => proc.print("working\n"));
 		const run = startInstall({
-			setup: claude,
+			command: installCommand(claude),
 			spawn,
 			home: "/h",
 			env: {},
@@ -87,7 +93,12 @@ describe("the install of an agent CLI", () => {
 
 	test("a stop ends it as stopped", async () => {
 		const { spawn, started } = fakeSpawn();
-		const run = startInstall({ setup: claude, spawn, home: "/h", env: {} });
+		const run = startInstall({
+			command: installCommand(claude),
+			spawn,
+			home: "/h",
+			env: {},
+		});
 		run.stop();
 		expect(await run.ended).toEqual({ kind: "stopped" });
 		expect(started[0]?.stopped).toBe(true);

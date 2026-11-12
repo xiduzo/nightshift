@@ -418,7 +418,8 @@ export function createAgentSetup(deps: AgentSetupDeps): AgentSetup {
 			job.set({ state: "installing", since: now() });
 			try {
 				const run = startInstall({
-					setup,
+					command: installCommand(setup),
+					extraEnv: setup.installEnv,
 					spawn,
 					home,
 					env,

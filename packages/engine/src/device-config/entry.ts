@@ -68,4 +68,5 @@ export {
 	isLoopbackHost,
 	settingsPatchSchema,
 	settingsSchema,
+	withEffectiveDecider,
 } from "./settings";

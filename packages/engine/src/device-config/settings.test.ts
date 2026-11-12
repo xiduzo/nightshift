@@ -3,7 +3,12 @@ import { setting } from "@nightshift/db/schema";
 import { DEFAULT_POLICY } from "@nightshift/flows";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import type { DeviceDocument } from "./device-document";
-import { createSettingsStore, defaultRunSettings } from "./settings";
+import {
+	createSettingsStore,
+	defaultRunSettings,
+	effectiveDecider,
+	withEffectiveDecider,
+} from "./settings";
 
 let sandbox: Sandbox;
 beforeEach(async () => {
@@ -160,6 +165,43 @@ describe("Ollama", () => {
 		await s.save({ embeddingModel: "bge-m3" });
 		expect(s.current().embeddingModel).toBe("bge-m3");
 		await expect(s.save({ embeddingModel: "two words" })).rejects.toThrow();
+	});
+});
+
+describe("the decider of new Decision nodes", () => {
+	test("never saved: Ollama without a TypeSafe key, TypeSafe with one", async () => {
+		const s = await store();
+		// The store itself keeps the built-in default.
+		expect(s.current().decisionDecider).toBe("typesafe");
+		const withoutKey = withEffectiveDecider(s.view(), false);
+		expect(withoutKey.values.decisionDecider).toBe("ollama");
+		expect(withoutKey.fields.decisionDecider).toEqual({
+			source: "default",
+			default: "ollama",
+		});
+		expect(effectiveDecider(s.view(), false)).toBe("ollama");
+		const withKey = withEffectiveDecider(s.view(), true);
+		expect(withKey.values.decisionDecider).toBe("typesafe");
+		expect(withKey.fields.decisionDecider.default).toBe("typesafe");
+		// The other settings stay as they are.
+		expect(withoutKey.values.maxConcurrentRuns).toBe(2);
+	});
+
+	test("a saved decider wins, with or without a key", async () => {
+		const s = await store();
+		await s.save({ decisionDecider: "openai" });
+		expect(withEffectiveDecider(s.view(), false).values.decisionDecider).toBe(
+			"openai",
+		);
+		expect(effectiveDecider(s.view(), true)).toBe("openai");
+		await s.save({ decisionDecider: "typesafe" });
+		expect(withEffectiveDecider(s.view(), false).values.decisionDecider).toBe(
+			"typesafe",
+		);
+		await s.save({ decisionDecider: null });
+		expect(withEffectiveDecider(s.view(), false).values.decisionDecider).toBe(
+			"ollama",
+		);
 	});
 });
 

@@ -26,6 +26,8 @@ const ref = (name: string) => `\${${name}}`;
 function fakeOllama() {
 	const state = {
 		up: true,
+		/** How long each part of a download takes. */
+		partMs: 5,
 		models: [] as { name: string; capabilities?: string[] }[],
 		requests: [] as { url: string; headers: Headers }[],
 	};
@@ -72,7 +74,7 @@ function fakeOllama() {
 							if (line.status === "success")
 								state.models.push({ name: model, capabilities: ["embedding"] });
 							controller.enqueue(encoder.encode(`${JSON.stringify(line)}\n`));
-							await Bun.sleep(5);
+							await Bun.sleep(state.partMs);
 						}
 						controller.close();
 					},
@@ -113,13 +115,16 @@ async function harness(
 	const ollama = fakeOllama();
 	ollama.state.up = options.up ?? true;
 	const spawned: string[][] = [];
+	// The `ollama` program on PATH: a test installs it later by setting it.
+	const found = {
+		binary: options.binary === undefined ? "/usr/bin/ollama" : options.binary,
+	};
 	const service = await createOllama({
 		dataDir: "/data",
 		settings,
 		secrets: connections,
 		env: { PATH: "/usr/bin" },
-		which: () =>
-			options.binary === undefined ? "/usr/bin/ollama" : options.binary,
+		which: () => found.binary,
 		spawn: (argv) => {
 			spawned.push(argv);
 			ollama.state.up = true;
@@ -139,7 +144,7 @@ async function harness(
 		log: () => {},
 	});
 	services.push(service);
-	return { service, settings, connections, ollama, spawned };
+	return { service, settings, connections, ollama, spawned, found };
 }
 
 const until = async (check: () => boolean | Promise<boolean>) => {
@@ -326,5 +331,56 @@ describe("models", () => {
 		const { download } = await h.service.status();
 		expect(download?.running).toBe(false);
 		expect(download?.error).toContain("fetch failed");
+	});
+});
+
+describe("a model of a decider", () => {
+	test("the status says whether Ollama has any model, and how far its download is", async () => {
+		const h = await harness();
+		h.ollama.state.models = [{ name: "qwen3-embedding:0.6b" }];
+		expect(await h.service.status("llama3.2:latest")).toMatchObject({
+			model: "llama3.2:latest",
+			hasModel: false,
+			download: null,
+		});
+		// The embedding model stays the default question.
+		expect(await h.service.status()).toMatchObject({
+			model: "qwen3-embedding:0.6b",
+			hasModel: true,
+		});
+		h.service.pull("llama3.2:latest");
+		await until(async () => (await h.service.status("llama3.2")).hasModel);
+		expect((await h.service.status("llama3.2:latest")).hasModel).toBe(true);
+	});
+
+	test("a cancelled download stops without an error, and the next one starts again", async () => {
+		const h = await harness();
+		h.ollama.state.partMs = 50;
+		h.service.pull("llama3.2:latest");
+		await until(
+			async () =>
+				(await h.service.status("llama3.2:latest")).download?.running === true,
+		);
+		await h.service.cancelPull("llama3.2:latest");
+		const after = await h.service.status("llama3.2:latest");
+		expect(after.download).toBeNull();
+		expect(after.hasModel).toBe(false);
+
+		h.ollama.state.partMs = 1;
+		h.service.pull("llama3.2:latest");
+		await until(
+			async () => (await h.service.status("llama3.2:latest")).hasModel,
+		);
+	});
+
+	test("a refresh after an install starts the Ollama the settings want", async () => {
+		const h = await harness({ binary: null, up: false });
+		await h.settings.save({ ollama: "on" });
+		await Bun.sleep(30);
+		expect(h.spawned).toHaveLength(0);
+		h.found.binary = "/opt/homebrew/bin/ollama";
+		await h.service.refresh();
+		await until(() => h.spawned.length === 1);
+		expect(h.spawned[0]).toEqual(["/opt/homebrew/bin/ollama", "serve"]);
 	});
 });

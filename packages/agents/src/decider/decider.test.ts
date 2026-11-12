@@ -3,6 +3,7 @@ import type { DecisionInput, ValueInput } from "../port/types";
 import {
 	cannotMakeValueMessage,
 	DECIDER_ADAPTERS,
+	DECIDER_SETUP,
 	deciderModels,
 	tanstackDecider,
 } from "./decider";
@@ -381,7 +382,7 @@ describe("tanstackDecider: Ollama", () => {
 			kind: "error",
 			errorKind: "harness",
 			message:
-				"The model qwen3:8b is not on this computer. Run ollama pull qwen3:8b in a terminal, then run the step again.",
+				"The model qwen3:8b is not on this computer. Download it from its Model Profile on the Agents page. Then run the step again.",
 			costUsd: null,
 		});
 	});
@@ -393,7 +394,7 @@ describe("tanstackDecider: Ollama", () => {
 			);
 		});
 		const message =
-			"Ollama is not running on this computer. Start Ollama and run the step again.";
+			"Ollama is not running on this computer. Start it, or let Night Shift start it in Settings. Then run the step again.";
 		expect(await free.decide(input({ decider: "ollama" }))).toMatchObject({
 			errorKind: "harness",
 			message,
@@ -796,5 +797,14 @@ describe("tanstackDecider: checkAddress", () => {
 			"Nothing answers there. Start the server, or change the address on the Agents page.",
 		);
 		expect(asked).toEqual(["http://gpu-box:11434/api/tags"]);
+	});
+});
+
+describe("the guided setup of a decider", () => {
+	test("saves the key TypeSafe reads, and downloads Ollama's default model", () => {
+		const { typesafeKey, localModel } = DECIDER_SETUP;
+		expect<string | null>(typesafeKey).toBe(DECIDER_ADAPTERS.typesafe.apiKey);
+		expect<string>(localModel.name).toBe(DECIDER_ADAPTERS.ollama.defaultModel);
+		expect(DECIDER_SETUP.localModel.bytes).toBeGreaterThan(1e9);
 	});
 });

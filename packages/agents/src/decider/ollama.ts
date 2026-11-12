@@ -47,6 +47,16 @@ export const OLLAMA_MODELS: readonly string[] = [...new Set(OllamaTextModels)];
  */
 export const OLLAMA_DEFAULT_MODEL = "llama3.2:latest";
 
+/**
+ * The model the guided setup downloads for a decider on this computer
+ * (Q22), and about how big its download is: 2.0 GB, as ollama.com lists
+ * it. The person sees the size before the download starts.
+ */
+export const LOCAL_DECIDER_MODEL = {
+	name: OLLAMA_DEFAULT_MODEL,
+	bytes: 2_000_000_000,
+} as const;
+
 /** Decides on an Ollama chat model, at `at` or Ollama's default address. */
 export function ollamaDecider(
 	model: string,
@@ -119,10 +129,10 @@ export function ollamaProblem(
 	const missing = MODEL_NOT_FOUND.exec(message);
 	if (missing) {
 		const name = missing[1] ?? model;
-		return `The model ${name} is not on this computer. Run ollama pull ${name} in a terminal, then run the step again.`;
+		return `The model ${name} is not on this computer. Download it from its Model Profile on the Agents page. Then run the step again.`;
 	}
 	if (NOT_RUNNING.test(message)) {
-		return "Ollama is not running on this computer. Start Ollama and run the step again.";
+		return "Ollama is not running on this computer. Start it, or let Night Shift start it in Settings. Then run the step again.";
 	}
 	return undefined;
 }

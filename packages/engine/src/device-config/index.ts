@@ -17,6 +17,7 @@ export {
 	storedDeviceCopy,
 	storedDevices,
 } from "./device-copies";
+export { saveProfile } from "./edits";
 export { agentProfileOn } from "./found-programs";
 export type { ProfileStore, ProfileView } from "./profiles";
 export {
@@ -25,4 +26,9 @@ export {
 	takenOverSecrets,
 } from "./secret-scopes";
 export type { RunSettings, SettingsStore } from "./settings";
-export { defaultRunSettings, HARNESS_BIN, isLoopbackHost } from "./settings";
+export {
+	defaultRunSettings,
+	effectiveDecider,
+	HARNESS_BIN,
+	isLoopbackHost,
+} from "./settings";

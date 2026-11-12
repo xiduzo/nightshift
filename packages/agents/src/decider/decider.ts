@@ -47,6 +47,7 @@ import {
 } from "./address";
 import { ChatEvaluateAdapter } from "./chat-evaluate";
 import {
+	LOCAL_DECIDER_MODEL,
 	OLLAMA_DEFAULT_MODEL,
 	OLLAMA_MODELS,
 	type OllamaAddress,
@@ -260,6 +261,18 @@ function reached(access: DeciderAccess, label: string): AddressAccess {
 	return { ...access.address, apiKey: access.apiKey };
 }
 
+/** The secret that holds the TypeSafe Jev key: the guided setup saves it there. */
+export const TYPESAFE_API_KEY = "TYPESAFE_API_KEY";
+
+/**
+ * What the guided setup of a decider needs (Q22): the secret of the
+ * TypeSafe Jev key, and the model a decider on this computer downloads.
+ */
+export const DECIDER_SETUP = {
+	typesafeKey: TYPESAFE_API_KEY,
+	localModel: LOCAL_DECIDER_MODEL,
+} as const;
+
 /** Every TanStack AI decider adapter (the `evaluate` activity). */
 export const DECIDER_ADAPTERS: Record<DeciderName, DeciderAdapter> = {
 	typesafe: {
@@ -267,7 +280,7 @@ export const DECIDER_ADAPTERS: Record<DeciderName, DeciderAdapter> = {
 		pkg: "@tanstack/ai-typesafe",
 		models: TYPESAFE_MODELS,
 		defaultModel: "jev-latest",
-		apiKey: "TYPESAFE_API_KEY",
+		apiKey: TYPESAFE_API_KEY,
 		create: async (model, { apiKey }) => {
 			const { createTypesafeDecider } = await import("@tanstack/ai-typesafe");
 			return createTypesafeDecider(model, apiKey ?? "");

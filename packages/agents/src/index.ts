@@ -23,6 +23,7 @@ export {
 	terminalTools,
 } from "./assistant";
 export {
+	DECIDER_SETUP,
 	type DeciderModels,
 	type DeciderView,
 	deciderModelsAt,

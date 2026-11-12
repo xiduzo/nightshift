@@ -30,7 +30,10 @@ export function createOllamaPulls(options: {
 	const pulls = new Map<string, OllamaPull>();
 	const running = new Map<string, Promise<void>>();
 	let stopped = false;
-	const aborts = new Set<() => void>();
+	/** Stops each running download's stream, by model. */
+	const aborts = new Map<string, () => void>();
+	/** The models whose download a person cancelled: it ends without an error. */
+	const cancelled = new Set<string>();
 
 	async function run(model: string): Promise<void> {
 		const pull: OllamaPull = { model, percent: 0, error: null, running: true };
@@ -40,10 +43,12 @@ export function createOllamaPulls(options: {
 		try {
 			const ollama = await client();
 			const stream = await ollama.pull({ model, stream: true });
-			const abort = () => stream.abort();
-			aborts.add(abort);
+			aborts.set(model, () => stream.abort());
+			// Cancelled while the download started: it stops before its first part.
+			if (cancelled.has(model)) stream.abort();
 			try {
 				for await (const part of stream) {
+					if (cancelled.has(model)) throw new Error("The download stopped.");
 					if (part.digest && part.total > 0) {
 						layers.set(part.digest, {
 							total: part.total,
@@ -64,16 +69,18 @@ export function createOllamaPulls(options: {
 					if (part.status === "success") pull.percent = 100;
 				}
 			} finally {
-				aborts.delete(abort);
+				aborts.delete(model);
 			}
 			if (pull.percent < 100) throw new Error("The download ended early.");
 			log(`[ollama] ${model} is downloaded.`);
 			onDone?.(model);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			pull.error = stopped ? null : message;
-			if (!stopped) log(`[ollama] ${model} did not download: ${message}`);
+			const quiet = stopped || cancelled.has(model);
+			pull.error = quiet ? null : message;
+			if (!quiet) log(`[ollama] ${model} did not download: ${message}`);
 		} finally {
+			cancelled.delete(model);
 			pull.running = false;
 		}
 	}
@@ -96,10 +103,21 @@ export function createOllamaPulls(options: {
 			const pull = pulls.get(model);
 			return pull?.running ? pull.percent : null;
 		},
+		/**
+		 * Stops the download of `model`. Ollama keeps what came: the next
+		 * download of it goes on from there.
+		 */
+		async cancel(model: string): Promise<void> {
+			const download = running.get(model);
+			if (!download) return;
+			cancelled.add(model);
+			aborts.get(model)?.();
+			await download.catch(() => {});
+		},
 		/** Stops every download. */
 		async stop(): Promise<void> {
 			stopped = true;
-			for (const abort of aborts) abort();
+			for (const abort of aborts.values()) abort();
 			await Promise.allSettled(running.values());
 		},
 	};

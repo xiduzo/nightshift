@@ -42,7 +42,7 @@ export type OllamaStatus = {
 	installed: boolean;
 	/** Whether Ollama answers now. */
 	answers: boolean;
-	/** The embedding model search by meaning uses. */
+	/** The model asked about: the embedding model of search by meaning, unless another is named. */
 	model: string;
 	/** Whether this Ollama has that model. */
 	hasModel: boolean;
@@ -238,10 +238,13 @@ export async function createOllama(deps: {
 			}
 			return made.meaning;
 		},
-		/** The Ollama Night Shift uses, for the Settings page. Never throws. */
-		async status(): Promise<OllamaStatus> {
+		/**
+		 * The Ollama Night Shift uses, and whether it has `model`: the
+		 * embedding model by default, or any other, such as a decider's.
+		 * Never throws.
+		 */
+		async status(model = knowledgeModel(settings)): Promise<OllamaStatus> {
 			const at = endpoint;
-			const model = knowledgeModel(settings);
 			let answers = false;
 			let models: OllamaModel[] = [];
 			try {
@@ -282,6 +285,18 @@ export async function createOllama(deps: {
 		/** Starts a download of `model` into this Ollama, in the background. */
 		pull(model: string): void {
 			pulls.pull(model);
+		},
+		/** Stops the download of `model`. The next one goes on where it stopped. */
+		cancelPull(model: string): Promise<void> {
+			return pulls.cancel(model);
+		},
+		/**
+		 * Brings the started Ollama in line with the settings again: after an
+		 * install, a start that found no `ollama` program looks again.
+		 */
+		refresh(): Promise<void> {
+			reapply();
+			return applying;
 		},
 		/** Stops the downloads and the Ollama Night Shift started. */
 		async stop(): Promise<void> {
