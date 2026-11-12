@@ -101,6 +101,12 @@ The End node reads its report from a file, but it did not get a text file from t
 
 "Update Night Shift" in the message means that the computer runs an older version. Update Night Shift there.
 
+### "Update Night Shift there to run a test."
+
+The computer that keeps this Space runs an older version of Night Shift. It cannot run a test with pinned outputs or skipped nodes, so nothing starts. Update Night Shift on that computer. Or start the run without pins and skips.
+
+A test run also moves only to a computer that can run one. A move to a computer with an older version says "runs an older version of Night Shift".
+
 ## Schedules
 
 ### A schedule did not start

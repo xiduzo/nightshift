@@ -906,7 +906,12 @@ In a test run, `end()` also drops `kept`, `memory` and `shapes` from every
 step's `StepEnded`, and calls no `keepShapes`. The steps still read kept
 values and memory. The run plan places no stand-in (`placement/run-plan.ts`),
 and run start resolves each pin from the Walker's own log before the plan
-(`run/test-run.ts`).
+(`run/test-run.ts`). The pinned outputs hold at most 4 MiB of JSON
+together, because every Replica keeps `RunStarted`. A Device that hands
+the start to its Host (`run/relay.ts`) checks the pins in its own log
+first, and sends them as refs on `sync.startTest`. The Host resolves them
+again from its own log. A pin whose run has not reached the Host yet says
+to try again in a moment.
 
 ## The sleep module (`graph/sleep.ts`)
 
