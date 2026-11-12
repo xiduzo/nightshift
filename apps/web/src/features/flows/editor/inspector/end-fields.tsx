@@ -1,4 +1,4 @@
-/** The fields of an End node: how it ends the run, and the line it leaves for you. */
+/** The fields of an End node: how it ends the run, the line it leaves for you, and its report. */
 import type { EndNode, EndStatus, Flow } from "@nightshift/flows";
 import {
 	ToggleGroup,
@@ -18,6 +18,17 @@ const STATUS_HINT: Record<EndStatus, string> = {
 	failed: "The run fails here on purpose. You can run it again from a step.",
 };
 
+/** Whether the node writes a report, in the order the toggle shows them. */
+type ReportKind = "none" | NonNullable<EndNode["report"]>["kind"];
+
+const REPORT_KINDS: { kind: ReportKind; label: string }[] = [
+	{ kind: "none", label: "None" },
+	{ kind: "text", label: "Write it" },
+];
+
+const PRESSED =
+	"flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground";
+
 export function EndFields({
 	flow,
 	node,
@@ -28,6 +39,11 @@ export function EndFields({
 	onChange: (change: (node: EndNode) => EndNode) => void;
 }) {
 	const id = useId();
+	const { report } = node;
+	const setReport = (next: EndNode["report"]) =>
+		onChange(({ report: _, ...current }) =>
+			next ? { ...current, report: next } : current,
+		);
 	return (
 		<InspectorSection title="End">
 			<Field id={`${id}-status`} label="Result" hint={STATUS_HINT[node.status]}>
@@ -44,11 +60,7 @@ export function EndFields({
 					}}
 				>
 					{STATUSES.map((status) => (
-						<ToggleGroupItem
-							key={status}
-							value={status}
-							className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-						>
+						<ToggleGroupItem key={status} value={status} className={PRESSED}>
 							{END_STATUS_LABEL[status]}
 						</ToggleGroupItem>
 					))}
@@ -69,10 +81,47 @@ export function EndFields({
 					)
 				}
 			/>
+			<Field
+				id={`${id}-report-kind`}
+				label="Report"
+				hint="Shows on the run page, on the flow's card and on Home."
+			>
+				<ToggleGroup
+					variant="outline"
+					size="sm"
+					spacing={0}
+					aria-label="Report"
+					className="w-full"
+					value={[report?.kind ?? "none"]}
+					onValueChange={(value) => {
+						const kind = value[0] as ReportKind | undefined;
+						if (kind === "none") setReport(undefined);
+						if (kind === "text") setReport({ kind: "text", text: "" });
+					}}
+				>
+					{REPORT_KINDS.map(({ kind, label }) => (
+						<ToggleGroupItem key={kind} value={kind} className={PRESSED}>
+							{label}
+						</ToggleGroupItem>
+					))}
+				</ToggleGroup>
+			</Field>
+			{report?.kind === "text" ? (
+				<TemplateField
+					id={`${id}-report`}
+					label="Text"
+					flow={flow}
+					nodeId={node.id}
+					value={report.text}
+					placeholder={"## What is new\n\n{{summary.output}}"}
+					language="markdown"
+					onChange={(text) => setReport({ kind: "text", text })}
+				/>
+			) : null}
 			<Note>
 				No edge leaves this node. In a subflow, it ends only the subflow. The
-				Subflow node reads the result as <code>ended</code> and the message as{" "}
-				<code>end_message</code>.
+				Subflow node reads the result as <code>ended</code>, the message as{" "}
+				<code>end_message</code> and the report as <code>end_report</code>.
 			</Note>
 		</InspectorSection>
 	);
