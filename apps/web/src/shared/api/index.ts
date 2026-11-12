@@ -9,7 +9,6 @@ export type {
 	AgentUsage,
 	Artifact,
 	DashboardSummary,
-	FailingFlow,
 	FlowHealthRow,
 	FlowListItem,
 	FlowRange,

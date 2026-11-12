@@ -24,9 +24,9 @@ A test run is a run that you start from the flow editor with pinned or skipped n
 - These steps have no transcript, take no time and cost nothing. The other steps run for real.
 - A test run keeps nothing for the next run. It writes no kept variables, and Since last run does not remember what it saw.
 
-A test run counts only in **Spend**, on Home, on the project page and in the details of a flow. Runs, Finished, Needed you, Failed, Latest reports and [Flow health](#flow-health) leave it out. The icon of a project in the sidebar leaves it out too. A try does not change how your flows look.
+A test run counts only in what a project spent. Home, the numbers of the project page and [Flow health](#flow-health) leave it out. The icon of a project in the sidebar leaves it out too. A try does not change how your flows look.
 
-While a test run runs, **Running now** on Home shows it with its **Test run** badge. The `list_runs` and `get_run` tools tell an agent which run is a test run. See [Terminal and MCP](Terminal-and-MCP.md).
+The run page and every list of runs show a test run with its **Test run** badge. The `list_runs` and `get_run` tools tell an agent which run is a test run. See [Terminal and MCP](Terminal-and-MCP.md).
 
 ## The report of a run
 
@@ -34,7 +34,7 @@ A run can end with a report: what it produced, in Markdown, such as research res
 
 - **The run page** shows the report in the End step. **Copy** puts it on your clipboard. **Download** saves it as a `.md` file. A run that ended with a report opens at it.
 - **The Flows page** shows the start of each flow's latest report on its card. Click **Latest report** to read all of it.
-- **Home** lists the latest report of each flow under the lanes, newest first. Point at a row to see the start of the report.
+- **Home** lists the latest report of each flow under **What came out**, the new ones first.
 - The report of a [test run](#test-runs) shows only on its run page.
 - Night Shift keeps the first 64 KB of a report. A longer report says so.
 - A report from a file must be a text file in the folder the run works in. When the file is not there, or is not text, the run ends as the End node says, without a report. The run page tells you why.
@@ -114,11 +114,54 @@ A computer that goes offline does not end the run:
 - A step without a profile moves to the next computer of the run that can take it.
 - Otherwise the step waits for its computer until the stop time, and Night Shift tells you.
 
+## Home
+
+Home is a short note about all your projects. Read it from top to bottom.
+
+- **The heading** says how many flows need a look. When you come back, it says how many are new since you last looked.
+- **The line under it** says how often your flows needed you without a plan this week, and last week.
+- **Needs a look** lists each flow that does not do what it usually does: its last runs failed, its last runs found nothing to do, or its last run cost more or took longer than usual. Night Shift learns what is usual from the runs of the flow. You set no limits.
+- **What came out** lists the latest report of each flow from the last 7 days.
+
+A flow stays under **Needs a look** until it does its usual work again. To look at one:
+
+1. Choose **Look**. A panel shows what is unusual, and what is usual for this flow.
+2. If a run failed, choose **Ask an agent**. An agent reads the run and tells you what went wrong. It changes nothing.
+3. Choose **Open the run** or **Open the flow** to fix the cause.
+4. Choose **Looked at it**. The flow folds to one line. It comes back when the problem starts again.
+
+Home keeps your last look in this browser. Another browser starts fresh.
+
+## Needed you, with and without a plan
+
+Night Shift counts each time that you stepped in on a run.
+
+- **As planned:** you answered a Gate or an Ask that the flow has for you, such as an approval.
+- **Without a plan:** a choice came to you because a rule or a decider did not hold. Or you continued, stopped, or took over a run.
+
+The aim is no time without a plan. A planned approval is fine.
+
+## Levels
+
+Each flow has a level. Night Shift measures it from the last 10 runs of the flow that ended.
+
+| Level | What it means |
+| --- | --- |
+| **You decide** | You stepped in on more than half of the runs. |
+| **You check** | You stepped in on some of the runs. |
+| **On its own** | You stepped in on none of the runs. |
+
+A flow with fewer than 3 runs that ended has no level yet.
+
 ## Flow health
 
-Flow health shows, for each flow, where its work landed, its runs per day, their cost against the median, why runs failed, and its metrics. Click a flow to open its details. Flow health leaves [test runs](#test-runs) out. **Total spent** in the details of a flow counts them, and says how many.
+A project's page shows one row for each flow: its level, its last runs, how often it needed you without a plan, and what a finished run costs. A flow that needs a look says why in its row. The numbers on top of the page compare with the same days before. Choose 7, 30 or 90 days.
 
-**Where the work landed** comes first. One bar shows the work: what agents and models made, in the flow and in the subflows it calls, and your answers to an Ask. A subflow with a cascade counts once, on the tier that held. One bar shows the choices: the Decisions. Each part of a bar is a rung:
+Click a row to open it. You see its runs per day, why runs did not finish, its latest runs, why it needed you, and where its work landed. **All details** opens the full details of the flow. Flow health leaves [test runs](#test-runs) out. **Total spent** in the details of a flow counts them, and says how many.
+
+**Spend** on top of the page shows what the project spent.
+
+**Where the work landed** shows in an opened row. One bar shows the work: what agents and models made, in the flow and in the subflows it calls, and your answers to an Ask. A subflow with a cascade counts once, on the tier that held. One bar shows the choices: the Decisions. Each part of a bar is a rung:
 
 - a tier of a cascade, such as Sonnet or Opus, or the agent or decider of a node without one,
 - **Rule**, when a rule made the choice,
@@ -132,6 +175,4 @@ The line next to a bar gives each share, such as "Sonnet 78% · Opus 19% · You 
 
 **Per useful result** shows what all runs of a flow cost, divided by the runs that people found useful. Runs that failed or that nobody answered count in the cost too. Under it, you see how many runs with an answer were useful.
 
-**Needed you** shows the share of a flow's runs that a person stepped in on. A person answered a Gate or an Ask, resumed, stopped, or took over the run. Point at the share to see why. When the share falls, the flow needs you less.
-
-Home and each project page show the same number for all runs. Open **Needed you** to see why runs needed you, the runs that did, and the Gates that they asked.
+**Details** next to **Needed you without a plan** shows why runs needed you, the runs that did, and the Gates that they asked.

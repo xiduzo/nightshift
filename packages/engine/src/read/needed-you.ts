@@ -1,4 +1,6 @@
 import type { EarlyWake, RunState, StopFact } from "../log";
+import { ladderOf } from "./ladder";
+import { deriveSteps } from "./run-views";
 
 /**
  * Needed you: what a person did to a run, from its log. The person leaves
@@ -23,6 +25,11 @@ import type { EarlyWake, RunState, StopFact } from "../log";
  *
  * A move to another Device does not count: the run did not need it.
  *
+ * Planned or not (docs/research/dashboards-2026-11.md, Q12): an answer to
+ * a Gate or an Ask that the flow draws for a person is `planned`. An
+ * answer after a ladder ran out (another try of the same node came first)
+ * is not, and neither is a resume, a stop or a take-over.
+ *
  * Older logs: a stop without `by` was a person's, and a stop that a
  * restart's `RunResumed` follows was a restart. A wake without `by` was a
  * person's unless its step slept for an offline Device or a lease: only
@@ -40,8 +47,31 @@ export const NEEDED_YOU_REASONS = [
 
 export type NeededYouReason = (typeof NEEDED_YOU_REASONS)[number];
 
+/** How much of a Gate's question a step-in keeps. */
+const QUESTION_LENGTH = 120;
+
 /** One time a person stepped in: why, and when. */
-export type NeededYou = { reason: NeededYouReason; at: number };
+export type NeededYou = {
+	reason: NeededYouReason;
+	at: number;
+	/**
+	 * The flow draws this Gate or Ask for a person: an approval, not a
+	 * fallback. False on every other step-in. Older Hosts send none.
+	 */
+	planned?: boolean;
+	/** A Gate or an Ask: its node. Older Hosts send none. */
+	nodeId?: string;
+	/** A Gate or an Ask: the start of its question. Older Hosts send none. */
+	question?: string;
+};
+
+/**
+ * Whether a step-in was planned. An older Host does not say: its Gates
+ * and Asks count as planned, so an old run raises no alarm.
+ */
+export function isPlanned(act: NeededYou): boolean {
+	return act.planned ?? (act.reason === "gate" || act.reason === "ask");
+}
 
 /** The sleeps only Night Shift ends early: it looks again when the Device or the lease is back. */
 const DAEMON_WAKES: ReadonlySet<string> = new Set(["device-offline", "lease"]);
@@ -65,28 +95,37 @@ function personStop(stop: StopFact, run: RunState): boolean {
 /** Each time a person stepped in on the run, oldest first. Empty: it needed nobody. */
 export function neededYouOf(run: RunState): NeededYou[] {
 	const acts: NeededYou[] = [];
+	const { fallbacks } = ladderOf(deriveSteps(run));
 	for (const step of run.steps.values()) {
 		for (const wait of step.gateWaits) {
 			if (wait.answeredBy !== "person") continue;
 			acts.push({
 				reason: wait.ask ? "ask" : "gate",
 				at: wait.answeredAt ?? wait.to ?? wait.from,
+				planned: !fallbacks.has(step.id),
+				nodeId: step.nodeId,
+				question: wait.question.slice(0, QUESTION_LENGTH),
 			});
 		}
 	}
+	const unplanned = (reason: NeededYouReason, at: number): NeededYou => ({
+		reason,
+		at,
+		planned: false,
+	});
 	for (const resume of run.resumes) {
 		if ((resume.payload.by ?? "person") === "person") {
-			acts.push({ reason: "resumed", at: resume.at });
+			acts.push(unplanned("resumed", resume.at));
 		}
 	}
 	for (const wake of run.earlyWakes) {
-		if (personWake(wake)) acts.push({ reason: "resumed", at: wake.at });
+		if (personWake(wake)) acts.push(unplanned("resumed", wake.at));
 	}
 	for (const stop of run.stops) {
-		if (personStop(stop, run)) acts.push({ reason: "stopped", at: stop.at });
+		if (personStop(stop, run)) acts.push(unplanned("stopped", stop.at));
 	}
 	for (const taken of run.takeOvers) {
-		acts.push({ reason: "took-over", at: taken.at });
+		acts.push(unplanned("took-over", taken.at));
 	}
 	return acts.sort((a, b) => a.at - b.at);
 }

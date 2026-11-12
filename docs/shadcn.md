@@ -82,11 +82,11 @@ CLI when you need them.
 | --- | --- |
 | ✓ [Dialog](https://ui.shadcn.com/docs/components/dialog) | A modal task: start a run, edit a schedule. |
 | ✓ [Alert Dialog](https://ui.shadcn.com/docs/components/alert-dialog) | Confirm a destructive or irreversible step (stop a run, delete a flow), or a step that changes this computer (install an agent, install Ollama). |
-| ✓ [Sheet](https://ui.shadcn.com/docs/components/sheet) | A panel that slides in from an edge: details beside a list, a run's facts (branch, worktree, times), a flow's revisions in the editor, a flow's schedules on the Flows page, what an agent changed in one file, the mobile sidebar. |
+| ✓ [Sheet](https://ui.shadcn.com/docs/components/sheet) | A panel that slides in from an edge: details beside a list, a run's facts (branch, worktree, times), a flow's revisions in the editor, a flow's schedules on the Flows page, what an agent changed in one file, a flow that needs a look on Home (`LookSheet`), the mobile sidebar. |
 | [Drawer](https://ui.shadcn.com/docs/components/drawer) | A bottom sheet for mobile (Vaul). |
 | ✓ [Popover](https://ui.shadcn.com/docs/components/popover) | Small floating content on click: a picker, a short form, the flow editor's issues, the variables a template field offers after `{{`. |
 | ✓ [Tooltip](https://ui.shadcn.com/docs/components/tooltip) | A short label on hover or focus, mostly for icon buttons. The hint of an inspector field, behind an info icon beside its label. Needs `TooltipProvider` (in the root). |
-| ✓ [Hover Card](https://ui.shadcn.com/docs/components/hover-card) | A preview on hover (a PR, an issue, a node, the tokens a step used). The rest of a row on Home: a Gate's question, why a flow failed, the result and the start of a report (`ReportPreview` in `features/runs`). |
+| ✓ [Hover Card](https://ui.shadcn.com/docs/components/hover-card) | A preview on hover (a PR, an issue, a node, the tokens a step used). |
 | ✓ [Context Menu](https://ui.shadcn.com/docs/components/context-menu) | A right-click menu. One menu over the flow editor's canvas opens on a node only: "Pin output" and "Skip with outcome" for a test run (`features/flows/editor/test-run/`). Shift+F10 opens it on a focused node. The Results tab of the node has the same choices. |
 | ✓ [Dropdown Menu](https://ui.shadcn.com/docs/components/dropdown-menu) | Actions behind a button ("…" menus, user menu). The editor's "2 pinned · 1 skipped" button lists the marked nodes and clears them. |
 | [Menubar](https://ui.shadcn.com/docs/components/menubar) | A desktop-app menubar (File, Edit, View). |
@@ -112,18 +112,18 @@ CLI when you need them.
 | ✓ [Card](https://ui.shadcn.com/docs/components/card) | A bordered group of content: `CardHeader`, `CardTitle`, `CardDescription`, `CardAction`, `CardContent`, `CardFooter`. Stat tiles, gate cards, flow and schedule cards. The flow editor's floating panels: the flow's title card and the inspector, over a canvas that fills the page. |
 | ✓ [Table](https://ui.shadcn.com/docs/components/table) | Rows and columns of data (runs, events). |
 | [Data Table](https://ui.shadcn.com/docs/components/data-table) | A Table with TanStack Table: sorting, filters, pagination, row selection. A guide, not a component. |
-| ✓ [Chart](https://ui.shadcn.com/docs/components/chart) | Recharts with theme colors, `ChartTooltip` and `ChartLegend`. The run-status donut (a project's menu in the sidebar), a sparkline in every stat card on Home, the metrics chart of a project's page, the history chart in each details dialog, and the three charts per day of a flow's Metrics tab (one `syncId`, so a hover shows the same day in all three). Recharts keeps a 5px margin by default. Set `margin` to zero on tiny charts. A chart whose values are all zero draws no bars. Give it a hidden `YAxis` with a domain of at least 1. |
+| ✓ [Chart](https://ui.shadcn.com/docs/components/chart) | Recharts with theme colors, `ChartTooltip` and `ChartLegend`. The run-status donut (a project's menu in the sidebar), the history chart in each details dialog, and the three charts per day of a flow's Metrics tab (one `syncId`, so a hover shows the same day in all three). Recharts keeps a 5px margin by default. Set `margin` to zero on tiny charts. A chart whose values are all zero draws no bars. Give it a hidden `YAxis` with a domain of at least 1. |
 | [Carousel](https://ui.shadcn.com/docs/components/carousel) | Slides you swipe through (Embla). |
 | [Aspect Ratio](https://ui.shadcn.com/docs/components/aspect-ratio) | Keeps media at a fixed ratio. |
 | [Typography](https://ui.shadcn.com/docs/components/typography) | Class recipes for headings, paragraphs, lists, blockquotes and inline code. Copy the classes. There is nothing to install. |
-| ✓ [Item](https://ui.shadcn.com/docs/components/item) | One row of a list with media, title, description and actions: `ItemGroup`, `ItemMedia`, `ItemContent`, `ItemTitle`, `ItemDescription`, `ItemActions`. Runs in a list, gates, projects, settings rows, the links of a Gate, the phones and browsers that can notify you. The one-line rows of Home's lanes and of its Latest reports card (`LaneRow` in `features/dashboard/home-lanes.tsx`). The steps of Get started on Home (`SetupCard` in `features/agents/setup`). |
+| ✓ [Item](https://ui.shadcn.com/docs/components/item) | One row of a list with media, title, description and actions: `ItemGroup`, `ItemMedia`, `ItemContent`, `ItemTitle`, `ItemDescription`, `ItemActions`. Runs in a list, gates, projects, settings rows, the links of a Gate, the phones and browsers that can notify you. The rows of Needs a look and of What came out on Home (`features/dashboard/home-page.tsx`). The steps of Get started on Home (`SetupCard` in `features/agents/setup`). |
 | ✓ [Kbd](https://ui.shadcn.com/docs/components/kbd) | A keyboard key or shortcut (⌘K, Tab on the node dock's Add a node, the keys of the Review page of Knowledge). |
 
 ### More
 
 | Component | What it is for |
 | --- | --- |
-| ✓ [Collapsible](https://ui.shadcn.com/docs/components/collapsible) | One section that opens and closes (a tool call's input, raw JSON, a run's status under its flow, each section of the inspector, the log of a run's service, the Details of an agent's install). |
+| ✓ [Collapsible](https://ui.shadcn.com/docs/components/collapsible) | One section that opens and closes (a tool call's input, raw JSON, a run's status under its flow, each section of the inspector, the log of a run's service, the Details of an agent's install, a flow's row on a project's page, the earlier reports on Home). |
 | ✓ [Toggle](https://ui.shadcn.com/docs/components/toggle) | A button that stays pressed (show/hide a panel, the metric tiles of a project's page). |
 | ✓ [Toggle Group](https://ui.shadcn.com/docs/components/toggle-group) | A set of toggles where one or many are on: a segmented control (Canvas / JSON, transcript levels, a Command node's output Text / JSON, the range of a project's page). |
 | ✓ [Pagination](https://ui.shadcn.com/docs/components/pagination) | Page links under a long list. `DataTable` shows them when it gets a `pageSize`: a project's runs page (15 a page). |

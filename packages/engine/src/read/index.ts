@@ -17,7 +17,9 @@ export {
 } from "./ladder";
 export { type LandedFact, landedFacts } from "./landed-facts";
 export {
+	isPlanned,
 	NEEDED_YOU_REASONS,
+	type NeededYou,
 	type NeededYouReason,
 } from "./needed-you";
 export { gitAuthorOf, namesOf } from "./people";

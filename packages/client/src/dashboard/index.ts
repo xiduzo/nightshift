@@ -4,14 +4,12 @@ export {
 	CONSOLE_METRICS,
 	type ConsoleMetric,
 	type ConsoleValues,
-	changeOf,
 	consoleNumbers,
 	consoleValues,
 	daysOf,
 	neededShare,
 } from "./console";
 export { dayLabel } from "./day-label";
-export { shortReason } from "./failing";
 export {
 	decisionsText,
 	type LadderPart,
@@ -27,7 +25,6 @@ export { neededReasonLabel, neededReasonsText } from "./needed";
 export { createDashboardQueries, readerTimeZone } from "./queries";
 export type {
 	DashboardSummary,
-	FailingFlow,
 	FlowHealthRow,
 	FlowRange,
 	FlowReport,
@@ -37,3 +34,19 @@ export type {
 	NightsRange,
 	Spread,
 } from "./types";
+export {
+	type AttentionCause,
+	againstBefore,
+	causeLabel,
+	FLOW_LEVELS,
+	type FlowLevel,
+	type FlowSignal,
+	type FlowWatch,
+	flowLevelHint,
+	flowLevelLabel,
+	signalFacts,
+	signalId,
+	signalScale,
+	signalTitle,
+	type WatchedFlow,
+} from "./watch";

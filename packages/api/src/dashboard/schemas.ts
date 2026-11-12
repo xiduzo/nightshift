@@ -173,6 +173,68 @@ const nodeLadderSchema = z.object({
 	unsure: z.number().optional(),
 });
 
+/** The level of a flow: You decide, You check, On its own. */
+const flowLevelSchema = z
+	.object({ level: z.enum(["decide", "check", "own"]), since: z.number() })
+	.nullable();
+
+const attentionCountSchema = z.object({
+	planned: z.number(),
+	unplanned: z.number(),
+});
+
+/** One way a flow left its usual range. */
+const flowSignalSchema = z.object({
+	kind: z.enum(["failing", "nothing", "cost", "length", "slow"]),
+	severe: z.boolean(),
+	since: z.number(),
+	runId: z.string(),
+	count: z.number().optional(),
+	now: z.number().optional(),
+	usual: z.object({ low: z.number(), high: z.number() }).optional(),
+});
+
+/** The watch over one flow: its level, how often it needed a person, its signals. */
+const flowWatchSchema = z.object({
+	level: flowLevelSchema,
+	attention: attentionCountSchema.extend({
+		before: attentionCountSchema,
+		causes: z.array(
+			z.object({
+				reason: neededYouReasonSchema,
+				planned: z.boolean(),
+				times: z.number(),
+				nodeId: z.string().optional(),
+				question: z.string().optional(),
+			}),
+		),
+		perWeek: z.array(z.number()),
+	}),
+	length: spreadSchema.nullable(),
+	signals: z.array(flowSignalSchema),
+});
+
+/** The watch over every flow of a dashboard. */
+const spaceWatchSchema = z.object({
+	perWeek: z.array(z.number()),
+	levels: z.object({
+		decide: z.number(),
+		check: z.number(),
+		own: z.number(),
+	}),
+	watched: z.number(),
+	flows: z.array(
+		z.object({
+			key: z.string(),
+			projectId: z.string(),
+			flow: z.string(),
+			level: flowLevelSchema,
+			signals: z.array(flowSignalSchema),
+			lastAt: z.number(),
+		}),
+	),
+});
+
 const flowHealthRowSchema = z.object({
 	name: z.string(),
 	last: lastFlowRunSchema.nullable(),
@@ -197,6 +259,8 @@ const flowHealthRowSchema = z.object({
 	report: latestReportSchema.optional(),
 	/** Where the work of its own runs landed. Older Hosts send none. */
 	ladders: flowLaddersSchema.optional(),
+	/** Older Hosts send none. */
+	watch: flowWatchSchema.optional(),
 });
 
 const nightTotalsSchema = z.object({
@@ -435,6 +499,8 @@ export const dashboardSummarySchema = exact<DashboardSummary>()(
 			}),
 		),
 		flowHealth: topRows(flowHealthRowSchema).nullable(),
+		/** Older Hosts send none. */
+		watch: spaceWatchSchema.optional(),
 	}),
 );
 

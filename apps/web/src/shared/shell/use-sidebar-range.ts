@@ -4,13 +4,13 @@ import { PAGE_RANGES } from "@/features/dashboard";
 
 type Range = (typeof PAGE_RANGES)[number];
 
-/** The pages with a range row: Home and a project's page. */
-const RANGED_ROUTES = new Set<string>(["/", "/projects/$projectId/"]);
+/** The page with a range row: a project's page. */
+const RANGED_ROUTES = new Set<string>(["/projects/$projectId/"]);
 
 /**
  * The range of days of the project donuts in the sidebar. It follows the
- * range row of Home and of a project's page, and keeps the last one on
- * the other pages. 7 days until you choose one.
+ * range row of a project's page, and keeps the last one on the other
+ * pages. 7 days until you choose one.
  */
 export function useSidebarRange(): Range {
 	const onPage = useRouterState({

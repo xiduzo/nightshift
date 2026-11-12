@@ -209,7 +209,7 @@ describe("a take-over", () => {
 		const run = await space.getRun(runId);
 		const workerStep = run.steps.find((s) => s.nodeId === "worker");
 		expect(run.neededYou).toEqual([
-			{ reason: "took-over", at: expect.any(Number) },
+			{ reason: "took-over", at: expect.any(Number), planned: false },
 		]);
 		const state = await createRunLog(sandbox.db, {
 			walkerId: sandbox.deviceId,

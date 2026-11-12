@@ -1,4 +1,4 @@
-/** The overview of the days: Home's numbers and lanes, and a project's page of metrics, chart and lists. */
+/** The watch over the flows: Home's note of what needs a look and what came out, and a project's page of flow rows. */
 
 export { HomePage } from "./home-page";
 export { OVERVIEW_ROWS } from "./overview";

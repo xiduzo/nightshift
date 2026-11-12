@@ -529,6 +529,99 @@ export type FlowHealthRow = {
 	report?: LatestReport;
 	/** Where the work of its own runs landed in the last days. Older Hosts send none. */
 	ladders?: FlowLadders;
+	/** Its level, how often it needed a person, and its signals. Older Hosts send none. */
+	watch?: FlowWatch;
+};
+
+/** The level of a flow: how much a person is still in its runs. */
+export const FLOW_LEVELS = ["decide", "check", "own"] as const;
+/** `decide`: You decide. `check`: You check. `own`: On its own. */
+export type FlowLevel = (typeof FLOW_LEVELS)[number];
+
+/** How often a person stepped in, as the flow draws it or not. */
+export type AttentionCount = { planned: number; unplanned: number };
+
+/** One reason a flow needed a person, at one node. */
+export type AttentionCause = {
+	reason: NeededYouReason;
+	planned: boolean;
+	times: number;
+	/** A Gate or an Ask: its node. */
+	nodeId?: string;
+	/** A Gate or an Ask: the start of its newest question. */
+	question?: string;
+};
+
+/**
+ * How often the runs of a flow that started in the days needed a person.
+ * It counts each step-in, not each run: a run that needed you twice
+ * counts twice.
+ */
+export type FlowAttention = AttentionCount & {
+	/** The same over as many days just before. */
+	before: AttentionCount;
+	/** Why, the unplanned first, then the most times. */
+	causes: AttentionCause[];
+	/** The unplanned step-ins per week, oldest first, the last week ending now. */
+	perWeek: number[];
+};
+
+/**
+ * One way a flow left its usual range. `failing`: its last runs failed.
+ * `nothing`: its last runs found nothing to do, and its runs before
+ * mostly did. `cost`, `length`: its last finished run cost more or worked
+ * longer than every run before it, and over twice their median. `slow`:
+ * the same for a run that still works.
+ */
+export type FlowSignal = {
+	kind: "failing" | "nothing" | "cost" | "length" | "slow";
+	/** It needs a look now. */
+	severe: boolean;
+	/** When it began: the start of the first run of it. */
+	since: number;
+	/** The newest run that shows it. */
+	runId: string;
+	/** `failing`, `nothing`: how many runs in a row. */
+	count?: number;
+	/** `cost`: dollars. `length`, `slow`: milliseconds at work. */
+	now?: number;
+	/** The lowest and the highest of the runs before, in the unit of `now`. */
+	usual?: { low: number; high: number };
+};
+
+/** The watch over one flow (`watch.ts`). */
+export type FlowWatch = {
+	/** Its level, and since when. Null with too few ended runs. */
+	level: { level: FlowLevel; since: number } | null;
+	attention: FlowAttention;
+	/** How long a finished run of the days worked, in milliseconds. Null when none finished. */
+	length: Spread | null;
+	/** The severe first. Empty: it does what it usually does. */
+	signals: FlowSignal[];
+};
+
+/** A flow with a signal, over all the runs of a dashboard. */
+export type WatchedFlow = {
+	/** The project and the flow: `<projectId>/<flow>`. */
+	key: string;
+	projectId: string;
+	flow: string;
+	level: FlowWatch["level"];
+	signals: FlowSignal[];
+	/** When its newest run started. */
+	lastAt: number;
+};
+
+/** The watch over every flow of a dashboard. */
+export type SpaceWatch = {
+	/** The unplanned step-ins per week, oldest first, the last week ending now. */
+	perWeek: number[];
+	/** How many flows are at each level. */
+	levels: Record<FlowLevel, number>;
+	/** How many flows it watches: those with a real run. */
+	watched: number;
+	/** The flows with a signal, the severe first. */
+	flows: WatchedFlow[];
 };
 
 /**
@@ -688,6 +781,8 @@ export type DashboardSummary = {
 	upNext: UpcomingRun[];
 	/** The busiest flows of a project. Null over all projects. */
 	flowHealth: TopRows<FlowHealthRow> | null;
+	/** The watch over every flow of the dashboard. Older Hosts send none. */
+	watch?: SpaceWatch;
 };
 
 /** One run of a flow: a run of its own, or a Subflow run inside another run. */
