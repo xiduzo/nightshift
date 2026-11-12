@@ -37,13 +37,19 @@ export type FlowOverview = {
 	lastRuns: FlowHealthRow["lastRuns"];
 	ended: number;
 	finished: number;
+	/**
+	 * The newest report of its own runs, of any day. Null when none wrote
+	 * one, and with an older Host.
+	 */
+	report: NonNullable<FlowHealthRow["report"]> | null;
 	problem: FlowProblem | null;
 };
 
 /**
  * The project's flows for the Flows page, in the list's order, each with
- * its schedules, the flows that call it and its last runs (`flowHealth`
- * of the dashboard). A flow without a health row never ran.
+ * its schedules, the flows that call it, its last runs and its newest
+ * report (`flowHealth` of the dashboard). A flow without a health row
+ * never ran.
  */
 export function flowOverviews(
 	flows: readonly FlowListItem[],
@@ -71,7 +77,8 @@ export function flowOverviews(
 			...wakers.map((schedule): FlowStart => ({ kind: "signal", schedule })),
 			...flow.callers.map((caller): FlowStart => ({ kind: "subflow", caller })),
 		];
-		const lastRuns = healthOf.get(flow.name)?.lastRuns ?? [];
+		const row = healthOf.get(flow.name);
+		const lastRuns = row?.lastRuns ?? [];
 		const ended = lastRuns.filter((run) => hasEnded(run.status));
 		return {
 			flow,
@@ -81,6 +88,7 @@ export function flowOverviews(
 			lastRuns,
 			ended: ended.length,
 			finished: ended.filter((run) => run.status === "finished").length,
+			report: row?.report ?? null,
 			problem: problemOf(flow, lastRuns[0]?.status),
 		};
 	});

@@ -142,6 +142,28 @@ describe("flowOverviews", () => {
 		]);
 	});
 
+	test("carries the flow's newest report, or null without one", () => {
+		const report = {
+			runId: "run-0",
+			stepId: "step-9",
+			endedAt: 2_000,
+			result: "done",
+			excerpt: "## What is new",
+			more: false,
+		} as const;
+		const [reported, quiet, never] = flowOverviews(
+			[flow("research"), flow("watch"), flow("idle")],
+			[],
+			[
+				{ ...health("research", ["finished"]), report },
+				health("watch", ["finished"]),
+			],
+		);
+		expect(reported?.report).toEqual(report);
+		expect(quiet?.report).toBeNull();
+		expect(never?.report).toBeNull();
+	});
+
 	test("a webhook that only sends a signal sits with each flow whose Wait waits for it", () => {
 		const wake = schedule({
 			id: "ci",

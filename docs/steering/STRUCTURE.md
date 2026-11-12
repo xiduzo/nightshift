@@ -320,3 +320,4 @@ When code must break a rule for a while, add an entry here: the rule it breaks, 
 | Rule | Files | Until |
 | --- | --- | --- |
 | The clock (`scripts/check-time.ts`) | The lock-screen widget builds a `Date` for the native timer (`apps/mobile/src/features/glance/lock-screen.ios.tsx`). Its `widget` function cannot import a Night Shift package. `scripts/time-debt.txt` lists that file. | the widget timer takes an instant |
+| Every name on an entry has an importer (section 3) | `runReport` on `@nightshift/client` (`packages/client/src/runs/report.ts`) is the one rule for the report of a run on the web and the phone. `PENDING_NAMES` in `scripts/check-verticals.ts` lists it. | the run page or the phone run screen shows the report |

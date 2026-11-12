@@ -240,6 +240,7 @@ export {
 	runActions,
 	runningStep,
 	runningSteps,
+	runReport,
 	runStatusLabel,
 	runTime,
 	type SessionSummary,
