@@ -125,6 +125,9 @@ packages/engine/src/
                            point to route(); beginStep/OpenStep is the lower
                            seam for the loop-shaped nodes (Subflow, Subflow with
                            `each`, the Gate).
+  graph/stand-in.ts        The stand-in of a test run (below): a pinned or
+                           skipped node of the run's own flow gives its
+                           output through runStep, without its work.
   graph/run-position.ts    The run position (below): where a run is, as
                            the checkpoint and the log agree. commitVisit
                            (the one writer of visits), positionOf (the held
@@ -873,6 +876,36 @@ the step through the lower seam in the same module: `beginStep` and
 The log is written exactly as before (rule 3). `graph/step-runner.test.ts`
 holds the lifecycle as a table: a new or a continued entry, crossed with
 what the run and the body do.
+
+### The stand-in of a test run (`graph/stand-in.ts`, ADR 27)
+
+A test run pins or skips nodes of the run's own flow
+(`RunStarted.test`). `compile.ts` wraps each node of the root graph that
+can stand in (`standsIn`: not an End, a Join, a Lease or a Service) with
+`withStandIn`. At each visit at the top level, the wrapper reads the run
+state. A node that the run names runs `runStep` with
+`RESUME_RULES.fresh` and `StepSpec.standIn`. Every other node runs its own
+action, and so does every node of a called flow. The lifecycle above then
+changes in five places:
+
+1. `beginStep` writes `StepStarted.test` (`pinned` or `skipped`), with no
+   `deviceId`, no `rung`, no log path and no time budget. The entry checks
+   still run, so a pinned node in a loop stops at the step cap.
+2. The runner skips `readyDevice` and `watchChanges`: the step asks no
+   Device, makes no worktree and needs no Hand-off.
+3. The body gives the pinned outputs with the step's own visit, or the
+   skipped outcome with each output field null (`nodeOutputFields`).
+4. The end applies the node's `set` writes. It scores nothing, opens no
+   pull request and costs nothing.
+5. `route()` follows as for any end, so Joins, Sections and fan-outs work.
+   A daemon that dies mid stand-in leaves the step `interrupted`, and the
+   next visit stands in again.
+
+In a test run, `end()` also drops `kept`, `memory` and `shapes` from every
+step's `StepEnded`, and calls no `keepShapes`. The steps still read kept
+values and memory. The run plan places no stand-in (`placement/run-plan.ts`),
+and run start resolves each pin from the Walker's own log before the plan
+(`run/test-run.ts`).
 
 ## The sleep module (`graph/sleep.ts`)
 
