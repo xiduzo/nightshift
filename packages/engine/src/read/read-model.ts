@@ -332,6 +332,21 @@ const callStatus: Partial<Record<StepOutcome, RunStatus>> = {
 };
 
 /** The Call steps of a run, with what each run of a called flow spent and how it ended. */
+/**
+ * The note a person sent with the answer to one wait of a Gate: the
+ * `note` output of the opening the wait closed. Null when it is empty,
+ * when nobody answered, or when the deadline chose (then Night Shift
+ * wrote the note).
+ */
+function personNote(
+	step: DerivedStep,
+	wait: DerivedStep["gateWaits"][number],
+): string | null {
+	if (wait.answeredBy !== "person") return null;
+	const note = step.openings[wait.opening]?.end?.payload.outputs.note;
+	return typeof note === "string" && note.trim() !== "" ? note : null;
+}
+
 function deriveCalls(steps: readonly DerivedStep[]): CallFact[] {
 	// The cost of each run of a called flow, with the flows it called, by scope key.
 	const cost = calledCosts(steps, scopeKey);
@@ -933,13 +948,18 @@ export function createReadModel(deps: ReadModelDeps) {
 					gte(run.createdAt, asDate(since)),
 				),
 			);
-		const steps = await log.derive(
+		const derived = await log.derive(
 			rows.map((r) => r.run.id),
-			deriveSteps,
+			(state) => ({
+				steps: deriveSteps(state),
+				run: { status: state.status, result: state.end?.result ?? null },
+			}),
 		);
 		const gates: AnsweredGate[] = [];
 		for (const { run: row, projectName } of rows) {
-			for (const step of steps.get(row.id) ?? []) {
+			const facts = derived.get(row.id);
+			if (!facts) continue;
+			for (const step of facts.steps) {
 				for (const wait of step.gateWaits) {
 					if (wait.to === null || wait.to < since) continue;
 					gates.push({
@@ -952,11 +972,15 @@ export function createReadModel(deps: ReadModelDeps) {
 						stepId: step.id,
 						nodeId: step.nodeId,
 						question: wait.question,
+						choices: wait.choices,
 						urgency: wait.urgency,
+						brief: wait.brief,
 						openedAt: wait.from,
 						closedAt: wait.to,
 						answeredBy: wait.answeredBy,
 						answer: wait.answer,
+						note: personNote(step, wait),
+						run: facts.run,
 					});
 				}
 			}

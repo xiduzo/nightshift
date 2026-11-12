@@ -142,6 +142,10 @@ export type GateWait = PartSpan & {
 	question: string;
 	/** How soon it needed an answer (ADR 21). `today` in logs from before. */
 	urgency: GateUrgency;
+	/** The options it offered, so an answered Gate can show the one it took among them. */
+	choices: GateChoice[];
+	/** Its brief (ADR 21): empty in logs from before. */
+	brief: GateBrief;
 	/** What the model that wrote its brief cost. Absent: no model was asked. */
 	briefCost?: CostTally;
 	answeredBy: AnsweredBy | null;
@@ -1206,6 +1210,8 @@ function applyStepEvent(
 							opening: step.openings.length - 1,
 							question: e.payload.question,
 							urgency,
+							choices: e.payload.choices,
+							brief: e.payload.brief ?? emptyGateBrief(),
 							...(briefCost ? { briefCost } : {}),
 							answeredBy: null,
 							answer: null,

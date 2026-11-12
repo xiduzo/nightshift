@@ -2831,15 +2831,19 @@ describe("gates", () => {
 		});
 		expect(await waitForEnd(engine, run.id)).toBe("finished");
 		expect(await engine.listGates()).toEqual([]);
-		// The answered Gate stays in the inbox, with what it asked and took.
+		// The answered Gate stays in the inbox, with what it asked and took,
+		// the note you sent, and what the run did after.
 		expect(await engine.listAnsweredGates(0)).toMatchObject([
 			{
 				runId: run.id,
 				stepId: open?.stepId,
 				projectName: "repo",
 				question: "The worker said: Built the parser.. Ship it?",
+				choices: [{ name: "approve" }, { name: "reject" }],
 				answeredBy: "person",
 				answer: "approve",
+				note: "LGTM, merge after CI.",
+				run: { status: "finished", result: null },
 			},
 		]);
 		expect(await engine.listAnsweredGates(now() + 60_000)).toEqual([]);

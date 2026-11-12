@@ -11,7 +11,13 @@ import {
 import { z } from "zod";
 
 import { exact } from "../output";
-import { gateChoiceSchema, gateDeadlineSchema, runWalkerSchema } from "../runs";
+import {
+	gateChoiceSchema,
+	gateDeadlineSchema,
+	runResultSchema,
+	runStatusSchema,
+	runWalkerSchema,
+} from "../runs";
 
 /** What a model can write of a Gate's brief. */
 const briefPartSchema = z.enum([
@@ -110,7 +116,9 @@ export const answeredGateSchema = exact<InboxAnsweredGate>()(
 			stepId: true,
 			nodeId: true,
 			question: true,
+			choices: true,
 			urgency: true,
+			brief: true,
 			openedAt: true,
 		})
 		.extend({
@@ -120,6 +128,13 @@ export const answeredGateSchema = exact<InboxAnsweredGate>()(
 			answeredBy: z.enum(["person", "deadline"]).nullable(),
 			/** The option it took. Null: nobody chose one. */
 			answer: z.string().nullable(),
+			/** The note the person sent with the answer. Null: none, or the deadline chose. */
+			note: z.string().nullable(),
+			/** What the run did after: its status now, and how it ended once it ended. */
+			run: z.object({
+				status: runStatusSchema,
+				result: runResultSchema.nullable(),
+			}),
 		}),
 );
 

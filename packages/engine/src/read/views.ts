@@ -530,7 +530,9 @@ export type AnsweredGate = Pick<
 	| "stepId"
 	| "nodeId"
 	| "question"
+	| "choices"
 	| "urgency"
+	| "brief"
 	| "openedAt"
 > & {
 	closedAt: number;
@@ -538,6 +540,10 @@ export type AnsweredGate = Pick<
 	answeredBy: "person" | "deadline" | null;
 	/** The option it took. Null: nobody chose one. */
 	answer: string | null;
+	/** The note the person sent with the answer. Null: no note, or the deadline chose. */
+	note: string | null;
+	/** What the run did after: its status now, and how it ended once it ended. */
+	run: { status: RunStatus; result: RunResult | null };
 };
 
 export type RunStreamItem =
