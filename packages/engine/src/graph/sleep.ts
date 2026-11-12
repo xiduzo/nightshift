@@ -116,7 +116,7 @@ export type SleepRequest =
 			kind: "device";
 			/**
 			 * The step gives up once its Device was offline for the run
-			 * policy's network grace (`StepSpec.pastGrace`). Without it, the
+			 * policy's network grace (`StepSpec.givesUp`). Without it, the
 			 * step sleeps as long as its Device is offline.
 			 */
 			grace?: true;
@@ -127,7 +127,7 @@ export type SleepOutcome =
 	| { kind: "asleep"; command: Command }
 	/**
 	 * The network grace is spent: the step ends `error`, or as its
-	 * `StepSpec.pastGrace` says.
+	 * `StepSpec.givesUp` says.
 	 */
 	| { kind: "give-up"; error: string }
 	/** The wait would pass the stop time: the step ends `stopped` and the run parks. */

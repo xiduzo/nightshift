@@ -51,9 +51,10 @@ import {
  * that did its work never fails for its report. A Device that went away
  * during the read waits as the network does, and the step reads again. A
  * Device that does not answer, or stays offline, for the run policy's
- * network grace is a `report` warning too (`StepSpec.pastGrace`): a report
- * never keeps a run open longer than the grace. A stop still stops the
- * step.
+ * network grace is a `report` warning too (`StepSpec.givesUp`): a report
+ * never keeps a run open longer than the grace. So is a Device that cannot
+ * be made ready for the read, such as a run whose copy of the project was
+ * not made yet and cannot be made now. A stop still stops the step.
  *
  * Inside a called flow it ends that flow; the Call reads the result
  * (`body.ts`) and the report (`end_report`). Pure, so a re-run is safe:
@@ -70,14 +71,18 @@ export function endStepNode(node: EndNode, ctx: StepContext): NodeAction {
 				return endWith(node, step, report);
 			},
 			// The Device did not answer the read, or stayed offline, for the
-			// run policy's network grace: the run ends without its report.
+			// run policy's network grace, or it cannot be made ready for the
+			// read: the run ends without its report.
 			...(readsFile(node)
 				? {
-						pastGrace: (step: StepHandle) =>
+						givesUp: (step: StepHandle, why: string | null) =>
 							endWith(node, step, {
 								kind: "kept",
 								kept: { text: "", cut: false },
-								warning: `Night Shift could not read the report file on ${step.device.name}. ${WITHOUT_REPORT}`,
+								warning:
+									why === null
+										? `Night Shift could not read the report file on ${step.device.name}. ${WITHOUT_REPORT}`
+										: `Night Shift could not read the report file. ${why} ${WITHOUT_REPORT}`,
 							}),
 					}
 				: {}),

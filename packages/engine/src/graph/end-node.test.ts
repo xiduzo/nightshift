@@ -566,6 +566,67 @@ describe("a report from a file the run wrote", () => {
 		expect(first.state.ended).toBeFalsy();
 	});
 
+	test("a run whose copy of the project cannot be made: the End warns and keeps its status", async () => {
+		// The End alone, in a run that has no copy yet (its Device was
+		// offline at the start): the End makes it first, and that is refused.
+		const h = await startRun(sandbox, flowOf([fromFile("report.md")]), {
+			branch: "",
+		});
+		const reads: string[] = [];
+		const device: Device = {
+			...testDevice(h.local),
+			name: "laptop",
+			worktree: async () => {
+				throw new Refusal("conflict", "The folder of the project is gone.");
+			},
+			readFile: async () => {
+				reads.push("read");
+				return { kind: "missing" };
+			},
+		};
+		h.ctx.placement = placementOn(() => device);
+		const driven = await drive(h, { inputs: {} });
+		expect(driven.parked).toEqual([]);
+		expect(driven.state.ended).toMatchObject({
+			status: "finished",
+			nodeId: "done",
+			result: "done",
+			reason: "Found it",
+		});
+		expect(driven.state.ended).not.toHaveProperty("report");
+		expect(reads).toEqual([]);
+		expect(await warnings(h)).toEqual([
+			{
+				kind: "report",
+				message:
+					"Night Shift could not read the report file. laptop could not make the run's copy of the project. The folder of the project is gone. The run ends without a report.",
+			},
+		]);
+		const [step] = deriveSteps(foldRun(await h.events())).filter(
+			(s) => s.nodeId === "done",
+		);
+		expect(step).toMatchObject({ outcome: "done", error: null });
+	});
+
+	test("a step before the End that cannot make the run's copy still fails the run", async () => {
+		const h = await startRun(sandbox, fileFlow("report.md"), { branch: "" });
+		h.ctx.placement = placementOn(() => ({
+			...testDevice(h.local),
+			name: "laptop",
+			worktree: async () => {
+				throw new Refusal("conflict", "The folder of the project is gone.");
+			},
+		}));
+		const driven = await drive(h, { inputs: {} });
+		expect(driven.parked[0]).toMatchObject({
+			status: "failed",
+			nodeId: "write",
+			reason:
+				'Node "write" failed: laptop could not make the run\'s copy of the project. The folder of the project is gone.',
+		});
+		expect(await warnings(h)).toEqual([]);
+	});
+
 	describe("a Device that does not answer for the network grace", () => {
 		/** The engine's clock: each wake moves it to the wait's time. */
 		let clock: number;

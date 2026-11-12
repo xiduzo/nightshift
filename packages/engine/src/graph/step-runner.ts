@@ -285,7 +285,7 @@ export type BodyEnd = {
  * - `wait`: a usage limit or a network failure (`WaitRequest`); the sleep
  *   module plans the policy's wait and parks at the wait node, or the step
  *   ends when the wait would pass the stop time or the grace is spent
- *   (`StepSpec.pastGrace`).
+ *   (`StepSpec.givesUp`).
  * - `sleep`: a Wait node worked out its own wake time (`OwnWait`); the
  *   sleep module persists it and parks at the wait node, the step open.
  * - `ask`: the body asks a person (an Agent with `ask`): the runner opens a
@@ -334,13 +334,17 @@ export type StepSpec = {
 	 */
 	outputs?(step: StepHandle): StepOutputs | Promise<StepOutputs>;
 	/**
-	 * How the step ends when it would wait past the run policy's network
-	 * grace: a network wait that gives up, or a Device that stays offline
-	 * that long. Without it, the first ends the step `error` and the step
-	 * sleeps as long as its Device is offline. An End that reads its report
-	 * from a file has it: a report never fails a run (ADR 26).
+	 * How the step ends when its Device cannot serve it. `why` is null
+	 * when the step would wait past the run policy's network grace: a
+	 * network wait that gives up, or a Device that stays offline that long.
+	 * `why` says what happened when the Device cannot be made ready
+	 * (`readyDevice`): the run's copy or folder cannot be made, or the run's
+	 * work cannot move to it. Without it, a wait that gives up and a Device
+	 * that is not ready end the step `error`, and the step sleeps as long as
+	 * its Device is offline. An End that reads its report from a file has
+	 * it: a report never fails a run (ADR 26).
 	 */
-	pastGrace?(step: StepHandle): Promise<BodyEnd>;
+	givesUp?(step: StepHandle, why: string | null): Promise<BodyEnd>;
 	/** What the step's route writes besides its end: a Join closes its round. */
 	update?: RunStateUpdate;
 	/**
@@ -420,7 +424,9 @@ export async function runStep(
 	try {
 		// A stand-in works on no Device: it only gives its output.
 		const notReady = spec.standIn ? null : await readyDevice(ctx, node, step);
-		if (notReady) result = notReady;
+		if (notReady?.kind === "end" && spec.givesUp) {
+			result = await spec.givesUp(step, notReady.error);
+		} else if (notReady) result = notReady;
 		else {
 			// Once the worktree is there: what the body changes in it.
 			changes = spec.standIn ? null : await watchChanges(ctx, node, step);
@@ -538,7 +544,7 @@ export async function runStep(
 						: {
 								...result,
 								kind: "device",
-								...(spec.pastGrace ? { grace: true as const } : {}),
+								...(spec.givesUp ? { grace: true as const } : {}),
 							};
 			const slept = await sleep(ctx, node, state, config, step, request);
 			if (slept.kind === "asleep") return slept.command;
@@ -554,8 +560,8 @@ export async function runStep(
 				);
 				return parkStopped(node, end, slept.reason);
 			}
-			if (spec.pastGrace) {
-				const instead = await spec.pastGrace(step);
+			if (spec.givesUp) {
+				const instead = await spec.givesUp(step, null);
 				return endAndGo(
 					instead.outcome,
 					{ ...instead.outputs, outcome: instead.outcome },
