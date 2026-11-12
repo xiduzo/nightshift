@@ -28,7 +28,6 @@ describe("the dashboard query", () => {
 	});
 
 	test("keeps the keys of its procedures", () => {
-		expect(dashboard.all()).toEqual(orpc.dashboard.key());
 		expect(dashboard.flow("p1", "night").queryKey).toEqual(
 			orpc.dashboard.flow.queryKey({
 				input: {

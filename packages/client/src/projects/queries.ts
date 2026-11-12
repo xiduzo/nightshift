@@ -11,13 +11,9 @@ export function createProjectQueries(orpc: ApiQueryUtils) {
 			orpc.projects.list.queryOptions({
 				input: { timeZone: readerTimeZone() },
 			}),
-		/** Every list of projects. A run that changes changes its counts. */
-		lists: () => orpc.projects.list.key(),
 		/** Whether the folder at `path` can be a project: git, a repository, a commit. */
 		check: (path: string) =>
 			orpc.projects.check.queryOptions({ input: { path } }),
-		/** Every check of the folder at `path`. Invalidate it to check again. */
-		checkKey: (path: string) => orpc.projects.check.key({ input: { path } }),
 		/** The branches of a project. */
 		branches: (projectId: string) =>
 			orpc.projects.branches.queryOptions({ input: { projectId } }),

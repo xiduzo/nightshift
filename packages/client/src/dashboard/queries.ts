@@ -22,8 +22,6 @@ export function readerTimeZone(): string {
 /** The query options of the dashboard, and how often it polls. */
 export function createDashboardQueries(orpc: ApiQueryUtils) {
 	return {
-		/** Every dashboard query. Invalidate it after a run changes. */
-		all: () => orpc.dashboard.key(),
 		/**
 		 * The numbers of the Space, of one project (`projectId`), or of every
 		 * Space (`everySpace`). Polls every 5 minutes. A failed background poll

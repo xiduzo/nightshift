@@ -49,8 +49,6 @@ const SERVICE_LOG_POLL_MS = 2_000;
 
 export function createRunQueries(orpc: ApiQueryUtils) {
 	return {
-		/** Every list of runs. The live cache reads them again after a run changes. */
-		lists: () => orpc.runs.list.key(),
 		/** The detail of one run, or of every run without `runId`: to read it again. */
 		getKey: (runId?: string) =>
 			orpc.runs.get.key(runId === undefined ? {} : { input: { runId } }),

@@ -10,8 +10,6 @@ const OFFERS_POLL_MS = 10_000;
 /** The query options of Devices, and how often they poll. */
 export function createDeviceQueries(orpc: ApiQueryUtils) {
 	return {
-		/** Every query of the Devices overview. Invalidate it after a Device or a Host changes. */
-		overviewKey: () => orpc.devices.list.key(),
 		/** This computer, its Hosts, and the person's paired Devices, once. */
 		overview: () => orpc.devices.list.queryOptions(),
 		/** This computer, its Hosts, and the person's paired Devices. Polls; a failed background poll keeps the page. */
@@ -20,8 +18,6 @@ export function createDeviceQueries(orpc: ApiQueryUtils) {
 			refetchInterval: OVERVIEW_POLL_MS,
 			meta: { quietRefetchErrors: true },
 		}),
-		/** Every query of your phones. Invalidate it after one signs out. */
-		phonesKey: () => orpc.devices.phones.key(),
 		/** Your phones on the Host of the active Space. Polls; a failed background poll keeps the list. */
 		phonesLive: () => ({
 			...orpc.devices.phones.queryOptions(),
