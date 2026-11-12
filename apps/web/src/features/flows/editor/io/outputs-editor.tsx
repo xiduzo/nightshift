@@ -17,7 +17,7 @@ import {
 } from "@nightshift/ui/components/native-select";
 import { PlusIcon } from "lucide-react";
 import { useId, useState } from "react";
-import { OutputSchemaField } from "../output-schema-field";
+import { InferredShape, OutputSchemaField } from "../output-schema-field";
 import { TemplateField } from "../template-field";
 import { type Change, move, NameInput, RowButtons } from "./io-rows";
 
@@ -48,9 +48,17 @@ function withType(
 		: { ...rest, type };
 }
 
+/** The output with its type as it is, confirmed by a person. */
+function confirmed(output: FlowOutputDef): FlowOutputDef {
+	const { inferred: _, ...rest } = output;
+	return rest;
+}
+
 /**
  * The flow's outputs: values it returns to the Call node that calls
- * it, rendered from templates when the flow ends.
+ * it, rendered from templates when the flow ends. A type Night Shift
+ * took from a run shows as such, with Confirm, until a person confirms
+ * or changes it.
  */
 export function OutputsEditor({
 	flow,
@@ -194,12 +202,16 @@ export function OutputsEditor({
 										label="Shape"
 										output={output.schema}
 										description="The node that calls this flow reads its fields."
+										inferred={output.inferred === true}
+										onConfirm={() => update(index, confirmed)}
 										onChange={(schema) =>
 											update(index, (current) =>
 												withType(current, "json", schema),
 											)
 										}
 									/>
+								) : output.type !== undefined && output.inferred ? (
+									<InferredShape onConfirm={() => update(index, confirmed)} />
 								) : null}
 							</Item>
 						);

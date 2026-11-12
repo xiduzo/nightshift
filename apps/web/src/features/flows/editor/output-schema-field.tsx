@@ -99,7 +99,7 @@ function shapeOf(
  * A shape Night Shift inferred from a run, until a person confirms it:
  * the mark, what it means, and Confirm and Edit. Editing confirms too.
  */
-function InferredShape({
+export function InferredShape({
 	onConfirm,
 	onEdit,
 }: {
