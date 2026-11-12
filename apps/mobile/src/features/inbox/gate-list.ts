@@ -1,6 +1,7 @@
 import {
 	type ContextItem,
 	deadlineWhen,
+	gateOrder,
 	gateParts,
 	gateRun,
 	mayAnswer,
@@ -93,18 +94,24 @@ function dueText(at: number, now: number): string {
 }
 
 /**
- * The Gate to answer after this one: the next one you may answer, in
- * inbox order (oldest first, as the Host sends `gates`). Null when
+ * The Gate to answer after this one: the first other Gate you may answer,
+ * in queue order (`gateOrder`), as Needs you lists them. Null when
  * nothing else waits for you.
  */
 export function nextGate<
 	G extends Pick<
 		OpenGate,
-		"runId" | "stepId" | "openedAt" | "canAnswer" | "answerPending"
+		| "runId"
+		| "stepId"
+		| "openedAt"
+		| "urgency"
+		| "deadline"
+		| "canAnswer"
+		| "answerPending"
 	>,
 >(gates: readonly G[], current: Pick<OpenGate, "runId" | "stepId">): G | null {
 	return (
-		gates.find(
+		gateOrder(gates).find(
 			(gate) =>
 				mayAnswer(gate) &&
 				(gate.runId !== current.runId || gate.stepId !== current.stepId),

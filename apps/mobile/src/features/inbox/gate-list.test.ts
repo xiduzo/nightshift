@@ -140,4 +140,15 @@ describe("nextGate", () => {
 		expect(nextGate([readOnly, pending, a, b, c], a)?.runId).toBe("b");
 		expect(nextGate([a], a)).toBeNull();
 	});
+
+	test("the next in queue order: a Gate for now before an older one, a deadline before none", () => {
+		const now = gate({ runId: "now", openedAt: 9 * MIN, urgency: "now" });
+		const closes = gate({
+			runId: "closes",
+			openedAt: 8 * MIN,
+			deadline: { at: 60 * MIN, choose: "keep" },
+		});
+		expect(nextGate([a, b, closes, now], a)?.runId).toBe("now");
+		expect(nextGate([a, b, closes], a)?.runId).toBe("closes");
+	});
 });
