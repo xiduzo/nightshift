@@ -109,4 +109,56 @@ describe("the registry check", () => {
 			}),
 		).toThrow(ATTR.visit);
 	});
+
+	test("fails a landing without its ladder and a flow metric without its name", () => {
+		expect(() =>
+			assertConforms({
+				spans: [],
+				metrics: [
+					{
+						name: METRIC.ladderRung.name,
+						unit: METRIC.ladderRung.unit,
+						instrument: "counter",
+						points: [{ attributes: { [ATTR.ladderRung]: "first" } }],
+					},
+				],
+			}),
+		).toThrow(ATTR.ladderKind);
+
+		expect(() =>
+			assertConforms({
+				spans: [],
+				metrics: [
+					{
+						name: METRIC.flowMetric.name,
+						unit: METRIC.flowMetric.unit,
+						instrument: "histogram",
+						points: [{ attributes: {} }],
+					},
+				],
+			}),
+		).toThrow(ATTR.flowMetricName);
+
+		expect(() =>
+			assertConforms({
+				spans: [],
+				metrics: [
+					{
+						name: METRIC.ladderRung.name,
+						unit: METRIC.ladderRung.unit,
+						instrument: "counter",
+						points: [
+							{
+								attributes: {
+									[ATTR.ladderKind]: "choice",
+									[ATTR.ladderRung]: "later",
+									[ATTR.ladderUnsure]: "yes",
+								},
+							},
+						],
+					},
+				],
+			}),
+		).toThrow(ATTR.ladderUnsure);
+	});
 });

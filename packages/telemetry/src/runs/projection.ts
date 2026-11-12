@@ -1,4 +1,5 @@
 import type { LandedFact, RunTrace } from "@nightshift/engine";
+import { REGISTRY } from "@nightshift/semconv";
 import type { Attributes, Counter, Histogram } from "@opentelemetry/api";
 
 import {
@@ -36,8 +37,13 @@ import { meterOf, type RunningExport } from "../otlp";
  *   A Gate wait is `gate {node}`. A sleep is `wait {reason}`.
  * - `run-ended`: the run's span (`invoke_workflow {flow}`), the trace's
  *   root; a resumed run's later end is a span under it.
- * - `scored`: a score: a Gate's answer, a useful answer, what became of a
- *   pull request, or a score the flow wrote.
+ * - `scored`: a score of Night Shift's own (a Gate's answer, a useful
+ *   answer, what became of a pull request) is a `nightshift.score` point.
+ *   A number the flow reports is a `nightshift.flow.metric` point.
+ *
+ * Where the work landed: the step a climb landed on adds one
+ * `nightshift.ladder.rung` point, with its ladder, rung and tier. The cost
+ * of a try on a ladder carries the rung that try stands on.
  */
 
 /** The run as the engine derives it, or null when it has none. */
@@ -45,6 +51,16 @@ export type ReadTrace = (runId: string) => Promise<RunTrace | null>;
 
 type Step = RunTrace["steps"][number];
 type StepEnd = Step["ends"][number];
+type Landing = NonNullable<StepEnd["landing"]>;
+
+/**
+ * The scores Night Shift writes itself: the closed list of
+ * `nightshift.score.name`, but for its other value. Any other name is a
+ * number a flow reports.
+ */
+const OWN_SCORES: ReadonlySet<string> = new Set(
+	REGISTRY.attributes[ATTR.score].members.filter((name) => name !== "_OTHER"),
+);
 
 const ERROR_CLASSES = new Set<string>(Object.values(ERROR_TYPE));
 
@@ -87,6 +103,8 @@ type Instruments = {
 	gateWait: Histogram;
 	runOutcome: Counter;
 	score: Counter;
+	ladderRung: Counter;
+	flowMetric: Histogram;
 };
 
 function instruments(running: RunningExport): Instruments {
@@ -133,8 +151,13 @@ function instruments(running: RunningExport): Instruments {
 		),
 		score: counter(
 			METRIC.score,
-			"Feedback on runs: Gate answers, useful answers, what became of a pull request, and the scores a flow writes.",
+			"Feedback on runs: Gate answers, useful answers, and what became of a pull request.",
 		),
+		ladderRung: counter(
+			METRIC.ladderRung,
+			"Where the work landed: one point for each climb that landed, by its ladder and rung.",
+		),
+		flowMetric: histogram(METRIC.flowMetric, "The numbers a flow reports."),
 	};
 }
 
@@ -153,6 +176,21 @@ function runMetricAttributes(run: RunTrace): Attributes {
 	return {
 		...(run.projectId ? { [ATTR.projectId]: run.projectId } : {}),
 		[ATTR.flowId]: run.flowName ?? "quick-run",
+	};
+}
+
+/**
+ * A landing as a point: its ladder, rung and tier. A climb of a Decision
+ * also says whether a decider was not sure enough.
+ */
+function landingAttributes(landing: Landing): Attributes {
+	return {
+		[ATTR.ladderKind]: landing.ladder,
+		[ATTR.ladderRung]: landing.rung,
+		...(landing.tier !== null ? { [ATTR.ladderTier]: landing.tier } : {}),
+		...(landing.ladder === "choice"
+			? { [ATTR.ladderUnsure]: landing.unsure === true }
+			: {}),
 	};
 }
 
@@ -312,8 +350,17 @@ export function createRunProjection(deps: {
 			});
 		}
 		if (end.first && step.visit > 1) m.retries.add(1, point);
+		// A step a person reopens lands again when it ends again: a counter only adds.
+		if (end.landing) {
+			m.ladderRung.add(1, { ...point, ...landingAttributes(end.landing) });
+		}
+		const rung = step.rung ? { [ATTR.ladderRung]: step.rung } : {};
 		if (end.costUsd !== null && end.costUsd > 0) {
-			m.cost.add(end.costUsd, { ...point, [ATTR.costBasis]: end.costBasis });
+			m.cost.add(end.costUsd, {
+				...point,
+				...rung,
+				[ATTR.costBasis]: end.costBasis,
+			});
 		}
 		for (const session of sessions) {
 			const sessionProvider = providerOf(session.harness);
@@ -328,6 +375,7 @@ export function createRunProjection(deps: {
 			if (session.costUsd !== null && session.costUsd > 0) {
 				m.cost.add(session.costUsd, {
 					...point,
+					...rung,
 					[ATTR.agent]: session.harness,
 					...(session.model ? { [ATTR.model]: session.model } : {}),
 					[ATTR.costBasis]: session.costBasis,
@@ -387,6 +435,13 @@ export function createRunProjection(deps: {
 		fact: Extract<LandedFact, { kind: "scored" }>,
 	): void {
 		const point = { ...runMetricAttributes(run), [ATTR.deviceId]: deviceId };
+		if (!OWN_SCORES.has(fact.score)) {
+			m.flowMetric.record(fact.value, {
+				...point,
+				[ATTR.flowMetricName]: fact.score,
+			});
+			return;
+		}
 		m.score.add(fact.value, {
 			...point,
 			[ATTR.score]: fact.score,

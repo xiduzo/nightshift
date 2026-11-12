@@ -579,7 +579,7 @@ describe("the export to monitoring", () => {
 		).toBe(1);
 	});
 
-	test("a score a Command step wrote counts unchanged, under the flow's own name", async () => {
+	test("a number a step reports is a flow metric under its own name, never a score", async () => {
 		const run = runEvents("run-1")
 			.at(T + 1_000)
 			.runStarted({ projectId: "p1", flowName: "replicate" })
@@ -600,18 +600,31 @@ describe("the export to monitoring", () => {
 				{ score: "held_post_publication", value: 0.25, label: null },
 				{ stepId: "s-check" },
 			)
+			.push(
+				"Scored",
+				{ score: "replicated", value: 3, label: null },
+				{ stepId: "s-check" },
+			)
 			.at(T + 2_100)
 			.ended("finished");
 		const h = await setup({}, run);
 		h.landRun();
 		await h.done();
-		const points = h.points().get(METRIC.score.name) ?? [];
+		expect(h.points().get(METRIC.score.name)).toBeUndefined();
+		const points = h.points().get(METRIC.flowMetric.name) ?? [];
 		expect(
 			points
-				.map((p) => ({ attributes: p.attributes, value: p.value }))
+				.map((p) => {
+					const value = p.value as Histogram;
+					return {
+						attributes: p.attributes,
+						count: value.count,
+						sum: value.sum,
+					};
+				})
 				.sort((a, b) =>
-					String(a.attributes[ATTR.score]).localeCompare(
-						String(b.attributes[ATTR.score]),
+					String(a.attributes[ATTR.flowMetricName]).localeCompare(
+						String(b.attributes[ATTR.flowMetricName]),
 					),
 				),
 		).toEqual([
@@ -620,20 +633,116 @@ describe("the export to monitoring", () => {
 					[ATTR.projectId]: "p1",
 					[ATTR.flowId]: "replicate",
 					[ATTR.deviceId]: DEVICE,
-					[ATTR.score]: "held_post_publication",
+					[ATTR.flowMetricName]: "held_post_publication",
 				},
-				value: 0.25,
+				count: 1,
+				sum: 0.25,
 			},
 			{
 				attributes: {
 					[ATTR.projectId]: "p1",
 					[ATTR.flowId]: "replicate",
 					[ATTR.deviceId]: DEVICE,
-					[ATTR.score]: "replicated",
+					[ATTR.flowMetricName]: "replicated",
+				},
+				count: 2,
+				sum: 4,
+			},
+		]);
+		assertConforms(exported(h.spans(), h.resources()));
+	});
+
+	test("a climb that landed adds one rung point, and each try's cost carries its rung", async () => {
+		// A Decision whose first tier was not sure enough, then an Agent without a cascade.
+		const run = runEvents("run-1")
+			.at(T + 1_000)
+			.runStarted({ projectId: "p1", flowName: "triage" })
+			.at(T + 1_100)
+			.stepStarted("s-try-1", "route", 1, {
+				nodeType: "decision",
+				deviceId: DEVICE,
+				rung: { by: "model", tier: 0 },
+			})
+			.at(T + 1_200)
+			.stepEnded(
+				"s-try-1",
+				"fail",
+				{ tier: "Small", tries: 1, confidence: 0.4, pick: "urgent" },
+				0.01,
+			)
+			.at(T + 1_300)
+			.stepStarted("s-try-2", "route", 2, {
+				nodeType: "decision",
+				deviceId: DEVICE,
+				rung: { by: "model", tier: 1, last: true },
+			})
+			.at(T + 1_400)
+			.stepEnded(
+				"s-try-2",
+				"urgent",
+				{ tier: "Large", tries: 2, confidence: 0.9 },
+				0.2,
+			)
+			.at(T + 1_500)
+			.stepStarted("s-agent", "answer", 1, {
+				nodeType: "agent",
+				deviceId: DEVICE,
+				rung: { by: "agent", last: true },
+			})
+			.sessionStarted("s-agent", "x1", { harness: "claude-code" })
+			.at(T + 2_000)
+			.sessionEnded("s-agent", "x1", "finished", 0.75, {
+				costSource: "reported",
+			})
+			.stepEnded("s-agent", "pass")
+			.at(T + 2_100)
+			.ended("finished");
+		const h = await setup({}, run);
+		h.landRun();
+		await h.done();
+		const points = h.points();
+		const landed = (points.get(METRIC.ladderRung.name) ?? []).map((p) => ({
+			attributes: p.attributes,
+			value: p.value,
+		}));
+		expect(
+			landed.sort((a, b) =>
+				String(a.attributes[ATTR.nodeKind]).localeCompare(
+					String(b.attributes[ATTR.nodeKind]),
+				),
+			),
+		).toEqual([
+			{
+				attributes: {
+					[ATTR.projectId]: "p1",
+					[ATTR.flowId]: "triage",
+					[ATTR.nodeKind]: "agent",
+					[ATTR.deviceId]: DEVICE,
+					[ATTR.ladderKind]: "work",
+					[ATTR.ladderRung]: "first",
+				},
+				value: 1,
+			},
+			{
+				attributes: {
+					[ATTR.projectId]: "p1",
+					[ATTR.flowId]: "triage",
+					[ATTR.nodeKind]: "decision",
+					[ATTR.deviceId]: DEVICE,
+					[ATTR.ladderKind]: "choice",
+					[ATTR.ladderRung]: "later",
+					[ATTR.ladderTier]: "Large",
+					[ATTR.ladderUnsure]: true,
 				},
 				value: 1,
 			},
 		]);
+		const cost = points.get(METRIC.cost.name);
+		expect(sum(cost, { [ATTR.ladderRung]: "first" })).toBeCloseTo(0.76);
+		expect(sum(cost, { [ATTR.ladderRung]: "later" })).toBeCloseTo(0.2);
+		expect(
+			sum(cost, { [ATTR.ladderRung]: "first", [ATTR.nodeKind]: "decision" }),
+		).toBeCloseTo(0.01);
 		assertConforms(exported(h.spans(), h.resources()));
 	});
 
