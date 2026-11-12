@@ -491,6 +491,41 @@ describe("planSubflowFromSection, small flows", () => {
 		});
 	});
 
+	test("a cascade Decision's fail without an edge fails the step, as in the engine: only its options end the flow", () => {
+		const decision = {
+			id: "c",
+			type: "decision" as const,
+			position: { x: 0, y: 0 },
+			prompt: "Is it ready?",
+			by: "model" as const,
+			options: [{ name: "ready" }, { name: "gone" }],
+			// No person tier: when no tier holds, the step ends `fail`.
+			cascade: [
+				{ decider: "typesafe" as const, minConfidence: 0.8 },
+				{ decider: "openrouter" as const, minConfidence: 0.6 },
+			],
+		};
+		const flow = chain({
+			nodes: [command("a"), command("b"), decision, command("d")],
+			edges: [
+				{ id: "ab", from: "a", outcome: "pass", to: "b" },
+				{ id: "bc", from: "b", outcome: "pass", to: "c" },
+				{ id: "cd", from: "c", outcome: "ready", to: "d" },
+			],
+		});
+		const plan = planned(planSubflowFromSection(flow, "middle", plain));
+		expect(errorsOf(plan, "middle")).toEqual([]);
+		expect(change(plan.changes, "ends-inside")[0]?.ends).toEqual([
+			{ node: "c", outcome: "gone", option: "gone" },
+		]);
+		expect(nodeOf(plan.caller, "middle_ended")).toMatchObject({
+			options: [
+				{ name: "ready", when: 'middle.ended = "ready"' },
+				{ name: "gone" },
+			],
+		});
+	});
+
 	test("a Section inside a Section: the Call takes its place in the outer one, the inner Sections go along", () => {
 		const nested = flowOf({
 			start: "a",

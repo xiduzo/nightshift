@@ -351,7 +351,8 @@ function endsFlow(node: FlowNode, outcome: string): boolean {
 		case "command":
 			return isChosenExit(node, outcome);
 		case "decision":
-			return true;
+			// Its options only: a cascade with no person tier fails the step on `fail`.
+			return node.options.some((option) => option.name === outcome);
 		case "call":
 			return node.each !== undefined || outcome === "pass";
 		case "wait":
