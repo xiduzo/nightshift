@@ -84,6 +84,7 @@ A project's page reads like the Performance page of Search Console. Keep its sha
 - One card with tabs under the chart. Each tab is an overview list (see Overview lists).
 - What runs or waits now shows in one slim line, only when there is something.
 - **Details** on a tile opens the details dialog of that number at the page's range.
+- A test run counts only in Spend. Runs, Finished, Needed you, the Failures and Gates tabs, Latest reports and Flow health leave it out (`isTestRun`, one rule for every number). The run page and every run list show a **Test run** badge.
 - Setup does not go on this page. The computers that have the project are in its ⋯ menu.
 
 ### Home
@@ -99,6 +100,7 @@ Home answers "what needs me, and what came out" over every project. The heading 
 - Failed shows one row per flow, not per run. The flows that still fail come first. A flow that a later run finished shows dimmed, with a check. The lane counts only the flows that still fail. The hover card says how often it failed, at which step, and the first sentence of why.
 - Every row opens its place: a run its run page, a failed flow its newest failed run, a Gate its question in the inbox. Waiting for you links to the inbox. **Details** on Failed opens the failed runs.
 - Under the lanes, **Latest reports**: one card across the full width. It shows one row per flow, the newest report first, at most 5, from the runs started in the range. The hover card shows the result and the start of the report. A row opens the run page at its report. The footer says how many more are on the Flows page of each project. An older Host sends no reports, so the card hides. Night Shift never pushes a report.
+- A test run counts only in Spend, as on a project's page. Failed and Latest reports leave it out. Running now shows it while it runs.
 - Under the reports, the projects, each with the status of its last runs. A project opens its page at the same range.
 - A run page opens at its report when the run ended with one and the link names no step.
 
@@ -164,6 +166,7 @@ Flow health is a tab of a project's page, one row per flow. It leads with where 
 - The rungs are named the same everywhere (`@nightshift/client` `ladderParts`): the tier, or Agent, Subflow, Decider, Rule. A person is always "You". "Its deadline" is a rung of its own. "Nowhere" is the rung when nothing held.
 - The rung colors are the `--ladder-*` tokens. The text next to a bar stays in text colors.
 - An older Host sends no ladders: a dash, and the tooltip says "Update Night Shift to see where the work landed."
+- A test run is not in a row: not in its last runs, its numbers or its latest report. The details dialog counts it only in the spend. "Total spent" says how many test runs it holds.
 
 A row opens the flow's details dialog. Its tabs: Overview, Ladders, Metrics, Cost, Problems, Runs.
 

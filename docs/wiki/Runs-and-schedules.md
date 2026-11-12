@@ -13,7 +13,18 @@ A run of a project without a folder starts in an empty folder of its own, with n
 
 You follow each step live: its transcript, the files that it changed, its cost, and its tokens.
 
-When a run finishes, the run page asks "Was this run useful?". The phone asks too. Flow health uses the answers to show what a useful result costs.
+When a run finishes, the run page asks "Was this run useful?". The phone asks too. Flow health uses the answers to show what a useful result costs. A [test run](#test-runs) does not ask.
+
+## Test runs
+
+A test run is a run that you start from the flow editor with pinned or skipped nodes. See [Flows and nodes](Flows-and-nodes.md). It shows a **Test run** badge on the run page and in the lists of runs.
+
+- A pinned node does not run. Its step gives the output of the node in an earlier run. The step links to that run.
+- A skipped node does not run. Its step takes the outcome that you chose, and its outputs are empty.
+- These steps have no transcript, take no time and cost nothing. The other steps run for real.
+- A test run keeps nothing for the next run. It writes no kept variables, and Since last run does not remember what it saw.
+
+A test run counts only in **Spend**, on Home, on the project page and in the details of a flow. Runs, Finished, Needed you, Failed, Latest reports and [Flow health](#flow-health) leave it out. A try does not change how your flows look.
 
 ## The report of a run
 
@@ -22,6 +33,7 @@ A run can end with a report: what it produced, in Markdown, such as research res
 - **The run page** shows the report in the End step. **Copy** puts it on your clipboard. **Download** saves it as a `.md` file. A run that ended with a report opens at it.
 - **The Flows page** shows the start of each flow's latest report on its card. Click **Latest report** to read all of it.
 - **Home** lists the latest report of each flow under the lanes, newest first. Point at a row to see the start of the report.
+- The report of a [test run](#test-runs) shows only on its run page.
 - Night Shift keeps the first 64 KB of a report. A longer report says so.
 - A report from a file must be a text file in the folder the run works in. When the file is not there, or is not text, the run ends as the End node says, without a report. The run page tells you why.
 - When the computer with the file is offline, the End node waits for it as long as the **Network** limit of the [run policy](#run-policy). Then the run ends the same way.
@@ -90,7 +102,7 @@ A computer that goes offline does not end the run:
 
 ## Flow health
 
-Flow health shows, for each flow, where its work landed, its runs per day, their cost against the median, why runs failed, and its metrics. Click a flow to open its details.
+Flow health shows, for each flow, where its work landed, its runs per day, their cost against the median, why runs failed, and its metrics. Click a flow to open its details. Flow health leaves [test runs](#test-runs) out. **Total spent** in the details of a flow counts them, and says how many.
 
 **Where the work landed** comes first. One bar shows the work: what agents, subflows and models made, and your answers to an Ask. One bar shows the choices: the Decisions. Each part of a bar is a rung:
 
