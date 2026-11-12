@@ -48,6 +48,7 @@ flowchart LR
 - **Prompt and skill.** With a skill, the agent gets `/<skill> <prompt>`.
 - **Outcomes.** An Agent can declare its own outcomes, such as `found` and `noise`, in place of `pass` and `fail`.
 - **Output.** The shape of the step's data. See [Data shapes](#data-shapes).
+- **Scores.** `{"scores": {"leads": 12}}` in its data scores the run. See [Scores](#scores).
 - **Ask a person.** An agent that needs input opens a Gate. Your answer goes back to the same session.
 - **Backups.** Other profiles, on other computers, that take the step when its computer is offline. See [Agents and profiles](Agents-and-profiles.md#backups).
 
@@ -66,7 +67,7 @@ A Decision or a Value that a model decides can have a cascade too. A model's pic
 - JSON that the command writes to `$NS_OUTPUT` is its data. `{"outcome": "approved"}` picks the outcome.
 - A command that prints JSON can give that as its data. Set **What it prints** to **JSON** (`"stdout": "json"` in the flow file).
 - **Data shape** in its **Output** says what that data holds. See [Data shapes](#data-shapes).
-- `{"scores": {"found": 4}}` in that data scores the run. Flow health shows the scores of each flow.
+- `{"scores": {"found": 4}}` in that data scores the run. See [Scores](#scores).
 - `$NS_KNOWLEDGE` is the project's [knowledge](Knowledge.md) folder.
 
 ### Web request
@@ -180,6 +181,14 @@ You do not have to write a shape. When a node has none, Night Shift takes it fro
 - An inferred shape only warns. The run shows the warning and goes on.
 - A Tool takes the shape that its MCP server gives for the tool's answer, marked as inferred.
 - A kit and a **Quick run** keep no shape.
+
+### Scores
+
+An Agent, a Command or a Value scores the run with `scores` in its data: `{"scores": {"leads": 12, "replies": 3}}`. Each name gets a number of 0 or more. A shape does not have to name `scores`.
+
+- Flow health shows the scores of each flow.
+- A name that Night Shift uses itself, such as `useful`, gives a warning and does not count.
+- When a cascade moves up to the next try, the try before scores nothing.
 
 ## The editor
 

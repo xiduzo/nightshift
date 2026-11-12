@@ -75,7 +75,7 @@ A computer that goes offline does not end the run:
 
 ## Flow health
 
-Flow health shows each flow's runs per day, their cost against the median, why runs failed, and the scores that its commands gave. A Command scores a run with `{"scores": {"found": 4}}` in its data. See [Command](Flows-and-nodes.md#command).
+Flow health shows each flow's runs per day, their cost against the median, why runs failed, and the scores that its steps gave. An Agent, a Command or a Value scores a run with `{"scores": {"found": 4}}` in its data. See [Scores](Flows-and-nodes.md#scores).
 
 **Per useful result** shows what all runs of a flow cost, divided by the runs that people found useful. Runs that failed or that nobody answered count in the cost too. Under it, you see how many runs with an answer were useful.
 
