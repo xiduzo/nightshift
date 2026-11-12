@@ -666,8 +666,9 @@ const haltMessages = new WeakMap<AbortSignal, string>();
  * scope and the time budget), or `StepReopened` for a reopen (with the
  * time budget), and opens the transcript and the timers. Exactly
  * `runStep`'s scaffolding in the old engine. It asks
- * `ctx.placement.deviceFor` for the step's Device first; `StepStarted`
- * names it.
+ * `ctx.placement.deviceFor` for the step's Device first, or, for a step
+ * that follows the work (`NodeKind.followsWork`), takes the Device that
+ * has the run's work now; `StepStarted` names it.
  *
  * `runState` is the run state as the caller read it on entry; without it
  * it is read here.
@@ -687,6 +688,12 @@ export async function beginStep(
 	// secrets (ADR 13).
 	let device = ctx.placement.deviceFor(node, ctx.run);
 	const logged = runState ?? (await ctx.log.state(runId));
+	// A step that only reads the run's copy goes where the copy is: a
+	// Hand-off would refuse what a step there did not commit.
+	if (ctx.kindOf(node).followsWork(node) && !logged.runFolder) {
+		const { holder } = deriveWorktrees(logged, ctx.run);
+		device = ctx.placement.deviceById(holder, ctx.run);
+	}
 	// The kind says which timers a step has: a Gate waits as long as it
 	// must, a Wait node keeps its own deadline across its sleeps, and only an
 	// Agent step has an idle clock (its own, else the policy's). The log
@@ -1094,9 +1101,11 @@ function worktreeOn(
  * run's work gets it by a Hand-off first: the Device that has it pushes
  * the branch (a worktree with uncommitted changes fails the step: nothing
  * is committed for you), this one fetches it into its own worktree of the
- * run, and the Walker logs `HandedOff`. A run of a project without a
- * folder has no Hand-off: the step works in the run folder of its own
- * Device (`readyRunFolder`, ADR 22).
+ * run, and the Walker logs `HandedOff`. A step that follows the work
+ * (`NodeKind.followsWork`) needs none: `beginStep` placed it on the Device
+ * that has the work, and it sleeps while that Device is offline. A run of
+ * a project without a folder has no Hand-off: the step works in the run
+ * folder of its own Device (`readyRunFolder`, ADR 22).
  */
 export async function readyDevice(
 	ctx: StepContext,

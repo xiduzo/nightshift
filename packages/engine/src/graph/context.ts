@@ -399,6 +399,13 @@ export type NodeKind<N extends FlowNode = FlowNode> = {
 	 * (it needs no computer: a Gate, a rule, a timer).
 	 */
 	works(node: N): "worktree" | "device" | null;
+	/**
+	 * Whether a step that works in the run's worktree goes to the Device
+	 * that has the run's work now, instead of a Hand-off to its own Device
+	 * (`beginStep`): it only reads there (an End's report file). A run
+	 * folder does not move, so there the step stays on its own Device.
+	 */
+	followsWork(node: N): boolean;
 };
 
 /** The outcome of a step whose work was cut short: stopped, overdue (`error`), or interrupted. */
@@ -414,7 +421,8 @@ export function endedAtReason(node: FlowNode, outcome: Outcome): string {
  * auxiliary node, `pass` is the one chosen end and the plain end, no
  * label or report for a Call, no command log, the node's own `timeoutMinutes`, a
  * cut-short step keeps its outputs, no connections, no programs, no
- * requirements.
+ * requirements, no computer, and a step that works in the worktree gets
+ * the run's work by a Hand-off.
  */
 export const PLAIN_KIND = {
 	aux: () => [],
@@ -434,6 +442,7 @@ export const PLAIN_KIND = {
 	programs: () => [],
 	requirements: [],
 	works: () => null,
+	followsWork: () => false,
 } satisfies Omit<NodeKind, "type" | "make" | "resumeRules">;
 
 export function messageOf(error: unknown): string {

@@ -1,14 +1,26 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdir, symlink, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import {
+	mkdir,
+	mkdtemp,
+	realpath,
+	rm,
+	symlink,
+	writeFile,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { run } from "@nightshift/db/schema";
 import type { EndNode } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { eq } from "drizzle-orm";
 import type { Capabilities, Device } from "../device";
 import { foldRun } from "../log";
 
 import { readTranscriptFile } from "../log/transcripts";
 import { refusalOf } from "../placement";
 import { deriveSteps } from "../read/run-views";
+import { createRunFolders } from "../run-folders";
 import {
 	command,
 	drive,
@@ -16,11 +28,13 @@ import {
 	flowOf,
 	payloads,
 	placementOn,
+	type StartOptions,
 	startRun,
 } from "../testing/graph";
 import {
 	createSandbox,
 	type Sandbox,
+	TEST_DEVICE_ID,
 	testDevice,
 } from "../testing/test-support";
 import { endingOf } from "./thread";
@@ -383,6 +397,138 @@ describe("a report from a file the run wrote", () => {
 		expect(driven.state.ended).toMatchObject({
 			result: "done",
 			report: "# Done",
+		});
+	});
+
+	describe("when a step on another Device wrote the file", () => {
+		/** Device b's copy of the project, or its run folders. */
+		let other: string;
+		beforeEach(async () => {
+			other = await realpath(
+				await mkdtemp(join(tmpdir(), "nightshift-device-b-")),
+			);
+		});
+		afterEach(async () => {
+			await rm(other, { recursive: true, force: true });
+		});
+
+		/**
+		 * write (on Device b) → done (on the run's Device), which reads
+		 * report.md. The run's Device has its copy at the sandbox's repo, b
+		 * at `other`. A Hand-off refuses a copy with a report.md, as git
+		 * refuses a file that is not committed.
+		 */
+		async function onTwoDevices(cmd: string, options: StartOptions = {}) {
+			const h = await startRun(
+				sandbox,
+				flowOf(
+					[command("write", cmd, { device: "b" }), fromFile("report.md")],
+					[edge("e1", "write", "pass", "done")],
+				),
+				options,
+			);
+			// The plan names b, by its id.
+			const deviceNames = JSON.stringify({ b: "studio-b" });
+			await sandbox.db
+				.update(run)
+				.set({ deviceNames })
+				.where(eq(run.id, h.runId));
+			h.ctx.run = { ...h.ctx.run, deviceNames };
+			const handOffs: string[] = [];
+			const here = testDevice(h.local);
+			const onB = {
+				...testDevice({ ...h.local, runFolders: createRunFolders(other) }, "b"),
+				name: "studio-b",
+			};
+			h.ctx.placement = placementOn((id) => {
+				const device = id === "b" ? onB : here;
+				return {
+					...device,
+					handOff: async ({ cwd }) => {
+						handOffs.push(device.name);
+						if (existsSync(join(cwd, "report.md"))) {
+							throw new Refusal(
+								"conflict",
+								"The run's copy of the project has changes that are not committed (report.md).",
+							);
+						}
+						return { commit: "c0ffee", branch: "nightshift/test" };
+					},
+					receiveHandOff: async ({ branch }) => ({
+						worktreePath: other,
+						branch,
+						baseRef: "main",
+					}),
+				};
+			});
+			const devices = async () =>
+				payloads(await h.events(), "StepStarted").map((s) => [
+					s.nodeId,
+					s.deviceId,
+				]);
+			return { h, handOffs, devices };
+		}
+
+		test("in a project with a folder, the End reads it on the Device that has the run's copy: no Hand-off, and the run ends done", async () => {
+			const { h, handOffs, devices } = await onTwoDevices(
+				"printf '# Done' > report.md",
+			);
+			const driven = await drive(h, { inputs: {} });
+			expect(driven.state.ended).toMatchObject({
+				status: "finished",
+				result: "done",
+				report: "# Done",
+			});
+			// Only the Hand-off to b, for the step that wrote the file.
+			expect(handOffs).toEqual(["test"]);
+			expect(payloads(await h.events(), "HandedOff")).toHaveLength(1);
+			expect(await warnings(h)).toEqual([]);
+			expect(await devices()).toEqual([
+				["write", "b"],
+				["done", "b"],
+			]);
+		});
+
+		test("a missing file there warns and names that Device: the End keeps its status", async () => {
+			const { h } = await onTwoDevices("true");
+			const driven = await drive(h, { inputs: {} });
+			expect(driven.state.ended).toMatchObject({
+				status: "finished",
+				result: "done",
+			});
+			expect(driven.state.ended).not.toHaveProperty("report");
+			expect(await warnings(h)).toEqual([
+				{
+					kind: "report",
+					message:
+						'Night Shift found no file "report.md" in the folder the run works in on studio-b. The run ends without a report.',
+				},
+			]);
+		});
+
+		test("in a project without a folder, the End reads the run folder on the run's Device: the file on b is missing", async () => {
+			const { h, handOffs, devices } = await onTwoDevices(
+				"printf '# Done' > report.md",
+				{ runFolder: true },
+			);
+			const driven = await drive(h, { inputs: {} });
+			expect(driven.state.ended).toMatchObject({
+				status: "finished",
+				result: "done",
+			});
+			expect(driven.state.ended).not.toHaveProperty("report");
+			expect(handOffs).toEqual([]);
+			expect(await warnings(h)).toEqual([
+				{
+					kind: "report",
+					message:
+						'Night Shift found no file "report.md" in the folder the run works in on test. The run ends without a report.',
+				},
+			]);
+			expect(await devices()).toEqual([
+				["write", "b"],
+				["done", TEST_DEVICE_ID],
+			]);
 		});
 	});
 

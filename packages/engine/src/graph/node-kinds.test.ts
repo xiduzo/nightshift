@@ -686,4 +686,14 @@ describe("works: what a step needs of its Device", () => {
 		expect(works(sinceLastRun())).toBeNull();
 		expect(works(convert())).toBeNull();
 	});
+
+	test("only an End that reads a report file goes where the run's work is; every other step gets it by a Hand-off", () => {
+		const follows = (n: FlowNode) => kindOf(n).followsWork(n);
+		expect(follows(reportFile())).toBe(true);
+		expect(follows(end())).toBe(false);
+		expect(follows(agent())).toBe(false);
+		expect(follows(command())).toBe(false);
+		expect(follows(service())).toBe(false);
+		expect(follows(callEach())).toBe(false);
+	});
 });

@@ -35,14 +35,16 @@ import { type BodyResult, runStep, type StepHandle } from "../step-runner";
  * (`read/report.ts`).
  *
  * A report from a file is read on the step's Device, in the folder the
- * run works in there (`Device.readFile`): the run's folder, or its copy of
- * the project, handed to this Device first as for any step that works in
- * it. A run folder does not move between Devices: a file that a step on
- * another Device wrote in its own folder is missing here. A file that is
- * missing, not text or outside the folder is a `report` warning: the step
- * still ends with the node's status, without a report, so a run that did
- * its work never fails for its report. A Device that went away during the
- * read waits as the network does, and the step reads again.
+ * run works in there (`Device.readFile`). In a project with a folder, the
+ * step goes to the Device that has the run's copy now
+ * (`NodeKind.followsWork`): no Hand-off, so a file that a step there did
+ * not commit is read all the same. A run folder does not move between
+ * Devices: the step reads the folder on the run's Device, and a file that
+ * a step on another Device wrote in its own folder is missing here. A file
+ * that is missing, not text or outside the folder is a `report` warning:
+ * the step still ends with the node's status, without a report, so a run
+ * that did its work never fails for its report. A Device that went away
+ * during the read waits as the network does, and the step reads again.
  *
  * Inside a called flow it ends that flow; the Call reads the result
  * (`body.ts`) and the report (`end_report`). Pure, so a re-run is safe:
@@ -239,14 +241,15 @@ const readsReportFiles: Requirement<EndNode> = (nodes, has) => {
  * status, and the reason `RunEnded` records is the message. A Call that
  * called the flow reports the status as `ended` and the report as
  * `end_report`. An End that reads its report from a file works in the
- * folder the run works in, on a Device that reads files, and sleeps while
- * that Device is offline.
+ * folder the run works in, on the Device that has the run's copy, and
+ * sleeps while that Device is offline.
  */
 export const END: NodeKind<EndNode> = {
 	...PLAIN_KIND,
 	type: "end",
 	make: endStepNode,
 	works: (node) => (readsFile(node) ? "worktree" : null),
+	followsWork: readsFile,
 	aux: (node) => (readsFile(node) ? [{ kind: "wait" }] : []),
 	resumeRules: () => RESUME_RULES.fresh,
 	isChosenEnd: () => true,
