@@ -47,6 +47,7 @@ export default function RootLayout() {
 					name="changes/[runId]"
 					options={{ title: "Changed files" }}
 				/>
+				<Stack.Screen name="report/[runId]" options={{ title: "Report" }} />
 				<Stack.Screen
 					name="gates/[runId]/[stepId]"
 					options={{ title: "Gate", presentation: "modal" }}
