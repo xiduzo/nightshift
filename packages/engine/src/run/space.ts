@@ -1,7 +1,7 @@
 import { Refusal } from "@nightshift/refusal";
 
 import type { ArtifactStore } from "../artifacts";
-import type { RunCopiesService, RunFilesService } from "../cleanup";
+import type { RunFilesService } from "../cleanup";
 import type { Actor, StartRunInput } from "../contract";
 import { flowUse, type SpaceFlows } from "../flows";
 import type { Runner } from "../graph";
@@ -56,11 +56,6 @@ export type SpacesDeps = {
 	/** The run's row, or "not found". */
 	runRow(runId: string): Promise<RunRow>;
 	listBranches(repoPath: string): Promise<Branches>;
-	/** What runs left on this computer, and their removal. */
-	runCopies: Pick<
-		RunCopiesService,
-		"list" | "removeRunCopy" | "deleteRunBranches"
-	>;
 	/** The files of run folders on this computer. */
 	runFiles: Pick<RunFilesService, "list" | "file">;
 	placement: Pick<PlacementPort, "devicesFor">;
@@ -258,21 +253,6 @@ export function createSpaces(deps: SpacesDeps) {
 				if (!found.folder) return { current: null, local: [], remote: [] };
 				const row = await projects.get(projectId, spaceId);
 				return deps.listBranches(row.repoPath);
-			},
-
-			async listRunCopies(projectId) {
-				await ready;
-				return deps.runCopies.list(spaceId, projectId);
-			},
-
-			async removeRunCopy(runId, options) {
-				await ready;
-				await deps.runCopies.removeRunCopy(spaceId, runId, options);
-			},
-
-			async deleteRunBranches(runId, options) {
-				await ready;
-				await deps.runCopies.deleteRunBranches(spaceId, runId, options);
 			},
 
 			async listDevices(projectId, forNode) {

@@ -36,7 +36,6 @@ export type {
 	Phone,
 	Project,
 	ProjectCheck,
-	RunCopy,
 	RunDetail,
 	RunFiles,
 	RunStatus,

@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test";
 import { waitFor } from "../testing/test-support";
 import { startCleanupJob } from "./job";
-import { cleanupTime, isSafeToRemove } from "./safety";
 
 test("sweeps after the delay and then on its interval, survives a failed sweep, and stops with the signal", async () => {
 	const controller = new AbortController();
@@ -123,40 +122,4 @@ test("never sweeps twice at once, nor when the engine did not start", async () =
 	controller.abort();
 	expect(most).toBe(1);
 	expect(never).toBe(0);
-});
-
-test("safe: nothing uncommitted and no commit only here; a folder git does not know never is", () => {
-	const state = {
-		worktreePath: "/x",
-		exists: true,
-		registered: true,
-		changes: 0,
-		branches: [
-			{
-				name: "nightshift/a",
-				merged: false,
-				pushed: true,
-				ahead: 0,
-				unsaved: 0,
-			},
-		],
-	};
-	expect(isSafeToRemove(state)).toBe(true);
-	expect(isSafeToRemove({ ...state, changes: 2 })).toBe(false);
-	expect(isSafeToRemove({ ...state, changes: null })).toBe(false);
-	expect(isSafeToRemove({ ...state, registered: false })).toBe(false);
-	expect(
-		isSafeToRemove({
-			...state,
-			branches: [
-				{ name: "b", merged: false, pushed: false, ahead: null, unsaved: 1 },
-			],
-		}),
-	).toBe(false);
-	expect(cleanupTime({ createdAt: 0, endedAt: 1000 }, 14)).toBe(
-		1000 + 14 * 24 * 60 * 60_000,
-	);
-	expect(cleanupTime({ createdAt: 5, endedAt: null }, 1)).toBe(
-		5 + 24 * 60 * 60_000,
-	);
 });

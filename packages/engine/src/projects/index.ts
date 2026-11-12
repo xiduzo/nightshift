@@ -28,4 +28,4 @@ export {
 export { forgetSpaceRows, spaceMoveBatch, spaceRunIds } from "./space-rows";
 export { createWorktreeSnapshots } from "./worktree-changes";
 export type { Branches } from "./worktrees";
-export { createWorktrees, itemBranchName } from "./worktrees";
+export { createWorktrees, itemBranchName, keptRefsOf } from "./worktrees";

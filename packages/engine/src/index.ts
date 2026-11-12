@@ -20,7 +20,7 @@ export {
 	type Artifact,
 	createArtifactStore,
 } from "./artifacts";
-export type { RunCopies, RunFiles } from "./cleanup";
+export type { RunFiles } from "./cleanup";
 export type {
 	Actor,
 	DeviceDirectory,

@@ -322,16 +322,22 @@ export type EnginePayloads = {
 	WorktreeCreated: { worktreePath: string; branch: string; baseRef: string };
 	/**
 	 * Night Shift removed what a run left on this computer: its worktree
-	 * (`worktreePath`, null when it stayed), local branches, or both.
-	 * `by: "cleanup"` is the scheduled cleanup, `person` a person's action.
-	 * A fact of this computer, not of the run: the event has no run, names
-	 * the run in its payload, and the exchange does not copy it.
+	 * (`worktreePath`, null when it stayed), local branches, or both. The
+	 * work that was only here went to the kept refs in `kept` first
+	 * (`refs/nightshift/kept/<short>/…`). `expired`: the kept refs it
+	 * deleted once the run was `cleanUpAfterDays` old. `by: "cleanup"` is
+	 * the scheduled cleanup, `person` a person's action (the Branches page,
+	 * until 2026-11-12). A fact of this computer, not of the run: the event
+	 * has no run, names the run in its payload, and the exchange does not
+	 * copy it.
 	 */
 	WorktreeRemoved: {
 		projectId: string;
 		runId: string;
 		worktreePath: string | null;
 		branches: string[];
+		kept?: string[];
+		expired?: string[];
 		by: "person" | "cleanup";
 	};
 	/**

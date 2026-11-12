@@ -6,4 +6,4 @@ export { ProjectFolderLine } from "./project-folder-line";
 export { ProjectMenu } from "./project-menu";
 export { ProjectPage } from "./project-page";
 export { notHere, useHasFolder } from "./projects";
-export { projectMutations, projectQueries } from "./queries";
+export { projectQueries } from "./queries";

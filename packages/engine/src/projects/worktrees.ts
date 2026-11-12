@@ -22,6 +22,28 @@ export function worktreeLocation(repoPath: string, shortId: string) {
 	};
 }
 
+/**
+ * Where the cleanup keeps the work of ended runs that is only on this
+ * computer, once their copy and their branches went (`cleanup/`): refs
+ * outside `refs/heads/`, so `git branch` does not list them.
+ */
+export const KEPT_REFS = "refs/nightshift/kept/";
+
+/**
+ * The kept refs of one run, all under `prefix`: `copy` is the state of
+ * its copy of the project when it went, with its uncommitted changes as
+ * one commit on top. `branch(name)` is a branch of the run as it was:
+ * `refs/nightshift/kept/<short>/heads/nightshift/<short>`.
+ */
+export function keptRefsOf(shortId: string) {
+	const prefix = `${KEPT_REFS}${shortId}/`;
+	return {
+		prefix,
+		copy: `${prefix}copy`,
+		branch: (name: string) => `${prefix}heads/${name}`,
+	};
+}
+
 /** The branches of a clone, newest commit first. */
 export type Branches = {
 	/** The checked-out branch, or null when HEAD is detached. */

@@ -23,7 +23,8 @@ const CLEANUP_KEYS = ["cleanUpAfterDays"] as const;
 
 /**
  * The scheduled cleanup of what ended runs left on this computer: their
- * copies of the project, and the files of runs without a project folder.
+ * copies of the project and branches a day after the run, the work it
+ * kept of them, and the files of runs without a project folder.
  */
 export function CleanupCard({ data }: { data: SettingsView }) {
 	const form = useSettingsForm(data, CLEANUP_KEYS, {
@@ -49,9 +50,10 @@ export function CleanupCard({ data }: { data: SettingsView }) {
 										Clean up old runs
 									</FieldLabel>
 									<FieldDescription>
-										Remove a run once its work is merged or pushed. Branches on
-										origin stay. Remove other runs on the Branches page. In a
-										project without a folder, the files of a run always go.
+										A day after a run ends, Night Shift removes its copy of the
+										project and its branches. Branches on origin stay, and work
+										saved nowhere else stays hidden for the days below, then
+										goes.
 									</FieldDescription>
 								</FieldContent>
 								<Switch
@@ -70,7 +72,7 @@ export function CleanupCard({ data }: { data: SettingsView }) {
 									settingKey="cleanUpAfterDays"
 									label="Clean up after"
 									unit="days"
-									description="Counted from the end of the run."
+									description="How long hidden work, and the files of a run without a project folder, stay after the run ends."
 									inputMode="numeric"
 								/>
 							</div>

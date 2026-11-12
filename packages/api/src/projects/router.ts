@@ -7,13 +7,7 @@ import { z } from "zod";
 import { timeZoneSchema } from "../dashboard";
 import { agentChoices, agentChoicesSchema } from "../flows";
 import { output } from "../output";
-import {
-	ownerOnly,
-	ownerProcedure,
-	permitted,
-	protectedProcedure,
-} from "../procedures";
-import { runProcedure } from "../runs";
+import { ownerProcedure, permitted, protectedProcedure } from "../procedures";
 import { projectProcedure } from "./project-space";
 import {
 	branchesSchema,
@@ -25,7 +19,6 @@ import {
 	projectReadinessSchema,
 	projectSchema,
 	projectSourcesSchema,
-	runCopiesSchema,
 } from "./schemas";
 import { projectSecrets } from "./secrets";
 
@@ -140,47 +133,6 @@ export const projects = {
 		.input(z.object({ projectId: z.string() }))
 		.handler(({ context, input }) =>
 			context.space.listBranches(input.projectId),
-		),
-	/**
-	 * The runs with a worktree or branches left in the project's clone on
-	 * this computer: merged, pushed, or with work only here. The owner's:
-	 * it is this computer's disk. Read-only, no fetch.
-	 */
-	runCopies: ownerProcedure
-		.route({
-			summary:
-				"Lists the runs of a project with a worktree or branches left on this computer.",
-		})
-		.output(output(runCopiesSchema))
-		.input(z.object({ projectId: z.string() }))
-		.handler(({ context, input }) =>
-			context.space.listRunCopies(input.projectId),
-		),
-	/** Removes a run's worktree on this computer. With changes, only with `force`. */
-	removeRunCopy: runProcedure(
-		z.object({ runId: z.string(), force: z.boolean().optional() }),
-	)
-		.use(ownerOnly)
-		.route({
-			summary:
-				"Removes the worktree of an ended run on this computer. Its branches stay.",
-		})
-		.output(output(z.void()))
-		.handler(({ context, input }) =>
-			context.space.removeRunCopy(input.runId, { force: input.force }),
-		),
-	/** Deletes a run's local branches, never a remote one. Unsaved commits only with `force`. */
-	deleteRunBranches: runProcedure(
-		z.object({ runId: z.string(), force: z.boolean().optional() }),
-	)
-		.use(ownerOnly)
-		.route({
-			summary:
-				"Deletes the local branches of an ended run on this computer. Branches on origin stay.",
-		})
-		.output(output(z.void()))
-		.handler(({ context, input }) =>
-			context.space.deleteRunBranches(input.runId, { force: input.force }),
 		),
 	/** What the folder needs before runs can start in it. Read-only. */
 	check: ownerProcedure

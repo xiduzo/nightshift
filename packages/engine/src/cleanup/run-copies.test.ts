@@ -20,19 +20,25 @@ import {
 	withDevice,
 } from "../testing/test-support";
 
-/** What runs leave on this computer, through the engine: the overview, the two actions and the sweep. */
+/**
+ * What runs leave in the clone, through the engine: the scheduled cleanup a
+ * day after a run ends, and the work it keeps out of sight until
+ * `cleanUpAfterDays`.
+ */
 
 const DAY_MS = 24 * 60 * 60_000;
-/** A commit of its own in each run: the folder makes the content differ. */
-const COMMIT =
-	"pwd > work.txt && git add work.txt && git -c user.name=t -c user.email=t@nightshift.invalid -c commit.gpgsign=false commit -q -m work";
+const GIT =
+	"git -c user.name=t -c user.email=t@nightshift.invalid -c commit.gpgsign=false";
+/** A commit of its own in each run (the folder makes the content differ), and one more on each visit of the step. */
+const COMMIT = `pwd >> work.txt && git add work.txt && ${GIT} commit -q -m work`;
 
 let sandbox: Sandbox;
+let origin: string;
 let daemons: AbortController[];
 
 beforeEach(async () => {
 	sandbox = await createSandbox();
-	const origin = join(sandbox.root, "origin.git");
+	origin = join(sandbox.root, "origin.git");
 	await mustGit(sandbox.root, ["init", "-q", "--bare", origin]);
 	await mustGit(sandbox.repoPath, ["remote", "add", "origin", origin]);
 	await mustGit(sandbox.repoPath, ["push", "-q", "origin", "main"]);
@@ -67,6 +73,26 @@ function startDaemon(
 	).space(sandbox.spaceId);
 }
 
+/** Stops every daemon, then starts one `days` later whose first sweep comes once it is ready. */
+async function sweptLater(
+	days: number,
+	settings = defaultRunSettings(),
+): Promise<SpaceEngine> {
+	for (const daemon of daemons) daemon.abort();
+	// The test waits for the sweep's end, not for a time: git is slow on a busy computer.
+	const swept = Promise.withResolvers<void>();
+	const later = startDaemon(
+		{
+			now: () => now() + days * DAY_MS,
+			cleanupDelayMs: 0,
+			cleanupSwept: swept.resolve,
+		},
+		settings,
+	);
+	await swept.promise;
+	return later;
+}
+
 function commandFlow(command: string): Flow {
 	return {
 		version: FLOW_VERSION,
@@ -86,6 +112,17 @@ function commandFlow(command: string): Flow {
 	};
 }
 
+/** Waits until the run is no longer running. */
+async function ended(engine: SpaceEngine, runId: string) {
+	return waitFor(
+		async () => {
+			const run = await engine.getRun(runId);
+			return run.status !== "running" ? run : null;
+		},
+		{ label: "the run to end", timeoutMs: 15_000 },
+	);
+}
+
 /** Starts a quick run of one command and waits for its end. */
 async function runCommand(
 	engine: SpaceEngine,
@@ -96,13 +133,7 @@ async function runCommand(
 		projectId,
 		flow: commandFlow(command),
 	});
-	return waitFor(
-		async () => {
-			const run = await engine.getRun(started.id);
-			return run.status !== "running" ? run : null;
-		},
-		{ label: "the run to end", timeoutMs: 15_000 },
-	);
+	return ended(engine, started.id);
 }
 
 async function removals() {
@@ -113,79 +144,170 @@ async function removals() {
 	return rows.map(parseEventRow) as WorktreeRemoval[];
 }
 
-describe("the overview and the actions of a person", () => {
-	test("lists a run's copy and branch, removes the copy, then deletes the branch on confirmation", async () => {
+/** The refs the cleanup kept, sorted. */
+async function keptRefs(): Promise<string[]> {
+	const out = await mustGit(sandbox.repoPath, [
+		"for-each-ref",
+		"--format=%(refname)",
+		"refs/nightshift/kept/",
+	]);
+	return out.split("\n").filter(Boolean).toSorted();
+}
+
+async function localRunBranches(): Promise<string[]> {
+	const out = await mustGit(sandbox.repoPath, [
+		"branch",
+		"--list",
+		"nightshift/*",
+		"--format=%(refname:short)",
+	]);
+	return out.split("\n").filter(Boolean);
+}
+
+const short = (runId: string) => runId.slice(0, 8);
+
+describe("the scheduled cleanup", () => {
+	test("a day after a run ends, its copy and branches go, and work only here is kept out of sight", async () => {
+		const engine = startDaemon();
+		const project = await engine.addProject({ repoPath: sandbox.repoPath });
+		const empty = await runCommand(engine, project.id, "true");
+		const pushed = await runCommand(
+			engine,
+			project.id,
+			`${COMMIT} && git push -q origin HEAD`,
+		);
+		const unsaved = await runCommand(engine, project.id, COMMIT);
+		const dirty = await runCommand(
+			engine,
+			project.id,
+			`${COMMIT} && git push -q origin HEAD && echo x > loose.txt`,
+		);
+		const unsavedTip = await mustGit(sandbox.repoPath, [
+			"rev-parse",
+			unsaved.branch,
+		]);
+
+		await sweptLater(1.1);
+
+		for (const run of [empty, pushed, unsaved, dirty]) {
+			expect(existsSync(run.worktreePath)).toBe(false);
+		}
+		expect(await localRunBranches()).toEqual([]);
+		expect(await keptRefs()).toEqual(
+			[
+				`refs/nightshift/kept/${short(unsaved.id)}/copy`,
+				`refs/nightshift/kept/${short(unsaved.id)}/heads/${unsaved.branch}`,
+				`refs/nightshift/kept/${short(dirty.id)}/copy`,
+			].toSorted(),
+		);
+		expect(
+			await mustGit(sandbox.repoPath, [
+				"rev-parse",
+				`refs/nightshift/kept/${short(unsaved.id)}/copy`,
+			]),
+		).toBe(unsavedTip);
+		// The change that was not committed is in the kept copy.
+		expect(
+			await mustGit(sandbox.repoPath, [
+				"show",
+				`refs/nightshift/kept/${short(dirty.id)}/copy:loose.txt`,
+			]),
+		).toBe("x");
+		// The branches on origin stay.
+		expect(
+			await mustGit(origin, ["branch", "--list", "nightshift/*"]),
+		).toContain(pushed.branch);
+
+		const byRun = new Map(
+			(await removals()).map((e) => [e.payload.runId, e.payload]),
+		);
+		expect(byRun.get(empty.id)).toEqual({
+			projectId: project.id,
+			runId: empty.id,
+			worktreePath: empty.worktreePath,
+			branches: [empty.branch],
+			by: "cleanup",
+		});
+		expect(byRun.get(unsaved.id)?.kept).toEqual([
+			`refs/nightshift/kept/${short(unsaved.id)}/copy`,
+			`refs/nightshift/kept/${short(unsaved.id)}/heads/${unsaved.branch}`,
+		]);
+		expect(byRun.get(pushed.id)?.kept).toBeUndefined();
+	}, 60_000);
+
+	test("work merged by a squash on origin needs no kept ref", async () => {
 		const engine = startDaemon();
 		const project = await engine.addProject({ repoPath: sandbox.repoPath });
 		const run = await runCommand(engine, project.id, COMMIT);
-		expect(run.status).toBe("finished");
-
-		const overview = await engine.listRunCopies(project.id);
-		expect(overview.defaultBranch).toBe("main");
-		expect(overview.copies).toHaveLength(1);
-		expect(overview.copies[0]).toMatchObject({
-			runId: run.id,
-			active: false,
-			copy: true,
-			changes: 0,
-			safe: false,
-			cleanupAt: null,
-			removed: null,
-			branches: [
-				{ name: run.branch, merged: false, pushed: false, unsaved: 1 },
-			],
-		});
-
-		await expect(engine.deleteRunBranches(run.id)).rejects.toThrow(
-			"Remove the run's copy of the project first",
-		);
-		await engine.removeRunCopy(run.id);
-		expect(existsSync(run.worktreePath)).toBe(false);
-
-		await expect(engine.deleteRunBranches(run.id)).rejects.toThrow(
-			"1 commit of this run is only on this computer",
-		);
-		await engine.deleteRunBranches(run.id, { force: true });
-
-		const after = await engine.listRunCopies(project.id);
-		expect(after.copies).toHaveLength(1);
-		expect(after.copies[0]).toMatchObject({
-			copy: false,
-			branches: [],
-			removed: { by: "person" },
-		});
-		expect((await removals()).map((e) => e.payload)).toEqual([
-			{
-				projectId: project.id,
-				runId: run.id,
-				worktreePath: run.worktreePath,
-				branches: [],
-				by: "person",
-			},
-			{
-				projectId: project.id,
-				runId: run.id,
-				worktreePath: null,
-				branches: [run.branch],
-				by: "person",
-			},
+		await mustGit(sandbox.repoPath, ["merge", "-q", "--squash", run.branch]);
+		await mustGit(sandbox.repoPath, [
+			"-c",
+			"user.name=t",
+			"-c",
+			"user.email=t@nightshift.invalid",
+			"commit",
+			"-q",
+			"-m",
+			"Squashed",
 		]);
-	}, 30_000);
+		await mustGit(sandbox.repoPath, ["push", "-q", "origin", "main"]);
 
-	test("changes that are not committed go only on confirmation", async () => {
+		await sweptLater(2);
+		expect(existsSync(run.worktreePath)).toBe(false);
+		expect(await localRunBranches()).toEqual([]);
+		expect(await keptRefs()).toEqual([]);
+	}, 60_000);
+
+	test("a copy on a branch of its own: the copy is kept, that branch stays", async () => {
 		const engine = startDaemon();
 		const project = await engine.addProject({ repoPath: sandbox.repoPath });
-		const run = await runCommand(engine, project.id, "echo x > loose.txt");
-		const [copy] = (await engine.listRunCopies(project.id)).copies;
-		expect(copy).toMatchObject({ changes: 1, safe: false });
-
-		await expect(engine.removeRunCopy(run.id)).rejects.toThrow(
-			"changes that are not committed",
+		const run = await runCommand(
+			engine,
+			project.id,
+			`git checkout -q -b tune/1110 && ${COMMIT}`,
 		);
-		expect(existsSync(run.worktreePath)).toBe(true);
-		await engine.removeRunCopy(run.id, { force: true });
+		const tip = await mustGit(sandbox.repoPath, ["rev-parse", "tune/1110"]);
+
+		await sweptLater(2);
 		expect(existsSync(run.worktreePath)).toBe(false);
-	}, 30_000);
+		expect(await localRunBranches()).toEqual([]);
+		expect(
+			await mustGit(sandbox.repoPath, ["rev-parse", "refs/heads/tune/1110"]),
+		).toBe(tip);
+		expect(await keptRefs()).toEqual([
+			`refs/nightshift/kept/${short(run.id)}/copy`,
+		]);
+	}, 60_000);
+
+	test("the kept work goes cleanUpAfterDays after the run ended", async () => {
+		const engine = startDaemon();
+		const project = await engine.addProject({ repoPath: sandbox.repoPath });
+		const run = await runCommand(engine, project.id, COMMIT);
+
+		await sweptLater(30);
+		expect(await keptRefs()).toHaveLength(2);
+		await sweptLater(91);
+		expect(await keptRefs()).toEqual([]);
+		const expired = (await removals()).find((e) => e.payload.expired);
+		expect(expired?.payload).toMatchObject({
+			runId: run.id,
+			worktreePath: null,
+			branches: [],
+			by: "cleanup",
+		});
+		expect(expired?.payload.expired).toHaveLength(2);
+	}, 60_000);
+
+	test("does nothing when it is off, or before a day has passed", async () => {
+		const engine = startDaemon();
+		const project = await engine.addProject({ repoPath: sandbox.repoPath });
+		const run = await runCommand(engine, project.id, COMMIT);
+		await sweptLater(0.9);
+		await sweptLater(120, { ...defaultRunSettings(), cleanUpRuns: false });
+		expect(await removals()).toEqual([]);
+		expect(existsSync(run.worktreePath)).toBe(true);
+		expect(await localRunBranches()).toEqual([run.branch]);
+	}, 60_000);
 
 	test("never touches a run that is still open", async () => {
 		const engine = startDaemon();
@@ -215,110 +337,9 @@ describe("the overview and the actions of a person", () => {
 			async () => (await engine.getRun(started.id)).status === "waiting",
 			{ label: "the Gate" },
 		);
-		const [copy] = (await engine.listRunCopies(project.id)).copies;
-		expect(copy).toMatchObject({ active: true, cleanupAt: null });
-		await expect(
-			engine.removeRunCopy(started.id, { force: true }),
-		).rejects.toThrow("This run is still going");
-		await expect(
-			engine.deleteRunBranches(started.id, { force: true }),
-		).rejects.toThrow();
+		await sweptLater(30);
 		expect(existsSync(started.worktreePath)).toBe(true);
-	}, 30_000);
-});
-
-describe("the scheduled cleanup", () => {
-	test("removes old runs whose work is merged or pushed, and keeps the rest", async () => {
-		const engine = startDaemon();
-		const project = await engine.addProject({ repoPath: sandbox.repoPath });
-		const empty = await runCommand(engine, project.id, "true");
-		const pushed = await runCommand(
-			engine,
-			project.id,
-			`${COMMIT} && git push -q origin HEAD`,
-		);
-		const unsaved = await runCommand(engine, project.id, COMMIT);
-		const dirty = await runCommand(
-			engine,
-			project.id,
-			`${COMMIT} && git push -q origin HEAD && echo x > loose.txt`,
-		);
-		const [copy] = (await engine.listRunCopies(project.id)).copies.filter(
-			(c) => c.runId === pushed.id,
-		);
-		expect(copy?.safe).toBe(true);
-		expect(copy?.cleanupAt).toBeGreaterThan(now() + 89 * DAY_MS);
-		for (const daemon of daemons) daemon.abort();
-
-		// A restart 91 days later: the first sweep comes once the engine is ready.
-		// The test waits for its end, not for a time: git is slow on a busy computer.
-		const swept = Promise.withResolvers<void>();
-		const later = startDaemon({
-			now: () => now() + 91 * DAY_MS,
-			cleanupDelayMs: 0,
-			cleanupSwept: swept.resolve,
-		});
-		await swept.promise;
-
-		expect(existsSync(empty.worktreePath)).toBe(false);
-		expect(existsSync(pushed.worktreePath)).toBe(false);
-		expect(existsSync(unsaved.worktreePath)).toBe(true);
-		expect(existsSync(dirty.worktreePath)).toBe(true);
-		const local = await mustGit(sandbox.repoPath, [
-			"branch",
-			"--list",
-			"nightshift/*",
-			"--format=%(refname:short)",
-		]);
-		expect(local.split("\n").toSorted()).toEqual(
-			[unsaved.branch, dirty.branch].toSorted(),
-		);
-		// The branch on origin stays.
-		expect(
-			await mustGit(join(sandbox.root, "origin.git"), [
-				"branch",
-				"--list",
-				pushed.branch,
-			]),
-		).toContain(pushed.branch);
-		expect(
-			(await removals())
-				.map((e) => `${e.payload.runId} ${e.payload.by}`)
-				.toSorted(),
-		).toEqual([`${empty.id} cleanup`, `${pushed.id} cleanup`].toSorted());
-
-		const kept = await later.listRunCopies(project.id);
-		expect(
-			kept.copies
-				.filter((c) => c.removed === null)
-				.map((c) => c.runId)
-				.toSorted(),
-		).toEqual([unsaved.id, dirty.id].toSorted());
-	}, 30_000);
-
-	test("does nothing when it is off, or before the days have passed", async () => {
-		const engine = startDaemon();
-		const project = await engine.addProject({ repoPath: sandbox.repoPath });
-		const run = await runCommand(engine, project.id, "true");
-		for (const daemon of daemons) daemon.abort();
-
-		const early = Promise.withResolvers<void>();
-		const off = Promise.withResolvers<void>();
-		startDaemon({
-			now: () => now() + 89 * DAY_MS,
-			cleanupDelayMs: 0,
-			cleanupSwept: early.resolve,
-		});
-		startDaemon(
-			{
-				now: () => now() + 120 * DAY_MS,
-				cleanupDelayMs: 0,
-				cleanupSwept: off.resolve,
-			},
-			{ ...defaultRunSettings(), cleanUpRuns: false },
-		);
-		await Promise.all([early.promise, off.promise]);
+		expect(await localRunBranches()).toEqual([started.branch]);
 		expect(await removals()).toEqual([]);
-		expect(existsSync(run.worktreePath)).toBe(true);
-	}, 30_000);
+	}, 60_000);
 });
