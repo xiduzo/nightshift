@@ -39,6 +39,7 @@ import {
 } from "../placement";
 import { deriveSteps, lastHarnessSession } from "../read";
 import {
+	isTestRun,
 	RunRefusal,
 	refuseUnless,
 	WALKED_ELSEWHERE,
@@ -411,7 +412,7 @@ export function createRunActions(deps: RunActionsDeps) {
 				.capabilities();
 			if (
 				(has.flowVersion ?? UNADVERTISED_FLOW_VERSION) < snapshotVersion(row) ||
-				(runState.test !== null && has.testRuns !== true)
+				(isTestRun(runState) && has.testRuns !== true)
 			) {
 				throw new Refusal("conflict", olderNightShift(target.name));
 			}
