@@ -1,7 +1,7 @@
 /**
  * The query and mutation options of the agents: Agent Profiles, harnesses,
  * Connections and their Secrets, CLI Tools, deciders, and the guided setup
- * of an agent.
+ * of an agent and of a decider.
  */
 
 import type {
@@ -9,6 +9,8 @@ import type {
 	AgentSetupJob,
 	AgentSetupStatus,
 	CheckTarget,
+	DeciderSetupJob,
+	DeciderSetupStatus,
 	HarnessRowName,
 	ModelProfileRow,
 	ProfileRow,
@@ -225,4 +227,38 @@ export const agentSetupMutations = {
 	sendCode: orpc.agentSetup.sendCode.mutationOptions,
 	/** Stops an install or a sign-in. */
 	cancel: orpc.agentSetup.cancel.mutationOptions,
+};
+
+/** The job states of a decider setup that still run (`deciderRuns` in `setup/decider-state.ts`). */
+const DECIDER_RUNNING: ReadonlySet<DeciderSetupJob["state"]> = new Set([
+	"installing",
+	"starting",
+	"downloading",
+]);
+
+/** The setup of a decider on this computer (Q22): Local with Ollama, or a TypeSafe key. */
+export const deciderSetupQueries = {
+	/**
+	 * Which decider new Decision nodes start on, whether Ollama and its
+	 * model are here, and how a setup goes. Asks again every second while a
+	 * job runs.
+	 */
+	status: () => ({
+		...orpc.deciderSetup.status.queryOptions(),
+		refetchInterval: (query: { state: { data?: DeciderSetupStatus } }) =>
+			query.state.data && DECIDER_RUNNING.has(query.state.data.job.state)
+				? SETUP_POLL_MS
+				: false,
+	}),
+};
+
+export const deciderSetupMutations = {
+	/** Installs Ollama with Homebrew, after the person confirms, then sets up the local decider. */
+	installOllama: orpc.deciderSetup.installOllama.mutationOptions,
+	/** Starts Ollama, downloads the model, and makes it the decider. */
+	useLocal: orpc.deciderSetup.useLocal.mutationOptions,
+	/** Saves the TypeSafe key, and makes TypeSafe Jev the decider. */
+	useTypesafe: orpc.deciderSetup.useTypesafe.mutationOptions,
+	/** Stops the install or the download. */
+	cancel: orpc.deciderSetup.cancel.mutationOptions,
 };

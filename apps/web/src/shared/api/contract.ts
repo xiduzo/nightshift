@@ -46,6 +46,10 @@ export type AgentSetupStatus = ApiOutputs["agentSetup"]["status"];
 export type AgentSetupView = AgentSetupStatus["agents"][number];
 export type AgentSetupJob = AgentSetupView["job"];
 
+/** The setup of a decider on this computer (Q22): Local with Ollama, or a TypeSafe key. */
+export type DeciderSetupStatus = ApiOutputs["deciderSetup"]["status"];
+export type DeciderSetupJob = DeciderSetupStatus["job"];
+
 /** One of the owner's other Devices: its profiles and secret names, read-only. */
 export type OtherDevice = ApiOutputs["devices"]["others"][number];
 /** What a merge of this computer's Personal into its home Host's does. */

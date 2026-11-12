@@ -188,7 +188,7 @@ function SetupNoteAlert({ note }: { note: SetupNote }) {
 }
 
 /** A "Details" section that opens: exact technical text, each with a copy button. */
-function SetupDetails({
+export function SetupDetails({
 	facts,
 }: {
 	facts: readonly { label: string; value: string }[];
@@ -430,8 +430,8 @@ export function BrowserStep({
 	);
 }
 
-/** Stops the install or the sign-in that runs. */
-function CancelButton({
+/** Stops the install, the sign-in or the download that runs. */
+export function CancelButton({
 	onCancel,
 	cancelling,
 }: {

@@ -13,12 +13,15 @@ import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { CircleAlertIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { ollamaQueries, settingsQueries } from "@/features/settings/queries";
 import type {
 	AgentSetupJob,
 	AgentSetupStatus,
 	AgentSetupView,
+	DeciderSetupJob,
+	DeciderSetupStatus,
 	HarnessRowName,
 } from "@/shared/api";
 import { itemOf } from "../agents-selection";
@@ -26,10 +29,15 @@ import {
 	agentSetupMutations,
 	agentSetupQueries,
 	connectionQueries,
+	deciderQueries,
+	deciderSetupMutations,
+	deciderSetupQueries,
 	harnessQueries,
 	profileQueries,
 	programQueries,
 } from "../queries";
+import { justChosen, offerDecider, readyText } from "./decider-state";
+import { DeciderStep } from "./decider-step";
 import { justReady, pickAgent, setupRuns, setupStep } from "./setup-state";
 import {
 	BrowserStep,
@@ -43,6 +51,8 @@ import {
  * The guided setup of an agent on this computer (ADR 25): choose Claude
  * Code or Codex, install it after a question, sign in in the browser.
  * Night Shift then adds the agent with a profile, and the profile opens.
+ * Then, while no decider was chosen, the decider step (Q22): Local or
+ * TypeSafe Jev, or Skip.
  */
 
 /** What the setup can do here, and each agent's job. Quiet when it fails: what needs it hides. */
@@ -122,10 +132,57 @@ function useSetupEnd(
 	}, [status, queryClient, navigate, onReady]);
 }
 
+/** The setup of a decider: the choices, and how a job goes. Quiet when it fails. */
+function useDeciderSetupStatus() {
+	return useQuery({
+		...deciderSetupQueries.status(),
+		meta: { quietErrors: true },
+	});
+}
+
+/** After a decider is chosen: a toast, and the lists that name it read again. */
+function useDeciderChosen() {
+	const queryClient = useQueryClient();
+	return useCallback(
+		(decider: string) => {
+			toast.success("The decider is ready", {
+				description: readyText(decider),
+			});
+			for (const queryKey of [
+				settingsQueries.all(),
+				profileQueries.all(),
+				deciderQueries.list().queryKey,
+				ollamaQueries.all(),
+			]) {
+				void queryClient.invalidateQueries({ queryKey });
+			}
+		},
+		[queryClient],
+	);
+}
+
+/**
+ * Follows the decider job. When a download ends with the decider ready,
+ * `onChosen` says so, also while the dialog is closed.
+ */
+function useDeciderEnd(
+	status: DeciderSetupStatus | undefined,
+	onChosen: (decider: string) => void,
+) {
+	const seen = useRef<DeciderSetupJob | undefined>(undefined);
+	useEffect(() => {
+		if (!status) return;
+		const before = seen.current;
+		seen.current = status.job;
+		const ready = justChosen(before, status.job);
+		if (ready) onChosen(ready.decider);
+	}, [status, onChosen]);
+}
+
 /**
  * The setup dialog. `harness` picks the agent it opens on. It follows a
- * job that runs, also while it is closed, and closes when the agent is
- * ready.
+ * job that runs, also while it is closed. When the agent is ready, it
+ * offers the decider step, or closes.
  */
 export function AgentSetupDialog({
 	open,
@@ -137,20 +194,114 @@ export function AgentSetupDialog({
 	harness?: HarnessRowName;
 }) {
 	const status = useAgentSetupStatus();
-	useSetupEnd(status.data, () => onOpenChange(false));
+	const decider = useDeciderSetupStatus();
+	const [phase, setPhase] = useState<"agent" | "decider">("agent");
+	const change = (next: boolean) => {
+		if (!next) setPhase("agent");
+		onOpenChange(next);
+	};
+	useSetupEnd(status.data, () => {
+		if (open && offerDecider(decider.data)) setPhase("decider");
+		else change(false);
+	});
+	const chosen = useDeciderChosen();
+	const onChosen = useCallback(
+		(name: string) => {
+			chosen(name);
+			if (phase === "decider") {
+				setPhase("agent");
+				onOpenChange(false);
+			}
+		},
+		[chosen, phase, onOpenChange],
+	);
+	useDeciderEnd(decider.data, onChosen);
 	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
+		<Dialog open={open} onOpenChange={change}>
 			<DialogContent className="sm:max-w-lg">
-				{open ? (
+				{!open ? null : phase === "decider" && decider.data ? (
+					<DeciderBody
+						status={decider.data}
+						onCheckAgain={() => decider.refetch()}
+						checking={decider.isFetching}
+						onChosen={onChosen}
+						onSkip={() => change(false)}
+					/>
+				) : (
 					<SetupBody
 						status={status.data}
 						loading={status.isPending}
 						error={status.error?.message ?? null}
 						wanted={harness}
 					/>
-				) : null}
+				)}
 			</DialogContent>
 		</Dialog>
+	);
+}
+
+/** The decider step, with its actions: each puts the status it answers in the cache. */
+function DeciderBody({
+	status,
+	onCheckAgain,
+	checking,
+	onChosen,
+	onSkip,
+}: {
+	status: DeciderSetupStatus;
+	onCheckAgain: () => void;
+	checking: boolean;
+	/** TypeSafe Jev is ready at once: no job to follow. */
+	onChosen: (decider: string) => void;
+	onSkip: () => void;
+}) {
+	const queryClient = useQueryClient();
+	const put = (next: DeciderSetupStatus) =>
+		queryClient.setQueryData(deciderSetupQueries.status().queryKey, next);
+	const install = useMutation(
+		deciderSetupMutations.installOllama({ onSuccess: put }),
+	);
+	const local = useMutation(deciderSetupMutations.useLocal({ onSuccess: put }));
+	const typesafe = useMutation(
+		deciderSetupMutations.useTypesafe({
+			onSuccess: (next) => {
+				put(next);
+				if (next.job.state === "ready") onChosen(next.job.decider);
+			},
+		}),
+	);
+	const cancel = useMutation(
+		deciderSetupMutations.cancel({
+			onSuccess: put,
+			onError: (error) => toast.error(`Not stopped: ${error.message}`),
+		}),
+	);
+	const acting = [install, local, typesafe];
+	return (
+		<DeciderStep
+			status={status}
+			onSkip={onSkip}
+			actions={{
+				installOllama: () => {
+					for (const m of acting) m.reset();
+					install.mutate(undefined);
+				},
+				useLocal: () => {
+					for (const m of acting) m.reset();
+					local.mutate(undefined);
+				},
+				useTypesafe: (key) => {
+					for (const m of acting) m.reset();
+					typesafe.mutate(key === null ? {} : { key });
+				},
+				cancel: () => cancel.mutate(undefined),
+				checkAgain: onCheckAgain,
+				pending: acting.some((m) => m.isPending),
+				checking,
+				cancelling: cancel.isPending,
+				error: acting.find((m) => m.error)?.error?.message ?? null,
+			}}
+		/>
 	);
 }
 

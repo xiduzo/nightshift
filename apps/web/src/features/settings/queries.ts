@@ -36,10 +36,18 @@ export const usageMutations = {
 	resetId: usage.resetId,
 };
 
-/** The Ollama search by meaning uses: where it is, its models, a download. */
+/** The Ollama search by meaning and Decision nodes use: where it is, its models, a download. */
 export const ollamaQueries = {
-	/** Whether it answers, has the model, and how far a download is. */
-	status: () => orpc.ollama.status.queryOptions(),
+	/**
+	 * Whether it answers, has a model, and how far its download is: the
+	 * embedding model, unless `model` names another.
+	 */
+	/** Every Ollama query. Invalidate it after Ollama or a model changed. */
+	all: () => orpc.ollama.key(),
+	status: (model?: string) =>
+		model
+			? orpc.ollama.status.queryOptions({ input: { model } })
+			: orpc.ollama.status.queryOptions(),
 	/** The embedding models it has. */
 	models: () => orpc.ollama.models.queryOptions(),
 };

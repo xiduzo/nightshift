@@ -27,6 +27,18 @@ const AGENT_KEYS = [
 	"decisionDecider",
 ] as const;
 
+/**
+ * What the decider field says. Until the person chooses one, the default
+ * follows the TypeSafe key: TypeSafe Jev with it, Ollama without it.
+ */
+function deciderNote(data: SettingsView): string {
+	const what = "The model a new Decision node uses to choose.";
+	if (data.fields.decisionDecider.source === "saved") return what;
+	return data.values.decisionDecider === "typesafe"
+		? `${what} Your TypeSafe key makes TypeSafe Jev the default.`
+		: `${what} Without a TypeSafe key, the default is Ollama on this computer.`;
+}
+
 export function AgentDefaultsCard({ data }: { data: SettingsView }) {
 	const form = useSettingsForm(data, AGENT_KEYS, {
 		title: "New Agent nodes",
@@ -97,7 +109,7 @@ export function AgentDefaultsCard({ data }: { data: SettingsView }) {
 									form={form}
 									settingKey="decisionDecider"
 									label="Decider"
-									description="The model a new Decision node uses to choose."
+									description={deciderNote(data)}
 									options={deciderOptions}
 								/>
 							</div>

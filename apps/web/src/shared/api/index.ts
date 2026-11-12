@@ -69,6 +69,8 @@ export type {
 	CliTool,
 	Connection,
 	ConnectionList,
+	DeciderSetupJob,
+	DeciderSetupStatus,
 	Effort,
 	FoundProgram,
 	HarnessRow,

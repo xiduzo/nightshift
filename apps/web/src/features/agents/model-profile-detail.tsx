@@ -41,6 +41,7 @@ import {
 	addressProblems,
 	sameAddress,
 } from "./model-address-draft";
+import { OllamaModelLine } from "./ollama-model";
 import { ProfileUsedIn } from "./profile-sections";
 import { deciderQueries, profileMutations, profileQueries } from "./queries";
 
@@ -164,6 +165,14 @@ export function ModelProfileDetail({
 			? `${decider.defaultModel} to decide, ${decider.value.defaultModel} to make a value`
 			: decider.defaultModel
 		: "";
+	/**
+	 * The saved model of a profile on Ollama on this computer: the page
+	 * offers its download. A draft that changes waits for its save.
+	 */
+	const localModel =
+		profile?.decider === "ollama" && !profile.address && !dirty
+			? profile.model?.trim() || decider?.defaultModel
+			: undefined;
 
 	return (
 		<DetailShell
@@ -345,6 +354,7 @@ export function ModelProfileDetail({
 								: "Leave it empty to use the decider's default model."}
 						</FieldDescription>
 					</Field>
+					{localModel ? <OllamaModelLine model={localModel} /> : null}
 				</FieldGroup>
 			</DetailSection>
 
