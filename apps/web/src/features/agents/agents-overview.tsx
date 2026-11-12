@@ -318,8 +318,23 @@ function UsedIn({ usedBy }: { usedBy: ProfileRow["usedBy"] }) {
 	);
 }
 
+/** A mode other than auto, short, so two profiles that differ only in it do not look the same. */
+const MODE_NOTES: Partial<
+	Record<NonNullable<AgentProfileRow["permissionMode"]>, string>
+> = {
+	plan: "plan only",
+	acceptEdits: "accepts edits",
+	default: "asks for each tool",
+	bypassPermissions: "bypasses permissions",
+};
+
 function profileSummary(profile: AgentProfileRow): string {
-	return [harnessInfo(profile.harness).label, profile.model, profile.effort]
+	return [
+		harnessInfo(profile.harness).label,
+		profile.model,
+		profile.effort,
+		profile.permissionMode && MODE_NOTES[profile.permissionMode],
+	]
 		.filter(Boolean)
 		.join(" · ");
 }
