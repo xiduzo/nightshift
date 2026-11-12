@@ -13,11 +13,7 @@ export {
 	isSavable,
 	type PlaceDevice,
 } from "./check";
-export {
-	type CliToolRef,
-	commandOf,
-	programsWithoutLogin,
-} from "./cli-programs";
+export { type CliToolRef, programsWithoutLogin } from "./cli-programs";
 export { copyNodes, type FlowClip, pasteNodes } from "./clipboard";
 export { BRANCH_RUN_FIELDS, type FolderNeed, folderNeeds } from "./folder";
 export {

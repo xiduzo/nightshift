@@ -5,7 +5,6 @@
  */
 
 import {
-	commandOf,
 	type NodeOption,
 	setInputs,
 	setVariables,
@@ -21,7 +20,7 @@ import {
 	type FlowVariableDef,
 	nodeOutcomes,
 } from "../flow";
-import type { VariableWrite } from "../nodes";
+import { type VariableWrite, waitCommandOf } from "../nodes";
 import { typedOutput } from "../shapes";
 import type {
 	SuggestedOutcome,
@@ -45,6 +44,21 @@ export function promptOf(node: FlowNode): string | undefined {
 		default:
 			return undefined;
 	}
+}
+
+/**
+ * The command a `command` suggestion rewrites: a Command's, the one a Wait
+ * runs until it passes, or the one that prints a Call node's list.
+ * Undefined: the node has no such field, so it takes no command
+ * suggestion. An Agent's check and a Service's commands take none either.
+ */
+export function suggestedCommandOf(node: FlowNode): string | undefined {
+	if (node.type === "command") return node.command;
+	if (node.type === "wait") return waitCommandOf(node.until)?.command;
+	if (node.type === "call" && node.each?.source.kind === "command") {
+		return node.each.source.command;
+	}
+	return undefined;
 }
 
 /** `text` with `range` replaced by `replacement`. A range past the end is cut to the text. */
@@ -79,7 +93,7 @@ export function takesSuggestion(node: FlowNode, kind: SuggestionKind): boolean {
 		case "expression":
 			return node.type === "value" && node.by === "rule";
 		case "command":
-			return commandOf(node) !== undefined;
+			return suggestedCommandOf(node) !== undefined;
 		case "arguments":
 			return node.type === "tool" && node.tool.trim() !== "";
 		case "description":

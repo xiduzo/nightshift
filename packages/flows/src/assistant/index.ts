@@ -16,6 +16,7 @@ export {
 	outcomeChanges,
 	outputChanges,
 	ruleChanges,
+	suggestedCommandOf,
 	takesSuggestion,
 	type WriteChange,
 	writeChanges,

@@ -22,6 +22,7 @@ const flow: Flow = flowSchema.parse({
 			position: { x: 0, y: 0 },
 			profile: "worker",
 			prompt: "Review {{pr}}.",
+			check: "npm test",
 		},
 		{
 			id: "gate",
@@ -79,6 +80,14 @@ const flow: Flow = flowSchema.parse({
 			flow: "trace",
 			each: { source: { kind: "json", value: "[1, 2]" } },
 		},
+		{
+			id: "app",
+			type: "service",
+			position: { x: 0, y: 0 },
+			start: "npm start",
+			ready: { command: "curl -f localhost:3000" },
+			stop: "npm stop",
+		},
 	],
 	edges: [
 		{ id: "e1", from: "review", outcome: "pass", to: "gate" },
@@ -107,6 +116,8 @@ describe("takesSuggestion", () => {
 		expect(takes("issue")).toEqual(["arguments"]);
 		expect(takes("traces")).toEqual(["command"]);
 		expect(takes("listed")).toEqual([]);
+		// Suggest writes no Agent check and no Service command.
+		expect(takes("app")).toEqual([]);
 	});
 
 	test("the description and the inputs belong to the flow, without a node", () => {

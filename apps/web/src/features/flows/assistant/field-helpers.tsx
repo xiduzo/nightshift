@@ -8,7 +8,6 @@
 import {
 	type AgentNode,
 	argumentChanges,
-	commandOf,
 	type DecisionNode,
 	type FlowNode,
 	inputChanges,
@@ -17,6 +16,7 @@ import {
 	ruleChanges,
 	type Suggestion,
 	type SuggestionKind,
+	suggestedCommandOf,
 	type TextRange,
 	type ToolNode,
 	type ValueNode,
@@ -444,7 +444,7 @@ export function CommandSuggest({ node }: { node: FlowNode }) {
 				suggestion.kind === "command" ? (
 					<TextPreview
 						label="The command becomes"
-						before={commandOf(node) ?? ""}
+						before={suggestedCommandOf(node) ?? ""}
 						after={suggestion.command}
 					/>
 				) : null
