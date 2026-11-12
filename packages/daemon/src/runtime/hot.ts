@@ -92,7 +92,29 @@ export type HotRegistry = KeptDevices &
 		nightshiftFacts?: Timer;
 		/** The stop of the newest daemon: the signal handlers call it. */
 		nightshiftStop?: () => Promise<void>;
+		/** The latest start of a daemon, ended or failed (`oneStartAtATime`). */
+		nightshiftDaemonStart?: Promise<void>;
 	};
+
+/**
+ * Runs `start` once the daemon's start before it in this process ended,
+ * also when it failed. Two saves in a row reload twice. Without this, both
+ * starts take the same slots at once: each makes a kept piece (two
+ * leases), and what one of them made in a replaced or handed-over slot is
+ * never stopped (a second scheduler, a second Link to each Host).
+ */
+export function oneStartAtATime<T>(
+	registry: Pick<HotRegistry, "nightshiftDaemonStart">,
+	start: () => Promise<T>,
+): Promise<T> {
+	const before = registry.nightshiftDaemonStart ?? Promise.resolve();
+	const next = before.then(start);
+	registry.nightshiftDaemonStart = next.then(
+		() => {},
+		() => {},
+	);
+	return next;
+}
 
 export const hot = globalThis as HotRegistry;
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { hotSlots, stopOlderKnowledge } from "./hot";
+import { hotSlots, oneStartAtATime, stopOlderKnowledge } from "./hot";
 
 /**
  * `bun --hot` makes the daemon again on each reload, in the same process:
@@ -162,5 +162,54 @@ describe("the slots of a daemon across reloads", () => {
 		});
 		await slots.stop();
 		expect(released).toBe(0);
+	});
+});
+
+describe("two reloads at once (two saves in a row)", () => {
+	type Starts = Registry & { nightshiftDaemonStart?: Promise<void> };
+
+	/** A start whose stop and make take a while, as the daemon's do. */
+	function slowStart(registry: Starts, id: number, made: Worker[]) {
+		return oneStartAtATime(registry, async () => {
+			const slots = hotSlots(registry);
+			return slots.replace(
+				"worker",
+				async () => {
+					await Bun.sleep(20);
+					const worker = { id, stopped: false };
+					made.push(worker);
+					return worker;
+				},
+				async (before) => {
+					await Bun.sleep(20);
+					before.stopped = true;
+				},
+			);
+		});
+	}
+
+	test("the second start waits for the first: every worker but the newest stops", async () => {
+		const first = { id: 1, stopped: false };
+		const registry: Starts = { worker: first };
+		const made: Worker[] = [];
+		await Promise.all([
+			slowStart(registry, 2, made),
+			slowStart(registry, 3, made),
+		]);
+		expect(first.stopped).toBe(true);
+		expect(made.map((w) => [w.id, w.stopped])).toEqual([
+			[2, true],
+			[3, false],
+		]);
+		expect(registry.worker?.id).toBe(3);
+	});
+
+	test("a start that failed does not hold up the next one", async () => {
+		const registry: Starts = {};
+		const failed = oneStartAtATime(registry, async () => {
+			throw new Error("The start failed.");
+		});
+		await expect(failed).rejects.toThrow("The start failed.");
+		expect(await oneStartAtATime(registry, async () => "next")).toBe("next");
 	});
 });

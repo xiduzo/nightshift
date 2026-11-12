@@ -306,9 +306,11 @@ describe("the devices runtime across a reload", () => {
 		expect(stopped).toEqual(["links", "engine"]);
 		expect(kept.nightshiftDevices?.hub).toBe(hub);
 		const slots: Record<string, unknown> = { ...kept };
-		expect(Object.keys(slots).filter((name) => slots[name])).toEqual([
-			"nightshiftDevices",
-		]);
+		expect(
+			Object.keys(slots)
+				.filter((name) => slots[name])
+				.sort(),
+		).toEqual(["nightshiftDevices", "nightshiftDevicesStart"]);
 	});
 
 	test("the Links and the presence sweep before it stop: one of each runs", async () => {
@@ -337,6 +339,29 @@ describe("the devices runtime across a reload", () => {
 			"sync.stream": 1,
 			"devices.work": 1,
 		});
+	});
+
+	test("two reloads at once (two saves in a row): one runtime keeps its Links, the others stop", async () => {
+		await startB();
+		await streamsOn();
+
+		// The second save reloads while the first reload still waits for the
+		// runtime before it to let go.
+		const [second, third] = await Promise.all([startB(), startB()]);
+		const sweeps = new Map<DevicesRuntime, number>([
+			[second, 0],
+			[third, 0],
+		]);
+		for (const runtime of [second, third]) {
+			runtime.engine.devices.sweep = async () => {
+				sweeps.set(runtime, (sweeps.get(runtime) ?? 0) + 1);
+			};
+		}
+		await Bun.sleep(500);
+		expect(open.get("sync.stream")).toBe(1);
+		expect(open.get("devices.work")).toBe(1);
+		// Only the newest runtime sweeps: the other one was released.
+		expect([...sweeps.values()].filter((n) => n > 0)).toHaveLength(1);
 	});
 
 	test("a Device that takes work again wakes the steps of the new engine, not of the engine before", async () => {

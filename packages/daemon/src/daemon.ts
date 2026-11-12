@@ -112,6 +112,7 @@ import {
 	holdLease,
 	hot,
 	hotSlots,
+	oneStartAtATime,
 	onProcessCrashed,
 	processDatabase,
 	secretFiles,
@@ -194,10 +195,18 @@ export type Daemon = DaemonServe & {
  * serves. It does not listen: `startDaemon` does. One per process: `bun
  * --hot` calls it again on each reload, and each piece that must have one
  * owner names its slot and lifecycle here (`hotSlots`, `runtime/hot.ts`).
+ * Two reloads at once start one after the other (`oneStartAtATime`).
  */
-export async function createDaemon(
+export function createDaemon(
 	env: DaemonEnv,
 	options: DaemonOptions = {},
+): Promise<Daemon> {
+	return oneStartAtATime(hot, () => makeDaemon(env, options));
+}
+
+async function makeDaemon(
+	env: DaemonEnv,
+	options: DaemonOptions,
 ): Promise<Daemon> {
 	// First: an error nothing caught must never stop the timers (the lease
 	// heartbeat, the scheduler). `nightshift serve` also exits on one.

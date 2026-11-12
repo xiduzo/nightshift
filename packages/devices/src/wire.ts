@@ -125,6 +125,8 @@ export type DevicesRuntime = {
  */
 export type KeptDevices = {
 	nightshiftDevices?: Handover;
+	/** The latest start, ended or failed: the next start waits for it (`startDevices`). */
+	nightshiftDevicesStart?: Promise<void>;
 	/**
 	 * A daemon from before the devices runtime kept these apart. The first
 	 * runtime stops them as a handover does, and keeps the work hub.
@@ -279,8 +281,25 @@ export type DevicesDeps = {
  * the reload (the work hub, the applied commands, the calls served as a
  * placed Device, the Offers in use, the Devices online and the pairings
  * in progress) and binds them to its own engine.
+ *
+ * One start at a time: two saves in a row reload twice, and the second
+ * start waits until the first one ends. Else both take over the same
+ * runtime, and the one that sets its `release` first is never released:
+ * its Links pull from the Host beside the next runtime's, and its
+ * engine's copy of the runs takes the rows first.
  */
-export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
+export function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
+	const before = deps.kept.nightshiftDevicesStart;
+	const start = (before ?? Promise.resolve()).then(() => startNow(deps));
+	// A start that failed ends the turn too: the next one takes over.
+	deps.kept.nightshiftDevicesStart = start.then(
+		() => {},
+		() => {},
+	);
+	return start;
+}
+
+async function startNow(deps: DevicesDeps): Promise<DevicesRuntime> {
 	const { db, self, ownerId, local } = deps;
 	// What can fail comes first: then the runtime before keeps running.
 	const reach = reachFor(deps.settings.current());

@@ -22,6 +22,7 @@ export {
 	type HotSlots,
 	hot,
 	hotSlots,
+	oneStartAtATime,
 	stopOlderDocuments,
 	stopOlderKnowledge,
 } from "./hot";
