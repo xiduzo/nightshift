@@ -1,5 +1,6 @@
 import { ORPCError } from "@orpc/client";
 
+import { isMissingOnHost } from "../api";
 import { startsOnTime } from "./plan";
 import { isPausedTonight } from "./tonight";
 import type { ScheduleList, ScheduleSummary } from "./types";
@@ -74,22 +75,10 @@ export type NudgeProblem =
 	| "gone"
 	| "other";
 
-/** Whether the error is the Host's 404 for a path it does not know: no error body of its own. */
-function isUnknownProcedure(error: ORPCError<string, unknown>): boolean {
-	const { data } = error;
-	return (
-		error.code === "NOT_FOUND" &&
-		typeof data === "object" &&
-		data !== null &&
-		"status" in data &&
-		"headers" in data
-	);
-}
-
 /** The problem of an error of a schedule nudge. */
 export function nudgeProblem(error: unknown): NudgeProblem {
 	if (!(error instanceof ORPCError)) return "other";
-	if (isUnknownProcedure(error)) return "host-outdated";
+	if (isMissingOnHost(error)) return "host-outdated";
 	switch (error.code) {
 		case "CONFLICT":
 			return "busy";

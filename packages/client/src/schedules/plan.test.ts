@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { ORPCError } from "@orpc/client";
 
+import { createApiClient } from "../api";
 import { nudgeProblem, scheduleNudges, withPause } from "./nudges";
 import { type PlannedSchedule, schedulePlan } from "./plan";
 import type { ScheduleSummary } from "./types";
@@ -125,6 +126,31 @@ describe("nudgeProblem", () => {
 			data: { status: 404, headers: {} },
 		});
 		expect(nudgeProblem(error)).toBe("host-outdated");
+	});
+
+	test("an older Host's answer on the wire is an outdated Host", async () => {
+		// Hono's own answer when no route matches: a plain 404, no oRPC error.
+		const client = createApiClient({
+			baseUrl: "http://localhost:3000",
+			fetch: async () =>
+				new Response("404 Not Found", {
+					status: 404,
+					headers: { "content-type": "text/plain; charset=UTF-8" },
+				}),
+		});
+		const error = await client.schedules
+			.pauseTonight({ projectId: "p1", scheduleId: "s1" })
+			.catch((error: unknown) => error);
+		expect(nudgeProblem(error)).toBe("host-outdated");
+	});
+
+	test("a NOT_FOUND the procedure declares is its own, whatever its data holds", () => {
+		const declared = new ORPCError("NOT_FOUND", {
+			defined: true,
+			status: 404,
+			data: { status: 404, headers: {} },
+		});
+		expect(nudgeProblem(declared)).toBe("gone");
 	});
 
 	test("the Host's own refusals keep their meaning", () => {
