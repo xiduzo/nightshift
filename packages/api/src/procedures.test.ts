@@ -411,7 +411,7 @@ const ROUTES: Route[] = [
 	route("gates.answered", undefined, "session"),
 	route("gates.resolve", { ...run, stepId: "s", choice: "yes" }, { gate: ["resolve"] }, "space.act.answer", ["r", { kind: "answer", stepId: "s", choice: "yes", via: "_OTHER" }]),
 	// The assistant.
-	route("assistant.suggest", { ...inEditor, kind: "prompt", nodeId: "agent" }, "owner", "assistant.suggest", [like({ kind: "prompt", nodeId: "agent" }), any]),
+	route("assistant.suggest", { ...inEditor, kind: "prompt", nodeId: "agent" }, "owner", "assistant.suggest", [like({ kind: "prompt", nodeId: "agent" }), any, { spaceId: SPACE, personId: PERSON }]),
 	route("assistant.chat", { ...inEditor, message: "Hi." }, "owner", "assistant.chat", [like({ message: "Hi." }), any, { spaceId: SPACE, personId: PERSON }]),
 	route("assistant.explain", run, RESUME, "assistant.explain", ["r", any, { spaceId: SPACE, personId: PERSON }]),
 	// Schedules.

@@ -275,8 +275,9 @@ export type ExplanationEvent =
 	| { type: "answer"; answer: string };
 
 /**
- * Who asks, and in which Space: the chat reads the project's other flows
- * and its runs as this Person sees them in that Space.
+ * Who asks, and in which Space: the chat and a suggestion read the
+ * project's other flows, its Devices and its runs as this Person sees them
+ * in that Space.
  */
 export type AssistantScope = { spaceId: string; personId: string };
 
@@ -285,6 +286,7 @@ export interface AssistantService {
 	suggest(
 		request: SuggestionRequest,
 		signal: AbortSignal,
+		scope: AssistantScope,
 	): AsyncIterable<SuggestionEvent>;
 	chat(
 		request: ChatRequest,

@@ -26,7 +26,10 @@ export const assistant = {
 		.output(stream(suggestionEventSchema))
 		.handler(
 			streamed(({ context, input, signal }) =>
-				context.assistant.suggest(input, signal),
+				context.assistant.suggest(input, signal, {
+					spaceId: context.spaceId,
+					personId: context.session.user.id,
+				}),
 			),
 		),
 	chat: ownerProcedure

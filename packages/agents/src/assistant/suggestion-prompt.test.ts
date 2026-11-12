@@ -186,6 +186,7 @@ describe("the checks of the newer kinds", () => {
 				summary: "x",
 				data: { outcomes: [{ name: "approved", from: "ok" }] },
 			},
+			{},
 		);
 		expect("problems" in bad && bad.problems[0]).toContain('`from` is "ok"');
 		const good = checkSuggestion(
@@ -199,6 +200,7 @@ describe("the checks of the newer kinds", () => {
 					],
 				},
 			},
+			{},
 		);
 		expect("suggestion" in good).toBe(true);
 	});
@@ -210,12 +212,17 @@ describe("the checks of the newer kinds", () => {
 				summary: "x",
 				data: { rules: [{ option: "merge", when: "true" }] },
 			},
+			{},
 		);
 		expect("problems" in unknown && unknown.problems[0]).toContain("merge");
-		const broken = checkSuggestion(request({ nodeId: "gate", kind: "rules" }), {
-			summary: "x",
-			data: { rules: [{ option: "ship", when: "check.exit_code = = 0" }] },
-		});
+		const broken = checkSuggestion(
+			request({ nodeId: "gate", kind: "rules" }),
+			{
+				summary: "x",
+				data: { rules: [{ option: "ship", when: "check.exit_code = = 0" }] },
+			},
+			{},
+		);
 		expect("problems" in broken).toBe(true);
 	});
 
@@ -231,6 +238,7 @@ describe("the checks of the newer kinds", () => {
 				},
 			}),
 			{ summary: "x", data: { arguments: { teem: "web" } } },
+			{},
 		);
 		expect("problems" in result && result.problems).toEqual([
 			"The argument `title` is required. Give it a value.",
@@ -239,10 +247,14 @@ describe("the checks of the newer kinds", () => {
 	});
 
 	test("inputs: dropping an input a template reads fails", () => {
-		const result = checkSuggestion(request({ kind: "inputs" }), {
-			summary: "x",
-			data: { inputs: [{ name: "owner", type: "text" }] },
-		});
+		const result = checkSuggestion(
+			request({ kind: "inputs" }),
+			{
+				summary: "x",
+				data: { inputs: [{ name: "owner", type: "text" }] },
+			},
+			{},
+		);
 		expect("problems" in result && result.problems.join(" ")).toContain("pr");
 	});
 });

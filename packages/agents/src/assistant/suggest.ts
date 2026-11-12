@@ -8,6 +8,7 @@ import {
 	type AgentProfileSettings,
 	type AssistantUsage,
 	applySuggestion,
+	type FlowPlace,
 	isFlowSuggestion,
 	NODE_TYPE_LABEL,
 	nodeOutcomes,
@@ -172,12 +173,13 @@ function at(path: readonly PropertyKey[]): string {
 /**
  * The suggestion in a report, or the problems the agent must fix: the
  * shape of the contract, then the checks of the flow on the draft with the
- * suggestion applied. Only errors the suggestion adds count: the draft's
- * own stay the person's.
+ * suggestion applied, in the draft's place as the editor checks it. Only
+ * errors the suggestion adds count: the draft's own stay the person's.
  */
 export function checkSuggestion(
 	request: SuggestionRequest,
 	report: AssistantReport,
+	place: FlowPlace,
 ): { suggestion: Suggestion } | { problems: string[] } {
 	const data =
 		typeof report.data === "object" && report.data !== null ? report.data : {};
@@ -207,9 +209,8 @@ export function checkSuggestion(
 			variables: suggestion.variables.filter((v) => !declared.has(v.name)),
 		};
 	}
-	const options = { name: request.flowName };
 	const before = new Set(
-		proposalIssues(request.flow, request.flow, options)
+		proposalIssues(request.flow, request.flow, place)
 			.filter((issue) => issue.severity === "error")
 			.map((issue) => issue.message),
 	);
@@ -219,7 +220,7 @@ export function checkSuggestion(
 		suggestion,
 		request.selection,
 	);
-	for (const issue of proposalIssues(request.flow, applied, options)) {
+	for (const issue of proposalIssues(request.flow, applied, place)) {
 		if (issue.severity === "error" && !before.has(issue.message)) {
 			problems.push(issue.message);
 		}
@@ -246,6 +247,8 @@ export type SuggestFieldInput = {
 	profile: Pick<AgentProfileSettings, "model" | "effort">;
 	/** The project's Clone on this computer. */
 	cwd: string;
+	/** The place the draft is checked in, as the editor checks it. */
+	place: FlowPlace;
 	signal: AbortSignal;
 };
 
@@ -256,7 +259,7 @@ export type SuggestFieldInput = {
 export async function* suggestField(
 	input: SuggestFieldInput,
 ): AsyncGenerator<SuggestionEvent> {
-	const { request, harness, profile, cwd, signal } = input;
+	const { request, harness, profile, cwd, place, signal } = input;
 	const refusal = cannotSuggest(request);
 	if (refusal) {
 		yield { type: "error", message: refusal };
@@ -327,7 +330,7 @@ export async function* suggestField(
 			];
 			continue;
 		}
-		const checked = checkSuggestion(request, report);
+		const checked = checkSuggestion(request, report, place);
 		if ("suggestion" in checked) {
 			yield { type: "suggestion", suggestion: checked.suggestion };
 			yield { type: "done" };

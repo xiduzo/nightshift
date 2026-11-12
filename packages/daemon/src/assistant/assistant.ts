@@ -26,6 +26,7 @@ import {
 	isAgentProfile,
 } from "@nightshift/flows";
 import { type AuthoringSpace, authoringPort, chatRun } from "./authoring";
+import { flowPlace } from "./place";
 import {
 	type ChatThread,
 	createThreadStore,
@@ -264,7 +265,7 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 	};
 
 	return {
-		async *suggest(request, signal) {
+		async *suggest(request, signal, scope) {
 			const picked = pickAgent(request, deps);
 			if ("error" in picked) {
 				yield { type: "error", message: picked.error };
@@ -280,11 +281,23 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 				yield { type: "error", message: NO_CLONE };
 				return;
 			}
+			// The answer is checked in the draft's place, as the editor checks it.
+			const place = await flowPlace(
+				{
+					space: deps.space(scope),
+					cliTools: deps.cliTools,
+					connections: deps.connections,
+					withoutFolder: deps.withoutFolder,
+				},
+				request.projectId,
+				request.flowName,
+			);
 			yield* suggestField({
 				request,
 				harness,
 				profile: picked.settings,
 				cwd,
+				place,
 				signal,
 			});
 		},

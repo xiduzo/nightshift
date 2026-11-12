@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	FLOW_VERSION,
 	type Flow,
+	type FlowPlace,
 	flowSchema,
 	type SuggestionEvent,
 	type SuggestionRequest,
@@ -329,21 +330,70 @@ describe("checkSuggestion", () => {
 	});
 
 	test("a prompt with an unknown reference fails, with the validator's words", () => {
-		const result = checkSuggestion(request(), {
-			summary: "Uses the ticket.",
-			data: { text: "Plan {{ticket}}." },
-		});
+		const result = checkSuggestion(
+			request(),
+			{
+				summary: "Uses the ticket.",
+				data: { text: "Plan {{ticket}}." },
+			},
+			{},
+		);
 		expect("problems" in result && result.problems.join(" ")).toContain(
 			"ticket",
 		);
 	});
 
+	test("the answer is checked in the draft's place: a read of an output the called flow does not have fails", () => {
+		const child = flowSchema.parse({
+			version: FLOW_VERSION,
+			outputs: [{ name: "summary", value: "{{notes.output}}" }],
+			start: "notes",
+			nodes: [
+				{
+					id: "notes",
+					type: "command",
+					position: { x: 0, y: 0 },
+					command: "cat notes.md",
+				},
+			],
+			edges: [],
+		});
+		const calling = flowSchema.parse({
+			...flow,
+			start: "sub",
+			nodes: [
+				{
+					id: "sub",
+					type: "call",
+					position: { x: 0, y: 0 },
+					flow: "child",
+					inputs: {},
+				},
+				{ ...flow.nodes[0], prompt: "Plan the fix." },
+			],
+			edges: [{ id: "e1", from: "sub", outcome: "pass", to: "plan" }],
+		});
+		const report = { summary: "x", data: { text: "Plan {{sub.sumary}}." } };
+		const checked = (place: FlowPlace) =>
+			checkSuggestion(request({ flow: calling }), report, place);
+		// While the project's flows are not known, a Call's outputs are not either.
+		expect("suggestion" in checked({})).toBe(true);
+		const result = checked({ flows: { child }, name: "fix" });
+		expect("problems" in result && result.problems.join(" ")).toContain(
+			'"sub" has no field "sumary"',
+		);
+	});
+
 	test("a valid prompt passes with the summary as its note", () => {
 		expect(
-			checkSuggestion(request(), {
-				summary: "Asks for steps.",
-				data: { text: "Plan {{issue}}. List the steps." },
-			}),
+			checkSuggestion(
+				request(),
+				{
+					summary: "Asks for steps.",
+					data: { text: "Plan {{issue}}. List the steps." },
+				},
+				{},
+			),
 		).toEqual({
 			suggestion: {
 				kind: "prompt",
@@ -354,33 +404,45 @@ describe("checkSuggestion", () => {
 	});
 
 	test("an output that is not an object schema fails", () => {
-		const result = checkSuggestion(request({ kind: "output" }), {
-			summary: "x",
-			data: { output: { type: "string" } },
-		});
+		const result = checkSuggestion(
+			request({ kind: "output" }),
+			{
+				summary: "x",
+				data: { output: { type: "string" } },
+			},
+			{},
+		);
 		expect("problems" in result).toBe(true);
 	});
 
 	test("set: a write to an undeclared variable fails unless the variable comes along", () => {
-		const bad = checkSuggestion(request({ kind: "set" }), {
-			summary: "x",
-			data: { set: [{ variable: "plan_text", value: "{{plan.output}}" }] },
-		});
-		expect("problems" in bad).toBe(true);
-		const good = checkSuggestion(request({ kind: "set" }), {
-			summary: "x",
-			data: {
-				set: [
-					{ variable: "plan_text", value: "{{plan.output}}" },
-					{ variable: "tries", expression: "vars.tries + 1" },
-				],
-				variables: [
-					{ name: "plan_text", type: "text" },
-					// Declared already: left out.
-					{ name: "tries", type: "number" },
-				],
+		const bad = checkSuggestion(
+			request({ kind: "set" }),
+			{
+				summary: "x",
+				data: { set: [{ variable: "plan_text", value: "{{plan.output}}" }] },
 			},
-		});
+			{},
+		);
+		expect("problems" in bad).toBe(true);
+		const good = checkSuggestion(
+			request({ kind: "set" }),
+			{
+				summary: "x",
+				data: {
+					set: [
+						{ variable: "plan_text", value: "{{plan.output}}" },
+						{ variable: "tries", expression: "vars.tries + 1" },
+					],
+					variables: [
+						{ name: "plan_text", type: "text" },
+						// Declared already: left out.
+						{ name: "tries", type: "number" },
+					],
+				},
+			},
+			{},
+		);
 		expect(good).toMatchObject({
 			suggestion: { variables: [{ name: "plan_text", type: "text" }] },
 		});
@@ -414,6 +476,7 @@ describe("suggestField", () => {
 				harness,
 				profile,
 				cwd: "/repo",
+				place: {},
 				signal: new AbortController().signal,
 			}),
 		);
@@ -447,6 +510,7 @@ describe("suggestField", () => {
 				harness,
 				profile,
 				cwd: "/repo",
+				place: {},
 				signal: new AbortController().signal,
 			}),
 		);
@@ -470,6 +534,7 @@ describe("suggestField", () => {
 				harness,
 				profile,
 				cwd: "/repo",
+				place: {},
 				signal: new AbortController().signal,
 			}),
 		);
@@ -488,6 +553,7 @@ describe("suggestField", () => {
 				harness,
 				profile,
 				cwd: "/repo",
+				place: {},
 				signal: new AbortController().signal,
 			}),
 		);
@@ -505,6 +571,7 @@ describe("suggestField", () => {
 				harness,
 				profile,
 				cwd: "/repo",
+				place: {},
 				signal: new AbortController().signal,
 			}),
 		);

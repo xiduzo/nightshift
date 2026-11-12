@@ -242,6 +242,70 @@ describe("assistant.suggest", () => {
 		expect(harness.calls[0]?.permissionMode).toBe("default");
 	});
 
+	test("checks the answer in the draft's place, as the person sees the Space", async () => {
+		const child = flowSchema.parse({
+			version: FLOW_VERSION,
+			outputs: [{ name: "summary", value: "{{notes.output}}" }],
+			start: "notes",
+			nodes: [
+				{
+					id: "notes",
+					type: "command",
+					position: { x: 0, y: 0 },
+					command: "cat notes.md",
+				},
+			],
+			edges: [],
+		});
+		const calling: FlowInput = {
+			...flow,
+			start: "sub",
+			nodes: [
+				{
+					id: "sub",
+					type: "call",
+					position: { x: 0, y: 0 },
+					flow: "child",
+					inputs: {},
+				},
+				...flow.nodes,
+			],
+			edges: [{ id: "e1", from: "sub", outcome: "pass", to: "plan" }],
+		};
+		const harness = fakeHarness({
+			steps: [
+				{
+					type: "report",
+					outcome: "",
+					summary: "Uses the notes.",
+					data: { text: "Plan {{sub.sumary}}." },
+				},
+			],
+		});
+		const base = deps({ harnessFor: () => harness });
+		const scopes: unknown[] = [];
+		const events = await suggest(
+			createAssistant({
+				...base,
+				space: (scope) => {
+					scopes.push(scope);
+					return {
+						...base.space(scope),
+						flows: { map: async () => ({ fix: null, child }) },
+					};
+				},
+			}),
+			{ flow: flowSchema.parse(calling) },
+		);
+		// Sent back once, then given up: the called flow has no such output.
+		expect(harness.calls).toHaveLength(2);
+		expect(events.at(-1)).toMatchObject({
+			type: "error",
+			message: expect.stringContaining('"sub" has no field "sumary"'),
+		});
+		expect(scopes).toEqual([{ spaceId: "space", personId: "owner" }]);
+	});
+
 	test("for a project without a folder, works in the assistant's own folder (ADR 22)", async () => {
 		const harness = fakeHarness({
 			steps: [
