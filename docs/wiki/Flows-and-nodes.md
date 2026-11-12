@@ -91,6 +91,8 @@ On a Host, a Web request reaches public addresses only. To let it reach the Host
 | A rule | **Branch** | It takes the first option whose JSONata rule holds. |
 | A model | **Decision** | A [decider](#deciders) picks an option, with its confidence. |
 
+Inside a filter of a rule, a name reads a key of each item. To read a node, an input or a variable there, start with `$$`: `tasks[p > $$.vars.limit]`.
+
 ### Deciders
 
 A decider is the model of a Decision or a Value that a model decides. You choose it in a Model Profile on the Agents page.

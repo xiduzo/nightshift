@@ -515,7 +515,7 @@ Prompts, commands, arguments, input bindings, outputs and variable values are te
 
 A template that is only one reference keeps its JSON value (an array stays an array). The validator checks every reference: read only inputs, variables, run fields and output fields that exist. A path that an \`output\` schema lacks is a warning.
 
-Rules (a Decision's \`when\`, a Value's \`expression\`, a write's \`expression\`) are JSONata over the same values, without braces: \`check.exit_code = 0 and vars.tries < 3\`.
+Rules (a Decision's \`when\`, a Value's \`expression\`, a write's \`expression\`) are JSONata over the same values, without braces: \`check.exit_code = 0 and vars.tries < 3\`. Inside a filter, a name reads a key of each item: write \`tasks[p > $$.vars.limit]\`.
 
 ## Variables
 

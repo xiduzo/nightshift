@@ -7,6 +7,7 @@ import {
 	rewriteRuleNames,
 	rewriteRuleVariables,
 	ruleContext,
+	ruleItemRefs,
 	ruleNames,
 	ruleProblem,
 	ruleRefs,
@@ -285,6 +286,68 @@ describe("a rule that reads through its root", () => {
 		).toBe(
 			"$$.finder.data and other[$$.`finder` = 1] and $.finder and other[$.scout]",
 		);
+	});
+});
+
+describe("a name a rule reads inside a filter", () => {
+	const listed: TemplateContext = {
+		...context,
+		vars: { limit: 2 },
+		nodes: {
+			...context.nodes,
+			scout: { outcome: "pass", data: { tasks: [{ p: 1 }, { p: 3 }] } },
+		},
+	};
+
+	test("JSONata reads it as a key of each item: only $$ reads the rule's value", async () => {
+		// What ruleItemRefs must find: the form that silently reads nothing.
+		expect(
+			await evaluateRule("scout.data.tasks[p > vars.limit]", listed),
+		).toBeUndefined();
+		expect(
+			await evaluateRule("scout.data.tasks.(p > vars.limit)", listed),
+		).toBeUndefined();
+		expect(
+			await evaluateRule("scout.data.tasks[p > $$.vars.limit]", listed),
+		).toEqual({ p: 3 });
+		// A function's body reads the rule's values where it was written.
+		expect(
+			await evaluateRule(
+				"$filter(scout.data.tasks, function($t) { $t.p > vars.limit })",
+				listed,
+			),
+		).toEqual({ p: 3 });
+	});
+
+	test("ruleItemRefs: a path that starts with a name in a filter, a step, a sort or a grouping", () => {
+		expect(
+			ruleItemRefs(
+				"scout.data.tasks[p > vars.limit and other.data.x[0] = `my-input`]",
+			),
+		).toEqual([
+			{ name: "p", read: "p" },
+			{ name: "vars", read: "vars.limit" },
+			{ name: "other", read: "other.data.x" },
+			{ name: "my-input", read: "`my-input`" },
+		]);
+		expect(
+			ruleItemRefs(
+				'tasks.(vars.limit) and tasks^(run.index) and t{"k": check}',
+			),
+		).toEqual([
+			{ name: "vars", read: "vars.limit" },
+			{ name: "run", read: "run.index" },
+			{ name: "check", read: "check" },
+		]);
+	});
+
+	test("ruleItemRefs leaves out $$, $, the top of the rule and a function's body", () => {
+		expect(
+			ruleItemRefs(
+				"scout.data.tasks[$.p > $$.vars.limit] and vars.limit > 1 and $filter(scout.data.tasks, function($t) { $t.p > vars.limit })",
+			),
+		).toEqual([]);
+		expect(ruleItemRefs("tasks[p > (")).toEqual([]);
 	});
 });
 

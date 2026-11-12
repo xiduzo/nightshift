@@ -2,6 +2,7 @@ import type { Flow, FlowNode } from "../flow";
 import { CASCADE_TEMPLATE_FIELDS } from "../nodes";
 import { RESERVED_DATA_KEYS, schemaAt } from "../shapes";
 import {
+	ruleItemRefs,
 	ruleNames,
 	ruleProblem,
 	ruleVariableNames,
@@ -136,6 +137,38 @@ function checkRuleReads(
 				at,
 			);
 		}
+	}
+	checkItemReads(expr, subject, at, scope, also);
+}
+
+/**
+ * A name the rule could read (`vars`, `run`, a node, an input or a name of
+ * `also`) inside a filter reads a key of each item instead, silently:
+ * `tasks[p > vars.limit]` compares with nothing. A warning names the form
+ * that reads the flow's value (`$$.vars.limit`). A node or an input may
+ * share its name with a key of the items: `$.status` reads the key and
+ * ends the warning.
+ */
+function checkItemReads(
+	expr: string,
+	subject: string,
+	at: At,
+	scope: Scope,
+	also: readonly string[],
+): void {
+	const warned = new Set<string>();
+	for (const { name, read } of ruleItemRefs(expr)) {
+		const flowName = name === "run" || name === "vars" || also.includes(name);
+		if (!flowName && !readsName(scope.template, name)) continue;
+		if (warned.has(read)) continue;
+		warned.add(read);
+		const what = flowName
+			? `Write $$.${read} instead.`
+			: `Write $$.${read} for the ${scope.nodes.has(name) ? "node" : "input"}, or $.${read} for the key.`;
+		scope.warning(
+			`${subject} reads ${read} inside a filter, where it reads a key of each item. ${what}`,
+			at,
+		);
 	}
 }
 

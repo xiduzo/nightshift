@@ -1130,6 +1130,42 @@ describe("validateFlow: decisions and gates", () => {
 		]);
 	});
 
+	// Inside a filter JSONata reads each item: `tasks[p > vars.limit]`
+	// compares with the item's own `vars`, which it has not.
+	test("a flow name inside a filter is a warning that names the form that reads it", () => {
+		const issues = validateFlow({
+			...flow(
+				[
+					command("check", { stdout: "json" }),
+					ruled("pick", [
+						["limit", "check.data.tasks[p > vars.limit and p > vars.limit]"],
+						["node", "check.data.tasks[check = 1].(mode & run.index)"],
+						[
+							"fine",
+							"check.data.tasks[$.check = 1 and p > $$.vars.limit and $$.mode = 'x' and size > 1]",
+						],
+						["stop"],
+					]),
+				],
+				[edge("a", "check", "pass", "pick")],
+				"check",
+			),
+			inputs: [{ name: "mode", type: "text" }],
+			variables: [{ name: "limit", type: "number" }],
+		});
+		expect(errors(issues)).toEqual([]);
+		expect(
+			warnings(issues)
+				.map((issue) => issue.message)
+				.filter((message) => message.includes("inside a filter")),
+		).toEqual([
+			'The rule of option "limit" of "pick" reads vars.limit inside a filter, where it reads a key of each item. Write $$.vars.limit instead.',
+			'The rule of option "node" of "pick" reads check inside a filter, where it reads a key of each item. Write $$.check for the node, or $.check for the key.',
+			'The rule of option "node" of "pick" reads mode inside a filter, where it reads a key of each item. Write $$.mode for the input, or $.mode for the key.',
+			'The rule of option "node" of "pick" reads run.index inside a filter, where it reads a key of each item. Write $$.run.index instead.',
+		]);
+	});
+
 	test("a rule may read the flow's inputs", () => {
 		const issues = validateFlow({
 			...flow(

@@ -19,6 +19,7 @@ export {
 	type RuleOutcome,
 	rewriteRuleNames,
 	rewriteRuleVariables,
+	ruleItemRefs,
 	ruleMessage,
 	ruleNames,
 	ruleProblem,

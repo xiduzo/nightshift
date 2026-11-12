@@ -70,6 +70,18 @@ describe("the Since last run node", () => {
 		expect(validateFlow(flowOf(node))).toEqual([]);
 	});
 
+	test("given a rule that reads previous inside a filter, then it warns and names $$.previous", () => {
+		const node = seen({
+			items: undefined,
+			key: undefined,
+			value: "{{feed.data.prices}}",
+			when: "$count(current[$not($ in previous)]) > 0 and $count(current[$ in $$.previous]) > 0",
+		});
+		expect(messages(validateFlow(flowOf(node)), "warning")).toEqual([
+			'The rule of "fresh" reads previous inside a filter, where it reads a key of each item. Write $$.previous instead.',
+		]);
+	});
+
 	test("given no list and no value, or both, then it is an error on the node", () => {
 		expect(
 			messages(validateFlow(flowOf(seen({ items: "" }))), "error"),

@@ -197,6 +197,30 @@ export function ruleRefs(expr: string): RuleRef[] {
 		.map(({ name, step, rest }) => ({ name, path: keysAfter(step, rest) }));
 }
 
+/**
+ * A name a rule reads where JSONata reads each item of a value, not the
+ * rule's values: in a filter, a sort, a grouping or a later step of a path
+ * (`vars.limit` in `tasks[p > vars.limit]`). `read` is the name with its
+ * keys as the rule writes them.
+ */
+type RuleItemRef = { name: string; read: string };
+
+/**
+ * Each place a path inside a filter (`[…]`), a sort, a grouping or a later
+ * step of a path starts with a name. JSONata reads that name as a key of
+ * each item there, so `tasks[p > vars.limit]` reads `limit` of the item's
+ * `vars`. `$$.vars.limit` reads the rule's value there, and `$.p` the key
+ * of the item: neither is listed. In the order of the rule.
+ */
+export function ruleItemRefs(expr: string): RuleItemRef[] {
+	return findRefs(expr)
+		.filter((ref) => !ref.top)
+		.map(({ name, step, rest }) => ({
+			name,
+			read: [name, ...keysAfter(step, rest)].map(nameInRule).join("."),
+		}));
+}
+
 /** Every name a path of the rule starts with: at the top, and below it. */
 function findRefs(expr: string): FoundRef[] {
 	let ast: unknown;

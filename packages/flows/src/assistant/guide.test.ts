@@ -141,8 +141,9 @@ describe("flowAuthoringGuide", () => {
 		// 5030: the report of an End node and a Subflow's `end_report`.
 		// 5055: the `scores` of an Agent and a Value (one sentence each).
 		// 5080: an End report from a file the run wrote. 5090: the kits
-		// under their families, as the add-node dialog lists them.
-		expect(words).toBeLessThan(5090);
+		// under their families, as the add-node dialog lists them. 5105:
+		// a name inside a filter reads each item (`$$.vars.limit`).
+		expect(words).toBeLessThan(5105);
 	});
 });
 
