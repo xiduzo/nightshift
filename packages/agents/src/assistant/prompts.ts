@@ -7,7 +7,9 @@
 import {
 	type Flow,
 	type FlowNode,
+	type FlowRead,
 	flowAuthoringGuide,
+	flowReads,
 	type TemplateField,
 	templateScope,
 } from "@nightshift/flows";
@@ -71,42 +73,58 @@ export function scopeList(flow: Flow, nodeId: string): string {
 	return lines.join("\n");
 }
 
-const escapeRegExp = (text: string) =>
-	text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/**
+ * The nodes that read what `matches` picks in the texts they use
+ * (`flowReads`), each once, in the order of the flow.
+ */
+export function nodesReading(
+	flow: Flow,
+	matches: (read: FlowRead) => boolean,
+): string[] {
+	const ids: string[] = [];
+	for (const read of flowReads(flow)) {
+		if (!("node" in read.reader) || !matches(read)) continue;
+		if (!ids.includes(read.reader.node)) ids.push(read.reader.node);
+	}
+	return ids;
+}
 
 /**
  * The keys of `nodeId`'s `data` (or another output `field`, such as a
- * Web request's `body`) that the rest of the flow reads: in templates
- * (`{{plan.data.tasks}}`), rules and expressions (`plan.data.ok`), and
- * the flow's outputs. Each key with who reads it.
+ * Web request's `body`) that the rest of the flow reads (`flowReads`): in
+ * templates (`{{plan.data.tasks}}`), rules and expressions
+ * (`plan.data.ok`), the flow's outputs, the initial values of its
+ * variables, and the node's own variable writes. Each key with who reads
+ * it.
  */
 export function dataReaders(
 	flow: Flow,
 	nodeId: string,
 	field = "data",
 ): { key: string; readers: string[] }[] {
-	const pattern = new RegExp(
-		`(?<![A-Za-z0-9_.])${escapeRegExp(nodeId)}\\.${field}\\.([A-Za-z0-9_-]+)`,
-		"g",
-	);
 	const found = new Map<string, Set<string>>();
-	const scan = (text: string, reader: string) => {
-		for (const match of text.matchAll(pattern)) {
-			const key = match[1] as string;
-			const readers = found.get(key) ?? new Set<string>();
-			readers.add(reader);
-			found.set(key, readers);
-		}
+	const add = (key: string, reader: string) => {
+		const readers = found.get(key) ?? new Set<string>();
+		readers.add(reader);
+		found.set(key, readers);
 	};
-	for (const node of flow.nodes) {
-		if (node.id === nodeId) continue;
-		scan(JSON.stringify(node), `node \`${node.id}\``);
+	const own: string[] = [];
+	for (const { reader, name, path, self } of flowReads(flow)) {
+		const [first, key] = path;
+		if (name !== nodeId || first !== field || key === undefined) continue;
+		if (!("node" in reader)) {
+			add(
+				key,
+				"output" in reader ? "the flow's outputs" : "the flow's variables",
+			);
+		} else if (reader.node !== nodeId) {
+			add(key, `node \`${reader.node}\``);
+		} else if (self) {
+			// Its own writes read its data too.
+			own.push(key);
+		}
 	}
-	scan(JSON.stringify(flow.outputs), "the flow's outputs");
-	scan(JSON.stringify(flow.variables ?? []), "the flow's variables");
-	// Its own writes read its data too.
-	const self = flow.nodes.find((node) => node.id === nodeId);
-	if (self?.set) scan(JSON.stringify(self.set), `this node's variable writes`);
+	for (const key of own) add(key, "this node's variable writes");
 	return [...found].map(([key, readers]) => ({ key, readers: [...readers] }));
 }
 

@@ -70,7 +70,12 @@ export {
 	uniqueOptionName,
 	withOptions,
 } from "./outcomes";
-export { type DataLink, dataLinks } from "./reads";
+export {
+	type DataLink,
+	dataLinks,
+	type FlowRead,
+	flowReads,
+} from "./reads";
 export {
 	renameInput,
 	renameVariable,

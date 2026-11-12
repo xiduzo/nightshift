@@ -268,6 +268,48 @@ describe("the suggestion prompts", () => {
 		]);
 	});
 
+	test("find what the flow reads, not what a label, a description or a field not in use says", () => {
+		const reads = flowSchema.parse({
+			...flow,
+			outputs: [{ name: "plan", value: "{{plan.data.summary}}" }],
+			nodes: [
+				...flow.nodes.filter((node) => node.id !== "gate"),
+				{
+					id: "gate",
+					type: "decision",
+					position: { x: 600, y: 0 },
+					label: "Reads plan.data.label",
+					prompt: "",
+					by: "rule",
+					options: [
+						{
+							name: "yes",
+							when: '$$.plan.data.risky = false and "plan.data.quoted" != ""',
+							description: "When plan.data.description holds",
+						},
+						{ name: "no" },
+					],
+				},
+				{
+					id: "pick",
+					type: "value",
+					position: { x: 900, y: 0 },
+					by: "model",
+					prompt: "Pick from {{plan.data.choices}}.",
+					output: { type: "object" },
+					// A person picks from choices: a model does not use them.
+					choices: { from: "{{plan.data.stale}}", field: "pick" },
+				},
+			],
+		});
+		expect(dataReaders(reads, "plan")).toEqual([
+			{ key: "steps", readers: ["node `build`"] },
+			{ key: "risky", readers: ["node `gate`"] },
+			{ key: "choices", readers: ["node `pick`"] },
+			{ key: "summary", readers: ["the flow's outputs"] },
+		]);
+	});
+
 	test("the prompt kind marks the selection and keeps the instruction", () => {
 		const text = suggestionPrompt(request({ selection: { start: 0, end: 8 } }));
 		expect(text).toContain(

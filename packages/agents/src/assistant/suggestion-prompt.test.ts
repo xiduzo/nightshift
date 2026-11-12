@@ -156,6 +156,36 @@ describe("each kind gets its own task and context", () => {
 		expect(inputs).toContain("- `owner`: read by `notify`");
 		expect(inputs).toContain("- `pr`: review");
 	});
+
+	test("inputs: a rule reads an input too, a label does not", () => {
+		const reads = flowSchema.parse({
+			...flow,
+			nodes: flow.nodes.map((node) =>
+				node.id === "gate" && node.type === "decision"
+					? {
+							...node,
+							label: "Ship {{owner}}",
+							options: [
+								{ name: "ship", when: "review.outcome = 'pass' and pr != ''" },
+								{ name: "hold" },
+							],
+						}
+					: node,
+			),
+		});
+		const inputs = suggestionPrompt(request({ kind: "inputs", flow: reads }));
+		expect(inputs).toContain("- `pr`: review, gate");
+		expect(inputs).toContain("- `owner`: read by `notify`\n");
+	});
+
+	test("outcomes: the nodes that read the outcome, in a template or a rule", () => {
+		const outcomes = suggestionPrompt(
+			request({ nodeId: "review", kind: "outcomes" }),
+		);
+		expect(outcomes).toContain(
+			"These nodes read the outcome as `{{review.outcome}}`: `gate`.",
+		);
+	});
 });
 
 describe("the checks of the newer kinds", () => {

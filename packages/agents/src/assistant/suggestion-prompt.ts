@@ -10,6 +10,7 @@ import {
 	type Flow,
 	type FlowNode,
 	flowAuthoringGuide,
+	flowReads,
 	githubSubIssuesCommand,
 	isFlowSuggestion,
 	nodeOutcomes,
@@ -19,7 +20,13 @@ import {
 	waitCommandOf,
 } from "@nightshift/flows";
 import type { ProjectFacts } from "./project-facts";
-import { dataReaders, draftSummary, flowJson, scopeList } from "./prompts";
+import {
+	dataReaders,
+	draftSummary,
+	flowJson,
+	nodesReading,
+	scopeList,
+} from "./prompts";
 
 /** What a task builds its context from. */
 type TaskInput = {
@@ -62,12 +69,12 @@ function outgoing(flow: Flow, node: FlowNode): string[] {
 	});
 }
 
-/** The nodes whose templates or rules read `{{<id>.outcome}}`. */
+/** The other nodes whose templates or rules read `{{<id>.outcome}}`. */
 function outcomeReaders(flow: Flow, nodeId: string): string[] {
-	const pattern = new RegExp(`(?<![A-Za-z0-9_.])${nodeId}\\.outcome\\b`);
-	return flow.nodes
-		.filter((node) => node.id !== nodeId && pattern.test(JSON.stringify(node)))
-		.map((node) => node.id);
+	return nodesReading(
+		flow,
+		({ name, path }) => name === nodeId && path[0] === "outcome",
+	).filter((id) => id !== nodeId);
 }
 
 /** A node in one line: its id, type and label, and the start of its prompt or command. */
@@ -91,16 +98,11 @@ function undeclaredNames(flow: Flow): { name: string; readers: string[] }[] {
 		...flow.nodes.map((node) => node.id),
 	]);
 	const found = new Map<string, Set<string>>();
-	for (const node of flow.nodes) {
-		for (const match of JSON.stringify(node).matchAll(
-			/\{\{\s*([a-z][a-z0-9_]*)/g,
-		)) {
-			const name = match[1] as string;
-			if (known.has(name)) continue;
-			const readers = found.get(name) ?? new Set<string>();
-			readers.add(node.id);
-			found.set(name, readers);
-		}
+	for (const { reader, name, rule } of flowReads(flow)) {
+		if (!("node" in reader) || rule || known.has(name)) continue;
+		const readers = found.get(name) ?? new Set<string>();
+		readers.add(reader.node);
+		found.set(name, readers);
 	}
 	return [...found].map(([name, readers]) => ({
 		name,
@@ -108,12 +110,9 @@ function undeclaredNames(flow: Flow): { name: string; readers: string[] }[] {
 	}));
 }
 
-/** Where each input is read: the nodes whose templates name it. */
+/** Where each input is read: the nodes whose templates or rules read it. */
 function inputReaders(flow: Flow, name: string): string[] {
-	const pattern = new RegExp(`\\{\\{\\s*${name}\\b`);
-	return flow.nodes
-		.filter((node) => pattern.test(JSON.stringify(node)))
-		.map((node) => node.id);
+	return nodesReading(flow, (read) => read.name === name);
 }
 
 const promptKind: KindPrompt = {
