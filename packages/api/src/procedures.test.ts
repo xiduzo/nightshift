@@ -426,6 +426,7 @@ const ROUTES: Route[] = [
 	route("runs.list", { projectId: "p1", limit: 10 }, "session", "space.listRuns", [{ projectId: "p1", limit: 10 }]),
 	route("runs.get", run, "session", "space.getRun", ["r"]),
 	route("runs.step", { ...run, stepId: "s" }, "session", "space.getStep", ["r", "s"]),
+	route("runs.stepTranscript", { ...run, stepId: "s" }, "session", "space.stepTranscript", ["r", "s", expect.any(AbortSignal)]),
 	route("runs.serviceLog", { ...run, nodeId: "n", scopeKey: "k" }, "session", "space.serviceLog", ["r", { nodeId: "n", scopeKey: "k" }]),
 	route("runs.artifacts", run, "session", "space.listArtifacts", ["r"]),
 	route("runs.files", run, "session", "space.listRunFiles", ["r"]),
@@ -1509,6 +1510,51 @@ describe("a run opened by its id", () => {
 			).toEqual(notFound);
 		}
 		expect(seen()).toEqual([]);
+	});
+
+	test("reads a step's transcript until the caller goes away, and refuses a step it cannot find in its own words", async () => {
+		const owner: Caller = { kind: "person", role: "owner", owner: true };
+		const wanted = { runId: "r", stepId: "s" };
+		// A read that waits, as for a Host that is away: what came, cut.
+		let started = () => {};
+		const reading = new Promise<void>((resolve) => {
+			started = resolve;
+		});
+		const waiting = contextOf(sandbox.db, owner, {
+			space: {
+				stepTranscript: (_run: string, _step: string, signal: AbortSignal) =>
+					new Promise((resolve) => {
+						signal.addEventListener(
+							"abort",
+							() => resolve({ entries: [], holds: "cut" }),
+							{ once: true },
+						);
+						started();
+					}),
+			},
+		});
+		const away = new AbortController();
+		const read = call(appRouter.runs.stepTranscript, wanted, {
+			context: waiting,
+			signal: away.signal,
+		});
+		await reading;
+		away.abort();
+		expect(await read).toEqual({ entries: [], holds: "cut" });
+		// Not a missing route: the declared NOT_FOUND, in the words of the step.
+		const words = "Night Shift cannot find this step of the run.";
+		const unknown = contextOf(sandbox.db, owner, {
+			space: {
+				stepTranscript: async () => {
+					throw new Refusal("not-found", words);
+				},
+			},
+		});
+		expect(
+			await refusalOf(
+				call(appRouter.runs.stepTranscript, wanted, { context: unknown }),
+			),
+		).toEqual({ code: "NOT_FOUND", defined: true, message: words });
 	});
 
 	test("acts only as far as the Person's role in the run's Space allows", async () => {

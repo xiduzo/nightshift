@@ -15,10 +15,18 @@ import {
 	runStreamItemSchema,
 	runSummarySchema,
 	stepDetailSchema,
+	stepTranscriptSchema,
 } from "./schemas";
 
 /** The most runs one page holds. */
 const RUNS_PAGE_MAX = 200;
+
+/**
+ * How long the read of a step's whole transcript may take. A read that
+ * a Host keeps waiting answers then with what came (`cut`). It is below
+ * the 10 s an assistant waits for it (`chatRun`), so that answer arrives.
+ */
+const STEP_TRANSCRIPT_MS = 8_000;
 
 /**
  * Lists, starts and the Devices of a project are the session's Space's. A
@@ -86,6 +94,29 @@ export const runs = {
 		.handler(({ context, input }) =>
 			context.space.getStep(input.runId, input.stepId),
 		),
+	/**
+	 * One step's transcript as Night Shift saved it, all at once, for a
+	 * reader that needs all of it (an assistant over `nightshift mcp`).
+	 * Once the step ended: all of it, wherever the run was walked. While
+	 * it runs: what this computer keeps so far. `holds` says which, or
+	 * `cut` when the read stopped first.
+	 */
+	stepTranscript: runProcedure(
+		z.object({ runId: z.string(), stepId: z.string() }),
+	)
+		.route({
+			summary:
+				"Reads the saved transcript of one step of a run, all of it at once.",
+		})
+		.output(output(stepTranscriptSchema))
+		.handler(({ context, input, signal }) => {
+			const bound = AbortSignal.timeout(STEP_TRANSCRIPT_MS);
+			return context.space.stepTranscript(
+				input.runId,
+				input.stepId,
+				signal ? AbortSignal.any([signal, bound]) : bound,
+			);
+		}),
 	/**
 	 * The end of a service's log (ADR 9), by its node and scope
 	 * (`RunService.scopeKey`). Null when this computer does not walk the

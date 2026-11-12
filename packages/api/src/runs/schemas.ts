@@ -11,6 +11,7 @@ import {
 	type RunStreamItem,
 	type RunSummary,
 	type StepDetail,
+	type StepTranscript,
 	type TranscriptEntry,
 } from "@nightshift/engine";
 import {
@@ -712,6 +713,18 @@ export const transcriptEntryViewSchema = exact<TranscriptEntry>()(
 		sessionId: z.string().nullable(),
 		at: z.number(),
 		event: stepEventSchema,
+	}),
+);
+
+/**
+ * One step's transcript as Night Shift saved it, and how much of it the
+ * entries are: `whole` (the step ended), `so-far` (it still runs) or
+ * `cut` (the read stopped before the end).
+ */
+export const stepTranscriptSchema = exact<StepTranscript>()(
+	z.object({
+		entries: z.array(transcriptEntryViewSchema),
+		holds: z.enum(["whole", "so-far", "cut"]),
 	}),
 );
 

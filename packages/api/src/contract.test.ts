@@ -529,6 +529,20 @@ describe("replies of a real engine", () => {
 		for (const step of detail.steps) {
 			await read(appRouter.runs.step, { runId: started.id, stepId: step.id });
 		}
+		// The run ended: each step's transcript is read whole.
+		const transcripts: { entries: unknown[]; holds: string }[] = [];
+		for (const step of detail.steps) {
+			transcripts.push(
+				(await read(appRouter.runs.stepTranscript, {
+					runId: started.id,
+					stepId: step.id,
+				})) as { entries: unknown[]; holds: string },
+			);
+		}
+		expect(transcripts.map((t) => t.holds)).toEqual(
+			detail.steps.map(() => "whole"),
+		);
+		expect(transcripts.flatMap((t) => t.entries).length).toBeGreaterThan(0);
 		await read(appRouter.runs.placements, { projectId });
 		await read(appRouter.runs.devices, { projectId });
 		expect(

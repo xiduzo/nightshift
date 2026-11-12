@@ -66,6 +66,7 @@ const READS = new Set([
 	"runs.list",
 	"runs.get",
 	"runs.step",
+	"runs.stepTranscript",
 	"runs.serviceLog",
 	"runs.artifacts",
 	"runs.files",
