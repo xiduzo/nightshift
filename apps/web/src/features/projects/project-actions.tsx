@@ -32,7 +32,7 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 import { spaceQueries } from "@/features/spaces";
 import type { Project } from "@/shared/api";
-import { projectMutations, projectQueries } from "./queries";
+import { projectMutations } from "./queries";
 
 /** Renames a project for everyone in its Space. */
 export function RenameProjectDialog({
@@ -65,16 +65,8 @@ function RenameProjectForm({
 	onDone: () => void;
 }) {
 	const id = useId();
-	const queryClient = useQueryClient();
 	const [name, setName] = useState(project.name);
-	const rename = useMutation(
-		projectMutations.rename({
-			onSuccess: () => {
-				void queryClient.invalidateQueries({ queryKey: projectQueries.all() });
-				onDone();
-			},
-		}),
-	);
+	const rename = useMutation(projectMutations.rename({ onSuccess: onDone }));
 	const trimmed = name.trim();
 
 	return (

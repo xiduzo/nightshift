@@ -1,3 +1,4 @@
+import { useChanged } from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
@@ -42,13 +43,17 @@ import {
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { client, type MergePreview, type MergeResult } from "@/shared/api";
+import {
+	client,
+	type MergePreview,
+	type MergeResult,
+	orpc,
+} from "@/shared/api";
 import { formatTime } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 
 import { MergePreviewList } from "./merge-preview";
 import { formatUserCode } from "./platform";
-import { deviceQueries } from "./queries";
 
 type Role = "home" | "guest";
 
@@ -117,6 +122,7 @@ function JoinHostSteps({
 }) {
 	const id = useId();
 	const queryClient = useQueryClient();
+	const changed = useChanged({ orpc });
 	const [address, setAddress] = useState("");
 	const [role, setRole] = useState<Role>(hasHome ? "guest" : "home");
 	const [step, setStep] = useState<Step>({ kind: "form", error: null });
@@ -147,9 +153,7 @@ function JoinHostSteps({
 						expiresAt: next.expiresAt,
 					});
 				} else if (next.kind === "joined") {
-					void queryClient.invalidateQueries({
-						queryKey: deviceQueries.overviewKey(),
-					});
+					changed("devices");
 					hostName = next.hostName;
 					if (next.restart) {
 						setStep({

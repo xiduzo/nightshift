@@ -31,11 +31,11 @@ import {
 	SelectValue,
 } from "@nightshift/ui/components/select";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { CopyIcon, SendIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-import { spaceMutations, spaceQueries } from "./queries";
+import { spaceMutations } from "./queries";
 import { INVITE_ROLES, roleLabel } from "./roles";
 
 /** The link that opens an invitation: its id is the secret. */
@@ -79,18 +79,9 @@ type InviteRole = (typeof INVITE_ROLES)[number];
 
 function InviteForm({ spaceName }: { spaceName: string }) {
 	const id = useId();
-	const queryClient = useQueryClient();
 	const [email, setEmail] = useState("");
 	const [role, setRole] = useState<InviteRole>("member");
-	const invite = useMutation(
-		spaceMutations.invite({
-			onSuccess: () => {
-				void queryClient.invalidateQueries({
-					queryKey: spaceQueries.membersKey(),
-				});
-			},
-		}),
-	);
+	const invite = useMutation(spaceMutations.invite());
 
 	if (invite.data) {
 		const link = invitationLink(invite.data.id);

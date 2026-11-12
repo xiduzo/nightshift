@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { Project } from "@/shared/api";
 import { projectMutations, projectQueries } from "./queries";
@@ -10,7 +10,6 @@ import { projectMutations, projectQueries } from "./queries";
  * can (`available`).
  */
 export function useChooseProjectFolder(project: Pick<Project, "id">) {
-	const queryClient = useQueryClient();
 	const sources = useQuery(projectQueries.sources());
 	const use = useMutation(
 		projectMutations.useFolder({
@@ -18,7 +17,6 @@ export function useChooseProjectFolder(project: Pick<Project, "id">) {
 				toast.success(`${used.name} uses this folder now`, {
 					description: used.repoPath ?? undefined,
 				});
-				void queryClient.invalidateQueries({ queryKey: projectQueries.all() });
 			},
 			onError: (error) => toast.error(error.message),
 		}),

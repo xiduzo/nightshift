@@ -35,7 +35,7 @@ import {
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { EyeIcon, LaptopIcon, ShieldCheckIcon } from "lucide-react";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -43,7 +43,7 @@ import { toast } from "sonner";
 import type { PairingReview } from "@/shared/api";
 
 import { formatUserCode } from "./platform";
-import { deviceMutations, deviceQueries } from "./queries";
+import { deviceMutations } from "./queries";
 
 /**
  * "Pair a device": the Person enters the code their other computer shows,
@@ -82,18 +82,14 @@ function PairDeviceSteps({
 	onDone: () => void;
 }) {
 	const id = useId();
-	const queryClient = useQueryClient();
 	const [code, setCode] = useState(cleanCode(initialCode));
 	const [review, setReview] = useState<PairingReview | null>(null);
 
 	const find = useMutation(deviceMutations.review({ onSuccess: setReview }));
-	const refresh = () =>
-		queryClient.invalidateQueries({ queryKey: deviceQueries.overviewKey() });
 	const allow = useMutation(
 		deviceMutations.approve({
 			onSuccess: () => {
 				toast.success(`${review?.device.name ?? "The device"} is paired`);
-				void refresh();
 				onDone();
 			},
 		}),

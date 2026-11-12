@@ -21,7 +21,7 @@ import {
 } from "@nightshift/ui/components/item";
 import { SheetFooter } from "@nightshift/ui/components/sheet";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
 	BotIcon,
@@ -36,11 +36,11 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { permissionLabel, WithdrawOfferDialog } from "@/features/agents";
 import { RunStatusBadge } from "@/features/runs/components/run-status-badge";
-import { type OfferView, orpc, type RunSummary } from "@/shared/api";
+import type { OfferView, RunSummary } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
 import { formatDateTime, formatRelative, useNow } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
-import { deviceMutations, deviceQueries, offerQueries } from "./queries";
+import { deviceMutations, offerQueries } from "./queries";
 import type { SpaceComputer } from "./space-view";
 import { ComputerStatus, computerLine } from "./status-badges";
 
@@ -395,15 +395,11 @@ function RemoveAccessDialog({
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 }) {
-	const queryClient = useQueryClient();
 	const revoke = useMutation(
 		deviceMutations.revoke({
 			onSuccess: () => {
 				toast.success(`${device.name} has no access now`);
 				onOpenChange(false);
-				void queryClient.invalidateQueries({
-					queryKey: deviceQueries.overviewKey(),
-				});
 			},
 			onError: (error) => toast.error(`Not removed: ${error.message}`),
 		}),
@@ -444,13 +440,11 @@ function RemoveComputerDialog({
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 }) {
-	const queryClient = useQueryClient();
 	const forget = useMutation(
 		deviceMutations.forget({
 			onSuccess: () => {
 				toast.success(`${device.name} is removed`);
 				onOpenChange(false);
-				void queryClient.invalidateQueries({ queryKey: orpc.devices.key() });
 			},
 			onError: (error) => toast.error(`Not removed: ${error.message}`),
 		}),

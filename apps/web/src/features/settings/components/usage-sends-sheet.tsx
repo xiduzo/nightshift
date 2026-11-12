@@ -29,7 +29,7 @@ import {
 } from "@nightshift/ui/components/sheet";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { CircleAlertIcon } from "lucide-react";
 import { useId } from "react";
 import { toast } from "sonner";
@@ -58,7 +58,6 @@ export function UsageSendsSheet({
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 }) {
-	const queryClient = useQueryClient();
 	const catalog = useQuery({
 		...usageQueries.catalog(),
 		enabled: open,
@@ -72,9 +71,6 @@ export function UsageSendsSheet({
 		...usageMutations.resetId(),
 		onSuccess: () => {
 			toast.success("This computer has a new anonymous id.");
-			void queryClient.invalidateQueries({
-				queryKey: usageQueries.outbox().queryKey,
-			});
 		},
 		onError: (error) => toast.error(`Not reset: ${error.message}`),
 	});

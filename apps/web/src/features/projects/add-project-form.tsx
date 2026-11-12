@@ -29,7 +29,7 @@ import {
 } from "@nightshift/ui/components/item";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { Tabs, TabsList, TabsTrigger } from "@nightshift/ui/components/tabs";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { FolderGitIcon, FolderOpenIcon, PlusIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
@@ -72,7 +72,6 @@ export function AddProjectDialog({
 
 export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 	const id = useId();
-	const queryClient = useQueryClient();
 	const sources = useQuery(projectQueries.sources());
 	// Until the server answers, assume the folder picker: most computers are Macs.
 	const folderPicker = sources.data?.folderPicker ?? true;
@@ -135,9 +134,6 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 				setRepo("");
 				setName("");
 				startCopy.reset();
-				void queryClient.invalidateQueries({
-					queryKey: projectQueries.all(),
-				});
 				onAdded?.();
 			},
 		}),
@@ -149,9 +145,6 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 			onSuccess: (project) => {
 				toast.success(`Added ${project.name}`);
 				setName("");
-				void queryClient.invalidateQueries({
-					queryKey: projectQueries.all(),
-				});
 				onAdded?.();
 			},
 		}),

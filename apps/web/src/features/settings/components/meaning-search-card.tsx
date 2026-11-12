@@ -26,7 +26,7 @@ import {
 import { Progress } from "@nightshift/ui/components/progress";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { DownloadIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
@@ -227,7 +227,6 @@ function ModelField({ form }: { form: SettingsForm }) {
 
 /** Which Ollama search uses, how it is now, and a download of a model it lacks. */
 function OllamaLine() {
-	const queryClient = useQueryClient();
 	const status = useQuery({
 		...ollamaQueries.status(),
 		refetchInterval: (query) =>
@@ -235,11 +234,6 @@ function OllamaLine() {
 	});
 	const pull = useMutation(
 		ollamaMutations.pull({
-			onSuccess: () => {
-				void queryClient.invalidateQueries({
-					queryKey: ollamaQueries.status().queryKey,
-				});
-			},
 			onError: (error) => toast.error(`Not downloaded: ${error.message}`),
 		}),
 	);

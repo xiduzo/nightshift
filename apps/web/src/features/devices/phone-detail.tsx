@@ -12,7 +12,7 @@ import {
 import { Button } from "@nightshift/ui/components/button";
 import { SheetFooter } from "@nightshift/ui/components/sheet";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { SmartphoneIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -20,7 +20,7 @@ import type { Phone } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
 import { formatRelative, useNow } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
-import { deviceMutations, deviceQueries } from "./queries";
+import { deviceMutations } from "./queries";
 
 /**
  * One of your phones on the Host of the Space: the Night Shift app signed
@@ -92,15 +92,11 @@ function SignOutDialog({
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 }) {
-	const queryClient = useQueryClient();
 	const signOut = useMutation(
 		deviceMutations.removePhone({
 			onSuccess: () => {
 				toast.success(`${phone.name} is signed out`);
 				onOpenChange(false);
-				void queryClient.invalidateQueries({
-					queryKey: deviceQueries.phonesKey(),
-				});
 			},
 			onError: (error) => toast.error(`Not signed out: ${error.message}`),
 		}),

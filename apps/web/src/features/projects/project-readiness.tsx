@@ -31,13 +31,13 @@ import {
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { CircleAlertIcon, CircleCheckIcon, RotateCwIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
 import type { GitInstall, ProjectCheck } from "@/shared/api";
-import { projectMutations, projectQueries } from "./queries";
+import { projectMutations } from "./queries";
 
 type Readiness = ProjectCheck;
 type Step = Readiness["steps"][number];
@@ -73,16 +73,10 @@ export function ProjectReadiness({
 	onRecheck: () => void;
 	onUseFolder: (path: string) => void;
 }) {
-	const queryClient = useQueryClient();
 	const [confirm, setConfirm] = useState<"install-git" | "set-up-git" | null>(
 		null,
 	);
 	const [install, setInstall] = useState<GitInstall | null>(null);
-
-	const refresh = () =>
-		queryClient.invalidateQueries({
-			queryKey: projectQueries.checkKey(readiness.path),
-		});
 
 	const installGit = useMutation(
 		projectMutations.installGit({
@@ -286,10 +280,7 @@ export function ProjectReadiness({
 				}}
 				path={readiness.path}
 				needsIdentity={readiness.needsIdentity}
-				onDone={() => {
-					setConfirm(null);
-					void refresh();
-				}}
+				onDone={() => setConfirm(null)}
 			/>
 		</div>
 	);

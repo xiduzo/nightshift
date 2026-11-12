@@ -73,9 +73,6 @@ async function renewOwnScreen(queryClient: QueryClient): Promise<void> {
 				...subscriptionParts(subscription),
 			});
 		setOwnScreenId(screen.id);
-		void queryClient.invalidateQueries({
-			queryKey: notificationQueries.all(),
-		});
 	} catch {
 		// It tries again on the next start.
 	}

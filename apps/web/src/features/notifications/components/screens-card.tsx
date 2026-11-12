@@ -35,7 +35,7 @@ import {
 } from "@nightshift/ui/components/item";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
 	BellRingIcon,
 	CircleAlertIcon,
@@ -69,7 +69,6 @@ const KINDS: Record<NotificationScreen["kind"], string> = {
 
 /** The phones, browsers and desktop apps that can notify you, each with Remove. */
 export function ScreensCard() {
-	const queryClient = useQueryClient();
 	const screens = useQuery(notificationQueries.screens());
 	const [toRemove, setToRemove] = useState<NotificationScreen | null>(null);
 	const own = ownScreenId();
@@ -83,9 +82,6 @@ export function ScreensCard() {
 						subscription?.unsubscribe(),
 					);
 				}
-				void queryClient.invalidateQueries({
-					queryKey: notificationQueries.all(),
-				});
 				toast.success(
 					toRemove?.kind === "expo"
 						? `${toRemove.name} is removed and signed out`

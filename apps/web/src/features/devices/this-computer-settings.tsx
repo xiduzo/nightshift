@@ -206,9 +206,6 @@ function HostSettings({ computer }: { computer: ThisComputer }) {
 		settingsMutations.save({
 			onSuccess: (data) => {
 				queryClient.setQueryData(settingsQueries.get().queryKey, data);
-				void queryClient.invalidateQueries({
-					queryKey: deviceQueries.overviewKey(),
-				});
 			},
 			onError: (error) => toast.error(`Not saved: ${error.message}`),
 		}),

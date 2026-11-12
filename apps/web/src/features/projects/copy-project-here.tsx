@@ -10,7 +10,7 @@ import {
 } from "@nightshift/ui/components/item";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { cn } from "@nightshift/ui/lib/utils";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { CloudDownloadIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
@@ -61,15 +61,10 @@ export function CopyProjectHere({
 	project: Project;
 	className?: string;
 }) {
-	const queryClient = useQueryClient();
 	const copy = useProjectCopy(project);
 	const folder = useChooseProjectFolder(project);
 	const start = useMutation(
 		projectMutations.copyHere({
-			onSuccess: () =>
-				queryClient.invalidateQueries({
-					queryKey: projectQueries.copies().queryKey,
-				}),
 			onError: (error) => toast.error(error.message),
 		}),
 	);

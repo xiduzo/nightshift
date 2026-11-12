@@ -45,7 +45,7 @@ import {
 } from "@nightshift/ui/components/select";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
 	CircleAlertIcon,
 	CopyIcon,
@@ -163,21 +163,13 @@ export function MembersPage() {
 	);
 }
 
-function useRefreshMembers() {
-	const queryClient = useQueryClient();
-	return () =>
-		void queryClient.invalidateQueries({ queryKey: spaceQueries.membersKey() });
-}
-
 /** The Members with their roles: change a role, or remove a Member. */
 function MemberList({ overview }: { overview: MembersOverview }) {
-	const refresh = useRefreshMembers();
 	const [toRemove, setToRemove] = useState<SpaceMember | null>(null);
 	const setRole = useMutation(
 		spaceMutations.setRole({
 			onSuccess: () => {
 				toast.success("Role changed");
-				refresh();
 			},
 			onError: (error) => toast.error(`Role not changed: ${error.message}`),
 		}),
@@ -187,7 +179,6 @@ function MemberList({ overview }: { overview: MembersOverview }) {
 			onSuccess: () => {
 				toast.success(`${toRemove?.name ?? "The member"} left the Space`);
 				setToRemove(null);
-				refresh();
 			},
 			onError: (error) => toast.error(`Not removed: ${error.message}`),
 		}),
@@ -331,12 +322,10 @@ function Invitations({
 	overview: MembersOverview;
 	onInvite: () => void;
 }) {
-	const refresh = useRefreshMembers();
 	const cancel = useMutation(
 		spaceMutations.cancelInvitation({
 			onSuccess: () => {
 				toast.success("Invitation canceled");
-				refresh();
 			},
 			onError: (error) => toast.error(`Not canceled: ${error.message}`),
 		}),
