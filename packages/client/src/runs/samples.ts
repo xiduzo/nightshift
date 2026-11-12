@@ -1,4 +1,9 @@
-import type { Flow, FlowNode } from "@nightshift/flows";
+import {
+	type Flow,
+	type FlowNode,
+	standInOutcomes,
+	standsIn,
+} from "@nightshift/flows";
 import type { RunDetail, StepSummary } from "./types";
 
 /**
@@ -17,6 +22,8 @@ export type NodeSample = {
 	inputs: RunDetail["inputs"];
 	/** The node in the run's flow is not the node of the draft: the output may not fit it now. */
 	changed: boolean;
+	/** The step stood in for its node in a test run: it gave a pinned output, or it was skipped. */
+	test?: StepSummary["test"];
 };
 
 /** What `nodeSamples` reads of a run. */
@@ -50,18 +57,84 @@ export function nodeSamples(
 				samples.has(node.id)
 			)
 				continue;
-			samples.set(node.id, {
-				runId: run.id,
-				stepId: step.id,
-				endedAt: step.endedAt,
-				outcome: step.outcome,
-				outputs: step.outputs,
-				inputs: run.inputs,
-				changed: nodeChanged(ran.get(node.id), node),
-			});
+			samples.set(node.id, sampleOf(run, step, node, ran.get(node.id)));
 		}
 	}
 	return samples;
+}
+
+/** Where a test run takes a node's output from: a step of an earlier run. */
+export type PinRef = { runId: string; stepId: string };
+
+/**
+ * The output each pin of a test run names, by node id: the step `stepId`
+ * of the run `runId`, from `runs` (the runs the pins name, any order). A
+ * pin whose run is not in `runs`, whose step that run does not have, or
+ * whose node `flow` does not have, has no sample.
+ */
+export function pinnedSamples(
+	runs: readonly SampleRun[],
+	pins: Readonly<Record<string, PinRef>>,
+	flow: Pick<Flow, "nodes">,
+): Map<string, NodeSample> {
+	const byId = new Map(runs.map((run) => [run.id, run]));
+	const samples = new Map<string, NodeSample>();
+	for (const node of flow.nodes) {
+		const pin = Object.hasOwn(pins, node.id) ? pins[node.id] : undefined;
+		const run = pin && byId.get(pin.runId);
+		const step = run?.steps.find((candidate) => candidate.id === pin?.stepId);
+		if (!run || !step) continue;
+		const ran = run.flow.nodes.find((candidate) => candidate.id === node.id);
+		samples.set(node.id, sampleOf(run, step, node, ran));
+	}
+	return samples;
+}
+
+/**
+ * Why a test run cannot pin the output of `sample` on `node`, in words
+ * for the person, or null when it can: the step must have ended on one
+ * of the node's outcomes, and it must have given an output. The engine
+ * checks the same at the start (ADR 27).
+ */
+export function pinProblem(
+	node: FlowNode,
+	sample: NodeSample | undefined,
+): string | null {
+	if (!standsIn(node)) return "A test run always runs this node.";
+	if (sample === undefined) return "Run the flow first. Then pin its output.";
+	if (sample.endedAt === null) return "Its step runs now.";
+	if (sample.test === "skipped") return "It was skipped in that run.";
+	if (sample.outcome === null || UNFINISHED.has(sample.outcome))
+		return "Its step did not finish in that run.";
+	if (!standInOutcomes(node).includes(sample.outcome))
+		return `It has no outcome "${sample.outcome}" now.`;
+	return null;
+}
+
+/** The outcomes of a step whose work did not finish. */
+const UNFINISHED: ReadonlySet<string> = new Set([
+	"error",
+	"stopped",
+	"interrupted",
+]);
+
+/** The sample of one step of a run, for the node of the draft. */
+function sampleOf(
+	run: SampleRun,
+	step: StepSummary,
+	node: FlowNode,
+	ran: FlowNode | undefined,
+): NodeSample {
+	return {
+		runId: run.id,
+		stepId: step.id,
+		endedAt: step.endedAt,
+		outcome: step.outcome,
+		outputs: step.outputs,
+		inputs: run.inputs,
+		changed: nodeChanged(ran, node),
+		...(step.test ? { test: step.test } : {}),
+	};
 }
 
 /** The newest top-level step of each node of one run. */
