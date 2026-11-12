@@ -93,6 +93,26 @@ describe("variables in the draft", () => {
 		expect(renamed.variables?.[0]?.initial).toBe("{{from}}");
 	});
 
+	test("renaming an input follows into the rules that read it", () => {
+		const reads = flowSchema.parse({
+			...flow,
+			nodes: [
+				{
+					id: "enough",
+					type: "decision",
+					position: { x: 0, y: 0 },
+					prompt: "",
+					by: "rule",
+					options: [{ name: "stop", when: 'start = "now"' }, { name: "go" }],
+				},
+			],
+		});
+		const [enough] = renameInput(reads, 0, "from").nodes;
+		expect(enough?.type === "decision" && enough.options[0]?.when).toBe(
+			'from = "now"',
+		);
+	});
+
 	test("setVariables and withWrites drop empty lists from the file", () => {
 		expect("variables" in setVariables(flow, [])).toBe(false);
 		const node = flow.nodes[0];

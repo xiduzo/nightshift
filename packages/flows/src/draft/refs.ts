@@ -155,13 +155,14 @@ export function renameVariable(flow: Flow, index: number, to: string): Flow {
 }
 
 /**
- * Renames an input and the `{{old…}}` references in this flow's nodes and
- * outputs. Flows that call this one keep binding the old name.
+ * Renames an input, the `{{old…}}` references in this flow's nodes and
+ * outputs, and `old` where its rules read it. Flows that call this one
+ * keep binding the old name.
  */
 export function renameInput(flow: Flow, index: number, to: string): Flow {
 	const from = flow.inputs[index]?.name;
 	if (from === undefined || from === to) return flow;
-	const next = rewriteFlowTemplates(flow, (text) => renameRefs(text, from, to));
+	const next = renameInFlow(flow, from, to);
 	return {
 		...next,
 		inputs: next.inputs.map((input, at) =>
@@ -557,14 +558,4 @@ export function rewriteFlowTexts(flow: Flow, rewrite: TextRewrite): Flow {
 				: { ...variable, initial: template(variable.initial) },
 		),
 	};
-}
-
-/** Applies `rewrite` to every template of the flow: `rewriteFlowTexts` without the rules. */
-export function rewriteFlowTemplates(
-	flow: Flow,
-	rewrite: (text: string) => string,
-): Flow {
-	return rewriteFlowTexts(flow, (text, field) =>
-		field.rule ? text : rewrite(text),
-	);
 }
