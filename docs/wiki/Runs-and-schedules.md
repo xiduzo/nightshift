@@ -17,12 +17,14 @@ When a run finishes, the run page asks "Was this run useful?". The phone asks to
 
 ## The report of a run
 
-A run can end with a report: what it produced, in Markdown, such as research results or a market update. An [End node](Flows-and-nodes.md#end) writes it.
+A run can end with a report: what it produced, in Markdown, such as research results or a market update. An [End node](Flows-and-nodes.md#end) writes it, or reads it from a file that a step of the run wrote.
 
 - **The run page** shows the report in the End step. **Copy** puts it on your clipboard. **Download** saves it as a `.md` file. A run that ended with a report opens at it.
 - **The Flows page** shows the start of each flow's latest report on its card. Click **Latest report** to read all of it.
 - **Home** lists the latest report of each flow under the lanes, newest first. Point at a row to see the start of the report.
 - Night Shift keeps the first 64 KB of a report. A longer report says so.
+- A report from a file must be a text file in the folder the run works in. When the file is not there, or is not text, the run ends as the End node says, without a report. The run page tells you why.
+- When the steps run on two computers, the End node reads the file on the computer of the run. A file that a step wrote on the other computer is not there.
 - Images in a report show as links. Night Shift loads nothing from other websites.
 - Night Shift never sends a report as a notification. Every Member of the Space can read it.
 

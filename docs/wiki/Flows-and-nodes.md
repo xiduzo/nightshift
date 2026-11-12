@@ -168,6 +168,8 @@ An **End** node ends the run with a result: **Done**, **Nothing to do** or **Fai
 
 Set **Report** to **Write it** to give the run a report: what the run produced, in Markdown. It is a template, such as `## What is new` and then `{{summary.output}}`. The report shows on the run page, on the flow's card and on Home. Night Shift never sends it as a notification. See [The report of a run](Runs-and-schedules.md#the-report-of-a-run).
 
+Set **Report** to **A file the run wrote** when a step writes the report itself, such as an agent that saves `report.md`. **File** is a path inside the folder the run works in, for example `report.md` or `reports/{{topic}}.md`. A path that starts with `/`, or that has `..` or `.git` in it, is not valid. The End node reads the file as text when the run gets there.
+
 In a subflow, the End node ends only the subflow. The Subflow node reads the result as `ended`, the message as `end_message` and the report as `end_report`.
 
 ## Inputs, outputs, and templates

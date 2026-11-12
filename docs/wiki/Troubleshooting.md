@@ -88,6 +88,18 @@ The computer or the Host runs an older version of Night Shift. It cannot add a p
 
 By design, a development install (`bun run dev`) pairs and connects only with a Host on the same computer. To test against a remote Host, set `NIGHTSHIFT_DEV_LINK_HOST=true`.
 
+## Runs
+
+### A run ended without its report file
+
+The End node reads its report from a file, but it found no text file at that path. The run page says why. Check these:
+
+1. The step writes the file inside the folder the run works in. The End node uses the same path, for example `reports/{{topic}}.md`.
+2. The file is text, such as Markdown. Night Shift does not read a PDF or an image as a report.
+3. The step that writes the file runs on the same computer as the run. Each computer has its own folder of the run.
+
+"Update Night Shift" in the message means that the computer runs an older version. Update Night Shift there.
+
 ## Schedules
 
 ### A schedule did not start
