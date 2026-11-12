@@ -20,6 +20,7 @@ export {
 } from "./cli-programs";
 export { copyNodes, type FlowClip, pasteNodes } from "./clipboard";
 export {
+	addCalledNode,
 	addEdge,
 	addNode,
 	addNodeAfter,

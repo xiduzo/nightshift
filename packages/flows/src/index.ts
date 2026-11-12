@@ -48,6 +48,7 @@ export {
 	writeChanges,
 } from "./assistant";
 export {
+	addCalledNode,
 	addEdge,
 	addNode,
 	addNodeAfter,

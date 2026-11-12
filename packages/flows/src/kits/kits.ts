@@ -35,44 +35,91 @@ export const KIT_PREFIX = "kit:";
 
 /**
  * One kit as the registry holds it: its flow as its file would hold it,
- * and its family, the role a node type of that family has (`NODE_FAMILY`).
- * The family lives here, not in the flow format: a copy in a project is a
- * plain flow.
+ * its family, the role a node type of that family has (`NODE_FAMILY`), and
+ * its label, what it does in a few words, where a person picks a kit. The
+ * family and the label live here, not in the flow format: a copy in a
+ * project is a plain flow.
  */
-type KitSource = { flow: FlowInput; family: NodeFamily };
+type KitSource = { flow: FlowInput; family: NodeFamily; label: string };
 
 /** The kits by name. */
 const SOURCES: Readonly<Record<string, KitSource>> = {
-	"kit:github/create-branch": { flow: createBranchKit, family: "do" },
-	"kit:github/publish-draft-pr": { flow: publishDraftPrKit, family: "do" },
-	"kit:github/finish-pr": { flow: finishPrKit, family: "do" },
-	"kit:github/wait-for-checks": { flow: waitForChecksKit, family: "hold" },
-	"kit:github/watch-pr": { flow: watchPrKit, family: "hold" },
-	"kit:jira/assign": { flow: jiraAssignKit, family: "do" },
-	"kit:jira/move": { flow: jiraMoveKit, family: "do" },
-	"kit:message/send": { flow: messageSendKit, family: "do" },
-	"kit:feeds/read": { flow: feedsReadKit, family: "do" },
-	"kit:email/send": { flow: emailSendKit, family: "do" },
+	"kit:github/create-branch": {
+		flow: createBranchKit,
+		family: "do",
+		label: "Create a branch",
+	},
+	"kit:github/publish-draft-pr": {
+		flow: publishDraftPrKit,
+		family: "do",
+		label: "Publish a draft pull request",
+	},
+	"kit:github/finish-pr": {
+		flow: finishPrKit,
+		family: "do",
+		label: "Finish a pull request",
+	},
+	"kit:github/wait-for-checks": {
+		flow: waitForChecksKit,
+		family: "hold",
+		label: "Wait for checks",
+	},
+	"kit:github/watch-pr": {
+		flow: watchPrKit,
+		family: "hold",
+		label: "Watch a pull request",
+	},
+	"kit:jira/assign": {
+		flow: jiraAssignKit,
+		family: "do",
+		label: "Assign a Jira work item",
+	},
+	"kit:jira/move": {
+		flow: jiraMoveKit,
+		family: "do",
+		label: "Move a Jira work item",
+	},
+	"kit:message/send": {
+		flow: messageSendKit,
+		family: "do",
+		label: "Send a message",
+	},
+	"kit:feeds/read": { flow: feedsReadKit, family: "do", label: "Read a feed" },
+	"kit:email/send": {
+		flow: emailSendKit,
+		family: "do",
+		label: "Send an email",
+	},
 	"kit:knowledge/review-learnings": {
 		flow: knowledgeReviewLearningsKit,
 		family: "decide",
+		label: "Review learnings",
 	},
+	// A sync kit takes the label of its source (`source-kits.ts`).
 	...Object.fromEntries(
-		KNOWLEDGE_SYNC_KITS.map(({ kit, flow }) => [kit, { flow, family: "do" }]),
+		KNOWLEDGE_SYNC_KITS.map(({ kit, flow, kind }) => [
+			kit,
+			{ flow, family: "do", label: `Knowledge: ${kind.label}` },
+		]),
 	),
 };
 
-/** One kit: its name, its flow and its family. */
-export type Kit = { name: string; flow: Flow; family: NodeFamily };
+/** One kit: its name, its flow, its family and its label. */
+export type Kit = {
+	name: string;
+	flow: Flow;
+	family: NodeFamily;
+	label: string;
+};
 
 /** The kits, parsed once on first use. */
 let parsed: ReadonlyMap<string, Kit> | undefined;
 
 function kits(): ReadonlyMap<string, Kit> {
 	parsed ??= new Map(
-		Object.entries(SOURCES).map(([name, { flow, family }]) => [
+		Object.entries(SOURCES).map(([name, { flow, family, label }]) => [
 			name,
-			{ name, flow: flowSchema.parse(flow), family },
+			{ name, flow: flowSchema.parse(flow), family, label },
 		]),
 	);
 	return parsed;

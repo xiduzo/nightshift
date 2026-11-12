@@ -16,6 +16,7 @@ import type {
 } from "../nodes";
 import { mainOutputField } from "../shapes";
 import {
+	addCalledNode,
 	addEdge,
 	addNode,
 	addNodeAfter,
@@ -209,5 +210,60 @@ describe("addNodeAfter", () => {
 		const result = addNodeAfter(flowOf(fetch), "convert", "gone", later);
 		expect(added<ConvertNode>(result, "convert").value).toBe("");
 		expect(result.flow.edges).toEqual([]);
+	});
+});
+
+describe("addCalledNode", () => {
+	test("runs the flow, with an id from its name", () => {
+		const result = addCalledNode(
+			flowOf(fetch),
+			"kit:github/publish-draft-pr",
+			later,
+		);
+		expect(result.id).toBe("publish_draft_pr");
+		expect(added<FlowNode>(result, "call")).toEqual({
+			id: "publish_draft_pr",
+			type: "call",
+			position: later,
+			flow: "kit:github/publish-draft-pr",
+			inputs: {},
+		});
+		expect(result.flow.start).toBe("fetch");
+		expect(result.flow.edges).toEqual([]);
+	});
+
+	test("a flow of the project, a name that starts with a digit, the first node", () => {
+		expect(addCalledNode(flowOf(), "weekly-report", at)).toMatchObject({
+			id: "weekly_report",
+			flow: { start: "weekly_report" },
+		});
+		expect(addCalledNode(flowOf(), "2fa-check", at).id).toBe("flow_2fa_check");
+	});
+
+	test("ids stay unique and short enough", () => {
+		let flow = flowOf(fetch);
+		const ids: string[] = [];
+		for (let i = 0; i < 3; i++) {
+			const result = addCalledNode(flow, "kit:feeds/read", later);
+			flow = result.flow;
+			ids.push(result.id);
+		}
+		expect(ids).toEqual(["read", "read_2", "read_3"]);
+
+		const long = `${"a".repeat(30)}-${"b".repeat(29)}`;
+		const first = addCalledNode(flowOf(), long, at);
+		const second = addCalledNode(first.flow, long, at);
+		expect(first.id).toHaveLength(40);
+		expect(second.id).toHaveLength(40);
+		expect(second.id.endsWith("_2")).toBe(true);
+	});
+
+	test("an input or a reserved name is taken too", () => {
+		const flow: Flow = {
+			...flowOf(),
+			inputs: [{ name: "read", type: "text" }],
+		};
+		expect(addCalledNode(flow, "kit:feeds/read", at).id).toBe("read_2");
+		expect(addCalledNode(flowOf(), "vars", at).id).toBe("vars_2");
 	});
 });

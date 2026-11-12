@@ -13,7 +13,7 @@ import {
 } from "../flow";
 import { jsonataPath } from "../presets";
 import { mainOutputField, outputFieldShape } from "../shapes";
-import { uniqueEdgeId, uniqueNodeId } from "./names";
+import { takenNames, uniqueEdgeId, uniqueNodeId } from "./names";
 import {
 	agentNode,
 	callNode,
@@ -121,6 +121,49 @@ export function addNode(
 		start: flow.nodes.length === 0 ? id : flow.start,
 	};
 	return { flow: next, id };
+}
+
+/** The longest node id (`nodeIdSchema`). */
+const MAX_NODE_ID = 40;
+
+/**
+ * Adds a Subflow node that runs `flowName`: a flow of the project or a kit.
+ * Its id comes from the name, `publish_draft_pr` for
+ * `kit:github/publish-draft-pr`, with `_2`, `_3`, … when it is taken.
+ */
+export function addCalledNode(
+	flow: Flow,
+	flowName: string,
+	position: Position,
+): { flow: Flow; id: string } {
+	const id = calledNodeId(flow, flowName);
+	const node = { ...callNode(id, position), flow: flowName };
+	const next: Flow = {
+		...flow,
+		nodes: [...flow.nodes, node],
+		start: flow.nodes.length === 0 ? id : flow.start,
+	};
+	return { flow: next, id };
+}
+
+/** A free node id from the last part of a flow's name: `kit:feeds/read` gives `read`. */
+function calledNodeId(flow: Flow, flowName: string): string {
+	const last = flowName.slice(flowName.lastIndexOf("/") + 1);
+	const words = last
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "_")
+		.replace(/^_+|_+$/g, "");
+	const named = words === "" ? "call" : words;
+	const base = /^[a-z]/.test(named) ? named : `flow_${named}`;
+	const trim = (text: string, max: number) =>
+		text.slice(0, max).replace(/_+$/, "");
+	const taken = takenNames(flow);
+	let id = trim(base, MAX_NODE_ID);
+	for (let n = 2; taken.has(id); n++) {
+		const suffix = `_${n}`;
+		id = `${trim(base, MAX_NODE_ID - suffix.length)}${suffix}`;
+	}
+	return id;
 }
 
 /**

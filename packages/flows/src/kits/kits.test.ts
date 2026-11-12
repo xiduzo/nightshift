@@ -11,7 +11,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Flow } from "../flow";
+import { type Flow, NODE_FAMILIES } from "../flow";
 import {
 	type CommandNode,
 	commandWaitOutcome,
@@ -37,6 +37,7 @@ import {
 	knowledgeKitsOf,
 } from "./kits";
 import { formatLearnings } from "./knowledge/learning-file";
+import { KNOWLEDGE_SOURCE_KINDS } from "./knowledge/source-kits";
 
 /**
  * The kits' commands, run as a Command step runs them: `sh -c` in a real
@@ -245,6 +246,28 @@ describe("the kit registry", () => {
 		);
 		expect(kitCopyName("github")).toBeNull();
 		expect(kitList().length).toBeGreaterThan(0);
+	});
+
+	test("every kit has a family and a label of its own", () => {
+		const kits = kitList();
+		for (const { name, family, label } of kits) {
+			expect(NODE_FAMILIES, name).toContain(family);
+			expect(label.trim(), name).not.toBe("");
+			expect(label, name).toBe(label.trim());
+		}
+		const labels = kits.map((kit) => kit.label);
+		expect(new Set(labels).size).toBe(labels.length);
+	});
+
+	test("a sync kit takes the label of its source", () => {
+		for (const kind of KNOWLEDGE_SOURCE_KINDS) {
+			const kit = kitList().find((candidate) => candidate.name === kind.kit);
+			expect(kit?.label).toBe(`Knowledge: ${kind.label}`);
+			expect(kit?.family).toBe("do");
+		}
+		expect(kitList().find((kit) => kit.name === "kit:feeds/read")?.label).toBe(
+			"Read a feed",
+		);
 	});
 
 	test("finds the knowledge kits a flow calls", () => {
