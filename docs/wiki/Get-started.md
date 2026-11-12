@@ -43,7 +43,7 @@ Run your real flows with `bun run night`, and change Night Shift in a separate g
 
 ## Your first run
 
-1. **Add your agents.** The Agents page shows the agent CLIs (`claude`, `codex`, `opencode`, `pi`) and tools (`gh`, `acli`) that it finds on this computer. Choose **Add profile** or **Add tool** for each one you want. See [Agents and profiles](Agents-and-profiles.md).
+1. **Add your agents.** The Agents page shows the agent CLIs (`claude`, `codex`, `opencode`, `pi`) and tools (`gh`, `acli`) that it finds on this computer. Choose **Add profile** or **Add tool** for each one you want. No agent yet? Choose **Set up an agent**, and Night Shift installs one for you. See [Agents and profiles](Agents-and-profiles.md#set-up-an-agent).
 2. **Add a project.** Choose its folder, or copy a repository from GitHub. A project can hold any files: notes, documents, data, or code. Only a project with a folder gets the starter flows, so use a folder for this first run.
 3. **Set up git if Night Shift asks.** Night Shift keeps the history of your project folder with git, and gives each run its own copy. For a folder without git, choose **Set up git**. Night Shift saves every file in a first commit. Runs do not change the files in your folder.
 4. **Keep the starter flows.** Leave **Add the starter flows** checked. Then choose which of your agents runs each part of the [starter flows](Flows-and-nodes.md#starter-flows). Night Shift keeps the flows outside your project folder.

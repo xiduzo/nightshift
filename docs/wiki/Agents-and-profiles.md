@@ -23,6 +23,26 @@ All real work so far runs on Claude Code. pi is verified with an Ollama model.
 
 Any other agent that speaks the Agent Client Protocol works too. Add it on the Agents page as a custom agent, with its command, for example `goose acp`.
 
+## Set up an agent
+
+Night Shift can install Claude Code or Codex for you, and sign you in. Do this on the computer that runs the agent.
+
+1. Open the Agents page.
+2. Choose **Set up an agent**.
+3. Choose Claude Code or Codex. Night Shift recommends Claude Code.
+4. Choose **Install Claude Code** or **Install Codex**. Night Shift asks before it starts. **Details** shows what it runs.
+5. Choose **Install**. Night Shift downloads the agent from Anthropic or OpenAI. It needs no administrator password.
+6. When the install ends, choose **Sign in to Claude** or **Sign in to ChatGPT**.
+7. Finish the sign-in in your browser. If the page shows a code, paste it in the **Code** field.
+
+Night Shift then adds the agent with a profile, and the profile opens.
+
+An agent that is on this computer already skips the install. An agent that is signed in already shows **Add Claude Code** or **Add Codex**.
+
+The page of a harness shows **Install** when its agent is missing, and **Sign in** when it is signed out.
+
+Night Shift sets up an agent only on the computer that you use, on macOS and Linux. See [Setup is not available](Troubleshooting.md#setup-is-not-available).
+
 ## Profiles
 
 A profile holds an agent's setup under one name: the agent, the model, the effort, and the permission mode. A Model Profile holds the [decider](Flows-and-nodes.md#deciders) and the model of a Decision or a Value. Deciders include TypeSafe Jev, OpenAI Decisions, and Ollama on this computer. You make profiles on the Agents page of each computer.
