@@ -12,9 +12,13 @@ import type { ProjectFlowMap } from "../validate";
 import { callPattern, commandOf, withoutComment } from "./cli-programs";
 import { nodeReads } from "./reads";
 
-/** The run fields that name a branch or a base: always empty without a folder. */
-const BRANCH_FIELDS = ["branch", "base_branch", "base_ref"] as const;
-type BranchField = (typeof BRANCH_FIELDS)[number];
+/**
+ * The run fields that name a branch or a base: `{{run.branch}}`. Always
+ * empty in a project without a folder, so the editor offers them only in
+ * a project with one.
+ */
+export const BRANCH_RUN_FIELDS = ["branch", "base_branch", "base_ref"] as const;
+type BranchField = (typeof BRANCH_RUN_FIELDS)[number];
 
 /** What in a node needs the project's folder. */
 export type FolderNeed =
@@ -78,7 +82,7 @@ function nodeNeeds(node: FlowNode): FolderNeed[] {
 	if (command !== undefined && runsGitHere(command))
 		needs.push({ kind: "git" });
 	for (const { name, path } of nodeReads(node)) {
-		const field = BRANCH_FIELDS.find((candidate) => candidate === path[0]);
+		const field = BRANCH_RUN_FIELDS.find((candidate) => candidate === path[0]);
 		if (name === "run" && field !== undefined) {
 			needs.push({ kind: "branch", field });
 		}

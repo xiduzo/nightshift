@@ -94,6 +94,7 @@ import { LeaveDialog } from "./leave-dialog";
 import { NodeDock } from "./node-dock";
 import { nodeEdits } from "./node-edits";
 import { ProjectFlowsContext } from "./project-flows-context";
+import { ProjectFolderContext } from "./project-folder-context";
 import {
 	type RevisionOnCanvas,
 	RevisionsSheet,
@@ -883,163 +884,165 @@ function Editor({
 
 			<DeviceNamesContext.Provider value={deviceNames}>
 				<ProjectFlowsContext.Provider value={projectFlows.flows}>
-					<div className="relative h-[calc(100svh-3.5rem)] min-h-0">
-						<div className="absolute inset-0" inert={subflows.inside}>
-							<OpenFlowContext.Provider value={openFlow}>
-								<EnterSubflowContext.Provider value={subflows.enter}>
-									<EditorCanvas
-										// A proposal is its own canvas: it fits the view anew,
-										// and keeps no routes of the draft.
-										key={
-											revisionPreview
-												? `revision:${shownRevision?.revisionId}`
-												: preview
-													? "proposal"
-													: "draft"
-										}
-										flow={preview?.flow ?? draft}
-										routesKey={`${projectId}/${name}${revisionPreview ? `#revision:${shownRevision?.revisionId}` : preview ? "#proposal" : ""}`}
-										check={previewCheck ?? check}
-										selection={preview ? null : selection}
-										onFlowChange={preview ? ignoreChange : changeFlow}
-										preview={preview ?? undefined}
-										// A fit keeps the flow beside the chat, not under it.
-										coveredRight={chat.open ? CHAT_PANEL_COVERS_PX : 0}
-										onSelect={setSelection}
-										onMakeSection={makeSection}
-										onDropNode={addNode}
-										onNodeDoubleClick={subflows.enterNode}
-										onPaneDoubleClick={addNodeDialog.show}
-										openSection={preview ? null : openSection}
-										onOpenSection={setOpenSection}
-										flowLabel={name}
-										samples={samples}
-										test={testMarks}
-									/>
-								</EnterSubflowContext.Provider>
-							</OpenFlowContext.Provider>
-						</div>
-
-						{/* The panels float over the canvas; the gaps between them pass
-					    clicks and drops through to it. */}
-						<div
-							className="pointer-events-none absolute inset-0"
-							hidden={subflows.inside}
-						>
-							<FlowTitleCard
-								projectId={projectId}
-								name={name}
-								flow={draft}
-								callers={callers}
-								settingsOpen={settingsOpen && selection === null}
-								onToggleSettings={() => {
-									// With a node selected, the button shows the settings.
-									setSettingsOpen((open) => selection !== null || !open);
-									setSelection(null);
-								}}
-								className="pointer-events-auto absolute top-3 left-3 w-[min(24rem,calc(100%-1.5rem))]"
-							/>
-							{shownRevision ? (
-								<ProposalBar
-									title={`What the revision of ${hoverTime(shownRevision.at)} changed`}
-									onHide={() => setShownRevision(null)}
-									className="pointer-events-auto absolute bottom-3 left-1/2 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2"
-								>
-									<Button
-										variant="outline"
-										size="sm"
-										onClick={() => {
-											setShownRevision(null);
-											setRevisionsOpen(true);
-										}}
-									>
-										<HistoryIcon data-icon="inline-start" />
-										Back to revisions
-									</Button>
-								</ProposalBar>
-							) : preview ? (
-								<ProposalBar
-									onHide={chat.hidePreview}
-									className="pointer-events-auto absolute bottom-3 left-1/2 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2"
-								/>
-							) : (
-								<>
-									{testRunId ? (
-										<FollowingBar
-											runId={testRunId}
-											onShowNewest={() => setTestRunId(null)}
-											className="pointer-events-auto absolute bottom-3 left-1/2 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2"
+					<ProjectFolderContext.Provider value={folder}>
+						<div className="relative h-[calc(100svh-3.5rem)] min-h-0">
+							<div className="absolute inset-0" inert={subflows.inside}>
+								<OpenFlowContext.Provider value={openFlow}>
+									<EnterSubflowContext.Provider value={subflows.enter}>
+										<EditorCanvas
+											// A proposal is its own canvas: it fits the view anew,
+											// and keeps no routes of the draft.
+											key={
+												revisionPreview
+													? `revision:${shownRevision?.revisionId}`
+													: preview
+														? "proposal"
+														: "draft"
+											}
+											flow={preview?.flow ?? draft}
+											routesKey={`${projectId}/${name}${revisionPreview ? `#revision:${shownRevision?.revisionId}` : preview ? "#proposal" : ""}`}
+											check={previewCheck ?? check}
+											selection={preview ? null : selection}
+											onFlowChange={preview ? ignoreChange : changeFlow}
+											preview={preview ?? undefined}
+											// A fit keeps the flow beside the chat, not under it.
+											coveredRight={chat.open ? CHAT_PANEL_COVERS_PX : 0}
+											onSelect={setSelection}
+											onMakeSection={makeSection}
+											onDropNode={addNode}
+											onNodeDoubleClick={subflows.enterNode}
+											onPaneDoubleClick={addNodeDialog.show}
+											openSection={preview ? null : openSection}
+											onOpenSection={setOpenSection}
+											flowLabel={name}
+											samples={samples}
+											test={testMarks}
 										/>
-									) : null}
-									<NodeDock
-										onAdd={(type) => addNode(type)}
-										onSearch={() => addNodeDialog.show()}
-										onDragChange={setDragging}
-										className="pointer-events-auto absolute top-1/2 left-3 -translate-y-1/2"
-									/>
-									<IssuesPopover
-										check={check}
-										onSelect={selectIssue}
-										className="pointer-events-auto absolute right-3 bottom-3 lg:top-3 lg:right-auto lg:bottom-auto lg:left-1/2 lg:-translate-x-1/2"
-									/>
-								</>
-							)}
-							{dragging ? (
-								<div className="absolute inset-3 flex items-end justify-center rounded-xl border-2 border-primary/40 border-dashed pb-20">
-									<span className="rounded-full bg-background px-3 py-1 text-muted-foreground text-xs shadow-sm">
-										Drop to add the {paletteMeta(dragging).label} node here
-									</span>
-								</div>
-							) : null}
-							{chat.open ? (
-								<FlowChatPanel
-									{...chat.panel}
-									notice={
-										project && notHere(project) ? (
-											<CopyProjectHere project={project} />
-										) : null
-									}
-									className="pointer-events-auto absolute top-3 right-3 bottom-3 w-[min(380px,calc(100%-1.5rem))]"
+									</EnterSubflowContext.Provider>
+								</OpenFlowContext.Provider>
+							</div>
+
+							{/* The panels float over the canvas; the gaps between them pass
+					    clicks and drops through to it. */}
+							<div
+								className="pointer-events-none absolute inset-0"
+								hidden={subflows.inside}
+							>
+								<FlowTitleCard
+									projectId={projectId}
+									name={name}
+									flow={draft}
+									callers={callers}
+									settingsOpen={settingsOpen && selection === null}
+									onToggleSettings={() => {
+										// With a node selected, the button shows the settings.
+										setSettingsOpen((open) => selection !== null || !open);
+										setSelection(null);
+									}}
+									className="pointer-events-auto absolute top-3 left-3 w-[min(24rem,calc(100%-1.5rem))]"
 								/>
-							) : null}
-							{inspector && !preview ? (
-								<FloatingInspector
-									label={selection ? "Selected" : "Flow settings"}
-									onClose={closeInspector}
-									className={cn(
-										"absolute top-3 right-3 bottom-3 w-[min(400px,calc(100%-1.5rem))]",
-										// Beside the chat on a wide screen, over it on a narrow one.
-										chat.open && "lg:right-[calc(380px+1.5rem)]",
-									)}
-								>
-									<FlowAssistantContext.Provider value={assistant}>
-										{/* An undo or a redo starts the fields again from the draft. */}
-										<div key={`${selectionKey(selection)}#${revision}`}>
-											<NodeSamplesContext.Provider value={samples}>
-												<TestMarksContext.Provider value={testMarks}>
-													{inspector}
-												</TestMarksContext.Provider>
-											</NodeSamplesContext.Provider>
-										</div>
-									</FlowAssistantContext.Provider>
-								</FloatingInspector>
+								{shownRevision ? (
+									<ProposalBar
+										title={`What the revision of ${hoverTime(shownRevision.at)} changed`}
+										onHide={() => setShownRevision(null)}
+										className="pointer-events-auto absolute bottom-3 left-1/2 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2"
+									>
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() => {
+												setShownRevision(null);
+												setRevisionsOpen(true);
+											}}
+										>
+											<HistoryIcon data-icon="inline-start" />
+											Back to revisions
+										</Button>
+									</ProposalBar>
+								) : preview ? (
+									<ProposalBar
+										onHide={chat.hidePreview}
+										className="pointer-events-auto absolute bottom-3 left-1/2 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2"
+									/>
+								) : (
+									<>
+										{testRunId ? (
+											<FollowingBar
+												runId={testRunId}
+												onShowNewest={() => setTestRunId(null)}
+												className="pointer-events-auto absolute bottom-3 left-1/2 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2"
+											/>
+										) : null}
+										<NodeDock
+											onAdd={(type) => addNode(type)}
+											onSearch={() => addNodeDialog.show()}
+											onDragChange={setDragging}
+											className="pointer-events-auto absolute top-1/2 left-3 -translate-y-1/2"
+										/>
+										<IssuesPopover
+											check={check}
+											onSelect={selectIssue}
+											className="pointer-events-auto absolute right-3 bottom-3 lg:top-3 lg:right-auto lg:bottom-auto lg:left-1/2 lg:-translate-x-1/2"
+										/>
+									</>
+								)}
+								{dragging ? (
+									<div className="absolute inset-3 flex items-end justify-center rounded-xl border-2 border-primary/40 border-dashed pb-20">
+										<span className="rounded-full bg-background px-3 py-1 text-muted-foreground text-xs shadow-sm">
+											Drop to add the {paletteMeta(dragging).label} node here
+										</span>
+									</div>
+								) : null}
+								{chat.open ? (
+									<FlowChatPanel
+										{...chat.panel}
+										notice={
+											project && notHere(project) ? (
+												<CopyProjectHere project={project} />
+											) : null
+										}
+										className="pointer-events-auto absolute top-3 right-3 bottom-3 w-[min(380px,calc(100%-1.5rem))]"
+									/>
+								) : null}
+								{inspector && !preview ? (
+									<FloatingInspector
+										label={selection ? "Selected" : "Flow settings"}
+										onClose={closeInspector}
+										className={cn(
+											"absolute top-3 right-3 bottom-3 w-[min(400px,calc(100%-1.5rem))]",
+											// Beside the chat on a wide screen, over it on a narrow one.
+											chat.open && "lg:right-[calc(380px+1.5rem)]",
+										)}
+									>
+										<FlowAssistantContext.Provider value={assistant}>
+											{/* An undo or a redo starts the fields again from the draft. */}
+											<div key={`${selectionKey(selection)}#${revision}`}>
+												<NodeSamplesContext.Provider value={samples}>
+													<TestMarksContext.Provider value={testMarks}>
+														{inspector}
+													</TestMarksContext.Provider>
+												</NodeSamplesContext.Provider>
+											</div>
+										</FlowAssistantContext.Provider>
+									</FloatingInspector>
+								) : null}
+							</div>
+
+							{subflows.inside ? (
+								<OpenFlowContext.Provider value={openFlow}>
+									<SubflowView
+										rootFlow={name}
+										stack={subflows.stack}
+										flows={projectFlows.flows}
+										onEnter={subflows.enter}
+										onGoTo={subflows.goTo}
+										onEdit={openFlow}
+									/>
+								</OpenFlowContext.Provider>
 							) : null}
 						</div>
-
-						{subflows.inside ? (
-							<OpenFlowContext.Provider value={openFlow}>
-								<SubflowView
-									rootFlow={name}
-									stack={subflows.stack}
-									flows={projectFlows.flows}
-									onEnter={subflows.enter}
-									onGoTo={subflows.goTo}
-									onEdit={openFlow}
-								/>
-							</OpenFlowContext.Provider>
-						) : null}
-					</div>
-					<AddNodeDialog {...addNodeDialog.props} />
+						<AddNodeDialog {...addNodeDialog.props} />
+					</ProjectFolderContext.Provider>
 				</ProjectFlowsContext.Provider>
 			</DeviceNamesContext.Provider>
 

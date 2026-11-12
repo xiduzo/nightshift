@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { useId, useState } from "react";
 import { TemplateField } from "../template-field";
+import { KitOptions } from "./kit-options";
 
 /** What a Call node's inspector needs from the editor around it. */
 export type CalledFlowSupport = {
@@ -136,13 +137,7 @@ export function CalledFlowField({
 							</NativeSelectOption>
 						))}
 					</NativeSelectOptGroup>
-					<NativeSelectOptGroup label="Kits">
-						{KITS.map(({ name }) => (
-							<NativeSelectOption key={name} value={name}>
-								{name}
-							</NativeSelectOption>
-						))}
-					</NativeSelectOptGroup>
+					<KitOptions current={current} />
 					{current !== "" && !known ? (
 						<NativeSelectOption value={current}>
 							{problem ? `${current} (${problem})` : current}

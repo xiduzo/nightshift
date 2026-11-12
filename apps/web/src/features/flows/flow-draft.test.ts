@@ -216,3 +216,33 @@ describe("checkFlow: a project without a folder", () => {
 		expect(warnings()).toEqual([]);
 	});
 });
+
+describe("templateVariables: a project without a folder", () => {
+	const run = (folder?: boolean) =>
+		templateVariables(flow, "check", { folder })
+			.find((group) => group.scope === "run")
+			?.variables.map((variable) => variable.text);
+
+	test("the run offers no branch and no base: they are always empty there", () => {
+		expect(run(false)).toEqual([
+			"{{run.index}}",
+			"{{run.worktree}}",
+			"{{run.flow}}",
+			"{{run.due_at}}",
+		]);
+	});
+
+	test("a project with a folder, or one that is still loading, offers them", () => {
+		const all = [
+			"{{run.branch}}",
+			"{{run.base_branch}}",
+			"{{run.index}}",
+			"{{run.worktree}}",
+			"{{run.base_ref}}",
+			"{{run.flow}}",
+			"{{run.due_at}}",
+		];
+		expect(run(true)).toEqual(all);
+		expect(run()).toEqual(all);
+	});
+});

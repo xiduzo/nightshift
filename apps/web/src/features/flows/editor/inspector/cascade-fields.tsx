@@ -11,7 +11,6 @@ import {
 	type DecisionTier,
 	type Flow,
 	isPersonTier,
-	kitList,
 	type PersonTier,
 	type ValueTier,
 } from "@nightshift/flows";
@@ -40,6 +39,7 @@ import { ArrowDownIcon, ArrowUpIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useId } from "react";
 import { Field, InspectorSection, Note, PositiveIntInput } from "../fields";
 import { GateBriefSection, withBrief } from "./gate-brief-fields";
+import { KitOptions } from "./kit-options";
 import {
 	ProfileSelect,
 	profileProblem,
@@ -61,8 +61,6 @@ const ASK_CHOICES = [
 	{ name: "accept", label: "Take the best answer" },
 	{ name: "fail", label: "Fail the step" },
 ] as const;
-
-const KITS = kitList();
 
 /** The node's first tier from what it runs on now: its profile, or its own model. */
 function firstTier(node: CascadeNode): ModelTier {
@@ -465,13 +463,7 @@ function TierItem<N extends CascadeNode>({
 								</NativeSelectOption>
 							))}
 						</NativeSelectOptGroup>
-						<NativeSelectOptGroup label="Kits">
-							{KITS.map(({ name }) => (
-								<NativeSelectOption key={name} value={name}>
-									{name}
-								</NativeSelectOption>
-							))}
-						</NativeSelectOptGroup>
+						<KitOptions current={(tier as CallTier).flow ?? ""} />
 					</NativeSelect>
 				</Field>
 			) : (

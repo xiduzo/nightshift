@@ -62,6 +62,7 @@ import {
 import type { DaemonCliTool } from "./cli-tools-field";
 import { Field, Note, Optional } from "./fields";
 import { useProjectFlowMap } from "./project-flows-context";
+import { useProjectFolder } from "./project-folder-context";
 
 /**
  * A text field that takes `{{name.path}}` templates, with the variables it
@@ -142,11 +143,13 @@ export function TemplateField({
 	const openHelper = () =>
 		setHelping({ base: value, selection: selectionOf(ref.current) });
 	const flows = useProjectFlowMap();
+	const folder = useProjectFolder();
 	const samples = useContext(NodeSamplesContext);
 	const groups = templateVariables(flow, nodeId, {
 		flows,
 		initialValue,
 		samples,
+		folder,
 	});
 
 	const moveCursor = (field: HTMLTextAreaElement | null, cursor: number) => {

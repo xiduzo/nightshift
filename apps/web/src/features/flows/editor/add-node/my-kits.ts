@@ -1,7 +1,12 @@
 // "My kits" in the add-node dialog: the flows of the Space that another
 // flow already runs, this project's first. A person made them to reuse.
 
-import { callersOf, type Flow, type ProjectFlowMap } from "@nightshift/flows";
+import {
+	callersOf,
+	type Flow,
+	folderNeeds,
+	type ProjectFlowMap,
+} from "@nightshift/flows";
 import { type CatalogEntry, firstSentence, SUBFLOW_ICON } from "./catalog";
 
 /** The flows of another project of the Space, by name. */
@@ -21,11 +26,17 @@ function reused(flows: ProjectFlowMap): [string, Flow][] {
 		.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 }
 
+/**
+ * The entry of the flow `name` of `flows`. It needs the project's folder
+ * when one of its steps, or of the flows it runs, does.
+ */
 function entry(
 	name: string,
 	flow: Flow,
+	flows: ProjectFlowMap,
 	from?: { projectId: string; project: string },
 ): CatalogEntry {
+	const needsFolder = folderNeeds(flow, { flows, name }).length > 0;
 	return {
 		key: from ? `flow:${from.projectId}/${name}` : `flow:${name}`,
 		family: "compose",
@@ -41,6 +52,7 @@ function entry(
 			...(from ? [from.project] : []),
 		],
 		...(from ? { badge: from.project } : {}),
+		...(needsFolder ? { needsFolder: true as const } : {}),
 		add: { kind: "kit", flow: name, ...(from ? { from } : {}) },
 	};
 }
@@ -70,7 +82,7 @@ export function myKitEntries({
 	const here: ProjectFlowMap = { ...flows, [flowName]: draft };
 	const own = reused(here)
 		.filter(([name]) => name !== flowName)
-		.map(([name, flow]) => entry(name, flow));
+		.map(([name, flow]) => entry(name, flow, here));
 	const copies = [...others]
 		.sort((a, b) => a.project.localeCompare(b.project))
 		.flatMap(({ projectId, project, flows: theirs }) =>
@@ -78,7 +90,9 @@ export function myKitEntries({
 				.filter(
 					([name, flow]) => JSON.stringify(here[name]) !== JSON.stringify(flow),
 				)
-				.map(([name, flow]) => entry(name, flow, { projectId, project })),
+				.map(([name, flow]) =>
+					entry(name, flow, theirs, { projectId, project }),
+				),
 		);
 	return [...own, ...copies];
 }

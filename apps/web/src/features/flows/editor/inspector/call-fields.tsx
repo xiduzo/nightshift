@@ -27,6 +27,7 @@ import { SOURCE_KINDS } from "../../flow-draft";
 import { useCommandToolField } from "../cli-tools-field";
 import { Field, InspectorSection, Note, PositiveIntInput } from "../fields";
 import { OptionsEditor } from "../options-editor";
+import { useProjectFolder } from "../project-folder-context";
 import { TemplateField } from "../template-field";
 import {
 	CalledFlowField,
@@ -176,6 +177,8 @@ function EachFields({
 	onChange: (change: (node: CallNode) => CallNode) => void;
 }) {
 	const id = useId();
+	// A project without a folder has no branches: an item gets none.
+	const folder = useProjectFolder();
 	// Switching the source kind back and forth keeps what was typed.
 	const lastSource = useRef<Partial<Record<ListSource["kind"], ListSource>>>(
 		{},
@@ -241,32 +244,34 @@ function EachFields({
 			</InspectorSection>
 
 			<InspectorSection title="Loop">
-				<Field
-					id={`${id}-branch`}
-					label="Branch"
-					hint={
-						each.branch === "per-item"
-							? "Each item gets its own branch, on top of the last item that finished. Use {{run.branch}} and {{run.base_branch}} to read them."
-							: "All items work on the same branch, one after the other."
-					}
-				>
-					<NativeSelect
+				{folder ? (
+					<Field
 						id={`${id}-branch`}
-						value={each.branch}
-						aria-describedby={`${id}-branch-hint`}
-						onChange={(event) => {
-							const branch = event.target.value as CallEach["branch"];
-							changeEach((current) => ({ ...current, branch }));
-						}}
+						label="Branch"
+						hint={
+							each.branch === "per-item"
+								? "Each item gets its own branch, on top of the last item that finished. Use {{run.branch}} and {{run.base_branch}} to read them."
+								: "All items work on the same branch, one after the other."
+						}
 					>
-						<NativeSelectOption value="per-item">
-							A branch per item (a stack)
-						</NativeSelectOption>
-						<NativeSelectOption value="shared">
-							One shared branch
-						</NativeSelectOption>
-					</NativeSelect>
-				</Field>
+						<NativeSelect
+							id={`${id}-branch`}
+							value={each.branch}
+							aria-describedby={`${id}-branch-hint`}
+							onChange={(event) => {
+								const branch = event.target.value as CallEach["branch"];
+								changeEach((current) => ({ ...current, branch }));
+							}}
+						>
+							<NativeSelectOption value="per-item">
+								A branch per item (a stack)
+							</NativeSelectOption>
+							<NativeSelectOption value="shared">
+								One shared branch
+							</NativeSelectOption>
+						</NativeSelect>
+					</Field>
+				) : null}
 
 				<HaltOnField
 					id={`${id}-halt`}

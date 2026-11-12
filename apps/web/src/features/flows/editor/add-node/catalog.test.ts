@@ -5,6 +5,7 @@ import {
 	CATALOG,
 	catalogGroups,
 	firstSentence,
+	offHere,
 	PALETTE,
 	paletteFamily,
 } from "./catalog";
@@ -97,6 +98,27 @@ describe("the add-node catalog", () => {
 		expect(
 			kits.find((entry) => entry.key === "kit:github/watch-pr")?.family,
 		).toBe("hold");
+	});
+
+	test("a project without a folder cannot pick a kit that needs one", () => {
+		const kits = CATALOG.filter((entry) => entry.add.kind === "kit");
+		const off = (folder: boolean) =>
+			kits.filter((entry) => offHere(entry, folder)).map((entry) => entry.key);
+		expect(off(false)).toEqual(
+			kitList()
+				.filter((kit) => kit.needsFolder)
+				.map((kit) => kit.name),
+		);
+		expect(off(false)).toContain("kit:github/publish-draft-pr");
+		expect(off(false)).toContain("kit:knowledge/files");
+		expect(off(false)).not.toContain("kit:feeds/read");
+		expect(off(true)).toEqual([]);
+		// A node or a preset never needs the folder.
+		expect(
+			CATALOG.filter((entry) => entry.add.kind !== "kit").some((entry) =>
+				offHere(entry, false),
+			),
+		).toBe(false);
 	});
 
 	test("a description gives its first sentence", () => {

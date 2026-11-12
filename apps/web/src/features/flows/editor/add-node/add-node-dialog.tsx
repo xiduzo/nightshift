@@ -21,11 +21,14 @@ import { cn } from "@nightshift/ui/lib/utils";
 import { useState } from "react";
 import { FAMILY_TILE, type PaletteItem } from "../../canvas/node-type";
 import { PresetForm } from "../inspector/value-presets";
+import { useProjectFolder } from "../project-folder-context";
 import {
 	type CatalogAdd,
 	type CatalogEntry,
 	type CatalogGroup,
 	catalogGroups,
+	NEEDS_FOLDER,
+	offHere,
 } from "./catalog";
 
 const GROUPS = catalogGroups();
@@ -34,7 +37,8 @@ const GROUPS = catalogGroups();
  * The add-node dialog: every node and kit by family, with a search, and
  * "My kits" last. Tab or a double-click on the canvas opens it, and so
  * does the first button of the dock. A Value preset opens its form as the
- * dialog's second page.
+ * dialog's second page. In a project without a folder, a kit or a flow
+ * that needs one shows, but cannot be picked.
  */
 export function AddNodeDialog({
 	open,
@@ -58,6 +62,7 @@ export function AddNodeDialog({
 	onUsePreset: (made: ValuePresetResult) => void;
 }) {
 	const [preset, setPreset] = useState<ValuePresetName | null>(null);
+	const folder = useProjectFolder();
 	const reads = from ? `${from.id}.${mainOutputField(from)}` : null;
 	const changeOpen = (next: boolean) => {
 		if (!next) setPreset(null);
@@ -106,6 +111,7 @@ export function AddNodeDialog({
 												? reads
 												: null
 										}
+										off={offHere(entry, folder)}
 										onPick={() => pick(entry)}
 									/>
 								))}
@@ -118,6 +124,7 @@ export function AddNodeDialog({
 										key={entry.key}
 										entry={entry}
 										reads={null}
+										off={offHere(entry, folder)}
 										onPick={() => pick(entry)}
 									/>
 								))}
@@ -154,18 +161,22 @@ function groupHeading(group: CatalogGroup): string {
  * One node, preset, kit or flow: its icon on a tile in its family's tint,
  * its name and what it does. With one node selected, what takes a value
  * shows what it reads. A kit says "Kit", a flow of another project its
- * project.
+ * project. One that is `off` here cannot be picked, and says why in
+ * place of what it does.
  */
 function CatalogItem({
 	entry,
 	reads,
+	off,
 	onPick,
 }: {
 	entry: CatalogEntry;
 	reads: string | null;
+	off: boolean;
 	onPick: () => void;
 }) {
 	const Icon = entry.icon;
+	const blurb = off ? NEEDS_FOLDER : entry.blurb;
 	return (
 		<CommandItem
 			value={entry.key}
@@ -174,6 +185,7 @@ function CatalogItem({
 				NODE_FAMILY_LABEL[entry.family],
 				...entry.keywords,
 			]}
+			disabled={off}
 			onSelect={onPick}
 			className="items-start"
 		>
@@ -187,8 +199,8 @@ function CatalogItem({
 			</span>
 			<span className="flex min-w-0 flex-1 flex-col">
 				<span className="font-medium">{entry.label}</span>
-				{entry.blurb ? (
-					<span className="text-muted-foreground text-xs">{entry.blurb}</span>
+				{blurb ? (
+					<span className="text-muted-foreground text-xs">{blurb}</span>
 				) : null}
 			</span>
 			{entry.badge ? (

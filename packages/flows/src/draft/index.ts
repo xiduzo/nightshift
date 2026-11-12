@@ -19,7 +19,7 @@ export {
 	programsWithoutLogin,
 } from "./cli-programs";
 export { copyNodes, type FlowClip, pasteNodes } from "./clipboard";
-export type { FolderNeed } from "./folder";
+export { BRANCH_RUN_FIELDS, type FolderNeed, folderNeeds } from "./folder";
 export {
 	addCalledNode,
 	addEdge,

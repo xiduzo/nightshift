@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow } from "@nightshift/flows";
+import { offHere } from "./catalog";
 import { myKitEntries } from "./my-kits";
 
 /** A flow that runs each of `calls` with a Subflow, or none. */
@@ -134,5 +135,45 @@ describe("My kits", () => {
 				],
 			}),
 		).toEqual([]);
+	});
+});
+
+describe("My kits in a project without a folder", () => {
+	test("a flow that runs a kit that needs the folder needs it too, at any depth", () => {
+		const entries = myKitEntries({
+			flowName: "daily",
+			draft: flow("", "ship", "summarize"),
+			flows: {
+				summarize,
+				ship: flow("Ships it.", "publish"),
+				publish: flow("Publishes.", "kit:github/publish-draft-pr"),
+				weekly: flow("", "publish"),
+			},
+			others: [
+				{
+					projectId: "p-a",
+					project: "Alpha",
+					flows: {
+						branch: flow("Makes a branch.", "kit:github/create-branch"),
+						feed: flow("Reads a feed.", "kit:feeds/read"),
+						run: flow("", "branch", "feed"),
+					},
+				},
+			],
+		});
+		const needs = Object.fromEntries(
+			entries.map((entry) => [entry.key, entry.needsFolder ?? false]),
+		);
+		expect(needs).toEqual({
+			"flow:publish": true,
+			"flow:ship": true,
+			"flow:summarize": false,
+			"flow:p-a/branch": true,
+			"flow:p-a/feed": false,
+		});
+		const publish = entries.find((entry) => entry.key === "flow:publish");
+		if (!publish) throw new Error("expected the publish flow");
+		expect(offHere(publish, false)).toBe(true);
+		expect(offHere(publish, true)).toBe(false);
 	});
 });

@@ -88,8 +88,25 @@ export type CatalogEntry = {
 	keywords: readonly string[];
 	/** A tag after the entry: "Kit", or the project a flow comes from. */
 	badge?: string;
+	/**
+	 * It works in the project's folder: a kit that the registry marks, or a
+	 * flow with a step that needs the folder (`folderNeeds`). A project
+	 * without a folder cannot pick it (`offHere`).
+	 */
+	needsFolder?: true;
 	add: CatalogAdd;
 };
+
+/** Why an entry cannot be picked in a project without a folder. */
+export const NEEDS_FOLDER = "Needs a project with a folder.";
+
+/**
+ * Whether a project cannot pick the entry: it has no folder (`folder`
+ * false) and the entry needs one.
+ */
+export function offHere(entry: CatalogEntry, folder: boolean): boolean {
+	return !folder && entry.needsFolder === true;
+}
 
 /** The words people may search with for each node, past its name. */
 const NODE_KEYWORDS: Record<PaletteItem, readonly string[]> = {
@@ -219,6 +236,7 @@ export const CATALOG: readonly CatalogEntry[] = [
 				...kit.name.replace(/^kit:/, "").split(/[/-]/),
 			],
 			badge: "Kit",
+			...(kit.needsFolder ? { needsFolder: true as const } : {}),
 			add: { kind: "kit", flow: kit.name },
 		}),
 	),

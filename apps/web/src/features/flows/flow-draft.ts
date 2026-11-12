@@ -5,6 +5,7 @@
  */
 import type { NodeSample } from "@nightshift/client";
 import {
+	BRANCH_RUN_FIELDS,
 	type CliToolRef,
 	checkDraft,
 	type DraftMessages,
@@ -143,7 +144,8 @@ type Samples = ReadonlyMap<string, NodeSample>;
  * outputs of the flows that Subflow nodes call. `initialValue`: a
  * variable's initial value, which reads the inputs and run only.
  * `samples`: each input and node output gets what it held in the newest
- * run that has it.
+ * run that has it. `folder` false: a project without a folder, where the
+ * run fields of a branch are always empty, so they are left out.
  */
 export function templateVariables(
 	flow: Flow,
@@ -152,9 +154,10 @@ export function templateVariables(
 		flows?: ProjectFlowMap;
 		initialValue?: boolean;
 		samples?: Samples | null;
+		folder?: boolean;
 	} = {},
 ): VariableGroup[] {
-	const { samples, ...scopeOptions } = options;
+	const { samples, folder, ...scopeOptions } = options;
 	const scope = templateScope(flow, scopeOptions);
 	const context = samples ? sampleContext(samples) : null;
 	const groups: VariableGroup[] = [];
@@ -189,9 +192,13 @@ export function templateVariables(
 			variables: nodeVariables(node, own, context),
 		});
 	}
+	const branchless: readonly string[] =
+		folder === false ? BRANCH_RUN_FIELDS : [];
 	groups.push({
 		scope: "run",
-		variables: scope.run.map((field) => variableOf(field, field.name)),
+		variables: scope.run
+			.filter((field) => !branchless.includes(field.name))
+			.map((field) => variableOf(field, field.name)),
 	});
 	return groups;
 }
