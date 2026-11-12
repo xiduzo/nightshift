@@ -784,16 +784,18 @@ describe("a report from a file the run wrote", () => {
 			const device: Device = {
 				...testDevice(h.local),
 				name: "laptop",
-				// The call ends when the stop aborts it.
+				// The person stops the run while the End reads: the call ends
+				// when the stop aborts it. Not on a timer: under load, a timer
+				// can stop the step before the End.
 				readFile: ({ signal }) =>
 					new Promise((_resolve, reject) => {
 						signal?.addEventListener("abort", () =>
 							reject(new Refusal("unavailable", "The call was stopped.")),
 						);
+						stop.abort();
 					}),
 			};
 			h.ctx.placement = placementOn(() => device);
-			setTimeout(() => stop.abort(), 100);
 			const { parked, state } = await drive(h, { inputs: {} });
 			expect(parked[0]).toMatchObject({ status: "stopped", reason: null });
 			expect(state.ended).toBeFalsy();
