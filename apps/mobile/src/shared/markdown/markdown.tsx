@@ -204,10 +204,12 @@ class BlockRenderer extends Renderer {
 		);
 	}
 
-	override image(_uri: string, alt?: string, _style?: unknown, title?: string) {
-		// The phone does not load pictures from the text: it shows their words.
+	override image(uri: string, alt?: string, _style?: unknown, title?: string) {
+		// The phone loads no picture from the text, so nothing loads from
+		// another server: a picture on the web is a link that opens it.
 		const words = alt || title;
-		return words ? this.text([words]) : null;
+		if (linkTarget(uri) === null) return words ? this.text([words]) : null;
+		return this.text([this.link(words || uri, uri)]);
 	}
 
 	override linkImage(
@@ -324,8 +326,8 @@ class InlineRenderer extends BlockRenderer {
 
 /**
  * Text an agent or a flow wrote, as Markdown: headings, lists, code, tables
- * and links. Raw HTML in it shows as text. `className` sets the text of
- * every block, such as "text-sm".
+ * and links. Raw HTML in it shows as text, and a picture as a link.
+ * `className` sets the text of every block, such as "text-sm".
  */
 export function Markdown({
 	text,
