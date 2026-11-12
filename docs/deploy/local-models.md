@@ -128,6 +128,33 @@ The Host cannot reach `127.0.0.1` of the Mac, and it does not have to.
 When the Mac is offline, the step waits for it, unless the node lists a
 backup profile on another computer.
 
+## Ollama on this computer
+
+The `ollama` decider needs no address and no key. It asks the Ollama that
+Night Shift uses: the **Ollama address** setting, else `OLLAMA_HOST`, else
+`127.0.0.1:11434`. The guided setup prepares it after an agent, when you
+choose **Local**:
+
+1. On a Mac with Homebrew, it runs `brew install ollama` after you confirm.
+   On a Mac without Homebrew, and on Linux, it links to Ollama's download
+   page. The vendor's Linux script needs `sudo`, so Night Shift does not
+   run it. A container image has Ollama already.
+2. If Ollama is installed but does not answer, it sets **Search by
+   meaning** to start Ollama with Night Shift (`ollama: on`).
+3. It downloads `llama3.2:latest`, about 2 GB. The person sees the size
+   first.
+4. It makes the Model Profile `local` (`ollama` and that model) and makes
+   `ollama` the decider of new Decision nodes.
+
+An Ollama that Night Shift starts keeps its models in `<data dir>/ollama`.
+Night Shift then also downloads the embedding model of search by meaning,
+about 640 MB. A Model Profile on `ollama` without an address offers
+**Download** for its model when Ollama lacks it.
+
+Until the owner saves a decider, new Decision nodes start on TypeSafe Jev
+when `TYPESAFE_API_KEY` is set, else on Ollama. A node that names no
+decider runs on TypeSafe Jev, so no flow file changes.
+
 ## Another OpenAI-compatible server
 
 LM Studio, llama-server, mlx-lm and vLLM serve OpenAI-compatible chat. Use

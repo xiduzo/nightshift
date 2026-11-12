@@ -97,6 +97,15 @@ A decider is the model of a Decision or a Value that a model decides. You choose
 
 For most choices, start with a small decision model, such as TypeSafe Jev. It is fast and cheap, because it only picks. In a Decision, it can pick only one of the node's options. It writes no text and adds no step.
 
+After you set up an agent, Night Shift asks you to choose a decider. You can also skip this step.
+
+- **Local**: Ollama on this computer. It is private and needs no account. Night Shift downloads a small model of about 2 GB, and shows the size before the download starts. On a Mac with Homebrew, Night Shift installs Ollama for you, after you confirm. Otherwise, download Ollama from its page, then choose **Check again**.
+- **TypeSafe Jev**: the fastest. Paste the key that TypeSafe gives you. Night Shift keeps it on this computer.
+
+Each choice makes a Model Profile: `local` or `jev`. New Decision nodes then start on that decider. Until you choose one, new nodes start on TypeSafe Jev when its key is saved, else on Ollama. **Settings** shows which one. A Decision that names no decider still runs on TypeSafe Jev.
+
+When a step needs an Ollama model that is not on this computer, open its Model Profile and choose **Download**. A local decider gives no confidence with its pick. So it cannot be a middle tier of a [cascade](#cascade) with a minimum confidence.
+
 A pick below the confidence that you set goes to the next tier of the [cascade](#cascade): a large model, or you. To run a decider on your own server, see [A model on your own server](https://github.com/xiduzo/nightshift/blob/main/docs/deploy/local-models.md).
 
 ### Value presets

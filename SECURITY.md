@@ -2,7 +2,7 @@
 
 Night Shift runs agents on your computer with your own logins. A flow can also run shell commands. Report a security problem privately.
 
-Night Shift can install Claude Code or Codex for you. After you confirm on this computer, it runs the vendor's own install script from a fixed https address, never as an administrator ([ADR 25](docs/adr/0025-night-shift-installs-an-agent-cli-with-the-vendors-installer.md)).
+Night Shift can install Claude Code or Codex for you. After you confirm on this computer, it runs the vendor's own install script from a fixed https address, never as an administrator ([ADR 25](docs/adr/0025-night-shift-installs-an-agent-cli-with-the-vendors-installer.md)). In the same way, on a Mac with Homebrew, it runs `brew install ollama` for a decider on this computer. A TypeSafe key that you paste goes to this computer's secrets, never to a log.
 
 ## Report a problem
 

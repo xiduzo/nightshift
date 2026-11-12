@@ -37,6 +37,8 @@ Night Shift can install Claude Code or Codex for you, and sign you in. Do this o
 
 Night Shift then adds the agent with a profile, and the profile opens.
 
+If you have not chosen a decider yet, the setup asks for one: **Local** or **TypeSafe Jev**. Choose **Skip** to keep the default. See [Deciders](Flows-and-nodes.md#deciders).
+
 An agent that is on this computer already skips the install. An agent that is signed in already shows **Add Claude Code** or **Add Codex**.
 
 The page of a harness shows **Install** when its agent is missing, and **Sign in** when it is signed out.

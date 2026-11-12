@@ -32,6 +32,16 @@ The problem says that the agent installed, but Night Shift cannot find it. Quit 
 
 The setup says that the agent is not signed in yet, or that the sign-in took too long. Choose **Sign in** again, and finish the sign-in in your browser. If the page shows a code, paste it in the **Code** field. **Cancel** stops a sign-in that waits.
 
+### The local decider did not finish
+
+- "Ollama did not start." Open the Ollama app, or start Ollama yourself. Then choose **Use Local** again.
+- "The download of llama3.2:latest stopped." Check the internet connection of this computer. Then choose **Use Local** again. The download continues from where it stopped.
+- "Night Shift could not install Ollama." Open **Details** under the problem for the last messages of Homebrew. Or download Ollama from its page, then choose **Check again**.
+
+### "The model … is not on this computer."
+
+A Decision or a Value runs on an Ollama model that this computer does not have. Open the Model Profile of the step on the Agents page, and choose **Download**. Then run the step again.
+
 ### "Needs OpenCode 1.x. Version 2.x does not work yet."
 
 Night Shift drives OpenCode 1.x only. Install an OpenCode 1.x build, and set its path on the Agents page.
