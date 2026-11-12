@@ -210,17 +210,18 @@ describe("the scheduled cleanup of run folders", () => {
 		for (const daemon of daemons) daemon.abort();
 
 		// A restart 90 days later: the first sweep comes once the engine is ready.
+		// The test waits for its end, not for a time: git is slow on a busy computer.
+		const swept = Promise.withResolvers<void>();
 		const later = startDaemon({
 			now: () => now() + 90 * DAY_MS,
 			cleanupDelayMs: 0,
+			cleanupSwept: swept.resolve,
 		});
-		await waitFor(async () => !existsSync(ended.worktreePath), {
-			label: "the sweep",
-		});
-		await waitFor(async () => !existsSync(stranger), {
-			label: "the folder of the run it does not know",
-		});
+		await swept.promise;
 
+		expect(existsSync(ended.worktreePath)).toBe(false);
+		// The folder of the run it does not know.
+		expect(existsSync(stranger)).toBe(false);
 		expect(existsSync(open.worktreePath)).toBe(true);
 		expect(existsSync(recent)).toBe(true);
 		// Logged for the run this computer knows only.
@@ -249,16 +250,22 @@ describe("the scheduled cleanup of run folders", () => {
 		await mkdir(join(folders.path("stranger-run")), { recursive: true });
 		for (const daemon of daemons) daemon.abort();
 
+		const off = Promise.withResolvers<void>();
+		const early = Promise.withResolvers<void>();
 		startDaemon(
-			{ now: () => now() + 200 * DAY_MS, cleanupDelayMs: 0, cleanupEveryMs: 5 },
+			{
+				now: () => now() + 200 * DAY_MS,
+				cleanupDelayMs: 0,
+				cleanupSwept: off.resolve,
+			},
 			{ ...defaultRunSettings(), cleanUpRuns: false },
 		);
 		startDaemon({
 			now: () => now() + 89 * DAY_MS,
 			cleanupDelayMs: 0,
-			cleanupEveryMs: 5,
+			cleanupSwept: early.resolve,
 		});
-		await Bun.sleep(200);
+		await Promise.all([off.promise, early.promise]);
 		expect(existsSync(run.worktreePath)).toBe(true);
 		expect(existsSync(folders.path("stranger-run"))).toBe(true);
 		expect(await removals()).toEqual([]);

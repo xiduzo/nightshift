@@ -313,6 +313,8 @@ export type EngineInternals = {
 	cleanupDelayMs?: number;
 	/** How often the cleanup of run copies and run folders sweeps. Default 6 h. */
 	cleanupEveryMs?: number;
+	/** Called when a round of the cleanup ended: a test waits for this, not for a time. */
+	cleanupSwept?: () => void;
 };
 
 export function createEngine(
@@ -844,6 +846,7 @@ export function createEngine(
 		...(internals.cleanupEveryMs !== undefined
 			? { everyMs: internals.cleanupEveryMs }
 			: {}),
+		...(internals.cleanupSwept ? { swept: internals.cleanupSwept } : {}),
 	});
 
 	/** A Space move: Projects to other Spaces, as one operation. */

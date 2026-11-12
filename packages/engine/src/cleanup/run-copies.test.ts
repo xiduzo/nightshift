@@ -251,13 +251,14 @@ describe("the scheduled cleanup", () => {
 		for (const daemon of daemons) daemon.abort();
 
 		// A restart 91 days later: the first sweep comes once the engine is ready.
+		// The test waits for its end, not for a time: git is slow on a busy computer.
+		const swept = Promise.withResolvers<void>();
 		const later = startDaemon({
 			now: () => now() + 91 * DAY_MS,
 			cleanupDelayMs: 0,
+			cleanupSwept: swept.resolve,
 		});
-		await waitFor(async () => (await removals()).length === 2, {
-			label: "the sweep",
-		});
+		await swept.promise;
 
 		expect(existsSync(empty.worktreePath)).toBe(false);
 		expect(existsSync(pushed.worktreePath)).toBe(false);
@@ -301,12 +302,22 @@ describe("the scheduled cleanup", () => {
 		const run = await runCommand(engine, project.id, "true");
 		for (const daemon of daemons) daemon.abort();
 
-		startDaemon({ now: () => now() + 89 * DAY_MS, cleanupDelayMs: 0 });
+		const early = Promise.withResolvers<void>();
+		const off = Promise.withResolvers<void>();
+		startDaemon({
+			now: () => now() + 89 * DAY_MS,
+			cleanupDelayMs: 0,
+			cleanupSwept: early.resolve,
+		});
 		startDaemon(
-			{ now: () => now() + 120 * DAY_MS, cleanupDelayMs: 0 },
+			{
+				now: () => now() + 120 * DAY_MS,
+				cleanupDelayMs: 0,
+				cleanupSwept: off.resolve,
+			},
 			{ ...defaultRunSettings(), cleanUpRuns: false },
 		);
-		await Bun.sleep(500);
+		await Promise.all([early.promise, off.promise]);
 		expect(await removals()).toEqual([]);
 		expect(existsSync(run.worktreePath)).toBe(true);
 	}, 30_000);

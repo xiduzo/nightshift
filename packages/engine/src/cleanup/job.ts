@@ -5,7 +5,8 @@
  * overlap. Every error is caught and logged here, so one that fails does
  * not keep the next from its work: under `bun --hot` one unhandled error
  * stops every timer of the process. The signal (the engine's lifetime)
- * clears the timers.
+ * clears the timers. `swept` is told when a round ends: a sweep runs git
+ * for every run, so its length depends on the load of this computer.
  */
 
 /** How long after the engine is ready the first sweep starts. */
@@ -21,6 +22,8 @@ export function startCleanupJob(options: {
 	signal: AbortSignal;
 	delayMs?: number;
 	everyMs?: number;
+	/** Called when every sweep of a round ran, also one that failed. Not after the signal stopped the round. */
+	swept?: () => void;
 }): void {
 	const { signal } = options;
 	let running = false;
@@ -45,6 +48,7 @@ export function startCleanupJob(options: {
 		} finally {
 			running = false;
 		}
+		options.swept?.();
 	}
 
 	const stop = () => {
