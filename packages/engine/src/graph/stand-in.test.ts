@@ -22,8 +22,10 @@ import {
 	startRun,
 } from "../testing/graph";
 import { createSandbox, type Sandbox } from "../testing/test-support";
+import type { UsageMoment } from "../usage";
 import { keptValues } from "../variables";
 import { OUTRUN_ERROR } from "./branches";
+import { scoreGate } from "./gate";
 import { closeOpenWork } from "./open-work";
 
 /**
@@ -399,5 +401,27 @@ describe("a test run", () => {
 		expect(real.shapes).toEqual(["research", "note"]);
 		expect(await keptValues(sandbox.db, space)).toEqual({ last: "seen" });
 		expect((await listMemory(sandbox.db, space)).length).toBeGreaterThan(0);
+	});
+
+	test("a Gate a person answers sends no usage moment", async () => {
+		const noted: UsageMoment[] = [];
+		const usage = { note: (moment: UsageMoment) => void noted.push(moment) };
+		const answer = async (test?: TestRun) => {
+			const h = await startRun(
+				sandbox,
+				flowOf([gate("approve")], []),
+				test ? { test } : {},
+			);
+			await scoreGate({ log: h.log, run: h.ctx.run, usage }, "step-1", {
+				choice: "send",
+			});
+			return h;
+		};
+		const tested = await answer({ pinned: {}, skipped: { other: "pass" } });
+		expect(noted).toEqual([]);
+		// The answer is in the run's own log all the same.
+		expect(payloads(await tested.events(), "Scored")).toHaveLength(1);
+		await answer();
+		expect(noted.map((moment) => moment.kind)).toEqual(["gate-answered"]);
 	});
 });

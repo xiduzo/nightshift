@@ -40,6 +40,16 @@ describe("runTrace", () => {
 		expect(runTrace(foldRun([]))).toBeNull();
 	});
 
+	test("says whether the run is a test run: monitoring sends only its spend", () => {
+		const trace = (payload: EnginePayloads["RunStarted"]) =>
+			runTrace(foldRun(log().push("RunStarted", payload).events));
+		expect(trace(started)?.test).toBe(false);
+		expect(
+			trace({ ...started, test: { pinned: {}, skipped: { build: "pass" } } })
+				?.test,
+		).toBe(true);
+	});
+
 	test("gives each step its ends, sessions with harness, model, tokens and cost", () => {
 		const { events } = log()
 			.at(1000)

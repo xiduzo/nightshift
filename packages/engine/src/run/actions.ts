@@ -453,12 +453,15 @@ export function createRunActions(deps: RunActionsDeps) {
 						label: null,
 					},
 				});
-				deps.usage?.note({
-					kind: "run-scored",
-					runId,
-					score: "useful",
-					value: request.useful ? 1 : 0,
-				});
+				// A test run sends no usage event (ADR 27): its answer counts nowhere.
+				if (deps.usage && !isTestRun(await log.state(runId))) {
+					deps.usage.note({
+						kind: "run-scored",
+						runId,
+						score: "useful",
+						value: request.useful ? 1 : 0,
+					});
+				}
 				return;
 			case "answer":
 				// The files first, so the session the answer starts has them.

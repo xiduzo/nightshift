@@ -44,6 +44,10 @@ import { meterOf, type RunningExport } from "../otlp";
  * Where the work landed: the step a climb landed on adds one
  * `nightshift.ladder.rung` point, with its ladder, rung and tier. The cost
  * of a try on a ladder carries the rung that try stands on.
+ *
+ * A test run (ADR 27) counts only in the spend, as in the app's numbers:
+ * it writes the cost and token points of its steps, and no span and no
+ * other point. The registry has no attribute that tells a test run apart.
  */
 
 /** The run as the engine derives it, or null when it has none. */
@@ -354,6 +358,19 @@ export function createRunProjection(deps: {
 		if (end.landing) {
 			m.ladderRung.add(1, { ...point, ...landingAttributes(end.landing) });
 		}
+		spent(run, step, end);
+	}
+
+	/**
+	 * What a step spent: its cost and its sessions' tokens. The only points
+	 * a test run writes.
+	 */
+	function spent(run: RunTrace, step: Step, end: StepEnd): void {
+		const point = {
+			...runMetricAttributes(run),
+			[ATTR.nodeKind]: step.nodeType,
+			[ATTR.deviceId]: step.deviceId ?? deviceId,
+		};
 		const rung = step.rung ? { [ATTR.ladderRung]: step.rung } : {};
 		if (end.costUsd !== null && end.costUsd > 0) {
 			m.cost.add(end.costUsd, {
@@ -362,7 +379,7 @@ export function createRunProjection(deps: {
 				[ATTR.costBasis]: end.costBasis,
 			});
 		}
-		for (const session of sessions) {
+		for (const session of end.sessions) {
 			const sessionProvider = providerOf(session.harness);
 			const labels = {
 				...point,
@@ -463,7 +480,12 @@ export function createRunProjection(deps: {
 		if (fact.kind === "step-ended") {
 			const step = run.steps.find((s) => s.id === fact.stepId);
 			const end = step?.ends.find((e) => e.seq === fact.seq);
-			if (step && end) stepEnded(run, step, end);
+			if (!step || !end) return;
+			// A test run counts only in the spend (ADR 27): no span, no other point.
+			if (run.test) spent(run, step, end);
+			else stepEnded(run, step, end);
+		} else if (run.test) {
+			return;
 		} else if (fact.kind === "run-ended") {
 			const end = run.ends.find((e) => e.seq === fact.seq);
 			if (end) runEnded(run, end);

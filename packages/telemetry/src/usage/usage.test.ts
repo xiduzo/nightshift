@@ -115,6 +115,7 @@ function trace(): RunTrace {
 			},
 		],
 		neededYou: [],
+		test: false,
 	};
 }
 
@@ -162,6 +163,45 @@ test("a flow name, a path, an email and a raw run id never appear in the stored 
 		expect(body).not.toContain(SECRET_RUN);
 		expect(body).not.toContain("Write the email");
 		expect(body).not.toContain("claude-sonnet-4-5");
+		await usage.stop();
+	} finally {
+		await close();
+	}
+});
+
+test("a test run and its steps send no event", async () => {
+	const { db, close } = await openDb();
+	try {
+		const usage = createUsage({
+			db,
+			settings: switches(true, true),
+			policy: async () => true,
+		});
+		const facts: LandedFact[] = [
+			{
+				kind: "run-ended",
+				spaceId: "space-1",
+				runId: SECRET_RUN,
+				seq: 1,
+				changes: "summary",
+				status: "finished",
+			},
+			{
+				kind: "step-ended",
+				spaceId: "space-1",
+				runId: SECRET_RUN,
+				seq: 2,
+				changes: "summary",
+				stepId: "step-1",
+			},
+		];
+		await usage.take(facts, async () => ({ ...trace(), test: true }));
+		await usage.settled();
+		expect((await usage.outbox()).waiting).toEqual([]);
+		// The same run, not a test: both events wait to go.
+		await usage.take(facts, async () => trace());
+		await usage.settled();
+		expect((await usage.outbox()).waiting).toHaveLength(2);
 		await usage.stop();
 	} finally {
 		await close();

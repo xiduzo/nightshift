@@ -15,6 +15,7 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
+import type { UsageMoment } from "../usage";
 import { createEngine, type Engine } from "./engine";
 import {
 	createRunStart,
@@ -141,11 +142,15 @@ describe("a test run that pins an Agent", () => {
 	beforeEach(async () => {
 		sandbox = await createSandbox();
 		engines = [];
+		noted = [];
 	});
 	afterEach(async () => {
 		for (const engine of engines) await engine.dispose();
 		await sandbox.cleanup();
 	});
+
+	/** The usage moments the daemons noted. */
+	let noted: UsageMoment[] = [];
 
 	/** This computer as a daemon, with these harnesses. */
 	function daemon(harnesses: Parameters<typeof withDevice>[0]["harnesses"]) {
@@ -156,6 +161,7 @@ describe("a test run that pins an Agent", () => {
 				deviceId: sandbox.deviceId,
 				dataDir: sandbox.dataDir,
 				scheduler: false,
+				usage: { note: (moment) => void noted.push(moment) },
 			}),
 		);
 		engines.push(engine);
@@ -239,5 +245,12 @@ describe("a test run that pins an Agent", () => {
 			costUsd: 0,
 		});
 		expect(after?.outputs.log_tail).toBe("Found 3 leads.");
+
+		// A useful answer counts for a real run only: a test run sends no usage.
+		await now.act(started.id, { kind: "useful", useful: true });
+		await now.act(earlier.id, { kind: "useful", useful: true });
+		expect(noted.filter((moment) => moment.kind === "run-scored")).toEqual([
+			{ kind: "run-scored", runId: earlier.id, score: "useful", value: 1 },
+		]);
 	});
 });

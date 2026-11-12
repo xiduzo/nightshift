@@ -1,5 +1,6 @@
 import type { AskForm } from "@nightshift/flows";
 import type { GateChoice, GateDeadline, GateVia, StepEvent } from "../log";
+import { isTestRun } from "../run-status";
 import type { StepContext } from "./context";
 import { saysAnything, type WrittenBrief } from "./gate-brief";
 
@@ -88,6 +89,8 @@ export async function scoreGate(
 	});
 	if (!ctx.usage) return;
 	const state = await ctx.log.state(ctx.run.id);
+	// A test run sends no usage event (ADR 27): its Gates count nowhere but in the run.
+	if (isTestRun(state)) return;
 	const step = state.steps.get(stepId);
 	const waits = step?.gateWaits ?? [];
 	let waitMs = 0;

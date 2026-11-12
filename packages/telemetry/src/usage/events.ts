@@ -65,12 +65,17 @@ function runCost(trace: RunTrace): number {
 	return Math.round(usd * 100) / 100;
 }
 
-/** A run that ended. The flow name and the run id are hashed, never stored. */
+/**
+ * A run that ended. The flow name and the run id are hashed, never stored.
+ * A test run (ADR 27) sends no event: no field tells it apart, and its
+ * spend cannot travel without the run.
+ */
 export function runEndedEvent(
 	fact: Extract<LandedFact, { kind: "run-ended" }>,
 	trace: RunTrace,
 	key: string,
 ): Record<string, unknown> | null {
+	if (trace.test) return null;
 	const end =
 		trace.ends.find((item) => item.seq === fact.seq) ?? trace.ends.at(-1);
 	if (!end) return null;
@@ -120,12 +125,16 @@ function landingFields(landing: StepLanding | undefined) {
 	};
 }
 
-/** A step that ended. Error text stays out. Only `_OTHER` may name the error. */
+/**
+ * A step that ended. Error text stays out. Only `_OTHER` may name the
+ * error. A step of a test run sends no event, as its run does not.
+ */
 export function stepEndedEvent(
 	fact: Extract<LandedFact, { kind: "step-ended" }>,
 	trace: RunTrace,
 	_key: string,
 ): Record<string, unknown> | null {
+	if (trace.test) return null;
 	const step = trace.steps.find((item) => item.id === fact.stepId);
 	const end =
 		step?.ends.find((item) => item.seq === fact.seq) ?? step?.ends.at(-1);

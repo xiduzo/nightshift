@@ -11,6 +11,7 @@ import {
 	sessionCost,
 	type WaitReason,
 } from "../log";
+import { isTestRun } from "../run-status";
 import {
 	type Ladder,
 	type Landing,
@@ -149,6 +150,11 @@ export type RunTrace = {
 	steps: TraceStep[];
 	/** Each time a person stepped in, oldest first. An end needed you when one came before it. */
 	neededYou: NeededYou[];
+	/**
+	 * A test run (`isTestRun`, ADR 27): monitoring sends only its spend.
+	 * Usage events and every other number leave it out.
+	 */
+	test: boolean;
 };
 
 /** The run as monitoring reads it, from its run state. Null for a log with no run. */
@@ -192,6 +198,7 @@ export function runTrace(run: RunState): RunTrace | null {
 			};
 		}),
 		neededYou,
+		test: isTestRun(run),
 	};
 }
 

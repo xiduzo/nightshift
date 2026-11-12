@@ -528,6 +528,59 @@ describe("the export to monitoring", () => {
 		expect(sum(cost, { [ATTR.agent]: "codex" })).toBeCloseTo(0.4);
 	});
 
+	test("a test run sends only what it spent: no span and no other point", async () => {
+		const run = runEvents("run-1")
+			.at(T + 1_000)
+			.runStarted({
+				projectId: "p1",
+				flowName: "nightly",
+				test: { pinned: {}, skipped: { ship: "yes" } },
+			})
+			.at(T + 1_100)
+			.stepStarted("s-agent", "build", 1, {
+				nodeType: "agent",
+				deviceId: DEVICE,
+			})
+			.sessionStarted("s-agent", "x1", { harness: "claude-code" })
+			.harness("s-agent", "x1", "h1", "claude-sonnet")
+			.at(T + 3_000)
+			.sessionEnded("s-agent", "x1", "finished", 0.75, {
+				usage: { inputTokens: 900, outputTokens: 100 },
+				costSource: "reported",
+			})
+			.stepEnded("s-agent", "pass")
+			.push(
+				"Scored",
+				{ score: "replicated", value: 1, label: null },
+				{ stepId: "s-agent" },
+			)
+			.at(T + 3_100)
+			.stepStarted("s-gate", "ship", 1, {
+				nodeType: "decision",
+				deviceId: DEVICE,
+				test: "skipped",
+			})
+			.stepEnded("s-gate", "yes")
+			.at(T + 3_200)
+			.ended("finished");
+		const h = await setup({}, run);
+		h.landRun();
+		await h.done();
+		expect(h.spans()).toEqual([]);
+		const points = h.points();
+		expect([...points.keys()].sort()).toEqual(
+			[
+				METRIC.cost.name,
+				METRIC.inputTokens.name,
+				METRIC.outputTokens.name,
+			].sort(),
+		);
+		expect(sum(points.get(METRIC.cost.name))).toBe(0.75);
+		expect(sum(points.get(METRIC.inputTokens.name))).toBe(900);
+		expect(sum(points.get(METRIC.outputTokens.name))).toBe(100);
+		assertConforms(exported(h.spans(), h.resources()));
+	});
+
 	test("a run a person stepped in on says so on its span and its outcome", async () => {
 		const run = runEvents("run-1")
 			.at(T + 1_000)
