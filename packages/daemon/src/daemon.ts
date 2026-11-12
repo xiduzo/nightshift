@@ -523,7 +523,7 @@ async function makeDaemon(
 	const local = localDevice({
 		id: device.id,
 		name: device.name,
-		...harnesses,
+		harnesses,
 		// Decision nodes decided by a model: TanStack AI deciders, with API
 		// keys from the secrets: the run's Project first, when a step asks.
 		decider: tanstackDecider({

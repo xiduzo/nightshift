@@ -16,7 +16,6 @@ import type { FlowInput } from "@nightshift/flows/testing";
 import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { createArtifactStore } from "../artifacts/store";
-import { localDevice } from "../device/local";
 import type { Device } from "../device/types";
 import { defaultRunSettings } from "../device-config/settings";
 import { compileFlow } from "../graph/compile";
@@ -67,6 +66,7 @@ import {
 	type Sandbox,
 	TEST_DEVICE_ID,
 	type TestDeviceDeps,
+	testDevice,
 } from "./test-support";
 
 /**
@@ -299,8 +299,7 @@ export async function startRun(
 		...(options.knowledge ? { knowledge: options.knowledge } : {}),
 		runFolders: createRunFolders(sandbox.dataDir),
 	};
-	const device = () =>
-		localDevice({ id: TEST_DEVICE_ID, name: "test", ...local });
+	const device = () => testDevice(local);
 	// What a step may touch, as the engine makes it once.
 	const shared: StepShared = {
 		log,

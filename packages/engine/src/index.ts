@@ -77,6 +77,7 @@ export type {
 } from "./device";
 export {
 	createToolLaunchers,
+	type Harnesses,
 	localDevice,
 	type SignInResult,
 	type ToolLaunchers,

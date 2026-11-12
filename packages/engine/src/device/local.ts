@@ -7,7 +7,6 @@ import type {
 	DeciderName,
 	DecisionInput,
 	DecisionResult,
-	HarnessName,
 	SessionContribution,
 	ValueInput,
 	ValueResult,
@@ -15,11 +14,9 @@ import type {
 import { findProgram, foldContributions } from "@nightshift/agents/types";
 import {
 	type AgentHarnessName,
-	type CustomHarnessName,
 	deciderNameSchema,
 	FLOW_VERSION,
 	type FlowSources,
-	isCustomHarness,
 	type JsonValue,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
@@ -77,6 +74,23 @@ export type DeviceConnections = Pick<
 export type DeviceCliTools = Pick<CliToolStore, "names" | "program" | "guides">;
 
 /**
+ * The agent harnesses of this computer, read at each question: the ones
+ * added on the Agents page, and the custom agents (`acp:<slug>`). The
+ * daemon reads them from its settings (`localHarnesses` of
+ * `@nightshift/daemon`), a test from a record (`harnessesOf`).
+ */
+export type Harnesses = {
+	/**
+	 * The harness of that name, when it is added and built here. Undefined:
+	 * none of that name. `use`: where the session happens, for the Secret
+	 * scope rule of a custom agent's env.
+	 */
+	get(name: AgentHarnessName, use?: SecretUse): AgentHarness | undefined;
+	/** The names `get` finds: the harnesses this Device reports. */
+	names(): readonly AgentHarnessName[];
+};
+
+/**
  * Everything on this computer a step body may touch: the harnesses, the
  * decider, this computer's configuration as its stores (connections and
  * secrets, CLI tools, Agent Profiles), `sh -c` and git worktrees.
@@ -86,25 +100,8 @@ export type DeviceCliTools = Pick<CliToolStore, "names" | "program" | "guides">;
 export type LocalDeviceDeps = {
 	id: string;
 	name: string;
-	/** The harnesses built on this computer, by name. */
-	harnesses: Partial<Record<HarnessName, AgentHarness>>;
-	/**
-	 * The custom agents added on this computer (`acp:<slug>`), read at each
-	 * question. Undefined: none of that name. `use`: where the session
-	 * happens, for the Secret scope rule.
-	 */
-	customHarness?: (
-		name: CustomHarnessName,
-		use?: SecretUse,
-	) => AgentHarness | undefined;
-	/**
-	 * The harnesses added on the Agents page, read at each question. A
-	 * harness left out cannot run a session, even when `harnesses` has it.
-	 * Without it: every harness in `harnesses`. Custom agents need no entry.
-	 */
-	harnessNames?: () => ReadonlySet<HarnessName>;
-	/** The custom agents added on this computer, by flow name. Without it: none. */
-	customHarnessNames?: () => readonly CustomHarnessName[];
+	/** The harnesses added on this computer. */
+	harnesses: Harnesses;
 	/** Decides Decision nodes and makes values for Value nodes. */
 	decider?: Decider;
 	/**
@@ -133,7 +130,7 @@ export type LocalDeviceDeps = {
 	toolLaunchers?: Pick<ToolLaunchers, "prepare" | "forCommand" | "guarded">;
 	/*
 	 * Every secret this Device reads for a step goes through `connections`,
-	 * `toolLaunchers`, `customHarness`, the decider and `secretValues`.
+	 * `toolLaunchers`, `harnesses`, the decider and `secretValues`.
 	 * Which scopes each reads is the Secret scope rule's (`secretScopes`),
 	 * not this file's: it passes the facts of the use on.
 	 */
@@ -476,17 +473,6 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 	const findCli = (name: string) => which(cliTools?.program(name) ?? name);
 	const connections: DeviceConnections = deps.connections ?? NO_CONNECTIONS;
 
-	/** The harness of that name, when it is added and built. */
-	const harnessFor = (
-		name: AgentHarnessName,
-		use?: SecretUse,
-	): AgentHarness | undefined => {
-		if (isCustomHarness(name)) return deps.customHarness?.(name, use);
-		return (deps.harnessNames?.().has(name) ?? true)
-			? harnesses[name]
-			: undefined;
-	};
-
 	const deciderFacts: DeciderFacts | null = decider
 		? {
 				values: decider.value !== undefined,
@@ -528,7 +514,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		// Where this session happens: the Secret scope rule decides what its
 		// `${NAME}` references read (ADR 13, ADR 18).
 		const use = useOf(run, underOffer);
-		const harness = harnessFor(name, use);
+		const harness = harnesses.get(name, use);
 		if (!harness) {
 			yield {
 				type: "refused",
@@ -739,10 +725,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		async capabilities(query = {}): Promise<Capabilities> {
 			return {
 				elsewhere: null,
-				harnesses: [
-					...(Object.keys(harnesses) as HarnessName[]),
-					...(deps.customHarnessNames?.() ?? []),
-				].filter((name) => harnessFor(name) !== undefined),
+				harnesses: [...harnesses.names()],
 				connections: [...connections.names()],
 				clis: [...(cliTools?.names() ?? [])],
 				programs: Object.fromEntries(

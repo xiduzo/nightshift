@@ -45,7 +45,7 @@ function makeEngine(
 	harnesses: Partial<Record<HarnessName, AgentHarness>>,
 	options: Pick<
 		TestEngineOptions,
-		"profileFor" | "harnessNames" | "cliTools" | "which" | "decider"
+		"profileFor" | "cliTools" | "which" | "decider"
 	> = {},
 ): SpaceEngine {
 	return createEngine(
@@ -302,12 +302,10 @@ describe("model profiles", () => {
 
 describe("added harnesses", () => {
 	test("a harness that is not added cannot run an Agent node", async () => {
+		// Only OpenCode is added: the profile runs on Claude Code.
 		const engine = makeEngine(
-			{ "claude-code": fakeHarness() },
-			{
-				profileFor: () => builder,
-				harnessNames: () => new Set(["opencode"]),
-			},
+			{ opencode: fakeHarness() },
+			{ profileFor: () => builder },
 		);
 		await expect(
 			engine.startRun({

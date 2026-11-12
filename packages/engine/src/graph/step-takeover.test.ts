@@ -6,7 +6,6 @@ import {
 	reportingScript,
 } from "@nightshift/agents/testing";
 import type { FlowNode } from "@nightshift/flows";
-import { localDevice } from "../device/local";
 import type { Device } from "../device/types";
 import { fallbackKey, type RunFallbacks } from "../log/run-row";
 import {
@@ -23,6 +22,7 @@ import {
 	createSandbox,
 	type Sandbox,
 	TEST_DEVICE_ID,
+	testDevice,
 } from "../testing/test-support";
 
 /**
@@ -47,7 +47,7 @@ type Seen = { at: string; run: unknown }[];
 
 /** The run's own computer as a Device that records what it runs. */
 function recording(h: Harness, seen: Seen): Device {
-	const device = localDevice({ id: TEST_DEVICE_ID, name: "here", ...h.local });
+	const device = testDevice(h.local, TEST_DEVICE_ID, "here");
 	return {
 		...device,
 		exec: (input) => {
@@ -64,7 +64,7 @@ function recording(h: Harness, seen: Seen): Device {
 /** A Device that is away, then comes back when `away.online` turns true. */
 function awayDevice(h: Harness, seen: Seen) {
 	const away = { online: false };
-	const device = localDevice({ id: "away", name: "away", ...h.local });
+	const device = testDevice(h.local, "away", "away");
 	return {
 		away,
 		device: {

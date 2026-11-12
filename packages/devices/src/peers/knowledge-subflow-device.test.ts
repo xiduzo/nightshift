@@ -5,6 +5,7 @@ import { type Device, localDevice } from "@nightshift/engine";
 import type { RunStatus } from "@nightshift/engine/run-status";
 import {
 	createSandbox,
+	harnessesOf,
 	mustGit,
 	type Sandbox,
 	testKnowledge,
@@ -69,7 +70,7 @@ beforeEach(async () => {
 	onB = localDevice({
 		id: b.deviceId,
 		name: "B",
-		harnesses: {},
+		harnesses: harnessesOf({}),
 		knowledge,
 		clonePath: async (id) => (id === projectId ? b.repoPath : null),
 	});

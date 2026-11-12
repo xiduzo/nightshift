@@ -27,10 +27,12 @@ import { testKnowledge } from "../testing/knowledge";
 import {
 	connectionsOf,
 	createSandbox,
+	harnessesOf,
 	mustGit,
 	type Sandbox,
+	type TestDeviceDeps,
 } from "../testing/test-support";
-import { type LocalDeviceDeps, localDevice } from "./local";
+import { localDevice } from "./local";
 import type { Device, ExecEvent, SessionEvent, SessionInput } from "./types";
 
 /**
@@ -61,8 +63,16 @@ afterEach(async () => {
 	await sandbox.cleanup();
 });
 
-function device(deps: Partial<LocalDeviceDeps> = {}): Device {
-	return localDevice({ id: "d1", name: "studio", harnesses: {}, ...deps });
+function device({
+	harnesses = {},
+	...deps
+}: Partial<TestDeviceDeps> = {}): Device {
+	return localDevice({
+		id: "d1",
+		name: "studio",
+		harnesses: harnessesOf(harnesses),
+		...deps,
+	});
 }
 
 /** Secrets saved on this computer, in memory. */
@@ -182,8 +192,7 @@ describe("what the Device reports", () => {
 
 	test("the added harnesses, its connections, CLI tools, asked programs and decider", async () => {
 		const d = device({
-			harnesses: { "claude-code": fakeHarness(), codex: fakeHarness() },
-			harnessNames: () => new Set(["codex"]),
+			harnesses: { codex: fakeHarness() },
 			connections: await connectionsHere({
 				connections: [
 					{ name: "jira", server: { url: "http://jira.test/mcp" } },
@@ -236,10 +245,8 @@ describe("what the Device reports", () => {
 describe("session", () => {
 	test("refuses a harness that is not added, before it starts anything", async () => {
 		const harness = fakeHarness();
-		const d = device({
-			harnesses: { "claude-code": harness },
-			harnessNames: () => new Set(),
-		});
+		// Another harness is added: the session asks for Claude Code.
+		const d = device({ harnesses: { codex: harness } });
 		expect(await collect(d.session(sessionInput()))).toEqual([
 			{
 				type: "refused",
@@ -277,11 +284,15 @@ describe("session", () => {
 
 	test("a session under an Offer asks for no Personal secret; its owner's own session may", async () => {
 		const uses: [string, unknown][] = [];
-		const d = device({
-			harnesses: { "claude-code": fakeHarness() },
-			customHarness: (_name, use) => {
-				uses.push(["agent", use]);
-				return fakeHarness();
+		const d = localDevice({
+			id: "d1",
+			name: "studio",
+			harnesses: {
+				get: (_name, use) => {
+					uses.push(["agent", use]);
+					return fakeHarness();
+				},
+				names: () => [],
 			},
 			connections: {
 				...connectionsOf(),
@@ -922,7 +933,7 @@ describe("exec", () => {
 	/** This computer's connections, with these secrets saved on it. */
 	const secrets = async (
 		values: Record<string, string>,
-	): Promise<Partial<LocalDeviceDeps>> => ({
+	): Promise<Partial<TestDeviceDeps>> => ({
 		connections: await connectionsHere({ secrets: values }),
 	});
 
@@ -1174,7 +1185,7 @@ describe("exec", () => {
 
 describe("callTool", () => {
 	/** This computer with the connection "tracker": the MCP fixture server. */
-	const tracker = async (): Promise<Partial<LocalDeviceDeps>> => ({
+	const tracker = async (): Promise<Partial<TestDeviceDeps>> => ({
 		connections: await connectionsHere({
 			connections: [{ name: "tracker", server: fakeMcp }],
 		}),

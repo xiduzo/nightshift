@@ -11,12 +11,14 @@ import type {
 import { createDb, type Database } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 import { device, event, organization } from "@nightshift/db/schema";
+import type { AgentHarnessName } from "@nightshift/flows";
 import { asDate, now } from "@nightshift/time";
 import { asc, eq, sql } from "drizzle-orm";
 import type { DeviceDirectory } from "../contract/directory";
 import {
 	type DeviceCliTools,
 	type DeviceConnections,
+	type Harnesses,
 	type LocalDeviceDeps,
 	localDevice,
 } from "../device/local";
@@ -43,15 +45,44 @@ import { alonePeers } from "./alone-peers";
 /** The id of the Device tests run on. */
 export const TEST_DEVICE_ID = "test-device";
 
-/** What a test's Device is made of: this computer's deps, over fakes. */
-export type TestDeviceDeps = Omit<LocalDeviceDeps, "id" | "name">;
+/** A test's harnesses by name. A custom agent goes under its `acp:<slug>`. */
+export type HarnessRecord = Partial<Record<AgentHarnessName, AgentHarness>>;
+
+/**
+ * The harnesses of a test's Device, read from `record` at each question:
+ * every harness in it is added, a custom agent too. A harness that is not
+ * added is one the record leaves out.
+ */
+export function harnessesOf(record: HarnessRecord): Harnesses {
+	return {
+		get: (name) => record[name],
+		names: () =>
+			(Object.keys(record) as AgentHarnessName[]).filter(
+				(name) => record[name] !== undefined,
+			),
+	};
+}
+
+/** What a test's Device is made of: this computer's deps, over fakes, with its harnesses by name. */
+export type TestDeviceDeps = Omit<
+	LocalDeviceDeps,
+	"id" | "name" | "harnesses"
+> & {
+	harnesses: HarnessRecord;
+};
 
 /** This computer as a Device, over the test's fakes. */
 export function testDevice(
-	deps: TestDeviceDeps,
+	{ harnesses, ...deps }: TestDeviceDeps,
 	id: string = TEST_DEVICE_ID,
+	name = "test",
 ): Device {
-	return localDevice({ id, name: "test", ...deps });
+	return localDevice({
+		id,
+		name,
+		harnesses: harnessesOf(harnesses),
+		...deps,
+	});
 }
 
 /** The engine's options with the Device's deps beside them, as a test writes them. */
@@ -72,9 +103,6 @@ export type TestEngineOptions = Omit<
 export function withDevice(options: TestEngineOptions): EngineOptions {
 	const {
 		harnesses,
-		harnessNames,
-		customHarness,
-		customHarnessNames,
 		decider,
 		connections,
 		cliTools,
@@ -96,9 +124,6 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 		device: testDevice(
 			{
 				harnesses,
-				harnessNames,
-				customHarness,
-				customHarnessNames,
 				decider,
 				connections,
 				cliTools,

@@ -28,6 +28,7 @@ export {
 	connectionsOf,
 	createSandbox,
 	expectRunLogsInSync,
+	harnessesOf,
 	mustGit,
 	type Sandbox,
 	sleepClock,

@@ -196,9 +196,7 @@ describe("custom agents", () => {
 		const engine = createEngine(
 			withDevice({
 				db: sandbox.db,
-				harnesses: { "claude-code": named("claude-code") },
-				customHarness: (name) => (name === "acp:goose" ? goose : undefined),
-				customHarnessNames: () => ["acp:goose"],
+				harnesses: { "claude-code": named("claude-code"), "acp:goose": goose },
 				dataDir: sandbox.dataDir,
 				scheduler: false,
 			}),

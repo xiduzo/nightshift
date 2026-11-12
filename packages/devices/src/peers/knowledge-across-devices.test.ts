@@ -11,6 +11,7 @@ import {
 } from "@nightshift/engine";
 import {
 	createSandbox,
+	harnessesOf,
 	type Sandbox,
 	testKnowledge,
 	waitFor,
@@ -80,7 +81,7 @@ function knowledgeOn(
 	const device = localDevice({
 		id: sandbox.deviceId,
 		name: sandbox.deviceId,
-		harnesses: {},
+		harnesses: harnessesOf({}),
 		knowledge,
 	});
 	const dir = () => folder(projectId);

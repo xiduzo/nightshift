@@ -17,17 +17,20 @@ import {
 } from "@nightshift/agents";
 import { findProgram } from "@nightshift/agents/types";
 import type { Context } from "@nightshift/api/context";
-import type { localDevice } from "@nightshift/engine";
+import type { Harnesses } from "@nightshift/engine";
 import {
 	type ConnectionStore,
 	HARNESS_BIN,
+	type SecretUse,
 	type SettingsStore,
 	unreachableNote,
 } from "@nightshift/engine/device-config";
-import { type AgentHarnessName, isCustomHarness } from "@nightshift/flows";
+import {
+	type AgentHarnessName,
+	type CustomHarnessName,
+	isCustomHarness,
+} from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-
-type LocalDeviceOptions = Parameters<typeof localDevice>[0];
 
 /** A harness built per session, so a changed path in Settings applies to the next session. */
 function perSession(
@@ -39,8 +42,10 @@ function perSession(
 
 /**
  * The harnesses of this computer's Device: one per harness Night Shift
- * knows, and the custom agents of the settings. Each harness spawns its CLI
- * only when an Agent node names it.
+ * knows, and the custom agents of the settings. A harness counts once it
+ * is added on the Agents page: built here is not enough. Each one spawns
+ * its CLI only when an Agent node names it. The settings are read at each
+ * question, so an edit applies to the next session.
  */
 export function localHarnesses(deps: {
 	settings: Pick<SettingsStore, "current">;
@@ -50,88 +55,102 @@ export function localHarnesses(deps: {
 	 * (`nightshift pi-acp`). Undefined: pi-acp's own script, from source.
 	 */
 	piAcp?: string[];
-}): Pick<
-	LocalDeviceOptions,
-	"harnesses" | "customHarness" | "customHarnessNames" | "harnessNames"
-> {
+}): Harnesses {
 	const { settings, connections, piAcp } = deps;
+	const built = {
+		"claude-code": perSession("claude-code", () =>
+			claudeCodeHarness({
+				claudeExecutable: settings.current().claudeBin,
+			}),
+		),
+		opencode: perSession("opencode", () =>
+			opencodeHarness({
+				opencodeExecutable: settings.current().opencodeBin,
+			}),
+		),
+		codex: perSession("codex", () =>
+			codexHarness({
+				codexExecutable: settings.current().codexBin,
+			}),
+		),
+		"grok-build": perSession("grok-build", () =>
+			grokBuildHarness({ grokExecutable: settings.current().grokBin }),
+		),
+		copilot: perSession("copilot", () =>
+			acpHarness("copilot", { executable: settings.current().copilotBin }),
+		),
+		gemini: perSession("gemini", () =>
+			acpHarness("gemini", { executable: settings.current().geminiBin }),
+		),
+		cursor: perSession("cursor", () =>
+			acpHarness("cursor", { executable: settings.current().cursorBin }),
+		),
+		pi: perSession("pi", () =>
+			acpHarness("pi", {
+				executable: settings.current().piBin,
+				...(piAcp ? { piAcp } : {}),
+			}),
+		),
+	} satisfies Record<HarnessName, AgentHarness>;
+
+	// Custom agents: read from the settings at each session, so an edit
+	// applies to the next one. `${NAME}` in their env reads the secrets,
+	// then this computer's environment: once per session, and every value
+	// it reads comes back as `•••` in the session's output.
+	// `use` says where the session happens: the Secret scope rule reads it.
+	const customAgent = (
+		name: CustomHarnessName,
+		use?: SecretUse,
+	): AgentHarness | undefined => {
+		const agent = settings
+			.current()
+			.customAgents.find((a) => `acp:${a.slug}` === name);
+		if (!agent) return undefined;
+		let expanding: ReturnType<ConnectionStore["expandEnv"]> | null = null;
+		const expanded = () => {
+			expanding ??= connections.expandEnv(agent.env, use);
+			return expanding;
+		};
+		const harness = customAcpHarness(agent, {
+			env: async () => {
+				const env = await expanded();
+				if (env.ok) return env.env;
+				const [noun, isNot, it] =
+					env.missing.length === 1
+						? ["secret", "it is", "it"]
+						: ["secrets", "they are", "them"];
+				// Words for the person: the step shows them as they are.
+				throw new Refusal(
+					"conflict",
+					`${agent.label} needs the ${noun} ${env.missing.join(", ")}, but ${isNot} not saved. Save ${it} on the Secrets page, or remove the reference.${unreachableNote(env)}`,
+				);
+			},
+		});
+		return {
+			...harness,
+			secretValues: async () => {
+				const env = await expanded();
+				return env.ok ? env.values : [];
+			},
+		};
+	};
+
 	return {
-		harnesses: {
-			"claude-code": perSession("claude-code", () =>
-				claudeCodeHarness({
-					claudeExecutable: settings.current().claudeBin,
-				}),
-			),
-			opencode: perSession("opencode", () =>
-				opencodeHarness({
-					opencodeExecutable: settings.current().opencodeBin,
-				}),
-			),
-			codex: perSession("codex", () =>
-				codexHarness({
-					codexExecutable: settings.current().codexBin,
-				}),
-			),
-			"grok-build": perSession("grok-build", () =>
-				grokBuildHarness({ grokExecutable: settings.current().grokBin }),
-			),
-			copilot: perSession("copilot", () =>
-				acpHarness("copilot", { executable: settings.current().copilotBin }),
-			),
-			gemini: perSession("gemini", () =>
-				acpHarness("gemini", { executable: settings.current().geminiBin }),
-			),
-			cursor: perSession("cursor", () =>
-				acpHarness("cursor", { executable: settings.current().cursorBin }),
-			),
-			pi: perSession("pi", () =>
-				acpHarness("pi", {
-					executable: settings.current().piBin,
-					...(piAcp ? { piAcp } : {}),
-				}),
-			),
+		get: (name, use) => {
+			if (isCustomHarness(name)) return customAgent(name, use);
+			return settings.current().harnesses.includes(name)
+				? built[name]
+				: undefined;
 		},
-		// Custom agents: read from the settings at each session, so an edit
-		// applies to the next one. `${NAME}` in their env reads the secrets,
-		// then this computer's environment: once per session, and every value
-		// it reads comes back as `•••` in the session's output.
-		// `use` says where the session happens: the Secret scope rule reads it.
-		customHarness: (name, use) => {
-			const agent = settings
-				.current()
-				.customAgents.find((a) => `acp:${a.slug}` === name);
-			if (!agent) return undefined;
-			let expanding: ReturnType<ConnectionStore["expandEnv"]> | null = null;
-			const expanded = () => {
-				expanding ??= connections.expandEnv(agent.env, use);
-				return expanding;
-			};
-			const harness = customAcpHarness(agent, {
-				env: async () => {
-					const env = await expanded();
-					if (env.ok) return env.env;
-					const [noun, isNot, it] =
-						env.missing.length === 1
-							? ["secret", "it is", "it"]
-							: ["secrets", "they are", "them"];
-					// Words for the person: the step shows them as they are.
-					throw new Refusal(
-						"conflict",
-						`${agent.label} needs the ${noun} ${env.missing.join(", ")}, but ${isNot} not saved. Save ${it} on the Secrets page, or remove the reference.${unreachableNote(env)}`,
-					);
-				},
-			});
-			return {
-				...harness,
-				secretValues: async () => {
-					const env = await expanded();
-					return env.ok ? env.values : [];
-				},
-			};
+		names: () => {
+			const { harnesses, customAgents } = settings.current();
+			return [
+				...(Object.keys(built) as HarnessName[]).filter((name) =>
+					harnesses.includes(name),
+				),
+				...customAgents.map((a) => `acp:${a.slug}` as const),
+			];
 		},
-		customHarnessNames: () =>
-			settings.current().customAgents.map((a) => `acp:${a.slug}` as const),
-		harnessNames: () => new Set(settings.current().harnesses),
 	};
 }
 
@@ -141,7 +160,7 @@ export function localHarnesses(deps: {
  * program is on this computer.
  */
 export function harnessLookup(
-	local: ReturnType<typeof localHarnesses>,
+	harnesses: Harnesses,
 	settings: Pick<SettingsStore, "current">,
 	which: (program: string) => string | null = (program) => findProgram(program),
 ): {
@@ -149,12 +168,9 @@ export function harnessLookup(
 	installed: (name: AgentHarnessName) => boolean;
 } {
 	return {
-		harnessFor: (name) => {
-			if (isCustomHarness(name)) return local.customHarness?.(name);
-			return local.harnessNames?.().has(name)
-				? local.harnesses[name]
-				: undefined;
-		},
+		// No `use`: the session is not a run's, so a custom agent's
+		// `${NAME}` reads no Space or Project secret (`SecretUse.run`).
+		harnessFor: (name) => harnesses.get(name),
 		installed: (name) => {
 			if (isCustomHarness(name)) {
 				const agent = settings

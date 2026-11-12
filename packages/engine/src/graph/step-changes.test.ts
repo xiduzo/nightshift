@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { Command } from "@langchain/langgraph";
 import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import type { JoinNode } from "@nightshift/flows";
-import { localDevice } from "../device/local";
 import type { StepEvent, WorktreeChanges } from "../log";
 import { foldRun } from "../log";
 import { readTranscriptFile } from "../log/transcripts";
@@ -23,7 +22,7 @@ import {
 import {
 	createSandbox,
 	type Sandbox,
-	TEST_DEVICE_ID,
+	testDevice,
 } from "../testing/test-support";
 import { activeBetween } from "./step-changes";
 
@@ -122,7 +121,7 @@ describe("what a step changed in the worktree", () => {
 			flowOf([command("gen", "echo hi > made.txt")]),
 		);
 		const broken = () => ({
-			...localDevice({ id: TEST_DEVICE_ID, name: "test", ...h.local }),
+			...testDevice(h.local),
 			snapshotWorktree: async (): Promise<{ tree: string }> => {
 				throw new Error("No git here.");
 			},
