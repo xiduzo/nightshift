@@ -35,7 +35,7 @@ import { WrittenByModel } from "../written-by-model";
 import { FocusAnswer } from "./focus-answer";
 import { GateLinks } from "./gate-links";
 import { GateFrom } from "./gate-where";
-import { reachText } from "./ladder";
+import { reachText } from "./reach";
 
 const BAND: Record<OpenGate["urgency"], string> = {
 	now: "border-status-failed/40 bg-status-failed/10",

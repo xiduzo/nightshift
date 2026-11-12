@@ -50,7 +50,7 @@ The phone answers simple Asks too.
 
 Every person in a Space gets its Gates and Asks in their inbox. An owner, an admin, or a member can answer. A viewer sees them, but cannot answer. See [Spaces](Computers-and-Hosts.md#spaces).
 
-The inbox shows one Gate at a time. The Gates and Asks that wait for you, in every project, form a queue: Now, then Today, then When you have time. The oldest Gate is first in each level. A row of bars at the top shows the queue, one bar for each Gate, in the colour of its level.
+The inbox shows one Gate at a time. The Gates and Asks that wait for you, in every project, form a queue: Now, then Today, then When you have time. In each level, the Gates with a deadline come first, the earliest first. The other Gates follow, the oldest first. A row of bars at the top shows the queue, one bar for each Gate, in the colour of its level.
 
 The Gate in focus starts with how soon it needs you: its level, its deadline and the option that Night Shift picks then. Then come the question, its brief and the links to check. The option that the flow recommends is first, with a badge.
 

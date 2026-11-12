@@ -1,4 +1,9 @@
-import { type AnswerDraft, gateParts, URGENCY_LABEL } from "@nightshift/client";
+import {
+	type AnswerDraft,
+	gateOrder,
+	gateParts,
+	URGENCY_LABEL,
+} from "@nightshift/client";
 import {
 	Alert,
 	AlertAction,
@@ -48,7 +53,6 @@ import { useOpenGates } from "../use-open-gates";
 import { AnsweredList } from "./answered-list";
 import { EMPTY_DRAFT, typing } from "./focus-answer";
 import { FocusGate } from "./focus-gate";
-import { ladderOf } from "./ladder";
 import { SleepingRuns } from "./sleeping-runs";
 
 /** What the inbox shows: the Gates that wait, the ones answered, or the sleeping runs. */
@@ -71,11 +75,11 @@ const SEGMENT: Record<OpenGate["urgency"], string> = {
 
 /**
  * The inbox: one Gate at a time, in focus. The Gates of every Space you
- * are in form a queue: Now, then Today, then When you have time, the
- * oldest first in each. You answer the Gate in focus, skip it to the end
- * of the queue, or step back and forth. Once you answer, the next one
- * takes its place. A second view lists what was answered, a third the
- * runs that sleep.
+ * are in form a queue (`gateOrder`): Now, then Today, then When you have
+ * time. In each, the first deadline first, then the oldest. You answer
+ * the Gate in focus, skip it to the end of the queue, or step back and
+ * forth. Once you answer, the next one takes its place. A second view
+ * lists what was answered, a third the runs that sleep.
  *
  * Keys: ← → (or K J) step, S skips. The answer takes 1–9, Enter and Esc.
  */
@@ -101,11 +105,11 @@ export function InboxPage({
 	// What you picked and wrote, per Gate, while you step around.
 	const [drafts, setDrafts] = useState<Record<string, AnswerDraft>>({});
 
-	const ladder = ladderOf(gates.data ?? []).flatMap((group) => group.gates);
+	const ordered = gateOrder(gates.data ?? []);
 	const queue = [
-		...ladder.filter((g) => !skipped.includes(g.stepId)),
+		...ordered.filter((g) => !skipped.includes(g.stepId)),
 		...skipped
-			.map((id) => ladder.find((g) => g.stepId === id))
+			.map((id) => ordered.find((g) => g.stepId === id))
 			.filter((g): g is OpenGate => g !== undefined),
 	];
 
