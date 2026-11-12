@@ -130,7 +130,11 @@ function readsAfter(item: NotificationItem): readonly Read[] {
 	}
 }
 
-/** A burst of items (a walk that starts and ends steps, a person who acts) reads once. */
+/**
+ * A burst of items (a walk that starts and ends steps, a person who acts)
+ * reads once. A save reads at once, and the first item of each change it
+ * wrote within this time is the stream telling of that save.
+ */
 const READ_MS = 300;
 /** How often the open Gates are read again while the notifications stream is down. */
 const GATES_POLL_MS = 60_000;
@@ -182,7 +186,8 @@ export type LiveCache = {
 	 * first reads everything again: items of the time it was down are lost.
 	 * While the stream is down, it reads the open Gates once a minute.
 	 * Meanwhile, each save of this query client that succeeds reads again
-	 * what its route wrote (`SAVES`), so a screen needs no read of its own.
+	 * what its route wrote (`SAVES`) at once, as `changed` does, so a screen
+	 * needs no read of its own.
 	 */
 	followHost(options: FollowHostOptions): Promise<void>;
 	/**
@@ -201,8 +206,11 @@ export type LiveCache = {
 	/**
 	 * Something on this screen changed what is not a save route the cache
 	 * sees: a job that ended, or a save through the client itself. Reads
-	 * again what the changes make stale, in the same burst as the stream,
-	 * so the change and the stream read it once.
+	 * again at once what the changes make stale. An item of the stream for
+	 * one of them that waits for its burst reads nothing more. The first
+	 * item of each that comes within the burst's time is the stream telling
+	 * of this change, and reads nothing: the change and the stream read
+	 * once. Another item after it reads as usual.
 	 */
 	changed(...changes: Change[]): void;
 	/**
@@ -242,6 +250,11 @@ export function createLiveCache({
 		changes: new Set<Change>(),
 	};
 	let waiting = false;
+	/**
+	 * The changes this screen read at once, until the stream tells of each
+	 * (its first item reads nothing) or the burst's time ends.
+	 */
+	const echoes = new Map<Change, object>();
 	/** Stops the poll of the open Gates. Null while the stream is live, or nothing follows. */
 	let stopPoll: (() => void) | null = null;
 
@@ -308,6 +321,20 @@ export function createLiveCache({
 			}
 			for (const path of stale) invalidate([path]);
 		}, READ_MS);
+	}
+
+	/** Reads now what `changes` make stale: a save or a job of this screen. */
+	function readNow(changes: readonly Change[]) {
+		for (const change of changes) {
+			// An item of it came before the save answered: this read covers it.
+			if (pending.changes.delete(change)) continue;
+			const echo = {};
+			echoes.set(change, echo);
+			schedule(() => {
+				if (echoes.get(change) === echo) echoes.delete(change);
+			}, READ_MS);
+		}
+		for (const path of staleAfter(changes)) invalidate([path]);
 	}
 
 	/** Takes away the shown Gate notifications whose Gate this read of the open Gates misses. */
@@ -392,7 +419,12 @@ export function createLiveCache({
 	}
 
 	function onItem(item: NotificationItem) {
-		read(readsAfter(item));
+		// The stream telling of a change this screen just read reads nothing.
+		read(
+			readsAfter(item).filter(
+				(one) => one.kind !== "change" || !echoes.delete(one.change),
+			),
+		);
 		switch (item.kind) {
 			case "gate-closed":
 			case "wait-ended":
@@ -453,7 +485,7 @@ export function createLiveCache({
 				const [route] = event.mutation.options.mutationKey ?? [];
 				if (!Array.isArray(route)) return;
 				const changes = savedBy(route);
-				if (changes.length > 0) read(changes.map(ofChange));
+				if (changes.length > 0) readNow(changes);
 			});
 			try {
 				await followNotifications({
@@ -487,7 +519,7 @@ export function createLiveCache({
 		},
 
 		changed(...changes) {
-			read(changes.map(ofChange));
+			readNow(changes);
 		},
 
 		async followRun({

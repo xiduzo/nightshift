@@ -848,33 +848,70 @@ function save(
 }
 
 describe("a save on this screen", () => {
-	test("reads again what its route wrote, for every save route", async () => {
+	test("reads again at once what its route wrote, for every save route", async () => {
 		for (const [path, changes = []] of Object.entries(SAVES)) {
 			const { live, timers, queryClient } = setUp();
 			const reads = readsOf(queryClient);
 			follow(live);
 			await save(queryClient, path);
+			expect(reads, path).toEqual(keysAfter(changes));
 			timers.due(300);
 			expect(reads, path).toEqual(keysAfter(changes));
 		}
 	});
 
-	test("and the document stream read the flows once", async () => {
+	const flowsChanged: NotificationItem = {
+		kind: "document-changed",
+		name: "flows:p1",
+		spaceId: "s1",
+		at: 4,
+	};
+	const historyChanged: NotificationItem = {
+		...flowsChanged,
+		name: "flows-history:p1",
+	};
+
+	test("and the stream telling of it read once", async () => {
 		const { live, timers, queryClient } = setUp();
 		const reads = readsOf(queryClient);
 		const { host } = follow(live);
 		await save(queryClient, "flows.save");
-		await host.send(
-			{ kind: "document-changed", name: "flows:p1", spaceId: "s1", at: 4 },
-			{
-				kind: "document-changed",
-				name: "flows-history:p1",
-				spaceId: "s1",
-				at: 4,
-			},
-		);
+		await host.send(flowsChanged, historyChanged);
 		timers.due(300);
 		expect(reads).toEqual(keysAfter(["flows", "flows-history"]));
+	});
+
+	test("covers an item of the stream that came before it answered", async () => {
+		const { live, timers, queryClient } = setUp();
+		const reads = readsOf(queryClient);
+		const { host } = follow(live);
+		await host.send(flowsChanged);
+		await save(queryClient, "flows.remove");
+		timers.due(300);
+		expect(reads).toEqual(keysAfter(["flows"]));
+	});
+
+	test("does not cover a second item of the stream, nor one after the burst's time", async () => {
+		const { live, timers, queryClient } = setUp();
+		const reads = readsOf(queryClient);
+		const { host } = follow(live);
+		await save(queryClient, "flows.remove");
+		// The save's own item, then another person's save of the flows.
+		await host.send(flowsChanged, flowsChanged);
+		timers.due(300);
+		expect(reads).toEqual([...keysAfter(["flows"]), ...keysAfter(["flows"])]);
+
+		const later = setUp();
+		const laterReads = readsOf(later.queryClient);
+		const followed = follow(later.live);
+		await save(later.queryClient, "flows.remove");
+		later.timers.due(300);
+		await followed.host.send(flowsChanged);
+		later.timers.due(300);
+		expect(laterReads).toEqual([
+			...keysAfter(["flows"]),
+			...keysAfter(["flows"]),
+		]);
 	});
 
 	test("that fails reads nothing", async () => {
@@ -923,6 +960,7 @@ describe("a save on this screen", () => {
 		const reads = readsOf(queryClient);
 		const { host } = follow(live);
 		live.changed("secrets", "device");
+		expect(reads).toEqual(keysAfter(["secrets", "device"]));
 		await host.send({
 			kind: "document-changed",
 			name: "device:laptop",
