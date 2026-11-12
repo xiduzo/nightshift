@@ -1,4 +1,3 @@
-import { outcomeColor } from "@nightshift/flows";
 import {
 	Empty,
 	EmptyDescription,
@@ -15,24 +14,11 @@ import {
 	MessageScrollerViewport,
 	useMessageScroller,
 } from "@nightshift/ui/components/message-scroller";
-import {
-	Trace,
-	TraceDescription,
-	TraceIcon,
-	TraceLine,
-	TraceTitle,
-} from "@nightshift/ui/components/trace";
-import { ArrowRightIcon, ListTodoIcon, SignpostIcon } from "lucide-react";
+import { ListTodoIcon } from "lucide-react";
 import { Fragment, type ReactNode, useEffect } from "react";
-import { OutcomeBadge } from "@/features/flows";
 import type { Artifact, RunDetail, RunStatus, StepSummary } from "@/shared/api";
 import { formatTime } from "@/shared/format";
-import {
-	flowOfStep,
-	type ItemScope,
-	nodeOfStep,
-	stepOutcomeColor,
-} from "../lib/run-steps";
+import { type ItemScope, nodeOfStep, stepOutcomeColor } from "../lib/run-steps";
 import {
 	emptyTranscript,
 	type TranscriptState,
@@ -45,8 +31,7 @@ export type StepPick = { stepId: string; seq: number };
 /**
  * The run as one conversation, top to bottom: every step in full, each
  * starting at its checkpoint. A checkpoint marks what is new since the
- * person last looked. While the run goes, it ends on where the flow goes
- * next.
+ * person last looked.
  */
 export function RunStory({
 	run,
@@ -118,11 +103,9 @@ export function RunStory({
 		);
 	}
 
-	const last = story[story.length - 1];
 	// The first step that started after the person last looked.
 	const firstNew =
 		seen === null ? undefined : story.find((step) => step.startedAt > seen);
-	const going = status === "running" || status === "waiting";
 	const answerPending = run.commands.some((c) => c.kind === "gate.resolve");
 
 	return (
@@ -168,56 +151,10 @@ export function RunStory({
 							</Fragment>
 						);
 					})}
-					{going && last && last.outcome === null ? (
-						<NextSteps run={run} steps={steps} step={last} />
-					) : null}
 					<div className="flex flex-col gap-3 empty:hidden">{ending}</div>
 				</MessageScrollerContent>
 			</MessageScrollerViewport>
 			<MessageScrollerButton />
 		</MessageScroller>
-	);
-}
-
-/** Where the flow goes once the running step ends: one line per way out. */
-function NextSteps({
-	run,
-	steps,
-	step,
-}: {
-	run: RunDetail;
-	steps: StepSummary[];
-	step: StepSummary;
-}) {
-	const flow = flowOfStep(run, steps, step);
-	const node = nodeOfStep(run, steps, step);
-	const ways = flow?.edges.filter((edge) => edge.from === step.nodeId) ?? [];
-	if (ways.length === 0) return null;
-	return (
-		<Trace>
-			<TraceLine>
-				<TraceIcon>
-					<SignpostIcon />
-				</TraceIcon>
-				<TraceTitle>Then, as the flow says</TraceTitle>
-			</TraceLine>
-			{ways.map((edge) => (
-				<TraceLine key={edge.id} className="pl-6">
-					<OutcomeBadge
-						state={edge.outcome}
-						color={node ? outcomeColor(node, edge.outcome) : undefined}
-					/>
-					<TraceIcon>
-						<ArrowRightIcon />
-					</TraceIcon>
-					<TraceTitle className="font-mono text-foreground">
-						{edge.to}
-					</TraceTitle>
-					{edge.max ? (
-						<TraceDescription>up to {edge.max} times</TraceDescription>
-					) : null}
-				</TraceLine>
-			))}
-		</Trace>
 	);
 }

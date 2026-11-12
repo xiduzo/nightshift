@@ -62,7 +62,7 @@ export function stepAtScope(
 }
 
 /** The flow a step's node belongs to: the run's flow or a called flow. */
-export function flowOfStep(
+function flowOfStep(
 	run: RunFlows,
 	steps: readonly StepSummary[],
 	step: StepSummary,
