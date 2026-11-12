@@ -11,6 +11,7 @@ import {
 	type ExecInput,
 	noRunFolders,
 	type OfferedSessionInput,
+	type ReadFileResult,
 	type RunFolder,
 	type SessionEvent,
 	type SessionInput,
@@ -88,6 +89,8 @@ export const CALL_DEADLINES_MS: Partial<Record<WorkCall["kind"], number>> = {
 	snapshotWorktree: 2 * 60_000,
 	worktreeChanges: 2 * 60_000,
 	runFolder: 60_000,
+	// A report file is at most 64 KB.
+	readFile: 30_000,
 	// Git work on a large project can take minutes.
 	worktree: 3 * 60_000,
 	handOff: 3 * 60_000,
@@ -355,6 +358,29 @@ export function remoteDevice(
 				};
 			}
 		},
+		/**
+		 * A file the run wrote in its folder on that Device. A Device of an
+		 * older Night Shift cannot read the call: run start refuses it
+		 * first (its capabilities say no `readFiles`), and the call says to
+		 * update it. One that went away throws an `unavailable` refusal.
+		 */
+		async readFile(input): Promise<ReadFileResult> {
+			const { signal, ...rest } = input;
+			try {
+				return await once<ReadFileResult>(
+					{ kind: "readFile", input: rest },
+					signal,
+				);
+			} catch (error) {
+				if (error instanceof Refusal && error.message === UNREADABLE_REQUEST) {
+					throw new Refusal(
+						"conflict",
+						`${device.name} runs an older version of Night Shift. Update Night Shift on ${device.name}.`,
+					);
+				}
+				throw error;
+			}
+		},
 		decide,
 		worktree: (run) => once<Worktree>({ kind: "worktree", run }),
 		// A Device of an older Night Shift cannot read the call: it says to update it.
@@ -394,6 +420,9 @@ const NOT_A_RUN_CALL = "This device moves its secrets only for its owner.";
 
 /** The words of a snapshot call on a Device that takes none. */
 const NO_SNAPSHOTS = "This device does not tell what a step changed.";
+
+/** The words of a file call on a Device that reads none. */
+const NO_FILES = "This device does not read the files of a run.";
 
 /**
  * Serves one call on this computer's Device, as the placed Device does
@@ -513,6 +542,10 @@ export async function* serveWork(
 						signal,
 					}),
 				);
+				return;
+			case "readFile":
+				if (!device.readFile) throw new Refusal("conflict", NO_FILES);
+				yield result(await device.readFile({ ...call.input, signal }));
 				return;
 			case "decide":
 				yield result(

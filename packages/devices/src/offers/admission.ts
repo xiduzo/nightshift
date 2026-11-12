@@ -6,6 +6,7 @@ import type {
 	PeerContext,
 	PeerProjects,
 	PlacedRun,
+	ReadFileInput,
 	RunRef,
 	SessionInput,
 } from "@nightshift/engine";
@@ -398,6 +399,13 @@ export function createOfferAdmission(deps: {
 				},
 				callTool: async (input) => (await pick()).callTool(input),
 				request: async (input) => (await pick()).request(input),
+				// Only when this computer reads files.
+				...(device.readFile
+					? {
+							readFile: async (input: ReadFileInput) =>
+								filesOf(await pick()).readFile(input),
+						}
+					: {}),
 				decide: (async (input: Parameters<Device["decide"]>[0]) =>
 					(await pick()).decide(input as never)) as Device["decide"],
 				worktree: async (run) => (await pick()).worktree(run),
@@ -455,6 +463,16 @@ function runFoldersOf(device: Device): Required<Pick<Device, "runFolder">> {
 	return { runFolder };
 }
 
+/**
+ * The file call of a Device. `deviceFor` has it only when this computer
+ * has it, and its admitted path always does.
+ */
+function filesOf(device: Device): Required<Pick<Device, "readFile">> {
+	const { readFile } = device;
+	if (!readFile) throw new Error(`${device.name} reads no files.`);
+	return { readFile };
+}
+
 /** The calls that work in the project's Clone, or its run folder; a model or a tool needs none. */
 const NEEDS_CLONE: ReadonlySet<WorkCall["kind"]> = new Set([
 	"flows",
@@ -467,6 +485,7 @@ const NEEDS_CLONE: ReadonlySet<WorkCall["kind"]> = new Set([
 	"worktreeChanges",
 	"session",
 	"exec",
+	"readFile",
 ]);
 
 /** The calls that work with git: a project without a folder has none (ADR 22). */
@@ -484,6 +503,7 @@ function cwdOf(call: WorkCall): string | null {
 	switch (call.kind) {
 		case "session":
 		case "exec":
+		case "readFile":
 			return call.input.cwd;
 		case "itemBranch":
 		case "handOff":
@@ -500,7 +520,8 @@ function cwdOf(call: WorkCall): string | null {
  * Offers in force into the run's Space: an offered session of one of
  * them, or the run's own folder work (its flows, its worktree, its item
  * branches, the Hand-off of its work to and from it, the snapshots that
- * tell what a step changed in it). Anything
+ * tell what a step changed in it, the report file the run wrote there).
+ * Anything
  * else is refused: a command, a tool, the decider, a session it did not
  * offer, and its capabilities (private to its owner). Null when it serves
  * the call.
@@ -521,6 +542,7 @@ function offeredCallRefusal(
 		case "receiveHandOff":
 		case "snapshotWorktree":
 		case "worktreeChanges":
+		case "readFile":
 			return null;
 		case "session": {
 			if (!("offered" in call.input)) return refused;

@@ -9,6 +9,7 @@ import {
 	type Sandbox,
 	testDevice,
 } from "@nightshift/engine/testing";
+import { Refusal } from "@nightshift/refusal";
 import {
 	UNREADABLE_REQUEST,
 	type WorkFor,
@@ -247,6 +248,85 @@ describe("a call to a remote Device that never answers", () => {
 			expect(cancelled).toBe(true);
 		} finally {
 			CALL_DEADLINES_MS.capabilities = before;
+		}
+	});
+});
+
+describe("a file the run wrote, on a remote Device", () => {
+	test("crosses the wire and comes back as text, or as why it was not read", async () => {
+		await writeFile(join(sandbox.repoPath, "report.md"), "## News\n");
+		const device = remoteDevice(
+			wireTo(testDevice({ harnesses: {} })),
+			{ id: "laptop", name: "laptop" },
+			FOR_RUN,
+		);
+		const read = (path: string) =>
+			device.readFile?.({ cwd: sandbox.repoPath, path, maxBytes: 1_024 });
+		expect(await read("report.md")).toEqual({
+			kind: "text",
+			text: "## News\n",
+			cut: false,
+		});
+		expect(await read("none.md")).toEqual({ kind: "missing" });
+		expect(await read("../escape.md")).toEqual({ kind: "outside" });
+	});
+
+	test("a Device of an older Night Shift, or one that reads none, says to update it", async () => {
+		const older = remoteDevice(
+			{
+				async *call() {
+					yield { kind: "error", message: UNREADABLE_REQUEST };
+				},
+				online: () => true,
+			},
+			{ id: "laptop", name: "laptop" },
+			FOR_RUN,
+		);
+		await expect(
+			older.readFile?.({ cwd: "/work", path: "report.md", maxBytes: 1_024 }),
+		).rejects.toThrow(
+			"laptop runs an older version of Night Shift. Update Night Shift on laptop.",
+		);
+		const { readFile: _, ...none } = testDevice({ harnesses: {} });
+		const reads = remoteDevice(
+			relayTo(none),
+			{ id: "test", name: "test" },
+			FOR_RUN,
+		);
+		await expect(
+			reads.readFile?.({ cwd: "/work", path: "report.md", maxBytes: 1_024 }),
+		).rejects.toThrow("This device does not read the files of a run.");
+	});
+
+	test("a Device that does not answer in 30 s: an unavailable refusal", async () => {
+		expect(CALL_DEADLINES_MS.readFile).toBe(30_000);
+		const before = CALL_DEADLINES_MS.readFile;
+		CALL_DEADLINES_MS.readFile = 30;
+		const lost: WorkRelay = {
+			async *call(_id, _request, signal) {
+				await new Promise<void>((resolve) =>
+					signal?.addEventListener("abort", () => resolve(), { once: true }),
+				);
+			},
+			online: () => true,
+		};
+		try {
+			const device = remoteDevice(
+				lost,
+				{ id: "laptop", name: "laptop" },
+				FOR_RUN,
+			);
+			const error = await device
+				.readFile?.({ cwd: "/work", path: "report.md", maxBytes: 1_024 })
+				.catch((caught: unknown) => caught);
+			expect(error).toBeInstanceOf(Refusal);
+			expect(error).toMatchObject({
+				kind: "unavailable",
+				message:
+					"laptop did not answer in time. Check that it is online, then try again.",
+			});
+		} finally {
+			CALL_DEADLINES_MS.readFile = before;
 		}
 	});
 });

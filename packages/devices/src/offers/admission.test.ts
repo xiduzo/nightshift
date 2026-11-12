@@ -132,7 +132,17 @@ const device = {
 		ran.push({ kind: "worktreeChanges" });
 		return { tree: "tree-2", files: [] };
 	},
+	async readFile(input: { cwd: string; path: string }) {
+		ran.push({ kind: "readFile", input });
+		return { kind: "text", text: "# Done", cut: false };
+	},
 } as unknown as Device;
+
+/** A report file the run wrote, read in `cwd`. */
+const readFile = (cwd: string): WorkRequest["call"] => ({
+	kind: "readFile",
+	input: { cwd, path: "report.md", maxBytes: 65_536 },
+});
 
 beforeEach(async () => {
 	sandbox = await createSandbox();
@@ -419,12 +429,20 @@ for (const [path, call] of Object.entries(paths)) {
 					}),
 				),
 			).toBe("served");
+			// The report file the run wrote there: its own folder work too.
+			expect(await outcome(request({ call: readFile(worktree) }))).toBe(
+				"served",
+			);
+			expect(await outcome(request({ call: readFile(sandbox.repoPath) }))).toBe(
+				"This device works only in the run's own folder.",
+			);
 			expect(ran.map((r) => r.kind)).toEqual([
 				"session",
 				"worktree",
 				"flows",
 				"snapshotWorktree",
 				"worktreeChanges",
+				"readFile",
 			]);
 		});
 
@@ -693,7 +711,11 @@ describe("Offer admission, its owner's run", () => {
 			expect(
 				await serve(mine({ call: { kind: "snapshotWorktree", cwd } })),
 			).toBe("This device works only in the run's own folder.");
+			expect(await serve(mine({ call: readFile(cwd) }))).toBe(
+				"This device works only in the run's own folder.",
+			);
 		}
+		expect(ran).toEqual([]);
 		expect(
 			await serve(
 				mine({
@@ -716,8 +738,12 @@ describe("Offer admission, its owner's run", () => {
 		).toBe("served");
 		expect(await serve(noFolder(exec(runFolder)))).toBe("served");
 		expect(await serve(noFolder(exec(join(runFolder, "out"))))).toBe("served");
+		expect(await serve(noFolder(readFile(runFolder)))).toBe("served");
 		for (const cwd of [worktree, `${runFolder}-other`, sandbox.dataDir]) {
 			expect(await serve(noFolder(exec(cwd)))).toBe(
+				"This device works only in the run's own folder.",
+			);
+			expect(await serve(noFolder(readFile(cwd)))).toBe(
 				"This device works only in the run's own folder.",
 			);
 		}
@@ -748,7 +774,12 @@ describe("Offer admission, its owner's run", () => {
 		).toBe(
 			"This project has a folder. Its runs work in their own copy of the project.",
 		);
-		expect(ran.map((r) => r.kind)).toEqual(["runFolder", "exec", "exec"]);
+		expect(ran.map((r) => r.kind)).toEqual([
+			"runFolder",
+			"exec",
+			"exec",
+			"readFile",
+		]);
 	});
 
 	test("walked here, it is this computer as is: no Offer is in play", async () => {

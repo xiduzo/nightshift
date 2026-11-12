@@ -3,6 +3,7 @@ import type {
 	CapabilityQuery,
 	ExecInput,
 	OfferedSessionInput,
+	ReadFileInput,
 	RunRef,
 	SessionInput,
 	ToolCallInput,
@@ -12,6 +13,7 @@ import {
 	agentHarnessSchema,
 	deciderNameSchema,
 	effortSchema,
+	MAX_REPORT_BYTES,
 	MAX_WEB_REQUEST_BYTES,
 	modelAddressSchema,
 	permissionModeSchema,
@@ -64,6 +66,8 @@ export type WorkCall =
 	| { kind: "exec"; input: Omit<ExecInput, "signal"> }
 	| { kind: "callTool"; input: Omit<ToolCallInput, "signal"> }
 	| { kind: "request"; input: Omit<WebRequestInput, "signal"> }
+	/** A text file the run wrote in its folder there: an End node's report. */
+	| { kind: "readFile"; input: Omit<ReadFileInput, "signal"> }
 	| {
 			kind: "decide";
 			input: Omit<DecisionInput, "signal"> | Omit<ValueInput, "signal">;
@@ -96,6 +100,7 @@ export const WORK_KINDS = [
 	"callTool",
 	"decide",
 	"request",
+	"readFile",
 ] as const satisfies readonly WorkCall["kind"][];
 
 /**
@@ -404,6 +409,15 @@ const workCallSchema = z.discriminatedUnion("kind", [
 	}),
 	z.object({ kind: z.literal("decide"), input: decideInputSchema }),
 	z.object({ kind: z.literal("request"), input: webRequestInputSchema }),
+	z.object({
+		kind: z.literal("readFile"),
+		input: z.object({
+			cwd: z.string(),
+			path: z.string(),
+			/** A Walker never asks a Device to keep more than a report may hold. */
+			maxBytes: z.number().int().positive().max(MAX_REPORT_BYTES),
+		}),
+	}),
 	secretRequestSchema.shape.call,
 ]);
 

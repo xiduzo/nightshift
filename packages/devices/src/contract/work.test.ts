@@ -59,6 +59,13 @@ const calls: WorkRequest[] = [
 	{ ...forRun, call: { kind: "snapshotWorktree", cwd: "/work" } },
 	{
 		...forRun,
+		call: {
+			kind: "readFile",
+			input: { cwd: "/work", path: "out/report.md", maxBytes: 65_536 },
+		},
+	},
+	{
+		...forRun,
 		call: { kind: "worktreeChanges", cwd: "/work", from: "4b825dc6" },
 	},
 	{
@@ -173,7 +180,7 @@ const calls: WorkRequest[] = [
 describe("the work relay's output schema", () => {
 	test("checks a call of every kind", () => {
 		const kinds = new Set(calls.map((request) => request.call.kind));
-		expect(kinds.size).toBe(14);
+		expect(kinds.size).toBe(15);
 		for (const request of calls) {
 			const delivery = { kind: "call", id: "call-1", request };
 			expect(workDeliverySchema.safeParse(delivery).error).toBeUndefined();
@@ -191,6 +198,18 @@ describe("the work relay's output schema", () => {
 					timeoutMs: 1_000,
 					maxBytes: 1_000,
 				},
+			},
+		};
+		const delivery = { kind: "call", id: "call-1", request };
+		expect(workDeliverySchema.safeParse(delivery).success).toBe(false);
+	});
+
+	test("refuses a file read larger than a report may be", () => {
+		const request: WorkRequest = {
+			...forRun,
+			call: {
+				kind: "readFile",
+				input: { cwd: "/work", path: "big.md", maxBytes: 65_537 },
 			},
 		};
 		const delivery = { kind: "call", id: "call-1", request };
