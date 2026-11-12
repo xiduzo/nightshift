@@ -106,7 +106,7 @@ A computer that goes offline does not end the run:
 
 Flow health shows, for each flow, where its work landed, its runs per day, their cost against the median, why runs failed, and its metrics. Click a flow to open its details. Flow health leaves [test runs](#test-runs) out. **Total spent** in the details of a flow counts them, and says how many.
 
-**Where the work landed** comes first. One bar shows the work: what agents, subflows and models made, and your answers to an Ask. One bar shows the choices: the Decisions. Each part of a bar is a rung:
+**Where the work landed** comes first. One bar shows the work: what agents and models made, in the flow and in the subflows it calls, and your answers to an Ask. One bar shows the choices: the Decisions. Each part of a bar is a rung:
 
 - a tier of a cascade, such as Sonnet or Opus, or the agent or decider of a node without one,
 - **Rule**, when a rule made the choice,

@@ -184,10 +184,11 @@ so you can read a total and an average per name.
 
 A climb is the tries of one node up its ladder, up to the step it landed
 on. A node without a cascade lands on each visit. The step a climb landed
-on adds one `nightshift.ladder.rung` point:
+on adds one `nightshift.ladder.rung` point. A Subflow without a cascade
+adds no point: the steps of the flow that it calls add theirs.
 
-- `nightshift.ladder.kind` is `work` (an Agent, a Subflow, a Value by a
-  model or an Ask) or `choice` (a Decision).
+- `nightshift.ladder.kind` is `work` (an Agent, a Subflow with a cascade,
+  a Value by a model or an Ask) or `choice` (a Decision).
 - `nightshift.ladder.tier` is the name of the tier it landed on. A node
   without a cascade has none.
 - `nightshift.ladder.unsure` is on a Decision's point. It is `true` when a
