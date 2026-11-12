@@ -111,4 +111,16 @@ describe("trailItemOf", () => {
 		expect(item.look.tone).toBe("sleeping");
 		expect(item.meta).toBe("2 min · $0.12");
 	});
+
+	test("a step of a test run that stood in for its node says what it gave", () => {
+		const standIn = { endedAt: 0, costUsd: 0, costCalls: 0 };
+		expect(
+			trailItemOf(step({ ...standIn, test: "pinned" }), { labels, now: MIN })
+				.meta,
+		).toBe("Pinned output");
+		expect(
+			trailItemOf(step({ ...standIn, test: "skipped" }), { labels, now: MIN })
+				.meta,
+		).toBe("Skipped");
+	});
 });

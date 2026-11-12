@@ -3,8 +3,10 @@ import {
 	dayLabel,
 	flowLabel,
 	hasEnded,
+	isTestRun,
 	type RunStatus,
 	type RunSummary,
+	TEST_RUN_LABEL,
 	tokensLabel,
 	wall,
 } from "@nightshift/client";
@@ -226,12 +228,15 @@ export function runMeta(
 		.join(" · ");
 }
 
-/** The line under a run's title: "website · Feature factory". */
+/**
+ * The line under a run's title: "website · Feature factory", and
+ * "· Test run" for a run started from the editor with pins or skips.
+ */
 export function runPlace(
-	run: Pick<RunSummary, "flowName">,
+	run: Pick<RunSummary, "flowName" | "test">,
 	projectName: string | null,
 ): string {
-	return [projectName, flowLabel(run)]
+	return [projectName, flowLabel(run), isTestRun(run) ? TEST_RUN_LABEL : null]
 		.filter((part): part is string => part !== null && part !== "")
 		.join(" · ");
 }

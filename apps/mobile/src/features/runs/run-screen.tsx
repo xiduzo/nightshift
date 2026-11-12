@@ -7,6 +7,7 @@ import {
 	flowLabel,
 	gateParts,
 	hasEnded,
+	isTestRun,
 	markdownPreview,
 	mergeSteps,
 	nodeLabels,
@@ -24,8 +25,11 @@ import {
 	stepName,
 	stepState,
 	stoppedNotice,
+	TEST_RUN_HINT,
+	TEST_RUN_LABEL,
 	now as timeNow,
 } from "@nightshift/client";
+import { Badge } from "@nightshift/ui-native/components/ui/badge";
 import { Button } from "@nightshift/ui-native/components/ui/button";
 import { Card, CardContent } from "@nightshift/ui-native/components/ui/card";
 import { Icon } from "@nightshift/ui-native/components/ui/icon";
@@ -37,6 +41,7 @@ import * as WebBrowser from "expo-web-browser";
 import {
 	FileDiff,
 	FileText,
+	FlaskConical,
 	GitPullRequest,
 	Hand,
 	Link2,
@@ -264,6 +269,19 @@ function RunBody({
 					<Text className="py-3 text-muted-foreground text-sm">
 						{flowLabel(run)}
 					</Text>
+					{isTestRun(run) ? (
+						<Badge
+							variant="outline"
+							className="ml-1.5"
+							accessibilityLabel={`${TEST_RUN_LABEL}. ${TEST_RUN_HINT}`}
+						>
+							<Icon
+								as={FlaskConical}
+								className="size-3 text-muted-foreground"
+							/>
+							<Text>{TEST_RUN_LABEL}</Text>
+						</Badge>
+					) : null}
 				</View>
 				<Text
 					accessibilityRole="header"

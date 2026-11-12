@@ -2,6 +2,7 @@ import {
 	costLabel,
 	type RunStatus,
 	type StepSummary,
+	standInLabel,
 	stepName,
 	stepState,
 	tokensLabel,
@@ -21,7 +22,7 @@ export type TrailItem = {
 	look: Look;
 	/** What happened: the step's error, or a line the screen gives. */
 	detail?: string;
-	/** "4 min · 12.3K tokens · $0.12", "Waiting 12 min". */
+	/** "4 min · 12.3K tokens · $0.12", "Waiting 12 min", "Pinned output", "Skipped". */
 	meta?: string;
 	/** An open Gate: the icon takes the waiting tone. */
 	waiting?: boolean;
@@ -49,11 +50,14 @@ export function trailItemOf(
 	const took = waitedText((step.endedAt ?? now) - step.startedAt);
 	const cost = costLabel(step);
 	const tokens = tokensLabel(step.metrics?.tokens);
+	// A step of a test run that stood in for its node took no time and cost nothing.
 	const meta = waiting
 		? `Waiting ${took}`
-		: [took, tokens, cost]
-				.filter((part): part is string => part !== null)
-				.join(" · ");
+		: step.test
+			? standInLabel(step.test)
+			: [took, tokens, cost]
+					.filter((part): part is string => part !== null)
+					.join(" · ");
 	return {
 		id: step.id,
 		kind: stepKind(step),

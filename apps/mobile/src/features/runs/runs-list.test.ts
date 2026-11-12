@@ -215,6 +215,18 @@ describe("runMeta and runPlace", () => {
 			"Quick run",
 		);
 	});
+
+	test("a test run says so after the flow", () => {
+		expect(
+			runPlace(
+				{
+					flowName: "Feature factory",
+					test: { pinned: ["spec"], skipped: [] },
+				},
+				"website",
+			),
+		).toBe("website · Feature factory · Test run");
+	});
 });
 
 describe("the chips on a Host that counts runs", () => {
