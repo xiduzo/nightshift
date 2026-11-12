@@ -6,8 +6,10 @@ import {
 	type Flow,
 	type FlowNodeType,
 	flowSchema,
+	NODE_FAMILY_LABEL,
 	outputFieldsByType,
 } from "../flow";
+import { kitList } from "../kits";
 import { reservedOutcomes } from "../nodes";
 import { validateFlow } from "../validate";
 import {
@@ -86,6 +88,22 @@ describe("flowAuthoringGuide", () => {
 		}
 	});
 
+	test("lists every kit under the heading of its family", () => {
+		const kits = guide.slice(
+			guide.indexOf("## Kits\n"),
+			guide.indexOf("## Profiles\n"),
+		);
+		for (const kit of kitList()) {
+			const heading = kits.indexOf(`\n${NODE_FAMILY_LABEL[kit.family]}:\n`);
+			const line = kits.indexOf(`- \`${kit.name}\` (`);
+			expect(heading, kit.name).toBeGreaterThan(0);
+			expect(line, kit.name).toBeGreaterThan(heading);
+			// No other family heading between the two.
+			const between = kits.slice(heading + 1, line);
+			expect(between.match(/\n[A-Z][a-z]+:\n/g), kit.name).toBeNull();
+		}
+	});
+
 	test("names the reserved outcomes and the template forms", () => {
 		for (const outcome of reservedOutcomes) expect(guide).toContain(outcome);
 		for (const form of ["{{task}}", "{{vars.", "{{run.", "{{check.log_tail}}"])
@@ -122,8 +140,9 @@ describe("flowAuthoringGuide", () => {
 		// feeds/read and email/send (a line each), and the secrets they read.
 		// 5030: the report of an End node and a Subflow's `end_report`.
 		// 5055: the `scores` of an Agent and a Value (one sentence each).
-		// 5080: an End report from a file the run wrote.
-		expect(words).toBeLessThan(5080);
+		// 5080: an End report from a file the run wrote. 5090: the kits
+		// under their families, as the add-node dialog lists them.
+		expect(words).toBeLessThan(5090);
 	});
 });
 

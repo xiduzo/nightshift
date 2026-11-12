@@ -14,6 +14,8 @@ import {
 	type FlowNode,
 	type FlowNodeType,
 	flowSchema,
+	NODE_FAMILIES,
+	NODE_FAMILY_LABEL,
 	nodeOutcomes,
 	outputFieldsByType,
 	sectionColors,
@@ -422,6 +424,20 @@ function kitLine({ name, flow }: Kit): string {
 	return `- \`${name}\` (${inputs})${outputs ? ` → ${outputs}` : ""}: ${what}.`;
 }
 
+/**
+ * The kits under their families, in the order of the add-node dialog: a
+ * family heading, then its kits. A family without a kit is left out.
+ */
+function kitsByFamily(): string {
+	const kits = kitList();
+	return NODE_FAMILIES.flatMap((family) => {
+		const lines = kits.filter((kit) => kit.family === family).map(kitLine);
+		return lines.length > 0
+			? [`${NODE_FAMILY_LABEL[family]}:\n\n${lines.join("\n")}`]
+			: [];
+	}).join("\n\n");
+}
+
 /** The guide, as Markdown. */
 export function flowAuthoringGuide(): string {
 	return `# Writing Night Shift flows
@@ -514,9 +530,9 @@ A cron time missed while Night Shift was off still starts up to \`lateMinutes\` 
 
 ## Kits
 
-A kit is a flow that ships with Night Shift: Commands on \`git\`, \`gh\`, \`acli\` or \`curl\`, or Web requests. A Subflow runs one by name (\`"flow": "kit:github/publish-draft-pr"\`) and reads its outputs (\`{{publish.url}}\`). Kits end at End nodes: \`ended\` and \`end_message\` say how. Prefer a kit to writing the same commands. Inputs with * are required. The \`kit:jira\` kits take that CLI tool as \`tool\`. \`kit:message/send\` posts to the URL in the secret that \`webhook\` names. \`kit:email/send\` reads the secrets \`EMAIL_SMTP_URL\`, \`EMAIL_SMTP_USER\` and \`EMAIL_SMTP_PASSWORD\`.
+A kit is a flow that ships with Night Shift: Commands on \`git\`, \`gh\`, \`acli\` or \`curl\`, or Web requests. A Subflow runs one by name (\`"flow": "kit:github/publish-draft-pr"\`) and reads its outputs (\`{{publish.url}}\`). Kits end at End nodes: \`ended\` and \`end_message\` say how. Prefer a kit to writing the same commands. Inputs with * are required. The \`kit:jira\` kits take that CLI tool as \`tool\`. \`kit:message/send\` posts to the URL in the secret that \`webhook\` names. \`kit:email/send\` reads the secrets \`EMAIL_SMTP_URL\`, \`EMAIL_SMTP_USER\` and \`EMAIL_SMTP_PASSWORD\`. The add-node dialog lists each kit under its family.
 
-${kitList().map(kitLine).join("\n")}
+${kitsByFamily()}
 
 A webhook schedule wakes \`wait-for-checks\` when CI is done: \`signal: { name: "ci-done", key: "event.body.check_suite.head_sha" }\`. It wakes \`watch-pr\` with \`signal: { name: "pr-changed", key: "event.body.pull_request.number" }\`.
 

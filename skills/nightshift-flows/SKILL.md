@@ -252,15 +252,15 @@ A cron time missed while Night Shift was off still starts up to `lateMinutes` la
 
 ## Kits
 
-A kit is a flow that ships with Night Shift: Commands on `git`, `gh`, `acli` or `curl`, or Web requests. A Subflow runs one by name (`"flow": "kit:github/publish-draft-pr"`) and reads its outputs (`{{publish.url}}`). Kits end at End nodes: `ended` and `end_message` say how. Prefer a kit to writing the same commands. Inputs with * are required. The `kit:jira` kits take that CLI tool as `tool`. `kit:message/send` posts to the URL in the secret that `webhook` names. `kit:email/send` reads the secrets `EMAIL_SMTP_URL`, `EMAIL_SMTP_USER` and `EMAIL_SMTP_PASSWORD`.
+A kit is a flow that ships with Night Shift: Commands on `git`, `gh`, `acli` or `curl`, or Web requests. A Subflow runs one by name (`"flow": "kit:github/publish-draft-pr"`) and reads its outputs (`{{publish.url}}`). Kits end at End nodes: `ended` and `end_message` say how. Prefer a kit to writing the same commands. Inputs with * are required. The `kit:jira` kits take that CLI tool as `tool`. `kit:message/send` posts to the URL in the secret that `webhook` names. `kit:email/send` reads the secrets `EMAIL_SMTP_URL`, `EMAIL_SMTP_USER` and `EMAIL_SMTP_PASSWORD`. The add-node dialog lists each kit under its family.
+
+Do:
 
 - `kit:email/send` (to*, subject*, body*, from): Sends a plain text email over SMTP.
 - `kit:feeds/read` (url*, first_run) → items, title: Reads an RSS, Atom or JSON feed and gives the items that are new since the last run.
 - `kit:github/create-branch` (name*, from) → branch, created, sha: Switches to a new branch with the name you give.
 - `kit:github/finish-pr` (pr*, action, comment) → number, url, state: Marks a pull request ready for review, or closes it.
 - `kit:github/publish-draft-pr` (title*, body, base) → number, url, created, branch, base: Pushes the current branch to GitHub and opens a draft pull request for it.
-- `kit:github/wait-for-checks` (ref) → state, sha, failed, total: Waits until the checks of a commit on GitHub are done, for at most 3 hours.
-- `kit:github/watch-pr` (pr) → state, number, url, failed, review: Waits until a pull request on GitHub is green, red, merged, closed or ejected from the merge queue.
 - `kit:jira/assign` (key*, assignee, tool): Assigns a Jira work item to a person, or to you.
 - `kit:jira/move` (key*, status*, tool): Moves a Jira work item to another status, for example In Progress.
 - `kit:knowledge/confluence` (site*, email*, pages*, folder) → files: Copies Confluence pages into the project's knowledge as markdown, one file each.
@@ -268,9 +268,17 @@ A kit is a flow that ships with Night Shift: Commands on `git`, `gh`, `acli` or 
 - `kit:knowledge/folder` (path*, patterns, folder) → files: Copies a folder of this computer into the project's knowledge, such as notes outside the project.
 - `kit:knowledge/github-wiki` (repo*, folder) → files: Copies the wiki of a GitHub repository into the project's knowledge, and takes the newest pages on each later sync.
 - `kit:knowledge/jira` (keys*, tool, folder) → files: Copies Jira work items into the project's knowledge as markdown, one file each.
-- `kit:knowledge/review-learnings` (): Shows what agents proposed to learn about the project, and asks you to keep or delete it.
 - `kit:knowledge/web` (urls*, folder) → files: Copies web pages into the project's knowledge as markdown.
 - `kit:message/send` (message*, webhook, format, field): Sends a message to the incoming webhook of a chat or another service.
+
+Decide:
+
+- `kit:knowledge/review-learnings` (): Shows what agents proposed to learn about the project, and asks you to keep or delete it.
+
+Hold:
+
+- `kit:github/wait-for-checks` (ref) → state, sha, failed, total: Waits until the checks of a commit on GitHub are done, for at most 3 hours.
+- `kit:github/watch-pr` (pr) → state, number, url, failed, review: Waits until a pull request on GitHub is green, red, merged, closed or ejected from the merge queue.
 
 A webhook schedule wakes `wait-for-checks` when CI is done: `signal: { name: "ci-done", key: "event.body.check_suite.head_sha" }`. It wakes `watch-pr` with `signal: { name: "pr-changed", key: "event.body.pull_request.number" }`.
 
