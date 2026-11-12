@@ -3,6 +3,19 @@ import { describe, expect, test } from "bun:test";
 import { documentOf, heldByDocuments, staleAfter } from "./changes";
 
 describe("what a change makes stale", () => {
+	test("a flow reads the lists that name the flows that use something", () => {
+		expect(staleAfter(["flows"])).toEqual([
+			["schedules", "list"],
+			["flows"],
+			["profiles", "list"],
+			["connections", "list"],
+			["cliTools", "list"],
+			["projects", "secrets"],
+			["projects", "spaceSecrets"],
+			["knowledge", "get"],
+		]);
+	});
+
 	test("a run reads the lists that count it, and what its steps keep for the next run", () => {
 		expect(staleAfter(["runs"])).toEqual([
 			["runs", "list"],
@@ -43,10 +56,9 @@ describe("what a change makes stale", () => {
 			["projects"],
 		]);
 		// The flows read their history too.
-		expect(staleAfter(["flows", "flows-history"])).toEqual([
-			["schedules", "list"],
-			["flows"],
-		]);
+		expect(staleAfter(["flows", "flows-history"])).toEqual(
+			staleAfter(["flows"]),
+		);
 		expect(staleAfter([])).toEqual([]);
 	});
 });

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { now } from "@nightshift/time";
 import { QueryClient } from "@tanstack/react-query";
 import { createApiClient, createQueryUtils } from "../api";
+import { staleAfter } from "../changes";
 import { createDashboardQueries } from "../dashboard";
 import { createGateQueries, type OpenGate } from "../gates";
 import { createKnowledgeQueries } from "../knowledge";
@@ -440,7 +441,7 @@ describe("the live cache follows the Host", () => {
 		);
 	});
 
-	test("a flow document reads the flows and the schedules, and its history reads the revisions", async () => {
+	test("a flow document reads the flows, the schedules and the lists of what flows use, and its history reads the revisions", async () => {
 		const { live, stale, timers } = setUp();
 		const { host } = follow(live);
 		await host.send({
@@ -451,7 +452,15 @@ describe("the live cache follows the Host", () => {
 		});
 		timers.due(300);
 		expect(stale()).toEqual(
-			sorted(["flows", "revisions", "kept", "memory", "schedules"]),
+			sorted([
+				"flows",
+				"revisions",
+				"kept",
+				"memory",
+				"schedules",
+				"profiles",
+				"knowledge",
+			]),
 		);
 
 		const history = setUp();
@@ -543,7 +552,7 @@ describe("the live cache follows the Host", () => {
 			at: 4,
 		});
 		timers.due(300);
-		expect(reads).toEqual([[["schedules", "list"]], [["flows"]]]);
+		expect(reads).toEqual(staleAfter(["flows"]).map((path) => [path]));
 	});
 
 	test("a document this screen does not know reads everything again", async () => {

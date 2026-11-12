@@ -83,7 +83,9 @@ const STALE: {
 	},
 	// A project's flows, their notices and its schedules. The kept values
 	// and the memory of a flow's runs are not in the document: the runs
-	// change them.
+	// change them. The lists that say which flows use a profile, a
+	// connection, a CLI tool or a secret, and the flows that fill the
+	// knowledge, read the flows.
 	flows: {
 		holds: [
 			["flows", "list"],
@@ -93,7 +95,15 @@ const STALE: {
 			["flows", "export"],
 			["schedules", "list"],
 		],
-		also: [["flows"]],
+		also: [
+			["flows"],
+			["profiles", "list"],
+			["connections", "list"],
+			["cliTools", "list"],
+			["projects", "secrets"],
+			["projects", "spaceSecrets"],
+			["knowledge", "get"],
+		],
 	},
 	"flows-history": {
 		holds: [
