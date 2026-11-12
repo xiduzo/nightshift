@@ -45,7 +45,6 @@ import {
 	FieldDescription,
 	FieldGroup,
 	FieldLabel,
-	FieldSeparator,
 } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
 import {
@@ -61,7 +60,12 @@ import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { FlaskConicalIcon, PlayIcon, WorkflowIcon } from "lucide-react";
+import {
+	FlaskConicalIcon,
+	HistoryIcon,
+	PlayIcon,
+	WorkflowIcon,
+} from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 import { useHasFolder } from "@/features/projects";
@@ -210,9 +214,17 @@ export function StartRunDialog({
 	/** The editor's pins and skips. The Flows page never sends them. */
 	test?: StartTest;
 }) {
+	// Inputs or pins to show: the wide, two-column layout of the quick run.
+	const wide = inputs.length > 0 || test !== undefined;
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
+			<DialogContent
+				className={
+					wide
+						? "max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg md:max-w-3xl lg:max-w-5xl xl:max-w-6xl"
+						: "max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg"
+				}
+			>
 				{open ? (
 					<StartRunForm
 						projectId={projectId}
@@ -247,9 +259,16 @@ function StartRunForm({
 	const navigate = useNavigate();
 	const runActed = useRunActed({ orpc });
 	const [stop, setStop] = useState(readStoredStop);
-	const [values, setValues] = useState(() =>
+	// Fields start empty. The values of the last start wait behind a button.
+	const [lastValues] = useState(() =>
 		readStoredInputs(projectId, flowName, inputs),
 	);
+	const [values, setValues] = useState<InputValues>({});
+	const canReuse =
+		Object.keys(lastValues).length > 0 &&
+		inputs.some(
+			({ name }) => (values[name] ?? "") !== (lastValues[name] ?? ""),
+		);
 	const [baseRef, setBaseRef] = useState("");
 	const [usesMarks, setUsesMarks] = useState(true);
 	const testing = test !== undefined && usesMarks;
@@ -340,8 +359,7 @@ function StartRunForm({
 			)}
 
 			<SplitFields
-				split={picker !== undefined}
-				separated={inputs.length > 0}
+				split={picker !== undefined || inputs.length > 0 || test !== undefined}
 				main={
 					<>
 						{picker}
@@ -494,6 +512,17 @@ function StartRunForm({
 			/>
 
 			<DialogFooter>
+				{canReuse ? (
+					<Button
+						type="button"
+						variant="ghost"
+						className="sm:mr-auto"
+						onClick={() => setValues({ ...values, ...lastValues })}
+					>
+						<HistoryIcon data-icon="inline-start" />
+						Use last run's values
+					</Button>
+				) : null}
 				<DialogClose render={<Button variant="outline" type="button" />}>
 					Cancel
 				</DialogClose>
@@ -526,28 +555,19 @@ function StartRunForm({
 
 /**
  * The fields of a start. Split: what to run on the left, how it runs on the
- * right, for the wide quick run dialog. Else one column, a line between.
+ * right, as in the quick run. Without anything on the left: one column.
  */
 function SplitFields({
 	split,
-	separated,
 	main,
 	settings,
 }: {
 	split: boolean;
-	/** One column: a line under the inputs, when there are any. */
-	separated: boolean;
 	main: ReactNode;
 	settings: ReactNode;
 }) {
 	if (!split) {
-		return (
-			<FieldGroup className="gap-6">
-				{main}
-				{separated ? <FieldSeparator /> : null}
-				{settings}
-			</FieldGroup>
-		);
+		return <FieldGroup className="gap-6">{settings}</FieldGroup>;
 	}
 	return (
 		<div className="grid gap-6 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
