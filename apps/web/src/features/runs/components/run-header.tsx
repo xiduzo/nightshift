@@ -1,4 +1,9 @@
-import { isTestRun, type RunNow, tokensLabel } from "@nightshift/client";
+import {
+	isTestRun,
+	type RunNow,
+	tokensLabel,
+	walkerName,
+} from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import {
@@ -12,7 +17,7 @@ import {
 	SkipForwardIcon,
 	WorkflowIcon,
 } from "lucide-react";
-import { WalkerBadge, walkerName } from "@/features/devices";
+import { WalkerBadge } from "@/features/devices";
 import type { RunDetail, StepSummary } from "@/shared/api";
 import { dayWord, formatTime, hoverTime } from "@/shared/format";
 import { CostText } from "./cost-text";

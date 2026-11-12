@@ -1,4 +1,4 @@
-import { waitedText } from "@nightshift/client";
+import { waitedText, walkerName } from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
@@ -15,7 +15,7 @@ import {
 	HourglassIcon,
 	SendIcon,
 } from "lucide-react";
-import { WalkerBadge, walkerName } from "@/features/devices";
+import { WalkerBadge } from "@/features/devices";
 import type { OpenGate } from "@/shared/api";
 import { LocalTime } from "@/shared/time";
 import { GateAnswer } from "./gate-answer";

@@ -6,6 +6,7 @@ import type {
 	RunDetail,
 	RunResult,
 	RunStatus,
+	RunSummary,
 	StepSummary,
 	WaitEvent,
 } from "./types";
@@ -103,19 +104,27 @@ export type RunNow = RunStatusView & {
 	notice: RunNotice | null;
 };
 
+/**
+ * A run as read: a run's screen has its steps and commands, a row of a
+ * list has neither. Without them a waiting run names no Gate, so it has
+ * no notice.
+ */
 type RunRead = Pick<
-	RunDetail,
-	| "status"
-	| "result"
-	| "reason"
-	| "walker"
-	| "wakeAt"
-	| "signal"
-	| "commands"
-	| "steps"
->;
+	RunSummary,
+	"status" | "result" | "reason" | "walker" | "wakeAt" | "signal"
+> &
+	Partial<Pick<RunDetail, "commands" | "steps">>;
 
-/** Where one run is now and what it needs, from the run as read and what came live. */
+/** The name of the device that walks a run, as people read it. */
+export function walkerName(walker: Pick<RunSummary["walker"], "name">): string {
+	return walker.name ?? "another device";
+}
+
+/**
+ * Where one run is now and what it needs, from the run as read and what
+ * came live: for a run's screen, and for a row of a list that offers an
+ * action (`allows`).
+ */
 export function runNow(run: RunRead, live: RunLive = {}): RunNow {
 	const own = live.status ?? run.status;
 	const here = run.walker.thisDevice;
@@ -127,7 +136,7 @@ export function runNow(run: RunRead, live: RunLive = {}): RunNow {
 	const actions = Object.keys(allows) as RunAction[];
 	const gate =
 		shown.status === "waiting"
-			? (openGates(live.steps ?? run.steps)[0] ?? null)
+			? (openGates(live.steps ?? run.steps ?? [])[0] ?? null)
 			: null;
 	return {
 		...statusOf(shown),
@@ -235,12 +244,10 @@ function noticeOf(
 		case "waiting": {
 			if (!gate) return null;
 			// A run of another device: the answer goes to it.
-			const elsewhere = run.walker.thisDevice
-				? null
-				: (run.walker.name ?? "another device");
+			const elsewhere = run.walker.thisDevice ? null : walkerName(run.walker);
 			if (
 				elsewhere &&
-				run.commands.some((command) => command.kind === "gate.resolve")
+				(run.commands ?? []).some((command) => command.kind === "gate.resolve")
 			) {
 				return notice(
 					"answer-sent",

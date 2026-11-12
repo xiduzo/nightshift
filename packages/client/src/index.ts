@@ -274,7 +274,6 @@ export {
 	rememberUseful,
 	rerunStarts,
 	retryDelay,
-	runActions,
 	runNow,
 	runningStep,
 	runningSteps,
@@ -324,6 +323,7 @@ export {
 	type WaitEvent,
 	type WorktreeChangesEvent,
 	waitFor,
+	walkerName,
 } from "./runs";
 export {
 	createScheduleQueries,

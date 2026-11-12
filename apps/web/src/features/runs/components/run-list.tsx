@@ -1,4 +1,4 @@
-import { isTestRun } from "@nightshift/client";
+import { isTestRun, walkerName } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Empty,
@@ -25,7 +25,6 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
-import { walkerName } from "@/features/devices";
 import type { Project, RunSummary } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import {

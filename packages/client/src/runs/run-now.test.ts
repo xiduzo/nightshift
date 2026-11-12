@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { openGates, type RunLive, runNow } from "./run-now";
+import { runActions } from "./actions";
+import { openGates, type RunLive, runNow, walkerName } from "./run-now";
 import type { RunStatus, StepSummary } from "./types";
 
 const here = { id: "this", thisDevice: true, name: null };
@@ -129,6 +130,63 @@ describe("what a run allows", () => {
 		expect(now.allows).toMatchObject({ stop: true, restart: false });
 		expect(now.whyNot.stop).toBeNull();
 		expect(now.whyNot.restart).not.toBeNull();
+	});
+
+	test("a row of a list, with no steps or commands, allows what the engine's rule allows", () => {
+		const statuses: RunStatus[] = [
+			"running",
+			"waiting",
+			"sleeping",
+			"finished",
+			"failed",
+			"stopped",
+			"interrupted",
+		];
+		for (const status of statuses) {
+			for (const walker of [here, laptop]) {
+				for (const result of [
+					null,
+					"done",
+					"failed",
+					"nothing-to-do",
+				] as const) {
+					const row = {
+						status,
+						result,
+						reason: null,
+						walker,
+						wakeAt: null,
+						signal: null,
+					};
+					expect(runNow(row).allows).toEqual(
+						runActions(status, walker.thisDevice, result),
+					);
+				}
+			}
+		}
+	});
+
+	test("a waiting row of a list names no Gate and no notice: it has no steps", () => {
+		const row = {
+			status: "waiting",
+			result: null,
+			reason: null,
+			walker: laptop,
+			wakeAt: null,
+			signal: null,
+		} as const;
+		expect(runNow(row)).toMatchObject({
+			word: "Waiting for you",
+			gate: null,
+			notice: null,
+		});
+	});
+});
+
+describe("the name of the computer that walks a run", () => {
+	test("its name, or another device when it has none", () => {
+		expect(walkerName(laptop)).toBe("Sander's laptop");
+		expect(walkerName(unnamed)).toBe("another device");
 	});
 });
 

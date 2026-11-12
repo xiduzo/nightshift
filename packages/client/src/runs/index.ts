@@ -1,6 +1,6 @@
 /** Runs: their query options, the stream of one run, the actions a run allows, and their view types. */
 
-export { type RunActing, type RunActions, runActions } from "./actions";
+export type { RunActing, RunActions } from "./actions";
 export { type AskWhy, askWhy, askWhyAnswer } from "./ask-why";
 export {
 	addsFiles,
@@ -67,6 +67,7 @@ export {
 	type RunNotice,
 	type RunNow,
 	runNow,
+	walkerName,
 } from "./run-now";
 export {
 	type NodeSample,

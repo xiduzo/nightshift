@@ -1,4 +1,4 @@
-import { runActions, useRunActed } from "@nightshift/client";
+import { runNow, useRunActed } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Item,
@@ -94,8 +94,7 @@ export function SleepingRuns({
 								</ItemDescription>
 							</ItemContent>
 							{/* Only the device that runs it wakes it. */}
-							{runActions(run.status, run.walker.thisDevice, run.result)
-								.resume ? (
+							{runNow(run).allows.resume ? (
 								<ItemActions>
 									<Tooltip>
 										<TooltipTrigger

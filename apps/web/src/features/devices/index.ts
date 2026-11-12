@@ -6,4 +6,4 @@ export { type Machine, neededMachines } from "./machines";
 export { deviceQueries } from "./queries";
 export { ThisComputerSettings } from "./this-computer-settings";
 export { ThisDeviceLabel } from "./this-device-label";
-export { WalkerBadge, walkerName } from "./walker-badge";
+export { WalkerBadge } from "./walker-badge";

@@ -2,6 +2,7 @@
  * The transcript of one step: its items in order.
  * Each kind of item has its view in `items/`, one file per group of kinds.
  */
+import { walkerName } from "@nightshift/client";
 import type { FlowNode } from "@nightshift/flows";
 import {
 	Alert,
@@ -94,8 +95,7 @@ export function StepTranscript({
 	const running = step.outcome === null;
 	// A gate step without an outcome waits for a person: it gets the answer form.
 	const gateOpen = step.gate !== null && running;
-	const elsewhere =
-		walker && !walker.thisDevice ? (walker.name ?? "another device") : null;
+	const elsewhere = walker && !walker.thisDevice ? walkerName(walker) : null;
 	// The transcript of a run of another device follows it live, but its
 	// gate entry may not be here yet: the open Gate comes from the step itself.
 	const openGate =

@@ -1,4 +1,4 @@
-import { hasEnded } from "@nightshift/client";
+import { hasEnded, walkerName } from "@nightshift/client";
 import { ScrollArea } from "@nightshift/ui/components/scroll-area";
 import {
 	Sheet,
@@ -7,7 +7,6 @@ import {
 } from "@nightshift/ui/components/sheet";
 import { Link } from "@tanstack/react-router";
 import { MonitorIcon, WorkflowIcon } from "lucide-react";
-import { walkerName } from "@/features/devices";
 import { InspectorSection, RunRevision } from "@/features/flows";
 import type { RunDetail, RunStatus, StepSummary } from "@/shared/api";
 import { authClient } from "@/shared/api";

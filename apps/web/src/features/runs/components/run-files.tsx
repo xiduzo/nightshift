@@ -1,3 +1,4 @@
+import { walkerName } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Table,
@@ -8,7 +9,6 @@ import {
 	TableRow,
 } from "@nightshift/ui/components/table";
 import { DownloadIcon, FileIcon } from "lucide-react";
-import { walkerName } from "@/features/devices";
 import { type RunDetail, type RunFiles, SERVER_URL } from "@/shared/api";
 import { formatDateTime, formatSize } from "@/shared/format";
 import { LocalTime } from "@/shared/time";

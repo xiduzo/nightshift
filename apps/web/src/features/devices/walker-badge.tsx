@@ -1,13 +1,9 @@
+import { walkerName } from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import { cn } from "@nightshift/ui/lib/utils";
 import { MonitorIcon } from "lucide-react";
 
 import type { RunSummary } from "@/shared/api";
-
-/** The name of the device that runs a run, as people read it. */
-export function walkerName(walker: RunSummary["walker"]): string {
-	return walker.name ?? "another device";
-}
 
 /**
  * Where a run runs (its steps' Device, or a Walker), when it is not this

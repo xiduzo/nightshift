@@ -1,7 +1,7 @@
 import {
 	hoverTime,
 	type RunSummary,
-	runActions,
+	runNow,
 	useRunPrefetch,
 } from "@nightshift/client";
 import { Button } from "@nightshift/ui-native/components/ui/button";
@@ -41,11 +41,7 @@ export const StoppedRunRow = memo(function StoppedRunRow({
 	const prefetch = useRunPrefetch(useSignedIn().host.orpc);
 	const look = runStatusLook(run.status, run.result);
 	const label = retryLabel(run.status);
-	const canRetry = runActions(
-		run.status,
-		run.walker.thisDevice,
-		run.result,
-	).resume;
+	const canRetry = runNow(run).allows.resume;
 	const overline = [projectName, run.flowName].filter(Boolean).join(" · ");
 
 	return (
