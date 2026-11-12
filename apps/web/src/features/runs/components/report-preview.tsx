@@ -35,7 +35,7 @@ export function ReportPreview({
 	return (
 		<div className={cn("flex flex-col gap-1.5", className)}>
 			<div className="max-h-56 overflow-hidden">
-				<Markdown text={text} imagesAsLinks className="max-w-none text-xs" />
+				<Markdown text={text} className="max-w-none text-xs" />
 			</div>
 			{more ? (
 				<p className="text-muted-foreground text-xs">

@@ -75,43 +75,48 @@ const COMPONENTS: Components = {
 	tr: ({ children }) => <TableRow>{children}</TableRow>,
 	th: ({ children }) => <TableHead>{children}</TableHead>,
 	td: ({ children }) => <TableCell>{children}</TableCell>,
+	img: ImageLink,
 };
 
 /**
- * An image as a link to it, named by its alt text: the page loads nothing
- * from the server the image is on.
+ * A picture as a link to it, with its words: the page loads nothing from
+ * the server the picture is on (ADR 26). A picture without a web address
+ * shows only its words.
  */
 function ImageLink({ src, alt }: { src?: string | Blob; alt?: string }) {
-	const href = typeof src === "string" ? src : undefined;
-	return <TextLink href={href}>{alt?.trim() || href || "Image"}</TextLink>;
+	const href = typeof src === "string" && src !== "" ? src : undefined;
+	const words = alt?.trim();
+	if (!href) return words ? <span>{words}</span> : null;
+	return <TextLink href={href}>{words || href}</TextLink>;
 }
 
 /**
  * Text an agent or a flow wrote, as Markdown: headings, lists, code and links.
- * Raw HTML in it shows as text.
+ * Raw HTML in it shows as text. A picture shows as a link to it.
  */
 export function Markdown({
 	text,
 	link,
-	imagesAsLinks = false,
 	className,
 }: {
 	text: string;
 	/** Shows some links in another way, such as a citation. */
 	link?: LinkView;
-	/** Shows each image as a link to it, so nothing loads from another server. */
-	imagesAsLinks?: boolean;
 	className?: string;
 }) {
-	const components = useMemo<Components>(() => {
-		const own: Components = { ...COMPONENTS };
-		if (link) {
-			own.a = ({ href, children }) =>
-				link({ href, children }) ?? <TextLink href={href}>{children}</TextLink>;
-		}
-		if (imagesAsLinks) own.img = ImageLink;
-		return link || imagesAsLinks ? own : COMPONENTS;
-	}, [link, imagesAsLinks]);
+	const components = useMemo<Components>(
+		() =>
+			link
+				? {
+						...COMPONENTS,
+						a: ({ href, children }) =>
+							link({ href, children }) ?? (
+								<TextLink href={href}>{children}</TextLink>
+							),
+					}
+				: COMPONENTS,
+		[link],
+	);
 	return (
 		<div
 			className={cn(

@@ -68,7 +68,7 @@ export function RunReport({
 				</CardAction>
 			</CardHeader>
 			<CardContent>
-				<Markdown text={text} imagesAsLinks className="max-w-none" />
+				<Markdown text={text} className="max-w-none" />
 			</CardContent>
 			{cut ? (
 				<CardFooter className="text-muted-foreground text-xs">
