@@ -86,7 +86,19 @@ A computer that goes offline does not end the run:
 
 ## Flow health
 
-Flow health shows each flow's runs per day, their cost against the median, why runs failed, and the scores that its steps gave. An Agent, a Command or a Value scores a run with `{"scores": {"found": 4}}` in its data. See [Scores](Flows-and-nodes.md#scores).
+Flow health shows, for each flow, where its work landed, its runs per day, their cost against the median, why runs failed, and its metrics. Click a flow to open its details.
+
+**Where the work landed** comes first. One bar shows the work: what agents, subflows and models made, and your answers to an Ask. One bar shows the choices: the Decisions. Each part of a bar is a rung:
+
+- a tier of a cascade, such as Sonnet or Opus, or the agent or decider of a node without one,
+- **Rule**, when a rule made the choice,
+- **You**, when the work or the choice came to you,
+- **Its deadline**, when the deadline answered for you,
+- **Nowhere**, when no tier held and nobody was asked.
+
+The line next to a bar gives each share, such as "Sonnet 78% · Opus 19% · You 3%". Point at the bars to see how often each rung got the work and what one time on it cost. That cost includes the tries before it. The tooltip also says how often a decider was not sure enough. The **Ladders** tab of a flow shows each rung, and the five nodes that ran most.
+
+**Metrics** are the numbers that the steps of a flow report about their work. An Agent, a Command or a Value reports one with `{"scores": {"found": 4}}` in its data. See [Scores](Flows-and-nodes.md#scores). On the **Metrics** tab of a flow, choose a metric. You see its total, its value per run, its latest value, and the runs that reported it. Three charts show it per day, next to what the runs spent and how often they needed you.
 
 **Per useful result** shows what all runs of a flow cost, divided by the runs that people found useful. Runs that failed or that nobody answered count in the cost too. Under it, you see how many runs with an answer were useful.
 

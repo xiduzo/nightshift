@@ -41,7 +41,7 @@ Night Shift runs on the person's own computers, with their own agent logins. It 
 - [ ] From the phone alone, a person starts, follows and unblocks an overnight flow. Night Shift tells them when a Gate waits, on the screen they use. See `docs/research/mobile.md`.
 - [ ] Another person runs Night Shift for a week on their own agents, with no help from the author.
 - [ ] One flow that is not code runs every day for a month.
-- [ ] For each flow, a person sees where the work landed on each ladder, what each rung cost, and how often the flow needed them.
+- [x] For each flow, a person sees where the work landed on each ladder, what each rung cost, and how often the flow needed them.
 - [ ] A project can live without a folder. Its flows run, and a Host runs its schedules without a GitHub remote.
 - [ ] A person who never opened a terminal installs Night Shift, sets up an agent and a decider, and finishes a first run.
 - [ ] A community flow from someone other than the author lands in `community/`.

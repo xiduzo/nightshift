@@ -35,8 +35,9 @@ Tokens live in `packages/ui/src/styles/globals.css` as CSS custom properties in 
 | `--chart-1` … `--chart-5` | blue scale | Cost and run history charts |
 | `--sidebar-*` | mirrors the page set | Project navigation |
 | `--family-do`, `-decide`, `-shape`, `-hold`, `-compose` | indigo 600 / 400, fuchsia 600 / 400, teal 700 / 400, sky 600 / 400, `--muted-foreground` | The family of a node type on its icon tile: the editor canvas, the node dock and the add-node dialog. A run view shows the run status instead. Each icon keeps 3:1 on its tile. |
+| `--ladder-rule`, `-first`, `-later`, `-person`, `-deadline`, `-none` | sky 400 / sky 800, blue 500 / blue 500, blue 800 / indigo 300, `--metric-needed`, amber 800 / amber 700, `--muted-foreground` | The rungs of a ladder in Flow health. The machine rungs climb one blue ramp, which turns around in the dark theme. A person takes the Needed you color, a deadline a darker step of it. Never a status color. Each neighbour pair passes the dataviz validator for color-blind readers in both themes. |
 
-The palette is neutral. The web app adds its run status, outcome, metric and family colors as tokens in `apps/web/src/index.css`. Add a color as a token before a screen hardcodes it.
+The palette is neutral. The web app adds its run status, outcome, metric, family and ladder colors as tokens in `apps/web/src/index.css`. Add a color as a token before a screen hardcodes it.
 
 ### Typography
 
@@ -150,6 +151,23 @@ A stat card or a table row can open a details dialog (`apps/web/src/features/das
 - One range toggle on the right of the tabs. It drives every tab.
 - Overview: 4 `Stat` cards, then one chart. Other tabs: one list or table, at most 5 rows (see Overview lists).
 - Each tab has its own empty state. A footer links to the full page.
+
+### Flow health
+
+Flow health is a tab of a project's page, one row per flow. It leads with where the work landed (Q31). Keep its shape:
+
+- Columns: Flow, **Where the work landed**, Last runs, Runs, Per finished run, Per useful result, Needed you. The last column has `pr-6`.
+- **Where the work landed** has a thin segmented bar for the work and one for the choices: 8px, rounded parts, a 2px gap, one part per rung in ladder order. A line next to each bar gives the shares: "Sonnet 78% · Opus 19% · You 3%". It names the 3 biggest rungs and how many more there are.
+- Its tooltip gives each rung with its count and the cost of one landing, every try before it included. It adds how often a decider was not sure enough: "A decider was not sure enough in 6 of 50 Decisions."
+- Count a landing in times ("32 of 41 times") or Decisions, never in steps: each try of a cascade is a step. Show a cost per landing, never a sum over a flow's rungs: a Subflow's landing holds the cost of the Agent inside it.
+- The rungs are named the same everywhere (`@nightshift/client` `ladderParts`): the tier, or Agent, Subflow, Decider, Rule. A person is always "You". "Its deadline" is a rung of its own. "Nowhere" is the rung when nothing held.
+- The rung colors are the `--ladder-*` tokens. The text next to a bar stays in text colors.
+- An older Host sends no ladders: a dash, and the tooltip says "Update Night Shift to see where the work landed."
+
+A row opens the flow's details dialog. Its tabs: Overview, Ladders, Metrics, Cost, Problems, Runs.
+
+- **Ladders**: a card per ladder (rung, share, count, cost each, the not-sure line under Choices), then the 5 nodes that landed most, each with its own bar.
+- **Metrics**: a `Select` picks the metric (Q32). Four `Stat` cards: Total, Per run, Latest, Runs. Then three small charts on one day axis, in this order: the metric per run, Spent, Needed you. A hover on one day shows it in all three. Then the Metrics table: every metric with its runs, total, average and latest value.
 
 ## Copy
 

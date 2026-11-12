@@ -194,7 +194,7 @@ You do not have to write a shape. When a node has none, Night Shift takes it fro
 
 An Agent, a Command or a Value scores the run with `scores` in its data: `{"scores": {"leads": 12, "replies": 3}}`. Each name gets a number of 0 or more. A shape does not have to name `scores`.
 
-- Flow health shows the scores of each flow.
+- Flow health shows each name as a metric of the flow, on its **Metrics** tab. See [Flow health](Runs-and-schedules.md#flow-health).
 - A name that Night Shift uses itself, such as `useful`, gives a warning and does not count.
 - When a cascade moves up to the next try, the try before scores nothing.
 
