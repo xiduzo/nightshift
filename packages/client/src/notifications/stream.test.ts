@@ -60,7 +60,8 @@ async function follow(connections: Connection[]) {
 	await followNotifications({
 		client,
 		signal: controller.signal,
-		onItem: (item) => items.push(`${item.kind} ${item.key}`),
+		onItem: (item) =>
+			items.push(`${item.kind} ${"key" in item ? item.key : ""}`),
 		onConnection: (state) => states.push(state),
 		wait: async (ms) => {
 			delays.push(ms);
