@@ -85,7 +85,7 @@ A project's page reads like the Performance page of Search Console. Keep its sha
 - What runs or waits now shows in one slim line, only when there is something.
 - **Details** on a tile opens the details dialog of that number at the page's range.
 - A test run counts only in Spend. Runs, Finished, Needed you, the Failures and Gates tabs, Latest reports and Flow health leave it out (`isTestRun`, one rule for every number). So does the sidebar's runs donut. The run page and every run list show a **Test run** badge. On the phone, the Runs chips and the Watch numbers leave it out, and the cost caption names it ("Of 8 runs and 1 test run").
-- Setup does not go on this page. The computers that have the project are in its ⋯ menu.
+- Setup does not go on this page. Its other pages sit under the project in the sidebar.
 
 ### Home
 
@@ -130,7 +130,7 @@ What you configure once reads like the Settings page:
 - Secrets have their own page in the main menu: Command nodes use them too, not only agents.
 - Secrets have two pages. The computer's page (under the computer in the Settings menu) lists the Personal secrets and this computer's. The Space's page (under Space in the Settings menu) lists each project's secrets and the secrets on your other devices.
 - The computer's page leaves out a missing name when each flow that uses it gets it from its project.
-- A project's Secrets are a page in the project's ⋯ menu in the sidebar, beside Knowledge. They are setup, so they do not go on the project's page.
+- A project's Secrets are a page under the project in the sidebar, beside Knowledge. They are setup, so they do not go on the project's page.
 - A secret on another of your devices has the same row menu as your own: Move to Personal, Move to a project…, Remove from <device>. That device does the work. When it is offline, the toast says so and when to try again. Its profiles stay read-only here.
 - A move into a project ends with a toast whose action opens that project's Secrets page.
 

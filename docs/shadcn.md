@@ -70,7 +70,7 @@ CLI when you need them.
 | ✓ [Accordion](https://ui.shadcn.com/docs/components/accordion) | Stacked sections that open one or many at a time. |
 | ✓ [Breadcrumb](https://ui.shadcn.com/docs/components/breadcrumb) | Where a page sits: Projects › rpgdotexe › night. With a dropdown on the current step, it opens the pages beside it (Knowledge › Files). |
 | [Navigation Menu](https://ui.shadcn.com/docs/components/navigation-menu) | Top-of-site links with dropdown panels (marketing sites). |
-| ✓ [Sidebar](https://ui.shadcn.com/docs/components/sidebar) | The app shell: `SidebarProvider`, `Sidebar`, `SidebarHeader`/`Content`/`Footer`, `SidebarGroup`, `SidebarMenu`, `SidebarMenuButton`, `SidebarMenuBadge`, `SidebarInset`, `SidebarTrigger`. Collapses to icons, turns into a Sheet on mobile. |
+| ✓ [Sidebar](https://ui.shadcn.com/docs/components/sidebar) | The app shell: `SidebarProvider`, `Sidebar`, `SidebarHeader`/`Content`/`Footer`, `SidebarGroup`, `SidebarMenu`, `SidebarMenuButton`, `SidebarMenuBadge`, `SidebarMenuSub` (in a Collapsible), `SidebarInset`, `SidebarTrigger`. Collapses to icons, turns into a Sheet on mobile. |
 | ✓ [Tabs](https://ui.shadcn.com/docs/components/tabs) | Switch between views of one thing (a schedule's Time and days / Cron line, a run's Steps / Flow / Variables / Artifacts, the node inspector's Work / Results / Setup). `variant="line"` for underline tabs. |
 | ✓ [Separator](https://ui.shadcn.com/docs/components/separator) | A thin rule between sections or toolbar items. |
 | ✓ [Scroll Area](https://ui.shadcn.com/docs/components/scroll-area) | A scroll region with styled scrollbars (transcripts, long lists in a fixed height). |
@@ -189,8 +189,8 @@ files into the app. Then adapt the copy. Browse them at
 | `sidebar-03` | A sidebar with submenus. |
 | `sidebar-04` | A floating sidebar with submenus. |
 | `sidebar-05` | A sidebar with collapsible submenus. |
-| `sidebar-06` | A sidebar with submenus as dropdowns. Each project's ⋯ menu opens its pages this way. |
-| `sidebar-07` | A sidebar that collapses to icons, with a team switcher and a user menu. Night Shift's app shell comes from it. Its team switcher is the Space switcher (`features/spaces/space-switcher.tsx`). Its user menu is the Settings menu: the Space, this computer, your account and the theme. |
+| `sidebar-06` | A sidebar with submenus as dropdowns. |
+| `sidebar-07` | A sidebar that collapses to icons, with a team switcher, collapsible menus and a user menu. Night Shift's app shell comes from it. Each project is a collapsible menu of its pages. Only the project you are in is open. Its team switcher is the Space switcher (`features/spaces/space-switcher.tsx`). Its user menu is the Settings menu: the Space, this computer, your account and the theme. |
 | `sidebar-08` | An inset sidebar with secondary navigation. |
 | `sidebar-09` | Collapsible nested sidebars (a mail-client layout). |
 | `sidebar-10` | A sidebar in a popover. |
@@ -214,7 +214,7 @@ files into the app. Then adapt the copy. Browse them at
 
 | You need | Use |
 | --- | --- |
-| The page frame, navigation, mobile menu | Sidebar (from `sidebar-07`, project menus from `sidebar-06`) with `SidebarInset` and a header holding `SidebarTrigger` and a Breadcrumb |
+| The page frame, navigation, mobile menu | Sidebar (from `sidebar-07`, with a collapsible menu per project) with `SidebarInset` and a header holding `SidebarTrigger` and a Breadcrumb |
 | A page title with actions | A header row: `h1` + muted description + Buttons. No component needed. |
 | A number with a caption | Card (`CardHeader` + `CardDescription` + `CardTitle`), as in `dashboard-01`'s section cards |
 | A list of things you click into | Item in an `ItemGroup`, or Table when there are columns to compare |

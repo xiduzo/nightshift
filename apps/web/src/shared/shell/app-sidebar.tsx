@@ -1,5 +1,10 @@
 import { Badge } from "@nightshift/ui/components/badge";
 import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@nightshift/ui/components/collapsible";
+import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuGroup,
@@ -18,7 +23,6 @@ import {
 	SidebarContent,
 	SidebarFooter,
 	SidebarGroup,
-	SidebarGroupAction,
 	SidebarGroupLabel,
 	SidebarHeader,
 	SidebarMenu,
@@ -26,6 +30,9 @@ import {
 	SidebarMenuBadge,
 	SidebarMenuButton,
 	SidebarMenuItem,
+	SidebarMenuSub,
+	SidebarMenuSubButton,
+	SidebarMenuSubItem,
 	SidebarRail,
 	useSidebar,
 } from "@nightshift/ui/components/sidebar";
@@ -34,6 +41,7 @@ import { Link, useMatchRoute } from "@tanstack/react-router";
 import {
 	BookOpenIcon,
 	BotIcon,
+	ChevronRightIcon,
 	ChevronsUpDownIcon,
 	CircleUserRoundIcon,
 	FolderIcon,
@@ -47,7 +55,6 @@ import {
 	MonitorIcon,
 	MonitorSmartphoneIcon,
 	MoonIcon,
-	MoreHorizontalIcon,
 	PlusIcon,
 	Settings2Icon,
 	SunIcon,
@@ -66,9 +73,9 @@ import type { Project } from "@/shared/api";
 import { useSidebarRange } from "./use-sidebar-range";
 
 /**
- * The app shell's sidebar, after the shadcn `sidebar-07` block with the
- * project menus of `sidebar-06`. It keeps what you open every day: Home,
- * the Inbox and the projects. A project's pages open from its ⋯ menu. The
+ * The app shell's sidebar, after the shadcn `sidebar-07` block. It keeps
+ * what you open every day: Home,
+ * the Inbox and the projects. The project you are in shows its pages. The
  * Space, this computer, your account and the theme sit in one Settings
  * menu in the footer.
  */
@@ -144,21 +151,30 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 	);
 }
 
-/** The projects. The + on the group label is the one place to add a project. */
+/**
+ * The projects. Only the project you are in is open and shows its pages.
+ * The chevron opens or closes any other. Add project sits below the list.
+ */
 function NavProjects({ projects }: { projects: Project[] | undefined }) {
 	const [adding, setAdding] = useState(false);
 	const range = useSidebarRange();
 	return (
 		<SidebarGroup>
 			<SidebarGroupLabel>Projects</SidebarGroupLabel>
-			<SidebarGroupAction title="Add project" onClick={() => setAdding(true)}>
-				<PlusIcon aria-hidden="true" />
-				<span className="sr-only">Add project</span>
-			</SidebarGroupAction>
 			<SidebarMenu>
 				{projects?.map((project) => (
 					<ProjectItem key={project.id} project={project} range={range} />
 				))}
+				<SidebarMenuItem>
+					<SidebarMenuButton
+						tooltip="Add project"
+						className="text-sidebar-foreground/70"
+						onClick={() => setAdding(true)}
+					>
+						<PlusIcon aria-hidden="true" />
+						<span>Add project</span>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
 			</SidebarMenu>
 			<AddProjectDialog open={adding} onOpenChange={setAdding} />
 		</SidebarGroup>
@@ -193,20 +209,24 @@ const PROJECT_PAGES: {
 ];
 
 /**
- * One project: its name opens the project's page and names the page of
- * the project you are on. Its icon is a donut of its runs over the range
- * of Home or the project's page. The ⋯ menu opens its other pages.
+ * One project: its name opens the project's page. Its icon is a donut of
+ * its runs over the range of Home or the project's page. Opened, it lists
+ * the project's other pages, after the collapsible menus of `sidebar-07`.
  */
 function ProjectItem({ project, range }: { project: Project; range: number }) {
 	const matchRoute = useMatchRoute();
-	const { isMobile } = useSidebar();
 	const params = { projectId: project.id };
 	const inProject = Boolean(
 		matchRoute({ to: "/projects/$projectId", params, fuzzy: true }),
 	);
-	const current = PROJECT_PAGES.find((page) =>
-		matchRoute({ to: page.to, params, fuzzy: true }),
-	);
+	// Open when you enter the project, closed when you leave it. The chevron
+	// changes it in between.
+	const [open, setOpen] = useState(inProject);
+	const [wasInProject, setWasInProject] = useState(inProject);
+	if (wasInProject !== inProject) {
+		setWasInProject(inProject);
+		setOpen(inProject);
+	}
 	const Icon = inProject ? FolderOpenIcon : FolderIcon;
 
 	// Counted by Night Shift with the project list: no read per project.
@@ -220,10 +240,14 @@ function ProjectItem({ project, range }: { project: Project; range: number }) {
 		.join(". ");
 
 	return (
-		<SidebarMenuItem>
+		<Collapsible
+			open={open}
+			onOpenChange={setOpen}
+			render={<SidebarMenuItem />}
+		>
 			<SidebarMenuButton
 				tooltip={label}
-				isActive={inProject}
+				isActive={Boolean(matchRoute({ to: "/projects/$projectId", params }))}
 				render={<Link to="/projects/$projectId" params={params} />}
 			>
 				{/* A pulsing dot on the icon while a run in this project is in progress. */}
@@ -242,50 +266,42 @@ function ProjectItem({ project, range }: { project: Project; range: number }) {
 						<span className="sr-only">{label.slice(project.name.length)}</span>
 					) : null}
 				</span>
-				{current ? (
-					<span className="ml-auto pr-5 text-muted-foreground text-xs">
-						{current.label}
-					</span>
-				) : null}
 			</SidebarMenuButton>
-			<DropdownMenu>
-				<DropdownMenuTrigger
-					render={
-						<SidebarMenuAction
-							showOnHover
-							className="data-popup-open:opacity-100"
-						/>
-					}
-				>
-					<MoreHorizontalIcon aria-hidden="true" />
-					<span className="sr-only">Pages of {project.name}</span>
-				</DropdownMenuTrigger>
-				<DropdownMenuContent
-					className="min-w-48"
-					side={isMobile ? "bottom" : "right"}
-					align={isMobile ? "end" : "start"}
-				>
+			<CollapsibleTrigger
+				render={
+					<SidebarMenuAction className="transition-transform data-panel-open:rotate-90" />
+				}
+			>
+				<ChevronRightIcon aria-hidden="true" />
+				<span className="sr-only">Pages of {project.name}</span>
+			</CollapsibleTrigger>
+			<CollapsibleContent>
+				<SidebarMenuSub>
 					<ProjectPages project={project} />
-				</DropdownMenuContent>
-			</DropdownMenu>
-		</SidebarMenuItem>
+				</SidebarMenuSub>
+			</CollapsibleContent>
+		</Collapsible>
 	);
 }
 
-/** The pages of a project in its menu. */
+/** The pages of a project under it. */
 function ProjectPages({ project }: { project: Project }) {
+	const matchRoute = useMatchRoute();
+	const params = { projectId: project.id };
 	return PROJECT_PAGES.filter(
 		// What runs left in the project's folder: only where it has one.
 		(page) =>
 			page.to !== "/projects/$projectId/branches" || project.repoPath !== null,
 	).map(({ to, label, icon: PageIcon }) => (
-		<DropdownMenuItem
-			key={to}
-			render={<Link to={to} params={{ projectId: project.id }} />}
-		>
-			<PageIcon aria-hidden="true" />
-			{label}
-		</DropdownMenuItem>
+		<SidebarMenuSubItem key={to}>
+			<SidebarMenuSubButton
+				isActive={Boolean(matchRoute({ to, params, fuzzy: true }))}
+				render={<Link to={to} params={params} />}
+			>
+				<PageIcon aria-hidden="true" />
+				<span>{label}</span>
+			</SidebarMenuSubButton>
+		</SidebarMenuSubItem>
 	));
 }
 
