@@ -93,6 +93,7 @@ export {
 	missingInputs,
 } from "./flows";
 export {
+	type AnswerDraft,
 	type AnsweredGate,
 	type AskOption,
 	type AskValue,

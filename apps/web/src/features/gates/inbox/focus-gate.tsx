@@ -1,4 +1,11 @@
-import { deadlineWhen, gateParts, waitedText } from "@nightshift/client";
+import {
+	type AnswerDraft,
+	briefView,
+	deadlineWhen,
+	gateParts,
+	URGENCY_LABEL,
+	waitedText,
+} from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
@@ -21,11 +28,11 @@ import { usePushUrgencies } from "@/features/notifications";
 import type { OpenGate } from "@/shared/api";
 import { InlineMarkdown, Markdown } from "@/shared/markdown";
 import { LocalTime } from "@/shared/time";
-import { URGENCY_LABEL, UrgencyMarker } from "@/shared/urgency";
+import { UrgencyMarker } from "@/shared/urgency";
 import { AskAttachments } from "../ask-attachments";
 import { ContextList } from "../gate-question";
 import { WrittenByModel } from "../written-by-model";
-import { type AnswerDraft, FocusAnswer } from "./focus-answer";
+import { FocusAnswer } from "./focus-answer";
 import { GateLinks } from "./gate-links";
 import { GateFrom } from "./gate-where";
 import { reachText } from "./ladder";
@@ -67,19 +74,21 @@ export function FocusGate({
 	onDraft: (next: AnswerDraft) => void;
 }) {
 	const { headline, context, links } = gateParts(gate.question);
-	const { situation, background, recommendation, byModel } = gate.brief;
-	const by = (part: OpenGate["brief"]["byModel"][number]) =>
-		byModel.includes(part);
+	const { situation, background, recommendation } = briefView(gate);
 	// Without a brief the details are all there is to read: they stay open.
-	const detailsOpen = !situation;
+	const detailsOpen = situation === null;
 	const attachments = gate.form?.attachments;
 	const folded =
-		background.length > 0 ||
+		background !== null ||
 		(!detailsOpen && (context.length > 0 || Boolean(attachments)));
 
 	return (
 		<article className="flex flex-col gap-6">
-			<UrgencyBand gate={gate} now={now} byModel={by("urgency")} />
+			<UrgencyBand
+				gate={gate}
+				now={now}
+				byModel={gate.brief.byModel.includes("urgency")}
+			/>
 
 			<header className="flex flex-col gap-2">
 				<GateFrom gate={gate} />
@@ -88,8 +97,8 @@ export function FocusGate({
 				</h1>
 				{situation ? (
 					<div className="text-lg text-muted-foreground">
-						<Markdown text={situation} />
-						{by("situation") ? <WrittenByModel /> : null}
+						<Markdown text={situation.text} />
+						{situation.byModel ? <WrittenByModel /> : null}
 					</div>
 				) : null}
 			</header>
@@ -111,7 +120,7 @@ export function FocusGate({
 							.
 						</span>{" "}
 						<InlineMarkdown text={recommendation.reason} />{" "}
-						{by("recommendation") ? <WrittenByModel /> : null}
+						{recommendation.byModel ? <WrittenByModel /> : null}
 					</span>
 				</p>
 			) : null}
@@ -147,14 +156,14 @@ export function FocusGate({
 								<OpenRun runId={gate.runId} />
 							</div>
 							<CollapsibleContent className="flex flex-col gap-4">
-								{background.length > 0 ? (
+								{background ? (
 									<section className="flex flex-col gap-1.5">
 										<h3 className="flex items-baseline gap-2 font-medium text-muted-foreground text-xs uppercase tracking-wide">
 											What is done
-											{by("background") ? <WrittenByModel /> : null}
+											{background.byModel ? <WrittenByModel /> : null}
 										</h3>
 										<ul className="flex flex-col gap-1.5 text-sm">
-											{background.map((item, index) => (
+											{background.items.map((item, index) => (
 												<li key={index} className="flex gap-2">
 													<CheckIcon
 														className="mt-0.5 size-4 shrink-0 text-muted-foreground"

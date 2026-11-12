@@ -1,4 +1,4 @@
-import { gateParts } from "@nightshift/client";
+import { type AnswerDraft, gateParts, URGENCY_LABEL } from "@nightshift/client";
 import {
 	Alert,
 	AlertAction,
@@ -43,11 +43,10 @@ import { runQueries } from "@/features/runs/queries";
 import type { OpenGate } from "@/shared/api";
 import { useNow } from "@/shared/format";
 import { SiteHeader } from "@/shared/page";
-import { URGENCY_LABEL } from "@/shared/urgency";
 import { gateQueries } from "../queries";
 import { useOpenGates } from "../use-open-gates";
 import { AnsweredList } from "./answered-list";
-import { type AnswerDraft, EMPTY_DRAFT, typing } from "./focus-answer";
+import { EMPTY_DRAFT, typing } from "./focus-answer";
 import { FocusGate } from "./focus-gate";
 import { ladderOf } from "./ladder";
 import { SleepingRuns } from "./sleeping-runs";

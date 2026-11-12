@@ -1,4 +1,10 @@
 import {
+	type AnswerDraft,
+	briefView,
+	choiceLine,
+	maySend,
+} from "@nightshift/client";
+import {
 	Alert,
 	AlertDescription,
 	AlertTitle,
@@ -29,14 +35,14 @@ import { GateDeadline } from "../gate-deadline";
 import { useResolveGate } from "../use-resolve-gate";
 import { WrittenByModel } from "../written-by-model";
 
-/** What you picked and wrote for one Gate. The inbox keeps it while you step to another Gate. */
-export type AnswerDraft = { choice: string | null; note: string };
-
+/** Nothing picked or written yet. The inbox keeps a draft per Gate while you step to another Gate. */
 export const EMPTY_DRAFT: AnswerDraft = { choice: null, note: "" };
 
 /** The choices of a Gate, the recommended one first: the order of the 1–9 keys. */
-export function orderedChoices(gate: OpenGate): OpenGate["choices"] {
-	const recommended = gate.brief.recommendation?.option ?? null;
+function orderedChoices(
+	gate: OpenGate,
+	recommended: string | null,
+): OpenGate["choices"] {
 	return [...gate.choices].sort(
 		(a, b) => Number(b.name === recommended) - Number(a.name === recommended),
 	);
@@ -71,19 +77,11 @@ export function FocusAnswer({
 	const resolve = useResolveGate({ runTitle: gate.runTitle });
 	const busy = resolve.isPending || reading || gate.answerPending;
 	const held = gate.branchesWork;
-	const recommended = gate.brief.recommendation?.option ?? null;
-	const choices = orderedChoices(gate);
+	const brief = briefView(gate);
+	const recommended = brief.recommendation?.option ?? null;
+	const choices = orderedChoices(gate, recommended);
 	const chosen = gate.choices.find((c) => c.name === draft.choice) ?? null;
-	const impactsByModel =
-		gate.brief.byModel.includes("impacts") &&
-		gate.choices.some((c) => c.impact);
-	const canSend =
-		chosen !== null &&
-		gate.canAnswer &&
-		!held &&
-		!busy &&
-		files.problem === null &&
-		(!chosen.needsNote || draft.note.trim() !== "");
+	const canSend = maySend(gate, draft) && !busy && files.problem === null;
 
 	const pick = (choice: string | null) => {
 		onDraft({ ...draft, choice });
@@ -169,7 +167,7 @@ export function FocusAnswer({
 					const style = outcomeStyle(choice.name, choice.color);
 					const Icon = style.icon;
 					const selected = choice.name === draft.choice;
-					const what = choice.impact ?? choice.description;
+					const what = choiceLine(choice);
 					return (
 						<button
 							key={choice.name}
@@ -223,7 +221,7 @@ export function FocusAnswer({
 					);
 				})}
 			</fieldset>
-			{impactsByModel ? (
+			{brief.impactsByModel ? (
 				<WrittenByModel>Night Shift wrote what each answer does</WrittenByModel>
 			) : null}
 			{chosen ? (

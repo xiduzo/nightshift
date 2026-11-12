@@ -1,4 +1,9 @@
-import { PHONE_DELAYS, phoneDelayLabel } from "@nightshift/client";
+import {
+	PHONE_DELAYS,
+	phoneDelayLabel,
+	URGENCY_LABEL,
+} from "@nightshift/client";
+import { GATE_URGENCIES, type GateUrgency } from "@nightshift/flows";
 import {
 	Alert,
 	AlertAction,
@@ -41,12 +46,7 @@ import { toast } from "sonner";
 
 import type { NotificationSettings } from "@/shared/api";
 import { PageSection } from "@/shared/page";
-import {
-	type GateUrgency,
-	URGENCIES,
-	URGENCY_LABEL,
-	UrgencyMarker,
-} from "@/shared/urgency";
+import { UrgencyMarker } from "@/shared/urgency";
 import { browserPushErrorText } from "../browser";
 import { notificationQueries } from "../queries";
 import { useBrowserPush } from "../use-browser-push";
@@ -332,12 +332,12 @@ function PushForField({
 				aria-describedby={`${id}-description`}
 				value={value}
 				onValueChange={(next: string[]) => {
-					const levels = URGENCIES.filter((level) => next.includes(level));
+					const levels = GATE_URGENCIES.filter((level) => next.includes(level));
 					if (levels.length > 0) onSave(levels);
 				}}
 				className="flex-wrap"
 			>
-				{URGENCIES.map((level) => (
+				{GATE_URGENCIES.map((level) => (
 					<ToggleGroupItem key={level} value={level}>
 						<UrgencyMarker urgency={level} />
 						{URGENCY_LABEL[level]}

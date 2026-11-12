@@ -1,9 +1,10 @@
+import { WRITTEN_BY_NIGHT_SHIFT } from "@nightshift/client";
 import { cn } from "@nightshift/ui/lib/utils";
 import { SparklesIcon } from "lucide-react";
 
 /** A quiet note on a part of a Gate's brief that a model wrote, not the flow. */
 export function WrittenByModel({
-	children = "Written by Night Shift",
+	children = WRITTEN_BY_NIGHT_SHIFT,
 	className,
 }: {
 	children?: string;

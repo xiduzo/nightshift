@@ -1,5 +1,6 @@
+import { GATE_URGENCIES, type GateUrgency } from "@nightshift/flows";
+
 import type { OpenGate } from "@/shared/api";
-import { type GateUrgency, URGENCIES } from "@/shared/urgency";
 
 /** One rung of the inbox ladder: the open Gates of one urgency. */
 export type LadderGroup<G> = { urgency: GateUrgency; gates: G[] };
@@ -11,7 +12,7 @@ export type LadderGroup<G> = { urgency: GateUrgency; gates: G[] };
 export function ladderOf<G extends Pick<OpenGate, "urgency" | "openedAt">>(
 	gates: readonly G[],
 ): LadderGroup<G>[] {
-	return URGENCIES.map((urgency) => ({
+	return GATE_URGENCIES.map((urgency) => ({
 		urgency,
 		gates: gates
 			.filter((gate) => gate.urgency === urgency)

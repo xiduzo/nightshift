@@ -1,6 +1,7 @@
 /** Gates that wait for a person: the inbox query, the Gate queue (urgency, its words, the one order, which Gates you may answer), the brief as parts, the answer and when it may go, how long a Gate waited, the words of a deadline, what a question shows (and as plain text), where each choice leads and what an answer does, and their view types. */
 
 export {
+	type AnswerDraft,
 	answerGate,
 	type GateAnswer,
 	type GateAnswerResult,

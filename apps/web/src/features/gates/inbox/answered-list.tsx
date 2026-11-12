@@ -5,6 +5,7 @@ import {
 	gateRun,
 	type StatusKey,
 	statusOf,
+	URGENCY_LABEL,
 } from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
@@ -49,7 +50,7 @@ import { outcomeLabel, outcomeStyle } from "@/features/flows";
 import { formatRelative, formatTime } from "@/shared/format";
 import { InlineMarkdown, Markdown } from "@/shared/markdown";
 import { LocalTime } from "@/shared/time";
-import { URGENCY_LABEL, UrgencyMarker } from "@/shared/urgency";
+import { UrgencyMarker } from "@/shared/urgency";
 import { ContextList } from "../gate-question";
 import { GateLinks } from "./gate-links";
 import { GateWhere } from "./gate-where";

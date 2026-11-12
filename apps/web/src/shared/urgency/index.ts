@@ -1,4 +1,3 @@
-/** How soon a Gate needs an answer: its levels, their names and their mark. */
+/** The mark of a Gate's urgency. Its levels and their words are `@nightshift/client`'s. */
 
-export { type GateUrgency, URGENCIES, URGENCY_LABEL } from "./urgency";
 export { UrgencyMarker } from "./urgency-marker";

@@ -1,6 +1,7 @@
+import { URGENCY_LABEL } from "@nightshift/client";
+import type { GateUrgency } from "@nightshift/flows";
 import { cn } from "@nightshift/ui/lib/utils";
 import { SignalHighIcon, SignalLowIcon, SignalMediumIcon } from "lucide-react";
-import { type GateUrgency, URGENCY_LABEL } from "./urgency";
 
 const LOOK: Record<GateUrgency, { icon: typeof SignalHighIcon; text: string }> =
 	{
