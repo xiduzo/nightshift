@@ -1,12 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-	FLOW_VERSION,
-	type Flow,
-	flowSchema,
-	NODE_FAMILY,
-	nodeOutcomes,
-	outputFieldsByType,
-} from "../flow";
+import { FLOW_VERSION, type Flow, flowSchema } from "../flow";
 import { outputFieldShape } from "../shapes";
 import { type FlowIssue, validateFlow } from "../validate";
 import type { CommandNode } from "./command";
@@ -147,16 +140,6 @@ describe("the Since last run node", () => {
 		expect(messages(scope, "error")).toEqual([
 			expect.stringContaining("{{ghost.name}}"),
 		]);
-	});
-
-	test("its outcomes are new, changed and same, and it is a Shape node", () => {
-		expect(nodeOutcomes(seen())).toEqual(["new", "changed", "same"]);
-		expect(outputFieldsByType["since-last-run"]).toEqual([
-			"outcome",
-			"data",
-			"visit",
-		]);
-		expect(NODE_FAMILY["since-last-run"]).toBe("shape");
 	});
 
 	test("its data has the new and changed items, and a value adds previous and current", () => {

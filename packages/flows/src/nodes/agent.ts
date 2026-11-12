@@ -20,6 +20,12 @@ import {
 	tierBase,
 	tierLabel,
 } from "./cascade";
+import {
+	type BuiltInOutcome,
+	EXAMPLE_DEVICE,
+	type NodeDefinition,
+	noSecrets,
+} from "./definition";
 import { checkOptions, option } from "./outcomes";
 
 /**
@@ -499,3 +505,36 @@ function checkAgentCascade(node: AgentNode, check: NodeCheck): void {
 		}
 	});
 }
+
+/** The Agent node type. */
+export const agentDefinition = {
+	type: "agent",
+	label: "Agent",
+	family: "do",
+	standsIn: true,
+	outcomes: (node) => {
+		const outcomes = node.outcomes
+			? node.outcomes.map((o) => o.name)
+			: (["pass", "fail", "needs-input"] satisfies BuiltInOutcome[]);
+		// An agent that asks a person never ends on needs-input.
+		return node.ask === "person"
+			? outcomes.filter((name) => name !== "needs-input")
+			: outcomes;
+	},
+	outcomeColor: (node, outcome) =>
+		node.outcomes?.find((own) => own.name === outcome)?.color,
+	outputFields: agentOutputFields,
+	check: checkAgentNode,
+	secrets: noSecrets,
+	sample: {
+		id: "scout",
+		type: "agent",
+		position: { x: 0, y: 0 },
+		profile: { device: EXAMPLE_DEVICE, profile: "worker" },
+		prompt: "Find news on {{topic}}. Already reported: {{vars.seen}}",
+		output: {
+			type: "object",
+			properties: { links: { type: "array", items: { type: "string" } } },
+		},
+	},
+} satisfies NodeDefinition<AgentNode, z.input<typeof agentNodeSchema>>;

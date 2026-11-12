@@ -25,6 +25,7 @@ import {
 	tierBase,
 	tierLabel,
 } from "./cascade";
+import { type NodeDefinition, noSecrets } from "./definition";
 import {
 	checkGateBrief,
 	gateBriefFields,
@@ -374,3 +375,32 @@ function checkDecidedBy(node: DecisionNode, check: NodeCheck): void {
 		);
 	}
 }
+
+/** The Decision node type: a Gate, a Branch or a Decision by a model. */
+export const decisionDefinition = {
+	type: "decision",
+	label: "Decision",
+	family: "decide",
+	standsIn: true,
+	outcomes: (node) => {
+		const options = node.options.map((option) => option.name);
+		// A cascade with no person tier ends `fail` when no tier holds.
+		const fails =
+			node.cascade !== undefined &&
+			!node.cascade.some((tier) => isPersonTier(tier));
+		return fails ? [...options, "fail"] : options;
+	},
+	outcomeColor: (node, outcome) =>
+		node.options.find((option) => option.name === outcome)?.color,
+	outputFields: decisionOutputFields,
+	check: checkDecisionNode,
+	secrets: noSecrets,
+	sample: {
+		id: "approve",
+		type: "decision",
+		position: { x: 0, y: 0 },
+		by: "person",
+		prompt: "Send the offer to {{lead}}?",
+		options: [{ name: "yes" }, { name: "no" }],
+	},
+} satisfies NodeDefinition<DecisionNode, z.input<typeof decisionNodeSchema>>;

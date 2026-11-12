@@ -1,11 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-	FLOW_VERSION,
-	type Flow,
-	flowSchema,
-	nodeOutcomes,
-	outputFieldsByType,
-} from "../flow";
+import { FLOW_VERSION, type Flow, flowSchema } from "../flow";
 import { parseFlow, validateFlow } from "../validate";
 import type { CommandNode } from "./command";
 import type { ToolNode } from "./tool";
@@ -77,16 +71,6 @@ describe("the Tool node schema", () => {
 		expect(bad({ connection: "linear", tool: "" })).toBe(false);
 		expect(bad({ connection: "Linear API", tool: "create_issue" })).toBe(false);
 		expect(bad({ connection: "linear", tool: "create_issue" })).toBe(true);
-	});
-
-	test("ends with pass or fail, and leaves data, text and visit for later nodes", () => {
-		expect(nodeOutcomes(tool("file"))).toEqual(["pass", "fail"]);
-		expect(outputFieldsByType.tool).toEqual([
-			"outcome",
-			"data",
-			"text",
-			"visit",
-		]);
 	});
 });
 

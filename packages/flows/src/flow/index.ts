@@ -52,14 +52,12 @@ export {
 	migrateToolSets,
 } from "./migrate";
 export {
-	type BuiltInOutcome,
 	DECISION_LABEL,
+	definitionOf,
 	jsonOutputFields,
-	NODE_FAMILIES,
+	NODE_DEFINITIONS,
 	NODE_FAMILY,
-	NODE_FAMILY_LABEL,
 	NODE_TYPE_LABEL,
-	type NodeFamily,
 	nodeOutcomes,
 	nodeOutputFields,
 	outcomeColor,

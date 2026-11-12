@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { type NodeCheck, nodeBase, ruleOwnNames } from "./base";
+import { type NodeDefinition, noOwnColors, noSecrets } from "./definition";
 
 /**
  * The Since last run node: what is new or changed since the last run of
@@ -121,3 +122,26 @@ export function checkSinceLastRunNode(
 		check.rule(node.when, `The rule of "${node.id}"`, ruleOwnNames);
 	}
 }
+
+/** The Since last run node type. */
+export const sinceLastRunDefinition = {
+	type: "since-last-run",
+	label: "Since last run",
+	family: "shape",
+	standsIn: true,
+	outcomes: () => sinceLastRunOutcomes,
+	outcomeColor: noOwnColors,
+	outputFields: sinceLastRunOutputFields,
+	check: checkSinceLastRunNode,
+	secrets: noSecrets,
+	sample: {
+		id: "fresh",
+		type: "since-last-run",
+		position: { x: 0, y: 0 },
+		items: "{{feed.data.items}}",
+		key: "link",
+	},
+} satisfies NodeDefinition<
+	SinceLastRunNode,
+	z.input<typeof sinceLastRunNodeSchema>
+>;

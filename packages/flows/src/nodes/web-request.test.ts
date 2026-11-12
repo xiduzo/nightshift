@@ -1,11 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-	FLOW_VERSION,
-	type Flow,
-	flowSchema,
-	nodeOutcomes,
-	outputFieldsByType,
-} from "../flow";
+import { FLOW_VERSION, type Flow, flowSchema } from "../flow";
 import { validateFlow } from "../validate";
 import type { CommandNode } from "./command";
 import type { WaitNode } from "./wait";
@@ -72,14 +66,6 @@ describe("the Web request node schema", () => {
 			edges: [],
 		});
 		expect(parsed.nodes[0]).toEqual(request("fetch"));
-		expect(nodeOutcomes(request("fetch"))).toEqual(["pass", "fail"]);
-		expect(outputFieldsByType["web-request"]).toEqual([
-			"outcome",
-			"status",
-			"headers",
-			"body",
-			"visit",
-		]);
 	});
 
 	test("refuses a size limit over 10 MB and a header name HTTP does not allow", () => {

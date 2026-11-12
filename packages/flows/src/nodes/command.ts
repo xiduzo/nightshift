@@ -8,6 +8,7 @@ import {
 	placed,
 	secretNameSchema,
 } from "./base";
+import type { NodeDefinition } from "./definition";
 import { checkOptions, outcomeColorSchema } from "./outcomes";
 
 /**
@@ -304,3 +305,27 @@ function checkExits(node: CommandNode, check: NodeCheck): void {
 		);
 	}
 }
+
+/** The Command node type. */
+export const commandDefinition = {
+	type: "command",
+	label: "Command",
+	family: "do",
+	standsIn: true,
+	outcomes: (node) => commandExits(node).map((exit) => exit.name),
+	outcomeColor: (node, outcome) =>
+		commandExits(node).find((exit) => exit.name === outcome)?.color,
+	outputFields: commandOutputFields,
+	check: checkCommandNode,
+	secrets: (node) => node.secrets ?? [],
+	sample: {
+		id: "check",
+		type: "command",
+		position: { x: 0, y: 0 },
+		command: "bun test",
+		exits: [
+			{ name: "pass", code: 0 },
+			{ name: "fail", description: "Any other exit code." },
+		],
+	},
+} satisfies NodeDefinition<CommandNode, z.input<typeof commandNodeSchema>>;

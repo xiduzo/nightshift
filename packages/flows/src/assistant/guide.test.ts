@@ -6,18 +6,12 @@ import {
 	type Flow,
 	type FlowNodeType,
 	flowSchema,
-	NODE_FAMILY_LABEL,
 	outputFieldsByType,
 } from "../flow";
 import { kitList } from "../kits";
-import { reservedOutcomes } from "../nodes";
+import { NODE_FAMILY_LABEL, reservedOutcomes } from "../nodes";
 import { validateFlow } from "../validate";
-import {
-	findEachExample,
-	fixLoopExample,
-	flowAuthoringGuide,
-	sampleNodes,
-} from "./guide";
+import { findEachExample, fixLoopExample, flowAuthoringGuide } from "./guide";
 
 const guide = flowAuthoringGuide();
 
@@ -58,18 +52,6 @@ describe("the examples of the guide", () => {
 		expect(issues.filter((i) => i.severity === "error")).toEqual([]);
 		// Only the outcomes that end the run on purpose.
 		expect(issues.map((i) => i.nodeId)).toEqual(["find", "all_read"]);
-	});
-
-	test("each sample node is a valid node of its type", () => {
-		for (const [type, node] of Object.entries(sampleNodes)) {
-			const parsed = flowSchema.safeParse({
-				version: FLOW_VERSION,
-				start: node.id,
-				nodes: [node],
-				edges: [],
-			});
-			expect(parsed.success, type).toBe(true);
-		}
 	});
 
 	test("the guide shows the examples as they are", () => {

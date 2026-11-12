@@ -16,6 +16,12 @@ import {
 	tierBase,
 	tierLabel,
 } from "./cascade";
+import {
+	type BuiltInOutcome,
+	type NodeDefinition,
+	noOwnColors,
+	noSecrets,
+} from "./definition";
 
 /**
  * The Call node: it runs another flow of the project, once or once per
@@ -239,3 +245,30 @@ function checkHaltOn(nodeId: string, each: CallEach, check: NodeCheck): void {
 		}
 	}
 }
+
+/** The Call node type: a person calls it a Subflow. */
+export const callDefinition = {
+	type: "call",
+	label: "Subflow",
+	family: "compose",
+	standsIn: true,
+	outcomes: (node) =>
+		node.each
+			? (["done", "halted", "stopped"] satisfies BuiltInOutcome[])
+			: (["pass", "fail", "stopped"] satisfies BuiltInOutcome[]),
+	outcomeColor: noOwnColors,
+	outputFields: callOutputFields,
+	check: checkCallNode,
+	secrets: noSecrets,
+	sample: {
+		id: "each_task",
+		type: "call",
+		position: { x: 0, y: 0 },
+		flow: "build-task",
+		inputs: { check: "bun test" },
+		each: {
+			source: { kind: "json", value: "{{plan.data.tasks}}" },
+			as: "item",
+		},
+	},
+} satisfies NodeDefinition<CallNode, z.input<typeof callNodeSchema>>;

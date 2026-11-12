@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { type NodeCheck, nodeBase } from "./base";
+import { type NodeDefinition, noOwnColors, noSecrets } from "./definition";
 
 /** The End node: it ends the run on purpose, with a result, one line of text and maybe a report. */
 
@@ -163,3 +164,25 @@ function reportPathProblem(path: string): string | null {
 	}
 	return null;
 }
+
+/** The End node type. */
+export const endDefinition = {
+	type: "end",
+	label: "End",
+	family: "compose",
+	// It ends the run (ADR 27).
+	standsIn: false,
+	// No edge leaves an End node: the run ends there.
+	outcomes: () => [],
+	outcomeColor: noOwnColors,
+	outputFields: endOutputFields,
+	check: checkEndNode,
+	secrets: noSecrets,
+	sample: {
+		id: "no_work",
+		type: "end",
+		position: { x: 0, y: 0 },
+		status: "nothing-to-do",
+		message: "Nothing new about {{topic}}",
+	},
+} satisfies NodeDefinition<EndNode, z.input<typeof endNodeSchema>>;

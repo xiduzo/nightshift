@@ -5,6 +5,7 @@ import {
 	nodeBase,
 	requestHeadersSchema,
 } from "./base";
+import type { BuiltInOutcome, NodeDefinition } from "./definition";
 import { checkOptions, type Option, option } from "./outcomes";
 import { secretNamesIn } from "./web-request";
 
@@ -284,3 +285,27 @@ function checkWaitOutcomes(node: WaitNode, check: NodeCheck): void {
 		check,
 	);
 }
+
+/** The Wait node type. */
+export const waitDefinition = {
+	type: "wait",
+	label: "Wait",
+	family: "hold",
+	standsIn: true,
+	// Its own outcomes first: a done or a timeout is the plain way out.
+	outcomes: (node) => [
+		...waitOutcomes(node).map((outcome) => outcome.name),
+		...(["done", "timeout"] satisfies BuiltInOutcome[]),
+	],
+	outcomeColor: (node, outcome) =>
+		waitOutcomes(node).find((own) => own.name === outcome)?.color,
+	outputFields: waitOutputFields,
+	check: checkWaitNode,
+	secrets: (node) => waitSecrets(node.until),
+	sample: {
+		id: "cool_down",
+		type: "wait",
+		position: { x: 0, y: 0 },
+		until: { kind: "duration", minutes: 10 },
+	},
+} satisfies NodeDefinition<WaitNode, z.input<typeof waitNodeSchema>>;

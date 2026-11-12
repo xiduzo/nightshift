@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Flow, FlowEdge, FlowNode } from "../flow";
-import {
-	FLOW_VERSION,
-	flowSchema,
-	nodeOutcomes,
-	outputFieldsByType,
-} from "../flow";
+import { FLOW_VERSION, flowSchema, nodeOutcomes } from "../flow";
 import type {
 	AgentNode,
 	CallEach,
@@ -2271,13 +2266,6 @@ describe("validateFlow: Value", () => {
 			"planner",
 		);
 		expect(validateFlow(f)).toEqual([]);
-		expect(nodeOutcomes(made("x"))).toEqual(["pass", "fail"]);
-		expect(outputFieldsByType.value).toEqual([
-			"outcome",
-			"data",
-			"note",
-			"visit",
-		]);
 	});
 
 	/** A planner for the expression to read, then the Value node. */
@@ -3019,18 +3007,6 @@ describe("the Lease node", () => {
 		);
 	});
 
-	test("its outcomes are held and busy, and busy names the holder", () => {
-		expect(nodeOutcomes(lease())).toEqual(["held", "busy"]);
-		expect(outputFieldsByType.lease).toEqual([
-			"outcome",
-			"name",
-			"holder",
-			"holder_title",
-			"waited_minutes",
-			"visit",
-		]);
-	});
-
 	test("given a Section scope, then the Section must exist and hold the node", () => {
 		const nodes = [lease({ name: "stack" }), command("work"), stop("skip")];
 		const edges = [
@@ -3121,16 +3097,6 @@ describe("the Service node", () => {
 		expect(warnings(issues).map((issue) => issue.message)).toContain(
 			'Service node "stack" does not use its timeout. Set how long it waits for the service with ready.timeoutMinutes.',
 		);
-	});
-
-	test("its outcomes are ready and failed, and later steps read its data and its log", () => {
-		expect(nodeOutcomes(service())).toEqual(["ready", "failed"]);
-		expect(outputFieldsByType.service).toEqual([
-			"outcome",
-			"data",
-			"log_tail",
-			"visit",
-		]);
 	});
 
 	test("given a step in its scope on another device, then it is an error on that step", () => {

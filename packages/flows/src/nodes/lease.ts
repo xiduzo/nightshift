@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { holdScopeSchema, type NodeCheck, nodeBase } from "./base";
+import { type NodeDefinition, noOwnColors, noSecrets } from "./definition";
 
 /**
  * The Lease node (ADR 7): it takes a named lease of the Space, so only one
@@ -89,3 +90,24 @@ export function checkLeaseNode(node: LeaseNode, check: NodeCheck): void {
 		);
 	}
 }
+
+/** The Lease node type. */
+export const leaseDefinition = {
+	type: "lease",
+	label: "Lease",
+	family: "hold",
+	// It holds the lease for the steps after it (ADR 27).
+	standsIn: false,
+	outcomes: () => leaseOutcomes,
+	outcomeColor: noOwnColors,
+	outputFields: leaseOutputFields,
+	check: checkLeaseNode,
+	secrets: noSecrets,
+	sample: {
+		id: "own_branch",
+		type: "lease",
+		position: { x: 0, y: 0 },
+		name: "branch:{{pr.data.head}}",
+		waitMinutes: 30,
+	},
+} satisfies NodeDefinition<LeaseNode, z.input<typeof leaseNodeSchema>>;

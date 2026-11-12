@@ -14,8 +14,7 @@ import {
 	type FlowNode,
 	type FlowNodeType,
 	flowSchema,
-	NODE_FAMILIES,
-	NODE_FAMILY_LABEL,
+	NODE_DEFINITIONS,
 	nodeOutcomes,
 	outputFieldsByType,
 	sectionColors,
@@ -27,9 +26,12 @@ import {
 	callEachOutputFields,
 	deciderNameSchema,
 	decisionNodeSchema,
+	EXAMPLE_DEVICE,
 	endStatusSchema,
 	GATE_TITLE_MAX,
 	harnessNameSchema,
+	NODE_FAMILIES,
+	NODE_FAMILY_LABEL,
 	outcomeColors,
 	permissionModeSchema,
 	reservedNames,
@@ -41,8 +43,6 @@ import {
 } from "../nodes";
 import { FEED_ITEM_KEYS } from "../shapes";
 import { runFields } from "../template";
-
-const at = { x: 0, y: 0 };
 
 /** A node as a flow file holds it, before defaults apply. */
 type NodeInput = FlowInput["nodes"][number];
@@ -58,132 +58,10 @@ function parsed(node: NodeInput): FlowNode {
 	return flow.nodes[0] as FlowNode;
 }
 
-/** The id of the Device that the profiles of the examples belong to. */
-const EXAMPLE_DEVICE = "8c1e4f2a-6b0d-4a7e-9f3c-2d5b7e9a1c4f";
-
-/**
- * One small, valid node per type: the guide shows it, and reads the type's
- * fixed outcomes from it. `satisfies` keeps the list complete.
- */
-export const sampleNodes = {
-	agent: {
-		id: "scout",
-		type: "agent",
-		position: at,
-		profile: { device: EXAMPLE_DEVICE, profile: "worker" },
-		prompt: "Find news on {{topic}}. Already reported: {{vars.seen}}",
-		output: {
-			type: "object",
-			properties: { links: { type: "array", items: { type: "string" } } },
-		},
-	},
-	command: {
-		id: "check",
-		type: "command",
-		position: at,
-		command: "bun test",
-		exits: [
-			{ name: "pass", code: 0 },
-			{ name: "fail", description: "Any other exit code." },
-		],
-	},
-	tool: {
-		id: "ticket",
-		type: "tool",
-		position: at,
-		connection: "jira",
-		tool: "getIssue",
-		arguments: { key: "{{issue}}" },
-	},
-	decision: {
-		id: "approve",
-		type: "decision",
-		position: at,
-		by: "person",
-		prompt: "Send the offer to {{lead}}?",
-		options: [{ name: "yes" }, { name: "no" }],
-	},
-	value: {
-		id: "small",
-		type: "value",
-		position: at,
-		by: "rule",
-		output: {
-			type: "object",
-			properties: { tasks: { type: "array" } },
-		},
-		expression: '{ "tasks": plan.data.tasks[size = "small"] }',
-	},
-	wait: {
-		id: "cool_down",
-		type: "wait",
-		position: at,
-		until: { kind: "duration", minutes: 10 },
-	},
-	call: {
-		id: "each_task",
-		type: "call",
-		position: at,
-		flow: "build-task",
-		inputs: { check: "bun test" },
-		each: {
-			source: { kind: "json", value: "{{plan.data.tasks}}" },
-			as: "item",
-		},
-	},
-	end: {
-		id: "no_work",
-		type: "end",
-		position: at,
-		status: "nothing-to-do",
-		message: "Nothing new about {{topic}}",
-	},
-	join: {
-		id: "reviewed",
-		type: "join",
-		position: at,
-		wait: "all",
-	},
-	lease: {
-		id: "own_branch",
-		type: "lease",
-		position: at,
-		name: "branch:{{pr.data.head}}",
-		waitMinutes: 30,
-	},
-	service: {
-		id: "stack",
-		type: "service",
-		position: at,
-		start: "docker compose up -d",
-		ready: { url: "http://127.0.0.1:8080/health", timeoutMinutes: 5 },
-		stop: "docker compose down",
-	},
-	"since-last-run": {
-		id: "fresh",
-		type: "since-last-run",
-		position: at,
-		items: "{{feed.data.items}}",
-		key: "link",
-	},
-	convert: {
-		id: "news",
-		type: "convert",
-		position: at,
-		from: "feed",
-		to: "json",
-		value: "{{fetch.body}}",
-	},
-	"web-request": {
-		id: "fetch",
-		type: "web-request",
-		position: at,
-		url: "https://api.example.com/items",
-		query: { q: "{{topic}}" },
-		// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
-		headers: { Authorization: "Bearer ${API_TOKEN}" },
-	},
-} as const satisfies Record<FlowNodeType, NodeInput>;
+/** The sample node of a type (`NodeDefinition.sample`): the guide shows it, and reads the type's fixed outcomes from it. */
+function sampleOf(type: FlowNodeType): NodeInput {
+	return NODE_DEFINITIONS[type].sample;
+}
 
 /** What each node type is for, and the fields it adds to the common ones. */
 const nodeText: Record<FlowNodeType, string> = {
@@ -214,7 +92,7 @@ const code = (names: readonly string[]) =>
 	names.map((name) => `\`${name}\``).join(", ");
 
 function nodeSection(type: FlowNodeType): string {
-	const sample = parsed(sampleNodes[type]);
+	const sample = parsed(sampleOf(type));
 	const outcomes =
 		type === "agent"
 			? `${code(nodeOutcomes(sample))} unless it lists its own`
@@ -223,7 +101,7 @@ function nodeSection(type: FlowNodeType): string {
 				: type === "decision"
 					? "its options"
 					: type === "call"
-						? `${code(nodeOutcomes(parsed({ ...sampleNodes.call, each: undefined })))}; with \`each\`: ${code(nodeOutcomes(sample))}`
+						? `${code(nodeOutcomes(parsed({ ...NODE_DEFINITIONS.call.sample, each: undefined })))}; with \`each\`: ${code(nodeOutcomes(sample))}`
 						: type === "end"
 							? "none, the run ends here"
 							: code(nodeOutcomes(sample));
@@ -235,7 +113,7 @@ function nodeSection(type: FlowNodeType): string {
 		`### ${type}`,
 		nodeText[type],
 		`Outcomes: ${outcomes}. Outputs: ${fields}.`,
-		`\`${JSON.stringify(sampleNodes[type])}\``,
+		`\`${JSON.stringify(sampleOf(type))}\``,
 	].join("\n\n");
 }
 

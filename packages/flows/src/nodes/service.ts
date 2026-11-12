@@ -6,6 +6,7 @@ import {
 	placed,
 	secretNameSchema,
 } from "./base";
+import { type NodeDefinition, noOwnColors } from "./definition";
 
 /**
  * The Service node (ADR 9): it starts a process that keeps running while
@@ -137,3 +138,25 @@ export function checkServiceNode(node: ServiceNode, check: NodeCheck): void {
 		);
 	}
 }
+
+/** The Service node type. */
+export const serviceDefinition = {
+	type: "service",
+	label: "Service",
+	family: "hold",
+	// It keeps its process for the steps after it (ADR 27).
+	standsIn: false,
+	outcomes: () => serviceOutcomes,
+	outcomeColor: noOwnColors,
+	outputFields: serviceOutputFields,
+	check: checkServiceNode,
+	secrets: (node) => node.secrets ?? [],
+	sample: {
+		id: "stack",
+		type: "service",
+		position: { x: 0, y: 0 },
+		start: "docker compose up -d",
+		ready: { url: "http://127.0.0.1:8080/health", timeoutMinutes: 5 },
+		stop: "docker compose down",
+	},
+} satisfies NodeDefinition<ServiceNode, z.input<typeof serviceNodeSchema>>;

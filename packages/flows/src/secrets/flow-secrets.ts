@@ -1,5 +1,4 @@
-import type { Flow, FlowNode } from "../flow";
-import { waitSecrets, webRequestSecrets } from "../nodes";
+import { definitionOf, type Flow, type FlowNode } from "../flow";
 import {
 	type CalledFlowsOptions,
 	type Known,
@@ -14,17 +13,7 @@ import {
 
 /** The secrets one node names, with the inputs of its flow known before a run. */
 function nodeSecrets(node: FlowNode, known: Known): readonly string[] {
-	switch (node.type) {
-		case "command":
-		case "service":
-			return node.secrets ?? [];
-		case "web-request":
-			return webRequestSecrets(node, (text) => knownText(text, known));
-		case "wait":
-			return waitSecrets(node.until);
-		default:
-			return [];
-	}
+	return definitionOf(node).secrets(node, (text) => knownText(text, known));
 }
 
 /**

@@ -8,6 +8,7 @@ import {
 	requestHeadersSchema,
 	secretNameSchema,
 } from "./base";
+import { type NodeDefinition, noOwnColors } from "./definition";
 
 /**
  * The Web request node: one HTTP request from the step's computer, with no
@@ -267,3 +268,28 @@ function checkJsonBody(value: string, title: string, check: NodeCheck): void {
 		);
 	}
 }
+
+/** The Web request node type. */
+export const webRequestDefinition = {
+	type: "web-request",
+	label: "Web request",
+	family: "do",
+	standsIn: true,
+	outcomes: () => webRequestOutcomes,
+	outcomeColor: noOwnColors,
+	outputFields: webRequestOutputFields,
+	check: checkWebRequestNode,
+	secrets: webRequestSecrets,
+	sample: {
+		id: "fetch",
+		type: "web-request",
+		position: { x: 0, y: 0 },
+		url: "https://api.example.com/items",
+		query: { q: "{{topic}}" },
+		// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
+		headers: { Authorization: "Bearer ${API_TOKEN}" },
+	},
+} satisfies NodeDefinition<
+	WebRequestNode,
+	z.input<typeof webRequestNodeSchema>
+>;

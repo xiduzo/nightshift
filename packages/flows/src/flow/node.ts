@@ -1,102 +1,91 @@
 import {
-	agentOutputFields,
+	agentDefinition,
 	type CallEachNode,
+	callDefinition,
 	callEachOutputFields,
-	callOutputFields,
 	cascadeOutputFields,
-	commandExits,
-	commandOutputFields,
+	commandDefinition,
 	confidenceField,
-	convertOutputFields,
+	convertDefinition,
 	type DecidedBy,
-	decisionOutputFields,
-	endOutputFields,
-	isPersonTier,
-	joinOutputFields,
-	leaseOutcomes,
-	leaseOutputFields,
+	decisionDefinition,
+	endDefinition,
+	joinDefinition,
+	leaseDefinition,
+	type NodeDefinition,
+	type NodeFamily,
 	type OutcomeColor,
-	serviceOutcomes,
-	serviceOutputFields,
-	sinceLastRunOutcomes,
-	sinceLastRunOutputFields,
-	toolOutputFields,
-	valueOutputFields,
-	waitOutcomes,
-	waitOutputFields,
-	webRequestOutcomes,
-	webRequestOutputFields,
+	serviceDefinition,
+	sinceLastRunDefinition,
+	toolDefinition,
+	valueDefinition,
+	waitDefinition,
+	webRequestDefinition,
 } from "../nodes";
-import type { Flow, FlowNode, FlowNodeType, Outcome } from "./flow";
+import type { Flow, FlowInput, FlowNode, FlowNodeType, Outcome } from "./flow";
 
 /**
- * What any node of a flow ends with and gives later nodes. Each node type
- * keeps its own part in `nodes/`. These pick the part by the node's type.
+ * The node types of the flow schema, each with its definition: every fact
+ * of the type that holds without a run (`NodeDefinition`, one per file in
+ * `nodes/`). The facts of a node read its type's definition here, so a
+ * new type is its file and one line in this list. A type of the schema
+ * without a definition, or a definition of no type, does not compile.
  */
+export const NODE_DEFINITIONS = {
+	agent: agentDefinition,
+	command: commandDefinition,
+	decision: decisionDefinition,
+	call: callDefinition,
+	value: valueDefinition,
+	wait: waitDefinition,
+	tool: toolDefinition,
+	end: endDefinition,
+	join: joinDefinition,
+	lease: leaseDefinition,
+	service: serviceDefinition,
+	"since-last-run": sinceLastRunDefinition,
+	convert: convertDefinition,
+	"web-request": webRequestDefinition,
+} as const satisfies {
+	readonly [T in FlowNodeType]: NodeDefinition<
+		Extract<FlowNode, { type: T }>,
+		Extract<NodeInput, { type: T }>
+	>;
+};
+
+/** A node as a flow file holds it, before defaults apply. */
+type NodeInput = FlowInput["nodes"][number];
 
 /**
- * What a person calls each node type, on every screen: a Call node is a
- * Subflow. A Decision has a name of its own by who decides it:
- * `DECISION_LABEL`.
+ * The definition of a node's type, typed for any flow node. The list is
+ * typed per type. A caller that holds a `FlowNode` gets this erased view
+ * and passes that same node, so the cast holds.
  */
-export const NODE_TYPE_LABEL = {
-	agent: "Agent",
-	command: "Command",
-	decision: "Decision",
-	call: "Subflow",
-	value: "Value",
-	wait: "Wait",
-	tool: "Tool",
-	end: "End",
-	join: "Join",
-	lease: "Lease",
-	service: "Service",
-	"since-last-run": "Since last run",
-	convert: "Convert",
-	"web-request": "Web request",
-} as const satisfies Record<FlowNodeType, string>;
+export function definitionOf(node: Pick<FlowNode, "type">) {
+	return NODE_DEFINITIONS[node.type] as unknown as NodeDefinition<
+		FlowNode,
+		NodeInput
+	>;
+}
 
-/**
- * The families of node types, by their role, in the order the editor
- * shows them. Do: work that changes something or fetches it. Decide: pick
- * a way on. Shape: make a value from other values. Hold: wait for a time,
- * a turn or a process. Compose: run other flows, meet, and end.
- */
-export const NODE_FAMILIES = [
-	"do",
-	"decide",
-	"shape",
-	"hold",
-	"compose",
-] as const;
-export type NodeFamily = (typeof NODE_FAMILIES)[number];
+const NODE_TYPES = Object.keys(NODE_DEFINITIONS) as FlowNodeType[];
 
-/** The family of each node type. A new node type names its family here. */
-export const NODE_FAMILY = {
-	agent: "do",
-	command: "do",
-	tool: "do",
-	"web-request": "do",
-	decision: "decide",
-	value: "shape",
-	"since-last-run": "shape",
-	convert: "shape",
-	wait: "hold",
-	lease: "hold",
-	service: "hold",
-	call: "compose",
-	join: "compose",
-	end: "compose",
-} as const satisfies Record<FlowNodeType, NodeFamily>;
+/** One fact of every node type, by its type. */
+function byType<V>(fact: (type: FlowNodeType) => V): {
+	readonly [T in FlowNodeType]: V;
+} {
+	return Object.fromEntries(NODE_TYPES.map((type) => [type, fact(type)])) as {
+		readonly [T in FlowNodeType]: V;
+	};
+}
 
-/** What a person calls each family: the headings of the add-node dialog. */
-export const NODE_FAMILY_LABEL = {
-	do: "Do",
-	decide: "Decide",
-	shape: "Shape",
-	hold: "Hold",
-	compose: "Compose",
-} as const satisfies Record<NodeFamily, string>;
+/** What a person calls each node type, on every screen (`NodeDefinition.label`). */
+export const NODE_TYPE_LABEL = byType((type) => NODE_DEFINITIONS[type].label);
+
+/** The family of each node type (`NodeDefinition.family`). */
+export const NODE_FAMILY: { readonly [T in FlowNodeType]: NodeFamily } = byType(
+	(type) => NODE_DEFINITIONS[type].family,
+);
 
 /**
  * What a person calls a Decision, by who decides it. You decide a Gate, a
@@ -108,24 +97,6 @@ export const DECISION_LABEL = {
 	model: "Decision",
 } as const satisfies Record<DecidedBy, string>;
 
-/**
- * The outcomes Night Shift names itself: the ones a node ends on when the
- * flow names none (`nodeOutcomes`), and the ones the engine ends a step on
- * when its work did not finish (`error`, `stopped`, `interrupted`). Any
- * other outcome is a name the flow gives: an agent outcome, a command exit,
- * a Decision option. Each screen gives these a word of their own.
- */
-export type BuiltInOutcome =
-	| "pass"
-	| "fail"
-	| "needs-input"
-	| "done"
-	| "halted"
-	| "timeout"
-	| "error"
-	| "stopped"
-	| "interrupted";
-
 /** Whether the node is a Call node that runs its flow once per element. */
 export function runsEach(node: FlowNode): node is CallEachNode {
 	return node.type === "call" && node.each !== undefined;
@@ -133,73 +104,12 @@ export function runsEach(node: FlowNode): node is CallEachNode {
 
 /** The outcomes a node can end with, in the order its handles show. */
 export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
-	switch (node.type) {
-		case "agent": {
-			const outcomes = node.outcomes
-				? node.outcomes.map((o) => o.name)
-				: (["pass", "fail", "needs-input"] satisfies BuiltInOutcome[]);
-			// An agent that asks a person never ends on needs-input.
-			return node.ask === "person"
-				? outcomes.filter((name) => name !== "needs-input")
-				: outcomes;
-		}
-		case "command":
-			return commandExits(node).map((exit) => exit.name);
-		case "decision": {
-			const options = node.options.map((option) => option.name);
-			// A cascade with no person tier ends `fail` when no tier holds.
-			const fails =
-				node.cascade !== undefined &&
-				!node.cascade.some((tier) => isPersonTier(tier));
-			return fails ? [...options, "fail"] : options;
-		}
-		case "call":
-			return node.each
-				? (["done", "halted", "stopped"] satisfies BuiltInOutcome[])
-				: (["pass", "fail", "stopped"] satisfies BuiltInOutcome[]);
-		case "value":
-			return ["pass", "fail"] satisfies BuiltInOutcome[];
-		case "wait":
-			// Its own outcomes first: a done or a timeout is the plain way out.
-			return [
-				...waitOutcomes(node).map((outcome) => outcome.name),
-				...(["done", "timeout"] satisfies BuiltInOutcome[]),
-			];
-		case "tool":
-			return ["pass", "fail"] satisfies BuiltInOutcome[];
-		case "end":
-			// No edge leaves an End node: the run ends there.
-			return [];
-		case "join":
-			return ["done"] satisfies BuiltInOutcome[];
-		case "lease":
-			return leaseOutcomes;
-		case "service":
-			return serviceOutcomes;
-		case "since-last-run":
-			return sinceLastRunOutcomes;
-		case "convert":
-			return ["pass", "fail"] satisfies BuiltInOutcome[];
-		case "web-request":
-			return webRequestOutcomes;
-	}
+	return definitionOf(node).outcomes(node);
 }
-
-/**
- * The node types that always run in a test run (ADR 27): an End ends the
- * run, a Join waits for its branches, a Lease and a Service hold something
- * for the steps after them.
- */
-const ALWAYS_RUNS: ReadonlySet<FlowNodeType> = new Set([
-	"end",
-	"join",
-	"lease",
-	"service",
-]);
 
 /** Whether a test run may pin or skip a node of this type (ADR 27). */
 export function standsIn(node: Pick<FlowNode, "type">): boolean {
-	return !ALWAYS_RUNS.has(node.type);
+	return definitionOf(node).standsIn;
 }
 
 /**
@@ -216,44 +126,22 @@ export function outcomeColor(
 	node: FlowNode,
 	outcome: Outcome,
 ): OutcomeColor | undefined {
-	switch (node.type) {
-		case "agent":
-			return node.outcomes?.find((o) => o.name === outcome)?.color;
-		case "command":
-			return commandExits(node).find((exit) => exit.name === outcome)?.color;
-		case "decision":
-			return node.options.find((option) => option.name === outcome)?.color;
-		case "wait":
-			return waitOutcomes(node).find((own) => own.name === outcome)?.color;
-		default:
-			return undefined;
-	}
+	return definitionOf(node).outcomeColor(node, outcome);
 }
 
 /**
- * The fields a later node can read with `{{<nodeId>.<field>}}`. A field of a
- * node that has not run yet renders as an empty string. `data` (Agent,
- * Value, and a Command with `stdout: "json"`) and `results` (a Call with
- * `each`) hold JSON and take a deeper path. A Call node's fields depend on
- * `each`, and without it the node also has the outputs of the flow it calls:
- * use `nodeOutputFields`.
+ * The fields a later node can read with `{{<nodeId>.<field>}}`, by type
+ * (`NodeDefinition.outputFields`). A field of a node that has not run yet
+ * renders as an empty string. `data` (Agent, Value, and a Command with
+ * `stdout: "json"`) and `results` (a Call with `each`) hold JSON and take a
+ * deeper path. A Call node's fields depend on `each`, and without it the
+ * node also has the outputs of the flow it calls: use `nodeOutputFields`.
  */
-export const outputFieldsByType = {
-	agent: agentOutputFields,
-	command: commandOutputFields,
-	decision: decisionOutputFields,
-	call: callOutputFields,
-	value: valueOutputFields,
-	wait: waitOutputFields,
-	tool: toolOutputFields,
-	end: endOutputFields,
-	join: joinOutputFields,
-	lease: leaseOutputFields,
-	service: serviceOutputFields,
-	"since-last-run": sinceLastRunOutputFields,
-	convert: convertOutputFields,
-	"web-request": webRequestOutputFields,
-} as const satisfies Record<FlowNodeType, readonly string[]>;
+export const outputFieldsByType = byType(
+	(type) => NODE_DEFINITIONS[type].outputFields,
+) as {
+	readonly [T in FlowNodeType]: (typeof NODE_DEFINITIONS)[T]["outputFields"];
+};
 
 /**
  * Output fields that hold JSON, so a template may take a path below them.
@@ -273,7 +161,7 @@ export function nodeOutputFields(
 ): readonly string[] {
 	if (runsEach(node)) return callEachOutputFields;
 	const fields: readonly string[] = [
-		...outputFieldsByType[node.type],
+		...definitionOf(node).outputFields,
 		...cascadeFieldsOf(node),
 	];
 	if (node.type !== "call" || !called) return fields;

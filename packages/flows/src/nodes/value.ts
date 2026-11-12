@@ -33,6 +33,12 @@ import {
 	tierBase,
 	tierLabel,
 } from "./cascade";
+import {
+	type BuiltInOutcome,
+	type NodeDefinition,
+	noOwnColors,
+	noSecrets,
+} from "./definition";
 import { checkGateBrief, gateBriefFields } from "./gate-brief";
 
 /** The Value node: it makes `data` that matches its output schema, by a rule, a model or a person. */
@@ -446,3 +452,27 @@ function checkAskDeadline(node: ValueNode, check: NodeCheck): void {
 		);
 	}
 }
+
+/** The Value node type. */
+export const valueDefinition = {
+	type: "value",
+	label: "Value",
+	family: "shape",
+	standsIn: true,
+	outcomes: () => ["pass", "fail"] satisfies BuiltInOutcome[],
+	outcomeColor: noOwnColors,
+	outputFields: valueOutputFields,
+	check: checkValueNode,
+	secrets: noSecrets,
+	sample: {
+		id: "small",
+		type: "value",
+		position: { x: 0, y: 0 },
+		by: "rule",
+		output: {
+			type: "object",
+			properties: { tasks: { type: "array" } },
+		},
+		expression: '{ "tasks": plan.data.tasks[size = "small"] }',
+	},
+} satisfies NodeDefinition<ValueNode, z.input<typeof valueNodeSchema>>;

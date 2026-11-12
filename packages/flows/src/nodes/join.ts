@@ -1,5 +1,11 @@
 import { z } from "zod";
 import { nodeBase } from "./base";
+import {
+	type BuiltInOutcome,
+	type NodeDefinition,
+	noOwnColors,
+	noSecrets,
+} from "./definition";
 
 /**
  * The Join node: where the parallel branches of a fan-out meet again.
@@ -27,3 +33,24 @@ export type JoinNode = z.infer<typeof joinNodeSchema>;
  * it holds the first branch only.
  */
 export const joinOutputFields = ["outcome", "data", "visit"] as const;
+
+/** The Join node type. */
+export const joinDefinition = {
+	type: "join",
+	label: "Join",
+	family: "compose",
+	// It waits for its branches (ADR 27).
+	standsIn: false,
+	outcomes: () => ["done"] satisfies BuiltInOutcome[],
+	outcomeColor: noOwnColors,
+	outputFields: joinOutputFields,
+	// A Join's checks are the branches' (`checkBranches`).
+	check: () => {},
+	secrets: noSecrets,
+	sample: {
+		id: "reviewed",
+		type: "join",
+		position: { x: 0, y: 0 },
+		wait: "all",
+	},
+} satisfies NodeDefinition<JoinNode, z.input<typeof joinNodeSchema>>;

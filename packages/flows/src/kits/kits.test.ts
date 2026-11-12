@@ -11,7 +11,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type Flow, NODE_FAMILIES } from "../flow";
+import type { Flow } from "../flow";
 import {
 	type CommandNode,
 	commandWaitOutcome,
@@ -19,6 +19,7 @@ import {
 	dataExitFor,
 	exitFor,
 	type JsonValue,
+	NODE_FAMILIES,
 	type ValueNode,
 	type WaitNode,
 	waitCommandOf,

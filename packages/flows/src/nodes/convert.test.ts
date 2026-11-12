@@ -1,11 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-	FLOW_VERSION,
-	type Flow,
-	flowSchema,
-	nodeOutcomes,
-	outputFieldsByType,
-} from "../flow";
+import { FLOW_VERSION, type Flow, flowSchema } from "../flow";
 import { outputFieldShape, typedOutput } from "../shapes/fields";
 import { validateFlow } from "../validate";
 import type { CommandNode } from "./command";
@@ -90,17 +84,6 @@ describe("the Convert node schema", () => {
 		expect(parses({ delimiter: ";;" })).toBe(false);
 		expect(parses({ maxBytes: MAX_CONVERT_BYTES + 1 })).toBe(false);
 		expect(parses({ delimiter: ";", maxBytes: MAX_CONVERT_BYTES })).toBe(true);
-	});
-
-	test("ends with pass or fail, and leaves data, text and note for later nodes", () => {
-		expect(nodeOutcomes(convert("rows"))).toEqual(["pass", "fail"]);
-		expect(outputFieldsByType.convert).toEqual([
-			"outcome",
-			"data",
-			"text",
-			"note",
-			"visit",
-		]);
 	});
 
 	test("one side of every pair is JSON, apart from HTML to text", () => {

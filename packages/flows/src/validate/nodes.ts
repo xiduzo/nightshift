@@ -1,20 +1,5 @@
-import type { FlowNode } from "../flow";
-import {
-	checkAgentNode,
-	checkCallNode,
-	checkCommandNode,
-	checkConvertNode,
-	checkDecisionNode,
-	checkEndNode,
-	checkLeaseNode,
-	checkServiceNode,
-	checkSinceLastRunNode,
-	checkToolNode,
-	checkValueNode,
-	checkWaitNode,
-	checkWebRequestNode,
-	type NodeCheck,
-} from "../nodes";
+import { definitionOf, type FlowNode } from "../flow";
+import type { NodeCheck } from "../nodes";
 import { nodesWithin, sectionPath } from "../sections";
 import { templatesInLiteralShellText } from "../template";
 import type { Report } from "./issues";
@@ -72,53 +57,11 @@ export function checkNode(
 }
 
 /**
- * Runs the checks of the node's own type through `check`. The flow check
- * reports issues through it. A reader can collect every template and rule
- * the checks read (`dataLinks`), so a new field needs no second list.
+ * Runs the checks of the node's own type (`NodeDefinition.check`) through
+ * `check`. The flow check reports issues through it. A reader can collect
+ * every template and rule the checks read (`dataLinks`), so a new field
+ * needs no second list.
  */
 export function checkNodeWith(node: FlowNode, check: NodeCheck): void {
-	switch (node.type) {
-		case "agent":
-			checkAgentNode(node, check);
-			break;
-		case "command":
-			checkCommandNode(node, check);
-			break;
-		case "decision":
-			checkDecisionNode(node, check);
-			break;
-		case "call":
-			checkCallNode(node, check);
-			break;
-		case "value":
-			checkValueNode(node, check);
-			break;
-		case "wait":
-			checkWaitNode(node, check);
-			break;
-		case "tool":
-			checkToolNode(node, check);
-			break;
-		case "end":
-			checkEndNode(node, check);
-			break;
-		case "join":
-			// A Join's checks are the branches' (`checkBranches`).
-			break;
-		case "lease":
-			checkLeaseNode(node, check);
-			break;
-		case "service":
-			checkServiceNode(node, check);
-			break;
-		case "since-last-run":
-			checkSinceLastRunNode(node, check);
-			break;
-		case "convert":
-			checkConvertNode(node, check);
-			break;
-		case "web-request":
-			checkWebRequestNode(node, check);
-			break;
-	}
+	definitionOf(node).check(node, check);
 }

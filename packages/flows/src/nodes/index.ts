@@ -7,12 +7,11 @@ export {
 	type AgentHarnessName,
 	type AgentNode,
 	type AgentTier,
+	agentDefinition,
 	agentHarnessSchema,
 	agentNodeSchema,
-	agentOutputFields,
 	type CustomAgent,
 	type CustomHarnessName,
-	checkAgentNode,
 	cliNameSchema,
 	customAgentSchema,
 	customAgentSlug,
@@ -90,11 +89,10 @@ export {
 	type CallEachNode,
 	type CallNode,
 	type CallTier,
+	callDefinition,
 	callEachOutputFields,
 	calledFlowNames,
 	callNodeSchema,
-	callOutputFields,
-	checkCallNode,
 	type ListSource,
 } from "./call";
 export {
@@ -109,11 +107,10 @@ export {
 export {
 	type CommandExit,
 	type CommandNode,
-	checkCommandNode,
+	commandDefinition,
 	commandExits,
 	commandHasData,
 	commandNodeSchema,
-	commandOutputFields,
 	DATA_EXIT_CODE,
 	DEFAULT_COMMAND_EXITS,
 	dataExitFor,
@@ -126,29 +123,34 @@ export {
 	CONVERT_PAIRS,
 	type ConvertFormat,
 	type ConvertNode,
-	checkConvertNode,
+	convertDefinition,
 	convertNodeSchema,
-	convertOutputFields,
 	DEFAULT_CONVERT_MAX_BYTES,
 	MAX_CONVERT_BYTES,
 } from "./convert";
 export {
-	checkDecisionNode,
 	confidenceField,
 	type DecidedBy,
 	type DecisionNode,
 	type DecisionTier,
 	decisionDecider,
+	decisionDefinition,
 	decisionNodeSchema,
-	decisionOutputFields,
 } from "./decision";
 export {
-	checkEndNode,
+	type BuiltInOutcome,
+	EXAMPLE_DEVICE,
+	NODE_FAMILIES,
+	NODE_FAMILY_LABEL,
+	type NodeDefinition,
+	type NodeFamily,
+} from "./definition";
+export {
 	type EndNode,
 	type EndStatus,
+	endDefinition,
 	endMessage,
 	endNodeSchema,
-	endOutputFields,
 	endStatusSchema,
 	MAX_REPORT_BYTES,
 	reportText,
@@ -165,16 +167,14 @@ export {
 export {
 	type JoinNode,
 	type JoinWait,
+	joinDefinition,
 	joinNodeSchema,
-	joinOutputFields,
 } from "./join";
 export {
-	checkLeaseNode,
 	DEFAULT_LEASE_TTL_MINUTES,
 	type LeaseNode,
+	leaseDefinition,
 	leaseNodeSchema,
-	leaseOutcomes,
-	leaseOutputFields,
 	leaseSection,
 } from "./lease";
 export {
@@ -186,47 +186,41 @@ export {
 	outcomeColors,
 } from "./outcomes";
 export {
-	checkServiceNode,
 	DEFAULT_SERVICE_EVERY_SECONDS,
 	DEFAULT_SERVICE_TIMEOUT_MINUTES,
 	type ServiceNode,
+	serviceDefinition,
 	serviceNodeSchema,
-	serviceOutcomes,
-	serviceOutputFields,
 	serviceSection,
 } from "./service";
 export {
-	checkSinceLastRunNode,
 	MAX_MEMORY_KEYS,
 	memoryPath,
 	type SinceLastRunNode,
+	sinceLastRunDefinition,
 	sinceLastRunNodeSchema,
 	sinceLastRunOutcomes,
-	sinceLastRunOutputFields,
 	watchesValue,
 } from "./since-last-run";
 export {
-	checkToolNode,
 	type ToolNode,
+	toolDefinition,
 	toolNodeSchema,
-	toolOutputFields,
 } from "./tool";
 export {
 	type AskChoicesSource,
 	type AskDeadline,
 	canMakeValue,
-	checkValueNode,
 	type ValueBy,
 	type ValueDeciderName,
 	type ValueNode,
 	type ValueTier,
 	valueDecider,
 	valueDeciderNameSchema,
+	valueDefinition,
 	valueNodeSchema,
-	valueOutputFields,
 } from "./value";
 export {
-	checkWaitNode,
 	commandWaitOutcome,
 	isOwnWaitOutcome,
 	signalRules,
@@ -234,15 +228,12 @@ export {
 	type WaitNode,
 	type WaitUntil,
 	waitCommandOf,
+	waitDefinition,
 	waitNodeSchema,
-	waitOutcomes,
-	waitOutputFields,
-	waitSecrets,
 	waitSignalOf,
 	waitUrlOf,
 } from "./wait";
 export {
-	checkWebRequestNode,
 	DEFAULT_WEB_REQUEST_MAX_BYTES,
 	DEFAULT_WEB_REQUEST_TIMEOUT_SECONDS,
 	MAX_WEB_REQUEST_BYTES,
@@ -252,8 +243,6 @@ export {
 	WEB_REQUEST_METHODS,
 	type WebRequestMethod,
 	type WebRequestNode,
+	webRequestDefinition,
 	webRequestNodeSchema,
-	webRequestOutcomes,
-	webRequestOutputFields,
-	webRequestSecrets,
 } from "./web-request";

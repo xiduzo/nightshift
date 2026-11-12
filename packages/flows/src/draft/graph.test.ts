@@ -3,9 +3,7 @@ import {
 	FLOW_VERSION,
 	type Flow,
 	type FlowNode,
-	NODE_FAMILIES,
 	NODE_FAMILY,
-	NODE_FAMILY_LABEL,
 	nodeOutputFields,
 } from "../flow";
 import type {
@@ -14,6 +12,7 @@ import type {
 	SinceLastRunNode,
 	ValueNode,
 } from "../nodes";
+import { NODE_FAMILIES, NODE_FAMILY_LABEL } from "../nodes";
 import { mainOutputField } from "../shapes";
 import {
 	addCalledNode,

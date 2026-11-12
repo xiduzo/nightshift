@@ -7,6 +7,12 @@ import {
 	outputInferredSchema,
 	placed,
 } from "./base";
+import {
+	type BuiltInOutcome,
+	type NodeDefinition,
+	noOwnColors,
+	noSecrets,
+} from "./definition";
 
 /**
  * Calls one tool of a Connection (an MCP server defined once on this
@@ -56,3 +62,24 @@ export function checkToolNode(node: ToolNode, check: NodeCheck): void {
 		check.template(value, `argument "${name}"`);
 	}
 }
+
+/** The Tool node type. */
+export const toolDefinition = {
+	type: "tool",
+	label: "Tool",
+	family: "do",
+	standsIn: true,
+	outcomes: () => ["pass", "fail"] satisfies BuiltInOutcome[],
+	outcomeColor: noOwnColors,
+	outputFields: toolOutputFields,
+	check: checkToolNode,
+	secrets: noSecrets,
+	sample: {
+		id: "ticket",
+		type: "tool",
+		position: { x: 0, y: 0 },
+		connection: "jira",
+		tool: "getIssue",
+		arguments: { key: "{{issue}}" },
+	},
+} satisfies NodeDefinition<ToolNode, z.input<typeof toolNodeSchema>>;

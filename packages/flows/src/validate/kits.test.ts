@@ -1,11 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import {
-	FLOW_VERSION,
-	type FlowInput,
-	flowSchema,
-	NODE_FAMILIES,
-} from "../flow";
+import { FLOW_VERSION, type FlowInput, flowSchema } from "../flow";
 import { kitList } from "../kits";
+import { NODE_FAMILIES } from "../nodes";
 import { parseFlow, validateFlow } from "./flow";
 
 /** A flow that calls `flow` once with `inputs`, then ends and echoes `{{pr.url}}`. */

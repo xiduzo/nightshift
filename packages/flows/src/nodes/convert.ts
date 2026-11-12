@@ -5,6 +5,12 @@ import {
 	nodeBase,
 	outputInferredSchema,
 } from "./base";
+import {
+	type BuiltInOutcome,
+	type NodeDefinition,
+	noOwnColors,
+	noSecrets,
+} from "./definition";
 
 /**
  * The Convert node: it turns text of one format into JSON, or JSON into
@@ -140,3 +146,24 @@ export function checkConvertNode(node: ConvertNode, check: NodeCheck): void {
 		);
 	}
 }
+
+/** The Convert node type. */
+export const convertDefinition = {
+	type: "convert",
+	label: "Convert",
+	family: "shape",
+	standsIn: true,
+	outcomes: () => ["pass", "fail"] satisfies BuiltInOutcome[],
+	outcomeColor: noOwnColors,
+	outputFields: convertOutputFields,
+	check: checkConvertNode,
+	secrets: noSecrets,
+	sample: {
+		id: "news",
+		type: "convert",
+		position: { x: 0, y: 0 },
+		from: "feed",
+		to: "json",
+		value: "{{fetch.body}}",
+	},
+} satisfies NodeDefinition<ConvertNode, z.input<typeof convertNodeSchema>>;
