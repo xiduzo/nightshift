@@ -90,7 +90,7 @@ CLI when you need them.
 | ✓ [Context Menu](https://ui.shadcn.com/docs/components/context-menu) | A right-click menu (canvas nodes). |
 | ✓ [Dropdown Menu](https://ui.shadcn.com/docs/components/dropdown-menu) | Actions behind a button ("…" menus, user menu). |
 | [Menubar](https://ui.shadcn.com/docs/components/menubar) | A desktop-app menubar (File, Edit, View). |
-| ✓ [Command](https://ui.shadcn.com/docs/components/command) | A searchable list of commands. `CommandDialog` is the add-node dialog of the flow editor (Tab, a double-click on the canvas, or the dock's first button): one group per family, with the Value presets under Shape (`features/flows/editor/add-node/`). The list of variables a template field offers after `{{`. |
+| ✓ [Command](https://ui.shadcn.com/docs/components/command) | A searchable list of commands. `CommandDialog` is the add-node dialog of the flow editor (Tab, a double-click on the canvas, or the dock's first button): one group per family, with the Value presets under Shape and the kits after the nodes of their family, each with an outline "Kit" `Badge`. "My kits" comes last: the flows that another flow runs, a flow of another project with its project as a `Badge` (`features/flows/editor/add-node/`). The list of variables a template field offers after `{{`. |
 
 ### Feedback and status
 

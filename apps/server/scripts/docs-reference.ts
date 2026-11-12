@@ -51,6 +51,7 @@ import {
 	isKnowledgeKit,
 	kitList,
 	migrateFlow,
+	NODE_FAMILY_LABEL,
 	NODE_TYPE_LABEL,
 	type ProjectFlowMap,
 	proposalIssues,
@@ -85,10 +86,11 @@ function kitsTable(knowledge: boolean): string {
 		.filter((kit) => isKnowledgeKit(kit.name) === knowledge)
 		.map((kit) => [
 			`\`${kit.name}\``,
+			NODE_FAMILY_LABEL[kit.family],
 			cell(kit.flow.description ?? ""),
 			kit.flow.inputs.map((input) => `\`${input.name}\``).join(", ") || "none",
 		]);
-	return table(["Kit", "Does", "Inputs"], rows);
+	return table(["Kit", "Family", "Does", "Inputs"], rows);
 }
 
 type StarterInput = { name: string; default?: unknown };

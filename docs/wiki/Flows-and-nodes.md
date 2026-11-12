@@ -185,6 +185,7 @@ You do not have to write a shape. When a node has none, Night Shift takes it fro
 
 - **Add a node.** Click the canvas and press **Tab**, or double-click an empty spot of the canvas. Type what you need, such as "http", "approve" or "csv", and pick a node. The buttons on the left of the canvas add nodes too. The first one opens the same search. Drag any other one to place it.
 - **Families.** The nodes are in families by their role, each with its own color: **Do** (Agent, Command, Tool, Web request), **Decide** (Gate, Branch), **Shape** (Value, the Value presets, Since last run, Convert), **Hold** (Wait, Lease, Service), and **Compose** (Subflow, Join, End).
+- **Kits.** The same search finds the kits, each in its family and marked **Kit**. **My kits** comes last. It lists the flows that another flow already runs, also in the other projects of your Space. Pick a flow of another project, and Night Shift copies it into this project first.
 - **Takes a value.** A Branch, a Value, a Value preset, Since last run and Convert take a value. Select a node first, then add one of them. It goes after that node and reads its output. An edge comes from the first outcome of that node, if that outcome has no edge yet.
 - **Last output.** After the first run of the flow, each node shows what it gave in the newest run, in one line at its bottom. A node that runs now shows **Running**. A node that the run did not reach shows **Not in the last run**. The **Results** tab of the node shows each output field, with its shape. **Open the run** opens that run at the step. When you change the node after that run, the tab says so. The template variables also show their values from the newest run.
 - **Sections.** Put related nodes in a Section, a box on the canvas that you zoom into. A Section can hold other Sections. You can move a Section into a flow of its own.
@@ -212,18 +213,18 @@ Kits are small flows that ship with Night Shift. A Subflow runs one by its name,
 Night Shift has no app catalog. An app is a command in your flow, such as `gh`, `acli`, or `curl`, a web request, or a tool of the agent. The kits wrap common steps: send a message or an email, read a feed, and work with `git`, `gh`, and `acli`.
 
 <!-- generated:kits: bun run docs:reference writes this table from the code. Do not edit it here. -->
-| Kit | Does | Inputs |
-| --- | --- | --- |
-| `kit:email/send` | Sends a plain text email over SMTP. Save the secrets EMAIL_SMTP_URL (for example smtps://smtp.example.com:465), EMAIL_SMTP_USER and EMAIL_SMTP_PASSWORD. The server must use TLS. Needs curl. | `to`, `subject`, `body`, `from` |
-| `kit:feeds/read` | Reads an RSS, Atom or JSON feed and gives the items that are new since the last run. On its first run, it only remembers the items that are there. | `url`, `first_run` |
-| `kit:github/create-branch` | Switches to a new branch with the name you give. It starts at the current commit, or at a branch on GitHub. A branch that exists already is switched to as it is. | `name`, `from` |
-| `kit:github/finish-pr` | Marks a pull request ready for review, or closes it. Both can leave a comment on it. | `pr`, `action`, `comment` |
-| `kit:github/publish-draft-pr` | Pushes the current branch to GitHub and opens a draft pull request for it. A pull request that is open for the branch stays as it is. A branch without new commits ends with nothing to do. | `title`, `body`, `base` |
-| `kit:github/wait-for-checks` | Waits until the checks of a commit on GitHub are done, for at most 3 hours. Failed checks end it as failed. To wake it as soon as GitHub is done, add a webhook schedule for check suites that sends the signal ci-done with the commit as its key: event.body.check_suite.head_sha. Without one, it looks again every 10 minutes. | `ref` |
-| `kit:github/watch-pr` | Waits until a pull request on GitHub is green, red, merged, closed or ejected from the merge queue. It reads the checks, the review and the merge queue every 10 minutes. To wake it as soon as GitHub reports a change, add a webhook schedule that sends the signal pr-changed with the pull request number as its key. | `pr` |
-| `kit:jira/assign` | Assigns a Jira work item to a person, or to you. Needs a CLI tool that runs the Atlassian CLI signed in. | `key`, `assignee`, `tool` |
-| `kit:jira/move` | Moves a Jira work item to another status, for example In Progress. Needs a CLI tool that runs the Atlassian CLI signed in. | `key`, `status`, `tool` |
-| `kit:message/send` | Sends a message to the incoming webhook of a chat or another service. Save its URL as the secret MESSAGE_WEBHOOK_URL, or name another secret in webhook. | `message`, `webhook`, `format`, `field` |
+| Kit | Family | Does | Inputs |
+| --- | --- | --- | --- |
+| `kit:email/send` | Do | Sends a plain text email over SMTP. Save the secrets EMAIL_SMTP_URL (for example smtps://smtp.example.com:465), EMAIL_SMTP_USER and EMAIL_SMTP_PASSWORD. The server must use TLS. Needs curl. | `to`, `subject`, `body`, `from` |
+| `kit:feeds/read` | Do | Reads an RSS, Atom or JSON feed and gives the items that are new since the last run. On its first run, it only remembers the items that are there. | `url`, `first_run` |
+| `kit:github/create-branch` | Do | Switches to a new branch with the name you give. It starts at the current commit, or at a branch on GitHub. A branch that exists already is switched to as it is. | `name`, `from` |
+| `kit:github/finish-pr` | Do | Marks a pull request ready for review, or closes it. Both can leave a comment on it. | `pr`, `action`, `comment` |
+| `kit:github/publish-draft-pr` | Do | Pushes the current branch to GitHub and opens a draft pull request for it. A pull request that is open for the branch stays as it is. A branch without new commits ends with nothing to do. | `title`, `body`, `base` |
+| `kit:github/wait-for-checks` | Hold | Waits until the checks of a commit on GitHub are done, for at most 3 hours. Failed checks end it as failed. To wake it as soon as GitHub is done, add a webhook schedule for check suites that sends the signal ci-done with the commit as its key: event.body.check_suite.head_sha. Without one, it looks again every 10 minutes. | `ref` |
+| `kit:github/watch-pr` | Hold | Waits until a pull request on GitHub is green, red, merged, closed or ejected from the merge queue. It reads the checks, the review and the merge queue every 10 minutes. To wake it as soon as GitHub reports a change, add a webhook schedule that sends the signal pr-changed with the pull request number as its key. | `pr` |
+| `kit:jira/assign` | Do | Assigns a Jira work item to a person, or to you. Needs a CLI tool that runs the Atlassian CLI signed in. | `key`, `assignee`, `tool` |
+| `kit:jira/move` | Do | Moves a Jira work item to another status, for example In Progress. Needs a CLI tool that runs the Atlassian CLI signed in. | `key`, `status`, `tool` |
+| `kit:message/send` | Do | Sends a message to the incoming webhook of a chat or another service. Save its URL as the secret MESSAGE_WEBHOOK_URL, or name another secret in webhook. | `message`, `webhook`, `format`, `field` |
 <!-- /generated:kits -->
 
 The knowledge kits are on the [Knowledge](Knowledge.md#sources) page.
