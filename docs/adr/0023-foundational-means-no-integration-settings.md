@@ -2,7 +2,7 @@
 
 Status: accepted, 2026-11-11. Built, 2026-11-12: typed outputs, the three nodes
 and the kits in wave 1, lane B, and the families in the editor in wave 2, lane D.
-A run does not check the types of flow outputs yet
+A run checks and infers the types of flow outputs since wave 4, lane H5
 ([the record](../research/any-domain-2026-11.md), Q6, Q14, Q35 to Q42). Replaces
 the "not nodes" lists of two research records, named below.
 
