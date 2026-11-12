@@ -9,7 +9,7 @@ import { folderKit, isKitName } from "../kits";
 import { calledFlowNames } from "../nodes";
 import { walkCalledFlows } from "../secrets";
 import type { ProjectFlowMap } from "../validate";
-import { callPattern, commandOf, withoutComment } from "./cli-programs";
+import { callPattern, commandsOf, withoutComment } from "./cli-programs";
 import { nodeReads } from "./reads";
 
 /**
@@ -26,7 +26,7 @@ export type FolderNeed =
 	| { kind: "kit"; kit: string; label: string }
 	/** It runs a flow of the project that has a step with a need of its own. */
 	| { kind: "flow"; flow: string }
-	/** Its command runs git on the folder it runs in (`runsGitHere`). */
+	/** One of its commands runs git on the folder it runs in (`runsGitHere`). */
 	| { kind: "git" }
 	/** It reads `{{run.branch}}`, `{{run.base_branch}}` or `{{run.base_ref}}`. */
 	| { kind: "branch"; field: BranchField };
@@ -78,9 +78,7 @@ function nodeNeeds(node: FlowNode): FolderNeed[] {
 			if (kit) needs.push({ kind: "kit", kit: kit.name, label: kit.label });
 		}
 	}
-	const command = commandOf(node);
-	if (command !== undefined && runsGitHere(command))
-		needs.push({ kind: "git" });
+	if (commandsOf(node).some(runsGitHere)) needs.push({ kind: "git" });
 	for (const { name, path } of nodeReads(node)) {
 		const field = BRANCH_RUN_FIELDS.find((candidate) => candidate === path[0]);
 		if (name === "run" && field !== undefined) {

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { FlowNode } from "../flow";
+import { agentNode } from "../nodes/agent";
 import { commandNode } from "../nodes/command";
 import { type CliToolRef, programsWithoutLogin } from "./cli-programs";
 
@@ -83,5 +84,38 @@ describe("programsWithoutLogin", () => {
 			},
 		};
 		expect(programsWithoutLogin(wait, [work])).toHaveLength(1);
+	});
+
+	test("reads every command of a node: an Agent's check and a Service's start, ready and stop commands", () => {
+		const agent: FlowNode = {
+			...agentNode("review", { x: 0, y: 0 }),
+			check: "acli jira workitem view PROJ-1",
+		};
+		expect(programsWithoutLogin(agent, [work])).toEqual([
+			{ program: "acli", tools: ["acli-work"] },
+		]);
+		const service = (fields: Record<string, unknown>): FlowNode => ({
+			id: "app",
+			type: "service",
+			position: { x: 0, y: 0 },
+			start: "npm start",
+			ready: { url: "http://localhost:3000" },
+			...fields,
+		});
+		for (const fields of [
+			{ start: "acli jira serve" },
+			{ ready: { command: "acli jira auth status" } },
+			{ stop: "acli jira stop" },
+		]) {
+			expect(programsWithoutLogin(service(fields), [work])).toHaveLength(1);
+		}
+		// A program in two commands of one node counts once.
+		expect(
+			programsWithoutLogin(
+				service({ start: "acli jira serve", stop: "acli jira stop" }),
+				[work],
+			),
+		).toEqual([{ program: "acli", tools: ["acli-work"] }]);
+		expect(programsWithoutLogin(service({}), [work])).toEqual([]);
 	});
 });

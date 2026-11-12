@@ -102,6 +102,36 @@ describe("folderNeeds: the node's own steps", () => {
 		]);
 	});
 
+	test("an Agent's check and a Service's commands that run git", () => {
+		const flow = flowOf([
+			{ ...agent("review", "Review the change."), check: "git diff --quiet" },
+			{
+				id: "site",
+				type: "service",
+				start: "npm start",
+				ready: { command: "git rev-parse HEAD" },
+			},
+			{
+				id: "clean",
+				type: "service",
+				start: "npm start",
+				ready: { url: "http://localhost:3000" },
+				stop: "git stash -u",
+			},
+			{
+				id: "elsewhere",
+				type: "service",
+				start: "git -C /srv/site pull && npm start",
+				ready: { url: "http://localhost:3000" },
+			},
+		]);
+		expect(folderNeeds(flow)).toEqual([
+			{ nodeId: "review", need: { kind: "git" } },
+			{ nodeId: "site", need: { kind: "git" } },
+			{ nodeId: "clean", need: { kind: "git" } },
+		]);
+	});
+
 	test("templates and rules that read a branch, each field once per node", () => {
 		const flow = flowOf([
 			agent(

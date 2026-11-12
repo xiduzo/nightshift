@@ -1,6 +1,5 @@
 /** Programs that a command calls by their own name while only other CLI tools sign in to them. */
-import type { FlowNode } from "../flow";
-import { waitCommandOf } from "../nodes";
+import { type FlowNode, nodeTexts } from "../flow";
 
 /** A CLI tool, as a check reads it. `program` null: the tool runs the program of its own name. */
 export type CliToolRef = {
@@ -14,23 +13,19 @@ export type CliToolRef = {
 export type ProgramWithoutLogin = { program: string; tools: string[] };
 
 /**
- * The command a node runs in a shell: a Command's, the one a Wait runs
- * until it passes, or the one that prints a Call node's list.
+ * The shell commands a node runs, as its type declares them
+ * (`NodeDefinition.texts`): a Command's, the one a Wait runs until it
+ * passes, the one that prints a Call node's list, an Agent's check, and a
+ * Service's start, ready and stop commands.
  */
-export function commandOf(node: FlowNode): string | undefined {
-	if (node.type === "command") return node.command;
-	if (node.type === "wait") {
-		const polled = waitCommandOf(node.until);
-		if (polled) return polled.command;
-	}
-	if (node.type === "call" && node.each?.source.kind === "command") {
-		return node.each.source.command;
-	}
-	return undefined;
+export function commandsOf(node: FlowNode): string[] {
+	return nodeTexts(node).flatMap((text) =>
+		text.kind === "command" ? [text.text] : [],
+	);
 }
 
 /**
- * The programs the node's command calls by their own name, such as `acli`,
+ * The programs the node's commands call by their own name, such as `acli`,
  * that only tools of another name sign in to, such as `acli-work`. A
  * command gets a tool with a login under the tool's name, so `acli` runs
  * without one. A tool named after its program, with a login, signs it in.
@@ -39,15 +34,16 @@ export function programsWithoutLogin(
 	node: FlowNode,
 	tools: readonly CliToolRef[],
 ): ProgramWithoutLogin[] {
-	const command = commandOf(node);
-	if (command === undefined) return [];
+	const lines = commandsOf(node).flatMap((command) =>
+		command.split("\n").map(withoutComment),
+	);
+	if (lines.length === 0) return [];
 	const byProgram = new Map<string, string[]>();
 	for (const tool of tools) {
 		if (!tool.signsIn) continue;
 		const program = tool.program ?? tool.name;
 		byProgram.set(program, [...(byProgram.get(program) ?? []), tool.name]);
 	}
-	const lines = command.split("\n").map(withoutComment);
 	const found: ProgramWithoutLogin[] = [];
 	for (const [program, names] of byProgram) {
 		if (names.includes(program)) continue;
