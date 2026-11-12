@@ -1,4 +1,5 @@
 import {
+	agoLabel,
 	flowLabel,
 	formatKnownCost,
 	hoverTime,
@@ -10,7 +11,7 @@ import {
 	waitedText,
 } from "@nightshift/client";
 import { router } from "expo-router";
-import { Lightbulb } from "lucide-react-native";
+import { FileText, Lightbulb } from "lucide-react-native";
 
 import { useSignedIn } from "@/features/host";
 import { GateRow } from "@/features/inbox";
@@ -18,6 +19,7 @@ import { formatTime } from "@/shared/format";
 import { ListRow } from "@/shared/list";
 import { runStatusLook } from "@/shared/tone";
 import type { WatchRun } from "./latest-day";
+import { reportLine, type WatchReport } from "./reports";
 
 /**
  * A run of the latest day or one at work now: its status, title and project.
@@ -51,6 +53,35 @@ export function WatchRunRow({ run, now }: { run: WatchRun; now: number }) {
 			href={{ pathname: "/runs/[runId]", params: { runId: run.id } }}
 			onPressIn={() => prefetch(run.id)}
 			accessibilityHint={`${hoverTime(run.createdAt)}. Opens the run`}
+		/>
+	);
+}
+
+/**
+ * The newest report of a flow: its project and flow, its first line, and
+ * how long ago its run ended. Tap opens the whole report.
+ */
+export function WatchReportRow({
+	report,
+	now,
+}: {
+	report: WatchReport;
+	now: number;
+}) {
+	const prefetch = useRunPrefetch(useSignedIn().host.orpc);
+	const ago = agoLabel(report.endedAt, now);
+	return (
+		<ListRow
+			icon={FileText}
+			overline={report.group}
+			title={report.title}
+			titleLines={1}
+			caption={reportLine(report.excerpt) || undefined}
+			value={ago}
+			valueLabel={`ended ${ago}`}
+			href={{ pathname: "/report/[runId]", params: { runId: report.runId } }}
+			onPressIn={() => prefetch(report.runId)}
+			accessibilityHint={`${hoverTime(report.endedAt)}. Opens the report`}
 		/>
 	);
 }

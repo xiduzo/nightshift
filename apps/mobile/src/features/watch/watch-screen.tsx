@@ -36,7 +36,8 @@ import {
 	runningNow,
 	todayLine,
 } from "./latest-day";
-import { NeedsItemRow, WatchRunRow } from "./watch-rows";
+import { latestReports } from "./reports";
+import { NeedsItemRow, WatchReportRow, WatchRunRow } from "./watch-rows";
 
 /** The Runs tab, showing only the runs on their way. */
 const RUNNING_RUNS: Href = { pathname: "/runs", params: { filter: "running" } };
@@ -45,9 +46,9 @@ const RUNNING_RUNS: Href = { pathname: "/runs", params: { filter: "running" } };
 const NEEDS_SHOWN = 3;
 
 /**
- * Watch: does something need you, how the latest day went, what runs now and
- * what runs tonight, over every Space you are in. In the header, the
- * avatar opens Settings and + starts a run.
+ * Watch: does something need you, how the latest day went, the latest
+ * reports, what runs now and what runs tonight, over every Space you are
+ * in. In the header, the avatar opens Settings and + starts a run.
  */
 export function WatchScreen() {
 	const { person } = useSignedIn();
@@ -159,6 +160,7 @@ export function WatchScreen() {
 			{data ? (
 				<>
 					<LatestDaySection data={data} now={now} />
+					<ReportsSection data={data} now={now} />
 					<RunningSection data={data} now={now} />
 				</>
 			) : summary.isError ? (
@@ -221,6 +223,31 @@ function LatestDaySection({
 					/>
 				</ListGroup>
 			)}
+		</Section>
+	);
+}
+
+/**
+ * What the runs of the last 7 days produced: the newest report of each
+ * flow, at most three. Hidden when no run wrote one.
+ */
+function ReportsSection({
+	data,
+	now,
+}: {
+	data: DashboardSummary;
+	now: number;
+}) {
+	const reports = latestReports(data);
+	if (reports.length === 0) return null;
+	return (
+		<Section>
+			<SectionHead title="Latest reports" />
+			<ListGroup>
+				{reports.map((report) => (
+					<WatchReportRow key={report.key} report={report} now={now} />
+				))}
+			</ListGroup>
 		</Section>
 	);
 }
