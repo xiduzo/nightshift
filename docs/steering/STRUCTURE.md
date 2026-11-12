@@ -123,7 +123,7 @@ The entries today:
 | `flows` | `.`, `./testing` (`commandNode`: a Command node with the id and position a test chooses, `FlowInput`: a flow before the schema fills in its defaults) |
 | `telemetry` | `.` (`createTelemetry`, `Telemetry`) |
 | `semconv` | `.` (`ATTR`, `METRIC`, `OPERATION`, `PROVIDER`, `ERROR_TYPE`, `SPAN`, `TOKEN_MODALITY`, `SERVICE_NAME`, `USAGE_EVENT`, `RETIRED_USAGE_EVENT`, `usageEventSchema`, `REGISTRY`. Generated from the Weaver registry. It imports no Night Shift package.) |
-| `insights` | `.` (`createInsights`, `migrateInsights`, `ingestLogs`, `INGEST_RULE`, `overview`, `funnel`, `days`, `feedback`, `mix`, `retention`, `publicNumbers`, and the result types those functions return) |
+| `insights` | `.` (`createInsights`, `migrateInsights`, `ingestLogs`, `INGEST_RULE`, `overview`, `funnel`, `days`, `feedback`, `ladders`, `mix`, `retention`, `publicNumbers`, and the result types those functions return) |
 | `refusal` | `.` (`Refusal`, `RefusalKind`, `FAILURE_MESSAGE`, `wordsFor`, from `src/refusal.ts`. It imports nothing.) |
 | `time` | `.` (instants, the viewer's clock, the UTC hover), `./cron` (the next and previous time of a cron line, so croner stays off the phone), `./testing` (`utc`, `atLocal`) |
 | `notifications` | `.` (`createNotifications`, `createInAppChannel`, `createExpoChannel`, `engineRunEvents`, `oneSenderPerSpace`, `createDesktopChannel`, `systemDesktopNotifier`, the settings and push target schemas, the channel port `NotificationChannel`, the Expo port `ExpoClient`, the desktop ports `DesktopNotifier` and `DesktopWindow`), `./contract` (the notification contract: keys, push data, where a tap goes. It imports nothing, for `client`), `./testing` (`fakeRunEvents`, `fakeWebPushSender`, `fakeVapidKeys`) |

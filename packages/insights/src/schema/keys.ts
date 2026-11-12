@@ -108,6 +108,7 @@ export const AGENT = USAGE_EVENT.agentChecked;
 export const PROJECT = USAGE_EVENT.projectAdded;
 export const CHECKED = USAGE_EVENT.projectChecked;
 export const SCHEDULE = USAGE_EVENT.scheduleChanged;
+export const STEP = USAGE_EVENT.stepEnded;
 
 /** Older builds send these instead of `SCORED` (ADR 24). */
 export const RETIRED_OUTCOME = RETIRED_USAGE_EVENT.pullRequestOutcome;
@@ -124,6 +125,9 @@ export const BY_DEADLINE = member(GATE, "gate.by", "deadline");
 export const VIA_PHONE = member(GATE, "gate.via", "phone");
 export const VIA_WEB = member(GATE, "gate.via", "web");
 export const VIA_LOCK = member(GATE, "gate.via", "lock_screen");
+export const WORK = member(STEP, "ladder.kind", "work");
+export const CHOICE = member(STEP, "ladder.kind", "choice");
+export const BY_RULE = member(STEP, "ladder.rung", "rule");
 
 /** A retired pull request outcome, and the score a newer build sends for it. */
 export const RETIRED_SCORE: readonly { outcome: string; score: string }[] = [

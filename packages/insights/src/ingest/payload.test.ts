@@ -150,3 +150,70 @@ test("a retired event of an older build is accepted next to the event that repla
 		{ eventName: UNKNOWN, rule: INGEST_RULE.unknownEvent },
 	]);
 });
+
+test("a step end accepts where its climb landed and refuses free text on a ladder field", () => {
+	const STEP = USAGE_EVENT.stepEnded;
+	const step = {
+		[attribute(STEP, "node.kind")]: { stringValue: "decision" },
+		[attribute(STEP, "step.result")]: { stringValue: "pass" },
+		[attribute(STEP, "step.visit")]: { intValue: "1" },
+	};
+	const KIND = attribute(STEP, "ladder.kind");
+	const RUNG = attribute(STEP, "ladder.rung");
+	const TRIES = attribute(STEP, "ladder.tries");
+	const UNSURE = attribute(STEP, "ladder.unsure");
+	const COST = attribute(STEP, "ladder.cost_usd");
+	const fields = (extra: Record<string, Record<string, unknown>>) =>
+		Object.entries({ ...step, ...extra }).map(([key, value]) => ({
+			key,
+			value,
+		}));
+	const read = readLogs(
+		logs([
+			// An older build: no ladder fields.
+			{ name: STEP, attributes: fields({}) },
+			{
+				name: STEP,
+				attributes: fields({
+					[KIND]: { stringValue: "choice" },
+					[RUNG]: { stringValue: "later" },
+					[TRIES]: { intValue: "2" },
+					[UNSURE]: { boolValue: true },
+					[COST]: { doubleValue: 0.03 },
+				}),
+			},
+			// The name of a tier is the person's own text: never a rung.
+			{
+				name: STEP,
+				attributes: fields({
+					[KIND]: { stringValue: "work" },
+					[RUNG]: { stringValue: "Strong agent" },
+				}),
+			},
+			// The name of a tier goes to monitoring only, never to usage.
+			{
+				name: STEP,
+				attributes: fields({
+					[KIND]: { stringValue: "work" },
+					[RUNG]: { stringValue: "first" },
+					[ATTR.ladderTier]: { stringValue: "Strong agent" },
+				}),
+			},
+		]),
+		{ country: null },
+	);
+	expect(read.rows).toHaveLength(2);
+	expect(read.rows[0]?.attributes).not.toHaveProperty(RUNG);
+	expect(read.rows[1]?.attributes).toMatchObject({
+		[KIND]: "choice",
+		[RUNG]: "later",
+		[TRIES]: 2,
+		[UNSURE]: true,
+		[COST]: 0.03,
+	});
+	expect(read.refusals).toEqual([
+		{ eventName: STEP, rule: INGEST_RULE.wrongType },
+		{ eventName: STEP, rule: INGEST_RULE.unknownAttribute },
+	]);
+	expect(JSON.stringify(read)).not.toContain("Strong agent");
+});

@@ -17,6 +17,7 @@ export {
 	usageStarter,
 	usageVersion,
 } from "./groups";
+export { LADDER_KIND, LADDER_RUNGS, usageLadder } from "./ladder";
 export { usageEvent } from "./table";
 export {
 	usageGates,

@@ -7,7 +7,7 @@ import { migrate } from "drizzle-orm/pglite/migrator";
 
 import type { InsightsDb } from "../client";
 import { migrationsFolder } from "../migrate/migrate";
-import { feedback, funnel, overview, publicNumbers } from "../queries";
+import { feedback, funnel, ladders, overview, publicNumbers } from "../queries";
 import { usageEvent } from "../schema";
 import { attribute } from "../schema/keys";
 import { ingestLogs } from "./ingest";
@@ -242,4 +242,105 @@ test("useful runs read old and new events as one answer per run, and the code sc
 	const steps = await funnel(db);
 	expect(steps.medianSecondsToFirstUsefulRun).toBe(120);
 	expect(steps.medianSecondsToFirstFinishedRun).toBe(60);
+}, 30_000);
+
+test("ladders count the landings of newer builds and leave older step ends out", async () => {
+	const db = await database();
+	const STEP = USAGE_EVENT.stepEnded;
+	const empty = await ladders(db);
+	expect(empty.work).toEqual({
+		landings: 0,
+		installs: 0,
+		costPerLanding: null,
+		rungs: [],
+	});
+	expect(empty.choice.unsureShare).toBeNull();
+
+	const ended = (
+		kind: string,
+		landing?: { ladder: string; rung: string; cost?: number; unsure?: boolean },
+	) => ({
+		name: STEP,
+		fields: {
+			[attribute(STEP, "node.kind")]: kind,
+			[attribute(STEP, "step.result")]: "pass",
+			[attribute(STEP, "step.visit")]: 1,
+			...(landing
+				? {
+						[attribute(STEP, "ladder.kind")]: landing.ladder,
+						[attribute(STEP, "ladder.rung")]: landing.rung,
+						[attribute(STEP, "ladder.tries")]: 1,
+					}
+				: {}),
+			...(landing?.cost === undefined
+				? {}
+				: { [attribute(STEP, "ladder.cost_usd")]: landing.cost }),
+			...(landing?.unsure === undefined
+				? {}
+				: { [attribute(STEP, "ladder.unsure")]: landing.unsure }),
+		},
+	});
+	const work = (rung: string, cost?: number) =>
+		ended("agent", { ladder: "work", rung, cost });
+	const choice = (rung: string, unsure: boolean, cost: number) =>
+		ended("decision", { ladder: "choice", rung, cost, unsure });
+	const start = now() - 60 * 60_000;
+	const one = await ingestLogs(
+		db,
+		events("install-1", start, [
+			// An older build: step ends without a rung.
+			ended("agent"),
+			ended("decision"),
+			ended("command"),
+			// A newer build. A person's answer has no known cost here.
+			work("first", 0.1),
+			work("first", 0.2),
+			work("later", 0.9),
+			work("person"),
+			choice("rule", false, 0),
+			choice("first", false, 0.01),
+			choice("later", true, 0.05),
+			choice("person", true, 0.02),
+		]),
+		{ country: null },
+	);
+	const two = await ingestLogs(
+		db,
+		events("install-2", start, [work("first", 0.3)]),
+		{ country: null },
+	);
+	expect(one.refused + two.refused).toBe(0);
+
+	const landed = await ladders(db);
+	expect(landed.work.landings).toBe(5);
+	expect(landed.work.installs).toBe(2);
+	expect(landed.work.costPerLanding).toBeCloseTo(1.5 / 4);
+	expect(landed.work.rungs.map((row) => row.rung)).toEqual([
+		"first",
+		"later",
+		"person",
+	]);
+	expect(landed.work.rungs[0]).toMatchObject({
+		landings: 3,
+		share: 0.6,
+		installs: 2,
+	});
+	expect(landed.work.rungs[0]?.costPerLanding).toBeCloseTo(0.2);
+	expect(landed.work.rungs[2]).toMatchObject({
+		landings: 1,
+		costPerLanding: null,
+	});
+	expect(landed.choice).toMatchObject({
+		landings: 4,
+		installs: 1,
+		decided: 3,
+		unsure: 2,
+	});
+	expect(landed.choice.unsureShare).toBeCloseTo(2 / 3);
+	expect(landed.choice.rungs.map((row) => [row.rung, row.share])).toEqual([
+		["rule", 0.25],
+		["first", 0.25],
+		["later", 0.25],
+		["person", 0.25],
+	]);
 }, 30_000);

@@ -14,6 +14,8 @@ export {
 	type Funnel,
 	feedback,
 	funnel,
+	type Ladders,
+	ladders,
 	type Mix,
 	mix,
 	type Overview,
