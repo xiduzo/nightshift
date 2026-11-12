@@ -76,7 +76,7 @@ Night Shift moves the work of the run between the computers for you.
 
 ## Secrets
 
-A `${NAME}` in a connection, a CLI tool login, or a webhook reads a secret. A secret has a scope:
+A `${NAME}` in a connection, a CLI tool login, a Web request, the address of a Model Profile, or a webhook reads a secret. A secret has a scope:
 
 | Scope | Where you save it | Who reads it |
 | --- | --- | --- |
