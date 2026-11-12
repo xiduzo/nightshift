@@ -18,7 +18,7 @@ import {
 	type ValueNode,
 	withChoices,
 } from "@nightshift/flows";
-import type { GateChoice, StepOutputs } from "../../../log";
+import type { GateChoice } from "../../../log";
 import type { NodeAction, StepContext } from "../../context";
 import type { BriefSpec } from "../../gate-brief";
 import { interruptNode } from "../../interrupt";
@@ -67,8 +67,6 @@ export type AskHow = {
 	prefill?: JsonValue;
 	deadline?: DeadlineSpec;
 	default?: JsonValue;
-	outputs?: StepOutputs;
-	climb?: true;
 	/** The brief fields (ADR 21), else the node's: the person tier gives its own. */
 	brief?: GateBriefFields;
 	/** What the engine knows of the background when the flow writes none: the tries. */
@@ -97,8 +95,7 @@ export function askGate(
 		question: how.question ?? ((tctx) => renderGateQuestion(node, tctx)),
 		choices: [ANSWER],
 		...(deadline ? { deadline } : {}),
-		outputs: { ...how.outputs, data: null },
-		...(how.climb ? { climb: true as const } : {}),
+		outputs: { data: null },
 		brief: {
 			fields: how.brief ?? node,
 			recommends: false,

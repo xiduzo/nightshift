@@ -14,6 +14,7 @@ import type {
 } from "@nightshift/agents/types";
 import {
 	type AgentNode,
+	type AgentTier,
 	type FlowNode,
 	type JsonValue,
 	knowledgeFolderPath,
@@ -34,13 +35,8 @@ import {
 } from "../../log";
 import { deriveBudgetSpend, lastHarnessSessionOfNode } from "../../read";
 import { budgetPassed, guardMessage, runBudget, turnLimit } from "../budget";
-import {
-	climbAt,
-	climbOutputs,
-	climbSpec,
-	climbValues,
-	tierAt,
-} from "../cascade";
+import { type Climb, climbOutputs, climbSpec, climbValues } from "../cascade";
+import { climbing } from "../climb";
 import { closeStream, consumeStream } from "../consume";
 import {
 	harnessLabel,
@@ -64,7 +60,7 @@ import { sessionGuards } from "../session-guards";
 import type { RunStateValues } from "../state";
 import { type BodyResult, runStep, type StepHandle } from "../step-runner";
 import { ASK_CHOICES, agentAskNode } from "./agent-ask";
-import { previousFailure, retryGate } from "./climb-gate";
+import { previousFailure, retryAsk } from "./climb-gate";
 
 /**
  * The Agent node: one harness session per visit, ported from `runAgentStep`
@@ -94,7 +90,12 @@ import { previousFailure, retryGate } from "./climb-gate";
  * 4), and `runSession` is one harness session from its start to its end.
  */
 export function agentNode(node: AgentNode, ctx: StepContext): NodeAction {
-	if (node.cascade !== undefined) return climbingAgent(node, ctx);
+	if (node.cascade !== undefined) {
+		return climbing(node, ctx, {
+			person: retryAsk,
+			attempt: (own, climb) => agentTry(node, own, ctx, climb),
+		});
+	}
 	return (state, config) =>
 		runStep(ctx, node, state, config, {
 			rules: AGENT.resumeRules(node),
@@ -129,28 +130,22 @@ export function agentNode(node: AgentNode, ctx: StepContext): NodeAction {
 }
 
 /**
- * An Agent with a cascade (ADR 6): each try runs the agent of its tier
- * (the tier's node, `tierNode`), up to the tier's `tries`, then the next
- * tier's. A try holds when the agent ends `pass` (or an own outcome) and
- * the node's `check` exits 0. The next try gets the failure in its prompt;
- * `session: "resume"` continues the session of the try before within a
- * tier, and a new tier starts a new session. `ask: "person"` works inside
- * a try as without a cascade. The person tier is a Gate with "try-again"
- * and "stop" (`climb-gate.ts`).
+ * One try of an Agent with a cascade (ADR 6, `climbing`): `own` is the
+ * agent of its tier (`tierNode`), tried up to the tier's `tries`, then the
+ * next tier's. A try holds when the agent ends `pass` (or an own outcome)
+ * and the node's `check` exits 0. The next try gets the failure in its
+ * prompt; `session: "resume"` continues the session of the try before
+ * within a tier, and a new tier starts a new session. `ask: "person"`
+ * works inside a try as without a cascade. The person tier is a Gate with
+ * "try-again" and "stop" (`climb-gate.ts`).
  */
-function climbingAgent(node: AgentNode, ctx: StepContext): NodeAction {
+function agentTry(
+	node: AgentNode,
+	own: AgentNode,
+	ctx: StepContext,
+	{ at }: Climb<AgentTier>,
+): NodeAction {
 	return (state, config) => {
-		const at = climbAt(state, node);
-		const tier = tierAt(node, at);
-		if (tier === null) {
-			throw new Error(
-				`Agent node "${node.id}" has no tier ${at.tier + 1} in its cascade.`,
-			);
-		}
-		if (tier.kind === "person") {
-			return retryGate(node, ctx, at, tier.tier)(state, config);
-		}
-		const own = tier.node as AgentNode;
 		const previous = at.trail.at(-1);
 		// Within a tier, `session: "resume"` goes on with the try before.
 		const resumed =

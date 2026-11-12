@@ -5,16 +5,14 @@ import {
 	personTierIndex,
 	renderTemplate,
 	type ValueNode,
-	type ValueTier,
 } from "@nightshift/flows";
 import {
-	climbAt,
+	type Climb,
 	climbBackground,
 	climbLines,
-	climbOutputs,
 	climbValues,
-	tierAt,
 } from "../cascade";
+import { climbing } from "../climb";
 import {
 	type NodeAction,
 	type NodeKind,
@@ -25,8 +23,8 @@ import {
 } from "../context";
 import { dataProblem } from "../output-schema";
 import { RESUME_RULES } from "../resume-point";
-import type { CascadePosition, CascadeTry } from "../state";
-import { gateChooser } from "./choosers/person";
+import type { CascadeTry } from "../state";
+import type { GateAsk } from "./choosers/person";
 import { modelProducer } from "./producers/model";
 import { askAnswerNode, askGate, personProducer } from "./producers/person";
 import type { Producer } from "./producers/producer";
@@ -54,39 +52,18 @@ import { ruleProducer } from "./producers/rule";
  *   which ends the step with the answer's data.
  */
 export function valueNode(node: ValueNode, ctx: StepContext): NodeAction {
-	if (node.cascade !== undefined) return climbingValue(node, ctx);
+	// A Value with a cascade (ADR 6): each try asks the model of its tier
+	// (`producers/model.ts` with the climb). Data that does not match the
+	// schema, or that the tier's `accept` rule refuses, goes to the next
+	// try. The person tier is an Ask (ADR 10): the form starts with the best
+	// answer of the models (`bestAnswer`), and its answer ends the step.
+	if (node.cascade !== undefined) {
+		return climbing(node, ctx, {
+			person: (climb) => personTierAsk(node, ctx, climb),
+			attempt: (own, climb) => modelProducer(own, ctx, climb),
+		});
+	}
 	return producerFor(node, ctx);
-}
-
-/**
- * A Value with a cascade (ADR 6): each try asks the model of its tier
- * (`producers/model.ts` with the climb). Data that does not match the
- * schema, or that the tier's `accept` rule refuses, goes to the next try.
- * The person tier is an Ask (ADR 10): the form starts with the best answer
- * of the models (`bestAnswer`), and its answer ends the step.
- */
-function climbingValue(node: ValueNode, ctx: StepContext): NodeAction {
-	return (state, config) => {
-		const at = climbAt(state, node);
-		const tier = tierAt(node, at);
-		if (tier === null) {
-			throw new Error(
-				`Value node "${node.id}" has no tier ${at.tier + 1} in its cascade.`,
-			);
-		}
-		if (tier.kind === "person") {
-			return gateChooser(
-				node,
-				ctx,
-				personTierAsk(node, ctx, at, tier.tier),
-			)(state, config);
-		}
-		return modelProducer(tier.node as ValueNode, ctx, {
-			root: node,
-			at,
-			tier: tier.tier as ValueTier,
-		})(state, config);
-	};
 }
 
 /**
@@ -97,9 +74,8 @@ function climbingValue(node: ValueNode, ctx: StepContext): NodeAction {
 function personTierAsk(
 	node: ValueNode,
 	ctx: StepContext,
-	at: CascadePosition,
-	tier: PersonTier,
-) {
+	{ at, tier }: Climb<PersonTier>,
+): GateAsk {
 	const best = bestAnswer(node, at.trail);
 	const { deadline } = tier;
 	return askGate(node, ctx, {
@@ -123,8 +99,6 @@ function personTierAsk(
 						: {}),
 				}
 			: {}),
-		outputs: climbOutputs(node, at),
-		climb: true,
 		brief: tier,
 		known: { background: climbBackground(at.trail) },
 	});

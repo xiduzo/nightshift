@@ -1,19 +1,17 @@
 import {
 	type DecisionNode,
-	type DecisionTier,
 	type PersonTier,
 	personTierIndex,
 	renderReadable,
 } from "@nightshift/flows";
 import {
-	climbAt,
+	type Climb,
 	climbBackground,
 	climbLines,
-	climbOutputs,
 	climbRecommendation,
 	climbValues,
-	tierAt,
 } from "../cascade";
+import { climbing } from "../climb";
 import {
 	endedAtReason,
 	type NodeAction,
@@ -28,8 +26,8 @@ import { type Chooser, decisionOutputs, gateChoices } from "./choosers/chooser";
 import { modelChooser } from "./choosers/model";
 import {
 	decisionBrief,
+	type GateAsk,
 	gateAskNode,
-	gateChooser,
 	personChooser,
 } from "./choosers/person";
 import { ruleChooser } from "./choosers/rule";
@@ -51,53 +49,44 @@ import { ruleChooser } from "./choosers/rule";
  * the person's note, the model's reasons, or "" for a rule.
  */
 export function decisionNode(node: DecisionNode, ctx: StepContext): NodeAction {
-	if (node.cascade !== undefined) return climbingDecision(node, ctx);
+	// A Decision with a cascade (ADR 6): each try asks the model of its tier
+	// (`choosers/model.ts` with the climb), and a pick below the tier's
+	// `minConfidence` goes to the next try. The person tier is a Gate that
+	// shows each tier's pick and probability; its answer ends the step on
+	// the option (`gateAskNode`).
+	if (node.cascade !== undefined) {
+		return climbing(node, ctx, {
+			person: (climb) => personTierGate(node, climb),
+			attempt: (own, climb) => modelChooser(own, ctx, climb),
+		});
+	}
 	return chooserFor(node, ctx);
 }
 
 /**
- * A Decision with a cascade (ADR 6): each try asks the model of its tier
- * (`choosers/model.ts` with the climb), and a pick below the tier's
- * `minConfidence` goes to the next try. The person tier is a Gate that
- * shows each tier's pick and probability; its answer ends the step on
- * the option (`gateAskNode`).
+ * The Gate of a Decision's person tier. Without the flow's words: what
+ * each tier picked, and the surest pick.
  */
-function climbingDecision(node: DecisionNode, ctx: StepContext): NodeAction {
-	return (state, config) => {
-		const at = climbAt(state, node);
-		const tier = tierAt(node, at);
-		if (tier === null) {
-			throw new Error(
-				`Decision node "${node.id}" has no tier ${at.tier + 1} in its cascade.`,
-			);
-		}
-		if (tier.kind === "person") {
-			// Without the flow's words: what each tier picked, and the surest pick.
-			const recommend = climbRecommendation(at.trail);
-			return gateChooser(node, ctx, {
-				question: (tctx) =>
-					climbQuestion(
-						renderReadable(node.prompt, {
-							...tctx,
-							cascade: climbValues(node, at),
-						}),
-						at.trail,
-					),
-				choices: gateChoices(node),
-				deadline: tier.tier.deadline,
-				outputs: climbOutputs(node, at),
-				climb: true,
-				brief: decisionBrief(node, tier.tier, {
-					background: climbBackground(at.trail),
-					...(recommend ? { recommend } : {}),
+function personTierGate(
+	node: DecisionNode,
+	{ at, tier }: Climb<PersonTier>,
+): GateAsk {
+	const recommend = climbRecommendation(at.trail);
+	return {
+		question: (tctx) =>
+			climbQuestion(
+				renderReadable(node.prompt, {
+					...tctx,
+					cascade: climbValues(node, at),
 				}),
-			})(state, config);
-		}
-		return modelChooser(tier.node as DecisionNode, ctx, {
-			root: node,
-			at,
-			tier: tier.tier as DecisionTier,
-		})(state, config);
+				at.trail,
+			),
+		choices: gateChoices(node),
+		deadline: tier.deadline,
+		brief: decisionBrief(node, tier, {
+			background: climbBackground(at.trail),
+			...(recommend ? { recommend } : {}),
+		}),
 	};
 }
 

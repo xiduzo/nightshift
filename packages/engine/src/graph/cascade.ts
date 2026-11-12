@@ -6,13 +6,10 @@ import {
 	isPersonTier,
 	type JsonValue,
 	lastModelTier,
-	type PersonTier,
 	tierLabel,
-	tierNode,
 } from "@nightshift/flows";
 import type {
 	GateBackgroundItem,
-	GateChoice,
 	RungBy,
 	StepOutcome,
 	StepOutputs,
@@ -29,10 +26,12 @@ import type {
 import type { StepSpec } from "./step-runner";
 
 /**
- * The climb of a cascade (ADR 6), walked inside the node. Each try is a
- * step of its own: a visit with its tier, so budgets and the step cap
- * count every try. A try runs as the node of its tier (`tierNode`): that
- * tier's profile, on that profile's Device.
+ * The climb of a cascade (ADR 6), walked inside the node: where it stands,
+ * what a try gives the next one, and the words of the person tier. The
+ * dispatch over the tiers is `climbing` (`climb.ts`). Each try is a step
+ * of its own: a visit with its tier, so budgets and the step cap count
+ * every try. A try runs as the node of its tier (`tierNode`): that tier's
+ * profile, on that profile's Device.
  *
  * A try that does not hold ends its step `fail` (or `error`), and the node
  * goes back to itself with the next position (`climbCommand`), not along an
@@ -60,40 +59,24 @@ export function climbAt(
 }
 
 /** An outcome that does not hold: the node tries again, or ends there. */
-export function notHolding(outcome: StepOutcome): boolean {
+function notHolding(outcome: StepOutcome): boolean {
 	return outcome === "fail" || outcome === "error";
 }
 
 /**
  * One try of a cascade as its node runs it: the node with the cascade
  * (`root`), the position, and the tier's own fields (`minConfidence`,
- * `accept`, `session`, `check` is the root's).
+ * `accept`, `session`, `check` is the root's). The person tier's `tier` is
+ * the person tier.
  */
-export type Climb<T> = { root: CascadeNode; at: CascadePosition; tier: T };
-
-/** A tier that is not a person, as `cascade` holds it. */
-type ModelTier = Exclude<
-	NonNullable<ReturnType<typeof cascadeOf>>[number],
-	PersonTier
->;
-
-/** The tier at a position: a person tier, a tier as a node with its fields, or null past the end. */
-export function tierAt(
-	node: CascadeNode,
-	at: CascadePosition,
-):
-	| { kind: "person"; tier: PersonTier }
-	| { kind: "node"; node: FlowNode; tier: ModelTier }
-	| null {
-	const tier = cascadeOf(node)?.[at.tier];
-	if (tier === undefined) return null;
-	if (isPersonTier(tier)) return { kind: "person", tier };
-	const own = tierNode(node, at.tier);
-	return own === null ? null : { kind: "node", node: own, tier };
-}
+export type Climb<T = unknown> = {
+	root: CascadeNode;
+	at: CascadePosition;
+	tier: T;
+};
 
 /** The name of the tier at a position. */
-export function tierLabelAt(node: CascadeNode, at: CascadePosition): string {
+function tierLabelAt(node: CascadeNode, at: CascadePosition): string {
 	const tier = cascadeOf(node)?.[at.tier];
 	return tier === undefined ? "" : tierLabel(tier, at.tier);
 }
@@ -143,7 +126,7 @@ function nextPlace(
  * else the first of the next tier, else null (no tier left: the step ends
  * on the try's outcome). `done` is the try that did not hold.
  */
-export function nextTry(
+function nextTry(
 	node: CascadeNode,
 	at: CascadePosition,
 	done: CascadeTry,
@@ -228,7 +211,7 @@ const clip = (text: string) =>
 	text.length > TRAIL_TEXT ? `…${text.slice(-TRAIL_TEXT)}` : text;
 
 /** What a try that ended gives the next one: its outcome and what it said, from its outputs. */
-export function tryRecord(
+function tryRecord(
 	node: CascadeNode,
 	at: CascadePosition,
 	end: Pick<StepEnd, "outcome" | "outputs" | "error">,
@@ -305,20 +288,6 @@ export function climbSpec(
 		command: (end) => climbCommand(node, end, next(end) ?? at),
 	};
 }
-
-/** The choices of the person tier of an Agent or a Call. */
-export const RETRY_GATE_CHOICES: readonly GateChoice[] = [
-	{
-		name: "try-again",
-		description: "Try once more on the last tier, with your note.",
-		color: "green",
-	},
-	{
-		name: "stop",
-		description: "End this step as failed.",
-		color: "red",
-	},
-];
 
 /** One try of the climb in words: the tier, its pick and probability, or what went wrong. */
 function tryLine(done: CascadeTry): string {

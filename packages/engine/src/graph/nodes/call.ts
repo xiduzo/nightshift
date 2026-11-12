@@ -6,13 +6,8 @@ import {
 	runsEach,
 } from "@nightshift/flows";
 import type { InputValues, StepOutputs } from "../../log";
-import {
-	climbAt,
-	climbOutputs,
-	climbSpec,
-	climbValues,
-	tierAt,
-} from "../cascade";
+import { type Climb, climbOutputs, climbSpec, climbValues } from "../cascade";
+import { climbing } from "../climb";
 import {
 	endedAtReason,
 	messageOf,
@@ -26,7 +21,7 @@ import { eachOutputs } from "../each";
 import { renderBindings, resolveInputs } from "../inputs";
 import { entryOf, RESUME_RULES, resumePoint } from "../resume-point";
 import { route, routeDone, type StepEnd, scopeOf } from "../route";
-import type { CascadePosition, RunStateUpdate } from "../state";
+import type { RunStateUpdate } from "../state";
 import { beginStep } from "../step-runner";
 import {
 	type BodyGraph,
@@ -38,7 +33,7 @@ import {
 	typedOutputs,
 } from "./body";
 import { callEachNode } from "./call-each";
-import { climbAskNode, retryGate } from "./climb-gate";
+import { climbAskNode, retryAsk } from "./climb-gate";
 
 /**
  * The Call node: runs another flow as a subgraph of the node (design rule
@@ -71,47 +66,31 @@ export function callNode(node: CallNode, ctx: StepContext): NodeAction {
 	if (runsEach(node)) return callEachNode(node, ctx);
 	// One compiled body per flow: a cascade's tiers may call other flows.
 	const graphs = new Map<string, BodyGraph>();
-	if (node.cascade !== undefined) return climbingCall(node, ctx, graphs);
+	// A Call with a cascade (ADR 6): each try runs the flow of its tier with
+	// its inputs, which may read `{{cascade.previous}}`. A try holds when
+	// the called flow ends `pass`; any other end climbs to the next try. The
+	// person tier is a Gate with "try-again" and "stop" (`climb-gate.ts`).
+	if (node.cascade !== undefined) {
+		return climbing(node, ctx, {
+			person: retryAsk,
+			attempt: (own, climb) => (state, config) =>
+				callOnce(ctx, own, graphs, state, config, climb),
+		});
+	}
 	return (state, config) => callOnce(ctx, node, graphs, state, config);
 }
 
 /**
- * A Call with a cascade (ADR 6): each try runs the flow of its tier with
- * its inputs, which may read `{{cascade.previous}}`. A try holds when the
- * called flow ends `pass`; any other end climbs to the next try. The
- * person tier is a Gate with "try-again" and "stop" (`climb-gate.ts`).
+ * One run of the called flow: a step that opens, runs the body and ends.
+ * With `climb`, a try of the node's cascade.
  */
-function climbingCall(
-	node: CallNode,
-	ctx: StepContext,
-	graphs: Map<string, BodyGraph>,
-): NodeAction {
-	return (state, config) => {
-		const at = climbAt(state, node);
-		const tier = tierAt(node, at);
-		if (tier === null) {
-			throw new Error(
-				`Subflow node "${node.id}" has no tier ${at.tier + 1} in its cascade.`,
-			);
-		}
-		if (tier.kind === "person") {
-			return retryGate(node, ctx, at, tier.tier)(state, config);
-		}
-		return callOnce(ctx, tier.node as CallNode, graphs, state, config, {
-			root: node,
-			at,
-		});
-	};
-}
-
-/** One run of the called flow: a step that opens, runs the body and ends. */
 async function callOnce(
 	ctx: StepContext,
 	node: CallNode,
 	graphs: Map<string, BodyGraph>,
 	state: Parameters<NodeAction>[0],
 	config: Parameters<NodeAction>[1],
-	climb?: { root: CallNode; at: CascadePosition },
+	climb?: Climb,
 ): Promise<Command> {
 	const runId = ctx.run.id;
 	const runState = await ctx.log.state(runId);
@@ -122,7 +101,7 @@ async function callOnce(
 		scopeOf(config),
 		CALL.resumeRules(node),
 	);
-	const climbing = climb ? climbSpec(climb.root, climb.at) : null;
+	const climbs = climb ? climbSpec(climb.root, climb.at) : null;
 	if (point.kind === "done") {
 		const logged: StepEnd = {
 			stepId: point.step.id,
@@ -131,7 +110,7 @@ async function callOnce(
 			outputs: point.ended.outputs,
 			error: point.ended.error,
 		};
-		if (climbing?.climbs(logged)) return climbing.command(logged);
+		if (climbs?.climbs(logged)) return climbs.command(logged);
 		return routeDone(ctx, state, node, point, config);
 	}
 	const begun = await beginStep(
@@ -162,14 +141,14 @@ async function callOnce(
 			outcome,
 			visit,
 		};
-		const climbs = climbing?.climbs({ outcome, outputs: all, error }) ?? false;
+		const climbed = climbs?.climbs({ outcome, outputs: all, error }) ?? false;
 		const ended = await step.end(
 			outcome,
 			all,
 			error,
-			climbs ? { skipWrites: true } : undefined,
+			climbed ? { skipWrites: true } : undefined,
 		);
-		if (climbs && climbing) return climbing.command(ended);
+		if (climbed && climbs) return climbs.command(ended);
 		return route(ctx, state, node, ended, config, extra);
 	};
 	/** Ends the step and goes nowhere: the run parks on the interrupt that follows. */

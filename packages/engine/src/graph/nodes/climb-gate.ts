@@ -1,25 +1,24 @@
 import { Command, type LangGraphRunnableConfig } from "@langchain/langgraph";
 import type { CascadeNode, PersonTier } from "@nightshift/flows";
+import type { GateChoice } from "../../log";
 import {
+	type Climb,
 	climbAt,
 	climbBackground,
 	climbCommand,
 	climbLines,
-	climbOutputs,
-	RETRY_GATE_CHOICES,
 	tryAgain,
 } from "../cascade";
 import type { NodeAction, StepContext } from "../context";
 import { interruptNode } from "../interrupt";
 import { route } from "../route";
 import type {
-	CascadePosition,
 	CascadeTry,
 	PendingGate,
 	ResumeValue,
 	RunStateValues,
 } from "../state";
-import { type GateAsk, gateChooser, resolve } from "./choosers/person";
+import { type GateAsk, resolve } from "./choosers/person";
 
 /**
  * The person tier of an Agent's or a Call's cascade (ADR 6): a Gate on a
@@ -30,12 +29,25 @@ import { type GateAsk, gateChooser, resolve } from "./choosers/person";
  * treat it the same. Its step has no timers.
  */
 
-/** What the person tier asks. */
-function retryAsk(
-	node: CascadeNode,
-	at: CascadePosition,
-	tier: PersonTier,
-): GateAsk {
+/** The choices of the person tier of an Agent or a Call. */
+const RETRY_GATE_CHOICES: readonly GateChoice[] = [
+	{
+		name: "try-again",
+		description: "Try once more on the last tier, with your note.",
+		color: "green",
+	},
+	{
+		name: "stop",
+		description: "End this step as failed.",
+		color: "red",
+	},
+];
+
+/**
+ * What the person tier asks: what each try did. Its outputs keep the last
+ * try's summary and log tail, which "stop" ends the step with.
+ */
+export function retryAsk({ at, tier }: Climb<PersonTier>): GateAsk {
 	const last = at.trail.at(-1);
 	return {
 		question: () =>
@@ -43,27 +55,15 @@ function retryAsk(
 		choices: [...RETRY_GATE_CHOICES],
 		deadline: tier.deadline,
 		outputs: {
-			...climbOutputs(node, at),
 			summary: last?.summary ?? "",
 			...(last?.log_tail !== undefined ? { log_tail: last.log_tail } : {}),
 		},
-		climb: true,
 		brief: {
 			fields: tier,
 			recommends: false,
 			known: { background: climbBackground(at.trail) },
 		},
 	};
-}
-
-/** Opens the person tier's Gate: the node's visit at that tier. */
-export function retryGate(
-	node: CascadeNode,
-	ctx: StepContext,
-	at: CascadePosition,
-	tier: PersonTier,
-): NodeAction {
-	return gateChooser(node, ctx, retryAsk(node, at, tier));
 }
 
 /**
