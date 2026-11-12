@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createDb, type Database } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
-import type { LandedFact, RunTrace } from "@nightshift/engine";
+import { type LandedFact, RUNGS, type RunTrace } from "@nightshift/engine";
 import { NODE_TYPE_LABEL, starterList } from "@nightshift/flows";
 import {
 	RETIRED_USAGE_EVENT,
@@ -239,6 +239,156 @@ test("a run's end says whether a person stepped in", async () => {
 	} finally {
 		await close();
 	}
+});
+
+test("a landing leaves with its ladder, rung, tries and cost, and a tier label and a metric name never appear in the stored JSON", async () => {
+	const SECRET_TIER = "Careful Reviewer";
+	const SECRET_METRIC = "leads_found";
+	const { db, close } = await openDb();
+	try {
+		const usage = createUsage({
+			db,
+			settings: switches(true, true),
+			policy: async () => true,
+		});
+		const landed = trace();
+		const step = landed.steps[0];
+		const end = step?.ends[0];
+		if (!step || !end) throw new Error("missing step");
+		landed.steps[0] = {
+			...step,
+			nodeType: "decision",
+			rung: "later",
+			ends: [
+				{
+					...end,
+					landing: {
+						ladder: "choice",
+						rung: "later",
+						tier: SECRET_TIER,
+						tries: 2,
+						costUsd: 0.0349,
+						unsure: true,
+					},
+				},
+			],
+		};
+		const facts: LandedFact[] = [
+			{
+				kind: "step-ended",
+				spaceId: "space-1",
+				runId: SECRET_RUN,
+				seq: 2,
+				changes: "summary",
+				stepId: "step-1",
+			},
+			{
+				kind: "scored",
+				spaceId: "space-1",
+				runId: SECRET_RUN,
+				seq: 3,
+				changes: "detail",
+				score: SECRET_METRIC,
+				value: 12,
+				label: null,
+				stepId: "step-1",
+				by: null,
+			},
+		];
+		await usage.take(facts, async () => landed);
+		await usage.settled();
+		const waiting = (await usage.outbox()).waiting as Record<string, unknown>[];
+		expect(waiting).toHaveLength(1);
+		const name = USAGE_EVENT.stepEnded;
+		const [event] = waiting;
+		expect(event?.[attr(name, "ladder.kind")]).toBe("choice");
+		expect(event?.[attr(name, "ladder.rung")]).toBe("later");
+		expect(event?.[attr(name, "ladder.tries")]).toBe(2);
+		expect(event?.[attr(name, "ladder.unsure")]).toBe(true);
+		expect(event?.[attr(name, "ladder.cost_usd")]).toBe(0.03);
+		const body = JSON.stringify(waiting);
+		expect(body).not.toContain(SECRET_TIER);
+		expect(body).not.toContain(SECRET_METRIC);
+		await usage.stop();
+	} finally {
+		await close();
+	}
+});
+
+test("a step that did not land, or landed on the work ladder, sends no unsure", async () => {
+	const { db, close } = await openDb();
+	try {
+		const usage = createUsage({
+			db,
+			settings: switches(true, true),
+			policy: async () => true,
+		});
+		const fact = (seq: number, stepId: string): LandedFact => ({
+			kind: "step-ended",
+			spaceId: "space-1",
+			runId: SECRET_RUN,
+			seq,
+			changes: "summary",
+			stepId,
+		});
+		const work = trace();
+		const step = work.steps[0];
+		const end = step?.ends[0];
+		if (!step || !end) throw new Error("missing step");
+		work.steps = [
+			{ ...step, id: "plain" },
+			{
+				...step,
+				id: "landed",
+				rung: "first",
+				ends: [
+					{
+						...end,
+						seq: 3,
+						landing: {
+							ladder: "work",
+							rung: "first",
+							tier: null,
+							tries: 1,
+							costUsd: null,
+						},
+					},
+				],
+			},
+		];
+		await usage.take([fact(2, "plain"), fact(3, "landed")], async () => work);
+		await usage.settled();
+		const name = USAGE_EVENT.stepEnded;
+		const [plain, landed] = (await usage.outbox()).waiting as Record<
+			string,
+			unknown
+		>[];
+		for (const key of [
+			"ladder.kind",
+			"ladder.rung",
+			"ladder.tries",
+			"ladder.unsure",
+			"ladder.cost_usd",
+		]) {
+			expect(plain?.[attr(name, key)]).toBeUndefined();
+		}
+		expect(landed?.[attr(name, "ladder.kind")]).toBe("work");
+		expect(landed?.[attr(name, "ladder.rung")]).toBe("first");
+		expect(landed?.[attr(name, "ladder.tries")]).toBe(1);
+		// Part of its cost is not known: no cost, never a part of it.
+		expect(landed?.[attr(name, "ladder.cost_usd")]).toBeUndefined();
+		expect(landed?.[attr(name, "ladder.unsure")]).toBeUndefined();
+		await usage.stop();
+	} finally {
+		await close();
+	}
+});
+
+test("every rung of the engine is a member of the closed list", () => {
+	const missing = RUNGS.filter(
+		(rung) => known(USAGE_EVENT.stepEnded, "ladder.rung", rung) !== rung,
+	);
+	expect(missing).toEqual([]);
 });
 
 test("an HMAC is stable for one key and changes after the id is reset", async () => {

@@ -92,6 +92,34 @@ function stepResult(outcome: string): string {
 	return listed(STEP, "step.result", value, "_OTHER");
 }
 
+/** Dollars rounded to the cent, 0 or more. */
+function cents(usd: number): number {
+	if (!Number.isFinite(usd)) return 0;
+	return Math.round(Math.max(0, usd) * 100) / 100;
+}
+
+type StepLanding = NonNullable<
+	RunTrace["steps"][number]["ends"][number]["landing"]
+>;
+
+/**
+ * Where a climb landed, on the step it landed on: its ladder, rung, tries
+ * and cost. The name of its tier stays out: the person chose it. A climb
+ * of a Decision also says whether a decider was not sure enough.
+ */
+function landingFields(landing: StepLanding | undefined) {
+	if (!landing) return {};
+	return {
+		"ladder.kind": listed(STEP, "ladder.kind", landing.ladder, "_OTHER"),
+		"ladder.rung": listed(STEP, "ladder.rung", landing.rung, "_OTHER"),
+		"ladder.tries": whole(landing.tries),
+		"ladder.unsure":
+			landing.ladder === "choice" ? landing.unsure === true : undefined,
+		"ladder.cost_usd":
+			landing.costUsd === null ? undefined : cents(landing.costUsd),
+	};
+}
+
 /** A step that ended. Error text stays out. Only `_OTHER` may name the error. */
 export function stepEndedEvent(
 	fact: Extract<LandedFact, { kind: "step-ended" }>,
@@ -142,6 +170,7 @@ export function stepEndedEvent(
 		"step.guard": end.guard
 			? listed(STEP, "step.guard", end.guard, "_OTHER")
 			: undefined,
+		...landingFields(end.landing),
 	});
 }
 
