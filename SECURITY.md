@@ -2,6 +2,8 @@
 
 Night Shift runs agents on your computer with your own logins. A flow can also run shell commands. Report a security problem privately.
 
+Night Shift can install Claude Code or Codex for you. After you confirm on this computer, it runs the vendor's own install script from a fixed https address, never as an administrator ([ADR 25](docs/adr/0025-night-shift-installs-an-agent-cli-with-the-vendors-installer.md)).
+
 ## Report a problem
 
 Do not open a public issue. Use [**Report a vulnerability**](https://github.com/xiduzo/nightshift/security/advisories/new) on the Security tab. Tell us:
