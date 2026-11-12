@@ -1,6 +1,8 @@
 /**
- * Where the work of a flow landed (Q31): the work ladder (agents, subflows,
- * Values by a model, Asks) and the choice ladder (Decisions). A landing is
+ * Where the work of a flow landed (Q31): the work ladder (agents, the
+ * tiers of a Subflow's cascade, Values by a model, Asks) and the choice
+ * ladder (Decisions). A Subflow without a cascade is on no ladder: the
+ * steps of its called flow land. A landing is
  * one time a node's work or choice came to rest, on a rung: a tier, a rule,
  * you, its deadline, or nowhere. Flow health shows it as its first column,
  * and its details as the Ladders tab.
@@ -124,9 +126,7 @@ export function LaddersCell({
 					—
 				</TooltipTrigger>
 				<TooltipContent className="max-w-64">
-					{ladders
-						? "No agent, subflow or Decision ran in these days."
-						: UPDATE_HINT}
+					{ladders ? "No agent or Decision ran in these days." : UPDATE_HINT}
 				</TooltipContent>
 			</Tooltip>
 		);
@@ -192,7 +192,7 @@ export function Ladders({
 	if (!ladders.work && !ladders.choice) {
 		return (
 			<DetailsEmpty>
-				No agent, subflow or Decision ran in the last {range} days.
+				No agent or Decision ran in the last {range} days.
 			</DetailsEmpty>
 		);
 	}
@@ -205,7 +205,7 @@ export function Ladders({
 					summary={ladders.work}
 					unit="Times"
 					count={(landed) => `${landed} ${landed === 1 ? "time" : "times"}`}
-					empty="No agent or subflow ran in these days."
+					empty="No agent ran in these days."
 				/>
 				<LadderCard
 					title="Choices"
