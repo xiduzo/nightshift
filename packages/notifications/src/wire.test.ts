@@ -167,6 +167,44 @@ test("the learnings that wait reach open screens only: nothing goes to a phone o
 	expect(sender.requests).toEqual([]);
 });
 
+test("a synced document reaches open screens only, and this computer's document reaches its owner", async () => {
+	const ada = await sandbox.signUp("Ada");
+	const spaceId = (await personalSpaceId(sandbox.db, ada.userId)) ?? "";
+	await notifications.targets.register(ada.userId, browser);
+	await notifications.start();
+	const got: { kind: string; name?: string; spaceId?: string | null }[] = [];
+	const controller = new AbortController();
+	void (async () => {
+		for await (const item of notifications.watch(
+			ada.userId,
+			controller.signal,
+		)) {
+			got.push(item);
+		}
+	})();
+	await Bun.sleep(0);
+
+	await notifications.documentChanged({ name: "flows:shop", spaceId });
+	await notifications.documentChanged({
+		name: "device:laptop",
+		personId: ada.userId,
+	});
+	await waitFor(() => got.length === 2);
+	controller.abort();
+
+	expect(got[0]).toMatchObject({
+		kind: "document-changed",
+		name: "flows:shop",
+		spaceId,
+	});
+	expect(got[1]).toMatchObject({
+		kind: "document-changed",
+		name: "device:laptop",
+		spaceId: null,
+	});
+	expect(sender.requests).toEqual([]);
+});
+
 test("a browser the push service lost is forgotten", async () => {
 	const ada = await sandbox.signUp("Ada");
 	const spaceId = (await personalSpaceId(sandbox.db, ada.userId)) ?? "";

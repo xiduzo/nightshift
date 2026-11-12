@@ -83,6 +83,7 @@ export {
 } from "./device";
 export {
 	createSyncedDocuments,
+	documentKind,
 	documentName,
 	documentRows,
 	type SyncedDocuments,

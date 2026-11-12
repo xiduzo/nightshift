@@ -102,6 +102,17 @@ const KEYS = {
 	review: createKnowledgeQueries(orpc).review("p1").queryKey,
 	knowledge: orpc.knowledge.get.queryOptions({ input: { projectId: "p1" } })
 		.queryKey,
+	flows: orpc.flows.list.queryOptions({ input: { projectId: "p1" } }).queryKey,
+	revisions: orpc.flows.revisions.queryOptions({
+		input: { projectId: "p1", name: "night" },
+	}).queryKey,
+	map: orpc.knowledge.graph.queryOptions({ input: { projectId: "p1" } })
+		.queryKey,
+	members: orpc.members.list.queryOptions().queryKey,
+	spaceList: orpc.spaces.list.queryOptions().queryKey,
+	profiles: orpc.profiles.list.queryOptions().queryKey,
+	offers: orpc.offers.list.queryOptions().queryKey,
+	overview: orpc.devices.list.queryOptions().queryKey,
 } as const;
 type Name = keyof typeof KEYS;
 
@@ -120,7 +131,10 @@ const RUN_1: Name[] = [
 	"schedules",
 	"projects",
 ];
-/** What a missed stretch of the stream reads again: the Gates, what every run changes, and the Knowledge page. */
+/**
+ * What a missed stretch of the stream reads again: the Gates, what every
+ * run changes, and every synced document.
+ */
 const EVERYTHING: Name[] = [
 	"gates",
 	...RUN_1,
@@ -129,6 +143,15 @@ const EVERYTHING: Name[] = [
 	"files2",
 	"folder2",
 	"knowledge",
+	"branches",
+	"flows",
+	"revisions",
+	"map",
+	"members",
+	"spaceList",
+	"profiles",
+	"offers",
+	"overview",
 ];
 const NOTHING: Name[] = [];
 
@@ -405,6 +428,123 @@ describe("the live cache follows the Host", () => {
 		expect(stale()).toEqual(
 			sorted(["projects", "branches", "dashboard", "flowHealth", "schedules"]),
 		);
+	});
+
+	test("a flow document reads the flows and the schedules, and its history reads the revisions", async () => {
+		const { live, stale, timers } = setUp();
+		const { host } = follow(live);
+		await host.send({
+			kind: "document-changed",
+			name: "flows:p1",
+			spaceId: "s1",
+			at: 4,
+		});
+		timers.due(300);
+		expect(stale()).toEqual(sorted(["flows", "revisions", "schedules"]));
+
+		const history = setUp();
+		const followed = follow(history.live);
+		await followed.host.send({
+			kind: "document-changed",
+			name: "flows-history:p1",
+			spaceId: "s1",
+			at: 5,
+		});
+		history.timers.due(300);
+		expect(history.stale()).toEqual(["revisions"]);
+	});
+
+	test("a knowledge document reads the Knowledge page, and a Space document reads its projects and Members", async () => {
+		const { live, stale, timers } = setUp();
+		const { host } = follow(live);
+		await host.send({
+			kind: "document-changed",
+			name: "knowledge:p1",
+			spaceId: "s1",
+			at: 4,
+		});
+		timers.due(300);
+		expect(stale()).toEqual(
+			sorted(["knowledge", "learnings", "review", "map"]),
+		);
+
+		const space = setUp();
+		const followed = follow(space.live);
+		await followed.host.send({
+			kind: "document-changed",
+			name: "space:s1",
+			spaceId: "s1",
+			at: 5,
+		});
+		space.timers.due(300);
+		expect(space.stale()).toEqual(
+			sorted([
+				"projects",
+				"branches",
+				"dashboard",
+				"flowHealth",
+				"schedules",
+				"members",
+				"spaceList",
+			]),
+		);
+	});
+
+	test("this computer's document reads its configuration, and a copy reads the Devices", async () => {
+		const { live, stale, timers } = setUp();
+		const { host } = follow(live);
+		await host.send({
+			kind: "document-changed",
+			name: "device:laptop",
+			spaceId: null,
+			at: 4,
+		});
+		timers.due(300);
+		expect(stale()).toEqual(sorted(["profiles", "offers"]));
+
+		const copy = setUp();
+		const followed = follow(copy.live);
+		await followed.host.send({
+			kind: "document-changed",
+			name: "device-copy:laptop",
+			spaceId: null,
+			at: 5,
+		});
+		copy.timers.due(300);
+		expect(copy.stale()).toEqual(sorted(["overview", "offers"]));
+	});
+
+	test("a save and the document stream read the flows once", async () => {
+		const { live, timers, queryClient } = setUp();
+		const { host } = follow(live);
+		const reads: unknown[] = [];
+		const invalidate = queryClient.invalidateQueries.bind(queryClient);
+		queryClient.invalidateQueries = (filters, options) => {
+			reads.push(filters?.queryKey);
+			return invalidate(filters, options);
+		};
+		live.synced("flows");
+		await host.send({
+			kind: "document-changed",
+			name: "flows:p1",
+			spaceId: "s1",
+			at: 4,
+		});
+		timers.due(300);
+		expect(reads).toEqual([orpc.schedules.list.key(), orpc.flows.key()]);
+	});
+
+	test("a document this screen does not know reads everything again", async () => {
+		const { live, stale, timers } = setUp();
+		const { host } = follow(live);
+		await host.send({
+			kind: "document-changed",
+			name: "notes:shop",
+			spaceId: "s1",
+			at: 4,
+		});
+		timers.due(300);
+		expect(stale()).toEqual(sorted(EVERYTHING));
 	});
 
 	test("an item of a kind this screen does not know reads everything again", async () => {

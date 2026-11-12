@@ -156,6 +156,7 @@ export {
 	useFollowHost,
 	useLiveRun,
 	useRunActed,
+	useSynced,
 } from "./live";
 export {
 	applySettingsPatch,

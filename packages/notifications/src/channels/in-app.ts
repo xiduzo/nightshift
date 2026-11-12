@@ -90,6 +90,18 @@ export type InAppItem =
 			kind: "projects-changed";
 			spaceId: string;
 			at: number;
+	  }
+	/**
+	 * A synced document was written: `flows:<project>`, `flows-history:<project>`,
+	 * `knowledge:<project>`, `space:<space>`, `device:<device>` or
+	 * `device-copy:<device>`. Quiet, as `run-changed`. `spaceId` is null for
+	 * this computer's own document. An older screen reads everything again.
+	 */
+	| {
+			kind: "document-changed";
+			name: string;
+			spaceId: string | null;
+			at: number;
 	  };
 
 /** A page counts as open this long after its stream ended: a page that reloads. */
@@ -133,6 +145,14 @@ export type InAppChannel = NotificationChannel<InAppTarget> & {
 	): void;
 	/** Tells the Person's open screens that the projects of a Space changed. No push. */
 	projectsChanged(target: InAppTarget, space: { spaceId: string }): void;
+	/**
+	 * Tells the Person's open screens that a synced document was written.
+	 * No push. `spaceId` is null for this computer's own document.
+	 */
+	documentChanged(
+		target: InAppTarget,
+		change: { name: string; spaceId: string | null },
+	): void;
 	/**
 	 * Whether the Person has a screen open, or closed a page a moment ago.
 	 * A phone app that left the front does not count.
@@ -234,6 +254,14 @@ export function createInAppChannel(
 			publish(target.personId, {
 				kind: "projects-changed",
 				...space,
+				at: now(),
+			});
+		},
+
+		documentChanged(target, change) {
+			publish(target.personId, {
+				kind: "document-changed",
+				...change,
 				at: now(),
 			});
 		},

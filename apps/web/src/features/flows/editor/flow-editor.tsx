@@ -4,6 +4,7 @@
 // one draft. The edits themselves live in `node-edits.ts`,
 // `sections/section-edits.ts` and `@nightshift/flows`.
 
+import { useSynced } from "@nightshift/client";
 import type { Flow, FlowIssue } from "@nightshift/flows";
 import {
 	callersOf,
@@ -56,6 +57,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CopyProjectHere, notHere, projectQueries } from "@/features/projects";
+import { orpc } from "@/shared/api";
 import { hoverTime } from "@/shared/format";
 import { SiteHeader } from "@/shared/page";
 import { FlowAssistantContext } from "../assistant/flow-assistant";
@@ -156,6 +158,7 @@ function Editor({
 }: Props) {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
+	const synced = useSynced({ orpc });
 	const { fitView } = useReactFlow();
 
 	const { draft, setDraft, undo, redo, canUndo, canRedo, revision } =
@@ -315,21 +318,11 @@ function Editor({
 				flowQueries.get(projectId, name).queryKey,
 				(loaded) => (loaded ? { ...loaded, flow: snapshot, issues } : loaded),
 			);
-			void queryClient.invalidateQueries({
-				queryKey: flowQueries.lists(),
-			});
-			// Another flow of the project checks its Subflow nodes against this one.
-			void queryClient.invalidateQueries({
-				queryKey: flowQueries.map(projectId).queryKey,
-			});
-			for (const queryKey of [
-				flowQueries.revisionsKey(projectId, name),
-				flowQueries.revisionKey(projectId, name),
-			]) {
-				void queryClient.invalidateQueries({ queryKey });
-			}
+			// The lists, the map and the revisions follow, with the stream.
+			synced("flows");
+			synced("flows-history");
 		},
-		[queryClient, projectId, name],
+		[queryClient, projectId, name, synced],
 	);
 
 	const save = useCallback(() => {
@@ -390,7 +383,7 @@ function Editor({
 			);
 			return;
 		}
-		void queryClient.invalidateQueries({ queryKey: flowQueries.lists() });
+		synced("flows");
 		const next = updateNode(draft, nodeId, (current) =>
 			current.type === "call" ? { ...current, flow: calledName } : current,
 		);
@@ -1088,9 +1081,7 @@ function Editor({
 							() => draftRef.current,
 						);
 						// The Subflow view reads the new flow from the project's list.
-						void queryClient.invalidateQueries({
-							queryKey: flowQueries.lists(),
-						});
+						synced("flows");
 					}}
 				/>
 			) : null}

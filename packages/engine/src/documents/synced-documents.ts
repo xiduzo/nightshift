@@ -68,6 +68,14 @@ export type SyncedDocuments = {
 			stored?(document: PersistedDocument): Promise<void>;
 		},
 	): void;
+	/**
+	 * After each write to the Replica, for every kind. One hook: a later
+	 * call replaces it, as after a `bun --hot` reload. It runs after the
+	 * kind's `stored` hook.
+	 */
+	watchStored(
+		hook: (document: PersistedDocument) => Promise<void> | void,
+	): void;
 	/** Closes a document and deletes it from the Replica. */
 	remove(name: string): Promise<void>;
 	/** Flushes every open document. */
@@ -124,6 +132,8 @@ export function documentId(kind: DocumentKind, name: string): string | null {
 
 export function createSyncedDocuments(options: {
 	db: Database;
+	/** After each write, until `watchStored` replaces it. */
+	onStored?: (document: PersistedDocument) => Promise<void> | void;
 }): SyncedDocuments {
 	const { db } = options;
 	const opening = new Map<string, Promise<PersistedDocument>>();
@@ -132,6 +142,7 @@ export function createSyncedDocuments(options: {
 		DocumentKind,
 		Parameters<SyncedDocuments["handle"]>[1]
 	>();
+	let watch = options.onStored ?? (() => undefined);
 
 	async function openOne(
 		name: string,
@@ -146,6 +157,7 @@ export function createSyncedDocuments(options: {
 			afterStore: async () => {
 				const stored = hooks.get(kind)?.stored;
 				if (holder.document && stored) await stored(holder.document);
+				if (holder.document) await watch(holder.document);
 			},
 		});
 		holder.document = document;
@@ -243,6 +255,9 @@ export function createSyncedDocuments(options: {
 		},
 		handle(kind, next) {
 			hooks.set(kind, next);
+		},
+		watchStored(hook) {
+			watch = hook;
 		},
 		async remove(name) {
 			const pending = opening.get(name);

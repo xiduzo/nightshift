@@ -12,6 +12,46 @@ import {
  */
 const RETRIES = 3;
 const STALE_MS = 60 * 1000;
+/** How long a synced document stays fresh when no item arrives for it. */
+const DOCUMENT_MS = 10 * STALE_MS;
+/** How long a screen keeps a read it may open again. */
+const KEPT_MS = 30 * STALE_MS;
+
+/**
+ * Reads the notifications stream marks stale. They stay fresh until then,
+ * so opening one shows what the screen already has.
+ */
+const UNTIL_STREAM: readonly (readonly string[])[] = [
+	["gates", "list"],
+	["gates", "answered"],
+	["runs", "list"],
+	["runs", "get"],
+	["runs", "step"],
+	["runs", "artifacts"],
+	["runs", "files"],
+];
+
+/**
+ * Reads a synced document marks stale (`document-changed`, or `useSynced`
+ * after a save). Ten minutes is the backstop: a Host of an older version
+ * sends no item for a document.
+ */
+const UNTIL_DOCUMENT: readonly (readonly string[])[] = [
+	["flows"],
+	["knowledge"],
+	["schedules", "list"],
+	["projects", "list"],
+	["spaces"],
+	["members"],
+	["profiles"],
+	["connections", "list"],
+	["harnesses", "list"],
+	["cliTools"],
+	["settings"],
+	["offers"],
+	["deciders"],
+	["dashboard"],
+];
 
 /**
  * The status codes of a proxy in front of a Host that does not answer
@@ -47,9 +87,10 @@ export type QueryClientOptions = {
 
 /**
  * Makes the query client of an app, with the rules both apps share: a
- * query tries again only when the Host does not answer, data stays fresh
- * for a minute, and background errors stay quiet. Each app makes its own
- * and holds it.
+ * query tries again only when the Host does not answer. A read the stream
+ * marks stale stays fresh until then. A synced document stays fresh for
+ * ten minutes. Any other read stays fresh for a minute. Background errors
+ * stay quiet. Each app makes its own and holds it.
  */
 export function createQueryClient({
 	handle,
@@ -80,5 +121,17 @@ export function createQueryClient({
 			},
 		},
 	});
+	for (const path of UNTIL_STREAM) {
+		client.setQueryDefaults([path], {
+			staleTime: Number.POSITIVE_INFINITY,
+			gcTime: KEPT_MS,
+		});
+	}
+	for (const path of UNTIL_DOCUMENT) {
+		client.setQueryDefaults([path], {
+			staleTime: DOCUMENT_MS,
+			gcTime: KEPT_MS,
+		});
+	}
 	return client;
 }

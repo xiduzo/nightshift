@@ -47,6 +47,7 @@ import {
 	createSpaceArchive,
 	createSyncedDocuments,
 	createToolLaunchers,
+	documentKind,
 	localDevice,
 } from "@nightshift/engine";
 import {
@@ -250,7 +251,10 @@ export async function createDaemon(
 		"nightshiftDocuments",
 		async () => {
 			await stopOlderDocuments(hot);
-			return createSyncedDocuments({ db });
+			return createSyncedDocuments({
+				db,
+				onStored: (document) => tellDocument(document.name),
+			});
 		},
 		(kept) => kept.flush(),
 	);
@@ -261,6 +265,8 @@ export async function createDaemon(
 	 */
 	/** Tells the open screens; set once the notifications below exist. */
 	let projectsChanged: (spaceId: string) => void = () => {};
+	/** A synced document was written. Set once the notifications below exist. */
+	let tellDocument: (name: string) => void = () => {};
 	const spaces = createSpaceDocuments({
 		db,
 		directory: deviceDirectory(db),
@@ -678,6 +684,29 @@ export async function createDaemon(
 			console.error("Could not tell the open screens of new projects:", error);
 		});
 	};
+	// A reload binds the kept documents to this daemon's notifications.
+	if (typeof documents.watchStored === "function") {
+		documents.watchStored((document) => tellDocument(document.name));
+	}
+	tellDocument = (name) => {
+		notifyStoredDocument(name).catch((error: unknown) => {
+			console.error("Could not tell the open screens of a document:", error);
+		});
+	};
+	async function notifyStoredDocument(name: string): Promise<void> {
+		const found = documentKind(name);
+		if (!found) return;
+		if (found.kind === "device" || found.kind === "device-copy") {
+			await notifications.documentChanged({
+				name,
+				personId: person.userId,
+			});
+			return;
+		}
+		const of = await documents.documentOf(name);
+		if (!of || of.kind === "device") return;
+		await notifications.documentChanged({ name, spaceId: of.spaceId });
+	}
 	learningsChanged = notifications.learningsChanged;
 	usageSnapshot = () =>
 		usageFacts({

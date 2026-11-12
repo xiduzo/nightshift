@@ -1,4 +1,4 @@
-import { flowOverviews, looseSchedules } from "@nightshift/client";
+import { flowOverviews, looseSchedules, useSynced } from "@nightshift/client";
 import { flowNameSchema, newFlow } from "@nightshift/flows";
 import { Alert, AlertDescription } from "@nightshift/ui/components/alert";
 import {
@@ -39,7 +39,7 @@ import {
 import { Input } from "@nightshift/ui/components/input";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
 	CircleAlertIcon,
@@ -52,6 +52,7 @@ import { toast } from "sonner";
 import { dashboardQueries } from "@/features/dashboard/queries";
 import { settingsQueries } from "@/features/settings/queries";
 import type { FlowListItem } from "@/shared/api";
+import { orpc } from "@/shared/api";
 import { PageHeading } from "@/shared/page";
 
 import { chatSearch } from "./chat/chat-link";
@@ -75,7 +76,7 @@ import { StartRunDialog } from "./start/start-run-dialog";
  * side panel. Schedules that no flow holds show below the flows.
  */
 export function FlowList({ projectId }: { projectId: string }) {
-	const queryClient = useQueryClient();
+	const synced = useSynced({ orpc });
 	// Each flow with its inputs, and which flows call it.
 	const flows = useQuery(flowQueries.list(projectId));
 	// What starts each flow, and its last runs. The cards show without them while they load.
@@ -119,7 +120,8 @@ export function FlowList({ projectId }: { projectId: string }) {
 			onSuccess: (_, input) => {
 				toast.success(`Deleted ${input.name}`);
 				setToDelete(null);
-				void queryClient.invalidateQueries({ queryKey: flowQueries.all() });
+				synced("flows");
+				synced("flows-history");
 			},
 			onError: (error) => toast.error(`Could not delete: ${error.message}`),
 		}),
@@ -359,7 +361,7 @@ function NewFlowForm({
 }) {
 	const id = useId();
 	const navigate = useNavigate();
-	const queryClient = useQueryClient();
+	const synced = useSynced({ orpc });
 	const [name, setName] = useState("");
 
 	const trimmed = name.trim();
@@ -377,7 +379,7 @@ function NewFlowForm({
 	const createFlow = useMutation(
 		flowMutations.save({
 			onSuccess: (_, input) => {
-				void queryClient.invalidateQueries({ queryKey: flowQueries.all() });
+				synced("flows");
 				// The new flow opens with the chat, to build it with an agent.
 				void navigate({
 					to: "/projects/$projectId/flows/$name",

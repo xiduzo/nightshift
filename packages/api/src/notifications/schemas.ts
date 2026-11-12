@@ -109,6 +109,17 @@ export const notificationItemSchema = exact<InAppItem>()(
 			spaceId: z.string(),
 			at: z.number(),
 		}),
+		/**
+		 * A synced document was written. Quiet: an older screen reads
+		 * everything again. `spaceId` is null for this computer's document.
+		 */
+		z.object({
+			kind: z.literal("document-changed"),
+			/** `flows:<project>`, `knowledge:<project>`, `space:<space>`, `device:<device>`. */
+			name: z.string(),
+			spaceId: z.string().nullable(),
+			at: z.number(),
+		}),
 	]),
 );
 

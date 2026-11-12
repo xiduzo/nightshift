@@ -1,3 +1,4 @@
+import { useSynced } from "@nightshift/client";
 import type { CustomAgent } from "@nightshift/flows";
 import { Alert, AlertDescription } from "@nightshift/ui/components/alert";
 import {
@@ -34,7 +35,7 @@ import {
 	ToggleGroup,
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { BotIcon, CircleAlertIcon, SquareTerminalIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
@@ -51,6 +52,7 @@ import type {
 	PermissionMode,
 	ProfileRow,
 } from "@/shared/api";
+import { orpc } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
 import { LargerTextarea } from "@/shared/larger-window";
 import { EFFORTS, PERMISSION_MODES } from "./agent-options";
@@ -60,7 +62,7 @@ import { harnessInfo } from "./harnesses";
 import { ModelCombobox, ModelSourceHint } from "./model-combobox";
 import { OfferDialog, WithdrawOfferDialog } from "./offer-dialog";
 import { ProfileOffers, ProfileUsedIn } from "./profile-sections";
-import { harnessQueries, profileMutations, profileQueries } from "./queries";
+import { profileMutations } from "./queries";
 
 const NAME = /^[a-z][a-z0-9_]{0,39}$/;
 
@@ -134,7 +136,7 @@ export function ProfileDetail({
 	onDirtyChange: (dirty: boolean) => void;
 }) {
 	const id = useId();
-	const queryClient = useQueryClient();
+	const synced = useSynced({ orpc });
 	const saved = profile ? draftFrom(profile) : initial;
 	const [draft, setDraft] = useState<Draft>(saved);
 	const [deleting, setDeleting] = useState(false);
@@ -150,16 +152,11 @@ export function ProfileDetail({
 	const set = (patch: Partial<Draft>) =>
 		setDraft((current) => ({ ...current, ...patch }));
 
-	const invalidate = () =>
-		queryClient.invalidateQueries({ queryKey: profileQueries.all() });
 	const save = useMutation(
 		profileMutations.save({
 			onSuccess: (next) => {
 				toast.success(profile ? `Saved ${next.name}` : `Added ${next.name}`);
-				void invalidate();
-				void queryClient.invalidateQueries({
-					queryKey: harnessQueries.lists(),
-				});
+				synced("device");
 				onSaved(next.id);
 			},
 		}),
@@ -168,7 +165,7 @@ export function ProfileDetail({
 		profileMutations.remove({
 			onSuccess: () => {
 				toast.success(`Deleted ${profile?.name}`);
-				void invalidate();
+				synced("device");
 				onDeleted();
 			},
 			onError: (error) => toast.error(`Not deleted: ${error.message}`),

@@ -3,6 +3,7 @@ import {
 	scheduleLastRuns,
 	scheduleName,
 	scheduleWhen,
+	useSynced,
 } from "@nightshift/client";
 import type { Schedule } from "@nightshift/flows";
 import {
@@ -32,7 +33,7 @@ import {
 	SheetTitle,
 } from "@nightshift/ui/components/sheet";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { PlusIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
@@ -43,6 +44,7 @@ import {
 } from "@/features/devices";
 import { runQueries } from "@/features/runs/flows-port";
 import type { ScheduleSummary } from "@/shared/api";
+import { orpc } from "@/shared/api";
 import { useNow } from "@/shared/format";
 import { flowQueries } from "../queries";
 import { scheduleMutations, scheduleQueries } from "./queries";
@@ -91,7 +93,7 @@ export function useScheduleBoard(
 	projectId: string,
 	showRuns: boolean,
 ): ScheduleBoard {
-	const queryClient = useQueryClient();
+	const synced = useSynced({ orpc });
 	const now = useNow(30_000);
 	const list = useQuery(scheduleQueries.listLive(projectId));
 	const [editing, setEditing] = useState<{
@@ -122,9 +124,7 @@ export function useScheduleBoard(
 	const save = useMutation(
 		scheduleMutations.save({
 			onSuccess: (issues) => {
-				void queryClient.invalidateQueries({
-					queryKey: scheduleQueries.all(),
-				});
+				synced("flows");
 				const errors = issues.filter((issue) => issue.severity === "error");
 				if (errors.length > 0) {
 					toast.warning(

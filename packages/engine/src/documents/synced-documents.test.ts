@@ -113,6 +113,24 @@ describe("synced documents", () => {
 		]);
 	});
 
+	test("a write tells the one stored hook, and a later hook replaces it", async () => {
+		const seen: string[] = [];
+		const documents = createSyncedDocuments({
+			db: sandbox.db,
+			onStored: (document) => {
+				seen.push(`first ${document.name}`);
+			},
+		});
+		documents.watchStored((document) => {
+			seen.push(`next ${document.name}`);
+		});
+		const document = await documents.open("knowledge:shop");
+		expect(seen).toEqual([]);
+		await document.change(() => document.doc.getMap("files").set("a", 1));
+		expect(seen).toEqual(["next knowledge:shop"]);
+		await documents.close();
+	});
+
 	test("a view handles its kind: once when a document opens, and after each write", async () => {
 		const seen: string[] = [];
 		documents.handle("knowledge", {

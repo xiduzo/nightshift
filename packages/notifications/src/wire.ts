@@ -122,6 +122,15 @@ export type Notifications = {
 	 * changed: its Host added, renamed or removed one. Quiet: no push.
 	 */
 	projectsChanged(spaceId: string): Promise<void>;
+	/**
+	 * Tells open screens that a synced document was written. The Members of
+	 * `spaceId`, or `personId` for this computer's own document. Quiet: no push.
+	 */
+	documentChanged(change: {
+		name: string;
+		spaceId?: string;
+		personId?: string;
+	}): Promise<void>;
 	/** Reads the open Gates, then listens to the run events. */
 	start(): Promise<void>;
 	stop(): void;
@@ -215,6 +224,19 @@ export function createNotifications(
 				options.inApp.projectsChanged(
 					{ kind: "in-app", personId },
 					{ spaceId },
+				);
+			}
+		},
+		async documentChanged({ name, spaceId, personId }) {
+			const people = personId
+				? [personId]
+				: spaceId
+					? await audience(spaceId)
+					: [];
+			for (const id of people) {
+				options.inApp.documentChanged(
+					{ kind: "in-app", personId: id },
+					{ name, spaceId: spaceId ?? null },
 				);
 			}
 		},

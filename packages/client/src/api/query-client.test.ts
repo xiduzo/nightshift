@@ -100,6 +100,34 @@ describe("the query client of an app", () => {
 		const client = createQueryClient();
 		expect(client.getDefaultOptions().queries?.staleTime).toBe(60 * 1000);
 	});
+
+	test("keeps a read the stream refreshes until the stream marks it stale", () => {
+		const client = createQueryClient();
+		const run = client.defaultQueryOptions({
+			queryKey: [["runs", "get"], { type: "query" }],
+		});
+		expect(run.staleTime).toBe(Number.POSITIVE_INFINITY);
+		expect(run.gcTime).toBe(30 * 60 * 1000);
+		expect(
+			client.defaultQueryOptions({
+				queryKey: [["runs", "moveTargets"], { type: "query" }],
+			}).staleTime,
+		).toBe(60 * 1000);
+	});
+
+	test("keeps a synced document fresh for 10 minutes", () => {
+		const client = createQueryClient();
+		expect(
+			client.defaultQueryOptions({
+				queryKey: [["flows", "list"], { type: "query", input: {} }],
+			}).staleTime,
+		).toBe(10 * 60 * 1000);
+		expect(
+			client.defaultQueryOptions({
+				queryKey: [["connections", "check"], { type: "query" }],
+			}).staleTime,
+		).toBe(60 * 1000);
+	});
 });
 
 describe("the errors of the query client", () => {

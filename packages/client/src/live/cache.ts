@@ -65,17 +65,68 @@ type Read =
 	| { kind: "run"; runId: string }
 	| { kind: "schedules" }
 	| { kind: "learnings" }
-	| { kind: "projects" };
+	| { kind: "projects" }
+	| { kind: "flows" }
+	| { kind: "flow-history" }
+	| { kind: "knowledge" }
+	| { kind: "spaces" }
+	| { kind: "device" }
+	| { kind: "device-copy" };
+
+/**
+ * What a save on this screen writes. The same words as the prefix of a
+ * synced document's name (`flows:`, `device:`, …).
+ */
+export type SyncKind =
+	| "flows"
+	| "flows-history"
+	| "knowledge"
+	| "space"
+	| "device"
+	| "device-copy";
 
 const GATES: Read = { kind: "gates" };
 const ofRun = (runId: string): Read => ({ kind: "run", runId });
 
-/** A missed stretch of the stream, or an item this screen does not know: read both, of every run. */
+/**
+ * A missed stretch of the stream, or an item this screen does not know:
+ * the Gates, every run, and every synced document.
+ */
 const EVERYTHING: readonly Read[] = [
 	GATES,
 	{ kind: "runs" },
 	{ kind: "learnings" },
+	{ kind: "flows" },
+	{ kind: "knowledge" },
+	{ kind: "projects" },
+	{ kind: "spaces" },
+	{ kind: "device" },
+	{ kind: "device-copy" },
 ];
+
+/**
+ * What a synced document's name reads again. The prefix is the kind
+ * (`flows:<project>`, or `flows` from a save on this screen). A name this
+ * screen does not know reads everything.
+ */
+function readsForDocument(name: string): readonly Read[] {
+	switch (name.split(":")[0]) {
+		case "flows":
+			return [{ kind: "flows" }];
+		case "flows-history":
+			return [{ kind: "flow-history" }];
+		case "knowledge":
+			return [{ kind: "knowledge" }];
+		case "space":
+			return [{ kind: "projects" }, { kind: "spaces" }];
+		case "device":
+			return [{ kind: "device" }];
+		case "device-copy":
+			return [{ kind: "device-copy" }];
+		default:
+			return EVERYTHING;
+	}
+}
 
 /**
  * What an item of `notifications.watch` reads again. A Gate that opens or
@@ -101,6 +152,8 @@ function readsAfter(item: NotificationItem): readonly Read[] {
 			return [{ kind: "learnings" }];
 		case "projects-changed":
 			return [{ kind: "projects" }];
+		case "document-changed":
+			return readsForDocument(item.name);
 		default:
 			return EVERYTHING;
 	}
@@ -173,6 +226,13 @@ export type LiveCache = {
 	 */
 	runActed(runId: string): void;
 	/**
+	 * A save on this screen wrote a synced document: the flows, their
+	 * history, the knowledge, a Space, or this computer. Reads that
+	 * document again, in the same burst as `document-changed` from the
+	 * stream, so the save and the stream read it once.
+	 */
+	synced(kind: SyncKind): void;
+	/**
 	 * Follows one run (`followRun`) and hands on what came in, in batches.
 	 * It reads nothing again: the screen lays the steps over what it read
 	 * (`mergeSteps`), and the notifications stream says when a step starts
@@ -217,6 +277,18 @@ export function createLiveCache({
 		schedules: false,
 		/** The projects of a Space: its Host added, renamed or removed one. */
 		projects: false,
+		/** The flows and schedules of a project: its flow document was written. */
+		flows: false,
+		/** The revisions of a flow: its history document was written. */
+		history: false,
+		/** A project's knowledge document was written. */
+		knowledge: false,
+		/** A Space document was written: its Members and its policy. */
+		spaces: false,
+		/** This computer's document: profiles, connections, settings. */
+		device: false,
+		/** A copy of another computer's document. */
+		copies: false,
 	};
 	let waiting = false;
 	/** Stops the poll of the open Gates. Null while the stream is live, or nothing follows. */
@@ -253,6 +325,30 @@ export function createLiveCache({
 				pending.projects = true;
 				continue;
 			}
+			if (one.kind === "flows") {
+				pending.flows = true;
+				continue;
+			}
+			if (one.kind === "flow-history") {
+				pending.history = true;
+				continue;
+			}
+			if (one.kind === "knowledge") {
+				pending.knowledge = true;
+				continue;
+			}
+			if (one.kind === "spaces") {
+				pending.spaces = true;
+				continue;
+			}
+			if (one.kind === "device") {
+				pending.device = true;
+				continue;
+			}
+			if (one.kind === "device-copy") {
+				pending.copies = true;
+				continue;
+			}
 			pending.lists = true;
 			// A Gate on hold opens to answers when its run's other branch ends.
 			if (one.kind === "run" && holdsGate(one.runId)) pending.gates = true;
@@ -270,7 +366,14 @@ export function createLiveCache({
 			waiting = false;
 			const { gates: readGates, everyRun, lists, learnings } = pending;
 			const readProjects = pending.projects;
-			const readSchedules = (pending.schedules || readProjects) && !lists;
+			const readFlows = pending.flows;
+			const readHistory = pending.history && !readFlows;
+			const readKnowledge = pending.knowledge;
+			const readSpaces = pending.spaces;
+			const readDevice = pending.device;
+			const readCopies = pending.copies;
+			const readSchedules =
+				(pending.schedules || readProjects || readFlows) && !lists;
 			const details = [...pending.details];
 			const steps = [...pending.steps];
 			const files = [...pending.files];
@@ -280,6 +383,12 @@ export function createLiveCache({
 			pending.schedules = false;
 			pending.learnings = false;
 			pending.projects = false;
+			pending.flows = false;
+			pending.history = false;
+			pending.knowledge = false;
+			pending.spaces = false;
+			pending.device = false;
+			pending.copies = false;
 			pending.details.clear();
 			pending.steps.clear();
 			pending.files.clear();
@@ -308,12 +417,36 @@ export function createLiveCache({
 				if (!lists) invalidate(dashboard.all());
 			}
 			if (readSchedules) invalidate(schedules.lists());
-			if (lists || learnings) {
+			if (readFlows) invalidate(orpc.flows.key());
+			if (readHistory) {
+				invalidate(orpc.flows.revisions.key());
+				invalidate(orpc.flows.revision.key());
+			}
+			if (readKnowledge) {
+				invalidate(orpc.knowledge.key());
+			} else if (lists || learnings) {
 				invalidate(knowledge.learningsKey());
 				// What waits on the Knowledge page: its learnings, and a source's last sync.
 				invalidate(knowledge.reviewKey());
 			}
-			if (learnings) invalidate(knowledge.getKey());
+			if (learnings && !readKnowledge) invalidate(knowledge.getKey());
+			if (readSpaces) {
+				invalidate(orpc.spaces.key());
+				invalidate(orpc.members.key());
+			}
+			if (readDevice) {
+				invalidate(orpc.profiles.key());
+				invalidate(orpc.connections.key());
+				invalidate(orpc.harnesses.key());
+				invalidate(orpc.cliTools.key());
+				invalidate(orpc.settings.key());
+				invalidate(orpc.offers.key());
+				invalidate(orpc.deciders.key());
+			}
+			if (readCopies) {
+				invalidate(orpc.devices.key());
+				invalidate(orpc.offers.key());
+			}
 		}, READ_MS);
 	}
 
@@ -480,6 +613,10 @@ export function createLiveCache({
 
 		runActed(runId) {
 			read([ofRun(runId)]);
+		},
+
+		synced(kind) {
+			read(readsForDocument(kind));
 		},
 
 		async followRun({
