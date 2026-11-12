@@ -397,12 +397,12 @@ describe("the live cache follows the Host", () => {
 			runs.artifactsKey("r2"),
 			runs.filesKey("r1"),
 			runs.filesKey("r2"),
-			runs.lists(),
-			orpc.dashboard.key(),
-			orpc.schedules.list.key(),
-			orpc.projects.list.key(),
-			orpc.knowledge.learnings.key(),
-			orpc.knowledge.review.key(),
+			[["runs", "list"]],
+			[["dashboard"]],
+			[["schedules", "list"]],
+			[["projects", "list"]],
+			[["knowledge", "learnings"]],
+			[["knowledge", "review"]],
 		]);
 	});
 
@@ -531,7 +531,7 @@ describe("the live cache follows the Host", () => {
 			at: 4,
 		});
 		timers.due(300);
-		expect(reads).toEqual([orpc.schedules.list.key(), orpc.flows.key()]);
+		expect(reads).toEqual([[["flows"]], [["schedules", "list"]]]);
 	});
 
 	test("a document this screen does not know reads everything again", async () => {

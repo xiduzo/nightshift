@@ -6,6 +6,8 @@ import {
 	QueryClient,
 } from "@tanstack/react-query";
 
+import { heldByDocuments } from "../changes";
+
 /**
  * How often a query tries again when the Host does not answer, and how
  * long its data stays fresh.
@@ -32,26 +34,12 @@ const UNTIL_STREAM: readonly (readonly string[])[] = [
 ];
 
 /**
- * Reads a synced document marks stale (`document-changed`, or `useSynced`
- * after a save). Ten minutes is the backstop: a Host of an older version
- * sends no item for a document.
+ * Reads a synced document holds (`heldByDocuments`): the stream marks them
+ * stale (`document-changed`), and so does a save on this screen. Ten
+ * minutes is the backstop: a Host of an older version sends no item for a
+ * document.
  */
-const UNTIL_DOCUMENT: readonly (readonly string[])[] = [
-	["flows"],
-	["knowledge"],
-	["schedules", "list"],
-	["projects", "list"],
-	["spaces"],
-	["members"],
-	["profiles"],
-	["connections", "list"],
-	["harnesses", "list"],
-	["cliTools"],
-	["settings"],
-	["offers"],
-	["deciders"],
-	["dashboard"],
-];
+const UNTIL_DOCUMENT = heldByDocuments();
 
 /**
  * The status codes of a proxy in front of a Host that does not answer

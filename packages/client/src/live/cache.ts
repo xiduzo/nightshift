@@ -1,7 +1,12 @@
 import { matchQuery, type QueryClient } from "@tanstack/react-query";
 
 import type { ApiQueryUtils } from "../api";
-import { createDashboardQueries } from "../dashboard";
+import {
+	type Change,
+	type DocumentKind,
+	documentOf,
+	staleAfter,
+} from "../changes";
 import {
 	createGateQueries,
 	type GateAnswer,
@@ -9,7 +14,6 @@ import {
 	leavesInbox,
 	type OpenGate,
 } from "../gates";
-import { createKnowledgeQueries } from "../knowledge";
 import {
 	describeNotice,
 	followNotifications,
@@ -20,7 +24,6 @@ import {
 	routeOf,
 	staleGates,
 } from "../notifications";
-import { createProjectQueries } from "../projects";
 import {
 	createRunQueries,
 	followRun,
@@ -28,7 +31,6 @@ import {
 	type RunWatchClient,
 	type Wait,
 } from "../runs";
-import { createScheduleQueries } from "../schedules";
 import {
 	createRunStreamBuffer,
 	type RunStreamBatch,
@@ -49,44 +51,26 @@ import type { Notice, ShownNotifications } from "./shown";
  */
 
 /**
- * What a screen reads again. `gates`: the open Gates. `run`: what one run
- * changes, its detail and files, the lists of runs, the dashboard's
- * numbers, a schedule's last start, the run counts of the projects and
- * the learnings that wait (a step that ends may propose some). `runs`: the
- * same for every run. `schedules`: the lists of schedules, after a pause
- * tonight began or ended. `learnings`: the learnings that wait, and the
- * Knowledge page that counts them. `projects`: every read of projects,
- * the dashboard and the schedules, after a Host changed the Space's projects.
- * The Devices a run can run on or move to do not change with a run.
+ * What a screen reads again. `gates`: the open Gates. `run`: one run's
+ * detail, its opened steps and its files. `every-run`: the same for every
+ * run. `change`: what a change makes stale (`staleAfter`): the lists that
+ * count runs, a synced document, the projects of a Space, the schedules,
+ * the learnings. The Devices a run can run on or move to do not change
+ * with a run.
  */
 type Read =
 	| { kind: "gates" }
-	| { kind: "runs" }
+	| { kind: "every-run" }
 	| { kind: "run"; runId: string }
-	| { kind: "schedules" }
-	| { kind: "learnings" }
-	| { kind: "projects" }
-	| { kind: "flows" }
-	| { kind: "flow-history" }
-	| { kind: "knowledge" }
-	| { kind: "spaces" }
-	| { kind: "device" }
-	| { kind: "device-copy" };
-
-/**
- * What a save on this screen writes. The same words as the prefix of a
- * synced document's name (`flows:`, `device:`, …).
- */
-export type SyncKind =
-	| "flows"
-	| "flows-history"
-	| "knowledge"
-	| "space"
-	| "device"
-	| "device-copy";
+	| { kind: "change"; change: Change };
 
 const GATES: Read = { kind: "gates" };
-const ofRun = (runId: string): Read => ({ kind: "run", runId });
+const changed = (change: Change): Read => ({ kind: "change", change });
+/** A change of one run: the run, and the lists that count it. */
+const ofRun = (runId: string): readonly Read[] => [
+	{ kind: "run", runId },
+	changed("runs"),
+];
 
 /**
  * A missed stretch of the stream, or an item this screen does not know:
@@ -94,38 +78,29 @@ const ofRun = (runId: string): Read => ({ kind: "run", runId });
  */
 const EVERYTHING: readonly Read[] = [
 	GATES,
-	{ kind: "runs" },
-	{ kind: "learnings" },
-	{ kind: "flows" },
-	{ kind: "knowledge" },
-	{ kind: "projects" },
-	{ kind: "spaces" },
-	{ kind: "device" },
-	{ kind: "device-copy" },
+	{ kind: "every-run" },
+	...(
+		[
+			"runs",
+			"learnings",
+			"flows",
+			"flows-history",
+			"knowledge",
+			"space",
+			"device",
+			"device-copy",
+		] as const
+	).map(changed),
 ];
 
 /**
- * What a synced document's name reads again. The prefix is the kind
- * (`flows:<project>`, or `flows` from a save on this screen). A name this
- * screen does not know reads everything.
+ * What a synced document's name reads again: what its kind makes stale
+ * (`flows:<project>` is a `flows` change). A name this screen does not
+ * know reads everything.
  */
 function readsForDocument(name: string): readonly Read[] {
-	switch (name.split(":")[0]) {
-		case "flows":
-			return [{ kind: "flows" }];
-		case "flows-history":
-			return [{ kind: "flow-history" }];
-		case "knowledge":
-			return [{ kind: "knowledge" }];
-		case "space":
-			return [{ kind: "projects" }, { kind: "spaces" }];
-		case "device":
-			return [{ kind: "device" }];
-		case "device-copy":
-			return [{ kind: "device-copy" }];
-		default:
-			return EVERYTHING;
-	}
+	const kind = documentOf(name);
+	return kind ? [changed(kind)] : EVERYTHING;
 }
 
 /**
@@ -142,16 +117,16 @@ function readsAfter(item: NotificationItem): readonly Read[] {
 		case "run-changed":
 		case "device-wait":
 		case "wait-ended":
-			return [ofRun(item.runId)];
+			return ofRun(item.runId);
 		case "gate-opened":
 		case "gate-closed":
-			return [GATES, ofRun(item.runId)];
+			return [GATES, ...ofRun(item.runId)];
 		case "schedules-changed":
-			return [{ kind: "schedules" }];
+			return [changed("pause")];
 		case "learnings-changed":
-			return [{ kind: "learnings" }];
+			return [changed("learnings")];
 		case "projects-changed":
-			return [{ kind: "projects" }];
+			return [changed("projects")];
 		case "document-changed":
 			return readsForDocument(item.name);
 		default:
@@ -231,7 +206,7 @@ export type LiveCache = {
 	 * document again, in the same burst as `document-changed` from the
 	 * stream, so the save and the stream read it once.
 	 */
-	synced(kind: SyncKind): void;
+	synced(kind: DocumentKind): void;
 	/**
 	 * Follows one run (`followRun`) and hands on what came in, in batches.
 	 * It reads nothing again: the screen lays the steps over what it read
@@ -249,10 +224,6 @@ export function createLiveCache({
 }: LiveCacheOptions): LiveCache {
 	const gates = createGateQueries(orpc);
 	const runs = createRunQueries(orpc);
-	const dashboard = createDashboardQueries(orpc);
-	const schedules = createScheduleQueries(orpc);
-	const projects = createProjectQueries(orpc);
-	const knowledge = createKnowledgeQueries(orpc);
 	const openKey = gates.open().queryKey;
 	/** The notifications stream was live before: a new `live` may have missed items. */
 	let wasLive = false;
@@ -269,26 +240,8 @@ export function createLiveCache({
 		steps: new Set<string>(),
 		/** The runs whose files to read. */
 		files: new Set<string>(),
-		/** A run changed: the lists of runs, the dashboard, the schedules, the projects and the learnings. */
-		lists: false,
-		/** A person kept or deleted learnings: the Knowledge page counts them too. */
-		learnings: false,
-		/** The schedules only: a pause tonight began or ended. */
-		schedules: false,
-		/** The projects of a Space: its Host added, renamed or removed one. */
-		projects: false,
-		/** The flows and schedules of a project: its flow document was written. */
-		flows: false,
-		/** The revisions of a flow: its history document was written. */
-		history: false,
-		/** A project's knowledge document was written. */
-		knowledge: false,
-		/** A Space document was written: its Members and its policy. */
-		spaces: false,
-		/** This computer's document: profiles, connections, settings. */
-		device: false,
-		/** A copy of another computer's document. */
-		copies: false,
+		/** What changed: `staleAfter` says what that makes stale. */
+		changes: new Set<Change>(),
 	};
 	let waiting = false;
 	/** Stops the poll of the open Gates. Null while the stream is live, or nothing follows. */
@@ -309,89 +262,40 @@ export function createLiveCache({
 	/** Reads again, once per burst. */
 	function read(what: readonly Read[]) {
 		for (const one of what) {
-			if (one.kind === "gates") {
-				pending.gates = true;
-				continue;
-			}
-			if (one.kind === "schedules") {
-				pending.schedules = true;
-				continue;
-			}
-			if (one.kind === "learnings") {
-				pending.learnings = true;
-				continue;
-			}
-			if (one.kind === "projects") {
-				pending.projects = true;
-				continue;
-			}
-			if (one.kind === "flows") {
-				pending.flows = true;
-				continue;
-			}
-			if (one.kind === "flow-history") {
-				pending.history = true;
-				continue;
-			}
-			if (one.kind === "knowledge") {
-				pending.knowledge = true;
-				continue;
-			}
-			if (one.kind === "spaces") {
-				pending.spaces = true;
-				continue;
-			}
-			if (one.kind === "device") {
-				pending.device = true;
-				continue;
-			}
-			if (one.kind === "device-copy") {
-				pending.copies = true;
-				continue;
-			}
-			pending.lists = true;
-			// A Gate on hold opens to answers when its run's other branch ends.
-			if (one.kind === "run" && holdsGate(one.runId)) pending.gates = true;
-			if (one.kind === "runs") {
-				pending.everyRun = true;
-			} else {
-				pending.details.add(one.runId);
-				pending.steps.add(one.runId);
-				pending.files.add(one.runId);
+			switch (one.kind) {
+				case "gates":
+					pending.gates = true;
+					break;
+				case "every-run":
+					pending.everyRun = true;
+					break;
+				case "run":
+					// A Gate on hold opens to answers when its run's other branch ends.
+					if (holdsGate(one.runId)) pending.gates = true;
+					pending.details.add(one.runId);
+					pending.steps.add(one.runId);
+					pending.files.add(one.runId);
+					break;
+				case "change":
+					pending.changes.add(one.change);
+					break;
 			}
 		}
 		if (waiting) return;
 		waiting = true;
 		schedule(() => {
 			waiting = false;
-			const { gates: readGates, everyRun, lists, learnings } = pending;
-			const readProjects = pending.projects;
-			const readFlows = pending.flows;
-			const readHistory = pending.history && !readFlows;
-			const readKnowledge = pending.knowledge;
-			const readSpaces = pending.spaces;
-			const readDevice = pending.device;
-			const readCopies = pending.copies;
-			const readSchedules =
-				(pending.schedules || readProjects || readFlows) && !lists;
+			const { gates: readGates, everyRun } = pending;
 			const details = [...pending.details];
 			const steps = [...pending.steps];
 			const files = [...pending.files];
+			const stale = staleAfter(pending.changes);
 			pending.gates = false;
 			pending.everyRun = false;
-			pending.lists = false;
-			pending.schedules = false;
-			pending.learnings = false;
-			pending.projects = false;
-			pending.flows = false;
-			pending.history = false;
-			pending.knowledge = false;
-			pending.spaces = false;
-			pending.device = false;
-			pending.copies = false;
 			pending.details.clear();
 			pending.steps.clear();
 			pending.files.clear();
+			pending.changes.clear();
 			if (readGates) invalidate(gates.all());
 			if (everyRun) {
 				invalidate(runs.getKey());
@@ -404,49 +308,7 @@ export function createLiveCache({
 				for (const runId of files) invalidate(runs.artifactsKey(runId));
 				for (const runId of files) invalidate(runs.filesKey(runId));
 			}
-			if (lists) {
-				invalidate(runs.lists());
-				invalidate(dashboard.all());
-				invalidate(schedules.lists());
-				// Each project carries the counts of its runs (the sidebar, the phone's Projects).
-				invalidate(projects.lists());
-			}
-			if (readProjects) {
-				// Every read of projects: the lists, one project's page, its sources.
-				invalidate(projects.all());
-				if (!lists) invalidate(dashboard.all());
-			}
-			if (readSchedules) invalidate(schedules.lists());
-			if (readFlows) invalidate(orpc.flows.key());
-			if (readHistory) {
-				invalidate(orpc.flows.revisions.key());
-				invalidate(orpc.flows.revision.key());
-			}
-			if (readKnowledge) {
-				invalidate(orpc.knowledge.key());
-			} else if (lists || learnings) {
-				invalidate(knowledge.learningsKey());
-				// What waits on the Knowledge page: its learnings, and a source's last sync.
-				invalidate(knowledge.reviewKey());
-			}
-			if (learnings && !readKnowledge) invalidate(knowledge.getKey());
-			if (readSpaces) {
-				invalidate(orpc.spaces.key());
-				invalidate(orpc.members.key());
-			}
-			if (readDevice) {
-				invalidate(orpc.profiles.key());
-				invalidate(orpc.connections.key());
-				invalidate(orpc.harnesses.key());
-				invalidate(orpc.cliTools.key());
-				invalidate(orpc.settings.key());
-				invalidate(orpc.offers.key());
-				invalidate(orpc.deciders.key());
-			}
-			if (readCopies) {
-				invalidate(orpc.devices.key());
-				invalidate(orpc.offers.key());
-			}
+			for (const path of stale) invalidate([path]);
 		}, READ_MS);
 	}
 
@@ -607,16 +469,16 @@ export function createLiveCache({
 					(one) => one.runId !== gate.runId || one.stepId !== gate.stepId,
 				),
 			);
-			read([GATES, ofRun(gate.runId)]);
+			read([GATES, ...ofRun(gate.runId)]);
 			void close(gateKey(gate));
 		},
 
 		runActed(runId) {
-			read([ofRun(runId)]);
+			read(ofRun(runId));
 		},
 
 		synced(kind) {
-			read(readsForDocument(kind));
+			read([changed(kind)]);
 		},
 
 		async followRun({
