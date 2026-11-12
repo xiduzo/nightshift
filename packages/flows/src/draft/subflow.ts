@@ -68,7 +68,7 @@ import {
 	type ValidateOptions,
 	validateFlow,
 } from "../validate";
-import { type NodeRead, readsOf, ruleReads, rulesOf } from "./reads";
+import { type NodeRead, readsOf } from "./reads";
 import { rewriteRefs, rewriteTemplates } from "./refs";
 import { removeSectionAndInside, updateSection } from "./sections";
 
@@ -257,6 +257,8 @@ export type SubflowPlan =
 /** Run fields that read differently inside a Call: they become inputs. */
 const CALL_RUN_FIELDS = ["flow", "base_branch", "index"] as const;
 type CallRunField = (typeof CALL_RUN_FIELDS)[number];
+const isCallRunField = (field: string | undefined): field is CallRunField =>
+	(CALL_RUN_FIELDS as readonly (string | undefined)[]).includes(field);
 /** The fields a Call node has besides its flow's outputs. */
 const CALL_FIELDS = ["outcome", "ended", "end_message", "end_report", "visit"];
 /** The space between nodes the plan places. */
@@ -329,17 +331,6 @@ function validateOptions(options: SubflowOptions): ValidateOptions {
 
 /** One reference of a template or a rule: a node's (`readsOf`) or a flow output's. */
 type Read = Omit<NodeRead, "reader"> & { reader: SubflowReader };
-
-/** `run.flow`, `run.base_branch` and `run.index` in a rule, best effort. */
-function ruleRunFields(text: string): CallRunField[] {
-	const found = new Set<CallRunField>();
-	for (const match of text.matchAll(
-		/(^|[^A-Za-z0-9_$.])run\s*\.\s*(flow|base_branch|index)(?![A-Za-z0-9_])/g,
-	)) {
-		found.add(match[2] as CallRunField);
-	}
-	return [...found];
-}
 
 /**
  * Whether the node ending with `outcome` and no edge ends its flow as
@@ -474,14 +465,14 @@ class Planner {
 		for (const node of this.flow.nodes) {
 			const inside = this.members.has(node.id);
 			const names = new Set<string>();
-			for (const rule of rulesOf(node)) {
-				for (const name of ruleReads(rule)) {
-					if (inside ? this.isOuterNode(name) : this.members.has(name))
-						names.add(name);
-				}
-				if (inside)
-					for (const field of ruleRunFields(rule.text))
-						names.add(`run.${field}`);
+			for (const { name, path, rule } of readsOf(node)) {
+				if (!rule) continue;
+				if (inside ? this.isOuterNode(name) : this.members.has(name))
+					names.add(name);
+				// These run fields read differently inside a Call.
+				const [field] = path;
+				if (inside && name === "run" && isCallRunField(field))
+					names.add(`run.${field}`);
 			}
 			if (names.size > 0)
 				blockers.push({
@@ -593,11 +584,7 @@ class Planner {
 				continue;
 			}
 			if (read.name === "run") {
-				if (
-					!read.rule &&
-					field !== undefined &&
-					(CALL_RUN_FIELDS as readonly string[]).includes(field)
-				) {
+				if (!read.rule && isCallRunField(field)) {
 					const key = `run:${field}`;
 					const name =
 						inputOf.get(key) ?? claim(subTaken, `run_${field}`, 40, "_");
@@ -607,7 +594,7 @@ class Planner {
 							key,
 							{ name, type: "text" },
 							`{{run.${field}}}`,
-							{ kind: "run", field: field as CallRunField },
+							{ kind: "run", field },
 							reader,
 						),
 					);

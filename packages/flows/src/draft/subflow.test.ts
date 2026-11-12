@@ -819,6 +819,41 @@ describe("planSubflowFromSection, small flows", () => {
 			{ kind: "differs", code: "session-per-call", nodes: ["c"] },
 		]);
 	});
+
+	test("a rule that reads a visit inside is listed too", () => {
+		const flow = flowOf({
+			start: "a",
+			nodes: [
+				command("a"),
+				command("b"),
+				{
+					id: "again",
+					type: "decision",
+					position: { x: 0, y: 0 },
+					prompt: "",
+					by: "rule",
+					options: [{ name: "yes", when: "b.visit < 3" }, { name: "no" }],
+				},
+				command("e"),
+			],
+			edges: [
+				{ id: "ab", from: "a", outcome: "pass", to: "b" },
+				{ id: "bg", from: "b", outcome: "pass", to: "again" },
+				{ id: "ge", from: "again", outcome: "yes", to: "e" },
+				{ id: "ge2", from: "again", outcome: "no", to: "e" },
+				{ id: "ea", from: "e", outcome: "pass", to: "a", max: 3 },
+			],
+			sections: [{ id: "s", label: "S", nodes: ["b", "again"] }],
+		});
+		const plan = planned(planSubflowFromSection(flow, "s", plain));
+		expect(change(plan.changes, "visit-per-call")).toEqual([
+			{
+				kind: "differs",
+				code: "visit-per-call",
+				reads: [{ node: "again", reads: "b" }],
+			},
+		]);
+	});
 });
 
 describe("planSubflowFromSection blockers", () => {
@@ -911,6 +946,44 @@ describe("planSubflowFromSection blockers", () => {
 			blockers: [
 				{ code: "rule-reads-outside", node: "b", names: ["a", "run.flow"] },
 				{ code: "rule-reads-inside", node: "c", names: ["b"] },
+			],
+		});
+	});
+
+	test("a rule reads a run field through $$ too, not in a string or as the key of an item", () => {
+		const ruled = flowOf({
+			start: "a",
+			nodes: [
+				command("a"),
+				{
+					id: "b",
+					type: "decision",
+					position: { x: 0, y: 0 },
+					prompt: "",
+					by: "rule",
+					options: [
+						{
+							name: "yes",
+							when: "$$.run.index > 0 and \"run.flow\" != 'x' and $count([{ 'run': { 'flow': 1 } }][run.flow = 1]) = 1",
+						},
+						{ name: "no" },
+					],
+				},
+				command("c"),
+			],
+			edges: [
+				{ id: "ab", from: "a", outcome: "pass", to: "b" },
+				{ id: "bc", from: "b", outcome: "yes", to: "c" },
+				{ id: "bc2", from: "b", outcome: "no", to: "c" },
+			],
+			sections: [{ id: "s", label: "S", nodes: ["b"] }],
+		});
+		expect(
+			planSubflowFromSection(ruled, "s", { name: "x", existingFlowNames: [] }),
+		).toEqual({
+			ok: false,
+			blockers: [
+				{ code: "rule-reads-outside", node: "b", names: ["run.index"] },
 			],
 		});
 	});

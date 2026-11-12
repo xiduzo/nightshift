@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow, type FlowInput, flowSchema } from "../flow";
-import { dataLinks } from "./reads";
+import { dataLinks, flowReads, readsOf } from "./reads";
 
 const at = { x: 0, y: 0 };
 const flowOf = (input: Omit<FlowInput, "version" | "start" | "edges">): Flow =>
@@ -177,5 +177,62 @@ describe("dataLinks", () => {
 		});
 		// `{{scout}}` reads the node without a field: a link with nothing to name.
 		expect(dataLinks(flow)).toEqual([{ from: "scout", to: "say", refs: [] }]);
+	});
+});
+
+describe("flowReads and readsOf", () => {
+	const flow = flowOf({
+		inputs: [{ name: "topic" }],
+		outputs: [{ name: "summary", value: "{{pick.data.title}}" }],
+		variables: [{ name: "seen", type: "text", initial: "{{topic}}" }],
+		nodes: [
+			command("scout", 'echo "{{topic}}" # {{label.data}}', {
+				label: "Read {{ghost.data}}",
+			}),
+			{
+				id: "pick",
+				type: "value",
+				position: at,
+				by: "model",
+				prompt: "Pick one of {{scout.data.items}}.",
+				output: { type: "object" },
+				// A person picks from choices: a Value a model makes does not use them.
+				choices: { from: "{{stale.data.items}}", field: "pick" },
+				set: [{ variable: "seen", expression: "pick.data.id & $$.vars.seen" }],
+			},
+		],
+	});
+
+	test("flowReads: the texts each node uses, then the outputs and the initial values", () => {
+		expect(
+			flowReads(flow).map(({ reader, name, path, rule, self }) => [
+				Object.values(reader)[0],
+				[name, ...path].join("."),
+				rule ? "rule" : "template",
+				self,
+			]),
+		).toEqual([
+			["scout", "topic", "template", false],
+			["scout", "label.data", "template", false],
+			["pick", "scout.data.items", "template", false],
+			["pick", "pick.data.id", "rule", true],
+			["pick", "vars.seen", "rule", true],
+			["summary", "pick.data.title", "template", false],
+			["seen", "topic", "template", false],
+		]);
+	});
+
+	test("readsOf: every text of the node, a field it does not use too, templates first", () => {
+		const [, pick] = flow.nodes;
+		expect(
+			(pick ? readsOf(pick) : []).map(({ name, path }) =>
+				[name, ...path].join("."),
+			),
+		).toEqual([
+			"scout.data.items",
+			"stale.data.items",
+			"pick.data.id",
+			"vars.seen",
+		]);
 	});
 });

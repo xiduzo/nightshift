@@ -1,73 +1,128 @@
 /**
- * What the templates and rules of a node read: other nodes, inputs,
- * variables and `run`. "Make subflow from section" moves the reads that
- * cross a Section's frame (`readsOf`). The canvas draws a dotted line from
- * each node to the nodes that read it (`dataLinks`).
+ * What the texts of a flow read: other nodes, inputs, variables and `run`.
+ * "Make subflow from section" moves the reads that cross a Section's frame
+ * (`readsOf`). The canvas draws a dotted line from each node to the nodes
+ * that read it (`dataLinks`), and an agent learns who reads what
+ * (`flowReads`).
  */
 import { type Flow, type FlowNode, nodeTexts } from "../flow";
 import type { HeldText } from "../nodes";
-import {
-	ruleNames,
-	ruleRefs,
-	ruleVariableNames,
-	templateRefs,
-} from "../template";
+import { ruleRefs, templateRefs } from "../template";
 import { checkNodeWith } from "../validate";
 
-/** One reference of a node's template or rule to a node, an input, a variable or `run`. */
-export type NodeRead = {
-	reader: { node: string };
+/** Who reads: a node, an output of the flow, or the initial value of a variable. */
+export type Reader =
+	| { node: string }
+	| { output: string }
+	| { variable: string };
+
+/** One reference of a text of the flow to a node, an input, a variable or `run`. */
+export type FlowRead = {
+	reader: Reader;
 	name: string;
-	/** The path below the name; rules give none. */
+	/**
+	 * The keys below the name, as far as they are plain:
+	 * `data.tasks` in `{{plan.data.tasks}}` and in `plan.data.tasks[0]`.
+	 */
 	path: string[];
+	/** A variable write's value or expression: the node's own id reads the step that just ended. */
 	self: boolean;
 	rule: boolean;
 };
 
-/** The templates of a node: its own, then the values of its variable writes. */
-function templatesOf(node: FlowNode): HeldText[] {
-	return nodeTexts(node).filter((text) => text.kind !== "rule");
+/** One reference of a node's text. */
+export type NodeRead = FlowRead & { reader: { node: string } };
+
+/** A text as the reads take it. */
+type ReadText = Pick<HeldText, "text" | "kind" | "also" | "self">;
+
+/**
+ * The reads of one text: each reference of a template, each name a rule
+ * reads at the top with the plain keys after it (`ruleRefs`). A rule's own
+ * names (`previous`, `current`) are no reads.
+ */
+function readsIn(
+	reader: { node: string },
+	{ text, kind, also, self }: ReadText,
+): NodeRead[] {
+	const rule = kind === "rule";
+	const refs = rule
+		? ruleRefs(text).filter((ref) => !also.includes(ref.name))
+		: templateRefs(text);
+	return refs.map(({ name, path }) => ({ reader, name, path, self, rule }));
 }
 
 /**
- * The rules (JSONata) of a node that are not empty: a Decision's `when`,
- * a Value's expression, a Since last run rule, the expressions of its
- * writes.
+ * Every reference the node's texts make (`nodeTexts`), a field it does not
+ * use as it is set up now too: first its templates, then its rules.
  */
-export function rulesOf(node: FlowNode): HeldText[] {
-	return nodeTexts(node).filter(
-		(text) => text.kind === "rule" && text.text.trim() !== "",
-	);
-}
-
-/** The names a rule reads: those of the flow, not its own (`also`). */
-export function ruleReads(rule: HeldText): string[] {
-	return ruleNames(rule.text).filter((name) => !rule.also.includes(name));
-}
-
-/** Every reference the node's templates and rules make. */
 export function readsOf(node: FlowNode): NodeRead[] {
 	const reader = { node: node.id };
-	const reads: NodeRead[] = [];
-	for (const { text, self } of templatesOf(node)) {
-		for (const ref of templateRefs(text)) {
-			reads.push({
-				reader,
-				name: ref.name,
-				path: ref.path,
-				self,
-				rule: false,
-			});
-		}
-	}
-	for (const rule of rulesOf(node)) {
-		const { text, self } = rule;
-		for (const name of ruleReads(rule))
-			reads.push({ reader, name, path: [], self, rule: true });
-		for (const variable of ruleVariableNames(text))
-			reads.push({ reader, name: "vars", path: [variable], self, rule: true });
-	}
-	return reads;
+	const texts = nodeTexts(node);
+	return [
+		...texts.filter((text) => text.kind !== "rule"),
+		...texts.filter((text) => text.kind === "rule"),
+	].flatMap((text) => readsIn(reader, text));
+}
+
+/**
+ * The texts the node uses as it is set up now: the ones its check reads
+ * (`checkNodeWith`), so every field the check reads counts, a new one too.
+ * Then the values and the expressions of its variable writes.
+ */
+function textsInUse(node: FlowNode): ReadText[] {
+	const texts: ReadText[] = [];
+	const add = (text: ReadText) => {
+		texts.push(text);
+	};
+	const skip = () => {};
+	checkNodeWith(node, {
+		error: skip,
+		warning: skip,
+		template: (text) => add({ text, kind: "template", also: [], self: false }),
+		commandTemplate: (text) =>
+			add({ text, kind: "command", also: [], self: false }),
+		rule: (text, _subject, also = []) =>
+			add({ text, kind: "rule", also, self: false }),
+		// These read only `event` or `data`, never a name of the flow.
+		eventRule: skip,
+		dataRule: skip,
+		routed: () => true,
+		section: () => null,
+	});
+	return [...texts, ...nodeTexts(node).filter((text) => text.self)];
+}
+
+/** The names the node reads in the texts it uses (`textsInUse`), each with its path, in order. */
+export function nodeReads(node: FlowNode): NodeRead[] {
+	const reader = { node: node.id };
+	return textsInUse(node).flatMap((text) => readsIn(reader, text));
+}
+
+/**
+ * What the flow reads, in order: the texts each node uses (`nodeReads`),
+ * the flow's outputs, and the initial values of its variables.
+ */
+export function flowReads(flow: Flow): FlowRead[] {
+	const template = (reader: Reader, text: string): FlowRead[] =>
+		templateRefs(text).map(({ name, path }) => ({
+			reader,
+			name,
+			path,
+			self: false,
+			rule: false,
+		}));
+	return [
+		...flow.nodes.flatMap(nodeReads),
+		...flow.outputs.flatMap((output) =>
+			template({ output: output.name }, output.value),
+		),
+		...(flow.variables ?? []).flatMap((variable) =>
+			variable.initial === undefined
+				? []
+				: template({ variable: variable.name }, variable.initial),
+		),
+	];
 }
 
 /** The node `to` reads the node `from` in its templates or rules. */
@@ -80,8 +135,9 @@ export type DataLink = {
 
 /**
  * Which node reads which: one link per pair of nodes, from the templates,
- * the rules and the variable writes of every node. Only nodes of the flow
- * count, not inputs, `vars` or `run`. A node that reads itself has no link.
+ * the rules and the variable writes each node uses (`nodeReads`). Only
+ * nodes of the flow count, not inputs, `vars` or `run`. A node that reads
+ * itself has no link.
  */
 export function dataLinks(flow: Flow): DataLink[] {
 	const nodes = new Set(flow.nodes.map((node) => node.id));
@@ -102,40 +158,4 @@ export function dataLinks(flow: Flow): DataLink[] {
 		}
 	}
 	return [...links.values()];
-}
-
-/**
- * The names the node reads, each with its path, in order. Its own fields
- * come from the flow check (`checkNodeWith`), so every field the check
- * reads counts, a new one too. Then the values and the expressions of its
- * variable writes. A rule's own names (`previous`, `current`) are no reads.
- */
-export function nodeReads(node: FlowNode): { name: string; path: string[] }[] {
-	const reads: { name: string; path: string[] }[] = [];
-	const template = (text: string) => {
-		reads.push(...templateRefs(text));
-	};
-	const rule = (text: string, also: readonly string[] = []) => {
-		for (const ref of ruleRefs(text)) {
-			if (!also.includes(ref.name)) reads.push(ref);
-		}
-	};
-	const skip = () => {};
-	checkNodeWith(node, {
-		error: skip,
-		warning: skip,
-		template,
-		commandTemplate: template,
-		rule: (text, _subject, also) => rule(text, also),
-		// These read only `event` or `data`, never a node.
-		eventRule: skip,
-		dataRule: skip,
-		routed: () => true,
-		section: () => null,
-	});
-	for (const write of node.set ?? []) {
-		if (write.value !== undefined) template(write.value);
-		if (write.expression !== undefined) rule(write.expression);
-	}
-	return reads;
 }
