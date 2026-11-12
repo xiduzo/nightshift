@@ -81,6 +81,30 @@ export const feedbackSchema = z.object({
 	}),
 });
 
+const ladderTotals = z.object({
+	landings: count,
+	installs: count,
+	costPerLanding: rate,
+	rungs: z.array(
+		z.object({
+			rung: z.string(),
+			landings: count,
+			share: rate,
+			installs: count,
+			costPerLanding: rate,
+		}),
+	),
+});
+
+export const laddersSchema = z.object({
+	work: ladderTotals,
+	choice: ladderTotals.extend({
+		decided: count,
+		unsure: count,
+		unsureShare: rate,
+	}),
+});
+
 export const mixSchema = z.object({
 	installs: count,
 	agentsPerInstall: z.array(z.object({ agents: count, installs: count })),

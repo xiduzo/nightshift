@@ -2,6 +2,7 @@ import {
 	days,
 	feedback,
 	funnel,
+	ladders,
 	mix,
 	overview,
 	retention,
@@ -14,6 +15,7 @@ import {
 	emptyInput,
 	feedbackSchema,
 	funnelSchema,
+	laddersSchema,
 	mixSchema,
 	overviewSchema,
 	retentionSchema,
@@ -52,6 +54,14 @@ export const adminRouter = {
 		.input(emptyInput)
 		.output(feedbackSchema)
 		.handler(({ context }) => feedback(context.db)),
+	ladders: signedIn
+		.route({
+			summary:
+				"Shows where work and choices landed, what a landing cost, and how often a decider was not sure enough.",
+		})
+		.input(emptyInput)
+		.output(laddersSchema)
+		.handler(({ context }) => ladders(context.db)),
 	mix: signedIn
 		.route({
 			summary: "Shows agents, systems, desktop or Host, and versions.",

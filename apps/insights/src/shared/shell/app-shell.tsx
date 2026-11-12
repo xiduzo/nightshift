@@ -17,6 +17,7 @@ import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
 	CalendarClockIcon,
 	CalendarDaysIcon,
+	ChartBarStackedIcon,
 	FunnelIcon,
 	HouseIcon,
 	MonitorSmartphoneIcon,
@@ -31,6 +32,7 @@ const ITEMS = [
 	{ to: "/funnel", label: "Funnel", icon: FunnelIcon },
 	{ to: "/days", label: "Days", icon: CalendarDaysIcon },
 	{ to: "/feedback", label: "Feedback", icon: ThumbsUpIcon },
+	{ to: "/ladders", label: "Ladders", icon: ChartBarStackedIcon },
 	{ to: "/mix", label: "Mix", icon: MonitorSmartphoneIcon },
 	{ to: "/retention", label: "Retention", icon: CalendarClockIcon },
 ] as const;
