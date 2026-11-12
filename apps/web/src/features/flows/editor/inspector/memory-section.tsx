@@ -14,7 +14,7 @@ import {
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { RotateCcwIcon } from "lucide-react";
 import { toast } from "sonner";
 import { formatRelative } from "@/shared/format";
@@ -45,14 +45,11 @@ export function MemorySection({
 	flowName: string;
 	node: SinceLastRunNode | CallNode;
 }) {
-	const queryClient = useQueryClient();
-	const query = flowQueries.memory(projectId, flowName);
-	const memory = useQuery(query);
+	const memory = useQuery(flowQueries.memory(projectId, flowName));
 	const forget = useMutation(
 		flowMutations.forgetMemory({
 			onSuccess: () => {
 				toast.success("Forgotten. The next run is a first run.");
-				void queryClient.invalidateQueries({ queryKey: query.queryKey });
 			},
 			onError: (error) => toast.error(`Could not forget: ${error.message}`),
 		}),

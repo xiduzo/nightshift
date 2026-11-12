@@ -26,7 +26,7 @@ import {
 	SelectValue,
 } from "@nightshift/ui/components/select";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { CopyIcon } from "lucide-react";
 import { useId, useState } from "react";
@@ -81,7 +81,6 @@ function CopyFlowForm({
 }) {
 	const id = useId();
 	const navigate = useNavigate();
-	const queryClient = useQueryClient();
 	const projects = useQuery(projectQueries.list());
 	const targets = (projects.data ?? [])
 		.filter((project) => project.id !== projectId)
@@ -110,7 +109,6 @@ function CopyFlowForm({
 	const copy = useMutation(
 		flowMutations.copy({
 			onSuccess: (saved, input) => {
-				void queryClient.invalidateQueries({ queryKey: flowQueries.lists() });
 				const errors = saved.issues.filter(
 					(issue) => issue.severity === "error",
 				).length;

@@ -5,8 +5,6 @@ export function createFlowQueries(orpc: ApiQueryUtils) {
 	return {
 		/** Every flows query. Invalidate it after a flow changes. */
 		all: () => orpc.flows.key(),
-		/** Every list of flows, of every project. */
-		lists: () => orpc.flows.list.key(),
 		/** The flows of one project. */
 		list: (projectId: string) =>
 			orpc.flows.list.queryOptions({ input: { projectId } }),

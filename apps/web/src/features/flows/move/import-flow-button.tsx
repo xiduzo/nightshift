@@ -14,13 +14,13 @@ import {
 	DialogTitle,
 } from "@nightshift/ui/components/dialog";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { UploadIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { FlowAgentsStep, useFlowAgents } from "@/features/agents";
-import { flowMutations, flowQueries } from "../queries";
+import { flowMutations } from "../queries";
 
 /** A file the person chose, before Night Shift saves it. */
 type ChosenFile = { name: string; json: string; agents: FlowAgent[] };
@@ -44,13 +44,11 @@ function agentsOf(json: string): FlowAgent[] {
 export function ImportFlowButton({ projectId }: { projectId: string }) {
 	const input = useRef<HTMLInputElement>(null);
 	const navigate = useNavigate();
-	const queryClient = useQueryClient();
 	const [chosen, setChosen] = useState<ChosenFile | null>(null);
 	const importFlow = useMutation(
 		flowMutations.import({
 			onSuccess: (saved) => {
 				setChosen(null);
-				void queryClient.invalidateQueries({ queryKey: flowQueries.lists() });
 				const errors = saved.issues.filter(
 					(issue) => issue.severity === "error",
 				).length;

@@ -90,10 +90,10 @@ export function useMyKits({
 				toProjectId: projectId,
 				as,
 			});
+			// The new flow must be in the map before the node names it.
 			await queryClient.invalidateQueries({
 				queryKey: flowQueries.map(projectId).queryKey,
 			});
-			void queryClient.invalidateQueries({ queryKey: flowQueries.lists() });
 			const copied = `Copied ${flow} from ${from.project}${saved.name === flow ? "" : ` as ${saved.name}`}.`;
 			const errors = saved.issues.filter(
 				(issue) => issue.severity === "error",

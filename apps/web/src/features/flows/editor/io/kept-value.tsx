@@ -1,7 +1,7 @@
 /** The value a kept variable carries to the next run, with a way to reset it. */
 import { Button } from "@nightshift/ui/components/button";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { RotateCcwIcon } from "lucide-react";
 import { toast } from "sonner";
 import { flowMutations, flowQueries } from "../../queries";
@@ -31,15 +31,11 @@ export function KeptValue({
 	name: string;
 	id: string;
 }) {
-	const queryClient = useQueryClient();
 	const values = useQuery(flowQueries.kept(kept.projectId, kept.flowName));
 	const reset = useMutation(
 		flowMutations.resetKept({
 			onSuccess: () => {
 				toast.success(`The next run starts ${name} from its initial value.`);
-				void queryClient.invalidateQueries({
-					queryKey: flowQueries.kept(kept.projectId, kept.flowName).queryKey,
-				});
 			},
 			onError: (error) => toast.error(`Could not reset: ${error.message}`),
 		}),

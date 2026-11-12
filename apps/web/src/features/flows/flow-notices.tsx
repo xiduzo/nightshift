@@ -4,7 +4,7 @@ import {
 	AlertDescription,
 } from "@nightshift/ui/components/alert";
 import { Button } from "@nightshift/ui/components/button";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { InfoIcon } from "lucide-react";
 import { toast } from "sonner";
 import { flowMutations, flowQueries } from "./queries";
@@ -16,17 +16,12 @@ import { flowMutations, flowQueries } from "./queries";
  * dismisses it.
  */
 export function FlowNotices({ projectId }: { projectId: string }) {
-	const queryClient = useQueryClient();
 	const notices = useQuery({
 		...flowQueries.notices(projectId),
 		meta: { quietErrors: true },
 	});
 	const dismiss = useMutation(
 		flowMutations.dismissNotice({
-			onSuccess: () =>
-				void queryClient.invalidateQueries({
-					queryKey: flowQueries.notices(projectId).queryKey,
-				}),
 			onError: (error) => toast.error(`Could not dismiss: ${error.message}`),
 		}),
 	);
