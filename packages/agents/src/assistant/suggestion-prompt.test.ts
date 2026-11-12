@@ -178,6 +178,31 @@ describe("each kind gets its own task and context", () => {
 		expect(inputs).toContain("- `owner`: read by `notify`\n");
 	});
 
+	test("inputs: a node with a cascade reads its own cascade, a node without one does not", () => {
+		const climbing = flowSchema.parse({
+			...flow,
+			nodes: flow.nodes.map((node) =>
+				node.id === "review"
+					? {
+							...node,
+							prompt:
+								"Review {{pr}}. This is try {{cascade.try}} of {{cascade.tier}}.",
+							cascade: [{ tries: 2 }, { person: true }],
+						}
+					: node.id === "notify"
+						? { ...node, prompt: "Tell {{owner}} on try {{cascade.try}}." }
+						: node,
+			),
+		});
+		const inputs = suggestionPrompt(
+			request({ kind: "inputs", flow: climbing }),
+		);
+		expect(inputs).toContain("- `owner`: read by `notify`");
+		expect(inputs).toContain("- `cascade`: read by `notify`\n");
+		expect(inputs).not.toContain("`review`, ");
+		expect(inputs).not.toContain("read by `review`");
+	});
+
 	test("outcomes: the nodes that read the outcome, in a template or a rule", () => {
 		const outcomes = suggestionPrompt(
 			request({ nodeId: "review", kind: "outcomes" }),

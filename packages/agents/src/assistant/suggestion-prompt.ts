@@ -12,6 +12,7 @@ import {
 	flowAuthoringGuide,
 	flowReads,
 	githubSubIssuesCommand,
+	hasCascade,
 	isFlowSuggestion,
 	nodeOutcomes,
 	type SuggestionKind,
@@ -89,7 +90,12 @@ function nodeLine(node: FlowNode): string {
 	return `- \`${node.id}\` (${node.type}${node.label ? `, "${node.label}"` : ""})${short ? `: ${short}` : ""}`;
 }
 
-/** Names that templates of the flow read but that are no input, node, `run` or `vars`. */
+/**
+ * Names that templates of the flow read but that are no input, node, `run`
+ * or `vars`. A node with a cascade reads its try as `cascade` in its own
+ * templates (`{{cascade.tier}}`, ADR 6), as the check allows: no input
+ * declares it.
+ */
 function undeclaredNames(flow: Flow): { name: string; readers: string[] }[] {
 	const known = new Set([
 		"run",
@@ -97,9 +103,13 @@ function undeclaredNames(flow: Flow): { name: string; readers: string[] }[] {
 		...flow.inputs.map((input) => input.name),
 		...flow.nodes.map((node) => node.id),
 	]);
+	const climbing = new Set(
+		flow.nodes.filter(hasCascade).map((node) => node.id),
+	);
 	const found = new Map<string, Set<string>>();
 	for (const { reader, name, rule } of flowReads(flow)) {
 		if (!("node" in reader) || rule || known.has(name)) continue;
+		if (name === "cascade" && climbing.has(reader.node)) continue;
 		const readers = found.get(name) ?? new Set<string>();
 		readers.add(reader.node);
 		found.set(name, readers);
