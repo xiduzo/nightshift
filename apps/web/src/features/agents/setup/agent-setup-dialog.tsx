@@ -93,17 +93,19 @@ export function useAgentSetupActions() {
 	};
 }
 
+/** The job of a setup that made an agent ready, with its profile. */
+type ReadyJob = Extract<AgentSetupJob, { state: "ready" }>;
+
 /**
  * Follows the setup jobs. When one ends, the checks and the lists read
- * again. When one makes an agent ready, a toast says so and its profile
- * opens. Mount it once per page: the dialog does.
+ * again. When one makes an agent ready, a toast says so and `onReady`
+ * gets its profile. Mount it once per page: the dialog does.
  */
 function useSetupEnd(
 	status: AgentSetupStatus | undefined,
-	onReady: () => void,
+	onReady: (ready: ReadyJob) => void,
 ) {
 	const queryClient = useQueryClient();
-	const navigate = useNavigate();
 	const seen = useRef(new Map<HarnessRowName, AgentSetupJob>());
 	useEffect(() => {
 		for (const agent of status?.agents ?? []) {
@@ -123,17 +125,13 @@ function useSetupEnd(
 			toast.success(`${agent.label} is ready`, {
 				description: `The profile ${ready.profileName} uses it.`,
 			});
-			onReady();
-			void navigate({
-				to: "/agents",
-				search: { item: itemOf({ kind: "profile", id: ready.profileId }) },
-			});
+			onReady(ready);
 		}
-	}, [status, queryClient, navigate, onReady]);
+	}, [status, queryClient, onReady]);
 }
 
 /** The setup of a decider: the choices, and how a job goes. Quiet when it fails. */
-function useDeciderSetupStatus() {
+export function useDeciderSetupStatus() {
 	return useQuery({
 		...deciderSetupQueries.status(),
 		meta: { quietErrors: true },
@@ -179,42 +177,76 @@ function useDeciderEnd(
 	}, [status, onChosen]);
 }
 
+/** What the setup dialog shows: an agent's setup, or the choice of a decider. */
+export type SetupPhase = "agent" | "decider";
+
 /**
- * The setup dialog. `harness` picks the agent it opens on. It follows a
+ * The setup dialog. `harness` picks the agent it opens on, `start` the
+ * step: the decider opens the choice of a decider at once. It follows a
  * job that runs, also while it is closed. When the agent is ready, it
- * offers the decider step, or closes.
+ * offers the decider step, or closes. Then the new profile opens, unless
+ * `openProfile` is false: Home keeps its Get started card in view.
  */
 export function AgentSetupDialog({
 	open,
 	onOpenChange,
 	harness,
+	start = "agent",
+	openProfile = true,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	harness?: HarnessRowName;
+	start?: SetupPhase;
+	openProfile?: boolean;
 }) {
 	const status = useAgentSetupStatus();
 	const decider = useDeciderSetupStatus();
-	const [phase, setPhase] = useState<"agent" | "decider">("agent");
-	const change = (next: boolean) => {
-		if (!next) setPhase("agent");
-		onOpenChange(next);
+	const navigate = useNavigate();
+	const [phase, setPhase] = useState<SetupPhase>(start);
+	// Each time the dialog opens, it starts on the step it was asked for.
+	const [wasOpen, setWasOpen] = useState(open);
+	if (open !== wasOpen) {
+		setWasOpen(open);
+		if (open) setPhase(start);
+	}
+	// The profile of an agent that became ready. It opens when the decider
+	// step closes: opening it at once would leave this page, and the dialog.
+	const [profile, setProfile] = useState<string | null>(null);
+	const showProfile = (id: string) => {
+		if (!openProfile) return;
+		void navigate({
+			to: "/agents",
+			search: { item: itemOf({ kind: "profile", id }) },
+		});
 	};
-	useSetupEnd(status.data, () => {
-		if (open && offerDecider(decider.data)) setPhase("decider");
-		else change(false);
+	const close = () => {
+		setPhase("agent");
+		onOpenChange(false);
+		if (profile !== null) {
+			setProfile(null);
+			showProfile(profile);
+		}
+	};
+	const change = (next: boolean) => {
+		if (next) onOpenChange(true);
+		else close();
+	};
+	useSetupEnd(status.data, (ready) => {
+		if (open && offerDecider(decider.data)) {
+			setPhase("decider");
+			setProfile(ready.profileId);
+		} else {
+			setPhase("agent");
+			onOpenChange(false);
+			showProfile(ready.profileId);
+		}
 	});
 	const chosen = useDeciderChosen();
-	const onChosen = useCallback(
-		(name: string) => {
-			chosen(name);
-			if (phase === "decider") {
-				setPhase("agent");
-				onOpenChange(false);
-			}
-		},
-		[chosen, phase, onOpenChange],
-	);
+	const onChosen = (name: string) => {
+		chosen(name);
+		if (phase === "decider") close();
+	};
 	useDeciderEnd(decider.data, onChosen);
 	return (
 		<Dialog open={open} onOpenChange={change}>

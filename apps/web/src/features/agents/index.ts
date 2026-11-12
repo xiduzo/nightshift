@@ -1,4 +1,4 @@
-/** Agents: harnesses, profiles, custom agents, connections, CLI tools and secrets, a project's secrets too. */
+/** Agents: harnesses, profiles, custom agents, connections, CLI tools and secrets, a project's secrets too, and the Get started card on Home. */
 
 export { EFFORTS, PERMISSION_MODES, permissionLabel } from "./agent-options";
 export { AgentsPage } from "./agents-page";
@@ -28,4 +28,5 @@ export {
 	spaceSecretQueries,
 } from "./queries";
 export { SecretsPage } from "./secrets-page";
+export { SetupCard } from "./setup/setup-card";
 export { SpaceSecretsPage } from "./space-secrets-page";

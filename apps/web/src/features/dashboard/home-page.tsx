@@ -1,6 +1,7 @@
 import { daysOf } from "@nightshift/client";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { SetupCard } from "@/features/agents";
 import { useOpenGates } from "@/features/gates";
 import { projectQueries } from "@/features/projects";
 import { runQueries } from "@/features/runs";
@@ -17,10 +18,10 @@ import { RangeBar } from "./range-bar";
 import { latestReports } from "./reports";
 
 /**
- * Home: what needs you, and what came out, over all projects. One range
- * for the page, the four numbers in a strip, then three lanes in the order
- * you act on them (running, waiting for you, failed), the latest reports,
- * and the projects.
+ * Home: what needs you, and what came out, over all projects. Before an
+ * agent is ready, Get started on top. One range for the page, the four
+ * numbers in a strip, then three lanes in the order you act on them
+ * (running, waiting for you, failed), the latest reports, and the projects.
  */
 export function HomePage({
 	range,
@@ -56,6 +57,7 @@ export function HomePage({
 							: needsYou(waiting, failing)
 					}
 				/>
+				<SetupCard />
 				<RangeBar value={range} onValueChange={onRangeChange} />
 				<MetricStrip
 					metrics={metrics}
