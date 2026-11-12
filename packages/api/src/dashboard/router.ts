@@ -1,6 +1,7 @@
 import { spacesOf } from "@nightshift/auth";
 import {
 	projectDashboard,
+	spaceSpend,
 	spacesDashboard,
 	summarizeFlow,
 } from "@nightshift/engine";
@@ -11,6 +12,7 @@ import { protectedProcedure } from "../procedures";
 import {
 	dashboardSummarySchema,
 	flowHealthDetailSchema,
+	spaceSpendSchema,
 	timeZoneSchema,
 } from "./schemas";
 
@@ -72,5 +74,16 @@ export const dashboard = {
 				await context.space.listRuns({ projectId: input.projectId }),
 				{ now: now(), timeZone: input.timeZone },
 			),
+		),
+	/** The Spend page of the session's Space. */
+	spend: protectedProcedure
+		.route({
+			summary:
+				"Computes what the runs of the Space cost, how steady the cost of each flow is, and where a change saves money.",
+		})
+		.output(output(spaceSpendSchema))
+		.input(z.object({ timeZone: timeZoneSchema }).default({ timeZone: "UTC" }))
+		.handler(async ({ context, input }) =>
+			spaceSpend(context.space, { now: now(), timeZone: input.timeZone }),
 		),
 };

@@ -44,6 +44,7 @@ import {
 	ChevronRightIcon,
 	ChevronsUpDownIcon,
 	CircleUserRoundIcon,
+	CoinsIcon,
 	FolderIcon,
 	FolderOpenIcon,
 	HistoryIcon,
@@ -74,7 +75,7 @@ import { useSidebarRange } from "./use-sidebar-range";
 /**
  * The app shell's sidebar, after the shadcn `sidebar-07` block. It keeps
  * what you open every day: Home,
- * the Inbox and the projects. The project you are in shows its pages. The
+ * the Inbox, Spend and the projects. The project you are in shows its pages. The
  * Space, this computer, your account and the theme sit in one Settings
  * menu in the footer.
  */
@@ -130,6 +131,16 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 									{open}
 								</SidebarMenuBadge>
 							) : null}
+						</SidebarMenuItem>
+						<SidebarMenuItem>
+							<SidebarMenuButton
+								tooltip="Spend"
+								isActive={Boolean(matchRoute({ to: "/spend" }))}
+								render={<Link to="/spend" />}
+							>
+								<CoinsIcon aria-hidden="true" />
+								<span>Spend</span>
+							</SidebarMenuButton>
 						</SidebarMenuItem>
 					</SidebarMenu>
 				</SidebarGroup>

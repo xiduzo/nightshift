@@ -98,7 +98,7 @@ CLI when you need them.
 | --- | --- |
 | ✓ [Alert](https://ui.shadcn.com/docs/components/alert) | A message in the page flow: a run failed, a run sleeps until a reset, a flow has errors. |
 | ✓ [Sonner](https://ui.shadcn.com/docs/components/sonner) | Toasts (`toast()` from `sonner`). `<Toaster />` sits in the root. Toast is the older name for the same thing. |
-| ✓ [Progress](https://ui.shadcn.com/docs/components/progress) | How far something is (items done of a Call with `each`, the night until stop time, an agent's install). |
+| ✓ [Progress](https://ui.shadcn.com/docs/components/progress) | How far something is (items done of a Call with `each`, the night until stop time, an agent's install), and a share (what a step costs per run and the part a change could save on the Spend page). |
 | ✓ [Spinner](https://ui.shadcn.com/docs/components/spinner) | Something loads or runs. Put it in a Button while its action is pending. |
 | ✓ [Skeleton](https://ui.shadcn.com/docs/components/skeleton) | A placeholder in the shape of content that is still loading. |
 | ✓ [Badge](https://ui.shadcn.com/docs/components/badge) | A short status or tag (run status, outcome, node type). Variants: `default`, `secondary`, `outline`, `destructive`, `ghost`, `link`. |
@@ -109,7 +109,7 @@ CLI when you need them.
 | Component | What it is for |
 | --- | --- |
 | ✓ [Avatar](https://ui.shadcn.com/docs/components/avatar) | A person or harness picture with fallback initials. |
-| ✓ [Card](https://ui.shadcn.com/docs/components/card) | A bordered group of content: `CardHeader`, `CardTitle`, `CardDescription`, `CardAction`, `CardContent`, `CardFooter`. Stat tiles, gate cards, flow and schedule cards. The flow editor's floating panels: the flow's title card and the inspector, over a canvas that fills the page. |
+| ✓ [Card](https://ui.shadcn.com/docs/components/card) | A bordered group of content: `CardHeader`, `CardTitle`, `CardDescription`, `CardAction`, `CardContent`, `CardFooter`. Stat tiles, gate cards, flow and schedule cards, the numbers and the ways to save on the Spend page (`features/spend`). The flow editor's floating panels: the flow's title card and the inspector, over a canvas that fills the page. |
 | ✓ [Table](https://ui.shadcn.com/docs/components/table) | Rows and columns of data (runs, events). |
 | [Data Table](https://ui.shadcn.com/docs/components/data-table) | A Table with TanStack Table: sorting, filters, pagination, row selection. A guide, not a component. |
 | ✓ [Chart](https://ui.shadcn.com/docs/components/chart) | Recharts with theme colors, `ChartTooltip` and `ChartLegend`. The run-status donut (a project's menu in the sidebar), the history chart in each details dialog, and the three charts per day of a flow's Metrics tab (one `syncId`, so a hover shows the same day in all three). Recharts keeps a 5px margin by default. Set `margin` to zero on tiny charts. A chart whose values are all zero draws no bars. Give it a hidden `YAxis` with a domain of at least 1. |
@@ -123,9 +123,9 @@ CLI when you need them.
 
 | Component | What it is for |
 | --- | --- |
-| ✓ [Collapsible](https://ui.shadcn.com/docs/components/collapsible) | One section that opens and closes (a tool call's input, raw JSON, a run's status under its flow, each section of the inspector, the log of a run's service, the Details of an agent's install, a flow's row on a project's page, the earlier reports on Home). |
+| ✓ [Collapsible](https://ui.shadcn.com/docs/components/collapsible) | One section that opens and closes (a tool call's input, raw JSON, a run's status under its flow, each section of the inspector, the log of a run's service, the Details of an agent's install, a flow's row on a project's page and on the Spend page, the earlier reports on Home). |
 | ✓ [Toggle](https://ui.shadcn.com/docs/components/toggle) | A button that stays pressed (show/hide a panel, the metric tiles of a project's page). |
-| ✓ [Toggle Group](https://ui.shadcn.com/docs/components/toggle-group) | A set of toggles where one or many are on: a segmented control (Canvas / JSON, transcript levels, a Command node's output Text / JSON, the range of a project's page). |
+| ✓ [Toggle Group](https://ui.shadcn.com/docs/components/toggle-group) | A set of toggles where one or many are on: a segmented control (Canvas / JSON, transcript levels, a Command node's output Text / JSON, the range of a project's page and of the Spend page). |
 | ✓ [Pagination](https://ui.shadcn.com/docs/components/pagination) | Page links under a long list. `DataTable` shows them when it gets a `pageSize`: a project's runs page (15 a page). |
 | [Direction](https://ui.shadcn.com/docs/components/direction) | Right-to-left support. |
 

@@ -3,12 +3,11 @@ import type { DashboardSummary, NightRange, Project } from "@/shared/api";
 import type { Metric } from "./metrics";
 import { NeededYouDialog } from "./needed-you-dialog";
 import { RunsDialog } from "./runs-dialog";
-import { SpendDialog } from "./spend-dialog";
 
 /**
  * The details of a number, at the page's range: Runs and Finished open the
- * runs (Finished on the failed ones), Spend and Needed you their own.
- * Without a project, over every project.
+ * runs (Finished on the failed ones), Needed you its own. Spend has a page
+ * of its own. Without a project, over every project.
  */
 export function MetricDetails({
 	metric,
@@ -18,7 +17,7 @@ export function MetricDetails({
 	summary,
 	range,
 }: {
-	metric: Metric;
+	metric: Exclude<Metric, "spend">;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	project?: Project;
@@ -34,7 +33,6 @@ export function MetricDetails({
 		initialRange: range,
 	};
 
-	if (metric === "spend") return <SpendDialog {...props} />;
 	if (metric === "needed") {
 		return (
 			<NeededYouDialog

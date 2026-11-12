@@ -42,5 +42,13 @@ export function createDashboardQueries(orpc: ApiQueryUtils) {
 			refetchInterval: POLL_MS,
 			meta: { quietRefetchErrors: true },
 		}),
+		/** The Spend page of the Space. Polls every 5 minutes. */
+		spend: () => ({
+			...orpc.dashboard.spend.queryOptions({
+				input: { timeZone: readerTimeZone() },
+			}),
+			refetchInterval: POLL_MS,
+			meta: { quietRefetchErrors: true },
+		}),
 	};
 }

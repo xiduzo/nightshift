@@ -1,7 +1,8 @@
 import type { SpaceFlows } from "../flows";
 import type { SpaceEngine } from "../run";
+import { summarizeSpend } from "./spend";
 import { summarizeDashboard } from "./summary";
-import type { DashboardSummary } from "./types";
+import type { DashboardSummary, SpaceSpend } from "./types";
 
 /** When the dashboard is read, and the reader's time zone (IANA). */
 export type DashboardRead = { now: number; timeZone: string };
@@ -41,4 +42,12 @@ export async function spacesDashboard(
 		...read,
 		scope: { kind: "all", projectNames },
 	});
+}
+
+/** The Spend page of a Space: what its runs cost, and where a change saves. */
+export async function spaceSpend(
+	space: Pick<SpaceEngine, "listRuns">,
+	read: DashboardRead,
+): Promise<SpaceSpend> {
+	return summarizeSpend(await space.listRuns(), read);
 }

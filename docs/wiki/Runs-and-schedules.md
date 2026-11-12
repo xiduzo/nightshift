@@ -159,7 +159,7 @@ A project's page shows one row for each flow: its level, its last runs, how ofte
 
 Click a row to open it. You see its runs per day, why runs did not finish, its latest runs, why it needed you, and where its work landed. **All details** opens the full details of the flow. Flow health leaves [test runs](#test-runs) out. **Total spent** in the details of a flow counts them, and says how many.
 
-**Spend** on top of the page shows what the project spent.
+**Spend** on top of the page opens the [Spend](#spend) page.
 
 **Where the work landed** shows in an opened row. One bar shows the work: what agents and models made, in the flow and in the subflows it calls, and your answers to an Ask. A subflow with a cascade counts once, on the tier that held. One bar shows the choices: the Decisions. Each part of a bar is a rung:
 
@@ -176,3 +176,27 @@ The line next to a bar gives each share, such as "Sonnet 78% · Opus 19% · You 
 **Per useful result** shows what all runs of a flow cost, divided by the runs that people found useful. Runs that failed or that nobody answered count in the cost too. Under it, you see how many runs with an answer were useful.
 
 **Details** next to **Needed you without a plan** shows why runs needed you, the runs that did, and the Gates that they asked.
+
+## Spend
+
+**Spend** in the sidebar shows what your flows cost. Choose 7, 30 or 90 days.
+
+The cards on top show what the runs spent against the same days before, how many flows have a steady cost, and what a change could save.
+
+**How predictable each flow is** has one row for each flow that cost money. The strip shows what its runs cost against a usual run of that flow. A short strip means a steady cost.
+
+| Cost is | What it means |
+| --- | --- |
+| **Steady** | Most runs cost within 20% of a usual run. |
+| **Varies** | Some runs cost a lot more or less than a usual run. |
+| **Hard to predict** | Many runs cost over twice a usual run, or one cost over four times that. |
+
+Click a row to open it. You see what each step costs per run, and the ways to save on that flow.
+
+**Ways to save** lists the changes that your runs show, the biggest first:
+
+- **Fix the runs that do not finish.** A run that failed or stopped still cost money.
+- **Check for work before the agents start.** Some runs found nothing to do, and still cost money.
+- **Keep the costly runs near a usual run.** Some runs cost over twice a usual run. The card names the step with the most extra cost.
+
+**Open the run** shows the newest run behind a card. **Open the flow** opens the flow, where you make the change.

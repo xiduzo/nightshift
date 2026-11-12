@@ -8,6 +8,7 @@ import {
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { ZapIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import {
@@ -31,8 +32,8 @@ import { RUN_STATUS_CHART } from "./run-statuses";
  * for the whole page. On top, how often the flows needed you without a
  * plan and as planned, how many run on their own, and how the runs ended,
  * each against the days before where it has them. Under it, one row per
- * flow that opens in place. What the project spent is one button away,
- * until Spend has its own page.
+ * flow that opens in place. What the flows spent is on the Spend page,
+ * one button away.
  */
 export function ProjectDashboardPage({
 	projectId,
@@ -46,9 +47,13 @@ export function ProjectDashboardPage({
 	const summary = useQuery(dashboardQueries.summary({ projectId }));
 	const [quickRun, setQuickRun] = useState(false);
 	// The metric stays while the dialog closes, so its body does not go blank.
-	const [details, setDetails] = useState<{ metric: Metric; open: boolean }>();
+	const [details, setDetails] = useState<{
+		metric: Exclude<Metric, "spend">;
+		open: boolean;
+	}>();
 	const days = summary.data ? daysOf(summary.data, range) : undefined;
-	const show = (metric: Metric) => setDetails({ metric, open: true });
+	const show = (metric: Exclude<Metric, "spend">) =>
+		setDetails({ metric, open: true });
 
 	return (
 		<ProjectPage projectId={projectId}>
@@ -59,7 +64,12 @@ export function ProjectDashboardPage({
 						description={<ProjectFolderLine project={project} />}
 						actions={
 							<>
-								<Button variant="ghost" size="sm" onClick={() => show("spend")}>
+								<Button
+									variant="ghost"
+									size="sm"
+									nativeButton={false}
+									render={<Link to="/spend" search={{ range }} />}
+								>
 									Spend
 								</Button>
 								<Button

@@ -375,3 +375,45 @@ describe("dashboard.flow", () => {
 		expect(summary.flowHealth?.rows[0]?.ladders?.work?.landed).toBe(3);
 	});
 });
+
+describe("dashboard.spend", () => {
+	test("gives what the runs of the session's Space cost, per flow, with the ways to save", async () => {
+		const { headers, personal, platform } = await ada();
+		const { engine, asked } = engineOf({
+			[platform]: {
+				projects: [{ id: "web", name: "website" }],
+				runs: [
+					aRun({ id: "a", projectId: "web", costUsd: 2 }),
+					aRun({ id: "b", projectId: "web", costUsd: 3, status: "failed" }),
+				],
+				flows: [],
+			},
+			[personal]: {
+				projects: [],
+				runs: [aRun({ id: "c", costUsd: 100 })],
+				flows: [],
+			},
+		});
+		const spend = await call(
+			appRouter.dashboard.spend,
+			{ timeZone: "Europe/Amsterdam" },
+			{ context: await contextFor(headers, engine) },
+		);
+		expect(asked).toEqual([platform]);
+		const week = spend.ranges.find((range) => range.nights === 7);
+		expect(week?.total).toBe(5);
+		expect(week?.flows).toMatchObject([
+			{ key: "web/night", projectId: "web", flow: "night", spent: 5, saves: 3 },
+		]);
+		expect(week?.savings).toMatchObject([
+			{
+				kind: "unfinished",
+				flow: "night",
+				saves: 3,
+				runs: 1,
+				of: 2,
+				runId: "b",
+			},
+		]);
+	});
+});

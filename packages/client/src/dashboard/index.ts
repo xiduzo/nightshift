@@ -23,6 +23,14 @@ export {
 } from "./ladders";
 export { neededReasonLabel, neededReasonsText } from "./needed";
 export { createDashboardQueries, readerTimeZone } from "./queries";
+export {
+	type CostSteadiness,
+	savingTitle,
+	savingWhy,
+	steadinessHint,
+	steadinessLabel,
+	timesUsual,
+} from "./spend";
 export type {
 	DashboardSummary,
 	FlowHealthRow,
@@ -32,6 +40,10 @@ export type {
 	GateState,
 	NightRange,
 	NightsRange,
+	SpaceSpend,
+	SpendDays,
+	SpendFlow,
+	SpendSaving,
 	Spread,
 } from "./types";
 export {
