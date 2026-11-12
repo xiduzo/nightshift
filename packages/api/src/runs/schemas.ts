@@ -5,6 +5,7 @@ import {
 	type OwnDevice,
 	type Placement,
 	RUN_END_REASONS,
+	RUNGS,
 	type RunDetail,
 	type RunFiles,
 	type RunStreamItem,
@@ -168,6 +169,31 @@ const metricsSchema = z.object({
 				stepId: z.string().nullable(),
 				at: z.number(),
 				by: answeredBySchema,
+			}),
+		)
+		.optional(),
+	/**
+	 * Where the work landed: the run's landings per node, rung and tier,
+	 * with what they cost, every try included. `via`: the Subflow nodes it
+	 * ran in. A Decision's entry counts how often a decider gave a
+	 * probability (`picked`) and was not sure enough (`unsure`). Older Hosts
+	 * send none.
+	 */
+	ladder: z
+		.array(
+			z.object({
+				ladder: z.enum(["work", "choice"]),
+				nodeId: z.string(),
+				via: z.string().optional(),
+				rung: z.enum(RUNGS),
+				by: z.enum(["rule", "model", "agent", "flow", "person"]),
+				tier: z.string().nullable(),
+				landed: z.number(),
+				costUsd: z.number(),
+				costEstimated: z.boolean(),
+				costMissing: z.number(),
+				picked: z.number().optional(),
+				unsure: z.number().optional(),
 			}),
 		)
 		.optional(),
