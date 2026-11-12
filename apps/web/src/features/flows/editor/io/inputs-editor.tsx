@@ -25,6 +25,8 @@ import { type Change, move, NameInput, RowButtons } from "./io-rows";
 /** Why an input cannot take a name, by what the name clashes with. */
 const INPUT_NAME_TAKEN: Record<NameClash, (name: string) => string> = {
 	reserved: (name) => `The name ${name} is taken. Pick another name.`,
+	rule: (name) =>
+		`Since last run rules read ${name} as their own value. Pick another name.`,
 	node: (name) => `A node is already named ${name}. Pick another name.`,
 	input: (name) => `Another input is named ${name}.`,
 	variable: (name) => `A variable is already named ${name}. Pick another name.`,

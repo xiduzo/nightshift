@@ -23,6 +23,8 @@ import type { Selection } from "./selection";
 /** Why a node cannot take a name, by what the name clashes with. */
 const NODE_NAME_TAKEN: Record<NameClash, (name: string) => string> = {
 	reserved: (name) => `The name ${name} is taken. Pick another name.`,
+	rule: (name) =>
+		`Since last run rules read ${name} as their own value. Pick another name.`,
 	node: (name) => `${name} is taken by another node.`,
 	input: (name) =>
 		`An input of this flow is already named ${name}. Pick another name.`,

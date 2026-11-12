@@ -5,6 +5,7 @@ import {
 	isPersonTier,
 	type ListSource,
 	type PersonTier,
+	ruleOwnNames,
 	type WaitNode,
 	type WebRequestNode,
 } from "../nodes";
@@ -192,9 +193,6 @@ export type TextField = {
 export type TextRewrite = (text: string, field: TextField) => string;
 
 const TEMPLATE: TextField = { rule: false, also: [], self: false };
-
-/** The names a Since last run rule reads besides the flow's. */
-const SINCE_LAST_RUN_NAMES = ["previous", "current"] as const;
 
 /** How the walk of one node rewrites its own templates and rules. */
 type OwnTexts = {
@@ -536,7 +534,7 @@ function rewriteOwnTexts(
 				...(node.scope === undefined ? {} : { scope: template(node.scope) }),
 				...(node.when === undefined
 					? {}
-					: { when: rule(node.when, SINCE_LAST_RUN_NAMES) }),
+					: { when: rule(node.when, ruleOwnNames) }),
 			};
 		case "web-request":
 			return rewriteWebRequest(node, template);

@@ -451,6 +451,16 @@ describe("planSubflowFromSection, small flows", () => {
 		expect(change(plan.changes, "exit-added")[0]?.endNode).toBeNull();
 	});
 
+	test("the Call's id is never a name a rule reads as its own", () => {
+		const plan = planned(
+			planSubflowFromSection(chain(), "middle", {
+				name: "current",
+				existingFlowNames: [],
+			}),
+		);
+		expect(plan.caller.nodes.map((n) => n.id)).toEqual(["a", "current_2", "d"]);
+	});
+
 	test("a Wait's own outcome without an edge ends the flow, as in the engine", () => {
 		const wait = {
 			id: "c",

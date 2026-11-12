@@ -4,7 +4,7 @@ import {
 	nodeOutcomes,
 	outputFieldsByType,
 } from "../flow";
-import { nameSchema, reservedNames } from "../nodes";
+import { nameSchema, reservedNames, ruleOwnNames } from "../nodes";
 import { coerceVariable, templateRefs } from "../template";
 import type { Report } from "./issues";
 import {
@@ -187,14 +187,17 @@ export function checkUnusedVariables(scope: Scope, warning: Report): void {
 
 /**
  * Inputs: unique names, valid and not reserved, not the id of a node, and a
- * default that fits the type. A `choice` input has options.
+ * default that fits the type. A `choice` input has options. A name a rule
+ * reads as its own (`previous`) is a warning: an older flow may have one.
  */
 export function checkInputs(
 	flow: Flow,
 	nodes: ReadonlyMap<string, FlowNode>,
 	error: Report,
+	warning: Report,
 ): void {
 	const reserved: readonly string[] = reservedNames;
+	const ruleOwn: readonly string[] = ruleOwnNames;
 	const seen = new Set<string>();
 	for (const input of flow.inputs) {
 		const name = input.name;
@@ -211,6 +214,11 @@ export function checkInputs(
 			);
 		} else if (reserved.includes(name)) {
 			error(`The input name "${name}" is reserved. Pick another name.`, {});
+		} else if (ruleOwn.includes(name)) {
+			warning(
+				`Since last run rules read "${name}" as their own value, not this input. Pick another name.`,
+				{},
+			);
 		}
 		if (nodes.has(name)) {
 			error(

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow, flowSchema } from "../flow";
 import { validateFlow } from "../validate";
 import { renameNode } from "./graph";
-import { type NameOwner, nameClash } from "./names";
+import { type NameOwner, nameClash, takenNames, uniqueNodeId } from "./names";
 import { renameInput, renameVariable } from "./refs";
 
 const at = { x: 0, y: 0 };
@@ -27,6 +27,10 @@ const flow: Flow = flowSchema.parse({
 
 const errors = (draft: Flow) =>
 	validateFlow(draft).filter((issue) => issue.severity === "error");
+const warnings = (draft: Flow) =>
+	validateFlow(draft)
+		.filter((issue) => issue.severity === "warning")
+		.map((issue) => issue.message);
 
 /** The draft after `owner` takes `name`. */
 function renamed(owner: NameOwner, name: string): Flow {
@@ -73,5 +77,43 @@ describe("a name in the flow's one namespace", () => {
 				}).toEqual({ owner, name, refused: clash !== null });
 			}
 		}
+	});
+
+	// A Since last run rule reads `previous` and `current` as its own
+	// values: a node or an input of that name is out of its reach.
+	test("a name a rule reads as its own: refused for a node or an input, warned about in a flow", () => {
+		for (const name of ["previous", "current"]) {
+			expect(nameClash(flow, name, { node: "check" })).toBe("rule");
+			expect(nameClash(flow, name, { input: 0 })).toBe("rule");
+			expect(errors(renamed({ node: "check" }, name))).toEqual([]);
+			expect(warnings(renamed({ node: "check" }, name))).toContain(
+				`Since last run rules read "${name}" as their own value, not this node. Give the node another id.`,
+			);
+			expect(errors(renamed({ input: 0 }, name))).toEqual([]);
+			expect(warnings(renamed({ input: 0 }, name))).toContain(
+				`Since last run rules read "${name}" as their own value, not this input. Pick another name.`,
+			);
+		}
+	});
+
+	test("a variable may take a rule's own name: a rule reads it as vars.<name>", () => {
+		expect(nameClash(flow, "current", { variable: 0 })).toBeNull();
+		expect(validateFlow(renamed({ variable: 0 }, "current"))).toEqual([]);
+	});
+
+	test("a node or an input that has a rule's own name may keep it", () => {
+		const old = renameInput(
+			renameNode(flow, "check", "current"),
+			0,
+			"previous",
+		);
+		expect(nameClash(old, "current", { node: "current" })).toBeNull();
+		expect(nameClash(old, "previous", { input: 0 })).toBeNull();
+		expect(nameClash(old, "previous", { node: "current" })).toBe("rule");
+	});
+
+	test("a new name is never a rule's own", () => {
+		expect(takenNames(flow).has("previous")).toBe(true);
+		expect(uniqueNodeId(flow, "current")).toBe("current_2");
 	});
 });

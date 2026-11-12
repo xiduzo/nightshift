@@ -78,6 +78,17 @@ export const reservedOutcomes = [
 export const reservedNames = ["run", "vars"] as const;
 
 /**
+ * The names a rule reads as its own, besides the flow's: a Since last run
+ * rule reads the value of the last run as `previous` and this one as
+ * `current`. They win over a node or an input of that name, so that rule
+ * cannot read it. The editor refuses them for a node or an input, and the
+ * check warns about a flow that has one. A variable may take them: a rule
+ * reads it as `vars.<name>`. The other rules read only their own value
+ * (`event`, `data`) or the flow's, so they keep no other name.
+ */
+export const ruleOwnNames = ["previous", "current"] as const;
+
+/**
  * Who decides a Decision node: a TanStack AI decision model, through
  * `decide()`. TypeSafe and OpenRouter serve Jev, OpenAI its Decisions API,
  * Ollaya a `laya` model on this computer, Ollama any chat model pulled on

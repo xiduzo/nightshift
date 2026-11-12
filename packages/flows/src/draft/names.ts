@@ -1,22 +1,27 @@
 /** Free names for new nodes, inputs, outputs and edges, and the clash of a new name. */
 import type { Flow } from "../flow";
-import { reservedNames } from "../nodes";
+import { reservedNames, ruleOwnNames } from "../nodes";
 
 /**
- * The names a template can read in this flow: node ids, inputs and
- * variables share one namespace, and `run` and `vars` are reserved.
+ * The names a new node, input or variable does not get: node ids, inputs
+ * and variables share one namespace, `run` and `vars` are reserved, and a
+ * rule reads `previous` and `current` as its own (`ruleOwnNames`).
  */
 export function takenNames(flow: Flow): Set<string> {
 	return new Set([
 		...reservedNames,
+		...ruleOwnNames,
 		...flow.nodes.map((node) => node.id),
 		...flow.inputs.map((input) => input.name),
 		...(flow.variables ?? []).map((variable) => variable.name),
 	]);
 }
 
-/** What a name clashes with in the one namespace of a flow. */
-export type NameClash = "reserved" | "node" | "input" | "variable";
+/**
+ * What a name clashes with in the one namespace of a flow. `rule`: a
+ * name a rule reads as its own (`ruleOwnNames`), for a node or an input.
+ */
+export type NameClash = "reserved" | "rule" | "node" | "input" | "variable";
 
 /** The thing that takes the name: it may keep its own name. */
 export type NameOwner =
@@ -28,6 +33,9 @@ export type NameOwner =
  * What `name` clashes with when `owner` takes it: a reserved name (`run`,
  * `vars`), another node, input or variable. Null when the name is free.
  * Validation refuses a flow with a clash, so an edit checks here first.
+ * A node or an input does not take a name a rule reads as its own
+ * (`previous`). The check only warns about a flow that has one already,
+ * so a node or an input that has it may keep it.
  */
 export function nameClash(
 	flow: Flow,
@@ -36,6 +44,8 @@ export function nameClash(
 ): NameClash | null {
 	const reserved: readonly string[] = reservedNames;
 	if (reserved.includes(name)) return "reserved";
+	const ruleOwn: readonly string[] = ruleOwnNames;
+	if (ruleOwn.includes(name) && !keepsName(flow, name, owner)) return "rule";
 	if (
 		flow.nodes.some(
 			(node) => node.id === name && !("node" in owner && owner.node === name),
@@ -61,6 +71,13 @@ export function nameClash(
 		return "variable";
 	}
 	return null;
+}
+
+/** Whether `owner` is a variable, or a node or an input that has `name` already. */
+function keepsName(flow: Flow, name: string, owner: NameOwner): boolean {
+	if ("variable" in owner) return true;
+	if ("node" in owner) return owner.node === name;
+	return flow.inputs[owner.input]?.name === name;
 }
 
 /** `base`, else `base_2`, `base_3`, … whichever no node or input uses yet. */

@@ -240,6 +240,13 @@ describe("addCalledNode", () => {
 		expect(addCalledNode(flowOf(), "2fa-check", at).id).toBe("flow_2fa_check");
 	});
 
+	test("an id is never a name a rule reads as its own", () => {
+		expect(addCalledNode(flowOf(), "kit:prices/current", at).id).toBe(
+			"current_2",
+		);
+		expect(addCalledNode(flowOf(), "previous", at).id).toBe("previous_2");
+	});
+
 	test("ids stay unique and short enough", () => {
 		let flow = flowOf(fetch);
 		const ids: string[] = [];

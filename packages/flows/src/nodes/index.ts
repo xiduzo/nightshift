@@ -78,6 +78,7 @@ export {
 	type ProfileRef,
 	reservedNames,
 	reservedOutcomes,
+	ruleOwnNames,
 	sameProfileRef,
 	secretNameSchema,
 	type VariableWrite,

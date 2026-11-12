@@ -86,6 +86,36 @@ describe("pasteNodes", () => {
 		});
 	});
 
+	test("a pasted node named as a rule's own value gets a free name, and its readers follow", () => {
+		const clip = {
+			nodes: flowSchema.parse({
+				version: FLOW_VERSION,
+				start: "current",
+				nodes: [
+					command("current"),
+					{
+						id: "moved",
+						type: "since-last-run",
+						position: { x: 0, y: 0 },
+						value: "{{current.stdout}}",
+						when: "current != previous and current.stdout != ''",
+					},
+				],
+				edges: [],
+			}).nodes,
+			edges: [],
+			sections: [],
+		};
+		const empty: Flow = { ...chain, nodes: [], edges: [], sections: [] };
+		const { flow, ids } = pasteNodes(empty, clip);
+		expect(ids).toEqual(["current_2", "moved"]);
+		// The rule's own `current` stays: it is the value, not the node.
+		expect(flow.nodes.at(-1)).toMatchObject({
+			value: "{{current_2.stdout}}",
+			when: "current != previous and current.stdout != ''",
+		});
+	});
+
 	test("keeps references to nodes that were not pasted", () => {
 		const clip = copyNodes(chain, ["b"]);
 		if (!clip) throw new Error("expected a clip");

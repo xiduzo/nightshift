@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type NodeCheck, nodeBase } from "./base";
+import { type NodeCheck, nodeBase, ruleOwnNames } from "./base";
 
 /**
  * The Since last run node: what is new or changed since the last run of
@@ -118,6 +118,6 @@ export function checkSinceLastRunNode(
 		}
 	}
 	if (node.when !== undefined && node.when.trim() !== "") {
-		check.rule(node.when, `The rule of "${node.id}"`, ["previous", "current"]);
+		check.rule(node.when, `The rule of "${node.id}"`, ruleOwnNames);
 	}
 }
