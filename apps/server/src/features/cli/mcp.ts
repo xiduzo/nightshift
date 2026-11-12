@@ -9,6 +9,7 @@ import {
 } from "@nightshift/agents";
 import type { AppRouterClient } from "@nightshift/api";
 import { type ChatSpace, chatRun } from "@nightshift/daemon";
+import { runReport } from "@nightshift/engine/run-status";
 import { createORPCClient, ORPCError } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 
@@ -247,7 +248,7 @@ export function apiPort(
 					flowName: detail.flowName,
 					cost: costOf(detail),
 					prUrl: detail.metrics?.prUrl ?? null,
-					report: reportOf(detail),
+					report: runReport(detail),
 				};
 			}),
 		stopRun: (runId, when) => g(() => client.runs.stop({ runId, when })),
@@ -299,32 +300,6 @@ function costOf(run: {
 			used > 0 && tokens
 				? { input: tokens.input, output: tokens.output }
 				: null,
-	};
-}
-
-/**
- * The report of a run (ADR 26), as the run tools read it: the output of
- * the End step that wrote it, or the excerpt the run carries when that
- * step is not at hand. The rule of `runReport` in `@nightshift/client`.
- */
-export function reportOf(detail: {
-	report?: { stepId: string; excerpt: string; more: boolean };
-	steps: { id: string; outputs: Record<string, unknown> }[];
-	warnings: { kind: string; stepId: string | null }[];
-}) {
-	const glance = detail.report;
-	if (!glance) return null;
-	const output = detail.steps.find((step) => step.id === glance.stepId)?.outputs
-		.report;
-	const whole = typeof output === "string" && output !== "" ? output : null;
-	return {
-		stepId: glance.stepId,
-		text: whole ?? glance.excerpt,
-		partial: whole === null && glance.more,
-		cut: detail.warnings.some(
-			(warning) =>
-				warning.kind === "report" && warning.stepId === glance.stepId,
-		),
 	};
 }
 

@@ -3,7 +3,7 @@ import type { AppRouterClient } from "@nightshift/api";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 
-import { apiPort, mcpOptions, reportOf } from "./mcp";
+import { apiPort, mcpOptions } from "./mcp";
 
 describe("nightshift mcp", () => {
 	test("the daemon and the links default to this computer", () => {
@@ -39,32 +39,6 @@ describe("nightshift mcp", () => {
 			process.cwd(),
 		);
 		expect(mcpOptions(["--nope"], {}, "/")).toBeNull();
-	});
-
-	test("get_run reads the report from the End step that wrote it", () => {
-		const glance = { stepId: "s9", excerpt: "## What is new", more: true };
-		const end = {
-			id: "s9",
-			outputs: { report: "## What is new\n\n- Two new sources" },
-		};
-		const cut = { kind: "report", stepId: "s9" };
-		expect(reportOf({ report: glance, steps: [end], warnings: [cut] })).toEqual(
-			{
-				stepId: "s9",
-				text: "## What is new\n\n- Two new sources",
-				partial: false,
-				cut: true,
-			},
-		);
-		// The step is not at hand: the start the run carries.
-		expect(reportOf({ report: glance, steps: [], warnings: [] })).toEqual({
-			stepId: "s9",
-			text: "## What is new",
-			partial: true,
-			cut: false,
-		});
-		// An older Host, or a run without a report.
-		expect(reportOf({ steps: [end], warnings: [] })).toBeNull();
 	});
 
 	test("list_runs marks a test run with its pinned and skipped nodes", async () => {

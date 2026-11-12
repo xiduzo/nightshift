@@ -1,16 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
-import { runReport } from "./report";
-import type { RunDetail } from "./types";
+import { runReport } from "./index";
 
-type Detail = Pick<RunDetail, "report" | "steps" | "warnings">;
+type Detail = Parameters<typeof runReport>[0];
 
-const endStep = (outputs: Record<string, unknown>) =>
-	({
-		id: "end-1",
-		nodeId: "done",
-		outputs,
-	}) as unknown as RunDetail["steps"][number];
+const endStep = (outputs: Record<string, unknown>) => ({
+	id: "end-1",
+	nodeId: "done",
+	outputs,
+});
 
 const detail = (extra: Partial<Detail> = {}): Detail => ({
 	report: { stepId: "end-1", excerpt: "## News", more: true },

@@ -137,6 +137,7 @@
         "@nightshift/auth": "workspace:*",
         "@nightshift/daemon": "workspace:*",
         "@nightshift/db": "workspace:*",
+        "@nightshift/engine": "workspace:*",
         "@nightshift/flows": "workspace:*",
         "@nightshift/time": "workspace:*",
         "@orpc/client": "catalog:",
@@ -147,7 +148,6 @@
       "devDependencies": {
         "@hocuspocus/provider": "^4.7.1",
         "@nightshift/config": "workspace:*",
-        "@nightshift/engine": "workspace:*",
         "@types/bun": "catalog:",
         "tsdown": "^0.23.0",
         "typescript": "catalog:",
