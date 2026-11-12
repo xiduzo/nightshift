@@ -57,6 +57,7 @@ export {
 	jsonOutputFields,
 	NODE_FAMILIES,
 	NODE_FAMILY,
+	NODE_FAMILY_LABEL,
 	NODE_TYPE_LABEL,
 	type NodeFamily,
 	nodeOutcomes,

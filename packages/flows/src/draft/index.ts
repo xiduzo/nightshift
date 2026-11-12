@@ -22,8 +22,10 @@ export { copyNodes, type FlowClip, pasteNodes } from "./clipboard";
 export {
 	addEdge,
 	addNode,
+	addNodeAfter,
 	edgeInLoop,
 	moveNode,
+	NEW_NODE_TAKES,
 	type NewNodeKind,
 	removeEdge,
 	removeNode,

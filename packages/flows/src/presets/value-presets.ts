@@ -267,7 +267,7 @@ function fieldOf(variable: string, field: string): string {
 }
 
 /** A reference as a JSONata path: each name that JSONata cannot take bare goes in backticks. */
-function jsonataPath(ref: string): string {
+export function jsonataPath(ref: string): string {
 	return ref.split(".").map(jsonataName).join(".");
 }
 

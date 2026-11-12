@@ -7,10 +7,11 @@ import type {
 	FlowVariableDef,
 	outputFieldsByType,
 } from "../flow";
-import type {
-	callEachOutputFields,
-	cascadeOutputFields,
-	confidenceField,
+import {
+	type callEachOutputFields,
+	type cascadeOutputFields,
+	commandHasData,
+	type confidenceField,
 } from "../nodes";
 import { convertDataShape } from "./convert";
 
@@ -189,6 +190,46 @@ export function typedOutput(node: FlowNode): TypedOutput | null {
 		schema: own.output,
 		inferred: own.output !== undefined && own.outputInferred === true,
 	};
+}
+
+/**
+ * The output field that holds what a node made or found: the field a new
+ * node that takes a value reads (`addNodeAfter`). The field its own
+ * `output` schema types, when the node has data. Else the field that says
+ * the most: an Agent's final message, a command's last lines, a Gate's
+ * note, the holder of a Lease.
+ */
+export function mainOutputField(node: FlowNode): string {
+	switch (node.type) {
+		case "agent":
+			return node.output !== undefined ? "data" : "output";
+		case "command":
+			return commandHasData(node) ? "data" : "log_tail";
+		case "convert":
+			return node.to === "json" ? "data" : "text";
+		case "value":
+		case "tool":
+		case "join":
+		case "service":
+		case "since-last-run":
+			return "data";
+		case "web-request":
+			return "body";
+		case "decision":
+			return "note";
+		case "call":
+			return node.each !== undefined ? "results" : "end_message";
+		case "wait":
+			return node.until.kind === "command"
+				? "log_tail"
+				: node.until.kind === "duration" || node.until.kind === "time"
+					? "waited_minutes"
+					: "data";
+		case "lease":
+			return "holder";
+		case "end":
+			return "message";
+	}
 }
 
 /**

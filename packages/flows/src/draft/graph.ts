@@ -1,15 +1,18 @@
 /** Edits of the flow graph: nodes, edges, the start, inputs, outputs, variables and the run policy. */
-import type {
-	Flow,
-	FlowEdge,
-	FlowInputDef,
-	FlowNode,
-	FlowNodeType,
-	FlowOutputDef,
-	FlowVariableDef,
-	Outcome,
-	Policy,
+import {
+	type Flow,
+	type FlowEdge,
+	type FlowInputDef,
+	type FlowNode,
+	type FlowNodeType,
+	type FlowOutputDef,
+	type FlowVariableDef,
+	nodeOutcomes,
+	type Outcome,
+	type Policy,
 } from "../flow";
+import { jsonataPath } from "../presets";
+import { mainOutputField, outputFieldShape } from "../shapes";
 import { uniqueEdgeId, uniqueNodeId } from "./names";
 import {
 	agentNode,
@@ -118,6 +121,108 @@ export function addNode(
 		start: flow.nodes.length === 0 ? id : flow.start,
 	};
 	return { flow: next, id };
+}
+
+/**
+ * Whether a new node of each kind starts from nothing or takes a value:
+ * the main output of the node before it (`mainOutputField`). A Branch
+ * tests it, a Value shapes it, Since last run compares it, and Convert
+ * converts it.
+ */
+export const NEW_NODE_TAKES = {
+	agent: "nothing",
+	command: "nothing",
+	tool: "nothing",
+	"web-request": "nothing",
+	decision: "nothing",
+	gate: "nothing",
+	branch: "value",
+	value: "value",
+	"since-last-run": "value",
+	convert: "value",
+	wait: "nothing",
+	lease: "nothing",
+	service: "nothing",
+	call: "nothing",
+	join: "nothing",
+	end: "nothing",
+} as const satisfies Record<NewNodeKind, "nothing" | "value">;
+
+/**
+ * Adds a node of `kind` after node `fromId`. A kind that takes a value
+ * (`NEW_NODE_TAKES`) reads the main output of `fromId`: a Convert converts
+ * it, a Since last run compares it (the one list in it, if it holds one),
+ * and a Value or a Branch reads it in its rule. An edge leads from the
+ * first outcome of `fromId`, but only when no edge leaves on that outcome
+ * yet. Without a node `fromId`, it adds the node as `addNode` does.
+ */
+export function addNodeAfter(
+	flow: Flow,
+	kind: NewNodeKind,
+	fromId: string,
+	position: Position,
+	defaults: NodeDefaults = {},
+): { flow: Flow; id: string } {
+	const added = addNode(flow, kind, position, defaults);
+	const from = flow.nodes.find((node) => node.id === fromId);
+	if (!from) return added;
+	let next = updateNode(added.flow, added.id, (node) =>
+		readingFrom(node, from),
+	);
+	const outcome = nodeOutcomes(from)[0];
+	const taken = next.edges.some(
+		(edge) => edge.from === fromId && edge.outcome === outcome,
+	);
+	if (outcome !== undefined && !taken) {
+		next = addEdge(next, fromId, outcome, added.id)?.flow ?? next;
+	}
+	return { flow: next, id: added.id };
+}
+
+/** A new node that reads the main output of `from`, for a kind that takes a value. */
+function readingFrom(node: FlowNode, from: FlowNode): FlowNode {
+	const field = mainOutputField(from);
+	const ref = `${from.id}.${field}`;
+	switch (node.type) {
+		case "convert":
+			return { ...node, value: `{{${ref}}}` };
+		case "since-last-run":
+			return { ...node, items: `{{${listIn(from, field)}}}` };
+		case "value":
+			return node.by === "rule"
+				? { ...node, expression: jsonataPath(ref) }
+				: node;
+		case "decision":
+			return node.by === "rule"
+				? {
+						...node,
+						options: node.options.map((option, index) =>
+							index === 0 ? { ...option, when: jsonataPath(ref) } : option,
+						),
+					}
+				: node;
+		default:
+			return node;
+	}
+}
+
+/**
+ * The reference of the list in a field: the field when it is a list, or
+ * its one list one level below (`news.data.items`). Else the field.
+ */
+function listIn(from: FlowNode, field: string): string {
+	const ref = `${from.id}.${field}`;
+	const shape = outputFieldShape(from, field);
+	if (shape?.type === "array") return ref;
+	const properties = shape?.properties;
+	if (properties === null || typeof properties !== "object") return ref;
+	const lists = Object.entries(properties).filter(
+		([, value]) =>
+			value !== null &&
+			typeof value === "object" &&
+			(value as Record<string, unknown>).type === "array",
+	);
+	return lists.length === 1 ? `${ref}.${lists[0]?.[0]}` : ref;
 }
 
 export function updateNode(

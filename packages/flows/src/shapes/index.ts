@@ -9,6 +9,7 @@ export { schemaAt } from "./at";
 export { FEED_ITEM_KEYS } from "./convert";
 export {
 	inputShape,
+	mainOutputField,
 	outputFieldShape,
 	RESERVED_DATA_KEYS,
 	typedOutput,

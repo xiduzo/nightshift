@@ -50,6 +50,7 @@ export {
 export {
 	addEdge,
 	addNode,
+	addNodeAfter,
 	addSection,
 	type CliToolRef,
 	checkDraft,
@@ -70,6 +71,7 @@ export {
 	moveNode,
 	type NameClash,
 	type NameOwner,
+	NEW_NODE_TAKES,
 	type NewNodeKind,
 	type NodeDefaults,
 	type NodeOption,
@@ -148,6 +150,7 @@ export {
 	type NextEdgeInput,
 	NODE_FAMILIES,
 	NODE_FAMILY,
+	NODE_FAMILY_LABEL,
 	NODE_TYPE_LABEL,
 	type NodeFamily,
 	nextEdge,
@@ -384,6 +387,7 @@ export {
 	VALUE_PRESETS,
 	type ValuePresetInput,
 	type ValuePresetName,
+	type ValuePresetResult,
 	valuePreset,
 } from "./presets";
 export {
@@ -461,6 +465,7 @@ export {
 	fieldNameProblem,
 	fromJsonSchema,
 	inferSchema,
+	mainOutputField,
 	RESERVED_DATA_KEYS,
 	type SchemaField,
 	type SchemaShape,

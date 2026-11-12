@@ -89,6 +89,15 @@ export const NODE_FAMILY = {
 	end: "compose",
 } as const satisfies Record<FlowNodeType, NodeFamily>;
 
+/** What a person calls each family: the headings of the add-node dialog. */
+export const NODE_FAMILY_LABEL = {
+	do: "Do",
+	decide: "Decide",
+	shape: "Shape",
+	hold: "Hold",
+	compose: "Compose",
+} as const satisfies Record<NodeFamily, string>;
+
 /**
  * What a person calls a Decision, by who decides it. You decide a Gate, a
  * rule decides a Branch. A Decision by a model keeps the plain name.

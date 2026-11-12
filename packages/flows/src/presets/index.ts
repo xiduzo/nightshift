@@ -8,10 +8,12 @@ export {
 	FILTER_COMPARES,
 	type FilterCompare,
 	itemFields,
+	jsonataPath,
 	type PresetSource,
 	presetSources,
 	VALUE_PRESETS,
 	type ValuePresetInput,
 	type ValuePresetName,
+	type ValuePresetResult,
 	valuePreset,
 } from "./value-presets";
