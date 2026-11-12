@@ -5,6 +5,7 @@ import {
 	evaluateRule,
 	isTruthy,
 	rewriteRuleNames,
+	rewriteRuleVariables,
 	ruleContext,
 	ruleNames,
 	ruleProblem,
@@ -300,6 +301,31 @@ describe("the variables a rule reads", () => {
 			),
 		).toEqual([]);
 		expect(ruleVariableNames("vars.tries = (")).toEqual([]);
+	});
+
+	test("rewriteRuleVariables renames each read, the rest stays byte for byte", () => {
+		const toN = (name: string) => (name === "tries" ? "n" : undefined);
+		expect(
+			rewriteRuleVariables(
+				"vars.tries  +\n  $$.vars.`tries` > vars.tries_2 and items[vars.tries = 1]",
+				toN,
+			),
+		).toBe("vars.n  +\n  $$.vars.`n` > vars.tries_2 and items[vars.n = 1]");
+	});
+
+	test("rewriteRuleVariables leaves strings, comments and other paths alone", () => {
+		const rule =
+			"\"vars.tries\" & 'vars.tries' & $x.vars.tries & other.vars.tries & $vars.tries /* vars.tries */";
+		expect(rewriteRuleVariables(rule, () => "n")).toBe(rule);
+		expect(rewriteRuleVariables("vars.tries = (", () => "n")).toBe(
+			"vars.tries = (",
+		);
+	});
+
+	test("rewriteRuleVariables puts a new name JSONata cannot take bare in backticks", () => {
+		expect(rewriteRuleVariables("vars.tries > 1", () => "and")).toBe(
+			"vars.`and` > 1",
+		);
 	});
 });
 

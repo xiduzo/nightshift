@@ -18,6 +18,7 @@ export {
 	type RuleEvaluation,
 	type RuleOutcome,
 	rewriteRuleNames,
+	rewriteRuleVariables,
 	ruleMessage,
 	ruleNames,
 	ruleProblem,

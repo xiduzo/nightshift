@@ -261,6 +261,20 @@ export function rewriteRuleNames(
 }
 
 /**
+ * Rewrites the variables a rule reads (`ruleVariableNames`) that `rename`
+ * gives a new name for: `tries` in `vars.tries`, in `$$.vars.tries` too.
+ * A string (`"vars.tries"`), a longer name (`vars.tries_2`) and a key
+ * below another value (`$x.vars.tries`) stay, as does the rest of the
+ * text. A rule that is not valid stays as a whole.
+ */
+export function rewriteRuleVariables(
+	expr: string,
+	rename: (name: string) => string | undefined,
+): string {
+	return rewriteSteps(expr, findVariableRefs(expr), rename);
+}
+
+/**
  * Replaces the name of each step that `rename` gives a new name for, by
  * its place in the text, so the rest stays byte for byte. A quoted name
  * stays quoted. A new name JSONata cannot take bare goes in backticks.

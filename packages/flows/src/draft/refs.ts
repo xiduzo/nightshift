@@ -9,7 +9,11 @@ import {
 	type WebRequestNode,
 } from "../nodes";
 import type { TemplateRef } from "../template";
-import { rewriteRuleNames, templateRefs } from "../template";
+import {
+	rewriteRuleNames,
+	rewriteRuleVariables,
+	templateRefs,
+} from "../template";
 
 /** A name a template can reference: a node id, an input, `run` or `vars`. */
 const REF_NAME = /^[a-z][a-z0-9_]*$/;
@@ -111,19 +115,17 @@ export function renameInFlow(flow: Flow, from: string, to: string): Flow {
 }
 
 /**
- * Rewrites `vars.from` in a rule or an expression, best effort: a name
- * that only starts the same (`vars.from_2`) stays.
+ * Rewrites `vars.from` where a rule or an expression reads the variable
+ * (`rewriteRuleVariables`): `vars.from`, `$$.vars.from`. A string, a name
+ * that only starts the same (`vars.from_2`) and a key below another value
+ * (`$x.vars.from`) stay. A rule that is not valid stays as it is.
  */
 export function renameVarInRule(
 	text: string,
 	from: string,
 	to: string,
 ): string {
-	const reference = new RegExp(
-		`(^|[^A-Za-z0-9_$.])(vars\\.)${from}(?![A-Za-z0-9_])`,
-		"g",
-	);
-	return text.replace(reference, `$1$2${to}`);
+	return rewriteRuleVariables(text, (name) => (name === from ? to : undefined));
 }
 
 /**

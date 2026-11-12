@@ -67,6 +67,21 @@ describe("variables in the draft", () => {
 		);
 	});
 
+	test("renameVarInRule renames the reads only: not a string or a comment", () => {
+		expect(
+			renameVarInRule(
+				"vars.tries & \"vars.tries\" & 'vars.tries' /* vars.tries */ & $$.vars.tries",
+				"tries",
+				"n",
+			),
+		).toBe(
+			"vars.n & \"vars.tries\" & 'vars.tries' /* vars.tries */ & $$.vars.n",
+		);
+		expect(renameVarInRule("vars.tries = (", "tries", "n")).toBe(
+			"vars.tries = (",
+		);
+	});
+
 	test("renameVariable follows templates, rules, expressions, writes and outputs", () => {
 		const renamed = renameVariable(flow, 0, "attempts");
 		expect(renamed.variables?.map((v) => v.name)).toEqual(["attempts", "plan"]);

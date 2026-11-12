@@ -9,15 +9,17 @@
  * - every text the checks read as a template or a rule, the rewrite visits
  *   as one, with the same names of its own;
  * - renaming a node rewrites every text the rewrite visits that reads it,
- *   a rule as well as a template.
+ *   a rule as well as a template, and a rule in every way it can read
+ *   a node;
+ * - renaming a variable does the same for every text that reads it.
  */
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
-import { FLOW_VERSION, type FlowNode, flowSchema } from "../flow";
-import { ruleNames, templateRefs } from "../template";
+import { FLOW_VERSION, type Flow, type FlowNode, flowSchema } from "../flow";
+import { ruleNames, ruleVariableNames, templateRefs } from "../template";
 import { checkNodeWith } from "../validate";
 import { renameNode } from "./graph";
-import { rewriteNodeTexts, type TextField } from "./refs";
+import { renameVariable, rewriteNodeTexts, type TextField } from "./refs";
 
 /** The schema of one node, of any type. */
 const flowNodeSchema = flowSchema.shape.nodes.element;
@@ -441,6 +443,52 @@ function notRenamed(node: FlowNode): string[] {
 	});
 }
 
+/** The variables a text reads: `{{vars.seen}}` in a template, `vars.seen` in a rule. */
+function variablesRead(text: TextField & { text: string }): string[] {
+	return text.rule
+		? ruleVariableNames(text.text)
+		: templateRefs(text.text).flatMap((ref) =>
+				ref.name === "vars" && ref.path[0] !== undefined ? [ref.path[0]] : [],
+			);
+}
+
+/**
+ * Every text the rewrite visits that still reads the variable `seen` after
+ * its rename. Each text reads it first: a template as `{{vars.seen}}`, a
+ * rule in every way a rule reads a variable.
+ */
+function variableNotRenamed(node: FlowNode): string[] {
+	const reads = [
+		"vars.seen = 1",
+		"$$.vars.seen = 1",
+		"vars.`seen` = 1",
+		"$count([1][vars.seen = $]) = 1",
+	].join(" and ");
+	const reading = rewriteNodeTexts(node, (text, field) =>
+		field.rule ? `${text} and ${reads}` : `${text}{{vars.seen}}`,
+	);
+	const flow: Flow = {
+		version: FLOW_VERSION,
+		inputs: [],
+		outputs: [],
+		variables: [{ name: "seen", type: "number" }],
+		start: node.id,
+		nodes: [reading],
+		edges: [],
+	};
+	const [renamed] = renameVariable(flow, 0, "seen_renamed").nodes;
+	const after = renamed ? rewrittenTexts(renamed) : [];
+	return rewrittenTexts(reading).flatMap((text, index) => {
+		const now = after[index];
+		const read = now ? variablesRead(now) : [];
+		return variablesRead(text).includes("seen") &&
+			read.includes("seen_renamed") &&
+			!read.includes("seen")
+			? []
+			: [`${text.rule ? "rule" : "template"} "${text.text}"`];
+	});
+}
+
 /** Every text of a value that is not empty, with where it sits. */
 function leaves(
 	value: unknown,
@@ -525,6 +573,13 @@ describe("the rewrite of a node's texts", () => {
 		"renaming a node rewrites every text that reads it (%s, %s)",
 		(_id, _type, node) => {
 			expect(notRenamed(node)).toEqual([]);
+		},
+	);
+
+	test.each(FIXTURES.map((node) => [node.id, node.type, node] as const))(
+		"renaming a variable rewrites every text that reads it (%s, %s)",
+		(_id, _type, node) => {
+			expect(variableNotRenamed(node)).toEqual([]);
 		},
 	);
 
