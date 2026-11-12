@@ -37,7 +37,7 @@ import {
 	ToggleGroup,
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
 	Background,
@@ -192,13 +192,9 @@ function MapLoader({ focus }: { focus: string | null }) {
 
 /** Marks a word as not a topic, with a way back, or puts one back. */
 function useNotTopic(projectId: string) {
-	const queryClient = useQueryClient();
 	const { mutate, isPending } = useMutation(
 		knowledgeMutations.markNotTopic({
 			onSuccess: (_words, { word, notTopic }) => {
-				void queryClient.invalidateQueries({
-					queryKey: knowledgeQueries.all(),
-				});
 				if (!notTopic) {
 					toast.success(`${word} is a topic again`);
 					return;

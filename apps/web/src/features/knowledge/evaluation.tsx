@@ -27,7 +27,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@nightshift/ui/components/table";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
 	ChevronDownIcon,
 	CircleAlertIcon,
@@ -183,13 +183,9 @@ function Advice({
 	evaluation: Evaluation;
 	mayChange: boolean;
 }) {
-	const queryClient = useQueryClient();
 	const setMeaning = useMutation(
 		knowledgeMutations.setMeaning({
 			onSuccess: (_status, input) => {
-				void queryClient.invalidateQueries({
-					queryKey: knowledgeQueries.all(),
-				});
 				toast.success(
 					input.on
 						? "Search by meaning is on for this project"

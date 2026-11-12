@@ -11,8 +11,6 @@ import type { ApiQueryUtils } from "../api";
  */
 export function createKnowledgeQueries(orpc: ApiQueryUtils) {
 	return {
-		/** Every read of the knowledge. */
-		all: () => orpc.knowledge.key(),
 		/** Every list of learnings that wait. */
 		learningsKey: () => orpc.knowledge.learnings.key(),
 		/** Every read of a project's knowledge: it counts the learnings that wait. */

@@ -29,7 +29,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@nightshift/ui/components/table";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { CircleAlertIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -211,14 +211,10 @@ function Answer({
 	choices: string[];
 	mayChange: boolean;
 }) {
-	const queryClient = useQueryClient();
 	const [typed, setTyped] = useState("");
 	const mark = useMutation(
 		knowledgeMutations.markQuestion({
 			onSuccess: (_set, input) => {
-				void queryClient.invalidateQueries({
-					queryKey: knowledgeQueries.all(),
-				});
 				toast.success(
 					input.answers.length > 0 ? "Question marked" : "Mark removed",
 				);

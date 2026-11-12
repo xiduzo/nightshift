@@ -41,7 +41,7 @@ import {
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
 	CircleAlertIcon,
@@ -55,14 +55,14 @@ import {
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { flowQueries, StartRunDialog } from "@/features/flows";
-import { type Knowledge, orpc } from "@/shared/api";
+import type { Knowledge } from "@/shared/api";
 import { formatRelative, hoverTime } from "@/shared/format";
 import {
 	AddSourceButton,
 	KnowledgeSection,
 	useKnowledge,
 } from "./knowledge-layout";
-import { knowledgeMutations, knowledgeQueries } from "./queries";
+import { knowledgeMutations } from "./queries";
 import type { EditedSource } from "./source-dialog";
 import {
 	computerText,
@@ -347,7 +347,6 @@ export function SyncNowButton({
 	sync: Omit<Sync, "may">;
 }) {
 	const navigate = useNavigate();
-	const queryClient = useQueryClient();
 	const [asking, setAsking] = useState(false);
 	const flows = useQuery({
 		...flowQueries.list(projectId),
@@ -357,9 +356,6 @@ export function SyncNowButton({
 	const start = useMutation(
 		knowledgeMutations.syncSource({
 			onSuccess: (run) => {
-				void queryClient.invalidateQueries({
-					queryKey: knowledgeQueries.all(),
-				});
 				toast.success("Night Shift syncs it now", {
 					action: {
 						label: "View run",
@@ -424,17 +420,11 @@ function RemoveSourceDialog({
 	onClose: () => void;
 }) {
 	const id = useId();
-	const queryClient = useQueryClient();
 	const [removeFiles, setRemoveFiles] = useState(removesFiles);
 	const label = sync ? sourceLabel(sync) : "";
 	const remove = useMutation(
 		knowledgeMutations.removeSource({
 			onSuccess: ({ removedFiles }) => {
-				void Promise.all([
-					queryClient.invalidateQueries({ queryKey: knowledgeQueries.all() }),
-					queryClient.invalidateQueries({ queryKey: orpc.flows.key() }),
-					queryClient.invalidateQueries({ queryKey: orpc.schedules.key() }),
-				]);
 				onClose();
 				toast.success(
 					removedFiles > 0

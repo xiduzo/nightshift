@@ -43,14 +43,13 @@ import {
 } from "@nightshift/ui/components/radio-group";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { UsersIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { FlowInputFields } from "@/features/flows";
 import { useHasFolder } from "@/features/projects";
-import { orpc } from "@/shared/api";
-import { knowledgeMutations, knowledgeQueries } from "./queries";
+import { knowledgeMutations } from "./queries";
 
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
 const DEFAULT_TIME = "06:00";
@@ -157,7 +156,6 @@ function SourceForm({
 	onDone: () => void;
 }) {
 	const id = useId();
-	const queryClient = useQueryClient();
 	const [kit, setKit] = useState<KnowledgeSourceKit>(
 		edited?.source.kit ?? "kit:knowledge/folder",
 	);
@@ -188,17 +186,25 @@ function SourceForm({
 	const braces = knowledgeSourceBracesProblem({ kit, inputs: values });
 	const invalid = missing.length > 0 || badTime || braces !== null;
 
-	const refresh = () =>
-		Promise.all([
-			queryClient.invalidateQueries({ queryKey: knowledgeQueries.all() }),
-			queryClient.invalidateQueries({ queryKey: orpc.flows.key() }),
-			queryClient.invalidateQueries({ queryKey: orpc.schedules.key() }),
-		]);
 	const sync = useMutation(knowledgeMutations.syncSource());
+	// Not awaited in the save's onSuccess: the save reads what it wrote first.
+	const syncNowAfterSave = async (name: string) => {
+		try {
+			await sync.mutateAsync({ projectId, name });
+			toast.success(
+				edited
+					? "Source saved. Night Shift syncs it now."
+					: "Source added. Night Shift syncs it now.",
+			);
+		} catch (error) {
+			toast.error(
+				`Saved, but the sync did not start: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
+	};
 	const save = useMutation(
 		knowledgeMutations.saveSource({
-			onSuccess: async ({ name, issues }) => {
-				void refresh();
+			onSuccess: ({ name, issues }) => {
 				onDone();
 				const problem = issues.find((issue) => issue.severity === "error");
 				if (problem) {
@@ -209,19 +215,7 @@ function SourceForm({
 					toast.success(edited ? "Source saved" : "Source added");
 					return;
 				}
-				try {
-					await sync.mutateAsync({ projectId, name });
-					toast.success(
-						edited
-							? "Source saved. Night Shift syncs it now."
-							: "Source added. Night Shift syncs it now.",
-					);
-					void refresh();
-				} catch (error) {
-					toast.error(
-						`Saved, but the sync did not start: ${error instanceof Error ? error.message : String(error)}`,
-					);
-				}
+				void syncNowAfterSave(name);
 			},
 			onError: (error) => toast.error(`Could not save: ${error.message}`),
 		}),
