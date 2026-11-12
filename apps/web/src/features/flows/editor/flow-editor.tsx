@@ -87,7 +87,6 @@ import { EditorCanvas } from "./editor-canvas";
 import { FloatingInspector } from "./floating-inspector";
 import { FlowInspector } from "./flow-inspector";
 import { FlowTitleCard } from "./flow-title-card";
-import { useDraftHistory } from "./history/use-draft-history";
 import { NodeInspector } from "./inspector/node-inspector";
 import { IssuesPopover } from "./issues-popover";
 import { LeaveDialog } from "./leave-dialog";
@@ -108,6 +107,11 @@ import {
 	selectedSectionIds,
 	selectionIn,
 } from "./selection";
+import {
+	createEditingSession,
+	type DraftSetter,
+} from "./session/editing-session";
+import { useEditingSession } from "./session/use-editing-session";
 import { SubflowView } from "./subflow/subflow-view";
 import { useSubflowStack } from "./subflow/use-subflow-stack";
 import { FollowingBar } from "./test-run/following-bar";
@@ -158,11 +162,12 @@ function Editor({
 	const queryClient = useQueryClient();
 	const { fitView } = useReactFlow();
 
-	const { draft, setDraft, undo, redo, canUndo, canRedo, revision } =
-		useDraftHistory(initialFlow);
-	const [savedJson, setSavedJson] = useState(() =>
-		initiallySaved ? JSON.stringify(initialFlow) : "",
+	// The draft, its undo history and what was saved last.
+	const [session] = useState(() =>
+		createEditingSession(initialFlow, { saved: initiallySaved }),
 	);
+	const { draft, canUndo, canRedo, revision, dirty, everSaved } =
+		useEditingSession(session);
 	const [selection, setSelection] = useState<Selection>(null);
 	const [revisionsOpen, setRevisionsOpen] = useState(
 		revisionLink !== undefined,
@@ -188,9 +193,9 @@ function Editor({
 	const [openSection, setOpenSection] = useState<string | null>(null);
 	// A node added or pasted while a Section is open joins it, unless it
 	// came in a pasted Section: then that Section joins it.
-	const setDraftInOpen = useCallback<typeof setDraft>(
+	const setDraftInOpen = useCallback<DraftSetter>(
 		(change, gesture) =>
-			setDraft((current) => {
+			session.edit((current) => {
 				const next = typeof change === "function" ? change(current) : change;
 				const section = openSection;
 				if (!section || !next.sections?.some((s) => s.id === section))
@@ -213,13 +218,9 @@ function Editor({
 					}),
 				}));
 			}, gesture),
-		[setDraft, openSection],
+		[session, openSection],
 	);
 
-	const dirty = useMemo(
-		() => JSON.stringify(draft) !== savedJson,
-		[draft, savedJson],
-	);
 	const {
 		projectFlows,
 		nodeDefaults,
@@ -251,12 +252,6 @@ function Editor({
 		(issue) => issue.severity === "error",
 	).length;
 
-	const changeFlow = useCallback(
-		(change: (flow: Flow) => Flow, gesture?: string) =>
-			setDraft(change, gesture),
-		[setDraft],
-	);
-
 	const saveFlow = useMutation(
 		flowMutations.save({
 			onError: (error) => toast.error(`Could not save: ${error.message}`),
@@ -264,8 +259,6 @@ function Editor({
 	);
 
 	const canSave = dirty && savable && !saveFlow.isPending;
-	// Export and copy read the saved flow: there is none before the first save.
-	const everSaved = savedJson !== "";
 
 	const exportFlow = async () => {
 		try {
@@ -288,14 +281,14 @@ function Editor({
 	/** After a save: the draft is the file now, and the cached flow follows. */
 	const onSaved = useCallback(
 		(snapshot: Flow, issues: FlowIssue[]) => {
-			setSavedJson(JSON.stringify(snapshot));
+			session.saved(snapshot);
 			queryClient.setQueryData(
 				flowQueries.get(projectId, name).queryKey,
 				(loaded) => (loaded ? { ...loaded, flow: snapshot, issues } : loaded),
 			);
 			// The live cache reads the lists, the map and the revisions.
 		},
-		[queryClient, projectId, name],
+		[session, queryClient, projectId, name],
 	);
 
 	const save = useCallback(() => {
@@ -359,7 +352,7 @@ function Editor({
 		const next = updateNode(draft, nodeId, (current) =>
 			current.type === "call" ? { ...current, flow: calledName } : current,
 		);
-		setDraft(next);
+		session.edit(next);
 		if (!isSavable(next)) {
 			toast.info(
 				`Created ${calledName}. Fix and save this flow, then open ${calledName} from the node.`,
@@ -381,14 +374,10 @@ function Editor({
 				? `Copied ${copy.kit} into this project as ${calledName}, and saved ${name}.`
 				: `Created ${calledName} and saved ${name}.`,
 		);
-		// The save has not rendered yet; leaving must not ask about it.
-		dirtyRef.current = false;
 		openFlow(calledName);
 	};
 
-	const sections = sectionEdits(draft, setDraft, setSelection);
-	const draftRef = useRef(draft);
-	draftRef.current = draft;
+	const sections = sectionEdits(draft, session.edit, setSelection);
 	const subflowSection = draft.sections?.find(
 		(section) => section.id === subflowOf,
 	);
@@ -444,11 +433,9 @@ function Editor({
 	}, [save]);
 
 	// Leaving with unsaved changes asks first, in the app and on reload.
-	const dirtyRef = useRef(dirty);
-	dirtyRef.current = dirty;
 	const blocker = useBlocker({
-		shouldBlockFn: () => dirtyRef.current,
-		enableBeforeUnload: () => dirtyRef.current,
+		shouldBlockFn: () => session.get().dirty,
+		enableBeforeUnload: () => session.get().dirty,
 		withResolver: true,
 	});
 
@@ -532,7 +519,7 @@ function Editor({
 		removeSelectedOutcome,
 		setSelectedCallEach,
 		setSelectedAgentOutcomes,
-	} = nodeEdits(draft, setDraft, setSelection);
+	} = nodeEdits(draft, session.edit, setSelection);
 
 	const flowsSupport = {
 		flowName: name,
@@ -552,8 +539,8 @@ function Editor({
 		projectId,
 		flowName: name,
 		flow: draft,
-		readFlow: () => draftRef.current,
-		changeFlow,
+		readFlow: () => session.get().draft,
+		changeFlow: session.edit,
 	};
 	// The agent reads the project's folder: without one here, it says how to get it.
 	const project = useQuery(projectQueries.list()).data?.find(
@@ -577,14 +564,8 @@ function Editor({
 		preview || subflows.inside
 			? null
 			: {
-					undo: () => {
-						if (canUndo) undo();
-						return canUndo;
-					},
-					redo: () => {
-						if (canRedo) redo();
-						return canRedo;
-					},
+					undo: session.undo,
+					redo: session.redo,
 					...clipboard,
 				};
 
@@ -613,7 +594,7 @@ function Editor({
 			flow={draft}
 			node={selectedNode}
 			onChange={(change) =>
-				setDraft(
+				session.edit(
 					(current) => updateNode(current, selectedNode.id, change),
 					`node:${selectedNode.id}`,
 				)
@@ -624,13 +605,13 @@ function Editor({
 			onSetAgentOutcomes={setSelectedAgentOutcomes(selectedNode)}
 			onSetCallEach={setSelectedCallEach(selectedNode)}
 			onSetStart={() =>
-				setDraft((current) => ({
+				session.edit((current) => ({
 					...current,
 					start: selectedNode.id,
 				}))
 			}
 			onDelete={() => {
-				setDraft((current) => removeNode(current, selectedNode.id));
+				session.edit((current) => removeNode(current, selectedNode.id));
 				setSelection(null);
 			}}
 			calledFlows={flowsSupport}
@@ -643,13 +624,13 @@ function Editor({
 			edge={selectedEdge}
 			onSelectEdge={(id) => setSelection({ kind: "edge", id })}
 			onChange={(change) =>
-				setDraft(
+				session.edit(
 					(current) => updateEdge(current, selectedEdge.id, change),
 					`edge:${selectedEdge.id}`,
 				)
 			}
 			onDelete={() => {
-				setDraft((current) => removeEdge(current, selectedEdge.id));
+				session.edit((current) => removeEdge(current, selectedEdge.id));
 				setSelection(null);
 			}}
 		/>
@@ -663,7 +644,7 @@ function Editor({
 			)}
 			autoFocus={madeSection === selectedSection.id}
 			onChange={(change) =>
-				setDraft(
+				session.edit(
 					(current) => updateSection(current, selectedSection.id, change),
 					`section:${selectedSection.id}`,
 				)
@@ -679,14 +660,14 @@ function Editor({
 			name={name}
 			projectId={projectId}
 			policyDefaults={policyDefaults}
-			onChange={(change) => setDraft(change, "settings")}
+			onChange={(change) => session.edit(change, "settings")}
 		/>
 	) : null;
 
 	// An undo or a redo can take away what is selected.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: runs on each undo or redo only.
 	useEffect(() => {
-		setSelection((current) => selectionIn(draftRef.current, current));
+		setSelection((current) => selectionIn(session.get().draft, current));
 	}, [revision]);
 
 	const closeInspector = useCallback(() => {
@@ -759,7 +740,7 @@ function Editor({
 						<DropdownMenuGroup>
 							<DropdownMenuItem
 								disabled={!canUndo || preview !== null}
-								onClick={undo}
+								onClick={() => session.undo()}
 							>
 								<Undo2Icon aria-hidden="true" />
 								Undo
@@ -767,7 +748,7 @@ function Editor({
 							</DropdownMenuItem>
 							<DropdownMenuItem
 								disabled={!canRedo || preview !== null}
-								onClick={redo}
+								onClick={() => session.redo()}
 							>
 								<Redo2Icon aria-hidden="true" />
 								Redo
@@ -850,7 +831,7 @@ function Editor({
 											routesKey={`${projectId}/${name}${revisionPreview ? `#revision:${shownRevision?.revisionId}` : preview ? "#proposal" : ""}`}
 											check={previewCheck ?? check}
 											selection={preview ? null : selection}
-											onFlowChange={preview ? ignoreChange : changeFlow}
+											onFlowChange={preview ? ignoreChange : session.edit}
 											preview={preview ?? undefined}
 											// A fit keeps the flow beside the chat, not under it.
 											coveredRight={chat.open ? CHAT_PANEL_COVERS_PX : 0}
@@ -1032,7 +1013,7 @@ function Editor({
 						sections.applySubflow(
 							subflowSection.id,
 							made,
-							() => draftRef.current,
+							() => session.get().draft,
 						);
 					}}
 				/>
@@ -1053,7 +1034,7 @@ function Editor({
 					setShownRevision(revision);
 				}}
 				onRestored={(flow, issues) => {
-					setDraft(flow);
+					session.edit(flow);
 					onSaved(flow, issues);
 					setShownRevision(null);
 				}}

@@ -11,12 +11,12 @@ import {
 import { useReactFlow, useStoreApi } from "@xyflow/react";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
-import type { DraftSetter } from "../history/use-draft-history";
 import {
 	type Selection,
 	type SelectionSetter,
 	selectedNodeIds,
 } from "../selection";
+import type { DraftSetter } from "../session/editing-session";
 
 /** Each paste on the same spot lands this far down and right of the one before. */
 const PASTE_STEP = 32;
