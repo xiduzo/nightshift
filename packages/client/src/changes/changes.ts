@@ -54,7 +54,8 @@ const STALE: {
 	// Each run carries into the lists that count it, the dashboard's
 	// numbers, a schedule's last start, the run counts of the projects (the
 	// sidebar, the phone's Projects), and the learnings that wait (a step
-	// that ends may propose some).
+	// that ends may propose some). Each step that ends saves the values of
+	// the kept variables and what the Since last run nodes saw.
 	runs: {
 		also: [
 			["runs", "list"],
@@ -63,6 +64,8 @@ const STALE: {
 			["projects", "list"],
 			["knowledge", "learnings"],
 			["knowledge", "review"],
+			["flows", "kept"],
+			["flows", "memory"],
 		],
 	},
 	// Every read of projects: the lists, one project's page, its sources.
@@ -78,8 +81,20 @@ const STALE: {
 			["knowledge", "get"],
 		],
 	},
-	// A project's flows, their notices and its schedules.
-	flows: { holds: [["flows"], ["schedules", "list"]] },
+	// A project's flows, their notices and its schedules. The kept values
+	// and the memory of a flow's runs are not in the document: the runs
+	// change them.
+	flows: {
+		holds: [
+			["flows", "list"],
+			["flows", "get"],
+			["flows", "map"],
+			["flows", "notices"],
+			["flows", "export"],
+			["schedules", "list"],
+		],
+		also: [["flows"]],
+	},
 	"flows-history": {
 		holds: [
 			["flows", "revisions"],

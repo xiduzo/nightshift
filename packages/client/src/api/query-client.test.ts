@@ -115,18 +115,31 @@ describe("the query client of an app", () => {
 		).toBe(60 * 1000);
 	});
 
-	test("keeps a synced document fresh for 10 minutes", () => {
+	test("keeps what a synced document holds fresh for 10 minutes, and nothing else", () => {
 		const client = createQueryClient();
-		expect(
+		const staleTime = (...path: string[]) =>
 			client.defaultQueryOptions({
-				queryKey: [["flows", "list"], { type: "query", input: {} }],
-			}).staleTime,
-		).toBe(10 * 60 * 1000);
-		expect(
-			client.defaultQueryOptions({
-				queryKey: [["connections", "check"], { type: "query" }],
-			}).staleTime,
-		).toBe(60 * 1000);
+				queryKey: [path, { type: "query", input: {} }],
+			}).staleTime;
+		for (const held of [
+			["flows", "list"],
+			["flows", "revisions"],
+			["knowledge", "get"],
+			["projects", "list"],
+			["profiles", "list"],
+			["connections", "list"],
+		]) {
+			expect(staleTime(...held), held.join(".")).toBe(10 * 60 * 1000);
+		}
+		// A run changes these, or the world outside Night Shift does.
+		for (const other of [
+			["flows", "kept"],
+			["flows", "memory"],
+			["connections", "check"],
+			["projects", "check"],
+		]) {
+			expect(staleTime(...other), other.join(".")).toBe(60 * 1000);
+		}
 	});
 });
 

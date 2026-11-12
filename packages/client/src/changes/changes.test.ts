@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { documentOf, heldByDocuments, staleAfter } from "./changes";
 
 describe("what a change makes stale", () => {
-	test("a run reads the lists that count it, not a synced document", () => {
+	test("a run reads the lists that count it, and what its steps keep for the next run", () => {
 		expect(staleAfter(["runs"])).toEqual([
 			["runs", "list"],
 			["dashboard"],
@@ -11,6 +11,8 @@ describe("what a change makes stale", () => {
 			["projects", "list"],
 			["knowledge", "learnings"],
 			["knowledge", "review"],
+			["flows", "kept"],
+			["flows", "memory"],
 		]);
 	});
 
@@ -34,14 +36,16 @@ describe("what a change makes stale", () => {
 			["schedules", "list"],
 			["knowledge", "learnings"],
 			["knowledge", "review"],
+			["flows", "kept"],
+			["flows", "memory"],
 			["spaces"],
 			["members"],
 			["projects"],
 		]);
 		// The flows read their history too.
 		expect(staleAfter(["flows", "flows-history"])).toEqual([
-			["flows"],
 			["schedules", "list"],
+			["flows"],
 		]);
 		expect(staleAfter([])).toEqual([]);
 	});
@@ -50,8 +54,14 @@ describe("what a change makes stale", () => {
 describe("the reads a synced document holds", () => {
 	test("are the reads only a document changes, each once", () => {
 		expect(heldByDocuments()).toEqual([
-			["flows"],
+			["flows", "list"],
+			["flows", "get"],
+			["flows", "map"],
+			["flows", "notices"],
+			["flows", "export"],
 			["schedules", "list"],
+			["flows", "revisions"],
+			["flows", "revision"],
 			["knowledge"],
 			["projects", "list"],
 			["spaces"],

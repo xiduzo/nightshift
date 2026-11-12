@@ -106,6 +106,12 @@ const KEYS = {
 	revisions: orpc.flows.revisions.queryOptions({
 		input: { projectId: "p1", name: "night" },
 	}).queryKey,
+	kept: orpc.flows.kept.queryOptions({
+		input: { projectId: "p1", name: "night" },
+	}).queryKey,
+	memory: orpc.flows.memory.queryOptions({
+		input: { projectId: "p1", name: "night" },
+	}).queryKey,
 	map: orpc.knowledge.graph.queryOptions({ input: { projectId: "p1" } })
 		.queryKey,
 	members: orpc.members.list.queryOptions().queryKey,
@@ -116,8 +122,10 @@ const KEYS = {
 } as const;
 type Name = keyof typeof KEYS;
 
-/** What any change of run r1 reads again: the run, its files, the lists, the numbers, the schedules, the projects' counts, the learnings that wait. */
+/** What any change of run r1 reads again: the run, its files, the lists, the numbers, the schedules, the projects' counts, the learnings that wait, the kept values and the memory. */
 const RUN_1: Name[] = [
+	"kept",
+	"memory",
 	"learnings",
 	"review",
 	"everyRun",
@@ -403,6 +411,8 @@ describe("the live cache follows the Host", () => {
 			[["projects", "list"]],
 			[["knowledge", "learnings"]],
 			[["knowledge", "review"]],
+			[["flows", "kept"]],
+			[["flows", "memory"]],
 		]);
 	});
 
@@ -440,7 +450,9 @@ describe("the live cache follows the Host", () => {
 			at: 4,
 		});
 		timers.due(300);
-		expect(stale()).toEqual(sorted(["flows", "revisions", "schedules"]));
+		expect(stale()).toEqual(
+			sorted(["flows", "revisions", "kept", "memory", "schedules"]),
+		);
 
 		const history = setUp();
 		const followed = follow(history.live);
@@ -531,7 +543,7 @@ describe("the live cache follows the Host", () => {
 			at: 4,
 		});
 		timers.due(300);
-		expect(reads).toEqual([[["flows"]], [["schedules", "list"]]]);
+		expect(reads).toEqual([[["schedules", "list"]], [["flows"]]]);
 	});
 
 	test("a document this screen does not know reads everything again", async () => {
