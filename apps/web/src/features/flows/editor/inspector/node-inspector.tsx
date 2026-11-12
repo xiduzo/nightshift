@@ -40,6 +40,7 @@ import { EndFields } from "./end-fields";
 import { JoinFields } from "./join-fields";
 import { LastOutputSection } from "./last-output-section";
 import { LeaseFields } from "./lease-fields";
+import { MemorySection } from "./memory-section";
 import { ServiceFields } from "./service-fields";
 import { SinceLastRunFields } from "./since-last-run-fields";
 import { ToolFields } from "./tool-fields";
@@ -222,6 +223,13 @@ export function NodeInspector({
 							)
 						}
 						onSetEach={onSetCallEach}
+					/>
+				) : null}
+				{node.type === "call" ? (
+					<MemorySection
+						projectId={projectId}
+						flowName={calledFlows.flowName}
+						node={node}
 					/>
 				) : null}
 

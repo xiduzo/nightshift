@@ -1,37 +1,22 @@
 /** The fields of a Since last run node: what it watches, how it compares, and what it remembers. */
 import {
 	type Flow,
-	MAX_MEMORY_KEYS,
 	type SinceLastRunNode,
 	watchesValue,
 } from "@nightshift/flows";
-import { Button } from "@nightshift/ui/components/button";
 import { Input } from "@nightshift/ui/components/input";
-import {
-	Item,
-	ItemActions,
-	ItemContent,
-	ItemDescription,
-	ItemGroup,
-	ItemTitle,
-} from "@nightshift/ui/components/item";
 import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
-import { Skeleton } from "@nightshift/ui/components/skeleton";
 import {
 	ToggleGroup,
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RotateCcwIcon } from "lucide-react";
 import { useId } from "react";
-import { toast } from "sonner";
-import { formatRelative } from "@/shared/format";
-import { flowMutations, flowQueries } from "../../queries";
 import { Field, InspectorSection, Note } from "../fields";
 import { TemplateField } from "../template-field";
+import { MemorySection } from "./memory-section";
 
 type Watch = "list" | "value";
 
@@ -264,99 +249,5 @@ export function SinceLastRunFields({
 			</InspectorSection>
 			<MemorySection projectId={projectId} flowName={flowName} node={node} />
 		</>
-	);
-}
-
-/** What the node remembers from the runs of this flow, per scope, and Forget what it saw. */
-function MemorySection({
-	projectId,
-	flowName,
-	node,
-}: {
-	projectId: string;
-	flowName: string;
-	node: SinceLastRunNode;
-}) {
-	const queryClient = useQueryClient();
-	const query = flowQueries.memory(projectId, flowName);
-	const memory = useQuery(query);
-	const forget = useMutation(
-		flowMutations.forgetMemory({
-			onSuccess: () => {
-				toast.success("Forgotten. The next run is a first run.");
-				void queryClient.invalidateQueries({ queryKey: query.queryKey });
-			},
-			onError: (error) => toast.error(`Could not forget: ${error.message}`),
-		}),
-	);
-	const scopes = (memory.data ?? []).filter((entry) => entry.node === node.id);
-	return (
-		<InspectorSection title="Memory" tab="results">
-			{memory.isLoading ? (
-				<Skeleton className="h-6 w-full" />
-			) : scopes.length === 0 ? (
-				<p className="text-muted-foreground text-xs">
-					Nothing remembered yet. The next run is a first run.
-				</p>
-			) : (
-				<ItemGroup className="gap-1">
-					{scopes.map((entry) => (
-						<Item key={entry.scope} variant="muted" size="xs">
-							<ItemContent className="min-w-0">
-								<ItemTitle className="text-xs">
-									{entry.value !== undefined
-										? `Last value: ${JSON.stringify(entry.value)}`
-										: `${entry.keys} ${entry.keys === 1 ? "item" : "items"}`}
-								</ItemTitle>
-								<ItemDescription className="truncate text-xs">
-									{entry.scope === "" ? "" : `${entry.scope} · `}
-									Saved {formatRelative(entry.updatedAt)}
-								</ItemDescription>
-							</ItemContent>
-							{scopes.length > 1 ? (
-								<ItemActions>
-									<Button
-										variant="ghost"
-										size="xs"
-										disabled={forget.isPending}
-										aria-label={`Forget what it saw for ${entry.scope}`}
-										onClick={() =>
-											forget.mutate({
-												projectId,
-												name: flowName,
-												node: node.id,
-												scope: entry.scope,
-											})
-										}
-									>
-										<RotateCcwIcon data-icon="inline-start" />
-										Forget
-									</Button>
-								</ItemActions>
-							) : null}
-						</Item>
-					))}
-				</ItemGroup>
-			)}
-			{scopes.length > 0 ? (
-				<Button
-					variant="outline"
-					size="sm"
-					className="self-start"
-					disabled={forget.isPending}
-					onClick={() =>
-						forget.mutate({ projectId, name: flowName, node: node.id })
-					}
-				>
-					<RotateCcwIcon data-icon="inline-start" />
-					Forget what it saw
-				</Button>
-			) : null}
-			<Note>
-				It saves what it saw when its step ends, also when a later step fails.
-				It keeps up to {MAX_MEMORY_KEYS.toLocaleString("en")} items. A quick run
-				remembers nothing.
-			</Note>
-		</InspectorSection>
 	);
 }

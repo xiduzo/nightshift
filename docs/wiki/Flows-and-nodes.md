@@ -149,7 +149,7 @@ A **Since last run** node remembers what it saw. The next run gets only what is 
 - **Data.** `{{fresh.data.new}}` and `{{fresh.data.changed}}` hold the items. `first_run` is true when it remembered nothing yet.
 - **The first run.** On its first run, everything is new. Set **First run** to **Nothing is new** to only remember what is there.
 - **Scope.** A scope, such as `{{feed_url}}`, gives each value its own memory. Two Subflows that call the same flow each have their own memory too.
-- **Forget what it saw.** The node remembers what it saw when its step ends. A later step that fails does not undo that. To see everything again, select the node and click **Forget what it saw**. The next run is a first run.
+- **Forget what it saw.** The node remembers what it saw when its step ends. A later step that fails does not undo that. To see everything again, select the node and click **Forget what it saw**. The next run is a first run. For a node inside a Subflow, select the Subflow node.
 
 It remembers up to 10,000 items, and forgets the oldest first. A quick run remembers nothing.
 
@@ -265,7 +265,7 @@ Set `format` and `field` to what the service takes:
 
 `kit:feeds/read` reads an RSS, Atom or JSON feed, and gives the items that are new since the last run. When the Subflow is the step `feed`, later steps read them in `{{feed.items}}`. It needs no secret.
 
-On its first run, it only remembers what the feed holds, so the next run gives what is new. Set `first_run` to `new` to get those items too. It remembers each feed on its own.
+On its first run, it only remembers what the feed holds, so the next run gives what is new. Set `first_run` to `new` to get those items too. It remembers each feed on its own. To read the whole feed again, select the Subflow node and click **Forget what it saw** under **Results**.
 
 ### Send an email
 
