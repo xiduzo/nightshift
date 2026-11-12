@@ -165,7 +165,7 @@ reopen them.
 
 ## Progress (2026-11-12)
 
-One line per lane. Waves 0 to 3 are built, apart from the two items that wait for the owner. Wave 0 is on main since 2026-11-11. Waves 1 to 3 wait on the integration branch for the owner to deploy the Host and Insights first. None of it is proven on a real Host or seen in a browser yet.
+One line per lane. Waves 0 to 4 are built, apart from the two items that wait for the owner. Waves 0 to 3 are on main and deployed since 2026-11-12. Wave 4 follows them. No new screen is seen in a browser yet.
 
 | Item | State | Where |
 | --- | --- | --- |
@@ -185,6 +185,17 @@ One line per lane. Waves 0 to 3 are built, apart from the two items that wait fo
 | Wave 3: Pin output and Skip (Lock and Bypass) | Done | L1 148fd681 (ADR 27), L2 e30e2fdd, L3 419050ef, L4 755ff1ce |
 | Wave 3: the first starter that is not about code | Waits for the owner (Q16) | |
 | Wave 3: signing the Mac app | Waits for the owner (Q23) | |
+| Deploy of waves 1 to 3 | Done, 2026-11-12 | main 3ccc7b87: Insights and its Collector, the nightly, the Host, the phone |
+| H1 Test runs count only in the spend, on every surface | Done | ad631549 to 33a9b2b0 |
+| H2 Rules read `$$`, a variable rename keeps strings, `previous` and `current` are taken | Done | 31764b84 to 16a6bf9d |
+| H3 "Used by" follows calls and counts Model Profile secrets | Done | 30df6c1b to c0c182d8 |
+| H4 Engine edge cases: Subflow rungs, the End report, Make subflow | Done | 0f30a693 to 5def1ba4 |
+| H5 Flow outputs hold their types at run time | Done | b05f58be to 0fa00c6c |
+| H6 A project without a folder warns at a step that needs one | Done | a7080b0d to 5d06a393 |
+| H7 Copy and docs debt | Done | 498fc28e to 327475fb |
+| H8 A stopped step on another Device waits for its cleanup | Done | 46b046c1, bddaeb80 |
+| H9 Filter reads, `cascade`, the widget, the latest day, cascade rungs | Done | a4ab5ba1 to 7be4b8ac |
+| H10 A project without a folder does not offer what fails there | Done | 7da51084 to b8906e0f |
 
 ## Findings
 
@@ -213,3 +224,17 @@ Waves 1 and 2:
 - No new screen is seen in a browser yet. Obscura cannot render the web app.
 - A test run carries its pins and skips. The flow never does, so no flow format change was needed and a scheduled run can never use a pin (ADR 27).
 - The scheduled nightly of 2026-11-12 did not run by 05:00 UTC. The one of 2026-11-11 ran eight hours late. So waves 1 to 3 stay off main until the Host and Insights can be deployed right after the push.
+
+The deploy of waves 1 to 3 (2026-11-12):
+
+- The Host brought all 35 flows of four projects to format 9 at its start, with no error.
+- The new check of output shapes found a real fault in one flow: a template read a field one level too high, so a step got empty text. The fix took one save.
+- The Host took the database lease at once. The lease loop of earlier deploys did not occur.
+
+Wave 4:
+
+- Nothing in wave 4 needs a Host-first deploy. No flow format, run bundle, registry or Insights change. A new field goes only to a peer that says it can read it.
+- A test run sends no usage event at all. So Insights spend leaves out test runs (H1).
+- A stopped step on another Device waits for its cleanup only when the Host and that Device run wave 4 (H8).
+- A flow output fails a run only when a person set or confirmed its type. An inferred type only warns (H5).
+- Open: rules that read `event` or `data` (Wait rules, a cascade's accept rule) have the same filter trap as H9 found. The terminal MCP `save_flow` does not repeat the folder warnings that `check_flow` gives. This computer cannot count the secrets of another Device's profiles.
