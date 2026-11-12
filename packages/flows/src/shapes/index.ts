@@ -15,7 +15,7 @@ export {
 	typedOutput,
 	variableShape,
 } from "./fields";
-export { inferSchema } from "./infer";
+export { inferOutputType, inferSchema } from "./infer";
 export {
 	emptyShape,
 	FILE_FORMAT,

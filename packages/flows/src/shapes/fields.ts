@@ -250,6 +250,7 @@ export function outputFieldShape(
 	called?: Flow | null,
 ): Schema | undefined {
 	if (node.type === "call" && node.each !== undefined) {
+		if (field === "results" && called) return eachResultsShape(called);
 		return own(CALL_EACH_FIELD_SHAPES, field);
 	}
 	if (node.type === "since-last-run" && node.value !== undefined) {
@@ -269,6 +270,34 @@ export function outputFieldShape(
 	if (shape !== undefined || node.type !== "call" || !called) return shape;
 	const output = called.outputs.find((candidate) => candidate.name === field);
 	return output === undefined ? undefined : flowOutputShape(output);
+}
+
+/**
+ * The `results` of a Call with `each`: each element's `outputs` holds the
+ * outputs of the flow it calls, each with its shape.
+ */
+function eachResultsShape(called: Flow): Schema {
+	const { results } = CALL_EACH_FIELD_SHAPES;
+	const items = results.items as Schema;
+	const properties = items.properties as Record<string, Schema>;
+	return {
+		...results,
+		items: {
+			...items,
+			properties: {
+				...properties,
+				outputs: {
+					type: "object",
+					properties: Object.fromEntries(
+						called.outputs.map((output) => [
+							output.name,
+							flowOutputShape(output),
+						]),
+					),
+				},
+			},
+		},
+	};
 }
 
 /**

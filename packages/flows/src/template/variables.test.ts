@@ -4,6 +4,7 @@ import { renderTemplate } from "./template";
 import {
 	applyVariableWrites,
 	coerceVariable,
+	fitOutput,
 	initialVariables,
 	MAX_VARIABLE_BYTES,
 	writesOn,
@@ -264,6 +265,64 @@ describe("applyVariableWrites", () => {
 			context: { ...context, nodes: { check: { log_tail: big } } },
 		});
 		expect(tooLarge.ok).toBe(false);
+	});
+});
+
+describe("fitOutput", () => {
+	const check = (schema: Record<string, unknown>, value: unknown) =>
+		schema.type === "array" && !Array.isArray(value)
+			? "data must be array"
+			: null;
+
+	test("an output without a type takes any value as it is", () => {
+		expect(fitOutput({ value: "{{a.data}}" }, { x: 1 }, check)).toEqual({
+			ok: true,
+			value: { x: 1 },
+		});
+	});
+
+	test("text from a template reads as the type, one reference keeps its value", () => {
+		expect(fitOutput({ value: "{{a}}{{b}}", type: "number" }, "12")).toEqual({
+			ok: true,
+			value: 12,
+		});
+		expect(fitOutput({ value: "{{a.count}}", type: "number" }, "12")).toEqual({
+			ok: true,
+			value: 12,
+		});
+		expect(
+			fitOutput({ value: "{{a.data}}", type: "json" }, '{"x": 1}'),
+		).toEqual({ ok: true, value: '{"x": 1}' });
+		expect(
+			fitOutput({ value: "Found: {{a.data}}", type: "json" }, "[1]"),
+		).toEqual({ ok: true, value: [1] });
+	});
+
+	test("null fits every type: a step that did not run gives none", () => {
+		expect(
+			fitOutput(
+				{ value: "{{a.data}}", type: "json", schema: { type: "array" } },
+				null,
+				check,
+			),
+		).toEqual({ ok: true, value: null });
+	});
+
+	test("a value of another type, or one its schema does not take, does not fit", () => {
+		expect(fitOutput({ value: "{{a.data}}", type: "number" }, "many")).toEqual({
+			ok: false,
+			problem: 'a number is needed, and the value is "many".',
+		});
+		expect(
+			fitOutput(
+				{ value: "{{a.data}}", type: "json", schema: { type: "array" } },
+				{ x: 1 },
+				check,
+			),
+		).toEqual({
+			ok: false,
+			problem: "the value does not match its schema: data must be array.",
+		});
 	});
 });
 

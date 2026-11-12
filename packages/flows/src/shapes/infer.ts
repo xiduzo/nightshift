@@ -9,6 +9,8 @@
  * (`fromJsonSchema`), with caps on depth and size.
  */
 
+import type { VariableType } from "../flow";
+
 type Schema = Record<string, unknown>;
 
 /** How deep the shape goes. Below it a value is open: `{}`. */
@@ -25,6 +27,33 @@ export const INFER_MAX_PROPERTIES = 200;
 export function inferSchema(value: unknown): Schema {
 	const budget = { properties: INFER_MAX_PROPERTIES };
 	return infer(value, 0, budget);
+}
+
+/**
+ * The type of a flow output, from one real value: text, a number, yes or
+ * no, or JSON with the value's shape (`inferSchema`). Null for null: an
+ * empty value says nothing.
+ */
+export function inferOutputType(
+	value: unknown,
+): { type: VariableType; schema?: Schema } | null {
+	switch (typeof value) {
+		case "string":
+			return { type: "text" };
+		case "number":
+			return { type: "number" };
+		case "boolean":
+			return { type: "boolean" };
+		case "object": {
+			if (value === null) return null;
+			const schema = inferSchema(value);
+			return Object.keys(schema).length === 0
+				? { type: "json" }
+				: { type: "json", schema };
+		}
+		default:
+			return null;
+	}
 }
 
 function infer(

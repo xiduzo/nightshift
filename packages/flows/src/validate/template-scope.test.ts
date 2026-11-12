@@ -409,6 +409,42 @@ describe("shape warnings", () => {
 		expect(read?.keys?.map((key) => key.ref)).toEqual(["read.data.count"]);
 	});
 
+	test("the results of a Subflow that runs per element hold the called flow's outputs, with their shapes", () => {
+		const typedTask: Flow = {
+			...task,
+			outputs: [
+				{
+					name: "summary",
+					value: "{{work.log_tail}}",
+					type: "json",
+					schema: { type: "object", properties: { pass: { type: "boolean" } } },
+				},
+			],
+		};
+		const warned = (command: string, known: ProjectFlowMap) =>
+			validateFlow(mainFlow(command), { flows: known, name: "main" })
+				.filter((issue) => issue.message.includes("has no field"))
+				.map((issue) => issue.message);
+		const typed = { ...flows, task: typedTask };
+		expect(
+			warned(
+				"echo {{each.results.0.outputs.summary.pass}} {{each.results.0.title}}",
+				typed,
+			),
+		).toEqual([]);
+		expect(
+			warned(
+				"echo {{each.results.0.outputs.sumary}} {{each.results.0.outputs.summary.ok}}",
+				typed,
+			),
+		).toEqual([
+			'The command of "use" uses {{each.results.0.outputs.sumary}}, but each.results.0.outputs has no field "sumary". Use one of: summary.',
+			'The command of "use" uses {{each.results.0.outputs.summary.ok}}, but each.results.0.outputs.summary has no field "ok". Use one of: pass.',
+		]);
+		// While the flows load, the results take any path below their outputs.
+		expect(warned("echo {{each.results.0.outputs.sumary}}", {})).toEqual([]);
+	});
+
 	test("only a json output takes a schema", () => {
 		expect(
 			validateFlow({

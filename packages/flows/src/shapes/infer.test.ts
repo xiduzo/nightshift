@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { schemaAt } from "./at";
-import { INFER_MAX_DEPTH, INFER_MAX_PROPERTIES, inferSchema } from "./infer";
+import {
+	INFER_MAX_DEPTH,
+	INFER_MAX_PROPERTIES,
+	inferOutputType,
+	inferSchema,
+} from "./infer";
 import { fromJsonSchema } from "./shape";
 
 describe("inferSchema", () => {
@@ -75,5 +80,29 @@ describe("inferSchema", () => {
 				big: { type: "object" },
 			},
 		});
+	});
+});
+
+describe("inferOutputType", () => {
+	test("a value gives the type of a flow output, JSON with its shape", () => {
+		expect(inferOutputType("hi")).toEqual({ type: "text" });
+		expect(inferOutputType(3.5)).toEqual({ type: "number" });
+		expect(inferOutputType(false)).toEqual({ type: "boolean" });
+		expect(inferOutputType({ tasks: ["a"] })).toEqual({
+			type: "json",
+			schema: {
+				type: "object",
+				properties: { tasks: { type: "array", items: { type: "string" } } },
+			},
+		});
+		expect(inferOutputType([])).toEqual({
+			type: "json",
+			schema: { type: "array" },
+		});
+	});
+
+	test("null says nothing", () => {
+		expect(inferOutputType(null)).toBeNull();
+		expect(inferOutputType(undefined)).toBeNull();
 	});
 });

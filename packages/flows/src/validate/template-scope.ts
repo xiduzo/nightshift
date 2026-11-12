@@ -164,12 +164,16 @@ function templateNode(
 		});
 		return { id: node.id, fields, open: false };
 	}
+	// A Subflow with `each`: its results hold the outputs of the flow it calls.
+	const called = node.type === "call" ? calledFlow(node.flow, flows) : null;
 	const fields = nodeOutputFields(node)
 		.filter(
 			(name) =>
 				!(node.type === "command" && name === "data" && !commandHasData(node)),
 		)
-		.map((name) => withShape(field(name), outputFieldShape(node, name)));
+		.map((name) =>
+			withShape(field(name), outputFieldShape(node, name, called)),
+		);
 	return { id: node.id, fields, open: false };
 }
 

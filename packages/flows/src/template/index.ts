@@ -41,6 +41,7 @@ export {
 export {
 	applyVariableWrites,
 	coerceVariable,
+	fitOutput,
 	initialVariables,
 	type SchemaCheck,
 	type VariableResult,

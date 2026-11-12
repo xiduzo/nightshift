@@ -1,4 +1,10 @@
-import type { Flow, FlowNode, FlowVariableDef, VariableType } from "../flow";
+import type {
+	Flow,
+	FlowNode,
+	FlowOutputDef,
+	FlowVariableDef,
+	VariableType,
+} from "../flow";
 import type { JsonValue, VariableWrite } from "../nodes";
 import type { TemplateContext } from "./context";
 import { evaluateRule, ruleMessage } from "./rule";
@@ -116,6 +122,33 @@ function fit(
 		const problem = checkSchema(def.schema, coerced.value);
 		if (problem !== null) {
 			return { ok: false, problem: `the value does not match: ${problem}.` };
+		}
+	}
+	return coerced;
+}
+
+/**
+ * The value a flow returns for `output`, read as its type the way a
+ * variable's value is (`coerceVariable`): text is read as the type, null
+ * fits every type, and a `json` output with a `schema` must match it. An
+ * output without a type takes any value as it is. The value came as text
+ * when the output's template is not one reference.
+ */
+export function fitOutput(
+	output: Pick<FlowOutputDef, "type" | "schema" | "value">,
+	value: JsonValue,
+	checkSchema?: SchemaCheck,
+): Coerced {
+	if (output.type === undefined) return { ok: true, value };
+	const coerced = coerceVariable(output.type, value, !isOnlyRef(output.value));
+	if (!coerced.ok) return coerced;
+	if (output.schema && checkSchema && coerced.value !== null) {
+		const problem = checkSchema(output.schema, coerced.value);
+		if (problem !== null) {
+			return {
+				ok: false,
+				problem: `the value does not match its schema: ${problem}.`,
+			};
 		}
 	}
 	return coerced;
