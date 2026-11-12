@@ -140,8 +140,29 @@ const PLAIN: Record<string, readonly string[]> = {
 let count = 0;
 /** A template no other field of the fixtures holds. */
 const template = (before = "") => `${before}{{n${++count}.data}}`;
+/**
+ * Each way a rule reads a node: bare, in backticks, through the rule's
+ * values (`$$` anywhere, `$` at the top) and from inside a filter. The
+ * rules of the fixtures take them in turn.
+ */
+const RULE_FORMS: readonly ((name: string) => string)[] = [
+	(name) => `${name}.data = 1`,
+	(name) => `$$.${name}.data = 1`,
+	(name) => `\`${name}\`.data = 1`,
+	(name) => `$.${name}.data = 1`,
+	(name) => `$count([1][$$.${name}.data = $]) = 1`,
+];
+/** The node each rule of the fixtures reads, by its text. */
+const RULE_READS = new Map<string, string>();
+let forms = 0;
 /** A rule no other field of the fixtures holds. */
-const rule = () => `n${++count}.data = 1`;
+const rule = () => {
+	const name = `n${++count}`;
+	const form = RULE_FORMS[forms++ % RULE_FORMS.length] ?? String;
+	const text = form(name);
+	RULE_READS.set(text, name);
+	return text;
+};
 /** Plain text no other field of the fixtures holds. */
 const plain = () => `p${++count}`;
 
@@ -512,5 +533,18 @@ describe("the rewrite of a node's texts", () => {
 			(text) => text.rule && namesRead(text).length > 0,
 		);
 		expect(rules.length).toBeGreaterThan(0);
+	});
+
+	test("each rule of the fixtures reads the node it was built with, in each form", () => {
+		const rules = FIXTURES.flatMap(rewrittenTexts).filter((text) => text.rule);
+		const missed = rules.flatMap((text) => {
+			const name = RULE_READS.get(text.text);
+			return name === undefined || namesRead(text).includes(name)
+				? []
+				: [text.text];
+		});
+		expect(missed).toEqual([]);
+		// Every form is in use, so the rename tests above cover each.
+		expect(rules.length).toBeGreaterThanOrEqual(RULE_FORMS.length);
 	});
 });

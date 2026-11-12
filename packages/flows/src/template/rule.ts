@@ -159,9 +159,10 @@ export function ruleMessage(error: unknown): string {
 }
 
 /**
- * The top-level names a rule reads (`build` in `build.data.x`), best
- * effort from JSONata's AST. Names below a variable (`$x.y`) or inside a
- * path step that is not the first are not top-level and are left out.
+ * The top-level names a rule reads (`build` in `build.data.x`, in
+ * `$$.build.data.x` too), best effort from JSONata's AST. Names below a
+ * variable (`$x.y`), in a path step that is not the first, or in a filter
+ * are not top-level and are left out.
  */
 export function ruleNames(expr: string): string[] {
 	return [...new Set(ruleRefs(expr).map((ref) => ref.name))];
@@ -170,8 +171,19 @@ export function ruleNames(expr: string): string[] {
 /** A top-level name a rule reads, with the keys after it. */
 type RuleRef = { name: string; path: string[] };
 
-/** A `RuleRef` and the name's step in JSONata's AST, which knows where the name ends. */
-type FoundRef = RuleRef & { step: AstNode };
+/** A name a path of the rule starts with, with its step and the steps after it. */
+type FoundRef = {
+	name: string;
+	/** The name's step in JSONata's AST, which knows where the name ends. */
+	step: AstNode;
+	/** The steps of the path after the name. */
+	rest: readonly AstNode[];
+	/** The name reads the rule's values (a top-level name), not a key of another value. */
+	top: boolean;
+};
+
+/** A name in the rule and its step in JSONata's AST: what a rewrite renames. */
+type NamedStep = { name: string; step: AstNode };
 
 /**
  * Each place a rule reads a top-level name (`ruleNames`), with the plain
@@ -180,9 +192,12 @@ type FoundRef = RuleRef & { step: AstNode };
  * the order of the rule.
  */
 export function ruleRefs(expr: string): RuleRef[] {
-	return findRefs(expr).map(({ name, path }) => ({ name, path }));
+	return findRefs(expr)
+		.filter((ref) => ref.top)
+		.map(({ name, step, rest }) => ({ name, path: keysAfter(step, rest) }));
 }
 
+/** Every name a path of the rule starts with: at the top, and below it. */
 function findRefs(expr: string): FoundRef[] {
 	let ast: unknown;
 	try {
@@ -193,6 +208,23 @@ function findRefs(expr: string): FoundRef[] {
 	const refs: FoundRef[] = [];
 	walk(ast, refs, true);
 	return refs;
+}
+
+/**
+ * Each place a rule reads a variable: the name right after `vars` at the
+ * start of a path (`tries` in `vars.tries + 1`, in `$$.vars.tries` too).
+ * A path below a variable (`$x.vars.tries`) or below another name
+ * (`other.vars.tries`) reads no variable.
+ */
+function findVariableRefs(expr: string): NamedStep[] {
+	return findRefs(expr).flatMap(({ name, rest }) => {
+		const [next] = rest;
+		return name === "vars" &&
+			next?.type === "name" &&
+			typeof next.value === "string"
+			? [{ name: next.value, step: next }]
+			: [];
+	});
 }
 
 /** The words JSONata reads as an operator or a value, not as a name. */
@@ -216,17 +248,31 @@ function nameInRule(name: string): string {
 /**
  * Rewrites the top-level names a rule reads (`ruleRefs`) that `rename`
  * gives a new name for: `build` in `build.data.x`, in `` `build`.data ``
- * too. Strings, `$` variables, functions and the keys below a name stay.
- * Everything else of the text stays as it is. A rule that is not valid
- * stays as a whole.
+ * and `$$.build` too. Strings, `$` variables, functions and the keys below
+ * a name stay. Everything else of the text stays as it is. A rule that is
+ * not valid stays as a whole.
  */
 export function rewriteRuleNames(
 	expr: string,
 	rename: (name: string) => string | undefined,
 ): string {
+	const top = findRefs(expr).filter((ref) => ref.top);
+	return rewriteSteps(expr, top, rename);
+}
+
+/**
+ * Replaces the name of each step that `rename` gives a new name for, by
+ * its place in the text, so the rest stays byte for byte. A quoted name
+ * stays quoted. A new name JSONata cannot take bare goes in backticks.
+ */
+function rewriteSteps(
+	expr: string,
+	found: readonly NamedStep[],
+	rename: (name: string) => string | undefined,
+): string {
 	let out = "";
 	let cursor = 0;
-	const spans = findRefs(expr)
+	const spans = found
 		.flatMap(({ name, step }) => {
 			const to = rename(name);
 			const span = nameSpan(expr, name, step);
@@ -265,41 +311,10 @@ function nameSpan(
 
 /**
  * The variables a rule reads (`tries` in `vars.tries + 1`), best effort
- * from JSONata's AST: the name right after a top-level `vars`.
+ * from JSONata's AST: the name right after `vars` at the start of a path.
  */
 export function ruleVariableNames(expr: string): string[] {
-	let ast: unknown;
-	try {
-		ast = jsonata(expr).ast();
-	} catch {
-		return [];
-	}
-	const names = new Set<string>();
-	const visit = (node: unknown): void => {
-		if (Array.isArray(node)) {
-			for (const child of node) visit(child);
-			return;
-		}
-		if (typeof node !== "object" || node === null) return;
-		const ast = node as AstNode;
-		if (ast.type === "path" && Array.isArray(ast.steps)) {
-			const [first, second] = ast.steps;
-			if (
-				first?.type === "name" &&
-				first.value === "vars" &&
-				second?.type === "name" &&
-				typeof second.value === "string"
-			) {
-				names.add(second.value);
-			}
-		}
-		for (const [key, value] of Object.entries(ast)) {
-			if (key === "type" || key === "value" || key === "position") continue;
-			visit(value);
-		}
-	};
-	visit(ast);
-	return [...names];
+	return [...new Set(findVariableRefs(expr).map((ref) => ref.name))];
 }
 
 type AstNode = {
@@ -310,9 +325,18 @@ type AstNode = {
 };
 
 /**
- * `top` is true where a path would read the context: the first step of a
- * path whose first step is a name. Inside a `$` variable path or after a
- * step, the names are keys of that value, not context names.
+ * The keys of an AST node that read each value it gives, not the rule's
+ * values: a filter or an index (`[…]`) and a grouping (`{…}`).
+ */
+const OVER_EACH_VALUE = new Set(["predicate", "stages", "group"]);
+
+/**
+ * `top` is true where a path would read the rule's values: the first step
+ * of a path at the top of the rule, or of a path after `$$` (the rule's
+ * values everywhere) or after `$` at the top. Inside a `$` variable path,
+ * after a step and in a filter, the names are keys of that value, not
+ * names of the rule. Every path that starts with a name counts, `top`
+ * says which kind it is.
  */
 function walk(node: unknown, refs: FoundRef[], top: boolean): void {
 	if (Array.isArray(node)) {
@@ -322,31 +346,59 @@ function walk(node: unknown, refs: FoundRef[], top: boolean): void {
 	if (typeof node !== "object" || node === null) return;
 	const ast = node as AstNode;
 	if (ast.type === "path" && Array.isArray(ast.steps)) {
-		const [first, ...rest] = ast.steps;
-		if (first?.type === "name" && typeof first.value === "string") {
-			if (top)
-				refs.push({
-					name: first.value,
-					path: keysAfter(first, rest),
-					step: first,
-				});
-		} else {
-			walk(first, refs, top);
-		}
-		// Predicates and expressions inside later steps read their own value.
-		for (const step of rest) walk(stepChildren(step), refs, false);
-		if (first) walk(stepChildren(first), refs, false);
+		walkPath(ast.steps, refs, top);
+		// A grouping after the path reads each value of it.
+		walk(stepChildren(ast), refs, false);
 		return;
 	}
 	if (ast.type === "name") {
-		if (top && typeof ast.value === "string")
-			refs.push({ name: ast.value, path: [], step: ast });
+		if (typeof ast.value === "string")
+			refs.push({ name: ast.value, step: ast, rest: [], top });
+		return;
+	}
+	if (readsRoot(ast, top)) {
+		// A filter on the rule's values reads them: `$$[check.ok]`.
+		walk(stepChildren(ast), refs, true);
 		return;
 	}
 	for (const [key, value] of Object.entries(ast)) {
 		if (key === "type" || key === "value" || key === "position") continue;
-		walk(value, refs, top);
+		walk(value, refs, top && !OVER_EACH_VALUE.has(key));
 	}
+}
+
+/** The steps of one path: the name it starts with, then what each later step reads. */
+function walkPath(
+	steps: readonly AstNode[],
+	refs: FoundRef[],
+	top: boolean,
+): void {
+	const [first, ...rest] = steps;
+	if (!first) return;
+	if (readsRoot(first, top)) {
+		walk(first, refs, top);
+		walkPath(rest, refs, true);
+		return;
+	}
+	if (first.type === "name" && typeof first.value === "string") {
+		refs.push({ name: first.value, step: first, rest, top });
+		walk(stepChildren(first), refs, false);
+	} else {
+		walk(first, refs, top);
+	}
+	// Predicates and expressions inside later steps read their own value.
+	for (const step of rest) walk(stepChildren(step), refs, false);
+}
+
+/**
+ * Whether a path's first step is the rule's values: `$$` anywhere, `$` at
+ * the top (in a filter, `$` is the value the filter tests).
+ */
+function readsRoot(step: AstNode, top: boolean): boolean {
+	return (
+		step.type === "variable" &&
+		(step.value === "$" || (step.value === "" && top))
+	);
 }
 
 /** The plain keys after a path's first step, up to one that filters or computes. */

@@ -1108,6 +1108,7 @@ describe("validateFlow: decisions and gates", () => {
 							"fine",
 							"$contains(run.branch, 'x') or glob = 'y' or `check`.exit_code = 1",
 						],
+						["root", "$$.check.exit_code = 0 and check.lines[$$.spook = $.n]"],
 						["stop"],
 					]),
 				],
@@ -1125,6 +1126,7 @@ describe("validateFlow: decisions and gates", () => {
 			),
 			'The rule of option "ghost" of "pick" reads "ghost", but there is no node or input "ghost".',
 			'The rule of option "fine" of "pick" reads "glob", but there is no node or input "glob".',
+			'The rule of option "root" of "pick" reads "spook", but there is no node or input "spook".',
 		]);
 	});
 

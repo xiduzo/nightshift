@@ -78,6 +78,27 @@ describe("dataLinks", () => {
 		]);
 	});
 
+	test("a rule that reads a node through its root ($$) links to it", () => {
+		const flow = flowOf({
+			nodes: [
+				command("scout"),
+				command("limits"),
+				{
+					id: "pick",
+					type: "value",
+					position: at,
+					by: "rule",
+					output: { type: "array" },
+					expression: "scout.data.items[price < $$.limits.data.max]",
+				},
+			],
+		});
+		expect(dataLinks(flow)).toEqual([
+			{ from: "scout", to: "pick", refs: ["data.items"] },
+			{ from: "limits", to: "pick", refs: ["data.max"] },
+		]);
+	});
+
 	test("the values and the expressions of variable writes read nodes, but a node's own id does not link", () => {
 		const flow = flowOf({
 			variables: [

@@ -9,6 +9,7 @@ import {
 	ruleNames,
 	ruleProblem,
 	ruleRefs,
+	ruleVariableNames,
 	signalOutcome,
 } from "./rule";
 
@@ -227,6 +228,78 @@ describe("ruleProblem and ruleNames", () => {
 		]);
 		expect(ruleRefs("$x.y")).toEqual([]);
 		expect(ruleRefs("broken (")).toEqual([]);
+	});
+});
+
+describe("a rule that reads through its root", () => {
+	test("$$ is the rule's values everywhere, $ only at the top", async () => {
+		// What the walk below must follow: JSONata's own reading.
+		expect(await evaluateRule("$$.build.data.tests_passed", context)).toBe(
+			true,
+		);
+		expect(await evaluateRule("$.build.outcome", context)).toBe("pass");
+		expect(
+			await evaluateRule('[1, 2][$$.build.outcome = "pass"]', context),
+		).toEqual([1, 2]);
+		// In a filter, `$` is the value it tests.
+		expect(await evaluateRule('[{ "mode": 1 }][$.mode = 1]', context)).toEqual({
+			mode: 1,
+		});
+	});
+
+	test("ruleRefs reads a name after $$ anywhere, and after $ at the top", () => {
+		expect(ruleRefs("$$.scout.data.tasks[0].title = 'x'")).toEqual([
+			{ name: "scout", path: ["data", "tasks"] },
+		]);
+		expect(ruleRefs("$.scout.outcome and $$.`my-input`")).toEqual([
+			{ name: "scout", path: ["outcome"] },
+			{ name: "my-input", path: [] },
+		]);
+		expect(ruleNames("other.data[$$.scout.data.x = id]")).toEqual([
+			"other",
+			"scout",
+		]);
+		expect(ruleNames("$$.(scout.ok) and $$[check.ok]")).toEqual([
+			"scout",
+			"check",
+		]);
+		expect(ruleNames("$$ and $")).toEqual([]);
+	});
+
+	test("a filter or a grouping reads each value, not the rule's names", () => {
+		expect(ruleNames("other.data[$.scout = 1]")).toEqual(["other"]);
+		expect(ruleNames("(scout.data.tasks)[done]")).toEqual(["scout"]);
+		expect(ruleNames("$x[scout = 1] and [1, 2][$.check]")).toEqual([]);
+		expect(ruleNames("scout.data{ kind: $count(other) }")).toEqual(["scout"]);
+	});
+
+	test("rewriteRuleNames follows $$, and $ at the top", () => {
+		const toFinder = (name: string) =>
+			name === "scout" ? "finder" : undefined;
+		expect(
+			rewriteRuleNames(
+				"$$.scout.data and other[$$.`scout` = 1] and $.scout and other[$.scout]",
+				toFinder,
+			),
+		).toBe(
+			"$$.finder.data and other[$$.`finder` = 1] and $.finder and other[$.scout]",
+		);
+	});
+});
+
+describe("the variables a rule reads", () => {
+	test("ruleVariableNames: the name after vars where a path starts", () => {
+		expect(
+			ruleVariableNames(
+				"vars.tries + $$.vars.limit > vars.tries and items[vars.max = 1]",
+			),
+		).toEqual(["tries", "limit", "max"]);
+		expect(
+			ruleVariableNames(
+				'"vars.a" & $x.vars.b & other.vars.c & vars /* vars.d */',
+			),
+		).toEqual([]);
+		expect(ruleVariableNames("vars.tries = (")).toEqual([]);
 	});
 });
 

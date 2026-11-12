@@ -502,6 +502,19 @@ describe("renameNode follows every rule", () => {
 		);
 	});
 
+	test("a rule that reads the node through its root: $$, and $ at the top", () => {
+		const renamed = renameNode(
+			scoutAndReader(
+				decideBy("$$.scout.ok and other[$$.scout.id = id] and $.scout.ok"),
+			),
+			"scout",
+			"finder",
+		);
+		expect(fieldAt(renamed.nodes[1], ["options", 0, "when"])).toBe(
+			"$$.finder.ok and other[$$.finder.id = id] and $.finder.ok",
+		);
+	});
+
 	test("a rule that is not valid stays as it is", () => {
 		const renamed = renameNode(
 			scoutAndReader(decideBy("scout.data = (")),
