@@ -105,16 +105,19 @@ const projectOnly: Record<string, unknown> = {
 	properties: { project: projectProperty },
 };
 
-/** Checks `flow` as the editor does, against the project as it is now. */
+/**
+ * Checks `flow` as the editor does, against the project as it is now: in
+ * a project without a folder, a step that needs one warns.
+ */
 async function checkIn(
 	port: TerminalPort,
-	projectId: string,
+	project: TerminalProject,
 	flow: unknown,
 	name: string | undefined,
 ): Promise<FlowIssue[]> {
 	const [flows, profiles, tools] = await Promise.all([
-		port.flows(projectId),
-		port.profiles(projectId),
+		port.flows(project.id),
+		port.profiles(project.id),
 		port.tools(),
 	]);
 	// The saved flow of that name is the base: a profile or a connection it
@@ -130,6 +133,7 @@ async function checkIn(
 		profiles: profileRefs(profiles),
 		connections: tools.connections.map((c) => c.name),
 		cliTools: tools.clis,
+		folder: project.folder !== false,
 	});
 }
 
@@ -287,7 +291,7 @@ export function terminalTools(
 			const name = field(args, "name");
 			const issues = await checkIn(
 				port,
-				project.id,
+				project,
 				field(args, "flow"),
 				typeof name === "string" && name !== "" ? name : undefined,
 			);
@@ -319,7 +323,7 @@ export function terminalTools(
 			}
 			const project = await projectOf(args);
 			const flow = field(args, "flow");
-			const issues = await checkIn(port, project.id, flow, name.data);
+			const issues = await checkIn(port, project, flow, name.data);
 			const errors = errorsOf(issues);
 			const parsed = flowSchema.safeParse(flow);
 			if (errors.length > 0 || !parsed.success) {

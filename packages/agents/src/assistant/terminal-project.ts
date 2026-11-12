@@ -4,8 +4,17 @@
  * whose Clone holds the folder the command runs in, else the only one.
  */
 
-/** A project of the Space. `path`: its Clone on this computer, or null. */
-export type TerminalProject = { id: string; name: string; path: string | null };
+/**
+ * A project of the Space. `path`: its Clone on this computer, or null.
+ * `folder`: false when the project has no folder at all (ADR 22): each run
+ * starts in an empty folder of its own. Left out: it has one.
+ */
+export type TerminalProject = {
+	id: string;
+	name: string;
+	path: string | null;
+	folder?: false;
+};
 
 /** The project a terminal command works in, or why there is none. */
 export type ProjectChoice =

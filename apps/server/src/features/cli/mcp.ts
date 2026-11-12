@@ -111,6 +111,8 @@ export function apiPort(
 					id: p.id,
 					name: p.name,
 					path: p.repoPath,
+					// An older Host sends no `folder`: its projects have one.
+					...(p.folder === false ? { folder: false as const } : {}),
 				})),
 			),
 		flows: (projectId) => g(() => client.flows.map({ projectId })),

@@ -177,6 +177,45 @@ describe("nightshift mcp tools", () => {
 		);
 	});
 
+	test("check_flow: in a project without a folder, a step that runs git warns", async () => {
+		const port = fakePort({
+			projects: async () => [
+				{ id: "p1", name: "App", path: "/work/app" },
+				{ id: "p2", name: "Notes", path: null, folder: false },
+			],
+		});
+		const { call } = await connect(port);
+		const git = {
+			...flow,
+			nodes: [
+				...flow.nodes,
+				{
+					id: "push",
+					type: "command",
+					position: { x: 0, y: 200 },
+					command: "git push",
+				},
+			],
+			edges: [{ id: "e1", from: "build", outcome: "pass", to: "push" }],
+		};
+		const check = async (project: string) =>
+			(await call("check_flow", { project, flow: git })).text;
+		const warnings = async (project: string) =>
+			(await check(project))
+				.split("\n")
+				.filter((line) => line.startsWith("- warning:"));
+		expect(await check("App")).toBe("No issues.");
+		expect(await warnings("Notes")).toEqual([
+			expect.stringContaining(
+				'The command of the node "push" runs git in that empty folder',
+			),
+		]);
+		// The list says which project has no folder.
+		const listed = JSON.parse((await call("list_projects")).text);
+		expect(listed[0]).not.toHaveProperty("folder");
+		expect(listed[1]).toMatchObject({ name: "Notes", folder: false });
+	});
+
 	test("without a project of the folder it asks for one", async () => {
 		const { call } = await connect(fakePort(), { folder: "/elsewhere" });
 		const result = await call("list_flows");

@@ -97,6 +97,36 @@ describe("nightshift mcp", () => {
 		expect(runs[1]).not.toHaveProperty("test");
 	});
 
+	test("a project without a folder says so, and an older Host's projects have one", async () => {
+		const project = (id: string, folder?: boolean) => ({
+			id,
+			name: id,
+			repoPath: null,
+			remote: null,
+			...(folder === undefined ? {} : { folder }),
+			createdAt: 1,
+			clones: [],
+		});
+		const client = {
+			projects: {
+				// An older Host sends no `folder`: that project has one.
+				list: async () => [
+					project("notes", false),
+					project("app", true),
+					project("old"),
+				],
+			},
+		} as unknown as AppRouterClient;
+		const projects = await apiPort(client, {
+			ui: "http://localhost:9",
+		}).projects();
+		expect(projects).toEqual([
+			{ id: "notes", name: "notes", path: null, folder: false },
+			{ id: "app", name: "app", path: null },
+			{ id: "old", name: "old", path: null },
+		]);
+	});
+
 	test("without Night Shift on this computer each tool says so", async () => {
 		// A port nothing listens on.
 		const server = Bun.serve({ port: 0, fetch: () => new Response() });
