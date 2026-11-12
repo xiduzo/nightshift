@@ -22,6 +22,7 @@ import {
 	CircleDashedIcon,
 	CircleStopIcon,
 	CircleXIcon,
+	FileTextIcon,
 	FlagIcon,
 	HandIcon,
 	InboxIcon,
@@ -77,6 +78,7 @@ type Notice = {
 	title: ReactNode;
 	/** One line, shown in the header while the panel is closed. */
 	gist: string;
+	/** Null: only the buttons. */
 	body: ReactNode;
 	/** Buttons under the body. */
 	actions?: ReactNode;
@@ -87,15 +89,17 @@ type Notice = {
 /**
  * What the run needs from you, under the flow like the flow editor's issues:
  * why it failed or stopped (with the composer that resumes it), the gate it
- * waits at, or why it sleeps, or the line an End node left. A Collapsible
- * whose header always shows what happened. Nothing shows while the run
- * walks, or once it finished without a word from an End node.
+ * waits at, or why it sleeps, or the line an End node left and its report.
+ * A Collapsible whose header always shows what happened. Nothing shows
+ * while the run walks, or once it finished without a word or a report
+ * from an End node.
  */
 export function RunStatusPanel({
 	run,
 	status,
 	openGateNodeId,
 	onShowGate,
+	onShowReport,
 	wait,
 	lastStep,
 	askWhy,
@@ -105,6 +109,8 @@ export function RunStatusPanel({
 	status: RunStatus;
 	openGateNodeId: string | null;
 	onShowGate: () => void;
+	/** Scrolls to the run's report. Unset: the run has none. */
+	onShowReport?: () => void;
 	wait: CurrentWait | null;
 	/** Where resuming continues. */
 	lastStep: StepSummary | undefined;
@@ -115,7 +121,14 @@ export function RunStatusPanel({
 	const id = useId();
 	const [open, setOpen] = useState(true);
 	const until = run.wakeAt ?? wait?.until ?? null;
-	const notice = noticeOf({ run, status, openGateNodeId, onShowGate, wait });
+	const notice = noticeOf({
+		run,
+		status,
+		openGateNodeId,
+		onShowGate,
+		onShowReport,
+		wait,
+	});
 	if (!notice) return null;
 	const Icon = notice.icon;
 
@@ -154,11 +167,13 @@ export function RunStatusPanel({
 					</CollapsibleTrigger>
 				</h2>
 				<CollapsibleContent className="flex flex-col gap-3 border-t p-3">
-					<ScrollArea className="max-h-32 [&>[data-slot=scroll-area-viewport]]:max-h-32">
-						<div className="whitespace-pre-wrap break-words text-muted-foreground text-sm leading-relaxed">
-							{notice.body}
-						</div>
-					</ScrollArea>
+					{notice.body ? (
+						<ScrollArea className="max-h-32 [&>[data-slot=scroll-area-viewport]]:max-h-32">
+							<div className="whitespace-pre-wrap break-words text-muted-foreground text-sm leading-relaxed">
+								{notice.body}
+							</div>
+						</ScrollArea>
+					) : null}
 					{notice.actions || askWhy ? (
 						<div className="flex flex-wrap gap-2">
 							{notice.actions}
@@ -179,12 +194,14 @@ function noticeOf({
 	status,
 	openGateNodeId,
 	onShowGate,
+	onShowReport,
 	wait,
 }: {
 	run: RunDetail;
 	status: RunStatus;
 	openGateNodeId: string | null;
 	onShowGate: () => void;
+	onShowReport: (() => void) | undefined;
 	wait: CurrentWait | null;
 }): Notice | null {
 	// A run of another device: answers, signals and stops go to it. Why a run ended: `stoppedNotice`.
@@ -299,8 +316,26 @@ function noticeOf({
 		case "failed":
 		case "interrupted":
 		case "stopped": {
+			const readReport = onShowReport ? (
+				<Button size="sm" variant="outline" onClick={onShowReport}>
+					<FileTextIcon data-icon="inline-start" />
+					Read the report
+				</Button>
+			) : undefined;
 			const ended = stoppedNotice(run, status);
-			if (!ended) return null;
+			if (!ended) {
+				// A run that finished without a message: its report is the word it left.
+				if (!readReport || status !== "finished") return null;
+				const tone = run.result === "nothing-to-do" ? "nothing-to-do" : "done";
+				return {
+					icon: ENDED_LOOK[tone].icon,
+					tone: ENDED_LOOK[tone].tone,
+					title: tone === "nothing-to-do" ? "Nothing to do" : "Done",
+					gist: "The run wrote a report.",
+					body: null,
+					actions: readReport,
+				};
+			}
 			const look = ENDED_LOOK[ended.tone];
 			return {
 				icon: look.icon,
@@ -308,6 +343,7 @@ function noticeOf({
 				title: ended.title,
 				gist: ended.gist,
 				body: ended.body,
+				actions: readReport,
 				resumable: ended.resumable,
 			};
 		}

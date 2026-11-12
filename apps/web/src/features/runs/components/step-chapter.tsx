@@ -19,6 +19,7 @@ import { HandIcon, TriangleAlertIcon } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
 import { NODE_TYPE, OutcomeBadge, stepState } from "@/features/flows";
 import type { Artifact, RunDetail, RunStatus, StepSummary } from "@/shared/api";
+import { reportFileName, stepReport } from "../lib/report";
 import type { ItemScope } from "../lib/run-steps";
 import { stepGist } from "../lib/step-gist";
 import { stepLearnings } from "../lib/step-learnings";
@@ -27,6 +28,7 @@ import type { TranscriptState } from "../transcript/transcript";
 import { ChangedFiles } from "./changed-files";
 import { StepDuration } from "./elapsed";
 import { RunArtifacts } from "./run-artifacts";
+import { RunReport } from "./run-report";
 import { StepOutputs } from "./step-header";
 import { StepLearnings } from "./step-learnings";
 import { StepPlan } from "./step-plan";
@@ -62,8 +64,8 @@ type ChapterProps = {
 /**
  * One step of the run's story, told in full: a checkpoint with its name,
  * time and outcome, then the agent's plan, the sources it used, its
- * transcript, and what it left: its summary, learnings, changed files,
- * artifacts and outputs.
+ * transcript, and what it left: an End step's report, its summary,
+ * learnings, changed files, artifacts and outputs.
  */
 export function StepChapter(props: ChapterProps) {
 	const { step, runStatus, outcomeColor, warned, action } = props;
@@ -169,6 +171,8 @@ function ChapterBody({
 	);
 	const outputs = Object.keys(step.outputs).length;
 	const ended = step.outcome !== null;
+	// From the step's outputs: it shows when the transcript is out of reach too.
+	const report = stepReport(step, run.warnings);
 
 	return (
 		<>
@@ -189,6 +193,13 @@ function ChapterBody({
 				answerPending={answerPending}
 				node={node}
 			/>
+			{report ? (
+				<RunReport
+					text={report.text}
+					cut={report.cut}
+					fileName={reportFileName(run.flowName)}
+				/>
+			) : null}
 			{ended || step.nodeType === "call" ? (
 				<StepSummaryView
 					run={run}

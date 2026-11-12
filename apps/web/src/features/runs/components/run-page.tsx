@@ -1,4 +1,4 @@
-import { askWhy, mergeSteps, runActions } from "@nightshift/client";
+import { askWhy, mergeSteps, runActions, runReport } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
@@ -126,6 +126,28 @@ function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 	useEffect(() => {
 		if (stepId !== undefined && loaded) openLinkedStep(stepId);
 	}, [stepId, loaded]);
+
+	// The End step that wrote what the run produced, once it is in the story.
+	const report = run.data
+		? runReport({
+				report: run.data.report,
+				steps,
+				warnings: run.data.warnings,
+			})
+		: null;
+	const reportStepId =
+		report && steps.some((step) => step.id === report.stepId)
+			? report.stepId
+			: null;
+	// Without a link, a run that ended with a report opens at it. Only as
+	// the page opens: a run that ends while you watch stays where you are.
+	const openReport = useEffectEvent(() => {
+		if (stepId === undefined && reportStepId !== null) showStep(reportStepId);
+	});
+	const ready = loaded && run.data !== undefined;
+	useEffect(() => {
+		if (ready) openReport();
+	}, [ready]);
 
 	if (run.isLoading) {
 		return (
@@ -292,6 +314,9 @@ function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 				onShowGate={() => {
 					if (openGate) showStep(openGate.id);
 				}}
+				onShowReport={
+					reportStepId !== null ? () => showStep(reportStepId) : undefined
+				}
 				wait={stream.transcript.lastWait}
 				lastStep={lastStep}
 				askWhy={

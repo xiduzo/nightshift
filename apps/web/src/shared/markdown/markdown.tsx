@@ -78,32 +78,40 @@ const COMPONENTS: Components = {
 };
 
 /**
+ * An image as a link to it, named by its alt text: the page loads nothing
+ * from the server the image is on.
+ */
+function ImageLink({ src, alt }: { src?: string | Blob; alt?: string }) {
+	const href = typeof src === "string" ? src : undefined;
+	return <TextLink href={href}>{alt?.trim() || href || "Image"}</TextLink>;
+}
+
+/**
  * Text an agent or a flow wrote, as Markdown: headings, lists, code and links.
  * Raw HTML in it shows as text.
  */
 export function Markdown({
 	text,
 	link,
+	imagesAsLinks = false,
 	className,
 }: {
 	text: string;
 	/** Shows some links in another way, such as a citation. */
 	link?: LinkView;
+	/** Shows each image as a link to it, so nothing loads from another server. */
+	imagesAsLinks?: boolean;
 	className?: string;
 }) {
-	const components = useMemo<Components>(
-		() =>
-			link
-				? {
-						...COMPONENTS,
-						a: ({ href, children }) =>
-							link({ href, children }) ?? (
-								<TextLink href={href}>{children}</TextLink>
-							),
-					}
-				: COMPONENTS,
-		[link],
-	);
+	const components = useMemo<Components>(() => {
+		const own: Components = { ...COMPONENTS };
+		if (link) {
+			own.a = ({ href, children }) =>
+				link({ href, children }) ?? <TextLink href={href}>{children}</TextLink>;
+		}
+		if (imagesAsLinks) own.img = ImageLink;
+		return link || imagesAsLinks ? own : COMPONENTS;
+	}, [link, imagesAsLinks]);
 	return (
 		<div
 			className={cn(
