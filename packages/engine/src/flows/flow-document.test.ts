@@ -416,6 +416,72 @@ describe("the flow document", () => {
 		});
 	});
 
+	describe("keepOutputTypes (Q40)", () => {
+		const withOutputs = (): Flow => ({
+			...twoNodes(),
+			outputs: [
+				{ name: "title", value: "{{a.output}}" },
+				{ name: "plan", value: "{{a.data}}" },
+				{ name: "count", value: "{{b.log_tail}}", type: "number" },
+			],
+		});
+		const plan = { type: "object", properties: { tasks: { type: "array" } } };
+
+		test("keeps a type on each output without one, marked inferred, with one revision of kind infer", async () => {
+			await laptop.flows.save(of, "build", withOutputs(), {
+				personId: "person",
+			});
+			clock.at = 8_000;
+			expect(
+				await laptop.flows.keepOutputTypes(of, "build", [
+					{ name: "title", value: "{{a.output}}", type: "text" },
+					{ name: "plan", value: "{{a.data}}", type: "json", schema: plan },
+				]),
+			).toBe(true);
+			const { build } = await read(laptop);
+			expect(build?.outputs).toEqual([
+				{ name: "title", value: "{{a.output}}", type: "text", inferred: true },
+				{
+					name: "plan",
+					value: "{{a.data}}",
+					type: "json",
+					schema: plan,
+					inferred: true,
+				},
+				{ name: "count", value: "{{b.log_tail}}", type: "number" },
+			]);
+			// The nodes stay as they were.
+			expect(build?.nodes).toEqual(withOutputs().nodes);
+			const revisions = await laptop.flows.revisions(of, "build");
+			expect(revisions.map((r) => [r.kind, r.personId, r.at])).toEqual([
+				["save", "person", 1_000],
+				["infer", null, 8_000],
+			]);
+		});
+
+		test("a person's type wins, and an output whose template changed gets none", async () => {
+			await laptop.flows.save(of, "build", withOutputs());
+			expect(
+				await laptop.flows.keepOutputTypes(of, "build", [
+					{ name: "count", value: "{{b.log_tail}}", type: "text" },
+					{ name: "title", value: "{{b.log_tail}}", type: "text" },
+					{ name: "gone", value: "{{a.data}}", type: "text" },
+				]),
+			).toBe(false);
+			expect(
+				await laptop.flows.keepOutputTypes(of, "nope", [
+					{ name: "title", value: "{{a.output}}", type: "text" },
+				]),
+			).toBe(false);
+			expect((await read(laptop)).build?.outputs).toEqual(
+				withOutputs().outputs,
+			);
+			expect(
+				(await laptop.flows.revisions(of, "build")).map((r) => r.kind),
+			).toEqual(["save"]);
+		});
+	});
+
 	test("the first revisions of one flow on two Devices are both kept", async () => {
 		const document = await laptop.document();
 		await saveFlow(document, {

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { FlowNode } from "@nightshift/flows";
 import type { RunRow, Scope } from "../log";
-import { stepShapes } from "./kept-shapes";
+import { outputTypes, stepShapes } from "./kept-shapes";
 import { kindOf } from "./node-kinds";
 
 describe("stepShapes", () => {
@@ -71,5 +71,47 @@ describe("stepShapes", () => {
 				data.outputs,
 			),
 		).toBeDefined();
+	});
+});
+
+describe("outputTypes", () => {
+	const called = {
+		outputs: [
+			{ name: "title", value: "{{a.output}}" },
+			{ name: "plan", value: "{{a.data}}" },
+			{ name: "count", value: "{{c.data}}", type: "number" as const },
+			{ name: "empty", value: "{{gone.data}}" },
+			{ name: "unsent", value: "{{b.data}}" },
+		],
+	};
+
+	test("the type of each output that has none, from its value", () => {
+		expect(
+			outputTypes(called, "review", {
+				title: "Done",
+				plan: { tasks: ["a"] },
+				count: "3",
+				empty: null,
+			}),
+		).toEqual([
+			{ name: "title", value: "{{a.output}}", type: "text" },
+			{
+				name: "plan",
+				value: "{{a.data}}",
+				type: "json",
+				schema: {
+					type: "object",
+					properties: {
+						tasks: { type: "array", items: { type: "string" } },
+					},
+				},
+			},
+		]);
+	});
+
+	test("nothing for a kit: Night Shift's own", () => {
+		expect(outputTypes(called, "kit:github/publish", { title: "x" })).toEqual(
+			[],
+		);
 	});
 });

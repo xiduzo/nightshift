@@ -10,6 +10,7 @@ import type {
 	Outcome,
 	ResolvedPolicy,
 	TemplateContext,
+	VariableType,
 } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
@@ -133,8 +134,27 @@ export type StepShared = {
 		node: Pick<FlowNode, "id" | "type">,
 		shapes: Record<string, Record<string, unknown>>,
 	): Promise<void>;
+	/**
+	 * Keeps the types of a called flow's outputs on `flow`, marked
+	 * inferred, while an output has no type (`ProjectFlows.keepOutputTypes`,
+	 * `kept-shapes.ts`). Absent: nothing keeps them.
+	 */
+	keepOutputTypes?(flow: KeptFlow, types: readonly OutputType[]): Promise<void>;
 	/** The git identity of a Person, for the worktree a Device adds; null when the repository keeps its own. */
 	gitAuthor(personId: string): Promise<GitAuthor | null>;
+};
+
+/**
+ * The type of one output of a called flow, from the value a run gave: what
+ * the Walker keeps on that output, marked inferred (`keepOutputTypes`).
+ * `value` is the output's template as the run read it: an output whose
+ * template a person changed since gets no type from the old one.
+ */
+export type OutputType = {
+	name: string;
+	value: string;
+	type: VariableType;
+	schema?: Record<string, unknown>;
 };
 
 /**

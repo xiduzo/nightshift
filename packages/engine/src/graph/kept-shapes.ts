@@ -1,13 +1,16 @@
 import {
+	type Flow,
 	type FlowNode,
+	inferOutputType,
 	inferSchema,
 	isKitName,
+	type JsonValue,
 	RESERVED_DATA_KEYS,
 	typedOutput,
 } from "@nightshift/flows";
 import type { Scope, StepOutcome, StepOutputs } from "../log";
 import type { KeptFlow } from "../variables";
-import { keptFlowOf, type StepContext } from "./context";
+import { keptFlowOf, type OutputType, type StepContext } from "./context";
 
 /**
  * Typed output by default (any-domain Q40, Q42): a node with no output
@@ -17,6 +20,11 @@ import { keptFlowOf, type StepContext } from "./context";
  * (`StepShared.keepShapes`, `ProjectFlows.keepShapes`). A later run that
  * gives other data warns, it does not fail (`outputVerdict`), until a
  * person confirms or changes the schema in the editor.
+ *
+ * The outputs of a flow get a type the same way, from the values a Call
+ * of that flow gave (`outputTypes`, `StepShared.keepOutputTypes`): the
+ * Walker keeps them on the called flow, marked `inferred`, and a later
+ * value that does not fit warns (`flowOutputsVerdict`).
  */
 
 /** The shapes of a step's data, by output field (`data`): JSON Schemas. */
@@ -73,6 +81,60 @@ function withoutReservedKeys(
 		),
 	);
 	return { ...schema, properties: kept };
+}
+
+/**
+ * The types of the outputs of a called flow for it to keep: only for an
+ * output that has no type yet and a value that is not null, of a flow that
+ * keeps them (not a kit: Night Shift's own, read only). The Call decides
+ * when: a body that finished at a chosen end, not a test run (ADR 27),
+ * not a try of a cascade that climbs on. Empty when there is nothing to
+ * keep.
+ */
+export function outputTypes(
+	called: Pick<Flow, "outputs">,
+	flowName: string,
+	values: Readonly<Record<string, JsonValue>>,
+): OutputType[] {
+	if (isKitName(flowName)) return [];
+	const types: OutputType[] = [];
+	for (const output of called.outputs ?? []) {
+		if (output.type !== undefined || !Object.hasOwn(values, output.name)) {
+			continue;
+		}
+		const inferred = inferOutputType(values[output.name]);
+		if (inferred === null) continue;
+		types.push({ name: output.name, value: output.value, ...inferred });
+	}
+	return types;
+}
+
+/**
+ * Keeps the types on the outputs of the flow `flowName` of the run's
+ * project, through the Walker's flows (`StepShared.keepOutputTypes`).
+ * Never throws: a type that is not kept is inferred again at the next run.
+ */
+export async function keepOutputTypes(
+	ctx: StepContext,
+	flowName: string,
+	types: readonly OutputType[],
+): Promise<void> {
+	if (types.length === 0 || !ctx.keepOutputTypes) return;
+	try {
+		await ctx.keepOutputTypes(
+			{
+				spaceId: ctx.run.spaceId,
+				projectId: ctx.run.projectId,
+				flowName,
+			},
+			types,
+		);
+	} catch (error) {
+		console.warn(
+			`[engine] Night Shift could not keep the output types of the flow "${flowName}" of run ${ctx.run.id}:`,
+			error,
+		);
+	}
 }
 
 /**

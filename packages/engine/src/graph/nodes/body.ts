@@ -19,11 +19,14 @@ import {
 	scopeKey,
 } from "../../log";
 import { deriveNodeOutputs, deriveVariables } from "../../read";
-import type { RunResult } from "../../run-status";
+import { isTestRun, type RunResult } from "../../run-status";
 import { compileFlow } from "../compile";
 import type { StepContext } from "../context";
 import { flowOutputs } from "../inputs";
+import { keepOutputTypes, outputTypes } from "../kept-shapes";
+import { flowOutputsVerdict } from "../output-schema";
 import type { Parked, RunStateValues } from "../state";
+import type { OpenStep } from "../step-runner";
 
 /**
  * What a Call node does, once and per element: running a called flow as a
@@ -236,6 +239,52 @@ export async function bodyOutputs(
 			flow: input.flowName,
 		},
 	});
+}
+
+/**
+ * What the outputs of a finished body promise (Q42): a body that finished
+ * at a chosen end (not a `failed` End) gives the outputs of its flow held
+ * to their types (`flowOutputsVerdict`).
+ *
+ * - An output that does not fit a type a person wrote or confirmed breaks
+ *   the promise: `broken`, and the caller fails the step or the element.
+ * - An output that does not fit a type Night Shift inferred lands a
+ *   `shape` warning on the step, once per output and step (`seen`).
+ * - An output without a type gets one from its value, which the Walker
+ *   keeps on the called flow (`keepOutputTypes`), once per step. Not in a
+ *   test run (ADR 27).
+ */
+export async function typedOutputs(
+	ctx: StepContext,
+	step: Pick<OpenStep, "runState" | "warn">,
+	body: { called: Flow; flowName: string },
+	outputs: StepOutputs,
+	seen: OutputsSeen = newOutputsSeen(),
+): Promise<
+	{ kind: "holds"; outputs: StepOutputs } | { kind: "broken"; error: string }
+> {
+	const verdict = flowOutputsVerdict(body.called, body.flowName, outputs);
+	if (verdict.broken !== null) return { kind: "broken", error: verdict.broken };
+	for (const warning of verdict.warnings) {
+		if (seen.warned.has(warning.output)) continue;
+		seen.warned.add(warning.output);
+		await step.warn("shape", warning.message);
+	}
+	if (!seen.kept && !isTestRun(step.runState)) {
+		const types = outputTypes(body.called, body.flowName, outputs);
+		if (types.length > 0) {
+			seen.kept = true;
+			await keepOutputTypes(ctx, body.flowName, types);
+		}
+	}
+	return { kind: "holds", outputs: verdict.values };
+}
+
+/** What a step already did about its called flow's outputs: the outputs it warned about, whether it kept types. */
+export type OutputsSeen = { warned: Set<string>; kept: boolean };
+
+export function newOutputsSeen(): OutputsSeen {
+	return { warned: new Set(), kept: false };
 }
 
 /**

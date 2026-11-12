@@ -3,6 +3,7 @@ import { Command } from "@langchain/langgraph";
 import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import type { AgentSessionInput } from "@nightshift/agents/types";
 import { step as stepTable } from "@nightshift/db/schema";
+import type { FlowOutputDef } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import { foldRun } from "../log";
 
@@ -19,6 +20,7 @@ import {
 	startRun,
 } from "../testing/graph";
 import { createSandbox, type Sandbox } from "../testing/test-support";
+import type { StepShared } from "./context";
 
 /**
  * The Call node (once) on the compiled graph: the called flow as a subgraph.
@@ -519,5 +521,140 @@ describe("the Call node", () => {
 		]);
 		const reopened = logged.filter((e) => e.type === "StepReopened");
 		expect(reopened.map((e) => e.stepId)).toEqual([crashed[0]?.id as string]);
+	});
+});
+
+describe("the outputs of a called flow hold their types (Q42)", () => {
+	/** A flow whose output `count` is what its command prints, with this type. */
+	const counted = (
+		printed: string,
+		typed: Partial<FlowOutputDef> = { type: "number" },
+	) =>
+		flowOf([command("count", `echo "${printed}"`)], [], {
+			outputs: [{ name: "count", value: "{{count.log_tail}}", ...typed }],
+		});
+	const caller = () =>
+		flowOf(
+			[callOnce("sub", "counted"), command("after", `echo "{{sub.count}}"`)],
+			[edge("e1", "sub", "pass", "after")],
+		);
+	const subEnd = async (h: Awaited<ReturnType<typeof startRun>>) => {
+		const logged = await h.events();
+		const sub = deriveSteps(foldRun(logged)).find((s) => s.nodeId === "sub");
+		return {
+			sub,
+			ended: logged.find((e) => e.type === "StepEnded" && e.stepId === sub?.id),
+			logged,
+		};
+	};
+
+	test("an output that fits the type a person gave goes to the caller as that type", async () => {
+		const h = await startRun(sandbox, caller(), {
+			harness: fakeHarness(),
+			flows: { counted: counted("3") },
+		});
+		const { parked } = await drive(h, { inputs: {} });
+		expect(parked).toEqual([]);
+		const { sub, logged } = await subEnd(h);
+		expect(sub?.outcome).toBe("pass");
+		expect(sub?.outputs.count).toBe(3);
+		expect(payloads(logged, "RunWarned")).toEqual([]);
+	});
+
+	test("an output that does not fit the type a person gave ends the Subflow step error, and the run parks", async () => {
+		const h = await startRun(sandbox, caller(), {
+			harness: fakeHarness(),
+			flows: { counted: counted("many") },
+		});
+		const { parked } = await drive(h, { inputs: {} });
+		const reason =
+			'The output "count" of the flow "counted" does not fit its type. A number is needed, and the value is "many".';
+		expect(parked).toMatchObject([
+			{
+				nodeId: "sub",
+				status: "failed",
+				reason: `Node "sub" failed: ${reason}`,
+			},
+		]);
+		const { ended } = await subEnd(h);
+		expect(ended?.payload).toMatchObject({
+			outcome: "error",
+			outputs: { count: "many", ended: "", outcome: "error" },
+			error: reason,
+		});
+	});
+
+	test("an output that does not fit a type Night Shift inferred warns on the Subflow step, and the run goes on", async () => {
+		const h = await startRun(sandbox, caller(), {
+			harness: fakeHarness(),
+			flows: { counted: counted("many", { type: "number", inferred: true }) },
+		});
+		const { parked, state } = await drive(h, { inputs: {} });
+		expect(parked).toEqual([]);
+		expect(state.ended?.nodeId).toBe("after");
+		const { sub, logged } = await subEnd(h);
+		expect(sub?.outputs.count).toBe("many");
+		expect(payloads(logged, "RunWarned")).toEqual([
+			{
+				kind: "shape",
+				message:
+					'The output "count" of the flow "counted" does not fit its type. A number is needed, and the value is "many". Night Shift took this type from an earlier run. Confirm it or change it in that flow.',
+			},
+		]);
+		expect(logged.find((e) => e.type === "RunWarned")?.stepId).toBe(sub?.id);
+	});
+
+	test("a failed called flow is not held to its types: it fails as before", async () => {
+		const failing = flowOf([command("count", "echo many; exit 1")], [], {
+			outputs: [{ name: "count", value: "{{count.log_tail}}", type: "number" }],
+		});
+		const h = await startRun(sandbox, caller(), {
+			harness: fakeHarness(),
+			flows: { counted: failing },
+		});
+		await drive(h, { inputs: {} });
+		const { ended } = await subEnd(h);
+		expect(ended?.payload).toMatchObject({
+			outcome: "fail",
+			outputs: { count: "many" },
+		});
+	});
+
+	test("an output without a type gets one from the run, kept on the called flow; a test run keeps none", async () => {
+		const kept: unknown[] = [];
+		const keepOutputTypes: StepShared["keepOutputTypes"] = async (
+			flow,
+			types,
+		) => {
+			kept.push({ flow, types });
+		};
+		const untyped = counted("3", {});
+		const h = await startRun(sandbox, caller(), {
+			harness: fakeHarness(),
+			flows: { counted: untyped },
+			keepOutputTypes,
+		});
+		await drive(h, { inputs: {} });
+		expect(kept).toEqual([
+			{
+				flow: {
+					spaceId: sandbox.spaceId,
+					projectId: "project-1",
+					flowName: "counted",
+				},
+				types: [{ name: "count", value: "{{count.log_tail}}", type: "text" }],
+			},
+		]);
+		// The value goes on as it came.
+		expect((await subEnd(h)).sub?.outputs.count).toBe("3");
+
+		const test = await startRun(sandbox, caller(), {
+			harness: fakeHarness(),
+			flows: { counted: untyped },
+			keepOutputTypes,
+			test: { pinned: {}, skipped: {} },
+		});
+		await drive(test, { inputs: {} });
+		expect(kept).toHaveLength(1);
 	});
 });

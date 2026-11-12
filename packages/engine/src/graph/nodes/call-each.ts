@@ -50,7 +50,10 @@ import {
 	bodyOutputs,
 	failedEndReason,
 	hasStoppedEdge,
+	newOutputsSeen,
+	type OutputsSeen,
 	runBody,
+	typedOutputs,
 } from "./body";
 
 /**
@@ -69,9 +72,11 @@ import {
  *
  * A failed element does not fail the step: the body's park is swallowed
  * (`runBody`), the element ends `failed` with the reason, and the loop goes
- * on with free work. A stop inside the body ends the step `stopped` and
- * propagates the park; a wait or a Gate inside the body propagates with
- * the step open. Everything before the body runs again on the resume and
+ * on with free work. An element whose outputs do not fit a type a person
+ * gave them fails the same way (`typedOutputs`, Q42). A stop inside the
+ * body ends the step `stopped` and propagates the park; a wait or a Gate
+ * inside the body propagates with the step open. Everything before the
+ * body runs again on the resume and
  * after a daemon death (rule 4), so the node continues the open element it
  * finds in the log (no `ItemStarted` or branch twice) and the body resumes
  * under the same namespace; an ended step (stopped, or `interrupted` by
@@ -91,6 +96,16 @@ import {
  */
 export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 	let graph: BodyGraph | null = null;
+	// One step spans the elements: it warns about an output and keeps types once.
+	const seen = new Map<string, OutputsSeen>();
+	const seenOf = (stepId: string): OutputsSeen => {
+		let known = seen.get(stepId);
+		if (!known) {
+			known = newOutputsSeen();
+			seen.set(stepId, known);
+		}
+		return known;
+	};
 	return async (state, config) => {
 		const runId = ctx.run.id;
 		const scope = scopeOf(config);
@@ -434,7 +449,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 				return next(element.index);
 			}
 			case "finished": {
-				const outputs = await bodyOutputs(ctx, body, ended);
+				let outputs = await bodyOutputs(ctx, body, ended);
 				// A failed End node fails the element, as a failed body does.
 				if (ended.result === "failed") {
 					await endItem(
@@ -445,6 +460,19 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 					);
 					return next(element.index);
 				}
+				// So does an output that does not fit a type a person gave it (Q42).
+				const typed = await typedOutputs(
+					ctx,
+					step,
+					body,
+					outputs,
+					seenOf(stepId),
+				);
+				if (typed.kind === "broken") {
+					await endItem(element.facts.id, "failed", typed.error, outputs);
+					return next(element.index);
+				}
+				outputs = typed.outputs;
 				if (haltOn.includes(ended.outcome)) {
 					await endItem(
 						element.facts.id,

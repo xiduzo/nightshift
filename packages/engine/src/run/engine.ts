@@ -560,6 +560,10 @@ export function createEngine(
 				shapes,
 			);
 		},
+		// And the type of a called flow's output (Q40).
+		keepOutputTypes: async (flow, types) => {
+			await projectFlows.keepOutputTypes(flow.projectId, flow.flowName, types);
+		},
 		gitAuthor: (personId) => gitAuthorOf(db, personId),
 		...(options.usage ? { usage: options.usage } : {}),
 	};

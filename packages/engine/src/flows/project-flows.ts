@@ -25,6 +25,7 @@ import {
 	flowNotices,
 	flowRevisions,
 	flowSources,
+	keepOutputTypes,
 	keepShapes,
 	mergeFlowDocuments,
 	olderFormat,
@@ -98,6 +99,23 @@ export type ProjectFlows = {
 		name: string,
 		node: { id: string; type: string },
 		shapes: Record<string, Record<string, unknown>>,
+	): Promise<boolean>;
+	/**
+	 * Keeps the types a run gave the outputs of the flow of that name, each
+	 * marked inferred, with one revision of kind `infer` by Night Shift on
+	 * this Device. Only on an output that has no type and the template the
+	 * run read: anything else writes nothing. The Walker calls it when a Call
+	 * of that flow finished. Returns whether it wrote a revision.
+	 */
+	keepOutputTypes(
+		projectId: string,
+		name: string,
+		types: readonly {
+			name: string;
+			value: string;
+			type: string;
+			schema?: Record<string, unknown>;
+		}[],
 	): Promise<boolean>;
 	/**
 	 * The revisions of the flow of that name, oldest first. Empty for a
@@ -233,6 +251,16 @@ export function createProjectFlows(deps: ProjectFlowsDeps): ProjectFlows {
 				name,
 				node,
 				shapes,
+				deviceId: await deviceId(),
+				at: now(),
+			});
+			return revisionId !== null;
+		},
+
+		async keepOutputTypes(projectId, name, types) {
+			const revisionId = await keepOutputTypes(await documentOf(projectId), {
+				name,
+				types,
 				deviceId: await deviceId(),
 				at: now(),
 			});

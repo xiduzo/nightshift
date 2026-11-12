@@ -35,6 +35,7 @@ import {
 	failedEndReason,
 	hasStoppedEdge,
 	runBody,
+	typedOutputs,
 } from "./body";
 import { callEachNode } from "./call-each";
 import { climbAskNode, retryGate } from "./climb-gate";
@@ -50,7 +51,9 @@ import { climbAskNode, retryGate } from "./climb-gate";
  * end, `fail` with the reason when it failed. An End node is a chosen end
  * with a result: `done` and `nothing-to-do` end the Call `pass`, `failed`
  * ends it `fail`, and `ended`, `end_message` and `end_report` hold its
- * status, message and report.
+ * status, message and report. The outputs of a flow that finished hold
+ * to their types (`typedOutputs`, Q42): one that does not fit a type a
+ * person gave it ends the step `error`.
  *
  * Everything before the body runs again on a resume and after a daemon
  * death (rule 4), so it is idempotent: the resume point (`resumePoint`,
@@ -256,7 +259,7 @@ async function callOnce(
 			return end("fail", outputs, ended.reason);
 		}
 		case "finished": {
-			const outputs = await bodyOutputs(ctx, body, ended);
+			let outputs = await bodyOutputs(ctx, body, ended);
 			const label = ctx
 				.kindOf(ended.node)
 				.endedLabel(ended.node, ended.outcome);
@@ -271,6 +274,14 @@ async function callOnce(
 						}
 					: { ended: label };
 			const failed = ended.result === "failed";
+			if (!failed) {
+				// The outputs a person typed hold, or the step errors (Q42).
+				const typed = await typedOutputs(ctx, step, body, outputs);
+				if (typed.kind === "broken") {
+					return end("error", { ...outputs, ...own }, typed.error);
+				}
+				outputs = typed.outputs;
+			}
 			return end(
 				failed ? "fail" : "pass",
 				{ ...outputs, ...own },

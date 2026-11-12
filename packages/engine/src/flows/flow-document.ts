@@ -93,7 +93,8 @@ function mapsOf(document: FlowDocument): FlowMaps {
 /**
  * Why a revision exists. `upgrade`: Night Shift brought the flow to a newer
  * format (`upgradeFlows`), nobody changed it. `infer`: Night Shift kept the
- * shape of a run's data on a node that had no output schema (`keepShapes`).
+ * shape of a run's data on a node that had no output schema (`keepShapes`),
+ * or the type of a value on a flow output that had none (`keepOutputTypes`).
  * An older Night Shift does not read an `infer` revision: it leaves it out
  * of the list.
  */
@@ -527,6 +528,82 @@ export async function keepShapes(
 			input.node.id,
 			plain({ ...node, output: shape, outputInferred: true }),
 		);
+		// A copy reads again once its original changes: it goes, its revisions stay.
+		for (const copy of scan.copies.get(found.flowId) ?? []) {
+			mapsOf(document).flows.delete(copy);
+		}
+	});
+	const revisionId = randomUUID();
+	const flow = flowJson(found.map);
+	await document.history.change(() => {
+		document.history.doc.getArray(found.flowId).push([
+			plain({
+				id: revisionId,
+				at: input.at,
+				personId: null,
+				deviceId: input.deviceId,
+				kind: "infer",
+				flow: { ...flow, version: FLOW_VERSION },
+			} satisfies FlowRevision),
+		]);
+	});
+	return revisionId;
+}
+
+/**
+ * Keeps the types a run gave the outputs of the flow of that name: each
+ * output named in `types` that has no type yet and still has the template
+ * the run read gets its `type` (and `schema`), marked `inferred`, with one
+ * revision of kind `infer` by Night Shift on `deviceId`. Writes nothing
+ * when the flow is gone or of another format, or no output takes a type: a
+ * person's type always wins. Returns the revision's id, or null.
+ */
+export async function keepOutputTypes(
+	document: FlowDocument,
+	input: {
+		name: string;
+		types: readonly {
+			name: string;
+			value: string;
+			type: string;
+			schema?: Record<string, unknown>;
+		}[];
+		deviceId: string;
+		at: number;
+	},
+): Promise<string | null> {
+	const scan = scanFlows(document);
+	const found = scan.entries.find((entry) => entry.name === input.name);
+	if (!found || found.newer || found.map.get("version") !== FLOW_VERSION) {
+		return null;
+	}
+	const scalars = found.map.get("scalars") as Y.Map<unknown>;
+	const stored = scalars.get("outputs");
+	if (!Array.isArray(stored)) return null;
+	let changed = false;
+	const outputs = (stored as Record<string, unknown>[]).map((output) => {
+		const kept = input.types.find(
+			(type) => type.name === output.name && type.value === output.value,
+		);
+		if (
+			kept === undefined ||
+			output.type !== undefined ||
+			output.schema !== undefined
+		) {
+			return output;
+		}
+		changed = true;
+		return {
+			...output,
+			type: kept.type,
+			...(kept.schema !== undefined ? { schema: kept.schema } : {}),
+			inferred: true,
+		};
+	});
+	if (!changed) return null;
+
+	await document.current.change(() => {
+		scalars.set("outputs", plain(outputs));
 		// A copy reads again once its original changes: it goes, its revisions stay.
 		for (const copy of scan.copies.get(found.flowId) ?? []) {
 			mapsOf(document).flows.delete(copy);

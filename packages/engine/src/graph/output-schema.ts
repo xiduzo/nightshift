@@ -1,7 +1,10 @@
 import {
 	type AskForm,
 	FILE_FORMAT,
+	type Flow,
 	type FlowNode,
+	fitOutput,
+	type JsonValue,
 	NODE_FAMILY,
 	RESERVED_DATA_KEYS,
 	typedOutput,
@@ -176,6 +179,66 @@ export function outputVerdict(node: FlowNode, data: unknown): OutputVerdict {
 /** The end of the warning of a schema Night Shift inferred. */
 const INFERRED_HINT =
 	"Night Shift took this shape from an earlier run. Confirm it or change it in the editor.";
+
+/**
+ * What the outputs of a called flow are against their types (Q42), as a
+ * variable's value is (`fitOutput`): text is read as the type, null fits
+ * every type, a `json` output is held to its `schema`.
+ *
+ * - `values`: the outputs the Call step gives. An output whose type a
+ *   person wrote or confirmed gives its value read as that type. Any other
+ *   output gives its value as it came.
+ * - `warnings`: the outputs that do not fit a type Night Shift inferred
+ *   from an earlier run (`inferred`), one message each. The step goes on.
+ * - `broken`: the first output that does not fit a type a person wrote or
+ *   confirmed, or null. The Call step ends `error` (once), the element
+ *   ends `failed` (with `each`).
+ */
+export type FlowOutputsVerdict = {
+	values: Record<string, JsonValue>;
+	warnings: { output: string; message: string }[];
+	broken: string | null;
+};
+
+export function flowOutputsVerdict(
+	called: Pick<Flow, "outputs">,
+	flowName: string,
+	values: Readonly<Record<string, JsonValue>>,
+): FlowOutputsVerdict {
+	const verdict: FlowOutputsVerdict = {
+		values: { ...values },
+		warnings: [],
+		broken: null,
+	};
+	for (const output of called.outputs ?? []) {
+		if (output.type === undefined || !Object.hasOwn(values, output.name)) {
+			continue;
+		}
+		const fitted = fitOutput(output, values[output.name] ?? null, dataProblem);
+		if (fitted.ok) {
+			if (!output.inferred) verdict.values[output.name] = fitted.value;
+			continue;
+		}
+		const problem = `The output "${output.name}" of the flow "${flowName}" does not fit its type. ${capitalized(fitted.problem)}`;
+		if (output.inferred) {
+			verdict.warnings.push({
+				output: output.name,
+				message: `${problem} ${INFERRED_OUTPUT_HINT}`,
+			});
+		} else if (verdict.broken === null) {
+			verdict.broken = problem;
+		}
+	}
+	return verdict;
+}
+
+/** The end of the warning of a flow output type Night Shift inferred. */
+const INFERRED_OUTPUT_HINT =
+	"Night Shift took this type from an earlier run. Confirm it or change it in that flow.";
+
+function capitalized(text: string): string {
+	return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 /**
  * Null when `data` answers the Ask (ADR 10): it matches the form's schema

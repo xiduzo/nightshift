@@ -9,7 +9,13 @@ import {
 	usageLimitScript,
 } from "@nightshift/agents/testing";
 import type { AgentSessionInput } from "@nightshift/agents/types";
-import type { CallEach, CallEachNode, CallNode, Flow } from "@nightshift/flows";
+import type {
+	CallEach,
+	CallEachNode,
+	CallNode,
+	Flow,
+	FlowOutputDef,
+} from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { defaultRunSettings } from "../device-config/settings";
 import type { DerivedStep } from "../log";
@@ -30,7 +36,7 @@ import {
 	startRun,
 } from "../testing/graph";
 import { createSandbox, mustGit, type Sandbox } from "../testing/test-support";
-import { DEFAULT_RESUME_PROMPT } from "./context";
+import { DEFAULT_RESUME_PROMPT, type StepShared } from "./context";
 
 /**
  * The Call node with `each` on the compiled graph: one element per super-step,
@@ -1320,6 +1326,74 @@ describe("the Call node with each", () => {
 		).toEqual([
 			[1, "interrupted"],
 			[2, "pass"],
+		]);
+	});
+});
+
+describe("the outputs of a flow that runs per element hold their types (Q42)", () => {
+	const counted = (typed: Partial<FlowOutputDef>) =>
+		body([command("work", `echo "{{item.n}}"`)], [], {
+			outputs: [{ name: "count", value: "{{work.log_tail}}", ...typed }],
+		});
+	const loopOver = (n: string[]) =>
+		flowOf([
+			callEach(
+				"loop",
+				"count",
+				json(n.map((value, index) => ({ id: String(index + 1), n: value }))),
+				{ branch: "shared" },
+			),
+		]);
+
+	test("an element whose output does not fit the type a person gave fails, and the loop goes on", async () => {
+		const h = await startRun(sandbox, loopOver(["3", "many", "4"]), {
+			harness: fakeHarness(),
+			flows: { count: counted({ type: "number" }) },
+		});
+		const { parked } = await drive(h, { inputs: {} });
+		expect(parked).toEqual([]);
+		const loop = loopStep(deriveSteps(foldRun(await h.events())));
+		expect(loop.items.map((i) => [i.facts.id, i.state, i.reason])).toEqual([
+			["1", "done", null],
+			[
+				"2",
+				"failed",
+				'The output "count" of the flow "count" does not fit its type. A number is needed, and the value is "many".',
+			],
+			["3", "done", null],
+		]);
+		expect(
+			payloads(await h.events(), "ItemEnded").map((e) => e.outputs),
+		).toEqual([{ count: 3 }, { count: "many" }, { count: 4 }]);
+	});
+
+	test("a type Night Shift inferred warns once per output, and types are kept once per step", async () => {
+		const kept: unknown[] = [];
+		const keepOutputTypes: StepShared["keepOutputTypes"] = async (
+			_flow,
+			types,
+		) => {
+			kept.push(types);
+		};
+		const inferred = await startRun(sandbox, loopOver(["many", "lots"]), {
+			harness: fakeHarness(),
+			flows: { count: counted({ type: "number", inferred: true }) },
+		});
+		await drive(inferred, { inputs: {} });
+		const logged = await inferred.events();
+		expect(
+			loopStep(deriveSteps(foldRun(logged))).items.map((i) => i.state),
+		).toEqual(["done", "done"]);
+		expect(payloads(logged, "RunWarned").map((w) => w.kind)).toEqual(["shape"]);
+
+		const untyped = await startRun(sandbox, loopOver(["a", "b"]), {
+			harness: fakeHarness(),
+			flows: { count: counted({}) },
+			keepOutputTypes,
+		});
+		await drive(untyped, { inputs: {} });
+		expect(kept).toEqual([
+			[{ name: "count", value: "{{work.log_tail}}", type: "text" }],
 		]);
 	});
 });

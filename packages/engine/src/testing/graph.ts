@@ -204,6 +204,8 @@ export type StartOptions = {
 	runFolder?: true;
 	/** Keeps the shapes a step gave on its node; default: nothing keeps them. */
 	keepShapes?: StepShared["keepShapes"];
+	/** Keeps the types a Call gave the outputs of the flow it calls; default: nothing keeps them. */
+	keepOutputTypes?: StepShared["keepOutputTypes"];
 	/** A test run's pins and skips, as `RunStarted` records them (ADR 27). */
 	test?: TestRun;
 };
@@ -315,6 +317,9 @@ export async function startRun(
 		keptValues: (kept) => keptValues(db, kept),
 		remembered: (at) => readMemory(db, at),
 		...(options.keepShapes ? { keepShapes: options.keepShapes } : {}),
+		...(options.keepOutputTypes
+			? { keepOutputTypes: options.keepOutputTypes }
+			: {}),
 		gitAuthor: (personId) => gitAuthorOf(db, personId),
 	};
 	const deps: ThreadDeps = {

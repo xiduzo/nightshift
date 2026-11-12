@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { FlowNode } from "@nightshift/flows";
-import { dataProblem, outputVerdict, schemaProblem } from "./output-schema";
+import {
+	dataProblem,
+	flowOutputsVerdict,
+	outputVerdict,
+	schemaProblem,
+} from "./output-schema";
 
 describe("output schemas", () => {
 	test("a file shape is a string of the format file", () => {
@@ -102,5 +107,112 @@ describe("outputVerdict", () => {
 		expect(
 			outputVerdict(node("command", { output: named }), data),
 		).toMatchObject({ kind: "broken" });
+	});
+});
+
+describe("flowOutputsVerdict", () => {
+	const plan = {
+		type: "object",
+		properties: { tasks: { type: "array" } },
+	};
+
+	test("outputs that fit their types hold, read as the type a person gave", () => {
+		expect(
+			flowOutputsVerdict(
+				{
+					outputs: [
+						{ name: "count", value: "{{a}}{{b}}", type: "number" },
+						{ name: "plan", value: "{{p.data}}", type: "json", schema: plan },
+						{
+							name: "seen",
+							value: "{{s}}{{t}}",
+							type: "number",
+							inferred: true,
+						},
+						{ name: "any", value: "{{x.data}}" },
+						{ name: "none", value: "{{gone.data}}", type: "boolean" },
+					],
+				},
+				"research",
+				{
+					count: "12",
+					plan: { tasks: [] },
+					seen: "4",
+					any: { free: true },
+					none: null,
+				},
+			),
+		).toEqual({
+			// An inferred type gives the value as it came.
+			values: {
+				count: 12,
+				plan: { tasks: [] },
+				seen: "4",
+				any: { free: true },
+				none: null,
+			},
+			warnings: [],
+			broken: null,
+		});
+	});
+
+	test("an output that does not fit a type a person gave breaks the promise", () => {
+		const verdict = flowOutputsVerdict(
+			{
+				outputs: [
+					{ name: "count", value: "{{c.data}}", type: "number" },
+					{ name: "plan", value: "{{p.data}}", type: "json", schema: plan },
+				],
+			},
+			"research",
+			{ count: "many", plan: { tasks: "none" } },
+		);
+		expect(verdict.broken).toBe(
+			'The output "count" of the flow "research" does not fit its type. A number is needed, and the value is "many".',
+		);
+		expect(verdict.warnings).toEqual([]);
+		expect(
+			flowOutputsVerdict(
+				{
+					outputs: [
+						{ name: "plan", value: "{{p.data}}", type: "json", schema: plan },
+					],
+				},
+				"research",
+				{ plan: { tasks: "none" } },
+			).broken,
+		).toBe(
+			'The output "plan" of the flow "research" does not fit its type. The value does not match its schema: data/tasks must be array.',
+		);
+	});
+
+	test("an output that does not fit a type Night Shift inferred warns, and keeps its value", () => {
+		expect(
+			flowOutputsVerdict(
+				{
+					outputs: [
+						{
+							name: "plan",
+							value: "{{p.data}}",
+							type: "json",
+							schema: plan,
+							inferred: true,
+						},
+					],
+				},
+				"research",
+				{ plan: { tasks: "none" } },
+			),
+		).toEqual({
+			values: { plan: { tasks: "none" } },
+			warnings: [
+				{
+					output: "plan",
+					message:
+						'The output "plan" of the flow "research" does not fit its type. The value does not match its schema: data/tasks must be array. Night Shift took this type from an earlier run. Confirm it or change it in that flow.',
+				},
+			],
+			broken: null,
+		});
 	});
 });
