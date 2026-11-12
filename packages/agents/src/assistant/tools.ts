@@ -123,6 +123,11 @@ export type AuthoringPort = {
 	}>;
 	/** The skills an Agent node may run. */
 	skills(): Promise<AuthoringSkill[]>;
+	/**
+	 * Whether the project has a folder (ADR 22). False: a step that needs
+	 * one gets a warning. Unset: the project has one.
+	 */
+	folder?: () => Promise<boolean>;
 	/** The run the chat is about. Unset: no `get_run` tool. Null: no such run of this flow. */
 	run?: () => Promise<AuthoringRun | null>;
 	/** Shows a checked proposal to the person. */
@@ -212,11 +217,12 @@ export function flowRows(flows: ProjectFlowMap, skip?: string) {
 
 /** The issues of a flow the agent wrote, checked as the editor checks it. */
 async function check(port: AuthoringPort, flow: unknown) {
-	const [draft, flows, profiles, tools] = await Promise.all([
+	const [draft, flows, profiles, tools, folder] = await Promise.all([
 		port.draft(),
 		port.flows(),
 		port.profiles(),
 		port.tools(),
+		port.folder?.(),
 	]);
 	const issues = proposalIssues(draft.flow, flow, {
 		flows,
@@ -224,6 +230,7 @@ async function check(port: AuthoringPort, flow: unknown) {
 		profiles: profileRefs(profiles),
 		connections: tools.connections.map((c) => c.name),
 		cliTools: tools.clis,
+		folder,
 	});
 	return { draft, issues };
 }

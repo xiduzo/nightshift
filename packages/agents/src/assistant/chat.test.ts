@@ -196,6 +196,24 @@ describe("authoringTools", () => {
 		);
 	});
 
+	test("check_flow: in a project without a folder, a step that runs git warns", async () => {
+		const git = {
+			...withTests,
+			nodes: [draft.nodes[0], { ...withTests.nodes[1], command: "git push" }],
+		};
+		const warns = async (over: Partial<AuthoringPort>) =>
+			(await call(authoringTools(port(over)), "check_flow", { flow: git }))
+				.split("\n")
+				.filter((line) => line.startsWith("- warning:"));
+		expect(await warns({})).toEqual([]);
+		expect(await warns({ folder: async () => true })).toEqual([]);
+		expect(await warns({ folder: async () => false })).toEqual([
+			expect.stringContaining(
+				'The command of the node "test" runs git in that empty folder',
+			),
+		]);
+	});
+
 	test("propose_flow refuses a flow with errors twice, then passes it with its issues", async () => {
 		const p = port();
 		const tools = authoringTools(p);
