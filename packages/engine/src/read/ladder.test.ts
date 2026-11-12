@@ -330,7 +330,7 @@ describe("landingsOf", () => {
 		).toEqual([["write", "none", "sub"]]);
 	});
 
-	test("a Subflow's tier lands with what its called flow cost, and the called flow's steps land too", () => {
+	test("a Subflow's tier lands with what its called flow cost, and the work inside it does not land again", () => {
 		const l = runEvents().runStarted();
 		step(l, "c1", "sub", "call", { by: "flow", tier: 0, last: true }, null);
 		const scope = { parentStepId: "c1", itemId: null };
@@ -349,18 +349,156 @@ describe("landingsOf", () => {
 		spent(l, "s1", "x1", 2);
 		l.stepEnded("s1", "pass");
 		l.stepEnded("c1", "pass", { tier: "small", tries: 1 });
-		const all = landings(l);
+		const ladder = ladderOf(deriveSteps(l.state()));
 		expect(
-			all.map((each) => [each.nodeId, each.via, each.tier, each.cost.usd]),
-		).toEqual([
-			["write", "sub", null, 2],
-			["sub", null, "small", 2],
-		]);
-		expect(runRungs(all)).toMatchObject([
-			{ nodeId: "write", via: "sub" },
+			ladder.landings.map((each) => [
+				each.nodeId,
+				each.via,
+				each.tier,
+				each.cost.usd,
+			]),
+		).toEqual([["sub", null, "small", 2]]);
+		expect([...ladder.tries]).toEqual([["c1", "first"]]);
+		expect(runRungs(ladder.landings)).toMatchObject([
 			{ nodeId: "sub", rung: "first", by: "flow", tier: "small" },
 		]);
-		expect(runRungs(all)[1]).not.toHaveProperty("via");
+		expect(runRungs(ladder.landings)[0]).not.toHaveProperty("via");
+	});
+
+	// Inside a tier's flow each Agent lands on its own first rung: only the
+	// Subflow's climb shows that the work went up to the next tier.
+	test("a Subflow's later tier lands once, with what both tiers' flows cost", () => {
+		const l = runEvents().runStarted();
+		step(l, "c1", "sub", "call", { by: "flow", tier: 0 }, null);
+		step(
+			l,
+			"s1",
+			"write",
+			"agent",
+			{ by: "agent", last: true },
+			"pass",
+			{},
+			{ scope: { parentStepId: "c1", itemId: null }, costUsd: 1 },
+		);
+		l.stepEnded("c1", "fail", { tier: "small", tries: 1 });
+		step(l, "c2", "sub", "call", { by: "flow", tier: 1, last: true }, null);
+		step(
+			l,
+			"s2",
+			"write",
+			"agent",
+			{ by: "agent", last: true },
+			"pass",
+			{},
+			{ scope: { parentStepId: "c2", itemId: null }, costUsd: 4 },
+		);
+		l.stepEnded("c2", "pass", { tier: "big", tries: 2 });
+		const all = landings(l);
+		expect(
+			all.map((each) => [each.nodeId, each.rung, each.tier, each.tries]),
+		).toEqual([["sub", "later", "big", 2]]);
+		expect(all[0]?.cost.usd).toBe(5);
+	});
+
+	test("inside a Subflow's tier, at any depth, a Decision lands and the work does not", () => {
+		const l = runEvents().runStarted();
+		step(l, "c1", "sub", "call", { by: "flow", tier: 0, last: true }, null);
+		const inSub = { parentStepId: "c1", itemId: null };
+		step(
+			l,
+			"p1",
+			"inner",
+			"call",
+			{ by: "flow", last: true },
+			null,
+			{},
+			{
+				scope: inSub,
+			},
+		);
+		const inInner = { parentStepId: "p1", itemId: null };
+		step(
+			l,
+			"a1",
+			"write",
+			"agent",
+			{ by: "agent", last: true },
+			"pass",
+			{},
+			{
+				scope: inInner,
+				costUsd: 2,
+			},
+		);
+		step(
+			l,
+			"v1",
+			"shape",
+			"value",
+			{ by: "model", last: true },
+			"pass",
+			{},
+			{
+				scope: inSub,
+				costUsd: 0.5,
+			},
+		);
+		step(
+			l,
+			"d1",
+			"route",
+			"decision",
+			{ by: "rule", last: true },
+			"go",
+			{},
+			{
+				scope: inInner,
+			},
+		);
+		l.stepEnded("p1", "pass");
+		l.stepEnded("c1", "pass", { tier: "small", tries: 1 });
+		const ladder = ladderOf(deriveSteps(l.state()));
+		expect(
+			ladder.landings.map((each) => [each.ladder, each.nodeId, each.via]),
+		).toEqual([
+			["choice", "route", "sub/inner"],
+			["work", "sub", null],
+		]);
+		expect(ladder.landings[1]?.cost.usd).toBe(2.5);
+		expect([...ladder.tries.keys()]).toEqual(["c1", "d1"]);
+	});
+
+	test("a Subflow with a cascade inside a plain Subflow lands, and its work does not", () => {
+		const l = runEvents().runStarted();
+		step(l, "p1", "outer", "call", { by: "flow", last: true }, null);
+		step(
+			l,
+			"c1",
+			"sub",
+			"call",
+			{ by: "flow", tier: 0, last: true },
+			null,
+			{},
+			{ scope: { parentStepId: "p1", itemId: null } },
+		);
+		step(
+			l,
+			"a1",
+			"write",
+			"agent",
+			{ by: "agent", last: true },
+			"pass",
+			{},
+			{
+				scope: { parentStepId: "c1", itemId: null },
+				costUsd: 2,
+			},
+		);
+		l.stepEnded("c1", "pass", { tier: "small", tries: 1 });
+		l.stepEnded("p1", "pass");
+		expect(
+			landings(l).map((each) => [each.nodeId, each.via, each.cost.usd]),
+		).toEqual([["sub", "outer", 2]]);
 	});
 
 	test("a decider that was not sure enough on a try, then sure: the later tier, unsure", () => {
@@ -498,6 +636,45 @@ describe("landingsOf, steps of an older Walker", () => {
 			["gate", "person", "person"],
 			["triage", "first", "model"],
 			["route", "rule", "rule"],
+		]);
+	});
+
+	test("the work inside an older Subflow's tier does not land again", () => {
+		const l = runEvents().runStarted();
+		step(l, "c1", "sub", "call", undefined, null);
+		step(
+			l,
+			"a1",
+			"write",
+			"agent",
+			undefined,
+			"pass",
+			{},
+			{
+				scope: { parentStepId: "c1", itemId: null },
+				costUsd: 2,
+			},
+		);
+		l.stepEnded("c1", "pass", { tier: "small", tries: 1 });
+		step(l, "p1", "plain", "call", undefined, null);
+		step(
+			l,
+			"a2",
+			"write",
+			"agent",
+			undefined,
+			"pass",
+			{},
+			{
+				scope: { parentStepId: "p1", itemId: null },
+			},
+		);
+		l.stepEnded("p1", "pass");
+		expect(
+			landings(l).map((each) => [each.nodeId, each.via, each.tier]),
+		).toEqual([
+			["sub", null, "small"],
+			["write", "plain", null],
 		]);
 	});
 

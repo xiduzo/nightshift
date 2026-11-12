@@ -25,7 +25,12 @@ import { calledCosts } from "./run-views";
  * on no ladder: the steps of the flow it calls did its work, and they land
  * on their own (`via` names the Subflow). Counted next to them, it would
  * land a second time for the same work. A Subflow with a cascade stays:
- * the tier that held is where its work landed.
+ * the tier that held is where its work landed, and its landing costs what
+ * its tiers' flows cost. So the work steps inside a try of it (at any
+ * depth) are on no ladder: they are that tier's work, and they would land
+ * a second time. Only that climb shows how far the work climbed: inside a
+ * tier's flow, each Agent lands on its own first rung. A Decision inside
+ * stays on the choice ladder: a choice is not the tier's work.
  *
  * A climb is the steps of one node in one scope, oldest first, up to its
  * landing. Each try of a cascade is a step of its own (ADR 6). A node
@@ -141,6 +146,7 @@ export function ladderOf(steps: readonly DerivedStep[]): RunLadder {
 	for (const step of ordered) {
 		const ladder = LADDER_OF[step.nodeType];
 		if (ladder === undefined) continue;
+		if (ladder === "work" && inCascadeTry(step, byId)) continue;
 		const key = climbKey(step);
 		const climb = open.get(key) ?? { steps: [], firstLabel: null };
 		const rung = step.rung ?? olderRung(step, climb, later.get(step.id));
@@ -183,6 +189,36 @@ function plainSubflow(step: DerivedStep, rung: StepRung): boolean {
 	return (
 		step.nodeType === "call" && rung.by === "flow" && rung.tier === undefined
 	);
+}
+
+/**
+ * Whether the step ran inside a try of a Subflow with a cascade, at any
+ * depth: its work is that tier's work, which lands on the Subflow.
+ */
+function inCascadeTry(
+	step: DerivedStep,
+	byId: ReadonlyMap<string, DerivedStep>,
+): boolean {
+	const seen = new Set<string>();
+	for (
+		let caller = step.scope ? byId.get(step.scope.parentStepId) : undefined;
+		caller && !seen.has(caller.id);
+		caller = caller.scope ? byId.get(caller.scope.parentStepId) : undefined
+	) {
+		seen.add(caller.id);
+		if (caller.nodeType === "call" && cascadeTry(caller)) return true;
+	}
+	return false;
+}
+
+/**
+ * A try of a Subflow's cascade: its rung names a tier. A step of an older
+ * Walker names no rung: its tier label says so (`olderRung`).
+ */
+function cascadeTry(step: DerivedStep): boolean {
+	return step.rung
+		? step.rung.by === "flow" && step.rung.tier !== undefined
+		: tierOf(step) !== null;
 }
 
 /** The next step of the same node and scope, by step id (older steps look ahead). */
