@@ -352,6 +352,7 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 						cliTools: deps.cliTools,
 						connections: deps.connections,
 						skills: () => skills(picked.settings.harness, { projectPath: cwd }),
+						withoutFolder: deps.withoutFolder,
 					},
 					request,
 					signal,

@@ -402,6 +402,62 @@ describe("assistant.chat", () => {
 		expect(harness.calls[0]?.cwd).toBe("/data/assistant");
 	});
 
+	test("for a project without a folder, a proposed step that needs one comes with a warning", async () => {
+		const publish = {
+			...withTests,
+			nodes: [
+				...withTests.nodes,
+				{
+					id: "publish",
+					type: "call",
+					position: { x: 600, y: 0 },
+					flow: "kit:github/publish-draft-pr",
+					inputs: { title: "Notes" },
+				},
+			],
+			edges: [
+				...withTests.edges,
+				{
+					id: "test-pass-publish",
+					from: "test",
+					outcome: "pass",
+					to: "publish",
+				},
+			],
+		};
+		const proposed = async (withoutFolder: boolean) => {
+			const harness = fakeHarness({
+				steps: [
+					{
+						type: "tool",
+						name: "propose_flow",
+						input: { flow: publish, summary: "Publishes the notes." },
+					},
+				],
+			});
+			const events = await chat(
+				createAssistant(
+					deps({
+						clonePath: async () => (withoutFolder ? null : "/repo"),
+						withoutFolder: async () => withoutFolder,
+						ownFolder: async () => "/data/assistant",
+						harnessFor: () => harness,
+					}),
+				),
+			);
+			const proposal = events.find((e) => e.type === "proposal");
+			return proposal?.type === "proposal" ? proposal.proposal.issues : null;
+		};
+		expect(await proposed(false)).toEqual([]);
+		expect(await proposed(true)).toEqual([
+			{
+				severity: "warning",
+				message: expect.stringContaining("This project has no folder"),
+				nodeId: "publish",
+			},
+		]);
+	});
+
 	test("a later message on the thread resumes its session; an unknown thread starts anew", async () => {
 		const harness = fakeHarness({ steps: [{ type: "text", text: "Ok." }] });
 		const assistant = createAssistant(deps({ harnessFor: () => harness }));

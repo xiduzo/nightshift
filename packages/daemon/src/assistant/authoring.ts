@@ -44,6 +44,8 @@ export type AuthoringPortDeps = {
 			source: "project" | "computer";
 		}[]
 	>;
+	/** Whether the project has no folder (ADR 22). Without it: every project has one. */
+	withoutFolder?: (projectId: string) => Promise<boolean>;
 };
 
 /** The port of one message: `get_run` only when the request names a run. */
@@ -53,8 +55,13 @@ export function authoringPort(
 	signal: AbortSignal,
 ): Omit<AuthoringPort, "propose"> {
 	const { runId } = request;
+	const { withoutFolder } = deps;
 	return {
 		draft: async () => ({ name: request.flowName, flow: request.flow }),
+		// A step that needs the project's folder warns in a project without one.
+		...(withoutFolder
+			? { folder: async () => !(await withoutFolder(request.projectId)) }
+			: {}),
 		flows: () => deps.space.flows.map(request.projectId),
 		// Each Device's, with the settings of this computer's own.
 		profiles: async () => {
