@@ -12,4 +12,17 @@ export const CLAUDE_CODE_FACTS: HarnessFacts = {
 	takeOver: (id) => `claude --resume ${id}`,
 	skillDirs: [".claude/skills"],
 	limitsTurns: true,
+	// https://code.claude.com/docs/en/setup: the native installer asks
+	// nothing, refuses sudo and puts `claude` in ~/.local/bin.
+	// `claude auth login` opens the browser; the person may paste a code.
+	setup: {
+		vendor: "Anthropic",
+		installScript: "https://claude.ai/install.sh",
+		installShell: "bash",
+		installEnv: {},
+		binDir: ".local/bin",
+		signIn: ["auth", "login"],
+		signInHosts: ["claude.ai", "claude.com", "anthropic.com"],
+		signInIo: "pipes",
+	},
 };

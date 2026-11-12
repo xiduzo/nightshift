@@ -11,10 +11,11 @@ async function codexCheck(bin: string): Promise<CliCheck> {
 		const out = await probe([resolved, "login", "status"]);
 		const line = firstLine(out.stdout) ?? firstLine(out.stderr);
 		if (out.code !== 0) {
+			// The CLI's own line names its command: plain words instead.
 			return {
 				...check,
 				signIn: "signed_out",
-				problem: line ?? "Not logged in. Run `codex login`.",
+				problem: "Codex is not signed in.",
 			};
 		}
 		return { ...check, signIn: "signed_in", account: line };

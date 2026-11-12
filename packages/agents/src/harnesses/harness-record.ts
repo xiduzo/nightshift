@@ -40,6 +40,41 @@ export type HarnessFacts = HarnessCatalogEntry & {
 	 * `--max-turns`). Unset: the engine counts the turns.
 	 */
 	limitsTurns?: true;
+	/**
+	 * How Night Shift installs the CLI and signs it in on this computer,
+	 * after the person confirms (ADR 25). Unset: the person installs it.
+	 */
+	setup?: HarnessSetup;
+};
+
+/**
+ * The guided setup of one harness's CLI: the vendor's own installer and the
+ * CLI's own sign-in. Fixed data only: nothing of a request goes into what
+ * runs (`@nightshift/engine/agent-setup` runs it).
+ */
+export type HarnessSetup = {
+	/** Who publishes the CLI and its installer, for the person: "Anthropic". */
+	vendor: string;
+	/** The vendor's install script: a fixed https address, no shell characters. */
+	installScript: `https://${string}`;
+	/** The shell that runs the script, as the vendor documents it. */
+	installShell: "bash" | "sh";
+	/** Variables the installer gets on top of this computer's: none waits for an answer. */
+	installEnv: Readonly<Record<string, string>>;
+	/** The folder the installer puts the CLI in, relative to the home folder. */
+	binDir: string;
+	/** The CLI's own sign-in command, after the program (`auth login`). */
+	signIn: readonly string[];
+	/**
+	 * The hosts a sign-in address may point at: the vendor's own, and their
+	 * subdomains. Any other address in the CLI's output is not shown.
+	 */
+	signInHosts: readonly string[];
+	/**
+	 * How the sign-in talks to the CLI: plain pipes, or a terminal for a CLI
+	 * that refuses to sign in without one.
+	 */
+	signInIo: "pipes" | "terminal";
 };
 
 /** A harness adapter: the TanStack AI package that drives one coding-agent CLI. */

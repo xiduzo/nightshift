@@ -65,7 +65,7 @@ describe("checkHarness: claude-code", () => {
 		expect(check.version).toBe("2.1.3 (Claude Code)");
 		expect(check.account).toBeNull();
 		expect(check.signIn).toBe("signed_out");
-		expect(check.problem).toBe("Not logged in. Run `claude` once to log in.");
+		expect(check.problem).toBe("Claude Code is not signed in.");
 	});
 
 	test("an older Claude Code without `auth status --json`: the version is enough", async () => {

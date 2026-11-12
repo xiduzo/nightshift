@@ -35,23 +35,24 @@ describe("checkHarness: codex", () => {
 		});
 	});
 
-	test("a failing `login status` is the problem", async () => {
+	test("a failing `login status` is not signed in, in plain words", async () => {
 		const bin = await fakeCli("codex", {
 			"--version": { stdout: "codex-cli 0.50.0" },
 			"login status": { stderr: "Not logged in\n", code: 1 },
 		});
 		const check = await checkHarness("codex", bin);
 		expect(check.account).toBeNull();
-		expect(check.problem).toBe("Not logged in");
+		expect(check.signIn).toBe("signed_out");
+		expect(check.problem).toBe("Codex is not signed in.");
 	});
 
-	test("a silent failing `login status` says how to log in", async () => {
+	test("a silent failing `login status` is not signed in too", async () => {
 		const bin = await fakeCli("codex", {
 			"--version": { stdout: "codex-cli 0.50.0" },
 			"login status": { code: 1 },
 		});
 		expect((await checkHarness("codex", bin)).problem).toBe(
-			"Not logged in. Run `codex login`.",
+			"Codex is not signed in.",
 		);
 	});
 });

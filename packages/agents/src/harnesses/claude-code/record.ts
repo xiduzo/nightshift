@@ -20,7 +20,7 @@ async function claudeCheck(bin: string): Promise<CliCheck> {
 			return {
 				...check,
 				signIn: "signed_out",
-				problem: "Not logged in. Run `claude` once to log in.",
+				problem: "Claude Code is not signed in.",
 			};
 		}
 		const facts = [

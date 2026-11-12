@@ -18,9 +18,21 @@ import {
 	shellQuote,
 } from "../port";
 import { HARNESS_FACTS } from "./facts-table";
-import type { HarnessFacts } from "./harness-record";
+import type { HarnessFacts, HarnessSetup } from "./harness-record";
 
 export { shellQuote };
+
+/** A harness's guided setup, with the program its installer puts in `binDir` (`claude`). */
+export type HarnessSetupFacts = HarnessSetup & { program: string };
+
+/**
+ * How Night Shift installs the harness's CLI and signs it in, or null when
+ * the person installs it themselves (ADR 25).
+ */
+export function harnessSetup(name: HarnessName): HarnessSetupFacts | null {
+	const facts = HARNESS_FACTS[name];
+	return facts.setup ? { ...facts.setup, program: facts.bin } : null;
+}
 
 function byHarness<T>(
 	pick: (facts: HarnessFacts) => T,
