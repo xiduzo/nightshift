@@ -294,7 +294,7 @@ Each failed step has a fix. A fix runs only after you confirm it.
 
 A run refuses to start in a project that is not ready (`checkProjectFolder` in `packages/engine/src/projects/project-setup.ts`).
 
-A project without a folder has nothing to check. The **No folder** tab of Add project asks only for a name (`projects.addWithoutFolder`, ADR 22).
+A project without a folder has nothing to check. The **No folder** tab of Add project asks only for a name (`projects.addWithoutFolder`, ADR 22). In such a project, the editor warns at each step that needs a folder (`folderNeeds` in `packages/flows/src/draft/folder.ts`). Those are a kit with `needsFolder` in the kit registry, and a command that runs git in the run's folder. A read of `run.branch`, `run.base_branch` or `run.base_ref` warns too: they are always empty. A Subflow warns when the flow it runs has such a step.
 
 **Lease.** One daemon per database. A daemon takes the lease (the `daemon_lease` row) before it recovers interrupted work or starts the scheduler. It writes a heartbeat every 10 seconds. A second daemon on the same database refuses to start. It prints the holder's host, pid and start time, and exits with code 1.
 

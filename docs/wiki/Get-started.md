@@ -67,6 +67,7 @@ To build its first flow, open the project's **Flows** page and choose **New flow
 - Each run starts in an empty folder of its own. The run page shows the files that the run wrote. See [The files of a run](Runs-and-schedules.md#the-files-of-a-run).
 - To keep a value for the next run, use a variable with **Keep between runs**, or the project's [knowledge](Knowledge.md).
 - It has no starter flows, no branches, and no **Start from**.
+- A step that needs a folder fails here, such as a GitHub kit or a command that runs git. The editor marks each one with a warning.
 - A Host needs no copy of it. See [Computers and Hosts](Computers-and-Hosts.md#a-project-without-a-folder).
 
 A project keeps its folder, or the lack of one. To give the work a folder later, add the folder as a new project.
