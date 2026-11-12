@@ -6,6 +6,7 @@ import {
 	dayLine,
 	dayNumbers,
 	dayOutput,
+	dayRuns,
 	type LeadItem,
 	leadText,
 	runningNow,
@@ -136,6 +137,52 @@ describe("dayNumbers", () => {
 			finished: null,
 			failed: null,
 			stopped: null,
+		});
+	});
+
+	test("counts a test run only in the cost, and the caption names it", () => {
+		const test = { pinned: ["fetch"], skipped: [] };
+		const day = (tests?: number) =>
+			dayNumbers(
+				summary({
+					lastNight: {
+						...latestDay([
+							run("a"),
+							run("try", { status: "failed", test }),
+							run("b", { status: "failed" }),
+						]),
+						...(tests === undefined ? {} : { tests }),
+					},
+				}),
+			);
+		expect(day(1)).toMatchObject({
+			finished: 1,
+			failed: 1,
+			stopped: 0,
+			cost: "$1.50",
+			costCaption: "Of 2 runs and 1 test run",
+		});
+		// An older Host does not tell the test runs of the day apart.
+		expect(day()?.costCaption).toBe("Of 3 runs");
+		expect(dayRuns({ runs: 3, tests: 1 })).toBe(2);
+		expect(dayRuns({ runs: 3 })).toBe(3);
+	});
+
+	test("a day of test runs only says so in the caption", () => {
+		const numbers = dayNumbers(
+			summary({
+				lastNight: {
+					...latestDay([
+						run("try", { test: { pinned: [], skipped: ["check"] } }),
+					]),
+					tokens: 12_300,
+					tests: 1,
+				},
+			}),
+		);
+		expect(numbers).toMatchObject({
+			finished: 0,
+			costCaption: "12.3K tokens of 1 test run",
 		});
 	});
 });

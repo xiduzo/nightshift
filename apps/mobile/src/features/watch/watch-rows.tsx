@@ -3,8 +3,10 @@ import {
 	flowLabel,
 	formatKnownCost,
 	hoverTime,
+	isTestRun,
 	type OpenGate,
 	type RunSummary,
+	TEST_RUN_LABEL,
 	usageLabel,
 	useRunPrefetch,
 	type WaitingLearning,
@@ -24,7 +26,7 @@ import { reportLine, type WatchReport } from "./reports";
 /**
  * A run of the latest day or one at work now: its status, title and project.
  * A run at work shows how long it has been at work, an ended one when it
- * started and what it cost.
+ * started and what it cost. A test run says so.
  */
 export function WatchRunRow({ run, now }: { run: WatchRun; now: number }) {
 	const look = runStatusLook(run.status);
@@ -40,6 +42,7 @@ export function WatchRunRow({ run, now }: { run: WatchRun; now: number }) {
 			caption={[
 				{ text: look.label, tone: look.tone },
 				run.group,
+				...(isTestRun(run) ? [TEST_RUN_LABEL] : []),
 				...(atWork
 					? []
 					: [

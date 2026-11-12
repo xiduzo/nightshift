@@ -71,12 +71,16 @@ function noCounts(): Record<RunFilter, number> {
 	};
 }
 
-/** How many runs each chip shows. */
+/**
+ * How many runs each chip shows. A test run shows in the list with its
+ * label, but a count leaves it out (`isTestRun`).
+ */
 export function filterCounts(
-	runs: readonly Pick<RunSummary, "status">[],
+	runs: readonly Pick<RunSummary, "status" | "test">[],
 ): Record<RunFilter, number> {
 	const counts = noCounts();
 	for (const run of runs) {
+		if (isTestRun(run)) continue;
 		for (const { key } of RUN_FILTERS) {
 			if (inFilter(run.status, key)) counts[key] += 1;
 		}
@@ -89,18 +93,21 @@ export function filterStatuses(filter: RunFilter): RunStatus[] | undefined {
 	return filter === "all" ? undefined : [...STATUSES[filter]];
 }
 
+/** How many runs of a project have each status, as the Host counts them. */
+type StatusCounts = {
+	statuses: Partial<Record<RunStatus, number>>;
+	/** The test runs among `statuses`. An older Host sends none. */
+	tests?: Partial<Record<RunStatus, number>>;
+};
+
 /**
  * How many runs each chip shows, from the run counts of the projects (of
- * one project, or of all when `projectId` is null). Null when the Host
- * sends no counts (an older Host): then the screen counts what it read.
+ * one project, or of all when `projectId` is null), without the test
+ * runs. Null when the Host sends no counts (an older Host): then the
+ * screen counts what it read.
  */
 export function countedFilters(
-	projects:
-		| readonly {
-				id: string;
-				runs?: { statuses: Partial<Record<RunStatus, number>> };
-		  }[]
-		| undefined,
+	projects: readonly { id: string; runs?: StatusCounts }[] | undefined,
 	projectId: string | null,
 ): Record<RunFilter, number> | null {
 	if (!projects || projects.some((project) => project.runs === undefined)) {
@@ -109,15 +116,30 @@ export function countedFilters(
 	const counts = noCounts();
 	for (const project of projects) {
 		if (projectId !== null && project.id !== projectId) continue;
+		const tests = project.runs?.tests ?? {};
 		for (const [status, count] of Object.entries(
 			project.runs?.statuses ?? {},
 		)) {
+			const runs = (count ?? 0) - (tests[status as RunStatus] ?? 0);
 			for (const { key } of RUN_FILTERS) {
-				if (inFilter(status as RunStatus, key)) counts[key] += count ?? 0;
+				if (inFilter(status as RunStatus, key)) counts[key] += runs;
 			}
 		}
 	}
 	return counts;
+}
+
+/**
+ * How many runs the Space has, test runs too: the list shows them all.
+ * Null when the Host sends no counts.
+ */
+export function spaceRunCount(
+	projects: readonly { runs?: { total: number } }[] | undefined,
+): number | null {
+	if (!projects || projects.some((project) => project.runs === undefined)) {
+		return null;
+	}
+	return projects.reduce((sum, project) => sum + (project.runs?.total ?? 0), 0);
 }
 
 /**

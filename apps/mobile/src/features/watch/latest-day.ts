@@ -2,6 +2,7 @@ import {
 	type DashboardSummary,
 	formatKnownCost,
 	formatLongDay,
+	isTestRun,
 	tokensLabel,
 } from "@nightshift/client";
 
@@ -12,11 +13,23 @@ function plural(count: number, one: string, many: string): string {
 	return `${count} ${count === 1 ? one : many}`;
 }
 
-/** "12.3K tokens of 9 runs", or "Of 9 runs" when the day used none. */
-function dayCaption(tokens: number, runs: number): string {
+/**
+ * "12.3K tokens of 9 runs", or "Of 9 runs" when the day used none. The
+ * spend counts the test runs, so the caption names them: "Of 8 runs and
+ * 1 test run".
+ */
+function dayCaption(tokens: number, runs: number, tests: number): string {
 	const used = tokensLabel(tokens);
-	const count = plural(runs, "run", "runs");
+	const count = [
+		...(runs > 0 || tests === 0 ? [plural(runs, "run", "runs")] : []),
+		...(tests > 0 ? [plural(tests, "test run", "test runs")] : []),
+	].join(" and ");
 	return used ? `${used} of ${count}` : `Of ${count}`;
+}
+
+/** The runs of the latest day without its test runs: what every count but the spend counts. */
+export function dayRuns(day: { runs: number; tests?: number }): number {
+	return Math.max(day.runs - (day.tests ?? 0), 0);
 }
 
 /** The numbers of the latest day with runs. Null where the summary does not tell. */
@@ -26,7 +39,7 @@ export type DayNumbers = {
 	failed: number | null;
 	stopped: number | null;
 	cost: string;
-	/** "Of 12 runs". */
+	/** "Of 12 runs", or "Of 11 runs and 1 test run". */
 	costCaption: string;
 };
 
@@ -34,7 +47,8 @@ export type DayNumbers = {
  * How the latest day with runs went: how many of its runs finished,
  * failed and stopped, and what they cost. The counts come from the ranges
  * of days. A day older than every range is counted from its runs, when
- * the summary lists them all. Null without runs.
+ * the summary lists them all. A test run counts only in the cost. Null
+ * without runs.
  */
 export function dayNumbers(summary: DashboardSummary): DayNumbers | null {
 	const day = summary.lastNight;
@@ -47,14 +61,16 @@ export function dayNumbers(summary: DashboardSummary): DayNumbers | null {
 		counts
 			? statuses.reduce((sum, status) => sum + (counts[status] ?? 0), 0)
 			: complete
-				? day.latest.filter((run) => statuses.includes(run.status)).length
+				? day.latest.filter(
+						(run) => !isTestRun(run) && statuses.includes(run.status),
+					).length
 				: null;
 	return {
 		finished: count("finished"),
 		failed: count("failed", "interrupted"),
 		stopped: count("stopped"),
 		cost: formatKnownCost(day.cost),
-		costCaption: dayCaption(day.tokens, day.runs),
+		costCaption: dayCaption(day.tokens, dayRuns(day), day.tests ?? 0),
 	};
 }
 

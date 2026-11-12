@@ -41,6 +41,7 @@ import {
 	type RunFilter,
 	runFilterOf,
 	shownRuns,
+	spaceRunCount,
 } from "./runs-list";
 
 /** One item of the list: the heading of a day, or a run in that day's card. */
@@ -174,8 +175,7 @@ export function RunsScreen() {
 	}, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
 	// An older Host sends no counts but every run.
-	const spaceRuns =
-		countedFilters(projects.data, null)?.all ?? loaded?.length ?? 0;
+	const spaceRuns = spaceRunCount(projects.data) ?? loaded?.length ?? 0;
 	const listed =
 		!runs.isPending &&
 		!(runs.isError && runs.data === undefined) &&

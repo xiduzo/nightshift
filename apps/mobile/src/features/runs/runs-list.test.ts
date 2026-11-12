@@ -13,6 +13,7 @@ import {
 	runMeta,
 	runPlace,
 	shownRuns,
+	spaceRunCount,
 } from "./runs-list";
 
 const MIN = 60_000;
@@ -32,6 +33,7 @@ type Row = Pick<
 	| "costUsd"
 	| "costMissing"
 	| "costCalls"
+	| "test"
 >;
 
 function run(fields: Partial<Row> & { status: RunStatus }): Row {
@@ -103,6 +105,15 @@ describe("filterCounts", () => {
 			finished: 1,
 		});
 		expect(filterCounts([]).all).toBe(0);
+	});
+
+	test("leaves the test runs out: the list shows them with their label", () => {
+		const tried = run({
+			id: "t",
+			status: "failed",
+			test: { pinned: [], skipped: ["check"] },
+		});
+		expect(filterCounts([...RUNS, tried])).toEqual(filterCounts(RUNS));
 	});
 });
 
@@ -253,6 +264,35 @@ describe("the chips on a Host that counts runs", () => {
 	test("are null on an older Host, which sends no counts", () => {
 		expect(countedFilters([{ id: "website" }], null)).toBeNull();
 		expect(countedFilters(undefined, null)).toBeNull();
+	});
+
+	test("leave the test runs out", () => {
+		const tested = [
+			{
+				id: "website",
+				runs: {
+					statuses: { running: 1, failed: 2, finished: 1 },
+					tests: { failed: 1, finished: 1 },
+				},
+			},
+		];
+		expect(countedFilters(tested, null)).toEqual({
+			all: 2,
+			running: 1,
+			"needs-you": 0,
+			failed: 1,
+			stopped: 0,
+			finished: 0,
+		});
+	});
+
+	test("the Space has runs while any project has one, test runs too", () => {
+		expect(
+			spaceRunCount([{ runs: { total: 0 } }, { runs: { total: 2 } }]),
+		).toBe(2);
+		expect(spaceRunCount([{ runs: { total: 0 } }])).toBe(0);
+		expect(spaceRunCount([{}])).toBeNull();
+		expect(spaceRunCount(undefined)).toBeNull();
 	});
 
 	test("ask the Host for their statuses", () => {

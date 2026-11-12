@@ -32,6 +32,7 @@ import {
 	dayLine,
 	dayNumbers,
 	dayOutput,
+	dayRuns,
 	leadText,
 	runningNow,
 	todayLine,
@@ -104,7 +105,7 @@ export function WatchScreen() {
 						<Text className="text-muted-foreground text-sm">
 							{dayLine(
 								numbers,
-								data.lastNight.runs,
+								dayRuns(data.lastNight),
 								dayLabel(data.lastNight.night, now),
 							)}
 						</Text>
