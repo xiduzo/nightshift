@@ -75,6 +75,7 @@ export {
 	uniqueOptionName,
 	withOptions,
 } from "./outcomes";
+export { type DataLink, dataLinks } from "./reads";
 export {
 	renameInput,
 	renameVariable,

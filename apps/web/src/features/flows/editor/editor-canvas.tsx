@@ -18,6 +18,7 @@ import {
 	BackgroundVariant,
 	type Connection,
 	type EdgeChange,
+	type EdgeTypes,
 	type InternalNode,
 	type IsValidConnection,
 	MiniMap,
@@ -33,6 +34,8 @@ import {
 import { GroupIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { type DataCanvasEdge, DataEdge, DataMarker } from "../canvas/data-edge";
+import { isDataEdgeId, useDataLinks } from "../canvas/data-links";
 import { exitHandleId, groupEdges } from "../canvas/edge-groups";
 import type { DiffMark, FlowCanvasNode } from "../canvas/flow-node";
 import type { PaletteItem } from "../canvas/node-type";
@@ -95,6 +98,11 @@ export type CanvasPreview = {
 
 /** One empty list for every node without issues, so its data stays the same. */
 const NO_ISSUES: FlowIssue[] = [];
+
+/** The flow's edges, and the dotted lines of the selected node. */
+type CanvasEdge = FlowCanvasEdge | DataCanvasEdge;
+
+const EDGE_TYPES: EdgeTypes = { ...edgeTypes, data: DataEdge };
 
 /**
  * Where React Flow measured each node's handles, from the node's top-left
@@ -350,6 +358,16 @@ export function EditorCanvas({
 			preview,
 		],
 	);
+	// The selected node's reads, dotted, under the flow's edges.
+	const dataEdges = useDataLinks(
+		view,
+		!preview && selection?.kind === "node" ? selection.id : null,
+		sections.endOf,
+	);
+	const allEdges = useMemo<CanvasEdge[]>(
+		() => (dataEdges.length > 0 ? [...dataEdges, ...edges] : edges),
+		[dataEdges, edges],
+	);
 	// A drawn edge carries every edge of its node pair, under its first id.
 	const groupOf = useMemo(
 		() => new Map(groups.map((group) => [group.id, group])),
@@ -432,7 +450,11 @@ export function EditorCanvas({
 	const boxSelecting = useRef(false);
 
 	const onEdgesChange = useCallback(
-		(changes: EdgeChange<FlowCanvasEdge>[]) => {
+		(all: EdgeChange<CanvasEdge>[]) => {
+			// A dotted line is no edge of the flow.
+			const changes = all.filter(
+				(change) => !("id" in change && isDataEdgeId(change.id)),
+			);
 			const ids = (id: string) =>
 				groupOf.get(id)?.edges.map((edge) => edge.id) ?? [id];
 			const selected = selection?.kind === "edge" ? selection.id : undefined;
@@ -498,7 +520,7 @@ export function EditorCanvas({
 		[flow, targetOf, onFlowChange, onSelect],
 	);
 
-	const isValidConnection = useCallback<IsValidConnection<FlowCanvasEdge>>(
+	const isValidConnection = useCallback<IsValidConnection<CanvasEdge>>(
 		(connection) => {
 			const target = targetOf(connection.target);
 			if (!target || sectionIdOf(connection.source) !== undefined) return false;
@@ -516,7 +538,7 @@ export function EditorCanvas({
 	// after React Flow has the new positions: a layout you cannot see looks
 	// like nothing happened. The layout picks the direction that shows the
 	// nodes biggest in the canvas the fit will show, less its padding.
-	const store = useStoreApi<CanvasNode, FlowCanvasEdge>();
+	const store = useStoreApi<CanvasNode, CanvasEdge>();
 	const laying = useRef(false);
 	const autoLayout = useCallback(async () => {
 		if (laying.current) return;
@@ -611,11 +633,12 @@ export function EditorCanvas({
 			<SelectEdgeContext.Provider value={preview ? null : selectEdge}>
 				<SectionActionsContext.Provider value={sectionActions}>
 					<OutcomeMarkers />
-					<ReactFlow<CanvasNode, FlowCanvasEdge>
+					<DataMarker />
+					<ReactFlow<CanvasNode, CanvasEdge>
 						nodes={nodes}
-						edges={edges}
+						edges={allEdges}
 						nodeTypes={canvasNodeTypes}
-						edgeTypes={edgeTypes}
+						edgeTypes={EDGE_TYPES}
 						onNodesChange={onNodesChange}
 						onEdgesChange={onEdgesChange}
 						onConnect={onConnect}
