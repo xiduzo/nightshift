@@ -72,7 +72,7 @@ function draftFrom(profile: AgentProfileRow): Draft {
 	return { ...rest, description: rest.description ?? "" };
 }
 
-/** A new profile: the first added harness, its default model, the night's permission mode. */
+/** A new profile: the first added harness, its default model, the default permission mode from Settings. */
 export function newProfileDraft(
 	harnesses: HarnessRow[],
 	permissionMode: PermissionMode,

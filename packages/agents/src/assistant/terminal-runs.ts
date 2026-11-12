@@ -1,6 +1,6 @@
 /**
  * The run side of `nightshift mcp`: what an agent or an orchestrator needs
- * to drive a night. List and read runs, stop one, see the Gates that wait
+ * to drive the runs. List and read runs, stop one, see the Gates that wait
  * for a person and answer one, and read what happened since a time. The
  * tools read and write through the same procedures as the web app, over a
  * `TerminalRunPort`.
@@ -410,7 +410,7 @@ export function terminalRunTools(
 		toolDefinition({
 			name: RUN_TOOLS.needsMe,
 			description:
-				"The Gates that wait for a person, in every project, oldest first: how urgent each is (now, today or later), the situation, the background, the recommended option, the question, the options with what each does, and how long it waited. Use it to see what blocks a night, then answer a Gate with answer_gate when the person tells you what to choose.",
+				"The Gates that wait for a person, in every project, oldest first: how urgent each is (now, today or later), the situation, the background, the recommended option, the question, the options with what each does, and how long it waited. Use it to see what blocks the runs, then answer a Gate with answer_gate when the person tells you what to choose.",
 			inputSchema: {
 				type: "object",
 				properties: {
