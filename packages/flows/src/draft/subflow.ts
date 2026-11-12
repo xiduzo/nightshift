@@ -45,6 +45,7 @@ import {
 	type DecisionNode,
 	flowNameSchema,
 	isChosenExit,
+	isOwnWaitOutcome,
 	type Option,
 	reservedOutcomes,
 	type VariableWrite,
@@ -354,7 +355,11 @@ function endsFlow(node: FlowNode, outcome: string): boolean {
 		case "call":
 			return node.each !== undefined || outcome === "pass";
 		case "wait":
-			return outcome === "pass" || outcome === "done";
+			return (
+				outcome === "pass" ||
+				outcome === "done" ||
+				isOwnWaitOutcome(node, outcome)
+			);
 		case "value":
 		case "tool":
 		case "convert":
@@ -380,6 +385,7 @@ function endedLabel(node: FlowNode, outcome: string): string {
 		return outcome;
 	}
 	if (node.type === "agent" && ownAgentLabel(node, outcome)) return outcome;
+	if (node.type === "wait" && isOwnWaitOutcome(node, outcome)) return outcome;
 	return "";
 }
 

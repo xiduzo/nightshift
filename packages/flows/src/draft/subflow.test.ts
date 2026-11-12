@@ -451,6 +451,46 @@ describe("planSubflowFromSection, small flows", () => {
 		expect(change(plan.changes, "exit-added")[0]?.endNode).toBeNull();
 	});
 
+	test("a Wait's own outcome without an edge ends the flow, as in the engine", () => {
+		const wait = {
+			id: "c",
+			type: "wait" as const,
+			position: { x: 0, y: 0 },
+			until: {
+				kind: "url" as const,
+				url: "https://example.com/status",
+				everyMinutes: 5,
+			},
+			outcomes: [
+				{ name: "ready", when: 'data.state = "ready"' },
+				{ name: "gone", when: 'data.state = "gone"' },
+			],
+		};
+		const flow = chain({
+			nodes: [command("a"), command("b"), wait, command("d")],
+			edges: [
+				{ id: "ab", from: "a", outcome: "pass", to: "b" },
+				{ id: "bc", from: "b", outcome: "pass", to: "c" },
+				{ id: "cd", from: "c", outcome: "ready", to: "d" },
+			],
+		});
+		const plan = planned(planSubflowFromSection(flow, "middle", plain));
+		expect(errorsOf(plan, "middle")).toEqual([]);
+		// `gone` and `done` end the flow inside; `gone` is its own label.
+		expect(change(plan.changes, "ends-inside")[0]?.ends).toEqual([
+			{ node: "c", outcome: "gone", option: "gone" },
+			{ node: "c", outcome: "done", option: "pass" },
+		]);
+		expect(plan.decisionNode).toBe("middle_ended");
+		expect(nodeOf(plan.caller, "middle_ended")).toMatchObject({
+			options: [
+				{ name: "ready", when: 'middle.ended = "ready"' },
+				{ name: "gone", when: 'middle.ended = "gone"' },
+				{ name: "pass" },
+			],
+		});
+	});
+
 	test("a Section inside a Section: the Call takes its place in the outer one, the inner Sections go along", () => {
 		const nested = flowOf({
 			start: "a",
