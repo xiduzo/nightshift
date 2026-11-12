@@ -1,7 +1,8 @@
 // What the add-node dialog and the node dock offer: every node a person can
-// add, and the Value presets, each in the family of its role.
+// add, the Value presets and the kits, each in the family of its role.
 
 import {
+	kitList,
 	NEW_NODE_TAKES,
 	NODE_FAMILIES,
 	NODE_FAMILY,
@@ -17,7 +18,11 @@ import {
 	ListStartIcon,
 	type LucideIcon,
 } from "lucide-react";
-import { type PaletteItem, paletteMeta } from "../../canvas/node-type";
+import {
+	NODE_TYPE,
+	type PaletteItem,
+	paletteMeta,
+} from "../../canvas/node-type";
 
 /**
  * Every palette item. A Decision shows twice, as the words people look
@@ -57,10 +62,19 @@ export const PALETTE: readonly PaletteItem[] = NODE_FAMILIES.flatMap((family) =>
 /** Whether a new node starts from nothing or takes a value: the main output of the node it follows. */
 export type Takes = "nothing" | "value";
 
-/** What picking an entry does: add a node, or open the form of a Value preset. */
+/**
+ * What picking an entry does: add a node, open the form of a Value preset,
+ * or add a Subflow that runs a kit or a flow. A flow `from` another project
+ * of the Space is copied into this one first.
+ */
 export type CatalogAdd =
 	| { kind: "node"; item: PaletteItem }
-	| { kind: "preset"; preset: ValuePresetName };
+	| { kind: "preset"; preset: ValuePresetName }
+	| {
+			kind: "kit";
+			flow: string;
+			from?: { projectId: string; project: string };
+	  };
 
 export type CatalogEntry = {
 	/** Unique in the catalog. The dialog's search reads it too. */
@@ -72,6 +86,8 @@ export type CatalogEntry = {
 	icon: LucideIcon;
 	/** Other words people search for, so anyone finds the node. */
 	keywords: readonly string[];
+	/** A tag after the entry: "Kit", or the project a flow comes from. */
+	badge?: string;
 	add: CatalogAdd;
 };
 
@@ -142,7 +158,22 @@ const PRESET_LOOK: Record<
 	},
 };
 
-/** Every entry: the nodes in palette order, then the Value presets under Shape. */
+/**
+ * The first sentence of a description, for one line under a name. Empty
+ * when there is none.
+ */
+export function firstSentence(text: string | undefined): string {
+	const trimmed = text?.trim() ?? "";
+	return trimmed.match(/^.*?[.!?](?=\s|$)/s)?.[0] ?? trimmed;
+}
+
+/** A kit or a flow shows as the node that runs it: a Subflow. */
+export const SUBFLOW_ICON: LucideIcon = NODE_TYPE.call.icon;
+
+/**
+ * Every entry: the nodes in palette order, the Value presets under Shape,
+ * then the kits. A kit takes nothing, so it follows the nodes of its family.
+ */
 export const CATALOG: readonly CatalogEntry[] = [
 	...PALETTE.map((item): CatalogEntry => {
 		const { label, blurb, icon } = paletteMeta(item);
@@ -172,6 +203,23 @@ export const CATALOG: readonly CatalogEntry[] = [
 				...PRESET_LOOK[preset.name].keywords,
 			],
 			add: { kind: "preset", preset: preset.name },
+		}),
+	),
+	...kitList().map(
+		(kit): CatalogEntry => ({
+			key: kit.name,
+			family: kit.family,
+			takes: "nothing",
+			label: kit.label,
+			blurb: firstSentence(kit.flow.description),
+			icon: SUBFLOW_ICON,
+			keywords: [
+				"kit",
+				"subflow",
+				...kit.name.replace(/^kit:/, "").split(/[/-]/),
+			],
+			badge: "Kit",
+			add: { kind: "kit", flow: kit.name },
 		}),
 	),
 ];

@@ -1,4 +1,5 @@
 import {
+	addCalledNode,
 	addNode,
 	addNodeAfter,
 	type Flow,
@@ -6,6 +7,7 @@ import {
 	NEW_NODE_TAKES,
 	type NodeDefaults,
 	type Position,
+	type ProjectFlowMap,
 	updateNode,
 	type ValuePresetResult,
 } from "@nightshift/flows";
@@ -15,7 +17,12 @@ import type { PaletteItem } from "../../canvas/node-type";
 import { freeSpot, useNewNodeSpot } from "../canvas-controls";
 import type { DraftSetter } from "../history/use-draft-history";
 import type { Selection, SelectionSetter } from "../selection";
+import type { CatalogAdd } from "./catalog";
 import { opensAddNode, trackFocusInput } from "./open-keys";
+import { useMyKits } from "./use-my-kits";
+
+/** What picking a kit, or a flow of "My kits", adds. */
+type KitAdd = Extract<CatalogAdd, { kind: "kit" }>;
 
 /** A node's width before React Flow measures it (`w-56`). */
 const NODE_WIDTH = 224;
@@ -29,11 +36,15 @@ type Point = { x: number; y: number };
  * the dock's first button open it. A node that takes a value goes after
  * the one node selected and reads it (`addNodeAfter`). Every other node
  * lands where the canvas was double-clicked, or in the middle of the view.
- * Each add is one change, through `setDraft`, and selects the new node.
- * While `disabled` (a proposal, a revision or a Subflow on view), nothing
- * opens it.
+ * A kit, or a flow of "My kits", goes in as a Subflow that runs it. A flow
+ * of another project is copied here first. Each add is one change, through
+ * `setDraft`, and selects the new node. While `disabled` (a proposal, a
+ * revision or a Subflow on view), nothing opens it.
  */
 export function useAddNodeDialog({
+	projectId,
+	flowName,
+	flows,
 	flow,
 	setDraft,
 	selection,
@@ -41,6 +52,11 @@ export function useAddNodeDialog({
 	defaults,
 	disabled,
 }: {
+	projectId: string;
+	/** The flow open in the editor. */
+	flowName: string;
+	/** The project's other flows. Undefined while they load. */
+	flows: ProjectFlowMap | undefined;
 	flow: Flow;
 	setDraft: DraftSetter;
 	selection: Selection;
@@ -53,6 +69,10 @@ export function useAddNodeDialog({
 	const anchor = useRef<Point | undefined>(undefined);
 	const spot = useNewNodeSpot();
 	const { getInternalNode } = useReactFlow();
+	const myKits = useMyKits({ projectId, flowName, flows, draft: flow, open });
+	// The draft as it is now: a copy into the project takes a moment.
+	const latest = useRef(flow);
+	latest.current = flow;
 
 	const show = useCallback(
 		(at?: Point) => {
@@ -112,6 +132,15 @@ export function useAddNodeDialog({
 		setSelection({ kind: "node", id });
 	};
 
+	/** A Subflow that runs the kit or the flow, placed as a node that takes nothing. */
+	const addKit = async ({ flow: called, from: project }: KitAdd) => {
+		const at = anchor.current;
+		const name = project ? await myKits.copyHere(called, project) : called;
+		if (name === null) return;
+		const now = latest.current;
+		commit(addCalledNode(now, name, spot(now, at)));
+	};
+
 	return {
 		/** Opens the dialog, to place a node at `at` on the screen, if given. */
 		show,
@@ -120,7 +149,9 @@ export function useAddNodeDialog({
 			onOpenChange: setOpen,
 			flow,
 			from,
+			myKits: myKits.entries,
 			onAddNode: (item: PaletteItem) => commit(place(item)),
+			onAddKit: (add: KitAdd) => void addKit(add),
 			// One Value by rule, with what the preset made, in one change.
 			onUsePreset: ({ expression, output }: ValuePresetResult) => {
 				const added = place("value");

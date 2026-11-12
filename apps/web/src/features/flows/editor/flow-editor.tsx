@@ -602,6 +602,9 @@ function Editor({
 
 	// The add-node dialog: Tab, a double-click on the canvas, or the dock.
 	const addNodeDialog = useAddNodeDialog({
+		projectId,
+		flowName: name,
+		flows: projectFlows.flows,
 		flow: draft,
 		setDraft: setDraftInOpen,
 		selection,

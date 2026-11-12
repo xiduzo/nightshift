@@ -6,6 +6,7 @@ import {
 	type ValuePresetName,
 	type ValuePresetResult,
 } from "@nightshift/flows";
+import { Badge } from "@nightshift/ui/components/badge";
 import {
 	Command,
 	CommandDialog,
@@ -20,21 +21,29 @@ import { cn } from "@nightshift/ui/lib/utils";
 import { useState } from "react";
 import { FAMILY_TILE, type PaletteItem } from "../../canvas/node-type";
 import { PresetForm } from "../inspector/value-presets";
-import { type CatalogEntry, type CatalogGroup, catalogGroups } from "./catalog";
+import {
+	type CatalogAdd,
+	type CatalogEntry,
+	type CatalogGroup,
+	catalogGroups,
+} from "./catalog";
 
 const GROUPS = catalogGroups();
 
 /**
- * The add-node dialog: every node by family, with a search. Tab or a
- * double-click on the canvas opens it, and so does the first button of
- * the dock. A Value preset opens its form as the dialog's second page.
+ * The add-node dialog: every node and kit by family, with a search, and
+ * "My kits" last. Tab or a double-click on the canvas opens it, and so
+ * does the first button of the dock. A Value preset opens its form as the
+ * dialog's second page.
  */
 export function AddNodeDialog({
 	open,
 	onOpenChange,
 	flow,
 	from,
+	myKits,
 	onAddNode,
+	onAddKit,
 	onUsePreset,
 }: {
 	open: boolean;
@@ -42,7 +51,10 @@ export function AddNodeDialog({
 	flow: Flow;
 	/** The one node selected: what takes a value goes after it and reads its main output. */
 	from: FlowNode | null;
+	/** The flows of the Space that another flow runs (`myKitEntries`). */
+	myKits: readonly CatalogEntry[];
 	onAddNode: (item: PaletteItem) => void;
+	onAddKit: (add: Extract<CatalogAdd, { kind: "kit" }>) => void;
 	onUsePreset: (made: ValuePresetResult) => void;
 }) {
 	const [preset, setPreset] = useState<ValuePresetName | null>(null);
@@ -56,7 +68,8 @@ export function AddNodeDialog({
 			setPreset(entry.add.preset);
 			return;
 		}
-		onAddNode(entry.add.item);
+		if (entry.add.kind === "kit") onAddKit(entry.add);
+		else onAddNode(entry.add.item);
 		changeOpen(false);
 	};
 
@@ -98,6 +111,18 @@ export function AddNodeDialog({
 								))}
 							</CommandGroup>
 						))}
+						{myKits.length > 0 ? (
+							<CommandGroup heading="My kits">
+								{myKits.map((entry) => (
+									<CatalogItem
+										key={entry.key}
+										entry={entry}
+										reads={null}
+										onPick={() => pick(entry)}
+									/>
+								))}
+							</CommandGroup>
+						) : null}
 					</CommandList>
 				</Command>
 			) : (
@@ -126,9 +151,10 @@ function groupHeading(group: CatalogGroup): string {
 }
 
 /**
- * One node or preset: its icon on a tile in its family's tint, its name and
- * what it does. With one node selected, what takes a value shows what it
- * reads.
+ * One node, preset, kit or flow: its icon on a tile in its family's tint,
+ * its name and what it does. With one node selected, what takes a value
+ * shows what it reads. A kit says "Kit", a flow of another project its
+ * project.
  */
 function CatalogItem({
 	entry,
@@ -161,8 +187,19 @@ function CatalogItem({
 			</span>
 			<span className="flex min-w-0 flex-1 flex-col">
 				<span className="font-medium">{entry.label}</span>
-				<span className="text-muted-foreground text-xs">{entry.blurb}</span>
+				{entry.blurb ? (
+					<span className="text-muted-foreground text-xs">{entry.blurb}</span>
+				) : null}
 			</span>
+			{entry.badge ? (
+				<Badge
+					variant="outline"
+					className="mt-0.5 max-w-32"
+					title={entry.badge}
+				>
+					<span className="truncate">{entry.badge}</span>
+				</Badge>
+			) : null}
 			{reads ? (
 				<CommandShortcut
 					className="mt-0.5 max-w-40 truncate font-mono tracking-normal"

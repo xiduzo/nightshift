@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { NODE_FAMILIES, VALUE_PRESETS } from "@nightshift/flows";
+import { kitList, NODE_FAMILIES, VALUE_PRESETS } from "@nightshift/flows";
 import type { PaletteItem } from "../../canvas/node-type";
-import { CATALOG, catalogGroups, PALETTE, paletteFamily } from "./catalog";
+import {
+	CATALOG,
+	catalogGroups,
+	firstSentence,
+	PALETTE,
+	paletteFamily,
+} from "./catalog";
 
 /** The entries a search word finds by name or keyword, as cmdk would. */
 function find(word: string): string[] {
@@ -66,6 +72,44 @@ describe("the add-node catalog", () => {
 		);
 	});
 
+	test("each kit is under its family, after the nodes, and says it is a kit", () => {
+		const kits = CATALOG.filter((entry) => entry.add.kind === "kit");
+		expect(kits.map((entry) => entry.key)).toEqual(
+			kitList().map((kit) => kit.name),
+		);
+		for (const kit of kitList()) {
+			const entry = kits.find((candidate) => candidate.key === kit.name);
+			expect(entry).toMatchObject({
+				family: kit.family,
+				takes: "nothing",
+				label: kit.label,
+				badge: "Kit",
+				add: { kind: "kit", flow: kit.name },
+			});
+			expect(kit.flow.description?.startsWith(entry?.blurb ?? "-")).toBe(true);
+		}
+		for (const group of catalogGroups()) {
+			const kinds = group.entries.map((entry) => entry.add.kind);
+			const firstKit = kinds.indexOf("kit");
+			if (firstKit < 0) continue;
+			expect(kinds.slice(firstKit).every((kind) => kind === "kit")).toBe(true);
+		}
+		expect(
+			kits.find((entry) => entry.key === "kit:github/watch-pr")?.family,
+		).toBe("hold");
+	});
+
+	test("a description gives its first sentence", () => {
+		expect(firstSentence("Reads a feed. On its first run, it waits.")).toBe(
+			"Reads a feed.",
+		);
+		expect(
+			firstSentence("Save smtps://smtp.example.com:465 first. Then send."),
+		).toBe("Save smtps://smtp.example.com:465 first.");
+		expect(firstSentence("No full stop")).toBe("No full stop");
+		expect(firstSentence(undefined)).toBe("");
+	});
+
 	test("anyone finds a node by the word they know", () => {
 		expect(find("http")).toContain("web-request");
 		expect(find("api")).toContain("web-request");
@@ -76,5 +120,9 @@ describe("the add-node catalog", () => {
 		expect(find("delay")).toContain("wait");
 		expect(find("sleep")).toContain("wait");
 		expect(find("dedupe")).toContain("preset-unique");
+		expect(find("feed")).toContain("kit:feeds/read");
+		expect(find("email")).toContain("kit:email/send");
+		expect(find("pull request")).toContain("kit:github/publish-draft-pr");
+		expect(find("kit")).toContain("kit:message/send");
 	});
 });
