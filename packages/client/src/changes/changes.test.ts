@@ -19,12 +19,12 @@ describe("what a change makes stale", () => {
 	test("this computer's document reads its configuration, the checks of its CLIs included", () => {
 		expect(staleAfter(["device"])).toEqual([
 			["profiles"],
-			["cliTools"],
 			["settings"],
 			["offers"],
 			["deciders"],
 			["connections"],
 			["harnesses"],
+			["cliTools"],
 		]);
 	});
 
@@ -70,7 +70,7 @@ describe("the reads a synced document holds", () => {
 			["profiles"],
 			["connections", "list"],
 			["harnesses", "list"],
-			["cliTools"],
+			["cliTools", "list"],
 			["settings"],
 			["offers"],
 			["deciders"],

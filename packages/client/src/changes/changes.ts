@@ -101,6 +101,9 @@ const STALE: {
 			["flows", "revision"],
 		],
 	},
+	// A project's knowledge: its files, the Map, the questions. Search,
+	// search by meaning and its evaluation change too while this computer
+	// prepares its search. They stay held with the rest.
 	knowledge: { holds: [["knowledge"]] },
 	// A Space's projects, its Members and its policy.
 	space: {
@@ -115,18 +118,20 @@ const STALE: {
 	},
 	// This computer: its profiles, connections and secrets, CLI tools,
 	// harnesses and Custom Agents, settings, Offers and deciders. A check
-	// of a CLI, or the tools of a connection, also changes on its own.
+	// of a CLI or a program, the programs found, or the tools of a
+	// connection also change on their own: a program installed outside
+	// Night Shift.
 	device: {
 		holds: [
 			["profiles"],
 			["connections", "list"],
 			["harnesses", "list"],
-			["cliTools"],
+			["cliTools", "list"],
 			["settings"],
 			["offers"],
 			["deciders"],
 		],
-		also: [["connections"], ["harnesses"]],
+		also: [["connections"], ["harnesses"], ["cliTools"]],
 	},
 	// A copy of another computer's document: the Devices, and the Offers.
 	"device-copy": { also: [["devices"], ["offers"]] },

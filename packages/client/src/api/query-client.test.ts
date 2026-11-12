@@ -128,6 +128,7 @@ describe("the query client of an app", () => {
 			["projects", "list"],
 			["profiles", "list"],
 			["connections", "list"],
+			["cliTools", "list"],
 		]) {
 			expect(staleTime(...held), held.join(".")).toBe(10 * 60 * 1000);
 		}
@@ -136,6 +137,8 @@ describe("the query client of an app", () => {
 			["flows", "kept"],
 			["flows", "memory"],
 			["connections", "check"],
+			["cliTools", "check"],
+			["cliTools", "programs"],
 			["projects", "check"],
 		]) {
 			expect(staleTime(...other), other.join(".")).toBe(60 * 1000);
