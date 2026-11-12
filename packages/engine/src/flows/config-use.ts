@@ -38,7 +38,7 @@ export type ConnectionInUse = Connection & {
 	profiles: string[];
 };
 
-/** A secret, with the flows whose Command nodes name it and the CLI tools whose logins read it. */
+/** A secret, with the flows that use it (`flowSecrets`) and the CLI tools whose logins read it. */
 export type SecretInUse = SecretView & {
 	flows: FlowRef[];
 	tools: string[];
@@ -48,9 +48,9 @@ export type SecretInUse = SecretView & {
 
 /**
  * The connections and the secrets of this computer and of its Person
- * (Personal), with what uses each. A secret only a Command node or a CLI
- * tool's login names is listed too: saved or not. `personal` says whether
- * the Personal secrets could be read now.
+ * (Personal), with what uses each. A secret only a flow or a CLI tool's
+ * login uses is listed too: saved or not. `personal` says whether the
+ * Personal secrets could be read now.
  *
  * `projectNames` gives the names of a project's own secrets (ADR 13). A
  * project's secret wins for its flows, so those flows do not use this

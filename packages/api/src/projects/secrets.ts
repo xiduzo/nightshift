@@ -71,9 +71,9 @@ export const projectSecrets = {
 			const { toolsBySecret, toolFlows } = cliToolsOfSecrets(context, use);
 			return {
 				secrets: listed.map((secret) => {
-					// The flows whose Command nodes name it, those whose Agent and
-					// Tool nodes use a connection that reads it, and those that use a
-					// CLI tool whose login reads it.
+					// The flows that use it (their nodes, or a flow or kit they
+					// call), those whose Agent and Tool nodes use a connection that
+					// reads it, and those that use a CLI tool whose login reads it.
 					const tools = toolsBySecret.get(secret.name) ?? [];
 					const viaTools = tools.flatMap((tool) =>
 						flowsOf(at.projectId, toolFlows.get(tool) ?? []),

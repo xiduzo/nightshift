@@ -388,7 +388,7 @@ A Command node reads secrets too. `"secrets": ["API_USER", "API_PASSWORD"]` give
 - The node sends only the names. The Device that runs the step reads the values in the same order. A value that a Host keeps comes to the step only, never to the Device's keychain or log. A step on a Host reads no Personal secret, and a step on another Person's Device reads none of yours.
 - A secret the Device lacks errors the step before the command runs.
 - The Device replaces each value with `•••` in the output before it leaves. So the transcript, the log file, `log_tail` and `data` never hold one. The Device also finds a value split over two chunks.
-- The Secrets page lists the flows whose Command nodes name each secret.
+- The Secrets page lists the flows that use each secret: through their nodes, or through a flow or a kit they call.
 
 **Run bundles.** "Export" on a run page downloads the run as one SQLite file, `<flow>-<run8>.nightshift.sqlite` (`GET /api/runs/:id/export`). The daemon keeps one database. A bundle is a copy of one run, made on demand. It uses the live schema's table and column names, and holds:
 

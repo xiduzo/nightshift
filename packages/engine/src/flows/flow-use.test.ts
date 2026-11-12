@@ -1,23 +1,18 @@
 import { describe, expect, test } from "bun:test";
-import type { LoadedFlow } from "@nightshift/flows";
+import type { Flow } from "@nightshift/flows";
 
 import { type FlowReader, flowUse, profileUseKey } from "./flow-use";
 
 const project = (id: string, name: string) => ({ id, name });
 
-/** A loaded flow with these nodes. The rest of the flow does not matter here. */
-const loaded = (name: string, nodes: unknown[]) =>
-	({
-		name,
-		path: `/${name}.json`,
-		flow: { nodes },
-		issues: [],
-	}) as never as LoadedFlow;
+/** A flow with these nodes. The rest of the flow does not matter here. */
+const flowOf = (nodes: unknown[], inputs: unknown[] = []) =>
+	({ nodes, inputs, edges: [] }) as never as Flow;
 
 describe("flowUse", () => {
 	test("finds the flows that name each connection, CLI tool, secret, and each Device's profile", async () => {
-		const flows: Record<string, LoadedFlow> = {
-			night: loaded("night", [
+		const flows: Record<string, Flow> = {
+			night: flowOf([
 				{
 					id: "plan",
 					type: "agent",
@@ -43,7 +38,7 @@ describe("flowUse", () => {
 				{ id: "login", type: "command", secrets: ["API_USER", "API_PW"] },
 				{ id: "again", type: "command", secrets: ["API_USER"] },
 			]),
-			day: loaded("day", [
+			day: flowOf([
 				{ id: "a", type: "agent", profile: { device: "mac", profile: "slow" } },
 				{ id: "check", type: "command" },
 			]),
@@ -61,54 +56,10 @@ describe("flowUse", () => {
 				};
 			},
 			flows: {
-				list: async (projectId) => {
+				map: async (projectId) => {
 					if (projectId === "p2") throw new Error("not on this computer");
-					return [
-						{
-							name: "night",
-							path: "",
-							description: null,
-							nodeCount: 3,
-							errorCount: 0,
-							inputs: [],
-							callers: [],
-							devices: { names: [], ids: [] },
-							nodeTypes: [],
-							gateCount: 0,
-							signals: [],
-						},
-						{
-							name: "day",
-							path: "",
-							description: null,
-							nodeCount: 1,
-							errorCount: 0,
-							inputs: [],
-							callers: [],
-							devices: { names: [], ids: [] },
-							nodeTypes: [],
-							gateCount: 0,
-							signals: [],
-						},
-						{
-							name: "broken",
-							path: "",
-							description: null,
-							nodeCount: null,
-							errorCount: 1,
-							inputs: [],
-							callers: [],
-							devices: { names: [], ids: [] },
-							nodeTypes: [],
-							gateCount: 0,
-							signals: [],
-						},
-					];
-				},
-				get: async (_projectId, name) => {
-					const flow = flows[name];
-					if (!flow) throw new Error("does not parse");
-					return flow;
+					// A flow that does not load uses nothing.
+					return { ...flows, broken: null };
 				},
 			},
 		};
@@ -134,5 +85,53 @@ describe("flowUse", () => {
 			{ projectId: "p1", projectName: "App", flowName: "day", nodeIds: ["a"] },
 		]);
 		expect([...use.connections.keys()].sort()).toEqual(["gh", "linear"]);
+	});
+	test("a secret only a Web request, a Wait, a Service, a kit or a called flow uses is used too", async () => {
+		const ref = (name: string) => `\${${name}}`;
+		const flows: Record<string, Flow> = {
+			watch: flowOf([
+				{
+					id: "fetch",
+					type: "web-request",
+					url: "https://api.example.com/items",
+					headers: { Authorization: `Bearer ${ref("API_TOKEN")}` },
+				},
+				{
+					id: "ready",
+					type: "wait",
+					until: {
+						kind: "url",
+						url: `https://status.example.com/${ref("JOB_KEY")}`,
+						everyMinutes: 5,
+					},
+				},
+				{ id: "stack", type: "service", secrets: ["DB_PASSWORD"] },
+				{ id: "tell", type: "call", flow: "kit:message/send", inputs: {} },
+				{
+					id: "ping",
+					type: "call",
+					flow: "ping",
+					inputs: { hook: "TEAM_CHAT_URL" },
+				},
+			]),
+			ping: flowOf(
+				[{ id: "send", type: "web-request", urlSecret: "{{hook}}" }],
+				[{ name: "hook", type: "text" }],
+			),
+		};
+		const reader: FlowReader = {
+			listProjects: async () => [project("p1", "App")],
+			listSchedules: async () => ({ schedules: [] }),
+			flows: { map: async () => flows },
+		};
+		const use = await flowUse(reader);
+		const watch = { projectId: "p1", projectName: "App", flowName: "watch" };
+		expect(Object.fromEntries(use.secrets)).toEqual({
+			API_TOKEN: [watch],
+			JOB_KEY: [watch],
+			DB_PASSWORD: [watch],
+			MESSAGE_WEBHOOK_URL: [watch],
+			TEAM_CHAT_URL: [watch],
+		});
 	});
 });

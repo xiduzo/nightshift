@@ -1,6 +1,8 @@
 import {
 	everyProfileOf,
+	flowSecrets,
 	isProfileRef,
+	type ProjectFlowMap,
 	runsAs,
 	type Schedule,
 	webhookSecretName,
@@ -17,9 +19,9 @@ export type FlowRef = {
 /**
  * Who uses what, from every flow of the Space's projects: the flows whose
  * Agent or Tool nodes name each connection, whose Agent nodes name each CLI
- * tool, whose Command nodes name each secret, by name, and the nodes that
- * name each profile (Agents, and Decisions and Values decided by a model),
- * by `profileUseKey`.
+ * tool, that use each secret (`flowSecrets`: its nodes, and the flows and
+ * kits it calls), by name, and the nodes that name each profile (Agents,
+ * and Decisions and Values decided by a model), by `profileUseKey`.
  */
 export type FlowUse = {
 	connections: Map<string, FlowRef[]>;
@@ -38,7 +40,7 @@ export function profileUseKey(deviceId: string, profileId: string): string {
 /** What `flowUse` reads: the Space's projects and their flow files. */
 export type FlowReader = {
 	listProjects(): Promise<{ id: string; name: string }[]>;
-	flows: Pick<SpaceFlows, "list" | "get">;
+	flows: Pick<SpaceFlows, "map">;
 	listSchedules(projectId: string): Promise<{
 		schedules: readonly Pick<Schedule, "flow" | "webhook">[];
 	}>;
@@ -66,21 +68,21 @@ export async function flowUse(space: FlowReader): Promise<FlowUse> {
 				{ projectId: project.id, projectName: project.name, flowName: flow },
 			]);
 		}
-		const files = await space.flows.list(project.id).catch(() => []);
-		for (const file of files) {
-			const loaded = await space.flows
-				.get(project.id, file.name)
-				.catch(() => null);
+		const flows: ProjectFlowMap = await space.flows
+			.map(project.id)
+			.catch(() => ({}));
+		for (const [flowName, flow] of Object.entries(flows)) {
+			if (!flow) continue;
 			const ref = {
 				projectId: project.id,
 				projectName: project.name,
-				flowName: file.name,
+				flowName,
 			};
 			// A cascade's tiers add their own connections and CLI tools.
-			const agents = (loaded?.flow?.nodes ?? [])
+			const agents = flow.nodes
 				.flatMap(runsAs)
 				.flatMap((n) => (n.type === "agent" ? [n] : []));
-			const toolConnections = (loaded?.flow?.nodes ?? []).flatMap((n) =>
+			const toolConnections = flow.nodes.flatMap((n) =>
 				n.type === "tool" ? [n.connection] : [],
 			);
 			for (const name of new Set([
@@ -92,14 +94,11 @@ export async function flowUse(space: FlowReader): Promise<FlowUse> {
 			for (const name of new Set(agents.flatMap((n) => n.clis ?? []))) {
 				clis.set(name, [...(clis.get(name) ?? []), ref]);
 			}
-			const commandSecrets = (loaded?.flow?.nodes ?? []).flatMap((n) =>
-				n.type === "command" ? (n.secrets ?? []) : [],
-			);
-			for (const name of new Set(commandSecrets)) {
+			for (const name of flowSecrets(flow, { flows, name: flowName })) {
 				secrets.set(name, [...(secrets.get(name) ?? []), ref]);
 			}
 			const byProfile = new Map<string, string[]>();
-			for (const node of loaded?.flow?.nodes ?? []) {
+			for (const node of flow.nodes) {
 				// A cascade names a profile per tier.
 				for (const profile of everyProfileOf(node).filter(isProfileRef)) {
 					const key = profileUseKey(profile.device, profile.profile);

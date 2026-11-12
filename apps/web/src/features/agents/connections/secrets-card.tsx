@@ -146,7 +146,7 @@ function WhereBadges({ secret }: { secret: SecretView }) {
 	);
 }
 
-/** The flows whose Command nodes name the secret, each once. */
+/** The flows that use the secret, each once. */
 function flowNamesOf(secret: SecretView): string[] {
 	return [...new Set(secret.flows.map((flow) => flow.flowName))];
 }
