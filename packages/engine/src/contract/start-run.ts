@@ -113,6 +113,19 @@ export const startRunInputSchema = z.union([
 ]) satisfies z.ZodType<StartRunInput>;
 
 /**
+ * A test run's start (ADR 27): a saved flow by name, with its pins and
+ * skips. A Device hands it to the Host that keeps the Space on its own
+ * procedure (`sync.startTest`), so a Host of an older version refuses it
+ * instead of running every node for real. The pins travel as refs: the
+ * Host reads their outputs from its own log.
+ */
+export const startTestInputSchema = z.object({
+	...startFields,
+	flowName: flowNameSchema,
+	test: testRunRequestSchema,
+}) satisfies z.ZodType<StartRunInput>;
+
+/**
  * A run start as a person asks for it in the app: `startRunInputSchema`,
  * and for a flow file a test run's pins and skips (`test`, ADR 27). Only
  * the API's `runs.start` takes it. `startRunInputSchema` stays without

@@ -33,8 +33,8 @@ import { checkServiceDevices } from "./service-devices";
 import {
 	checkTestRun,
 	type ResolvedTestRun,
+	refuseTestStart,
 	resolveTestRun,
-	TEST_RUN_FROM_EDITOR,
 } from "./test-run";
 
 /**
@@ -268,14 +268,7 @@ export function createRunStart(deps: RunStartDeps) {
 		input: StartRunInput,
 		trigger: RunTrigger,
 	): Promise<RunSummary> {
-		// A test run is a person's start of a saved flow (ADR 27): a
-		// schedule, a webhook or a quick run never pins or skips a node.
-		if (
-			input.test !== undefined &&
-			(trigger.kind !== "manual" || input.flowName === undefined)
-		) {
-			throw new Refusal("invalid", TEST_RUN_FROM_EDITOR);
-		}
+		refuseTestStart(input, trigger);
 		const runId = randomUUID();
 		let started: { row: RunRow; walkerId: string; device: Device } | undefined;
 		await runner.take(runId, {

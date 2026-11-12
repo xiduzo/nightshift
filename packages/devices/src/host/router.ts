@@ -127,6 +127,9 @@ export const hostRouter = os.router({
 		startRun: keyed.sync.startRun.handler(({ context, input }) =>
 			context.exchange.startRun(context.caller, input),
 		),
+		startTest: keyed.sync.startTest.handler(({ context, input }) =>
+			context.exchange.startTest(context.caller, input),
+		),
 		devices: keyed.sync.devices.handler(({ context, input }) =>
 			context.exchange.devices(context.caller, input),
 		),

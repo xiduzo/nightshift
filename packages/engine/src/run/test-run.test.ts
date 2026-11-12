@@ -14,8 +14,10 @@ import { createSandbox, type Sandbox } from "../testing/test-support";
 import {
 	checkTestRun,
 	PIN_MAX_BYTES,
+	PinNotHereError,
 	type ResolvedTestRun,
 	resolveTestRun,
+	TEST_RUN_MAX_BYTES,
 } from "./test-run";
 
 /**
@@ -238,6 +240,80 @@ describe("resolveTestRun", () => {
 		await expect(resolve({ pinned: { fetch: ref } }, h)).rejects.toThrow(
 			'The output you pinned on "fetch" is larger than 1 MiB. Let the node run instead.',
 		);
+	});
+
+	test("refuses pinned outputs larger than 4 MiB together: every Replica keeps them", async () => {
+		const ids = ["a", "b", "c", "d", "e"];
+		// Each fits on its own: 0.9 MiB.
+		const near: PinnedOutput = {
+			runId: "run-earlier",
+			stepId: "step-earlier",
+			endedAt: 1,
+			outcome: "pass",
+			outputs: {
+				outcome: "pass",
+				log_tail: "x".repeat(Math.floor(PIN_MAX_BYTES * 0.9)),
+				visit: 1,
+			},
+		};
+		const h = await startRun(
+			sandbox,
+			flowOf(
+				ids.map((id) => command(id, "exit 1")),
+				ids.slice(1).map((id, i) => edge(`e${i}`, ids[i] ?? "", "pass", id)),
+			),
+			{
+				flowName: "watch",
+				test: {
+					pinned: Object.fromEntries(ids.map((id) => [id, near])),
+					skipped: {},
+				},
+			},
+		);
+		await drive(h, { inputs: {} });
+		const steps = await stepsOf(h);
+		const pins = (count: number) => ({
+			pinned: Object.fromEntries(
+				ids
+					.slice(0, count)
+					.map((id) => [
+						id,
+						{ runId: h.runId, stepId: steps.get(id)?.id ?? "" },
+					]),
+			),
+		});
+		expect(TEST_RUN_MAX_BYTES).toBe(4 * PIN_MAX_BYTES);
+		// Four of them hold 3.6 MiB.
+		const four = await resolve(pins(4), h);
+		expect(Object.keys(four?.test.pinned ?? {})).toEqual(ids.slice(0, 4));
+		await expect(resolve(pins(5), h)).rejects.toThrow(
+			"These pinned outputs are too large together. Pin fewer nodes or a smaller output.",
+		);
+	});
+
+	test("a pin this log does not hold names its node: a Host says it has not arrived yet", async () => {
+		const { h, steps } = await earlierRun();
+		const stepId = steps.get("fetch")?.id ?? "";
+		const lost = await resolve(
+			{ pinned: { fetch: { runId: "run-gone", stepId } } },
+			h,
+		).catch((error: unknown) => error);
+		expect(lost).toBeInstanceOf(PinNotHereError);
+		expect(lost).toMatchObject({ kind: "invalid", nodeId: "fetch" });
+
+		const open = await startRun(sandbox, flowOf([gate("approve")]));
+		await drive(open, { inputs: {} });
+		const waiting = (await stepsOf(open)).get("approve");
+		const running = await resolve(
+			{
+				pinned: {
+					approve: { runId: open.runId, stepId: waiting?.id ?? "" },
+				},
+			},
+			open,
+		).catch((error: unknown) => error);
+		expect(running).toBeInstanceOf(PinNotHereError);
+		expect(running).toMatchObject({ kind: "conflict", nodeId: "approve" });
 	});
 });
 

@@ -7,8 +7,8 @@ import {
 	standsIn,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import type { TestRunRequest } from "../contract";
-import type { PinnedOutput, RunLog, TestRun } from "../log";
+import type { StartRunInput, TestRunRequest } from "../contract";
+import type { PinnedOutput, RunLog, RunTrigger, TestRun } from "../log";
 
 /**
  * A test run (ADR 27): a person's start of a saved flow with pins and
@@ -22,7 +22,8 @@ import type { PinnedOutput, RunLog, TestRun } from "../log";
  *   the same project in the same Space, at the top level, for the same
  *   node, that ended, and that was not skipped itself. A pin of a pinned
  *   step pins the output it gave, from the step it came from. A pinned
- *   output holds at most 1 MiB of JSON.
+ *   output holds at most 1 MiB of JSON, and all of them 4 MiB together:
+ *   `RunStarted` carries them, and every Replica of the Space keeps it.
  * - `checkTestRun`, once the plan has the flow, before any check of a
  *   Device: each node is in the flow, may stand in (`standsIn`: not an End,
  *   a Join, a Lease or a Service), has the type of the pinned step, and
@@ -32,9 +33,50 @@ import type { PinnedOutput, RunLog, TestRun } from "../log";
 /** The most JSON one pinned output may hold. */
 export const PIN_MAX_BYTES = 1024 * 1024;
 
+/** The most JSON the pinned outputs of one test run may hold together. */
+export const TEST_RUN_MAX_BYTES = 4 * PIN_MAX_BYTES;
+
+/** Why a test run does not start when its pinned outputs hold too much together. */
+export const PINS_TOO_LARGE =
+	"These pinned outputs are too large together. Pin fewer nodes or a smaller output.";
+
 /** A start that is not a person's start of a saved flow cannot be a test run. */
 export const TEST_RUN_FROM_EDITOR =
 	"A test run starts only from the editor of a saved flow.";
+
+/**
+ * A pin whose output this Walker's log does not hold: no such run of the
+ * project here, no such step, or a step that has not ended here. On a
+ * Host, the Device that hands it the start found the output in its own
+ * log first, so the run has not reached the Host yet (`sync.startTest`).
+ */
+export class PinNotHereError extends Refusal {
+	constructor(
+		kind: "invalid" | "conflict",
+		message: string,
+		/** The pinned node. */
+		readonly nodeId: string,
+	) {
+		super(kind, message);
+		this.name = "PinNotHereError";
+	}
+}
+
+/**
+ * Refuses a test run that is not a person's start of a saved flow (ADR
+ * 27): a schedule, a webhook or a quick run never pins or skips a node.
+ */
+export function refuseTestStart(
+	input: StartRunInput,
+	trigger: RunTrigger,
+): void {
+	if (
+		input.test !== undefined &&
+		(trigger.kind !== "manual" || input.flowName === undefined)
+	) {
+		throw new Refusal("invalid", TEST_RUN_FROM_EDITOR);
+	}
+}
 
 /** The ending of each refusal of a pin that is no longer right. */
 const NEWER = "Pin a newer output.";
@@ -70,6 +112,7 @@ export async function resolveTestRun(
 	if (pins.length === 0 && Object.keys(skipped).length === 0) return null;
 	const pinned: Record<string, PinnedOutput> = {};
 	const types: Record<string, FlowNodeType> = {};
+	let bytes = 0;
 	for (const [nodeId, ref] of pins) {
 		if (Object.hasOwn(skipped, nodeId)) {
 			throw new Refusal(
@@ -77,9 +120,10 @@ export async function resolveTestRun(
 				`You pinned and skipped "${nodeId}". Choose one of the two.`,
 			);
 		}
-		const lost = new Refusal(
+		const lost = new PinNotHereError(
 			"invalid",
 			`Night Shift cannot find the output you pinned on "${nodeId}". ${NEWER}`,
+			nodeId,
 		);
 		const row = await log.row(ref.runId).catch((error: unknown) => {
 			if (error instanceof Refusal && error.kind === "not-found") return null;
@@ -109,9 +153,10 @@ export async function resolveTestRun(
 			);
 		}
 		if (step.endedAt === null || step.outcome === null) {
-			throw new Refusal(
+			throw new PinNotHereError(
 				"conflict",
 				`The step you pinned on "${nodeId}" has not ended yet. Pin its output when it ends.`,
+				nodeId,
 			);
 		}
 		if (step.test === "skipped") {
@@ -132,11 +177,16 @@ export async function resolveTestRun(
 						outputs: step.outputs,
 					};
 		if (!pin) throw lost;
-		if (jsonBytes(pin.outputs) > PIN_MAX_BYTES) {
+		const size = jsonBytes(pin.outputs);
+		if (size > PIN_MAX_BYTES) {
 			throw new Refusal(
 				"invalid",
 				`The output you pinned on "${nodeId}" is larger than 1 MiB. Let the node run instead.`,
 			);
+		}
+		bytes += size;
+		if (bytes > TEST_RUN_MAX_BYTES) {
+			throw new Refusal("invalid", PINS_TOO_LARGE);
 		}
 		pinned[nodeId] = pin;
 		types[nodeId] = step.nodeType;

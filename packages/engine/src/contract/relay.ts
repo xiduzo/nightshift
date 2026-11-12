@@ -98,7 +98,10 @@ export type Relay = {
 	/**
 	 * Starts a run placed on another Device through the Host that keeps
 	 * the Space: the Host walks it. Returns the run's id; its rows follow
-	 * by the exchange.
+	 * by the exchange. A test run (`test`, ADR 27) carries its pins as
+	 * refs, and the Host reads their outputs from its own log. A Host of
+	 * a version before test runs refuses it with `OlderHostError`, and
+	 * nothing starts.
 	 */
 	startRun(
 		input: StartRunInput & { spaceId: string },

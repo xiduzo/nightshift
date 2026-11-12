@@ -226,6 +226,54 @@ describe("the Host walks a run a Device starts", () => {
 		expect(listed?.startedBy).toEqual(expected);
 	});
 
+	test("B starts a test run: A reads the pinned output from its own log, and the run keeps nothing (ADR 27)", async () => {
+		const space = paired.device.space(a.spaceId, { personId: paired.personId });
+		const first = await space.startRun({
+			projectId,
+			flowName: "count",
+			deviceId: b.deviceId,
+		});
+		await untilStatus(paired.device, first.id, "finished");
+		const [source] = (await space.getRun(first.id)).steps;
+		expect(await keptOn(a)).toEqual([["runs", "1"]]);
+
+		const tested = await space.startRun({
+			projectId,
+			flowName: "count",
+			test: {
+				pinned: { count: { runId: first.id, stepId: source?.id ?? "" } },
+			},
+		});
+		expect(tested.walker).toMatchObject({ id: a.deviceId });
+		expect(tested.test).toEqual({ pinned: ["count"], skipped: [] });
+		await untilStatus(paired.device, tested.id, "finished");
+		const [step] = (await space.getRun(tested.id)).steps;
+		// The output of the first run, on no Device: nothing ran.
+		expect(step).toMatchObject({
+			nodeId: "count",
+			test: "pinned",
+			device: null,
+			pinnedFrom: { runId: first.id, stepId: source?.id },
+		});
+		expect(step?.outputs.log_tail).toBe(source?.outputs.log_tail);
+		// Its `set` wrote no kept value.
+		expect(await keptOn(a)).toEqual([["runs", "1"]]);
+	});
+
+	test("a pinned output that has not reached A yet: A says to try again in a moment", async () => {
+		const caller = await paired.caller();
+		await expect(
+			paired.hostExchange.startTest(caller, {
+				spaceId: a.spaceId,
+				projectId,
+				flowName: "count",
+				test: { pinned: { count: { runId: "run-of-b", stepId: "step-1" } } },
+			}),
+		).rejects.toThrow(
+			'The output you pinned on "count" is not on the computer that keeps this Space yet. Try again in a moment.',
+		);
+	});
+
 	test("a value kept here later than the step ended stays", async () => {
 		// B saved a value later than A's step will end, as a run it walked would.
 		await b.db.insert(keptVariable).values({

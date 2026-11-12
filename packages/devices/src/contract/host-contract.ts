@@ -3,6 +3,7 @@ import {
 	type OwnDevice,
 	runCommandSchema,
 	startRunInputSchema,
+	startTestInputSchema,
 	type TranscriptEntry,
 } from "@nightshift/engine";
 import {
@@ -138,6 +139,11 @@ const leaseAnswerSchema = z.discriminatedUnion("kind", [
 const runStartInput = startRunInputSchema.and(
 	z.object({ spaceId: z.string().min(1) }),
 );
+
+/** A test run's start (ADR 27), as a Device asks its Host: a saved flow, with its pins as refs and its skips. */
+const testStartInput = startTestInputSchema.extend({
+	spaceId: z.string().min(1),
+});
 
 /** A person's action on a run another Device walks, as a Device sends it: the Command, with its run. */
 const runCommandInput = runCommandSchema({ runId: z.string().min(1) });
@@ -319,6 +325,19 @@ export const hostContract = {
 				summary: "Starts a run placed on another Device. This Host walks it.",
 			})
 			.input(runStartInput)
+			.output(described(z.object({ runId: z.string() }))),
+		/**
+		 * Starts a test run (ADR 27) placed on another Device, for the key's
+		 * Person: this Host walks it, and reads the pinned outputs from its
+		 * own log. Its own procedure, so an older Host refuses it instead
+		 * of dropping the pins and skips: the Device says to update it.
+		 */
+		startTest: sync
+			.route({
+				summary:
+					"Starts a test run with pins and skips, placed on another Device. This Host walks it.",
+			})
+			.input(testStartInput)
 			.output(described(z.object({ runId: z.string() }))),
 		/** The key's Person's Devices for a project: online, with a Clone or not. */
 		devices: sync

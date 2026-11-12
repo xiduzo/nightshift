@@ -31,6 +31,8 @@ describe("the Host's contract", () => {
 			"sync.commandDone",
 			"sync.commands",
 			"sync.startRun",
+			// ADR 27: an older Host has none, and the Device says to update it.
+			"sync.startTest",
 			"sync.devices",
 			"sync.offer",
 			"sync.withdrawOffer",

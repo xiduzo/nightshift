@@ -9,6 +9,7 @@ import {
 } from "@nightshift/engine";
 import { createSandbox } from "@nightshift/engine/testing";
 import { Refusal } from "@nightshift/refusal";
+import { ORPCError } from "@orpc/client";
 import type { HostClient, WorkReply, WorkRequest } from "../contract";
 import type { DeviceLinks } from "../links";
 import { hostCall, NOT_PAIRED, translated } from "../links/from-host";
@@ -17,6 +18,7 @@ import {
 	createRelay,
 	OLDER_HOST_NO_FOLDER,
 	OLDER_HOST_PROJECTS,
+	OLDER_HOST_TEST_RUN,
 } from "./relay";
 import { createSpaceRoutes } from "./route";
 import { createWorkRelay } from "./work-relay";
@@ -85,6 +87,7 @@ function fakeHost(
 			offer: take("sync.offer", undefined),
 			withdrawOffer: take("sync.withdrawOffer", undefined),
 			startRun: take("sync.startRun", { runId: "run-on-host" }),
+			startTest: take("sync.startTest", { runId: "test-on-host" }),
 			devices: take("sync.devices", LISTED),
 		},
 		archive: {
@@ -586,6 +589,42 @@ describe("the relay, for a Space a Host keeps", () => {
 		arrive(true);
 		expect(await started).toEqual({ runId: "run-on-host" });
 		expect(host.taken.map((t) => t.procedure)).toEqual(["sync.startRun"]);
+	});
+
+	test("a test run starts on the Host's own procedure, with its pins as refs (ADR 27)", async () => {
+		const { relay, host } = relayWith();
+		const marks = {
+			pinned: { fetch: { runId: "run-earlier", stepId: "step-1" } },
+			skipped: { approve: "send" },
+		};
+		expect(
+			await relay.startRun({ ...start("space-team"), test: marks } as never),
+		).toEqual({ runId: "test-on-host" });
+		const { startedBy: _person, ...onHost } = start("space-team");
+		expect(host.taken).toEqual([
+			{ procedure: "sync.startTest", input: { ...onHost, test: marks } },
+		]);
+	});
+
+	test("a Host of an older version, which cannot start a test run, says to update it, and nothing starts", async () => {
+		const host = fakeHost();
+		// A Host without the procedure answers NOT_FOUND.
+		Object.assign(host.client.sync, {
+			startTest: async () => {
+				throw new ORPCError("NOT_FOUND", { message: "Not found" });
+			},
+		});
+		const { relay } = relayWith(host);
+		const older = await relay
+			.startRun({
+				...start("space-team"),
+				test: { skipped: { approve: "send" } },
+			} as never)
+			.catch((error: unknown) => error);
+		expect(older).toBeInstanceOf(OlderHostError);
+		expect(older).toMatchObject({ message: OLDER_HOST_TEST_RUN });
+		// Its plain start, which would run every node for real, was never asked.
+		expect(host.taken).toEqual([]);
 	});
 
 	test("a run start refuses in plain words when the flows are not in step in time", async () => {

@@ -3,9 +3,11 @@ import type { Database } from "@nightshift/db";
 import {
 	type Engine,
 	type PeerProjects,
+	PinNotHereError,
 	permissionOf,
 	RUN_NOT_FOUND,
 	type SpaceArchive,
+	type StartRunInput,
 	withoutPrivatePaths,
 } from "@nightshift/engine";
 import { PROJECT_NOT_FOUND } from "@nightshift/engine/projects";
@@ -60,6 +62,10 @@ const STREAM_IDLE_MS = 20_000;
 
 /** The role every start of a run and every lease of a Space asks for. */
 const STARTS_RUNS: Permissions = { run: ["start"] };
+
+/** What a person reads when the run of an output they pinned has not reached this Host yet. */
+export const pinNotOnHost = (nodeId: string) =>
+	`The output you pinned on "${nodeId}" is not on the computer that keeps this Space yet. Try again in a moment.`;
 
 export function createHostExchange(deps: {
 	db: Database;
@@ -184,6 +190,19 @@ export function createHostExchange(deps: {
 			.map((f) => f.stepId)
 			.sort()
 			.join();
+
+	/** Starts a run placed on another Device, for the Caller's Person: this Host walks it. */
+	async function startFor(
+		caller: Caller,
+		input: StartRunInput & { spaceId: string },
+	): Promise<{ runId: string }> {
+		const { spaceId, ...start } = input;
+		await caller.may(spaceId, STARTS_RUNS);
+		const run = await engine
+			.space(spaceId, { personId: caller.personId })
+			.startRun({ ...start, startedBy: caller.personId });
+		return { runId: run.id };
+	}
 
 	return {
 		pull: (caller, { cursors }) => batch(caller, cursors),
@@ -473,13 +492,17 @@ export function createHostExchange(deps: {
 			return { known: deps.work.reply(caller.deviceId, input) };
 		},
 
-		async startRun(caller, input) {
-			const { spaceId, ...start } = input;
-			await caller.may(spaceId, STARTS_RUNS);
-			const run = await engine
-				.space(spaceId, { personId: caller.personId })
-				.startRun({ ...start, startedBy: caller.personId });
-			return { runId: run.id };
+		startRun: startFor,
+
+		async startTest(caller, input) {
+			// The Device found each pinned output in its own log first: one
+			// that is not here yet is on its way (ADR 27).
+			return startFor(caller, input).catch((error: unknown) => {
+				if (error instanceof PinNotHereError) {
+					throw new Refusal("unavailable", pinNotOnHost(error.nodeId));
+				}
+				throw error;
+			});
 		},
 
 		async devices(caller, input) {

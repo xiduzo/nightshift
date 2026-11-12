@@ -38,6 +38,10 @@ export const OLDER_HOST_PROJECTS =
 export const OLDER_HOST_NO_FOLDER =
 	"Your Host runs an older version of Night Shift. Update Night Shift there to add a project without a folder.";
 
+/** What a person reads when the Host that keeps the Space cannot start a test run (ADR 27). */
+export const OLDER_HOST_TEST_RUN =
+	"The computer that keeps this Space runs an older version of Night Shift. Update Night Shift there to run a test.";
+
 /** What a run reads when the Host that keeps its Space does not know leases. */
 export const OLDER_HOST_LEASES =
 	"The computer that keeps this Space runs an older version of Night Shift. Update Night Shift there to use a Lease node.";
@@ -223,9 +227,14 @@ export function createRelay(deps: {
 					);
 				}
 			}
+			// A test run goes on its own procedure (ADR 27): the start of an
+			// older Host would drop its pins and skips and run every node.
 			// Longer than the Host's own limit on a start, so its refusal comes first.
 			return to.ask(
-				(client, signal) => client.sync.startRun(start, { signal }),
+				(client, signal) =>
+					start.test === undefined
+						? client.sync.startRun(start, { signal })
+						: client.sync.startTest({ ...start, test: start.test }, { signal }),
 				{
 					deadlineMs: START_DEADLINE_MS + 30_000,
 					late: () =>
@@ -233,6 +242,9 @@ export function createRelay(deps: {
 							"unavailable",
 							"The computer that keeps this Space did not answer in time. Check the run list, then start the run again.",
 						),
+					...(start.test !== undefined
+						? { olderHost: OLDER_HOST_TEST_RUN }
+						: {}),
 				},
 			);
 		},

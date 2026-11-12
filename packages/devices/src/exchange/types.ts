@@ -6,6 +6,7 @@ import type {
 	OwnDevice,
 	RunCommandInput,
 	StartRunInput,
+	TestRunRequest,
 	TranscriptEntry,
 } from "@nightshift/engine";
 import type {
@@ -205,6 +206,20 @@ export type HostExchange = {
 	startRun(
 		caller: Caller,
 		input: StartRunInput & { spaceId: string },
+	): Promise<{ runId: string }>;
+	/**
+	 * Starts a test run (ADR 27) placed on another Device, for the
+	 * Caller's Person, as `startRun` does: this Host reads the pinned
+	 * outputs from its own log. A pin whose run has not reached it yet
+	 * says to try again in a moment.
+	 */
+	startTest(
+		caller: Caller,
+		input: StartRunInput & {
+			spaceId: string;
+			flowName: string;
+			test: TestRunRequest;
+		},
 	): Promise<{ runId: string }>;
 	/** The Caller's Person's Devices for a project: online, with a Clone or not. */
 	devices(

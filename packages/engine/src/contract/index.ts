@@ -48,5 +48,6 @@ export {
 	type StartRunInput,
 	startRunInputSchema,
 	startRunRequestSchema,
+	startTestInputSchema,
 	type TestRunRequest,
 } from "./start-run";

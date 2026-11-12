@@ -39,6 +39,67 @@ async function errorOf(thrown: Error): Promise<ORPCError<string, unknown>> {
 	return error as ORPCError<string, unknown>;
 }
 
+describe("the Host's start of a test run (ADR 27)", () => {
+	/** A Host whose exchange takes each test start, and the starts it took. */
+	function testHost() {
+		const taken: unknown[] = [];
+		const context = {
+			deviceKey: {
+				keyId: "key-1",
+				deviceId: "device-1",
+				personId: "person-1",
+				permissions: { sync: ["push"] },
+			},
+			exchange: {
+				startTest: async (_caller: unknown, input: unknown) => {
+					taken.push(input);
+					return { runId: "run-1" };
+				},
+			},
+			devices: { admit: admitEvery() },
+			phones: {},
+		} as unknown as HostPeerContext;
+		return { host: createRouterClient(hostRouter, { context }), taken };
+	}
+
+	const marks = {
+		pinned: { fetch: { runId: "run-earlier", stepId: "step-1" } },
+		skipped: { approve: "send" },
+	};
+	const start = {
+		spaceId: "space-1",
+		projectId: "project-1",
+		flowName: "watch",
+		test: marks,
+	};
+
+	test("hands a saved flow's start to the exchange with its pins as refs and its skips", async () => {
+		const { host, taken } = testHost();
+		expect(await host.sync.startTest(start)).toEqual({ runId: "run-1" });
+		expect(taken).toEqual([start]);
+	});
+
+	test("takes no start without pins and skips, no quick run, and no more than 50 marks", async () => {
+		const { host, taken } = testHost();
+		const { test: _marks, ...plain } = start;
+		const many = Object.fromEntries(
+			Array.from({ length: 51 }, (_, i) => [`node-${i}`, "pass"]),
+		);
+		for (const input of [
+			plain,
+			{ ...plain, flowName: undefined, flow: { nodes: [] }, test: marks },
+			{ ...start, test: { skipped: many } },
+		]) {
+			const error = await host.sync.startTest(input as never).then(
+				() => null,
+				(e: unknown) => e,
+			);
+			expect(error).toMatchObject({ code: "BAD_REQUEST" });
+		}
+		expect(taken).toEqual([]);
+	});
+});
+
 describe("the Host's errors on the wire", () => {
 	test("a refusal is a BAD_REQUEST with its words, whatever its kind, and its kind beside them", async () => {
 		for (const kind of ["forbidden", "not-found", "conflict"] as const) {

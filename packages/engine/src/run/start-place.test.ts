@@ -5,6 +5,7 @@ import type { RunTrigger } from "../log";
 import { NOT_ON_THIS_COMPUTER } from "../projects";
 import type { RunSummary } from "../read";
 import { createStartPlaces, SCHEDULE_PROJECT_MISSING } from "./start-place";
+import { TEST_RUN_FROM_EDITOR } from "./test-run";
 
 /**
  * Who walks a run and its Run's Device, for every start (ADR 1,
@@ -137,6 +138,29 @@ describe("a person's start", () => {
 			{ where: "here", input: start() },
 			{ where: "here", input: start({ deviceId: "desktop" }) },
 		]);
+	});
+});
+
+describe("a test run's start (ADR 27)", () => {
+	const marks = { skipped: { approve: "send" } };
+
+	test("goes to the Host with its pins and skips, as a person starts it", async () => {
+		const p = places();
+		const input = { ...start(), projectId: "project-hosted", test: marks };
+		await p.start(input, MANUAL);
+		expect(p.started).toEqual([
+			{ where: "host", input: { ...input, startedFrom: HERE } },
+		]);
+	});
+
+	test("is refused for a schedule before it goes anywhere: the Host's start knows no trigger", async () => {
+		const p = places();
+		for (const projectId of ["project-hosted", "project-1"]) {
+			await expect(
+				p.start({ ...start(), projectId, test: marks }, SCHEDULED),
+			).rejects.toThrow(TEST_RUN_FROM_EDITOR);
+		}
+		expect(p.started).toEqual([]);
 	});
 });
 

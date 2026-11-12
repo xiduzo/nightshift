@@ -12,3 +12,4 @@ export type {
 export type { MoveRows } from "./projects-move";
 export { START_DEADLINE_MS } from "./run-start";
 export type { SpaceEngine } from "./space-engine";
+export { PinNotHereError } from "./test-run";

@@ -4,6 +4,7 @@ import type { RunTrigger } from "../log";
 import type { PlacementPort } from "../placement";
 import { NOT_ON_THIS_COMPUTER } from "../projects";
 import type { RunSummary } from "../read";
+import { refuseTestStart } from "./test-run";
 
 /**
  * Where a run goes when it starts: who walks it, and its Run's Device.
@@ -135,6 +136,8 @@ export function createStartPlaces(deps: {
 		trigger: RunTrigger,
 	): Promise<RunSummary> {
 		await deps.ready;
+		// The Host's start knows no trigger: refuse here what it cannot.
+		refuseTestStart(input, trigger);
 		const spaceId = await deps.spaceOf(input.projectId);
 		const at = await place(spaceId, input);
 		if (at.walker === "host") {

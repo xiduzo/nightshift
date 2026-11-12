@@ -34,6 +34,7 @@ export type {
 	Relay,
 	RunCommandInput,
 	StartRunInput,
+	TestRunRequest,
 } from "./contract";
 export {
 	COMMAND_KINDS,
@@ -45,6 +46,7 @@ export {
 	runCommandSchema,
 	startRunInputSchema,
 	startRunRequestSchema,
+	startTestInputSchema,
 } from "./contract";
 export {
 	type DashboardSummary,
@@ -189,7 +191,12 @@ export type {
 	Peers,
 	SpaceEngine,
 } from "./run";
-export { createEngine, GateClosedError, START_DEADLINE_MS } from "./run";
+export {
+	createEngine,
+	GateClosedError,
+	PinNotHereError,
+	START_DEADLINE_MS,
+} from "./run";
 export { createRunFolders, noRunFolders } from "./run-folders";
 export type {
 	ScheduleList,
