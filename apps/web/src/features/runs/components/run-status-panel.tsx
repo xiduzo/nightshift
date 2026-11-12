@@ -1,10 +1,4 @@
-import {
-	type NoticeAction,
-	type NoticeKind,
-	type NoticePart,
-	type RunNow,
-	useRunActed,
-} from "@nightshift/client";
+import { type RunNotice, type RunNow, useRunActed } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import { Card } from "@nightshift/ui/components/card";
 import {
@@ -43,7 +37,7 @@ import { runMutations } from "../queries";
 import { ResumeComposer } from "./resume-composer";
 
 /** The icon and colour of each notice. */
-const LOOK: Record<NoticeKind, { icon: LucideIcon; tone: string }> = {
+const LOOK: Record<RunNotice["kind"], { icon: LucideIcon; tone: string }> = {
 	"answer-sent": { icon: SendIcon, tone: "text-status-waiting" },
 	gate: { icon: HandIcon, tone: "text-status-waiting" },
 	signal: { icon: RadioIcon, tone: "text-status-sleeping" },
@@ -94,7 +88,7 @@ export function RunStatusPanel({
 	if (!notice) return null;
 	const { icon: Icon, tone } = LOOK[notice.kind];
 	// The button of each action a notice can offer. Only those it offers show.
-	const button: Record<NoticeAction, ReactNode> = {
+	const button: Record<RunNotice["actions"][number], ReactNode> = {
 		answer: (
 			<Button size="sm" onClick={onShowGate}>
 				<HandIcon data-icon="inline-start" />
@@ -187,7 +181,7 @@ export function RunStatusPanel({
 }
 
 /** A notice's words: a name from the flow in code type, a time of day on the reader's clock. */
-function Parts({ parts, code }: { parts: NoticePart[]; code: string }) {
+function Parts({ parts, code }: { parts: RunNotice["body"]; code: string }) {
 	return parts.map((part, index) => (
 		<Fragment key={index}>
 			{typeof part === "string" ? (

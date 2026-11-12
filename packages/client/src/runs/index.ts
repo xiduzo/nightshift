@@ -63,10 +63,8 @@ export { createRunQueries } from "./queries";
 export { runReport } from "./report";
 export { type RerunStart, rerunStarts, runningStep } from "./retry";
 export {
-	type NoticeAction,
-	type NoticeKind,
-	type NoticePart,
 	openGates,
+	type RunNotice,
 	type RunNow,
 	runNow,
 } from "./run-now";
