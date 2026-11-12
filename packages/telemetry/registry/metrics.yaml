@@ -39,6 +39,56 @@ metrics:
         requirement_level: recommended
       - ref: nightshift.node.kind
         requirement_level: recommended
+      - ref: nightshift.ladder.rung
+        requirement_level:
+          conditionally_required: When the step is a try on a ladder.
+      - ref: nightshift.project.id
+        requirement_level: recommended
+      - ref: nightshift.flow.id
+        requirement_level: recommended
+      - ref: nightshift.device.id
+        requirement_level: recommended
+
+  - name: nightshift.ladder.rung
+    requirement_level: recommended
+    instrument: counter
+    unit: "{step}"
+    brief: Where the work landed. One point for each climb that landed, on the step it landed on.
+    note: >
+      A node without a cascade lands on each visit. The cost of a rung is
+      nightshift.run.cost_usd with the same nightshift.ladder.rung.
+    stability: development
+    attributes:
+      - ref: nightshift.ladder.kind
+        requirement_level: required
+      - ref: nightshift.ladder.rung
+        requirement_level: required
+      - ref: nightshift.ladder.tier
+        requirement_level:
+          conditionally_required: When the node has a cascade.
+      - ref: nightshift.ladder.unsure
+        requirement_level:
+          conditionally_required: On the choice ladder.
+      - ref: nightshift.node.kind
+        requirement_level: recommended
+      - ref: nightshift.project.id
+        requirement_level: recommended
+      - ref: nightshift.flow.id
+        requirement_level: recommended
+      - ref: nightshift.device.id
+        requirement_level: recommended
+
+  - name: nightshift.flow.metric
+    requirement_level: recommended
+    instrument: histogram
+    unit: "{value}"
+    brief: The numbers a flow reports. A Command, an Agent or a Value step writes them in its data.
+    note: >
+      The flow chooses each name and what its value means. A value is 0 or more.
+    stability: development
+    attributes:
+      - ref: nightshift.flow.metric.name
+        requirement_level: required
       - ref: nightshift.project.id
         requirement_level: recommended
       - ref: nightshift.flow.id
@@ -100,10 +150,11 @@ metrics:
     requirement_level: recommended
     instrument: counter
     unit: "{score}"
-    brief: Feedback on runs. Gate answers, useful answers, what became of a pull request, and the scores a flow writes.
+    brief: Feedback on runs. Gate answers, useful answers, and what became of a pull request.
     note: >
       A no to "Was this run useful?" adds 0. A changed answer adds its new
-      value again. The run keeps only the latest answer.
+      value again. The run keeps only the latest answer. A number a flow
+      reports is a nightshift.flow.metric point.
     stability: development
     attributes:
       - ref: nightshift.score.name

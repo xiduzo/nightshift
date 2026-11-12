@@ -92,6 +92,9 @@ events:
 
   - name: nightshift.step.ended
     brief: A step ended.
+    note: >
+      The nightshift.ladder fields come only on the step a climb landed on.
+      They never name a tier.
     stability: development
     attributes:
       - ref: nightshift.node.kind
@@ -118,6 +121,16 @@ events:
         requirement_level: recommended
       - ref: nightshift.step.visit
         requirement_level: required
+      - ref: nightshift.ladder.kind
+        requirement_level: recommended
+      - ref: nightshift.ladder.rung
+        requirement_level: recommended
+      - ref: nightshift.ladder.tries
+        requirement_level: recommended
+      - ref: nightshift.ladder.unsure
+        requirement_level: recommended
+      - ref: nightshift.ladder.cost_usd
+        requirement_level: recommended
 
   - name: nightshift.schedule.fired
     brief: A schedule started a run.

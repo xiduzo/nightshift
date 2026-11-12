@@ -56,6 +56,11 @@ processors:
       - nightshift.install.members
       - nightshift.install.spaces
       - nightshift.knowledge.document.kilobytes
+      - nightshift.ladder.cost_usd
+      - nightshift.ladder.kind
+      - nightshift.ladder.rung
+      - nightshift.ladder.tries
+      - nightshift.ladder.unsure
       - nightshift.model.family
       - nightshift.node.kind
       - nightshift.phone.signed_in

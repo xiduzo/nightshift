@@ -115,6 +115,9 @@ export const REGISTRY = {
 		"nightshift.flow.id": {
 			type: "string",
 		},
+		"nightshift.flow.metric.name": {
+			type: "string",
+		},
 		"nightshift.flow.starter": {
 			type: "string",
 			members: [
@@ -180,6 +183,34 @@ export const REGISTRY = {
 		},
 		"nightshift.knowledge.searches": {
 			type: "int",
+		},
+		"nightshift.ladder.cost_usd": {
+			type: "double",
+		},
+		"nightshift.ladder.kind": {
+			type: "string",
+			members: ["work", "choice", "_OTHER"],
+		},
+		"nightshift.ladder.rung": {
+			type: "string",
+			members: [
+				"rule",
+				"first",
+				"later",
+				"person",
+				"deadline",
+				"none",
+				"_OTHER",
+			],
+		},
+		"nightshift.ladder.tier": {
+			type: "string",
+		},
+		"nightshift.ladder.tries": {
+			type: "int",
+		},
+		"nightshift.ladder.unsure": {
+			type: "boolean",
 		},
 		"nightshift.model.family": {
 			type: "string",
@@ -627,10 +658,20 @@ export const REGISTRY = {
 			unit: "s",
 			required: [],
 		},
+		"nightshift.flow.metric": {
+			instrument: "histogram",
+			unit: "{value}",
+			required: ["nightshift.flow.metric.name"],
+		},
 		"nightshift.gate.wait": {
 			instrument: "histogram",
 			unit: "s",
 			required: [],
+		},
+		"nightshift.ladder.rung": {
+			instrument: "counter",
+			unit: "{step}",
+			required: ["nightshift.ladder.kind", "nightshift.ladder.rung"],
 		},
 		"nightshift.retries": {
 			instrument: "counter",
@@ -832,6 +873,11 @@ export const ATTR = {
 	score: "nightshift.score.name",
 	scoreLabel: "nightshift.score.label",
 	scoreBy: "nightshift.score.by",
+	flowMetricName: "nightshift.flow.metric.name",
+	ladderKind: "nightshift.ladder.kind",
+	ladderRung: "nightshift.ladder.rung",
+	ladderTier: "nightshift.ladder.tier",
+	ladderUnsure: "nightshift.ladder.unsure",
 	errorType: "error.type",
 	serviceName: "service.name",
 	serviceInstance: "service.instance.id",
@@ -875,6 +921,8 @@ export const METRIC = {
 	gateWait: { name: "nightshift.gate.wait", unit: "s" },
 	runOutcome: { name: "nightshift.run.outcome", unit: "{run}" },
 	score: { name: "nightshift.score", unit: "{score}" },
+	ladderRung: { name: "nightshift.ladder.rung", unit: "{step}" },
+	flowMetric: { name: "nightshift.flow.metric", unit: "{value}" },
 } as const;
 
 /**
@@ -1244,6 +1292,21 @@ export const usageEventSchema = {
 			"nightshift.cost.basis": z
 				.enum(["billed", "estimated", "unknown"])
 				.optional(),
+			"nightshift.ladder.cost_usd": z.number().optional(),
+			"nightshift.ladder.kind": z.enum(["work", "choice", "_OTHER"]).optional(),
+			"nightshift.ladder.rung": z
+				.enum([
+					"rule",
+					"first",
+					"later",
+					"person",
+					"deadline",
+					"none",
+					"_OTHER",
+				])
+				.optional(),
+			"nightshift.ladder.tries": z.number().int().optional(),
+			"nightshift.ladder.unsure": z.boolean().optional(),
 			"nightshift.model.family": z
 				.enum([
 					"claude-sonnet",

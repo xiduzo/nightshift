@@ -142,6 +142,11 @@ export const ATTR = {
 	score: "nightshift.score.name",
 	scoreLabel: "nightshift.score.label",
 	scoreBy: "nightshift.score.by",
+	flowMetricName: "nightshift.flow.metric.name",
+	ladderKind: "nightshift.ladder.kind",
+	ladderRung: "nightshift.ladder.rung",
+	ladderTier: "nightshift.ladder.tier",
+	ladderUnsure: "nightshift.ladder.unsure",
 	errorType: "error.type",
 	serviceName: "service.name",
 	serviceInstance: "service.instance.id",
@@ -185,6 +190,8 @@ export const METRIC = {
 	gateWait: { name: "nightshift.gate.wait", unit: "s" },
 	runOutcome: { name: "nightshift.run.outcome", unit: "{run}" },
 	score: { name: "nightshift.score", unit: "{score}" },
+	ladderRung: { name: "nightshift.ladder.rung", unit: "{step}" },
+	flowMetric: { name: "nightshift.flow.metric", unit: "{value}" },
 } as const;
 
 /**

@@ -216,8 +216,9 @@ attributes:
         - { id: other, value: _OTHER, brief: A score outside this list., stability: development }
     brief: Which score this point is.
     note: >
-      The export to monitoring sends the name a flow gives its own score.
-      A usage event sends _OTHER for it.
+      Night Shift writes these scores itself. A number a flow reports is a
+      nightshift.flow.metric point in the export to monitoring, and never
+      a usage event.
     stability: development
   - key: nightshift.score.value
     type: double
@@ -237,6 +238,50 @@ attributes:
         - { id: person, value: person, brief: A person chose., stability: development }
         - { id: deadline, value: deadline, brief: The deadline chose., stability: development }
     brief: Who chose a Gate answer that became a score.
+    stability: development
+  - key: nightshift.flow.metric.name
+    type: string
+    brief: The name a flow gives a number it reports. The export to monitoring only.
+    stability: development
+  - key: nightshift.ladder.kind
+    type:
+      members:
+        - { id: work, value: work, brief: "The work ladder of Agent, Subflow and Value steps.", stability: development }
+        - { id: choice, value: choice, brief: The choice ladder of Decision steps., stability: development }
+        - { id: other, value: _OTHER, brief: A ladder outside this list., stability: development }
+    brief: The ladder a climb landed on.
+    stability: development
+  - key: nightshift.ladder.rung
+    type:
+      members:
+        - { id: rule, value: rule, brief: A rule chose., stability: development }
+        - { id: first, value: first, brief: The first tier held or a node without a cascade did., stability: development }
+        - { id: later, value: later, brief: A later tier held., stability: development }
+        - { id: person, value: person, brief: The climb reached a person who answered., stability: development }
+        - { id: deadline, value: deadline, brief: The climb reached a person and the deadline answered., stability: development }
+        - { id: none, value: none, brief: No try held and no person was asked., stability: development }
+        - { id: other, value: _OTHER, brief: A rung outside this list., stability: development }
+    brief: The rung a climb landed on, or the rung a try stands on.
+    note: >
+      A climb is the tries of one node up its ladder, up to the step it
+      landed on. A try stands on rule, first, later or person. Only a
+      landing is deadline or none.
+    stability: development
+  - key: nightshift.ladder.tier
+    type: string
+    brief: The name of the tier a climb landed on. The export to monitoring only.
+    stability: development
+  - key: nightshift.ladder.tries
+    type: int
+    brief: How many steps a climb took, a stopped one included.
+    stability: development
+  - key: nightshift.ladder.unsure
+    type: boolean
+    brief: Whether a decider's pick fell below its tier's minimum confidence in a climb of a Decision.
+    stability: development
+  - key: nightshift.ladder.cost_usd
+    type: double
+    brief: What every try of a climb cost, in US dollars, a Subflow's called flow included.
     stability: development
   - key: nightshift.pull_request.outcome
     type:
