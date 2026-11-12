@@ -7,7 +7,7 @@ import type {
 	OllamaService,
 	SyncedDocuments,
 } from "@nightshift/engine";
-import type { AgentSetup } from "@nightshift/engine/agent-setup";
+import type { AgentSetup, DeciderSetup } from "@nightshift/engine/agent-setup";
 import type { GitHubClones, ProjectCopies } from "@nightshift/engine/projects";
 import type { InAppChannel, Notifications } from "@nightshift/notifications";
 import type { Telemetry } from "@nightshift/telemetry";
@@ -85,6 +85,8 @@ export type HotRegistry = KeptDevices &
 		nightshiftProjectCopies?: ProjectCopies;
 		/** The guided setup of agents: the installers and sign-ins it started stop with it. */
 		nightshiftAgentSetup?: AgentSetup;
+		/** The setup of a decider: the Homebrew install it started stops with it. */
+		nightshiftDeciderSetup?: DeciderSetup;
 		/** The daily update of the price list. */
 		nightshiftPrices?: PriceUpdates;
 		nightshiftFacts?: Timer;

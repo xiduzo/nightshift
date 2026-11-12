@@ -20,6 +20,8 @@ import type {
 	AgentSetupJob,
 	AgentSetupStatus,
 	AgentSetupView,
+	DeciderSetupJob,
+	DeciderSetupStatus,
 } from "@nightshift/engine/agent-setup";
 import {
 	type CliTool,
@@ -396,7 +398,7 @@ export const ollamaStatusSchema = exact<OllamaStatus>()(
 		installed: z.boolean(),
 		/** Whether Ollama answers now. */
 		answers: z.boolean(),
-		/** The embedding model search by meaning uses. */
+		/** The model asked about: the embedding model of search by meaning, unless another is named. */
 		model: z.string(),
 		/** Whether this Ollama has that model. */
 		hasModel: z.boolean(),
@@ -495,5 +497,87 @@ export const agentSetupStatusSchema = exact<AgentSetupStatus>()(
 		/** Why not, for the person. */
 		message: z.string().nullable(),
 		agents: z.array(agentSetupViewSchema),
+	}),
+);
+
+/** The state of the setup of a decider: the screen polls it. */
+const deciderSetupJobSchema = exact<DeciderSetupJob>()(
+	z.discriminatedUnion("state", [
+		z.object({ state: z.literal("idle") }),
+		z.object({ state: z.literal("installing"), since: z.number() }),
+		z.object({
+			state: z.literal("install-failed"),
+			problem: z.string(),
+			/** The end of what Homebrew printed, for the details. */
+			output: z.string(),
+			at: z.number(),
+		}),
+		z.object({ state: z.literal("starting"), since: z.number() }),
+		z.object({
+			state: z.literal("downloading"),
+			/** From 0 to 100. */
+			percent: z.number(),
+			since: z.number(),
+		}),
+		z.object({
+			state: z.literal("failed"),
+			problem: z.string(),
+			at: z.number(),
+		}),
+		z.object({
+			state: z.literal("ready"),
+			/** The decider new Decision nodes start on now. */
+			decider: deciderNameSchema,
+			/** The Model Profile the setup made or updated. */
+			profileId: z.string(),
+			profileName: z.string(),
+			at: z.number(),
+		}),
+		z.object({ state: z.literal("cancelled"), at: z.number() }),
+	]),
+);
+
+/** The setup of a decider on this computer: the choices, and the job. Never a key. */
+export const deciderSetupStatusSchema = exact<DeciderSetupStatus>()(
+	z.object({
+		/** The setup can act here, for this request. */
+		available: z.boolean(),
+		reason: z.enum(["elsewhere", "container", "platform"]).nullable(),
+		/** Why not, for the person. */
+		message: z.string().nullable(),
+		/** The decider new Decision nodes start on now. `chosen`: the person saved it. */
+		current: z.object({ decider: deciderNameSchema, chosen: z.boolean() }),
+		local: z.object({
+			model: z.string(),
+			/** About how big the download of the model is, in bytes. */
+			bytes: z.number(),
+			/** Null: Ollama on this computer. Else the host name of the one Night Shift uses. */
+			where: z.string().nullable(),
+			installed: z.boolean(),
+			answers: z.boolean(),
+			hasModel: z.boolean(),
+			/** How Ollama gets on this computer. Null: nothing to install. */
+			install: z
+				.discriminatedUnion("kind", [
+					z.object({
+						kind: z.literal("brew"),
+						/** The exact command that runs. */
+						command: z.string(),
+					}),
+					z.object({
+						kind: z.literal("download"),
+						/** Ollama's download page. */
+						url: z.string(),
+					}),
+				])
+				.nullable(),
+		}),
+		typesafe: z.object({
+			/** A TypeSafe key is saved, or set in the environment. */
+			keySaved: z.boolean(),
+			/** Where the person gets a key. */
+			keyPage: z.string(),
+		}),
+		job: deciderSetupJobSchema,
 	}),
 );

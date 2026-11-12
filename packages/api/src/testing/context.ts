@@ -36,6 +36,7 @@ const SERVICES: Record<keyof Services, true> = {
 	assistant: true,
 	checks: true,
 	agentSetup: true,
+	deciderSetup: true,
 	projectSetup: true,
 	usage: true,
 	daemon: true,

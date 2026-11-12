@@ -16,7 +16,7 @@ import type {
 	ToolLaunchers,
 	UsageMoment,
 } from "@nightshift/engine";
-import type { AgentSetup } from "@nightshift/engine/agent-setup";
+import type { AgentSetup, DeciderSetup } from "@nightshift/engine/agent-setup";
 import type {
 	CliToolStore,
 	ConnectionStore,
@@ -114,6 +114,14 @@ export type Services = {
 	agentSetup: Pick<
 		AgentSetup,
 		"status" | "install" | "signIn" | "sendCode" | "cancel"
+	>;
+	/**
+	 * Sets up a decider on this computer, when its owner asks for it there
+	 * (Q22): Ollama with its small model, or a TypeSafe key.
+	 */
+	deciderSetup: Pick<
+		DeciderSetup,
+		"status" | "installOllama" | "useLocal" | "useTypesafe" | "cancel"
 	>;
 	/** What a folder needs before runs can start in it, and the fixes a person asks for. */
 	projectSetup: {

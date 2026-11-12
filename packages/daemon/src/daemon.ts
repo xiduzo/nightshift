@@ -1,6 +1,10 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { startPriceUpdates, tanstackDecider } from "@nightshift/agents";
+import {
+	DECIDER_SETUP,
+	startPriceUpdates,
+	tanstackDecider,
+} from "@nightshift/agents";
 import { findProgram } from "@nightshift/agents/types";
 import type { Context } from "@nightshift/api/context";
 import {
@@ -45,7 +49,10 @@ import {
 	createToolLaunchers,
 	localDevice,
 } from "@nightshift/engine";
-import { createAgentSetup } from "@nightshift/engine/agent-setup";
+import {
+	createAgentSetup,
+	createDeciderSetup,
+} from "@nightshift/engine/agent-setup";
 import {
 	HARNESS_BIN,
 	openConfigStores,
@@ -767,6 +774,23 @@ export async function createDaemon(
 			}),
 		(before) => before.stop(),
 	);
+	/**
+	 * Sets up a decider, when the person asks for it on this computer (Q22):
+	 * Ollama with its small model, or a TypeSafe key. A reload stops what
+	 * it runs.
+	 */
+	const deciderSetup = await slots.replace(
+		"nightshiftDeciderSetup",
+		() =>
+			createDeciderSetup({
+				stores: config,
+				ollama,
+				localModel: DECIDER_SETUP.localModel,
+				typesafeKey: DECIDER_SETUP.typesafeKey,
+				container: inContainer(),
+			}),
+		(before) => before.stop(),
+	);
 
 	const info: DaemonInfo = {
 		dataDir,
@@ -818,6 +842,7 @@ export async function createDaemon(
 		}),
 		checks,
 		agentSetup,
+		deciderSetup,
 		usage: telemetry,
 		knowledge,
 		ollama,

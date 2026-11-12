@@ -1,8 +1,30 @@
-import { settingsPatchSchema } from "@nightshift/engine/device-config";
+import { DECIDER_SETUP } from "@nightshift/agents";
+import {
+	type SettingsStore,
+	settingsPatchSchema,
+	withEffectiveDecider,
+} from "@nightshift/engine/device-config";
 
+import type { Context } from "../context";
 import { output } from "../output";
 import { ownerProcedure } from "../procedures";
 import { settingsViewSchema } from "./schemas";
+
+/**
+ * The settings as the screens read them: an unsaved decider of new
+ * Decision nodes is TypeSafe Jev with its key, else Ollama (Q22).
+ */
+function shown(
+	view: ReturnType<SettingsStore["view"]>,
+	context: Pick<Context, "connections" | "daemon">,
+) {
+	const typesafeKey =
+		context.connections.secretSource(DECIDER_SETUP.typesafeKey) !== "missing";
+	return {
+		...withEffectiveDecider(view, typesafeKey),
+		daemon: context.daemon,
+	};
+}
 
 /** Daemon settings: saved in the database, else the environment, else the default. */
 export const settings = {
@@ -12,10 +34,7 @@ export const settings = {
 				"Reads every setting of this computer, where each value comes from, and facts about Night Shift here.",
 		})
 		.output(output(settingsViewSchema))
-		.handler(({ context }) => ({
-			...context.settings.view(),
-			daemon: context.daemon,
-		})),
+		.handler(({ context }) => shown(context.settings.view(), context)),
 	/**
 	 * A value saves it; null forgets it (back to the environment, then the
 	 * default).
@@ -27,8 +46,7 @@ export const settings = {
 		})
 		.output(output(settingsViewSchema))
 		.input(settingsPatchSchema)
-		.handler(async ({ context, input }) => {
-			const view = await context.settings.save(input);
-			return { ...view, daemon: context.daemon };
-		}),
+		.handler(async ({ context, input }) =>
+			shown(await context.settings.save(input), context),
+		),
 };
