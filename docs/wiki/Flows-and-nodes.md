@@ -206,9 +206,9 @@ You choose the agent that answers: a profile, or an agent and a model.
 
 ## Kits
 
-Kits are small flows that ship with Night Shift. A Subflow runs one by its name, for example `kit:github/publish-draft-pr`. To change a kit, copy it into the project. The copy is a flow of your own.
+Kits are small flows that ship with Night Shift. A Subflow runs one by its name, for example `kit:feeds/read`. To change a kit, copy it into the project. The copy is a flow of your own.
 
-Night Shift has no app catalog. An app is a command in your flow, such as `gh`, `acli`, or `curl`, or a tool of the agent. The kits wrap common steps on `git`, `gh`, and `acli`.
+Night Shift has no app catalog. An app is a command in your flow, such as `gh`, `acli`, or `curl`, a web request, or a tool of the agent. The kits wrap common steps: send a message or an email, read a feed, and work with `git`, `gh`, and `acli`.
 
 <!-- generated:kits: bun run docs:reference writes this table from the code. Do not edit it here. -->
 | Kit | Does | Inputs |
@@ -226,6 +226,37 @@ Night Shift has no app catalog. An app is a command in your flow, such as `gh`, 
 <!-- /generated:kits -->
 
 The knowledge kits are on the [Knowledge](Knowledge.md#sources) page.
+
+### Send a message
+
+`kit:message/send` sends a message to an incoming webhook, such as one of a chat channel. Any service that gives you a webhook URL works.
+
+Save the webhook URL as the secret `MESSAGE_WEBHOOK_URL` on the Secrets page. The URL is a key: anyone with it can post. Night Shift never shows it. For another channel, save another secret, and give its name in `webhook`.
+
+Set `format` and `field` to what the service takes:
+
+| Service | `format` | `field` |
+| --- | --- | --- |
+| Slack | `json` | `text` |
+| Discord | `json` | `content` |
+| ntfy | `plain` | not used |
+
+### Read a feed
+
+`kit:feeds/read` reads an RSS, Atom or JSON feed, and gives the items that are new since the last run. When the Subflow is the step `feed`, later steps read them in `{{feed.items}}`. It needs no secret.
+
+On its first run, it only remembers what the feed holds, so the next run gives what is new. Set `first_run` to `new` to get those items too. It remembers each feed on its own.
+
+### Send an email
+
+`kit:email/send` sends a plain text email over SMTP. Save three secrets on the Secrets page:
+
+- `EMAIL_SMTP_URL`: the server, for example `smtps://smtp.example.com:465`. The server must use TLS.
+- `EMAIL_SMTP_USER` and `EMAIL_SMTP_PASSWORD`: the login of the mail account. Many providers give you an app password for this.
+
+The email comes from that user, or from `from`. To send to more people, separate the addresses in `to` with commas.
+
+You cannot undo a message or an email that went out. When it goes to other people, put a Gate before it.
 
 ## Starter flows
 

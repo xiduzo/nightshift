@@ -16,19 +16,19 @@ It could use: a schedule, a Command with `curl`, a variable kept between runs, a
 
 ## Follow new papers on a topic
 
-A schedule starts the flow each morning. A Command gets the newest papers of a search with `curl`. A rule drops the papers that an earlier run saw. A decider reads the abstract of each new paper, and picks: on your topic, or not. An agent writes a summary of each paper on your topic, in plain words, into the knowledge.
+A schedule starts the flow each morning. It reads the feed of a search for papers, and keeps only the papers that an earlier run did not see. A decider reads the abstract of each new paper, and picks: on your topic, or not. An agent writes a summary of each paper on your topic, in plain words, into the knowledge.
 
 The run only writes files for you to read, so no Gate asks first.
 
-It could use: a schedule, a Command with `curl` and `jq`, a variable kept between runs, a Subflow per paper, a decider, the knowledge.
+It could use: a schedule, `kit:feeds/read`, a Subflow per paper, a decider, the knowledge.
 
 ## Watch prices you care about
 
 A schedule starts the flow each morning. A Command reads the prices with `curl` and `jq`. A rule keeps the prices that fell below your limit since the last run. When there are none, the run ends. A decider looks at each hit, and picks: a real offer, or noise, such as another size or a used item.
 
-For each real offer, a Command sends you a message with the link, through the incoming webhook of your chat app. The message goes only to you, so no Gate asks first. No agent runs at all.
+For each real offer, Night Shift sends you a message with the link, through the incoming webhook of your chat app. The message goes only to you, so no Gate asks first. No agent runs at all.
 
-It could use: a schedule, a Command with `curl` and `jq`, a variable kept between runs, a decider, a secret for the webhook address.
+It could use: a schedule, a Command with `curl` and `jq`, a variable kept between runs, a decider, `kit:message/send` with a secret for the webhook address.
 
 ## Check your backups each morning
 
@@ -52,7 +52,7 @@ A schedule starts the flow each week. An agent searches the web for companies th
 
 A Gate shows you each mail before Night Shift sends it, because you cannot undo a sent mail. When you trust the drafts, give the Gate a cascade. A decider then approves the clear mails first, and you see only the rest.
 
-It could use: a schedule, an Agent, a variable kept between runs, a decider, a Gate with a cascade, a Command with `curl`, a secret.
+It could use: a schedule, an Agent, a variable kept between runs, a decider, a Gate with a cascade, `kit:email/send` with its secrets.
 
 ## Draft the weekly newsletter
 

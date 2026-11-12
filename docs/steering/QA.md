@@ -10,7 +10,7 @@ Last updated: 2026-11-11
 | --- | --- | --- | --- |
 | Unit | Function and module | `bun test` | Engine rules: frontier, locks, run policy, decision validation, status derivation. |
 | Integration | Server + database, runner protocol, connector adapters | `bun test` against a real libsql file, fake `gh` and fake harness binaries | The daemon writes the right facts and events. Adapters speak the real CLI shapes. |
-| Contract | Starters and kits | `bun test` | Each starter comes to the current flow format with no errors and meets the starter standard. Each kit runs its commands against fake CLIs. |
+| Contract | Starters and kits | `bun test` | Each starter comes to the current flow format with no errors and meets the starter standard. Each kit runs its commands against fake CLIs. A kit with web requests runs end to end against a local server. |
 | E2E | A person's path through the web UI | Playwright, not set up yet | Start a run, answer its Gate, and see the run end. Every status on screen comes from a fact. |
 
 Model integration tests on the sandbox test of the night-shift script: a repo with a bare origin, fakes of `gh`, `claude` and `opencode` on `PATH`, and a fixture file as the fake GitHub.
