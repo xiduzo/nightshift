@@ -39,6 +39,7 @@ import {
 } from "@nightshift/devices";
 import {
 	createArtifactStore,
+	createConfigUse,
 	createFlowDocuments,
 	createKnowledge,
 	createKnowledgeFolderLocks,
@@ -860,6 +861,14 @@ async function makeDaemon(
 		settings: computerSettings,
 		notifications,
 		toolLaunchers,
+		configUse: createConfigUse({
+			deviceId: device.id,
+			space: ({ spaceId, personId }) => engine.space(spaceId, { personId }),
+			connections,
+			cliTools,
+			profiles,
+			toolLaunchers,
+		}),
 		// Suggestions and chats in the flow editor: on this computer's
 		// profiles, read only in the project's Clone. A chat reads the
 		// project's flows and runs as the Person sees them in the Space.

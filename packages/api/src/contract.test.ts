@@ -3,7 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fakeHarness } from "@nightshift/agents/testing";
 import { membersOf } from "@nightshift/auth";
-import { createEngine, type Engine } from "@nightshift/engine";
+import { createConfigUse, createEngine, type Engine } from "@nightshift/engine";
 import {
 	createCliToolStore,
 	createConnectionStore,
@@ -162,6 +162,14 @@ describe("replies of a real engine", () => {
 			inApp,
 		});
 		await notifications.start();
+		const connections = createConnectionStore({ document, env: {}, secrets });
+		const cliTools = createCliToolStore({ document });
+		const profiles = createProfileStore({ document });
+		const toolLaunchers = {
+			signIn: async () => ({ ok: false, output: "", signedInAt: null }),
+			signedInAt: async () => null,
+			forget: async () => {},
+		};
 		context = testContext({
 			access: accessAs({ personId, spaceId: sandbox.spaceId, role: "owner" }),
 			fromThisComputer: true,
@@ -169,14 +177,18 @@ describe("replies of a real engine", () => {
 			engine,
 			settings,
 			notifications,
-			connections: createConnectionStore({ document, env: {}, secrets }),
-			cliTools: createCliToolStore({ document }),
-			toolLaunchers: {
-				signIn: async () => ({ ok: false, output: "", signedInAt: null }),
-				signedInAt: async () => null,
-				forget: async () => {},
-			},
-			profiles: createProfileStore({ document }),
+			connections,
+			cliTools,
+			toolLaunchers,
+			profiles,
+			configUse: createConfigUse({
+				deviceId: sandbox.deviceId,
+				space: ({ spaceId, personId }) => engine.space(spaceId, { personId }),
+				connections,
+				cliTools,
+				profiles,
+				toolLaunchers,
+			}),
 			daemon: {
 				dataDir: sandbox.dataDir,
 				device: { id: sandbox.deviceId, name: "test", ownerId: personId },

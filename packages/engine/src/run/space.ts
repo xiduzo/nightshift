@@ -3,7 +3,7 @@ import { Refusal } from "@nightshift/refusal";
 import type { ArtifactStore } from "../artifacts";
 import type { RunCopiesService, RunFilesService } from "../cleanup";
 import type { Actor, StartRunInput } from "../contract";
-import { flowUse, type SpaceFlows } from "../flows";
+import type { SpaceFlows } from "../flows";
 import type { Runner } from "../graph";
 import {
 	RUN_NOT_FOUND,
@@ -319,10 +319,6 @@ export function createSpaces(deps: SpacesDeps) {
 			},
 
 			flows: deps.flows(spaceId, actor?.personId),
-
-			flowUse() {
-				return flowUse(this);
-			},
 
 			async listRuns(input) {
 				await ready;

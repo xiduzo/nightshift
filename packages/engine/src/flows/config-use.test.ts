@@ -1,468 +1,564 @@
 import { describe, expect, test } from "bun:test";
+import type { Flow } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
 
 import type {
 	CliTool,
 	Connection,
 	ProfileView,
-	SecretList,
+	ProjectSecretName,
 	SecretView,
 } from "../device-config";
-import {
-	cliToolsInUse,
-	cliToolsOfSecrets,
-	connectionsInUse,
-	profilesInUse,
-	useThroughProfiles,
-} from "./config-use";
-import { type FlowRef, type FlowUse, profileUseKey } from "./flow-use";
+import { type Asker, type ConfigUseDeps, createConfigUse } from "./config-use";
+import type { FlowRef } from "./flow-use";
 
 /** This computer's id: its profiles are the ones flows name with it. */
 const HERE = "d1";
+/** Who asks, in which Space. */
+const AT: Asker = { spaceId: "s1", personId: "ada" };
 
-const flow = (flowName: string): FlowRef => ({
-	projectId: "p1",
-	projectName: "website",
+/** A secret reference, as a person writes it. */
+const ref = (name: string) => `\${${name}}`;
+
+/** A flow with these nodes. The rest of the flow does not matter here. */
+const flowOf = (...nodes: unknown[]) =>
+	({ nodes, inputs: [], edges: [] }) as never as Flow;
+
+const command = (id: string, ...secrets: string[]) => ({
+	id,
+	type: "command",
+	secrets,
+});
+
+/** An Agent node that names these connections, CLI tools and a profile of a Device. */
+const agent = (
+	id: string,
+	fields: {
+		connections?: string[];
+		clis?: string[];
+		profile?: string;
+		device?: string;
+	},
+) => ({
+	id,
+	type: "agent",
+	connections: fields.connections ?? [],
+	clis: fields.clis ?? [],
+	...(fields.profile
+		? { profile: { device: fields.device ?? HERE, profile: fields.profile } }
+		: {}),
+});
+
+/** A Decision a Model Profile of this computer decides. */
+const decision = (id: string, profile: string) => ({
+	id,
+	type: "decision",
+	prompt: "Is it a bug?",
+	options: [{ name: "bug" }, { name: "idea" }],
+	by: "model",
+	profile: { device: HERE, profile },
+});
+
+/** A project of the Space: its flows, and the secret of each webhook schedule. */
+type Project = {
+	id: string;
+	name: string;
+	flows: Record<string, Flow>;
+	webhooks?: Record<string, string>;
+};
+
+const project = (
+	id: string,
+	flows: Record<string, Flow>,
+	webhooks?: Record<string, string>,
+): Project => ({
+	id,
+	name: id.toUpperCase(),
+	flows,
+	...(webhooks ? { webhooks } : {}),
+});
+
+/** A flow of a project, as the lists name it. */
+const flow = (projectId: string, flowName: string): FlowRef => ({
+	projectId,
+	projectName: projectId.toUpperCase(),
 	flowName,
 });
 
-const noUse = (): FlowUse => ({
-	connections: new Map(),
-	clis: new Map(),
-	webhooks: new Map(),
-	secrets: new Map(),
-	profiles: new Map(),
-	profileFlows: new Map(),
-});
+/** A connection whose server reads these secrets. */
+const connection = (name: string, ...secrets: string[]): Connection =>
+	({
+		name,
+		description: null,
+		variables: secrets.map((secret) => ({ name: secret, source: "missing" })),
+		updatedAt: 0,
+	}) as never;
 
-const connection = (name: string): Connection =>
-	({ name, description: null, variables: [], updatedAt: 0 }) as never;
-
-const tool = (name: string, fields: Partial<CliTool> = {}): CliTool => ({
+/** A CLI tool, with a login that reads these secrets. */
+const tool = (name: string, ...secrets: string[]): CliTool => ({
 	name,
 	program: null,
 	description: null,
-	login: null,
+	login:
+		secrets.length > 0
+			? { env: Object.fromEntries(secrets.map((s) => [s, ref(s)])) }
+			: null,
 	git: null,
 	updatedAt: 0,
-	...fields,
 });
 
-/** An Agent Profile that names these connections and CLI tools, or a Model Profile (no `harness`). */
-const profile = (
-	name: string,
-	fields: { connections?: string[]; clis?: string[]; model?: true } = {},
+/** An Agent Profile that names these connections and CLI tools. */
+const agentProfile = (
+	id: string,
+	fields: { connections?: string[]; clis?: string[] } = {},
 ): ProfileView =>
-	(fields.model
-		? { id: name, name, decider: "ollama", model: "llama" }
-		: {
-				id: name,
-				name,
-				harness: "claude-code",
-				connections: fields.connections ?? [],
-				clis: fields.clis ?? [],
-			}) as never;
+	({
+		id,
+		name: id,
+		harness: "claude-code",
+		connections: fields.connections ?? [],
+		clis: fields.clis ?? [],
+	}) as never;
 
 /** A Model Profile whose address reads these secrets: its API key, and a header. */
 const modelProfile = (
-	name: string,
+	id: string,
 	secrets: { apiKey?: string; header?: string },
 ): ProfileView =>
 	({
-		id: name,
-		name,
+		id,
+		name: id,
 		decider: "compatible",
 		address: {
 			baseUrl: "http://models.example.com",
 			...(secrets.apiKey ? { apiKey: secrets.apiKey } : {}),
 			...(secrets.header
-				? { headers: { "X-Team": `team-\${${secrets.header}}` } }
+				? { headers: { "X-Team": `team-${ref(secrets.header)}` } }
 				: {}),
 		},
 	}) as never;
 
-/** The secret store's view: every name it is asked for, none saved. */
-const secretsOf = async (
-	named: Iterable<string> = [],
-): Promise<SecretList> => ({
-	personal: "available",
-	secrets: [...new Set(named)].sort().map(
-		(name): SecretView => ({
-			name,
-			scope: "computer",
-			saved: false,
-			inEnv: false,
-			usedBy: [],
-			setAt: null,
-			usedAt: null,
-		}),
-	),
+/** A secret of a project or of the Space, as Members see it. */
+const shared = (name: string): ProjectSecretName => ({
+	name,
+	setAt: 1,
+	setBy: null,
 });
 
-describe("cliToolsOfSecrets", () => {
-	test("names the tools whose logins read a secret, and the flows that use each tool", () => {
-		const use = noUse();
-		use.clis.set("acli-work", [flow("nightly")]);
-		const login = {
-			env: {},
-			folder: "HOME",
-			signIn: { command: "acli login", input: "${TOKEN}" },
-		};
-		const { toolsBySecret, toolFlows } = cliToolsOfSecrets(
-			{
-				cliTools: {
-					list: () => [
-						{
-							name: "acli-work",
-							program: "acli",
-							description: null,
-							login,
-							git: null,
-							updatedAt: 1,
-						},
-					],
+/**
+ * This computer over a Space of `projects`. `kept` gives the names of the
+ * secrets of each project and of the Space (`space`): a Refusal or an
+ * error is what reading them throws. `saved`: the names saved here.
+ */
+function configUse(
+	options: {
+		projects?: Project[];
+		connections?: Connection[];
+		tools?: CliTool[];
+		profiles?: ProfileView[];
+		kept?: Record<string, string[] | Error>;
+		saved?: string[];
+		personal?: "available" | "unavailable";
+		signedInAt?: ConfigUseDeps["toolLaunchers"]["signedInAt"];
+	} = {},
+) {
+	const projects = options.projects ?? [];
+	const connections = options.connections ?? [];
+	/** Each project's and the Space's names it is asked for, in order. */
+	const asked: string[] = [];
+	const keptOf = async (key: string) => {
+		asked.push(key);
+		const kept = options.kept?.[key] ?? [];
+		if (kept instanceof Error) throw kept;
+		return kept.map(shared);
+	};
+	const deps: ConfigUseDeps = {
+		deviceId: HERE,
+		space: (at) => {
+			expect(at).toEqual(AT);
+			return {
+				listProjects: async () =>
+					projects.map(({ id, name }) => ({ id, name })),
+				listSchedules: async (projectId) => ({
+					schedules: Object.entries(
+						projects.find((p) => p.id === projectId)?.webhooks ?? {},
+					).map(([flowName, secret]) => ({
+						flow: flowName,
+						webhook: { secret: ref(secret) },
+					})),
+				}),
+				flows: {
+					map: async (projectId) =>
+						projects.find((p) => p.id === projectId)?.flows ?? {},
 				},
-				profiles: { list: () => [] },
-			},
-			use,
-			HERE,
-		);
-		expect(toolsBySecret.get("TOKEN")).toEqual(["acli-work"]);
-		expect(toolFlows.get("acli-work")).toEqual([flow("nightly")]);
-	});
-
-	test("a tool's flows include those of an Agent Profile of this computer that names it, not of another Device's", () => {
-		const use = noUse();
-		use.profileFlows.set(profileUseKey(HERE, "worker"), [flow("triage")]);
-		// The same profile id on another Device is another profile.
-		use.profileFlows.set(profileUseKey("le2316", "worker"), [flow("far")]);
-		const { toolFlows } = cliToolsOfSecrets(
-			{
-				cliTools: { list: () => [tool("gh")] },
-				profiles: { list: () => [profile("worker", { clis: ["gh"] })] },
-			},
-			use,
-			HERE,
-		);
-		expect(toolFlows.get("gh")).toEqual([flow("triage")]);
-	});
-});
-
-describe("useThroughProfiles", () => {
-	test("the flows that use a profile of this computer use its connections, its CLI tools and the secrets its address reads", () => {
-		const use = noUse();
-		use.profileFlows.set(profileUseKey(HERE, "worker"), [flow("triage")]);
-		use.profileFlows.set(profileUseKey(HERE, "jev"), [
-			flow("triage"),
-			flow("sort"),
-		]);
-		use.profileFlows.set(profileUseKey("le2316", "jev"), [flow("far")]);
-		const through = useThroughProfiles(
-			{
-				profiles: {
-					list: () => [
-						profile("worker", { connections: ["tracker"], clis: ["gh"] }),
-						modelProfile("jev", { apiKey: "JEV_KEY", header: "TEAM_ID" }),
-						// No flow uses it: it adds no flow.
-						modelProfile("idle", { apiKey: "IDLE_KEY" }),
-					],
-				},
-			},
-			use,
-			HERE,
-		);
-		expect(Object.fromEntries(through.connections)).toEqual({
-			tracker: [flow("triage")],
-		});
-		expect(Object.fromEntries(through.clis)).toEqual({ gh: [flow("triage")] });
-		expect(Object.fromEntries(through.secrets)).toEqual({
-			JEV_KEY: [flow("triage"), flow("sort")],
-			TEAM_ID: [flow("triage"), flow("sort")],
-		});
-	});
-});
-
-describe("connectionsInUse", () => {
-	test("names the flows and the Agent Profiles that use each connection", async () => {
-		const use = noUse();
-		use.connections.set("github", [flow("night")]);
-		const listed = await connectionsInUse(
-			{
-				connections: {
-					list: () => [connection("github"), connection("linear")],
-					secrets: secretsOf,
-				},
-				cliTools: { list: () => [] },
-				profiles: {
-					list: () => [
-						profile("fast", { connections: ["github"] }),
-						profile("slow", { connections: ["linear", "github"] }),
-						// A Model Profile names no connections.
-						profile("decider", { model: true }),
-					],
-				},
-			},
-			use,
-			HERE,
-		);
-		expect(
-			listed.connections.map((c) => [c.name, c.usedBy, c.profiles]),
-		).toEqual([
-			["github", [flow("night")], ["fast", "slow"]],
-			["linear", [], ["slow"]],
-		]);
-	});
-
-	test("lists a secret a Command node or a CLI tool's login names, with what reads it", async () => {
-		const use = noUse();
-		use.secrets.set("API_USER", [flow("tools")]);
-		const listed = await connectionsInUse(
-			{
-				connections: { list: () => [], secrets: secretsOf },
-				cliTools: {
-					list: () => [
-						tool("gh-work", {
-							login: {
-								// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
-								env: { GH_TOKEN: "${GH_WORK_TOKEN}" },
-								folder: "GH_CONFIG_DIR",
-								// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
-								signIn: { command: "gh auth login", input: "${API_USER}" },
-							},
+			};
+		},
+		connections: {
+			list: () => connections,
+			// The store's view: the names asked for and those connections read, none saved but `saved`.
+			secrets: async (named = []) => {
+				const usedBy = new Map<string, string[]>();
+				for (const c of connections) {
+					for (const { name } of c.variables) {
+						usedBy.set(name, [...(usedBy.get(name) ?? []), c.name]);
+					}
+				}
+				const names = new Set([
+					...named,
+					...usedBy.keys(),
+					...(options.saved ?? []),
+				]);
+				return {
+					personal: options.personal ?? "available",
+					secrets: [...names].sort().map(
+						(name): SecretView => ({
+							name,
+							scope: "computer",
+							saved: options.saved?.includes(name) === true,
+							inEnv: false,
+							usedBy: usedBy.get(name) ?? [],
+							setAt: null,
+							usedAt: null,
 						}),
-						tool("jq"),
-					],
-				},
-				profiles: { list: () => [] },
+					),
+				};
 			},
-			use,
-			HERE,
-		);
-		expect(listed.secrets.map((s) => [s.name, s.flows, s.tools])).toEqual([
-			["API_USER", [flow("tools")], ["gh-work"]],
-			["GH_WORK_TOKEN", [], ["gh-work"]],
+			projectSecrets: (at, personId) => {
+				expect([at.spaceId, personId]).toEqual([AT.spaceId, AT.personId]);
+				return keptOf(at.projectId);
+			},
+			spaceSecrets: (spaceId, personId) => {
+				expect([spaceId, personId]).toEqual([AT.spaceId, AT.personId]);
+				return keptOf("space");
+			},
+		},
+		cliTools: { list: () => options.tools ?? [] },
+		profiles: { list: () => options.profiles ?? [] },
+		toolLaunchers: { signedInAt: options.signedInAt ?? (async () => null) },
+	};
+	return { use: createConfigUse(deps), asked };
+}
+
+/** This computer's secrets: each name with what the list says uses it. */
+async function computerList(
+	options: Parameters<typeof configUse>[0],
+): Promise<
+	{ name: string; flows: FlowRef[]; usedBy: string[]; tools: string[] }[]
+> {
+	const listed = await configUse(options).use.connections(AT);
+	return listed.secrets.map(({ name, flows, usedBy, tools }) => ({
+		name,
+		flows,
+		usedBy,
+		tools,
+	}));
+}
+
+describe("what uses a secret", () => {
+	// A flow uses a secret in four ways: it names it, or names a profile,
+	// a Connection or a CLI tool of this computer that reads it.
+	const space = {
+		projects: [
+			project("p1", {
+				login: flowOf(command("call", "TOKEN")),
+				sort: flowOf(decision("pick", "jev")),
+				read: flowOf(agent("look", { connections: ["tracker"] })),
+				work: flowOf(agent("do", { profile: "worker" })),
+				ship: flowOf(agent("push", { clis: ["acli"] })),
+				// Another Device's profile of the same id is another profile.
+				far: flowOf(agent("away", { profile: "worker", device: "le2316" })),
+			}),
+			project("p2", {
+				// A flow that calls one that uses it uses it too.
+				night: flowOf({ id: "run", type: "call", flow: "login", inputs: {} }),
+				login: flowOf(command("call", "TOKEN")),
+			}),
+		],
+		connections: [connection("tracker", "TOKEN")],
+		tools: [tool("acli", "TOKEN")],
+		profiles: [
+			modelProfile("jev", { apiKey: "TOKEN" }),
+			agentProfile("worker", { connections: ["tracker"], clis: ["acli"] }),
+		],
+	};
+
+	test("this computer's list names the flows that name it or a Model Profile that reads it, and its connections and CLI tools", async () => {
+		expect(await computerList(space)).toEqual([
+			{
+				name: "TOKEN",
+				flows: [
+					flow("p1", "login"),
+					flow("p2", "night"),
+					flow("p2", "login"),
+					flow("p1", "sort"),
+				],
+				usedBy: ["tracker"],
+				tools: ["acli"],
+			},
 		]);
 	});
 
-	test("lists a secret a Model Profile's address reads, with the flows that use the profile, unless their project has it", async () => {
-		const use = noUse();
-		const sort: FlowRef = { ...flow("sort"), projectId: "p2" };
-		// A Command of triage names the key too: triage counts once.
-		use.secrets.set("JEV_KEY", [flow("triage")]);
-		use.profileFlows.set(profileUseKey(HERE, "jev"), [flow("triage"), sort]);
-		const listed = await connectionsInUse(
+	test("a project's list names every flow of that project that uses it, and the CLI tools", async () => {
+		const { use } = configUse({ ...space, kept: { p1: ["TOKEN"] } });
+		expect(await use.sharedSecrets(AT, { projectId: "p1" })).toEqual([
 			{
-				connections: { list: () => [], secrets: secretsOf },
-				cliTools: { list: () => [] },
-				profiles: {
-					list: () => [
-						modelProfile("jev", { apiKey: "JEV_KEY", header: "TEAM_ID" }),
-					],
-				},
+				...shared("TOKEN"),
+				flows: ["login", "read", "ship", "sort", "work"],
+				tools: ["acli"],
+				webhooks: [],
 			},
-			use,
-			HERE,
-			async (projectId) => new Set(projectId === "p2" ? ["TEAM_ID"] : []),
-		);
-		expect(listed.secrets.map((s) => [s.name, s.flows])).toEqual([
-			["JEV_KEY", [flow("triage"), sort]],
-			["TEAM_ID", [flow("triage")]],
 		]);
 	});
 
-	test("leaves out the flows whose project has the secret, and a name nothing else needs", async () => {
-		const use = noUse();
-		const other: FlowRef = { ...flow("rebalance"), projectId: "p2" };
-		// p1 keeps both names. Only p2's flow still reads LAB_DB_URL here.
-		use.secrets.set("ALPACA_KEY", [flow("trade")]);
-		use.secrets.set("LAB_DB_URL", [flow("mark"), other]);
-		const asked: string[] = [];
-		const listed = await connectionsInUse(
+	test("the Space's list names the flows of every project", async () => {
+		const { use } = configUse({ ...space, kept: { space: ["TOKEN"] } });
+		expect(await use.sharedSecrets(AT, "space")).toEqual([
 			{
-				connections: { list: () => [], secrets: secretsOf },
-				cliTools: { list: () => [] },
-				profiles: { list: () => [] },
+				...shared("TOKEN"),
+				flows: ["login", "night", "read", "ship", "sort", "work"],
+				tools: ["acli"],
+				webhooks: [],
 			},
-			use,
-			HERE,
-			async (projectId) => {
-				asked.push(projectId);
-				return new Set(projectId === "p1" ? ["ALPACA_KEY", "LAB_DB_URL"] : []);
-			},
-		);
-		expect(listed.secrets.map((s) => [s.name, s.flows])).toEqual([
-			["LAB_DB_URL", [other]],
 		]);
-		expect(asked.sort()).toEqual(["p1", "p2"]);
+	});
+
+	test("a shared list is null when the Host cannot be reached, and other errors throw", async () => {
+		const away = configUse({
+			kept: {
+				p1: new Refusal("unavailable", "Away."),
+				space: new Error("Broken."),
+			},
+		}).use;
+		expect(await away.sharedSecrets(AT, { projectId: "p1" })).toBeNull();
+		await expect(away.sharedSecrets(AT, "space")).rejects.toThrow("Broken.");
+	});
+});
+
+describe("this computer's Secrets list: the scopes of ADR 13 and 18", () => {
+	test("leaves out the flows whose project or Space has the secret, and a name nothing else needs", async () => {
+		const { use, asked } = configUse({
+			projects: [
+				project("p1", {
+					trade: flowOf(command("buy", "ALPACA_KEY", "LAB_DB_URL")),
+				}),
+				project("p2", {
+					rebalance: flowOf(command("mark", "LAB_DB_URL", "SPACE_KEY")),
+				}),
+			],
+			kept: { p1: ["ALPACA_KEY", "LAB_DB_URL"], space: ["SPACE_KEY"] },
+		});
+		const listed = await use.connections(AT);
+		expect(listed.secrets.map((s) => [s.name, s.flows])).toEqual([
+			["LAB_DB_URL", [flow("p2", "rebalance")]],
+		]);
+		// The Space's names are read once.
+		expect(asked.sort()).toEqual(["p1", "p2", "space"]);
+	});
+
+	test("a project whose secrets cannot be read covers nothing", async () => {
+		expect(
+			await computerList({
+				projects: [
+					project("p1", { mark: flowOf(command("run", "LAB_DB_URL")) }),
+				],
+				kept: { p1: new Error("Away.") },
+			}),
+		).toEqual([
+			{
+				name: "LAB_DB_URL",
+				flows: [flow("p1", "mark")],
+				usedBy: [],
+				tools: [],
+			},
+		]);
 	});
 
 	test("keeps a saved value when its project has the secret too", async () => {
-		const use = noUse();
-		use.secrets.set("LAB_DB_URL", [flow("mark")]);
-		const listed = await connectionsInUse(
-			{
-				connections: {
-					list: () => [],
-					secrets: async (named) => {
-						const list = await secretsOf(named);
-						return {
-							...list,
-							secrets: list.secrets.map((s) => ({ ...s, saved: true })),
-						};
-					},
-				},
-				cliTools: { list: () => [] },
-				profiles: { list: () => [] },
-			},
-			use,
-			HERE,
-			async () => new Set(["LAB_DB_URL"]),
-		);
+		const listed = await configUse({
+			projects: [project("p1", { mark: flowOf(command("run", "LAB_DB_URL")) })],
+			kept: { p1: ["LAB_DB_URL"] },
+			saved: ["LAB_DB_URL"],
+		}).use.connections(AT);
 		expect(listed.secrets.map((s) => [s.name, s.saved, s.flows])).toEqual([
 			["LAB_DB_URL", true, []],
 		]);
 	});
-});
 
-describe("connectionsInUse with a CLI tool's login", () => {
-	const acli = tool("acli-work", {
-		login: {
-			// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
-			env: { TOKEN: "${ACLI_TOKEN}" },
-			folder: null,
-			signIn: null,
-		} as never,
-	});
-	const list = (use: FlowUse, keeps: Record<string, string[]>) =>
-		connectionsInUse(
-			{
-				connections: { list: () => [], secrets: secretsOf },
-				cliTools: { list: () => [acli] },
-				profiles: { list: () => [profile("worker", { clis: ["acli-work"] })] },
-			},
-			use,
-			HERE,
-			async (projectId) => new Set(keeps[projectId] ?? []),
-		);
-
-	test("leaves out the tool when each flow that uses it is in a project that has the secret", async () => {
-		const use = noUse();
-		use.secrets.set("ACLI_TOKEN", [flow("demo")]);
-		use.clis.set("acli-work", [flow("test")]);
-		expect((await list(use, { p1: ["ACLI_TOKEN"] })).secrets).toEqual([]);
+	test("a CLI tool that reads it goes when each flow that uses it or the name gets it from its project", async () => {
+		expect(
+			await computerList({
+				projects: [
+					project("p1", {
+						demo: flowOf(command("call", "TOKEN")),
+						test: flowOf(
+							agent("check", { connections: ["tracker"], clis: ["acli"] }),
+						),
+					}),
+				],
+				connections: [connection("tracker", "TOKEN")],
+				tools: [tool("acli", "TOKEN")],
+				kept: { p1: ["TOKEN"] },
+			}),
+		).toEqual([{ name: "TOKEN", flows: [], usedBy: ["tracker"], tools: [] }]);
 	});
 
-	test("keeps the tool when a flow of another project uses it", async () => {
-		const use = noUse();
-		const other: FlowRef = { ...flow("sync"), projectId: "p2" };
-		use.secrets.set("ACLI_TOKEN", [flow("demo")]);
-		use.profileFlows.set(profileUseKey(HERE, "worker"), [other]);
-		const listed = await list(use, { p1: ["ACLI_TOKEN"] });
-		expect(listed.secrets.map((s) => [s.name, s.flows, s.tools])).toEqual([
-			["ACLI_TOKEN", [], ["acli-work"]],
+	test("it stays when a flow of another project uses it through a profile of this computer", async () => {
+		expect(
+			await computerList({
+				projects: [
+					project("p1", { demo: flowOf(command("call", "TOKEN")) }),
+					project("p2", { sync: flowOf(agent("pull", { profile: "worker" })) }),
+				],
+				tools: [tool("acli", "TOKEN")],
+				profiles: [agentProfile("worker", { clis: ["acli"] })],
+				kept: { p1: ["TOKEN"] },
+			}),
+		).toEqual([{ name: "TOKEN", flows: [], usedBy: [], tools: ["acli"] }]);
+	});
+
+	test("it stays when no flow is known to use the name: a test or a sign-in reads it here", async () => {
+		expect(
+			await computerList({
+				connections: [connection("tracker", "TOKEN")],
+				tools: [tool("acli", "TOKEN")],
+				kept: { p1: ["TOKEN"] },
+			}),
+		).toEqual([
+			{ name: "TOKEN", flows: [], usedBy: ["tracker"], tools: ["acli"] },
 		]);
 	});
 
-	test("keeps the tool when no flow is known to use it", async () => {
-		const listed = await list(noUse(), { p1: ["ACLI_TOKEN"] });
-		expect(listed.secrets.map((s) => [s.name, s.tools])).toEqual([
-			["ACLI_TOKEN", ["acli-work"]],
+	test("names the flow a webhook starts, unless its project keeps the secret", async () => {
+		const projects = [project("p1", { deploy: flowOf() }, { deploy: "HOOK" })];
+		const shown = await configUse({ projects }).use.connections(AT);
+		expect(shown.secrets.map((s) => [s.name, s.webhooks])).toEqual([
+			["HOOK", [flow("p1", "deploy")]],
+		]);
+		const covered = await configUse({
+			projects,
+			kept: { p1: ["HOOK"] },
+		}).use.connections(AT);
+		expect(covered.secrets).toEqual([]);
+	});
+
+	test("lists a secret only a Model Profile's address reads, with the flows that use the profile", async () => {
+		expect(
+			await computerList({
+				projects: [project("p1", { sort: flowOf(decision("pick", "jev")) })],
+				profiles: [
+					modelProfile("jev", { apiKey: "JEV_KEY", header: "TEAM_ID" }),
+					// No flow uses it: its key is not asked for.
+					modelProfile("idle", { apiKey: "IDLE_KEY" }),
+				],
+			}),
+		).toEqual([
+			{ name: "JEV_KEY", flows: [flow("p1", "sort")], usedBy: [], tools: [] },
+			{ name: "TEAM_ID", flows: [flow("p1", "sort")], usedBy: [], tools: [] },
 		]);
 	});
 });
 
-describe("cliToolsInUse", () => {
+describe("this computer's connections, CLI tools and profiles", () => {
+	test("names the flows and the Agent Profiles that use each connection", async () => {
+		const listed = await configUse({
+			projects: [
+				project("p1", {
+					night: flowOf(agent("plan", { connections: ["github"] })),
+				}),
+			],
+			connections: [connection("github"), connection("linear")],
+			profiles: [
+				agentProfile("fast", { connections: ["github"] }),
+				agentProfile("slow", { connections: ["linear", "github"] }),
+				// A Model Profile names no connections.
+				modelProfile("decider", {}),
+			],
+		}).use.connections(AT);
+		expect(
+			listed.connections.map((c) => [c.name, c.usedBy, c.profiles]),
+		).toEqual([
+			["github", [flow("p1", "night")], ["fast", "slow"]],
+			["linear", [], ["slow"]],
+		]);
+	});
+
 	test("names the flows and Agent Profiles that use each tool, and when a login signed in", async () => {
-		const use = noUse();
-		use.clis.set("jq", [flow("night")]);
 		const signedIn: string[] = [];
-		const listed = await cliToolsInUse(
-			{
-				connections: {
-					secrets: async () => ({ secrets: [], personal: "available" }),
-				},
-				cliTools: {
-					list: () => [
-						tool("jq"),
-						tool("gh-work", {
-							login: {
-								env: {},
-								folder: "GH_CONFIG_DIR",
-								signIn: { command: "gh auth login" },
-							},
-						}),
-					],
-				},
-				profiles: { list: () => [profile("fast", { clis: ["jq"] })] },
-				toolLaunchers: {
-					signedInAt: async (name) => {
-						signedIn.push(name);
-						return 42;
+		const listed = await configUse({
+			projects: [
+				project("p1", { night: flowOf(agent("plan", { clis: ["jq"] })) }),
+			],
+			tools: [
+				tool("jq"),
+				{
+					...tool("gh-work"),
+					login: {
+						env: {},
+						folder: "GH_CONFIG_DIR",
+						signIn: { command: "gh auth login" },
 					},
 				},
+			],
+			profiles: [agentProfile("fast", { clis: ["jq"] })],
+			signedInAt: async (name) => {
+				signedIn.push(name);
+				return 42;
 			},
-			use,
-			{ list: async () => [], secretNames: async () => new Set() },
-		);
+		}).use.cliTools(AT);
 		expect(
 			listed.map((t) => [t.name, t.usedBy, t.profiles, t.signedInAt]),
 		).toEqual([
-			["jq", [flow("night")], ["fast"], null],
+			["jq", [flow("p1", "night")], ["fast"], null],
 			["gh-work", [], [], 42],
 		]);
 		// Only a tool with a sign-in has a time to read.
 		expect(signedIn).toEqual(["gh-work"]);
 	});
+
+	test("names the nodes that use each profile of this computer only", async () => {
+		const listed = await configUse({
+			projects: [
+				project("p1", {
+					night: flowOf(
+						agent("plan", { profile: "fast" }),
+						agent("far", { profile: "slow", device: "le2316" }),
+					),
+				}),
+			],
+			profiles: [agentProfile("fast"), agentProfile("slow")],
+		}).use.profiles(AT);
+		expect(listed.map((p) => [p.name, p.usedBy])).toEqual([
+			["fast", [{ ...flow("p1", "night"), nodeIds: ["plan"] }]],
+			["slow", []],
+		]);
+	});
 });
 
-describe("cliToolsInUse: where a login finds its secrets", () => {
-	const acli = tool("acli-work", {
+describe("a CLI tool's login: where it finds its secrets", () => {
+	const acli: CliTool = {
+		...tool("acli"),
 		program: "acli",
 		login: {
 			env: {},
 			folder: "HOME",
-			// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
-			signIn: { command: "acli login", input: "${TOKEN}" },
+			signIn: { command: "acli login", input: ref("TOKEN") },
 		},
-	});
-	const acme = { id: "acme", name: "Acme" };
+	};
 
 	async function stateOf(options: {
 		here?: boolean;
 		personal?: "available" | "unavailable";
-		keeps?: ReadonlySet<string> | null;
+		kept?: string[] | Error;
 	}) {
-		const [listed] = await cliToolsInUse(
-			{
-				connections: {
-					secrets: async () => ({
-						secrets: [
-							{
-								name: "TOKEN",
-								scope: "computer",
-								saved: options.here === true,
-								inEnv: false,
-								usedBy: [],
-								setAt: null,
-								usedAt: null,
-							},
-						],
-						personal: options.personal ?? "available",
-					}),
-				},
-				cliTools: { list: () => [acli] },
-				profiles: { list: () => [] },
-				toolLaunchers: {
-					signedInAt: async (_name, projectId) =>
-						projectId === "acme" ? 42 : null,
-				},
-			},
-			noUse(),
-			{
-				list: async () => [acme],
-				secretNames: async () =>
-					options.keeps === undefined ? new Set() : options.keeps,
-			},
-		);
+		const [listed] = await configUse({
+			projects: [project("acme", {})],
+			tools: [acli],
+			saved: options.here ? ["TOKEN"] : [],
+			...(options.personal ? { personal: options.personal } : {}),
+			kept: { acme: options.kept ?? [] },
+			signedInAt: async (_name, projectId) =>
+				projectId === "acme" ? 42 : null,
+		}).use.cliTools(AT);
 		return listed?.loginState;
 	}
 
@@ -475,9 +571,9 @@ describe("cliToolsInUse: where a login finds its secrets", () => {
 	});
 
 	test("a project's token signs in for that project, not here", async () => {
-		expect(await stateOf({ keeps: new Set(["TOKEN"]) })).toEqual({
+		expect(await stateOf({ kept: ["TOKEN"] })).toEqual({
 			signsInHere: false,
-			projects: [{ projectId: "acme", projectName: "Acme", signedInAt: 42 }],
+			projects: [{ projectId: "acme", projectName: "ACME", signedInAt: 42 }],
 			missing: [],
 		});
 	});
@@ -492,49 +588,7 @@ describe("cliToolsInUse: where a login finds its secrets", () => {
 
 	test("secrets that cannot be read now never say a secret is missing", async () => {
 		const expected = { signsInHere: true, projects: [], missing: [] };
-		expect(await stateOf({ keeps: null })).toEqual(expected);
+		expect(await stateOf({ kept: new Error("Away.") })).toEqual(expected);
 		expect(await stateOf({ personal: "unavailable" })).toEqual(expected);
-	});
-});
-
-describe("connectionsInUse: webhooks", () => {
-	test("names the flow a webhook starts, unless its project keeps the secret", async () => {
-		const use = noUse();
-		use.webhooks.set("HOOK", [flow("deploy")]);
-		const listedWith = (kept: ReadonlySet<string>) =>
-			connectionsInUse(
-				{
-					connections: { list: () => [], secrets: secretsOf },
-					cliTools: { list: () => [] },
-					profiles: { list: () => [] },
-				},
-				use,
-				HERE,
-				async () => kept,
-			);
-		const shown = await listedWith(new Set());
-		expect(shown.secrets.map((s) => [s.name, s.webhooks])).toEqual([
-			["HOOK", [flow("deploy")]],
-		]);
-		const covered = await listedWith(new Set(["HOOK"]));
-		expect(covered.secrets).toEqual([]);
-	});
-});
-
-describe("profilesInUse", () => {
-	test("names the nodes that use each profile of this computer only", () => {
-		const use = noUse();
-		const nodes = { ...flow("night"), nodeIds: ["plan"] };
-		use.profiles.set(profileUseKey("mac", "fast"), [nodes]);
-		use.profiles.set(profileUseKey("le2316", "slow"), [nodes]);
-		const listed = profilesInUse(
-			{ profiles: { list: () => [profile("fast"), profile("slow")] } },
-			use,
-			"mac",
-		);
-		expect(listed.map((p) => [p.name, p.usedBy])).toEqual([
-			["fast", [nodes]],
-			["slow", []],
-		]);
 	});
 });

@@ -10,6 +10,7 @@ import type { DeviceKeyAccess, RequestAccess } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { Devices, HostExchange, Offers } from "@nightshift/devices";
 import type {
+	ConfigUse,
 	Engine,
 	Knowledge,
 	OllamaService,
@@ -88,6 +89,12 @@ export type Services = {
 	/** The CLI tools' logins: signing one in, when it last did, its folder. */
 	toolLaunchers: Pick<ToolLaunchers, "signIn" | "signedInAt" | "forget">;
 	profiles: ProfileStore;
+	/**
+	 * What uses this computer's connections, CLI tools, profiles and
+	 * secrets, and the secrets of a project or of the Space, in the flows of
+	 * a Space.
+	 */
+	configUse: ConfigUse;
 	/** The projects' knowledge in their Spaces (ADR 4), on this computer. */
 	knowledge: Knowledge;
 	/** The Ollama search by meaning and Decision nodes use: where it is, its models, a download. */

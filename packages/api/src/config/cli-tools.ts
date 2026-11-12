@@ -1,4 +1,3 @@
-import { cliToolsInUse } from "@nightshift/engine";
 import {
 	cliToolInputSchema,
 	removeCliTool,
@@ -13,7 +12,6 @@ import {
 	cliToolSchema,
 	signInResultSchema,
 } from "./schemas";
-import { sharedSecretNames } from "./shared-secret-names";
 
 /**
  * CLI tools: programs on this computer that the agents may run. Agent nodes
@@ -27,10 +25,10 @@ export const cliTools = {
 				"Lists the CLI tools the agents may run, with the flows and profiles that name each.",
 		})
 		.output(output(cliToolListSchema))
-		.handler(async ({ context }) =>
-			cliToolsInUse(context, await context.space.flowUse(), {
-				list: () => context.space.listProjects(),
-				secretNames: (projectId) => sharedSecretNames(context, projectId),
+		.handler(({ context }) =>
+			context.configUse.cliTools({
+				spaceId: context.spaceId,
+				personId: context.session.user.id,
 			}),
 		),
 	/** The programs this computer can run by name, to pick one from. */

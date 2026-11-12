@@ -99,14 +99,11 @@ export type {
 	SpaceFlows,
 } from "./flows";
 export {
-	cliToolsInUse,
-	cliToolsOfSecrets,
-	connectionsInUse,
+	type ConfigUse,
+	createConfigUse,
 	createFlowDocuments,
 	flowsForRun,
-	profilesInUse,
 	revisionKinds,
-	useThroughProfiles,
 } from "./flows";
 export {
 	type AskedQuestion,

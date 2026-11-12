@@ -9,7 +9,7 @@ import type {
 	RunCommandInput,
 	StartRunInput,
 } from "../contract";
-import type { FlowUse, SpaceFlows } from "../flows";
+import type { SpaceFlows } from "../flows";
 import type { NodeMemory } from "../memory";
 import type { Branches, Project } from "../projects";
 import type {
@@ -147,13 +147,6 @@ export interface SpaceEngine {
 		node: string,
 		scope?: string,
 	): Promise<void>;
-	/**
-	 * Who uses what, from every flow of the Space's projects: the flows that
-	 * name each connection and CLI tool, and the Agent nodes that name each
-	 * profile. A flow that cannot be read uses nothing.
-	 */
-	flowUse(): Promise<FlowUse>;
-
 	/** Open Gates over the Space's runs, oldest first. The Needs-you inbox. A Gate stays open across daemon restarts. */
 	listGates(): Promise<OpenGate[]>;
 

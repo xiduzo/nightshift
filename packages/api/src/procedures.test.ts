@@ -123,6 +123,7 @@ const SERVICES: Record<keyof Services, true> = {
 	cliTools: true,
 	toolLaunchers: true,
 	profiles: true,
+	configUse: true,
 	knowledge: true,
 	ollama: true,
 	assistant: true,
@@ -265,6 +266,8 @@ const run = { runId: "r" };
 const project = { projectId: "p1" };
 const flowRef = { ...project, name: "night" };
 const at = { spaceId: SPACE, ...project };
+/** Who asks, in which Space: the session's Person in the session's Space. */
+const ASKER = { spaceId: SPACE, personId: PERSON };
 const secret = { name: "GH_TOKEN" };
 const schedule = { id: "nightly", flow: "night", cron: "0 22 * * 1-5" };
 const one = { ...project, scheduleId: "nightly" };
@@ -357,12 +360,12 @@ const ROUTES: Route[] = [
 	route("projects.rename", { ...project, name: " App " }, { project: ["add"] }, "space.renameProject", ["p1", "App"]),
 	route("projects.move", { ...project, spaceId: SPACE }, { project: ["move"] }, "space.moveProject", ["p1", SPACE]),
 	// A project's secrets, and the Space's (ADR 13, 18).
-	route("projects.secrets", project, "session", ["space.listProjects", "connections.projectSecrets"]),
+	route("projects.secrets", project, "session", "configUse.sharedSecrets", [ASKER, project]),
 	route("projects.setSecret", { ...project, ...secret, value: "v" }, SAVE, "connections.setProjectSecret", [at, "GH_TOKEN", "v", PERSON]),
 	route("projects.removeSecret", { ...project, ...secret }, SAVE, "connections.removeProjectSecret", [at, "GH_TOKEN", PERSON]),
 	route("projects.moveSecretOut", { ...project, ...secret, to: "personal" }, OWNER_SAVING, "connections.moveFromProject", [at, "GH_TOKEN", "personal", PERSON]),
 	route("projects.moveSecretIn", { ...project, ...secret, from: "personal" }, OWNER_SAVING, "connections.moveToProject", ["GH_TOKEN", "personal", at, PERSON]),
-	route("projects.spaceSecrets", undefined, "session", ["connections.spaceSecrets", "space.flowUse"], [SPACE, PERSON]),
+	route("projects.spaceSecrets", undefined, "session", "configUse.sharedSecrets", [ASKER, "space"]),
 	route("projects.setSpaceSecret", { ...secret, value: "v" }, SAVE, "connections.setSpaceSecret", [SPACE, "GH_TOKEN", "v", PERSON]),
 	route("projects.removeSpaceSecret", secret, SAVE, "connections.removeSpaceSecret", [SPACE, "GH_TOKEN", PERSON]),
 	route("projects.moveSecretToSpace", { ...secret, from: "personal" }, OWNER_SAVING, "connections.moveToSpace", ["GH_TOKEN", "personal", SPACE, PERSON]),
@@ -461,7 +464,7 @@ const ROUTES: Route[] = [
 	route("usage.outbox", undefined, "owner", "usage.outbox", []),
 	route("usage.catalog", undefined, "owner", "usage.catalog", []),
 	route("usage.resetId", undefined, "owner", "usage.resetId", []),
-	route("connections.list", undefined, "owner", ["space.flowUse", "connections.secrets"]),
+	route("connections.list", undefined, "owner", "configUse.connections", [ASKER]),
 	route("connections.check", { target: "claude-code" }, "owner", ["checks.harness", "settings.current"], ["claude-code", any]),
 	route("connections.save", { name: "gh", server }, "owner", "connections.save", [like({ name: "gh" })], { given: { connections: { get: () => undefined } } }),
 	route("connections.remove", { name: "gh" }, "owner", ["connections.remove", "profiles.list"], ["gh"]),
@@ -470,7 +473,7 @@ const ROUTES: Route[] = [
 	route("connections.setSecret", { ...secret, value: "v", scope: "personal" }, "owner", "connections.setSecret", ["GH_TOKEN", "v", "personal"]),
 	route("connections.removeSecret", secret, "owner", "connections.removeSecret", ["GH_TOKEN", undefined]),
 	route("connections.moveSecret", { ...secret, to: "personal" }, "owner", "connections.moveSecret", ["GH_TOKEN", "personal"]),
-	route("cliTools.list", undefined, "owner", ["space.flowUse", "cliTools.list"]),
+	route("cliTools.list", undefined, "owner", "configUse.cliTools", [ASKER]),
 	route("cliTools.programs", undefined, "owner", "checks.programs", []),
 	route("cliTools.check", { name: "jq" }, "owner", ["cliTools.program", "checks.cli"], ["jq"]),
 	route("cliTools.save", { name: "jq" }, "owner", "cliTools.save", [like({ name: "jq" })]),
@@ -500,7 +503,7 @@ const ROUTES: Route[] = [
 	route("ollama.status", { model: "llama3.2" }, "owner", "ollama.status", ["llama3.2"]),
 	route("ollama.models", undefined, "owner", "ollama.models", []),
 	route("ollama.pull", { model: "bge-m3" }, "owner", "ollama.pull", ["bge-m3"]),
-	route("profiles.list", undefined, "owner", ["space.flowUse", "profiles.list"]),
+	route("profiles.list", undefined, "owner", "configUse.profiles", [ASKER]),
 	route("profiles.save", agentProfile, "owner", "profiles.save", [like({ name: "fast" }), undefined], { given: { profiles: { byName: () => undefined } } }),
 	route("profiles.catalog", { spaceId: SPACE, ...project }, "session", "space.listDevices", ["p1"]),
 	route("profiles.remove", { id: "p-1" }, "owner", "profiles.remove", ["p-1"]),

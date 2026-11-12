@@ -1,16 +1,8 @@
 import type { Permissions } from "@nightshift/auth";
-import {
-	cliToolsOfSecrets,
-	type FlowRef,
-	HostUnreachableError,
-	useThroughProfiles,
-} from "@nightshift/engine";
 import { secretNameSchema } from "@nightshift/flows";
-import { Refusal } from "@nightshift/refusal";
 import { z } from "zod";
 
 import { secretScopeSchema } from "../config";
-import type { Context } from "../context";
 import { output } from "../output";
 import { ownerOnly, permitted, protectedProcedure } from "../procedures";
 import { projectProcedure } from "./project-space";
@@ -19,75 +11,21 @@ import { projectSecretListSchema } from "./schemas";
 /** What the Project secret procedures share: the project, in the session's Space. */
 const projectInput = z.object({ projectId: z.string() });
 
-/** The secrets could not be read now: the Host of the Space is away, or older. */
-function unreachable(error: unknown): boolean {
-	return (
-		error instanceof HostUnreachableError ||
-		(error instanceof Refusal && error.kind === "unavailable")
-	);
-}
-
-/**
- * What uses each secret of a project or of the Space, by its name: the
- * flows that use it, and the CLI tools whose logins read it. A flow uses
- * it through its nodes or a flow or kit it calls, through a connection
- * that reads it, through a CLI tool whose login reads it, or through a
- * Model Profile whose address reads it. A flow uses a connection or a CLI
- * tool when it names it, or when an Agent Profile it uses names it. The
- * connections and the profiles are this computer's.
- */
-function secretUsers(
-	context: Pick<Context, "connections" | "cliTools" | "profiles" | "daemon">,
-	use: Parameters<typeof cliToolsOfSecrets>[1],
-): {
-	flows: (secret: string) => FlowRef[];
-	tools: (secret: string) => readonly string[];
-	webhooks: (secret: string) => readonly FlowRef[];
-} {
-	const deviceId = context.daemon.device.id;
-	const through = useThroughProfiles(context, use, deviceId);
-	const { toolsBySecret, toolFlows } = cliToolsOfSecrets(
-		context,
-		use,
-		deviceId,
-	);
-	const connections = context.connections.list();
-	return {
-		flows: (secret) => {
-			const tools = toolsBySecret.get(secret) ?? [];
-			return [
-				...(use.secrets.get(secret) ?? []),
-				...(through.secrets.get(secret) ?? []),
-				...connections
-					.filter((c) => c.variables.some((v) => v.name === secret))
-					.flatMap((c) => [
-						...(use.connections.get(c.name) ?? []),
-						...(through.connections.get(c.name) ?? []),
-					]),
-				...tools.flatMap((tool) => toolFlows.get(tool) ?? []),
-			];
-		},
-		tools: (secret) => toolsBySecret.get(secret) ?? [],
-		webhooks: (secret) => use.webhooks.get(secret) ?? [],
-	};
-}
-
-/** The names of the flows among `flows`, each once and sorted: of one project, when it is given. */
-function flowNames(flows: readonly FlowRef[], projectId?: string): string[] {
-	return [
-		...new Set(
-			flows
-				.filter((f) => projectId === undefined || f.projectId === projectId)
-				.map((f) => f.flowName),
-		),
-	].sort();
-}
-
 /** A role that saves Flows: it sets, replaces, moves and removes a project's secrets. */
 const SAVING = { flow: ["save"] } satisfies Permissions;
 
 /** A move that changes this computer's secrets or its owner's: the owner's, with a role that saves Flows. */
 const ownerSaving = permitted(SAVING).use(ownerOnly);
+
+/**
+ * A list of shared secrets as the screens read it. `secrets` null: the Host
+ * that keeps the Space cannot be reached now, and the list is empty.
+ */
+function listed<T>(secrets: T[] | null, canChange: boolean) {
+	return secrets === null
+		? { secrets: [], available: false, canChange }
+		: { secrets, available: true, canChange };
+}
 
 /**
  * A Project's secrets (ADR 13): every Member sees their names, who set
@@ -105,33 +43,15 @@ export const projectSecrets = {
 				"Lists the secrets of a project, with who set each, when, and the flows that use it.",
 		})
 		.output(output(projectSecretListSchema))
-		.handler(async ({ context }) => {
-			const at = context.project;
-			const canChange = await context.access.can(SAVING);
-			let listed: Awaited<
-				ReturnType<typeof context.connections.projectSecrets>
-			>;
-			try {
-				listed = await context.connections.projectSecrets(
-					at,
-					context.session.user.id,
-				);
-			} catch (error) {
-				if (!unreachable(error)) throw error;
-				return { secrets: [], available: false, canChange };
-			}
-			const users = secretUsers(context, await context.space.flowUse());
-			return {
-				secrets: listed.map((secret) => ({
-					...secret,
-					flows: flowNames(users.flows(secret.name), at.projectId),
-					tools: [...users.tools(secret.name)].sort(),
-					webhooks: flowNames(users.webhooks(secret.name), at.projectId),
-				})),
-				available: true,
-				canChange,
-			};
-		}),
+		.handler(async ({ context }) =>
+			listed(
+				await context.configUse.sharedSecrets(
+					{ spaceId: context.spaceId, personId: context.session.user.id },
+					{ projectId: context.project.projectId },
+				),
+				await context.access.can(SAVING),
+			),
+		),
 	setSecret: projectProcedure(
 		projectInput.extend({ name: secretNameSchema, value: z.string().min(1) }),
 		permitted(SAVING),
@@ -216,30 +136,15 @@ export const projectSecrets = {
 				"Lists the secrets of the Space, with who set each, when, and the flows that use it.",
 		})
 		.output(output(projectSecretListSchema))
-		.handler(async ({ context }) => {
-			const canChange = await context.access.can(SAVING);
-			let listed: Awaited<ReturnType<typeof context.connections.spaceSecrets>>;
-			try {
-				listed = await context.connections.spaceSecrets(
-					context.spaceId,
-					context.session.user.id,
-				);
-			} catch (error) {
-				if (!unreachable(error)) throw error;
-				return { secrets: [], available: false, canChange };
-			}
-			const users = secretUsers(context, await context.space.flowUse());
-			return {
-				secrets: listed.map((secret) => ({
-					...secret,
-					flows: flowNames(users.flows(secret.name)),
-					tools: [...users.tools(secret.name)].sort(),
-					webhooks: flowNames(users.webhooks(secret.name)),
-				})),
-				available: true,
-				canChange,
-			};
-		}),
+		.handler(async ({ context }) =>
+			listed(
+				await context.configUse.sharedSecrets(
+					{ spaceId: context.spaceId, personId: context.session.user.id },
+					"space",
+				),
+				await context.access.can(SAVING),
+			),
+		),
 	setSpaceSecret: permitted(SAVING)
 		.route({
 			summary:

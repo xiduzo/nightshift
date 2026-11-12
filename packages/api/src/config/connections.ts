@@ -1,4 +1,3 @@
-import { connectionsInUse } from "@nightshift/engine";
 import {
 	connectionInputSchema,
 	customAgentOf,
@@ -25,7 +24,6 @@ import {
 	mcpToolsSchema,
 	secretScopeSchema,
 } from "./schemas";
-import { sharedSecretNames } from "./shared-secret-names";
 
 const checkTarget = z.enum(harnessNameSchema.options);
 
@@ -37,16 +35,11 @@ export const connections = {
 				"Lists the connections (MCP servers) and secrets of this computer, with what uses them.",
 		})
 		.output(output(connectionListSchema))
-		.handler(async ({ context }) =>
-			connectionsInUse(
-				context,
-				await context.space.flowUse(),
-				context.daemon.device.id,
-				// A project's and its Space's secrets cover its flows. When they
-				// cannot be read now, the flows stay listed.
-				async (projectId) =>
-					(await sharedSecretNames(context, projectId)) ?? new Set<string>(),
-			),
+		.handler(({ context }) =>
+			context.configUse.connections({
+				spaceId: context.spaceId,
+				personId: context.session.user.id,
+			}),
 		),
 	/** Runs `--version` and the login check of one CLI. Read-only. */
 	check: ownerProcedure

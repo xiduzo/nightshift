@@ -31,6 +31,7 @@ const SERVICES: Record<keyof Services, true> = {
 	cliTools: true,
 	toolLaunchers: true,
 	profiles: true,
+	configUse: true,
 	knowledge: true,
 	ollama: true,
 	assistant: true,

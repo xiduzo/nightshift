@@ -6,6 +6,7 @@ export type { ConfigStores } from "./config-stores";
 export type {
 	Connection,
 	ConnectionStore,
+	ProjectSecretName,
 	SecretEnv,
 	SecretList,
 	SecretView,
