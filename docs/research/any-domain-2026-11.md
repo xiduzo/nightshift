@@ -165,7 +165,7 @@ reopen them.
 
 ## Progress (2026-11-12)
 
-One line per lane. Waves 0 to 2 are built. Wave 0 is on main since 2026-11-11. Waves 1 and 2 reach main after their verify on 2026-11-12. None of it is proven on a real Host or seen in a browser yet.
+One line per lane. Waves 0 to 3 are built, apart from the two items that wait for the owner. Wave 0 is on main since 2026-11-11. Waves 1 to 3 wait on the integration branch for the owner to deploy the Host and Insights first. None of it is proven on a real Host or seen in a browser yet.
 
 | Item | State | Where |
 | --- | --- | --- |
@@ -182,7 +182,7 @@ One line per lane. Waves 0 to 2 are built. Wave 0 is on main since 2026-11-11. W
 | F Where the work landed, flow metrics | Done | F1 a92952fa, F2 a4e877c5, F3 3a8dda62, F4 bbb69554 |
 | G Guided setup of an agent and a decider | Done | G1 87ae7f6a (ADR 25), G2 60669488, G3 2542acdc, G4 0c797ae5 |
 | Fixes found on the way | Done | X1 e434179f, X1b 3d09a4d2, X2 44364903, X2b ff8330c5, X3 66ec702d, W1f f611f77a, W2f 3f2633e9, W2g cb82ca01, W2h e5b20348, W2i 821c1de5, W2j 7f9bf35a |
-| Wave 3: Lock and Bypass | Planned | |
+| Wave 3: Pin output and Skip (Lock and Bypass) | Done | L1 148fd681 (ADR 27), L2 e30e2fdd, L3 419050ef, L4 755ff1ce |
 | Wave 3: the first starter that is not about code | Waits for the owner (Q16) | |
 | Wave 3: signing the Mac app | Waits for the owner (Q23) | |
 
@@ -211,3 +211,5 @@ Waves 1 and 2:
 - One Insights deploy and one Collector restart cover the new usage vocabulary (C1, F3) and the new view (F4). They must happen before a release sends it (ADR 24).
 - The guided setup never ran a real install or sign-in. The pipes-or-terminal choice for each agent's sign-in still needs one check by hand.
 - No new screen is seen in a browser yet. Obscura cannot render the web app.
+- A test run carries its pins and skips. The flow never does, so no flow format change was needed and a scheduled run can never use a pin (ADR 27).
+- The scheduled nightly of 2026-11-12 did not run by 05:00 UTC. The one of 2026-11-11 ran eight hours late. So waves 1 to 3 stay off main until the Host and Insights can be deployed right after the push.
