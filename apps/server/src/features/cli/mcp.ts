@@ -9,7 +9,11 @@ import {
 } from "@nightshift/agents";
 import type { AppRouterClient } from "@nightshift/api";
 import { chatRun } from "@nightshift/daemon";
-import type { SpaceEngine, TranscriptEntry } from "@nightshift/engine";
+import type {
+	SpaceEngine,
+	StepTranscript,
+	TranscriptEntry,
+} from "@nightshift/engine";
 import { runReport } from "@nightshift/engine/run-status";
 import { createORPCClient, ORPCError } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
@@ -319,11 +323,10 @@ function costOf(run: {
 }
 
 /**
- * One step's saved transcript over the API, for `chatRun`. The API reads
- * a transcript only with `runs.watch`: the whole run, what is saved, then
- * live, with no mark between the two. So the read ends once nothing new
- * comes for `idleMs` (the replay is done), or after `totalMs` (`cut`).
- * Night Shift on this computer reads it whole (`SpaceEngine.stepTranscript`).
+ * One step's saved transcript over the API, for `chatRun`: read whole
+ * with `runs.stepTranscript`, as Night Shift reads it for the editor's
+ * chat. A Night Shift of an older version does not have that route: then
+ * the step is read from the run's stream (`watchedTranscript`).
  */
 export function apiTranscripts(
 	client: AppRouterClient,
@@ -331,46 +334,82 @@ export function apiTranscripts(
 ): Pick<SpaceEngine, "stepTranscript"> {
 	return {
 		async stepTranscript(runId, stepId, signal) {
-			const controller = new AbortController();
-			let ended: "idle" | "total" | null = null;
-			const stop = (why: "idle" | "total") => () => {
-				ended ??= why;
-				controller.abort();
-			};
-			const cancel = stop("total");
-			signal.addEventListener("abort", cancel, { once: true });
-			const total = setTimeout(cancel, times.totalMs ?? 5_000);
-			let idle: ReturnType<typeof setTimeout> | null = null;
-			const entries: TranscriptEntry[] = [];
-			let stepEnded = false;
 			try {
-				const stream = await client.runs.watch(
-					{ runId },
-					{ signal: controller.signal },
-				);
-				for await (const item of stream) {
-					if (idle) clearTimeout(idle);
-					idle = setTimeout(stop("idle"), times.idleMs ?? 750);
-					if (item.kind === "step" && item.step.id === stepId) {
-						stepEnded = item.step.endedAt !== null;
-					} else if (
-						item.kind === "transcript" &&
-						item.entry.stepId === stepId
-					) {
-						entries.push(item.entry);
-					}
-				}
-			} catch {
-				// Stopped, or the transcript could not be read: keep what came.
-			} finally {
-				clearTimeout(total);
-				if (idle) clearTimeout(idle);
-				signal.removeEventListener("abort", cancel);
+				return await client.runs.stepTranscript({ runId, stepId }, { signal });
+			} catch (error) {
+				if (!isMissingRoute(error)) throw error;
 			}
-			const holds = ended !== "idle" ? "cut" : stepEnded ? "whole" : "so-far";
-			return { entries, holds };
+			return watchedTranscript(client, { runId, stepId }, signal, times);
 		},
 	};
+}
+
+/**
+ * Whether Night Shift does not have the route at all: a version older than
+ * this command. It answers a plain 404 that is not an oRPC error, and the
+ * client keeps that raw response as `data`. A route that cannot find the
+ * run or the step declares its NOT_FOUND, with no such `data`. The web
+ * and the phone tell a Host of an older version the same way
+ * (`isMissingOnHost` of `@nightshift/client`).
+ */
+function isMissingRoute(error: unknown): boolean {
+	if (!(error instanceof ORPCError)) return false;
+	if (error.defined || error.status !== 404) return false;
+	const data: unknown = error.data;
+	return (
+		typeof data === "object" &&
+		data !== null &&
+		(data as { status?: unknown }).status === 404
+	);
+}
+
+/**
+ * One step's saved transcript from `runs.watch`, for a Night Shift without
+ * `runs.stepTranscript`. The stream sends the whole run, what is saved,
+ * then live, with no mark between the two. So the read ends once nothing
+ * new comes for `idleMs` (the replay is done), or after `totalMs` (`cut`).
+ */
+async function watchedTranscript(
+	client: AppRouterClient,
+	{ runId, stepId }: { runId: string; stepId: string },
+	signal: AbortSignal,
+	times: { idleMs?: number; totalMs?: number },
+): Promise<StepTranscript> {
+	const controller = new AbortController();
+	let ended: "idle" | "total" | null = null;
+	const stop = (why: "idle" | "total") => () => {
+		ended ??= why;
+		controller.abort();
+	};
+	const cancel = stop("total");
+	signal.addEventListener("abort", cancel, { once: true });
+	const total = setTimeout(cancel, times.totalMs ?? 5_000);
+	let idle: ReturnType<typeof setTimeout> | null = null;
+	const entries: TranscriptEntry[] = [];
+	let stepEnded = false;
+	try {
+		const stream = await client.runs.watch(
+			{ runId },
+			{ signal: controller.signal },
+		);
+		for await (const item of stream) {
+			if (idle) clearTimeout(idle);
+			idle = setTimeout(stop("idle"), times.idleMs ?? 750);
+			if (item.kind === "step" && item.step.id === stepId) {
+				stepEnded = item.step.endedAt !== null;
+			} else if (item.kind === "transcript" && item.entry.stepId === stepId) {
+				entries.push(item.entry);
+			}
+		}
+	} catch {
+		// Stopped, or the transcript could not be read: keep what came.
+	} finally {
+		clearTimeout(total);
+		if (idle) clearTimeout(idle);
+		signal.removeEventListener("abort", cancel);
+	}
+	const holds = ended !== "idle" ? "cut" : stepEnded ? "whole" : "so-far";
+	return { entries, holds };
 }
 
 export async function mcpCommand(argv: string[], program: string) {

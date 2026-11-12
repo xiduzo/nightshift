@@ -72,15 +72,51 @@ describe("nightshift mcp", () => {
 		expect(runs[1]).not.toHaveProperty("test");
 	});
 
-	/** A run whose step `s2` printed a thousand lines: what is saved, then live. */
-	const watching = (stepEnded: boolean) =>
+	/**
+	 * Night Shift on a port that answers each call with `answer`: its
+	 * client, and how to stop it.
+	 */
+	const answering = (answer: () => Response) => {
+		const server = Bun.serve({ port: 0, fetch: answer });
+		const client: AppRouterClient = createORPCClient(
+			new RPCLink({ url: `http://localhost:${server.port}/rpc` }),
+		);
+		return { client, stop: () => server.stop(true) };
+	};
+	/** An older Night Shift: a route it does not have is its server's plain 404. */
+	const older = () =>
+		new Response("404 Not Found", {
+			status: 404,
+			headers: { "content-type": "text/plain; charset=UTF-8" },
+		});
+
+	/** One entry of step `stepId`'s transcript. */
+	const entryOf = (seq: number, stepId: string, event: object) => ({
+		seq,
+		stepId,
+		sessionId: null,
+		at: seq,
+		event,
+	});
+	const line = (i: number) => ({
+		type: "command-output",
+		stream: "stdout",
+		text: `line ${i}\n`,
+	});
+
+	/**
+	 * A run whose step `s2` printed a thousand lines, as `runs.watch` sends
+	 * it: what is saved, then live. `stepTranscript` is the whole read.
+	 */
+	const watching = (stepEnded: boolean, stepTranscript: unknown) =>
 		({
 			runs: {
+				stepTranscript,
 				watch: async (_input: unknown, { signal }: { signal: AbortSignal }) =>
 					(async function* () {
 						const entry = (seq: number, stepId: string, event: object) => ({
 							kind: "transcript",
-							entry: { seq, stepId, sessionId: null, at: seq, event },
+							entry: entryOf(seq, stepId, event),
 						});
 						yield { kind: "status", status: "failed" };
 						yield {
@@ -88,13 +124,7 @@ describe("nightshift mcp", () => {
 							step: { id: "s2", endedAt: stepEnded ? 9 : null },
 						};
 						yield entry(1, "s1", { type: "text", messageId: "m", delta: "A" });
-						for (let i = 0; i < 1000; i++) {
-							yield entry(2 + i, "s2", {
-								type: "command-output",
-								stream: "stdout",
-								text: `line ${i}\n`,
-							});
-						}
+						for (let i = 0; i < 1000; i++) yield entry(2 + i, "s2", line(i));
 						// Live: nothing more comes until the reader lets go.
 						await new Promise((resolve) =>
 							signal.addEventListener("abort", resolve, { once: true }),
@@ -103,27 +133,128 @@ describe("nightshift mcp", () => {
 			},
 		}) as unknown as AppRouterClient;
 
-	test("get_run reads a step's transcript over the watch until the replay is done", async () => {
-		const signal = new AbortController().signal;
-		const started = now();
-		const read = await apiTranscripts(watching(true), {
-			idleMs: 50,
-		}).stepTranscript("r1", "s2", signal);
-		expect(now() - started).toBeLessThan(2_000);
-		expect(read.holds).toBe("whole");
-		expect(read.entries).toHaveLength(1000);
-		expect(read.entries.every((entry) => entry.stepId === "s2")).toBe(true);
-		// A step that still runs: what it saved so far.
-		const running = await apiTranscripts(watching(false), {
-			idleMs: 50,
-		}).stepTranscript("r1", "s2", signal);
-		expect(running.holds).toBe("so-far");
-		// Out of time: what came, cut.
-		const late = await apiTranscripts(watching(true), {
-			idleMs: 5_000,
-			totalMs: 50,
-		}).stepTranscript("r1", "s2", signal);
-		expect(late.holds).toBe("cut");
+	test("get_run reads the failed step's transcript whole, in one call", async () => {
+		const failed = {
+			id: "r1",
+			projectId: "p1",
+			flowName: "news",
+			status: "failed",
+			reason: null,
+			inputs: {},
+			flow: { nodes: [] },
+			calledFlows: {},
+			steps: [
+				{
+					id: "s1",
+					nodeId: "fetch",
+					outcome: "done",
+					error: null,
+					outputs: {},
+				},
+				{
+					id: "s2",
+					nodeId: "build",
+					outcome: "fail",
+					error: null,
+					outputs: {},
+				},
+			],
+			report: null,
+			warnings: [],
+			costUsd: 0,
+			costEstimated: false,
+			costMissing: 0,
+			costCalls: 0,
+		};
+		const asked: unknown[] = [];
+		const client = {
+			runs: {
+				get: async () => failed,
+				stepTranscript: async (input: unknown) => {
+					asked.push(input);
+					return {
+						entries: [0, 1, 2].map((i) => entryOf(2 + i, "s2", line(i))),
+						holds: "whole",
+					};
+				},
+				watch: async () => {
+					throw new Error("A whole read needs no watch.");
+				},
+			},
+		} as unknown as AppRouterClient;
+		const found = await apiPort(client, { ui: "http://localhost:9" }).run(
+			"p1",
+			"r1",
+		);
+		expect(asked).toEqual([{ runId: "r1", stepId: "s2" }]);
+		expect(found?.run.failedStepId).toBe("s2");
+		expect(found?.run.transcript).toEqual(["line 0", "line 1", "line 2"]);
+		expect(found?.run).not.toHaveProperty("transcriptHolds");
+	});
+
+	test("an older Night Shift without the whole read: get_run reads the step over the watch until the replay is done", async () => {
+		const night = answering(older);
+		const { stepTranscript } = night.client.runs;
+		try {
+			const signal = new AbortController().signal;
+			const started = now();
+			const read = await apiTranscripts(watching(true, stepTranscript), {
+				idleMs: 50,
+			}).stepTranscript("r1", "s2", signal);
+			expect(now() - started).toBeLessThan(2_000);
+			expect(read.holds).toBe("whole");
+			expect(read.entries).toHaveLength(1000);
+			expect(read.entries.every((entry) => entry.stepId === "s2")).toBe(true);
+			// A step that still runs: what it saved so far.
+			const running = await apiTranscripts(watching(false, stepTranscript), {
+				idleMs: 50,
+			}).stepTranscript("r1", "s2", signal);
+			expect(running.holds).toBe("so-far");
+			// Out of time: what came, cut.
+			const late = await apiTranscripts(watching(true, stepTranscript), {
+				idleMs: 5_000,
+				totalMs: 50,
+			}).stepTranscript("r1", "s2", signal);
+			expect(late.holds).toBe("cut");
+		} finally {
+			night.stop();
+		}
+	});
+
+	test("a run or a step that Night Shift cannot find is not a missing route: no watch", async () => {
+		const words = "This run is not in one of your Spaces.";
+		// The route's own refusal, as Night Shift sends it.
+		const night = answering(() =>
+			Response.json(
+				{
+					json: {
+						defined: true,
+						code: "NOT_FOUND",
+						status: 404,
+						message: words,
+					},
+				},
+				{ status: 404 },
+			),
+		);
+		try {
+			const client = watching(true, night.client.runs.stepTranscript);
+			let watched = false;
+			client.runs.watch = (async () => {
+				watched = true;
+				throw new Error("No watch.");
+			}) as unknown as AppRouterClient["runs"]["watch"];
+			await expect(
+				apiTranscripts(client).stepTranscript(
+					"r1",
+					"s2",
+					new AbortController().signal,
+				),
+			).rejects.toThrow(words);
+			expect(watched).toBe(false);
+		} finally {
+			night.stop();
+		}
 	});
 
 	test("get_run reads a run of the project, with its report", async () => {
