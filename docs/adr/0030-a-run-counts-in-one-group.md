@@ -1,7 +1,7 @@
 # 30. A run counts in one group
 
 Status: accepted, 2026-11-12. Built, 2026-11-12, in architecture series 3, lane L3
-(391b2482, 71b424d3, 3fb679e5).
+(391b2482, 71b424d3, 3fb679e5) and lane F1 (6492a933, aa423265).
 
 ## Context
 
@@ -80,6 +80,8 @@ than the Stopped chip. Its second half is false since 3d7883d2.
   to send the Signal. To count it under Needs you, each row of a list needs the reason of
   its wait.
 - Watch's fallback count ("N runs are at work") comes from the engine's dashboard
-  (`open.running`). It counts running runs only, not asleep ones.
-- The lock screen and the widget show "Finished" for a run that had nothing to do. Their
-  status text takes no result yet.
+  (`open.running`). It counts running and asleep runs (lane F1, aa423265). A phone of
+  build 6 or older reads the same field, so its hint also counts asleep runs.
+- The lock screen, the Dynamic Island, the Android notification and the widgets read
+  the word from `statusOf`, so a run that had nothing to do says "Nothing to do" there
+  too (lane F1, 6492a933).

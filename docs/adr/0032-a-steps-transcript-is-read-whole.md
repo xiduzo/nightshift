@@ -73,7 +73,7 @@ the only route with a transcript.
   of `TRANSCRIPT_MS` must keep the route below it.
 - The CLI's watch read and its wall-clock test can go once no CLI talks to a daemon
   without the route.
-- Three functions tell that the other side does not have a route: `isMissingOnHost` and
-  `isUnknownProcedure` in the client, and `isMissingRoute` in the CLI. No module that both
-  the client and the server may import holds that rule.
+- Two functions tell that the other side does not have a route: `isMissingOnHost` in the
+  client and `isMissingRoute` in the CLI. No module that both the client and the server
+  may import holds that rule.
 - Ask why reads the run once, not twice.
