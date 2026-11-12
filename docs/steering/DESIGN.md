@@ -95,6 +95,7 @@ Home answers "what needs me, and what came out" over every project. The heading 
 - The same range as a project's page, on top: 7, 30 or 90 days, in the URL (`?range=30`).
 - The four numbers in one slim strip: Runs, Finished, Spend, Needed you. Each has a small line per day, with the days before dashed. Each says how it moved against them. A number opens its details dialog.
 - Three lanes in the order you act on them: Running now, Waiting for you, Failed. The lanes have the same height: the height of the tallest. Each has a count. A lane with nothing shows one line that says so.
+- Running now holds the runs on their way: running and asleep. A run at a Gate shows under Waiting for you. One table decides the group of a run on Home, on the phone's Watch and in its Runs chips (`statusOf` of `@nightshift/client`). An interrupted run counts as stopped, not as failed. A Watch tile counts the runs of the chip it opens.
 - A row is one line: what it is and one fact (when, or how often). The rest shows in a hover card. Long text truncates. It never wraps the row.
 - Waiting for you and Failed show at most 5 rows (see Overview lists). The rest is one link away: the inbox, or **Details**.
 - Failed shows one row per flow, not per run. The flows that still fail come first. A flow that a later run finished shows dimmed, with a check. The lane counts only the flows that still fail. The hover card says how often it failed, at which step, and the first sentence of why.

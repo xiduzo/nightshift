@@ -43,7 +43,7 @@ export function DayTiles({
 				icon={CircleX}
 				tone={failed ? "failed" : "neutral"}
 				href={{ pathname: "/runs", params: { filter: "failed" } }}
-				accessibilityHint="Opens every failed or interrupted run, not only this day's"
+				accessibilityHint="Opens every failed run, not only this day's"
 			/>
 			<StatTile
 				value={numbers ? shown(stopped) : undefined}
@@ -51,7 +51,7 @@ export function DayTiles({
 				icon={CircleStop}
 				tone={stopped ? "stopped" : "neutral"}
 				href={{ pathname: "/runs", params: { filter: "stopped" } }}
-				accessibilityHint="Opens every stopped run, not only this day's"
+				accessibilityHint="Opens every stopped or interrupted run, not only this day's"
 			/>
 			<StatTile
 				value={numbers?.cost}

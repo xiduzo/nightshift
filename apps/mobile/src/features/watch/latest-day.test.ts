@@ -2,6 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import type { DashboardSummary } from "@nightshift/client";
 import { atLocal, utc } from "@nightshift/client/testing";
+import { countedFilters } from "../runs/runs-list";
 import {
 	dayLine,
 	dayNumbers,
@@ -104,11 +105,37 @@ describe("dayNumbers", () => {
 		);
 		expect(numbers).toEqual({
 			finished: 6,
-			failed: 3,
-			stopped: 2,
+			failed: 2,
+			stopped: 3,
 			cost: "$1.50",
 			costCaption: "Of 9 runs",
 		});
+	});
+
+	test("each tile counts the runs of the Runs chip it opens: an interrupted run counts as stopped", () => {
+		const counts = {
+			finished: 6,
+			failed: 2,
+			interrupted: 1,
+			stopped: 2,
+			running: 1,
+		};
+		const numbers = dayNumbers(
+			summary({
+				lastNight: latestDay([run("a")], 12),
+				nights: [days(7, [{ night: DAY, counts }])],
+			}),
+		);
+		const chips = countedFilters(
+			[{ id: "p", runs: { statuses: counts } }],
+			null,
+		);
+		expect(numbers).toMatchObject({
+			finished: chips?.finished,
+			failed: chips?.failed,
+			stopped: chips?.stopped,
+		});
+		expect(chips).toMatchObject({ failed: 2, stopped: 3 });
 	});
 
 	test("counts a day older than every range from its runs, when it lists them all", () => {
@@ -188,7 +215,7 @@ describe("dayNumbers", () => {
 });
 
 describe("runningNow", () => {
-	test("joins the open runs and the day's runs at work, once each, the newest first", () => {
+	test("joins the open runs and the day's runs on their way, once each, the newest first", () => {
 		const old = run("old", { status: "running", createdAt: DAY });
 		const fresh = run("fresh", { status: "running", createdAt: DAY + HOUR });
 		const list = runningNow(
@@ -207,7 +234,8 @@ describe("runningNow", () => {
 				lastNight: latestDay([fresh, run("done")]),
 			}),
 		);
-		expect(list.map((r) => r.id)).toEqual(["gate", "fresh", "old"]);
+		// Running or asleep, as the Running chip: the run at a Gate waits in Needs you.
+		expect(list.map((r) => r.id)).toEqual(["asleep", "fresh", "old"]);
 	});
 });
 

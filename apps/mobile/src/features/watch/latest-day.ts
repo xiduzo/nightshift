@@ -2,7 +2,10 @@ import {
 	type DashboardSummary,
 	formatKnownCost,
 	formatLongDay,
+	groupCounts,
+	hasEnded,
 	isTestRun,
+	statusOf,
 	tokensLabel,
 } from "@nightshift/client";
 
@@ -32,16 +35,38 @@ export function dayRuns(day: { runs: number; tests?: number }): number {
 	return Math.max(day.runs - (day.tests ?? 0), 0);
 }
 
-/** The numbers of the latest day with runs. Null where the summary does not tell. */
+/**
+ * The numbers of the latest day with runs. Null where the summary does
+ * not tell. Each count is a group of `statusOf`, as the Runs chip that its
+ * tile opens counts it.
+ */
 export type DayNumbers = {
 	finished: number | null;
-	/** Failed and interrupted runs, as the Runs tab's Failed chip counts them. */
 	failed: number | null;
+	/** Stopped and interrupted runs. */
 	stopped: number | null;
 	cost: string;
 	/** "Of 12 runs", or "Of 11 runs and 1 test run". */
 	costCaption: string;
 };
+
+/** How many runs of the latest day have each status, test runs left out. Null when the summary does not tell. */
+function dayStatuses(
+	summary: DashboardSummary,
+): Readonly<Partial<Record<string, number>>> | null {
+	const day = summary.lastNight;
+	if (!day) return null;
+	const counts = summary.nights
+		.flatMap((range) => range.runs.perNight)
+		.find((entry) => entry.night === day.night)?.counts;
+	if (counts) return counts;
+	if (day.latest.length < day.runs) return null;
+	const statuses: Partial<Record<string, number>> = {};
+	for (const run of day.latest) {
+		if (!isTestRun(run)) statuses[run.status] = (statuses[run.status] ?? 0) + 1;
+	}
+	return statuses;
+}
 
 /**
  * How the latest day with runs went: how many of its runs finished,
@@ -53,22 +78,12 @@ export type DayNumbers = {
 export function dayNumbers(summary: DashboardSummary): DayNumbers | null {
 	const day = summary.lastNight;
 	if (!day) return null;
-	const counts = summary.nights
-		.flatMap((range) => range.runs.perNight)
-		.find((entry) => entry.night === day.night)?.counts;
-	const complete = day.latest.length >= day.runs;
-	const count = (...statuses: string[]): number | null =>
-		counts
-			? statuses.reduce((sum, status) => sum + (counts[status] ?? 0), 0)
-			: complete
-				? day.latest.filter(
-						(run) => !isTestRun(run) && statuses.includes(run.status),
-					).length
-				: null;
+	const statuses = dayStatuses(summary);
+	const groups = statuses ? groupCounts(statuses) : null;
 	return {
-		finished: count("finished"),
-		failed: count("failed", "interrupted"),
-		stopped: count("stopped"),
+		finished: groups?.finished ?? null,
+		failed: groups?.failed ?? null,
+		stopped: groups?.stopped ?? null,
 		cost: formatKnownCost(day.cost),
 		costCaption: dayCaption(day.tokens, dayRuns(day), day.tests ?? 0),
 	};
@@ -129,12 +144,6 @@ export function todayLine(
 	return `${formatLongDay(now)} · ${time(now)}`;
 }
 
-/** The statuses of a run that has not ended. */
-const LIVE = new Set(["running", "waiting", "sleeping"]);
-
-/** The statuses of a run at work now: running, or waiting at a Gate. */
-const AT_WORK = new Set(["running", "waiting"]);
-
 /** Tokens a run reported, from a dashboard row or from a whole run. */
 function runTokens(run: {
 	tokens?: { input: number; output: number } | null;
@@ -147,7 +156,8 @@ function runTokens(run: {
 }
 
 /**
- * The runs at work now, running or waiting, the newest first. The summary
+ * The runs on their way now, running or asleep, the newest first: the
+ * Running chip of Runs. A run at a Gate waits in Needs you. The summary
  * lists the oldest open runs and the newest runs of the latest day: a run
  * in neither is behind "Runs".
  */
@@ -155,7 +165,7 @@ export function runningNow(summary: DashboardSummary): WatchRun[] {
 	const seen = new Set<string>();
 	return [...summary.open.rows, ...(summary.lastNight?.latest ?? [])]
 		.filter((run) => {
-			if (!AT_WORK.has(run.status) || seen.has(run.id)) return false;
+			if (statusOf(run).group !== "running" || seen.has(run.id)) return false;
 			seen.add(run.id);
 			return true;
 		})
@@ -166,7 +176,7 @@ export function runningNow(summary: DashboardSummary): WatchRun[] {
 /** The runs of the latest day that ended, newest first, at most `limit`. */
 export function dayOutput(summary: DashboardSummary, limit = 4): WatchRun[] {
 	return (summary.lastNight?.latest ?? [])
-		.filter((run) => !LIVE.has(run.status))
+		.filter((run) => hasEnded(run.status))
 		.slice(0, limit)
 		.map((run) => ({ ...run, tokens: runTokens(run) }));
 }

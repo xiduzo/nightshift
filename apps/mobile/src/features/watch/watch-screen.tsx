@@ -253,7 +253,7 @@ function ReportsSection({
 	);
 }
 
-/** The runs at work now, running or waiting at a Gate. */
+/** The runs on their way now, running or asleep. A run at a Gate waits in Needs you. */
 function RunningSection({
 	data,
 	now,
