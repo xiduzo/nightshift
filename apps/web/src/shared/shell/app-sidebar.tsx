@@ -46,7 +46,6 @@ import {
 	CircleUserRoundIcon,
 	FolderIcon,
 	FolderOpenIcon,
-	GitBranchIcon,
 	HistoryIcon,
 	HouseIcon,
 	InboxIcon,
@@ -185,8 +184,7 @@ type ProjectPageRoute =
 	| "/projects/$projectId/flows"
 	| "/projects/$projectId/runs"
 	| "/projects/$projectId/knowledge"
-	| "/projects/$projectId/secrets"
-	| "/projects/$projectId/branches";
+	| "/projects/$projectId/secrets";
 
 const PROJECT_PAGES: {
 	to: ProjectPageRoute;
@@ -201,11 +199,6 @@ const PROJECT_PAGES: {
 		icon: BookOpenIcon,
 	},
 	{ to: "/projects/$projectId/secrets", label: "Secrets", icon: KeyRoundIcon },
-	{
-		to: "/projects/$projectId/branches",
-		label: "Branches",
-		icon: GitBranchIcon,
-	},
 ];
 
 /**
@@ -288,11 +281,7 @@ function ProjectItem({ project, range }: { project: Project; range: number }) {
 function ProjectPages({ project }: { project: Project }) {
 	const matchRoute = useMatchRoute();
 	const params = { projectId: project.id };
-	return PROJECT_PAGES.filter(
-		// What runs left in the project's folder: only where it has one.
-		(page) =>
-			page.to !== "/projects/$projectId/branches" || project.repoPath !== null,
-	).map(({ to, label, icon: PageIcon }) => (
+	return PROJECT_PAGES.map(({ to, label, icon: PageIcon }) => (
 		<SidebarMenuSubItem key={to}>
 			<SidebarMenuSubButton
 				isActive={Boolean(matchRoute({ to, params, fuzzy: true }))}

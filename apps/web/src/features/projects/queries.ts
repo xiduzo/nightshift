@@ -18,6 +18,4 @@ export const projectMutations = {
 	useFolder: orpc.projects.useFolder.mutationOptions,
 	installGit: orpc.projects.installGit.mutationOptions,
 	setUpGit: orpc.projects.setUpGit.mutationOptions,
-	removeRunCopy: orpc.projects.removeRunCopy.mutationOptions,
-	deleteRunBranches: orpc.projects.deleteRunBranches.mutationOptions,
 };

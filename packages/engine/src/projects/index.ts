@@ -27,5 +27,5 @@ export {
 } from "./space-document";
 export { forgetSpaceRows, spaceMoveBatch, spaceRunIds } from "./space-rows";
 export { createWorktreeSnapshots } from "./worktree-changes";
-export type { Branches } from "./worktrees";
-export { createWorktrees, itemBranchName } from "./worktrees";
+export type { Branches, RestoredFrom } from "./worktrees";
+export { createWorktrees, itemBranchName, keptRefsOf } from "./worktrees";

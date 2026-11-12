@@ -1,15 +1,11 @@
 /**
- * The cleanup of what runs leave on this computer: the overview of run
- * worktrees and branches, the files of run folders, their removal, and the
- * scheduled sweep.
+ * The cleanup of what runs leave on this computer: the scheduled sweep of
+ * run worktrees and branches (and of the work it keeps of them), and the
+ * files of run folders with their removal.
  */
 
 export { startCleanupJob } from "./job";
-export {
-	createRunCopies,
-	type RunCopies,
-	type RunCopiesService,
-} from "./run-copies";
+export { createRunCopies } from "./run-copies";
 export {
 	createRunFiles,
 	type RunFiles,

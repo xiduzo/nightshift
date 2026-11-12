@@ -9,6 +9,8 @@ import {
 	mustGit,
 	type Sandbox,
 } from "../testing/test-support";
+import { systemGit } from "./git";
+import { createRunBranches } from "./run-branches";
 import {
 	baseDiverged,
 	baseNotFetched,
@@ -19,8 +21,10 @@ import {
 	currentBranch,
 	freeBranchName,
 	itemBranchName,
+	keptRefsOf,
 	listBranches,
 	resolveRepoTopLevel,
+	restoreWorktree,
 	slugify,
 	uncommittedChanges,
 } from "./worktrees";
@@ -339,5 +343,125 @@ describe("item branches", () => {
 
 		await mustGit(wt, ["checkout", "-q", "--detach"]);
 		expect(await currentBranch(wt)).toBeNull();
+	});
+});
+
+describe("restoreWorktree", () => {
+	const branches = createRunBranches(systemGit());
+	let base: string;
+	beforeEach(async () => {
+		const origin = join(sandbox.root, "origin.git");
+		await mustGit(sandbox.root, ["init", "-q", "--bare", origin]);
+		await mustGit(sandbox.repoPath, ["remote", "add", "origin", origin]);
+		await mustGit(sandbox.repoPath, ["push", "-q", "origin", "main"]);
+		base = await mustGit(sandbox.repoPath, ["rev-parse", "HEAD"]);
+	});
+
+	const restore = () =>
+		restoreWorktree({
+			repoPath: sandbox.repoPath,
+			shortId: "abcd1234",
+			baseRef: base,
+		});
+
+	/** A run's copy with one commit, then gone: its folder and git's record of it. */
+	async function goneCopy(options: { push?: boolean; deleteBranch?: boolean }) {
+		const worktree = await createWorktree({
+			repoPath: sandbox.repoPath,
+			shortId: "abcd1234",
+		});
+		await commitFile(worktree.worktreePath, "one.txt");
+		const tip = await mustGit(worktree.worktreePath, ["rev-parse", "HEAD"]);
+		if (options.push) {
+			await mustGit(worktree.worktreePath, [
+				"push",
+				"-q",
+				"origin",
+				worktree.branch,
+			]);
+		}
+		await branches.removeWorktree(sandbox.repoPath, worktree.worktreePath);
+		if (options.deleteBranch) {
+			await branches.deleteBranch(sandbox.repoPath, worktree.branch);
+		}
+		return { ...worktree, tip };
+	}
+
+	test("a copy that is there stays as it is", async () => {
+		await createWorktree({ repoPath: sandbox.repoPath, shortId: "abcd1234" });
+		expect(await restore()).toBeNull();
+	});
+
+	test("from the run's branch on this computer", async () => {
+		const gone = await goneCopy({});
+		expect(await restore()).toEqual({
+			worktreePath: gone.worktreePath,
+			branch: gone.branch,
+			baseRef: base,
+			from: "branch",
+		});
+		expect(await mustGit(gone.worktreePath, ["rev-parse", "HEAD"])).toBe(
+			gone.tip,
+		);
+		expect(await currentBranch(gone.worktreePath)).toBe(gone.branch);
+	});
+
+	test("from the work the cleanup kept, with the changes it did not commit; the kept refs go", async () => {
+		const worktree = await createWorktree({
+			repoPath: sandbox.repoPath,
+			shortId: "abcd1234",
+		});
+		await commitFile(worktree.worktreePath, "one.txt");
+		await Bun.write(join(worktree.worktreePath, "loose.txt"), "x");
+		const tip = await mustGit(worktree.worktreePath, ["rev-parse", "HEAD"]);
+		const refs = keptRefsOf("abcd1234");
+		const copy = await branches.commitChanges(worktree.worktreePath, "kept");
+		await branches.keep(sandbox.repoPath, refs.copy, copy);
+		await branches.keep(sandbox.repoPath, refs.branch(worktree.branch), tip);
+		await branches.removeWorktree(sandbox.repoPath, worktree.worktreePath, {
+			force: true,
+		});
+		await branches.deleteBranch(sandbox.repoPath, worktree.branch);
+
+		expect((await restore())?.from).toBe("kept");
+		expect(await mustGit(worktree.worktreePath, ["rev-parse", "HEAD"])).toBe(
+			copy,
+		);
+		expect(existsSync(join(worktree.worktreePath, "loose.txt"))).toBe(true);
+		expect(await currentBranch(worktree.worktreePath)).toBe(worktree.branch);
+		expect(await branches.listKept(sandbox.repoPath)).toEqual(new Map());
+	});
+
+	test("from a kept branch of the run, with its Item Branches back too", async () => {
+		const gone = await goneCopy({});
+		const item = "nightshift/abcd1234-1-login";
+		await mustGit(sandbox.repoPath, ["branch", item, gone.branch]);
+		const refs = keptRefsOf("abcd1234");
+		await branches.keep(sandbox.repoPath, refs.branch(gone.branch), gone.tip);
+		await branches.keep(sandbox.repoPath, refs.branch(item), gone.tip);
+		await branches.deleteBranch(sandbox.repoPath, gone.branch);
+		await branches.deleteBranch(sandbox.repoPath, item);
+
+		expect((await restore())?.from).toBe("kept");
+		expect(await mustGit(gone.worktreePath, ["rev-parse", "HEAD"])).toBe(
+			gone.tip,
+		);
+		expect(await branchExists(sandbox.repoPath, item)).toBe(true);
+		expect(await branches.listKept(sandbox.repoPath)).toEqual(new Map());
+	});
+
+	test("from the run's branch on origin when nothing was kept", async () => {
+		const gone = await goneCopy({ push: true, deleteBranch: true });
+		expect((await restore())?.from).toBe("origin");
+		expect(await mustGit(gone.worktreePath, ["rev-parse", "HEAD"])).toBe(
+			gone.tip,
+		);
+	});
+
+	test("from the commit the run started from when nothing is anywhere", async () => {
+		const gone = await goneCopy({ deleteBranch: true });
+		expect((await restore())?.from).toBe("base");
+		expect(await mustGit(gone.worktreePath, ["rev-parse", "HEAD"])).toBe(base);
+		expect(await currentBranch(gone.worktreePath)).toBe(gone.branch);
 	});
 });

@@ -817,14 +817,12 @@ export function createEngine(
 		...(options.usage ? { usage: options.usage } : {}),
 	});
 
-	/** What runs left on this computer: the overview, its two actions, and the scheduled cleanup. */
+	/** The scheduled cleanup of the worktrees and branches runs left on this computer. */
 	const runCopies = createRunCopies({
-		db,
 		log: runLog,
 		branches: createRunBranches(git),
 		projects,
 		listRuns: reads.listRuns,
-		runRow: (runId) => getRunRow(db, runId),
 		runStatus: reads.runStatus,
 		isActive: (runId) => runner.isActive(runId),
 		now,
@@ -882,7 +880,6 @@ export function createEngine(
 		runIdsOfProject: (projectId) => runIdsOfProject(db, projectId),
 		runRow: (runId) => getRunRow(db, runId),
 		listBranches,
-		runCopies,
 		runFiles,
 		placement: devices,
 		placements: places.placements,

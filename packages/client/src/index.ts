@@ -200,7 +200,6 @@ export {
 	hasFolder,
 	type Project,
 	type ProjectCheck,
-	type RunCopy,
 } from "./projects";
 export {
 	type AgentErrorKind,

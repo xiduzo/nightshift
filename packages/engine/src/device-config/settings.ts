@@ -205,13 +205,13 @@ const DEFS = {
 		fromEnv: onOff,
 	} satisfies Def<boolean>,
 	/**
-	 * The cleanup of what runs leave on this computer (`cleanup/`), once an
-	 * ended run is `cleanUpAfterDays` old. A run's worktree and local
-	 * branches go only when its work is merged or pushed and nothing is
-	 * left uncommitted. A run folder (a run of a project without a folder,
-	 * ADR 22) goes with its files, whatever is in it. The folder of a run
-	 * this computer does not know goes `cleanUpAfterDays` after its last
-	 * change. An open run keeps all of it.
+	 * The cleanup of what runs leave on this computer (`cleanup/`, ADR 28).
+	 * A day after a run ended, its worktree and local branches go, and the
+	 * work that is only here goes to kept refs first. The kept refs go once
+	 * the run is `cleanUpAfterDays` old. A run folder (a run of a project
+	 * without a folder, ADR 22) goes with its files then, whatever is in
+	 * it. The folder of a run this computer does not know goes
+	 * `cleanUpAfterDays` after its last change. An open run keeps all of it.
 	 */
 	cleanUpRuns: {
 		schema: z.boolean(),
@@ -220,6 +220,7 @@ const DEFS = {
 		fromEnv: onOff,
 	} satisfies Def<boolean>,
 	// 90 days keeps every run that the overviews and their graphs look back on.
+	// It counts for kept work and run folders. Worktrees and branches go after a day.
 	cleanUpAfterDays: {
 		schema: z.number().int().min(1).max(365),
 		default: 90,

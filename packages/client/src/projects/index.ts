@@ -2,4 +2,4 @@
 
 export { hasFolder } from "./folder";
 export { createProjectQueries } from "./queries";
-export type { GitInstall, Project, ProjectCheck, RunCopy } from "./types";
+export type { GitInstall, Project, ProjectCheck } from "./types";

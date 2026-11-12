@@ -1,4 +1,4 @@
-import type { ProjectRuns, RunCopies } from "@nightshift/engine";
+import type { ProjectRuns } from "@nightshift/engine";
 import type { ProjectSecretName } from "@nightshift/engine/device-config";
 import type {
 	Branches,
@@ -110,40 +110,6 @@ export const projectReadinessSchema = exact<ProjectReadiness>()(
 				z.object({ kind: z.literal("manual"), url: z.string() }),
 			])
 			.nullable(),
-	}),
-);
-
-/** A local branch of a run, and where its commits are kept. */
-const runBranchSchema = z.object({
-	name: z.string(),
-	merged: z.boolean(),
-	pushed: z.boolean(),
-	ahead: z.number().nullable(),
-	unsaved: z.number(),
-});
-
-/** The runs of a project with a copy or branches left on this computer. */
-export const runCopiesSchema = exact<RunCopies>()(
-	z.object({
-		defaultBranch: z.string().nullable(),
-		copies: z.array(
-			z.object({
-				runId: z.string(),
-				title: z.string(),
-				status: runStatusSchema,
-				active: z.boolean(),
-				createdAt: z.number(),
-				endedAt: z.number().nullable(),
-				copy: z.boolean(),
-				changes: z.number().nullable(),
-				branches: z.array(runBranchSchema),
-				safe: z.boolean(),
-				cleanupAt: z.number().nullable(),
-				removed: z
-					.object({ at: z.number(), by: z.enum(["person", "cleanup"]) })
-					.nullable(),
-			}),
-		),
 	}),
 );
 

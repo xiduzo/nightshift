@@ -12,6 +12,7 @@ import {
 	noRunFolders,
 	type OfferedSessionInput,
 	type ReadFileResult,
+	type RestoredWorktree,
 	type RunFolder,
 	type SessionEvent,
 	type SessionInput,
@@ -93,6 +94,7 @@ export const CALL_DEADLINES_MS: Partial<Record<WorkCall["kind"], number>> = {
 	readFile: 30_000,
 	// Git work on a large project can take minutes.
 	worktree: 3 * 60_000,
+	restoreWorktree: 3 * 60_000,
 	handOff: 3 * 60_000,
 	receiveHandOff: 3 * 60_000,
 };
@@ -413,6 +415,34 @@ export function remoteDevice(
 		},
 		decide,
 		worktree: (run) => once<Worktree>({ kind: "worktree", run }),
+		/**
+		 * The run's copy there, made again when it is gone. A Device or a
+		 * Host of an older Night Shift cannot read the call: the copy stays
+		 * as it is, and the step works as before: so does a call that did not
+		 * reach the Device. Only the Device's own answer (git could not make
+		 * the copy, a `conflict`) fails the step.
+		 */
+		async restoreWorktree(input) {
+			try {
+				return await once<RestoredWorktree | null>({
+					kind: "restoreWorktree",
+					...input,
+				});
+			} catch (error) {
+				if (
+					error instanceof Refusal &&
+					error.kind === "conflict" &&
+					error.message !== UNREADABLE_REQUEST
+				) {
+					throw error;
+				}
+				console.warn(
+					`[devices] ${device.name} did not take the call to make a run's copy again:`,
+					error instanceof Error ? error.message : error,
+				);
+				return null;
+			}
+		},
 		// A Device of an older Night Shift cannot read the call: it says to update it.
 		async runFolder(run) {
 			try {
@@ -490,6 +520,12 @@ export async function* serveWork(
 				return;
 			case "worktree":
 				yield result(await device.worktree(call.run));
+				return;
+			case "restoreWorktree":
+				yield result(
+					(await device.restoreWorktree?.({ run: call.run, cwd: call.cwd })) ??
+						null,
+				);
 				return;
 			case "runFolder":
 				if (!device.runFolder) {

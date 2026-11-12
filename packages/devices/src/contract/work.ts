@@ -46,6 +46,8 @@ export type WorkCall =
 	| { kind: "capabilities"; query: CapabilityQuery }
 	| { kind: "flows" }
 	| { kind: "worktree"; run: RunRef }
+	/** The run's worktree, made again when its folder is gone. An older Device cannot read it. */
+	| { kind: "restoreWorktree"; run: RunRef; cwd: string }
 	/** The run's own folder, for a project without a folder (ADR 22). */
 	| { kind: "runFolder"; run: RunRef }
 	| {
@@ -89,6 +91,7 @@ export const WORK_KINDS = [
 	"capabilities",
 	"flows",
 	"worktree",
+	"restoreWorktree",
 	"runFolder",
 	"itemBranch",
 	"handOff",
@@ -361,6 +364,11 @@ const workCallSchema = z.discriminatedUnion("kind", [
 	z.object({ kind: z.literal("capabilities"), query: capabilityQuerySchema }),
 	z.object({ kind: z.literal("flows") }),
 	z.object({ kind: z.literal("worktree"), run: runRefSchema }),
+	z.object({
+		kind: z.literal("restoreWorktree"),
+		run: runRefSchema,
+		cwd: z.string(),
+	}),
 	z.object({ kind: z.literal("runFolder"), run: runRefSchema }),
 	z.object({
 		kind: z.literal("itemBranch"),

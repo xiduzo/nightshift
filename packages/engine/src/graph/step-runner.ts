@@ -69,6 +69,7 @@ import { positionOf } from "./run-position";
 import {
 	makeRunWorktree,
 	readyRunFolder,
+	restoreRunCopy,
 	withLoggedWorktree,
 } from "./run-worktree";
 import {
@@ -1159,7 +1160,10 @@ function worktreeOn(
  * run's work gets it by a Hand-off first: the Device that has it pushes
  * the branch (a worktree with uncommitted changes fails the step: nothing
  * is committed for you), this one fetches it into its own worktree of the
- * run, and the Walker logs `HandedOff`. A step that follows the work
+ * run, and the Walker logs `HandedOff`. When the copy on the Device that
+ * has the work is gone (the cleanup removes it a day after the run
+ * ended), that Device makes it again first (`restoreRunCopy`, ADR 28).
+ * A step that follows the work
  * (`NodeKind.followsWork`) needs none: `beginStep` placed it on the Device
  * that has the work, and it sleeps while that Device is offline. A run of
  * a project without a folder has no Hand-off: the step works in the run
@@ -1225,16 +1229,27 @@ export async function readyDevice(
 			step.tctx.run.branch = made.worktree.branch;
 	}
 	const { holder, paths } = deriveWorktrees(runState, ctx.run);
+	// A resume or a rerun after the cleanup: the copy that has the work is made again first.
+	const notBack = (at: Device, error: unknown): BodyResult =>
+		fail(
+			`${at.name} could not make the run's copy of the project again. ${stepFailure(error, `the worktree of run ${ctx.run.id}`)}`,
+		);
 	if (isDevice(ctx, holder, device)) {
-		step.worktree = paths.get(holder) ?? step.worktree;
+		const cwd = paths.get(holder) ?? step.worktree;
+		const back = await restoreRunCopy(ctx, device, cwd, runState);
+		if (back.kind === "refused") return notBack(device, back.error);
+		step.worktree = back.kind === "made" ? back.worktreePath : cwd;
 		return null;
 	}
 	const from = ctx.placement.deviceById(holder, ctx.run);
 	if (!(await from.state()).online) return offline(from);
+	const cwd = paths.get(holder) ?? ctx.run.worktreePath;
+	const back = await restoreRunCopy(ctx, from, cwd, runState);
+	if (back.kind === "refused") return notBack(from, back.error);
 	let sent: { commit: string; branch: string };
 	try {
 		sent = await from.handOff({
-			cwd: paths.get(holder) ?? ctx.run.worktreePath,
+			cwd: back.kind === "made" ? back.worktreePath : cwd,
 			runBranch: ctx.run.branch,
 		});
 	} catch (error) {

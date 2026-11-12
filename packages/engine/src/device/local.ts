@@ -1,3 +1,4 @@
+import { stat } from "node:fs/promises";
 import { delimiter } from "node:path";
 import { harnessNoun } from "@nightshift/agents/harness-facts";
 import type {
@@ -465,6 +466,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		freeBranchName,
 		pullRunBranch,
 		pushRunBranch,
+		restoreWorktree,
 	} = createWorktrees(git);
 	const snapshots = deps.snapshots ? createWorktreeSnapshots(git) : null;
 	const which = deps.which ?? ((program: string) => findProgram(program));
@@ -824,6 +826,17 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				repoPath,
 				shortId: run.id.slice(0, 8),
 				...(run.baseRef !== undefined ? { baseRef: run.baseRef } : {}),
+				...(run.author ? { author: run.author } : {}),
+			});
+		},
+		async restoreWorktree({ run, cwd }) {
+			// The copy is there: nothing to ask of the project's Clone.
+			if ((await stat(cwd).catch(() => null))?.isDirectory()) return null;
+			return restoreWorktree({
+				repoPath: await cloneOf(run.projectId),
+				shortId: run.id.slice(0, 8),
+				was: cwd,
+				baseRef: run.baseRef ?? "HEAD",
 				...(run.author ? { author: run.author } : {}),
 			});
 		},

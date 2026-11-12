@@ -21,12 +21,6 @@ export function createProjectQueries(orpc: ApiQueryUtils) {
 		/** The branches of a project. */
 		branches: (projectId: string) =>
 			orpc.projects.branches.queryOptions({ input: { projectId } }),
-		/** The runs of a project with a copy or branches left on this computer. */
-		runCopies: (projectId: string) =>
-			orpc.projects.runCopies.queryOptions({ input: { projectId } }),
-		/** Every run-copies query of a project. Invalidate it after a removal. */
-		runCopiesKey: (projectId: string) =>
-			orpc.projects.runCopies.key({ input: { projectId } }),
 		/** How a project can be added on this computer: a folder picker, GitHub. */
 		sources: () => orpc.projects.sources.queryOptions(),
 		/** The person's GitHub repositories, when GitHub is signed in on this computer. */

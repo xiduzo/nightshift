@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import {
@@ -310,6 +311,27 @@ describe("a run placed on another Device", () => {
 		expect(requests.map((r) => r.call.kind)).not.toContain("flows");
 		expect(requests.map((r) => r.call.kind)).toEqual(
 			expect.arrayContaining(["capabilities", "worktree", "exec", "session"]),
+		);
+	});
+
+	test("a rerun makes its copy on that Device again when the copy is gone", async () => {
+		const started = await space().startRun({
+			projectId,
+			flow: flow([command("where", "pwd")]),
+			startedBy: personId,
+			deviceId: B,
+		});
+		await until(started.id, "finished");
+		await rm(started.worktreePath, { recursive: true, force: true });
+		requests = [];
+
+		await space().act(started.id, { kind: "rerun", nodeId: "where" });
+		const run = await until(started.id, "finished");
+		expect(existsSync(started.worktreePath)).toBe(true);
+		expect(run.steps.at(-1)?.outcome).toBe("pass");
+		expect(requests.map((r) => r.call.kind)).toContain("restoreWorktree");
+		expect(run.warnings.map((w) => w.message)).toContain(
+			"The run's copy of the project on studio-b was gone. Night Shift made it again from the run's branch.",
 		);
 	});
 

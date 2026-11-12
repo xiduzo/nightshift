@@ -548,10 +548,6 @@ describe("replies of a real engine", () => {
 			},
 		]);
 		await read(appRouter.runs.moveTargets, { runId: started.id });
-		const copies = (await read(appRouter.projects.runCopies, {
-			projectId,
-		})) as { copies: { runId: string }[] };
-		expect(copies.copies.map((c) => c.runId)).toEqual([started.id]);
 		await read(appRouter.gates.list);
 		const heard = await notices;
 		for (const notice of heard) {
