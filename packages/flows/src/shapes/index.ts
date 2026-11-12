@@ -6,7 +6,7 @@
  */
 
 export { schemaAt } from "./at";
-export { FEED_ITEM_KEYS } from "./convert";
+export { FEED_ITEM_KEYS, FEED_ITEM_SHAPE } from "./convert";
 export {
 	inputShape,
 	mainOutputField,

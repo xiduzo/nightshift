@@ -252,8 +252,10 @@ A cron time missed while Night Shift was off still starts up to `lateMinutes` la
 
 ## Kits
 
-A kit is a flow that ships with Night Shift: Commands on `git`, `gh`, `acli` or `curl`. A Subflow runs one by name (`"flow": "kit:github/publish-draft-pr"`) and reads its outputs (`{{publish.url}}`). Kits end at End nodes: `ended` and `end_message` say how. Prefer a kit to writing the same commands. Inputs with * are required. The `kit:jira` kits take that CLI tool as `tool`.
+A kit is a flow that ships with Night Shift: Commands on `git`, `gh`, `acli` or `curl`, or Web requests. A Subflow runs one by name (`"flow": "kit:github/publish-draft-pr"`) and reads its outputs (`{{publish.url}}`). Kits end at End nodes: `ended` and `end_message` say how. Prefer a kit to writing the same commands. Inputs with * are required. The `kit:jira` kits take that CLI tool as `tool`. `kit:message/send` posts to the URL in the secret that `webhook` names. `kit:email/send` reads the secrets `EMAIL_SMTP_URL`, `EMAIL_SMTP_USER` and `EMAIL_SMTP_PASSWORD`.
 
+- `kit:email/send` (to*, subject*, body*, from): Sends a plain text email over SMTP.
+- `kit:feeds/read` (url*, first_run) → items, title: Reads an RSS, Atom or JSON feed and gives the items that are new since the last run.
 - `kit:github/create-branch` (name*, from) → branch, created, sha: Switches to a new branch with the name you give.
 - `kit:github/finish-pr` (pr*, action, comment) → number, url, state: Marks a pull request ready for review, or closes it.
 - `kit:github/publish-draft-pr` (title*, body, base) → number, url, created, branch, base: Pushes the current branch to GitHub and opens a draft pull request for it.
@@ -268,6 +270,7 @@ A kit is a flow that ships with Night Shift: Commands on `git`, `gh`, `acli` or 
 - `kit:knowledge/jira` (keys*, tool, folder) → files: Copies Jira work items into the project's knowledge as markdown, one file each.
 - `kit:knowledge/review-learnings` (): Shows what agents proposed to learn about the project, and asks you to keep or delete it.
 - `kit:knowledge/web` (urls*, folder) → files: Copies web pages into the project's knowledge as markdown.
+- `kit:message/send` (message*, webhook, format, field): Sends a message to the incoming webhook of a chat or another service.
 
 A webhook schedule wakes `wait-for-checks` when CI is done: `signal: { name: "ci-done", key: "event.body.check_suite.head_sha" }`. It wakes `watch-pr` with `signal: { name: "pr-changed", key: "event.body.pull_request.number" }`.
 

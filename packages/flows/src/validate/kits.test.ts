@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { FLOW_VERSION, type FlowInput, flowSchema } from "../flow";
+import {
+	FLOW_VERSION,
+	type FlowInput,
+	flowSchema,
+	NODE_FAMILIES,
+} from "../flow";
 import { kitList } from "../kits";
 import { parseFlow, validateFlow } from "./flow";
 
@@ -31,6 +36,8 @@ describe("kits", () => {
 	test("every kit is a flow without an error or a warning", () => {
 		const kits = kitList();
 		expect(kits.map((kit) => kit.name)).toEqual([
+			"kit:email/send",
+			"kit:feeds/read",
 			"kit:github/create-branch",
 			"kit:github/finish-pr",
 			"kit:github/publish-draft-pr",
@@ -45,6 +52,7 @@ describe("kits", () => {
 			"kit:knowledge/jira",
 			"kit:knowledge/review-learnings",
 			"kit:knowledge/web",
+			"kit:message/send",
 		]);
 		for (const kit of kits) {
 			expect({ kit: kit.name, issues: parseFlow(kit.flow).issues }).toEqual({
@@ -58,7 +66,21 @@ describe("kits", () => {
 			for (const output of kit.flow.outputs) {
 				expect(output.description).toBeDefined();
 			}
+			expect(NODE_FAMILIES, kit.name).toContain(kit.family);
 		}
+	});
+
+	test("each kit has the family of what it does", () => {
+		const families = Object.fromEntries(
+			kitList().map((kit) => [kit.name, kit.family]),
+		);
+		expect(families).toMatchObject({
+			"kit:message/send": "do",
+			"kit:feeds/read": "do",
+			"kit:email/send": "do",
+			"kit:github/watch-pr": "hold",
+			"kit:knowledge/review-learnings": "decide",
+		});
 	});
 
 	test("a Call runs a kit by name, with or without the project's flows", () => {

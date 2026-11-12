@@ -514,7 +514,7 @@ A cron time missed while Night Shift was off still starts up to \`lateMinutes\` 
 
 ## Kits
 
-A kit is a flow that ships with Night Shift: Commands on \`git\`, \`gh\`, \`acli\` or \`curl\`. A Subflow runs one by name (\`"flow": "kit:github/publish-draft-pr"\`) and reads its outputs (\`{{publish.url}}\`). Kits end at End nodes: \`ended\` and \`end_message\` say how. Prefer a kit to writing the same commands. Inputs with * are required. The \`kit:jira\` kits take that CLI tool as \`tool\`.
+A kit is a flow that ships with Night Shift: Commands on \`git\`, \`gh\`, \`acli\` or \`curl\`, or Web requests. A Subflow runs one by name (\`"flow": "kit:github/publish-draft-pr"\`) and reads its outputs (\`{{publish.url}}\`). Kits end at End nodes: \`ended\` and \`end_message\` say how. Prefer a kit to writing the same commands. Inputs with * are required. The \`kit:jira\` kits take that CLI tool as \`tool\`. \`kit:message/send\` posts to the URL in the secret that \`webhook\` names. \`kit:email/send\` reads the secrets \`EMAIL_SMTP_URL\`, \`EMAIL_SMTP_USER\` and \`EMAIL_SMTP_PASSWORD\`.
 
 ${kitList().map(kitLine).join("\n")}
 

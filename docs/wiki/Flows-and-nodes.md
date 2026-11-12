@@ -213,6 +213,8 @@ Night Shift has no app catalog. An app is a command in your flow, such as `gh`, 
 <!-- generated:kits: bun run docs:reference writes this table from the code. Do not edit it here. -->
 | Kit | Does | Inputs |
 | --- | --- | --- |
+| `kit:email/send` | Sends a plain text email over SMTP. Save the secrets EMAIL_SMTP_URL (for example smtps://smtp.example.com:465), EMAIL_SMTP_USER and EMAIL_SMTP_PASSWORD. The server must use TLS. Needs curl. | `to`, `subject`, `body`, `from` |
+| `kit:feeds/read` | Reads an RSS, Atom or JSON feed and gives the items that are new since the last run. On its first run, it only remembers the items that are there. | `url`, `first_run` |
 | `kit:github/create-branch` | Switches to a new branch with the name you give. It starts at the current commit, or at a branch on GitHub. A branch that exists already is switched to as it is. | `name`, `from` |
 | `kit:github/finish-pr` | Marks a pull request ready for review, or closes it. Both can leave a comment on it. | `pr`, `action`, `comment` |
 | `kit:github/publish-draft-pr` | Pushes the current branch to GitHub and opens a draft pull request for it. A pull request that is open for the branch stays as it is. A branch without new commits ends with nothing to do. | `title`, `body`, `base` |
@@ -220,6 +222,7 @@ Night Shift has no app catalog. An app is a command in your flow, such as `gh`, 
 | `kit:github/watch-pr` | Waits until a pull request on GitHub is green, red, merged, closed or ejected from the merge queue. It reads the checks, the review and the merge queue every 10 minutes. To wake it as soon as GitHub reports a change, add a webhook schedule that sends the signal pr-changed with the pull request number as its key. | `pr` |
 | `kit:jira/assign` | Assigns a Jira work item to a person, or to you. Needs a CLI tool that runs the Atlassian CLI signed in. | `key`, `assignee`, `tool` |
 | `kit:jira/move` | Moves a Jira work item to another status, for example In Progress. Needs a CLI tool that runs the Atlassian CLI signed in. | `key`, `status`, `tool` |
+| `kit:message/send` | Sends a message to the incoming webhook of a chat or another service. Save its URL as the secret MESSAGE_WEBHOOK_URL, or name another secret in webhook. | `message`, `webhook`, `format`, `field` |
 <!-- /generated:kits -->
 
 The knowledge kits are on the [Knowledge](Knowledge.md#sources) page.

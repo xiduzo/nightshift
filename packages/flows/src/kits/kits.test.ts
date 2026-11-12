@@ -15,13 +15,20 @@ import type { Flow } from "../flow";
 import {
 	type CommandNode,
 	commandWaitOutcome,
+	type DecisionNode,
 	dataExitFor,
 	exitFor,
 	type JsonValue,
+	type ValueNode,
 	type WaitNode,
 	waitCommandOf,
 } from "../nodes";
-import { chooseByRule, renderCommand, runFields } from "../template";
+import {
+	chooseByRule,
+	evaluateRule,
+	renderCommand,
+	runFields,
+} from "../template";
 import {
 	isKitName,
 	kitCopyName,
@@ -1181,5 +1188,222 @@ describe("kit:knowledge/review-learnings", () => {
 		await writeFile(join(proposed(), "my notes.md"), "- Spaces.\n");
 		await writeFile(join(proposed(), "a.b.c.md"), "- Too many parts.\n");
 		expect((await step(flow(), "list", {})).outcome).toBe("none");
+	});
+});
+
+/** A node of a kit, of the type it must have. */
+function nodeOf<T extends Flow["nodes"][number]>(
+	flow: Flow,
+	id: string,
+	type: T["type"],
+): T {
+	const node = flow.nodes.find((one) => one.id === id);
+	if (node?.type !== type) throw new Error(`no ${type} node ${id}`);
+	return node as T;
+}
+
+/** The run's facts, all empty, as a rule reads them. */
+const NO_RUN = Object.fromEntries(
+	runFields.map((field) => [field, ""]),
+) as Record<(typeof runFields)[number], string>;
+
+describe("kit:message/send", () => {
+	const flow = () => kit("kit:message/send");
+
+	test("builds a JSON body with the message in one field, or plain text", async () => {
+		const build = nodeOf<ValueNode>(flow(), "build", "value");
+		const body = (inputs: Record<string, string>) =>
+			evaluateRule(build.expression ?? "", {
+				nodes: {},
+				inputs: { format: "json", field: "text", ...inputs },
+				run: NO_RUN,
+			});
+		const message = 'Line "one"\nLine twö';
+		expect(await body({ message })).toEqual({
+			type: "application/json",
+			text: JSON.stringify({ text: message }),
+		});
+		expect(await body({ message, field: "content" })).toEqual({
+			type: "application/json",
+			text: JSON.stringify({ content: message }),
+		});
+		expect(await body({ message, format: "plain" })).toEqual({
+			type: "text/plain; charset=utf-8",
+			text: message,
+		});
+	});
+
+	test("sends to the URL that a secret holds, never to a written URL", () => {
+		const send = flow().nodes.find((node) => node.id === "send");
+		expect(send).toMatchObject({
+			type: "web-request",
+			method: "POST",
+			urlSecret: "{{webhook}}",
+		});
+		expect(send).not.toHaveProperty("url");
+		expect(
+			flow().inputs.find((input) => input.name === "webhook")?.default,
+		).toBe("MESSAGE_WEBHOOK_URL");
+	});
+});
+
+describe("kit:feeds/read", () => {
+	const flow = () => kit("kit:feeds/read");
+
+	test("a Web request, a Convert and a Since last run do the work, with no shell", () => {
+		expect(flow().nodes.map((node) => node.type)).not.toContain("command");
+		expect(flow().nodes.find((node) => node.id === "fresh")).toMatchObject({
+			type: "since-last-run",
+			items: "{{parse.data.items}}",
+			key: "id",
+			scope: "{{url}}",
+		});
+	});
+
+	test("the first run gives nothing, unless first_run is new; a later run gives the new items", async () => {
+		const first = nodeOf<DecisionNode>(flow(), "first", "decision");
+		const pick = async (firstRun: boolean, input: string) =>
+			(
+				await chooseByRule(first.options, {
+					nodes: { fresh: { data: { first_run: firstRun, new: [] } } },
+					inputs: { url: "https://example.com/feed.xml", first_run: input },
+					run: NO_RUN,
+				})
+			).matched;
+		expect(await pick(true, "same")).toBe("remember");
+		expect(await pick(true, "new")).toBe("give");
+		expect(await pick(false, "same")).toBe("give");
+		expect(
+			flow().inputs.find((input) => input.name === "first_run")?.default,
+		).toBe("same");
+	});
+});
+
+/**
+ * A stub of `curl` for SMTP: logs its arguments, keeps the config it reads
+ * on its standard input and a copy of the mail it uploads, and exits with
+ * the code in `curl.exit`.
+ */
+const SMTP_CURL_STUB = `#!/bin/sh
+printf '%s\\n' "curl $*" >> "$STUB_LOG"
+cat > "$STUB_FIXTURES/config"
+prev=""
+for arg in "$@"; do
+	[ "$prev" = --upload-file ] && cp "$arg" "$STUB_FIXTURES/mail"
+	prev="$arg"
+done
+code=0
+[ -f "$STUB_FIXTURES/curl.exit" ] && code=$(cat "$STUB_FIXTURES/curl.exit")
+exit "$code"
+`;
+
+describe("kit:email/send", () => {
+	const flow = () => kit("kit:email/send");
+	const secrets = {
+		EMAIL_SMTP_URL: "smtps://smtp.example.com:465",
+		EMAIL_SMTP_USER: "bot@example.com",
+		EMAIL_SMTP_PASSWORD: 'pa"ss\\word',
+	};
+
+	beforeEach(async () => {
+		await writeFile(join(bin, "curl"), SMTP_CURL_STUB);
+		await chmod(join(bin, "curl"), 0o755);
+	});
+
+	/** The mail as curl got it: its headers by name, and its body decoded. */
+	async function sent(): Promise<{
+		headers: Record<string, string>;
+		body: string;
+	}> {
+		const mail = await readFile(join(fixtures, "mail"), "utf8");
+		const [head = "", encoded = ""] = mail.split("\n\n");
+		const headers = Object.fromEntries(
+			head.split("\n").map((line) => {
+				const at = line.indexOf(": ");
+				return [line.slice(0, at), line.slice(at + 2)];
+			}),
+		);
+		const body = Buffer.from(encoded.replace(/\s/g, ""), "base64").toString();
+		return { headers, body };
+	}
+
+	test("sends one mail, and the secrets reach curl on its input, never as arguments", async () => {
+		const long = "x".repeat(1200);
+		const ran = await step(
+			flow(),
+			"send",
+			{
+				to: "ada@example.com, Bob <bob@example.com>",
+				subject: "Report\nBcc: eve@example.com",
+				body: `Hello.\n.\nA long line: ${long}`,
+			},
+			{},
+			{ env: secrets },
+		);
+		expect(ran.outcome).toBe("sent");
+		const [call = ""] = await calls();
+		expect(call).toStartWith(
+			"curl --silent --show-error --ssl-reqd --crlf --max-time 120 --upload-file ",
+		);
+		expect(call).toEndWith(" --config -");
+		expect(call).not.toContain("smtp.example.com");
+		expect(call).not.toContain(secrets.EMAIL_SMTP_PASSWORD);
+		expect(await readFile(join(fixtures, "config"), "utf8")).toBe(
+			[
+				'url = "smtps://smtp.example.com:465"',
+				'user = "bot@example.com:pa\\"ss\\\\word"',
+				'mail-from = "bot@example.com"',
+				'mail-rcpt = "ada@example.com"',
+				'mail-rcpt = "bob@example.com"',
+				"",
+			].join("\n"),
+		);
+		const { headers, body } = await sent();
+		// The line break in the subject is gone, so it adds no header.
+		expect(headers).toMatchObject({
+			From: "bot@example.com",
+			To: "ada@example.com, Bob <bob@example.com>",
+			Subject: "Report Bcc: eve@example.com",
+			"Content-Type": "text/plain; charset=UTF-8",
+			"Content-Transfer-Encoding": "base64",
+		});
+		expect(headers).not.toHaveProperty("Bcc");
+		expect(body).toBe(`Hello.\n.\nA long line: ${long}\n`);
+	});
+
+	test("a sender of its own, and a subject that is not ASCII", async () => {
+		const ran = await step(
+			flow(),
+			"send",
+			{
+				to: "ada@example.com",
+				subject: "Price drop: € 5",
+				body: "See the link.",
+				from: "Night Shift <night@example.com>",
+			},
+			{},
+			{ env: secrets },
+		);
+		expect(ran.outcome).toBe("sent");
+		expect(await readFile(join(fixtures, "config"), "utf8")).toContain(
+			'mail-from = "night@example.com"',
+		);
+		const { headers } = await sent();
+		expect(headers.From).toBe("Night Shift <night@example.com>");
+		expect(headers.Subject).toBe(
+			`=?UTF-8?B?${Buffer.from("Price drop: € 5").toString("base64")}?=`,
+		);
+	});
+
+	test("fails when the server refuses it", async () => {
+		await writeFile(join(fixtures, "curl.exit"), "67");
+		const ran = await step(
+			flow(),
+			"send",
+			{ to: "ada@example.com", subject: "S", body: "B" },
+			{},
+			{ env: secrets },
+		);
+		expect(ran.outcome).toBe("fail");
 	});
 });

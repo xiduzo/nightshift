@@ -42,7 +42,8 @@ export const FEED_ITEM_KEYS = Object.keys(
 	FEED_ITEM_FIELDS,
 ) as readonly (keyof typeof FEED_ITEM_FIELDS)[];
 
-const FEED_ITEM_SHAPE: Schema = {
+/** One item of a feed. The feed kit (`kit:feeds/read`) gives a list of these. */
+export const FEED_ITEM_SHAPE: Schema = {
 	type: "object",
 	properties: FEED_ITEM_FIELDS,
 	required: [...FEED_ITEM_KEYS],
