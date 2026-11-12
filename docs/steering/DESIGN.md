@@ -90,6 +90,7 @@ A project's page reads like the Performance page of Search Console. Keep its sha
 
 Home answers "what needs me, and what came out" over every project. The heading says how many Gates wait and how many flows still fail in the range. Keep its shape:
 
+- Until this computer has an agent, **Get started** sits under the heading. Its rows: An agent (**Set up**), A decider (**Choose**, optional), and A project (**Add project**, no folder needed). A row that is done shows a check. Once the card shows, it stays until you leave Home. The setup on Home does not open the new profile. **Later** hides the card until the next session.
 - The same range as a project's page, on top: 7, 30 or 90 days, in the URL (`?range=30`).
 - The four numbers in one slim strip: Runs, Finished, Spend, Needed you. Each has a small line per day, with the days before dashed. Each says how it moved against them. A number opens its details dialog.
 - Three lanes in the order you act on them: Running now, Waiting for you, Failed. The lanes have the same height: the height of the tallest. Each has a count. A lane with nothing shows one line that says so.

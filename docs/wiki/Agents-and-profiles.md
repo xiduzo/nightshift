@@ -35,9 +35,11 @@ Night Shift can install Claude Code or Codex for you, and sign you in. Do this o
 6. When the install ends, choose **Sign in to Claude** or **Sign in to ChatGPT**.
 7. Finish the sign-in in your browser. If the page shows a code, paste it in the **Code** field.
 
-Night Shift then adds the agent with a profile, and the profile opens.
+Night Shift then adds the agent with a profile.
 
-If you have not chosen a decider yet, the setup asks for one: **Local** or **TypeSafe Jev**. Choose **Skip** to keep the default. See [Deciders](Flows-and-nodes.md#deciders).
+If you have not chosen a decider yet, the setup asks for one: **Local** or **TypeSafe Jev**. Choose **Skip** to keep the default. Then the profile opens. See [Deciders](Flows-and-nodes.md#deciders).
+
+Until this computer has an agent, Home offers the same setup. Choose **Set up** in **Get started**. On Home, the profile does not open, so that you can continue with the next step. See [Your first run](Get-started.md#your-first-run).
 
 An agent that is on this computer already skips the install. An agent that is signed in already shows **Add Claude Code** or **Add Codex**.
 
