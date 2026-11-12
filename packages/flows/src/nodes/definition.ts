@@ -2,6 +2,7 @@ import type { AgentNode } from "./agent";
 import type { NodeCheck } from "./base";
 import type { DecisionNode } from "./decision";
 import type { OutcomeColor } from "./outcomes";
+import type { NodeText } from "./texts";
 
 /**
  * The definition of one node type: every fact of the type that holds
@@ -131,6 +132,23 @@ export type NodeDefinition<N extends { type: string }, I> = {
 	outputFields: readonly string[];
 	/** The checks of the node's own content: its templates, rules and fields. */
 	check: (node: N, check: NodeCheck) => void;
+	/**
+	 * Every text of the node that can read a name of the flow, by where it
+	 * sits: its templates, its shell commands and its rules, in the order a
+	 * rename visits them. The variable writes every node has come after
+	 * them (`nodeBaseTexts`). A field the node does not read as it is set
+	 * up now counts too (the Ask fields of a Value a model makes): set up
+	 * again, it reads the new names. The check reads only the texts in use,
+	 * and each of those is one of these.
+	 */
+	texts: readonly NodeText[];
+	/**
+	 * The other string fields of the node that could hold a template, but
+	 * hold plain text: names, models, places, rules over a signal or a
+	 * model's value. With `texts` and the plain fields of every node
+	 * (`nodeBasePlain`), they name each such field of the type's schema once.
+	 */
+	plain: readonly string[];
 	/** The secrets the node names, known before a run (`flowSecrets`). */
 	secrets: (node: N, known: KnownText) => readonly string[];
 	/**

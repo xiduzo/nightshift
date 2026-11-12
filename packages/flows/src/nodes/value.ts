@@ -13,13 +13,16 @@ import {
 	isObjectSchema,
 	jsonSchemaSchema,
 	type ModelAddress,
+	modelAddressPlain,
 	modelAddressSchema,
 	type NodeCheck,
 	type NodeProfile,
 	nodeBase,
+	nodeProfilePlain,
 	nodeProfileSchema,
 	outputInferredSchema,
 	placed,
+	placedPlain,
 	profileFallbacksSchema,
 } from "./base";
 import {
@@ -30,6 +33,7 @@ import {
 	gateTitleSchema,
 	isPersonTier,
 	personTierSchema,
+	personTierTexts,
 	tierBase,
 	tierLabel,
 } from "./cascade";
@@ -42,7 +46,7 @@ import {
 	noSecrets,
 	type Position,
 } from "./definition";
-import { checkGateBrief, gateBriefFields } from "./gate-brief";
+import { checkGateBrief, gateBriefFields, gateBriefTexts } from "./gate-brief";
 
 /** The Value node: it makes `data` that matches its output schema, by a rule, a model or a person. */
 
@@ -482,6 +486,34 @@ export const valueDefinition = {
 	outcomeColor: noOwnColors,
 	outputFields: valueOutputFields,
 	check: checkValueNode,
+	texts: [
+		{ at: "prompt" },
+		...gateBriefTexts,
+		{ at: "expression", kind: "rule" },
+		{ at: "title" },
+		{ at: "choices.from" },
+		{ at: "attachments[].path" },
+		{ at: "attachments[].url" },
+		{ at: "deadline.at" },
+		...personTierTexts,
+	],
+	plain: [
+		...placedPlain,
+		...nodeProfilePlain,
+		...modelAddressPlain,
+		"model",
+		"choices.field",
+		"attachments[].label",
+		"default",
+		"cascade[].label",
+		"cascade[].model",
+		"cascade[].profile.device",
+		"cascade[].profile.profile",
+		"cascade[].address.baseUrl",
+		"cascade[].address.headers{}",
+		// It reads only the value a model made (`data`), no name of the flow.
+		"cascade[].accept",
+	],
 	secrets: noSecrets,
 	endsFlow: endsOnPass,
 	endedLabel: noEndedLabel,

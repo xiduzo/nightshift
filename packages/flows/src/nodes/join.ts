@@ -54,6 +54,8 @@ export const joinDefinition = {
 	outputFields: joinOutputFields,
 	// A Join's checks are the branches' (`checkBranches`).
 	check: () => {},
+	texts: [],
+	plain: [],
 	secrets: noSecrets,
 	endsFlow: (_node, outcome) => outcome === "done",
 	endedLabel: noEndedLabel,

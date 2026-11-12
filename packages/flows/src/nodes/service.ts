@@ -4,6 +4,7 @@ import {
 	type NodeCheck,
 	nodeBase,
 	placed,
+	placedPlain,
 	secretNameSchema,
 } from "./base";
 import {
@@ -164,6 +165,13 @@ export const serviceDefinition = {
 	outcomeColor: noOwnColors,
 	outputFields: serviceOutputFields,
 	check: checkServiceNode,
+	texts: [
+		{ at: "start", kind: "command" },
+		{ at: "ready.command", kind: "command" },
+		{ at: "ready.url" },
+		{ at: "stop", kind: "command" },
+	],
+	plain: [...placedPlain, "scope.section"],
 	secrets: (node) => node.secrets ?? [],
 	endsFlow: (_node, outcome) => outcome === "ready",
 	endedLabel: noEndedLabel,

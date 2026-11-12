@@ -4,7 +4,8 @@
  * cross a Section's frame (`readsOf`). The canvas draws a dotted line from
  * each node to the nodes that read it (`dataLinks`).
  */
-import type { Flow, FlowNode } from "../flow";
+import { type Flow, type FlowNode, nodeTexts } from "../flow";
+import type { HeldText } from "../nodes";
 import {
 	ruleNames,
 	ruleRefs,
@@ -12,10 +13,6 @@ import {
 	templateRefs,
 } from "../template";
 import { checkNodeWith } from "../validate";
-import { rewriteNodeTexts, type TextField } from "./refs";
-
-/** A template or a rule a node holds (`TextField`). */
-type Text = TextField & { text: string };
 
 /** One reference of a node's template or rule to a node, an input, a variable or `run`. */
 export type NodeRead = {
@@ -27,22 +24,9 @@ export type NodeRead = {
 	rule: boolean;
 };
 
-/**
- * Every template and rule of a node, in order: its own, then its variable
- * writes' (`rewriteNodeTexts`).
- */
-function textsOf(node: FlowNode): Text[] {
-	const texts: Text[] = [];
-	rewriteNodeTexts(node, (text, field) => {
-		texts.push({ text, ...field });
-		return text;
-	});
-	return texts;
-}
-
 /** The templates of a node: its own, then the values of its variable writes. */
-function templatesOf(node: FlowNode): Text[] {
-	return textsOf(node).filter((text) => !text.rule);
+function templatesOf(node: FlowNode): HeldText[] {
+	return nodeTexts(node).filter((text) => text.kind !== "rule");
 }
 
 /**
@@ -50,12 +34,14 @@ function templatesOf(node: FlowNode): Text[] {
  * a Value's expression, a Since last run rule, the expressions of its
  * writes.
  */
-export function rulesOf(node: FlowNode): Text[] {
-	return textsOf(node).filter((text) => text.rule && text.text.trim() !== "");
+export function rulesOf(node: FlowNode): HeldText[] {
+	return nodeTexts(node).filter(
+		(text) => text.kind === "rule" && text.text.trim() !== "",
+	);
 }
 
 /** The names a rule reads: those of the flow, not its own (`also`). */
-export function ruleReads(rule: Text): string[] {
+export function ruleReads(rule: HeldText): string[] {
 	return ruleNames(rule.text).filter((name) => !rule.also.includes(name));
 }
 

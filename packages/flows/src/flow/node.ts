@@ -10,13 +10,19 @@ import {
 	type DecidedBy,
 	decisionDefinition,
 	endDefinition,
+	type HeldText,
 	joinDefinition,
 	leaseDefinition,
+	mapTexts,
 	type NodeDefinition,
 	type NodeFamily,
+	type NodeText,
+	nodeBaseTexts,
 	type OutcomeColor,
 	serviceDefinition,
 	sinceLastRunDefinition,
+	type TextRewrite,
+	textsIn,
 	toolDefinition,
 	valueDefinition,
 	waitDefinition,
@@ -203,4 +209,29 @@ function cascadeFieldsOf(node: FlowNode): readonly string[] {
 	return node.type === "decision"
 		? [...cascadeOutputFields, confidenceField]
 		: cascadeOutputFields;
+}
+
+/**
+ * The texts of each node type (`NodeDefinition.texts`), then the variable
+ * writes every node has (`nodeBaseTexts`).
+ */
+const HELD_TEXTS = byType((type): readonly NodeText[] => [
+	...NODE_DEFINITIONS[type].texts,
+	...nodeBaseTexts,
+]);
+
+/**
+ * Every text of the node that can read a name of the flow: its templates,
+ * its commands and its rules, then its variable writes, as its type
+ * declares them (`NodeDefinition.texts`). A field the node does not read
+ * as it is set up now counts too. The texts in use are the ones its check
+ * reads (`checkNodeWith`).
+ */
+export function nodeTexts(node: FlowNode): HeldText[] {
+	return textsIn(node, HELD_TEXTS[node.type]);
+}
+
+/** The node with `rewrite` applied to each of its texts (`nodeTexts`), in the same order. */
+export function mapNodeTexts(node: FlowNode, rewrite: TextRewrite): FlowNode {
+	return mapTexts(node, HELD_TEXTS[node.type], rewrite);
 }

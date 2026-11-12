@@ -114,6 +114,8 @@ export const leaseDefinition = {
 	outcomeColor: noOwnColors,
 	outputFields: leaseOutputFields,
 	check: checkLeaseNode,
+	texts: [{ at: "name" }],
+	plain: ["scope.section"],
 	secrets: noSecrets,
 	endsFlow: (_node, outcome) => outcome === "held",
 	endedLabel: noEndedLabel,

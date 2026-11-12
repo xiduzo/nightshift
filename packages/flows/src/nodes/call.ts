@@ -6,12 +6,14 @@ import {
 	nameSchema,
 	nodeBase,
 	placed,
+	placedPlain,
 	reservedOutcomes,
 } from "./base";
 import {
 	checkCascade,
 	isPersonTier,
 	personTierSchema,
+	personTierTexts,
 	RETRY_CHOICES,
 	tierBase,
 	tierLabel,
@@ -267,6 +269,14 @@ export const callDefinition = {
 	outcomeColor: noOwnColors,
 	outputFields: callOutputFields,
 	check: checkCallNode,
+	texts: [
+		{ at: "inputs{}" },
+		{ at: "each.source.value" },
+		{ at: "each.source.command", kind: "command" },
+		{ at: "cascade[].inputs{}" },
+		...personTierTexts,
+	],
+	plain: [...placedPlain, "cascade[].label"],
 	secrets: noSecrets,
 	// With `each`, every outcome is a chosen end.
 	endsFlow: (node, outcome) => outcome === "pass" || node.each !== undefined,

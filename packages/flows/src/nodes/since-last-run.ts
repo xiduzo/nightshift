@@ -146,6 +146,13 @@ export const sinceLastRunDefinition = {
 	outcomeColor: noOwnColors,
 	outputFields: sinceLastRunOutputFields,
 	check: checkSinceLastRunNode,
+	texts: [
+		{ at: "items" },
+		{ at: "value" },
+		{ at: "scope" },
+		{ at: "when", kind: "rule", also: ruleOwnNames },
+	],
+	plain: ["key", "compare[]"],
 	secrets: noSecrets,
 	// Every outcome of its own is a chosen end.
 	endsFlow: (_node, outcome) =>

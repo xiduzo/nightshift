@@ -6,6 +6,7 @@ import {
 	nodeBase,
 	outputInferredSchema,
 	placed,
+	placedPlain,
 } from "./base";
 import {
 	type BuiltInOutcome,
@@ -89,6 +90,8 @@ export const toolDefinition = {
 	outcomeColor: noOwnColors,
 	outputFields: toolOutputFields,
 	check: checkToolNode,
+	texts: [{ at: "arguments{}" }],
+	plain: [...placedPlain, "tool"],
 	secrets: noSecrets,
 	endsFlow: endsOnPass,
 	endedLabel: noEndedLabel,

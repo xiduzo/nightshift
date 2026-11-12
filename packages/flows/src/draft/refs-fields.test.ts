@@ -1,5 +1,5 @@
 /**
- * The rewrite of a node's texts (`rewriteNodeTexts`) keeps its own list of
+ * The rewrite of a node's texts (`mapNodeTexts`) keeps its own list of
  * fields: the checks visit only the fields a node reads as it is set up
  * now, the rewrite every field. These tests hold the two together, so a
  * new field cannot be missed again:
@@ -15,11 +15,19 @@
  */
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
-import { FLOW_VERSION, type Flow, type FlowNode, flowSchema } from "../flow";
+import {
+	FLOW_VERSION,
+	type Flow,
+	type FlowNode,
+	flowSchema,
+	mapNodeTexts,
+} from "../flow";
 import { ruleNames, ruleVariableNames, templateRefs } from "../template";
 import { checkNodeWith } from "../validate";
 import { renameNode } from "./graph";
-import { renameVariable, rewriteNodeTexts, type TextField } from "./refs";
+import { renameVariable } from "./refs";
+
+type TextField = { rule: boolean; also: readonly string[]; self: boolean };
 
 /** The schema of one node, of any type. */
 const flowNodeSchema = flowSchema.shape.nodes.element;
@@ -392,8 +400,13 @@ function checkedTexts(node: FlowNode): Text[] {
 /** The texts the rewrite visits. */
 function rewrittenTexts(node: FlowNode): (TextField & { text: string })[] {
 	const texts: (TextField & { text: string })[] = [];
-	rewriteNodeTexts(node, (text, field) => {
-		texts.push({ text, ...field });
+	mapNodeTexts(node, (text, field) => {
+		texts.push({
+			text,
+			rule: field.kind === "rule",
+			also: field.also,
+			self: field.self,
+		});
 		return text;
 	});
 	return texts;
@@ -464,8 +477,8 @@ function variableNotRenamed(node: FlowNode): string[] {
 		"vars.`seen` = 1",
 		"$count([1][vars.seen = $]) = 1",
 	].join(" and ");
-	const reading = rewriteNodeTexts(node, (text, field) =>
-		field.rule ? `${text} and ${reads}` : `${text}{{vars.seen}}`,
+	const reading = mapNodeTexts(node, (text, field) =>
+		field.kind === "rule" ? `${text} and ${reads}` : `${text}{{vars.seen}}`,
 	);
 	const flow: Flow = {
 		version: FLOW_VERSION,

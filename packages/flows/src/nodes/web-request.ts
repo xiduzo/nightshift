@@ -5,6 +5,7 @@ import {
 	nodeBase,
 	outputInferredSchema,
 	placed,
+	placedPlain,
 	requestHeadersSchema,
 	secretNameSchema,
 } from "./base";
@@ -291,6 +292,15 @@ export const webRequestDefinition = {
 	outcomeColor: noOwnColors,
 	outputFields: webRequestOutputFields,
 	check: checkWebRequestNode,
+	texts: [
+		{ at: "url" },
+		{ at: "urlSecret" },
+		{ at: "query{}" },
+		{ at: "headers{}" },
+		{ at: "body.value" },
+		{ at: "body.fields{}" },
+	],
+	plain: [...placedPlain, "body.contentType"],
 	secrets: webRequestSecrets,
 	endsFlow: endsOnPass,
 	endedLabel: noEndedLabel,

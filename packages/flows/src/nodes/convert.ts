@@ -165,6 +165,8 @@ export const convertDefinition = {
 	outcomeColor: noOwnColors,
 	outputFields: convertOutputFields,
 	check: checkConvertNode,
+	texts: [{ at: "value" }],
+	plain: ["delimiter"],
 	secrets: noSecrets,
 	endsFlow: endsOnPass,
 	endedLabel: noEndedLabel,

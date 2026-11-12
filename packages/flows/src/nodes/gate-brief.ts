@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { NodeCheck } from "./base";
+import type { NodeText } from "./texts";
 
 /**
  * The brief of a Gate (ADR 21): how urgent it is, why a person must
@@ -74,11 +75,24 @@ export const gateBriefFields = {
 	fillBrief: z.boolean().optional(),
 };
 
+/** The texts of `gateBriefFields` (`NodeDefinition.texts`). */
+export const gateBriefTexts: readonly NodeText[] = [
+	{ at: "urgency" },
+	{ at: "situation" },
+	{ at: "background" },
+];
+
 /** A Decision's recommendation: one of its options, and why. */
 export const gateRecommendField = {
 	/** A person answers only: the option the flow recommends, and why. Templates. */
 	recommend: gateRecommendSchema.optional(),
 };
+
+/** The texts of `gateRecommendField`. */
+export const gateRecommendTexts: readonly NodeText[] = [
+	{ at: "recommend.option" },
+	{ at: "recommend.reason" },
+];
 
 /** The brief fields a node sets, by name. */
 export function briefFieldsSet(fields: GateBriefFields): string[] {

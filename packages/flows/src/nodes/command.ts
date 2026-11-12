@@ -6,6 +6,7 @@ import {
 	nodeBase,
 	outputInferredSchema,
 	placed,
+	placedPlain,
 	secretNameSchema,
 } from "./base";
 import {
@@ -334,6 +335,8 @@ export const commandDefinition = {
 		commandExits(node).find((exit) => exit.name === outcome)?.color,
 	outputFields: commandOutputFields,
 	check: checkCommandNode,
+	texts: [{ at: "command", kind: "command" }],
+	plain: [...placedPlain, "exits[].description"],
 	secrets: (node) => node.secrets ?? [],
 	endsFlow: isChosenExit,
 	endedLabel: noEndedLabel,

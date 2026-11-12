@@ -188,6 +188,8 @@ export const endDefinition = {
 	outcomeColor: noOwnColors,
 	outputFields: endOutputFields,
 	check: checkEndNode,
+	texts: [{ at: "message" }, { at: "report.text" }, { at: "report.path" }],
+	plain: [],
 	secrets: noSecrets,
 	// The run ends here, whatever its status.
 	endsFlow: () => true,

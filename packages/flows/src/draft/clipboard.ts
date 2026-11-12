@@ -1,10 +1,16 @@
 /** Copy and paste of nodes: within one flow, or from one flow into another. */
-import type { Flow, FlowEdge, FlowNode, FlowSection } from "../flow";
+import {
+	type Flow,
+	type FlowEdge,
+	type FlowNode,
+	type FlowSection,
+	mapNodeTexts,
+} from "../flow";
 import type { Position } from "../nodes";
 import { nodesWithin } from "../sections";
 import { rewriteRuleNames } from "../template";
 import { uniqueEdgeId, uniqueNodeId } from "./names";
-import { rewriteNodeTexts, rewriteRefs } from "./refs";
+import { rewriteRefs } from "./refs";
 import { uniqueSectionId } from "./sections";
 
 /**
@@ -97,8 +103,8 @@ export function pasteNodes(
 		...next,
 		nodes: next.nodes.map((node) =>
 			pasted.has(node.id)
-				? rewriteNodeTexts(node, (text, field) =>
-						field.rule
+				? mapNodeTexts(node, (text, field) =>
+						field.kind === "rule"
 							? rewriteRuleNames(text, (name) =>
 									field.also.includes(name) ? undefined : names.get(name),
 								)

@@ -74,6 +74,7 @@ export {
 	type NodeCheck,
 	type NodeProfile,
 	nameSchema,
+	nodeBaseTexts,
 	nodeIdSchema,
 	type ProfileRef,
 	reservedNames,
@@ -204,6 +205,13 @@ export {
 	sinceLastRunNodeSchema,
 	watchesValue,
 } from "./since-last-run";
+export {
+	type HeldText,
+	mapTexts,
+	type NodeText,
+	type TextRewrite,
+	textsIn,
+} from "./texts";
 export {
 	type ToolNode,
 	toolDefinition,

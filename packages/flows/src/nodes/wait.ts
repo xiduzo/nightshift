@@ -316,6 +316,17 @@ export const waitDefinition = {
 		waitOutcomes(node).find((own) => own.name === outcome)?.color,
 	outputFields: waitOutputFields,
 	check: checkWaitNode,
+	texts: [
+		{ at: "until.at" },
+		{ at: "until.key" },
+		{ at: "until.signal.key" },
+		{ at: "until.command", kind: "command" },
+		{ at: "until.command.command", kind: "command" },
+		{ at: "until.url" },
+		{ at: "until.headers{}" },
+	],
+	// An outcome's rule reads only the signal (`event`) or the answer (`data`).
+	plain: ["outcomes[].description", "outcomes[].when"],
 	secrets: (node) => waitSecrets(node.until),
 	endsFlow: (node, outcome) =>
 		outcome === "pass" || outcome === "done" || isOwnWaitOutcome(node, outcome),

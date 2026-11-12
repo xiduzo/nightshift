@@ -1,10 +1,11 @@
 import { z } from "zod";
+import type { NodeText } from "./texts";
 
 /**
  * The parts every node type shares: names, labels, deciders, the Device a
  * step runs on, variable writes and the base fields of a node. A leaf: it
- * imports no other node file, so each node file and the flow format can
- * import it without a cycle.
+ * imports no other node file but the leaf `texts.ts`, so each node file
+ * and the flow format can import it without a cycle.
  */
 
 /**
@@ -205,6 +206,12 @@ export const modelAddressSchema = z.object({
 		.optional(),
 });
 export type ModelAddress = z.infer<typeof modelAddressSchema>;
+
+/** The plain text of a node's address (`modelAddressSchema`). */
+export const modelAddressPlain: readonly string[] = [
+	"address.baseUrl",
+	"address.headers{}",
+];
 
 /**
  * The server of an address, without a trailing `/v1`: each adapter adds its
@@ -474,6 +481,29 @@ export const nodeBase = {
 	/** Writes to the flow's variables when the step ends, in order. */
 	set: z.array(variableWriteSchema).optional(),
 };
+
+/**
+ * The texts of `nodeBase` (`NodeDefinition.texts`): the value and the
+ * expression of each variable write, after the node's own texts.
+ */
+export const nodeBaseTexts: readonly NodeText[] = [
+	{ at: "set[].value", self: true },
+	{ at: "set[].expression", kind: "rule", self: true },
+];
+
+/** The plain text of `nodeBase` (`NodeDefinition.plain`). */
+export const nodeBasePlain: readonly string[] = ["label"];
+
+/** The plain text of `placed`: the Device's id, or a name left from before ids. */
+export const placedPlain: readonly string[] = ["device", "device.name"];
+
+/** The plain text of a node's profile and its backups (`profileRefSchema`). */
+export const nodeProfilePlain: readonly string[] = [
+	"profile.device",
+	"profile.profile",
+	"fallbacks[].device",
+	"fallbacks[].profile",
+];
 
 /**
  * What the check of one node reports to and reads through. The flow check

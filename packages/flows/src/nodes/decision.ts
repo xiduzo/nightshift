@@ -5,12 +5,15 @@ import {
 	type DeciderName,
 	deciderNameSchema,
 	type ModelAddress,
+	modelAddressPlain,
 	modelAddressSchema,
 	type NodeCheck,
 	type NodeProfile,
 	nodeBase,
+	nodeProfilePlain,
 	nodeProfileSchema,
 	placed,
+	placedPlain,
 	profileFallbacksSchema,
 } from "./base";
 import {
@@ -21,6 +24,7 @@ import {
 	gateTitleSchema,
 	isPersonTier,
 	personTierSchema,
+	personTierTexts,
 	probabilityProblem,
 	tierBase,
 	tierLabel,
@@ -29,7 +33,9 @@ import { type NodeDefinition, noSecrets, type Position } from "./definition";
 import {
 	checkGateBrief,
 	gateBriefFields,
+	gateBriefTexts,
 	gateRecommendField,
+	gateRecommendTexts,
 } from "./gate-brief";
 import { checkOptions, decisionOption } from "./outcomes";
 
@@ -425,6 +431,29 @@ export const decisionDefinition = {
 		node.options.find((option) => option.name === outcome)?.color,
 	outputFields: decisionOutputFields,
 	check: checkDecisionNode,
+	texts: [
+		{ at: "prompt" },
+		{ at: "deadline.at" },
+		...gateBriefTexts,
+		...gateRecommendTexts,
+		{ at: "options[].impact" },
+		{ at: "options[].when", kind: "rule" },
+		{ at: "title" },
+		...personTierTexts,
+	],
+	plain: [
+		...placedPlain,
+		...nodeProfilePlain,
+		...modelAddressPlain,
+		"model",
+		"options[].description",
+		"cascade[].label",
+		"cascade[].model",
+		"cascade[].profile.device",
+		"cascade[].profile.profile",
+		"cascade[].address.baseUrl",
+		"cascade[].address.headers{}",
+	],
 	secrets: noSecrets,
 	endsFlow: (node, outcome) =>
 		node.options.some((option) => option.name === outcome),

@@ -13,8 +13,11 @@ import {
 	checkGateBrief,
 	type GateRecommend,
 	gateBriefFields,
+	gateBriefTexts,
 	gateRecommendField,
+	gateRecommendTexts,
 } from "./gate-brief";
+import type { NodeText } from "./texts";
 
 /**
  * A cascade (ADR 6): a list of tiers on an Agent, a Decision or a Value
@@ -88,6 +91,16 @@ export const personTierSchema: z.ZodType<PersonTier> = z.object({
 	...gateBriefFields,
 	...gateRecommendField,
 });
+
+/**
+ * The texts of a cascade's person tier (`NodeDefinition.texts`): its
+ * deadline and its brief, in each tier of `cascade`.
+ */
+export const personTierTexts: readonly NodeText[] = [
+	{ at: "deadline.at" },
+	...gateBriefTexts,
+	...gateRecommendTexts,
+].map((text) => ({ ...text, at: `cascade[].${text.at}` }));
 
 /** The choices of the person tier of an Agent or a Call. */
 export const RETRY_CHOICES = ["try-again", "stop"] as const;
