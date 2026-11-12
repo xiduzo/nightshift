@@ -181,6 +181,7 @@ describe("what a change makes stale", () => {
 			["projects", "secrets"],
 			["projects", "spaceSecrets"],
 			["knowledge", "get"],
+			["knowledge", "review"],
 		]);
 	});
 

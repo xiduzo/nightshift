@@ -465,6 +465,7 @@ describe("the live cache follows the Host", () => {
 				"schedules",
 				"profiles",
 				"knowledge",
+				"review",
 			]),
 		);
 

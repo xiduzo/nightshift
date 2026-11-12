@@ -121,7 +121,8 @@ const STALE: {
 	// and the memory of a flow's runs are not in the document: the runs
 	// change them. The lists that say which flows use a profile, a
 	// connection, a CLI tool or a secret, and the flows that fill the
-	// knowledge, read the flows.
+	// knowledge (its sources, and the sources that need a look), read the
+	// flows.
 	flows: {
 		holds: [
 			["flows", "list"],
@@ -139,6 +140,7 @@ const STALE: {
 			["projects", "secrets"],
 			["projects", "spaceSecrets"],
 			["knowledge", "get"],
+			["knowledge", "review"],
 		],
 	},
 	"flows-history": {
