@@ -9,12 +9,7 @@ import {
 
 import type { Device } from "../../../device";
 import type { StepOutputs } from "../../../log";
-import {
-	type Climb,
-	climbOutputs,
-	climbSpec,
-	climbValues,
-} from "../../cascade";
+import type { Climb } from "../../cascade";
 import {
 	isWaitKind,
 	STOP_GRACE_MS,
@@ -57,12 +52,9 @@ export function modelChooser(
 	return (state, config) =>
 		runStep(ctx, node, state, config, {
 			rules: RESUME_RULES.model,
-			outputs: (step) => ({
-				...decisionOutputs("", "", step.visit),
-				...(climb ? climbOutputs(climb.root, climb.at) : {}),
-			}),
+			outputs: (step) => decisionOutputs("", "", step.visit),
 			body: (step) => decide(node, step, climb),
-			...(climb ? { climb: climbSpec(climb.root, climb.at) } : {}),
+			...(climb ? { climb } : {}),
 		});
 }
 
@@ -73,8 +65,6 @@ async function decide(
 	climb?: Climb<DecisionTier>,
 ): Promise<BodyResult> {
 	const { visit, signal } = step;
-	if (climb) step.tctx.cascade = climbValues(climb.root, climb.at);
-	const climbing: StepOutputs = climb ? climbOutputs(climb.root, climb.at) : {};
 	const prompt = renderTemplate(node.prompt, step.tctx);
 	const options = visibleOptions(node);
 	const decider = (await step.device.capabilities()).decider;
@@ -82,7 +72,7 @@ async function decide(
 		return {
 			kind: "end",
 			outcome: "error",
-			outputs: { ...decisionOutputs("error", "", visit), ...climbing },
+			outputs: decisionOutputs("error", "", visit),
 			error: "No decider is configured for Decision nodes.",
 		};
 	}
@@ -133,7 +123,7 @@ async function decide(
 		outcome,
 		outputs: {
 			...decisionOutputs(outcome, note, visit),
-			...climbing,
+			// The probability is a fact of the climb (ADR 6.9).
 			...(climb ? sure : {}),
 			...more,
 		},
@@ -143,7 +133,7 @@ async function decide(
 	if (signal.aborted) {
 		return {
 			kind: "aborted",
-			outputs: { ...decisionOutputs("", note, visit), ...climbing },
+			outputs: decisionOutputs("", note, visit),
 			...cost,
 		};
 	}

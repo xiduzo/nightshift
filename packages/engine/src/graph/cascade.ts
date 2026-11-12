@@ -23,7 +23,6 @@ import type {
 	RunStateUpdate,
 	RunStateValues,
 } from "./state";
-import type { StepSpec } from "./step-runner";
 
 /**
  * The climb of a cascade (ADR 6), walked inside the node: where it stands,
@@ -272,19 +271,31 @@ export function trailData(data: JsonValue | undefined): Partial<CascadeTry> {
 }
 
 /**
- * The climb of a node whose try runs through the step runner (`runStep`):
- * an end that does not hold climbs while a try is left. `more` adds what
- * the node keeps of the try besides its outputs (a Value's answer).
+ * Where a try's end sends its node: the next position when the end does
+ * not hold and a try is left, else null (the node routes on the end).
+ * `trail` is what the try keeps besides its outputs (a Value's answer).
  */
+export function climbNext(
+	{ root, at }: Pick<Climb, "root" | "at">,
+	end: Pick<StepEnd, "outcome" | "outputs" | "error">,
+	trail?: Partial<CascadeTry>,
+): CascadePosition | null {
+	if (!notHolding(end.outcome)) return null;
+	return nextTry(root, at, { ...tryRecord(root, at, end), ...trail });
+}
+
+/** The climb of a Call's try: an end that does not hold climbs while a try is left. */
 export function climbSpec(
 	node: CascadeNode,
 	at: CascadePosition,
-	more?: () => Partial<CascadeTry>,
-): NonNullable<StepSpec["climb"]> {
+): {
+	climbs(end: Pick<StepEnd, "outcome" | "outputs" | "error">): boolean;
+	command(end: StepEnd): Command;
+} {
 	const next = (end: Pick<StepEnd, "outcome" | "outputs" | "error">) =>
-		nextTry(node, at, { ...tryRecord(node, at, end), ...more?.() });
+		climbNext({ root: node, at }, end);
 	return {
-		climbs: (end) => notHolding(end.outcome) && next(end) !== null,
+		climbs: (end) => next(end) !== null,
 		command: (end) => climbCommand(node, end, next(end) ?? at),
 	};
 }

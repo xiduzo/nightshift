@@ -33,7 +33,14 @@ import { isTestRun } from "../run-status";
 import { keptNames } from "../variables";
 import { OUTRUN_ERROR, outrun, placeOf } from "./branches";
 import { budgetPassed, runBudget } from "./budget";
-import { stepRung } from "./cascade";
+import {
+	type Climb,
+	climbCommand,
+	climbNext,
+	climbOutputs,
+	climbValues,
+	stepRung,
+} from "./cascade";
 import {
 	emit,
 	keptFlowOf,
@@ -79,7 +86,12 @@ import {
 	sleep,
 	type WaitRequest,
 } from "./sleep";
-import type { PendingGate, RunStateUpdate, RunStateValues } from "./state";
+import type {
+	CascadeTry,
+	PendingGate,
+	RunStateUpdate,
+	RunStateValues,
+} from "./state";
 import { type ChangesWatch, watchChanges } from "./step-changes";
 
 /**
@@ -152,9 +164,18 @@ export type StepStart =
 	 * a cascade's person tier. `standIn`: the step stands in for its node in
 	 * a test run (ADR 27): no timers, no Device, no rung.
 	 */
-	| { kind: "new"; untimed?: true; standIn?: StandIn }
-	| { kind: "reopen"; stepId: string; prompt: string | null }
-	| { kind: "continue"; stepId: string; quiet?: boolean };
+	(
+		| { kind: "new"; untimed?: true; standIn?: StandIn }
+		| { kind: "reopen"; stepId: string; prompt: string | null }
+		| { kind: "continue"; stepId: string; quiet?: boolean }
+	) & {
+		/**
+		 * The step is a try of a cascade (ADR 6), or its person tier: its
+		 * templates read `{{cascade.*}}`, and every end of the step adds the
+		 * try's `tier` and `tries` to its outputs.
+		 */
+		climb?: Climb;
+	};
 
 /** One harness session of an Agent step, as the runner records it. */
 export type SessionRecord = {
@@ -273,6 +294,11 @@ export type BodyEnd = {
 	 * saved in its batch. Left out when the step ends `error` instead.
 	 */
 	memory?: StepMemory;
+	/**
+	 * A try of a cascade: what the climb keeps of it besides its outputs,
+	 * for the next try and the person tier (a Value's answer).
+	 */
+	trail?: Partial<CascadeTry>;
 };
 
 /**
@@ -349,15 +375,13 @@ export type StepSpec = {
 	/** What the step's route writes besides its end: a Join closes its round. */
 	update?: RunStateUpdate;
 	/**
-	 * A node with a cascade (ADR 6, `cascade.ts`): whether an end climbs to
-	 * the next try instead of routing, and the command that climbs. A
-	 * climbing end writes none of the node's variables: only the try that
-	 * routes does.
+	 * The step is a try of a cascade (ADR 6, `climb.ts`): its templates read
+	 * `{{cascade.*}}`, its outputs add `tier` and `tries`, and an end that
+	 * does not hold climbs to the next try while one is left, instead of
+	 * routing. A climbing end writes none of the node's variables and scores
+	 * nothing: only the try that routes does.
 	 */
-	climb?: {
-		climbs(end: Pick<StepEnd, "outcome" | "outputs" | "error">): boolean;
-		command(end: StepEnd): Command;
-	};
+	climb?: Climb;
 	/**
 	 * The step stands in for its node in a test run (`stand-in.ts`, ADR 27):
 	 * the body only gives the pinned output or the skipped outcome. The
@@ -381,6 +405,7 @@ export async function runStep(
 	withLoggedWorktree(ctx, runState);
 	const entry = resumePoint(node, state, runState, scopeOf(config), spec.rules);
 	const extra = spec.update;
+	const { climb } = spec;
 	if (entry.kind === "done") {
 		// A try that ended before its commit and did not hold climbs again.
 		const logged: StepEnd = {
@@ -390,17 +415,20 @@ export async function runStep(
 			outputs: entry.ended.outputs,
 			error: entry.ended.error,
 		};
-		if (spec.climb?.climbs(logged)) return spec.climb.command(logged);
+		const next = climb ? climbNext(climb, logged) : null;
+		if (climb && next) return climbCommand(climb.root, logged, next);
 		return routeDone(ctx, state, node, entry, config, extra);
 	}
+	const start: StepStart =
+		spec.standIn && entry.kind === "new"
+			? { kind: "new", standIn: spec.standIn }
+			: entryOf(entry);
 	const begun = await beginStep(
 		ctx,
 		node,
 		state,
 		config,
-		spec.standIn && entry.kind === "new"
-			? { kind: "new", standIn: spec.standIn }
-			: entryOf(entry),
+		climb ? { ...start, climb } : start,
 		runState,
 	);
 	if (begun.kind === "parked") return begun.command;
@@ -472,13 +500,16 @@ export async function runStep(
 			guard?: StepGuard;
 			memory?: StepMemory;
 		},
+		trail?: Partial<CascadeTry>,
 	): Promise<Command> => {
-		const climbing = spec.climb?.climbs({ outcome, outputs, error }) ?? false;
+		const next = climb
+			? climbNext(climb, { outcome, outputs, error }, trail)
+			: null;
 		const scores =
-			climbing || spec.standIn ? [] : await dataScores(step, node, outputs);
+			next || spec.standIn ? [] : await dataScores(step, node, outputs);
 		const end = await step.end(outcome, outputs, error, {
 			...costs,
-			...(climbing ? { skipWrites: true } : {}),
+			...(next ? { skipWrites: true } : {}),
 		});
 		// After the end, as a Gate's answer: every reader sees the step ended first.
 		for (const { score, value } of scores) {
@@ -489,7 +520,7 @@ export async function runStep(
 				payload: { score, value, label: null },
 			});
 		}
-		if (climbing && spec.climb) return spec.climb.command(end);
+		if (climb && next) return climbCommand(climb.root, end, next);
 		return route(ctx, state, node, end, config, extra);
 	};
 	switch (result.kind) {
@@ -502,6 +533,7 @@ export async function runStep(
 					...extraOf(result),
 					...(result.memory ? { memory: result.memory } : {}),
 				},
+				result.trail,
 			);
 		case "aborted": {
 			const aborted = abortEnd(ctx, node, step.signal, result.outputs);
@@ -816,12 +848,14 @@ export async function beginStep(
 			!standIn && ctx.kindOf(node).logsCommandOutput(node)
 				? ctx.log.files(runId).commandLog(stepId)
 				: null;
-		// Its rung, from the node as its flow has it: a tier's node has no
-		// cascade. A stand-in is on no rung: nobody worked or decided.
+		// Its rung, from the node with the cascade: a tier's node has none.
+		// A stand-in is on no rung: nobody worked or decided.
 		const rung = standIn
 			? null
 			: stepRung(
-					ctx.flow.nodes.find((each) => each.id === node.id) ?? node,
+					start.climb?.root ??
+						ctx.flow.nodes.find((each) => each.id === node.id) ??
+						node,
 					state,
 				);
 		// The log writes the step's row with its event, in one batch: a stop
@@ -907,6 +941,10 @@ export async function beginStep(
 			)
 		: () => {};
 
+	// A try of a cascade: what its templates read, and what every end adds.
+	const { climb } = start;
+	const climbed = climb ? climbOutputs(climb.root, climb.at) : null;
+
 	let closed = false;
 	const leaveOpen = () => {
 		if (closed) return;
@@ -926,12 +964,15 @@ export async function beginStep(
 		worktree: worktreeOn(ctx, logged, device) ?? ctx.run.worktreePath,
 		existing,
 		runState: logged,
-		tctx: withServiceTails(
-			ctx,
-			templateContext(ctx, state, config),
-			logged.holds,
-			scope,
-		),
+		tctx: {
+			...withServiceTails(
+				ctx,
+				templateContext(ctx, state, config),
+				logged.holds,
+				scope,
+			),
+			...(climb ? { cascade: climbValues(climb.root, climb.at) } : {}),
+		},
 		signal: stepController.signal,
 		opened: start.kind,
 		record(sessionId, stepEvent) {
@@ -1015,7 +1056,7 @@ export async function beginStep(
 			// ends the step `error` instead, so the run parks and a person
 			// can fix the flow and resume.
 			let outcome = ended;
-			let outputs = endOutputs;
+			let outputs = climbed ? { ...endOutputs, ...climbed } : endOutputs;
 			let error = endError;
 			const written = extra?.skipWrites
 				? ({ ok: true, values: {} } as const)

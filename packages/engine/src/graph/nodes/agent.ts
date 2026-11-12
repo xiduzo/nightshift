@@ -35,7 +35,7 @@ import {
 } from "../../log";
 import { deriveBudgetSpend, lastHarnessSessionOfNode } from "../../read";
 import { budgetPassed, guardMessage, runBudget, turnLimit } from "../budget";
-import { type Climb, climbOutputs, climbSpec, climbValues } from "../cascade";
+import type { Climb } from "../cascade";
 import { climbing } from "../climb";
 import { closeStream, consumeStream } from "../consume";
 import {
@@ -143,20 +143,19 @@ function agentTry(
 	node: AgentNode,
 	own: AgentNode,
 	ctx: StepContext,
-	{ at }: Climb<AgentTier>,
+	climb: Climb<AgentTier>,
 ): NodeAction {
-	return (state, config) => {
-		const previous = at.trail.at(-1);
-		// Within a tier, `session: "resume"` goes on with the try before.
-		const resumed =
-			at.try > 1 && own.session === "resume" && previous?.session_id
-				? previous.session_id
-				: null;
-		return runStep(ctx, own, state, config, {
+	const { at } = climb;
+	const previous = at.trail.at(-1);
+	// Within a tier, `session: "resume"` goes on with the try before.
+	const resumed =
+		at.try > 1 && own.session === "resume" && previous?.session_id
+			? previous.session_id
+			: null;
+	return (state, config) =>
+		runStep(ctx, own, state, config, {
 			rules: AGENT.resumeRules(own),
-			outputs: (step) => ({ visit: step.visit, ...climbOutputs(node, at) }),
 			body: async (step, entry) => {
-				step.tctx.cascade = climbValues(node, at);
 				const asked = heldStep(state, node.id);
 				const answer =
 					asked?.kind === "gate" && asked.answer !== undefined
@@ -180,31 +179,25 @@ function agentTry(
 					resumeSessionId:
 						entry.kind !== "new" ? entry.harnessSessionId : resumed,
 				});
-				return checkTry(ctx, node, step, result, climbOutputs(node, at));
+				return checkTry(ctx, node, step, result);
 			},
-			climb: climbSpec(node, at),
+			climb,
 		});
-	};
 }
 
 /**
- * A try's end with the climb's fields, and the node's check run after an
- * end that holds so far: an exit other than 0 ends the try `fail`, with
- * the check's log tail. The check's output goes to the step's transcript
- * and its command log, as a Command node's does.
+ * The node's check, run after a try's end that holds so far: an exit
+ * other than 0 ends the try `fail`, with the check's log tail. The check's
+ * output goes to the step's transcript and its command log, as a Command
+ * node's does.
  */
 async function checkTry(
 	ctx: StepContext,
 	node: AgentNode,
 	step: StepHandle,
 	result: BodyResult,
-	climbing: StepOutputs,
 ): Promise<BodyResult> {
-	if (result.kind === "aborted") {
-		return { ...result, outputs: { ...result.outputs, ...climbing } };
-	}
 	if (result.kind !== "end") return result;
-	const ended = { ...result, outputs: { ...result.outputs, ...climbing } };
 	const check = node.check;
 	if (
 		check === undefined ||
@@ -212,7 +205,7 @@ async function checkTry(
 		result.outcome === "needs-input" ||
 		result.outcome === "error"
 	) {
-		return ended;
+		return result;
 	}
 	const { command, env } = renderCommand(check, step.tctx);
 	step.record(null, { type: "command-start", command });
@@ -228,7 +221,7 @@ async function checkTry(
 	if (run.refused === null) {
 		step.record(null, { type: "command-exit", exitCode: run.exitCode });
 	}
-	const outputs = { ...ended.outputs, log_tail: run.logTail };
+	const outputs = { ...result.outputs, log_tail: run.logTail };
 	if (step.signal.aborted) {
 		return {
 			kind: "aborted",
@@ -236,14 +229,14 @@ async function checkTry(
 			harnessSessionId: result.harnessSessionId ?? null,
 		};
 	}
-	if (run.exitCode === 0) return { ...ended, outputs };
+	if (run.exitCode === 0) return { ...result, outputs };
 	const why =
 		run.refused ??
 		(run.spawnError !== null
 			? `The check could not start: ${run.spawnError}`
 			: `The check \`${check}\` exited with code ${run.exitCode ?? "none"}.`);
 	return {
-		...ended,
+		...result,
 		outcome: "fail",
 		outputs: { ...outputs, outcome: "fail" },
 		error: why,

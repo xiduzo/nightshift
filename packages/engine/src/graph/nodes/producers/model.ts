@@ -7,14 +7,7 @@ import {
 	type ValueTier,
 	valueDecider,
 } from "@nightshift/flows";
-import type { StepOutputs } from "../../../log";
-import {
-	type Climb,
-	climbOutputs,
-	climbSpec,
-	climbValues,
-	trailData,
-} from "../../cascade";
+import { type Climb, trailData } from "../../cascade";
 import { isWaitKind, type StepContext, stepFailure } from "../../context";
 import { deciderCostSource, warnDeciderCost } from "../../cost";
 import { schemaProblem } from "../../output-schema";
@@ -56,76 +49,57 @@ export function modelProducer(
 	 */
 	climb?: Climb<ValueTier>,
 ): Producer {
-	return (state, config) => {
-		// The model's answer of this try, for the person tier's form.
-		let answered: JsonValue | undefined;
-		return runStep(ctx, node, state, config, {
+	return (state, config) =>
+		runStep(ctx, node, state, config, {
 			rules: RESUME_RULES.model,
-			outputs: (step) => ({
-				...valueOutputs("", null, "", step.visit),
-				...(climb ? climbOutputs(climb.root, climb.at) : {}),
-			}),
+			outputs: (step) => valueOutputs("", null, "", step.visit),
 			body: async (step) => {
-				const made = await make(node, step, climb, (data) => {
-					answered = data;
-				});
-				return climb ? withClimb(made, climb, step) : made;
+				const made = await make(node, step);
+				return climb ? accepted(made, climb.tier, step) : made;
 			},
-			...(climb
-				? {
-						climb: climbSpec(climb.root, climb.at, () => trailData(answered)),
-					}
-				: {}),
+			...(climb ? { climb } : {}),
 		});
-	};
 }
 
 /**
- * A try's end with the climb's fields, and the tier's `accept` rule
- * tested on data that matched: data it refuses, or that it fails on, ends
- * the try `fail` with why in `note`.
+ * The tier's `accept` rule, tested on data that matched: data it refuses,
+ * or that it fails on, ends the try `fail` with why in `note`.
  */
-async function withClimb(
+async function accepted(
 	made: BodyResult,
-	climb: Climb<ValueTier>,
+	tier: ValueTier,
 	step: StepHandle,
 ): Promise<BodyResult> {
-	if (made.kind !== "end" && made.kind !== "aborted") return made;
-	const outputs: StepOutputs = {
-		...made.outputs,
-		...climbOutputs(climb.root, climb.at),
-	};
-	const rule = climb.tier.accept?.trim() ?? "";
+	const rule = tier.accept?.trim() ?? "";
 	if (made.kind !== "end" || made.outcome !== "pass" || rule === "") {
-		return { ...made, outputs };
+		return made;
 	}
 	let why: string | null = null;
 	try {
-		if (!(await acceptsValue(rule, outputs.data as JsonValue))) {
+		if (!(await acceptsValue(rule, made.outputs.data as JsonValue))) {
 			why = `The value does not pass the accept rule of the tier: ${rule}`;
 		}
 	} catch (error) {
 		why = `The accept rule of the tier failed: ${error instanceof Error ? error.message : String(error)}`;
 	}
-	if (why === null) return { ...made, outputs };
+	if (why === null) return made;
 	step.record(null, { type: "value", data: null, problem: why });
 	return {
 		...made,
 		outcome: "fail",
-		outputs: { ...outputs, ...valueOutputs("fail", null, why, step.visit) },
+		outputs: {
+			...made.outputs,
+			...valueOutputs("fail", null, why, step.visit),
+		},
 	};
 }
 
-/** Asks the decider and ends the step on its answer, or asks for a wait. */
-async function make(
-	node: ValueNode,
-	step: StepHandle,
-	climb?: Climb<ValueTier>,
-	/** The model answered with this data, before it is held to the schema. */
-	onAnswer?: (data: JsonValue) => void,
-): Promise<BodyResult> {
+/**
+ * Asks the decider and ends the step on its answer, or asks for a wait.
+ * An end the model answered keeps its answer for a cascade's trail.
+ */
+async function make(node: ValueNode, step: StepHandle): Promise<BodyResult> {
 	const { visit, signal } = step;
-	if (climb) step.tctx.cascade = climbValues(climb.root, climb.at);
 	const prompt = renderTemplate(node.prompt ?? "", step.tctx);
 	const fail = (error: string): BodyResult => ({
 		kind: "end",
@@ -195,8 +169,12 @@ async function make(
 		}
 		return endWithoutValue(step, `The model failed: ${result.message}`, cost);
 	}
-	onAnswer?.(result.data as JsonValue);
-	return endWithValue(step, node, result.data, "", cost);
+	// The model's answer, before it is held to the schema: the person tier's
+	// form starts with the best one.
+	return {
+		...(await endWithValue(step, node, result.data, "", cost)),
+		trail: trailData(result.data as JsonValue),
+	};
 }
 
 function lateResult(message: string): ValueResult {
