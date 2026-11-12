@@ -602,4 +602,85 @@ describe("replies of a real engine", () => {
 		expect(flows.map((flow) => flow.name)).toContain("build-task");
 		expect(mismatches).toEqual([]);
 	});
+
+	test("a test run starts with its pins and skips, and its replies say so (ADR 27)", async () => {
+		const repoPath = join(sandbox.root, "with-a-test");
+		await mkdir(repoPath, { recursive: true });
+		for (const args of [
+			["init", "-q", "-b", "main"],
+			[
+				"-c",
+				"user.name=Test",
+				"-c",
+				"user.email=test@example.com",
+				"commit",
+				"-q",
+				"--allow-empty",
+				"-m",
+				"initial",
+			],
+		]) {
+			expect(Bun.spawnSync(["git", ...args], { cwd: repoPath }).exitCode).toBe(
+				0,
+			);
+		}
+		const { id: projectId } = (await reply(appRouter.projects.add, {
+			repoPath,
+		})) as { id: string };
+		await reply(appRouter.flows.save, {
+			projectId,
+			name: "watch",
+			flow: singleAgentFlow({
+				prompt: "Find what is new.",
+				model: "sonnet",
+				permissionMode: "acceptEdits",
+			}),
+		});
+		const ended = async (runId: string) =>
+			waitFor(
+				async () => {
+					const run = (await call(
+						appRouter.runs.get,
+						{ runId },
+						{ context },
+					)) as { status: string };
+					return run.status === "running" ? null : run.status;
+				},
+				{ label: "the run to end" },
+			);
+		const earlier = (await reply(appRouter.runs.start, {
+			projectId,
+			flowName: "watch",
+		})) as { id: string };
+		await ended(earlier.id);
+		const { steps } = (await read(appRouter.runs.get, {
+			runId: earlier.id,
+		})) as { steps: { id: string; nodeId: string }[] };
+		const source = steps.find((step) => step.nodeId === "agent");
+
+		const started = (await reply(appRouter.runs.start, {
+			projectId,
+			flowName: "watch",
+			test: {
+				pinned: { agent: { runId: earlier.id, stepId: source?.id ?? "" } },
+			},
+		})) as { id: string; test?: unknown };
+		expect(started.test).toEqual({ pinned: ["agent"], skipped: [] });
+		expect(await ended(started.id)).toBe("finished");
+		const detail = (await read(appRouter.runs.get, {
+			runId: started.id,
+		})) as { test?: unknown; steps: Record<string, unknown>[] };
+		expect(detail.test).toEqual({ pinned: ["agent"], skipped: [] });
+		expect(detail.steps[0]).toMatchObject({
+			nodeId: "agent",
+			test: "pinned",
+			pinnedFrom: { runId: earlier.id, stepId: source?.id },
+		});
+		await read(appRouter.runs.step, {
+			runId: started.id,
+			stepId: detail.steps[0]?.id,
+		});
+		await read(appRouter.runs.list, { projectId });
+		expect(mismatches).toEqual([]);
+	});
 });

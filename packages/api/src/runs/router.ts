@@ -1,4 +1,4 @@
-import { permissionOf, startRunInputSchema } from "@nightshift/engine";
+import { permissionOf, startRunRequestSchema } from "@nightshift/engine";
 import { labelSchema } from "@nightshift/flows";
 import { z } from "zod";
 
@@ -127,13 +127,16 @@ export const runs = {
 	/**
 	 * Starts a flow file by name, or a flow given inline (a quick run). A
 	 * Device it names goes first. Without one, the flow says where (ADR 17).
+	 * A flow file may start as a test run, with pins and skips (`test`,
+	 * ADR 27).
 	 */
 	start: permitted({ run: ["start"] })
 		.route({
-			summary: "Starts a run of a flow file, or of a flow given inline.",
+			summary:
+				"Starts a run of a flow file, or of a flow given inline, or a test run of a flow file.",
 		})
 		.output(output(runSummarySchema))
-		.input(startRunInputSchema)
+		.input(startRunRequestSchema)
 		.handler(({ context, input }) =>
 			context.space.startRun({
 				...input,

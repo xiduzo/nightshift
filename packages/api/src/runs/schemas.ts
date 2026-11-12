@@ -271,6 +271,10 @@ export const runSummarySchema = exact<RunSummary>()(
 		report: runReportGlanceSchema.optional(),
 		sleeps: z.array(sleepSchema).optional(),
 		metrics: metricsSchema.optional(),
+		/** A test run: the nodes its start pinned and skipped. Older Hosts send none. */
+		test: z
+			.object({ pinned: z.array(z.string()), skipped: z.array(z.string()) })
+			.optional(),
 	}),
 );
 
@@ -359,6 +363,12 @@ const stepSummarySchema = z.object({
 				read: z.boolean(),
 			}),
 		)
+		.optional(),
+	/** A step of a test run that stood in for its node. Older Hosts send none. */
+	test: z.enum(["pinned", "skipped"]).optional(),
+	/** A pinned step: the step of an earlier run its output comes from. */
+	pinnedFrom: z
+		.object({ runId: z.string(), stepId: z.string(), endedAt: z.number() })
 		.optional(),
 });
 
