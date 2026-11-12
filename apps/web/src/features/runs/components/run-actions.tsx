@@ -1,4 +1,4 @@
-import { runActions, runningStep, useRunActed } from "@nightshift/client";
+import { type RunNow, runningStep, useRunActed } from "@nightshift/client";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -59,13 +59,14 @@ const STOP_NOW_TEXT: Partial<Record<RunStatus, string>> = {
  */
 export function RunActions({
 	run,
-	status,
+	now,
 	steps,
 	onShowStep,
 	onShowFlow,
 }: {
 	run: RunDetail;
-	status: RunStatus;
+	/** Where the run is now and what it allows (`runNow`). */
+	now: RunNow;
 	/** The run's steps as they stand, live. */
 	steps: StepSummary[];
 	onShowStep: (stepId: string) => void;
@@ -76,13 +77,13 @@ export function RunActions({
 	const [restarting, setRestarting] = useState(false);
 	const [detailsOpen, setDetailsOpen] = useState(false);
 
-	const allows = runActions(status, run.walker.thisDevice, run.result);
+	const { allows, status } = now;
 	// A run of another device: its session and its files are there.
 	const here = run.walker.thisDevice;
 	const running = here && allows.restart ? runningStep(steps) : undefined;
 	const takeOverCommand =
 		here && run.device.thisDevice ? run.takeOverCommand : null;
-	const move = useMoveRun(run, status);
+	const move = useMoveRun(run, now);
 
 	const runActed = useRunActed({ orpc });
 	const stopRun = useMutation(

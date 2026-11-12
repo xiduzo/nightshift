@@ -1,12 +1,10 @@
 import {
 	type Artifact,
-	actedRunStatus,
 	createGateQueries,
 	createProjectQueries,
 	createRunQueries,
 	flowLabel,
 	gateParts,
-	hasEnded,
 	isTestRun,
 	markdownPreview,
 	mergeSteps,
@@ -16,7 +14,7 @@ import {
 	type RunDetail,
 	type RunStatus,
 	rerunStarts,
-	runActions,
+	runNow,
 	runningStep,
 	runningSteps,
 	type StepChanges,
@@ -24,7 +22,6 @@ import {
 	stepChangedFiles,
 	stepName,
 	stepState,
-	stoppedNotice,
 	TEST_RUN_HINT,
 	TEST_RUN_LABEL,
 	now as timeNow,
@@ -175,19 +172,12 @@ function RunBody({
 	gates: OpenGate[];
 	projectName: string | null;
 }) {
-	const act = useRunAct(run.id, live.status ?? run.status);
-	// A stop or resume on its way shows its result at once.
-	const shown = actedRunStatus(
-		{
-			status: live.status ?? run.status,
-			result: run.result,
-			walkedHere: run.walker.thisDevice,
-		},
-		act.acting,
-	);
-	const status: RunStatus = shown.status;
-	const ended = hasEnded(status);
 	const steps = mergeSteps(run.steps, live.steps);
+	// The run's own status, live: an action lets go once the run gets there.
+	const act = useRunAct(run.id, runNow(run, { status: live.status }).status);
+	// A stop or resume on its way shows its result at once.
+	const shown = runNow(run, { status: live.status, steps, acting: act.acting });
+	const { status, ended, allows } = shown;
 	const ownSteps = steps.filter((step) => step.scope === null);
 	const labels = nodeLabels(run);
 	// Parallel branches run several steps at once: each that talks shows.
@@ -198,11 +188,6 @@ function RunBody({
 					stepState(step) === "running" &&
 					(live.entries.messages.has(step.id) || step.nodeType === "agent"),
 			);
-	const allows = runActions(
-		live.status ?? run.status,
-		run.walker.thisDevice,
-		run.result,
-	);
 	const links = runLinks(steps);
 	const computer = computerName(run.device);
 	const restartStep = runningStep(steps);
@@ -229,7 +214,7 @@ function RunBody({
 			: null,
 		step: restartStep ? stepName(restartStep, labels) : null,
 		computer,
-		notice: stoppedNotice(run, status),
+		notice: shown.notice,
 		pullRequests: links.filter((link) => linkLook(link.url).pullRequest).length,
 	});
 	const buttonProps = {

@@ -1,4 +1,4 @@
-import { isTestRun, runActions, tokensLabel } from "@nightshift/client";
+import { isTestRun, type RunNow, tokensLabel } from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import {
@@ -13,7 +13,7 @@ import {
 	WorkflowIcon,
 } from "lucide-react";
 import { WalkerBadge, walkerName } from "@/features/devices";
-import type { RunDetail, RunStatus, StepSummary } from "@/shared/api";
+import type { RunDetail, StepSummary } from "@/shared/api";
 import { dayWord, formatTime, hoverTime } from "@/shared/format";
 import { CostText } from "./cost-text";
 import { useWorkTime } from "./elapsed";
@@ -85,14 +85,14 @@ export function RunTitle({
  */
 export function RunBadges({
 	run,
-	status,
+	now,
 	reconnecting,
 }: {
 	run: RunDetail;
-	status: RunStatus;
+	now: RunNow;
 	reconnecting: boolean;
 }) {
-	const stoppable = runActions(status, run.walker.thisDevice, run.result).stop;
+	const stoppable = now.allows.stop;
 	return (
 		<div
 			aria-live="polite"
@@ -104,7 +104,7 @@ export function RunBadges({
 			</Badge>
 			{isTestRun(run) ? <TestRunBadge /> : null}
 			<WalkerBadge walker={run.device} />
-			<RunStatusBadge status={status} result={run.result} />
+			<RunStatusBadge status={now.status} result={now.result} />
 			{run.commands.length > 0 ? (
 				<Badge
 					variant="outline"

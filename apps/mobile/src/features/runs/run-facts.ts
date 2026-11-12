@@ -8,7 +8,6 @@ import {
 	type RunStatus,
 	type StepChangedFiles,
 	type StepSummary,
-	type StoppedNotice,
 	tokensLabel,
 	tokensSplit,
 	waitedText,
@@ -198,7 +197,8 @@ export function runVerdict({
 	/** The name of the step that runs now. */
 	step: string | null;
 	computer: string;
-	notice: Pick<StoppedNotice, "gist"> | null;
+	/** What the run needs or why it ended (`runNow`), for its gist. */
+	notice: { gist: string } | null;
 	/** How many pull requests the run made. */
 	pullRequests: number;
 }): string | null {

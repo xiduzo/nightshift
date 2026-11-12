@@ -2,7 +2,7 @@ import {
 	askWhy,
 	askWhyAnswer,
 	mergeSteps,
-	runActions,
+	runNow,
 	runReport,
 } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
@@ -106,14 +106,34 @@ function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 		() => mergeSteps(run.data?.steps ?? [], stream.steps),
 		[run.data?.steps, stream.steps],
 	);
-	const liveStatus = stream.status ?? run.data?.status;
+
+	// The End step that wrote what the run produced, once it is in the story.
+	const report = run.data
+		? runReport({
+				report: run.data.report,
+				steps,
+				warnings: run.data.warnings,
+			})
+		: null;
+	const reportStepId =
+		report && steps.some((step) => step.id === report.stepId)
+			? report.stepId
+			: null;
+	// Where the run is and what it needs, with what came live: one answer for the whole page.
+	const now = run.data
+		? runNow(run.data, {
+				status: stream.status,
+				steps,
+				wait: stream.transcript.lastWait,
+				report: reportStepId !== null,
+			})
+		: null;
+	const running = now?.status === "running";
 	// It needs only the run's id, so it loads beside the run, not after it.
-	const artifacts = useQuery(
-		runQueries.artifacts(runId, liveStatus === "running"),
-	);
+	const artifacts = useQuery(runQueries.artifacts(runId, running));
 	// Only a run of a project without a folder has a folder of its own.
 	const files = useQuery({
-		...runQueries.files(runId, liveStatus === "running"),
+		...runQueries.files(runId, running),
 		enabled: run.data?.runFolder === true,
 	});
 
@@ -135,18 +155,6 @@ function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 		if (stepId !== undefined && loaded) openLinkedStep(stepId);
 	}, [stepId, loaded]);
 
-	// The End step that wrote what the run produced, once it is in the story.
-	const report = run.data
-		? runReport({
-				report: run.data.report,
-				steps,
-				warnings: run.data.warnings,
-			})
-		: null;
-	const reportStepId =
-		report && steps.some((step) => step.id === report.stepId)
-			? report.stepId
-			: null;
 	// Without a link, a run that ended with a report opens at it. Only as
 	// the page opens: a run that ends while you watch stays where you are.
 	const openReport = useEffectEvent(() => {
@@ -178,7 +186,7 @@ function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 		);
 	}
 
-	if (!run.data) {
+	if (!run.data || !now) {
 		return (
 			<>
 				<SiteHeader
@@ -214,8 +222,8 @@ function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 		);
 	}
 
-	// The stream reports a status change before the refetched run arrives.
-	const status = stream.status ?? run.data.status;
+	// The stream reports a status change before the refetched run arrives: `now` shows it.
+	const status = now.status;
 	const runData = run.data;
 	const project = projects.data?.find((p) => p.id === runData.projectId);
 	const ask = askWhy({
@@ -227,11 +235,7 @@ function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 	const story = stepsIn(steps, focus);
 	const artifactList = artifacts.data ?? [];
 	// A run that is not going runs again from a step, on the device that runs it.
-	const rerunnable = runActions(
-		status,
-		runData.walker.thisDevice,
-		runData.result,
-	).rerun;
+	const rerunnable = now.allows.rerun;
 	const warnedStepIds = new Set(
 		runData.warnings.flatMap((warning) =>
 			warning.stepId ? [warning.stepId] : [],
@@ -241,14 +245,7 @@ function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 		? steps.find((step) => step.id === pick.stepId)
 		: undefined;
 	const lastStep = steps[steps.length - 1];
-
-	// The newest step of a gate without an outcome is the one the run waits at.
-	const openGate =
-		status === "waiting"
-			? [...steps]
-					.reverse()
-					.find((step) => step.gate !== null && step.outcome === null)
-			: undefined;
+	const openGate = now.gate;
 
 	// The graph: the top-level flow, or the called flow of the call in focus.
 	const focusStep = focus
@@ -317,15 +314,13 @@ function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 				// Opens again when the status changes.
 				key={status}
 				run={runData}
-				status={status}
-				openGateNodeId={openGate?.nodeId ?? null}
+				now={now}
 				onShowGate={() => {
 					if (openGate) showStep(openGate.id);
 				}}
 				onShowReport={
 					reportStepId !== null ? () => showStep(reportStepId) : undefined
 				}
-				wait={stream.transcript.lastWait}
 				lastStep={lastStep}
 				askWhy={
 					askWhyAnswer(status) ? (
@@ -436,7 +431,7 @@ function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 				<RunActions
 					key={runData.id}
 					run={runData}
-					status={status}
+					now={now}
 					steps={steps}
 					onShowStep={showStep}
 					onShowFlow={() => setFlowOpen(true)}
@@ -447,7 +442,7 @@ function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 				<div className="flex min-h-9 min-w-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-3 pb-3 text-sm lg:px-5">
 					<RunBadges
 						run={runData}
-						status={status}
+						now={now}
 						reconnecting={stream.connection === "reconnecting"}
 					/>
 					{focus ? (

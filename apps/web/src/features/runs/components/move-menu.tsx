@@ -1,4 +1,4 @@
-import { hasEnded, runActions, useRunActed, whyNot } from "@nightshift/client";
+import { type RunNow, useRunActed } from "@nightshift/client";
 import {
 	DropdownMenuGroup,
 	DropdownMenuItem,
@@ -11,7 +11,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowRightLeftIcon, MonitorIcon } from "lucide-react";
 import { toast } from "sonner";
 
-import type { RunDetail, RunStatus } from "@/shared/api";
+import type { RunDetail } from "@/shared/api";
 import { orpc } from "@/shared/api";
 import { runMutations, runQueries } from "../queries";
 import { ActionText } from "./action-text";
@@ -22,7 +22,7 @@ import { ActionText } from "./action-text";
  * device online, for a run that has not ended for good. It lives above the
  * menu, which unmounts when it closes, so a move on its way stays visible.
  */
-export function useMoveRun(run: RunDetail, status: RunStatus) {
+export function useMoveRun(run: RunDetail, now: RunNow) {
 	const runActed = useRunActed({ orpc });
 	// Your own devices that are online, from the run's own Space.
 	const moveTargets = useQuery({
@@ -40,13 +40,11 @@ export function useMoveRun(run: RunDetail, status: RunStatus) {
 			onError: (error) => toast.error(`Could not move: ${error.message}`),
 		}),
 	);
-	const walkedHere = run.walker.thisDevice;
-	const movable = runActions(status, walkedHere, run.result).move;
 	return {
 		// A run that ended for good has nothing to move.
-		offered: targets.length > 0 && (movable || !hasEnded(status)),
+		offered: targets.length > 0 && (now.allows.move || !now.ended),
 		targets,
-		blocked: whyNot("move", status, walkedHere, run.result),
+		blocked: now.whyNot.move,
 		pending: move.isPending,
 		moveTo: (deviceId: string) => move.mutate({ runId: run.id, deviceId }),
 	};

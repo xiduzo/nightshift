@@ -1,12 +1,6 @@
 /** Runs: their query options, the stream of one run, the actions a run allows, and their view types. */
 
-export {
-	actedRunStatus,
-	type RunActing,
-	type RunActions,
-	runActions,
-	whyNot,
-} from "./actions";
+export { type RunActing, type RunActions, runActions } from "./actions";
 export { type AskWhy, askWhy, askWhyAnswer } from "./ask-why";
 export {
 	addsFiles,
@@ -48,11 +42,6 @@ export {
 } from "./format";
 export { metricsByNode, type NodeMetrics } from "./node-metrics";
 export {
-	type StoppedNotice,
-	type StoppedTone,
-	stoppedNotice,
-} from "./notice";
-export {
 	hostOwnerHint,
 	type PlacementChoice,
 	placementChoices,
@@ -73,6 +62,14 @@ export { projectPath } from "./project-path";
 export { createRunQueries } from "./queries";
 export { runReport } from "./report";
 export { type RerunStart, rerunStarts, runningStep } from "./retry";
+export {
+	type NoticeAction,
+	type NoticeKind,
+	type NoticePart,
+	openGates,
+	type RunNow,
+	runNow,
+} from "./run-now";
 export {
 	type NodeSample,
 	nodeSamples,

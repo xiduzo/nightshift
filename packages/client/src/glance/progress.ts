@@ -2,6 +2,7 @@ import {
 	flowLabel,
 	hasEnded,
 	nodeLabels,
+	openGates,
 	type RunDetail,
 	type RunStatus,
 	runningSteps,
@@ -88,8 +89,8 @@ export function runProgress(
 		endedAt: ended ? run.endedAt : null,
 		deadlineAt:
 			run.status === "waiting"
-				? (top.find((step) => step.endedAt === null && step.gate?.deadline)
-						?.gate?.deadline?.at ?? null)
+				? (openGates(top).find((step) => step.gate?.deadline)?.gate?.deadline
+						?.at ?? null)
 				: null,
 	};
 }

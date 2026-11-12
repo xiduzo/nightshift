@@ -1,7 +1,8 @@
 import {
-	runActions,
-	type StoppedTone,
-	stoppedNotice,
+	type NoticeAction,
+	type NoticeKind,
+	type NoticePart,
+	type RunNow,
 	useRunActed,
 } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
@@ -32,32 +33,22 @@ import {
 	SendIcon,
 	SunriseIcon,
 } from "lucide-react";
-import { type ReactNode, useId, useState } from "react";
+import { Fragment, type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
-import { walkerName } from "@/features/devices";
-import type { RunDetail, RunStatus, StepSummary } from "@/shared/api";
+import type { RunDetail, StepSummary } from "@/shared/api";
 import { orpc } from "@/shared/api";
 import { formatCountdown, formatTime, useNow } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { runMutations } from "../queries";
-import type { CurrentWait } from "../transcript/transcript";
 import { ResumeComposer } from "./resume-composer";
 
-const SLEEP_REASON: Record<CurrentWait["reason"], string> = {
-	"usage-limit": "The agent hit its usage limit.",
-	network: "The network is down.",
-	duration: "The flow waits a while.",
-	time: "The flow waits for a time.",
-	command: "The flow waits for a command to pass.",
-	signal: "The flow waits for a signal.",
-	any: "The flow waits for a signal or a command to pass.",
-	url: "The flow waits for a URL to answer.",
-	"device-offline": "The device of the next step is offline.",
-	lease: "The flow waits for a lease another run holds.",
-};
-
-/** The icon and colour of the notice of a run that ended. */
-const ENDED_LOOK: Record<StoppedTone, { icon: LucideIcon; tone: string }> = {
+/** The icon and colour of each notice. */
+const LOOK: Record<NoticeKind, { icon: LucideIcon; tone: string }> = {
+	"answer-sent": { icon: SendIcon, tone: "text-status-waiting" },
+	gate: { icon: HandIcon, tone: "text-status-waiting" },
+	signal: { icon: RadioIcon, tone: "text-status-sleeping" },
+	wait: { icon: MoonIcon, tone: "text-status-sleeping" },
+	sleep: { icon: MoonIcon, tone: "text-status-sleeping" },
 	done: { icon: FlagIcon, tone: "text-status-finished" },
 	"nothing-to-do": { icon: CircleDashedIcon, tone: "text-muted-foreground" },
 	"ended-failed": { icon: FlagIcon, tone: "text-destructive" },
@@ -66,54 +57,29 @@ const ENDED_LOOK: Record<StoppedTone, { icon: LucideIcon; tone: string }> = {
 	stopped: { icon: CircleStopIcon, tone: "text-status-stopped" },
 };
 
-/** A Wait node's own wait, not the run policy's. */
-const isNodeWait = (reason: CurrentWait["reason"]) =>
-	reason !== "usage-limit" &&
-	reason !== "network" &&
-	reason !== "device-offline";
-
-type Notice = {
-	icon: LucideIcon;
-	/** Text colour of the icon and title. */
-	tone: string;
-	title: ReactNode;
-	/** One line, shown in the header while the panel is closed. */
-	gist: string;
-	/** Null: only the buttons. */
-	body: ReactNode;
-	/** Buttons under the body. */
-	actions?: ReactNode;
-	/** Whether the panel ends in the composer that resumes the run. */
-	resumable?: boolean;
-};
-
 /**
  * What the run needs from you, under the flow like the flow editor's issues:
  * why it failed or stopped (with the composer that resumes it), the gate it
  * waits at, or why it sleeps, or the line an End node left and its report.
  * A Collapsible whose header always shows what happened. Nothing shows
  * while the run walks, or once it finished without a word or a report
- * from an End node.
+ * from an End node. The words come from `runNow`: this draws them.
  */
 export function RunStatusPanel({
 	run,
-	status,
-	openGateNodeId,
+	now,
 	onShowGate,
 	onShowReport,
-	wait,
 	lastStep,
 	askWhy,
 	agentAnswer,
 	className,
 }: {
 	run: RunDetail;
-	status: RunStatus;
-	openGateNodeId: string | null;
+	now: RunNow;
 	onShowGate: () => void;
 	/** Scrolls to the run's report. Unset: the run has none. */
 	onShowReport?: () => void;
-	wait: CurrentWait | null;
 	/** Where resuming continues. */
 	lastStep: StepSummary | undefined;
 	/** "Ask an agent" and "Improve the flow", beside the reason the run ended. */
@@ -124,17 +90,43 @@ export function RunStatusPanel({
 }) {
 	const id = useId();
 	const [open, setOpen] = useState(true);
-	const until = run.wakeAt ?? wait?.until ?? null;
-	const notice = noticeOf({
-		run,
-		status,
-		openGateNodeId,
-		onShowGate,
-		onShowReport,
-		wait,
-	});
+	const notice = now.notice;
 	if (!notice) return null;
-	const Icon = notice.icon;
+	const { icon: Icon, tone } = LOOK[notice.kind];
+	// The button of each action a notice can offer. Only those it offers show.
+	const button: Record<NoticeAction, ReactNode> = {
+		answer: (
+			<Button size="sm" onClick={onShowGate}>
+				<HandIcon data-icon="inline-start" />
+				Answer it
+			</Button>
+		),
+		"open-inbox": (
+			<Button
+				size="sm"
+				variant="outline"
+				nativeButton={false}
+				render={<Link to="/inbox" />}
+			>
+				<InboxIcon data-icon="inline-start" />
+				Open the inbox
+			</Button>
+		),
+		"send-signal":
+			notice.signal !== null ? (
+				<SignalButton runId={run.id} name={notice.signal} />
+			) : null,
+		wake: <WakeButton runId={run.id} />,
+		"read-report": onShowReport ? (
+			<Button size="sm" variant="outline" onClick={onShowReport}>
+				<FileTextIcon data-icon="inline-start" />
+				Read the report
+			</Button>
+		) : null,
+	};
+	const buttons = notice.actions.map((action) => (
+		<Fragment key={action}>{button[action]}</Fragment>
+	));
 
 	return (
 		<Card size="sm" className={cn("shrink-0 gap-0 py-0", className)}>
@@ -156,12 +148,12 @@ export function RunStatusPanel({
 							className="size-3.5 text-muted-foreground transition-transform group-data-panel-open/status:rotate-90 motion-reduce:transition-none"
 							aria-hidden="true"
 						/>
-						<Icon className={cn("size-4", notice.tone)} aria-hidden="true" />
-						<span className={cn("font-medium text-sm", notice.tone)}>
-							{notice.title}
+						<Icon className={cn("size-4", tone)} aria-hidden="true" />
+						<span className={cn("font-medium text-sm", tone)}>
+							<Parts parts={notice.title} code="font-mono" />
 						</span>
-						{status === "sleeping" && until ? (
-							<Countdown until={until} className={notice.tone} />
+						{notice.wakeAt ? (
+							<Countdown until={notice.wakeAt} className={tone} />
 						) : null}
 						{open ? null : (
 							<span className="min-w-0 truncate font-normal text-muted-foreground text-xs">
@@ -171,16 +163,16 @@ export function RunStatusPanel({
 					</CollapsibleTrigger>
 				</h2>
 				<CollapsibleContent className="flex flex-col gap-3 border-t p-3">
-					{notice.body ? (
+					{notice.body.length > 0 ? (
 						<ScrollArea className="max-h-32 [&>[data-slot=scroll-area-viewport]]:max-h-32">
 							<div className="whitespace-pre-wrap break-words text-muted-foreground text-sm leading-relaxed">
-								{notice.body}
+								<Parts parts={notice.body} code="font-mono text-foreground" />
 							</div>
 						</ScrollArea>
 					) : null}
-					{notice.actions || askWhy ? (
+					{notice.actions.length > 0 || askWhy ? (
 						<div className="flex flex-wrap gap-2">
-							{notice.actions}
+							{buttons}
 							{askWhy}
 						</div>
 					) : null}
@@ -194,167 +186,24 @@ export function RunStatusPanel({
 	);
 }
 
-function noticeOf({
-	run,
-	status,
-	openGateNodeId,
-	onShowGate,
-	onShowReport,
-	wait,
-}: {
-	run: RunDetail;
-	status: RunStatus;
-	openGateNodeId: string | null;
-	onShowGate: () => void;
-	onShowReport: (() => void) | undefined;
-	wait: CurrentWait | null;
-}): Notice | null {
-	// A run of another device: answers, signals and stops go to it. Why a run ended: `stoppedNotice`.
-	const elsewhere = run.walker.thisDevice ? null : walkerName(run.walker);
-	const allows = runActions(status, run.walker.thisDevice, run.result);
-	switch (status) {
-		case "waiting":
-			if (
-				openGateNodeId &&
-				elsewhere &&
-				run.commands.some((c) => c.kind === "gate.resolve")
-			) {
-				return {
-					icon: SendIcon,
-					tone: "text-status-waiting",
-					title: "Answer sent",
-					gist: `It applies when ${elsewhere} is online.`,
-					body: `Your answer is on its way to ${elsewhere}. The run continues when ${elsewhere} is online.`,
-				};
-			}
-			return openGateNodeId
-				? {
-						icon: HandIcon,
-						tone: "text-status-waiting",
-						title: "Waiting for your answer",
-						gist: `At the gate ${openGateNodeId}`,
-						body: (
-							<>
-								The run waits at the gate{" "}
-								<span className="font-mono text-foreground">
-									{openGateNodeId}
-								</span>{" "}
-								until someone answers it.
-							</>
-						),
-						actions: (
-							<>
-								<Button size="sm" onClick={onShowGate}>
-									<HandIcon data-icon="inline-start" />
-									Answer it
-								</Button>
-								<Button
-									size="sm"
-									variant="outline"
-									nativeButton={false}
-									render={<Link to="/inbox" />}
-								>
-									<InboxIcon data-icon="inline-start" />
-									Open the inbox
-								</Button>
-							</>
-						),
-					}
-				: null;
-		case "sleeping": {
-			const until = run.wakeAt ?? wait?.until ?? null;
-			const signal = run.signal ?? wait?.signal ?? null;
-			const reason = wait ? SLEEP_REASON[wait.reason] : "The run sleeps.";
-			const at = until ? (
+/** A notice's words: a name from the flow in code type, a time of day on the reader's clock. */
+function Parts({ parts, code }: { parts: NoticePart[]; code: string }) {
+	return parts.map((part, index) => (
+		<Fragment key={index}>
+			{typeof part === "string" ? (
+				part
+			) : "code" in part ? (
+				<span className={code}>{part.code}</span>
+			) : (
 				<LocalTime
-					at={until}
+					at={part.time}
 					className="font-medium text-foreground tabular-nums"
 				>
-					{formatTime(until)}
+					{formatTime(part.time)}
 				</LocalTime>
-			) : null;
-			if (signal !== null) {
-				return {
-					icon: RadioIcon,
-					tone: "text-status-sleeping",
-					title: (
-						<>
-							Waiting for signal <span className="font-mono">{signal}</span>
-						</>
-					),
-					gist: `Send ${signal} to continue.`,
-					body: (
-						<>
-							The flow continues when the run gets the signal{" "}
-							<span className="font-mono text-foreground">{signal}</span>
-							{at ? <>, or times out at {at}</> : null}. Send it here, or from
-							another system through the API.
-						</>
-					),
-					actions: <SignalButton runId={run.id} name={signal} />,
-				};
-			}
-			const nodeWait = wait ? isNodeWait(wait.reason) : false;
-			return {
-				icon: MoonIcon,
-				tone: "text-status-sleeping",
-				title: nodeWait ? "Waiting" : "Sleeping",
-				gist: reason,
-				body: (
-					<>
-						{reason}{" "}
-						{wait?.reason === "command" || wait?.reason === "any"
-							? "It tries the command again"
-							: wait?.reason === "device-offline"
-								? "It checks for the device again"
-								: nodeWait
-									? "It continues"
-									: "It continues where it stopped"}
-						{at ? <> at {at}</> : null}.
-						{wait?.message ? `\n${wait.message}` : null}
-					</>
-				),
-				actions: allows.resume ? <WakeButton runId={run.id} /> : undefined,
-			};
-		}
-		case "finished":
-		case "failed":
-		case "interrupted":
-		case "stopped": {
-			const readReport = onShowReport ? (
-				<Button size="sm" variant="outline" onClick={onShowReport}>
-					<FileTextIcon data-icon="inline-start" />
-					Read the report
-				</Button>
-			) : undefined;
-			const ended = stoppedNotice(run, status);
-			if (!ended) {
-				// A run that finished without a message: its report is the word it left.
-				if (!readReport || status !== "finished") return null;
-				const tone = run.result === "nothing-to-do" ? "nothing-to-do" : "done";
-				return {
-					icon: ENDED_LOOK[tone].icon,
-					tone: ENDED_LOOK[tone].tone,
-					title: tone === "nothing-to-do" ? "Nothing to do" : "Done",
-					gist: "The run wrote a report.",
-					body: null,
-					actions: readReport,
-				};
-			}
-			const look = ENDED_LOOK[ended.tone];
-			return {
-				icon: look.icon,
-				tone: look.tone,
-				title: ended.title,
-				gist: ended.gist,
-				body: ended.body,
-				actions: readReport,
-				resumable: ended.resumable,
-			};
-		}
-		default:
-			return null;
-	}
+			)}
+		</Fragment>
+	));
 }
 
 /** How long until the run wakes, ticking. */
