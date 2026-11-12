@@ -413,11 +413,7 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 				return;
 			}
 			yield { type: "activity", text: "Reads the run" };
-			const run = await chatRun(space, detail.projectId, runId, { signal });
-			if (!run) {
-				yield { type: "error", message: NO_RUN };
-				return;
-			}
+			const run = await chatRun(space, detail, signal);
 			yield* explainRun({
 				run,
 				harness,

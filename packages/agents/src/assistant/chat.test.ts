@@ -295,6 +295,16 @@ describe("runReport", () => {
 		expect(report).toContain("The draft changed since this run: 1 steps added");
 		expect(report).toContain("line 4999");
 		expect(report).not.toContain("line 10\n");
+		expect(report).not.toContain("still runs");
+	});
+
+	test("a transcript that is not whole says why", () => {
+		expect(runReport({ ...run, transcriptHolds: "so-far" }, draft)).toContain(
+			"The step still runs: this is what it saved until now.",
+		);
+		expect(runReport({ ...run, transcriptHolds: "cut" }, draft)).toContain(
+			"Night Shift could not read all of it: this is what it read.",
+		);
 	});
 
 	test("with cite, each step is the link the chat shows as a citation", () => {

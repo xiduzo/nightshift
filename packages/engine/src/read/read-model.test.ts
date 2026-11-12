@@ -8,6 +8,7 @@ import {
 	getRunRow,
 	type RunBus,
 	type RunLog,
+	type TranscriptEntry,
 } from "../log";
 import type { EventInput } from "../log/events";
 import { createSandbox, type Sandbox } from "../testing/test-support";
@@ -26,6 +27,14 @@ let log: RunLog;
 let bus: RunBus;
 let reads: ReadModel;
 const controllers: AbortController[] = [];
+
+/** What the peers and this computer's files hold of each step, by step id. */
+const saved = {
+	whole: new Map<string, TranscriptEntry[]>(),
+	own: new Map<string, TranscriptEntry[]>(),
+	/** Steps whose read goes on until it is stopped: a Host that is away. */
+	away: new Set<string>(),
+};
 
 beforeEach(async () => {
 	sandbox = await createSandbox();
@@ -57,7 +66,14 @@ beforeEach(async () => {
 		walkers: async (_spaceId, ids) =>
 			new Map(ids.map((id) => [id, { id, name: null, thisDevice: true }])),
 		pendingCommands: async () => new Map(),
-		stepEntries: async function* () {},
+		stepEntries: async function* (step, _afterSeq, signal) {
+			yield* saved.whole.get(step.stepId) ?? [];
+			if (!saved.away.has(step.stepId)) return;
+			await new Promise((resolve) =>
+				signal.addEventListener("abort", resolve, { once: true }),
+			);
+		},
+		ownEntries: async (step) => saved.own.get(step.stepId) ?? [],
 	});
 	await log.append({
 		type: "RunStarted",
@@ -68,6 +84,9 @@ beforeEach(async () => {
 
 afterEach(async () => {
 	for (const controller of controllers.splice(0)) controller.abort();
+	saved.whole.clear();
+	saved.own.clear();
+	saved.away.clear();
 	await sandbox.cleanup();
 });
 
@@ -391,5 +410,62 @@ describe("the read model", () => {
 			[30, 1],
 			[90, 1],
 		]);
+	});
+});
+
+describe("a step's saved transcript", () => {
+	const entry = (seq: number, stepId: string): TranscriptEntry => ({
+		seq,
+		stepId,
+		sessionId: null,
+		at: seq,
+		event: { type: "command-output", stream: "stdout", text: `${seq}` },
+	});
+	const ended = (stepId: string): EventInput<"StepEnded"> => ({
+		type: "StepEnded",
+		runId: "r1",
+		stepId,
+		payload: { outcome: "fail", outputs: {}, error: null },
+	});
+	const read = async (stepId: string, signal = new AbortController().signal) =>
+		reads.stepTranscript(await getRunRow(sandbox.db, "r1"), stepId, signal);
+
+	test("a step that ended: all of it, wherever the run was walked", async () => {
+		await log.append(stepStarted("s1"));
+		await log.append(ended("s1"));
+		saved.whole.set("s1", [entry(1, "s1"), entry(2, "s1")]);
+		saved.own.set("s1", [entry(1, "s1")]);
+		expect(await read("s1")).toEqual({
+			entries: [entry(1, "s1"), entry(2, "s1")],
+			holds: "whole",
+		});
+	});
+
+	test("a step that still runs: what this computer keeps of it so far", async () => {
+		await log.append(stepStarted("s1"));
+		// Its live read never ends while it runs: it is not asked.
+		saved.whole.set("s1", [entry(1, "s1"), entry(2, "s1")]);
+		saved.away.add("s1");
+		saved.own.set("s1", [entry(1, "s1")]);
+		expect(await read("s1")).toEqual({
+			entries: [entry(1, "s1")],
+			holds: "so-far",
+		});
+	});
+
+	test("a read that is stopped keeps what came, and says so", async () => {
+		await log.append(stepStarted("s1"));
+		await log.append(ended("s1"));
+		saved.whole.set("s1", [entry(1, "s1")]);
+		saved.away.add("s1");
+		const controller = new AbortController();
+		const reading = read("s1", controller.signal);
+		await Bun.sleep(5);
+		controller.abort();
+		expect(await reading).toEqual({ entries: [entry(1, "s1")], holds: "cut" });
+	});
+
+	test("a step the run does not have is not found", async () => {
+		await expect(read("nope")).rejects.toMatchObject({ kind: "not-found" });
 	});
 });

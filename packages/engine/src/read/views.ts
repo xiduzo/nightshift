@@ -551,3 +551,15 @@ export type RunStreamItem =
 	| { kind: "status"; status: RunStatus }
 	/** A step started or ended. Sent with its latest summary. */
 	| { kind: "step"; step: StepSummary };
+
+/**
+ * One step's transcript as Night Shift saved it (`SpaceEngine.stepTranscript`):
+ * its entries in `seq` order, and how much of it they are. `whole`: the
+ * step ended, and these are all its entries. `so-far`: the step still
+ * runs, and these are the entries this computer keeps of it until now.
+ * `cut`: the read stopped before the end.
+ */
+export type StepTranscript = {
+	entries: TranscriptEntry[];
+	holds: "whole" | "so-far" | "cut";
+};

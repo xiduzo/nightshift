@@ -8,7 +8,8 @@ import {
 	terminalTools,
 } from "@nightshift/agents";
 import type { AppRouterClient } from "@nightshift/api";
-import { type ChatSpace, chatRun } from "@nightshift/daemon";
+import { chatRun } from "@nightshift/daemon";
+import type { SpaceEngine, TranscriptEntry } from "@nightshift/engine";
 import { runReport } from "@nightshift/engine/run-status";
 import { createORPCClient, ORPCError } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
@@ -224,25 +225,13 @@ export function apiPort(
 			),
 		run: (projectId, runId) =>
 			g(async () => {
-				const seen: {
-					detail?: Awaited<ReturnType<AppRouterClient["runs"]["get"]>>;
-				} = {};
-				const space: ChatSpace = {
-					flows: { map: (id) => client.flows.map({ projectId: id }) },
-					getRun: async (id) => {
-						seen.detail = await client.runs.get({ runId: id });
-						return seen.detail;
-					},
-					watchRun: (id, watch) =>
-						streamOf(() =>
-							client.runs.watch({ runId: id }, { signal: watch?.signal }),
-						),
-				};
-				const run = await chatRun(space, projectId, runId, {
-					signal: AbortSignal.timeout(15_000),
-				});
-				const { detail } = seen;
-				if (!run || !detail) return null;
+				const detail = await client.runs.get({ runId }).catch(() => null);
+				if (!detail || detail.projectId !== projectId) return null;
+				const run = await chatRun(
+					apiTranscripts(client),
+					detail,
+					AbortSignal.timeout(15_000),
+				);
 				return {
 					run,
 					flowName: detail.flowName,
@@ -303,11 +292,59 @@ function costOf(run: {
 	};
 }
 
-/** An async iterable of a stream the call opens. */
-async function* streamOf<T>(
-	open: () => Promise<AsyncIterable<T>>,
-): AsyncGenerator<T> {
-	yield* await open();
+/**
+ * One step's saved transcript over the API, for `chatRun`. The API reads
+ * a transcript only with `runs.watch`: the whole run, what is saved, then
+ * live, with no mark between the two. So the read ends once nothing new
+ * comes for `idleMs` (the replay is done), or after `totalMs` (`cut`).
+ * Night Shift on this computer reads it whole (`SpaceEngine.stepTranscript`).
+ */
+export function apiTranscripts(
+	client: AppRouterClient,
+	times: { idleMs?: number; totalMs?: number } = {},
+): Pick<SpaceEngine, "stepTranscript"> {
+	return {
+		async stepTranscript(runId, stepId, signal) {
+			const controller = new AbortController();
+			let ended: "idle" | "total" | null = null;
+			const stop = (why: "idle" | "total") => () => {
+				ended ??= why;
+				controller.abort();
+			};
+			const cancel = stop("total");
+			signal.addEventListener("abort", cancel, { once: true });
+			const total = setTimeout(cancel, times.totalMs ?? 5_000);
+			let idle: ReturnType<typeof setTimeout> | null = null;
+			const entries: TranscriptEntry[] = [];
+			let stepEnded = false;
+			try {
+				const stream = await client.runs.watch(
+					{ runId },
+					{ signal: controller.signal },
+				);
+				for await (const item of stream) {
+					if (idle) clearTimeout(idle);
+					idle = setTimeout(stop("idle"), times.idleMs ?? 750);
+					if (item.kind === "step" && item.step.id === stepId) {
+						stepEnded = item.step.endedAt !== null;
+					} else if (
+						item.kind === "transcript" &&
+						item.entry.stepId === stepId
+					) {
+						entries.push(item.entry);
+					}
+				}
+			} catch {
+				// Stopped, or the transcript could not be read: keep what came.
+			} finally {
+				clearTimeout(total);
+				if (idle) clearTimeout(idle);
+				signal.removeEventListener("abort", cancel);
+			}
+			const holds = ended !== "idle" ? "cut" : stepEnded ? "whole" : "so-far";
+			return { entries, holds };
+		},
+	};
 }
 
 export async function mcpCommand(argv: string[], program: string) {

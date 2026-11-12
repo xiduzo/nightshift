@@ -18,7 +18,6 @@ import type {
 } from "@nightshift/flows";
 import { FLOW_VERSION, flowSchema } from "@nightshift/flows";
 import type { FlowInput } from "@nightshift/flows/testing";
-import { now } from "@nightshift/time";
 import { call } from "@orpc/server";
 import {
 	type AssistantDeps,
@@ -29,7 +28,7 @@ import {
 	NOT_ENDED_EARLY,
 	pickAgent,
 } from "./assistant";
-import { type ChatSpace, chatRun } from "./authoring";
+import { authoringPort, chatRun } from "./authoring";
 
 const settingsOf = (
 	harness: AgentHarnessName,
@@ -76,7 +75,7 @@ function deps(over: Partial<AssistantDeps> = {}): AssistantDeps {
 			getRun: async () => {
 				throw new Error("No such run");
 			},
-			watchRun: async function* () {},
+			stepTranscript: async () => ({ entries: [], holds: "whole" }),
 			listDevices: async () => [],
 		}),
 		cliTools: { list: () => [] },
@@ -647,57 +646,82 @@ describe("chatRun", () => {
 			},
 		],
 	};
-	const entry = (seq: number, stepId: string, event: unknown) => ({
-		kind: "transcript",
-		entry: { seq, stepId, sessionId: null, at: seq, event },
-	});
-	const space = (): ChatSpace =>
-		({
-			flows: { map: async () => ({}) },
-			getRun: async (id: string) => {
-				if (id !== "r1") throw new Error("No such run");
-				return run;
+	const detail = (over: object = {}) => ({ ...run, ...over }) as never;
+	const entry = (seq: number, event: unknown) =>
+		({ seq, stepId: "s2", sessionId: null, at: seq, event }) as never;
+	/** A Space whose step `s2` saved a long command, and what each read asked. */
+	const space = (holds: "whole" | "so-far" | "cut" = "whole") => {
+		const asked: string[] = [];
+		return {
+			asked,
+			stepTranscript: async (runId: string, stepId: string) => {
+				asked.push(`${runId}/${stepId}`);
+				return {
+					entries: [
+						entry(1, { type: "command-start", command: "bun test" }),
+						...Array.from({ length: 1000 }, (_, i) =>
+							entry(2 + i, {
+								type: "command-output",
+								stream: "stdout",
+								text: `line ${i}\n`,
+							}),
+						),
+						entry(2000, { type: "command-exit", exitCode: 1 }),
+					],
+					holds,
+				};
 			},
-			watchRun: async function* (
-				_id: string,
-				{ signal }: { signal: AbortSignal },
-			) {
-				yield { kind: "status", status: "failed" };
-				yield entry(1, "s1", { type: "text", messageId: "m", delta: "Plan" });
-				yield entry(2, "s2", { type: "command-start", command: "bun test" });
-				for (let i = 0; i < 1000; i++) {
-					yield entry(3 + i, "s2", {
-						type: "command-output",
-						stream: "stdout",
-						text: `line ${i}\n`,
-					});
-				}
-				yield entry(2000, "s2", { type: "command-exit", exitCode: 1 });
-				// Live: nothing more comes until the reader lets go.
-				await new Promise((resolve) =>
-					signal.addEventListener("abort", resolve, { once: true }),
-				);
-			},
-		}) as unknown as ChatSpace;
+		};
+	};
+	const signal = new AbortController().signal;
 
-	test("the failed step and the end of its transcript, bounded; it stops once the replay is done", async () => {
-		const started = now();
-		const found = await chatRun(space(), "p1", "r1", {
-			signal: new AbortController().signal,
-			idleMs: 50,
-		});
-		expect(now() - started).toBeLessThan(2_000);
-		expect(found?.failedStepId).toBe("s2");
-		expect(found?.steps[0]?.note).toBe("Planned.");
-		expect(found?.transcript.at(-1)).toBe("Exit code: 1");
-		expect(found?.transcript).toContain("line 999");
-		expect(found?.transcript).not.toContain("$ bun test");
-		expect(found?.transcript.length).toBeLessThanOrEqual(300);
+	test("the failed step and the end of its saved transcript, bounded", async () => {
+		const saved = space();
+		const found = await chatRun(saved, detail(), signal);
+		expect(saved.asked).toEqual(["r1/s2"]);
+		expect(found.failedStepId).toBe("s2");
+		expect(found.steps[0]?.note).toBe("Planned.");
+		expect(found.transcript.at(-1)).toBe("Exit code: 1");
+		expect(found.transcript).toContain("line 999");
+		expect(found.transcript).not.toContain("$ bun test");
+		expect(found.transcript.length).toBeLessThanOrEqual(300);
+		expect(found).not.toHaveProperty("transcriptHolds");
+	});
+
+	test("a step that still runs, or a read that stopped, says so", async () => {
+		const running = await chatRun(space("so-far"), detail(), signal);
+		expect(running.transcriptHolds).toBe("so-far");
+		expect(running.transcript.at(-1)).toBe("Exit code: 1");
+		const cut = await chatRun(space("cut"), detail(), signal);
+		expect(cut.transcriptHolds).toBe("cut");
+		// A read that fails keeps nothing, and says so.
+		const failed = await chatRun(
+			{
+				stepTranscript: async () => {
+					throw new Error("The Host is away.");
+				},
+			},
+			detail(),
+			signal,
+		);
+		expect(failed.transcript).toEqual([]);
+		expect(failed.transcriptHolds).toBe("cut");
+	});
+
+	test("a run that failed nowhere reads no transcript", async () => {
+		const saved = space();
+		const found = await chatRun(
+			saved,
+			detail({ status: "finished", steps: [run.steps[0]] }),
+			signal,
+		);
+		expect(found.failedStepId).toBeNull();
+		expect(found.transcript).toEqual([]);
+		expect(saved.asked).toEqual([]);
 	});
 
 	test("a failure inside a called flow: that step, with the flow it ran in", async () => {
-		const nested = {
-			...run,
+		const nested = detail({
 			flow: {
 				...withTests,
 				nodes: [{ id: "each_task", type: "call", flow: "build-task" }],
@@ -721,52 +745,53 @@ describe("chatRun", () => {
 					scope: { parentStepId: "c1", itemId: null },
 				},
 			],
-		};
-		const found = await chatRun(
-			{
-				flows: { map: async () => ({}) },
-				getRun: async () => nested,
-				watchRun: async function* () {},
-			} as unknown as ChatSpace,
-			"p1",
-			"r1",
-			{ signal: new AbortController().signal },
-		);
-		expect(found?.failedStepId).toBe("c2");
-		expect(found?.steps.map((s) => s.flow)).toEqual([null, "build-task"]);
+		});
+		const found = await chatRun(space(), nested, signal);
+		expect(found.failedStepId).toBe("c2");
+		expect(found.steps.map((s) => s.flow)).toEqual([null, "build-task"]);
 	});
 
-	test("a run of another project, or none: null", async () => {
-		const signal = new AbortController().signal;
-		expect(await chatRun(space(), "p2", "r1", { signal })).toBeNull();
-		expect(await chatRun(space(), "p1", "nope", { signal })).toBeNull();
+	test("the editor's get_run: a run of another project, or none, is null", async () => {
+		const port = (projectId: string, runId: string) =>
+			authoringPort(
+				{
+					space: {
+						...deps().space({ spaceId: "s", personId: "p" }),
+						getRun: async (id: string) => {
+							if (id !== "r1") throw new Error("No such run");
+							return detail();
+						},
+					},
+					profiles: { list: () => [] },
+					cliTools: { list: () => [] },
+					connections: { list: () => [] },
+					skills: async () => [],
+				},
+				{ projectId, runId, flowName: "fix", flow: withTests } as never,
+				signal,
+			);
+		expect(await port("p2", "r1").run?.()).toBeNull();
+		expect(await port("p1", "nope").run?.()).toBeNull();
+		expect((await port("p1", "r1").run?.())?.failedStepId).toBe("s2");
 	});
 
 	test("a test run says so, and so does each step that stood in", async () => {
-		const tested = {
-			...run,
+		const tested = detail({
 			status: "finished",
 			test: { pinned: ["plan"], skipped: [] },
 			steps: [{ ...run.steps[0], test: "pinned" }],
-		};
-		const read = (detail: unknown) =>
-			chatRun(
-				{
-					flows: { map: async () => ({}) },
-					getRun: async () => detail,
-					watchRun: async function* () {},
-				} as unknown as ChatSpace,
-				"p1",
-				"r1",
-				{ signal: new AbortController().signal },
-			);
-		const found = await read(tested);
-		expect(found?.test).toEqual({ pinned: ["plan"], skipped: [] });
-		expect(found?.steps.map((step) => step.test)).toEqual(["pinned"]);
+		});
+		const found = await chatRun(space(), tested, signal);
+		expect(found.test).toEqual({ pinned: ["plan"], skipped: [] });
+		expect(found.steps.map((step) => step.test)).toEqual(["pinned"]);
 		// A run that is no test says nothing of it.
-		const real = await read({ ...run, steps: [run.steps[0]] });
+		const real = await chatRun(
+			space(),
+			detail({ steps: [run.steps[0]] }),
+			signal,
+		);
 		expect(real).not.toHaveProperty("test");
-		expect(real?.steps[0]).not.toHaveProperty("test");
+		expect(real.steps[0]).not.toHaveProperty("test");
 	});
 });
 
@@ -796,18 +821,18 @@ describe("assistant.explain", () => {
 			if (id !== run.id) throw new Error("No such run");
 			return run as never;
 		},
-		watchRun: async function* () {
-			yield {
-				kind: "transcript",
-				entry: {
+		stepTranscript: async () => ({
+			entries: [
+				{
 					seq: 1,
 					stepId: "s2",
 					sessionId: null,
 					at: 1,
 					event: { type: "command-exit", exitCode: 1 },
-				},
-			} as never;
-		},
+				} as never,
+			],
+			holds: "whole" as const,
+		}),
 		listDevices: async () => [],
 	});
 

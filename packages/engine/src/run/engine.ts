@@ -671,6 +671,7 @@ export function createEngine(
 		walkers: peers.runs.walkers,
 		pendingCommands: peers.runs.pendingCommands,
 		stepEntries: peers.runs.stepEntries,
+		ownEntries: history.ownTranscript,
 		memberName: membersName,
 	});
 

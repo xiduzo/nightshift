@@ -344,6 +344,15 @@ export function createSpaces(deps: SpacesDeps) {
 				return reads.getStep(await getRunRow(runId, spaceId), stepId);
 			},
 
+			async stepTranscript(runId, stepId, signal) {
+				await ready;
+				return reads.stepTranscript(
+					await getRunRow(runId, spaceId),
+					stepId,
+					AbortSignal.any([signal, deps.signal]),
+				);
+			},
+
 			async serviceLog(runId, service) {
 				await ready;
 				const row = await getRunRow(runId, spaceId);

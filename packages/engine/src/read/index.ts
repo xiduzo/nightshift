@@ -1,4 +1,4 @@
-/** The read model: the pure projections of the event log, the landed facts, the Needs-you inbox, what a person did to a run (Needed you), where the work landed (the ladders), the run views, cost, the Persons a run names, and the run bundle. */
+/** The read model: the pure projections of the event log, the facts an assistant reads in a run, the landed facts, the Needs-you inbox, what a person did to a run (Needed you), where the work landed (the ladders), the run views, cost, the Persons a run names, and the run bundle. */
 
 export {
 	answeredOf,
@@ -26,6 +26,7 @@ export {
 export type { RunBundleSummary } from "./run-bundle";
 export { exportRun } from "./run-bundle";
 export { pullRequestOf } from "./run-metrics";
+export { runReading } from "./run-reading";
 export type { RunTrace } from "./run-trace";
 export type { FeedStep } from "./run-transcript";
 export {
@@ -60,5 +61,6 @@ export type {
 	RunSummary,
 	RunWalker,
 	StepDetail,
+	StepTranscript,
 } from "./views";
 export { NIGHT_RANGES, type NightRange } from "./views";

@@ -102,6 +102,12 @@ export type AuthoringRun = {
 	failedStepId: string | null;
 	/** The last lines of that step's transcript, oldest first. */
 	transcript: string[];
+	/**
+	 * `so-far`: the step still runs, and `transcript` is what it saved
+	 * until now. `cut`: Night Shift could not read all of it. Absent: all
+	 * of it.
+	 */
+	transcriptHolds?: "so-far" | "cut";
 };
 
 /**
@@ -321,6 +327,11 @@ export function runReport(
 			"",
 			`## The end of the transcript of \`${failed.nodeId}\``,
 			"",
+			...(run.transcriptHolds === "so-far"
+				? ["The step still runs: this is what it saved until now.", ""]
+				: run.transcriptHolds === "cut"
+					? ["Night Shift could not read all of it: this is what it read.", ""]
+					: []),
 			"```",
 			run.transcript.length > 0
 				? tail(run.transcript.join("\n"), TRANSCRIPT_LIMIT)

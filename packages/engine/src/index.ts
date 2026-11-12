@@ -170,6 +170,7 @@ export type {
 	RunTrace,
 	RunWalker,
 	StepDetail,
+	StepTranscript,
 } from "./read";
 export {
 	answeredOf,
@@ -180,6 +181,7 @@ export {
 	NEEDED_YOU_REASONS,
 	RUNGS,
 	type RunBundleSummary,
+	runReading,
 } from "./read";
 export type {
 	Engine,

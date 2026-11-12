@@ -26,6 +26,7 @@ import {
 	type WaitReason,
 } from "../log";
 import { isTestRun, type RunStatus } from "../run-status";
+import { calledFlows } from "./called-flows";
 import { inboxOrder } from "./inbox";
 import { landingsOf, runRungs } from "./ladder";
 import { neededYouOf } from "./needed-you";
@@ -63,6 +64,7 @@ import type {
 	RunWarning,
 	StepDetail,
 	StepSummary,
+	StepTranscript,
 	SubflowRun,
 } from "./views";
 import { NIGHT_RANGES } from "./views";
@@ -305,7 +307,8 @@ export function toSummary(
  * with `each`: `subflowRuns` reads that from the run's flow snapshots.
  */
 type CallFact = {
-	stepId: string;
+	/** The Call step's id. */
+	id: string;
 	nodeId: string;
 	/** The Call step and item this step runs in. Null at the top level. */
 	scope: Scope | null;
@@ -359,7 +362,7 @@ function deriveCalls(steps: readonly DerivedStep[]): CallFact[] {
 		// Items run one at a time: a stop or a daemon death cuts the last one.
 		const last = step.items.findLast((item) => item.state !== "blocked");
 		calls.push({
-			stepId: step.id,
+			id: step.id,
 			nodeId: step.nodeId,
 			scope: step.scope,
 			flow: step.call?.flow ?? null,
@@ -409,30 +412,16 @@ function subflowRuns(
 ): SubflowRun[] {
 	if (calls.length === 0) return [];
 	// Parsed only when a Call with `each` needs them.
-	let parsed: { top: Flow; called: Record<string, Flow> } | null = null;
-	const snapshots = () =>
-		(parsed ??= { top: parseRunFlow(row), called: parseCalledFlows(row) });
-	const calledFlow = (name: string | null): Flow | undefined => {
-		const { called } = snapshots();
-		return name !== null && Object.hasOwn(called, name)
-			? called[name]
-			: undefined;
-	};
-	const byStep = new Map(calls.map((call) => [call.stepId, call]));
-	const names = new Map<string, string | null>();
-	const nameOf = (call: CallFact): string | null => {
-		if (call.flow !== null) return call.flow;
-		const known = names.get(call.stepId);
-		if (known !== undefined) return known;
-		const parent = call.scope ? byStep.get(call.scope.parentStepId) : undefined;
-		const holder = call.scope
-			? parent && calledFlow(nameOf(parent))
-			: snapshots().top;
-		const node = holder?.nodes.find((n) => n.id === call.nodeId);
-		const name = node?.type === "call" ? node.flow : null;
-		names.set(call.stepId, name);
-		return name;
-	};
+	let parsed: { flow: Flow; calledFlows: Record<string, Flow> } | null = null;
+	const { calls: nameOf } = calledFlows(
+		calls,
+		() =>
+			(parsed ??= {
+				flow: parseRunFlow(row),
+				calledFlows: parseCalledFlows(row),
+			}),
+		(call) => call.flow,
+	);
 	return calls
 		.flatMap((call) => {
 			const flowName = nameOf(call);
@@ -613,6 +602,11 @@ export type ReadModelDeps = {
 	): Promise<Map<string, PendingCommand[]>>;
 	/** A step's transcript, wherever its run is walked (`RunsPort.stepEntries`). */
 	stepEntries: StepEntries;
+	/** The entries of a step's own transcript file on this Replica: none without one (`RunHistory.ownTranscript`). */
+	ownEntries(step: {
+		runId: string;
+		stepId: string;
+	}): Promise<TranscriptEntry[]>;
 	/** The name of a Person as the Space document's Members name them. Default: none. */
 	memberName?(spaceId: string, personId: string): Promise<string | null>;
 };
@@ -830,6 +824,32 @@ export function createReadModel(deps: ReadModelDeps) {
 		const step = steps.find((s) => s.id === stepId);
 		if (!step) throw new Refusal("not-found", STEP_NOT_FOUND);
 		return toStepDetail(step, await namer(row.spaceId, [step.deviceId]));
+	}
+
+	/**
+	 * One step's transcript as Night Shift saved it. A step that ended:
+	 * all of it, wherever the run was walked (`stepEntries` returns once
+	 * the transcript is whole). A step that still runs: what this
+	 * computer's file holds so far, which is nothing while another Device
+	 * walks it. Aborting `signal` ends the read with what came.
+	 */
+	async function stepTranscript(
+		row: RunRow,
+		stepId: string,
+		signal: AbortSignal,
+	): Promise<StepTranscript> {
+		const steps = await one(row.id, deriveSteps);
+		const step = steps.find((s) => s.id === stepId);
+		if (!step) throw new Refusal("not-found", STEP_NOT_FOUND);
+		const at = { spaceId: row.spaceId, runId: row.id, stepId };
+		if (step.endedAt === null) {
+			return { entries: await deps.ownEntries(at), holds: "so-far" };
+		}
+		const entries: TranscriptEntry[] = [];
+		for await (const entry of deps.stepEntries(at, 0, signal)) {
+			entries.push(entry);
+		}
+		return { entries, holds: signal.aborted ? "cut" : "whole" };
 	}
 
 	/** The run's status, or null for a run the log has nothing on. */
@@ -1120,6 +1140,7 @@ export function createReadModel(deps: ReadModelDeps) {
 		projectRuns,
 		getRun,
 		getStep,
+		stepTranscript,
 		runStatus,
 		runHere,
 		trace,

@@ -21,6 +21,7 @@ import type {
 	RunStreamItem,
 	RunSummary,
 	StepDetail,
+	StepTranscript,
 } from "../read";
 import type { RunFile } from "../run-folders";
 import type { ScheduleList, SchedulePause } from "../schedules";
@@ -200,6 +201,18 @@ export interface SpaceEngine {
 	 * prompt of each session and the element of each item.
 	 */
 	getStep(runId: string, stepId: string): Promise<StepDetail>;
+	/**
+	 * One step's transcript as Night Shift saved it, for a reader that
+	 * needs all of it at once (an assistant). Once the step ended: all of
+	 * it, wherever the run was walked (this computer's file, the archive,
+	 * the Host). While it runs: what this computer keeps of it so far.
+	 * Aborting `signal` ends the read with what came (`holds: "cut"`).
+	 */
+	stepTranscript(
+		runId: string,
+		stepId: string,
+		signal: AbortSignal,
+	): Promise<StepTranscript>;
 	/**
 	 * The end of the log of a service of the run (ADR 9), by its node and
 	 * scope (`RunService.scopeKey`). Null when this computer does not walk

@@ -10,10 +10,12 @@ import type {
 	AuthoringRun,
 	AuthoringRunStep,
 } from "@nightshift/agents";
-import type {
-	SpaceEngine,
-	SpaceFlows,
-	TranscriptEntry,
+import {
+	type RunDetail,
+	runReading,
+	type SpaceEngine,
+	type SpaceFlows,
+	type TranscriptEntry,
 } from "@nightshift/engine";
 import type {
 	CliToolStore,
@@ -24,7 +26,7 @@ import { isTestRun } from "@nightshift/engine/run-status";
 import { type ChatRequest, isAgentProfile } from "@nightshift/flows";
 
 /** What the port reads in the Space. */
-export type ChatSpace = Pick<SpaceEngine, "getRun" | "watchRun"> & {
+type ChatSpace = Pick<SpaceEngine, "getRun" | "stepTranscript"> & {
 	flows: Pick<SpaceFlows, "map">;
 };
 
@@ -108,55 +110,35 @@ export function authoringPort(
 		skills: deps.skills,
 		...(runId
 			? {
-					run: () => chatRun(deps.space, request.projectId, runId, { signal }),
+					run: async () => {
+						const detail = await deps.space.getRun(runId).catch(() => null);
+						if (!detail || detail.projectId !== request.projectId) return null;
+						return chatRun(deps.space, detail, signal);
+					},
 				}
 			: {}),
 	};
 }
 
-/** Step outcomes that end a run badly. */
-const BAD = new Set(["fail", "needs-input", "error", "stopped", "interrupted"]);
-
-/** How long the transcript read waits for more after the last entry, and in all. */
-export type TranscriptTimes = { idleMs?: number; totalMs?: number };
+/** How long the read of the failed step's transcript may take in all. */
+const TRANSCRIPT_MS = 10_000;
 
 /**
- * The run for the chat, or null when the Space has no run of that id in
- * this project. The failed step is the last one that ended badly, inside
- * the flows it called: a step in a called flow, not the Subflow step that
- * failed because of it. Each step names the called flow it ran in.
+ * The run for the chat, from its detail: each step with the called flow
+ * it ran in, the step the run failed at (`runReading`), and the end of
+ * that step's saved transcript in plain text.
  */
 export async function chatRun(
-	space: ChatSpace,
-	projectId: string,
-	runId: string,
-	options: { signal: AbortSignal } & TranscriptTimes,
-): Promise<AuthoringRun | null> {
-	const detail = await space.getRun(runId).catch(() => null);
-	if (!detail || detail.projectId !== projectId) return null;
-	const byId = new Map(detail.steps.map((step) => [step.id, step]));
-	const flowOf = new Map<string, string | null>();
-	/** The called flow a step ran in: the `flow` of its parent's Subflow node. */
-	const calledFlow = (stepId: string, depth = 0): string | null => {
-		const known = flowOf.get(stepId);
-		if (known !== undefined) return known;
-		const step = byId.get(stepId);
-		const parent = step?.scope ? byId.get(step.scope.parentStepId) : null;
-		let name: string | null = null;
-		if (parent && depth < 20) {
-			const outer = calledFlow(parent.id, depth + 1);
-			const flow = outer ? detail.calledFlows[outer] : detail.flow;
-			const node = flow?.nodes.find((n) => n.id === parent.nodeId);
-			name = node?.type === "call" ? node.flow : null;
-		}
-		flowOf.set(stepId, name);
-		return name;
-	};
+	space: Pick<SpaceEngine, "stepTranscript">,
+	detail: RunDetail,
+	signal: AbortSignal,
+): Promise<AuthoringRun> {
+	const { flowOf, failedStep } = runReading(detail);
 	const steps: AuthoringRunStep[] = detail.steps.map((step) => {
 		const note = step.outputs.note ?? step.outputs.summary;
 		return {
 			id: step.id,
-			flow: calledFlow(step.id),
+			flow: flowOf.get(step.id) ?? null,
 			nodeId: step.nodeId,
 			nodeType: step.nodeType,
 			visit: step.visit,
@@ -166,16 +148,9 @@ export async function chatRun(
 			...(step.test ? { test: step.test } : {}),
 		};
 	});
-	const bad = detail.steps.filter(
-		(step) =>
-			step.error !== null || (step.outcome !== null && BAD.has(step.outcome)),
-	);
-	// A Subflow step that failed because a step inside it did is not the cause.
-	const parents = new Set(
-		bad.flatMap((step) => (step.scope ? [step.scope.parentStepId] : [])),
-	);
-	const failed =
-		[...bad].reverse().find((step) => !parents.has(step.id)) ?? null;
+	const transcript = failedStep
+		? await savedLines(space, detail.id, failedStep.id, signal)
+		: null;
 	return {
 		id: detail.id,
 		status: detail.status,
@@ -184,10 +159,11 @@ export async function chatRun(
 		inputs: detail.inputs,
 		flow: detail.flow,
 		steps,
-		failedStepId: failed?.id ?? null,
-		transcript: failed
-			? await stepTranscript(space, runId, failed.id, options)
-			: [],
+		failedStepId: failedStep?.id ?? null,
+		transcript: transcript?.lines ?? [],
+		...(transcript && transcript.holds !== "whole"
+			? { transcriptHolds: transcript.holds }
+			: {}),
 	};
 }
 
@@ -198,23 +174,24 @@ const cut = (text: string, max: number) =>
 	text.length > max ? `${text.slice(0, max - 1)}…` : text;
 
 /**
- * The last lines of one step's transcript, in plain text. It reads the
- * run's saved transcript, and stops once nothing new comes for `idleMs`
- * (the replay is done) or after `totalMs`.
+ * The last lines of one step's saved transcript, in plain text, and how
+ * much of the transcript they come from. A read that takes longer than
+ * `TRANSCRIPT_MS` keeps what came, and a read that fails keeps nothing:
+ * both are `cut`.
  */
-export async function stepTranscript(
-	space: Pick<SpaceEngine, "watchRun">,
+async function savedLines(
+	space: Pick<SpaceEngine, "stepTranscript">,
 	runId: string,
 	stepId: string,
-	options: { signal: AbortSignal } & TranscriptTimes,
-): Promise<string[]> {
-	const idleMs = options.idleMs ?? 750;
-	const totalMs = options.totalMs ?? 5_000;
-	const controller = new AbortController();
-	const stop = () => controller.abort();
-	options.signal.addEventListener("abort", stop, { once: true });
-	const total = setTimeout(stop, totalMs);
-	let idle: ReturnType<typeof setTimeout> | null = null;
+	signal: AbortSignal,
+): Promise<{ lines: string[]; holds: "whole" | "so-far" | "cut" }> {
+	const read = await space
+		.stepTranscript(
+			runId,
+			stepId,
+			AbortSignal.any([signal, AbortSignal.timeout(TRANSCRIPT_MS)]),
+		)
+		.catch(() => ({ entries: [], holds: "cut" as const }));
 	const lines: string[] = [];
 	let text = "";
 	const push = (line: string) => {
@@ -227,26 +204,12 @@ export async function stepTranscript(
 			lines.splice(0, lines.length - TRANSCRIPT_LINES);
 		}
 	};
-	try {
-		for await (const item of space.watchRun(runId, {
-			signal: controller.signal,
-		})) {
-			if (idle) clearTimeout(idle);
-			idle = setTimeout(stop, idleMs);
-			if (item.kind !== "transcript" || item.entry.stepId !== stepId) continue;
-			const event = item.entry.event;
-			if (event.type === "text") text += event.delta;
-			else push(lineOf(event));
-		}
-	} catch {
-		// Aborted, or the transcript could not be read: keep what came.
-	} finally {
-		clearTimeout(total);
-		if (idle) clearTimeout(idle);
-		options.signal.removeEventListener("abort", stop);
+	for (const { event } of read.entries) {
+		if (event.type === "text") text += event.delta;
+		else push(lineOf(event));
 	}
 	push("");
-	return lines.slice(-TRANSCRIPT_LINES);
+	return { lines: lines.slice(-TRANSCRIPT_LINES), holds: read.holds };
 }
 
 /** One transcript event as a line. Empty: not worth a line. */
@@ -302,7 +265,35 @@ function lineOf(event: TranscriptEntry["event"]): string {
 			return event.status === null
 				? `Web response: none. ${event.text}`
 				: `Web response: ${event.status} ${event.text}`.trim();
-		default:
+		// Not worth a line: the text and the thinking come as deltas, the
+		// rest is the start of what a line above shows, or bookkeeping.
+		case "text":
+		case "thinking":
+		case "session":
+		case "tool-start":
+		case "usage":
+		case "finished":
+		case "decision-start":
+		case "rule":
+		case "gate-open":
+		case "items-read":
+		case "item-start":
+		case "wake":
+		case "value-start":
+		case "tool-call":
+		case "worktree-snapshot":
+		case "worktree-changes":
 			return "";
+		default:
+			return unknownKind(event);
 	}
+}
+
+/**
+ * An event kind this build does not know, from a newer Night Shift: no
+ * line. Its type is `never`, so a kind added to `StepEvent` fails to
+ * compile until `lineOf` gives it words or none.
+ */
+function unknownKind(_event: never): string {
+	return "";
 }
