@@ -501,6 +501,40 @@ describe("planSubflowFromSection, small flows", () => {
 		});
 	});
 
+	test("a Since last run outcome without an edge ends the flow on its own label, as in the engine", () => {
+		const since = {
+			id: "c",
+			type: "since-last-run" as const,
+			position: { x: 0, y: 0 },
+			items: "{{b.data}}",
+			key: "id",
+		};
+		const flow = chain({
+			nodes: [command("a"), command("b", "true", { stdout: "json" }), since],
+			edges: [
+				{ id: "ab", from: "a", outcome: "pass", to: "b" },
+				{ id: "bc", from: "b", outcome: "pass", to: "c" },
+			],
+			sections: [{ id: "middle", label: "Middle", nodes: ["b", "c"] }],
+		});
+		const plan = planned(planSubflowFromSection(flow, "middle", plain));
+		expect(errorsOf(plan, "middle")).toEqual([]);
+		// Every outcome ends the flow, each with its own label.
+		expect(change(plan.changes, "ends-inside")[0]?.ends).toEqual([
+			{ node: "c", outcome: "new", option: "new" },
+			{ node: "c", outcome: "changed", option: "changed" },
+			{ node: "c", outcome: "same", option: "same" },
+		]);
+		expect(nodeOf(plan.caller, "middle_ended")).toMatchObject({
+			options: [
+				{ name: "new", when: 'middle.ended = "new"' },
+				{ name: "changed", when: 'middle.ended = "changed"' },
+				// The last option takes what is left.
+				{ name: "same" },
+			],
+		});
+	});
+
 	test("a cascade Decision's fail without an edge fails the step, as in the engine: only its options end the flow", () => {
 		const decision = {
 			id: "c",

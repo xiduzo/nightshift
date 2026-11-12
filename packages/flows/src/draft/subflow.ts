@@ -50,6 +50,7 @@ import {
 	reservedNames,
 	reservedOutcomes,
 	ruleOwnNames,
+	sinceLastRunOutcomes,
 	type VariableWrite,
 } from "../nodes";
 import {
@@ -343,7 +344,8 @@ function ruleRunFields(text: string): CallRunField[] {
 /**
  * Whether the node ending with `outcome` and no edge ends its flow as
  * chosen (`finished`), not as a failure. The same facts as the engine's
- * node kinds (`isChosenEnd`); a stop never ends a flow.
+ * node kinds (`isChosenEnd`, pinned per kind in the engine's
+ * `node-kinds.test.ts`): change both together. A stop never ends a flow.
  */
 function endsFlow(node: FlowNode, outcome: string): boolean {
 	if (outcome === "stopped") return false;
@@ -378,7 +380,7 @@ function endsFlow(node: FlowNode, outcome: string): boolean {
 		case "service":
 			return outcome === "ready";
 		case "since-last-run":
-			return true;
+			return sinceLastRunOutcomes.some((own) => own === outcome);
 	}
 }
 
