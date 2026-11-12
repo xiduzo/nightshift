@@ -28,3 +28,12 @@ export type DashboardInput = Omit<
 	NonNullable<ApiInputs["dashboard"]["summary"]>,
 	"timeZone"
 >;
+
+/** What the runs of a Space cost, how steady that is, and where a change saves. */
+export type SpaceSpend = ApiOutputs["dashboard"]["spend"];
+/** The Spend page over the last 7, 30 or 90 days. */
+export type SpendDays = SpaceSpend["ranges"][number];
+/** One flow on the Spend page. */
+export type SpendFlow = SpendDays["flows"][number];
+/** One way to save on one flow. */
+export type SpendSaving = SpendDays["savings"][number];

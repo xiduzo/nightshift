@@ -5,7 +5,6 @@ export {
 	AskAgentButton,
 	useAgentAsk,
 } from "./components/ask-agent";
-export { CostWithTokens } from "./components/cost-text";
 export { QuickRunDialog } from "./components/new-run-form";
 export { ProjectRunsPage } from "./components/project-runs-page";
 export { ReportPreview } from "./components/report-preview";

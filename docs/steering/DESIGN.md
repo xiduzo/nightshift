@@ -81,7 +81,7 @@ A project's page shows where each of its flows still needs you (`docs/research/d
 - One card of numbers: **Needed you without a plan**, **Needed you as planned**, **On its own** (how many flows are at that level), and **How N runs ended** as one bar. The first two count each time you stepped in, not each run. Each says how it moved against the same days just before. That is not a choice.
 - **Details** next to a number opens its details dialog at the page's range.
 - Under it, one card with one row per flow (see Flow health). The flows that needed you most without a plan come first.
-- The page shows no spend of its own. **Spend** in the heading opens the spend details, until Spend has its own page. Cost stays only as evidence of a flow: what a finished run costs, and what a useful result costs.
+- The page shows no spend of its own. **Spend** in the heading opens the Spend page at the page's range. Cost stays only as evidence of a flow: what a finished run costs, and what a useful result costs.
 - A test run counts only in the spend. Every other number leaves it out (`isTestRun`, one rule for every number). So does the sidebar's runs donut. The run page and every run list show a **Test run** badge. On the phone, the Runs chips and the Watch numbers leave it out, and the cost caption names it ("Of 8 runs and 1 test run").
 - An older Host sends no level and no planned split: a dash.
 - Setup does not go on this page. Its other pages sit under the project in the sidebar.
@@ -103,6 +103,21 @@ Home is a note over every project that you read top to bottom. It guards the flo
 - A test run does not count on Home.
 - An older Host sends no watch: one line asks to update Night Shift, and What came out still shows.
 - A run page opens at its report when the run ended with one and the link names no step.
+
+### Spend
+
+Spend is the page for the money of a Space, for the person who pays (`docs/research/dashboards-2026-11.md`, Q9). It sits under the Inbox in the sidebar. Keep its shape:
+
+- One range for the whole page, in the heading: 7, 30 or 90 days, in the URL (`?range=90`). It opens at 30 days.
+- Four cards on top: **Spent** against the same days before, with one bar per day, **Steady flows**, **Hard to predict**, and **You could save**.
+- **How predictable each flow is** has one row per flow that cost money, the most spend first. A strip shows what its runs cost against a usual run of that flow. A usual run is the median of its finished runs with a known cost. Every strip has the same scale, 0× to 6× a usual run, so a short strip means a steady cost.
+- **Cost is** says **Steady**, **Varies** or **Hard to predict**. Night Shift reads it from the runs. Nobody sets a threshold. A flow with fewer than 3 such runs has none.
+- A row opens in place: what each step costs per run, what stands out on a step, and the ways to save on that flow.
+- The flows that cost nothing share one row. So do the quick runs. The last row is the total.
+- **Ways to save** lists changes that the runs show, the biggest first: runs that did not finish, runs that found nothing to do, and runs that cost over twice a usual run. A run counts under one of them only. Each card says what the change saves, how many runs show it, and opens the newest of those runs and the flow.
+- The page never shows a saving that the runs do not show. It does not guess what another model or a removed step saves.
+- A test run counts in the spend. It is not in a usual run or in a way to save.
+- An older Host cannot send the page: one alert asks to update Night Shift.
 
 ### Knowledge
 

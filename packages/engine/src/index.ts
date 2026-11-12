@@ -49,10 +49,14 @@ export {
 	startTestInputSchema,
 } from "./contract";
 export {
+	COST_STEADINESS,
 	type DashboardSummary,
 	type FlowHealthDetail,
 	isTimeZone,
 	projectDashboard,
+	SAVING_KINDS,
+	type SpaceSpend,
+	spaceSpend,
 	spacesDashboard,
 	summarizeFlow,
 } from "./dashboard";
