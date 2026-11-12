@@ -1,4 +1,5 @@
 import type { RunSummary } from "../read";
+import { isTestRun } from "../run-status";
 import { dayStart, lastDays } from "./clock";
 import { neededRange, neededReasons } from "./needed";
 import {
@@ -39,6 +40,14 @@ const GATE_STATES: GateState[] = ["answered", "unanswered", "waiting"];
 /** A run with the start of its day and its group, worked out once. */
 export type PlacedRun = { run: RunSummary; day: number; group: string };
 
+/**
+ * The runs without the test runs (`isTestRun`): every number but spend
+ * counts these.
+ */
+export function notTests(runs: readonly PlacedRun[]): PlacedRun[] {
+	return runs.filter(({ run }) => !isTestRun(run));
+}
+
 /** A Gate a run asked, with the start of the day it opened in. */
 type PlacedGate = AskedGate & { day: number };
 
@@ -46,7 +55,7 @@ type PlacedGate = AskedGate & { day: number };
  * Every Gate the runs asked. A Gate is answered when a person chose its
  * option. One whose deadline chose, or that closed with no answer (its
  * run stopped or failed while it waited), was not answered. An open one
- * waits while its run waits.
+ * waits while its run waits. The caller leaves the test runs out.
  */
 export function askedGates(
 	runs: readonly PlacedRun[],
@@ -364,7 +373,10 @@ function gatesOf(days: readonly number[], asked: PlacedGate[]): GatesRange {
 	};
 }
 
-/** The headline numbers of `days`, per day and in all. */
+/**
+ * The headline numbers of `days`, per day and in all. A test run counts
+ * only in the spend. `gates` are of the other runs only.
+ */
 function totalsOf(
 	days: readonly number[],
 	runs: readonly PlacedRun[],
@@ -372,17 +384,18 @@ function totalsOf(
 ): PeriodTotals {
 	const perNight = days.map((day): NightTotals => {
 		const ofDay = runs.filter((placed) => placed.day === day);
-		const finished = ofDay.filter(({ run }) => run.status === "finished");
-		const failed = ofDay.filter(({ run }) => run.status === "failed");
+		const counted = notTests(ofDay);
+		const finished = counted.filter(({ run }) => run.status === "finished");
+		const failed = counted.filter(({ run }) => run.status === "failed");
 		return {
 			night: day,
-			runs: ofDay.length,
+			runs: counted.length,
 			ended: finished.length + failed.length,
 			finished: finished.length,
 			costUsd: ofDay.reduce((sum, { run }) => sum + run.costUsd, 0),
 			tokens: ofDay.reduce((sum, { run }) => sum + usedTokens(run), 0),
 			gates: gates.filter((gate) => gate.day === day).length,
-			neededYou: ofDay.filter(({ run }) => neededReasons(run).length > 0)
+			neededYou: counted.filter(({ run }) => neededReasons(run).length > 0)
 				.length,
 		};
 	});
@@ -403,7 +416,8 @@ function totalsOf(
 /**
  * Spend, runs, Gates, Needed you and the latest reports over the last
  * `range` days, today included, and the headline numbers of the `range`
- * days before. Flow health is the caller's: it needs the flows.
+ * days before. Flow health is the caller's: it needs the flows. A test
+ * run counts only in the spend. `gates` are of the other runs only.
  */
 export function nightsRange(
 	range: NightRange,
@@ -416,17 +430,18 @@ export function nightsRange(
 	const days = both.slice(range);
 	const first = days[0] ?? 0;
 	const inRange = runs.filter(({ day }) => day >= first);
+	const counted = notTests(inRange);
 	const asked = gates
 		.filter((gate) => gate.day >= first)
 		.sort((a, b) => a.openedAt - b.openedAt);
 	return {
 		nights: range,
 		spend: spendOf(days, inRange),
-		runs: runsOf(days, inRange),
+		runs: runsOf(days, counted),
 		gates: gatesOf(days, asked),
 		needed: neededRange(
 			days,
-			inRange.map(({ run, day, group }) => ({
+			counted.map(({ run, day, group }) => ({
 				runId: run.id,
 				title: run.title,
 				createdAt: run.createdAt,
@@ -435,7 +450,7 @@ export function nightsRange(
 				reasons: neededReasons(run),
 			})),
 		),
-		reports: reportsOf(inRange),
+		reports: reportsOf(counted),
 		totals: totalsOf(days, inRange, asked),
 		before: totalsOf(both.slice(0, range), runs, gates),
 	};

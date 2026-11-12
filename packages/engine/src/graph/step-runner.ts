@@ -29,6 +29,7 @@ import {
 } from "../log";
 import type { StepMemory } from "../memory";
 import { deriveBudgetSpend, deriveWorktrees, pullRequestOf } from "../read";
+import { isTestRun } from "../run-status";
 import { keptNames } from "../variables";
 import { OUTRUN_ERROR, outrun, placeOf } from "./branches";
 import { budgetPassed, runBudget } from "./budget";
@@ -1023,7 +1024,7 @@ export async function beginStep(
 					: undefined;
 			// A test run keeps nothing that lasts (ADR 27): no kept values, no
 			// memory and no shapes. Its steps still read them.
-			const lasting = logged.test === null;
+			const lasting = !isTestRun(logged);
 			// A write of a kept variable saves it for the next run: the log
 			// writes the values `kept` names, in the batch of the step's end.
 			const keptFlow = variables && lasting ? keptFlowOf(ctx, scope) : null;

@@ -1,7 +1,7 @@
 import type { RunSummary } from "../read";
 import { DAY_MS, dayStart, HOUR_MS, lastHours } from "./clock";
 import { FLOW_HEALTH_DAYS, flowHealthRows } from "./flow-health";
-import { askedGates, nightsRange, type PlacedRun } from "./nights";
+import { askedGates, nightsRange, notTests, type PlacedRun } from "./nights";
 import {
 	isOpen,
 	sumKnownCost,
@@ -319,7 +319,9 @@ function upNextOf(runs: readonly RunSummary[], now: number): UpcomingRun[] {
 /**
  * The dashboard of `runs`: the stat cards and their details for every
  * range a toggle offers, what the latest day produced, what comes next,
- * and (for one project) the health of its flows.
+ * and (for one project) the health of its flows. A test run shows where
+ * runs are listed or at work, and counts in the spend. The numbers of the
+ * day ranges and Flow health leave it out (`isTestRun`).
  */
 export function summarizeDashboard(
 	runs: readonly RunSummary[],
@@ -332,7 +334,8 @@ export function summarizeDashboard(
 		day: dayStart(run.createdAt, timeZone),
 		group: group(run),
 	}));
-	const gates = askedGates(placed, now, timeZone);
+	// The Gates of a test run are a try: they count nowhere.
+	const gates = askedGates(notTests(placed), now, timeZone);
 	const open = placed
 		.filter(({ run }) => isOpen(run))
 		.sort((a, b) => a.run.createdAt - b.run.createdAt);

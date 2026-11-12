@@ -1277,3 +1277,132 @@ describe("the latest reports", () => {
 		expect(rows.get("idle")).toBeUndefined();
 	});
 });
+
+describe("test runs", () => {
+	/** A run started from the editor with a pinned node (ADR 27). */
+	const tried = (fields: Partial<RunSummary> = {}): RunSummary =>
+		aRun({ test: { pinned: ["fetch"], skipped: [] }, ...fields });
+	const metrics = (score: string) => ({
+		wallMs: 1,
+		agentMs: 1,
+		gateWaitMs: 0,
+		tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		costBasis: "billed" as const,
+		prUrl: null,
+		scores: [{ score, value: 1, label: null, stepId: null, at: NOW, by: null }],
+		ladder: [
+			{
+				ladder: "work" as const,
+				nodeId: "write",
+				rung: "first" as const,
+				by: "agent" as const,
+				tier: null,
+				landed: 1,
+				costUsd: 1,
+				costEstimated: false,
+				costMissing: 0,
+			},
+		],
+	});
+	const gate = {
+		openedAt: TODAY + HOUR,
+		closedAt: TODAY + 2 * HOUR,
+		answeredBy: "person" as const,
+	};
+	const runs = () => [
+		aRun({ id: "real", costUsd: 1, createdAt: TODAY + HOUR }),
+		tried({
+			id: "try",
+			status: "failed",
+			costUsd: 2,
+			createdAt: TODAY + 2 * HOUR,
+			endedAt: TODAY + 3 * HOUR,
+			result: "done",
+			report: { stepId: "try-end", excerpt: "A try", more: false },
+			gates: [gate],
+			neededYou: [{ reason: "gate", at: TODAY + 2 * HOUR }],
+			metrics: metrics("useful"),
+			subflows: [
+				{
+					flowName: "fetch",
+					status: "failed",
+					costUsd: 0.5,
+					costEstimated: false,
+					costMissing: 0,
+					costCalls: 1,
+					startedAt: TODAY + 2 * HOUR,
+					endedAt: TODAY + 3 * HOUR,
+				},
+			],
+		}),
+	];
+
+	test("count in the spend of a range of days, and in none of its other numbers", () => {
+		const range = daysOf(summarize(runs(), project(["night", "fetch"])), 7);
+		expect(range.totals).toMatchObject({
+			runs: 1,
+			ended: 1,
+			finished: 1,
+			costUsd: 3,
+			gates: 0,
+			neededYou: 0,
+		});
+		expect(range.spend.total).toBe(3);
+		expect(range.spend.runs).toBe(2);
+		expect(range.runs).toMatchObject({ runs: 1, failed: { count: 0 } });
+		expect(range.runs.failing.count).toBe(0);
+		expect(range.gates.asked).toBe(0);
+		expect(range.needed).toMatchObject({ runs: 1, needed: 0 });
+		expect(range.reports).toEqual({ rows: [], count: 0 });
+	});
+
+	test("stay out of Flow health, its last runs and its report, also as a subflow", () => {
+		const summary = summarize(runs(), project(["night", "fetch"]));
+		const rows = new Map(
+			summary.flowHealth?.rows.map((row) => [row.name, row]),
+		);
+		expect(rows.get("night")).toMatchObject({
+			runs: 1,
+			finished: 1,
+			ended: 1,
+			lastRuns: [{ runId: "real" }],
+			useful: { answered: 0, useful: 0, costPerUseful: null },
+			neededYou: { runs: 1, needed: 0, reasons: [] },
+			ladders: { work: null, choice: null },
+		});
+		expect(rows.get("night")?.report).toBeUndefined();
+		expect(rows.get("fetch")).toMatchObject({ runs: 0, lastRuns: [] });
+	});
+
+	test("count in a flow's spend in detail, and say how many there were", () => {
+		const range = summarizeFlow("night", runs(), {
+			now: NOW,
+			timeZone: "UTC",
+		}).ranges[0];
+		expect(range).toMatchObject({
+			runs: 1,
+			ended: 1,
+			finished: 1,
+			unfinished: 0,
+			tests: 1,
+			spent: { costUsd: 3 },
+			spentUnfinished: { costUsd: 0 },
+			latest: [{ runId: "real" }],
+		});
+		const today = range?.perNight.at(-1);
+		expect(today?.counts).toEqual({ finished: 1 });
+		expect(today?.spent?.costUsd).toBe(3);
+		expect(today?.needed).toEqual({ runs: 1, needed: 0 });
+		expect(today?.metrics).toEqual({});
+
+		const called = summarizeFlow("fetch", runs(), {
+			now: NOW,
+			timeZone: "UTC",
+		}).ranges[0];
+		expect(called).toMatchObject({
+			runs: 0,
+			tests: 1,
+			spent: { costUsd: 0.5 },
+		});
+	});
+});

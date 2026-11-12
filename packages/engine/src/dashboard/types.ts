@@ -380,7 +380,10 @@ export type FlowReport = LatestReport & {
 	title: string;
 };
 
-/** The headline numbers of one day: runs, how they ended, spend, Gates, Needed you. */
+/**
+ * The headline numbers of one day: runs, how they ended, spend, Gates,
+ * Needed you. A test run counts only in the spend (`costUsd`, `tokens`).
+ */
 export type NightTotals = {
 	/** The start of the day. */
 	night: number;
@@ -388,9 +391,9 @@ export type NightTotals = {
 	/** Runs that finished or failed. */
 	ended: number;
 	finished: number;
-	/** What the runs spent, the steps with a known cost. */
+	/** What the runs spent, the steps with a known cost, the test runs too. */
 	costUsd: number;
-	/** Tokens the runs used. */
+	/** Tokens the runs used, the test runs too. */
 	tokens: number;
 	/** Gates the runs asked. */
 	gates: number;
@@ -407,7 +410,11 @@ export type PeriodTotals = Omit<NightTotals, "night"> & {
 	perNight: NightTotals[];
 };
 
-/** The details over the last `nights` days, today included. */
+/**
+ * The details over the last `nights` days, today included. A test run
+ * (`isTestRun`) counts in `spend` and in the spend of the totals only:
+ * runs, Gates, Needed you, the reports and Flow health leave it out.
+ */
 export type NightsRange = {
 	/** How many days. */
 	nights: NightRange;
@@ -465,7 +472,11 @@ export type LastFlowRun = {
 /** How many of a flow's last runs a Flow health row carries. */
 export const LAST_FLOW_RUNS = 10;
 
-/** One row of Flow health: a flow over the last days. */
+/**
+ * One row of Flow health: a flow over the last days. A test run
+ * (`isTestRun`) is not in it: not in its last runs, its numbers or its
+ * report.
+ */
 export type FlowHealthRow = {
 	name: string;
 	last: LastFlowRun | null;
@@ -727,9 +738,15 @@ export type FlowRange = {
 	tokenUse: Spread | null;
 	/** How long a finished run took. */
 	length: Spread | null;
+	/** What every run in the days spent, the test runs too. */
 	spent: KnownCost;
 	/** Tokens of the runs in `spent`. A run that reported none counts as 0. */
 	spentTokens: number;
+	/**
+	 * The test runs in the days (`isTestRun`). Only `spent`, `spentTokens`
+	 * and the spend per day count them. Older Hosts send none.
+	 */
+	tests?: number;
 	spentUnfinished: KnownCost;
 	/** Tokens of the runs in `spentUnfinished`. */
 	unfinishedTokens: number;

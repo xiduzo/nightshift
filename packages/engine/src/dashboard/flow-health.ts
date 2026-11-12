@@ -1,6 +1,6 @@
 import type { RunScore } from "../log";
 import type { NeededYouReason, RunRung, RunSummary } from "../read";
-import { finishedShare, usefulAnswer } from "../run-status";
+import { finishedShare, isTestRun, usefulAnswer } from "../run-status";
 import { dayStart, lastDays } from "./clock";
 import { flowLadders, flowRangeLadders } from "./ladders";
 import { countReasons, neededReasons } from "./needed";
@@ -37,7 +37,11 @@ import {
 /** The days a Flow health row covers. */
 export const FLOW_HEALTH_DAYS: NightRange = 30;
 
-/** A run of a flow with its warnings, its scores, why it needed you, where its work landed and the start of the day it started in. */
+/**
+ * A run of a flow with its warnings, its scores, why it needed you, where
+ * its work landed, the start of the day it started in, and whether it is
+ * part of a test run.
+ */
 type PlacedFlowRun = Omit<FlowRun, "warnings"> & {
 	warnings: RunSummary["warnings"];
 	/** Its scores. A subflow run has none: they are in the run that called it. */
@@ -47,6 +51,8 @@ type PlacedFlowRun = Omit<FlowRun, "warnings"> & {
 	/** Where its work landed. A subflow run has none: it is in the run that called it. */
 	ladder: RunRung[];
 	day: number;
+	/** Part of a test run (`isTestRun`): only its spend counts. */
+	test: boolean;
 };
 
 /** The runs of the flow `name` in `runs`, on their own and as a subflow. */
@@ -75,6 +81,7 @@ function runsOf(
 						needed: neededReasons(run),
 						ladder: run.metrics?.ladder ?? [],
 						day: dayStart(run.createdAt, timeZone),
+						test: isTestRun(run),
 					},
 				]
 			: []),
@@ -97,6 +104,7 @@ function runsOf(
 				needed: [],
 				ladder: [],
 				day: dayStart(subflow.startedAt, timeZone),
+				test: isTestRun(run),
 			})),
 	]);
 }
@@ -133,6 +141,7 @@ function toFlowRun({
 	scores: _scores,
 	needed: _needed,
 	ladder: _ladder,
+	test: _test,
 	...run
 }: PlacedFlowRun): FlowRun {
 	return { ...run, warnings: run.warnings.length };
@@ -209,24 +218,32 @@ function metricsOf(
 /**
  * One day of the flow: its runs per status (every status the range has, 0
  * included), what they spent, how often its own runs needed you, and its
- * metrics.
+ * metrics. A test run counts only in what they spent.
  */
 function flowDay(
 	day: number,
 	runs: readonly PlacedFlowRun[],
 	statuses: readonly { status: string }[],
 ): FlowDay {
+	const counted = notTests(runs);
 	const counts: Record<string, number> = {};
 	for (const { status } of statuses) counts[status] = 0;
-	for (const run of runs) counts[run.status] = (counts[run.status] ?? 0) + 1;
-	const needed = neededYouOf(runs);
+	for (const run of counted) {
+		counts[run.status] = (counts[run.status] ?? 0) + 1;
+	}
+	const needed = neededYouOf(counted);
 	return {
 		night: day,
 		counts,
 		spent: sumKnownCost(runs),
 		needed: { runs: needed.runs, needed: needed.needed },
-		metrics: metricsOf(runs),
+		metrics: metricsOf(counted),
 	};
+}
+
+/** The runs without the test runs: every number but spend counts these. */
+function notTests(runs: readonly PlacedFlowRun[]): PlacedFlowRun[] {
+	return runs.filter((run) => !run.test);
 }
 
 /** The ladder rows of the flow's own runs: a run as a subflow has none. */
@@ -271,7 +288,8 @@ function neededYouOf(runs: readonly PlacedFlowRun[]): FlowNeededYou {
 /**
  * The newest report of the flow's own runs, of any day. A run as a
  * subflow has no report of its own: its End's report went to the run
- * that called it, as `end_report`.
+ * that called it, as `end_report`. A test run's report is a try, not a
+ * result: it does not count.
  */
 function reportOf(
 	name: string,
@@ -279,7 +297,7 @@ function reportOf(
 ): LatestReport | null {
 	let newest: LatestReport | null = null;
 	for (const run of runs) {
-		if (run.flowName !== name) continue;
+		if (run.flowName !== name || isTestRun(run)) continue;
 		const report = toLatestReport(run);
 		if (report && (newest === null || report.endedAt > newest.endedAt)) {
 			newest = report;
@@ -293,8 +311,9 @@ function reportOf(
  * where its work landed, how often it finished, what a finished run costs,
  * what a useful result costs, and how often its runs needed you. A
  * stopped run did not finish, so it counts against it. A flow a Subflow
- * node ran counts too, inside the run that called it. The busiest flows
- * first, then the one that ran last.
+ * node ran counts too, inside the run that called it. A test run does not
+ * count at all: a row has no spend total. The busiest flows first, then
+ * the one that ran last.
  */
 export function flowHealthRows(
 	flows: readonly string[],
@@ -305,7 +324,7 @@ export function flowHealthRows(
 ): TopRows<FlowHealthRow> {
 	const first = lastDays(days, now, timeZone)[0] ?? 0;
 	const rows = flows.map((name): FlowHealthRow => {
-		const mine = runsOf(name, runs, timeZone);
+		const mine = notTests(runsOf(name, runs, timeZone));
 		const lastRuns = [...mine]
 			.sort((a, b) => b.startedAt - a.startedAt)
 			.slice(0, LAST_FLOW_RUNS)
@@ -410,7 +429,10 @@ function warningsOf(runs: readonly PlacedFlowRun[]): FlowWarning[] {
 		.map(({ runIds: _runIds, ...row }) => row);
 }
 
-/** One flow over the last `range` days. */
+/**
+ * One flow over the last `range` days. A test run counts only in what the
+ * runs spent: in all, and per day.
+ */
 function flowRange(
 	range: NightRange,
 	mine: readonly PlacedFlowRun[],
@@ -419,9 +441,10 @@ function flowRange(
 ): FlowRange {
 	const days = lastDays(range, now, timeZone);
 	const first = days[0] ?? 0;
-	const inRange = mine
+	const withTests = mine
 		.filter((run) => run.day >= first)
 		.sort((a, b) => a.startedAt - b.startedAt);
+	const inRange = notTests(withTests);
 	const ended = inRange.filter(hasEnded);
 	const finished = ended.filter((run) => run.status === "finished");
 	const unfinished = ended.filter((run) => run.status !== "finished");
@@ -434,7 +457,7 @@ function flowRange(
 	const perNight = days.map((day) =>
 		flowDay(
 			day,
-			inRange.filter((run) => run.day === day),
+			withTests.filter((run) => run.day === day),
 			statuses,
 		),
 	);
@@ -452,8 +475,9 @@ function flowRange(
 				run.endedAt === null ? [] : [run.endedAt - run.startedAt],
 			),
 		),
-		spent: sumKnownCost(inRange),
-		spentTokens: inRange.reduce((total, run) => total + (run.tokens ?? 0), 0),
+		spent: sumKnownCost(withTests),
+		spentTokens: withTests.reduce((total, run) => total + (run.tokens ?? 0), 0),
+		tests: withTests.length - inRange.length,
 		spentUnfinished: sumKnownCost(unfinished),
 		unfinishedTokens: unfinished.reduce(
 			(total, run) => total + (run.tokens ?? 0),
@@ -491,7 +515,8 @@ function flowRange(
  * One flow in detail, for each day range: runs, spend, Needed you and
  * metrics per day, where its work landed, what each run cost, what a
  * useful result cost, why runs did not finish, and the latest runs. Runs
- * as a subflow count, as in its Flow health row.
+ * as a subflow count, as in its Flow health row. A test run counts only in
+ * the spend.
  */
 export function summarizeFlow(
 	name: string,

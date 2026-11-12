@@ -25,7 +25,7 @@ import {
 	type TranscriptEntry,
 	type WaitReason,
 } from "../log";
-import type { RunStatus } from "../run-status";
+import { isTestRun, type RunStatus } from "../run-status";
 import { inboxOrder } from "./inbox";
 import { landingsOf, runRungs } from "./ladder";
 import { neededYouOf } from "./needed-you";
@@ -185,7 +185,7 @@ export function runFacts(run: RunState) {
 		/** The worktree the log names: a run row has none when its Device was offline at the start. */
 		worktree: run.worktree,
 		...(run.runFolder ? { runFolder: true } : {}),
-		...(run.test ? { test: testOf(run.test) } : {}),
+		...(isTestRun(run) ? { test: testOf(run.test) } : {}),
 		metrics: {
 			...runMetrics(
 				steps,

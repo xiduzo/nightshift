@@ -464,6 +464,8 @@ export const flowHealthDetailSchema = exact<FlowHealthDetail>()(
 				length: spreadSchema.nullable(),
 				spent: knownCostSchema,
 				spentTokens: z.number(),
+				// Test runs: only the spend counts them. Older Hosts send none.
+				tests: z.number().optional(),
 				spentUnfinished: knownCostSchema,
 				unfinishedTokens: z.number(),
 				dearest: z
