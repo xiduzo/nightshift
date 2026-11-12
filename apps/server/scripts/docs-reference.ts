@@ -55,9 +55,12 @@ import {
 	NODE_TYPE_LABEL,
 	type ProjectFlowMap,
 	proposalIssues,
+	secretNameSchema,
+	secretParts,
 	starterList,
 	tierNode,
 	valueDecider,
+	type WebRequestNode,
 } from "@nightshift/flows";
 
 const ROOT = join(import.meta.dir, "../../..");
@@ -200,6 +203,34 @@ const code = (names: Iterable<string>) =>
 	[...names].map((name) => `\`${name}\``);
 
 /**
+ * The secrets a Web request names: the one that holds its URL, when it
+ * names one plainly, and each `${NAME}` of its own text. A URL secret that
+ * is a template (`{{webhook}}`) names it only when the run renders it.
+ */
+function webRequestSecrets(node: WebRequestNode): string[] {
+	const { body } = node;
+	const texts = [
+		node.url ?? "",
+		...Object.values(node.query ?? {}),
+		...Object.values(node.headers ?? {}),
+		...(body === undefined
+			? []
+			: body.kind === "form"
+				? Object.values(body.fields)
+				: [body.value]),
+	];
+	const urlSecret = node.urlSecret?.trim() ?? "";
+	return [
+		...(secretNameSchema.safeParse(urlSecret).success ? [urlSecret] : []),
+		...texts.flatMap((text) =>
+			secretParts(text).flatMap((part) =>
+				"secret" in part ? [part.secret] : [],
+			),
+		),
+	];
+}
+
+/**
  * What a flow needs on the computer that runs it: its agents and models,
  * CLI tools, secrets, connections (MCP servers), kits, the flows it calls,
  * and skills. Only the kinds it needs, each name once.
@@ -232,6 +263,9 @@ export function flowNeeds(flow: Flow): Need[] {
 			case "command":
 			case "service":
 				for (const name of node.secrets ?? []) secrets.add(name);
+				break;
+			case "web-request":
+				for (const name of webRequestSecrets(node)) secrets.add(name);
 				break;
 			case "tool":
 				connections.add(node.connection);

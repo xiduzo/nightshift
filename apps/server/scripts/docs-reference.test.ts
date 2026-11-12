@@ -206,6 +206,41 @@ describe("flowNeeds", () => {
 		);
 	});
 
+	test("a Web request needs the secret that holds its URL and each secret of its text", () => {
+		const request = (id: string, extra: Record<string, unknown>) => ({
+			id,
+			type: "web-request",
+			position: { x: 0, y: 0 },
+			...extra,
+		});
+		const flow = flowSchema.parse({
+			version: FLOW_VERSION,
+			start: "post",
+			nodes: [
+				request("post", {
+					method: "POST",
+					urlSecret: "HOOK_URL",
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
+					headers: { Authorization: "Bearer ${API_TOKEN}" },
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
+					body: { kind: "form", fields: { key: "${FORM_KEY}" } },
+				}),
+				// A URL secret from an input is named only when the run renders it.
+				request("get", {
+					urlSecret: "{{channel}}",
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
+					query: { token: "${API_TOKEN}" },
+				}),
+			],
+			edges: [],
+			inputs: [{ name: "channel" }],
+		});
+		expect(needsList(flowNeeds(flow))).toBe(
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: secret references, as a person writes them.
+			"- Secrets: `${HOOK_URL}`, `${API_TOKEN}`, `${FORM_KEY}`",
+		);
+	});
+
 	test("a flow of commands without secrets needs Night Shift only", () => {
 		const flow = flowSchema.parse(commandFile());
 		expect(flowNeeds(flow)).toEqual([]);
