@@ -468,6 +468,7 @@ export {
 	fromJsonSchema,
 	inferSchema,
 	mainOutputField,
+	outputFieldShape,
 	RESERVED_DATA_KEYS,
 	type SchemaField,
 	type SchemaShape,

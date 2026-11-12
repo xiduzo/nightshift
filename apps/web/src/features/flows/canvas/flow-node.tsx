@@ -32,6 +32,7 @@ import {
 import {
 	ArrowRightLeftIcon,
 	CircleAlertIcon,
+	LoaderCircleIcon,
 	LockIcon,
 	MonitorIcon,
 	PlayIcon,
@@ -57,6 +58,7 @@ import {
 	type StepState,
 	stepStateStyle,
 } from "./outcome-badge";
+import type { SampleLine } from "./viewer/gist";
 
 export type NodeRunState = {
 	/** The state of the node's latest step. */
@@ -73,6 +75,11 @@ export type FlowNodeData = {
 	run?: NodeRunState | null;
 	/** A proposed change on view: how the node differs from the draft. */
 	change?: DiffMark;
+	/**
+	 * Editor only, once the flow has a run: what the node gave in its newest
+	 * run, in one line at the bottom of the card.
+	 */
+	sample?: SampleLine;
 };
 
 /** How a node or edge of a proposed flow differs from the editor's draft. */
@@ -320,7 +327,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 	selected,
 	isConnectable,
 }: NodeProps<FlowCanvasNode>) {
-	const { node, isStart, issues, run, change } = data;
+	const { node, isStart, issues, run, change, sample } = data;
 	const errors = issues.filter((issue) => issue.severity === "error");
 	const warnings = issues.filter((issue) => issue.severity === "warning");
 	// A Decision is named a Gate or a Branch by who decides it.
@@ -610,6 +617,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 						})}
 					</ul>
 				)}
+				{sample ? <SampleStrip line={sample} /> : null}
 			</div>
 			{overview ? (
 				<div
@@ -628,6 +636,37 @@ const FlowNodeCard = memo(function FlowNodeCard({
 		</div>
 	);
 });
+
+/**
+ * The node's viewer: what it gave in the flow's newest run, in one line.
+ * It sits at the bottom of the card with a fixed height, so no handle
+ * moves and the routes of the last layout hold. A click selects the node.
+ */
+function SampleStrip({ line }: { line: SampleLine }) {
+	return (
+		<div
+			className="flex h-6 min-w-0 items-center gap-1.5 rounded-b-[calc(var(--radius-xl)-1px)] border-t bg-muted/50 px-2.5 text-[11px] text-muted-foreground"
+			title={line.kind === "output" ? `${line.field}: ${line.text}` : undefined}
+		>
+			{line.kind === "running" ? (
+				<>
+					<LoaderCircleIcon
+						className="size-3 shrink-0 animate-spin motion-reduce:animate-none"
+						aria-hidden="true"
+					/>
+					Running
+				</>
+			) : line.kind === "absent" ? (
+				<span className="truncate italic">Not in the last run</span>
+			) : (
+				<>
+					<span className="sr-only">Last output: </span>
+					<span className="truncate">{line.text}</span>
+				</>
+			)}
+		</div>
+	);
+}
 
 /**
  * How an End node ends the run, where other nodes list their outcomes:

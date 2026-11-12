@@ -38,6 +38,7 @@ import { ConvertFields } from "./convert-fields";
 import { DecisionFields } from "./decision-fields";
 import { EndFields } from "./end-fields";
 import { JoinFields } from "./join-fields";
+import { LastOutputSection } from "./last-output-section";
 import { LeaseFields } from "./lease-fields";
 import { ServiceFields } from "./service-fields";
 import { SinceLastRunFields } from "./since-last-run-fields";
@@ -163,6 +164,9 @@ export function NodeInspector({
 			</div>
 
 			<InspectorTabs>
+				{/* First on the Results tab: what the node gave in the last run. */}
+				<LastOutputSection node={node} />
+
 				{node.type === "agent" ? (
 					<AgentFields
 						projectId={projectId}

@@ -65,6 +65,8 @@ import {
 	EnterSubflowContext,
 	OpenFlowContext,
 } from "../canvas/open-flow-context";
+import { NodeSamplesContext } from "../canvas/viewer/node-samples-context";
+import { useNodeSamples } from "../canvas/viewer/use-node-samples";
 import type { ChatLink } from "../chat/chat-link";
 import { FlowChatPanel } from "../chat/chat-panel";
 import { ProposalBar } from "../chat/proposal-bar";
@@ -224,6 +226,8 @@ function Editor({
 		cliTools,
 		deviceNames,
 	} = useEditorData(projectId, name);
+	// What each node gave in the flow's newest runs: the viewers.
+	const samples = useNodeSamples({ projectId, flowName: name, flow: draft });
 	const check = useMemo(
 		() =>
 			checkFlow(
@@ -874,6 +878,7 @@ function Editor({
 										openSection={preview ? null : openSection}
 										onOpenSection={setOpenSection}
 										flowLabel={name}
+										samples={samples}
 									/>
 								</EnterSubflowContext.Provider>
 							</OpenFlowContext.Provider>
@@ -967,7 +972,9 @@ function Editor({
 									<FlowAssistantContext.Provider value={assistant}>
 										{/* An undo or a redo starts the fields again from the draft. */}
 										<div key={`${selectionKey(selection)}#${revision}`}>
-											{inspector}
+											<NodeSamplesContext.Provider value={samples}>
+												{inspector}
+											</NodeSamplesContext.Provider>
 										</div>
 									</FlowAssistantContext.Provider>
 								</FloatingInspector>

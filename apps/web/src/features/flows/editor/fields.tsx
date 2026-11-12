@@ -214,7 +214,9 @@ export function InspectorSection({
 			open={open}
 			onOpenChange={setOpen}
 			hidden={!shown}
-			className="border-t first:border-t-0"
+			// A line above it only when something shows above it: the first
+			// section on a tab has none, also when sections of other tabs come first.
+			className="[:not([hidden])~&]:border-t"
 			render={<section aria-labelledby={headingId} />}
 		>
 			<h3 id={headingId}>

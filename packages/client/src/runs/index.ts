@@ -75,6 +75,7 @@ export { projectPath } from "./project-path";
 export { createRunQueries } from "./queries";
 export { runReport } from "./report";
 export { type RerunStart, rerunStarts, runningStep } from "./retry";
+export { type NodeSample, nodeSamples } from "./samples";
 export { finishedShare } from "./share";
 export {
 	applyStepChanges,

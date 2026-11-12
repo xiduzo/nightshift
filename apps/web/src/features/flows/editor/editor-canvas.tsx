@@ -1,3 +1,4 @@
+import type { NodeSample } from "@nightshift/client";
 import type { Flow, FlowIssue, Outcome } from "@nightshift/flows";
 import {
 	addEdge,
@@ -67,6 +68,7 @@ import {
 	useSectionCanvas,
 } from "../canvas/sections/use-section-canvas";
 import { useMeasured } from "../canvas/use-measured";
+import { sampleLine } from "../canvas/viewer/gist";
 import { CanvasControls } from "./canvas-controls";
 import { fitViewOptions } from "./fit-view";
 import { loadElk } from "./lib/elk";
@@ -162,6 +164,7 @@ export function EditorCanvas({
 	flowLabel,
 	preview,
 	coveredRight = 0,
+	samples,
 }: {
 	flow: Flow;
 	/** Names the flow for the routes this browser keeps of its last layout. */
@@ -191,6 +194,12 @@ export function EditorCanvas({
 	preview?: CanvasPreview;
 	/** Pixels of the canvas's right side a panel covers: a fit keeps the flow beside it. */
 	coveredRight?: number;
+	/**
+	 * What each node gave in the flow's newest runs (`useNodeSamples`): each
+	 * node shows it in its viewer. Null or absent: no viewers. A proposal
+	 * shows none.
+	 */
+	samples?: ReadonlyMap<string, NodeSample> | null;
 }) {
 	const [measured, applyDimensions] = useMeasured();
 	const { fitView } = useReactFlow();
@@ -287,6 +296,9 @@ export function EditorCanvas({
 								isStart: view.start === node.id,
 								issues: counts.byNode.get(node.id) ?? NO_ISSUES,
 								change: preview?.nodes.get(node.id),
+								...(samples && !preview
+									? { sample: sampleLine(node, samples.get(node.id)) }
+									: {}),
 							},
 						},
 					],
@@ -301,6 +313,7 @@ export function EditorCanvas({
 		hidden,
 		sections.boxes,
 		preview,
+		samples,
 	]);
 
 	// The routes of the last "Lay out". Each holds while its nodes stay put.
