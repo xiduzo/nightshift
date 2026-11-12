@@ -15,6 +15,7 @@ import type {
 	StepEvent,
 	StepOutputs,
 } from "../../../log";
+import { type Climb, climbOutputs } from "../../cascade";
 import { messageOf, type NodeAction, type StepContext } from "../../context";
 import { openGate, scoreGate } from "../../gate";
 import { type BriefSpec, writeBrief } from "../../gate-brief";
@@ -103,13 +104,15 @@ export function decisionBrief(
 
 /**
  * What a Gate asks: the question (rendered when it opens), the choices,
- * and its deadline. A Decision's Gate asks its prompt and options. The
- * person tier of a cascade (ADR 6) asks what the tiers did: its step has
- * no timers (`untimed`), its `outputs` are the fields its end keeps, and
- * `climb` marks its Gate for the ask node. An Ask (a Value made by a
- * person, ADR 10) makes its `form` as it opens: the choices of the run and
- * the attachments the run keeps. `brief` is what the node says about its
- * brief (ADR 21): the Gate writes it as it opens (`writeBrief`).
+ * and its deadline. A Decision's Gate asks its prompt and options. Its
+ * `outputs` are the fields its end keeps. The person tier of a cascade
+ * (ADR 6, `climbing`) asks what the tiers did, with its `climb`: its step
+ * has no timers (`untimed`), its templates read `{{cascade.*}}`, its end
+ * keeps the climb's `tier` and `tries`, and the pending Gate is marked
+ * for the ask node. An Ask (a Value made by a person, ADR 10) makes its
+ * `form` as it opens: the choices of the run and the attachments the run
+ * keeps. `brief` is what the node says about its brief (ADR 21): the Gate
+ * writes it as it opens (`writeBrief`).
  */
 export type GateAsk = {
 	question: (tctx: TemplateContext) => string;
@@ -117,7 +120,7 @@ export type GateAsk = {
 	lockScreen?: boolean;
 	deadline?: DecisionNode["deadline"];
 	outputs?: StepOutputs;
-	climb?: true;
+	climb?: Climb;
 	form?: (step: OpenStep) => Promise<AskForm>;
 	brief?: BriefSpec;
 };
@@ -136,6 +139,11 @@ export function gateChooser(
 		}
 		if (asked.kind === "failed")
 			return route(ctx, state, node, asked.end, config);
+		// What the answer ends the step with: the climb's fields first.
+		const { climb } = ask;
+		const outputs = climb
+			? { ...climbOutputs(climb.root, climb.at), ...ask.outputs }
+			: ask.outputs;
 		const pending: PendingGate = {
 			kind: "gate",
 			stepId: asked.stepId,
@@ -144,8 +152,8 @@ export function gateChooser(
 			question: asked.question,
 			choices: asked.choices,
 			...(asked.deadline ? { deadline: asked.deadline } : {}),
-			...(ask.outputs ? { outputs: ask.outputs } : {}),
-			...(ask.climb ? { climb: true as const } : {}),
+			...(outputs ? { outputs } : {}),
+			...(climb ? { climb: true as const } : {}),
 			...(asked.form ? { form: asked.form } : {}),
 		};
 		return new Command({ update: { pending }, goto: askNodeId(node.id) });
@@ -256,7 +264,9 @@ async function ensureOpen(
 		node,
 		state,
 		config,
-		ask.climb ? { kind: "new", untimed: true } : { kind: "new" },
+		ask.climb
+			? { kind: "new", untimed: true, climb: ask.climb }
+			: { kind: "new" },
 		runState,
 	);
 	if (begun.kind === "parked") return begun;

@@ -6,12 +6,7 @@ import {
 	renderTemplate,
 	type ValueNode,
 } from "@nightshift/flows";
-import {
-	type Climb,
-	climbBackground,
-	climbLines,
-	climbValues,
-} from "../cascade";
+import { type Climb, climbBackground, climbLines } from "../cascade";
 import { climbing } from "../climb";
 import {
 	type NodeAction,
@@ -80,10 +75,7 @@ function personTierAsk(
 	const { deadline } = tier;
 	return askGate(node, ctx, {
 		question: (tctx) => {
-			const prompt = renderTemplate(node.prompt ?? "", {
-				...tctx,
-				cascade: climbValues(node, at),
-			});
+			const prompt = renderTemplate(node.prompt ?? "", tctx);
 			return at.trail.length === 0
 				? prompt
 				: `${prompt}\n\nThe models did not make a value that holds:\n${climbLines(at.trail)}`;

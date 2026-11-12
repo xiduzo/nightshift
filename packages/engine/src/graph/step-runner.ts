@@ -858,14 +858,7 @@ export async function beginStep(
 				: null;
 		// Its rung, from the node with the cascade: a tier's node has none.
 		// A stand-in is on no rung: nobody worked or decided.
-		const rung = standIn
-			? null
-			: stepRung(
-					start.climb?.root ??
-						ctx.flow.nodes.find((each) => each.id === node.id) ??
-						node,
-					state,
-				);
+		const rung = standIn ? null : stepRung(start.climb?.root ?? node, state);
 		// The log writes the step's row with its event, in one batch: a stop
 		// lands before or after both. `deviceId` is the Device the step runs
 		// on (its Placement), not the Walker. A stand-in runs on none.

@@ -6,7 +6,7 @@ import {
 	type PersonTier,
 	tierNode,
 } from "@nightshift/flows";
-import { type Climb, climbAt, climbOutputs } from "./cascade";
+import { type Climb, climbAt } from "./cascade";
 import type { NodeAction, StepContext } from "./context";
 import { type GateAsk, gateChooser } from "./nodes/choosers/person";
 
@@ -17,10 +17,13 @@ import { type GateAsk, gateChooser } from "./nodes/choosers/person";
  * one try of a tier that is not a person. A node gives only what differs:
  * what its person tier asks, and how it runs one try.
  *
- * The climb gives the person tier's Gate the climb's outputs and marks it
- * as a climb's (`GateAsk.climb`). What holds stays the node's: an Agent's
- * check, a Decision's `minConfidence`, a Value's `accept` rule, a Call's
- * flow that ends `pass`.
+ * The climb rides on the step: a try hands it to the step runner
+ * (`StepSpec.climb`, or `beginStep`'s start for a Call), the person tier's
+ * Gate takes it (`GateAsk.climb`). So the step's templates read
+ * `{{cascade.*}}`, every end of the step adds `tier` and `tries`, and an
+ * end that does not hold climbs to the next try. What holds stays the
+ * node's: an Agent's check, a Decision's `minConfidence`, a Value's
+ * `accept` rule, a Call's flow that ends `pass`.
  */
 
 /** A tier of a node's cascade that is not a person. */
@@ -55,12 +58,11 @@ export function climbing<N extends CascadeNode>(
 		const tier = cascadeOf(root)?.[at.tier];
 		const own = tierNode(root, at.tier);
 		if (tier !== undefined && isPersonTier(tier)) {
-			const ask = parts.person({ root, at, tier });
-			return gateChooser(root, ctx, {
-				...ask,
-				outputs: { ...climbOutputs(root, at), ...ask.outputs },
-				climb: true,
-			})(state, config);
+			const climb = { root, at, tier };
+			return gateChooser(root, ctx, { ...parts.person(climb), climb })(
+				state,
+				config,
+			);
 		}
 		if (tier === undefined || own === null) {
 			throw new Error(

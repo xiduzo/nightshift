@@ -9,7 +9,6 @@ import {
 	climbBackground,
 	climbLines,
 	climbRecommendation,
-	climbValues,
 } from "../cascade";
 import { climbing } from "../climb";
 import {
@@ -74,13 +73,7 @@ function personTierGate(
 	const recommend = climbRecommendation(at.trail);
 	return {
 		question: (tctx) =>
-			climbQuestion(
-				renderReadable(node.prompt, {
-					...tctx,
-					cascade: climbValues(node, at),
-				}),
-				at.trail,
-			),
+			climbQuestion(renderReadable(node.prompt, tctx), at.trail),
 		choices: gateChoices(node),
 		deadline: tier.deadline,
 		brief: decisionBrief(node, tier, {
