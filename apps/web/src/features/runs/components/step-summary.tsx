@@ -1,14 +1,24 @@
-import { waitedText } from "@nightshift/client";
+import { standInLabel, waitedText } from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
-import { CircleXIcon } from "lucide-react";
+import {
+	Item,
+	ItemContent,
+	ItemDescription,
+	ItemMedia,
+	ItemTitle,
+} from "@nightshift/ui/components/item";
+import { Link } from "@tanstack/react-router";
+import { CircleXIcon, PinIcon, SkipForwardIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { RunDetail, StepSummary as Step } from "@/shared/api";
 import { CodeView } from "@/shared/code";
+import { formatDayTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 import { type ItemScope, stepRunsEach } from "../lib/run-steps";
 import { stepProse } from "../lib/step-gist";
 import { CallDetail } from "./call-detail";
@@ -16,9 +26,54 @@ import { ItemList } from "./item-list";
 import { StepClimb } from "./step-climb";
 
 /**
- * What a step did, without the transcript: why it failed, what it said it
- * did, its command's last output, the elements a Call step ran, or the flow
- * it called.
+ * A step of a test run that stood in for its node: where its pinned
+ * output comes from, or that the node was skipped.
+ */
+function StandIn({
+	step,
+	test,
+}: {
+	step: Step;
+	test: NonNullable<Step["test"]>;
+}) {
+	const from = step.pinnedFrom;
+	return (
+		<Item variant="outline" size="sm">
+			<ItemMedia variant="icon">
+				{test === "pinned" ? <PinIcon /> : <SkipForwardIcon />}
+			</ItemMedia>
+			<ItemContent>
+				<ItemTitle>{standInLabel(test)}</ItemTitle>
+				<ItemDescription>
+					{test === "skipped" ? (
+						"The node did not run. The run went on with the outcome you chose."
+					) : from ? (
+						<>
+							From the run of{" "}
+							<Link
+								to="/runs/$runId"
+								params={{ runId: from.runId }}
+								search={{ step: from.stepId }}
+							>
+								<LocalTime at={from.endedAt}>
+									{formatDayTime(from.endedAt)}
+								</LocalTime>
+							</Link>
+							. The node did not run.
+						</>
+					) : (
+						"The node did not run."
+					)}
+				</ItemDescription>
+			</ItemContent>
+		</Item>
+	);
+}
+
+/**
+ * What a step did, without the transcript: that it stood in for its node
+ * in a test run, why it failed, what it said it did, its command's last
+ * output, the elements a Call step ran, or the flow it called.
  */
 export function StepSummary({
 	run,
@@ -50,6 +105,7 @@ export function StepSummary({
 			? step.outputs.waited_minutes
 			: null;
 	const hasBody =
+		step.test ||
 		step.error ||
 		prose ||
 		logTail ||
@@ -61,6 +117,7 @@ export function StepSummary({
 			{context ? (
 				<div className="min-w-0 text-muted-foreground text-xs">{context}</div>
 			) : null}
+			{step.test ? <StandIn step={step} test={step.test} /> : null}
 			<StepClimb steps={steps} step={step} runStatus={run.status} />
 			{step.error ? (
 				<Alert variant="destructive">

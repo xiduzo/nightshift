@@ -119,7 +119,9 @@ function FlowHealthDetails({
 					</div>
 				) : inRange.runs === 0 ? (
 					<DetailsEmpty>
-						This flow did not run in the last {range} days.
+						{inRange.tests
+							? `This flow had only test runs in the last ${range} days. Flow health leaves them out.`
+							: `This flow did not run in the last ${range} days.`}
 					</DetailsEmpty>
 				) : (
 					<>
@@ -207,6 +209,7 @@ function FlowHealthDetails({
 										formatKnownCost(inRange.spent),
 										inRange.spentTokens,
 									)}
+									hint={testRunsHint(inRange.tests)}
 								/>
 								<Stat
 									label="Not finished"
@@ -321,6 +324,15 @@ function neededHint(neededYou: FlowRange["neededYou"]): string | undefined {
 	if (!neededYou || neededYou.runs === 0) return undefined;
 	if (neededYou.needed === 0) return "Every run ran without you";
 	return neededReasonsText(neededYou.reasons);
+}
+
+/**
+ * Under "Total spent": the test runs it counts. Only the spend counts
+ * them. Nothing without one, and from an older Host.
+ */
+function testRunsHint(tests: FlowRange["tests"]): string | undefined {
+	if (!tests) return undefined;
+	return tests === 1 ? "With 1 test run" : `With ${tests} test runs`;
 }
 
 /** Under "Per useful result": how many runs with an answer were useful. */

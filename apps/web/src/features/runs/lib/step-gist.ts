@@ -1,3 +1,4 @@
+import { standInLabel } from "@nightshift/client";
 import type { StepSummary } from "@/shared/api";
 
 /** The output that says in words what a step did, by node type. */
@@ -15,9 +16,13 @@ export function stepProse(
 	return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
-/** One line on what the step did, for a collapsed view: its error, else the first line of its prose or log. */
+/**
+ * One line on what the step did, for a collapsed view: its error, else the
+ * first line of its prose or log. A step of a test run that stood in for
+ * its node and has none says so: "Pinned output" or "Skipped".
+ */
 export function stepGist(
-	step: Pick<StepSummary, "nodeType" | "outputs" | "error">,
+	step: Pick<StepSummary, "nodeType" | "outputs" | "error" | "test">,
 ): string | undefined {
 	if (step.error) return step.error.split("\n")[0];
 	const prose = stepProse(step);
@@ -26,5 +31,5 @@ export function stepGist(
 	if (typeof logTail === "string" && logTail.trim()) {
 		return logTail.trim().split("\n").at(-1);
 	}
-	return undefined;
+	return step.test ? standInLabel(step.test) : undefined;
 }

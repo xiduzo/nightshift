@@ -37,4 +37,32 @@ describe("the gist of a step", () => {
 			stepGist({ nodeType: "command", error: null, outputs: {} }),
 		).toBeUndefined();
 	});
+
+	test("a step that stood in for its node in a test run says so", () => {
+		expect(
+			stepGist({
+				nodeType: "decision",
+				error: null,
+				outputs: { decision: null },
+				test: "skipped",
+			}),
+		).toBe("Skipped");
+		expect(
+			stepGist({
+				nodeType: "command",
+				error: null,
+				outputs: {},
+				test: "pinned",
+			}),
+		).toBe("Pinned output");
+		// A pinned Agent's summary is its gist.
+		expect(
+			stepGist({
+				nodeType: "agent",
+				error: null,
+				outputs: { summary: "Found three leads." },
+				test: "pinned",
+			}),
+		).toBe("Found three leads.");
+	});
 });

@@ -1,4 +1,4 @@
-import { runActions, tokensLabel } from "@nightshift/client";
+import { isTestRun, runActions, tokensLabel } from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import {
@@ -18,6 +18,7 @@ import { dayWord, formatTime, hoverTime } from "@/shared/format";
 import { CostText } from "./cost-text";
 import { useWorkTime } from "./elapsed";
 import { RunStatusBadge } from "./run-status-badge";
+import { TestRunBadge } from "./test-run-badge";
 
 /**
  * The run on one line: its title, and how long it ran and what it cost.
@@ -78,8 +79,9 @@ export function RunTitle({
 
 /**
  * The run's state as badges, in a fixed order: what every run has first,
- * then what comes and goes. The flow, the device that runs it, its status,
- * then an answer on its way, the stop plans and a lost connection.
+ * then what comes and goes. The flow, a test run, the device that runs
+ * it, its status, then an answer on its way, the stop plans and a lost
+ * connection.
  */
 export function RunBadges({
 	run,
@@ -100,6 +102,7 @@ export function RunBadges({
 				<WorkflowIcon aria-hidden="true" />
 				<span className="truncate">{run.flowName ?? "Quick run"}</span>
 			</Badge>
+			{isTestRun(run) ? <TestRunBadge /> : null}
 			<WalkerBadge walker={run.device} />
 			<RunStatusBadge status={status} result={run.result} />
 			{run.commands.length > 0 ? (

@@ -1,3 +1,4 @@
+import { isTestRun } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Empty,
@@ -39,6 +40,7 @@ import {
 } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { RunStatusIcon } from "./run-status-badge";
+import { TestRunBadge } from "./test-run-badge";
 
 /**
  * Runs as a table, newest first. Each row: a status icon, the title (a link
@@ -179,8 +181,8 @@ function runColumns(
 
 /**
  * The status icon and the title as a link over the whole row, then what
- * the icons do not say: the project, and the flow when the title hides it.
- * The outcome goes under it.
+ * the icons do not say: the project, the flow when the title hides it,
+ * and a test run. The outcome goes under it.
  */
 function RunTitle({
 	run,
@@ -214,6 +216,7 @@ function RunTitle({
 						{context.join(" · ")}
 					</span>
 				) : null}
+				{isTestRun(run) ? <TestRunBadge /> : null}
 				{run.status === "sleeping" && run.wakeAt ? (
 					<span className="shrink-0 text-status-sleeping text-xs">
 						wakes{" "}

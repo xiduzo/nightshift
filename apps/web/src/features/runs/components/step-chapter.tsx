@@ -34,6 +34,7 @@ import { StepLearnings } from "./step-learnings";
 import { StepPlan } from "./step-plan";
 import { StepSources } from "./step-sources";
 import { StepSummary as StepSummaryView } from "./step-summary";
+import { StandInBadge } from "./test-run-badge";
 
 type ChapterProps = {
 	run: RunDetail;
@@ -89,6 +90,7 @@ export function StepChapter(props: ChapterProps) {
 							state={stepState(step, runStatus)}
 							color={outcomeColor}
 						/>
+						{step.test ? <StandInBadge test={step.test} /> : null}
 						{warned ? (
 							<TriangleAlertIcon
 								className="size-3.5 text-status-waiting"
@@ -183,16 +185,19 @@ function ChapterBody({
 			{step.sources && step.sources.length > 0 ? (
 				<StepSources sources={step.sources} />
 			) : null}
-			<StepTranscript
-				runId={run.id}
-				step={step}
-				transcript={transcript}
-				projectRoot={run.worktreePath}
-				connecting={connecting}
-				walker={run.walker}
-				answerPending={answerPending}
-				node={node}
-			/>
+			{/* A step that stood in for its node in a test run has no transcript. */}
+			{step.test ? null : (
+				<StepTranscript
+					runId={run.id}
+					step={step}
+					transcript={transcript}
+					projectRoot={run.worktreePath}
+					connecting={connecting}
+					walker={run.walker}
+					answerPending={answerPending}
+					node={node}
+				/>
+			)}
 			{report ? (
 				<RunReport
 					text={report.text}

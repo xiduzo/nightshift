@@ -19,7 +19,7 @@ const useful = (value: number) => ({ score: "useful", value });
 
 describe("Useful on the run page", () => {
 	test("asks only on a finished run, with or without a pull request", () => {
-		expect(usefulView("finished", null)).toBe("ask");
+		expect(usefulView("finished", null, {})).toBe("ask");
 		for (const status of [
 			"running",
 			"waiting",
@@ -27,14 +27,20 @@ describe("Useful on the run page", () => {
 			"stopped",
 			"interrupted",
 		] as const) {
-			expect(usefulView(status, null)).toBe("hidden");
-			expect(usefulView(status, true)).toBe("hidden");
+			expect(usefulView(status, null, {})).toBe("hidden");
+			expect(usefulView(status, true, {})).toBe("hidden");
 		}
 	});
 
+	test("never asks on a test run, and hides an earlier answer too", () => {
+		const test = { test: { pinned: ["fetch"], skipped: [] } };
+		expect(usefulView("finished", null, test)).toBe("hidden");
+		expect(usefulView("finished", true, test)).toBe("hidden");
+	});
+
 	test("asks once, then shows the choice", () => {
-		expect(usefulView("finished", true)).toBe("yes");
-		expect(usefulView("finished", false)).toBe("no");
+		expect(usefulView("finished", true, {})).toBe("yes");
+		expect(usefulView("finished", false, {})).toBe("no");
 		expect(usefulLabel("yes")).toBe("You found this run useful.");
 		expect(usefulLabel("no")).toBe("You did not find this run useful.");
 	});

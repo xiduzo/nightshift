@@ -4,7 +4,7 @@
  * what a flow's runs cost by the useful ones.
  */
 
-import { usefulAnswer } from "@nightshift/engine/run-status";
+import { isTestRun, usefulAnswer } from "@nightshift/engine/run-status";
 
 import type { RunStatus } from "./types";
 
@@ -47,12 +47,16 @@ export function knownUseful(
 	return usefulAnswer(scores);
 }
 
-/** Only a finished run asks. Then the question, or Yes, or No. */
+/**
+ * Only a finished run asks. Then the question, or Yes, or No. A test run
+ * never asks: its result is a try, not one to count.
+ */
 export function usefulView(
 	status: RunStatus,
 	known: boolean | null,
+	run: { test?: unknown },
 ): UsefulView {
-	if (status !== "finished") return "hidden";
+	if (status !== "finished" || isTestRun(run)) return "hidden";
 	if (known === null) return "ask";
 	return known ? "yes" : "no";
 }

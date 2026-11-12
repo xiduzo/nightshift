@@ -23,7 +23,7 @@ import { useHostQueries } from "@/features/host";
 /**
  * One tap on a finished run: was it useful? After it lands, the card
  * shows the choice and does not ask again. `status` is the one the screen
- * shows, an action on its way too.
+ * shows, an action on its way too. A test run does not ask.
  */
 export function RunUseful({
 	run,
@@ -40,7 +40,7 @@ export function RunUseful({
 	const busy = useRef(false);
 	const mark = useMutation(queries.useful());
 	const known = knownUseful(run.metrics?.scores, rememberedUseful(run.id));
-	const view = usefulView(status, known);
+	const view = usefulView(status, known, run);
 
 	const choose = (useful: boolean) => {
 		if (busy.current) return;

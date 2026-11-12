@@ -95,6 +95,12 @@ export {
 	waitFor,
 } from "./stream";
 export { isLaunchNotice, subagentTask } from "./subagent";
+export {
+	isTestRun,
+	standInLabel,
+	TEST_RUN_HINT,
+	TEST_RUN_LABEL,
+} from "./test-run";
 export { runTime } from "./time";
 export { stepTodos, type Todo } from "./todos";
 export {

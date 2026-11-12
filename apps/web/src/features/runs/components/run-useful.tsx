@@ -34,7 +34,8 @@ import { runMutations } from "../queries";
 /**
  * One tap on a finished run: was it useful? It sits at the end of the
  * run's story. After it lands, it shows the choice and does not ask again.
- * `status` is the one the page shows, the live one too.
+ * `status` is the one the page shows, the live one too. A test run does
+ * not ask.
  */
 export function RunUseful({
 	run,
@@ -51,7 +52,7 @@ export function RunUseful({
 	const busy = useRef(false);
 	const mark = useMutation(runMutations.useful());
 	const known = knownUseful(run.metrics?.scores, rememberedUseful(run.id));
-	const view = usefulView(status, known);
+	const view = usefulView(status, known, run);
 	if (view === "hidden") return null;
 
 	const choose = (useful: boolean) => {
