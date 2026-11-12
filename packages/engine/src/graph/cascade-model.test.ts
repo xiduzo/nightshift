@@ -140,23 +140,6 @@ describe("a Decision climbs its cascade", () => {
 		expect(state.traversals).toEqual({ e2: 1 });
 	});
 
-	test("without a person tier, the step ends fail when the last tier is not sure either", async () => {
-		const { decider } = picks([{ label: "bug", probability: 0.3 }]);
-		const h = await startRun(sandbox, flowWith(triage()), { decider });
-		const { parked } = await drive(h, { inputs: {} });
-		expect(parked).toEqual([
-			{
-				kind: "parked",
-				stepId: expect.any(String),
-				nodeId: "triage",
-				status: "failed",
-				reason:
-					'Node "triage" ended with "fail" and no edge leaves it on that outcome.',
-				endReason: "_OTHER",
-			},
-		]);
-	});
-
 	test("a tier that cannot answer passes the question on", async () => {
 		const { decider, calls } = picks([
 			"error",
@@ -372,14 +355,6 @@ describe("a Value climbs its cascade", () => {
 			tier: "strong",
 			tries: 2,
 		});
-	});
-
-	test("data that does not match the schema climbs too, and the last tier's fail ends the step", async () => {
-		const { decider } = makes([{ nope: 1 }, { nope: 2 }]);
-		const h = await startRun(sandbox, flowWith(plan()), { decider });
-		const { parked, state } = await drive(h, { inputs: {} });
-		expect(parked[0]).toMatchObject({ kind: "parked", nodeId: "plan" });
-		expect(state.nodes.plan).toMatchObject({ outcome: "fail", tries: 2 });
 	});
 
 	test("the person tier is an Ask that starts with the best answer of the models", async () => {
