@@ -38,6 +38,7 @@ export {
 	type FailingFlow,
 	type FlowHealthRow,
 	type FlowRange,
+	type FlowReport,
 	type FlowRun,
 	type GateState,
 	type NightRange,

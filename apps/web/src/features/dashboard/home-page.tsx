@@ -8,16 +8,19 @@ import type { NightRange } from "@/shared/api";
 import { PageHeading, SiteHeader } from "@/shared/page";
 import { HomeLanes } from "./home-lanes";
 import { HomeProjects } from "./home-projects";
+import { HomeReports } from "./home-reports";
 import { MetricDetails } from "./metric-details";
 import { MetricStrip } from "./metric-strip";
 import { type Metric, metricsOf } from "./metrics";
 import { dashboardQueries } from "./queries";
 import { RangeBar } from "./range-bar";
+import { latestReports } from "./reports";
 
 /**
- * Home: what needs you over all projects. One range for the page, the four numbers
- * in a strip, then three lanes in the order you act on them (running,
- * waiting for you, failed), and the projects.
+ * Home: what needs you, and what came out, over all projects. One range
+ * for the page, the four numbers in a strip, then three lanes in the order
+ * you act on them (running, waiting for you, failed), the latest reports,
+ * and the projects.
  */
 export function HomePage({
 	range,
@@ -49,7 +52,7 @@ export function HomePage({
 					title="Home"
 					description={
 						!days
-							? "What runs now, what waits for you and what failed in all your projects."
+							? "What runs now, what waits for you, what failed and what came out in all your projects."
 							: needsYou(waiting, failing)
 					}
 				/>
@@ -66,6 +69,10 @@ export function HomePage({
 					range={range}
 					isLoading={openRuns.isLoading || gates.isLoading}
 					onFailedDetails={() => setDetails({ metric: "finished", open: true })}
+				/>
+				<HomeReports
+					reports={days ? latestReports(days.reports) : undefined}
+					range={range}
 				/>
 				<HomeProjects projects={projects.data} range={range} />
 

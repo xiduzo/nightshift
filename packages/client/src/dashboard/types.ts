@@ -10,6 +10,8 @@ export type NightsRange = DashboardSummary["nights"][number];
 export type NightRange = NightsRange["nights"];
 /** The failures of one flow in a range, one row per flow. */
 export type FailingFlow = NightsRange["runs"]["failing"]["rows"][number];
+/** The newest report of one flow in a range, one row per flow. */
+export type FlowReport = NonNullable<NightsRange["reports"]>["rows"][number];
 export type FlowHealthRow = NonNullable<
 	DashboardSummary["flowHealth"]
 >["rows"][number];

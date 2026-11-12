@@ -19,6 +19,7 @@ export type {
 	FailingFlow,
 	FlowHealthRow,
 	FlowRange,
+	FlowReport,
 	FlowRun,
 	GateState,
 	NightRange,

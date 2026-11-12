@@ -42,13 +42,15 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { neededMachines, useSpaceMachines } from "@/features/devices";
-import { RunBars } from "@/features/runs/flows-port";
-import { formatDayTime } from "@/shared/format";
+import { ReportPreview, RunBars, reportLink } from "@/features/runs/flows-port";
+import { formatDayTime, formatRelative, useNow } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
 
 /**
- * One flow on the Flows page: what it is, what starts it, and how its
- * last runs went. A line says what blocks it: errors in the flow, or a
- * computer it needs that is offline. Run, Edit and Delete are in the menu.
+ * One flow on the Flows page: what it is, what starts it, how its last
+ * runs went, and the start of its latest report. A line says what blocks
+ * it: errors in the flow, or a computer it needs that is offline. Run,
+ * Edit and Delete are in the menu.
  */
 export function FlowCard({
 	projectId,
@@ -93,6 +95,7 @@ export function FlowCard({
 			<CardContent className="flex flex-col gap-3.5">
 				<Starts starts={overview.starts} onSchedules={onSchedules} />
 				<LastRuns overview={overview} />
+				{overview.report ? <LatestReport report={overview.report} /> : null}
 				<Blockers overview={overview} />
 			</CardContent>
 		</Card>
@@ -243,6 +246,37 @@ function LastRuns({ overview }: { overview: FlowOverview }) {
 			) : (
 				<div className="h-4" />
 			)}
+		</div>
+	);
+}
+
+/**
+ * The newest report of its runs, of any day: when its run ended, and its
+ * first lines without marks. The label opens it on the run's page.
+ */
+function LatestReport({
+	report,
+}: {
+	report: NonNullable<FlowOverview["report"]>;
+}) {
+	const now = useNow();
+	return (
+		<div className="flex min-w-0 flex-col gap-1">
+			<span className="flex items-center gap-1.5 text-xs">
+				<Button
+					variant="link"
+					size="xs"
+					className="h-auto p-0 text-foreground"
+					nativeButton={false}
+					render={<Link {...reportLink(report)} />}
+				>
+					Latest report
+				</Button>
+				<LocalTime at={report.endedAt} className="text-muted-foreground">
+					{formatRelative(report.endedAt, now)}
+				</LocalTime>
+			</span>
+			<ReportPreview text={report.excerpt} plain />
 		</div>
 	);
 }

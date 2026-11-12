@@ -237,7 +237,13 @@ function FailedRow({ flow, now }: { flow: FailingFlow; now: number }) {
 }
 
 /** "project · flow": the flow truncates first. */
-function Title({ group, name }: { group: string | undefined; name: string }) {
+export function Title({
+	group,
+	name,
+}: {
+	group: string | undefined;
+	name: string;
+}) {
 	return (
 		<span className="flex min-w-0 gap-1">
 			{group ? (
@@ -249,7 +255,7 @@ function Title({ group, name }: { group: string | undefined; name: string }) {
 }
 
 /** One line of a lane. With `detail`, the rest shows on hover. */
-function LaneRow({
+export function LaneRow({
 	link,
 	icon,
 	title,
@@ -302,7 +308,7 @@ function LaneRow({
  * One lane: as tall as its row of lanes, one line when it has none, and how many
  * rows it leaves out under them.
  */
-function Lane({
+export function Lane({
 	icon,
 	title,
 	count,
