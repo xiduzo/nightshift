@@ -51,7 +51,7 @@ A run of a [project without a folder](Get-started.md#a-project-without-a-folder)
 - The files stay on the computer that ran the steps. Open the run there to see them.
 - When the steps run on two computers, each computer has a folder of its own. The run tells you so when it starts.
 - The next run does not see them. To keep a value for the next run, use a variable with **Keep between runs**, or the project's [knowledge](Knowledge.md).
-- With **Clean up old runs** on in **Settings**, Night Shift removes the files some days after the run ends. **Clean up after** sets the days, 90 by default. The run page shows the date.
+- With **Clean up old runs** on in **Settings**, Night Shift removes the files some days after the run ends. **Clean up after** sets the days, 90 by default. The run page shows the date. See [Cleanup](#cleanup).
 
 ## Stop and resume
 
@@ -59,6 +59,18 @@ A run of a [project without a folder](Get-started.md#a-project-without-a-folder)
 - **Resume** a stopped, failed, or interrupted run at its last step. You can resume it from any computer of its Space. A viewer cannot resume a run.
 - A run that a restart interrupted resumes by itself a few seconds after Night Shift starts again, unless its [run policy](#run-policy) says to wait for you.
 - **Take over** copies the command that continues the agent's work in a terminal, on the computer that runs the run. On the phone, you share it.
+- When the [cleanup](#cleanup) removed the run's copy of your project, **Resume** and **Run again from here** make it again first. The run page tells you where from: the run's branch, the work Night Shift kept, or the branch on the remote. Without any of them, the copy starts where the run started.
+
+## Cleanup
+
+Night Shift cleans up after your runs. **Clean up old runs** in **Settings** turns it on or off. It is on by default.
+
+- A day after a run ends, Night Shift removes the run's copy of your project and its branches on this computer.
+- Work that is saved nowhere else stays hidden first: changes that are not committed, and commits that are not on the remote or in your main branch. Your list of branches does not show it. **Clean up after** sets how long it stays, 90 days by default. Then it goes too.
+- Work that you merged counts as saved, also with a squash merge or a rebase merge.
+- Branches on the remote stay. Night Shift does not delete or push them.
+- A run that runs, waits at a Gate or sleeps keeps all of it.
+- To get the work of a run back, resume it or run it again from a step.
 
 ## Schedules
 
