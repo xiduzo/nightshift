@@ -245,6 +245,7 @@ export {
 	DEFAULT_WEB_REQUEST_TIMEOUT_SECONDS,
 	MAX_WEB_REQUEST_BYTES,
 	type SecretPart,
+	secretNamesIn,
 	secretParts,
 	WEB_REQUEST_METHODS,
 	type WebRequestMethod,

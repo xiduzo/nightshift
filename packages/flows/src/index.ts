@@ -421,6 +421,7 @@ export {
 	profileLabel,
 	profileOf,
 	profileSchema,
+	profileSecrets,
 	profileSettingsSchema,
 	type ResolvedAgentNode,
 	resolvedAgent,
@@ -456,7 +457,7 @@ export {
 	webhookSecretName,
 	webhookSignalKey,
 } from "./schedules";
-export { flowSecrets } from "./secrets";
+export { flowConfigUse, flowSecrets } from "./secrets";
 export {
 	nodesWithin,
 	parentSection,

@@ -26,6 +26,7 @@ import {
 	nameSchema,
 	type ProfileRef,
 	permissionModeSchema,
+	secretNamesIn,
 	tierLabel,
 	type ValueNode,
 	valueDeciderNameSchema,
@@ -120,6 +121,23 @@ export function isAgentProfile<P extends ProfileSettings>(
 	profile: P,
 ): profile is Extract<P, AgentProfileSettings> {
 	return "harness" in profile;
+}
+
+/**
+ * The secrets a profile reads itself, each once: a Model Profile's at its
+ * address, the one that holds its API key and each `${NAME}` of its
+ * headers. An Agent Profile reads none: its connections and CLI tools do.
+ */
+export function profileSecrets(profile: ProfileSettings): string[] {
+	if (isAgentProfile(profile)) return [];
+	const address = profile.address;
+	if (address === undefined) return [];
+	return [
+		...new Set([
+			...(address.apiKey !== undefined ? [address.apiKey] : []),
+			...Object.values(address.headers ?? {}).flatMap(secretNamesIn),
+		]),
+	];
 }
 
 /**

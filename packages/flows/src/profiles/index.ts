@@ -27,6 +27,7 @@ export {
 	profileLabel,
 	profileOf,
 	profileSchema,
+	profileSecrets,
 	profileSettingsSchema,
 	type ResolvedAgentNode,
 	resolvedAgent,

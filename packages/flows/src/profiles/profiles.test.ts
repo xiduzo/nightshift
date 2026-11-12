@@ -16,6 +16,7 @@ import {
 	modelProfileSettingsSchema,
 	nodeProfiles,
 	profileLabel,
+	profileSecrets,
 	profileSettingsSchema,
 	resolveAgentNode,
 	resolvedAgent,
@@ -350,6 +351,35 @@ describe("the address of a model profile", () => {
 					.success,
 			).toBe(false);
 		}
+	});
+
+	test("profileSecrets: the secret of its API key and each one its headers read, each once", () => {
+		expect(profileSecrets(remote)).toEqual(["PROXY_KEY"]);
+		expect(
+			profileSecrets({
+				decider: "openai",
+				address: {
+					baseUrl: "http://openjev:8080",
+					apiKey: "OPENJEV_KEY",
+					headers: {
+						// biome-ignore lint/suspicious/noTemplateCurlyInString: secret references, as a person writes them.
+						"X-Team": "${TEAM_ID}/${OPENJEV_KEY}",
+						"X-Plain": "night-shift",
+					},
+				},
+			}),
+		).toEqual(["OPENJEV_KEY", "TEAM_ID"]);
+		// Without an address, a decider reads its own key: not the profile's.
+		expect(profileSecrets({ decider: "typesafe" })).toEqual([]);
+		expect(
+			profileSecrets({
+				harness: "claude-code",
+				model: "sonnet",
+				permissionMode: "auto",
+				clis: ["gh"],
+				connections: ["tracker"],
+			}),
+		).toEqual([]);
 	});
 
 	test("a vendor API takes no address", () => {
