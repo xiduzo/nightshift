@@ -256,7 +256,8 @@ An agent helps you in the editor, on your own logins:
 
 - **Chat beside the canvas.** Tell the agent what the flow must do. It proposes changes. The canvas marks each node that it adds, removes, or changes, and each edge that it adds or removes. Choose **Apply** or **Discard**.
 - **Suggest.** A prompt, the outcomes, a rule, a command, tool arguments, or output fields: one click gives a suggestion that fits the flow.
-- **Ask an agent why.** When a run ends early, the run page asks an agent why. The agent reads the run for you.
+- **Ask an agent.** When a run ends early, an agent reads the run. It tells you on the run page what went wrong and what you can do.
+- **Improve the flow.** Opens the flow with a chat about the run. The agent proposes a change to the flow, and you apply it.
 
 You choose the agent that answers: a profile, or an agent and a model.
 

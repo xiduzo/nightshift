@@ -4,31 +4,13 @@ import {
 	QUICK_RUN_HARNESS,
 	singleAgentFlow,
 } from "@nightshift/flows";
-import { Alert, AlertDescription } from "@nightshift/ui/components/alert";
-import { Button } from "@nightshift/ui/components/button";
 import {
 	Dialog,
-	DialogClose,
 	DialogContent,
 	DialogDescription,
-	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from "@nightshift/ui/components/dialog";
-import {
-	Field,
-	FieldDescription,
-	FieldError,
-	FieldGroup,
-	FieldLabel,
-} from "@nightshift/ui/components/field";
-import { Input } from "@nightshift/ui/components/input";
-import { Kbd, KbdGroup } from "@nightshift/ui/components/kbd";
-import {
-	NativeSelect,
-	NativeSelectOption,
-} from "@nightshift/ui/components/native-select";
-import { Spinner } from "@nightshift/ui/components/spinner";
 import {
 	Tabs,
 	TabsContent,
@@ -37,20 +19,19 @@ import {
 } from "@nightshift/ui/components/tabs";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import { MessageSquareTextIcon, WorkflowIcon } from "lucide-react";
+import { useState } from "react";
+import { harnessInfo } from "@/features/agents";
 import {
-	MessageSquareTextIcon,
-	PlayIcon,
-	TriangleAlertIcon,
-	WorkflowIcon,
-} from "lucide-react";
-import { useId, useState } from "react";
-import { EFFORTS, ModelCombobox, PERMISSION_MODES } from "@/features/agents";
-import { PickFlowRunForm } from "@/features/flows";
+	type AgentChoice,
+	PickFlowRunForm,
+	requestAgent,
+} from "@/features/flows";
 import { useHasFolder } from "@/features/projects";
-import type { Effort, PermissionMode } from "@/shared/api";
+import type { PermissionMode } from "@/shared/api";
 import { orpc } from "@/shared/api";
-import { LargerTextarea } from "@/shared/larger-window";
 import { runMutations } from "../queries";
+import { DEFAULT_PERMISSION, QuickRunPrompt } from "./quick-run-prompt";
 
 type QuickRunMode = "flow" | "prompt";
 
@@ -68,16 +49,17 @@ export function QuickRunDialog({
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 }) {
-	const id = useId();
 	const navigate = useNavigate();
 	const runActed = useRunActed({ orpc });
 	const [prompt, setPrompt] = useState("");
-	const [model, setModel] = useState<string>(
-		HARNESS_CATALOG[QUICK_RUN_HARNESS].defaultModel,
+	// No profile at first: the quick run's harness and its default model.
+	const [agent, setAgent] = useState<AgentChoice>({
+		harness: QUICK_RUN_HARNESS,
+		model: HARNESS_CATALOG[QUICK_RUN_HARNESS].defaultModel,
+	});
+	const [permissionMode, setPermissionMode] = useState<PermissionMode | null>(
+		null,
 	);
-	const [permissionMode, setPermissionMode] =
-		useState<PermissionMode>("acceptEdits");
-	const [effort, setEffort] = useState<Effort | "">("");
 	const [baseRef, setBaseRef] = useState("");
 	// A project without a folder has no branches: nothing to start from.
 	const withFolder = useHasFolder(projectId);
@@ -94,18 +76,23 @@ export function QuickRunDialog({
 		}),
 	);
 
-	const canSubmit =
-		prompt.trim() !== "" && model.trim() !== "" && !startRun.isPending;
+	const canSubmit = prompt.trim() !== "" && !startRun.isPending;
 
 	const submit = () => {
 		if (!canSubmit) return;
 		let flow: ReturnType<typeof singleAgentFlow>;
 		try {
+			const chosen = requestAgent(
+				agent,
+				(harness) => harnessInfo(harness).defaultModel,
+			);
 			flow = singleAgentFlow({
 				prompt: prompt.trim(),
-				model: model.trim(),
-				permissionMode,
-				effort: effort || undefined,
+				...chosen,
+				// A profile brings its own mode unless the person picked one.
+				permissionMode:
+					permissionMode ??
+					(chosen.profile === undefined ? DEFAULT_PERMISSION : undefined),
 			});
 		} catch (error) {
 			setFlowError(
@@ -123,7 +110,7 @@ export function QuickRunDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
+			<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg md:max-w-3xl lg:max-w-5xl xl:max-w-6xl">
 				<DialogHeader>
 					<DialogTitle>Quick run</DialogTitle>
 					<DialogDescription>
@@ -156,162 +143,22 @@ export function QuickRunDialog({
 							onStarted={() => onOpenChange(false)}
 						/>
 					</TabsContent>
-					<TabsContent value="prompt" className="grid gap-6">
-						<form
-							className="contents"
-							onSubmit={(event) => {
-								event.preventDefault();
-								submit();
-							}}
-						>
-							<FieldGroup className="gap-5">
-								<Field>
-									<FieldLabel htmlFor={`${id}-prompt`}>Prompt</FieldLabel>
-									<LargerTextarea
-										title="Prompt"
-										id={`${id}-prompt`}
-										value={prompt}
-										onChange={(event) => setPrompt(event.target.value)}
-										onKeyDown={(event) => {
-											if (
-												event.key === "Enter" &&
-												(event.metaKey || event.ctrlKey)
-											) {
-												event.preventDefault();
-												submit();
-											}
-										}}
-										placeholder="What should the agent do?"
-										className="min-h-28 text-sm md:text-sm"
-										aria-describedby={`${id}-prompt-hint`}
-										required
-										autoFocus
-									/>
-									<FieldDescription id={`${id}-prompt-hint`}>
-										<KbdGroup>
-											<Kbd>⌘/Ctrl</Kbd>
-											<Kbd>Enter</Kbd>
-										</KbdGroup>{" "}
-										to start.
-									</FieldDescription>
-								</Field>
-
-								<div className="grid gap-5 sm:grid-cols-2">
-									<Field>
-										<FieldLabel htmlFor={`${id}-model`}>Model</FieldLabel>
-										<ModelCombobox
-											id={`${id}-model`}
-											harness={QUICK_RUN_HARNESS}
-											value={model}
-											onChange={setModel}
-										/>
-									</Field>
-									<Field>
-										<FieldLabel htmlFor={`${id}-effort`}>
-											Effort{" "}
-											<span className="font-normal text-muted-foreground">
-												(optional)
-											</span>
-										</FieldLabel>
-										<NativeSelect
-											id={`${id}-effort`}
-											value={effort}
-											className="w-full"
-											onChange={(event) =>
-												setEffort(event.target.value as Effort | "")
-											}
-										>
-											<NativeSelectOption value="">
-												Model default
-											</NativeSelectOption>
-											{EFFORTS.map((value) => (
-												<NativeSelectOption key={value} value={value}>
-													{value}
-												</NativeSelectOption>
-											))}
-										</NativeSelect>
-									</Field>
-									<Field>
-										<FieldLabel htmlFor={`${id}-permission`}>
-											Permission mode
-										</FieldLabel>
-										<NativeSelect
-											id={`${id}-permission`}
-											value={permissionMode}
-											className="w-full"
-											onChange={(event) =>
-												setPermissionMode(event.target.value as PermissionMode)
-											}
-											aria-describedby={
-												permissionMode === "bypassPermissions"
-													? `${id}-permission-warning`
-													: undefined
-											}
-										>
-											{PERMISSION_MODES.map(({ value, label }) => (
-												<NativeSelectOption key={value} value={value}>
-													{label}
-												</NativeSelectOption>
-											))}
-										</NativeSelect>
-									</Field>
-									{withFolder ? (
-										<Field>
-											<FieldLabel htmlFor={`${id}-base-ref`}>
-												Start from{" "}
-												<span className="font-normal text-muted-foreground">
-													(optional)
-												</span>
-											</FieldLabel>
-											<Input
-												id={`${id}-base-ref`}
-												value={baseRef}
-												onChange={(event) => setBaseRef(event.target.value)}
-												placeholder="The current branch"
-												className="font-mono"
-												autoComplete="off"
-												spellCheck={false}
-											/>
-										</Field>
-									) : null}
-								</div>
-
-								{permissionMode === "bypassPermissions" ? (
-									<Alert
-										id={`${id}-permission-warning`}
-										className="border-status-interrupted/40 text-status-interrupted"
-									>
-										<TriangleAlertIcon aria-hidden="true" />
-										<AlertDescription className="text-status-interrupted">
-											The agent runs every tool, shell commands included,
-											without asking. Use it only on a project you trust.
-										</AlertDescription>
-									</Alert>
-								) : null}
-
-								{flowError || startRun.error ? (
-									<FieldError>
-										{flowError ?? startRun.error?.message}
-									</FieldError>
-								) : null}
-							</FieldGroup>
-
-							<DialogFooter>
-								<DialogClose
-									render={<Button variant="outline" type="button" />}
-								>
-									Cancel
-								</DialogClose>
-								<Button type="submit" disabled={!canSubmit}>
-									{startRun.isPending ? (
-										<Spinner data-icon="inline-start" />
-									) : (
-										<PlayIcon data-icon="inline-start" />
-									)}
-									{startRun.isPending ? "Starting…" : "Start run"}
-								</Button>
-							</DialogFooter>
-						</form>
+					<TabsContent value="prompt">
+						<QuickRunPrompt
+							projectId={projectId}
+							prompt={prompt}
+							onPromptChange={setPrompt}
+							agent={agent}
+							onAgentChange={setAgent}
+							permissionMode={permissionMode}
+							onPermissionModeChange={setPermissionMode}
+							baseRef={baseRef}
+							onBaseRefChange={setBaseRef}
+							withFolder={withFolder}
+							starting={startRun.isPending}
+							error={flowError ?? startRun.error?.message ?? null}
+							onSubmit={submit}
+						/>
 					</TabsContent>
 				</Tabs>
 			</DialogContent>

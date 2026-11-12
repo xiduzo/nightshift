@@ -12,13 +12,14 @@ import {
 import { cn } from "@nightshift/ui/lib/utils";
 import { ArrowUpIcon, SquareIcon } from "lucide-react";
 import { type ReactNode, useId, useRef } from "react";
+import { AgentMenus, type AgentMenusProps } from "./agent-picker";
 
 const SEND_TITLE = "Send (Enter). Shift + Enter starts a new line.";
 
 /**
- * The message box of the agent chat and of each Suggest popover (the AI
- * Elements Prompt Input): a text box over a row with the agent's menus
- * and Send. Enter sends, Shift+Enter starts a new line. While the agent
+ * The message box of every place you prompt an agent: the chat, each
+ * Suggest popover and Quick run (the AI Elements Prompt Input). A text box
+ * over a row with the agent's menus (the Model Selector) and Send. Enter sends, Shift+Enter starts a new line. While the agent
  * answers, Send becomes Stop. Send waits until there is something to send.
  */
 export function PromptInput({
@@ -33,6 +34,7 @@ export function PromptInput({
 	onStop,
 	allowEmpty = false,
 	submitLabel,
+	agent,
 	tools,
 	autoFocus,
 	className,
@@ -55,7 +57,9 @@ export function PromptInput({
 	allowEmpty?: boolean;
 	/** Words on Send. Without them, Send is an arrow. */
 	submitLabel?: string;
-	/** In the row under the text, before Send: the agent's menus. */
+	/** Which agent answers: its profile, model and effort menus, first in the row under the text. */
+	agent?: AgentMenusProps;
+	/** More menus in that row, after the agent's and before Send. */
 	tools?: ReactNode;
 	autoFocus?: boolean;
 	className?: string;
@@ -101,6 +105,7 @@ export function PromptInput({
 						}}
 					/>
 					<InputGroupAddon align="block-end" className="min-w-0">
+						{agent ? <AgentMenus {...agent} /> : null}
 						{tools}
 						{answering ? (
 							<InputGroupButton

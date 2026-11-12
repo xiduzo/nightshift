@@ -104,6 +104,7 @@ export function RunStatusPanel({
 	wait,
 	lastStep,
 	askWhy,
+	agentAnswer,
 	className,
 }: {
 	run: RunDetail;
@@ -115,8 +116,10 @@ export function RunStatusPanel({
 	wait: CurrentWait | null;
 	/** Where resuming continues. */
 	lastStep: StepSummary | undefined;
-	/** "Ask an agent why", beside the reason the run ended. */
+	/** "Ask an agent" and "Improve the flow", beside the reason the run ended. */
 	askWhy?: ReactNode;
+	/** The answer of "Ask an agent", below the buttons. */
+	agentAnswer?: ReactNode;
 	className?: string;
 }) {
 	const id = useId();
@@ -181,6 +184,7 @@ export function RunStatusPanel({
 							{askWhy}
 						</div>
 					) : null}
+					{agentAnswer}
 					{notice.resumable ? (
 						<ResumeComposer runId={run.id} lastStep={lastStep} />
 					) : null}

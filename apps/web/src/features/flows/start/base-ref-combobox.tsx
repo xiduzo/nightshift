@@ -9,10 +9,64 @@ import {
 	ComboboxLabel,
 	ComboboxList,
 } from "@nightshift/ui/components/combobox";
+import {
+	Field,
+	FieldDescription,
+	FieldLabel,
+} from "@nightshift/ui/components/field";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-
+import { useId, useState } from "react";
 import { projectQueries } from "@/features/projects";
+import { runQueries } from "@/features/runs/flows-port";
+
+/** The runs whose branches "Start from" offers. */
+const RECENT_RUNS = 12;
+
+/**
+ * The Start from field of a start: the branches of this project's recent
+ * runs first, so a night can go on from an open stack, and the base of the
+ * last run in the placeholder. Empty means the current branch.
+ */
+export function StartFromField({
+	projectId,
+	value,
+	onChange,
+}: {
+	projectId: string;
+	value: string;
+	onChange: (ref: string) => void;
+}) {
+	const id = useId();
+	const runs = useQuery(runQueries.ofProject(projectId, RECENT_RUNS));
+	const recent = [
+		...new Set((runs.data ?? []).flatMap((run) => [run.branch, run.baseRef])),
+	].slice(0, 12);
+	const lastBase = runs.data?.[0]?.baseRef;
+	return (
+		<Field>
+			<FieldLabel htmlFor={id}>
+				Start from
+				<span className="font-normal text-muted-foreground">(optional)</span>
+			</FieldLabel>
+			<BaseRefCombobox
+				id={id}
+				projectId={projectId}
+				value={value}
+				recent={recent}
+				placeholder={
+					lastBase
+						? `The current branch (last: ${lastBase})`
+						: "The current branch"
+				}
+				describedBy={`${id}-hint`}
+				onChange={onChange}
+			/>
+			<FieldDescription id={`${id}-hint`}>
+				A branch, tag or commit, for example the top of an open stack.
+			</FieldDescription>
+		</Field>
+	);
+}
 
 /** A clone can have hundreds of remote branches: show the newest per group. */
 const PER_GROUP = 50;

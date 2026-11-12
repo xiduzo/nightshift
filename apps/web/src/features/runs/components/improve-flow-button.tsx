@@ -5,18 +5,24 @@ import { SparklesIcon } from "lucide-react";
 import { chatAboutRun } from "@/features/flows";
 
 /**
- * "Ask an agent why": opens the run's flow with a chat about the run. The
- * agent reads the run, explains what went wrong and proposes a change to
- * the flow. Off, with the reason, where it cannot work.
+ * "Improve the flow": opens the run's flow with a chat about the run. The
+ * agent reads the run and proposes a change to the flow. Off, with the
+ * reason, where it cannot work. "Ask an agent" answers in place instead.
  */
-export function AskWhyButton({ runId, ask }: { runId: string; ask: AskWhy }) {
+export function ImproveFlowButton({
+	runId,
+	ask,
+}: {
+	runId: string;
+	ask: AskWhy;
+}) {
 	if (ask.kind === "hidden") return null;
 	if (ask.kind === "disabled") {
 		return (
 			<>
 				<Button size="sm" variant="outline" disabled>
 					<SparklesIcon data-icon="inline-start" />
-					Ask an agent why
+					Improve the flow
 				</Button>
 				<span className="self-center text-muted-foreground text-xs">
 					{ask.reason}
@@ -29,7 +35,7 @@ export function AskWhyButton({ runId, ask }: { runId: string; ask: AskWhy }) {
 			size="sm"
 			variant="outline"
 			nativeButton={false}
-			title="Opens the flow with a chat. The agent reads this run and proposes a fix."
+			title="Opens the flow with a chat. The agent reads this run and proposes a change."
 			render={
 				<Link
 					to="/projects/$projectId/flows/$name"
@@ -39,7 +45,7 @@ export function AskWhyButton({ runId, ask }: { runId: string; ask: AskWhy }) {
 			}
 		>
 			<SparklesIcon data-icon="inline-start" />
-			Ask an agent why
+			Improve the flow
 		</Button>
 	);
 }

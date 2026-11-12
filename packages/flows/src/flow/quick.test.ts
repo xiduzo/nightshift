@@ -54,4 +54,32 @@ describe("singleAgentFlow", () => {
 		expect(node).not.toHaveProperty("effort");
 		expect(node).not.toHaveProperty("skill");
 	});
+
+	test("runs an Agent Profile, with only the overrides given", () => {
+		const node = singleAgentFlow({
+			prompt: "x",
+			profile: "worker",
+			model: "opus",
+			permissionMode: "acceptEdits",
+		}).nodes[0];
+		expect(node).toMatchObject({ profile: "worker", model: "opus" });
+		expect(node).not.toHaveProperty("harness");
+	});
+
+	test("takes another harness without a profile", () => {
+		const flow = singleAgentFlow({
+			prompt: "x",
+			harness: "codex",
+			model: "gpt-5.1-codex",
+			permissionMode: "acceptEdits",
+		});
+		expect(flow.nodes[0]).toMatchObject({ harness: "codex" });
+		expect(validateFlow(flow)).toEqual([]);
+	});
+
+	test("refuses an agent with neither a profile nor a model", () => {
+		expect(() =>
+			singleAgentFlow({ prompt: "x", permissionMode: "acceptEdits" }),
+		).toThrow();
+	});
 });

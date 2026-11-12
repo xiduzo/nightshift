@@ -1,4 +1,10 @@
-import { askWhy, mergeSteps, runActions, runReport } from "@nightshift/client";
+import {
+	askWhy,
+	askWhyAnswer,
+	mergeSteps,
+	runActions,
+	runReport,
+} from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
@@ -39,7 +45,8 @@ import {
 	traversalsIn,
 } from "../lib/run-steps";
 import { runQueries } from "../queries";
-import { AskWhyButton } from "./ask-why-button";
+import { AgentAnswer, AskAgentButton, useAgentAsk } from "./ask-agent";
+import { ImproveFlowButton } from "./improve-flow-button";
 import { RunActions } from "./run-actions";
 import { FocusBreadcrumb, StepContext } from "./run-focus";
 import { RunGraph } from "./run-graph";
@@ -87,6 +94,7 @@ function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 	// This computer, for its owner only: the assistant is the owner's.
 	const devices = useQuery(deviceQueries.overview());
 	const stream = useRunStream(runId);
+	const agent = useAgentAsk(runId);
 	const desktop = useMediaQuery(DESKTOP);
 	const seen = useLastSeen(runId);
 	const [pick, setPick] = useState<StepPick | null>(null);
@@ -320,9 +328,17 @@ function RunPageBody({ runId, stepId }: { runId: string; stepId?: string }) {
 				wait={stream.transcript.lastWait}
 				lastStep={lastStep}
 				askWhy={
-					ask.kind === "hidden" ? undefined : (
-						<AskWhyButton runId={runData.id} ask={ask} />
-					)
+					askWhyAnswer(status) ? (
+						<>
+							<AskAgentButton agent={agent} />
+							<ImproveFlowButton runId={runData.id} ask={ask} />
+						</>
+					) : undefined
+				}
+				agentAnswer={
+					askWhyAnswer(status) ? (
+						<AgentAnswer agent={agent} failed={status === "failed"} />
+					) : undefined
 				}
 			/>
 			<RunUseful run={runData} status={status} />

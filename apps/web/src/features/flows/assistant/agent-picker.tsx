@@ -56,8 +56,19 @@ import {
 	useAgentChoice,
 } from "./agent-choice";
 
-/** What the agent is for: the chat needs a harness that can use its tools. */
-export type AgentPurpose = "suggest" | "chat";
+/**
+ * What the agent is for: the chat needs a harness that can use its tools.
+ * A run has no profile for help: it names its own agent.
+ */
+export type AgentPurpose = "suggest" | "chat" | "run";
+
+/** Who keeps the choice. Without one, the assistant's choice that this browser keeps. */
+type ChoiceStore = {
+	choice?: AgentChoice;
+	onChoiceChange?: (choice: AgentChoice) => void;
+};
+
+export type AgentMenusProps = { purpose: AgentPurpose } & ChoiceStore;
 
 /** The profile radio's value for the profile for help, and for no profile. Profile names cannot hold a colon. */
 const HELP = ":help";
@@ -80,7 +91,7 @@ function useAgentOptions(purpose: AgentPurpose) {
 	const customAgents = useCustomAgents();
 	const added = (harnesses.data ?? []).filter((h) => h.added);
 	const fits = (harness: HarnessName) =>
-		purpose === "suggest" || harnessTakesTools(harness);
+		purpose !== "chat" || harnessTakesTools(harness);
 	const list = profiles.data ?? [];
 	const setting = settings.data?.values.assistantProfile?.trim() ?? "";
 	const fromSetting = list.find((p) => p.name === setting);
@@ -174,15 +185,21 @@ function chatRefusal(
 }
 
 /** The agent's two menus, for the `block-end` row of a Prompt Input. */
-export function AgentMenus({ purpose }: { purpose: AgentPurpose }) {
-	const choice = useAgentChoice();
+export function AgentMenus({
+	purpose,
+	choice: given,
+	onChoiceChange,
+}: AgentMenusProps) {
+	const stored = useAgentChoice();
+	const choice = given ?? stored;
+	const set = onChoiceChange ?? setAgentChoice;
 	const options = useAgentOptions(purpose);
 	const now = resolve(choice, options);
 	const label = choiceLabel(choice, options.info);
 	const refusal = chatRefusal(choice, purpose, options);
 	const [otherModel, setOtherModel] = useState<HarnessName | null>(null);
 	const pick = (harness: HarnessName, model: string) =>
-		setAgentChoice(
+		set(
 			pickModel(
 				choice,
 				{ harness, model },
@@ -222,6 +239,7 @@ export function AgentMenus({ purpose }: { purpose: AgentPurpose }) {
 					) : null}
 					<ProfileGroup
 						choice={choice}
+						set={set}
 						purpose={purpose}
 						options={options}
 						now={now}
@@ -258,9 +276,7 @@ export function AgentMenus({ purpose }: { purpose: AgentPurpose }) {
 							</DropdownMenuSub>
 						))}
 						{!now.none && (choice.harness || choice.model) ? (
-							<DropdownMenuItem
-								onClick={() => setAgentChoice(profileModel(choice))}
-							>
+							<DropdownMenuItem onClick={() => set(profileModel(choice))}>
 								Use the profile's model
 								{now.profile?.model ? (
 									<DropdownMenuShortcut className="tracking-normal">
@@ -272,7 +288,7 @@ export function AgentMenus({ purpose }: { purpose: AgentPurpose }) {
 					</DropdownMenuGroup>
 				</DropdownMenuContent>
 			</DropdownMenu>
-			<EffortMenu choice={choice} now={now} />
+			<EffortMenu choice={choice} set={set} now={now} />
 			{otherModel ? (
 				<OtherModelDialog
 					harness={otherModel}
@@ -299,11 +315,13 @@ function harnessList(choice: AgentChoice, options: Options) {
 
 function ProfileGroup({
 	choice,
+	set,
 	purpose,
 	options,
 	now,
 }: {
 	choice: AgentChoice;
+	set: (choice: AgentChoice) => void;
 	purpose: AgentPurpose;
 	options: Options;
 	now: ReturnType<typeof resolve>;
@@ -319,23 +337,25 @@ function ProfileGroup({
 			<DropdownMenuRadioGroup
 				value={value}
 				onValueChange={(next: string) => {
-					if (next === HELP) setAgentChoice({});
+					if (next === HELP) set({});
 					else if (next === NONE)
 						// Keep what the profile gave, so the same agent answers.
-						setAgentChoice({
+						set({
 							harness: now.harness,
 							model: now.model || info(now.harness).defaultModel,
 							...(now.effort ? { effort: now.effort } : {}),
 						});
-					else setAgentChoice({ profile: next });
+					else set({ profile: next });
 				}}
 			>
-				<DropdownMenuRadioItem value={HELP} closeOnClick>
-					<span className="truncate">Profile for help</span>
-					<DropdownMenuShortcut className="tracking-normal">
-						{forHelp ? forHelp.name : "none yet"}
-					</DropdownMenuShortcut>
-				</DropdownMenuRadioItem>
+				{purpose === "run" ? null : (
+					<DropdownMenuRadioItem value={HELP} closeOnClick>
+						<span className="truncate">Profile for help</span>
+						<DropdownMenuShortcut className="tracking-normal">
+							{forHelp ? forHelp.name : "none yet"}
+						</DropdownMenuShortcut>
+					</DropdownMenuRadioItem>
+				)}
 				{profiles.map((p) => (
 					<DropdownMenuRadioItem
 						key={p.name}
@@ -401,9 +421,11 @@ function HarnessModels({
 
 function EffortMenu({
 	choice,
+	set,
 	now,
 }: {
 	choice: AgentChoice;
+	set: (choice: AgentChoice) => void;
 	now: ReturnType<typeof resolve>;
 }) {
 	const fromProfile = !now.none && now.profile?.effort;
@@ -436,7 +458,7 @@ function EffortMenu({
 									: {}
 								: { ...choice };
 							const { effort: _, ...rest } = base;
-							setAgentChoice(effort ? { ...rest, effort } : rest);
+							set(effort ? { ...rest, effort } : rest);
 						}}
 					>
 						<DropdownMenuRadioItem value={NO_EFFORT} closeOnClick>

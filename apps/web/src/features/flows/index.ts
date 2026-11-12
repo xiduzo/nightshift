@@ -1,5 +1,11 @@
 /** Flows: the list, the canvas, the editor, the flow draft, and starting a run of a flow. */
 
+export {
+	type AgentChoice,
+	requestAgent,
+} from "./assistant/agent-choice";
+export { PromptInput } from "./assistant/prompt-input";
+export { Suggestions } from "./assistant/suggestions";
 export type { FlowCanvasNode, NodeRunState } from "./canvas/flow-node";
 export {
 	END_STATUS_LABEL,
@@ -40,6 +46,7 @@ export { FlowPage } from "./flow-page";
 export { preloadFlowPage } from "./preload";
 export { ProjectFlowsPage } from "./project-flows-page";
 export { flowQueries } from "./queries";
+export { StartFromField } from "./start/base-ref-combobox";
 export { FlowInputFields } from "./start/flow-input-fields";
 export {
 	PickFlowRunForm,

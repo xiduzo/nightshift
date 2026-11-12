@@ -30,7 +30,7 @@ import {
 	useState,
 } from "react";
 import { Markdown } from "@/shared/markdown";
-import { AgentMenus, agentRequest } from "./agent-picker";
+import { agentRequest } from "./agent-picker";
 import {
 	applyToDraft,
 	type FlowAssistant,
@@ -261,7 +261,7 @@ function SuggestBody({
 						submitLabel={state.status === "failed" ? "Try again" : "Suggest"}
 						answering={state.status === "running"}
 						onStop={stop}
-						tools={<AgentMenus purpose="suggest" />}
+						agent={{ purpose: "suggest" }}
 					/>
 				</>
 			) : null}

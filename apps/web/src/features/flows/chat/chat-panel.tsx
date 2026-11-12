@@ -58,7 +58,6 @@ import { formatCost } from "@/shared/format";
 import { type LinkView, Markdown } from "@/shared/markdown";
 import { PanelHeader } from "@/shared/panel";
 import { UsageContext } from "@/shared/usage";
-import { AgentMenus } from "../assistant/agent-picker";
 import { PromptInput } from "../assistant/prompt-input";
 import { Suggestions } from "../assistant/suggestions";
 import {
@@ -517,7 +516,7 @@ function Composer({
 				blockedBy={sendBlockedBy}
 				answering={streaming}
 				onStop={onStop}
-				tools={<AgentMenus purpose="chat" />}
+				agent={{ purpose: "chat" }}
 			/>
 		</div>
 	);

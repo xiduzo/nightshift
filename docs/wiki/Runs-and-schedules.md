@@ -3,7 +3,7 @@
 ## Start a run
 
 - **Run** in the flow editor starts the flow. The start dialog asks for its inputs. In a project with a folder, it also asks for the branch to start from.
-- **Quick run** on a project starts one Agent from a prompt, with no flow. It can also pick a flow, with the most used flows first.
+- **Quick run** on a project starts one Agent from a prompt, with no flow. Choose a profile or a model, as in the chat. It can also pick a flow, with the most used flows first.
 - A [schedule](#schedules) or a [webhook](#webhooks) starts a run without you.
 - An agent in a terminal starts a run with the `start_run` tool. See [Terminal and MCP](Terminal-and-MCP.md).
 

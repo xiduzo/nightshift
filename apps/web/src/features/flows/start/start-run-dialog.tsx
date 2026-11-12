@@ -82,7 +82,7 @@ import {
 	testRequest,
 } from "../editor/test-run/marks";
 import { flowQueries } from "../queries";
-import { BaseRefCombobox } from "./base-ref-combobox";
+import { StartFromField } from "./base-ref-combobox";
 import { FlowInputFields } from "./flow-input-fields";
 import { placementDescription } from "./placement-words";
 
@@ -178,9 +178,6 @@ function typedInputs(inputs: FlowInputDef[], values: InputValues): InputValues {
 	return typed;
 }
 
-/** The runs whose branches "Start from" offers. */
-const RECENT_RUNS = 12;
-
 /** The pins and skips of a test run, from the editor (ADR 27). */
 export type StartTest = {
 	marks: TestMarks;
@@ -268,15 +265,6 @@ function StartRunForm({
 	const askDevice = devices.length > 1 || devices[0]?.thisDevice === false;
 	const noDevice = placements.isSuccess && devices.length === 0;
 	const now = useNow(15_000);
-	// Recent branches of this project's runs: a night can go on from an open stack.
-	const runs = useQuery({
-		...runQueries.ofProject(projectId, RECENT_RUNS),
-		enabled: withFolder,
-	});
-	const recentRefs = [
-		...new Set((runs.data ?? []).flatMap((run) => [run.branch, run.baseRef])),
-	].slice(0, 12);
-	const lastBase = runs.data?.[0]?.baseRef;
 
 	const stopAt = stop.on ? nextOccurrence(stop.time, now) : null;
 	const missing = missingInputs(inputs, values);
@@ -351,167 +339,159 @@ function StartRunForm({
 				</DialogHeader>
 			)}
 
-			<FieldGroup className="gap-6">
-				{picker}
-				{test ? (
-					<div className="flex flex-col gap-3">
-						<Field orientation="horizontal">
-							<Switch
-								id={`${id}-test`}
-								checked={usesMarks}
-								onCheckedChange={setUsesMarks}
-							/>
-							<FieldLabel htmlFor={`${id}-test`}>Use pins and skips</FieldLabel>
-						</Field>
-						{usesMarks ? <TestAlert test={test} /> : null}
-					</div>
-				) : null}
-				<FlowInputFields
-					idPrefix={id}
-					inputs={inputs}
-					values={values}
-					onChange={setValues}
-				/>
-
-				{inputs.length > 0 ? <FieldSeparator /> : null}
-
-				{askDevice || noDevice ? (
-					<Field data-invalid={noDevice || undefined}>
-						<FieldLabel htmlFor={`${id}-device`}>Device</FieldLabel>
-						<Select
-							items={[
-								{ value: AUTOMATIC, label: "Automatic" },
-								...devices.map((d) => ({
-									value: d.deviceId,
-									label: placementLabel(d),
-								})),
-							]}
-							value={device?.deviceId ?? AUTOMATIC}
-							onValueChange={(value) => {
-								if (value) setChosenDevice(value);
-							}}
-							disabled={noDevice}
-						>
-							<SelectTrigger
-								id={`${id}-device`}
-								className="w-full"
-								aria-describedby={`${id}-device-hint`}
-							>
-								<SelectValue placeholder="No device" />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value={AUTOMATIC}>Automatic</SelectItem>
-								{[
-									{
-										label: "Your devices",
-										list: devices.filter((d) => d.offers === undefined),
-									},
-									{
-										label: "Offered to this Space",
-										list: devices.filter((d) => d.offers !== undefined),
-									},
-								].map((group) =>
-									group.list.length === 0 ? null : (
-										<SelectGroup key={group.label}>
-											<SelectLabel>{group.label}</SelectLabel>
-											{group.list.map((d) => (
-												<SelectItem key={d.deviceId} value={d.deviceId}>
-													{placementLabel(d)}
-												</SelectItem>
-											))}
-										</SelectGroup>
-									),
-								)}
-							</SelectContent>
-						</Select>
-						<FieldDescription
-							id={`${id}-device-hint`}
-							className={noDevice ? "text-destructive" : undefined}
-						>
-							{placementDescription(device, noDevice)}
-						</FieldDescription>
-					</Field>
-				) : null}
-
-				{withFolder ? (
-					<Field>
-						<FieldLabel htmlFor={`${id}-base`}>
-							Start from
-							<span className="font-normal text-muted-foreground">
-								(optional)
-							</span>
-						</FieldLabel>
-						<BaseRefCombobox
-							id={`${id}-base`}
-							projectId={projectId}
-							value={baseRef}
-							recent={recentRefs}
-							placeholder={
-								lastBase
-									? `The current branch (last: ${lastBase})`
-									: "The current branch"
-							}
-							describedBy={`${id}-base-hint`}
-							onChange={setBaseRef}
+			<SplitFields
+				split={picker !== undefined}
+				separated={inputs.length > 0}
+				main={
+					<>
+						{picker}
+						{test ? (
+							<div className="flex flex-col gap-3">
+								<Field orientation="horizontal">
+									<Switch
+										id={`${id}-test`}
+										checked={usesMarks}
+										onCheckedChange={setUsesMarks}
+									/>
+									<FieldLabel htmlFor={`${id}-test`}>
+										Use pins and skips
+									</FieldLabel>
+								</Field>
+								{usesMarks ? <TestAlert test={test} /> : null}
+							</div>
+						) : null}
+						<FlowInputFields
+							idPrefix={id}
+							inputs={inputs}
+							values={values}
+							onChange={setValues}
 						/>
-						<FieldDescription id={`${id}-base-hint`}>
-							A branch, tag or commit, for example the top of an open stack.
-						</FieldDescription>
-					</Field>
-				) : null}
-
-				<Field
-					orientation="horizontal"
-					data-invalid={stopInvalid || undefined}
-					className="items-start"
-				>
-					<Switch
-						id={`${id}-on`}
-						checked={stop.on}
-						className="mt-0.5"
-						onCheckedChange={(on) => setStop((current) => ({ ...current, on }))}
-					/>
-					<FieldContent>
-						<FieldLabel htmlFor={`${id}-on`}>Stop at a time</FieldLabel>
-						<FieldDescription
-							id={`${id}-hint`}
-							aria-live="polite"
-							className={stopInvalid ? "text-destructive" : undefined}
-						>
-							{!stop.on ? (
-								"The run goes until the flow ends."
-							) : stopAt === null ? (
-								"Enter a time, for example 07:00."
-							) : (
-								<>
-									Stops{" "}
-									<LocalTime
-										at={stopAt}
-										className="font-medium text-foreground"
+					</>
+				}
+				settings={
+					<>
+						{askDevice || noDevice ? (
+							<Field data-invalid={noDevice || undefined}>
+								<FieldLabel htmlFor={`${id}-device`}>Device</FieldLabel>
+								<Select
+									items={[
+										{ value: AUTOMATIC, label: "Automatic" },
+										...devices.map((d) => ({
+											value: d.deviceId,
+											label: placementLabel(d),
+										})),
+									]}
+									value={device?.deviceId ?? AUTOMATIC}
+									onValueChange={(value) => {
+										if (value) setChosenDevice(value);
+									}}
+									disabled={noDevice}
+								>
+									<SelectTrigger
+										id={`${id}-device`}
+										className="w-full"
+										aria-describedby={`${id}-device-hint`}
 									>
-										{dayWord(stopAt, now)}, {formatDayTime(stopAt)}
-									</LocalTime>{" "}
-									(in {waitedText(stopAt - now)}). No new step starts after
-									that.
-								</>
-							)}
-						</FieldDescription>
-					</FieldContent>
-					<Input
-						id={`${id}-time`}
-						type="time"
-						value={stop.time}
-						disabled={!stop.on}
-						aria-label="Stop time"
-						aria-invalid={stopInvalid}
-						aria-describedby={`${id}-hint`}
-						className="w-28 shrink-0 font-mono tabular-nums"
-						onChange={(event) =>
-							setStop({ on: true, time: event.target.value })
-						}
-					/>
-				</Field>
-			</FieldGroup>
+										<SelectValue placeholder="No device" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value={AUTOMATIC}>Automatic</SelectItem>
+										{[
+											{
+												label: "Your devices",
+												list: devices.filter((d) => d.offers === undefined),
+											},
+											{
+												label: "Offered to this Space",
+												list: devices.filter((d) => d.offers !== undefined),
+											},
+										].map((group) =>
+											group.list.length === 0 ? null : (
+												<SelectGroup key={group.label}>
+													<SelectLabel>{group.label}</SelectLabel>
+													{group.list.map((d) => (
+														<SelectItem key={d.deviceId} value={d.deviceId}>
+															{placementLabel(d)}
+														</SelectItem>
+													))}
+												</SelectGroup>
+											),
+										)}
+									</SelectContent>
+								</Select>
+								<FieldDescription
+									id={`${id}-device-hint`}
+									className={noDevice ? "text-destructive" : undefined}
+								>
+									{placementDescription(device, noDevice)}
+								</FieldDescription>
+							</Field>
+						) : null}
+
+						{withFolder ? (
+							<StartFromField
+								projectId={projectId}
+								value={baseRef}
+								onChange={setBaseRef}
+							/>
+						) : null}
+
+						<Field
+							orientation="horizontal"
+							data-invalid={stopInvalid || undefined}
+							className="items-start"
+						>
+							<Switch
+								id={`${id}-on`}
+								checked={stop.on}
+								className="mt-0.5"
+								onCheckedChange={(on) =>
+									setStop((current) => ({ ...current, on }))
+								}
+							/>
+							<FieldContent>
+								<FieldLabel htmlFor={`${id}-on`}>Stop at a time</FieldLabel>
+								<FieldDescription
+									id={`${id}-hint`}
+									aria-live="polite"
+									className={stopInvalid ? "text-destructive" : undefined}
+								>
+									{!stop.on ? (
+										"The run goes until the flow ends."
+									) : stopAt === null ? (
+										"Enter a time, for example 07:00."
+									) : (
+										<>
+											Stops{" "}
+											<LocalTime
+												at={stopAt}
+												className="font-medium text-foreground"
+											>
+												{dayWord(stopAt, now)}, {formatDayTime(stopAt)}
+											</LocalTime>{" "}
+											(in {waitedText(stopAt - now)}). No new step starts after
+											that.
+										</>
+									)}
+								</FieldDescription>
+							</FieldContent>
+							<Input
+								id={`${id}-time`}
+								type="time"
+								value={stop.time}
+								disabled={!stop.on}
+								aria-label="Stop time"
+								aria-invalid={stopInvalid}
+								aria-describedby={`${id}-hint`}
+								className="w-28 shrink-0 font-mono tabular-nums"
+								onChange={(event) =>
+									setStop({ on: true, time: event.target.value })
+								}
+							/>
+						</Field>
+					</>
+				}
+			/>
 
 			<DialogFooter>
 				<DialogClose render={<Button variant="outline" type="button" />}>
@@ -541,6 +521,41 @@ function StartRunForm({
 				</Button>
 			</DialogFooter>
 		</form>
+	);
+}
+
+/**
+ * The fields of a start. Split: what to run on the left, how it runs on the
+ * right, for the wide quick run dialog. Else one column, a line between.
+ */
+function SplitFields({
+	split,
+	separated,
+	main,
+	settings,
+}: {
+	split: boolean;
+	/** One column: a line under the inputs, when there are any. */
+	separated: boolean;
+	main: ReactNode;
+	settings: ReactNode;
+}) {
+	if (!split) {
+		return (
+			<FieldGroup className="gap-6">
+				{main}
+				{separated ? <FieldSeparator /> : null}
+				{settings}
+			</FieldGroup>
+		);
+	}
+	return (
+		<div className="grid gap-6 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+			<FieldGroup className="gap-6">{main}</FieldGroup>
+			<FieldGroup className="gap-6 border-t pt-6 md:border-t-0 md:border-l md:pt-0 md:pl-6">
+				{settings}
+			</FieldGroup>
+		</div>
 	);
 }
 
