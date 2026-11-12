@@ -305,18 +305,24 @@ function noticeOf(
 			if (ended) return { ...ended, actions: read };
 			// A run that finished without a message: its report is the word it left.
 			if (!report || status !== "finished") return null;
-			const nothing = run.result === "nothing-to-do";
-			return notice(
-				nothing ? "nothing-to-do" : "done",
-				[nothing ? "Nothing to do" : "Done"],
-				"The run wrote a report.",
-				[],
-				{ actions: read },
-			);
+			return finishedNotice(run.result, "The run wrote a report.", [], read);
 		}
 		default:
 			return null;
 	}
+}
+
+/** A finished run's notice: "Done", or quiet when it had nothing to do (`statusOf`). */
+function finishedNotice(
+	result: RunResult | null,
+	gist: string,
+	body: NoticePart[],
+	actions: NoticeAction[] = [],
+): RunNotice {
+	const { key, word } = statusOf({ status: "finished", result });
+	return key === "nothing-to-do"
+		? notice("nothing-to-do", [word], gist, body, { actions })
+		: notice("done", ["Done"], gist, body, { actions });
 }
 
 /**
@@ -335,13 +341,9 @@ function endedNotice(
 		case "finished": {
 			// Only an End node with a message leaves you something to read.
 			if (!run.result || !run.reason) return null;
-			const nothing = run.result === "nothing-to-do";
-			return notice(
-				nothing ? "nothing-to-do" : "done",
-				[nothing ? "Nothing to do" : "Done"],
-				firstLine(run.reason) ?? "",
-				[run.reason],
-			);
+			return finishedNotice(run.result, firstLine(run.reason) ?? "", [
+				run.reason,
+			]);
 		}
 		case "failed":
 			if (run.result === "failed") {
