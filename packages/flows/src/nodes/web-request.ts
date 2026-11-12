@@ -8,7 +8,14 @@ import {
 	requestHeadersSchema,
 	secretNameSchema,
 } from "./base";
-import { type NodeDefinition, noOwnColors } from "./definition";
+import {
+	endsOnPass,
+	type NodeDefinition,
+	noEndedLabel,
+	noOwnColors,
+	type Position,
+	takesNoValue,
+} from "./definition";
 
 /**
  * The Web request node: one HTTP request from the step's computer, with no
@@ -269,6 +276,11 @@ function checkJsonBody(value: string, title: string, check: NodeCheck): void {
 	}
 }
 
+/** A new Web request node: a GET to a URL that starts empty. The issues panel asks for it. */
+export function webRequestNode(id: string, position: Position): WebRequestNode {
+	return { id, type: "web-request", position, method: "GET", url: "" };
+}
+
 /** The Web request node type. */
 export const webRequestDefinition = {
 	type: "web-request",
@@ -280,6 +292,15 @@ export const webRequestDefinition = {
 	outputFields: webRequestOutputFields,
 	check: checkWebRequestNode,
 	secrets: webRequestSecrets,
+	endsFlow: endsOnPass,
+	endedLabel: noEndedLabel,
+	touchesDevice: () => true,
+	typedOutputField: () => "body",
+	mainOutputField: () => "body",
+	newNodes: {
+		"web-request": { id: "fetch", takes: "nothing", create: webRequestNode },
+	},
+	takeValue: takesNoValue,
 	sample: {
 		id: "fetch",
 		type: "web-request",

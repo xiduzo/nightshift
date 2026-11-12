@@ -23,8 +23,11 @@ import {
 import {
 	type BuiltInOutcome,
 	EXAMPLE_DEVICE,
+	type NodeDefaults,
 	type NodeDefinition,
 	noSecrets,
+	type Position,
+	takesNoValue,
 } from "./definition";
 import { checkOptions, option } from "./outcomes";
 
@@ -506,6 +509,40 @@ function checkAgentCascade(node: AgentNode, check: NodeCheck): void {
 	});
 }
 
+/** The model a new Agent node runs when Settings → New nodes names none. */
+export const DEFAULT_MODEL = "sonnet";
+
+/** A new Agent node, with the harness, model and permission mode of Settings → New nodes. */
+export function agentNode(
+	id: string,
+	position: Position,
+	defaults: NodeDefaults = {},
+): AgentNode {
+	return {
+		id,
+		type: "agent",
+		position,
+		prompt: "",
+		harness: defaults.agentHarness ?? "claude-code",
+		model: defaults.agentModel ?? DEFAULT_MODEL,
+		permissionMode: defaults.agentPermissionMode ?? "acceptEdits",
+		session: "fresh",
+	};
+}
+
+/**
+ * Whether `outcome` is one of an Agent's own outcomes (`outcomes`), not
+ * `fail` or `needs-input`: it ends the flow as chosen, and a Call reports
+ * it in `ended`.
+ */
+function isOwnAgentOutcome(node: AgentNode, outcome: string): boolean {
+	return (
+		node.outcomes !== undefined &&
+		outcome !== "fail" &&
+		outcome !== "needs-input"
+	);
+}
+
 /** The Agent node type. */
 export const agentDefinition = {
 	type: "agent",
@@ -526,6 +563,16 @@ export const agentDefinition = {
 	outputFields: agentOutputFields,
 	check: checkAgentNode,
 	secrets: noSecrets,
+	endsFlow: (node, outcome) =>
+		outcome === "pass" || isOwnAgentOutcome(node, outcome),
+	endedLabel: (node, outcome) =>
+		isOwnAgentOutcome(node, outcome) ? outcome : "",
+	touchesDevice: () => true,
+	typedOutputField: () => "data",
+	// Its data when it reports some, else its final message.
+	mainOutputField: (node) => (node.output !== undefined ? "data" : "output"),
+	newNodes: { agent: { id: "agent", takes: "nothing", create: agentNode } },
+	takeValue: takesNoValue,
 	sample: {
 		id: "scout",
 		type: "agent",

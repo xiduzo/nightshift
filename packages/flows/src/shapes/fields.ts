@@ -1,17 +1,17 @@
-import type {
-	Flow,
-	FlowInputDef,
-	FlowNode,
-	FlowNodeType,
-	FlowOutputDef,
-	FlowVariableDef,
-	outputFieldsByType,
-} from "../flow";
 import {
-	type callEachOutputFields,
-	type cascadeOutputFields,
-	commandHasData,
-	type confidenceField,
+	definitionOf,
+	type Flow,
+	type FlowInputDef,
+	type FlowNode,
+	type FlowNodeType,
+	type FlowOutputDef,
+	type FlowVariableDef,
+	type outputFieldsByType,
+} from "../flow";
+import type {
+	callEachOutputFields,
+	cascadeOutputFields,
+	confidenceField,
 } from "../nodes";
 import { convertDataShape } from "./convert";
 
@@ -19,7 +19,7 @@ import { convertDataShape } from "./convert";
  * The shape of each output field a later node reads (`{{check.exit_code}}`),
  * as JSON Schema. `{}` is any JSON value: a template may take any path
  * below it. A node's own `output` schema types one of its fields
- * (`TYPED_OUTPUT_FIELD`).
+ * (`NodeDefinition.typedOutputField`).
  */
 
 type Schema = Record<string, unknown>;
@@ -140,20 +140,6 @@ const CASCADE_FIELD_SHAPES: Record<
 > = { tier: text, tries: whole, confidence: number };
 
 /**
- * The output field that a node's own `output` schema types: the data of
- * an Agent's report, of a Value, of a command, of a tool, of a conversion
- * to JSON. A node type not listed has no `output` schema.
- */
-export const TYPED_OUTPUT_FIELD = {
-	agent: "data",
-	value: "data",
-	command: "data",
-	tool: "data",
-	convert: "data",
-	"web-request": "body",
-} as const satisfies Partial<Record<FlowNodeType, string>>;
-
-/**
  * Keys that a node's data may hold whatever its schema says: a command
  * writes `outcome` to pick an exit, and a command, an agent or a value
  * writes `scores` to score the run. A path that starts with one never warns.
@@ -171,29 +157,22 @@ export type TypedOutput = {
 };
 
 /**
- * The `output` schema of `node`, for a node type that has one
- * (`TYPED_OUTPUT_FIELD`), else null. A schema that a person wrote or
- * confirmed holds a run to it. An inferred one only warns.
+ * The `output` schema of `node`, for a node that has one
+ * (`NodeDefinition.typedOutputField`), else null. A schema that a person
+ * wrote or confirmed holds a run to it. An inferred one only warns.
  */
 export function typedOutput(node: FlowNode): TypedOutput | null {
-	const field: string | undefined =
-		TYPED_OUTPUT_FIELD[node.type as keyof typeof TYPED_OUTPUT_FIELD];
-	if (field === undefined) return null;
-	if (node.type === "convert") {
-		// To text there is no data. To JSON, the format's own shape holds when
-		// the node names none: Night Shift wrote it, so it counts as written,
-		// and Night Shift infers nothing for a Convert node.
-		if (node.to !== "json") return null;
-		return {
-			field,
-			schema: node.output ?? convertDataShape(node),
-			inferred: node.output !== undefined && node.outputInferred === true,
-		};
-	}
+	const field = definitionOf(node).typedOutputField(node);
+	if (field === null) return null;
 	const own = node as { output?: Schema; outputInferred?: true };
 	return {
 		field,
-		schema: own.output,
+		// To JSON, a Convert node's format gives the shape when the node
+		// names none: Night Shift wrote it, so it counts as written, and
+		// Night Shift infers nothing for a Convert node.
+		schema:
+			own.output ??
+			(node.type === "convert" ? convertDataShape(node) : undefined),
 		inferred: own.output !== undefined && own.outputInferred === true,
 	};
 }
@@ -203,39 +182,10 @@ export function typedOutput(node: FlowNode): TypedOutput | null {
  * node that takes a value reads (`addNodeAfter`). The field its own
  * `output` schema types, when the node has data. Else the field that says
  * the most: an Agent's final message, a command's last lines, a Gate's
- * note, the holder of a Lease.
+ * note, the holder of a Lease (`NodeDefinition.mainOutputField`).
  */
 export function mainOutputField(node: FlowNode): string {
-	switch (node.type) {
-		case "agent":
-			return node.output !== undefined ? "data" : "output";
-		case "command":
-			return commandHasData(node) ? "data" : "log_tail";
-		case "convert":
-			return node.to === "json" ? "data" : "text";
-		case "value":
-		case "tool":
-		case "join":
-		case "service":
-		case "since-last-run":
-			return "data";
-		case "web-request":
-			return "body";
-		case "decision":
-			return "note";
-		case "call":
-			return node.each !== undefined ? "results" : "end_message";
-		case "wait":
-			return node.until.kind === "command"
-				? "log_tail"
-				: node.until.kind === "duration" || node.until.kind === "time"
-					? "waited_minutes"
-					: "data";
-		case "lease":
-			return "holder";
-		case "end":
-			return "message";
-	}
+	return definitionOf(node).mainOutputField(node);
 }
 
 /**

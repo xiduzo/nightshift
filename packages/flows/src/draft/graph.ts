@@ -1,5 +1,6 @@
 /** Edits of the flow graph: nodes, edges, the start, inputs, outputs, variables and the run policy. */
 import {
+	definitionOf,
 	type Flow,
 	type FlowEdge,
 	type FlowInputDef,
@@ -7,32 +8,15 @@ import {
 	type FlowNodeType,
 	type FlowOutputDef,
 	type FlowVariableDef,
+	NODE_DEFINITIONS,
 	nodeOutcomes,
 	type Outcome,
 	type Policy,
 } from "../flow";
+import type { NewNode, NodeDefaults, Position } from "../nodes";
 import { jsonataPath } from "../presets";
 import { mainOutputField, outputFieldShape } from "../shapes";
 import { takenNames, uniqueEdgeId, uniqueNodeId } from "./names";
-import {
-	agentNode,
-	callNode,
-	commandNode,
-	convertNode,
-	decisionNode,
-	endNode,
-	gateNode,
-	joinNode,
-	leaseNode,
-	type NodeDefaults,
-	type Position,
-	serviceNode,
-	sinceLastRunNode,
-	toolNode,
-	valueNode,
-	waitNode,
-	webRequestNode,
-} from "./nodes";
 import { renameInFlow } from "./refs";
 import { sectionsWithoutNode, sectionsWithRenamedNode } from "./sections";
 
@@ -69,41 +53,20 @@ export function setVariables(flow: Flow, variables: FlowVariableDef[]): Flow {
 }
 
 /**
- * What the palette adds: a node of a type, or a Decision by who decides it.
- * A Gate is a Decision you decide, a Branch one a rule decides. Both write a
- * `decision` node; a Decision by a model is the same node with another
- * `by`, set in the inspector.
+ * What the palette adds: a node of a type, or a Decision by who decides it
+ * (`NodeDefinition.newNodes`). A Gate is a Decision you decide, a Branch
+ * one a rule decides.
  */
-export type NewNodeKind = FlowNodeType | "gate" | "branch";
+export type NewNodeKind = {
+	[T in FlowNodeType]: keyof (typeof NODE_DEFINITIONS)[T]["newNodes"];
+}[FlowNodeType];
 
-const NEW_NODE: Record<
-	NewNodeKind,
-	{
-		id: string;
-		create: (
-			id: string,
-			position: Position,
-			defaults: NodeDefaults,
-		) => FlowNode;
-	}
-> = {
-	agent: { id: "agent", create: agentNode },
-	command: { id: "check", create: commandNode },
-	decision: { id: "decide", create: decisionNode },
-	gate: { id: "gate", create: gateNode },
-	branch: { id: "branch", create: decisionNode },
-	call: { id: "call", create: callNode },
-	value: { id: "value", create: valueNode },
-	wait: { id: "wait", create: waitNode },
-	tool: { id: "tool", create: toolNode },
-	end: { id: "end", create: endNode },
-	join: { id: "join", create: joinNode },
-	lease: { id: "lease", create: leaseNode },
-	service: { id: "service", create: serviceNode },
-	"since-last-run": { id: "since-last-run", create: sinceLastRunNode },
-	convert: { id: "convert", create: convertNode },
-	"web-request": { id: "fetch", create: webRequestNode },
-};
+/** Every kind of the palette, with its new node. */
+const NEW_NODE = Object.fromEntries(
+	Object.values(NODE_DEFINITIONS).flatMap((definition) =>
+		Object.entries(definition.newNodes),
+	),
+) as Record<NewNodeKind, NewNode<FlowNode>>;
 
 /** Adds a node of `type`; a new Agent node starts with `defaults`. */
 export function addNode(
@@ -137,7 +100,7 @@ export function addCalledNode(
 	position: Position,
 ): { flow: Flow; id: string } {
 	const id = calledNodeId(flow, flowName);
-	const node = { ...callNode(id, position), flow: flowName };
+	const node = { ...NEW_NODE.call.create(id, position, {}), flow: flowName };
 	const next: Flow = {
 		...flow,
 		nodes: [...flow.nodes, node],
@@ -172,24 +135,9 @@ function calledNodeId(flow: Flow, flowName: string): string {
  * tests it, a Value shapes it, Since last run compares it, and Convert
  * converts it.
  */
-export const NEW_NODE_TAKES = {
-	agent: "nothing",
-	command: "nothing",
-	tool: "nothing",
-	"web-request": "nothing",
-	decision: "nothing",
-	gate: "nothing",
-	branch: "value",
-	value: "value",
-	"since-last-run": "value",
-	convert: "value",
-	wait: "nothing",
-	lease: "nothing",
-	service: "nothing",
-	call: "nothing",
-	join: "nothing",
-	end: "nothing",
-} as const satisfies Record<NewNodeKind, "nothing" | "value">;
+export const NEW_NODE_TAKES = Object.fromEntries(
+	Object.entries(NEW_NODE).map(([kind, node]) => [kind, node.takes]),
+) as Record<NewNodeKind, NewNode<FlowNode>["takes"]>;
 
 /**
  * Adds a node of `kind` after node `fromId`. A kind that takes a value
@@ -222,31 +170,18 @@ export function addNodeAfter(
 	return { flow: next, id: added.id };
 }
 
-/** A new node that reads the main output of `from`, for a kind that takes a value. */
+/**
+ * A new node that reads the main output of `from`, for a kind that takes a
+ * value (`NodeDefinition.takeValue`).
+ */
 function readingFrom(node: FlowNode, from: FlowNode): FlowNode {
 	const field = mainOutputField(from);
 	const ref = `${from.id}.${field}`;
-	switch (node.type) {
-		case "convert":
-			return { ...node, value: `{{${ref}}}` };
-		case "since-last-run":
-			return { ...node, items: `{{${listIn(from, field)}}}` };
-		case "value":
-			return node.by === "rule"
-				? { ...node, expression: jsonataPath(ref) }
-				: node;
-		case "decision":
-			return node.by === "rule"
-				? {
-						...node,
-						options: node.options.map((option, index) =>
-							index === 0 ? { ...option, when: jsonataPath(ref) } : option,
-						),
-					}
-				: node;
-		default:
-			return node;
-	}
+	return definitionOf(node).takeValue(node, {
+		ref,
+		list: listIn(from, field),
+		path: jsonataPath(ref),
+	});
 }
 
 /**

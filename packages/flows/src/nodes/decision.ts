@@ -25,7 +25,7 @@ import {
 	tierBase,
 	tierLabel,
 } from "./cascade";
-import { type NodeDefinition, noSecrets } from "./definition";
+import { type NodeDefinition, noSecrets, type Position } from "./definition";
 import {
 	checkGateBrief,
 	gateBriefFields,
@@ -376,6 +376,37 @@ function checkDecidedBy(node: DecisionNode, check: NodeCheck): void {
 	}
 }
 
+/**
+ * A new Decision node: a rule decides, with the options yes and no and no
+ * rule yet. The issues panel asks for one. The inspector switches who
+ * decides: you (a Gate) or a model (`withDecidedBy`).
+ */
+export function decisionNode(id: string, position: Position): DecisionNode {
+	return {
+		id,
+		type: "decision",
+		position,
+		prompt: "",
+		options: [{ name: "yes" }, { name: "no" }],
+		by: "rule",
+	};
+}
+
+/**
+ * A new Gate: a Decision you decide, with the options yes and no and no
+ * question yet. The issues panel asks for one.
+ */
+function gateNode(id: string, position: Position): DecisionNode {
+	return {
+		id,
+		type: "decision",
+		position,
+		prompt: "",
+		options: [{ name: "yes" }, { name: "no" }],
+		by: "person",
+	};
+}
+
 /** The Decision node type: a Gate, a Branch or a Decision by a model. */
 export const decisionDefinition = {
 	type: "decision",
@@ -395,6 +426,30 @@ export const decisionDefinition = {
 	outputFields: decisionOutputFields,
 	check: checkDecisionNode,
 	secrets: noSecrets,
+	endsFlow: (node, outcome) =>
+		node.options.some((option) => option.name === outcome),
+	endedLabel: (_node, outcome) => outcome,
+	// Only a model runs on a computer: a person or a rule needs none.
+	touchesDevice: (node) => node.by === "model",
+	typedOutputField: () => null,
+	mainOutputField: () => "note",
+	// A Gate is a Decision you decide, a Branch one a rule decides. A
+	// Decision by a model is the same node with another `by`.
+	newNodes: {
+		decision: { id: "decide", takes: "nothing", create: decisionNode },
+		gate: { id: "gate", takes: "nothing", create: gateNode },
+		branch: { id: "branch", takes: "value", create: decisionNode },
+	},
+	// A rule tests the value in its first option.
+	takeValue: (node, value) =>
+		node.by === "rule"
+			? {
+					...node,
+					options: node.options.map((option, index) =>
+						index === 0 ? { ...option, when: value.path } : option,
+					),
+				}
+			: node,
 	sample: {
 		id: "approve",
 		type: "decision",

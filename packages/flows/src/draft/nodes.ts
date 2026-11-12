@@ -3,100 +3,23 @@
 import { FLOW_VERSION, type Flow, type FlowNode } from "../flow";
 import {
 	type AgentNode,
+	agentNode,
 	type CallEach,
-	type CallNode,
-	type CommandNode,
-	type ConvertNode,
 	canMakeValue,
-	DEFAULT_COMMAND_EXITS,
 	type DecidedBy,
 	type DecisionNode,
 	decisionDecider,
-	type EndNode,
-	type JoinNode,
-	type LeaseNode,
 	type ListSource,
-	type ServiceNode,
-	type SinceLastRunNode,
+	type NodeDefaults,
 	type ToolNode,
 	type ValueBy,
 	type ValueDeciderName,
 	type ValueNode,
 	type VariableWrite,
 	valueDeciderNameSchema,
-	type WaitNode,
 	type WaitUntil,
-	type WebRequestNode,
 } from "../nodes";
 import { typedOutput } from "../shapes";
-
-export type Position = { x: number; y: number };
-
-export const DEFAULT_MODEL = "sonnet";
-
-/**
- * What a new Agent or Decision node starts with: the daemon's settings
- * (Settings → New nodes). Each one left out keeps the built-in default.
- */
-export type NodeDefaults = {
-	agentHarness?: AgentNode["harness"];
-	agentModel?: string;
-	agentPermissionMode?: AgentNode["permissionMode"];
-	decisionDecider?: DecisionNode["decider"];
-};
-
-export function agentNode(
-	id: string,
-	position: Position,
-	defaults: NodeDefaults = {},
-): AgentNode {
-	return {
-		id,
-		type: "agent",
-		position,
-		prompt: "",
-		harness: defaults.agentHarness ?? "claude-code",
-		model: defaults.agentModel ?? DEFAULT_MODEL,
-		permissionMode: defaults.agentPermissionMode ?? "acceptEdits",
-		session: "fresh",
-	};
-}
-
-/** The command starts empty; the issues panel asks for one. */
-export function commandNode(id: string, position: Position): CommandNode {
-	return {
-		id,
-		type: "command",
-		position,
-		command: "",
-		stdout: "text",
-		exits: DEFAULT_COMMAND_EXITS.map((exit) => ({ ...exit })),
-	};
-}
-
-/**
- * A rule decides, with the options yes and no and no rule yet; the issues
- * panel asks for one. The inspector switches who decides: you (a Gate) or
- * a model (`withDecidedBy`).
- */
-export function decisionNode(id: string, position: Position): DecisionNode {
-	return {
-		id,
-		type: "decision",
-		position,
-		prompt: "",
-		options: [{ name: "yes" }, { name: "no" }],
-		by: "rule",
-	};
-}
-
-/**
- * A Gate, from the palette: a Decision you decide, with the options yes
- * and no and no question yet; the issues panel asks for one.
- */
-export function gateNode(id: string, position: Position): DecisionNode {
-	return withDecidedBy(decisionNode(id, position), "person");
-}
 
 /**
  * Changes who decides. A rule's `when` fields go, and `title`,
@@ -170,16 +93,6 @@ function withoutUndefined<T extends Record<string, unknown>>(
 	) as Partial<T>;
 }
 
-/** Ends the run as done, with no message yet. */
-export function endNode(id: string, position: Position): EndNode {
-	return { id, type: "end", position, status: "done", message: "" };
-}
-
-/** Runs a flow once. The called flow starts empty; the issues panel asks for one. */
-export function callNode(id: string, position: Position): CallNode {
-	return { id, type: "call", position, flow: "", inputs: {} };
-}
-
 /**
  * What a Call node loops over when "once per item" is switched on: a JSON
  * list by default, often another node's output. The list starts empty; the
@@ -198,22 +111,6 @@ export function defaultEach(): CallEach {
 // The enum is not empty.
 const FIRST_VALUE_DECIDER = valueDeciderNameSchema
 	.options[0] as ValueDeciderName;
-
-/**
- * A rule makes the value, with an object schema and no expression yet; the
- * issues panel asks for one. Switched to a model, the node starts on the
- * first decider that can make a value (`withValueBy`).
- */
-export function valueNode(id: string, position: Position): ValueNode {
-	return {
-		id,
-		type: "value",
-		position,
-		by: "rule",
-		expression: "",
-		output: { type: "object" },
-	};
-}
 
 /**
  * Changes who makes the value. The expression and the prompt both stay, for
@@ -256,16 +153,6 @@ export function withValueBy(node: ValueNode, by: ValueBy): ValueNode {
 	};
 }
 
-/** Waits 15 minutes until the inspector says otherwise. */
-export function waitNode(id: string, position: Position): WaitNode {
-	return {
-		id,
-		type: "wait",
-		position,
-		until: { kind: "duration", minutes: 15 },
-	};
-}
-
 /** What a Wait node of each kind starts with when the person switches to it. */
 export function emptyUntil(kind: WaitUntil["kind"]): WaitUntil {
 	switch (kind) {
@@ -286,57 +173,6 @@ export function emptyUntil(kind: WaitUntil["kind"]): WaitUntil {
 		case "url":
 			return { kind: "url", url: "", everyMinutes: 5 };
 	}
-}
-
-/** The connection and the tool start empty; the issues panel asks for them. */
-export function toolNode(id: string, position: Position): ToolNode {
-	return {
-		id,
-		type: "tool",
-		position,
-		connection: "",
-		tool: "",
-		arguments: {},
-	};
-}
-
-/** A GET to a URL that starts empty; the issues panel asks for it. */
-export function webRequestNode(id: string, position: Position): WebRequestNode {
-	return { id, type: "web-request", position, method: "GET", url: "" };
-}
-
-/** The name starts empty; the issues panel asks for it. It does not wait. */
-export function leaseNode(id: string, position: Position): LeaseNode {
-	return { id, type: "lease", position, name: "" };
-}
-
-/**
- * A service starts with empty commands and a URL to check; the issues
- * panel asks for them. It runs for the whole run.
- */
-export function serviceNode(id: string, position: Position): ServiceNode {
-	return { id, type: "service", position, start: "", ready: { url: "" } };
-}
-
-/** A Since last run node starts with an empty list; the issues panel asks for it. */
-export function sinceLastRunNode(
-	id: string,
-	position: Position,
-): SinceLastRunNode {
-	return { id, type: "since-last-run", position, items: "" };
-}
-
-/**
- * A conversion starts from CSV to JSON with no value; the issues panel
- * asks for it.
- */
-export function convertNode(id: string, position: Position): ConvertNode {
-	return { id, type: "convert", position, from: "csv", to: "json", value: "" };
-}
-
-/** A Join waits for every branch until the person picks `first`. */
-export function joinNode(id: string, position: Position): JoinNode {
-	return { id, type: "join", position, wait: "all" };
 }
 
 export function emptySource(kind: ListSource["kind"]): ListSource {

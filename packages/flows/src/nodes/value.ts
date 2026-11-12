@@ -35,9 +35,12 @@ import {
 } from "./cascade";
 import {
 	type BuiltInOutcome,
+	endsOnPass,
 	type NodeDefinition,
+	noEndedLabel,
 	noOwnColors,
 	noSecrets,
+	type Position,
 } from "./definition";
 import { checkGateBrief, gateBriefFields } from "./gate-brief";
 
@@ -453,6 +456,22 @@ function checkAskDeadline(node: ValueNode, check: NodeCheck): void {
 	}
 }
 
+/**
+ * A new Value node: a rule makes the value, with an object schema and no
+ * expression yet. The issues panel asks for one. Switched to a model, the
+ * node starts on the first decider that can make a value (`withValueBy`).
+ */
+export function valueNode(id: string, position: Position): ValueNode {
+	return {
+		id,
+		type: "value",
+		position,
+		by: "rule",
+		expression: "",
+		output: { type: "object" },
+	};
+}
+
 /** The Value node type. */
 export const valueDefinition = {
 	type: "value",
@@ -464,6 +483,16 @@ export const valueDefinition = {
 	outputFields: valueOutputFields,
 	check: checkValueNode,
 	secrets: noSecrets,
+	endsFlow: endsOnPass,
+	endedLabel: noEndedLabel,
+	// Only a model runs on a computer: a person or a rule needs none.
+	touchesDevice: (node) => node.by === "model",
+	typedOutputField: () => "data",
+	mainOutputField: () => "data",
+	newNodes: { value: { id: "value", takes: "value", create: valueNode } },
+	// A rule shapes the value.
+	takeValue: (node, value) =>
+		node.by === "rule" ? { ...node, expression: value.path } : node,
 	sample: {
 		id: "small",
 		type: "value",

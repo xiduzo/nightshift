@@ -8,7 +8,12 @@ import {
 	placed,
 	secretNameSchema,
 } from "./base";
-import type { NodeDefinition } from "./definition";
+import {
+	type NodeDefinition,
+	noEndedLabel,
+	type Position,
+	takesNoValue,
+} from "./definition";
 import { checkOptions, outcomeColorSchema } from "./outcomes";
 
 /**
@@ -306,6 +311,18 @@ function checkExits(node: CommandNode, check: NodeCheck): void {
 	}
 }
 
+/** A new Command node. The command starts empty; the issues panel asks for one. */
+export function commandNode(id: string, position: Position): CommandNode {
+	return {
+		id,
+		type: "command",
+		position,
+		command: "",
+		stdout: "text",
+		exits: DEFAULT_COMMAND_EXITS.map((exit) => ({ ...exit })),
+	};
+}
+
 /** The Command node type. */
 export const commandDefinition = {
 	type: "command",
@@ -318,6 +335,14 @@ export const commandDefinition = {
 	outputFields: commandOutputFields,
 	check: checkCommandNode,
 	secrets: (node) => node.secrets ?? [],
+	endsFlow: isChosenExit,
+	endedLabel: noEndedLabel,
+	touchesDevice: () => true,
+	typedOutputField: () => "data",
+	// Its data when it has some, else its last lines.
+	mainOutputField: (node) => (commandHasData(node) ? "data" : "log_tail"),
+	newNodes: { command: { id: "check", takes: "nothing", create: commandNode } },
+	takeValue: takesNoValue,
 	sample: {
 		id: "check",
 		type: "command",

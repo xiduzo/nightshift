@@ -18,7 +18,6 @@ import {
 	type FlowNode,
 	type JsonValue,
 	knowledgeFolderPath,
-	type Outcome,
 	personTierIndex,
 	profileLabel,
 	renderCommand,
@@ -249,15 +248,6 @@ function agentPrompt(node: AgentNode, tctx: StepHandle["tctx"]): string {
 	return node.skill ? `/${node.skill} ${rendered}`.trim() : rendered;
 }
 
-/** An Agent's own outcome, other than one named `fail` or `needs-input`. */
-export function isOwnAgentLabel(node: AgentNode, outcome: Outcome): boolean {
-	return (
-		node.outcomes !== undefined &&
-		outcome !== "fail" &&
-		outcome !== "needs-input"
-	);
-}
-
 /** Every CLI tool an Agent node uses is on the Device. */
 export const cliToolsInstalled: Requirement<AgentNode> = (nodes, has) => {
 	const notFound = [...new Set(nodes.flatMap(programsOf))].filter(
@@ -345,10 +335,6 @@ export const AGENT: NodeKind<AgentNode> = {
 		node.ask === "person" || personTierIndex(node) !== null
 			? [{ kind: "wait" }, { kind: "ask", make: agentAskNode }]
 			: [{ kind: "wait" }],
-	isChosenEnd: (node, outcome) =>
-		outcome === "pass" || isOwnAgentLabel(node, outcome),
-	endedLabel: (node, outcome) =>
-		isOwnAgentLabel(node, outcome) ? outcome : "",
 	// Every Agent step has an idle clock: its own, else the run policy's.
 	timeBudget: (node, policy) => ({
 		timeoutMinutes: node.timeoutMinutes,

@@ -1,22 +1,23 @@
 import { describe, expect, test } from "bun:test";
-import type {
-	AgentNode,
-	CallNode,
-	CommandNode,
-	ConvertNode,
-	DecisionNode,
-	EndNode,
-	FlowNode,
-	FlowNodeType,
-	JoinNode,
-	LeaseNode,
-	Outcome,
-	ServiceNode,
-	SinceLastRunNode,
-	ToolNode,
-	ValueNode,
-	WaitNode,
-	WebRequestNode,
+import {
+	type AgentNode,
+	type CallNode,
+	type CommandNode,
+	type ConvertNode,
+	type DecisionNode,
+	type EndNode,
+	type FlowNode,
+	type FlowNodeType,
+	type JoinNode,
+	type LeaseNode,
+	type Outcome,
+	type ServiceNode,
+	type SinceLastRunNode,
+	type ToolNode,
+	touchesDevice,
+	type ValueNode,
+	type WaitNode,
+	type WebRequestNode,
 } from "@nightshift/flows";
 
 import type { DerivedItem, DerivedStep } from "../log";
@@ -28,8 +29,10 @@ import { RESUME_RULES } from "./resume-point";
  * The node-kind descriptors as a table: one fact, every kind. Each table
  * pins what the switches said before the descriptor took them over
  * (`compile.ts`, `route.ts`, the step runner, `closeOpenWork`,
- * `body.endedLabel`, `placement/fit.ts` `REQUIREMENTS`), so a new kind shows up
- * here first and an old one cannot drift.
+ * `placement/fit.ts` `REQUIREMENTS`), so a new kind shows up here first and
+ * an old one cannot drift. Whether an end is a chosen end (`endsFlow`) and
+ * a Call's `ended` label (`endedLabel`) are facts of the node type in
+ * `@nightshift/flows`, pinned in its table test.
  */
 
 const node = <N extends FlowNode>(fields: Record<string, unknown>): N =>
@@ -227,16 +230,14 @@ describe("aux: the auxiliary graph nodes compile.ts adds", () => {
 	});
 });
 
-describe("isChosenEnd and endReason: what route() does with no edge", () => {
-	const chosen = (n: FlowNode, outcome: Outcome) =>
-		kindOf(n).isChosenEnd(n, outcome);
+describe("endReason and endResult: what route() says of a chosen end", () => {
 	const reason = (n: FlowNode, outcome: Outcome) =>
 		kindOf(n).endReason(n, outcome, {});
 	const result = (n: FlowNode, outcome: Outcome) =>
 		kindOf(n).endResult(n, outcome);
 	const endedAt = (outcome: string) => `Ended at node "n" with "${outcome}".`;
 
-	test("pass is a chosen end and the plain end for an Agent, a Tool and a Value; fail and needs-input are not", () => {
+	test("pass is the plain end of an Agent, a Tool, a Value and a Convert", () => {
 		for (const n of [
 			agent(),
 			tool(),
@@ -244,26 +245,17 @@ describe("isChosenEnd and endReason: what route() does with no edge", () => {
 			value("model"),
 			convert(),
 		]) {
-			expect(chosen(n, "pass")).toBe(true);
 			expect(reason(n, "pass")).toBeNull();
-			expect(chosen(n, "fail")).toBe(false);
-			expect(chosen(n, "needs-input")).toBe(false);
 		}
 	});
 
-	test("an Agent's own outcome is a chosen end with a reason", () => {
+	test("an Agent's own outcome ends with a reason", () => {
 		const own = agent({ outcomes: [{ name: "shipped" }, { name: "fail" }] });
-		expect(chosen(own, "shipped")).toBe(true);
 		expect(reason(own, "shipped")).toBe(endedAt("shipped"));
-		expect(chosen(own, "fail")).toBe(false);
-		expect(chosen(own, "needs-input")).toBe(false);
-		expect(chosen(agent(), "shipped")).toBe(false);
 	});
 
-	test("a Command's exit on code 0 is its chosen end, whatever its name; the others fail", () => {
-		expect(chosen(command(), "pass")).toBe(true);
+	test("a Command's exit on code 0 is its plain end, whatever its name", () => {
 		expect(reason(command(), "pass")).toBeNull();
-		expect(chosen(command(), "fail")).toBe(false);
 		const exits = command({
 			exits: [
 				{ name: "clean", code: 0 },
@@ -271,67 +263,48 @@ describe("isChosenEnd and endReason: what route() does with no edge", () => {
 				{ name: "broken", code: null },
 			],
 		});
-		expect(chosen(exits, "clean")).toBe(true);
 		expect(reason(exits, "clean")).toBeNull();
-		expect(chosen(exits, "dirty")).toBe(false);
-		expect(chosen(exits, "broken")).toBe(false);
-		expect(chosen(exits, "pass")).toBe(false);
 	});
 
-	test("every Decision option is a chosen end, with a reason unless it is named pass", () => {
+	test("a Decision option ends with a reason unless it is named pass", () => {
 		for (const by of ["person", "rule", "model"] as const) {
-			expect(chosen(decision(by), "yes")).toBe(true);
 			expect(reason(decision(by), "yes")).toBe(endedAt("yes"));
 			expect(reason(decision(by), "pass")).toBeNull();
 		}
 	});
 
-	test("a Wait that is done ends the flow plainly; a timeout is a failure", () => {
+	test("a Wait that is done ends the flow plainly", () => {
 		const w = wait({ kind: "duration", minutes: 1 });
-		expect(chosen(w, "done")).toBe(true);
 		expect(reason(w, "done")).toBeNull();
-		expect(chosen(w, "timeout")).toBe(false);
 	});
 
-	test("a Lease that is held ends the flow plainly; busy is a failure", () => {
-		expect(chosen(lease(), "held")).toBe(true);
+	test("a Lease that is held ends the flow plainly", () => {
 		expect(reason(lease(), "held")).toBeNull();
-		expect(chosen(lease(), "busy")).toBe(false);
 	});
 
-	test("a Service that is ready ends the flow plainly; failed is a failure", () => {
-		expect(chosen(service(), "ready")).toBe(true);
+	test("a Service that is ready ends the flow plainly", () => {
 		expect(reason(service(), "ready")).toBeNull();
-		expect(chosen(service(), "failed")).toBe(false);
 	});
 
-	test("every outcome of a Since last run node is a chosen end, with a reason", () => {
+	test("every outcome of a Since last run node ends with a reason", () => {
 		for (const outcome of ["new", "changed", "same"]) {
-			expect(chosen(sinceLastRun(), outcome)).toBe(true);
 			expect(reason(sinceLastRun(), outcome)).toBe(endedAt(outcome));
 		}
-		expect(chosen(sinceLastRun(), "pass")).toBe(false);
 	});
 
 	test("a Join that is done ends the flow plainly", () => {
-		expect(chosen(join(), "done")).toBe(true);
 		expect(reason(join(), "done")).toBeNull();
 	});
 
-	test("a Call once ends on pass; a Call with each ends on any outcome, done plainly", () => {
-		expect(chosen(call(), "pass")).toBe(true);
+	test("a Call once ends plainly on pass; a Call with each on done", () => {
 		expect(reason(call(), "pass")).toBeNull();
-		expect(chosen(call(), "fail")).toBe(false);
-		expect(chosen(callEach(), "done")).toBe(true);
 		expect(reason(callEach(), "done")).toBeNull();
-		expect(chosen(callEach(), "halted")).toBe(true);
 		expect(reason(callEach(), "halted")).toBe(endedAt("halted"));
 		expect(reason(callEach(), "pass")).toBe(endedAt("pass"));
 	});
 
-	test("an End is a chosen end whatever its status: its result is the status, its reason the message", () => {
+	test("an End's result is its status, its reason its message", () => {
 		for (const status of ["done", "nothing-to-do", "failed"] as const) {
-			expect(chosen(end(status), status)).toBe(true);
 			expect(result(end(status), status)).toBe(status);
 			expect(reason(end(status), status)).toBeNull();
 			expect(
@@ -354,36 +327,6 @@ describe("isChosenEnd and endReason: what route() does with no edge", () => {
 			callEach(),
 		]) {
 			expect(result(n, "pass")).toBeNull();
-		}
-	});
-});
-
-describe("endedLabel: a Call's `ended` for the node its flow ended at", () => {
-	test("a Decision option and an Agent's own outcome are the label; everything else is empty", () => {
-		const own = agent({ outcomes: [{ name: "shipped" }] });
-		expect(kindOf(decision("rule")).endedLabel(decision("rule"), "yes")).toBe(
-			"yes",
-		);
-		expect(kindOf(own).endedLabel(own, "shipped")).toBe("shipped");
-		expect(kindOf(sinceLastRun()).endedLabel(sinceLastRun(), "new")).toBe(
-			"new",
-		);
-		expect(
-			kindOf(end("nothing-to-do")).endedLabel(
-				end("nothing-to-do"),
-				"nothing-to-do",
-			),
-		).toBe("nothing-to-do");
-		expect(kindOf(own).endedLabel(own, "fail")).toBe("");
-		expect(kindOf(agent()).endedLabel(agent(), "pass")).toBe("");
-		for (const n of [
-			command(),
-			tool(),
-			value("rule"),
-			wait({ kind: "duration", minutes: 1 }),
-			call(),
-		]) {
-			expect(kindOf(n).endedLabel(n, "pass")).toBe("");
 		}
 	});
 });
@@ -685,6 +628,32 @@ describe("works: what a step needs of its Device", () => {
 		expect(works(reportFile())).toBe("worktree");
 		expect(works(sinceLastRun())).toBeNull();
 		expect(works(convert())).toBeNull();
+	});
+
+	test("a step that touches its computer (touchesDevice of @nightshift/flows) needs one at run time", () => {
+		const works = (n: FlowNode) => kindOf(n).works(n);
+		const nodes = [
+			agent(),
+			command(),
+			tool(),
+			webRequest(),
+			service(),
+			decision("model"),
+			value("model"),
+			wait({ kind: "command", command: "test -f x", everyMinutes: 1 }),
+			wait({ kind: "url", url: "https://x.example", everyMinutes: 5 }),
+			callEach({ kind: "command", command: "ls" }),
+		];
+		for (const n of nodes) {
+			expect(touchesDevice(n), n.type).toBe(true);
+			expect(works(n), n.type).not.toBeNull();
+		}
+		// The run's folder only: an End that reads its report, and a Call
+		// whose items each get a branch.
+		for (const n of [reportFile(), callEach()]) {
+			expect(touchesDevice(n), n.type).toBe(false);
+			expect(works(n), n.type).toBe("worktree");
+		}
 	});
 
 	test("only an End that reads a report file goes where the run's work is; every other step gets it by a Hand-off", () => {

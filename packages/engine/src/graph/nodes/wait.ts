@@ -1,7 +1,6 @@
 import {
 	acceptsValue,
 	commandWaitOutcome,
-	isOwnWaitOutcome,
 	type JsonValue,
 	renderCommand,
 	renderTemplate,
@@ -126,14 +125,10 @@ export const WAIT: NodeKind<WaitNode> = {
 	],
 	resumeRules: () => RESUME_RULES.wait,
 	aux: () => [{ kind: "wait" }],
-	isChosenEnd: (node, outcome) =>
-		outcome === "pass" || outcome === "done" || isOwnWaitOutcome(node, outcome),
 	endReason: (node, outcome) =>
 		outcome === "pass" || outcome === "done"
 			? null
 			: endedAtReason(node, outcome),
-	endedLabel: (node, outcome) =>
-		isOwnWaitOutcome(node, outcome) ? outcome : "",
 	logsCommandOutput: (node) => waitCommandOf(node.until) !== null,
 	timeBudget: () => ({ timeoutMinutes: undefined, idleMinutes: undefined }),
 };

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { FlowNode } from "../flow";
+import { commandNode } from "../nodes/command";
 import { type CliToolRef, programsWithoutLogin } from "./cli-programs";
-import { commandNode } from "./nodes";
 
 const work: CliToolRef = {
 	name: "acli-work",

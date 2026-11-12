@@ -54,6 +54,8 @@ export {
 export {
 	DECISION_LABEL,
 	definitionOf,
+	endedLabel,
+	endsFlow,
 	jsonOutputFields,
 	NODE_DEFINITIONS,
 	NODE_FAMILY,
@@ -65,6 +67,7 @@ export {
 	runsEach,
 	standInOutcomes,
 	standsIn,
+	touchesDevice,
 } from "./node";
 export { QUICK_RUN_HARNESS, singleAgentFlow } from "./quick";
 export {

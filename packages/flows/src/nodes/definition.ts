@@ -1,4 +1,6 @@
+import type { AgentNode } from "./agent";
 import type { NodeCheck } from "./base";
+import type { DecisionNode } from "./decision";
 import type { OutcomeColor } from "./outcomes";
 
 /**
@@ -58,6 +60,43 @@ export type BuiltInOutcome =
  */
 export type KnownText = (template: string) => string | null;
 
+/** Where a node sits on the canvas. */
+export type Position = { x: number; y: number };
+
+/**
+ * What a new Agent or Decision node starts with: the daemon's settings
+ * (Settings → New nodes). Each one left out keeps the built-in default.
+ */
+export type NodeDefaults = {
+	agentHarness?: AgentNode["harness"];
+	agentModel?: string;
+	agentPermissionMode?: AgentNode["permissionMode"];
+	decisionDecider?: DecisionNode["decider"];
+};
+
+/** A node the editor adds, of one kind of the palette. */
+export type NewNode<N> = {
+	/** The id it takes, with `_2`, `_3`, … when that is taken. */
+	id: string;
+	/**
+	 * Whether it starts from nothing or takes a value: the main output of
+	 * the node it follows (`NodeDefinition.takeValue`).
+	 */
+	takes: "nothing" | "value";
+	/** The node, with what it starts with. The issues panel asks for the rest. */
+	create: (id: string, position: Position, defaults: NodeDefaults) => N;
+};
+
+/** The value a new node takes: the main output of the node it follows. */
+export type TakenValue = {
+	/** Its reference: `news.data`. */
+	ref: string;
+	/** The reference of the one list in it, else `ref`: `news.data.items`. */
+	list: string;
+	/** Its path in a rule (JSONata). */
+	path: string;
+};
+
 /** The id of the Device that the profiles of the examples belong to. */
 export const EXAMPLE_DEVICE = "8c1e4f2a-6b0d-4a7e-9f3c-2d5b7e9a1c4f";
 
@@ -95,6 +134,40 @@ export type NodeDefinition<N extends { type: string }, I> = {
 	/** The secrets the node names, known before a run (`flowSecrets`). */
 	secrets: (node: N, known: KnownText) => readonly string[];
 	/**
+	 * Whether ending with `outcome` and no edge ends the node's flow as
+	 * chosen (`finished`), not as a failure. The engine's walk asks this
+	 * (`route()`), and so does Make subflow. A stop never gets here: the walk
+	 * parks it first.
+	 */
+	endsFlow: (node: N, outcome: string) => boolean;
+	/** What a Call reports in `ended` when its flow ended at this node: the label, or "". */
+	endedLabel: (node: N, outcome: string) => string;
+	/**
+	 * Whether a step of the node runs something on its computer beyond the
+	 * run's folder: a process, a session, a tool, a web request or a model.
+	 * An Offer allows only an offered Agent there. Where a step runs and
+	 * what it needs there at run time is the engine's (`NodeKind.works`).
+	 */
+	touchesDevice: (node: N) => boolean;
+	/**
+	 * The output field that the node's own `output` schema types (`data`,
+	 * a Web request's `body`), or null when the node has no output schema
+	 * (`typedOutput`).
+	 */
+	typedOutputField: (node: N) => string | null;
+	/**
+	 * The output field that holds what the node made or found: the field a
+	 * new node that takes a value reads (`mainOutputField`).
+	 */
+	mainOutputField: (node: N) => string;
+	/**
+	 * The new nodes the editor adds of this type, by their kind in the
+	 * palette: the type itself, and for a Decision also a Gate and a Branch.
+	 */
+	newNodes: Readonly<Record<string, NewNode<N>>>;
+	/** A new node that reads `value` where its kind reads one, else the node as it is. */
+	takeValue: (node: N, value: TakenValue) => N;
+	/**
 	 * One small, valid node of the type, as a flow file holds it. The flow
 	 * authoring guide shows it, and the table test of the definitions reads
 	 * every fact from it.
@@ -107,3 +180,13 @@ export const noOwnColors = (): OutcomeColor | undefined => undefined;
 
 /** For a type that names no secret. */
 export const noSecrets = (): readonly string[] => [];
+
+/** For a type whose flow ends as chosen on `pass` only. */
+export const endsOnPass = (_node: unknown, outcome: string): boolean =>
+	outcome === "pass";
+
+/** For a type whose end a Call reports with no label. */
+export const noEndedLabel = (): string => "";
+
+/** For a type whose new node reads no value. */
+export const takesNoValue = <N>(node: N): N => node;

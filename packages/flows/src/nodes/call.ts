@@ -19,8 +19,11 @@ import {
 import {
 	type BuiltInOutcome,
 	type NodeDefinition,
+	noEndedLabel,
 	noOwnColors,
 	noSecrets,
+	type Position,
+	takesNoValue,
 } from "./definition";
 
 /**
@@ -246,6 +249,11 @@ function checkHaltOn(nodeId: string, each: CallEach, check: NodeCheck): void {
 	}
 }
 
+/** A new Call node: it runs a flow once. The called flow starts empty; the issues panel asks for one. */
+export function callNode(id: string, position: Position): CallNode {
+	return { id, type: "call", position, flow: "", inputs: {} };
+}
+
 /** The Call node type: a person calls it a Subflow. */
 export const callDefinition = {
 	type: "call",
@@ -260,6 +268,17 @@ export const callDefinition = {
 	outputFields: callOutputFields,
 	check: checkCallNode,
 	secrets: noSecrets,
+	// With `each`, every outcome is a chosen end.
+	endsFlow: (node, outcome) => outcome === "pass" || node.each !== undefined,
+	endedLabel: noEndedLabel,
+	// Its flow's steps are nodes of their own. Only a list it reads with a
+	// command runs here.
+	touchesDevice: (node) => node.each?.source.kind === "command",
+	typedOutputField: () => null,
+	mainOutputField: (node) =>
+		node.each !== undefined ? "results" : "end_message",
+	newNodes: { call: { id: "call", takes: "nothing", create: callNode } },
+	takeValue: takesNoValue,
 	sample: {
 		id: "each_task",
 		type: "call",

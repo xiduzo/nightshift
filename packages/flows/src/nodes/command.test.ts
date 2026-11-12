@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { commandNode } from "../draft/nodes";
 import { FLOW_VERSION, type Flow } from "../flow";
 import { validateFlow } from "../validate";
 import { reservedOutcomes } from "./base";
 import {
 	type CommandNode,
+	commandNode,
 	DEFAULT_COMMAND_EXITS,
 	dataExitFor,
 	exitFor,

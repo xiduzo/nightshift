@@ -9,6 +9,8 @@ import {
 	flowSchema,
 } from "./flow";
 import {
+	endedLabel,
+	endsFlow,
 	NODE_DEFINITIONS,
 	NODE_FAMILY,
 	NODE_TYPE_LABEL,
@@ -17,6 +19,7 @@ import {
 	outputFieldsByType,
 	standInOutcomes,
 	standsIn,
+	touchesDevice,
 } from "./node";
 
 /**
@@ -342,5 +345,220 @@ describe("check", () => {
 		expect(issuesOf(sampleWith("lease", { timeoutMinutes: 5 }))).not.toEqual(
 			[],
 		);
+	});
+});
+
+describe("endsFlow and endedLabel: what the engine's walk does with no edge", () => {
+	test("pass is the chosen end of an Agent, a Tool, a Value, a Convert and a Web request; fail and needs-input are not", () => {
+		for (const type of [
+			"agent",
+			"tool",
+			"value",
+			"convert",
+			"web-request",
+		] as const) {
+			const node = sample(type);
+			expect(endsFlow(node, "pass"), type).toBe(true);
+			expect(endsFlow(node, "fail"), type).toBe(false);
+			expect(endsFlow(node, "needs-input"), type).toBe(false);
+			expect(endedLabel(node, "pass"), type).toBe("");
+		}
+	});
+
+	test("an Agent's own outcome is a chosen end, and a Call reports it", () => {
+		const own = sampleWith("agent", {
+			outcomes: [{ name: "shipped" }, { name: "fail" }],
+		});
+		expect(endsFlow(own, "shipped")).toBe(true);
+		expect(endedLabel(own, "shipped")).toBe("shipped");
+		expect(endsFlow(own, "fail")).toBe(false);
+		expect(endedLabel(own, "fail")).toBe("");
+		expect(endsFlow(own, "needs-input")).toBe(false);
+		expect(endsFlow(sample("agent"), "shipped")).toBe(false);
+	});
+
+	test("a Command's exit on code 0 is its chosen end, whatever its name", () => {
+		const exits = sampleWith("command", {
+			exits: [
+				{ name: "clean", code: 0 },
+				{ name: "dirty", code: 1 },
+				{ name: "broken" },
+			],
+		});
+		expect(endsFlow(exits, "clean")).toBe(true);
+		expect(endsFlow(exits, "dirty")).toBe(false);
+		expect(endsFlow(exits, "broken")).toBe(false);
+		expect(endsFlow(exits, "pass")).toBe(false);
+		expect(endedLabel(exits, "clean")).toBe("");
+	});
+
+	test("every Decision option is a chosen end, and its label", () => {
+		for (const by of ["person", "rule", "model"]) {
+			const node = sampleWith("decision", { by });
+			expect(endsFlow(node, "yes"), by).toBe(true);
+			expect(endedLabel(node, "yes"), by).toBe("yes");
+		}
+	});
+
+	test("a Wait ends plainly when done, on its own outcome with its label; a timeout fails", () => {
+		const until = { kind: "signal", name: "ci" };
+		const own = sampleWith("wait", { until, outcomes: [{ name: "green" }] });
+		expect(endsFlow(sample("wait"), "done")).toBe(true);
+		expect(endedLabel(sample("wait"), "done")).toBe("");
+		expect(endsFlow(sample("wait"), "timeout")).toBe(false);
+		expect(endsFlow(own, "green")).toBe(true);
+		expect(endedLabel(own, "green")).toBe("green");
+	});
+
+	test("a Lease that is held, a Service that is ready and a Join that is done end plainly", () => {
+		expect(endsFlow(sample("lease"), "held")).toBe(true);
+		expect(endsFlow(sample("lease"), "busy")).toBe(false);
+		expect(endsFlow(sample("service"), "ready")).toBe(true);
+		expect(endsFlow(sample("service"), "failed")).toBe(false);
+		expect(endsFlow(sample("join"), "done")).toBe(true);
+		for (const type of ["lease", "service", "join"] as const) {
+			expect(
+				endedLabel(sample(type), nodeOutcomes(sample(type))[0] ?? ""),
+				type,
+			).toBe("");
+		}
+	});
+
+	test("every outcome of Since last run is a chosen end, and its label", () => {
+		for (const outcome of ["new", "changed", "same"]) {
+			expect(endsFlow(sample("since-last-run"), outcome)).toBe(true);
+			expect(endedLabel(sample("since-last-run"), outcome)).toBe(outcome);
+		}
+		expect(endsFlow(sample("since-last-run"), "pass")).toBe(false);
+	});
+
+	test("a Call once ends on pass; a Call with each on any outcome", () => {
+		const once = sampleWith("call", { each: undefined });
+		expect(endsFlow(once, "pass")).toBe(true);
+		expect(endsFlow(once, "fail")).toBe(false);
+		for (const outcome of ["done", "halted", "pass"]) {
+			expect(endsFlow(sample("call"), outcome)).toBe(true);
+		}
+		expect(endedLabel(once, "pass")).toBe("");
+	});
+
+	test("an End is a chosen end whatever its status, and its status is the label", () => {
+		for (const status of ["done", "nothing-to-do", "failed"]) {
+			const node = sampleWith("end", { status });
+			expect(endsFlow(node, status)).toBe(true);
+			expect(endedLabel(node, status)).toBe(status);
+		}
+	});
+});
+
+describe("touchesDevice: what a step runs on its computer", () => {
+	test("a process, a session, a tool, a web request or a model", () => {
+		expect(everyType((type) => touchesDevice(sample(type)))).toEqual({
+			agent: true,
+			command: true,
+			// The sample Gate: a person decides.
+			decision: false,
+			// The sample lists its items in JSON.
+			call: false,
+			// The sample Value: a rule makes it.
+			value: false,
+			// The sample waits for a time.
+			wait: false,
+			tool: true,
+			end: false,
+			join: false,
+			lease: false,
+			service: true,
+			"since-last-run": false,
+			convert: false,
+			"web-request": true,
+		});
+	});
+
+	test("a Decision and a Value by a model, a Wait that polls, and a Call whose list comes from a command", () => {
+		expect(touchesDevice(sampleWith("decision", { by: "model" }))).toBe(true);
+		expect(touchesDevice(sampleWith("value", { by: "model" }))).toBe(true);
+		const command = { command: "ci-state", everyMinutes: 5 };
+		expect(
+			touchesDevice(
+				sampleWith("wait", { until: { kind: "command", ...command } }),
+			),
+		).toBe(true);
+		expect(
+			touchesDevice(
+				sampleWith("wait", {
+					until: { kind: "any", signal: { name: "ci" }, command },
+				}),
+			),
+		).toBe(true);
+		expect(
+			touchesDevice(
+				sampleWith("wait", {
+					until: { kind: "url", url: "https://x.example", everyMinutes: 5 },
+				}),
+			),
+		).toBe(true);
+		expect(
+			touchesDevice(
+				sampleWith("wait", { until: { kind: "signal", name: "ci" } }),
+			),
+		).toBe(false);
+		expect(
+			touchesDevice(
+				sampleWith("call", {
+					each: { source: { kind: "command", command: "ls" }, as: "item" },
+				}),
+			),
+		).toBe(true);
+		expect(touchesDevice(sampleWith("call", { each: undefined }))).toBe(false);
+	});
+});
+
+describe("typedOutputField and mainOutputField", () => {
+	test("the field each sample's own output schema types, and the field that holds what it made", () => {
+		expect(
+			everyType((type) => [
+				NODE_DEFINITIONS[type].typedOutputField(sample(type) as never),
+				NODE_DEFINITIONS[type].mainOutputField(sample(type) as never),
+			]),
+		).toEqual({
+			agent: ["data", "data"],
+			command: ["data", "log_tail"],
+			decision: [null, "note"],
+			call: [null, "results"],
+			value: ["data", "data"],
+			wait: [null, "waited_minutes"],
+			tool: ["data", "data"],
+			end: [null, "message"],
+			join: [null, "data"],
+			lease: [null, "holder"],
+			service: [null, "data"],
+			"since-last-run": [null, "data"],
+			convert: ["data", "data"],
+			"web-request": ["body", "body"],
+		});
+	});
+
+	test("a Convert to text has no output schema", () => {
+		const text = sampleWith("convert", { from: "html", to: "text" });
+		expect(NODE_DEFINITIONS.convert.typedOutputField(text as never)).toBeNull();
+		expect(NODE_DEFINITIONS.convert.mainOutputField(text as never)).toBe(
+			"text",
+		);
+	});
+});
+
+describe("newNodes", () => {
+	test("each kind of the palette makes a node of its type, at its place", () => {
+		for (const type of TYPES) {
+			for (const [kind, made] of Object.entries(
+				NODE_DEFINITIONS[type].newNodes,
+			)) {
+				const node = made.create(made.id, { x: 3, y: 4 }, {});
+				expect(node.type, kind).toBe(type);
+				expect(node.id, kind).toBe(made.id);
+				expect(node.position, kind).toEqual({ x: 3, y: 4 });
+			}
+		}
 	});
 });

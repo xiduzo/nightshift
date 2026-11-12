@@ -107,6 +107,29 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 	return definitionOf(node).outcomes(node);
 }
 
+/**
+ * Whether the node ending with `outcome` and no edge ends its flow as
+ * chosen (`finished`), not as a failure. The engine's walk (`route()`)
+ * parks a stop before it asks.
+ */
+export function endsFlow(node: FlowNode, outcome: Outcome): boolean {
+	return definitionOf(node).endsFlow(node, outcome);
+}
+
+/** What a Call reports in `ended` when its flow ended at this node with `outcome`: the label, or "". */
+export function endedLabel(node: FlowNode, outcome: Outcome): string {
+	return definitionOf(node).endedLabel(node, outcome);
+}
+
+/**
+ * Whether a step of the node runs something on its computer beyond the
+ * run's folder: a process, a session, a tool, a web request or a model
+ * (`NodeDefinition.touchesDevice`).
+ */
+export function touchesDevice(node: FlowNode): boolean {
+	return definitionOf(node).touchesDevice(node);
+}
+
 /** Whether a test run may pin or skip a node of this type (ADR 27). */
 export function standsIn(node: Pick<FlowNode, "type">): boolean {
 	return definitionOf(node).standsIn;

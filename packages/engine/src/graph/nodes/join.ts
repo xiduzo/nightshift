@@ -97,7 +97,6 @@ export const JOIN: NodeKind<JoinNode> = {
 	type: "join",
 	make: joinNode,
 	resumeRules: () => RESUME_RULES.fresh,
-	isChosenEnd: (_node, outcome) => outcome === "done",
 	endReason: (node, outcome) =>
 		outcome === "done" ? null : endedAtReason(node, outcome),
 };

@@ -363,12 +363,6 @@ export type NodeKind<N extends FlowNode = FlowNode> = {
 	/** The auxiliary graph nodes `compile.ts` adds besides the park node. */
 	aux(node: N): readonly Aux<N>[];
 	/**
-	 * Whether ending with `outcome` and no edge is a chosen end of the flow
-	 * (`route()`): `ended` is set and the graph reaches END. Else the step
-	 * is a failure with no edge.
-	 */
-	isChosenEnd(node: N, outcome: Outcome): boolean;
-	/**
 	 * The `RunEnded` reason of a chosen end: null for the flow's plain end,
 	 * else which node and outcome, or what the node says (`outputs`, the
 	 * step's outputs: an End node's message).
@@ -379,8 +373,6 @@ export type NodeKind<N extends FlowNode = FlowNode> = {
 	 * node's status. Null for every other end.
 	 */
 	endResult(node: N, outcome: Outcome): RunResult | null;
-	/** A Call's `ended` output when its flow ended at this node: the label, or "". */
-	endedLabel(node: N, outcome: Outcome): string;
 	/**
 	 * The report of a chosen end (`outputs`, the step's outputs): an End
 	 * node's report, which a Call gives as `end_report`. Null for every
@@ -438,19 +430,17 @@ export function endedAtReason(node: FlowNode, outcome: Outcome): string {
 
 /**
  * The facts most kinds share, for a kind to spread and override: no
- * auxiliary node, `pass` is the one chosen end and the plain end, no
- * label or report for a Call, no command log, the node's own `timeoutMinutes`, a
+ * auxiliary node, `pass` is the plain end, no report for a Call, no
+ * command log, the node's own `timeoutMinutes`, a
  * cut-short step keeps its outputs, no connections, no programs, no
  * requirements, no computer, and a step that works in the worktree gets
  * the run's work by a Hand-off.
  */
 export const PLAIN_KIND = {
 	aux: () => [],
-	isChosenEnd: (_node, outcome) => outcome === "pass",
 	endReason: (node, outcome) =>
 		outcome === "pass" ? null : endedAtReason(node, outcome),
 	endResult: () => null,
-	endedLabel: () => "",
 	endReport: () => null,
 	logsCommandOutput: () => false,
 	timeBudget: (node) => ({

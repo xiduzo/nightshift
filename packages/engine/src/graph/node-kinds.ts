@@ -38,7 +38,10 @@ import { WEB_REQUEST } from "./nodes/web-request";
  *
  * The deletion test picked the members: a fact is on the descriptor only
  * when deleting the switch in a caller would make the fact reappear there.
- * What is not here, on purpose: the zod union in `packages/flows` and the
+ * What is not here, on purpose: the facts of a node type that hold
+ * without a run, such as which end is a chosen end and a Call's `ended`
+ * label (`endsFlow`, `endedLabel`: the type's definition in
+ * `@nightshift/flows`, which `route()` and the Call read); the zod union in `packages/flows` and the
  * web's `NODE_TYPE` record (inherent to a kind, out of this package); the
  * transcript-event unions in `log/step-events.ts` (one per kind, typed data, no
  * switch asks them); the `WaitReason` enum in `state.ts` (it enumerates a

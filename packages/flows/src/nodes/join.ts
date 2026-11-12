@@ -3,8 +3,11 @@ import { nodeBase } from "./base";
 import {
 	type BuiltInOutcome,
 	type NodeDefinition,
+	noEndedLabel,
 	noOwnColors,
 	noSecrets,
+	type Position,
+	takesNoValue,
 } from "./definition";
 
 /**
@@ -34,6 +37,11 @@ export type JoinNode = z.infer<typeof joinNodeSchema>;
  */
 export const joinOutputFields = ["outcome", "data", "visit"] as const;
 
+/** A new Join node: it waits for every branch until the person picks `first`. */
+export function joinNode(id: string, position: Position): JoinNode {
+	return { id, type: "join", position, wait: "all" };
+}
+
 /** The Join node type. */
 export const joinDefinition = {
 	type: "join",
@@ -47,6 +55,13 @@ export const joinDefinition = {
 	// A Join's checks are the branches' (`checkBranches`).
 	check: () => {},
 	secrets: noSecrets,
+	endsFlow: (_node, outcome) => outcome === "done",
+	endedLabel: noEndedLabel,
+	touchesDevice: () => false,
+	typedOutputField: () => null,
+	mainOutputField: () => "data",
+	newNodes: { join: { id: "join", takes: "nothing", create: joinNode } },
+	takeValue: takesNoValue,
 	sample: {
 		id: "reviewed",
 		type: "join",

@@ -1,7 +1,7 @@
 import type { Command } from "@langchain/langgraph";
 import {
 	type CallNode,
-	type Outcome,
+	endedLabel,
 	personTierIndex,
 	runsEach,
 } from "@nightshift/flows";
@@ -214,9 +214,7 @@ async function callOnce(
 		}
 		case "finished": {
 			let outputs = await bodyOutputs(ctx, body, ended);
-			const label = ctx
-				.kindOf(ended.node)
-				.endedLabel(ended.node, ended.outcome);
+			const label = endedLabel(ended.node, ended.outcome);
 			// An End node: its status is the label, its message the end_message,
 			// its report the end_report.
 			const own: StepOutputs =
@@ -246,10 +244,6 @@ async function callOnce(
 }
 
 /** A chosen end of a Call: `pass` once, and whatever outcome a Call with `each` ends on. */
-function isChosenCallEnd(node: CallNode, outcome: Outcome): boolean {
-	return outcome === "pass" || runsEach(node);
-}
-
 /**
  * The Call kind. Its facts follow `node.each`: a Call with `each` takes up
  * a cut-short loop, every outcome is a chosen end and `done` the plain
@@ -272,7 +266,6 @@ export const CALL: NodeKind<CallNode> = {
 			: null,
 	resumeRules: (node) =>
 		runsEach(node) ? RESUME_RULES.callEach : RESUME_RULES.call,
-	isChosenEnd: isChosenCallEnd,
 	endReason: (node, outcome) =>
 		outcome === (runsEach(node) ? "done" : "pass")
 			? null

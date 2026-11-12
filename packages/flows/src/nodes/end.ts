@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { type NodeCheck, nodeBase } from "./base";
-import { type NodeDefinition, noOwnColors, noSecrets } from "./definition";
+import {
+	type NodeDefinition,
+	noOwnColors,
+	noSecrets,
+	type Position,
+	takesNoValue,
+} from "./definition";
 
 /** The End node: it ends the run on purpose, with a result, one line of text and maybe a report. */
 
@@ -165,6 +171,11 @@ function reportPathProblem(path: string): string | null {
 	return null;
 }
 
+/** A new End node: it ends the run as done, with no message yet. */
+export function endNode(id: string, position: Position): EndNode {
+	return { id, type: "end", position, status: "done", message: "" };
+}
+
 /** The End node type. */
 export const endDefinition = {
 	type: "end",
@@ -178,6 +189,15 @@ export const endDefinition = {
 	outputFields: endOutputFields,
 	check: checkEndNode,
 	secrets: noSecrets,
+	// The run ends here, whatever its status.
+	endsFlow: () => true,
+	endedLabel: (node) => node.status,
+	// A report file it reads is in the run's folder.
+	touchesDevice: () => false,
+	typedOutputField: () => null,
+	mainOutputField: () => "message",
+	newNodes: { end: { id: "end", takes: "nothing", create: endNode } },
+	takeValue: takesNoValue,
 	sample: {
 		id: "no_work",
 		type: "end",

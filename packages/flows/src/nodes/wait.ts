@@ -5,7 +5,12 @@ import {
 	nodeBase,
 	requestHeadersSchema,
 } from "./base";
-import type { BuiltInOutcome, NodeDefinition } from "./definition";
+import {
+	type BuiltInOutcome,
+	type NodeDefinition,
+	type Position,
+	takesNoValue,
+} from "./definition";
 import { checkOptions, type Option, option } from "./outcomes";
 import { secretNamesIn } from "./web-request";
 
@@ -286,6 +291,16 @@ function checkWaitOutcomes(node: WaitNode, check: NodeCheck): void {
 	);
 }
 
+/** A new Wait node: it waits 15 minutes until the inspector says otherwise. */
+export function waitNode(id: string, position: Position): WaitNode {
+	return {
+		id,
+		type: "wait",
+		position,
+		until: { kind: "duration", minutes: 15 },
+	};
+}
+
 /** The Wait node type. */
 export const waitDefinition = {
 	type: "wait",
@@ -302,6 +317,23 @@ export const waitDefinition = {
 	outputFields: waitOutputFields,
 	check: checkWaitNode,
 	secrets: (node) => waitSecrets(node.until),
+	endsFlow: (node, outcome) =>
+		outcome === "pass" || outcome === "done" || isOwnWaitOutcome(node, outcome),
+	endedLabel: (node, outcome) =>
+		isOwnWaitOutcome(node, outcome) ? outcome : "",
+	// A command it polls, or a URL it asks.
+	touchesDevice: (node) =>
+		waitCommandOf(node.until) !== null || waitUrlOf(node.until) !== null,
+	typedOutputField: () => null,
+	// A command's last lines, how long a timer waited, else what woke it.
+	mainOutputField: (node) =>
+		node.until.kind === "command"
+			? "log_tail"
+			: node.until.kind === "duration" || node.until.kind === "time"
+				? "waited_minutes"
+				: "data",
+	newNodes: { wait: { id: "wait", takes: "nothing", create: waitNode } },
+	takeValue: takesNoValue,
 	sample: {
 		id: "cool_down",
 		type: "wait",

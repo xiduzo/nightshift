@@ -13,6 +13,7 @@ import type {
 	ValueNode,
 } from "../nodes";
 import { NODE_FAMILIES, NODE_FAMILY_LABEL } from "../nodes";
+import { commandNode } from "../nodes/command";
 import { mainOutputField } from "../shapes";
 import {
 	addCalledNode,
@@ -23,7 +24,6 @@ import {
 	NEW_NODE_TAKES,
 	type NewNodeKind,
 } from "./graph";
-import { commandNode } from "./nodes";
 
 const at = { x: 0, y: 0 };
 const later = { x: 300, y: 0 };

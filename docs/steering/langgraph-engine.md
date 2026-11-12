@@ -111,8 +111,8 @@ packages/engine/src/
                            graph node asks ctx.kindOf(node).
   graph/route.ts           route(): picks the edge with `nextEdge`, logs
                            EdgeTaken and returns `new Command({ update,
-                           goto })`; or ends the flow (the kind's
-                           isChosenEnd and endReason); or parks
+                           goto })`; or ends the flow (`endsFlow` of
+                           the node type, the kind's endReason); or parks
                            (parkCommand). parkNode, the node ids, scopeOf.
   graph/context.ts         StepShared (what a step may touch, the same for
                            every run) and StepContext (below, with kindOf:
@@ -155,8 +155,7 @@ packages/engine/src/
                            copy of pending the interrupt carries and what
                            the answer does.
   graph/nodes/agent.ts     agent node: the body runSession; AGENT, with
-                           the Agent's requirements (CLI tools, harness)
-                           and isOwnAgentLabel.
+                           the Agent's requirements (CLI tools, harness).
   graph/nodes/agent-ask.ts the ask node of an Agent that asks a person
                            (`ask`): answer reopens the step with the note,
                            stop ends it `fail`.
@@ -1049,9 +1048,7 @@ module. Now the engine asks the descriptor:
 | `make` | `compile.ts` | the `switch (node.type)` that picked the factory |
 | `aux(node)` | `compile.ts` | the same switch deciding wait and ask nodes, per `by` |
 | `resumeRules(node)` | the kind's own factory | the `RESUME_RULES` entry each factory named |
-| `isChosenEnd(node, outcome)` | `route()` | `isChosenEnd`, `isOwnAgentLabel`, `isSuccessExit` in route.ts |
 | `endReason(node, outcome)` | `route()` | `finishedReason` in route.ts |
-| `endedLabel(node, outcome)` | the Subflow node | `endedLabel` in body.ts |
 | `logsCommandOutput(node)` | `beginStep` | the three-kind `logPath` rule |
 | `timeBudget(node)` | `beginStep`, `abortEnd` | the Gate and Wait timeout rule, the Agent idle rule |
 | `cutShortOutputs(open, node, outcome)` | `closingEvents` (`graph/open-work.ts`) | the `nodeType` ternary of the stop, and recovery's raw outputs |
@@ -1059,7 +1056,12 @@ module. Now the engine asks the descriptor:
 | `requirements` | `placement/fit.ts` `REQUIREMENTS` | the per-kind requirement functions |
 
 The deletion test picked the members. A fact is on the descriptor only
-when it would come back in a caller if you deleted the switch there. A
+when it would come back in a caller if you deleted the switch there.
+Whether an end is a chosen end of the flow (`endsFlow`) and what a
+Subflow reports in `ended` (`endedLabel`) hold without a run, so they are
+facts of the node type in `@nightshift/flows` (`NodeDefinition`, one per
+file in `nodes/`). `route()`, the kept shapes and the Subflow node read
+them there, and so does Make subflow. A
 fact may depend on `node.by` (Decision, Value) or `node.each` (Subflow).
 The chooser and producer seams stay as they are.
 

@@ -151,11 +151,8 @@ export const DECISION: NodeKind<DecisionNode> = {
 				? [{ kind: "ask", make: gateAskNode }]
 				: [],
 	// Every option; a cascade with no tier that held ends on `fail`.
-	isChosenEnd: (node, outcome) =>
-		node.options.some((option) => option.name === outcome),
 	endReason: (node, outcome) =>
 		outcome === "pass" ? null : endedAtReason(node, outcome),
-	endedLabel: (_node, outcome) => outcome,
 	timeBudget: (node) => ({
 		// A Gate waits as long as it must.
 		timeoutMinutes: node.by === "person" ? undefined : node.timeoutMinutes,

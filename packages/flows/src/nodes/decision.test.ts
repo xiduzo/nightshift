@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { withDecidedBy, withValueBy } from "../draft";
-import { valueNode } from "../draft/nodes";
 import { FLOW_VERSION, flowSchema } from "../flow";
 import { validateFlow } from "../validate";
 import type { DecisionNode } from "./decision";
+import { valueNode } from "./value";
 
 /** The Decision node's lock-screen flag: a Gate the author lets a person answer from a phone's lock screen. */
 

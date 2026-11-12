@@ -11,8 +11,7 @@ import {
 	isProfileRef,
 	nameSchema,
 	type permissionModeSchema,
-	waitCommandOf,
-	waitUrlOf,
+	touchesDevice,
 } from "@nightshift/flows";
 import { z } from "zod";
 import { offerCapsSchema } from "../contract";
@@ -234,41 +233,6 @@ const OWN_SETTINGS = [
 	"clis",
 	"connections",
 ] as const satisfies readonly (keyof AgentNode)[];
-
-/**
- * Whether a node's step touches its Device beyond the run's worktree: a
- * process, a tool, a harness or the decider. Gates, rules, waits for a
- * time or a signal, Joins, calls of other flows, End nodes, Leases and
- * Convert nodes touch nothing.
- *
- * A switch on the node type, on purpose: it is the Offer's rule (what an
- * Offer lets another Person run), not a fact of each kind.
- */
-function touchesDevice(node: FlowNode): boolean {
-	switch (node.type) {
-		case "agent":
-		case "command":
-		case "tool":
-		case "web-request":
-		case "service":
-			return true;
-		case "decision":
-		case "value":
-			return node.by === "model";
-		case "wait":
-			return (
-				waitCommandOf(node.until) !== null || waitUrlOf(node.until) !== null
-			);
-		case "call":
-			return node.each?.source.kind === "command";
-		case "end":
-		case "join":
-		case "lease":
-		case "since-last-run":
-		case "convert":
-			return false;
-	}
-}
 
 /**
  * Whether a node may name another Person's Device: it is an Agent node

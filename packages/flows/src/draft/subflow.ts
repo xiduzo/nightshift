@@ -28,6 +28,8 @@
  * writes the words, as for `canMakeSection`.
  */
 import {
+	endedLabel,
+	endsFlow,
 	FLOW_VERSION,
 	type Flow,
 	type FlowEdge,
@@ -44,13 +46,10 @@ import {
 	type CallNode,
 	type DecisionNode,
 	flowNameSchema,
-	isChosenExit,
-	isOwnWaitOutcome,
 	type Option,
 	reservedNames,
 	reservedOutcomes,
 	ruleOwnNames,
-	sinceLastRunOutcomes,
 	templateOwnNames,
 	type VariableWrite,
 } from "../nodes";
@@ -344,66 +343,11 @@ function ruleRunFields(text: string): CallRunField[] {
 
 /**
  * Whether the node ending with `outcome` and no edge ends its flow as
- * chosen (`finished`), not as a failure. The same facts as the engine's
- * node kinds (`isChosenEnd`, pinned per kind in the engine's
- * `node-kinds.test.ts`): change both together. A stop never ends a flow.
+ * chosen (`finished`), not as a failure: the definition's, which the
+ * engine's walk reads too. A stop never ends a flow: the walk parks it.
  */
-function endsFlow(node: FlowNode, outcome: string): boolean {
-	if (outcome === "stopped") return false;
-	switch (node.type) {
-		case "agent":
-			return outcome === "pass" || ownAgentLabel(node, outcome);
-		case "command":
-			return isChosenExit(node, outcome);
-		case "decision":
-			// Its options only: a cascade with no person tier fails the step on `fail`.
-			return node.options.some((option) => option.name === outcome);
-		case "call":
-			return node.each !== undefined || outcome === "pass";
-		case "wait":
-			return (
-				outcome === "pass" ||
-				outcome === "done" ||
-				isOwnWaitOutcome(node, outcome)
-			);
-		case "value":
-		case "tool":
-		case "convert":
-		case "web-request":
-			return outcome === "pass";
-		case "end":
-			// A Section with an End node does not become a Subflow (`end-node`).
-			return false;
-		case "join":
-			return outcome === "done";
-		case "lease":
-			return outcome === "held";
-		case "service":
-			return outcome === "ready";
-		case "since-last-run":
-			return sinceLastRunOutcomes.some((own) => own === outcome);
-	}
-}
-
-/** The label a Call reports in `ended` when its flow ends at this node: the engine's `endedLabel`. */
-function endedLabel(node: FlowNode, outcome: string): string {
-	if (node.type === "decision" || node.type === "since-last-run") {
-		return outcome;
-	}
-	if (node.type === "agent" && ownAgentLabel(node, outcome)) return outcome;
-	if (node.type === "wait" && isOwnWaitOutcome(node, outcome)) return outcome;
-	return "";
-}
-
-function ownAgentLabel(
-	node: FlowNode & { type: "agent" },
-	outcome: string,
-): boolean {
-	return (
-		node.outcomes !== undefined &&
-		outcome !== "fail" &&
-		outcome !== "needs-input"
-	);
+function endsFlowOn(node: FlowNode, outcome: string): boolean {
+	return outcome !== "stopped" && endsFlow(node, outcome);
 }
 
 /** `base`, else `base<sep>2`, … not in `taken`, at most `max` long. Adds the result to `taken`. */
@@ -795,7 +739,7 @@ class Planner {
 				const routed = flow.edges.some(
 					(e) => e.from === node.id && e.outcome === outcome,
 				);
-				if (!routed && endsFlow(node, outcome))
+				if (!routed && endsFlowOn(node, outcome))
 					ends.push({ node, outcome, label: endedLabel(node, outcome) });
 			}
 		}
@@ -847,7 +791,7 @@ class Planner {
 					e.outcome === exit.outcome &&
 					members.has(e.to),
 			);
-			if (!decided && endsFlow(from, exit.outcome) && !leadsInside) return;
+			if (!decided && endsFlowOn(from, exit.outcome) && !leadsInside) return;
 			const y = Math.max(from.position.y - minY, endY + STEP_Y);
 			endY = y;
 			const color = outcomeColor(from, exit.outcome);

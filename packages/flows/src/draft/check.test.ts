@@ -1,13 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow } from "../flow";
 import type { AgentNode } from "../nodes";
+import { agentNode } from "../nodes/agent";
+import { commandNode } from "../nodes/command";
 import {
 	checkDraft,
 	type DraftMessages,
 	isSavable,
 	type KnownProfile,
 } from "./check";
-import { agentNode, commandNode } from "./nodes";
 
 const messages: DraftMessages = {
 	schemaIssue: (_flow, issue) => `schema ${issue.path.map(String).join(".")}`,

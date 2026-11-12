@@ -9,9 +9,13 @@ import {
 } from "./base";
 import {
 	type BuiltInOutcome,
+	endsOnPass,
 	type NodeDefinition,
+	noEndedLabel,
 	noOwnColors,
 	noSecrets,
+	type Position,
+	takesNoValue,
 } from "./definition";
 
 /**
@@ -63,6 +67,18 @@ export function checkToolNode(node: ToolNode, check: NodeCheck): void {
 	}
 }
 
+/** A new Tool node. The connection and the tool start empty; the issues panel asks for them. */
+export function toolNode(id: string, position: Position): ToolNode {
+	return {
+		id,
+		type: "tool",
+		position,
+		connection: "",
+		tool: "",
+		arguments: {},
+	};
+}
+
 /** The Tool node type. */
 export const toolDefinition = {
 	type: "tool",
@@ -74,6 +90,13 @@ export const toolDefinition = {
 	outputFields: toolOutputFields,
 	check: checkToolNode,
 	secrets: noSecrets,
+	endsFlow: endsOnPass,
+	endedLabel: noEndedLabel,
+	touchesDevice: () => true,
+	typedOutputField: () => "data",
+	mainOutputField: () => "data",
+	newNodes: { tool: { id: "tool", takes: "nothing", create: toolNode } },
+	takeValue: takesNoValue,
 	sample: {
 		id: "ticket",
 		type: "tool",

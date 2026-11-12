@@ -1,4 +1,4 @@
-import type { Flow, FlowNode } from "../flow";
+import { type Flow, type FlowNode, touchesDevice } from "../flow";
 import {
 	deviceIdOf,
 	isProfileRef,
@@ -83,30 +83,10 @@ function scopeOf(flow: Flow, service: ServiceNode): FlowNode[] {
 	return flow.nodes.filter((node) => inside.has(node.id));
 }
 
-/** Whether a step of the node runs on a computer: a process, a session, a tool, a model or a flow there. */
+/**
+ * Whether the work of the node lands on a computer: its step touches one
+ * (`touchesDevice`), or it is a Call, whose flow runs where the Call runs.
+ */
 function runsOnDevice(node: FlowNode): boolean {
-	switch (node.type) {
-		case "agent":
-		case "command":
-		case "tool":
-		case "web-request":
-		case "service":
-		case "call":
-			return true;
-		case "decision":
-		case "value":
-			return node.by === "model";
-		case "wait":
-			return (
-				node.until.kind === "command" ||
-				node.until.kind === "any" ||
-				node.until.kind === "url"
-			);
-		case "end":
-		case "join":
-		case "lease":
-		case "since-last-run":
-		case "convert":
-			return false;
-	}
+	return touchesDevice(node) || node.type === "call";
 }

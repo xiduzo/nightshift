@@ -4,6 +4,7 @@ import {
 	type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
 import {
+	endsFlow,
 	type FlowEdge,
 	type FlowNode,
 	type JsonValue,
@@ -32,9 +33,9 @@ import type { PendingParked, RunStateUpdate, RunStateValues } from "./state";
 /**
  * Where a node goes after its step: the edge the outcome picks, a chosen
  * end, or the node's park node. Ported from `walkScope` in engine.ts. Which
- * ends are chosen and what `RunEnded` says are the node kind's facts
- * (`ctx.kindOf(node).isChosenEnd`, `endReason`): this module switches on no
- * node type.
+ * ends are chosen is a fact of the node type (`endsFlow` of
+ * `@nightshift/flows`), and what `RunEnded` says is the node kind's
+ * (`ctx.kindOf(node).endReason`): this module switches on no node type.
  *
  * Node naming in the compiled graph: the step node is the flow node's id;
  * its park node is `park__<id>`; the wait node of an Agent node or a
@@ -283,7 +284,7 @@ async function routeOn(
 				`Node "${node.id}" ended with "${outcome}" on a branch, and no edge leads on to its Join.`,
 			);
 		}
-		if (kind.isChosenEnd(node, outcome)) {
+		if (endsFlow(node, outcome)) {
 			// The end of a called flow goes on in its caller: a Call step that
 			// ends here ends the Sections of its own flow.
 			await leaveScopes(ctx, end, [], config);

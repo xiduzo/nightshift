@@ -66,10 +66,7 @@ export const SINCE_LAST_RUN: NodeKind<SinceLastRunNode> = {
 	type: "since-last-run",
 	make: sinceLastRunStepNode,
 	resumeRules: () => RESUME_RULES.fresh,
-	isChosenEnd: (_node, outcome) =>
-		outcome === "new" || outcome === "changed" || outcome === "same",
 	endReason: (node, outcome) => endedAtReason(node, outcome),
-	endedLabel: (_node, outcome) => outcome,
 };
 
 /** The longest scope a node remembers under. */

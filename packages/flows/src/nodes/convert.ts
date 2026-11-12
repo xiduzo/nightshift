@@ -7,9 +7,12 @@ import {
 } from "./base";
 import {
 	type BuiltInOutcome,
+	endsOnPass,
 	type NodeDefinition,
+	noEndedLabel,
 	noOwnColors,
 	noSecrets,
+	type Position,
 } from "./definition";
 
 /**
@@ -147,6 +150,11 @@ export function checkConvertNode(node: ConvertNode, check: NodeCheck): void {
 	}
 }
 
+/** A new Convert node: from CSV to JSON, with no value. The issues panel asks for it. */
+export function convertNode(id: string, position: Position): ConvertNode {
+	return { id, type: "convert", position, from: "csv", to: "json", value: "" };
+}
+
 /** The Convert node type. */
 export const convertDefinition = {
 	type: "convert",
@@ -158,6 +166,16 @@ export const convertDefinition = {
 	outputFields: convertOutputFields,
 	check: checkConvertNode,
 	secrets: noSecrets,
+	endsFlow: endsOnPass,
+	endedLabel: noEndedLabel,
+	touchesDevice: () => false,
+	// To JSON it has data, to text it has none.
+	typedOutputField: (node) => (node.to === "json" ? "data" : null),
+	mainOutputField: (node) => (node.to === "json" ? "data" : "text"),
+	newNodes: {
+		convert: { id: "convert", takes: "value", create: convertNode },
+	},
+	takeValue: (node, value) => ({ ...node, value: `{{${value.ref}}}` }),
 	sample: {
 		id: "news",
 		type: "convert",

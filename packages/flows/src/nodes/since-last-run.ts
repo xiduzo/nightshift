@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { type NodeCheck, nodeBase, ruleOwnNames } from "./base";
-import { type NodeDefinition, noOwnColors, noSecrets } from "./definition";
+import {
+	type NodeDefinition,
+	noOwnColors,
+	noSecrets,
+	type Position,
+} from "./definition";
 
 /**
  * The Since last run node: what is new or changed since the last run of
@@ -123,6 +128,14 @@ export function checkSinceLastRunNode(
 	}
 }
 
+/** A new Since last run node. Its list starts empty; the issues panel asks for it. */
+export function sinceLastRunNode(
+	id: string,
+	position: Position,
+): SinceLastRunNode {
+	return { id, type: "since-last-run", position, items: "" };
+}
+
 /** The Since last run node type. */
 export const sinceLastRunDefinition = {
 	type: "since-last-run",
@@ -134,6 +147,22 @@ export const sinceLastRunDefinition = {
 	outputFields: sinceLastRunOutputFields,
 	check: checkSinceLastRunNode,
 	secrets: noSecrets,
+	// Every outcome of its own is a chosen end.
+	endsFlow: (_node, outcome) =>
+		sinceLastRunOutcomes.some((own) => own === outcome),
+	endedLabel: (_node, outcome) => outcome,
+	touchesDevice: () => false,
+	typedOutputField: () => null,
+	mainOutputField: () => "data",
+	newNodes: {
+		"since-last-run": {
+			id: "since-last-run",
+			takes: "value",
+			create: sinceLastRunNode,
+		},
+	},
+	// It compares the one list in the value, if it holds one.
+	takeValue: (node, value) => ({ ...node, items: `{{${value.list}}}` }),
 	sample: {
 		id: "fresh",
 		type: "since-last-run",

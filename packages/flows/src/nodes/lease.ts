@@ -1,6 +1,13 @@
 import { z } from "zod";
 import { holdScopeSchema, type NodeCheck, nodeBase } from "./base";
-import { type NodeDefinition, noOwnColors, noSecrets } from "./definition";
+import {
+	type NodeDefinition,
+	noEndedLabel,
+	noOwnColors,
+	noSecrets,
+	type Position,
+	takesNoValue,
+} from "./definition";
 
 /**
  * The Lease node (ADR 7): it takes a named lease of the Space, so only one
@@ -91,6 +98,11 @@ export function checkLeaseNode(node: LeaseNode, check: NodeCheck): void {
 	}
 }
 
+/** A new Lease node. The name starts empty; the issues panel asks for it. It does not wait. */
+export function leaseNode(id: string, position: Position): LeaseNode {
+	return { id, type: "lease", position, name: "" };
+}
+
 /** The Lease node type. */
 export const leaseDefinition = {
 	type: "lease",
@@ -103,6 +115,14 @@ export const leaseDefinition = {
 	outputFields: leaseOutputFields,
 	check: checkLeaseNode,
 	secrets: noSecrets,
+	endsFlow: (_node, outcome) => outcome === "held",
+	endedLabel: noEndedLabel,
+	// The lease is the Space's, not a computer's.
+	touchesDevice: () => false,
+	typedOutputField: () => null,
+	mainOutputField: () => "holder",
+	newNodes: { lease: { id: "lease", takes: "nothing", create: leaseNode } },
+	takeValue: takesNoValue,
 	sample: {
 		id: "own_branch",
 		type: "lease",

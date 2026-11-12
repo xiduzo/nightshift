@@ -5,6 +5,7 @@
  * a kit's node as a step renders it (`kitCommand`). Only tests import this
  * entry.
  */
-export { commandNode } from "../draft/nodes";
+
 export type { FlowInput } from "../flow";
+export { commandNode } from "../nodes/command";
 export { kitCommand } from "./kit-command";

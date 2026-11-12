@@ -6,7 +6,13 @@ import {
 	placed,
 	secretNameSchema,
 } from "./base";
-import { type NodeDefinition, noOwnColors } from "./definition";
+import {
+	type NodeDefinition,
+	noEndedLabel,
+	noOwnColors,
+	type Position,
+	takesNoValue,
+} from "./definition";
 
 /**
  * The Service node (ADR 9): it starts a process that keeps running while
@@ -139,6 +145,14 @@ export function checkServiceNode(node: ServiceNode, check: NodeCheck): void {
 	}
 }
 
+/**
+ * A new Service node: empty commands and a URL to check. The issues panel
+ * asks for them. It runs for the whole run.
+ */
+export function serviceNode(id: string, position: Position): ServiceNode {
+	return { id, type: "service", position, start: "", ready: { url: "" } };
+}
+
 /** The Service node type. */
 export const serviceDefinition = {
 	type: "service",
@@ -151,6 +165,15 @@ export const serviceDefinition = {
 	outputFields: serviceOutputFields,
 	check: checkServiceNode,
 	secrets: (node) => node.secrets ?? [],
+	endsFlow: (_node, outcome) => outcome === "ready",
+	endedLabel: noEndedLabel,
+	touchesDevice: () => true,
+	typedOutputField: () => null,
+	mainOutputField: () => "data",
+	newNodes: {
+		service: { id: "service", takes: "nothing", create: serviceNode },
+	},
+	takeValue: takesNoValue,
 	sample: {
 		id: "stack",
 		type: "service",

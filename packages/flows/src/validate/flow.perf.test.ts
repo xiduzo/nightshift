@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { moveNodes } from "../draft/graph";
-import { commandNode } from "../draft/nodes";
 import { FLOW_VERSION, type Flow } from "../flow";
 import { fanOutsOf } from "../flow/branches";
+import { commandNode } from "../nodes/command";
 import { validateFlow } from "./flow";
 
 /**

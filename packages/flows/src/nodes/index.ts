@@ -9,6 +9,7 @@ export {
 	type AgentTier,
 	agentDefinition,
 	agentHarnessSchema,
+	agentNode,
 	agentNodeSchema,
 	type CustomAgent,
 	type CustomHarnessName,
@@ -112,7 +113,6 @@ export {
 	commandHasData,
 	commandNodeSchema,
 	DATA_EXIT_CODE,
-	DEFAULT_COMMAND_EXITS,
 	dataExitFor,
 	exitFor,
 	isChosenExit,
@@ -140,10 +140,13 @@ export {
 export {
 	type BuiltInOutcome,
 	EXAMPLE_DEVICE,
+	type NewNode,
 	NODE_FAMILIES,
 	NODE_FAMILY_LABEL,
+	type NodeDefaults,
 	type NodeDefinition,
 	type NodeFamily,
+	type Position,
 } from "./definition";
 export {
 	type EndNode,
@@ -199,7 +202,6 @@ export {
 	type SinceLastRunNode,
 	sinceLastRunDefinition,
 	sinceLastRunNodeSchema,
-	sinceLastRunOutcomes,
 	watchesValue,
 } from "./since-last-run";
 export {
@@ -222,7 +224,6 @@ export {
 } from "./value";
 export {
 	commandWaitOutcome,
-	isOwnWaitOutcome,
 	signalRules,
 	type WaitCommand,
 	type WaitNode,

@@ -1,4 +1,5 @@
 import {
+	endsFlow,
 	type Flow,
 	type FlowNode,
 	inferOutputType,
@@ -53,7 +54,7 @@ function shapesFlowOf(
  * Undefined when there is nothing to keep.
  */
 export function stepShapes(
-	ctx: Pick<StepContext, "run" | "flowName" | "kindOf">,
+	ctx: Pick<StepContext, "run" | "flowName">,
 	node: FlowNode,
 	scope: Scope | null,
 	outcome: StepOutcome,
@@ -61,7 +62,7 @@ export function stepShapes(
 ): StepShapes | undefined {
 	const typed = typedOutput(node);
 	if (typed === null || typed.schema !== undefined) return undefined;
-	if (!ctx.kindOf(node).isChosenEnd(node, outcome)) return undefined;
+	if (!endsFlow(node, outcome)) return undefined;
 	const data = outputs[typed.field];
 	if (data === undefined || data === null) return undefined;
 	if (shapesFlowOf(ctx, scope) === null) return undefined;
