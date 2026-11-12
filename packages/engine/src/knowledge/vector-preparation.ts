@@ -119,7 +119,7 @@ export function createVectorPreparation(options: {
 					: ready === "downloading"
 						? `Knowledge search finds by words only while ${model.model} downloads.`
 						: ready === "no-model"
-							? `Knowledge search finds by words only: Ollama does not have ${model.model}. Run: ollama pull ${model.model}`
+							? `Knowledge search finds by words only: Ollama does not have ${model.model}. Download it on the Settings page.`
 							: `Knowledge search finds by words only: Ollama does not answer${model.where ? ` at ${model.where}` : " on this computer"}.`,
 			);
 		}
