@@ -197,6 +197,7 @@ An Agent, a Command or a Value scores the run with `scores` in its data: `{"scor
 - **Kits.** The same search finds the kits, each in its family and marked **Kit**. **My kits** comes last. It lists the flows that another flow already runs, also in the other projects of your Space. Pick a flow of another project, and Night Shift copies it into this project first.
 - **Takes a value.** A Branch, a Value, a Value preset, Since last run and Convert take a value. Select a node first, then add one of them. It goes after that node and reads its output. An edge comes from the first outcome of that node, if that outcome has no edge yet.
 - **Last output.** After the first run of the flow, each node shows what it gave in the newest run, in one line at its bottom. A node that runs now shows **Running**. A node that the run did not reach shows **Not in the last run**. The **Results** tab of the node shows each output field, with its shape. **Open the run** opens that run at the step. When you change the node after that run, the tab says so. The template variables also show their values from the newest run.
+- **Data links.** Select a node to see dotted lines to the nodes it reads and the nodes that read it. The label on a line names what it reads, such as `data.tasks`.
 - **Sections.** Put related nodes in a Section, a box on the canvas that you zoom into. A Section can hold other Sections. You can move a Section into a flow of its own.
 - **Auto layout** arranges the nodes for you.
 - **Undo, redo, cut, copy, and paste** work with the keyboard.
