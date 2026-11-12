@@ -14,6 +14,7 @@ export {
 export {
 	adoptSelfDevice,
 	defaultSelfDeviceHost,
+	inContainer,
 	selfDevice,
 	selfOwnerId,
 	setSelfOwner,

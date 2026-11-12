@@ -2,6 +2,7 @@
 
 export type { CliTool, CliToolStore } from "./cli-tools";
 export { cliToolsInstruction, programOf } from "./cli-tools";
+export type { ConfigStores } from "./config-stores";
 export type {
 	Connection,
 	ConnectionStore,
@@ -16,6 +17,7 @@ export {
 	storedDeviceCopy,
 	storedDevices,
 } from "./device-copies";
+export { agentProfileOn } from "./found-programs";
 export type { ProfileStore, ProfileView } from "./profiles";
 export {
 	type SecretUse,
@@ -23,4 +25,4 @@ export {
 	takenOverSecrets,
 } from "./secret-scopes";
 export type { RunSettings, SettingsStore } from "./settings";
-export { defaultRunSettings, isLoopbackHost } from "./settings";
+export { defaultRunSettings, HARNESS_BIN, isLoopbackHost } from "./settings";

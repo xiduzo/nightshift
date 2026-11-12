@@ -115,16 +115,35 @@ export async function setUpProgram(
 		const tool = await stores.cliTools.save({ name: found.program });
 		return { kind: "tool", name: tool.name };
 	}
-	await addHarness(stores, found.harness);
+	const profile = await agentProfileOn(stores, found.harness, found.program);
+	return { kind: "agent", profileId: profile.id, name: profile.name };
+}
+
+/**
+ * Adds the harness, and an Agent Profile on it named after its program,
+ * with the harness's default model and the night's permission mode. A
+ * harness that has a profile keeps it: no second one is made. Setting up a
+ * found program and the guided setup of an agent (ADR 25) both end here.
+ */
+export async function agentProfileOn(
+	stores: Stores,
+	harness: HarnessName,
+	program: string,
+): Promise<{ id: string; name: string }> {
+	await addHarness(stores, harness);
+	const existing = stores.profiles
+		.list()
+		.find((p) => isAgentProfile(p) && p.harness === harness);
+	if (existing) return { id: existing.id, name: existing.name };
 	const profile = await saveProfile(stores, {
-		name: freeProfileName(stores, found.program),
-		harness: found.harness,
-		model: HARNESS_CATALOG[found.harness].defaultModel,
+		name: freeProfileName(stores, program),
+		harness,
+		model: HARNESS_CATALOG[harness].defaultModel,
 		permissionMode: stores.settings.current().agentPermissionMode,
 		clis: [],
 		connections: [],
 	});
-	return { kind: "agent", profileId: profile.id, name: profile.name };
+	return { id: profile.id, name: profile.name };
 }
 
 /** A profile name from the program's file name (`claude`), with a number when it is taken. */
