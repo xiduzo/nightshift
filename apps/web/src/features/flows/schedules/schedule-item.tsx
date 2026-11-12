@@ -6,20 +6,21 @@ import {
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
-	Card,
-	CardAction,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@nightshift/ui/components/card";
-import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@nightshift/ui/components/dropdown-menu";
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemFooter,
+	ItemMedia,
+	ItemTitle,
+} from "@nightshift/ui/components/item";
 import {
 	Tooltip,
 	TooltipContent,
@@ -52,12 +53,12 @@ import { LocalTime } from "@/shared/time";
 import { LastDelivery } from "./webhook-deliveries";
 
 /**
- * One schedule of a flow, in the shape of a flow card. The title says
- * when it starts, with a Paused badge when it is off, and its menu. The
- * facts say what it starts with. The bars show its last runs. Lines say
- * what went wrong: a skipped start, an offline computer, a problem.
+ * One schedule of a flow, as an Item. The title says when it starts,
+ * with a Paused badge when it is off, and its menu. The facts say what
+ * it starts with. The bars show its last runs. Lines say what went
+ * wrong: a skipped start, an offline computer, a problem.
  */
-export function ScheduleCard({
+export function ScheduleItem({
 	schedule,
 	description,
 	lastRuns,
@@ -96,29 +97,31 @@ export function ScheduleCard({
 	) : (
 		description
 	);
+	const Icon = schedule.webhook ? WebhookIcon : CalendarClockIcon;
 	return (
-		<Card className="[--card-spacing:--spacing(5)]">
-			<CardHeader>
-				<CardTitle className="min-w-0">
+		<Item variant="outline" className="items-start">
+			<ItemMedia
+				variant="icon"
+				className={cn(
+					"mt-0.5 self-start",
+					!schedule.enabled && "text-muted-foreground",
+				)}
+			>
+				<Icon aria-hidden="true" />
+			</ItemMedia>
+			<ItemContent className="min-w-0">
+				<ItemTitle className="max-w-full">
 					<Tooltip>
 						<TooltipTrigger
 							render={
 								<span
 									className={cn(
-										"inline-flex items-center gap-1.5",
+										"truncate",
 										!schedule.enabled && "text-muted-foreground",
 									)}
 								/>
 							}
 						>
-							{schedule.webhook ? (
-								<WebhookIcon className="size-4 shrink-0" aria-hidden="true" />
-							) : (
-								<CalendarClockIcon
-									className="size-4 shrink-0"
-									aria-hidden="true"
-								/>
-							)}
 							{when}
 						</TooltipTrigger>
 						<TooltipContent className="font-mono">
@@ -127,30 +130,28 @@ export function ScheduleCard({
 								: schedule.cron}
 						</TooltipContent>
 					</Tooltip>
-				</CardTitle>
-				{what ? (
-					<CardDescription className="line-clamp-2">{what}</CardDescription>
-				) : null}
-				<CardAction className="flex items-center gap-1.5">
-					{schedule.enabled ? null : (
-						<Badge variant="outline" className="text-muted-foreground">
-							<PauseIcon aria-hidden="true" />
-							Paused
-						</Badge>
-					)}
-					<ScheduleMenu
-						name={when}
-						webhook={schedule.webhook !== undefined}
-						enabled={schedule.enabled}
-						busy={busy}
-						onToggle={onToggle}
-						onEdit={onEdit}
-						onWebhook={onWebhook}
-						onDelete={onDelete}
-					/>
-				</CardAction>
-			</CardHeader>
-			<CardContent className="gap-3.5">
+				</ItemTitle>
+				{what ? <ItemDescription>{what}</ItemDescription> : null}
+			</ItemContent>
+			<ItemActions className="gap-1.5">
+				{schedule.enabled ? null : (
+					<Badge variant="outline" className="text-muted-foreground">
+						<PauseIcon aria-hidden="true" />
+						Paused
+					</Badge>
+				)}
+				<ScheduleMenu
+					name={when}
+					webhook={schedule.webhook !== undefined}
+					enabled={schedule.enabled}
+					busy={busy}
+					onToggle={onToggle}
+					onEdit={onEdit}
+					onWebhook={onWebhook}
+					onDelete={onDelete}
+				/>
+			</ItemActions>
+			<ItemFooter className="flex-col items-stretch justify-start gap-3 pl-7.5">
 				<div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 empty:hidden">
 					<NoNextStart schedule={schedule} now={now} />
 					<InputsFact inputs={schedule.inputs} baseRef={schedule.baseRef} />
@@ -163,12 +164,12 @@ export function ScheduleCard({
 				<LastStart schedule={schedule} device={runsOn} />
 				<OfflineLines machines={needs} />
 				{errors.length > 0 ? <IssueLines issues={errors} /> : null}
-			</CardContent>
-		</Card>
+			</ItemFooter>
+		</Item>
 	);
 }
 
-/** One fact of the card: a small icon and a short text. */
+/** One fact of the schedule: a small icon and a short text. */
 function Fact({
 	icon: Icon,
 	className,

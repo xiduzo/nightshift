@@ -22,6 +22,7 @@ import {
 	EmptyHeader,
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
+import { ItemGroup } from "@nightshift/ui/components/item";
 import {
 	Sheet,
 	SheetContent,
@@ -45,8 +46,8 @@ import type { ScheduleSummary } from "@/shared/api";
 import { useNow } from "@/shared/format";
 import { flowQueries } from "../queries";
 import { scheduleMutations, scheduleQueries } from "./queries";
-import { ScheduleCard } from "./schedule-card";
 import { ScheduleDialog } from "./schedule-dialog";
+import { ScheduleItem } from "./schedule-item";
 import { WebhookDialog } from "./webhook-deliveries";
 
 /** The schedule as the file holds it, without what the engine derived. */
@@ -61,7 +62,7 @@ function plain(summary: ScheduleSummary): Schedule {
 	return schedule;
 }
 
-/** How many runs of each schedule its card shows. */
+/** How many runs of each schedule its item shows. */
 const LAST_RUNS = 10;
 /** The project's newest runs, to find each schedule's last runs in. */
 const RECENT_RUNS = 200;
@@ -70,8 +71,8 @@ const RECENT_RUNS = 200;
 export type ScheduleBoard = {
 	/** Every schedule of the project. Empty while they load. */
 	schedules: ScheduleSummary[];
-	/** A card for each of `schedules`. `describe` says what one does, where the flow around it does not. */
-	cards: (
+	/** An item for each of `schedules`. `describe` says what one does, where the flow around it does not. */
+	items: (
 		schedules: readonly ScheduleSummary[],
 		describe?: (schedule: ScheduleSummary) => ReactNode,
 	) => ReactNode;
@@ -84,7 +85,7 @@ export type ScheduleBoard = {
 /**
  * Reads and changes the project's schedules. All of them save as one
  * list, so pausing one also sends the others as they are. `showRuns`
- * reads the runs the cards need, only while a card shows.
+ * reads the runs the items need, only while one shows.
  */
 export function useScheduleBoard(
 	projectId: string,
@@ -151,9 +152,9 @@ export function useScheduleBoard(
 		saveAll(next, () => setEditing(null));
 	};
 
-	const cards: ScheduleBoard["cards"] = (shown, describe) =>
+	const items: ScheduleBoard["items"] = (shown, describe) =>
 		shown.map((schedule) => (
-			<ScheduleCard
+			<ScheduleItem
 				key={schedule.id}
 				schedule={schedule}
 				description={describe?.(schedule)}
@@ -242,7 +243,7 @@ export function useScheduleBoard(
 
 	return {
 		schedules,
-		cards,
+		items,
 		add: (flow) => setEditing({ schedule: null, flow }),
 		dialogs,
 	};
@@ -267,14 +268,14 @@ export function FlowSchedulesSheet({
 }) {
 	return (
 		<Sheet open={open} onOpenChange={onOpenChange}>
-			<SheetContent className="data-[side=right]:sm:max-w-md">
+			<SheetContent className="data-[side=right]:sm:max-w-xl">
 				<SheetHeader className="border-b">
 					<SheetTitle className="font-mono">{flowName}</SheetTitle>
 					<SheetDescription>
 						What starts this flow, and the webhooks that wake its waiting runs.
 					</SheetDescription>
 				</SheetHeader>
-				<div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4">
+				<div className="flex flex-1 flex-col overflow-y-auto px-4">
 					{schedules.length === 0 ? (
 						<Empty>
 							<EmptyHeader>
@@ -286,7 +287,7 @@ export function FlowSchedulesSheet({
 							</EmptyHeader>
 						</Empty>
 					) : (
-						board.cards(schedules)
+						<ItemGroup className="gap-3">{board.items(schedules)}</ItemGroup>
 					)}
 				</div>
 				<SheetFooter className="border-t">

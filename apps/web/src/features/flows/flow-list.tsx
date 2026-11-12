@@ -65,7 +65,7 @@ import {
 	FlowSchedulesSheet,
 	useScheduleBoard,
 } from "./schedules/schedule-board";
-import { IssueLines } from "./schedules/schedule-card";
+import { IssueLines } from "./schedules/schedule-item";
 import { StartRunDialog } from "./start/start-run-dialog";
 
 /**
@@ -245,7 +245,7 @@ export function FlowList({ projectId }: { projectId: string }) {
 						</p>
 					</div>
 					<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-						{board.cards(loose, (schedule) =>
+						{board.items(loose, (schedule) =>
 							schedule.flow ? (
 								<>
 									Starts <span className="font-mono">{schedule.flow}</span>.
