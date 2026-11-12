@@ -1,7 +1,6 @@
 # 26. The report of a run
 
-Status: accepted, 2026-11-12. The format, the engine, the read model and the API
-are built. The web and phone screens come next
+Status: accepted, 2026-11-12. Built, 2026-11-12, in wave 2, lanes E1 to E4
 ([the record](../research/any-domain-2026-11.md), Q15, Q21, Q38).
 
 ## Context

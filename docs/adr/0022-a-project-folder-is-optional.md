@@ -1,6 +1,6 @@
 # 22. A project folder is optional
 
-Status: accepted, 2026-11-11. Not built yet: wave 1, lane A builds it
+Status: accepted, 2026-11-11. Built, 2026-11-12, in wave 1, lane A
 ([the record](../research/any-domain-2026-11.md), Q7, Q9, Q10, Q27).
 [ADR 2](0002-flows-are-night-shift-data.md) stays: a flow belongs to one project.
 

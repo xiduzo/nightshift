@@ -1,7 +1,6 @@
 # 27. A test run carries its pins and skips, the flow does not
 
-Status: accepted, 2026-11-12. The engine, the read model and the API are
-built. A Host start, a Walker move, the editor and the run views come next
+Status: accepted, 2026-11-12. Built, 2026-11-12, in wave 3, lanes L1 to L4
 ([the record](../research/any-domain-2026-11.md), Q39).
 
 ## Context

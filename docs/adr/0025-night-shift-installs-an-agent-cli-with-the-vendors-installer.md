@@ -1,7 +1,6 @@
 # 25. Night Shift installs an agent CLI with the vendor's installer, on this computer, after you confirm
 
-Status: accepted, 2026-11-12. The engine, daemon and API part is built (wave 2,
-lane G1). The screens come in lanes G2 and G4
+Status: accepted, 2026-11-12. Built, 2026-11-12, in wave 2, lanes G1, G2 and G4
 ([the record](../research/any-domain-2026-11.md), Q12, Q22).
 
 ## Context
