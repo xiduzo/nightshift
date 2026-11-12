@@ -405,11 +405,13 @@ export function createRunActions(deps: RunActionsDeps) {
 				);
 			}
 			// The new Walker reads the run's flows: an older Night Shift may not.
+			// Nor may it walk a test run: it would run every node for real.
 			const has = await deps.placement
 				.deviceById(target.id, placedRun(row), target.name)
 				.capabilities();
 			if (
-				(has.flowVersion ?? UNADVERTISED_FLOW_VERSION) < snapshotVersion(row)
+				(has.flowVersion ?? UNADVERTISED_FLOW_VERSION) < snapshotVersion(row) ||
+				(runState.test !== null && has.testRuns !== true)
 			) {
 				throw new Refusal("conflict", olderNightShift(target.name));
 			}

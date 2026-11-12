@@ -21,6 +21,7 @@ import {
 	transcriptPath,
 } from "../log/transcripts";
 import { alonePeers } from "../testing/alone-peers";
+import { seedFlows } from "../testing/seed-flows";
 import {
 	createSandbox,
 	type Sandbox,
@@ -80,12 +81,15 @@ const keyOf = (ref: WalkRef) =>
 let sandboxes: Sandbox[];
 /** The flow format the Device a run moves to reads; undefined: this build's. */
 let targetReads: number | undefined;
+/** Whether the Device a run moves to walks a test run. */
+let targetTests: boolean;
 /** The archive both computers keep a Space in. */
 let archive: Map<string, string>;
 /** The stamps of the files in `archive`. */
 let stamps: Map<string, WalkFile["stamp"]>;
 beforeEach(() => {
 	targetReads = undefined;
+	targetTests = true;
 	sandboxes = [];
 	archive = new Map();
 	stamps = new Map();
@@ -117,10 +121,14 @@ async function computer(
 					const device = alone.placement.deviceById(id, run, name);
 					return {
 						...device,
-						capabilities: async (query) => ({
-							...(await device.capabilities(query)),
-							flowVersion: targetReads ?? FLOW_VERSION,
-						}),
+						capabilities: async (query) => {
+							const { testRuns, ...has } = await device.capabilities(query);
+							return {
+								...has,
+								flowVersion: targetReads ?? FLOW_VERSION,
+								...(targetTests ? { testRuns } : {}),
+							};
+						},
 					};
 				},
 				// The planner's answer (`PlacementPort.moveTo`): one of the
@@ -587,6 +595,37 @@ describe("a run that moves to another Device", () => {
 		);
 		expect(archive.size).toBe(0);
 		await spaceOf(a, a).act(runId, { kind: "stop" });
+	});
+
+	test("a test run is refused to a Device of a Night Shift without test runs, and keeps nothing; a run that is no test goes there (ADR 27)", async () => {
+		const { a, b } = await pair();
+		targetTests = false;
+		const space = spaceOf(a, a);
+		const { id: projectId } = await space.addProject({
+			repoPath: a.sandbox.repoPath,
+		});
+		await seedFlows(space, projectId, { ship: gateFlow });
+		// `build` stands in: the run waits at the Gate at once.
+		const tested = await space.startRun({
+			projectId,
+			flowName: "ship",
+			test: { skipped: { build: "pass" } },
+		});
+		await waitFor(
+			async () => (await space.getRun(tested.id)).status === "waiting",
+			{ label: "the test run to wait at the Gate" },
+		);
+		await expect(
+			space.act(tested.id, { kind: "move", to: b.sandbox.deviceId }),
+		).rejects.toThrow(
+			"laptop runs an older version of Night Shift. Update Night Shift on laptop.",
+		);
+		expect(archive.size).toBe(0);
+		await space.act(tested.id, { kind: "stop" });
+
+		const { runId } = await waitingOn(a);
+		await space.act(runId, { kind: "move", to: b.sandbox.deviceId });
+		expect(archive.size).toBeGreaterThan(0);
 	});
 
 	test("a sleeping run that arrived gets its timer back after a restart of its new Walker", async () => {

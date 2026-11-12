@@ -202,6 +202,12 @@ export type Capabilities = {
 	 * older Night Shift, which reads format 8 at most.
 	 */
 	flowVersion?: number;
+	/**
+	 * It walks a test run (ADR 27): its pinned and skipped nodes stand in
+	 * and do not run. Absent: an older Night Shift, which would run every
+	 * node for real, so no test run moves there.
+	 */
+	testRuns?: true;
 };
 
 /** A Model Profile's address to check, with the decider that asks it. */

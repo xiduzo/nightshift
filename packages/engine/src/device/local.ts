@@ -758,6 +758,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				requests: true,
 				readFiles: true,
 				flowVersion: FLOW_VERSION,
+				testRuns: true,
 				...(query.addresses?.length && decider?.checkAddress
 					? {
 							addresses: await checkAddresses(

@@ -223,11 +223,12 @@ describe("what the Device reports", () => {
 		).toBe(false);
 	});
 
-	test("that it sends web requests, reads files and the newest flow format it reads", async () => {
+	test("that it sends web requests, reads files, the newest flow format it reads and that it walks a test run", async () => {
 		expect(await device().capabilities()).toMatchObject({
 			requests: true,
 			readFiles: true,
 			flowVersion: FLOW_VERSION,
+			testRuns: true,
 		});
 	});
 });
