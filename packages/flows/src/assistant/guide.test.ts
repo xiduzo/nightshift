@@ -121,7 +121,8 @@ describe("flowAuthoringGuide", () => {
 		// request node and a Wait for a URL. 4995: the kits message/send,
 		// feeds/read and email/send (a line each), and the secrets they read.
 		// 5030: the report of an End node and a Subflow's `end_report`.
-		expect(words).toBeLessThan(5030);
+		// 5055: the `scores` of an Agent and a Value (one sentence each).
+		expect(words).toBeLessThan(5055);
 	});
 });
 

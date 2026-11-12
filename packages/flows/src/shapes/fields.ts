@@ -155,8 +155,8 @@ export const TYPED_OUTPUT_FIELD = {
 
 /**
  * Keys that a node's data may hold whatever its schema says: a command
- * writes `outcome` to pick an exit and `scores` to score the run. A path
- * that starts with one never warns.
+ * writes `outcome` to pick an exit, and a command, an agent or a value
+ * writes `scores` to score the run. A path that starts with one never warns.
  */
 export const RESERVED_DATA_KEYS = ["outcome", "scores"] as const;
 
