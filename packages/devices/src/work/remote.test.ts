@@ -16,7 +16,15 @@ import {
 	type WorkRequest,
 	workRequestSchema,
 } from "../contract";
-import { CALL_DEADLINES_MS, remoteDevice, serveWork } from "./remote";
+import { partialHostClient } from "../testing";
+import {
+	CALL_DEADLINES_MS,
+	CLEANUP_WAIT_MS,
+	remoteDevice,
+	serveWork,
+} from "./remote";
+import { createWorkServer } from "./work";
+import { createWorkHub } from "./work-hub";
 
 /**
  * The snapshots that tell what a step changed, as a Walker asks another
@@ -287,5 +295,198 @@ describe("the run folder of a remote Device", () => {
 				`Update Night Shift on ${device.name} to run projects without a folder.`,
 			);
 		}
+	});
+});
+
+/** One turn of the event loop, as a cleanup that removes files takes. */
+const turn = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+/**
+ * A Host's hub, and a placed Device that serves `device` through it as the
+ * daemon does: its work server takes the calls over its link and sends the
+ * replies back, a batch at a time. `cancelled`: the calls the Host
+ * cancelled there.
+ */
+async function placedOn(device: Device) {
+	const back = Promise.withResolvers<void>();
+	const hub = createWorkHub({ onBack: () => back.resolve() });
+	const client = partialHostClient({
+		devices: {
+			work: async (input, options) =>
+				hub.take("laptop", options?.signal as AbortSignal, input?.running),
+			workReply: async (input) => ({ known: hub.reply("laptop", input) }),
+		},
+	});
+	const cancelled: string[] = [];
+	const server = createWorkServer({
+		serve: (request, signal) => {
+			signal.addEventListener("abort", () => cancelled.push(request.call.kind));
+			return serveWork(device, request, signal);
+		},
+	});
+	const closed = new AbortController();
+	const detach = server.attach({
+		stream(_name, open) {
+			void open(client, closed.signal);
+			return () => closed.abort();
+		},
+		ready: async () => client,
+	});
+	await back.promise;
+	return { hub, cancelled, detach };
+}
+
+/** The Walker's cleanup wait, which ends when the test says. */
+function heldPause() {
+	const asked = Promise.withResolvers<number>();
+	let end = () => {};
+	return {
+		/** How long the Walker would wait. */
+		asked: asked.promise,
+		end: () => end(),
+		pause: (ms: number, signal?: AbortSignal) =>
+			new Promise<void>((resolve) => {
+				end = resolve;
+				signal?.addEventListener("abort", () => resolve(), { once: true });
+				asked.resolve(ms);
+			}),
+	};
+}
+
+const SESSION = {
+	cwd: "/work",
+	prompt: "Do the work.",
+	harness: "claude-code",
+	model: "sonnet",
+	permissionMode: "acceptEdits",
+} as const;
+
+/** A placed Device whose session ends, then cleans up as `cleanup` says. */
+function sessionDevice(cleanup: () => Promise<void>): Device {
+	return {
+		id: "laptop",
+		name: "laptop",
+		async *session() {
+			try {
+				yield { type: "ready", harness: "claude-code" };
+				yield { type: "finished" };
+			} finally {
+				await cleanup();
+			}
+		},
+	} as unknown as Device;
+}
+
+/** A step's read of a session: up to its last event. */
+async function readSession(
+	device: Device,
+	signal: AbortSignal,
+	order: string[],
+) {
+	for await (const event of device.session({ ...SESSION, signal })) {
+		order.push(event.type);
+		if (event.type === "finished") break;
+	}
+	order.push("step ended");
+}
+
+describe("a session or a command on a remote Device", () => {
+	test("a session ends after the Device's cleanup there, and its call is not cancelled", async () => {
+		const order: string[] = [];
+		const placed = await placedOn(
+			sessionDevice(async () => {
+				// The knowledge goes to the Space, the harness's files go.
+				await turn();
+				order.push("cleanup");
+			}),
+		);
+		const walker = remoteDevice(
+			placed.hub,
+			{ id: "laptop", name: "laptop" },
+			FOR_RUN,
+		);
+		await readSession(walker, new AbortController().signal, order);
+		expect(order).toEqual(["ready", "finished", "cleanup", "step ended"]);
+		expect(placed.cancelled).toEqual([]);
+		placed.detach();
+	});
+
+	test("a command ends after the Device's cleanup there, and its call is not cancelled", async () => {
+		const order: string[] = [];
+		const device = {
+			id: "laptop",
+			name: "laptop",
+			async *exec() {
+				try {
+					yield { type: "output", stream: "stdout", text: "synced\n" };
+					yield { type: "exit", exitCode: 0, spawnError: null };
+				} finally {
+					// A sync's files go to the Space.
+					await turn();
+					order.push("cleanup");
+				}
+			},
+		} as unknown as Device;
+		const placed = await placedOn(device);
+		const walker = remoteDevice(
+			placed.hub,
+			{ id: "laptop", name: "laptop" },
+			FOR_RUN,
+		);
+		// As `runCommand` reads it: up to its exit.
+		for await (const event of walker.exec({
+			command: "sync",
+			cwd: "/work",
+			signal: new AbortController().signal,
+		})) {
+			order.push(event.type);
+			if (event.type === "exit") break;
+		}
+		order.push("step ended");
+		expect(order).toEqual(["output", "exit", "cleanup", "step ended"]);
+		expect(placed.cancelled).toEqual([]);
+		placed.detach();
+	});
+
+	test("a Device that does not end its call holds the step for the cleanup wait only, then the call stops there", async () => {
+		const order: string[] = [];
+		// A cleanup that hangs, or a Device that went away during it.
+		const placed = await placedOn(sessionDevice(() => new Promise(() => {})));
+		const held = heldPause();
+		const walker = remoteDevice(
+			placed.hub,
+			{ id: "laptop", name: "laptop" },
+			FOR_RUN,
+			{ pause: held.pause },
+		);
+		const reading = readSession(walker, new AbortController().signal, order);
+		expect(await held.asked).toBe(CLEANUP_WAIT_MS);
+		expect(order).toEqual(["ready", "finished"]);
+		held.end();
+		await reading;
+		expect(order).toEqual(["ready", "finished", "step ended"]);
+		// As without the wait: the call is cancelled there.
+		expect(placed.cancelled).toEqual(["session"]);
+		placed.detach();
+	});
+
+	test("a stop during the Device's cleanup ends the step at once", async () => {
+		const order: string[] = [];
+		const placed = await placedOn(sessionDevice(() => new Promise(() => {})));
+		const held = heldPause();
+		const walker = remoteDevice(
+			placed.hub,
+			{ id: "laptop", name: "laptop" },
+			FOR_RUN,
+			{ pause: held.pause },
+		);
+		const stop = new AbortController();
+		const reading = readSession(walker, stop.signal, order);
+		await held.asked;
+		stop.abort();
+		await reading;
+		expect(order).toEqual(["ready", "finished", "step ended"]);
+		expect(placed.cancelled).toEqual(["session"]);
+		placed.detach();
 	});
 });

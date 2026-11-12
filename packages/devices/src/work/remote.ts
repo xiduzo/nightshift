@@ -29,6 +29,7 @@ import {
 	type WorkReply,
 	type WorkRequest,
 } from "../contract";
+import { pause } from "../links";
 
 /**
  * Another Device as a Device: `remoteDevice(relay, device, forRun)` makes
@@ -93,18 +94,81 @@ export const CALL_DEADLINES_MS: Partial<Record<WorkCall["kind"], number>> = {
 	receiveHandOff: 3 * 60_000,
 };
 
+/**
+ * How long a session or a command waits after its last event for the
+ * placed Device to end its call. The Device ends it after its cleanup:
+ * the harness's files and the CLI tool launchers go, and what the step
+ * changed in the knowledge reaches the Host (it waits up to 10 s for
+ * that). A Device that went away, or hangs, holds the step no longer.
+ */
+export const CLEANUP_WAIT_MS = 30_000;
+
 /** Another Device, reached through `relay`, working for one run (or its start). */
 export function remoteDevice(
 	relay: WorkRelay,
 	device: { id: string; name: string },
 	forRun: WorkFor,
+	options: {
+		/** Waits out `CLEANUP_WAIT_MS`, or less when `signal` aborts. Default a timer. */
+		pause?: (ms: number, signal: AbortSignal) => Promise<void>;
+	} = {},
 ): Device {
+	const wait = options.pause ?? pause;
 	const ask = (call: WorkCall, signal?: AbortSignal, projectId?: string) =>
 		relay.call(
 			device.id,
 			{ ...forRun, ...(projectId ? { projectId } : {}), call },
 			signal,
 		);
+
+	/**
+	 * The replies of a streaming call (`session`, `exec`). A placed Device
+	 * ends a call only after its cleanup there, as every version does
+	 * (`createWorkServer`): the end of the call is its "cleaned up". So
+	 * once the call's last event came, `close` reads on until the call
+	 * ends, and the step ends after the cleanup, as it does on this
+	 * computer. It waits `CLEANUP_WAIT_MS` at most, then cancels the call
+	 * there. A stop ends the wait at once. A call closed before its last
+	 * event is cancelled there.
+	 */
+	function streamed(call: WorkCall, signal: AbortSignal) {
+		const giveUp = new AbortController();
+		const replies = ask(call, AbortSignal.any([signal, giveUp.signal]))[
+			Symbol.asyncIterator
+		]();
+		let last = false;
+		return {
+			next: () => replies.next(),
+			/** The call's last event came: `close` waits for the Device to end the call. */
+			lastCame() {
+				last = true;
+			},
+			async close() {
+				if (!last) {
+					await replies.return?.();
+					return;
+				}
+				const over = new AbortController();
+				const late = wait(CLEANUP_WAIT_MS, over.signal).then(
+					() => "late" as const,
+				);
+				try {
+					while (true) {
+						const next = await Promise.race([replies.next(), late]);
+						if (next === "late") {
+							giveUp.abort();
+							return;
+						}
+						if (next.done) return;
+					}
+				} catch {
+					// The Device went away during its cleanup: the step goes on.
+				} finally {
+					over.abort();
+				}
+			},
+		};
+	}
 
 	/** The one result of a call; throws its error as a refusal (`refusalOf`). */
 	async function once<T>(
@@ -135,28 +199,40 @@ export function remoteDevice(
 		const { signal, ...rest } = input;
 		let started = false;
 		let ended = false;
-		for await (const reply of ask({ kind: "session", input: rest }, signal)) {
-			if (reply.kind === "error") {
-				// A Device that went away mid-session: a network kind lets the
-				// run's policy wait for it and continue the harness session.
-				yield started
-					? {
-							type: "error",
-							kind: signal.aborted
-								? "aborted"
-								: reply.offline
-									? "network"
-									: "harness",
-							message: reply.message,
-						}
-					: { type: "refused", message: reply.message };
-				return;
+		const replies = streamed({ kind: "session", input: rest }, signal);
+		try {
+			while (true) {
+				const next = await replies.next();
+				if (next.done) break;
+				const reply = next.value;
+				if (reply.kind === "error") {
+					replies.lastCame();
+					// A Device that went away mid-session: a network kind lets the
+					// run's policy wait for it and continue the harness session.
+					yield started
+						? {
+								type: "error",
+								kind: signal.aborted
+									? "aborted"
+									: reply.offline
+										? "network"
+										: "harness",
+								message: reply.message,
+							}
+						: { type: "refused", message: reply.message };
+					return;
+				}
+				if (reply.kind !== "item") continue;
+				const event = reply.item as SessionEvent;
+				if (event.type === "ready" || event.type === "refused") started = true;
+				if (event.type === "finished" || event.type === "error") {
+					ended = true;
+					replies.lastCame();
+				}
+				yield event;
 			}
-			if (reply.kind !== "item") continue;
-			const event = reply.item as SessionEvent;
-			if (event.type === "ready" || event.type === "refused") started = true;
-			if (event.type === "finished" || event.type === "error") ended = true;
-			yield event;
+		} finally {
+			await replies.close();
 		}
 		if (ended) return;
 		// The stream ended without its last event: cancelled here, or the
@@ -177,15 +253,25 @@ export function remoteDevice(
 
 	async function* exec(input: ExecInput): AsyncGenerator<ExecEvent> {
 		const { signal, ...rest } = input;
-		for await (const reply of ask({ kind: "exec", input: rest }, signal)) {
-			if (reply.kind === "error") {
-				yield { type: "exit", exitCode: null, spawnError: reply.message };
-				return;
+		const replies = streamed({ kind: "exec", input: rest }, signal);
+		try {
+			while (true) {
+				const next = await replies.next();
+				if (next.done) break;
+				const reply = next.value;
+				if (reply.kind === "error") {
+					replies.lastCame();
+					yield { type: "exit", exitCode: null, spawnError: reply.message };
+					return;
+				}
+				if (reply.kind !== "item") continue;
+				const event = reply.item as ExecEvent;
+				if (event.type === "exit") replies.lastCame();
+				yield event;
+				if (event.type === "exit") return;
 			}
-			if (reply.kind !== "item") continue;
-			const event = reply.item as ExecEvent;
-			yield event;
-			if (event.type === "exit") return;
+		} finally {
+			await replies.close();
 		}
 		// Killed by a stop here, or the Device went away.
 		yield {
