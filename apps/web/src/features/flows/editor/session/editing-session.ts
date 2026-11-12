@@ -163,18 +163,12 @@ export function createEditingSession(
 	const step = (walk: (history: DraftHistory) => DraftHistory) => {
 		const history = walk(inner.history);
 		if (history === inner.history) return false;
-		const draft = history.present;
-		const { selection, openSection } = inner;
+		// What the draft lost leaves the selection in the same step, so the
+		// open Section stays: `settle` judges only what is still there.
 		update({
 			history,
 			revision: inner.revision + 1,
-			// The selection from before the step counts first: when it holds
-			// something outside the open Section of the draft now, the whole
-			// flow shows. This is the order the editor always had.
-			openSection: pickedOutside(draft, openSection, selection)
-				? null
-				: openSection,
-			selection: selectionIn(draft, selection),
+			selection: selectionIn(history.present, inner.selection),
 		});
 		return true;
 	};

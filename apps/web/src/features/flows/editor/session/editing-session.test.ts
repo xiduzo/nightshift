@@ -10,6 +10,7 @@ import {
 	renameNode,
 	sectionOf,
 	updateNode,
+	updateSection,
 } from "@nightshift/flows";
 import { commandNode } from "@nightshift/flows/testing";
 import { createEditingSession } from "./editing-session";
@@ -317,21 +318,40 @@ describe("the editing session: the selection", () => {
 		expect(session.get().selection).toBe(kept);
 	});
 
-	test("undo of a node added and selected in the open Section shows the whole flow", () => {
-		// Today's order: the selection from before the undo counts first,
-		// and the node it holds is gone, so it lies outside the Section.
+	test("undo of a node added and selected in the open Section keeps the Section open", () => {
 		const { session } = sessionOn(sectioned);
 		session.openSection("one");
 		const { flow: next, id } = withNode(session.get().draft);
 		session.add(next);
 		session.select({ kind: "node", id });
 		session.settle();
-		expect(session.get().openSection).toBe("one");
 		session.undo();
+		session.settle();
 		expect(session.get()).toMatchObject({
-			openSection: null,
+			openSection: "one",
 			selection: null,
 		});
+	});
+
+	test("an undo that leaves a selected node outside the open Section shows the whole flow", () => {
+		// The node is still there, so it stays selected, and settle judges it.
+		const { session } = sessionOn(sectioned);
+		session.edit((draft) =>
+			updateSection(draft, "one", (section) => ({
+				...section,
+				nodes: [...section.nodes, "d"],
+			})),
+		);
+		session.openSection("one");
+		session.select({ kind: "node", id: "d" });
+		session.settle();
+		session.undo();
+		expect(session.get()).toMatchObject({
+			openSection: "one",
+			selection: { kind: "node", id: "d" },
+		});
+		session.settle();
+		expect(session.get().openSection).toBeNull();
 	});
 
 	test("an undo that takes the open Section away keeps it, and redo opens it again", () => {
@@ -453,15 +473,18 @@ describe("the editing session: making a Section", () => {
 		expect(session.get()).toBe(before);
 	});
 
-	test("a Section made in the open Section keeps it open", () => {
+	test("a Section made in the open Section keeps it open, also after an undo", () => {
 		const { session } = sessionOn(sectioned);
 		session.openSection("one");
 		const made = session.makeSection(["a"]);
 		if (!made.ok) throw new Error("expected a Section");
 		session.settle();
 		expect(session.get().openSection).toBe("one");
-		// The undo takes the made Section, still selected: it lies outside.
 		session.undo();
-		expect(session.get().openSection).toBeNull();
+		session.settle();
+		expect(session.get()).toMatchObject({
+			openSection: "one",
+			selection: null,
+		});
 	});
 });
