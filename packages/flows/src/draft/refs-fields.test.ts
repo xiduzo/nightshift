@@ -7,12 +7,16 @@
  * - every field of the node schema that can hold a template is rewritten,
  *   or listed below as plain text;
  * - every text the checks read as a template or a rule, the rewrite visits
- *   as one, with the same names of its own.
+ *   as one, with the same names of its own;
+ * - renaming a node rewrites every text the rewrite visits that reads it,
+ *   a rule as well as a template.
  */
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
-import { type FlowNode, flowSchema } from "../flow";
+import { FLOW_VERSION, type FlowNode, flowSchema } from "../flow";
+import { ruleNames, templateRefs } from "../template";
 import { checkNodeWith } from "../validate";
+import { renameNode } from "./graph";
 import { rewriteNodeTexts, type TextField } from "./refs";
 
 /** The schema of one node, of any type. */
@@ -367,6 +371,50 @@ function rewrittenTexts(node: FlowNode): (TextField & { text: string })[] {
 	return texts;
 }
 
+/** The names of the flow a text reads: a rule's own names (`also`) are none. */
+function namesRead(text: TextField & { text: string }): string[] {
+	const names = text.rule
+		? ruleNames(text.text).filter((name) => !text.also.includes(name))
+		: templateRefs(text.text).map((ref) => ref.name);
+	// `run` and `vars` are no node.
+	return names.filter((name) => name !== "run" && name !== "vars");
+}
+
+/** Every text the rewrite visits that still reads a name of `before`, after the rename. */
+function notRenamed(node: FlowNode): string[] {
+	const before = rewrittenTexts(node);
+	const names = [...new Set(before.flatMap(namesRead))];
+	const renamedTo = (name: string) => `${name}_renamed`;
+	let flow = flowSchema.parse({
+		version: FLOW_VERSION,
+		inputs: [],
+		outputs: [],
+		start: node.id,
+		nodes: [
+			node,
+			...names.map((id) => ({
+				id,
+				type: "command",
+				position: { x: 0, y: 0 },
+				command: "true",
+			})),
+		],
+		edges: [],
+	});
+	for (const name of names) flow = renameNode(flow, name, renamedTo(name));
+	const [renamed] = flow.nodes;
+	const after = renamed ? rewrittenTexts(renamed) : [];
+	return before.flatMap((text, index) => {
+		const now = after[index];
+		const reads = now ? namesRead(now) : [];
+		return namesRead(text).every(
+			(name) => reads.includes(renamedTo(name)) && !reads.includes(name),
+		)
+			? []
+			: [`${text.rule ? "rule" : "template"} "${text.text}"`];
+	});
+}
+
 /** Every text of a value that is not empty, with where it sits. */
 function leaves(
 	value: unknown,
@@ -446,4 +494,18 @@ describe("the rewrite of a node's texts", () => {
 			expect(missed).toEqual([]);
 		},
 	);
+
+	test.each(FIXTURES.map((node) => [node.id, node.type, node] as const))(
+		"renaming a node rewrites every text that reads it (%s, %s)",
+		(_id, _type, node) => {
+			expect(notRenamed(node)).toEqual([]);
+		},
+	);
+
+	test("the fixtures read nodes in rules", () => {
+		const rules = FIXTURES.flatMap(rewrittenTexts).filter(
+			(text) => text.rule && namesRead(text).length > 0,
+		);
+		expect(rules.length).toBeGreaterThan(0);
+	});
 });
