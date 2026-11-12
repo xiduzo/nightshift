@@ -11,7 +11,7 @@
 		"to": "now"
 	},
 	"refresh": "5m",
-	"description": "The runs Night Shift sends with Settings → Monitoring: outcomes, useful runs, the runs that needed you, time, cost, tokens, retries, Gate waits and scores.",
+	"description": "The runs Night Shift sends with Settings → Monitoring: outcomes, useful runs, the runs that needed you, time, cost, tokens, retries, Gate waits, scores, where the work landed and flow metrics.",
 	"templating": {
 		"list": [
 			{
@@ -840,6 +840,97 @@
 				"showValue": "auto",
 				"xTickLabelRotation": 0
 			}
+		},
+		{
+			"id": 17,
+			"type": "barchart",
+			"title": "Where the work landed",
+			"description": "How often the work and the choices of your flows landed on each rung: a rule, the first tier, a later tier, a person, a deadline, or none.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${datasource}"
+			},
+			"gridPos": {
+				"x": 0,
+				"y": 44,
+				"w": 12,
+				"h": 8
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "sum by (nightshift_ladder_kind, nightshift_ladder_rung) (increase(nightshift_ladder_rung_total{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__range]))",
+					"legendFormat": "{{nightshift_ladder_kind}} {{nightshift_ladder_rung}}",
+					"instant": true,
+					"format": "table"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"orientation": "horizontal",
+				"showValue": "auto",
+				"xTickLabelRotation": 0
+			}
+		},
+		{
+			"id": 18,
+			"type": "timeseries",
+			"title": "Flow metrics",
+			"description": "The total of each number your flows report, per interval. A Command, an Agent or a Value step writes these numbers in its data.",
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${datasource}"
+			},
+			"gridPos": {
+				"x": 12,
+				"y": 44,
+				"w": 12,
+				"h": 8
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${datasource}"
+					},
+					"expr": "sum by (nightshift_flow_metric_name) (increase(nightshift_flow_metric_sum{nightshift_project_id=~\"$project\", nightshift_flow_id=~\"$flow\"}[$__interval]))",
+					"legendFormat": "{{nightshift_flow_metric_name}}"
+				}
+			],
+			"fieldConfig": {
+				"defaults": {
+					"custom": {
+						"drawStyle": "bars",
+						"fillOpacity": 60,
+						"stacking": {
+							"mode": "none"
+						}
+					}
+				},
+				"overrides": []
+			},
+			"options": {
+				"legend": {
+					"displayMode": "list",
+					"placement": "bottom"
+				},
+				"tooltip": {
+					"mode": "multi"
+				}
+			},
+			"interval": "1h"
 		}
 	]
 }

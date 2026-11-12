@@ -2,7 +2,8 @@
 
 Night Shift can send the runs a computer walks to a monitoring tool you
 choose. Each run is one trace, and each step is a span in it. Metrics give
-the time, cost, tokens, retries and Gate waits of your runs. Claude Code
+the time, cost, tokens, retries and Gate waits of your runs. They also tell
+where the work landed and give the numbers your flows report. Claude Code
 steps also send their own usage, under the span of their step. Codex steps
 send their own usage too.
 
@@ -147,7 +148,7 @@ The GenAI conventions are still in development.
 | `gen_ai.invoke_workflow.duration` (s) | histogram | `gen_ai.workflow.name`, `nightshift.run.status` |
 | `gen_ai.invoke_agent.duration` (s) | histogram | `gen_ai.provider.name`, `gen_ai.agent.name` |
 | `nightshift.step.duration` (s) | histogram | `nightshift.node.kind`, `nightshift.step.outcome`. An Agent step uses `gen_ai.invoke_agent.duration` instead. |
-| `nightshift.run.cost_usd` | counter | `nightshift.cost.basis` (`billed`, `estimated`), `nightshift.agent`, `gen_ai.request.model`: the same cost as the Spend tab, also for a run that was cut short |
+| `nightshift.run.cost_usd` | counter | `nightshift.cost.basis` (`billed`, `estimated`), `nightshift.agent`, `gen_ai.request.model`: the same cost as the Spend tab, also for a run that was cut short. A try on a ladder adds `nightshift.ladder.rung`: the rung it stands on. |
 | `gen_ai.client.inference.usage.input_tokens` | counter | `gen_ai.token.modality`, `gen_ai.provider.name` |
 | `gen_ai.client.inference.usage.output_tokens` | counter | `gen_ai.token.modality`, `gen_ai.provider.name` |
 | `gen_ai.client.inference.usage.cache_read.input_tokens` | counter | `gen_ai.token.modality`, `gen_ai.provider.name` |
@@ -156,6 +157,8 @@ The GenAI conventions are still in development.
 | `nightshift.gate.wait` (s) | histogram | how long Gates waited for a person |
 | `nightshift.run.outcome` | counter | `nightshift.run.status` (`finished`, `failed`, `stopped`, ...), `nightshift.run.needed_you` (whether a person answered a Gate or an Ask, resumed, stopped or took over the run) |
 | `nightshift.score` | counter | `nightshift.score.name`, `nightshift.score.label`, `nightshift.score.by` (`person`, `deadline`). See the names below. |
+| `nightshift.ladder.rung` | counter | `nightshift.ladder.kind`, `nightshift.ladder.rung`, `nightshift.ladder.tier`, `nightshift.ladder.unsure`, `nightshift.node.kind`: one point for each climb that landed. See [Where the work landed](#where-the-work-landed). |
+| `nightshift.flow.metric` | histogram | `nightshift.flow.metric.name`: a number a Command, Agent or Value step reported in its data, such as `{"scores": {"leads_found": 12}}` |
 
 `nightshift.score.name` says what a score point is:
 
@@ -164,15 +167,54 @@ The GenAI conventions are still in development.
 | `gate_decision` | A Gate was answered. The label is the option, and `nightshift.score.by` says who chose it. |
 | `useful` | A person answered "Was this run useful?": 1 for yes, 0 for no. An older Night Shift writes `pr_useful`. |
 | `pr_merged`, `pr_closed`, `reverted_within_7d` | What became of a run's pull request, from a schedule that [scores pull requests](triggers.md#score-runs-by-their-pull-requests). |
-| Any other name | A score a Command step wrote, with no label. |
 
 A counter only adds. A no to "Was this run useful?" adds 0, and a changed
 answer adds its new value again.
+
+A flow chooses the name of each number it reports, and what the value
+means. A `nightshift.flow.metric` point has the value in its sum and count,
+so you can read a total and an average per name.
+
+#### Where the work landed
+
+A climb is the tries of one node up its ladder, up to the step it landed
+on. A node without a cascade lands on each visit. The step a climb landed
+on adds one `nightshift.ladder.rung` point:
+
+- `nightshift.ladder.kind` is `work` (an Agent, a Subflow, a Value by a
+  model or an Ask) or `choice` (a Decision).
+- `nightshift.ladder.tier` is the name of the tier it landed on. A node
+  without a cascade has none.
+- `nightshift.ladder.unsure` is on a Decision's point. It is `true` when a
+  decider's pick fell below the minimum of its tier on a try.
+- `nightshift.ladder.rung` is one of these:
+
+| Rung | Where the climb landed |
+| --- | --- |
+| `rule` | A rule chose. |
+| `first` | The first tier held, or a node without a cascade did. |
+| `later` | A later tier held. |
+| `person` | The climb reached a person, who answered. |
+| `deadline` | The climb reached a person, and the deadline answered. |
+| `none` | No try held, and no person was asked. |
+
+The cost of each try on a ladder is a `nightshift.run.cost_usd` point with
+the rung that try stands on: `rule`, `first`, `later` or `person`. A step
+that a person reopens lands again when it ends again.
+
+#### Changed names
 
 Night Shift no longer sends `nightshift.pr.outcome`. The same facts are the
 `nightshift.score` points `pr_merged`, `pr_closed` and `reverted_within_7d`.
 A dashboard that reads `nightshift_pr_outcome_total` must read
 `nightshift_score_total` instead.
+
+Night Shift no longer sends the numbers a flow reports as `nightshift.score`
+points. They are `nightshift.flow.metric` points now, with the name in
+`nightshift.flow.metric.name`. A dashboard that reads such a name from
+`nightshift_score_total` must read `nightshift_flow_metric_sum` and
+`nightshift_flow_metric_count` instead. `nightshift.score` keeps only the
+names in the table above.
 
 Each point also has `nightshift.project.id`, `nightshift.flow.id` and
 `nightshift.device.id`. No point has the id of one run or step, so there are

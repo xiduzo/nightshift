@@ -17,14 +17,16 @@ A released build of Night Shift sends these events to the Night Shift team. A ru
 | `nightshift.schedule.fired` | No fields. |
 | `nightshift.schedule.skipped` | `nightshift.schedule.skip_reason` (`missed`, `paused`, `still_open`, `_OTHER`). |
 | `nightshift.run.ended` | `nightshift.flow.id`. `nightshift.run.status`. `nightshift.run.trigger`. `nightshift.run.end_reason`. `nightshift.run.duration` (seconds). `nightshift.run.cost_usd`. `nightshift.run.node_kinds`. Optional `nightshift.run.needed_you` (boolean): a person answered a Gate or an Ask, resumed, stopped or took over the run. |
-| `nightshift.step.ended` | `nightshift.node.kind`. `nightshift.step.result` (`pass`, `error`, `stopped`, `interrupted`, `_OTHER`). `nightshift.step.visit`. Optional token counts, `nightshift.cost.basis`, `nightshift.model.family`, `nightshift.step.guard` and `error.type`. |
+| `nightshift.step.ended` | `nightshift.node.kind`. `nightshift.step.result` (`pass`, `error`, `stopped`, `interrupted`, `_OTHER`). `nightshift.step.visit`. Optional token counts, `nightshift.cost.basis`, `nightshift.model.family`, `nightshift.step.guard` and `error.type`. On the step a climb landed on: `nightshift.ladder.kind` (`work`, `choice`, `_OTHER`), `nightshift.ladder.rung` (`rule`, `first`, `later`, `person`, `deadline`, `none`, `_OTHER`), `nightshift.ladder.tries` (int) and `nightshift.ladder.cost_usd` (rounded to the cent, when all of it is known). A Decision's climb also has `nightshift.ladder.unsure` (boolean). |
 | `nightshift.gate.answered` | `nightshift.gate.by` (`person`, `deadline`). `nightshift.gate.via` (`web`, `phone`, `lock_screen`, `_OTHER`). `nightshift.gate.wait` (seconds). `nightshift.gate.has_deadline` and `nightshift.gate.is_form` (booleans). |
 | `nightshift.run.scored` | `nightshift.run.id` (a hash). `nightshift.score.name` (`gate_decision`, `useful`, `pr_merged`, `pr_closed`, `reverted_within_7d`, `_OTHER`). `nightshift.score.value` (1 for yes, 0 for no). Optional `nightshift.score.hours`: for a pull request score, the hours from when the run opened it. |
 | `nightshift.install.active` | `os.type`. `host.arch`. `service.version`. `nightshift.install.spaces` and `nightshift.install.members` (`0`, `1`, `2-4`, `5+`). `nightshift.install.agents` (int). `nightshift.host.paired` and `nightshift.phone.signed_in` (booleans). |
 | `nightshift.knowledge.document_measured` | `nightshift.project.id` (a hash). `nightshift.knowledge.document.kilobytes` (int). |
 | `nightshift.process.crashed` | `error.type`. |
 
-`useful` is a person's answer to "Was this run useful?". A schedule that scores pull requests sends `pr_merged`, `pr_closed` and `reverted_within_7d`. Night Shift does not send a score that a flow names itself as usage.
+`useful` is a person's answer to "Was this run useful?". A schedule that scores pull requests sends `pr_merged`, `pr_closed` and `reverted_within_7d`. Night Shift does not send a number that a flow reports as usage, not even how many there are.
+
+A climb is the tries of one node up its ladder, up to the step it landed on. The rung says where it landed: a rule, the first tier, a later tier, a person, the deadline of a person's Gate, or none. The name of a tier stays on your computer, because you choose it.
 
 ## Retired events
 
