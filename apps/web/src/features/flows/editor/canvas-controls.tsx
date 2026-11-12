@@ -1,4 +1,4 @@
-import type { Flow, NewNodeKind } from "@nightshift/flows";
+import type { Flow, NewNodeKind, Position } from "@nightshift/flows";
 import { addNode, type NodeDefaults } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import { ButtonGroup } from "@nightshift/ui/components/button-group";
@@ -23,20 +23,30 @@ import type { SelectionSetter } from "./selection";
 /** Below the node a new one lands on, so repeated adds do not stack exactly. */
 const ADD_OFFSET = 32;
 
+/** `position`, nudged down and right past nodes that already sit on that spot. */
+export function freeSpot(flow: Flow, position: Position): Position {
+	let spot = { x: Math.round(position.x), y: Math.round(position.y) };
+	while (
+		flow.nodes.some(
+			(node) =>
+				Math.abs(node.position.x - spot.x) < ADD_OFFSET &&
+				Math.abs(node.position.y - spot.y) < ADD_OFFSET,
+		)
+	) {
+		spot = { x: spot.x + ADD_OFFSET, y: spot.y + ADD_OFFSET };
+	}
+	return spot;
+}
+
 /**
- * Adds a node and selects it: where it was dropped (`at`, a point on the
- * screen), or else in the middle of the visible canvas, a third from the
- * top. Nudged past nodes already on that spot.
+ * Where a new node lands on the canvas: at a point on the screen (`at`),
+ * or else in the middle of the visible canvas, a third from the top. Its
+ * middle sits there. Nudged past nodes already on that spot.
  */
-export function useAddNode(
-	flow: Flow,
-	onFlowChange: (change: (flow: Flow) => Flow) => void,
-	onSelect: SelectionSetter,
-	defaults: NodeDefaults | undefined,
-) {
+export function useNewNodeSpot() {
 	const { screenToFlowPosition } = useReactFlow();
 	const store = useStoreApi();
-	return (type: NewNodeKind, at?: { x: number; y: number }) => {
+	return (flow: Flow, at?: { x: number; y: number }): Position => {
 		const rect = store.getState().domNode?.getBoundingClientRect();
 		const center = at
 			? screenToFlowPosition(at)
@@ -46,18 +56,23 @@ export function useAddNode(
 						y: rect.top + rect.height / 3,
 					})
 				: { x: 0, y: 0 };
-		// Nudge down past nodes that already sit on that spot.
-		let position = { x: Math.round(center.x - 120), y: Math.round(center.y) };
-		while (
-			flow.nodes.some(
-				(node) =>
-					Math.abs(node.position.x - position.x) < ADD_OFFSET &&
-					Math.abs(node.position.y - position.y) < ADD_OFFSET,
-			)
-		) {
-			position = { x: position.x + ADD_OFFSET, y: position.y + ADD_OFFSET };
-		}
-		const result = addNode(flow, type, position, defaults);
+		return freeSpot(flow, { x: center.x - 120, y: center.y });
+	};
+}
+
+/**
+ * Adds a node and selects it: where it was dropped (`at`, a point on the
+ * screen), or else in the middle of the visible canvas (`useNewNodeSpot`).
+ */
+export function useAddNode(
+	flow: Flow,
+	onFlowChange: (change: (flow: Flow) => Flow) => void,
+	onSelect: SelectionSetter,
+	defaults: NodeDefaults | undefined,
+) {
+	const spot = useNewNodeSpot();
+	return (type: NewNodeKind, at?: { x: number; y: number }) => {
+		const result = addNode(flow, type, spot(flow, at), defaults);
 		onFlowChange(() => result.flow);
 		onSelect({ kind: "node", id: result.id });
 	};

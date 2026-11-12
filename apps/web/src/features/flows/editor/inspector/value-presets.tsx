@@ -16,6 +16,7 @@ import {
 	type ValueNode,
 	type ValuePresetInput,
 	type ValuePresetName,
+	type ValuePresetResult,
 	valuePreset,
 } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
@@ -109,10 +110,7 @@ export function ValuePresetMenu({
 }: {
 	flow: Flow;
 	node: ValueNode;
-	onUse: (made: {
-		expression: string;
-		output: Record<string, unknown>;
-	}) => void;
+	onUse: (made: ValuePresetResult) => void;
 }) {
 	const [preset, setPreset] = useState<ValuePresetName | null>(null);
 	return (
@@ -150,7 +148,8 @@ export function ValuePresetMenu({
 						<PresetForm
 							preset={preset}
 							flow={flow}
-							node={node}
+							nodeId={node.id}
+							replaces={(node.expression ?? "").trim() !== ""}
 							onUse={(made) => {
 								onUse(made);
 								setPreset(null);
@@ -163,26 +162,39 @@ export function ValuePresetMenu({
 	);
 }
 
-function PresetForm({
+/**
+ * The form of one preset, inside a Dialog: the list, the fields, and Use.
+ * The inspector fills the Value it is on. The add-node dialog adds a new
+ * Value with what it makes, in one change. `nodeId` is the Value, whose own
+ * lists it leaves out. `from` is a node whose lists come first. With
+ * `onBack`, the form goes back instead of closing the dialog.
+ */
+export function PresetForm({
 	preset,
 	flow,
-	node,
+	nodeId,
+	replaces,
+	from,
 	onUse,
+	onBack,
 }: {
 	preset: ValuePresetName;
 	flow: Flow;
-	node: ValueNode;
-	onUse: (made: {
-		expression: string;
-		output: Record<string, unknown>;
-	}) => void;
+	nodeId?: string;
+	/** The Value has an expression: Use replaces it, and the form says so. */
+	replaces: boolean;
+	from?: string;
+	onUse: (made: ValuePresetResult) => void;
+	onBack?: () => void;
 }) {
 	const id = useId();
 	const flows = useProjectFlowMap();
-	const sources = useMemo(
-		() => presetSources(templateScope(flow, { flows }), node.id),
-		[flow, flows, node.id],
-	);
+	const sources = useMemo(() => {
+		const all = presetSources(templateScope(flow, { flows }), nodeId ?? "");
+		if (from === undefined) return all;
+		const mine = (source: PresetSource) => source.ref.startsWith(`${from}.`);
+		return [...all.filter(mine), ...all.filter((source) => !mine(source))];
+	}, [flow, flows, nodeId, from]);
 	// Filter and Sort start on the first field of an item; Remove duplicates on the whole item.
 	const firstField = (ref: string) => {
 		if (preset === "unique") return "";
@@ -201,7 +213,6 @@ function PresetForm({
 	const fields = source ? itemFields(source.item) : [];
 	const input = inputOf(preset, values);
 	const meta = VALUE_PRESETS.find((entry) => entry.name === preset);
-	const replaces = (node.expression ?? "").trim() !== "";
 
 	return (
 		<form
@@ -400,9 +411,15 @@ function PresetForm({
 				) : null}
 			</FieldGroup>
 			<DialogFooter>
-				<DialogClose render={<Button variant="outline" type="button" />}>
-					Cancel
-				</DialogClose>
+				{onBack ? (
+					<Button variant="outline" type="button" onClick={onBack}>
+						Back
+					</Button>
+				) : (
+					<DialogClose render={<Button variant="outline" type="button" />}>
+						Cancel
+					</DialogClose>
+				)}
 				<Button type="submit" disabled={input === null}>
 					Use {meta?.label}
 				</Button>

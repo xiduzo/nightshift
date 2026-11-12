@@ -297,7 +297,10 @@ export function FlowInspector({
 				defaultOpen={flow.nodes.length <= 1}
 			>
 				<ul className="flex list-disc flex-col gap-1.5 pl-4 text-muted-foreground text-xs leading-relaxed marker:text-border">
-					<li>Add a node with the buttons on the left of the canvas.</li>
+					<li>
+						To add a node, press <Kbd>Tab</Kbd> or double-click the canvas. The
+						buttons on the left add one too.
+					</li>
 					<li>
 						Drag from an outcome dot on the right of a node to another node to
 						add an edge.

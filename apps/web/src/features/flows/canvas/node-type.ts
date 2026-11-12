@@ -5,7 +5,9 @@ import {
 	type FlowNode,
 	type FlowNodeType,
 	type NewNodeKind,
+	NODE_FAMILY,
 	NODE_TYPE_LABEL,
+	type NodeFamily,
 	type ValueBy,
 } from "@nightshift/flows";
 import {
@@ -145,6 +147,32 @@ export function paletteMeta(item: PaletteItem): NodeMeta {
 	if (item === "branch") return DECISION_KIND.rule;
 	return NODE_TYPE[item];
 }
+
+/** The family of a node: its role (`NODE_FAMILY`). */
+export function nodeFamily(node: FlowNode): NodeFamily {
+	return NODE_FAMILY[node.type];
+}
+
+/** The tint of each family, as a colour (`--family-*` in `index.css`). */
+export const FAMILY_TINT: Record<NodeFamily, string> = {
+	do: "var(--family-do)",
+	decide: "var(--family-decide)",
+	shape: "var(--family-shape)",
+	hold: "var(--family-hold)",
+	compose: "var(--family-compose)",
+};
+
+/**
+ * An icon tile in its family's tint: a light wash and the icon in the
+ * tint. In the dock and the add-node dialog, where no run status shows.
+ */
+export const FAMILY_TILE: Record<NodeFamily, string> = {
+	do: "bg-family-do/15 text-family-do dark:bg-family-do/15",
+	decide: "bg-family-decide/15 text-family-decide dark:bg-family-decide/15",
+	shape: "bg-family-shape/15 text-family-shape dark:bg-family-shape/15",
+	hold: "bg-family-hold/15 text-family-hold dark:bg-family-hold/15",
+	compose: "bg-family-compose/15 text-family-compose dark:bg-family-compose/15",
+};
 
 /** How an End node ends the run, in words. */
 export const END_STATUS_LABEL: Record<EndStatus, string> = {

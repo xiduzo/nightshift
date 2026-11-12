@@ -46,6 +46,8 @@ import {
 	CALL_EACH_ICON,
 	DECIDED_BY_ICON,
 	END_STATUS_LABEL,
+	FAMILY_TINT,
+	nodeFamily,
 	nodeMeta,
 	VALUE_BY_ICON,
 } from "./node-type";
@@ -308,7 +310,8 @@ const CARD_OVERVIEW_TEXT_MAX = 24;
  * A node on the canvas: a compact chip with the node's icon, id and one line
  * under it, then one row per outcome with its handle. The icon tile carries
  * the state: a run's step state on its corner, and the tile tinted by that
- * state or by the node's issues. In a run, the outcome the step ended on
+ * state or by the node's issues. Else, outside a run, the tile takes the tint
+ * of the node's family. In a run, the outcome the step ended on
  * lights up on its own row. The rest of the node shows in the inspector.
  */
 const FlowNodeCard = memo(function FlowNodeCard({
@@ -336,14 +339,18 @@ const FlowNodeCard = memo(function FlowNodeCard({
 	const StateIcon = state?.icon;
 	const running = run?.state === "running";
 	const waiting = run?.state === "waiting";
-	// The tile takes the run state's colour, else the colour of the worst issue.
+	// The tile takes the run state's colour, else the colour of the worst
+	// issue, else its family's tint. A run view shows no tint: there, a
+	// colour is a state.
 	const tileColor =
 		state?.color ??
 		(errors.length > 0
 			? "var(--destructive)"
 			: warnings.length > 0
 				? "var(--status-waiting)"
-				: undefined);
+				: run === undefined
+					? FAMILY_TINT[nodeFamily(node)]
+					: undefined);
 	// The variables the node sets when its step ends, each once.
 	const writes = [...new Set((node.set ?? []).map((write) => write.variable))];
 

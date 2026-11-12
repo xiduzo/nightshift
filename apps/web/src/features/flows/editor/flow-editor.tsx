@@ -75,6 +75,8 @@ import { CopyFlowDialog } from "../move/copy-flow-dialog";
 import { saveFile } from "../move/flow-file";
 import { flowMutations, flowQueries } from "../queries";
 import { StartRunDialog } from "../start/start-run-dialog";
+import { AddNodeDialog } from "./add-node/add-node-dialog";
+import { useAddNodeDialog } from "./add-node/use-add-node-dialog";
 import { useAddNode } from "./canvas-controls";
 import { useFlowClipboard } from "./clipboard/use-flow-clipboard";
 import { EdgeInspector } from "./edge-inspector";
@@ -594,6 +596,16 @@ function Editor({
 					...clipboard,
 				};
 
+	// The add-node dialog: Tab, a double-click on the canvas, or the dock.
+	const addNodeDialog = useAddNodeDialog({
+		flow: draft,
+		setDraft: setDraftInOpen,
+		selection,
+		setSelection,
+		defaults: nodeDefaults,
+		disabled: Boolean(preview) || subflows.inside,
+	});
+
 	const previewCheck = useMemo(
 		() =>
 			preview &&
@@ -858,6 +870,7 @@ function Editor({
 										onMakeSection={makeSection}
 										onDropNode={addNode}
 										onNodeDoubleClick={subflows.enterNode}
+										onPaneDoubleClick={addNodeDialog.show}
 										openSection={preview ? null : openSection}
 										onOpenSection={setOpenSection}
 										flowLabel={name}
@@ -912,6 +925,7 @@ function Editor({
 								<>
 									<NodeDock
 										onAdd={(type) => addNode(type)}
+										onSearch={() => addNodeDialog.show()}
 										onDragChange={setDragging}
 										className="pointer-events-auto absolute top-1/2 left-3 -translate-y-1/2"
 									/>
@@ -973,6 +987,7 @@ function Editor({
 							</OpenFlowContext.Provider>
 						) : null}
 					</div>
+					<AddNodeDialog {...addNodeDialog.props} />
 				</ProjectFlowsContext.Provider>
 			</DeviceNamesContext.Provider>
 

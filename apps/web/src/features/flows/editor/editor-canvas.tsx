@@ -156,6 +156,7 @@ export function EditorCanvas({
 	onMakeSection,
 	onDropNode,
 	onNodeDoubleClick,
+	onPaneDoubleClick,
 	openSection,
 	onOpenSection,
 	flowLabel,
@@ -176,6 +177,8 @@ export function EditorCanvas({
 	onDropNode: (type: PaletteItem, at: { x: number; y: number }) => void;
 	/** A node was double-clicked, for example a Subflow to look inside. */
 	onNodeDoubleClick?: (nodeId: string) => void;
+	/** The empty canvas was double-clicked at this point of the screen: add a node there. */
+	onPaneDoubleClick?: (at: { x: number; y: number }) => void;
 	/** The Section whose nodes alone show, or null for the whole flow. */
 	openSection: string | null;
 	onOpenSection: (sectionId: string | null) => void;
@@ -613,6 +616,18 @@ export function EditorCanvas({
 							const sectionId = sectionIdOf(node.id);
 							if (sectionId === undefined) onNodeDoubleClick?.(node.id);
 							else onOpenSection(sectionId);
+						}}
+						// A double-click on the empty canvas adds a node there. It
+						// does not zoom. A Section box still opens on one.
+						zoomOnDoubleClick={false}
+						onDoubleClick={(event) => {
+							if (preview) return;
+							const target = event.target;
+							if (
+								target instanceof Element &&
+								target.classList.contains("react-flow__pane")
+							)
+								onPaneDoubleClick?.({ x: event.clientX, y: event.clientY });
 						}}
 						onSelectionStart={() => {
 							boxSelecting.current = true;

@@ -106,7 +106,34 @@
 	--metric-needed-tile-foreground: var(--color-amber-950);
 }
 
+/*
+ * Family tints: the role of a node type on its icon tile, in the editor,
+ * the node dock and the add-node dialog. A run view shows the run status
+ * instead, so a tint never reads as a status. Each icon keeps a contrast of
+ * at least 3:1 on its tile (the tint at 15–18% over the card).
+ */
+:root {
+	--family-do: var(--color-indigo-600);
+	--family-decide: var(--color-fuchsia-600);
+	--family-shape: var(--color-teal-700);
+	--family-hold: var(--color-sky-600);
+	--family-compose: var(--muted-foreground);
+}
+
+.dark {
+	--family-do: var(--color-indigo-400);
+	--family-decide: var(--color-fuchsia-400);
+	--family-shape: var(--color-teal-400);
+	--family-hold: var(--color-sky-400);
+	--family-compose: var(--muted-foreground);
+}
+
 @theme inline {
+	--color-family-do: var(--family-do);
+	--color-family-decide: var(--family-decide);
+	--color-family-shape: var(--family-shape);
+	--color-family-hold: var(--family-hold);
+	--color-family-compose: var(--family-compose);
 	--color-status-running: var(--status-running);
 	--color-status-finished: var(--status-finished);
 	--color-status-stopped: var(--status-stopped);
