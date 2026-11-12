@@ -17,11 +17,12 @@ Your phone needs a [Host](Computers-and-Hosts.md#run-a-host).
 
 | Tab | Shows |
 | --- | --- |
-| **Watch** | What needs you, how your latest day of runs went, and what runs now. Pause tonight's schedules, or run one now. |
+| **Watch** | What needs you, how your latest day of runs went, the latest reports, and what runs now. Pause tonight's schedules, or run one now. |
 | **Needs you** | The Gates and Asks that wait, with their count. |
-| **Runs** | The runs, their steps, transcripts, and changed files. |
+| **Runs** | The runs, their steps, reports, transcripts, and changed files. |
 
 - **Answer** a Gate, or a simple Ask.
+- **Read a report.** A run can end with a report from its End node. The run screen shows its start. Tap **Read all** to read all of it, and select text to copy it. A picture in a report shows as a link.
 - **Start a flow** with its inputs.
 - **The lock screen.** Approve or reject a Gate with two options, when its node allows it.
 - **A Live Activity** follows a run on the lock screen.
@@ -35,3 +36,5 @@ A push tells you what waits, and nothing more:
 - A run finished, or failed.
 - A step waits for a computer that is offline.
 - A schedule did not start.
+
+A report never sends a push. **Latest reports** on Watch shows the newest report of up to three flows from the last 7 days.
