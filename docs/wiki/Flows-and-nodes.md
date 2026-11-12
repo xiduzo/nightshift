@@ -153,7 +153,7 @@ A **Service** starts a process for the next steps and stops it when the run leav
 A **Since last run** node remembers what it saw. The next run gets only what is new or changed.
 
 - **A list.** Give it a list, such as `{{feed.data.items}}`, and the key of an item, such as `link`. An item with a key it never saw is new. An item with other fields than last time is changed. **Compare** sets the fields that count.
-- **A value.** Give it one value, such as `{{price.data.usd}}`. A rule over `previous` and `current` says when it changed: `current > 100 and previous <= 100`. Without a rule, any change counts.
+- **A value.** Give it one value, such as `{{price.data.usd}}`. A rule over `previous` and `current` says when it changed: `current > 100 and previous <= 100`. Without a rule, any change counts. Nodes and inputs cannot use these two names.
 - **Outcomes.** `new` when anything is new, else `changed`, else `same`. Each one ends the run when no edge leaves on it.
 - **Data.** `{{fresh.data.new}}` and `{{fresh.data.changed}}` hold the items. `first_run` is true when it remembered nothing yet.
 - **The first run.** On its first run, everything is new. Set **First run** to **Nothing is new** to only remember what is there.
