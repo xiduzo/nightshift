@@ -46,7 +46,7 @@ function StandIn({
 				<ItemTitle>{standInLabel(test)}</ItemTitle>
 				<ItemDescription>
 					{test === "skipped" ? (
-						"The node did not run. The run went on with the outcome you chose."
+						"The node did not run. It gave the outcome you chose."
 					) : from ? (
 						<>
 							From the run of{" "}
