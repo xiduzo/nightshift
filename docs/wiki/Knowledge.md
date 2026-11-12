@@ -42,7 +42,7 @@ To search by meaning on your own computer:
 
 1. Install Ollama from https://ollama.com.
 2. Open **Settings**, then **Meaning search**.
-3. Click **Download**, or run `ollama pull qwen3-embedding:0.6b` (639 MB).
+3. Click **Download** (639 MB).
 
 The Docker image has Ollama inside. A Host starts it by itself, and downloads the model at its first start. The Knowledge page tells you when search by meaning stopped.
 

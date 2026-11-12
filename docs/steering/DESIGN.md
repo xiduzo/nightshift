@@ -7,7 +7,7 @@ Last updated: 2026-11-11
 ## Design Principles
 
 1. **Show the facts, not a mood** — Every status on screen comes from a fact the user can open: an event, a step's output, a check. No spinner without a session behind it.
-2. **The gate is the product** — The "Needs you" inbox is the most important screen. Its list, as in a mail app, shows the open gates of every Space you are in, grouped by urgency: Now, Today, When you have time. The oldest is first in each group. An answered gate does not go away: it moves to "Answered" below, dimmed, for 90 days. Home sums up the day. The open gate reads as a handover on the left: who asks, the title, then Situation, Background and Recommendation, then the details and links. Your answer is on the right: the options as cards, each with what it does, and a note. The right side stays in place while you read. To resolve a gate takes two actions: pick a choice, then send. Nothing goes out by accident.
+2. **The gate is the product** — The "Needs you" inbox is the most important screen. Its list, as in a mail app, shows the open gates of every Space you are in, grouped by urgency: Now, Today, When you have time. The oldest is first in each group. An answered gate does not go away: it moves to "Answered" below, dimmed, for 90 days. Home shows what needs you, and what came out. The open gate reads as a handover on the left: who asks, the title, then Situation, Background and Recommendation, then the details and links. Your answer is on the right: the options as cards, each with what it does, and a note. The right side stays in place while you read. To resolve a gate takes two actions: pick a choice, then send. Nothing goes out by accident.
 3. **Calm by default** — An unattended run is quiet. The UI shows only changes that need a person. Noise goes to the transcript. A notification goes out only for a gate, a finished run, a failed run or a step that waits for an offline device. It goes only to the screens the person chose, outside their quiet hours.
 4. **Night Shift's words, the flow's content** — The UI names what Night Shift does in the glossary's words: flow, run, step, Gate. The words of a method or a domain (Epic, Trace, a lead) show only as the content of a flow: its names, prompts and outputs. No screen belongs to one method.
 5. **Readable for anyone** — No terminal metaphors. A session is a transcript. A takeover is a button that copies a command.
@@ -152,7 +152,7 @@ A stat card or a table row can open a details dialog (`apps/web/src/features/das
 - A header with the trail ("project › Runs") and a title.
 - `DetailsTabs`: Overview first, then one tab per view (a breakdown per flow or project, the latest or top rows). A tab can carry a count badge for what needs attention (problems, open runs, waiting Gates).
 - One range toggle on the right of the tabs. It drives every tab.
-- Overview: 4 `Stat` cards, then one chart. Other tabs: one list or table, at most 5 rows (see Overview lists).
+- Overview: 3 to 6 `Stat` cards, then one chart. Flow health has 6, in two rows of three. Other tabs: one list or table, at most 5 rows (see Overview lists).
 - Each tab has its own empty state. A footer links to the full page.
 
 ### Flow health

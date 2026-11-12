@@ -28,7 +28,7 @@ flowchart LR
 | Node | Does |
 | --- | --- |
 | **Agent** | Runs one agent session with a prompt, and optionally a skill. Ends with an outcome and, if you ask, data that matches a JSON schema. It can ask you a question and continue the same session with your answer. |
-| **Command** | Runs a shell command in the project, for example `curl` to call an API, or the tests. Its exit code picks the outcome. |
+| **Command** | Runs a shell command in the project, for example a CLI or a script. Its exit code picks the outcome. |
 | **Tool** | Calls one tool of an MCP server with typed arguments. No model in the loop. |
 | **Web request** | Sends one request to a web address and gives the answer as data: its status, headers and body. No shell and no project folder. |
 | **Decision** | Picks one of its options. A person picks it in a **Gate**, a rule picks it in a **Branch**, or a model picks it. |

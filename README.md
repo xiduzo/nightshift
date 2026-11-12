@@ -118,8 +118,8 @@ bun run dev            # web UI on :3001, API on :3000
 
 Then, in Night Shift:
 
-1. **Add your agents.** The Agents page shows the agent CLIs that it finds on this computer, such as `claude`, `codex`, or `pi`. Add a profile for each one that you want.
-2. **Add a project.** Choose its folder, or copy a repository from GitHub. A folder without git gets a **Set up git** button. Keep "Add the starter flows" on, and choose which of your agents runs each part.
+1. **Add your agents.** No agent yet? On Home, **Get started** installs Claude Code or Codex and signs you in. The Agents page shows the agent CLIs that it finds on this computer, such as `claude`, `codex`, or `pi`. Add a profile for each one that you want.
+2. **Add a project.** Choose its folder, copy a repository from GitHub, or choose **No folder**. A folder without git gets a **Set up git** button. For a project with a folder, keep "Add the starter flows" on, and choose which of your agents runs each part.
 3. **Run a starter.** Open `scout-and-pick`, and start a run with a topic you care about. Night Shift asks you to pick one of the candidates that an agent finds. Another agent then writes a report on your pick into the project's knowledge.
 
 [Get started](https://github.com/xiduzo/nightshift/wiki/Get-started) in the user guide tells the rest.
