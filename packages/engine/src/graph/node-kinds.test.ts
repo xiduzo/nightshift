@@ -68,6 +68,12 @@ const callEach = (source: Record<string, unknown> = { kind: "json" }) =>
 	call({ each: { source } });
 const end = (status: EndNode["status"] = "done") =>
 	node<EndNode>({ type: "end", status });
+const reportFile = () =>
+	node<EndNode>({
+		type: "end",
+		status: "done",
+		report: { kind: "file", path: "report.md" },
+	});
 const join = (fields: Record<string, unknown> = {}) =>
 	node<JoinNode>({ type: "join", wait: "all", ...fields });
 const lease = (fields: Record<string, unknown> = {}) =>
@@ -597,10 +603,29 @@ describe("connections and requirements: what run start asks", () => {
 		).toEqual([null]);
 	});
 
-	test("a Command, a Tool, a Call and an End require nothing of their own", async () => {
-		for (const type of ["command", "tool", "call", "end"] as const) {
+	test("a Command, a Tool and a Call require nothing of their own", async () => {
+		for (const type of ["command", "tool", "call"] as const) {
 			expect(NODE_KINDS[type].requirements).toEqual([]);
 		}
+	});
+
+	test("an End that reads its report from a file requires a Device that reads files", async () => {
+		const current = await has();
+		const older = { ...current, readFiles: undefined, elsewhere: "nas" };
+		const report = { kind: "text" as const, text: "## News" };
+		expect(
+			NODE_KINDS.end.requirements.map((r) =>
+				r([end(), { ...end(), report }], older),
+			),
+		).toEqual([null]);
+		expect(
+			NODE_KINDS.end.requirements.map((r) => r([reportFile()], older)),
+		).toEqual([
+			"The flow ends with a report from a file (n), but nas runs an older version of Night Shift. Update Night Shift on nas.",
+		]);
+		expect(
+			NODE_KINDS.end.requirements.map((r) => r([reportFile()], current)),
+		).toEqual([null]);
 	});
 
 	test("a Web request and a Wait for a URL require a Device that sends web requests", async () => {
@@ -657,6 +682,7 @@ describe("works: what a step needs of its Device", () => {
 		expect(works(callEach())).toBe("worktree");
 		expect(works(call())).toBeNull();
 		expect(works(end())).toBeNull();
+		expect(works(reportFile())).toBe("worktree");
 		expect(works(sinceLastRun())).toBeNull();
 		expect(works(convert())).toBeNull();
 	});
