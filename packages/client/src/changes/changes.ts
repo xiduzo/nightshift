@@ -1,8 +1,11 @@
+import type { AppRouterClient } from "@nightshift/api/client";
+
 /**
  * What a write changes, and which reads that makes stale: the one table of
  * both apps. The live cache reads these again when the stream says
- * something changed. The query client keeps the reads a synced document
- * holds fresh until it changes.
+ * something changed, and when a save on this screen answers (`SAVES`). The
+ * query client keeps the reads a synced document holds fresh until it
+ * changes.
  */
 
 /**
@@ -25,19 +28,44 @@ export type DocumentKind =
 	| "device-copy";
 
 /**
- * What a write changes: a synced document, or a write the stream tells
- * without one. `runs`: a run started, changed or ended. `projects`: a Host
- * changed the Space's projects. `pause`: a pause tonight began or ended.
- * `learnings`: a person kept or deleted learnings. `sources`: a run of a
- * knowledge source started or ended.
+ * A write the stream tells without a document. `runs`: a run started,
+ * changed or ended. `projects`: a Host changed the Space's projects.
+ * `pause`: a pause tonight began or ended. `learnings`: a person kept or
+ * deleted learnings. `sources`: a run of a knowledge source started or
+ * ended.
  */
-export type Change =
-	| DocumentKind
-	| "runs"
-	| "projects"
-	| "pause"
-	| "learnings"
-	| "sources";
+type StreamChange = "runs" | "projects" | "pause" | "learnings" | "sources";
+
+/**
+ * A write that only the screen that saves knows of: the stream does not
+ * tell it, so other screens see it when they read again. `secrets`: a
+ * secret the Host keeps (of a project, of the Space, Personal). `members`:
+ * the Members of the Space and its invitations. `run-memory`: the kept
+ * values and what the Since last run nodes saw. `programs`: the programs
+ * found on this computer. `copies`: the copies of projects to this
+ * computer. `run-copies`: a run's own copy and branches. `git`: the git
+ * setup of a folder. `ollama`: the models of Ollama. `usage`: the
+ * anonymous usage of this computer. `screens`: the screens that get
+ * notifications. `devices`: the Person's Devices, pairings and phones.
+ * `logins`: the login of a CLI tool. `account`: how the owner signs in.
+ */
+type SaveChange =
+	| "secrets"
+	| "members"
+	| "run-memory"
+	| "programs"
+	| "copies"
+	| "run-copies"
+	| "git"
+	| "ollama"
+	| "usage"
+	| "screens"
+	| "devices"
+	| "logins"
+	| "account";
+
+/** What a write changes: a synced document, or a write without one. */
+export type Change = DocumentKind | StreamChange | SaveChange;
 
 /** The reads a change makes stale. */
 type Stale = {
@@ -155,7 +183,192 @@ const STALE: {
 	},
 	// A copy of another computer's document: the Devices, and the Offers.
 	"device-copy": { also: [["devices"], ["offers"]] },
+	// The Secrets page lists this computer's and the Personal secrets.
+	secrets: {
+		also: [
+			["projects", "secrets"],
+			["projects", "spaceSecrets"],
+			["connections", "list"],
+		],
+	},
+	members: { also: [["members"]] },
+	"run-memory": {
+		also: [
+			["flows", "kept"],
+			["flows", "memory"],
+		],
+	},
+	programs: { also: [["programs"]] },
+	copies: { also: [["projects", "copies"]] },
+	"run-copies": { also: [["projects", "runCopies"]] },
+	git: { also: [["projects", "check"]] },
+	ollama: { also: [["ollama"]] },
+	usage: { also: [["usage"]] },
+	// The settings name the screens too.
+	screens: { also: [["notifications"]] },
+	devices: { also: [["devices"]] },
+	// The tools list their logins, and the connections list them.
+	logins: {
+		also: [
+			["cliTools", "list"],
+			["connections", "list"],
+		],
+	},
+	account: { also: [["account"]] },
 };
+
+/** The dotted path of each procedure under `Prefix` (`flows.save`). */
+type PathsOf<T, Prefix extends string = ""> = {
+	[K in keyof T & string]: T[K] extends (...args: never[]) => unknown
+		? `${Prefix}${K}`
+		: PathsOf<T[K], `${Prefix}${K}.`>;
+}[keyof T & string];
+
+/** A procedure of the API, by its dotted path (`flows.save`). */
+type RoutePath = PathsOf<AppRouterClient>;
+
+/**
+ * What each save route writes, once it answers: the one place that says
+ * what a save makes stale. While the live cache follows the Host, a save
+ * that succeeds reads these again, so a screen needs no read of its own.
+ * A test checks that every route of the API that is not a read has a row.
+ *
+ * An empty row: the screen owns the read (`useRunActed`, `useAnswerGate`,
+ * `useSettleLearnings`, or `spaceChanged` when every read changes), a job
+ * that the screen follows (its end calls `changed`), or nothing a screen
+ * reads changes. A row names a document the route writes only for
+ * some inputs too. It never names what changes later: another computer
+ * moves its own secret, and its copy here follows with the stream.
+ */
+export const SAVES: {
+	readonly [Route in RoutePath]?: readonly Change[];
+} = {
+	// Every read changes with the Space a person works in.
+	"spaces.switch": [],
+	"spaces.create": [],
+	"invitations.accept": [],
+	"spaces.setUsage": ["space"],
+	"members.invite": ["members"],
+	"members.cancelInvitation": ["members"],
+	"members.setRole": ["members"],
+	"members.remove": ["members"],
+
+	"projects.add": ["space"],
+	"projects.addWithoutFolder": ["space"],
+	"projects.useFolder": ["space"],
+	"projects.rename": ["space"],
+	"projects.remove": ["space"],
+	"projects.move": ["space"],
+	"projects.copyHere": ["copies"],
+	// A copy from GitHub is a job: the screen follows it (`gitHubClone`).
+	"projects.cloneFromGitHub": [],
+	"projects.setUpGit": ["git"],
+	// The installer runs on its own: the person checks again.
+	"projects.installGit": [],
+	"projects.removeRunCopy": ["run-copies"],
+	"projects.deleteRunBranches": ["run-copies"],
+	"projects.setSecret": ["secrets"],
+	"projects.removeSecret": ["secrets"],
+	"projects.moveSecretOut": ["secrets"],
+	"projects.moveSecretIn": ["secrets"],
+	"projects.moveSecretFromDevice": ["secrets"],
+	"projects.setSpaceSecret": ["secrets"],
+	"projects.removeSpaceSecret": ["secrets"],
+	"projects.moveSecretToSpace": ["secrets"],
+	"projects.moveSecretFromSpace": ["secrets"],
+
+	"flows.save": ["flows", "flows-history"],
+	"flows.restore": ["flows", "flows-history"],
+	"flows.import": ["flows", "flows-history"],
+	"flows.copy": ["flows", "flows-history"],
+	"flows.remove": ["flows"],
+	"flows.dismissNotice": ["flows"],
+	"flows.resetKept": ["run-memory"],
+	"flows.forgetMemory": ["run-memory"],
+	"schedules.save": ["flows"],
+	"schedules.pauseTonight": ["pause"],
+	"schedules.resumeTonight": ["pause"],
+
+	"knowledge.saveSource": ["flows"],
+	"knowledge.removeSource": ["flows", "knowledge"],
+	"knowledge.syncSource": ["runs", "sources"],
+	"knowledge.markNotTopic": ["knowledge"],
+	"knowledge.markQuestion": ["knowledge"],
+	"knowledge.setMeaning": ["knowledge"],
+	"knowledge.keepLearning": [],
+	"knowledge.deleteLearning": [],
+
+	"gates.resolve": [],
+	"schedules.runNow": [],
+	"runs.start": [],
+	"runs.stop": [],
+	"runs.resume": [],
+	"runs.restartStep": [],
+	"runs.rerun": [],
+	"runs.move": [],
+	"runs.signal": [],
+	"runs.releaseLease": [],
+	// The screen keeps the answer itself.
+	"runs.useful": [],
+	"runs.takeOver": [],
+
+	// It answers with every setting, and the screen keeps them.
+	"notifications.settings.save": [],
+	"notifications.targets.register": ["screens"],
+	"notifications.targets.remove": ["screens"],
+
+	// The Host's addresses show on the Devices page too.
+	"settings.save": ["device", "devices"],
+	"usage.resetId": ["usage"],
+	"profiles.save": ["device"],
+	"profiles.remove": ["device"],
+	"connections.save": ["device"],
+	"connections.remove": ["device"],
+	// A Personal secret shows in this computer's list.
+	"connections.setSecret": ["device"],
+	"connections.removeSecret": ["device"],
+	"connections.moveSecret": ["device"],
+	"cliTools.save": ["device"],
+	"cliTools.remove": ["device"],
+	"cliTools.signIn": ["logins"],
+	"harnesses.add": ["device"],
+	"harnesses.remove": ["device"],
+	"harnesses.saveCustom": ["device"],
+	"programs.setUp": ["device", "programs"],
+	"offers.make": ["device"],
+	"offers.withdraw": ["device"],
+	"ollama.pull": ["ollama"],
+	// The setup of an agent or a decider is a job.
+	"agentSetup.install": [],
+	"agentSetup.signIn": [],
+	"agentSetup.sendCode": [],
+	"agentSetup.cancel": [],
+	"deciderSetup.installOllama": [],
+	"deciderSetup.useLocal": [],
+	"deciderSetup.useTypesafe": [],
+	"deciderSetup.cancel": [],
+	"account.setLogin": ["account"],
+
+	// That device moves its own value later.
+	"devices.moveSecret": ["secrets"],
+	// It holds the code: no list shows it.
+	"devices.review": [],
+	"devices.approve": ["devices"],
+	"devices.deny": ["devices"],
+	"devices.revoke": ["devices"],
+	"devices.forget": ["devices"],
+	"devices.removePhone": ["devices"],
+	"devices.merge.run": [],
+	"devices.leave": [],
+};
+
+/**
+ * What the save route at `path` (`["flows", "save"]`, the first part of
+ * its mutation key) wrote. None for a route without a row.
+ */
+export function savedBy(path: readonly string[]): readonly Change[] {
+	return SAVES[path.join(".") as RoutePath] ?? [];
+}
 
 /** The order the reads go out in: the order of `STALE`. */
 const CHANGES = Object.keys(STALE) as Change[];

@@ -65,7 +65,6 @@ export function SpaceSecretsPage() {
 				<div className="mx-auto flex w-full max-w-4xl flex-col gap-10">
 					<SharedSecrets
 						query={spaceSecretQueries.list()}
-						listKey={spaceSecretQueries.lists()}
 						actions={spaceSecretActions}
 						words={{
 							title: "Space secrets",

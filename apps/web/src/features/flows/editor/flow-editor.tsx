@@ -4,7 +4,6 @@
 // one draft. The edits themselves live in `node-edits.ts`,
 // `sections/section-edits.ts` and `@nightshift/flows`.
 
-import { useSynced } from "@nightshift/client";
 import type { Flow, FlowIssue } from "@nightshift/flows";
 import {
 	callersOf,
@@ -57,7 +56,6 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CopyProjectHere, notHere, projectQueries } from "@/features/projects";
-import { orpc } from "@/shared/api";
 import { hoverTime } from "@/shared/format";
 import { SiteHeader } from "@/shared/page";
 import { FlowAssistantContext } from "../assistant/flow-assistant";
@@ -158,7 +156,6 @@ function Editor({
 }: Props) {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
-	const synced = useSynced({ orpc });
 	const { fitView } = useReactFlow();
 
 	const { draft, setDraft, undo, redo, canUndo, canRedo, revision } =
@@ -318,11 +315,9 @@ function Editor({
 				flowQueries.get(projectId, name).queryKey,
 				(loaded) => (loaded ? { ...loaded, flow: snapshot, issues } : loaded),
 			);
-			// The lists, the map and the revisions follow, with the stream.
-			synced("flows");
-			synced("flows-history");
+			// The live cache reads the lists, the map and the revisions.
 		},
-		[queryClient, projectId, name, synced],
+		[queryClient, projectId, name],
 	);
 
 	const save = useCallback(() => {
@@ -383,7 +378,6 @@ function Editor({
 			);
 			return;
 		}
-		synced("flows");
 		const next = updateNode(draft, nodeId, (current) =>
 			current.type === "call" ? { ...current, flow: calledName } : current,
 		);
@@ -1080,8 +1074,6 @@ function Editor({
 							made,
 							() => draftRef.current,
 						);
-						// The Subflow view reads the new flow from the project's list.
-						synced("flows");
 					}}
 				/>
 			) : null}

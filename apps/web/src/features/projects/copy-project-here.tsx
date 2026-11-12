@@ -1,3 +1,4 @@
+import { useChanged } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Item,
@@ -13,7 +14,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CloudDownloadIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
-import type { Project } from "@/shared/api";
+import { orpc, type Project } from "@/shared/api";
 import { useChooseProjectFolder } from "./choose-project-folder";
 import { notHere } from "./projects";
 import { projectMutations, projectQueries } from "./queries";
@@ -31,7 +32,7 @@ function onGitHub(project: Pick<Project, "remote">): boolean {
 export function useProjectCopy(
 	project: Pick<Project, "id" | "repoPath" | "folder">,
 ) {
-	const queryClient = useQueryClient();
+	const changed = useChanged({ orpc });
 	const copies = useQuery({
 		...projectQueries.copies(),
 		enabled: notHere(project),
@@ -40,11 +41,10 @@ export function useProjectCopy(
 	const copying = copy?.state === "copying";
 	const wasCopying = useRef(false);
 	useEffect(() => {
-		if (wasCopying.current && !copying) {
-			void queryClient.invalidateQueries({ queryKey: projectQueries.all() });
-		}
+		// The copy is the project's folder here now.
+		if (wasCopying.current && !copying) changed("projects");
 		wasCopying.current = copying;
-	}, [copying, queryClient]);
+	}, [copying, changed]);
 	return copy;
 }
 

@@ -2,8 +2,8 @@
 
 export {
 	type Change,
-	type DocumentKind,
 	documentOf,
 	heldByDocuments,
+	savedBy,
 	staleAfter,
 } from "./changes";

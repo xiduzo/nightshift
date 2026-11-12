@@ -1,12 +1,7 @@
 import { matchQuery, type QueryClient } from "@tanstack/react-query";
 
 import type { ApiQueryUtils } from "../api";
-import {
-	type Change,
-	type DocumentKind,
-	documentOf,
-	staleAfter,
-} from "../changes";
+import { type Change, documentOf, savedBy, staleAfter } from "../changes";
 import {
 	createGateQueries,
 	type GateAnswer,
@@ -65,11 +60,11 @@ type Read =
 	| { kind: "change"; change: Change };
 
 const GATES: Read = { kind: "gates" };
-const changed = (change: Change): Read => ({ kind: "change", change });
+const ofChange = (change: Change): Read => ({ kind: "change", change });
 /** A change of one run: the run, and the lists that count it. */
 const ofRun = (runId: string): readonly Read[] => [
 	{ kind: "run", runId },
-	changed("runs"),
+	ofChange("runs"),
 ];
 
 /**
@@ -90,7 +85,7 @@ const EVERYTHING: readonly Read[] = [
 			"device",
 			"device-copy",
 		] as const
-	).map(changed),
+	).map(ofChange),
 ];
 
 /**
@@ -100,7 +95,7 @@ const EVERYTHING: readonly Read[] = [
  */
 function readsForDocument(name: string): readonly Read[] {
 	const kind = documentOf(name);
-	return kind ? [changed(kind)] : EVERYTHING;
+	return kind ? [ofChange(kind)] : EVERYTHING;
 }
 
 /**
@@ -114,7 +109,7 @@ function readsAfter(item: NotificationItem): readonly Read[] {
 	switch (item.kind) {
 		case "run-finished":
 		case "run-failed":
-			return [...ofRun(item.runId), changed("sources")];
+			return [...ofRun(item.runId), ofChange("sources")];
 		case "run-changed":
 		case "device-wait":
 		case "wait-ended":
@@ -123,11 +118,11 @@ function readsAfter(item: NotificationItem): readonly Read[] {
 		case "gate-closed":
 			return [GATES, ...ofRun(item.runId)];
 		case "schedules-changed":
-			return [changed("pause")];
+			return [ofChange("pause")];
 		case "learnings-changed":
-			return [changed("learnings")];
+			return [ofChange("learnings")];
 		case "projects-changed":
-			return [changed("projects")];
+			return [ofChange("projects")];
 		case "document-changed":
 			return readsForDocument(item.name);
 		default:
@@ -186,6 +181,8 @@ export type LiveCache = {
 	 * notifications of Gates that no longer wait. Each `live` after the
 	 * first reads everything again: items of the time it was down are lost.
 	 * While the stream is down, it reads the open Gates once a minute.
+	 * Meanwhile, each save of this query client that succeeds reads again
+	 * what its route wrote (`SAVES`), so a screen needs no read of its own.
 	 */
 	followHost(options: FollowHostOptions): Promise<void>;
 	/**
@@ -202,12 +199,12 @@ export type LiveCache = {
 	 */
 	runActed(runId: string): void;
 	/**
-	 * A save on this screen wrote a synced document: the flows, their
-	 * history, the knowledge, a Space, or this computer. Reads that
-	 * document again, in the same burst as `document-changed` from the
-	 * stream, so the save and the stream read it once.
+	 * Something on this screen changed what is not a save route the cache
+	 * sees: a job that ended, or a save through the client itself. Reads
+	 * again what the changes make stale, in the same burst as the stream,
+	 * so the change and the stream read it once.
 	 */
-	synced(kind: DocumentKind): void;
+	changed(...changes: Change[]): void;
 	/**
 	 * Follows one run (`followRun`) and hands on what came in, in batches.
 	 * It reads nothing again: the screen lays the steps over what it read
@@ -448,6 +445,16 @@ export function createLiveCache({
 			});
 			const known = queryClient.getQueryState<OpenGate[]>(openKey);
 			if (known?.data) void clearStale(known.data, known.dataUpdatedAt);
+			const stopSaves = queryClient.getMutationCache().subscribe((event) => {
+				if (event.type !== "updated" || event.action.type !== "success") {
+					return;
+				}
+				// An oRPC mutation's key starts with its route (`["flows", "save"]`).
+				const [route] = event.mutation.options.mutationKey ?? [];
+				if (!Array.isArray(route)) return;
+				const changes = savedBy(route);
+				if (changes.length > 0) read(changes.map(ofChange));
+			});
 			try {
 				await followNotifications({
 					client,
@@ -459,6 +466,7 @@ export function createLiveCache({
 				});
 			} finally {
 				stop();
+				stopSaves();
 				stopPolling();
 			}
 		},
@@ -478,8 +486,8 @@ export function createLiveCache({
 			read(ofRun(runId));
 		},
 
-		synced(kind) {
-			read([changed(kind)]);
+		changed(...changes) {
+			read(changes.map(ofChange));
 		},
 
 		async followRun({

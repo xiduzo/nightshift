@@ -1,3 +1,4 @@
+import { useChanged } from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
@@ -15,26 +16,21 @@ import { useNavigate } from "@tanstack/react-router";
 import { CircleAlertIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ollamaQueries, settingsQueries } from "@/features/settings/queries";
-import type {
-	AgentSetupJob,
-	AgentSetupStatus,
-	AgentSetupView,
-	DeciderSetupJob,
-	DeciderSetupStatus,
-	HarnessRowName,
+import {
+	type AgentSetupJob,
+	type AgentSetupStatus,
+	type AgentSetupView,
+	type DeciderSetupJob,
+	type DeciderSetupStatus,
+	type HarnessRowName,
+	orpc,
 } from "@/shared/api";
 import { itemOf } from "../agents-selection";
 import {
 	agentSetupMutations,
 	agentSetupQueries,
-	connectionQueries,
-	deciderQueries,
 	deciderSetupMutations,
 	deciderSetupQueries,
-	harnessQueries,
-	profileQueries,
-	programQueries,
 } from "../queries";
 import { justChosen, offerDecider, readyText } from "./decider-state";
 import { DeciderStep } from "./decider-step";
@@ -105,21 +101,15 @@ function useSetupEnd(
 	status: AgentSetupStatus | undefined,
 	onReady: (ready: ReadyJob) => void,
 ) {
-	const queryClient = useQueryClient();
+	const changed = useChanged({ orpc });
 	const seen = useRef(new Map<HarnessRowName, AgentSetupJob>());
 	useEffect(() => {
 		for (const agent of status?.agents ?? []) {
 			const before = seen.current.get(agent.harness);
 			seen.current.set(agent.harness, agent.job);
 			if (!before || !setupRuns(before) || setupRuns(agent.job)) continue;
-			for (const queryKey of [
-				connectionQueries.checks(),
-				harnessQueries.all(),
-				profileQueries.all(),
-				programQueries.all(),
-			]) {
-				void queryClient.invalidateQueries({ queryKey });
-			}
+			// The job added a harness and a profile, or found the agent.
+			changed("device", "programs");
 			const ready = justReady(before, agent.job);
 			if (!ready) continue;
 			toast.success(`${agent.label} is ready`, {
@@ -127,7 +117,7 @@ function useSetupEnd(
 			});
 			onReady(ready);
 		}
-	}, [status, queryClient, onReady]);
+	}, [status, changed, onReady]);
 }
 
 /** The setup of a decider: the choices, and how a job goes. Quiet when it fails. */
@@ -140,22 +130,16 @@ export function useDeciderSetupStatus() {
 
 /** After a decider is chosen: a toast, and the lists that name it read again. */
 function useDeciderChosen() {
-	const queryClient = useQueryClient();
+	const changed = useChanged({ orpc });
 	return useCallback(
 		(decider: string) => {
 			toast.success("The decider is ready", {
 				description: readyText(decider),
 			});
-			for (const queryKey of [
-				settingsQueries.all(),
-				profileQueries.all(),
-				deciderQueries.list().queryKey,
-				ollamaQueries.all(),
-			]) {
-				void queryClient.invalidateQueries({ queryKey });
-			}
+			// The settings and a Model Profile name it, and Ollama has its model.
+			changed("device", "ollama");
 		},
-		[queryClient],
+		[changed],
 	);
 }
 

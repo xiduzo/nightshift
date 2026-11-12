@@ -3,7 +3,6 @@ import {
 	scheduleLastRuns,
 	scheduleName,
 	scheduleWhen,
-	useSynced,
 } from "@nightshift/client";
 import type { Schedule } from "@nightshift/flows";
 import {
@@ -44,7 +43,6 @@ import {
 } from "@/features/devices";
 import { runQueries } from "@/features/runs/flows-port";
 import type { ScheduleSummary } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { useNow } from "@/shared/format";
 import { flowQueries } from "../queries";
 import { scheduleMutations, scheduleQueries } from "./queries";
@@ -93,7 +91,6 @@ export function useScheduleBoard(
 	projectId: string,
 	showRuns: boolean,
 ): ScheduleBoard {
-	const synced = useSynced({ orpc });
 	const now = useNow(30_000);
 	const list = useQuery(scheduleQueries.listLive(projectId));
 	const [editing, setEditing] = useState<{
@@ -124,7 +121,6 @@ export function useScheduleBoard(
 	const save = useMutation(
 		scheduleMutations.save({
 			onSuccess: (issues) => {
-				synced("flows");
 				const errors = issues.filter((issue) => issue.severity === "error");
 				if (errors.length > 0) {
 					toast.warning(

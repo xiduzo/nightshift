@@ -1,3 +1,4 @@
+import { useChanged } from "@nightshift/client";
 import {
 	Alert,
 	AlertAction,
@@ -54,7 +55,6 @@ import {
 	type UseQueryOptions,
 	useMutation,
 	useQuery,
-	useQueryClient,
 } from "@tanstack/react-query";
 import {
 	CircleAlertIcon,
@@ -67,12 +67,12 @@ import {
 } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-import type { ProjectSecretRow } from "@/shared/api";
+import { orpc, type ProjectSecretRow } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import { useNow } from "@/shared/format";
 import { PageSection } from "@/shared/page";
 import { Ago, SCOPE, SECRET_NAME, UsedBy } from "./connections/secret-parts";
-import { connectionQueries, type SharedSecretActions } from "./queries";
+import type { SharedSecretActions } from "./queries";
 
 /** What a list of shared secrets says: for a project, or for the Space. */
 export type SharedSecretWords = {
@@ -212,13 +212,10 @@ function projectSecretColumns({
  */
 export function SharedSecrets({
 	query,
-	listKey,
 	actions,
 	words,
 }: {
 	query: UseQueryOptions<SecretList, Error, SecretList, QueryKey>;
-	/** Every list to refresh after a change. */
-	listKey: QueryKey;
 	actions: SharedSecretActions;
 	words: SharedSecretWords;
 }) {
@@ -227,11 +224,9 @@ export function SharedSecrets({
 	const [setting, setSetting] = useState<string | null>(null);
 	const [removing, setRemoving] = useState<ProjectSecretRow | null>(null);
 	const now = useNow(60_000);
-	const queryClient = useQueryClient();
-	const refresh = () => {
-		void queryClient.invalidateQueries({ queryKey: listKey });
-		void queryClient.invalidateQueries({ queryKey: connectionQueries.lists() });
-	};
+	const changed = useChanged({ orpc });
+	// The actions call the client: the live cache does not see them.
+	const refresh = () => changed("secrets");
 	const move = useMutation({
 		mutationFn: actions.moveOut,
 		onSuccess: (_, { name, to }) => {

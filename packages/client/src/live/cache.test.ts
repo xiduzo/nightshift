@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { now } from "@nightshift/time";
 import { QueryClient } from "@tanstack/react-query";
 import { createApiClient, createQueryUtils } from "../api";
-import { staleAfter } from "../changes";
+import { type Change, staleAfter } from "../changes";
+import { SAVES } from "../changes/changes";
 import { createDashboardQueries } from "../dashboard";
 import { createGateQueries, type OpenGate } from "../gates";
 import { createKnowledgeQueries } from "../knowledge";
@@ -539,26 +540,6 @@ describe("the live cache follows the Host", () => {
 		expect(copy.stale()).toEqual(sorted(["overview", "offers"]));
 	});
 
-	test("a save and the document stream read the flows once", async () => {
-		const { live, timers, queryClient } = setUp();
-		const { host } = follow(live);
-		const reads: unknown[] = [];
-		const invalidate = queryClient.invalidateQueries.bind(queryClient);
-		queryClient.invalidateQueries = (filters, options) => {
-			reads.push(filters?.queryKey);
-			return invalidate(filters, options);
-		};
-		live.synced("flows");
-		await host.send({
-			kind: "document-changed",
-			name: "flows:p1",
-			spaceId: "s1",
-			at: 4,
-		});
-		timers.due(300);
-		expect(reads).toEqual(staleAfter(["flows"]).map((path) => [path]));
-	});
-
 	test("a document this screen does not know reads everything again", async () => {
 		const { live, stale, timers } = setUp();
 		const { host } = follow(live);
@@ -824,6 +805,132 @@ describe("a run the person acted on", () => {
 		expect(stale()).toEqual(NOTHING);
 		timers.due(300);
 		expect(stale()).toEqual(sorted(RUN_1));
+	});
+});
+
+/** The keys the query client reads again, in order. */
+function readsOf(queryClient: QueryClient): unknown[] {
+	const reads: unknown[] = [];
+	const invalidate = queryClient.invalidateQueries.bind(queryClient);
+	queryClient.invalidateQueries = (filters, options) => {
+		reads.push(filters?.queryKey);
+		return invalidate(filters, options);
+	};
+	return reads;
+}
+
+/** What `staleAfter` reads, as the keys the query client reads again. */
+const keysAfter = (changes: readonly Change[]) =>
+	staleAfter(changes).map((path) => [path]);
+
+/**
+ * A save of the route at `path` (`flows.save`) on the query client, as
+ * `useMutation` makes it from `orpc`: its key is the route's.
+ */
+function save(
+	queryClient: QueryClient,
+	path: string,
+	result: () => Promise<unknown> = async () => ({}),
+): Promise<unknown> {
+	const utils = path
+		.split(".")
+		.reduce<unknown>(
+			(at, key) => (at as Record<string, unknown>)[key],
+			orpc,
+		) as { mutationKey(): readonly unknown[] };
+	return queryClient
+		.getMutationCache()
+		.build(queryClient, {
+			mutationKey: utils.mutationKey(),
+			mutationFn: result,
+		})
+		.execute(undefined);
+}
+
+describe("a save on this screen", () => {
+	test("reads again what its route wrote, for every save route", async () => {
+		for (const [path, changes = []] of Object.entries(SAVES)) {
+			const { live, timers, queryClient } = setUp();
+			const reads = readsOf(queryClient);
+			follow(live);
+			await save(queryClient, path);
+			timers.due(300);
+			expect(reads, path).toEqual(keysAfter(changes));
+		}
+	});
+
+	test("and the document stream read the flows once", async () => {
+		const { live, timers, queryClient } = setUp();
+		const reads = readsOf(queryClient);
+		const { host } = follow(live);
+		await save(queryClient, "flows.save");
+		await host.send(
+			{ kind: "document-changed", name: "flows:p1", spaceId: "s1", at: 4 },
+			{
+				kind: "document-changed",
+				name: "flows-history:p1",
+				spaceId: "s1",
+				at: 4,
+			},
+		);
+		timers.due(300);
+		expect(reads).toEqual(keysAfter(["flows", "flows-history"]));
+	});
+
+	test("that fails reads nothing", async () => {
+		const { live, timers, queryClient } = setUp();
+		const reads = readsOf(queryClient);
+		follow(live);
+		await save(queryClient, "profiles.save", () =>
+			Promise.reject(new Error("not saved")),
+		).catch(() => undefined);
+		timers.due(300);
+		expect(reads).toEqual([]);
+	});
+
+	test("reads nothing while nothing follows the Host: the phone in the background", async () => {
+		const { live, timers, queryClient } = setUp();
+		const reads = readsOf(queryClient);
+		const { host, followed } = follow(live);
+		host.stop();
+		await followed;
+		await save(queryClient, "profiles.save");
+		timers.due(300);
+		expect(reads).toEqual([]);
+	});
+
+	test("of a mutation that is not a route reads nothing", async () => {
+		const { live, timers, queryClient } = setUp();
+		const reads = readsOf(queryClient);
+		follow(live);
+		await queryClient
+			.getMutationCache()
+			.build(queryClient, { mutationFn: async () => ({}) })
+			.execute(undefined);
+		await queryClient
+			.getMutationCache()
+			.build(queryClient, {
+				mutationKey: ["ask-why"],
+				mutationFn: async () => ({}),
+			})
+			.execute(undefined);
+		timers.due(300);
+		expect(reads).toEqual([]);
+	});
+
+	test("through the client, or a job that ended, says what changed itself", async () => {
+		const { live, timers, queryClient } = setUp();
+		const reads = readsOf(queryClient);
+		const { host } = follow(live);
+		live.changed("secrets", "device");
+		await host.send({
+			kind: "document-changed",
+			name: "device:laptop",
+			spaceId: null,
+			at: 4,
+		});
+		timers.due(300);
+		expect(reads).toEqual(keysAfter(["secrets", "device"]));
 	});
 });
 

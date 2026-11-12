@@ -1,6 +1,175 @@
 import { describe, expect, test } from "bun:test";
+import { appRouter } from "@nightshift/api";
 
-import { documentOf, heldByDocuments, staleAfter } from "./changes";
+import {
+	documentOf,
+	heldByDocuments,
+	SAVES,
+	savedBy,
+	staleAfter,
+} from "./changes";
+
+/** Every procedure of the router, by its dotted path (`flows.save`). */
+function proceduresOf(router: object, prefix = ""): string[] {
+	return Object.entries(router).flatMap(([key, value]) =>
+		typeof value === "object" && value !== null && "~orpc" in value
+			? [`${prefix}${key}`]
+			: proceduresOf(value as object, `${prefix}${key}.`),
+	);
+}
+
+/**
+ * The procedures that only read: a screen reads them as a query. Three a
+ * screen calls as a mutation, but they write nothing: a test of a
+ * connection or of an address, and the folder picker.
+ */
+const READS = new Set([
+	"healthCheck",
+	"spaces.list",
+	"members.list",
+	"invitations.get",
+	"projects.list",
+	"projects.branches",
+	"projects.runCopies",
+	"projects.check",
+	"projects.chooseFolder",
+	"projects.sources",
+	"projects.gitHubRepos",
+	"projects.gitHubClone",
+	"projects.copies",
+	"projects.secrets",
+	"projects.spaceSecrets",
+	"knowledge.get",
+	"knowledge.review",
+	"knowledge.files",
+	"knowledge.learnings",
+	"knowledge.search",
+	"knowledge.meaning",
+	"knowledge.read",
+	"knowledge.questions",
+	"knowledge.graph",
+	"knowledge.evaluate",
+	"knowledge.use",
+	"flows.list",
+	"flows.get",
+	"flows.map",
+	"flows.kept",
+	"flows.memory",
+	"flows.notices",
+	"flows.revisions",
+	"flows.revision",
+	"flows.export",
+	"gates.list",
+	"gates.answered",
+	"schedules.list",
+	"schedules.preview",
+	"runs.placements",
+	"runs.list",
+	"runs.get",
+	"runs.step",
+	"runs.serviceLog",
+	"runs.artifacts",
+	"runs.files",
+	"runs.moveTargets",
+	"runs.devices",
+	"notifications.settings.get",
+	"notifications.targets.list",
+	"notifications.webPush.key",
+	"dashboard.summary",
+	"dashboard.flow",
+	"settings.get",
+	"usage.outbox",
+	"usage.catalog",
+	"connections.list",
+	"connections.check",
+	"connections.test",
+	"connections.tools",
+	"cliTools.list",
+	"cliTools.programs",
+	"cliTools.check",
+	"programs.found",
+	"harnesses.list",
+	"harnesses.models",
+	"harnesses.skills",
+	"agentSetup.status",
+	"deciderSetup.status",
+	"deciders.list",
+	"deciders.modelsAt",
+	"ollama.status",
+	"ollama.models",
+	"profiles.list",
+	"profiles.catalog",
+	"offers.list",
+	"devices.list",
+	"devices.others",
+	"devices.space",
+	"devices.phones",
+	"devices.merge.pending",
+	"devices.merge.preview",
+	"account.status",
+]);
+
+/** The streams: a screen follows them, they save nothing. */
+const STREAMS = new Set([
+	"assistant.suggest",
+	"assistant.chat",
+	"assistant.explain",
+	"runs.watch",
+	"notifications.watch",
+	"devices.join",
+]);
+
+/** What only a paired Device calls: the peer protocol. */
+const PEER = [
+	"pairing.",
+	"link.",
+	"sync.",
+	"archive.",
+	"leases.",
+	"secrets.",
+	"projectSecrets.",
+	"spaceSecrets.",
+	"devices.work",
+	"devices.call",
+	"devices.stop",
+	"devices.reachable",
+	"devices.workReply",
+];
+
+describe("the save routes", () => {
+	const procedures = proceduresOf(appRouter);
+	const ofPeer = (path: string) =>
+		PEER.some((peer) => path === peer || path.startsWith(peer));
+
+	test("each route of the API that a screen calls and that is not a read has a row", () => {
+		expect(procedures.length).toBeGreaterThan(200);
+		const missing = procedures.filter(
+			(path) =>
+				!READS.has(path) &&
+				!STREAMS.has(path) &&
+				!ofPeer(path) &&
+				!(path in SAVES),
+		);
+		// A new route: say what it writes in `SAVES`, or add it to the reads here.
+		expect(missing).toEqual([]);
+	});
+
+	test("are routes of the API, and none of them is a read", () => {
+		const known = new Set(procedures);
+		for (const path of Object.keys(SAVES)) {
+			expect(known.has(path), path).toBe(true);
+			expect(READS.has(path) || STREAMS.has(path) || ofPeer(path), path).toBe(
+				false,
+			);
+		}
+	});
+
+	test("a route is found by the first part of its mutation key", () => {
+		expect(savedBy(["flows", "save"])).toEqual(["flows", "flows-history"]);
+		expect(savedBy(["devices", "merge", "run"])).toEqual([]);
+		expect(savedBy(["flows", "list"])).toEqual([]);
+	});
+});
 
 describe("what a change makes stale", () => {
 	test("a flow reads the lists that name the flows that use something", () => {

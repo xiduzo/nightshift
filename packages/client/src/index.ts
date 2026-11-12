@@ -170,10 +170,10 @@ export {
 	type Notice,
 	type ShownNotifications,
 	useAnswerGate,
+	useChanged,
 	useFollowHost,
 	useLiveRun,
 	useRunActed,
-	useSynced,
 } from "./live";
 export {
 	applySettingsPatch,

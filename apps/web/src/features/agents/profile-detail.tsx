@@ -1,4 +1,3 @@
-import { useSynced } from "@nightshift/client";
 import type { CustomAgent } from "@nightshift/flows";
 import { Alert, AlertDescription } from "@nightshift/ui/components/alert";
 import {
@@ -52,7 +51,6 @@ import type {
 	PermissionMode,
 	ProfileRow,
 } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
 import { LargerTextarea } from "@/shared/larger-window";
 import { EFFORTS, PERMISSION_MODES } from "./agent-options";
@@ -136,7 +134,6 @@ export function ProfileDetail({
 	onDirtyChange: (dirty: boolean) => void;
 }) {
 	const id = useId();
-	const synced = useSynced({ orpc });
 	const saved = profile ? draftFrom(profile) : initial;
 	const [draft, setDraft] = useState<Draft>(saved);
 	const [deleting, setDeleting] = useState(false);
@@ -156,7 +153,6 @@ export function ProfileDetail({
 		profileMutations.save({
 			onSuccess: (next) => {
 				toast.success(profile ? `Saved ${next.name}` : `Added ${next.name}`);
-				synced("device");
 				onSaved(next.id);
 			},
 		}),
@@ -165,7 +161,6 @@ export function ProfileDetail({
 		profileMutations.remove({
 			onSuccess: () => {
 				toast.success(`Deleted ${profile?.name}`);
-				synced("device");
 				onDeleted();
 			},
 			onError: (error) => toast.error(`Not deleted: ${error.message}`),

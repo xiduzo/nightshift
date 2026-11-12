@@ -26,7 +26,6 @@ export function ProjectSecretsPage({ projectId }: { projectId: string }) {
 					/>
 					<SharedSecrets
 						query={projectSecretQueries.list(project.id)}
-						listKey={projectSecretQueries.lists()}
 						actions={projectSecretActions(project.id)}
 						words={{
 							title: "Project secrets",
