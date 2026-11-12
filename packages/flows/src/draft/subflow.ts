@@ -59,13 +59,13 @@ import {
 	sectionBoundary,
 	sectionsWithin,
 } from "../sections";
-import { ruleNames, type TemplateRef, templateRefs } from "../template";
+import { type TemplateRef, templateRefs } from "../template";
 import {
 	type FlowIssue,
 	type ValidateOptions,
 	validateFlow,
 } from "../validate";
-import { type NodeRead, readsOf, rulesOf } from "./reads";
+import { type NodeRead, readsOf, ruleReads, rulesOf } from "./reads";
 import { rewriteRefs, rewriteTemplates } from "./refs";
 import { removeSectionAndInside, updateSection } from "./sections";
 
@@ -524,13 +524,14 @@ class Planner {
 		for (const node of this.flow.nodes) {
 			const inside = this.members.has(node.id);
 			const names = new Set<string>();
-			for (const { text } of rulesOf(node)) {
-				for (const name of ruleNames(text)) {
+			for (const rule of rulesOf(node)) {
+				for (const name of ruleReads(rule)) {
 					if (inside ? this.isOuterNode(name) : this.members.has(name))
 						names.add(name);
 				}
 				if (inside)
-					for (const field of ruleRunFields(text)) names.add(`run.${field}`);
+					for (const field of ruleRunFields(rule.text))
+						names.add(`run.${field}`);
 			}
 			if (names.size > 0)
 				blockers.push({

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow, flowSchema } from "../flow";
-import { setVariables } from "./graph";
+import { renameNode, setVariables } from "./graph";
 import { takenNames } from "./names";
 import { withWrites } from "./nodes";
 import {
@@ -43,6 +43,13 @@ const flow: Flow = flowSchema.parse({
 				{ name: "again" },
 			],
 		},
+		{
+			id: "moved",
+			type: "since-last-run",
+			position: { x: 0, y: 0 },
+			value: "{{vars.tries}}",
+			when: "current - previous > vars.tries",
+		},
 	],
 	edges: [],
 });
@@ -63,7 +70,7 @@ describe("variables in the draft", () => {
 	test("renameVariable follows templates, rules, expressions, writes and outputs", () => {
 		const renamed = renameVariable(flow, 0, "attempts");
 		expect(renamed.variables?.map((v) => v.name)).toEqual(["attempts", "plan"]);
-		const [check, enough] = renamed.nodes;
+		const [check, enough, moved] = renamed.nodes;
 		expect(check?.type === "command" && check.command).toBe(
 			'echo "{{vars.attempts}} {{vars.tries_2}} {{ vars.plan.steps }}"',
 		);
@@ -74,6 +81,10 @@ describe("variables in the draft", () => {
 		expect(enough?.type === "decision" && enough.options[0]?.when).toBe(
 			"vars.attempts >= 3 and vars.tries_2 = 0",
 		);
+		expect(moved).toMatchObject({
+			value: "{{vars.attempts}}",
+			when: "current - previous > vars.attempts",
+		});
 		expect(renamed.outputs[0]?.value).toBe("{{vars.attempts}}");
 	});
 
@@ -136,5 +147,237 @@ describe("renaming references", () => {
 			"{{vars.c}} {{vars.a}}",
 		);
 		expect(renameVarRefs("{{vars.a.b}}", "a.b", "c")).toBe("{{vars.c}}");
+	});
+});
+
+/** A node that reads `{{scout.data.topic}}` in one field, and the path to that field. */
+type FieldCase = {
+	field: string;
+	node: Record<string, unknown>;
+	path: (string | number)[];
+};
+
+const SCOUT = "{{scout.data.topic}}";
+const personTier = (fields: Record<string, unknown>) => ({
+	person: true,
+	...fields,
+});
+const ask = (fields: Record<string, unknown>) => ({
+	type: "value",
+	by: "person",
+	prompt: "",
+	output: { type: "object", properties: { pick: { type: "string" } } },
+	...fields,
+});
+
+/** Every field a template can sit in, one case each: the older node types and the new ones. */
+const FIELD_CASES: FieldCase[] = [
+	{
+		field: "the check of an Agent",
+		node: {
+			type: "agent",
+			prompt: "",
+			cascade: [{ model: "small" }],
+			check: `test -n "${SCOUT}"`,
+		},
+		path: ["check"],
+	},
+	{
+		field: "the inputs of a Subflow's cascade tier",
+		node: {
+			type: "call",
+			flow: "research",
+			cascade: [{ flow: "deep", inputs: { topic: SCOUT } }],
+		},
+		path: ["cascade", 0, "inputs", "topic"],
+	},
+	{
+		field: "the deadline of a cascade's person tier",
+		node: {
+			type: "agent",
+			prompt: "",
+			cascade: [
+				{ model: "small" },
+				personTier({ deadline: { at: SCOUT, choose: "stop" } }),
+			],
+		},
+		path: ["cascade", 1, "deadline", "at"],
+	},
+	{
+		field: "the situation of a cascade's person tier",
+		node: {
+			type: "call",
+			flow: "research",
+			cascade: [{}, personTier({ situation: SCOUT })],
+		},
+		path: ["cascade", 1, "situation"],
+	},
+	{
+		field: "the recommendation of a cascade's person tier",
+		node: {
+			type: "decision",
+			prompt: "",
+			by: "model",
+			options: [{ name: "go" }, { name: "stop" }],
+			cascade: [
+				{ model: "small" },
+				personTier({ recommend: { option: "go", reason: SCOUT } }),
+			],
+		},
+		path: ["cascade", 1, "recommend", "reason"],
+	},
+	{
+		field: "the title of a Gate",
+		node: {
+			type: "decision",
+			prompt: "",
+			by: "person",
+			title: SCOUT,
+			options: [{ name: "go" }, { name: "stop" }],
+		},
+		path: ["title"],
+	},
+	{
+		field: "the title of an Ask",
+		node: ask({ title: SCOUT }),
+		path: ["title"],
+	},
+	{
+		field: "the choices of an Ask",
+		node: ask({ choices: { from: SCOUT, field: "pick" } }),
+		path: ["choices", "from"],
+	},
+	{
+		field: "the file of an Ask's attachment",
+		node: ask({ attachments: [{ path: `notes/${SCOUT}.md` }] }),
+		path: ["attachments", 0, "path"],
+	},
+	{
+		field: "the link of an Ask's attachment",
+		node: ask({ attachments: [{ url: `https://example.com/${SCOUT}` }] }),
+		path: ["attachments", 0, "url"],
+	},
+	{
+		field: "the deadline of an Ask",
+		node: ask({ deadline: { at: SCOUT }, default: { pick: "none" } }),
+		path: ["deadline", "at"],
+	},
+	{
+		field: "the key of a Wait for a signal",
+		node: { type: "wait", until: { kind: "signal", name: "paid", key: SCOUT } },
+		path: ["until", "key"],
+	},
+	{
+		field: "the URL of a Web request",
+		node: { type: "web-request", url: `https://example.com/${SCOUT}` },
+		path: ["url"],
+	},
+	{
+		field: "the URL secret of a Web request",
+		node: { type: "web-request", urlSecret: SCOUT },
+		path: ["urlSecret"],
+	},
+	{
+		field: "a query value of a Web request",
+		node: {
+			type: "web-request",
+			url: "https://example.com",
+			query: { q: SCOUT },
+		},
+		path: ["query", "q"],
+	},
+	{
+		field: "a header of a Web request",
+		node: {
+			type: "web-request",
+			url: "https://example.com",
+			headers: { "X-Topic": SCOUT },
+		},
+		path: ["headers", "X-Topic"],
+	},
+	{
+		field: "the body of a Web request",
+		node: {
+			type: "web-request",
+			method: "POST",
+			url: "https://example.com",
+			body: { kind: "json", value: SCOUT },
+		},
+		path: ["body", "value"],
+	},
+	{
+		field: "a form field of a Web request",
+		node: {
+			type: "web-request",
+			method: "POST",
+			url: "https://example.com",
+			body: { kind: "form", fields: { topic: SCOUT } },
+		},
+		path: ["body", "fields", "topic"],
+	},
+	{
+		field: "the value of a Convert",
+		node: { type: "convert", from: "csv", to: "json", value: SCOUT },
+		path: ["value"],
+	},
+	{
+		field: "the list of Since last run",
+		node: { type: "since-last-run", items: SCOUT },
+		path: ["items"],
+	},
+	{
+		field: "the value of Since last run",
+		node: { type: "since-last-run", value: SCOUT },
+		path: ["value"],
+	},
+	{
+		field: "the scope of Since last run",
+		node: { type: "since-last-run", items: "[]", scope: SCOUT },
+		path: ["scope"],
+	},
+	{
+		field: "the report of an End",
+		node: {
+			type: "end",
+			status: "done",
+			report: { kind: "text", text: `## New\n\n${SCOUT}` },
+		},
+		path: ["report", "text"],
+	},
+];
+
+function fieldAt(value: unknown, path: readonly (string | number)[]): unknown {
+	let at = value;
+	for (const key of path) {
+		if (typeof at !== "object" || at === null) return undefined;
+		at = (at as Record<string | number, unknown>)[key];
+	}
+	return at;
+}
+
+describe("renameNode follows every template", () => {
+	test.each(FIELD_CASES)("$field", ({ node, path }) => {
+		const flow = flowSchema.parse({
+			version: FLOW_VERSION,
+			inputs: [],
+			outputs: [],
+			start: "scout",
+			nodes: [
+				{
+					id: "scout",
+					type: "command",
+					position: { x: 0, y: 0 },
+					command: "true",
+				},
+				{ id: "reader", position: { x: 0, y: 0 }, ...node },
+			],
+			edges: [],
+		});
+		const before = fieldAt(flow.nodes[1], path);
+		expect(typeof before === "string" && before.includes(SCOUT)).toBe(true);
+		const renamed = renameNode(flow, "scout", "finder");
+		expect(fieldAt(renamed.nodes[1], path)).toBe(
+			String(before).replace(SCOUT, "{{finder.data.topic}}"),
+		);
 	});
 });

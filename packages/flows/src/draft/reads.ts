@@ -12,10 +12,10 @@ import {
 	templateRefs,
 } from "../template";
 import { checkNodeWith } from "../validate";
-import { rewriteOwnTemplates } from "./refs";
+import { rewriteNodeTexts, type TextField } from "./refs";
 
-/** A template a node holds. `self`: a variable write's value, where the node's id reads the step that just ended. */
-type Text = { text: string; self: boolean };
+/** A template or a rule a node holds (`TextField`). */
+type Text = TextField & { text: string };
 
 /** One reference of a node's template or rule to a node, an input, a variable or `run`. */
 export type NodeRead = {
@@ -27,37 +27,36 @@ export type NodeRead = {
 	rule: boolean;
 };
 
-/** The templates of a node: its own, then the values of its variable writes. */
-function templatesOf(node: FlowNode): Text[] {
+/**
+ * Every template and rule of a node, in order: its own, then its variable
+ * writes' (`rewriteNodeTexts`).
+ */
+function textsOf(node: FlowNode): Text[] {
 	const texts: Text[] = [];
-	rewriteOwnTemplates(node, (text) => {
-		texts.push({ text, self: false });
+	rewriteNodeTexts(node, (text, field) => {
+		texts.push({ text, ...field });
 		return text;
 	});
-	for (const write of node.set ?? []) {
-		if (write.value !== undefined)
-			texts.push({ text: write.value, self: true });
-	}
 	return texts;
 }
 
-/** The rules (JSONata) of a node: a Decision's `when`, a Value's expression, the expressions of its writes. */
+/** The templates of a node: its own, then the values of its variable writes. */
+function templatesOf(node: FlowNode): Text[] {
+	return textsOf(node).filter((text) => !text.rule);
+}
+
+/**
+ * The rules (JSONata) of a node that are not empty: a Decision's `when`,
+ * a Value's expression, a Since last run rule, the expressions of its
+ * writes.
+ */
 export function rulesOf(node: FlowNode): Text[] {
-	const rules: Text[] = [];
-	if (node.type === "decision") {
-		for (const option of node.options) {
-			if (option.when !== undefined && option.when.trim() !== "")
-				rules.push({ text: option.when, self: false });
-		}
-	}
-	if (node.type === "value" && node.expression !== undefined) {
-		rules.push({ text: node.expression, self: false });
-	}
-	for (const write of node.set ?? []) {
-		if (write.expression !== undefined && write.expression.trim() !== "")
-			rules.push({ text: write.expression, self: true });
-	}
-	return rules;
+	return textsOf(node).filter((text) => text.rule && text.text.trim() !== "");
+}
+
+/** The names a rule reads: those of the flow, not its own (`also`). */
+export function ruleReads(rule: Text): string[] {
+	return ruleNames(rule.text).filter((name) => !rule.also.includes(name));
 }
 
 /** Every reference the node's templates and rules make. */
@@ -75,8 +74,9 @@ export function readsOf(node: FlowNode): NodeRead[] {
 			});
 		}
 	}
-	for (const { text, self } of rulesOf(node)) {
-		for (const name of ruleNames(text))
+	for (const rule of rulesOf(node)) {
+		const { text, self } = rule;
+		for (const name of ruleReads(rule))
 			reads.push({ reader, name, path: [], self, rule: true });
 		for (const variable of ruleVariableNames(text))
 			reads.push({ reader, name: "vars", path: [variable], self, rule: true });

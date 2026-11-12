@@ -600,6 +600,87 @@ describe("planSubflowFromSection, small flows", () => {
 		});
 	});
 
+	test("an Agent's check, a Wait's key and a Gate's title bind and follow across the frame", () => {
+		const flow = chain({
+			nodes: [
+				command("a", "true", { stdout: "json" }),
+				{
+					id: "b",
+					type: "agent",
+					position: { x: 0, y: 0 },
+					prompt: "Sum up the topic",
+					cascade: [
+						{ harness: "claude-code", model: "small", permissionMode: "auto" },
+					],
+					check: 'test -n "{{a.data.topic}}"',
+				},
+				{
+					id: "c",
+					type: "wait",
+					position: { x: 0, y: 0 },
+					until: { kind: "signal", name: "paid", key: "{{a.data.id}}" },
+				},
+				{
+					id: "d",
+					type: "decision",
+					position: { x: 0, y: 0 },
+					prompt: "Send it?",
+					by: "person",
+					title: "{{b.data.title}}",
+					options: [{ name: "send" }, { name: "skip" }],
+				},
+			],
+			edges: [
+				{ id: "ab", from: "a", outcome: "pass", to: "b" },
+				{ id: "bc", from: "b", outcome: "pass", to: "c" },
+				{ id: "cd", from: "c", outcome: "done", to: "d" },
+			],
+		});
+		const plan = planned(planSubflowFromSection(flow, "middle", plain));
+		expect(errorsOf(plan, "middle")).toEqual([]);
+		expect(nodeOf(plan.caller, "middle")).toMatchObject({
+			inputs: { a_data: "{{a.data}}" },
+		});
+		expect(nodeOf(plan.subflow, "b")).toMatchObject({
+			check: 'test -n "{{a_data.topic}}"',
+		});
+		expect(nodeOf(plan.subflow, "c")).toMatchObject({
+			until: { key: "{{a_data.id}}" },
+		});
+		expect(plan.subflow.outputs).toEqual([
+			{ name: "b_data", value: "{{b.data}}" },
+		]);
+		expect(nodeOf(plan.caller, "d")).toMatchObject({
+			title: "{{middle.b_data.title}}",
+		});
+	});
+
+	test("a Since last run rule that reads across the frame blocks, its own names do not", () => {
+		const flow = chain({
+			nodes: [
+				command("a", "true", { stdout: "json" }),
+				{
+					id: "b",
+					type: "since-last-run",
+					position: { x: 0, y: 0 },
+					value: "{{a.data.price}}",
+					when: "current - previous > a.data.step",
+				},
+				command("c"),
+				command("d"),
+			],
+			edges: [
+				{ id: "ab", from: "a", outcome: "pass", to: "b" },
+				{ id: "bc", from: "b", outcome: "changed", to: "c" },
+				{ id: "cd", from: "c", outcome: "pass", to: "d" },
+			],
+		});
+		expect(planSubflowFromSection(flow, "middle", plain)).toEqual({
+			ok: false,
+			blockers: [{ code: "rule-reads-outside", node: "b", names: ["a"] }],
+		});
+	});
+
 	test("a Section the flow comes back to: visits, sessions and reads of an earlier pass are listed", () => {
 		const flow = flowOf({
 			start: "a",

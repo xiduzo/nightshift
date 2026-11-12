@@ -1,6 +1,13 @@
 /** Renames in templates, rules and expressions. */
 import type { Flow, FlowNode } from "../flow";
-import type { GateBriefFields, ListSource, WebRequestNode } from "../nodes";
+import {
+	type GateBriefFields,
+	isPersonTier,
+	type ListSource,
+	type PersonTier,
+	type WaitNode,
+	type WebRequestNode,
+} from "../nodes";
 import type { TemplateRef } from "../template";
 import { templateRefs } from "../template";
 
@@ -95,46 +102,24 @@ export function renameVarInRule(
 export function renameVariable(flow: Flow, index: number, to: string): Flow {
 	const from = flow.variables?.[index]?.name;
 	if (from === undefined || from === to) return flow;
-	const templated = rewriteFlowTemplates(flow, (text) =>
-		renameVarRefs(text, from, to),
+	const renamed = rewriteFlowTexts(flow, (text, field) =>
+		field.rule
+			? renameVarInRule(text, from, to)
+			: renameVarRefs(text, from, to),
 	);
-	const rule = (text: string) => renameVarInRule(text, from, to);
-	const nodes = templated.nodes.map((node): FlowNode => {
-		let next: FlowNode = node;
-		if (next.type === "decision") {
-			next = {
-				...next,
-				options: next.options.map((option) =>
-					option.when === undefined
-						? option
-						: { ...option, when: rule(option.when) },
-				),
-			};
-		}
-		if (next.type === "value" && next.expression !== undefined) {
-			next = { ...next, expression: rule(next.expression) };
-		}
-		if (next.type === "since-last-run" && next.when !== undefined) {
-			next = { ...next, when: rule(next.when) };
-		}
-		if (next.set) {
-			next = {
-				...next,
-				set: next.set.map((write) => ({
-					...write,
-					variable: write.variable === from ? to : write.variable,
-					...(write.expression !== undefined
-						? { expression: rule(write.expression) }
-						: {}),
-				})),
-			};
-		}
-		return next;
-	});
 	return {
-		...templated,
-		nodes,
-		variables: (templated.variables ?? []).map((variable, at) =>
+		...renamed,
+		nodes: renamed.nodes.map((node) =>
+			node.set === undefined
+				? node
+				: {
+						...node,
+						set: node.set.map((write) =>
+							write.variable === from ? { ...write, variable: to } : write,
+						),
+					},
+		),
+		variables: (renamed.variables ?? []).map((variable, at) =>
 			at === index ? { ...variable, name: to } : variable,
 		),
 	};
@@ -155,6 +140,33 @@ export function renameInput(flow: Flow, index: number, to: string): Flow {
 		),
 	};
 }
+
+/**
+ * A text of a node that can read a name. A template reads names in
+ * `{{…}}`. A rule (JSONata) reads them bare, and `also` lists the names
+ * it reads besides the flow's (`previous`, `current`). `self`: a variable
+ * write's value or expression, where the node's id reads the step that
+ * just ended.
+ */
+export type TextField = {
+	rule: boolean;
+	also: readonly string[];
+	self: boolean;
+};
+
+/** The new text of one text of a node. */
+export type TextRewrite = (text: string, field: TextField) => string;
+
+const TEMPLATE: TextField = { rule: false, also: [], self: false };
+
+/** The names a Since last run rule reads besides the flow's. */
+const SINCE_LAST_RUN_NAMES = ["previous", "current"] as const;
+
+/** How the walk of one node rewrites its own templates and rules. */
+type OwnTexts = {
+	template: (text: string) => string;
+	rule: (text: string, also?: readonly string[]) => string;
+};
 
 function rewriteBindings(
 	bindings: Record<string, string>,
@@ -226,170 +238,285 @@ function rewriteBrief(
 	};
 }
 
+/** A deadline of a Gate or an Ask: its time, when it has one. */
+function rewriteDeadline<T extends { at?: string }>(
+	deadline: T,
+	rewrite: (text: string) => string,
+): T {
+	return deadline.at === undefined
+		? deadline
+		: { ...deadline, at: rewrite(deadline.at) };
+}
+
 /**
- * Applies `rewrite` to every template of the node: a prompt, a command, a question, a list source, the bindings
- * of a called flow's inputs, and the values of its variable writes.
+ * A cascade: the deadline and the brief of its person tier, and the
+ * templates `own` finds in each other tier.
  */
+function rewriteCascade<T extends object>(
+	tiers: readonly (T | PersonTier)[],
+	rewrite: (text: string) => string,
+	own: (tier: T) => T = (tier) => tier,
+): (T | PersonTier)[] {
+	return tiers.map((tier) =>
+		isPersonTier(tier)
+			? {
+					...tier,
+					...(tier.deadline === undefined
+						? {}
+						: { deadline: rewriteDeadline(tier.deadline, rewrite) }),
+					...rewriteBrief(tier, rewrite),
+				}
+			: own(tier),
+	);
+}
+
+/** What a Wait waits for: its time, its command, its signal's key, its URL and headers. */
+function rewriteUntil(
+	until: WaitNode["until"],
+	rewrite: (text: string) => string,
+): WaitNode["until"] {
+	switch (until.kind) {
+		case "duration":
+			return until;
+		case "time":
+			return { ...until, at: rewrite(until.at) };
+		case "command":
+			return { ...until, command: rewrite(until.command) };
+		case "signal":
+			return until.key === undefined
+				? until
+				: { ...until, key: rewrite(until.key) };
+		case "any": {
+			const { signal, command } = until;
+			return {
+				...until,
+				signal:
+					signal.key === undefined
+						? signal
+						: { ...signal, key: rewrite(signal.key) },
+				command: { ...command, command: rewrite(command.command) },
+			};
+		}
+		case "url":
+			return {
+				...until,
+				url: rewrite(until.url),
+				...(until.headers
+					? { headers: rewriteBindings(until.headers, rewrite) }
+					: {}),
+			};
+	}
+}
+
+/**
+ * Applies `rewrite` to every text of the node that can read a name: its
+ * templates and its rules, then the value and the expression of each
+ * variable write. A field the node does not read as it is set up now
+ * counts too (the Ask fields of a Value a model makes): set up again, it
+ * reads the new names. So this is not the walk of the checks
+ * (`checkNodeWith`), which read only the fields in use. Every text the
+ * checks read is one of these: `refs-fields.test.ts` holds the two
+ * together, and fails on a field of the schema that is in neither list.
+ * Rules that read only `event` or `data` (a Wait's outcomes, a cascade
+ * tier's `accept`) read no name of the flow: they stay.
+ */
+export function rewriteNodeTexts(
+	node: FlowNode,
+	rewrite: TextRewrite,
+): FlowNode {
+	const own = rewriteOwnTexts(node, {
+		template: (text) => rewrite(text, TEMPLATE),
+		rule: (text, also = []) => rewrite(text, { rule: true, also, self: false }),
+	});
+	if (!own.set) return own;
+	return {
+		...own,
+		set: own.set.map((write) => ({
+			...write,
+			...(write.value === undefined
+				? {}
+				: {
+						value: rewrite(write.value, { rule: false, also: [], self: true }),
+					}),
+			...(write.expression === undefined
+				? {}
+				: {
+						expression: rewrite(write.expression, {
+							rule: true,
+							also: [],
+							self: true,
+						}),
+					}),
+		})),
+	};
+}
+
+/** Applies `rewrite` to every template of the node: `rewriteNodeTexts` without the rules. */
 export function rewriteTemplates(
 	node: FlowNode,
 	rewrite: (text: string) => string,
 ): FlowNode {
-	const own = rewriteOwnTemplates(node, rewrite);
-	if (!own.set) return own;
-	return {
-		...own,
-		set: own.set.map((write) =>
-			write.value === undefined
-				? write
-				: { ...write, value: rewrite(write.value) },
-		),
-	};
+	return rewriteNodeTexts(node, (text, field) =>
+		field.rule ? text : rewrite(text),
+	);
 }
 
-/** The templates of the node's own kind: all but the values of its variable writes. */
-export function rewriteOwnTemplates(
+/** The templates and rules of the node's own kind: all but its variable writes. */
+function rewriteOwnTexts(
 	node: FlowNode,
-	rewrite: (text: string) => string,
+	{ template, rule }: OwnTexts,
 ): FlowNode {
 	switch (node.type) {
 		case "agent":
-			return { ...node, prompt: rewrite(node.prompt) };
+			return {
+				...node,
+				prompt: template(node.prompt),
+				...(node.check === undefined ? {} : { check: template(node.check) }),
+				...(node.cascade === undefined
+					? {}
+					: { cascade: rewriteCascade(node.cascade, template) }),
+			};
 		case "decision":
 			return {
 				...node,
-				prompt: rewrite(node.prompt),
-				...(node.deadline?.at !== undefined
-					? { deadline: { ...node.deadline, at: rewrite(node.deadline.at) } }
-					: {}),
-				...rewriteBrief(node, rewrite),
-				options: node.options.map((option) =>
-					option.impact === undefined
-						? option
-						: { ...option, impact: rewrite(option.impact) },
-				),
+				prompt: template(node.prompt),
+				...(node.deadline === undefined
+					? {}
+					: { deadline: rewriteDeadline(node.deadline, template) }),
+				...rewriteBrief(node, template),
+				options: node.options.map((option) => ({
+					...option,
+					...(option.impact === undefined
+						? {}
+						: { impact: template(option.impact) }),
+					...(option.when === undefined ? {} : { when: rule(option.when) }),
+				})),
+				...(node.title === undefined ? {} : { title: template(node.title) }),
+				...(node.cascade === undefined
+					? {}
+					: { cascade: rewriteCascade(node.cascade, template) }),
 			};
 		case "end":
 			return {
 				...node,
 				...(node.message === undefined
 					? {}
-					: { message: rewrite(node.message) }),
+					: { message: template(node.message) }),
 				...(node.report?.kind === "text"
-					? { report: { ...node.report, text: rewrite(node.report.text) } }
+					? { report: { ...node.report, text: template(node.report.text) } }
 					: {}),
 			};
 		case "command":
-			return { ...node, command: rewrite(node.command) };
+			return { ...node, command: template(node.command) };
 		case "call":
 			return {
 				...node,
-				inputs: rewriteBindings(node.inputs, rewrite),
+				inputs: rewriteBindings(node.inputs, template),
 				...(node.each
 					? {
 							each: {
 								...node.each,
-								source: rewriteSource(node.each.source, rewrite),
+								source: rewriteSource(node.each.source, template),
 							},
 						}
 					: {}),
+				...(node.cascade === undefined
+					? {}
+					: {
+							cascade: rewriteCascade(node.cascade, template, (tier) =>
+								tier.inputs === undefined
+									? tier
+									: { ...tier, inputs: rewriteBindings(tier.inputs, template) },
+							),
+						}),
 			};
-		case "value":
-			// The expression reads names bare, as a Decision's rules do: not a template.
+		case "value": {
+			const { choices, attachments, deadline } = node;
 			return {
 				...node,
-				...(node.prompt === undefined ? {} : { prompt: rewrite(node.prompt) }),
-				...rewriteBrief(node, rewrite),
+				...(node.prompt === undefined ? {} : { prompt: template(node.prompt) }),
+				...rewriteBrief(node, template),
+				...(node.expression === undefined
+					? {}
+					: { expression: rule(node.expression) }),
+				...(node.title === undefined ? {} : { title: template(node.title) }),
+				...(choices === undefined
+					? {}
+					: { choices: { ...choices, from: template(choices.from) } }),
+				...(attachments === undefined
+					? {}
+					: {
+							attachments: attachments.map((attachment) => ({
+								...attachment,
+								...(attachment.path === undefined
+									? {}
+									: { path: template(attachment.path) }),
+								...(attachment.url === undefined
+									? {}
+									: { url: template(attachment.url) }),
+							})),
+						}),
+				...(deadline === undefined
+					? {}
+					: { deadline: rewriteDeadline(deadline, template) }),
+				...(node.cascade === undefined
+					? {}
+					: { cascade: rewriteCascade(node.cascade, template) }),
 			};
+		}
 		case "wait":
-			switch (node.until.kind) {
-				case "time":
-					return {
-						...node,
-						until: { ...node.until, at: rewrite(node.until.at) },
-					};
-				case "command":
-					return {
-						...node,
-						until: { ...node.until, command: rewrite(node.until.command) },
-					};
-				case "any": {
-					const { signal, command } = node.until;
-					return {
-						...node,
-						until: {
-							...node.until,
-							signal:
-								signal.key === undefined
-									? signal
-									: { ...signal, key: rewrite(signal.key) },
-							command: { ...command, command: rewrite(command.command) },
-						},
-					};
-				}
-				case "url":
-					return {
-						...node,
-						until: {
-							...node.until,
-							url: rewrite(node.until.url),
-							...(node.until.headers
-								? { headers: rewriteBindings(node.until.headers, rewrite) }
-								: {}),
-						},
-					};
-				default:
-					return node;
-			}
+			return { ...node, until: rewriteUntil(node.until, template) };
 		case "tool":
-			return { ...node, arguments: rewriteBindings(node.arguments, rewrite) };
+			return { ...node, arguments: rewriteBindings(node.arguments, template) };
 		case "convert":
-			return { ...node, value: rewrite(node.value) };
+			return { ...node, value: template(node.value) };
 		case "join":
 			return node;
 		case "lease":
-			return { ...node, name: rewrite(node.name) };
+			return { ...node, name: template(node.name) };
 		case "service":
 			return {
 				...node,
-				start: rewrite(node.start),
+				start: template(node.start),
 				ready: {
 					...node.ready,
 					...(node.ready.command !== undefined
-						? { command: rewrite(node.ready.command) }
+						? { command: template(node.ready.command) }
 						: {}),
 					...(node.ready.url !== undefined
-						? { url: rewrite(node.ready.url) }
+						? { url: template(node.ready.url) }
 						: {}),
 				},
-				...(node.stop !== undefined ? { stop: rewrite(node.stop) } : {}),
+				...(node.stop !== undefined ? { stop: template(node.stop) } : {}),
 			};
 		case "since-last-run":
-			// The rule reads names bare, as a Decision's rules do: not a template.
 			return {
 				...node,
-				...(node.items === undefined ? {} : { items: rewrite(node.items) }),
-				...(node.value === undefined ? {} : { value: rewrite(node.value) }),
-				...(node.scope === undefined ? {} : { scope: rewrite(node.scope) }),
+				...(node.items === undefined ? {} : { items: template(node.items) }),
+				...(node.value === undefined ? {} : { value: template(node.value) }),
+				...(node.scope === undefined ? {} : { scope: template(node.scope) }),
+				...(node.when === undefined
+					? {}
+					: { when: rule(node.when, SINCE_LAST_RUN_NAMES) }),
 			};
 		case "web-request":
-			return rewriteWebRequest(node, rewrite);
+			return rewriteWebRequest(node, template);
 	}
 }
 
 /**
- * Applies `rewrite` to every template of the flow: its nodes, its outputs,
- * and the initial values of its variables.
+ * Applies `rewrite` to every text of the flow that can read a name: its
+ * nodes' (`rewriteNodeTexts`), its outputs, and the initial values of its
+ * variables.
  */
-export function rewriteFlowTemplates(
-	flow: Flow,
-	rewrite: (text: string) => string,
-): Flow {
+export function rewriteFlowTexts(flow: Flow, rewrite: TextRewrite): Flow {
+	const template = (text: string) => rewrite(text, TEMPLATE);
 	const rewritten: Flow = {
 		...flow,
-		nodes: flow.nodes.map((node) => rewriteTemplates(node, rewrite)),
+		nodes: flow.nodes.map((node) => rewriteNodeTexts(node, rewrite)),
 		outputs: flow.outputs.map((output) => ({
 			...output,
-			value: rewrite(output.value),
+			value: template(output.value),
 		})),
 	};
 	if (!flow.variables) return rewritten;
@@ -398,7 +525,17 @@ export function rewriteFlowTemplates(
 		variables: flow.variables.map((variable) =>
 			variable.initial === undefined
 				? variable
-				: { ...variable, initial: rewrite(variable.initial) },
+				: { ...variable, initial: template(variable.initial) },
 		),
 	};
+}
+
+/** Applies `rewrite` to every template of the flow: `rewriteFlowTexts` without the rules. */
+export function rewriteFlowTemplates(
+	flow: Flow,
+	rewrite: (text: string) => string,
+): Flow {
+	return rewriteFlowTexts(flow, (text, field) =>
+		field.rule ? text : rewrite(text),
+	);
 }
