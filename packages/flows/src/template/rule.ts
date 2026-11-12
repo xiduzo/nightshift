@@ -170,6 +170,9 @@ export function ruleNames(expr: string): string[] {
 /** A top-level name a rule reads, with the keys after it. */
 type RuleRef = { name: string; path: string[] };
 
+/** A `RuleRef` and the name's step in JSONata's AST, which knows where the name ends. */
+type FoundRef = RuleRef & { step: AstNode };
+
 /**
  * Each place a rule reads a top-level name (`ruleNames`), with the plain
  * keys after it: `build` and `data.tasks` in `build.data.tasks[0].title`.
@@ -177,15 +180,87 @@ type RuleRef = { name: string; path: string[] };
  * the order of the rule.
  */
 export function ruleRefs(expr: string): RuleRef[] {
+	return findRefs(expr).map(({ name, path }) => ({ name, path }));
+}
+
+function findRefs(expr: string): FoundRef[] {
 	let ast: unknown;
 	try {
 		ast = jsonata(expr).ast();
 	} catch {
 		return [];
 	}
-	const refs: RuleRef[] = [];
+	const refs: FoundRef[] = [];
 	walk(ast, refs, true);
 	return refs;
+}
+
+/** The words JSONata reads as an operator or a value, not as a name. */
+const NOT_A_NAME = new Set([
+	"and",
+	"or",
+	"in",
+	"true",
+	"false",
+	"null",
+	"function",
+]);
+
+/** The name as a rule writes it: bare when JSONata takes it bare, else in backticks. */
+function nameInRule(name: string): string {
+	return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && !NOT_A_NAME.has(name)
+		? name
+		: `\`${name}\``;
+}
+
+/**
+ * Rewrites the top-level names a rule reads (`ruleRefs`) that `rename`
+ * gives a new name for: `build` in `build.data.x`, in `` `build`.data ``
+ * too. Strings, `$` variables, functions and the keys below a name stay.
+ * Everything else of the text stays as it is. A rule that is not valid
+ * stays as a whole.
+ */
+export function rewriteRuleNames(
+	expr: string,
+	rename: (name: string) => string | undefined,
+): string {
+	let out = "";
+	let cursor = 0;
+	const spans = findRefs(expr)
+		.flatMap(({ name, step }) => {
+			const to = rename(name);
+			const span = nameSpan(expr, name, step);
+			return to === undefined || to === name || span === null
+				? []
+				: [{ ...span, to }];
+		})
+		.sort((a, b) => a.start - b.start);
+	for (const { start, end, quoted, to } of spans) {
+		if (start < cursor) continue;
+		out += expr.slice(cursor, start) + (quoted ? `\`${to}\`` : nameInRule(to));
+		cursor = end;
+	}
+	return out + expr.slice(cursor);
+}
+
+/**
+ * Where the name of a step sits in the rule. JSONata puts the end of the
+ * name (after its closing backtick) in `position`. Null when the text
+ * there is not the name, so a rewrite never lands in the wrong place.
+ */
+function nameSpan(
+	expr: string,
+	name: string,
+	step: AstNode,
+): { start: number; end: number; quoted: boolean } | null {
+	const end = step.position;
+	if (typeof end !== "number") return null;
+	const quoted = `\`${name}\``;
+	if (expr.slice(end - quoted.length, end) === quoted)
+		return { start: end - quoted.length, end, quoted: true };
+	if (expr.slice(end - name.length, end) === name)
+		return { start: end - name.length, end, quoted: false };
+	return null;
 }
 
 /**
@@ -239,7 +314,7 @@ type AstNode = {
  * path whose first step is a name. Inside a `$` variable path or after a
  * step, the names are keys of that value, not context names.
  */
-function walk(node: unknown, refs: RuleRef[], top: boolean): void {
+function walk(node: unknown, refs: FoundRef[], top: boolean): void {
 	if (Array.isArray(node)) {
 		for (const child of node) walk(child, refs, top);
 		return;
@@ -249,7 +324,12 @@ function walk(node: unknown, refs: RuleRef[], top: boolean): void {
 	if (ast.type === "path" && Array.isArray(ast.steps)) {
 		const [first, ...rest] = ast.steps;
 		if (first?.type === "name" && typeof first.value === "string") {
-			if (top) refs.push({ name: first.value, path: keysAfter(first, rest) });
+			if (top)
+				refs.push({
+					name: first.value,
+					path: keysAfter(first, rest),
+					step: first,
+				});
 		} else {
 			walk(first, refs, top);
 		}
@@ -260,7 +340,7 @@ function walk(node: unknown, refs: RuleRef[], top: boolean): void {
 	}
 	if (ast.type === "name") {
 		if (top && typeof ast.value === "string")
-			refs.push({ name: ast.value, path: [] });
+			refs.push({ name: ast.value, path: [], step: ast });
 		return;
 	}
 	for (const [key, value] of Object.entries(ast)) {

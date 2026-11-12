@@ -9,7 +9,7 @@ import {
 	type WebRequestNode,
 } from "../nodes";
 import type { TemplateRef } from "../template";
-import { templateRefs } from "../template";
+import { rewriteRuleNames, templateRefs } from "../template";
 
 /** A name a template can reference: a node id, an input, `run` or `vars`. */
 const REF_NAME = /^[a-z][a-z0-9_]*$/;
@@ -77,6 +77,35 @@ export function renameVarRefs(text: string, from: string, to: string): string {
 		const at = ref.raw.indexOf("vars") + "vars.".length;
 		return ref.raw.slice(0, at) + to + ref.raw.slice(at + from.length);
 	});
+}
+
+/**
+ * Rewrites the name `from` where a rule or an expression reads it at the
+ * top: `from.data.x`, `` `from`.data ``. A string, a `$` variable, a key
+ * below another name and the rule's own names (`also`: `previous`,
+ * `current`) stay. A rule that is not valid stays as it is.
+ */
+function renameInRule(
+	text: string,
+	from: string,
+	to: string,
+	also: readonly string[] = [],
+): string {
+	if (also.includes(from)) return text;
+	return rewriteRuleNames(text, (name) => (name === from ? to : undefined));
+}
+
+/**
+ * Renames `from` in every template and rule of the flow
+ * (`rewriteFlowTexts`): `{{from…}}` in a template, `from` at the top of a
+ * rule.
+ */
+export function renameInFlow(flow: Flow, from: string, to: string): Flow {
+	return rewriteFlowTexts(flow, (text, field) =>
+		field.rule
+			? renameInRule(text, from, to, field.also)
+			: renameRefs(text, from, to),
+	);
 }
 
 /**

@@ -355,24 +355,24 @@ function fieldAt(value: unknown, path: readonly (string | number)[]): unknown {
 	return at;
 }
 
+/** A flow of the node `scout` and a node that reads it. */
+const scoutAndReader = (node: Record<string, unknown>, id = "scout"): Flow =>
+	flowSchema.parse({
+		version: FLOW_VERSION,
+		inputs: [],
+		outputs: [],
+		variables: [{ name: "seen", type: "number" }],
+		start: id,
+		nodes: [
+			{ id, type: "command", position: { x: 0, y: 0 }, command: "true" },
+			{ id: "reader", position: { x: 0, y: 0 }, ...node },
+		],
+		edges: [],
+	});
+
 describe("renameNode follows every template", () => {
 	test.each(FIELD_CASES)("$field", ({ node, path }) => {
-		const flow = flowSchema.parse({
-			version: FLOW_VERSION,
-			inputs: [],
-			outputs: [],
-			start: "scout",
-			nodes: [
-				{
-					id: "scout",
-					type: "command",
-					position: { x: 0, y: 0 },
-					command: "true",
-				},
-				{ id: "reader", position: { x: 0, y: 0 }, ...node },
-			],
-			edges: [],
-		});
+		const flow = scoutAndReader(node);
 		const before = fieldAt(flow.nodes[1], path);
 		expect(typeof before === "string" && before.includes(SCOUT)).toBe(true);
 		const renamed = renameNode(flow, "scout", "finder");
@@ -380,4 +380,162 @@ describe("renameNode follows every template", () => {
 			String(before).replace(SCOUT, "{{finder.data.topic}}"),
 		);
 	});
+});
+
+/** A node whose rule reads `scout`, the path to the rule, and the rule after `scout` is `finder`. */
+type RuleCase = FieldCase & { after: string };
+
+const decideBy = (when: string) => ({
+	type: "decision",
+	prompt: "",
+	by: "rule",
+	options: [{ name: "go", when }, { name: "stop" }],
+});
+
+/** Every kind of rule that can read a node, one case each. */
+const RULE_CASES: RuleCase[] = [
+	{
+		field: "the rule of a Decision option",
+		node: decideBy('scout.data.count > 3 and scout.outcome = "pass"'),
+		path: ["options", 0, "when"],
+		after: 'finder.data.count > 3 and finder.outcome = "pass"',
+	},
+	{
+		field: "the expression of a Value by rule",
+		node: {
+			type: "value",
+			by: "rule",
+			output: { type: "object" },
+			expression:
+				'{ "topic": scout.data.topic, "n": $count(scout.data.items) }',
+		},
+		path: ["expression"],
+		after: '{ "topic": finder.data.topic, "n": $count(finder.data.items) }',
+	},
+	{
+		field: "the rule of Since last run",
+		node: {
+			type: "since-last-run",
+			value: "{{vars.seen}}",
+			when: "current - previous > scout.data.limit",
+		},
+		path: ["when"],
+		after: "current - previous > finder.data.limit",
+	},
+	{
+		field: "the expression of a variable write",
+		node: {
+			type: "command",
+			command: "true",
+			set: [
+				{
+					variable: "seen",
+					expression: "vars.seen + $count(scout.data.items)",
+				},
+			],
+		},
+		path: ["set", 0, "expression"],
+		after: "vars.seen + $count(finder.data.items)",
+	},
+	{
+		field: "a name in backticks",
+		node: decideBy("`scout`.data.ok = true and (scout).data.ready"),
+		path: ["options", 0, "when"],
+		after: "`finder`.data.ok = true and (finder).data.ready",
+	},
+];
+
+describe("renameNode follows every rule", () => {
+	test.each(RULE_CASES)("$field", ({ node, path, after }) => {
+		const renamed = renameNode(scoutAndReader(node), "scout", "finder");
+		expect(fieldAt(renamed.nodes[1], path)).toBe(after);
+	});
+
+	test("the node's own write reads it under the new name", () => {
+		const flow = flowSchema.parse({
+			...scoutAndReader({ type: "command", command: "true" }),
+			nodes: [
+				{
+					id: "scout",
+					type: "command",
+					position: { x: 0, y: 0 },
+					command: "true",
+					set: [{ variable: "seen", expression: "scout.data.count" }],
+				},
+			],
+		});
+		expect(renameNode(flow, "scout", "finder").nodes[0]?.set).toEqual([
+			{ variable: "seen", expression: "finder.data.count" },
+		]);
+	});
+
+	test("only the name the rule reads at the top changes, the rest of the text stays", () => {
+		const rule =
+			'scout.ok and "scout" = other.scout and other.tasks[scout = 1] and $scout and scout_2 /* scout */';
+		const renamed = renameNode(
+			scoutAndReader(decideBy(rule)),
+			"scout",
+			"finder",
+		);
+		expect(fieldAt(renamed.nodes[1], ["options", 0, "when"])).toBe(
+			'finder.ok and "scout" = other.scout and other.tasks[scout = 1] and $scout and scout_2 /* scout */',
+		);
+	});
+
+	test("a rule that is not valid stays as it is", () => {
+		const renamed = renameNode(
+			scoutAndReader(decideBy("scout.data = (")),
+			"scout",
+			"finder",
+		);
+		expect(fieldAt(renamed.nodes[1], ["options", 0, "when"])).toBe(
+			"scout.data = (",
+		);
+	});
+
+	// `previous` and `current`, `data` and `event` are the rule's own
+	// values: a node of the same name is not what the rule reads.
+	test.each([
+		{
+			field: "the values of Since last run",
+			id: "previous",
+			node: {
+				type: "since-last-run",
+				value: "{{vars.seen}}",
+				when: "current - previous > 0",
+			},
+			path: ["when"],
+		},
+		{
+			field: "the value a model made",
+			id: "data",
+			node: {
+				type: "value",
+				by: "model",
+				prompt: "",
+				output: { type: "object" },
+				cascade: [{ model: "small", accept: "data.score > 0.5" }],
+			},
+			path: ["cascade", 0, "accept"],
+		},
+		{
+			field: "the signal of a Wait",
+			id: "event",
+			node: {
+				type: "wait",
+				until: { kind: "signal", name: "paid" },
+				outcomes: [{ name: "ok", when: "event.body.ok = true" }],
+			},
+			path: ["outcomes", 0, "when"],
+		},
+	])(
+		"a node does not take the rule's own name: $field",
+		({ id, node, path }) => {
+			const flow = scoutAndReader(node, id);
+			const renamed = renameNode(flow, id, "renamed");
+			expect(fieldAt(renamed.nodes[1], path)).toBe(
+				fieldAt(flow.nodes[1], path),
+			);
+		},
+	);
 });

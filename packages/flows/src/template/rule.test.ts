@@ -4,6 +4,7 @@ import {
 	chooseByRule,
 	evaluateRule,
 	isTruthy,
+	rewriteRuleNames,
 	ruleContext,
 	ruleNames,
 	ruleProblem,
@@ -226,6 +227,52 @@ describe("ruleProblem and ruleNames", () => {
 		]);
 		expect(ruleRefs("$x.y")).toEqual([]);
 		expect(ruleRefs("broken (")).toEqual([]);
+	});
+});
+
+describe("rewriteRuleNames", () => {
+	const toFinder = (name: string) => (name === "scout" ? "finder" : undefined);
+
+	test("rewrites each top-level name, the rest of the text stays", () => {
+		expect(
+			rewriteRuleNames(
+				"$count(scout.data.tasks[done = false]) > 3 and\n  scout.outcome = 'pass' ? scout : other",
+				toFinder,
+			),
+		).toBe(
+			"$count(finder.data.tasks[done = false]) > 3 and\n  finder.outcome = 'pass' ? finder : other",
+		);
+		expect(
+			rewriteRuleNames('{ "a": scout.data, scout: [scout] }', toFinder),
+		).toBe('{ "a": finder.data, finder: [finder] }');
+		expect(
+			rewriteRuleNames("scout.data ~> $map(function($v){ scout })", toFinder),
+		).toBe("finder.data ~> $map(function($v){ finder })");
+	});
+
+	test("keeps a name in backticks in backticks", () => {
+		expect(rewriteRuleNames("`scout`.data and ( scout ).ok", toFinder)).toBe(
+			"`finder`.data and ( finder ).ok",
+		);
+	});
+
+	test("leaves strings, variables, comments, keys and longer names alone", () => {
+		const rule =
+			"\"scout\" & 'scout' & $scout & $scout() & other.scout & other[scout = 1] & scout_2 /* scout */";
+		expect(rewriteRuleNames(rule, toFinder)).toBe(rule);
+	});
+
+	test("puts a new name JSONata cannot take bare in backticks", () => {
+		expect(rewriteRuleNames("scout.x and scout", () => "and")).toBe(
+			"`and`.x and `and`",
+		);
+		expect(rewriteRuleNames("scout = 1", () => "my-node")).toBe(
+			"`my-node` = 1",
+		);
+	});
+
+	test("leaves a rule that is not valid as it is", () => {
+		expect(rewriteRuleNames("scout.data = (", toFinder)).toBe("scout.data = (");
 	});
 });
 

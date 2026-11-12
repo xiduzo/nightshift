@@ -33,7 +33,7 @@ import {
 	waitNode,
 	webRequestNode,
 } from "./nodes";
-import { renameRefs, rewriteFlowTemplates } from "./refs";
+import { renameInFlow } from "./refs";
 import { sectionsWithoutNode, sectionsWithRenamedNode } from "./sections";
 
 /**
@@ -304,19 +304,21 @@ export function removeNode(flow: Flow, id: string): Flow {
 }
 
 /**
- * Renames a node everywhere: its edges, the start, its Section, and
- * `{{old…}}` references in the flow's templates and outputs.
+ * Renames a node everywhere: its edges, the start, its Section,
+ * `{{old…}}` references in the flow's templates and outputs, and `old`
+ * where its rules and expressions read it.
  */
 export function renameNode(flow: Flow, from: string, to: string): Flow {
 	if (from === to) return flow;
-	const renamed = rewriteFlowTemplates(
+	const renamed = renameInFlow(
 		{
 			...flow,
 			nodes: flow.nodes.map((node) =>
 				node.id === from ? { ...node, id: to } : node,
 			),
 		},
-		(text) => renameRefs(text, from, to),
+		from,
+		to,
 	);
 	return sectionsWithRenamedNode(
 		{

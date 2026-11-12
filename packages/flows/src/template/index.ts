@@ -17,6 +17,7 @@ export {
 	isTruthy,
 	type RuleEvaluation,
 	type RuleOutcome,
+	rewriteRuleNames,
 	ruleMessage,
 	ruleNames,
 	ruleProblem,
