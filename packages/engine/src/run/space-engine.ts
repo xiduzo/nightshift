@@ -138,7 +138,8 @@ export interface SpaceEngine {
 	listNodeMemory(projectId: string, flowName: string): Promise<NodeMemory[]>;
 	/**
 	 * Forgets what a Since last run node saw, in every scope or in one: the
-	 * next run of the flow is its first run again.
+	 * next run of the flow is its first run again. `node` is the node's
+	 * path: a Subflow node's forgets what every node inside it saw.
 	 */
 	forgetNodeMemory(
 		projectId: string,

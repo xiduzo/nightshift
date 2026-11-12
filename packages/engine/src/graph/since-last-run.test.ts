@@ -263,6 +263,44 @@ describe("the Since last run node", () => {
 		).toEqual(["same", "same"]);
 	});
 
+	test("Forget on a Subflow node forgets what the nodes inside it saw, and only that", async () => {
+		const watch = watching();
+		const call = (id: string) =>
+			({
+				id,
+				type: "call",
+				position: at,
+				flow: "watch",
+				inputs: { items: "{{items}}" },
+			}) as const;
+		// "left_2" starts with "left" but is another node.
+		const caller = flowOf(
+			[call("left"), call("left_2")],
+			[{ id: "on", from: "left", outcome: "pass", to: "left_2" }],
+			{ inputs: [{ name: "items", type: "json" }] },
+		);
+		const items = [{ id: 1, title: "a" }];
+		await runOnce(caller, { items }, { flowName: "both", flows: { watch } });
+		expect((await memory("both")).map((m) => m.node)).toEqual([
+			"left/fresh",
+			"left_2/fresh",
+		]);
+		await forgetMemory(
+			sandbox.db,
+			{ spaceId: sandbox.spaceId, projectId: "project-1", flowName: "both" },
+			"left",
+		);
+		expect((await memory("both")).map((m) => m.node)).toEqual(["left_2/fresh"]);
+		const again = await runOnce(
+			caller,
+			{ items },
+			{ flowName: "both", flows: { watch } },
+		);
+		expect(
+			again.ended.filter((e) => e.outputs.data).map((e) => e.outcome),
+		).toEqual(["new", "same"]);
+	});
+
 	test("a quick run remembers nothing: each of its runs is a first run", async () => {
 		const flow = watching();
 		const items = [{ id: 1, title: "a" }];

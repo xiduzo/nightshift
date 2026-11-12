@@ -2,7 +2,7 @@ import type { Database } from "@nightshift/db";
 import { nodeMemory, run } from "@nightshift/db/schema";
 import { type JsonValue, MAX_MEMORY_KEYS } from "@nightshift/flows";
 import { asDate, instant } from "@nightshift/time";
-import { and, desc, eq, lt, max, type SQL, sql } from "drizzle-orm";
+import { and, desc, eq, lt, max, or, type SQL, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
 /**
@@ -317,8 +317,10 @@ export async function listMemory(
 }
 
 /**
- * Forgets what a node saw: every scope, or one. The next run of the flow
- * is a first run for it again.
+ * Forgets what a node saw: every scope, or one. `node` is a node's path:
+ * a Subflow node's forgets what every node inside its flow saw (a kit's
+ * Since last run under `<subflow id>/fresh`). The next run of the flow
+ * is a first run for them again.
  */
 export async function forgetMemory(
 	db: Database,
@@ -326,6 +328,7 @@ export async function forgetMemory(
 	node: string,
 	scope?: string,
 ): Promise<void> {
+	const inside = `${node}/`;
 	await db
 		.delete(nodeMemory)
 		.where(
@@ -333,7 +336,10 @@ export async function forgetMemory(
 				eq(nodeMemory.spaceId, flow.spaceId),
 				eq(nodeMemory.projectId, flow.projectId),
 				eq(nodeMemory.rootFlow, flow.flowName),
-				eq(nodeMemory.nodePath, node),
+				or(
+					eq(nodeMemory.nodePath, node),
+					sql`substr(${nodeMemory.nodePath}, 1, length(${inside})) = ${inside}`,
+				),
 				scope === undefined ? undefined : eq(nodeMemory.scope, scope),
 			),
 		);

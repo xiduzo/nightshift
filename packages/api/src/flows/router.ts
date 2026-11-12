@@ -86,7 +86,7 @@ export const flows = {
 	memory: protectedProcedure
 		.route({
 			summary:
-				"Lists what the Since last run nodes of a flow remember between runs on this computer, per node and scope.",
+				"Lists what the Since last run nodes of a flow remember between runs on this computer, per node and scope. A node inside a Subflow node has a path such as `read/fresh`.",
 		})
 		.output(output(z.array(nodeMemorySchema)))
 		.input(flowRef)
@@ -96,7 +96,7 @@ export const flows = {
 	forgetMemory: ownerProcedure
 		.route({
 			summary:
-				"Forgets what a Since last run node of a flow saw, in every scope or in one: its next run is a first run.",
+				"Forgets what a Since last run node of a flow saw, in every scope or in one: its next run is a first run. A Subflow node forgets what every node inside it saw.",
 		})
 		.output(output(z.void()))
 		.input(
