@@ -213,10 +213,8 @@ Real nights so far run on Claude Code only.
 Server mode is built: the Host, its Spaces and its Offers ([docs/research/devices.md](research/devices.md), [docs/deploy/](deploy/)). The next phase is in [docs/research/next-phase-2026-11.md](research/next-phase-2026-11.md). Still open:
 
 - **A flow library to share.** It starts as the [`community/`](../community/) folder. A separate repository or a gallery in the app can come later.
-- **Cost and benefit insight.** A run shows what each step cost. A person cannot see yet:
-  - how often each tier of a cascade holds, and what it costs
-  - the cost per useful result, such as a run that a person marked useful
-  - how much of their own attention a flow takes
+- **Dashboards that get you out of the loop.** Each flow gets a level: You decide, You check or On its own. Home guards the flows that nobody watches. A project's page suggests how each flow can need you less, tests the suggestion, and measures it after you confirm it. Spend shows the cost to the person who pays. [docs/research/dashboards-2026-11.md](research/dashboards-2026-11.md) lists the decisions.
+- **Cost and benefit insight.** Flow health shows how often each rung holds, the cost per useful result and how often a flow needed you. A person cannot see yet:
   - what a subscription really costs, beyond the API price of the work
   - how close a running run is to its budget
   - how often the guards stop a flow
