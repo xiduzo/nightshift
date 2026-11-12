@@ -6,6 +6,7 @@ import {
 	requestHeadersSchema,
 } from "./base";
 import { checkOptions, type Option, option } from "./outcomes";
+import { secretNamesIn } from "./web-request";
 
 /** The Wait node: it sleeps until a time, a command passes, or a signal arrives. */
 
@@ -77,6 +78,13 @@ export function waitUrlOf(
 	until: WaitUntil,
 ): Extract<WaitUntil, { kind: "url" }> | null {
 	return until.kind === "url" ? until : null;
+}
+
+/** The secrets a Wait for a URL reads: each `${NAME}` of its URL and its headers. */
+export function waitSecrets(until: WaitUntil): string[] {
+	const url = waitUrlOf(until);
+	if (url === null) return [];
+	return [url.url, ...Object.values(url.headers ?? {})].flatMap(secretNamesIn);
 }
 
 /** The signal the Wait waits for, or null when it waits for none. */

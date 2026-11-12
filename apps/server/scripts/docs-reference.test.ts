@@ -225,7 +225,7 @@ describe("flowNeeds", () => {
 					// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
 					body: { kind: "form", fields: { key: "${FORM_KEY}" } },
 				}),
-				// A URL secret from an input is named only when the run renders it.
+				// A URL secret from an input without a default is named only when the run renders it.
 				request("get", {
 					urlSecret: "{{channel}}",
 					// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
@@ -238,6 +238,36 @@ describe("flowNeeds", () => {
 		expect(needsList(flowNeeds(flow))).toBe(
 			// biome-ignore lint/suspicious/noTemplateCurlyInString: secret references, as a person writes them.
 			"- Secrets: `${HOOK_URL}`, `${API_TOKEN}`, `${FORM_KEY}`",
+		);
+	});
+
+	test("a kit it calls adds the secrets the kit reads", () => {
+		const call = (
+			id: string,
+			flow: string,
+			inputs: Record<string, string>,
+		) => ({
+			id,
+			type: "call",
+			position: { x: 0, y: 0 },
+			flow,
+			inputs,
+		});
+		const flow = flowSchema.parse({
+			version: FLOW_VERSION,
+			start: "tell",
+			nodes: [
+				call("tell", "kit:message/send", { webhook: "TEAM_CHAT_URL" }),
+				call("mail", "kit:email/send", {}),
+			],
+			edges: [],
+		});
+		expect(needsList(flowNeeds(flow))).toBe(
+			[
+				// biome-ignore lint/suspicious/noTemplateCurlyInString: secret references, as a person writes them.
+				"- Secrets: `${TEAM_CHAT_URL}`, `${EMAIL_SMTP_URL}`, `${EMAIL_SMTP_USER}`, `${EMAIL_SMTP_PASSWORD}`",
+				"- Kits: `kit:message/send`, `kit:email/send`",
+			].join("\n"),
 		);
 	});
 

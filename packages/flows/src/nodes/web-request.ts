@@ -133,6 +133,31 @@ export function secretParts(text: string): SecretPart[] {
 	return parts;
 }
 
+/** The secrets `text` reads: each `${NAME}` in it, in order. */
+export function secretNamesIn(text: string): string[] {
+	return secretParts(text).flatMap((part) =>
+		"secret" in part ? [part.secret] : [],
+	);
+}
+
+/**
+ * The secrets a Web request reads: the one that holds its URL, and each
+ * `${NAME}` of its own text. `urlSecret` is a template: `known` gives the
+ * text it renders before a run, or null when only a run knows it
+ * (`{{webhook}}` reads an input that the run gets).
+ */
+export function webRequestSecrets(
+	node: WebRequestNode,
+	known: (template: string) => string | null,
+): string[] {
+	const urlSecret =
+		node.urlSecret === undefined ? "" : (known(node.urlSecret)?.trim() ?? "");
+	return [
+		...(secretNameSchema.safeParse(urlSecret).success ? [urlSecret] : []),
+		...ownTexts(node).flatMap(({ text }) => secretNamesIn(text)),
+	];
+}
+
 /** The texts of a Web request node that may hold `${NAME}`, by what the person calls them. */
 function ownTexts(node: WebRequestNode): { where: string; text: string }[] {
 	const body = node.body;

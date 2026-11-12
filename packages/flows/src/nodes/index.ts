@@ -235,6 +235,7 @@ export {
 	waitNodeSchema,
 	waitOutcomes,
 	waitOutputFields,
+	waitSecrets,
 	waitSignalOf,
 	waitUrlOf,
 } from "./wait";
@@ -251,4 +252,5 @@ export {
 	webRequestNodeSchema,
 	webRequestOutcomes,
 	webRequestOutputFields,
+	webRequestSecrets,
 } from "./web-request";

@@ -453,6 +453,7 @@ export {
 	webhookSecretName,
 	webhookSignalKey,
 } from "./schedules";
+export { flowSecrets } from "./secrets";
 export {
 	nodesWithin,
 	parentSection,
