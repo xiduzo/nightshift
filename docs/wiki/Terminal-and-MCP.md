@@ -134,8 +134,8 @@ From a clone, put the full `bun` command after `--`.
 | `list_profiles`, `list_tools`, `list_skills` | Look up the names that a node may use. |
 | `check_flow`, `save_flow` | Check a flow, and save it when it has no errors. |
 | `start_run` | Start a saved flow with its inputs. |
-| `list_runs` | The newest runs, by status and since a time. Each with its cost and pull request. |
-| `get_run` | One run: its status, cost, pull request, steps, why it failed, and its report. |
+| `list_runs` | The newest runs, by status and since a time. Each with its cost and pull request. A test run says which nodes it pinned and skipped. |
+| `get_run` | One run: its status, cost, pull request, steps, why it failed, and its report. A test run says so, and so does each step whose node did not run. |
 | `stop_run` | Stop a run now, or after the step that runs now. |
 | `needs_me` | The Gates that wait for you, in every project, with the question and the options. |
 | `answer_gate` | Answer a Gate with one of its options and a note. The run continues. |

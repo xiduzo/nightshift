@@ -24,7 +24,9 @@ A test run is a run that you start from the flow editor with pinned or skipped n
 - These steps have no transcript, take no time and cost nothing. The other steps run for real.
 - A test run keeps nothing for the next run. It writes no kept variables, and Since last run does not remember what it saw.
 
-A test run counts only in **Spend**, on Home, on the project page and in the details of a flow. Runs, Finished, Needed you, Failed, Latest reports and [Flow health](#flow-health) leave it out. A try does not change how your flows look.
+A test run counts only in **Spend**, on Home, on the project page and in the details of a flow. Runs, Finished, Needed you, Failed, Latest reports and [Flow health](#flow-health) leave it out. The icon of a project in the sidebar leaves it out too. A try does not change how your flows look.
+
+While a test run runs, **Running now** on Home shows it with its **Test run** badge. The `list_runs` and `get_run` tools tell an agent which run is a test run. See [Terminal and MCP](Terminal-and-MCP.md).
 
 ## The report of a run
 

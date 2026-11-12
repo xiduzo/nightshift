@@ -171,6 +171,11 @@ The GenAI conventions are still in development.
 A counter only adds. A no to "Was this run useful?" adds 0, and a changed
 answer adds its new value again.
 
+A test run (a run with pinned or skipped nodes, [ADR 27](../adr/0027-a-test-run-carries-its-pins-and-skips.md))
+counts only in the spend, as in the app. It sends the
+`nightshift.run.cost_usd` and token counter points of its steps, and no span
+and no other point.
+
 A flow chooses the name of each number it reports, and what the value
 means. A `nightshift.flow.metric` point has the value in its sum and count,
 so you can read a total and an average per name.

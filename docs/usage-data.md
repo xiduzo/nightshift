@@ -26,6 +26,8 @@ A released build of Night Shift sends these events to the Night Shift team. A ru
 
 `useful` is a person's answer to "Was this run useful?". A schedule that scores pull requests sends `pr_merged`, `pr_closed` and `reverted_within_7d`. Night Shift does not send a number that a flow reports as usage, not even how many there are.
 
+A test run (a run with pinned or skipped nodes, [ADR 27](adr/0027-a-test-run-carries-its-pins-and-skips.md)) sends no event: no `nightshift.run.ended`, `nightshift.step.ended`, `nightshift.gate.answered` or `nightshift.run.scored`. No field tells a test run apart, and its cost cannot go without its run.
+
 A climb is the tries of one node up its ladder, up to the step it landed on. The rung says where it landed: a rule, the first tier, a later tier, a person, the deadline of a person's Gate, or none. The name of a tier stays on your computer, because you choose it.
 
 ## Retired events
