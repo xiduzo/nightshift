@@ -192,6 +192,42 @@ describe("the Web request node", () => {
 		});
 	});
 
+	test("a failed request keeps no shape, a later 2xx does", async () => {
+		const kept: Record<string, unknown>[] = [];
+		const keepShapes = async (
+			_flow: unknown,
+			_node: unknown,
+			shapes: Record<string, unknown>,
+		) => {
+			kept.push(shapes);
+		};
+		const failed = await startRun(
+			sandbox,
+			flowOf([request("fetch", { url: at("/gone") })]),
+			{ flowName: "news", keepShapes },
+		);
+		await drive(failed, {});
+		const [failedEnd] = payloads(await failed.events(), "StepEnded");
+		expect(failedEnd).toMatchObject({ outcome: "fail" });
+		expect(failedEnd?.shapes).toBeUndefined();
+		expect(kept).toEqual([]);
+
+		answers["/items"] = [Response.json({ items: ["a"] })];
+		const passed = await startRun(sandbox, flowOf([request("fetch")]), {
+			flowName: "news",
+			keepShapes,
+		});
+		await drive(passed, {});
+		expect(kept).toEqual([
+			{
+				body: {
+					type: "object",
+					properties: { items: { type: "array", items: { type: "string" } } },
+				},
+			},
+		]);
+	});
+
 	test("waits out a 429 until its Retry-After, then asks again", async () => {
 		answers["/items"] = [
 			new Response("slow down", {

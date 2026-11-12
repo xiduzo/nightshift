@@ -3,7 +3,6 @@ import {
 	inferSchema,
 	isKitName,
 	RESERVED_DATA_KEYS,
-	reservedOutcomes,
 	typedOutput,
 } from "@nightshift/flows";
 import type { Scope, StepOutcome, StepOutputs } from "../log";
@@ -38,14 +37,15 @@ function shapesFlowOf(
 
 /**
  * The shapes of the step's data for its node to keep: only for a node
- * type with an output schema that has none yet, a step that ended on an
- * outcome of its own (not `error`, `stopped`, …) with data, in a flow that
- * keeps them. The keys a command's data may hold whatever its schema says
- * (`outcome`, `scores`) are left out. Undefined when there is nothing to
- * keep.
+ * type with an output schema that has none yet, a step that passed (an
+ * outcome its kind counts as a chosen end: not `fail`, so a Web request's
+ * 404 page never becomes its body's shape, and not `error`, `stopped`, …)
+ * with data, in a flow that keeps them. The keys a command's data may
+ * hold whatever its schema says (`outcome`, `scores`) are left out.
+ * Undefined when there is nothing to keep.
  */
 export function stepShapes(
-	ctx: Pick<StepContext, "run" | "flowName">,
+	ctx: Pick<StepContext, "run" | "flowName" | "kindOf">,
 	node: FlowNode,
 	scope: Scope | null,
 	outcome: StepOutcome,
@@ -53,9 +53,7 @@ export function stepShapes(
 ): StepShapes | undefined {
 	const typed = typedOutput(node);
 	if (typed === null || typed.schema !== undefined) return undefined;
-	if ((reservedOutcomes as readonly string[]).includes(outcome)) {
-		return undefined;
-	}
+	if (!ctx.kindOf(node).isChosenEnd(node, outcome)) return undefined;
 	const data = outputs[typed.field];
 	if (data === undefined || data === null) return undefined;
 	if (shapesFlowOf(ctx, scope) === null) return undefined;

@@ -2,11 +2,13 @@ import { describe, expect, test } from "bun:test";
 import type { FlowNode } from "@nightshift/flows";
 import type { RunRow, Scope } from "../log";
 import { stepShapes } from "./kept-shapes";
+import { kindOf } from "./node-kinds";
 
 describe("stepShapes", () => {
 	const ctx = (runFlow: string | null, flowName = runFlow ?? "Quick run") => ({
 		run: { flowName: runFlow, spaceId: "space", projectId: "p" } as RunRow,
 		flowName,
+		kindOf,
 	});
 	const scope: Scope = { parentStepId: "s", itemId: null };
 	const agent = { id: "a", type: "agent", position: { x: 0, y: 0 } };
@@ -20,7 +22,7 @@ describe("stepShapes", () => {
 		});
 	});
 
-	test("nothing for a quick run, a kit, an engine outcome, no data or a schema", () => {
+	test("nothing for a quick run, a kit, a failed step, no data or a schema", () => {
 		const of = (
 			c: ReturnType<typeof ctx>,
 			node: Record<string, unknown>,
@@ -41,6 +43,8 @@ describe("stepShapes", () => {
 			),
 		).toBeUndefined();
 		expect(of(ctx("nightly"), agent, "error", data.outputs)).toBeUndefined();
+		// A step that failed: its data is an error's, not the node's shape.
+		expect(of(ctx("nightly"), agent, "fail", data.outputs)).toBeUndefined();
 		expect(
 			of(ctx("nightly"), agent, "pass", { outcome: "pass", data: null }),
 		).toBeUndefined();
