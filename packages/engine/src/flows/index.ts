@@ -6,6 +6,7 @@ export {
 	cliToolsOfSecrets,
 	connectionsInUse,
 	profilesInUse,
+	useThroughProfiles,
 } from "./config-use";
 export {
 	createFlowDocuments,

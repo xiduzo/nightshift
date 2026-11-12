@@ -12,8 +12,12 @@ import {
 	cliToolsOfSecrets,
 	connectionsInUse,
 	profilesInUse,
+	useThroughProfiles,
 } from "./config-use";
 import { type FlowRef, type FlowUse, profileUseKey } from "./flow-use";
+
+/** This computer's id: its profiles are the ones flows name with it. */
+const HERE = "d1";
 
 const flow = (flowName: string): FlowRef => ({
 	projectId: "p1",
@@ -27,6 +31,7 @@ const noUse = (): FlowUse => ({
 	webhooks: new Map(),
 	secrets: new Map(),
 	profiles: new Map(),
+	profileFlows: new Map(),
 });
 
 const connection = (name: string): Connection =>
@@ -56,6 +61,24 @@ const profile = (
 				connections: fields.connections ?? [],
 				clis: fields.clis ?? [],
 			}) as never;
+
+/** A Model Profile whose address reads these secrets: its API key, and a header. */
+const modelProfile = (
+	name: string,
+	secrets: { apiKey?: string; header?: string },
+): ProfileView =>
+	({
+		id: name,
+		name,
+		decider: "compatible",
+		address: {
+			baseUrl: "http://models.example.com",
+			...(secrets.apiKey ? { apiKey: secrets.apiKey } : {}),
+			...(secrets.header
+				? { headers: { "X-Team": `team-\${${secrets.header}}` } }
+				: {}),
+		},
+	}) as never;
 
 /** The secret store's view: every name it is asked for, none saved. */
 const secretsOf = async (
@@ -101,9 +124,60 @@ describe("cliToolsOfSecrets", () => {
 				profiles: { list: () => [] },
 			},
 			use,
+			HERE,
 		);
 		expect(toolsBySecret.get("TOKEN")).toEqual(["acli-work"]);
 		expect(toolFlows.get("acli-work")).toEqual([flow("nightly")]);
+	});
+
+	test("a tool's flows include those of an Agent Profile of this computer that names it, not of another Device's", () => {
+		const use = noUse();
+		use.profileFlows.set(profileUseKey(HERE, "worker"), [flow("triage")]);
+		// The same profile id on another Device is another profile.
+		use.profileFlows.set(profileUseKey("le2316", "worker"), [flow("far")]);
+		const { toolFlows } = cliToolsOfSecrets(
+			{
+				cliTools: { list: () => [tool("gh")] },
+				profiles: { list: () => [profile("worker", { clis: ["gh"] })] },
+			},
+			use,
+			HERE,
+		);
+		expect(toolFlows.get("gh")).toEqual([flow("triage")]);
+	});
+});
+
+describe("useThroughProfiles", () => {
+	test("the flows that use a profile of this computer use its connections, its CLI tools and the secrets its address reads", () => {
+		const use = noUse();
+		use.profileFlows.set(profileUseKey(HERE, "worker"), [flow("triage")]);
+		use.profileFlows.set(profileUseKey(HERE, "jev"), [
+			flow("triage"),
+			flow("sort"),
+		]);
+		use.profileFlows.set(profileUseKey("le2316", "jev"), [flow("far")]);
+		const through = useThroughProfiles(
+			{
+				profiles: {
+					list: () => [
+						profile("worker", { connections: ["tracker"], clis: ["gh"] }),
+						modelProfile("jev", { apiKey: "JEV_KEY", header: "TEAM_ID" }),
+						// No flow uses it: it adds no flow.
+						modelProfile("idle", { apiKey: "IDLE_KEY" }),
+					],
+				},
+			},
+			use,
+			HERE,
+		);
+		expect(Object.fromEntries(through.connections)).toEqual({
+			tracker: [flow("triage")],
+		});
+		expect(Object.fromEntries(through.clis)).toEqual({ gh: [flow("triage")] });
+		expect(Object.fromEntries(through.secrets)).toEqual({
+			JEV_KEY: [flow("triage"), flow("sort")],
+			TEAM_ID: [flow("triage"), flow("sort")],
+		});
 	});
 });
 
@@ -128,6 +202,7 @@ describe("connectionsInUse", () => {
 				},
 			},
 			use,
+			HERE,
 		);
 		expect(
 			listed.connections.map((c) => [c.name, c.usedBy, c.profiles]),
@@ -160,10 +235,37 @@ describe("connectionsInUse", () => {
 				profiles: { list: () => [] },
 			},
 			use,
+			HERE,
 		);
 		expect(listed.secrets.map((s) => [s.name, s.flows, s.tools])).toEqual([
 			["API_USER", [flow("tools")], ["gh-work"]],
 			["GH_WORK_TOKEN", [], ["gh-work"]],
+		]);
+	});
+
+	test("lists a secret a Model Profile's address reads, with the flows that use the profile, unless their project has it", async () => {
+		const use = noUse();
+		const sort: FlowRef = { ...flow("sort"), projectId: "p2" };
+		// A Command of triage names the key too: triage counts once.
+		use.secrets.set("JEV_KEY", [flow("triage")]);
+		use.profileFlows.set(profileUseKey(HERE, "jev"), [flow("triage"), sort]);
+		const listed = await connectionsInUse(
+			{
+				connections: { list: () => [], secrets: secretsOf },
+				cliTools: { list: () => [] },
+				profiles: {
+					list: () => [
+						modelProfile("jev", { apiKey: "JEV_KEY", header: "TEAM_ID" }),
+					],
+				},
+			},
+			use,
+			HERE,
+			async (projectId) => new Set(projectId === "p2" ? ["TEAM_ID"] : []),
+		);
+		expect(listed.secrets.map((s) => [s.name, s.flows])).toEqual([
+			["JEV_KEY", [flow("triage"), sort]],
+			["TEAM_ID", [flow("triage")]],
 		]);
 	});
 
@@ -181,6 +283,7 @@ describe("connectionsInUse", () => {
 				profiles: { list: () => [] },
 			},
 			use,
+			HERE,
 			async (projectId) => {
 				asked.push(projectId);
 				return new Set(projectId === "p1" ? ["ALPACA_KEY", "LAB_DB_URL"] : []);
@@ -211,6 +314,7 @@ describe("connectionsInUse", () => {
 				profiles: { list: () => [] },
 			},
 			use,
+			HERE,
 			async () => new Set(["LAB_DB_URL"]),
 		);
 		expect(listed.secrets.map((s) => [s.name, s.saved, s.flows])).toEqual([
@@ -236,6 +340,7 @@ describe("connectionsInUse with a CLI tool's login", () => {
 				profiles: { list: () => [profile("worker", { clis: ["acli-work"] })] },
 			},
 			use,
+			HERE,
 			async (projectId) => new Set(keeps[projectId] ?? []),
 		);
 
@@ -250,9 +355,7 @@ describe("connectionsInUse with a CLI tool's login", () => {
 		const use = noUse();
 		const other: FlowRef = { ...flow("sync"), projectId: "p2" };
 		use.secrets.set("ACLI_TOKEN", [flow("demo")]);
-		use.profiles.set(profileUseKey("d1", "worker"), [
-			{ ...other, nodeIds: ["a"] },
-		]);
+		use.profileFlows.set(profileUseKey(HERE, "worker"), [other]);
 		const listed = await list(use, { p1: ["ACLI_TOKEN"] });
 		expect(listed.secrets.map((s) => [s.name, s.flows, s.tools])).toEqual([
 			["ACLI_TOKEN", [], ["acli-work"]],
@@ -406,6 +509,7 @@ describe("connectionsInUse: webhooks", () => {
 					profiles: { list: () => [] },
 				},
 				use,
+				HERE,
 				async () => kept,
 			);
 		const shown = await listedWith(new Set());

@@ -1,4 +1,4 @@
-import { isAgentProfile } from "@nightshift/flows";
+import { isAgentProfile, profileSecrets } from "@nightshift/flows";
 
 import { loginReferences, type ToolLaunchers } from "../device";
 import type {
@@ -17,7 +17,8 @@ import { type FlowRef, type FlowUse, profileUseKey } from "./flow-use";
  * What uses this computer's configuration, for the pages that list it: the
  * flows of the Space that name a connection, a secret, a CLI tool or a
  * profile (`flowUse`), the Agent Profiles that name a connection or a CLI
- * tool, and the CLI tools whose login reads a secret.
+ * tool, the CLI tools whose login reads a secret, and the Model Profiles
+ * whose address reads one.
  */
 
 /** The Agent Profiles whose `pick` names it. */
@@ -32,13 +33,63 @@ function profilesNaming(
 		.map((p) => p.name);
 }
 
+/** The flows of each name, in a map that `add` fills. */
+type FlowsByName = Map<string, FlowRef[]>;
+
+/** Adds `flows` to those of `name`: a name without flows stays out. */
+function add(map: FlowsByName, name: string, flows: readonly FlowRef[]): void {
+	if (flows.length > 0) map.set(name, [...(map.get(name) ?? []), ...flows]);
+}
+
+/** Each flow once, in its first place. */
+function eachOnce(flows: readonly FlowRef[]): FlowRef[] {
+	const seen = new Set<string>();
+	return flows.filter((flow) => {
+		const key = JSON.stringify([flow.projectId, flow.flowName]);
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
+}
+
+/**
+ * What the profiles of this computer (`deviceId`) add to `use`: by name,
+ * the flows that use each connection and CLI tool through an Agent
+ * Profile that names it, and the flows that use each secret through a
+ * Model Profile whose address reads it. A flow uses a profile when it
+ * names it, or a flow or kit it calls does (`FlowUse.profileFlows`).
+ */
+export function useThroughProfiles(
+	config: { profiles: Pick<ProfileStore, "list"> },
+	use: Pick<FlowUse, "profileFlows">,
+	deviceId: string,
+): {
+	connections: ReadonlyMap<string, readonly FlowRef[]>;
+	clis: ReadonlyMap<string, readonly FlowRef[]>;
+	secrets: ReadonlyMap<string, readonly FlowRef[]>;
+} {
+	const connections: FlowsByName = new Map();
+	const clis: FlowsByName = new Map();
+	const secrets: FlowsByName = new Map();
+	for (const profile of config.profiles.list()) {
+		const flows =
+			use.profileFlows.get(profileUseKey(deviceId, profile.id)) ?? [];
+		if (isAgentProfile(profile)) {
+			for (const name of profile.connections) add(connections, name, flows);
+			for (const name of profile.clis) add(clis, name, flows);
+		}
+		for (const name of profileSecrets(profile)) add(secrets, name, flows);
+	}
+	return { connections, clis, secrets };
+}
+
 /** A connection, with the flows and the profiles that name it. */
 export type ConnectionInUse = Connection & {
 	usedBy: FlowRef[];
 	profiles: string[];
 };
 
-/** A secret, with the flows that use it (`flowSecrets`) and the CLI tools whose logins read it. */
+/** A secret, with the flows that use it (`flowSecrets`, or a Model Profile) and the CLI tools whose logins read it. */
 export type SecretInUse = SecretView & {
 	flows: FlowRef[];
 	tools: string[];
@@ -47,10 +98,12 @@ export type SecretInUse = SecretView & {
 };
 
 /**
- * The connections and the secrets of this computer and of its Person
- * (Personal), with what uses each. A secret only a flow or a CLI tool's
- * login uses is listed too: saved or not. `personal` says whether the
- * Personal secrets could be read now.
+ * The connections and the secrets of this computer (`deviceId`) and of its
+ * Person (Personal), with what uses each. A secret's flows use it through
+ * their nodes or through a Model Profile of this computer whose address
+ * reads it. A secret only a flow or a CLI tool's login uses is listed too:
+ * saved or not. `personal` says whether the Personal secrets could be read
+ * now.
  *
  * `projectNames` gives the names of a project's own secrets (ADR 13). A
  * project's secret wins for its flows, so those flows do not use this
@@ -67,6 +120,7 @@ export async function connectionsInUse(
 		profiles: Pick<ProfileStore, "list">;
 	},
 	use: FlowUse,
+	deviceId: string,
 	projectNames: (
 		projectId: string,
 	) => Promise<ReadonlySet<string>> = async () => new Set(),
@@ -75,14 +129,26 @@ export async function connectionsInUse(
 	secrets: SecretInUse[];
 	personal: SecretList["personal"];
 }> {
-	const { toolsBySecret, toolFlows } = cliToolsOfSecrets(config, use);
+	const { toolsBySecret, toolFlows } = cliToolsOfSecrets(config, use, deviceId);
+	const through = useThroughProfiles(config, use, deviceId);
+	const secretFlows = (name: string) =>
+		eachOnce([
+			...(use.secrets.get(name) ?? []),
+			...(through.secrets.get(name) ?? []),
+		]);
 	const listed = await config.connections.secrets([
 		...use.secrets.keys(),
+		...through.secrets.keys(),
 		...use.webhooks.keys(),
 		...toolsBySecret.keys(),
 	]);
 	const projectIds = new Set(
-		[...use.secrets.values(), ...use.webhooks.values(), ...toolFlows.values()]
+		[
+			...use.secrets.values(),
+			...through.secrets.values(),
+			...use.webhooks.values(),
+			...toolFlows.values(),
+		]
 			.flat()
 			.map((flow) => flow.projectId),
 	);
@@ -98,13 +164,11 @@ export async function connectionsInUse(
 		const tools = (toolsBySecret.get(secret.name) ?? []).filter((tool) => {
 			const users = [
 				...(toolFlows.get(tool) ?? []),
-				...(use.secrets.get(secret.name) ?? []),
+				...secretFlows(secret.name),
 			];
 			return users.length === 0 || !users.every(covered);
 		});
-		const flows = (use.secrets.get(secret.name) ?? []).filter(
-			(flow) => !covered(flow),
-		);
+		const flows = secretFlows(secret.name).filter((flow) => !covered(flow));
 		const webhooks = (use.webhooks.get(secret.name) ?? []).filter(
 			(flow) => !covered(flow),
 		);
@@ -131,7 +195,8 @@ export async function connectionsInUse(
 
 /**
  * The CLI tools whose logins read each secret, and the flows that use each
- * tool: by name in an Agent node, or through an Agent Profile that names it.
+ * tool: by name in an Agent node, or through an Agent Profile of this
+ * computer (`deviceId`) that names it.
  */
 export function cliToolsOfSecrets(
 	config: {
@@ -139,27 +204,21 @@ export function cliToolsOfSecrets(
 		profiles: Pick<ProfileStore, "list">;
 	},
 	use: FlowUse,
+	deviceId: string,
 ): {
 	toolsBySecret: ReadonlyMap<string, readonly string[]>;
 	toolFlows: ReadonlyMap<string, readonly FlowRef[]>;
 } {
+	const through = useThroughProfiles(config, use, deviceId);
 	const toolsBySecret = new Map<string, string[]>();
 	const toolFlows = new Map<string, FlowRef[]>();
 	for (const tool of config.cliTools.list()) {
 		for (const name of tool.login ? loginReferences(tool.login) : []) {
 			toolsBySecret.set(name, [...(toolsBySecret.get(name) ?? []), tool.name]);
 		}
-		const viaProfiles = config.profiles
-			.list()
-			.filter((p) => isAgentProfile(p) && p.clis.includes(tool.name))
-			.flatMap((p) =>
-				[...use.profiles]
-					.filter(([key]) => key.endsWith(`/${p.id}`))
-					.flatMap(([, flows]) => flows),
-			);
 		toolFlows.set(tool.name, [
 			...(use.clis.get(tool.name) ?? []),
-			...viaProfiles,
+			...(through.clis.get(tool.name) ?? []),
 		]);
 	}
 	return { toolsBySecret, toolFlows };

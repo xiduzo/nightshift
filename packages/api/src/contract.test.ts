@@ -243,6 +243,12 @@ describe("replies of a real engine", () => {
 			clis: ["jq"],
 			connections: ["gh"],
 		});
+		// A Model Profile whose address reads a secret.
+		const jev = (await reply(appRouter.profiles.save, {
+			name: "jev",
+			decider: "compatible",
+			address: { baseUrl: "http://127.0.0.1:9", apiKey: "JEV_KEY" },
+		})) as { id: string };
 
 		const night = singleAgentFlow({
 			prompt: "Fix the bug.",
@@ -265,8 +271,20 @@ describe("replies of a real engine", () => {
 					stdout: "text",
 					secrets: ["API_USER", "API_PASSWORD"],
 				},
+				{
+					id: "sort",
+					type: "decision",
+					position: { x: 0, y: 400 },
+					prompt: "Is it a bug?",
+					options: [{ name: "bug" }, { name: "idea" }],
+					by: "model",
+					profile: { device: sandbox.deviceId, profile: jev.id },
+				},
 			],
-			edges: [{ id: "e1", from: "agent", outcome: "pass", to: "login" }],
+			edges: [
+				{ id: "e1", from: "agent", outcome: "pass", to: "login" },
+				{ id: "e2", from: "login", outcome: "pass", to: "sort" },
+			],
 		};
 		await reply(appRouter.flows.save, {
 			projectId,
@@ -377,6 +395,13 @@ describe("replies of a real engine", () => {
 				saved: false,
 				flows: [],
 				tools: ["gh-work"],
+			}),
+			// A secret only a Model Profile's address reads: the flows that use the profile.
+			expect.objectContaining({
+				name: "JEV_KEY",
+				saved: false,
+				flows: [{ ...toolsFlow, flowName: "tools" }],
+				tools: [],
 			}),
 		]);
 		await read(appRouter.cliTools.list);

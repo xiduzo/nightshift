@@ -85,6 +85,66 @@ describe("flowUse", () => {
 			{ projectId: "p1", projectName: "App", flowName: "day", nodeIds: ["a"] },
 		]);
 		expect([...use.connections.keys()].sort()).toEqual(["gh", "linear"]);
+		expect(Object.fromEntries(use.profileFlows)).toEqual({
+			[profileUseKey("mac", "fast")]: [night],
+			[profileUseKey("le2316", "fast")]: [night],
+			[profileUseKey("mac", "slow")]: [
+				{ projectId: "p1", projectName: "App", flowName: "day" },
+			],
+		});
+	});
+
+	test("a connection, a CLI tool or a profile only a called flow names is used by its callers too", async () => {
+		const call = (id: string, flow: string, extra: object = {}) => ({
+			id,
+			type: "call",
+			flow,
+			inputs: {},
+			...extra,
+		});
+		const flows: Record<string, Flow> = {
+			triage: flowOf([
+				call("look", "research", {
+					cascade: [{ flow: "research" }, { flow: "report" }],
+				}),
+			]),
+			research: flowOf([
+				{
+					id: "read",
+					type: "agent",
+					connections: ["search"],
+					clis: ["curl"],
+					profile: { device: "mac", profile: "fast" },
+				},
+			]),
+			report: flowOf([{ id: "post", type: "tool", connection: "chat" }]),
+		};
+		const reader: FlowReader = {
+			listProjects: async () => [project("p1", "App")],
+			listSchedules: async () => ({ schedules: [] }),
+			flows: { map: async () => flows },
+		};
+		const use = await flowUse(reader);
+		const ref = (flowName: string) => ({
+			projectId: "p1",
+			projectName: "App",
+			flowName,
+		});
+		expect(Object.fromEntries(use.connections)).toEqual({
+			search: [ref("triage"), ref("research")],
+			chat: [ref("triage"), ref("report")],
+		});
+		expect(Object.fromEntries(use.clis)).toEqual({
+			curl: [ref("triage"), ref("research")],
+		});
+		expect(use.profileFlows.get(profileUseKey("mac", "fast"))).toEqual([
+			ref("triage"),
+			ref("research"),
+		]);
+		// The Profiles page names the nodes that name a profile: only the flow's own.
+		expect(use.profiles.get(profileUseKey("mac", "fast"))).toEqual([
+			{ ...ref("research"), nodeIds: ["read"] },
+		]);
 	});
 	test("a secret only a Web request, a Wait, a Service, a kit or a called flow uses is used too", async () => {
 		const ref = (name: string) => `\${${name}}`;

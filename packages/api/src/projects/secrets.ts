@@ -1,10 +1,16 @@
 import type { Permissions } from "@nightshift/auth";
-import { cliToolsOfSecrets, HostUnreachableError } from "@nightshift/engine";
+import {
+	cliToolsOfSecrets,
+	type FlowRef,
+	HostUnreachableError,
+	useThroughProfiles,
+} from "@nightshift/engine";
 import { secretNameSchema } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { z } from "zod";
 
 import { secretScopeSchema } from "../config";
+import type { Context } from "../context";
 import { output } from "../output";
 import { ownerOnly, permitted, protectedProcedure } from "../procedures";
 import { projectProcedure } from "./project-space";
@@ -21,12 +27,60 @@ function unreachable(error: unknown): boolean {
 	);
 }
 
-/** The names of the flows of one project among `flows`. */
-function flowsOf(
-	projectId: string,
-	flows: readonly { projectId: string; flowName: string }[],
-): string[] {
-	return flows.filter((f) => f.projectId === projectId).map((f) => f.flowName);
+/**
+ * What uses each secret of a project or of the Space, by its name: the
+ * flows that use it, and the CLI tools whose logins read it. A flow uses
+ * it through its nodes or a flow or kit it calls, through a connection
+ * that reads it, through a CLI tool whose login reads it, or through a
+ * Model Profile whose address reads it. A flow uses a connection or a CLI
+ * tool when it names it, or when an Agent Profile it uses names it. The
+ * connections and the profiles are this computer's.
+ */
+function secretUsers(
+	context: Pick<Context, "connections" | "cliTools" | "profiles" | "daemon">,
+	use: Parameters<typeof cliToolsOfSecrets>[1],
+): {
+	flows: (secret: string) => FlowRef[];
+	tools: (secret: string) => readonly string[];
+	webhooks: (secret: string) => readonly FlowRef[];
+} {
+	const deviceId = context.daemon.device.id;
+	const through = useThroughProfiles(context, use, deviceId);
+	const { toolsBySecret, toolFlows } = cliToolsOfSecrets(
+		context,
+		use,
+		deviceId,
+	);
+	const connections = context.connections.list();
+	return {
+		flows: (secret) => {
+			const tools = toolsBySecret.get(secret) ?? [];
+			return [
+				...(use.secrets.get(secret) ?? []),
+				...(through.secrets.get(secret) ?? []),
+				...connections
+					.filter((c) => c.variables.some((v) => v.name === secret))
+					.flatMap((c) => [
+						...(use.connections.get(c.name) ?? []),
+						...(through.connections.get(c.name) ?? []),
+					]),
+				...tools.flatMap((tool) => toolFlows.get(tool) ?? []),
+			];
+		},
+		tools: (secret) => toolsBySecret.get(secret) ?? [],
+		webhooks: (secret) => use.webhooks.get(secret) ?? [],
+	};
+}
+
+/** The names of the flows among `flows`, each once and sorted: of one project, when it is given. */
+function flowNames(flows: readonly FlowRef[], projectId?: string): string[] {
+	return [
+		...new Set(
+			flows
+				.filter((f) => projectId === undefined || f.projectId === projectId)
+				.map((f) => f.flowName),
+		),
+	].sort();
 }
 
 /** A role that saves Flows: it sets, replaces, moves and removes a project's secrets. */
@@ -66,40 +120,14 @@ export const projectSecrets = {
 				if (!unreachable(error)) throw error;
 				return { secrets: [], available: false, canChange };
 			}
-			const use = await context.space.flowUse();
-			const connections = context.connections.list();
-			const { toolsBySecret, toolFlows } = cliToolsOfSecrets(context, use);
+			const users = secretUsers(context, await context.space.flowUse());
 			return {
-				secrets: listed.map((secret) => {
-					// The flows that use it (their nodes, or a flow or kit they
-					// call), those whose Agent and Tool nodes use a connection that
-					// reads it, and those that use a CLI tool whose login reads it.
-					const tools = toolsBySecret.get(secret.name) ?? [];
-					const viaTools = tools.flatMap((tool) =>
-						flowsOf(at.projectId, toolFlows.get(tool) ?? []),
-					);
-					const viaConnections = connections
-						.filter((c) => c.variables.some((v) => v.name === secret.name))
-						.flatMap((c) =>
-							flowsOf(at.projectId, use.connections.get(c.name) ?? []),
-						);
-					return {
-						...secret,
-						flows: [
-							...new Set([
-								...flowsOf(at.projectId, use.secrets.get(secret.name) ?? []),
-								...viaConnections,
-								...viaTools,
-							]),
-						].sort(),
-						tools: [...tools].sort(),
-						webhooks: [
-							...new Set(
-								flowsOf(at.projectId, use.webhooks.get(secret.name) ?? []),
-							),
-						].sort(),
-					};
-				}),
+				secrets: listed.map((secret) => ({
+					...secret,
+					flows: flowNames(users.flows(secret.name), at.projectId),
+					tools: [...users.tools(secret.name)].sort(),
+					webhooks: flowNames(users.webhooks(secret.name), at.projectId),
+				})),
 				available: true,
 				canChange,
 			};
@@ -200,33 +228,14 @@ export const projectSecrets = {
 				if (!unreachable(error)) throw error;
 				return { secrets: [], available: false, canChange };
 			}
-			const use = await context.space.flowUse();
-			const connections = context.connections.list();
-			const { toolsBySecret, toolFlows } = cliToolsOfSecrets(context, use);
-			const names = (flows: readonly { flowName: string }[]) =>
-				flows.map((f) => f.flowName);
+			const users = secretUsers(context, await context.space.flowUse());
 			return {
-				secrets: listed.map((secret) => {
-					const tools = toolsBySecret.get(secret.name) ?? [];
-					return {
-						...secret,
-						flows: [
-							...new Set([
-								...names(use.secrets.get(secret.name) ?? []),
-								...connections
-									.filter((c) =>
-										c.variables.some((v) => v.name === secret.name),
-									)
-									.flatMap((c) => names(use.connections.get(c.name) ?? [])),
-								...tools.flatMap((tool) => names(toolFlows.get(tool) ?? [])),
-							]),
-						].sort(),
-						tools: [...tools].sort(),
-						webhooks: [
-							...new Set(names(use.webhooks.get(secret.name) ?? [])),
-						].sort(),
-					};
-				}),
+				secrets: listed.map((secret) => ({
+					...secret,
+					flows: flowNames(users.flows(secret.name)),
+					tools: [...users.tools(secret.name)].sort(),
+					webhooks: flowNames(users.webhooks(secret.name)),
+				})),
 				available: true,
 				canChange,
 			};

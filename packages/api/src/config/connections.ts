@@ -41,6 +41,7 @@ export const connections = {
 			connectionsInUse(
 				context,
 				await context.space.flowUse(),
+				context.daemon.device.id,
 				// A project's and its Space's secrets cover its flows. When they
 				// cannot be read now, the flows stay listed.
 				async (projectId) =>

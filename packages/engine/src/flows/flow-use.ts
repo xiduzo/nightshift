@@ -1,9 +1,9 @@
 import {
 	everyProfileOf,
+	flowConfigUse,
 	flowSecrets,
 	isProfileRef,
 	type ProjectFlowMap,
-	runsAs,
 	type Schedule,
 	webhookSecretName,
 } from "@nightshift/flows";
@@ -19,9 +19,10 @@ export type FlowRef = {
 /**
  * Who uses what, from every flow of the Space's projects: the flows whose
  * Agent or Tool nodes name each connection, whose Agent nodes name each CLI
- * tool, that use each secret (`flowSecrets`: its nodes, and the flows and
- * kits it calls), by name, and the nodes that name each profile (Agents,
- * and Decisions and Values decided by a model), by `profileUseKey`.
+ * tool (`flowConfigUse`), and that use each secret (`flowSecrets`), by
+ * name. Each counts the flows and kits a flow calls too. And the nodes
+ * that name each profile (Agents, and Decisions and Values decided by a
+ * model), by `profileUseKey`.
  */
 export type FlowUse = {
 	connections: Map<string, FlowRef[]>;
@@ -29,7 +30,13 @@ export type FlowUse = {
 	/** By secret: the flows a webhook schedule with that secret starts. */
 	webhooks: Map<string, FlowRef[]>;
 	secrets: Map<string, FlowRef[]>;
+	/** The flow's own nodes that name the profile. */
 	profiles: Map<string, (FlowRef & { nodeIds: string[] })[]>;
+	/**
+	 * By `profileUseKey`: the flows that use the profile, through their own
+	 * nodes or through a flow they call. What reads its secrets counts them.
+	 */
+	profileFlows: Map<string, FlowRef[]>;
 };
 
 /** The key of a Device's profile in `FlowUse.profiles`. */
@@ -55,6 +62,7 @@ export async function flowUse(space: FlowReader): Promise<FlowUse> {
 	const clis = new Map<string, FlowRef[]>();
 	const secrets = new Map<string, FlowRef[]>();
 	const profiles = new Map<string, (FlowRef & { nodeIds: string[] })[]>();
+	const profileFlows = new Map<string, FlowRef[]>();
 	const webhooks = new Map<string, FlowRef[]>();
 	for (const project of await space.listProjects()) {
 		const listed = await space
@@ -78,25 +86,14 @@ export async function flowUse(space: FlowReader): Promise<FlowUse> {
 				projectName: project.name,
 				flowName,
 			};
-			// A cascade's tiers add their own connections and CLI tools.
-			const agents = flow.nodes
-				.flatMap(runsAs)
-				.flatMap((n) => (n.type === "agent" ? [n] : []));
-			const toolConnections = flow.nodes.flatMap((n) =>
-				n.type === "tool" ? [n.connection] : [],
-			);
-			for (const name of new Set([
-				...agents.flatMap((n) => n.connections ?? []),
-				...toolConnections,
-			])) {
-				connections.set(name, [...(connections.get(name) ?? []), ref]);
+			const reach = { flows, name: flowName };
+			const named = flowConfigUse(flow, reach);
+			for (const name of named.connections) add(connections, name, ref);
+			for (const name of named.clis) add(clis, name, ref);
+			for (const profile of named.profiles) {
+				add(profileFlows, profileUseKey(profile.device, profile.profile), ref);
 			}
-			for (const name of new Set(agents.flatMap((n) => n.clis ?? []))) {
-				clis.set(name, [...(clis.get(name) ?? []), ref]);
-			}
-			for (const name of flowSecrets(flow, { flows, name: flowName })) {
-				secrets.set(name, [...(secrets.get(name) ?? []), ref]);
-			}
+			for (const name of flowSecrets(flow, reach)) add(secrets, name, ref);
 			const byProfile = new Map<string, string[]>();
 			for (const node of flow.nodes) {
 				// A cascade names a profile per tier.
@@ -114,5 +111,10 @@ export async function flowUse(space: FlowReader): Promise<FlowUse> {
 			}
 		}
 	}
-	return { connections, clis, webhooks, secrets, profiles };
+	return { connections, clis, webhooks, secrets, profiles, profileFlows };
+}
+
+/** Adds `ref` to the flows of `key`. */
+function add(map: Map<string, FlowRef[]>, key: string, ref: FlowRef): void {
+	map.set(key, [...(map.get(key) ?? []), ref]);
 }

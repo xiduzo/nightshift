@@ -531,7 +531,7 @@ function RemoveSharedSecretDialog({
 										? `${tools.join(", ")} will not sign in with it.`
 										: null,
 									flows.length > 0
-										? `Flows that use it (${flows.join(", ")}) stop before the command runs, unless the computer that runs them has a secret of that name.`
+										? `Flows that use it (${flows.join(", ")}) stop at the step that needs it, unless the computer that runs them has a secret of that name.`
 										: null,
 									webhooks.length > 0
 										? `Webhooks of ${webhooks.join(", ")} stop working until you set it again.`

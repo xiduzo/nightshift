@@ -717,7 +717,7 @@ function RemoveSecretDialog({
 							? `${usedBy.join(", ")} will have no value for it. Agent nodes that use ${usedBy.length === 1 ? "that tool" : "those tools"} cannot run until you set it again.`
 							: null,
 						flows.length > 0
-							? `Flows that use it (${flows.join(", ")}) stop before the command runs until you set it again.`
+							? `Flows that use it (${flows.join(", ")}) stop at the step that needs it until you set it again.`
 							: null,
 						webhooks.length > 0
 							? `Webhooks of ${webhooks.join(", ")} stop working until you set it again.`

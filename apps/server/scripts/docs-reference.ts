@@ -44,6 +44,7 @@ import {
 	FLOW_VERSION,
 	type Flow,
 	type FlowNode,
+	flowConfigUse,
 	flowSchema,
 	flowSecrets,
 	HARNESS_CATALOG,
@@ -202,15 +203,13 @@ const code = (names: Iterable<string>) =>
 
 /**
  * What a flow needs on the computer that runs it: its agents and models,
- * CLI tools, secrets (`flowSecrets`: the kits it calls add theirs),
- * connections (MCP servers), kits, the flows it calls, and skills. Only
- * the kinds it needs, each name once.
+ * CLI tools, secrets and connections (MCP servers) (`flowConfigUse`,
+ * `flowSecrets`: the kits it calls add theirs), kits, the flows it calls,
+ * and skills. Only the kinds it needs, each name once.
  */
 export function flowNeeds(flow: Flow): Need[] {
 	const agents = new Set<string>();
 	const models = new Set<string>();
-	const clis = new Set<string>();
-	const connections = new Set<string>();
 	const kits = new Set<string>();
 	const flows = new Set<string>();
 	const skills = new Set<string>();
@@ -218,8 +217,6 @@ export function flowNeeds(flow: Flow): Need[] {
 		switch (node.type) {
 			case "agent":
 				agents.add(agentOf(node));
-				for (const cli of node.clis ?? []) clis.add(cli);
-				for (const name of node.connections ?? []) connections.add(name);
 				if (node.skill !== undefined) skills.add(node.skill);
 				break;
 			case "decision":
@@ -230,24 +227,22 @@ export function flowNeeds(flow: Flow): Need[] {
 				if (node.by === "model")
 					models.add(modelOf({ ...node, decider: valueDecider(node) }));
 				break;
-			case "tool":
-				connections.add(node.connection);
-				break;
 			case "call":
 				for (const name of calledFlowNames(node))
 					(isKitName(name) ? kits : flows).add(name);
 				break;
 		}
 	}
+	const named = flowConfigUse(flow);
 	const needs: Need[] = [
 		{ kind: "Agents", names: [...agents] },
 		{ kind: "Models", names: [...models] },
-		{ kind: "CLI tools", names: code(clis) },
+		{ kind: "CLI tools", names: code(named.clis) },
 		{
 			kind: "Secrets",
 			names: flowSecrets(flow).map((name) => `\`\${${name}}\``),
 		},
-		{ kind: "Connections (MCP servers)", names: code(connections) },
+		{ kind: "Connections (MCP servers)", names: code(named.connections) },
 		{ kind: "Kits", names: code(kits) },
 		{ kind: "Flows it calls", names: code(flows) },
 		{ kind: "Skills", names: code(skills) },

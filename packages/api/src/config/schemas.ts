@@ -151,7 +151,7 @@ export const connectionListSchema = z.object({
 	),
 	secrets: z.array(
 		secretViewSchema.extend({
-			/** The flows that use it: through their nodes, or a flow or kit they call. */
+			/** The flows that use it: through their nodes, a Model Profile of this computer, or a flow or kit they call. */
 			flows: z.array(flowRefSchema),
 			/** The CLI tools whose logins read it. */
 			tools: z.array(z.string()),
