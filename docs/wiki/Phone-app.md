@@ -28,7 +28,7 @@ Your phone needs a [Host](Computers-and-Hosts.md#run-a-host).
 - **The counts leave test runs out.** The chips of **Runs** and the numbers of **Watch** do not count them. The cost of the day counts them, and says how many it holds: "Of 8 runs and 1 test run".
 - **The lock screen.** Approve or reject a Gate with two options, when its node allows it.
 - **A Live Activity** follows a run on the lock screen.
-- **A widget** shows on the home screen how many Gates wait and how your latest runs went.
+- **A widget** shows on the home screen how many Gates wait and how your latest runs went. A test run there says **Test run** after its status.
 
 ## Notifications
 

@@ -65,6 +65,25 @@ describe("the widget's snapshot", () => {
 		expect(JSON.stringify(snapshot)).not.toContain("secret");
 	});
 
+	// The newest runs are a list: a test run stays in it, with its label.
+	test("a test run stays among the newest runs, and its status says so", () => {
+		const snapshot = glanceSnapshot({
+			gates: [],
+			runs: [
+				{
+					...run("a", "finished", 1),
+					test: { pinned: ["fetch"], skipped: [] },
+				},
+				run("b", "running", 2),
+			],
+		});
+		expect(snapshot.runs.map((each) => [each.id, each.statusText])).toEqual([
+			["b", "Running"],
+			["a", "Finished · Test run"],
+		]);
+		expect(snapshot.runs[1]?.tone).toBe("finished");
+	});
+
 	test("an interrupted run looks like a stopped one", () => {
 		const snapshot = glanceSnapshot({
 			gates: [],

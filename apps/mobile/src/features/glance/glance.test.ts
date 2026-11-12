@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	glanceSnapshot,
 	type RunDetail,
 	type RunProgress,
 	type RunStatus,
@@ -205,6 +206,32 @@ describe("the props outside the app", () => {
 			},
 		]);
 		expect(JSON.parse(JSON.stringify(props))).toEqual(props);
+	});
+
+	test("give the widget a test run with its label, in the color of its status", () => {
+		const props = homeWidgetProps(
+			glanceSnapshot({
+				gates: [],
+				runs: [
+					{
+						id: "a",
+						flowName: "deploy",
+						status: "failed",
+						createdAt: 1,
+						test: { pinned: [], skipped: ["send"] },
+					},
+				],
+			}),
+		);
+		expect(props.runs).toEqual([
+			{
+				id: "a",
+				flow: "deploy",
+				statusText: "Failed · Test run",
+				light: "#c51e21",
+				dark: "#fe6c66",
+			},
+		]);
 	});
 
 	test("show no count and no runs when the phone is not signed in", () => {

@@ -1,9 +1,11 @@
 import { type OpenGate, waitingForYou } from "../gates";
 import {
 	flowLabel,
+	isTestRun,
 	type RunStatus,
 	type RunSummary,
 	runStatusLabel,
+	TEST_RUN_LABEL,
 } from "../runs";
 import { type GlanceTone, glanceTone } from "./tone";
 
@@ -15,6 +17,7 @@ export type GlanceRun = {
 	id: string;
 	flow: string;
 	status: RunStatus;
+	/** "Finished", or "Finished · Test run" for a test run. */
 	statusText: string;
 	tone: GlanceTone;
 };
@@ -45,13 +48,18 @@ export function waitingText(count: number): string {
 /**
  * The widget's snapshot from the open Gates (of every Space) and the runs
  * (of the active Space). Gates the person may not answer do not count.
+ * The newest runs are a list: a test run stays in it, and its status says
+ * "Test run", as the run lists of the app do.
  */
 export function glanceSnapshot({
 	gates,
 	runs,
 }: {
 	gates: readonly Pick<OpenGate, "canAnswer">[];
-	runs: readonly Pick<RunSummary, "id" | "flowName" | "status" | "createdAt">[];
+	runs: readonly Pick<
+		RunSummary,
+		"id" | "flowName" | "status" | "createdAt" | "test"
+	>[];
 }): GlanceSnapshot {
 	const waiting = waitingForYou(gates);
 	const latest = [...runs]
@@ -61,7 +69,9 @@ export function glanceSnapshot({
 			id: run.id,
 			flow: flowLabel(run),
 			status: run.status,
-			statusText: runStatusLabel(run.status),
+			statusText: isTestRun(run)
+				? `${runStatusLabel(run.status)} · ${TEST_RUN_LABEL}`
+				: runStatusLabel(run.status),
 			tone: glanceTone(run.status),
 		}));
 	return {
