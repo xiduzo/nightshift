@@ -360,7 +360,10 @@ export function summarizeDashboard(
 			.slice(0, OVERVIEW_ROWS),
 		open: {
 			...topRows(open.map(({ run, group }) => toDashboardRun(run, group))),
-			running: open.filter(({ run }) => run.status === "running").length,
+			// Running now: at work or asleep. A run at a Gate waits for a person.
+			running: open.filter(
+				({ run }) => run.status === "running" || run.status === "sleeping",
+			).length,
 			nextWakeAt: earliest(open.map(({ run }) => run.wakeAt)),
 		},
 		activity: HOUR_RANGES.map((range) =>

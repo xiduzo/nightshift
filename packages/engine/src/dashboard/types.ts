@@ -671,7 +671,11 @@ export type DashboardSummary = {
 	cards: DashboardCards;
 	/** The newest runs. */
 	recent: RunSummary[];
-	/** The runs at work, waiting or asleep: the oldest first. */
+	/**
+	 * The runs at work, waiting or asleep: the oldest first. `running`
+	 * counts the runs on their way, at work or asleep, as Running now
+	 * does: not the ones at a Gate.
+	 */
 	open: TopRows<DashboardRun> & { running: number; nextWakeAt: number | null };
 	activity: ActivityRange[];
 	/** The details per day range. */

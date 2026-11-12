@@ -287,8 +287,18 @@ describe("the activity details", () => {
 		]);
 		expect(summary.open.rows.map((run) => run.id)).toEqual(["a", "b"]);
 		expect(summary.open.count).toBe(2);
-		expect(summary.open.running).toBe(1);
 		expect(summary.open.nextWakeAt).toBe(NOW + HOUR);
+	});
+
+	test("count Running now as the runs at work or asleep, not the ones at a Gate", () => {
+		const summary = summarize([
+			aRun({ id: "work", status: "running", createdAt: NOW - HOUR }),
+			aRun({ id: "sleep", status: "sleeping", createdAt: NOW - HOUR }),
+			aRun({ id: "gate", status: "waiting", createdAt: NOW - HOUR }),
+			aRun({ id: "done", status: "finished" }),
+		]);
+		expect(summary.open.count).toBe(3);
+		expect(summary.open.running).toBe(2);
 	});
 });
 
