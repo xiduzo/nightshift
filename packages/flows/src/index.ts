@@ -158,6 +158,7 @@ export {
 	type NodeFamily,
 	nextEdge,
 	nodeOutcomes,
+	nodeOutputFields,
 	type Outcome,
 	outcomeColor,
 	outputFieldsByType,
