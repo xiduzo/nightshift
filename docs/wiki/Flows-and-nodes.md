@@ -225,6 +225,26 @@ An Agent, a Command or a Value scores the run with `scores` in its data: `{"scor
 
 Night Shift keeps your flows outside your project folder. Your project needs no Night Shift files. To move a flow, open its ⋯ menu in the editor and choose **Export as file**. Then choose **Import flow** on the Flows page of another project. The import asks which of your profiles takes each agent of the flow.
 
+### Test a flow
+
+A test run tries one part of a flow. A pinned node gives an output of an earlier run again, and a skipped node gives the outcome you choose. Neither does its work. The other nodes run for real.
+
+1. Run the flow once, so that each node has a last output.
+2. To pin a node, right-click it and choose **Pin output**. The node gives its last output again in each test run.
+3. To skip a node, right-click it and choose **Skip with outcome**. Then choose the outcome that the node gives.
+4. Choose **Run**. The dialog lists your pins and skips. Choose **Start test**.
+
+- **On the canvas**, a pinned node shows a pin and its pinned output. A skipped node fades, and the outcome that it gives lights up.
+- **With the keyboard**, focus a node and press **Shift+F10**. The **Results** tab of a node has the same choices.
+- **After the start**, you stay in the editor, and the nodes show what the test run gives. **Open the run** opens it. **Show the newest runs** goes back.
+- **The button beside Run** counts your pins and skips, for example "2 pinned · 1 skipped". It lists the nodes, and **Clear pins and skips** removes them all.
+- **Use pins and skips** in the dialog is on. Turn it off to run the whole flow.
+- **A skipped Gate does not ask.** The steps after it run for real, also a send or a publish.
+- **A pinned output is what the step gave, not the files it changed.** A step after it that reads those files does not find them.
+- An End, a Join, a Lease and a Service always run. A test run takes at most 50 pins and skips.
+- Your pins and skips stay in this browser. They are not part of the flow, so a schedule, a webhook and the Flows page never use them.
+- A test run keeps nothing for the next run: no kept variables, and no memory of a Since last run node.
+
 ## Build a flow with an agent
 
 An agent helps you in the editor, on your own logins:
