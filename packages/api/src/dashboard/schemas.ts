@@ -2,12 +2,15 @@ import {
 	type DashboardSummary,
 	type FlowHealthDetail,
 	isTimeZone,
+	RUNGS,
 } from "@nightshift/engine";
 import { z } from "zod";
 
 import { exact } from "../output";
 import {
+	ladderSchema,
 	neededYouReasonSchema,
+	rungBySchema,
 	runReportGlanceSchema,
 	runResultSchema,
 	runStatusSchema,
@@ -121,6 +124,51 @@ const latestReportSchema = runReportGlanceSchema.extend({
 	result: runResultSchema,
 });
 
+/**
+ * One rung of a flow's ladder: how often a climb landed on it, and what a
+ * landing there cost on average, every try before it included. `tier` is
+ * null on a person, a deadline, a rule, `none`, and a node without a
+ * Cascade (`by` names it).
+ */
+const ladderRungRowSchema = z.object({
+	rung: z.enum(RUNGS),
+	by: rungBySchema,
+	tier: z.string().nullable(),
+	landed: z.number(),
+	costPerLanding: knownCostSchema,
+});
+
+/** Where the climbs of one ladder landed, the cheapest rung first. */
+const ladderSummarySchema = z.object({
+	landed: z.number(),
+	rungs: z.array(ladderRungRowSchema),
+});
+
+/**
+ * Where the work of a flow's own runs landed: the work ladder and the
+ * choice ladder, with how often a decider gave a probability (`picked`)
+ * and was not sure enough (`unsure`). Null: nothing landed on it.
+ */
+const flowLaddersSchema = z.object({
+	work: ladderSummarySchema.nullable(),
+	choice: ladderSummarySchema
+		.extend({ picked: z.number(), unsure: z.number() })
+		.nullable(),
+});
+
+/** One node's ladder: `via` names the Subflow nodes it ran in. */
+const nodeLadderSchema = z.object({
+	key: z.string(),
+	ladder: ladderSchema,
+	nodeId: z.string(),
+	via: z.string().optional(),
+	landed: z.number(),
+	costPerLanding: knownCostSchema,
+	rungs: z.array(ladderRungRowSchema),
+	picked: z.number().optional(),
+	unsure: z.number().optional(),
+});
+
 const flowHealthRowSchema = z.object({
 	name: z.string(),
 	last: lastFlowRunSchema.nullable(),
@@ -143,6 +191,8 @@ const flowHealthRowSchema = z.object({
 	neededYou: flowNeededYouSchema.optional(),
 	/** The newest report of its own runs. Absent: none, or an older Host. */
 	report: latestReportSchema.optional(),
+	/** Where the work of its own runs landed. Older Hosts send none. */
+	ladders: flowLaddersSchema.optional(),
 });
 
 const nightTotalsSchema = z.object({
@@ -425,7 +475,22 @@ export const flowHealthDetailSchema = exact<FlowHealthDetail>()(
 					.nullable(),
 				warnings: z.number(),
 				statuses: z.array(statusCountSchema),
-				perNight: z.array(nightCountsSchema),
+				/** Older Hosts send only `night` and `counts`. */
+				perNight: z.array(
+					nightCountsSchema.extend({
+						spent: knownCostSchema.optional(),
+						needed: z
+							.object({ runs: z.number(), needed: z.number() })
+							.optional(),
+						/** Per metric name: the sum its runs wrote that day, and how many runs wrote it. */
+						metrics: z
+							.record(
+								z.string(),
+								z.object({ sum: z.number(), runs: z.number() }),
+							)
+							.optional(),
+					}),
+				),
 				endedRuns: z.array(
 					z.object({
 						runId: z.string(),
@@ -457,6 +522,10 @@ export const flowHealthDetailSchema = exact<FlowHealthDetail>()(
 				scores: z.array(flowScoreRowSchema).optional(),
 				useful: flowUsefulSchema.optional(),
 				neededYou: flowNeededYouSchema.optional(),
+				/** Where the work of its own runs landed. Older Hosts send none. */
+				ladders: flowLaddersSchema
+					.extend({ nodes: topRows(nodeLadderSchema) })
+					.optional(),
 				latest: z.array(flowRunSchema),
 			}),
 		),

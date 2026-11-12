@@ -8,7 +8,7 @@ export {
 	inboxOf,
 	lockScreenRefusal,
 } from "./inbox";
-export { RUNGS } from "./ladder";
+export { type Ladder, RUNGS, type Rung, type RunRung } from "./ladder";
 export { type LandedFact, landedFacts } from "./landed-facts";
 export {
 	NEEDED_YOU_REASONS,

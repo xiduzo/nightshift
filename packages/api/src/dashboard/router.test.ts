@@ -281,4 +281,97 @@ describe("dashboard.flow", () => {
 			unfinished: 1,
 		});
 	});
+
+	test("says where the work landed, and what each day spent, needed and measured", async () => {
+		const { headers, platform } = await ada();
+		const rung = {
+			ladder: "work" as const,
+			nodeId: "draft",
+			rung: "first" as const,
+			by: "agent" as const,
+			tier: "Sonnet",
+			landed: 3,
+			costUsd: 0.75,
+			costEstimated: false,
+			costMissing: 0,
+		};
+		const { engine } = engineOf({
+			[platform]: {
+				projects: [{ id: "web", name: "website" }],
+				runs: [
+					aRun({
+						id: "a",
+						projectId: "web",
+						flowName: "night",
+						metrics: {
+							wallMs: 1,
+							agentMs: 1,
+							gateWaitMs: 0,
+							tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+							costBasis: "billed",
+							prUrl: null,
+							scores: [
+								{
+									score: "found",
+									value: 4,
+									label: null,
+									stepId: null,
+									at: now(),
+									by: null,
+								},
+							],
+							ladder: [
+								rung,
+								{
+									...rung,
+									ladder: "choice",
+									nodeId: "triage",
+									rung: "later",
+									by: "model",
+									tier: "Large",
+									landed: 1,
+									picked: 1,
+									unsure: 1,
+								},
+							],
+						},
+					}),
+				],
+				flows: ["night"],
+			},
+		});
+		const context = await contextFor(headers, engine);
+
+		const detail = await call(
+			appRouter.dashboard.flow,
+			{ projectId: "web", flowName: "night", timeZone: "UTC" },
+			{ context },
+		);
+		const week = detail.ranges[0];
+		expect(week?.ladders?.work?.rungs).toEqual([
+			{
+				rung: "first",
+				by: "agent",
+				tier: "Sonnet",
+				landed: 3,
+				costPerLanding: { costUsd: 0.25, costEstimated: false, costMissing: 0 },
+			},
+		]);
+		expect(week?.ladders?.choice).toMatchObject({ picked: 1, unsure: 1 });
+		expect(week?.ladders?.nodes.rows.map((node) => node.key)).toEqual([
+			"work//draft",
+			"choice//triage",
+		]);
+		expect(week?.perNight.at(-1)).toMatchObject({
+			needed: { runs: 1, needed: 0 },
+			metrics: { found: { sum: 4, runs: 1 } },
+		});
+
+		const summary = await call(
+			appRouter.dashboard.summary,
+			{ projectId: "web", timeZone: "UTC" },
+			{ context },
+		);
+		expect(summary.flowHealth?.rows[0]?.ladders?.work?.landed).toBe(3);
+	});
 });

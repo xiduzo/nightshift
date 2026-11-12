@@ -1,7 +1,10 @@
+import type { RungBy } from "../log";
 import {
+	type Ladder,
 	type NeededYouReason,
 	NIGHT_RANGES,
 	type NightRange,
+	type Rung,
 	type RunSummary,
 } from "../read";
 import type { RunResult, RunStatus } from "../run-status";
@@ -498,6 +501,91 @@ export type FlowHealthRow = {
 	 * no run of its own wrote one, or an older Host.
 	 */
 	report?: LatestReport;
+	/** Where the work of its own runs landed in the last days. Older Hosts send none. */
+	ladders?: FlowLadders;
+};
+
+/**
+ * One rung of a flow's ladder over some days: how often a climb landed on
+ * it, and what a landing there cost on average, every try before it
+ * included. Tiers of the same name merge, over all the flow's nodes. A
+ * person, a deadline, a rule and `none` are one rung each: `tier` is null
+ * on them. `tier` is null too on a node without a Cascade: `by` names it.
+ */
+export type LadderRungRow = {
+	rung: Rung;
+	by: RungBy;
+	tier: string | null;
+	/** How many climbs landed on it. */
+	landed: number;
+	/** What its landings cost, divided by `landed`. */
+	costPerLanding: KnownCost;
+};
+
+/** Where the climbs of one ladder landed: the rungs in ladder order, the cheapest first. */
+export type LadderSummary = {
+	/** All its landings. */
+	landed: number;
+	rungs: LadderRungRow[];
+};
+
+/** The choice ladder also counts how sure its deciders were. */
+export type ChoiceLadderSummary = LadderSummary & {
+	/** Decisions a decider gave a probability on. */
+	picked: number;
+	/** Of them, the Decisions a decider was not sure enough on: below `minConfidence`. */
+	unsure: number;
+};
+
+/**
+ * Where the work of a flow's own runs landed (Q31): the work ladder
+ * (Agent, Subflow, Value by a model, Ask) and the choice ladder
+ * (Decisions). A run as a subflow counts in the run that called it. Null
+ * when nothing landed on that ladder.
+ */
+export type FlowLadders = {
+	work: LadderSummary | null;
+	choice: ChoiceLadderSummary | null;
+};
+
+/** One node's ladder in a flow's detail. */
+export type NodeLadder = {
+	/** `<ladder>/<via>/<nodeId>`. */
+	key: string;
+	ladder: Ladder;
+	nodeId: string;
+	/** The Subflow nodes it ran in, outermost first, joined by `/`. Absent at the top level. */
+	via?: string;
+	landed: number;
+	/** What its landings cost, divided by `landed`. */
+	costPerLanding: KnownCost;
+	rungs: LadderRungRow[];
+	/** A Decision only: as on the choice ladder. */
+	picked?: number;
+	/** A Decision only: as on the choice ladder. */
+	unsure?: number;
+};
+
+/** A flow's ladders in its detail, with the nodes that landed most. */
+export type FlowRangeLadders = FlowLadders & {
+	/** The most landings first. */
+	nodes: TopRows<NodeLadder>;
+};
+
+/**
+ * One day of a flow: its runs per status, and what the Metrics tab charts.
+ * `night` is the start of the day. Older Hosts send only `night` and `counts`.
+ */
+export type FlowDay = NightCounts & {
+	/** What its runs that started this day spent, on its own and as a subflow. */
+	spent?: KnownCost;
+	/** Its own runs that started this day, and how many of them needed you. */
+	needed?: { runs: number; needed: number };
+	/**
+	 * Per metric name (a score of its own runs): what its runs that started
+	 * this day wrote, added up, and how many runs wrote it.
+	 */
+	metrics?: Record<string, { sum: number; runs: number }>;
 };
 
 /**
@@ -531,11 +619,11 @@ export type FlowUseful = {
 };
 
 /**
- * One score name of a flow's runs over some days: what its Command
- * steps wrote, and what became of its pull requests (the optional scorer
- * for code). A Gate's answer and the useful answer are left out: they have
- * their own numbers. Only the flow's own runs count, not its runs as a
- * subflow.
+ * One score name of a flow's runs over some days, a flow metric (Q32):
+ * what its Command, Agent and Value steps wrote, and what became of its
+ * pull requests (the optional scorer for code). A Gate's answer and the
+ * useful answer are left out: they have their own numbers. Only the flow's
+ * own runs count, not its runs as a subflow.
  */
 export type FlowScoreRow = {
 	name: string;
@@ -649,8 +737,8 @@ export type FlowRange = {
 	dearest: { costUsd: number; startedAt: number; tokens: number | null } | null;
 	warnings: number;
 	statuses: StatusCount[];
-	/** Runs per day per status, oldest first. */
-	perNight: NightCounts[];
+	/** Runs per day per status, what they spent, how often they needed you and their metrics, oldest first. */
+	perNight: FlowDay[];
 	/** Every ended run, oldest first: what it cost. */
 	endedRuns: {
 		runId: string;
@@ -672,6 +760,8 @@ export type FlowRange = {
 	useful?: FlowUseful;
 	/** How often its runs needed you, and why. Older Hosts send none. */
 	neededYou?: FlowNeededYou;
+	/** Where the work of its own runs landed. Older Hosts send none. */
+	ladders?: FlowRangeLadders;
 	/** The newest first. */
 	latest: FlowRun[];
 };

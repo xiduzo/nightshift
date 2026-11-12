@@ -120,6 +120,18 @@ const answeredBySchema = z
  */
 export const neededYouReasonSchema = z.enum(NEEDED_YOU_REASONS);
 
+/** The two ladders: the work ladder, and the choice ladder (Decisions). */
+export const ladderSchema = z.enum(["work", "choice"]);
+
+/** Who works or decides on a rung: a rule, a model, an agent, a called flow, a person. */
+export const rungBySchema = z.enum([
+	"rule",
+	"model",
+	"agent",
+	"flow",
+	"person",
+]);
+
 /**
  * The start of a run's report: the End step that wrote it, at most 600
  * characters of its Markdown, and whether it goes on. The full text is in
@@ -182,11 +194,11 @@ const metricsSchema = z.object({
 	ladder: z
 		.array(
 			z.object({
-				ladder: z.enum(["work", "choice"]),
+				ladder: ladderSchema,
 				nodeId: z.string(),
 				via: z.string().optional(),
 				rung: z.enum(RUNGS),
-				by: z.enum(["rule", "model", "agent", "flow", "person"]),
+				by: rungBySchema,
 				tier: z.string().nullable(),
 				landed: z.number(),
 				costUsd: z.number(),

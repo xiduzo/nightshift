@@ -56,7 +56,7 @@ export const dashboard = {
 	flow: protectedProcedure
 		.route({
 			summary:
-				"Computes the health of one flow of a project: its runs, cost, problems and latest runs.",
+				"Computes the health of one flow of a project: its runs, where its work landed, its metrics, cost, problems and latest runs.",
 		})
 		.output(output(flowHealthDetailSchema))
 		.input(

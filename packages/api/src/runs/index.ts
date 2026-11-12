@@ -4,7 +4,9 @@ export { runAccess, runProcedure } from "./run-space";
 export {
 	gateChoiceSchema,
 	gateDeadlineSchema,
+	ladderSchema,
 	neededYouReasonSchema,
+	rungBySchema,
 	runReportGlanceSchema,
 	runResultSchema,
 	runStatusSchema,

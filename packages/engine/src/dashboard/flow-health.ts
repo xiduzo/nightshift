@@ -1,7 +1,8 @@
 import type { RunScore } from "../log";
-import type { NeededYouReason, RunSummary } from "../read";
+import type { NeededYouReason, RunRung, RunSummary } from "../read";
 import { finishedShare, usefulAnswer } from "../run-status";
 import { dayStart, lastDays } from "./clock";
+import { flowLadders, flowRangeLadders } from "./ladders";
 import { countReasons, neededReasons } from "./needed";
 import {
 	countStatuses,
@@ -13,6 +14,7 @@ import {
 	topRows,
 } from "./stats";
 import {
+	type FlowDay,
 	type FlowHealthDetail,
 	type FlowHealthRow,
 	type FlowNeededYou,
@@ -25,7 +27,6 @@ import {
 	type LastFlowRun,
 	type LatestReport,
 	NIGHT_RANGES,
-	type NightCounts,
 	type NightRange,
 	OVERVIEW_ROWS,
 	type Spread,
@@ -36,13 +37,15 @@ import {
 /** The days a Flow health row covers. */
 export const FLOW_HEALTH_DAYS: NightRange = 30;
 
-/** A run of a flow with its warnings, its scores, why it needed you and the start of the day it started in. */
+/** A run of a flow with its warnings, its scores, why it needed you, where its work landed and the start of the day it started in. */
 type PlacedFlowRun = Omit<FlowRun, "warnings"> & {
 	warnings: RunSummary["warnings"];
 	/** Its scores. A subflow run has none: they are in the run that called it. */
 	scores: RunScore[];
 	/** Why it needed you. A subflow run has none: they are in the run that called it. */
 	needed: NeededYouReason[];
+	/** Where its work landed. A subflow run has none: it is in the run that called it. */
+	ladder: RunRung[];
 	day: number;
 };
 
@@ -70,6 +73,7 @@ function runsOf(
 						warnings: run.warnings,
 						scores: run.metrics?.scores ?? [],
 						needed: neededReasons(run),
+						ladder: run.metrics?.ladder ?? [],
 						day: dayStart(run.createdAt, timeZone),
 					},
 				]
@@ -91,6 +95,7 @@ function runsOf(
 				warnings: [],
 				scores: [],
 				needed: [],
+				ladder: [],
 				day: dayStart(subflow.startedAt, timeZone),
 			})),
 	]);
@@ -127,6 +132,7 @@ function toFlowRun({
 	day: _day,
 	scores: _scores,
 	needed: _needed,
+	ladder: _ladder,
 	...run
 }: PlacedFlowRun): FlowRun {
 	return { ...run, warnings: run.warnings.length };
@@ -173,6 +179,59 @@ function scoresOf(runs: readonly PlacedFlowRun[]): FlowScoreRow[] {
 	return [...byName.values()]
 		.sort((a, b) => b.runs - a.runs || a.name.localeCompare(b.name))
 		.map(({ runIds: _runIds, ...row }) => row);
+}
+
+/**
+ * Per metric name, what the runs wrote added up, and how many runs wrote
+ * it: the day's point on the Metrics tab. The same names as the score rows.
+ */
+function metricsOf(
+	runs: readonly PlacedFlowRun[],
+): Record<string, { sum: number; runs: number }> {
+	const byName = new Map<string, { sum: number; runIds: Set<string> }>();
+	for (const run of runs) {
+		for (const { score, value } of run.scores) {
+			if (NOT_IN_SCORE_ROWS.has(score)) continue;
+			const metric = byName.get(score) ?? { sum: 0, runIds: new Set() };
+			metric.sum += value;
+			metric.runIds.add(run.runId);
+			byName.set(score, metric);
+		}
+	}
+	return Object.fromEntries(
+		[...byName].map(([name, { sum, runIds }]) => [
+			name,
+			{ sum, runs: runIds.size },
+		]),
+	);
+}
+
+/**
+ * One day of the flow: its runs per status (every status the range has, 0
+ * included), what they spent, how often its own runs needed you, and its
+ * metrics.
+ */
+function flowDay(
+	day: number,
+	runs: readonly PlacedFlowRun[],
+	statuses: readonly { status: string }[],
+): FlowDay {
+	const counts: Record<string, number> = {};
+	for (const { status } of statuses) counts[status] = 0;
+	for (const run of runs) counts[run.status] = (counts[run.status] ?? 0) + 1;
+	const needed = neededYouOf(runs);
+	return {
+		night: day,
+		counts,
+		spent: sumKnownCost(runs),
+		needed: { runs: needed.runs, needed: needed.needed },
+		metrics: metricsOf(runs),
+	};
+}
+
+/** The ladder rows of the flow's own runs: a run as a subflow has none. */
+function ladderRows(runs: readonly PlacedFlowRun[]): RunRung[] {
+	return runs.flatMap((run) => run.ladder);
 }
 
 /**
@@ -231,8 +290,8 @@ function reportOf(
 
 /**
  * Each flow over the last `days` days: its last runs, its newest report,
- * how often it finished, what a finished run costs, what a useful result
- * costs, and how often its runs needed you. A
+ * where its work landed, how often it finished, what a finished run costs,
+ * what a useful result costs, and how often its runs needed you. A
  * stopped run did not finish, so it counts against it. A flow a Subflow
  * node ran counts too, inside the run that called it. The busiest flows
  * first, then the one that ran last.
@@ -286,6 +345,7 @@ export function flowHealthRows(
 			useful: usefulOf(recent),
 			neededYou: neededYouOf(recent),
 			...(report ? { report } : {}),
+			ladders: flowLadders(ladderRows(recent)),
 		};
 	});
 	return topRows(
@@ -371,14 +431,13 @@ function flowRange(
 		undefined,
 	);
 	const { cost, tokenUse } = finishedCostOf(finished);
-	const perNight: NightCounts[] = days.map((day) => {
-		const counts: Record<string, number> = {};
-		for (const { status } of statuses) counts[status] = 0;
-		for (const run of inRange) {
-			if (run.day === day) counts[run.status] = (counts[run.status] ?? 0) + 1;
-		}
-		return { night: day, counts };
-	});
+	const perNight = days.map((day) =>
+		flowDay(
+			day,
+			inRange.filter((run) => run.day === day),
+			statuses,
+		),
+	);
 	return {
 		nights: range,
 		runs: inRange.length,
@@ -423,14 +482,16 @@ function flowRange(
 		scores: scoresOf(inRange),
 		useful: usefulOf(inRange),
 		neededYou: neededYouOf(inRange),
+		ladders: flowRangeLadders(ladderRows(inRange)),
 		latest: inRange.slice(-OVERVIEW_ROWS).reverse().map(toFlowRun),
 	};
 }
 
 /**
- * One flow in detail, for each day range: runs per day, what each run
- * cost, what a useful result cost, why runs did not finish, and the latest
- * runs. Runs as a subflow count, as in its Flow health row.
+ * One flow in detail, for each day range: runs, spend, Needed you and
+ * metrics per day, where its work landed, what each run cost, what a
+ * useful result cost, why runs did not finish, and the latest runs. Runs
+ * as a subflow count, as in its Flow health row.
  */
 export function summarizeFlow(
 	name: string,
