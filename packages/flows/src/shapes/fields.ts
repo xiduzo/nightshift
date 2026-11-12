@@ -53,7 +53,13 @@ export const OUTPUT_FIELD_SHAPES: { [T in FlowNodeType]: FieldShapes<T> } = {
 		visit: whole,
 	},
 	decision: { outcome: text, note: text, visit: whole },
-	call: { outcome: text, ended: text, end_message: text, visit: whole },
+	call: {
+		outcome: text,
+		ended: text,
+		end_message: text,
+		end_report: text,
+		visit: whole,
+	},
 	value: { outcome: text, data: anything, note: text, visit: whole },
 	wait: {
 		outcome: text,
@@ -63,7 +69,7 @@ export const OUTPUT_FIELD_SHAPES: { [T in FlowNodeType]: FieldShapes<T> } = {
 		visit: whole,
 	},
 	tool: { outcome: text, data: anything, text, visit: whole },
-	end: { outcome: text, message: text, visit: whole },
+	end: { outcome: text, message: text, report: text, visit: whole },
 	join: { outcome: text, data: { type: "object" }, visit: whole },
 	lease: {
 		outcome: text,

@@ -72,6 +72,8 @@ export type BodyEnd =
 			result?: RunResult;
 			/** The reason of the chosen end: an End node's message. */
 			reason: string | null;
+			/** The report of the End node the body ended at, when it gave one. */
+			report?: string;
 			/** The body's node outputs, from its final state. */
 			nodes: NodeOutputs;
 			/** The body's variables, from its final state. */
@@ -198,6 +200,7 @@ export async function runBody(input: {
 		outcome: ended.outcome as Outcome,
 		...(ended.result ? { result: ended.result } : {}),
 		reason: ended.reason,
+		...(ended.report !== undefined ? { report: ended.report } : {}),
 		nodes: result.nodes,
 		vars: result.vars ?? {},
 	};

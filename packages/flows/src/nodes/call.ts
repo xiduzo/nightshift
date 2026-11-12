@@ -104,8 +104,8 @@ export const callTierSchema: z.ZodType<CallTier> = z.object({
  * Once: ends `pass` or `fail`; its outputs are the called flow's outputs,
  * plus `ended` (the label or choice it ended on, or "") and `visit`. A
  * called flow that ends at an End node ends the Call `pass` (`done`,
- * `nothing-to-do`) or `fail` (`failed`); `ended` is then the End's status
- * and `end_message` its message.
+ * `nothing-to-do`) or `fail` (`failed`); `ended` is then the End's status,
+ * `end_message` its message and `end_report` its report.
  * With `each`: ends `done` or `halted`; its outputs count the elements and
  * hold each one's result in `results` (`callEachOutputFields`).
  *
@@ -157,12 +157,13 @@ export type CallEachNode = CallNode & { each: CallEach };
 /**
  * Without `each`. ended: the label or choice the called flow ended on, or
  * the status of its End node, or "". end_message: the message of that End
- * node, or "".
+ * node, or "". end_report: the report of that End node, or "".
  */
 export const callOutputFields = [
 	"outcome",
 	"ended",
 	"end_message",
+	"end_report",
 	"visit",
 ] as const;
 

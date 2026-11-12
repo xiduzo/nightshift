@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { addNode, planSubflowFromSection } from "../draft";
+import { addNode, planSubflowFromSection, renameNode } from "../draft";
 import { FLOW_VERSION, type Flow, flowSchema } from "../flow";
 import { validateFlow } from "../validate";
-import { endMessage } from "./end";
+import { endMessage, MAX_REPORT_BYTES, reportText } from "./end";
 
 /** The End node: it ends the run on purpose, with a status and one line. */
 
@@ -105,6 +105,117 @@ describe("the End node", () => {
 				code: "end-node",
 				nodes: ["none"],
 			});
+		}
+	});
+});
+
+describe("the report of an End node", () => {
+	const withReport = (text: string) => {
+		const f = flow();
+		return {
+			...f,
+			nodes: f.nodes.map((node) =>
+				node.type === "end"
+					? { ...node, report: { kind: "text" as const, text } }
+					: node,
+			),
+		};
+	};
+
+	test("is a template of Markdown that reads known names", () => {
+		const text = "## What is new\n\n{{look.log_tail}} for {{label}}";
+		const f = flowSchema.parse(withReport(text));
+		expect(messages(f)).toEqual([]);
+		const end = f.nodes.find((node) => node.type === "end");
+		expect(end?.type === "end" ? end.report : null).toEqual({
+			kind: "text",
+			text,
+		});
+	});
+
+	test("a report that reads an unknown name is an error", () => {
+		expect(messages(withReport("{{ghost}}"))).toContainEqual(
+			expect.stringContaining('The report of "none" uses {{ghost}}'),
+		);
+	});
+
+	test("follows a node that is renamed", () => {
+		const renamed = renameNode(
+			flowSchema.parse(withReport("Seen: {{look.log_tail}}")),
+			"look",
+			"scan",
+		);
+		const end = renamed.nodes.find((node) => node.type === "end");
+		expect(end?.type === "end" ? end.report : null).toEqual({
+			kind: "text",
+			text: "Seen: {{scan.log_tail}}",
+		});
+		expect(messages(renamed)).toEqual([]);
+	});
+
+	test("takes only a known kind", () => {
+		const f = flow();
+		expect(() =>
+			flowSchema.parse({
+				...f,
+				nodes: f.nodes.map((node) =>
+					node.type === "end"
+						? { ...node, report: { kind: "web", text: "x" } }
+						: node,
+				),
+			}),
+		).toThrow();
+	});
+});
+
+describe("reportText", () => {
+	test("keeps a short report, without blank lines on top and space at the end", () => {
+		expect(reportText("\n  \n## News\n\n- one  \n\n")).toEqual({
+			text: "## News\n\n- one",
+			cut: false,
+		});
+	});
+
+	test("is empty for a blank report", () => {
+		expect(reportText(" \n\t\n")).toEqual({ text: "", cut: false });
+	});
+
+	test("keeps a report of exactly the cap", () => {
+		const text = "a".repeat(MAX_REPORT_BYTES);
+		expect(reportText(text)).toEqual({ text, cut: false });
+	});
+
+	test("cuts a longer report at the last line break within the cap", () => {
+		const line = `${"a".repeat(99)}\n`;
+		const rendered = line.repeat(1000);
+		const { text, cut } = reportText(rendered);
+		expect(cut).toBe(true);
+		expect(new TextEncoder().encode(text).length).toBeLessThanOrEqual(
+			MAX_REPORT_BYTES,
+		);
+		// 655 whole lines fit in 65,536 bytes; the cut drops the line break.
+		expect(text).toBe(line.repeat(655).trimEnd());
+	});
+
+	test("a line break right after the cap still keeps the last whole line", () => {
+		const rendered = `${"a".repeat(MAX_REPORT_BYTES)}\nmore`;
+		expect(reportText(rendered)).toEqual({
+			text: "a".repeat(MAX_REPORT_BYTES),
+			cut: true,
+		});
+	});
+
+	test("cuts one long line before the character the cap falls in", () => {
+		// "é" is 2 bytes and "😀" 4: the cap falls inside one of them.
+		for (const char of ["é", "😀"]) {
+			const rendered = `a${char.repeat(MAX_REPORT_BYTES)}`;
+			const { text, cut } = reportText(rendered);
+			const bytes = new TextEncoder().encode(text).length;
+			expect(cut).toBe(true);
+			expect(bytes).toBeLessThanOrEqual(MAX_REPORT_BYTES);
+			expect(bytes).toBeGreaterThan(MAX_REPORT_BYTES - 4);
+			expect(text).not.toContain("�");
+			expect(text.startsWith(`a${char}`)).toBe(true);
 		}
 	});
 });

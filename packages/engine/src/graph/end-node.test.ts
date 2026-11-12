@@ -136,6 +136,100 @@ describe("the End node", () => {
 	});
 });
 
+describe("the report of an End node", () => {
+	const reporting = (text: string): EndNode => ({
+		...end("done", "done", "Found {{look.log_tail}}"),
+		report: { kind: "text", text },
+	});
+	const reportFlow = (text: string, cmd = "echo 3 items") =>
+		flowOf(
+			[command("look", cmd), reporting(text)],
+			[edge("e1", "look", "pass", "done")],
+		);
+
+	test("renders into the step's outputs and the transcript says it wrote one", async () => {
+		const h = await startRun(
+			sandbox,
+			reportFlow("\n## What is new\n\n- {{look.log_tail}}\n\n"),
+		);
+		const driven = await drive(h, { inputs: {} });
+		expect(driven.state.nodes.done).toEqual({
+			message: "Found 3 items",
+			report: "## What is new\n\n- 3 items",
+			visit: 1,
+			outcome: "done",
+		});
+		// Only a Call reads it from the end: the run's report is the step's.
+		expect(driven.state.ended).toMatchObject({
+			nodeId: "done",
+			result: "done",
+			report: "## What is new\n\n- 3 items",
+		});
+		const events = await h.events();
+		expect(payloads(events, "RunWarned")).toEqual([]);
+		const step = deriveSteps(foldRun(events)).find((s) => s.nodeId === "done");
+		expect(
+			(await readTranscriptFile(step?.transcriptPath as string)).map(
+				(e) => e.event,
+			),
+		).toEqual([
+			{
+				type: "end",
+				status: "done",
+				message: "Found 3 items",
+				report: { cut: false },
+			},
+		]);
+	});
+
+	test("a blank report keeps an empty text, and the run has no report", async () => {
+		const h = await startRun(sandbox, reportFlow("  \n"));
+		const driven = await drive(h, { inputs: {} });
+		expect(driven.state.nodes.done).toMatchObject({ report: "" });
+		expect(driven.state.ended).not.toHaveProperty("report");
+	});
+
+	test("an End without a report has no report output", async () => {
+		const h = await startRun(sandbox, lookFlow("true"));
+		const driven = await drive(h, { inputs: {} });
+		expect(driven.state.nodes.none).not.toHaveProperty("report");
+	});
+
+	test("a report over 64 KB is cut at a line break, with a warning", async () => {
+		// 2,000 lines of 40 bytes: 80,000 bytes, then what the step found.
+		const line = `${"x".repeat(39)}\n`;
+		const h = await startRun(
+			sandbox,
+			reportFlow(`${line.repeat(2000)}{{look.log_tail}}`),
+		);
+		const driven = await drive(h, { inputs: {} });
+		const report = (driven.state.nodes.done as { report: string }).report;
+		// 1,638 whole lines fit in 65,536 bytes.
+		expect(report).toBe(line.repeat(1638).trimEnd());
+		const events = await h.events();
+		const step = deriveSteps(foldRun(events)).find((s) => s.nodeId === "done");
+		expect(payloads(events, "RunWarned")).toEqual([
+			{
+				kind: "report",
+				message:
+					"This report is longer than 64 KB. Night Shift kept the first 64 KB.",
+			},
+		]);
+		expect(
+			(await readTranscriptFile(step?.transcriptPath as string)).map(
+				(e) => e.event,
+			),
+		).toEqual([
+			{
+				type: "end",
+				status: "done",
+				message: "Found 3 items",
+				report: { cut: true },
+			},
+		]);
+	});
+});
+
 describe("an End node in a called flow", () => {
 	const callOnce = (id: string, flow: string) =>
 		({ id, type: "call", position: { x: 0, y: 0 }, flow, inputs: {} }) as const;
@@ -192,6 +286,42 @@ describe("an End node in a called flow", () => {
 		expect(sub?.error).toBe('The flow ended as failed at node "broke".');
 		expect(driven.state.nodes.report).toMatchObject({
 			log_tail: "fail|failed|",
+		});
+	});
+
+	test("the Call gives the End's report as end_report, and an empty one without a report", async () => {
+		const written = flowOf([
+			{
+				...end("found", "done", "Found it"),
+				report: { kind: "text", text: "## Found\n\n{{label}}" },
+			},
+		]);
+		const h = await startRun(
+			sandbox,
+			flowOf(
+				[callOnce("sub", "write"), callOnce("bare", "look")],
+				[edge("e1", "sub", "pass", "bare")],
+			),
+			{
+				flows: {
+					write: {
+						...written,
+						inputs: [{ name: "label", type: "text", default: "news" }],
+					},
+					look: lookFlow("true"),
+				},
+			},
+		);
+		const driven = await drive(h, { inputs: {} });
+		expect(driven.state.nodes.sub).toMatchObject({
+			outcome: "pass",
+			ended: "done",
+			end_message: "Found it",
+			end_report: "## Found\n\nnews",
+		});
+		expect(driven.state.nodes.bare).toMatchObject({
+			ended: "nothing-to-do",
+			end_report: "",
 		});
 	});
 

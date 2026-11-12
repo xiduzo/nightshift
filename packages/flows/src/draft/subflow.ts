@@ -258,7 +258,7 @@ export type SubflowPlan =
 const CALL_RUN_FIELDS = ["flow", "base_branch", "index"] as const;
 type CallRunField = (typeof CALL_RUN_FIELDS)[number];
 /** The fields a Call node has besides its flow's outputs. */
-const CALL_FIELDS = ["outcome", "ended", "end_message", "visit"];
+const CALL_FIELDS = ["outcome", "ended", "end_message", "end_report", "visit"];
 /** The space between nodes the plan places. */
 const STEP_X = 384;
 const STEP_Y = 144;

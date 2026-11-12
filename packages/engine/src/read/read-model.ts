@@ -29,6 +29,7 @@ import type { RunStatus } from "../run-status";
 import { inboxOrder } from "./inbox";
 import { neededYouOf } from "./needed-you";
 import { type MemberName, namesOf, runPerson } from "./people";
+import { reportOf } from "./report";
 import { deriveScores, runMetrics, stepMetrics } from "./run-metrics";
 import { type RunTrace, runTrace } from "./run-trace";
 import { followRunTranscript, type StepEntries } from "./run-transcript";
@@ -145,6 +146,7 @@ export function runFacts(run: RunState) {
 	const open = isOpenStatus(status);
 	const cost = sumCost(run);
 	const endedAt = end?.at ?? null;
+	const report = reportOf(end, steps);
 	return {
 		status,
 		reason: end?.reason ?? null,
@@ -173,6 +175,8 @@ export function runFacts(run: RunState) {
 			.sort((a, b) => a.openedAt - b.openedAt),
 		/** Each time a person stepped in, oldest first (`neededYouOf`). */
 		neededYou: neededYouOf(run),
+		/** The start of the run's report (`reportOf`): never its full text. */
+		...(report ? { report } : {}),
 		sleeps: steps
 			.flatMap((step) => step.sleeps.map(({ from, to }) => ({ from, to })))
 			.sort((a, b) => a.from - b.from),

@@ -40,11 +40,16 @@ export type GateEvent =
 			byDeadline?: true;
 	  };
 
-/** What an End step writes to its transcript: how it ends the run, and its message. */
+/**
+ * What an End step writes to its transcript: how it ends the run, its
+ * message, and whether it wrote a report (`report`; `cut`: Night Shift
+ * kept only the first 64 KB). The report itself is in the step's outputs.
+ */
 export type EndEvent = {
 	type: "end";
 	status: RunResult;
 	message: string | null;
+	report?: { cut: boolean };
 };
 
 /**

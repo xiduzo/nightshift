@@ -120,7 +120,8 @@ describe("flowAuthoringGuide", () => {
 		// node, with its pairs and the fields of a feed item. 4920: the Web
 		// request node and a Wait for a URL. 4995: the kits message/send,
 		// feeds/read and email/send (a line each), and the secrets they read.
-		expect(words).toBeLessThan(4995);
+		// 5030: the report of an End node and a Subflow's `end_report`.
+		expect(words).toBeLessThan(5030);
 	});
 });
 

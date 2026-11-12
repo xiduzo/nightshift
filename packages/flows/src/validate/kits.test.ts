@@ -103,7 +103,7 @@ describe("kits", () => {
 		expect(
 			errorsOf(caller("kit:github/create-branch", { name: "x" }), {}),
 		).toEqual([
-			'The command of "said" uses {{pr.url}}, but "pr" has no field "url". Use one of: outcome, ended, end_message, visit, branch, created, sha.',
+			'The command of "said" uses {{pr.url}}, but "pr" has no field "url". Use one of: outcome, ended, end_message, end_report, visit, branch, created, sha.',
 		]);
 	});
 

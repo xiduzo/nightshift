@@ -1155,3 +1155,125 @@ describe("what a useful result costs", () => {
 		});
 	});
 });
+
+describe("the latest reports", () => {
+	/** A run that ended at an End node that wrote a report. */
+	const reported = (
+		id: string,
+		fields: Partial<RunSummary> & { endedAt: number },
+	): RunSummary =>
+		aRun({
+			id,
+			result: "done",
+			report: { stepId: `${id}-end`, excerpt: `Report of ${id}`, more: false },
+			...fields,
+		});
+
+	test("one row per flow, its newest report, the newest end first", () => {
+		const summary = summarize(
+			[
+				reported("old", {
+					createdAt: TODAY - 3 * DAY,
+					endedAt: TODAY - 3 * DAY + HOUR,
+				}),
+				reported("new", {
+					createdAt: TODAY - DAY,
+					endedAt: TODAY - DAY + HOUR,
+				}),
+				reported("fix", {
+					flowName: "fix",
+					createdAt: TODAY + HOUR,
+					endedAt: TODAY + 2 * HOUR,
+					result: "nothing-to-do",
+				}),
+				aRun({ createdAt: TODAY, endedAt: TODAY + HOUR, result: "done" }),
+			],
+			project(["night", "fix"]),
+		);
+		const range = daysOf(summary, 7);
+		expect(range.reports?.count).toBe(2);
+		expect(range.reports?.rows[0]).toEqual({
+			key: "p1/fix",
+			group: "fix",
+			title: "fix",
+			runId: "fix",
+			stepId: "fix-end",
+			endedAt: TODAY + 2 * HOUR,
+			result: "nothing-to-do",
+			excerpt: "Report of fix",
+			more: false,
+		});
+		expect(range.reports?.rows[1]).toMatchObject({
+			key: "p1/night",
+			runId: "new",
+		});
+	});
+
+	test("count the runs that started in the range", () => {
+		const summary = summarize([
+			reported("ancient", {
+				createdAt: TODAY - 40 * DAY,
+				endedAt: TODAY - 40 * DAY + HOUR,
+			}),
+		]);
+		expect(daysOf(summary, 30).reports).toEqual({ rows: [], count: 0 });
+		expect(daysOf(summary, 90).reports?.rows.map((row) => row.runId)).toEqual([
+			"ancient",
+		]);
+	});
+
+	test("over all projects, a row names the project and the flow", () => {
+		const summary = summarize(
+			[reported("site", { createdAt: TODAY, endedAt: TODAY + HOUR })],
+			all({ p1: "website" }),
+		);
+		expect(daysOf(summary, 7).reports?.rows[0]).toMatchObject({
+			group: "website",
+			title: "night",
+		});
+	});
+
+	test("a Flow health row has its own newest report of any day, not one as a subflow", () => {
+		const summary = summarize(
+			[
+				reported("long-ago", {
+					createdAt: TODAY - 60 * DAY,
+					endedAt: TODAY - 60 * DAY + HOUR,
+				}),
+				aRun({
+					flowName: "fix",
+					createdAt: TODAY,
+					endedAt: TODAY + HOUR,
+					result: "done",
+					report: { stepId: "own", excerpt: "Fix report", more: true },
+					subflows: [
+						{
+							flowName: "night",
+							status: "finished",
+							costUsd: 0,
+							costEstimated: false,
+							costMissing: 0,
+							costCalls: 0,
+							startedAt: TODAY,
+							endedAt: TODAY + HOUR,
+						},
+					],
+				}),
+			],
+			project(["night", "fix", "idle"]),
+		);
+		const rows = new Map(
+			summary.flowHealth?.rows.map((row) => [row.name, row.report]),
+		);
+		expect(rows.get("night")).toEqual({
+			runId: "long-ago",
+			stepId: "long-ago-end",
+			endedAt: TODAY - 60 * DAY + HOUR,
+			result: "done",
+			excerpt: "Report of long-ago",
+			more: false,
+		});
+		expect(rows.get("fix")?.stepId).toBe("own");
+		expect(rows.get("idle")).toBeUndefined();
+	});
+});

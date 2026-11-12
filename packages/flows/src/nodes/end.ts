@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { type NodeCheck, nodeBase } from "./base";
 
-/** The End node: it ends the run on purpose, with a result and one line of text. */
+/** The End node: it ends the run on purpose, with a result, one line of text and maybe a report. */
 
 /**
  * How an End node ends the run. `done`: the run did its work. `nothing-to-do`:
@@ -12,14 +12,33 @@ export const endStatusSchema = z.enum(["done", "nothing-to-do", "failed"]);
 export type EndStatus = z.infer<typeof endStatusSchema>;
 
 /**
+ * A report the End node writes itself: `text`, a template that renders to
+ * Markdown (`## What is new\n\n{{summary.output}}`).
+ */
+const textReportSchema = z.object({
+	kind: z.literal("text"),
+	text: z.string(),
+});
+
+/**
+ * What the run produced, for a person to read (ADR 26). One kind of report
+ * today: text the End node writes. The union stays open for more kinds.
+ */
+const endReportSchema = z.discriminatedUnion("kind", [textReportSchema]);
+
+/**
  * Ends the run with `status` and `message`, a template rendered to one line
  * ("No open issues"). The runs list, the run page and the notification show
  * both. No edge leaves it: its step ends with the status as its outcome, and
  * the run ends there.
  *
+ * `report` is what the run produced, in Markdown: the run page, the flow's
+ * card and Home show it. The step's outputs keep it, cut at
+ * {@link MAX_REPORT_BYTES}. Night Shift never pushes it.
+ *
  * In a called flow it ends the called flow: `done` and `nothing-to-do` end
  * the Call `pass`, `failed` ends it `fail`. The Call's `ended` holds the
- * status and its `end_message` the message.
+ * status, its `end_message` the message and its `end_report` the report.
  */
 export const endNodeSchema = z.object({
 	...nodeBase,
@@ -27,11 +46,27 @@ export const endNodeSchema = z.object({
 	status: endStatusSchema,
 	/** One line for a person. A template. */
 	message: z.string().optional(),
+	/** What the run produced, in Markdown. Unset: no report. */
+	report: endReportSchema.optional(),
 });
 export type EndNode = z.infer<typeof endNodeSchema>;
 
-/** message: the rendered message, on one line. */
-export const endOutputFields = ["outcome", "message", "visit"] as const;
+/**
+ * message: the rendered message, on one line. report: the rendered report,
+ * at most {@link MAX_REPORT_BYTES}, only from a node with a report.
+ */
+export const endOutputFields = [
+	"outcome",
+	"message",
+	"report",
+	"visit",
+] as const;
+
+/**
+ * The most bytes of a report a run keeps (UTF-8). The rest is cut at a
+ * line break. The memory of a Since last run node has the same cap.
+ */
+export const MAX_REPORT_BYTES = 64 * 1024;
 
 /**
  * The message an End node gives, from its rendered template: the first
@@ -45,10 +80,38 @@ export function endMessage(rendered: string): string | null {
 	return line ?? null;
 }
 
+/** A line feed in UTF-8: one byte, never part of a longer character. */
+const LINE_FEED = 0x0a;
+
 /**
- * An End node's message reads known names. That no edge leaves it is a
- * check of the flow's edges (`validateFlow`).
+ * The report an End node keeps, from its rendered template: without blank
+ * lines on top and white space at the end, at most
+ * {@link MAX_REPORT_BYTES} in UTF-8. A longer report is cut at the last
+ * line break within the cap (`cut`). A report of one long line is cut
+ * before the character the cap falls in. Empty when the report is blank.
+ */
+export function reportText(rendered: string): { text: string; cut: boolean } {
+	const text = rendered.replace(/^(?:[ \t]*\r?\n)+/, "").trimEnd();
+	const bytes = new TextEncoder().encode(text);
+	if (bytes.length <= MAX_REPORT_BYTES) return { text, cut: false };
+	// A line feed right after the cap still ends a whole line.
+	let end = bytes.subarray(0, MAX_REPORT_BYTES + 1).lastIndexOf(LINE_FEED);
+	if (end <= 0) {
+		// No line break: cut before the character the cap falls in.
+		end = MAX_REPORT_BYTES;
+		while (end > 0 && ((bytes[end] ?? 0) & 0xc0) === 0x80) end -= 1;
+	}
+	return {
+		text: new TextDecoder().decode(bytes.subarray(0, end)).trimEnd(),
+		cut: true,
+	};
+}
+
+/**
+ * An End node's message and report read known names. That no edge leaves
+ * it is a check of the flow's edges (`validateFlow`).
  */
 export function checkEndNode(node: EndNode, check: NodeCheck): void {
 	if (node.message !== undefined) check.template(node.message, "message");
+	if (node.report?.kind === "text") check.template(node.report.text, "report");
 }

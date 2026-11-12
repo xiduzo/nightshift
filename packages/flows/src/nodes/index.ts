@@ -148,6 +148,8 @@ export {
 	endNodeSchema,
 	endOutputFields,
 	endStatusSchema,
+	MAX_REPORT_BYTES,
+	reportText,
 } from "./end";
 export {
 	DEFAULT_GATE_URGENCY,

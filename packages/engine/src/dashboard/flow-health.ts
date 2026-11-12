@@ -9,6 +9,7 @@ import {
 	reportedTokens,
 	spreadOf,
 	sumKnownCost,
+	toLatestReport,
 	topRows,
 } from "./stats";
 import {
@@ -22,6 +23,7 @@ import {
 	type FlowWarning,
 	LAST_FLOW_RUNS,
 	type LastFlowRun,
+	type LatestReport,
 	NIGHT_RANGES,
 	type NightCounts,
 	type NightRange,
@@ -208,9 +210,29 @@ function neededYouOf(runs: readonly PlacedFlowRun[]): FlowNeededYou {
 }
 
 /**
- * Each flow over the last `days` days: its last runs, how often it
- * finished, what a finished run costs, what a useful result costs, and
- * how often its runs needed you. A
+ * The newest report of the flow's own runs, of any day. A run as a
+ * subflow has no report of its own: its End's report went to the run
+ * that called it, as `end_report`.
+ */
+function reportOf(
+	name: string,
+	runs: readonly RunSummary[],
+): LatestReport | null {
+	let newest: LatestReport | null = null;
+	for (const run of runs) {
+		if (run.flowName !== name) continue;
+		const report = toLatestReport(run);
+		if (report && (newest === null || report.endedAt > newest.endedAt)) {
+			newest = report;
+		}
+	}
+	return newest;
+}
+
+/**
+ * Each flow over the last `days` days: its last runs, its newest report,
+ * how often it finished, what a finished run costs, what a useful result
+ * costs, and how often its runs needed you. A
  * stopped run did not finish, so it counts against it. A flow a Subflow
  * node ran counts too, inside the run that called it. The busiest flows
  * first, then the one that ran last.
@@ -235,6 +257,7 @@ export function flowHealthRows(
 					startedAt: run.startedAt,
 				}),
 			);
+		const report = reportOf(name, runs);
 		const recent = mine.filter((run) => run.day >= first);
 		const ended = recent.filter(hasEnded);
 		const finished = ended.filter((run) => run.status === "finished");
@@ -262,6 +285,7 @@ export function flowHealthRows(
 			scores: scoresOf(recent),
 			useful: usefulOf(recent),
 			neededYou: neededYouOf(recent),
+			...(report ? { report } : {}),
 		};
 	});
 	return topRows(

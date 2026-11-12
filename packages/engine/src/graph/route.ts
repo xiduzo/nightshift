@@ -288,6 +288,7 @@ async function routeOn(
 			// ends here ends the Sections of its own flow.
 			await leaveScopes(ctx, end, [], config);
 			const result = kind.endResult(node, outcome);
+			const report = kind.endReport(node, end.outputs);
 			return new Command({
 				update: {
 					...update,
@@ -297,6 +298,7 @@ async function routeOn(
 						outcome,
 						reason: kind.endReason(node, outcome, end.outputs),
 						...(result !== null ? { result } : {}),
+						...(report !== null ? { report } : {}),
 					},
 				},
 				goto: END,

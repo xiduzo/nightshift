@@ -1643,7 +1643,7 @@ describe("validateFlow: outputs", () => {
 		).toEqual([
 			'The flow has the output "report" more than once.',
 			expect.stringContaining('The output "Bad" is not a valid name'),
-			'The output "ended" clashes with a field every Subflow node has: outcome, ended, end_message, visit.',
+			'The output "ended" clashes with a field every Subflow node has: outcome, ended, end_message, end_report, visit.',
 		]);
 	});
 });
@@ -2053,7 +2053,7 @@ describe("validateFlow: Call", () => {
 			expect.objectContaining({
 				nodeId: "report",
 				message: expect.stringContaining(
-					'"call" has no field "summary". Use one of: outcome, ended, end_message, visit, verdict, report.',
+					'"call" has no field "summary". Use one of: outcome, ended, end_message, end_report, visit, verdict, report.',
 				),
 			}),
 		]);

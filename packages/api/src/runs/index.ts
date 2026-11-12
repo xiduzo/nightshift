@@ -5,6 +5,8 @@ export {
 	gateChoiceSchema,
 	gateDeadlineSchema,
 	neededYouReasonSchema,
+	runReportGlanceSchema,
+	runResultSchema,
 	runStatusSchema,
 	runSummarySchema,
 	runWalkerSchema,

@@ -49,8 +49,8 @@ import { climbAskNode, retryGate } from "./climb-gate";
  * flow's declared outputs, `ended` and `visit` when it finished on a chosen
  * end, `fail` with the reason when it failed. An End node is a chosen end
  * with a result: `done` and `nothing-to-do` end the Call `pass`, `failed`
- * ends it `fail`, and `ended` and `end_message` hold its status and
- * message.
+ * ends it `fail`, and `ended`, `end_message` and `end_report` hold its
+ * status, message and report.
  *
  * Everything before the body runs again on a resume and after a daemon
  * death (rule 4), so it is idempotent: the resume point (`resumePoint`,
@@ -260,10 +260,15 @@ async function callOnce(
 			const label = ctx
 				.kindOf(ended.node)
 				.endedLabel(ended.node, ended.outcome);
-			// An End node: its status is the label, its message the end_message.
+			// An End node: its status is the label, its message the end_message,
+			// its report the end_report.
 			const own: StepOutputs =
 				ended.result !== undefined
-					? { ended: label, end_message: ended.reason ?? "" }
+					? {
+							ended: label,
+							end_message: ended.reason ?? "",
+							end_report: ended.report ?? "",
+						}
 					: { ended: label };
 			const failed = ended.result === "failed";
 			return end(

@@ -8,6 +8,8 @@ import { z } from "zod";
 import { exact } from "../output";
 import {
 	neededYouReasonSchema,
+	runReportGlanceSchema,
+	runResultSchema,
 	runStatusSchema,
 	runSummarySchema,
 } from "../runs";
@@ -109,6 +111,16 @@ const flowUsefulSchema = z.object({
 	costPerUseful: knownCostSchema.nullable(),
 });
 
+/**
+ * A run's report as a list shows it: the run, the End step that wrote it,
+ * when the run ended, how it came out, and the start of the report.
+ */
+const latestReportSchema = runReportGlanceSchema.extend({
+	runId: z.string(),
+	endedAt: z.number(),
+	result: runResultSchema,
+});
+
 const flowHealthRowSchema = z.object({
 	name: z.string(),
 	last: lastFlowRunSchema.nullable(),
@@ -129,6 +141,8 @@ const flowHealthRowSchema = z.object({
 	scores: z.array(flowScoreRowSchema).optional(),
 	useful: flowUsefulSchema.optional(),
 	neededYou: flowNeededYouSchema.optional(),
+	/** The newest report of its own runs. Absent: none, or an older Host. */
+	report: latestReportSchema.optional(),
 });
 
 const nightTotalsSchema = z.object({
@@ -269,6 +283,14 @@ const nightsRangeSchema = z.object({
 			),
 		})
 		.optional(),
+	/** The newest report of each flow, the newest end first. Older Hosts send none. */
+	reports: topRows(
+		latestReportSchema.extend({
+			key: z.string(),
+			group: z.string(),
+			title: z.string(),
+		}),
+	).optional(),
 	totals: periodTotalsSchema,
 	before: periodTotalsSchema,
 	flows: topRows(flowHealthRowSchema).nullable(),

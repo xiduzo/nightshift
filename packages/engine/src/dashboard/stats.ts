@@ -3,6 +3,7 @@ import type { RunStatus } from "../run-status";
 import {
 	type DashboardRun,
 	type KnownCost,
+	type LatestReport,
 	OVERVIEW_ROWS,
 	type Spread,
 	type StatusCount,
@@ -117,6 +118,23 @@ export function topRows<T>(
 	count = OVERVIEW_ROWS,
 ): TopRows<T> {
 	return { rows: rows.slice(0, count), count: rows.length };
+}
+
+/**
+ * A run's report as a dashboard list shows it, or null when the run has
+ * none. A run with a report ended at an End node.
+ */
+export function toLatestReport(run: RunSummary): LatestReport | null {
+	const { report, endedAt, result } = run;
+	if (!report || endedAt === null || result === null) return null;
+	return {
+		runId: run.id,
+		stepId: report.stepId,
+		endedAt,
+		result,
+		excerpt: report.excerpt,
+		more: report.more,
+	};
 }
 
 /** A run as a dashboard list shows it. */

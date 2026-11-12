@@ -42,8 +42,9 @@ export const runStatusSchema = z.enum([
  * What a run warning is about: a cost that is not known, a guard of the
  * run policy (the budget, a turn limit, no activity, a loop), a run that
  * does not start from the newest commit of its base branch, a score a
- * Command step wrote that Night Shift left out, or data that does not
- * match a shape Night Shift inferred from an earlier run.
+ * Command step wrote that Night Shift left out, data that does not
+ * match a shape Night Shift inferred from an earlier run, or a report
+ * longer than Night Shift keeps.
  */
 const runWarningKindSchema = z.enum([
 	"cost-unknown",
@@ -55,6 +56,7 @@ const runWarningKindSchema = z.enum([
 	"score",
 	"device-fallback",
 	"shape",
+	"report",
 ]);
 
 /** How the End node that ended a run says it came out. */
@@ -116,6 +118,17 @@ const answeredBySchema = z
  * stopped, or took the run over.
  */
 export const neededYouReasonSchema = z.enum(NEEDED_YOU_REASONS);
+
+/**
+ * The start of a run's report: the End step that wrote it, at most 600
+ * characters of its Markdown, and whether it goes on. The full text is in
+ * that step's outputs (`report`). Absent: no report, or an older Host.
+ */
+export const runReportGlanceSchema = z.object({
+	stepId: z.string(),
+	excerpt: z.string(),
+	more: z.boolean(),
+});
 
 /** A time a step slept; `to` is null while it sleeps. Older Hosts send no sleeps. */
 const sleepSchema = z.object({ from: z.number(), to: z.number().nullable() });
@@ -217,6 +230,7 @@ export const runSummarySchema = exact<RunSummary>()(
 		neededYou: z
 			.array(z.object({ reason: neededYouReasonSchema, at: z.number() }))
 			.optional(),
+		report: runReportGlanceSchema.optional(),
 		sleeps: z.array(sleepSchema).optional(),
 		metrics: metricsSchema.optional(),
 	}),
@@ -596,6 +610,8 @@ const stepEventSchema = z.discriminatedUnion("type", [
 		type: z.literal("end"),
 		status: runResultSchema,
 		message: z.string().nullable(),
+		/** The End wrote a report. `cut`: Night Shift kept only its start. Older Hosts send none. */
+		report: z.object({ cut: z.boolean() }).optional(),
 	}),
 	z.object({
 		type: z.literal("lease"),

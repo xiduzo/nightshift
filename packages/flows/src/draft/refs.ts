@@ -269,9 +269,15 @@ export function rewriteOwnTemplates(
 				),
 			};
 		case "end":
-			return node.message === undefined
-				? node
-				: { ...node, message: rewrite(node.message) };
+			return {
+				...node,
+				...(node.message === undefined
+					? {}
+					: { message: rewrite(node.message) }),
+				...(node.report?.kind === "text"
+					? { report: { ...node.report, text: rewrite(node.report.text) } }
+					: {}),
+			};
 		case "command":
 			return { ...node, command: rewrite(node.command) };
 		case "call":

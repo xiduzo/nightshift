@@ -6,6 +6,7 @@ import {
 	hasEnded,
 	spreadOf,
 	toDashboardRun,
+	toLatestReport,
 	topRows,
 	usedTokens,
 } from "./stats";
@@ -13,6 +14,7 @@ import {
 	type AskedGate,
 	type FailedRun,
 	type FailingFlow,
+	type FlowReport,
 	type GateState,
 	type GatesGroup,
 	type GatesRange,
@@ -25,6 +27,7 @@ import {
 	type RunsRange,
 	type SpendGroup,
 	type SpendRange,
+	type TopRows,
 } from "./types";
 
 /** Spend groups beyond this many fold into one. The theme has five chart colors. */
@@ -286,6 +289,29 @@ function failingOf(
 	};
 }
 
+/**
+ * The newest report of each flow whose runs in the range wrote one: one
+ * row per flow, the newest end first. The runs are the runs of their own
+ * that started in the range: a called flow's report counts in no row.
+ */
+function reportsOf(inRange: readonly PlacedRun[]): TopRows<FlowReport> {
+	const flows = new Map<string, FlowReport>();
+	for (const { run, group } of inRange) {
+		const report = toLatestReport(run);
+		if (report === null) continue;
+		const key = `${run.projectId}/${run.flowName ?? run.title}`;
+		const newest = flows.get(key);
+		if (newest && newest.endedAt >= report.endedAt) continue;
+		flows.set(key, {
+			...report,
+			key,
+			group,
+			title: run.flowName ?? run.title,
+		});
+	}
+	return topRows([...flows.values()].sort((a, b) => b.endedAt - a.endedAt));
+}
+
 function waitsOf(gates: readonly AskedGate[]): number[] {
 	return gates.flatMap((gate) => (gate.wait === null ? [] : [gate.wait]));
 }
@@ -375,9 +401,9 @@ function totalsOf(
 }
 
 /**
- * Spend, runs, Gates and Needed you over the last `range` days, today
- * included, and the headline numbers of the `range` days before. Flow
- * health is the caller's: it needs the flows.
+ * Spend, runs, Gates, Needed you and the latest reports over the last
+ * `range` days, today included, and the headline numbers of the `range`
+ * days before. Flow health is the caller's: it needs the flows.
  */
 export function nightsRange(
 	range: NightRange,
@@ -409,6 +435,7 @@ export function nightsRange(
 				reasons: neededReasons(run),
 			})),
 		),
+		reports: reportsOf(inRange),
 		totals: totalsOf(days, inRange, asked),
 		before: totalsOf(both.slice(0, range), runs, gates),
 	};

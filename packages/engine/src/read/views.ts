@@ -160,6 +160,18 @@ export type PendingCommand = {
 /** A Person as a run names them. `name` is null for a Person this computer does not know. */
 export type RunPerson = { id: string; name: string | null };
 
+/**
+ * The start of a run's report (ADR 26, `read/report.ts`): the End step
+ * that wrote it, at most 600 characters of its Markdown, cut at a line
+ * break, and whether the report goes on (`more`). The full text is in that
+ * step's outputs (`report`).
+ */
+export type RunReportGlance = {
+	stepId: string;
+	excerpt: string;
+	more: boolean;
+};
+
 export type RunSummary = {
 	id: string;
 	projectId: string;
@@ -243,6 +255,11 @@ export type RunSummary = {
 	 * nobody. Older Hosts send none.
 	 */
 	neededYou?: NeededYou[];
+	/**
+	 * The start of the run's report (ADR 26), when the End node that ended
+	 * it wrote one. Absent: no report, or an older Host.
+	 */
+	report?: RunReportGlance;
 	/**
 	 * Every time a step of the run slept, also in called flows, oldest
 	 * first. `to` is null while it sleeps. Older Hosts send none.

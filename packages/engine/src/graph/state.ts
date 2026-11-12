@@ -188,6 +188,11 @@ const endedSchema = z.object({
 	 * run `failed`, the others `finished`. Absent for every other end.
 	 */
 	result: z.enum(["done", "nothing-to-do", "failed"]).optional(),
+	/**
+	 * The report an End node gave (`NodeKind.endReport`), for a Call to give
+	 * as `end_report`. Absent for every other end, and for an End without one.
+	 */
+	report: z.string().optional(),
 });
 export type Ended = z.infer<typeof endedSchema>;
 

@@ -4,7 +4,7 @@ import {
 	type NightRange,
 	type RunSummary,
 } from "../read";
-import type { RunStatus } from "../run-status";
+import type { RunResult, RunStatus } from "../run-status";
 
 /**
  * The dashboard's numbers, computed from the runs on the server: the stat
@@ -350,6 +350,33 @@ export type NeededRange = {
 	latest: NeededRun[];
 };
 
+/**
+ * A run's report (ADR 26) as a list shows it: the run, the End step that
+ * wrote it (the run page opens there), when the run ended, how it came out,
+ * and the start of the report (`RunSummary.report`). Never its full text.
+ */
+export type LatestReport = {
+	runId: string;
+	stepId: string;
+	endedAt: number;
+	/** How the End node that ended the run says it came out. */
+	result: RunResult;
+	/** At most 600 characters of its Markdown, cut at a line break. */
+	excerpt: string;
+	/** The report goes on after the excerpt. */
+	more: boolean;
+};
+
+/** The newest report of one flow in a range: one row per flow. */
+export type FlowReport = LatestReport & {
+	/** The project and the flow: `<projectId>/<flow>`. */
+	key: string;
+	/** Its flow, or its project over all projects. */
+	group: string;
+	/** The flow name, or the prompt of a quick run. */
+	title: string;
+};
+
 /** The headline numbers of one day: runs, how they ended, spend, Gates, Needed you. */
 export type NightTotals = {
 	/** The start of the day. */
@@ -386,6 +413,11 @@ export type NightsRange = {
 	gates: GatesRange;
 	/** How often the runs needed you, and why. Older Hosts send none. */
 	needed?: NeededRange;
+	/**
+	 * The newest report of each flow whose own runs started in these days
+	 * wrote one, the newest end first. Older Hosts send none.
+	 */
+	reports?: TopRows<FlowReport>;
 	/** The headline numbers over these days. */
 	totals: PeriodTotals;
 	/**
@@ -461,6 +493,11 @@ export type FlowHealthRow = {
 	useful?: FlowUseful;
 	/** How often its runs needed you in the last days, and why. Older Hosts send none. */
 	neededYou?: FlowNeededYou;
+	/**
+	 * The newest report of its own runs, of any day, like `lastRuns`. Absent:
+	 * no run of its own wrote one, or an older Host.
+	 */
+	report?: LatestReport;
 };
 
 /**

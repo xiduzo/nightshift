@@ -815,8 +815,9 @@ export type KnowledgeVia = "step" | "mcp";
  * Command step wrote a score Night Shift left out (`scores.ts`). `shape`:
  * a step's data does not match the output schema Night Shift inferred
  * from an earlier run (`outputVerdict`): no person confirmed it, so the
- * step goes on. A reader treats the kinds as an open list: a later build
- * may add one.
+ * step goes on. `report`: an End step's report was longer than the cap,
+ * so Night Shift kept only its start (ADR 26). A reader treats the kinds
+ * as an open list: a later build may add one.
  */
 export type RunWarningKind =
 	| "cost-unknown"
@@ -827,7 +828,8 @@ export type RunWarningKind =
 	| "base-ref"
 	| "score"
 	| "device-fallback"
-	| "shape";
+	| "shape"
+	| "report";
 
 /**
  * The names Night Shift scores itself (`scores.ts` says what each means).

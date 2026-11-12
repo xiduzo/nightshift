@@ -361,6 +361,12 @@ export type NodeKind<N extends FlowNode = FlowNode> = {
 	endResult(node: N, outcome: Outcome): RunResult | null;
 	/** A Call's `ended` output when its flow ended at this node: the label, or "". */
 	endedLabel(node: N, outcome: Outcome): string;
+	/**
+	 * The report of a chosen end (`outputs`, the step's outputs): an End
+	 * node's report, which a Call gives as `end_report`. Null for every
+	 * other end, and for an End without one.
+	 */
+	endReport(node: N, outputs: StepOutputs): string | null;
 	/** Whether a step of this node writes a command log (`StepStarted.logPath`). */
 	logsCommandOutput(node: N): boolean;
 	/**
@@ -406,7 +412,7 @@ export function endedAtReason(node: FlowNode, outcome: Outcome): string {
 /**
  * The facts most kinds share, for a kind to spread and override: no
  * auxiliary node, `pass` is the one chosen end and the plain end, no
- * label for a Call, no command log, the node's own `timeoutMinutes`, a
+ * label or report for a Call, no command log, the node's own `timeoutMinutes`, a
  * cut-short step keeps its outputs, no connections, no programs, no
  * requirements.
  */
@@ -417,6 +423,7 @@ export const PLAIN_KIND = {
 		outcome === "pass" ? null : endedAtReason(node, outcome),
 	endResult: () => null,
 	endedLabel: () => "",
+	endReport: () => null,
 	logsCommandOutput: () => false,
 	timeBudget: (node) => ({
 		timeoutMinutes: node.timeoutMinutes,
