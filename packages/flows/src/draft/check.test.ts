@@ -18,6 +18,7 @@ const messages: DraftMessages = {
 	programWithoutLogin: (program, tools) =>
 		`${program} without ${tools.join(",")}`,
 	refusesCommands: (node, mode) => `${node.id} refuses commands in ${mode}`,
+	needsFolder: (need, node) => `folder ${need.kind} for ${node.id}`,
 };
 
 const flow: Flow = {
@@ -236,6 +237,43 @@ describe("checkDraft", () => {
 		expect(marked()).toEqual([]);
 		expect(marked(["studio"])).toEqual([
 			{ severity: "error", message: "call on old-mac", nodeId: "sync" },
+		]);
+	});
+
+	test("a step that needs the project's folder warns only in a project without one", () => {
+		const draft: Flow = {
+			...flow,
+			start: "publish",
+			nodes: [
+				{
+					id: "publish",
+					type: "call",
+					position: { x: 0, y: 0 },
+					flow: "kit:github/publish-draft-pr",
+					inputs: { title: "Notes" },
+				},
+				{ ...commandNode("commit", { x: 0, y: 0 }), command: "git commit" },
+			],
+		};
+		const folderIssues = (folder?: boolean) =>
+			checkDraft(
+				draft,
+				messages,
+				folder === undefined ? {} : { folder },
+			).issues.filter((issue) => issue.message.startsWith("folder"));
+		expect(folderIssues()).toEqual([]);
+		expect(folderIssues(true)).toEqual([]);
+		expect(folderIssues(false)).toEqual([
+			{
+				severity: "warning",
+				message: "folder kit for publish",
+				nodeId: "publish",
+			},
+			{
+				severity: "warning",
+				message: "folder git for commit",
+				nodeId: "commit",
+			},
 		]);
 	});
 });

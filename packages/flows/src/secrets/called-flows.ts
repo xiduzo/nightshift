@@ -76,16 +76,34 @@ function calledInputs(
  */
 export type CalledFlowsOptions = { flows?: ProjectFlowMap; name?: string };
 
+/**
+ * One step of the way a run reaches a node of a called flow: the Call
+ * node, and the flow of it that the run enters (its own, or a tier's).
+ */
+export type CallStep = { node: CallNode; flow: string };
+
+/**
+ * What a walk does with each node: `known` holds the inputs known before
+ * the run of the flow that holds it, `trail` the calls that lead to it,
+ * outermost first. The trail is empty for a node of the walked flow itself.
+ */
+export type CalledFlowsVisit = (
+	node: FlowNode,
+	known: Known,
+	trail: readonly CallStep[],
+) => void;
+
 /** Visits each node of `flow`, and after a Call, each node of the flows it may start. */
 function walk(
 	flow: Flow,
 	known: Known,
 	flows: ProjectFlowMap,
 	chain: readonly string[],
-	visit: (node: FlowNode, known: Known) => void,
+	trail: readonly CallStep[],
+	visit: CalledFlowsVisit,
 ): void {
 	for (const node of flow.nodes) {
-		visit(node, known);
+		visit(node, known, trail);
 		if (node.type !== "call") continue;
 		for (const run of callRuns(node)) {
 			// A flow that calls back into its chain adds nothing new.
@@ -97,6 +115,7 @@ function walk(
 				calledInputs(called, run, node.each?.as, known),
 				flows,
 				[...chain, run.flow],
+				[...trail, { node, flow: run.flow }],
 				visit,
 			);
 		}
@@ -112,11 +131,12 @@ function walk(
  *
  * An input's value is known when a Call binds it to text without a
  * template, else it is its default: so the flow's own defaults count too.
+ * Each visit also gets the calls that lead to the node (`CalledFlowsVisit`).
  */
 export function walkCalledFlows(
 	flow: Flow,
 	options: CalledFlowsOptions,
-	visit: (node: FlowNode, known: Known) => void,
+	visit: CalledFlowsVisit,
 ): void {
 	const own: CalledRun = { flow: options.name ?? "", inputs: {} };
 	walk(
@@ -124,6 +144,7 @@ export function walkCalledFlows(
 		calledInputs(flow, own, undefined, new Map()),
 		options.flows ?? {},
 		options.name === undefined ? [] : [options.name],
+		[],
 		visit,
 	);
 }

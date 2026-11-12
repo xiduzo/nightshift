@@ -32,6 +32,7 @@ describe("programsWithoutLogin", () => {
 			"(acli jira)",
 			"`acli jira`",
 			"if acli jira auth status; then echo ok; fi",
+			"if ! acli jira auth status; then exit 1; fi",
 			"ACLI_DEBUG=1 acli jira",
 			"  acli",
 		]) {

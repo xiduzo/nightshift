@@ -160,4 +160,34 @@ describe("proposalIssues", () => {
 		);
 		expect(issues.length).toBeGreaterThan(0);
 	});
+
+	test("a project without a folder: a warning names the node and what fails", () => {
+		const proposal: FlowInput = {
+			version: FLOW_VERSION,
+			start: "watch",
+			nodes: [
+				{
+					id: "watch",
+					type: "call",
+					position: { x: 0, y: 0 },
+					flow: "kit:github/watch-pr",
+				},
+			],
+			edges: [],
+		};
+		const warnings = (folder?: boolean) =>
+			proposalIssues(draft, proposal, { folder }).filter(
+				(issue) => issue.severity === "warning",
+			);
+		expect(warnings()).toEqual([]);
+		expect(warnings(false)).toEqual([
+			{
+				severity: "warning",
+				message: expect.stringContaining(
+					'The node "watch" runs the kit "kit:github/watch-pr", which works in the project\'s folder',
+				),
+				nodeId: "watch",
+			},
+		]);
+	});
 });

@@ -1,6 +1,7 @@
 /** Kits: flows that ship with Night Shift, read only, run by a Call node. */
 
 export {
+	folderKit,
 	isKitName,
 	isKnowledgeKit,
 	type Kit,

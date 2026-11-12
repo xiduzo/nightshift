@@ -60,17 +60,19 @@ export function programsWithoutLogin(
 }
 
 /** The line up to a `#` that starts a shell comment. */
-const withoutComment = (line: string) => line.replace(/(^|\s)#.*$/, "$1");
+export const withoutComment = (line: string) =>
+	line.replace(/(^|\s)#.*$/, "$1");
 
 /**
  * The program in a place where the shell runs it: at the start of a line,
- * after `;`, `&`, `|`, `(`, `$(`, a backtick or a keyword such as `then`,
- * after variables set for it (`A=1 acli`), and not as part of a longer name.
+ * after `;`, `&`, `|`, `(`, `$(`, a backtick, a keyword such as `then` or a
+ * `!` that negates it, after variables set for it (`A=1 acli`), and not as
+ * part of a longer name. The pattern has no capturing group.
  */
-function callPattern(program: string): RegExp {
+export function callPattern(program: string): RegExp {
 	const name = program.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 	const start = String.raw`(?:^|[;&|(\x60{]|\$\(|\b(?:then|do|else|elif|if|while|until|exec|xargs|time|command|env|nohup|sudo)\s)`;
 	return new RegExp(
-		String.raw`${start}\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*${name}(?![\w.-])`,
+		String.raw`${start}\s*(?:!\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*${name}(?![\w.-])`,
 	);
 }

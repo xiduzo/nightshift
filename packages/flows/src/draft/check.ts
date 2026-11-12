@@ -1,4 +1,4 @@
-/** Checks a draft: the schema, the connections, profiles, Devices and CLI programs it names, and `validateFlow`. */
+/** Checks a draft: the schema, the connections, profiles, Devices and CLI programs it names, what needs the project's folder, and `validateFlow`. */
 import { type Flow, type FlowNode, flowSchema } from "../flow";
 import {
 	type AgentNode,
@@ -11,6 +11,7 @@ import { everyProfileOf, profileOf, runsAs } from "../profiles";
 import type { FlowIssue, ProjectFlowMap } from "../validate";
 import { validateFlow } from "../validate";
 import { type CliToolRef, programsWithoutLogin } from "./cli-programs";
+import { type FolderNeed, folderNeeds } from "./folder";
 import { missingConnections } from "./nodes";
 
 export type FlowCheck = {
@@ -45,6 +46,8 @@ export type DraftMessages = {
 	 * edit files and run its CLI tools. `git commit` fails.
 	 */
 	refusesCommands: (node: AgentNode, mode: CommandlessMode) => string;
+	/** A node that needs the project's folder, in a project without one (`folderNeeds`). */
+	needsFolder: (need: FolderNeed, node: FlowNode) => string;
 };
 
 /** The permission modes that refuse every shell command but the node's CLI tools in a run nobody watches. */
@@ -77,6 +80,11 @@ export type DraftCheckOptions = {
 	devices?: readonly string[];
 	/** The CLI tools, to find a command that calls a program without its login. Leave it out while they load. */
 	cliTools?: readonly CliToolRef[];
+	/**
+	 * Whether the project has a folder (ADR 22). False: each step that
+	 * needs one warns (`folderNeeds`). Leave it out while the project loads.
+	 */
+	folder?: boolean;
 };
 
 /**
@@ -96,6 +104,7 @@ export function checkDraft(
 		untoldDevices,
 		devices,
 		cliTools,
+		folder,
 	}: DraftCheckOptions = {},
 ): FlowCheck {
 	const issues: FlowIssue[] = [];
@@ -192,10 +201,37 @@ export function checkDraft(
 	let validatorError: string | null = null;
 	try {
 		issues.push(...validateFlow(flow, flows ? { flows, name } : undefined));
+		if (folder === false)
+			issues.push(...folderIssues(flow, messages, flows, name));
 	} catch (error) {
 		validatorError = error instanceof Error ? error.message : String(error);
 	}
 	return { issues, validatorError };
+}
+
+/**
+ * A warning on each node that needs the project's folder (`folderNeeds`):
+ * the step fails, or reads nothing, only when a run reaches it.
+ */
+function folderIssues(
+	flow: Flow,
+	messages: DraftMessages,
+	flows: ProjectFlowMap | undefined,
+	name: string | undefined,
+): FlowIssue[] {
+	const nodes = new Map(flow.nodes.map((node) => [node.id, node]));
+	return folderNeeds(flow, { flows, name }).flatMap(({ nodeId, need }) => {
+		const node = nodes.get(nodeId);
+		return node
+			? [
+					{
+						severity: "warning" as const,
+						message: messages.needsFolder(need, node),
+						nodeId,
+					},
+				]
+			: [];
+	});
 }
 
 /**

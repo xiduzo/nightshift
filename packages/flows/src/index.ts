@@ -68,6 +68,7 @@ export {
 	emptyUntil,
 	type FlowCheck,
 	type FlowClip,
+	type FolderNeed,
 	isOptionNode,
 	isSavable,
 	type KnownProfile,

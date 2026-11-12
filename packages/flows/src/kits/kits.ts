@@ -38,9 +38,16 @@ export const KIT_PREFIX = "kit:";
  * its family, the role a node type of that family has (`NODE_FAMILY`), and
  * its label, what it does in a few words, where a person picks a kit. The
  * family and the label live here, not in the flow format: a copy in a
- * project is a plain flow.
+ * project is a plain flow. `needsFolder`: it works in the project's folder
+ * (git, or `gh` on the project's GitHub repository), so a run of a project
+ * without one (ADR 22) fails at its step.
  */
-type KitSource = { flow: FlowInput; family: NodeFamily; label: string };
+type KitSource = {
+	flow: FlowInput;
+	family: NodeFamily;
+	label: string;
+	needsFolder?: boolean;
+};
 
 /** The kits by name. */
 const SOURCES: Readonly<Record<string, KitSource>> = {
@@ -48,26 +55,31 @@ const SOURCES: Readonly<Record<string, KitSource>> = {
 		flow: createBranchKit,
 		family: "do",
 		label: "Create a branch",
+		needsFolder: true,
 	},
 	"kit:github/publish-draft-pr": {
 		flow: publishDraftPrKit,
 		family: "do",
 		label: "Publish a draft pull request",
+		needsFolder: true,
 	},
 	"kit:github/finish-pr": {
 		flow: finishPrKit,
 		family: "do",
 		label: "Finish a pull request",
+		needsFolder: true,
 	},
 	"kit:github/wait-for-checks": {
 		flow: waitForChecksKit,
 		family: "hold",
 		label: "Wait for checks",
+		needsFolder: true,
 	},
 	"kit:github/watch-pr": {
 		flow: watchPrKit,
 		family: "hold",
 		label: "Watch a pull request",
+		needsFolder: true,
 	},
 	"kit:jira/assign": {
 		flow: jiraAssignKit,
@@ -99,17 +111,23 @@ const SOURCES: Readonly<Record<string, KitSource>> = {
 	...Object.fromEntries(
 		KNOWLEDGE_SYNC_KITS.map(({ kit, flow, kind }) => [
 			kit,
-			{ flow, family: "do", label: `Knowledge: ${kind.label}` },
+			{
+				flow,
+				family: "do",
+				label: `Knowledge: ${kind.label}`,
+				needsFolder: kind.needsFolder,
+			},
 		]),
 	),
 };
 
-/** One kit: its name, its flow, its family and its label. */
+/** One kit: its name, its flow, its family, its label, and whether it works in the project's folder. */
 export type Kit = {
 	name: string;
 	flow: Flow;
 	family: NodeFamily;
 	label: string;
+	needsFolder: boolean;
 };
 
 /** The kits, parsed once on first use. */
@@ -117,10 +135,18 @@ let parsed: ReadonlyMap<string, Kit> | undefined;
 
 function kits(): ReadonlyMap<string, Kit> {
 	parsed ??= new Map(
-		Object.entries(SOURCES).map(([name, { flow, family, label }]) => [
-			name,
-			{ name, flow: flowSchema.parse(flow), family, label },
-		]),
+		Object.entries(SOURCES).map(
+			([name, { flow, family, label, needsFolder }]) => [
+				name,
+				{
+					name,
+					flow: flowSchema.parse(flow),
+					family,
+					label,
+					needsFolder: needsFolder ?? false,
+				},
+			],
+		),
 	);
 	return parsed;
 }
@@ -133,6 +159,15 @@ export function isKitName(name: string): boolean {
 /** The flow of a kit, by its name. Undefined for a name that is not a kit. */
 export function kitFlow(name: string): Flow | undefined {
 	return kits().get(name)?.flow;
+}
+
+/**
+ * The kit `name` when it works in the project's folder: a run of a project
+ * without one (ADR 22) fails at its step. Undefined for any other name.
+ */
+export function folderKit(name: string): Kit | undefined {
+	const kit = kits().get(name);
+	return kit?.needsFolder ? kit : undefined;
 }
 
 /** Every kit, sorted by name. */

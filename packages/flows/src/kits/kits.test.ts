@@ -30,6 +30,7 @@ import {
 	runFields,
 } from "../template";
 import {
+	folderKit,
 	isKitName,
 	kitCopyName,
 	kitFlow,
@@ -268,6 +269,28 @@ describe("the kit registry", () => {
 		expect(kitList().find((kit) => kit.name === "kit:feeds/read")?.label).toBe(
 			"Read a feed",
 		);
+	});
+
+	test("the kits that work in the project's folder: every GitHub kit and the Project files sync", () => {
+		expect(
+			kitList()
+				.filter((kit) => folderKit(kit.name) !== undefined)
+				.map((kit) => kit.name),
+		).toEqual([
+			"kit:github/create-branch",
+			"kit:github/finish-pr",
+			"kit:github/publish-draft-pr",
+			"kit:github/wait-for-checks",
+			"kit:github/watch-pr",
+			"kit:knowledge/files",
+		]);
+		for (const kind of KNOWLEDGE_SOURCE_KINDS) {
+			expect(folderKit(kind.kit) !== undefined, kind.kit).toBe(
+				kind.needsFolder,
+			);
+		}
+		expect(folderKit("kit:github/nope")).toBeUndefined();
+		expect(folderKit("publish")).toBeUndefined();
 	});
 
 	test("finds the knowledge kits a flow calls", () => {

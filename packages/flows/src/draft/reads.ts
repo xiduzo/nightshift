@@ -124,7 +124,7 @@ export function dataLinks(flow: Flow): DataLink[] {
  * reads counts, a new one too. Then the values and the expressions of its
  * variable writes. A rule's own names (`previous`, `current`) are no reads.
  */
-function nodeReads(node: FlowNode): { name: string; path: string[] }[] {
+export function nodeReads(node: FlowNode): { name: string; path: string[] }[] {
 	const reads: { name: string; path: string[] }[] = [];
 	const template = (text: string) => {
 		reads.push(...templateRefs(text));

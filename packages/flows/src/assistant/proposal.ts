@@ -4,7 +4,12 @@
  * and the person see the same issues.
  */
 
-import { type CliToolRef, checkDraft, type DraftMessages } from "../draft";
+import {
+	type CliToolRef,
+	checkDraft,
+	type DraftMessages,
+	type FolderNeed,
+} from "../draft";
 import { FLOW_VERSION, type Flow, type FlowNode, flowSchema } from "../flow";
 import { isProfileRef, type ProfileRef } from "../nodes";
 import { everyProfileOf } from "../profiles";
@@ -21,6 +26,8 @@ export type ProposalCheckOptions = {
 	connections?: readonly string[];
 	/** This computer's CLI tools, to warn about a program called without its login. */
 	cliTools?: readonly CliToolRef[];
+	/** Whether the project has a folder (ADR 22). False: a step that needs one warns. */
+	folder?: boolean;
 };
 
 /**
@@ -74,6 +81,7 @@ export function proposalIssues(
 		profiles,
 		connections,
 		cliTools: options.cliTools,
+		folder: options.folder,
 	});
 	if (validatorError !== null) {
 		issues.push({
@@ -99,7 +107,26 @@ const messages: DraftMessages = {
 		`The command calls ${program}, which runs without a login. Call ${tools.join(" or ")} instead: ${tools.length === 1 ? "that CLI tool runs" : "those CLI tools run"} ${program} signed in. list_tools names them.`,
 	refusesCommands: (node, mode) =>
 		`The Agent node "${node.id}" runs in ${mode}, which refuses shell commands such as git commit, except its CLI tools. Set permissionMode to "auto" if it must run commands.`,
+	needsFolder: (need, node) => `${NO_FOLDER} ${folderNeedWords(need, node)}`,
 };
+
+/** What every folder need says first, for the agent. */
+const NO_FOLDER =
+	"This project has no folder: each run starts in an empty folder of its own, without git history or branches.";
+
+/** What one folder need of a node says to the agent. */
+function folderNeedWords(need: FolderNeed, node: FlowNode): string {
+	switch (need.kind) {
+		case "kit":
+			return `The node "${node.id}" runs the kit "${need.kit}", which works in the project's folder, so it fails there. Leave it out.`;
+		case "flow":
+			return `The node "${node.id}" runs the flow "${need.flow}", which has a step that needs the project's folder, so that step fails.`;
+		case "git":
+			return `The command of the node "${node.id}" runs git in that empty folder, so it fails. Clone a repository first, or leave git out.`;
+		case "branch":
+			return `The node "${node.id}" reads run.${need.field}, which is always empty here.`;
+	}
+}
 
 /** A schema issue, on its node or edge when it has one: `Node "build": prompt: …`. */
 function schemaIssue(
