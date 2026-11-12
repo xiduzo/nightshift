@@ -122,7 +122,8 @@ describe("flowAuthoringGuide", () => {
 		// feeds/read and email/send (a line each), and the secrets they read.
 		// 5030: the report of an End node and a Subflow's `end_report`.
 		// 5055: the `scores` of an Agent and a Value (one sentence each).
-		expect(words).toBeLessThan(5055);
+		// 5080: an End report from a file the run wrote.
+		expect(words).toBeLessThan(5080);
 	});
 });
 

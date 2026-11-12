@@ -434,9 +434,14 @@ function rewriteOwnTexts(
 				...(node.message === undefined
 					? {}
 					: { message: template(node.message) }),
-				...(node.report?.kind === "text"
-					? { report: { ...node.report, text: template(node.report.text) } }
-					: {}),
+				...(node.report === undefined
+					? {}
+					: {
+							report:
+								node.report.kind === "text"
+									? { ...node.report, text: template(node.report.text) }
+									: { ...node.report, path: template(node.report.path) },
+						}),
 			};
 		case "command":
 			return { ...node, command: template(node.command) };

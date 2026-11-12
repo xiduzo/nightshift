@@ -130,7 +130,7 @@ Outcomes: `pass`, `fail`. Outputs: `outcome`, `data`, `text`, `visit`.
 
 ### end
 
-Ends the run on purpose. `status`: `done`, `nothing-to-do`, `failed`. `message` (template) is one line for a person: the runs list and the notification show it. `report: { kind: "text", text }` (template, Markdown) is what the run produced, up to 64 KB: the run page, the flow's card and Home show it. `nothing-to-do` is for a run that found no work: it is not a failure. `failed` fails the run on purpose. No edge leaves an End node.
+Ends the run on purpose. `status`: `done`, `nothing-to-do`, `failed`. `message` (template) is one line for a person: the runs list and the notification show it. `report: { kind: "text", text }` (template, Markdown) is what the run produced, up to 64 KB: the run page, the flow's card and Home show it. `report: { kind: "file", path }` reads a text file the run wrote instead (`path`: template, relative to the folder the run works in). `nothing-to-do` is for a run that found no work: it is not a failure. `failed` fails the run on purpose. No edge leaves an End node.
 
 Outcomes: none, the run ends here. Outputs: `outcome`, `message`, `report`, `visit`.
 

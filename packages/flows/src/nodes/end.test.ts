@@ -168,6 +168,72 @@ describe("the report of an End node", () => {
 	});
 });
 
+describe("a report from a file the run wrote", () => {
+	const withFile = (path: string) => {
+		const f = flow();
+		return flowSchema.parse({
+			...f,
+			nodes: f.nodes.map((node) =>
+				node.type === "end"
+					? { ...node, report: { kind: "file", path } }
+					: node,
+			),
+		});
+	};
+
+	test("is a path that may hold a template", () => {
+		for (const path of ["report.md", "./out/report.md", "out/{{label}}.md"]) {
+			expect(messages(withFile(path))).toEqual([]);
+		}
+		const end = withFile("report.md").nodes.find((node) => node.type === "end");
+		expect(end?.type === "end" ? end.report : null).toEqual({
+			kind: "file",
+			path: "report.md",
+		});
+	});
+
+	test("a path that reads an unknown name is an error", () => {
+		expect(messages(withFile("{{ghost}}.md"))).toContainEqual(
+			expect.stringContaining('The report file of "none" uses {{ghost}}'),
+		);
+	});
+
+	test("its own text stays inside the folder the run works in", () => {
+		expect(messages(withFile(" "))).toEqual([
+			'The report file of "none" has no path. Name the file the run writes, for example report.md.',
+		]);
+		expect(messages(withFile("/tmp/report.md"))).toEqual([
+			'The report file of "none" starts with /. Give a path inside the folder the run works in, for example report.md.',
+		]);
+		for (const path of ["../report.md", "out/../../x.md", "{{label}}/../x"]) {
+			expect(messages(withFile(path))).toEqual([
+				'The report file of "none" leaves the folder the run works in. Remove ".." from the path.',
+			]);
+		}
+		expect(messages(withFile(".git/config"))).toEqual([
+			'The report file of "none" is in .git. Pick a file the run writes.',
+		]);
+	});
+
+	test("a part with a template is checked when the step reads the file", () => {
+		expect(messages(withFile("{{label}}..md/report.md"))).toEqual([]);
+	});
+
+	test("follows a node that is renamed", () => {
+		const renamed = renameNode(
+			withFile("out/{{look.exit_code}}.md"),
+			"look",
+			"scan",
+		);
+		const end = renamed.nodes.find((node) => node.type === "end");
+		expect(end?.type === "end" ? end.report : null).toEqual({
+			kind: "file",
+			path: "out/{{scan.exit_code}}.md",
+		});
+		expect(messages(renamed)).toEqual([]);
+	});
+});
+
 describe("reportText", () => {
 	test("keeps a short report, without blank lines on top and space at the end", () => {
 		expect(reportText("\n  \n## News\n\n- one  \n\n")).toEqual({

@@ -21,10 +21,23 @@ const textReportSchema = z.object({
 });
 
 /**
- * What the run produced, for a person to read (ADR 26). One kind of report
- * today: text the End node writes. The union stays open for more kinds.
+ * A report from a file the run wrote: `path`, a template that renders to a
+ * path inside the folder the run works in (`reports/{{topic}}.md`). The
+ * End step reads it on its Device, as UTF-8 text.
  */
-const endReportSchema = z.discriminatedUnion("kind", [textReportSchema]);
+const fileReportSchema = z.object({
+	kind: z.literal("file"),
+	path: z.string(),
+});
+
+/**
+ * What the run produced, for a person to read (ADR 26): text the End node
+ * writes, or a file the run wrote.
+ */
+const endReportSchema = z.discriminatedUnion("kind", [
+	textReportSchema,
+	fileReportSchema,
+]);
 
 /**
  * Ends the run with `status` and `message`, a template rendered to one line
@@ -34,7 +47,9 @@ const endReportSchema = z.discriminatedUnion("kind", [textReportSchema]);
  *
  * `report` is what the run produced, in Markdown: the run page, the flow's
  * card and Home show it. The step's outputs keep it, cut at
- * {@link MAX_REPORT_BYTES}. Night Shift never pushes it.
+ * {@link MAX_REPORT_BYTES}. Night Shift never pushes it. A report file the
+ * step cannot read (missing, not text, outside the folder) is a warning:
+ * the run ends as the node says, without a report.
  *
  * In a called flow it ends the called flow: `done` and `nothing-to-do` end
  * the Call `pass`, `failed` ends it `fail`. The Call's `ended` holds the
@@ -108,10 +123,43 @@ export function reportText(rendered: string): { text: string; cut: boolean } {
 }
 
 /**
- * An End node's message and report read known names. That no edge leaves
- * it is a check of the flow's edges (`validateFlow`).
+ * An End node's message and report read known names, and the path of a
+ * report file stays inside the folder the run works in. That no edge
+ * leaves it is a check of the flow's edges (`validateFlow`).
  */
 export function checkEndNode(node: EndNode, check: NodeCheck): void {
 	if (node.message !== undefined) check.template(node.message, "message");
-	if (node.report?.kind === "text") check.template(node.report.text, "report");
+	const { report } = node;
+	if (report?.kind === "text") check.template(report.text, "report");
+	if (report?.kind === "file") {
+		check.template(report.path, "report file");
+		const problem = reportPathProblem(report.path);
+		if (problem !== null) {
+			check.error(`The report file of "${node.id}" ${problem}`);
+		}
+	}
+}
+
+/**
+ * Why the path of a report file does not name a file inside the folder
+ * the run works in, as the end of a sentence; null when it does. Only the
+ * node's own text counts: a part with a template is checked when the step
+ * reads the file.
+ */
+function reportPathProblem(path: string): string | null {
+	const text = path.trim();
+	if (text === "") {
+		return "has no path. Name the file the run writes, for example report.md.";
+	}
+	if (text.startsWith("/")) {
+		return "starts with /. Give a path inside the folder the run works in, for example report.md.";
+	}
+	const parts = text.split("/").filter((part) => !part.includes("{{"));
+	if (parts.includes("..")) {
+		return 'leaves the folder the run works in. Remove ".." from the path.';
+	}
+	if (parts.includes(".git")) {
+		return "is in .git. Pick a file the run writes.";
+	}
+	return null;
 }
