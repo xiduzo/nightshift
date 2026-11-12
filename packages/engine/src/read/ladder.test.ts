@@ -279,7 +279,7 @@ describe("landingsOf", () => {
 		]);
 	});
 
-	test("a Subflow's landing costs what its called flow cost, and the called flow's steps land too", () => {
+	test("a Subflow without a cascade is on no ladder: the steps of its called flow land", () => {
 		const l = runEvents().runStarted();
 		step(l, "c1", "sub", "call", { by: "flow", last: true }, null);
 		const scope = { parentStepId: "c1", itemId: null };
@@ -298,14 +298,67 @@ describe("landingsOf", () => {
 		spent(l, "s1", "x1", 2);
 		l.stepEnded("s1", "pass");
 		l.stepEnded("c1", "pass");
+		const ladder = ladderOf(deriveSteps(l.state()));
+		expect(
+			ladder.landings.map((each) => [each.nodeId, each.via, each.cost.usd]),
+		).toEqual([["write", "sub", 2]]);
+		expect([...ladder.tries]).toEqual([["s1", "first"]]);
+		expect(runRungs(ladder.landings)).toMatchObject([
+			{ nodeId: "write", via: "sub", rung: "first", landed: 1 },
+		]);
+	});
+
+	test("a failed Subflow without a cascade: only its called flow's step lands nowhere", () => {
+		const l = runEvents().runStarted();
+		step(l, "c1", "sub", "call", { by: "flow", last: true }, null);
+		const scope = { parentStepId: "c1", itemId: null };
+		step(
+			l,
+			"s1",
+			"write",
+			"agent",
+			{ by: "agent", last: true },
+			"error",
+			{},
+			{
+				scope,
+			},
+		);
+		l.stepEnded("c1", "error");
+		expect(
+			landings(l).map((each) => [each.nodeId, each.rung, each.via]),
+		).toEqual([["write", "none", "sub"]]);
+	});
+
+	test("a Subflow's tier lands with what its called flow cost, and the called flow's steps land too", () => {
+		const l = runEvents().runStarted();
+		step(l, "c1", "sub", "call", { by: "flow", tier: 0, last: true }, null);
+		const scope = { parentStepId: "c1", itemId: null };
+		step(
+			l,
+			"s1",
+			"write",
+			"agent",
+			{ by: "agent", last: true },
+			null,
+			{},
+			{
+				scope,
+			},
+		);
+		spent(l, "s1", "x1", 2);
+		l.stepEnded("s1", "pass");
+		l.stepEnded("c1", "pass", { tier: "small", tries: 1 });
 		const all = landings(l);
-		expect(all.map((each) => [each.nodeId, each.via, each.cost.usd])).toEqual([
-			["write", "sub", 2],
-			["sub", null, 2],
+		expect(
+			all.map((each) => [each.nodeId, each.via, each.tier, each.cost.usd]),
+		).toEqual([
+			["write", "sub", null, 2],
+			["sub", null, "small", 2],
 		]);
 		expect(runRungs(all)).toMatchObject([
 			{ nodeId: "write", via: "sub" },
-			{ nodeId: "sub" },
+			{ nodeId: "sub", rung: "first", by: "flow", tier: "small" },
 		]);
 		expect(runRungs(all)[1]).not.toHaveProperty("via");
 	});
@@ -446,6 +499,20 @@ describe("landingsOf, steps of an older Walker", () => {
 			["triage", "first", "model"],
 			["route", "rule", "rule"],
 		]);
+	});
+
+	test("a Subflow without a tier label is on no ladder, a Subflow's tier is", () => {
+		const l = runEvents().runStarted();
+		step(l, "c1", "sub", "call", undefined, "pass");
+		step(l, "c2", "tiers", "call", undefined, "pass", {
+			tier: "small",
+			tries: 1,
+		});
+		const ladder = ladderOf(deriveSteps(l.state()));
+		expect(
+			ladder.landings.map((each) => [each.nodeId, each.rung, each.by]),
+		).toEqual([["tiers", "first", "flow"]]);
+		expect(ladder.tries.has("c1")).toBe(false);
 	});
 
 	test("a Value without a cascade: a cost is a decider, nothing is a rule and no ladder", () => {

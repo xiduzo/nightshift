@@ -21,6 +21,12 @@ import { calledCosts } from "./run-views";
  * steps: a Value by model, and an Ask. A Value by rule is on no ladder.
  * The choice ladder holds Decision steps.
  *
+ * Only the rungs that did the work count. A Subflow without a cascade is
+ * on no ladder: the steps of the flow it calls did its work, and they land
+ * on their own (`via` names the Subflow). Counted next to them, it would
+ * land a second time for the same work. A Subflow with a cascade stays:
+ * the tier that held is where its work landed.
+ *
  * A climb is the steps of one node in one scope, oldest first, up to its
  * landing. Each try of a cascade is a step of its own (ADR 6). A node
  * without a cascade lands on every visit. A step that ended `stopped` or
@@ -138,7 +144,7 @@ export function ladderOf(steps: readonly DerivedStep[]): RunLadder {
 		const key = climbKey(step);
 		const climb = open.get(key) ?? { steps: [], firstLabel: null };
 		const rung = step.rung ?? olderRung(step, climb, later.get(step.id));
-		if (rung === null) continue;
+		if (rung === null || plainSubflow(step, rung)) continue;
 		const label = tierOf(step);
 		if (rung.by !== "person" && label !== null) climb.firstLabel ??= label;
 		climb.steps.push({ step, rung });
@@ -167,6 +173,16 @@ function firstSeq(step: DerivedStep): number {
 /** The node and the scope a climb belongs to. */
 function climbKey(step: DerivedStep): string {
 	return `${scopeKey(step.scope)}\n${step.nodeId}`;
+}
+
+/**
+ * A Subflow without a cascade: its rung names no tier. Its called flow's
+ * steps did the work, so it is on no ladder.
+ */
+function plainSubflow(step: DerivedStep, rung: StepRung): boolean {
+	return (
+		step.nodeType === "call" && rung.by === "flow" && rung.tier === undefined
+	);
 }
 
 /** The next step of the same node and scope, by step id (older steps look ahead). */
