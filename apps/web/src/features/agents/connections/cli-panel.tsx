@@ -40,6 +40,7 @@ import { formatTime } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { HARNESSES, type HarnessInfo } from "../harnesses";
 import { connectionQueries } from "../queries";
+import { AgentSetupButton, AgentSetupHint } from "../setup/setup-offer";
 import { CheckBadge, type CheckState, FactList, OffMachineNote } from "./parts";
 
 type BinKey = HarnessInfo["setting"] & keyof SettingsView["fields"];
@@ -93,6 +94,7 @@ function fallbackText(settings: SettingsView, key: BinKey): string {
 /**
  * One CLI on this machine: where it is, its version and login, why it cannot
  * run (if so), and where its prompts go. Check again and change its path.
+ * An agent Night Shift can set up gets Install or Sign in where it applies.
  */
 export function CliPanel({
 	tool,
@@ -175,8 +177,10 @@ export function CliPanel({
 					) : null}
 				</>
 			) : null}
+			<AgentSetupHint target={tool.target} check={data} />
 			<OffMachineNote>{tool.offMachine(data)}</OffMachineNote>
 			<div className="flex flex-wrap items-center gap-2">
+				<AgentSetupButton target={tool.target} check={data} />
 				<Button
 					variant="outline"
 					size="sm"

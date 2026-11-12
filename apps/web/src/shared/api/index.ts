@@ -60,6 +60,9 @@ export { authClient } from "./auth-client";
 export type {
 	AgentProfileInput,
 	AgentProfileRow,
+	AgentSetupJob,
+	AgentSetupStatus,
+	AgentSetupView,
 	CheckTarget,
 	CliCheck,
 	CliTool,

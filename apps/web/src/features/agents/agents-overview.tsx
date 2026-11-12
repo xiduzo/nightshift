@@ -2,6 +2,7 @@ import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Empty,
+	EmptyContent,
 	EmptyDescription,
 	EmptyHeader,
 	EmptyMedia,
@@ -16,8 +17,13 @@ import {
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Link } from "@tanstack/react-router";
-import { BotIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import {
+	BotIcon,
+	ChevronRightIcon,
+	DownloadIcon,
+	PlusIcon,
+} from "lucide-react";
+import { type ReactNode, useState } from "react";
 import type {
 	AgentProfileRow,
 	CliTool,
@@ -33,12 +39,17 @@ import { CliToolCheckBadge } from "./cli-tool";
 import { CliCheckBadge } from "./connections/cli-panel";
 import { useFoundPrograms } from "./found-programs";
 import { harnessInfo } from "./harnesses";
+import {
+	AgentSetupDialog,
+	useAgentSetupStatus,
+} from "./setup/agent-setup-dialog";
 
 /**
  * The Agents page with nothing picked: profiles, model profiles, harnesses,
  * tools and your other devices, one section each, like the Settings page.
  * Each row opens its detail; the programs found on this computer wait at
- * the end of the list they join.
+ * the end of the list they join. On this computer, "Set up an agent"
+ * installs one and signs it in.
  */
 export function AgentsOverview({
 	agentProfiles,
@@ -65,6 +76,16 @@ export function AgentsOverview({
 	onAddTool: () => void;
 }) {
 	const found = useFoundPrograms(onSelect);
+	const setup = useAgentSetupStatus();
+	const canSetUp =
+		setup.data?.available === true && setup.data.agents.length > 0;
+	const [settingUp, setSettingUp] = useState(false);
+	const setUpButton = (
+		<Button variant="outline" size="sm" onClick={() => setSettingUp(true)}>
+			<DownloadIcon data-icon="inline-start" />
+			Set up an agent
+		</Button>
+	);
 
 	return (
 		<div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
@@ -93,10 +114,12 @@ export function AgentsOverview({
 								</EmptyMedia>
 								<EmptyTitle>No profiles yet</EmptyTitle>
 								<EmptyDescription>
-									Add a profile, or add an agent from this computer under
-									Harnesses.
+									{canSetUp
+										? "Night Shift installs an agent for you and adds its profile."
+										: "Add a profile, or add an agent from this computer under Harnesses."}
 								</EmptyDescription>
 							</EmptyHeader>
+							{canSetUp ? <EmptyContent>{setUpButton}</EmptyContent> : null}
 						</Empty>
 					) : (
 						<ItemGroup className="gap-2">
@@ -144,7 +167,12 @@ export function AgentsOverview({
 				<PageSection
 					title="Harnesses"
 					description="The agents a profile runs on."
-					actions={<AddButton onClick={onAddHarness}>Add harness</AddButton>}
+					actions={
+						<>
+							{canSetUp ? setUpButton : null}
+							<AddButton onClick={onAddHarness}>Add harness</AddButton>
+						</>
+					}
 				>
 					<ItemGroup className="gap-2">
 						{harnesses.map((harness) => (
@@ -224,6 +252,9 @@ export function AgentsOverview({
 					</PageSection>
 				) : null}
 			</div>
+			{canSetUp ? (
+				<AgentSetupDialog open={settingUp} onOpenChange={setSettingUp} />
+			) : null}
 		</div>
 	);
 }

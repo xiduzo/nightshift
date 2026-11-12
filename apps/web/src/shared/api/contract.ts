@@ -41,6 +41,11 @@ export type ProjectSecretRow =
 /** An agent CLI or a kit's tool found on this computer, not set up yet. */
 export type FoundProgram = ApiOutputs["programs"]["found"][number];
 
+/** The guided setup of an agent on this computer (ADR 25): what it can do here, and each agent's job. */
+export type AgentSetupStatus = ApiOutputs["agentSetup"]["status"];
+export type AgentSetupView = AgentSetupStatus["agents"][number];
+export type AgentSetupJob = AgentSetupView["job"];
+
 /** One of the owner's other Devices: its profiles and secret names, read-only. */
 export type OtherDevice = ApiOutputs["devices"]["others"][number];
 /** What a merge of this computer's Personal into its home Host's does. */

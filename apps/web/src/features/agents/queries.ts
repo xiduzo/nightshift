@@ -1,10 +1,13 @@
 /**
  * The query and mutation options of the agents: Agent Profiles, harnesses,
- * Connections and their Secrets, CLI Tools and deciders.
+ * Connections and their Secrets, CLI Tools, deciders, and the guided setup
+ * of an agent.
  */
 
 import type {
 	AgentProfileRow,
+	AgentSetupJob,
+	AgentSetupStatus,
 	CheckTarget,
 	HarnessRowName,
 	ModelProfileRow,
@@ -183,4 +186,43 @@ export const deciderQueries = {
 export const deciderMutations = {
 	/** Asks the server at a Model Profile's address for its models: the test of the address. */
 	modelsAt: orpc.deciders.modelsAt.mutationOptions,
+};
+
+/** The job states of a guided setup that still run (`setupRuns` in `setup/setup-state.ts`). */
+const SETUP_RUNNING: ReadonlySet<AgentSetupJob["state"]> = new Set([
+	"installing",
+	"checking",
+	"signing-in",
+	"code-needed",
+]);
+
+/** How often the guided setup is asked about while a job runs. */
+const SETUP_POLL_MS = 1_000;
+
+/** The guided setup of an agent on this computer (ADR 25). */
+export const agentSetupQueries = {
+	/**
+	 * What the setup can do here, and how each agent's setup goes. Asks
+	 * again every second while a job runs.
+	 */
+	status: () => ({
+		...orpc.agentSetup.status.queryOptions(),
+		refetchInterval: (query: { state: { data?: AgentSetupStatus } }) =>
+			query.state.data?.agents.some((agent) =>
+				SETUP_RUNNING.has(agent.job.state),
+			)
+				? SETUP_POLL_MS
+				: false,
+	}),
+};
+
+export const agentSetupMutations = {
+	/** Installs an agent with its vendor's installer, after the person confirms. */
+	install: orpc.agentSetup.install.mutationOptions,
+	/** Signs an agent in, then adds it with a profile. */
+	signIn: orpc.agentSetup.signIn.mutationOptions,
+	/** Gives a waiting sign-in the code its page shows. */
+	sendCode: orpc.agentSetup.sendCode.mutationOptions,
+	/** Stops an install or a sign-in. */
+	cancel: orpc.agentSetup.cancel.mutationOptions,
 };
