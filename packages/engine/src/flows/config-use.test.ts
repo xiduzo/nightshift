@@ -254,7 +254,7 @@ async function computerList(
 	}));
 }
 
-describe("what uses a secret", () => {
+describe("what uses a secret: one rule for every Secrets list", () => {
 	// A flow uses a secret in four ways: it names it, or names a profile,
 	// a Connection or a CLI tool of this computer that reads it.
 	const space = {
@@ -282,7 +282,7 @@ describe("what uses a secret", () => {
 		],
 	};
 
-	test("this computer's list names the flows that name it or a Model Profile that reads it, and its connections and CLI tools", async () => {
+	test("this computer's list names every flow that uses it, each once", async () => {
 		expect(await computerList(space)).toEqual([
 			{
 				name: "TOKEN",
@@ -291,6 +291,9 @@ describe("what uses a secret", () => {
 					flow("p2", "night"),
 					flow("p2", "login"),
 					flow("p1", "sort"),
+					flow("p1", "read"),
+					flow("p1", "work"),
+					flow("p1", "ship"),
 				],
 				usedBy: ["tracker"],
 				tools: ["acli"],
@@ -298,7 +301,7 @@ describe("what uses a secret", () => {
 		]);
 	});
 
-	test("a project's list names every flow of that project that uses it, and the CLI tools", async () => {
+	test("a project's list names the same flows of that project, and the CLI tools", async () => {
 		const { use } = configUse({ ...space, kept: { p1: ["TOKEN"] } });
 		expect(await use.sharedSecrets(AT, { projectId: "p1" })).toEqual([
 			{
@@ -384,7 +387,7 @@ describe("this computer's Secrets list: the scopes of ADR 13 and 18", () => {
 		]);
 	});
 
-	test("a CLI tool that reads it goes when each flow that uses it or the name gets it from its project", async () => {
+	test("a Connection or a CLI tool that reads it goes when each flow that uses the name gets it from its project", async () => {
 		expect(
 			await computerList({
 				projects: [
@@ -399,7 +402,7 @@ describe("this computer's Secrets list: the scopes of ADR 13 and 18", () => {
 				tools: [tool("acli", "TOKEN")],
 				kept: { p1: ["TOKEN"] },
 			}),
-		).toEqual([{ name: "TOKEN", flows: [], usedBy: ["tracker"], tools: [] }]);
+		).toEqual([]);
 	});
 
 	test("it stays when a flow of another project uses it through a profile of this computer", async () => {
@@ -413,7 +416,14 @@ describe("this computer's Secrets list: the scopes of ADR 13 and 18", () => {
 				profiles: [agentProfile("worker", { clis: ["acli"] })],
 				kept: { p1: ["TOKEN"] },
 			}),
-		).toEqual([{ name: "TOKEN", flows: [], usedBy: [], tools: ["acli"] }]);
+		).toEqual([
+			{
+				name: "TOKEN",
+				flows: [flow("p2", "sync")],
+				usedBy: [],
+				tools: ["acli"],
+			},
+		]);
 	});
 
 	test("it stays when no flow is known to use the name: a test or a sign-in reads it here", async () => {

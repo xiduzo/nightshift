@@ -29,11 +29,9 @@ import {
  * (`flowUse`) and knows this Device: a flow uses a profile of this computer
  * when it names the profile with this Device's id.
  *
- * One rule says what uses a secret of a project or of the Space
- * (`secretUsers`). This computer's list counts the flows that name a
- * secret or a Model Profile that reads it, and names the connections and
- * CLI tools that read it. It leaves out the flows whose project or Space
- * has the name (ADR 13, 18).
+ * One rule says what uses a secret (`secretUsers`). Each list then keeps
+ * the uses that read its scope (ADR 13, 18): this computer's list leaves
+ * out the flows whose project or Space has the name.
  */
 
 /** Who asks, in which Space: the Space's flows and secrets as that Person sees them. */
@@ -65,7 +63,7 @@ export type ConnectionInUse = Connection & {
  * `usedBy` holds the connections that read it.
  */
 export type SecretInUse = SecretView & {
-	/** The flows that use it through their nodes, or a Model Profile of this computer. */
+	/** The flows that use it (`secretUsers`). */
 	flows: FlowRef[];
 	/** The CLI tools whose logins read it. */
 	tools: string[];
@@ -146,17 +144,6 @@ export function createConfigUse(deps: ConfigUseDeps): ConfigUse {
 		async connections(at) {
 			const use = await flowUse(deps.space(at));
 			const users = secretUsers(deps, use);
-			const through = useThroughProfiles(deps.profiles, use, deps.deviceId);
-			/** The flows that name it in a node, or name a Model Profile that reads it. */
-			const named = (name: string) =>
-				eachOnce([
-					...(use.secrets.get(name) ?? []),
-					...(through.secrets.get(name) ?? []),
-				]);
-			const toolFlows = (tool: string) => [
-				...(use.clis.get(tool) ?? []),
-				...(through.clis.get(tool) ?? []),
-			];
 			const listed = await deps.connections.secrets(users.named);
 			const rows = listed.secrets.map((secret) => ({
 				secret,
@@ -164,33 +151,28 @@ export function createConfigUse(deps: ConfigUseDeps): ConfigUse {
 			}));
 			const covers = await coverage(
 				sharedNames(deps, at),
-				rows.flatMap(({ secret, of }) => [
-					...named(secret.name),
-					...of.webhooks,
-					...of.tools.flatMap(toolFlows),
-				]),
+				rows.flatMap(({ of }) => [...of.flows, ...of.webhooks]),
 			);
 			const secrets: SecretInUse[] = [];
 			for (const { secret, of } of rows) {
 				// A flow whose project or Space has the name reads that value.
 				const covered = (flow: FlowRef) =>
 					covers.get(flow.projectId)?.has(secret.name) === true;
-				const flows = named(secret.name).filter((flow) => !covered(flow));
+				const flows = of.flows.filter((flow) => !covered(flow));
 				const webhooks = of.webhooks.filter((flow) => !covered(flow));
-				// A tool stays while no flow is known to use it or the name, or one
-				// that does needs this value.
-				const tools = of.tools.filter((tool) => {
-					const users = [...toolFlows(tool), ...named(secret.name)];
-					return users.length === 0 || !users.every(covered);
-				});
+				// The connections and CLI tools that read it stay while no flow is
+				// known to use the name, or one that does needs this value.
+				const holders = of.flows.length === 0 || flows.length > 0;
+				const usedBy = holders ? secret.usedBy : [];
+				const tools = holders ? [...of.tools] : [];
 				const needed =
 					secret.saved ||
 					secret.inEnv ||
-					secret.usedBy.length > 0 ||
+					usedBy.length > 0 ||
 					tools.length > 0 ||
 					flows.length > 0 ||
 					webhooks.length > 0;
-				if (needed) secrets.push({ ...secret, flows, tools, webhooks });
+				if (needed) secrets.push({ ...secret, usedBy, flows, tools, webhooks });
 			}
 			return {
 				// After the secrets: a connection's variables read the Personal names as listed now.
