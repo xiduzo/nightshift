@@ -253,6 +253,22 @@ describe("runMetrics", () => {
 		]);
 	});
 
+	test("lists where the work landed, per node and rung, with what it cost", () => {
+		expect(runFacts(night().state()).metrics.ladder).toEqual([
+			{
+				ladder: "work",
+				nodeId: "a",
+				rung: "first",
+				by: "agent",
+				tier: null,
+				landed: 2,
+				costUsd: 0.5,
+				costEstimated: false,
+				costMissing: 1,
+			},
+		]);
+	});
+
 	test("names a useful answer useful, an older log's pr_useful too", () => {
 		const { events } = night()
 			.at(1400)

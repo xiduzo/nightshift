@@ -11,6 +11,13 @@ import {
 	sessionCost,
 	type WaitReason,
 } from "../log";
+import {
+	type Ladder,
+	type Landing,
+	ladderOf,
+	type Rung,
+	type TryRung,
+} from "./ladder";
 import { type NeededYou, neededYouOf } from "./needed-you";
 import {
 	type CostBasis,
@@ -76,6 +83,22 @@ export type TraceStepEnd = {
 	sleeps: TraceSleep[];
 	/** How often its agents searched and read the project's knowledge in this part. */
 	knowledge: { searches: number; reads: number };
+	/** The climb of its node landed at this end (`ladder.ts`). Absent on any other end. */
+	landing?: TraceLanding;
+};
+
+/** A landing as monitoring reads it: its ladder, rung and tier, its tries and what they cost. */
+export type TraceLanding = {
+	ladder: Ladder;
+	rung: Rung;
+	/** The name of the tier. Null for a node without a cascade. */
+	tier: string | null;
+	/** The steps of the climb, a stopped one included. */
+	tries: number;
+	/** What every try cost, a Subflow's called flow included. Null when part of it is not known. */
+	costUsd: number | null;
+	/** A decider's pick fell below its tier's minimum on a try. */
+	unsure?: true;
 };
 
 /** A harness session of an Agent step. */
@@ -108,6 +131,8 @@ export type TraceStep = {
 	parentStepId: string | null;
 	/** The Device it ran on. Null for steps from before Devices named it. */
 	deviceId: string | null;
+	/** The rung its try stands on: `rule`, `first`, `later` or `person`. Absent on no ladder. */
+	rung?: TryRung;
 	startedAt: number;
 	/** Each part of the step that ended, oldest first. */
 	ends: TraceStepEnd[];
@@ -131,6 +156,11 @@ export function runTrace(run: RunState): RunTrace | null {
 	if (!run.runId) return null;
 	const started = run.started;
 	const neededYou = neededYouOf(run);
+	const steps = deriveSteps(run);
+	const ladder = ladderOf(steps);
+	const landed = new Map(
+		ladder.landings.map((landing) => [landing.stepId, landing]),
+	);
 	return {
 		runId: run.runId,
 		projectId: started?.payload.projectId ?? null,
@@ -147,17 +177,34 @@ export function runTrace(run: RunState): RunTrace | null {
 			first: i === 0,
 			neededYou: neededYou.some((act) => act.at <= end.at),
 		})),
-		steps: deriveSteps(run).map((step) => ({
-			id: step.id,
-			nodeId: step.nodeId,
-			nodeType: step.nodeType,
-			visit: step.visit,
-			parentStepId: step.scope?.parentStepId ?? null,
-			deviceId: step.deviceId,
-			startedAt: step.startedAt,
-			ends: stepEnds(step),
-		})),
+		steps: steps.map((step) => {
+			const rung = ladder.tries.get(step.id);
+			return {
+				id: step.id,
+				nodeId: step.nodeId,
+				nodeType: step.nodeType,
+				visit: step.visit,
+				parentStepId: step.scope?.parentStepId ?? null,
+				deviceId: step.deviceId,
+				...(rung ? { rung } : {}),
+				startedAt: step.startedAt,
+				ends: stepEnds(step, landed.get(step.id)),
+			};
+		}),
 		neededYou,
+	};
+}
+
+/** A landing as the trace has it, on the end it landed at. */
+function traceLanding(landing: Landing): TraceLanding {
+	const { cost } = landing;
+	return {
+		ladder: landing.ladder,
+		rung: landing.rung,
+		tier: landing.tier,
+		tries: landing.tries,
+		costUsd: cost.missing === 0 ? cost.usd : null,
+		...(landing.unsure ? { unsure: true as const } : {}),
 	};
 }
 
@@ -192,8 +239,11 @@ function knowledgeIn(step: DerivedStep, from: number, to: number) {
 	return { searches, reads };
 }
 
-/** Each opening of the step that ended, with its end and what began in it. */
-function stepEnds(step: DerivedStep): TraceStepEnd[] {
+/**
+ * Each opening of the step that ended, with its end and what began in it.
+ * `landing`: the climb landed on this step, at its latest end.
+ */
+function stepEnds(step: DerivedStep, landing?: Landing): TraceStepEnd[] {
 	const ends: TraceStepEnd[] = [];
 	step.openings.forEach((opening, index) => {
 		const { end } = opening;
@@ -221,5 +271,7 @@ function stepEnds(step: DerivedStep): TraceStepEnd[] {
 			knowledge: knowledgeIn(step, opening.seq, end.seq),
 		});
 	});
+	const last = ends.at(-1);
+	if (landing && last) last.landing = traceLanding(landing);
 	return ends;
 }

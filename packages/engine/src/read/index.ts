@@ -1,4 +1,4 @@
-/** The read model: the pure projections of the event log, the landed facts, the Needs-you inbox, what a person did to a run (Needed you), the run views, cost, the Persons a run names, and the run bundle. */
+/** The read model: the pure projections of the event log, the landed facts, the Needs-you inbox, what a person did to a run (Needed you), where the work landed (the ladders), the run views, cost, the Persons a run names, and the run bundle. */
 
 export {
 	answeredOf,
@@ -8,6 +8,7 @@ export {
 	inboxOf,
 	lockScreenRefusal,
 } from "./inbox";
+export { RUNGS } from "./ladder";
 export { type LandedFact, landedFacts } from "./landed-facts";
 export {
 	NEEDED_YOU_REASONS,

@@ -8,7 +8,6 @@ import { asDate, instant, lastDays, now } from "@nightshift/time";
 import { and, desc, eq, gte, isNull, lt, or } from "drizzle-orm";
 import { stepSources } from "../knowledge";
 import {
-	addCost,
 	type CostTally,
 	type Derive,
 	type DerivedStep,
@@ -27,6 +26,7 @@ import {
 } from "../log";
 import type { RunStatus } from "../run-status";
 import { inboxOrder } from "./inbox";
+import { landingsOf, runRungs } from "./ladder";
 import { neededYouOf } from "./needed-you";
 import { type MemberName, namesOf, runPerson } from "./people";
 import { reportOf } from "./report";
@@ -34,6 +34,7 @@ import { deriveScores, runMetrics, stepMetrics } from "./run-metrics";
 import { type RunTrace, runTrace } from "./run-trace";
 import { followRunTranscript, type StepEntries } from "./run-transcript";
 import {
+	calledCosts,
 	deriveCalledTraversals,
 	deriveInputs,
 	deriveLeases,
@@ -183,14 +184,17 @@ export function runFacts(run: RunState) {
 		/** The worktree the log names: a run row has none when its Device was offline at the start. */
 		worktree: run.worktree,
 		...(run.runFolder ? { runFolder: true } : {}),
-		metrics: runMetrics(
-			steps,
-			cost,
-			run.started?.at ?? null,
-			endedAt,
-			deriveScores(run),
-			run.pullRequest?.url ?? null,
-		),
+		metrics: {
+			...runMetrics(
+				steps,
+				cost,
+				run.started?.at ?? null,
+				endedAt,
+				deriveScores(run),
+				run.pullRequest?.url ?? null,
+			),
+			ladder: runRungs(landingsOf(steps)),
+		},
 	};
 }
 
@@ -319,16 +323,8 @@ const callStatus: Partial<Record<StepOutcome, RunStatus>> = {
 
 /** The Call steps of a run, with what each run of a called flow spent and how it ended. */
 function deriveCalls(steps: readonly DerivedStep[]): CallFact[] {
-	const byId = new Map(steps.map((step) => [step.id, step]));
 	// The cost of each run of a called flow, with the flows it called, by scope key.
-	const cost = new Map<string, CostTally>();
-	for (const step of steps) {
-		for (let scope = step.scope; scope; ) {
-			const key = scopeKey(scope);
-			cost.set(key, addCost(cost.get(key) ?? NO_COST, step.cost));
-			scope = byId.get(scope.parentStepId)?.scope ?? null;
-		}
-	}
+	const cost = calledCosts(steps, scopeKey);
 	const calls: CallFact[] = [];
 	for (const step of steps) {
 		if (step.nodeType !== "call") continue;

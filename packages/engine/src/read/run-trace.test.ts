@@ -104,6 +104,8 @@ describe("runTrace", () => {
 				visit: 1,
 				parentStepId: null,
 				deviceId: "mac",
+				// An Agent without a cascade, from a Walker that named no rung.
+				rung: "first",
 				startedAt: 1010,
 				ends: [
 					{
@@ -115,6 +117,13 @@ describe("runTrace", () => {
 						costUsd: null,
 						costBasis: "billed",
 						first: true,
+						landing: {
+							ladder: "work",
+							rung: "first",
+							tier: null,
+							tries: 1,
+							costUsd: 0.25,
+						},
 						sessions: [
 							{
 								id: "x1",
@@ -298,5 +307,66 @@ describe("runTrace", () => {
 			{ from: 1030, to: 1500, reason: "duration" },
 		]);
 		expect(trace?.ends).toEqual([]);
+	});
+});
+
+describe("runTrace, where the work landed", () => {
+	test("names each try's rung, and puts the landing on the latest end of the step it landed on", () => {
+		const { events } = log()
+			.at(1000)
+			.push("RunStarted", started)
+			.push(
+				"StepStarted",
+				step("build", "agent", { rung: { by: "agent", tier: 0 } }),
+				{ stepId: "s1" },
+			)
+			.push(
+				"StepEnded",
+				ended("fail", { outputs: { tier: "Sonnet", tries: 1 } }),
+				{ stepId: "s1" },
+			)
+			.push(
+				"StepStarted",
+				step("build", "agent", { rung: { by: "agent", tier: 1, last: true } }),
+				{ stepId: "s2" },
+			)
+			.push(
+				"StepEnded",
+				ended("stopped", { outputs: { tier: "Opus", tries: 2 } }),
+				{ stepId: "s2" },
+			)
+			.push("StepReopened", { prompt: null }, { stepId: "s2" })
+			.push(
+				"StepEnded",
+				ended("pass", {
+					outputs: { tier: "Opus", tries: 2 },
+					costUsd: 0.3,
+					costSource: "reported",
+				}),
+				{ stepId: "s2" },
+			)
+			.push("StepStarted", step("check", "command"), { stepId: "s3" })
+			.push("StepEnded", ended("pass"), { stepId: "s3" });
+
+		const steps = runTrace(foldRun(events))?.steps ?? [];
+		expect(steps.map((s) => [s.id, s.rung])).toEqual([
+			["s1", "first"],
+			["s2", "later"],
+			["s3", undefined],
+		]);
+		expect(steps.map((s) => s.ends.map((end) => end.landing ?? null))).toEqual([
+			[null],
+			[
+				null,
+				{
+					ladder: "work",
+					rung: "later",
+					tier: "Opus",
+					tries: 2,
+					costUsd: 0.3,
+				},
+			],
+			[null],
+		]);
 	});
 });

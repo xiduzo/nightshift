@@ -11,6 +11,7 @@ import {
 	type RunRow,
 	type RunState,
 	type RunTrigger,
+	type Scope,
 	scopeKey,
 	sessionCost,
 	visitKey,
@@ -349,6 +350,29 @@ export function sumCost(run: RunState): CostTally {
 		total = addCost(total, sessionCost(session));
 	}
 	return total;
+}
+
+/**
+ * What the steps of called flows spent, added up by a key of the scope
+ * they ran in (`key`), and of every scope around it: a run of a called
+ * flow costs what the flows it called cost too. `scopeKey` gives the cost
+ * of each run of a called flow; `scope.parentStepId` the cost of
+ * everything a Call step ran.
+ */
+export function calledCosts(
+	steps: readonly DerivedStep[],
+	key: (scope: Scope) => string,
+): Map<string, CostTally> {
+	const byId = new Map(steps.map((step) => [step.id, step]));
+	const cost = new Map<string, CostTally>();
+	for (const step of steps) {
+		for (let scope = step.scope; scope; ) {
+			const at = key(scope);
+			cost.set(at, addCost(cost.get(at) ?? NO_COST, step.cost));
+			scope = byId.get(scope.parentStepId)?.scope ?? null;
+		}
+	}
+	return cost;
 }
 
 /** The step and the calling steps (Call) it runs in, from the inside out. */

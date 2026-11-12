@@ -8,6 +8,7 @@ import {
 	runScore,
 	type StepSleep,
 } from "../log";
+import type { RunRung } from "./ladder";
 
 /**
  * The run metrics: how long a run and each of its steps took, how long
@@ -65,6 +66,12 @@ export type RunMetrics = {
 	 * send none, or the useful answer as `pr_useful`.
 	 */
 	scores?: RunScore[];
+	/**
+	 * Where the work landed (Q31): the run's landings per node, rung and
+	 * tier, with what they cost (`ladder.ts`). The steps of called flows
+	 * count here too. Only a run's metrics have them. Older Hosts send none.
+	 */
+	ladder?: RunRung[];
 };
 
 /** The run's scores, in log order. */
