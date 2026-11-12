@@ -3,10 +3,11 @@ import {
 	type FlowNodeType,
 	NODE_TYPE_LABEL,
 	type Outcome,
+	standInOutcomes,
+	standsIn,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { TestRunRequest } from "../contract";
-import { standInOutcomes, standsIn } from "../graph";
 import type { PinnedOutput, RunLog, TestRun } from "../log";
 
 /**

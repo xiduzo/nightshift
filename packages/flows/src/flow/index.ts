@@ -65,6 +65,8 @@ export {
 	outcomeColor,
 	outputFieldsByType,
 	runsEach,
+	standInOutcomes,
+	standsIn,
 } from "./node";
 export { QUICK_RUN_HARNESS, singleAgentFlow } from "./quick";
 export {

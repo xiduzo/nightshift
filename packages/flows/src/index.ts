@@ -172,6 +172,8 @@ export {
 	type SectionColor,
 	sectionColors,
 	singleAgentFlow,
+	standInOutcomes,
+	standsIn,
 	tierNode,
 	type VariableType,
 	variableTypeSchema,

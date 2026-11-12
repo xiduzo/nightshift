@@ -23,7 +23,6 @@ export { rerunNodeRefusal } from "./reentry";
 export { runFolderOn } from "./run-worktree";
 export type { Runner } from "./runner";
 export { createRunner } from "./runner";
-export { standInOutcomes, standsIn } from "./stand-in";
 export {
 	createRunWalks,
 	type RunWalks,

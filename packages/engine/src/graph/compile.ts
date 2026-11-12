@@ -5,7 +5,7 @@ import {
 	START,
 	StateGraph,
 } from "@langchain/langgraph";
-import { type Flow, initialVariables } from "@nightshift/flows";
+import { type Flow, initialVariables, standsIn } from "@nightshift/flows";
 import { keptNames } from "../variables";
 import { keptFlowOf, type StepContext, templateContext } from "./context";
 import { dataProblem } from "./output-schema";
@@ -18,7 +18,7 @@ import {
 	waitNodeId,
 } from "./route";
 import { waitNode } from "./sleep";
-import { standsIn, withStandIn } from "./stand-in";
+import { withStandIn } from "./stand-in";
 import { RunState } from "./state";
 
 /**

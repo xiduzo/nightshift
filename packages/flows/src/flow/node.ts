@@ -185,6 +185,32 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 	}
 }
 
+/**
+ * The node types that always run in a test run (ADR 27): an End ends the
+ * run, a Join waits for its branches, a Lease and a Service hold something
+ * for the steps after them.
+ */
+const ALWAYS_RUNS: ReadonlySet<FlowNodeType> = new Set([
+	"end",
+	"join",
+	"lease",
+	"service",
+]);
+
+/** Whether a test run may pin or skip a node of this type (ADR 27). */
+export function standsIn(node: Pick<FlowNode, "type">): boolean {
+	return !ALWAYS_RUNS.has(node.type);
+}
+
+/**
+ * The outcomes a node may give in a test run, pinned or skipped: its own
+ * (`nodeOutcomes`). Not `stopped`, which a Call can end with: a stand-in
+ * that ends `stopped` would stop the run.
+ */
+export function standInOutcomes(node: FlowNode): readonly Outcome[] {
+	return nodeOutcomes(node).filter((outcome) => outcome !== "stopped");
+}
+
 /** The colour a node gives one of its outcomes, or undefined when it sets none. */
 export function outcomeColor(
 	node: FlowNode,

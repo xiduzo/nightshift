@@ -882,7 +882,8 @@ what the run and the body do.
 A test run pins or skips nodes of the run's own flow
 (`RunStarted.test`). `compile.ts` wraps each node of the root graph that
 can stand in (`standsIn`: not an End, a Join, a Lease or a Service) with
-`withStandIn`. At each visit at the top level, the wrapper reads the run
+`withStandIn`. `standsIn` and `standInOutcomes` are in `@nightshift/flows`,
+so the editor marks nodes by the same rule. At each visit at the top level, the wrapper reads the run
 state. A node that the run names runs `runStep` with
 `RESUME_RULES.fresh` and `StepSpec.standIn`. Every other node runs its own
 action, and so does every node of a called flow. The lifecycle above then

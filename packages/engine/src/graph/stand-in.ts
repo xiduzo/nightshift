@@ -2,8 +2,6 @@ import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import {
 	type Flow,
 	type FlowNode,
-	type FlowNodeType,
-	nodeOutcomes,
 	nodeOutputFields,
 	type Outcome,
 } from "@nightshift/flows";
@@ -27,35 +25,11 @@ import { runStep } from "./step-runner";
  *
  * Only a node of the run's own flow stands in, at the top level: a
  * called flow runs as it is. `compile.ts` wraps each node of the root
- * graph that can stand in (`standsIn`) with `withStandIn`, which reads
- * the run's pins and skips from its `RunStarted` at each visit.
+ * graph that can stand in (`standsIn`, in `@nightshift/flows` with
+ * `standInOutcomes`, so the editor reads the same rule) with
+ * `withStandIn`, which reads the run's pins and skips from its
+ * `RunStarted` at each visit.
  */
-
-/**
- * The node types that always run: an End ends the run, a Join waits for
- * its branches, a Lease and a Service hold something for the steps after
- * them.
- */
-const ALWAYS_RUNS: ReadonlySet<FlowNodeType> = new Set([
-	"end",
-	"join",
-	"lease",
-	"service",
-]);
-
-/** Whether a test run may pin or skip a node of this type. */
-export function standsIn(node: Pick<FlowNode, "type">): boolean {
-	return !ALWAYS_RUNS.has(node.type);
-}
-
-/**
- * The outcomes a stand-in may give: the node's own (`nodeOutcomes`). Not
- * `stopped`, which a Call can end with: a stand-in that ends `stopped`
- * would stop the run.
- */
-export function standInOutcomes(node: FlowNode): readonly Outcome[] {
-	return nodeOutcomes(node).filter((outcome) => outcome !== "stopped");
-}
 
 /** How a node of the run's own flow stands in, or null when it runs. */
 type StandInOf =
