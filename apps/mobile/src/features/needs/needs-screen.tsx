@@ -2,6 +2,7 @@ import {
 	createProjectQueries,
 	hoverTime,
 	type RunSummary,
+	URGENCY_LABEL,
 	type WaitingLearning,
 } from "@nightshift/client";
 import {
@@ -33,7 +34,6 @@ import { TabRootHeader } from "@/shared/header";
 import { CellSeparator, ListCell } from "@/shared/list";
 import { ScreenList } from "@/shared/page";
 import { useScreenRefresh, useWhileFocused } from "@/shared/refresh";
-import { URGENCY_LABEL } from "@/shared/urgency";
 import {
 	firstDeadline,
 	headIndices,

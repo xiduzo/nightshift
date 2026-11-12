@@ -1,9 +1,35 @@
 import { ORPCError } from "@orpc/client";
 
 import { type ApiClient, type ApiInputs, isHostUnreachable } from "../api";
+import { mayAnswer } from "./queue";
+import type { OpenGate } from "./types";
 
 /** An answer to one Gate: its run, its step and the choice. `via: "lock-screen"` for a notification button. */
 export type GateAnswer = ApiInputs["gates"]["resolve"];
+
+/** What you picked and wrote for a Gate with choices, before you send it. */
+export type AnswerDraft = { choice: string | null; note: string };
+
+/**
+ * Your answer may go now: you may answer the Gate, no other branch of its
+ * run still works, you picked one of its choices, and you wrote the note
+ * that choice needs. An Ask checks its form with `askAnswerOf`.
+ */
+export function maySend(
+	gate: Pick<
+		OpenGate,
+		"canAnswer" | "answerPending" | "branchesWork" | "choices"
+	>,
+	draft: AnswerDraft,
+): boolean {
+	const chosen = gate.choices.find((choice) => choice.name === draft.choice);
+	return (
+		mayAnswer(gate) &&
+		!gate.branchesWork &&
+		chosen !== undefined &&
+		(!chosen.needsNote || draft.note.trim() !== "")
+	);
+}
 
 /**
  * Why Night Shift did not take an answer:

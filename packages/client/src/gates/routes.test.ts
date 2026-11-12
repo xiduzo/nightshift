@@ -1,7 +1,15 @@
 import { describe, expect, test } from "bun:test";
 
 import type { RunDetail } from "../runs";
-import { choiceRoutes } from "./routes";
+import {
+	choiceRoutes,
+	confirmText,
+	isDestructive,
+	needsConfirm,
+	routeNote,
+	routeText,
+	sentText,
+} from "./routes";
 
 /** A run whose flow has a Gate `review`: approve goes to `build`, reject ends, retry loops back once. */
 function run(fields: Partial<RunDetail> = {}): RunDetail {
@@ -102,5 +110,81 @@ describe("choiceRoutes", () => {
 				labels,
 			).size,
 		).toBe(0);
+	});
+});
+
+describe("routeText and needsConfirm", () => {
+	test("says where a choice leads", () => {
+		expect(routeText({ kind: "node", nodeId: "build", label: "Build" })).toBe(
+			"Goes to Build",
+		);
+		expect(routeText({ kind: "end" })).toBe("Ends the run");
+		expect(routeText({ kind: "limit" })).toBe("Stops the run");
+		expect(routeNote({ kind: "limit" })).toBe("This path reached its limit.");
+		expect(routeNote({ kind: "end" })).toBeNull();
+		expect(routeText(undefined)).toBeNull();
+	});
+
+	test("a red choice, or one that ends the run, asks first", () => {
+		const goes = { kind: "node", nodeId: "b", label: "B" } as const;
+		expect(needsConfirm({}, goes)).toBe(false);
+		expect(needsConfirm({ color: "red" }, goes)).toBe(true);
+		expect(needsConfirm({ color: "green" }, { kind: "end" })).toBe(true);
+		expect(needsConfirm({}, { kind: "limit" })).toBe(true);
+		expect(needsConfirm({}, undefined)).toBe(false);
+		expect(isDestructive({ color: "red" })).toBe(true);
+		expect(isDestructive({})).toBe(false);
+	});
+});
+
+describe("confirmText", () => {
+	test("ending and stopping the run are two things", () => {
+		expect(confirmText({ kind: "end" }, "reject", "Fix login")).toEqual({
+			title: "End the run?",
+			body: "This answer ends the run Fix login.",
+		});
+		const stop = confirmText({ kind: "limit" }, "retry", "Fix login");
+		expect(stop.title).toBe("Stop the run?");
+		expect(stop.body).toContain("stops the run Fix login");
+		expect(
+			confirmText(
+				{ kind: "node", nodeId: "b", label: "Build" },
+				"approve",
+				"Fix login",
+			),
+		).toEqual({
+			title: "Send approve?",
+			body: "Goes to Build in the run Fix login.",
+		});
+		expect(confirmText(undefined, "approve", "Fix login").body).toBe(
+			"The run Fix login gets this answer.",
+		);
+	});
+});
+
+describe("sentText", () => {
+	test("what the run does after your answer", () => {
+		expect(
+			sentText(
+				{ kind: "node", nodeId: "b", label: "Build" },
+				"Fix login",
+				null,
+			),
+		).toBe("Fix login continues at Build.");
+		expect(sentText(undefined, "Fix login", null)).toBe("Fix login continues.");
+		expect(
+			sentText(
+				{ kind: "node", nodeId: "a", label: "Announce it?" },
+				"Ship",
+				null,
+			),
+		).toBe("Ship continues at Announce it?");
+		expect(sentText(undefined, "Fix login", "Mac mini")).toBe(
+			"Fix login continues when Mac mini is online.",
+		);
+		expect(sentText({ kind: "end" }, "Fix login", null)).toBe("The run ends.");
+		expect(sentText({ kind: "limit" }, "Fix login", null)).toBe(
+			"The run stops.",
+		);
 	});
 });

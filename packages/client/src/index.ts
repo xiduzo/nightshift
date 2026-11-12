@@ -6,8 +6,9 @@
  * follower of a Host: its notifications stream and one run's stream, what
  * each item reads again, the notices it shows), the view types derived from
  * the API, the push contract, the glances (the widget and the run on the
- * lock screen), and the words and rules both apps show for one thing (a
- * Gate's deadline, a step's outcome, whether a flow can start). No
+ * lock screen), and the words and rules both apps show for one thing (the
+ * Gate queue and a Gate's brief, a Gate's deadline, a step's outcome,
+ * whether a flow can start). No
  * DOM, no React Native, no Node or Bun: `platform-free.test.ts` checks it.
  */
 
@@ -101,9 +102,13 @@ export {
 	askFormFields,
 	askOptions,
 	askStartValues,
+	type BriefView,
+	briefView,
 	type ChoiceRoute,
 	type ContextItem,
+	choiceLine,
 	choiceRoutes,
+	confirmText,
 	createGateQueries,
 	deadlineSoon,
 	deadlineText,
@@ -111,14 +116,25 @@ export {
 	type GateChoice,
 	type GateLink,
 	type GateRefusal,
+	gateOrder,
 	gateParts,
 	gateRefusalText,
 	gateRun,
+	isDestructive,
+	mayAnswer,
+	maySend,
+	needsConfirm,
 	type OpenGate,
 	parseGateQuestion,
 	phoneCanAnswer,
 	plainText,
+	routeNote,
+	routeText,
+	sentText,
+	URGENCY_LABEL,
 	unreachableAnswerText,
+	urgencyOf,
+	WRITTEN_BY_NIGHT_SHIFT,
 	waitedText,
 	waitingForYou,
 } from "./gates";

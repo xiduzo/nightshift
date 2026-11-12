@@ -1,7 +1,5 @@
 import { localZone } from "@nightshift/client";
-import type { GateUrgency } from "@nightshift/flows";
-
-import { URGENCIES } from "@/shared/urgency";
+import { GATE_URGENCIES, type GateUrgency } from "@nightshift/flows";
 
 /**
  * What Settings offers to choose, without React Native: the hours, the
@@ -45,10 +43,10 @@ export function pushUrgenciesWith(
 	urgency: GateUrgency,
 	on: boolean,
 ): GateUrgency[] {
-	const next = URGENCIES.filter((level) =>
+	const next = GATE_URGENCIES.filter((level) =>
 		level === urgency ? on : current.includes(level),
 	);
 	return next.length > 0
 		? next
-		: URGENCIES.filter((level) => current.includes(level));
+		: GATE_URGENCIES.filter((level) => current.includes(level));
 }

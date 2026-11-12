@@ -1,6 +1,8 @@
 import {
+	briefView,
 	type ChoiceRoute,
 	choiceRoutes,
+	confirmText,
 	costLabel,
 	createProjectQueries,
 	createRunQueries,
@@ -10,8 +12,13 @@ import {
 	gateParts,
 	gateRefusalText,
 	gateRun,
+	isDestructive,
+	mayAnswer,
+	maySend,
+	needsConfirm,
 	nodeLabels,
 	type OpenGate,
+	sentText,
 	usageLabel,
 } from "@nightshift/client";
 import {
@@ -73,19 +80,11 @@ import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
 import { AskScreen } from "./ask-screen";
 import { BriefSections } from "./brief-sections";
-import { briefView, IMPACTS_BY_NIGHT_SHIFT } from "./brief-view";
 import { ChoiceCards } from "./choice-cards";
 import { Breadcrumbs } from "./gate-breadcrumbs";
 import { nextGate } from "./gate-list";
 import { GateDeadline, GateStatus, RunSteps } from "./gate-times";
-import {
-	confirmText,
-	isDestructive,
-	LINK_WORD,
-	needsConfirm,
-	sentText,
-	stepsHint,
-} from "./gate-view";
+import { LINK_WORD, stepsHint } from "./gate-view";
 import { ProblemAlert } from "./problem-alert";
 import { QuestionSections } from "./question-sections";
 import { SentCard } from "./sent-card";
@@ -219,9 +218,8 @@ function OpenGateScreen({
 	const chosen = gate.choices.find((choice) => choice.name === answer.choice);
 	// An agent that asks continues with the note: its answer needs one.
 	const answersAgent = gate.choices.some((choice) => choice.needsNote);
-	const noteMissing = chosen?.needsNote === true && answer.note.trim() === "";
 	const chosenRoute = chosen ? routes.get(chosen.name) : undefined;
-	const answerable = gate.canAnswer && !gate.answerPending;
+	const answerable = mayAnswer(gate);
 	const elsewhere =
 		!gate.walker.thisDevice && gate.walker.name ? gate.walker.name : null;
 
@@ -264,7 +262,7 @@ function OpenGateScreen({
 						action={{
 							label: "Send",
 							onPress: send,
-							disabled: !chosen || noteMissing || gate.branchesWork,
+							disabled: !maySend(gate, answer),
 							busy: answer.checking || answer.sending,
 							busyLabel: answer.checking ? "Checking…" : "Sending…",
 							variant:
@@ -418,7 +416,7 @@ function OpenGateScreen({
 							/>
 							{brief.impactsByModel ? (
 								<Text className="text-muted-foreground text-xs">
-									{IMPACTS_BY_NIGHT_SHIFT}
+									Night Shift wrote what these answers do.
 								</Text>
 							) : null}
 							{gate.deadline ? <GateDeadline deadline={gate.deadline} /> : null}

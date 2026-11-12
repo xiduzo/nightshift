@@ -7,6 +7,7 @@ import {
 	type GateRefusal,
 	gateRefusalOf,
 	gateRefusalText,
+	maySend,
 	unreachableAnswerText,
 } from "./answer";
 
@@ -136,5 +137,37 @@ describe("an answer while the Host of the Space cannot be reached", () => {
 		]) {
 			expect(unreachableAnswerText(other)).toBeNull();
 		}
+	});
+});
+
+describe("maySend", () => {
+	const open = {
+		canAnswer: true,
+		answerPending: false,
+		branchesWork: false,
+		choices: [{ name: "ship" }, { name: "answer", needsNote: true as const }],
+	};
+	const ship = { choice: "ship", note: "" };
+
+	test("a picked choice of a Gate you may answer goes", () => {
+		expect(maySend(open, ship)).toBe(true);
+	});
+
+	test("not before you pick one of its choices", () => {
+		expect(maySend(open, { choice: null, note: "" })).toBe(false);
+		expect(maySend(open, { choice: "gone", note: "" })).toBe(false);
+	});
+
+	test("a choice that needs a note waits for one", () => {
+		expect(maySend(open, { choice: "answer", note: "  " })).toBe(false);
+		expect(maySend(open, { choice: "answer", note: "Use the old one." })).toBe(
+			true,
+		);
+	});
+
+	test("not for a Gate you may only read, that someone answered, or while another branch works", () => {
+		expect(maySend({ ...open, canAnswer: false }, ship)).toBe(false);
+		expect(maySend({ ...open, answerPending: true }, ship)).toBe(false);
+		expect(maySend({ ...open, branchesWork: true }, ship)).toBe(false);
 	});
 });

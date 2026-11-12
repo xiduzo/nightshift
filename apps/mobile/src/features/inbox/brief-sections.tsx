@@ -1,3 +1,4 @@
+import { type BriefView, WRITTEN_BY_NIGHT_SHIFT } from "@nightshift/client";
 import { Badge } from "@nightshift/ui-native/components/ui/badge";
 import { Card } from "@nightshift/ui-native/components/ui/card";
 import { Icon } from "@nightshift/ui-native/components/ui/icon";
@@ -9,7 +10,6 @@ import { View } from "react-native";
 
 import { SectionHead } from "@/shared/list";
 import { InlineMarkdown, Markdown } from "@/shared/markdown";
-import { type BriefView, WRITTEN_BY_NIGHT_SHIFT } from "./brief-view";
 
 /**
  * The brief of a Gate, above its question: Situation (why you decide),

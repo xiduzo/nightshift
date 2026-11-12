@@ -1,8 +1,7 @@
-/// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
-import type { OpenGate } from "@nightshift/client";
 
-import { briefView, choiceLine } from "./brief-view";
+import { briefView, choiceLine } from "./brief";
+import type { OpenGate } from "./types";
 
 type Brief = OpenGate["brief"];
 
@@ -17,6 +16,9 @@ function brief(fields: Partial<Brief>): Brief {
 	};
 }
 
+/** Two options that do not say what they do. */
+const plain: { impact?: string }[] = [{}, {}];
+
 describe("briefView", () => {
 	test("every part, and the parts Night Shift wrote", () => {
 		const view = briefView({
@@ -29,6 +31,7 @@ describe("briefView", () => {
 				recommendation: { option: "Ship", reason: "All checks pass." },
 				byModel: ["background", "impacts"],
 			}),
+			choices: [{ impact: "The fix goes live." }, {}],
 		});
 		expect(view).toEqual({
 			situation: { text: "The release waits for this.", byModel: false },
@@ -55,6 +58,7 @@ describe("briefView", () => {
 				background: [{ text: " ", source: "CI" }],
 				recommendation: { option: null, reason: "" },
 			}),
+			choices: plain,
 		});
 		expect(view.situation).toBeNull();
 		expect(view.background).toBeNull();
@@ -64,6 +68,7 @@ describe("briefView", () => {
 	test("a reason without an option still shows", () => {
 		const view = briefView({
 			brief: brief({ recommendation: { option: null, reason: "Wait." } }),
+			choices: plain,
 		});
 		expect(view.recommendation).toEqual({
 			option: null,
@@ -72,8 +77,22 @@ describe("briefView", () => {
 		});
 	});
 
+	test("Night Shift wrote what the answers do only when an answer says what it does", () => {
+		const wrote = brief({ byModel: ["impacts"] });
+		expect(briefView({ brief: wrote, choices: plain }).impactsByModel).toBe(
+			false,
+		);
+		expect(
+			briefView({ brief: wrote, choices: [{ impact: " " }] }).impactsByModel,
+		).toBe(false);
+		expect(
+			briefView({ brief: wrote, choices: [{ impact: "It ships." }] })
+				.impactsByModel,
+		).toBe(true);
+	});
+
 	test("a Host older than the brief: nothing to show", () => {
-		expect(briefView({})).toEqual({
+		expect(briefView({ choices: plain })).toEqual({
 			situation: null,
 			background: null,
 			recommendation: null,

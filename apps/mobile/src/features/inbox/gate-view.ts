@@ -1,100 +1,11 @@
-import type {
-	ChoiceRoute,
-	ContextItem,
-	GateChoice,
-	GateLink,
-} from "@nightshift/client";
+import type { ContextItem, GateLink } from "@nightshift/client";
 
 /**
- * What the Gate screen shows, without React Native: the words for where
- * each choice leads, which choices need a confirm, the parts of the question, and the
- * words after an answer went.
+ * What the Gate screen shows, without React Native: the parts of the
+ * question, the hint over the run's steps, and the words of a link. Where
+ * each choice leads, the confirm and the words after an answer are the
+ * client's (`routeText`, `needsConfirm`, `sentText`).
  */
-
-/**
- * Where a choice leads, in a few words: "Goes to Build", "Ends the run"
- * (the run finishes), "Stops the run" (the path reached its limit: the
- * run stops, and you can resume it).
- */
-export function routeText(route: ChoiceRoute | undefined): string | null {
-	switch (route?.kind) {
-		case "node":
-			return `Goes to ${route.label}`;
-		case "end":
-			return "Ends the run";
-		case "limit":
-			return "Stops the run";
-		default:
-			return null;
-	}
-}
-
-/** Why a choice stops the run, under its card. */
-export function routeNote(route: ChoiceRoute | undefined): string | null {
-	return route?.kind === "limit" ? "This path reached its limit." : null;
-}
-
-/** The words of the confirm before a red choice, or one that ends or stops the run. */
-export function confirmText(
-	route: ChoiceRoute | undefined,
-	choiceName: string,
-	runTitle: string,
-): { title: string; body: string } {
-	switch (route?.kind) {
-		case "end":
-			return {
-				title: "End the run?",
-				body: `This answer ends the run ${runTitle}.`,
-			};
-		case "limit":
-			return {
-				title: "Stop the run?",
-				body: `This path reached its limit. This answer stops the run ${runTitle}. You can resume it later.`,
-			};
-		case "node":
-			return {
-				title: `Send ${choiceName}?`,
-				body: `${routeText(route)} in the run ${runTitle}.`,
-			};
-		default:
-			return {
-				title: `Send ${choiceName}?`,
-				body: `The run ${runTitle} gets this answer.`,
-			};
-	}
-}
-
-/** A choice the flow author colored red: it stops work. */
-export function isDestructive(choice: Pick<GateChoice, "color">): boolean {
-	return choice.color === "red";
-}
-
-/** The person confirms first: a red choice, or one that ends or stops the run. */
-export function needsConfirm(
-	choice: Pick<GateChoice, "color">,
-	route: ChoiceRoute | undefined,
-): boolean {
-	return (
-		isDestructive(choice) || route?.kind === "end" || route?.kind === "limit"
-	);
-}
-
-/** What happens once the answer went: "Fix the bug continues at Build". */
-export function sentText(
-	route: ChoiceRoute | undefined,
-	runTitle: string,
-	walkerElsewhere: string | null,
-): string {
-	if (route?.kind === "end") return "The run ends.";
-	if (route?.kind === "limit") return "The run stops.";
-	const goesOn =
-		route?.kind === "node"
-			? `${runTitle} continues at ${route.label}`
-			: `${runTitle} continues`;
-	if (walkerElsewhere) return `${goesOn} when ${walkerElsewhere} is online.`;
-	// A step label may end in its own mark: "Announce it?".
-	return /[.?!]$/.test(goesOn) ? goesOn : `${goesOn}.`;
-}
 
 /** Longer text or code under its label. Code keeps the language of its fence. */
 export type QuestionSection = {

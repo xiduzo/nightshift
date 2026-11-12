@@ -4,8 +4,6 @@ import type { OpenGate, RunSummary } from "@nightshift/client";
 
 import {
 	firstDeadline,
-	gateOrder,
-	gatesForYou,
 	headIndices,
 	needsItems,
 	needsRows,
@@ -36,46 +34,26 @@ const learning: L = { projectId: "web", id: "l1" };
 
 const time = (at: number) => `t${at / MIN}`;
 
-describe("gatesForYou and gateOrder", () => {
-	test("only the Gates you may answer and nobody answered", () => {
-		const gates = [
-			gate({ runId: "a" }),
-			gate({ runId: "b", canAnswer: false }),
-			gate({ runId: "c", answerPending: true }),
-		];
-		expect(gatesForYou(gates).map((g) => g.runId)).toEqual(["a"]);
-	});
-
-	test("the first to close first, then the oldest without a deadline", () => {
-		const gates = [
-			gate({ runId: "none-new", openedAt: 2 }),
-			gate({ runId: "late", deadline: { at: 30 * MIN, choose: "keep" } }),
-			gate({ runId: "none-old", openedAt: 1 }),
-			gate({ runId: "soon", deadline: { at: 10 * MIN, choose: "keep" } }),
-		];
-		expect(gateOrder(gates).map((g) => g.runId)).toEqual([
-			"soon",
-			"late",
-			"none-old",
-			"none-new",
-		]);
-	});
-
-	test("the Gates for now first, whatever their deadline", () => {
-		const gates = [
-			gate({ runId: "later", urgency: "later" }),
-			gate({ runId: "soon", deadline: { at: 10 * MIN, choose: "keep" } }),
-			gate({ runId: "now", urgency: "now" }),
-		];
-		expect(gateOrder(gates).map((g) => g.runId)).toEqual([
-			"now",
-			"soon",
-			"later",
-		]);
-	});
-});
-
 describe("needsItems", () => {
+	test("only the Gates you may answer, in queue order", () => {
+		const items = needsItems<L>({
+			gates: [
+				gate({ runId: "old", openedAt: 1 }),
+				gate({ runId: "read-only", canAnswer: false }),
+				gate({ runId: "answered", answerPending: true }),
+				gate({ runId: "soon", deadline: { at: 10 * MIN, choose: "keep" } }),
+				gate({ runId: "now", urgency: "now", openedAt: 9 }),
+			],
+			runs: undefined,
+			learnings: undefined,
+		});
+		expect(items.map((item) => item.key)).toEqual([
+			"gate:now:s1",
+			"gate:soon:s1",
+			"gate:old:s1",
+		]);
+	});
+
 	test("the Gates, then the runs, then the learnings", () => {
 		const items = needsItems<L>({
 			gates: [gate({ runId: "g" })],

@@ -3,6 +3,7 @@ import {
 	deadlineWhen,
 	gateParts,
 	gateRun,
+	mayAnswer,
 	type OpenGate,
 	plainText,
 	waitedText,
@@ -105,8 +106,7 @@ export function nextGate<
 	return (
 		gates.find(
 			(gate) =>
-				gate.canAnswer &&
-				!gate.answerPending &&
+				mayAnswer(gate) &&
 				(gate.runId !== current.runId || gate.stepId !== current.stepId),
 		) ?? null
 	);

@@ -1,13 +1,13 @@
-import type { GateChoice, OpenGate } from "@nightshift/client";
+import type { GateChoice, OpenGate } from "./types";
 
 /**
- * What the brief of a Gate shows, without React Native: why you decide
- * (Situation), what is already done (Background), the option the flow
- * recommends (Recommendation), and which parts Night Shift wrote. An empty
- * part is null, so the screen leaves it out.
+ * The brief of a Gate (ADR 21) as both apps show it: why you decide
+ * (the situation), what is already done (the background), the option the
+ * flow recommends, and which parts Night Shift wrote. An empty part is
+ * null, so a screen leaves it out.
  */
 
-/** One item of the Background, with where it comes from: "Tests pass", "CI". */
+/** One item of the background, with where it comes from: "Tests pass", "CI". */
 export type BackgroundItem = { text: string; source: string | null };
 
 export type BriefView = {
@@ -32,7 +32,10 @@ function filled(text: string | null | undefined): string | null {
  * The brief of a Gate, part by part. A Host older than the brief sends
  * none: every part is empty.
  */
-export function briefView(gate: { brief?: OpenGate["brief"] }): BriefView {
+export function briefView(gate: {
+	brief?: OpenGate["brief"];
+	choices: readonly Pick<GateChoice, "impact">[];
+}): BriefView {
 	const brief = gate.brief;
 	const byModel = new Set(brief?.byModel ?? []);
 	const situation = filled(brief?.situation);
@@ -52,7 +55,9 @@ export function briefView(gate: { brief?: OpenGate["brief"] }): BriefView {
 			option || reason
 				? { option, reason, byModel: byModel.has("recommendation") }
 				: null,
-		impactsByModel: byModel.has("impacts"),
+		impactsByModel:
+			byModel.has("impacts") &&
+			gate.choices.some((choice) => filled(choice.impact) !== null),
 	};
 }
 
@@ -63,9 +68,5 @@ export function choiceLine(
 	return filled(choice.impact) ?? filled(choice.description);
 }
 
-/** The quiet word on a part that Night Shift wrote. */
+/** The quiet word on a part of the brief that Night Shift wrote. */
 export const WRITTEN_BY_NIGHT_SHIFT = "Written by Night Shift";
-
-/** Under the options, when Night Shift wrote what some of them do. */
-export const IMPACTS_BY_NIGHT_SHIFT =
-	"Night Shift wrote what these answers do.";

@@ -3,7 +3,9 @@ import {
 	type NotificationSettingsPatch,
 	PHONE_DELAYS,
 	phoneDelayLabel,
+	URGENCY_LABEL,
 } from "@nightshift/client";
+import { GATE_URGENCIES } from "@nightshift/flows";
 import { Label } from "@nightshift/ui-native/components/ui/label";
 import {
 	Select,
@@ -19,7 +21,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ErrorAlert } from "@/shared/feedback";
 import { ListGroup, SectionHead, SwitchRow } from "@/shared/list";
-import { URGENCIES, URGENCY_LABEL } from "@/shared/urgency";
 import {
 	type Choice,
 	DEFAULT_PUSH_URGENCIES,
@@ -136,7 +137,7 @@ function PushForSection({ value, onChange }: SectionProps) {
 				}
 			/>
 			<ListGroup>
-				{URGENCIES.map((urgency) => (
+				{GATE_URGENCIES.map((urgency) => (
 					<SwitchRow
 						key={urgency}
 						title={URGENCY_LABEL[urgency]}

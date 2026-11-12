@@ -2,11 +2,14 @@ import {
 	type AskValues,
 	askAnswerOf,
 	askStartValues,
+	briefView,
 	deadlineText,
 	gateParts,
+	mayAnswer,
 	now,
 	type OpenGate,
 	phoneCanAnswer,
+	sentText,
 } from "@nightshift/client";
 import type { AskForm } from "@nightshift/flows";
 import {
@@ -38,11 +41,9 @@ import { AskFields } from "./ask-fields";
 import { AskFiles } from "./ask-files";
 import { askSentSummary, askWebUrl } from "./ask-view";
 import { BriefSections } from "./brief-sections";
-import { briefView } from "./brief-view";
 import { Breadcrumbs } from "./gate-breadcrumbs";
 import { nextGate } from "./gate-list";
 import { GateStatus } from "./gate-times";
-import { sentText } from "./gate-view";
 import { ProblemAlert } from "./problem-alert";
 import { QuestionSections } from "./question-sections";
 import { SentCard } from "./sent-card";
@@ -82,7 +83,7 @@ export function AskScreen({
 	const answer = useGateAnswer(gate, { onSent, onGone });
 	const native = phoneCanAnswer(form);
 	const ready = askAnswerOf(form, values);
-	const answerable = gate.canAnswer && !gate.answerPending;
+	const answerable = mayAnswer(gate);
 	const elsewhere =
 		!gate.walker.thisDevice && gate.walker.name ? gate.walker.name : null;
 	const files = {

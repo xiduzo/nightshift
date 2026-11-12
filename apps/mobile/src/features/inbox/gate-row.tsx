@@ -1,6 +1,8 @@
 import {
 	deadlineSoon,
 	type OpenGate,
+	URGENCY_LABEL,
+	urgencyOf,
 	useRunPrefetch,
 } from "@nightshift/client";
 import { GitPullRequest } from "lucide-react-native";
@@ -10,7 +12,6 @@ import { useSignedIn } from "@/features/host";
 import { useClock } from "@/shared/clock";
 import { ListRow } from "@/shared/list";
 import { gateLook, NEEDS_YOU } from "@/shared/tone";
-import { URGENCY_LABEL, urgencyOf } from "@/shared/urgency";
 import { gateRowText } from "./gate-list";
 
 /**

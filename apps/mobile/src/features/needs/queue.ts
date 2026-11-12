@@ -1,7 +1,11 @@
-import type { OpenGate, RunSummary } from "@nightshift/client";
-import type { GateUrgency } from "@nightshift/flows";
-
-import { URGENCIES, urgencyOf } from "@/shared/urgency";
+import {
+	gateOrder,
+	mayAnswer,
+	type OpenGate,
+	type RunSummary,
+	urgencyOf,
+} from "@nightshift/client";
+import { GATE_URGENCIES, type GateUrgency } from "@nightshift/flows";
 
 /** What waits for you on Needs you: a Gate, a run that stopped, or a learning. */
 export type NeedsItem<L> =
@@ -16,44 +20,17 @@ export type NeedsParts<L> = {
 	learnings: readonly L[] | undefined;
 };
 
-/** The Gates you may answer and nobody answered yet. */
-export function gatesForYou(gates: readonly OpenGate[]): OpenGate[] {
-	return gates.filter((gate) => gate.canAnswer && !gate.answerPending);
-}
-
-/** The deadline of a Gate, or the end of time without one: for the order. */
-function deadlineOf(gate: OpenGate): number {
-	return gate.deadline?.at ?? Number.POSITIVE_INFINITY;
-}
-
-function rankOf(gate: OpenGate): number {
-	return URGENCIES.indexOf(urgencyOf(gate));
-}
-
 /**
- * The Gates of the queue: the Gates for now first, then for today, then
- * for when you have time. In each, the first to close first. Gates without
- * a deadline follow, oldest first.
- */
-export function gateOrder(gates: readonly OpenGate[]): OpenGate[] {
-	return [...gates].sort(
-		(a, b) =>
-			rankOf(a) - rankOf(b) ||
-			deadlineOf(a) - deadlineOf(b) ||
-			a.openedAt - b.openedAt,
-	);
-}
-
-/**
- * Everything that waits for you, in one order: the Gates first (by
- * urgency, then the first to close first), then the runs that stopped (the newest first), then the
- * learnings. A part that loads still adds nothing yet.
+ * Everything that waits for you, in one order: the Gates you may answer
+ * first, in queue order (`gateOrder`), then the runs that stopped (the
+ * newest first), then the learnings. A part that loads still adds
+ * nothing yet.
  */
 export function needsItems<L extends { projectId: string; id: string }>(
 	parts: NeedsParts<L>,
 ): NeedsItem<L>[] {
 	return [
-		...gateOrder(gatesForYou(parts.gates ?? [])).map(
+		...gateOrder((parts.gates ?? []).filter(mayAnswer)).map(
 			(gate): NeedsItem<L> => ({
 				kind: "gate",
 				key: `gate:${gate.runId}:${gate.stepId}`,
@@ -112,7 +89,11 @@ export function needsSummary(
  */
 export type NeedsSection = GateUrgency | "run" | "learning";
 
-const SECTIONS: readonly NeedsSection[] = [...URGENCIES, "run", "learning"];
+const SECTIONS: readonly NeedsSection[] = [
+	...GATE_URGENCIES,
+	"run",
+	"learning",
+];
 
 /** The section of one thing: a Gate goes in the section of its urgency. */
 function sectionOf(item: NeedsItem<unknown>): NeedsSection {
