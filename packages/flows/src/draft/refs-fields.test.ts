@@ -285,6 +285,11 @@ const FIXTURES: FlowNode[] = [
 		message: template(),
 		report: { kind: "text", text: template() },
 	},
+	{
+		type: "end",
+		status: "done",
+		report: { kind: "file", path: template("reports/") },
+	},
 	{ type: "join" },
 	{ type: "lease", name: template(), scope: { section: plain() } },
 	{
