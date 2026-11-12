@@ -148,6 +148,29 @@ async function runOf(runId: string) {
 	return (await colleague.runs.list()).find((r) => r.id === runId);
 }
 
+/** The caps of B's Offer of `coder` to Platform. */
+const CAPS = { permissionCap: "acceptEdits", sessionCap: 1 } as const;
+
+/**
+ * B offers `coder` to Platform, unless it does already, and the colleague
+ * can place a run there. Each test that needs the Offer asks for it: a
+ * filter may skip the test that makes it.
+ */
+async function offerCoder() {
+	const { offers } = await b.client.offers.list();
+	const made = offers.some(
+		(o) => o.spaceId === spaceId && o.profile === coderId && o.listed,
+	);
+	if (!made) {
+		await b.client.offers.make({ spaceId, profile: coderId, ...CAPS });
+	}
+	return waitFor(
+		() => colleague.runs.placements({ projectId }),
+		(list) =>
+			list.some((p) => p.deviceId === bId && p.offers?.includes("coder")),
+	);
+}
+
 /** The colleague signs up from the invitation's link, on A, from another computer. */
 async function signUpColleague(invitationId: string): Promise<AppRouterClient> {
 	const elsewhere = { "x-forwarded-for": "10.0.0.2" };
@@ -175,7 +198,8 @@ beforeAll(async () => {
 	const claude = join(root, "claude");
 	writeFileSync(
 		claude,
-		`#!/bin/sh\necho $$ >> '${PIDS}'\necho "$@" >> '${ARGS}'\nexport FAKE_CLAUDE_SLEEP_MS=$(cat '${SLEEP_MS}' 2>/dev/null || echo 0)\nexec '${process.execPath}' '${FAKE_CLAUDE}' "$@"\n`,
+		// Night Shift asks for the version first: that is no session.
+		`#!/bin/sh\nif [ "$1" != "--version" ]; then echo $$ >> '${PIDS}'; echo "$@" >> '${ARGS}'; fi\nexport FAKE_CLAUDE_SLEEP_MS=$(cat '${SLEEP_MS}' 2>/dev/null || echo 0)\nexec '${process.execPath}' '${FAKE_CLAUDE}' "$@"\n`,
 	);
 	chmodSync(claude, 0o755);
 	[a, b] = await Promise.all([
@@ -250,18 +274,10 @@ describe("a colleague's run on another Person's Device", () => {
 	}, 30_000);
 
 	test("B's owner offers `coder` to Platform: the Space lists it, and nothing else of B", async () => {
-		const { spaces } = await b.client.offers.list();
+		const { spaces, offers } = await b.client.offers.list();
 		expect(spaces.map((s) => s.id)).toContain(spaceId);
-		await b.client.offers.make({
-			spaceId,
-			profile: coderId,
-			permissionCap: "acceptEdits",
-			sessionCap: 1,
-		});
-		const placements = await waitFor(
-			() => colleague.runs.placements({ projectId }),
-			(list) => list.some((p) => p.deviceId === bId),
-		);
+		expect(offers).toEqual([]);
+		const placements = await offerCoder();
 		expect(placements.find((p) => p.deviceId === bId)).toEqual({
 			deviceId: bId,
 			name: bName,
@@ -319,6 +335,7 @@ describe("a colleague's run on another Person's Device", () => {
 	}, 60_000);
 
 	test("naming another profile, or a wider permission mode, is refused at start", async () => {
+		await offerCoder();
 		await saveFlow("other", {
 			profile: { device: bId, profile: "p-claude" },
 		});
@@ -337,6 +354,7 @@ describe("a colleague's run on another Person's Device", () => {
 	}, 30_000);
 
 	test("through the Offer it runs on B under the caps, in the colleague's name", async () => {
+		await offerCoder();
 		writeFileSync(SLEEP_MS, "0");
 		const started = await colleague.runs.start({
 			projectId,
@@ -387,6 +405,7 @@ describe("a colleague's run on another Person's Device", () => {
 	}, 90_000);
 
 	test("the session cap holds: a second session waits for the first", async () => {
+		await offerCoder();
 		writeFileSync(SLEEP_MS, "1500");
 		const before = lines(PIDS).length;
 		const runs = await Promise.all([
@@ -408,6 +427,7 @@ describe("a colleague's run on another Person's Device", () => {
 	}, 90_000);
 
 	test("withdrawing on B ends the running step as stopped, and the Offer", async () => {
+		await offerCoder();
 		writeFileSync(SLEEP_MS, "60000");
 		const before = lines(PIDS).length;
 		const started = await colleague.runs.start({
