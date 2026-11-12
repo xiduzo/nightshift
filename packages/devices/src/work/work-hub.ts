@@ -30,6 +30,12 @@ import { OFFLINE_AFTER_MS } from "../registry";
  *   Device that acks leaves a call without one for `ackMs`, its stream is
  *   dead: that stream ends, and the call waits for the next one. A Device
  *   of an older version never acks, so nothing waits for its acks.
+ *
+ * A stop (the caller's `stop` signal) cancels the call on the Device. When
+ * the stream that took it says `stopWaits`, the call stays open: the
+ * Device's replies still come, and the call ends when the Device ends it,
+ * after its cleanup. Else, and for a call no stream took, the call ends at
+ * the stop, as at an abort.
  */
 
 /** How long a Device that acks its calls may take to ack one before its stream counts as dead. */
@@ -48,6 +54,14 @@ export type WorkHub = WorkRelay & {
 		deviceId: string,
 		signal: AbortSignal,
 		running?: readonly string[],
+		options?: {
+			/**
+			 * The Device ends a cancelled call after its cleanup there, and its
+			 * replies until then come: a stop keeps such a call open. An older
+			 * Device does not say so.
+			 */
+			stopWaits?: boolean;
+		},
 	): AsyncIterable<WorkDelivery>;
 	/**
 	 * The placed Device answers a call it took. `done`: the call ended
@@ -86,6 +100,8 @@ type Stream = {
 	end: AbortController;
 	/** It stopped counting as one of the Device's streams. */
 	left: boolean;
+	/** The Device ends a cancelled call after its cleanup: a stop keeps the call open. */
+	stopWaits: boolean;
 };
 
 /** A call waiting for its replies. */
@@ -98,6 +114,8 @@ type OpenCall = {
 	answered: boolean;
 	/** Ends the stream that took it when no ack comes. */
 	ackTimer: Timer | null;
+	/** A stop cancelled it there, and it stays open until the Device ends it. */
+	stopping: boolean;
 	push(replies: WorkReply[], done: boolean): void;
 };
 
@@ -158,10 +176,18 @@ export function createWorkHub(
 		call.ackTimer = null;
 	}
 
-	/** A call that left with a stream nobody reads waits for the next one, first in line. */
+	/**
+	 * A call that left with a stream nobody reads waits for the next one,
+	 * first in line. A stopped one ends: nothing of it ran there.
+	 */
 	function redeliver(call: OpenCall) {
 		stopAckTimer(call);
 		call.takenBy = null;
+		if (call.stopping) {
+			calls.delete(call.request.id);
+			call.push([], true);
+			return;
+		}
 		const box = inbox(call.deviceId);
 		box.deliveries.unshift(call.request);
 		wakeAll(box);
@@ -215,8 +241,9 @@ export function createWorkHub(
 		// a drop. A new step on a Device without a stream waits for it
 		// (`device-offline`); a call already made waits out a short drop.
 		online: (deviceId) => (inboxes.get(deviceId)?.streams.size ?? 0) > 0,
+		stops: true,
 
-		async *call(deviceId, request, signal) {
+		async *call(deviceId, request, signal, stop) {
 			if (!reachable(deviceId)) {
 				yield {
 					kind: "error",
@@ -241,6 +268,7 @@ export function createWorkHub(
 				takenBy: null,
 				answered: false,
 				ackTimer: null,
+				stopping: false,
 				push(replies, done) {
 					queue.push(...replies);
 					if (done) ended = true;
@@ -259,8 +287,23 @@ export function createWorkHub(
 				else deliver(deviceId, { kind: "cancel", id });
 				notify();
 			};
+			/**
+			 * A stop: the Device's cleanup is part of the call when the stream
+			 * that took it says `stopWaits`. Else it ends now, as at an abort.
+			 */
+			const halt = () => {
+				if (!calls.has(id) || open.stopping) return;
+				if (!open.takenBy?.stopWaits) {
+					cancel();
+					return;
+				}
+				open.stopping = true;
+				deliver(deviceId, { kind: "cancel", id });
+			};
 			signal?.addEventListener("abort", cancel, { once: true });
+			stop?.addEventListener("abort", halt, { once: true });
 			deliver(deviceId, delivery);
+			if (stop?.aborted) halt();
 			try {
 				while (true) {
 					const reply = queue.shift();
@@ -275,19 +318,27 @@ export function createWorkHub(
 				}
 			} finally {
 				signal?.removeEventListener("abort", cancel);
+				stop?.removeEventListener("abort", halt);
 				// The Walker stopped reading before the Device ended it.
 				cancel();
 			}
 		},
 
-		async *take(deviceId, signal, running) {
+		async *take(deviceId, signal, running, said = {}) {
 			const box = inbox(deviceId);
 			const serving = running ? new Set(running) : null;
+			/** The calls it still serves: this stream carries them now. */
+			const served: OpenCall[] = [];
 			// The calls out with a stream of before. The Device restarted, or
 			// that stream died: this one replaces them.
 			for (const [id, call] of calls) {
 				if (call.deviceId !== deviceId || !call.takenBy) continue;
-				if (serving?.has(id)) continue;
+				if (serving?.has(id)) {
+					served.push(call);
+					// Its cancel may have left with the stream of before.
+					if (call.stopping) box.deliveries.push({ kind: "cancel", id });
+					continue;
+				}
 				if (!call.answered) {
 					// It never reached the Device, or the Device lost it before
 					// it began: this stream takes it again.
@@ -319,7 +370,12 @@ export function createWorkHub(
 				older.end.abort();
 				leave(deviceId, older);
 			}
-			const stream: Stream = { end: new AbortController(), left: false };
+			const stream: Stream = {
+				end: new AbortController(),
+				left: false,
+				stopWaits: said.stopWaits === true,
+			};
+			for (const call of served) call.takenBy = stream;
 			const back = box.streams.size === 0 && !box.lost;
 			box.streams.add(stream);
 			if (box.lost) {
@@ -349,7 +405,7 @@ export function createWorkHub(
 									call.ackTimer = null;
 									if (call.answered || call.takenBy !== stream) return;
 									console.warn(
-										`[work] device ${deviceId} did not confirm a call: its connection is dead, the call goes again`,
+										`[work] device ${deviceId} did not confirm a call: its connection is dead, ${call.stopping ? "the stopped call ends" : "the call goes again"}`,
 									);
 									stream.end.abort();
 									leave(deviceId, stream);

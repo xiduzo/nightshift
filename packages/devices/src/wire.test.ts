@@ -53,6 +53,8 @@ let flows: FlowDocuments;
 let kept: KeptDevices;
 /** B's sessions as a placed Device: each runs until the test ends it. */
 let sessions: { input: SessionInput; end(): void }[];
+/** When B's sessions cleaned up, among what a test notes. */
+let order: string[];
 /** The streams of B's Links open on A now, and how many ever opened, by procedure. */
 let open: Map<string, number>;
 let opened: Map<string, number>;
@@ -66,6 +68,7 @@ beforeEach(async () => {
 	flows = createFlowDocuments({ db: b.db, documents: paired.synced });
 	kept = {};
 	sessions = [];
+	order = [];
 	open = new Map();
 	opened = new Map();
 });
@@ -147,9 +150,15 @@ function placedDevice(): Device {
 				});
 			});
 			sessions.push({ input, end });
-			yield { type: "ready", harness: input.harness };
-			await ended;
-			if (!input.signal.aborted) yield { type: "text", delta: "done" };
+			try {
+				yield { type: "ready", harness: input.harness };
+				await ended;
+				if (!input.signal.aborted) yield { type: "text", delta: "done" };
+			} finally {
+				// The harness's files go, and what the step wrote reaches the Space.
+				await Bun.sleep(20);
+				order.push("B cleaned up");
+			}
 		},
 	} as unknown as Device;
 }
@@ -674,6 +683,100 @@ function behind(network: { up: boolean; refused: number; answered: number }) {
 		};
 	};
 }
+
+describe("a Walker's stop through the Host", () => {
+	/** A session on B, as a Walker sends it to A. */
+	async function sessionRequest(run: string) {
+		const projectId = await projectOnBoth();
+		return {
+			spaceId: a.spaceId,
+			projectId,
+			personId: paired.personId,
+			runId: run,
+			call: {
+				kind: "session",
+				input: {
+					cwd: worktreeLocation(b.repoPath, run.slice(0, 8)).worktreePath,
+					prompt: "Work.",
+					harness: "claude-code",
+					model: "sonnet",
+					permissionMode: "acceptEdits",
+				},
+			},
+		} satisfies WorkRequest;
+	}
+
+	/** A Walker's call to B through A, read on its own until A ends it. */
+	async function callThroughA(input: {
+		request: Awaited<ReturnType<typeof sessionRequest>>;
+		stopId?: string;
+	}) {
+		const replies: WorkReply[] = [];
+		const closed = new AbortController();
+		const stream = await paired.memory
+			.client(paired.key)
+			.devices.call(
+				{ deviceId: b.deviceId, ...input },
+				{ signal: closed.signal },
+			);
+		let done = false;
+		void (async () => {
+			try {
+				for await (const reply of stream) replies.push(reply);
+			} catch {
+				// Closed here.
+			}
+			order.push("call ended");
+			done = true;
+		})();
+		return { replies, done: () => done, close: () => closed.abort() };
+	}
+
+	test("with its stopId: B stops the session, and the call ends after B's cleanup there", async () => {
+		const request = await sessionRequest(
+			"abcdef12-0000-0000-0000-000000000000",
+		);
+		await startB();
+		await streamsOn();
+		const call = await callThroughA({ request, stopId: "stop-1" });
+		await waitFor(() => call.replies.length === 1, {
+			label: "the first reply",
+		});
+
+		expect(
+			await paired.memory.client(paired.key).devices.stop({ id: "stop-1" }),
+		).toEqual({ known: true });
+		await waitFor(call.done, { label: "the call to end", timeoutMs: 15_000 });
+		expect(sessions[0]?.input.signal.aborted).toBe(true);
+		expect(order).toEqual(["B cleaned up", "call ended"]);
+		// The call is gone: a stop no longer finds it.
+		expect(
+			await paired.memory.client(paired.key).devices.stop({ id: "stop-1" }),
+		).toEqual({ known: false });
+	});
+
+	test("without one, as an older Walker sends it: closing the stream stops the session, as before", async () => {
+		const request = await sessionRequest(
+			"abcdef13-0000-0000-0000-000000000000",
+		);
+		await startB();
+		await streamsOn();
+		const call = await callThroughA({ request });
+		await waitFor(() => call.replies.length === 1, {
+			label: "the first reply",
+		});
+
+		call.close();
+		await waitFor(() => sessions[0]?.input.signal.aborted === true, {
+			label: "B's session to stop",
+			timeoutMs: 15_000,
+		});
+		await waitFor(() => order.includes("B cleaned up"), {
+			label: "B's cleanup",
+		});
+		expect(order).toEqual(["call ended", "B cleaned up"]);
+	});
+});
 
 describe("a Device's link to its Host", () => {
 	test("each time the link comes online, the engine renews the leases of its runs: once, not at every heartbeat", async () => {

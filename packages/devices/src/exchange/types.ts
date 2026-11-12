@@ -191,7 +191,11 @@ export type HostExchange = {
 	 */
 	work(
 		caller: Caller,
-		input: { running: string[] },
+		input: {
+			running: string[];
+			/** The Device ends a cancelled call after its cleanup: a stop keeps the call open. */
+			stopWaits?: boolean;
+		},
 		signal?: AbortSignal,
 	): AsyncIterable<WorkDelivery>;
 	/** The Caller's Device answers a call it took. */
@@ -229,13 +233,21 @@ export type HostExchange = {
 	/**
 	 * The Walker → Host → Device leg: a call of a run the Caller's Device
 	 * walks, for one of its Person's Devices (or this Host), relayed (or
-	 * served here), with its replies, until the signal aborts.
+	 * served here), with its replies, until the signal aborts. With a
+	 * `stopId`, `stop` stops it too.
 	 */
 	call(
 		caller: Caller,
-		input: { deviceId: string; request: WorkRequest },
+		input: { deviceId: string; request: WorkRequest; stopId?: string },
 		signal?: AbortSignal,
 	): AsyncIterable<WorkReply>;
+	/**
+	 * Stops a call the Caller's Device made with this `stopId`: the Device
+	 * cancels it, and its stream ends after the Device's cleanup there when
+	 * that Device says `stopWaits`, else at once. False: no such call is
+	 * open now.
+	 */
+	stop(caller: Caller, input: { id: string }): Promise<{ known: boolean }>;
 	/** Whether one of the Caller's Person's Devices (or this Host) takes work now. */
 	reachable(caller: Caller, input: { deviceId: string }): Promise<boolean>;
 	/**

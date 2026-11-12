@@ -136,8 +136,10 @@ const offered = (profile: string, cwd = worktree): WorkRequest["call"] => ({
  * A Host's side of the work stream: a real work hub behind the two
  * procedures a placed Device calls, and this computer's link to it.
  */
-function hubHost() {
+function hubHost(said: { stopWaits?: true } = {}) {
 	const hub = createWorkHub();
+	/** What the Device said each time it opened its work stream. */
+	const opened: unknown[] = [];
 	const link = httpsLink({
 		link: {
 			hostId: HOST,
@@ -156,8 +158,15 @@ function hubHost() {
 			partialHostClient({
 				link: { hello: async () => hello, heartbeat: async () => hello },
 				devices: {
-					work: async (input, options) =>
-						hub.take(DEVICE.id, options?.signal as AbortSignal, input?.running),
+					work: async (input, options) => {
+						opened.push(input);
+						return hub.take(
+							DEVICE.id,
+							options?.signal as AbortSignal,
+							input?.running,
+							{ stopWaits: input?.stopWaits === true },
+						);
+					},
 					workReply: async (input) => ({
 						known: hub.reply(DEVICE.id, input),
 					}),
@@ -169,10 +178,12 @@ function hubHost() {
 		deviceId: DEVICE.id,
 		personId: ME,
 		spaces: [],
+		...said,
 	};
 	return {
 		hub,
 		link,
+		opened,
 		/** A call of the Host's Walker: its replies, until the call ends. */
 		call(request: WorkRequest) {
 			const replies: WorkReply[] = [];
@@ -189,6 +200,20 @@ function hubHost() {
 }
 
 describe("the work server", () => {
+	test("tells a Host whose hello says stopWaits that a call it cancels ends after the cleanup here; an older Host hears nothing new", async () => {
+		const server = createWorkServer({
+			serve: async function* () {},
+		});
+		for (const said of [{ stopWaits: true } as const, {}]) {
+			const host = hubHost(said);
+			const detach = server.attach(host.link);
+			await waitUntil(() => host.opened.length === 1);
+			expect(host.opened[0]).toEqual({ running: [], ...said });
+			detach();
+			await host.link.close();
+		}
+	});
+
 	test("serves the Host's calls through the Offer admission: the profile as its owner set it, a session over the cap waits, withdrawing aborts it", async () => {
 		own = [
 			{
@@ -471,6 +496,174 @@ describe("the work hub", () => {
 			offline: true,
 		});
 		expect(hub.online("b", "")).toBe(false);
+	});
+});
+
+describe("a stop of a call in the work hub", () => {
+	/** A Device's stream on the hub, its call of a Walker, and the call's stop. */
+	async function stopped(said: { stopWaits?: boolean }) {
+		const hub = createWorkHub();
+		const taking = new AbortController();
+		const deliveries = hub
+			.take("b", taking.signal, [], said)
+			[Symbol.asyncIterator]();
+		const first = deliveries.next();
+		const stop = new AbortController();
+		const replies: WorkReply[] = [];
+		let ended = false;
+		void (async () => {
+			for await (const reply of hub.call(
+				"b",
+				request(),
+				undefined,
+				stop.signal,
+			)) {
+				replies.push(reply);
+			}
+			ended = true;
+		})();
+		const call = (await first).value;
+		hub.reply("b", { id: call.id, replies: [], done: false });
+		const cancel = deliveries.next();
+		stop.abort();
+		expect((await cancel).value).toEqual({ kind: "cancel", id: call.id });
+		return { hub, call, replies, ended: () => ended, taking, deliveries };
+	}
+
+	test("a Device that says stopWaits: its replies still come, and the call ends when the Device ends it", async () => {
+		const { hub, call, replies, ended, taking } = await stopped({
+			stopWaits: true,
+		});
+		await Bun.sleep(20);
+		expect(ended()).toBe(false);
+		// Its session ends there, and its cleanup runs, then it ends the call.
+		expect(
+			hub.reply("b", {
+				id: call.id,
+				replies: [{ kind: "item", item: { type: "error", kind: "aborted" } }],
+				done: false,
+			}),
+		).toBe(true);
+		expect(hub.reply("b", { id: call.id, replies: [], done: true })).toBe(true);
+		await waitUntil(ended);
+		expect(replies).toEqual([
+			{ kind: "item", item: { type: "error", kind: "aborted" } },
+		]);
+		taking.abort();
+	});
+
+	test("a Device of an older version: the call ends at the stop, as at an abort", async () => {
+		const { hub, call, replies, ended, taking } = await stopped({});
+		await waitUntil(ended);
+		expect(replies).toEqual([]);
+		// Its replies after the cancel no longer reach anyone: it stops them there.
+		expect(hub.reply("b", { id: call.id, replies: [], done: true })).toBe(
+			false,
+		);
+		taking.abort();
+	});
+
+	test("a call no Device took yet never goes", async () => {
+		const hub = createWorkHub();
+		// A Device that is away for a moment: its calls wait for it.
+		const away = new AbortController();
+		const gone = hub
+			.take("b", away.signal, [], { stopWaits: true })
+			[Symbol.asyncIterator]();
+		const opened = gone.next();
+		away.abort();
+		await opened;
+		const stop = new AbortController();
+		stop.abort();
+		const replies = [];
+		for await (const reply of hub.call("b", request(), undefined, stop.signal))
+			replies.push(reply);
+		expect(replies).toEqual([]);
+		const back = new AbortController();
+		const deliveries = hub.take("b", back.signal, [])[Symbol.asyncIterator]();
+		const next = deliveries.next();
+		await Bun.sleep(20);
+		back.abort();
+		expect((await next).done).toBe(true);
+	});
+
+	test("a stopped call the Device no longer serves when it comes back ends; one it still serves gets its cancel again", async () => {
+		const gone = await stopped({ stopWaits: true });
+		gone.taking.abort();
+		await gone.deliveries.next();
+		// It restarted: it serves nothing now.
+		const again = new AbortController();
+		const after = gone.hub
+			.take("b", again.signal, [], { stopWaits: true })
+			[Symbol.asyncIterator]();
+		const next = after.next();
+		await waitUntil(gone.ended);
+		expect(gone.replies).toEqual([
+			{
+				kind: "error",
+				message: "The device of this step stopped before the step ended.",
+				offline: true,
+			},
+		]);
+		again.abort();
+		await next;
+
+		const still = await stopped({ stopWaits: true });
+		still.taking.abort();
+		await still.deliveries.next();
+		// Its link came back, and the call still runs there.
+		const back = new AbortController();
+		const deliveries = still.hub
+			.take("b", back.signal, [still.call.id], { stopWaits: true })
+			[Symbol.asyncIterator]();
+		expect((await deliveries.next()).value).toEqual({
+			kind: "cancel",
+			id: still.call.id,
+		});
+		still.hub.reply("b", { id: still.call.id, replies: [], done: true });
+		await waitUntil(still.ended);
+		back.abort();
+		await deliveries.next();
+	});
+
+	test("a stopped call that never reached the Device ends instead of going to its next stream", async () => {
+		const hub = createWorkHub({ ackMs: 20 });
+		const first = new AbortController();
+		const before = hub
+			.take("b", first.signal, [], { stopWaits: true })
+			[Symbol.asyncIterator]();
+		const taken = before.next();
+		// An earlier call tells the hub this Device acks.
+		const earlier = hub.call("b", request())[Symbol.asyncIterator]();
+		const earlierAnswer = earlier.next();
+		const one = (await taken).value;
+		hub.reply("b", { id: one.id, replies: [], done: false });
+		hub.reply("b", {
+			id: one.id,
+			replies: [{ kind: "result", value: 1 }],
+			done: true,
+		});
+		await earlierAnswer;
+
+		// The next call goes into a stream that died, and a stop comes.
+		const stop = new AbortController();
+		let ended = false;
+		void (async () => {
+			for await (const _ of hub.call("b", request(), undefined, stop.signal)) {
+			}
+			ended = true;
+		})();
+		const call = (await before.next()).value;
+		stop.abort();
+		// No ack: the hub ends that stream, and the stopped call with it.
+		await waitUntil(() => ended);
+		const again = new AbortController();
+		const after = hub.take("b", again.signal, [])[Symbol.asyncIterator]();
+		const next = after.next();
+		// Only its cancel goes, in case the call reached the Device after all.
+		expect((await next).value).toEqual({ kind: "cancel", id: call.id });
+		again.abort();
+		await after.next();
 	});
 });
 

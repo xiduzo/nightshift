@@ -15,7 +15,9 @@ import { backoff, type Link, pause } from "../links";
  * Offer admission (`OfferAdmission.serve`: every check, from its own
  * Replica, before it starts anything), and sends the replies back
  * (`devices.workReply`), a batch at a time. A cancel from the Host aborts
- * the call here: its session or command ends.
+ * the call here: its session or command ends, and the call ends after its
+ * cleanup, with its replies until then. To a Host whose hello says
+ * `stopWaits`, it says so in `devices.work`: that Host waits for them.
  *
  * A call outlives its stream: the replies of a session that runs while
  * the link drops go when it is back, after a backoff when the Host does
@@ -39,8 +41,13 @@ import { backoff, type Link, pause } from "../links";
 export const REPLY_DEADLINE_MS = 10 * 60_000;
 
 export type WorkServer = {
-	/** Takes and serves the Host's calls over its link while it is online. Returns how to stop. */
-	attach(link: Pick<Link, "stream" | "ready">): () => void;
+	/**
+	 * Takes and serves the Host's calls over its link while it is online.
+	 * Returns how to stop. A link without `hello` reads as an older Host's.
+	 */
+	attach(
+		link: Pick<Link, "stream" | "ready"> & Partial<Pick<Link, "hello">>,
+	): () => void;
 	/** The calls running here now. */
 	running(): number;
 };
@@ -203,8 +210,11 @@ export function createWorkServer(deps: {
 		attach(next) {
 			served.link = next;
 			const stop = next.stream("devices.work", async (client, signal) => {
+				// A call the Host cancels ends here after its cleanup, and its
+				// replies until then go: a Host that waits for them hears so.
+				const stopWaits = next.hello?.()?.stopWaits === true;
 				const stream = await client.devices.work(
-					{ running: [...calls.keys()] },
+					{ running: [...calls.keys()], ...(stopWaits ? { stopWaits } : {}) },
 					{ signal },
 				);
 				for await (const delivery of stream) {

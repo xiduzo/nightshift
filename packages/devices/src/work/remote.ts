@@ -131,15 +131,42 @@ export function remoteDevice(
 	 * once the call's last event came, `close` reads on until the call
 	 * ends, and the step ends after the cleanup, as it does on this
 	 * computer. It waits `CLEANUP_WAIT_MS` at most, then cancels the call
-	 * there. A stop ends the wait at once. A call closed before its last
-	 * event is cancelled there.
+	 * there. A call closed before its last event is cancelled there.
+	 *
+	 * A stop cancels the call there. Through a relay that takes a stop
+	 * (`WorkRelay.stops`), the stream goes on until the Device ended the
+	 * call after its cleanup, when every hop can: `CLEANUP_WAIT_MS` after
+	 * the stop at most, then it closes. Else the stream ends at the stop.
 	 */
 	function streamed(call: WorkCall, signal: AbortSignal) {
 		const giveUp = new AbortController();
-		const replies = ask(call, AbortSignal.any([signal, giveUp.signal]))[
-			Symbol.asyncIterator
-		]();
+		/** The call ended here: no wait goes on. */
+		const over = new AbortController();
+		const request = { ...forRun, call };
+		const replies = (
+			relay.stops
+				? relay.call(device.id, request, giveUp.signal, signal)
+				: relay.call(
+						device.id,
+						request,
+						AbortSignal.any([signal, giveUp.signal]),
+					)
+		)[Symbol.asyncIterator]();
+		/** A Device that does not end a stopped call holds the step no longer. */
+		const afterStop = () => {
+			void wait(CLEANUP_WAIT_MS, over.signal).then(() => {
+				if (!over.signal.aborted) giveUp.abort();
+			});
+		};
+		if (relay.stops) {
+			if (signal.aborted) afterStop();
+			else signal.addEventListener("abort", afterStop, { once: true });
+		}
 		let last = false;
+		const end = () => {
+			signal.removeEventListener("abort", afterStop);
+			over.abort();
+		};
 		return {
 			next: () => replies.next(),
 			/** The call's last event came: `close` waits for the Device to end the call. */
@@ -148,10 +175,13 @@ export function remoteDevice(
 			},
 			async close() {
 				if (!last) {
-					await replies.return?.();
+					try {
+						await replies.return?.();
+					} finally {
+						end();
+					}
 					return;
 				}
-				const over = new AbortController();
 				const late = wait(CLEANUP_WAIT_MS, over.signal).then(
 					() => "late" as const,
 				);
@@ -167,7 +197,7 @@ export function remoteDevice(
 				} catch {
 					// The Device went away during its cleanup: the step goes on.
 				} finally {
-					over.abort();
+					end();
 				}
 			},
 		};

@@ -262,10 +262,14 @@ export const hostRouter = os.router({
 					deviceId: input.deviceId,
 					// The call's input as the Device port types it: the placed Device checks it.
 					request: input.request as unknown as WorkRequest,
+					...(input.stopId === undefined ? {} : { stopId: input.stopId }),
 				},
 				signal,
 			);
 		}),
+		stop: keyed.devices.stop.handler(({ context, input }) =>
+			context.exchange.stop(context.caller, input),
+		),
 		reachable: keyed.devices.reachable.handler(({ context, input }) =>
 			context.exchange.reachable(context.caller, input),
 		),

@@ -165,12 +165,21 @@ export type WorkRelay = {
 	 * Sends one call and streams its replies. Aborting `signal` cancels the
 	 * call on the Device and ends the stream. A Device that cannot be
 	 * reached answers with an error.
+	 *
+	 * Aborting `stop` (a relay with `stops` only) cancels the call on the
+	 * Device too. The stream goes on until the Device ended the call there,
+	 * after its cleanup, when every hop says it can (`stopWaits`: the Host
+	 * in its hello, the Device in its `devices.work`). Else it ends at the
+	 * stop, as at `signal`.
 	 */
 	call(
 		deviceId: string,
 		request: WorkRequest,
 		signal?: AbortSignal,
+		stop?: AbortSignal,
 	): AsyncIterable<WorkReply>;
+	/** Its `call` takes a `stop`. Absent: a stop is an abort of `signal`. */
+	stops?: true;
 	/** Whether the Device takes work now, for a run of that Space. */
 	online(deviceId: string, spaceId: string): boolean | Promise<boolean>;
 };

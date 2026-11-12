@@ -7,10 +7,15 @@ import {
 	type TranscriptEntry,
 	HOST_UNREACHABLE as UNREACHABLE,
 } from "@nightshift/engine";
-import { createSandbox } from "@nightshift/engine/testing";
+import { createSandbox, waitFor } from "@nightshift/engine/testing";
 import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/client";
-import type { HostClient, WorkReply, WorkRequest } from "../contract";
+import type {
+	HostClient,
+	HostHello,
+	WorkReply,
+	WorkRequest,
+} from "../contract";
 import type { DeviceLinks } from "../links";
 import { hostCall, NOT_PAIRED, translated } from "../links/from-host";
 import { pairedReplicas } from "../testing";
@@ -143,6 +148,8 @@ type InStepFake = {
 function fakeLinks(
 	clients: Record<string, HostClient | null>,
 	inStep: InStepFake = { answer: async () => true, asked: [] },
+	/** What each Host said of itself last. Default: nothing yet. */
+	hellos: Record<string, Partial<HostHello>> = {},
 ): Pick<DeviceLinks, "get"> {
 	return {
 		get(hostId) {
@@ -157,6 +164,7 @@ function fakeLinks(
 					since: 0,
 				}),
 				client: () => client,
+				hello: () => (client ? ((hellos[hostId] as HostHello) ?? null) : null),
 				// The relays read `client()` only.
 				stream: () => () => {},
 				call: (use, options) =>
@@ -683,7 +691,10 @@ const request = (spaceId: string): WorkRequest => ({
 	call: { kind: "exec" } as WorkRequest["call"],
 });
 
-function workRelayWith(host = fakeHost()) {
+function workRelayWith(
+	host: { client: HostClient; taken: Taken[] } = fakeHost(),
+	hello: Partial<HostHello> = {},
+) {
 	const hubCalls: string[] = [];
 	const relay = createWorkRelay({
 		hub: {
@@ -694,9 +705,67 @@ function workRelayWith(host = fakeHost()) {
 			online: (deviceId) => deviceId === "device-here",
 		},
 		engine: () => ({ hostSpaces }),
-		links: () => fakeLinks({ "host-1": host.client, "host-3": null }),
+		links: () =>
+			fakeLinks({ "host-1": host.client, "host-3": null }, undefined, {
+				"host-1": hello,
+			}),
 	});
 	return { relay, host, hubCalls };
+}
+
+/**
+ * A Host whose call streams until its signal aborts, or until the test
+ * ends it there (`endCall`): a Device that ended the call after its
+ * cleanup. `known`: what it answers to a stop.
+ */
+function stoppingHost(known = true) {
+	const taken: Taken[] = [];
+	let endCall = () => {};
+	const client = {
+		devices: {
+			call: async (input: unknown, options?: { signal?: AbortSignal }) => {
+				taken.push({ procedure: "devices.call", input });
+				return (async function* (): AsyncGenerator<WorkReply> {
+					yield { kind: "item", item: "ready" };
+					await new Promise<void>((resolve) => {
+						endCall = resolve;
+						options?.signal?.addEventListener("abort", () => resolve(), {
+							once: true,
+						});
+					});
+					if (!options?.signal?.aborted) {
+						yield { kind: "item", item: "cleaned up" };
+					}
+				})();
+			},
+			stop: async (input: unknown) => {
+				taken.push({ procedure: "devices.stop", input });
+				return { known };
+			},
+		},
+	};
+	return {
+		client: client as unknown as HostClient,
+		taken,
+		endCall: () => endCall(),
+	};
+}
+
+/** A call through a Host's relay, read on its own, and its stop. */
+function readCall(relay: ReturnType<typeof createWorkRelay>) {
+	const stop = new AbortController();
+	const replies: WorkReply[] = [];
+	const reading = (async () => {
+		for await (const reply of relay.call(
+			"device-b",
+			request("space-team"),
+			undefined,
+			stop.signal,
+		)) {
+			replies.push(reply);
+		}
+	})();
+	return { stop, replies, reading };
 }
 
 async function repliesOf(
@@ -821,6 +890,70 @@ describe("the work relay", () => {
 				relay.call("device-b", request("space-team"), stop.signal),
 			),
 		).toEqual([]);
+	});
+
+	test("a stop through a Host whose hello says stopWaits: the call names a stopId, the stop goes to the Host, and the replies come until the Device ends the call", async () => {
+		const host = stoppingHost();
+		const { relay } = workRelayWith(host, { stopWaits: true });
+		const call = readCall(relay);
+		await waitFor(() => call.replies.length === 1, {
+			label: "the first reply",
+		});
+		call.stop.abort();
+		await waitFor(() => host.taken.length === 2, { label: "the stop" });
+		await Bun.sleep(20);
+		// The Device cleans up: the stream stays open.
+		expect(call.replies).toEqual([{ kind: "item", item: "ready" }]);
+		host.endCall();
+		await call.reading;
+		expect(call.replies).toEqual([
+			{ kind: "item", item: "ready" },
+			{ kind: "item", item: "cleaned up" },
+		]);
+		const stopId = (host.taken[0]?.input as { stopId?: string } | undefined)
+			?.stopId;
+		expect(stopId).toBeString();
+		expect(host.taken).toEqual([
+			{
+				procedure: "devices.call",
+				input: { deviceId: "device-b", request: request("space-team"), stopId },
+			},
+			{ procedure: "devices.stop", input: { id: stopId } },
+		]);
+	});
+
+	test("a stop through a Host of an older version closes the stream, as before: no stopId goes", async () => {
+		const host = stoppingHost();
+		const { relay } = workRelayWith(host);
+		const call = readCall(relay);
+		await waitFor(() => call.replies.length === 1, {
+			label: "the first reply",
+		});
+		call.stop.abort();
+		await call.reading;
+		expect(call.replies).toEqual([{ kind: "item", item: "ready" }]);
+		expect(host.taken).toEqual([
+			{
+				procedure: "devices.call",
+				input: { deviceId: "device-b", request: request("space-team") },
+			},
+		]);
+	});
+
+	test("a stop the Host does not know closes the stream", async () => {
+		const host = stoppingHost(false);
+		const { relay } = workRelayWith(host, { stopWaits: true });
+		const call = readCall(relay);
+		await waitFor(() => call.replies.length === 1, {
+			label: "the first reply",
+		});
+		call.stop.abort();
+		await call.reading;
+		expect(call.replies).toEqual([{ kind: "item", item: "ready" }]);
+		expect(host.taken.map((t) => t.procedure)).toEqual([
+			"devices.call",
+			"devices.stop",
+		]);
 	});
 });
 

@@ -38,6 +38,13 @@ export const hostHelloSchema = z.object({
 	 * older version, leaves it out.
 	 */
 	devices: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
+	/**
+	 * A stop of a step this Host relays waits for the Device's cleanup:
+	 * `devices.call` takes a `stopId`, and `devices.stop` stops that call
+	 * and keeps its stream open until the Device ended it. A Host of an
+	 * older version leaves it out: a Walker closes the stream at a stop.
+	 */
+	stopWaits: z.boolean().optional(),
 });
 export type HostHello = z.infer<typeof hostHelloSchema>;
 

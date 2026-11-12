@@ -48,7 +48,8 @@ export function createOfferedSessions() {
 		relay(work: WorkRelay): WorkRelay {
 			return {
 				online: (deviceId, spaceId) => work.online(deviceId, spaceId),
-				async *call(deviceId, request, signal) {
+				...(work.stops ? { stops: true } : {}),
+				async *call(deviceId, request, signal, stop) {
 					const { call } = request;
 					const untrack =
 						call.kind === "session" &&
@@ -62,7 +63,7 @@ export function createOfferedSessions() {
 								})
 							: null;
 					try {
-						yield* work.call(deviceId, request, signal);
+						yield* work.call(deviceId, request, signal, stop);
 					} finally {
 						untrack?.();
 					}

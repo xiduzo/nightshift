@@ -67,6 +67,7 @@ describe("the Host's contract", () => {
 			"spaceSecrets.take",
 			"devices.work",
 			"devices.call",
+			"devices.stop",
 			"devices.reachable",
 			"devices.workReply",
 		]);

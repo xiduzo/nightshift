@@ -160,6 +160,35 @@ describe("httpsLink", () => {
 		}
 	});
 
+	test("keeps the Host's last answer while online, and none while offline: what its version can do", async () => {
+		let up = true;
+		let answer: HostHello = hello([]);
+		const host = fakeHost({
+			"https://studio.example.com": () =>
+				up ? Promise.resolve(answer) : unreachable(),
+		});
+		const link = httpsLink({
+			link: LINK,
+			key: "nsd_key",
+			clientFor: host.clientFor,
+			heartbeatMs: 5,
+			firstBackoffMs: 5,
+		});
+		try {
+			expect(link.hello()).toBeNull();
+			await until(() => link.state().status === "online");
+			expect(link.hello()).toEqual(hello([]));
+			// The Host was updated: its next answer says more.
+			answer = { ...hello([]), stopWaits: true };
+			await until(() => link.hello()?.stopWaits === true);
+			up = false;
+			await until(() => link.state().status === "offline");
+			expect(link.hello()).toBeNull();
+		} finally {
+			await link.close();
+		}
+	});
+
 	test("a Host that refuses the key ends the link: revoked, and no more calls", async () => {
 		let refuse = false;
 		const host = fakeHost({

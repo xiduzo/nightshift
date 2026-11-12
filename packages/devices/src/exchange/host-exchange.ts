@@ -104,6 +104,13 @@ export function createHostExchange(deps: {
 }): HostExchange {
 	const { db, engine, registry } = deps;
 	const { exchange } = engine;
+	/**
+	 * The stops of the calls Walkers make through this Host with a
+	 * `stopId`, by the Walker's Device and that id, while the call is open.
+	 */
+	const stops = new Map<string, AbortController>();
+	const stopKey = (caller: Caller, id: string) =>
+		JSON.stringify([caller.deviceId, id]);
 
 	function forbidden(message: string): never {
 		throw new ORPCError("FORBIDDEN", { message });
@@ -485,6 +492,7 @@ export function createHostExchange(deps: {
 				caller.deviceId,
 				signal ?? new AbortController().signal,
 				input.running,
+				{ stopWaits: input.stopWaits === true },
 			);
 		},
 
@@ -514,37 +522,58 @@ export function createHostExchange(deps: {
 				.listDevices(input.projectId);
 		},
 
-		async *call(caller, { deviceId, request }, signal) {
-			// The Walker asks in the name of its run's Person: its own.
-			if (request.personId !== caller.personId) {
-				forbidden("A device may ask only for its own Person's runs.");
-			}
-			await caller.may(request.spaceId, STARTS_RUNS);
-			if (deviceId === deps.selfId) {
-				// Its owner's run, or another Person's through its Offers.
-				yield* engine.admission.serve(
+		async *call(caller, { deviceId, request, stopId }, signal) {
+			// Known before its first wait: a stop right after the start finds it.
+			const key = stopId === undefined ? null : stopKey(caller, stopId);
+			const stop = new AbortController();
+			if (key) stops.set(key, stop);
+			try {
+				// The Walker asks in the name of its run's Person: its own.
+				if (request.personId !== caller.personId) {
+					forbidden("A device may ask only for its own Person's runs.");
+				}
+				await caller.may(request.spaceId, STARTS_RUNS);
+				if (deviceId === deps.selfId) {
+					// Its owner's run, or another Person's through its Offers. A
+					// stop ends the session here, and the stream after its cleanup.
+					const ended = signal ?? new AbortController().signal;
+					yield* engine.admission.serve(
+						request,
+						{ keptHere: true },
+						key ? AbortSignal.any([ended, stop.signal]) : ended,
+					);
+					return;
+				}
+				const paired = await registry.get(deviceId);
+				if (
+					!paired ||
+					paired.revokedAt ||
+					(paired.ownerId !== caller.personId &&
+						!(await offersInto(deviceId, request.spaceId)))
+				) {
+					yield {
+						kind: "error",
+						message:
+							"That device is not one of yours on this Host, and it offers nothing to this Space.",
+					};
+					return;
+				}
+				// Another Person's Device checks its Offers again itself.
+				yield* deps.work.call(
+					deviceId,
 					request,
-					{ keptHere: true },
-					signal ?? new AbortController().signal,
+					signal,
+					key ? stop.signal : undefined,
 				);
-				return;
+			} finally {
+				if (key && stops.get(key) === stop) stops.delete(key);
 			}
-			const paired = await registry.get(deviceId);
-			if (
-				!paired ||
-				paired.revokedAt ||
-				(paired.ownerId !== caller.personId &&
-					!(await offersInto(deviceId, request.spaceId)))
-			) {
-				yield {
-					kind: "error",
-					message:
-						"That device is not one of yours on this Host, and it offers nothing to this Space.",
-				};
-				return;
-			}
-			// Another Person's Device checks its Offers again itself.
-			yield* deps.work.call(deviceId, request, signal);
+		},
+
+		async stop(caller, { id }) {
+			const stop = stops.get(stopKey(caller, id));
+			stop?.abort();
+			return { known: stop !== undefined };
 		},
 
 		async mergePersonal(caller, input) {

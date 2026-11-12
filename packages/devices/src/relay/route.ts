@@ -1,5 +1,5 @@
 import { HostUnreachableError } from "@nightshift/engine";
-import type { HostClient } from "../contract";
+import type { HostClient, HostHello } from "../contract";
 import type { CallOptions, DeviceLinks } from "../links";
 
 /**
@@ -19,6 +19,8 @@ export type SpaceRoute =
 			at: "host";
 			hostId: string;
 			client: HostClient;
+			/** What the Host said of itself last (`Link.hello`). Null: it did not say yet. */
+			hello: HostHello | null;
 			/** One call on the Host for a person: `Link.call`, with its deadline (`CallOptions`). */
 			ask<T>(
 				use: (client: HostClient, signal: AbortSignal) => Promise<T>,
@@ -63,6 +65,7 @@ export function createSpaceRoutes(deps: {
 			at: "host",
 			hostId,
 			client,
+			hello: link.hello(),
 			ask: (use, options) => link.call(use, options),
 		};
 	}

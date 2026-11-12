@@ -324,6 +324,8 @@ export function createHost(deps: {
 				spaces: home ? spaces : spaces.filter((space) => !space.personal),
 				hostAdmin: await isHostAdmin(deps.db, key.personId),
 				...(home ? { devices: await ownDevices(key) } : {}),
+				// A stop of a step it relays waits for the Device's cleanup.
+				stopWaits: true,
 			};
 		},
 	};

@@ -11,6 +11,7 @@ import {
 } from "@nightshift/engine/testing";
 import { Refusal } from "@nightshift/refusal";
 import {
+	type HostHello,
 	UNREADABLE_REQUEST,
 	type WorkFor,
 	type WorkRelay,
@@ -385,15 +386,18 @@ const turn = () => new Promise<void>((resolve) => setImmediate(resolve));
  * A Host's hub, and a placed Device that serves `device` through it as the
  * daemon does: its work server takes the calls over its link and sends the
  * replies back, a batch at a time. `cancelled`: the calls the Host
- * cancelled there.
+ * cancelled there. `stopWaits`: the Host says so in its hello, and the
+ * Device's work server tells it in turn; else both are of an older version.
  */
-async function placedOn(device: Device) {
+async function placedOn(device: Device, options: { stopWaits?: true } = {}) {
 	const back = Promise.withResolvers<void>();
 	const hub = createWorkHub({ onBack: () => back.resolve() });
 	const client = partialHostClient({
 		devices: {
 			work: async (input, options) =>
-				hub.take("laptop", options?.signal as AbortSignal, input?.running),
+				hub.take("laptop", options?.signal as AbortSignal, input?.running, {
+					stopWaits: input?.stopWaits === true,
+				}),
 			workReply: async (input) => ({ known: hub.reply("laptop", input) }),
 		},
 	});
@@ -411,6 +415,8 @@ async function placedOn(device: Device) {
 			return () => closed.abort();
 		},
 		ready: async () => client,
+		hello: () =>
+			options.stopWaits ? ({ stopWaits: true } as HostHello) : null,
 	});
 	await back.promise;
 	return { hub, cancelled, detach };
@@ -431,6 +437,30 @@ function heldPause() {
 				asked.resolve(ms);
 			}),
 	};
+}
+
+/** The Walker's waits, each until the test ends them all. */
+function heldPauses() {
+	const asked: number[] = [];
+	const ends: (() => void)[] = [];
+	return {
+		/** How long each wait would be. */
+		asked,
+		endAll: () => {
+			for (const end of ends.splice(0)) end();
+		},
+		pause: (ms: number, signal?: AbortSignal) =>
+			new Promise<void>((resolve) => {
+				asked.push(ms);
+				ends.push(resolve);
+				signal?.addEventListener("abort", () => resolve(), { once: true });
+			}),
+	};
+}
+
+async function until(ok: () => boolean) {
+	for (let i = 0; i < 1_000 && !ok(); i++) await Bun.sleep(5);
+	if (!ok()) throw new Error("Timed out.");
 }
 
 const SESSION = {
@@ -550,7 +580,7 @@ describe("a session or a command on a remote Device", () => {
 		placed.detach();
 	});
 
-	test("a stop during the Device's cleanup ends the step at once", async () => {
+	test("a stop during the cleanup of a Device of an older version ends the step at once", async () => {
 		const order: string[] = [];
 		const placed = await placedOn(sessionDevice(() => new Promise(() => {})));
 		const held = heldPause();
@@ -567,6 +597,187 @@ describe("a session or a command on a remote Device", () => {
 		await reading;
 		expect(order).toEqual(["ready", "finished", "step ended"]);
 		expect(placed.cancelled).toEqual(["session"]);
+		placed.detach();
+	});
+
+	test("a stop during the cleanup of a Device that says stopWaits waits for that cleanup", async () => {
+		const order: string[] = [];
+		const cleaned = Promise.withResolvers<void>();
+		const placed = await placedOn(
+			sessionDevice(async () => {
+				await cleaned.promise;
+				order.push("cleanup");
+			}),
+			{ stopWaits: true },
+		);
+		const held = heldPauses();
+		const walker = remoteDevice(
+			placed.hub,
+			{ id: "laptop", name: "laptop" },
+			FOR_RUN,
+			{ pause: held.pause },
+		);
+		const stop = new AbortController();
+		const reading = readSession(walker, stop.signal, order);
+		await until(() => held.asked.length === 1);
+		stop.abort();
+		await until(() => placed.cancelled.length === 1);
+		expect(order).toEqual(["ready", "finished"]);
+		cleaned.resolve();
+		await reading;
+		expect(order).toEqual(["ready", "finished", "cleanup", "step ended"]);
+		placed.detach();
+	});
+});
+
+/**
+ * A placed Device whose session or command runs until its stop, says so,
+ * then cleans up as `cleanup` says.
+ */
+function stoppableDevice(cleanup: () => Promise<void>): Device {
+	const stopped = (signal: AbortSignal) =>
+		new Promise<void>((resolve) =>
+			signal.addEventListener("abort", () => resolve(), { once: true }),
+		);
+	return {
+		id: "laptop",
+		name: "laptop",
+		async *session(input: { signal: AbortSignal }) {
+			try {
+				yield { type: "ready", harness: "claude-code" };
+				await stopped(input.signal);
+				yield {
+					type: "error",
+					kind: "aborted",
+					message: "The session was stopped.",
+				};
+			} finally {
+				await cleanup();
+			}
+		},
+		async *exec(input: { signal: AbortSignal }) {
+			try {
+				yield { type: "output", stream: "stdout", text: "working\n" };
+				await stopped(input.signal);
+				yield { type: "exit", exitCode: null, spawnError: null };
+			} finally {
+				await cleanup();
+			}
+		},
+	} as unknown as Device;
+}
+
+/** A step's read of a session that a person stops once it is ready. */
+async function readStopped(device: Device, order: string[]) {
+	const stop = new AbortController();
+	for await (const event of device.session({
+		...SESSION,
+		signal: stop.signal,
+	})) {
+		order.push(event.type);
+		if (event.type === "ready") stop.abort();
+		if (event.type === "finished" || event.type === "error") break;
+	}
+	order.push("step ended");
+}
+
+describe("a stop of a step on a remote Device", () => {
+	test("the session ends there, and the step ends after the Device's cleanup", async () => {
+		const order: string[] = [];
+		const placed = await placedOn(
+			stoppableDevice(async () => {
+				// The knowledge view goes, and what the step wrote reaches the Space.
+				await turn();
+				order.push("cleanup");
+			}),
+			{ stopWaits: true },
+		);
+		const walker = remoteDevice(
+			placed.hub,
+			{ id: "laptop", name: "laptop" },
+			FOR_RUN,
+		);
+		await readStopped(walker, order);
+		expect(order).toEqual(["ready", "error", "cleanup", "step ended"]);
+		expect(placed.cancelled).toEqual(["session"]);
+		placed.detach();
+	});
+
+	test("a command ends there, and the step ends after the Device's cleanup", async () => {
+		const order: string[] = [];
+		const placed = await placedOn(
+			stoppableDevice(async () => {
+				await turn();
+				order.push("cleanup");
+			}),
+			{ stopWaits: true },
+		);
+		const walker = remoteDevice(
+			placed.hub,
+			{ id: "laptop", name: "laptop" },
+			FOR_RUN,
+		);
+		const stop = new AbortController();
+		// As `runCommand` reads it: up to its exit.
+		for await (const event of walker.exec({
+			command: "sync",
+			cwd: "/work",
+			signal: stop.signal,
+		})) {
+			order.push(event.type);
+			if (event.type === "output") stop.abort();
+			if (event.type === "exit") break;
+		}
+		order.push("step ended");
+		expect(order).toEqual(["output", "exit", "cleanup", "step ended"]);
+		expect(placed.cancelled).toEqual(["exec"]);
+		placed.detach();
+	});
+
+	test("on a Device of an older version, or through a Host of one, the step ends at the stop, as before", async () => {
+		const order: string[] = [];
+		const cleaned = Promise.withResolvers<void>();
+		const placed = await placedOn(
+			stoppableDevice(async () => {
+				await cleaned.promise;
+				order.push("cleanup");
+			}),
+		);
+		const walker = remoteDevice(
+			placed.hub,
+			{ id: "laptop", name: "laptop" },
+			FOR_RUN,
+		);
+		await readStopped(walker, order);
+		expect(order).toEqual(["ready", "error", "step ended"]);
+		await until(() => placed.cancelled.length === 1);
+		// The Device still cleans up, after the step.
+		cleaned.resolve();
+		await until(() => order.includes("cleanup"));
+		placed.detach();
+	});
+
+	test("a Device that does not end the stopped call holds the step for the cleanup wait only", async () => {
+		const order: string[] = [];
+		const placed = await placedOn(
+			stoppableDevice(() => new Promise(() => {})),
+			{ stopWaits: true },
+		);
+		const held = heldPauses();
+		const walker = remoteDevice(
+			placed.hub,
+			{ id: "laptop", name: "laptop" },
+			FOR_RUN,
+			{ pause: held.pause },
+		);
+		const reading = readStopped(walker, order);
+		// The wait after the stop, and the one after the last event.
+		await until(() => held.asked.length === 2);
+		expect(held.asked).toEqual([CLEANUP_WAIT_MS, CLEANUP_WAIT_MS]);
+		expect(order).toEqual(["ready", "error"]);
+		held.endAll();
+		await reading;
+		expect(order).toEqual(["ready", "error", "step ended"]);
 		placed.detach();
 	});
 });
