@@ -9,6 +9,7 @@ export {
 	RunStatusBadge,
 	RunStatusIcon,
 } from "./components/run-status-badge";
+export { TestRunBadge } from "./components/test-run-badge";
 export { ProjectRunCopiesPage } from "./copies/run-copies-page";
 export { reportLink } from "./lib/report";
 export { preloadRunCopiesPage, preloadRunPage } from "./preload";

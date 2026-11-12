@@ -1,4 +1,4 @@
-import { shortReason } from "@nightshift/client";
+import { isTestRun, shortReason } from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
@@ -40,6 +40,7 @@ import {
 	MoonIcon,
 } from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
+import { TestRunBadge } from "@/features/runs";
 import type {
 	FailingFlow,
 	NightRange,
@@ -103,7 +104,10 @@ export function HomeLanes({
 							)
 						}
 						title={
-							<Title group={projectName(run.projectId)} name={run.title} />
+							<span className="flex min-w-0 items-center gap-1.5">
+								<Title group={projectName(run.projectId)} name={run.title} />
+								{isTestRun(run) ? <TestRunBadge className="shrink-0" /> : null}
+							</span>
 						}
 						meta={
 							run.status === "sleeping" && run.wakeAt ? (
