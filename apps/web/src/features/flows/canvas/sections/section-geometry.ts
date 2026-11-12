@@ -2,7 +2,7 @@
 // its members. Its place is not stored, so the box follows its members, and
 // moving the box moves the members. Positions in the flow file stay per node.
 
-import { type Flow, type FlowSection, moveNode } from "@nightshift/flows";
+import { type Flow, type FlowSection, moveNodes } from "@nightshift/flows";
 import type { Point } from "../edge-route";
 import type { Measured } from "../use-measured";
 
@@ -64,14 +64,13 @@ export function moveSection(
 ): Flow {
 	if (delta.x === 0 && delta.y === 0) return flow;
 	const members = new Set(section.nodes);
-	return flow.nodes.reduce(
-		(next, node) =>
-			members.has(node.id)
-				? moveNode(next, node.id, {
-						x: node.position.x + delta.x,
-						y: node.position.y + delta.y,
-					})
-				: next,
-		flow,
-	);
+	const positions = new Map<string, { x: number; y: number }>();
+	for (const node of flow.nodes) {
+		if (!members.has(node.id)) continue;
+		positions.set(node.id, {
+			x: node.position.x + delta.x,
+			y: node.position.y + delta.y,
+		});
+	}
+	return moveNodes(flow, positions);
 }

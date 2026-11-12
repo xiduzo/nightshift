@@ -6,7 +6,7 @@
  */
 import type { Flow, FlowEdge, FlowSection } from "../flow";
 import { nodeOutcomes } from "../flow";
-import { findSection, nodesWithin, sectionPath } from "./tree";
+import { nodesWithin, sectionPath } from "./tree";
 
 /**
  * Why a set of nodes cannot be a Section. Codes, not words: the editor
@@ -59,6 +59,11 @@ export type SectionCheckOptions = {
 	 * one: holding them there does not count as "in another Section".
 	 */
 	from?: string;
+	/**
+	 * The Sections and edges of the flow, read once. The check of every
+	 * Section passes the same one.
+	 */
+	index?: GraphIndex;
 };
 
 /**
@@ -80,9 +85,10 @@ export function canMakeSection(
 	if (unknown.length > 0)
 		problems.push({ code: "unknown-nodes", nodes: unknown });
 
+	const index = options.index ?? graphIndex(flow);
 	const childIds = unique(options.sections ?? []);
 	const unknownSections = childIds.filter(
-		(id) => findSection(flow, id) === undefined,
+		(id) => index.holders.find(id) === undefined,
 	);
 	if (unknownSections.length > 0)
 		problems.push({ code: "unknown-sections", sections: unknownSections });
@@ -96,7 +102,7 @@ export function canMakeSection(
 	if (loops.length > 0)
 		problems.push({ code: "holds-itself", sections: loops });
 	const children = childIds.flatMap((id) => {
-		const child = findSection(flow, id);
+		const child = index.holders.find(id);
 		return child && !around.has(id) ? [child] : [];
 	});
 
@@ -107,13 +113,8 @@ export function canMakeSection(
 	);
 	const heldSections: { section: string; holder: string }[] = [];
 	for (const child of children) {
-		const holder = (flow.sections ?? []).find(
-			(section) =>
-				!mine.has(section.id) &&
-				section.id !== child.id &&
-				(section.sections ?? []).includes(child.id),
-		);
-		if (holder) heldSections.push({ section: child.id, holder: holder.id });
+		const holder = index.holders.sectionOf(child.id, mine);
+		if (holder) heldSections.push({ section: child.id, holder });
 	}
 	if (heldSections.length > 0)
 		problems.push({ code: "section-in-other-section", sections: heldSections });
@@ -129,18 +130,16 @@ export function canMakeSection(
 
 	const taken: { node: string; section: string }[] = [];
 	for (const id of own) {
-		const other = (flow.sections ?? []).find(
-			(section) => !mine.has(section.id) && section.nodes.includes(id),
-		);
-		if (other) taken.push({ node: id, section: other.id });
+		const other = index.holders.nodeOf(id, mine);
+		if (other) taken.push({ node: id, section: other });
 	}
 	if (taken.length > 0)
 		problems.push({ code: "in-other-section", nodes: taken });
 
-	const parts = connectedParts(flow, members);
+	const parts = connectedParts(members, index);
 	if (parts.length > 1) problems.push({ code: "not-connected", parts });
 
-	const entries = entriesOf(flow, new Set(members));
+	const entries = entriesOf(flow, new Set(members), index);
 	if (entries.length === 0) problems.push({ code: "no-entry" });
 	if (entries.length > 1) problems.push({ code: "several-entries", entries });
 
@@ -215,7 +214,7 @@ export function sectionBoundary(
 		}
 	}
 
-	const nodeOrder = new Map(flow.nodes.map((node, index) => [node.id, index]));
+	const nodeOrder = new Map(flow.nodes.map((node, at) => [node.id, at]));
 	const outcomeOrder = (exit: SectionExit) => {
 		const node = flow.nodes.find((candidate) => candidate.id === exit.from);
 		const index = node ? nodeOutcomes(node).indexOf(exit.outcome) : -1;
@@ -248,23 +247,124 @@ export function sectionOf(flow: Flow, nodeId: string): FlowSection | undefined {
 }
 
 /**
+ * Which Section lists a node or a Section first, in file order. A Section
+ * that lists itself is not its own parent.
+ */
+function sectionHolders(flow: Pick<Flow, "sections">) {
+	const byId = new Map<string, FlowSection>();
+	const nodeHolders = new Map<string, string[]>();
+	const childHolders = new Map<string, string[]>();
+	for (const section of flow.sections ?? []) {
+		if (!byId.has(section.id)) byId.set(section.id, section);
+		for (const id of section.nodes) {
+			const list = nodeHolders.get(id);
+			if (list) list.push(section.id);
+			else nodeHolders.set(id, [section.id]);
+		}
+		for (const id of section.sections ?? []) {
+			if (id === section.id) continue;
+			const list = childHolders.get(id);
+			if (list) list.push(section.id);
+			else childHolders.set(id, [section.id]);
+		}
+	}
+	const first = (
+		map: Map<string, string[]>,
+		id: string,
+		skip: ReadonlySet<string>,
+	) => {
+		for (const holder of map.get(id) ?? []) {
+			if (!skip.has(holder)) return holder;
+		}
+		return undefined;
+	};
+	return {
+		find: (id: string) => byId.get(id),
+		nodeOf: (id: string, skip: ReadonlySet<string>) =>
+			first(nodeHolders, id, skip),
+		sectionOf: (id: string, skip: ReadonlySet<string>) =>
+			first(childHolders, id, skip),
+	};
+}
+
+/** The edges and Sections of a flow, read once for every Section check. */
+type GraphIndex = {
+	holders: ReturnType<typeof sectionHolders>;
+	incoming: Map<string, FlowEdge[]>;
+	outgoing: Map<string, FlowEdge[]>;
+	/** Where each node sits in the file, so an entry list keeps that order. */
+	order: Map<string, number>;
+};
+
+function graphIndex(flow: Flow): GraphIndex {
+	const known = new Set(flow.nodes.map((node) => node.id));
+	const incoming = new Map<string, FlowEdge[]>();
+	const outgoing = new Map<string, FlowEdge[]>();
+	for (const edge of flow.edges) {
+		if (!known.has(edge.from) || !known.has(edge.to)) continue;
+		const into = incoming.get(edge.to);
+		if (into) into.push(edge);
+		else incoming.set(edge.to, [edge]);
+		const out = outgoing.get(edge.from);
+		if (out) out.push(edge);
+		else outgoing.set(edge.from, [edge]);
+	}
+	return {
+		holders: sectionHolders(flow),
+		incoming,
+		outgoing,
+		order: new Map(flow.nodes.map((node, at) => [node.id, at])),
+	};
+}
+
+/**
+ * The check of every Section, each against one read of the flow. The
+ * warnings of a flow (`checkSections`) use this on every change.
+ */
+export function sectionChecks(flow: Flow): {
+	section: FlowSection;
+	index: number;
+	check: SectionCheck;
+}[] {
+	const index = graphIndex(flow);
+	return (flow.sections ?? []).map((section, at) => ({
+		section,
+		index: at,
+		check: canMakeSection(flow, section.nodes, {
+			section: section.id,
+			sections: section.sections ?? [],
+			index,
+		}),
+	}));
+}
+
+/**
  * The nodes where the flow enters `members`: the start, and each target of
  * an edge from a node outside. In the order of the nodes in the flow.
  */
-function entriesOf(flow: Flow, members: ReadonlySet<string>): string[] {
-	const known = new Set(flow.nodes.map((node) => node.id));
+function entriesOf(
+	flow: Flow,
+	members: ReadonlySet<string>,
+	index?: GraphIndex,
+): string[] {
+	const incoming = index?.incoming ?? edgesInto(flow);
 	const entries = new Set<string>();
 	if (members.has(flow.start)) entries.add(flow.start);
-	for (const edge of flow.edges) {
-		if (
-			known.has(edge.from) &&
-			!members.has(edge.from) &&
-			members.has(edge.to)
-		) {
-			entries.add(edge.to);
+	for (const id of members) {
+		for (const edge of incoming.get(id) ?? []) {
+			if (!members.has(edge.from)) entries.add(edge.to);
 		}
 	}
-	return flow.nodes.map((node) => node.id).filter((id) => entries.has(id));
+	const order = index?.order;
+	if (!order) {
+		return flow.nodes.map((node) => node.id).filter((id) => entries.has(id));
+	}
+	return [...entries].sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+}
+
+/** Edges between known nodes, by their target. */
+function edgesInto(flow: Flow): Map<string, FlowEdge[]> {
+	return graphIndex(flow).incoming;
 }
 
 /**
@@ -272,13 +372,21 @@ function entriesOf(flow: Flow, members: ReadonlySet<string>): string[] {
  * either direction. Each part in the order of `members`, the parts by
  * their first member.
  */
-function connectedParts(flow: Flow, members: readonly string[]): string[][] {
+function connectedParts(
+	members: readonly string[],
+	index: GraphIndex,
+): string[][] {
 	const inside = new Set(members);
 	const neighbours = new Map<string, string[]>(members.map((id) => [id, []]));
-	for (const edge of flow.edges) {
-		if (!inside.has(edge.from) || !inside.has(edge.to)) continue;
-		neighbours.get(edge.from)?.push(edge.to);
-		neighbours.get(edge.to)?.push(edge.from);
+	for (const id of members) {
+		const list = neighbours.get(id);
+		if (!list) continue;
+		for (const edge of index.outgoing.get(id) ?? []) {
+			if (inside.has(edge.to)) list.push(edge.to);
+		}
+		for (const edge of index.incoming.get(id) ?? []) {
+			if (inside.has(edge.from)) list.push(edge.from);
+		}
 	}
 	const seen = new Set<string>();
 	const parts: string[][] = [];
@@ -287,7 +395,8 @@ function connectedParts(flow: Flow, members: readonly string[]): string[][] {
 		const part = new Set<string>([first]);
 		seen.add(first);
 		const queue = [first];
-		for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
+		for (let head = 0; head < queue.length; head++) {
+			const id = queue[head] as string;
 			for (const next of neighbours.get(id) ?? []) {
 				if (seen.has(next)) continue;
 				seen.add(next);

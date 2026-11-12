@@ -1,6 +1,6 @@
 /** The checks of a flow's Sections. The engine does not read them, so every issue is a warning. */
 import type { Flow, FlowSection } from "../flow";
-import { canMakeSection, type SectionProblem } from "../sections";
+import { type SectionProblem, sectionChecks } from "../sections";
 import type { Report } from "./issues";
 
 /**
@@ -23,16 +23,12 @@ export function checkSections(flow: Flow, warning: Report): void {
 		}
 	});
 
-	sections.forEach((section, index) => {
-		const check = canMakeSection(flow, section.nodes, {
-			section: section.id,
-			sections: section.sections ?? [],
-		});
-		if (check.ok) return;
+	for (const { section, check, index } of sectionChecks(flow)) {
+		if (check.ok) continue;
 		for (const problem of check.problems) {
 			report(problem, section, sections, index, firstIndex, warning);
 		}
-	});
+	}
 }
 
 function report(

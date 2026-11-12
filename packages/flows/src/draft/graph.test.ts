@@ -20,9 +20,11 @@ import {
 	addEdge,
 	addNode,
 	addNodeAfter,
+	moveNodes,
 	NEW_NODE_TAKES,
 	type NewNodeKind,
 } from "./graph";
+import { commandNode } from "./nodes";
 
 const at = { x: 0, y: 0 };
 const later = { x: 300, y: 0 };
@@ -278,5 +280,24 @@ describe("addCalledNode", () => {
 		};
 		expect(addCalledNode(flow, "kit:feeds/read", at).id).toBe("read_2");
 		expect(addCalledNode(flowOf(), "vars", at).id).toBe("vars_2");
+	});
+});
+
+describe("moveNodes", () => {
+	test("moves every listed node in one copy and leaves the others", () => {
+		const flow = flowOf(
+			commandNode("a", { x: 0, y: 0 }),
+			commandNode("b", { x: 10, y: 10 }),
+		);
+		const moved = moveNodes(
+			flow,
+			new Map([
+				["a", { x: 1.4, y: 2.6 }],
+				["missing", { x: 9, y: 9 }],
+			]),
+		);
+		expect(moved.nodes[0]?.position).toEqual({ x: 1, y: 3 });
+		expect(moved.nodes[1]).toBe(flow.nodes[1]);
+		expect(moveNodes(flow, new Map())).toBe(flow);
 	});
 });

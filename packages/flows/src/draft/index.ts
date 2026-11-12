@@ -26,7 +26,7 @@ export {
 	addNode,
 	addNodeAfter,
 	edgeInLoop,
-	moveNode,
+	moveNodes,
 	NEW_NODE_TAKES,
 	type NewNodeKind,
 	removeEdge,

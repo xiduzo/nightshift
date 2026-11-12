@@ -3,7 +3,7 @@ import type { Flow, FlowIssue, FlowNode, Outcome } from "@nightshift/flows";
 import {
 	addEdge,
 	type FlowCheck,
-	moveNode,
+	moveNodes,
 	nodesWithin,
 	removeEdge,
 	removeNode,
@@ -460,8 +460,12 @@ export function EditorCanvas({
 						if (delta) next = moveSection(next, section, delta);
 						for (const id of section.nodes) carried.add(id);
 					}
-					for (const { id, position } of moves) {
-						if (!carried.has(id)) next = moveNode(next, id, position);
+					if (moves.length > 0) {
+						const positions = new Map<string, { x: number; y: number }>();
+						for (const { id, position } of moves) {
+							if (!carried.has(id)) positions.set(id, position);
+						}
+						next = moveNodes(next, positions);
 					}
 					for (const id of removed) next = removeNode(next, id);
 					return next;
@@ -623,12 +627,7 @@ export function EditorCanvas({
 			);
 			setRoutes(book);
 			writeRoutes(routesKey, book);
-			onFlowChange((current) =>
-				current.nodes.reduce((next, node) => {
-					const position = at.get(node.id);
-					return position ? moveNode(next, node.id, position) : next;
-				}, current),
-			);
+			onFlowChange((current) => moveNodes(current, at));
 		} catch {
 			toast.error("Could not lay out the flow. Try again.");
 			return;
@@ -642,12 +641,7 @@ export function EditorCanvas({
 				onClick: () => {
 					setRoutes(routesBefore);
 					writeRoutes(routesKey, routesBefore);
-					onFlowChange((current) =>
-						current.nodes.reduce((next, node) => {
-							const position = before.get(node.id);
-							return position ? moveNode(next, node.id, position) : next;
-						}, current),
-					);
+					onFlowChange((current) => moveNodes(current, before));
 				},
 			},
 		});

@@ -279,11 +279,27 @@ export function updateNode(
 	};
 }
 
-export function moveNode(flow: Flow, id: string, position: Position): Flow {
-	return updateNode(flow, id, (node) => ({
-		...node,
-		position: { x: Math.round(position.x), y: Math.round(position.y) },
-	}));
+/**
+ * Moves every listed node, once. A drag, of one node or many, and "Lay out"
+ * use this, so the flow is copied once however many nodes move. A node
+ * that is listed is a new object, also when it stays at the same place.
+ */
+export function moveNodes(
+	flow: Flow,
+	positions: ReadonlyMap<string, Position>,
+): Flow {
+	if (positions.size === 0) return flow;
+	let moved = false;
+	const nodes = flow.nodes.map((node) => {
+		const position = positions.get(node.id);
+		if (!position) return node;
+		moved = true;
+		return {
+			...node,
+			position: { x: Math.round(position.x), y: Math.round(position.y) },
+		};
+	});
+	return moved ? { ...flow, nodes } : flow;
 }
 
 /**
@@ -369,14 +385,20 @@ export function removeEdge(flow: Flow, id: string): Flow {
 
 /** Whether the edge closes a loop: its source is reachable again from its target. */
 export function edgeInLoop(flow: Flow, edge: FlowEdge): boolean {
+	const outgoing = new Map<string, string[]>();
+	for (const next of flow.edges) {
+		const list = outgoing.get(next.from);
+		if (list) list.push(next.to);
+		else outgoing.set(next.from, [next.to]);
+	}
 	const seen = new Set<string>();
 	const queue = [edge.to];
-	while (queue.length > 0) {
-		const id = queue.shift() as string;
+	for (let head = 0; head < queue.length; head++) {
+		const id = queue[head] as string;
 		if (id === edge.from) return true;
 		if (seen.has(id)) continue;
 		seen.add(id);
-		for (const next of flow.edges) if (next.from === id) queue.push(next.to);
+		for (const to of outgoing.get(id) ?? []) queue.push(to);
 	}
 	return false;
 }

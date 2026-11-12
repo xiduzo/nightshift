@@ -28,9 +28,14 @@ export function parentSection(
 
 /** The Sections that no other Section holds, in file order. */
 export function topSections(flow: Sections): FlowSection[] {
-	return (flow.sections ?? []).filter(
-		(section) => parentSection(flow, section.id) === undefined,
-	);
+	const held = new Set<string>();
+	for (const section of flow.sections ?? []) {
+		for (const id of section.sections ?? []) {
+			// A Section that lists itself has no parent.
+			if (id !== section.id) held.add(id);
+		}
+	}
+	return (flow.sections ?? []).filter((section) => !held.has(section.id));
 }
 
 /** The Sections directly inside `section`, in its order. Unknown ids are left out. */

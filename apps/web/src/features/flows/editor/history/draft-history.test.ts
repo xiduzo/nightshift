@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { type Flow, moveNode, newFlow } from "@nightshift/flows";
+import { type Flow, moveNodes, newFlow } from "@nightshift/flows";
 import { record, redo, startHistory, undo } from "./draft-history";
 
 const start = newFlow();
 const id = start.nodes[0]?.id ?? "";
-const moved = (x: number): Flow => moveNode(start, id, { x, y: 0 });
+const moved = (x: number): Flow =>
+	moveNodes(start, new Map([[id, { x, y: 0 }]]));
 const drag = (at: number) => ({ key: "drag:1", at, within: 1000 });
 
 describe("draft history", () => {

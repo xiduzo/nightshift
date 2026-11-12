@@ -455,7 +455,7 @@ export async function saveFlow(
 	}
 	const snapshot = { ...input.flow, version: FLOW_VERSION };
 	const flowId = found?.flowId ?? randomUUID();
-	const last = flowRevisions(document, flowId).at(-1);
+	const last = lastRevision(document, flowId);
 	const revisionId =
 		last !== undefined && same(last.flow, snapshot) ? null : randomUUID();
 
@@ -647,6 +647,21 @@ export async function removeFlow(
 			maps.flows.delete(flowId);
 		}
 	});
+}
+
+/** The newest revision of a flow that this Night Shift reads, or none. Older ones stay for the history. */
+function lastRevision(
+	document: FlowDocument,
+	flowId: string,
+): FlowRevision | undefined {
+	const list = document.history.doc.getArray(flowId);
+	for (let index = list.length - 1; index >= 0; index--) {
+		const parsed = flowRevisionSchema.safeParse(list.get(index));
+		if (parsed.success && parsed.data.flow.version <= FLOW_VERSION) {
+			return parsed.data;
+		}
+	}
+	return undefined;
 }
 
 /** The revisions of a flow that this Night Shift reads, oldest first. One from a newer Night Shift is left out. */

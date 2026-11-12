@@ -28,6 +28,11 @@ export type Scope = {
 	template: TemplateScope;
 	/** The variables a template or a rule read so far, for the unused-variable warning. */
 	readVars: Set<string>;
+	/**
+	 * Edges that exist, as `from` and outcome. A node asks once per outcome
+	 * whether one leaves it, and this answers without reading the edge list.
+	 */
+	routed: ReadonlySet<string>;
 	/** The node whose templates are checked has a cascade: it reads `{{cascade.*}}` (ADR 6). */
 	cascade?: boolean;
 	/**

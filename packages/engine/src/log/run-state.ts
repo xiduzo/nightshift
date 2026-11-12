@@ -582,7 +582,8 @@ export function foldRun(events: readonly LoggedEvent[]): RunState {
 		}
 	}
 	const draft = emptyState();
-	for (const e of ordered) apply(draft, e);
+	const owned = new WeakSet<readonly unknown[]>();
+	for (const e of ordered) apply(draft, e, owned);
 	return draft;
 }
 
@@ -640,6 +641,24 @@ function settle(step: DerivedStep): DerivedStep {
 	}
 	const endedAt = end?.at ?? null;
 	const outcome = end?.payload.outcome ?? null;
+	// While the step stays open, an open item is already running. A reopen
+	// is the case that puts one back: the step still carries its old end.
+	const items =
+		endedAt === null && step.endedAt === null
+			? step.items
+			: step.items.map((item) => {
+					if (!item.open) return item;
+					const state: ItemState = endedAt === null ? "running" : "failed";
+					const reason =
+						endedAt === null
+							? null
+							: (cutShort[outcome ?? ""] ?? cutShort.error ?? null);
+					return item.state === state &&
+						item.reason === reason &&
+						item.endedAt === endedAt
+						? item
+						: { ...item, state, reason, endedAt };
+				});
 	return {
 		...step,
 		openedSeq: current?.seq ?? step.startSeq,
@@ -648,19 +667,7 @@ function settle(step: DerivedStep): DerivedStep {
 		outputs,
 		error: end?.payload.error ?? null,
 		cost,
-		items: step.items.map((item) => {
-			if (!item.open) return item;
-			const state: ItemState = endedAt === null ? "running" : "failed";
-			const reason =
-				endedAt === null
-					? null
-					: (cutShort[outcome ?? ""] ?? cutShort.error ?? null);
-			return item.state === state &&
-				item.reason === reason &&
-				item.endedAt === endedAt
-				? item
-				: { ...item, state, reason, endedAt };
-		}),
+		items,
 	};
 }
 
@@ -674,7 +681,11 @@ function closeLast<T extends StepSleep>(
 	return [...spans.slice(0, -1), { ...last, to: at }];
 }
 
-function apply(run: Draft, e: LoggedEvent): void {
+function apply(
+	run: Draft,
+	e: LoggedEvent,
+	owned: WeakSet<readonly unknown[]> = new WeakSet(),
+): void {
 	run.lastSeq = e.seq;
 	run.runId ??= e.runId;
 	switch (e.type) {
@@ -834,7 +845,7 @@ function apply(run: Draft, e: LoggedEvent): void {
 		}
 	}
 	if (e.sessionId) applySessionEvent(run, e, e.sessionId);
-	if (e.stepId) applyStepEvent(run, e, e.stepId);
+	if (e.stepId) applyStepEvent(run, e, e.stepId, owned);
 	enterCallers(run, e);
 	if (RUN_FACT_EVENTS.has(e.type)) settleRun(run);
 }
@@ -1045,7 +1056,45 @@ function openingOf(run: Draft, stepId: string | null): number | null {
 	return step ? step.openings.length - 1 : null;
 }
 
-function applyStepEvent(run: Draft, e: LoggedEvent, stepId: string): void {
+/** Appends to a list this fold already owns. A published state gets a copy first. */
+function appendOwned<T>(
+	owned: WeakSet<readonly unknown[]>,
+	list: readonly T[],
+	item: T,
+): readonly T[] {
+	if (owned.has(list)) {
+		(list as T[]).push(item);
+		return list;
+	}
+	const next = list.slice();
+	next.push(item);
+	owned.add(next);
+	return next;
+}
+
+/** Writes one entry of a list this fold already owns. A published state gets a copy first. */
+function writeOwned<T>(
+	owned: WeakSet<readonly unknown[]>,
+	list: readonly T[],
+	index: number,
+	item: T,
+): readonly T[] {
+	if (owned.has(list)) {
+		(list as T[])[index] = item;
+		return list;
+	}
+	const next = list.slice();
+	next[index] = item;
+	owned.add(next);
+	return next;
+}
+
+function applyStepEvent(
+	run: Draft,
+	e: LoggedEvent,
+	stepId: string,
+	owned: WeakSet<readonly unknown[]>,
+): void {
 	if (e.type === "StepStarted") {
 		startStep(run, e, stepId);
 		return;
@@ -1122,22 +1171,19 @@ function applyStepEvent(run: Draft, e: LoggedEvent, stepId: string): void {
 			if (e.type === "ItemStarted") {
 				step = {
 					...step,
-					items: [
-						...step.items,
-						{
-							facts: e.payload.item,
-							index: e.payload.index,
-							state: "running",
-							open: true,
-							branch: e.payload.branch,
-							baseBranch: e.payload.baseBranch,
-							inputs: e.payload.inputs ?? null,
-							outputs: {},
-							startedAt: e.at,
-							endedAt: null,
-							reason: null,
-						},
-					],
+					items: appendOwned(owned, step.items, {
+						facts: e.payload.item,
+						index: e.payload.index,
+						state: "running",
+						open: true,
+						branch: e.payload.branch,
+						baseBranch: e.payload.baseBranch,
+						inputs: e.payload.inputs ?? null,
+						outputs: {},
+						startedAt: e.at,
+						endedAt: null,
+						reason: null,
+					}),
 				};
 			}
 			break;
@@ -1236,22 +1282,19 @@ function applyStepEvent(run: Draft, e: LoggedEvent, stepId: string): void {
 		case "ItemBlocked":
 			step = {
 				...step,
-				items: [
-					...step.items,
-					{
-						facts: e.payload.item,
-						index: null,
-						state: "blocked",
-						open: false,
-						branch: null,
-						baseBranch: null,
-						inputs: null,
-						outputs: {},
-						startedAt: e.at,
-						endedAt: e.at,
-						reason: e.payload.reason,
-					},
-				],
+				items: appendOwned(owned, step.items, {
+					facts: e.payload.item,
+					index: null,
+					state: "blocked",
+					open: false,
+					branch: null,
+					baseBranch: null,
+					inputs: null,
+					outputs: {},
+					startedAt: e.at,
+					endedAt: e.at,
+					reason: e.payload.reason,
+				}),
 			};
 			break;
 		case "ItemEnded": {
@@ -1259,20 +1302,18 @@ function applyStepEvent(run: Draft, e: LoggedEvent, stepId: string): void {
 				(i) => i.facts.id === e.payload.itemId && i.open,
 			);
 			if (at !== -1) {
+				const item = step.items[at];
+				if (!item) break;
 				step = {
 					...step,
-					items: step.items.map((item, i) =>
-						i === at
-							? {
-									...item,
-									open: false,
-									state: e.payload.state,
-									reason: e.payload.reason,
-									outputs: e.payload.outputs ?? {},
-									endedAt: e.at,
-								}
-							: item,
-					),
+					items: writeOwned(owned, step.items, at, {
+						...item,
+						open: false,
+						state: e.payload.state,
+						reason: e.payload.reason,
+						outputs: e.payload.outputs ?? {},
+						endedAt: e.at,
+					}),
 				};
 			}
 			break;

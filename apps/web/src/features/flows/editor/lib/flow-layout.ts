@@ -29,7 +29,7 @@
 import {
 	type Flow,
 	type FlowSection,
-	moveNode,
+	moveNodes,
 	nodeOutcomes,
 	sectionBoundary,
 	sectionLevel,
@@ -44,6 +44,7 @@ import {
 	groupSegments,
 	labelAtRest,
 	labelText,
+	segmentIndex,
 } from "../../canvas/edge-groups";
 import type { EdgeRoute, Point } from "../../canvas/edge-route";
 
@@ -208,14 +209,24 @@ function candidateOptions(
  */
 export function walk(flow: Flow) {
 	const ids = new Set(flow.nodes.map((node) => node.id));
+	const byFrom = new Map<string, Flow["edges"]>();
+	for (const edge of flow.edges) {
+		if (!ids.has(edge.from) || !ids.has(edge.to)) continue;
+		const list = byFrom.get(edge.from);
+		if (list) list.push(edge);
+		else byFrom.set(edge.from, [edge]);
+	}
 	const outgoing = new Map<string, Flow["edges"]>();
 	for (const node of flow.nodes) {
 		const rank = nodeOutcomes(node);
+		const edges = byFrom.get(node.id);
 		outgoing.set(
 			node.id,
-			flow.edges
-				.filter((edge) => edge.from === node.id && ids.has(edge.to))
-				.sort((a, b) => rank.indexOf(a.outcome) - rank.indexOf(b.outcome)),
+			edges
+				? [...edges].sort(
+						(a, b) => rank.indexOf(a.outcome) - rank.indexOf(b.outcome),
+					)
+				: [],
 		);
 	}
 
@@ -374,12 +385,13 @@ export function flowGraph(
 		nodes.push({ id, ...size, ports: nodePorts });
 	}
 
+	const indexed = segmentIndex(flow);
 	const edges = groupEdges(flow).flatMap((group): LayoutEdge[] => {
 		const from = foldedOf.get(group.from);
 		const to = foldedOf.get(group.to);
 		// Inside a folded Section: nothing to draw.
 		if (from && from === to) return [];
-		const segments = groupSegments(flow, group);
+		const segments = groupSegments(flow, group, indexed);
 		const text = labelText(segments);
 		const port = outcomePort(group.from, group.edges[0]?.outcome ?? "");
 		const sourcePort = from ? exitPort.get(port) : port;
@@ -831,11 +843,7 @@ export async function layoutFlow(
 			at.set(node.id, { x: snap(box.x), y: snap(box.y) });
 	}
 
-	const laid = flow.nodes.reduce((next, node) => {
-		const position = at.get(node.id);
-		return position ? moveNode(next, node.id, position) : next;
-	}, flow);
-	return { flow: laid, routes, inside, direction, sections };
+	return { flow: moveNodes(flow, at), routes, inside, direction, sections };
 }
 
 /**

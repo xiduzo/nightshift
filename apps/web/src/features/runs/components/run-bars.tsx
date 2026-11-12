@@ -61,6 +61,8 @@ export function RunBars({
 								<Link
 									to="/runs/$runId"
 									params={{ runId: run.runId }}
+									// Inside a row or card that opens something else, a bar opens only its run.
+									onClick={(event) => event.stopPropagation()}
 									className={cn(
 										"h-4 w-2 rounded-[2px] outline-none transition-opacity hover:opacity-70 focus-visible:ring-2 focus-visible:ring-ring/50",
 										nothing ? "bg-muted-foreground/30" : BAR[run.status],

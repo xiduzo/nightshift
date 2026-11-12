@@ -15,7 +15,7 @@ import {
 import { useQueries } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ChevronRightIcon } from "lucide-react";
-import { RunStatusIcon } from "@/features/runs";
+import { RunBars } from "@/features/runs";
 import type {
 	FlowHealthRow,
 	NightRange,
@@ -108,7 +108,7 @@ function lastRunsOf(days: NightsRange | undefined): LastRun[] {
 		.slice(0, LAST_RUNS);
 }
 
-/** Status icons of the last runs, and when the newest started. */
+/** The last runs as bars, oldest on the left, and when the newest started. */
 function LastRuns({
 	runs,
 	range,
@@ -128,25 +128,15 @@ function LastRuns({
 	}
 	return (
 		<div className="flex flex-col items-start gap-1">
-			<div className="flex items-center gap-0.5">
-				{runs.map((run) => (
-					<Link
-						key={run.runId}
-						to="/runs/$runId"
-						params={{ runId: run.runId }}
-						// Above the card's link: the card opens the project, an icon its run.
-						className="relative z-10 rounded-sm p-0.5 hover:bg-muted"
-					>
-						<RunStatusIcon
-							status={run.status}
-							context={{
-								before: run.flow,
-								after: hoverTime(run.startedAt),
-							}}
-						/>
-					</Link>
-				))}
-			</div>
+			<RunBars
+				// Above the card's link: the card opens the project, a bar its run.
+				className="relative z-10"
+				runs={[...runs].reverse().map((run) => ({
+					runId: run.runId,
+					status: run.status,
+					hint: `${run.flow} · ${hoverTime(run.startedAt)}`,
+				}))}
+			/>
 			<LocalTime at={last.startedAt} className="text-muted-foreground text-xs">
 				Last run {formatRelative(last.startedAt, now)}
 			</LocalTime>

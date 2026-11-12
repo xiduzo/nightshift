@@ -29,6 +29,7 @@ import {
 	groupSegments,
 	SEGMENT_SEPARATOR,
 	segmentAtRest,
+	segmentIndex,
 	segmentText,
 } from "./edge-groups";
 import {
@@ -92,8 +93,9 @@ export function canvasEdges(
 		flow.nodes.map((node) => [node.id, node.position]),
 	);
 	for (const [id, position] of boxes ?? []) at.set(id, position);
+	const index = segmentIndex(flow);
 	return groups.map((group) => {
-		const segments = groupSegments(flow, group).map((segment) => ({
+		const segments = groupSegments(flow, group, index).map((segment) => ({
 			...segment,
 			hasError: errors?.has(segment.id) ?? false,
 			traversals: traversals ? (traversals[segment.id] ?? 0) : undefined,

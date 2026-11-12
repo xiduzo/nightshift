@@ -46,17 +46,32 @@ export function findCycles(
 	};
 	for (const id of ids) if (!index.has(id)) connect(id);
 
+	// A chain is one component per node. Scanning the file to place each
+	// one would read the node list once per node.
+	const order = new Map<string, number>();
+	for (let at = 0; at < ids.length; at++) {
+		const id = ids[at];
+		if (id !== undefined && !order.has(id)) order.set(id, at);
+	}
 	const cycles: string[][] = [];
 	for (const component of components) {
-		const members = new Set(component);
+		const only = component.length === 1 ? component[0] : undefined;
+		if (only !== undefined && !next.get(only)?.includes(only)) continue;
 		// Start at the member that comes first in the file.
-		const start = ids.find((id) => members.has(id));
+		let start: string | undefined;
+		let best = Number.POSITIVE_INFINITY;
+		for (const id of component) {
+			const at = order.get(id) ?? Number.POSITIVE_INFINITY;
+			if (at < best) {
+				best = at;
+				start = id;
+			}
+		}
 		if (start === undefined) continue;
-		if (component.length === 1 && !next.get(start)?.includes(start)) continue;
-		cycles.push(cycleThrough(start, members, next));
+		cycles.push(cycleThrough(start, new Set(component), next));
 	}
 	return cycles.sort(
-		(a, b) => ids.indexOf(a[0] ?? "") - ids.indexOf(b[0] ?? ""),
+		(a, b) => (order.get(a[0] ?? "") ?? 0) - (order.get(b[0] ?? "") ?? 0),
 	);
 }
 
@@ -68,7 +83,8 @@ function cycleThrough(
 ): string[] {
 	const parent = new Map<string, string>();
 	const queue = [start];
-	for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
+	for (let head = 0; head < queue.length; head++) {
+		const id = queue[head] as string;
 		for (const to of next.get(id) ?? []) {
 			if (to === start) {
 				const path = [id];

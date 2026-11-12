@@ -62,10 +62,7 @@ export function checkNode(
 			checkRule(expr, subject, at, scope, error, also),
 		eventRule: (expr, subject) => checkEventRule(expr, subject, at, error),
 		dataRule: (expr, subject) => checkDataRule(expr, subject, at, error),
-		routed: (outcome) =>
-			scope.flow.edges.some(
-				(edge) => edge.from === node.id && edge.outcome === outcome,
-			),
+		routed: (outcome) => scope.routed.has(`${node.id}\u0000${outcome}`),
 		section: (id) => {
 			const section = sectionPath(scope.flow, id).at(-1);
 			return section ? nodesWithin(scope.flow, section) : null;

@@ -11,6 +11,7 @@ export {
 	type SectionExit,
 	type SectionProblem,
 	sectionBoundary,
+	sectionChecks,
 	sectionOf,
 } from "./shape";
 export {

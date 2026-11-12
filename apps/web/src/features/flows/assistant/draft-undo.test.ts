@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type Flow, moveNode, newFlow, updateNode } from "@nightshift/flows";
+import { type Flow, moveNodes, newFlow, updateNode } from "@nightshift/flows";
 import { canUndo, undoDraft } from "./draft-undo";
 
 /** The editor's draft as React state: each change runs on the latest draft. */
@@ -35,7 +35,9 @@ describe("Apply, then Undo", () => {
 		editor.changeFlow(() => after);
 		const node = after.nodes[0];
 		if (!node) throw new Error("no node");
-		editor.changeFlow((flow) => moveNode(flow, node.id, node.position));
+		editor.changeFlow((flow) =>
+			moveNodes(flow, new Map([[node.id, node.position]])),
+		);
 		expect(editor.readFlow()).not.toBe(after);
 		expect(undoDraft(editor, { before, after })).toBe(true);
 		expect(editor.readFlow()).toBe(before);

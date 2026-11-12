@@ -147,6 +147,9 @@ function validateIn(
 		flows,
 		template: templateScope(flow, { flows }),
 		readVars: new Set(),
+		routed: new Set(
+			flow.edges.map((edge) => `${edge.from}\u0000${edge.outcome}`),
+		),
 		warning,
 	};
 	checkInputs(flow, nodes, error, warning);
@@ -281,13 +284,21 @@ function validateIn(
 
 	// Reachability.
 	if (nodes.has(flow.start)) {
+		const next = new Map<string, string[]>();
+		for (const edge of flow.edges) {
+			if (!nodes.has(edge.from) || !nodes.has(edge.to)) continue;
+			const list = next.get(edge.from);
+			if (list) list.push(edge.to);
+			else next.set(edge.from, [edge.to]);
+		}
 		const reached = new Set<string>([flow.start]);
 		const queue = [flow.start];
-		for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
-			for (const edge of flow.edges) {
-				if (edge.from === id && nodes.has(edge.to) && !reached.has(edge.to)) {
-					reached.add(edge.to);
-					queue.push(edge.to);
+		for (let head = 0; head < queue.length; head++) {
+			const id = queue[head] as string;
+			for (const to of next.get(id) ?? []) {
+				if (!reached.has(to)) {
+					reached.add(to);
+					queue.push(to);
 				}
 			}
 		}

@@ -7,7 +7,6 @@ import {
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
 	type Machine,
@@ -15,7 +14,7 @@ import {
 	neededMachines,
 	useSpaceMachines,
 } from "@/features/devices";
-import { RunStatusIcon } from "@/features/runs";
+import { RunBars } from "@/features/runs";
 import type { FlowHealthRow, Project, Spread } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import {
@@ -25,6 +24,7 @@ import {
 	formatCost,
 	formatKnownCost,
 	formatRelative,
+	hoverTime,
 	typicalCostSentence,
 	useNow,
 } from "@/shared/format";
@@ -292,27 +292,20 @@ function Needs({ machines }: { machines: Machine[] }) {
 	);
 }
 
-/** The status of the last runs, newest first, and when the last one started. */
+/** The last runs as bars, oldest on the left, and when the last one started. */
 function LastRuns({ row, now }: { row: FlowHealthRow; now: number }) {
 	if (!row.last) {
 		return <span className="text-muted-foreground text-xs">Never run</span>;
 	}
 	return (
 		<div className="flex flex-col gap-1">
-			<div className="flex items-center gap-0.5">
-				{row.lastRuns.map((run) => (
-					<Link
-						key={run.runId}
-						to="/runs/$runId"
-						params={{ runId: run.runId }}
-						// The row opens the flow; an icon opens its run.
-						onClick={(event) => event.stopPropagation()}
-						className="rounded-sm p-0.5 hover:bg-muted"
-					>
-						<RunStatusIcon status={run.status} />
-					</Link>
-				))}
-			</div>
+			<RunBars
+				runs={[...row.lastRuns].reverse().map((run) => ({
+					runId: run.runId,
+					status: run.status,
+					hint: hoverTime(run.startedAt),
+				}))}
+			/>
 			<LocalTime
 				at={row.last.startedAt}
 				className="text-muted-foreground text-xs"

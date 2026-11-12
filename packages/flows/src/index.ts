@@ -74,7 +74,7 @@ export {
 	isOptionNode,
 	isSavable,
 	type KnownProfile,
-	moveNode,
+	moveNodes,
 	type NameClash,
 	type NameOwner,
 	NEW_NODE_TAKES,

@@ -144,26 +144,47 @@ export function labelAtRest(segments: readonly EdgeSegment[]): boolean {
 }
 
 /**
+ * One read of the nodes and of the edges that run at once. The canvas
+ * builds it once per draw, then every group reads from it.
+ */
+export type SegmentIndex = {
+	nodes: Map<string, Flow["nodes"][number]>;
+	/** Edges without a max, keyed by source and outcome. Two or more run at once. */
+	open: Map<string, number>;
+};
+
+/** Reads the flow once, so a drawn edge does not scan it again. */
+export function segmentIndex(
+	flow: Pick<Flow, "nodes" | "edges">,
+): SegmentIndex {
+	const nodes = new Map(flow.nodes.map((node) => [node.id, node]));
+	const open = new Map<string, number>();
+	for (const edge of flow.edges) {
+		if (edge.max !== undefined) continue;
+		const key = `${edge.from}\u0000${edge.outcome}`;
+		open.set(key, (open.get(key) ?? 0) + 1);
+	}
+	return { nodes, open };
+}
+
+/**
  * The segments of a group, before the canvas adds errors or run counts.
  * Each edge reads its colour from its own source node: a group that leaves
- * a folded Section holds edges of several nodes.
+ * a folded Section holds edges of several nodes. Pass `index` when drawing
+ * every group, so the flow is read once.
  */
 export function groupSegments(
 	flow: Pick<Flow, "nodes" | "edges">,
 	group: EdgeGroup,
+	index: SegmentIndex = segmentIndex(flow),
 ): EdgeSegment[] {
 	return group.edges.map((edge) => {
-		const source = flow.nodes.find((node) => node.id === edge.from);
+		const source = index.nodes.get(edge.from);
 		const boxed = edge.from !== group.from;
 		// Two or more edges without a max on one outcome run at once.
 		const parallel =
 			edge.max === undefined &&
-			flow.edges.filter(
-				(other) =>
-					other.from === edge.from &&
-					other.outcome === edge.outcome &&
-					other.max === undefined,
-			).length > 1;
+			(index.open.get(`${edge.from}\u0000${edge.outcome}`) ?? 0) > 1;
 		return {
 			id: edge.id,
 			outcome: edge.outcome,

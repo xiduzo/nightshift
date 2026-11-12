@@ -49,9 +49,15 @@ export function isFanOut(edges: readonly Pick<FlowEdge, "max">[]): boolean {
 /** The fan-outs of a flow, in the order of their first edge in the file. */
 export function fanOutsOf(flow: Pick<Flow, "nodes" | "edges">): FanOut[] {
 	const byOutcome = new Map<string, FlowEdge[]>();
+	const outgoing = new Map<string, FlowEdge[]>();
 	for (const edge of flow.edges) {
 		const key = `${edge.from}\u0000${edge.outcome}`;
-		byOutcome.set(key, [...(byOutcome.get(key) ?? []), edge]);
+		const group = byOutcome.get(key);
+		if (group) group.push(edge);
+		else byOutcome.set(key, [edge]);
+		const next = outgoing.get(edge.from);
+		if (next) next.push(edge);
+		else outgoing.set(edge.from, [edge]);
 	}
 	const joins = new Set(
 		flow.nodes.filter((node) => node.type === "join").map((node) => node.id),
@@ -63,7 +69,7 @@ export function fanOutsOf(flow: Pick<Flow, "nodes" | "edges">): FanOut[] {
 		if (!first) continue;
 		const open = edges.filter((edge) => edge.max === undefined);
 		const branches = open.map((edge) =>
-			branchFrom(flow, edge, first.from, joins),
+			branchFrom(outgoing, edge, first.from, joins),
 		);
 		const reached = new Set(branches.flatMap((branch) => branch.joins));
 		const [join] = reached;
@@ -102,7 +108,7 @@ export function branchPlaces(
 
 /** Every node the walk reaches from `edge` before a Join, without passing the node that fans out. */
 function branchFrom(
-	flow: Pick<Flow, "edges">,
+	outgoing: ReadonlyMap<string, readonly FlowEdge[]>,
 	edge: FlowEdge,
 	source: string,
 	joins: ReadonlySet<string>,
@@ -112,7 +118,8 @@ function branchFrom(
 	const seen = new Set<string>();
 	let loopsBack = false;
 	const queue = [edge.to];
-	for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
+	for (let head = 0; head < queue.length; head++) {
+		const id = queue[head] as string;
 		if (seen.has(id)) continue;
 		seen.add(id);
 		if (id === source) {
@@ -124,9 +131,7 @@ function branchFrom(
 			continue;
 		}
 		nodes.push(id);
-		for (const next of flow.edges) {
-			if (next.from === id) queue.push(next.to);
-		}
+		for (const next of outgoing.get(id) ?? []) queue.push(next.to);
 	}
 	return { edge, nodes, joins: reached, loopsBack };
 }

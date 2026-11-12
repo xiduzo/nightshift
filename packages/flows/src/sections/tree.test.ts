@@ -67,6 +67,15 @@ describe("the nesting of Sections", () => {
 		expect(nodesWithin(loop, x)).toEqual(["b", "c"]);
 		expect(sectionPath(loop, "x").map((s) => s.id)).toEqual(["y", "x"]);
 	});
+
+	test("a Section that lists itself stays on top", () => {
+		const flow: Flow = {
+			...nested,
+			sections: [{ id: "x", label: "X", nodes: ["b"], sections: ["x"] }],
+		};
+		expect(topSections(flow).map((section) => section.id)).toEqual(["x"]);
+		expect(parentSection(flow, "x")).toBeUndefined();
+	});
 });
 
 describe("sectionLevel", () => {
