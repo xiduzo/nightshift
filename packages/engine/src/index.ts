@@ -65,6 +65,7 @@ export type {
 	OfferedSessionInput,
 	ReadFileInput,
 	ReadFileResult,
+	RestoredWorktree,
 	RunFolder,
 	RunRef,
 	SessionEvent,

@@ -22,8 +22,8 @@ import {
 
 /**
  * What runs leave in the clone, through the engine: the scheduled cleanup a
- * day after a run ends, and the work it keeps out of sight until
- * `cleanUpAfterDays`.
+ * day after a run ends, the work it keeps out of sight until
+ * `cleanUpAfterDays`, and the copy a rerun or a resume makes again.
  */
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -162,6 +162,13 @@ async function localRunBranches(): Promise<string[]> {
 		"--format=%(refname:short)",
 	]);
 	return out.split("\n").filter(Boolean);
+}
+
+/** The commits of the run's branch past `main`. */
+async function workCommits(branch: string): Promise<number> {
+	return Number(
+		await mustGit(sandbox.repoPath, ["rev-list", "--count", `main..${branch}`]),
+	);
 }
 
 const short = (runId: string) => runId.slice(0, 8);
@@ -341,5 +348,64 @@ describe("the scheduled cleanup", () => {
 		expect(existsSync(started.worktreePath)).toBe(true);
 		expect(await localRunBranches()).toEqual([started.branch]);
 		expect(await removals()).toEqual([]);
+	}, 60_000);
+});
+
+describe("a run whose copy went", () => {
+	test("a rerun makes the copy again from the work the cleanup kept", async () => {
+		const engine = startDaemon();
+		const project = await engine.addProject({ repoPath: sandbox.repoPath });
+		const run = await runCommand(engine, project.id, COMMIT);
+		const later = await sweptLater(2);
+		expect(existsSync(run.worktreePath)).toBe(false);
+
+		await later.act(run.id, { kind: "rerun", nodeId: "work" });
+		const again = await ended(later, run.id);
+		expect(again.status).toBe("finished");
+		expect(existsSync(run.worktreePath)).toBe(true);
+		// The first visit's commit came back, and the rerun added one.
+		expect(await workCommits(run.branch)).toBe(2);
+		expect(await keptRefs()).toEqual([]);
+		expect(JSON.stringify(again)).toContain(
+			"Night Shift made it again from the work it kept.",
+		);
+	}, 60_000);
+
+	test("a resume makes the copy again from the run's branch on origin", async () => {
+		const engine = startDaemon();
+		const project = await engine.addProject({ repoPath: sandbox.repoPath });
+		const run = await runCommand(
+			engine,
+			project.id,
+			`${COMMIT} && git push -q origin HEAD && exit 3`,
+		);
+		expect(run.status).toBe("failed");
+		const later = await sweptLater(2);
+		expect(existsSync(run.worktreePath)).toBe(false);
+		expect(await keptRefs()).toEqual([]);
+
+		await later.act(run.id, { kind: "resume" });
+		const again = await ended(later, run.id);
+		expect(existsSync(run.worktreePath)).toBe(true);
+		expect(await workCommits(run.branch)).toBe(2);
+		expect(JSON.stringify(again)).toContain(
+			"Night Shift made it again from the run's branch on the remote.",
+		);
+	}, 60_000);
+
+	test("a rerun of a run that kept nothing starts again where the run started", async () => {
+		const engine = startDaemon();
+		const project = await engine.addProject({ repoPath: sandbox.repoPath });
+		const run = await runCommand(engine, project.id, "true");
+		const later = await sweptLater(2);
+		expect(existsSync(run.worktreePath)).toBe(false);
+
+		await later.act(run.id, { kind: "rerun", nodeId: "work" });
+		const again = await ended(later, run.id);
+		expect(again.status).toBe("finished");
+		expect(existsSync(run.worktreePath)).toBe(true);
+		expect(JSON.stringify(again)).toContain(
+			"Night Shift made it again from where the run started.",
+		);
 	}, 60_000);
 });

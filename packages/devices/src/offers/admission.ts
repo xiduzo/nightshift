@@ -208,6 +208,7 @@ export function createOfferAdmission(deps: {
 		if ("refusal" in own) return own;
 		if (
 			(call.kind === "worktree" ||
+				call.kind === "restoreWorktree" ||
 				call.kind === "receiveHandOff" ||
 				call.kind === "runFolder") &&
 			(call.run.id !== runId || call.run.projectId !== projectId)
@@ -409,6 +410,13 @@ export function createOfferAdmission(deps: {
 				decide: (async (input: Parameters<Device["decide"]>[0]) =>
 					(await pick()).decide(input as never)) as Device["decide"],
 				worktree: async (run) => (await pick()).worktree(run),
+				// Only when this computer makes a run's copy again.
+				...(device.restoreWorktree
+					? {
+							restoreWorktree: async (input: RestoreInput) =>
+								(await (await pick()).restoreWorktree?.(input)) ?? null,
+						}
+					: {}),
 				// Only when this computer makes run folders.
 				...(device.runFolder
 					? {
@@ -437,6 +445,7 @@ export function createOfferAdmission(deps: {
 const offerKey = (spaceId: string, profile: string) => `${spaceId}/${profile}`;
 
 type SnapshotInput = Parameters<NonNullable<Device["snapshotWorktree"]>>[0];
+type RestoreInput = Parameters<NonNullable<Device["restoreWorktree"]>>[0];
 type ChangesInput = Parameters<NonNullable<Device["worktreeChanges"]>>[0];
 
 /**
@@ -477,6 +486,7 @@ function filesOf(device: Device): Required<Pick<Device, "readFile">> {
 const NEEDS_CLONE: ReadonlySet<WorkCall["kind"]> = new Set([
 	"flows",
 	"worktree",
+	"restoreWorktree",
 	"runFolder",
 	"itemBranch",
 	"handOff",
@@ -491,6 +501,7 @@ const NEEDS_CLONE: ReadonlySet<WorkCall["kind"]> = new Set([
 /** The calls that work with git: a project without a folder has none (ADR 22). */
 const GIT_CALLS: ReadonlySet<WorkCall["kind"]> = new Set([
 	"worktree",
+	"restoreWorktree",
 	"itemBranch",
 	"handOff",
 	"receiveHandOff",
@@ -509,6 +520,7 @@ function cwdOf(call: WorkCall): string | null {
 		case "handOff":
 		case "snapshotWorktree":
 		case "worktreeChanges":
+		case "restoreWorktree":
 			return call.cwd;
 		default:
 			return null;
@@ -536,6 +548,7 @@ function offeredCallRefusal(
 	switch (call.kind) {
 		case "flows":
 		case "worktree":
+		case "restoreWorktree":
 		case "runFolder":
 		case "itemBranch":
 		case "handOff":

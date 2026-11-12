@@ -22,6 +22,7 @@ export type {
 	RequestField,
 	RequestPart,
 	RequestText,
+	RestoredWorktree,
 	RunFolder,
 	RunRef,
 	SessionEvent,

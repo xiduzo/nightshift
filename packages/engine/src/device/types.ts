@@ -19,6 +19,7 @@ import type {
 import type { StepRun } from "../device-config";
 import type { KnowledgeRequest, KnowledgeUseEvent } from "../knowledge";
 import type { WorktreeChanges } from "../log";
+import type { RestoredFrom } from "../projects";
 
 /**
  * The Device port: what a step body needs from a computer, as one
@@ -93,6 +94,19 @@ export type Device = {
 	 * the top of a repository, no commit), before it adds anything.
 	 */
 	worktree(run: RunRef): Promise<Worktree>;
+	/**
+	 * The run's worktree on this Device, made again at its place when the
+	 * folder `cwd` (where the run's log says it is) is gone: the cleanup
+	 * removed it a day after the run ended. From its branch here, the work
+	 * the cleanup kept, its branch on origin, or `run.baseRef`, the commit
+	 * it started from. Null when `cwd` is there: nothing changes. Absent,
+	 * or null from a Device of an older Night Shift: the step works as
+	 * before.
+	 */
+	restoreWorktree?(input: {
+		run: RunRef;
+		cwd: string;
+	}): Promise<RestoredWorktree | null>;
 	/**
 	 * The run's own folder on this Device, made when it is not there: a run
 	 * of a project without a folder works in it (ADR 22). It has no git, so
@@ -520,6 +534,18 @@ export type Worktree = {
 	 * older Device, and when the run starts from the newest commit.
 	 */
 	warning?: string;
+};
+
+/**
+ * A run's worktree made again (`Device.restoreWorktree`), and where from:
+ * the run's branch here, the work the cleanup kept, the run's branch on
+ * origin, or the commit the run started from.
+ */
+export type RestoredWorktree = Pick<
+	Worktree,
+	"worktreePath" | "branch" | "baseRef"
+> & {
+	from: RestoredFrom;
 };
 
 /**

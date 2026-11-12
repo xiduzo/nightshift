@@ -1,6 +1,6 @@
 import type { TemplateContext } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import type { Device, RunFolder, RunRef } from "../device";
+import type { Device, RestoredWorktree, RunFolder, RunRef } from "../device";
 import type { RunRow, RunState } from "../log";
 import { awaitsWorktree, type RunWorktree, runWorktree } from "../read";
 import { noRunFolders } from "../run-folders";
@@ -128,6 +128,105 @@ async function created(
 		});
 	}
 	return { kind: "made", worktree };
+}
+
+/** What making the run's copy again on a Device did (`restoreRunCopy`). */
+export type RestoredCopy =
+	| { kind: "there" }
+	| { kind: "made"; worktreePath: string }
+	| { kind: "refused"; error: unknown };
+
+const THERE: RestoredCopy = { kind: "there" };
+
+/** The copies being made again, by run and Device: two branches of a run make it once. */
+const restoring = new Map<string, Promise<RestoredCopy>>();
+
+/** The Devices whose copy a drive found there, by the drive's signal: each is asked once per drive. */
+const found = new WeakMap<AbortSignal, Set<string>>();
+
+/** The run's warning when its copy was made again, by where from. */
+function restoredWarning(
+	device: string,
+	from: RestoredWorktree["from"],
+): string {
+	const gone = `The run's copy of the project on ${device} was gone.`;
+	switch (from) {
+		case "branch":
+			return `${gone} Night Shift made it again from the run's branch.`;
+		case "kept":
+			return `${gone} Night Shift made it again from the work it kept.`;
+		case "origin":
+			return `${gone} Night Shift made it again from the run's branch on the remote.`;
+		case "base":
+			return `${gone} Night Shift made it again from where the run started. It does not have the changes of earlier steps.`;
+	}
+}
+
+/**
+ * Makes the run's copy of the project on `at` again when its folder is
+ * gone (`Device.restoreWorktree`): the cleanup removes the copy a day
+ * after the run ended, and a resume or a rerun needs it back. The cleanup
+ * never touches a run that goes on, so each drive asks each Device once.
+ * The run warns where the copy came from (`RunWarned`, `base-ref`). A
+ * Device without the call (an older Night Shift) keeps its copy as is.
+ */
+export async function restoreRunCopy(
+	ctx: StepContext,
+	at: Device,
+	cwd: string,
+	runState: RunState,
+): Promise<RestoredCopy> {
+	if (!at.restoreWorktree) return THERE;
+	const signal = ctx.signal();
+	const there = found.get(signal) ?? new Set<string>();
+	found.set(signal, there);
+	if (there.has(at.id)) return THERE;
+	const key = `${ctx.run.id}/${at.id}`;
+	let pending = restoring.get(key);
+	if (!pending) {
+		pending = restore(ctx, at, cwd, runState).finally(() =>
+			restoring.delete(key),
+		);
+		restoring.set(key, pending);
+	}
+	const restored = await pending;
+	if (restored.kind !== "refused") there.add(at.id);
+	return restored;
+}
+
+async function restore(
+	ctx: StepContext,
+	at: Device,
+	cwd: string,
+	runState: RunState,
+): Promise<RestoredCopy> {
+	const row = ctx.run;
+	const author = row.startedBy ? await ctx.gitAuthor(row.startedBy) : null;
+	let restored: RestoredWorktree | null;
+	try {
+		restored =
+			(await at.restoreWorktree?.({
+				run: {
+					id: row.id,
+					projectId: row.projectId,
+					baseRef: runWorktree(row, runState).baseRef,
+					...(author ? { author } : {}),
+				},
+				cwd,
+			})) ?? null;
+	} catch (error) {
+		return { kind: "refused", error };
+	}
+	if (!restored) return THERE;
+	await ctx.log.append({
+		type: "RunWarned",
+		runId: row.id,
+		payload: {
+			kind: "base-ref",
+			message: restoredWarning(at.name, restored.from),
+		},
+	});
+	return { kind: "made", worktreePath: restored.worktreePath };
 }
 
 /** What a step that works in a folder has of it: its Device, and where it works. */
