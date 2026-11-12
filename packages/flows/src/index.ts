@@ -486,6 +486,7 @@ export {
 	evaluateRule,
 	initialVariables,
 	isTruthy,
+	lookupRef,
 	type NodeOutputs,
 	type RuleEvaluation,
 	type RuleOutcome,

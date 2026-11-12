@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { NodeSample } from "@nightshift/client";
 import { FLOW_VERSION, type Flow, flowSchema } from "@nightshift/flows";
 
 import {
@@ -98,5 +99,70 @@ describe("completing a template while you type", () => {
 			text: "{{vars.plan}}",
 			cursor: 11,
 		});
+	});
+});
+
+describe("what each variable held in the newest run", () => {
+	const sample = (
+		outputs: NodeSample["outputs"],
+		fields: Partial<NodeSample> = {},
+	): NodeSample => ({
+		runId: "run",
+		stepId: "step",
+		endedAt: 100,
+		outcome: "pass",
+		outputs,
+		inputs: { start: "3" },
+		changed: false,
+		...fields,
+	});
+
+	test("an input and a node's fields show their value in one line", () => {
+		const samples = new Map([
+			[
+				"check",
+				sample({
+					outcome: "pass",
+					exit_code: 0,
+					log_tail: "checking\n2 of 3 sources answered",
+				}),
+			],
+		]);
+		const groups = templateVariables(flow, "enough", { samples });
+		const of = (scope: string) =>
+			Object.fromEntries(
+				(groups.find((group) => group.scope === scope)?.variables ?? []).map(
+					(variable) => [variable.text, variable.sample],
+				),
+			);
+		expect(of("inputs")).toEqual({ "{{start}}": "3" });
+		expect(of("check")).toMatchObject({
+			"{{check.exit_code}}": "0",
+			"{{check.log_tail}}": "2 of 3 sources answered",
+		});
+		expect(of("vars")["{{vars.tries}}"]).toBeUndefined();
+		expect(Object.values(of("run")).every((value) => value === undefined)).toBe(
+			true,
+		);
+	});
+
+	test("the inputs come from the newest sample's run", () => {
+		const samples = new Map([
+			["check", sample({}, { endedAt: 100, inputs: { start: "old" } })],
+			["enough", sample({}, { endedAt: null, inputs: { start: "new" } })],
+		]);
+		const inputs = templateVariables(flow, null, { samples }).find(
+			(group) => group.scope === "inputs",
+		);
+		expect(inputs?.variables[0]?.sample).toBe("new");
+	});
+
+	test("without samples, no variable has one", () => {
+		const groups = templateVariables(flow, "enough");
+		expect(
+			groups.every((group) =>
+				group.variables.every((variable) => variable.sample === undefined),
+			),
+		).toBe(true);
 	});
 });

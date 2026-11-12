@@ -25,6 +25,7 @@ export {
 } from "./rule";
 export { templatesInLiteralShellText } from "./shell-quotes";
 export {
+	lookupRef,
 	renderCommand,
 	renderGateQuestion,
 	renderReadable,

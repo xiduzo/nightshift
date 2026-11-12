@@ -23,6 +23,7 @@ import {
 	type KeyboardEvent,
 	type ReactNode,
 	type RefObject,
+	useContext,
 	useEffect,
 	useId,
 	useRef,
@@ -48,6 +49,7 @@ import {
 	selectionOf,
 } from "../assistant/field-helpers";
 import { useFlowAssistant } from "../assistant/flow-assistant";
+import { NodeSamplesContext } from "../canvas/viewer/node-samples-context";
 import {
 	completeTemplate,
 	matchVariables,
@@ -73,6 +75,8 @@ import { useProjectFlowMap } from "./project-flows-context";
  * the language its text looks like. It stays below a set height and opens
  * in a larger window, where the person can pick another language. A command
  * also lists the CLI tools it can call (`tools`): a click inserts the name.
+ * Once the flow has a run, a variable shows what it held in it
+ * (`NodeSamplesContext`).
  */
 export function TemplateField({
 	id,
@@ -138,7 +142,12 @@ export function TemplateField({
 	const openHelper = () =>
 		setHelping({ base: value, selection: selectionOf(ref.current) });
 	const flows = useProjectFlowMap();
-	const groups = templateVariables(flow, nodeId, { flows, initialValue });
+	const samples = useContext(NodeSamplesContext);
+	const groups = templateVariables(flow, nodeId, {
+		flows,
+		initialValue,
+		samples,
+	});
 
 	const moveCursor = (field: HTMLTextAreaElement | null, cursor: number) => {
 		requestAnimationFrame(() => {
@@ -376,6 +385,7 @@ function TemplateVariables({
 												? `Holds JSON: add a path, for example ${variable.text.slice(0, -2)}.name}}`
 												: null,
 											variable.description ?? null,
+											variable.sample ? `Last run: ${variable.sample}` : null,
 										]
 											.filter(Boolean)
 											.join("\n")}
@@ -562,9 +572,17 @@ function TemplateSuggestions({
 										className="font-mono text-xs"
 									>
 										<span className="truncate">{variable.text}</span>
-										{variable.description ? (
-											<span className="ml-auto max-w-[50%] truncate font-sans text-muted-foreground">
-												{variable.description}
+										{/* What it held in the last run, else what it holds. */}
+										{variable.sample || variable.description ? (
+											<span
+												className="ml-auto max-w-[50%] truncate font-sans text-muted-foreground"
+												title={
+													variable.sample
+														? `Last run: ${variable.sample}`
+														: variable.description
+												}
+											>
+												{variable.sample ?? variable.description}
 											</span>
 										) : null}
 									</CommandItem>

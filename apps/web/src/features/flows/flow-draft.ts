@@ -3,6 +3,7 @@
  * chips and the messages of a check. The edits themselves live in
  * `@nightshift/flows` (the draft vertical).
  */
+import type { NodeSample } from "@nightshift/client";
 import {
 	type CliToolRef,
 	checkDraft,
@@ -13,14 +14,17 @@ import {
 	isOptionNode,
 	type KnownProfile,
 	type ListSource,
+	lookupRef,
 	nodeOptions,
 	type ProfileRef,
 	type ProjectFlowMap,
+	type TemplateContext,
 	type TemplateField,
 	type TemplateNode,
 	templateScope,
 	type WaitUntil,
 } from "@nightshift/flows";
+import { gist } from "./canvas/viewer/gist";
 
 /** How each kind of wait reads in a picker. */
 export const WAIT_KINDS: Record<WaitUntil["kind"], string> = {
@@ -100,6 +104,8 @@ export type TemplateVariable = {
 	json: boolean;
 	/** Shown as the chip's tooltip. */
 	description?: string;
+	/** What it held in the flow's newest run, in one line (`gist`). */
+	sample?: string;
 };
 
 export type VariableGroup = {
@@ -108,25 +114,36 @@ export type VariableGroup = {
 	variables: TemplateVariable[];
 };
 
+/** The samples of the nodes of a flow, by node id (`useNodeSamples`). */
+type Samples = ReadonlyMap<string, NodeSample>;
+
 /**
  * The `{{…}}` variables a field can use, in groups: the template scope of
  * `@nightshift/flows` (what the checks accept), in the editor's words. The
  * node `nodeId` is left out (null: every node counts). `flows` adds the
  * outputs of the flows that Subflow nodes call. `initialValue`: a
  * variable's initial value, which reads the inputs and run only.
+ * `samples`: each input and node output gets what it held in the newest
+ * run that has it.
  */
 export function templateVariables(
 	flow: Flow,
 	nodeId: string | null,
-	options: { flows?: ProjectFlowMap; initialValue?: boolean } = {},
+	options: {
+		flows?: ProjectFlowMap;
+		initialValue?: boolean;
+		samples?: Samples | null;
+	} = {},
 ): VariableGroup[] {
-	const scope = templateScope(flow, options);
+	const { samples, ...scopeOptions } = options;
+	const scope = templateScope(flow, scopeOptions);
+	const context = samples ? sampleContext(samples) : null;
 	const groups: VariableGroup[] = [];
 	if (scope.inputs.length > 0) {
 		groups.push({
 			scope: "inputs",
 			variables: scope.inputs.map((field) =>
-				variableOf(field, field.name, field.description),
+				variableOf(field, field.name, field.description, context),
 			),
 		});
 	}
@@ -148,7 +165,10 @@ export function templateVariables(
 	for (const node of scope.nodes) {
 		if (node.id === nodeId) continue;
 		const own = flow.nodes.find((candidate) => candidate.id === node.id);
-		groups.push({ scope: node.id, variables: nodeVariables(node, own) });
+		groups.push({
+			scope: node.id,
+			variables: nodeVariables(node, own, context),
+		});
 	}
 	groups.push({
 		scope: "run",
@@ -161,6 +181,7 @@ export function templateVariables(
 function nodeVariables(
 	node: TemplateNode,
 	own: FlowNode | undefined,
+	context: TemplateContext | null,
 ): TemplateVariable[] {
 	const keyWords =
 		own?.type === "value"
@@ -175,11 +196,12 @@ function nodeVariables(
 					? (field.description ??
 							`An output of ${own?.type === "call" ? own.flow : "the called flow"}`)
 					: undefined,
+				context,
 			),
 		),
 		...node.fields.flatMap((field) =>
 			(field.keys ?? []).map((key) =>
-				variableOf(key, `${field.name}.${key.name}`, keyWords),
+				variableOf(key, `${field.name}.${key.name}`, keyWords, context),
 			),
 		),
 	];
@@ -189,13 +211,55 @@ function variableOf(
 	field: TemplateField,
 	label: string,
 	description?: string,
+	context?: TemplateContext | null,
 ): TemplateVariable {
+	const sample = context ? sampleOf(context, field) : null;
 	return {
 		text: `{{${field.ref}}}`,
 		label,
 		json: field.json,
 		...(description === undefined ? {} : { description }),
+		...(sample === null ? {} : { sample }),
 	};
+}
+
+/**
+ * The editor knows the fields of no run: a `{{run.…}}` reference gets no
+ * sample, and none asks for one.
+ */
+const NO_RUN = {} as TemplateContext["run"];
+
+/**
+ * What a template reads in the newest runs: each node's outputs from its
+ * sample, and the input values of the newest sample's run. A step that
+ * runs counts as the newest.
+ */
+function sampleContext(samples: Samples): TemplateContext {
+	const nodes: TemplateContext["nodes"] = {};
+	let newest: NodeSample | undefined;
+	for (const [id, sample] of samples) {
+		nodes[id] = sample.outputs;
+		if (
+			newest === undefined ||
+			(newest.endedAt !== null &&
+				(sample.endedAt === null || sample.endedAt > newest.endedAt))
+		)
+			newest = sample;
+	}
+	return { nodes, inputs: newest?.inputs ?? {}, run: NO_RUN };
+}
+
+/** What the field held, in one line, or null when the runs do not say. */
+function sampleOf(
+	context: TemplateContext,
+	field: TemplateField,
+): string | null {
+	const [name = "", ...path] = field.ref.split(".");
+	return gist(lookupRef(context, { name, path }), {
+		shape: field.schema,
+		// A log reads from its end.
+		lastLine: path.length === 1 && path[0] === "log_tail",
+	});
 }
 
 const FIELD_MESSAGES: Record<string, string> = {
