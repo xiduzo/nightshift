@@ -18,7 +18,12 @@ import {
 	type StepContext,
 } from "../context";
 import { RESUME_RULES } from "../resume-point";
-import { type BodyResult, runStep, type StepHandle } from "../step-runner";
+import {
+	type BodyEnd,
+	type BodyResult,
+	runStep,
+	type StepHandle,
+} from "../step-runner";
 
 /**
  * The End node: a chosen end of the flow, with a result, one line and
@@ -44,7 +49,11 @@ import { type BodyResult, runStep, type StepHandle } from "../step-runner";
  * that is missing, not text or outside the folder is a `report` warning:
  * the step still ends with the node's status, without a report, so a run
  * that did its work never fails for its report. A Device that went away
- * during the read waits as the network does, and the step reads again.
+ * during the read waits as the network does, and the step reads again. A
+ * Device that does not answer, or stays offline, for the run policy's
+ * network grace is a `report` warning too (`StepSpec.pastGrace`): a report
+ * never keeps a run open longer than the grace. A stop still stops the
+ * step.
  *
  * Inside a called flow it ends that flow; the Call reads the result
  * (`body.ts`) and the report (`end_report`). Pure, so a re-run is safe:
@@ -56,42 +65,66 @@ export function endStepNode(node: EndNode, ctx: StepContext): NodeAction {
 			rules: RESUME_RULES.fresh,
 			outputs: (step) => ({ message: "", visit: step.visit }),
 			async body(step) {
-				const message = endMessage(
-					renderTemplate(node.message ?? "", step.tctx),
-				);
 				const report = await reportOf(node, step);
 				if (report.kind === "instead") return report.result;
-				if (report.warning !== null) {
-					await step.warn("report", report.warning);
-				}
-				const { kept } = report;
-				step.record(null, {
-					type: "end",
-					status: node.status,
-					message,
-					...(kept ? { report: { cut: kept.cut } } : {}),
-				});
-				return {
-					kind: "end",
-					outcome: node.status,
-					outputs: {
-						message: message ?? "",
-						...(kept ? { report: kept.text } : {}),
-						visit: step.visit,
-					},
-					error: null,
-				};
+				return endWith(node, step, report);
 			},
+			// The Device did not answer the read, or stayed offline, for the
+			// run policy's network grace: the run ends without its report.
+			...(readsFile(node)
+				? {
+						pastGrace: (step: StepHandle) =>
+							endWith(node, step, {
+								kind: "kept",
+								kept: { text: "", cut: false },
+								warning: `Night Shift could not read the report file on ${step.device.name}. ${WITHOUT_REPORT}`,
+							}),
+					}
+				: {}),
 		});
 }
 
+/** Ends the step with the node's status, its message and the report it keeps, after its warning. */
+async function endWith(
+	node: EndNode,
+	step: StepHandle,
+	report: Kept,
+): Promise<BodyEnd> {
+	const message = endMessage(renderTemplate(node.message ?? "", step.tctx));
+	if (report.warning !== null) {
+		await step.warn("report", report.warning);
+	}
+	const { kept } = report;
+	step.record(null, {
+		type: "end",
+		status: node.status,
+		message,
+		...(kept ? { report: { cut: kept.cut } } : {}),
+	});
+	return {
+		kind: "end",
+		outcome: node.status,
+		outputs: {
+			message: message ?? "",
+			...(kept ? { report: kept.text } : {}),
+			visit: step.visit,
+		},
+		error: null,
+	};
+}
+
+/** What the last words of every warning about a report file that was not read say. */
+const WITHOUT_REPORT = "The run ends without a report.";
+
 /** The report a step keeps (null: the node has none), and what a person should know about it. */
+type Kept = {
+	kind: "kept";
+	kept: { text: string; cut: boolean } | null;
+	warning: string | null;
+};
+
 type KeptReport =
-	| {
-			kind: "kept";
-			kept: { text: string; cut: boolean } | null;
-			warning: string | null;
-	  }
+	| Kept
 	/**
 	 * The read did not end: the Device went away (the step waits, then
 	 * reads again), or a stop came.
@@ -120,7 +153,7 @@ async function reportOf(node: EndNode, step: StepHandle): Promise<KeptReport> {
 		return {
 			kind: "kept",
 			kept: { text: "", cut: false },
-			warning: `${unreadable(read, path, step.device.name)} The run ends without a report.`,
+			warning: `${unreadable(read, path, step.device.name)} ${WITHOUT_REPORT}`,
 		};
 	}
 	const kept = reportText(read.text);
@@ -242,7 +275,7 @@ const readsReportFiles: Requirement<EndNode> = (nodes, has) => {
  * called the flow reports the status as `ended` and the report as
  * `end_report`. An End that reads its report from a file works in the
  * folder the run works in, on the Device that has the run's copy, and
- * sleeps while that Device is offline.
+ * sleeps while that Device is offline, for the network grace at most.
  */
 export const END: NodeKind<EndNode> = {
 	...PLAIN_KIND,

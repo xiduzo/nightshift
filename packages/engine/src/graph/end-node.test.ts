@@ -10,6 +10,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Command } from "@langchain/langgraph";
 import { run } from "@nightshift/db/schema";
 import type { EndNode } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
@@ -23,9 +24,12 @@ import { deriveSteps } from "../read/run-views";
 import { createRunFolders } from "../run-folders";
 import {
 	command,
+	type Driven,
 	drive,
 	edge,
 	flowOf,
+	type Harness,
+	MINUTE,
 	payloads,
 	placementOn,
 	type StartOptions,
@@ -560,6 +564,185 @@ describe("a report from a file the run wrote", () => {
 		const first = await drive(h, { inputs: {} });
 		expect(first.parked[0]).toMatchObject({ kind: "wait", reason: "network" });
 		expect(first.state.ended).toBeFalsy();
+	});
+
+	describe("a Device that does not answer for the network grace", () => {
+		/** The engine's clock: each wake moves it to the wait's time. */
+		let clock: number;
+		beforeEach(() => {
+			clock = 1_000_000;
+		});
+
+		/** fileFlow with a network grace of 5 min: waits of 1 and 2 min fit, the next one does not. */
+		const graceFlow = () => ({
+			...fileFlow("report.md"),
+			policy: { networkGraceMinutes: 5 },
+		});
+
+		async function notAnswering(options: StartOptions = {}) {
+			const h = await startRun(sandbox, graceFlow(), {
+				now: () => clock,
+				...options,
+			});
+			const reads: string[] = [];
+			const device: Device = {
+				...testDevice(h.local),
+				name: "laptop",
+				readFile: async () => {
+					reads.push(`read at ${clock}`);
+					throw new Refusal("unavailable", "laptop did not answer in time.");
+				},
+			};
+			h.ctx.placement = placementOn(() => device);
+			return { h, reads };
+		}
+
+		/** Wakes the run at its wait's time, as the runner's timer does. */
+		async function wake(h: Harness, parked: Driven["parked"]) {
+			const [wait] = parked;
+			if (wait?.kind !== "wait") throw new Error("The run does not wait.");
+			clock = wait.until ?? clock;
+			await h.log.append({
+				type: "WaitEnded",
+				runId: h.runId,
+				stepId: wait.stepId,
+				payload: { early: false },
+			});
+			return drive(h, new Command({ resume: { kind: "wake", early: false } }));
+		}
+
+		test("once the network grace runs out, the End warns and keeps its status: the run ends done", async () => {
+			const { h, reads } = await notAnswering();
+			const first = await drive(h, { inputs: {} });
+			expect(first.parked[0]).toMatchObject({
+				kind: "wait",
+				reason: "network",
+				until: clock + MINUTE,
+			});
+			const second = await wake(h, first.parked);
+			expect(second.parked[0]).toMatchObject({
+				kind: "wait",
+				reason: "network",
+				until: clock + 2 * MINUTE,
+			});
+			// 1 + 2 min have passed: a wait of 5 more would pass the grace.
+			const third = await wake(h, second.parked);
+			expect(reads).toHaveLength(3);
+			expect(third.parked).toEqual([]);
+			expect(third.state.ended).toMatchObject({
+				status: "finished",
+				nodeId: "done",
+				outcome: "done",
+				reason: "Found it",
+				result: "done",
+			});
+			expect(third.state.ended).not.toHaveProperty("report");
+			expect(third.state.nodes.done).toEqual({
+				message: "Found it",
+				report: "",
+				visit: 1,
+				outcome: "done",
+			});
+			const events = await h.events();
+			expect(await warnings(h)).toEqual([
+				{
+					kind: "report",
+					message:
+						"Night Shift could not read the report file on laptop. The run ends without a report.",
+				},
+			]);
+			const [step] = deriveSteps(foldRun(events)).filter(
+				(s) => s.nodeId === "done",
+			);
+			expect(step).toMatchObject({ outcome: "done", error: null });
+			expect(
+				(await readTranscriptFile(step?.transcriptPath as string))
+					.map((e) => e.event)
+					.filter((e) => e.type === "end"),
+			).toEqual([
+				{
+					type: "end",
+					status: "done",
+					message: "Found it",
+					report: { cut: false },
+				},
+			]);
+		});
+
+		test("a Device that stays offline: the End sleeps for the grace, then warns and keeps its status", async () => {
+			// The End alone: the Device is offline from the start.
+			const h = await startRun(
+				sandbox,
+				flowOf([fromFile("report.md")], [], {
+					policy: { networkGraceMinutes: 5 },
+				}),
+				{ now: () => clock },
+			);
+			const reads: string[] = [];
+			const device: Device = {
+				...testDevice(h.local),
+				name: "laptop",
+				state: async () => ({ online: false }),
+				readFile: async () => {
+					reads.push("read");
+					return { kind: "missing" };
+				},
+			};
+			h.ctx.placement = placementOn(() => device);
+			const start = clock;
+			let driven = await drive(h, { inputs: {} });
+			const looks: number[] = [];
+			while (driven.parked[0]?.kind === "wait" && looks.length < 10) {
+				expect(driven.parked[0]).toMatchObject({ reason: "device-offline" });
+				looks.push((clock - start) / MINUTE);
+				driven = await wake(h, driven.parked);
+			}
+			// It looks again each minute: a look past 5 min would pass the grace.
+			expect(looks).toEqual([0, 1, 2, 3, 4]);
+			expect(clock - start).toBe(5 * MINUTE);
+			expect(reads).toEqual([]);
+			expect(driven.parked).toEqual([]);
+			expect(driven.state.ended).toMatchObject({
+				status: "finished",
+				result: "done",
+				reason: "Found it",
+			});
+			expect(driven.state.ended).not.toHaveProperty("report");
+			expect(await warnings(h)).toEqual([
+				{
+					kind: "report",
+					message:
+						"Night Shift could not read the report file on laptop. The run ends without a report.",
+				},
+			]);
+		});
+
+		test("a stop during the read still stops: the step ends stopped, with no warning", async () => {
+			const stop = new AbortController();
+			const h = await startRun(sandbox, graceFlow(), { signal: stop.signal });
+			const device: Device = {
+				...testDevice(h.local),
+				name: "laptop",
+				// The call ends when the stop aborts it.
+				readFile: ({ signal }) =>
+					new Promise((_resolve, reject) => {
+						signal?.addEventListener("abort", () =>
+							reject(new Refusal("unavailable", "The call was stopped.")),
+						);
+					}),
+			};
+			h.ctx.placement = placementOn(() => device);
+			setTimeout(() => stop.abort(), 100);
+			const { parked, state } = await drive(h, { inputs: {} });
+			expect(parked[0]).toMatchObject({ status: "stopped", reason: null });
+			expect(state.ended).toBeFalsy();
+			expect(payloads(await h.events(), "StepEnded").at(-1)).toEqual({
+				outcome: "stopped",
+				outputs: { outcome: "stopped", message: "", visit: 1 },
+				error: null,
+			});
+			expect(await warnings(h)).toEqual([]);
+		});
 	});
 
 	test("run start refuses a Device that reads no files, and names the nodes", () => {

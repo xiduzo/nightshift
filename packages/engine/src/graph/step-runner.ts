@@ -278,7 +278,8 @@ export type BodyEnd = {
  *   outputs the body had so far.
  * - `wait`: a usage limit or a network failure (`WaitRequest`); the sleep
  *   module plans the policy's wait and parks at the wait node, or the step
- *   ends when the wait would pass the stop time or the grace is spent.
+ *   ends when the wait would pass the stop time or the grace is spent
+ *   (`StepSpec.pastGrace`).
  * - `sleep`: a Wait node worked out its own wake time (`OwnWait`); the
  *   sleep module persists it and parks at the wait node, the step open.
  * - `ask`: the body asks a person (an Agent with `ask`): the runner opens a
@@ -326,6 +327,14 @@ export type StepSpec = {
 	 * kind's empty fields. Default `{ visit }`.
 	 */
 	outputs?(step: StepHandle): StepOutputs | Promise<StepOutputs>;
+	/**
+	 * How the step ends when it would wait past the run policy's network
+	 * grace: a network wait that gives up, or a Device that stays offline
+	 * that long. Without it, the first ends the step `error` and the step
+	 * sleeps as long as its Device is offline. An End that reads its report
+	 * from a file has it: a report never fails a run (ADR 26).
+	 */
+	pastGrace?(step: StepHandle): Promise<BodyEnd>;
 	/** What the step's route writes besides its end: a Join closes its round. */
 	update?: RunStateUpdate;
 	/**
@@ -509,7 +518,11 @@ export async function runStep(
 					? { ...result, kind: "policy" }
 					: result.kind === "sleep"
 						? { ...result, kind: "own" }
-						: { ...result, kind: "device" };
+						: {
+								...result,
+								kind: "device",
+								...(spec.pastGrace ? { grace: true as const } : {}),
+							};
 			const slept = await sleep(ctx, node, state, config, step, request);
 			if (slept.kind === "asleep") return slept.command;
 			// The step ends before its wait: with the session it has, and
@@ -523,6 +536,15 @@ export async function runStep(
 					costs,
 				);
 				return parkStopped(node, end, slept.reason);
+			}
+			if (spec.pastGrace) {
+				const instead = await spec.pastGrace(step);
+				return endAndGo(
+					instead.outcome,
+					{ ...instead.outputs, outcome: instead.outcome },
+					instead.error,
+					{ ...costs, ...extraOf(instead) },
+				);
 			}
 			return endAndGo("error", await blank("error"), slept.error, costs);
 		}

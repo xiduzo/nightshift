@@ -112,12 +112,23 @@ export const DEVICE_RETRY_MINUTES = 1;
 export type SleepRequest =
 	| ({ kind: "policy" } & WaitRequest)
 	| ({ kind: "own" } & OwnWait)
-	| ({ kind: "device" } & DeviceWait);
+	| ({
+			kind: "device";
+			/**
+			 * The step gives up once its Device was offline for the run
+			 * policy's network grace (`StepSpec.pastGrace`). Without it, the
+			 * step sleeps as long as its Device is offline.
+			 */
+			grace?: true;
+	  } & DeviceWait);
 
 /** What `sleep` gives back: the park at the wait node, or why the step must end instead. */
 export type SleepOutcome =
 	| { kind: "asleep"; command: Command }
-	/** The network grace is spent: the step ends `error`. */
+	/**
+	 * The network grace is spent: the step ends `error`, or as its
+	 * `StepSpec.pastGrace` says.
+	 */
 	| { kind: "give-up"; error: string }
 	/** The wait would pass the stop time: the step ends `stopped` and the run parks. */
 	| { kind: "stop-time"; reason: string };
@@ -201,7 +212,8 @@ function cutToDeadline(
  *
  * A policy wait that would end after the stop time is not started
  * (`stop-time`: the step ends `stopped`, a resume continues it), and one
- * past the network grace gives up. A Wait node's own wait knows no stop
+ * past the network grace gives up. A Device wait gives up past the grace
+ * only when the step asks (`grace`). A Wait node's own wait knows no stop
  * time: the step runner ends a continued step past it on the wake.
  */
 export async function sleep(
@@ -243,6 +255,15 @@ export async function sleep(
 		// sooner.
 		const stopAt = stopAtOf(state, config);
 		const retry = now + DEVICE_RETRY_MINUTES * ctx.minuteMs;
+		// A step that gives up does not look again past the grace, as a
+		// network wait does not.
+		const grace = request.grace ? ctx.policy().networkGraceMinutes : null;
+		if (grace !== null && retry - since > grace * ctx.minuteMs) {
+			return {
+				kind: "give-up",
+				error: `${request.name} was offline for more than ${grace} min.`,
+			};
+		}
 		until = stopAt === null ? retry : Math.min(retry, stopAt);
 		message = `${request.name} is offline. The step starts when it is back.`;
 	} else {
