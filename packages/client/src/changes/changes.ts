@@ -43,10 +43,9 @@ type StreamChange = "runs" | "projects" | "pause" | "learnings" | "sources";
  * the Members of the Space and its invitations. `run-memory`: the kept
  * values and what the Since last run nodes saw. `programs`: the programs
  * found on this computer. `copies`: the copies of projects to this
- * computer. `run-copies`: a run's own copy and branches. `git`: the git
- * setup of a folder. `ollama`: the models of Ollama. `usage`: the
- * anonymous usage of this computer. `screens`: the screens that get
- * notifications. `devices`: the Person's Devices, pairings and phones.
+ * computer. `git`: the git setup of a folder. `ollama`: the models of
+ * Ollama. `usage`: the anonymous usage of this computer. `screens`: the
+ * screens that get notifications. `devices`: the Person's Devices, pairings and phones.
  * `logins`: the login of a CLI tool. `account`: how the owner signs in.
  */
 type SaveChange =
@@ -55,7 +54,6 @@ type SaveChange =
 	| "run-memory"
 	| "programs"
 	| "copies"
-	| "run-copies"
 	| "git"
 	| "ollama"
 	| "usage"
@@ -200,7 +198,6 @@ const STALE: {
 	},
 	programs: { also: [["programs"]] },
 	copies: { also: [["projects", "copies"]] },
-	"run-copies": { also: [["projects", "runCopies"]] },
 	git: { also: [["projects", "check"]] },
 	ollama: { also: [["ollama"]] },
 	usage: { also: [["usage"]] },
@@ -265,8 +262,6 @@ export const SAVES: {
 	"projects.setUpGit": ["git"],
 	// The installer runs on its own: the person checks again.
 	"projects.installGit": [],
-	"projects.removeRunCopy": ["run-copies"],
-	"projects.deleteRunBranches": ["run-copies"],
 	"projects.setSecret": ["secrets"],
 	"projects.removeSecret": ["secrets"],
 	"projects.moveSecretOut": ["secrets"],

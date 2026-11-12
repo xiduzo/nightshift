@@ -30,7 +30,6 @@ const READS = new Set([
 	"invitations.get",
 	"projects.list",
 	"projects.branches",
-	"projects.runCopies",
 	"projects.check",
 	"projects.chooseFolder",
 	"projects.sources",
