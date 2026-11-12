@@ -170,7 +170,6 @@ function MeaningLine({ projectId }: { projectId: string }) {
 	const status = meaning.data;
 	if (!status || status.state === "off") return null;
 	const where = status.where ? `at ${status.where}` : "on this computer";
-	const pull = <code className="font-mono">ollama pull {status.model}</code>;
 	const done =
 		status.total > 0 ? Math.floor((status.done / status.total) * 100) : 0;
 	return (
@@ -195,7 +194,7 @@ function MeaningLine({ projectId }: { projectId: string }) {
 			) : status.state === "no-model" ? (
 				<>
 					Search finds words only. Ollama {where} does not have {status.model}.
-					Download it on the Settings page, or run {pull}.
+					Download it on the Settings page.
 				</>
 			) : status.where ? (
 				<>
@@ -205,7 +204,8 @@ function MeaningLine({ projectId }: { projectId: string }) {
 			) : (
 				<>
 					Search finds words only. Ollama does not answer on this computer. To
-					find files by their meaning too, install Ollama, then run {pull}.
+					find files by their meaning too, open Meaning search on the Settings
+					page.
 				</>
 			)}
 		</p>
