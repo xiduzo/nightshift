@@ -1,4 +1,4 @@
-/** A flow compiled to a graph and walked: the nodes, the step runner, sleeps, the checkpointer, and the input, output and policy rules a step follows. */
+/** A flow compiled to a graph and walked: the nodes, the step runner, sleeps, the checkpointer, the stand-ins of a test run, and the input, output and policy rules a step follows. */
 
 export { pruneCheckpoints } from "./checkpointer";
 export type {
@@ -23,6 +23,7 @@ export { rerunNodeRefusal } from "./reentry";
 export { runFolderOn } from "./run-worktree";
 export type { Runner } from "./runner";
 export { createRunner } from "./runner";
+export { standInOutcomes, standsIn } from "./stand-in";
 export {
 	createRunWalks,
 	type RunWalks,

@@ -352,6 +352,57 @@ describe("the node walk of a run's plan", () => {
 		);
 	});
 
+	test("a test run's pinned and skipped nodes, and the flows only they call, are placed nowhere (ADR 27)", async () => {
+		const sync = {
+			id: "sync",
+			type: "call",
+			position: { x: 0, y: 0 },
+			flow: "body",
+			inputs: {},
+		} as FlowNode;
+		const sources = {
+			watch: {
+				json: flow([
+					profiled("deliver", { device: "sold", profile: "p-1234" }),
+					command("after"),
+					sync,
+				]),
+			},
+			body: { json: flow([command("far", "gone")]) },
+		};
+		const at = { ...devices(), flows: async () => sources };
+		// Every node runs: the profile of a gone Device refuses the run.
+		await expect(
+			planNodes({ projectId: "p", flowName: "watch" }, at, "the-person"),
+		).rejects.toThrow("Pick another profile.");
+
+		const planned = await planNodes(
+			{
+				projectId: "p",
+				flowName: "watch",
+				test: {
+					pinned: { deliver: { runId: "run-1", stepId: "step-1" } },
+					skipped: { sync: "pass" },
+				},
+			},
+			at,
+			"the-person",
+		);
+		expect(
+			planned.groups.map((g) => [g.at.id, g.nodes.map((n) => n.id)]),
+		).toEqual([["this", ["after"]]]);
+		// The run's flows still have them, as the flow has them.
+		expect(planned.flow.nodes.map((n) => n.id)).toEqual([
+			"deliver",
+			"after",
+			"sync",
+		]);
+		expect(planned.flow.nodes[0]).toMatchObject({
+			profile: { device: "sold", profile: "p-1234" },
+		});
+		expect(Object.keys(planned.calledFlows)).toEqual(["body"]);
+	});
+
 	test("a profile on an offline Device starts from what its document last said: the step waits for it there", async () => {
 		const away = at("away", { offline: true });
 		const offline: PlanDevices = {

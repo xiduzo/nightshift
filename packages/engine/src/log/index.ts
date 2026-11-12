@@ -28,6 +28,7 @@ export type {
 	KnowledgeVia,
 	LeaseWait,
 	LoggedEvent,
+	PinnedOutput,
 	PolicyWaitReason,
 	ResumeAction,
 	ResumedBy,
@@ -39,11 +40,13 @@ export type {
 	ScoreName,
 	ServiceSpec,
 	SessionOutcome,
+	StandIn,
 	StepBudget,
 	StepOutcome,
 	StepOutputs,
 	StepRung,
 	StoppedBy,
+	TestRun,
 	WaitReason,
 } from "./events";
 export { groupByRun, parseEventRow, runDueAt, scopeKey } from "./events";

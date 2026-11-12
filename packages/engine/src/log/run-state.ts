@@ -29,11 +29,13 @@ import {
 	type LoggedEvent,
 	type RunEnding,
 	type Scope,
+	type StandIn,
 	type StepOutcome,
 	type StepOutputs,
 	type StepRung,
 	type StoppedBy,
 	scopeKey,
+	type TestRun,
 	type WaitReason,
 } from "./events";
 import { type Hold, sameService } from "./holds";
@@ -192,6 +194,16 @@ export type DerivedStep = {
 	 * Absent for a step on no ladder, and for a step of an older Walker.
 	 */
 	rung?: StepRung;
+	/**
+	 * The step stood in for its node in a test run (ADR 27), as its
+	 * `StepStarted` says. Absent: the node ran.
+	 */
+	test?: StandIn;
+	/**
+	 * A pinned step: the step of an earlier run its output comes from
+	 * (`RunStarted.test`). Absent for every other step.
+	 */
+	pinnedFrom?: { runId: string; stepId: string; endedAt: number };
 	/** Its latest `StepStarted`. */
 	startedAt: number;
 	startSeq: number;
@@ -416,6 +428,11 @@ export type RunState = {
 	 * copy of the project (`RunStarted.runFolder`, ADR 22).
 	 */
 	runFolder: boolean;
+	/**
+	 * A test run's pins and skips (`RunStarted.test`, ADR 27): the run keeps
+	 * nothing that lasts. Null: a run where every node runs.
+	 */
+	test: TestRun | null;
 	/** The latest `WorktreeCreated`: for a run folder, its folder on the run's Device. */
 	worktree: EnginePayloads["WorktreeCreated"] | null;
 	/** Where the run's work went: each `WorktreeCreated` and `HandedOff`, oldest first. */
@@ -497,6 +514,7 @@ function emptyState(): Draft {
 		scores: [],
 		pullRequest: null,
 		runFolder: false,
+		test: null,
 		worktree: null,
 		moves: [],
 		edges: new Map(),
@@ -957,6 +975,7 @@ function applyRunEvent(
 	if (e.type === "RunStarted") {
 		run.started ??= logged(e);
 		run.runFolder = run.started.payload.runFolder === true;
+		run.test = run.started.payload.test ?? null;
 		run.stopAt = e.payload.stopAt ?? null;
 		run.daemonResumes = 0;
 		run.budgetFrom = e.seq;
@@ -1311,6 +1330,10 @@ function startStep(
 	const known = run.steps.get(stepId);
 	const scope = e.payload.scope ?? null;
 	const rung = e.payload.rung ?? known?.rung;
+	const test = e.payload.test;
+	// A pinned step names the earlier step its output comes from.
+	const pin =
+		test === "pinned" ? run.test?.pinned[e.payload.nodeId] : undefined;
 	const opening: StepOpening = {
 		kind: "start",
 		seq: e.seq,
@@ -1334,6 +1357,16 @@ function startStep(
 			logPath: e.payload.logPath,
 			deviceId: e.payload.deviceId ?? null,
 			...(rung ? { rung } : {}),
+			...(test ? { test } : {}),
+			...(pin
+				? {
+						pinnedFrom: {
+							runId: pin.runId,
+							stepId: pin.stepId,
+							endedAt: pin.endedAt,
+						},
+					}
+				: {}),
 			startedAt: e.at,
 			startSeq: e.seq,
 			openedSeq: e.seq,

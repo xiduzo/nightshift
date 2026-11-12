@@ -54,6 +54,34 @@ export type RunEnding = Exclude<RunStatus, "running">;
 /** A step's template outputs: JSON values, so `{{planner.data.tasks}}` can take a path. */
 export type StepOutputs = Record<string, JsonValue>;
 
+/**
+ * The output a pinned node of a test run gives (ADR 27): the end of the
+ * step of an earlier run it comes from. A pin of a pinned step names the
+ * step the output first came from.
+ */
+export type PinnedOutput = {
+	runId: string;
+	stepId: string;
+	/** When that step ended. */
+	endedAt: number;
+	outcome: StepOutcome;
+	outputs: StepOutputs;
+};
+
+/**
+ * A test run's pins and skips, as its `RunStarted` records them (ADR 27):
+ * a node named here stands in at the top level of the run, and runs nothing.
+ */
+export type TestRun = {
+	/** The pinned nodes, by id: each gives this output. */
+	pinned: Record<string, PinnedOutput>;
+	/** The skipped nodes, by id: each gives this outcome and empty output fields. */
+	skipped: Record<string, Outcome>;
+};
+
+/** How a step stood in for its node in a test run: `StepStarted.test`. */
+export type StandIn = "pinned" | "skipped";
+
 /** Input values of a flow, by input name. */
 export type InputValues = Record<string, JsonValue>;
 
@@ -284,6 +312,12 @@ export type EnginePayloads = {
 		 * no base. Absent: it works in its own copy of the project.
 		 */
 		runFolder?: true;
+		/**
+		 * A test run (ADR 27): the nodes that stand in for themselves, with
+		 * the output each pin gives. The run keeps nothing that lasts.
+		 * Absent: every node runs.
+		 */
+		test?: TestRun;
 	};
 	WorktreeCreated: { worktreePath: string; branch: string; baseRef: string };
 	/**
@@ -377,6 +411,12 @@ export type EnginePayloads = {
 		 * reads those from the step's outputs).
 		 */
 		rung?: StepRung;
+		/**
+		 * The step stands in for its node in a test run (ADR 27): it gives
+		 * the pinned output or the skipped outcome, on no Device and with no
+		 * rung. Absent: the node ran.
+		 */
+		test?: StandIn;
 	} & StepBudget;
 	/**
 	 * An ended step runs again: an Agent step in a new session of the same
@@ -412,16 +452,16 @@ export type EnginePayloads = {
 		/**
 		 * The kept variables (`keep`) among `variables`, and the flow that
 		 * keeps them: another Replica saves them from this event too
-		 * (`ingestKeptValues`). Absent when the step wrote none, and in
-		 * older logs.
+		 * (`ingestKeptValues`). Absent when the step wrote none, in a test
+		 * run (ADR 27), and in older logs.
 		 */
 		kept?: { flowName: string; names: string[] };
 		/**
 		 * What a Since last run step saw new or changed (only the changes),
 		 * and the node it is the memory of: another Replica saves it from
 		 * this event too. Absent for every other step, when nothing was new
-		 * or changed, in a run of a flow that is not saved, and in older
-		 * logs.
+		 * or changed, in a run of a flow that is not saved, in a test run,
+		 * and in older logs.
 		 */
 		memory?: StepMemory;
 		/**
@@ -429,7 +469,7 @@ export type EnginePayloads = {
 		 * node has no output schema yet: the Walker keeps them on the node,
 		 * marked inferred (`ProjectFlows.keepShapes`). Absent when the node
 		 * has a schema, the step gave no data, its flow keeps none (a kit, a
-		 * quick run), and in older logs.
+		 * quick run, a test run), and in older logs.
 		 */
 		shapes?: Record<string, Record<string, unknown>>;
 	};

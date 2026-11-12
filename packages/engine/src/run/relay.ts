@@ -14,6 +14,10 @@ import { RunRefusal } from "../run-status";
 /** How long a Device waits for a run its Host started to arrive. */
 const RUN_ARRIVES_MS = 30_000;
 
+/** Why a test run does not start in a Space a Host keeps, for now. */
+export const TEST_RUN_ON_HOST =
+	"A test run cannot start yet in a Space that another computer keeps. Start the run without pins and skips.";
+
 /**
  * Runs another Device walks. The Walker is the only writer of its run's
  * events, so an action on such a run travels to it as a command through
@@ -63,6 +67,11 @@ export function createRunRelay(deps: {
 			input: StartRunInput,
 			spaceId: string,
 		): Promise<RunSummary> {
+			// The Host's start drops pins and skips, and would run every node
+			// for real. A test run starts there once it takes them (ADR 27).
+			if (input.test !== undefined) {
+				throw new Refusal("unavailable", TEST_RUN_ON_HOST);
+			}
 			if (!relay) throw new HostUnreachableError();
 			const { runId } = await relay.startRun({ ...input, spaceId });
 			const deadline = deps.now() + RUN_ARRIVES_MS;

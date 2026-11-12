@@ -21,6 +21,7 @@ import {
 	type StepOutcome,
 	scopeKey,
 	sessionCost,
+	type TestRun,
 	type TranscriptEntry,
 	type WaitReason,
 } from "../log";
@@ -184,6 +185,7 @@ export function runFacts(run: RunState) {
 		/** The worktree the log names: a run row has none when its Device was offline at the start. */
 		worktree: run.worktree,
 		...(run.runFolder ? { runFolder: true } : {}),
+		...(run.test ? { test: testOf(run.test) } : {}),
 		metrics: {
 			...runMetrics(
 				steps,
@@ -199,6 +201,14 @@ export function runFacts(run: RunState) {
 }
 
 export type RunFacts = ReturnType<typeof runFacts>;
+
+/** A test run's pinned and skipped nodes, by id, as its summary names them. */
+function testOf(test: TestRun): { pinned: string[]; skipped: string[] } {
+	return {
+		pinned: Object.keys(test.pinned).sort(),
+		skipped: Object.keys(test.skipped).sort(),
+	};
+}
 
 /** The run's status, or null for a run the log has nothing on. */
 function knownStatus(run: RunState): RunStatus | null {
@@ -493,6 +503,8 @@ export function toStepSummary(
 		sleeps: derived.sleeps.map(({ from, to }) => ({ from, to })),
 		metrics: stepMetrics(derived),
 		sources: stepSources(derived.knowledge),
+		...(derived.test ? { test: derived.test } : {}),
+		...(derived.pinnedFrom ? { pinnedFrom: derived.pinnedFrom } : {}),
 	};
 }
 

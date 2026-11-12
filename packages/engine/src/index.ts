@@ -44,6 +44,7 @@ export {
 	permissionOf,
 	runCommandSchema,
 	startRunInputSchema,
+	startRunRequestSchema,
 } from "./contract";
 export {
 	type DashboardSummary,

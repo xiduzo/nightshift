@@ -30,6 +30,12 @@ import {
 	toSummary,
 } from "../read";
 import { checkServiceDevices } from "./service-devices";
+import {
+	checkTestRun,
+	type ResolvedTestRun,
+	resolveTestRun,
+	TEST_RUN_FROM_EDITOR,
+} from "./test-run";
 
 /**
  * Run start: from a `StartRunInput` to a run the runner drives. Two layers
@@ -54,6 +60,10 @@ import { checkServiceDevices } from "./service-devices";
  * - A run of a project without a folder (ADR 22) gets a run folder on its
  *   Device instead (`Device.runFolder`): empty, with no branch and no
  *   base. `RunStarted.runFolder` says so to every reader.
+ * - A test run (ADR 27, `test-run.ts`) is a person's start of a saved
+ *   flow with pins and skips. Its pins resolve from this Walker's log
+ *   before the plan, which leaves their nodes out; `RunStarted.test`
+ *   records the output each pin gives.
  */
 
 /** A base for a run of a project without a folder: it has no branches. */
@@ -120,16 +130,20 @@ function runFolderNotes(groups: PlannedRun["groups"]): string[] {
  * has a Clone; the stop time is ahead; the inputs resolve. Throws the
  * refusal, returns the prepared run. A Device checks its Clone is ready
  * when it adds the worktree, before the run is written. A run of a
- * project without a folder (`runFolder`) takes no base.
+ * project without a folder (`runFolder`) takes no base. A test run's
+ * pins and skips (`test`) are checked first: the plan left their nodes
+ * out, so no Device answers for them.
  */
 export async function prepareRun(
 	input: StartRunInput,
 	planned: PlannedRun,
 	deps: { now(): number },
 	runFolder = false,
+	test: ResolvedTestRun | null = null,
 ): Promise<PreparedRun> {
 	const { flow, flowName, flowRevision, calledFlows, calledFlowRevisions } =
 		planned;
+	if (test) checkTestRun(flow, test);
 	if (runFolder && input.baseRef !== undefined) {
 		throw new Refusal("invalid", NO_BRANCHES);
 	}
@@ -254,6 +268,14 @@ export function createRunStart(deps: RunStartDeps) {
 		input: StartRunInput,
 		trigger: RunTrigger,
 	): Promise<RunSummary> {
+		// A test run is a person's start of a saved flow (ADR 27): a
+		// schedule, a webhook or a quick run never pins or skips a node.
+		if (
+			input.test !== undefined &&
+			(trigger.kind !== "manual" || input.flowName === undefined)
+		) {
+			throw new Refusal("invalid", TEST_RUN_FROM_EDITOR);
+		}
 		const runId = randomUUID();
 		let started: { row: RunRow; walkerId: string; device: Device } | undefined;
 		await runner.take(runId, {
@@ -263,6 +285,9 @@ export function createRunStart(deps: RunStartDeps) {
 					deps.startDeadlineMs ?? START_DEADLINE_MS,
 					async (deadline) => {
 						const projectRow = await deps.projectRow(input.projectId);
+						// A test run's pins come from this Walker's log, before the
+						// plan: it leaves their nodes out (ADR 27).
+						const test = await resolveTestRun(input.test, projectRow, log);
 						// Every run has a starter, and the plan names them: the Person
 						// who starts it, else this computer's owner (a schedule that
 						// names no Person fires here for them), as the Host of the
@@ -278,7 +303,13 @@ export function createRunStart(deps: RunStartDeps) {
 						const { device } = planned.run;
 						// A project without a folder: the run works in a run folder (ADR 22).
 						const runFolder = projectRow.folder === false;
-						const prepared = await prepareRun(input, planned, deps, runFolder);
+						const prepared = await prepareRun(
+							input,
+							planned,
+							deps,
+							runFolder,
+							test,
+						);
 						const {
 							flow,
 							flowName,
@@ -335,6 +366,7 @@ export function createRunStart(deps: RunStartDeps) {
 									trigger,
 									startedBy,
 									...(runFolder ? { runFolder: true as const } : {}),
+									...(test ? { test: test.test } : {}),
 								},
 							},
 							{

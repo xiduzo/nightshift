@@ -52,6 +52,7 @@ import type {
 	EnginePayloads,
 	InputValues,
 	LoggedEvent,
+	TestRun,
 } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";
 import type { PlacedRun } from "../log/run-row";
@@ -203,6 +204,8 @@ export type StartOptions = {
 	runFolder?: true;
 	/** Keeps the shapes a step gave on its node; default: nothing keeps them. */
 	keepShapes?: StepShared["keepShapes"];
+	/** A test run's pins and skips, as `RunStarted` records them (ADR 27). */
+	test?: TestRun;
 };
 
 let runs = 0;
@@ -279,6 +282,7 @@ export async function startRun(
 			start: flow.start,
 			inputs: options.inputs ?? {},
 			...(options.runFolder ? { runFolder: true as const } : {}),
+			...(options.test ? { test: options.test } : {}),
 		},
 	});
 	const bus = createRunBus();

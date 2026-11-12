@@ -19,6 +19,7 @@ import {
 	type RunState,
 	type RunWarningKind,
 	type Scope,
+	type StandIn,
 	type StepBudget,
 	type StepEvent,
 	type StepGuard,
@@ -144,8 +145,12 @@ const GUARD_WARNINGS = {
  * that ends on its answer).
  */
 export type StepStart =
-	/** `untimed`: the step has no timers, whatever its kind says: the Gate of a cascade's person tier. */
-	| { kind: "new"; untimed?: true }
+	/**
+	 * `untimed`: the step has no timers, whatever its kind says: the Gate of
+	 * a cascade's person tier. `standIn`: the step stands in for its node in
+	 * a test run (ADR 27): no timers, no Device, no rung.
+	 */
+	| { kind: "new"; untimed?: true; standIn?: StandIn }
 	| { kind: "reopen"; stepId: string; prompt: string | null }
 	| { kind: "continue"; stepId: string; quiet?: boolean };
 
@@ -347,6 +352,12 @@ export type StepSpec = {
 		climbs(end: Pick<StepEnd, "outcome" | "outputs" | "error">): boolean;
 		command(end: StepEnd): Command;
 	};
+	/**
+	 * The step stands in for its node in a test run (`stand-in.ts`, ADR 27):
+	 * the body only gives the pinned output or the skipped outcome. The
+	 * step asks no Device, records no changes, and scores nothing.
+	 */
+	standIn?: StandIn;
 };
 
 /**
@@ -381,7 +392,9 @@ export async function runStep(
 		node,
 		state,
 		config,
-		entryOf(entry),
+		spec.standIn && entry.kind === "new"
+			? { kind: "new", standIn: spec.standIn }
+			: entryOf(entry),
 		runState,
 	);
 	if (begun.kind === "parked") return begun.command;
@@ -404,11 +417,12 @@ export async function runStep(
 	let result: BodyResult;
 	let changes: ChangesWatch | null = null;
 	try {
-		const notReady = await readyDevice(ctx, node, step);
+		// A stand-in works on no Device: it only gives its output.
+		const notReady = spec.standIn ? null : await readyDevice(ctx, node, step);
 		if (notReady) result = notReady;
 		else {
 			// Once the worktree is there: what the body changes in it.
-			changes = await watchChanges(ctx, node, step);
+			changes = spec.standIn ? null : await watchChanges(ctx, node, step);
 			result = await spec.body(step, entry);
 		}
 	} catch (error) {
@@ -440,6 +454,7 @@ export async function runStep(
 	 * Ends the step, then climbs (a try that did not hold, with a try left)
 	 * or routes. A step that does not climb scores what its data says
 	 * (`dataScores`). A climbing try scores nothing: only the try that lands.
+	 * A stand-in scores nothing either: its data is an earlier step's.
 	 */
 	const endAndGo = async (
 		outcome: StepOutcome,
@@ -451,7 +466,8 @@ export async function runStep(
 		},
 	): Promise<Command> => {
 		const climbing = spec.climb?.climbs({ outcome, outputs, error }) ?? false;
-		const scores = climbing ? [] : await dataScores(step, node, outputs);
+		const scores =
+			climbing || spec.standIn ? [] : await dataScores(step, node, outputs);
 		const end = await step.end(outcome, outputs, error, {
 			...costs,
 			...(climbing ? { skipWrites: true } : {}),
@@ -721,8 +737,10 @@ export async function beginStep(
 	// Agent step has an idle clock (its own, else the policy's). The log
 	// keeps the same limits, so they hold when the timers do not
 	// (`deriveStepClocks`).
+	// A stand-in of a test run gives its output at once: it has no timers.
+	const standIn = start.kind === "new" ? start.standIn : undefined;
 	const { timeoutMinutes, idleMinutes } =
-		start.kind === "new" && start.untimed
+		start.kind === "new" && (start.untimed || standIn)
 			? { timeoutMinutes: undefined, idleMinutes: undefined }
 			: ctx.kindOf(node).timeBudget(node, ctx.policy());
 	const budget: StepBudget = {
@@ -786,17 +804,21 @@ export async function beginStep(
 		stepId = randomUUID();
 		path = ctx.log.files(runId).transcript(stepId);
 		visit = positionOf(state, logged, scope).nextVisit(node);
-		const logPath = ctx.kindOf(node).logsCommandOutput(node)
-			? ctx.log.files(runId).commandLog(stepId)
-			: null;
-		// Its rung, from the node as its flow has it: a tier's node has no cascade.
-		const rung = stepRung(
-			ctx.flow.nodes.find((each) => each.id === node.id) ?? node,
-			state,
-		);
+		const logPath =
+			!standIn && ctx.kindOf(node).logsCommandOutput(node)
+				? ctx.log.files(runId).commandLog(stepId)
+				: null;
+		// Its rung, from the node as its flow has it: a tier's node has no
+		// cascade. A stand-in is on no rung: nobody worked or decided.
+		const rung = standIn
+			? null
+			: stepRung(
+					ctx.flow.nodes.find((each) => each.id === node.id) ?? node,
+					state,
+				);
 		// The log writes the step's row with its event, in one batch: a stop
 		// lands before or after both. `deviceId` is the Device the step runs
-		// on (its Placement), not the Walker.
+		// on (its Placement), not the Walker. A stand-in runs on none.
 		await ctx.log.append({
 			type: "StepStarted",
 			runId,
@@ -808,7 +830,7 @@ export async function beginStep(
 				transcriptPath: path,
 				logPath,
 				scope,
-				deviceId: device.id,
+				...(standIn ? { test: standIn } : { deviceId: device.id }),
 				...(rung ? { rung } : {}),
 				...budget,
 			},
@@ -999,9 +1021,12 @@ export async function beginStep(
 				written.ok && Object.keys(written.values).length > 0
 					? written.values
 					: undefined;
+			// A test run keeps nothing that lasts (ADR 27): no kept values, no
+			// memory and no shapes. Its steps still read them.
+			const lasting = logged.test === null;
 			// A write of a kept variable saves it for the next run: the log
 			// writes the values `kept` names, in the batch of the step's end.
-			const keptFlow = variables ? keptFlowOf(ctx, scope) : null;
+			const keptFlow = variables && lasting ? keptFlowOf(ctx, scope) : null;
 			const keptWritten =
 				variables && keptFlow
 					? Object.keys(variables).filter((name) =>
@@ -1010,10 +1035,12 @@ export async function beginStep(
 					: [];
 			// The shapes of the step's data, for a node with no schema yet:
 			// the Walker keeps them on the node after the end (`kept-shapes.ts`).
-			const shapes = extra?.skipWrites
-				? undefined
-				: stepShapes(ctx, node, scope, outcome, outputs);
-			const opened = pullRequestOf(outputs);
+			const shapes =
+				extra?.skipWrites || !lasting
+					? undefined
+					: stepShapes(ctx, node, scope, outcome, outputs);
+			// A stand-in's outputs are an earlier step's: it opened nothing.
+			const opened = standIn ? null : pullRequestOf(outputs);
 			if (opened) {
 				await ctx.log.append({
 					type: "PullRequestOpened",
@@ -1041,7 +1068,9 @@ export async function beginStep(
 						: {}),
 					...(written.ok && extra?.guard ? { guard: extra.guard } : {}),
 					// A step that ends `error` instead runs again: it saw nothing yet.
-					...(written.ok && extra?.memory ? { memory: extra.memory } : {}),
+					...(written.ok && lasting && extra?.memory
+						? { memory: extra.memory }
+						: {}),
 					...(shapes ? { shapes } : {}),
 				},
 			});

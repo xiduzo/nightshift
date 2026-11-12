@@ -44,4 +44,9 @@ export {
 	OlderHostError,
 	type Relay,
 } from "./relay";
-export { type StartRunInput, startRunInputSchema } from "./start-run";
+export {
+	type StartRunInput,
+	startRunInputSchema,
+	startRunRequestSchema,
+	type TestRunRequest,
+} from "./start-run";

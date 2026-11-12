@@ -135,6 +135,11 @@ function unplacedOf(flows: readonly Flow[]): FlowNode[] {
 	);
 }
 
+/**
+ * The Devices of a run's nodes, in the order above. `flows` are the run's
+ * flow and the flows it calls, without a test run's stand-ins (ADR 27):
+ * those run on no Device, so they never pass a Device over.
+ */
 export async function chooseDevices(
 	flows: readonly Flow[],
 	start: Pick<StartRunInput, "deviceId" | "startedFrom">,

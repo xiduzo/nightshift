@@ -18,6 +18,7 @@ import {
 	waitNodeId,
 } from "./route";
 import { waitNode } from "./sleep";
+import { standsIn, withStandIn } from "./stand-in";
 import { RunState } from "./state";
 
 /**
@@ -70,7 +71,16 @@ export function compileFlow(flow: Flow, ctx: StepContext) {
 				}
 			}
 		}
-		graph.addNode(node.id, kind.make(node, ctx), { ends: [...ends, ...own] });
+		// A node of the run's own flow stands in where a test run pins or
+		// skips it (`stand-in.ts`, ADR 27). A called flow runs as it is.
+		const made = kind.make(node, ctx);
+		graph.addNode(
+			node.id,
+			ctx.callPath.length === 0 && standsIn(node)
+				? withStandIn(node, ctx, made)
+				: made,
+			{ ends: [...ends, ...own] },
+		);
 		graph.addNode(park, parkNode(node), { ends: [node.id] });
 	}
 	if ((flow.variables ?? []).length > 0) {

@@ -20,6 +20,7 @@ import type {
 	RunWarningKind,
 	Scope,
 	SessionOutcome,
+	StandIn,
 	StepOutcome,
 	TranscriptEntry,
 	VariableChange,
@@ -110,6 +111,14 @@ export type StepSummary = {
 	metrics?: RunMetrics;
 	/** The knowledge files its agents used: read, or at the top of a search. Older Hosts send none. */
 	sources?: StepSource[];
+	/**
+	 * The step stood in for its node in a test run (ADR 27): it gave a
+	 * pinned output or a skipped outcome, and its node did not run. Absent:
+	 * the node ran.
+	 */
+	test?: StandIn;
+	/** A pinned step: the step of an earlier run its output comes from, and when that step ended. */
+	pinnedFrom?: { runId: string; stepId: string; endedAt: number };
 };
 
 /**
@@ -271,6 +280,11 @@ export type RunSummary = {
 	 * Older Hosts send none.
 	 */
 	metrics?: RunMetrics;
+	/**
+	 * A test run (ADR 27): the nodes its start pinned and skipped, by id.
+	 * It keeps nothing that lasts. Absent: every node ran for real.
+	 */
+	test?: { pinned: string[]; skipped: string[] };
 };
 
 /**
