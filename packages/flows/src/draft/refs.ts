@@ -83,7 +83,9 @@ export function renameVarRefs(text: string, from: string, to: string): string {
  * Rewrites the name `from` where a rule or an expression reads it at the
  * top: `from.data.x`, `` `from`.data ``. A string, a `$` variable, a key
  * below another name and the rule's own names (`also`: `previous`,
- * `current`) stay. A rule that is not valid stays as it is.
+ * `current`) stay. A rule that is not valid stays as it is. So does a
+ * rule whose own name `to` is: it would read its own value, not the
+ * node, so the old name stays for the check to show.
  */
 function renameInRule(
 	text: string,
@@ -91,7 +93,7 @@ function renameInRule(
 	to: string,
 	also: readonly string[] = [],
 ): string {
-	if (also.includes(from)) return text;
+	if (also.includes(from) || also.includes(to)) return text;
 	return rewriteRuleNames(text, (name) => (name === from ? to : undefined));
 }
 

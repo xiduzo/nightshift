@@ -558,4 +558,18 @@ describe("renameNode follows every rule", () => {
 			);
 		},
 	);
+
+	// The rule would read its own value under that name: the old name
+	// stays, so the check shows the rule to fix.
+	test("a rule keeps the old name when the new name is one of its own", () => {
+		const when = "current - previous > scout.data.limit";
+		const flow = scoutAndReader({
+			type: "since-last-run",
+			value: "{{vars.seen}}",
+			when,
+		});
+		expect(renameNode(flow, "scout", "previous").nodes[1]).toMatchObject({
+			when,
+		});
+	});
 });
