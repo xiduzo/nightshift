@@ -330,11 +330,13 @@ describe("the run tools of nightshift mcp", () => {
 						basis: "unknown",
 					},
 					prUrl: "https://github.com/acme/app/pull/7",
+					report: null,
 				}),
 			}),
 			{ project: "p1" },
 		);
-		const lines = (await call("get_run", { run: "run-1" })).text.split("\n");
+		const text = (await call("get_run", { run: "run-1" })).text;
+		const lines = text.split("\n");
 		const status = lines.findIndex((l) => l.startsWith("Status:"));
 		expect(lines.slice(status, status + 4)).toEqual([
 			"Status: finished",
@@ -342,6 +344,75 @@ describe("the run tools of nightshift mcp", () => {
 			"Pull request: https://github.com/acme/app/pull/7",
 			"Open it at http://localhost:9/runs/run-1",
 		]);
+		expect(text).not.toContain("## The report of the run");
+	});
+
+	test("get_run ends with the run's report, and where to read the rest", async () => {
+		const reportOf = (report: {
+			text: string;
+			partial?: boolean;
+			cut?: boolean;
+		}) =>
+			fakePort({
+				run: async (_project, runId) => ({
+					run: {
+						id: runId,
+						status: "finished",
+						reason: null,
+						inputs: {},
+						flow,
+						steps: [],
+						failedStepId: null,
+						transcript: [],
+					},
+					flowName: "existing",
+					cost: {
+						usd: 0,
+						estimated: false,
+						missing: 0,
+						calls: 0,
+						basis: null,
+					},
+					prUrl: null,
+					report: {
+						stepId: "s9",
+						partial: false,
+						cut: false,
+						...report,
+					},
+				}),
+			});
+		const whole = await connect(
+			reportOf({ text: "## What is new\n\n- Two new sources\n" }),
+			{ project: "p1" },
+		);
+		const text = (await whole.call("get_run", { run: "run-1" })).text;
+		expect(text.endsWith("## What is new\n\n- Two new sources")).toBe(true);
+		expect(text).toContain("## The report of the run");
+		expect(text).not.toContain("Only the start");
+
+		// A long report: the start, and the link to the End step.
+		const long = await connect(
+			reportOf({ text: `${"word ".repeat(2_000)}\nthe end`, cut: true }),
+			{ project: "p1" },
+		);
+		const start = (await long.call("get_run", { run: "run-1" })).text;
+		expect(start).not.toContain("the end");
+		expect(start).toContain(
+			"(Only the start of the report. Read all of it at http://localhost:9/runs/run-1?step=s9)",
+		);
+		expect(start).toContain(
+			"(Night Shift kept the first 64 KB of this report.)",
+		);
+
+		// Only the excerpt was at hand.
+		const partial = await connect(
+			reportOf({ text: "## What is new", partial: true }),
+			{ project: "p1" },
+		);
+		expect((await partial.call("get_run", { run: "run-1" })).text).toContain(
+			"(Only the start of the report.",
+		);
 	});
 
 	test("stop_run stops now or after the step", async () => {

@@ -97,6 +97,18 @@ export type TerminalGate = {
 	answerPending: boolean;
 };
 
+/** What a run produced: the report of the End node that ended it (ADR 26). */
+export type TerminalReport = {
+	/** The End step that wrote it. */
+	stepId: string;
+	/** Markdown: the whole report, or its start when `partial`. */
+	text: string;
+	/** `text` is only the start of the report. */
+	partial: boolean;
+	/** Night Shift kept only the first 64 KB of a longer report. */
+	cut: boolean;
+};
+
 /** What the run tools read and do: Night Shift on this computer. */
 export type TerminalRunPort = {
 	flows(projectId: string): Promise<ProjectFlowMap>;
@@ -114,6 +126,8 @@ export type TerminalRunPort = {
 		flowName: string | null;
 		cost: TerminalCost;
 		prUrl: string | null;
+		/** Null: the run ended without one, or has not ended. */
+		report: TerminalReport | null;
 	} | null>;
 	/** Stops a run now, or after the step that runs now. */
 	stopRun(runId: string, when: "now" | "after-step"): Promise<void>;
@@ -131,6 +145,35 @@ export type TerminalRunPort = {
 
 const RUNS_DEFAULT = 10;
 const RUNS_MAX = 50;
+/** At most this many characters of a run's report go into `get_run`. */
+const REPORT_LIMIT = 8_000;
+
+/**
+ * The report of a run as the end of `get_run`: the Markdown, at most
+ * {@link REPORT_LIMIT} characters, and where to read the rest.
+ */
+function reportSection(report: TerminalReport, link: string): string {
+	const long = report.text.length > REPORT_LIMIT;
+	const text = long
+		? report.text.slice(0, REPORT_LIMIT).trimEnd()
+		: report.text.trimEnd();
+	const notes = [
+		...(long || report.partial
+			? [`(Only the start of the report. Read all of it at ${link})`]
+			: []),
+		...(report.cut
+			? ["(Night Shift kept the first 64 KB of this report.)"]
+			: []),
+	];
+	return [
+		"## The report of the run",
+		"",
+		"What the run produced, written by its End node:",
+		"",
+		text,
+		...(notes.length > 0 ? ["", ...notes] : []),
+	].join("\n");
+}
 
 const projectProperty = {
 	type: "string",
@@ -286,7 +329,7 @@ export function terminalRunTools(
 		toolDefinition({
 			name: AUTHORING_TOOLS.getRun,
 			description:
-				"One run of the project: its status, why it ended, its cost, the pull request it opened, its steps with their outcomes and notes, and the end of the failed step's transcript. Use it to follow a run you started, or to see why one failed.",
+				"One run of the project: its status, why it ended, its cost, the pull request it opened, its steps with their outcomes and notes, the end of the failed step's transcript, and its report. Use it to follow a run you started, to see why one failed, or to read what it produced.",
 			inputSchema: {
 				type: "object",
 				properties: {
@@ -323,6 +366,11 @@ export function terminalRunTools(
 			const lines = report.split("\n");
 			const status = lines.findIndex((line) => line.startsWith("Status:"));
 			lines.splice(status + 1, 0, ...facts);
+			// What the run produced comes last, after the steps.
+			if (found.report) {
+				const link = port.runLink(found.run.id, found.report.stepId);
+				lines.push("", reportSection(found.report, link));
+			}
 			return lines.join("\n");
 		}),
 		toolDefinition({

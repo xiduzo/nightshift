@@ -135,7 +135,7 @@ From a clone, put the full `bun` command after `--`.
 | `check_flow`, `save_flow` | Check a flow, and save it when it has no errors. |
 | `start_run` | Start a saved flow with its inputs. |
 | `list_runs` | The newest runs, by status and since a time. Each with its cost and pull request. |
-| `get_run` | One run: its status, cost, pull request, steps, and why it failed. |
+| `get_run` | One run: its status, cost, pull request, steps, why it failed, and its report. |
 | `stop_run` | Stop a run now, or after the step that runs now. |
 | `needs_me` | The Gates that wait for you, in every project, with the question and the options. |
 | `answer_gate` | Answer a Gate with one of its options and a note. The run continues. |
