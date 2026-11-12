@@ -58,18 +58,14 @@ import {
 	sectionBoundary,
 	sectionsWithin,
 } from "../sections";
-import {
-	ruleNames,
-	ruleVariableNames,
-	type TemplateRef,
-	templateRefs,
-} from "../template";
+import { ruleNames, type TemplateRef, templateRefs } from "../template";
 import {
 	type FlowIssue,
 	type ValidateOptions,
 	validateFlow,
 } from "../validate";
-import { rewriteOwnTemplates, rewriteRefs, rewriteTemplates } from "./refs";
+import { type NodeRead, readsOf, rulesOf } from "./reads";
+import { rewriteRefs, rewriteTemplates } from "./refs";
 import { removeSectionAndInside, updateSection } from "./sections";
 
 export type SubflowOptions = {
@@ -327,75 +323,8 @@ function validateOptions(options: SubflowOptions): ValidateOptions {
 			};
 }
 
-/** A template a node holds. `self`: a variable write's value, where the node's id reads the step that just ended. */
-type Text = { text: string; self: boolean };
-
-/** One reference of a template or a rule to a node, an input, a variable or `run`. */
-type Read = {
-	reader: SubflowReader;
-	name: string;
-	/** The path below the name; rules give none. */
-	path: string[];
-	self: boolean;
-	rule: boolean;
-};
-
-/** The templates of a node: its own, then the values of its variable writes. */
-function templatesOf(node: FlowNode): Text[] {
-	const texts: Text[] = [];
-	rewriteOwnTemplates(node, (text) => {
-		texts.push({ text, self: false });
-		return text;
-	});
-	for (const write of node.set ?? []) {
-		if (write.value !== undefined)
-			texts.push({ text: write.value, self: true });
-	}
-	return texts;
-}
-
-/** The rules (JSONata) of a node: a Decision's `when`, a Value's expression, the expressions of its writes. */
-function rulesOf(node: FlowNode): Text[] {
-	const rules: Text[] = [];
-	if (node.type === "decision") {
-		for (const option of node.options) {
-			if (option.when !== undefined && option.when.trim() !== "")
-				rules.push({ text: option.when, self: false });
-		}
-	}
-	if (node.type === "value" && node.expression !== undefined) {
-		rules.push({ text: node.expression, self: false });
-	}
-	for (const write of node.set ?? []) {
-		if (write.expression !== undefined && write.expression.trim() !== "")
-			rules.push({ text: write.expression, self: true });
-	}
-	return rules;
-}
-
-/** Every reference the node's templates and rules make. */
-function readsOf(node: FlowNode): Read[] {
-	const reader = { node: node.id };
-	const reads: Read[] = [];
-	for (const { text, self } of templatesOf(node)) {
-		for (const ref of templateRefs(text)) {
-			reads.push({
-				reader,
-				name: ref.name,
-				path: ref.path,
-				self,
-				rule: false,
-			});
-		}
-	}
-	for (const { text, self } of rulesOf(node)) {
-		for (const name of ruleNames(text))
-			reads.push({ reader, name, path: [], self, rule: true });
-		for (const variable of ruleVariableNames(text))
-			reads.push({ reader, name: "vars", path: [variable], self, rule: true });
-	}
-	return reads;
-}
+/** One reference of a template or a rule: a node's (`readsOf`) or a flow output's. */
+type Read = Omit<NodeRead, "reader"> & { reader: SubflowReader };
 
 /** `run.flow`, `run.base_branch` and `run.index` in a rule, best effort. */
 function ruleRunFields(text: string): CallRunField[] {

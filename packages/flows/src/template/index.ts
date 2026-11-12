@@ -20,6 +20,7 @@ export {
 	ruleMessage,
 	ruleNames,
 	ruleProblem,
+	ruleRefs,
 	ruleVariableNames,
 	signalOutcome,
 } from "./rule";

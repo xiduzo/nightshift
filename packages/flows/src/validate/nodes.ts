@@ -71,6 +71,15 @@ export function checkNode(
 			return section ? nodesWithin(scope.flow, section) : null;
 		},
 	};
+	checkNodeWith(node, check);
+}
+
+/**
+ * Runs the checks of the node's own type through `check`. The flow check
+ * reports issues through it. A reader can collect every template and rule
+ * the checks read (`dataLinks`), so a new field needs no second list.
+ */
+export function checkNodeWith(node: FlowNode, check: NodeCheck): void {
 	switch (node.type) {
 		case "agent":
 			checkAgentNode(node, check);

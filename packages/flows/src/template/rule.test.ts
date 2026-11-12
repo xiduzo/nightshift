@@ -7,6 +7,7 @@ import {
 	ruleContext,
 	ruleNames,
 	ruleProblem,
+	ruleRefs,
 	signalOutcome,
 } from "./rule";
 
@@ -207,6 +208,24 @@ describe("ruleProblem and ruleNames", () => {
 		expect(ruleNames("build.data[tests_passed = true]")).toEqual(["build"]);
 		expect(ruleNames("$count(planner.data.tasks) > 3")).toEqual(["planner"]);
 		expect(ruleNames("broken (")).toEqual([]);
+	});
+
+	test("each place a rule reads a name, with the plain keys after it", () => {
+		expect(
+			ruleRefs(
+				"$count(scout.data.tasks[done = false].title) > 3 and check.outcome = 'pass' and scout",
+			),
+		).toEqual([
+			{ name: "scout", path: ["data", "tasks"] },
+			{ name: "check", path: ["outcome"] },
+			{ name: "scout", path: [] },
+		]);
+		expect(ruleRefs("build[0].data.x")).toEqual([{ name: "build", path: [] }]);
+		expect(ruleRefs("build.data.(a + b)")).toEqual([
+			{ name: "build", path: ["data"] },
+		]);
+		expect(ruleRefs("$x.y")).toEqual([]);
+		expect(ruleRefs("broken (")).toEqual([]);
 	});
 });
 

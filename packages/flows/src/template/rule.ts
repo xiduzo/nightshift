@@ -164,15 +164,28 @@ export function ruleMessage(error: unknown): string {
  * path step that is not the first are not top-level and are left out.
  */
 export function ruleNames(expr: string): string[] {
+	return [...new Set(ruleRefs(expr).map((ref) => ref.name))];
+}
+
+/** A top-level name a rule reads, with the keys after it. */
+type RuleRef = { name: string; path: string[] };
+
+/**
+ * Each place a rule reads a top-level name (`ruleNames`), with the plain
+ * keys after it: `build` and `data.tasks` in `build.data.tasks[0].title`.
+ * The keys stop after a step that filters or computes. Best effort, in
+ * the order of the rule.
+ */
+export function ruleRefs(expr: string): RuleRef[] {
 	let ast: unknown;
 	try {
 		ast = jsonata(expr).ast();
 	} catch {
 		return [];
 	}
-	const names = new Set<string>();
-	walk(ast, names, true);
-	return [...names];
+	const refs: RuleRef[] = [];
+	walk(ast, refs, true);
+	return refs;
 }
 
 /**
@@ -226,9 +239,9 @@ type AstNode = {
  * path whose first step is a name. Inside a `$` variable path or after a
  * step, the names are keys of that value, not context names.
  */
-function walk(node: unknown, names: Set<string>, top: boolean): void {
+function walk(node: unknown, refs: RuleRef[], top: boolean): void {
 	if (Array.isArray(node)) {
-		for (const child of node) walk(child, names, top);
+		for (const child of node) walk(child, refs, top);
 		return;
 	}
 	if (typeof node !== "object" || node === null) return;
@@ -236,23 +249,36 @@ function walk(node: unknown, names: Set<string>, top: boolean): void {
 	if (ast.type === "path" && Array.isArray(ast.steps)) {
 		const [first, ...rest] = ast.steps;
 		if (first?.type === "name" && typeof first.value === "string") {
-			if (top) names.add(first.value);
+			if (top) refs.push({ name: first.value, path: keysAfter(first, rest) });
 		} else {
-			walk(first, names, top);
+			walk(first, refs, top);
 		}
 		// Predicates and expressions inside later steps read their own value.
-		for (const step of rest) walk(stepChildren(step), names, false);
-		if (first) walk(stepChildren(first), names, false);
+		for (const step of rest) walk(stepChildren(step), refs, false);
+		if (first) walk(stepChildren(first), refs, false);
 		return;
 	}
 	if (ast.type === "name") {
-		if (top && typeof ast.value === "string") names.add(ast.value);
+		if (top && typeof ast.value === "string")
+			refs.push({ name: ast.value, path: [] });
 		return;
 	}
 	for (const [key, value] of Object.entries(ast)) {
 		if (key === "type" || key === "value" || key === "position") continue;
-		walk(value, names, top);
+		walk(value, refs, top);
 	}
+}
+
+/** The plain keys after a path's first step, up to one that filters or computes. */
+function keysAfter(first: AstNode, rest: readonly AstNode[]): string[] {
+	const keys: string[] = [];
+	if (stepChildren(first).length > 0) return keys;
+	for (const step of rest) {
+		if (step.type !== "name" || typeof step.value !== "string") break;
+		keys.push(step.value);
+		if (stepChildren(step).length > 0) break;
+	}
+	return keys;
 }
 
 /** Everything of a path step but its own name: predicates, stages, grouping. */

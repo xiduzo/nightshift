@@ -17,6 +17,7 @@ export type {
 	ProjectFlowMap,
 	ValidateOptions,
 } from "./issues";
+export { checkNodeWith } from "./nodes";
 export {
 	callersOf,
 	canonicalFlowJson,
