@@ -67,6 +67,11 @@ export type DashboardRun = {
 	tokens: { input: number; output: number } | null;
 	/** Its flow (on a project's dashboard), or its project (over all of them). */
 	group: string;
+	/**
+	 * A test run (`isTestRun`): the nodes its start pinned and skipped, as
+	 * on its run summary. Absent: no test run, or an older Host.
+	 */
+	test?: { pinned: string[]; skipped: string[] };
 };
 
 /** The first rows of a ranked list, and how many rows it has in all. */
@@ -443,10 +448,17 @@ export type NightsRange = {
 export type NightOutput = {
 	/** The start of the day: its midnight on the reader's clock. */
 	night: number;
+	/** Its runs, the test runs among them. */
 	runs: number;
+	/** Its spend: the test runs count in it. */
 	cost: KnownCost;
-	/** Tokens its runs used. */
+	/** Tokens its runs used, the test runs too. */
 	tokens: number;
+	/**
+	 * Of `runs`, the test runs (`isTestRun`): every count but the spend
+	 * leaves them out. Absent: none, or an older Host.
+	 */
+	tests?: number;
 	/**
 	 * Its newest runs, whole, so they show like any run list. `group` is its
 	 * flow or its project, as on a DashboardRun.

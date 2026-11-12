@@ -296,12 +296,19 @@ export type NightRange = (typeof NIGHT_RANGES)[number];
 
 /** How the runs of one project stand: what a project's row and the sidebar show. */
 export type ProjectRuns = {
+	/** Every run, as the run list shows them: the test runs too. */
 	total: number;
 	/** How many runs have each status. A status no run has is left out. */
 	statuses: Partial<Record<RunStatus, number>>;
 	/**
-	 * The same counts over the last 7, 30 and 90 days, on the reader's
-	 * clock, as the dashboard counts them. Older Hosts send none.
+	 * Of `statuses`, the test runs (`isTestRun`) by status: a count of runs
+	 * leaves them out. Absent: none, or an older Host.
+	 */
+	tests?: Partial<Record<RunStatus, number>>;
+	/**
+	 * The counts over the last 7, 30 and 90 days, on the reader's clock, as
+	 * the dashboard counts them: without the test runs. Older Hosts send
+	 * none. A Host of an older version counts the test runs in them.
 	 */
 	nights?: {
 		nights: NightRange;

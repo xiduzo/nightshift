@@ -322,6 +322,53 @@ describe("the read model", () => {
 		expect(counts.has("q")).toBe(false);
 	});
 
+	test("a project's test runs count in its run list, not in its days", async () => {
+		await sandbox.db.insert(run).values({
+			id: "r2",
+			spaceId: sandbox.spaceId,
+			projectId: "p",
+			flow: "{}",
+			title: "A test",
+			worktreePath: "/w",
+			branch: "b",
+			baseRef: "main",
+			walkerId: sandbox.deviceId,
+			createdAt: asDate(now() + 60_000),
+		});
+		await log.append({
+			type: "RunStarted",
+			runId: "r2",
+			payload: {
+				projectId: "p",
+				flowName: "f",
+				title: "t",
+				start: "a",
+				test: { pinned: {}, skipped: { check: "pass" } },
+			},
+		});
+		await log.append({
+			type: "RunEnded",
+			runId: "r2",
+			payload: { status: "failed", reason: "It broke." },
+		});
+		const counted = (await reads.projectRuns(sandbox.spaceId)).get("p");
+		// The run list shows it: the total and the statuses count it.
+		expect(counted).toMatchObject({
+			total: 2,
+			statuses: { running: 1, failed: 1 },
+			tests: { failed: 1 },
+			last: { id: "r2" },
+		});
+		// The days count as the dashboard does: without it.
+		expect(counted?.nights).toEqual(
+			([7, 30, 90] as const).map((nights) => ({
+				nights,
+				total: 1,
+				statuses: { running: 1 },
+			})),
+		);
+	});
+
 	test("a project's last days start at midnight on the reader's clock", async () => {
 		// 23:30 UTC on 3 November is 00:30 on 4 November in Amsterdam (UTC+1).
 		await sandbox.db

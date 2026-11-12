@@ -46,6 +46,8 @@ const projectRunsSchema = exact<ProjectRuns>()(
 	z.object({
 		total: z.number(),
 		statuses: z.partialRecord(runStatusSchema, z.number()),
+		/** The test runs among `statuses`. Older Hosts send none. */
+		tests: z.partialRecord(runStatusSchema, z.number()).optional(),
 		last: z
 			.object({ id: z.string(), title: z.string(), createdAt: z.number() })
 			.nullable(),

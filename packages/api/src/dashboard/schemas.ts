@@ -74,6 +74,10 @@ const dashboardRunSchema = z.object({
 	costMissing: z.number(),
 	tokens: z.object({ input: z.number(), output: z.number() }).nullable(),
 	group: z.string(),
+	/** A test run: the nodes its start pinned and skipped. Older Hosts send none. */
+	test: z
+		.object({ pinned: z.array(z.string()), skipped: z.array(z.string()) })
+		.optional(),
 });
 
 const gateStateSchema = z.enum(["answered", "unanswered", "waiting"]);
@@ -417,6 +421,8 @@ export const dashboardSummarySchema = exact<DashboardSummary>()(
 				runs: z.number(),
 				cost: knownCostSchema,
 				tokens: z.number(),
+				// The test runs among `runs`. Older Hosts send none.
+				tests: z.number().optional(),
 				latest: z.array(runSummarySchema.extend({ group: z.string() })),
 			})
 			.nullable(),

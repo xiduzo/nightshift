@@ -1,4 +1,5 @@
 import type { RunSummary } from "../read";
+import { isTestRun } from "../run-status";
 import { DAY_MS, dayStart, HOUR_MS, lastHours } from "./clock";
 import { FLOW_HEALTH_DAYS, flowHealthRows } from "./flow-health";
 import { askedGates, nightsRange, notTests, type PlacedRun } from "./nights";
@@ -284,11 +285,13 @@ function lastDayOf(runs: readonly PlacedRun[]): NightOutput | null {
 	const ofDay = runs
 		.filter(({ day }) => day === newest.day)
 		.sort((a, b) => b.run.createdAt - a.run.createdAt);
+	const tests = ofDay.filter(({ run }) => isTestRun(run)).length;
 	return {
 		night: newest.day,
 		runs: ofDay.length,
 		cost: sumKnownCost(ofDay.map(({ run }) => run)),
 		tokens: ofDay.reduce((sum, { run }) => sum + usedTokens(run), 0),
+		...(tests > 0 ? { tests } : {}),
 		latest: ofDay
 			.slice(0, OVERVIEW_ROWS)
 			.map(({ run, group }) => ({ ...run, group })),

@@ -1405,4 +1405,27 @@ describe("test runs", () => {
 			spent: { costUsd: 0.5 },
 		});
 	});
+
+	test("count in the latest day's spend, which says how many there were", () => {
+		const day = summarize(runs()).lastNight;
+		expect(day).toMatchObject({ runs: 2, tests: 1, cost: { costUsd: 3 } });
+		expect(day?.latest.map((run) => run.id)).toEqual(["try", "real"]);
+		// A day without test runs says nothing of them.
+		expect(
+			summarize([aRun({ createdAt: TODAY + HOUR })]).lastNight,
+		).not.toHaveProperty("tests");
+	});
+
+	test("show at work with their pins and skips", () => {
+		const summary = summarize([
+			tried({ id: "try", status: "running", createdAt: TODAY + HOUR }),
+			aRun({ id: "real", status: "running", createdAt: TODAY + 2 * HOUR }),
+		]);
+		expect(summary.open.rows.map((run) => [run.id, run.test])).toEqual([
+			["try", { pinned: ["fetch"], skipped: [] }],
+			["real", undefined],
+		]);
+		expect(summary.open.rows[1]).not.toHaveProperty("test");
+		expect(summary.open.running).toBe(2);
+	});
 });

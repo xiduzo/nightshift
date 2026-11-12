@@ -705,7 +705,9 @@ export function createReadModel(deps: ReadModelDeps) {
 	/** The run page of `row`, the run's row (the caller has read it). */
 	/**
 	 * How the runs of each project of the Space stand, by project id. A
-	 * project without runs is not in it. The facts are the run list's.
+	 * project without runs is not in it. The facts are the run list's. A
+	 * test run counts in `total` and `statuses`, as the run list shows it,
+	 * and in `tests`. The day ranges leave it out, as the dashboard does.
 	 */
 	async function projectRuns(
 		spaceId: string,
@@ -760,12 +762,18 @@ export function createReadModel(deps: ReadModelDeps) {
 			counted.total += 1;
 			counted.statuses[fact.status] = (counted.statuses[fact.status] ?? 0) + 1;
 			const createdAt = instant(row.createdAt);
-			ranges.forEach(({ first }, index) => {
-				const range = counted.nights?.[index];
-				if (!range || createdAt < first) return;
-				range.total += 1;
-				range.statuses[fact.status] = (range.statuses[fact.status] ?? 0) + 1;
-			});
+			if (isTestRun(fact)) {
+				const tests = counted.tests ?? {};
+				tests[fact.status] = (tests[fact.status] ?? 0) + 1;
+				counted.tests = tests;
+			} else {
+				ranges.forEach(({ first }, index) => {
+					const range = counted.nights?.[index];
+					if (!range || createdAt < first) return;
+					range.total += 1;
+					range.statuses[fact.status] = (range.statuses[fact.status] ?? 0) + 1;
+				});
+			}
 			if (
 				fact.wakeAt !== null &&
 				(counted.nextWakeAt === null || fact.wakeAt < counted.nextWakeAt)

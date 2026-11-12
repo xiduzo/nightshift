@@ -1,5 +1,5 @@
 import { isOpenStatus, type RunSummary } from "../read";
-import type { RunStatus } from "../run-status";
+import { isTestRun, type RunStatus } from "../run-status";
 import {
 	type DashboardRun,
 	type KnownCost,
@@ -152,5 +152,6 @@ export function toDashboardRun(run: RunSummary, group: string): DashboardRun {
 		costMissing: run.costMissing,
 		tokens: tokenCounts(run),
 		group,
+		...(isTestRun(run) ? { test: run.test } : {}),
 	};
 }
