@@ -10,11 +10,11 @@ import {
 } from "@nightshift/flows";
 import type {
 	GateBackgroundItem,
-	RungBy,
 	StepOutcome,
 	StepOutputs,
 	StepRung,
 } from "../log";
+import { CASCADE_RUNGS } from "../read";
 import type { StepEnd } from "./route";
 import { commitVisit } from "./run-position";
 import type {
@@ -134,14 +134,6 @@ function nextTry(
 	return next === null ? null : { ...next, trail: [...at.trail, done] };
 }
 
-/** Who tries a tier that is not a person, by the type of the node with the cascade. */
-const TIER_BY = {
-	agent: "agent",
-	call: "flow",
-	decision: "model",
-	value: "model",
-} as const satisfies Record<CascadeNode["type"], RungBy>;
-
 /**
  * Where a new step of `root` stands on its ladder (`StepStarted.rung`,
  * Q31): its tier and who tries it, from the node's position on its
@@ -163,7 +155,8 @@ export function stepRung(
 		const tier = tiers[at.tier];
 		if (tier === undefined) return null;
 		return {
-			by: isPersonTier(tier) ? "person" : TIER_BY[node.type],
+			// Who tries a tier that is not a person: by the node's type.
+			by: isPersonTier(tier) ? "person" : CASCADE_RUNGS[node.type].by,
 			tier: at.tier,
 			...(nextPlace(node, at) === null ? { last: true as const } : {}),
 		};

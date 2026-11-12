@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { FlowNodeType } from "@nightshift/flows";
 import type { StepOutcome, StepRung } from "../log";
 import { runEvents } from "../testing/run-events";
-import { ladderOf, landingsOf, runRungs } from "./ladder";
+import { CASCADE_RUNGS, ladderOf, landingsOf, runRungs } from "./ladder";
 import { deriveSteps } from "./run-views";
 
 /**
@@ -556,6 +556,25 @@ describe("landingsOf", () => {
 });
 
 describe("landingsOf, steps of an older Walker", () => {
+	test.each(
+		Object.entries(CASCADE_RUNGS) as [
+			FlowNodeType,
+			(typeof CASCADE_RUNGS)[keyof typeof CASCADE_RUNGS],
+		][],
+	)(
+		"a try of a %s lands on its ladder, by who tries its tier",
+		(nodeType, { ladder, by }) => {
+			const l = runEvents().runStarted();
+			step(l, "s1", "work", nodeType, undefined, "pass", {
+				tier: "small",
+				tries: 1,
+			});
+			expect(landings(l)).toMatchObject([
+				{ ladder, nodeType, rung: "first", by, tier: "small", tries: 1 },
+			]);
+		},
+	);
+
 	test("reads a cascade from its tier labels: the first label is the first tier", () => {
 		const l = runEvents().runStarted();
 		step(l, "s1", "build", "agent", undefined, "fail", {

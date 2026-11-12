@@ -1,4 +1,4 @@
-import type { FlowNodeType } from "@nightshift/flows";
+import type { CascadeNode, FlowNodeType } from "@nightshift/flows";
 import {
 	addCost,
 	type CostTally,
@@ -112,21 +112,28 @@ export type RunLadder = {
 	landings: Landing[];
 };
 
-/** The ladder each node type climbs. Any other type is on no ladder. */
-const LADDER_OF: Partial<Record<FlowNodeType, Ladder>> = {
-	agent: "work",
-	call: "work",
-	value: "work",
-	decision: "choice",
-};
+/**
+ * The node types that can have a cascade (ADR 6), one entry each: the
+ * ladder each climbs, and who tries a tier that is not a person. Only
+ * these types are on a ladder. A new type with a cascade does not
+ * compile without its entry. The climb (`graph/cascade.ts`) reads `by`
+ * for a new step's rung; this module reads it for a step of an older
+ * Walker, which names no rung.
+ */
+export const CASCADE_RUNGS = {
+	agent: { ladder: "work", by: "agent" },
+	call: { ladder: "work", by: "flow" },
+	decision: { ladder: "choice", by: "model" },
+	value: { ladder: "work", by: "model" },
+} as const satisfies Record<
+	CascadeNode["type"],
+	{ ladder: Ladder; by: RungBy }
+>;
 
-/** Who tries a cascade's tier that is not a person, by node type (older steps). */
-const TIER_BY: Partial<Record<FlowNodeType, RungBy>> = {
-	agent: "agent",
-	call: "flow",
-	value: "model",
-	decision: "model",
-};
+/** Whether a node type is on a ladder: one that can have a cascade. */
+function onLadder(type: FlowNodeType): type is CascadeNode["type"] {
+	return Object.hasOwn(CASCADE_RUNGS, type);
+}
 
 /** One step of an open climb, with the rung it stands on. */
 type ClimbStep = { step: DerivedStep; rung: StepRung };
@@ -144,8 +151,8 @@ export function ladderOf(steps: readonly DerivedStep[]): RunLadder {
 	const tries = new Map<string, TryRung>();
 	const landings: Landing[] = [];
 	for (const step of ordered) {
-		const ladder = LADDER_OF[step.nodeType];
-		if (ladder === undefined) continue;
+		if (!onLadder(step.nodeType)) continue;
+		const { ladder } = CASCADE_RUNGS[step.nodeType];
 		if (ladder === "work" && inCascadeTry(step, byId)) continue;
 		const key = climbKey(step);
 		const climb = open.get(key) ?? { steps: [], firstLabel: null };
@@ -282,8 +289,8 @@ function olderRung(
 	const label = tierOf(step);
 	if (label !== null) {
 		if (asked) return { by: "person" };
-		const by = TIER_BY[step.nodeType];
-		if (by === undefined) return null;
+		if (!onLadder(step.nodeType)) return null;
+		const { by } = CASCADE_RUNGS[step.nodeType];
 		// A try of the same climb follows: it counts its tries on.
 		const goesOn =
 			next !== undefined &&
