@@ -11,6 +11,7 @@ import {
 	isCustomHarness,
 	secretNameSchema,
 } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
@@ -54,9 +55,10 @@ export const connections = {
 			if (isCustomHarness(input.target)) {
 				const agent = customAgentOf(values.customAgents, input.target);
 				if (!agent) {
-					throw new ORPCError("NOT_FOUND", {
-						message: "This custom agent was removed. Add it again.",
-					});
+					throw new Refusal(
+						"not-found",
+						"This custom agent was removed. Add it again.",
+					);
 				}
 				return context.checks.customAgent(agent.command, agent.label);
 			}

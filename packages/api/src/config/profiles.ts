@@ -1,6 +1,6 @@
 import { saveProfile } from "@nightshift/engine/device-config";
 import { agentProfileSchema, modelProfileSchema } from "@nightshift/flows";
-import { ORPCError } from "@orpc/server";
+import { Refusal } from "@nightshift/refusal";
 import { z } from "zod";
 
 import { output } from "../output";
@@ -69,9 +69,7 @@ export const profiles = {
 		.input(z.object({ spaceId: z.string().min(1), projectId: z.string() }))
 		.handler(async ({ context, input }) => {
 			if ((await context.access.roleIn(input.spaceId)) === null) {
-				throw new ORPCError("NOT_FOUND", {
-					message: "That Space does not exist.",
-				});
+				throw new Refusal("not-found", "That Space does not exist.");
 			}
 			const devices = await context.engine
 				.space(input.spaceId, { personId: context.session.user.id })

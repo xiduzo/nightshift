@@ -2,7 +2,7 @@ import {
 	notificationSettingsPatchSchema,
 	registerScreenSchema,
 } from "@nightshift/notifications";
-import { ORPCError } from "@orpc/server";
+import { Refusal } from "@nightshift/refusal";
 import { z } from "zod";
 
 import { output, stream } from "../output";
@@ -96,10 +96,10 @@ export const notifications = {
 					input.id,
 				);
 				if (!removed) {
-					throw new ORPCError("NOT_FOUND", {
-						message:
-							"This phone or browser is not in your list. Reload the page to see the list.",
-					});
+					throw new Refusal(
+						"not-found",
+						"This phone or browser is not in your list. Reload the page to see the list.",
+					);
 				}
 			}),
 	},

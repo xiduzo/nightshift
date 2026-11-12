@@ -1941,4 +1941,60 @@ describe("the error rule at the API seam", () => {
 		});
 		expect(readable(declared, ["gates", "resolve"])).toBe(declared);
 	});
+
+	// What a procedure does not find is a refusal of kind not-found. The
+	// answer that goes over the wire is the plain NOT_FOUND (404) with the
+	// procedure's own words, not a declared error: a screen reads the same.
+	const owner: Caller = { kind: "person", role: "owner", owner: true };
+	const notFound: {
+		path: string;
+		input: unknown;
+		given?: Given;
+		message: string;
+	}[] = [
+		{
+			path: "notifications.targets.remove",
+			input: { id: "gone" },
+			given: { notifications: { targets: { remove: async () => false } } },
+			message:
+				"This phone or browser is not in your list. Reload the page to see the list.",
+		},
+		{
+			path: "profiles.catalog",
+			input: { spaceId: "another-space", ...project },
+			message: "That Space does not exist.",
+		},
+		{
+			path: "invitations.get",
+			input: { invitationId: "gone" },
+			message: "This invitation does not exist. Ask for a new one.",
+		},
+		{
+			path: "connections.check",
+			input: { target: "acp:gone" },
+			given: { settings: { current: settingsOf } },
+			message: "This custom agent was removed. Add it again.",
+		},
+	];
+	for (const { path, input, given, message } of notFound) {
+		test(`${path} refuses what it does not find as not found`, async () => {
+			const context = contextOf(sandbox.db, owner, given);
+			const error = await call(procedureAt(path), input, { context }).then(
+				() => {
+					throw new Error("The call did not fail.");
+				},
+				(error: unknown) => error,
+			);
+			if (!(error instanceof ORPCError)) throw error;
+			expect(error.toJSON()).toEqual({
+				defined: false,
+				code: "NOT_FOUND",
+				status: 404,
+				message,
+				data: undefined,
+			});
+			expect(error.cause).toBeInstanceOf(Refusal);
+			expect((error.cause as Refusal).kind).toBe("not-found");
+		});
+	}
 });

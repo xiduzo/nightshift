@@ -1,5 +1,5 @@
 import { invitationView, membersOf, spacesOf } from "@nightshift/auth";
-import { ORPCError } from "@orpc/server";
+import { Refusal } from "@nightshift/refusal";
 import { z } from "zod";
 
 import { output } from "../output";
@@ -145,9 +145,10 @@ export const invitations = {
 		.handler(async ({ context, input }) => {
 			const found = await invitationView(context.db, input.invitationId);
 			if (!found) {
-				throw new ORPCError("NOT_FOUND", {
-					message: "This invitation does not exist. Ask for a new one.",
-				});
+				throw new Refusal(
+					"not-found",
+					"This invitation does not exist. Ask for a new one.",
+				);
 			}
 			return found;
 		}),
