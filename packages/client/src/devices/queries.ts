@@ -40,8 +40,6 @@ export function createDeviceQueries(orpc: ApiQueryUtils) {
 /** The query options of Offers, and how often they poll. */
 export function createOfferQueries(orpc: ApiQueryUtils) {
 	return {
-		/** Every offers query. Invalidate it after an Offer is made or withdrawn. */
-		all: () => orpc.offers.key(),
 		/** The Offers of this computer, and the Spaces it can offer to. */
 		list: () => orpc.offers.list.queryOptions(),
 		/** The Offers of this computer. Polls; a failed background poll keeps the list. */

@@ -16,7 +16,7 @@ import {
 import { Input } from "@nightshift/ui/components/input";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { CircleAlertIcon, KeyRoundIcon, WandSparklesIcon } from "lucide-react";
 import { useId } from "react";
@@ -28,7 +28,7 @@ import { formatRelative, useNow } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { KeyValueRows } from "./connections/key-value-rows";
 import { FactList } from "./connections/parts";
-import { cliToolMutations, cliToolQueries, connectionQueries } from "./queries";
+import { cliToolMutations } from "./queries";
 import { type LoginDraft, loginPreset } from "./tool-login-draft";
 
 /**
@@ -190,17 +190,10 @@ export function LoginFields({
 
 /** The login of a CLI tool on its page: what it reads, its folder, and Sign in. */
 export function LoginSection({ tool }: { tool: CliTool }) {
-	const queryClient = useQueryClient();
 	const now = useNow(60_000);
 	const signIn = useMutation(
 		cliToolMutations.signIn({
 			onSuccess: (result) => {
-				void queryClient.invalidateQueries({
-					queryKey: cliToolQueries.lists(),
-				});
-				void queryClient.invalidateQueries({
-					queryKey: connectionQueries.lists(),
-				});
 				if (result.ok) toast.success(`Signed in ${tool.name}`);
 			},
 		}),

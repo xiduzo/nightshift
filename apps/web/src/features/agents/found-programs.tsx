@@ -7,7 +7,7 @@ import {
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { PlusIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
@@ -15,13 +15,7 @@ import type { CheckTarget, FoundProgram } from "@/shared/api";
 import type { Selection } from "./agents-selection";
 import { checkState, useCliCheck } from "./connections/cli-panel";
 import { CheckBadge } from "./connections/parts";
-import {
-	cliToolQueries,
-	harnessQueries,
-	profileQueries,
-	programMutations,
-	programQueries,
-} from "./queries";
+import { programMutations, programQueries } from "./queries";
 
 /**
  * The agent CLIs and the kits' tools that this computer has and that are
@@ -36,19 +30,10 @@ export function useFoundPrograms(
 	tools: FoundProgram[];
 	row: (program: FoundProgram) => ReactNode;
 } {
-	const queryClient = useQueryClient();
 	const found = useQuery(programQueries.found());
 	const setUp = useMutation(
 		programMutations.setUp({
 			onSuccess: (made) => {
-				for (const queryKey of [
-					programQueries.all(),
-					profileQueries.all(),
-					harnessQueries.all(),
-					cliToolQueries.lists(),
-				]) {
-					void queryClient.invalidateQueries({ queryKey });
-				}
 				if (made.kind === "agent") {
 					toast.success(`Added the profile ${made.name}`);
 					onSetUp({ kind: "profile", id: made.profileId });

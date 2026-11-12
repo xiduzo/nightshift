@@ -25,7 +25,7 @@ import {
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
 	BotIcon,
@@ -40,11 +40,7 @@ import type { Connection } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
 import { FactList, OffMachineNote, VariableBadge } from "./connections/parts";
 import { McpTestOutcome } from "./connections/test-result";
-import {
-	connectionMutations,
-	connectionQueries,
-	profileQueries,
-} from "./queries";
+import { connectionMutations } from "./queries";
 
 function host(url: string): string {
 	try {
@@ -75,17 +71,12 @@ export function ToolDetail({
 	onOpenSecrets: () => void;
 	onRemoved: () => void;
 }) {
-	const queryClient = useQueryClient();
 	const [removing, setRemoving] = useState(false);
 	const test = useMutation(connectionMutations.test());
 	const remove = useMutation(
 		connectionMutations.remove({
 			onSuccess: () => {
 				toast.success(`Removed ${connection.name}`);
-				void queryClient.invalidateQueries({
-					queryKey: connectionQueries.lists(),
-				});
-				void queryClient.invalidateQueries({ queryKey: profileQueries.all() });
 				onRemoved();
 			},
 			onError: (error) => toast.error(`Not removed: ${error.message}`),

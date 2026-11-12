@@ -18,10 +18,6 @@ import type {
 import { client, orpc } from "@/shared/api";
 
 export const profileQueries = {
-	/** Every profiles query. Invalidate it after a profile, a Connection or a CLI Tool changes. */
-	all: () => orpc.profiles.key(),
-	/** Every list of profiles. */
-	lists: () => orpc.profiles.list.key(),
 	/** The profiles of this computer: Agent Profiles and Model Profiles. */
 	list: () => orpc.profiles.list.queryOptions(),
 	/** The Agent Profiles of this computer, for Agent nodes and the assistant. */
@@ -44,10 +40,6 @@ export const profileMutations = {
 };
 
 export const harnessQueries = {
-	/** Every harnesses query. Invalidate it after a harness is added or removed. */
-	all: () => orpc.harnesses.key(),
-	/** Every list of harnesses. */
-	lists: () => orpc.harnesses.list.key(),
 	/** The harnesses of this computer, with their state and Custom Agents. */
 	list: () => orpc.harnesses.list.queryOptions(),
 	/** The models a harness offers. */
@@ -65,12 +57,8 @@ export const harnessMutations = {
 };
 
 export const connectionQueries = {
-	/** Every list of Connections. */
-	lists: () => orpc.connections.list.key(),
 	/** The Connections (MCP servers) of this computer. */
 	list: () => orpc.connections.list.queryOptions(),
-	/** Every check of a program or a harness login. */
-	checks: () => orpc.connections.check.key(),
 	/** Whether a program or a harness login is ready. */
 	check: (target: CheckTarget) =>
 		orpc.connections.check.queryOptions({ input: { target } }),
@@ -90,8 +78,6 @@ export const connectionMutations = {
 
 /** The secrets of a project (ADR 13): the Host of its Space keeps them. */
 export const projectSecretQueries = {
-	/** Every list of project secrets. Invalidate it after one is set, moved or removed. */
-	lists: () => orpc.projects.secrets.key(),
 	/** The secrets of one project: names, who set each and when. */
 	list: (projectId: string) =>
 		orpc.projects.secrets.queryOptions({ input: { projectId } }),
@@ -110,8 +96,6 @@ export const projectSecretMutations = {
 
 /** The secrets of the Space you work in (ADR 18). */
 export const spaceSecretQueries = {
-	/** Every list of Space secrets. Invalidate it after one is set, moved or removed. */
-	lists: () => orpc.projects.spaceSecrets.key(),
 	list: () => orpc.projects.spaceSecrets.queryOptions(),
 };
 
@@ -142,8 +126,6 @@ export const spaceSecretActions: SharedSecretActions = {
 };
 
 export const cliToolQueries = {
-	/** Every list of CLI Tools. */
-	lists: () => orpc.cliTools.list.key(),
 	/** The CLI Tools of this computer. */
 	list: () => orpc.cliTools.list.queryOptions(),
 	/** Whether this computer finds a CLI Tool. */
@@ -160,8 +142,6 @@ export const cliToolMutations = {
 };
 
 export const programQueries = {
-	/** Every query of the programs found on this computer. */
-	all: () => orpc.programs.key(),
 	/** The agent CLIs and the kits' tools on this computer that are not set up yet. */
 	found: () => orpc.programs.found.queryOptions(),
 };

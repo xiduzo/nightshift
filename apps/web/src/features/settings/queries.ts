@@ -11,8 +11,6 @@ import { createUsageQueries } from "@nightshift/client";
 import { orpc } from "@/shared/api";
 
 export const settingsQueries = {
-	/** Every settings query. Invalidate it after a change. */
-	all: () => orpc.settings.key(),
 	/** The settings view: the values, where each comes from, and the daemon facts. */
 	get: () => orpc.settings.get.queryOptions(),
 };
@@ -42,8 +40,6 @@ export const ollamaQueries = {
 	 * Whether it answers, has a model, and how far its download is: the
 	 * embedding model, unless `model` names another.
 	 */
-	/** Every Ollama query. Invalidate it after Ollama or a model changed. */
-	all: () => orpc.ollama.key(),
 	status: (model?: string) =>
 		model
 			? orpc.ollama.status.queryOptions({ input: { model } })

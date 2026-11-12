@@ -8,7 +8,7 @@ import {
 } from "@nightshift/ui/components/item";
 import { Progress } from "@nightshift/ui/components/progress";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { DownloadIcon } from "lucide-react";
 import { toast } from "sonner";
 import { ollamaMutations, ollamaQueries } from "@/features/settings/queries";
@@ -22,7 +22,6 @@ const DOWNLOAD_POLL_MS = 1_500;
  * Ollama has it, or does not answer: a step says so when it runs.
  */
 export function OllamaModelLine({ model }: { model: string }) {
-	const queryClient = useQueryClient();
 	const status = useQuery({
 		...ollamaQueries.status(model),
 		refetchInterval: (query) =>
@@ -31,11 +30,6 @@ export function OllamaModelLine({ model }: { model: string }) {
 	});
 	const pull = useMutation(
 		ollamaMutations.pull({
-			onSuccess: () => {
-				void queryClient.invalidateQueries({
-					queryKey: ollamaQueries.status(model).queryKey,
-				});
-			},
 			onError: (error) => toast.error(`Not downloaded: ${error.message}`),
 		}),
 	);

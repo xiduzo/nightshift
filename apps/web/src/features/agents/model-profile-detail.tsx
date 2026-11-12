@@ -26,7 +26,7 @@ import {
 	RadioGroup,
 	RadioGroupItem,
 } from "@nightshift/ui/components/radio-group";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { CircleAlertIcon, SparklesIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
@@ -43,7 +43,7 @@ import {
 } from "./model-address-draft";
 import { OllamaModelLine } from "./ollama-model";
 import { ProfileUsedIn } from "./profile-sections";
-import { deciderQueries, profileMutations, profileQueries } from "./queries";
+import { deciderQueries, profileMutations } from "./queries";
 
 const NAME = /^[a-z][a-z0-9_]{0,39}$/;
 
@@ -107,7 +107,6 @@ export function ModelProfileDetail({
 	onDirtyChange: (dirty: boolean) => void;
 }) {
 	const id = useId();
-	const queryClient = useQueryClient();
 	const saved = profile ? draftFrom(profile) : initial;
 	const [draft, setDraft] = useState<Draft>(saved);
 	const [deleting, setDeleting] = useState(false);
@@ -118,13 +117,10 @@ export function ModelProfileDetail({
 	const set = (patch: Partial<Draft>) =>
 		setDraft((current) => ({ ...current, ...patch }));
 
-	const invalidate = () =>
-		queryClient.invalidateQueries({ queryKey: profileQueries.all() });
 	const save = useMutation(
 		profileMutations.save({
 			onSuccess: (next) => {
 				toast.success(profile ? `Saved ${next.name}` : `Added ${next.name}`);
-				void invalidate();
 				onSaved(next.id);
 			},
 		}),
@@ -133,7 +129,6 @@ export function ModelProfileDetail({
 		profileMutations.remove({
 			onSuccess: () => {
 				toast.success(`Deleted ${profile?.name}`);
-				void invalidate();
 				onDeleted();
 			},
 			onError: (error) => toast.error(`Not deleted: ${error.message}`),

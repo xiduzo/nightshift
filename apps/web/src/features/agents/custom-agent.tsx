@@ -36,7 +36,7 @@ import {
 import { Input } from "@nightshift/ui/components/input";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import {
 	BotIcon,
 	CircleAlertIcon,
@@ -58,7 +58,7 @@ import {
 	rowsFrom,
 } from "./connections/key-value-rows";
 import { FactList, OffMachineNote } from "./connections/parts";
-import { connectionQueries, harnessMutations, harnessQueries } from "./queries";
+import { harnessMutations } from "./queries";
 
 /** `${NAME}`: a reference to a secret. */
 const ref = (name: string) => `$\{${name}}`;
@@ -130,7 +130,6 @@ function CustomAgentForm({
 	onDone: (slug?: string) => void;
 }) {
 	const id = useId();
-	const queryClient = useQueryClient();
 	const [label, setLabel] = useState(agent?.label ?? "");
 	const [command, setCommand] = useState(
 		agent ? joinCommand([agent.command, ...agent.args]) : "",
@@ -140,10 +139,6 @@ function CustomAgentForm({
 		harnessMutations.saveCustom({
 			onSuccess: (saved) => {
 				toast.success(agent ? `Saved ${saved.label}` : `Added ${saved.label}`);
-				void queryClient.invalidateQueries({ queryKey: harnessQueries.all() });
-				void queryClient.invalidateQueries({
-					queryKey: connectionQueries.checks(),
-				});
 				onDone(saved.slug);
 			},
 		}),
@@ -283,7 +278,6 @@ export function CustomAgentDetail({
 	onOpenProfile: (name: string) => void;
 	onRemoved: () => void;
 }) {
-	const queryClient = useQueryClient();
 	const [removing, setRemoving] = useState(false);
 	const check = useCliCheck(harness.name);
 	const data = check.data;
@@ -291,7 +285,6 @@ export function CustomAgentDetail({
 		harnessMutations.remove({
 			onSuccess: () => {
 				toast.success(`Removed ${agent.label}`);
-				void queryClient.invalidateQueries({ queryKey: harnessQueries.all() });
 				onRemoved();
 			},
 			onError: (error) => toast.error(`Not removed: ${error.message}`),

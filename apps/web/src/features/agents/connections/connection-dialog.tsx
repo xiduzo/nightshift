@@ -28,7 +28,7 @@ import {
 	ToggleGroup,
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import {
 	CircleAlertIcon,
 	PlugZapIcon,
@@ -39,11 +39,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Connection, McpServer } from "@/shared/api";
 import { LargerTextarea } from "@/shared/larger-window";
-import {
-	connectionMutations,
-	connectionQueries,
-	profileQueries,
-} from "../queries";
+import { connectionMutations } from "../queries";
 import {
 	type KeyValueRow,
 	KeyValueRows,
@@ -163,7 +159,6 @@ function ConnectionForm({
 	onDone: (name?: string) => void;
 }) {
 	const id = useId();
-	const queryClient = useQueryClient();
 	const [draft, setDraft] = useState(() => draftFrom(connection, kind));
 	const set = (patch: Partial<Draft>) =>
 		setDraft((current) => ({ ...current, ...patch }));
@@ -181,13 +176,6 @@ function ConnectionForm({
 				toast.success(
 					connection ? `Saved ${saved.name}` : `Added ${saved.name}`,
 				);
-				void queryClient.invalidateQueries({
-					queryKey: connectionQueries.lists(),
-				});
-				// A rename reaches the profiles that name it.
-				void queryClient.invalidateQueries({
-					queryKey: profileQueries.lists(),
-				});
 				onDone(saved.name);
 			},
 		}),

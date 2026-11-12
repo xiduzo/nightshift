@@ -293,12 +293,6 @@ function ChangePathForm({
 		settingsMutations.save({
 			onSuccess: (next, patch) => {
 				queryClient.setQueryData(settingsQueries.get().queryKey, next);
-				void queryClient.invalidateQueries({
-					queryKey: settingsQueries.all(),
-				});
-				void queryClient.invalidateQueries({
-					queryKey: connectionQueries.check(tool.target).queryKey,
-				});
 				toast.success(
 					patch[key] === null
 						? `${tool.title} uses the default again`

@@ -42,7 +42,7 @@ import {
 import { Input } from "@nightshift/ui/components/input";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
 	CircleAlertIcon,
 	RefreshCwIcon,
@@ -55,12 +55,7 @@ import { CodeView } from "@/shared/code";
 import { DetailSection, DetailShell } from "@/shared/detail";
 import { checkState } from "./connections/cli-panel";
 import { CheckBadge, FactList } from "./connections/parts";
-import {
-	cliToolMutations,
-	cliToolQueries,
-	connectionQueries,
-	profileQueries,
-} from "./queries";
+import { cliToolMutations, cliToolQueries } from "./queries";
 import { UsedBySection } from "./tool-detail";
 import { LoginFields, LoginSection } from "./tool-login";
 import { gitOf, loginDraftOf, loginOf, loginProblem } from "./tool-login-draft";
@@ -108,7 +103,6 @@ export function CliToolDetail({
 	onOpenProfile: (name: string) => void;
 	onRemoved: () => void;
 }) {
-	const queryClient = useQueryClient();
 	const [removing, setRemoving] = useState(false);
 	const check = useCliToolCheck(tool.name);
 	const data = check.data;
@@ -116,10 +110,6 @@ export function CliToolDetail({
 		cliToolMutations.remove({
 			onSuccess: () => {
 				toast.success(`Removed ${tool.name}`);
-				void queryClient.invalidateQueries({
-					queryKey: cliToolQueries.lists(),
-				});
-				void queryClient.invalidateQueries({ queryKey: profileQueries.all() });
 				onRemoved();
 			},
 			onError: (error) => toast.error(`Not removed: ${error.message}`),
@@ -322,7 +312,6 @@ function CliToolForm({
 	onDone: (name?: string) => void;
 }) {
 	const id = useId();
-	const queryClient = useQueryClient();
 	const [program, setProgram] = useState(tool?.program ?? tool?.name ?? "");
 	// A new tool is named after its program until the person names it.
 	const [name, setName] = useState(tool?.name ?? "");
@@ -338,12 +327,6 @@ function CliToolForm({
 		cliToolMutations.save({
 			onSuccess: (saved) => {
 				toast.success(tool ? `Saved ${saved.name}` : `Added ${saved.name}`);
-				void queryClient.invalidateQueries({
-					queryKey: cliToolQueries.lists(),
-				});
-				void queryClient.invalidateQueries({
-					queryKey: connectionQueries.lists(),
-				});
 				onDone(saved.name);
 			},
 		}),

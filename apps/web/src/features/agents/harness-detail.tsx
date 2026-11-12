@@ -27,7 +27,7 @@ import {
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { BotIcon, PlusIcon, SquareTerminalIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -42,7 +42,7 @@ import { CliCheckBadge, CliPanel, toolFor } from "./connections/cli-panel";
 import { MonoTile } from "./connections/parts";
 import type { BuiltInHarnessName } from "./harnesses";
 import { ModelSourceHint, useHarnessModels } from "./model-combobox";
-import { harnessMutations, harnessQueries } from "./queries";
+import { harnessMutations } from "./queries";
 
 export function HarnessDetail({
 	harness,
@@ -55,16 +55,12 @@ export function HarnessDetail({
 	onOpenProfile: (name: string) => void;
 	onRemoved: () => void;
 }) {
-	const queryClient = useQueryClient();
 	const [removing, setRemoving] = useState(false);
 	const models = useHarnessModels(harness.name);
 	const remove = useMutation(
 		harnessMutations.remove({
 			onSuccess: () => {
 				toast.success(`Removed ${harness.label}`);
-				void queryClient.invalidateQueries({
-					queryKey: harnessQueries.all(),
-				});
 				onRemoved();
 			},
 			onError: (error) => toast.error(`Not removed: ${error.message}`),
@@ -206,13 +202,9 @@ export function HarnessPicker({
 	/** Opens the custom agent form. */
 	onAddCustom: () => void;
 }) {
-	const queryClient = useQueryClient();
 	const add = useMutation(
 		harnessMutations.add({
 			onSuccess: (_, input) => {
-				void queryClient.invalidateQueries({
-					queryKey: harnessQueries.all(),
-				});
 				onOpenChange(false);
 				onAdded(input.harness as HarnessRowName);
 			},

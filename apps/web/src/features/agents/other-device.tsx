@@ -56,11 +56,7 @@ import {
 	type MoveTarget,
 	MoveToProjectDialog,
 } from "./connections/move-to-project-dialog";
-import {
-	connectionQueries,
-	otherDeviceMutations,
-	otherDeviceQueries,
-} from "./queries";
+import { otherDeviceMutations, otherDeviceQueries } from "./queries";
 
 /** Where a person changes the profiles of another device: there. */
 function profilesOn(device: Pick<OtherDevice, "name">): string {
@@ -179,9 +175,6 @@ function SecretNames({ device, now }: { device: OtherDevice; now: number }) {
 						: `Moved ${name} to Personal`,
 				);
 				forget(name);
-				void queryClient.invalidateQueries({
-					queryKey: connectionQueries.lists(),
-				});
 				setRemoving(null);
 			},
 			onError: (error, { to }) =>

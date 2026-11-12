@@ -37,7 +37,7 @@ import {
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { ShareIcon, TriangleAlertIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
@@ -89,7 +89,6 @@ function OfferForm({
 	onDone: () => void;
 }) {
 	const id = useId();
-	const queryClient = useQueryClient();
 	const listed = useQuery(offerQueries.list());
 	const spaces = listed.data?.spaces ?? [];
 	const [spaceId, setSpaceId] = useState<string | null>(null);
@@ -108,7 +107,6 @@ function OfferForm({
 				toast.success(
 					`Offered ${profile.name} to ${chosen?.name ?? "the Space"}`,
 				);
-				void queryClient.invalidateQueries({ queryKey: offerQueries.all() });
 				onDone();
 			},
 		}),
@@ -261,7 +259,6 @@ export function WithdrawOfferDialog({
 	} | null;
 	onOpenChange: (open: boolean) => void;
 }) {
-	const queryClient = useQueryClient();
 	const withdraw = useMutation(
 		offerMutations.withdraw({
 			onSuccess: () => {
@@ -271,8 +268,6 @@ export function WithdrawOfferDialog({
 				onOpenChange(false);
 			},
 			onError: (error) => toast.error(`Not withdrawn: ${error.message}`),
-			onSettled: () =>
-				queryClient.invalidateQueries({ queryKey: offerQueries.all() }),
 		}),
 	);
 	return (

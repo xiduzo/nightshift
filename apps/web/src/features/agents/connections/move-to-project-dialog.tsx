@@ -24,17 +24,13 @@ import {
 	SelectValue,
 } from "@nightshift/ui/components/select";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowRightLeftIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { projectQueries } from "@/features/projects";
-import {
-	connectionQueries,
-	projectSecretMutations,
-	projectSecretQueries,
-} from "../queries";
+import { projectSecretMutations } from "../queries";
 import type { SecretScope } from "./secret-parts";
 
 /**
@@ -88,7 +84,6 @@ function MoveToProjectForm({
 	onDone: () => void;
 }) {
 	const id = useId();
-	const queryClient = useQueryClient();
 	const navigate = useNavigate();
 	const projects = useQuery(projectQueries.list());
 	const choices = (projects.data ?? []).map((project) => ({
@@ -107,12 +102,6 @@ function MoveToProjectForm({
 						params: { projectId: input.projectId },
 					}),
 			},
-		});
-		void queryClient.invalidateQueries({
-			queryKey: connectionQueries.lists(),
-		});
-		void queryClient.invalidateQueries({
-			queryKey: projectSecretQueries.lists(),
 		});
 		onDone();
 	};

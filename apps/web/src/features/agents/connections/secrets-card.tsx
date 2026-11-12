@@ -61,7 +61,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import {
 	ArrowRightLeftIcon,
 	CircleAlertIcon,
@@ -77,12 +77,7 @@ import type { SecretView } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import { useNow } from "@/shared/format";
 import { PageSection } from "@/shared/page";
-import {
-	connectionMutations,
-	connectionQueries,
-	spaceSecretMutations,
-	spaceSecretQueries,
-} from "../queries";
+import { connectionMutations, spaceSecretMutations } from "../queries";
 import { MoveToProjectDialog } from "./move-to-project-dialog";
 import { OUTSIDE_HINT } from "./parts";
 import {
@@ -333,14 +328,10 @@ export function SecretsCard({
 	const [removing, setRemoving] = useState<SecretRef | null>(null);
 	const [toProject, setToProject] = useState<SecretRef | null>(null);
 	const now = useNow(60_000);
-	const queryClient = useQueryClient();
 	const moveSecret = useMutation(
 		connectionMutations.moveSecret({
 			onSuccess: (_, { name, to }) => {
 				toast.success(`Moved ${name} to ${SCOPE[to].label}`);
-				void queryClient.invalidateQueries({
-					queryKey: connectionQueries.lists(),
-				});
 			},
 			onError: (error) => toast.error(`Not moved: ${error.message}`),
 		}),
@@ -349,12 +340,6 @@ export function SecretsCard({
 		spaceSecretMutations.moveIn({
 			onSuccess: (_, { name }) => {
 				toast.success(`Moved ${name} to this Space`);
-				void queryClient.invalidateQueries({
-					queryKey: connectionQueries.lists(),
-				});
-				void queryClient.invalidateQueries({
-					queryKey: spaceSecretQueries.lists(),
-				});
 			},
 			onError: (error) => toast.error(`Not moved: ${error.message}`),
 		}),
@@ -560,7 +545,6 @@ function SecretForm({
 	onDone: () => void;
 }) {
 	const id = useId();
-	const queryClient = useQueryClient();
 	const [name, setName] = useState(fixedName ?? "");
 	const [value, setValue] = useState("");
 	const [scope, setScope] = useState<SecretScope>(initialScope);
@@ -568,9 +552,6 @@ function SecretForm({
 		connectionMutations.setSecret({
 			onSuccess: () => {
 				toast.success(`Saved ${name}`);
-				void queryClient.invalidateQueries({
-					queryKey: connectionQueries.lists(),
-				});
 				onDone();
 			},
 		}),
@@ -690,14 +671,10 @@ function RemoveSecretDialog({
 	secret: SecretView | null;
 	onOpenChange: (open: boolean) => void;
 }) {
-	const queryClient = useQueryClient();
 	const removeSecret = useMutation(
 		connectionMutations.removeSecret({
 			onSuccess: () => {
 				toast.success(`Removed ${target?.name}`);
-				void queryClient.invalidateQueries({
-					queryKey: connectionQueries.lists(),
-				});
 				onOpenChange(false);
 			},
 			onError: (error) => toast.error(`Not removed: ${error.message}`),
