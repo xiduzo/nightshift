@@ -134,6 +134,8 @@ describe("the Gate node", () => {
 				logPath: null,
 				scope: null,
 				deviceId: TEST_DEVICE_ID,
+				// A Gate is the person's rung of the choice ladder.
+				rung: { by: "person", last: true },
 			},
 		]);
 		expect(payloads(logged, "GateOpened")).toEqual([
