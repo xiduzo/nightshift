@@ -15,8 +15,8 @@ import { useReactFlow } from "@xyflow/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PaletteItem } from "../../canvas/node-type";
 import { freeSpot, useNewNodeSpot } from "../canvas-controls";
-import type { Selection, SelectionSetter } from "../selection";
-import type { DraftSetter } from "../session/editing-session";
+import type { EditingSession } from "../session/editing-session";
+import { useEditingSession } from "../session/use-editing-session";
 import type { CatalogAdd } from "./catalog";
 import { opensAddNode, trackFocusInput } from "./open-keys";
 import { useMyKits } from "./use-my-kits";
@@ -37,42 +37,34 @@ type Point = { x: number; y: number };
  * the one node selected and reads it (`addNodeAfter`). Every other node
  * lands where the canvas was double-clicked, or in the middle of the view.
  * A kit, or a flow of "My kits", goes in as a Subflow that runs it. A flow
- * of another project is copied here first. Each add is one change, through
- * `setDraft`, and selects the new node. While `disabled` (a proposal, a
- * revision or a Subflow on view), nothing opens it.
+ * of another project is copied here first. Each add is one step of the
+ * session, joins the open Section and selects the new node. While
+ * `disabled` (a proposal, a revision or a Subflow on view), nothing opens it.
  */
 export function useAddNodeDialog({
+	session,
 	projectId,
 	flowName,
 	flows,
-	flow,
-	setDraft,
-	selection,
-	setSelection,
 	defaults,
 	disabled,
 }: {
+	session: EditingSession;
 	projectId: string;
 	/** The flow open in the editor. */
 	flowName: string;
 	/** The project's other flows. Undefined while they load. */
 	flows: ProjectFlowMap | undefined;
-	flow: Flow;
-	setDraft: DraftSetter;
-	selection: Selection;
-	setSelection: SelectionSetter;
 	defaults: NodeDefaults | undefined;
 	disabled: boolean;
 }) {
+	const { draft: flow, selection } = useEditingSession(session);
 	const [open, setOpen] = useState(false);
 	// The point on the screen the canvas was double-clicked at, if it was.
 	const anchor = useRef<Point | undefined>(undefined);
 	const spot = useNewNodeSpot();
 	const { getInternalNode } = useReactFlow();
 	const myKits = useMyKits({ projectId, flowName, flows, draft: flow, open });
-	// The draft as it is now: a copy into the project takes a moment.
-	const latest = useRef(flow);
-	latest.current = flow;
 
 	const show = useCallback(
 		(at?: Point) => {
@@ -128,8 +120,8 @@ export function useAddNodeDialog({
 			: addNode(flow, item, spot(flow, anchor.current), defaults);
 
 	const commit = ({ flow: next, id }: { flow: Flow; id: string }) => {
-		setDraft(() => next);
-		setSelection({ kind: "node", id });
+		session.add(next);
+		session.select({ kind: "node", id });
 	};
 
 	/** A Subflow that runs the kit or the flow, placed as a node that takes nothing. */
@@ -137,7 +129,8 @@ export function useAddNodeDialog({
 		const at = anchor.current;
 		const name = project ? await myKits.copyHere(called, project) : called;
 		if (name === null) return;
-		const now = latest.current;
+		// The draft as it is now: a copy into the project takes a moment.
+		const now = session.get().draft;
 		commit(addCalledNode(now, name, spot(now, at)));
 	};
 

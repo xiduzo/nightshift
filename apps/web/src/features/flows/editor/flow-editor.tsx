@@ -1,8 +1,10 @@
 // The flow editor: the canvas, the floating panels, the inspector of what
 // is selected, saving, and the keys that act on the whole flow. Over 600
 // lines because it wires every inspector (node, edge, Section, flow) to the
-// one draft. The edits themselves live in `node-edits.ts`,
-// `sections/section-edits.ts` and `@nightshift/flows`.
+// one draft. The draft, its history, the selection and the open Section
+// live in the editing session (`session/editing-session.ts`). The edits
+// themselves live in `node-edits.ts`, `sections/section-edits.ts` and
+// `@nightshift/flows`.
 
 import type { Flow, FlowIssue } from "@nightshift/flows";
 import {
@@ -11,10 +13,8 @@ import {
 	kitFlow,
 	newElementFlow,
 	newFlow,
-	parentSection,
 	removeEdge,
 	removeNode,
-	sectionOf,
 	updateEdge,
 	updateNode,
 	updateSection,
@@ -105,12 +105,8 @@ import {
 	type Selection,
 	selectedNodeIds,
 	selectedSectionIds,
-	selectionIn,
 } from "./selection";
-import {
-	createEditingSession,
-	type DraftSetter,
-} from "./session/editing-session";
+import { createEditingSession } from "./session/editing-session";
 import { useEditingSession } from "./session/use-editing-session";
 import { SubflowView } from "./subflow/subflow-view";
 import { useSubflowStack } from "./subflow/use-subflow-stack";
@@ -162,13 +158,22 @@ function Editor({
 	const queryClient = useQueryClient();
 	const { fitView } = useReactFlow();
 
-	// The draft, its undo history and what was saved last.
+	// The draft, its undo history, what was saved last, what is selected
+	// and which Section is open.
 	const [session] = useState(() =>
 		createEditingSession(initialFlow, { saved: initiallySaved }),
 	);
-	const { draft, canUndo, canRedo, revision, dirty, everSaved } =
-		useEditingSession(session);
-	const [selection, setSelection] = useState<Selection>(null);
+	const {
+		draft,
+		canUndo,
+		canRedo,
+		revision,
+		dirty,
+		everSaved,
+		selection,
+		openSection,
+		madeSection,
+	} = useEditingSession(session);
 	const [revisionsOpen, setRevisionsOpen] = useState(
 		revisionLink !== undefined,
 	);
@@ -185,41 +190,8 @@ function Editor({
 	useEffect(() => {
 		if (revisionLink !== undefined) onRevisionLinkUsed?.();
 	}, []);
-	// The Section just made: its inspector asks for a name first.
-	const [madeSection, setMadeSection] = useState<string | null>(null);
 	// The Section "Make subflow" works on, while its dialog is open.
 	const [subflowOf, setSubflowOf] = useState<string | null>(null);
-	// The Section whose nodes alone show on the canvas.
-	const [openSection, setOpenSection] = useState<string | null>(null);
-	// A node added or pasted while a Section is open joins it, unless it
-	// came in a pasted Section: then that Section joins it.
-	const setDraftInOpen = useCallback<DraftSetter>(
-		(change, gesture) =>
-			session.edit((current) => {
-				const next = typeof change === "function" ? change(current) : change;
-				const section = openSection;
-				if (!section || !next.sections?.some((s) => s.id === section))
-					return next;
-				const before = new Set(current.nodes.map((node) => node.id));
-				const added = next.nodes
-					.map((node) => node.id)
-					.filter((id) => !before.has(id) && !sectionOf(next, id));
-				const had = new Set((current.sections ?? []).map((s) => s.id));
-				const addedSections = (next.sections ?? [])
-					.filter((s) => !had.has(s.id) && !parentSection(next, s.id))
-					.map((s) => s.id)
-					.filter((id) => id !== section);
-				if (added.length === 0 && addedSections.length === 0) return next;
-				return updateSection(next, section, (s) => ({
-					...s,
-					nodes: [...s.nodes, ...added],
-					...(addedSections.length > 0 && {
-						sections: [...(s.sections ?? []), ...addedSections],
-					}),
-				}));
-			}, gesture),
-		[session, openSection],
-	);
 
 	const {
 		projectFlows,
@@ -247,7 +219,7 @@ function Editor({
 	// The flow's settings show in the inspector while nothing is selected.
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [dragging, setDragging] = useState<PaletteItem | null>(null);
-	const addNode = useAddNode(draft, setDraftInOpen, setSelection, nodeDefaults);
+	const addNode = useAddNode(session, nodeDefaults);
 	const errorCount = check.issues.filter(
 		(issue) => issue.severity === "error",
 	).length;
@@ -377,27 +349,11 @@ function Editor({
 		openFlow(calledName);
 	};
 
-	const sections = sectionEdits(draft, session.edit, setSelection);
+	const sections = useMemo(() => sectionEdits(session), [session]);
 	const subflowSection = draft.sections?.find(
 		(section) => section.id === subflowOf,
 	);
-	const makeSection = (
-		nodeIds: readonly string[],
-		sectionIds: readonly string[] = [],
-	) => {
-		const id = sections.makeSection(nodeIds, sectionIds);
-		if (id) setMadeSection(id);
-	};
-	const makeSectionRef = useRef(makeSection);
-	makeSectionRef.current = makeSection;
-	const selectionRef = useRef(selection);
-	selectionRef.current = selection;
-	const clipboard = useFlowClipboard({
-		draft,
-		setDraft: setDraftInOpen,
-		selection,
-		setSelection,
-	});
+	const clipboard = useFlowClipboard(session);
 	// The keys that edit the canvas: undo, redo, copy, cut and paste. Not
 	// while a proposal or a Subflow is on view.
 	const editKeysRef = useRef<EditKeys | null>(null);
@@ -421,16 +377,17 @@ function Editor({
 				const target = event.target as HTMLElement | null;
 				if (target?.closest("input, textarea, [contenteditable='true']"))
 					return;
-				const ids = selectedNodeIds(selectionRef.current);
-				const sectionIds = selectedSectionIds(selectionRef.current);
+				const { selection } = session.get();
+				const ids = selectedNodeIds(selection);
+				const sectionIds = selectedSectionIds(selection);
 				if (ids.length + sectionIds.length === 0) return;
 				event.preventDefault();
-				makeSectionRef.current(ids, sectionIds);
+				sections.makeSection(ids, sectionIds);
 			}
 		};
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [save]);
+	}, [save, session, sections]);
 
 	// Leaving with unsaved changes asks first, in the app and on reload.
 	const blocker = useBlocker({
@@ -448,17 +405,8 @@ function Editor({
 
 	const selectNode = (nodeId: string) => {
 		// A node inside a Section shows in its open Section.
-		const holder = sectionOf(draft, nodeId);
-		setSelection({ kind: "node", id: nodeId });
-		if (holder && holder.id !== openSection) {
-			setOpenSection(holder.id);
-			return;
-		}
-		if (!holder && openSection !== null) {
-			setOpenSection(null);
-			return;
-		}
-		void fitView({ nodes: [{ id: nodeId }], duration: 300, maxZoom: 1 });
+		if (session.selectNode(nodeId))
+			void fitView({ nodes: [{ id: nodeId }], duration: 300, maxZoom: 1 });
 	};
 
 	const selectIssue = (issue: FlowIssue) => {
@@ -470,7 +418,7 @@ function Editor({
 			(section) => section.id === issue.sectionId,
 		);
 		if (issueSection) {
-			setSelection({ kind: "section", id: issueSection.id });
+			session.select({ kind: "section", id: issueSection.id });
 			void fitView({
 				nodes: [{ id: `section:${issueSection.id}` }],
 				duration: 300,
@@ -480,7 +428,7 @@ function Editor({
 		}
 		const edge = draft.edges.find((candidate) => candidate.id === issue.edgeId);
 		if (edge) {
-			setSelection({ kind: "edge", id: edge.id });
+			session.select({ kind: "edge", id: edge.id });
 			void fitView({
 				nodes: [{ id: edge.from }, { id: edge.to }],
 				duration: 300,
@@ -508,7 +456,7 @@ function Editor({
 		flow: draft,
 		selectedNodeId: selectedNode?.id ?? null,
 		beforeEnter: () => {
-			setSelection(null);
+			session.select(null);
 			setSettingsOpen(false);
 		},
 	});
@@ -519,7 +467,7 @@ function Editor({
 		removeSelectedOutcome,
 		setSelectedCallEach,
 		setSelectedAgentOutcomes,
-	} = nodeEdits(draft, session.edit, setSelection);
+	} = nodeEdits(session);
 
 	const flowsSupport = {
 		flowName: name,
@@ -560,6 +508,12 @@ function Editor({
 		[shownRevision],
 	);
 	const preview = revisionPreview ?? chat.preview;
+	// Once a render shows a change, something picked outside the open
+	// Section shows the whole flow again. Not while a proposal is on view.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: runs after each render that changed the draft, the selection or the open Section.
+	useEffect(() => {
+		if (!preview) session.settle();
+	}, [session, preview, draft, selection, openSection]);
 	editKeysRef.current =
 		preview || subflows.inside
 			? null
@@ -571,13 +525,10 @@ function Editor({
 
 	// The add-node dialog: Tab, a double-click on the canvas, or the dock.
 	const addNodeDialog = useAddNodeDialog({
+		session,
 		projectId,
 		flowName: name,
 		flows: projectFlows.flows,
-		flow: draft,
-		setDraft: setDraftInOpen,
-		selection,
-		setSelection,
 		defaults: nodeDefaults,
 		disabled: Boolean(preview) || subflows.inside,
 	});
@@ -612,7 +563,7 @@ function Editor({
 			}
 			onDelete={() => {
 				session.edit((current) => removeNode(current, selectedNode.id));
-				setSelection(null);
+				session.select(null);
 			}}
 			calledFlows={flowsSupport}
 			connections={connections}
@@ -622,7 +573,7 @@ function Editor({
 			key={selectedEdge.id}
 			flow={draft}
 			edge={selectedEdge}
-			onSelectEdge={(id) => setSelection({ kind: "edge", id })}
+			onSelectEdge={(id) => session.select({ kind: "edge", id })}
 			onChange={(change) =>
 				session.edit(
 					(current) => updateEdge(current, selectedEdge.id, change),
@@ -631,7 +582,7 @@ function Editor({
 			}
 			onDelete={() => {
 				session.edit((current) => removeEdge(current, selectedEdge.id));
-				setSelection(null);
+				session.select(null);
 			}}
 		/>
 	) : selectedSection ? (
@@ -649,7 +600,7 @@ function Editor({
 					`section:${selectedSection.id}`,
 				)
 			}
-			onOpen={() => setOpenSection(selectedSection.id)}
+			onOpen={() => session.openSection(selectedSection.id)}
 			onRemove={() => sections.removeWithUndo(selectedSection.id)}
 			onSelectNode={selectNode}
 			onMakeSubflow={() => setSubflowOf(selectedSection.id)}
@@ -664,16 +615,10 @@ function Editor({
 		/>
 	) : null;
 
-	// An undo or a redo can take away what is selected.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: runs on each undo or redo only.
-	useEffect(() => {
-		setSelection((current) => selectionIn(session.get().draft, current));
-	}, [revision]);
-
 	const closeInspector = useCallback(() => {
-		setSelection(null);
+		session.select(null);
 		setSettingsOpen(false);
-	}, []);
+	}, [session]);
 	const inspectorOpen = inspector !== null && !preview;
 	// Escape closes the inspector, but not while you type in a field or a
 	// menu, a list or a dialog has the focus: Escape closes those first.
@@ -835,13 +780,13 @@ function Editor({
 											preview={preview ?? undefined}
 											// A fit keeps the flow beside the chat, not under it.
 											coveredRight={chat.open ? CHAT_PANEL_COVERS_PX : 0}
-											onSelect={setSelection}
-											onMakeSection={makeSection}
+											onSelect={session.select}
+											onMakeSection={sections.makeSection}
 											onDropNode={addNode}
 											onNodeDoubleClick={subflows.enterNode}
 											onPaneDoubleClick={addNodeDialog.show}
 											openSection={preview ? null : openSection}
-											onOpenSection={setOpenSection}
+											onOpenSection={session.openSection}
 											flowLabel={name}
 											samples={samples}
 											test={testMarks}
@@ -865,7 +810,7 @@ function Editor({
 									onToggleSettings={() => {
 										// With a node selected, the button shows the settings.
 										setSettingsOpen((open) => selection !== null || !open);
-										setSelection(null);
+										session.select(null);
 									}}
 									className="pointer-events-auto absolute top-3 left-3 w-[min(24rem,calc(100%-1.5rem))]"
 								/>
@@ -1009,13 +954,7 @@ function Editor({
 					draft={draft}
 					section={subflowSection}
 					flows={projectFlows.flows}
-					onMade={(made) => {
-						sections.applySubflow(
-							subflowSection.id,
-							made,
-							() => session.get().draft,
-						);
-					}}
+					onMade={(made) => sections.applySubflow(subflowSection.id, made)}
 				/>
 			) : null}
 
@@ -1029,7 +968,7 @@ function Editor({
 				dirty={dirty}
 				onShow={(revision) => {
 					chat.hidePreview();
-					setSelection(null);
+					session.select(null);
 					setRevisionsOpen(false);
 					setShownRevision(revision);
 				}}

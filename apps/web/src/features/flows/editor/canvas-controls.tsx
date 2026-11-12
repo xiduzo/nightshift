@@ -15,7 +15,7 @@ import {
 } from "@xyflow/react";
 import { MaximizeIcon, MinusIcon, PlusIcon, WorkflowIcon } from "lucide-react";
 import { FIT_VIEW } from "./fit-view";
-import type { SelectionSetter } from "./selection";
+import type { EditingSession } from "./session/editing-session";
 
 // Adding a node, and the zoom, fit and layout buttons: the parts of a flow
 // canvas around its nodes and edges.
@@ -63,18 +63,18 @@ export function useNewNodeSpot() {
 /**
  * Adds a node and selects it: where it was dropped (`at`, a point on the
  * screen), or else in the middle of the visible canvas (`useNewNodeSpot`).
+ * While a Section is open, the node joins it.
  */
 export function useAddNode(
-	flow: Flow,
-	onFlowChange: (change: (flow: Flow) => Flow) => void,
-	onSelect: SelectionSetter,
+	session: EditingSession,
 	defaults: NodeDefaults | undefined,
 ) {
 	const spot = useNewNodeSpot();
 	return (type: NewNodeKind, at?: { x: number; y: number }) => {
+		const flow = session.get().draft;
 		const result = addNode(flow, type, spot(flow, at), defaults);
-		onFlowChange(() => result.flow);
-		onSelect({ kind: "node", id: result.id });
+		session.add(result.flow);
+		session.select({ kind: "node", id: result.id });
 	};
 }
 

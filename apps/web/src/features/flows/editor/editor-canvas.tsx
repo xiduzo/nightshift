@@ -9,7 +9,6 @@ import {
 	removeNode,
 	sectionBoundary,
 	sectionLevel,
-	sectionPath,
 } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import { Kbd, KbdGroup } from "@nightshift/ui/components/kbd";
@@ -286,27 +285,9 @@ export function EditorCanvas({
 	}, [check]);
 
 	// An open Section shows its nodes alone. Edits still go to the whole flow.
+	// The editor's session closes it when something outside is picked.
 	const open = useOpenSection(flow, openSection);
 	const view = open.view;
-	// Something picked outside the open Section shows the whole flow again.
-	useEffect(() => {
-		if (!open.section) return;
-		const openId = open.section.id;
-		const members = new Set(nodesWithin(flow, open.section));
-		const outside =
-			selection?.kind === "section"
-				? !sectionPath(flow, selection.id).some(
-						(section) => section.id === openId,
-					)
-				: [
-						...selectedNodeIds(selection).filter((id) => !members.has(id)),
-						...selectedSectionIds(selection).filter(
-							(id) =>
-								!sectionPath(flow, id).some((section) => section.id === openId),
-						),
-					].length > 0;
-		if (outside) onOpenSection(null);
-	}, [flow, selection, open.section, onOpenSection]);
 
 	const selectedSections = useMemo(
 		() => selectedSectionIds(selection),

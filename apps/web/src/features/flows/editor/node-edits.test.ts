@@ -7,6 +7,7 @@ import {
 } from "@nightshift/flows";
 
 import { nodeEdits } from "./node-edits";
+import { createEditingSession } from "./session/editing-session";
 
 const flow: Flow = flowSchema.parse({
 	version: FLOW_VERSION,
@@ -34,19 +35,13 @@ const flow: Flow = flowSchema.parse({
 	edges: [{ id: "e1", from: "build", outcome: "pass", to: "check" }],
 });
 
-/** Renames `check` the way the inspector does: the refusal, and the draft after. */
-function rename(next: string): { refusal: string | null; draft: Flow } {
-	let draft = flow;
+/** Renames `check` the way the inspector does: the refusal, and the session after. */
+function rename(next: string) {
+	const session = createEditingSession(flow, { saved: true });
 	const check = flow.nodes[1];
 	if (!check) throw new Error("expected the node check");
-	const refusal = nodeEdits(
-		flow,
-		(change) => {
-			draft = typeof change === "function" ? change(draft) : change;
-		},
-		() => {},
-	).renameSelected(check)(next);
-	return { refusal, draft };
+	const refusal = nodeEdits(session).renameSelected(check)(next);
+	return { refusal, ...session.get() };
 }
 
 describe("renaming a node", () => {
@@ -59,10 +54,11 @@ describe("renaming a node", () => {
 		},
 	);
 
-	test("a free name renames the node, and the flow stays valid", () => {
-		const { refusal, draft } = rename("review");
+	test("a free name renames the node and selects it, and the flow stays valid", () => {
+		const { refusal, draft, selection } = rename("review");
 		expect(refusal).toBeNull();
 		expect(draft.nodes.map((node) => node.id)).toEqual(["build", "review"]);
+		expect(selection).toEqual({ kind: "node", id: "review" });
 		expect(validateFlow(draft).filter((i) => i.severity === "error")).toEqual(
 			[],
 		);

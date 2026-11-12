@@ -11,12 +11,8 @@ import {
 import { useReactFlow, useStoreApi } from "@xyflow/react";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
-import {
-	type Selection,
-	type SelectionSetter,
-	selectedNodeIds,
-} from "../selection";
-import type { DraftSetter } from "../session/editing-session";
+import { type Selection, selectedNodeIds } from "../selection";
+import type { EditingSession } from "../session/editing-session";
 
 /** Each paste on the same spot lands this far down and right of the one before. */
 const PASTE_STEP = 32;
@@ -36,17 +32,11 @@ function nodesToCopy(flow: Flow, selection: Selection): string[] {
 
 const snap = (value: number) => Math.round(value / GRID) * GRID;
 
-export function useFlowClipboard({
-	draft,
-	setDraft,
-	selection,
-	setSelection,
-}: {
-	draft: Flow;
-	setDraft: DraftSetter;
-	selection: Selection;
-	setSelection: SelectionSetter;
-}) {
+/**
+ * Copy, cut and paste on the session's draft and selection. Pasted nodes
+ * join the open Section.
+ */
+export function useFlowClipboard(session: EditingSession) {
 	const { screenToFlowPosition } = useReactFlow();
 	const store = useStoreApi();
 
@@ -63,6 +53,7 @@ export function useFlowClipboard({
 
 	/** Returns false when nothing is selected to copy. */
 	const copy = (): boolean => {
+		const { draft, selection } = session.get();
 		const clip = copyNodes(draft, nodesToCopy(draft, selection));
 		if (!clip) return false;
 		copied = clip;
@@ -75,13 +66,14 @@ export function useFlowClipboard({
 	};
 
 	const cut = (): boolean => {
+		const { draft, selection } = session.get();
 		const ids = nodesToCopy(draft, selection);
 		const clip = copyNodes(draft, ids);
 		if (!clip) return false;
 		copied = clip;
 		lastPaste.current = { at: "", times: 0 };
-		setDraft((current) => ids.reduce(removeNode, current));
-		setSelection(null);
+		session.edit((current) => ids.reduce(removeNode, current));
+		session.select(null);
 		return true;
 	};
 
@@ -108,14 +100,14 @@ export function useFlowClipboard({
 		const times =
 			lastPaste.current.at === spot ? lastPaste.current.times + 1 : 0;
 		lastPaste.current = { at: spot, times };
-		const result = pasteNodes(draft, clip, {
+		const result = pasteNodes(session.get().draft, clip, {
 			x: snap(anchor.x - left) + times * PASTE_STEP,
 			y: snap(anchor.y - top) + times * PASTE_STEP,
 		});
-		setDraft(result.flow);
+		session.add(result.flow);
 		const [first, ...rest] = result.ids;
 		if (first !== undefined)
-			setSelection(
+			session.select(
 				rest.length === 0
 					? { kind: "node", id: first }
 					: { kind: "nodes", ids: result.ids },

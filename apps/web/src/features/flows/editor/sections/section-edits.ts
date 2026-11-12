@@ -1,61 +1,49 @@
 import {
-	addSection,
 	type Flow,
 	type FlowSection,
 	parentSection,
 	removeSection,
 } from "@nightshift/flows";
-import type { Dispatch, SetStateAction } from "react";
 import { toast } from "sonner";
-import type { Selection } from "../selection";
+import type { EditingSession } from "../session/editing-session";
 import type { SubflowMade } from "./make-subflow";
 import { sectionName, sectionProblemText } from "./section-problems";
 
 /**
- * The edits of Sections that reach past one field: make one from the
- * selected nodes, remove one (with an undo), and put a Subflow in its
- * place (with an undo).
+ * The edits of Sections that reach past one field, with what they say:
+ * make one from the selected nodes, remove one (with an undo), and put a
+ * Subflow in its place (with an undo).
  */
-export function sectionEdits(
-	draft: Flow,
-	setDraft: Dispatch<SetStateAction<Flow>>,
-	setSelection: Dispatch<SetStateAction<Selection>>,
-) {
-	/**
-	 * A Section of the nodes and the Sections `sectionIds`. Returns its id,
-	 * or null when they cannot form one.
-	 */
+export function sectionEdits(session: EditingSession) {
+	/** A Section of the nodes and the Sections `sectionIds`, or why not. */
 	const makeSection = (
 		nodeIds: readonly string[],
 		sectionIds: readonly string[] = [],
-	): string | null => {
-		const result = addSection(draft, nodeIds, {}, sectionIds);
-		if (!result.ok) {
-			toast.error("Could not make a section", {
-				description: result.problems
-					.map((problem) => sectionProblemText(draft, problem))
-					.join(" "),
-			});
-			return null;
-		}
-		setDraft(result.flow);
-		setSelection({ kind: "section", id: result.id });
-		return result.id;
+	) => {
+		const { draft } = session.get();
+		const result = session.makeSection(nodeIds, sectionIds);
+		if (result.ok) return;
+		toast.error("Could not make a section", {
+			description: result.problems
+				.map((problem) => sectionProblemText(draft, problem))
+				.join(" "),
+		});
 	};
 
 	const removeWithUndo = (sectionId: string) => {
+		const { draft } = session.get();
 		const sections = draft.sections ?? [];
 		const index = sections.findIndex((section) => section.id === sectionId);
 		const section = sections[index];
 		if (!section) return;
 		const around = parentSection(draft, sectionId)?.id;
-		setDraft((current) => removeSection(current, sectionId));
-		setSelection(null);
+		session.edit((current) => removeSection(current, sectionId));
+		session.select(null);
 		toast.info(`Removed the Section ${sectionName(section)}. Its nodes stay.`, {
 			action: {
 				label: "Undo",
 				onClick: () =>
-					setDraft((current) =>
+					session.edit((current) =>
 						restoreSection(current, section, index, around),
 					),
 			},
@@ -67,14 +55,10 @@ export function sectionEdits(
 	 * Section's place in the draft and is selected. Undo puts the draft back
 	 * while nothing else changed it. The new flow file stays.
 	 */
-	const applySubflow = (
-		sectionId: string,
-		made: SubflowMade,
-		latest: () => Flow,
-	) => {
-		const before = draft;
-		setDraft(made.caller);
-		setSelection({ kind: "node", id: made.callNode });
+	const applySubflow = (sectionId: string, made: SubflowMade) => {
+		const before = session.get().draft;
+		session.edit(made.caller);
+		session.select({ kind: "node", id: made.callNode });
 		toast.success(
 			`Made the Subflow "${made.name}". Save this flow to keep the change.`,
 			{
@@ -82,15 +66,15 @@ export function sectionEdits(
 				action: {
 					label: "Undo",
 					onClick: () => {
-						const back = undoSubflow(latest(), made, before);
+						const back = undoSubflow(session.get().draft, made, before);
 						if (back === null) {
 							toast.error(
 								"Could not undo. You changed this flow after you made the Subflow.",
 							);
 							return;
 						}
-						setDraft(back);
-						setSelection({ kind: "section", id: sectionId });
+						session.edit(back);
+						session.select({ kind: "section", id: sectionId });
 						toast.info(
 							`The Section is back. The flow "${made.name}" stays in the project.`,
 						);

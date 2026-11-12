@@ -1,8 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import {
+	addNode,
+	copyNodes,
 	FLOW_VERSION,
 	type Flow,
 	moveNodes,
+	pasteNodes,
+	removeNode,
+	renameNode,
+	sectionOf,
 	updateNode,
 } from "@nightshift/flows";
 import { commandNode } from "@nightshift/flows/testing";
@@ -14,7 +20,7 @@ const flow: Flow = {
 	outputs: [],
 	start: "a",
 	nodes: ["a", "b"].map((id) => commandNode(id, { x: 0, y: 0 })),
-	edges: [],
+	edges: [{ id: "a-pass-b", from: "a", outcome: "pass", to: "b" }],
 };
 
 /** `flow` with node `a` at x. */
@@ -203,5 +209,259 @@ describe("the editing session as a store", () => {
 		stop();
 		session.redo();
 		expect(heard).toBe(2);
+	});
+});
+
+/**
+ * Nodes a and b in the Section one, c in two, d in none. The Section
+ * outer holds e and the Section inner, which holds f.
+ */
+const sectioned: Flow = {
+	...flow,
+	nodes: ["a", "b", "c", "d", "e", "f"].map((id) =>
+		commandNode(id, { x: 0, y: 0 }),
+	),
+	edges: [
+		{ id: "a-pass-b", from: "a", outcome: "pass", to: "b" },
+		{ id: "b-pass-d", from: "b", outcome: "pass", to: "d" },
+	],
+	sections: [
+		{ id: "one", label: "One", nodes: ["a", "b"] },
+		{ id: "two", label: "Two", nodes: ["c"] },
+		{ id: "outer", label: "Outer", nodes: ["e"], sections: ["inner"] },
+		{ id: "inner", label: "Inner", nodes: ["f"] },
+	],
+};
+
+/** The draft with a new node, and its id. */
+const withNode = (draft: Flow) => addNode(draft, "command", { x: 0, y: 0 });
+
+describe("the editing session: a node joins the open Section", () => {
+	test("an added node joins the open Section, in the same step", () => {
+		const { session } = sessionOn(sectioned);
+		session.openSection("one");
+		const { flow: next, id } = withNode(session.get().draft);
+		session.add(next);
+		expect(sectionOf(session.get().draft, id)?.id).toBe("one");
+		session.undo();
+		expect(session.get().draft).toBe(sectioned);
+	});
+
+	test("an edit that adds a node leaves it in no Section", () => {
+		// The inspector, the chat and Suggest change the whole flow.
+		const { session } = sessionOn(sectioned);
+		session.openSection("one");
+		const { flow: next, id } = withNode(session.get().draft);
+		session.edit(next);
+		expect(sectionOf(session.get().draft, id)).toBeUndefined();
+	});
+
+	test("with no Section open, or one the draft lost, an added node stays out", () => {
+		const { session } = sessionOn(sectioned);
+		const first = withNode(session.get().draft);
+		session.add(first.flow);
+		expect(sectionOf(session.get().draft, first.id)).toBeUndefined();
+
+		session.openSection("gone");
+		const second = withNode(session.get().draft);
+		session.add(second.flow);
+		expect(sectionOf(session.get().draft, second.id)).toBeUndefined();
+	});
+
+	test("a pasted Section joins the open Section with its nodes", () => {
+		const { session } = sessionOn(sectioned);
+		const clip = copyNodes(sectioned, ["c"]);
+		if (!clip) throw new Error("expected a clip");
+		session.openSection("one");
+		session.add(pasteNodes(session.get().draft, clip).flow);
+		const sections = session.get().draft.sections ?? [];
+		const one = sections.find((section) => section.id === "one");
+		const pasted = one?.sections?.[0];
+		expect(one?.nodes).toEqual(["a", "b"]);
+		expect(pasted).toBeDefined();
+		expect(sections.find((section) => section.id === pasted)?.nodes).toEqual([
+			"c_2",
+		]);
+	});
+});
+
+describe("the editing session: the selection", () => {
+	test("select takes a selection, or a change of the one there is", () => {
+		const { session } = sessionOn(sectioned);
+		session.select({ kind: "node", id: "a" });
+		session.select((current) =>
+			current?.kind === "node"
+				? { kind: "nodes", ids: [current.id, "b"] }
+				: null,
+		);
+		expect(session.get().selection).toEqual({
+			kind: "nodes",
+			ids: ["a", "b"],
+		});
+	});
+
+	test("undo drops a selection the draft lost, and keeps one it still has", () => {
+		const { session } = sessionOn(sectioned);
+		const { flow: next, id } = withNode(sectioned);
+		session.add(next);
+		session.select({ kind: "node", id });
+		session.undo();
+		expect(session.get().selection).toBeNull();
+
+		const kept = { kind: "node", id: "a" } as const;
+		session.select(kept);
+		session.edit(movedTo(10));
+		session.undo();
+		expect(session.get().selection).toBe(kept);
+		session.redo();
+		expect(session.get().selection).toBe(kept);
+	});
+
+	test("undo of a node added and selected in the open Section shows the whole flow", () => {
+		// Today's order: the selection from before the undo counts first,
+		// and the node it holds is gone, so it lies outside the Section.
+		const { session } = sessionOn(sectioned);
+		session.openSection("one");
+		const { flow: next, id } = withNode(session.get().draft);
+		session.add(next);
+		session.select({ kind: "node", id });
+		session.settle();
+		expect(session.get().openSection).toBe("one");
+		session.undo();
+		expect(session.get()).toMatchObject({
+			openSection: null,
+			selection: null,
+		});
+	});
+
+	test("an undo that takes the open Section away keeps it, and redo opens it again", () => {
+		const { session } = sessionOn(flow);
+		const made = session.makeSection(["a", "b"]);
+		if (!made.ok) throw new Error("expected a Section");
+		session.openSection(made.id);
+		session.undo();
+		expect(session.get().draft.sections).toBeUndefined();
+		expect(session.get().openSection).toBe(made.id);
+		session.redo();
+		expect(session.get().openSection).toBe(made.id);
+	});
+});
+
+describe("the editing session: selecting a node shows its level", () => {
+	test("a node in another Section opens that Section", () => {
+		const { session } = sessionOn(sectioned);
+		expect(session.selectNode("c")).toBe(false);
+		expect(session.get()).toMatchObject({
+			openSection: "two",
+			selection: { kind: "node", id: "c" },
+		});
+		expect(session.selectNode("f")).toBe(false);
+		expect(session.get().openSection).toBe("inner");
+	});
+
+	test("a node in the open Section keeps the view", () => {
+		const { session } = sessionOn(sectioned);
+		session.openSection("one");
+		expect(session.selectNode("b")).toBe(true);
+		expect(session.get().openSection).toBe("one");
+	});
+
+	test("a node in no Section shows the whole flow", () => {
+		const { session } = sessionOn(sectioned);
+		expect(session.selectNode("d")).toBe(true);
+		session.openSection("one");
+		expect(session.selectNode("d")).toBe(false);
+		expect(session.get().openSection).toBeNull();
+	});
+});
+
+describe("the editing session: settle after a render", () => {
+	test("something selected outside the open Section shows the whole flow", () => {
+		const { session } = sessionOn(sectioned);
+		session.openSection("one");
+		session.select({ kind: "nodes", ids: ["a", "c"] });
+		session.settle();
+		expect(session.get().openSection).toBeNull();
+	});
+
+	test("a node or a Section inside it keeps it open, at any depth", () => {
+		const { session } = sessionOn(sectioned);
+		session.openSection("outer");
+		session.select({ kind: "node", id: "f" });
+		session.settle();
+		session.select({ kind: "section", id: "inner" });
+		session.settle();
+		session.select({ kind: "nodes", ids: ["e"], sections: ["inner"] });
+		session.settle();
+		session.select({ kind: "edge", id: "a-pass-b" });
+		session.settle();
+		expect(session.get().openSection).toBe("outer");
+
+		session.select({ kind: "section", id: "one" });
+		session.settle();
+		expect(session.get().openSection).toBeNull();
+	});
+
+	test("a handler that changes the draft, then the selection, counts where it ends", () => {
+		const { session } = sessionOn(sectioned);
+		session.openSection("one");
+		session.select({ kind: "node", id: "a" });
+		// A rename selects the node under its new name.
+		session.edit((draft) => renameNode(draft, "a", "z"));
+		session.select({ kind: "node", id: "z" });
+		session.settle();
+		expect(session.get().openSection).toBe("one");
+		// A cut drops the selection with the nodes.
+		session.edit((draft) => removeNode(draft, "z"));
+		session.select(null);
+		session.settle();
+		expect(session.get().openSection).toBe("one");
+	});
+
+	test("with no Section open, or one the draft lost, nothing changes", () => {
+		const { session } = sessionOn(sectioned);
+		session.select({ kind: "node", id: "c" });
+		const before = session.get();
+		session.settle();
+		expect(session.get()).toBe(before);
+		session.openSection("gone");
+		session.settle();
+		expect(session.get().openSection).toBe("gone");
+	});
+});
+
+describe("the editing session: making a Section", () => {
+	test("a Section of the nodes is selected and marked as made, in one step", () => {
+		const { session } = sessionOn(sectioned);
+		const made = session.makeSection(["d"]);
+		if (!made.ok) throw new Error("expected a Section");
+		expect(sectionOf(session.get().draft, "d")?.id).toBe(made.id);
+		expect(session.get()).toMatchObject({
+			selection: { kind: "section", id: made.id },
+			madeSection: made.id,
+		});
+		session.undo();
+		expect(session.get().draft).toBe(sectioned);
+		expect(session.get().selection).toBeNull();
+	});
+
+	test("nodes that cannot form one give the problems and change nothing", () => {
+		const { session } = sessionOn(sectioned);
+		const before = session.get();
+		const made = session.makeSection(["a", "c"]);
+		expect(made.ok).toBe(false);
+		expect(session.get()).toBe(before);
+	});
+
+	test("a Section made in the open Section keeps it open", () => {
+		const { session } = sessionOn(sectioned);
+		session.openSection("one");
+		const made = session.makeSection(["a"]);
+		if (!made.ok) throw new Error("expected a Section");
+		session.settle();
+		expect(session.get().openSection).toBe("one");
+		// The undo takes the made Section, still selected: it lies outside.
+		session.undo();
+		expect(session.get().openSection).toBeNull();
 	});
 });
