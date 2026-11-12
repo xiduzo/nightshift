@@ -107,6 +107,32 @@
 }
 
 /*
+ * Where the work landed: one color per rung of a ladder, in Flow health.
+ * The machine rungs climb one blue ramp, from a rule (light) to a later tier
+ * (dark), and the dark theme turns the ramp around. A person takes the
+ * Needed you color, a deadline a dark step of it, and nothing held the muted
+ * gray. Never a status color. Checked with the dataviz validator: every
+ * neighbour pair stays apart for color-blind readers, in both themes.
+ */
+:root {
+	--ladder-rule: var(--color-sky-400);
+	--ladder-first: var(--color-blue-500);
+	--ladder-later: var(--color-blue-800);
+	--ladder-person: var(--metric-needed);
+	--ladder-deadline: var(--color-amber-800);
+	--ladder-none: var(--muted-foreground);
+}
+
+.dark {
+	--ladder-rule: var(--color-sky-800);
+	--ladder-first: var(--color-blue-500);
+	--ladder-later: var(--color-indigo-300);
+	--ladder-person: var(--metric-needed);
+	--ladder-deadline: var(--color-amber-700);
+	--ladder-none: var(--muted-foreground);
+}
+
+/*
  * Family tints: the role of a node type on its icon tile, in the editor,
  * the node dock and the add-node dialog. A run view shows the run status
  * instead, so a tint never reads as a status. Each icon keeps a contrast of
@@ -129,6 +155,12 @@
 }
 
 @theme inline {
+	--color-ladder-rule: var(--ladder-rule);
+	--color-ladder-first: var(--ladder-first);
+	--color-ladder-later: var(--ladder-later);
+	--color-ladder-person: var(--ladder-person);
+	--color-ladder-deadline: var(--ladder-deadline);
+	--color-ladder-none: var(--ladder-none);
 	--color-family-do: var(--family-do);
 	--color-family-decide: var(--family-decide);
 	--color-family-shape: var(--family-shape);

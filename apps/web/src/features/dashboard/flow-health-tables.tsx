@@ -1,4 +1,4 @@
-/** The tables of a flow's health: its warnings, why runs did not finish, its scores, and the latest runs. */
+/** The tables of a flow's health: its warnings, why runs did not finish, and the latest runs. */
 import { Button } from "@nightshift/ui/components/button";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { TriangleAlertIcon } from "lucide-react";
@@ -185,104 +185,6 @@ function reasonColumns(now: number) {
 				</LocalTime>
 			),
 			meta: { headClassName: "w-28" },
-		}),
-	]);
-}
-
-type ScoreRow = NonNullable<FlowRange["scores"]>[number];
-
-/** A score as a short number: whole numbers as they are, else two decimals. */
-function formatScore(value: number): string {
-	return Number.isInteger(value)
-		? String(value)
-		: value.toLocaleString(undefined, { maximumFractionDigits: 2 });
-}
-
-/**
- * The scores the flow's runs wrote, one row per name, the most scored
- * first. The caller leaves it out when no run scored.
- */
-export function Scores({
-	scores,
-	now,
-	onNavigate,
-}: {
-	scores: ScoreRow[];
-	now: number;
-	onNavigate: () => void;
-}) {
-	return (
-		<ChartSection title="Scores" hint="Per name, the most scored first">
-			<DataTable
-				columns={scoreColumns(now, onNavigate)}
-				data={scores}
-				getRowId={(row) => row.name}
-			/>
-		</ChartSection>
-	);
-}
-
-const scoreColumn = dataTableColumns<ScoreRow>();
-
-function scoreColumns(now: number, onNavigate: () => void) {
-	const number = {
-		headClassName: "text-right w-20",
-		cellClassName: "text-right tabular-nums",
-	};
-	return scoreColumn.columns([
-		scoreColumn.accessor("name", {
-			header: "Score",
-			cell: ({ getValue }) => (
-				<span className="font-mono text-xs">{getValue()}</span>
-			),
-		}),
-		scoreColumn.accessor("runs", {
-			header: "Runs",
-			enableSorting: true,
-			meta: number,
-		}),
-		scoreColumn.accessor("sum", {
-			header: "Total",
-			enableSorting: true,
-			cell: ({ getValue }) => formatScore(getValue()),
-			meta: number,
-		}),
-		scoreColumn.accessor("mean", {
-			header: "Average",
-			enableSorting: true,
-			cell: ({ getValue }) => formatScore(getValue()),
-			meta: number,
-		}),
-		scoreColumn.accessor((row) => row.latest.at, {
-			id: "latest",
-			header: "Latest",
-			enableSorting: true,
-			cell: ({ row: { original } }) => (
-				<span className="flex items-center gap-2">
-					<span className="tabular-nums">
-						{formatScore(original.latest.value)}
-					</span>
-					<Button
-						variant="link"
-						size="xs"
-						className="h-auto px-0 font-normal text-muted-foreground"
-						nativeButton={false}
-						aria-label={`Open run, scored ${hoverTime(original.latest.at)}`}
-						render={
-							<Link
-								to="/runs/$runId"
-								params={{ runId: original.latest.runId }}
-								onClick={onNavigate}
-							/>
-						}
-					>
-						<LocalTime at={original.latest.at}>
-							{formatRelative(original.latest.at, now)}
-						</LocalTime>
-					</Button>
-				</span>
-			),
-			meta: { headClassName: "w-44" },
 		}),
 	]);
 }

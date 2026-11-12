@@ -30,16 +30,16 @@ import {
 } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { FlowHealthDialog } from "./flow-health-dialog";
+import { LaddersCell } from "./flow-health-ladders";
 import { projectFlowsQuery } from "./queries";
 
 /**
- * Each flow over the page's range: the status of its last runs, its runs
- * and how many finished, what a finished run costs, what a useful result
- * costs, and how often its runs needed you. A stopped run did not finish,
- * so it counts against it. A
- * flow a Subflow node ran counts too, inside the run that called it. Under
- * its name: the computers its steps need. A row opens the details of its
- * flow.
+ * Each flow over the page's range: where its work landed, the status of
+ * its last runs, its runs and how many finished, what a finished run
+ * costs, what a useful result costs, and how often its runs needed you. A
+ * stopped run did not finish, so it counts against it. A flow a Subflow
+ * node ran counts too, inside the run that called it. Under its name: the
+ * computers its steps need. A row opens the details of its flow.
  */
 export function FlowHealthTable({
 	project,
@@ -117,6 +117,14 @@ function flowHealthColumns(
 				</div>
 			),
 			meta: { headClassName: "pl-6", cellClassName: "pl-6" },
+		}),
+		column.accessor((row) => row.ladders?.work?.landed, {
+			id: "ladders",
+			header: "Where the work landed",
+			cell: ({ row: { original } }) => (
+				<LaddersCell ladders={original.ladders} />
+			),
+			meta: { headClassName: "min-w-64" },
 		}),
 		column.accessor((row) => row.last?.startedAt, {
 			id: "last",

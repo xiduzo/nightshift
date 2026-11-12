@@ -27,23 +27,20 @@ import {
 	Stat,
 } from "./details";
 import { CostPerRun, RunsPerDay } from "./flow-health-charts";
-import {
-	LatestRuns,
-	Scores,
-	Warnings,
-	WhyUnfinished,
-} from "./flow-health-tables";
+import { Ladders } from "./flow-health-ladders";
+import { FlowMetrics } from "./flow-health-metrics";
+import { LatestRuns, Warnings, WhyUnfinished } from "./flow-health-tables";
 import { dashboardQueries } from "./queries";
 
-type Tab = "overview" | "cost" | "problems" | "runs";
+type Tab = "overview" | "ladders" | "metrics" | "cost" | "problems" | "runs";
 
 /**
  * One flow in detail, behind its Flow health row, in tabs so each view stays
- * small: an overview with what a useful result costs and how often its
- * runs needed you, runs per day and the
- * runs' scores, what each run cost against the median, why runs did not
- * finish, and the latest runs. One range drives
- * every tab. Runs as a subflow count, as in the row.
+ * small: an overview with what a useful result costs, how often its runs
+ * needed you and runs per day, where its work landed, its metrics, what
+ * each run cost against the median, why runs did not finish, and the
+ * latest runs. One range drives every tab. Runs as a subflow count, as in
+ * the row.
  */
 export function FlowHealthDialog({
 	open,
@@ -91,6 +88,8 @@ function FlowHealthDetails({
 			<DetailsTabs
 				tabs={[
 					{ value: "overview", label: "Overview" },
+					{ value: "ladders", label: "Ladders" },
+					{ value: "metrics", label: "Metrics" },
 					{ value: "cost", label: "Cost" },
 					{
 						value: "problems",
@@ -190,13 +189,14 @@ function FlowHealthDetails({
 								perNight={inRange.perNight}
 								statuses={inRange.statuses}
 							/>
-							{inRange.scores && inRange.scores.length > 0 ? (
-								<Scores
-									scores={inRange.scores}
-									now={now}
-									onNavigate={onNavigate}
-								/>
-							) : null}
+						</DetailsTabContent>
+
+						<DetailsTabContent value="ladders">
+							<Ladders ladders={inRange.ladders} range={range} />
+						</DetailsTabContent>
+
+						<DetailsTabContent value="metrics">
+							<FlowMetrics range={inRange} now={now} onNavigate={onNavigate} />
 						</DetailsTabContent>
 
 						<DetailsTabContent value="cost">
@@ -308,7 +308,6 @@ function FlowHealthDetails({
 	);
 }
 
-/** Under "Per useful result": how many runs with an answer were useful. */
 /** The share of the flow's own runs that needed you, or a dash. */
 function neededValue(neededYou: FlowRange["neededYou"]): string {
 	const share = neededYou
@@ -324,6 +323,7 @@ function neededHint(neededYou: FlowRange["neededYou"]): string | undefined {
 	return neededReasonsText(neededYou.reasons);
 }
 
+/** Under "Per useful result": how many runs with an answer were useful. */
 function usefulHint(useful: FlowRange["useful"]): string | undefined {
 	if (!useful) return undefined;
 	if (useful.answered === 0) return "No answers yet";
