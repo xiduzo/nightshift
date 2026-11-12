@@ -2,6 +2,8 @@
 
 export {
 	createRunFolders,
+	entryUnder,
+	folderPathParts,
 	noRunFolders,
 	type RunFile,
 	type RunFolders,

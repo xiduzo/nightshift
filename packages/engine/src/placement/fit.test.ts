@@ -71,8 +71,8 @@ describe("REQUIREMENTS", () => {
 		expect(REQUIREMENTS[0]).toBe(readsTheFlow);
 		expect(REQUIREMENTS[1]).toBe(connectionsExist);
 		// The Agent's two, the model Decision's, the model Value's, a Wait for
-		// a URL's and the Web request's.
-		expect(REQUIREMENTS).toHaveLength(8);
+		// a URL's, the Web request's and an End's report file.
+		expect(REQUIREMENTS).toHaveLength(9);
 		expect(AGENT.requirements).toEqual([cliToolsInstalled, harnessesAdded]);
 		expect(DECISION.requirements).toEqual([modelDecisionsHaveDecider]);
 		expect(VALUE.requirements).toEqual([modelValuesHaveDecider]);

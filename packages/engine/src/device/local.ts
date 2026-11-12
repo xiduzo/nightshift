@@ -45,6 +45,7 @@ import {
 } from "../projects";
 import type { RunFolders } from "../run-folders";
 import { spawnCommand } from "./command";
+import { readFolderFile } from "./read-file";
 import { redactExec, redactSession, redactText } from "./redact";
 import { callServerTool } from "./tool-call";
 import type { ToolLaunchers } from "./tool-launchers";
@@ -755,6 +756,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				),
 				decider: deciderFacts,
 				requests: true,
+				readFiles: true,
 				flowVersion: FLOW_VERSION,
 				...(query.addresses?.length && decider?.checkAddress
 					? {
@@ -809,6 +811,9 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			});
 			return redactRequest(result, Object.values(found.env));
 		},
+		// A file is small and local: the signal is not needed here.
+		readFile: ({ cwd, path, maxBytes }) =>
+			readFolderFile({ cwd, path, maxBytes }),
 		decide,
 		flows: async (projectId) => deps.flows?.(projectId) ?? {},
 		async worktree(run) {

@@ -1,8 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdir, symlink, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { EndNode } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
+import type { Capabilities, Device } from "../device";
 import { foldRun } from "../log";
 
 import { readTranscriptFile } from "../log/transcripts";
+import { refusalOf } from "../placement";
 import { deriveSteps } from "../read/run-views";
 import {
 	command,
@@ -10,9 +15,14 @@ import {
 	edge,
 	flowOf,
 	payloads,
+	placementOn,
 	startRun,
 } from "../testing/graph";
-import { createSandbox, type Sandbox } from "../testing/test-support";
+import {
+	createSandbox,
+	type Sandbox,
+	testDevice,
+} from "../testing/test-support";
 import { endingOf } from "./thread";
 
 /**
@@ -227,6 +237,203 @@ describe("the report of an End node", () => {
 				report: { cut: true },
 			},
 		]);
+	});
+});
+
+describe("a report from a file the run wrote", () => {
+	const fromFile = (path: string): EndNode => ({
+		...end("done", "done", "Found it"),
+		report: { kind: "file", path },
+	});
+	/** write (a command in the folder the run works in) → done, which reads `path`. */
+	const fileFlow = (path: string, cmd = "true") =>
+		flowOf(
+			[command("write", cmd), fromFile(path)],
+			[edge("e1", "write", "pass", "done")],
+			{ inputs: [{ name: "name", type: "text", default: "news" }] },
+		);
+	const warnings = async (h: { events: () => Promise<unknown[]> }) =>
+		payloads((await h.events()) as Parameters<typeof payloads>[0], "RunWarned");
+
+	test("keeps the file a step wrote as the report, at a path a template renders", async () => {
+		const h = await startRun(
+			sandbox,
+			fileFlow(
+				"./out/{{name}}.md",
+				"mkdir -p out && printf '\\n## What is new\\n\\n- one\\n\\n' > out/news.md",
+			),
+		);
+		const driven = await drive(h, { inputs: { name: "news" } });
+		expect(driven.state.nodes.done).toEqual({
+			message: "Found it",
+			report: "## What is new\n\n- one",
+			visit: 1,
+			outcome: "done",
+		});
+		expect(driven.state.ended).toMatchObject({
+			result: "done",
+			report: "## What is new\n\n- one",
+		});
+		const events = await h.events();
+		expect(payloads(events, "RunWarned")).toEqual([]);
+		const step = deriveSteps(foldRun(events)).find((s) => s.nodeId === "done");
+		expect(
+			(await readTranscriptFile(step?.transcriptPath as string)).map(
+				(e) => e.event,
+			),
+		).toEqual([
+			{
+				type: "end",
+				status: "done",
+				message: "Found it",
+				report: { cut: false },
+			},
+		]);
+	});
+
+	test("a missing file warns, and the run ends done without a report", async () => {
+		const h = await startRun(sandbox, fileFlow("report.md"));
+		const driven = await drive(h, { inputs: {} });
+		expect(driven.state.ended).toMatchObject({
+			status: "finished",
+			result: "done",
+		});
+		expect(driven.state.ended).not.toHaveProperty("report");
+		expect(driven.state.nodes.done).toMatchObject({
+			outcome: "done",
+			report: "",
+		});
+		expect(await warnings(h)).toEqual([
+			{
+				kind: "report",
+				message:
+					'Night Shift found no file "report.md" in the folder the run works in on test. The run ends without a report.',
+			},
+		]);
+	});
+
+	test("a file that is not text, or not inside the folder, warns", async () => {
+		const outside = join(sandbox.dataDir, "secret.md");
+		await mkdir(sandbox.dataDir, { recursive: true });
+		await writeFile(outside, "# not the run's");
+		await writeFile(
+			join(sandbox.repoPath, "chart.png"),
+			new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x00, 0xff]),
+		);
+		await symlink(outside, join(sandbox.repoPath, "linked.md"));
+		const cases: [string, string][] = [
+			[
+				"chart.png",
+				'"chart.png" is not a text file. Write the report as Markdown or plain text.',
+			],
+			[
+				"linked.md",
+				'"linked.md" is not a file inside the folder the run works in.',
+			],
+			[
+				"{{name}}/../../secret.md",
+				'"news/../../secret.md" is not a file inside the folder the run works in.',
+			],
+			[
+				"/etc/hosts",
+				'"/etc/hosts" is not a file inside the folder the run works in.',
+			],
+			[
+				".git/config",
+				'".git/config" is not a file inside the folder the run works in.',
+			],
+			["{{write.log_tail}}", "The path of the report file is empty."],
+		];
+		for (const [path, why] of cases) {
+			const h = await startRun(sandbox, fileFlow(path));
+			const driven = await drive(h, { inputs: { name: "news" } });
+			expect(driven.state.ended).toMatchObject({ result: "done" });
+			expect(driven.state.ended).not.toHaveProperty("report");
+			expect(await warnings(h)).toEqual([
+				{ kind: "report", message: `${why} The run ends without a report.` },
+			]);
+		}
+	});
+
+	test("a file over 64 KB is cut at a line break, with a warning", async () => {
+		// 2,000 lines of 40 bytes: 80,000 bytes.
+		const line = `${"x".repeat(39)}\n`;
+		await writeFile(join(sandbox.repoPath, "long.md"), line.repeat(2000));
+		const h = await startRun(sandbox, fileFlow("long.md"));
+		const driven = await drive(h, { inputs: {} });
+		expect((driven.state.nodes.done as { report: string }).report).toBe(
+			line.repeat(1638).trimEnd(),
+		);
+		expect(await warnings(h)).toEqual([
+			{
+				kind: "report",
+				message:
+					"This report is longer than 64 KB. Night Shift kept the first 64 KB.",
+			},
+		]);
+	});
+
+	test("in a run without a folder, it reads the file from the run's own folder", async () => {
+		const h = await startRun(
+			sandbox,
+			fileFlow("report.md", "printf '# Done' > report.md"),
+			{ runFolder: true },
+		);
+		const driven = await drive(h, { inputs: {} });
+		expect(driven.state.ended).toMatchObject({
+			result: "done",
+			report: "# Done",
+		});
+	});
+
+	test("a Device that reads no files: a warning that says to update it", async () => {
+		const h = await startRun(sandbox, fileFlow("report.md"));
+		const { readFile: _, ...older } = testDevice(h.local);
+		h.ctx.placement = placementOn(() => ({ ...older, name: "laptop" }));
+		const driven = await drive(h, { inputs: {} });
+		expect(driven.state.ended).toMatchObject({ result: "done" });
+		expect(await warnings(h)).toEqual([
+			{
+				kind: "report",
+				message:
+					"Night Shift could not read the report file. laptop runs an older version of Night Shift. Update Night Shift on laptop. The run ends without a report.",
+			},
+		]);
+	});
+
+	test("a Device that goes away during the read: the step waits as the network does", async () => {
+		const h = await startRun(sandbox, fileFlow("report.md"));
+		const device: Device = {
+			...testDevice(h.local),
+			name: "laptop",
+			readFile: async () => {
+				throw new Refusal("unavailable", "laptop did not answer in time.");
+			},
+		};
+		h.ctx.placement = placementOn(() => device);
+		const first = await drive(h, { inputs: {} });
+		expect(first.parked[0]).toMatchObject({ kind: "wait", reason: "network" });
+		expect(first.state.ended).toBeFalsy();
+	});
+
+	test("run start refuses a Device that reads no files, and names the nodes", () => {
+		const has: Capabilities = {
+			elsewhere: "laptop",
+			harnesses: [],
+			connections: [],
+			clis: [],
+			programs: {},
+			profiles: {},
+			decider: null,
+			requests: true,
+			flowVersion: Number.MAX_SAFE_INTEGER,
+		};
+		const nodes = [fromFile("report.md"), end("none", "nothing-to-do")];
+		expect(refusalOf(nodes, has)).toBe(
+			"The flow ends with a report from a file (done), but laptop runs an older version of Night Shift. Update Night Shift on laptop.",
+		);
+		expect(refusalOf(nodes, { ...has, readFiles: true })).toBeNull();
+		expect(refusalOf([end("none", "done")], has)).toBeNull();
 	});
 });
 

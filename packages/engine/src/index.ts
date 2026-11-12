@@ -60,6 +60,8 @@ export type {
 	ExecEvent,
 	ExecInput,
 	OfferedSessionInput,
+	ReadFileInput,
+	ReadFileResult,
 	RunFolder,
 	RunRef,
 	SessionEvent,

@@ -17,6 +17,8 @@ export type {
 	ExecInput,
 	GitAuthor,
 	OfferedSessionInput,
+	ReadFileInput,
+	ReadFileResult,
 	RequestField,
 	RequestPart,
 	RequestText,

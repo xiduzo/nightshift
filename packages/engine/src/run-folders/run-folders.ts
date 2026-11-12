@@ -56,6 +56,68 @@ const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 /** Not listed and never served: a git folder a step made. */
 const HIDDEN = ".git";
 
+/**
+ * The parts of a path inside a folder (`report/summary.md`, with `/`
+ * between folders), or null when it is not one: an empty, `.`, `..`,
+ * `.git` or NUL part.
+ */
+export function folderPathParts(relative: string): string[] | null {
+	const parts = relative.split("/");
+	const bad = parts.some(
+		(part) =>
+			part === "" ||
+			part === "." ||
+			part === ".." ||
+			part === HIDDEN ||
+			part.includes("\0"),
+	);
+	return bad ? null : parts;
+}
+
+/** What is at a path inside a folder, without following a link (`entryUnder`). */
+export type FolderEntry =
+	/** A regular file: its real path on this computer, its size and when it last changed. */
+	| { kind: "file"; path: string; size: number; modifiedAt: number }
+	/** Nothing is there. */
+	| { kind: "missing" }
+	/** A link is on the way, or at the path: what it points to may be anywhere. */
+	| { kind: "link" }
+	/** A folder, or anything else that is not a regular file. */
+	| { kind: "other" };
+
+/**
+ * What is at `parts` (from `folderPathParts`) under `root`. A file counts
+ * only when its real path is its path under the real `root`: a link
+ * anywhere on the way makes it another one, so a link an agent made never
+ * reaches outside.
+ */
+export async function entryUnder(
+	root: string,
+	parts: readonly string[],
+): Promise<FolderEntry> {
+	let real: string;
+	try {
+		real = await realpath(join(root, ...parts));
+	} catch {
+		// A link whose target is gone is still a link.
+		const info = await lstat(join(root, ...parts)).catch(() => null);
+		return info?.isSymbolicLink() ? { kind: "link" } : { kind: "missing" };
+	}
+	try {
+		if (real !== join(await realpath(root), ...parts)) return { kind: "link" };
+		const info = await lstat(real);
+		if (!info.isFile()) return { kind: "other" };
+		return {
+			kind: "file",
+			path: real,
+			size: info.size,
+			modifiedAt: info.mtimeMs,
+		};
+	} catch {
+		return { kind: "missing" };
+	}
+}
+
 /** The entries of a folder by name, or none when it cannot be read. */
 async function entriesOf(folder: string): Promise<Dirent[]> {
 	try {
@@ -175,38 +237,20 @@ export function createRunFolders(dataDir: string) {
 			runId: string,
 			relative: string,
 		): Promise<{ file: RunFile; path: string } | null> {
-			const parts = relative.split("/");
-			if (
-				parts.some(
-					(part) =>
-						part === "" ||
-						part === "." ||
-						part === ".." ||
-						part === HIDDEN ||
-						part.includes("\0"),
-				)
-			) {
-				throw new Refusal("invalid", NOT_A_RUN_FILE);
-			}
+			const parts = folderPathParts(relative);
+			if (parts === null) throw new Refusal("invalid", NOT_A_RUN_FILE);
 			const folder = await folderOf(runId);
 			if (!folder) return null;
-			try {
-				const real = await realpath(join(folder, ...parts));
-				// A link anywhere on the way makes the real path another one.
-				if (real !== join(await realpath(folder), ...parts)) return null;
-				const info = await lstat(real);
-				if (!info.isFile()) return null;
-				return {
-					file: {
-						path: parts.join("/"),
-						size: info.size,
-						modifiedAt: info.mtimeMs,
-					},
-					path: real,
-				};
-			} catch {
-				return null;
-			}
+			const entry = await entryUnder(folder, parts);
+			if (entry.kind !== "file") return null;
+			return {
+				file: {
+					path: parts.join("/"),
+					size: entry.size,
+					modifiedAt: entry.modifiedAt,
+				},
+				path: entry.path,
+			};
 		},
 
 		/**

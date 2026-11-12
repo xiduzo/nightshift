@@ -72,6 +72,16 @@ export type Device = {
 	 */
 	request(input: WebRequestInput): Promise<WebRequestResult>;
 	/**
+	 * Reads one text file the run wrote in the folder it works in: its run
+	 * folder or its copy of the project on this Device (an End node's
+	 * report from a file). Only a regular file inside that folder, never
+	 * through a link or in `.git`. A file problem is a result, not an
+	 * error. Absent: this Device reads no files (a test's). A Device of an
+	 * older Night Shift has no `readFiles` capability and cannot read the
+	 * call.
+	 */
+	readFile?(input: ReadFileInput): Promise<ReadFileResult>;
+	/**
 	 * Asks the decider: a label for a Decision, data for a Value. Never
 	 * throws: a failure is `kind: "error"`.
 	 */
@@ -185,6 +195,8 @@ export type Capabilities = {
 	addresses?: Record<string, string | null>;
 	/** It sends web requests (`Device.request`). Absent: an older Night Shift. */
 	requests?: true;
+	/** It reads a file the run wrote (`Device.readFile`). Absent: an older Night Shift. */
+	readFiles?: true;
 	/**
 	 * The newest flow format the Device reads (`FLOW_VERSION`). Absent: an
 	 * older Night Shift, which reads format 8 at most.
@@ -453,6 +465,26 @@ export type WebRequestResult =
 	 * was too large, or a redirect went wrong.
 	 */
 	| { kind: "failed"; message: string; network: boolean };
+
+export type ReadFileInput = {
+	/** The folder the run works in on the Device: its run folder or its copy of the project. */
+	cwd: string;
+	/** The file's path in that folder, with `/` between folders: `report/summary.md`. */
+	path: string;
+	/** The most bytes it keeps. A longer file is cut at a line break, as a report is. */
+	maxBytes: number;
+	signal?: AbortSignal;
+};
+
+export type ReadFileResult =
+	/** The file as UTF-8 text. `cut`: it was longer than `maxBytes`. */
+	| { kind: "text"; text: string; cut: boolean }
+	/** No regular file is at that path: nothing, or a folder. */
+	| { kind: "missing" }
+	/** The file is not UTF-8 text. */
+	| { kind: "not-text" }
+	/** The path leaves the folder, goes into `.git`, or a link is on the way. */
+	| { kind: "outside" };
 
 /** A run, as the Device that holds its worktree sees it. */
 export type RunRef = {
