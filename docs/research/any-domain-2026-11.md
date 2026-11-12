@@ -163,9 +163,9 @@ reopen them.
 - **Wave 3:** Lock and Bypass, the first starter that is not about code, and
   signing the Mac app.
 
-## Progress (2026-11-11)
+## Progress (2026-11-12)
 
-One line per lane. The orchestrator adds the commits on main.
+One line per lane. Waves 0 to 2 are built. Wave 0 is on main since 2026-11-11. Waves 1 and 2 reach main after their verify on 2026-11-12. None of it is proven on a real Host or seen in a browser yet.
 
 | Item | State | Where |
 | --- | --- | --- |
@@ -173,33 +173,41 @@ One line per lane. The orchestrator adds the commits on main.
 | W0b Steering docs, PLAN, glossary, AGENTS.md | Done, on main | fb0446d0 to 96a664ab |
 | W0c README, wiki, CONTRIBUTING, SECURITY | Done, on main | c93e6245 to 9762d893 |
 | W0d UI copy: web, phone, server, assistant | Done, on main | 65e9dacb to 32306782 |
-| W0e Neutral names, stale facts, a ladder-first assistant | Not started | |
-| A Optional project folder, run folder | In progress: A1 (data model and API). Then A2 run folders, A3 files and removal, A4 web and docs | |
-| B Typed outputs, Web request, Since last run, Convert, kits | In progress: B1 (format 9, shapes, families). Then B2 to B5 | |
-| C Metrics vocabulary, useful, Needed you, days | In progress: C1 (one vocabulary, ADR 24) and C4 (days). Then C2 useful, C3 Needed you | |
-| D Add-node dialog by family, viewers, dotted links | Not started | |
-| E Reports | Not started | |
-| F Where the work landed, flow metrics | Not started | |
-| G Guided setup of an agent and a decider | Not started | |
-| Wave 3: Lock and Bypass | Not started | |
-| Wave 3: the first starter that is not about code | Not started | |
-| Wave 3: signing the Mac app | Not started | |
+| W0e Neutral names, stale facts, a ladder-first assistant | Done | b89f570b to 5ac49ec7 |
+| A Optional project folder, run folder, run files, the UI | Done | A1 f2615a67, A2 20f5edb5, A3 82dda8bb, A4 d6cabb7c to 325082d7 |
+| B Typed outputs, Web request, Since last run, Convert, kits | Done | B1 97799c5d, B2 967061c1, B3 557dc4c3, B4 12a3da7e, B5a 8f8016e0, B5b 9325699d |
+| C Metrics vocabulary, useful, Needed you, days | Done | C1 986cc373 (ADR 24), C2 fe90a006, C3 d4ff57ca, C4 79dc5be1 |
+| D Add-node dialog by family, kits, viewers, dotted links | Done | D1 2ac063a2, D2 6a9d9158, D3 99d399bd, D4 565f15f4 |
+| E Reports | Done | E1 2dec9ce0 (ADR 26), E2 48d8aebe, E3 2e2f816b, E4 fa4f5237 |
+| F Where the work landed, flow metrics | Done | F1 a92952fa, F2 a4e877c5, F3 3a8dda62, F4 bbb69554 |
+| G Guided setup of an agent and a decider | Done | G1 87ae7f6a (ADR 25), G2 60669488, G3 2542acdc, G4 0c797ae5 |
+| Fixes found on the way | Done | X1 e434179f, X1b 3d09a4d2, X2 44364903, X2b ff8330c5, X3 66ec702d, W1f f611f77a, W2f 3f2633e9, W2g cb82ca01, W2h e5b20348, W2i 821c1de5, W2j 7f9bf35a |
+| Wave 3: Lock and Bypass | Planned | |
+| Wave 3: the first starter that is not about code | Waits for the owner (Q16) | |
+| Wave 3: signing the Mac app | Waits for the owner (Q23) | |
 
 ## Findings
-
-The orchestrator adds findings as lanes report.
 
 Wave 0 (on main 32306782, 2026-11-11):
 
 - The README and the wiki now start a first run with `scout-and-pick`. It needs only a topic, not a test command.
 - The repository About and topics changed: `coding-agents`, `developer-tools` and `human-in-the-loop` are out. `workflow-automation`, `autonomous-agents` and `human-on-the-loop` are in.
-- Test fixtures and a few docs still name private projects. Lane W0e replaces them with neutral names.
-- Three tests fail under heavy load and pass alone: a lease renewal after a restart, the session cap of an Offer, and the folders of an Agent node's knowledge. They are flaky, not broken.
+- Test fixtures and a few docs named private projects. Lane W0e replaced them with neutral names.
 
-For wave 1 (from the plans):
+Tests that failed only under load (corrected on 2026-11-12):
 
-- Command already has a field `output` (`text` or `json`). Format 9 renames it to `stdout`, and `output` becomes the output schema, as on Agent and Value.
-- A kept variable is per project and shared across the Space, through the step events. Since last run keeps its memory the same way, in its own table.
-- A run of a project without a folder needs no new run column. The run start event carries the fact.
-- The usage ingest refuses a whole record with an unknown event or attribute. The ingest must be updated before a release sends the new vocabulary (ADR 24).
-- A new flow format must reach the Host before a laptop saves it, because every schedule runs on the Host.
+- Two of them were real races in production code, not flaky tests.
+  - A new daemon renewed the leases of its runs only when its one-minute timer first fired. A two-minute lease could expire across a restart. It now renews right after recovery, and again when the link to the Host comes up (X1, X1b).
+  - An Agent step ended before its session's cleanup: the knowledge view, the after-step sync and the harness files. The step now waits for it, also on another Device (X2, X2b).
+- The scheduled cleanup test waited a fixed 5 seconds for about 30 git calls. It now waits for the sweep itself. Two "does nothing" cleanup tests had passed falsely under load (X3).
+- The Offer session-cap test passes when its whole file runs. It fails only when a filter skips the setup of earlier tests.
+
+Waves 1 and 2:
+
+- A missing dependency made every live stream item `any` in the web app, the phone and the client. The api emitted types that name `@orpc/contract` without depending on it (W1f).
+- Renaming a node missed many template fields and every rule. A rename now walks every field once, and a test fails when a new field is missed (W2f, W2h).
+- The Secrets page counted only Command secrets as used. A secret that only a Web request, a Wait, a Service or a kit used looked unused (W2g).
+- Every Device of a Space needs the new build before it takes a step of a format 9 flow. A Device that advertises no flow version reads format 8.
+- One Insights deploy and one Collector restart cover the new usage vocabulary (C1, F3) and the new view (F4). They must happen before a release sends it (ADR 24).
+- The guided setup never ran a real install or sign-in. The pipes-or-terminal choice for each agent's sign-in still needs one check by hand.
+- No new screen is seen in a browser yet. Obscura cannot render the web app.
