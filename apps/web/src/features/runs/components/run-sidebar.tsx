@@ -1,20 +1,13 @@
 import { Badge } from "@nightshift/ui/components/badge";
+import { ItemGroup } from "@nightshift/ui/components/item";
 import { ScrollArea } from "@nightshift/ui/components/scroll-area";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@nightshift/ui/components/table";
 import { cn } from "@nightshift/ui/lib/utils";
 import type { ReactNode } from "react";
 import type { Artifact, RunDetail, RunFiles, StepSummary } from "@/shared/api";
 import { showsRunFiles } from "../lib/run-files";
 import { RunArtifacts } from "./run-artifacts";
 import { RunFilesList } from "./run-files";
-import { RunVariables, ValuePreview, variableCount } from "./run-variables";
+import { RunVariables, ValueItem, variableCount } from "./run-variables";
 import { type Source, SourceList } from "./step-sources";
 
 /**
@@ -63,26 +56,11 @@ export function RunSidebar({
 				<div className="flex flex-col gap-6 p-4">
 					{inputs.length > 0 ? (
 						<Section title="Inputs" count={inputs.length}>
-							<Table className="text-xs">
-								<TableHeader>
-									<TableRow>
-										<TableHead>Input</TableHead>
-										<TableHead className="text-right">Value</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{inputs.map(([name, value]) => (
-										<TableRow key={name}>
-											<TableCell className="whitespace-nowrap font-mono">
-												{name}
-											</TableCell>
-											<TableCell className="w-full max-w-0 truncate text-right font-mono text-muted-foreground">
-												<ValuePreview value={value} />
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
+							<ItemGroup className="gap-1.5">
+								{inputs.map(([name, value]) => (
+									<ValueItem key={name} name={name} value={value} />
+								))}
+							</ItemGroup>
 						</Section>
 					) : null}
 					{variables > 0 ? (

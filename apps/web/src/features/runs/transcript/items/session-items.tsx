@@ -5,6 +5,7 @@ import {
 	AlertDescription,
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
+import { Bubble, BubbleContent } from "@nightshift/ui/components/bubble";
 import {
 	Marker,
 	MarkerContent,
@@ -37,8 +38,9 @@ import type {
 import { PromptBubble, ResultCard } from "./parts";
 
 /**
- * Where a session starts, as a checkpoint: a line across the transcript
- * with the session's number, when it started and its model, then its prompt.
+ * Where a session starts: its prompt, with when it started and its model.
+ * The step's checkpoint marks the first session. A resumed session gets a
+ * checkpoint of its own.
  */
 export function SessionBoundary({
 	number,
@@ -52,21 +54,29 @@ export function SessionBoundary({
 	prompt: string;
 }) {
 	const resumed = number !== undefined && number > 1;
-	const details = [resumed ? "resumed" : null, formatTime(at), model].filter(
-		Boolean,
-	);
+	const details = [formatTime(at), model].filter(Boolean).join(" · ");
 	return (
-		<div className="flex flex-col gap-3 pt-2">
-			<Marker variant="separator" className="text-xs">
-				<MarkerContent className="inline-flex items-center gap-2">
-					<h3 className="font-medium text-foreground">
-						{number === undefined ? "Session" : `Session ${number}`}
-					</h3>
-					<LocalTime at={at}>{details.join(" · ")}</LocalTime>
-				</MarkerContent>
-			</Marker>
+		<div className="flex flex-col gap-3">
+			{resumed ? (
+				<Marker variant="separator" className="text-xs">
+					<MarkerContent className="inline-flex items-center gap-2">
+						<h3 className="font-medium text-foreground">
+							Session {number} · resumed
+						</h3>
+						<LocalTime at={at}>{details}</LocalTime>
+					</MarkerContent>
+				</Marker>
+			) : null}
 			<PromptBubble
-				label={resumed ? "Follow-up prompt" : "Prompt"}
+				label={
+					resumed ? (
+						"Follow-up prompt"
+					) : (
+						<>
+							Prompt · <LocalTime at={at}>{details}</LocalTime>
+						</>
+					)
+				}
 				prompt={prompt}
 				empty={resumed ? "Resumed without a new prompt." : "No prompt."}
 			/>
@@ -74,12 +84,16 @@ export function SessionBoundary({
 	);
 }
 
-/** The agent's own words, as Markdown. */
+/** The agent's own words, as Markdown in a bubble. */
 export function MessageBlock({ item }: { item: MessageItem }) {
 	return (
 		<Message>
 			<MessageContent>
-				<Markdown text={item.text} className="max-w-none" />
+				<Bubble variant="outline" className="max-w-[92%]">
+					<BubbleContent>
+						<Markdown text={item.text} className="max-w-none" />
+					</BubbleContent>
+				</Bubble>
 			</MessageContent>
 		</Message>
 	);

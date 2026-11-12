@@ -37,16 +37,16 @@ import {
 	emptyTranscript,
 	type TranscriptState,
 } from "../transcript/transcript";
-import { StepChapter, StepRecap } from "./step-chapter";
+import { StepChapter } from "./step-chapter";
 
 /** A pick of a step: each one scrolls the story to it, also the same step again. */
 export type StepPick = { stepId: string; seq: number };
 
 /**
- * The run as one conversation, top to bottom. Steps the person saw already
- * are one line each, which open on the whole step. A checkpoint marks what
- * is new since they last looked, and those steps show in full. While the
- * run goes, it ends on where the flow goes next.
+ * The run as one conversation, top to bottom: every step in full, each
+ * starting at its checkpoint. A checkpoint marks what is new since the
+ * person last looked. While the run goes, it ends on where the flow goes
+ * next.
  */
 export function RunStory({
 	run,
@@ -77,7 +77,7 @@ export function RunStory({
 	connecting: boolean;
 	/** When the person last looked at this run. Null: never, here. */
 	seen: number | null;
-	/** A step a link, the visits or the flow picked: it shows in full. */
+	/** A step a link, the visits or the flow picked: the story scrolls to it. */
 	pick: StepPick | null;
 	warnedStepIds: ReadonlySet<string>;
 	focus: ItemScope;
@@ -122,8 +122,6 @@ export function RunStory({
 	// The first step that started after the person last looked.
 	const firstNew =
 		seen === null ? undefined : story.find((step) => step.startedAt > seen);
-	// Without new steps, only the last one shows in full.
-	const newFrom = firstNew ? story.indexOf(firstNew) : story.length - 1;
 	const going = status === "running" || status === "waiting";
 	const answerPending = run.commands.some((c) => c.kind === "gate.resolve");
 
@@ -152,11 +150,6 @@ export function RunStory({
 							context: stepContext?.(step),
 							action: stepAction?.(step),
 						};
-						// Seen steps fold to a line, unless they still run or were picked.
-						const full =
-							index >= newFrom ||
-							step.outcome === null ||
-							step.id === pick?.stepId;
 						return (
 							<Fragment key={step.id}>
 								{step === firstNew && index > 0 && seen !== null ? (
@@ -170,7 +163,7 @@ export function RunStory({
 									</Marker>
 								) : null}
 								<MessageScrollerItem messageId={step.id}>
-									{full ? <StepChapter {...props} /> : <StepRecap {...props} />}
+									<StepChapter {...props} />
 								</MessageScrollerItem>
 							</Fragment>
 						);

@@ -18,31 +18,13 @@ export type TranscriptRow =
 	| { kind: "tool-calls"; items: (ToolItem | ThinkingItem)[] }
 	| { kind: "command"; command: CommandItem; log?: LogItem; exit?: ExitItem };
 
-/** The items a row draws, in order. Select and Copy work on these. */
-export function rowItems(row: TranscriptRow): TranscriptItem[] {
-	switch (row.kind) {
-		case "item":
-			return [row.item];
-		case "tool-calls":
-			return row.items;
-		case "command":
-			return [
-				row.command,
-				...(row.log ? [row.log] : []),
-				...(row.exit ? [row.exit] : []),
-			];
-	}
-}
-
 /**
  * The rows of a step's transcript. A command takes the log and the exit
  * that follow it. Two or more tool calls in a row fold into one group,
- * with the thoughts around and between them as steps inside it, unless `groupTools` is off: then every call is a row of its own, so
- * Select can pick single calls.
+ * with the thoughts around and between them as steps inside it.
  */
 export function transcriptRows(
 	items: readonly TranscriptItem[],
-	{ groupTools }: { groupTools: boolean },
 ): TranscriptRow[] {
 	const rows: TranscriptRow[] = [];
 	for (let at = 0; at < items.length; at++) {
@@ -68,7 +50,6 @@ export function transcriptRows(
 		}
 		rows.push(row);
 	}
-	if (!groupTools) return rows;
 	return groupToolCalls(rows, (row) => joinsGroup(row)).flatMap(
 		(grouped): TranscriptRow[] => {
 			if (grouped.kind === "item") return [grouped.item];

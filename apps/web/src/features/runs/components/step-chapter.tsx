@@ -6,22 +6,12 @@ import {
 	MarkerContent,
 	MarkerIcon,
 } from "@nightshift/ui/components/marker";
-import {
-	TraceCollapsible,
-	TraceCollapsibleContent,
-	TraceCollapsibleTrigger,
-	TraceDescription,
-	TraceIcon,
-	TraceLine,
-	TraceTitle,
-} from "@nightshift/ui/components/trace";
 import { HandIcon, TriangleAlertIcon } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
 import { NODE_TYPE, OutcomeBadge, stepState } from "@/features/flows";
 import type { Artifact, RunDetail, RunStatus, StepSummary } from "@/shared/api";
 import { reportFileName, stepReport } from "../lib/report";
 import type { ItemScope } from "../lib/run-steps";
-import { stepGist } from "../lib/step-gist";
 import { stepLearnings } from "../lib/step-learnings";
 import { StepTranscript } from "../transcript/step-transcript";
 import type { TranscriptState } from "../transcript/transcript";
@@ -29,7 +19,6 @@ import { ChangedFiles } from "./changed-files";
 import { StepDuration } from "./elapsed";
 import { RunArtifacts } from "./run-artifacts";
 import { RunReport } from "./run-report";
-import { StepOutputs } from "./step-header";
 import { StepLearnings } from "./step-learnings";
 import { StepPlan } from "./step-plan";
 import { StepSources } from "./step-sources";
@@ -66,7 +55,7 @@ type ChapterProps = {
  * One step of the run's story, told in full: a checkpoint with its name,
  * time and outcome, then the agent's plan, the sources it used, its
  * transcript, and what it left: an End step's report, its summary,
- * learnings, changed files, artifacts and outputs.
+ * learnings, changed files and artifacts.
  */
 export function StepChapter(props: ChapterProps) {
 	const { step, runStatus, outcomeColor, warned, action } = props;
@@ -106,37 +95,6 @@ export function StepChapter(props: ChapterProps) {
 	);
 }
 
-/**
- * A step the person saw already, on one line: its name, outcome and what it
- * did in a few words. It opens on the whole step.
- */
-export function StepRecap(props: ChapterProps) {
-	const { step, runStatus } = props;
-	const Icon = step.gate !== null ? HandIcon : NODE_TYPE[step.nodeType].icon;
-	return (
-		<TraceCollapsible>
-			<TraceCollapsibleTrigger>
-				<TraceLine status={step.error ? "error" : undefined}>
-					<TraceIcon>
-						<Icon />
-					</TraceIcon>
-					<TraceTitle className="font-mono">
-						{step.nodeId} · {stepState(step, runStatus)}
-					</TraceTitle>
-					<TraceDescription className="truncate">
-						{stepGist(step)}
-					</TraceDescription>
-				</TraceLine>
-			</TraceCollapsibleTrigger>
-			<TraceCollapsibleContent className="text-foreground">
-				<div className="flex flex-col gap-4 py-2">
-					<ChapterBody {...props} />
-				</div>
-			</TraceCollapsibleContent>
-		</TraceCollapsible>
-	);
-}
-
 function ChapterBody({
 	run,
 	steps,
@@ -171,7 +129,6 @@ function ChapterBody({
 		() => changedFiles(calls, run.worktreePath, transcript.changes),
 		[calls, run.worktreePath, transcript.changes],
 	);
-	const outputs = Object.keys(step.outputs).length;
 	const ended = step.outcome !== null;
 	// From the step's outputs: it shows when the transcript is out of reach too.
 	const report = stepReport(step, run.warnings);
@@ -239,21 +196,6 @@ function ChapterBody({
 					onShowStep={onShowStep}
 					className="p-0"
 				/>
-			) : null}
-			{outputs > 0 ? (
-				<TraceCollapsible>
-					<TraceCollapsibleTrigger>
-						<TraceLine>
-							<TraceTitle>Outputs</TraceTitle>
-							<TraceDescription className="tabular-nums">
-								{outputs}
-							</TraceDescription>
-						</TraceLine>
-					</TraceCollapsibleTrigger>
-					<TraceCollapsibleContent className="text-foreground">
-						<StepOutputs step={step} />
-					</TraceCollapsibleContent>
-				</TraceCollapsible>
 			) : null}
 		</>
 	);

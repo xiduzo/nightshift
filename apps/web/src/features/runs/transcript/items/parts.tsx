@@ -51,7 +51,7 @@ export function PromptBubble({
 	empty,
 	children,
 }: {
-	label: string;
+	label: ReactNode;
 	prompt: string;
 	/** Shown in place of an empty prompt. */
 	empty: string;

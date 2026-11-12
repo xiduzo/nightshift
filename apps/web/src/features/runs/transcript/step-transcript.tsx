@@ -1,5 +1,5 @@
 /**
- * The transcript of one step: its items in order, with selection and copy.
+ * The transcript of one step: its items in order.
  * Each kind of item has its view in `items/`, one file per group of kinds.
  */
 import type { FlowNode } from "@nightshift/flows";
@@ -8,17 +8,14 @@ import {
 	AlertDescription,
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
-import { Button } from "@nightshift/ui/components/button";
-import { Checkbox } from "@nightshift/ui/components/checkbox";
 import {
 	Marker,
 	MarkerContent,
 	MarkerIcon,
 } from "@nightshift/ui/components/marker";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { CircleXIcon, CopyIcon, ListChecksIcon, SendIcon } from "lucide-react";
-import { memo, type ReactNode, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { CircleXIcon, SendIcon } from "lucide-react";
+import { memo, useMemo } from "react";
 import {
 	AskForm,
 	GateAnswer,
@@ -58,12 +55,7 @@ import { WaitCard, WakeMarker } from "./items/wait-items";
 import { WebRequestCard } from "./items/web-request-items";
 import type { TranscriptState } from "./transcript";
 import type { TranscriptItem } from "./transcript-items";
-import { markdownContext, transcriptToMarkdown } from "./transcript-markdown";
-import {
-	rowItems,
-	type TranscriptRow,
-	transcriptRows,
-} from "./transcript-rows";
+import { type TranscriptRow, transcriptRows } from "./transcript-rows";
 
 /**
  * The transcript of one step, inline in the run's story: the story scrolls,
@@ -142,103 +134,13 @@ export function StepTranscript({
 		),
 	]);
 
-	// Select mode: a checkbox per part, to copy only some of them. While
-	// selecting, tool calls are not grouped, so each call can be picked.
-	const [selecting, setSelecting] = useState(false);
-	const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
-	const [anchor, setAnchor] = useState<number | null>(null);
 	const rows = useMemo(
-		() => transcriptRows(transcript.items, { groupTools: !selecting }),
-		[transcript.items, selecting],
+		() => transcriptRows(transcript.items),
+		[transcript.items],
 	);
-	const select = (index: number, checked: boolean, range: boolean) => {
-		const from = range && anchor !== null ? Math.min(anchor, index) : index;
-		const to = range && anchor !== null ? Math.max(anchor, index) : index;
-		setSelected((current) => {
-			const next = new Set(current);
-			for (const row of rows.slice(from, to + 1)) {
-				for (const item of rowItems(row)) {
-					if (checked) next.add(item.key);
-					else next.delete(item.key);
-				}
-			}
-			return next;
-		});
-		setAnchor(index);
-	};
-	const stopSelecting = () => {
-		setSelecting(false);
-		setSelected(new Set());
-		setAnchor(null);
-	};
-	const copy = async (items: readonly TranscriptItem[]) => {
-		const text = transcriptToMarkdown(
-			step,
-			items,
-			markdownContext(step, itemTitles),
-		);
-		try {
-			await navigator.clipboard.writeText(text);
-			toast.success(
-				items.length === transcript.items.length
-					? "Copied the transcript as Markdown."
-					: `Copied ${items.length} ${items.length === 1 ? "part" : "parts"} as Markdown.`,
-			);
-			stopSelecting();
-		} catch {
-			toast.error("Could not copy. Allow this page to use the clipboard.");
-		}
-	};
-	const picked = transcript.items.filter((item) => selected.has(item.key));
 
 	return (
 		<div className="flex min-w-0 flex-col gap-3">
-			<div className="flex h-7 items-center justify-end gap-1">
-				<div className="flex items-center gap-1">
-					{selecting ? (
-						<>
-							<span className="px-2 text-muted-foreground text-xs tabular-nums">
-								{picked.length === 0
-									? "Pick the parts to copy. Shift-click picks a range."
-									: `${picked.length} selected`}
-							</span>
-							<Button variant="ghost" size="xs" onClick={stopSelecting}>
-								Cancel
-							</Button>
-							<Button
-								size="xs"
-								disabled={picked.length === 0}
-								onClick={() => void copy(picked)}
-							>
-								<CopyIcon data-icon="inline-start" />
-								Copy selected
-							</Button>
-						</>
-					) : (
-						<>
-							<Button
-								variant="ghost"
-								size="xs"
-								disabled={transcript.items.length === 0}
-								onClick={() => setSelecting(true)}
-							>
-								<ListChecksIcon data-icon="inline-start" />
-								Select
-							</Button>
-							<Button
-								variant="ghost"
-								size="xs"
-								disabled={transcript.items.length === 0 && !step.error}
-								title="Copy the whole transcript as Markdown"
-								onClick={() => void copy(transcript.items)}
-							>
-								<CopyIcon data-icon="inline-start" />
-								Copy
-							</Button>
-						</>
-					)}
-				</div>
-			</div>
 			{openGate ? (
 				<div className="flex flex-col gap-4 rounded-xl border p-4">
 					<GateQuestionText question={openGate.question} />
@@ -278,79 +180,71 @@ export function StepTranscript({
 				aria-label={`Transcript of ${step.nodeId}`}
 				className="flex min-w-0 flex-col gap-4"
 			>
-				{rows.map((row, index) => {
+				{rows.map((row) => {
 					const key = rowKey(row);
 					return (
 						<div key={key} className="min-w-0">
-							<Selectable
-								on={selecting}
-								checked={rowItems(row).every((item) => selected.has(item.key))}
-								onCheckedChange={(checked, range) =>
-									select(index, checked, range)
-								}
-							>
-								{row.kind === "tool-calls" ? (
-									<ToolCallsGroup
-										items={row.items}
-										running={running}
-										projectRoot={projectRoot}
-									/>
-								) : row.kind === "command" ? (
-									<CommandRun
-										command={row.command}
-										{...(row.log ? { log: row.log } : {})}
-										{...(row.exit ? { exit: row.exit } : {})}
-										running={running}
-									/>
-								) : row.item.kind === "gate-open" &&
-									row.item.key === openGateKey &&
-									step.gate?.form ? (
-									<div className="flex flex-col gap-4 rounded-xl border p-4">
-										<GateQuestionText question={row.item.question} />
-										<AskForm
-											runId={runId}
-											stepId={step.id}
-											form={step.gate.form}
-											deadline={step.gate.deadline}
-											filesHere={!elsewhere}
-											{...(elsewhere ? { walkerName: elsewhere } : {})}
-										/>
-									</div>
-								) : row.item.kind === "gate-open" &&
-									row.item.key === openGateKey ? (
-									<GateConfirmation
+							{row.kind === "tool-calls" ? (
+								<ToolCallsGroup
+									items={row.items}
+									running={running}
+									projectRoot={projectRoot}
+								/>
+							) : row.kind === "command" ? (
+								<CommandRun
+									command={row.command}
+									{...(row.log ? { log: row.log } : {})}
+									{...(row.exit ? { exit: row.exit } : {})}
+									running={running}
+								/>
+							) : row.item.kind === "gate-open" &&
+								row.item.key === openGateKey &&
+								step.gate?.form ? (
+								<div className="flex flex-col gap-4 rounded-xl border p-4">
+									<GateQuestionText question={row.item.question} />
+									<AskForm
 										runId={runId}
 										stepId={step.id}
-										question={row.item.question}
-										choices={row.item.choices}
-										deadline={row.item.deadline ?? null}
-										openedAt={row.item.at}
+										form={step.gate.form}
+										deadline={step.gate.deadline}
+										filesHere={!elsewhere}
 										{...(elsewhere ? { walkerName: elsewhere } : {})}
 									/>
-								) : (
-									<TranscriptItemView
-										item={row.item}
-										projectRoot={projectRoot}
-										node={node}
-										itemTitle={
-											row.item.kind === "item-end"
-												? itemTitles.get(row.item.itemId)
-												: undefined
-										}
-										running={running}
-										session={
-											row.item.sessionId
-												? sessionsById.get(row.item.sessionId)
-												: undefined
-										}
-										sessionNumber={
-											row.item.sessionId
-												? sessionNumbers.get(row.item.sessionId)
-												: undefined
-										}
-									/>
-								)}
-							</Selectable>
+								</div>
+							) : row.item.kind === "gate-open" &&
+								row.item.key === openGateKey ? (
+								<GateConfirmation
+									runId={runId}
+									stepId={step.id}
+									question={row.item.question}
+									choices={row.item.choices}
+									deadline={row.item.deadline ?? null}
+									openedAt={row.item.at}
+									{...(elsewhere ? { walkerName: elsewhere } : {})}
+								/>
+							) : (
+								<TranscriptItemView
+									item={row.item}
+									projectRoot={projectRoot}
+									node={node}
+									itemTitle={
+										row.item.kind === "item-end"
+											? itemTitles.get(row.item.itemId)
+											: undefined
+									}
+									running={running}
+									session={
+										row.item.sessionId
+											? sessionsById.get(row.item.sessionId)
+											: undefined
+									}
+									sessionNumber={
+										row.item.sessionId
+											? sessionNumbers.get(row.item.sessionId)
+											: undefined
+									}
+								/>
+							)}
 						</div>
 					);
 				})}
@@ -395,38 +289,6 @@ export function StepTranscript({
 					</Marker>
 				) : null}
 			</div>
-		</div>
-	);
-}
-
-/** One part of the transcript, with a checkbox in front while selecting. */
-function Selectable({
-	on,
-	checked,
-	onCheckedChange,
-	children,
-}: {
-	on: boolean;
-	checked: boolean;
-	/** `range`: Shift was held, so everything since the last click follows. */
-	onCheckedChange: (checked: boolean, range: boolean) => void;
-	children: ReactNode;
-}) {
-	if (!on) return children;
-	return (
-		<div className="flex items-start gap-3">
-			<Checkbox
-				className="mt-1"
-				checked={checked}
-				aria-label="Copy this part"
-				onCheckedChange={(next, details) =>
-					onCheckedChange(
-						next,
-						details.event instanceof MouseEvent && details.event.shiftKey,
-					)
-				}
-			/>
-			<div className="min-w-0 flex-1">{children}</div>
 		</div>
 	);
 }

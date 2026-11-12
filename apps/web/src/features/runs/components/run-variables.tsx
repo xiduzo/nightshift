@@ -22,17 +22,9 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@nightshift/ui/components/sheet";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@nightshift/ui/components/table";
 import { cn } from "@nightshift/ui/lib/utils";
 import { VariableIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 
 import type { RunDetail, StepSummary } from "@/shared/api";
 import { JsonBlock } from "@/shared/code";
@@ -67,7 +59,7 @@ export function RunVariables({
 	run: RunDetail;
 	steps: StepSummary[];
 	onShowStep: (stepId: string) => void;
-	/** The tables' wrapper, to drop its padding in the run's sidebar. */
+	/** The lists' wrapper, to drop its padding in the run's sidebar. */
 	className?: string;
 }) {
 	const groups = useMemo(() => variableGroups(run, steps), [run, steps]);
@@ -167,47 +159,29 @@ function VariableTable({
 			{titled ? (
 				<h3 className="text-muted-foreground text-xs">{title}</h3>
 			) : null}
-			<Table className="text-xs">
-				<TableHeader>
-					<TableRow>
-						<TableHead>Variable</TableHead>
-						<TableHead>Value</TableHead>
-						<TableHead>Set by</TableHead>
-					</TableRow>
-				</TableHeader>
-				<TableBody>
-					{group.rows.map((row) => (
-						<TableRow key={row.name}>
-							<TableCell className="whitespace-nowrap">
-								<div className="flex items-center gap-1.5">
-									<Button
-										variant="link"
-										size="xs"
-										className="h-auto px-0 font-mono"
-										title="Show every value"
-										onClick={() => onOpen(row.name)}
-									>
-										{row.name}
-									</Button>
-									{row.type ? (
-										<Badge variant="outline">{TYPE_LABEL[row.type]}</Badge>
-									) : null}
-								</div>
-							</TableCell>
-							<TableCell className="w-full max-w-0 truncate font-mono">
-								<ValuePreview value={row.last.value} />
-							</TableCell>
-							<TableCell className="whitespace-nowrap">
-								<SetBy
-									change={row.last}
-									steps={steps}
-									onShowStep={onShowStep}
-								/>
-							</TableCell>
-						</TableRow>
-					))}
-				</TableBody>
-			</Table>
+			<ItemGroup className="gap-1.5">
+				{group.rows.map((row) => (
+					<ValueItem
+						key={row.name}
+						name={
+							<Button
+								variant="link"
+								size="xs"
+								className="h-auto px-0 font-mono"
+								title="Show every value"
+								onClick={() => onOpen(row.name)}
+							>
+								{row.name}
+							</Button>
+						}
+						type={row.type ? TYPE_LABEL[row.type] : undefined}
+						value={row.last.value}
+						aside={
+							<SetBy change={row.last} steps={steps} onShowStep={onShowStep} />
+						}
+					/>
+				))}
+			</ItemGroup>
 		</section>
 	);
 }
@@ -229,6 +203,42 @@ export function ScopeTitle({
 			{label.item ? <> · {label.item}</> : null}
 			{label.flow ? <span className="font-mono"> · {label.flow}</span> : null}
 		</>
+	);
+}
+
+/**
+ * One named value in a narrow column: the name, its type and what set it
+ * on one line, the value under it at full width.
+ */
+export function ValueItem({
+	name,
+	type,
+	value,
+	aside,
+}: {
+	name: ReactNode;
+	type?: string | undefined;
+	value: unknown;
+	/** What set the value, at the end of the name's line. */
+	aside?: ReactNode;
+}) {
+	return (
+		<Item size="xs" variant="muted">
+			<ItemContent className="min-w-0">
+				<ItemTitle className="w-full min-w-0 text-xs">
+					<span className="min-w-0 truncate font-mono">{name}</span>
+					{type ? <Badge variant="outline">{type}</Badge> : null}
+					{aside ? (
+						<span className="ml-auto shrink-0 font-normal text-muted-foreground">
+							{aside}
+						</span>
+					) : null}
+				</ItemTitle>
+				<ItemDescription className="break-all font-mono text-xs">
+					<ValuePreview value={value} />
+				</ItemDescription>
+			</ItemContent>
+		</Item>
 	);
 }
 
