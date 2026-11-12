@@ -216,6 +216,7 @@ export function apiPort(
 					endedAt: run.endedAt,
 					cost: costOf(run),
 					prUrl: run.metrics?.prUrl ?? null,
+					...(run.test ? { test: run.test } : {}),
 				})),
 			),
 		run: (projectId, runId) =>

@@ -347,6 +347,76 @@ describe("the run tools of nightshift mcp", () => {
 		expect(text).not.toContain("## The report of the run");
 	});
 
+	test("list_runs and get_run say which run is a test run, and which steps stood in", async () => {
+		const test = { pinned: ["fetch"], skipped: ["check"] };
+		const { call } = await connect(
+			fakePort({
+				runs: async () => [summary("try", { test }), summary("real")],
+				run: async (_project, runId) => ({
+					run: {
+						id: runId,
+						status: "finished",
+						reason: null,
+						test,
+						inputs: {},
+						flow,
+						steps: [
+							{
+								id: "s1",
+								flow: null,
+								nodeId: "fetch",
+								nodeType: "command",
+								visit: 1,
+								outcome: "pass",
+								error: null,
+								note: null,
+								test: "pinned",
+							},
+							{
+								id: "s2",
+								flow: null,
+								nodeId: "check",
+								nodeType: "decision",
+								visit: 1,
+								outcome: "pass",
+								error: null,
+								note: null,
+								test: "skipped",
+							},
+						],
+						failedStepId: null,
+						transcript: [],
+					},
+					flowName: null,
+					cost: { usd: 0, estimated: false, missing: 0, calls: 0, basis: null },
+					prUrl: null,
+					report: null,
+				}),
+			}),
+			{ project: "p1", now: () => NOW },
+		);
+		const listed = JSON.parse((await call("list_runs")).text) as {
+			id: string;
+			testRun?: unknown;
+		}[];
+		expect(listed.map((run) => [run.id, run.testRun])).toEqual([
+			["try", test],
+			["real", undefined],
+		]);
+		expect(listed[1]).not.toHaveProperty("testRun");
+
+		const text = (await call("get_run", { run: "try" })).text;
+		expect(text).toContain(
+			"Test run: a person started it from the editor. Its pinned and skipped nodes did not run. Pinned (each gave the output of a step of an earlier run): `fetch`. Skipped (each gave an outcome the person chose): `check`. Only its spend counts in the numbers of the project.",
+		);
+		expect(text).toContain(
+			"- `fetch` (command): pass. pinned output: the node did not run",
+		);
+		expect(text).toContain(
+			"- `check` (decision): pass. skipped: the node did not run",
+		);
+	});
+
 	test("get_run ends with the run's report, and where to read the rest", async () => {
 		const reportOf = (report: {
 			text: string;

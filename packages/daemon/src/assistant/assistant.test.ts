@@ -685,6 +685,33 @@ describe("chatRun", () => {
 		expect(await chatRun(space(), "p2", "r1", { signal })).toBeNull();
 		expect(await chatRun(space(), "p1", "nope", { signal })).toBeNull();
 	});
+
+	test("a test run says so, and so does each step that stood in", async () => {
+		const tested = {
+			...run,
+			status: "finished",
+			test: { pinned: ["plan"], skipped: [] },
+			steps: [{ ...run.steps[0], test: "pinned" }],
+		};
+		const read = (detail: unknown) =>
+			chatRun(
+				{
+					flows: { map: async () => ({}) },
+					getRun: async () => detail,
+					watchRun: async function* () {},
+				} as unknown as ChatSpace,
+				"p1",
+				"r1",
+				{ signal: new AbortController().signal },
+			);
+		const found = await read(tested);
+		expect(found?.test).toEqual({ pinned: ["plan"], skipped: [] });
+		expect(found?.steps.map((step) => step.test)).toEqual(["pinned"]);
+		// A run that is no test says nothing of it.
+		const real = await read({ ...run, steps: [run.steps[0]] });
+		expect(real).not.toHaveProperty("test");
+		expect(real?.steps[0]).not.toHaveProperty("test");
+	});
 });
 
 describe("assistant.explain", () => {

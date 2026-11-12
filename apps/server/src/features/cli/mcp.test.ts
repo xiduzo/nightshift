@@ -67,6 +67,36 @@ describe("nightshift mcp", () => {
 		expect(reportOf({ steps: [end], warnings: [] })).toBeNull();
 	});
 
+	test("list_runs marks a test run with its pinned and skipped nodes", async () => {
+		const row = (id: string, more: object = {}) => ({
+			id,
+			flowName: "watch",
+			title: `watch · ${id}`,
+			status: "finished",
+			reason: null,
+			createdAt: 1,
+			endedAt: 2,
+			costUsd: 0.5,
+			costEstimated: false,
+			costMissing: 0,
+			costCalls: 1,
+			...more,
+		});
+		const test = { pinned: ["fetch"], skipped: ["check"] };
+		const client = {
+			runs: { list: async () => [row("try", { test }), row("real")] },
+		} as unknown as AppRouterClient;
+		const runs = await apiPort(client, { ui: "http://localhost:9" }).runs(
+			"p1",
+			{ limit: 10 },
+		);
+		expect(runs.map((run) => [run.id, run.test])).toEqual([
+			["try", test],
+			["real", undefined],
+		]);
+		expect(runs[1]).not.toHaveProperty("test");
+	});
+
 	test("without Night Shift on this computer each tool says so", async () => {
 		// A port nothing listens on.
 		const server = Bun.serve({ port: 0, fetch: () => new Response() });

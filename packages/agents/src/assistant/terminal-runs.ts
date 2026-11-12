@@ -60,6 +60,8 @@ export type TerminalRunSummary = {
 	cost: TerminalCost;
 	/** The pull request the run opened. */
 	prUrl: string | null;
+	/** A test run (ADR 27): the nodes its start pinned and skipped, by id. */
+	test?: { pinned: string[]; skipped: string[] };
 };
 
 /** A Gate that waits for a person, as the Needs-you inbox shows it. */
@@ -269,7 +271,7 @@ export function terminalRunTools(
 		toolDefinition({
 			name: RUN_TOOLS.listRuns,
 			description:
-				"The newest runs of the project: id, flow, title, status, why it ended, when it started and ended, its cost and the pull request it opened. Filter by status and by start time. Use it to see what ran, and to find a run's id for get_run or stop_run.",
+				"The newest runs of the project: id, flow, title, status, why it ended, when it started and ended, its cost and the pull request it opened. A test run has testRun: the nodes it pinned and skipped, which did not run. Filter by status and by start time. Use it to see what ran, and to find a run's id for get_run or stop_run.",
 			inputSchema: {
 				type: "object",
 				properties: {
@@ -316,11 +318,13 @@ export function terminalRunTools(
 					: `The project "${project.name}" has no runs like that.`;
 			}
 			return JSON.stringify(
-				runs.map(({ cost, ...run }) => ({
+				runs.map(({ cost, test, ...run }) => ({
 					...run,
 					createdAt: isoOrNull(run.createdAt),
 					endedAt: isoOrNull(run.endedAt),
 					cost: costText(cost),
+					// Only a test run says so: its pinned and skipped nodes did not run.
+					...(test ? { testRun: test } : {}),
 				})),
 				null,
 				2,
@@ -329,7 +333,7 @@ export function terminalRunTools(
 		toolDefinition({
 			name: AUTHORING_TOOLS.getRun,
 			description:
-				"One run of the project: its status, why it ended, its cost, the pull request it opened, its steps with their outcomes and notes, the end of the failed step's transcript, and its report. Use it to follow a run you started, to see why one failed, or to read what it produced.",
+				"One run of the project: its status, why it ended, whether it is a test run, its cost, the pull request it opened, its steps with their outcomes and notes, the end of the failed step's transcript, and its report. Use it to follow a run you started, to see why one failed, or to read what it produced.",
 			inputSchema: {
 				type: "object",
 				properties: {

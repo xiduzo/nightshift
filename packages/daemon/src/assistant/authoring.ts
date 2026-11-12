@@ -20,6 +20,7 @@ import type {
 	ConnectionStore,
 	ProfileStore,
 } from "@nightshift/engine/device-config";
+import { isTestRun } from "@nightshift/engine/run-status";
 import { type ChatRequest, isAgentProfile } from "@nightshift/flows";
 
 /** What the port reads in the Space. */
@@ -155,6 +156,7 @@ export async function chatRun(
 			outcome: step.outcome,
 			error: step.error,
 			note: typeof note === "string" && note.trim() !== "" ? note : null,
+			...(step.test ? { test: step.test } : {}),
 		};
 	});
 	const bad = detail.steps.filter(
@@ -171,6 +173,7 @@ export async function chatRun(
 		id: detail.id,
 		status: detail.status,
 		reason: detail.reason,
+		...(isTestRun(detail) ? { test: detail.test } : {}),
 		inputs: detail.inputs,
 		flow: detail.flow,
 		steps,

@@ -81,6 +81,8 @@ export type AuthoringRunStep = {
 	error: string | null;
 	/** The step's note or summary, when it has one. */
 	note: string | null;
+	/** In a test run: the step stood in for its node, and the node did not run. */
+	test?: "pinned" | "skipped";
 };
 
 /** A run of the flow, for the chat about it. */
@@ -89,6 +91,8 @@ export type AuthoringRun = {
 	status: string;
 	/** Why the run failed, or which label ended it. */
 	reason: string | null;
+	/** A test run (ADR 27): the nodes its start pinned and skipped, by id. */
+	test?: { pinned: string[]; skipped: string[] };
 	inputs: Record<string, unknown>;
 	/** The copy of the flow the run started from. */
 	flow: Flow;
@@ -225,6 +229,28 @@ async function check(port: AuthoringPort, flow: unknown) {
 }
 
 /**
+ * What a test run (ADR 27) is, for the agent: which nodes stood in and how.
+ * The numbers of Night Shift count only its spend.
+ */
+function testRunLine(test: { pinned: string[]; skipped: string[] }): string {
+	const ids = (nodes: string[]) => nodes.map((id) => `\`${id}\``).join(", ");
+	return [
+		"Test run: a person started it from the editor. Its pinned and skipped nodes did not run",
+		...(test.pinned.length > 0
+			? [
+					`Pinned (each gave the output of a step of an earlier run): ${ids(test.pinned)}`,
+				]
+			: []),
+		...(test.skipped.length > 0
+			? [
+					`Skipped (each gave an outcome the person chose): ${ids(test.skipped)}`,
+				]
+			: []),
+		"Only its spend counts in the numbers of the project.",
+	].join(". ");
+}
+
+/**
  * One run as Markdown for the agent, at most `RUN_REPORT_LIMIT` characters.
  * `draft` is the flow as it is now, which `what` names. With `cite`, each
  * step is the link the chat shows as a citation of it (`stepCitation`).
@@ -242,6 +268,7 @@ export function runReport(
 		"",
 		`Status: ${run.status}${run.reason ? `. Why: ${cut(run.reason, NOTE_LIMIT)}` : ""}`,
 	];
+	if (run.test) lines.push(testRunLine(run.test));
 	const inputs = JSON.stringify(run.inputs);
 	if (inputs !== "{}") lines.push(`Inputs: ${cut(inputs, 1_000)}`);
 	const diff = flowDiffSummary(diffFlows(run.flow, draft));
@@ -266,6 +293,11 @@ export function runReport(
 		const parts = [
 			`- ${name(step)}${where(step)} (${step.nodeType}${step.visit > 1 ? `, visit ${step.visit}` : ""}): ${step.outcome ?? "running"}`,
 		];
+		if (step.test) {
+			parts.push(
+				`${step.test === "pinned" ? "pinned output" : "skipped"}: the node did not run`,
+			);
+		}
 		if (step.error) parts.push(`error: ${cut(step.error, NOTE_LIMIT)}`);
 		if (step.note) parts.push(`note: ${cut(step.note, NOTE_LIMIT)}`);
 		lines.push(parts.join(". "));
