@@ -1,4 +1,4 @@
-import { runStatusLabel } from "@nightshift/client";
+import { type StatusKey, statusOf } from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import {
 	Tooltip,
@@ -20,7 +20,8 @@ import {
 
 import type { RunStatus, RunSummary } from "@/shared/api";
 
-const STATUS: Record<RunStatus, { icon: LucideIcon; className: string }> = {
+/** The icon and colour of each look a run takes, "Nothing to do" included. */
+const STATUS: Record<StatusKey, { icon: LucideIcon; className: string }> = {
 	running: {
 		icon: LoaderCircleIcon,
 		className:
@@ -55,21 +56,17 @@ const STATUS: Record<RunStatus, { icon: LucideIcon; className: string }> = {
 		className:
 			"border-status-interrupted/40 bg-status-interrupted/10 text-status-interrupted",
 	},
+	// Finished, but quiet.
+	"nothing-to-do": {
+		icon: CircleDashedIcon,
+		className: "border-border bg-muted text-muted-foreground",
+	},
 };
 
-/** A run an End node ended with nothing to do: finished, but quiet. */
-const NOTHING_TO_DO = {
-	icon: CircleDashedIcon,
-	className: "border-border bg-muted text-muted-foreground",
-};
-
-/** The icon, colour and label of a status, "Nothing to do" included. */
+/** The icon, colour and word of a run's status. */
 function statusLook(status: RunStatus, result: RunSummary["result"]) {
-	const nothing = status === "finished" && result === "nothing-to-do";
-	return {
-		...(nothing ? NOTHING_TO_DO : STATUS[status]),
-		label: nothing ? "Nothing to do" : runStatusLabel(status),
-	};
+	const { key, word } = statusOf({ status, result });
+	return { ...STATUS[key], label: word };
 }
 
 export function RunStatusBadge({

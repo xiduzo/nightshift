@@ -76,21 +76,6 @@ export function flowLabel(run: Pick<RunSummary, "flowName">): string {
 	return run.flowName ?? "Quick run";
 }
 
-const STATUS_LABELS: Record<RunSummary["status"], string> = {
-	running: "Running",
-	waiting: "Waiting for you",
-	sleeping: "Sleeping",
-	finished: "Finished",
-	stopped: "Stopped",
-	failed: "Failed",
-	interrupted: "Interrupted",
-};
-
-/** A run's status in words, as every screen shows it: "Running", "Waiting for you". */
-export function runStatusLabel(status: RunSummary["status"]): string {
-	return STATUS_LABELS[status];
-}
-
 const OUTCOME_LABELS: Record<BuiltInOutcome, string> = {
 	pass: "Pass",
 	fail: "Fail",

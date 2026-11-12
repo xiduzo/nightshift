@@ -1,3 +1,4 @@
+import { hasEnded } from "@nightshift/client";
 import { ScrollArea } from "@nightshift/ui/components/scroll-area";
 import {
 	Sheet,
@@ -21,8 +22,6 @@ import { CopyValue, Count, Fact, Time } from "./run-facts";
 
 /** A git object id: shown short, with the full id in a tooltip. */
 const SHA = /^[0-9a-f]{40}$/i;
-
-const ENDED: RunStatus[] = ["finished", "failed", "stopped", "interrupted"];
 
 /**
  * Every fact of the run in a Sheet, in folding sections like the node
@@ -86,7 +85,7 @@ function OverviewSection({
 	steps: StepSummary[];
 	status: RunStatus;
 }) {
-	const ended = ENDED.includes(status);
+	const ended = hasEnded(status);
 	const time = useWorkTime(steps, run.createdAt);
 
 	return (

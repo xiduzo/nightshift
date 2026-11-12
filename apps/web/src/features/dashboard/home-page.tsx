@@ -1,4 +1,4 @@
-import { daysOf } from "@nightshift/client";
+import { daysOf, statusOf } from "@nightshift/client";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { SetupCard } from "@/features/agents";
@@ -33,14 +33,14 @@ export function HomePage({
 	const summary = useQuery(dashboardQueries.summary());
 	const projects = useQuery(projectQueries.list());
 	const gates = useOpenGates();
-	// At work or asleep now. A run at a Gate shows in its own lane.
+	// Running or asleep now. A run at a Gate shows in its own lane.
 	const openRuns = useQuery(runQueries.open());
 	// The metric stays while the dialog closes, so its body does not go blank.
 	const [details, setDetails] = useState<{ metric: Metric; open: boolean }>();
 	const days = summary.data ? daysOf(summary.data, range) : undefined;
 	const metrics = days ? metricsOf(days) : undefined;
 	const running = (openRuns.data ?? []).filter(
-		(run) => run.status === "running" || run.status === "sleeping",
+		(run) => statusOf(run).group === "running",
 	);
 	const waiting = gates.data?.length ?? 0;
 	const failing = days?.runs.stillFailing ?? 0;

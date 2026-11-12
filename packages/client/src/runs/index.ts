@@ -40,7 +40,6 @@ export {
 	formatKnownCost,
 	type KnownCost,
 	runEndLine,
-	runStatusLabel,
 	stepOutcomeLabel,
 	tokensLabel,
 	tokensSplit,
@@ -62,7 +61,6 @@ export { useRunPrefetch } from "./prefetch";
 export {
 	type AgentMessages,
 	applyAgentMessages,
-	hasEnded,
 	markdownPreview,
 	nodeLabels,
 	runningSteps,
@@ -83,6 +81,15 @@ export {
 	pinProblem,
 } from "./samples";
 export { finishedShare } from "./share";
+export {
+	groupCounts,
+	groupStatuses,
+	hasEnded,
+	type RunGroup,
+	runStatusLabel,
+	type StatusKey,
+	statusOf,
+} from "./status";
 export {
 	applyStepChanges,
 	lastWorktreeChanges,

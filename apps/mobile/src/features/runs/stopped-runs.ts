@@ -1,12 +1,12 @@
 import type { RunSummary } from "@nightshift/client";
-import { now as timeNow } from "@nightshift/client";
+import { groupStatuses, now as timeNow } from "@nightshift/client";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useSignedIn } from "@/features/host";
 import { useLeftRuns } from "./left-runs";
 
-/** The statuses of a run that ended before its work was done. */
-const STOPPED = ["failed", "stopped", "interrupted"] as const;
+/** The statuses of a run that ended before its work was done: failed or stopped. */
+const STOPPED = groupStatuses("failed", "stopped");
 
 /** How far back a run that stopped still needs you: the last 24 hours. */
 const STOPPED_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -28,7 +28,7 @@ export function stoppedRuns(
 	return runs
 		.filter(
 			(run) =>
-				(STOPPED as readonly string[]).includes(run.status) &&
+				STOPPED.includes(run.status) &&
 				!leftIds.has(run.id) &&
 				(run.endedAt ?? run.createdAt) >= now - STOPPED_WINDOW_MS,
 		)

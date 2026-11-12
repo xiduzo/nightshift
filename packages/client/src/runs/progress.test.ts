@@ -2,60 +2,11 @@ import { describe, expect, test } from "bun:test";
 
 import {
 	applyAgentMessages,
-	groupRuns,
-	hasEnded,
 	markdownPreview,
 	runningSteps,
 	stepState,
 } from "./progress";
-import type { RunStatus, TranscriptEntry } from "./types";
-
-const run = (id: string, status: RunStatus, createdAt: number) => ({
-	id,
-	status,
-	createdAt,
-});
-
-describe("the runs by group", () => {
-	test("puts what runs first, then what waits for you, then what ended", () => {
-		const groups = groupRuns([
-			run("a", "finished", 1),
-			run("b", "waiting", 2),
-			run("c", "running", 3),
-			run("d", "sleeping", 4),
-			run("e", "failed", 5),
-			run("f", "stopped", 6),
-			run("g", "interrupted", 7),
-		]);
-		expect(
-			groups.map(({ group, runs }) => [group, runs.map((r) => r.id)]),
-		).toEqual([
-			["running", ["d", "c"]],
-			["waiting", ["b"]],
-			["ended", ["g", "f", "e", "a"]],
-		]);
-	});
-
-	test("leaves out a group without runs", () => {
-		expect(groupRuns([run("a", "finished", 1)]).map((g) => g.group)).toEqual([
-			"ended",
-		]);
-		expect(groupRuns([])).toEqual([]);
-	});
-
-	test("does not change the list it got", () => {
-		const runs = [run("a", "finished", 1), run("b", "finished", 2)];
-		groupRuns(runs);
-		expect(runs.map((r) => r.id)).toEqual(["a", "b"]);
-	});
-
-	test("knows which statuses have ended", () => {
-		expect(hasEnded("finished")).toBe(true);
-		expect(hasEnded("interrupted")).toBe(true);
-		expect(hasEnded("sleeping")).toBe(false);
-		expect(hasEnded("waiting")).toBe(false);
-	});
-});
+import type { TranscriptEntry } from "./types";
 
 describe("where a step is", () => {
 	const gate = {

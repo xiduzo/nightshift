@@ -1,4 +1,4 @@
-import { runStatusLabel } from "@nightshift/client";
+import { type StatusKey, statusOf } from "@nightshift/client";
 import {
 	Tooltip,
 	TooltipContent,
@@ -9,7 +9,7 @@ import { Link } from "@tanstack/react-router";
 
 import type { RunStatus, RunSummary } from "@/shared/api";
 
-const BAR: Record<RunStatus, string> = {
+const BAR: Record<StatusKey, string> = {
 	running: "bg-status-running motion-safe:animate-pulse",
 	waiting: "bg-status-waiting",
 	sleeping: "bg-status-sleeping",
@@ -17,6 +17,7 @@ const BAR: Record<RunStatus, string> = {
 	stopped: "bg-status-stopped",
 	failed: "bg-status-failed",
 	interrupted: "bg-status-interrupted",
+	"nothing-to-do": "bg-muted-foreground/30",
 };
 
 /** One run in a `RunBars` row. */
@@ -43,14 +44,8 @@ export function RunBars({
 	return (
 		<div className={cn("flex flex-wrap items-center gap-0.75", className)}>
 			{runs.map((run, index) => {
-				const nothing =
-					run.status === "finished" && run.result === "nothing-to-do";
-				const hover = [
-					nothing ? "Nothing to do" : runStatusLabel(run.status),
-					run.hint,
-				]
-					.filter(Boolean)
-					.join(" · ");
+				const { key, word } = statusOf(run);
+				const hover = [word, run.hint].filter(Boolean).join(" · ");
 				return (
 					<Tooltip
 						// A run that calls the flow twice shows twice.
@@ -65,7 +60,7 @@ export function RunBars({
 									onClick={(event) => event.stopPropagation()}
 									className={cn(
 										"h-4 w-2 rounded-[2px] outline-none transition-opacity hover:opacity-70 focus-visible:ring-2 focus-visible:ring-ring/50",
-										nothing ? "bg-muted-foreground/30" : BAR[run.status],
+										BAR[key],
 									)}
 								/>
 							}

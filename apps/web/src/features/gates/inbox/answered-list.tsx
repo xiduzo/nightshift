@@ -3,7 +3,8 @@ import {
 	formatDay,
 	gateParts,
 	gateRun,
-	runStatusLabel,
+	type StatusKey,
+	statusOf,
 } from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
@@ -75,23 +76,17 @@ function whoText(gate: AnsweredGate): string {
 	return "Nobody answered before the run ended";
 }
 
-/** The run's status now, in words and in its status colour. */
-const RUN_DOT: Record<AnsweredGate["run"]["status"], string> = {
+/** The colour of the run's status now, beside its word. */
+const RUN_DOT: Record<StatusKey, string> = {
 	running: "bg-status-running",
 	waiting: "bg-status-waiting",
 	sleeping: "bg-status-sleeping",
 	finished: "bg-status-finished",
+	"nothing-to-do": "bg-status-finished",
 	stopped: "bg-status-stopped",
 	failed: "bg-status-failed",
 	interrupted: "bg-status-interrupted",
 };
-
-function runText(run: AnsweredGate["run"]): string {
-	if (run.status === "finished" && run.result === "nothing-to-do") {
-		return "Nothing to do";
-	}
-	return runStatusLabel(run.status);
-}
 
 function AnswerBadge({
 	gate,
@@ -122,12 +117,11 @@ function AnswerBadge({
 }
 
 function RunNow({ run }: { run: AnsweredGate["run"] }) {
+	const { key, word } = statusOf(run);
 	return (
 		<span className="inline-flex items-center gap-1.5 text-muted-foreground text-xs">
-			<span
-				className={cn("size-1.5 shrink-0 rounded-full", RUN_DOT[run.status])}
-			/>
-			{runText(run)}
+			<span className={cn("size-1.5 shrink-0 rounded-full", RUN_DOT[key])} />
+			{word}
 		</span>
 	);
 }
@@ -281,6 +275,7 @@ function AnsweredSheet({ gate, now }: { gate: AnsweredGate; now: number }) {
 	const { headline, context, links } = gateParts(gate.question);
 	const look = answerLook(gate);
 	const recommended = gate.brief.recommendation?.option ?? null;
+	const runStatus = statusOf(gate.run);
 	const waited = Math.max(
 		1,
 		Math.round((gate.closedAt - gate.openedAt) / 60_000),
@@ -352,12 +347,12 @@ function AnsweredSheet({ gate, now }: { gate: AnsweredGate; now: number }) {
 								<span
 									className={cn(
 										"size-2.5 rounded-full",
-										RUN_DOT[gate.run.status],
+										RUN_DOT[runStatus.key],
 									)}
 								/>
 							</ItemMedia>
 							<ItemContent className="min-w-0">
-								<ItemTitle>{runText(gate.run)}</ItemTitle>
+								<ItemTitle>{runStatus.word}</ItemTitle>
 								<ItemDescription className="truncate">
 									{gate.runTitle}
 								</ItemDescription>

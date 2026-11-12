@@ -2,10 +2,14 @@ import {
 	costLabel,
 	dayLabel,
 	flowLabel,
+	groupCounts,
+	groupStatuses,
 	hasEnded,
 	isTestRun,
+	type RunGroup,
 	type RunStatus,
 	type RunSummary,
+	statusOf,
 	TEST_RUN_LABEL,
 	tokensLabel,
 	wall,
@@ -19,14 +23,11 @@ import { matches, queryWords } from "@/shared/match";
  * line under each run.
  */
 
-/** The status chips over the list of runs. */
-export type RunFilter =
-	| "all"
-	| "running"
-	| "needs-you"
-	| "failed"
-	| "stopped"
-	| "finished";
+/**
+ * The status chips over the list of runs: every run, or one group
+ * (`statusOf`), the same groups Watch counts.
+ */
+export type RunFilter = "all" | RunGroup;
 
 /** The chips, in the order they show. */
 export const RUN_FILTERS: readonly { key: RunFilter; label: string }[] = [
@@ -38,15 +39,6 @@ export const RUN_FILTERS: readonly { key: RunFilter; label: string }[] = [
 	{ key: "finished", label: "Finished" },
 ];
 
-/** The statuses each chip shows. A sleeping run is on its way: it runs. An interrupted run stopped before its work was done. */
-const STATUSES: Record<Exclude<RunFilter, "all">, readonly RunStatus[]> = {
-	running: ["running", "sleeping"],
-	"needs-you": ["waiting"],
-	failed: ["failed"],
-	stopped: ["stopped", "interrupted"],
-	finished: ["finished"],
-};
-
 /** The filter of a link (`/runs?filter=failed`). Anything else shows every run. */
 export function runFilterOf(value: string | string[] | undefined): RunFilter {
 	const key = Array.isArray(value) ? value[0] : value;
@@ -57,18 +49,16 @@ export function runFilterOf(value: string | string[] | undefined): RunFilter {
 
 /** Whether a run with this status shows under the filter. */
 export function inFilter(status: RunStatus, filter: RunFilter): boolean {
-	return filter === "all" || STATUSES[filter].includes(status);
+	return filter === "all" || statusOf({ status }).group === filter;
 }
 
-function noCounts(): Record<RunFilter, number> {
-	return {
-		all: 0,
-		running: 0,
-		"needs-you": 0,
-		failed: 0,
-		stopped: 0,
-		finished: 0,
-	};
+/** The counts of the chips: every run, then the runs of each group. */
+function chipCounts(
+	statuses: Readonly<Partial<Record<string, number>>>,
+): Record<RunFilter, number> {
+	const groups = groupCounts(statuses);
+	const all = Object.values(groups).reduce((sum, count) => sum + count, 0);
+	return { all, ...groups };
 }
 
 /**
@@ -78,19 +68,17 @@ function noCounts(): Record<RunFilter, number> {
 export function filterCounts(
 	runs: readonly Pick<RunSummary, "status" | "test">[],
 ): Record<RunFilter, number> {
-	const counts = noCounts();
+	const statuses: Partial<Record<RunStatus, number>> = {};
 	for (const run of runs) {
 		if (isTestRun(run)) continue;
-		for (const { key } of RUN_FILTERS) {
-			if (inFilter(run.status, key)) counts[key] += 1;
-		}
+		statuses[run.status] = (statuses[run.status] ?? 0) + 1;
 	}
-	return counts;
+	return chipCounts(statuses);
 }
 
 /** The statuses the Host reads for a chip. None for "All": every run. */
 export function filterStatuses(filter: RunFilter): RunStatus[] | undefined {
-	return filter === "all" ? undefined : [...STATUSES[filter]];
+	return filter === "all" ? undefined : groupStatuses(filter);
 }
 
 /** How many runs of a project have each status, as the Host counts them. */
@@ -113,7 +101,7 @@ export function countedFilters(
 	if (!projects || projects.some((project) => project.runs === undefined)) {
 		return null;
 	}
-	const counts = noCounts();
+	const statuses: Partial<Record<string, number>> = {};
 	for (const project of projects) {
 		if (projectId !== null && project.id !== projectId) continue;
 		const tests = project.runs?.tests ?? {};
@@ -121,12 +109,10 @@ export function countedFilters(
 			project.runs?.statuses ?? {},
 		)) {
 			const runs = (count ?? 0) - (tests[status as RunStatus] ?? 0);
-			for (const { key } of RUN_FILTERS) {
-				if (inFilter(status as RunStatus, key)) counts[key] += runs;
-			}
+			statuses[status] = (statuses[status] ?? 0) + runs;
 		}
 	}
-	return counts;
+	return chipCounts(statuses);
 }
 
 /**

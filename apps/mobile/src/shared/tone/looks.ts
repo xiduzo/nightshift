@@ -1,9 +1,10 @@
 import {
 	type RunResult,
 	type RunStatus,
-	runStatusLabel,
+	type StatusKey,
 	type StepState,
 	type StepSummary,
+	statusOf,
 	stepOutcomeLabel,
 } from "@nightshift/client";
 import { DECISION_LABEL, NODE_TYPE_LABEL } from "@nightshift/flows";
@@ -106,14 +107,16 @@ export const TONE_CLASS: Record<Tone, { text: string; badge: string }> = {
 	neutral: { text: "text-muted-foreground", badge: "border-border" },
 };
 
-const RUN_ICON: Record<RunStatus, StatusIconName> = {
-	running: "loader",
-	waiting: "hourglass",
-	sleeping: "moon",
-	finished: "circle-check",
-	stopped: "circle-stop",
-	failed: "circle-x",
-	interrupted: "circle-alert",
+const RUN_LOOK: Record<StatusKey, Omit<Look, "label">> = {
+	running: { tone: "running", icon: "loader" },
+	waiting: { tone: "waiting", icon: "hourglass" },
+	sleeping: { tone: "sleeping", icon: "moon" },
+	finished: { tone: "finished", icon: "circle-check" },
+	// Finished, but quiet.
+	"nothing-to-do": { tone: "neutral", icon: "circle-dashed" },
+	stopped: { tone: "stopped", icon: "circle-stop" },
+	failed: { tone: "failed", icon: "circle-x" },
+	interrupted: { tone: "interrupted", icon: "circle-alert" },
 };
 
 /**
@@ -124,14 +127,8 @@ export function runStatusLook(
 	status: RunStatus,
 	result: RunResult | null = null,
 ): Look {
-	if (status === "finished" && result === "nothing-to-do") {
-		return { tone: "neutral", icon: "circle-dashed", label: "Nothing to do" };
-	}
-	return {
-		tone: status,
-		icon: RUN_ICON[status],
-		label: runStatusLabel(status),
-	};
+	const { key, word } = statusOf({ status, result });
+	return { ...RUN_LOOK[key], label: word };
 }
 
 /** A Gate that waits for the person. */
