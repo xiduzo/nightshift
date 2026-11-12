@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { ladderOf, reachText, rowLine } from "./ladder";
+import { ladderOf, reachText } from "./ladder";
 
 const gate = (
 	id: string,
@@ -29,32 +29,6 @@ describe("the inbox ladder", () => {
 			"later",
 		]);
 		expect(ladderOf([])).toEqual([]);
-	});
-});
-
-describe("the row line", () => {
-	test("is the first line of the situation", () => {
-		expect(
-			rowLine({
-				question: "Merge it?\n\nThe tests pass.",
-				brief: { situation: "\nThe release waits on this.\nMore." },
-			}),
-		).toBe("The release waits on this.");
-	});
-
-	test("falls back to the first line below the title", () => {
-		expect(
-			rowLine({
-				question: "Merge it?\n\nThe tests pass.\nAll of them.",
-				brief: { situation: null },
-			}),
-		).toBe("The tests pass.");
-	});
-
-	test("is null when the question is only a title", () => {
-		expect(rowLine({ question: "Merge it?", brief: { situation: "  " } })).toBe(
-			null,
-		);
 	});
 });
 

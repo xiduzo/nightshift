@@ -50,9 +50,21 @@ The phone answers simple Asks too.
 
 Every person in a Space gets its Gates and Asks in their inbox. An owner, an admin, or a member can answer. A viewer sees them, but cannot answer. See [Spaces](Computers-and-Hosts.md#spaces).
 
-The inbox shows the Gates and Asks that wait for you, in every project. They are in three groups: Now, Today and When you have time. The oldest Gate is first in each group. Below them are the Gates that you answered. Night Shift keeps answered Gates for 90 days.
+The inbox shows one Gate at a time. The Gates and Asks that wait for you, in every project, form a queue: Now, then Today, then When you have time. The oldest Gate is first in each level. A row of bars at the top shows the queue, one bar for each Gate, in the colour of its level.
 
-Open a Gate to read its brief. Your answer is on the right: pick an option, add a note if you want, then send. The option that the flow recommends has a badge.
+The Gate in focus starts with how soon it needs you: its level, its deadline and the option that Night Shift picks then. Then come the question, its brief and the links to check. The option that the flow recommends is first, with a badge.
+
+To answer:
+
+1. Pick an option. Click it, or press its number key.
+2. Add context or files if you want. Some options need context.
+3. Send. Click **Send**, or press Enter. Shift+Enter starts a new line.
+
+Nothing goes out before you send. The next Gate then takes its place.
+
+To move through the queue, use **Previous** and **Next**, or the arrow keys. **Skip for now** moves a Gate to the end of the queue. What you picked and wrote stays while you look at another Gate.
+
+**Answered** shows the Gates that closed, by day, for 90 days. Each one shows the option it took, who chose it, and the run's status now. Open one to see your note, every option it offered, and what it asked. **Sleeping** shows the runs that wait on a usage limit or the network. They continue on their own.
 
 A Gate sends a notification only for the levels that you choose. Go to Settings, Notifications, and set **Push for**. The default is Now. A Gate of another level waits in the inbox without a notification.
 

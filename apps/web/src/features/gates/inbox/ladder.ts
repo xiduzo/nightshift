@@ -1,4 +1,3 @@
-import { gateParts } from "@nightshift/client";
 import type { OpenGate } from "@/shared/api";
 import { type GateUrgency, URGENCIES } from "@/shared/urgency";
 
@@ -18,32 +17,6 @@ export function ladderOf<G extends Pick<OpenGate, "urgency" | "openedAt">>(
 			.filter((gate) => gate.urgency === urgency)
 			.sort((a, b) => a.openedAt - b.openedAt),
 	})).filter((group) => group.gates.length > 0);
-}
-
-/**
- * The one line under a Gate's title in the list: its situation, else the
- * first line of the question below the title. Null when neither has text.
- */
-export function rowLine(
-	gate: Pick<OpenGate, "question"> & {
-		brief: Pick<OpenGate["brief"], "situation">;
-	},
-): string | null {
-	const situation = gate.brief.situation?.trim();
-	if (situation) return firstLine(situation);
-	const text = gateParts(gate.question).context.find(
-		(item) => item.kind === "text" && item.value.trim() !== "",
-	);
-	return text ? firstLine(text.value) : null;
-}
-
-function firstLine(text: string): string | null {
-	return (
-		text
-			.split("\n")
-			.map((line) => line.trim())
-			.find((line) => line !== "") ?? null
-	);
 }
 
 /**

@@ -1,10 +1,4 @@
-import {
-	deadlineWhen,
-	gateParts,
-	runActions,
-	useRunActed,
-	waitedText,
-} from "@nightshift/client";
+import { gateParts } from "@nightshift/client";
 import {
 	Alert,
 	AlertAction,
@@ -14,10 +8,6 @@ import {
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
-	ButtonGroup,
-	ButtonGroupText,
-} from "@nightshift/ui/components/button-group";
-import {
 	Empty,
 	EmptyContent,
 	EmptyDescription,
@@ -25,67 +15,77 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
-import {
-	Item,
-	ItemActions,
-	ItemContent,
-	ItemDescription,
-	ItemGroup,
-	ItemMedia,
-	ItemTitle,
-} from "@nightshift/ui/components/item";
-import { Separator } from "@nightshift/ui/components/separator";
+import { Kbd } from "@nightshift/ui/components/kbd";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
+import {
+	ToggleGroup,
+	ToggleGroupItem,
+} from "@nightshift/ui/components/toggle-group";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { cn } from "@nightshift/ui/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 import {
-	ChevronDownIcon,
-	ChevronUpIcon,
+	CheckCheckIcon,
+	ChevronLeftIcon,
+	ChevronRightIcon,
 	CircleAlertIcon,
-	FolderIcon,
-	InboxIcon,
-	MoonIcon,
-	SunriseIcon,
+	SkipForwardIcon,
 } from "lucide-react";
-import { Fragment, type ReactNode, useEffect, useRef } from "react";
-import { toast } from "sonner";
-import { usePushUrgencies } from "@/features/notifications";
+import { useEffect, useRef, useState } from "react";
+import { outcomeLabel } from "@/features/flows";
 import { projectQueries } from "@/features/projects";
-import { runMutations, runQueries } from "@/features/runs/queries";
-import type { OpenGate, RunSummary } from "@/shared/api";
-import { orpc } from "@/shared/api";
-import { formatCountdown, formatTime, useNow } from "@/shared/format";
-import { InlineMarkdown } from "@/shared/markdown";
+import { runQueries } from "@/features/runs/queries";
+import type { OpenGate } from "@/shared/api";
+import { useNow } from "@/shared/format";
 import { SiteHeader } from "@/shared/page";
-import { LocalTime } from "@/shared/time";
-import { URGENCY_LABEL, UrgencyMarker } from "@/shared/urgency";
+import { URGENCY_LABEL } from "@/shared/urgency";
 import { gateQueries } from "../queries";
 import { useOpenGates } from "../use-open-gates";
-import { AnsweredGateDetail, AnsweredGateNavItem } from "./answered-gate";
-import { GateDetail } from "./gate-detail";
-import { ladderOf, reachText, rowLine } from "./ladder";
+import { AnsweredList } from "./answered-list";
+import { type AnswerDraft, EMPTY_DRAFT, typing } from "./focus-answer";
+import { FocusGate } from "./focus-gate";
+import { ladderOf } from "./ladder";
+import { SleepingRuns } from "./sleeping-runs";
+
+/** What the inbox shows: the Gates that wait, the ones answered, or the sleeping runs. */
+export type InboxView = "todo" | "answered" | "sleeping";
+
+/** Where you are in the inbox. The route keeps it in the URL. */
+export type InboxPlace = {
+	view: InboxView;
+	/** The step id of the open Gate in focus. The first one in the queue when unset or gone. */
+	gate?: string;
+	/** The answered Gate the Sheet shows (`answeredKey`). */
+	answered?: string;
+};
+
+const SEGMENT: Record<OpenGate["urgency"], string> = {
+	now: "bg-status-failed",
+	today: "bg-status-waiting",
+	later: "bg-muted-foreground/40",
+};
 
 /**
- * The inbox: a list and a detail, as a mail app has. The list is a
- * ladder: the open Gates of every Space you are in, grouped Now, Today and
- * When you have time, the oldest first in each. Then the sleeping runs,
- * then the Gates that closed in the last 90 days. The selected item shows
- * on the right as a handover, with your answer beside it. Each pane
- * scrolls on its own.
+ * The inbox: one Gate at a time, in focus. The Gates of every Space you
+ * are in form a queue: Now, then Today, then When you have time, the
+ * oldest first in each. You answer the Gate in focus, skip it to the end
+ * of the queue, or step back and forth. Once you answer, the next one
+ * takes its place. A second view lists what was answered, a third the
+ * runs that sleep.
+ *
+ * Keys: ← → (or K J) step, S skips. The answer takes 1–9, Enter and Esc.
  */
 export function InboxPage({
-	gateId,
-	onSelect,
+	place,
+	onPlace,
 }: {
-	/** The step id of the Gate to show: an open one, else an answered one. The oldest open one when unset or gone. */
-	gateId: string | undefined;
-	onSelect: (gate: string) => void;
+	place: InboxPlace;
+	onPlace: (next: InboxPlace) => void;
 }) {
 	const gates = useOpenGates();
 	const answered = useQuery(gateQueries.answered());
@@ -97,409 +97,269 @@ export function InboxPage({
 		.filter((run) => run.status === "sleeping")
 		.sort((a, b) => (a.wakeAt ?? 0) - (b.wakeAt ?? 0));
 
-	const pushUrgencies = usePushUrgencies();
+	// What you skipped goes to the end of the queue, for as long as the page is open.
+	const [skipped, setSkipped] = useState<string[]>([]);
+	// What you picked and wrote, per Gate, while you step around.
+	const [drafts, setDrafts] = useState<Record<string, AnswerDraft>>({});
 
-	const closed = answered.data ?? [];
-	const ladder = ladderOf(gates.data ?? []);
-	const open = ladder.flatMap((group) => group.gates);
+	const ladder = ladderOf(gates.data ?? []).flatMap((group) => group.gates);
+	const queue = [
+		...ladder.filter((g) => !skipped.includes(g.stepId)),
+		...skipped
+			.map((id) => ladder.find((g) => g.stepId === id))
+			.filter((g): g is OpenGate => g !== undefined),
+	];
 
-	const selectedOpen =
-		open.find((g) => g.stepId === gateId) ??
-		(closed.some((g) => g.stepId === gateId) ? undefined : open[0]);
-	const selectedClosed = selectedOpen
-		? undefined
-		: (closed.find((g) => g.stepId === gateId) ?? closed[0]);
-	const position = selectedOpen ? open.indexOf(selectedOpen) : -1;
-
-	// The Gate you look at closed (you answered it): go on to the next one that waits.
-	const wasOpen = useRef(new Set<string>());
+	// The Gate in focus closed (you answered it): the next one takes its place.
+	const lastIndex = useRef(0);
+	const found = queue.findIndex((g) => g.stepId === place.gate);
+	const index =
+		found >= 0 ? found : Math.min(lastIndex.current, queue.length - 1);
+	const gate = index >= 0 ? queue[index] : undefined;
 	useEffect(() => {
-		const openIds = new Set(open.map((g) => g.stepId));
-		const next = open[0];
-		if (gateId && wasOpen.current.has(gateId) && !openIds.has(gateId) && next) {
-			onSelect(next.stepId);
-		}
-		wasOpen.current = openIds;
-	}, [open, gateId, onSelect]);
+		if (index >= 0) lastIndex.current = index;
+	}, [index]);
+
+	const view = place.view;
+	const focus = (next: OpenGate | undefined) => {
+		if (next) onPlace({ view: "todo", gate: next.stepId });
+	};
+	const step = (by: number) => focus(queue[index + by]);
+	const skip = () => {
+		if (!gate || queue.length < 2) return;
+		const next = queue[index + 1] ?? queue[0];
+		setSkipped((prev) => [
+			...prev.filter((id) => id !== gate.stepId),
+			gate.stepId,
+		]);
+		focus(next);
+	};
+
+	useEffect(() => {
+		if (view !== "todo" || !gate) return;
+		const onKey = (event: KeyboardEvent) => {
+			if (event.altKey || event.metaKey || event.ctrlKey || typing(event))
+				return;
+			if (event.key === "ArrowRight" || event.key === "j") step(1);
+			else if (event.key === "ArrowLeft" || event.key === "k") step(-1);
+			else if (event.key === "s") skip();
+			else return;
+			event.preventDefault();
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	});
+
+	const nowCount = queue.filter((g) => g.urgency === "now").length;
+	const draft = (gate && drafts[gate.stepId]) ?? EMPTY_DRAFT;
 
 	return (
 		<>
 			<SiteHeader crumbs={[{ label: "Inbox" }]}>
-				{position >= 0 ? (
-					<ButtonGroup aria-label="Gates that wait">
-						<ButtonGroupText className="text-muted-foreground text-xs tabular-nums">
-							{position + 1} of {open.length} waiting
-						</ButtonGroupText>
-						<Button
-							variant="outline"
-							size="icon-sm"
-							aria-label="Previous Gate"
-							disabled={position === 0}
-							onClick={() => {
-								const prev = open[position - 1];
-								if (prev) onSelect(prev.stepId);
-							}}
-						>
-							<ChevronUpIcon />
-						</Button>
-						<Button
-							variant="outline"
-							size="icon-sm"
-							aria-label="Next Gate"
-							disabled={position === open.length - 1}
-							onClick={() => {
-								const next = open[position + 1];
-								if (next) onSelect(next.stepId);
-							}}
-						>
-							<ChevronDownIcon />
-						</Button>
-					</ButtonGroup>
-				) : null}
-			</SiteHeader>
-			<div className="flex h-[calc(100svh-3.5rem)] min-h-0">
-				<nav
-					aria-label="Inbox"
-					className="flex min-h-0 w-80 shrink-0 flex-col gap-5 overflow-y-auto border-r p-4"
+				<ToggleGroup
+					aria-label="Inbox view"
+					value={[view]}
+					onValueChange={(next) => {
+						const picked = next[0];
+						if (
+							picked === "todo" ||
+							picked === "answered" ||
+							picked === "sleeping"
+						) {
+							onPlace({ view: picked, gate: place.gate });
+						}
+					}}
+					variant="outline"
+					size="sm"
 				>
-					{gates.isLoading ? (
-						<ListSkeleton />
-					) : open.length === 0 ? (
-						<p className="px-2 text-muted-foreground text-xs">
-							Nothing waits for you. A run asks you here when it needs your
-							decision.
-						</p>
+					<ToggleGroupItem value="todo">
+						To do
+						{queue.length > 0 ? (
+							<Badge variant="secondary" className="tabular-nums">
+								{queue.length}
+							</Badge>
+						) : null}
+					</ToggleGroupItem>
+					<ToggleGroupItem value="answered">Answered</ToggleGroupItem>
+					{sleeping.length > 0 || view === "sleeping" ? (
+						<ToggleGroupItem value="sleeping">
+							Sleeping
+							<Badge
+								variant="outline"
+								className="border-status-sleeping/40 bg-status-sleeping/10 text-status-sleeping tabular-nums"
+							>
+								{sleeping.length}
+							</Badge>
+						</ToggleGroupItem>
+					) : null}
+				</ToggleGroup>
+			</SiteHeader>
+			<div className="h-[calc(100svh-3.5rem)] overflow-y-auto">
+				{view === "answered" ? (
+					answered.isLoading ? (
+						<PageSkeleton />
 					) : (
-						ladder.map(({ urgency, gates: list }, index) => (
-							<Fragment key={urgency}>
-								{index > 0 ? <Separator /> : null}
-								<NavGroup
-									title={
-										<span className="flex items-center gap-1.5">
-											<UrgencyMarker urgency={urgency} />
-											{URGENCY_LABEL[urgency]}
-										</span>
-									}
-									hint={reachText(urgency, pushUrgencies)}
-									aside={
-										<Badge variant="outline" className="tabular-nums">
-											{list.length}
-										</Badge>
-									}
-								>
-									{list.map((gate) => (
-										<GateNavItem
-											key={gate.stepId}
-											gate={gate}
-											now={now}
-											selected={gate.stepId === selectedOpen?.stepId}
-											onClick={() => onSelect(gate.stepId)}
-										/>
-									))}
-								</NavGroup>
-							</Fragment>
-						))
-					)}
-					{sleeping.length > 0 ? (
-						<>
-							<Separator />
-							<SleepingGroup runs={sleeping} projectNames={projectNames} />
-						</>
-					) : null}
-					{closed.length > 0 ? (
-						<>
-							<Separator />
-							<NavGroup title="Answered" hint="Kept for 90 days">
-								{closed.map((gate) => (
-									<AnsweredGateNavItem
-										key={`${gate.stepId} ${gate.openedAt}`}
-										gate={gate}
-										now={now}
-										selected={
-											gate.stepId === selectedClosed?.stepId &&
-											gate.openedAt === selectedClosed.openedAt
-										}
-										onClick={() => onSelect(gate.stepId)}
-									/>
-								))}
-							</NavGroup>
-						</>
-					) : null}
-				</nav>
-				<div className="min-w-0 flex-1 overflow-y-auto">
-					{gates.isLoading ? (
-						<DetailSkeleton />
-					) : gates.error && !gates.data ? (
-						<div className="p-8">
-							<Alert variant="destructive">
-								<CircleAlertIcon />
-								<AlertTitle>The inbox did not load</AlertTitle>
-								<AlertDescription>{gates.error.message}</AlertDescription>
-								<AlertAction>
-									<Button
-										variant="outline"
-										size="sm"
-										disabled={gates.isFetching}
-										onClick={() => void gates.refetch()}
-									>
-										{gates.isFetching ? (
-											<Spinner data-icon="inline-start" />
-										) : null}
-										Try again
-									</Button>
-								</AlertAction>
-							</Alert>
-						</div>
-					) : selectedOpen ? (
-						<GateDetail
-							key={selectedOpen.stepId}
-							gate={selectedOpen}
+						<AnsweredList
+							gates={answered.data ?? []}
 							now={now}
+							openKey={place.answered}
+							onOpen={(key) => onPlace({ view: "answered", answered: key })}
 						/>
-					) : selectedClosed ? (
-						<AnsweredGateDetail
-							key={`${selectedClosed.stepId} ${selectedClosed.openedAt}`}
-							gate={selectedClosed}
-						/>
-					) : (
-						<Empty className="h-full">
-							<EmptyHeader>
-								<EmptyMedia variant="icon">
-									<InboxIcon />
-								</EmptyMedia>
-								<EmptyTitle>Nothing waits for you</EmptyTitle>
-								<EmptyDescription>
-									When a run reaches a Gate, its question shows here. Add a Gate
-									to a flow to ask you before an important step.
-								</EmptyDescription>
-							</EmptyHeader>
-							<EmptyContent>
+					)
+				) : view === "sleeping" ? (
+					<SleepingRuns runs={sleeping} projectNames={projectNames} />
+				) : gates.isLoading ? (
+					<PageSkeleton />
+				) : gates.error && !gates.data ? (
+					<div className="mx-auto max-w-3xl p-8">
+						<Alert variant="destructive">
+							<CircleAlertIcon />
+							<AlertTitle>The inbox did not load</AlertTitle>
+							<AlertDescription>{gates.error.message}</AlertDescription>
+							<AlertAction>
 								<Button
 									variant="outline"
 									size="sm"
-									nativeButton={false}
-									render={<Link to="/" />}
+									disabled={gates.isFetching}
+									onClick={() => void gates.refetch()}
 								>
-									<FolderIcon data-icon="inline-start" />
-									Go to projects
+									{gates.isFetching ? (
+										<Spinner data-icon="inline-start" />
+									) : null}
+									Try again
 								</Button>
-							</EmptyContent>
-						</Empty>
-					)}
-				</div>
+							</AlertAction>
+						</Alert>
+					</div>
+				) : !gate ? (
+					<Empty className="h-full">
+						<EmptyHeader>
+							<EmptyMedia variant="icon">
+								<CheckCheckIcon />
+							</EmptyMedia>
+							<EmptyTitle>Nothing waits for you</EmptyTitle>
+							<EmptyDescription>
+								When a run reaches a Gate, its question shows here. Add a Gate
+								to a flow to ask you before an important step.
+							</EmptyDescription>
+						</EmptyHeader>
+						<EmptyContent>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => onPlace({ view: "answered" })}
+							>
+								See what you answered
+							</Button>
+						</EmptyContent>
+					</Empty>
+				) : (
+					<div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pt-6 md:px-8">
+						<div className="flex flex-col gap-2">
+							<div className="flex items-center justify-between gap-2 text-muted-foreground text-xs">
+								<span className="tabular-nums">
+									{index + 1} of {queue.length}
+									{nowCount > 0 ? ` · ${nowCount} need you now` : ""}
+								</span>
+								<span className="hidden items-center gap-1 sm:flex">
+									<Kbd>←</Kbd>
+									<Kbd>→</Kbd> step · <Kbd>S</Kbd> skip · <Kbd>1</Kbd> pick ·{" "}
+									<Kbd>⏎</Kbd> send
+								</span>
+							</div>
+							{/* The queue at a glance: one segment per Gate, in the colour of its urgency. */}
+							<div className="flex gap-1">
+								{queue.map((g, i) => {
+									const headline = gateParts(g.question).headline;
+									const drafted = drafts[g.stepId]?.choice;
+									return (
+										<Tooltip key={g.stepId}>
+											<TooltipTrigger
+												render={
+													<button
+														type="button"
+														aria-label={headline}
+														aria-current={i === index ? "step" : undefined}
+														onClick={() => focus(g)}
+														className={cn(
+															"h-1.5 flex-1 rounded-full outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring/50",
+															SEGMENT[g.urgency],
+															i === index
+																? "opacity-100 ring-2 ring-ring/50"
+																: skipped.includes(g.stepId)
+																	? "opacity-20 hover:opacity-60"
+																	: "opacity-40 hover:opacity-70",
+														)}
+													/>
+												}
+											/>
+											<TooltipContent>
+												{URGENCY_LABEL[g.urgency]} · {headline}
+												{drafted ? ` · draft: ${outcomeLabel(drafted)}` : ""}
+											</TooltipContent>
+										</Tooltip>
+									);
+								})}
+							</div>
+						</div>
+
+						<FocusGate
+							key={gate.stepId}
+							gate={gate}
+							now={now}
+							draft={draft}
+							onDraft={(next) =>
+								setDrafts((prev) => ({ ...prev, [gate.stepId]: next }))
+							}
+						/>
+
+						<nav
+							aria-label="Gates that wait"
+							className="sticky bottom-4 z-10 flex justify-center pb-4"
+						>
+							<div className="flex items-center gap-1 rounded-full border bg-background/95 p-1 shadow-lg backdrop-blur">
+								<Button
+									variant="ghost"
+									size="sm"
+									disabled={index === 0}
+									onClick={() => step(-1)}
+								>
+									<ChevronLeftIcon data-icon="inline-start" />
+									Previous
+								</Button>
+								<Button
+									variant="ghost"
+									size="sm"
+									disabled={queue.length < 2}
+									onClick={skip}
+								>
+									<SkipForwardIcon data-icon="inline-start" />
+									Skip for now
+								</Button>
+								<Button
+									variant="ghost"
+									size="sm"
+									disabled={index === queue.length - 1}
+									onClick={() => step(1)}
+								>
+									Next
+									<ChevronRightIcon data-icon="inline-end" />
+								</Button>
+							</div>
+						</nav>
+					</div>
+				)}
 			</div>
 		</>
 	);
 }
 
-function NavGroup({
-	title,
-	hint,
-	aside,
-	children,
-}: {
-	title: ReactNode;
-	hint: string | null;
-	aside?: ReactNode;
-	children: ReactNode;
-}) {
+function PageSkeleton() {
 	return (
-		<section className="flex flex-col gap-1">
-			<div className="flex items-center justify-between gap-2 px-2">
-				<div className="min-w-0">
-					<h3 className="truncate font-medium text-sm">{title}</h3>
-					{hint ? (
-						<p className="text-muted-foreground text-xs">{hint}</p>
-					) : null}
-				</div>
-				{aside}
-			</div>
-			<ItemGroup className="gap-0.5">{children}</ItemGroup>
-		</section>
-	);
-}
-
-function GateNavItem({
-	gate,
-	now,
-	selected,
-	onClick,
-}: {
-	gate: OpenGate;
-	now: number;
-	selected: boolean;
-	onClick: () => void;
-}) {
-	const { headline } = gateParts(gate.question);
-	const line = rowLine(gate);
-	return (
-		<Item
-			size="xs"
-			variant={selected ? "muted" : "default"}
-			render={
-				<button
-					type="button"
-					className="text-left"
-					aria-current={selected ? "page" : undefined}
-				/>
-			}
-			onClick={onClick}
-		>
-			<ItemContent className="min-w-0">
-				<ItemTitle className="w-full">
-					<span className="line-clamp-2">
-						<InlineMarkdown text={headline} links={false} />
-					</span>
-				</ItemTitle>
-				{line ? (
-					<ItemDescription className="line-clamp-1 text-xs">
-						<InlineMarkdown text={line} links={false} />
-					</ItemDescription>
-				) : null}
-				<ItemDescription className="truncate text-xs">
-					{gate.projectName} ·{" "}
-					{gate.deadline ? (
-						<DueText at={gate.deadline.at} now={now} />
-					) : (
-						<span className="text-status-waiting tabular-nums">
-							{waitedText(now - gate.openedAt)}
-						</span>
-					)}
-				</ItemDescription>
-			</ItemContent>
-		</Item>
-	);
-}
-
-/** "due 12:00", "due 07:00 tomorrow": when a Gate with a deadline needs its answer. */
-function DueText({ at, now }: { at: number; now: number }) {
-	const { time, day } = deadlineWhen(at, now);
-	return (
-		<LocalTime at={at} className="font-medium text-status-waiting tabular-nums">
-			due {time}
-			{day}
-		</LocalTime>
-	);
-}
-
-/** How long until a sleeping run wakes, again each second. Only this text updates, not the whole group. */
-function WakeCountdown({ at }: { at: number }) {
-	const now = useNow(1000);
-	return (
-		<span className="font-mono tabular-nums">
-			({formatCountdown(at - now)})
-		</span>
-	);
-}
-
-/** Runs that wait on a usage limit or the network. They go on by themselves. */
-function SleepingGroup({
-	runs,
-	projectNames,
-}: {
-	runs: RunSummary[];
-	projectNames: Map<string, string>;
-}) {
-	const runActed = useRunActed({ orpc });
-	const wake = useMutation(
-		runMutations.resume({
-			onSuccess: (_, { runId }) => runActed(runId),
-			onError: (error) => toast.error(`Could not wake: ${error.message}`),
-		}),
-	);
-
-	return (
-		<NavGroup
-			title="Sleeping"
-			hint="Each one continues on its own"
-			aside={
-				<Badge
-					variant="outline"
-					className="border-status-sleeping/40 bg-status-sleeping/10 text-status-sleeping tabular-nums"
-				>
-					{runs.length}
-				</Badge>
-			}
-		>
-			{runs.map((run) => {
-				const waking = wake.isPending && wake.variables?.runId === run.id;
-				return (
-					<Item key={run.id} size="xs">
-						<ItemMedia variant="icon" className="text-status-sleeping">
-							<MoonIcon />
-						</ItemMedia>
-						<ItemContent className="min-w-0">
-							<ItemTitle className="w-full min-w-0">
-								<Link
-									to="/runs/$runId"
-									params={{ runId: run.id }}
-									className="truncate underline-offset-3 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
-								>
-									{run.title}
-								</Link>
-							</ItemTitle>
-							<ItemDescription className="truncate text-xs">
-								{projectNames.get(run.projectId) ?? "Project"}
-								{run.wakeAt ? (
-									<>
-										{" · "}
-										<span className="text-status-sleeping">
-											wakes{" "}
-											<LocalTime at={run.wakeAt}>
-												{formatTime(run.wakeAt)}
-											</LocalTime>{" "}
-											<WakeCountdown at={run.wakeAt} />
-										</span>
-									</>
-								) : null}
-							</ItemDescription>
-						</ItemContent>
-						{/* Only the device that runs it wakes it. */}
-						{runActions(run.status, run.walker.thisDevice, run.result)
-							.resume ? (
-							<ItemActions>
-								<Tooltip>
-									<TooltipTrigger
-										render={
-											<Button
-												variant="ghost"
-												size="icon-sm"
-												aria-label={`Wake ${run.title} now`}
-												disabled={waking}
-												onClick={() => wake.mutate({ runId: run.id })}
-											/>
-										}
-									>
-										{waking ? <Spinner /> : <SunriseIcon />}
-									</TooltipTrigger>
-									<TooltipContent>Wake now</TooltipContent>
-								</Tooltip>
-							</ItemActions>
-						) : null}
-					</Item>
-				);
-			})}
-		</NavGroup>
-	);
-}
-
-function ListSkeleton() {
-	return (
-		<div className="flex flex-col gap-2 px-2 py-1" aria-hidden>
-			<Skeleton className="h-10 w-full" />
-			<Skeleton className="h-10 w-full" />
-		</div>
-	);
-}
-
-function DetailSkeleton() {
-	return (
-		<div className="mx-auto flex max-w-6xl flex-col gap-6 p-8" aria-hidden>
-			<Skeleton className="h-12 w-2/3" />
-			<div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
-				<Skeleton className="h-64 w-full" />
-				<Skeleton className="h-64 w-full" />
-			</div>
+		<div className="mx-auto flex max-w-3xl flex-col gap-6 p-8" aria-hidden>
+			<Skeleton className="h-16 w-full" />
+			<Skeleton className="h-10 w-2/3" />
+			<Skeleton className="h-40 w-full" />
 		</div>
 	);
 }
