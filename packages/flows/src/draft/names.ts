@@ -1,16 +1,18 @@
 /** Free names for new nodes, inputs, outputs and edges, and the clash of a new name. */
 import type { Flow } from "../flow";
-import { reservedNames, ruleOwnNames } from "../nodes";
+import { reservedNames, ruleOwnNames, templateOwnNames } from "../nodes";
 
 /**
  * The names a new node, input or variable does not get: node ids, inputs
- * and variables share one namespace, `run` and `vars` are reserved, and a
- * rule reads `previous` and `current` as its own (`ruleOwnNames`).
+ * and variables share one namespace, `run` and `vars` are reserved, a
+ * rule reads `previous` and `current` as its own (`ruleOwnNames`), and a
+ * node with a cascade reads `cascade` (`templateOwnNames`).
  */
 export function takenNames(flow: Flow): Set<string> {
 	return new Set([
 		...reservedNames,
 		...ruleOwnNames,
+		...templateOwnNames,
 		...flow.nodes.map((node) => node.id),
 		...flow.inputs.map((input) => input.name),
 		...(flow.variables ?? []).map((variable) => variable.name),
@@ -20,8 +22,16 @@ export function takenNames(flow: Flow): Set<string> {
 /**
  * What a name clashes with in the one namespace of a flow. `rule`: a
  * name a rule reads as its own (`ruleOwnNames`), for a node or an input.
+ * `template`: a name a template reads as its own (`templateOwnNames`),
+ * for a node or an input.
  */
-export type NameClash = "reserved" | "rule" | "node" | "input" | "variable";
+export type NameClash =
+	| "reserved"
+	| "rule"
+	| "template"
+	| "node"
+	| "input"
+	| "variable";
 
 /** The thing that takes the name: it may keep its own name. */
 export type NameOwner =
@@ -33,9 +43,9 @@ export type NameOwner =
  * What `name` clashes with when `owner` takes it: a reserved name (`run`,
  * `vars`), another node, input or variable. Null when the name is free.
  * Validation refuses a flow with a clash, so an edit checks here first.
- * A node or an input does not take a name a rule reads as its own
- * (`previous`). The check only warns about a flow that has one already,
- * so a node or an input that has it may keep it.
+ * A node or an input does not take a name a rule or a template reads as
+ * its own (`previous`, `cascade`). The check only warns about a flow that
+ * has one already, so a node or an input that has it may keep it.
  */
 export function nameClash(
 	flow: Flow,
@@ -46,6 +56,9 @@ export function nameClash(
 	if (reserved.includes(name)) return "reserved";
 	const ruleOwn: readonly string[] = ruleOwnNames;
 	if (ruleOwn.includes(name) && !keepsName(flow, name, owner)) return "rule";
+	const templateOwn: readonly string[] = templateOwnNames;
+	if (templateOwn.includes(name) && !keepsName(flow, name, owner))
+		return "template";
 	if (
 		flow.nodes.some(
 			(node) => node.id === name && !("node" in owner && owner.node === name),

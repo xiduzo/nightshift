@@ -116,4 +116,32 @@ describe("a name in the flow's one namespace", () => {
 		expect(takenNames(flow).has("previous")).toBe(true);
 		expect(uniqueNodeId(flow, "current")).toBe("current_2");
 	});
+
+	// A node with a cascade reads `{{cascade.tier}}`, after the inputs and
+	// the nodes: a node or an input named `cascade` hides its cascade.
+	test("the name a template reads as its own: refused for a node or an input, warned about in a flow", () => {
+		expect(nameClash(flow, "cascade", { node: "check" })).toBe("template");
+		expect(nameClash(flow, "cascade", { input: 0 })).toBe("template");
+		expect(errors(renamed({ node: "check" }, "cascade"))).toEqual([]);
+		expect(warnings(renamed({ node: "check" }, "cascade"))).toContain(
+			'Nodes with a cascade read "cascade" as their own value, not this node. Give the node another id.',
+		);
+		expect(errors(renamed({ input: 0 }, "cascade"))).toEqual([]);
+		expect(warnings(renamed({ input: 0 }, "cascade"))).toContain(
+			'Nodes with a cascade read "cascade" as their own value, not this input. Pick another name.',
+		);
+	});
+
+	test("a variable may take the name: a template reads it as vars.cascade", () => {
+		expect(nameClash(flow, "cascade", { variable: 0 })).toBeNull();
+		expect(validateFlow(renamed({ variable: 0 }, "cascade"))).toEqual([]);
+	});
+
+	test("a node or an input named cascade may keep it, and a new name is never cascade", () => {
+		const old = renameNode(flow, "check", "cascade");
+		expect(nameClash(old, "cascade", { node: "cascade" })).toBeNull();
+		expect(nameClash(old, "cascade", { input: 0 })).toBe("template");
+		expect(takenNames(flow).has("cascade")).toBe(true);
+		expect(uniqueNodeId(flow, "cascade")).toBe("cascade_2");
+	});
 });

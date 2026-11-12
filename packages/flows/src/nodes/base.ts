@@ -89,6 +89,16 @@ export const reservedNames = ["run", "vars"] as const;
 export const ruleOwnNames = ["previous", "current"] as const;
 
 /**
+ * The names a template reads as its own, besides the flow's: a node with
+ * a cascade reads its try as `cascade` (`{{cascade.tier}}`, ADR 6). A node
+ * or an input of that name wins over it, so that node's templates cannot
+ * read its cascade. The editor refuses it for a node or an input, and the
+ * check warns about a flow that has one. A variable may take it: a
+ * template reads it as `vars.cascade`.
+ */
+export const templateOwnNames = ["cascade"] as const;
+
+/**
  * Who decides a Decision node: a TanStack AI decision model, through
  * `decide()`. TypeSafe and OpenRouter serve Jev, OpenAI its Decisions API,
  * Ollaya a `laya` model on this computer, Ollama any chat model pulled on

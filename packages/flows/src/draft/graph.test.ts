@@ -247,6 +247,12 @@ describe("addCalledNode", () => {
 		expect(addCalledNode(flowOf(), "previous", at).id).toBe("previous_2");
 	});
 
+	test("an id is never the name a node with a cascade reads as its own", () => {
+		expect(addCalledNode(flowOf(), "kit:tiers/cascade", at).id).toBe(
+			"cascade_2",
+		);
+	});
+
 	test("ids stay unique and short enough", () => {
 		let flow = flowOf(fetch);
 		const ids: string[] = [];

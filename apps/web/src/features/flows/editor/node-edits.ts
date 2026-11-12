@@ -25,6 +25,8 @@ const NODE_NAME_TAKEN: Record<NameClash, (name: string) => string> = {
 	reserved: (name) => `The name ${name} is taken. Pick another name.`,
 	rule: (name) =>
 		`Since last run rules read ${name} as their own value. Pick another name.`,
+	template: (name) =>
+		`Nodes with a cascade read ${name} as their own value. Pick another name.`,
 	node: (name) => `${name} is taken by another node.`,
 	input: (name) =>
 		`An input of this flow is already named ${name}. Pick another name.`,

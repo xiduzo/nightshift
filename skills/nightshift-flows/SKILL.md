@@ -66,7 +66,7 @@ A flow is a directed graph of nodes and edges. Night Shift keeps it in the proje
 - `policy`: optional. `maxSteps` caps the steps of a run. `budgetUsd` stops the run when its known cost, at API prices, passes it. `maxTurns` and `idleMinutes` (default 15) limit each Agent step. A node may set its own. The stop time ends no running step. Only its own `timeoutMinutes` ends a long Command.
 - `sections`: frames in the editor only, see below.
 
-Names (node ids, inputs, variables): lowercase letters, digits and `_`, starting with a letter, at most 40 characters. Node ids and inputs share one namespace. Do not use `run`, `vars`, `previous`, `current`. Outcomes and option names: lowercase letters, digits and `-`. Do not use `error`, `stopped`, `interrupted`, `waiting`: those are the engine's.
+Names (node ids, inputs, variables): lowercase letters, digits and `_`, starting with a letter, at most 40 characters. Node ids and inputs share one namespace. Do not use `run`, `vars`, `previous`, `current`, `cascade`. Outcomes and option names: lowercase letters, digits and `-`. Do not use `error`, `stopped`, `interrupted`, `waiting`: those are the engine's.
 
 ## Nodes
 

@@ -14,6 +14,7 @@ import {
 	legacyDeviceName,
 	reservedNames,
 	ruleOwnNames,
+	templateOwnNames,
 } from "../nodes";
 import { checkBranches } from "./branches";
 import { checkCall, type ErrorsOf } from "./calls";
@@ -39,8 +40,8 @@ import {
 
 /**
  * Checks what the schema cannot: unique names (node ids and inputs share one
- * namespace, `run` is reserved, a name a rule reads as its own is a
- * warning), a known start node, edges between known
+ * namespace, `run` is reserved, a name a rule or a template reads as its
+ * own is a warning), a known start node, edges between known
  * nodes with outcomes the source node can produce, an Agent node with a
  * prompt or a skill, outcomes and options that are unique and not reserved,
  * a Decision's rules (`when`) that parse and read known names, an Agent
@@ -93,6 +94,7 @@ function validateIn(
 	const nodes = new Map<string, FlowNode>();
 	const reserved: readonly string[] = reservedNames;
 	const ruleOwn: readonly string[] = ruleOwnNames;
+	const templateOwn: readonly string[] = templateOwnNames;
 	for (const node of flow.nodes) {
 		if (nodes.has(node.id)) {
 			error(
@@ -129,6 +131,11 @@ function validateIn(
 		} else if (ruleOwn.includes(node.id)) {
 			warning(
 				`Since last run rules read "${node.id}" as their own value, not this node. Give the node another id.`,
+				{ nodeId: node.id },
+			);
+		} else if (templateOwn.includes(node.id)) {
+			warning(
+				`Nodes with a cascade read "${node.id}" as their own value, not this node. Give the node another id.`,
 				{ nodeId: node.id },
 			);
 		}

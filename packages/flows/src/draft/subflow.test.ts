@@ -461,6 +461,16 @@ describe("planSubflowFromSection, small flows", () => {
 		expect(plan.caller.nodes.map((n) => n.id)).toEqual(["a", "current_2", "d"]);
 	});
 
+	test("the Call's id is never the name a node with a cascade reads as its own", () => {
+		const plan = planned(
+			planSubflowFromSection(chain(), "middle", {
+				name: "cascade",
+				existingFlowNames: [],
+			}),
+		);
+		expect(plan.caller.nodes.map((n) => n.id)).toEqual(["a", "cascade_2", "d"]);
+	});
+
 	test("a Wait's own outcome without an edge ends the flow, as in the engine", () => {
 		const wait = {
 			id: "c",

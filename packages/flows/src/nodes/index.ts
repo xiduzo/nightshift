@@ -81,6 +81,7 @@ export {
 	ruleOwnNames,
 	sameProfileRef,
 	secretNameSchema,
+	templateOwnNames,
 	type VariableWrite,
 	variableWriteSchema,
 } from "./base";

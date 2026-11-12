@@ -56,6 +56,8 @@ flowchart LR
 
 A step can climb a **cascade**. It tries the first tier, and moves up when a try does not hold. Each tier has a number of tries. Each try gets the failure of the try before. A new tier starts a new session. The last tier can be you.
 
+The prompt of a step with a cascade can read its try: `{{cascade.tier}}`, `{{cascade.try}}` and `{{cascade.previous}}`. Nodes and inputs cannot use the name `cascade`.
+
 The `implement-and-check` starter is one Agent with a cascade. Sonnet tries up to 3 times, then Opus. After each try, the check runs. A try holds only when the check passes.
 
 A Decision or a Value that a model decides can have a cascade too. A model's pick below the confidence you set goes to the next tier: a stronger model, or you.

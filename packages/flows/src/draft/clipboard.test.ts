@@ -116,6 +116,28 @@ describe("pasteNodes", () => {
 		});
 	});
 
+	test("a pasted node named cascade gets a free name, and its readers follow", () => {
+		const clip = {
+			nodes: flowSchema.parse({
+				version: FLOW_VERSION,
+				start: "cascade",
+				nodes: [
+					command("cascade"),
+					command("after", "echo {{cascade.stdout}}"),
+				],
+				edges: [],
+			}).nodes,
+			edges: [],
+			sections: [],
+		};
+		const empty: Flow = { ...chain, nodes: [], edges: [], sections: [] };
+		const { flow, ids } = pasteNodes(empty, clip);
+		expect(ids).toEqual(["cascade_2", "after"]);
+		expect(flow.nodes.at(-1)).toMatchObject({
+			command: "echo {{cascade_2.stdout}}",
+		});
+	});
+
 	test("keeps references to nodes that were not pasted", () => {
 		const clip = copyNodes(chain, ["b"]);
 		if (!clip) throw new Error("expected a clip");

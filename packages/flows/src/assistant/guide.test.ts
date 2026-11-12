@@ -142,7 +142,8 @@ describe("flowAuthoringGuide", () => {
 		// 5055: the `scores` of an Agent and a Value (one sentence each).
 		// 5080: an End report from a file the run wrote. 5090: the kits
 		// under their families, as the add-node dialog lists them. 5105:
-		// a name inside a filter reads each item (`$$.vars.limit`).
+		// a name inside a filter reads each item (`$$.vars.limit`), and
+		// `cascade` with the names not to use.
 		expect(words).toBeLessThan(5105);
 	});
 });

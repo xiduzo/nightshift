@@ -51,6 +51,7 @@ import {
 	reservedOutcomes,
 	ruleOwnNames,
 	sinceLastRunOutcomes,
+	templateOwnNames,
 	type VariableWrite,
 } from "../nodes";
 import {
@@ -559,10 +560,12 @@ class Planner {
 		const changes: SubflowChange[] = [];
 
 		// Names of the new flow: its nodes, inputs and variables share one
-		// namespace. A new name is not reserved, and not a rule's own.
+		// namespace. A new name is not reserved, and not a rule's or a
+		// template's own.
 		const subTaken = new Set<string>([
 			...reservedNames,
 			...ruleOwnNames,
+			...templateOwnNames,
 			...this.inner.map((node) => node.id),
 			// Variables keep their names, so rules and templates inside stay.
 			...(flow.variables ?? []).map((variable) => variable.name),
@@ -570,6 +573,7 @@ class Planner {
 		const callerTaken = new Set<string>([
 			...reservedNames,
 			...ruleOwnNames,
+			...templateOwnNames,
 			...flow.nodes.map((node) => node.id),
 			...flow.inputs.map((input) => input.name),
 			...(flow.variables ?? []).map((variable) => variable.name),

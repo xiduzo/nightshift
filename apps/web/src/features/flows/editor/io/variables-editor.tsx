@@ -41,6 +41,8 @@ const VARIABLE_NAME_TAKEN: Record<NameClash, (name: string) => string> = {
 	reserved: (name) => `The name ${name} is taken. Pick another name.`,
 	rule: (name) =>
 		`Since last run rules read ${name} as their own value. Pick another name.`,
+	template: (name) =>
+		`Nodes with a cascade read ${name} as their own value. Pick another name.`,
 	node: (name) => `A node is already named ${name}. Pick another name.`,
 	input: (name) => `An input is already named ${name}. Pick another name.`,
 	variable: (name) => `Another variable is named ${name}.`,
