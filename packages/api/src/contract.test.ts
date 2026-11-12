@@ -464,6 +464,17 @@ describe("replies of a real engine", () => {
 			costBasis: expect.stringMatching(/^(billed|estimated|unknown)$/),
 			prUrl: null,
 			scores: [],
+			// The one Agent landed on its first rung.
+			ladder: [
+				expect.objectContaining({
+					ladder: "work",
+					nodeId: "agent",
+					rung: "first",
+					by: "agent",
+					tier: null,
+					landed: 1,
+				}),
+			],
 		});
 		const listed = (await read(appRouter.projects.list)) as {
 			id: string;
