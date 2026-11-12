@@ -3,6 +3,7 @@ import {
 	glanceSnapshot,
 	type RunDetail,
 	type RunProgress,
+	type RunResult,
 	type RunStatus,
 	runProgress,
 } from "@nightshift/client";
@@ -58,11 +59,16 @@ function memoryStore() {
 	};
 }
 
-const run = (status: RunStatus, started: string[]) =>
+const run = (
+	status: RunStatus,
+	started: string[],
+	result: RunResult | null = null,
+) =>
 	({
 		id: "run-1",
 		flowName: "feature",
 		status,
+		result,
 		flow: { nodes: [{ id: "plan" }, { id: "build" }, { id: "ship" }] },
 		calledFlows: {},
 		steps: started.map((nodeId, index) => ({
@@ -217,6 +223,7 @@ describe("the props outside the app", () => {
 						id: "a",
 						flowName: "deploy",
 						status: "failed",
+						result: null,
 						createdAt: 1,
 						test: { pinned: [], skipped: ["send"] },
 					},
@@ -232,6 +239,31 @@ describe("the props outside the app", () => {
 				dark: "#fe6c66",
 			},
 		]);
+	});
+
+	test("say Nothing to do for a run that had nothing to do, on the widget and the lock screen", () => {
+		const widget = homeWidgetProps(
+			glanceSnapshot({
+				gates: [],
+				runs: [
+					{
+						id: "a",
+						flowName: "triage",
+						status: "finished",
+						result: "nothing-to-do",
+						createdAt: 1,
+					},
+				],
+			}),
+		);
+		expect(widget.runs.map((each) => each.statusText)).toEqual([
+			"Nothing to do",
+		]);
+		const lock = runActivityProps(
+			runProgress(run("finished", ["plan"], "nothing-to-do")),
+		);
+		expect(lock.statusText).toBe("Nothing to do");
+		expect(lock.headline).toBe("Nothing to do · Ran 1 of 3 steps");
 	});
 
 	test("show no count and no runs when the phone is not signed in", () => {

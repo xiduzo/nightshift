@@ -6,7 +6,7 @@ import {
 	type RunDetail,
 	type RunStatus,
 	runningSteps,
-	runStatusLabel,
+	statusOf,
 	stepName,
 	stepPosition,
 } from "../runs";
@@ -22,6 +22,7 @@ export type RunProgress = {
 	runId: string;
 	flow: string;
 	status: RunStatus;
+	/** The status as every screen says it: "Running", "Nothing to do" (`statusOf`). */
 	statusText: string;
 	tone: GlanceTone;
 	/** The name of the step that runs or waits now. Null before the first step and after the run ends. */
@@ -50,6 +51,7 @@ export function runProgress(
 		| "id"
 		| "flowName"
 		| "status"
+		| "result"
 		| "steps"
 		| "flow"
 		| "calledFlows"
@@ -76,7 +78,7 @@ export function runProgress(
 		runId: run.id,
 		flow: flowLabel(run),
 		status: run.status,
-		statusText: runStatusLabel(run.status),
+		statusText: statusOf(run).word,
 		tone: glanceTone(run.status),
 		step:
 			running.length > 0
@@ -101,6 +103,7 @@ export function sameProgress(a: RunProgress, b: RunProgress): boolean {
 		a.runId === b.runId &&
 		a.flow === b.flow &&
 		a.status === b.status &&
+		a.statusText === b.statusText &&
 		a.step === b.step &&
 		a.position === b.position &&
 		a.fraction === b.fraction &&

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import type { RunDetail, RunStatus } from "../runs";
+import type { RunDetail, RunResult, RunStatus } from "../runs";
 import { runProgress, sameProgress } from "./progress";
 import { glanceSnapshot, waitingText } from "./snapshot";
 
@@ -9,7 +9,8 @@ const run = (
 	status: RunStatus,
 	createdAt: number,
 	flowName: string | null = "fix-bug",
-) => ({ id, status, createdAt, flowName });
+	result: RunResult | null = null,
+) => ({ id, status, createdAt, flowName, result });
 
 describe("the widget's snapshot", () => {
 	test("counts only the Gates you may answer", () => {
@@ -93,6 +94,27 @@ describe("the widget's snapshot", () => {
 		expect(snapshot.runs[0]?.statusText).toBe("Interrupted");
 	});
 
+	test("a run that had nothing to do says so, as every screen does", () => {
+		const snapshot = glanceSnapshot({
+			gates: [],
+			runs: [
+				run("a", "finished", 1, "triage", "nothing-to-do"),
+				run("b", "finished", 2, "triage", "done"),
+				{
+					...run("c", "finished", 3, "triage", "nothing-to-do"),
+					test: { pinned: [], skipped: [] },
+				},
+			],
+		});
+		expect(
+			snapshot.runs.map((each) => [each.id, each.statusText, each.tone]),
+		).toEqual([
+			["c", "Nothing to do · Test run", "finished"],
+			["b", "Finished", "finished"],
+			["a", "Nothing to do", "finished"],
+		]);
+	});
+
 	test("says how many Gates wait in words", () => {
 		expect(waitingText(0)).toBe("Nothing waits for you");
 		expect(waitingText(1)).toBe("1 Gate waits for you");
@@ -126,11 +148,13 @@ const detail = (
 	status: RunStatus,
 	steps: RunDetail["steps"],
 	nodes = [node("plan", "Plan"), node("build", "Build"), node("review")],
+	result: RunResult | null = null,
 ): Detail =>
 	({
 		id: "run-1",
 		flowName: "feature",
 		status,
+		result,
 		steps,
 		createdAt: 100,
 		endedAt: hasEndedStatus(status) ? 900 : null,
@@ -251,6 +275,23 @@ describe("a run's progress on the lock screen", () => {
 		);
 		expect(progress.ended).toBe(false);
 		expect(progress.statusText).toBe("Interrupted");
+	});
+
+	test("a run that had nothing to do says so, as every screen does", () => {
+		const nodes = [node("plan", "Plan")];
+		const quiet = runProgress(
+			detail("finished", [step("plan", 1, 2)], nodes, "nothing-to-do"),
+		);
+		expect(quiet).toMatchObject({
+			statusText: "Nothing to do",
+			tone: "finished",
+			ended: true,
+		});
+		const done = runProgress(
+			detail("finished", [step("plan", 1, 2)], nodes, "done"),
+		);
+		expect(done.statusText).toBe("Finished");
+		expect(sameProgress(quiet, done)).toBe(false);
 	});
 
 	test("knows when an update changes nothing", () => {

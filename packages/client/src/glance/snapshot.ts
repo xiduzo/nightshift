@@ -4,7 +4,7 @@ import {
 	isTestRun,
 	type RunStatus,
 	type RunSummary,
-	runStatusLabel,
+	statusOf,
 	TEST_RUN_LABEL,
 } from "../runs";
 import { type GlanceTone, glanceTone } from "./tone";
@@ -17,7 +17,7 @@ export type GlanceRun = {
 	id: string;
 	flow: string;
 	status: RunStatus;
-	/** "Finished", or "Finished · Test run" for a test run. */
+	/** "Finished", "Nothing to do" (`statusOf`), or "Finished · Test run" for a test run. */
 	statusText: string;
 	tone: GlanceTone;
 };
@@ -58,22 +58,23 @@ export function glanceSnapshot({
 	gates: readonly Pick<OpenGate, "canAnswer">[];
 	runs: readonly Pick<
 		RunSummary,
-		"id" | "flowName" | "status" | "createdAt" | "test"
+		"id" | "flowName" | "status" | "result" | "createdAt" | "test"
 	>[];
 }): GlanceSnapshot {
 	const waiting = waitingForYou(gates);
 	const latest = [...runs]
 		.sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
 		.slice(0, GLANCE_RUNS)
-		.map((run) => ({
-			id: run.id,
-			flow: flowLabel(run),
-			status: run.status,
-			statusText: isTestRun(run)
-				? `${runStatusLabel(run.status)} · ${TEST_RUN_LABEL}`
-				: runStatusLabel(run.status),
-			tone: glanceTone(run.status),
-		}));
+		.map((run) => {
+			const { word } = statusOf(run);
+			return {
+				id: run.id,
+				flow: flowLabel(run),
+				status: run.status,
+				statusText: isTestRun(run) ? `${word} · ${TEST_RUN_LABEL}` : word,
+				tone: glanceTone(run.status),
+			};
+		});
 	return {
 		waiting,
 		waitingText: waitingText(waiting),
