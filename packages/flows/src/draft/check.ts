@@ -1,11 +1,10 @@
-/** Checks a draft: the schema, the connections, profiles, Devices and CLI programs it names, what needs the project's folder, and `validateFlow`. */
+/** Checks a draft in its place: the schema, the connections, profiles, Devices and CLI programs it names, what needs the project's folder, and `validateFlow`. */
 import { type Flow, type FlowNode, flowSchema } from "../flow";
 import {
 	type AgentNode,
 	deviceIdOf,
 	isProfileRef,
 	type ProfileRef,
-	sameProfileRef,
 } from "../nodes";
 import { everyProfileOf, profileOf, runsAs } from "../profiles";
 import type { FlowIssue, ProjectFlowMap } from "../validate";
@@ -53,60 +52,66 @@ export type DraftMessages = {
 /** The permission modes that refuse every shell command but the node's CLI tools in a run nobody watches. */
 export type CommandlessMode = "acceptEdits" | "default";
 
-/** A profile a node may name, with its permission mode when it is an Agent Profile and its Device tells it. */
-export type KnownProfile = ProfileRef & {
+/** A profile of a Device, with its permission mode when it is an Agent Profile and its Device tells it. */
+export type PlaceProfile = {
+	id: string;
 	permissionMode?: AgentNode["permissionMode"];
 };
 
-export type DraftCheckOptions = {
+/**
+ * A Device a run of the project may use, with the profiles a node may
+ * name on it. `profiles` is absent when this computer cannot tell them:
+ * a profile on that Device is not checked.
+ */
+export type PlaceDevice = {
+	deviceId: string;
+	profiles?: readonly PlaceProfile[];
+};
+
+/**
+ * The place a flow is checked in: what its project offers it. Each
+ * runtime reads it its own way (the editor, the chat, `nightshift mcp`,
+ * Suggest), and every check of a flow takes it whole, so one flow gets
+ * the same issues at every door. Leave a fact out while it loads: the
+ * checks that need it wait.
+ */
+export type FlowPlace = {
 	/** The project's flow files by name, so Call nodes can check the flows they call. */
 	flows?: ProjectFlowMap;
-	/** The draft's own file name. The draft stands in for that file. */
+	/** The flow's own file name. The checked flow stands in for that file. */
 	name?: string;
-	/** The names of the connections. Leave it out while they load. */
+	/**
+	 * The Devices a run of the project may use, as `SpaceEngine.listDevices`
+	 * lists them: the person's own and those that offer profiles to the
+	 * Space. A node that names another Device, or a profile none of them
+	 * has, does not start.
+	 */
+	devices?: readonly PlaceDevice[];
+	/** The names of the connections. */
 	connections?: readonly string[];
-	/**
-	 * The profiles a node may name: each Device's that this computer knows
-	 * of. Leave it out while they load.
-	 */
-	profiles?: readonly KnownProfile[];
-	/** The Devices whose profiles this computer cannot tell: a profile on one is not checked. */
-	untoldDevices?: readonly string[];
-	/**
-	 * The ids of the Devices a run of the project may use: the person's
-	 * own and those that offer profiles to the Space. A node that names
-	 * another does not start. Leave it out while they load.
-	 */
-	devices?: readonly string[];
-	/** The CLI tools, to find a command that calls a program without its login. Leave it out while they load. */
+	/** The CLI tools, to find a command that calls a program without its login. */
 	cliTools?: readonly CliToolRef[];
 	/**
 	 * Whether the project has a folder (ADR 22). False: each step that
-	 * needs one warns (`folderNeeds`). Leave it out while the project loads.
+	 * needs one warns (`folderNeeds`).
 	 */
 	folder?: boolean;
 };
 
 /**
- * Checks the draft: the schema first (what the API would refuse to save), then
- * `validateFlow` for meaning. Schema issues point at their node or edge.
- * With `flows`, Call nodes check the flows they call, and a flow that reaches
- * itself is reported with the chain.
+ * Checks the draft in its place: the schema first (what the API would
+ * refuse to save), then what the place offers it (connections, profiles,
+ * Devices, CLI tools, the folder), then `validateFlow` for meaning. Schema
+ * issues point at their node or edge. With `flows`, Call nodes check the
+ * flows they call, and a flow that reaches itself is reported with the
+ * chain.
  */
 export function checkDraft(
 	flow: Flow,
 	messages: DraftMessages,
-	{
-		flows,
-		name,
-		connections,
-		profiles,
-		untoldDevices,
-		devices,
-		cliTools,
-		folder,
-	}: DraftCheckOptions = {},
+	place: FlowPlace = {},
 ): FlowCheck {
+	const { flows, name, connections, devices, cliTools, folder } = place;
 	const issues: FlowIssue[] = [];
 	const parsed = flowSchema.safeParse(flow);
 	if (!parsed.success) {
@@ -143,12 +148,11 @@ export function checkDraft(
 		}
 	}
 
-	if (profiles) {
+	if (devices) {
 		for (const node of flow.nodes) {
 			// A name left from format 6: `validateFlow` asks to pick it again.
 			for (const profile of everyProfileOf(node).filter(isProfileRef)) {
-				if (untoldDevices?.includes(profile.device)) continue;
-				if (profiles.some((known) => sameProfileRef(known, profile))) continue;
+				if (profileIn(devices, profile) !== undefined) continue;
 				issues.push({
 					severity: "error",
 					message: messages.missingProfile(profile),
@@ -160,7 +164,7 @@ export function checkDraft(
 
 	for (const node of flow.nodes) {
 		if (node.type !== "agent") continue;
-		const mode = commandlessMode(node, profiles);
+		const mode = commandlessMode(node, devices);
 		if (mode === null) continue;
 		issues.push({
 			severity: "warning",
@@ -170,13 +174,15 @@ export function checkDraft(
 	}
 
 	if (devices) {
+		const known = (id: string) =>
+			devices.some((device) => device.deviceId === id);
 		for (const id of flow.devices ?? []) {
-			if (devices.includes(id)) continue;
+			if (known(id)) continue;
 			issues.push({ severity: "error", message: messages.missingFlowDevice() });
 		}
 		for (const node of flow.nodes) {
 			const id = "device" in node ? deviceIdOf(node.device) : undefined;
-			if (id === undefined || devices.includes(id)) continue;
+			if (id === undefined || known(id)) continue;
 			issues.push({
 				severity: "error",
 				message: messages.missingDevice(id, node),
@@ -210,6 +216,20 @@ export function checkDraft(
 }
 
 /**
+ * The profile `ref` names, as the place's Devices tell it: `"untold"`
+ * when its Device does not tell its profiles, undefined when no Device
+ * has it.
+ */
+function profileIn(
+	devices: readonly PlaceDevice[],
+	ref: ProfileRef,
+): PlaceProfile | "untold" | undefined {
+	const device = devices.find((known) => known.deviceId === ref.device);
+	if (device && device.profiles === undefined) return "untold";
+	return device?.profiles?.find((profile) => profile.id === ref.profile);
+}
+
+/**
  * A warning on each node that needs the project's folder (`folderNeeds`):
  * the step fails, or reads nothing, only when a run reaches it.
  */
@@ -236,24 +256,25 @@ function folderIssues(
 
 /**
  * The mode that refuses commands that the Agent node, or one of its
- * cascade's tiers, runs in: its own permission mode, else its profile's.
- * Null when it runs in another mode, or when the profile's mode is not
- * known.
+ * cascade's tiers, runs in: its own permission mode, else its profile's
+ * as its Device tells it. Null when it runs in another mode, or when the
+ * profile's mode is not known.
  */
 function commandlessMode(
 	node: AgentNode,
-	profiles: readonly KnownProfile[] | undefined,
+	devices: readonly PlaceDevice[] | undefined,
 ): CommandlessMode | null {
 	for (const run of runsAs(node)) {
 		if (run.type !== "agent") continue;
 		const profile = profileOf(run);
+		const known =
+			devices && profile !== undefined && isProfileRef(profile)
+				? profileIn(devices, profile)
+				: undefined;
 		const mode =
 			run.permissionMode ??
 			node.permissionMode ??
-			(profile !== undefined && isProfileRef(profile)
-				? profiles?.find((known) => sameProfileRef(known, profile))
-						?.permissionMode
-				: undefined);
+			(typeof known === "object" ? known.permissionMode : undefined);
 		if (mode === "acceptEdits" || mode === "default") return mode;
 	}
 	return null;

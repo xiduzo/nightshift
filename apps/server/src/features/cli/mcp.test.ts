@@ -203,6 +203,69 @@ describe("nightshift mcp", () => {
 		]);
 	});
 
+	test("a flow is checked in the place the editor reads: the folder, the Devices with their profiles' modes", async () => {
+		const client = {
+			flows: { map: async () => ({ fix: null }) },
+			runs: {
+				devices: async () => [
+					{
+						deviceId: "mac",
+						name: "MacBook",
+						profiles: [
+							{
+								id: "night",
+								name: "night",
+								kind: "agent",
+								permissionMode: "acceptEdits",
+							},
+						],
+					},
+					// Its profiles this computer cannot tell.
+					{ deviceId: "studio", name: "Studio" },
+				],
+			},
+			cliTools: {
+				list: async () => [
+					{ name: "acli-work", program: "acli", login: { kind: "x" } },
+				],
+			},
+			connections: {
+				list: async () => ({ connections: [{ name: "github" }] }),
+			},
+			projects: {
+				list: async () => [
+					{ id: "notes", folder: false },
+					// An older Host sends no `folder`: that project has one.
+					{ id: "app" },
+				],
+			},
+		} as unknown as AppRouterClient;
+		const port = apiPort(client, { ui: "http://localhost:9" });
+		expect(await port.place("notes", "fix")).toEqual<unknown>({
+			flows: { fix: null },
+			name: "fix",
+			devices: [
+				{
+					deviceId: "mac",
+					name: "MacBook",
+					profiles: [
+						{
+							id: "night",
+							name: "night",
+							kind: "agent",
+							permissionMode: "acceptEdits",
+						},
+					],
+				},
+				{ deviceId: "studio", name: "Studio" },
+			],
+			connections: ["github"],
+			cliTools: [{ name: "acli-work", program: "acli", signsIn: true }],
+			folder: false,
+		});
+		expect((await port.place("app")).folder).toBe(true);
+	});
+
 	test("without Night Shift on this computer each tool says so", async () => {
 		// A port nothing listens on.
 		const server = Bun.serve({ port: 0, fetch: () => new Response() });

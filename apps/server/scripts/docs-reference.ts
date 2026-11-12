@@ -325,7 +325,8 @@ export function loadCommunityFlow(
 		);
 		return { name, flow: null, problems };
 	}
-	// No profiles or connections to check against, so the base is never
+	// A community flow has no project: its place holds only the flows it may
+	// call. No Devices or connections to check against, so the base is never
 	// read: the flow stands in for it, as `check_flow` does for a new flow.
 	const errors = proposalIssues(migrated as Flow, migrated, { flows, name })
 		.filter((issue) => issue.severity === "error")

@@ -1,42 +1,31 @@
 /**
- * What "valid" means for a flow the assistant proposes. The backend's
- * `propose_flow` tool and the web both ask this one function, so the agent
+ * What "valid" means for a flow an agent writes. The chat's `propose_flow`
+ * and `check_flow`, `nightshift mcp`, Suggest and the docs script ask this
+ * one function. It checks in the place the editor checks in, so the agent
  * and the person see the same issues.
  */
 
 import {
-	type CliToolRef,
 	checkDraft,
 	type DraftMessages,
+	type FlowPlace,
 	type FolderNeed,
+	type PlaceDevice,
 } from "../draft";
 import { FLOW_VERSION, type Flow, type FlowNode, flowSchema } from "../flow";
-import { isProfileRef, type ProfileRef } from "../nodes";
+import { deviceIdOf, isProfileRef } from "../nodes";
 import { everyProfileOf } from "../profiles";
-import type { FlowIssue, ProjectFlowMap } from "../validate";
-
-export type ProposalCheckOptions = {
-	/** The project's flow files by name, so Call nodes can check the flows they call. */
-	flows?: ProjectFlowMap;
-	/** The flow's own file name. The proposal stands in for that file. */
-	name?: string;
-	/** The profiles a node may name, each on its Device. Leave it out to skip the check. */
-	profiles?: readonly ProfileRef[];
-	/** The names of this computer's connections. Leave it out to skip the check. */
-	connections?: readonly string[];
-	/** This computer's CLI tools, to warn about a program called without its login. */
-	cliTools?: readonly CliToolRef[];
-	/** Whether the project has a folder (ADR 22). False: a step that needs one warns. */
-	folder?: boolean;
-};
+import type { FlowIssue } from "../validate";
 
 /**
- * The issues of `proposal`, a new version of `draft`: the flow schema first,
- * then the same checks as the editor (`checkDraft`, `validateFlow`).
+ * The issues of `proposal`, a new version of `draft`, in the place the
+ * flow is checked in: the flow schema first, then the same checks as the
+ * editor (`checkDraft`, `validateFlow`).
  *
- * A profile or a connection the proposal names that this computer does not
- * have is an error, so the assistant does not invent one. A name the draft
- * already uses is left to the editor's own check: the person put it there.
+ * A profile, a connection or a Device the proposal names that the place
+ * does not have is an error, so the assistant does not invent one. A name
+ * the draft already uses is left to the editor's own check: the person
+ * put it there.
  *
  * `proposal` is what the agent wrote, not yet read by the schema. A flow with
  * no `error` issue reads with `flowSchema.parse(proposal)`.
@@ -44,7 +33,7 @@ export type ProposalCheckOptions = {
 export function proposalIssues(
 	draft: Flow,
 	proposal: unknown,
-	options: ProposalCheckOptions = {},
+	place: FlowPlace = {},
 ): FlowIssue[] {
 	const version =
 		typeof proposal === "object" && proposal !== null
@@ -67,22 +56,11 @@ export function proposalIssues(
 		);
 	}
 
-	const profiles = options.profiles && [
-		...options.profiles,
-		...draft.nodes.flatMap(profilesOf),
-	];
-	const connections = options.connections && [
-		...options.connections,
-		...draft.nodes.flatMap(connectionsOf),
-	];
-	const { issues, validatorError } = checkDraft(parsed.data, messages, {
-		flows: options.flows,
-		name: options.name,
-		profiles,
-		connections,
-		cliTools: options.cliTools,
-		folder: options.folder,
-	});
+	const { issues, validatorError } = checkDraft(
+		parsed.data,
+		messages,
+		withNamesOf(draft, place),
+	);
 	if (validatorError !== null) {
 		issues.push({
 			severity: "error",
@@ -90,6 +68,55 @@ export function proposalIssues(
 		});
 	}
 	return issues;
+}
+
+/**
+ * The place with what `draft` names already: its connections, and its
+ * profiles and Devices on the place's Devices. A Device that does not
+ * tell its profiles stays so.
+ */
+function withNamesOf(draft: Flow, place: FlowPlace): FlowPlace {
+	const { connections, devices } = place;
+	return {
+		...place,
+		...(connections && {
+			connections: [...connections, ...draft.nodes.flatMap(connectionsOf)],
+		}),
+		...(devices && { devices: withDevicesOf(draft, devices) }),
+	};
+}
+
+/** The Devices with the profiles and Device ids `draft` names added. */
+function withDevicesOf(
+	draft: Flow,
+	devices: readonly PlaceDevice[],
+): PlaceDevice[] {
+	const named = new Map<string, string[]>();
+	const name = (deviceId: string, profile?: string) => {
+		const profiles = named.get(deviceId) ?? [];
+		if (profile !== undefined) profiles.push(profile);
+		named.set(deviceId, profiles);
+	};
+	for (const node of draft.nodes) {
+		for (const ref of everyProfileOf(node).filter(isProfileRef)) {
+			name(ref.device, ref.profile);
+		}
+		const id = "device" in node ? deviceIdOf(node.device) : undefined;
+		if (id !== undefined) name(id);
+	}
+	for (const id of draft.devices ?? []) name(id);
+	const added = (ids: string[]) => ids.map((id) => ({ id }));
+	return [
+		...devices.map((device) => {
+			const ids = named.get(device.deviceId);
+			return ids && device.profiles
+				? { ...device, profiles: [...device.profiles, ...added(ids)] }
+				: device;
+		}),
+		...[...named]
+			.filter(([id]) => !devices.some((device) => device.deviceId === id))
+			.map(([deviceId, ids]) => ({ deviceId, profiles: added(ids) })),
+	];
 }
 
 const messages: DraftMessages = {
@@ -155,10 +182,6 @@ function schemaIssue(
 		severity: "error",
 		message: at === "" ? message : `${at}: ${message}`,
 	};
-}
-
-function profilesOf(node: FlowNode): ProfileRef[] {
-	return everyProfileOf(node).filter(isProfileRef);
 }
 
 function connectionsOf(node: FlowNode): string[] {

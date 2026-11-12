@@ -60,6 +60,14 @@ function fakePort(
 		],
 		tools: async () => ({ clis: [], connections: [] }),
 		skills: async () => [],
+		place: async (projectId, name) => ({
+			flows: { ...saved[projectId] },
+			name,
+			devices: [{ deviceId: "mac", profiles: [{ id: "worker" }] }],
+			connections: [],
+			cliTools: [],
+			folder: true,
+		}),
 		saveFlow: async (projectId, name, next): Promise<FlowIssue[]> => {
 			saved[projectId] = { ...saved[projectId], [name]: next };
 			return [];
@@ -177,12 +185,24 @@ describe("nightshift mcp tools", () => {
 		);
 	});
 
-	test("check_flow: in a project without a folder, a step that runs git warns", async () => {
+	test("check_flow checks in the place of the project it works in", async () => {
+		const asked: [string, string | undefined][] = [];
 		const port = fakePort({
-			projects: async () => [
-				{ id: "p1", name: "App", path: "/work/app" },
-				{ id: "p2", name: "Notes", path: null, folder: false },
-			],
+			place: async (projectId, name) => {
+				asked.push([projectId, name]);
+				return projectId === "p2"
+					? {
+							name,
+							devices: [
+								{
+									deviceId: "mac",
+									profiles: [{ id: "worker", permissionMode: "acceptEdits" }],
+								},
+							],
+							folder: false,
+						}
+					: {};
+			},
 		});
 		const { call } = await connect(port);
 		const git = {
@@ -199,18 +219,30 @@ describe("nightshift mcp tools", () => {
 			edges: [{ id: "e1", from: "build", outcome: "pass", to: "push" }],
 		};
 		const check = async (project: string) =>
-			(await call("check_flow", { project, flow: git })).text;
-		const warnings = async (project: string) =>
-			(await check(project))
-				.split("\n")
-				.filter((line) => line.startsWith("- warning:"));
+			(await call("check_flow", { project, flow: git, name: "ship" })).text;
 		expect(await check("App")).toBe("No issues.");
-		expect(await warnings("Notes")).toEqual([
+		expect((await check("Site")).split("\n")).toEqual([
+			expect.stringContaining(
+				'- warning: The Agent node "build" runs in acceptEdits',
+			),
 			expect.stringContaining(
 				'The command of the node "push" runs git in that empty folder',
 			),
 		]);
-		// The list says which project has no folder.
+		expect(asked).toEqual([
+			["p1", "ship"],
+			["p2", "ship"],
+		]);
+	});
+
+	test("list_projects says which project has no folder", async () => {
+		const port = fakePort({
+			projects: async () => [
+				{ id: "p1", name: "App", path: "/work/app" },
+				{ id: "p2", name: "Notes", path: null, folder: false },
+			],
+		});
+		const { call } = await connect(port);
 		const listed = JSON.parse((await call("list_projects")).text);
 		expect(listed[0]).not.toHaveProperty("folder");
 		expect(listed[1]).toMatchObject({ name: "Notes", folder: false });

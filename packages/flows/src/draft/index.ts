@@ -6,12 +6,12 @@
 
 export {
 	checkDraft,
-	type DraftCheckOptions,
 	type DraftMessages,
 	type DraftSchemaIssue,
 	type FlowCheck,
+	type FlowPlace,
 	isSavable,
-	type KnownProfile,
+	type PlaceDevice,
 } from "./check";
 export {
 	type CliToolRef,

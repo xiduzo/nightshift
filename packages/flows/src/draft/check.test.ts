@@ -7,7 +7,7 @@ import {
 	checkDraft,
 	type DraftMessages,
 	isSavable,
-	type KnownProfile,
+	type PlaceDevice,
 } from "./check";
 
 const messages: DraftMessages = {
@@ -62,7 +62,10 @@ describe("checkDraft", () => {
 			],
 		} as Flow;
 		const { issues } = checkDraft(withBackup, messages, {
-			profiles: [{ device: "mac", profile: "night" }],
+			devices: [
+				{ deviceId: "mac", profiles: [{ id: "night" }] },
+				{ deviceId: "host", profiles: [] },
+			],
 		});
 		expect(issues).toContainEqual({
 			severity: "error",
@@ -74,9 +77,10 @@ describe("checkDraft", () => {
 	test("connections and profiles count only once they load", () => {
 		const loading = checkDraft(flow, messages).issues.map((i) => i.message);
 		expect(loading).not.toContain("connection github");
+		expect(loading).not.toContain("profile night");
 		const loaded = checkDraft(flow, messages, {
 			connections: [],
-			profiles: [{ device: "mac", profile: "day" }],
+			devices: [{ deviceId: "mac", profiles: [{ id: "day" }] }],
 		}).issues;
 		expect(loaded).toContainEqual({
 			severity: "error",
@@ -103,19 +107,23 @@ describe("checkDraft", () => {
 				},
 			],
 		});
-		const warnings = (draft: Flow, profiles?: KnownProfile[]) =>
-			checkDraft(draft, messages, profiles ? { profiles } : {}).issues.filter(
+		/** The warnings, with the Device "mac" that has the profile "night" in `mode`. */
+		const warnings = (
+			draft: Flow,
+			mode?: NonNullable<AgentNode["permissionMode"]>,
+		) => {
+			const devices: PlaceDevice[] = [
+				{ deviceId: "mac", profiles: [{ id: "night", permissionMode: mode }] },
+			];
+			return checkDraft(draft, messages, mode ? { devices } : {}).issues.filter(
 				(issue) => issue.severity === "warning",
 			);
+		};
 
 		test("its profile's mode counts once the profiles load", () => {
 			const draft = worker({});
 			expect(warnings(draft)).toEqual([]);
-			expect(
-				warnings(draft, [
-					{ device: "mac", profile: "night", permissionMode: "acceptEdits" },
-				]),
-			).toEqual([
+			expect(warnings(draft, "acceptEdits")).toEqual([
 				{
 					severity: "warning",
 					message: "worker refuses commands in acceptEdits",
@@ -125,16 +133,13 @@ describe("checkDraft", () => {
 		});
 
 		test("its own mode wins over the profile's", () => {
-			const profiles: KnownProfile[] = [
-				{ device: "mac", profile: "night", permissionMode: "acceptEdits" },
-			];
-			expect(warnings(worker({ permissionMode: "auto" }), profiles)).toEqual(
-				[],
-			);
 			expect(
-				warnings(worker({ permissionMode: "default" }), [
-					{ device: "mac", profile: "night", permissionMode: "auto" },
-				]).map((issue) => issue.message),
+				warnings(worker({ permissionMode: "auto" }), "acceptEdits"),
+			).toEqual([]);
+			expect(
+				warnings(worker({ permissionMode: "default" }), "auto").map(
+					(issue) => issue.message,
+				),
 			).toEqual(["worker refuses commands in default"]);
 		});
 
@@ -144,11 +149,7 @@ describe("checkDraft", () => {
 				"auto",
 				"bypassPermissions",
 			] as const) {
-				expect(
-					warnings(worker({}), [
-						{ device: "mac", profile: "night", permissionMode },
-					]),
-				).toEqual([]);
+				expect(warnings(worker({}), permissionMode)).toEqual([]);
 			}
 		});
 	});
@@ -156,8 +157,7 @@ describe("checkDraft", () => {
 	test("a profile on a Device whose profiles this computer cannot tell is not marked", () => {
 		const issues = checkDraft(flow, messages, {
 			connections: ["github"],
-			profiles: [],
-			untoldDevices: ["mac"],
+			devices: [{ deviceId: "mac" }],
 		}).issues.map((i) => i.message);
 		expect(issues).not.toContain("profile night");
 	});
@@ -176,7 +176,7 @@ describe("checkDraft", () => {
 			checkDraft(
 				{ ...flow, nodes: [{ ...decision, by }], start: "pick" },
 				messages,
-				{ profiles: [{ device: "mac", profile: "day" }] },
+				{ devices: [{ deviceId: "mac", profiles: [{ id: "day" }] }] },
 			).issues.map((i) => i.message);
 		expect(check("model")).toContain("profile small");
 		expect(check("person")).not.toContain("profile small");
@@ -231,10 +231,12 @@ describe("checkDraft", () => {
 				},
 			],
 		};
-		const marked = (devices?: string[]) =>
-			checkDraft(draft, messages, devices ? { devices } : {}).issues.filter(
-				(issue) => issue.message.includes(" on "),
-			);
+		const marked = (ids?: string[]) =>
+			checkDraft(
+				draft,
+				messages,
+				ids ? { devices: ids.map((deviceId) => ({ deviceId })) } : {},
+			).issues.filter((issue) => issue.message.includes(" on "));
 		expect(marked()).toEqual([]);
 		expect(marked(["studio"])).toEqual([
 			{ severity: "error", message: "call on old-mac", nodeId: "sync" },

@@ -401,11 +401,13 @@ describe("assistant.chat", () => {
 		expect(harness.calls[0]?.cwd).toBe("/data/assistant");
 	});
 
-	test("for a project without a folder, a proposed step that needs one comes with a warning", async () => {
+	test("a proposal is checked in the draft's place: the project's folder and the Space's Devices", async () => {
 		const publish = {
 			...withTests,
 			nodes: [
-				...withTests.nodes,
+				// A profile on a Device whose profiles this computer cannot tell.
+				{ ...flow.nodes[0], profile: { device: "studio", profile: "night" } },
+				withTests.nodes[1],
 				{
 					id: "publish",
 					type: "call",
@@ -416,39 +418,35 @@ describe("assistant.chat", () => {
 			],
 			edges: [
 				...withTests.edges,
-				{
-					id: "test-pass-publish",
-					from: "test",
-					outcome: "pass",
-					to: "publish",
-				},
+				{ id: "e2", from: "test", outcome: "pass", to: "publish" },
 			],
 		};
-		const proposed = async (withoutFolder: boolean) => {
-			const harness = fakeHarness({
-				steps: [
-					{
-						type: "tool",
-						name: "propose_flow",
-						input: { flow: publish, summary: "Publishes the notes." },
-					},
-				],
-			});
-			const events = await chat(
-				createAssistant(
-					deps({
-						clonePath: async () => (withoutFolder ? null : "/repo"),
-						withoutFolder: async () => withoutFolder,
-						ownFolder: async () => "/data/assistant",
-						harnessFor: () => harness,
-					}),
-				),
-			);
-			const proposal = events.find((e) => e.type === "proposal");
-			return proposal?.type === "proposal" ? proposal.proposal.issues : null;
-		};
-		expect(await proposed(false)).toEqual([]);
-		expect(await proposed(true)).toEqual([
+		const harness = fakeHarness({
+			steps: [
+				{
+					type: "tool",
+					name: "propose_flow",
+					input: { flow: publish, summary: "Publishes the notes." },
+				},
+			],
+		});
+		const base = deps();
+		const events = await chat(
+			createAssistant({
+				...base,
+				space: (scope) => ({
+					...base.space(scope),
+					listDevices: async () =>
+						[{ deviceId: "studio", name: "Studio" }] as never,
+				}),
+				clonePath: async () => null,
+				withoutFolder: async () => true,
+				ownFolder: async () => "/data/assistant",
+				harnessFor: () => harness,
+			}),
+		);
+		const proposal = events.find((e) => e.type === "proposal");
+		expect(proposal?.type === "proposal" && proposal.proposal.issues).toEqual([
 			{
 				severity: "warning",
 				message: expect.stringContaining("This project has no folder"),

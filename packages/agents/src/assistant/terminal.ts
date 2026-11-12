@@ -17,6 +17,7 @@
 import {
 	type Flow,
 	type FlowIssue,
+	type FlowPlace,
 	flowNameSchema,
 	flowSchema,
 	type JsonValue,
@@ -43,7 +44,6 @@ import {
 	field,
 	flowRows,
 	issueLines,
-	profileRefs,
 } from "./tools";
 
 /** What the terminal tools read and write: Night Shift on this computer. */
@@ -62,6 +62,8 @@ export type TerminalPort = TerminalRunPort &
 			connections: AuthoringToolInfo[];
 		}>;
 		skills(projectId: string): Promise<AuthoringSkill[]>;
+		/** The place the project's flow `name` is checked in, as the editor checks it. */
+		place(projectId: string, name?: string): Promise<FlowPlace>;
 		/** Saves the flow as a new revision. Returns its issues as saved. */
 		saveFlow(projectId: string, name: string, flow: Flow): Promise<FlowIssue[]>;
 		startRun(
@@ -106,8 +108,8 @@ const projectOnly: Record<string, unknown> = {
 };
 
 /**
- * Checks `flow` as the editor does, against the project as it is now: in
- * a project without a folder, a step that needs one warns.
+ * Checks `flow` as the editor does, in the project's place as it is now:
+ * its flows, Devices, connections, CLI tools and folder.
  */
 async function checkIn(
 	port: TerminalPort,
@@ -115,26 +117,16 @@ async function checkIn(
 	flow: unknown,
 	name: string | undefined,
 ): Promise<FlowIssue[]> {
-	const [flows, profiles, tools] = await Promise.all([
-		port.flows(project.id),
-		port.profiles(project.id),
-		port.tools(),
-	]);
-	// The saved flow of that name is the base: a profile or a connection it
-	// names already is no new error. A new flow has no base: no nodes.
+	const place = await port.place(project.id, name);
+	// The saved flow of that name is the base: a profile, a connection or a
+	// Device it names already is no new error. A new flow has no base: no
+	// nodes and no Devices.
 	const parsed = flowSchema.safeParse(flow);
 	const base =
-		(name ? flows[name] : null) ??
-		(parsed.success ? { ...parsed.data, nodes: [] } : null);
+		(name ? place.flows?.[name] : null) ??
+		(parsed.success ? { ...parsed.data, nodes: [], devices: [] } : null);
 	// Without a base the flow does not parse, and the check stops before it reads one.
-	return proposalIssues(base ?? (flow as Flow), flow, {
-		flows,
-		name,
-		profiles: profileRefs(profiles),
-		connections: tools.connections.map((c) => c.name),
-		cliTools: tools.clis,
-		folder: project.folder !== false,
-	});
+	return proposalIssues(base ?? (flow as Flow), flow, place);
 }
 
 function inputsOf(value: unknown): Record<string, JsonValue> {

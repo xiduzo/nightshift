@@ -98,7 +98,7 @@ describe("proposalIssues", () => {
 		build.connections = ["github", "made_up"];
 		const issues = errors(
 			proposalIssues(draft, proposal, {
-				profiles: [{ device: "mac", profile: "reviewer" }],
+				devices: [{ deviceId: "mac", profiles: [{ id: "reviewer" }] }],
 				connections: ["github"],
 			}),
 		);
@@ -114,17 +114,22 @@ describe("proposalIssues", () => {
 		]);
 	});
 
-	test("a profile or connection the draft already names is left to the editor", () => {
-		const proposal = structuredClone(valid);
+	test("a profile, connection or Device the draft already names is left to the editor", () => {
+		const base: Flow = { ...draft, devices: ["old-mac"] };
+		const proposal = { ...structuredClone(valid), devices: ["old-mac"] };
 		const build = proposal.nodes[0];
 		if (build?.type !== "agent") throw new Error("agent");
 		build.profile = { device: "mac", profile: "old" };
 		build.connections = ["jira"];
+		const place = { devices: [], connections: [] };
+		expect(errors(proposalIssues(base, proposal, place))).toEqual([]);
+		// A Device the draft does not name is the agent's to fix.
+		const moved = { ...proposal, devices: ["new-mac"] };
 		expect(
-			errors(
-				proposalIssues(draft, proposal, { profiles: [], connections: [] }),
-			),
-		).toEqual([]);
+			errors(proposalIssues(base, moved, place)).map((i) => i.message),
+		).toEqual([
+			"The flow's list of devices names a device that is not in this Space. Use a device id from list_profiles.",
+		]);
 	});
 
 	test("a Call node checks the flows of the project", () => {

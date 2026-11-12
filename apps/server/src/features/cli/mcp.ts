@@ -201,6 +201,32 @@ export function apiPort(
 						Number(a.source !== "project") - Number(b.source !== "project"),
 				);
 			}),
+		// The place a flow is checked in, from the sources the editor reads.
+		place: (projectId, name) =>
+			g(async () => {
+				const [flows, devices, clis, connections, projects] = await Promise.all(
+					[
+						client.flows.map({ projectId }),
+						client.runs.devices({ projectId }),
+						client.cliTools.list(),
+						client.connections.list(),
+						client.projects.list(),
+					],
+				);
+				return {
+					flows,
+					name,
+					devices,
+					connections: connections.connections.map((c) => c.name),
+					cliTools: clis.map((t) => ({
+						name: t.name,
+						program: t.program,
+						signsIn: t.login !== null,
+					})),
+					// An older Host sends no `folder`: its projects have one.
+					folder: projects.find((p) => p.id === projectId)?.folder !== false,
+				};
+			}),
 		saveFlow: (projectId, name, flow) =>
 			g(() => client.flows.save({ projectId, name, flow })),
 		startRun: (projectId, flowName, inputs) =>

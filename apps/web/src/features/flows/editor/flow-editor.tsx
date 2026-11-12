@@ -225,9 +225,7 @@ function Editor({
 		nodeDefaults,
 		policyDefaults,
 		connections,
-		connectionNames,
-		profileRefs,
-		cliTools,
+		place,
 		deviceNames,
 		folder,
 	} = useEditorData(projectId, name);
@@ -242,27 +240,7 @@ function Editor({
 		flow: draft,
 		runId: testRunId ?? undefined,
 	});
-	const check = useMemo(
-		() =>
-			checkFlow(
-				draft,
-				projectFlows.flows,
-				name,
-				connectionNames,
-				profileRefs,
-				cliTools,
-				folder,
-			),
-		[
-			draft,
-			projectFlows.flows,
-			name,
-			connectionNames,
-			profileRefs,
-			cliTools,
-			folder,
-		],
-	);
+	const check = useMemo(() => checkFlow(draft, place), [draft, place]);
 	const [starting, setStarting] = useState(false);
 	const savable = useMemo(() => isSavable(draft), [draft]);
 	// The flow's settings show in the inspector while nothing is selected.
@@ -624,26 +602,8 @@ function Editor({
 	});
 
 	const previewCheck = useMemo(
-		() =>
-			preview &&
-			checkFlow(
-				preview.proposed,
-				projectFlows.flows,
-				name,
-				connectionNames,
-				profileRefs,
-				cliTools,
-				folder,
-			),
-		[
-			preview,
-			projectFlows.flows,
-			name,
-			connectionNames,
-			profileRefs,
-			cliTools,
-			folder,
-		],
+		() => preview && checkFlow(preview.proposed, place),
+		[preview, place],
 	);
 
 	const inspector = selectedNode ? (

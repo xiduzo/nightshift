@@ -13,6 +13,7 @@ import {
 	diffFlows,
 	type Flow,
 	type FlowIssue,
+	type FlowPlace,
 	type FlowProposal,
 	flowDiffSummary,
 	flowSchema,
@@ -44,13 +45,6 @@ export type AuthoringProfile = {
 	model?: string;
 	decider?: string;
 };
-
-/** The pairs a node may name, for the flow check. */
-export function profileRefs(
-	profiles: readonly AuthoringProfile[],
-): { device: string; profile: string }[] {
-	return profiles.map(({ device, profile }) => ({ device, profile }));
-}
 
 /** A CLI tool or a connection, by name. */
 export type AuthoringToolInfo = { name: string; description: string | null };
@@ -129,11 +123,8 @@ export type AuthoringPort = {
 	}>;
 	/** The skills an Agent node may run. */
 	skills(): Promise<AuthoringSkill[]>;
-	/**
-	 * Whether the project has a folder (ADR 22). False: a step that needs
-	 * one gets a warning. Unset: the project has one.
-	 */
-	folder?: () => Promise<boolean>;
+	/** The place the draft is checked in, as the editor checks it: what its project offers it. */
+	place(): Promise<FlowPlace>;
 	/** The run the chat is about. Unset: no `get_run` tool. Null: no such run of this flow. */
 	run?: () => Promise<AuthoringRun | null>;
 	/** Shows a checked proposal to the person. */
@@ -221,24 +212,10 @@ export function flowRows(flows: ProjectFlowMap, skip?: string) {
 		);
 }
 
-/** The issues of a flow the agent wrote, checked as the editor checks it. */
+/** The issues of a flow the agent wrote, checked in the draft's place as the editor checks it. */
 async function check(port: AuthoringPort, flow: unknown) {
-	const [draft, flows, profiles, tools, folder] = await Promise.all([
-		port.draft(),
-		port.flows(),
-		port.profiles(),
-		port.tools(),
-		port.folder?.(),
-	]);
-	const issues = proposalIssues(draft.flow, flow, {
-		flows,
-		name: draft.name,
-		profiles: profileRefs(profiles),
-		connections: tools.connections.map((c) => c.name),
-		cliTools: tools.clis,
-		folder,
-	});
-	return { draft, issues };
+	const [draft, place] = await Promise.all([port.draft(), port.place()]);
+	return { draft, issues: proposalIssues(draft.flow, flow, place) };
 }
 
 /**

@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import type { NodeSample } from "@nightshift/client";
-import { FLOW_VERSION, type Flow, flowSchema } from "@nightshift/flows";
+import {
+	FLOW_VERSION,
+	type Flow,
+	type FlowIssue,
+	type FlowPlace,
+	flowSchema,
+	proposalIssues,
+} from "@nightshift/flows";
 
 import {
 	checkFlow,
@@ -189,8 +196,8 @@ describe("checkFlow: a project without a folder", () => {
 		],
 		edges: [],
 	});
-	const warnings = (folder?: boolean) =>
-		checkFlow(draft, {}, "ship", undefined, undefined, undefined, folder)
+	const warnings = (folder: boolean) =>
+		checkFlow(draft, { flows: {}, name: "ship", folder })
 			.issues.filter((issue) => issue.severity === "warning")
 			.filter((issue) => issue.message.includes("folder"));
 
@@ -210,10 +217,106 @@ describe("checkFlow: a project without a folder", () => {
 			},
 		]);
 	});
+});
 
-	test("a project with a folder, or one that is still loading, gets no warning", () => {
-		expect(warnings(true)).toEqual([]);
-		expect(warnings()).toEqual([]);
+describe("checkFlow and an agent's check: one place, the same issues", () => {
+	const place: FlowPlace = {
+		flows: { notes: null },
+		name: "ship",
+		devices: [
+			{
+				deviceId: "mac",
+				profiles: [
+					{ id: "night", permissionMode: "acceptEdits" },
+					{ id: "day", permissionMode: "auto" },
+				],
+			},
+			// A Device whose profiles this computer cannot tell.
+			{ deviceId: "studio" },
+		],
+		connections: ["github"],
+		cliTools: [{ name: "acli-work", program: "acli", signsIn: true }],
+		folder: false,
+	};
+	/** A flow of one node, with the flow's own fields on top. */
+	const flowOf = (node: object, fields: object = {}): Flow =>
+		flowSchema.parse({
+			version: FLOW_VERSION,
+			start: "only",
+			nodes: [{ id: "only", position: { x: 0, y: 0 }, ...node }],
+			edges: [],
+			...fields,
+		});
+	const agent = (fields: object) => ({
+		type: "agent",
+		prompt: "Work.",
+		profile: { device: "mac", profile: "day" },
+		...fields,
+	});
+	const command = (fields: object) => ({ type: "command", ...fields });
+	const rows: [string, Flow, [FlowIssue["severity"], string | null][]][] = [
+		["a flow that fits its place", flowOf(agent({})), []],
+		[
+			"a node on a Device that is not in the Space",
+			flowOf(command({ command: "make", device: "old-mac" })),
+			[["error", "only"]],
+		],
+		[
+			'a "Runs on" Device that is not in the Space',
+			flowOf(agent({}), { devices: ["old-mac"] }),
+			[["error", null]],
+		],
+		[
+			"a profile no Device has",
+			flowOf(agent({ profile: { device: "mac", profile: "ghost" } })),
+			[["error", "only"]],
+		],
+		[
+			"a profile on a Device that does not tell its profiles",
+			flowOf(agent({ profile: { device: "studio", profile: "any" } })),
+			[],
+		],
+		[
+			"a profile in a mode that refuses commands",
+			flowOf(agent({ profile: { device: "mac", profile: "night" } })),
+			[["warning", "only"]],
+		],
+		[
+			"a connection this computer does not have",
+			flowOf(agent({ connections: ["linear"] })),
+			[["error", "only"]],
+		],
+		[
+			"a program called without its login",
+			flowOf(command({ command: "acli jira workitem search" })),
+			[["warning", "only"]],
+		],
+		[
+			"git in a project without a folder",
+			flowOf(command({ command: "git push" })),
+			[["warning", "only"]],
+		],
+		[
+			"a Call to a flow the project does not have",
+			flowOf({ type: "call", flow: "gone", inputs: {} }),
+			[["error", "only"]],
+		],
+	];
+	const where = (issues: readonly FlowIssue[]) =>
+		issues
+			.map((issue): [FlowIssue["severity"], string | null] => [
+				issue.severity,
+				issue.nodeId ?? issue.edgeId ?? null,
+			])
+			.sort();
+
+	test.each(rows)("%s", (_row, flow, expected) => {
+		const editor = where(checkFlow(flow, place).issues);
+		// A new flow: the agent names everything itself.
+		const base: Flow = { ...flow, nodes: [], devices: [] };
+		const agent = where(proposalIssues(base, flow, place));
+		expect(editor).toEqual(expected);
+		expect(agent).toEqual(editor);
 	});
 });
 

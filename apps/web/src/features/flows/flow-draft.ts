@@ -6,15 +6,14 @@
 import type { NodeSample } from "@nightshift/client";
 import {
 	BRANCH_RUN_FIELDS,
-	type CliToolRef,
 	checkDraft,
 	type DraftMessages,
 	type Flow,
 	type FlowCheck,
 	type FlowNode,
+	type FlowPlace,
 	type FolderNeed,
 	isOptionNode,
-	type KnownProfile,
 	type ListSource,
 	lookupRef,
 	nodeOptions,
@@ -416,43 +415,12 @@ export function completeTemplate(
 }
 
 /**
- * Checks the draft with `checkDraft`, in the editor's words. `flows` holds
- * the project's flow files by name, so Call nodes can check the flows they
- * call; leave it out while they load. `name` is the draft's own file name.
- * `connections` holds the names of the daemon's connections, and
- * `profiles` the profiles a node may name, each on its device, with the
- * devices whose profiles this computer cannot tell, and `cliTools` the CLI
- * tools; leave them out while they load. `folder`: whether the project
- * has a folder. False warns at each step that needs one.
+ * Checks the draft in its place (`checkDraft`), in the editor's words.
+ * The place is what the project offers the flow, as the editor reads it:
+ * leave a fact out while it loads.
  */
-export function checkFlow(
-	flow: Flow,
-	flows?: ProjectFlowMap,
-	name?: string,
-	connections?: readonly string[],
-	profiles?: {
-		known: readonly KnownProfile[];
-		untoldDevices: readonly string[];
-		/** The ids of the devices a run may use: a node that names another does not start. */
-		deviceIds: readonly string[];
-	},
-	cliTools?: readonly CliToolRef[],
-	folder?: boolean,
-): FlowCheck {
-	return checkDraft(flow, MESSAGES, {
-		flows,
-		name,
-		connections,
-		cliTools,
-		folder,
-		...(profiles
-			? {
-					profiles: profiles.known,
-					untoldDevices: profiles.untoldDevices,
-					devices: profiles.deviceIds,
-				}
-			: {}),
-	});
+export function checkFlow(flow: Flow, place: FlowPlace): FlowCheck {
+	return checkDraft(flow, MESSAGES, place);
 }
 
 /** A bad label, choice or outcome name: `labels.1.name` reads as `Label "Yes": …`. */

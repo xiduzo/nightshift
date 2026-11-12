@@ -3,6 +3,7 @@ import {
 	type ChatRequest,
 	FLOW_VERSION,
 	type Flow,
+	type FlowPlace,
 	type FlowProposal,
 	flowSchema,
 } from "@nightshift/flows";
@@ -88,6 +89,13 @@ function port(over: Partial<AuthoringPort> = {}): AuthoringPort & {
 		skills: async () => [
 			{ name: "tdd", description: "Test first", source: "project" },
 		],
+		place: async () => ({
+			flows: { fix: draft, release: draft, old: null },
+			name: "fix",
+			devices: [{ deviceId: "mac", profiles: [{ id: "worker" }] }],
+			connections: ["linear"],
+			cliTools: [{ name: "gh", program: null, signsIn: false }],
+		}),
 		propose: (proposal) => {
 			proposed.push(proposal);
 		},
@@ -196,20 +204,45 @@ describe("authoringTools", () => {
 		);
 	});
 
-	test("check_flow: in a project without a folder, a step that runs git warns", async () => {
-		const git = {
+	test("check_flow checks in the port's place: its folder, its Devices and their profiles' modes", async () => {
+		const flow = {
 			...withTests,
-			nodes: [draft.nodes[0], { ...withTests.nodes[1], command: "git push" }],
+			nodes: [
+				draft.nodes[0],
+				{ ...withTests.nodes[1], command: "git push", device: "old-mac" },
+			],
 		};
-		const warns = async (over: Partial<AuthoringPort>) =>
-			(await call(authoringTools(port(over)), "check_flow", { flow: git }))
+		const lines = async (place: Partial<FlowPlace>) =>
+			(
+				await call(
+					authoringTools(port({ place: async () => place })),
+					"check_flow",
+					{ flow },
+				)
+			)
 				.split("\n")
-				.filter((line) => line.startsWith("- warning:"));
-		expect(await warns({})).toEqual([]);
-		expect(await warns({ folder: async () => true })).toEqual([]);
-		expect(await warns({ folder: async () => false })).toEqual([
+				.filter((line) => line.startsWith("- "));
+		// While the place loads, nothing it holds is checked.
+		expect(await lines({})).toEqual([]);
+		expect(
+			await lines({
+				devices: [
+					{
+						deviceId: "mac",
+						profiles: [{ id: "worker", permissionMode: "acceptEdits" }],
+					},
+				],
+				folder: false,
+			}),
+		).toEqual([
 			expect.stringContaining(
-				'The command of the node "test" runs git in that empty folder',
+				'- warning: The Agent node "build" runs in acceptEdits',
+			),
+			expect.stringContaining(
+				'- error: There is no device with the id "old-mac"',
+			),
+			expect.stringContaining(
+				'- warning: This project has no folder: each run starts in an empty folder of its own, without git history or branches. The command of the node "test" runs git in that empty folder',
 			),
 		]);
 	});

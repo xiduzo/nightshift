@@ -1,9 +1,9 @@
 /**
  * The authoring tools' port for a chat in the editor: the draft from the
  * request, the project's flows and runs as the Person sees them in the
- * Space, the profiles each Device of the Space offers a node, and this
- * computer's CLI tools, connections and skills. Names and descriptions
- * only: never a secret.
+ * Space, the profiles each Device of the Space offers a node, this
+ * computer's CLI tools, connections and skills, and the place the draft
+ * is checked in. Names and descriptions only: never a secret.
  */
 import type {
 	AuthoringPort,
@@ -17,13 +17,10 @@ import {
 	type SpaceFlows,
 	type TranscriptEntry,
 } from "@nightshift/engine";
-import type {
-	CliToolStore,
-	ConnectionStore,
-	ProfileStore,
-} from "@nightshift/engine/device-config";
+import type { ProfileStore } from "@nightshift/engine/device-config";
 import { isTestRun } from "@nightshift/engine/run-status";
 import { type ChatRequest, isAgentProfile } from "@nightshift/flows";
+import { flowPlace, type PlaceDeps } from "./place";
 
 /** What the port reads in the Space. */
 type ChatSpace = Pick<SpaceEngine, "getRun" | "stepTranscript"> & {
@@ -33,11 +30,9 @@ type ChatSpace = Pick<SpaceEngine, "getRun" | "stepTranscript"> & {
 /** The chat's Space, and its Devices with the profiles a node may name. */
 export type AuthoringSpace = ChatSpace & Pick<SpaceEngine, "listDevices">;
 
-export type AuthoringPortDeps = {
+export type AuthoringPortDeps = PlaceDeps & {
 	space: AuthoringSpace;
 	profiles: Pick<ProfileStore, "list">;
-	cliTools: Pick<CliToolStore, "list">;
-	connections: Pick<ConnectionStore, "list">;
 	/** The skills the chat's harness can run in the project. */
 	skills: () => Promise<
 		{
@@ -46,8 +41,6 @@ export type AuthoringPortDeps = {
 			source: "project" | "computer";
 		}[]
 	>;
-	/** Whether the project has no folder (ADR 22). Without it: every project has one. */
-	withoutFolder?: (projectId: string) => Promise<boolean>;
 };
 
 /** The port of one message: `get_run` only when the request names a run. */
@@ -57,13 +50,9 @@ export function authoringPort(
 	signal: AbortSignal,
 ): Omit<AuthoringPort, "propose"> {
 	const { runId } = request;
-	const { withoutFolder } = deps;
 	return {
 		draft: async () => ({ name: request.flowName, flow: request.flow }),
-		// A step that needs the project's folder warns in a project without one.
-		...(withoutFolder
-			? { folder: async () => !(await withoutFolder(request.projectId)) }
-			: {}),
+		place: () => flowPlace(deps, request.projectId, request.flowName),
 		flows: () => deps.space.flows.map(request.projectId),
 		// Each Device's, with the settings of this computer's own.
 		profiles: async () => {

@@ -52,4 +52,4 @@ export {
 	type NodeMove,
 } from "./diff";
 export { flowAuthoringGuide } from "./guide";
-export { type ProposalCheckOptions, proposalIssues } from "./proposal";
+export { proposalIssues } from "./proposal";
