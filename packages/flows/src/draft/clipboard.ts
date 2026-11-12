@@ -1,9 +1,10 @@
 /** Copy and paste of nodes: within one flow, or from one flow into another. */
 import type { Flow, FlowEdge, FlowNode, FlowSection } from "../flow";
 import { nodesWithin } from "../sections";
+import { rewriteRuleNames } from "../template";
 import { uniqueEdgeId, uniqueNodeId } from "./names";
 import type { Position } from "./nodes";
-import { rewriteRefs, rewriteTemplates } from "./refs";
+import { rewriteNodeTexts, rewriteRefs } from "./refs";
 import { uniqueSectionId } from "./sections";
 
 /**
@@ -52,8 +53,9 @@ function copiedSections(
 /**
  * Adds the clip's nodes to the flow, moved by `offset`. A name the flow
  * already uses gets a free one (`review` → `review_2`), and the edges,
- * Sections and templates of the pasted nodes follow it. The first node of
- * an empty flow becomes its start. Returns the ids of the pasted nodes.
+ * Sections, templates and rules of the pasted nodes follow it. The first
+ * node of an empty flow becomes its start. Returns the ids of the pasted
+ * nodes.
  */
 export function pasteNodes(
 	flow: Flow,
@@ -82,7 +84,8 @@ export function pasteNodes(
 		};
 	}
 	const pasted = new Set(names.values());
-	// The pasted nodes read each other under their new names.
+	// The pasted nodes read each other under their new names, in their
+	// templates and in their rules. A rule's own names (`previous`) stay.
 	const renamed = (text: string) =>
 		rewriteRefs(text, (ref) => {
 			const to = names.get(ref.name);
@@ -93,7 +96,15 @@ export function pasteNodes(
 	next = {
 		...next,
 		nodes: next.nodes.map((node) =>
-			pasted.has(node.id) ? rewriteTemplates(node, renamed) : node,
+			pasted.has(node.id)
+				? rewriteNodeTexts(node, (text, field) =>
+						field.rule
+							? rewriteRuleNames(text, (name) =>
+									field.also.includes(name) ? undefined : names.get(name),
+								)
+							: renamed(text),
+					)
+				: node,
 		),
 	};
 	for (const edge of clip.edges) {

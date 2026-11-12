@@ -55,6 +55,37 @@ describe("pasteNodes", () => {
 		});
 	});
 
+	test("the pasted nodes read each other under their new names in their rules", () => {
+		const decide = {
+			id: "go",
+			type: "decision",
+			position: { x: 0, y: 0 },
+			prompt: "",
+			by: "rule",
+			options: [
+				{ name: "yes", when: 'a.exit_code = 0 and b.stdout = "a"' },
+				{ name: "no" },
+			],
+			set: [{ variable: "n", expression: "go.outcome = 'yes' and a.stdout" }],
+		};
+		const flow: Flow = flowSchema.parse({
+			...chain,
+			nodes: [...chain.nodes, decide],
+		});
+		const clip = copyNodes(flow, ["a", "go"]);
+		if (!clip) throw new Error("expected a clip");
+		expect(pasteNodes(flow, clip).flow.nodes.at(-1)).toMatchObject({
+			id: "go_2",
+			options: [
+				{ name: "yes", when: 'a_2.exit_code = 0 and b.stdout = "a"' },
+				{ name: "no" },
+			],
+			set: [
+				{ variable: "n", expression: "go_2.outcome = 'yes' and a_2.stdout" },
+			],
+		});
+	});
+
 	test("keeps references to nodes that were not pasted", () => {
 		const clip = copyNodes(chain, ["b"]);
 		if (!clip) throw new Error("expected a clip");
