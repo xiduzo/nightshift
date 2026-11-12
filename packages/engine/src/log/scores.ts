@@ -20,10 +20,11 @@ import type { EnginePayloads, ScoreName } from "./events";
  *   the morning check of `gh pr view`. On the run, not on a step.
  *   `pr_merged`'s label is the merge commit's sha, a revert's the commit or
  *   the pull request that reverted it.
- * - Any other name: a Command step wrote it in its data, as
- *   `{"scores": {"replicated": 1}}` (`flowScores`). On that step, after its
- *   `StepEnded`, with no label. The flow chooses the name and what the
- *   value means. A name is letters, digits, `_` and `-`, at most 64
+ * - Any other name: a Command, an Agent or a Value step wrote it in its
+ *   data, as `{"scores": {"replicated": 1}}` (`flowScores`): a flow metric
+ *   (Q32). On that step, after its `StepEnded`, with no label. A try of a
+ *   cascade that climbs on scores nothing. The flow chooses the name and
+ *   what the value means. A name is letters, digits, `_` and `-`, at most 64
  *   characters, and not one of the names above. The value is a number of
  *   0 or more: the export adds scores up as a counter.
  *
@@ -87,11 +88,11 @@ const OWN_SCORES: ReadonlySet<string> = new Set<ScoreName>([
 /** The name of a score a flow writes: letters, digits, `_` and `-`. */
 const FLOW_SCORE_NAME = /^[A-Za-z0-9_-]{1,64}$/;
 
-/** A score a Command step wrote, to log as `Scored` on its step. */
+/** A score a step wrote in its data, to log as `Scored` on its step. */
 export type FlowScore = { score: string; value: number };
 
 /**
- * The scores in a Command step's data: its `scores` object, name to
+ * The scores in a step's data: its `scores` object, name to
  * number. An entry Night Shift cannot keep is left out, with a sentence
  * for the step's warning: a name Night Shift writes itself, a name that is
  * not letters, digits, `_` and `-` (at most 64), or a value that is not a

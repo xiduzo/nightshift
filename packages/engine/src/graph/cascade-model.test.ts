@@ -116,6 +116,11 @@ describe("a Decision climbs its cascade", () => {
 			[1, "fail"],
 			[2, "feature"],
 		]);
+		// Each try names its rung: the tier, and that no try follows the last.
+		expect(steps.map((step) => step.rung)).toEqual([
+			{ by: "model", tier: 0 },
+			{ by: "model", tier: 1, last: true },
+		]);
 		expect(steps[0]?.outputs).toMatchObject({
 			pick: "bug",
 			confidence: 0.55,
@@ -227,6 +232,11 @@ describe("a Decision climbs its cascade", () => {
 			(step) => step.nodeId === "triage",
 		);
 		expect(steps.map((step) => step.outcome)).toEqual(["fail", "fail", "bug"]);
+		expect(steps.map((step) => step.rung)).toEqual([
+			{ by: "model", tier: 0 },
+			{ by: "model", tier: 1 },
+			{ by: "person", tier: 2, last: true },
+		]);
 	});
 
 	test("every try counts toward the step cap, and a resume climbs on where it stopped", async () => {

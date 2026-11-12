@@ -31,6 +31,7 @@ import {
 	type Scope,
 	type StepOutcome,
 	type StepOutputs,
+	type StepRung,
 	type StoppedBy,
 	scopeKey,
 	type WaitReason,
@@ -186,6 +187,11 @@ export type DerivedStep = {
 	deviceId: string | null;
 	/** Another Device took this step over while the run walked (ADR 17). */
 	moved?: true;
+	/**
+	 * Where the step stands on its node's ladder, as its `StepStarted` says.
+	 * Absent for a step on no ladder, and for a step of an older Walker.
+	 */
+	rung?: StepRung;
 	/** Its latest `StepStarted`. */
 	startedAt: number;
 	startSeq: number;
@@ -1304,6 +1310,7 @@ function startStep(
 ): void {
 	const known = run.steps.get(stepId);
 	const scope = e.payload.scope ?? null;
+	const rung = e.payload.rung ?? known?.rung;
 	const opening: StepOpening = {
 		kind: "start",
 		seq: e.seq,
@@ -1326,6 +1333,7 @@ function startStep(
 			transcriptPath: e.payload.transcriptPath,
 			logPath: e.payload.logPath,
 			deviceId: e.payload.deviceId ?? null,
+			...(rung ? { rung } : {}),
 			startedAt: e.at,
 			startSeq: e.seq,
 			openedSeq: e.seq,

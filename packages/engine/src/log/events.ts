@@ -370,6 +370,13 @@ export type EnginePayloads = {
 		scope?: Scope | null;
 		/** The Device the step runs on. Absent before Devices: this computer. */
 		deviceId?: string;
+		/**
+		 * Where the step stands on its node's ladder (Q31): who works or
+		 * decides, and which tier of the cascade it tries. Absent for a step
+		 * on no ladder, and in logs from older Walkers (`read/ladder.ts`
+		 * reads those from the step's outputs).
+		 */
+		rung?: StepRung;
 	} & StepBudget;
 	/**
 	 * An ended step runs again: an Agent step in a new session of the same
@@ -801,6 +808,26 @@ export type StepBudget = {
 
 export type EngineEventType = keyof EnginePayloads;
 
+/**
+ * Who works or decides on a step of a ladder: a `rule`, a decider
+ * (`model`), an `agent`, a called flow (`flow`) or a `person` (a Gate, an
+ * Ask, a cascade's person tier).
+ */
+export type RungBy = "rule" | "model" | "agent" | "flow" | "person";
+
+/**
+ * Where a step stands on its node's ladder (`StepStarted.rung`). The work
+ * ladder holds Agent, Subflow and Value steps, the choice ladder Decision
+ * steps. A Value by rule is on no ladder.
+ */
+export type StepRung = {
+	by: RungBy;
+	/** The index of its tier in the node's cascade. Absent: the node has no cascade. */
+	tier?: number;
+	/** No try follows when this one does not hold: the climb ends here. */
+	last?: true;
+};
+
 /** Where an agent used the knowledge: the tools of an Agent step, or the nightshift MCP server. */
 export type KnowledgeVia = "step" | "mcp";
 
@@ -812,12 +839,12 @@ export type KnowledgeVia = "step" | "mcp";
  * same tool call with the same input three times in a row). `base-ref`:
  * the run does not start from the newest commit of its base branch (the
  * fetch failed, or the branch went apart from the remote's). `score`: a
- * Command step wrote a score Night Shift left out (`scores.ts`). `shape`:
- * a step's data does not match the output schema Night Shift inferred
- * from an earlier run (`outputVerdict`): no person confirmed it, so the
- * step goes on. `report`: an End step's report was longer than the cap,
- * so Night Shift kept only its start (ADR 26). A reader treats the kinds
- * as an open list: a later build may add one.
+ * Command, Agent or Value step wrote a score Night Shift left out
+ * (`scores.ts`). `shape`: a step's data does not match the output schema
+ * Night Shift inferred from an earlier run (`outputVerdict`): no person
+ * confirmed it, so the step goes on. `report`: an End step's report was
+ * longer than the cap, so Night Shift kept only its start (ADR 26). A
+ * reader treats the kinds as an open list: a later build may add one.
  */
 export type RunWarningKind =
 	| "cost-unknown"

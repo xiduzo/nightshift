@@ -32,6 +32,7 @@ export type {
 	ResumeAction,
 	ResumedBy,
 	RunEnding,
+	RungBy,
 	RunTrigger,
 	RunWarningKind,
 	Scope,
@@ -41,6 +42,7 @@ export type {
 	StepBudget,
 	StepOutcome,
 	StepOutputs,
+	StepRung,
 	StoppedBy,
 	WaitReason,
 } from "./events";

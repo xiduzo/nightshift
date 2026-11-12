@@ -8,7 +8,7 @@ import {
 } from "@nightshift/flows";
 
 import { runCommand } from "../../device";
-import { flowScores, type StepOutputs } from "../../log";
+import type { StepOutputs } from "../../log";
 import {
 	endedAtReason,
 	type NodeAction,
@@ -46,12 +46,11 @@ import { type BodyResult, runStep, type StepHandle } from "../step-runner";
  * ends the step on the catch-all. An empty file leaves the older way:
  * with `stdout: "json"` and exit 0, what the command printed on stdout is
  * the JSON, and output that is not JSON ends on the catch-all too. Data
- * with `scores` (`{"scores": {"replicated": 1}}`) scores the run: one
- * `Scored` per name on the step, after it ends (`flowScores`). An entry
- * Night Shift cannot keep is a warning (`score`), not a failed step. Data
- * that does not match the node's `output` schema errors the step when a
- * person wrote or confirmed the schema, and warns (`shape`) when Night
- * Shift inferred it (`outputVerdict`).
+ * with `scores` (`{"scores": {"replicated": 1}}`) scores the run: the
+ * step runner logs them after the step ends, as for an Agent and a Value
+ * (`flowScores`). Data that does not match the node's `output` schema
+ * errors the step when a person wrote or confirmed the schema, and warns
+ * (`shape`) when Night Shift inferred it (`outputVerdict`).
  *
  * Every visit is new (`RESUME_RULES.fresh`): a parked or interrupted
  * Command step has nothing to continue, so a resume starts the next visit.
@@ -181,13 +180,7 @@ async function runShell(
 		}
 		if (verdict.kind === "warning") await step.warn("shape", verdict.message);
 	}
-	// The data's `scores`: logged after the step ends. One the step cannot
-	// keep is a warning, never a failed step.
-	const { scores, refused } = flowScores(outputs.data);
-	for (const message of refused) await step.warn("score", message);
+	// The data's `scores` land after the step ends (the step runner).
 	const chosen = dataExitFor(node, outputs.data);
-	const ended = chosen ? end(chosen.name, outputs, null) : endOn(code, null);
-	return ended.kind === "end" && scores.length > 0
-		? { ...ended, scores }
-		: ended;
+	return chosen ? end(chosen.name, outputs, null) : endOn(code, null);
 }

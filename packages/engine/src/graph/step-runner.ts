@@ -13,6 +13,7 @@ import {
 	type DerivedStep,
 	type EnginePayloads,
 	type FlowScore,
+	flowScores,
 	type GateChoice,
 	type Hold,
 	type RunState,
@@ -30,6 +31,7 @@ import { deriveBudgetSpend, deriveWorktrees, pullRequestOf } from "../read";
 import { keptNames } from "../variables";
 import { OUTRUN_ERROR, outrun, placeOf } from "./branches";
 import { budgetPassed, runBudget } from "./budget";
+import { stepRung } from "./cascade";
 import {
 	emit,
 	keptFlowOf,
@@ -260,11 +262,6 @@ export type BodyEnd = {
 	/** Agent steps: the harness session the step has, for a reopen. */
 	harnessSessionId?: string | null;
 	/**
-	 * Scores the step wrote (a Command's data): one `Scored` each on the
-	 * step, after its `StepEnded`, as a Gate's answer is scored.
-	 */
-	scores?: readonly FlowScore[];
-	/**
 	 * What a Since last run step saw new or changed: `StepEnded.memory`,
 	 * saved in its batch. Left out when the step ends `error` instead.
 	 */
@@ -430,7 +427,11 @@ export async function runStep(
 			? { harnessSessionId: r.harnessSessionId }
 			: {}),
 	});
-	/** Ends the step, then climbs (a try that did not hold, with a try left) or routes. */
+	/**
+	 * Ends the step, then climbs (a try that did not hold, with a try left)
+	 * or routes. A step that does not climb scores what its data says
+	 * (`dataScores`). A climbing try scores nothing: only the try that lands.
+	 */
 	const endAndGo = async (
 		outcome: StepOutcome,
 		outputs: StepOutputs,
@@ -439,9 +440,9 @@ export async function runStep(
 			guard?: StepGuard;
 			memory?: StepMemory;
 		},
-		scores: readonly FlowScore[] = [],
 	): Promise<Command> => {
 		const climbing = spec.climb?.climbs({ outcome, outputs, error }) ?? false;
+		const scores = climbing ? [] : await dataScores(step, node, outputs);
 		const end = await step.end(outcome, outputs, error, {
 			...costs,
 			...(climbing ? { skipWrites: true } : {}),
@@ -468,7 +469,6 @@ export async function runStep(
 					...extraOf(result),
 					...(result.memory ? { memory: result.memory } : {}),
 				},
-				result.scores,
 			);
 		case "aborted": {
 			const aborted = abortEnd(ctx, node, step.signal, result.outputs);
@@ -527,6 +527,30 @@ export async function runStep(
 			return endAndGo("error", await blank("error"), slept.error, costs);
 		}
 	}
+}
+
+/** The node types whose data may hold `scores`: the flow's own metrics (Q32). */
+const SCORED_TYPES: ReadonlySet<FlowNode["type"]> = new Set([
+	"command",
+	"agent",
+	"value",
+]);
+
+/**
+ * The scores in the data of a Command, an Agent or a Value step
+ * (`flowScores`), as `{"scores": {"found": 12}}`: one `Scored` each on the
+ * step, after its `StepEnded`. One the step cannot keep is a warning
+ * (`score`), never a failed step. The data of any other node is never read.
+ */
+async function dataScores(
+	step: StepHandle,
+	node: FlowNode,
+	outputs: StepOutputs,
+): Promise<FlowScore[]> {
+	if (!SCORED_TYPES.has(node.type)) return [];
+	const { scores, refused } = flowScores(outputs.data);
+	for (const message of refused) await step.warn("score", message);
+	return scores;
 }
 
 /**
@@ -736,6 +760,11 @@ export async function beginStep(
 		const logPath = ctx.kindOf(node).logsCommandOutput(node)
 			? ctx.log.files(runId).commandLog(stepId)
 			: null;
+		// Its rung, from the node as its flow has it: a tier's node has no cascade.
+		const rung = stepRung(
+			ctx.flow.nodes.find((each) => each.id === node.id) ?? node,
+			state,
+		);
 		// The log writes the step's row with its event, in one batch: a stop
 		// lands before or after both. `deviceId` is the Device the step runs
 		// on (its Placement), not the Walker.
@@ -751,6 +780,7 @@ export async function beginStep(
 				logPath,
 				scope,
 				deviceId: device.id,
+				...(rung ? { rung } : {}),
 				...budget,
 			},
 		});

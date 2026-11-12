@@ -146,6 +146,44 @@ describe("the Value node made by a rule", () => {
 		]);
 	});
 
+	test("the `scores` in its data score the run on the step, after StepEnded; a rule's step is on no ladder", async () => {
+		const h = await startRun(
+			sandbox,
+			around(
+				byRule(
+					"small",
+					'{ "small": tasks[size = "small"].name, "scores": { "small_tasks": $count(tasks[size = "small"]), "useful": 1 } }',
+				),
+			),
+		);
+		const { state } = await drive(h, { inputs: { tasks } });
+		expect(state.ended?.nodeId).toBe("done");
+		const logged = await h.events();
+		expect((await h.types()).slice(0, 5)).toEqual([
+			"RunStarted",
+			"StepStarted",
+			"RunWarned",
+			"StepEnded",
+			"Scored",
+		]);
+		const [step] = deriveSteps(foldRun(logged));
+		expect(step?.rung).toBeUndefined();
+		expect(
+			logged
+				.filter((e) => e.type === "Scored")
+				.map((e) => [e.stepId, e.payload]),
+		).toEqual([
+			[step?.id as string, { score: "small_tasks", value: 2, label: null }],
+		]);
+		expect(payloads(logged, "RunWarned")).toEqual([
+			{
+				kind: "score",
+				message:
+					'The step wrote the score "useful". Night Shift keeps that name for itself. Choose another name.',
+			},
+		]);
+	});
+
 	test("a result that does not match the output schema fails the step, with why in the note, and takes the fail edge", async () => {
 		const h = await startRun(
 			sandbox,

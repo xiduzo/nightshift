@@ -10,6 +10,7 @@ import {
 	drive,
 	flowOf,
 	held,
+	payloads,
 	startRun,
 } from "../testing/graph";
 import { createSandbox, type Sandbox } from "../testing/test-support";
@@ -96,6 +97,12 @@ describe("an Agent climbs its cascade", () => {
 			[2, "fail"],
 			[3, "pass"],
 		]);
+		// Each try names its rung: two tries on the first tier, then the last.
+		expect(steps.map((step) => step.rung)).toEqual([
+			{ by: "agent", tier: 0 },
+			{ by: "agent", tier: 0 },
+			{ by: "agent", tier: 1, last: true },
+		]);
 		expect(steps[0]?.error).toContain("exited with code 1");
 		expect(steps[0]?.logPath).not.toBeNull();
 		expect(state.nodes.worker).toMatchObject({
@@ -175,6 +182,13 @@ describe("an Agent climbs its cascade", () => {
 			"try-again",
 			"pass",
 		]);
+		// The try after try-again is the last tier's again: the person tier follows it.
+		expect(steps.map((step) => step.rung)).toEqual([
+			{ by: "agent", tier: 0 },
+			{ by: "agent", tier: 1 },
+			{ by: "person", tier: 2, last: true },
+			{ by: "agent", tier: 1 },
+		]);
 		expect(second.state.nodes.worker).toMatchObject({
 			tier: "strong",
 			tries: 3,
@@ -213,6 +227,43 @@ describe("an Agent climbs its cascade", () => {
 			tries: 2,
 		});
 		expect(second.state.cascades?.worker).toBeNull();
+	});
+});
+
+describe("the scores in an Agent's data", () => {
+	test("score the run on the try that lands, never on a try that climbs on", async () => {
+		const harness = fakeHarness((_input, call) =>
+			reportingScript(call === 0 ? "fail" : "pass", `Try ${call + 1}.`, {
+				scores: call === 0 ? { leads: 1 } : { leads: 3, useful: 1 },
+			}),
+		);
+		const h = await startRun(sandbox, around(worker({ check: undefined })), {
+			harness,
+		});
+		const { state } = await drive(h, { inputs: {} });
+		expect(state.ended?.nodeId).toBe("after");
+		const logged = await h.events();
+		const steps = deriveSteps(foldRun(logged)).filter(
+			(step) => step.nodeId === "worker",
+		);
+		expect(steps.map((step) => step.outcome)).toEqual(["fail", "pass"]);
+		expect(
+			logged
+				.filter((e) => e.type === "Scored")
+				.map((e) => [e.stepId, e.payload]),
+		).toEqual([
+			[steps[1]?.id as string, { score: "leads", value: 3, label: null }],
+		]);
+		// The name Night Shift keeps for itself warns, on the try that lands only.
+		expect(
+			payloads(logged, "RunWarned").filter((w) => w.kind === "score"),
+		).toEqual([
+			{
+				kind: "score",
+				message:
+					'The step wrote the score "useful". Night Shift keeps that name for itself. Choose another name.',
+			},
+		]);
 	});
 });
 
@@ -257,6 +308,15 @@ describe("a Call climbs its cascade", () => {
 			["deep", "pass"],
 		]);
 		expect(steps[1]?.call?.inputs).toEqual({ issue: "42", before: "fail" });
+		expect(steps.map((step) => step.rung)).toEqual([
+			{ by: "flow", tier: 0 },
+			{ by: "flow", tier: 1, last: true },
+		]);
+		// The steps of the called flows are on no ladder: a Command each.
+		const work = deriveSteps(foldRun(await h.events())).filter(
+			(step) => step.nodeId === "work",
+		);
+		expect(work.map((step) => step.rung)).toEqual([undefined, undefined]);
 		expect(state.nodes.fix).toMatchObject({
 			outcome: "pass",
 			tier: "2",

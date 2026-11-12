@@ -13,8 +13,10 @@ import {
 import type {
 	GateBackgroundItem,
 	GateChoice,
+	RungBy,
 	StepOutcome,
 	StepOutputs,
+	StepRung,
 } from "../log";
 import type { StepEnd } from "./route";
 import { commitVisit } from "./run-position";
@@ -124,6 +126,18 @@ function triesOf(node: CascadeNode, index: number): number {
 	return tier.tries ?? 1;
 }
 
+/** The tier and try after `at`, or null when no tier is left. */
+function nextPlace(
+	node: CascadeNode,
+	at: Pick<CascadePosition, "tier" | "try">,
+): Pick<CascadePosition, "tier" | "try"> | null {
+	const tiers = cascadeOf(node) ?? [];
+	if (at.try < triesOf(node, at.tier))
+		return { tier: at.tier, try: at.try + 1 };
+	if (at.tier + 1 < tiers.length) return { tier: at.tier + 1, try: 1 };
+	return null;
+}
+
 /**
  * The position after a try that did not hold: the next try of the tier,
  * else the first of the next tier, else null (no tier left: the step ends
@@ -134,15 +148,56 @@ export function nextTry(
 	at: CascadePosition,
 	done: CascadeTry,
 ): CascadePosition | null {
-	const tiers = cascadeOf(node) ?? [];
-	const trail = [...at.trail, done];
-	if (at.try < triesOf(node, at.tier)) {
-		return { tier: at.tier, try: at.try + 1, trail };
+	const next = nextPlace(node, at);
+	return next === null ? null : { ...next, trail: [...at.trail, done] };
+}
+
+/** Who tries a tier that is not a person, by the type of the node with the cascade. */
+const TIER_BY = {
+	agent: "agent",
+	call: "flow",
+	decision: "model",
+	value: "model",
+} as const satisfies Record<CascadeNode["type"], RungBy>;
+
+/**
+ * Where a new step of `root` stands on its ladder (`StepStarted.rung`,
+ * Q31): its tier and who tries it, from the node's position on its
+ * cascade, and whether a try follows when it does not hold. A node
+ * without a cascade has one rung: its `by`, an Agent, or its flow. Null
+ * for a node on no ladder: a Value by rule, a Command and the rest.
+ *
+ * `root` is the node as its flow has it: a tier's node has no cascade.
+ */
+export function stepRung(
+	root: FlowNode,
+	state: Pick<RunStateValues, "cascades">,
+): StepRung | null {
+	const tiers = cascadeOf(root);
+	if (tiers !== undefined) {
+		// Only a node that can have a cascade has one.
+		const node = root as CascadeNode;
+		const at = climbAt(state, node);
+		const tier = tiers[at.tier];
+		if (tier === undefined) return null;
+		return {
+			by: isPersonTier(tier) ? "person" : TIER_BY[node.type],
+			tier: at.tier,
+			...(nextPlace(node, at) === null ? { last: true as const } : {}),
+		};
 	}
-	if (at.tier + 1 < tiers.length) {
-		return { tier: at.tier + 1, try: 1, trail };
+	switch (root.type) {
+		case "agent":
+			return { by: "agent", last: true };
+		case "call":
+			return { by: "flow", last: true };
+		case "decision":
+			return { by: root.by, last: true };
+		case "value":
+			return root.by === "rule" ? null : { by: root.by, last: true };
+		default:
+			return null;
 	}
-	return null;
 }
 
 /**
