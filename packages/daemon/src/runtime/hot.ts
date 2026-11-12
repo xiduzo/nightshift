@@ -7,6 +7,7 @@ import type {
 	OllamaService,
 	SyncedDocuments,
 } from "@nightshift/engine";
+import type { AgentSetup } from "@nightshift/engine/agent-setup";
 import type { GitHubClones, ProjectCopies } from "@nightshift/engine/projects";
 import type { InAppChannel, Notifications } from "@nightshift/notifications";
 import type { Telemetry } from "@nightshift/telemetry";
@@ -31,8 +32,10 @@ import type { HeldLease } from "./hold-lease";
  * - replaced, the one before stopped first: the notifier, the keep-awake,
  *   the export to monitoring, the Ollama (and the `ollama serve` it
  *   started), the project copies, the scheduler, the price list, the facts
- *   timer and the knowledge (its timers and its open index file: only what
- *   is on disk stays, so no closure or code of an earlier reload does);
+ *   timer, the knowledge (its timers and its open index file: only what
+ *   is on disk stays, so no closure or code of an earlier reload does) and
+ *   the guided setup of agents (an install or a sign-in that runs stops:
+ *   the person checks again);
  * - handed over: the devices (`startDevices` fills `nightshiftDevices`
  *   itself: its engine lets go of its runs, and the work hub, the applied
  *   commands, the calls served for a Host, the Devices online and the
@@ -80,6 +83,8 @@ export type HotRegistry = KeptDevices &
 		/** The Ollama Night Shift uses: the `ollama serve` it started stops with it. */
 		nightshiftOllama?: OllamaService;
 		nightshiftProjectCopies?: ProjectCopies;
+		/** The guided setup of agents: the installers and sign-ins it started stop with it. */
+		nightshiftAgentSetup?: AgentSetup;
 		/** The daily update of the price list. */
 		nightshiftPrices?: PriceUpdates;
 		nightshiftFacts?: Timer;

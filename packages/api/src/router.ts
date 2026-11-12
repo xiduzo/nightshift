@@ -2,6 +2,7 @@ import type { RouterClient } from "@orpc/server";
 import { z } from "zod";
 import { assistant } from "./assistant";
 import {
+	agentSetup,
 	cliTools,
 	connections,
 	deciders,
@@ -83,6 +84,7 @@ const configRoutes = {
 	cliTools,
 	programs,
 	harnesses,
+	agentSetup,
 	deciders,
 	ollama,
 	profiles,

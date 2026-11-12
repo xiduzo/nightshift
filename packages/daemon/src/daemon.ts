@@ -24,6 +24,7 @@ import {
 	defaultSelfDeviceHost,
 	deviceDirectory,
 	type HostClient,
+	inContainer,
 	machineFingerprint,
 	type OpenDocumentChannel,
 	selfDevice,
@@ -44,6 +45,7 @@ import {
 	createToolLaunchers,
 	localDevice,
 } from "@nightshift/engine";
+import { createAgentSetup } from "@nightshift/engine/agent-setup";
 import {
 	HARNESS_BIN,
 	openConfigStores,
@@ -737,6 +739,35 @@ export async function createDaemon(
 	);
 	projectCopies.start();
 
+	/** The read-only checks of programs. A harness's check notes `agent-checked`. */
+	const checks: Context["checks"] = {
+		...programChecks(),
+		harness: async (harness, bin) => {
+			const check = await programChecks().harness(harness, bin);
+			telemetry.note({
+				kind: "agent-checked",
+				harness,
+				installed: check.path !== null,
+				signIn: check.signIn,
+			});
+			return check;
+		},
+	};
+	/**
+	 * Installs an agent CLI and signs it in, when the person asks for it on
+	 * this computer (ADR 25). A reload stops what it runs.
+	 */
+	const agentSetup = await slots.replace(
+		"nightshiftAgentSetup",
+		() =>
+			createAgentSetup({
+				stores: config,
+				check: (harness, bin) => checks.harness(harness, bin),
+				container: inContainer(),
+			}),
+		(before) => before.stop(),
+	);
+
 	const info: DaemonInfo = {
 		dataDir,
 		device: { ...device, ownerId: person.userId },
@@ -785,19 +816,8 @@ export async function createDaemon(
 				return folder;
 			},
 		}),
-		checks: {
-			...programChecks(),
-			harness: async (harness, bin) => {
-				const check = await programChecks().harness(harness, bin);
-				telemetry.note({
-					kind: "agent-checked",
-					harness,
-					installed: check.path !== null,
-					signIn: check.signIn,
-				});
-				return check;
-			},
-		},
+		checks,
+		agentSetup,
 		usage: telemetry,
 		knowledge,
 		ollama,

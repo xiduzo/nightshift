@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import type { AuthConfig } from "@nightshift/auth";
 import { ensureDataDir, resolveDataDir } from "@nightshift/db/data-dir";
+import { putAgentBinsOnPath } from "@nightshift/engine/agent-setup";
 
 /**
  * The environment the daemon reads: `apps/server/.env.schema` documents
@@ -38,7 +39,9 @@ export type DaemonEnv = Omit<AuthConfig, "BETTER_AUTH_SECRET"> & {
 /**
  * `process.env` for a daemon that runs without the varlock CLI and without
  * `.env` files: the desktop app and the `nightshift` binary. Call it before
- * the daemon starts. A value already in the environment always wins.
+ * the daemon starts. A value already in the environment always wins. The
+ * folder the agents' installers use (`~/.local/bin`) goes on the PATH when
+ * it exists and the PATH lacks it: an app or a service gets a short PATH.
  */
 
 type Env = Record<string, string | undefined>;
@@ -59,6 +62,7 @@ export function prepareDaemonEnv(options: {
 	env.PORT = String(options.port);
 	env.BETTER_AUTH_URL ??= options.url;
 	env.CORS_ORIGIN ??= options.uiOrigin;
+	putAgentBinsOnPath(env);
 
 	const dataDir = ensureDataDir(
 		resolveDataDir({

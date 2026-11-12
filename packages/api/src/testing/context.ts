@@ -35,6 +35,7 @@ const SERVICES: Record<keyof Services, true> = {
 	ollama: true,
 	assistant: true,
 	checks: true,
+	agentSetup: true,
 	projectSetup: true,
 	usage: true,
 	daemon: true,

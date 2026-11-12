@@ -1,8 +1,9 @@
 /**
  * This computer's own configuration, private to its owner: the settings,
  * the harnesses and deciders, Agent Profiles, connections and CLI tools,
- * and the Ollama search by meaning uses.
+ * the Ollama search by meaning uses, and the guided setup of an agent.
  */
+export { agentSetup } from "./agent-setup";
 export { cliTools } from "./cli-tools";
 export { connections } from "./connections";
 export { programs } from "./found-programs";

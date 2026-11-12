@@ -49,6 +49,23 @@ describe("the environment of a daemon without varlock", () => {
 		expect(env.BETTER_AUTH_SECRET?.length).toBe(64);
 	});
 
+	test("puts the agents' install folder on a short PATH", () => {
+		const home = dir();
+		mkdirSync(join(home, ".local/bin"), { recursive: true });
+		const env: Record<string, string | undefined> = {
+			NIGHTSHIFT_DATA_DIR: dir(),
+			HOME: home,
+			PATH: "/usr/bin:/bin",
+		};
+		prepareDaemonEnv({
+			port: 3100,
+			url: "http://localhost:3100",
+			uiOrigin: "http://localhost:3001",
+			env,
+		});
+		expect(env.PATH).toBe(`${join(home, ".local/bin")}:/usr/bin:/bin`);
+	});
+
 	test("the auth secret is made once, readable by this user only", () => {
 		const dataDir = dir();
 		const first = authSecret({}, dataDir);

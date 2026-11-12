@@ -16,6 +16,11 @@ import type {
 	OllamaStatus,
 	SignInResult,
 } from "@nightshift/engine";
+import type {
+	AgentSetupJob,
+	AgentSetupStatus,
+	AgentSetupView,
+} from "@nightshift/engine/agent-setup";
 import {
 	type CliTool,
 	type Connection,
@@ -34,6 +39,7 @@ import {
 	type CustomAgent,
 	customAgentSchema,
 	deciderNameSchema,
+	harnessNameSchema,
 	loginSchema,
 	mcpServerSchema,
 	modelProfileSchema,
@@ -414,5 +420,80 @@ export const ollamaModelSchema = exact<OllamaModel>()(
 		size: z.number(),
 		/** Whether it makes embeddings. Null: this Ollama does not say. */
 		embedding: z.boolean().nullable(),
+	}),
+);
+
+/** The state of the guided setup of one agent: the screen polls it. */
+const agentSetupJobSchema = exact<AgentSetupJob>()(
+	z.discriminatedUnion("state", [
+		z.object({ state: z.literal("idle") }),
+		z.object({ state: z.literal("installing"), since: z.number() }),
+		z.object({
+			state: z.literal("installed"),
+			/** Where the CLI is now. */
+			path: z.string(),
+			at: z.number(),
+		}),
+		z.object({
+			state: z.literal("install-failed"),
+			problem: z.string(),
+			/** The end of what the installer printed, for the details. */
+			output: z.string(),
+			at: z.number(),
+		}),
+		z.object({ state: z.literal("checking"), since: z.number() }),
+		z.object({
+			state: z.literal("signing-in"),
+			/** The sign-in page, once the CLI printed it. */
+			url: z.string().nullable(),
+			since: z.number(),
+		}),
+		z.object({
+			state: z.literal("code-needed"),
+			url: z.string().nullable(),
+			since: z.number(),
+		}),
+		z.object({
+			state: z.literal("sign-in-failed"),
+			problem: z.string(),
+			at: z.number(),
+		}),
+		z.object({
+			state: z.literal("ready"),
+			/** The profile on the agent: the one it had, or a new one. */
+			profileId: z.string(),
+			profileName: z.string(),
+			account: z.string().nullable(),
+			at: z.number(),
+		}),
+		z.object({ state: z.literal("cancelled"), at: z.number() }),
+	]),
+);
+
+/** One agent the guided setup can install and sign in. */
+export const agentSetupViewSchema = exact<AgentSetupView>()(
+	z.object({
+		harness: harnessNameSchema,
+		label: z.string(),
+		/** Who publishes the CLI. */
+		vendor: z.string(),
+		/** Where the CLI is on this computer now. Null: not found. */
+		path: z.string().nullable(),
+		/** The exact command an install runs, and the script it downloads. */
+		install: z.object({ command: z.string(), source: z.string() }),
+		/** The exact command a sign-in runs. */
+		signIn: z.object({ command: z.string() }),
+		job: agentSetupJobSchema,
+	}),
+);
+
+export const agentSetupStatusSchema = exact<AgentSetupStatus>()(
+	z.object({
+		/** Setup can act here, for this request. */
+		available: z.boolean(),
+		reason: z.enum(["elsewhere", "container", "platform"]).nullable(),
+		/** Why not, for the person. */
+		message: z.string().nullable(),
+		agents: z.array(agentSetupViewSchema),
 	}),
 );

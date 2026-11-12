@@ -16,6 +16,7 @@ import type {
 	ToolLaunchers,
 	UsageMoment,
 } from "@nightshift/engine";
+import type { AgentSetup } from "@nightshift/engine/agent-setup";
 import type {
 	CliToolStore,
 	ConnectionStore,
@@ -106,6 +107,14 @@ export type Services = {
 		/** The models a harness offers: its adapter's list, plus the CLI's own listing. */
 		models(harness: HarnessName, bin: string): Promise<HarnessModels>;
 	};
+	/**
+	 * Installs an agent CLI and signs it in on this computer, when its owner
+	 * asks for it there (ADR 25).
+	 */
+	agentSetup: Pick<
+		AgentSetup,
+		"status" | "install" | "signIn" | "sendCode" | "cancel"
+	>;
 	/** What a folder needs before runs can start in it, and the fixes a person asks for. */
 	projectSetup: {
 		check(path: string): Promise<ProjectReadiness>;
