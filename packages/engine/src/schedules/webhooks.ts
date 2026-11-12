@@ -10,7 +10,6 @@ import {
 	type FlowInputDef,
 	type JsonValue,
 	loadFlowSource,
-	nextTimeOfDay,
 	type Schedule,
 	type WebhookEvent,
 	webhookEvent,
@@ -25,6 +24,7 @@ import type { StartRunInput } from "../contract";
 import type { ProjectFlows } from "../flows";
 import { parseEventRow, type RunLog, type RunTrigger } from "../log";
 import type { RunSummary } from "../read";
+import { scheduledStart } from "./scheduled-start";
 
 /**
  * Webhooks: a schedule with `webhook` starts its flow, sends its signal,
@@ -246,9 +246,6 @@ export function createWebhooks(deps: WebhooksDeps) {
 			}
 		}
 		if (schedule.flow !== undefined) {
-			const stopAt = schedule.stopAt
-				? (nextTimeOfDay(schedule.stopAt, at, schedule.timeZone) ?? undefined)
-				: undefined;
 			try {
 				const inputs = webhookInputs(
 					schedule,
@@ -256,14 +253,7 @@ export function createWebhooks(deps: WebhooksDeps) {
 					webhook,
 				);
 				const run = await deps.startRun(
-					{
-						projectId,
-						flowName: schedule.flow,
-						inputs,
-						...(schedule.baseRef ? { baseRef: schedule.baseRef } : {}),
-						...(stopAt !== undefined ? { stopAt } : {}),
-						...(schedule.person ? { startedBy: schedule.person } : {}),
-					},
+					scheduledStart(projectId, schedule, schedule.flow, at, { inputs }),
 					{ kind: "webhook", scheduleId: schedule.id, at },
 				);
 				runId = run.id;

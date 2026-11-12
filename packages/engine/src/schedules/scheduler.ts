@@ -22,6 +22,7 @@ import {
 import type { RunSummary } from "../read";
 import type { RunStatus } from "../run-status";
 import type { UsageNotes } from "../usage";
+import { scheduledStart } from "./scheduled-start";
 import type { WebhookDelivery } from "./webhooks";
 
 /**
@@ -421,22 +422,12 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			return;
 		}
 
-		const stopAt = schedule.stopAt
-			? (nextTimeOfDay(schedule.stopAt, at, schedule.timeZone) ?? undefined)
-			: undefined;
 		let runId: string | null = null;
 		let error: string | null = null;
 		try {
+			// It stops on the first stop time after now; its trigger keeps the cron time.
 			const run = await deps.startRun(
-				{
-					projectId,
-					flowName: schedule.flow,
-					inputs: schedule.inputs,
-					...(schedule.baseRef ? { baseRef: schedule.baseRef } : {}),
-					...(stopAt !== undefined ? { stopAt } : {}),
-					// Another Person's schedule: their run, through the Offers here.
-					...(schedule.person ? { startedBy: schedule.person } : {}),
-				},
+				scheduledStart(projectId, schedule, schedule.flow, at),
 				{ kind: "schedule", scheduleId: schedule.id, at: due },
 			);
 			runId = run.id;
@@ -574,19 +565,10 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 				);
 			}
 			const at = now();
-			const stopAt = schedule.stopAt
-				? (nextTimeOfDay(schedule.stopAt, at, schedule.timeZone) ?? undefined)
-				: undefined;
-			const startedBy = schedule.person ?? personId ?? undefined;
 			const run = await deps.startRun(
-				{
-					projectId,
-					flowName: flow,
-					inputs: schedule.inputs,
-					...(schedule.baseRef ? { baseRef: schedule.baseRef } : {}),
-					...(stopAt !== undefined ? { stopAt } : {}),
-					...(startedBy ? { startedBy } : {}),
-				},
+				scheduledStart(projectId, schedule, flow, at, {
+					startedBy: personId ?? undefined,
+				}),
 				{ kind: "schedule", scheduleId: schedule.id, at },
 			);
 			// A cron time before now counts as handled: it does not fire as well.
