@@ -7,6 +7,7 @@ import {
 	createSettingsStore,
 	defaultRunSettings,
 	effectiveDecider,
+	reachesPrivateNetwork,
 	withEffectiveDecider,
 } from "./settings";
 
@@ -228,6 +229,23 @@ describe("the scheduler switch", () => {
 		await s.save({ scheduler: false });
 		expect(s.current().scheduler).toBe(false);
 		expect(s.view().fields.scheduler.source).toBe("saved");
+	});
+});
+
+describe("web requests to this network", () => {
+	test("a computer that is not a Host always reaches its own network", async () => {
+		const s = await store();
+		expect(reachesPrivateNetwork(s.current())).toBe(true);
+		await s.save({ webRequestsPrivateNetwork: false });
+		expect(reachesPrivateNetwork(s.current())).toBe(true);
+	});
+
+	test("a Host reaches it only when its owner allows it", async () => {
+		const s = await store();
+		await s.save({ host: true });
+		expect(reachesPrivateNetwork(s.current())).toBe(false);
+		await s.save({ webRequestsPrivateNetwork: true });
+		expect(reachesPrivateNetwork(s.current())).toBe(true);
 	});
 });
 

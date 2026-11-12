@@ -66,6 +66,7 @@ export {
 	HARNESS_BIN,
 	isHostAddress,
 	isLoopbackHost,
+	reachesPrivateNetwork,
 	settingsPatchSchema,
 	settingsSchema,
 	withEffectiveDecider,

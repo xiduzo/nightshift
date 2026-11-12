@@ -5,7 +5,6 @@ import {
 	startPriceUpdates,
 	tanstackDecider,
 } from "@nightshift/agents";
-import { findProgram } from "@nightshift/agents/types";
 import type { Context } from "@nightshift/api/context";
 import {
 	createAuth,
@@ -13,10 +12,8 @@ import {
 	hasLogin,
 	hostPolicyFromEnv,
 	localPerson,
-	membersOf,
 	spaceIds,
 } from "@nightshift/auth";
-import type { Database } from "@nightshift/db";
 import {
 	databaseUrl,
 	ensureDataDir,
@@ -48,7 +45,6 @@ import {
 	createSpaceArchive,
 	createSyncedDocuments,
 	createToolLaunchers,
-	documentKind,
 	localDevice,
 } from "@nightshift/engine";
 import {
@@ -56,11 +52,11 @@ import {
 	createDeciderSetup,
 } from "@nightshift/engine/agent-setup";
 import {
-	HARNESS_BIN,
 	openConfigStores,
 	openDeviceDocument,
 	type PersonalSecrets,
 	type ProjectSecrets,
+	reachesPrivateNetwork,
 	secretStore,
 } from "@nightshift/engine/device-config";
 import {
@@ -99,6 +95,7 @@ import {
 } from "./keep-awake";
 import {
 	type DesktopScreen,
+	documentAudience,
 	sendsPushesFor,
 	wireNotifications,
 } from "./notifications";
@@ -124,7 +121,7 @@ import {
 	stopOnSignals,
 } from "./runtime";
 import { keepSync } from "./sync";
-import { moveTelemetryHeaders } from "./telemetry";
+import { moveTelemetryHeaders, usageFacts } from "./telemetry";
 
 export type DaemonOptions = {
 	/** The port the daemon listens on: its own addresses may call it. Default: PORT, else DEFAULT_PORT. */
@@ -564,10 +561,7 @@ async function makeDaemon(
 		],
 		// A Host reaches this computer and its network only when its
 		// Settings allow it: it serves every Member of its Spaces.
-		privateNetwork: () => {
-			const current = settings.current();
-			return !current.host || current.webRequestsPrivateNetwork;
-		},
+		privateNetwork: () => reachesPrivateNetwork(settings.current()),
 	});
 
 	/**
@@ -699,24 +693,18 @@ async function makeDaemon(
 		documents.watchStored((document) => tellDocument(document.name));
 	}
 	tellDocument = (name) => {
-		notifyStoredDocument(name).catch((error: unknown) => {
-			console.error("Could not tell the open screens of a document:", error);
-		});
-	};
-	async function notifyStoredDocument(name: string): Promise<void> {
-		const found = documentKind(name);
-		if (!found) return;
-		if (found.kind === "device" || found.kind === "device-copy") {
-			await notifications.documentChanged({
-				name,
-				personId: person.userId,
+		documentAudience(name, {
+			documentOf: (of) => documents.documentOf(of),
+			personId: person.userId,
+		})
+			.then(
+				(audience) =>
+					audience && notifications.documentChanged({ name, ...audience }),
+			)
+			.catch((error: unknown) => {
+				console.error("Could not tell the open screens of a document:", error);
 			});
-			return;
-		}
-		const of = await documents.documentOf(name);
-		if (!of || of.kind === "device") return;
-		await notifications.documentChanged({ name, spaceId: of.spaceId });
-	}
+	};
 	learningsChanged = notifications.learningsChanged;
 	usageSnapshot = () =>
 		usageFacts({
@@ -922,57 +910,5 @@ async function makeDaemon(
 		ownerHasLogin: () => hasLogin(db, person.userId),
 		stop,
 		onLeaseHeartbeat: (listener) => lease.onHeartbeat(listener),
-	};
-}
-
-/** Counts for the daily usage event. No names, paths or free text leave here. */
-async function usageFacts(input: {
-	db: Database;
-	settings: {
-		current(): {
-			customAgents: { command: string }[];
-			[key: string]: unknown;
-		};
-	};
-	listScreens(personId: string): Promise<{ kind: string }[]>;
-	devices: {
-		overview(query: { personId: string; owner: boolean }): Promise<{
-			thisComputer: { hosts: unknown[] } | null;
-		}>;
-	};
-	ownerId: string;
-}): Promise<{
-	agents: number;
-	phone: boolean;
-	paired: boolean;
-	spaces: number;
-	members: number;
-}> {
-	const current = input.settings.current();
-	let agents = 0;
-	for (const name of Object.keys(HARNESS_BIN) as (keyof typeof HARNESS_BIN)[]) {
-		const bin = current[HARNESS_BIN[name]];
-		if (typeof bin === "string" && findProgram(bin)) agents += 1;
-	}
-	for (const agent of current.customAgents) {
-		if (findProgram(agent.command)) agents += 1;
-	}
-	const screens = await input.listScreens(input.ownerId);
-	const overview = await input.devices.overview({
-		personId: input.ownerId,
-		owner: true,
-	});
-	const spaces = await spaceIds(input.db);
-	const people = new Set<string>();
-	for (const spaceId of spaces) {
-		const listed = await membersOf(input.db, spaceId);
-		for (const member of listed.members) people.add(member.personId);
-	}
-	return {
-		agents,
-		phone: screens.some((screen) => screen.kind === "expo"),
-		paired: (overview.thisComputer?.hosts.length ?? 0) > 0,
-		spaces: spaces.length,
-		members: people.size,
 	};
 }

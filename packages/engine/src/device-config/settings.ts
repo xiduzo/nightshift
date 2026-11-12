@@ -364,7 +364,7 @@ const DEFS = {
 	 * Waits for a URL may reach this computer (loopback) and its private
 	 * network (RFC 1918, unique local, carrier-grade NAT). Off by default:
 	 * a Host serves every Member of its Spaces. A computer that is not a
-	 * Host always may (`device/web-addresses.ts`).
+	 * Host always may (`reachesPrivateNetwork`).
 	 */
 	webRequestsPrivateNetwork: {
 		schema: z.boolean(),
@@ -546,6 +546,18 @@ export const HARNESS_BIN = Object.fromEntries(
 ) as {
 	[K in HarnessName]: (typeof HARNESS_CATALOG)[K]["binSetting"];
 } satisfies Record<HarnessName, SettingKey>;
+
+/**
+ * Whether a web request from this computer may reach loopback and its
+ * private network (`device/web-addresses.ts`): always on a computer that
+ * is not a Host, else only when "Web requests reach this network" is on.
+ * A Host serves every Member of its Spaces.
+ */
+export function reachesPrivateNetwork(
+	settings: Pick<Settings, "host" | "webRequestsPrivateNetwork">,
+): boolean {
+	return !settings.host || settings.webRequestsPrivateNetwork;
+}
 
 /** A change: a value saves it, null forgets the saved value (back to the environment, then the default). */
 export const settingsPatchSchema = z
