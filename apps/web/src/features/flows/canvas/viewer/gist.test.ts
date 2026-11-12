@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type FlowNode, flowSchema } from "@nightshift/flows";
-import { GIST_MAX, gist, sampleLine, shapeLabel } from "./gist";
+import { GIST_MAX, gist, markedLine, sampleLine, shapeLabel } from "./gist";
 
 describe("the gist of a value", () => {
 	test("a text gives its first line with words on it", () => {
@@ -127,6 +127,36 @@ describe("the viewer line of a node", () => {
 		expect(
 			sampleLine(fetch, { endedAt: 10, outcome: null, outputs: {} }),
 		).toEqual({ kind: "output", text: "No output", field: "log_tail" });
+	});
+});
+
+describe("the viewer line of a node a test run pins or skips", () => {
+	test("a skipped node shows the outcome it takes", () => {
+		expect(
+			markedLine(read, { kind: "skipped", outcome: "pass" }, undefined),
+		).toEqual({ kind: "skipped", outcome: "pass" });
+	});
+
+	test("a pinned node shows the gist of its pinned output", () => {
+		expect(
+			markedLine(
+				fetch,
+				{ kind: "pinned" },
+				{
+					endedAt: 10,
+					outcome: "pass",
+					outputs: { log_tail: "start\n3 new items" },
+				},
+			),
+		).toEqual({ kind: "pinned", text: "3 new items", field: "log_tail" });
+	});
+
+	test("a pinned output that has not loaded has no text yet", () => {
+		expect(markedLine(read, { kind: "pinned" }, undefined)).toEqual({
+			kind: "pinned",
+			text: null,
+			field: "body",
+		});
 	});
 });
 

@@ -1,5 +1,5 @@
 import type { NodeSample } from "@nightshift/client";
-import type { Flow, FlowIssue, Outcome } from "@nightshift/flows";
+import type { Flow, FlowIssue, FlowNode, Outcome } from "@nightshift/flows";
 import {
 	addEdge,
 	type FlowCheck,
@@ -37,7 +37,11 @@ import { toast } from "sonner";
 import { type DataCanvasEdge, DataEdge, DataMarker } from "../canvas/data-edge";
 import { isDataEdgeId, useDataLinks } from "../canvas/data-links";
 import { exitHandleId, groupEdges } from "../canvas/edge-groups";
-import type { DiffMark, FlowCanvasNode } from "../canvas/flow-node";
+import type {
+	DiffMark,
+	FlowCanvasNode,
+	FlowNodeData,
+} from "../canvas/flow-node";
 import type { PaletteItem } from "../canvas/node-type";
 import {
 	canvasEdges,
@@ -71,7 +75,7 @@ import {
 	useSectionCanvas,
 } from "../canvas/sections/use-section-canvas";
 import { useMeasured } from "../canvas/use-measured";
-import { sampleLine } from "../canvas/viewer/gist";
+import { markedLine, sampleLine } from "../canvas/viewer/gist";
 import { CanvasControls } from "./canvas-controls";
 import { fitViewOptions } from "./fit-view";
 import { loadElk } from "./lib/elk";
@@ -86,6 +90,9 @@ import {
 	selectedSectionIds,
 	withoutNodes,
 } from "./selection";
+import { markOf, type TestMarks } from "./test-run/marks";
+import { NodeMenu } from "./test-run/node-menu";
+import type { TestMarksApi } from "./test-run/use-test-marks";
 
 /** The keys that delete what is selected. */
 const DELETE_KEYS = ["Backspace", "Delete"];
@@ -98,6 +105,29 @@ export type CanvasPreview = {
 
 /** One empty list for every node without issues, so its data stays the same. */
 const NO_ISSUES: FlowIssue[] = [];
+
+/**
+ * What a node's card shows of the runs: its pinned output or the outcome
+ * it takes in a test run, else what it gave in the newest runs.
+ */
+function viewerOf(
+	node: FlowNode,
+	samples: ReadonlyMap<string, NodeSample> | null | undefined,
+	marks: TestMarks | undefined,
+	pinned: ReadonlyMap<string, NodeSample> | undefined,
+): Pick<FlowNodeData, "sample" | "mark"> {
+	const mark = marks ? markOf(marks, node.id) : null;
+	if (mark?.kind === "skipped")
+		return { mark, sample: markedLine(node, mark, undefined) };
+	if (mark?.kind === "pinned") {
+		const sample = pinned?.get(node.id);
+		return {
+			mark: { kind: "pinned", outcome: sample?.outcome ?? null },
+			sample: markedLine(node, mark, sample),
+		};
+	}
+	return samples ? { sample: sampleLine(node, samples.get(node.id)) } : {};
+}
 
 /** The flow's edges, and the dotted lines of the selected node. */
 type CanvasEdge = FlowCanvasEdge | DataCanvasEdge;
@@ -173,6 +203,7 @@ export function EditorCanvas({
 	preview,
 	coveredRight = 0,
 	samples,
+	test,
 }: {
 	flow: Flow;
 	/** Names the flow for the routes this browser keeps of its last layout. */
@@ -208,6 +239,11 @@ export function EditorCanvas({
 	 * shows none.
 	 */
 	samples?: ReadonlyMap<string, NodeSample> | null;
+	/**
+	 * The pins and skips of a test run: the cards show them, and a node's
+	 * menu changes them. A proposal and a revision show none.
+	 */
+	test?: TestMarksApi;
 }) {
 	const [measured, applyDimensions] = useMeasured();
 	const { fitView } = useReactFlow();
@@ -285,6 +321,8 @@ export function EditorCanvas({
 	});
 	const { hidden } = sections;
 
+	const marks = preview ? undefined : test?.marks;
+	const pinned = preview ? undefined : test?.pinned;
 	const nodes = useMemo<CanvasNode[]>(() => {
 		const selected = new Set(selectedNodeIds(selection));
 		const flowNodes = view.nodes.flatMap((node): FlowCanvasNode[] =>
@@ -304,9 +342,7 @@ export function EditorCanvas({
 								isStart: view.start === node.id,
 								issues: counts.byNode.get(node.id) ?? NO_ISSUES,
 								change: preview?.nodes.get(node.id),
-								...(samples && !preview
-									? { sample: sampleLine(node, samples.get(node.id)) }
-									: {}),
+								...(preview ? {} : viewerOf(node, samples, marks, pinned)),
 							},
 						},
 					],
@@ -322,6 +358,8 @@ export function EditorCanvas({
 		sections.boxes,
 		preview,
 		samples,
+		marks,
+		pinned,
 	]);
 
 	// The routes of the last "Lay out". Each holds while its nodes stay put.
@@ -628,7 +666,7 @@ export function EditorCanvas({
 			? { nodes: selection.ids, sections: selection.sections ?? [] }
 			: null;
 
-	return (
+	const canvas = (
 		<div className="relative h-full min-h-0 overflow-hidden bg-muted/40 dark:bg-muted/20">
 			<SelectEdgeContext.Provider value={preview ? null : selectEdge}>
 				<SectionActionsContext.Provider value={sectionActions}>
@@ -751,5 +789,13 @@ export function EditorCanvas({
 				</SectionActionsContext.Provider>
 			</SelectEdgeContext.Provider>
 		</div>
+	);
+	// The node menu: not on a proposal or a revision.
+	return test && !preview ? (
+		<NodeMenu flow={flow} samples={samples} test={test}>
+			{canvas}
+		</NodeMenu>
+	) : (
+		canvas
 	);
 }

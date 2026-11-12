@@ -108,11 +108,20 @@ function cut(text: string, max: number): string {
 	return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
-/** What the viewer strip of a node shows, once the flow has a run. */
+/**
+ * What the viewer strip of a node shows: once the flow has a run, its last
+ * output. With a test run's mark: its pinned output, or the outcome it
+ * takes when skipped. A pinned output that has not loaded has no text.
+ */
 export type SampleLine =
 	| { kind: "running" }
 	| { kind: "absent" }
-	| { kind: "output"; text: string; field: string };
+	| { kind: "output"; text: string; field: string }
+	| { kind: "pinned"; text: string | null; field: string }
+	| { kind: "skipped"; outcome: string };
+
+/** What a viewer line reads of a sample. */
+type LineSample = Pick<NodeSample, "endedAt" | "outcome" | "outputs">;
 
 /**
  * The viewer line of `node` from its sample: "Running", "Not in the last
@@ -121,10 +130,35 @@ export type SampleLine =
  */
 export function sampleLine(
 	node: FlowNode,
-	sample: Pick<NodeSample, "endedAt" | "outcome" | "outputs"> | undefined,
+	sample: LineSample | undefined,
 ): SampleLine {
 	if (sample === undefined) return { kind: "absent" };
 	if (sample.endedAt === null) return { kind: "running" };
+	return { kind: "output", ...outputLine(node, sample) };
+}
+
+/**
+ * The viewer line of a node that a test run pins or skips: the gist of
+ * the pinned output (`pinned`, once its run loads), or the outcome the
+ * skipped node takes.
+ */
+export function markedLine(
+	node: FlowNode,
+	mark: { kind: "pinned" } | { kind: "skipped"; outcome: string },
+	pinned: LineSample | undefined,
+): SampleLine {
+	if (mark.kind === "skipped")
+		return { kind: "skipped", outcome: mark.outcome };
+	return pinned === undefined
+		? { kind: "pinned", text: null, field: mainOutputField(node) }
+		: { kind: "pinned", ...outputLine(node, pinned) };
+}
+
+/** The gist of a step's main output, else its outcome. */
+function outputLine(
+	node: FlowNode,
+	sample: LineSample,
+): { text: string; field: string } {
 	const field = mainOutputField(node);
 	const { outputs } = sample;
 	const text =
@@ -132,7 +166,7 @@ export function sampleLine(
 			shape: outputFieldShape(node, field),
 			lastLine: field === "log_tail",
 		}) ?? (sample.outcome ? stepOutcomeLabel(sample.outcome) : "No output");
-	return { kind: "output", text, field };
+	return { text, field };
 }
 
 /**

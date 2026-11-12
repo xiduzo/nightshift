@@ -109,6 +109,9 @@ import {
 } from "./selection";
 import { SubflowView } from "./subflow/subflow-view";
 import { useSubflowStack } from "./subflow/use-subflow-stack";
+import { FollowingBar } from "./test-run/following-bar";
+import { TestBadge } from "./test-run/test-badge";
+import { TestMarksContext, useTestMarks } from "./test-run/use-test-marks";
 import { useEditorData } from "./use-editor-data";
 
 type Props = {
@@ -226,8 +229,17 @@ function Editor({
 		cliTools,
 		deviceNames,
 	} = useEditorData(projectId, name);
-	// What each node gave in the flow's newest runs: the viewers.
-	const samples = useNodeSamples({ projectId, flowName: name, flow: draft });
+	// The pins and skips of a test run, kept in this browser.
+	const testMarks = useTestMarks({ projectId, flowName: name, flow: draft });
+	// The test run started here: the viewers show it until you leave it.
+	const [testRunId, setTestRunId] = useState<string | null>(null);
+	// What each node gave in the flow's newest runs, or in that test run: the viewers.
+	const samples = useNodeSamples({
+		projectId,
+		flowName: name,
+		flow: draft,
+		runId: testRunId ?? undefined,
+	});
 	const check = useMemo(
 		() =>
 			checkFlow(
@@ -838,6 +850,7 @@ function Editor({
 					</TooltipTrigger>
 					<TooltipContent>Build with an agent</TooltipContent>
 				</Tooltip>
+				<TestBadge test={testMarks} onSelectNode={selectNode} />
 				<Button
 					size="sm"
 					onClick={() => setStarting(true)}
@@ -882,6 +895,7 @@ function Editor({
 										onOpenSection={setOpenSection}
 										flowLabel={name}
 										samples={samples}
+										test={testMarks}
 									/>
 								</EnterSubflowContext.Provider>
 							</OpenFlowContext.Provider>
@@ -931,6 +945,13 @@ function Editor({
 								/>
 							) : (
 								<>
+									{testRunId ? (
+										<FollowingBar
+											runId={testRunId}
+											onShowNewest={() => setTestRunId(null)}
+											className="pointer-events-auto absolute bottom-3 left-1/2 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2"
+										/>
+									) : null}
 									<NodeDock
 										onAdd={(type) => addNode(type)}
 										onSearch={() => addNodeDialog.show()}
@@ -976,7 +997,9 @@ function Editor({
 										{/* An undo or a redo starts the fields again from the draft. */}
 										<div key={`${selectionKey(selection)}#${revision}`}>
 											<NodeSamplesContext.Provider value={samples}>
-												{inspector}
+												<TestMarksContext.Provider value={testMarks}>
+													{inspector}
+												</TestMarksContext.Provider>
 											</NodeSamplesContext.Provider>
 										</div>
 									</FlowAssistantContext.Provider>
@@ -1007,6 +1030,22 @@ function Editor({
 				projectId={projectId}
 				flowName={name}
 				inputs={draft.inputs}
+				test={
+					testMarks.count.total > 0
+						? {
+								marks: testMarks.marks,
+								skippedGates: draft.nodes
+									.filter(
+										(node) =>
+											node.type === "decision" &&
+											node.by === "person" &&
+											Object.hasOwn(testMarks.marks.skipped, node.id),
+									)
+									.map((node) => node.id),
+								onStarted: setTestRunId,
+							}
+						: undefined
+				}
 			/>
 
 			{subflowSection ? (

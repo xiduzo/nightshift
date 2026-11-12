@@ -35,8 +35,10 @@ import {
 	LoaderCircleIcon,
 	LockIcon,
 	MonitorIcon,
+	PinIcon,
 	PlayIcon,
 	ServerIcon,
+	SkipForwardIcon,
 	TriangleAlertIcon,
 	VariableIcon,
 } from "lucide-react";
@@ -77,10 +79,21 @@ export type FlowNodeData = {
 	change?: DiffMark;
 	/**
 	 * Editor only, once the flow has a run: what the node gave in its newest
-	 * run, in one line at the bottom of the card.
+	 * run, in one line at the bottom of the card. With a mark: the pinned
+	 * output, or the outcome the skipped node takes.
 	 */
 	sample?: SampleLine;
+	/** Editor only: the node gives a pinned output in a test run, or is skipped. */
+	mark?: NodeMark;
 };
+
+/**
+ * A test run's mark on a node: the outcome it takes lights up on its row.
+ * A pinned output that has not loaded has no outcome yet.
+ */
+export type NodeMark =
+	| { kind: "pinned"; outcome: string | null }
+	| { kind: "skipped"; outcome: string };
 
 /** How a node or edge of a proposed flow differs from the editor's draft. */
 export type DiffMark = "added" | "removed" | "changed";
@@ -327,7 +340,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 	selected,
 	isConnectable,
 }: NodeProps<FlowCanvasNode>) {
-	const { node, isStart, issues, run, change, sample } = data;
+	const { node, isStart, issues, run, change, sample, mark } = data;
 	const errors = issues.filter((issue) => issue.severity === "error");
 	const warnings = issues.filter((issue) => issue.severity === "warning");
 	// A Decision is named a Gate or a Branch by who decides it.
@@ -414,7 +427,8 @@ const FlowNodeCard = memo(function FlowNodeCard({
 			<div
 				className={cn(
 					overview && "invisible",
-					(run === null || change === "removed") && "opacity-60",
+					(run === null || change === "removed" || mark?.kind === "skipped") &&
+						"opacity-60",
 				)}
 			>
 				<div className="flex min-w-0 items-center gap-2.5 p-2.5">
@@ -475,6 +489,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 								<span className="sr-only">Start</span>
 							</Badge>
 						) : null}
+						{mark ? <MarkBadge mark={mark} /> : null}
 						{errors.length > 0 || warnings.length > 0 ? (
 							<IssueBadge errors={errors} warnings={warnings} />
 						) : null}
@@ -575,7 +590,11 @@ const FlowNodeCard = memo(function FlowNodeCard({
 						) : null}
 						{outcomes.map((outcome) => {
 							const style = outcomeStyle(outcome, outcomeColor(node, outcome));
-							const taken = run?.state === outcome;
+							// A run lights up the outcome its step took. In the
+							// editor, a mark lights up the one a test run takes.
+							const taken = run
+								? run.state === outcome
+								: mark?.outcome === outcome;
 							return (
 								<li
 									key={outcome}
@@ -637,18 +656,67 @@ const FlowNodeCard = memo(function FlowNodeCard({
 	);
 });
 
+/** "Pinned output" or "Skipped", in the badge column. */
+function MarkBadge({ mark }: { mark: NodeMark }) {
+	const words =
+		mark.kind === "pinned"
+			? "Pinned output"
+			: `Skipped: takes ${outcomeLabel(mark.outcome)}`;
+	const Icon = mark.kind === "pinned" ? PinIcon : SkipForwardIcon;
+	return (
+		<Badge
+			variant="secondary"
+			className="h-4 gap-0.5 px-1 text-[10px]"
+			title={words}
+		>
+			<Icon aria-hidden="true" />
+			<span className="sr-only">{words}</span>
+		</Badge>
+	);
+}
+
+/** The strip's title: what it shows, in full. */
+function stripTitle(line: SampleLine): string | undefined {
+	switch (line.kind) {
+		case "output":
+			return `${line.field}: ${line.text}`;
+		case "pinned":
+			return line.text === null
+				? "Pinned output"
+				: `Pinned output: ${line.text}`;
+		case "skipped":
+			return `Skipped: takes ${outcomeLabel(line.outcome)}`;
+		default:
+			return undefined;
+	}
+}
+
 /**
- * The node's viewer: what it gave in the flow's newest run, in one line.
- * It sits at the bottom of the card with a fixed height, so no handle
- * moves and the routes of the last layout hold. A click selects the node.
+ * The node's viewer: what it gave in the flow's newest run, in one line,
+ * or what it gives in a test run when it is pinned or skipped. It sits at
+ * the bottom of the card with a fixed height, so no handle moves and the
+ * routes of the last layout hold. A click selects the node.
  */
 function SampleStrip({ line }: { line: SampleLine }) {
 	return (
 		<div
 			className="flex h-6 min-w-0 items-center gap-1.5 rounded-b-[calc(var(--radius-xl)-1px)] border-t bg-muted/50 px-2.5 text-[11px] text-muted-foreground"
-			title={line.kind === "output" ? `${line.field}: ${line.text}` : undefined}
+			title={stripTitle(line)}
 		>
-			{line.kind === "running" ? (
+			{line.kind === "pinned" ? (
+				<>
+					<PinIcon className="size-3 shrink-0" aria-hidden="true" />
+					<span className="sr-only">Pinned output: </span>
+					<span className="truncate">{line.text ?? "Pinned output"}</span>
+				</>
+			) : line.kind === "skipped" ? (
+				<>
+					<SkipForwardIcon className="size-3 shrink-0" aria-hidden="true" />
+					<span className="truncate">
+						Skipped · takes {outcomeLabel(line.outcome)}
+					</span>
+				</>
+			) : line.kind === "running" ? (
 				<>
 					<LoaderCircleIcon
 						className="size-3 shrink-0 animate-spin motion-reduce:animate-none"

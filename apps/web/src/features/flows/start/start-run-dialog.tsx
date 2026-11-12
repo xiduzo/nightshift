@@ -9,6 +9,11 @@ import {
 	waitedText,
 } from "@nightshift/client";
 import type { FlowInputDef } from "@nightshift/flows";
+import {
+	Alert,
+	AlertDescription,
+	AlertTitle,
+} from "@nightshift/ui/components/alert";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Combobox,
@@ -56,7 +61,7 @@ import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { PlayIcon, WorkflowIcon } from "lucide-react";
+import { FlaskConicalIcon, PlayIcon, WorkflowIcon } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 import { useHasFolder } from "@/features/projects";
@@ -69,6 +74,13 @@ import {
 	useNow,
 } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
+import { outcomeLabel } from "../canvas/outcome-badge";
+import {
+	markCount,
+	marksText,
+	type TestMarks,
+	testRequest,
+} from "../editor/test-run/marks";
 import { flowQueries } from "../queries";
 import { BaseRefCombobox } from "./base-ref-combobox";
 import { FlowInputFields } from "./flow-input-fields";
@@ -169,10 +181,20 @@ function typedInputs(inputs: FlowInputDef[], values: InputValues): InputValues {
 /** The runs whose branches "Start from" offers. */
 const RECENT_RUNS = 12;
 
+/** The pins and skips of a test run, from the editor (ADR 27). */
+export type StartTest = {
+	marks: TestMarks;
+	/** The skipped nodes that are Gates: nobody answers them. */
+	skippedGates: readonly string[];
+	/** The test run started: the editor shows what it gives. */
+	onStarted: (runId: string) => void;
+};
+
 /**
  * Starts a flow file in a new worktree: its inputs, the ref to start from,
  * and an optional stop time. A project without a folder has no ref to
- * start from.
+ * start from. With `test`, the editor's pins and skips: a test run, unless
+ * the person turns them off.
  */
 export function StartRunDialog({
 	open,
@@ -180,6 +202,7 @@ export function StartRunDialog({
 	projectId,
 	flowName,
 	inputs = [],
+	test,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -187,6 +210,8 @@ export function StartRunDialog({
 	flowName: string;
 	/** The flow's inputs, asked before the start. */
 	inputs?: FlowInputDef[];
+	/** The editor's pins and skips. The Flows page never sends them. */
+	test?: StartTest;
 }) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
@@ -197,6 +222,7 @@ export function StartRunDialog({
 						flowName={flowName}
 						inputs={inputs}
 						onStarted={() => onOpenChange(false)}
+						test={test}
 					/>
 				) : null}
 			</DialogContent>
@@ -210,6 +236,7 @@ function StartRunForm({
 	inputs,
 	onStarted,
 	picker,
+	test,
 }: {
 	projectId: string;
 	flowName: string;
@@ -217,6 +244,7 @@ function StartRunForm({
 	onStarted: () => void;
 	/** A field that chooses the flow. With it, the form has no header of its own. */
 	picker?: ReactNode;
+	test?: StartTest;
 }) {
 	const id = useId();
 	const navigate = useNavigate();
@@ -226,6 +254,8 @@ function StartRunForm({
 		readStoredInputs(projectId, flowName, inputs),
 	);
 	const [baseRef, setBaseRef] = useState("");
+	const [usesMarks, setUsesMarks] = useState(true);
+	const testing = test !== undefined && usesMarks;
 	// A project without a folder has no branches: nothing to start from.
 	const withFolder = useHasFolder(projectId);
 	// Where the steps run: Automatic lets the flow decide. A device the person
@@ -259,10 +289,20 @@ function StartRunForm({
 
 	const startRun = useMutation(
 		runMutations.start({
-			onSuccess: (run) => {
+			onSuccess: (run, start) => {
 				onStarted();
 				runActed(run.id);
-				void navigate({ to: "/runs/$runId", params: { runId: run.id } });
+				const open = () =>
+					void navigate({ to: "/runs/$runId", params: { runId: run.id } });
+				// A test run keeps you in the editor, which shows what it gives.
+				if ("test" in start && start.test !== undefined) {
+					test?.onStarted(run.id);
+					toast.success("Test run started", {
+						action: { label: "Open the run", onClick: open },
+					});
+					return;
+				}
+				open();
 			},
 			onError: (error) => toast.error(`Could not start: ${error.message}`),
 		}),
@@ -277,6 +317,7 @@ function StartRunForm({
 		const ref = withFolder ? baseRef.trim() : "";
 		// Computed at the click, so a dialog left open does not start with a stale time.
 		const at = stop.on ? nextOccurrence(stop.time) : null;
+		const marks = testing ? testRequest(test.marks) : undefined;
 		startRun.mutate({
 			projectId,
 			flowName,
@@ -284,6 +325,7 @@ function StartRunForm({
 			...(ref === "" ? {} : { baseRef: ref }),
 			...(at === null ? {} : { stopAt: at }),
 			...(device ? { deviceId: device.deviceId } : {}),
+			...(marks ? { test: marks } : {}),
 		});
 	};
 
@@ -298,7 +340,8 @@ function StartRunForm({
 			{picker ? null : (
 				<DialogHeader>
 					<DialogTitle>
-						Run <span className="font-mono">{flowName}</span>
+						{testing ? "Test" : "Run"}{" "}
+						<span className="font-mono">{flowName}</span>
 					</DialogTitle>
 					<DialogDescription>
 						{withFolder
@@ -310,6 +353,19 @@ function StartRunForm({
 
 			<FieldGroup className="gap-6">
 				{picker}
+				{test ? (
+					<div className="flex flex-col gap-3">
+						<Field orientation="horizontal">
+							<Switch
+								id={`${id}-test`}
+								checked={usesMarks}
+								onCheckedChange={setUsesMarks}
+							/>
+							<FieldLabel htmlFor={`${id}-test`}>Use pins and skips</FieldLabel>
+						</Field>
+						{usesMarks ? <TestAlert test={test} /> : null}
+					</div>
+				) : null}
 				<FlowInputFields
 					idPrefix={id}
 					inputs={inputs}
@@ -476,13 +532,62 @@ function StartRunForm({
 				>
 					{startRun.isPending ? (
 						<Spinner data-icon="inline-start" />
+					) : testing ? (
+						<FlaskConicalIcon data-icon="inline-start" />
 					) : (
 						<PlayIcon data-icon="inline-start" />
 					)}
-					{startRun.isPending ? "Starting…" : "Start"}
+					{startRun.isPending ? "Starting…" : testing ? "Start test" : "Start"}
 				</Button>
 			</DialogFooter>
 		</form>
+	);
+}
+
+/**
+ * What a test run pins and skips, and what still runs for real: the steps
+ * after a skipped Gate, such as a send, run without anyone's answer.
+ */
+function TestAlert({ test }: { test: StartTest }) {
+	const pinned = Object.keys(test.marks.pinned);
+	const skipped = Object.entries(test.marks.skipped);
+	return (
+		<Alert>
+			<FlaskConicalIcon />
+			<AlertTitle>{marksText(markCount(test.marks))}</AlertTitle>
+			<AlertDescription>
+				<ul className="flex flex-col gap-0.5">
+					{pinned.length > 0 ? (
+						<li>
+							Pinned output:{" "}
+							{pinned.map((nodeId, index) => (
+								<span key={nodeId}>
+									{index > 0 ? ", " : null}
+									<code className="font-mono">{nodeId}</code>
+								</span>
+							))}
+						</li>
+					) : null}
+					{skipped.length > 0 ? (
+						<li>
+							Skipped:{" "}
+							{skipped.map(([nodeId, outcome], index) => (
+								<span key={nodeId}>
+									{index > 0 ? ", " : null}
+									<code className="font-mono">{nodeId}</code> takes{" "}
+									{outcomeLabel(outcome)}
+								</span>
+							))}
+						</li>
+					) : null}
+				</ul>
+				<p>
+					{test.skippedGates.length > 0
+						? "A skipped Gate does not ask. The steps after it run for real."
+						: "Every other node runs for real."}
+				</p>
+			</AlertDescription>
+		</Alert>
 	);
 }
 
