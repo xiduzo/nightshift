@@ -18,12 +18,13 @@ const STATUS_HINT: Record<EndStatus, string> = {
 	failed: "The run fails here on purpose. You can run it again from a step.",
 };
 
-/** Whether the node writes a report, in the order the toggle shows them. */
+/** Whether the node writes a report, or reads one, in the order the toggle shows them. */
 type ReportKind = "none" | NonNullable<EndNode["report"]>["kind"];
 
 const REPORT_KINDS: { kind: ReportKind; label: string }[] = [
 	{ kind: "none", label: "None" },
 	{ kind: "text", label: "Write it" },
+	{ kind: "file", label: "A file the run wrote" },
 ];
 
 const PRESSED =
@@ -97,6 +98,7 @@ export function EndFields({
 						const kind = value[0] as ReportKind | undefined;
 						if (kind === "none") setReport(undefined);
 						if (kind === "text") setReport({ kind: "text", text: "" });
+						if (kind === "file") setReport({ kind: "file", path: "" });
 					}}
 				>
 					{REPORT_KINDS.map(({ kind, label }) => (
@@ -116,6 +118,19 @@ export function EndFields({
 					placeholder={"## What is new\n\n{{summary.output}}"}
 					language="markdown"
 					onChange={(text) => setReport({ kind: "text", text })}
+				/>
+			) : null}
+			{report?.kind === "file" ? (
+				<TemplateField
+					id={`${id}-report-file`}
+					label="File"
+					hint="A path inside the folder the run works in."
+					flow={flow}
+					nodeId={node.id}
+					value={report.path}
+					placeholder="report.md"
+					multiline={false}
+					onChange={(path) => setReport({ kind: "file", path })}
 				/>
 			) : null}
 			<Note>
