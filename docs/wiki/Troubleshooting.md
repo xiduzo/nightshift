@@ -92,11 +92,12 @@ By design, a development install (`bun run dev`) pairs and connects only with a 
 
 ### A run ended without its report file
 
-The End node reads its report from a file, but it found no text file at that path. The run page says why. Check these:
+The End node reads its report from a file, but it did not get a text file from that path. The run page says why. Check these:
 
 1. The step writes the file inside the folder the run works in. The End node uses the same path, for example `reports/{{topic}}.md`.
 2. The file is text, such as Markdown. Night Shift does not read a PDF or an image as a report.
 3. In a project without a folder, the step that writes the file runs on the same computer as the run. Each computer has its own folder of the run.
+4. The computer with the file stays on until the run ends. "Could not read the report file on" a computer means that it was offline or did not answer. Night Shift waited for it as long as the **Network** limit of the [run policy](Runs-and-schedules.md#run-policy).
 
 "Update Night Shift" in the message means that the computer runs an older version. Update Night Shift there.
 
