@@ -203,7 +203,7 @@ apps/web/src/
       <name>-page.tsx      the page a route renders
       types.ts             this vertical's slice of the API types, when contract.ts is not enough
       components/ hooks/ lib/   when the vertical is big enough
-    flows/                 canvas/, editor/ (+ add-node/ the add-node dialog and its catalog, inspector/ one file per node type, io/, lib/), start/ (Start run, the flow's inputs), schedules/ (a flow's schedules and webhooks)
+    flows/                 canvas/ (+ viewer/ the last output on each node), editor/ (+ add-node/ the add-node dialog and its catalog, inspector/ one file per node type, io/, lib/), start/ (Start run, the flow's inputs), schedules/ (a flow's schedules and webhooks)
     runs/                  components/ (+ run-page.tsx, details/), hooks/, lib/, transcript/ (+ items/ per group of item kinds)
     settings/              settings-page.tsx, components/ (one file per card), hooks/use-settings-form.ts
     agents/                connections/ (MCP servers, CLI tools and secrets, on the Agents page)
