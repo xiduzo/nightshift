@@ -56,6 +56,29 @@ export async function consumeStream<T>(
 	}
 }
 
+/**
+ * Closes a stream a stop ends before it is read: its cleanup is part of
+ * the step, as in `consumeStream`. Waits `graceMs` at most, so that a
+ * stuck cleanup cannot hold a stop forever.
+ */
+export async function closeStream(
+	iterator: AsyncIterator<unknown>,
+	graceMs: number,
+): Promise<"ended" | "abandoned"> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const abandoned = new Promise<"abandoned">((resolve) => {
+		timer = setTimeout(() => resolve("abandoned"), graceMs);
+	});
+	try {
+		return await Promise.race([
+			close(iterator).then(() => "ended" as const),
+			abandoned,
+		]);
+	} finally {
+		clearTimeout(timer);
+	}
+}
+
 /** Closes the stream: resolves once its cleanup is over. Never throws. */
 function close(iterator: AsyncIterator<unknown>): Promise<void> {
 	return Promise.resolve()

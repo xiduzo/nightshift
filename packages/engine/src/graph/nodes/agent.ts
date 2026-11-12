@@ -41,7 +41,7 @@ import {
 	climbValues,
 	tierAt,
 } from "../cascade";
-import { consumeStream } from "../consume";
+import { closeStream, consumeStream } from "../consume";
 import {
 	harnessLabel,
 	isWaitKind,
@@ -769,9 +769,11 @@ async function runSession(
 	});
 
 	try {
-		// A stop that came in while the session was being recorded.
+		// A stop that came in while the session was being recorded. The
+		// harness never ran, but the Device made the step's knowledge view:
+		// its cleanup ends before the step does.
 		if (signal.aborted) {
-			void Promise.resolve(stream.return?.()).catch(() => {});
+			await closeStream(stream, STOP_GRACE_MS);
 			throw new Error("The step was stopped.");
 		}
 		await consumeStream(

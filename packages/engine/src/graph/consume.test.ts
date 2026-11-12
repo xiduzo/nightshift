@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { consumeStream } from "./consume";
+import { closeStream, consumeStream } from "./consume";
 
 /**
  * A session's stream does its cleanup when it closes: the Device removes the
@@ -80,5 +80,38 @@ describe("consumeStream", () => {
 		}
 		expect(await read(session(), { order, signal: stop.signal })).toBe("ended");
 		expect(order).toEqual(["finished"]);
+	});
+});
+
+describe("closeStream", () => {
+	test("a stream a stop closes before its read has done its cleanup when the close returns", async () => {
+		const order: string[] = [];
+		async function* session() {
+			try {
+				yield "ready";
+				yield "never read";
+			} finally {
+				await turn();
+				order.push("cleanup");
+			}
+		}
+		const stream = session();
+		await stream.next();
+		expect(await closeStream(stream, 1_000)).toBe("ended");
+		order.push("returned");
+		expect(order).toEqual(["cleanup", "returned"]);
+	});
+
+	test("a cleanup that never ends is left after the grace", async () => {
+		async function* session() {
+			try {
+				yield "ready";
+			} finally {
+				await new Promise(() => {});
+			}
+		}
+		const stream = session();
+		await stream.next();
+		expect(await closeStream(stream, 1)).toBe("abandoned");
 	});
 });

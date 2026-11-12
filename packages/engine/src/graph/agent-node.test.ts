@@ -48,6 +48,13 @@ import { ASK_CHOICES } from "./nodes/agent-ask";
 const agent = (id: string, extra: Record<string, unknown> = {}) =>
 	agentNode(id, `Work on ${id}: {{task}}`, extra as Partial<AgentNode>);
 
+/** Some turns of the event loop. */
+async function turns(count: number) {
+	for (let i = 0; i < count; i++) {
+		await new Promise<void>((resolve) => setImmediate(resolve));
+	}
+}
+
 let sandbox: Sandbox;
 beforeEach(async () => {
 	sandbox = await createSandbox();
@@ -1147,6 +1154,68 @@ describe("the Agent node", () => {
 		expect(payloads(logged, "StepEnded")[0]).toMatchObject({
 			outcome: "stopped",
 			error: null,
+		});
+	});
+
+	test("a stop while the session is recorded ends the step after the session's cleanup: the knowledge view is gone", async () => {
+		const { knowledge, folder, close } = testKnowledge(sandbox);
+		closes.push(close);
+		await mkdir(join(folder("project-1"), "books"), { recursive: true });
+		await writeFile(join(folder("project-1"), "books", "a.md"), "# A\n");
+		const order: string[] = [];
+		const stop = new AbortController();
+		/** The step ended its session: it logged `SessionEnded`. */
+		const sessionEnded = Promise.withResolvers<void>();
+		let view: string | undefined;
+		const harness = fakeHarness(reportingScript("pass"));
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "reader",
+				nodes: [agent("reader", { knowledge: ["./books/"] })],
+				edges: [],
+			}),
+			{
+				harness,
+				signal: stop.signal,
+				knowledge: {
+					...knowledge,
+					async forSession(request, at) {
+						const known = await knowledge.forSession(request, at);
+						view = known.contribution.env?.NS_KNOWLEDGE;
+						// The stop comes before the step has recorded its session.
+						stop.abort();
+						return {
+							...known,
+							async done() {
+								// A cleanup that takes a while: until the step logged its
+								// end, or for some turns of the event loop.
+								await Promise.race([sessionEnded.promise, turns(50)]);
+								await known.done();
+								order.push("cleanup");
+							},
+						};
+					},
+				},
+			},
+		);
+		const append = h.log.append.bind(h.log);
+		h.log.append = async (input, writes) => {
+			const appended = await append(input, writes);
+			if (input.type === "SessionEnded") {
+				order.push("SessionEnded");
+				sessionEnded.resolve();
+			}
+			return appended;
+		};
+		await drive(h, { inputs: {} });
+		expect(harness.calls).toEqual([]);
+		expect(order).toEqual(["cleanup", "SessionEnded"]);
+		expect(view).toBeString();
+		expect(existsSync(view as string)).toBe(false);
+		expect(payloads(await h.events(), "SessionEnded")[0]).toMatchObject({
+			outcome: "stopped",
+			errorKind: "aborted",
 		});
 	});
 
