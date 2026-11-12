@@ -72,7 +72,7 @@ import {
 	type StepEnd,
 	scopeOf,
 } from "./route";
-import { positionOf } from "./run-position";
+import { type DoneStep, positionOf } from "./run-position";
 import {
 	makeRunWorktree,
 	readyRunFolder,
@@ -245,26 +245,46 @@ export type OpenStep = StepHandle & {
 	/**
 	 * Closes the step: `StepEnded` in the log, the recorder and the timers
 	 * closed, the bus and the custom stream told. The node then routes on
-	 * the returned end (`route()`).
+	 * the returned end (`route()`), or parks: `endAndGo` does the first.
 	 */
 	end(
 		outcome: StepOutcome,
 		outputs: StepOutputs,
 		error: string | null,
-		extra?: {
-			costUsd?: number | null;
-			costSource?: CostSource | null;
-			harnessSessionId?: string | null;
+		extra?: EndExtra & {
 			/** The node's variable writes do not apply: a try of a cascade that climbs on. */
 			skipWrites?: boolean;
-			/** The guard that stopped the step. */
-			guard?: StepGuard;
-			/** What a Since last run step saw new or changed: saved with `StepEnded`. */
-			memory?: StepMemory;
 		},
 	): Promise<StepEnd>;
+	/**
+	 * Closes the step and goes on: a try of a cascade (`StepStart.climb`)
+	 * that did not hold climbs to its next try while one is left, with none
+	 * of the node's writes and no scores. Any other end scores what the
+	 * step's data says (`dataScores`) and routes (`route()`), with `update`.
+	 * `trail` is what the climb keeps of the try besides its outputs.
+	 */
+	endAndGo(
+		outcome: StepOutcome,
+		outputs: StepOutputs,
+		error: string | null,
+		extra?: EndExtra & {
+			update?: RunStateUpdate;
+			trail?: Partial<CascadeTry>;
+		},
+	): Promise<Command>;
 	/** Closes the recorder and the timers but leaves the step open in the log (a wait). */
 	leaveOpen(): void;
+};
+
+/** What a step's end records besides its outcome, outputs and error. */
+type EndExtra = {
+	costUsd?: number | null;
+	costSource?: CostSource | null;
+	harnessSessionId?: string | null;
+	/** The guard that stopped the step. */
+	guard?: StepGuard;
+	/** What a Since last run step saw new or changed: saved with `StepEnded`. */
+	memory?: StepMemory;
 };
 
 /**
@@ -407,17 +427,7 @@ export async function runStep(
 	const extra = spec.update;
 	const { climb } = spec;
 	if (entry.kind === "done") {
-		// A try that ended before its commit and did not hold climbs again.
-		const logged: StepEnd = {
-			stepId: entry.step.id,
-			visit: entry.step.visit,
-			outcome: entry.ended.outcome,
-			outputs: entry.ended.outputs,
-			error: entry.ended.error,
-		};
-		const next = climb ? climbNext(climb, logged) : null;
-		if (climb && next) return climbCommand(climb.root, logged, next);
-		return routeDone(ctx, state, node, entry, config, extra);
+		return doneAndGo(ctx, state, node, entry, config, climb, extra);
 	}
 	const start: StepStart =
 		spec.standIn && entry.kind === "new"
@@ -486,43 +496,14 @@ export async function runStep(
 			? { harnessSessionId: r.harnessSessionId }
 			: {}),
 	});
-	/**
-	 * Ends the step, then climbs (a try that did not hold, with a try left)
-	 * or routes. A step that does not climb scores what its data says
-	 * (`dataScores`). A climbing try scores nothing: only the try that lands.
-	 * A stand-in scores nothing either: its data is an earlier step's.
-	 */
-	const endAndGo = async (
+	/** Ends the step, then climbs or routes (`OpenStep.endAndGo`), with the spec's update. */
+	const endAndGo = (
 		outcome: StepOutcome,
 		outputs: StepOutputs,
 		error: string | null,
-		costs: ReturnType<typeof extraOf> & {
-			guard?: StepGuard;
-			memory?: StepMemory;
-		},
-		trail?: Partial<CascadeTry>,
-	): Promise<Command> => {
-		const next = climb
-			? climbNext(climb, { outcome, outputs, error }, trail)
-			: null;
-		const scores =
-			next || spec.standIn ? [] : await dataScores(step, node, outputs);
-		const end = await step.end(outcome, outputs, error, {
-			...costs,
-			...(next ? { skipWrites: true } : {}),
-		});
-		// After the end, as a Gate's answer: every reader sees the step ended first.
-		for (const { score, value } of scores) {
-			await ctx.log.append({
-				type: "Scored",
-				runId: ctx.run.id,
-				stepId: step.stepId,
-				payload: { score, value, label: null },
-			});
-		}
-		if (climb && next) return climbCommand(climb.root, end, next);
-		return route(ctx, state, node, end, config, extra);
-	};
+		more: EndExtra & { trail?: Partial<CascadeTry> },
+	): Promise<Command> =>
+		step.endAndGo(outcome, outputs, error, { ...more, update: extra });
 	switch (result.kind) {
 		case "end":
 			return endAndGo(
@@ -532,8 +513,8 @@ export async function runStep(
 				{
 					...extraOf(result),
 					...(result.memory ? { memory: result.memory } : {}),
+					...(result.trail ? { trail: result.trail } : {}),
 				},
-				result.trail,
 			);
 		case "aborted": {
 			const aborted = abortEnd(ctx, node, step.signal, result.outputs);
@@ -605,6 +586,33 @@ export async function runStep(
 			return endAndGo("error", await blank("error"), slept.error, costs);
 		}
 	}
+}
+
+/**
+ * Goes on from a step the log has as ended whose route the checkpoint
+ * lost (the daemon died before the commit): a try of a cascade that did
+ * not hold climbs again while a try is left, any other end routes on
+ * (`routeDone`) with `update`.
+ */
+export function doneAndGo(
+	ctx: StepContext,
+	state: RunStateValues,
+	node: FlowNode,
+	done: DoneStep,
+	config: LangGraphRunnableConfig,
+	climb?: Climb,
+	update?: RunStateUpdate,
+): Promise<Command> | Command {
+	const logged: StepEnd = {
+		stepId: done.step.id,
+		visit: done.step.visit,
+		outcome: done.ended.outcome,
+		outputs: done.ended.outputs,
+		error: done.ended.error,
+	};
+	const next = climb ? climbNext(climb, logged) : null;
+	if (climb && next) return climbCommand(climb.root, logged, next);
+	return routeDone(ctx, state, node, done, config, update);
 }
 
 /** The node types whose data may hold `scores`: the flow's own metrics (Q32). */
@@ -1144,6 +1152,31 @@ export async function beginStep(
 					: {}),
 				...(variables ? { variables } : {}),
 			};
+		},
+		async endAndGo(outcome, outputs, error, more = {}) {
+			const { update, trail, ...extra } = more;
+			const next = climb
+				? climbNext(climb, { outcome, outputs, error }, trail)
+				: null;
+			// A climbing try scores nothing: only the try that lands. A
+			// stand-in scores nothing either: its data is an earlier step's.
+			const scores =
+				next || standIn ? [] : await dataScores(handle, node, outputs);
+			const end = await handle.end(outcome, outputs, error, {
+				...extra,
+				...(next ? { skipWrites: true } : {}),
+			});
+			// After the end, as a Gate's answer: every reader sees the step ended first.
+			for (const { score, value } of scores) {
+				await ctx.log.append({
+					type: "Scored",
+					runId,
+					stepId,
+					payload: { score, value, label: null },
+				});
+			}
+			if (climb && next) return climbCommand(climb.root, end, next);
+			return route(ctx, state, node, end, config, update);
 		},
 		leaveOpen,
 	};

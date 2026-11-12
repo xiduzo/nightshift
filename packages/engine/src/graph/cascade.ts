@@ -284,22 +284,6 @@ export function climbNext(
 	return nextTry(root, at, { ...tryRecord(root, at, end), ...trail });
 }
 
-/** The climb of a Call's try: an end that does not hold climbs while a try is left. */
-export function climbSpec(
-	node: CascadeNode,
-	at: CascadePosition,
-): {
-	climbs(end: Pick<StepEnd, "outcome" | "outputs" | "error">): boolean;
-	command(end: StepEnd): Command;
-} {
-	const next = (end: Pick<StepEnd, "outcome" | "outputs" | "error">) =>
-		climbNext({ root: node, at }, end);
-	return {
-		climbs: (end) => next(end) !== null,
-		command: (end) => climbCommand(node, end, next(end) ?? at),
-	};
-}
-
 /** One try of the climb in words: the tier, its pick and probability, or what went wrong. */
 function tryLine(done: CascadeTry): string {
 	const where = done.try > 1 ? `${done.tier} (try ${done.try})` : done.tier;

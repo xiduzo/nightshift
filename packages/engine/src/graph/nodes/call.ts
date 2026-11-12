@@ -6,7 +6,7 @@ import {
 	runsEach,
 } from "@nightshift/flows";
 import type { InputValues, StepOutputs } from "../../log";
-import { type Climb, climbOutputs, climbSpec, climbValues } from "../cascade";
+import type { Climb } from "../cascade";
 import { climbing } from "../climb";
 import {
 	endedAtReason,
@@ -20,9 +20,9 @@ import {
 import { eachOutputs } from "../each";
 import { renderBindings, resolveInputs } from "../inputs";
 import { entryOf, RESUME_RULES, resumePoint } from "../resume-point";
-import { route, routeDone, type StepEnd, scopeOf } from "../route";
+import { scopeOf } from "../route";
 import type { RunStateUpdate } from "../state";
-import { beginStep } from "../step-runner";
+import { beginStep, doneAndGo } from "../step-runner";
 import {
 	type BodyGraph,
 	bodyGraph,
@@ -101,67 +101,42 @@ async function callOnce(
 		scopeOf(config),
 		CALL.resumeRules(node),
 	);
-	const climbs = climb ? climbSpec(climb.root, climb.at) : null;
 	if (point.kind === "done") {
-		const logged: StepEnd = {
-			stepId: point.step.id,
-			visit: point.step.visit,
-			outcome: point.ended.outcome,
-			outputs: point.ended.outputs,
-			error: point.ended.error,
-		};
-		if (climbs?.climbs(logged)) return climbs.command(logged);
-		return routeDone(ctx, state, node, point, config);
+		return doneAndGo(ctx, state, node, point, config, climb);
 	}
+	const start = entryOf(point);
 	const begun = await beginStep(
 		ctx,
 		node,
 		state,
 		config,
-		entryOf(point),
+		climb ? { ...start, climb } : start,
 		runState,
 	);
 	if (begun.kind === "parked") return begun.command;
 	const step = begun.step;
 	const { stepId, visit } = step;
-	if (climb) step.tctx.cascade = climbValues(climb.root, climb.at);
-	const own = climb ? climbOutputs(climb.root, climb.at) : {};
+	const all = (outcome: string, outputs: StepOutputs): StepOutputs => ({
+		...outputs,
+		ended: outputs.ended ?? "",
+		outcome,
+		visit,
+	});
 
 	/** Ends the step, then climbs (a try that did not hold, with a try left) or routes. */
-	const end = async (
+	const end = (
 		outcome: "pass" | "fail" | "error" | "stopped",
 		outputs: StepOutputs,
 		error: string | null,
-		extra?: RunStateUpdate,
-	): Promise<Command> => {
-		const all = {
-			...outputs,
-			...own,
-			ended: outputs.ended ?? "",
-			outcome,
-			visit,
-		};
-		const climbed = climbs?.climbs({ outcome, outputs: all, error }) ?? false;
-		const ended = await step.end(
-			outcome,
-			all,
-			error,
-			climbed ? { skipWrites: true } : undefined,
-		);
-		if (climbed && climbs) return climbs.command(ended);
-		return route(ctx, state, node, ended, config, extra);
-	};
+		update?: RunStateUpdate,
+	): Promise<Command> =>
+		step.endAndGo(outcome, all(outcome, outputs), error, { update });
 	/** Ends the step and goes nowhere: the run parks on the interrupt that follows. */
 	const close = (
 		outcome: "error" | "stopped",
 		outputs: StepOutputs,
 		error: string | null,
-	) =>
-		step.end(
-			outcome,
-			{ ...outputs, ...own, ended: outputs.ended ?? "", outcome, visit },
-			error,
-		);
+	) => step.end(outcome, all(outcome, outputs), error);
 
 	const called = ctx.flows[node.flow];
 	if (!called) {
