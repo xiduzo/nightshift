@@ -8,19 +8,19 @@ Each idea climbs the ladder. A rule, or a check for what is new, comes first, so
 
 ## Keep a market brief up to date
 
-A schedule starts the flow each Monday. A Command reads the pages of the products and the companies that you follow. A rule keeps only the pages that changed since the last run. When nothing changed, the run ends. A decider sorts each change: it matters to you, or it does not. An agent adds what matters to a brief in the project's knowledge.
-
-The run only writes a file for you to read, so no Gate asks first.
-
-It could use: a schedule, a Command with `curl`, a variable kept between runs, a Branch, a decider, the knowledge.
-
-## Follow new papers on a topic
-
-A schedule starts the flow each morning. It reads the feed of a search for papers, and keeps only the papers that an earlier run did not see. A decider reads the abstract of each new paper, and picks: on your topic, or not. An agent writes a summary of each paper on your topic, in plain words, into the knowledge.
+A schedule starts the flow each Monday. A Command reads the pages of the products and the companies that you follow. A rule keeps only the pages that changed since the last run. When nothing changed, the run ends. A decider sorts each change: it matters to you, or it does not. An agent adds what matters to a brief in the project's knowledge. The End node writes what changed as the run's report, so you read it on Home.
 
 The run only writes files for you to read, so no Gate asks first.
 
-It could use: a schedule, `kit:feeds/read`, a Subflow per paper, a decider, the knowledge.
+It could use: a schedule, a Command with `curl`, a variable kept between runs, a Branch, a decider, the knowledge, an End node with a report.
+
+## Follow new papers on a topic
+
+A schedule starts the flow each morning. It reads the feed of a search for papers, and keeps only the papers that an earlier run did not see. A decider reads the abstract of each new paper, and picks: on your topic, or not. An agent writes a summary of each paper on your topic, in plain words, into the knowledge. The run's report lists the new papers with a link to each.
+
+The run only writes files for you to read, so no Gate asks first.
+
+It could use: a schedule, `kit:feeds/read`, a Subflow per paper, a decider, the knowledge, an End node with a report.
 
 ## Watch prices you care about
 
@@ -32,11 +32,11 @@ It could use: a schedule, a Command with `curl` and `jq`, a variable kept betwee
 
 ## Check your backups each morning
 
-A schedule starts the flow each morning. A Command lists the newest backups, with their time and size. A rule passes when each backup is new, and about as large as the one before. Then the run ends, and nobody hears about it.
+A schedule starts the flow each morning. A Command lists the newest backups, with their time and size. A rule passes when each backup is new, and about as large as the one before. Then the run ends with a short report of each backup, its time and its size. You read it on Home when you want to, and nobody gets a notification.
 
 When the rule fails, a Command starts the backup again. When that fails too, an agent reads the logs and finds the cause. A Gate with the urgency Now then shows you the cause, and asks what to do. This Gate is the fallback: the ladder ran out.
 
-It could use: a schedule, a Command, a Branch, an Agent, a Gate with the urgency Now.
+It could use: a schedule, a Command, a Branch, an Agent, a Gate with the urgency Now, an End node with a report.
 
 ## Reorder supplies that run low
 

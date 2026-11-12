@@ -86,7 +86,7 @@ CLI when you need them.
 | [Drawer](https://ui.shadcn.com/docs/components/drawer) | A bottom sheet for mobile (Vaul). |
 | ✓ [Popover](https://ui.shadcn.com/docs/components/popover) | Small floating content on click: a picker, a short form, the flow editor's issues, the variables a template field offers after `{{`. |
 | ✓ [Tooltip](https://ui.shadcn.com/docs/components/tooltip) | A short label on hover or focus, mostly for icon buttons. The hint of an inspector field, behind an info icon beside its label. Needs `TooltipProvider` (in the root). |
-| ✓ [Hover Card](https://ui.shadcn.com/docs/components/hover-card) | A preview on hover (a PR, an issue, a node, the tokens a step used). |
+| ✓ [Hover Card](https://ui.shadcn.com/docs/components/hover-card) | A preview on hover (a PR, an issue, a node, the tokens a step used). The rest of a row on Home: a Gate's question, why a flow failed, the result and the start of a report (`ReportPreview` in `features/runs`). |
 | ✓ [Context Menu](https://ui.shadcn.com/docs/components/context-menu) | A right-click menu (canvas nodes). |
 | ✓ [Dropdown Menu](https://ui.shadcn.com/docs/components/dropdown-menu) | Actions behind a button ("…" menus, user menu). |
 | [Menubar](https://ui.shadcn.com/docs/components/menubar) | A desktop-app menubar (File, Edit, View). |
@@ -116,7 +116,7 @@ CLI when you need them.
 | [Carousel](https://ui.shadcn.com/docs/components/carousel) | Slides you swipe through (Embla). |
 | [Aspect Ratio](https://ui.shadcn.com/docs/components/aspect-ratio) | Keeps media at a fixed ratio. |
 | [Typography](https://ui.shadcn.com/docs/components/typography) | Class recipes for headings, paragraphs, lists, blockquotes and inline code. Copy the classes. There is nothing to install. |
-| ✓ [Item](https://ui.shadcn.com/docs/components/item) | One row of a list with media, title, description and actions: `ItemGroup`, `ItemMedia`, `ItemContent`, `ItemTitle`, `ItemDescription`, `ItemActions`. Runs in a list, gates, projects, settings rows, the links of a Gate, the phones and browsers that can notify you. |
+| ✓ [Item](https://ui.shadcn.com/docs/components/item) | One row of a list with media, title, description and actions: `ItemGroup`, `ItemMedia`, `ItemContent`, `ItemTitle`, `ItemDescription`, `ItemActions`. Runs in a list, gates, projects, settings rows, the links of a Gate, the phones and browsers that can notify you. The one-line rows of Home's lanes and of its Latest reports card (`LaneRow` in `features/dashboard/home-lanes.tsx`). |
 | ✓ [Kbd](https://ui.shadcn.com/docs/components/kbd) | A keyboard key or shortcut (⌘K, Tab on the node dock's Add a node, the keys of the Review page of Knowledge). |
 
 ### More

@@ -40,7 +40,7 @@ flowchart LR
 | **Lease** | Lets one run at a time do the next steps, for example one deploy at a time. Runs on other computers of the Space take turns too. |
 | **Service** | Starts a Docker Compose stack, a dev server, or a model server for the next steps, and stops it after. |
 | **Since last run** | Remembers what it saw, and finds what is new or changed since the last run. It also watches one value, such as a price that passes a limit. |
-| **End** | Ends the run on purpose: done, nothing to do, or failed, with one line that says why. |
+| **End** | Ends the run on purpose: done, nothing to do, or failed, with one line that says why. It can also write the run's report. |
 <!-- /checked:nodes -->
 
 ### Agent
@@ -152,6 +152,14 @@ A **Since last run** node remembers what it saw. The next run gets only what is 
 - **Forget what it saw.** The node remembers what it saw when its step ends. A later step that fails does not undo that. To see everything again, select the node and click **Forget what it saw**. The next run is a first run.
 
 It remembers up to 10,000 items, and forgets the oldest first. A quick run remembers nothing.
+
+### End
+
+An **End** node ends the run with a result: **Done**, **Nothing to do** or **Failed**. Its **Message** is one line for the runs list and the notification.
+
+Set **Report** to **Write it** to give the run a report: what the run produced, in Markdown. It is a template, such as `## What is new` and then `{{summary.output}}`. The report shows on the run page, on the flow's card and on Home. Night Shift never sends it as a notification. See [The report of a run](Runs-and-schedules.md#the-report-of-a-run).
+
+In a subflow, the End node ends only the subflow. The Subflow node reads the result as `ended`, the message as `end_message` and the report as `end_report`.
 
 ## Inputs, outputs, and templates
 

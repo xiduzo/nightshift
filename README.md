@@ -28,7 +28,7 @@ A workflow builder like n8n or Zapier. A step can be an agent that works for an 
 
 Agents can research a market, watch a service, write a newsletter, or fix a bug. But you still start each one, check what it made, and choose what comes next. The agents do the work, and you work the shift.
 
-Night Shift lets you engineer that work once. You draw a flow: which agent does which step, which check proves it, what it may cost, and which choices need you. Rules and decision models make the other choices. Night Shift runs the flow on a schedule, from a webhook, or when you click Run. You answer only at a Gate.
+Night Shift lets you engineer that work once. You draw a flow: which agent does which step, which check proves it, what it may cost, and which choices need you. Rules and decision models make the other choices. Night Shift runs the flow on a schedule, from a webhook, or when you click Run. You answer only at a Gate. A run can end with a report of what it produced, which waits for you on Home.
 
 Every run shows what each step cost and how far each ladder climbed. So you tune a flow like any other system you build.
 

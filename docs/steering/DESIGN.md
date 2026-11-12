@@ -65,7 +65,7 @@ The palette is neutral. The web app adds its run status, outcome, metric and fam
 
 ### Overview lists
 
-An overview shows **at most 5 rows** in a list or table: the Failed lane on Home, the tabs under a project page's chart (Flows, Failures, Gates, Spend), and every tab of a details dialog.
+An overview shows **at most 5 rows** in a list or table: the Failed lane and Latest reports on Home, the tabs under a project page's chart (Flows, Failures, Gates, Spend), and every tab of a details dialog.
 
 - One number for all of them: `OVERVIEW_ROWS` in `apps/web/src/features/dashboard/overview.ts`. Do not add a limit per list.
 - Show the top 5 for the list's question: newest first, the most runs, the highest cost. Say which in the hint ("The last 5, newest first", "The top 5, the most runs first").
@@ -87,7 +87,7 @@ A project's page reads like the Performance page of Search Console. Keep its sha
 
 ### Home
 
-Home answers "what needs me" over every project. The heading says how many Gates wait and how many flows still fail in the range. Keep its shape:
+Home answers "what needs me, and what came out" over every project. The heading says how many Gates wait and how many flows still fail in the range. Keep its shape:
 
 - The same range as a project's page, on top: 7, 30 or 90 days, in the URL (`?range=30`).
 - The four numbers in one slim strip: Runs, Finished, Spend, Needed you. Each has a small line per day, with the days before dashed. Each says how it moved against them. A number opens its details dialog.
@@ -96,7 +96,9 @@ Home answers "what needs me" over every project. The heading says how many Gates
 - Waiting for you and Failed show at most 5 rows (see Overview lists). The rest is one link away: the inbox, or **Details**.
 - Failed shows one row per flow, not per run. The flows that still fail come first. A flow that a later run finished shows dimmed, with a check. The lane counts only the flows that still fail. The hover card says how often it failed, at which step, and the first sentence of why.
 - Every row opens its place: a run its run page, a failed flow its newest failed run, a Gate its question in the inbox. Waiting for you links to the inbox. **Details** on Failed opens the failed runs.
-- Under the lanes, the projects, each with the status of its last runs. A project opens its page at the same range.
+- Under the lanes, **Latest reports**: one card across the full width. It shows one row per flow, the newest report first, at most 5, from the runs started in the range. The hover card shows the result and the start of the report. A row opens the run page at its report. The footer says how many more are on the Flows page of each project. An older Host sends no reports, so the card hides. Night Shift never pushes a report.
+- Under the reports, the projects, each with the status of its last runs. A project opens its page at the same range.
+- A run page opens at its report when the run ended with one and the link names no step.
 
 ### Knowledge
 
