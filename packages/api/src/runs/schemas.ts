@@ -267,7 +267,16 @@ export const runSummarySchema = exact<RunSummary>()(
 		),
 		/** Each time a person stepped in, oldest first. Older Hosts send none. */
 		neededYou: z
-			.array(z.object({ reason: neededYouReasonSchema, at: z.number() }))
+			.array(
+				z.object({
+					reason: neededYouReasonSchema,
+					at: z.number(),
+					/** The flow draws this Gate or Ask for a person. Older Hosts send none. */
+					planned: z.boolean().optional(),
+					nodeId: z.string().optional(),
+					question: z.string().optional(),
+				}),
+			)
 			.optional(),
 		report: runReportGlanceSchema.optional(),
 		sleeps: z.array(sleepSchema).optional(),

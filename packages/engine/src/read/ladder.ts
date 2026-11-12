@@ -110,6 +110,12 @@ export type RunLadder = {
 	tries: ReadonlyMap<string, TryRung>;
 	/** In the order they landed. */
 	landings: Landing[];
+	/**
+	 * The steps that asked a person after another try of the same climb: a
+	 * ladder ran out. A person who is the only try of a climb was drawn
+	 * there, and is not in it.
+	 */
+	fallbacks: ReadonlySet<string>;
 };
 
 /**
@@ -149,6 +155,7 @@ export function ladderOf(steps: readonly DerivedStep[]): RunLadder {
 	const later = laterSteps(ordered);
 	const open = new Map<string, Climb>();
 	const tries = new Map<string, TryRung>();
+	const fallbacks = new Set<string>();
 	const landings: Landing[] = [];
 	for (const step of ordered) {
 		if (!onLadder(step.nodeType)) continue;
@@ -160,6 +167,12 @@ export function ladderOf(steps: readonly DerivedStep[]): RunLadder {
 		if (rung === null || plainSubflow(step, rung)) continue;
 		const label = tierOf(step);
 		if (rung.by !== "person" && label !== null) climb.firstLabel ??= label;
+		if (
+			rung.by === "person" &&
+			climb.steps.some((before) => before.rung.by !== "person")
+		) {
+			fallbacks.add(step.id);
+		}
 		climb.steps.push({ step, rung });
 		tries.set(step.id, tryRung(rung));
 		if (!lands(step.outcome, rung)) {
@@ -170,7 +183,7 @@ export function ladderOf(steps: readonly DerivedStep[]): RunLadder {
 		landings.push(landing(ladder, climb.steps, byId, inside));
 	}
 	landings.sort((a, b) => a.at - b.at);
-	return { tries, landings };
+	return { tries, landings, fallbacks };
 }
 
 /** The landings of a run's steps (`ladderOf`). */

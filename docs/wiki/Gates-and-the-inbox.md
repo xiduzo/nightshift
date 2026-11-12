@@ -68,6 +68,6 @@ To move through the queue, use **Previous** and **Next**, or the arrow keys. **S
 
 A Gate sends a notification only for the levels that you choose. Go to Settings, Notifications, and set **Push for**. The default is Now. A Gate of another level waits in the inbox without a notification.
 
-Home shows what needs you in every project: the runs that work now, the Gates that wait, and the flows that failed.
+Home does not list your Gates. It shows the flows that need a look, and what your flows produced. See [Home](Runs-and-schedules.md#home).
 
 An agent in a terminal reads the same inbox with the `needs_me` tool, and answers a Gate with `answer_gate`. See [Terminal and MCP](Terminal-and-MCP.md).

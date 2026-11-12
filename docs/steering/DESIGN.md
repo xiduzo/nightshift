@@ -75,34 +75,33 @@ An overview shows **at most 5 rows** in a list or table: the Failed lane and Lat
 
 ### A project's page
 
-A project's page reads like the Performance page of Search Console. Keep its shape:
+A project's page shows where each of its flows still needs you (`docs/research/dashboards-2026-11.md`). Keep its shape:
 
 - One range for the whole page, on top: 7, 30 or 90 days, in the URL (`?range=30`). A day runs from midnight to midnight on your clock. No section has a range of its own.
-- Four metric tiles in one row: Runs, Finished, Spend, Needed you. Needed you is the share of the runs started in the range that a person stepped in on (answered, resumed, stopped or took over). Its change is in points, like Finished. A tile turns its line on the chart on or off. A tile that is on fills with a light shade of its line's color, and its text is a dark shade (`--metric-<key>-tile` tokens, one pair per theme). Each tile always says how its number moved against the same days just before. That is not a choice.
-- One line chart of the tiles that are on, with the days before as a dashed line. The tooltip puts the number before in brackets after each number, not on a row of its own.
-- When the days before had no runs, there is nothing to compare. The tiles and the chart say so, and the chart draws no dashed lines.
-- One card with tabs under the chart. Each tab is an overview list (see Overview lists).
-- What runs or waits now shows in one slim line, only when there is something.
-- **Details** on a tile opens the details dialog of that number at the page's range.
-- A test run counts only in Spend. Runs, Finished, Needed you, the Failures and Gates tabs, Latest reports and Flow health leave it out (`isTestRun`, one rule for every number). So does the sidebar's runs donut. The run page and every run list show a **Test run** badge. On the phone, the Runs chips and the Watch numbers leave it out, and the cost caption names it ("Of 8 runs and 1 test run").
+- One card of numbers: **Needed you without a plan**, **Needed you as planned**, **On its own** (how many flows are at that level), and **How N runs ended** as one bar. The first two count each time you stepped in, not each run. Each says how it moved against the same days just before. That is not a choice.
+- **Details** next to a number opens its details dialog at the page's range.
+- Under it, one card with one row per flow (see Flow health). The flows that needed you most without a plan come first.
+- The page shows no spend of its own. **Spend** in the heading opens the spend details, until Spend has its own page. Cost stays only as evidence of a flow: what a finished run costs, and what a useful result costs.
+- A test run counts only in the spend. Every other number leaves it out (`isTestRun`, one rule for every number). So does the sidebar's runs donut. The run page and every run list show a **Test run** badge. On the phone, the Runs chips and the Watch numbers leave it out, and the cost caption names it ("Of 8 runs and 1 test run").
+- An older Host sends no level and no planned split: a dash.
 - Setup does not go on this page. Its other pages sit under the project in the sidebar.
 
 ### Home
 
-Home answers "what needs me, and what came out" over every project. The heading says how many Gates wait and how many flows still fail in the range. Keep its shape:
+Home is a note over every project that you read top to bottom. It guards the flows that nobody watches (`docs/research/dashboards-2026-11.md`). Keep its shape:
 
+- One narrow column (`max-w-2xl`), sentences before numbers. No range, no cards of numbers, no spend.
+- The heading says how many flows need a look: "3 flows need a look." or "Every flow did its work." When you were here before, it splits the new ones: "1 new flow needs a look. 2 still do." The line above it says when you last looked.
+- Under the heading, one sentence with the number of times your flows needed you without a plan this week, against last week, and one small bar per week for 12 weeks. The number follows the week, not your last look.
 - Until this computer has an agent, **Get started** sits under the heading. Its rows: An agent (**Set up**), A decider (**Choose**, optional), and A project (**Add project**, no folder needed). A row that is done shows a check. Once the card shows, it stays until you leave Home. The setup on Home does not open the new profile. **Later** hides the card until the next session.
-- The same range as a project's page, on top: 7, 30 or 90 days, in the URL (`?range=30`).
-- The four numbers in one slim strip: Runs, Finished, Spend, Needed you. Each has a small line per day, with the days before dashed. Each says how it moved against them. A number opens its details dialog.
-- Three lanes in the order you act on them: Running now, Waiting for you, Failed. The lanes have the same height: the height of the tallest. Each has a count. A lane with nothing shows one line that says so.
-- Running now holds the runs on their way: running and asleep. A run at a Gate shows under Waiting for you. One table decides the group of a run on Home, on the phone's Watch and in its Runs chips (`statusOf` of `@nightshift/client`). An interrupted run counts as stopped, not as failed. A Watch tile counts the runs of the chip it opens.
-- A row is one line: what it is and one fact (when, or how often). The rest shows in a hover card. Long text truncates. It never wraps the row.
-- Waiting for you and Failed show at most 5 rows (see Overview lists). The rest is one link away: the inbox, or **Details**.
-- Failed shows one row per flow, not per run. The flows that still fail come first. A flow that a later run finished shows dimmed, with a check. The lane counts only the flows that still fail. The hover card says how often it failed, at which step, and the first sentence of why.
-- Every row opens its place: a run its run page, a failed flow its newest failed run, a Gate its question in the inbox. Waiting for you links to the inbox. **Details** on Failed opens the failed runs.
-- Under the lanes, **Latest reports**: one card across the full width. It shows one row per flow, the newest report first, at most 5, from the runs started in the range. The hover card shows the result and the start of the report. A row opens the run page at its report. The footer says how many more are on the Flows page of each project. An older Host sends no reports, so the card hides. Night Shift never pushes a report.
-- A test run counts only in Spend, as on a project's page. Failed and Latest reports leave it out. Running now shows it while it runs, with a **Test run** badge.
-- Under the reports, the projects, each with the status of its last runs. A project opens its page at the same range.
+- **Needs a look** holds one row per flow that left its usual range: its last runs failed, its last runs found nothing to do, or its last run cost more or took longer than every run before. Nobody sets a threshold. A row is state, not news: it stays until the flow is back in its range.
+- **Look** opens the flow in a Sheet at the side: what is unusual, the usual range against now, and the links to the run and the flow. For a failed run, **Ask an agent** reads the run and says what went wrong. It changes nothing.
+- **Looked at it** folds the row to one line ("You looked at … at 08:14"). It comes back as a row when its signal starts again. A flow that left the list since your last look says so once: "… is back to normal."
+- Only what is new since your last look gets a **New** badge. Night Shift keeps your last look in this browser.
+- **What came out** lists the newest report of each flow from the last 7 days, the new ones first. The reports from before your last look fold behind one line. A row opens the run page at its report. Night Shift never pushes a report.
+- Home has no list of Gates and no list of runs at work. The inbox holds the Gates. A run that works longer than usual is a Needs a look row.
+- A test run does not count on Home.
+- An older Host sends no watch: one line asks to update Night Shift, and What came out still shows.
 - A run page opens at its report when the run ended with one and the link names no step.
 
 ### Knowledge
@@ -158,9 +157,13 @@ A stat card or a table row can open a details dialog (`apps/web/src/features/das
 
 ### Flow health
 
-Flow health is a tab of a project's page, one row per flow. It leads with where the work landed (Q31). Keep its shape:
+Flow health is the card of flows on a project's page, one row per flow. Keep its shape:
 
-- Columns: Flow, **Where the work landed**, Last runs, Runs, Per finished run, Per useful result, Needed you. The last column has `pr-6`.
+- Columns: Flow, Last runs, **Needed you without a plan**, Per finished run, Needs a look. Under the flow's name: its level (**You decide**, **You check**, **On its own**) and since when. A flow with fewer than 3 ended runs has no level yet.
+- The level is measured from the flow's last 10 ended runs: You decide when you stepped in on more than half, On its own when on none, else You check. Nobody sets it.
+- Needed you without a plan shows the count, the count of the days before, and one small bar per week for 12 weeks. Its tooltip adds the planned times.
+- Per finished run is a box plot of what a finished run costs, with the median under it.
+- A row opens in place (a Collapsible), one at a time. Left: History, Why runs did not finish, Latest runs. Right: its signals, **Why it needed you** (Without a plan, As planned, each with the Gate's question), **Where the work landed**, Per useful result, and the time of a finished run. **All details** opens the details dialog.
 - **Where the work landed** has a thin segmented bar for the work and one for the choices: 8px, rounded parts, a 2px gap, one part per rung in ladder order. A line next to each bar gives the shares: "Sonnet 78% · Opus 19% · You 3%". It names the 3 biggest rungs and how many more there are.
 - Its tooltip gives each rung with its count and the cost of one landing, every try before it included. It adds how often a decider was not sure enough: "A decider was not sure enough in 6 of 50 Decisions."
 - Count a landing in times ("32 of 41 times") or Decisions, never in steps: each try of a cascade is a step. Show a cost per landing, never a sum over a flow's rungs: a Subflow's landing holds the cost of the Agent inside it.
@@ -169,7 +172,7 @@ Flow health is a tab of a project's page, one row per flow. It leads with where 
 - An older Host sends no ladders: a dash, and the tooltip says "Update Night Shift to see where the work landed."
 - A test run is not in a row: not in its last runs, its numbers or its latest report. The details dialog counts it only in the spend. "Total spent" says how many test runs it holds.
 
-A row opens the flow's details dialog. Its tabs: Overview, Ladders, Metrics, Cost, Problems, Runs.
+**All details** in an opened row opens the flow's details dialog. Its tabs: Overview, Ladders, Metrics, Cost, Problems, Runs.
 
 - **Ladders**: a card per ladder (rung, share, count, cost each, the not-sure line under Choices), then the 5 nodes that landed most, each with its own bar.
 - **Metrics**: a `Select` picks the metric (Q32). Four `Stat` cards: Total, Per run, Latest, Runs. Then three small charts on one day axis, in this order: the metric per run, Spent, Needed you. A hover on one day shows it in all three. Then the Metrics table: every metric with its runs, total, average and latest value.

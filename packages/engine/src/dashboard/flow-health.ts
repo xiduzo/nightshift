@@ -33,6 +33,7 @@ import {
 	type TopRows,
 	type UnfinishedReason,
 } from "./types";
+import { flowWatch, watchRunsOf } from "./watch";
 
 /** The days a Flow health row covers. */
 export const FLOW_HEALTH_DAYS: NightRange = 30;
@@ -365,6 +366,7 @@ export function flowHealthRows(
 			neededYou: neededYouOf(recent),
 			...(report ? { report } : {}),
 			ladders: flowLadders(ladderRows(recent)),
+			watch: flowWatch(watchRunsOf(name, runs, now), now, first),
 		};
 	});
 	return topRows(

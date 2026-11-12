@@ -32,7 +32,15 @@ describe("what a person did to a run", () => {
 			{ stepId: "g1" },
 		);
 		b.stepEnded("g1", "approve");
-		expect(neededYouOf(b.state())).toEqual([{ reason: "gate", at: 5000 }]);
+		expect(neededYouOf(b.state())).toEqual([
+			{
+				reason: "gate",
+				at: 5000,
+				planned: true,
+				nodeId: "gate",
+				question: "Ship it?",
+			},
+		]);
 	});
 
 	test("a deadline that chose for nobody does not count", () => {
@@ -176,9 +184,52 @@ describe("what a person did to a run", () => {
 			.at(1500)
 			.push("StopRequested", { by: "person" });
 		expect(neededYouOf(b.state())).toEqual([
-			{ reason: "stopped", at: 1500 },
-			{ reason: "took-over", at: 2000 },
+			{ reason: "stopped", at: 1500, planned: false },
+			{ reason: "took-over", at: 2000, planned: false },
 		]);
 		expect(b.trace()?.neededYou).toEqual(neededYouOf(b.state()));
+	});
+
+	test("an answer after a ladder ran out is not planned", () => {
+		const b = log()
+			.runStarted()
+			.stepStarted("s1", "decide", 1, {
+				nodeType: "decision",
+				rung: { by: "model", tier: 0 },
+			})
+			.stepEnded("s1", "fail", { tier: "local", tries: 1 })
+			.stepStarted("s2", "decide", 1, {
+				nodeType: "decision",
+				rung: { by: "person", tier: 1, last: true },
+			})
+			.gateOpened("s2")
+			.push(
+				"Scored",
+				{ score: "gate_decision", value: 1, label: "approve", by: "person" },
+				{ stepId: "s2" },
+			)
+			.stepEnded("s2", "approve", { tier: "person", tries: 2 });
+		expect(neededYouOf(b.state())).toMatchObject([
+			{ reason: "gate", planned: false, nodeId: "decide" },
+		]);
+	});
+
+	test("an answer to a Decision that only a person decides is planned", () => {
+		const b = log()
+			.runStarted()
+			.stepStarted("s1", "decide", 1, {
+				nodeType: "decision",
+				rung: { by: "person", tier: 0, last: true },
+			})
+			.gateOpened("s1")
+			.push(
+				"Scored",
+				{ score: "gate_decision", value: 1, label: "approve", by: "person" },
+				{ stepId: "s1" },
+			)
+			.stepEnded("s1", "approve");
+		expect(neededYouOf(b.state())).toMatchObject([
+			{ reason: "gate", planned: true },
+		]);
 	});
 });

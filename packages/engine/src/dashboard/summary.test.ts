@@ -1459,3 +1459,64 @@ describe("test runs", () => {
 		expect(summary.open.running).toBe(2);
 	});
 });
+
+describe("the watch over the flows", () => {
+	const failed = (hoursAgo: number, fields: Partial<RunSummary> = {}) =>
+		aRun({
+			status: "failed",
+			createdAt: NOW - hoursAgo * HOUR,
+			endedAt: NOW - hoursAgo * HOUR + 1000,
+			...fields,
+		});
+	const finished = (hoursAgo: number, fields: Partial<RunSummary> = {}) =>
+		aRun({
+			createdAt: NOW - hoursAgo * HOUR,
+			endedAt: NOW - hoursAgo * HOUR + 1000,
+			...fields,
+		});
+
+	test("over all projects it lists the flows with a signal, the severe first", () => {
+		const { watch } = summarize(
+			[
+				failed(1, { projectId: "p1", flowName: "digest" }),
+				failed(2, { projectId: "p2", flowName: "sweep" }),
+				failed(3, { projectId: "p2", flowName: "sweep" }),
+				finished(4, { projectId: "p2", flowName: "quiet" }),
+				// A quick run has no flow, and a test run is a try.
+				failed(1, { flowName: null }),
+				failed(1, { flowName: "tried", test: { pinned: [], skipped: [] } }),
+			],
+			all({ p1: "One", p2: "Two" }),
+		);
+		expect(watch?.watched).toBe(3);
+		expect(watch?.flows.map((flow) => flow.key)).toEqual([
+			"p2/sweep",
+			"p1/digest",
+		]);
+		expect(watch?.flows[0]?.signals).toMatchObject([
+			{ kind: "failing", severe: true, count: 2 },
+		]);
+	});
+
+	test("a project's flow row carries its level and how often it needed you", () => {
+		const act = (hoursAgo: number, planned: boolean) => ({
+			reason: "gate" as const,
+			at: NOW - hoursAgo * HOUR,
+			planned,
+		});
+		const summary = summarize(
+			[
+				finished(1, { neededYou: [act(1, true)] }),
+				finished(2, { neededYou: [act(2, false)] }),
+				finished(3, { neededYou: [act(3, true)] }),
+				finished(4),
+			],
+			project(["night"]),
+		);
+		const row = summary.flowHealth?.rows[0];
+		expect(row?.watch?.level?.level).toBe("decide");
+		expect(row?.watch?.attention).toMatchObject({ planned: 2, unplanned: 1 });
+		expect(summary.watch?.levels).toEqual({ decide: 1, check: 0, own: 0 });
+		expect(summary.watch?.perWeek.at(-1)).toBe(1);
+	});
+});

@@ -1,6 +1,6 @@
 import type { RunSummary } from "../read";
 import { isTestRun } from "../run-status";
-import { DAY_MS, dayStart, HOUR_MS, lastHours } from "./clock";
+import { DAY_MS, dayStart, HOUR_MS, lastDays, lastHours } from "./clock";
 import { FLOW_HEALTH_DAYS, flowHealthRows } from "./flow-health";
 import { askedGates, nightsRange, notTests, type PlacedRun } from "./nights";
 import {
@@ -24,6 +24,7 @@ import {
 	OVERVIEW_ROWS,
 	type UpcomingRun,
 } from "./types";
+import { spaceWatch } from "./watch";
 
 /** The hours of the stat cards' small charts. */
 const CARD_HOURS = 24;
@@ -383,5 +384,10 @@ export function summarizeDashboard(
 			scope.kind === "project"
 				? flowHealthRows(scope.flows, runs, now, timeZone)
 				: null,
+		watch: spaceWatch(
+			runs,
+			now,
+			lastDays(FLOW_HEALTH_DAYS, now, timeZone)[0] ?? 0,
+		),
 	};
 }

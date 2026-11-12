@@ -8,8 +8,6 @@ export type DashboardRun = DashboardSummary["open"]["rows"][number];
 /** The details over the last 7, 30 or 90 days. The wire key is `nights`. */
 export type NightsRange = DashboardSummary["nights"][number];
 export type NightRange = NightsRange["nights"];
-/** The failures of one flow in a range, one row per flow. */
-export type FailingFlow = NightsRange["runs"]["failing"]["rows"][number];
 /** The newest report of one flow in a range, one row per flow. */
 export type FlowReport = NonNullable<NightsRange["reports"]>["rows"][number];
 export type FlowHealthRow = NonNullable<
