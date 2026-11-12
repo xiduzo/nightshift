@@ -29,10 +29,15 @@ import {
 	type Harness,
 	held,
 	payloads,
+	placementOn,
 	type StartOptions,
 	startRun,
 } from "../testing/graph";
-import { createSandbox, type Sandbox } from "../testing/test-support";
+import {
+	createSandbox,
+	type Sandbox,
+	testDevice,
+} from "../testing/test-support";
 import { climbing } from "./climb";
 import type { StepContext } from "./context";
 import type { RunStateValues } from "./state";
@@ -346,3 +351,38 @@ describe.each([AGENT, SUBFLOW, DECISION, VALUE])(
 		});
 	},
 );
+
+describe("an Agent's try whose Device is not ready", () => {
+	test("ends with its tier and tries, as every try does (ADR 6.9)", async () => {
+		// A run without a folder, on a Device that makes no run folder: each
+		// try ends `error` before its agent starts.
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "work",
+				nodes: [AGENT.node(false), command("after", "true")],
+				edges: [{ id: "e1", from: "work", outcome: "pass", to: "after" }],
+			}),
+			{ runFolder: true },
+		);
+		h.ctx.placement = placementOn(() => testDevice({ harnesses: {} }));
+		const { parked } = await drive(h, { inputs: {} });
+		expect(parked[0]).toMatchObject({
+			kind: "parked",
+			nodeId: "work",
+			status: "failed",
+		});
+		const tries = await steps(h);
+		expect(
+			tries.map((step) => [
+				step.outcome,
+				step.outputs.tier,
+				step.outputs.tries,
+			]),
+		).toEqual([
+			["error", "small", 1],
+			["error", "big", 2],
+		]);
+		expect(tries[0]?.error).toContain("could not make the run's folder");
+	});
+});
