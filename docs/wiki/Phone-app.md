@@ -25,7 +25,7 @@ Your phone needs a [Host](Computers-and-Hosts.md#run-a-host).
 - **Read a report.** A run can end with a report from its End node. The run screen shows its start. Tap **Read all** to read all of it, and select text to copy it. A picture in a report shows as a link.
 - **Start a flow** with its inputs.
 - **A test run** shows a **Test run** badge. A step whose node did not run says **Pinned output** or **Skipped**. The phone does not ask if a test run was useful. See [Test runs](Runs-and-schedules.md#test-runs).
-- **The counts leave test runs out.** The chips of **Runs** and the numbers of **Watch** do not count them. The cost of the day counts them, and says how many it holds: "Of 8 runs and 1 test run".
+- **The counts leave test runs out.** The chips of **Runs** and the numbers of **Watch** do not count them. The cost of the day counts them, and says how many it holds: "Of 8 runs and 1 test run". **Watch** shows the latest day with a run that is not a test run.
 - **The lock screen.** Approve or reject a Gate with two options, when its node allows it.
 - **A Live Activity** follows a run on the lock screen.
 - **A widget** shows on the home screen how many Gates wait and how your latest runs went. A test run there says **Test run** after its status.

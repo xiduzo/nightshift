@@ -272,15 +272,14 @@ function activityOf(
 	};
 }
 
-/** The latest day with runs, its newest runs first. */
+/**
+ * The latest day with a real run, its newest runs first, its test runs
+ * among them. A day of only test runs was a try, not a day of work: the
+ * day before it shows. Without any real run, the latest day with runs, so
+ * the test runs still show.
+ */
 function lastDayOf(runs: readonly PlacedRun[]): NightOutput | null {
-	const newest = runs.reduce<PlacedRun | undefined>(
-		(latest, placed) =>
-			latest === undefined || placed.run.createdAt > latest.run.createdAt
-				? placed
-				: latest,
-		undefined,
-	);
+	const newest = newestOf(notTests(runs)) ?? newestOf(runs);
 	if (!newest) return null;
 	const ofDay = runs
 		.filter(({ day }) => day === newest.day)
@@ -296,6 +295,17 @@ function lastDayOf(runs: readonly PlacedRun[]): NightOutput | null {
 			.slice(0, OVERVIEW_ROWS)
 			.map(({ run, group }) => ({ ...run, group })),
 	};
+}
+
+/** The run that started last. */
+function newestOf(runs: readonly PlacedRun[]): PlacedRun | undefined {
+	return runs.reduce<PlacedRun | undefined>(
+		(latest, placed) =>
+			latest === undefined || placed.run.createdAt > latest.run.createdAt
+				? placed
+				: latest,
+		undefined,
+	);
 }
 
 /** The wake-ups and stop times still to come, the soonest first. */

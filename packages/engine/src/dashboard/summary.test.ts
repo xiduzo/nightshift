@@ -1416,6 +1416,26 @@ describe("test runs", () => {
 		).not.toHaveProperty("tests");
 	});
 
+	test("do not make a latest day of their own: the latest day with a real run shows", () => {
+		const day = summarize([
+			aRun({ id: "work", costUsd: 1, createdAt: TODAY - DAY + HOUR }),
+			tried({ id: "eve", costUsd: 2, createdAt: TODAY - DAY + 2 * HOUR }),
+			tried({ id: "try", costUsd: 4, createdAt: TODAY + HOUR }),
+		]).lastNight;
+		expect(day?.night).toBe(TODAY - DAY);
+		// That day keeps its own test runs, in the list and the spend.
+		expect(day).toMatchObject({ runs: 2, tests: 1, cost: { costUsd: 3 } });
+		expect(day?.latest.map((run) => run.id)).toEqual(["eve", "work"]);
+	});
+
+	test("make the latest day when no run is real, so they still show", () => {
+		const day = summarize([
+			tried({ id: "try", costUsd: 4, createdAt: TODAY + HOUR }),
+		]).lastNight;
+		expect(day).toMatchObject({ night: TODAY, runs: 1, tests: 1 });
+		expect(day?.latest.map((run) => run.id)).toEqual(["try"]);
+	});
+
 	test("show at work with their pins and skips", () => {
 		const summary = summarize([
 			tried({ id: "try", status: "running", createdAt: TODAY + HOUR }),

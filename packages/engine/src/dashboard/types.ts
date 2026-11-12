@@ -444,7 +444,10 @@ export type NightsRange = {
 	flows: TopRows<FlowHealthRow> | null;
 };
 
-/** What the latest day with runs produced. */
+/**
+ * What the latest day with a real run produced (a test run is not one).
+ * Without any real run, the latest day with runs.
+ */
 export type NightOutput = {
 	/** The start of the day: its midnight on the reader's clock. */
 	night: number;
@@ -679,7 +682,7 @@ export type DashboardSummary = {
 	 * window picks that range.
 	 */
 	healthNights: NightRange;
-	/** The latest day with runs. Null without runs. */
+	/** The latest day with a real run (`NightOutput`). Null without runs. */
 	lastNight: NightOutput | null;
 	/** The soonest wake-ups and stop times. */
 	upNext: UpcomingRun[];
