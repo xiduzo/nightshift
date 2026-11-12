@@ -24,7 +24,8 @@ A run can end with a report: what it produced, in Markdown, such as research res
 - **Home** lists the latest report of each flow under the lanes, newest first. Point at a row to see the start of the report.
 - Night Shift keeps the first 64 KB of a report. A longer report says so.
 - A report from a file must be a text file in the folder the run works in. When the file is not there, or is not text, the run ends as the End node says, without a report. The run page tells you why.
-- When the steps run on two computers, the End node reads the file on the computer of the run. A file that a step wrote on the other computer is not there.
+- When the steps run on two computers, the End node reads the file on the computer of the last step that worked in the project.
+- In a project without a folder, each computer has its own folder of the run. The End node reads the folder on the computer of the run. A file that a step wrote on the other computer is not there.
 - Images in a report show as links. Night Shift loads nothing from other websites.
 - Night Shift never sends a report as a notification. Every Member of the Space can read it.
 
