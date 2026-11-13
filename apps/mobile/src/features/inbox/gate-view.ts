@@ -1,4 +1,11 @@
-import type { ContextItem, GateLink } from "@nightshift/client";
+import {
+	type ContextItem,
+	deadlineWhen,
+	type GateLink,
+	type OpenGate,
+	urgencyOf,
+	waitedText,
+} from "@nightshift/client";
 
 /**
  * What the Gate screen shows, without React Native: the parts of the
@@ -75,4 +82,44 @@ export const LINK_WORD: Record<GateLink["kind"], string> = {
 export function openLinkText(link: Pick<GateLink, "url" | "kind">): string {
 	if (link.kind === "pull" || link.kind === "issue") return "Open on GitHub";
 	return "Open in the browser";
+}
+
+/** A deadline this close counts down in minutes: "Answer in 14 min". */
+const SOON_MS = 60 * 60_000;
+
+/**
+ * Why a Gate is urgent, at the top of the Gate: when you must answer, and
+ * what happens when you do not. "Answer in 14 min" or "Answer by 07:30",
+ * then "If you do not, Night Shift picks Keep." A Gate for now without a
+ * deadline says that the run waits. Null for every other Gate.
+ */
+export function urgentText(
+	gate: Pick<OpenGate, "deadline"> &
+		Partial<Pick<OpenGate, "urgency" | "form">>,
+	now: number,
+): { title: string; description: string } | null {
+	const { deadline } = gate;
+	if (deadline) {
+		const left = deadline.at - now;
+		const { time, day } = deadlineWhen(deadline.at, now);
+		const title =
+			left <= 0
+				? "Answer now"
+				: left < SOON_MS
+					? `Answer in ${waitedText(left)}`
+					: `Answer by ${time}${day}`;
+		const takes = gate.form
+			? gate.form.default === undefined
+				? "the step fails"
+				: "Night Shift takes the default"
+			: `Night Shift picks ${deadline.choose}`;
+		return { title, description: `If you do not, ${takes}.` };
+	}
+	if (urgencyOf(gate) === "now") {
+		return {
+			title: "This needs you now",
+			description: "The run waits until you answer.",
+		};
+	}
+	return null;
 }

@@ -18,11 +18,15 @@ import { cn } from "@nightshift/ui-native/lib/utils";
 import { ArrowRight, CircleStop, TriangleAlert } from "lucide-react-native";
 import { Pressable, View } from "react-native";
 
+import { OUTCOME_CLASS } from "@/shared/tone";
+
 /**
  * The options of a Gate as cards in a RadioGroup: each with its name, a
  * "Recommended" Badge on the option the flow recommends, what happens
- * when you pick it (or else its description) and where it leads. A red option shows in the destructive
- * color. Tapping a card chooses it; the bar at the bottom sends it.
+ * when you pick it (or else its description) and where it leads. An
+ * option the flow colored has a stripe in its color and its name in that
+ * color. A red option shows in the destructive color. Tapping a card
+ * chooses it. The bar at the bottom sends it.
  */
 export function ChoiceCards({
 	choices,
@@ -78,6 +82,7 @@ function ChoiceCard({
 	disabled: boolean;
 }) {
 	const destructive = isDestructive(choice);
+	const tint = choice.color ? OUTCOME_CLASS[choice.color] : null;
 	// "Ends the run" or "Stops the run" shows as the badge, "Goes to …" as a line.
 	const ends = route?.kind === "end" || route?.kind === "limit";
 	const next = route?.kind === "node" ? routeText(route) : null;
@@ -101,86 +106,96 @@ function ChoiceCard({
 		>
 			<Card
 				className={cn(
-					"flex-row gap-3 px-4 py-4",
+					"flex-row gap-0 overflow-hidden py-0",
 					selected &&
 						(destructive
 							? "border-destructive bg-destructive/5"
-							: "border-primary bg-accent"),
+							: (tint?.chosen ?? "border-primary bg-accent")),
 					disabled && !selected && "opacity-50",
 				)}
 			>
-				<View className="flex-1 gap-1.5">
-					<View className="flex-row items-start gap-1.5">
-						{destructive ? (
-							<Icon
-								as={TriangleAlert}
-								className="mt-0.5 size-4 text-destructive"
-							/>
+				{tint ? (
+					<View
+						className={cn(
+							"w-1.5",
+							destructive ? "bg-destructive" : tint.stripe,
+						)}
+					/>
+				) : null}
+				<View className="flex-1 flex-row gap-3 px-4 py-4">
+					<View className="flex-1 gap-1.5">
+						<View className="flex-row items-start gap-1.5">
+							{destructive ? (
+								<Icon
+									as={TriangleAlert}
+									className="mt-0.5 size-4 text-destructive"
+								/>
+							) : null}
+							<Text
+								className={cn(
+									"flex-shrink font-semibold text-base",
+									destructive ? "text-destructive" : tint?.text,
+								)}
+							>
+								{choice.name}
+							</Text>
+							{recommended ? (
+								<Badge className="ml-auto">
+									<Text>Recommended</Text>
+								</Badge>
+							) : null}
+						</View>
+						{line ? (
+							<Text className="text-muted-foreground text-sm">{line}</Text>
 						) : null}
-						<Text
-							className={cn(
-								"flex-shrink font-semibold text-base",
-								destructive && "text-destructive",
-							)}
-						>
-							{choice.name}
-						</Text>
-						{recommended ? (
-							<Badge className="ml-auto">
-								<Text>Recommended</Text>
+						{next ? (
+							<View className="flex-row items-start gap-1.5">
+								<Icon
+									as={ArrowRight}
+									className="mt-0.5 size-4 text-muted-foreground"
+								/>
+								<Text className="flex-shrink text-sm">{next}</Text>
+							</View>
+						) : null}
+						{note ? (
+							<Text className="text-muted-foreground text-sm">{note}</Text>
+						) : null}
+						{ends ? (
+							<Badge
+								variant="outline"
+								className={cn(
+									"mt-1 self-start",
+									destructive && "border-destructive/40 bg-destructive/10",
+								)}
+							>
+								<Icon
+									as={CircleStop}
+									className={cn(
+										"size-3",
+										destructive ? "text-destructive" : "text-muted-foreground",
+									)}
+								/>
+								<Text className={cn(destructive && "text-destructive")}>
+									{routeText(route)}
+								</Text>
 							</Badge>
 						) : null}
 					</View>
-					{line ? (
-						<Text className="text-muted-foreground text-sm">{line}</Text>
-					) : null}
-					{next ? (
-						<View className="flex-row items-start gap-1.5">
-							<Icon
-								as={ArrowRight}
-								className="mt-0.5 size-4 text-muted-foreground"
-							/>
-							<Text className="flex-shrink text-sm">{next}</Text>
-						</View>
-					) : null}
-					{note ? (
-						<Text className="text-muted-foreground text-sm">{note}</Text>
-					) : null}
-					{ends ? (
-						<Badge
-							variant="outline"
+					<View
+						pointerEvents="none"
+						accessibilityElementsHidden
+						importantForAccessibility="no-hide-descendants"
+						className="pt-0.5"
+					>
+						<RadioGroupItem
+							value={choice.name}
 							className={cn(
-								"mt-1 self-start",
-								destructive && "border-destructive/40 bg-destructive/10",
+								"size-5",
+								selected &&
+									(destructive ? "border-destructive" : "border-primary"),
 							)}
-						>
-							<Icon
-								as={CircleStop}
-								className={cn(
-									"size-3",
-									destructive ? "text-destructive" : "text-muted-foreground",
-								)}
-							/>
-							<Text className={cn(destructive && "text-destructive")}>
-								{routeText(route)}
-							</Text>
-						</Badge>
-					) : null}
-				</View>
-				<View
-					pointerEvents="none"
-					accessibilityElementsHidden
-					importantForAccessibility="no-hide-descendants"
-					className="pt-0.5"
-				>
-					<RadioGroupItem
-						value={choice.name}
-						className={cn(
-							"size-5",
-							selected &&
-								(destructive ? "border-destructive" : "border-primary"),
-						)}
-					/>
+						/>
+					</View>
 				</View>
 			</Card>
 		</Pressable>

@@ -3,10 +3,8 @@ import {
 	askAnswerOf,
 	askStartValues,
 	briefView,
-	deadlineText,
 	gateParts,
 	mayAnswer,
-	now,
 	type OpenGate,
 	phoneCanAnswer,
 	sentText,
@@ -42,8 +40,9 @@ import { AskFiles } from "./ask-files";
 import { askSentSummary, askWebUrl } from "./ask-view";
 import { BriefSections } from "./brief-sections";
 import { Breadcrumbs } from "./gate-breadcrumbs";
+import type { GateQueue, GateSent } from "./gate-briefing";
 import { nextGate } from "./gate-list";
-import { GateStatus } from "./gate-times";
+import { GateStatus, GateUrgent } from "./gate-times";
 import { ProblemAlert } from "./problem-alert";
 import { QuestionSections } from "./question-sections";
 import { SentCard } from "./sent-card";
@@ -65,25 +64,35 @@ export function AskScreen({
 	onRefresh,
 	onSent,
 	onGone,
+	queue,
 }: {
 	gate: OpenGate;
 	form: AskForm;
 	inbox: readonly OpenGate[];
 	manySpaces: boolean;
 	onRefresh: () => Promise<unknown>;
-	onSent: () => void;
+	onSent: (sent: GateSent) => void;
 	onGone: (refusal: GoneRefusal) => void;
+	/** In the Needs you queue: what shows above the question. */
+	queue?: GateQueue;
 }) {
 	const { host } = useSignedIn();
 	const { headline, context } = gateParts(gate.question);
 	const [values, setValues] = useState<AskValues>(() => askStartValues(form));
 	const [tried, setTried] = useState(false);
-	const answer = useGateAnswer(gate, { onSent, onGone });
+	const elsewhere =
+		!gate.walker.thisDevice && gate.walker.name ? gate.walker.name : null;
+	const answer = useGateAnswer(gate, {
+		onSent: (sent) =>
+			onSent({
+				choice: askSentSummary(form, sent.data),
+				outcome: sentText(undefined, gate.runTitle, elsewhere),
+			}),
+		onGone,
+	});
 	const native = phoneCanAnswer(form);
 	const ready = askAnswerOf(form, values);
 	const answerable = mayAnswer(gate);
-	const elsewhere =
-		!gate.walker.thisDevice && gate.walker.name ? gate.walker.name : null;
 	const files = {
 		runId: gate.runId,
 		address: host.address,
@@ -119,6 +128,10 @@ export function AskScreen({
 				) : undefined
 			}
 		>
+			{queue?.lead}
+
+			{answerable && !answer.sent ? <GateUrgent gate={gate} /> : null}
+
 			<View className="gap-3">
 				<Breadcrumbs gate={gate} manySpaces={manySpaces} runHref={runHref} />
 				<Text
@@ -137,7 +150,7 @@ export function AskScreen({
 				</View>
 			</View>
 
-			{answer.sent ? (
+			{answer.sent && !queue ? (
 				<SentCard
 					answer={{
 						choice: askSentSummary(form, answer.sent.data),
@@ -234,11 +247,6 @@ export function AskScreen({
 							</Button>
 						</>
 					)}
-					{gate.deadline && answerable ? (
-						<Text className="text-muted-foreground text-xs">
-							{deadlineText(gate.deadline, now(), form)}
-						</Text>
-					) : null}
 					{elsewhere && native && answerable ? (
 						<Text className="text-muted-foreground text-xs">
 							{`Your answer goes to ${elsewhere}. The run continues when ${elsewhere} is online.`}
