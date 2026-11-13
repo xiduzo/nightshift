@@ -79,7 +79,7 @@ export const dashboard = {
 	spend: protectedProcedure
 		.route({
 			summary:
-				"Computes what the runs of the Space cost, how steady the cost of each flow is, and where a change saves money.",
+				"Computes what the runs of the Space cost, how steady the cost of each flow is, where a change saves money, and what Night Shift's own agents cost.",
 		})
 		.output(output(spaceSpendSchema))
 		.input(z.object({ timeZone: timeZoneSchema }).default({ timeZone: "UTC" }))

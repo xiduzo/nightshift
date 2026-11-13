@@ -2,6 +2,7 @@ import {
 	COST_STEADINESS,
 	type DashboardSummary,
 	type FlowHealthDetail,
+	HELP_AGENTS,
 	isTimeZone,
 	RUNGS,
 	SAVING_KINDS,
@@ -675,7 +676,21 @@ export const spaceSpendSchema = exact<SpaceSpend>()(
 					}),
 				),
 				saves: z.number(),
+				// What Night Shift's own agents cost. Not part of a run's cost.
+				help: z.object({
+					total: z.number(),
+					answers: z.number(),
+					unknown: z.number(),
+					agents: z.array(
+						z.object({
+							agent: z.enum(HELP_AGENTS),
+							answers: z.number(),
+							costUsd: z.number(),
+						}),
+					),
+				}),
 			}),
 		),
+		helpThisMonth: z.number(),
 	}),
 );

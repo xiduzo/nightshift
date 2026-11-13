@@ -3,6 +3,8 @@
 // writes a table only through the owner's functions. Each file names its
 // owner above its tables:
 //
+// - `assistant.ts`: `@nightshift/engine` `assistant/` (what the answers of
+//   Night Shift's own agents cost).
 // - `auth.ts`: `@nightshift/auth` (Better Auth's tables). `auth:generate`
 //   writes this file, so its owner is named here.
 // - `devices.ts`: `@nightshift/devices`.
@@ -17,6 +19,7 @@
 //
 // drizzle-kit reads this file: every table must be exported from here.
 
+export * from "./assistant";
 export * from "./auth";
 /**
  * The auth tables only, as one object: Better Auth's drizzle adapter takes

@@ -21,6 +21,7 @@ import {
 	engineRunEvents,
 	type Notifications,
 } from "@nightshift/notifications";
+import { now } from "@nightshift/time";
 import { OpenAPIGenerator } from "@orpc/openapi";
 import { type AnyProcedure, call, isProcedure, Procedure } from "@orpc/server";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
@@ -586,6 +587,33 @@ describe("replies of a real engine", () => {
 		})) as { cards: { lastDay: { runs: number } } };
 		expect(projectDashboard.cards.lastDay.runs).toBe(1);
 		await reply(appRouter.dashboard.flow, { projectId, flowName: "night" });
+
+		// What an answer of Night Shift's own agents cost is its own line of
+		// the spend, read from what the engine kept.
+		await engine.keepAnswerCost({
+			at: now(),
+			agent: "improver",
+			entry: "run.improve",
+			projectId,
+			spaceId: sandbox.spaceId,
+			personId: "ada",
+			inputTokens: 900,
+			outputTokens: 120,
+			costUsd: 0.25,
+		});
+		const spend = (await reply(appRouter.dashboard.spend, {
+			timeZone: "UTC",
+		})) as {
+			ranges: { nights: number; help: unknown }[];
+			helpThisMonth: number;
+		};
+		expect(spend.ranges.find((range) => range.nights === 7)?.help).toEqual({
+			total: 0.25,
+			answers: 1,
+			unknown: 0,
+			agents: [{ agent: "improver", answers: 1, costUsd: 0.25 }],
+		});
+		expect(spend.helpThisMonth).toBe(0.25);
 
 		const controller = new AbortController();
 		const events = (await call(

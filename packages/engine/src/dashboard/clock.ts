@@ -11,4 +11,5 @@ export {
 	isTimeZone,
 	lastDays,
 	lastHours,
+	wall,
 } from "@nightshift/time";

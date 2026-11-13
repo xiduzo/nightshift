@@ -1,5 +1,6 @@
 import type { Schedule, ScheduleIssue } from "@nightshift/flows";
 import type { Artifact } from "../artifacts";
+import type { AnswerCost } from "../assistant";
 import type { RunFiles } from "../cleanup";
 import type {
 	NodeToPlace,
@@ -172,6 +173,12 @@ export interface SpaceEngine {
 	 * of them, after the run of `cursor`.
 	 */
 	listRuns(input?: { projectId?: string } & RunPage): Promise<RunSummary[]>;
+	/**
+	 * What the answers of Night Shift's own agents cost in the Space, as
+	 * this computer kept them, the oldest first. `since`: only the answers
+	 * that ended at or after it. Not part of a run's cost.
+	 */
+	listAnswerCosts(since?: number): Promise<AnswerCost[]>;
 	getRun(runId: string): Promise<RunDetail>;
 	/**
 	 * One step of a run with what the run's summary of it leaves out: the

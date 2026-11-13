@@ -1,6 +1,7 @@
 import { Refusal } from "@nightshift/refusal";
 
 import type { ArtifactStore } from "../artifacts";
+import type { AnswerCost } from "../assistant";
 import type { RunFilesService } from "../cleanup";
 import type { Actor, StartRunInput } from "../contract";
 import type { SpaceFlows } from "../flows";
@@ -75,6 +76,8 @@ export type SpacesDeps = {
 		list(flow: MemoryFlow): Promise<NodeMemory[]>;
 		forget(flow: MemoryFlow, node: string, scope?: string): Promise<void>;
 	};
+	/** What the answers of Night Shift's own agents cost in a Space, on this computer. */
+	answerCosts(spaceId: string, since?: number): Promise<AnswerCost[]>;
 	scheduleFiles: ScheduleFiles;
 	reads: ReadModel;
 	/** The artifacts kept on this computer. */
@@ -311,6 +314,11 @@ export function createSpaces(deps: SpacesDeps) {
 				});
 				const shown = await deps.pathsFor(spaceId, actor);
 				return Promise.all(runs.map(shown));
+			},
+
+			async listAnswerCosts(since) {
+				await ready;
+				return deps.answerCosts(spaceId, since);
 			},
 
 			async getRun(runId) {

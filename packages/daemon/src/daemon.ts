@@ -77,7 +77,7 @@ import {
 import { deliveryMoves } from "@nightshift/notifications";
 import { createTelemetry } from "@nightshift/telemetry";
 import { instant } from "@nightshift/time";
-import { createAssistant } from "./assistant";
+import { createAssistant, recordingAssistant } from "./assistant";
 import {
 	harnessLookup,
 	localHarnesses,
@@ -857,6 +857,15 @@ async function makeDaemon(
 		reach: devices.reach,
 	};
 
+	// The assistant, with one record kept per answer that spent something:
+	// the Spend page shows what Night Shift's own agents cost.
+	const assistantWithCosts = (deps: Parameters<typeof createAssistant>[0]) =>
+		recordingAssistant(createAssistant(deps), {
+			keep: (cost) => engine.keepAnswerCost(cost),
+			projectOfRun: async (runId, { spaceId, personId }) =>
+				(await engine.space(spaceId, { personId }).getRun(runId)).projectId,
+		});
+
 	const http = createHttp({
 		...config,
 		auth,
@@ -884,7 +893,7 @@ async function makeDaemon(
 		// Suggestions and chats in the flow editor: on this computer's
 		// profiles, read only in the project's Clone. A chat reads the
 		// project's flows and runs as the Person sees them in the Space.
-		assistant: createAssistant({
+		assistant: assistantWithCosts({
 			profiles,
 			settings,
 			...harnessLookup(harnesses, settings),

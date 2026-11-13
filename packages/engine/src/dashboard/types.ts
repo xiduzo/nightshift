@@ -1,3 +1,4 @@
+import type { HelpAgent } from "../assistant";
 import type { RungBy } from "../log";
 import {
 	type Ladder,
@@ -988,6 +989,22 @@ export type SpendDay = {
 	saves: number;
 };
 
+/**
+ * What Night Shift's own agents cost for their answers: the Builder and
+ * the Improver in a chat, the Explainer on a run, the Field writer on a
+ * field. Not part of a run's cost, and not in the spend of the runs.
+ */
+export type HelpSpend = {
+	/** What the answers with a known cost cost. */
+	total: number;
+	/** The answers. */
+	answers: number;
+	/** Of them, the answers whose cost is not known. */
+	unknown: number;
+	/** One per agent that answered, the most cost first. */
+	agents: { agent: HelpAgent; answers: number; costUsd: number }[];
+};
+
 /** The Spend page over the last `nights` days, today included. */
 export type SpendDays = {
 	nights: NightRange;
@@ -1009,6 +1026,8 @@ export type SpendDays = {
 	savings: SpendSaving[];
 	/** What the ways to save add up to. */
 	saves: number;
+	/** What Night Shift's own agents cost in the days. Not in `total`. */
+	help: HelpSpend;
 };
 
 /** What the runs of a Space cost, how steady that is, and where a change saves. */
@@ -1017,4 +1036,9 @@ export type SpaceSpend = {
 	at: number;
 	/** One per day range. */
 	ranges: SpendDays[];
+	/**
+	 * What Night Shift's own agents cost in the calendar month of `at`, on
+	 * the reader's clock, up to now.
+	 */
+	helpThisMonth: number;
 };
