@@ -6,23 +6,17 @@ import {
 	URGENCY_LABEL,
 } from "@nightshift/client";
 import { GATE_URGENCIES } from "@nightshift/flows";
-import { Label } from "@nightshift/ui-native/components/ui/label";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@nightshift/ui-native/components/ui/select";
-import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
-import { Text } from "@nightshift/ui-native/components/ui/text";
-import { ScrollView, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { CircleAlert } from "lucide-react-native";
 
-import { ErrorAlert } from "@/shared/feedback";
-import { ListGroup, SectionHead, SwitchRow } from "@/shared/list";
 import {
-	type Choice,
+	NativeButtonRow,
+	NativeLoadingRow,
+	NativePickerRow,
+	NativeRow,
+	NativeSection,
+	NativeToggleRow,
+} from "@/shared/native-list";
+import {
 	DEFAULT_PUSH_URGENCIES,
 	HOURS,
 	isLastPushUrgency,
@@ -37,9 +31,17 @@ import {
 /** Quiet hours when the person turns them on: the night. */
 const DEFAULT_QUIET = { start: "22:00", end: "07:00" };
 
+const HOUR_OPTIONS = HOURS.map((hour) => ({ value: hour, label: hour }));
+
+const DELAY_OPTIONS = PHONE_DELAYS.map((minutes) => ({
+	value: String(minutes),
+	label: phoneDelayLabel(minutes),
+}));
+
 /**
- * The person's notification settings, in three sections: what Night Shift
- * tells them about, which Gates send a notification, and quiet hours. They apply on every screen. Each change saves at once.
+ * The person's notification settings, as sections of the Settings list:
+ * what Night Shift tells them about, which Gates send a notification, and
+ * quiet hours. They apply on every screen. Each change saves at once.
  */
 export function NotificationSections() {
 	const settings = useNotificationSettings();
@@ -54,20 +56,29 @@ export function NotificationSections() {
 			</>
 		);
 	}
-	return (
-		<View className="gap-3">
-			<SectionHead title="Notifications" />
-			{settings.error ? (
-				<ErrorAlert
+	if (settings.error) {
+		return (
+			<NativeSection
+				title="Notifications"
+				footer="Check that this phone is online, then try again."
+			>
+				<NativeRow
+					icon={{ sf: "exclamationmark.circle.fill", lucide: CircleAlert }}
+					iconColor="#dc2626"
 					title="The notification settings did not load"
-					message={settings.error.message}
-					fix="Check that this phone is online, then try again."
-					onRetry={() => void settings.refetch()}
+					subtitle={settings.error.message}
 				/>
-			) : (
-				<Skeleton className="h-64 w-full rounded-xl" />
-			)}
-		</View>
+				<NativeButtonRow
+					label="Try again"
+					onPress={() => void settings.refetch()}
+				/>
+			</NativeSection>
+		);
+	}
+	return (
+		<NativeSection title="Notifications">
+			<NativeLoadingRow label="Loading" />
+		</NativeSection>
 	);
 }
 
@@ -79,43 +90,41 @@ type SectionProps = {
 /** Which events reach the person, and whether phones get them at all. */
 function TellMeSection({ value, onChange }: SectionProps) {
 	return (
-		<View className="gap-3">
-			<SectionHead title="Tell me about" />
-			<ListGroup>
-				<SwitchRow
+		<>
+			<NativeSection title="Tell me about">
+				<NativeToggleRow
 					title="Gates"
-					caption="When a run waits for your answer"
-					checked={value.events.gateOpened}
+					subtitle="When a run waits for your answer"
+					value={value.events.gateOpened}
 					onChange={(on) => onChange({ events: { gateOpened: on } })}
 				/>
-				<SwitchRow
+				<NativeToggleRow
 					title="Runs that stop"
-					caption="When a run fails or stops early"
-					checked={value.events.runFailed}
+					subtitle="When a run fails or stops early"
+					value={value.events.runFailed}
 					onChange={(on) => onChange({ events: { runFailed: on } })}
 				/>
-				<SwitchRow
+				<NativeToggleRow
 					title="Runs that finish"
-					caption="When a run is done"
-					checked={value.events.runFinished}
+					subtitle="When a run is done"
+					value={value.events.runFinished}
 					onChange={(on) => onChange({ events: { runFinished: on } })}
 				/>
-				<SwitchRow
+				<NativeToggleRow
 					title="Offline computers"
-					caption="When a step waits for a computer that is offline"
-					checked={value.events.deviceWait}
+					subtitle="When a step waits for a computer that is offline"
+					value={value.events.deviceWait}
 					onChange={(on) => onChange({ events: { deviceWait: on } })}
 				/>
-			</ListGroup>
-			<ListGroup>
-				<SwitchRow
+			</NativeSection>
+			<NativeSection footer="When off, your phones get no notifications. Needs you still shows what waits.">
+				<NativeToggleRow
 					title="Phones"
-					caption="When off, your phones get no notifications. Needs you still shows what waits."
-					checked={value.screens.expo}
+					value={value.screens.expo}
 					onChange={(on) => onChange({ screens: { expo: on } })}
 				/>
-			</ListGroup>
-		</View>
+			</NativeSection>
+		</>
 	);
 }
 
@@ -127,50 +136,47 @@ function PushForSection({ value, onChange }: SectionProps) {
 	const levels = value.pushUrgencies ?? DEFAULT_PUSH_URGENCIES;
 	const off = !value.events.gateOpened;
 	return (
-		<View className="gap-3">
-			<SectionHead
-				title="Push for"
-				hint={
-					off
-						? "Turn on Gates above to choose."
-						: "The Gates that send a notification. The others still show in Needs you."
-				}
-			/>
-			<ListGroup>
-				{GATE_URGENCIES.map((urgency) => (
-					<SwitchRow
-						key={urgency}
-						title={URGENCY_LABEL[urgency]}
-						checked={levels.includes(urgency)}
-						disabled={off || isLastPushUrgency(levels, urgency)}
-						onChange={(on) =>
-							onChange({
-								pushUrgencies: pushUrgenciesWith(levels, urgency, on),
-							})
-						}
-					/>
-				))}
-			</ListGroup>
-		</View>
+		<NativeSection
+			title="Push for"
+			footer={
+				off
+					? "Turn on Gates above to choose."
+					: "The Gates that send a notification. The others still show in Needs you."
+			}
+		>
+			{GATE_URGENCIES.map((urgency) => (
+				<NativeToggleRow
+					key={urgency}
+					title={URGENCY_LABEL[urgency]}
+					value={levels.includes(urgency)}
+					disabled={off || isLastPushUrgency(levels, urgency)}
+					onChange={(on) =>
+						onChange({
+							pushUrgencies: pushUrgenciesWith(levels, urgency, on),
+						})
+					}
+				/>
+			))}
+		</NativeSection>
 	);
 }
 
 /** Hours without notifications, and how long a phone waits while you use another screen. */
 function QuietSection({ value, onChange }: SectionProps) {
 	const quiet = value.quietHours;
-	const hours = HOURS.map((hour) => ({ value: hour, label: hour }));
 	return (
-		<View className="gap-3">
-			<SectionHead title="Quiet hours" />
-			<ListGroup>
-				<SwitchRow
+		<>
+			<NativeSection
+				title="Quiet hours"
+				footer={
+					quiet
+						? `No notifications in these hours. Times are in ${value.timeZone}.`
+						: "Night Shift stays silent, then tells you what still waits."
+				}
+			>
+				<NativeToggleRow
 					title="Quiet hours"
-					caption={
-						quiet
-							? `No notifications in these hours. Times are in ${value.timeZone}.`
-							: "Night Shift stays silent, then tells you what still waits."
-					}
-					checked={quiet !== null}
+					value={quiet !== null}
 					onChange={(on) =>
 						onChange(
 							on
@@ -180,84 +186,30 @@ function QuietSection({ value, onChange }: SectionProps) {
 					}
 				/>
 				{quiet ? (
-					<View className="flex-row gap-4 px-4 py-3">
-						<View className="flex-1">
-							<OptionSelect
-								label="From"
-								options={hours}
-								value={quiet.start}
-								onChange={(start) =>
-									onChange({ quietHours: { ...quiet, start } })
-								}
-							/>
-						</View>
-						<View className="flex-1">
-							<OptionSelect
-								label="Until"
-								options={hours}
-								value={quiet.end}
-								onChange={(end) => onChange({ quietHours: { ...quiet, end } })}
-							/>
-						</View>
-					</View>
+					<NativePickerRow
+						title="From"
+						value={quiet.start}
+						options={HOUR_OPTIONS}
+						onChange={(start) => onChange({ quietHours: { ...quiet, start } })}
+					/>
 				) : null}
-			</ListGroup>
-			<OptionSelect
-				label="Phone delay"
-				options={PHONE_DELAYS.map((minutes) => ({
-					value: String(minutes),
-					label: phoneDelayLabel(minutes),
-				}))}
-				value={String(value.holdMinutes)}
-				onChange={(minutes) => onChange({ holdMinutes: Number(minutes) })}
-			/>
-			<Text variant="muted" className="text-muted-foreground">
-				While you use another screen, your phones wait this long. A Gate you
-				answer in that time does not reach them.
-			</Text>
-		</View>
-	);
-}
-
-/** A label and a Select of one of a list of options. */
-function OptionSelect({
-	label,
-	options,
-	value,
-	onChange,
-}: {
-	label: string;
-	options: Choice[];
-	value: string;
-	onChange(value: string): void;
-}) {
-	const insets = useSafeAreaInsets();
-	const chosen = options.find((option) => option.value === value);
-	return (
-		<View className="gap-2">
-			<Label>{label}</Label>
-			<Select
-				value={chosen}
-				onValueChange={(option) => option && onChange(option.value)}
-			>
-				<SelectTrigger
-					accessibilityLabel={label}
-					accessibilityValue={{ text: chosen?.label ?? "" }}
-				>
-					<SelectValue placeholder="Choose" />
-				</SelectTrigger>
-				<SelectContent insets={{ top: insets.top, bottom: insets.bottom }}>
-					<ScrollView className="max-h-64">
-						{options.map((option) => (
-							<SelectItem
-								key={option.value}
-								value={option.value}
-								label={option.label}
-							/>
-						))}
-					</ScrollView>
-				</SelectContent>
-			</Select>
-		</View>
+				{quiet ? (
+					<NativePickerRow
+						title="Until"
+						value={quiet.end}
+						options={HOUR_OPTIONS}
+						onChange={(end) => onChange({ quietHours: { ...quiet, end } })}
+					/>
+				) : null}
+			</NativeSection>
+			<NativeSection footer="While you use another screen, your phones wait this long. A Gate you answer in that time does not reach them.">
+				<NativePickerRow
+					title="Phone delay"
+					value={String(value.holdMinutes)}
+					options={DELAY_OPTIONS}
+					onChange={(minutes) => onChange({ holdMinutes: Number(minutes) })}
+				/>
+			</NativeSection>
+		</>
 	);
 }

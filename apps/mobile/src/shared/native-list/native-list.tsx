@@ -1,10 +1,11 @@
 import {
 	Button,
-	HStack,
 	Host,
+	HStack,
 	Image,
 	List,
 	Picker,
+	ProgressView,
 	RNHostView,
 	Section,
 	Spacer,
@@ -33,6 +34,7 @@ import type {
 	NativeButtonRowProps,
 	NativeCustomRowProps,
 	NativeListProps,
+	NativeLoadingRowProps,
 	NativeOptionRowProps,
 	NativePickerRowProps,
 	NativeRowProps,
@@ -364,6 +366,16 @@ export function NativeButtonRow({
 			onPress={onPress}
 			modifiers={[disabledModifier(disabled)]}
 		/>
+	);
+}
+
+export function NativeLoadingRow({ label }: NativeLoadingRowProps) {
+	return (
+		<HStack spacing={10}>
+			<ProgressView />
+			<Text modifiers={[SECONDARY]}>{label}</Text>
+			<Spacer />
+		</HStack>
 	);
 }
 

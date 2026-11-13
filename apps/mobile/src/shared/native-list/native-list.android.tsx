@@ -1,5 +1,6 @@
 import {
 	Card,
+	CircularProgressIndicator,
 	Column,
 	DropdownMenu,
 	DropdownMenuItem,
@@ -21,6 +22,7 @@ import {
 	fillMaxWidth,
 	padding,
 	selectable,
+	size,
 } from "@expo/ui/jetpack-compose/modifiers";
 import { Icon } from "@nightshift/ui-native/components/ui/icon";
 import {
@@ -38,6 +40,7 @@ import type {
 	NativeCustomRowProps,
 	NativeIcon,
 	NativeListProps,
+	NativeLoadingRowProps,
 	NativeOptionRowProps,
 	NativePickerRowProps,
 	NativeRowProps,
@@ -416,6 +419,19 @@ export function NativeButtonRow({
 		>
 			<Text>{label}</Text>
 		</TextButton>
+	);
+}
+
+export function NativeLoadingRow({ label }: NativeLoadingRowProps) {
+	return (
+		<ListItem>
+			<ListItem.LeadingContent>
+				<CircularProgressIndicator strokeWidth={3} modifiers={[size(24, 24)]} />
+			</ListItem.LeadingContent>
+			<ListItem.HeadlineContent>
+				<Text modifiers={[alpha(0.7)]}>{label}</Text>
+			</ListItem.HeadlineContent>
+		</ListItem>
 	);
 }
 

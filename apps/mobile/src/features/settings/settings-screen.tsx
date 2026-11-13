@@ -1,23 +1,23 @@
-import { PushCard } from "@/features/push";
-import { Screen } from "@/shared/page";
-import { AccountCard } from "./account-card";
+import { PushSection } from "@/features/push";
+import { NativeList } from "@/shared/native-list";
+import { AccountSection } from "./account-section";
 import { AppearanceSection } from "./appearance-section";
 import { NotificationSections } from "./notification-sections";
-import { ThisPhoneCard } from "./this-phone-card";
+import { ThisPhoneSection } from "./this-phone-section";
 
 /**
- * Settings: who is signed in to which Host, notifications on this phone,
- * what Night Shift tells you about, quiet hours, the appearance, and this
- * phone.
+ * Settings, as a native grouped list (the Settings app of the phone): who
+ * is signed in to which Host, notifications on this phone, what Night
+ * Shift tells you about, quiet hours, the appearance, and this phone.
  */
 export function SettingsScreen() {
 	return (
-		<Screen>
-			<AccountCard />
-			<PushCard />
+		<NativeList>
+			<AccountSection />
+			<PushSection />
 			<NotificationSections />
 			<AppearanceSection />
-			<ThisPhoneCard />
-		</Screen>
+			<ThisPhoneSection />
+		</NativeList>
 	);
 }

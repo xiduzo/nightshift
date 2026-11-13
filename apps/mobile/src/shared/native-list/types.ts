@@ -113,5 +113,8 @@ export type NativeButtonRowProps = {
 	onPress: () => void;
 };
 
+/** A row that says what loads, with the platform's spinner. */
+export type NativeLoadingRowProps = { label: string };
+
 /** Any React Native content in a row, for what the kit does not cover: a Markdown body, a chart. */
 export type NativeCustomRowProps = { children: ReactNode };
