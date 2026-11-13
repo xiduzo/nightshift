@@ -28,8 +28,12 @@ import type {
 	OtherDevice,
 	ProfileRow,
 } from "@/shared/api";
-import { HeaderActions, PageHeading, PageSection } from "@/shared/page";
-import { itemOf, type Selection } from "./agents-selection";
+import { HeaderActions, PageSection } from "@/shared/page";
+import {
+	type AgentsPartName,
+	itemOf,
+	type Selection,
+} from "./agents-selection";
 import { CliToolCheckBadge } from "./cli-tool";
 import { CliCheckBadge } from "./connections/cli-panel";
 import { useFoundPrograms } from "./found-programs";
@@ -39,20 +43,28 @@ import {
 	useAgentSetupStatus,
 } from "./setup/agent-setup-dialog";
 
-/** PROTOTYPE, throw away: one part of the page, shown inside Settings. */
+/** One list of the agents, as a page of Settings. */
 export type AgentsPart = {
-	only: "profiles" | "models" | "harnesses" | "tools";
-	/** The search of a link in Settings that opens `item`. */
+	/** The list the page shows. */
+	only: AgentsPartName;
+	/** The search of the Settings link that opens `item`. No item: the list. */
 	search: (item: string | undefined) => { section?: string; item?: string };
 };
 const PartContext = createContext<AgentsPart | null>(null);
 
+/** The part of the page a row or a button sits in. */
+function usePart(): AgentsPart {
+	const part = useContext(PartContext);
+	if (!part) throw new Error("A list of the agents needs its part.");
+	return part;
+}
+
 /**
- * The Agents page with nothing picked: profiles, model profiles, harnesses,
- * tools and your other devices, one section each, like the Settings page.
- * Each row opens its detail; the programs found on this computer wait at
- * the end of the list they join. On this computer, "Set up an agent"
- * installs one and signs it in.
+ * One list of the agents with nothing picked: the profiles (with your
+ * other devices), the model profiles, the harnesses or the tools. Each row
+ * opens its detail. The programs found on this computer wait at the end of
+ * the list they join. On this computer, "Set up an agent" installs one and
+ * signs it in.
  */
 export function AgentsOverview({
 	agentProfiles,
@@ -69,10 +81,10 @@ export function AgentsOverview({
 	heading,
 	after,
 }: {
-	part?: AgentsPart;
-	/** The heading of the page, in place of "Agents". */
-	heading?: ReactNode;
-	/** More sections, after the lists. */
+	part: AgentsPart;
+	/** The heading of the page. */
+	heading: ReactNode;
+	/** More sections, after the list. */
 	after?: ReactNode;
 	agentProfiles: AgentProfileRow[];
 	modelProfiles: ModelProfileRow[];
@@ -98,20 +110,13 @@ export function AgentsOverview({
 		</Button>
 	);
 
-	const shows = (name: AgentsPart["only"]) => !part || part.only === name;
+	const shows = (name: AgentsPartName) => part.only === name;
 	return (
-		<PartContext value={part ?? null}>
+		<PartContext value={part}>
 			<div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-8 p-4 md:p-6">
-				{heading ?? (
-					<PageHeading
-						title="Agents"
-						description="Give Agent nodes a harness, a model and tools under one name. When you change a profile, every flow that uses it changes too."
-					/>
-				)}
+				{heading}
 				{shows("profiles") ? (
 					<Part
-						title="Profiles"
-						description="Agent nodes pick a profile by its name."
 						actions={
 							<AddButton onClick={() => onSelect({ kind: "new-profile" })}>
 								Add profile
@@ -128,7 +133,7 @@ export function AgentsOverview({
 									<EmptyDescription>
 										{canSetUp
 											? "Night Shift installs an agent for you and adds its profile."
-											: "Add a profile, or add an agent from this computer under Harnesses."}
+											: "Add a profile, or add an agent from this computer under Your harnesses."}
 									</EmptyDescription>
 								</EmptyHeader>
 								{canSetUp ? <EmptyContent>{setUpButton}</EmptyContent> : null}
@@ -151,8 +156,6 @@ export function AgentsOverview({
 
 				{shows("models") ? (
 					<Part
-						title="Model profiles"
-						description="Decision and Value nodes pick one when a model decides."
 						actions={
 							<AddButton
 								onClick={() => onSelect({ kind: "new-model-profile" })}
@@ -183,8 +186,6 @@ export function AgentsOverview({
 
 				{shows("harnesses") ? (
 					<Part
-						title="Harnesses"
-						description="The agents a profile runs on."
 						actions={
 							<>
 								{canSetUp ? setUpButton : null}
@@ -214,11 +215,7 @@ export function AgentsOverview({
 				) : null}
 
 				{shows("tools") ? (
-					<Part
-						title="Tools"
-						description="The CLIs and MCP servers a profile gives its agent."
-						actions={<AddButton onClick={onAddTool}>Add tool</AddButton>}
-					>
+					<Part actions={<AddButton onClick={onAddTool}>Add tool</AddButton>}>
 						{cliTools.length === 0 &&
 						connections.length === 0 &&
 						found.tools.length === 0 ? (
@@ -291,34 +288,21 @@ export function AgentsOverview({
 }
 
 /**
- * One list of the page. On the Agents page it is a section with a title. As
- * a page of its own in Settings, the page heading is its title, and its
- * actions go to the site header.
+ * The list of the page. The page heading is its title, and its actions go
+ * to the site header.
  */
 function Part({
-	title,
-	description,
 	actions,
 	children,
 }: {
-	title: string;
-	description: string;
 	actions: ReactNode;
 	children: ReactNode;
 }) {
-	const part = useContext(PartContext);
-	if (part) {
-		return (
-			<>
-				<HeaderActions>{actions}</HeaderActions>
-				{children}
-			</>
-		);
-	}
 	return (
-		<PageSection title={title} description={description} actions={actions}>
+		<>
+			<HeaderActions>{actions}</HeaderActions>
 			{children}
-		</PageSection>
+		</>
 	);
 }
 
@@ -330,9 +314,8 @@ function AddButton({
 	children: ReactNode;
 }) {
 	// In the site header it is the main action of the page.
-	const part = useContext(PartContext);
 	return (
-		<Button variant={part ? "default" : "outline"} size="sm" onClick={onClick}>
+		<Button size="sm" onClick={onClick}>
 			<PlusIcon data-icon="inline-start" />
 			{children}
 		</Button>
@@ -380,28 +363,17 @@ function OpenRow({
 	middle?: ReactNode;
 	aside?: ReactNode;
 }) {
-	const part = useContext(PartContext);
-	const className = "font-medium underline-offset-4 hover:underline";
+	const part = usePart();
 	return (
 		<TableRow>
 			<TableCell className="max-w-72 px-3 py-2.5">
-				{part ? (
-					<Link
-						to="/settings"
-						search={part.search(itemOf(to))}
-						className={className}
-					>
-						{title}
-					</Link>
-				) : (
-					<Link
-						to="/agents"
-						search={{ item: itemOf(to) }}
-						className={className}
-					>
-						{title}
-					</Link>
-				)}
+				<Link
+					to="/settings"
+					search={part.search(itemOf(to))}
+					className="font-medium underline-offset-4 hover:underline"
+				>
+					{title}
+				</Link>
 				{line ? (
 					<div className="truncate text-muted-foreground text-xs">{line}</div>
 				) : null}

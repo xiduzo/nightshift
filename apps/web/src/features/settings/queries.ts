@@ -20,6 +20,12 @@ export const settingsMutations = {
 	save: orpc.settings.save.mutationOptions,
 };
 
+/** Night Shift's own agents: the Builder, the Explainer, the Decider and the others. */
+export const builtinQueries = {
+	/** Who answers for each agent on this computer now, or why nothing can. */
+	status: () => orpc.assistant.agents.queryOptions(),
+};
+
 const usage = createUsageQueries(orpc);
 
 export const usageQueries = {

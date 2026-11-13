@@ -238,17 +238,17 @@ export function ComputerDetail({
 			{computer.thisDevice ? (
 				<>
 					<DetailSection
-						title="Agents"
+						title="Your agents"
 						description="The profiles and tools of this computer."
 					>
 						<Button
 							variant="outline"
 							size="sm"
 							nativeButton={false}
-							render={<Link to="/agents" />}
+							render={<Link to="/settings" search={{ section: "agents" }} />}
 						>
 							<BotIcon data-icon="inline-start" />
-							Open Agents
+							Open your agents
 						</Button>
 					</DetailSection>
 					<DetailSection
@@ -369,7 +369,7 @@ function ThisComputerOffers({ spaceId }: { spaceId: string }) {
 						variant="ghost"
 						size="sm"
 						nativeButton={false}
-						render={<Link to="/agents" />}
+						render={<Link to="/settings" search={{ section: "agents" }} />}
 					>
 						<PlusIcon data-icon="inline-start" />
 						Offer a profile

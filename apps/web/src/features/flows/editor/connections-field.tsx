@@ -70,11 +70,11 @@ export function ConnectionsField({
 			<Note>
 				You have no connections yet.{" "}
 				<Link
-					to="/agents"
-					search={{ item: undefined }}
+					to="/settings"
+					search={{ section: "tools" }}
 					className="text-foreground underline underline-offset-4 hover:text-primary"
 				>
-					Add one under Agents → Tools
+					Add one under Settings → Tools
 				</Link>
 				, then pick it here.
 			</Note>
@@ -166,8 +166,8 @@ export function ConnectionsField({
 			))}
 			<FieldDescription id={`${id}-hint`} className="text-xs">
 				Tools you set up once under{" "}
-				<Link to="/agents" search={{ item: undefined }}>
-					Agents → Tools
+				<Link to="/settings" search={{ section: "tools" }}>
+					Settings → Tools
 				</Link>
 				. Use them in any node.
 			</FieldDescription>

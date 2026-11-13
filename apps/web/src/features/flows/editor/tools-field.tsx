@@ -108,11 +108,11 @@ export function ToolsField({
 			<Note>
 				This computer has no tools yet.{" "}
 				<Link
-					to="/agents"
-					search={{ item: undefined }}
+					to="/settings"
+					search={{ section: "tools" }}
 					className="text-foreground underline underline-offset-4 hover:text-primary"
 				>
-					Add one under Agents → Tools
+					Add one under Settings → Tools
 				</Link>
 				, then pick it here.
 			</Note>
@@ -321,7 +321,7 @@ export function NodeProgramsField({
 			</div>
 			{error ? <FieldError className="text-xs">{error}</FieldError> : null}
 			<FieldDescription id={`${id}-hint`} className="text-xs">
-				Programs on this computer that are not under Agents → Tools. The run
+				Programs on this computer that are not under Settings → Tools. The run
 				does not start when this computer cannot find one.
 			</FieldDescription>
 		</FieldSet>

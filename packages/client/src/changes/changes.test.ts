@@ -108,6 +108,7 @@ const READS = new Set([
 	"devices.merge.pending",
 	"devices.merge.preview",
 	"account.status",
+	"assistant.agents",
 ]);
 
 /** The streams: a screen follows them, they save nothing. */
@@ -209,6 +210,7 @@ describe("what a change makes stale", () => {
 			["connections"],
 			["harnesses"],
 			["cliTools"],
+			["assistant", "agents"],
 		]);
 	});
 

@@ -51,10 +51,11 @@ import {
 import { ToolPicker } from "./tool-detail";
 
 /**
- * The Agents page. With nothing picked it shows the overview: profiles,
- * model profiles, harnesses, tools and your other devices. A pick opens
- * its detail in place, and the breadcrumb leads back. Leaving a profile
- * with unsaved changes asks first.
+ * One list of the agents of this computer, as a page of Settings: your
+ * profiles, your model profiles, your harnesses or your tools. With
+ * nothing picked it shows the list. A pick opens its detail in place, and
+ * the breadcrumb leads back. Leaving a profile with unsaved changes asks
+ * first.
  */
 export function AgentsPage({
 	item,
@@ -64,12 +65,17 @@ export function AgentsPage({
 	heading,
 	after,
 }: {
-	/** PROTOTYPE, throw away: one part of the page, inside Settings. */
-	part?: AgentsPart;
-	partCrumbs?: Crumb[];
-	heading?: ReactNode;
+	/** Which list the page shows, and the Settings link of each of its items. */
+	part: AgentsPart;
+	/** The breadcrumb of the list. With an item open, its last step links back to the list. */
+	partCrumbs: Crumb[];
+	/** The heading of the list. */
+	heading: ReactNode;
+	/** More sections, after the list. */
 	after?: ReactNode;
+	/** What is open in detail, for example `harness:claude-code`. None: the list. */
 	item: string | undefined;
+	/** Opens an item, or goes back to the list. */
 	onSelect: (item: string | undefined) => void;
 }) {
 	const profiles = useQuery(profileQueries.list());
@@ -136,35 +142,22 @@ export function AgentsPage({
 		tools.isPending ||
 		cliTools.isPending;
 
-	const crumbs: Crumb[] = partCrumbs
-		? selection
-			? [
-					...partCrumbs.slice(0, -1),
-					{
-						label: partCrumbs.at(-1)?.label,
-						link: { to: "/settings", search: part?.search(undefined) },
-					},
-					{
-						label: selectionLabel(selection, {
-							profiles: profiles.data ?? [],
-							harnesses: added,
-							otherDevices: otherDevices.data ?? [],
-						}),
-					},
-				]
-			: partCrumbs
-		: selection
-			? [
-					{ label: "Agents", link: { to: "/agents", search: {} } },
-					{
-						label: selectionLabel(selection, {
-							profiles: profiles.data ?? [],
-							harnesses: added,
-							otherDevices: otherDevices.data ?? [],
-						}),
-					},
-				]
-			: [{ label: "Agents" }];
+	const crumbs: Crumb[] = selection
+		? [
+				...partCrumbs.slice(0, -1),
+				{
+					label: partCrumbs.at(-1)?.label,
+					link: { to: "/settings", search: part.search(undefined) },
+				},
+				{
+					label: selectionLabel(selection, {
+						profiles: profiles.data ?? [],
+						harnesses: added,
+						otherDevices: otherDevices.data ?? [],
+					}),
+				},
+			]
+		: partCrumbs;
 
 	return (
 		<>
@@ -222,23 +215,21 @@ export function AgentsPage({
 					/>
 				</DetailInPage>
 			) : (
-				<>
-					<AgentsOverview
-						part={part}
-						heading={heading}
-						after={after}
-						agentProfiles={agentProfiles}
-						modelProfiles={modelProfiles}
-						harnesses={added}
-						cliTools={cliTools.data ?? []}
-						connections={connections}
-						otherDevices={otherDevices.data ?? []}
-						deciderLabel={deciderLabel}
-						onSelect={select}
-						onAddHarness={() => setPicking("harness")}
-						onAddTool={() => setPicking("tool")}
-					/>
-				</>
+				<AgentsOverview
+					part={part}
+					heading={heading}
+					after={after}
+					agentProfiles={agentProfiles}
+					modelProfiles={modelProfiles}
+					harnesses={added}
+					cliTools={cliTools.data ?? []}
+					connections={connections}
+					otherDevices={otherDevices.data ?? []}
+					deciderLabel={deciderLabel}
+					onSelect={select}
+					onAddHarness={() => setPicking("harness")}
+					onAddTool={() => setPicking("tool")}
+				/>
 			)}
 
 			<HarnessPicker

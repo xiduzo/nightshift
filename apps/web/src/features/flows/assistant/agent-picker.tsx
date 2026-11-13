@@ -73,7 +73,7 @@ type ChoiceStore = {
 	onChoiceChange?: (choice: AgentChoice) => void;
 };
 
-/** PROTOTYPE, throw away: models that give one answer, in the same list as the agents. */
+/** Models that give one answer, in the same list as the agents: Settings offers both for one choice. */
 export type ModelOptions = {
 	/** The group's label. */
 	label?: string;
@@ -97,6 +97,8 @@ export type AgentMenusProps = {
 	models?: ModelOptions;
 	/** False: only models can answer. */
 	agents?: boolean;
+	/** False: no effort menu, for a choice that keeps no effort. */
+	effort?: boolean;
 } & ChoiceStore;
 
 /** The profile radio's value for the profile for help, and for no profile. Profile names cannot hold a colon. */
@@ -220,6 +222,7 @@ export function AgentMenus({
 	onChoiceChange,
 	models,
 	agents = true,
+	effort = true,
 }: AgentMenusProps) {
 	const stored = useAgentChoice();
 	const choice = given ?? stored;
@@ -381,7 +384,9 @@ export function AgentMenus({
 					) : null}
 				</DropdownMenuContent>
 			</DropdownMenu>
-			{modelOn ? null : <EffortMenu choice={choice} set={set} now={now} />}
+			{modelOn || !effort ? null : (
+				<EffortMenu choice={choice} set={set} now={now} />
+			)}
 			{otherModel ? (
 				<OtherModelDialog
 					harness={otherModel}
@@ -483,7 +488,7 @@ function ProfileGroup({
 			</DropdownMenuRadioGroup>
 			{now.locked ? (
 				<DropdownMenuLabel className="font-normal">
-					Add a profile on the Agents page, or choose a model below.
+					Add a profile under Your agents in Settings, or choose a model below.
 				</DropdownMenuLabel>
 			) : null}
 		</DropdownMenuGroup>

@@ -51,7 +51,7 @@ export function optionNoun(node: FlowNode): "option" | "outcome" | "exit" {
 
 /** What the editor says about a connection the daemon does not have. */
 export function missingConnectionMessage(name: string): string {
-	return `No connection named ${name}. The flow cannot run until you add it on the Agents page.`;
+	return `No connection named ${name}. The flow cannot run until you add it under Tools in Settings.`;
 }
 
 /** What the editor says about a profile that its device does not have. */
