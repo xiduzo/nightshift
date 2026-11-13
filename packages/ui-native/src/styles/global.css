@@ -54,6 +54,25 @@
 			--color-status-waiting: oklch(0.52 0.12 65);
 			--color-status-sleeping: oklch(0.49 0.12 290);
 
+			/*
+			 * The colors a flow gives an outcome or a Gate's option (OutcomeColor
+			 * in packages/flows), as the web's --outcome-*: 600 on light, 400 on dark.
+			 */
+			--color-outcome-red: var(--color-red-600);
+			--color-outcome-orange: var(--color-orange-600);
+			--color-outcome-amber: var(--color-amber-600);
+			--color-outcome-yellow: var(--color-yellow-600);
+			--color-outcome-lime: var(--color-lime-600);
+			--color-outcome-green: var(--color-green-600);
+			--color-outcome-teal: var(--color-teal-600);
+			--color-outcome-cyan: var(--color-cyan-600);
+			--color-outcome-sky: var(--color-sky-600);
+			--color-outcome-blue: var(--color-blue-600);
+			--color-outcome-indigo: var(--color-indigo-600);
+			--color-outcome-violet: var(--color-violet-600);
+			--color-outcome-pink: var(--color-pink-600);
+			--color-outcome-gray: var(--color-gray-600);
+
 			/* Outcomes: pass green, fail red, needs-input amber, every other cyan. */
 			--color-outcome-pass: var(--color-green-600);
 			--color-outcome-fail: var(--color-red-600);
@@ -93,6 +112,21 @@
 			--color-status-interrupted: oklch(0.76 0.15 50);
 			--color-status-waiting: oklch(0.83 0.14 80);
 			--color-status-sleeping: oklch(0.76 0.09 290);
+
+			--color-outcome-red: var(--color-red-400);
+			--color-outcome-orange: var(--color-orange-400);
+			--color-outcome-amber: var(--color-amber-400);
+			--color-outcome-yellow: var(--color-yellow-400);
+			--color-outcome-lime: var(--color-lime-400);
+			--color-outcome-green: var(--color-green-400);
+			--color-outcome-teal: var(--color-teal-400);
+			--color-outcome-cyan: var(--color-cyan-400);
+			--color-outcome-sky: var(--color-sky-400);
+			--color-outcome-blue: var(--color-blue-400);
+			--color-outcome-indigo: var(--color-indigo-400);
+			--color-outcome-violet: var(--color-violet-400);
+			--color-outcome-pink: var(--color-pink-400);
+			--color-outcome-gray: var(--color-gray-400);
 
 			--color-outcome-pass: var(--color-green-400);
 			--color-outcome-fail: var(--color-red-400);
