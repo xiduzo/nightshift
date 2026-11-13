@@ -1,5 +1,6 @@
 import {
 	agentHarnessSchema,
+	type BuiltinCheck,
 	type BuiltinStatus,
 	builtinAgentIdSchema,
 	type ChatEvent,
@@ -60,28 +61,42 @@ export const chatEventSchema = exact<ChatEvent>()(
 	]),
 );
 
+/** What answers for a built-in agent: an agent or a model. Null: nothing can. */
+const builtinAnswersBySchema = z
+	.discriminatedUnion("kind", [
+		z.object({
+			kind: z.literal("agent"),
+			profile: z.string().nullable(),
+			harness: agentHarnessSchema,
+			model: z.string(),
+			effort: z.string().optional(),
+		}),
+		z.object({
+			kind: z.literal("model"),
+			profile: z.string().optional(),
+			decider: deciderNameSchema,
+			model: z.string().optional(),
+		}),
+	])
+	.nullable();
+
 /** Who answers for one of Night Shift's own agents on this computer now. */
 export const builtinStatusSchema = exact<BuiltinStatus>()(
 	z.object({
 		id: builtinAgentIdSchema,
 		chosen: z.boolean(),
-		answers: z
-			.discriminatedUnion("kind", [
-				z.object({
-					kind: z.literal("agent"),
-					profile: z.string().nullable(),
-					harness: agentHarnessSchema,
-					model: z.string(),
-					effort: z.string().optional(),
-				}),
-				z.object({
-					kind: z.literal("model"),
-					profile: z.string().optional(),
-					decider: deciderNameSchema,
-					model: z.string().optional(),
-				}),
-			])
-			.nullable(),
+		answers: builtinAnswersBySchema,
+		problem: z.string().nullable(),
+	}),
+);
+
+/** What the check of one of Night Shift's own agents found. */
+export const builtinCheckSchema = exact<BuiltinCheck>()(
+	z.object({
+		id: builtinAgentIdSchema,
+		ok: z.boolean(),
+		ms: z.number(),
+		answers: builtinAnswersBySchema,
 		problem: z.string().nullable(),
 	}),
 );

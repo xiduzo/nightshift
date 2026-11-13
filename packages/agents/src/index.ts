@@ -12,6 +12,7 @@ export {
 	type ChatExchange,
 	chatCanUseTools,
 	chatTurn,
+	checkAgent,
 	chooseProject,
 	explainRun,
 	type HistoryPort,

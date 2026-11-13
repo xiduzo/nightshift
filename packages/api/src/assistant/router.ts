@@ -1,10 +1,15 @@
-import { chatRequestSchema, suggestionRequestSchema } from "@nightshift/flows";
+import {
+	builtinAgentIdSchema,
+	chatRequestSchema,
+	suggestionRequestSchema,
+} from "@nightshift/flows";
 import { z } from "zod";
 
 import { stream } from "../output";
 import { ownerProcedure, streamed } from "../procedures";
 import { runProcedure } from "../runs";
 import {
+	builtinCheckSchema,
 	builtinStatusSchema,
 	chatEventSchema,
 	explanationEventSchema,
@@ -25,6 +30,24 @@ export const assistant = {
 		})
 		.output(z.array(builtinStatusSchema))
 		.handler(({ context }) => context.assistant.agents()),
+	/**
+	 * "Try it": one small question to what answers for one agent. It costs
+	 * the computer's agent or model a little, so it is its owner's. A check
+	 * that fails is an answer, not an error. Stopping the call stops the check.
+	 */
+	check: ownerProcedure
+		.route({
+			summary:
+				"Asks what answers for one of Night Shift's own agents one small question, and says whether it answered and how fast, or what to fix.",
+		})
+		.input(z.object({ agent: builtinAgentIdSchema }))
+		.output(builtinCheckSchema)
+		.handler(({ context, input, signal }) =>
+			context.assistant.check(
+				input.agent,
+				signal ?? new AbortController().signal,
+			),
+		),
 	suggest: ownerProcedure
 		.route({
 			summary:

@@ -3,13 +3,20 @@ import {
 	type AssistantVia,
 	chatCanUseTools,
 	chatTurn,
+	checkAgent,
 	explainRun,
 	installedSkills,
 	resumesOnAnotherModel,
 	suggestField,
 } from "@nightshift/agents";
 import { harnessLabel, harnessNoun } from "@nightshift/agents/harness-facts";
-import type { ValueInput, ValueResult } from "@nightshift/agents/types";
+import type {
+	AgentErrorKind,
+	DecisionInput,
+	DecisionResult,
+	ValueInput,
+	ValueResult,
+} from "@nightshift/agents/types";
 import type {
 	CliToolStore,
 	ConnectionStore,
@@ -26,15 +33,21 @@ import {
 	BUILTIN_AGENTS,
 	type BuiltinAgentId,
 	type BuiltinAnswer,
+	type BuiltinCheck,
 	type BuiltinStatus,
 	builtinAgent,
 	builtinModel,
 	type ChatEvent,
 	type ChatRequest,
+	canMakeValue,
 	chatMessage,
+	type DeciderName,
 	type ExplanationEvent,
 	isAgentProfile,
+	type ModelPick,
+	valueDecider,
 } from "@nightshift/flows";
+import { now } from "@nightshift/time";
 import {
 	type AuthoringSpace,
 	authoringPort,
@@ -85,7 +98,95 @@ export type AssistantDeps = {
 	 * model for them. Without it, only an agent can answer.
 	 */
 	decide?: (input: ValueInput) => Promise<ValueResult>;
+	/**
+	 * One call to a model of this computer that picks one of the labels, as
+	 * a Decision in a run asks it. The check of the Decider uses it. Without
+	 * it, the check asks for a value, when the model can make one.
+	 */
+	decideOption?: (input: DecisionInput) => Promise<DecisionResult>;
+	/** How long a check waits for its answer. Default: `CHECK_TIMEOUTS`. */
+	checkTimeouts?: { agentMs: number; modelMs: number };
 };
+
+/** How long a check waits: an agent starts a program first, a model is one call. */
+export const CHECK_TIMEOUTS = { agentMs: 60_000, modelMs: 30_000 };
+
+export const NO_CHECK_FOLDER =
+	"Night Shift has no folder for the check on this computer. Start Night Shift again, then try again.";
+
+export const NO_CHECK_MODEL =
+	"This computer cannot ask this model for a check. Choose another model in Settings.";
+
+/** What the check asks a model that picks an option. */
+const CHECK_QUESTION =
+	"This is a check that you answer. Pick the option: ready.";
+const CHECK_LABELS = [{ name: "ready" }, { name: "not ready" }];
+
+/** What the check asks a model that writes an answer, and the shape it holds it to. */
+const CHECK_VALUE_PROMPT =
+	'Answer with one JSON object. Set "answer" to the one word: ready.';
+const CHECK_OUTPUT = {
+	type: "object",
+	properties: { answer: { type: "string" } },
+	required: ["answer"],
+	additionalProperties: false,
+};
+
+const seconds = (ms: number) => Math.max(1, Math.round(ms / 1000));
+
+/** What the person can check when a model did not answer. */
+function modelHint(decider: DeciderName): string {
+	return decider === "ollama"
+		? "Check that Ollama runs and has this model."
+		: "Check its key and its model in Settings.";
+}
+
+/** Words for the person about a model call that failed. */
+function modelProblem(
+	decider: DeciderName,
+	kind: AgentErrorKind,
+	message: string,
+): string {
+	switch (kind) {
+		case "aborted":
+			return "Stopped.";
+		case "usage-limit":
+			return "This model reached its usage limit. Try again later, or choose another model in Settings.";
+		case "network":
+			return "Night Shift could not reach the model. Check the internet connection, then try again.";
+		default: {
+			const said = message.trim();
+			return `The model did not answer. ${said ? `${/[.!?]$/.test(said) ? said : `${said}.`} ` : ""}${modelHint(decider)}`;
+		}
+	}
+}
+
+/**
+ * `work` with a time limit: its signal aborts after `ms`, and the wait
+ * ends then, also when the work does not stop. "late": the time ran out.
+ */
+async function within<T>(
+	ms: number,
+	outer: AbortSignal,
+	work: (signal: AbortSignal) => Promise<T>,
+): Promise<T | "late"> {
+	const limit = new AbortController();
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const late = new Promise<"late">((resolve) => {
+		timer = setTimeout(() => {
+			limit.abort();
+			resolve("late");
+		}, ms);
+	});
+	try {
+		return await Promise.race([
+			work(AbortSignal.any([outer, limit.signal])),
+			late,
+		]);
+	} finally {
+		clearTimeout(timer);
+	}
+}
 
 /**
  * The agent that answers: a profile's harness, model and effort with the
@@ -422,8 +523,185 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 		};
 	}
 
+	/**
+	 * The model a run asks for the Decider or the Brief writer, or the model
+	 * the person chose for the Explainer or the Field writer. With no choice
+	 * a Decision asks TypeSafe, and a Gate's brief asks the first decider
+	 * that writes (`valueDecider`), as the engine does.
+	 */
+	function checkedModel(id: BuiltinAgentId):
+		| {
+				pick: ModelPick;
+				answers: Extract<BuiltinStatus["answers"], { kind: "model" }>;
+		  }
+		| { problem: string } {
+		const answer = deps.settings.current().builtinAgents[id];
+		const chosen = answer?.kind === "model" ? answer : null;
+		const pick: ModelPick | { problem: string } = chosen
+			? builtinModel(chosen, deps.profiles.list(), {
+					values: id !== "decider",
+				})
+			: { decider: id === "decider" ? "typesafe" : valueDecider({}) };
+		if ("problem" in pick) return pick;
+		return {
+			pick,
+			answers: {
+				kind: "model",
+				...(chosen?.profile !== undefined ? { profile: chosen.profile } : {}),
+				decider: pick.decider,
+				...(pick.model !== undefined ? { model: pick.model } : {}),
+			},
+		};
+	}
+
+	/** One small call to the model of `id`. Null: it answered. Else the problem. */
+	async function askModel(
+		id: BuiltinAgentId,
+		pick: ModelPick,
+		signal: AbortSignal,
+	): Promise<string | null> {
+		const to = {
+			decider: pick.decider,
+			...(pick.model !== undefined ? { model: pick.model } : {}),
+			...(pick.address !== undefined ? { address: pick.address } : {}),
+			signal,
+		};
+		// The Decider picks an option, as a Decision in a run asks it. Without
+		// that call, a model that also writes is asked for a value.
+		const options = id === "decider" ? deps.decideOption : undefined;
+		if (!options && (!deps.decide || !canMakeValue(pick.decider))) {
+			// The Explainer and the Field writer can run on an agent instead.
+			return deps.decide || builtinAgent(id).takes === "model"
+				? NO_CHECK_MODEL
+				: NO_MODEL_HERE;
+		}
+		const timeouts = deps.checkTimeouts ?? CHECK_TIMEOUTS;
+		let result: DecisionResult | ValueResult | "late";
+		try {
+			result = await within<DecisionResult | ValueResult>(
+				timeouts.modelMs,
+				signal,
+				(limited) =>
+					options
+						? options({
+								...to,
+								prompt: CHECK_QUESTION,
+								labels: CHECK_LABELS,
+								signal: limited,
+							})
+						: (deps.decide as NonNullable<AssistantDeps["decide"]>)({
+								...to,
+								prompt: CHECK_VALUE_PROMPT,
+								output: CHECK_OUTPUT,
+								signal: limited,
+							}),
+			);
+		} catch (error) {
+			return modelProblem(
+				pick.decider,
+				"harness",
+				error instanceof Error ? error.message : "",
+			);
+		}
+		if (result === "late") {
+			return `The model did not answer in ${seconds(timeouts.modelMs)} seconds. ${modelHint(pick.decider)}`;
+		}
+		if (result.kind !== "error") return null;
+		return modelProblem(
+			pick.decider,
+			signal.aborted ? "aborted" : result.errorKind,
+			result.message,
+		);
+	}
+
+	/**
+	 * The check of one built-in agent: one small question to what answers
+	 * for it. An agent answers in a read-only session in the assistant's own
+	 * folder, with no tools. A model answers in one call.
+	 */
+	async function check(
+		id: BuiltinAgentId,
+		signal: AbortSignal,
+	): Promise<BuiltinCheck> {
+		const started = now();
+		const done = (
+			answers: BuiltinCheck["answers"],
+			problem: string | null,
+		): BuiltinCheck => ({
+			id,
+			ok: problem === null,
+			ms: now() - started,
+			answers,
+			problem,
+		});
+		try {
+			const status = statusOf(id);
+			if (builtinAgent(id).takes === "model" || status.answers === null) {
+				// A model, or nothing: the status says why nothing can answer.
+				if (status.problem !== null) return done(null, status.problem);
+				const model = checkedModel(id);
+				if ("problem" in model) return done(null, model.problem);
+				return done(model.answers, await askModel(id, model.pick, signal));
+			}
+			if (status.answers.kind === "model") {
+				const model = checkedModel(id);
+				if ("problem" in model) return done(null, model.problem);
+				return done(model.answers, await askModel(id, model.pick, signal));
+			}
+			const { answers } = status;
+			// The status holds the refusal of an agent without Night Shift's
+			// tools (the Builder, the Improver) and a harness that is not added.
+			if (status.problem !== null) return done(answers, status.problem);
+			const label = harnessLabel(answers.harness);
+			const harness = deps.harnessFor(answers.harness);
+			if (!harness || !deps.installed(answers.harness)) {
+				return done(
+					answers,
+					`Night Shift cannot find ${label} on this computer. Install it, or choose another agent in Settings.`,
+				);
+			}
+			// The same agent as the status names, with its settings as a session takes them.
+			const picked = pickAgent({}, deps, {
+				builtin: id,
+				...(builtinAgent(id).takes === "agent-with-tools"
+					? { fits: chatCanUseTools }
+					: {}),
+			});
+			if ("error" in picked) return done(answers, picked.error);
+			const cwd = await deps.ownFolder?.();
+			if (cwd === undefined) return done(answers, NO_CHECK_FOLDER);
+			const timeouts = deps.checkTimeouts ?? CHECK_TIMEOUTS;
+			const result = await within(timeouts.agentMs, signal, (limited) =>
+				checkAgent({
+					harness,
+					profile: picked.settings,
+					cwd,
+					signal: limited,
+				}),
+			);
+			if (result === "late") {
+				return done(
+					answers,
+					`${label} did not answer in ${seconds(timeouts.agentMs)} seconds. Check that you are signed in to it, then try again.`,
+				);
+			}
+			if (result.answered) return done(answers, null);
+			return done(
+				answers,
+				signal.aborted ? "Stopped." : `${label} did not answer. ${result.why}`,
+			);
+		} catch (error) {
+			const said = error instanceof Error ? error.message.trim() : "";
+			return done(
+				null,
+				`The check did not finish. ${said ? `${said} ` : ""}Try again.`,
+			);
+		}
+	}
+
 	return {
 		agents: () => BUILTIN_AGENTS.map((agent) => statusOf(agent.id)),
+		check,
 
 		async *suggest(request, signal, scope) {
 			const via = await reportVia(

@@ -350,3 +350,18 @@ export type BuiltinStatus = {
 		| null;
 	problem: string | null;
 };
+
+/**
+ * What the check of one built-in agent found: it asked what answers for
+ * the agent one small question. `ok`: it answered, in `ms` milliseconds.
+ * Else `problem` says what happened and what to do, in words for the
+ * person. `answers`: what was asked, or null when nothing could be.
+ */
+export type BuiltinCheck = {
+	id: BuiltinAgentId;
+	ok: boolean;
+	/** How long the check took, in milliseconds. */
+	ms: number;
+	answers: BuiltinStatus["answers"];
+	problem: string | null;
+};

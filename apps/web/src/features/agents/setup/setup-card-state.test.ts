@@ -7,6 +7,7 @@ import type {
 } from "@/shared/api";
 import {
 	agentRow,
+	checkRow,
 	chooseLater,
 	deciderRow,
 	laterChosen,
@@ -139,7 +140,7 @@ describe("the decider row", () => {
 	test("an unchosen decider offers the choice", () => {
 		expect(deciderRow(decider())).toEqual({
 			done: false,
-			text: "A decider makes the small choices in your flows.",
+			text: "A flow can let a model pick the next step.",
 			action: { kind: "choose" },
 		});
 		expect(deciderRow(undefined).action).toBeNull();
@@ -153,12 +154,67 @@ describe("the decider row", () => {
 		});
 		expect(deciderRow(container)).toEqual({
 			done: false,
-			text: "A decider makes the small choices in your flows. Choose the decider in Settings.",
+			text: "A flow can let a model pick the next step. Choose the decider in Settings.",
 			action: { kind: "open", page: "settings" },
 		});
 		expect(deciderRow(null).action).toEqual({
 			kind: "open",
 			page: "settings",
+		});
+	});
+});
+
+describe("the check row", () => {
+	const summary = (failed: number, checked = true) => ({
+		checked,
+		failed,
+		total: 3,
+	});
+
+	test("without an agent it waits for one", () => {
+		expect(checkRow(false, summary(0, false))).toEqual({
+			done: false,
+			text: "Night Shift asks each of its agents one small question. Connect an agent first.",
+			action: null,
+		});
+	});
+
+	test("while this computer has not said who answers, it offers nothing", () => {
+		expect(checkRow(true, null).action).toBeNull();
+		expect(
+			checkRow(true, { checked: false, failed: 0, total: 0 }).action,
+		).toBeNull();
+	});
+
+	test("not checked yet: it offers the check", () => {
+		expect(checkRow(true, summary(0, false))).toEqual({
+			done: false,
+			text: "Night Shift asks each of its agents one small question.",
+			action: { kind: "check", again: false },
+		});
+	});
+
+	test("every agent answered: done", () => {
+		expect(checkRow(true, summary(0))).toEqual({
+			done: true,
+			text: "Night Shift's agents answer.",
+			action: null,
+		});
+	});
+
+	test("a problem: the row says how many, and opens the check again", () => {
+		expect(checkRow(true, summary(1))).toEqual({
+			done: false,
+			text: "One check found a problem. Open the check to fix it.",
+			action: { kind: "check", again: true },
+		});
+		expect(checkRow(true, summary(2)).text).toBe(
+			"2 checks found a problem. Open the check to fix them.",
+		);
+		// A problem shows before every question has its result.
+		expect(checkRow(true, summary(1, false)).action).toEqual({
+			kind: "check",
+			again: true,
 		});
 	});
 });
@@ -187,7 +243,7 @@ describe("the project row", () => {
 
 test("the line under the title says what is next", () => {
 	expect(setupCardLine(false, true)).toBe(
-		"Set up an agent and add a project. Then start your first run.",
+		"Connect an agent and add a project. Then start your first run.",
 	);
 	expect(setupCardLine(true, true)).toBe(
 		"You are ready. Open a project and start a run.",
