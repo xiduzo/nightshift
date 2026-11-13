@@ -110,11 +110,11 @@ Spend is the page for the money of a Space, for the person who pays (`docs/resea
 
 - One range for the whole page, in the toolbar: 7, 30 or 90 days, in the URL (`?range=90`). It opens at 30 days.
 - Four cards on top: **Spent** against the same days before, with one bar per day, **Steady flows**, **Hard to predict**, and **You could save**.
-- **How predictable each flow is** has one row per flow that cost money, the most spend first. A strip shows what its runs cost against a usual run of that flow. A usual run is the median of its finished runs with a known cost. Every strip has the same scale, 0× to 6× a usual run, so a short strip means a steady cost.
-- **Cost is** says **Steady**, **Varies** or **Hard to predict**. Night Shift reads it from the runs. Nobody sets a threshold. A flow with fewer than 3 such runs has none.
+- **How predictable each flow is** has one row per flow that cost money, the most spend first. A strip shows what its runs cost against a usual run of that flow. A usual run is the median of its finished runs with a known cost. Every strip has the same scale, 0× to 6× a usual run, so a short strip means a steady cost. The list shows no scale.
+- The colour of a strip says **Steady**, **Varies** or **Hard to predict**. The legend under the list names each colour, and a row has no label for it. Night Shift reads it from the runs. Nobody sets a threshold. A flow with fewer than 3 such runs has a line of text, not a strip.
 - A row opens in place: what each step costs per run, what stands out on a step, and the ways to save on that flow.
 - The flows that cost nothing share one row. So do the quick runs. The last row is the total.
-- **Ways to save** lists changes that the runs show, the biggest first: runs that did not finish, runs that found nothing to do, and runs that cost over twice a usual run. A run counts under one of them only. Each card says what the change saves, how many runs show it, and opens the newest of those runs and the flow.
+- **Ways to save** lists changes that the runs show, the biggest first: runs that did not finish, runs that found nothing to do, and runs that cost over twice a usual run. A run counts under one of them only. The list is as wide as it needs: the flow list gives it room. Each change is an Item, not a Card. It says what the change saves, how many runs show it, and opens the newest of those runs and the flow.
 - The page never shows a saving that the runs do not show. It does not guess what another model or a removed step saves.
 - A test run counts in the spend. It is not in a usual run or in a way to save.
 - An older Host cannot send the page: one alert asks to update Night Shift.

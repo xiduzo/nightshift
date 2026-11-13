@@ -4,7 +4,7 @@ import { cn } from "@nightshift/ui/lib/utils";
 import type { Spread } from "@/shared/api";
 
 /** The strip ends at this many times a usual run. A larger run sits on its end. */
-export const STRIP_TIMES = 6;
+const STRIP_TIMES = 6;
 
 /** The colour of each steadiness, as a fill, as text and as a tint: the status tokens. */
 export const STEADINESS_TONE: Record<

@@ -7,14 +7,14 @@ import {
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
-	Card,
-	CardAction,
-	CardContent,
-	CardDescription,
-	CardFooter,
-	CardHeader,
-	CardTitle,
-} from "@nightshift/ui/components/card";
+	Item,
+	ItemContent,
+	ItemDescription,
+	ItemFooter,
+	ItemGroup,
+	ItemMedia,
+	ItemTitle,
+} from "@nightshift/ui/components/item";
 import { Progress } from "@nightshift/ui/components/progress";
 import { Link } from "@tanstack/react-router";
 import { CircleCheckIcon } from "lucide-react";
@@ -28,7 +28,7 @@ const SHOWN = 5;
 
 /**
  * The ways to save over the page's range, the most saved first: what they
- * add up to against the spend, then one card per change with the runs
+ * add up to against the spend, then one item per change with the runs
  * that show it. Each is read from the runs, never a guess.
  */
 export function WaysToSave({
@@ -54,8 +54,8 @@ export function WaysToSave({
 				</p>
 			) : (
 				<>
-					<Card size="sm" className="bg-status-finished/10 ring-0">
-						<CardContent className="flex flex-col gap-2 text-status-finished">
+					<Item className="bg-status-finished/10 text-status-finished">
+						<ItemContent className="gap-2">
 							<span className="flex items-baseline gap-2">
 								<span className="font-semibold text-xl tabular-nums tracking-tight">
 									{formatCost(days.saves)}
@@ -73,17 +73,19 @@ export function WaysToSave({
 								With each change, these {days.nights} days cost about{" "}
 								{formatCost(Math.max(days.total - days.saves, 0))}.
 							</span>
-						</CardContent>
-					</Card>
-					{shown.map((saving, index) => (
-						<SavingCard
-							key={saving.key}
-							saving={saving}
-							rank={index + 1}
-							range={days.nights}
-							project={projectName(saving.projectId)}
-						/>
-					))}
+						</ItemContent>
+					</Item>
+					<ItemGroup className="gap-3">
+						{shown.map((saving, index) => (
+							<SavingItem
+								key={saving.key}
+								saving={saving}
+								rank={index + 1}
+								range={days.nights}
+								project={projectName(saving.projectId)}
+							/>
+						))}
+					</ItemGroup>
 					{rest.length > 0 ? (
 						<p className="px-1 text-muted-foreground text-sm">
 							{rest.length} smaller{" "}
@@ -99,7 +101,7 @@ export function WaysToSave({
 }
 
 /** One way to save: what to do, on which flow, what it saves, and the runs that show it. */
-function SavingCard({
+function SavingItem({
 	saving,
 	rank,
 	range,
@@ -111,32 +113,32 @@ function SavingCard({
 	project: string | undefined;
 }) {
 	return (
-		<Card size="sm">
-			<CardHeader>
-				<CardTitle className="flex items-start gap-2.5">
-					<Badge
-						variant={rank === 1 ? "default" : "secondary"}
-						className="size-5.5 shrink-0 rounded-full px-0 tabular-nums"
-					>
-						{rank}
-					</Badge>
-					{savingTitle(saving)}
-				</CardTitle>
-				<CardDescription className="pl-8 text-xs">
+		<Item variant="outline" role="listitem">
+			<ItemMedia>
+				<Badge
+					variant={rank === 1 ? "default" : "secondary"}
+					className="size-5.5 rounded-full px-0 tabular-nums"
+				>
+					{rank}
+				</Badge>
+			</ItemMedia>
+			<ItemContent>
+				<ItemTitle className="line-clamp-none">{savingTitle(saving)}</ItemTitle>
+				<ItemDescription className="text-xs">
 					<span className="font-mono">{saving.flow}</span>
 					{project ? ` · ${project}` : null}
-				</CardDescription>
-				<CardAction className="flex flex-col items-end">
-					<span className="font-semibold text-base tabular-nums">
-						{formatCost(saving.saves)}
-					</span>
-					<span className="text-muted-foreground text-xs">in {range} days</span>
-				</CardAction>
-			</CardHeader>
-			<CardContent className="pl-11 text-muted-foreground text-sm">
-				{savingWhy(saving, formatCost)}
-			</CardContent>
-			<CardFooter className="flex-wrap justify-between gap-2 pl-11">
+				</ItemDescription>
+				<ItemDescription className="line-clamp-none pt-1">
+					{savingWhy(saving, formatCost)}
+				</ItemDescription>
+			</ItemContent>
+			<ItemContent className="items-end gap-0 self-start">
+				<span className="font-semibold text-base tabular-nums">
+					{formatCost(saving.saves)}
+				</span>
+				<span className="text-muted-foreground text-xs">in {range} days</span>
+			</ItemContent>
+			<ItemFooter className="flex-wrap pl-9">
 				<span className="flex items-center gap-1.5 text-muted-foreground text-xs">
 					<CircleCheckIcon className="size-3" aria-hidden="true" />
 					Seen in {saving.runs} {saving.runs === 1 ? "run" : "runs"}
@@ -146,8 +148,8 @@ function SavingCard({
 					linked={project !== undefined}
 					primary={rank === 1}
 				/>
-			</CardFooter>
-		</Card>
+			</ItemFooter>
+		</Item>
 	);
 }
 

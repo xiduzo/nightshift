@@ -1,23 +1,28 @@
-import { type SpendFlow, timesUsual } from "@nightshift/client";
+import {
+	type CostSteadiness,
+	type SpendFlow,
+	steadinessHint,
+	steadinessLabel,
+	timesUsual,
+} from "@nightshift/client";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
+import { cn } from "@nightshift/ui/lib/utils";
 import { formatCost } from "@/shared/format";
-import { SpreadStrip, STRIP_TIMES } from "@/shared/spread-strip";
+import { SpreadStrip, STEADINESS_TONE } from "@/shared/spread-strip";
 
-/** The marks of the scale over the strips: 0× to 6×. */
-export const STRIP_MARKS = Array.from(
-	{ length: STRIP_TIMES + 1 },
-	(_, times) => times,
-);
+/** Each steadiness, the steadiest first: the order of the legend. */
+const STEADINESS_ORDER: CostSteadiness[] = ["steady", "varies", "unsteady"];
 
 /**
  * What the runs of a flow cost against a usual run of that flow: the box
  * holds the middle half of the runs, the bar marks a usual run (1×), and
  * the dot is the dearest run. Every strip has the same scale, in times a
  * usual run, so a short strip means a steady cost whatever the flow costs.
+ * The colour says how steady the cost is.
  */
 export function CostStrip({ flow }: { flow: SpendFlow }) {
 	const { usual, steadiness } = flow;
@@ -34,6 +39,9 @@ export function CostStrip({ flow }: { flow: SpendFlow }) {
 				<SpreadStrip spread={usual} steadiness={steadiness} />
 			</TooltipTrigger>
 			<TooltipContent className="flex flex-col items-start gap-0.5 tabular-nums">
+				<span className="font-medium">
+					{steadinessLabel(steadiness)}. {steadinessHint(steadiness)}
+				</span>
 				<span>A usual run costs {formatCost(usual.median)}.</span>
 				<span>
 					Most runs cost {formatCost(usual.q1)} to {formatCost(usual.q3)}.
@@ -50,10 +58,28 @@ export function CostStrip({ flow }: { flow: SpendFlow }) {
 	);
 }
 
-/** What the marks of a strip mean. */
+/** What the colours and the marks of a strip mean. */
 export function CostStripLegend() {
 	return (
-		<div className="flex flex-wrap gap-x-5 gap-y-1 text-muted-foreground text-xs">
+		<div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-muted-foreground text-xs">
+			{STEADINESS_ORDER.map((steadiness) => (
+				<Tooltip key={steadiness}>
+					<TooltipTrigger
+						render={<span className="flex items-center gap-1.5" />}
+					>
+						<span
+							className={cn(
+								"size-2 rounded-xs",
+								STEADINESS_TONE[steadiness].fill,
+							)}
+							aria-hidden="true"
+						/>
+						{steadinessLabel(steadiness)}
+					</TooltipTrigger>
+					<TooltipContent>{steadinessHint(steadiness)}</TooltipContent>
+				</Tooltip>
+			))}
+			<span className="h-3 w-px bg-border" aria-hidden="true" />
 			<span className="flex items-center gap-1.5">
 				<span className="h-3 w-[3px] bg-muted-foreground" aria-hidden="true" />
 				Usual run

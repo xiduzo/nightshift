@@ -186,13 +186,13 @@ A row without an arrow has no runs yet. The [Spend](#spend) page is in the sideb
 
 The cards on top show what the runs spent against the same days before, how many flows have a steady cost, and what a change could save.
 
-**How predictable each flow is** has one row for each flow that cost money. The strip shows what its runs cost against a usual run of that flow. A short strip means a steady cost.
+**How predictable each flow is** has one row for each flow that cost money. The strip shows what its runs cost against a usual run of that flow. A short strip means a steady cost. The colour of the strip says how steady the cost is. The legend under the list names each colour.
 
-| Cost is | What it means |
+| Colour | What it means |
 | --- | --- |
-| **Steady** | Most runs cost within 20% of a usual run. |
-| **Varies** | Some runs cost a lot more or less than a usual run. |
-| **Hard to predict** | Many runs cost over twice a usual run, or one cost over four times that. |
+| Green: **Steady** | Most runs cost within 20% of a usual run. |
+| Amber: **Varies** | Some runs cost a lot more or less than a usual run. |
+| Red: **Hard to predict** | Many runs cost over twice a usual run, or one cost over four times that. |
 
 Click a row to open it. You see what each step costs per run, and the ways to save on that flow.
 

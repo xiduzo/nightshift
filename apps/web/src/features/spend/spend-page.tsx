@@ -103,7 +103,7 @@ export function SpendPage({
 							</Alert>
 						) : null}
 						<SpendTiles days={days} />
-						<div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
+						<div className="grid items-start gap-8 xl:grid-cols-[minmax(0,3fr)_minmax(24rem,2fr)]">
 							<PageSection
 								title="How predictable each flow is"
 								description={`Each strip shows what a run cost against a usual run of that flow, in the last ${range} days. A short strip means a steady cost.`}

@@ -17,18 +17,17 @@ import { Link } from "@tanstack/react-router";
 import { ChevronRightIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { formatCost } from "@/shared/format";
-import { STRIP_TIMES } from "@/shared/spread-strip";
-import { CostStrip, CostStripLegend, STRIP_MARKS } from "./cost-strip";
-import { SteadinessBadge } from "./steadiness";
+import { CostStrip, CostStripLegend } from "./cost-strip";
 import { SavingActions } from "./ways-to-save";
 
 const GRID =
-	"grid grid-cols-[1.25rem_minmax(11rem,1.3fr)_13.75rem_8.5rem_5rem_5.5rem] items-center gap-4 px-3";
+	"grid grid-cols-[1.25rem_minmax(9rem,1fr)_minmax(9rem,13.75rem)_4.5rem_5.5rem] items-center gap-4 px-3";
 
 /**
  * Each flow that cost money over the page's range, the most spend first:
- * what its runs cost against a usual run of that flow, how steady that
- * is, what it spent and what a change could save. A row opens in place:
+ * what its runs cost against a usual run of that flow, what it spent and
+ * what a change could save. The colour of a strip says how steady the
+ * cost is, and the legend under the list names each colour. A row opens in place:
  * what each step costs, and the ways to save on that flow. The flows that
  * cost nothing share one row, and so do the quick runs.
  */
@@ -45,7 +44,7 @@ export function SpendFlows({
 	const free = days.flows.filter((flow) => flow.spent <= 0);
 	return (
 		<div className="overflow-x-auto">
-			<div className="min-w-[52rem]">
+			<div className="min-w-[36rem]">
 				<div
 					className={cn(
 						GRID,
@@ -54,17 +53,7 @@ export function SpendFlows({
 				>
 					<span />
 					<span>Flow</span>
-					<span className="flex justify-between font-normal tabular-nums">
-						{STRIP_MARKS.map((times) => (
-							<span
-								key={times}
-								className={times === 1 ? "font-semibold text-foreground" : ""}
-							>
-								{times}×{times === STRIP_TIMES ? "+" : ""}
-							</span>
-						))}
-					</span>
-					<span>Cost is</span>
+					<span>Cost of a run</span>
 					<span className="text-right">Spent</span>
 					<span className="text-right">Could save</span>
 				</div>
@@ -106,11 +95,6 @@ export function SpendFlows({
 									</span>
 								</span>
 								<CostStrip flow={flow} />
-								<span>
-									{flow.steadiness ? (
-										<SteadinessBadge steadiness={flow.steadiness} />
-									) : null}
-								</span>
 								<span className="text-right font-medium tabular-nums">
 									{formatCost(flow.spent)}
 								</span>
@@ -157,7 +141,6 @@ export function SpendFlows({
 						</span>
 					</span>
 					<span />
-					<span />
 					<span className="text-right font-semibold tabular-nums">
 						{formatCost(days.total)}
 					</span>
@@ -201,7 +184,7 @@ function PlainRow({
 	return (
 		<div className={cn(GRID, "border-b py-3 text-sm")}>
 			<span />
-			<span className="col-span-3 flex min-w-0 flex-col gap-0.5">
+			<span className="col-span-2 flex min-w-0 flex-col gap-0.5">
 				<span>{title}</span>
 				<span className="truncate text-muted-foreground text-xs">{sub}</span>
 			</span>
