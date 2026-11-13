@@ -4,6 +4,8 @@ export {
 	type AgentChoice,
 	requestAgent,
 } from "./assistant/agent-choice";
+// PROTOTYPE, throw away: Settings shows the picker too.
+export { AgentMenus } from "./assistant/agent-picker";
 export { PromptInput } from "./assistant/prompt-input";
 export { Suggestions } from "./assistant/suggestions";
 export type { FlowCanvasNode, NodeRunState } from "./canvas/flow-node";

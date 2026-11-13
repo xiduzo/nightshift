@@ -1,17 +1,39 @@
 /**
- * PROTOTYPE, throw away. The Settings area three ways, behind
- * `?variant=A..C` on `/settings`. `?data=` picks the computer to look at:
- * this one, or a sample. Choices stay in this tab: nothing is saved.
- *
- * The question: how does a person choose who answers for Night Shift's
- * six built-in agents, and how are they guided there?
+ * PROTOTYPE, throw away. Settings as an overview with one card for each
+ * part, and each part its own page behind the breadcrumb and the sidebar
+ * menu. Night Shift's agents get a table with a choice for each. Your
+ * agents, your harnesses, models and tools are the parts of the Agents
+ * page, as they are. The choices for Night Shift's agents stay in this
+ * tab: nothing is saved.
  */
-import { Button } from "@nightshift/ui/components/button";
+import {
+	Card,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@nightshift/ui/components/card";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
+import {
+	BotIcon,
+	ChevronRightIcon,
+	CpuIcon,
+	MonitorIcon,
+	PlayIcon,
+	SparklesIcon,
+	TerminalIcon,
+	UserIcon,
+	WrenchIcon,
+} from "lucide-react";
 import type { ReactNode } from "react";
+import {
+	AgentsPage,
+	type AgentsPart,
+	profileQueries,
+	SetupCard,
+} from "@/features/agents";
 import { NotificationSettingsCard } from "@/features/notifications";
-import { PrototypeSwitcher } from "@/shared/prototype-switcher";
+import { type Crumb, PageHeading, SiteHeader } from "@/shared/page";
 import { AgentDefaultsCard } from "../components/agent-defaults-card";
 import { AppearanceCard } from "../components/appearance-card";
 import { CleanupCard } from "../components/cleanup-card";
@@ -21,151 +43,235 @@ import { PhoneCard } from "../components/phone-card";
 import { RunPolicyCard } from "../components/run-policy-card";
 import { RunsCard } from "../components/runs-card";
 import { settingsQueries } from "../queries";
-import { BUILTINS, SCENARIOS, SLOTS } from "./model";
-import { type Proto, useProto } from "./use-proto";
-import { MenuVariant } from "./variant-menu";
-import { OverviewVariant } from "./variant-overview";
-import { PathVariant } from "./variant-path";
-
-const VARIANTS = [
-	{ key: "A", name: "Side menu, three choices" },
-	{ key: "B", name: "Overview and pages, a choice per agent" },
-	{ key: "C", name: "Setup path, by what you can do" },
-] as const;
+import {
+	type AgentPicker,
+	BuiltinDetail,
+	BuiltinTable,
+	useChoices,
+} from "./builtin-agents";
+import { BUILTINS, builtinOf } from "./model";
 
 export type ProtoSearch = {
-	variant?: string;
-	data?: string;
 	section?: string;
 	agent?: string;
+	item?: string;
 };
 
-/** The settings that exist today, for each variant to place. */
-export type RealCards = {
-	runs: ReactNode;
-	yours: ReactNode;
-	search: ReactNode;
-	computer: ReactNode;
-	you: ReactNode;
-};
+const SECTIONS = [
+	{
+		key: "builtin",
+		label: "Night Shift's agents",
+		icon: SparklesIcon,
+		line: "Six agents help you build, explain and decide. Choose who answers for each.",
+	},
+	{
+		key: "agents",
+		label: "Your agents",
+		icon: BotIcon,
+		line: "Profiles do the work of a step. A flow picks one by its name.",
+	},
+	{
+		key: "harnesses",
+		label: "Your harnesses",
+		icon: TerminalIcon,
+		line: "The programs an agent runs on, such as Claude Code or Codex.",
+	},
+	{
+		key: "models",
+		label: "Models",
+		icon: CpuIcon,
+		line: "Models that give one answer: to decide in a run and for short answers.",
+	},
+	{
+		key: "tools",
+		label: "Tools",
+		icon: WrenchIcon,
+		line: "The programs and connections a profile gives its agent.",
+	},
+	{
+		key: "runs",
+		label: "Runs",
+		icon: PlayIcon,
+		line: "Schedules, how many runs at once, limits, cleanup.",
+	},
+	{
+		key: "computer",
+		label: "This computer",
+		icon: MonitorIcon,
+		line: "Data folder, Host, network, phone, monitoring.",
+	},
+	{
+		key: "you",
+		label: "You",
+		icon: UserIcon,
+		line: "Notifications and appearance.",
+	},
+] as const;
 
-export type VariantProps = {
-	proto: Proto;
-	section: string | undefined;
-	agent: string | undefined;
-	real: RealCards;
-	go: {
-		/** The search of a link to a section or an agent, with the variant and the data kept. */
-		to: (target: { section?: string; agent?: string }) => ProtoSearch;
-	};
+type SectionKey = (typeof SECTIONS)[number]["key"];
+
+/** The parts that are the Agents page, as it is. */
+const AGENTS_PARTS: Partial<Record<SectionKey, AgentsPart["only"]>> = {
+	agents: "profiles",
+	harnesses: "harnesses",
+	models: "models",
+	tools: "tools",
 };
 
 export function PrototypeSettings({
 	search,
+	onSelect,
 	thisComputer,
+	agentPicker,
 }: {
 	search: ProtoSearch;
+	/** Opens an item of a part, or closes it. */
+	onSelect: (item: string | undefined) => void;
 	thisComputer: ReactNode;
+	agentPicker: AgentPicker;
 }) {
-	const navigate = useNavigate();
-	const variant = search.variant ?? "A";
-	const proto = useProto(search.data);
+	const current = SECTIONS.find((item) => item.key === search.section);
+	const builtin = current?.key === "builtin" ? builtinOf(search.agent) : null;
 	const settings = useQuery(settingsQueries.get());
+	const profiles = useQuery(profileQueries.agents());
+	const choices = useChoices();
 	const data = settings.data;
 
-	const real: RealCards = {
-		runs: data ? (
-			<>
-				<RunsCard data={data} />
-				<RunPolicyCard data={data} />
-				<CleanupCard data={data} />
-			</>
-		) : null,
-		yours: data ? <AgentDefaultsCard data={data} /> : null,
-		search: data ? <MeaningSearchCard data={data} /> : null,
-		computer: (
-			<>
-				{thisComputer}
-				<PhoneCard />
-				{data ? <MonitoringCard data={data} /> : null}
-			</>
-		),
-		you: (
-			<>
-				<NotificationSettingsCard />
-				<AppearanceCard />
-			</>
-		),
-	};
-	const props: VariantProps = {
-		proto,
-		section: search.section,
-		agent: search.agent,
-		real,
-		go: {
-			to: (target) => ({
-				...(search.variant ? { variant: search.variant } : {}),
-				...(search.data ? { data: search.data } : {}),
-				...target,
-			}),
-		},
-	};
-	const scenario =
-		SCENARIOS.find((item) => item.key === proto.scenario) ?? SCENARIOS[0];
-	const nextScenario =
-		SCENARIOS[(SCENARIOS.indexOf(scenario) + 1) % SCENARIOS.length];
+	const sectionCrumb = (last: boolean): Crumb[] =>
+		current
+			? [
+					{ label: "Settings", link: { to: "/settings", search: {} } },
+					last
+						? {
+								label: current.label,
+								menu: SECTIONS.map((item) => ({
+									label: item.label,
+									icon: item.icon,
+									link: { to: "/settings", search: { section: item.key } },
+									current: item.key === current.key,
+								})),
+							}
+						: {
+								label: current.label,
+								link: { to: "/settings", search: { section: current.key } },
+							},
+				]
+			: [{ label: "Settings" }];
+
+	const part = current ? AGENTS_PARTS[current.key] : undefined;
+	if (current && part) {
+		return (
+			<AgentsPage
+				item={search.item}
+				onSelect={onSelect}
+				part={{
+					only: part,
+					search: (item) => ({
+						section: current.key,
+						...(item ? { item } : {}),
+					}),
+				}}
+				partCrumbs={sectionCrumb(true)}
+				heading={
+					<div className="mx-auto w-full max-w-4xl px-4 pt-4 md:px-6 md:pt-6">
+						<PageHeading title={current.label} description={current.line} />
+					</div>
+				}
+			/>
+		);
+	}
 
 	return (
 		<>
-			{variant === "B" ? (
-				<OverviewVariant {...props} />
-			) : variant === "C" ? (
-				<PathVariant {...props} />
-			) : (
-				<MenuVariant {...props} />
-			)}
-			<StateDump proto={proto} />
-			<PrototypeSwitcher variants={VARIANTS} current={variant}>
-				<Button
-					size="sm"
-					variant="ghost"
-					className="rounded-full font-mono text-xs hover:bg-zinc-800"
-					onClick={() =>
-						void navigate({
-							to: "/settings",
-							search: { ...search, data: nextScenario?.key },
-							replace: true,
-						})
-					}
-				>
-					{scenario.name}
-				</Button>
-			</PrototypeSwitcher>
+			<SiteHeader
+				crumbs={
+					builtin
+						? [...sectionCrumb(false), { label: builtin.name }]
+						: sectionCrumb(true)
+				}
+			/>
+			<div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-8 p-4 md:p-6">
+				{builtin ? (
+					<>
+						<PageHeading title={builtin.name} description={builtin.job} />
+						<BuiltinDetail
+							builtin={builtin}
+							choices={choices}
+							agentPicker={agentPicker}
+						/>
+					</>
+				) : !current ? (
+					<>
+						<PageHeading
+							title="Settings"
+							description="Choose who answers, how flows run and how Night Shift tells you."
+						/>
+						<SetupCard always />
+						<div className="grid gap-4 sm:grid-cols-2">
+							{SECTIONS.map((item) => (
+								<Link
+									key={item.key}
+									to="/settings"
+									search={{ section: item.key }}
+									className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								>
+									<Card size="sm" className="h-full hover:bg-muted/50">
+										<CardHeader>
+											<CardTitle className="flex items-center gap-2">
+												<item.icon className="size-4 text-muted-foreground" />
+												{item.label}
+												<ChevronRightIcon className="ml-auto size-4 text-muted-foreground" />
+											</CardTitle>
+											<CardDescription>
+												{item.key === "builtin"
+													? `${BUILTINS.length} agents. ${item.line}`
+													: item.key === "agents" && profiles.data
+														? `${profiles.data.length} ${profiles.data.length === 1 ? "profile" : "profiles"}. ${item.line}`
+														: item.line}
+											</CardDescription>
+										</CardHeader>
+									</Card>
+								</Link>
+							))}
+						</div>
+					</>
+				) : current.key === "builtin" ? (
+					<>
+						<PageHeading title={current.label} description={current.line} />
+						<BuiltinTable
+							choices={choices}
+							agentPicker={agentPicker}
+							searchOf={(agent) => ({ section: "builtin", agent })}
+						/>
+						{data ? <AgentDefaultsCard data={data} /> : null}
+						{data ? <MeaningSearchCard data={data} /> : null}
+					</>
+				) : current.key === "runs" ? (
+					<>
+						<PageHeading title={current.label} description={current.line} />
+						{data ? (
+							<>
+								<RunsCard data={data} />
+								<RunPolicyCard data={data} />
+								<CleanupCard data={data} />
+							</>
+						) : null}
+					</>
+				) : current.key === "computer" ? (
+					<>
+						<PageHeading title={current.label} description={current.line} />
+						{thisComputer}
+						<PhoneCard />
+						{data ? <MonitoringCard data={data} /> : null}
+					</>
+				) : (
+					<>
+						<PageHeading title={current.label} description={current.line} />
+						<NotificationSettingsCard />
+						<AppearanceCard />
+					</>
+				)}
+			</div>
 		</>
-	);
-}
-
-/** The state behind the page, so a switch shows what changed. */
-function StateDump({ proto }: { proto: Proto }) {
-	return (
-		<details className="fixed bottom-4 left-4 z-50 max-w-sm rounded-lg border-2 border-fuchsia-500 bg-zinc-950 p-2 font-mono text-xs text-zinc-50 shadow-2xl">
-			<summary className="cursor-pointer">state</summary>
-			<pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap">
-				{[
-					...SLOTS.map(
-						(slot) =>
-							`${slot.id}: ${proto.slotEngine(slot.id)?.name ?? "—"} (${proto.checkOf(slot.id)})`,
-					),
-					"",
-					...BUILTINS.map((builtin) => {
-						const state = proto.stateOf(builtin);
-						return `${builtin.id}: ${state.ready ? `${state.engine.name} via ${state.via}` : state.text}`;
-					}),
-					"",
-					`agents: ${proto.agents.map((e) => e.name).join(", ") || "—"}`,
-					`models: ${proto.models.map((e) => e.name).join(", ") || "—"}`,
-				].join("\n")}
-			</pre>
-		</details>
 	);
 }

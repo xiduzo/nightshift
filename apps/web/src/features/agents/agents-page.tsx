@@ -33,7 +33,7 @@ import type {
 } from "@/shared/api";
 import { type Crumb, SiteHeader } from "@/shared/page";
 import { Detail } from "./agents-detail";
-import { AgentsOverview } from "./agents-overview";
+import { AgentsOverview, type AgentsPart } from "./agents-overview";
 import { itemOf, parseItem, type Selection } from "./agents-selection";
 import { CliToolDialog } from "./cli-tool";
 import { ConnectionDialog } from "./connections/connection-dialog";
@@ -58,7 +58,14 @@ import { ToolPicker } from "./tool-detail";
 export function AgentsPage({
 	item,
 	onSelect,
+	part,
+	partCrumbs,
+	heading,
 }: {
+	/** PROTOTYPE, throw away: one part of the page, inside Settings. */
+	part?: AgentsPart;
+	partCrumbs?: Crumb[];
+	heading?: ReactNode;
 	item: string | undefined;
 	onSelect: (item: string | undefined) => void;
 }) {
@@ -126,18 +133,35 @@ export function AgentsPage({
 		tools.isPending ||
 		cliTools.isPending;
 
-	const crumbs: Crumb[] = selection
-		? [
-				{ label: "Agents", link: { to: "/agents", search: {} } },
-				{
-					label: selectionLabel(selection, {
-						profiles: profiles.data ?? [],
-						harnesses: added,
-						otherDevices: otherDevices.data ?? [],
-					}),
-				},
-			]
-		: [{ label: "Agents" }];
+	const crumbs: Crumb[] = partCrumbs
+		? selection
+			? [
+					...partCrumbs.slice(0, -1),
+					{
+						label: partCrumbs.at(-1)?.label,
+						link: { to: "/settings", search: part?.search(undefined) },
+					},
+					{
+						label: selectionLabel(selection, {
+							profiles: profiles.data ?? [],
+							harnesses: added,
+							otherDevices: otherDevices.data ?? [],
+						}),
+					},
+				]
+			: partCrumbs
+		: selection
+			? [
+					{ label: "Agents", link: { to: "/agents", search: {} } },
+					{
+						label: selectionLabel(selection, {
+							profiles: profiles.data ?? [],
+							harnesses: added,
+							otherDevices: otherDevices.data ?? [],
+						}),
+					},
+				]
+			: [{ label: "Agents" }];
 
 	return (
 		<>
@@ -193,18 +217,22 @@ export function AgentsPage({
 					}}
 				/>
 			) : (
-				<AgentsOverview
-					agentProfiles={agentProfiles}
-					modelProfiles={modelProfiles}
-					harnesses={added}
-					cliTools={cliTools.data ?? []}
-					connections={connections}
-					otherDevices={otherDevices.data ?? []}
-					deciderLabel={deciderLabel}
-					onSelect={select}
-					onAddHarness={() => setPicking("harness")}
-					onAddTool={() => setPicking("tool")}
-				/>
+				<>
+					{heading}
+					<AgentsOverview
+						part={part}
+						agentProfiles={agentProfiles}
+						modelProfiles={modelProfiles}
+						harnesses={added}
+						cliTools={cliTools.data ?? []}
+						connections={connections}
+						otherDevices={otherDevices.data ?? []}
+						deciderLabel={deciderLabel}
+						onSelect={select}
+						onAddHarness={() => setPicking("harness")}
+						onAddTool={() => setPicking("tool")}
+					/>
+				</>
 			)}
 
 			<HarnessPicker

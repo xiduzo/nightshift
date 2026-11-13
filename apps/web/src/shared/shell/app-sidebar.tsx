@@ -45,6 +45,7 @@ import {
 	ChevronsUpDownIcon,
 	CircleUserRoundIcon,
 	CoinsIcon,
+	CpuIcon,
 	FolderIcon,
 	FolderOpenIcon,
 	HistoryIcon,
@@ -57,10 +58,13 @@ import {
 	MoonIcon,
 	PlusIcon,
 	Settings2Icon,
+	SparklesIcon,
 	SunIcon,
 	SunMoonIcon,
+	TerminalIcon,
 	UsersIcon,
 	WorkflowIcon,
+	WrenchIcon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { type ComponentProps, useState } from "react";
@@ -382,9 +386,39 @@ function SettingsMenu({
 				{/* Saved on this computer only: its agents, secrets and settings. */}
 				<DropdownMenuGroup>
 					<ThisDeviceLabel />
-					<MenuLink to="/agents" label="Agents" icon={BotIcon} />
+					{/* PROTOTYPE, throw away: the parts of Settings. */}
+					<MenuLink
+						to="/settings"
+						section="builtin"
+						label="Night Shift's agents"
+						icon={SparklesIcon}
+					/>
+					<MenuLink
+						to="/settings"
+						section="agents"
+						label="Your agents"
+						icon={BotIcon}
+					/>
+					<MenuLink
+						to="/settings"
+						section="harnesses"
+						label="Your harnesses"
+						icon={TerminalIcon}
+					/>
+					<MenuLink
+						to="/settings"
+						section="models"
+						label="Models"
+						icon={CpuIcon}
+					/>
+					<MenuLink
+						to="/settings"
+						section="tools"
+						label="Tools"
+						icon={WrenchIcon}
+					/>
 					<MenuLink to="/secrets" label="Secrets" icon={KeyRoundIcon} />
-					<MenuLink to="/settings" label="Settings" icon={Settings2Icon} />
+					<MenuLink to="/settings" label="All settings" icon={Settings2Icon} />
 				</DropdownMenuGroup>
 				<DropdownMenuSeparator />
 				<DropdownMenuGroup>
@@ -408,15 +442,25 @@ const SETTINGS_PAGES = [
 
 function MenuLink({
 	to,
+	section,
 	label,
 	icon: ItemIcon,
 }: {
+	section?: string;
 	to: (typeof SETTINGS_PAGES)[number];
 	label: string;
 	icon: LucideIcon;
 }) {
 	return (
-		<DropdownMenuItem render={<Link to={to} />}>
+		<DropdownMenuItem
+			render={
+				section ? (
+					<Link to="/settings" search={{ section }} />
+				) : (
+					<Link to={to} />
+				)
+			}
+		>
 			<ItemIcon aria-hidden="true" />
 			{label}
 		</DropdownMenuItem>

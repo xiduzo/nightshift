@@ -57,7 +57,7 @@ function sessionStore(): Storage | undefined {
  * through it, so each row turns done. Later hides it until the next
  * session.
  */
-export function SetupCard() {
+export function SetupCard({ always = false }: { always?: boolean } = {}) {
 	const profiles = useQuery({
 		...profileQueries.agents(),
 		meta: { quietErrors: true },
@@ -65,7 +65,7 @@ export function SetupCard() {
 	const [later, setLater] = useState(() => laterChosen(sessionStore()));
 	const [shown, setShown] = useState(false);
 	if (profiles.data?.length === 0 && !shown) setShown(true);
-	if (!shown || later) return null;
+	if (!always && (!shown || later)) return null;
 	return (
 		<SetupCardBody
 			profiles={profiles.data ?? []}
