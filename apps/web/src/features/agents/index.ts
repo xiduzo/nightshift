@@ -31,4 +31,5 @@ export {
 } from "./queries";
 export { SecretsPage } from "./secrets-page";
 export { SetupCard } from "./setup/setup-card";
+export { TryAgentButton } from "./setup/try-agent-button";
 export { SpaceSecretsPage } from "./space-secrets-page";

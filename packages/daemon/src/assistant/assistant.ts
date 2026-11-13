@@ -42,6 +42,7 @@ import {
 	canMakeValue,
 	chatMessage,
 	type DeciderName,
+	decisionDecider,
 	type ExplanationEvent,
 	isAgentProfile,
 	type ModelPick,
@@ -474,13 +475,16 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 		const { takes } = builtinAgent(id);
 		const answer = deps.settings.current().builtinAgents[id];
 		if (answer?.kind === "model" || takes === "model") {
-			// The Decider and the Brief writer with no choice run on TypeSafe.
+			// With no choice, the Decider runs on what a node without a decider
+			// runs on, and the Brief writer on what a Value without one does.
 			const chosen = answer?.kind === "model" ? answer : null;
 			const pick = chosen
 				? builtinModel(chosen, deps.profiles.list(), {
 						values: id !== "decider",
 					})
-				: { decider: "typesafe" as const };
+				: ({
+						decider: id === "decider" ? decisionDecider({}) : valueDecider({}),
+					} satisfies ModelPick as ModelPick);
 			if ("problem" in pick) {
 				return { id, chosen: true, answers: null, problem: pick.problem };
 			}

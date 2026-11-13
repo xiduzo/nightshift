@@ -20,7 +20,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { RotateCcwIcon } from "lucide-react";
-import { harnessInfo } from "@/features/agents";
+import { harnessInfo, TryAgentButton } from "@/features/agents";
 import type { SettingsView } from "@/shared/api";
 import { PageSection, SettingRow, SettingRows } from "@/shared/page";
 import {
@@ -211,15 +211,6 @@ export function BuiltinAgentsTable({
 	);
 }
 
-/**
- * The place of the "Try it" button of one agent: it asks the agent a
- * sample question and shows the answer. Another change builds it. Put its
- * Button in `HeaderActions` here, so it is the main action of the page.
- */
-function TryIt(_props: { agent: BuiltinAgent }) {
-	return null;
-}
-
 /** The page of one of Night Shift's agents: who answers, the most it spends, and what it does. */
 export function BuiltinAgentDetail({
 	agent,
@@ -240,7 +231,7 @@ export function BuiltinAgentDetail({
 	];
 	return (
 		<>
-			<TryIt agent={agent} />
+			<TryAgentButton agent={agent.id} />
 			<SettingRows>
 				<SettingRow
 					label="Answers with"

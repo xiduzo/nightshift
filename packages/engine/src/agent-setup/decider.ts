@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { findProgram } from "@nightshift/agents/types";
 import {
+	canMakeValue,
 	type DeciderName,
 	isAgentProfile,
 	type ModelProfileSettings,
@@ -379,7 +380,10 @@ export function createDeciderSetup(deps: DeciderSetupDeps): DeciderSetup {
 			decider: "ollama",
 			model,
 		});
-		await stores.settings.save({ decisionDecider: "ollama" });
+		await stores.settings.save({
+			decisionDecider: "ollama",
+			builtinAgents: withModel(profile.name, "ollama"),
+		});
 		run.set({
 			state: "ready",
 			decider: "ollama",
@@ -388,6 +392,23 @@ export function createDeciderSetup(deps: DeciderSetupDeps): DeciderSetup {
 			at: now(),
 		});
 	}
+
+	/**
+	 * Night Shift's own Decider, and its Brief writer when the model can
+	 * write, on the model profile the setup made. A choice the person made
+	 * in Settings stays.
+	 */
+	const withModel = (profile: string, decider: DeciderName) => {
+		const chosen = stores.settings.current().builtinAgents;
+		const answer = { kind: "model" as const, profile };
+		return {
+			...chosen,
+			...(chosen.decider ? {} : { decider: answer }),
+			...(chosen["brief-writer"] || !canMakeValue(decider)
+				? {}
+				: { "brief-writer": answer }),
+		};
+	};
 
 	/** A job that failed in an unforeseen way: plain words, the error in the log. */
 	const unforeseen = (run: Run) => (error: unknown) => {
@@ -516,7 +537,10 @@ export function createDeciderSetup(deps: DeciderSetupDeps): DeciderSetup {
 			const profile = await modelProfile(TYPESAFE_PROFILE, {
 				decider: "typesafe",
 			});
-			await stores.settings.save({ decisionDecider: "typesafe" });
+			await stores.settings.save({
+				decisionDecider: "typesafe",
+				builtinAgents: withModel(profile.name, "typesafe"),
+			});
 			run.set({
 				state: "ready",
 				decider: "typesafe",
