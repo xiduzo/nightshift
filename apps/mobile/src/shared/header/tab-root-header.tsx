@@ -5,7 +5,7 @@ import { HeaderToolbar } from "./header-toolbar";
 /**
  * The header of a tab's first screen, the same on each tab: your avatar
  * on the left opens Settings. `right` holds items such as the Space
- * picker on Runs. A run starts from a schedule's Run now: new runs are
+ * menu on Runs. A run starts from a schedule's Run now: new runs are
  * made on the computer.
  */
 export function TabRootHeader({

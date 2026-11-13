@@ -14,12 +14,12 @@ import type { TonightEntry } from "@/features/schedules";
 const MINUTE = 60_000;
 
 /**
- * The thin line next to the time: `running` for a run at work, `offline`
- * for a schedule whose computer is offline, `quiet` for the rest.
+ * The look of a line, its icon and color: `running` for a run at work,
+ * `offline` for a schedule whose computer is offline, `quiet` for the rest.
  */
 export type Rail = "running" | "offline" | "quiet";
 
-/** A run on its way, under Now. Tap opens it, Stop at the end. */
+/** A run on its way, under Now. Tap opens it, Stop is its action. */
 export type RunLine = {
 	kind: "run";
 	key: string;
@@ -32,10 +32,10 @@ export type RunLine = {
 	rail: Rail;
 };
 
-/** What the button at the end of a schedule line does. */
+/** What the action of a schedule line does. */
 export type ScheduleAction = "pause" | "undo" | "open";
 
-/** A schedule of tonight. Its button pauses it, undoes the pause, or opens its run. */
+/** A schedule of tonight. Its action pauses it, undoes the pause, or opens its run. */
 export type ScheduleLine = {
 	kind: "schedule";
 	key: string;
@@ -47,12 +47,12 @@ export type ScheduleLine = {
 	rail: Rail;
 	/** Paused tonight: the line shows faded. */
 	muted: boolean;
-	/** The button at the end. Null: none. */
+	/** The action. Null: none. */
 	action: ScheduleAction | null;
 	/** The run its start began, while that run is on its way. */
 	runId: string | null;
 	/**
-	 * Run now, by a long press: `yes`, `offline` when the computer it needs
+	 * Run now, its other action: `yes`, `offline` when the computer it needs
 	 * is offline, `no` when the schedule cannot run now or its run is on its way.
 	 */
 	runNow: "yes" | "offline" | "no";
@@ -149,17 +149,51 @@ export function tonightLines(
 	});
 }
 
-/** The line as a screen reader says it: "03:00, Lighthouse check, website". */
-export function lineLabel(line: {
-	at: number | null;
-	title: string;
-	caption: string;
-}): string {
-	return [
-		line.at === null ? null : formatTime(line.at),
-		line.title,
-		line.caption,
-	]
-		.filter((part): part is string => part !== null)
-		.join(", ");
+/**
+ * How a row shows its actions: `swipe` on iOS (swipe actions), `hold` on
+ * Android (a long-press menu).
+ */
+export type Gesture = "swipe" | "hold";
+
+/**
+ * The hint under Now: how to stop a run, and that the list ends at
+ * `limit` runs. Nothing without runs.
+ */
+export function nowHint(
+	runs: number,
+	limit: number,
+	gesture: Gesture,
+): string | undefined {
+	if (runs === 0) return undefined;
+	const stop =
+		gesture === "swipe"
+			? "Swipe a run left to stop it."
+			: "Hold a run to stop it.";
+	return runs >= limit ? `${stop} Shows ${limit} runs at most.` : stop;
+}
+
+/**
+ * The hint under Tonight: how to pause a schedule and how to run one now,
+ * for what the lines offer. Nothing when no line offers either.
+ */
+export function tonightHint(
+	lines: readonly Pick<ScheduleLine, "action" | "runNow">[],
+	gesture: Gesture,
+): string | undefined {
+	const pause = lines.some(
+		(line) => line.action === "pause" || line.action === "undo",
+	);
+	const run = lines.some((line) => line.runNow === "yes");
+	if (gesture === "swipe") {
+		if (pause && run) {
+			return "Swipe left to pause a schedule tonight. Swipe right to run it now.";
+		}
+		if (pause) return "Swipe left to pause a schedule tonight.";
+		if (run) return "Swipe right to run a schedule now.";
+		return undefined;
+	}
+	if (pause && run) return "Hold a schedule to pause it tonight or run it now.";
+	if (pause) return "Hold a schedule to pause it tonight.";
+	if (run) return "Hold a schedule to run it now.";
+	return undefined;
 }
