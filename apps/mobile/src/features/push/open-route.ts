@@ -9,6 +9,6 @@ import { phoneRouteOf } from "./push-data";
  */
 export function openPhoneRoute(route: PushRoute): void {
 	const href = phoneRouteOf(route);
-	if (href.pathname === "/needs") router.dismissTo(href);
+	if (href.pathname === "/") router.dismissTo(href);
 	else router.push(href);
 }

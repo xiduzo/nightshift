@@ -114,21 +114,21 @@ describe("a push while the app is in front", () => {
 	const gate = pushDataOf(plainGate);
 
 	test("a Gate shows as a banner on any other screen", () => {
-		expect(showInFront(gate, { pathname: "/" })).toBe(true);
+		expect(showInFront(gate, { pathname: "/settings" })).toBe(true);
 		expect(showInFront(gate, { pathname: "/runs" })).toBe(true);
 		expect(showInFront(gate, { pathname: "/gates/run-2/review" })).toBe(true);
 	});
 
 	test("no banner on Needs you, or on that Gate", () => {
-		expect(showInFront(gate, { pathname: "/needs" })).toBe(false);
+		expect(showInFront(gate, { pathname: "/" })).toBe(false);
 		expect(showInFront(gate, { pathname: "/gates/run-1/review" })).toBe(false);
 	});
 
 	test("the end of quiet hours shows, except on Needs you", () => {
 		const waiting = pushDataOf({ kind: "gates-waiting", key: "waiting:5" });
 		expect(showInFront(waiting, { pathname: "/settings" })).toBe(true);
-		expect(showInFront(waiting, { pathname: "/" })).toBe(true);
-		expect(showInFront(waiting, { pathname: "/needs" })).toBe(false);
+		expect(showInFront(waiting, { pathname: "/runs" })).toBe(true);
+		expect(showInFront(waiting, { pathname: "/" })).toBe(false);
 	});
 
 	test("a step that waits for a device shows, except on its run", () => {
@@ -175,10 +175,10 @@ describe("where a tap goes", () => {
 
 	test("the end of quiet hours, or a run's end without its run, opens Needs you", () => {
 		expect(screenOf({ kind: "gates-waiting", key: "waiting:5" })).toEqual({
-			pathname: "/needs",
+			pathname: "/",
 		});
 		expect(screenOf({ kind: "run-failed", key: "r:end:1" })).toEqual({
-			pathname: "/needs",
+			pathname: "/",
 		});
 	});
 
