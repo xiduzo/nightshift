@@ -450,6 +450,26 @@ export const knowledge = {
 			context.knowledge.setMeaning(input.projectId, input.on),
 		),
 	/**
+	 * Turns the learnings from runs that ended on or off for the project, on
+	 * every computer of its Space (ADR 37). It changes what waits in the
+	 * knowledge, so it asks a role that may start runs (ADR 4).
+	 */
+	setLearnsFromRuns: projectProcedure(
+		projectInput.extend({ on: z.boolean() }),
+		permitted(MAY.changeKnowledge),
+	)
+		.route({
+			summary:
+				"Turns on or off the learnings Night Shift proposes from the runs of a project that ended, on every computer of its Space.",
+		})
+		.output(output(z.object({ on: z.boolean() })))
+		.handler(async ({ context, input }) => {
+			await context.knowledge.setLearnsFromRuns(input.projectId, input.on);
+			return {
+				on: await context.knowledge.learnsFromRuns(input.projectId),
+			};
+		}),
+	/**
 	 * How often agents found and read each file of the project's knowledge
 	 * in the last 90 days, when a run last used it, and which files no run
 	 * used in 30 days.

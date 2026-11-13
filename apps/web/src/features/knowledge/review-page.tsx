@@ -28,6 +28,12 @@ import {
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
 import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldLabel,
+} from "@nightshift/ui/components/field";
+import {
 	Item,
 	ItemActions,
 	ItemContent,
@@ -38,6 +44,8 @@ import {
 import { Kbd } from "@nightshift/ui/components/kbd";
 import { Progress } from "@nightshift/ui/components/progress";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
+import { Switch } from "@nightshift/ui/components/switch";
+import { useMutation } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
 	CheckCircle2Icon,
@@ -52,7 +60,8 @@ import {
 	Trash2Icon,
 	TriangleAlertIcon,
 } from "lucide-react";
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useId } from "react";
+import { toast } from "sonner";
 import { formatRelative } from "@/shared/format";
 import {
 	closeNotesShown,
@@ -61,6 +70,7 @@ import {
 } from "./close-notes-words";
 import { fileNameOf } from "./folder-tree";
 import { KnowledgeSection, useKnowledge } from "./knowledge-layout";
+import { knowledgeMutations } from "./queries";
 import { SyncNowButton } from "./sources";
 import type { Review } from "./use-review";
 
@@ -78,8 +88,49 @@ export function KnowledgeReviewPage() {
 			title="Review"
 			description="What waits for you. Keep what agents learned, and fix what they could not find."
 		>
-			<ReviewQueue />
+			<div className="flex flex-col gap-6">
+				<ReviewQueue />
+				<LearnFromRuns />
+			</div>
 		</KnowledgeSection>
+	);
+}
+
+/**
+ * Whether Night Shift proposes learnings from the runs of this project
+ * that ended (ADR 37). It holds for every computer of the Space.
+ */
+function LearnFromRuns() {
+	const { projectId, knowledge } = useKnowledge();
+	const id = useId();
+	const set = useMutation(
+		knowledgeMutations.setLearnsFromRuns({
+			onError: (error) =>
+				toast.error(`The change was not saved: ${error.message}`),
+		}),
+	);
+	const checked = set.isPending
+		? (set.variables?.on ?? knowledge.learnsFromRuns)
+		: knowledge.learnsFromRuns;
+	return (
+		<Field
+			orientation="horizontal"
+			className="mx-auto w-full max-w-3xl rounded-xl border p-4"
+		>
+			<FieldContent>
+				<FieldLabel htmlFor={id}>Learn from runs</FieldLabel>
+				<FieldDescription>
+					When a run needed a fix or your answer, Night Shift proposes what to
+					learn. You keep or delete each learning.
+				</FieldDescription>
+			</FieldContent>
+			<Switch
+				id={id}
+				checked={checked}
+				disabled={!knowledge.can.startRuns || set.isPending}
+				onCheckedChange={(on) => set.mutate({ projectId, on })}
+			/>
+		</Field>
 	);
 }
 
@@ -134,8 +185,8 @@ function ReviewQueue() {
 					</EmptyMedia>
 					<EmptyTitle>Nothing to review</EmptyTitle>
 					<EmptyDescription>
-						When an agent learns something, it shows here. You keep it or delete
-						it.
+						When an agent or a run teaches Night Shift something, it shows here.
+						You keep it or delete it.
 					</EmptyDescription>
 				</EmptyHeader>
 				{fileCount > 0 ? (
@@ -288,7 +339,9 @@ function TaskCard({
 					<CardHeader>
 						<CardDescription className="flex flex-wrap items-center gap-x-2">
 							<LightbulbIcon aria-hidden="true" className="size-4" />
-							An agent learned this ·
+							{learning.stepId === null
+								? "Night Shift learned this from a run ·"
+								: "An agent learned this ·"}
 							<Link
 								to="/runs/$runId"
 								params={{ runId: learning.runId }}

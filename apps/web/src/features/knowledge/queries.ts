@@ -18,4 +18,6 @@ export const knowledgeMutations = {
 	markNotTopic: orpc.knowledge.markNotTopic.mutationOptions,
 	/** Turns search by meaning on or off for the project. */
 	setMeaning: orpc.knowledge.setMeaning.mutationOptions,
+	/** Turns the learnings from runs that ended on or off for the project. */
+	setLearnsFromRuns: orpc.knowledge.setLearnsFromRuns.mutationOptions,
 };

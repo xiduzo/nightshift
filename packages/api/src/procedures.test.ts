@@ -388,6 +388,7 @@ const ROUTES: Route[] = [
 	route("knowledge.markQuestion", { ...project, query: "q", answers: ["a.md"] }, START, "knowledge.markQuestion", ["p1", { query: "q", answers: ["a.md"], by: PERSON }]),
 	route("knowledge.evaluate", project, "session", "knowledge.evaluate", ["p1"]),
 	route("knowledge.setMeaning", { ...project, on: true }, START, "knowledge.setMeaning", ["p1", true]),
+	route("knowledge.setLearnsFromRuns", { ...project, on: false }, START, "knowledge.setLearnsFromRuns", ["p1", false]),
 	route("knowledge.use", project, "session", "knowledge.use", ["p1"]),
 	// Flows.
 	route("flows.list", project, "session", "space.flows.list", ["p1"]),

@@ -95,6 +95,8 @@ export const knowledgeSchema = z.object({
 	}),
 	/** The Host that keeps the Space runs an older version of Night Shift: it cannot take this knowledge yet. */
 	olderHost: z.boolean(),
+	/** Night Shift proposes learnings from the runs of the project that ended (ADR 37). */
+	learnsFromRuns: z.boolean(),
 });
 export type KnowledgePage = z.infer<typeof knowledgeSchema>;
 
