@@ -22,7 +22,7 @@ Knowledge is the files that your agents read besides the project files: notes, w
 | `kit:knowledge/github-wiki` | Do | Copies the wiki of a GitHub repository into the project's knowledge, and takes the newest pages on each later sync. A private wiki needs git signed in to GitHub. | `repo`, `folder` |
 | `kit:knowledge/jira` | Do | Copies Jira work items into the project's knowledge as markdown, one file each. Needs a CLI tool that runs the Atlassian CLI signed in, and jq. | `keys`, `tool`, `folder` |
 | `kit:knowledge/review-learnings` | Decide | Shows what agents proposed to learn about the project, and asks you to keep or delete it. Agents read what you keep. | none |
-| `kit:knowledge/web` | Do | Copies web pages into the project's knowledge as markdown. It needs no account. Each page gets a file named after its address. A page that cannot be read does not stop the others. | `urls`, `folder` |
+| `kit:knowledge/web` | Do | Copies web pages into the project's knowledge as markdown. It needs no account. Each page gets a file named after its address. A page that cannot be read does not stop the others. With Follow links, it also copies the pages that they link to. | `urls`, `follow`, `scope`, `limit`, `depth`, `folder` |
 <!-- /generated:knowledge-kits -->
 
 **Git repository** copies only the folders or files you choose, for example the markdown of a documentation site. In **Only these paths**, write one pattern per line:
@@ -35,6 +35,14 @@ docs/standaard/**/*.md
 A line that starts with `!` leaves those paths out. Each sync takes the newest version, and a file that no longer matches leaves the knowledge.
 
 **Project files** copies from the project's own folder, so only a project with a folder offers it.
+
+**Web pages** can copy a whole site from one address. Turn on **Follow links**. Night Shift then also copies the pages that your pages link to:
+
+- **Only addresses that start with**: the part of the site to copy, one address per line. Empty: the folder of each page, for example `https://example.com/docs/`.
+- **Most pages**: at most 500.
+- **Links away**: how many links away from your pages to go.
+
+Night Shift uses the list of pages that the site publishes when it has one. It skips images, files and PDFs, and the pages that the site asks readers to skip. It reads one page at a time, so 100 pages take about 15 minutes. A page that left the site leaves the knowledge on the next full sync. When a sync stops at the page limit, it removes nothing.
 
 Any flow that writes markdown into `$NS_KNOWLEDGE` is a source too.
 

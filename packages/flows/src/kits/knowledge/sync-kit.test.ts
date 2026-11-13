@@ -39,6 +39,7 @@ describe("defineSyncKit", () => {
 			flowName: "knowledge-notes",
 			main: "from",
 			lines: ["from"],
+			switches: {},
 			local: false,
 			needsFolder: false,
 			programs: ["curl", "jq"],
@@ -117,5 +118,7 @@ describe("defineSyncKit", () => {
 		defineSyncKit({ ...source, main: "nope" });
 		// @ts-expect-error "nope" is not an input of this source.
 		defineSyncKit({ ...source, lines: ["nope"] });
+		// @ts-expect-error "nope" is not an input of this source.
+		defineSyncKit({ ...source, switches: { from: ["nope"] } });
 	});
 });

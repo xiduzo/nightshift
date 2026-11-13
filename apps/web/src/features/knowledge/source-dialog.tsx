@@ -176,7 +176,17 @@ function SourceForm({
 	const elsewhere =
 		edited?.computer && !edited.computer.here ? edited.computer.name : null;
 	// The kit's folder is Night Shift's to pick: the dialog does not ask.
-	const inputs = knowledgeSourceFields(kit);
+	const fields = knowledgeSourceFields(kit);
+	// An input that matters only while a switch is on shows only then.
+	const isOn = (name: string) =>
+		(values[name] || fields.find((input) => input.name === name)?.default) ===
+		"true";
+	const inputs = fields.filter(
+		(input) =>
+			!Object.entries(kind.switches).some(
+				([name, shown]) => shown.includes(input.name) && !isOn(name),
+			),
+	);
 	const missing = missingInputs(inputs, values);
 	const badTime =
 		times.on &&

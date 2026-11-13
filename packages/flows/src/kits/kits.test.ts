@@ -1,4 +1,12 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {
+	afterAll,
+	afterEach,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	test,
+} from "bun:test";
 import {
 	chmod,
 	mkdir,
@@ -212,6 +220,8 @@ async function step(
 			PATH: `${bin}:${process.env.PATH}`,
 			STUB_LOG: log,
 			STUB_FIXTURES: fixtures,
+			// The web kit pauses between pages: not in a test.
+			NS_WEB_PAUSE: "0",
 			...where.env,
 		},
 		stdout: "pipe",
@@ -1133,8 +1143,8 @@ describe("the knowledge kits", () => {
 			"Title: Docs\n\nThe docs.",
 		);
 		expect(await calls()).toEqual([
-			"curl -fsL --max-time 120 https://r.jina.ai/https://example.com/docs?page=1",
-			"curl -fsL --max-time 120 https://r.jina.ai/https://example.org",
+			"curl -fsL --max-time 120 -A NightShift-knowledge/1 (+https://github.com/xiduzo/nightshift) https://r.jina.ai/https://example.com/docs?page=1",
+			"curl -fsL --max-time 120 -A NightShift-knowledge/1 (+https://github.com/xiduzo/nightshift) https://r.jina.ai/https://example.org",
 		]);
 	});
 
@@ -1181,6 +1191,251 @@ describe("the knowledge kits", () => {
 		const end = flow.nodes.find((node) => node.id === "not_synced");
 		expect(end).toMatchObject({
 			message: "Could not read any page. {{sync.log_tail}}",
+		});
+	});
+
+	/**
+	 * Follow links, against a small site on this computer: `Bun.serve`
+	 * answers as the site (robots.txt, sitemaps) and as the reader
+	 * (`/reader/<address>`, markdown in the reader's format). Real curl, no
+	 * stub: `NS_WEB_READER` points the kit at it.
+	 */
+	describe("web: follow links", () => {
+		type Site = {
+			/** Markdown by path. A path not here is gone: the reader warns. */
+			pages: Record<string, string>;
+			/** Files the site serves itself, by path. */
+			files: Record<string, string>;
+		};
+		let site: Site = { pages: {}, files: {} };
+		/** What the reader read, as paths. */
+		let reads: string[] = [];
+		/** Every User-Agent the server saw. */
+		let agents: Set<string> = new Set();
+		let server: ReturnType<typeof Bun.serve>;
+		let base = "";
+		/** The start of a file name of the site: `127.0.0.1-<port>`. */
+		let host = "";
+
+		beforeAll(() => {
+			server = Bun.serve({
+				port: 0,
+				hostname: "127.0.0.1",
+				fetch(request) {
+					agents.add(request.headers.get("user-agent") ?? "");
+					const marker = "/reader/";
+					const at = request.url.indexOf(marker);
+					if (at >= 0) {
+						const target = request.url.slice(at + marker.length);
+						const path = new URL(target).pathname;
+						reads.push(path);
+						const page = site.pages[path];
+						if (page === undefined) {
+							return new Response(
+								`Title: Not Found\n\nURL Source: ${target}\n\nWarning: Target URL returned error 404: Not Found\n\nMarkdown Content:\nGone.\n`,
+							);
+						}
+						return new Response(
+							`Title: ${path}\n\nURL Source: ${target}\n\nMarkdown Content:\n${page.replaceAll("BASE", base)}`,
+						);
+					}
+					const file = site.files[new URL(request.url).pathname];
+					return file === undefined
+						? new Response("Not found", { status: 404 })
+						: new Response(file.replaceAll("BASE", base));
+				},
+			});
+			base = `http://127.0.0.1:${server.port}`;
+			host = `127.0.0.1-${server.port}`;
+		});
+
+		afterAll(() => server.stop(true));
+
+		beforeEach(() => {
+			site = { pages: {}, files: {} };
+			reads = [];
+			agents = new Set();
+		});
+
+		/** A sync with Follow links on, through the real curl. */
+		const crawl = (inputs: Record<string, string>) =>
+			step(
+				kit("kit:knowledge/web"),
+				"sync",
+				{ follow: "true", ...inputs },
+				{},
+				{
+					env: {
+						PATH: process.env.PATH ?? "",
+						NS_WEB_READER: `${base}/reader/`,
+					},
+				},
+			);
+
+		const files = async () => (await readdir(join(knowledge, "web"))).sort();
+
+		test("follows the links of each page, breadth first, in the folder of the page", async () => {
+			site.pages = {
+				"/docs/": [
+					"[A](BASE/docs/a) and [B](/docs/b), [A again](BASE/docs/a#part)",
+					"[A query](BASE/docs/a?tab=2) [Blog](BASE/blog/post) [Out](https://elsewhere.example/docs/x)",
+					'![Logo](BASE/docs/logo.png) [Manual](BASE/docs/manual.pdf "PDF")',
+				].join("\n"),
+				"/docs/a": "[Deep](BASE/docs/a/deep) [Home](BASE/docs/)",
+				"/docs/b": "B, no links.",
+				"/docs/a/deep": "[Deeper](BASE/docs/a/deep/er)",
+				"/docs/a/deep/er": "Too far.",
+				"/blog/post": "Not in scope.",
+			};
+			const ran = await crawl({ urls: `${base}/docs/`, depth: "2" });
+			expect(ran.outcome).toBe("synced");
+			expect(ran.data).toEqual({ files: 4, skipped: "" });
+			expect(reads).toEqual(["/docs/", "/docs/a", "/docs/b", "/docs/a/deep"]);
+			expect(await files()).toEqual([
+				`${host}-docs-a-deep.md`,
+				`${host}-docs-a.md`,
+				`${host}-docs-b.md`,
+				`${host}-docs.md`,
+			]);
+			expect(await read(`web/${host}-docs-b.md`)).toContain(
+				"Markdown Content:\nB, no links.",
+			);
+			// It names Night Shift, never the person, to the site and to the reader.
+			expect([...agents]).toEqual([
+				"NightShift-knowledge/1 (+https://github.com/xiduzo/nightshift)",
+			]);
+		});
+
+		test("reads the pages the sitemap lists in scope, and follows no link", async () => {
+			site.files = {
+				"/robots.txt": [
+					"User-agent: BadBot",
+					"Disallow: /",
+					"",
+					"User-agent: *",
+					"Disallow: /docs/private",
+					"Allow: /docs/private/open",
+					"",
+					"Sitemap: BASE/maps/index.xml",
+				].join("\r\n"),
+				"/maps/index.xml":
+					'<?xml version="1.0"?><sitemapindex><sitemap><loc>BASE/maps/pages.xml</loc></sitemap></sitemapindex>',
+				"/maps/pages.xml": [
+					'<?xml version="1.0"?>',
+					"<urlset>",
+					"<url><loc>BASE/docs/one</loc></url>",
+					"<url>",
+					"  <loc>",
+					"    BASE/docs/two?ref=map&amp;x=1",
+					"  </loc>",
+					"</url>",
+					"<url><loc>BASE/docs/private/secret</loc></url>",
+					"<url><loc>BASE/other/three</loc></url>",
+					"</urlset>",
+				].join("\n"),
+			};
+			site.pages = {
+				"/docs/": "[Not listed](BASE/docs/linked)",
+				"/docs/one": "One.",
+				"/docs/two": "Two.",
+				"/docs/linked": "Only a link finds it.",
+				"/docs/private/secret": "Robots says no.",
+			};
+			const ran = await crawl({ urls: `${base}/docs/` });
+			expect(ran.outcome).toBe("synced");
+			expect(reads).toEqual(["/docs/", "/docs/one", "/docs/two"]);
+			expect(ran.data).toEqual({ files: 3, skipped: "" });
+		});
+
+		test("a page robots.txt refuses is not read", async () => {
+			site.files = { "/robots.txt": "User-agent: *\nDisallow: /docs/\n" };
+			site.pages = { "/docs/": "Refused." };
+			const ran = await crawl({ urls: `${base}/docs/` });
+			expect(ran.outcome).toBe("fail");
+			expect(reads).toEqual([]);
+			expect(ran.log).toContain(
+				`Did not read ${base}/docs/: the site asks readers to stay away from it.`,
+			);
+		});
+
+		test("only addresses that start with the scope: the start page is read anyway", async () => {
+			site.pages = {
+				"/docs/": "[Guide](BASE/guide/a) [Docs](BASE/docs/b)",
+				"/guide/a": "[Guide B](BASE/guide/b) [Home](BASE/)",
+				"/guide/b": "Guide B.",
+				"/docs/b": "Out of this scope.",
+			};
+			const ran = await crawl({
+				urls: `${base}/docs/`,
+				scope: `${base}/guide/`,
+			});
+			expect(ran.outcome).toBe("synced");
+			expect(reads).toEqual(["/docs/", "/guide/a", "/guide/b"]);
+		});
+
+		test("the page limit cuts the crawl, and a cut crawl removes nothing", async () => {
+			await mkdir(join(knowledge, "web"), { recursive: true });
+			await writeFile(join(knowledge, "web/old.md"), "A page from before.");
+			site.pages = {
+				"/docs/": "[A](BASE/docs/a) [B](BASE/docs/b) [C](BASE/docs/c)",
+				"/docs/a": "A.",
+				"/docs/b": "B.",
+				"/docs/c": "C.",
+			};
+			const ran = await crawl({ urls: `${base}/docs/`, limit: "2" });
+			expect(ran.outcome).toBe("synced");
+			expect(reads).toEqual(["/docs/", "/docs/a"]);
+			expect(ran.data).toEqual({ files: 3, skipped: ". Stopped at 2 pages" });
+			expect(await read("web/old.md")).toBe("A page from before.");
+		});
+
+		test("a whole crawl removes the pages that left it, and only those", async () => {
+			await mkdir(join(knowledge, "web/notes"), { recursive: true });
+			await writeFile(join(knowledge, "web/old.md"), "A page from before.");
+			await writeFile(join(knowledge, "web/notes/mine.md"), "Not a page.");
+			site.pages = { "/docs/": "[A](BASE/docs/a)", "/docs/a": "A." };
+			const ran = await crawl({ urls: `${base}/docs/` });
+			expect(ran.outcome).toBe("synced");
+			expect(ran.log).toContain(
+				"Removed old.md: the page is no longer in the crawl.",
+			);
+			expect(ran.data).toEqual({ files: 3, skipped: "" });
+			expect(await read("web/notes/mine.md")).toBe("Not a page.");
+			await expect(read("web/old.md")).rejects.toThrow();
+		});
+
+		test("a dead page keeps its last copy, and the crawl removes nothing below it", async () => {
+			await mkdir(join(knowledge, "web"), { recursive: true });
+			await writeFile(
+				join(knowledge, `web/${host}-docs-gone.md`),
+				"Last copy.",
+			);
+			await writeFile(
+				join(knowledge, `web/${host}-docs-gone-child.md`),
+				"Child.",
+			);
+			site.pages = {
+				"/docs/": "[Gone](BASE/docs/gone) [A](BASE/docs/a)",
+				"/docs/a": "A.",
+			};
+			const ran = await crawl({ urls: `${base}/docs/` });
+			expect(ran.outcome).toBe("synced");
+			expect(ran.data).toEqual({
+				files: 4,
+				skipped: ". Could not read 1 pages",
+			});
+			expect(ran.log).toContain(
+				`Could not read ${base}/docs/gone: the page is gone or blocks readers.`,
+			);
+			expect(await read(`web/${host}-docs-gone.md`)).toBe("Last copy.");
+			expect(await read(`web/${host}-docs-gone-child.md`)).toBe("Child.");
+		});
+
+		test("without Follow links, as old sources are, it reads only the pages given", async () => {
+			site.pages = { "/docs/": "[A](BASE/docs/a)", "/docs/a": "A." };
+			const ran = await crawl({ urls: `${base}/docs/`, follow: "false" });
+			expect(ran.data).toEqual({ files: 1, skipped: "" });
+			expect(reads).toEqual(["/docs/"]);
 		});
 	});
 

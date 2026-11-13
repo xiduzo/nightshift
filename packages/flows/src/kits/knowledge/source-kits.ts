@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { KNOWLEDGE_STAGING_SUFFIX } from "./layout";
 import { defineSyncKit, type SourceKind } from "./sync-kit";
+import { WEB_SOURCE } from "./web-source";
 
 /**
  * Every Knowledge source Night Shift ships, one declaration each, in the
@@ -200,68 +201,8 @@ mv "$part" "$dest"`,
 		],
 	}),
 
-	/**
-	 * Web pages as markdown, through the free reader at r.jina.ai. No
-	 * account. A page that cannot be read keeps its last copy and does not
-	 * stop the others: the sync fails only when it reads no page at all. The
-	 * reader answers 200 for a page that is gone or behind a bot check, and
-	 * says so in a `Warning:` line above the content.
-	 */
-	defineSyncKit({
-		name: "web",
-		label: "Web pages",
-		blurb: "Any public page, as text. No account needed.",
-		flowName: "knowledge-web-pages",
-		main: "urls",
-		lines: ["urls"],
-		programs: [{ name: "curl" }],
-		description:
-			"Copies web pages into the project's knowledge as markdown. It needs no account. Each page gets a file named after its address. A page that cannot be read does not stop the others.",
-		inputs: [
-			{
-				name: "urls",
-				label: "Pages",
-				type: "text",
-				description:
-					"The pages, one address per line, for example https://example.com/docs.",
-				required: true,
-			},
-		],
-		folder: "web",
-		stepLabel: "Read the pages",
-		script: String.raw`urls="{{urls}}"
-mkdir -p "$dest"
-# Split the list, but never read a pattern in it.
-set -f
-kept=0
-missed=""
-for url in $urls; do
-	name=$(printf '%s' "$url" | sed -e 's#^[A-Za-z]*://##' -e 's#[/?=&:]#-#g' -e 's#[^A-Za-z0-9._-]##g' -e 's#-*$##')
-	part="$dest/$name.md${KNOWLEDGE_STAGING_SUFFIX}"
-	if ! curl -fsL --max-time 120 "https://r.jina.ai/$url" > "$part"; then
-		echo "Could not read $url: the page did not load." >&2
-	elif sed -n '1,/^Markdown Content:/p' "$part" | grep -q -E '^Warning: (Target URL returned error|This page maybe requiring CAPTCHA)'; then
-		echo "Could not read $url: the page is gone or blocks readers." >&2
-	else
-		mv "$part" "$dest/$name.md"
-		kept=$((kept + 1))
-		continue
-	fi
-	rm -f "$part"
-	missed="$missed $url"
-done
-if [ "$kept" -eq 0 ]; then exit 1; fi
-skipped=""
-if [ -n "$missed" ]; then
-	skipped=$(printf '. Could not read:%s' "$missed" | sed -e 's/[\\"]/\\&/g')
-fi`,
-		data: { skipped: "$skipped" },
-		messages: {
-			synced: "Pages synced",
-			syncedMore: "{{sync.data.skipped}}",
-			notSynced: "Could not read any page. {{sync.log_tail}}",
-		},
-	}),
+	/** Web pages as markdown, also the pages they link to: `web-source.ts`. */
+	WEB_SOURCE,
 
 	/**
 	 * The wiki of a GitHub repository, with plain git. The first sync clones

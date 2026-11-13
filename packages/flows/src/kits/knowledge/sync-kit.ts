@@ -65,6 +65,13 @@ type SyncSource<Name extends string, Input extends string> = {
 	main: NoInfer<Input>;
 	/** The inputs that take one value per line. */
 	lines: readonly NoInfer<Input>[];
+	/**
+	 * A boolean input, and the inputs that matter only while it is on: the
+	 * page shows them only then.
+	 */
+	switches?: Readonly<
+		Partial<Record<NoInfer<Input>, readonly NoInfer<Input>[]>>
+	>;
 	/** It reads a folder of one computer: its runs belong on that Device. */
 	local?: true;
 	/** It reads the project's own folder: a project without one (ADR 22) cannot use it. */
@@ -104,6 +111,8 @@ export type SourceKind<Kit extends string> = {
 	flowName: string;
 	main: string;
 	lines: readonly string[];
+	/** A boolean input, and the inputs to show only while it is on. */
+	switches: Readonly<Record<string, readonly string[]>>;
 	local: boolean;
 	/** It reads the project's own folder: not offered for a project without one. */
 	needsFolder: boolean;
@@ -152,6 +161,9 @@ export function defineSyncKit<
 			flowName: source.flowName,
 			main: source.main,
 			lines: source.lines,
+			switches: (source.switches ?? {}) as Readonly<
+				Record<string, readonly string[]>
+			>,
 			local: source.local ?? false,
 			needsFolder: source.needsFolder ?? false,
 			programs: source.programs.map((program) => program.name),

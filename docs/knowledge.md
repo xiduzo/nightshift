@@ -346,11 +346,69 @@ Kits do the common syncs. Call one from a Subflow node:
 | `kit:knowledge/folder` | A folder anywhere on the computer (`~/notes` or a full path), with optional patterns, one per line: `*.md`. Hidden files stay out. At most 5 000 files. | Nothing. Runs on the computer that has the folder |
 | `kit:knowledge/github-wiki` | The wiki of a repository (`owner/name`), or any git address. | git, signed in for a private wiki |
 | `kit:knowledge/git` | Some folders or files of any git repository (`owner/name` or any git address), with an optional branch. "Only these paths" takes gitignore-style patterns, one per line: `docs/standaard/**/*.md`, `!docs/standaard/archief/**`. Empty copies the whole repository. The clone is shallow, blobless and sparse, so git fetches only the contents of matching files. | git, signed in for a private repository |
-| `kit:knowledge/web` | Web pages as markdown, through `r.jina.ai`. A page that cannot be read keeps its last copy and does not stop the others. The sync fails only when it reads no page. | curl, no account |
+| `kit:knowledge/web` | Web pages as markdown, through `r.jina.ai`. A page that cannot be read keeps its last copy and does not stop the others. The sync fails only when it reads no page. With `follow`, also the pages they link to (see Web pages that follow links). | curl, no account |
 | `kit:knowledge/jira` | Jira work items, one markdown file each. | A CLI tool for `acli`, signed in, and jq |
 | `kit:knowledge/confluence` | Confluence pages by id, one markdown file each. | The secret `CONFLUENCE_API_TOKEN`, curl and jq |
 
 `kit:knowledge/review-learnings` is not a sync. See Learnings below.
+
+### Web pages that follow links
+
+With `follow` set to `true`, `kit:knowledge/web` treats each address in
+`urls` as the start of a crawl. The shell is in
+`packages/flows/src/kits/knowledge/web-source.ts`.
+
+| Input | Default | What it does |
+| --- | --- | --- |
+| `scope` | The folder of each start page (`https://example.com/docs/`) | The crawl reads only addresses that start with one of these lines. A start page is always read. |
+| `limit` | 100 | The most pages one sync reads. The kit caps it at 500. |
+| `depth` | 3 | How many links away from a start page the crawl goes. |
+
+1. The kit reads `robots.txt` of each site. It keeps the `Disallow` lines
+   of the `User-agent: *` group as address prefixes. A `*` ends the prefix
+   and a final `$` is dropped. `Allow` lines do not lift a `Disallow`: the
+   kit reads less, never more.
+2. The kit reads the sitemaps that `robots.txt` names, else
+   `<origin>/sitemap.xml`. It follows one level of sitemap index, and reads
+   at most 20 sitemap files. Gzipped sitemaps are not read.
+3. When a sitemap lists pages in scope, the kit reads the start pages and
+   those pages, and follows no link.
+4. Otherwise the kit follows the markdown links (`[text](address)`) of each
+   page, breadth first, up to `depth`. Absolute and root-relative links
+   count. Other relative links do not: the reader writes absolute links.
+
+A link loses its `#fragment` and its `?query`. Two addresses with the same
+file name are one page, so `/docs` and `/docs/` are read once. A crawl does
+not follow images, media, fonts, archives, CSS, scripts, JSON, XML, feeds
+or PDFs. A PDF can still be a start page. The reader turns it into one
+long file, which is why a crawl does not follow it.
+
+The kit sends one request at a time. It waits `NS_WEB_PAUSE` seconds
+between two reader requests (default 3): without a key, the reader takes
+20 requests a minute. Every request has the User-Agent
+`NightShift-knowledge/1 (+https://github.com/xiduzo/nightshift)`. It names
+the product, never the person. `NS_WEB_READER` sets the address of the
+reader (default `https://r.jina.ai/`). The tests point it at a local
+`Bun.serve` site.
+
+Pages that leave the crawl leave the folder, but only after a whole crawl.
+A crawl removes nothing when:
+
+- the page limit cut it,
+- it read no page (the sync fails),
+- a page that it follows links from could not be read. The pages below
+  that page are unknown.
+
+A sitemap crawl lists every page. There, a page that cannot be read keeps
+its last copy, and the other removals still happen. Only top-level `*.md`
+files of the folder are removed. Subfolders stay.
+
+Each later sync reads every page again. A sitemap `lastmod` could skip
+unchanged pages, but sites set it unreliably, and the reader has no cheap
+change check. Measured on 2026-11-13 against a public documentation site
+through the real reader: 6 pages in 56 seconds, so about 9 seconds a page
+with the 3 second pause. 100 pages take about 15 minutes. The shell runs
+on macOS and on the Host's Wolfi image (busybox `sed`, `grep` and `find`).
 
 Each sync kit is one declaration in
 `packages/flows/src/kits/knowledge/source-kits.ts`. The list of kits, the
