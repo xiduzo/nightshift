@@ -18,7 +18,7 @@ Your phone needs a [Host](Computers-and-Hosts.md#run-a-host).
 | Tab | Shows |
 | --- | --- |
 | **Needs you** | The Gates and Asks that wait for you, by urgency: Now, Today, When you have time. The runs that stopped in the last day, with **Retry** or **Resume**. |
-| **Runs** | What runs now, and what runs tonight. Tap a run to follow it or stop it. Pause a schedule for tonight, or run its flow now. |
+| **Runs** | One timeline from now to tomorrow morning. Now shows the runs at work, each with **Stop**. Tonight shows each schedule at its time, with **Pause**, or **Undo** for a paused one. Hold a schedule to run it now. |
 
 - **Answer** a Gate, or a simple Ask.
 - **Follow a run.** The run screen shows its steps, transcripts and changed files, with **Stop**.
