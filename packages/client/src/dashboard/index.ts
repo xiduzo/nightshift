@@ -1,6 +1,16 @@
 /** The dashboard: its query, computed on the server, the reader's clock, and its view types. */
 
 export {
+	changeSummary,
+	type MoveTone,
+	moveKindOf,
+	moveStep,
+	moveText,
+	moveTone,
+	moveToneLabel,
+	verdictLabel,
+} from "./changes";
+export {
 	CONSOLE_METRICS,
 	type ConsoleMetric,
 	type ConsoleValues,
@@ -20,8 +30,12 @@ export {
 	timesUsual,
 } from "./spend";
 export type {
+	ChangeMeasure,
+	ChangeTrend,
 	DashboardSummary,
+	FlowChanges,
 	FlowHealthRow,
+	FlowMove,
 	FlowRange,
 	FlowReport,
 	NightRange,
@@ -33,9 +47,7 @@ export type {
 	Spread,
 } from "./types";
 export {
-	type AttentionCause,
 	againstBefore,
-	causeLabel,
 	type FlowLevel,
 	type FlowSignal,
 	type FlowWatch,

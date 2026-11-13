@@ -8056,7 +8056,7 @@ exports[`published schemas customAgentSchema as JSON Schema 1`] = `
 
 exports[`published schemas every published schema as a JSON Schema hash 1`] = `
 {
-  "agentEntryIdSchema": "cb16210d596ce7724c36af97bfa08d9e077451afa5b1352e1d261d1807dabd40",
+  "agentEntryIdSchema": "8e7d904e714eb5a4fc30942980d98c91fc97ad2dc425493a61ef247315f92908",
   "agentHarnessSchema": "d12cc5d7f05c6d4a3a3619d72791c31de7a482d1090430b563bf01d4149f9471",
   "agentNodeSchema": "e59c7eec9d4eff3a996e7a7d95660a9fe931b32eb6b073e06949b31f7d6cb995",
   "agentProfileSchema": "bed949397866c087d61cfac1a7ada6bb6b9f11d13b232be0c56b0d150bf20ee8",
@@ -8075,7 +8075,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "callNodeSchema": "856424b932b2bdf5e466e4df2fefb72963a974a3c5f8eaeeb7cb85cde6c12095",
   "callTierSchema": "00472b8d815f172216c3976c44d8148ab36a7690a4b331f344112daf0a7ade18",
   "calledFlowNameSchema": "41a733acacaf6fd4a56ce1af8652a762a9eae1a70888ac38628091b417b7f999",
-  "chatRequestSchema": "a27e3406b325e72a3a9fdfe13751300781bda32f84a665bc538d447524720063",
+  "chatRequestSchema": "0c5d77395d13184b9172d51e9dc54a25a269af171f72e932a9c3f9971eadcae1",
   "choiceItemSchema": "55d6a793593f2331affa67faa389d61df03d4029c01b7a7443f9a98834f63da7",
   "cliNameSchema": "51a3ab3696b70b9bee33bc67a8d7cb8f1ae494ccef5ccc7e73878b93fb22c12c",
   "commandExitSchema": "81c5c7ed3b70f87931cdd1b3beb8943305b5a7b50e6f5840b9d885ba920e88a3",
@@ -8096,6 +8096,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "effortSchema": "493230d82c85cabb606d65dd36a75b762c05cb4a2b5fda14a43a1d6b1d2d1902",
   "endNodeSchema": "76ce43efb69a45372dec7ea4aa0dfb869e373cdd28f6629dab83f3ca038dacb8",
   "endStatusSchema": "1b45bb9efb2f5fc745832f728bd234de5e568540940e6f98def1b412fbeaca2e",
+  "entryMoveSchema": "45847b02d49c1bc2fe319e1454175e92da4c53b98dd7b8edb2e4acdfc7aaa91b",
   "entrySavingSchema": "97815168fbe518e3ecaadb118ea638a438e098938328e584f4021febbbb42c67",
   "flowEdgeSchema": "fa102c4d0dbb7e0dc39d6b2ff6a8dda61e677b0a5b06f37519200f3145d3e80d",
   "flowInputSchema": "c4327eae5fd47880a975ba515ace6c59b99e4872d70d039dbe0e13f3b78794dd",

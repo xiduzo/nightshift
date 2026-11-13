@@ -1,9 +1,17 @@
 import type { SpaceFlows } from "../flows";
 import type { SpaceEngine } from "../run";
+import { ownEndedRuns, summarizeChanges } from "./changes";
 import { lastDays } from "./clock";
+import { MOVE_RUNS, nextMoves } from "./moves";
 import { summarizeSpend } from "./spend";
 import { summarizeDashboard } from "./summary";
-import { type DashboardSummary, NIGHT_RANGES, type SpaceSpend } from "./types";
+import {
+	type DashboardSummary,
+	type FlowChanges,
+	NIGHT_RANGES,
+	type NightRange,
+	type SpaceSpend,
+} from "./types";
 
 /** The days of help cost the Spend page reads: its longest range. A month is shorter. */
 const HELP_DAYS = Math.max(...NIGHT_RANGES);
@@ -62,4 +70,37 @@ export async function spaceSpend(
 		space.listAnswerCosts?.(since) ?? [],
 	]);
 	return summarizeSpend(runs, { ...read, help });
+}
+
+/**
+ * Before and after for one flow of a project over the last `nights` days:
+ * its runs and its changes, and the next changes to try, read from the
+ * steps of its newest runs of the days. A flow without revisions (a
+ * removed one) has no changes.
+ */
+export async function flowChanges(
+	space: Pick<SpaceEngine, "listRuns" | "getRun"> & {
+		flows: Pick<SpaceFlows, "revisions">;
+	},
+	flow: { projectId: string; name: string; nights: NightRange },
+	read: DashboardRead,
+): Promise<FlowChanges> {
+	const [all, revisions] = await Promise.all([
+		space.listRuns({ projectId: flow.projectId }),
+		(async () => space.flows.revisions(flow.projectId, flow.name))().catch(
+			() => [],
+		),
+	]);
+	const runs = ownEndedRuns(flow.name, all);
+	const start = lastDays(flow.nights, read.now, read.timeZone)[0] ?? read.now;
+	const recent = runs.filter((run) => run.createdAt >= start).slice(-MOVE_RUNS);
+	const details = (
+		await Promise.allSettled(recent.map((run) => space.getRun(run.id)))
+	).flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
+	return summarizeChanges(runs, revisions, {
+		...read,
+		nights: flow.nights,
+		moves: nextMoves(details),
+		read: details.length,
+	});
 }

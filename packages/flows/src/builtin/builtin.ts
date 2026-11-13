@@ -214,6 +214,7 @@ export const agentEntryIds = [
 	"run.improve",
 	"spend.saving",
 	"flow.improve",
+	"flow.move",
 	"flow.build",
 	"field.suggest",
 ] as const;
@@ -231,6 +232,7 @@ export const AGENT_ENTRIES: Record<AgentEntryId, AgentEntry> = {
 	"run.improve": { agent: "improver", label: "Improve this flow" },
 	"spend.saving": { agent: "improver", label: "Improve this flow" },
 	"flow.improve": { agent: "improver", label: "Improve this flow" },
+	"flow.move": { agent: "improver", label: "Improve this flow" },
 	"flow.build": { agent: "builder", label: "Build with an agent" },
 	"field.suggest": { agent: "field-writer", label: "Suggest" },
 };
@@ -290,6 +292,58 @@ export const entrySavingSchema = z.object({
 });
 export type EntrySaving = z.infer<typeof entrySavingSchema>;
 
+/** The kinds of a next change to try that a project's page shows for a flow. */
+export const entryMoveKinds = [
+	"edge",
+	"loopLimit",
+	"setup",
+	"unsure",
+	"sameAnswer",
+	"notes",
+	"leftOpen",
+	"wait",
+	"loop",
+	"endsRuns",
+	"guard",
+	"stalled",
+	"late",
+	"rate",
+	"nothing",
+] as const;
+
+/** A next change to try that a chat starts from: its kind, and the step it is about. */
+export const entryMoveSchema = z.object({
+	kind: z.enum(entryMoveKinds),
+	step: z.string().trim().min(1).max(200).optional(),
+});
+export type EntryMove = z.infer<typeof entryMoveSchema>;
+
+/** What the person asks about a next change to try, on the run that shows it. */
+function moveOpening(move: EntryMove): string {
+	const at = move.step ? ` at the step ${move.step}` : "";
+	const asks: Record<EntryMove["kind"], string> = {
+		edge: `This run stopped${at}: no edge leaves it on the outcome it ended on. Propose where that outcome should go: try again, ask a person, or end the run.`,
+		loopLimit: `This run stopped when a loop${at} ran out of rounds. Find why the loop kept going, and propose a change so it ends sooner.`,
+		setup:
+			"This run could not do its work because of the setup. Find what went wrong, and tell me what to check. Propose no change to the flow.",
+		unsure: `The model that decides${at} is seldom sure of its choice. Propose clearer options, or a rule for the common case.`,
+		sameAnswer: `A person gives the same answer${at} almost every time. Propose a change so the flow goes on with that answer unless a person objects.`,
+		notes: `A person sends the work back${at} with a note. Read the notes in this run, and propose instructions for the step before it, so it gets the work right the first time.`,
+		leftOpen: `Runs end while the Gate${at} still waits. Propose whether it needs a deadline, or whether the flow can do without it.`,
+		wait: `Runs of this flow wait for a person most of their time${at}. Propose a deadline, or a change so the flow asks less often.`,
+		loop: `This run went back${at} more than once. Find whether the extra rounds are needed, and propose a change so it gets the work right in fewer rounds.`,
+		endsRuns: `Runs end${at} without finishing. Find why, and propose a change to the flow so runs like this one finish.`,
+		guard:
+			"Night Shift stopped this run at one of its limits. Find what made it run so long, and propose a change to the flow.",
+		stalled: `The agent${at} showed no activity, and its step stopped. Propose smaller steps, or clearer instructions.`,
+		late: "Scheduled runs of this flow start late. Tell me what to check. Propose no change to the flow.",
+		rate: "Few runs of this flow are rated. Propose what a good result looks like for this flow, in a few lines.",
+		nothing:
+			"Most runs of this flow find nothing to do. Propose a check that ends the flow before the agents start when there is no work.",
+	};
+	return asks[move.kind];
+}
+
 /**
  * The first message of a chat that an entry starts: what the person asks,
  * in their words. The page and the agent both read it from here. Null: the
@@ -297,9 +351,11 @@ export type EntrySaving = z.infer<typeof entrySavingSchema>;
  */
 export function entryOpening(
 	entry: AgentEntryId,
-	context: { saving?: EntrySaving } = {},
+	context: { saving?: EntrySaving; move?: EntryMove } = {},
 ): string | null {
 	switch (entry) {
+		case "flow.move":
+			return context.move ? moveOpening(context.move) : null;
 		case "run.improve":
 			return "Why did this run not finish? Propose a change to the flow that fixes it.";
 		case "spend.saving": {

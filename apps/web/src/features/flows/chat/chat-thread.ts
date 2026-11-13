@@ -1,9 +1,10 @@
-import { savingKindOf } from "@nightshift/client";
+import { moveKindOf, savingKindOf } from "@nightshift/client";
 import {
 	AGENT_ENTRIES,
 	type AgentEntryId,
 	type ChatEvent,
 	type ChatRequest,
+	type EntryMove,
 	type EntrySaving,
 	entryOpening,
 	type Flow,
@@ -54,6 +55,8 @@ export type ChatThread = {
 	entry?: AgentEntryId;
 	/** `spend.saving` only: the way to save the chat starts from. */
 	saving?: EntrySaving;
+	/** `flow.move` only: the next change to try the chat starts from. */
+	move?: EntryMove;
 	messages: ChatMessage[];
 };
 
@@ -62,12 +65,13 @@ export const EMPTY_THREAD: ChatThread = { messages: [] };
 /** A new chat that `entry` starts, about run `runId` when it names one. */
 export function startedBy(
 	entry: AgentEntryId,
-	about: { runId?: string; saving?: EntrySaving } = {},
+	about: { runId?: string; saving?: EntrySaving; move?: EntryMove } = {},
 ): ChatThread {
 	return {
 		...(about.runId ? { runId: about.runId } : {}),
 		entry,
 		...(about.saving ? { saving: about.saving } : {}),
+		...(about.move ? { move: about.move } : {}),
 		messages: [],
 	};
 }
@@ -95,6 +99,7 @@ export function chatAgent(thread: ChatThread): "builder" | "improver" {
 export function threadOpening(thread: ChatThread): string | null {
 	return entryOpening(threadEntry(thread), {
 		...(thread.saving ? { saving: thread.saving } : {}),
+		...(thread.move ? { move: thread.move } : {}),
 	});
 }
 
@@ -113,9 +118,10 @@ export function chatRequest(
 		entry: threadEntry(thread),
 		...(message !== undefined
 			? { message }
-			: thread.saving
-				? { saving: thread.saving }
-				: {}),
+			: {
+					...(thread.saving ? { saving: thread.saving } : {}),
+					...(thread.move ? { move: thread.move } : {}),
+				}),
 		...(thread.threadId ? { threadId: thread.threadId } : {}),
 		...(thread.runId ? { runId: thread.runId } : {}),
 	};
@@ -303,9 +309,19 @@ function isSaving(value: unknown): value is EntrySaving {
 	);
 }
 
+function isMove(value: unknown): value is EntryMove {
+	if (typeof value !== "object" || value === null) return false;
+	const { kind, step } = value as Record<string, unknown>;
+	return (
+		typeof kind === "string" &&
+		moveKindOf(kind) !== undefined &&
+		(step === undefined || typeof step === "string")
+	);
+}
+
 function isThread(value: unknown): value is ChatThread {
 	if (typeof value !== "object" || value === null) return false;
-	const { threadId, runId, entry, saving, messages } = value as Record<
+	const { threadId, runId, entry, saving, move, messages } = value as Record<
 		string,
 		unknown
 	>;
@@ -317,6 +333,7 @@ function isThread(value: unknown): value is ChatThread {
 	)
 		return false;
 	if (saving !== undefined && !isSaving(saving)) return false;
+	if (move !== undefined && !isMove(move)) return false;
 	return (
 		Array.isArray(messages) &&
 		messages.every(

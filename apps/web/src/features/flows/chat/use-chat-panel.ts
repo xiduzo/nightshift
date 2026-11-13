@@ -73,6 +73,7 @@ export function useChatPanel(
 						...(link.kind === "run" && link.saving
 							? { saving: link.saving }
 							: {}),
+						...(link.kind === "run" && link.move ? { move: link.move } : {}),
 					}),
 					// A draft that cannot be sent waits: the person fixes it and asks.
 					isSavable(assistant.flow) ? assistant.flow : undefined,

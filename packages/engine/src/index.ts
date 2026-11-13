@@ -50,10 +50,16 @@ export {
 	startTestInputSchema,
 } from "./contract";
 export {
+	CHANGE_TRENDS,
+	CHANGE_VERDICTS,
 	COST_STEADINESS,
 	type DashboardSummary,
+	type FlowChanges,
 	type FlowHealthDetail,
+	flowChanges,
 	isTimeZone,
+	MOVE_GUARDS,
+	MOVE_SETUP_CAUSES,
 	projectDashboard,
 	SAVING_KINDS,
 	type SpaceSpend,

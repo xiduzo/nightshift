@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	chatAboutMove,
 	chatAboutRun,
 	chatAboutSaving,
 	chatSearch,
@@ -61,6 +62,26 @@ describe("the chat link", () => {
 			runId: "run-1",
 			saving: { kind: "unfinished" },
 		});
+	});
+
+	test("a next change to try keeps its kind, its run and its step", () => {
+		expect(
+			parseChatLink(
+				chatAboutMove({ kind: "edge", runId: "run-1", step: "write:2" }),
+			),
+		).toEqual({
+			kind: "run",
+			runId: "run-1",
+			move: { kind: "edge", step: "write:2" },
+		});
+		expect(
+			parseChatLink(chatAboutMove({ kind: "rate", runId: "run-1" })),
+		).toEqual({
+			kind: "run",
+			runId: "run-1",
+			move: { kind: "rate" },
+		});
+		expect(parseChatLink("move:nope:run-1")).toBeUndefined();
 	});
 
 	test("anything else opens nothing", () => {

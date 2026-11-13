@@ -64,6 +64,7 @@ export {
 	builtinAgentIdSchema,
 	builtinAnswersSchema,
 	builtinModel,
+	type EntryMove,
 	type EntrySaving,
 	entryOpening,
 	type ModelPick,

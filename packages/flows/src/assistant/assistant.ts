@@ -24,7 +24,9 @@ import {
 	type BuiltinAgentId,
 	type BuiltinCheck,
 	type BuiltinStatus,
+	type EntryMove,
 	type EntrySaving,
+	entryMoveSchema,
 	entryOpening,
 	entrySavingSchema,
 } from "../builtin";
@@ -239,6 +241,8 @@ export const chatRequestSchema = z
 		entry: agentEntryIdSchema.optional(),
 		/** `spend.saving` only: the way to save the chat starts from. */
 		saving: entrySavingSchema.optional(),
+		/** `flow.move` only: the next change to try the chat starts from. */
+		move: entryMoveSchema.optional(),
 		/**
 		 * Continue this chat. Unset: start a new one. A chat continues on
 		 * another agent too: the new agent gets the conversation so far.
@@ -259,11 +263,13 @@ export function chatMessage(request: {
 	message?: string | undefined;
 	entry?: AgentEntryId | undefined;
 	saving?: EntrySaving | undefined;
+	move?: EntryMove | undefined;
 }): string | null {
 	if (request.message !== undefined) return request.message;
 	if (request.entry === undefined) return null;
 	return entryOpening(request.entry, {
 		...(request.saving ? { saving: request.saving } : {}),
+		...(request.move ? { move: request.move } : {}),
 	});
 }
 

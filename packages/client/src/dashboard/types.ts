@@ -37,3 +37,16 @@ export type SpendDays = SpaceSpend["ranges"][number];
 export type SpendFlow = SpendDays["flows"][number];
 /** One way to save on one flow. */
 export type SpendSaving = SpendDays["savings"][number];
+
+/** Before and after for one flow over some days, and the next changes to try. */
+export type FlowChanges = ApiOutputs["dashboard"]["changes"];
+/** One change of a flow: saves less than 30 minutes apart. */
+export type FlowChange = FlowChanges["changes"][number];
+/** Two sets of runs of a flow side by side. */
+export type ChangeComparison = FlowChanges["days"];
+/** One column of the before and after table. */
+export type ChangeMeasure = ChangeComparison["before"];
+export type ChangeVerdict = ChangeComparison["verdict"];
+export type ChangeTrend = ChangeComparison["trends"]["finished"];
+/** One next change to try on a flow. */
+export type FlowMove = FlowChanges["moves"][number];

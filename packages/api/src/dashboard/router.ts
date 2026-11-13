@@ -1,5 +1,6 @@
 import { spacesOf } from "@nightshift/auth";
 import {
+	flowChanges,
 	projectDashboard,
 	spaceSpend,
 	spacesDashboard,
@@ -11,7 +12,9 @@ import { output } from "../output";
 import { protectedProcedure } from "../procedures";
 import {
 	dashboardSummarySchema,
+	flowChangesSchema,
 	flowHealthDetailSchema,
+	nightRangeSchema,
 	spaceSpendSchema,
 	timeZoneSchema,
 } from "./schemas";
@@ -72,6 +75,36 @@ export const dashboard = {
 			summarizeFlow(
 				input.flowName,
 				await context.space.listRuns({ projectId: input.projectId }),
+				{ now: now(), timeZone: input.timeZone },
+			),
+		),
+	/**
+	 * Before and after for one flow of a project over the last `nights`
+	 * days: the effect of its last change, the days against the days
+	 * before, and the next changes to try.
+	 */
+	changes: protectedProcedure
+		.route({
+			summary:
+				"Compares the runs of one flow before and after its last change, and over some days against the days before, and lists the next changes to try.",
+		})
+		.output(output(flowChangesSchema))
+		.input(
+			z.object({
+				projectId: z.string(),
+				flowName: z.string().min(1),
+				nights: nightRangeSchema,
+				timeZone: timeZoneSchema,
+			}),
+		)
+		.handler(({ context, input }) =>
+			flowChanges(
+				context.space,
+				{
+					projectId: input.projectId,
+					name: input.flowName,
+					nights: input.nights,
+				},
 				{ now: now(), timeZone: input.timeZone },
 			),
 		),
