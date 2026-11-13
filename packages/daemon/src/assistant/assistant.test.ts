@@ -28,7 +28,7 @@ import {
 	NOT_ENDED_EARLY,
 	pickAgent,
 } from "./assistant";
-import { authoringPort, chatRun } from "./authoring";
+import { authoringPort, chatRun, historyPort } from "./authoring";
 
 const settingsOf = (
 	harness: AgentHarnessName,
@@ -71,7 +71,14 @@ function deps(over: Partial<AssistantDeps> = {}): AssistantDeps {
 		installed: (name) => name === "claude-code",
 		clonePath: async () => "/repo",
 		space: () => ({
-			flows: { map: async () => ({ fix: null }) },
+			flows: {
+				map: async () => ({ fix: null }),
+				revisions: async () => [],
+				revision: async () => {
+					throw new Error("No such revision");
+				},
+			},
+			listRuns: async () => [],
 			getRun: async () => {
 				throw new Error("No such run");
 			},
@@ -291,7 +298,10 @@ describe("assistant.suggest", () => {
 					scopes.push(scope);
 					return {
 						...base.space(scope),
-						flows: { map: async () => ({ fix: null, child }) },
+						flows: {
+							...base.space(scope).flows,
+							map: async () => ({ fix: null, child }),
+						},
 					};
 				},
 			}),
@@ -837,6 +847,120 @@ describe("chatRun", () => {
 		expect((await port("p1", "r1").run?.())?.failedStepId).toBe("s2");
 	});
 
+	test("the history tools read only the chat's project", async () => {
+		const costs = {
+			costUsd: 3,
+			costEstimated: false,
+			costMissing: 0,
+			costCalls: 2,
+		};
+		const summary = (id: string, flowName: string, createdAt: number) => ({
+			...costs,
+			id,
+			projectId: "p1",
+			flowName,
+			title: flowName,
+			status: "finished",
+			result: "done",
+			reason: null,
+			trigger: { kind: "schedule" },
+			createdAt,
+			endedAt: createdAt + 60_000,
+		});
+		const revision = (id: string, at: number, current = false) => ({
+			id,
+			at,
+			kind: "save" as const,
+			person: { id: "u1", name: "Ada" },
+			device: { id: "d1", name: "Studio" },
+			current,
+			changes: null,
+		});
+		const asked: unknown[] = [];
+		const port = (projectId: string) =>
+			historyPort(
+				{
+					...space(),
+					getRun: async (id: string) => {
+						if (id !== "r1") throw new Error("No such run");
+						return detail({
+							...costs,
+							flowName: "fix",
+							flowRevision: "v2",
+							createdAt: 1_000,
+							endedAt: 61_000,
+							steps: run.steps.map((step, index) => ({
+								...step,
+								scope: null,
+								startedAt: 1_000,
+								endedAt: 31_000,
+								sessions: index === 0 ? [{}, {}] : [],
+								...costs,
+								costUsd: index === 0 ? 3 : 0,
+								costCalls: index === 0 ? 2 : 0,
+							})),
+						});
+					},
+					listRuns: async (input) => {
+						asked.push(input);
+						return [
+							summary("r1", "fix", 1_000),
+							summary("r2", "other", 2_000),
+							summary("r3", "fix", 3_000),
+						] as never;
+					},
+					flows: {
+						map: async () => ({ fix: null }),
+						revisions: async () => [
+							revision("v2", 20, true),
+							revision("v1", 10),
+						],
+						revision: async (_project, _flow, id, against) =>
+							({
+								revision: { ...revision(id, 20), flow: withTests },
+								against: { revisionId: against ?? null, flow: null },
+								diff: null,
+							}) as never,
+					},
+				},
+				{ projectId, runId: "r1", flowName: "fix", flow: withTests } as never,
+				signal,
+			);
+		const own = port("p1");
+		// A run of another project is no run, for every read.
+		expect(await port("p2").run("r1")).toBeNull();
+		expect(await port("p2").transcript("r1", "s2")).toBeNull();
+
+		const runs = await own.runs({ flow: "fix", limit: 10 });
+		expect(runs.map((each) => each.id)).toEqual(["r3", "r1"]);
+		expect(runs[0]).toMatchObject({ startedBy: "schedule", cost: { usd: 3 } });
+		expect(asked).toEqual([{ projectId: "p1" }]);
+
+		const found = await own.run("r1");
+		expect(found).toMatchObject({ revisionId: "v2", cost: { usd: 3 } });
+		expect(found?.steps[0]).toMatchObject({
+			nodeId: "plan",
+			usd: 3,
+			ms: 30_000,
+			sessions: 2,
+		});
+
+		// A step by its id, or by its node for the last visit.
+		expect((await own.transcript("r1", "test"))?.nodeId).toBe("test");
+		expect(await own.transcript("r1", "nope")).toBeNull();
+
+		expect(await own.revisions("nope")).toBeNull();
+		expect((await own.revisions("fix"))?.[0]).toMatchObject({
+			id: "v2",
+			by: "Ada",
+			current: true,
+		});
+		// Compared with the revision before it, and the first with none.
+		expect((await own.revision("fix", "v2"))?.against).toBe("v1");
+		expect((await own.revision("fix", "v1"))?.against).toBeNull();
+		expect(await own.revision("fix", "v9")).toBeNull();
+	});
+
 	test("a test run says so, and so does each step that stood in", async () => {
 		const tested = detail({
 			status: "finished",
@@ -878,7 +1002,14 @@ describe("assistant.explain", () => {
 		],
 	};
 	const runSpace = (run: typeof failed) => () => ({
-		flows: { map: async () => ({}) },
+		flows: {
+			map: async () => ({}),
+			revisions: async () => [],
+			revision: async () => {
+				throw new Error("No such revision");
+			},
+		},
+		listRuns: async () => [],
 		getRun: async (id: string) => {
 			if (id !== run.id) throw new Error("No such run");
 			return run as never;

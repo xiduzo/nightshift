@@ -204,4 +204,4 @@ Click a row to open it. You see what each step costs per run, and the ways to sa
 - **Check for work before the agents start.** Some runs found nothing to do, and still cost money.
 - **Keep the costly runs near a usual run.** Some runs cost over twice a usual run. The card names the step with the most extra cost.
 
-**Open the run** shows the newest run behind a card. **Open the flow** opens the flow, where you make the change.
+**Open the run** shows the newest run behind a card. **Open the flow** opens the flow, where you make the change. **Improve with an agent** opens the flow with a chat. The agent reads that run and proposes a change. You apply it or discard it.

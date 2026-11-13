@@ -25,7 +25,12 @@ import {
 	type ExplanationEvent,
 	isAgentProfile,
 } from "@nightshift/flows";
-import { type AuthoringSpace, authoringPort, chatRun } from "./authoring";
+import {
+	type AuthoringSpace,
+	authoringPort,
+	chatRun,
+	historyPort,
+} from "./authoring";
 import { flowPlace } from "./place";
 import {
 	type ChatThread,
@@ -358,9 +363,10 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 			let answer = "";
 			try {
 				yield { type: "thread", threadId: thread.id };
+				const space = deps.space(scope);
 				const port = authoringPort(
 					{
-						space: deps.space(scope),
+						space,
 						profiles: deps.profiles,
 						cliTools: deps.cliTools,
 						connections: deps.connections,
@@ -376,6 +382,7 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 					profile: picked.settings,
 					cwd,
 					port,
+					past: historyPort(space, request, signal),
 					...(resume
 						? { resumeSessionId: resume, newRun }
 						: { history: thread.exchanges }),

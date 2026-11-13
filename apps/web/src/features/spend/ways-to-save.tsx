@@ -17,7 +17,8 @@ import {
 } from "@nightshift/ui/components/card";
 import { Progress } from "@nightshift/ui/components/progress";
 import { Link } from "@tanstack/react-router";
-import { CircleCheckIcon } from "lucide-react";
+import { CircleCheckIcon, SparklesIcon } from "lucide-react";
+import { chatAboutSaving } from "@/features/flows";
 import { formatCost } from "@/shared/format";
 import { PageSection } from "@/shared/page";
 
@@ -149,7 +150,11 @@ function SavingCard({
 	);
 }
 
-/** Where a way to save leads: the newest run that shows it, and the flow to change. */
+/**
+ * Where a way to save leads: the newest run that shows it, the flow to
+ * change, and a chat in that flow where an agent reads the run and
+ * proposes the change.
+ */
 export function SavingActions({
 	saving,
 	linked,
@@ -161,7 +166,7 @@ export function SavingActions({
 	primary?: boolean;
 }) {
 	return (
-		<span className="flex gap-2">
+		<span className="flex flex-wrap justify-end gap-2">
 			<Button
 				size="xs"
 				variant="ghost"
@@ -171,19 +176,37 @@ export function SavingActions({
 				Open the run
 			</Button>
 			{linked ? (
-				<Button
-					size="xs"
-					variant={primary ? "default" : "outline"}
-					nativeButton={false}
-					render={
-						<Link
-							to="/projects/$projectId/flows/$name"
-							params={{ projectId: saving.projectId, name: saving.flow }}
-						/>
-					}
-				>
-					Open the flow
-				</Button>
+				<>
+					<Button
+						size="xs"
+						variant="outline"
+						nativeButton={false}
+						render={
+							<Link
+								to="/projects/$projectId/flows/$name"
+								params={{ projectId: saving.projectId, name: saving.flow }}
+							/>
+						}
+					>
+						Open the flow
+					</Button>
+					<Button
+						size="xs"
+						variant={primary ? "default" : "outline"}
+						nativeButton={false}
+						title="Opens the flow with a chat. The agent reads the run and proposes a change."
+						render={
+							<Link
+								to="/projects/$projectId/flows/$name"
+								params={{ projectId: saving.projectId, name: saving.flow }}
+								search={{ chat: chatAboutSaving(saving) }}
+							/>
+						}
+					>
+						<SparklesIcon data-icon="inline-start" />
+						Improve with an agent
+					</Button>
+				</>
 			) : null}
 		</span>
 	);

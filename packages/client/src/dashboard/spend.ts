@@ -75,3 +75,34 @@ export function savingWhy(
 		}
 	}
 }
+
+/** The way to save `value` names, or undefined when it names none. */
+export function savingKindOf(value: string): SpendSaving["kind"] | undefined {
+	return Object.hasOwn(SAVING_TITLE, value)
+		? (value as SpendSaving["kind"])
+		: undefined;
+}
+
+/**
+ * What to ask an agent about the run that shows a way to save: the first
+ * message of a chat about that run. It holds what the page knows, since
+ * the agent reads the run and not its cost.
+ */
+export function savingAsk(saving: {
+	kind: SpendSaving["kind"];
+	/** The step that cost most, by its label. */
+	step?: string;
+}): string {
+	switch (saving.kind) {
+		case "unfinished":
+			return "This run did not finish, so its cost bought nothing. Find why, and propose a change to the flow so runs like it finish.";
+		case "nothing":
+			return "This run found nothing to do, and it still cost money. Propose a check that ends the flow before the agents start when there is no work.";
+		default: {
+			const step = saving.step
+				? ` Most of the extra cost was in the step ${saving.step}.`
+				: "";
+			return `This run cost over twice a usual run of this flow.${step} Find what made it cost more, and propose a change to the flow that keeps the cost near a usual run.`;
+		}
+	}
+}

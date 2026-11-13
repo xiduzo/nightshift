@@ -56,6 +56,8 @@ export {
 	type SpendFlow,
 	type SpendSaving,
 	type Spread,
+	savingAsk,
+	savingKindOf,
 	savingTitle,
 	savingWhy,
 	signalFacts,

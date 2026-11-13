@@ -13,6 +13,7 @@ export {
 	chatTurn,
 	chooseProject,
 	explainRun,
+	type HistoryPort,
 	resumesOnAnotherModel,
 	type SuggestFieldInput,
 	serveTools,

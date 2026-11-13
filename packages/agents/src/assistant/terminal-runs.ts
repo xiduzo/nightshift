@@ -21,7 +21,7 @@ export const RUN_TOOLS = {
 } as const;
 
 /** The statuses a run can have, as `list_runs` filters them. */
-const RUN_STATUSES = [
+export const RUN_STATUSES = [
 	"running",
 	"waiting",
 	"sleeping",
@@ -248,7 +248,7 @@ function parseGateId(value: unknown): { runId: string; stepId: string } {
 	return { runId: text.slice(0, at), stepId: text.slice(at + 1) };
 }
 
-function statusesOf(value: unknown): TerminalRunStatus[] | undefined {
+export function statusesOf(value: unknown): TerminalRunStatus[] | undefined {
 	if (value === undefined || value === null || value === "") return undefined;
 	const given = Array.isArray(value) ? value : [value];
 	const known = new Set<string>(RUN_STATUSES);

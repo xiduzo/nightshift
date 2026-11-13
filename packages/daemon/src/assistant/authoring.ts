@@ -9,22 +9,27 @@ import type {
 	AuthoringPort,
 	AuthoringRun,
 	AuthoringRunStep,
+	HistoryPort,
 } from "@nightshift/agents";
 import {
+	type FlowRevisionItem,
 	type RunDetail,
+	type RunSummary,
 	runReading,
 	type SpaceEngine,
 	type SpaceFlows,
+	spaceSpend,
 	type TranscriptEntry,
 } from "@nightshift/engine";
 import type { ProfileStore } from "@nightshift/engine/device-config";
 import { isTestRun } from "@nightshift/engine/run-status";
 import { type ChatRequest, isAgentProfile } from "@nightshift/flows";
+import { now } from "@nightshift/time";
 import { flowPlace, type PlaceDeps } from "./place";
 
-/** What the port reads in the Space. */
-type ChatSpace = Pick<SpaceEngine, "getRun" | "stepTranscript"> & {
-	flows: Pick<SpaceFlows, "map">;
+/** What the ports read in the Space. */
+type ChatSpace = Pick<SpaceEngine, "getRun" | "stepTranscript" | "listRuns"> & {
+	flows: Pick<SpaceFlows, "map" | "revisions" | "revision">;
 };
 
 /** The chat's Space, and its Devices with the profiles a node may name. */
@@ -106,6 +111,217 @@ export function authoringPort(
 					},
 				}
 			: {}),
+	};
+}
+
+function costOf(
+	of: Pick<
+		RunSummary,
+		"costUsd" | "costEstimated" | "costMissing" | "costCalls"
+	> & { metrics?: RunSummary["metrics"] },
+) {
+	return {
+		usd: of.costUsd,
+		estimated: of.costEstimated,
+		missing: of.costMissing,
+		calls: of.costCalls,
+		basis: of.metrics?.costBasis ?? null,
+	};
+}
+
+function revisionOf(
+	revision: FlowRevisionItem,
+): Awaited<ReturnType<HistoryPort["revisions"]>> extends (infer R)[] | null
+	? R
+	: never {
+	return {
+		id: revision.id,
+		at: revision.at,
+		kind: revision.kind,
+		by: revision.person?.name ?? null,
+		current: revision.current,
+		changes: revision.changes,
+	};
+}
+
+const cents = (usd: number) => Math.round(usd * 100) / 100;
+
+/**
+ * The history tools' port for a chat in the editor: the runs, the cost
+ * and the flow revisions of the chat's project, as the Person sees them
+ * in the Space. It reads only, and only `request.projectId`: a run of
+ * another project is no run, and a flow is looked up in this project.
+ */
+export function historyPort(
+	space: ChatSpace,
+	request: ChatRequest,
+	signal: AbortSignal,
+): HistoryPort {
+	const { projectId } = request;
+	/** The run when it is one of this project. */
+	const runOf = async (runId: string) => {
+		const detail = await space.getRun(runId).catch(() => null);
+		return detail && detail.projectId === projectId ? detail : null;
+	};
+	const hasFlow = async (flow: string) =>
+		flow in (await space.flows.map(projectId));
+	return {
+		flowName: request.flowName,
+		...(request.runId ? { aboutRunId: request.runId } : {}),
+		runs: async ({ flow, statuses, limit }) => {
+			const runs = await space.listRuns({
+				projectId,
+				...(statuses ? { statuses } : {}),
+			});
+			return runs
+				.filter((run) => flow === undefined || run.flowName === flow)
+				.sort((a, b) => b.createdAt - a.createdAt)
+				.slice(0, limit)
+				.map((run) => ({
+					id: run.id,
+					flow: run.flowName,
+					title: run.title,
+					status: run.status,
+					result: run.result,
+					reason: run.reason,
+					startedBy: run.trigger.kind,
+					startedAt: run.createdAt,
+					endedAt: run.endedAt,
+					cost: costOf(run),
+					...(isTestRun(run) ? { test: run.test } : {}),
+				}));
+		},
+		run: async (runId) => {
+			const detail = await runOf(runId);
+			if (!detail) return null;
+			const run = await chatRun(space, detail, signal);
+			const flowOf = new Map(run.steps.map((step) => [step.id, step.flow]));
+			return {
+				run,
+				flowName: detail.flowName,
+				startedAt: detail.createdAt,
+				endedAt: detail.endedAt,
+				cost: costOf(detail),
+				revisionId: detail.flowRevision,
+				tokens: detail.metrics?.tokens ?? null,
+				steps: detail.steps.map((step) => ({
+					stepId: step.id,
+					nodeId: step.nodeId,
+					flow: flowOf.get(step.id) ?? null,
+					visit: step.visit,
+					usd: step.costUsd,
+					estimated: step.costEstimated,
+					missing: step.costMissing,
+					calls: step.costCalls,
+					ms: step.endedAt === null ? null : step.endedAt - step.startedAt,
+					sessions: step.sessions.length,
+				})),
+			};
+		},
+		transcript: async (runId, named) => {
+			const detail = await runOf(runId);
+			const step =
+				detail?.steps.find((each) => each.id === named) ??
+				detail?.steps.findLast((each) => each.nodeId === named);
+			if (!detail || !step) return null;
+			const saved = await savedLines(space, detail.id, step.id, signal);
+			return { nodeId: step.nodeId, ...saved };
+		},
+		spend: async (days) => {
+			const spend = await spaceSpend(
+				{ listRuns: () => space.listRuns({ projectId }) },
+				{ now: now(), timeZone: "UTC" },
+			);
+			const range = spend.ranges.find((each) => each.nights === days);
+			if (!range) return { days, runs: 0 };
+			return {
+				days,
+				runs: range.runs,
+				spentUsd: cents(range.total),
+				spentInTheDaysBeforeUsd: cents(range.before),
+				runsWithAnUnknownCost: range.unknown,
+				couldSaveUsd: cents(range.saves),
+				how: "A usual run is the median cost of a flow's finished runs. A costly run cost over twice a usual run. A run saves what it cost above a usual run, or all of it when it did not finish or found nothing to do.",
+				flows: range.flows.map((flow) => ({
+					flow: flow.flow,
+					runs: flow.runs,
+					spentUsd: cents(flow.spent),
+					usualRunUsd: flow.usual
+						? {
+								median: cents(flow.usual.median),
+								quarter: cents(flow.usual.q1),
+								threeQuarters: cents(flow.usual.q3),
+								most: cents(flow.usual.max),
+								finishedRuns: flow.usual.count,
+							}
+						: null,
+					costIs: flow.steadiness,
+					couldSaveUsd: cents(flow.saves),
+					steps: flow.steps.map((step) => ({
+						node: step.via ? `${step.via}/${step.nodeId}` : step.nodeId,
+						perRunUsd: cents(step.perRun),
+						mostInOneRunUsd: cents(step.most),
+						timesPerRun: Math.round(step.timesPerRun * 10) / 10,
+					})),
+				})),
+				waysToSave: range.savings.map((saving) => ({
+					flow: saving.flow,
+					kind: saving.kind,
+					savesUsd: cents(saving.saves),
+					runs: saving.runs,
+					ofRuns: saving.of,
+					newestRun: saving.runId,
+					...(saving.step
+						? {
+								stepWithMostExtraCost: saving.step.via
+									? `${saving.step.via}/${saving.step.nodeId}`
+									: saving.step.nodeId,
+							}
+						: {}),
+				})),
+				quickRuns: {
+					runs: range.quick.runs,
+					spentUsd: cents(range.quick.spent),
+				},
+			};
+		},
+		revisions: async (flow) => {
+			if (!(await hasFlow(flow))) return null;
+			return (await space.flows.revisions(projectId, flow)).map(revisionOf);
+		},
+		revision: async (flow, revisionId, against) => {
+			if (!(await hasFlow(flow))) return null;
+			const revisions = await space.flows.revisions(projectId, flow);
+			const at = revisions.findIndex((each) => each.id === revisionId);
+			if (at < 0) return null;
+			// Newest first: the one before it comes after it in the list.
+			const before =
+				against !== undefined
+					? revisions.find((each) => each.id === against)?.id
+					: revisions[at + 1]?.id;
+			if (against !== undefined && before === undefined) return null;
+			if (before === undefined) {
+				const view = await space.flows.revision(projectId, flow, revisionId);
+				return {
+					revision: revisionOf(view.revision),
+					against: null,
+					diff: null,
+					flow: view.revision.flow,
+				};
+			}
+			const view = await space.flows.revision(
+				projectId,
+				flow,
+				revisionId,
+				before,
+			);
+			return {
+				revision: revisionOf(view.revision),
+				against: before,
+				diff: view.diff,
+				flow: view.revision.flow,
+			};
+		},
 	};
 }
 

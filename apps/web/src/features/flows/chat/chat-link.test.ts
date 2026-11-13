@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { chatAboutRun, chatSearch, parseChatLink } from "./chat-link";
+import {
+	chatAboutRun,
+	chatAboutSaving,
+	chatSearch,
+	parseChatLink,
+} from "./chat-link";
 
 describe("the chat link", () => {
 	test("reads back what it writes", () => {
@@ -12,8 +17,42 @@ describe("the chat link", () => {
 		});
 	});
 
+	test("a way to save keeps its kind, its run and its step", () => {
+		expect(
+			parseChatLink(
+				chatAboutSaving({
+					kind: "costly",
+					runId: "run-1",
+					step: { nodeId: "build:2", via: "write" },
+				}),
+			),
+		).toEqual({
+			kind: "run",
+			runId: "run-1",
+			saving: { kind: "costly", step: "write / build:2" },
+		});
+		expect(
+			parseChatLink(chatAboutSaving({ kind: "unfinished", runId: "run-1" })),
+		).toEqual({
+			kind: "run",
+			runId: "run-1",
+			saving: { kind: "unfinished" },
+		});
+	});
+
 	test("anything else opens nothing", () => {
-		for (const value of [undefined, 3, "", "run:", "run:  ", "other"]) {
+		for (const value of [
+			undefined,
+			3,
+			"",
+			"run:",
+			"run:  ",
+			"other",
+			"save:",
+			"save:costly",
+			"save:costly: ",
+			"save:other:run-1",
+		]) {
 			expect(parseChatLink(value)).toBeUndefined();
 		}
 	});

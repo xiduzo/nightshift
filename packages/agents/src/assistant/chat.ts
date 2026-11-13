@@ -19,6 +19,7 @@ import {
 	harnessTakesTools,
 } from "@nightshift/flows";
 import type { AgentHarness } from "../port";
+import { describeHistoryTool, type HistoryPort, historyTools } from "./history";
 import { type ChatExchange, chatFollowUpPrompt, chatPrompt } from "./prompts";
 import { runAssistantSession } from "./session";
 import {
@@ -61,6 +62,11 @@ export type ChatTurnInput = {
 	cwd: string;
 	/** What the tools read. Proposals become `proposal` events. */
 	port: Omit<AuthoringPort, "propose">;
+	/**
+	 * What the history tools read: the runs, the cost and the revisions of
+	 * the chat's project. Unset: the chat has only `get_run` for its run.
+	 */
+	past?: HistoryPort;
 	/** Continue this session. Unset: a new session. */
 	resumeSessionId?: string;
 	/** On resume: the chat was not about `request.runId` before. */
@@ -88,12 +94,17 @@ export async function* chatTurn(
 ): AsyncGenerator<ChatTurnEvent> {
 	const { request, harness, signal } = input;
 	const proposals: FlowProposal[] = [];
-	const tools = authoringTools({
-		...input.port,
-		propose: (proposal) => {
-			proposals.push(proposal);
-		},
-	});
+	// With the history tools, their `get_run` reads any run of the project.
+	const { run: _run, ...withoutRun } = input.port;
+	const tools = [
+		...authoringTools({
+			...(input.past ? withoutRun : input.port),
+			propose: (proposal) => {
+				proposals.push(proposal);
+			},
+		}),
+		...(input.past ? historyTools(input.past, input.port.draft) : []),
+	];
 	const prompt = input.resumeSessionId
 		? chatFollowUpPrompt({
 				message: request.message,
@@ -104,6 +115,7 @@ export async function* chatTurn(
 				flow: request.flow,
 				message: request.message,
 				...(request.runId ? { runId: request.runId } : {}),
+				...(input.past ? { past: true } : {}),
 				...(input.history && input.history.length > 0
 					? { history: input.history }
 					: {}),
@@ -122,7 +134,8 @@ export async function* chatTurn(
 			? { resumeSessionId: input.resumeSessionId }
 			: {}),
 		tools,
-		describeTool: describeAuthoringTool,
+		describeTool: (name) =>
+			describeAuthoringTool(name) ?? describeHistoryTool(name),
 		signal,
 	})) {
 		yield* flush();

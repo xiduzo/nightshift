@@ -12,6 +12,7 @@ export {
 	resumesOnAnotherModel,
 } from "./chat";
 export { explainRun } from "./explain";
+export type { HistoryPort } from "./history";
 export { serveTools } from "./mcp";
 export type { ChatExchange } from "./prompts";
 export { type SuggestFieldInput, suggestField } from "./suggest";

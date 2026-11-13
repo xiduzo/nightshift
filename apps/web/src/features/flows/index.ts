@@ -38,7 +38,7 @@ export {
 } from "./canvas/sections/section-zoom";
 export { useSectionCanvas } from "./canvas/sections/use-section-canvas";
 export { useMeasured } from "./canvas/use-measured";
-export { chatAboutRun } from "./chat/chat-link";
+export { chatAboutRun, chatAboutSaving } from "./chat/chat-link";
 export { InspectorSection } from "./editor/fields";
 export { loadElk } from "./editor/lib/elk";
 export { RunRevision } from "./editor/revisions/run-revision";
