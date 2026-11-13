@@ -530,7 +530,11 @@ export type FlowHealthRow = {
 	/** Where the work of its own runs landed in the last days. Older Hosts send none. */
 	ladders?: FlowLadders;
 	/** Its level, how often it needed a person, and its signals. Older Hosts send none. */
-	watch?: FlowWatch;
+	watch?: FlowWatch /**
+	 * How steady its finished runs are: what one costs, and how long one
+	 * works. Null with too few of them. Older Hosts send none.
+	 */;
+	steady?: { cost: CostSteadiness | null; time: CostSteadiness | null };
 };
 
 /** The level of a flow: how much a person is still in its runs. */

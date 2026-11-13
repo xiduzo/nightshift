@@ -18,13 +18,6 @@ export type SpaceWatch = NonNullable<DashboardSummary["watch"]>;
 /** A flow that needs a look. */
 export type WatchedFlow = SpaceWatch["flows"][number];
 
-/** The levels, from the most of you to the least. */
-export const FLOW_LEVELS = [
-	"decide",
-	"check",
-	"own",
-] as const satisfies readonly FlowLevel[];
-
 const LEVEL: Record<FlowLevel, { label: string; hint: string }> = {
 	decide: {
 		label: "You decide",

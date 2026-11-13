@@ -66,7 +66,7 @@ The palette is neutral. The web app adds its run status, outcome, metric, family
 
 ### Overview lists
 
-An overview shows **at most 5 rows** in a list or table: the Failed lane and Latest reports on Home, the tabs under a project page's chart (Flows, Failures, Gates, Spend), and every tab of a details dialog.
+An overview shows **at most 5 rows** in a list or table: the Failed lane and Latest reports on Home, and the steps of a flow on the Spend page.
 
 - One number for all of them: `OVERVIEW_ROWS` in `apps/web/src/features/dashboard/overview.ts`. Do not add a limit per list.
 - Show the top 5 for the list's question: newest first, the most runs, the highest cost. Say which in the hint ("The last 5, newest first", "The top 5, the most runs first").
@@ -78,12 +78,12 @@ An overview shows **at most 5 rows** in a list or table: the Failed lane and Lat
 A project's page shows where each of its flows still needs you (`docs/research/dashboards-2026-11.md`). Keep its shape:
 
 - One range for the whole page, on top: 7, 30 or 90 days, in the URL (`?range=30`). A day runs from midnight to midnight on your clock. No section has a range of its own.
-- One card of numbers: **Needed you without a plan**, **Needed you as planned**, **On its own** (how many flows are at that level), and **How N runs ended** as one bar. The first two count each time you stepped in, not each run. Each says how it moved against the same days just before. That is not a choice.
-- **Details** next to a number opens its details dialog at the page's range.
+- One number on top: how often a flow needed you without a plan in the range, against the same days just before. That is not a choice. It counts each time you stepped in, not each run.
+- The page has no details dialog and no chart. A number that leads to no run and no flow does not go on it.
 - Under it, one card with one row per flow (see Flow health). The flows that needed you most without a plan come first.
-- The page shows no spend of its own. **Spend** in the heading opens the Spend page at the page's range. Cost stays only as evidence of a flow: what a finished run costs, and what a useful result costs.
+- The page shows no spend of its own. **Spend** in the heading opens the Spend page at the page's range. Cost stays only as evidence of a flow: how steady the cost of a run is.
 - A test run counts only in the spend. Every other number leaves it out (`isTestRun`, one rule for every number). So does the sidebar's runs donut. The run page and every run list show a **Test run** badge. On the phone, the Runs chips and the Watch numbers leave it out, and the cost caption names it ("Of 8 runs and 1 test run").
-- An older Host sends no level and no planned split: a dash.
+- An older Host sends no level and no planned split: a dash. It sends no steadiness: a grey strip.
 - Setup does not go on this page. Its other pages sit under the project in the sidebar.
 
 ### Home
@@ -160,37 +160,20 @@ The Devices page shows the Space you work in, around its Host:
 - A pick opens its detail in a Sheet over the page (`?device=`), so the page stays in view.
 - While it loads, a skeleton in the shape of the page. An error says what to check and has "Try again".
 
-### Details dialogs
-
-A stat card or a table row can open a details dialog (`apps/web/src/features/dashboard/details.tsx`). Flow health set the shape. Every details dialog follows it:
-
-- A header with the trail ("project › Runs") and a title.
-- `DetailsTabs`: Overview first, then one tab per view (a breakdown per flow or project, the latest or top rows). A tab can carry a count badge for what needs attention (problems, open runs, waiting Gates).
-- One range toggle on the right of the tabs. It drives every tab.
-- Overview: 3 to 6 `Stat` cards, then one chart. Flow health has 6, in two rows of three. Other tabs: one list or table, at most 5 rows (see Overview lists).
-- Each tab has its own empty state. A footer links to the full page.
-
 ### Flow health
 
 Flow health is the card of flows on a project's page, one row per flow. Keep its shape:
 
-- Columns: Flow, Last runs, **Needed you without a plan**, Per finished run, Needs a look. Under the flow's name: its level (**You decide**, **You check**, **On its own**) and since when. A flow with fewer than 3 ended runs has no level yet.
+- Columns: Flow, Last runs, **Needed you without a plan**, Time of a run, Cost of a run. Under the flow's name: its level (**You decide**, **You check**, **On its own**) and since when. A flow with fewer than 3 ended runs has no level yet. The name opens the flow.
 - The level is measured from the flow's last 10 ended runs: You decide when you stepped in on more than half, On its own when on none, else You check. Nobody sets it.
 - Needed you without a plan shows the count, the count of the days before, and one small bar per week for 12 weeks. Its tooltip adds the planned times.
-- Per finished run is a box plot of what a finished run costs, with the median under it.
-- A row opens in place (a Collapsible), one at a time. Left: History, Why runs did not finish, Latest runs. Right: its signals, **Why it needed you** (Without a plan, As planned, each with the Gate's question), **Where the work landed**, Per useful result, and the time of a finished run. **All details** opens the details dialog.
-- **Where the work landed** has a thin segmented bar for the work and one for the choices: 8px, rounded parts, a 2px gap, one part per rung in ladder order. A line next to each bar gives the shares: "Sonnet 78% · Opus 19% · You 3%". It names the 3 biggest rungs and how many more there are.
-- Its tooltip gives each rung with its count and the cost of one landing, every try before it included. It adds how often a decider was not sure enough: "A decider was not sure enough in 6 of 50 Decisions."
-- Count a landing in times ("32 of 41 times") or Decisions, never in steps: each try of a cascade is a step. Show a cost per landing, never a sum over a flow's rungs: a Subflow's landing holds the cost of the Agent inside it.
-- The rungs are named the same everywhere (`@nightshift/client` `ladderParts`): the tier, or Agent, Subflow, Decider, Rule. A person is always "You". "Its deadline" is a rung of its own. "Nowhere" is the rung when nothing held.
-- The rung colors are the `--ladder-*` tokens. The text next to a bar stays in text colors.
-- An older Host sends no ladders: a dash, and the tooltip says "Update Night Shift to see where the work landed."
-- A test run is not in a row: not in its last runs, its numbers or its latest report. The details dialog counts it only in the spend. "Total spent" says how many test runs it holds.
-
-**All details** in an opened row opens the flow's details dialog. Its tabs: Overview, Ladders, Metrics, Cost, Problems, Runs.
-
-- **Ladders**: a card per ladder (rung, share, count, cost each, the not-sure line under Choices), then the 5 nodes that landed most, each with its own bar.
-- **Metrics**: a `Select` picks the metric (Q32). Four `Stat` cards: Total, Per run, Latest, Runs. Then three small charts on one day axis, in this order: the metric per run, Spent, Needed you. A hover on one day shows it in all three. Then the Metrics table: every metric with its runs, total, average and latest value.
+- Time of a run and Cost of a run are the strip of the Spend page (`shared/spread-strip`): the finished runs against a usual run of that flow, with the usual value under it. The colour says how steady: green for steady, amber for varies, red for hard to predict, grey with fewer than 3 runs. The rule is the same as on the Spend page (`steadinessOf`).
+- The row has no Needs a look column. A flow that left its usual range shows the icon of each signal after its name, with the signal on hover.
+- A row opens in place (a Collapsible), one at a time, and only when the flow has something to show. A row with nothing has no chevron.
+- An opened row shows places to improve, at most 4, the most pressing first: what is unusual (usual against now), where the flow needed you without a plan (the step and the question), the runs that did not finish (the reason most of them share), a warning that more than one run shares, and last the times it asked you as planned. Each place has one line of evidence and one link: the run or the flow.
+- Under the places, what came out: the numbers the flow counted per run, and how many runs with an answer were useful.
+- An opened row has no chart, no table and no details dialog.
+- A test run is not in a row: not in its last runs, its numbers or its latest report.
 
 ## Copy
 

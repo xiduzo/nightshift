@@ -16,7 +16,7 @@ type Totals = Omit<NightsRange["totals"], "perNight">;
  * answered a Gate or an Ask, resumed, stopped, or took one over. Null
  * without runs, and from an older Host that does not count it.
  */
-export function neededShare(totals: {
+function neededShare(totals: {
 	runs: number;
 	neededYou?: number;
 }): number | null {
@@ -70,23 +70,6 @@ export function consoleValues(totals: Totals): ConsoleValues {
 	return Object.fromEntries(
 		CONSOLE_METRICS.map((metric) => [metric.key, metric.of(totals)]),
 	) as ConsoleValues;
-}
-
-/**
- * The numbers of a range, and of the days just before. `compared` is
- * false while the days before had no runs at all, so there is nothing to
- * set them against yet.
- */
-export function consoleNumbers(range: NightsRange): {
-	values: ConsoleValues;
-	before: ConsoleValues;
-	compared: boolean;
-} {
-	return {
-		values: consoleValues(range.totals),
-		before: consoleValues(range.before),
-		compared: range.before.runs > 0,
-	};
 }
 
 /** The part of the dashboard's numbers a range of days picks. */

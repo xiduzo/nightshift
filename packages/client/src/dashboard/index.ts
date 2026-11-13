@@ -4,24 +4,11 @@ export {
 	CONSOLE_METRICS,
 	type ConsoleMetric,
 	type ConsoleValues,
-	consoleNumbers,
 	consoleValues,
 	daysOf,
-	neededShare,
 } from "./console";
 export { dayLabel } from "./day-label";
-export {
-	decisionsText,
-	type LadderPart,
-	type LadderSummary,
-	ladderParts,
-	landedText,
-	type NodeLadder,
-	nodeLadderLabel,
-	shareText,
-	unsureText,
-} from "./ladders";
-export { neededReasonLabel, neededReasonsText } from "./needed";
+export { type NodeLadder, nodeLadderLabel } from "./ladders";
 export { createDashboardQueries, readerTimeZone } from "./queries";
 export {
 	type CostSteadiness,
@@ -36,8 +23,6 @@ export type {
 	FlowHealthRow,
 	FlowRange,
 	FlowReport,
-	FlowRun,
-	GateState,
 	NightRange,
 	NightsRange,
 	SpaceSpend,
@@ -50,7 +35,6 @@ export {
 	type AttentionCause,
 	againstBefore,
 	causeLabel,
-	FLOW_LEVELS,
 	type FlowLevel,
 	type FlowSignal,
 	type FlowWatch,

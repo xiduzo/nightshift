@@ -10,28 +10,7 @@ import {
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
 import { cn } from "@nightshift/ui/lib/utils";
-
-/** The colour of each steadiness, as a fill and as text: the status tokens. */
-export const STEADINESS_TONE: Record<
-	CostSteadiness,
-	{ fill: string; text: string; tint: string }
-> = {
-	steady: {
-		fill: "bg-status-finished",
-		text: "text-status-finished",
-		tint: "bg-status-finished/15",
-	},
-	varies: {
-		fill: "bg-status-waiting",
-		text: "text-status-waiting",
-		tint: "bg-status-waiting/15",
-	},
-	unsteady: {
-		fill: "bg-status-failed",
-		text: "text-status-failed",
-		tint: "bg-status-failed/15",
-	},
-};
+import { STEADINESS_TONE } from "@/shared/spread-strip";
 
 /** How steady the cost of a flow is, with what that says about its runs on hover. */
 export function SteadinessBadge({

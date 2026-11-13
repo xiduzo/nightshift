@@ -17,12 +17,8 @@ import { Link } from "@tanstack/react-router";
 import { ChevronRightIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { formatCost } from "@/shared/format";
-import {
-	CostStrip,
-	CostStripLegend,
-	STRIP_MARKS,
-	STRIP_TIMES,
-} from "./cost-strip";
+import { STRIP_TIMES } from "@/shared/spread-strip";
+import { CostStrip, CostStripLegend, STRIP_MARKS } from "./cost-strip";
 import { SteadinessBadge } from "./steadiness";
 import { SavingActions } from "./ways-to-save";
 

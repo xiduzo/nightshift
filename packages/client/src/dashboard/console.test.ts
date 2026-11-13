@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { consoleNumbers, daysOf } from "./console";
+import { consoleValues, daysOf } from "./console";
 import type { DashboardSummary, NightsRange } from "./types";
 
 const totals = (
@@ -28,34 +28,35 @@ const range = (
 		before: totals(before),
 	}) as NightsRange;
 
-describe("consoleNumbers", () => {
+describe("consoleValues", () => {
 	test("counts runs, the share that finished, spend and the share that needed you, now and before", () => {
-		const numbers = consoleNumbers(
-			range(
-				7,
-				{ runs: 10, ended: 8, finished: 6, costUsd: 1.5, neededYou: 3 },
-				{ runs: 4, ended: 4, finished: 4, costUsd: 2, neededYou: 0 },
-			),
+		const days = range(
+			7,
+			{ runs: 10, ended: 8, finished: 6, costUsd: 1.5, neededYou: 3 },
+			{ runs: 4, ended: 4, finished: 4, costUsd: 2, neededYou: 0 },
 		);
-		expect(numbers).toEqual({
-			values: { runs: 10, finished: 75, spend: 1.5, needed: 30 },
-			before: { runs: 4, finished: 100, spend: 2, needed: 0 },
-			compared: true,
+		expect(consoleValues(days.totals)).toEqual({
+			runs: 10,
+			finished: 75,
+			spend: 1.5,
+			needed: 30,
+		});
+		expect(consoleValues(days.before)).toEqual({
+			runs: 4,
+			finished: 100,
+			spend: 2,
+			needed: 0,
 		});
 	});
 
 	test("has no share that needed you without runs, or from an older Host", () => {
-		expect(consoleNumbers(range(7, {}, {})).values.needed).toBeNull();
-		const older = consoleNumbers(
-			range(7, { runs: 5, neededYou: undefined }, {}),
-		);
-		expect(older.values.needed).toBeNull();
+		expect(consoleValues(range(7, {}, {}).totals).needed).toBeNull();
+		const older = range(7, { runs: 5, neededYou: undefined }, {});
+		expect(consoleValues(older.totals).needed).toBeNull();
 	});
 
-	test("has no share without ended runs, and nothing to compare without runs before", () => {
-		const numbers = consoleNumbers(range(7, { runs: 2 }, {}));
-		expect(numbers.values.finished).toBeNull();
-		expect(numbers.compared).toBe(false);
+	test("has no share that finished without ended runs", () => {
+		expect(consoleValues(range(7, { runs: 2 }, {}).totals).finished).toBeNull();
 	});
 });
 

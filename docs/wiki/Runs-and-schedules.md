@@ -13,7 +13,7 @@ A run of a project without a folder starts in an empty folder of its own, with n
 
 You follow each step live: its transcript, the files that it changed, its cost, and its tokens.
 
-When a run finishes, the run page asks "Was this run useful?". The phone asks too. Flow health uses the answers to show what a useful result costs. A [test run](#test-runs) does not ask.
+When a run finishes, the run page asks "Was this run useful?". The phone asks too. Flow health shows how many runs were useful when you open the row of a flow. A [test run](#test-runs) does not ask.
 
 ## Test runs
 
@@ -155,27 +155,32 @@ A flow with fewer than 3 runs that ended has no level yet.
 
 ## Flow health
 
-A project's page shows one row for each flow: its level, its last runs, how often it needed you without a plan, and what a finished run costs. A flow that needs a look says why in its row. The numbers on top of the page compare with the same days before. Choose 7, 30 or 90 days.
+A project's page shows one row for each flow: its level, its last runs, how often it needed you without a plan, and how steady the time and the cost of a run are. The number on top of the page compares with the same days before. Choose 7, 30 or 90 days. Flow health leaves [test runs](#test-runs) out.
 
-Click a row to open it. You see its runs per day, why runs did not finish, its latest runs, why it needed you, and where its work landed. **All details** opens the full details of the flow. Flow health leaves [test runs](#test-runs) out. **Total spent** in the details of a flow counts them, and says how many.
+**Time of a run** and **Cost of a run** each show a strip: the finished runs of the flow against a usual run of that flow. A short strip means that you can predict the next run. The colour says how steady the runs are:
+
+| Colour | What it means |
+| --- | --- |
+| Green | Most runs stay within 20% of a usual run. |
+| Amber | Some runs take or cost a lot more or less than a usual run. |
+| Red | Many runs take or cost over twice a usual run, or one took or cost over four times that. |
+| Grey | The flow has fewer than 3 finished runs. |
+
+An icon after the name of a flow means that the flow needs a look. Point at the icon to see why.
+
+A row with an arrow opens. An opened row shows where to improve the flow, the most pressing first:
+
+- what is not usual, with the usual range and the value now,
+- where the flow needed you without a plan, with the step and the question,
+- the runs that did not finish, with the reason that most of them share,
+- a warning that more than one run has,
+- where the flow asked you as planned.
+
+Each line has a link to the run or to the flow. Under the lines, you see the numbers that the flow counted per run, and how many runs with an answer were useful. A step reports a number with `{"scores": {"found": 4}}` in its data. See [Scores](Flows-and-nodes.md#scores).
+
+A row without an arrow has nothing to show.
 
 **Spend** on top of the page opens the [Spend](#spend) page.
-
-**Where the work landed** shows in an opened row. One bar shows the work: what agents and models made, in the flow and in the subflows it calls, and your answers to an Ask. A subflow with a cascade counts once, on the tier that held. One bar shows the choices: the Decisions. Each part of a bar is a rung:
-
-- a tier of a cascade, such as Sonnet or Opus, or the agent or decider of a node without one,
-- **Rule**, when a rule made the choice,
-- **You**, when the work or the choice came to you,
-- **Its deadline**, when the deadline answered for you,
-- **Nowhere**, when no tier held and nobody was asked.
-
-The line next to a bar gives each share, such as "Sonnet 78% · Opus 19% · You 3%". Point at the bars to see how often each rung got the work and what one time on it cost. That cost includes the tries before it. The tooltip also says how often a decider was not sure enough. The **Ladders** tab of a flow shows each rung, and the five nodes that ran most.
-
-**Metrics** are the numbers that the steps of a flow report about their work. An Agent, a Command or a Value reports one with `{"scores": {"found": 4}}` in its data. See [Scores](Flows-and-nodes.md#scores). On the **Metrics** tab of a flow, choose a metric. You see its total, its value per run, its latest value, and the runs that reported it. Three charts show it per day, next to what the runs spent and how often they needed you.
-
-**Per useful result** shows what all runs of a flow cost, divided by the runs that people found useful. Runs that failed or that nobody answered count in the cost too. Under it, you see how many runs with an answer were useful.
-
-**Details** next to **Needed you without a plan** shows why runs needed you, the runs that did, and the Gates that they asked.
 
 ## Spend
 

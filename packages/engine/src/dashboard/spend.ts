@@ -47,7 +47,10 @@ const STEP_ROWS = 8;
 
 type Placed = { run: RunSummary; day: number };
 
-/** How steady the cost of the runs in `usual` is. Null with too few of them. */
+/**
+ * How steady the runs in `usual` are against a usual one: what they cost,
+ * or how long they work. Null with too few of them.
+ */
 export function steadinessOf(usual: Spread | null): CostSteadiness | null {
 	if (!usual || usual.count < STEADINESS_MIN_RUNS || usual.median <= 0) {
 		return null;

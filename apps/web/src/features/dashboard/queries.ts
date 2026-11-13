@@ -8,7 +8,3 @@ import { createDashboardQueries } from "@nightshift/client";
 import { orpc } from "@/shared/api";
 
 export const dashboardQueries = createDashboardQueries(orpc);
-
-/** The flows of a project: Flow health shows the computers each one needs. */
-export const projectFlowsQuery = (projectId: string) =>
-	orpc.flows.list.queryOptions({ input: { projectId } });

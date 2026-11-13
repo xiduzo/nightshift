@@ -4,6 +4,7 @@ import { finishedShare, isTestRun, usefulAnswer } from "../run-status";
 import { dayStart, lastDays } from "./clock";
 import { flowLadders, flowRangeLadders } from "./ladders";
 import { countReasons, neededReasons } from "./needed";
+import { steadinessOf } from "./spend";
 import {
 	countStatuses,
 	hasEnded,
@@ -344,6 +345,7 @@ export function flowHealthRows(
 		// what a run costs. Its spend shows on its own instead.
 		const unfinished = ended.filter((run) => run.status !== "finished");
 		const { cost, tokenUse, unknown, free } = finishedCostOf(finished);
+		const watch = flowWatch(watchRunsOf(name, runs, now), now, first);
 		return {
 			name,
 			last: lastRuns[0] ?? null,
@@ -366,7 +368,8 @@ export function flowHealthRows(
 			neededYou: neededYouOf(recent),
 			...(report ? { report } : {}),
 			ladders: flowLadders(ladderRows(recent)),
-			watch: flowWatch(watchRunsOf(name, runs, now), now, first),
+			watch,
+			steady: { cost: steadinessOf(cost), time: steadinessOf(watch.length) },
 		};
 	});
 	return topRows(

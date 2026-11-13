@@ -264,6 +264,13 @@ const flowHealthRowSchema = z.object({
 	ladders: flowLaddersSchema.optional(),
 	/** Older Hosts send none. */
 	watch: flowWatchSchema.optional(),
+	/** How steady what a finished run costs and how long it works are. Older Hosts send none. */
+	steady: z
+		.object({
+			cost: z.enum(COST_STEADINESS).nullable(),
+			time: z.enum(COST_STEADINESS).nullable(),
+		})
+		.optional(),
 });
 
 const nightTotalsSchema = z.object({

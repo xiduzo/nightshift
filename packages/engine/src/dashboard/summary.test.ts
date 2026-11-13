@@ -477,6 +477,21 @@ describe("the dashboard of Spaces and of one project", () => {
 		expect(summary.flowHealth?.rows.map((row) => row.name)).toContain("fix");
 	});
 
+	test("a flow's row says how steady its cost and its time are", () => {
+		const finished = (costUsd: number, minutes: number) =>
+			aRun({
+				status: "finished",
+				createdAt: NOW - 2 * HOUR,
+				endedAt: NOW - 2 * HOUR + minutes * 60_000,
+				costUsd,
+			});
+		const row = summarize(
+			[finished(1, 10), finished(1, 10), finished(1, 10), finished(1.1, 50)],
+			project(["night"]),
+		).flowHealth?.rows.find((flow) => flow.name === "night");
+		expect(row?.steady).toEqual({ cost: "steady", time: "unsteady" });
+	});
+
 	test("says the days Flow health covers: one of its ranges of days", async () => {
 		const space = aSpace([aRun({ projectId: "p1" })], { p1: "website" });
 		const read = { now: NOW, timeZone: "UTC" };

@@ -10,6 +10,5 @@ export { ProjectRunsPage } from "./components/project-runs-page";
 export { ReportPreview } from "./components/report-preview";
 export { RunBars } from "./components/run-bars";
 export { RunPage } from "./components/run-page";
-export { RunStatusBadge } from "./components/run-status-badge";
 export { reportLink } from "./lib/report";
 export { preloadRunPage } from "./preload";
