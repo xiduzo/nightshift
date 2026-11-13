@@ -210,6 +210,7 @@ describe("what a change makes stale", () => {
 			["connections"],
 			["harnesses"],
 			["cliTools"],
+			["assistant", "agents"],
 		]);
 	});
 

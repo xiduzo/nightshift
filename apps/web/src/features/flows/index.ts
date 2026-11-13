@@ -4,7 +4,7 @@ export {
 	type AgentChoice,
 	requestAgent,
 } from "./assistant/agent-choice";
-// PROTOTYPE, throw away: Settings shows the picker too.
+// Settings chooses who answers with the picker of the chat.
 export { AgentMenus } from "./assistant/agent-picker";
 export { PromptInput } from "./assistant/prompt-input";
 export { Suggestions } from "./assistant/suggestions";

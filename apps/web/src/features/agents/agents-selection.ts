@@ -1,4 +1,4 @@
-/** What the Agents page shows in detail, and its `item` in the URL. */
+/** What a page of the agents shows in detail, and its `item` in the URL. */
 import type { HarnessRowName } from "@/shared/api";
 import { isHarnessName } from "./harnesses";
 
@@ -32,6 +32,27 @@ export function parseItem(item: string | undefined): Selection | null {
 			return { kind };
 		default:
 			return null;
+	}
+}
+
+/** The lists of the agents. Each is a page of Settings. */
+export type AgentsPartName = "profiles" | "models" | "harnesses" | "tools";
+
+/**
+ * The list that `item` belongs to: the page of Settings that opens it. A
+ * profile opens with the Agent Profiles: its item does not say its kind.
+ */
+export function agentsPartOfItem(item: string | undefined): AgentsPartName {
+	switch (parseItem(item)?.kind) {
+		case "new-model-profile":
+			return "models";
+		case "harness":
+			return "harnesses";
+		case "tool":
+		case "cli":
+			return "tools";
+		default:
+			return "profiles";
 	}
 }
 

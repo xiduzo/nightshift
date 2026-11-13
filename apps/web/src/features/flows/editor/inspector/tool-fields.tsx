@@ -74,8 +74,8 @@ export function ToolFields({
 						noServers ? undefined : (
 							<>
 								An MCP server you add once under{" "}
-								<Link to="/agents" search={{ item: undefined }}>
-									Agents → Tools
+								<Link to="/settings" search={{ section: "tools" }}>
+									Settings → Tools
 								</Link>
 								.
 							</>
@@ -90,11 +90,11 @@ export function ToolFields({
 							MCP servers. Run them in a Command node, or give them to an Agent
 							node.{" "}
 							<Link
-								to="/agents"
-								search={{ item: undefined }}
+								to="/settings"
+								search={{ section: "tools" }}
 								className="text-foreground underline underline-offset-4 hover:text-primary"
 							>
-								Add an MCP server under Agents → Tools
+								Add an MCP server under Settings → Tools
 							</Link>
 							.
 						</Note>

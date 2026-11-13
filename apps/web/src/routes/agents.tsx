@@ -1,25 +1,17 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-import { AgentsPage } from "@/features/agents";
+import { settingsSearchOfAgents } from "@/features/settings";
 
+/** The Agents page became pages of Settings. A link to an item opens the page that lists it. */
 export const Route = createFileRoute("/agents")({
-	// The checks run CLIs on the daemon; nothing to render on the server.
-	ssr: false,
-	/** `item`: what opens in detail, for example `harness:claude-code`. None: the overview. */
+	/** `item`: what opens in detail, for example `harness:claude-code`. */
 	validateSearch: (search: Record<string, unknown>): { item?: string } =>
 		typeof search.item === "string" ? { item: search.item } : {},
-	component: AgentsRoute,
+	beforeLoad: ({ search }) => {
+		throw redirect({
+			to: "/settings",
+			search: settingsSearchOfAgents(search.item),
+			replace: true,
+		});
+	},
 });
-
-function AgentsRoute() {
-	const { item } = Route.useSearch();
-	const navigate = Route.useNavigate();
-	return (
-		<AgentsPage
-			item={item}
-			onSelect={(next) =>
-				void navigate({ search: next ? { item: next } : {}, replace: true })
-			}
-		/>
-	);
-}

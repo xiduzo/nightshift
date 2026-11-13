@@ -1,4 +1,4 @@
-/** The detail of the Agents page: the profile, harness, tool or device you picked. */
+/** The detail of a page of the agents: the profile, harness, tool or device you picked. */
 import type { CustomAgent } from "@nightshift/flows";
 import {
 	Empty,
@@ -116,8 +116,8 @@ export function Detail({
 							</EmptyMedia>
 							<EmptyTitle>Add a harness first</EmptyTitle>
 							<EmptyDescription>
-								A profile runs on a harness, such as Claude Code or Codex. Go
-								back to Agents and choose Add harness.
+								A profile runs on a harness, such as Claude Code or Codex. Open
+								Your harnesses in Settings and choose Add harness.
 							</EmptyDescription>
 						</EmptyHeader>
 					</Empty>
@@ -214,7 +214,7 @@ function Gone({ what }: { what: string }) {
 				</EmptyMedia>
 				<EmptyTitle>No such {what}</EmptyTitle>
 				<EmptyDescription>
-					It was removed or renamed. Go back to Agents and pick another one.
+					It was removed or renamed. Go back to the list and pick another one.
 				</EmptyDescription>
 			</EmptyHeader>
 		</Empty>

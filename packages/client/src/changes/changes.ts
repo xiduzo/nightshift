@@ -168,7 +168,8 @@ const STALE: {
 	// harnesses and Custom Agents, settings, Offers and deciders. A check
 	// of a CLI or a program, the programs found, or the tools of a
 	// connection also change on their own: a program installed outside
-	// Night Shift.
+	// Night Shift. Who answers for each of Night Shift's own agents follows
+	// the settings, the profiles and the harnesses.
 	device: {
 		holds: [
 			["profiles"],
@@ -179,7 +180,12 @@ const STALE: {
 			["offers"],
 			["deciders"],
 		],
-		also: [["connections"], ["harnesses"], ["cliTools"]],
+		also: [
+			["connections"],
+			["harnesses"],
+			["cliTools"],
+			["assistant", "agents"],
+		],
 	},
 	// A copy of another computer's document: the Devices, and the Offers.
 	"device-copy": { also: [["devices"], ["offers"]] },

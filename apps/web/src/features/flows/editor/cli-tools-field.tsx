@@ -87,7 +87,7 @@ export function useCommandToolField(node: FlowNode): {
 
 /** What the editor says about a CLI tool Night Shift does not have. */
 export function missingCliToolMessage(name: string): string {
-	return `There is no CLI tool named ${name}. The run does not start. Add it under Agents → Tools, or remove it here.`;
+	return `There is no CLI tool named ${name}. The run does not start. Add it under Settings → Tools, or remove it here.`;
 }
 
 /**
@@ -127,11 +127,11 @@ export function CliToolsField({
 			<Note>
 				There are no CLI tools yet.{" "}
 				<Link
-					to="/agents"
-					search={{ item: undefined }}
+					to="/settings"
+					search={{ section: "tools" }}
 					className="text-foreground underline underline-offset-4 hover:text-primary"
 				>
-					Add one under Agents → Tools
+					Add one under Settings → Tools
 				</Link>
 				, then pick it here.
 			</Note>

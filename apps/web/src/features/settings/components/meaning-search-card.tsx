@@ -54,6 +54,27 @@ export const SHORTLIST: readonly { name: string; about: string }[] = [
 const DOWNLOAD_POLL = 1500;
 const STATUS_POLL = 15_000;
 
+/** When Night Shift searches by meaning, in the words of the choice. A Host starts Ollama itself. */
+export function ollamaModes(host: boolean) {
+	return [
+		{
+			value: "auto",
+			label: host ? "Start Ollama on this Host" : "Use Ollama when it runs",
+		},
+		{ value: "on", label: "Start Ollama with Night Shift" },
+		{ value: "off", label: "Off: find by words only" },
+	] as const;
+}
+
+/** How the Ollama of search is now. Asks again often while a download runs. */
+export function useOllamaStatus() {
+	return useQuery({
+		...ollamaQueries.status(),
+		refetchInterval: (query) =>
+			query.state.data?.download?.running ? DOWNLOAD_POLL : STATUS_POLL,
+	});
+}
+
 /**
  * "Meaning search": whether Night Shift starts Ollama, which embedding
  * model search uses, and which Ollama, with the headers of a proxy in
@@ -64,16 +85,7 @@ export function MeaningSearchCard({ data }: { data: SettingsView }) {
 	const form = useSettingsForm(data, MEANING_KEYS, { title: "Meaning search" });
 	const off = data.values.ollama === "off";
 	const elsewhere = data.values.ollamaAddress.trim() !== "";
-	const modes = [
-		{
-			value: "auto",
-			label: data.values.host
-				? "Start Ollama on this Host"
-				: "Use Ollama when it runs",
-		},
-		{ value: "on", label: "Start Ollama with Night Shift" },
-		{ value: "off", label: "Off: find by words only" },
-	] as const;
+	const modes = ollamaModes(data.values.host);
 
 	return (
 		<PageSection
@@ -221,11 +233,7 @@ function ModelField({ form }: { form: SettingsForm }) {
 
 /** Which Ollama search uses, how it is now, and a download of a model it lacks. */
 function OllamaLine() {
-	const status = useQuery({
-		...ollamaQueries.status(),
-		refetchInterval: (query) =>
-			query.state.data?.download?.running ? DOWNLOAD_POLL : STATUS_POLL,
-	});
+	const status = useOllamaStatus();
 	const pull = useMutation(
 		ollamaMutations.pull({
 			onError: (error) => toast.error(`Not downloaded: ${error.message}`),

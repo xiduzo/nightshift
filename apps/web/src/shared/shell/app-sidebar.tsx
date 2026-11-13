@@ -386,7 +386,7 @@ function SettingsMenu({
 				{/* Saved on this computer only: its agents, secrets and settings. */}
 				<DropdownMenuGroup>
 					<ThisDeviceLabel />
-					{/* PROTOTYPE, throw away: the parts of Settings. */}
+					{/* The pages of Settings that hold the agents, then all of them. */}
 					<MenuLink
 						to="/settings"
 						section="builtin"
@@ -434,7 +434,6 @@ const SETTINGS_PAGES = [
 	"/members",
 	"/devices",
 	"/space-secrets",
-	"/agents",
 	"/secrets",
 	"/settings",
 	"/account",
@@ -446,6 +445,7 @@ function MenuLink({
 	label,
 	icon: ItemIcon,
 }: {
+	/** A page of Settings, when `to` is "/settings". None: its overview. */
 	section?: string;
 	to: (typeof SETTINGS_PAGES)[number];
 	label: string;

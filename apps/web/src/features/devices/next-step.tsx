@@ -92,7 +92,11 @@ function deviceSteps(input: StepsInput): Step[] {
 					"Members can then run steps on this computer, with your login and your tools.",
 				done: !self || self.offers.length > 0,
 				action: (
-					<Button size="sm" nativeButton={false} render={<Link to="/agents" />}>
+					<Button
+						size="sm"
+						nativeButton={false}
+						render={<Link to="/settings" search={{ section: "agents" }} />}
+					>
 						Offer a profile
 					</Button>
 				),
@@ -216,7 +220,7 @@ export function ComputerNudge({
 				size="xs"
 				variant="outline"
 				nativeButton={false}
-				render={<Link to="/agents" />}
+				render={<Link to="/settings" search={{ section: "agents" }} />}
 			>
 				Offer a profile
 			</Button>
