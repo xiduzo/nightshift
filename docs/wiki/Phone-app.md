@@ -17,7 +17,7 @@ Your phone needs a [Host](Computers-and-Hosts.md#run-a-host).
 
 | Tab | Shows |
 | --- | --- |
-| **Needs you** | One thing at a time: first the Gates and Asks that wait for you, the most urgent first, then the runs that stopped in the last day. Each shows in full: when to answer, the brief, what happened and what to check. The options show in the colors of the flow. Your answer goes in the color of the option you chose. **Skip** moves a thing to the end. For a run that stopped, choose **Retry** or **Resume**, or **Leave it**. |
+| **Needs you** | One thing at a time: first the Gates and Asks that wait for you, the most urgent first, then the runs that stopped in the last day. Each shows in full: when to answer, the brief, what happened and what to check. The options show in the colors of the flow. You sign off on your answer in the color of the option you chose. **Skip** moves a thing to the end. For a run that stopped, choose **Retry** or **Resume**, or **Leave it**. |
 | **Runs** | One timeline from now to tomorrow morning. Now shows the runs at work, each with **Stop**. Tonight shows each schedule at its time, with **Pause**, or **Undo** for a paused one. Hold a schedule to run it now. |
 
 - **Answer** a Gate, or a simple Ask.

@@ -107,14 +107,14 @@ describe("tonightLines", () => {
 		});
 	});
 
-	test("a paused schedule: no time, faded, and Undo", () => {
+	test("a paused schedule: no time, faded, Undo, and no Run now", () => {
 		const [line] = tonightLines([entry({ paused: true })], NOW);
 		expect(line).toMatchObject({
 			at: null,
 			caption: "Paused tonight",
 			muted: true,
 			action: "undo",
-			runNow: "yes",
+			runNow: "no",
 		});
 	});
 

@@ -182,7 +182,7 @@ export function NeedsScreen() {
 					setFocus((state) => handle(state, item));
 					setNotice({
 						kind: "sent",
-						title: `Sent: ${sent.choice}`,
+						title: `Signed off: ${sent.choice}`,
 						description: sent.outcome,
 					});
 				}}

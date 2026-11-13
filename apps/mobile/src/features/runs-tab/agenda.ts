@@ -104,7 +104,8 @@ function scheduleCaption(entry: TonightEntry): string {
 
 /**
  * The schedules of tonight, in the order of `useTonight`: soonest first,
- * the paused ones last. A run on its way opens. A paused one has Undo.
+ * the paused ones last. A run on its way opens. A paused one has Undo,
+ * and no Run now.
  * Another has Pause when it starts on its own at a time.
  */
 export function tonightLines(
@@ -121,8 +122,13 @@ export function tonightLines(
 				: allowed.pause
 					? "pause"
 					: null;
+		// A paused one offers Undo only, as before the agenda: Run now waits until you undo.
 		const runNow =
-			started || !allowed.runNow ? "no" : offline !== null ? "offline" : "yes";
+			started || paused || !allowed.runNow
+				? "no"
+				: offline !== null
+					? "offline"
+					: "yes";
 		return {
 			kind: "schedule",
 			key: entry.key,

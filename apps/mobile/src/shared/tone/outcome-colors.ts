@@ -4,8 +4,8 @@ import type { OutcomeColor } from "@nightshift/flows";
  * The classes of one flow color (`--color-outcome-<color>`): its text, the
  * stripe of a card, the border and soft fill of a chosen card, and a
  * filled button. The button's text is `text-primary-foreground`: light on
- * the 600 shades of the light theme, dark on the 400 shades of the dark
- * theme, so it stays readable in both.
+ * the 700 and 800 shades of the light theme, dark on the 400 shades of the
+ * dark theme. `contrast.test.ts` checks 4.5:1 for each of them.
  */
 export type OutcomeClass = {
 	text: string;

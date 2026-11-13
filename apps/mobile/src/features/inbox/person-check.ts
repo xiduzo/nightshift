@@ -29,7 +29,7 @@ export async function checkBeforeAnswer(gate: {
 	if (next === "send") return null;
 	if (next === "not-set-up") return "not-set-up";
 	const result = await LocalAuthentication.authenticateAsync({
-		promptMessage: "Send your answer",
+		promptMessage: "Sign off on your answer",
 		cancelLabel: "Cancel",
 		disableDeviceFallback: false,
 	}).catch(() => ({ success: false as const, error: "unknown" as const }));

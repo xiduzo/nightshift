@@ -192,11 +192,11 @@ export function GateBriefing({
 						destructive={chosen ? isDestructive(chosen) : false}
 						color={chosen?.color}
 						action={{
-							label: "Send",
+							label: "Sign off",
 							onPress: send,
 							disabled: !maySend(gate, answer),
 							busy: answer.checking || answer.sending,
-							busyLabel: answer.checking ? "Checking…" : "Sending…",
+							busyLabel: answer.checking ? "Checking…" : "Signing off…",
 							variant:
 								chosen && isDestructive(chosen) ? "destructive" : "default",
 						}}
@@ -332,8 +332,8 @@ export function GateBriefing({
 								<Alert icon={Loader}>
 									<AlertTitle>The run is still busy</AlertTitle>
 									<AlertDescription>
-										Another branch of this run still works. You can send your
-										answer when its step ends.
+										Another branch of this run still works. You can sign off
+										when its step ends.
 									</AlertDescription>
 								</Alert>
 							) : null}
@@ -520,7 +520,7 @@ function ConfirmDialog({
 								variant: destructive ? "destructive" : "default",
 							})}
 						>
-							<Text>{`Send ${choice.name}`}</Text>
+							<Text>{`Sign off on ${choice.name}`}</Text>
 						</TextClassContext.Provider>
 					</AlertDialogAction>
 				</AlertDialogFooter>
