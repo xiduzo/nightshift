@@ -76,9 +76,9 @@ export function RunStatusPanel({
 	onShowReport?: () => void;
 	/** Where resuming continues. */
 	lastStep: StepSummary | undefined;
-	/** "Ask an agent" and "Improve the flow", beside the reason the run ended. */
+	/** "Ask why" and "Improve this flow", beside the reason the run ended. */
 	askWhy?: ReactNode;
-	/** The answer of "Ask an agent", below the buttons. */
+	/** The answer of "Ask why", below the buttons. */
 	agentAnswer?: ReactNode;
 	className?: string;
 }) {

@@ -1,10 +1,11 @@
 /**
  * Which agent answers, as two menus in the row under a Prompt Input (the
  * AI Elements Model Selector): one for the agent (a profile, or a model
- * of a harness), one for the effort. The field helpers and the chat share
- * the choice, and this browser keeps it (`agent-choice.ts`).
+ * of a harness), one for the effort. Its owner keeps the choice: a quick
+ * run, or the Settings page of one of Night Shift's own agents. The chat
+ * and the field helpers have no picker: Settings says who answers there.
  */
-import { type AssistantAgent, harnessTakesTools } from "@nightshift/flows";
+import { harnessTakesTools } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Dialog,
@@ -51,15 +52,7 @@ import {
 } from "@/features/agents";
 import { settingsQueries } from "@/features/settings/queries";
 import type { AgentProfileRow, Effort } from "@/shared/api";
-import {
-	type AgentChoice,
-	currentAgentChoice,
-	pickModel,
-	profileModel,
-	requestAgent,
-	setAgentChoice,
-	useAgentChoice,
-} from "./agent-choice";
+import { type AgentChoice, pickModel, profileModel } from "./agent-choice";
 
 /**
  * What the agent is for: the chat needs a harness that can use its tools.
@@ -67,10 +60,10 @@ import {
  */
 export type AgentPurpose = "suggest" | "chat" | "run";
 
-/** Who keeps the choice. Without one, the assistant's choice that this browser keeps. */
+/** Who keeps the choice. */
 type ChoiceStore = {
-	choice?: AgentChoice;
-	onChoiceChange?: (choice: AgentChoice) => void;
+	choice: AgentChoice;
+	onChoiceChange: (choice: AgentChoice) => void;
 };
 
 /** PROTOTYPE, throw away: models that give one answer, in the same list as the agents. */
@@ -141,14 +134,6 @@ function useAgentOptions(purpose: AgentPurpose) {
 
 type Options = ReturnType<typeof useAgentOptions>;
 
-/** The request fields of the choice now, for a request sent from a callback. */
-export function agentRequest(): AssistantAgent {
-	return requestAgent(
-		currentAgentChoice(),
-		(harness) => harnessInfo(harness).defaultModel,
-	);
-}
-
 /** What the menus show for a choice: the profile in use, the harness, model and effort that answer. */
 function resolve(choice: AgentChoice, options: Options) {
 	const none = choice.profile === undefined && choice.harness !== undefined;
@@ -216,18 +201,16 @@ function chatRefusal(
 /** The agent's two menus, for the `block-end` row of a Prompt Input. */
 export function AgentMenus({
 	purpose,
-	choice: given,
+	choice,
 	onChoiceChange,
 	models,
 	agents = true,
 }: AgentMenusProps) {
-	const stored = useAgentChoice();
-	const choice = given ?? stored;
 	const modelOn = models?.value !== undefined || !agents;
 	const pickedModel = models?.options.find((o) => o.value === models.value);
 	const set = (next: AgentChoice) => {
 		models?.onPick(undefined);
-		(onChoiceChange ?? setAgentChoice)(next);
+		onChoiceChange(next);
 	};
 	const options = useAgentOptions(purpose);
 	const now = resolve(choice, options);

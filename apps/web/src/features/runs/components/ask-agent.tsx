@@ -8,12 +8,12 @@ import {
 	AlertDescription,
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
-import { Button } from "@nightshift/ui/components/button";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useMutationState } from "@tanstack/react-query";
-import { MessageCircleQuestionIcon, RotateCcwIcon } from "lucide-react";
+import { MessageCircleQuestionIcon } from "lucide-react";
 import { useState } from "react";
 
+import { AgentButton } from "@/shared/agent-button";
 import { client } from "@/shared/api";
 import { Markdown } from "@/shared/markdown";
 
@@ -24,7 +24,7 @@ type LastAsk = {
 	error: Error | null;
 };
 
-/** "Ask an agent" for one run: the button and the answer share it. */
+/** "Ask why" for one run: the button and the answer share it. */
 export type AgentAsk = {
 	ask: () => void;
 	last: LastAsk | undefined;
@@ -65,30 +65,23 @@ export function useAgentAsk(runId: string): AgentAsk {
 	};
 }
 
-/** "Ask an agent": the agent reads the run and tells you what went wrong. */
+/** "Ask why": the Explainer reads the run and tells you what went wrong. */
 export function AskAgentButton({ agent }: { agent: AgentAsk }) {
 	if (agent.missing) return null;
 	const pending = agent.last?.status === "pending";
 	const asked = agent.last !== undefined && agent.last.status !== "idle";
 	return (
-		<Button
-			size="sm"
-			variant="outline"
+		<AgentButton
+			entry="run.why"
+			again={asked && !pending}
 			disabled={pending}
 			title="An agent reads this run and tells you what went wrong."
 			onClick={agent.ask}
-		>
-			{asked && !pending ? (
-				<RotateCcwIcon data-icon="inline-start" />
-			) : (
-				<MessageCircleQuestionIcon data-icon="inline-start" />
-			)}
-			{asked && !pending ? "Ask again" : "Ask an agent"}
-		</Button>
+		/>
 	);
 }
 
-/** The answer of "Ask an agent", while it comes and once it is there. */
+/** The answer of "Ask why", while it comes and once it is there. */
 export function AgentAnswer({
 	agent,
 	failed,

@@ -30,7 +30,6 @@ import {
 	useState,
 } from "react";
 import { Markdown } from "@/shared/markdown";
-import { agentRequest } from "./agent-picker";
 import {
 	applyToDraft,
 	type FlowAssistant,
@@ -193,7 +192,6 @@ function SuggestBody({
 			projectId: assistant.projectId,
 			flowName: assistant.flowName,
 			flow: assistant.flow,
-			...agentRequest(),
 			...(nodeId ? { nodeId } : {}),
 			kind,
 			instruction: text.trim(),
@@ -261,7 +259,6 @@ function SuggestBody({
 						submitLabel={state.status === "failed" ? "Try again" : "Suggest"}
 						answering={state.status === "running"}
 						onStop={stop}
-						agent={{ purpose: "suggest" }}
 					/>
 				</>
 			) : null}

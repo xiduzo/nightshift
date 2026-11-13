@@ -1,9 +1,7 @@
 import type { Flow } from "@nightshift/flows";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { client } from "@/shared/api";
-import { agentRequest } from "../assistant/agent-picker";
 import {
-	aboutRun,
 	applyChatEvent,
 	type ChatThread,
 	chatRequest,
@@ -14,6 +12,7 @@ import {
 	setProposalStatus,
 	startAnswer,
 	threadKey,
+	threadOpening,
 	writeThread,
 } from "./chat-thread";
 import { followChat, NO_ANSWER } from "./follow-chat";
@@ -29,8 +28,9 @@ function sessionStore(): Storage | undefined {
 /**
  * The chat about one flow: its messages, the answer that streams now and
  * the line about what the agent does. The tab keeps the chat over a
- * reload. Leaving the editor stops an answer. A chat about a run sends
- * the run with each message.
+ * reload. Leaving the editor stops an answer. Each message carries the
+ * entry of the chat, and its run when it is about one. Which agent answers
+ * is Night Shift's choice (Settings), not a field of the message.
  */
 export function useFlowChat(projectId: string, flowName: string) {
 	const key = threadKey(projectId, flowName);
@@ -47,19 +47,25 @@ export function useFlowChat(projectId: string, flowName: string) {
 	useEffect(() => writeThread(sessionStore(), key, thread), [key, thread]);
 	useEffect(() => () => running.current?.abort(), []);
 
-	/** Sends `text` in `base`, the thread as it is or a new one. */
+	/**
+	 * Sends `text` in `base`, the thread as it is or a new one. Null: the
+	 * first message of the entry of `base`. The page shows its words, and
+	 * the request sends none.
+	 */
 	const post = useCallback(
-		(text: string, flow: Flow, base: ChatThread) => {
-			const message = text.trim();
+		(text: string | null, flow: Flow, base: ChatThread) => {
+			const message = text === null ? threadOpening(base) : text.trim();
 			if (!message || running.current) return;
 			const controller = new AbortController();
 			running.current = controller;
 			const baseJson = JSON.stringify(flow);
 			const id = crypto.randomUUID();
-			const request = {
-				...chatRequest(base, { projectId, flowName, flow, message }),
-				...agentRequest(),
-			};
+			const request = chatRequest(base, {
+				projectId,
+				flowName,
+				flow,
+				...(text === null ? {} : { message }),
+			});
 			const started = startAnswer(base, message, {
 				person: `${id}:person`,
 				agent: `${id}:agent`,
@@ -106,17 +112,23 @@ export function useFlowChat(projectId: string, flowName: string) {
 		setActivity(null);
 	}, []);
 
+	/** Sends the first message of the chat's entry, when it has one. */
+	const open = useCallback(
+		(flow: Flow) => post(null, flow, current.current),
+		[post],
+	);
+
 	/**
-	 * A new chat about run `runId`, with `text` sent as its first message
-	 * when there is one. Without `text`, the person sends the first message.
+	 * A new chat, `thread`, as an entry starts it. With `flow`, the first
+	 * message of the entry goes at once, when it has one. Without, the
+	 * person sends the first message.
 	 */
-	const startAboutRun = useCallback(
-		(runId: string, text?: string, flow?: Flow) => {
+	const start = useCallback(
+		(thread: ChatThread, flow?: Flow) => {
 			letGo();
-			const thread = aboutRun(runId);
 			current.current = thread;
 			setThread(thread);
-			if (text !== undefined && flow) post(text, flow, thread);
+			if (flow) post(null, flow, thread);
 		},
 		[letGo, post],
 	);
@@ -140,7 +152,8 @@ export function useFlowChat(projectId: string, flowName: string) {
 		streaming,
 		activity,
 		send,
-		startAboutRun,
+		open,
+		start,
 		stop,
 		reset,
 		markProposal,

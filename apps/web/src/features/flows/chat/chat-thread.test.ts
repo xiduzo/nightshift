@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type FlowProposal, flowSchema } from "@nightshift/flows";
 import {
-	aboutRun,
 	applyChatEvent,
 	type ChatThread,
+	chatAgent,
 	chatRequest,
 	EMPTY_THREAD,
 	endAnswer,
@@ -12,7 +12,9 @@ import {
 	restorePoint,
 	setProposalStatus,
 	startAnswer,
+	startedBy,
 	threadKey,
+	threadOpening,
 	writeThread,
 } from "./chat-thread";
 
@@ -132,10 +134,15 @@ describe("the kept chat", () => {
 describe("a chat about a run", () => {
 	const flow = proposal.flow;
 	const input = { projectId: "p1", flowName: "build", flow, message: "Why?" };
+	const aboutRun = (runId: string) => startedBy("run.improve", { runId });
 
-	test("every message carries the run, and the thread once it has one", () => {
+	test("every message carries the run and the entry, and the thread once it has one", () => {
 		const about = aboutRun("run-1");
-		expect(chatRequest(about, input)).toEqual({ ...input, runId: "run-1" });
+		expect(chatRequest(about, input)).toEqual({
+			...input,
+			entry: "run.improve",
+			runId: "run-1",
+		});
 		const continued = applyChatEvent(
 			startAnswer(about, "Why?", { person: "1:person", agent: "1:agent" }),
 			{ type: "thread", threadId: "t1" },
@@ -144,13 +151,23 @@ describe("a chat about a run", () => {
 		expect(continued.runId).toBe("run-1");
 		expect(chatRequest(continued, input)).toEqual({
 			...input,
+			entry: "run.improve",
 			threadId: "t1",
 			runId: "run-1",
 		});
 	});
 
-	test("a chat about the flow sends no run", () => {
-		expect(chatRequest(EMPTY_THREAD, input)).toEqual(input);
+	test("a chat about the flow sends no run, and is the editor's own", () => {
+		expect(chatRequest(EMPTY_THREAD, input)).toEqual({
+			...input,
+			entry: "flow.build",
+		});
+	});
+
+	test("a chat kept from before entries, about a run, improves", () => {
+		const kept: ChatThread = { runId: "run-1", messages: [] };
+		expect(chatRequest(kept, input).entry).toBe("run.improve");
+		expect(chatAgent(kept)).toBe("improver");
 	});
 
 	test("is kept over a reload, before its first message too", () => {
@@ -160,6 +177,82 @@ describe("a chat about a run", () => {
 		expect(readThread(store, key)).toEqual(aboutRun("run-1"));
 		store.setItem(key, JSON.stringify({ runId: 7, messages: [] }));
 		expect(readThread(store, key)).toEqual(EMPTY_THREAD);
+		store.setItem(key, JSON.stringify({ entry: "other", messages: [] }));
+		expect(readThread(store, key)).toEqual(EMPTY_THREAD);
+		store.setItem(
+			key,
+			JSON.stringify({
+				entry: "spend.saving",
+				saving: { kind: "x" },
+				messages: [],
+			}),
+		);
+		expect(readThread(store, key)).toEqual(EMPTY_THREAD);
+		const improve = startedBy("flow.improve");
+		writeThread(store, key, improve);
+		expect(readThread(store, key)).toEqual(improve);
+	});
+});
+
+describe("the first message of an entry", () => {
+	const flow = proposal.flow;
+	const where = { projectId: "p1", flowName: "build", flow };
+
+	test("sends the entry and no text: the page shows the same words", () => {
+		const thread = startedBy("run.improve", { runId: "run-1" });
+		const request = chatRequest(thread, where);
+		expect(request).toEqual({ ...where, entry: "run.improve", runId: "run-1" });
+		expect("message" in request).toBe(false);
+		expect(threadOpening(thread)).toContain("Why did this run not finish?");
+	});
+
+	test("a way to save goes with the first message only", () => {
+		const saving = { kind: "costly", step: "write / build:2" } as const;
+		const thread = startedBy("spend.saving", { runId: "run-1", saving });
+		expect(chatRequest(thread, where)).toEqual({
+			...where,
+			entry: "spend.saving",
+			saving,
+			runId: "run-1",
+		});
+		expect(threadOpening(thread)).toContain("the step write / build:2");
+		expect(chatRequest(thread, { ...where, message: "And now?" })).toEqual({
+			...where,
+			message: "And now?",
+			entry: "spend.saving",
+			runId: "run-1",
+		});
+	});
+
+	test("the editor's chat and a chat to improve the flow have none", () => {
+		expect(threadOpening(EMPTY_THREAD)).toBeNull();
+		expect(threadOpening(startedBy("flow.improve"))).toBeNull();
+	});
+});
+
+describe("the agent of a chat", () => {
+	test("the editor's own chat is the Builder's", () => {
+		expect(chatAgent(EMPTY_THREAD)).toBe("builder");
+		expect(chatAgent(startedBy("flow.build"))).toBe("builder");
+	});
+
+	test("an improve entry or a run makes it the Improver's, and it stays", () => {
+		expect(chatAgent(startedBy("flow.improve"))).toBe("improver");
+		expect(chatAgent(startedBy("spend.saving", { runId: "r" }))).toBe(
+			"improver",
+		);
+		const continued = applyChatEvent(
+			startAnswer(startedBy("run.improve", { runId: "r" }), "Then what?", {
+				person: "1:person",
+				agent: "1:agent",
+			}),
+			{ type: "thread", threadId: "t1" },
+			"{}",
+		);
+		expect(chatAgent(continued)).toBe("improver");
+		expect(
+			chatAgent({ ...EMPTY_THREAD, runId: "r", entry: "flow.build" }),
+		).toBe("improver");
 	});
 });
 

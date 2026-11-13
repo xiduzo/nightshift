@@ -50,12 +50,12 @@ import {
 	PlayIcon,
 	Redo2Icon,
 	SaveIcon,
-	SparklesIcon,
 	Undo2Icon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CopyProjectHere, notHere, projectQueries } from "@/features/projects";
+import { AgentButton } from "@/shared/agent-button";
 import { hoverTime } from "@/shared/format";
 import { SiteHeader } from "@/shared/page";
 import { FlowAssistantContext } from "../assistant/flow-assistant";
@@ -727,22 +727,12 @@ function Editor({
 						</DropdownMenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
-				<Tooltip>
-					<TooltipTrigger
-						render={
-							<Button
-								variant={chat.open ? "secondary" : "outline"}
-								size="icon-sm"
-								aria-label="Build with an agent"
-								aria-pressed={chat.open}
-								onClick={chat.toggle}
-							/>
-						}
-					>
-						<SparklesIcon />
-					</TooltipTrigger>
-					<TooltipContent>Build with an agent</TooltipContent>
-				</Tooltip>
+				<AgentButton
+					entry="flow.build"
+					variant={chat.open ? "secondary" : "outline"}
+					aria-pressed={chat.open}
+					onClick={chat.toggle}
+				/>
 				<TestBadge test={testMarks} onSelectNode={selectNode} />
 				<Button
 					size="sm"

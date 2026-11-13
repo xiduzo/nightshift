@@ -1,8 +1,13 @@
-import type {
-	ChatEvent,
-	ChatRequest,
-	Flow,
-	FlowProposal,
+import { savingKindOf } from "@nightshift/client";
+import {
+	AGENT_ENTRIES,
+	type AgentEntryId,
+	type ChatEvent,
+	type ChatRequest,
+	type EntrySaving,
+	entryOpening,
+	type Flow,
+	type FlowProposal,
 } from "@nightshift/flows";
 
 /** What the agent spent on one answer. */
@@ -38,32 +43,79 @@ export type AgentMessage = Extract<ChatMessage, { role: "agent" }>;
 /**
  * A chat about one flow: the thread to continue, and its messages. With
  * `runId` the chat is about that run of the flow, for example one that
- * failed: every message of the chat carries it.
+ * failed: every message of the chat carries it. `entry` is the place in
+ * the product that started the chat: it names the agent that answers, and
+ * every message carries it, so the agent stays the same. Without one, the
+ * chat is the editor's own (`flow.build`).
  */
 export type ChatThread = {
 	threadId?: string;
 	runId?: string;
+	entry?: AgentEntryId;
+	/** `spend.saving` only: the way to save the chat starts from. */
+	saving?: EntrySaving;
 	messages: ChatMessage[];
 };
 
 export const EMPTY_THREAD: ChatThread = { messages: [] };
 
-/** A new chat about run `runId`. */
-export function aboutRun(runId: string): ChatThread {
-	return { runId, messages: [] };
+/** A new chat that `entry` starts, about run `runId` when it names one. */
+export function startedBy(
+	entry: AgentEntryId,
+	about: { runId?: string; saving?: EntrySaving } = {},
+): ChatThread {
+	return {
+		...(about.runId ? { runId: about.runId } : {}),
+		entry,
+		...(about.saving ? { saving: about.saving } : {}),
+		messages: [],
+	};
 }
 
-/** The first message of a chat about a run that did not finish. */
-export const ASK_WHY_MESSAGE =
-	"Why did this run not finish? Propose a change to the flow that fixes it.";
+/** The entry of `thread`: its own, else the one a chat like it starts from. */
+export function threadEntry(thread: ChatThread): AgentEntryId {
+	return thread.entry ?? (thread.runId ? "run.improve" : "flow.build");
+}
 
-/** The request for one message of `thread`: it continues the thread, and keeps its run. */
+/**
+ * The agent that answers in `thread`, by the rule of Night Shift: a chat
+ * that an improve entry started, or a chat about a run, is the Improver's.
+ * Any other chat is the Builder's.
+ */
+export function chatAgent(thread: ChatThread): "builder" | "improver" {
+	const improves = AGENT_ENTRIES[threadEntry(thread)].agent === "improver";
+	return improves || thread.runId !== undefined ? "improver" : "builder";
+}
+
+/**
+ * The first message of `thread` as its entry words it, or null when the
+ * person writes the first message. The request sends no text for it: Night
+ * Shift reads the same words from the entry.
+ */
+export function threadOpening(thread: ChatThread): string | null {
+	return entryOpening(threadEntry(thread), {
+		...(thread.saving ? { saving: thread.saving } : {}),
+	});
+}
+
+/**
+ * The request for one message of `thread`: it continues the thread, and
+ * keeps its run and its entry. Without `message`, it asks for the first
+ * message of the entry, with the way to save it starts from.
+ */
 export function chatRequest(
 	thread: ChatThread,
-	input: { projectId: string; flowName: string; flow: Flow; message: string },
+	input: { projectId: string; flowName: string; flow: Flow; message?: string },
 ): ChatRequest {
+	const { message, ...where } = input;
 	return {
-		...input,
+		...where,
+		entry: threadEntry(thread),
+		...(message !== undefined
+			? { message }
+			: thread.saving
+				? { saving: thread.saving }
+				: {}),
 		...(thread.threadId ? { threadId: thread.threadId } : {}),
 		...(thread.runId ? { runId: thread.runId } : {}),
 	};
@@ -228,7 +280,12 @@ export function writeThread(
 	thread: ChatThread,
 ): void {
 	try {
-		if (thread.messages.length === 0 && !thread.threadId && !thread.runId)
+		if (
+			thread.messages.length === 0 &&
+			!thread.threadId &&
+			!thread.runId &&
+			!thread.entry
+		)
 			store?.removeItem(key);
 		else store?.setItem(key, JSON.stringify(thread));
 	} catch {
@@ -236,11 +293,30 @@ export function writeThread(
 	}
 }
 
+function isSaving(value: unknown): value is EntrySaving {
+	if (typeof value !== "object" || value === null) return false;
+	const { kind, step } = value as Record<string, unknown>;
+	return (
+		typeof kind === "string" &&
+		savingKindOf(kind) !== undefined &&
+		(step === undefined || typeof step === "string")
+	);
+}
+
 function isThread(value: unknown): value is ChatThread {
 	if (typeof value !== "object" || value === null) return false;
-	const { threadId, runId, messages } = value as Record<string, unknown>;
+	const { threadId, runId, entry, saving, messages } = value as Record<
+		string,
+		unknown
+	>;
 	if (threadId !== undefined && typeof threadId !== "string") return false;
 	if (runId !== undefined && typeof runId !== "string") return false;
+	if (
+		entry !== undefined &&
+		!(typeof entry === "string" && Object.hasOwn(AGENT_ENTRIES, entry))
+	)
+		return false;
+	if (saving !== undefined && !isSaving(saving)) return false;
 	return (
 		Array.isArray(messages) &&
 		messages.every(

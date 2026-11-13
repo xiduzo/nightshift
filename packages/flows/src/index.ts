@@ -64,6 +64,7 @@ export {
 	builtinAnswersSchema,
 	builtinModel,
 	type EntrySaving,
+	entryOpening,
 	type ModelPick,
 } from "./builtin";
 export {

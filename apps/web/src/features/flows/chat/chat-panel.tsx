@@ -1,5 +1,5 @@
 import { runStatusLabel } from "@nightshift/client";
-import { citedStepId, type Flow } from "@nightshift/flows";
+import { builtinAgent, citedStepId, type Flow } from "@nightshift/flows";
 import {
 	Alert,
 	AlertDescription,
@@ -53,6 +53,8 @@ import {
 	XIcon,
 } from "lucide-react";
 import { type ReactNode, useCallback, useMemo, useState } from "react";
+import { harnessInfo, useCustomAgents } from "@/features/agents";
+import { AnswersLink, useBuiltinAgent } from "@/shared/agent-button";
 import type { RunStatus, StepSummary } from "@/shared/api";
 import { formatCost } from "@/shared/format";
 import { type LinkView, Markdown } from "@/shared/markdown";
@@ -62,7 +64,6 @@ import { PromptInput } from "../assistant/prompt-input";
 import { Suggestions } from "../assistant/suggestions";
 import {
 	type AgentMessage,
-	ASK_WHY_MESSAGE,
 	type ChatProposal,
 	type ChatThread,
 	restorePoint,
@@ -74,6 +75,10 @@ import { StepCitation } from "./step-citation";
 
 type Props = {
 	thread: ChatThread;
+	/** Which of Night Shift's agents answers in this chat. */
+	agent: "builder" | "improver";
+	/** The first message of a new chat, as its entry words it. Null: the person writes it. */
+	opening: string | null;
 	streaming: boolean;
 	/** What the agent does now, while it answers. */
 	activity: string | null;
@@ -93,6 +98,8 @@ type Props = {
 	/** The message whose proposal the canvas shows. */
 	shownId: string | null;
 	onSend: (text: string) => void;
+	/** Sends `opening`. */
+	onOpen: () => void;
 	onStop: () => void;
 	onNewChat: () => void;
 	onClose: () => void;
@@ -113,20 +120,16 @@ type Props = {
  * person saves the flow.
  */
 export function FlowChatPanel(props: Props) {
-	const { thread, streaming, onClose, onNewChat, className } = props;
+	const { thread, agent, streaming, onClose, onNewChat, className } = props;
 	const empty = thread.messages.length === 0;
 	return (
 		<aside
-			aria-label="Build with an agent"
+			aria-label={`Chat with the ${builtinAgent(agent).name}`}
 			className={cn("flex max-h-full min-h-0 flex-col", className)}
 		>
 			<Card className="flex h-full min-h-0 flex-col gap-0 py-0 shadow-lg">
-				<PanelHeader
-					icon={SparklesIcon}
-					kicker="Agent"
-					title="Build with an agent"
-					mono={false}
-					className="shrink-0 border-b p-3"
+				<ChatHead
+					agent={agent}
 					actions={
 						<>
 							<Button
@@ -162,6 +165,51 @@ export function FlowChatPanel(props: Props) {
 	);
 }
 
+/** What each agent of the chat does, in one line under its name. */
+const CHAT_JOB: Record<Props["agent"], string> = {
+	builder: "Reads this project. Proposes changes to this flow.",
+	improver:
+		"Reads this project, its runs and their cost. Proposes changes to this flow.",
+};
+
+/**
+ * The head of every chat: the agent that answers by its name, what it
+ * does, and on the right what answers for it, as a link to its Settings
+ * page. When nothing can answer, the line says why.
+ */
+function ChatHead({
+	agent,
+	actions,
+}: {
+	agent: Props["agent"];
+	actions: ReactNode;
+}) {
+	const status = useBuiltinAgent(agent);
+	const customAgents = useCustomAgents();
+	return (
+		<>
+			<PanelHeader
+				icon={SparklesIcon}
+				kicker="Agent"
+				title={builtinAgent(agent).name}
+				mono={false}
+				className="shrink-0 p-3 pb-2"
+				actions={actions}
+			/>
+			<div className="flex shrink-0 items-start justify-between gap-3 border-b px-3 pb-2 text-xs">
+				<p className="min-w-0 text-muted-foreground">
+					{status?.problem ?? CHAT_JOB[agent]}
+				</p>
+				<AnswersLink
+					agent={agent}
+					harnessLabel={(harness) => harnessInfo(harness, customAgents).label}
+					className="max-w-40 shrink-0"
+				/>
+			</div>
+		</>
+	);
+}
+
 /** The run the chat is about, as a link back to it. */
 function RunChip({ run }: { run: NonNullable<Props["run"]> }) {
 	const status = run.status ? runStatusLabel(run.status).toLowerCase() : null;
@@ -188,51 +236,60 @@ function shortRunId(id: string): string {
 	return id.length > 8 ? id.slice(0, 8) : id;
 }
 
-function ChatEmpty({ blank, run, sendBlockedBy, onSend }: Props) {
-	if (run) {
-		return (
-			<Empty className="min-h-0 flex-1 overflow-y-auto border-0">
-				<EmptyHeader>
-					<EmptyMedia variant="icon">
-						<SparklesIcon />
-					</EmptyMedia>
-					<EmptyTitle>Ask an agent about this run</EmptyTitle>
-					<EmptyDescription>
-						The agent reads the run, says what went wrong and proposes a change
-						to the flow.
-					</EmptyDescription>
-				</EmptyHeader>
-				<EmptyContent>
-					<Button
-						variant="outline"
-						size="sm"
-						className="h-auto w-full justify-start whitespace-normal py-1.5 text-left"
-						disabled={sendBlockedBy !== null}
-						onClick={() => onSend(ASK_WHY_MESSAGE)}
-					>
-						{ASK_WHY_MESSAGE}
-					</Button>
-				</EmptyContent>
-			</Empty>
-		);
-	}
+function ChatEmpty({
+	agent,
+	blank,
+	run,
+	opening,
+	sendBlockedBy,
+	onOpen,
+}: Props) {
+	const words =
+		agent === "improver"
+			? run
+				? {
+						title: "Improve this flow from a run",
+						description:
+							"The Improver reads the run, says what went wrong and proposes a change to the flow.",
+					}
+				: {
+						title: "Improve this flow",
+						description:
+							"Say what must get better. The Improver reads the runs of this flow and proposes a change.",
+					}
+			: blank
+				? {
+						title: "Build this flow with an agent",
+						description:
+							"Say what the flow must do. The Builder reads the project and proposes the steps.",
+					}
+				: {
+						title: "Change this flow with an agent",
+						description:
+							"Say what to change. The Builder proposes it, and you see it on the canvas first.",
+					};
 	return (
 		<Empty className="min-h-0 flex-1 overflow-y-auto border-0">
 			<EmptyHeader>
 				<EmptyMedia variant="icon">
 					<SparklesIcon />
 				</EmptyMedia>
-				<EmptyTitle>
-					{blank
-						? "Build this flow with an agent"
-						: "Change this flow with an agent"}
-				</EmptyTitle>
-				<EmptyDescription>
-					{blank
-						? "Say what the flow must do. The agent reads the project and proposes the steps."
-						: "Say what to change. The agent proposes it, and you see it on the canvas first."}
-				</EmptyDescription>
+				<EmptyTitle>{words.title}</EmptyTitle>
+				<EmptyDescription>{words.description}</EmptyDescription>
 			</EmptyHeader>
+			{opening ? (
+				<EmptyContent>
+					<Button
+						variant="outline"
+						size="sm"
+						className="h-auto w-full justify-start whitespace-normal py-1.5 text-left"
+						disabled={sendBlockedBy !== null}
+						onClick={onOpen}
+					>
+						{opening}
+					</Button>
+				</EmptyContent>
+			) : null}
 		</Empty>
 	);
 }
@@ -485,6 +542,7 @@ function ProposalMessage({
 
 function Composer({
 	thread,
+	agent,
 	blank,
 	run,
 	streaming,
@@ -494,7 +552,11 @@ function Composer({
 }: Props) {
 	const [text, setText] = useState("");
 	// A new flow and a new chat: ideas to start with, above the box.
-	const starters = blank && run === null && thread.messages.length === 0;
+	const starters =
+		agent === "builder" &&
+		blank &&
+		run === null &&
+		thread.messages.length === 0;
 	return (
 		<div className="flex shrink-0 flex-col gap-2 border-t p-3">
 			{starters ? (
@@ -506,7 +568,11 @@ function Composer({
 			) : null}
 			<PromptInput
 				label="Message to the agent"
-				placeholder="Example: Each morning, find news on my topic, and ask me before you send it."
+				placeholder={
+					agent === "improver"
+						? "Example: Find the step that fails most, and fix it."
+						: "Example: Each morning, find news on my topic, and ask me before you send it."
+				}
 				value={text}
 				onValueChange={setText}
 				onSubmit={(value) => {
@@ -516,7 +582,6 @@ function Composer({
 				blockedBy={sendBlockedBy}
 				answering={streaming}
 				onStop={onStop}
-				agent={{ purpose: "chat" }}
 			/>
 		</div>
 	);

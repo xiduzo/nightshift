@@ -17,8 +17,9 @@ import {
 } from "@nightshift/ui/components/card";
 import { Progress } from "@nightshift/ui/components/progress";
 import { Link } from "@tanstack/react-router";
-import { CircleCheckIcon, SparklesIcon } from "lucide-react";
+import { CircleCheckIcon } from "lucide-react";
 import { chatAboutSaving } from "@/features/flows";
+import { AgentButton } from "@/shared/agent-button";
 import { formatCost } from "@/shared/format";
 import { PageSection } from "@/shared/page";
 
@@ -190,22 +191,19 @@ export function SavingActions({
 					>
 						Open the flow
 					</Button>
-					<Button
+					<AgentButton
+						entry="spend.saving"
 						size="xs"
 						variant={primary ? "default" : "outline"}
-						nativeButton={false}
-						title="Opens the flow with a chat. The agent reads the run and proposes a change."
-						render={
+						title="Opens the flow with a chat. The Improver reads the run and proposes a change."
+						link={
 							<Link
 								to="/projects/$projectId/flows/$name"
 								params={{ projectId: saving.projectId, name: saving.flow }}
 								search={{ chat: chatAboutSaving(saving) }}
 							/>
 						}
-					>
-						<SparklesIcon data-icon="inline-start" />
-						Improve with an agent
-					</Button>
+					/>
 				</>
 			) : null}
 		</span>
