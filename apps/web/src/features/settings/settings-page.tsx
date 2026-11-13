@@ -57,6 +57,7 @@ export function SettingsPage({
 	onSelect,
 	thisComputer,
 	agentPicker,
+	helpCost,
 }: {
 	search: SettingsSearch;
 	/** Opens an item of a list of your agents, or closes it. */
@@ -65,6 +66,8 @@ export function SettingsPage({
 	thisComputer: ReactNode;
 	/** The agent picker of the chat, which the flows vertical owns. */
 	agentPicker: AgentPicker;
+	/** One line on what Night Shift's agents cost this month. The route hands it over: Spend sits above settings. */
+	helpCost?: ReactNode;
 }) {
 	const current = SECTIONS.find((item) => item.key === search.section);
 	const builtin =
@@ -185,6 +188,7 @@ export function SettingsPage({
 								<SearchTable data={view} agentPicker={agentPicker} />
 							))}
 						</PageSection>
+						{helpCost}
 					</>
 				) : current.key === "runs" ? (
 					<>

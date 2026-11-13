@@ -56,6 +56,13 @@ function recording(
 		chat: (request) => streamOf(events.chat?.(request) ?? []),
 		explain: () => streamOf(events.explain ?? []),
 		agents: () => [],
+		check: async (id) => ({
+			id,
+			ok: true,
+			ms: 0,
+			answers: null,
+			problem: null,
+		}),
 	};
 	const assistant = recordingAssistant(service, {
 		keep:

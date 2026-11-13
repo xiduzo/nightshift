@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ThisComputerSettings } from "@/features/devices";
 import { AgentMenus } from "@/features/flows";
 import { SettingsPage, type SettingsSearch } from "@/features/settings";
+import { HelpCostLine } from "@/features/spend";
 
 export const Route = createFileRoute("/settings")({
 	// The theme and the notification permission exist only in the browser.
@@ -37,6 +38,7 @@ function SettingsRoute() {
 			thisComputer={<ThisComputerSettings titled={false} />}
 			// The chat's agent picker. The route hands it over: the flow editor reads the settings, so settings does not import flows.
 			agentPicker={(props) => <AgentMenus {...props} />}
+			helpCost={<HelpCostLine />}
 		/>
 	);
 }

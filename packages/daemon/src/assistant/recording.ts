@@ -162,5 +162,7 @@ export function recordingAssistant(
 			})),
 
 		agents: () => service.agents(),
+		// A check is a test of the setup: its few cents are not help.
+		check: (id, signal) => service.check(id, signal),
 	};
 }
