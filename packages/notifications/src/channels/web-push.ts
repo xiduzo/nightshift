@@ -112,7 +112,13 @@ export function topicOf(key: string): string {
 function urgencyOf(
 	kind: NotificationMessage["kind"],
 ): WebPushRequest["urgency"] {
-	if (kind === "gate-opened" || kind === "gates-waiting") return "high";
+	if (
+		kind === "gate-opened" ||
+		kind === "gates-waiting" ||
+		kind === "flow-needs-a-look"
+	) {
+		return "high";
+	}
 	if (
 		kind === "run-failed" ||
 		kind === "device-wait" ||

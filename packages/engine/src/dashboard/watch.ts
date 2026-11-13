@@ -308,6 +308,26 @@ export function flowWatch(
 	};
 }
 
+/**
+ * The severe signal that the end of one run turned on: the flow shows a
+ * severe signal with that run, and none without it. Null: the run is not
+ * among `runs`, it did not end, nothing is severe, or the flow was severe
+ * already. A flow that stays severe turns on nothing new. A flow that got
+ * back into its range can turn severe again.
+ */
+export function turnedSevere(
+	runs: readonly WatchRun[],
+	runId: string,
+): FlowSignal | null {
+	const ended = runs.find((run) => run.id === runId);
+	if (!ended || !hasEnded(ended)) return null;
+	const newestFirst = [...runs].sort((a, b) => b.createdAt - a.createdAt);
+	const severe = signalsOf(newestFirst).find((signal) => signal.severe);
+	if (!severe) return null;
+	const before = signalsOf(newestFirst.filter((run) => run.id !== runId));
+	return before.some((signal) => signal.severe) ? null : severe;
+}
+
 /** The own real runs of one flow of one project, as the watch reads them. */
 export function watchRunsOf(
 	name: string,

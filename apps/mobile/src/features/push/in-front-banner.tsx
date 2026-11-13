@@ -13,6 +13,7 @@ import {
 	Hand,
 	type LucideIcon,
 	MonitorSmartphone,
+	TriangleAlert,
 } from "lucide-react-native";
 import { useEffect } from "react";
 import { Pressable } from "react-native";
@@ -42,10 +43,12 @@ const LOOK: Record<PushData["kind"], { icon: LucideIcon; tone: Tone | null }> =
 		"run-failed": { icon: CircleX, tone: "failed" },
 		"device-wait": { icon: MonitorSmartphone, tone: "waiting" },
 		"schedule-missed": { icon: CalendarX, tone: "failed" },
+		"flow-needs-a-look": { icon: TriangleAlert, tone: "failed" },
 	};
 
 /**
- * A Gate that opened, or a step that waits for a device, while the app is
+ * A Gate that opened, a step that waits for a device, or a flow that needs
+ * a look, while the app is
  * in front, as a banner at the top of the app: the live cache shows it
  * from the stream at once, and a push that comes in front shows it too.
  * The phone shows no banner of its own then. A tap opens the Gate or the

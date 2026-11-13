@@ -37,5 +37,6 @@ A push tells you what waits, and nothing more:
 - A run finished, or failed.
 - A step waits for a computer that is offline.
 - A schedule did not start.
+- A flow needs a look: for example, it failed 2 runs in a row. Night Shift tells you once, when the problem starts. Tap it to open the run.
 
 A report never sends a push. Read reports on your computer.

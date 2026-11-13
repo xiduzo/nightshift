@@ -5,8 +5,9 @@ export type PushRoute =
 	| { to: "inbox" };
 
 /**
- * Where a tap on a notification goes: a run's end, or a step that waits
- * for a Device, opens the run. A Gate opens the Gate. Anything else opens
+ * Where a tap on a notification goes: a run's end, a step that waits
+ * for a Device, or a flow that turned severe under Needs a look, opens
+ * the run (for a flow, the run that turned it). A Gate opens the Gate. Anything else opens
  * the inbox. A run and a Gate open
  * from any of the Person's Spaces, so a route names no Space.
  */
@@ -18,7 +19,8 @@ export function routeOf(data: {
 	if (
 		(data.kind === "run-finished" ||
 			data.kind === "run-failed" ||
-			data.kind === "device-wait") &&
+			data.kind === "device-wait" ||
+			data.kind === "flow-needs-a-look") &&
 		data.runId
 	) {
 		return { to: "run", runId: data.runId };

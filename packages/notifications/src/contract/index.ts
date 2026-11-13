@@ -9,12 +9,15 @@ export {
 	deviceWaitKey,
 	gateKey,
 	isGateKey,
+	needsALookKey,
 	parseDeviceWaitKey,
 	parseGateKey,
+	parseNeedsALookKey,
 	runEndKey,
 	scheduleMissedKey,
 	waitingKey,
 } from "./keys";
+export { type LookSignal, signalTitle } from "./look";
 export {
 	type GateOption,
 	PUSH_ACTION,

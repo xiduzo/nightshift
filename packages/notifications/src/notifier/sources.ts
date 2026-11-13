@@ -1,6 +1,13 @@
 import { spaceRoster } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import type { Engine, LandedFact, ScheduleMissed } from "@nightshift/engine";
+import {
+	type Engine,
+	flowTurnedSevere,
+	type LandedFact,
+	type ScheduleMissed,
+	type SevereTurn,
+} from "@nightshift/engine";
+import { now } from "@nightshift/time";
 
 /**
  * What the notifier reads, as ports: the run events of this Replica (as
@@ -48,15 +55,22 @@ export type RunEventSource = {
 	 * Absent: no schedule fires here.
 	 */
 	onScheduleMissed?(listener: (missed: ScheduleMissed) => void): () => void;
+	/**
+	 * Whether the end of the run turned its flow severe under Needs a look
+	 * (the dashboard's watch). Null: it did not. Absent: never.
+	 */
+	severeTurn?(spaceId: string, runId: string): Promise<SevereTurn | null>;
 };
 
-/** The engine's run events, missed schedules and open Gates. */
+/** The engine's run events, missed schedules, open Gates and flows that turn severe. */
 export function engineRunEvents(
 	engine: Pick<Engine, "onLandedFacts" | "onScheduleMissed" | "space">,
 ): RunEventSource {
 	return {
 		subscribe: (listener) => engine.onLandedFacts(listener),
 		onScheduleMissed: (listener) => engine.onScheduleMissed(listener),
+		severeTurn: (spaceId, runId) =>
+			flowTurnedSevere(engine.space(spaceId), runId, now()),
 		async openGates(spaceId) {
 			const gates = await engine.space(spaceId).listGates();
 			return gates.map((g) => ({

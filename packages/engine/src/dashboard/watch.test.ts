@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { NeededYou } from "../read";
 import { DAY_MS } from "./clock";
-import { flowWatch, type WatchRun } from "./watch";
+import { flowWatch, turnedSevere, type WatchRun } from "./watch";
 
 /*
  * The watch over a flow: its level, how often it needed a person, and the
@@ -197,5 +197,43 @@ describe("the signals of a flow", () => {
 	test("a last finished run that worked far longer than the runs before", () => {
 		const runs = days(8, (day) => (day === 1 ? { workMs: 600_000 } : {}));
 		expect(kinds(runs)).toEqual(["length"]);
+	});
+});
+
+describe("a flow that turns severe", () => {
+	const failed = { status: "failed" as const, result: null };
+	/** Runs newest first: `f` failed, `d` done. The newest is run-1. */
+	const history = (marks: string) =>
+		[...marks].map((mark, index) => run(index + 1, mark === "f" ? failed : {}));
+
+	test("one failed run is not severe yet", () => {
+		expect(turnedSevere(history("fddddd"), "run-1")).toBeNull();
+	});
+
+	test("the second failure in a row turns it severe", () => {
+		const signal = turnedSevere(history("ffdddd"), "run-1");
+		expect(signal).toMatchObject({
+			kind: "failing",
+			severe: true,
+			count: 2,
+			runId: "run-1",
+		});
+	});
+
+	test("a third failure in a row turns on nothing new", () => {
+		expect(turnedSevere(history("fffddd"), "run-1")).toBeNull();
+	});
+
+	test("after it got back into its range, it can turn severe again", () => {
+		expect(turnedSevere(history("dffddd"), "run-1")).toBeNull();
+		expect(turnedSevere(history("ffdffd"), "run-1")).not.toBeNull();
+	});
+
+	test("a run that is not there, or still works, turns on nothing", () => {
+		expect(turnedSevere(history("ffdddd"), "run-9")).toBeNull();
+		const runs = history("ffdddd").map((r) =>
+			r.id === "run-1" ? { ...r, status: "running" as const } : r,
+		);
+		expect(turnedSevere(runs, "run-1")).toBeNull();
 	});
 });
