@@ -465,9 +465,7 @@ export const knowledge = {
 		.output(output(z.object({ on: z.boolean() })))
 		.handler(async ({ context, input }) => {
 			await context.knowledge.setLearnsFromRuns(input.projectId, input.on);
-			return {
-				on: await context.knowledge.learnsFromRuns(input.projectId),
-			};
+			return { on: input.on };
 		}),
 	/**
 	 * How often agents found and read each file of the project's knowledge
