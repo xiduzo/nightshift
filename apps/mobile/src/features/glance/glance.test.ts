@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import {
-	glanceSnapshot,
 	type RunDetail,
 	type RunProgress,
 	type RunResult,
@@ -189,24 +188,23 @@ describe("following a run on the lock screen", () => {
 describe("the props outside the app", () => {
 	test("give the widget plain values with the status colors", () => {
 		const props = homeWidgetProps({
-			waiting: 1,
-			waitingText: "1 Gate waits for you",
-			noRunsText: "No runs yet",
-			runs: [
+			now: 1,
+			nowText: "1 thing needs you now",
+			laterText: "",
+			items: [
 				{
-					id: "a",
+					id: "look:web/deploy",
 					flow: "deploy",
-					status: "failed",
-					statusText: "Failed",
+					detail: "Needs a look",
 					tone: "failed",
 				},
 			],
 		});
-		expect(props.runs).toEqual([
+		expect(props.items).toEqual([
 			{
-				id: "a",
+				id: "look:web/deploy",
 				flow: "deploy",
-				statusText: "Failed",
+				detail: "Needs a look",
 				light: "#c51e21",
 				dark: "#fe6c66",
 			},
@@ -214,51 +212,7 @@ describe("the props outside the app", () => {
 		expect(JSON.parse(JSON.stringify(props))).toEqual(props);
 	});
 
-	test("give the widget a test run with its label, in the color of its status", () => {
-		const props = homeWidgetProps(
-			glanceSnapshot({
-				gates: [],
-				runs: [
-					{
-						id: "a",
-						flowName: "deploy",
-						status: "failed",
-						result: null,
-						createdAt: 1,
-						test: { pinned: [], skipped: ["send"] },
-					},
-				],
-			}),
-		);
-		expect(props.runs).toEqual([
-			{
-				id: "a",
-				flow: "deploy",
-				statusText: "Failed · Test run",
-				light: "#c51e21",
-				dark: "#fe6c66",
-			},
-		]);
-	});
-
-	test("say Nothing to do for a run that had nothing to do, on the widget and the lock screen", () => {
-		const widget = homeWidgetProps(
-			glanceSnapshot({
-				gates: [],
-				runs: [
-					{
-						id: "a",
-						flowName: "triage",
-						status: "finished",
-						result: "nothing-to-do",
-						createdAt: 1,
-					},
-				],
-			}),
-		);
-		expect(widget.runs.map((each) => each.statusText)).toEqual([
-			"Nothing to do",
-		]);
+	test("say Nothing to do for a run that had nothing to do on the lock screen", () => {
 		const lock = runActivityProps(
 			runProgress(run("finished", ["plan"], "nothing-to-do")),
 		);
@@ -266,12 +220,12 @@ describe("the props outside the app", () => {
 		expect(lock.headline).toBe("Nothing to do · Ran 1 of 3 steps");
 	});
 
-	test("show no count and no runs when the phone is not signed in", () => {
+	test("show nothing of a Host when the phone is not signed in", () => {
 		expect(homeWidgetProps(null)).toEqual({
-			waiting: 0,
-			waitingText: "Open Night Shift to connect to your Host",
-			noRunsText: "",
-			runs: [],
+			now: 0,
+			nowText: "Open Night Shift to connect to your Host",
+			laterText: "",
+			items: [],
 			ink: {
 				text: { light: "#0a0a0a", dark: "#fafafa" },
 				muted: { light: "#737373", dark: "#a1a1a1" },

@@ -33,7 +33,7 @@ import { Icon } from "@nightshift/ui-native/components/ui/icon";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { type Href, Link, Redirect } from "expo-router";
+import { Link, Redirect } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import {
 	FileDiff,
@@ -88,7 +88,7 @@ import { type PhoneLiveRun, usePhoneLiveRun } from "./use-live-run";
 
 /**
  * One run, live: where it is from, its status and one sentence about it,
- * its one main action, its report, what it cost and changed, and its details (steps,
+ * its one main action, what it cost and changed, and its details (steps,
  * transcript, more actions, take over) folded away. Opened from the Runs
  * tab, after a start, or from a notification.
  */
@@ -232,17 +232,9 @@ function RunBody({
 				<View className="flex-row flex-wrap items-center gap-x-1.5">
 					{projectName ? (
 						<>
-							<Link href={projectHref(run.projectId)} asChild>
-								<Button
-									variant="link"
-									className="h-auto min-h-11 px-0 py-2"
-									accessibilityHint="Opens the project"
-								>
-									<Text className="text-muted-foreground text-sm underline">
-										{projectName}
-									</Text>
-								</Button>
-							</Link>
+							<Text className="py-3 text-muted-foreground text-sm">
+								{projectName}
+							</Text>
 							<Text
 								className="text-muted-foreground text-sm"
 								importantForAccessibility="no"
@@ -309,10 +301,6 @@ function RunBody({
 				<RunActionFailure act={act} />
 			</View>
 
-			{run.report ? (
-				<ReportSection runId={run.id} excerpt={run.report.excerpt} />
-			) : null}
-
 			{gates.length > 1 ? (
 				<View className="gap-3">
 					<SectionHead
@@ -378,38 +366,6 @@ function RunBody({
 				computer={computer}
 			/>
 		</>
-	);
-}
-
-function projectHref(projectId: string): Href {
-	return { pathname: "/projects/[projectId]", params: { projectId } };
-}
-
-/** The whole excerpt of a report: eight lines cut it on the screen. */
-const REPORT_PREVIEW_CHARS = 600;
-
-/**
- * What the run produced: the start of its report as plain text, in eight
- * lines. "Read all" opens the whole report. Read only.
- */
-function ReportSection({ runId, excerpt }: { runId: string; excerpt: string }) {
-	return (
-		<View className="gap-3">
-			<SectionHead
-				title="Report"
-				seeAll={{
-					href: { pathname: "/report/[runId]", params: { runId } },
-					label: "Read all",
-				}}
-			/>
-			<Card className="py-4">
-				<CardContent className="px-4">
-					<Text numberOfLines={8}>
-						{markdownPreview(excerpt, REPORT_PREVIEW_CHARS)}
-					</Text>
-				</CardContent>
-			</Card>
-		</View>
 	);
 }
 

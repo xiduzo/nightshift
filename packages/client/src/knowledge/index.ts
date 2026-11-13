@@ -4,8 +4,6 @@ export {
 	ASK_A_MEMBER,
 	canKeep,
 	learningKey,
-	mayDecide,
-	stillWaiting,
 	type WaitingLearning,
 } from "./learnings";
 export { createKnowledgeQueries } from "./queries";

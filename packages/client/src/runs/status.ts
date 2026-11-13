@@ -45,29 +45,6 @@ export function groupStatuses(...groups: RunGroup[]): RunStatus[] {
 	return STATUSES.filter((status) => groups.includes(GROUP_OF[status]));
 }
 
-/**
- * How many runs each group holds, from how many runs have each status.
- * A key that is no status counts nowhere.
- */
-export function groupCounts(
-	counts: Readonly<Partial<Record<string, number>>>,
-): Record<RunGroup, number> {
-	const groups: Record<RunGroup, number> = {
-		running: 0,
-		"needs-you": 0,
-		failed: 0,
-		stopped: 0,
-		finished: 0,
-	};
-	for (const [status, count] of Object.entries(counts)) {
-		const group = Object.hasOwn(GROUP_OF, status)
-			? GROUP_OF[status as RunStatus]
-			: undefined;
-		if (group) groups[group] += count ?? 0;
-	}
-	return groups;
-}
-
 const STATUS_LABELS: Record<RunStatus, string> = {
 	running: "Running",
 	waiting: "Waiting for you",

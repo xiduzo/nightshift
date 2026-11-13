@@ -82,7 +82,7 @@ A project's page shows where each of its flows still needs you (`docs/research/d
 - The page has no details dialog. A number that leads to no run and no flow does not go on it.
 - Under it, one card with one row per flow (see Flow health). The flows that needed you most without a plan come first.
 - The page shows no spend of its own. The Spend page is in the sidebar. Cost stays only as evidence of a flow: how steady the cost of a run is, and what a run cost before and after a change.
-- A test run counts only in the spend. Every other number leaves it out (`isTestRun`, one rule for every number). So does the sidebar's runs donut. The run page and every run list show a **Test run** badge. On the phone, the Runs chips and the Watch numbers leave it out, and the cost caption names it ("Of 8 runs and 1 test run").
+- A test run counts only in the spend. Every other number leaves it out (`isTestRun`, one rule for every number). So does the sidebar's runs donut. The run page and every run list show a **Test run** badge.
 - An older Host sends no level and no planned split: a dash. It sends no steadiness: a grey strip.
 - Setup does not go on this page. Its other pages sit under the project in the sidebar.
 
@@ -249,7 +249,7 @@ to do, drop it.
 
 ## Responsive Behavior
 
-The product is a desktop app first. The web UI must still work in a narrow window. The phone app is a second screen for the inbox, runs and Start run. It uses React Native Reusables, not the web UI (see `docs/research/mobile.md`).
+The product is a desktop app first. The web UI must still work in a narrow window. The phone app is a controller for when you are away: Needs you (Gates and stopped runs) and Runs (running now, tonight). It shows no numbers, reports, history or learnings. Those are the work of the desktop and web app. It uses React Native Reusables, not the web UI (see `docs/research/mobile.md`).
 
 | Breakpoint | Width | Layout behavior |
 | --- | --- | --- |

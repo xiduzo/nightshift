@@ -2,123 +2,110 @@ import { describe, expect, test } from "bun:test";
 
 import type { RunDetail, RunResult, RunStatus } from "../runs";
 import { runProgress, sameProgress } from "./progress";
-import { glanceSnapshot, waitingText } from "./snapshot";
+import { glanceLooks, glanceSnapshot, nowText } from "./snapshot";
 
-const run = (
-	id: string,
-	status: RunStatus,
-	createdAt: number,
-	flowName: string | null = "fix-bug",
-	result: RunResult | null = null,
-) => ({ id, status, createdAt, flowName, result });
+type Gate = Parameters<typeof glanceSnapshot>[0]["gates"][number];
+
+const gate = (fields: Partial<Gate> & { runId: string }): Gate => ({
+	stepId: "s1",
+	flowName: "triage",
+	canAnswer: true,
+	answerPending: false,
+	deadline: null,
+	openedAt: 1,
+	urgency: "now",
+	...fields,
+});
+
+const time = (at: number) => `t${at}`;
 
 describe("the widget's snapshot", () => {
-	test("counts only the Gates you may answer", () => {
+	test("counts only the Gates marked Now that you may answer", () => {
 		const snapshot = glanceSnapshot({
-			gates: [{ canAnswer: true }, { canAnswer: false }, { canAnswer: true }],
-			runs: [],
+			gates: [
+				gate({ runId: "a" }),
+				gate({ runId: "read-only", canAnswer: false }),
+				gate({ runId: "sent", answerPending: true }),
+				gate({ runId: "today", urgency: "today" }),
+				gate({ runId: "b" }),
+			],
+			time,
 		});
-		expect(snapshot.waiting).toBe(2);
-		expect(snapshot.waitingText).toBe("2 Gates wait for you");
+		expect(snapshot.now).toBe(2);
+		expect(snapshot.nowText).toBe("2 things need you now");
+		expect(snapshot.laterText).toBe("1 Gate waits for later");
 	});
 
-	test("shows the three newest runs with their status, newest first", () => {
+	test("a Gate says when to answer by, a flow says it needs a look", () => {
 		const snapshot = glanceSnapshot({
-			gates: [],
-			runs: [
-				run("a", "finished", 1),
-				run("b", "failed", 4, "deploy"),
-				run("c", "waiting", 3),
-				run("d", "running", 2, null),
+			gates: [
+				gate({ runId: "a", flowName: null }),
+				gate({ runId: "b", deadline: { at: 730, choose: "keep" } }),
 			],
+			looks: [{ key: "web/deploy", flow: "deploy" }],
+			time,
 		});
-		expect(snapshot.runs).toEqual([
+		expect(snapshot.items).toEqual([
 			{
-				id: "b",
-				flow: "deploy",
-				status: "failed",
-				statusText: "Failed",
-				tone: "failed",
-			},
-			{
-				id: "c",
-				flow: "fix-bug",
-				status: "waiting",
-				statusText: "Waiting for you",
+				id: "gate:b:s1",
+				flow: "triage",
+				detail: "Answer by t730",
 				tone: "waiting",
 			},
 			{
-				id: "d",
+				id: "gate:a:s1",
 				flow: "Quick run",
-				status: "running",
-				statusText: "Running",
-				tone: "running",
+				detail: "Waits for your answer",
+				tone: "waiting",
+			},
+			{
+				id: "look:web/deploy",
+				flow: "deploy",
+				detail: "Needs a look",
+				tone: "failed",
 			},
 		]);
 	});
 
-	test("holds no run titles or Gate questions", () => {
+	test("shows three things and counts them all", () => {
 		const snapshot = glanceSnapshot({
-			gates: [{ canAnswer: true, question: "Ship it?" } as never],
-			runs: [{ ...run("a", "running", 1), title: "fix-bug · secret" } as never],
+			gates: [gate({ runId: "a" }), gate({ runId: "b" })],
+			looks: [
+				{ key: "p/x", flow: "x" },
+				{ key: "p/y", flow: "y" },
+			],
+			time,
+		});
+		expect(snapshot.items).toHaveLength(3);
+		expect(snapshot.now).toBe(4);
+	});
+
+	test("holds no Gate questions", () => {
+		const snapshot = glanceSnapshot({
+			gates: [{ ...gate({ runId: "a" }), question: "Ship it?" } as never],
+			time,
 		});
 		expect(JSON.stringify(snapshot)).not.toContain("Ship it?");
-		expect(JSON.stringify(snapshot)).not.toContain("secret");
 	});
 
-	// The newest runs are a list: a test run stays in it, with its label.
-	test("a test run stays among the newest runs, and its status says so", () => {
-		const snapshot = glanceSnapshot({
-			gates: [],
-			runs: [
-				{
-					...run("a", "finished", 1),
-					test: { pinned: ["fetch"], skipped: [] },
-				},
-				run("b", "running", 2),
-			],
-		});
-		expect(snapshot.runs.map((each) => [each.id, each.statusText])).toEqual([
-			["b", "Running"],
-			["a", "Finished · Test run"],
-		]);
-		expect(snapshot.runs[1]?.tone).toBe("finished");
+	test("says how many things need you now in words", () => {
+		expect(nowText(0)).toBe("Nothing needs you now");
+		expect(nowText(1)).toBe("1 thing needs you now");
+		expect(nowText(5)).toBe("5 things need you now");
 	});
+});
 
-	test("an interrupted run looks like a stopped one", () => {
-		const snapshot = glanceSnapshot({
-			gates: [],
-			runs: [run("a", "interrupted", 1)],
-		});
-		expect(snapshot.runs[0]?.tone).toBe("stopped");
-		expect(snapshot.runs[0]?.statusText).toBe("Interrupted");
-	});
-
-	test("a run that had nothing to do says so, as every screen does", () => {
-		const snapshot = glanceSnapshot({
-			gates: [],
-			runs: [
-				run("a", "finished", 1, "triage", "nothing-to-do"),
-				run("b", "finished", 2, "triage", "done"),
-				{
-					...run("c", "finished", 3, "triage", "nothing-to-do"),
-					test: { pinned: [], skipped: [] },
-				},
-			],
-		});
+describe("glanceLooks", () => {
+	test("only the flows with a severe signal", () => {
 		expect(
-			snapshot.runs.map((each) => [each.id, each.statusText, each.tone]),
-		).toEqual([
-			["c", "Nothing to do · Test run", "finished"],
-			["b", "Finished", "finished"],
-			["a", "Nothing to do", "finished"],
-		]);
-	});
-
-	test("says how many Gates wait in words", () => {
-		expect(waitingText(0)).toBe("Nothing waits for you");
-		expect(waitingText(1)).toBe("1 Gate waits for you");
-		expect(waitingText(5)).toBe("5 Gates wait for you");
+			glanceLooks({
+				flows: [
+					{ key: "p/a", flow: "a", signals: [{ severe: true }] },
+					{ key: "p/b", flow: "b", signals: [{ severe: false }] },
+				],
+			}),
+		).toEqual([{ key: "p/a", flow: "a" }]);
+		expect(glanceLooks(undefined)).toEqual([]);
 	});
 });
 

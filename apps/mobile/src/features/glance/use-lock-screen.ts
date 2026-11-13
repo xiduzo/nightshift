@@ -61,22 +61,6 @@ export function useLockScreenFollow(runId: string) {
 	};
 }
 
-/** Starts to follow a run on the lock screen, outside a button: after a start. */
-export function useFollowAfterStart() {
-	const { host } = useSignedIn();
-	const queryClient = useQueryClient();
-	const runQueries = useHostQueries(createRunQueries);
-	return useCallback(
-		(runId: string) =>
-			follower
-				.follow(host.address, runId, () =>
-					queryClient.fetchQuery({ ...runQueries.get(runId), staleTime: 0 }),
-				)
-				.catch(() => ({ kind: "refused" as const, reason: "" })),
-		[host.address, queryClient, runQueries],
-	);
-}
-
 /** Shows a followed run's newest progress; ends it with the run. */
 export function syncFollowedRun(
 	runId: string,
@@ -84,6 +68,3 @@ export function syncFollowedRun(
 ): void {
 	void follower.sync(runId, runProgress(run));
 }
-
-/** Whether this phone can show a run on the lock screen at all. */
-export const canFollowOnLockScreen = lockScreen.available;

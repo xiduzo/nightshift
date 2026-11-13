@@ -13,8 +13,8 @@ import {
 import type { HomeWidgetProps } from "./glance-props";
 
 /**
- * The home screen widget on Android: how many Gates wait for you and the
- * latest runs with their status. expo-widgets 58 cannot open a link from
+ * The home screen widget on Android: what needs you now. The Gates marked
+ * Now and the flows that need a look, each with its flow and why. expo-widgets 58 cannot open a link from
  * an Android widget, so a tap does not open the inbox there yet.
  *
  * A `'widget'` function runs in the widget's own runtime: it may use only
@@ -24,7 +24,7 @@ import type { HomeWidgetProps } from "./glance-props";
 const layout = (props: HomeWidgetProps, environment: WidgetEnvironment) => {
 	"widget";
 	const dark = environment.colorScheme === "dark";
-	const runs = props.runs ?? [];
+	const items = props.items ?? [];
 	const text = dark ? props.ink?.text.dark : props.ink?.text.light;
 	const muted = dark ? props.ink?.muted.dark : props.ink?.muted.light;
 	return (
@@ -33,29 +33,29 @@ const layout = (props: HomeWidgetProps, environment: WidgetEnvironment) => {
 				Night Shift
 			</Text>
 			<Text color={text} style={{ fontSize: 16, fontWeight: "700" }}>
-				{props.waitingText}
+				{props.nowText}
 			</Text>
 			<Spacer modifiers={[height(8)]} />
-			{runs.length === 0 ? (
+			{items.length === 0 ? (
 				<Text color={muted} style={{ fontSize: 13 }}>
-					{props.noRunsText}
+					{props.laterText}
 				</Text>
 			) : (
-				runs.map((run) => (
-					<Row key={run.id}>
+				items.map((item) => (
+					<Row key={item.id}>
 						<Text
 							color={text}
 							maxLines={1}
 							style={{ fontSize: 13, fontWeight: "500" }}
 						>
-							{`${run.flow}  `}
+							{`${item.flow}  `}
 						</Text>
 						<Text
-							color={dark ? run.dark : run.light}
+							color={dark ? item.dark : item.light}
 							maxLines={1}
 							style={{ fontSize: 13 }}
 						>
-							{run.statusText}
+							{item.detail}
 						</Text>
 					</Row>
 				))

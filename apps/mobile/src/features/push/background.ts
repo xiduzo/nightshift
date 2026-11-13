@@ -1,7 +1,7 @@
 import {
 	answerGate,
-	GLANCE_RUNS,
 	gateRefusalText,
+	glanceLooks,
 	glanceSnapshot,
 	PUSH_ANDROID_CHANNEL,
 	PUSH_CATEGORY,
@@ -16,6 +16,7 @@ import { AppState, Platform } from "react-native";
 
 import { updateGlance } from "@/features/glance";
 import { savedHost } from "@/features/host";
+import { formatTime } from "@/shared/format";
 import { defineCategories } from "./categories";
 import { inFrontPlace, showBanner } from "./in-front";
 import { lockScreenAnswer } from "./lock-answer";
@@ -112,8 +113,8 @@ async function tellOpenGate(
 }
 
 /**
- * Reads the open Gates and the latest runs again for the home screen
- * widget, so it is right while the app is not in front. Without a Host the
+ * Reads the open Gates and the flows that need a look again for the home
+ * screen widget, so it is right while the app is not in front. Without a Host the
  * widget shows nothing. A failed read keeps what the widget shows.
  */
 async function refreshGlance(): Promise<void> {
@@ -122,12 +123,18 @@ async function refreshGlance(): Promise<void> {
 		updateGlance(null);
 		return;
 	}
-	const [gates, runs] = await Promise.all([
+	const [gates, summary] = await Promise.all([
 		host.client.gates.list(),
-		// An older Host sends every run: the glance takes the newest.
-		host.client.runs.list({ limit: GLANCE_RUNS }),
+		// The widget shows the Gates even when the flows do not load.
+		host.client.dashboard.summary({ everySpace: true }).catch(() => undefined),
 	]);
-	updateGlance(glanceSnapshot({ gates, runs }));
+	updateGlance(
+		glanceSnapshot({
+			gates,
+			looks: glanceLooks(summary?.watch),
+			time: formatTime,
+		}),
+	);
 }
 
 /**

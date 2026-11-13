@@ -1,39 +1,33 @@
-import type { WaitingLearning } from "@nightshift/client";
 import { useMemo } from "react";
 
 import { useInbox } from "@/features/inbox";
-import { useLearningsToCheck } from "@/features/learnings";
 import { useStoppedRuns } from "@/features/runs";
 import { type NeedsItem, needsItems } from "./queue";
 
 /**
- * Everything that waits for you: the Gates you may answer, the runs that
- * stopped in the last day and the learnings to check, in one order
+ * Everything that waits for you: the Gates you may answer and the runs
+ * that stopped in the last day, in one order
  * (`needsItems`). `loading` while no part has loaded. A screen passes
  * `useWhileFocused().subscribed`. The tab bar stays subscribed.
  */
 export function useNeedsYou(subscribed = true) {
 	const gates = useInbox(subscribed);
 	const stopped = useStoppedRuns(subscribed);
-	const learnings = useLearningsToCheck(subscribed);
-	const items: NeedsItem<WaitingLearning>[] = useMemo(
+	const items: NeedsItem[] = useMemo(
 		() =>
 			needsItems({
 				gates: gates.data,
 				runs: stopped.runs,
-				learnings: learnings.learnings,
 			}),
-		[gates.data, stopped.runs, learnings.learnings],
+		[gates.data, stopped.runs],
 	);
-	const refetch = () =>
-		Promise.all([gates.refetch(), stopped.refetch(), learnings.refetch()]);
+	const refetch = () => Promise.all([gates.refetch(), stopped.refetch()]);
 	return {
 		items,
 		/** The Gates did not load: the queue may miss them. */
 		gatesError: gates.error,
 		runsError: stopped.error,
 		loading: gates.data === undefined && !gates.error,
-		learnings,
 		refetch,
 	};
 }

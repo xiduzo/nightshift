@@ -1,60 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { hostOwnerHint, placementChoices } from "./placements";
-
-const host = { deviceId: "host", name: "Studio", thisDevice: true };
-const laptop = { deviceId: "laptop", name: "Laptop", thisDevice: false };
-const offered = {
-	deviceId: "kim",
-	name: "Kim's Mac",
-	thisDevice: false,
-	offers: ["claude"],
-};
-const device = (
-	deviceId: string,
-	online: boolean,
-	hasClone = true,
-	thisDevice = false,
-) => ({ deviceId, name: deviceId, thisDevice, online, hasClone });
-
-describe("where a run can go", () => {
-	test("the online Devices first, then your offline ones with the project", () => {
-		const choices = placementChoices(
-			[host, offered],
-			[
-				device("host", true, true, true),
-				device("laptop", false),
-				device("old-pc", false, false),
-			],
-		);
-		expect(choices.map((c) => [c.deviceId, c.online])).toEqual([
-			["host", true],
-			["kim", true],
-			["laptop", false],
-		]);
-		expect(choices[1]?.offers).toEqual(["claude"]);
-		expect("offers" in (choices[0] ?? {})).toBe(false);
-	});
-
-	test("without the Devices list, only the online ones", () => {
-		expect(placementChoices([laptop]).map((c) => c.deviceId)).toEqual([
-			"laptop",
-		]);
-	});
-
-	test("goes where the person chose, else where Night Shift marks the default, else the first", () => {
-		const desktop = { deviceId: "desktop", name: "Desktop", thisDevice: false };
-		const choices = placementChoices(
-			[host, { ...desktop, lastRun: true, default: true }],
-			[device("pc", false)],
-		);
-		expect(choices.map((c) => c.default ?? false)).toEqual([
-			false,
-			true,
-			false,
-		]);
-	});
-});
+import { hostOwnerHint } from "./placements";
 
 describe("the words for a Host that another person runs", () => {
 	test("name the Host admin and what they offer to this Space", () => {

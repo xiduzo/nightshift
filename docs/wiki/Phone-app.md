@@ -1,6 +1,6 @@
 # Phone app
 
-The phone app is the night watch. You draw and change flows on your computer. On the phone you follow your runs and answer what waits for you.
+The phone app is for when you are away from your computer. It tells you what needs you now, and you act on it: answer a Gate, pause tonight, run a flow now, or stop a run. You build flows, start new runs and see how your flows do on your computer.
 
 The phone app is in a closed test. It is not in the App Store or Google Play yet.
 
@@ -17,18 +17,17 @@ Your phone needs a [Host](Computers-and-Hosts.md#run-a-host).
 
 | Tab | Shows |
 | --- | --- |
-| **Watch** | What needs you, how your latest day of runs went, the latest reports, and what runs now. Pause tonight's schedules, or run one now. |
-| **Needs you** | The Gates and Asks that wait, with their count. |
-| **Runs** | The runs, their steps, reports, transcripts, and changed files. |
+| **Needs you** | The Gates and Asks that wait for you, by urgency: Now, Today, When you have time. The runs that stopped in the last day, with **Retry** or **Resume**. |
+| **Runs** | What runs now, and what runs tonight. Tap a run to follow it or stop it. Pause a schedule for tonight, or run its flow now. |
 
 - **Answer** a Gate, or a simple Ask.
-- **Read a report.** A run can end with a report from its End node. The run screen shows its start. Tap **Read all** to read all of it, and select text to copy it. A picture in a report shows as a link.
-- **Start a flow** with its inputs.
-- **A test run** shows a **Test run** badge. A step whose node did not run says **Pinned output** or **Skipped**. The phone does not ask if a test run was useful. See [Test runs](Runs-and-schedules.md#test-runs).
-- **The counts leave test runs out.** The chips of **Runs** and the numbers of **Watch** do not count them. The cost of the day counts them, and says how many it holds: "Of 8 runs and 1 test run". **Watch** shows the latest day with a run that is not a test run.
+- **Follow a run.** The run screen shows its steps, transcripts and changed files, with **Stop**.
+- **A test run** shows a **Test run** badge. A step whose node did not run says **Pinned output** or **Skipped**. See [Test runs](Runs-and-schedules.md#test-runs).
 - **The lock screen.** Approve or reject a Gate with two options, when its node allows it.
 - **A Live Activity** follows a run on the lock screen.
-- **A widget** shows on the home screen how many Gates wait and how your latest runs went. A test run there says **Test run** after its status.
+- **A widget** shows on the home screen what needs you now: the Gates marked Now, and the flows that need a look. It never shows what a Gate asks.
+
+The phone shows no numbers, reports or history. Open Night Shift on your computer for those, and for learnings to check.
 
 ## Notifications
 
@@ -39,4 +38,4 @@ A push tells you what waits, and nothing more:
 - A step waits for a computer that is offline.
 - A schedule did not start.
 
-A report never sends a push. **Latest reports** on Watch shows the newest report of up to three flows from the last 7 days.
+A report never sends a push. Read reports on your computer.

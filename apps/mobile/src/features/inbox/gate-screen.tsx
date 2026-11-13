@@ -4,7 +4,6 @@ import {
 	choiceRoutes,
 	confirmText,
 	costLabel,
-	createProjectQueries,
 	createRunQueries,
 	createSpaceQueries,
 	type GateChoice,
@@ -171,7 +170,7 @@ function ClosedGate({
 			<EmptyState icon={CircleCheck} title={title} description={description}>
 				<Button
 					size="lg"
-					onPress={() => router.dismissTo("/needs")}
+					onPress={() => router.dismissTo("/")}
 					className="h-auto min-h-11 py-2"
 				>
 					<Text>Back to Needs you</Text>
@@ -202,11 +201,6 @@ function OpenGateScreen({
 	const spaceQueries = useHostQueries(createSpaceQueries);
 	const spaces = useQuery({ ...spaceQueries.list(), ...useWhileFocused() });
 	const manySpaces = (spaces.data?.spaces.length ?? 1) > 1;
-	const projectQueries = useHostQueries(createProjectQueries);
-	const projects = useQuery({ ...projectQueries.list(), ...useWhileFocused() });
-	/** A project screen shows the projects of the Space this phone works in only. */
-	const projectHere =
-		projects.data?.some((project) => project.id === gate.projectId) ?? false;
 	const runQueries = useHostQueries(createRunQueries);
 	const run = useQuery({ ...runQueries.get(gate.runId), ...useWhileFocused() });
 	const labels = run.data ? nodeLabels(run.data) : NO_LABELS;
@@ -242,7 +236,6 @@ function OpenGateScreen({
 				form={gate.form}
 				inbox={inbox}
 				manySpaces={manySpaces}
-				projectHere={projectHere}
 				onRefresh={onRefresh}
 				onSent={onSent}
 				onGone={onGone}
@@ -291,12 +284,7 @@ function OpenGateScreen({
 			/>
 
 			<View className="gap-3">
-				<Breadcrumbs
-					gate={gate}
-					manySpaces={manySpaces}
-					projectHere={projectHere}
-					runHref={runHref}
-				/>
+				<Breadcrumbs gate={gate} manySpaces={manySpaces} runHref={runHref} />
 				<Text
 					accessibilityRole="header"
 					selectable

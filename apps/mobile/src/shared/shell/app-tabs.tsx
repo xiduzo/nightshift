@@ -11,7 +11,7 @@ import { useInFront } from "@/shared/in-front";
 import { TabBar } from "./tab-bar";
 
 /**
- * The three tabs: Watch, Needs you and Runs. Without a Host, or
+ * The two tabs: Needs you and Runs. Without a Host, or
  * signed out, the person goes to the connect screen first. While signed
  * in and in front, the app follows the Host: the live cache reads again
  * what changed, and a new Gate shows as a banner in the app. The home

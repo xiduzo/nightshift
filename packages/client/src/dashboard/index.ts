@@ -10,14 +10,7 @@ export {
 	moveToneLabel,
 	verdictLabel,
 } from "./changes";
-export {
-	CONSOLE_METRICS,
-	type ConsoleMetric,
-	type ConsoleValues,
-	consoleValues,
-	daysOf,
-} from "./console";
-export { dayLabel } from "./day-label";
+export { daysOf } from "./console";
 export { type NodeLadder, nodeLadderLabel } from "./ladders";
 export { createDashboardQueries, readerTimeZone } from "./queries";
 export {

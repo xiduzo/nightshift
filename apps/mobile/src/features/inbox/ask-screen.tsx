@@ -62,7 +62,6 @@ export function AskScreen({
 	form,
 	inbox,
 	manySpaces,
-	projectHere,
 	onRefresh,
 	onSent,
 	onGone,
@@ -71,7 +70,6 @@ export function AskScreen({
 	form: AskForm;
 	inbox: readonly OpenGate[];
 	manySpaces: boolean;
-	projectHere: boolean;
 	onRefresh: () => Promise<unknown>;
 	onSent: () => void;
 	onGone: (refusal: GoneRefusal) => void;
@@ -122,12 +120,7 @@ export function AskScreen({
 			}
 		>
 			<View className="gap-3">
-				<Breadcrumbs
-					gate={gate}
-					manySpaces={manySpaces}
-					projectHere={projectHere}
-					runHref={runHref}
-				/>
+				<Breadcrumbs gate={gate} manySpaces={manySpaces} runHref={runHref} />
 				<Text
 					accessibilityRole="header"
 					selectable

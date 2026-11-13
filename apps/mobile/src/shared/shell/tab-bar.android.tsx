@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Hand, History, type LucideIcon, Moon } from "lucide-react-native";
+import { Hand, type LucideIcon, Moon } from "lucide-react-native";
 import type { ColorValue } from "react-native";
 
 import { useThemeColors } from "@/shared/theme";
@@ -12,7 +12,7 @@ function icon(Icon: LucideIcon) {
 }
 
 /**
- * The three tabs on Android: the JavaScript tab bar with lucide icons. The
+ * The two tabs on Android: the JavaScript tab bar with lucide icons. The
  * native tabs of Android need `expo-symbols` or drawables for their icons,
  * which this app does not ship. Each tab is a stack with its own native
  * header (`TabStack`), which keeps the page below the status bar.
@@ -29,11 +29,7 @@ export function TabBar({ waiting, needsLabel }: TabBarProps) {
 			}}
 		>
 			<Tabs.Screen
-				name="(watch)"
-				options={{ title: "Watch", tabBarIcon: icon(Moon) }}
-			/>
-			<Tabs.Screen
-				name="needs"
+				name="(needs)"
 				options={{
 					title: "Needs you",
 					tabBarIcon: icon(Hand),
@@ -43,7 +39,7 @@ export function TabBar({ waiting, needsLabel }: TabBarProps) {
 			/>
 			<Tabs.Screen
 				name="runs"
-				options={{ title: "Runs", tabBarIcon: icon(History) }}
+				options={{ title: "Runs", tabBarIcon: icon(Moon) }}
 			/>
 		</Tabs>
 	);

@@ -3,7 +3,6 @@ import {
 	hoverTime,
 	type RunSummary,
 	URGENCY_LABEL,
-	type WaitingLearning,
 } from "@nightshift/client";
 import {
 	Alert,
@@ -17,14 +16,12 @@ import { Text } from "@nightshift/ui-native/components/ui/text";
 import { cn } from "@nightshift/ui-native/lib/utils";
 import type { ListRenderItemInfo } from "@shopify/flash-list";
 import { useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { Inbox, Undo2 } from "lucide-react-native";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
 
 import { useHostQueries, useSignedIn } from "@/features/host";
 import { GateRow } from "@/features/inbox";
-import { LearningRow } from "@/features/learnings";
 import { PushCard } from "@/features/push";
 import { leaveRun, unleaveRun } from "@/features/runs";
 import { EmptyState } from "@/shared/empty";
@@ -68,20 +65,15 @@ const SECTION_HEAD: Record<NeedsSection, { title: string; hint: string }> = {
 		title: "Runs that stopped",
 		hint: "Retry or resume them, or leave them.",
 	},
-	learning: {
-		title: "Learnings to check",
-		hint: "Agents use a learning you keep from their next run.",
-	},
 };
 
-type Row = NeedsRow<WaitingLearning>;
+type Row = NeedsRow;
 
 /**
  * The Needs you tab: everything that waits for you, in sections. The
  * Gates you may answer, by urgency (Now, Today, When you have time), in
  * each the first to close first. The runs that
- * stopped in the last day, with Retry or Resume and Leave it. The
- * learnings to keep or delete. A section's head stays at the top while
+ * stopped in the last day, with Retry or Resume and Leave it. A section's head stays at the top while
  * its rows scroll under it.
  */
 export function NeedsScreen() {
@@ -92,7 +84,6 @@ export function NeedsScreen() {
 	const projects = useQuery({ ...projectQueries.list(), subscribed });
 	const refresh = useScreenRefresh([needs.refetch, projects.refetch]);
 	const retry = useRetryRuns();
-	const { onKeep, onDelete, failure: settleFailure } = needs.learnings;
 	const [left, setLeft] = useState<{ runId: string; title: string } | null>(
 		null,
 	);
@@ -145,20 +136,9 @@ export function NeedsScreen() {
 							/>
 						</ListCell>
 					);
-				case "learning":
-					return (
-						<ListCell first={item.first} last={item.last}>
-							<LearningRow
-								learning={item.learning}
-								projectName={projectNames.get(item.learning.projectId) ?? null}
-								onKeep={onKeep}
-								onDelete={onDelete}
-							/>
-						</ListCell>
-					);
 			}
 		},
-		[projectNames, sends, onRetry, onLeave, onKeep, onDelete],
+		[projectNames, sends, onRetry, onLeave],
 	);
 
 	const firstAt = firstDeadline(needs.items);
@@ -191,7 +171,9 @@ export function NeedsScreen() {
 					{left ? (
 						<Alert icon={Undo2}>
 							<AlertTitle>You left {left.title}</AlertTitle>
-							<AlertDescription>It stays in Runs.</AlertDescription>
+							<AlertDescription>
+								You still find it on the computer.
+							</AlertDescription>
 							<Button
 								variant="outline"
 								size="sm"
@@ -229,13 +211,6 @@ export function NeedsScreen() {
 							fix="Check that this phone is online and that your role in this Space lets you do this."
 						/>
 					) : null}
-					{settleFailure ? (
-						<ErrorAlert
-							title={settleFailure.title}
-							message={settleFailure.message}
-							fix="Check that this phone is online, then try again."
-						/>
-					) : null}
 					{needs.loading ? (
 						<>
 							<Skeleton className="h-6 w-1/3 rounded-md" />
@@ -247,17 +222,8 @@ export function NeedsScreen() {
 							<EmptyState
 								icon={Inbox}
 								title="Nothing needs you"
-								description="When a Gate opens, a run stops or agents learn something, it shows here."
-							>
-								<Button
-									size="lg"
-									variant="outline"
-									onPress={() => router.navigate("/")}
-									className="h-auto min-h-11 py-2"
-								>
-									<Text>See your latest runs</Text>
-								</Button>
-							</EmptyState>
+								description="When a Gate waits for you or a run stops, it shows here."
+							/>
 							<PushCard />
 						</>
 					) : null}

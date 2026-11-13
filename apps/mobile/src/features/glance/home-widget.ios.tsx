@@ -16,8 +16,9 @@ import {
 import type { HomeWidgetProps } from "./glance-props";
 
 /**
- * The home screen and lock screen widget on iOS: how many Gates wait for
- * you and the latest runs with their status. A tap opens the inbox.
+ * The home screen and lock screen widget on iOS: what needs you now. The
+ * Gates marked Now and the flows that need a look, each with its flow and
+ * why. A tap opens Needs you.
  *
  * A `'widget'` function runs in the widget's own runtime: it may use only
  * its props, its environment and `@expo/ui` components, nothing else from
@@ -26,37 +27,35 @@ import type { HomeWidgetProps } from "./glance-props";
 const layout = (props: HomeWidgetProps, environment: WidgetEnvironment) => {
 	"widget";
 	const dark = environment.colorScheme === "dark";
-	const runs = props.runs ?? [];
-	const count = props.waiting ?? 0;
+	const items = props.items ?? [];
+	const count = props.now ?? 0;
 	const label =
 		count === 0
-			? props.waitingText
+			? props.nowText
 			: count === 1
-				? "Gate waits for you"
-				: "Gates wait for you";
+				? "thing needs you now"
+				: "things need you now";
 
 	if (environment.widgetFamily === "accessoryInline") {
 		return (
-			<Text modifiers={[widgetURL("nightshift://inbox")]}>
-				{props.waitingText}
-			</Text>
+			<Text modifiers={[widgetURL("nightshift://")]}>{props.nowText}</Text>
 		);
 	}
 
 	if (environment.widgetFamily === "accessoryRectangular") {
-		const latest = runs[0];
+		const first = items[0];
 		return (
 			<VStack
 				alignment="leading"
 				spacing={2}
-				modifiers={[widgetURL("nightshift://inbox")]}
+				modifiers={[widgetURL("nightshift://")]}
 			>
 				<Text modifiers={[font({ weight: "semibold", size: 15 })]}>
-					{props.waitingText}
+					{props.nowText}
 				</Text>
-				{latest ? (
+				{first ? (
 					<Text modifiers={[font({ size: 13 }), lineLimit(1)]}>
-						{`${latest.flow} · ${latest.statusText}`}
+						{`${first.flow} · ${first.detail}`}
 					</Text>
 				) : null}
 			</VStack>
@@ -93,7 +92,7 @@ const layout = (props: HomeWidgetProps, environment: WidgetEnvironment) => {
 				alignment="leading"
 				modifiers={[
 					frame({ maxWidth: 10000, maxHeight: 10000, alignment: "topLeading" }),
-					widgetURL("nightshift://inbox"),
+					widgetURL("nightshift://"),
 				]}
 			>
 				{waiting}
@@ -107,27 +106,27 @@ const layout = (props: HomeWidgetProps, environment: WidgetEnvironment) => {
 			spacing={16}
 			modifiers={[
 				frame({ maxWidth: 10000, maxHeight: 10000, alignment: "topLeading" }),
-				widgetURL("nightshift://inbox"),
+				widgetURL("nightshift://"),
 			]}
 		>
 			{waiting}
 			<VStack alignment="leading" spacing={8} modifiers={[padding({ top: 2 })]}>
-				{runs.length === 0 ? (
+				{items.length === 0 ? (
 					<Text
 						modifiers={[
 							font({ size: 13 }),
 							foregroundStyle({ type: "hierarchical", style: "secondary" }),
 						]}
 					>
-						{props.noRunsText}
+						{props.laterText}
 					</Text>
 				) : (
-					runs.map((run) => (
-						<HStack key={run.id} spacing={6} alignment="top">
+					items.map((item) => (
+						<HStack key={item.id} spacing={6} alignment="top">
 							<Image
 								systemName="circle.fill"
 								size={8}
-								color={dark ? run.dark : run.light}
+								color={dark ? item.dark : item.light}
 								modifiers={[padding({ top: 4 })]}
 							/>
 							<VStack alignment="leading" spacing={0}>
@@ -137,16 +136,16 @@ const layout = (props: HomeWidgetProps, environment: WidgetEnvironment) => {
 										lineLimit(1),
 									]}
 								>
-									{run.flow}
+									{item.flow}
 								</Text>
 								<Text
 									modifiers={[
 										font({ size: 12 }),
-										foregroundStyle(dark ? run.dark : run.light),
+										foregroundStyle(dark ? item.dark : item.light),
 										lineLimit(1),
 									]}
 								>
-									{run.statusText}
+									{item.detail}
 								</Text>
 							</VStack>
 						</HStack>

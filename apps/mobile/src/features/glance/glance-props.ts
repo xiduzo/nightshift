@@ -39,49 +39,49 @@ const INK: InkColors = {
 	muted: schemeColor("mutedForeground"),
 };
 
-/** One run on the home screen widget. */
-export type WidgetRun = {
+/** One thing that needs you now, on the home screen widget. */
+export type WidgetItem = {
 	id: string;
 	flow: string;
-	statusText: string;
+	detail: string;
 	light: string;
 	dark: string;
 };
 
 /** The props of the home screen widget: plain values only, ready to show. */
 export type HomeWidgetProps = {
-	waiting: number;
-	waitingText: string;
-	noRunsText: string;
-	runs: WidgetRun[];
+	now: number;
+	nowText: string;
+	laterText: string;
+	items: WidgetItem[];
 	ink: InkColors;
 };
 
 /**
  * The widget's props from a snapshot. Null is a phone that is not signed
- * in: the widget shows no count and no runs of a Host it cannot read.
+ * in: the widget shows nothing of a Host it cannot read.
  */
 export function homeWidgetProps(
 	snapshot: GlanceSnapshot | null,
 ): HomeWidgetProps {
 	if (!snapshot) {
 		return {
-			waiting: 0,
-			waitingText: "Open Night Shift to connect to your Host",
-			noRunsText: "",
-			runs: [],
+			now: 0,
+			nowText: "Open Night Shift to connect to your Host",
+			laterText: "",
+			items: [],
 			ink: INK,
 		};
 	}
 	return {
-		waiting: snapshot.waiting,
-		waitingText: snapshot.waitingText,
-		noRunsText: snapshot.noRunsText,
-		runs: snapshot.runs.map((run) => ({
-			id: run.id,
-			flow: run.flow,
-			statusText: run.statusText,
-			...TONE_COLORS[run.tone],
+		now: snapshot.now,
+		nowText: snapshot.nowText,
+		laterText: snapshot.laterText,
+		items: snapshot.items.map((item) => ({
+			id: item.id,
+			flow: item.flow,
+			detail: item.detail,
+			...TONE_COLORS[item.tone],
 		})),
 		ink: INK,
 	};

@@ -29,14 +29,11 @@ function run(id: string): RunSummary {
 	return { id } as RunSummary;
 }
 
-type L = { projectId: string; id: string };
-const learning: L = { projectId: "web", id: "l1" };
-
 const time = (at: number) => `t${at / MIN}`;
 
 describe("needsItems", () => {
 	test("only the Gates you may answer, in queue order", () => {
-		const items = needsItems<L>({
+		const items = needsItems({
 			gates: [
 				gate({ runId: "old", openedAt: 1 }),
 				gate({ runId: "read-only", canAnswer: false }),
@@ -45,7 +42,6 @@ describe("needsItems", () => {
 				gate({ runId: "now", urgency: "now", openedAt: 9 }),
 			],
 			runs: undefined,
-			learnings: undefined,
 		});
 		expect(items.map((item) => item.key)).toEqual([
 			"gate:now:s1",
@@ -54,34 +50,29 @@ describe("needsItems", () => {
 		]);
 	});
 
-	test("the Gates, then the runs, then the learnings", () => {
-		const items = needsItems<L>({
+	test("the Gates, then the runs", () => {
+		const items = needsItems({
 			gates: [gate({ runId: "g" })],
 			runs: [run("x"), run("y")],
-			learnings: [learning],
 		});
 		expect(items.map((item) => item.key)).toEqual([
 			"gate:g:s1",
 			"run:x",
 			"run:y",
-			"learning:web:l1",
 		]);
 	});
 
 	test("a part that loads adds nothing yet", () => {
-		expect(
-			needsItems<L>({ gates: undefined, runs: undefined, learnings: [] }),
-		).toEqual([]);
+		expect(needsItems({ gates: undefined, runs: [] })).toEqual([]);
 	});
 });
 
 describe("needsRows", () => {
 	test("a head per section that holds something, and where each card starts and ends", () => {
 		const rows = needsRows(
-			needsItems<L>({
+			needsItems({
 				gates: [gate({ runId: "g" })],
-				runs: undefined,
-				learnings: [learning, { projectId: "web", id: "l2" }],
+				runs: [run("x"), run("y")],
 			}),
 		);
 		expect(
@@ -93,16 +84,16 @@ describe("needsRows", () => {
 		).toEqual([
 			"head:today:1:true",
 			"gate:g:s1:true:true",
-			"head:learning:2:false",
-			"learning:web:l1:true:false",
-			"learning:web:l2:false:true",
+			"head:run:2:false",
+			"run:x:true:false",
+			"run:y:false:true",
 		]);
 		expect(headIndices(rows)).toEqual([0, 2]);
 	});
 
 	test("the Gates split by urgency: now, today, when you have time", () => {
 		const rows = needsRows(
-			needsItems<L>({
+			needsItems({
 				gates: [
 					gate({ runId: "later", urgency: "later" }),
 					gate({ runId: "old" }),
@@ -110,7 +101,6 @@ describe("needsRows", () => {
 					gate({ runId: "now", urgency: "now", openedAt: 9 }),
 				],
 				runs: [run("x")],
-				learnings: undefined,
 			}),
 		);
 		expect(
@@ -137,13 +127,12 @@ describe("needsRows", () => {
 
 describe("needsSummary", () => {
 	test("how many things, and when the first Gate closes", () => {
-		const items = needsItems<L>({
+		const items = needsItems({
 			gates: [
 				gate({ runId: "a", deadline: { at: 90 * MIN, choose: "keep" } }),
 				gate({ runId: "b", deadline: { at: 30 * MIN, choose: "keep" } }),
 			],
 			runs: [run("x")],
-			learnings: undefined,
 		});
 		expect(needsSummary(items, time)).toBe(
 			"3 things. The first Gate closes at t30.",
@@ -151,13 +140,12 @@ describe("needsSummary", () => {
 	});
 
 	test("the first deadline of any Gate, also when a Gate for now has none", () => {
-		const items = needsItems<L>({
+		const items = needsItems({
 			gates: [
 				gate({ runId: "a", urgency: "now" }),
 				gate({ runId: "b", deadline: { at: 30 * MIN, choose: "keep" } }),
 			],
 			runs: undefined,
-			learnings: undefined,
 		});
 		expect(firstDeadline(items)).toBe(30 * MIN);
 		expect(needsSummary(items, time)).toBe(
@@ -166,16 +154,14 @@ describe("needsSummary", () => {
 	});
 
 	test("a Gate without a deadline, no Gate, nothing", () => {
-		const one = needsItems<L>({
+		const one = needsItems({
 			gates: [gate({})],
 			runs: undefined,
-			learnings: undefined,
 		});
 		expect(needsSummary(one, time)).toBe("1 thing. A Gate waits for you.");
-		const noGate = needsItems<L>({
+		const noGate = needsItems({
 			gates: [],
 			runs: [run("x")],
-			learnings: undefined,
 		});
 		expect(needsSummary(noGate, time)).toBe("1 thing. No Gate is open.");
 		expect(needsSummary([], time)).toBe("Nothing needs you");

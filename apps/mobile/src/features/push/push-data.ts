@@ -103,7 +103,7 @@ export function showInFront(data: PushData | null, place: InFrontPlace) {
 	if (data.kind !== "gate-opened" && data.kind !== "gates-waiting") {
 		return false;
 	}
-	if (place.pathname === "/needs") return false;
+	if (place.pathname === "/") return false;
 	if (data.runId && data.stepId) {
 		return place.pathname !== `/gates/${data.runId}/${data.stepId}`;
 	}
@@ -117,7 +117,7 @@ export type PhoneRoute =
 			params: { runId: string; stepId: string };
 	  }
 	| { pathname: "/runs/[runId]"; params: { runId: string } }
-	| { pathname: "/needs" };
+	| { pathname: "/" };
 
 /**
  * The screen of a route: the Gate, the run, or Needs you (`/needs`). The
@@ -133,7 +133,7 @@ export function phoneRouteOf(route: PushRoute): PhoneRoute {
 		case "run":
 			return { pathname: "/runs/[runId]", params: { runId: route.runId } };
 		case "inbox":
-			return { pathname: "/needs" };
+			return { pathname: "/" };
 	}
 }
 
