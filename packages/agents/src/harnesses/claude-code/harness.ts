@@ -131,6 +131,9 @@ export const READ_ONLY_DISALLOWED = [
 	"Write",
 	"Task",
 	"Agent",
+	// What a read-only session reads is private. It must not reach the web.
+	"WebFetch",
+	"WebSearch",
 ] as const;
 
 /** `--disallowedTools` of one session: the harness's own, and the read-only list. */

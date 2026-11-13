@@ -13,12 +13,15 @@
 import {
 	type AgentHarnessName,
 	type AgentProfileSettings,
+	builtinAgent,
 	type ChatEvent,
 	type ChatRequest,
+	chatMessage,
 	type FlowProposal,
 	harnessTakesTools,
 } from "@nightshift/flows";
 import type { AgentHarness } from "../port";
+import { toolsOf } from "./builtin-tools";
 import { describeHistoryTool, type HistoryPort, historyTools } from "./history";
 import { type ChatExchange, chatFollowUpPrompt, chatPrompt } from "./prompts";
 import { runAssistantSession } from "./session";
@@ -54,6 +57,12 @@ export function resumesOnAnotherModel(harness: AgentHarnessName): boolean {
 
 export type ChatTurnInput = {
 	request: ChatRequest;
+	/**
+	 * The built-in agent that answers: the Builder makes and changes the
+	 * flow, the Improver also reads what happened in the project. Each gets
+	 * its own tools and its own limits.
+	 */
+	agent: "builder" | "improver";
 	/** The harness that answers, as this computer runs it. */
 	harness: AgentHarness;
 	/** The model and effort that answer. */
@@ -93,29 +102,34 @@ export async function* chatTurn(
 	input: ChatTurnInput,
 ): AsyncGenerator<ChatTurnEvent> {
 	const { request, harness, signal } = input;
+	// The person's own message, or the first message of the entry.
+	const message = chatMessage(request) ?? "";
 	const proposals: FlowProposal[] = [];
-	// With the history tools, their `get_run` reads any run of the project.
+	// The history tools are the Improver's: their `get_run` reads any run of
+	// the project. The session gets only the tools its agent lists.
+	const past = input.agent === "improver" ? input.past : undefined;
 	const { run: _run, ...withoutRun } = input.port;
-	const tools = [
+	const tools = toolsOf(input.agent, [
 		...authoringTools({
-			...(input.past ? withoutRun : input.port),
+			...(past ? withoutRun : input.port),
 			propose: (proposal) => {
 				proposals.push(proposal);
 			},
 		}),
-		...(input.past ? historyTools(input.past, input.port.draft) : []),
-	];
+		...(past ? historyTools(past, input.port.draft) : []),
+	]);
+	const aboutRun = input.agent === "improver" ? request.runId : undefined;
 	const prompt = input.resumeSessionId
 		? chatFollowUpPrompt({
-				message: request.message,
-				...(input.newRun && request.runId ? { newRunId: request.runId } : {}),
+				message,
+				...(input.newRun && aboutRun ? { newRunId: aboutRun } : {}),
 			})
 		: chatPrompt({
 				flowName: request.flowName,
 				flow: request.flow,
-				message: request.message,
-				...(request.runId ? { runId: request.runId } : {}),
-				...(input.past ? { past: true } : {}),
+				message,
+				...(aboutRun ? { runId: aboutRun } : {}),
+				...(past ? { past: true } : {}),
 				...(input.history && input.history.length > 0
 					? { history: input.history }
 					: {}),
@@ -136,6 +150,7 @@ export async function* chatTurn(
 		tools,
 		describeTool: (name) =>
 			describeAuthoringTool(name) ?? describeHistoryTool(name),
+		limits: builtinAgent(input.agent).limits,
 		signal,
 	})) {
 		yield* flush();

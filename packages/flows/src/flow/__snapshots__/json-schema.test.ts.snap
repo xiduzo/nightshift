@@ -8056,6 +8056,7 @@ exports[`published schemas customAgentSchema as JSON Schema 1`] = `
 
 exports[`published schemas every published schema as a JSON Schema hash 1`] = `
 {
+  "agentEntryIdSchema": "cb16210d596ce7724c36af97bfa08d9e077451afa5b1352e1d261d1807dabd40",
   "agentHarnessSchema": "d12cc5d7f05c6d4a3a3619d72791c31de7a482d1090430b563bf01d4149f9471",
   "agentNodeSchema": "e59c7eec9d4eff3a996e7a7d95660a9fe931b32eb6b073e06949b31f7d6cb995",
   "agentProfileSchema": "bed949397866c087d61cfac1a7ada6bb6b9f11d13b232be0c56b0d150bf20ee8",
@@ -8067,11 +8068,14 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "askFormSchema": "097414de3e04104422c07cb05b39ec3ee8347aae90cfb84348b9964bf3690aa1",
   "assistantAgentSchema": "36bfe28d5f2ea9f04d7ede5e9b04c55b639f78d55df97c28163748894aa7622f",
   "attachmentSourceSchema": "e63152c9f939d53092f05c55ddd5ea845d0590d46db2407cff64b1f3cccdbf96",
+  "builtinAgentIdSchema": "c6fbfd5b81f7ca2e4415d45d9da78eb003bf664e620ee168f68e776608d5c31d",
+  "builtinAnswerSchema": "d652e3e515c84e549c3bb4ca11934099b568b47c387f5d994fa0669c79ca4042",
+  "builtinAnswersSchema": "7434a255f10328fd40a6c8c6e45eef84fb6b0b40bce03a33748837e96d7ff7a7",
   "callEachSchema": "9beea47d254094b6284537655fecbbddd2721f074705bffb1c0b45fb9109f0d7",
   "callNodeSchema": "856424b932b2bdf5e466e4df2fefb72963a974a3c5f8eaeeb7cb85cde6c12095",
   "callTierSchema": "00472b8d815f172216c3976c44d8148ab36a7690a4b331f344112daf0a7ade18",
   "calledFlowNameSchema": "41a733acacaf6fd4a56ce1af8652a762a9eae1a70888ac38628091b417b7f999",
-  "chatRequestSchema": "3640a1167a69fdd094833210c8a43c4c828c57cbdb3d757996db7606bc3efe50",
+  "chatRequestSchema": "a27e3406b325e72a3a9fdfe13751300781bda32f84a665bc538d447524720063",
   "choiceItemSchema": "55d6a793593f2331affa67faa389d61df03d4029c01b7a7443f9a98834f63da7",
   "cliNameSchema": "51a3ab3696b70b9bee33bc67a8d7cb8f1ae494ccef5ccc7e73878b93fb22c12c",
   "commandExitSchema": "81c5c7ed3b70f87931cdd1b3beb8943305b5a7b50e6f5840b9d885ba920e88a3",
@@ -8092,6 +8096,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "effortSchema": "493230d82c85cabb606d65dd36a75b762c05cb4a2b5fda14a43a1d6b1d2d1902",
   "endNodeSchema": "76ce43efb69a45372dec7ea4aa0dfb869e373cdd28f6629dab83f3ca038dacb8",
   "endStatusSchema": "1b45bb9efb2f5fc745832f728bd234de5e568540940e6f98def1b412fbeaca2e",
+  "entrySavingSchema": "97815168fbe518e3ecaadb118ea638a438e098938328e584f4021febbbb42c67",
   "flowEdgeSchema": "fa102c4d0dbb7e0dc39d6b2ff6a8dda61e677b0a5b06f37519200f3145d3e80d",
   "flowInputSchema": "c4327eae5fd47880a975ba515ace6c59b99e4872d70d039dbe0e13f3b78794dd",
   "flowInputTypeSchema": "01b4ffbb09aa8ea76514a7d2ec8b814bc6d444afe04c4387819be8a08a4b10a4",

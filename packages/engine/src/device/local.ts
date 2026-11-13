@@ -106,6 +106,11 @@ export type LocalDeviceDeps = {
 	/** Decides Decision nodes and makes values for Value nodes. */
 	decider?: Decider;
 	/**
+	 * Who answers for Night Shift's own Decider and Brief writer here, from
+	 * this computer's settings. Read on each `capabilities` call.
+	 */
+	builtinModels?: () => NonNullable<DeciderFacts["builtin"]>;
+	/**
 	 * This computer's connections and secrets (`ConnectionStore`): an Agent
 	 * node's MCP servers with `${NAME}` expanded, a Command node's secrets
 	 * by name, from the scopes of the use (`secretScopes`). Without it:
@@ -739,7 +744,9 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 						return profile ? [[id, profile]] : [];
 					}),
 				),
-				decider: deciderFacts,
+				decider: deciderFacts
+					? { ...deciderFacts, builtin: deps.builtinModels?.() ?? {} }
+					: null,
 				requests: true,
 				readFiles: true,
 				flowVersion: FLOW_VERSION,

@@ -1,6 +1,7 @@
 import type { ValueResult } from "@nightshift/agents/types";
 import {
 	acceptsValue,
+	canMakeValue,
 	type JsonValue,
 	renderTemplate,
 	type ValueNode,
@@ -111,9 +112,15 @@ async function make(node: ValueNode, step: StepHandle): Promise<BodyResult> {
 	if (!decider?.values) {
 		return fail("No decider is configured for Value nodes.");
 	}
-	// The Device says which text model a node without one starts on.
-	const maker = valueDecider(node);
-	const model = node.model ?? decider.defaultModels[maker].value;
+	// A node that names no decider runs on Night Shift's Decider of this
+	// Device, when its person chose one that makes values. The Device says
+	// which text model a node without one starts on.
+	const chosen =
+		node.decider === undefined ? decider.builtin?.decider : undefined;
+	const own = chosen && canMakeValue(chosen.decider) ? chosen : undefined;
+	const maker = own?.decider ?? valueDecider(node);
+	const model = node.model ?? own?.model ?? decider.defaultModels[maker].value;
+	const address = node.address ?? own?.address;
 	step.record(null, {
 		type: "value-start",
 		by: "model",
@@ -128,7 +135,7 @@ async function make(node: ValueNode, step: StepHandle): Promise<BodyResult> {
 			prompt,
 			output: node.output,
 			model,
-			...(node.address !== undefined ? { address: node.address } : {}),
+			...(address !== undefined ? { address } : {}),
 			signal,
 		});
 	const result = await withinGrace(

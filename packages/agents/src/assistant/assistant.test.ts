@@ -515,9 +515,7 @@ describe("suggestField", () => {
 		const events = await collect(
 			suggestField({
 				request: request(),
-				harness,
-				profile,
-				cwd: "/repo",
+				via: { kind: "agent", harness, profile, cwd: "/repo" },
 				place: {},
 				signal: new AbortController().signal,
 			}),
@@ -549,9 +547,7 @@ describe("suggestField", () => {
 		const events = await collect(
 			suggestField({
 				request: request(),
-				harness,
-				profile,
-				cwd: "/repo",
+				via: { kind: "agent", harness, profile, cwd: "/repo" },
 				place: {},
 				signal: new AbortController().signal,
 			}),
@@ -573,9 +569,7 @@ describe("suggestField", () => {
 		const events = await collect(
 			suggestField({
 				request: request(),
-				harness,
-				profile,
-				cwd: "/repo",
+				via: { kind: "agent", harness, profile, cwd: "/repo" },
 				place: {},
 				signal: new AbortController().signal,
 			}),
@@ -592,9 +586,7 @@ describe("suggestField", () => {
 		const events = await collect(
 			suggestField({
 				request: request(),
-				harness,
-				profile,
-				cwd: "/repo",
+				via: { kind: "agent", harness, profile, cwd: "/repo" },
 				place: {},
 				signal: new AbortController().signal,
 			}),
@@ -610,9 +602,7 @@ describe("suggestField", () => {
 		const events = await collect(
 			suggestField({
 				request: request(),
-				harness,
-				profile,
-				cwd: "/repo",
+				via: { kind: "agent", harness, profile, cwd: "/repo" },
 				place: {},
 				signal: new AbortController().signal,
 			}),

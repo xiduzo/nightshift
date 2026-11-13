@@ -5,7 +5,6 @@
  * pass is sent back once with its problems, in the same session.
  */
 import {
-	type AgentProfileSettings,
 	type AssistantUsage,
 	applySuggestion,
 	type FlowPlace,
@@ -21,10 +20,13 @@ import {
 	takesSuggestion,
 } from "@nightshift/flows";
 import { z } from "zod";
-import type { AgentHarness } from "../port";
 import { readProjectFacts } from "./project-facts";
 import { retryPrompt } from "./prompts";
-import { type AssistantReport, runAssistantSession } from "./session";
+import {
+	type AssistantReport,
+	type AssistantVia,
+	runReportSession,
+} from "./session";
 import { suggestionPrompt } from "./suggestion-prompt";
 
 /** How many times the agent may answer: once, and once more with the problems. */
@@ -242,11 +244,8 @@ const sum = (a: AssistantUsage, b: AssistantUsage): AssistantUsage => {
 
 export type SuggestFieldInput = {
 	request: SuggestionRequest;
-	/** The harness that answers, as this computer runs it. */
-	harness: AgentHarness;
-	profile: Pick<AgentProfileSettings, "model" | "effort">;
-	/** The project's Clone on this computer. */
-	cwd: string;
+	/** What answers for the Field writer: an agent of this computer, or a model. */
+	via: AssistantVia;
 	/** The place the draft is checked in, as the editor checks it. */
 	place: FlowPlace;
 	signal: AbortSignal;
@@ -259,7 +258,7 @@ export type SuggestFieldInput = {
 export async function* suggestField(
 	input: SuggestFieldInput,
 ): AsyncGenerator<SuggestionEvent> {
-	const { request, harness, profile, cwd, place, signal } = input;
+	const { request, via, place, signal } = input;
 	const refusal = cannotSuggest(request);
 	if (refusal) {
 		yield { type: "error", message: refusal };
@@ -267,7 +266,11 @@ export async function* suggestField(
 	}
 	const output = suggestionDataSchema(request.kind);
 	// A command is only as good as the scripts it names: read them first.
-	const facts = request.kind === "command" ? await readProjectFacts(cwd) : null;
+	// A model has no folder: it writes the command without them.
+	const facts =
+		request.kind === "command" && via.kind === "agent"
+			? await readProjectFacts(via.cwd)
+			: null;
 	const first = suggestionPrompt(request, facts);
 	let spent: AssistantUsage | null = null;
 	let sessionId: string | null = null;
@@ -284,10 +287,7 @@ export async function* suggestField(
 		let last: AssistantUsage | null = null;
 		let report: AssistantReport | null = null;
 		let ended = false;
-		for await (const event of runAssistantSession({
-			harness,
-			profile,
-			cwd,
+		for await (const event of runReportSession(via, {
 			prompt,
 			...(resume ? { resumeSessionId: resume } : {}),
 			report: { output },

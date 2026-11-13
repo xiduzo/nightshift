@@ -13,6 +13,7 @@ import type {
 	FlowSources,
 	JsonValue,
 	ModelAddress,
+	ModelPick,
 	ProfileSettings,
 	WebRequestMethod,
 } from "@nightshift/flows";
@@ -243,6 +244,13 @@ export type DeciderFacts = {
 	values: boolean;
 	/** The model a node on each decider starts on when it names none. */
 	defaultModels: Record<DeciderName, { decision: string; value: string }>;
+	/**
+	 * Who answers for Night Shift's own Decider and Brief writer on this
+	 * Device, when its person chose one in Settings. A node that names no
+	 * decider runs on `decider`. A Gate's brief is written by `briefWriter`.
+	 * Unset: TypeSafe, as before.
+	 */
+	builtin?: { decider?: ModelPick; briefWriter?: ModelPick };
 };
 
 export type SessionInput = Omit<

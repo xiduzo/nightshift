@@ -76,9 +76,14 @@ async function decide(
 			error: "No decider is configured for Decision nodes.",
 		};
 	}
-	// The Device says which model a node without one starts on.
-	const picker = decisionDecider(node);
-	const model = node.model ?? decider.defaultModels[picker].decision;
+	// A node that names no decider runs on Night Shift's Decider of this
+	// Device, when its person chose one. The Device says which model a
+	// node without one starts on.
+	const own = node.decider === undefined ? decider.builtin?.decider : undefined;
+	const picker = own?.decider ?? decisionDecider(node);
+	const model =
+		node.model ?? own?.model ?? decider.defaultModels[picker].decision;
+	const address = node.address ?? own?.address;
 	step.record(null, {
 		type: "decision-start",
 		prompt,
@@ -92,7 +97,7 @@ async function decide(
 			prompt,
 			labels: options,
 			model,
-			...(node.address !== undefined ? { address: node.address } : {}),
+			...(address !== undefined ? { address } : {}),
 			signal,
 		},
 		signal,

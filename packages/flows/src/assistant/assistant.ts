@@ -19,6 +19,14 @@
 import { z } from "zod";
 
 import {
+	type AgentEntryId,
+	agentEntryIdSchema,
+	type BuiltinStatus,
+	type EntrySaving,
+	entryOpening,
+	entrySavingSchema,
+} from "../builtin";
+import {
 	type Flow,
 	flowInputSchema,
 	flowSchema,
@@ -217,7 +225,18 @@ export type Suggestion = z.infer<typeof suggestionSchema>;
 export const chatRequestSchema = z
 	.object({
 		...flowInEditor,
-		message: z.string().min(1).max(20_000),
+		/**
+		 * What the person wrote. Unset: the first message of `entry`
+		 * (`entryOpening`), so a button sends no text of its own.
+		 */
+		message: z.string().min(1).max(20_000).optional(),
+		/**
+		 * The place in the product that started this message: it names the
+		 * built-in agent that answers. Unset: the chat of the flow editor.
+		 */
+		entry: agentEntryIdSchema.optional(),
+		/** `spend.saving` only: the way to save the chat starts from. */
+		saving: entrySavingSchema.optional(),
 		/**
 		 * Continue this chat. Unset: start a new one. A chat continues on
 		 * another agent too: the new agent gets the conversation so far.
@@ -226,8 +245,25 @@ export const chatRequestSchema = z
 		/** A run of this flow the chat is about, for example one that failed. */
 		runId: z.string().min(1).optional(),
 	})
-	.refine(isCompleteAgent, INCOMPLETE_AGENT);
+	.refine(isCompleteAgent, INCOMPLETE_AGENT)
+	.refine((request) => chatMessage(request) !== null, {
+		message: "Write a message.",
+		path: ["message"],
+	});
 export type ChatRequest = z.infer<typeof chatRequestSchema>;
+
+/** The message of a chat request: the person's own, else the first message of its entry. */
+export function chatMessage(request: {
+	message?: string | undefined;
+	entry?: AgentEntryId | undefined;
+	saving?: EntrySaving | undefined;
+}): string | null {
+	if (request.message !== undefined) return request.message;
+	if (request.entry === undefined) return null;
+	return entryOpening(request.entry, {
+		...(request.saving ? { saving: request.saving } : {}),
+	});
+}
 
 /** What the assistant spent on one answer. */
 export type AssistantUsage = {
@@ -302,4 +338,6 @@ export interface AssistantService {
 		signal: AbortSignal,
 		scope: AssistantScope,
 	): AsyncIterable<ExplanationEvent>;
+	/** Who answers for each of Night Shift's own agents on this computer now. */
+	agents(): BuiltinStatus[];
 }

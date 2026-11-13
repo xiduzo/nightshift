@@ -482,12 +482,15 @@ async function askModel(
 	const ask = async (): Promise<ValueResult | null> => {
 		const decider = (await step.device.capabilities()).decider;
 		if (!decider?.values) return null;
-		const maker = valueDecider({});
+		// Night Shift's Brief writer of this Device, when its person chose one.
+		const own = decider.builtin?.briefWriter;
+		const maker = own?.decider ?? valueDecider({});
 		return step.device.decide({
 			decider: maker,
 			prompt,
 			output,
-			model: decider.defaultModels[maker].value,
+			model: own?.model ?? decider.defaultModels[maker].value,
+			...(own?.address !== undefined ? { address: own.address } : {}),
 			signal,
 		});
 	};

@@ -296,10 +296,11 @@ describe("claudeCodeHarness read only", () => {
 		expect(argv[argv.indexOf("--permission-mode") + 1]).toBe("default");
 		expect(argv).toContain("--strict-mcp-config");
 		const list = (flag: string) => argv[argv.indexOf(flag) + 1]?.split(",");
+		// The read-only list names the web tools too: no doubles.
 		expect(list("--disallowedTools")).toEqual([
-			"WebSearch",
-			...READ_ONLY_DISALLOWED,
+			...new Set(["WebSearch", ...READ_ONLY_DISALLOWED]),
 		]);
+		expect(READ_ONLY_DISALLOWED).toContain("WebFetch");
 		// No CLI tool, no artifact tool: only Night Shift's report and its own tool.
 		expect(list("--allowedTools")).toEqual([
 			REPORT_TOOL_ID,

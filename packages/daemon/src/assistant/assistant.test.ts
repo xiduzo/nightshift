@@ -10,6 +10,7 @@ import type {
 import type {
 	AgentHarnessName,
 	AgentProfileSettings,
+	BuiltinAnswers,
 	ChatEvent,
 	ChatRequest,
 	ExplanationEvent,
@@ -24,6 +25,7 @@ import {
 	BUSY,
 	createAssistant,
 	NO_CLONE,
+	NO_MODEL_HERE,
 	NO_PROFILE,
 	NOT_ENDED_EARLY,
 	pickAgent,
@@ -55,8 +57,14 @@ function profiles(
 	};
 }
 
-const settings = (assistantProfile = ""): Pick<SettingsStore, "current"> => ({
-	current: () => ({ assistantProfile }) as ReturnType<SettingsStore["current"]>,
+const settings = (
+	assistantProfile = "",
+	builtinAgents: BuiltinAnswers = {},
+): Pick<SettingsStore, "current"> => ({
+	current: () =>
+		({ assistantProfile, builtinAgents }) as ReturnType<
+			SettingsStore["current"]
+		>,
 });
 
 function deps(over: Partial<AssistantDeps> = {}): AssistantDeps {
@@ -140,6 +148,41 @@ describe("pickAgent", () => {
 		expect(pickAgent({}, deps({ installed: () => false }))).toEqual({
 			error: NO_PROFILE,
 		});
+	});
+
+	test("a built-in agent: the agent the person chose for it in Settings", () => {
+		const chosen = settings("", {
+			builder: { kind: "agent", profile: "a_codex" },
+			explainer: { kind: "agent", harness: "claude-code", model: "haiku" },
+		});
+		expect(
+			pickAgent({}, deps({ settings: chosen }), { builtin: "builder" }),
+		).toMatchObject({ profile: "a_codex" });
+		expect(
+			pickAgent({}, deps({ settings: chosen }), { builtin: "explainer" }),
+		).toEqual({
+			profile: null,
+			settings: { harness: "claude-code", model: "haiku" },
+		});
+		// An agent with no choice follows the computer.
+		expect(
+			pickAgent({}, deps({ settings: chosen }), { builtin: "improver" }),
+		).toMatchObject({ profile: "b_claude" });
+		// The request's own pick still wins.
+		expect(
+			pickAgent({ profile: "b_claude" }, deps({ settings: chosen }), {
+				builtin: "builder",
+			}),
+		).toMatchObject({ profile: "b_claude" });
+	});
+
+	test("a chosen agent that is gone falls back to the first that works", () => {
+		const chosen = settings("", {
+			builder: { kind: "agent", profile: "gone" },
+		});
+		expect(
+			pickAgent({}, deps({ settings: chosen }), { builtin: "builder" }),
+		).toMatchObject({ profile: "b_claude" });
 	});
 });
 
@@ -659,7 +702,7 @@ describe("assistant.chat", () => {
 			{
 				type: "error",
 				message:
-					"The chat cannot use pi. It cannot read your flow or propose changes. Choose Claude Code, Codex or OpenCode.",
+					"The chat cannot use pi. It cannot read your flow or propose changes. Choose Claude Code, Codex or OpenCode in Settings.",
 			},
 		]);
 	});
@@ -680,7 +723,7 @@ describe("assistant.chat", () => {
 		const refused = await chat(assistant, { profile: "local" });
 		expect(refused).toHaveLength(1);
 		expect(refused[0]?.type === "error" && refused[0].message).toContain(
-			"Choose a profile that uses Claude Code, Codex or OpenCode.",
+			"Choose an agent in Settings that uses Claude Code, Codex or OpenCode.",
 		);
 		// The profile for help does not fit the chat: the first that does.
 		const events = await chat(assistant);
@@ -1129,5 +1172,54 @@ describe("assistant.explain", () => {
 		const events = await explain(asked("member", assistant));
 		expect(events.at(-1)).toEqual({ type: "done" });
 		expect(harness.calls[0]?.cwd).toBe("/data/assistant");
+	});
+
+	test("a model the person chose for the Explainer answers, with no agent and no folder", async () => {
+		const asks: { decider: string; model?: string; prompt: string }[] = [];
+		const assistant = createAssistant(
+			deps({
+				harnessFor: () => undefined,
+				installed: () => false,
+				clonePath: async () => null,
+				space: runSpace(failed),
+				settings: settings("", {
+					explainer: { kind: "model", decider: "ollama", model: "llama3.2" },
+				}),
+				decide: async (input) => {
+					asks.push({
+						decider: input.decider,
+						...(input.model ? { model: input.model } : {}),
+						prompt: input.prompt,
+					});
+					return {
+						kind: "made",
+						data: { summary: "The test step failed. Try the run again." },
+						costUsd: null,
+					};
+				},
+			}),
+		);
+		const events = await explain(asked("member", assistant));
+		expect(events.at(-2)).toEqual({
+			type: "answer",
+			answer: "The test step failed. Try the run again.",
+		});
+		expect(events.at(-1)).toEqual({ type: "done" });
+		expect(asks).toHaveLength(1);
+		expect(asks[0]).toMatchObject({ decider: "ollama", model: "llama3.2" });
+		expect(asks[0]?.prompt).toContain("You cannot read files");
+	});
+
+	test("a model the person chose, on a computer that cannot ask one: says what to do", async () => {
+		const assistant = createAssistant(
+			deps({
+				space: runSpace(failed),
+				settings: settings("", {
+					explainer: { kind: "model", decider: "ollama" },
+				}),
+			}),
+		);
+		const events = await explain(asked("member", assistant));
+		expect(events.at(-1)).toEqual({ type: "error", message: NO_MODEL_HERE });
 	});
 });

@@ -26,6 +26,8 @@ export type ChatThread = {
 	flowName: string;
 	/** The agent the session runs on. Another agent may need a new session. */
 	agent: ThreadAgent;
+	/** The built-in agent that answers: a Builder chat can become the Improver's. */
+	builtin: "builder" | "improver";
 	/** The harness session to resume. Null until the harness names one. */
 	sessionId: string | null;
 	/** The messages and answers so far, oldest first, for a new session. */
@@ -57,7 +59,7 @@ export type ThreadStore = {
 	get(id: string): ChatThread | null;
 	/** A new thread. The one used longest ago goes when there are too many. */
 	start(
-		fields: Pick<ChatThread, "projectId" | "flowName" | "agent">,
+		fields: Pick<ChatThread, "projectId" | "flowName" | "agent" | "builtin">,
 	): ChatThread;
 };
 

@@ -5,6 +5,7 @@ import { stream } from "../output";
 import { ownerProcedure, streamed } from "../procedures";
 import { runProcedure } from "../runs";
 import {
+	builtinStatusSchema,
 	chatEventSchema,
 	explanationEventSchema,
 	suggestionEventSchema,
@@ -17,6 +18,13 @@ import {
  * of a run only reads, so the run's Space decides who may ask.
  */
 export const assistant = {
+	agents: ownerProcedure
+		.route({
+			summary:
+				"Lists Night Shift's own agents with who answers for each on this computer now, or why nothing can.",
+		})
+		.output(z.array(builtinStatusSchema))
+		.handler(({ context }) => context.assistant.agents()),
 	suggest: ownerProcedure
 		.route({
 			summary:

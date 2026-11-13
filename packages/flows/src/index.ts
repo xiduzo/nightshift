@@ -10,6 +10,7 @@ export {
 	type Change as SuggestionChange,
 	type ChatEvent,
 	type ChatRequest,
+	chatMessage,
 	chatRequestSchema,
 	citedStepId,
 	diffFlows,
@@ -47,6 +48,24 @@ export {
 	type WriteChange,
 	writeChanges,
 } from "./assistant";
+export {
+	AGENT_ENTRIES,
+	type AgentEntry,
+	type AgentEntryId,
+	BUILTIN_AGENTS,
+	type BuiltinAgent,
+	type BuiltinAgentId,
+	type BuiltinAnswer,
+	type BuiltinAnswers,
+	type BuiltinStatus,
+	type BuiltinTakes,
+	builtinAgent,
+	builtinAgentIdSchema,
+	builtinAnswersSchema,
+	builtinModel,
+	type EntrySaving,
+	type ModelPick,
+} from "./builtin";
 export {
 	addCalledNode,
 	addEdge,

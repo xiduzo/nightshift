@@ -69,6 +69,11 @@ import {
 	systemGitInstaller,
 	withoutFolderOf,
 } from "@nightshift/engine/projects";
+import {
+	type BuiltinAnswer,
+	builtinModel,
+	type ModelPick,
+} from "@nightshift/flows";
 import { deliveryMoves } from "@nightshift/notifications";
 import { createTelemetry } from "@nightshift/telemetry";
 import { instant } from "@nightshift/time";
@@ -516,22 +521,41 @@ async function makeDaemon(
 			}),
 		(before) => before.close(),
 	);
+	// Decision nodes decided by a model: TanStack AI deciders, with API
+	// keys from the secrets: the run's Project first, when a step asks.
+	const decider = tanstackDecider({
+		secret: (name, run) => connections.secret(name, run ? { run } : undefined),
+		// The same Ollama search by meaning uses, with its headers.
+		ollama: () => {
+			const at = ollama.endpoint();
+			return { host: at.address, headers: at.headers };
+		},
+	});
 	/** This computer as a Device: every computer-touching piece of a step. */
 	const local = localDevice({
 		id: device.id,
 		name: device.name,
 		harnesses,
-		// Decision nodes decided by a model: TanStack AI deciders, with API
-		// keys from the secrets: the run's Project first, when a step asks.
-		decider: tanstackDecider({
-			secret: (name, run) =>
-				connections.secret(name, run ? { run } : undefined),
-			// The same Ollama search by meaning uses, with its headers.
-			ollama: () => {
-				const at = ollama.endpoint();
-				return { host: at.address, headers: at.headers };
-			},
-		}),
+		decider,
+		// The models the person chose in Settings for Night Shift's own
+		// Decider and Brief writer. One that is gone counts as not chosen.
+		builtinModels: () => {
+			const chosen = settings.current().builtinAgents;
+			const pick = (
+				answer: BuiltinAnswer | undefined,
+				values: boolean,
+			): ModelPick | undefined => {
+				if (answer?.kind !== "model") return undefined;
+				const model = builtinModel(answer, profiles.list(), { values });
+				return "problem" in model ? undefined : model;
+			};
+			const own = pick(chosen.decider, false);
+			const briefWriter = pick(chosen["brief-writer"], true);
+			return {
+				...(own ? { decider: own } : {}),
+				...(briefWriter ? { briefWriter } : {}),
+			};
+		},
 		// This computer's configuration, as the stores of its Device document.
 		connections,
 		cliTools,
@@ -869,6 +893,16 @@ async function makeDaemon(
 			space: ({ spaceId, personId }) => engine.space(spaceId, { personId }),
 			cliTools,
 			connections,
+			// The Explainer and the Field writer on a model of this computer.
+			decide: async (input) =>
+				decider.value
+					? decider.value(input)
+					: {
+							kind: "error",
+							errorKind: "harness",
+							message: "This computer has no model that writes an answer.",
+							costUsd: null,
+						},
 			ownFolder: async () => {
 				const folder = join(dataDir, "assistant");
 				await mkdir(folder, { recursive: true });

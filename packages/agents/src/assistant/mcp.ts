@@ -11,6 +11,7 @@ import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { BridgedTool } from "../port";
+import { toolAnnotations } from "./builtin-tools";
 
 export type ToolServerInfo = {
 	name: string;
@@ -94,6 +95,8 @@ async function toolServer(
 		tools: tools.map((tool) => ({
 			name: tool.name,
 			description: tool.description,
+			// Hints from the tool's tier, so a client can ask before a write.
+			annotations: toolAnnotations(tool.name),
 			inputSchema: (tool.inputSchema ?? EMPTY_INPUT) as {
 				type: "object";
 				[key: string]: unknown;

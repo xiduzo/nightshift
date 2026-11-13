@@ -380,10 +380,14 @@ const request = (over: Partial<ChatRequest> = {}): ChatRequest => ({
 });
 
 async function turn(
-	input: Parameters<typeof chatTurn>[0],
+	input: Omit<Parameters<typeof chatTurn>[0], "agent"> & {
+		agent?: "builder" | "improver";
+	},
 ): Promise<ChatTurnEvent[]> {
 	const events: ChatTurnEvent[] = [];
-	for await (const event of chatTurn(input)) events.push(event);
+	for await (const event of chatTurn({ agent: "improver", ...input })) {
+		events.push(event);
+	}
 	return events;
 }
 
@@ -457,6 +461,24 @@ describe("chatTurn", () => {
 		expect(input?.prompt).toContain("(#step-<step id>)");
 		expect(input?.prompt).not.toContain("# Writing Night Shift flows");
 		expect(input?.tools?.map((t) => t.name)).toContain("get_run");
+	});
+
+	test("the Builder gets no tool that reads a run", async () => {
+		const harness = fakeHarness({ steps: [{ type: "text", text: "Ok." }] });
+		const { propose: _p, ...rest } = port();
+		await turn({
+			agent: "builder",
+			request: request({ message: "Add a lint step.", runId: "r1" }),
+			harness,
+			profile: { model: "haiku" },
+			cwd: "/repo",
+			port: rest,
+			signal: new AbortController().signal,
+		});
+		const input = harness.calls[0];
+		expect(input?.tools?.map((t) => t.name)).not.toContain("get_run");
+		expect(input?.tools?.map((t) => t.name)).toContain("propose_flow");
+		expect(input?.maxTurns).toBe(40);
 	});
 
 	test("a new session of a chat on another agent gets the chat so far", async () => {

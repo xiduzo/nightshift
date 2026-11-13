@@ -1,4 +1,6 @@
 import {
+	type BuiltinAnswers,
+	builtinAnswersSchema,
 	type CustomAgent,
 	customAgentSchema,
 	DEFAULT_POLICY,
@@ -317,6 +319,16 @@ const DEFS = {
 		schema: z.string().trim().max(100),
 		default: "",
 	} satisfies Def<string>,
+	/**
+	 * Who answers for each of Night Shift's own agents (the Builder, the
+	 * Explainer, the Decider, ...). An agent with no entry follows this
+	 * computer: `assistantProfile` or the first profile that works for an
+	 * agent, the decider's default for a model.
+	 */
+	builtinAgents: {
+		schema: builtinAnswersSchema,
+		default: {},
+	} satisfies Def<BuiltinAnswers>,
 	/**
 	 * New Decision nodes start on this decider. Unsaved, the readers see
 	 * the effective default instead (`withEffectiveDecider`).

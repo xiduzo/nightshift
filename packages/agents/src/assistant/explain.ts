@@ -5,9 +5,8 @@
  * answers with a step report whose summary is the answer. No thread, no
  * tools, no proposal: the phone asks once and shows the answer.
  */
-import type { AgentProfileSettings, ExplanationEvent } from "@nightshift/flows";
-import type { AgentHarness } from "../port";
-import { runAssistantSession } from "./session";
+import type { ExplanationEvent } from "@nightshift/flows";
+import { type AssistantVia, runReportSession } from "./session";
 import { type AuthoringRun, runReport } from "./tools";
 
 /** The most characters of an answer: a few sentences. */
@@ -40,11 +39,8 @@ export function explanationPrompt(run: AuthoringRun): string {
 
 export type ExplainRunInput = {
 	run: AuthoringRun;
-	/** The harness that answers, as this computer runs it. */
-	harness: AgentHarness;
-	profile: Pick<AgentProfileSettings, "model" | "effort">;
-	/** The project's Clone on this computer, or a folder of its own. */
-	cwd: string;
+	/** What answers for the Explainer: an agent of this computer, or a model. */
+	via: AssistantVia;
 	signal: AbortSignal;
 };
 
@@ -55,10 +51,7 @@ export type ExplainRunInput = {
 export async function* explainRun(
 	input: ExplainRunInput,
 ): AsyncGenerator<ExplanationEvent> {
-	for await (const event of runAssistantSession({
-		harness: input.harness,
-		profile: input.profile,
-		cwd: input.cwd,
+	for await (const event of runReportSession(input.via, {
 		prompt: explanationPrompt(input.run),
 		report: {},
 		signal: input.signal,

@@ -28,6 +28,7 @@ export {
 	type AssistantUsage,
 	type ChatEvent,
 	type ChatRequest,
+	chatMessage,
 	chatRequestSchema,
 	type ExplanationEvent,
 	type FlowProposal,

@@ -1,5 +1,9 @@
 import {
+	agentHarnessSchema,
+	type BuiltinStatus,
+	builtinAgentIdSchema,
 	type ChatEvent,
+	deciderNameSchema,
 	type ExplanationEvent,
 	flowSchema,
 	type SuggestionEvent,
@@ -54,4 +58,30 @@ export const chatEventSchema = exact<ChatEvent>()(
 			}),
 		}),
 	]),
+);
+
+/** Who answers for one of Night Shift's own agents on this computer now. */
+export const builtinStatusSchema = exact<BuiltinStatus>()(
+	z.object({
+		id: builtinAgentIdSchema,
+		chosen: z.boolean(),
+		answers: z
+			.discriminatedUnion("kind", [
+				z.object({
+					kind: z.literal("agent"),
+					profile: z.string().nullable(),
+					harness: agentHarnessSchema,
+					model: z.string(),
+					effort: z.string().optional(),
+				}),
+				z.object({
+					kind: z.literal("model"),
+					profile: z.string().optional(),
+					decider: deciderNameSchema,
+					model: z.string().optional(),
+				}),
+			])
+			.nullable(),
+		problem: z.string().nullable(),
+	}),
 );

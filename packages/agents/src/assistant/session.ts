@@ -16,6 +16,7 @@ import type {
 	AgentHarness,
 	AgentUsage,
 	BridgedTool,
+	ValueResult,
 } from "../port";
 import { settleCost } from "../pricing";
 import { activityOf } from "./activity";
@@ -44,8 +45,20 @@ export type AssistantSessionInput = {
 	 * given. No outcome: the assistant has none to pick.
 	 */
 	report?: { output?: Record<string, unknown> };
+	/**
+	 * The most one answer may use: the limits of the built-in agent that
+	 * answers. The session stops there, and the person can ask again.
+	 */
+	limits?: SessionLimits;
 	signal: AbortSignal;
 };
+
+/** The most turns and the most money of one answer. */
+export type SessionLimits = { turns?: number; usd?: number };
+
+/** What the person reads when an answer stopped at its limit. */
+export const AT_LIMIT =
+	"The agent reached the most it may use for one answer. Ask again to continue.";
 
 /** The step report of an assistant session. `data` is not checked yet. */
 export type AssistantReport = { summary: string; data?: unknown };
@@ -134,7 +147,11 @@ export function settleUsage(
 export async function* runAssistantSession(
 	input: AssistantSessionInput,
 ): AsyncGenerator<AssistantSessionEvent> {
-	const { harness, profile, cwd, signal } = input;
+	const { harness, profile, cwd, limits } = input;
+	// A harness that does not stop at a limit itself is stopped here.
+	const stop = new AbortController();
+	const signal = AbortSignal.any([input.signal, stop.signal]);
+	let turns = 0;
 	let sessionId: string | null = input.resumeSessionId ?? null;
 	let model: string | null = profile.model;
 	let report: AssistantReport | null = null;
@@ -163,6 +180,8 @@ export async function* runAssistantSession(
 					}
 				: {}),
 			...(input.tools && input.tools.length > 0 ? { tools: input.tools } : {}),
+			...(limits?.turns !== undefined ? { maxTurns: limits.turns } : {}),
+			...(limits?.usd !== undefined ? { maxBudgetUsd: limits.usd } : {}),
 			signal,
 		});
 		for await (const event of events) {
@@ -180,7 +199,11 @@ export async function* runAssistantSession(
 						lastMessage !== null && lastMessage !== event.messageId && text
 							? "\n\n"
 							: "";
+					if (lastMessage !== event.messageId) turns += 1;
 					lastMessage = event.messageId;
+					if (limits?.turns !== undefined && turns > limits.turns) {
+						stop.abort();
+					}
 					text += gap + event.delta;
 					yield { type: "text", delta: gap + event.delta };
 					break;
@@ -207,6 +230,13 @@ export async function* runAssistantSession(
 				case "usage":
 					live = usageOf(event.usage, model);
 					yield { type: "usage", usage: live };
+					if (
+						limits?.usd !== undefined &&
+						live.costUsd !== undefined &&
+						live.costUsd > limits.usd
+					) {
+						stop.abort();
+					}
 					break;
 				case "finished":
 					if (event.usage) {
@@ -214,6 +244,10 @@ export async function* runAssistantSession(
 							type: "usage",
 							usage: settleUsage(live, usageOf(event.usage, model)),
 						};
+					}
+					if (event.limit && !report) {
+						yield { type: "error", message: AT_LIMIT, sessionId };
+						return;
 					}
 					yield {
 						type: "end",
@@ -225,11 +259,13 @@ export async function* runAssistantSession(
 				case "error":
 					yield {
 						type: "error",
-						message: sessionErrorMessage(
-							signal.aborted ? "aborted" : event.kind,
-							event.message,
-							event.resetAt,
-						),
+						message: stop.signal.aborted
+							? AT_LIMIT
+							: sessionErrorMessage(
+									input.signal.aborted ? "aborted" : event.kind,
+									event.message,
+									event.resetAt,
+								),
 						sessionId,
 					};
 					return;
@@ -245,12 +281,145 @@ export async function* runAssistantSession(
 	} catch (error) {
 		yield {
 			type: "error",
-			message: signal.aborted
-				? "Stopped."
-				: error instanceof Error && error.message
-					? error.message
-					: "The agent stopped with an error.",
+			message: stop.signal.aborted
+				? AT_LIMIT
+				: input.signal.aborted
+					? "Stopped."
+					: error instanceof Error && error.message
+						? error.message
+						: "The agent stopped with an error.",
 			sessionId,
 		};
 	}
+}
+
+/** An agent of this computer answers: a read-only session in a folder. */
+export type AgentVia = {
+	kind: "agent";
+	/** The harness that answers, as this computer runs it. */
+	harness: AgentHarness;
+	profile: Pick<AgentProfileSettings, "model" | "effort">;
+	/** The project's Clone on this computer, or a folder of the assistant's own. */
+	cwd: string;
+	limits?: SessionLimits;
+};
+
+/** A model answers: one call that returns the report, with no tools and no files. */
+export type ModelVia = {
+	kind: "model";
+	ask: (input: {
+		prompt: string;
+		/** A JSON Schema the answer is held to. */
+		output: Record<string, unknown>;
+		signal: AbortSignal;
+	}) => Promise<ValueResult>;
+};
+
+/**
+ * What answers for a built-in agent that gives one report (the Explainer,
+ * the Field writer): one of the person's agents, or one of their models.
+ * The prompt and the shape of the answer are the same for both.
+ */
+export type AssistantVia = AgentVia | ModelVia;
+
+/** What a model is told on top of the prompt of an agent. */
+const MODEL_NOTE = [
+	"",
+	"---",
+	"",
+	"You cannot read files or call tools. Work with what is above only.",
+	"Answer with one JSON object. `summary` is the summary of your step report. `data`, when asked for, is its data.",
+].join("\n");
+
+/** The JSON Schema of a step report as one model call returns it. */
+function reportSchema(
+	output: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+	return {
+		type: "object",
+		properties: {
+			summary: { type: "string" },
+			...(output ? { data: output } : {}),
+		},
+		required: output ? ["summary", "data"] : ["summary"],
+		additionalProperties: false,
+	};
+}
+
+/**
+ * One report for one prompt, from an agent session or from one model
+ * call, as the events of a session. A model has no session to resume: it
+ * ends with an empty `sessionId`. Never throws.
+ */
+export async function* runReportSession(
+	via: AssistantVia,
+	input: {
+		prompt: string;
+		report: { output?: Record<string, unknown> };
+		resumeSessionId?: string;
+		signal: AbortSignal;
+	},
+): AsyncGenerator<AssistantSessionEvent> {
+	if (via.kind === "agent") {
+		yield* runAssistantSession({
+			harness: via.harness,
+			profile: via.profile,
+			cwd: via.cwd,
+			prompt: input.prompt,
+			report: input.report,
+			...(input.resumeSessionId
+				? { resumeSessionId: input.resumeSessionId }
+				: {}),
+			...(via.limits ? { limits: via.limits } : {}),
+			signal: input.signal,
+		});
+		return;
+	}
+	yield { type: "activity", text: "Asks the model" };
+	let result: ValueResult;
+	try {
+		result = await via.ask({
+			prompt: `${input.prompt}\n${MODEL_NOTE}`,
+			output: reportSchema(input.report.output),
+			signal: input.signal,
+		});
+	} catch (error) {
+		yield {
+			type: "error",
+			message: error instanceof Error ? error.message : "The model failed.",
+			sessionId: null,
+		};
+		return;
+	}
+	if (result.costUsd !== null) {
+		yield {
+			type: "usage",
+			usage: { inputTokens: 0, outputTokens: 0, costUsd: result.costUsd },
+		};
+	}
+	if (result.kind === "error") {
+		yield {
+			type: "error",
+			message: sessionErrorMessage(
+				input.signal.aborted ? "aborted" : result.errorKind,
+				result.message,
+			),
+			sessionId: null,
+		};
+		return;
+	}
+	const data =
+		typeof result.data === "object" && result.data !== null
+			? (result.data as { summary?: unknown; data?: unknown })
+			: {};
+	const summary = typeof data.summary === "string" ? data.summary : "";
+	yield {
+		type: "end",
+		sessionId: "",
+		report: {
+			summary,
+			...(data.data !== undefined ? { data: data.data } : {}),
+		},
+		text: summary,
+	};
 }

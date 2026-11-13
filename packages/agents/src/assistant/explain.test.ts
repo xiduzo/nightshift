@@ -51,9 +51,7 @@ async function explain(
 	const events: ExplanationEvent[] = [];
 	for await (const event of explainRun({
 		run,
-		harness,
-		profile: { model: "sonnet" },
-		cwd: "/repo",
+		via: { kind: "agent", harness, profile: { model: "sonnet" }, cwd: "/repo" },
 		signal: new AbortController().signal,
 	})) {
 		events.push(event);

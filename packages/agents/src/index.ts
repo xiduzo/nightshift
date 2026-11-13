@@ -5,6 +5,7 @@
  * (`./types`, `./harness-facts`, `./pricing`, `./tools`) instead.
  */
 export {
+	type AssistantVia,
 	type AuthoringPort,
 	type AuthoringRun,
 	type AuthoringRunStep,

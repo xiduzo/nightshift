@@ -1,5 +1,6 @@
 import {
 	type AgentHarness,
+	type AssistantVia,
 	chatCanUseTools,
 	chatTurn,
 	explainRun,
@@ -8,6 +9,7 @@ import {
 	suggestField,
 } from "@nightshift/agents";
 import { harnessLabel, harnessNoun } from "@nightshift/agents/harness-facts";
+import type { ValueInput, ValueResult } from "@nightshift/agents/types";
 import type {
 	CliToolStore,
 	ConnectionStore,
@@ -16,12 +18,20 @@ import type {
 } from "@nightshift/engine/device-config";
 import { endedEarly } from "@nightshift/engine/run-status";
 import {
+	AGENT_ENTRIES,
 	type AgentHarnessName,
 	type AssistantAgent,
 	type AssistantScope,
 	type AssistantService,
+	BUILTIN_AGENTS,
+	type BuiltinAgentId,
+	type BuiltinAnswer,
+	type BuiltinStatus,
+	builtinAgent,
+	builtinModel,
 	type ChatEvent,
 	type ChatRequest,
+	chatMessage,
 	type ExplanationEvent,
 	isAgentProfile,
 } from "@nightshift/flows";
@@ -69,6 +79,12 @@ export type AssistantDeps = {
 	 * project without a folder. Without it, neither can be answered here.
 	 */
 	ownFolder?: () => Promise<string>;
+	/**
+	 * One call to a model of this computer that returns a value in a shape.
+	 * The Explainer and the Field writer use it when the person chose a
+	 * model for them. Without it, only an agent can answer.
+	 */
+	decide?: (input: ValueInput) => Promise<ValueResult>;
 };
 
 /**
@@ -79,16 +95,19 @@ export type AssistantDeps = {
 export type PickedAgent = { profile: string | null; settings: ThreadAgent };
 
 export const NO_PROFILE =
-	"No profile can make suggestions on this computer. Add a profile on the Agents page, with a harness that is installed here.";
+	"No agent can make suggestions on this computer. Add an agent in Settings, or choose a model for the Field writer.";
 
 export const NO_CHAT_PROFILE =
-	"No profile can chat on this computer. Add a profile on the Agents page that uses Claude Code, Codex or OpenCode.";
+	"No agent can chat on this computer. Add an agent in Settings that uses Claude Code, Codex or OpenCode.";
 
 export const NO_CLONE =
 	"This project is not on this computer. Add its folder here, then ask again.";
 
 export const NO_EXPLAIN_PROFILE =
-	"No profile can answer on this computer. Add a profile on the Agents page, with a harness that is installed here.";
+	"No agent can answer on this computer. Add an agent in Settings, or choose a model for the Explainer.";
+
+export const NO_MODEL_HERE =
+	"This computer cannot ask a model. Choose an agent in Settings.";
 
 export const NOT_ENDED_EARLY =
 	"This run did not stop early, so there is nothing to explain.";
@@ -113,8 +132,8 @@ export function chatRefusal(picked: PickedAgent): string | null {
 	const { harness } = picked.settings;
 	if (chatCanUseTools(harness)) return null;
 	return picked.profile !== null
-		? `The chat cannot use the profile "${picked.profile}". ${harnessLabel(harness)} cannot read your flow or propose changes. Choose a profile that uses Claude Code, Codex or OpenCode.`
-		: `The chat cannot use ${harnessLabel(harness)}. It cannot read your flow or propose changes. Choose Claude Code, Codex or OpenCode.`;
+		? `The chat cannot use the profile "${picked.profile}". ${harnessLabel(harness)} cannot read your flow or propose changes. Choose an agent in Settings that uses Claude Code, Codex or OpenCode.`
+		: `The chat cannot use ${harnessLabel(harness)}. It cannot read your flow or propose changes. Choose Claude Code, Codex or OpenCode in Settings.`;
 }
 
 /**
@@ -136,6 +155,12 @@ export function pickAgent(
 	fallback: {
 		fits?: (harness: AgentHarnessName) => boolean;
 		none?: string;
+		/**
+		 * The built-in agent that answers. A request that picks nothing gets
+		 * the agent the person chose for it in Settings, when that one still
+		 * works here. Then the profile for help, then the first that works.
+		 */
+		builtin?: BuiltinAgentId;
 	} = {},
 ): PickedAgent | { error: string } {
 	// The assistant runs on an Agent Profile only.
@@ -170,6 +195,16 @@ export function pickAgent(
 	}
 	if (picksAgent(requested)) {
 		return { error: "Choose a profile, or a harness and a model." };
+	}
+	const answer = fallback.builtin
+		? deps.settings.current().builtinAgents[fallback.builtin]
+		: undefined;
+	if (answer?.kind === "agent") {
+		const { kind: _kind, ...own } = answer;
+		// The agent the person chose, as a request would pick it. One that is
+		// gone falls back, as the profile for help does.
+		const picked = pickAgent(own, deps);
+		if (!("error" in picked)) return picked;
 	}
 	const chosen = deps.settings.current().assistantProfile.trim();
 	const fits = (harness: AgentHarnessName) => fallback.fits?.(harness) ?? true;
@@ -231,6 +266,17 @@ function harnessOf(
 	return harness;
 }
 
+/** The agent the person chose in Settings for `id`, as a request names an agent. Empty: none. */
+function chosenAgent(
+	id: BuiltinAgentId,
+	deps: Pick<AssistantDeps, "settings">,
+): AssistantAgent {
+	const answer = deps.settings.current().builtinAgents[id];
+	if (answer?.kind !== "agent") return {};
+	const { kind: _kind, ...agent } = answer;
+	return agent;
+}
+
 /** Whether two agents are the same: a session on one resumes on the other. */
 function sameAgent(a: ThreadAgent, b: ThreadAgent): boolean {
 	return (
@@ -269,21 +315,125 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 			: null;
 	};
 
+	/**
+	 * What answers for a built-in agent that gives one report: the agent
+	 * the request picks, else what the person chose for it in Settings (an
+	 * agent or a model), else the first agent that works. `folder`: where an
+	 * agent reads, asked only when an agent answers.
+	 */
+	async function reportVia(
+		id: "explainer" | "field-writer",
+		requested: AssistantAgent,
+		folder: () => Promise<string | null>,
+		none: string,
+	): Promise<AssistantVia | { error: string }> {
+		const answer: BuiltinAnswer | undefined =
+			deps.settings.current().builtinAgents[id];
+		if (!picksAgent(requested) && answer?.kind === "model") {
+			const { decide } = deps;
+			if (!decide) return { error: NO_MODEL_HERE };
+			const pick = builtinModel(answer, deps.profiles.list(), {
+				values: true,
+			});
+			if ("problem" in pick) return { error: pick.problem };
+			return {
+				kind: "model",
+				ask: ({ prompt, output, signal }) =>
+					decide({
+						decider: pick.decider,
+						prompt,
+						output,
+						...(pick.model !== undefined ? { model: pick.model } : {}),
+						...(pick.address !== undefined ? { address: pick.address } : {}),
+						signal,
+					}),
+			};
+		}
+		const picked = pickAgent(requested, deps, { builtin: id, none });
+		if ("error" in picked) return picked;
+		const harness = harnessOf(
+			picked,
+			picksAgent(requested) ? requested : chosenAgent(id, deps),
+			deps,
+		);
+		if ("error" in harness) return harness;
+		const cwd = await folder();
+		if (cwd === null) return { error: NO_CLONE };
+		return {
+			kind: "agent",
+			harness,
+			profile: picked.settings,
+			cwd,
+			limits: builtinAgent(id).limits,
+		};
+	}
+
+	/** Who answers for one built-in agent now, or why nothing can. */
+	function statusOf(id: BuiltinAgentId): BuiltinStatus {
+		const { takes } = builtinAgent(id);
+		const answer = deps.settings.current().builtinAgents[id];
+		if (answer?.kind === "model" || takes === "model") {
+			// The Decider and the Brief writer with no choice run on TypeSafe.
+			const chosen = answer?.kind === "model" ? answer : null;
+			const pick = chosen
+				? builtinModel(chosen, deps.profiles.list(), {
+						values: id !== "decider",
+					})
+				: { decider: "typesafe" as const };
+			if ("problem" in pick) {
+				return { id, chosen: true, answers: null, problem: pick.problem };
+			}
+			return {
+				id,
+				chosen: chosen !== null,
+				answers: {
+					kind: "model",
+					...(chosen?.profile !== undefined ? { profile: chosen.profile } : {}),
+					decider: pick.decider,
+					...(pick.model !== undefined ? { model: pick.model } : {}),
+				},
+				problem: null,
+			};
+		}
+		const tools = takes === "agent-with-tools";
+		const picked = pickAgent({}, deps, {
+			builtin: id,
+			...(tools ? { fits: chatCanUseTools } : {}),
+			none: tools ? NO_CHAT_PROFILE : NO_PROFILE,
+		});
+		if ("error" in picked) {
+			return { id, chosen: false, answers: null, problem: picked.error };
+		}
+		const refusal = tools ? chatRefusal(picked) : null;
+		const harness = harnessOf(picked, chosenAgent(id, deps), deps);
+		return {
+			id,
+			chosen: answer?.kind === "agent",
+			answers: {
+				kind: "agent",
+				profile: picked.profile,
+				harness: picked.settings.harness,
+				model: picked.settings.model,
+				...(picked.settings.effort !== undefined
+					? { effort: picked.settings.effort }
+					: {}),
+			},
+			problem: refusal ?? ("error" in harness ? harness.error : null),
+		};
+	}
+
 	return {
+		agents: () => BUILTIN_AGENTS.map((agent) => statusOf(agent.id)),
+
 		async *suggest(request, signal, scope) {
-			const picked = pickAgent(request, deps);
-			if ("error" in picked) {
-				yield { type: "error", message: picked.error };
-				return;
-			}
-			const harness = harnessOf(picked, request, deps);
-			if ("error" in harness) {
-				yield { type: "error", message: harness.error };
-				return;
-			}
-			const cwd = await workFolder(request.projectId);
-			if (cwd === null) {
-				yield { type: "error", message: NO_CLONE };
+			const via = await reportVia(
+				"field-writer",
+				request,
+				() => workFolder(request.projectId),
+				NO_PROFILE,
+			);
+			if ("error" in via) {
+				yield { type: "error", message: via.error };
 				return;
 			}
 			// The answer is checked in the draft's place, as the editor checks it.
@@ -297,14 +447,7 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 				request.projectId,
 				request.flowName,
 			);
-			yield* suggestField({
-				request,
-				harness,
-				profile: picked.settings,
-				cwd,
-				place,
-				signal,
-			});
+			yield* suggestField({ request, via, place, signal });
 		},
 
 		async *chat(request, signal, scope): AsyncGenerator<ChatEvent> {
@@ -313,12 +456,26 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 				yield { type: "error", message: BUSY };
 				return;
 			}
-			// A later message that picks no agent stays on the thread's.
-			const requested: AssistantAgent =
-				existing && !picksAgent(request) ? existing.agent : request;
+			// The entry names the agent. A chat about a run is the Improver's,
+			// and a chat that became the Improver's stays so.
+			const entered = request.entry
+				? AGENT_ENTRIES[request.entry].agent
+				: request.runId
+					? "improver"
+					: "builder";
+			const builtin: "builder" | "improver" =
+				existing?.builtin === "improver" || entered === "improver"
+					? "improver"
+					: "builder";
+			// A later message that picks no agent stays on the thread's, unless
+			// the thread goes to the other built-in agent.
+			const stays =
+				existing && existing.builtin === builtin && !picksAgent(request);
+			const requested: AssistantAgent = stays ? existing.agent : request;
 			const picked = pickAgent(requested, deps, {
 				fits: chatCanUseTools,
 				none: NO_CHAT_PROFILE,
+				builtin,
 			});
 			if ("error" in picked) {
 				yield { type: "error", message: picked.error };
@@ -329,7 +486,11 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 				yield { type: "error", message: refusal };
 				return;
 			}
-			const harness = harnessOf(picked, requested, deps);
+			const harness = harnessOf(
+				picked,
+				picksAgent(requested) ? requested : chosenAgent(builtin, deps),
+				deps,
+			);
 			if ("error" in harness) {
 				yield { type: "error", message: harness.error };
 				return;
@@ -345,7 +506,9 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 					projectId: request.projectId,
 					flowName: request.flowName,
 					agent: picked.settings,
+					builtin,
 				});
+			thread.builtin = builtin;
 			// Another agent: its session resumes only on the same harness,
 			// when that harness takes another model on resume. Else a new
 			// session gets the conversation so far.
@@ -378,6 +541,7 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 				);
 				for await (const event of chatTurn({
 					request,
+					agent: builtin,
 					harness,
 					profile: picked.settings,
 					cwd,
@@ -397,7 +561,10 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 				}
 				if (request.runId) thread.runIds.add(request.runId);
 			} finally {
-				keepExchange(thread, { message: request.message, answer });
+				keepExchange(thread, {
+					message: chatMessage(request) ?? "",
+					answer,
+				});
 				thread.busy = false;
 			}
 		},
@@ -413,34 +580,23 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 				yield { type: "error", message: NOT_ENDED_EARLY };
 				return;
 			}
-			// Any agent that works here: the explanation needs no tools.
-			const picked = pickAgent({}, deps, { none: NO_EXPLAIN_PROFILE });
-			if ("error" in picked) {
-				yield { type: "error", message: picked.error };
-				return;
-			}
-			const harness = harnessOf(picked, {}, deps);
-			if ("error" in harness) {
-				yield { type: "error", message: harness.error };
-				return;
-			}
-			const cwd =
-				(await deps.clonePath(detail.projectId, scope.spaceId)) ??
-				(await deps.ownFolder?.()) ??
-				null;
-			if (cwd === null) {
-				yield { type: "error", message: NO_CLONE };
+			// An agent that works here, or a model: the explanation needs no tools.
+			const via = await reportVia(
+				"explainer",
+				{},
+				async () =>
+					(await deps.clonePath(detail.projectId, scope.spaceId)) ??
+					(await deps.ownFolder?.()) ??
+					null,
+				NO_EXPLAIN_PROFILE,
+			);
+			if ("error" in via) {
+				yield { type: "error", message: via.error };
 				return;
 			}
 			yield { type: "activity", text: "Reads the run" };
 			const run = await chatRun(space, detail, signal);
-			yield* explainRun({
-				run,
-				harness,
-				profile: picked.settings,
-				cwd,
-				signal,
-			});
+			yield* explainRun({ run, via, signal });
 		},
 	};
 }
