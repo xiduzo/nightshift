@@ -181,19 +181,13 @@ export function PrototypeSettings({
 				partCrumbs={sectionCrumb(true)}
 				after={
 					data && current.key === "agents" ? (
-						<div className="mx-auto w-full max-w-4xl px-4 pb-6 md:px-6">
-							<AgentDefaultsCard data={data} />
-						</div>
+						<AgentDefaultsCard data={data} />
 					) : data && current.key === "models" ? (
-						<div className="mx-auto w-full max-w-4xl px-4 pb-6 md:px-6">
-							<MeaningSearchCard data={data} />
-						</div>
+						<MeaningSearchCard data={data} />
 					) : null
 				}
 				heading={
-					<div className="mx-auto w-full max-w-4xl px-4 pt-4 md:px-6 md:pt-6">
-						<PageHeading title={current.label} description={current.line} />
-					</div>
+					<PageHeading title={current.label} description={current.line} />
 				}
 			/>
 		);

@@ -36,14 +36,6 @@ import {
 	InputGroupButton,
 } from "@nightshift/ui/components/input-group";
 import {
-	Item,
-	ItemActions,
-	ItemContent,
-	ItemDescription,
-	ItemGroup,
-	ItemTitle,
-} from "@nightshift/ui/components/item";
-import {
 	Table,
 	TableBody,
 	TableCell,
@@ -64,6 +56,7 @@ import {
 	profileQueries,
 	useDeciderSetupStatus,
 } from "@/features/agents";
+import { PageSection, SettingRow, SettingRows } from "@/shared/page";
 import { SHORTLIST } from "../components/meaning-search-card";
 import { ollamaQueries, settingsQueries } from "../queries";
 import { type Builtin, TAKES_LABEL, type Takes } from "./model";
@@ -486,15 +479,15 @@ export function AnswersTable({
 			<Table>
 				<TableHeader>
 					<TableRow>
-						<TableHead className="w-64">{first}</TableHead>
-						<TableHead>Answers with</TableHead>
+						<TableHead className="w-72 px-3">{first}</TableHead>
+						<TableHead className="px-3">Answers with</TableHead>
 						<TableHead />
 					</TableRow>
 				</TableHeader>
 				<TableBody>
 					{rows.map((row) => (
 						<TableRow key={row.id}>
-							<TableCell>
+							<TableCell className="px-3 py-2.5">
 								{searchOf ? (
 									<Link
 										to="/settings"
@@ -508,14 +501,14 @@ export function AnswersTable({
 								)}
 								<div className="text-muted-foreground text-xs">{row.job}</div>
 							</TableCell>
-							<TableCell>
+							<TableCell className="px-3 py-2.5">
 								<AnswersWith
 									row={row}
 									choices={choices}
 									agentPicker={agentPicker}
 								/>
 							</TableCell>
-							<TableCell className="text-right">
+							<TableCell className="px-3 py-2.5 text-right">
 								<State problem={problemOf(row)} />
 							</TableCell>
 						</TableRow>
@@ -544,42 +537,34 @@ export function BuiltinDetail({
 		["Never", builtin.never],
 	];
 	return (
-		<div className="flex flex-col gap-6">
-			<dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-2 text-sm">
-				{facts.map(([term, text]) => (
-					<div key={term} className="contents">
-						<dt className="text-muted-foreground">{term}</dt>
-						<dd>{text}</dd>
-					</div>
-				))}
-			</dl>
-			<ItemGroup className="gap-2">
-				<Item variant="outline" size="sm">
-					<ItemContent>
-						<ItemTitle>
-							Answers with <State problem={problemOf(builtin)} />
-						</ItemTitle>
-						<ItemDescription>{TAKES_LABEL[builtin.takes]}.</ItemDescription>
-					</ItemContent>
-					<ItemActions>
-						<AnswersWith
-							row={builtin}
-							choices={choices}
-							agentPicker={agentPicker}
-						/>
-					</ItemActions>
-				</Item>
-				<Item variant="outline" size="sm">
-					<ItemContent>
-						<ItemTitle>Most it spends on one answer</ItemTitle>
-					</ItemContent>
-					<ItemActions>
-						<span className="text-muted-foreground text-sm tabular-nums">
-							{builtin.limit}
-						</span>
-					</ItemActions>
-				</Item>
-			</ItemGroup>
-		</div>
+		<>
+			<SettingRows>
+				<SettingRow
+					label="Answers with"
+					description={`${TAKES_LABEL[builtin.takes]}.`}
+				>
+					<AnswersWith
+						row={builtin}
+						choices={choices}
+						agentPicker={agentPicker}
+					/>
+					<State problem={problemOf(builtin)} />
+				</SettingRow>
+				<SettingRow label="Most it spends on one answer">
+					<span className="text-muted-foreground tabular-nums">
+						{builtin.limit}
+					</span>
+				</SettingRow>
+			</SettingRows>
+			<PageSection title="What it does">
+				<SettingRows first="About" second="">
+					{facts.map(([term, text]) => (
+						<SettingRow key={term} label={term}>
+							{text}
+						</SettingRow>
+					))}
+				</SettingRows>
+			</PageSection>
+		</>
 	);
 }

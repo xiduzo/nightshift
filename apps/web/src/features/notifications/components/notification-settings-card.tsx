@@ -11,18 +11,6 @@ import {
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
 import { Button } from "@nightshift/ui/components/button";
-import { Card, CardContent } from "@nightshift/ui/components/card";
-import {
-	Field,
-	FieldContent,
-	FieldDescription,
-	FieldGroup,
-	FieldLabel,
-	FieldLegend,
-	FieldSeparator,
-	FieldSet,
-	FieldTitle,
-} from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
 import {
 	Select,
@@ -45,7 +33,12 @@ import { useId, useMemo } from "react";
 import { toast } from "sonner";
 
 import type { NotificationSettings } from "@/shared/api";
-import { PageSection } from "@/shared/page";
+import {
+	PageSection,
+	SettingNote,
+	SettingRow,
+	SettingRows,
+} from "@/shared/page";
 import { UrgencyMarker } from "@/shared/urgency";
 import { browserPushErrorText } from "../browser";
 import { notificationQueries } from "../queries";
@@ -160,150 +153,137 @@ function SettingsForm({ data }: { data: NotificationSettings }) {
 	const save = useSaveSettings();
 
 	return (
-		<Card>
-			<CardContent>
-				<FieldGroup>
-					<BrowserField />
-					<FieldSeparator />
-					<FieldSet>
-						<FieldLegend>What Night Shift tells you about</FieldLegend>
-						<FieldGroup>
-							{EVENTS.map(({ key, label, description }) => (
-								<Field key={key} orientation="horizontal">
-									<FieldContent>
-										<FieldLabel htmlFor={`${id}-${key}`}>{label}</FieldLabel>
-										{description ? (
-											<FieldDescription>{description}</FieldDescription>
-										) : null}{" "}
-									</FieldContent>{" "}
-									<Switch
-										id={`${id}-${key}`}
-										checked={data.events[key]}
-										onCheckedChange={(checked) =>
-											save.mutate({ events: { [key]: checked } })
-										}
-									/>
-								</Field>
-							))}
-							{data.events.gateOpened ? (
-								<PushForField
-									value={data.pushUrgencies}
-									onSave={(pushUrgencies) => save.mutate({ pushUrgencies })}
-								/>
-							) : null}
-						</FieldGroup>
-					</FieldSet>
-					<FieldSeparator />
-					<FieldSet>
-						<FieldGroup>
-							<Field orientation="horizontal">
-								<FieldContent>
-									<FieldLabel htmlFor={`${id}-quiet`}>Quiet hours</FieldLabel>
-									<FieldDescription>
-										Night Shift stays silent, then tells you what still waits.
-									</FieldDescription>
-								</FieldContent>
-								<Switch
-									id={`${id}-quiet`}
-									checked={data.quietHours !== null}
-									onCheckedChange={(checked) =>
-										save.mutate({
-											quietHours: checked ? DEFAULT_QUIET : null,
-										})
-									}
-								/>
-							</Field>
-							{data.quietHours ? (
-								<div className="grid gap-4 sm:grid-cols-3">
-									<TimeField
-										label="From"
-										value={data.quietHours.start}
-										onSave={(start) =>
-											data.quietHours &&
-											save.mutate({
-												quietHours: { ...data.quietHours, start },
-											})
-										}
-									/>
-									<TimeField
-										label="Until"
-										value={data.quietHours.end}
-										onSave={(end) =>
-											data.quietHours &&
-											save.mutate({ quietHours: { ...data.quietHours, end } })
-										}
-									/>
-									<TimeZoneField
-										value={data.timeZone}
-										onSave={(zone) => save.mutate({ timeZone: zone })}
-									/>
-								</div>
-							) : null}
-						</FieldGroup>
-					</FieldSet>
-					<FieldSeparator />
-					<FieldSet>
-						<FieldLegend>Where Night Shift tells you</FieldLegend>
-						<FieldDescription>
-							An open Night Shift page always shows what happens.
-						</FieldDescription>
-						<FieldGroup>
-							{SCREENS.map(({ key, label, description }) => (
-								<Field key={key} orientation="horizontal">
-									<FieldContent>
-										<FieldLabel htmlFor={`${id}-screen-${key}`}>
-											{label}
-										</FieldLabel>
-										<FieldDescription>{description}</FieldDescription>
-									</FieldContent>
-									<Switch
-										id={`${id}-screen-${key}`}
-										checked={data.screens[key]}
-										onCheckedChange={(checked) =>
-											save.mutate({ screens: { [key]: checked } })
-										}
-									/>
-								</Field>
-							))}
-							<Field>
-								<FieldLabel htmlFor={`${id}-hold`}>Phone delay</FieldLabel>
-								<Select
-									items={PHONE_DELAYS.map((minutes) => ({
-										value: minutes,
-										label: phoneDelayLabel(minutes),
-									}))}
-									value={data.holdMinutes}
-									onValueChange={(minutes) => {
-										if (minutes !== null) save.mutate({ holdMinutes: minutes });
-									}}
-								>
-									<SelectTrigger
-										id={`${id}-hold`}
-										className="w-full sm:w-56"
-										aria-describedby={`${id}-hold-description`}
-									>
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectGroup>
-											{PHONE_DELAYS.map((minutes) => (
-												<SelectItem key={minutes} value={minutes}>
-													{phoneDelayLabel(minutes)}
-												</SelectItem>
-											))}
-										</SelectGroup>
-									</SelectContent>
-								</Select>
-								<FieldDescription id={`${id}-hold-description`}>
-									While you use another screen, phones and closed browsers wait
-									this long. A Gate you answer in that time does not reach them.
-								</FieldDescription>
-							</Field>
-						</FieldGroup>
-					</FieldSet>
-				</FieldGroup>
-			</CardContent>
-		</Card>
+		<>
+			<SettingRows first="What Night Shift tells you about" second="On">
+				{EVENTS.map(({ key, label, description }) => (
+					<SettingRow
+						key={key}
+						label={label}
+						htmlFor={`${id}-${key}`}
+						description={description}
+					>
+						<Switch
+							id={`${id}-${key}`}
+							checked={data.events[key]}
+							onCheckedChange={(checked) =>
+								save.mutate({ events: { [key]: checked } })
+							}
+						/>
+					</SettingRow>
+				))}
+				{data.events.gateOpened ? (
+					<PushForField
+						value={data.pushUrgencies}
+						onSave={(pushUrgencies) => save.mutate({ pushUrgencies })}
+					/>
+				) : null}
+			</SettingRows>
+			<SettingRows first="When">
+				<SettingRow
+					label="Quiet hours"
+					htmlFor={`${id}-quiet`}
+					description="Night Shift stays silent, then tells you what still waits."
+				>
+					<Switch
+						id={`${id}-quiet`}
+						checked={data.quietHours !== null}
+						onCheckedChange={(checked) =>
+							save.mutate({
+								quietHours: checked ? DEFAULT_QUIET : null,
+							})
+						}
+					/>
+				</SettingRow>
+				{data.quietHours ? (
+					<>
+						<TimeField
+							label="From"
+							value={data.quietHours.start}
+							onSave={(start) =>
+								data.quietHours &&
+								save.mutate({
+									quietHours: { ...data.quietHours, start },
+								})
+							}
+						/>
+						<TimeField
+							label="Until"
+							value={data.quietHours.end}
+							onSave={(end) =>
+								data.quietHours &&
+								save.mutate({ quietHours: { ...data.quietHours, end } })
+							}
+						/>
+						<TimeZoneField
+							value={data.timeZone}
+							onSave={(zone) => save.mutate({ timeZone: zone })}
+						/>
+					</>
+				) : null}
+			</SettingRows>
+			<SettingRows first="Where Night Shift tells you" second="On">
+				<BrowserField />
+				{SCREENS.map(({ key, label, description }) => (
+					<SettingRow
+						key={key}
+						label={label}
+						htmlFor={`${id}-screen-${key}`}
+						description={description}
+					>
+						<Switch
+							id={`${id}-screen-${key}`}
+							checked={data.screens[key]}
+							onCheckedChange={(checked) =>
+								save.mutate({ screens: { [key]: checked } })
+							}
+						/>
+					</SettingRow>
+				))}
+				<SettingRow
+					label="Phone delay"
+					htmlFor={`${id}-hold`}
+					description={
+						<span id={`${id}-hold-description`}>
+							While you use another screen, phones and closed browsers wait this
+							long. A Gate you answer in that time does not reach them.
+						</span>
+					}
+				>
+					<Select
+						items={PHONE_DELAYS.map((minutes) => ({
+							value: minutes,
+							label: phoneDelayLabel(minutes),
+						}))}
+						value={data.holdMinutes}
+						onValueChange={(minutes) => {
+							if (minutes !== null) save.mutate({ holdMinutes: minutes });
+						}}
+					>
+						<SelectTrigger
+							id={`${id}-hold`}
+							className="w-full"
+							aria-describedby={`${id}-hold-description`}
+						>
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectGroup>
+								{PHONE_DELAYS.map((minutes) => (
+									<SelectItem key={minutes} value={minutes}>
+										{phoneDelayLabel(minutes)}
+									</SelectItem>
+								))}
+							</SelectGroup>
+						</SelectContent>
+					</Select>
+				</SettingRow>
+				<SettingNote>
+					<span className="text-muted-foreground text-xs">
+						An open Night Shift page always shows what happens.
+					</span>
+				</SettingNote>
+			</SettingRows>
+		</>
 	);
 }
 
@@ -321,8 +301,14 @@ function PushForField({
 }) {
 	const id = useId();
 	return (
-		<Field>
-			<FieldTitle id={id}>Push for</FieldTitle>
+		<SettingRow
+			label={<span id={id}>Push for</span>}
+			description={
+				<span id={`${id}-description`}>
+					Gates of the other levels wait in your inbox without a notification.
+				</span>
+			}
+		>
 			<ToggleGroup
 				multiple
 				variant="outline"
@@ -344,10 +330,7 @@ function PushForField({
 					</ToggleGroupItem>
 				))}
 			</ToggleGroup>
-			<FieldDescription id={`${id}-description`}>
-				Gates of the other levels wait in your inbox without a notification.
-			</FieldDescription>
-		</Field>
+		</SettingRow>
 	);
 }
 
@@ -362,8 +345,7 @@ function TimeZoneField({
 	const id = useId();
 	const zones = useMemo(() => timeZones(value), [value]);
 	return (
-		<Field>
-			<FieldLabel htmlFor={id}>Time zone</FieldLabel>
+		<SettingRow label="Time zone" htmlFor={id}>
 			<Select
 				items={zones.map((zone) => ({
 					value: zone,
@@ -387,7 +369,7 @@ function TimeZoneField({
 					</SelectGroup>
 				</SelectContent>
 			</Select>
-		</Field>
+		</SettingRow>
 	);
 }
 
@@ -403,8 +385,7 @@ function TimeField({
 }) {
 	const id = useId();
 	return (
-		<Field>
-			<FieldLabel htmlFor={id}>{label}</FieldLabel>
+		<SettingRow label={label} htmlFor={id}>
 			<Input
 				id={id}
 				type="time"
@@ -418,7 +399,7 @@ function TimeField({
 					if (event.key === "Enter") event.currentTarget.blur();
 				}}
 			/>
-		</Field>
+		</SettingRow>
 	);
 }
 
@@ -429,18 +410,11 @@ function BrowserField() {
 
 	return (
 		<>
-			<Field orientation="horizontal">
-				<FieldContent>
-					<FieldLabel htmlFor={`${id}-browser`}>
-						Notifications in this browser
-					</FieldLabel>
-					<FieldDescription>
-						Get notifications here, also when Night Shift is closed.
-					</FieldDescription>
-				</FieldContent>
-				{push.busy || push.state === "loading" ? (
-					<Spinner aria-label="Checking this browser" />
-				) : null}
+			<SettingRow
+				label="This browser"
+				htmlFor={`${id}-browser`}
+				description="Get notifications here, also when Night Shift is closed."
+			>
 				<Switch
 					id={`${id}-browser`}
 					checked={push.state === "on"}
@@ -458,35 +432,44 @@ function BrowserField() {
 						);
 					}}
 				/>
-			</Field>
+				{push.busy || push.state === "loading" ? (
+					<Spinner aria-label="Checking this browser" />
+				) : null}
+			</SettingRow>
 			{push.state === "denied" ? (
-				<Alert>
-					<BellOffIcon />
-					<AlertTitle>This browser blocks notifications</AlertTitle>
-					<AlertDescription>
-						Allow notifications for this site in the site settings of the
-						browser. On macOS, also allow the browser in System Settings,
-						Notifications.
-					</AlertDescription>
-				</Alert>
+				<SettingNote>
+					<Alert>
+						<BellOffIcon />
+						<AlertTitle>This browser blocks notifications</AlertTitle>
+						<AlertDescription>
+							Allow notifications for this site in the site settings of the
+							browser. On macOS, also allow the browser in System Settings,
+							Notifications.
+						</AlertDescription>
+					</Alert>
+				</SettingNote>
 			) : push.state === "home-screen" ? (
-				<Alert>
-					<SquarePlusIcon />
-					<AlertTitle>Add Night Shift to your Home Screen</AlertTitle>
-					<AlertDescription>
-						An iPhone or iPad sends notifications only to apps on its Home
-						Screen. Tap Share, then Add to Home Screen. Open Night Shift from
-						there and turn this on.
-					</AlertDescription>
-				</Alert>
+				<SettingNote>
+					<Alert>
+						<SquarePlusIcon />
+						<AlertTitle>Add Night Shift to your Home Screen</AlertTitle>
+						<AlertDescription>
+							An iPhone or iPad sends notifications only to apps on its Home
+							Screen. Tap Share, then Add to Home Screen. Open Night Shift from
+							there and turn this on.
+						</AlertDescription>
+					</Alert>
+				</SettingNote>
 			) : push.state === "unsupported" ? (
-				<Alert>
-					<BellOffIcon />
-					<AlertTitle>No notifications in this browser</AlertTitle>
-					<AlertDescription>
-						Open Night Shift at its https:// address to get notifications.
-					</AlertDescription>
-				</Alert>
+				<SettingNote>
+					<Alert>
+						<BellOffIcon />
+						<AlertTitle>No notifications in this browser</AlertTitle>
+						<AlertDescription>
+							Open Night Shift at its https:// address to get notifications.
+						</AlertDescription>
+					</Alert>
+				</SettingNote>
 			) : null}
 		</>
 	);

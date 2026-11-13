@@ -1,12 +1,6 @@
 import { Button } from "@nightshift/ui/components/button";
-import {
-	Item,
-	ItemActions,
-	ItemContent,
-	ItemDescription,
-	ItemTitle,
-} from "@nightshift/ui/components/item";
 import { Spinner } from "@nightshift/ui/components/spinner";
+import { TableCell, TableRow } from "@nightshift/ui/components/table";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { PlusIcon } from "lucide-react";
 import type { ReactNode } from "react";
@@ -72,7 +66,7 @@ export function useFoundPrograms(
 }
 
 /**
- * A program that is here but not used yet: a dashed row with one action.
+ * A program that is here but not used yet: a table row with one action.
  * An agent CLI that its harness check refuses (an unsupported version, say)
  * shows that problem instead of "On this computer".
  */
@@ -91,33 +85,40 @@ function FoundItem({
 	onSetUp: () => void;
 }) {
 	return (
-		<Item variant="outline" size="sm" className="border-dashed">
-			<ItemContent>
-				<ItemTitle className="text-muted-foreground">{program.label}</ItemTitle>
-				<ItemDescription>
+		<TableRow>
+			<TableCell className="px-3 py-2.5">
+				<span className="font-medium text-muted-foreground">
+					{program.label}
+				</span>
+				<div className="text-muted-foreground text-xs">
 					{problem ??
 						(program.kind === "agent"
 							? "On this computer, no profile uses it yet"
 							: "On this computer, not added yet")}
-				</ItemDescription>
-			</ItemContent>
-			<ItemActions>
-				{problem ? <CheckBadge state="problem" /> : null}
-				<Button
-					size="sm"
-					variant="outline"
-					disabled={disabled}
-					onClick={onSetUp}
-				>
-					{pending ? (
-						<Spinner data-icon="inline-start" />
-					) : (
-						<PlusIcon data-icon="inline-start" />
-					)}
-					{program.kind === "agent" ? "Add profile" : "Add tool"}
-				</Button>
-			</ItemActions>
-		</Item>
+				</div>
+			</TableCell>
+			<TableCell className="px-3 py-2.5 text-muted-foreground">
+				Not added
+			</TableCell>
+			<TableCell className="px-3 py-2.5">
+				<div className="flex items-center justify-end gap-2">
+					{problem ? <CheckBadge state="problem" /> : null}
+					<Button
+						size="sm"
+						variant="outline"
+						disabled={disabled}
+						onClick={onSetUp}
+					>
+						{pending ? (
+							<Spinner data-icon="inline-start" />
+						) : (
+							<PlusIcon data-icon="inline-start" />
+						)}
+						{program.kind === "agent" ? "Add profile" : "Add tool"}
+					</Button>
+				</div>
+			</TableCell>
+		</TableRow>
 	);
 }
 

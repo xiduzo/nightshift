@@ -3,33 +3,23 @@ import {
 	AlertDescription,
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
-import { Card, CardContent } from "@nightshift/ui/components/card";
-import {
-	Field,
-	FieldContent,
-	FieldDescription,
-	FieldGroup,
-	FieldLabel,
-	FieldSeparator,
-} from "@nightshift/ui/components/field";
-import { Switch } from "@nightshift/ui/components/switch";
-import { InfoIcon } from "lucide-react";
+import { InfoIcon, LockIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { SpaceUsageSection } from "@/features/spaces";
 import type { SettingsView } from "@/shared/api";
-import { PageSection } from "@/shared/page";
+import { PageSection, SettingNote, SettingRows } from "@/shared/page";
 import { useSettingsForm, useToggleSetting } from "../hooks/use-settings-form";
 import { readUsage, usagePatch } from "../usage-setting";
 import {
 	CardForm,
 	HeadersCard,
 	ResetSection,
-	SaveError,
+	SaveErrorRow,
 	SelectSetting,
+	SwitchSetting,
 	TextSetting,
 } from "./setting-fields";
 import { UsageSendsButton, UsageSendsSheet } from "./usage-sends-sheet";
-import { UsageSwitch } from "./usage-switch";
 
 const MONITORING_KEYS = ["telemetryEndpoint", "telemetryProtocol"] as const;
 
@@ -55,74 +45,69 @@ export function MonitoringCard({ data }: { data: SettingsView }) {
 				description="Send your runs to a monitoring tool you choose, such as Grafana. Nothing leaves this computer until you turn it on."
 				actions={<ResetSection form={form} />}
 			>
-				<Card>
-					<CardForm form={form}>
-						<CardContent>
-							<FieldGroup>
-								<Field orientation="horizontal">
-									<FieldContent>
-										<FieldLabel htmlFor={`${id}-telemetry`}>
-											Send runs to your monitoring
-										</FieldLabel>
-										<FieldDescription>
-											Night Shift sends each run with its steps, time, tokens
-											and cost. Claude Code steps send their own usage there
-											too. Prompts and replies stay on this computer.
-										</FieldDescription>
-									</FieldContent>
-									<Switch
-										id={`${id}-telemetry`}
-										checked={on}
-										disabled={toggle.isPending}
-										onCheckedChange={(checked) =>
-											toggle.mutate({ telemetry: checked })
-										}
-									/>
-								</Field>
-								{noAddress ? (
-									<Alert>
-										<InfoIcon />
-										<AlertTitle>Add an address</AlertTitle>
-										<AlertDescription>
-											Night Shift starts to send your runs when you add the
-											address of your monitoring tool.
-										</AlertDescription>
-									</Alert>
-								) : null}
-								<FieldSeparator />
-								<div className="grid gap-6 sm:grid-cols-2">
-									<TextSetting
-										form={form}
-										settingKey="telemetryEndpoint"
-										label="Address"
-										placeholder="http://localhost:4318"
-										description="Where your tool takes OpenTelemetry data, for example http://localhost:4318."
-										mono
-									/>
-									<SelectSetting
-										form={form}
-										settingKey="telemetryProtocol"
-										label="Format"
-										description="Use protobuf unless your tool asks for JSON."
-										options={FORMATS}
-									/>
-								</div>
-								<SaveError error={form.saveError} />
-								<FieldSeparator />
-								<UsageSwitch
-									checked={usage.on}
-									locked={usage.locked}
-									pending={toggle.isPending}
-									description
-									onCheckedChange={(checked) =>
-										toggle.mutate(usagePatch({ usage: checked }))
-									}
-								/>
-								<UsageSendsButton onClick={() => setSends(true)} />
-							</FieldGroup>
-						</CardContent>
-					</CardForm>
-				</Card>
+				<CardForm form={form}>
+					<SettingRows>
+						<SwitchSetting
+							label="Send runs to your monitoring"
+							description="Night Shift sends each run with its steps, time, tokens and cost. Claude Code steps send their own usage there too. Prompts and replies stay on this computer."
+							checked={on}
+							disabled={toggle.isPending}
+							onCheckedChange={(checked) =>
+								toggle.mutate({ telemetry: checked })
+							}
+						/>
+						{noAddress ? (
+							<SettingNote>
+								<Alert>
+									<InfoIcon />
+									<AlertTitle>Add an address</AlertTitle>
+									<AlertDescription>
+										Night Shift starts to send your runs when you add the
+										address of your monitoring tool.
+									</AlertDescription>
+								</Alert>
+							</SettingNote>
+						) : null}
+						<TextSetting
+							form={form}
+							settingKey="telemetryEndpoint"
+							label="Address"
+							placeholder="http://localhost:4318"
+							description="Where your tool takes OpenTelemetry data, for example http://localhost:4318."
+							mono
+						/>
+						<SelectSetting
+							form={form}
+							settingKey="telemetryProtocol"
+							label="Format"
+							description="Use protobuf unless your tool asks for JSON."
+							options={FORMATS}
+						/>
+						<SaveErrorRow error={form.saveError} />
+						<SwitchSetting
+							label="Send anonymous usage"
+							description="Night Shift sends anonymous counts of how you use it. You can turn this off."
+							checked={usage.on}
+							disabled={Boolean(usage.locked) || toggle.isPending}
+							describedBy={usage.locked ? `${id}-usage-lock` : undefined}
+							onCheckedChange={(checked) =>
+								toggle.mutate(usagePatch({ usage: checked }))
+							}
+						/>
+						{usage.locked ? (
+							<SettingNote>
+								<Alert id={`${id}-usage-lock`}>
+									<LockIcon />
+									<AlertTitle>You cannot change this here</AlertTitle>
+									<AlertDescription>{usage.locked}</AlertDescription>
+								</Alert>
+							</SettingNote>
+						) : null}
+						<SettingNote>
+							<UsageSendsButton onClick={() => setSends(true)} />
+						</SettingNote>
+					</SettingRows>
+				</CardForm>
 				{/* A new saved value, from here or another screen, starts a new draft. */}
 				<HeadersCard
 					key={JSON.stringify(data.values.telemetryHeaders)}

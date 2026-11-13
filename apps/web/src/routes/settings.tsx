@@ -34,7 +34,7 @@ function SettingsRoute() {
 					replace: true,
 				})
 			}
-			thisComputer={<ThisComputerSettings />}
+			thisComputer={<ThisComputerSettings titled={false} />}
 			// The chat's agent picker: the route hands it over, as settings sits below flows.
 			agentPicker={(props) => <AgentMenus {...props} />}
 		/>

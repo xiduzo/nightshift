@@ -64,10 +64,25 @@ import { HostStatus } from "./status-badges";
  * the Hosts it joined with the Spaces each keeps, and where its data is.
  * Its owner's only: nothing for another Person.
  */
-export function ThisComputerSettings() {
+export function ThisComputerSettings({
+	titled = true,
+}: {
+	/** False on a page that has "This computer" as its heading. */
+	titled?: boolean;
+}) {
 	const overview = useQuery(deviceQueries.overviewLive());
 	const computer = overview.data?.thisComputer;
 	if (overview.data && !computer) return null;
+	if (!titled) {
+		return computer ? (
+			<>
+				<ThisComputerCard computer={computer} />
+				<Hosts hosts={computer.hosts} />
+			</>
+		) : (
+			<Skeleton className="h-64 w-full rounded-xl" />
+		);
+	}
 	// The Devices page links here.
 	return (
 		<PageSection

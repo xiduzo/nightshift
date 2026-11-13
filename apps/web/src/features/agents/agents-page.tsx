@@ -31,6 +31,7 @@ import type {
 	OtherDevice,
 	ProfileRow,
 } from "@/shared/api";
+import { DetailInPage } from "@/shared/detail";
 import { type Crumb, SiteHeader } from "@/shared/page";
 import { Detail } from "./agents-detail";
 import { AgentsOverview, type AgentsPart } from "./agents-overview";
@@ -200,29 +201,32 @@ export function AgentsPage({
 					<Skeleton className="h-40 w-full" />
 				</div>
 			) : selection ? (
-				<Detail
-					selection={selection}
-					onSelect={select}
-					onGo={go}
-					onDirtyChange={setDirty}
-					onEditTool={(connection) => setEditing({ open: true, connection })}
-					onEditCliTool={(tool) => setEditingCli({ open: true, tool })}
-					onEditAgent={(agent) => setEditingAgent({ open: true, agent })}
-					onOpenSecrets={() => void navigate({ to: "/secrets" })}
-					data={{
-						profiles: profiles.data ?? [],
-						harnesses: harnesses.data ?? [],
-						connections,
-						cliTools: cliTools.data ?? [],
-						settings: settings.data,
-						otherDevices: otherDevices.data ?? [],
-					}}
-				/>
+				<DetailInPage>
+					<Detail
+						selection={selection}
+						onSelect={select}
+						onGo={go}
+						onDirtyChange={setDirty}
+						onEditTool={(connection) => setEditing({ open: true, connection })}
+						onEditCliTool={(tool) => setEditingCli({ open: true, tool })}
+						onEditAgent={(agent) => setEditingAgent({ open: true, agent })}
+						onOpenSecrets={() => void navigate({ to: "/secrets" })}
+						data={{
+							profiles: profiles.data ?? [],
+							harnesses: harnesses.data ?? [],
+							connections,
+							cliTools: cliTools.data ?? [],
+							settings: settings.data,
+							otherDevices: otherDevices.data ?? [],
+						}}
+					/>
+				</DetailInPage>
 			) : (
 				<>
-					{heading}
 					<AgentsOverview
 						part={part}
+						heading={heading}
+						after={after}
 						agentProfiles={agentProfiles}
 						modelProfiles={modelProfiles}
 						harnesses={added}
@@ -234,7 +238,6 @@ export function AgentsPage({
 						onAddHarness={() => setPicking("harness")}
 						onAddTool={() => setPicking("tool")}
 					/>
-					{after}
 				</>
 			)}
 

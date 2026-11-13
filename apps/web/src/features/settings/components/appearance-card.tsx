@@ -1,4 +1,3 @@
-import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
 	Field,
 	FieldContent,
@@ -12,7 +11,7 @@ import {
 import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useId, useState } from "react";
-import { PageSection } from "@/shared/page";
+import { PageSection, SettingRow, SettingRows } from "@/shared/page";
 
 const THEMES = [
 	{
@@ -44,13 +43,16 @@ export function AppearanceCard() {
 
 	return (
 		<PageSection title="Appearance" description="Applies to this browser only.">
-			<Card>
-				<CardContent>
+			<SettingRows>
+				<SettingRow
+					label="Theme"
+					description="Follow this computer, or stay dark or light."
+				>
 					<RadioGroup
 						aria-label="Theme"
 						value={mounted ? (theme ?? "system") : null}
 						onValueChange={(value) => setTheme(String(value))}
-						className="grid gap-3 sm:grid-cols-3"
+						className="grid w-full gap-2"
 					>
 						{THEMES.map(({ value, label, icon: Icon }) => (
 							<FieldLabel key={value} htmlFor={`${id}-${value}`}>
@@ -66,8 +68,8 @@ export function AppearanceCard() {
 							</FieldLabel>
 						))}
 					</RadioGroup>
-				</CardContent>
-			</Card>
+				</SettingRow>
+			</SettingRows>
 		</PageSection>
 	);
 }

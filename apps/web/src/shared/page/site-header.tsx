@@ -17,7 +17,10 @@ import { Separator } from "@nightshift/ui/components/separator";
 import { SidebarTrigger } from "@nightshift/ui/components/sidebar";
 import { Link, type LinkProps } from "@tanstack/react-router";
 import { ChevronDownIcon, type LucideIcon } from "lucide-react";
-import { Fragment, type ReactNode } from "react";
+import { Fragment, type ReactNode, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+
+const ACTIONS_SLOT = "site-header-actions";
 
 /** One step of the breadcrumb. The last one is the current page and takes no link. */
 export type Crumb = {
@@ -91,8 +94,26 @@ export function SiteHeader({
 			{children ? (
 				<div className="flex shrink-0 items-center gap-2">{children}</div>
 			) : null}
+			<div
+				id={ACTIONS_SLOT}
+				className="flex shrink-0 items-center gap-2 empty:hidden"
+			/>
 		</header>
 	);
+}
+
+/**
+ * The actions of the page, shown on the right of the site header. A part
+ * deep in the page puts its main action there with this.
+ */
+export function HeaderActions({ children }: { children: ReactNode }) {
+	const [slot, setSlot] = useState<HTMLElement | null>(null);
+	// The header can mount again when the page changes: look for it each time.
+	useEffect(() => {
+		const found = document.getElementById(ACTIONS_SLOT);
+		if (found !== slot) setSlot(found);
+	});
+	return slot ? createPortal(children, slot) : null;
 }
 
 /** The current step of the breadcrumb as a menu, after the shadcn Breadcrumb "with dropdown". */

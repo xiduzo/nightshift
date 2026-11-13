@@ -1,6 +1,5 @@
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
-import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
 	Combobox,
 	ComboboxContent,
@@ -9,13 +8,6 @@ import {
 	ComboboxItem,
 	ComboboxList,
 } from "@nightshift/ui/components/combobox";
-import {
-	Field,
-	FieldDescription,
-	FieldGroup,
-	FieldLabel,
-	FieldSeparator,
-} from "@nightshift/ui/components/field";
 import {
 	Item,
 	ItemActions,
@@ -31,14 +23,19 @@ import { DownloadIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import type { SettingsView } from "@/shared/api";
-import { PageSection } from "@/shared/page";
+import {
+	PageSection,
+	SettingNote,
+	SettingRow,
+	SettingRows,
+} from "@/shared/page";
 import { type SettingsForm, useSettingsForm } from "../hooks/use-settings-form";
 import { ollamaMutations, ollamaQueries } from "../queries";
 import {
 	CardForm,
 	HeadersCard,
 	ResetSection,
-	SaveError,
+	SaveErrorRow,
 	SelectSetting,
 	TextSetting,
 } from "./setting-fields";
@@ -84,38 +81,35 @@ export function MeaningSearchCard({ data }: { data: SettingsView }) {
 			description="Search finds files by what they mean, not only by their words. Ollama does this, on this computer or on one you choose."
 			actions={<ResetSection form={form} />}
 		>
-			<Card>
-				<CardForm form={form}>
-					<CardContent>
-						<FieldGroup>
-							{off ? null : <OllamaLine />}
-							<SelectSetting
+			<CardForm form={form}>
+				<SettingRows>
+					{off ? null : (
+						<SettingNote>
+							<OllamaLine />
+						</SettingNote>
+					)}
+					<SelectSetting
+						form={form}
+						settingKey="ollama"
+						label="Search by meaning"
+						options={modes}
+					/>
+					{off ? null : (
+						<>
+							<ModelField form={form} />
+							<TextSetting
 								form={form}
-								settingKey="ollama"
-								label="Search by meaning"
-								options={modes}
+								settingKey="ollamaAddress"
+								label="Ollama address"
+								placeholder="On this computer"
+								description="With another address, Night Shift sends your knowledge text to that computer, where the model reads it."
+								mono
 							/>
-							{off ? null : (
-								<>
-									<FieldSeparator />
-									<div className="grid gap-6 sm:grid-cols-2">
-										<ModelField form={form} />
-										<TextSetting
-											form={form}
-											settingKey="ollamaAddress"
-											label="Ollama address"
-											placeholder="On this computer"
-											description="With another address, Night Shift sends your knowledge text to that computer, where the model reads it."
-											mono
-										/>
-									</div>
-								</>
-							)}
-							<SaveError error={form.saveError} />
-						</FieldGroup>
-					</CardContent>
-				</CardForm>
-			</Card>
+						</>
+					)}
+					<SaveErrorRow error={form.saveError} />
+				</SettingRows>
+			</CardForm>
 			{off || !elsewhere ? null : (
 				<HeadersCard
 					key={JSON.stringify(data.values.ollamaHeaders)}
@@ -164,8 +158,16 @@ function ModelField({ form }: { form: SettingsForm }) {
 	};
 
 	return (
-		<Field data-invalid={error ? true : undefined}>
-			<FieldLabel htmlFor={id}>Model</FieldLabel>
+		<SettingRow
+			label="Model"
+			htmlFor={id}
+			description={
+				<span id={`${id}-description`}>
+					A new model prepares the search again.
+				</span>
+			}
+			error={error}
+		>
 			<Combobox
 				items={names}
 				filteredItems={shown}
@@ -213,15 +215,7 @@ function ModelField({ form }: { form: SettingsForm }) {
 					</ComboboxList>
 				</ComboboxContent>
 			</Combobox>
-			{error ? (
-				<FieldDescription className="text-destructive">
-					{error}
-				</FieldDescription>
-			) : null}
-			<FieldDescription id={`${id}-description`}>
-				A new model prepares the search again.
-			</FieldDescription>
-		</Field>
+		</SettingRow>
 	);
 }
 

@@ -9,20 +9,15 @@ import {
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
 import {
-	Item,
-	ItemActions,
-	ItemContent,
-	ItemDescription,
-	ItemGroup,
-	ItemTitle,
-} from "@nightshift/ui/components/item";
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@nightshift/ui/components/table";
 import { Link } from "@tanstack/react-router";
-import {
-	BotIcon,
-	ChevronRightIcon,
-	DownloadIcon,
-	PlusIcon,
-} from "lucide-react";
+import { BotIcon, DownloadIcon, PlusIcon } from "lucide-react";
 import { createContext, type ReactNode, useContext, useState } from "react";
 import type {
 	AgentProfileRow,
@@ -33,7 +28,7 @@ import type {
 	OtherDevice,
 	ProfileRow,
 } from "@/shared/api";
-import { PageHeading, PageSection } from "@/shared/page";
+import { HeaderActions, PageHeading, PageSection } from "@/shared/page";
 import { itemOf, type Selection } from "./agents-selection";
 import { CliToolCheckBadge } from "./cli-tool";
 import { CliCheckBadge } from "./connections/cli-panel";
@@ -71,8 +66,14 @@ export function AgentsOverview({
 	onAddHarness,
 	onAddTool,
 	part,
+	heading,
+	after,
 }: {
 	part?: AgentsPart;
+	/** The heading of the page, in place of "Agents". */
+	heading?: ReactNode;
+	/** More sections, after the lists. */
+	after?: ReactNode;
 	agentProfiles: AgentProfileRow[];
 	modelProfiles: ModelProfileRow[];
 	/** The harnesses that are added. */
@@ -100,141 +101,149 @@ export function AgentsOverview({
 	const shows = (name: AgentsPart["only"]) => !part || part.only === name;
 	return (
 		<PartContext value={part ?? null}>
-			<div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-				<div className={part ? "hidden" : "mx-auto w-full max-w-4xl"}>
+			<div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-8 p-4 md:p-6">
+				{heading ?? (
 					<PageHeading
 						title="Agents"
 						description="Give Agent nodes a harness, a model and tools under one name. When you change a profile, every flow that uses it changes too."
 					/>
-				</div>
+				)}
+				{shows("profiles") ? (
+					<Part
+						title="Profiles"
+						description="Agent nodes pick a profile by its name."
+						actions={
+							<AddButton onClick={() => onSelect({ kind: "new-profile" })}>
+								Add profile
+							</AddButton>
+						}
+					>
+						{agentProfiles.length === 0 ? (
+							<Empty className="border">
+								<EmptyHeader>
+									<EmptyMedia variant="icon">
+										<BotIcon />
+									</EmptyMedia>
+									<EmptyTitle>No profiles yet</EmptyTitle>
+									<EmptyDescription>
+										{canSetUp
+											? "Night Shift installs an agent for you and adds its profile."
+											: "Add a profile, or add an agent from this computer under Harnesses."}
+									</EmptyDescription>
+								</EmptyHeader>
+								{canSetUp ? <EmptyContent>{setUpButton}</EmptyContent> : null}
+							</Empty>
+						) : (
+							<ListTable first="Profile" second="Runs on">
+								{agentProfiles.map((profile) => (
+									<OpenRow
+										key={profile.id}
+										to={{ kind: "profile", id: profile.id }}
+										title={<span className="font-mono">{profile.name}</span>}
+										middle={profileSummary(profile)}
+										aside={<UsedIn usedBy={profile.usedBy} />}
+									/>
+								))}
+							</ListTable>
+						)}
+					</Part>
+				) : null}
 
-				<div className="mx-auto flex w-full max-w-4xl flex-col gap-10">
-					{shows("profiles") ? (
-						<PageSection
-							title="Profiles"
-							description="Agent nodes pick a profile by its name."
-							actions={
-								<AddButton onClick={() => onSelect({ kind: "new-profile" })}>
-									Add profile
-								</AddButton>
-							}
-						>
-							{agentProfiles.length === 0 ? (
-								<Empty className="border">
-									<EmptyHeader>
-										<EmptyMedia variant="icon">
-											<BotIcon />
-										</EmptyMedia>
-										<EmptyTitle>No profiles yet</EmptyTitle>
-										<EmptyDescription>
-											{canSetUp
-												? "Night Shift installs an agent for you and adds its profile."
-												: "Add a profile, or add an agent from this computer under Harnesses."}
-										</EmptyDescription>
-									</EmptyHeader>
-									{canSetUp ? <EmptyContent>{setUpButton}</EmptyContent> : null}
-								</Empty>
-							) : (
-								<ItemGroup className="gap-2">
-									{agentProfiles.map((profile) => (
-										<OpenItem
-											key={profile.id}
-											to={{ kind: "profile", id: profile.id }}
-											title={<span className="font-mono">{profile.name}</span>}
-											description={profileSummary(profile)}
-											aside={<UsedIn usedBy={profile.usedBy} />}
-										/>
-									))}
-								</ItemGroup>
-							)}
-						</PageSection>
-					) : null}
+				{shows("models") ? (
+					<Part
+						title="Model profiles"
+						description="Decision and Value nodes pick one when a model decides."
+						actions={
+							<AddButton
+								onClick={() => onSelect({ kind: "new-model-profile" })}
+							>
+								Add model profile
+							</AddButton>
+						}
+					>
+						{modelProfiles.length === 0 ? (
+							<p className="text-muted-foreground text-sm">
+								No model profiles yet.
+							</p>
+						) : (
+							<ListTable first="Model profile" second="Answers with">
+								{modelProfiles.map((profile) => (
+									<OpenRow
+										key={profile.id}
+										to={{ kind: "profile", id: profile.id }}
+										title={<span className="font-mono">{profile.name}</span>}
+										middle={`${deciderLabel(profile.decider)} · ${profile.model ?? "default model"}`}
+										aside={<UsedIn usedBy={profile.usedBy} />}
+									/>
+								))}
+							</ListTable>
+						)}
+					</Part>
+				) : null}
 
-					{shows("models") ? (
-						<PageSection
-							title="Model profiles"
-							description="Decision and Value nodes pick one when a model decides."
-							actions={
-								<AddButton
-									onClick={() => onSelect({ kind: "new-model-profile" })}
-								>
-									Add model profile
-								</AddButton>
-							}
-						>
-							{modelProfiles.length === 0 ? (
-								<p className="text-muted-foreground text-sm">
-									No model profiles yet.
-								</p>
-							) : (
-								<ItemGroup className="gap-2">
-									{modelProfiles.map((profile) => (
-										<OpenItem
-											key={profile.id}
-											to={{ kind: "profile", id: profile.id }}
-											title={<span className="font-mono">{profile.name}</span>}
-											description={`${deciderLabel(profile.decider)} · ${profile.model ?? "default model"}`}
-											aside={<UsedIn usedBy={profile.usedBy} />}
-										/>
-									))}
-								</ItemGroup>
-							)}
-						</PageSection>
-					) : null}
-
-					{shows("harnesses") ? (
-						<PageSection
-							title="Harnesses"
-							description="The agents a profile runs on."
-							actions={
-								<>
-									{canSetUp ? setUpButton : null}
-									<AddButton onClick={onAddHarness}>Add harness</AddButton>
-								</>
-							}
-						>
-							<ItemGroup className="gap-2">
+				{shows("harnesses") ? (
+					<Part
+						title="Harnesses"
+						description="The agents a profile runs on."
+						actions={
+							<>
+								{canSetUp ? setUpButton : null}
+								<AddButton onClick={onAddHarness}>Add harness</AddButton>
+							</>
+						}
+					>
+						{harnesses.length === 0 && found.agents.length === 0 ? (
+							<p className="text-muted-foreground text-sm">
+								No harnesses yet. Add one, such as Claude Code or Codex.
+							</p>
+						) : (
+							<ListTable first="Harness" second="Kind">
 								{harnesses.map((harness) => (
-									<OpenItem
+									<OpenRow
 										key={harness.name}
 										to={{ kind: "harness", name: harness.name }}
 										title={harness.label}
-										description={harness.custom ? "Custom agent" : undefined}
+										middle={harness.custom ? "Custom agent" : "Agent"}
 										aside={<CliCheckBadge target={harness.name} />}
 									/>
 								))}
 								{found.agents.map(found.row)}
-								{harnesses.length === 0 && found.agents.length === 0 ? (
-									<p className="text-muted-foreground text-sm">
-										No harnesses yet. Add one, such as Claude Code or Codex.
-									</p>
-								) : null}
-							</ItemGroup>
-						</PageSection>
-					) : null}
+							</ListTable>
+						)}
+					</Part>
+				) : null}
 
-					{shows("tools") ? (
-						<PageSection
-							title="Tools"
-							description="The CLIs and MCP servers a profile gives its agent."
-							actions={<AddButton onClick={onAddTool}>Add tool</AddButton>}
-						>
-							<ItemGroup className="gap-2">
+				{shows("tools") ? (
+					<Part
+						title="Tools"
+						description="The CLIs and MCP servers a profile gives its agent."
+						actions={<AddButton onClick={onAddTool}>Add tool</AddButton>}
+					>
+						{cliTools.length === 0 &&
+						connections.length === 0 &&
+						found.tools.length === 0 ? (
+							<p className="text-muted-foreground text-sm">
+								No tools yet. Add a CLI, such as gh, or an MCP server.
+							</p>
+						) : (
+							<ListTable first="Tool" second="Kind">
 								{cliTools.map((tool) => (
-									<OpenItem
+									<OpenRow
 										key={`cli:${tool.name}`}
 										to={{ kind: "cli", name: tool.name }}
 										title={<span className="font-mono">{tool.name}</span>}
-										description="CLI"
+										line={tool.description ?? undefined}
+										middle="CLI"
 										aside={<CliToolCheckBadge tool={tool} />}
 									/>
 								))}
 								{connections.map((connection) => (
-									<OpenItem
+									<OpenRow
 										key={connection.name}
 										to={{ kind: "tool", name: connection.name }}
 										title={<span className="font-mono">{connection.name}</span>}
-										description="MCP server"
+										line={connection.description ?? undefined}
+										middle="MCP server"
 										aside={
 											connection.variables.some(
 												(v) => v.source === "missing",
@@ -250,40 +259,66 @@ export function AgentsOverview({
 									/>
 								))}
 								{found.tools.map(found.row)}
-								{cliTools.length === 0 &&
-								connections.length === 0 &&
-								found.tools.length === 0 ? (
-									<p className="text-muted-foreground text-sm">
-										No tools yet. Add a CLI, such as gh, or an MCP server.
-									</p>
-								) : null}
-							</ItemGroup>
-						</PageSection>
-					) : null}
+							</ListTable>
+						)}
+					</Part>
+				) : null}
 
-					{otherDevices.length > 0 && shows("profiles") ? (
-						<PageSection
-							title="On your other devices"
-							description="You can only look at these. Change them on that device."
-						>
-							<ItemGroup className="gap-2">
-								{otherDevices.map((device) => (
-									<OpenItem
-										key={device.id}
-										to={{ kind: "device", id: device.id }}
-										title={device.name}
-										description={deviceSummary(device)}
-									/>
-								))}
-							</ItemGroup>
-						</PageSection>
-					) : null}
-				</div>
+				{otherDevices.length > 0 && shows("profiles") ? (
+					<PageSection
+						title="On your other devices"
+						description="You can only look at these. Change them on that device."
+					>
+						<ListTable first="Device" second="Has">
+							{otherDevices.map((device) => (
+								<OpenRow
+									key={device.id}
+									to={{ kind: "device", id: device.id }}
+									title={device.name}
+									middle={deviceSummary(device)}
+								/>
+							))}
+						</ListTable>
+					</PageSection>
+				) : null}
+				{after}
 				{canSetUp ? (
 					<AgentSetupDialog open={settingUp} onOpenChange={setSettingUp} />
 				) : null}
 			</div>
 		</PartContext>
+	);
+}
+
+/**
+ * One list of the page. On the Agents page it is a section with a title. As
+ * a page of its own in Settings, the page heading is its title, and its
+ * actions go to the site header.
+ */
+function Part({
+	title,
+	description,
+	actions,
+	children,
+}: {
+	title: string;
+	description: string;
+	actions: ReactNode;
+	children: ReactNode;
+}) {
+	const part = useContext(PartContext);
+	if (part) {
+		return (
+			<>
+				<HeaderActions>{actions}</HeaderActions>
+				{children}
+			</>
+		);
+	}
+	return (
+		<PageSection title={title} description={description} actions={actions}>
+			{children}
+		</PageSection>
 	);
 }
 
@@ -294,48 +329,88 @@ function AddButton({
 	onClick: () => void;
 	children: ReactNode;
 }) {
+	// In the site header it is the main action of the page.
+	const part = useContext(PartContext);
 	return (
-		<Button variant="outline" size="sm" onClick={onClick}>
+		<Button variant={part ? "default" : "outline"} size="sm" onClick={onClick}>
 			<PlusIcon data-icon="inline-start" />
 			{children}
 		</Button>
 	);
 }
 
-/** A row that opens its detail: a link, so it hovers and opens in a new tab. */
-function OpenItem({
+/** The frame of a list: the same table as Night Shift's agents. */
+function ListTable({
+	first,
+	second,
+	children,
+}: {
+	first: string;
+	second: string;
+	children: ReactNode;
+}) {
+	return (
+		<div className="overflow-x-auto rounded-xl border">
+			<Table>
+				<TableHeader>
+					<TableRow>
+						<TableHead className="w-72 px-3">{first}</TableHead>
+						<TableHead className="px-3">{second}</TableHead>
+						<TableHead />
+					</TableRow>
+				</TableHeader>
+				<TableBody>{children}</TableBody>
+			</Table>
+		</div>
+	);
+}
+
+/** A row that opens its detail: its name is a link, so it opens in a new tab too. */
+function OpenRow({
 	to,
 	title,
-	description,
+	line,
+	middle,
 	aside,
 }: {
 	to: Selection;
 	title: ReactNode;
-	description?: ReactNode;
+	/** One line under the name. */
+	line?: ReactNode;
+	middle?: ReactNode;
 	aside?: ReactNode;
 }) {
 	const part = useContext(PartContext);
+	const className = "font-medium underline-offset-4 hover:underline";
 	return (
-		<Item
-			variant="outline"
-			size="sm"
-			render={
-				part ? (
-					<Link to="/settings" search={part.search(itemOf(to))} />
+		<TableRow>
+			<TableCell className="max-w-72 px-3 py-2.5">
+				{part ? (
+					<Link
+						to="/settings"
+						search={part.search(itemOf(to))}
+						className={className}
+					>
+						{title}
+					</Link>
 				) : (
-					<Link to="/agents" search={{ item: itemOf(to) }} />
-				)
-			}
-		>
-			<ItemContent>
-				<ItemTitle>{title}</ItemTitle>
-				{description ? <ItemDescription>{description}</ItemDescription> : null}
-			</ItemContent>
-			<ItemActions>
-				{aside}
-				<ChevronRightIcon className="size-4 text-muted-foreground" />
-			</ItemActions>
-		</Item>
+					<Link
+						to="/agents"
+						search={{ item: itemOf(to) }}
+						className={className}
+					>
+						{title}
+					</Link>
+				)}
+				{line ? (
+					<div className="truncate text-muted-foreground text-xs">{line}</div>
+				) : null}
+			</TableCell>
+			<TableCell className="px-3 py-2.5 text-muted-foreground">
+				{middle}
+			</TableCell>
+			<TableCell className="px-3 py-2.5 text-right">{aside}</TableCell>
+		</TableRow>
 	);
 }
 

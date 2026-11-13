@@ -6,11 +6,8 @@ import {
 import { Button } from "@nightshift/ui/components/button";
 import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
-	Field,
 	FieldDescription,
-	FieldError,
 	FieldGroup,
-	FieldLabel,
 	FieldLegend,
 	FieldSet,
 } from "@nightshift/ui/components/field";
@@ -30,10 +27,12 @@ import {
 	SelectValue,
 } from "@nightshift/ui/components/select";
 import { Spinner } from "@nightshift/ui/components/spinner";
+import { Switch } from "@nightshift/ui/components/switch";
 import { CircleAlertIcon, RotateCcwIcon } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 import { KeyValueRows, recordFrom, rowsFrom } from "@/features/agents";
+import { SettingNote, SettingRow } from "@/shared/page";
 import {
 	type SettingKey,
 	type SettingsForm,
@@ -49,6 +48,16 @@ export function SaveError({ error }: { error: Error | null }) {
 			<AlertTitle>Not saved</AlertTitle>
 			<AlertDescription>{error.message}</AlertDescription>
 		</Alert>
+	);
+}
+
+/** The same answer as a row of a settings table. */
+export function SaveErrorRow({ error }: { error: Error | null }) {
+	if (!error) return null;
+	return (
+		<SettingNote>
+			<SaveError error={error} />
+		</SettingNote>
 	);
 }
 
@@ -73,7 +82,7 @@ export function ResetSection({ form }: { form: SettingsForm }) {
 	);
 }
 
-/** A number or text setting: label, input, error, description. */
+/** A number or text setting, as a row: label, description and error, then the input. */
 export function TextSetting({
 	form,
 	settingKey,
@@ -119,8 +128,14 @@ export function TextSetting({
 	} as const;
 
 	return (
-		<Field data-invalid={error ? true : undefined}>
-			<FieldLabel htmlFor={id}>{label}</FieldLabel>
+		<SettingRow
+			label={label}
+			htmlFor={id}
+			description={
+				description ? <span id={`${id}-description`}>{description}</span> : null
+			}
+			error={error ? <span id={`${id}-error`}>{error}</span> : null}
+		>
 			{unit ? (
 				<InputGroup>
 					<InputGroupInput {...inputProps} />
@@ -138,17 +153,11 @@ export function TextSetting({
 					))}
 				</datalist>
 			) : null}
-			{error ? <FieldError id={`${id}-error`}>{error}</FieldError> : null}
-			{description ? (
-				<FieldDescription id={`${id}-description`}>
-					{description}
-				</FieldDescription>
-			) : null}
-		</Field>
+		</SettingRow>
 	);
 }
 
-/** A choice from a short list, in a Select. */
+/** A choice from a short list, in a Select, as a row. */
 export function SelectSetting<V extends string>({
 	form,
 	settingKey,
@@ -166,8 +175,13 @@ export function SelectSetting<V extends string>({
 }) {
 	const id = useId();
 	return (
-		<Field>
-			<FieldLabel htmlFor={id}>{label}</FieldLabel>
+		<SettingRow
+			label={label}
+			htmlFor={id}
+			description={
+				description ? <span id={`${id}-description`}>{description}</span> : null
+			}
+		>
 			<Select
 				items={options}
 				value={form.value(settingKey) as V}
@@ -194,16 +208,41 @@ export function SelectSetting<V extends string>({
 					</SelectGroup>
 				</SelectContent>
 			</Select>
-			{description ? (
-				<FieldDescription id={`${id}-description`}>
-					{description}
-				</FieldDescription>
-			) : null}
-		</Field>
+		</SettingRow>
 	);
 }
 
-/** A form inside a card: Enter saves at once. */
+/** A setting that is on or off, as a row. It saves at once. */
+export function SwitchSetting({
+	label,
+	description,
+	checked,
+	disabled,
+	describedBy,
+	onCheckedChange,
+}: {
+	label: string;
+	description?: ReactNode;
+	checked: boolean;
+	disabled?: boolean;
+	describedBy?: string;
+	onCheckedChange: (checked: boolean) => void;
+}) {
+	const id = useId();
+	return (
+		<SettingRow label={label} htmlFor={id} description={description}>
+			<Switch
+				id={id}
+				checked={checked}
+				disabled={disabled}
+				aria-describedby={describedBy}
+				onCheckedChange={onCheckedChange}
+			/>
+		</SettingRow>
+	);
+}
+
+/** A form around a table of settings: Enter saves at once. */
 export function CardForm({
 	form,
 	children,

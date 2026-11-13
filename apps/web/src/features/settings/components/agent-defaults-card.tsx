@@ -1,5 +1,3 @@
-import { Card, CardContent } from "@nightshift/ui/components/card";
-import { FieldGroup } from "@nightshift/ui/components/field";
 import { useQuery } from "@tanstack/react-query";
 import { TriangleAlertIcon } from "lucide-react";
 import {
@@ -9,13 +7,13 @@ import {
 	harnessInfo,
 } from "@/features/agents";
 import type { SettingsView } from "@/shared/api";
-import { PageSection } from "@/shared/page";
+import { PageSection, SettingRows } from "@/shared/page";
 import { useSettingsForm } from "../hooks/use-settings-form";
 import { PERMISSION_MODES } from "../permission-modes";
 import {
 	CardForm,
 	ResetSection,
-	SaveError,
+	SaveErrorRow,
 	SelectSetting,
 	TextSetting,
 } from "./setting-fields";
@@ -59,65 +57,59 @@ export function AgentDefaultsCard({ data }: { data: SettingsView }) {
 			description="What a new Agent or Decision node starts with. Existing nodes keep their values."
 			actions={<ResetSection form={form} />}
 		>
-			<Card>
-				<CardForm form={form}>
-					<CardContent>
-						<FieldGroup>
-							<div className="grid gap-6 sm:grid-cols-2">
-								<SelectSetting
-									form={form}
-									settingKey="agentHarness"
-									label="Harness"
-									description={harness.note}
-									options={HARNESSES}
-									onPick={(next) => {
-										// A model suggested for the old harness means nothing to the new one.
-										const model = form.value("agentModel");
-										if (harness.models.includes(model) || model.trim() === "") {
-											form.set("agentModel", harnessInfo(next).defaultModel);
-										}
-									}}
-								/>
-								<TextSetting
-									form={form}
-									settingKey="agentModel"
-									label="Model"
-									description={`For example ${harness.models.slice(0, 3).join(", ")}.`}
-									mono
-									suggestions={harness.models}
-								/>
-								<SelectSetting
-									form={form}
-									settingKey="agentPermissionMode"
-									label="Permission mode"
-									description={
-										mode?.value === "bypassPermissions" ? (
-											<span className="flex items-start gap-1.5 text-status-waiting">
-												<TriangleAlertIcon
-													className="mt-0.5 size-3.5 shrink-0"
-													aria-hidden="true"
-												/>
-												{mode.description}
-											</span>
-										) : (
-											mode?.description
-										)
-									}
-									options={PERMISSION_MODES}
-								/>
-								<SelectSetting
-									form={form}
-									settingKey="decisionDecider"
-									label="Decider"
-									description={deciderNote(data)}
-									options={deciderOptions}
-								/>
-							</div>
-							<SaveError error={form.saveError} />
-						</FieldGroup>
-					</CardContent>
-				</CardForm>
-			</Card>
+			<CardForm form={form}>
+				<SettingRows>
+					<SelectSetting
+						form={form}
+						settingKey="agentHarness"
+						label="Harness"
+						description={harness.note}
+						options={HARNESSES}
+						onPick={(next) => {
+							// A model suggested for the old harness means nothing to the new one.
+							const model = form.value("agentModel");
+							if (harness.models.includes(model) || model.trim() === "") {
+								form.set("agentModel", harnessInfo(next).defaultModel);
+							}
+						}}
+					/>
+					<TextSetting
+						form={form}
+						settingKey="agentModel"
+						label="Model"
+						description={`For example ${harness.models.slice(0, 3).join(", ")}.`}
+						mono
+						suggestions={harness.models}
+					/>
+					<SelectSetting
+						form={form}
+						settingKey="agentPermissionMode"
+						label="Permission mode"
+						description={
+							mode?.value === "bypassPermissions" ? (
+								<span className="flex items-start gap-1.5 text-status-waiting">
+									<TriangleAlertIcon
+										className="mt-0.5 size-3.5 shrink-0"
+										aria-hidden="true"
+									/>
+									{mode.description}
+								</span>
+							) : (
+								mode?.description
+							)
+						}
+						options={PERMISSION_MODES}
+					/>
+					<SelectSetting
+						form={form}
+						settingKey="decisionDecider"
+						label="Decider"
+						description={deciderNote(data)}
+						options={deciderOptions}
+					/>
+					<SaveErrorRow error={form.saveError} />
+				</SettingRows>
+			</CardForm>
 		</PageSection>
 	);
 }

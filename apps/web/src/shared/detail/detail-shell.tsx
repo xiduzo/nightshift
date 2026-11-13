@@ -9,7 +9,18 @@ import { Separator } from "@nightshift/ui/components/separator";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { cn } from "@nightshift/ui/lib/utils";
 import { EllipsisIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { createContext, type ReactNode, useContext } from "react";
+import { HeaderActions, PageHeading, PageSection } from "@/shared/page";
+
+const InPage = createContext(false);
+
+/**
+ * A detail that is a page of its own, under the site header: it takes the
+ * heading and the width of a page, and its actions go to the site header.
+ */
+export function DetailInPage({ children }: { children: ReactNode }) {
+	return <InPage value={true}>{children}</InPage>;
+}
 
 /**
  * The detail of one thing (an Agents item, a device in the Devices sheet):
@@ -49,6 +60,76 @@ export function DetailShell({
 	children: ReactNode;
 }) {
 	const showBar = save && (save.dirty || save.isNew);
+	const inPage = useContext(InPage);
+	const menu =
+		actions && actions.length > 0 ? (
+			<DropdownMenu>
+				<DropdownMenuTrigger
+					render={<Button variant="ghost" size="icon-sm" aria-label="More" />}
+				>
+					<EllipsisIcon />
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end">
+					{actions.map((action) => (
+						<DropdownMenuItem
+							key={action.label}
+							variant={action.destructive ? "destructive" : "default"}
+							onClick={action.onSelect}
+						>
+							{action.label}
+						</DropdownMenuItem>
+					))}
+				</DropdownMenuContent>
+			</DropdownMenu>
+		) : null;
+	const saveButtons = showBar ? (
+		<>
+			<Button
+				variant="ghost"
+				size="sm"
+				disabled={save.pending}
+				onClick={save.onDiscard}
+			>
+				{save.isNew ? "Cancel" : "Discard"}
+			</Button>
+			<Button
+				size="sm"
+				disabled={!save.canSave || save.pending}
+				onClick={save.onSave}
+			>
+				{save.pending ? <Spinner data-icon="inline-start" /> : null}
+				{save.isNew ? "Add" : "Save"}
+			</Button>
+		</>
+	) : null;
+	const saveState = showBar ? (
+		<span className="text-muted-foreground text-sm">
+			{save.isNew ? "Not saved yet" : "Unsaved changes"}
+		</span>
+	) : null;
+
+	if (inPage) {
+		return (
+			<div className="flex min-h-full flex-col">
+				<div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-8 p-4 md:p-6">
+					<PageHeading
+						title={mono ? <span className="font-mono">{title}</span> : title}
+						description={subtitle}
+					/>
+					{children}
+				</div>
+				<HeaderActions>
+					{saveState ? (
+						<span className="hidden sm:inline">{saveState}</span>
+					) : null}
+					{saveButtons}
+					{menu}
+				</HeaderActions>
+				{footer ? <div className="sticky bottom-0">{footer}</div> : null}
+			</div>
+		);
+	}
+
 	return (
 		<div className="flex min-h-full flex-col">
 			<div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 pt-8 pb-16 md:px-8">
@@ -70,53 +151,15 @@ export function DetailShell({
 							<div className="text-muted-foreground text-sm">{subtitle}</div>
 						) : null}
 					</div>
-					{actions && actions.length > 0 ? (
-						<DropdownMenu>
-							<DropdownMenuTrigger
-								render={
-									<Button variant="ghost" size="icon-sm" aria-label="More" />
-								}
-							>
-								<EllipsisIcon />
-							</DropdownMenuTrigger>
-							<DropdownMenuContent align="end">
-								{actions.map((action) => (
-									<DropdownMenuItem
-										key={action.label}
-										variant={action.destructive ? "destructive" : "default"}
-										onClick={action.onSelect}
-									>
-										{action.label}
-									</DropdownMenuItem>
-								))}
-							</DropdownMenuContent>
-						</DropdownMenu>
-					) : null}
+					{menu}
 				</header>
 				{children}
 			</div>
 			{showBar ? (
 				<div className="sticky bottom-0 border-t bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
 					<div className="mx-auto flex w-full max-w-6xl items-center justify-end gap-2 px-4 py-3 md:px-8">
-						<span className="mr-auto text-muted-foreground text-sm">
-							{save.isNew ? "Not saved yet" : "Unsaved changes"}
-						</span>
-						<Button
-							variant="ghost"
-							size="sm"
-							disabled={save.pending}
-							onClick={save.onDiscard}
-						>
-							{save.isNew ? "Cancel" : "Discard"}
-						</Button>
-						<Button
-							size="sm"
-							disabled={!save.canSave || save.pending}
-							onClick={save.onSave}
-						>
-							{save.pending ? <Spinner data-icon="inline-start" /> : null}
-							{save.isNew ? "Add" : "Save"}
-						</Button>
+						<span className="mr-auto">{saveState}</span>
+						{saveButtons}
 					</div>
 				</div>
 			) : null}
@@ -135,6 +178,14 @@ export function DetailSection({
 	description?: ReactNode;
 	children: ReactNode;
 }) {
+	const inPage = useContext(InPage);
+	if (inPage) {
+		return (
+			<PageSection title={title} description={description}>
+				{children}
+			</PageSection>
+		);
+	}
 	return (
 		<>
 			<Separator />
