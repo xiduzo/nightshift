@@ -12,13 +12,16 @@ import type { TabBarProps } from "./tabs";
  * brand color. Needs you shows how many things wait, in the system's
  * badge color. Android has its own file (`tab-bar.android.tsx`).
  */
-export function TabBar({ waiting, needsLabel }: TabBarProps) {
+export function TabBar({ waiting, needsLabel, accessory }: TabBarProps) {
 	const { colors } = useThemeColors();
 	return (
 		<NativeTabs
 			// The badge keeps the system's color: what waits is no error.
 			tintColor={colors.primary}
 		>
+			{accessory ? (
+				<NativeTabs.BottomAccessory>{accessory}</NativeTabs.BottomAccessory>
+			) : null}
 			<NativeTabs.Trigger name="(needs)" accessibilityLabel={needsLabel}>
 				<NativeTabs.Trigger.Icon
 					sf={{ default: "hand.raised", selected: "hand.raised.fill" }}
