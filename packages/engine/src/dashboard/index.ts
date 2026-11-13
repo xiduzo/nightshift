@@ -4,7 +4,9 @@ export { isTimeZone } from "./clock";
 export { summarizeFlow } from "./flow-health";
 export {
 	flowChanges,
+	flowTurnedSevere,
 	projectDashboard,
+	type SevereTurn,
 	spaceSpend,
 	spacesDashboard,
 } from "./spaces";

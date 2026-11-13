@@ -8,10 +8,12 @@ import { summarizeDashboard } from "./summary";
 import {
 	type DashboardSummary,
 	type FlowChanges,
+	type FlowSignal,
 	NIGHT_RANGES,
 	type NightRange,
 	type SpaceSpend,
 } from "./types";
+import { turnedSevere, watchRunsOf } from "./watch";
 
 /** The days of help cost the Spend page reads: its longest range. A month is shorter. */
 const HELP_DAYS = Math.max(...NIGHT_RANGES);
@@ -103,4 +105,39 @@ export async function flowChanges(
 		moves: nextMoves(details),
 		read: details.length,
 	});
+}
+
+/** A flow that turned severe under Needs a look, and the run that turned it. */
+export type SevereTurn = {
+	projectId: string;
+	/** The flow's name. */
+	flow: string;
+	/** The run whose end turned it severe: the newest that shows it. */
+	runId: string;
+	/** The severe signal. */
+	signal: FlowSignal;
+};
+
+/**
+ * Whether the end of one run turned its flow severe under Needs a look:
+ * the same watch as the dashboard, over the flow's own real runs. Null
+ * for a quick run, a test run, a run this Replica does not have, and a
+ * flow that was severe already or is not severe now.
+ */
+export async function flowTurnedSevere(
+	space: Pick<SpaceEngine, "listRuns" | "getRun">,
+	runId: string,
+	now: number,
+): Promise<SevereTurn | null> {
+	const run = await space.getRun(runId).catch(() => null);
+	if (!run?.flowName) return null;
+	const runs = watchRunsOf(
+		run.flowName,
+		await space.listRuns({ projectId: run.projectId }),
+		now,
+	);
+	const signal = turnedSevere(runs, runId);
+	return signal
+		? { projectId: run.projectId, flow: run.flowName, runId, signal }
+		: null;
 }
