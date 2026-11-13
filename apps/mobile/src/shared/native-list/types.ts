@@ -1,6 +1,6 @@
 import type { ButtonProps } from "@expo/ui/swift-ui";
 import type { LucideIcon } from "lucide-react-native";
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 
 export type SFSymbol = NonNullable<ButtonProps["systemImage"]>;
 
@@ -120,3 +120,32 @@ export type NativeLoadingRowProps = { label: string };
 
 /** Any React Native content in a row, for what the kit does not cover: a Markdown body, a chart. */
 export type NativeCustomRowProps = { children: ReactNode };
+
+/**
+ * What a field holds. It sets the keyboard, the autofill hint for the
+ * password manager, and whether the text shows: a password is hidden. A
+ * code is typed as is: no capitals, no corrections.
+ */
+export type NativeFieldKind =
+	| "url"
+	| "email"
+	| "password"
+	| "one-time-code"
+	| "code";
+
+/** Puts the cursor in a field: after Email, the Password field. */
+export type NativeFieldHandle = { focus: () => void };
+
+/** A labelled text field in a row: the native field of each platform. */
+export type NativeTextFieldRowProps = {
+	label: string;
+	value: string;
+	onChange: (value: string) => void;
+	kind: NativeFieldKind;
+	placeholder?: string;
+	/** The return key: "next" goes to the next field, "go" sends the form. */
+	returnKey?: "next" | "go";
+	/** The return key was pressed. */
+	onSubmit?: () => void;
+	ref?: Ref<NativeFieldHandle>;
+};

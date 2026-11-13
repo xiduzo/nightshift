@@ -252,7 +252,7 @@ apps/mobile/src/
     theme/                 useThemeColors: the light or dark colors for props that take a color
     tone/                  the status map, pure: tone, icon name and word of a run status, a step, a step kind
     status/                StatusBadge and StatusText: a tone drawn with its icon and word
-    list/                  ListGroup, ListRow, SectionHead: lists in a card
+    list/                  ListGroup, ListRow: lists in a card
     match/                 matching a typed query, pure: its words, and the Gates that hold them all (the Inbox search and Search)
     header/  avatar/       the native header's actions (HeaderToolbar on Stack.Toolbar), its search field (HeaderSearch) and AvatarButton; InitialsAvatar
     chips/                 filter chips (ChipRail, Chip)

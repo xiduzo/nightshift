@@ -3,45 +3,60 @@ import {
 	Host,
 	HStack,
 	Image,
+	LabeledContent,
 	List,
 	Picker,
 	ProgressView,
 	RNHostView,
 	Section,
+	SecureField,
+	type SecureFieldRef,
 	Spacer,
 	SwipeActions,
 	Text,
+	TextField,
+	type TextFieldRef,
 	Toggle,
+	useNativeState,
 	VStack,
 } from "@expo/ui/swift-ui";
 import {
 	accessibilityElement,
 	accessibilityLabel as accessibilityLabelModifier,
+	autocorrectionDisabled,
 	disabled as disabledModifier,
 	font,
 	foregroundStyle,
+	keyboardType,
 	labelsHidden,
 	lineLimit,
 	listStyle,
+	multilineTextAlignment,
+	onSubmit as onSubmitModifier,
 	opacity,
 	pickerStyle,
 	refreshable,
+	submitLabel,
 	tag,
+	textContentType,
+	textInputAutocapitalization,
 	textSelection,
 	tint,
 } from "@expo/ui/swift-ui/modifiers";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useImperativeHandle, useRef } from "react";
 
 import { useThemeColors } from "@/shared/theme";
 import type {
 	NativeButtonRowProps,
 	NativeCustomRowProps,
+	NativeFieldKind,
 	NativeListProps,
 	NativeLoadingRowProps,
 	NativeOptionRowProps,
 	NativePickerRowProps,
 	NativeRowProps,
 	NativeSectionProps,
+	NativeTextFieldRowProps,
 	NativeTextRowProps,
 	NativeTitleRowProps,
 	NativeToggleRowProps,
@@ -404,6 +419,104 @@ export function NativeCustomRow({ children }: NativeCustomRowProps) {
 		<RNHostView matchContents={{ vertical: true }}>
 			<>{children}</>
 		</RNHostView>
+	);
+}
+
+/**
+ * The field's text as native state that follows `value`: what the person
+ * types goes out through `onChange`, a new value from the screen (a
+ * scanned address, a cleared code) goes into the field.
+ */
+function useFieldText(value: string, onChange: (value: string) => void) {
+	const text = useNativeState(value);
+	const last = useRef(value);
+	useEffect(() => {
+		if (value === last.current) return;
+		last.current = value;
+		text.set(value);
+	}, [value, text]);
+	return {
+		text,
+		change(next: string) {
+			last.current = next;
+			onChange(next);
+		},
+	};
+}
+
+/** The keyboard and the autofill hint of each kind of field. */
+const FIELD_INPUT = {
+	url: { keyboard: "url", content: "URL" },
+	email: { keyboard: "email-address", content: "emailAddress" },
+	password: { keyboard: "default", content: "password" },
+	"one-time-code": { keyboard: "numeric", content: "oneTimeCode" },
+	code: { keyboard: "default", content: undefined },
+} as const satisfies Record<
+	NativeFieldKind,
+	{
+		keyboard: Parameters<typeof keyboardType>[0];
+		content: Parameters<typeof textContentType>[0] | undefined;
+	}
+>;
+
+/**
+ * The label at the start of the row and the field after it, the form rows
+ * of the Settings app. A password is a SecureField. The keychain offers
+ * the saved email and password.
+ */
+export function NativeTextFieldRow({
+	label,
+	value,
+	onChange,
+	kind,
+	placeholder,
+	returnKey,
+	onSubmit,
+	ref,
+}: NativeTextFieldRowProps) {
+	const { text, change } = useFieldText(value, onChange);
+	const plain = useRef<TextFieldRef>(null);
+	const secure = useRef<SecureFieldRef>(null);
+	useImperativeHandle(
+		ref,
+		() => ({
+			focus() {
+				void (plain.current ?? secure.current)?.focus();
+			},
+		}),
+		[],
+	);
+	const input = FIELD_INPUT[kind];
+	const modifiers = [
+		keyboardType(input.keyboard),
+		...(input.content ? [textContentType(input.content)] : []),
+		textInputAutocapitalization("never"),
+		autocorrectionDisabled(true),
+		multilineTextAlignment("trailing"),
+		accessibilityLabelModifier(label),
+		...(returnKey ? [submitLabel(returnKey)] : []),
+		...(onSubmit ? [onSubmitModifier(onSubmit)] : []),
+	];
+	return (
+		<LabeledContent label={label}>
+			{kind === "password" ? (
+				<SecureField
+					ref={secure}
+					text={text}
+					placeholder={placeholder}
+					onTextChange={change}
+					modifiers={modifiers}
+				/>
+			) : (
+				<TextField
+					ref={plain}
+					text={text}
+					placeholder={placeholder}
+					onTextChange={change}
+					modifiers={modifiers}
+				/>
+			)}
+		</LabeledContent>
 	);
 }
 
