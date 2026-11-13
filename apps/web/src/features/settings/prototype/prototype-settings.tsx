@@ -33,7 +33,12 @@ import {
 	SetupCard,
 } from "@/features/agents";
 import { NotificationSettingsCard } from "@/features/notifications";
-import { type Crumb, PageHeading, SiteHeader } from "@/shared/page";
+import {
+	type Crumb,
+	PageHeading,
+	PageSection,
+	SiteHeader,
+} from "@/shared/page";
 import { AgentDefaultsCard } from "../components/agent-defaults-card";
 import { AppearanceCard } from "../components/appearance-card";
 import { CleanupCard } from "../components/cleanup-card";
@@ -45,8 +50,10 @@ import { RunsCard } from "../components/runs-card";
 import { settingsQueries } from "../queries";
 import {
 	type AgentPicker,
+	AnswersTable,
 	BuiltinDetail,
-	BuiltinTable,
+	NEW_NODES,
+	SEARCH,
 	useChoices,
 } from "./builtin-agents";
 import { BUILTINS, builtinOf } from "./model";
@@ -172,6 +179,17 @@ export function PrototypeSettings({
 					}),
 				}}
 				partCrumbs={sectionCrumb(true)}
+				after={
+					data && current.key === "agents" ? (
+						<div className="mx-auto w-full max-w-4xl px-4 pb-6 md:px-6">
+							<AgentDefaultsCard data={data} />
+						</div>
+					) : data && current.key === "models" ? (
+						<div className="mx-auto w-full max-w-4xl px-4 pb-6 md:px-6">
+							<MeaningSearchCard data={data} />
+						</div>
+					) : null
+				}
 				heading={
 					<div className="mx-auto w-full max-w-4xl px-4 pt-4 md:px-6 md:pt-6">
 						<PageHeading title={current.label} description={current.line} />
@@ -238,13 +256,35 @@ export function PrototypeSettings({
 				) : current.key === "builtin" ? (
 					<>
 						<PageHeading title={current.label} description={current.line} />
-						<BuiltinTable
+						<AnswersTable
+							rows={BUILTINS}
+							first="Agent"
 							choices={choices}
 							agentPicker={agentPicker}
 							searchOf={(agent) => ({ section: "builtin", agent })}
 						/>
-						{data ? <AgentDefaultsCard data={data} /> : null}
-						{data ? <MeaningSearchCard data={data} /> : null}
+						<PageSection
+							title="New nodes"
+							description="What a new node starts with. Existing nodes keep their values."
+						>
+							<AnswersTable
+								rows={NEW_NODES}
+								first="Node"
+								choices={choices}
+								agentPicker={agentPicker}
+							/>
+						</PageSection>
+						<PageSection
+							title="Search"
+							description="Search finds files by what they mean, not only by their words."
+						>
+							<AnswersTable
+								rows={[SEARCH]}
+								first="Search"
+								choices={choices}
+								agentPicker={agentPicker}
+							/>
+						</PageSection>
 					</>
 				) : current.key === "runs" ? (
 					<>

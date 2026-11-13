@@ -61,11 +61,13 @@ export function AgentsPage({
 	part,
 	partCrumbs,
 	heading,
+	after,
 }: {
 	/** PROTOTYPE, throw away: one part of the page, inside Settings. */
 	part?: AgentsPart;
 	partCrumbs?: Crumb[];
 	heading?: ReactNode;
+	after?: ReactNode;
 	item: string | undefined;
 	onSelect: (item: string | undefined) => void;
 }) {
@@ -232,6 +234,7 @@ export function AgentsPage({
 						onAddHarness={() => setPicking("harness")}
 						onAddTool={() => setPicking("tool")}
 					/>
+					{after}
 				</>
 			)}
 

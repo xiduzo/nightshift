@@ -32,7 +32,12 @@ import {
 import { Field, FieldLabel } from "@nightshift/ui/components/field";
 import { InputGroupButton } from "@nightshift/ui/components/input-group";
 import { useQuery } from "@tanstack/react-query";
-import { BotIcon, ChevronDownIcon, TriangleAlertIcon } from "lucide-react";
+import {
+	BotIcon,
+	ChevronDownIcon,
+	CpuIcon,
+	TriangleAlertIcon,
+} from "lucide-react";
 import { useId, useState } from "react";
 import {
 	EFFORTS,
@@ -68,7 +73,22 @@ type ChoiceStore = {
 	onChoiceChange?: (choice: AgentChoice) => void;
 };
 
-export type AgentMenusProps = { purpose: AgentPurpose } & ChoiceStore;
+/** PROTOTYPE, throw away: models that give one answer, in the same list as the agents. */
+export type ModelOptions = {
+	/** The group's label. */
+	label?: string;
+	options: readonly { value: string; label: string; hint?: string }[];
+	/** The model that answers. Undefined: an agent answers. */
+	value: string | undefined;
+	onPick: (value: string | undefined) => void;
+};
+
+export type AgentMenusProps = {
+	purpose: AgentPurpose;
+	models?: ModelOptions;
+	/** False: only models can answer. */
+	agents?: boolean;
+} & ChoiceStore;
 
 /** The profile radio's value for the profile for help, and for no profile. Profile names cannot hold a colon. */
 const HELP = ":help";
@@ -189,14 +209,23 @@ export function AgentMenus({
 	purpose,
 	choice: given,
 	onChoiceChange,
+	models,
+	agents = true,
 }: AgentMenusProps) {
 	const stored = useAgentChoice();
 	const choice = given ?? stored;
-	const set = onChoiceChange ?? setAgentChoice;
+	const modelOn = models?.value !== undefined || !agents;
+	const pickedModel = models?.options.find((o) => o.value === models.value);
+	const set = (next: AgentChoice) => {
+		models?.onPick(undefined);
+		(onChoiceChange ?? setAgentChoice)(next);
+	};
 	const options = useAgentOptions(purpose);
 	const now = resolve(choice, options);
-	const label = choiceLabel(choice, options.info);
-	const refusal = chatRefusal(choice, purpose, options);
+	const label = modelOn
+		? (pickedModel?.label ?? models?.value ?? "Choose a model")
+		: choiceLabel(choice, options.info);
+	const refusal = modelOn ? null : chatRefusal(choice, purpose, options);
 	const [otherModel, setOtherModel] = useState<HarnessName | null>(null);
 	const pick = (harness: HarnessName, model: string) =>
 		set(
@@ -221,6 +250,8 @@ export function AgentMenus({
 						>
 							{refusal ? (
 								<TriangleAlertIcon className="text-destructive" />
+							) : modelOn ? (
+								<CpuIcon />
 							) : (
 								<BotIcon />
 							)}
@@ -237,58 +268,94 @@ export function AgentMenus({
 							</DropdownMenuLabel>
 						</DropdownMenuGroup>
 					) : null}
-					<ProfileGroup
-						choice={choice}
-						set={set}
-						purpose={purpose}
-						options={options}
-						now={now}
-					/>
-					<DropdownMenuSeparator />
-					<DropdownMenuGroup>
-						<DropdownMenuLabel>Model</DropdownMenuLabel>
-						{harnessList(choice, options).map(({ name, added }) => (
-							<DropdownMenuSub key={name}>
-								<DropdownMenuSubTrigger
-									disabled={purpose === "chat" && !options.fits(name)}
-								>
-									<span className="truncate">
-										{options.info(name).label}
-										{added ? "" : " (not added)"}
-										{purpose === "chat" && !options.fits(name)
-											? " (cannot chat)"
-											: ""}
-									</span>
-									{name === now.harness ? (
-										<DropdownMenuShortcut className="tracking-normal">
-											{now.model}
-										</DropdownMenuShortcut>
-									) : null}
-								</DropdownMenuSubTrigger>
-								<DropdownMenuSubContent className="max-h-80 min-w-44">
-									<HarnessModels
-										harness={name}
-										current={name === now.harness ? now.model : null}
-										onPick={(model) => pick(name, model)}
-										onOther={() => setOtherModel(name)}
-									/>
-								</DropdownMenuSubContent>
-							</DropdownMenuSub>
-						))}
-						{!now.none && (choice.harness || choice.model) ? (
-							<DropdownMenuItem onClick={() => set(profileModel(choice))}>
-								Use the profile's model
-								{now.profile?.model ? (
-									<DropdownMenuShortcut className="tracking-normal">
-										{now.profile.model}
-									</DropdownMenuShortcut>
+					{agents ? (
+						<>
+							<ProfileGroup
+								choice={choice}
+								set={set}
+								purpose={purpose}
+								options={options}
+								now={now}
+								off={modelOn}
+							/>
+							<DropdownMenuSeparator />
+							<DropdownMenuGroup>
+								<DropdownMenuLabel>
+									{models ? "A harness and its model" : "Model"}
+								</DropdownMenuLabel>
+								{harnessList(choice, options).map(({ name, added }) => (
+									<DropdownMenuSub key={name}>
+										<DropdownMenuSubTrigger
+											disabled={purpose === "chat" && !options.fits(name)}
+										>
+											<span className="truncate">
+												{options.info(name).label}
+												{added ? "" : " (not added)"}
+												{purpose === "chat" && !options.fits(name)
+													? " (cannot chat)"
+													: ""}
+											</span>
+											{name === now.harness ? (
+												<DropdownMenuShortcut className="tracking-normal">
+													{now.model}
+												</DropdownMenuShortcut>
+											) : null}
+										</DropdownMenuSubTrigger>
+										<DropdownMenuSubContent className="max-h-80 min-w-44">
+											<HarnessModels
+												harness={name}
+												current={name === now.harness ? now.model : null}
+												onPick={(model) => pick(name, model)}
+												onOther={() => setOtherModel(name)}
+											/>
+										</DropdownMenuSubContent>
+									</DropdownMenuSub>
+								))}
+								{!now.none && (choice.harness || choice.model) ? (
+									<DropdownMenuItem onClick={() => set(profileModel(choice))}>
+										Use the profile's model
+										{now.profile?.model ? (
+											<DropdownMenuShortcut className="tracking-normal">
+												{now.profile.model}
+											</DropdownMenuShortcut>
+										) : null}
+									</DropdownMenuItem>
 								) : null}
-							</DropdownMenuItem>
-						) : null}
-					</DropdownMenuGroup>
+							</DropdownMenuGroup>
+						</>
+					) : null}
+					{models ? (
+						<>
+							{agents ? <DropdownMenuSeparator /> : null}
+							<DropdownMenuGroup>
+								<DropdownMenuLabel>
+									{models.label ?? "Models"}
+								</DropdownMenuLabel>
+								<DropdownMenuRadioGroup
+									value={models.value ?? ""}
+									onValueChange={(next: string) => models.onPick(next)}
+								>
+									{models.options.map((option) => (
+										<DropdownMenuRadioItem
+											key={option.value}
+											value={option.value}
+											closeOnClick
+										>
+											<span className="truncate">{option.label}</span>
+											{option.hint ? (
+												<DropdownMenuShortcut className="truncate tracking-normal">
+													{option.hint}
+												</DropdownMenuShortcut>
+											) : null}
+										</DropdownMenuRadioItem>
+									))}
+								</DropdownMenuRadioGroup>
+							</DropdownMenuGroup>
+						</>
+					) : null}
 				</DropdownMenuContent>
 			</DropdownMenu>
-			<EffortMenu choice={choice} set={set} now={now} />
+			{modelOn ? null : <EffortMenu choice={choice} set={set} now={now} />}
 			{otherModel ? (
 				<OtherModelDialog
 					harness={otherModel}
@@ -319,7 +386,10 @@ function ProfileGroup({
 	purpose,
 	options,
 	now,
+	off = false,
 }: {
+	/** A model answers: no profile is the picked one. */
+	off?: boolean;
 	choice: AgentChoice;
 	set: (choice: AgentChoice) => void;
 	purpose: AgentPurpose;
@@ -327,7 +397,13 @@ function ProfileGroup({
 	now: ReturnType<typeof resolve>;
 }) {
 	const { profiles, forHelp, fits, info } = options;
-	const value = now.usesHelp ? HELP : now.none ? NONE : (choice.profile ?? "");
+	const value = off
+		? ""
+		: now.usesHelp
+			? HELP
+			: now.none
+				? NONE
+				: (choice.profile ?? "");
 	const unknown =
 		choice.profile !== undefined &&
 		!profiles.some((p) => p.name === choice.profile);

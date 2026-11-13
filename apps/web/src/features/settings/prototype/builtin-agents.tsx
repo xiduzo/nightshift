@@ -1,7 +1,8 @@
 /**
- * PROTOTYPE, throw away. Night Shift's agents: a table with a choice for
- * each of the six, and the page of one. An agent is chosen with the agent
- * picker the chat already has, a model with a select of your models.
+ * PROTOTYPE, throw away. Who answers: a table with one row for each of
+ * Night Shift's agents, for a new node, and for meaning search. Every
+ * row uses the agent picker of the chat. Its list holds your agents and
+ * your models together, and a row shows only what can answer for it.
  * Choices stay in this tab.
  */
 import { type AssistantAgent, harnessTakesTools } from "@nightshift/flows";
@@ -19,10 +20,6 @@ import {
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import {
-	NativeSelect,
-	NativeSelectOption,
-} from "@nightshift/ui/components/native-select";
-import {
 	Table,
 	TableBody,
 	TableCell,
@@ -30,145 +27,216 @@ import {
 	TableHeader,
 	TableRow,
 } from "@nightshift/ui/components/table";
-import {
-	ToggleGroup,
-	ToggleGroupItem,
-} from "@nightshift/ui/components/toggle-group";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { CircleAlertIcon, CircleCheckIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { profileQueries, useDeciderSetupStatus } from "@/features/agents";
-import { BUILTINS, type Builtin, type BuiltinId, TAKES_LABEL } from "./model";
+import {
+	deciderQueries,
+	profileQueries,
+	useDeciderSetupStatus,
+} from "@/features/agents";
+import { ollamaQueries, settingsQueries } from "../queries";
+import { type Builtin, TAKES_LABEL, type Takes } from "./model";
+
+type ModelOption = { value: string; label: string; hint?: string };
 
 /** The agent picker of the chat, handed in by the route. */
 export type AgentPicker = (props: {
-	purpose: "chat" | "suggest";
+	purpose: "chat" | "suggest" | "run";
 	choice: AssistantAgent;
 	onChoiceChange: (choice: AssistantAgent) => void;
+	agents?: boolean;
+	models?: {
+		label?: string;
+		options: readonly ModelOption[];
+		value: string | undefined;
+		onPick: (value: string | undefined) => void;
+	};
 }) => ReactNode;
 
-type Choice = {
-	/** For an agent that takes both: which kind answers. */
-	kind: "agent" | "model";
-	agent: AssistantAgent;
-	/** A Model Profile's name. Empty: the decider of this computer. */
-	model: string;
+/** A row of the table that is not one of the six agents. */
+export type OtherRow = {
+	id: "new-agent" | "new-decision" | "search";
+	name: string;
+	job: string;
+	takes: Takes | "embedding" | "harness";
 };
+
+export const NEW_NODES: readonly OtherRow[] = [
+	{
+		id: "new-agent",
+		name: "A new Agent node",
+		job: "What an Agent node starts with.",
+		takes: "harness",
+	},
+	{
+		id: "new-decision",
+		name: "A new Decision node",
+		job: "The model a new Decision uses to choose.",
+		takes: "model",
+	},
+];
+
+export const SEARCH: OtherRow = {
+	id: "search",
+	name: "Meaning search",
+	job: "Finds knowledge by what it means.",
+	takes: "embedding",
+};
+
+type Row = Builtin | OtherRow;
+type Choice = { agent: AssistantAgent; model: string | undefined };
 
 export type Choices = {
-	of: (builtin: Builtin) => Choice;
-	set: (id: BuiltinId, change: Partial<Choice>) => void;
+	of: (row: Row) => Choice;
+	set: (row: Row, change: Partial<Choice>) => void;
 };
 
+/** The choices of this tab. A row with nothing picked starts on what this computer uses now. */
 export function useChoices(): Choices {
-	const [choices, setChoices] = useState<Partial<Record<BuiltinId, Choice>>>(
-		{},
-	);
-	const of = (builtin: Builtin): Choice =>
-		choices[builtin.id] ?? {
-			kind: builtin.takes === "model" ? "model" : "agent",
-			agent: {},
-			model: "",
-		};
+	const settings = useQuery(settingsQueries.get());
+	const decider = useDeciderSetupStatus();
+	const [choices, setChoices] = useState<Record<string, Choice>>({});
+	const values = settings.data?.values;
+	const start = (row: Row): Choice => {
+		const takes = row.takes as string;
+		if (row.id === "search") {
+			return { agent: {}, model: values?.embeddingModel };
+		}
+		if (row.id === "new-agent") {
+			return {
+				agent: values
+					? { harness: values.agentHarness, model: values.agentModel }
+					: {},
+				model: undefined,
+			};
+		}
+		if (takes === "model") {
+			return {
+				agent: {},
+				model: decider.data
+					? `decider:${decider.data.current.decider}`
+					: undefined,
+			};
+		}
+		return { agent: {}, model: undefined };
+	};
+	const of = (row: Row) => choices[row.id] ?? start(row);
 	return {
 		of,
-		set: (id, change) =>
-			setChoices((now) => {
-				const builtin = BUILTINS.find((item) => item.id === id);
-				return builtin
-					? { ...now, [id]: { ...of(builtin), ...now[id], ...change } }
-					: now;
-			}),
+		set: (row, change) =>
+			setChoices((now) => ({ ...now, [row.id]: { ...of(row), ...change } })),
 	};
 }
 
-/** Whether something can answer for a built-in agent on this computer. */
-function useReady(choices: Choices) {
+/** Your models: the model profiles, then the deciders of this computer. */
+function useModelOptions(): ModelOption[] {
+	const profiles = useQuery(profileQueries.models());
+	const deciders = useQuery(deciderQueries.list());
+	return [
+		...(profiles.data ?? []).map((profile) => ({
+			value: `profile:${profile.name}`,
+			label: profile.name,
+			hint: profile.model ?? profile.decider,
+		})),
+		...(deciders.data ?? []).map((decider) => ({
+			value: `decider:${decider.name}`,
+			label: decider.label,
+			hint: decider.defaultModel ?? undefined,
+		})),
+	];
+}
+
+/** The models that search by meaning. */
+function useSearchOptions(current: string | undefined): ModelOption[] {
+	const models = useQuery({
+		...ollamaQueries.models(),
+		meta: { quietErrors: true },
+	});
+	const names = new Set([
+		...(current ? [current] : []),
+		...(models.data ?? []).map((model) => model.name),
+	]);
+	return [...names].map((name) => ({ value: name, label: name }));
+}
+
+/** Who answers for one row: the same picker everywhere. */
+function AnswersWith({
+	row,
+	choices,
+	agentPicker,
+}: {
+	row: Row;
+	choices: Choices;
+	agentPicker: AgentPicker;
+}) {
+	const choice = choices.of(row);
+	const takes = row.takes as string;
+	const modelOptions = useModelOptions();
+	const searchOptions = useSearchOptions(
+		row.id === "search" ? choice.model : undefined,
+	);
+	const withModels = takes === "either" || takes === "model";
+	return (
+		<InputGroup className="w-auto max-w-96">
+			<InputGroupAddon>
+				{agentPicker({
+					purpose:
+						row.id === "new-agent"
+							? "run"
+							: takes === "harness-with-tools"
+								? "chat"
+								: "suggest",
+					choice: choice.agent,
+					onChoiceChange: (agent) =>
+						choices.set(row, { agent, model: undefined }),
+					agents: takes !== "model" && takes !== "embedding",
+					models:
+						row.id === "search"
+							? {
+									label: "Models for search",
+									options: searchOptions,
+									value: choice.model,
+									onPick: (model) => choices.set(row, { model }),
+								}
+							: withModels
+								? {
+										label: "Models",
+										options:
+											row.id === "new-decision"
+												? modelOptions.filter((o) =>
+														o.value.startsWith("decider:"),
+													)
+												: modelOptions,
+										value: choice.model,
+										onPick: (model) => choices.set(row, { model }),
+									}
+								: undefined,
+				})}
+			</InputGroupAddon>
+		</InputGroup>
+	);
+}
+
+/** Whether something can answer for a row on this computer. */
+function useProblem(choices: Choices) {
 	const agents = useQuery(profileQueries.agents());
-	const decider = useDeciderSetupStatus();
 	const anyAgent = (agents.data ?? []).length > 0;
 	const toolAgent = (agents.data ?? []).some((profile) =>
 		harnessTakesTools(profile.harness),
 	);
-	return (builtin: Builtin): string | null => {
-		const choice = choices.of(builtin);
-		if (choice.kind === "model") {
-			return decider.data?.current.chosen || choice.model !== ""
-				? null
-				: "Choose a model";
-		}
-		if (builtin.takes === "harness-with-tools") {
+	return (row: Row): string | null => {
+		const choice = choices.of(row);
+		const takes = row.takes as string;
+		if (choice.model !== undefined) return null;
+		if (takes === "model" || takes === "embedding") return "Choose a model";
+		if (row.id === "new-agent") return null;
+		if (takes === "harness-with-tools") {
 			return toolAgent ? null : "Needs an agent";
 		}
 		return anyAgent ? null : "Needs an agent";
 	};
-}
-
-/** Who answers for one built-in agent: existing controls only. */
-function AnswersWith({
-	builtin,
-	choices,
-	agentPicker,
-}: {
-	builtin: Builtin;
-	choices: Choices;
-	agentPicker: AgentPicker;
-}) {
-	const models = useQuery(profileQueries.models());
-	const decider = useDeciderSetupStatus();
-	const choice = choices.of(builtin);
-	return (
-		<div className="flex flex-wrap items-center gap-2">
-			{builtin.takes === "either" ? (
-				<ToggleGroup
-					variant="outline"
-					size="sm"
-					value={[choice.kind]}
-					onValueChange={(value) => {
-						const kind = value[0];
-						if (kind === "agent" || kind === "model")
-							choices.set(builtin.id, { kind });
-					}}
-					aria-label={`${builtin.name} answers with an agent or a model`}
-				>
-					<ToggleGroupItem value="agent">Agent</ToggleGroupItem>
-					<ToggleGroupItem value="model">Model</ToggleGroupItem>
-				</ToggleGroup>
-			) : null}
-			{choice.kind === "agent" ? (
-				<InputGroup className="w-auto max-w-80">
-					<InputGroupAddon>
-						{agentPicker({
-							purpose:
-								builtin.takes === "harness-with-tools" ? "chat" : "suggest",
-							choice: choice.agent,
-							onChoiceChange: (agent) => choices.set(builtin.id, { agent }),
-						})}
-					</InputGroupAddon>
-				</InputGroup>
-			) : (
-				<NativeSelect
-					aria-label={`${builtin.name} answers with`}
-					value={choice.model}
-					onChange={(event) =>
-						choices.set(builtin.id, { model: event.target.value })
-					}
-				>
-					<NativeSelectOption value="">
-						{decider.data
-							? `The decider of this computer (${decider.data.current.decider})`
-							: "The decider of this computer"}
-					</NativeSelectOption>
-					{(models.data ?? []).map((profile) => (
-						<NativeSelectOption key={profile.id} value={profile.name}>
-							{profile.name} · {profile.model ?? profile.decider}
-						</NativeSelectOption>
-					))}
-				</NativeSelect>
-			)}
-		</div>
-	);
 }
 
 function State({ problem }: { problem: string | null }) {
@@ -185,50 +253,58 @@ function State({ problem }: { problem: string | null }) {
 	);
 }
 
-export function BuiltinTable({
+export function AnswersTable({
+	rows,
+	first,
 	choices,
 	agentPicker,
 	searchOf,
 }: {
+	rows: readonly Row[];
+	/** The head of the first column. */
+	first: string;
 	choices: Choices;
 	agentPicker: AgentPicker;
-	searchOf: (agent: string) => { section?: string; agent?: string };
+	/** The search of the page of a built-in agent. None: the name is no link. */
+	searchOf?: (agent: string) => { section?: string; agent?: string };
 }) {
-	const problemOf = useReady(choices);
+	const problemOf = useProblem(choices);
 	return (
 		<div className="overflow-x-auto rounded-xl border">
 			<Table>
 				<TableHeader>
 					<TableRow>
-						<TableHead>Agent</TableHead>
+						<TableHead className="w-64">{first}</TableHead>
 						<TableHead>Answers with</TableHead>
 						<TableHead />
 					</TableRow>
 				</TableHeader>
 				<TableBody>
-					{BUILTINS.map((builtin) => (
-						<TableRow key={builtin.id}>
+					{rows.map((row) => (
+						<TableRow key={row.id}>
 							<TableCell>
-								<Link
-									to="/settings"
-									search={searchOf(builtin.id)}
-									className="font-medium underline-offset-4 hover:underline"
-								>
-									{builtin.name}
-								</Link>
-								<div className="text-muted-foreground text-xs">
-									{builtin.job}
-								</div>
+								{searchOf ? (
+									<Link
+										to="/settings"
+										search={searchOf(row.id)}
+										className="font-medium underline-offset-4 hover:underline"
+									>
+										{row.name}
+									</Link>
+								) : (
+									<span className="font-medium">{row.name}</span>
+								)}
+								<div className="text-muted-foreground text-xs">{row.job}</div>
 							</TableCell>
 							<TableCell>
 								<AnswersWith
-									builtin={builtin}
+									row={row}
 									choices={choices}
 									agentPicker={agentPicker}
 								/>
 							</TableCell>
 							<TableCell className="text-right">
-								<State problem={problemOf(builtin)} />
+								<State problem={problemOf(row)} />
 							</TableCell>
 						</TableRow>
 					))}
@@ -248,7 +324,7 @@ export function BuiltinDetail({
 	choices: Choices;
 	agentPicker: AgentPicker;
 }) {
-	const problemOf = useReady(choices);
+	const problemOf = useProblem(choices);
 	const facts: [string, string][] = [
 		["You start it with", builtin.startedBy],
 		["Reads", builtin.reads],
@@ -275,7 +351,7 @@ export function BuiltinDetail({
 					</ItemContent>
 					<ItemActions>
 						<AnswersWith
-							builtin={builtin}
+							row={builtin}
 							choices={choices}
 							agentPicker={agentPicker}
 						/>
