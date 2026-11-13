@@ -1,6 +1,6 @@
 # Knowledge
 
-Knowledge is the files that your agents read besides the project files: notes, web pages, a wiki, Jira work items, Confluence pages. Night Shift keeps them per project, outside the project folder. Every computer of the project's Space works on the same files.
+Knowledge is the files that your agents read besides the project files: notes, web pages, a wiki, files of a git repository, Jira work items, Confluence pages. Night Shift keeps them per project, outside the project folder. Every computer of the project's Space works on the same files.
 
 ## What an agent gets
 
@@ -18,11 +18,21 @@ Knowledge is the files that your agents read besides the project files: notes, w
 | `kit:knowledge/confluence` | Do | Copies Confluence pages into the project's knowledge as markdown, one file each. Save an Atlassian API token as the secret CONFLUENCE_API_TOKEN. Needs jq. | `site`, `email`, `pages`, `folder` |
 | `kit:knowledge/files` | Do | Copies files of the project into its knowledge, also files that git ignores, such as private notes. It replaces what the folder had. | `from`, `folder` |
 | `kit:knowledge/folder` | Do | Copies a folder of this computer into the project's knowledge, such as notes outside the project. It replaces what the folder had. | `path`, `patterns`, `folder` |
+| `kit:knowledge/git` | Do | Copies the folders or files you choose of a git repository into the project's knowledge. Each later sync takes the newest version. A private repository needs git signed in. | `repo`, `branch`, `paths`, `folder` |
 | `kit:knowledge/github-wiki` | Do | Copies the wiki of a GitHub repository into the project's knowledge, and takes the newest pages on each later sync. A private wiki needs git signed in to GitHub. | `repo`, `folder` |
 | `kit:knowledge/jira` | Do | Copies Jira work items into the project's knowledge as markdown, one file each. Needs a CLI tool that runs the Atlassian CLI signed in, and jq. | `keys`, `tool`, `folder` |
 | `kit:knowledge/review-learnings` | Decide | Shows what agents proposed to learn about the project, and asks you to keep or delete it. Agents read what you keep. | none |
 | `kit:knowledge/web` | Do | Copies web pages into the project's knowledge as markdown. It needs no account. Each page gets a file named after its address. A page that cannot be read does not stop the others. | `urls`, `folder` |
 <!-- /generated:knowledge-kits -->
+
+**Git repository** copies only the folders or files you choose, for example the markdown of a documentation site. In **Only these paths**, write one pattern per line:
+
+```
+docs/standaard/**/*.md
+!docs/standaard/archief/**
+```
+
+A line that starts with `!` leaves those paths out. Each sync takes the newest version, and a file that no longer matches leaves the knowledge.
 
 **Project files** copies from the project's own folder, so only a project with a folder offers it.
 

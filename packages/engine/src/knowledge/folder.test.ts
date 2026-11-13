@@ -50,6 +50,8 @@ describe("the knowledge folder", () => {
 		const dir = await folders.ensure("p1");
 		await put(dir, "wiki/Home.md", "# Home\n");
 		await put(dir, ".git/HEAD", "x");
+		// A git source keeps its clone in its folder: it stays out too.
+		await put(dir, "repo/.git/objects/pack/a.pack", "x");
 		await put(dir, "INDEX.md", "old");
 		await put(dir, "learnings/proposed/r1.md", "- a note");
 		await put(dir, "learnings/accepted/r0.md", "- kept");

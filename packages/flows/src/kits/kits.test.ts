@@ -988,6 +988,140 @@ describe("the knowledge kits", () => {
 		expect(await read("wiki/Setup.md")).toBe("# Setup\n");
 	});
 
+	describe("git", () => {
+		/** A repository with docs, an archive and binaries that must not come. */
+		let docs: string;
+		let url: string;
+		/** The files of the source, below `knowledge/repo`, without `.git`. */
+		const synced = async () =>
+			(
+				await sh(
+					knowledge,
+					"find repo -type f -not -path 'repo/.git/*' | LC_ALL=C sort",
+				).catch(() => "")
+			)
+				.split("\n")
+				.filter(Boolean);
+		/** The blobs the copy does not have: git never fetched them. */
+		const missing = async () =>
+			(
+				await sh(
+					join(knowledge, "repo"),
+					"git rev-list --objects --missing=print HEAD | sed -n 's/^?//p'",
+				)
+			).split("\n");
+
+		beforeEach(async () => {
+			docs = join(root, "docs-src");
+			await mkdir(docs);
+			await sh(
+				docs,
+				[
+					"git init -q -b main",
+					"mkdir -p docs/standaard/archief docs/img data",
+					"printf '# Zaken\\n' > docs/standaard/zaken.md",
+					"printf '# Besluiten\\n' > docs/standaard/besluiten.md",
+					"printf '# Oud\\n' > docs/standaard/archief/oud.md",
+					"head -c 300000 /dev/urandom > docs/img/diagram.png",
+					"head -c 300000 /dev/urandom > data/export.xlsx",
+					"printf 'readme' > README.md",
+					"mkdir -p .github && printf 'x' > .github/ci.yml",
+					"git add -A && git commit -qm one",
+					// Partial clone over file:// needs the server to allow filters.
+					"git config uploadpack.allowFilter true",
+				].join(" && "),
+			);
+			url = `file://${docs}`;
+		});
+
+		test("first sync: only the files that match, and git fetches no other contents", async () => {
+			const ran = await step(kit("kit:knowledge/git"), "sync", {
+				repo: url,
+				paths: " docs/standaard/**/*.md \n\n!docs/standaard/archief/**\n",
+			});
+			expect(ran.outcome).toBe("synced");
+			expect(ran.data).toEqual({ files: 2 });
+			expect(await synced()).toEqual([
+				"repo/docs/standaard/besluiten.md",
+				"repo/docs/standaard/zaken.md",
+			]);
+			expect(await read("repo/docs/standaard/zaken.md")).toBe("# Zaken\n");
+			const blobs = await sh(
+				docs,
+				"git rev-parse HEAD:docs/img/diagram.png HEAD:data/export.xlsx HEAD:docs/standaard/archief/oud.md",
+			);
+			const gone = await missing();
+			for (const blob of blobs.split("\n")) expect(gone).toContain(blob);
+		});
+
+		test("a later sync takes the newest commit and the new patterns: what no longer matches leaves", async () => {
+			const kitFlow = kit("kit:knowledge/git");
+			await step(kitFlow, "sync", { repo: url, paths: "docs/standaard" });
+			expect(await synced()).toHaveLength(3);
+
+			await sh(
+				docs,
+				"git rm -q docs/standaard/besluiten.md && printf '# Nieuw\\n' > docs/standaard/nieuw.md && git add -A && git commit -qm two",
+			);
+			const second = await step(kitFlow, "sync", {
+				repo: url,
+				paths: "docs/standaard/*.md",
+			});
+			expect(second.data).toEqual({ files: 2 });
+			expect(await synced()).toEqual([
+				"repo/docs/standaard/nieuw.md",
+				"repo/docs/standaard/zaken.md",
+			]);
+
+			// No patterns: the whole repository. Hidden folders are there, as in any copy.
+			const all = await step(kitFlow, "sync", { repo: url, paths: "" });
+			expect(all.outcome).toBe("synced");
+			expect(await synced()).toEqual([
+				"repo/.github/ci.yml",
+				"repo/README.md",
+				"repo/data/export.xlsx",
+				"repo/docs/img/diagram.png",
+				"repo/docs/standaard/archief/oud.md",
+				"repo/docs/standaard/nieuw.md",
+				"repo/docs/standaard/zaken.md",
+			]);
+		});
+
+		test("a branch, and another repository clones anew", async () => {
+			await sh(
+				docs,
+				"git checkout -q -b concept && printf '# Concept\\n' > docs/standaard/concept.md && git add -A && git commit -qm concept && git checkout -q main",
+			);
+			const kitFlow = kit("kit:knowledge/git");
+			const onBranch = await step(kitFlow, "sync", {
+				repo: url,
+				branch: "concept",
+				paths: "docs/standaard/*.md",
+			});
+			expect(onBranch.data).toEqual({ files: 3 });
+			expect(await read("repo/docs/standaard/concept.md")).toBe("# Concept\n");
+
+			const other = join(root, "other-src");
+			await mkdir(other);
+			await sh(
+				other,
+				"git init -q -b main && printf 'b' > b.md && git add -A && git commit -qm b",
+			);
+			const moved = await step(kitFlow, "sync", { repo: `file://${other}` });
+			expect(moved.data).toEqual({ files: 1 });
+			expect(await synced()).toEqual(["repo/b.md"]);
+		});
+
+		test("patterns that match nothing stop as nothing found", async () => {
+			const ran = await step(kit("kit:knowledge/git"), "sync", {
+				repo: url,
+				paths: "*.pdf",
+			});
+			expect(ran.outcome).toBe("nothing");
+			expect(ran.log).toContain("No files of");
+		});
+	});
+
 	test("web: each page through the reader, named after its address", async () => {
 		await writeFile(join(fixtures, "curl.out"), "Title: Docs\n\nThe docs.");
 		const ran = await step(kit("kit:knowledge/web"), "sync", {

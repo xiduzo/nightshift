@@ -44,6 +44,7 @@ describe("kits", () => {
 			"kit:knowledge/confluence",
 			"kit:knowledge/files",
 			"kit:knowledge/folder",
+			"kit:knowledge/git",
 			"kit:knowledge/github-wiki",
 			"kit:knowledge/jira",
 			"kit:knowledge/review-learnings",

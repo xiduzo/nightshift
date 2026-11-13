@@ -345,6 +345,7 @@ Kits do the common syncs. Call one from a Subflow node:
 | `kit:knowledge/files` | Paths or patterns of the project's own folder, one per line: `docs/private`. Files git ignores too, so private docs become knowledge without a commit. | Nothing |
 | `kit:knowledge/folder` | A folder anywhere on the computer (`~/notes` or a full path), with optional patterns, one per line: `*.md`. Hidden files stay out. At most 5 000 files. | Nothing. Runs on the computer that has the folder |
 | `kit:knowledge/github-wiki` | The wiki of a repository (`owner/name`), or any git address. | git, signed in for a private wiki |
+| `kit:knowledge/git` | Some folders or files of any git repository (`owner/name` or any git address), with an optional branch. "Only these paths" takes gitignore-style patterns, one per line: `docs/standaard/**/*.md`, `!docs/standaard/archief/**`. Empty copies the whole repository. The clone is shallow, blobless and sparse, so git fetches only the contents of matching files. | git, signed in for a private repository |
 | `kit:knowledge/web` | Web pages as markdown, through `r.jina.ai`. A page that cannot be read keeps its last copy and does not stop the others. The sync fails only when it reads no page. | curl, no account |
 | `kit:knowledge/jira` | Jira work items, one markdown file each. | A CLI tool for `acli`, signed in, and jq |
 | `kit:knowledge/confluence` | Confluence pages by id, one markdown file each. | The secret `CONFLUENCE_API_TOKEN`, curl and jq |
@@ -361,8 +362,19 @@ computer does not have them, with the command that installs them. Runs
 start without them: only the sources that need them fail.
 
 Each kit writes into its own folder in the knowledge (`folder`, for
-example `wiki`) and reports how many files it has. `files`, `folder` and
-`github-wiki` replace the old content of their folder.
+example `wiki`) and reports how many files it has. `files`, `folder`,
+`github-wiki` and `git` replace the old content of their folder.
+
+`kit:knowledge/git` keeps its clone in the folder: the `.git` folder is
+hidden, so it never syncs to the Space and stays out of `INDEX.md` and
+search. Each sync fetches the newest commit with depth 1, applies the
+patterns again with `git sparse-checkout set --no-cone`, and resets to the
+commit. A file that no longer matches leaves the folder. Another address
+clones anew. Example: the GEMMA Zaken repository
+(`VNG-Realisatie/gemma-zaken`) is 243 MB, but `docs/standaard/**/*.md`
+copies about 160 files of about 400 KB. Partial clone needs a server that
+allows filters. GitHub does. A server that does not sends the whole
+commit, and the patterns still pick the files.
 
 ## Learnings
 

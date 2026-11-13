@@ -25,6 +25,7 @@ describe("the list of sources", () => {
 			"Project files",
 			"Web pages",
 			"GitHub wiki",
+			"Git repository",
 			"Jira",
 			"Confluence",
 		]);

@@ -266,6 +266,7 @@ Do:
 - `kit:knowledge/confluence` (site*, email*, pages*, folder) → files: Copies Confluence pages into the project's knowledge as markdown, one file each.
 - `kit:knowledge/files` (from*, folder) → files: Copies files of the project into its knowledge, also files that git ignores, such as private notes.
 - `kit:knowledge/folder` (path*, patterns, folder) → files: Copies a folder of this computer into the project's knowledge, such as notes outside the project.
+- `kit:knowledge/git` (repo*, branch, paths, folder) → files: Copies the folders or files you choose of a git repository into the project's knowledge.
 - `kit:knowledge/github-wiki` (repo*, folder) → files: Copies the wiki of a GitHub repository into the project's knowledge, and takes the newest pages on each later sync.
 - `kit:knowledge/jira` (keys*, tool, folder) → files: Copies Jira work items into the project's knowledge as markdown, one file each.
 - `kit:knowledge/web` (urls*, folder) → files: Copies web pages into the project's knowledge as markdown.

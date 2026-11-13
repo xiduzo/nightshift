@@ -125,8 +125,9 @@ describe("flowAuthoringGuide", () => {
 		// 5080: an End report from a file the run wrote. 5090: the kits
 		// under their families, as the add-node dialog lists them. 5105:
 		// a name inside a filter reads each item (`$$.vars.limit`), and
-		// `cascade` with the names not to use.
-		expect(words).toBeLessThan(5105);
+		// `cascade` with the names not to use. 5135: the git knowledge kit
+		// (one line).
+		expect(words).toBeLessThan(5135);
 	});
 });
 

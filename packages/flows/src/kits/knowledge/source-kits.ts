@@ -309,6 +309,100 @@ fi`,
 		},
 	}),
 
+	/**
+	 * Some folders or files of any git repository, such as the markdown of
+	 * a documentation site. The clone is shallow, blobless and sparse: git
+	 * fetches the contents of only the files that match the patterns
+	 * (non-cone sparse-checkout, gitignore syntax). A later sync fetches the
+	 * newest commit and applies the patterns again, so a file that no
+	 * longer matches leaves the folder. Another repository clones anew.
+	 */
+	defineSyncKit({
+		name: "git",
+		label: "Git repository",
+		blurb: "Only the folders or files you choose, such as the docs.",
+		flowName: "knowledge-git",
+		main: "repo",
+		lines: ["paths"],
+		programs: [],
+		description:
+			"Copies the folders or files you choose of a git repository into the project's knowledge. Each later sync takes the newest version. A private repository needs git signed in.",
+		inputs: [
+			{
+				name: "repo",
+				label: "Repository",
+				type: "text",
+				description:
+					"The repository, for example owner/name on GitHub. Or the git address of any repository.",
+				required: true,
+			},
+			{
+				name: "branch",
+				label: "Branch",
+				type: "text",
+				description: "Empty takes the main branch of the repository.",
+			},
+			{
+				name: "paths",
+				label: "Only these paths",
+				type: "text",
+				description:
+					"Git patterns, one per line, for example docs/**/*.md. Start a line with ! to leave paths out. Empty copies everything.",
+			},
+		],
+		folder: "repo",
+		stepLabel: "Sync the repository",
+		script: String.raw`repo="{{repo}}"
+branch="{{branch}}"
+paths="{{paths}}"
+case "$repo" in
+	*://*|*@*) url="$repo" ;;
+	*) url="https://github.com/$repo.git" ;;
+esac
+# Shallow and blobless: git fetches a file's contents only when the patterns check it out.
+if [ -d "$dest/.git" ] && [ "$(git -C "$dest" remote get-url origin 2>/dev/null)" = "$url" ]; then
+	if [ -n "$branch" ]; then
+		git -C "$dest" fetch -q --depth 1 --filter=blob:none origin "$branch"
+	else
+		git -C "$dest" fetch -q --depth 1 --filter=blob:none origin HEAD
+	fi
+	commit=FETCH_HEAD
+else
+	rm -rf "$dest"
+	mkdir -p "$NS_KNOWLEDGE"
+	if [ -n "$branch" ]; then
+		git clone -q --depth 1 --filter=blob:none --no-checkout --branch "$branch" "$url" "$dest"
+	else
+		git clone -q --depth 1 --filter=blob:none --no-checkout "$url" "$dest"
+	fi
+	commit=HEAD
+fi
+# The patterns may have changed since the last sync: apply them again.
+patterns=$(printf '%s\n' "$paths" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d')
+if [ -z "$patterns" ]; then
+	git -C "$dest" sparse-checkout disable
+else
+	printf '%s\n' "$patterns" | git -C "$dest" sparse-checkout set --no-cone --stdin
+fi
+git -C "$dest" reset -q --hard "$commit"
+if [ -z "$(find "$dest" -type f -not -path "$dest/.git/*" | head -n 1)" ]; then
+	echo "No files of $repo match: $patterns" >&2
+	exit 3
+fi`,
+		messages: {
+			synced: "Repository synced",
+			notSynced: "Could not sync the repository",
+		},
+		stops: [
+			{
+				outcome: "nothing",
+				code: 3,
+				end: "nothing_found",
+				message: "No files of {{repo}} match the paths",
+			},
+		],
+	}),
+
 	/** Jira work items as markdown, with the Atlassian CLI (`acli`) and `jq`. */
 	defineSyncKit({
 		name: "jira",
