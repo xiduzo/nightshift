@@ -1,15 +1,20 @@
-import { type OpenGate, type RunDetail, waitedText } from "@nightshift/client";
 import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui-native/components/ui/alert";
-import { Card } from "@nightshift/ui-native/components/ui/card";
+	gateParts,
+	gateRun,
+	type OpenGate,
+	plainText,
+	type RunDetail,
+	waitedText,
+} from "@nightshift/client";
 import { AlarmClock, CircleAlert } from "lucide-react-native";
 
 import { useClock } from "@/shared/clock";
-import { StatusBadge } from "@/shared/status";
-import { type Look, NEEDS_YOU } from "@/shared/tone";
+import {
+	NativeSection,
+	NativeTextRow,
+	NativeTitleRow,
+} from "@/shared/native-list";
+import { useThemeColors } from "@/shared/theme";
 import { StepTrail, trailItemOf } from "@/shared/trail";
 import { urgentText } from "./gate-view";
 
@@ -19,24 +24,56 @@ import { urgentText } from "./gate-view";
  * on a tick.
  */
 
-/** The Gate's status and how long it waited: "Needs you · 12 min". */
-export function GateStatus({
-	openedAt,
+/** "Needs you · 12 min", "Answered" or "Waiting 12 min". */
+function statusText(
+	{ sent, answerable }: { sent: boolean; answerable: boolean },
+	waited: string,
+): string {
+	if (sent) return "Answered";
+	return answerable ? `Needs you · ${waited}` : `Waiting ${waited}`;
+}
+
+/**
+ * The head of a Gate as the first row of the page: where it is from
+ * ("Acme › website › Fix the login bug"), the headline, then its status
+ * and how long it waited, the flow and the step.
+ */
+export function GateHead({
+	gate,
+	manySpaces,
 	sent,
 	answerable,
+	flowAndStep = true,
 }: {
-	openedAt: number;
+	gate: OpenGate;
+	manySpaces: boolean;
 	sent: boolean;
 	answerable: boolean;
+	/** Shows the flow and the step in the status line. */
+	flowAndStep?: boolean;
 }) {
 	const now = useClock();
-	const waited = waitedText(now - openedAt);
-	const look: Look = sent
-		? { tone: "finished", icon: "circle-check", label: "Answered" }
-		: answerable
-			? { ...NEEDS_YOU, label: `Needs you · ${waited}` }
-			: { tone: "neutral", icon: "hourglass", label: `Waiting ${waited}` };
-	return <StatusBadge look={look} />;
+	const { headline } = gateParts(gate.question);
+	const where = [
+		manySpaces ? gate.spaceName : null,
+		gate.projectName,
+		gate.runTitle,
+	]
+		.filter(Boolean)
+		.join(" › ");
+	const caption = [
+		statusText({ sent, answerable }, waitedText(now - gate.openedAt)),
+		...(flowAndStep ? [gateRun(gate).flow, `Step ${gate.nodeId}`] : []),
+	].join(" · ");
+	return (
+		<NativeSection>
+			<NativeTitleRow
+				overline={where}
+				title={plainText(headline)}
+				caption={caption}
+			/>
+		</NativeSection>
+	);
 }
 
 /** The steps of the run so far, with how long the running one takes. */
@@ -49,15 +86,13 @@ export function RunSteps({
 }) {
 	const now = useClock();
 	return (
-		<Card className="px-4 py-4">
-			<StepTrail
-				items={run.steps
-					.filter((step) => step.scope === null)
-					.map((step) =>
-						trailItemOf(step, { labels, runStatus: run.status, now }),
-					)}
-			/>
-		</Card>
+		<StepTrail
+			items={run.steps
+				.filter((step) => step.scope === null)
+				.map((step) =>
+					trailItemOf(step, { labels, runStatus: run.status, now }),
+				)}
+		/>
 	);
 }
 
@@ -72,16 +107,21 @@ export function GateUrgent({
 	gate: Pick<OpenGate, "deadline" | "urgency" | "form">;
 }) {
 	const now = useClock();
+	const { colors } = useThemeColors();
 	const text = urgentText(gate, now);
 	if (!text) return null;
 	return (
-		<Alert
-			icon={gate.deadline ? AlarmClock : CircleAlert}
-			variant="destructive"
-			accessibilityLiveRegion="polite"
-		>
-			<AlertTitle>{text.title}</AlertTitle>
-			<AlertDescription>{text.description}</AlertDescription>
-		</Alert>
+		<NativeSection>
+			<NativeTextRow
+				icon={
+					gate.deadline
+						? { sf: "alarm", lucide: AlarmClock }
+						: { sf: "exclamationmark.circle", lucide: CircleAlert }
+				}
+				iconColor={colors.destructive}
+				text={`**${text.title}**`}
+				note={text.description}
+			/>
+		</NativeSection>
 	);
 }

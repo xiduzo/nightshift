@@ -18,11 +18,13 @@ export function HeaderToolbar({ placement, items }: HeaderToolbarProps) {
 					return (
 						<Stack.Toolbar.Button
 							key={item.key}
-							icon={item.sf}
+							icon={item.text ? undefined : item.sf}
 							accessibilityLabel={item.label}
 							accessibilityHint={item.hint}
 							onPress={item.onPress}
-						/>
+						>
+							{item.text}
+						</Stack.Toolbar.Button>
 					);
 				}
 				if (item.kind === "menu") {

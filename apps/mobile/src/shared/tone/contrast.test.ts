@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { outcomeColors } from "@nightshift/flows";
 
+import { OUTCOME_HEX } from "./outcome-hex";
+
 /**
  * Every flow color and run status color keeps 4.5:1 (WCAG AA for small
  * text) in both themes, on the phone and on the web: as text on the page
@@ -130,6 +132,31 @@ describe("flow colors keep 4.5:1 in both themes", () => {
 				}
 			});
 		}
+	}
+});
+
+/** A `#rrggbb` value as linear sRGB. */
+function hex(value: string): Rgb {
+	const channel = (at: number) => {
+		const x = Number.parseInt(value.slice(at, at + 2), 16) / 255;
+		return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+	};
+	return [channel(1), channel(3), channel(5)];
+}
+
+describe("the flow colors as values match the phone's tokens", () => {
+	for (const name of outcomeColors) {
+		test(name, () => {
+			const value = themes(PHONE, `--color-outcome-${name}`);
+			for (const theme of ["light", "dark"] as const) {
+				const ours = hex(OUTCOME_HEX[theme][name]);
+				ours.forEach((channel, at) => {
+					expect(Math.abs(channel - (value[theme][at] as number))).toBeLessThan(
+						0.01,
+					);
+				});
+			}
+		});
 	}
 });
 

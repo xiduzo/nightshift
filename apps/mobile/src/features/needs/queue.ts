@@ -46,9 +46,12 @@ function plural(count: number, one: string, many: string): string {
 	return `${count} ${count === 1 ? one : many}`;
 }
 
+/** "3 things wait for you". */
+export function waitsText(count: number): string {
+	return `${plural(count, "thing waits", "things wait")} for you`;
+}
+
 /** What a screen reader says for the Needs you tab: "Needs you, 3 things wait for you". */
 export function needsTabLabel(count: number): string {
-	return count === 0
-		? "Needs you"
-		: `Needs you, ${plural(count, "thing waits", "things wait")} for you`;
+	return count === 0 ? "Needs you" : `Needs you, ${waitsText(count)}`;
 }

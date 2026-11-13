@@ -1,16 +1,14 @@
 import { gateRefusalText } from "@nightshift/client";
-import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui-native/components/ui/alert";
 import { CircleAlert } from "lucide-react-native";
 
+import { NativeTextRow } from "@/shared/native-list";
+import { useThemeColors } from "@/shared/theme";
 import { CHECK_COPY } from "./answer-check";
 import type { Problem } from "./use-gate-answer";
 
 /** Why the last answer did not go: the check of the person, a refusal, an unreachable Host, or a failure. */
-export function ProblemAlert({ problem }: { problem: Problem }) {
+export function ProblemRow({ problem }: { problem: Problem }) {
+	const { colors } = useThemeColors();
 	const copy =
 		problem.kind === "check"
 			? CHECK_COPY[problem.failure]
@@ -23,9 +21,11 @@ export function ProblemAlert({ problem }: { problem: Problem }) {
 							description: `${problem.message} Check that this phone is online. Then send it again.`,
 						};
 	return (
-		<Alert icon={CircleAlert} variant="destructive">
-			<AlertTitle>{copy.title}</AlertTitle>
-			<AlertDescription>{copy.description}</AlertDescription>
-		</Alert>
+		<NativeTextRow
+			icon={{ sf: "exclamationmark.circle.fill", lucide: CircleAlert }}
+			iconColor={colors.destructive}
+			text={`**${copy.title}**`}
+			note={copy.description}
+		/>
 	);
 }

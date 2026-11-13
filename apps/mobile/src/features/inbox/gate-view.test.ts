@@ -7,6 +7,7 @@ import {
 } from "@nightshift/client";
 
 import {
+	isInlineMarkdown,
 	openLinkText,
 	questionSections,
 	stepsHint,
@@ -129,5 +130,25 @@ describe("urgentText", () => {
 		});
 		expect(urgentText({ deadline: null, urgency: "today" }, 0)).toBeNull();
 		expect(urgentText({ deadline: null }, 0)).toBeNull();
+	});
+});
+
+describe("isInlineMarkdown", () => {
+	test("a paragraph with bold, links and code is inline", () => {
+		expect(isInlineMarkdown("The **tests** pass on [the branch](x).")).toBe(
+			true,
+		);
+		expect(isInlineMarkdown("Two lines.\nStill a paragraph: 3 - 1 = 2.")).toBe(
+			true,
+		);
+	});
+
+	test("lists, headings, quotes, fences and tables are blocks", () => {
+		expect(isInlineMarkdown("Done:\n- the form\n- the server")).toBe(false);
+		expect(isInlineMarkdown("1. First")).toBe(false);
+		expect(isInlineMarkdown("## Plan")).toBe(false);
+		expect(isInlineMarkdown("> quoted")).toBe(false);
+		expect(isInlineMarkdown("```ts\nx\n```")).toBe(false);
+		expect(isInlineMarkdown("| a | b |")).toBe(false);
 	});
 });

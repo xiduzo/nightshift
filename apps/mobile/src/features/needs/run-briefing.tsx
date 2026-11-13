@@ -1,32 +1,37 @@
 import { type RunSummary, useRunPrefetch } from "@nightshift/client";
-import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui-native/components/ui/alert";
-import { Text } from "@nightshift/ui-native/components/ui/text";
+import { router } from "expo-router";
 import { CirclePlay, TriangleAlert } from "lucide-react-native";
-import { type ReactNode, useEffect, useState } from "react";
-import { View } from "react-native";
+import { useEffect, useState } from "react";
 
 import { useSignedIn } from "@/features/host";
-import { ChoiceCards } from "@/features/inbox";
-import { ActionBar } from "@/shared/action-bar";
+import {
+	type AnswerBar,
+	ChoiceSection,
+	type GateQueue,
+	useQueueBar,
+} from "@/features/inbox";
 import { formatTime } from "@/shared/format";
-import { ListGroup, ListRow, SectionHead } from "@/shared/list";
-import { Screen } from "@/shared/page";
-import { StatusBadge } from "@/shared/status";
+import { HeaderToolbar } from "@/shared/header";
+import {
+	NativeList,
+	NativeRow,
+	NativeSection,
+	NativeTextRow,
+	NativeTitleRow,
+} from "@/shared/native-list";
+import { useThemeColors } from "@/shared/theme";
 import { runStatusLook } from "@/shared/tone";
 import { stoppedFacts, stoppedOptions } from "./stopped-view";
 
 const NO_ROUTES = new Map();
 
 /**
- * A run that stopped, in full, as Needs you shows it: its status, title,
- * where it is from and when it stopped, why it stopped, the run to check
- * first, then what you can do as cards in their color (Retry or Resume,
- * Leave it). The bar at the bottom confirms the choice in its color.
- * Once Night Shift takes a Retry or Resume, `onRetried` moves the queue on.
+ * A run that stopped, in full, as Needs you shows it: its title, where
+ * it is from and when it stopped, why it stopped, the run to check
+ * first, then what you can do as options in their color (Retry or
+ * Resume, Leave it). The bar above the tabs confirms the choice in its
+ * color. Once Night Shift takes a Retry or Resume, `onRetried` moves the
+ * queue on.
  */
 export function RunBriefing({
 	run,
@@ -36,7 +41,7 @@ export function RunBriefing({
 	onRetried,
 	onLeave,
 	onRefresh,
-	lead,
+	queue,
 }: {
 	run: RunSummary;
 	projectName: string | null;
@@ -46,10 +51,11 @@ export function RunBriefing({
 	onRetried: (run: RunSummary, label: string) => void;
 	onLeave: (run: RunSummary) => void;
 	onRefresh: () => Promise<unknown>;
-	/** What shows above the run: where it is in the queue, and Skip. */
-	lead: ReactNode;
+	/** What shows at the top, in the header and in the bar above the tabs. */
+	queue: GateQueue;
 }) {
 	const prefetch = useRunPrefetch(useSignedIn().host.orpc);
+	const { colors } = useThemeColors();
 	const look = runStatusLook(run.status, run.result);
 	const options = stoppedOptions(run);
 	const [chosen, setChosen] = useState<string | null>(null);
@@ -66,79 +72,79 @@ export function RunBriefing({
 		else onLeave(run);
 	}
 
+	const bar: AnswerBar = {
+		choice: option
+			? { name: option.name, color: option.color ?? null, destructive: false }
+			: null,
+		prompt: "Choose what happens",
+		action: {
+			label: option ? option.act : "Confirm",
+			busyLabel: "Sending…",
+			busy: retry !== null,
+			disabled: !option,
+		},
+	};
+	useQueueBar(queue, bar, act);
+
 	return (
-		<Screen
-			onRefresh={onRefresh}
-			footer={
-				<ActionBar
-					caption={option ? "Your choice" : undefined}
-					label={option ? option.name : "Choose what happens"}
-					color={option?.color}
-					action={{
-						label: option ? option.act : "Confirm",
-						onPress: act,
-						disabled: !option,
-						busy: retry !== null,
-						busyLabel: "Sending…",
-					}}
-				/>
-			}
-		>
-			{lead}
-
-			<View className="gap-3">
-				<Text
-					accessibilityRole="header"
-					selectable
-					className="font-bold text-2xl tracking-tight"
-				>
-					{run.title}
-				</Text>
-				<View className="flex-row flex-wrap items-center gap-2">
-					<StatusBadge look={look} />
-				</View>
-				<Text className="text-muted-foreground text-sm">
-					{stoppedFacts(run, {
-						projectName,
-						statusLabel: look.label,
-						time: formatTime,
-					})}
-				</Text>
-			</View>
-
-			{run.reason ? (
-				<Alert icon={TriangleAlert} variant="destructive">
-					<AlertTitle>Why it stopped</AlertTitle>
-					<AlertDescription>{run.reason}</AlertDescription>
-				</Alert>
+		<>
+			{queue.right.length > 0 ? (
+				<HeaderToolbar placement="right" items={queue.right} />
 			) : null}
+			<NativeList onRefresh={onRefresh}>
+				{queue.lead}
 
-			<View className="gap-2">
-				<SectionHead
-					title="Check first"
-					hint="Look at the run before you choose."
-				/>
-				<ListGroup>
-					<ListRow
-						icon={CirclePlay}
-						title="Open the run"
-						caption="Its steps and where it stopped"
-						href={{ pathname: "/runs/[runId]", params: { runId: run.id } }}
-						onPressIn={() => prefetch(run.id)}
+				<NativeSection>
+					<NativeTitleRow
+						title={run.title}
+						caption={stoppedFacts(run, {
+							projectName,
+							statusLabel: look.label,
+							time: formatTime,
+						})}
 					/>
-				</ListGroup>
-			</View>
+				</NativeSection>
 
-			<View className="gap-3">
-				<SectionHead title="What happens now" />
-				<ChoiceCards
+				{run.reason ? (
+					<NativeSection title="Why it stopped">
+						<NativeTextRow
+							icon={{
+								sf: "exclamationmark.triangle.fill",
+								lucide: TriangleAlert,
+							}}
+							iconColor={colors.destructive}
+							text={run.reason}
+						/>
+					</NativeSection>
+				) : null}
+
+				<NativeSection
+					title="Check first"
+					footer="Look at the run before you choose."
+				>
+					<NativeRow
+						icon={{ sf: "play.circle", lucide: CirclePlay }}
+						title="Open the run"
+						subtitle="Its steps and where it stopped"
+						onPress={() => {
+							prefetch(run.id);
+							router.push({
+								pathname: "/runs/[runId]",
+								params: { runId: run.id },
+							});
+						}}
+					/>
+				</NativeSection>
+
+				<ChoiceSection
+					title="What happens now"
 					choices={options}
 					routes={NO_ROUTES}
 					chosen={chosen}
 					onChoose={setChosen}
 					disabled={retry !== null}
 				/>
-			</View>
-		</Screen>
+			</NativeList>
+		</>
 	);
 }

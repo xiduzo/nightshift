@@ -1,16 +1,19 @@
 import type { ContextItem } from "@nightshift/client";
-import { Card } from "@nightshift/ui-native/components/ui/card";
-import { View } from "react-native";
 
-import { SectionHead } from "@/shared/list";
-import { CodeBlock, Markdown } from "@/shared/markdown";
-import { FactGrid, FactTile } from "@/shared/tiles";
+import { CodeBlock } from "@/shared/markdown";
+import {
+	NativeCustomRow,
+	NativeRow,
+	NativeSection,
+} from "@/shared/native-list";
+import { MarkdownRow } from "./brief-sections";
 import { questionSections } from "./gate-view";
 
 /**
  * What a Gate shows below its headline: the rest of the question, short
- * labelled values as tiles ("At a glance"), and longer text and code each
- * under its label. Text reads as Markdown. Code scrolls sideways.
+ * labelled values as rows with their value ("At a glance"), and longer
+ * text and code each under its label. Text reads as Markdown. Code
+ * scrolls sideways.
  */
 export function QuestionSections({
 	context,
@@ -21,38 +24,29 @@ export function QuestionSections({
 	return (
 		<>
 			{body.length > 0 ? (
-				<View className="gap-2">
-					<SectionHead title="The question" />
+				<NativeSection title="The question">
 					{body.map((text, index) => (
-						<Markdown key={index} text={text} />
+						<MarkdownRow key={index} text={text} />
 					))}
-				</View>
+				</NativeSection>
 			) : null}
 			{glance.length > 0 ? (
-				<View className="gap-2">
-					<SectionHead title="At a glance" />
-					<FactGrid>
-						{glance.map((fact) => (
-							<FactTile
-								key={fact.label}
-								label={fact.label}
-								value={fact.value}
-							/>
-						))}
-					</FactGrid>
-				</View>
+				<NativeSection title="At a glance">
+					{glance.map((fact) => (
+						<NativeRow key={fact.label} title={fact.label} value={fact.value} />
+					))}
+				</NativeSection>
 			) : null}
 			{sections.map((section, index) => (
-				<View key={`${section.label}:${index}`} className="gap-2">
-					<SectionHead title={section.label} />
+				<NativeSection key={`${section.label}:${index}`} title={section.label}>
 					{section.kind === "code" ? (
-						<CodeBlock code={section.value} language={section.language} />
+						<NativeCustomRow>
+							<CodeBlock code={section.value} language={section.language} />
+						</NativeCustomRow>
 					) : (
-						<Card className="px-4 py-3">
-							<Markdown text={section.value} className="text-sm" />
-						</Card>
+						<MarkdownRow text={section.value} />
 					)}
-				</View>
+				</NativeSection>
 			))}
 		</>
 	);

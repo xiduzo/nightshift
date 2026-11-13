@@ -9,6 +9,7 @@ export {
 	NativeCustomRow,
 	NativeList,
 	NativeLoadingRow,
+	NativeOptionRow,
 	NativePickerRow,
 	NativeRow,
 	NativeSection,

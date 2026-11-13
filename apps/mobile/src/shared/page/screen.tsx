@@ -1,11 +1,6 @@
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { type ReactNode, useState } from "react";
-import { RefreshControl, ScrollView, View } from "react-native";
-import {
-	KeyboardAwareScrollView,
-	KeyboardStickyView,
-} from "react-native-keyboard-controller";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { RefreshControl, ScrollView } from "react-native";
 
 import { useThemeColors } from "@/shared/theme";
 
@@ -20,12 +15,6 @@ type ScreenProps = {
 	summary?: string;
 	/** The standardized time of that line, for the screen reader. */
 	summaryHint?: string;
-	/**
-	 * What stays at the bottom while the body scrolls: an ActionBar. It
-	 * sits above the home indicator, and above the keyboard while one is
-	 * open; the body ends above it.
-	 */
-	footer?: ReactNode;
 };
 
 /**
@@ -95,57 +84,19 @@ export function Screen({
 	onRefresh,
 	summary,
 	summaryHint,
-	footer,
 }: ScreenProps) {
-	const [footerHeight, setFooterHeight] = useState(0);
-	const { colors } = useThemeColors();
-	const insets = useSafeAreaInsets();
 	const refreshControl = useRefreshControl(onRefresh);
-
-	if (!footer) {
-		return (
-			<ScrollView
-				{...PAGE_SCROLL}
-				className="flex-1 bg-background"
-				contentContainerClassName="flex-grow gap-4 p-4"
-				// iOS: a field near the bottom scrolls above the keyboard.
-				automaticallyAdjustKeyboardInsets
-				refreshControl={refreshControl}
-			>
-				<Summary text={summary} hint={summaryHint} />
-				{children}
-			</ScrollView>
-		);
-	}
-
-	// With a footer, the bar rides on the keyboard, and a focused field (a
-	// Gate's note) scrolls above the bar. Closed, the bar ends above the
-	// home indicator. Open, it sits a small gap above the keyboard: the
-	// keyboard covers the home indicator already.
-	const gap = 8;
 	return (
-		<View className="flex-1 bg-background">
-			<KeyboardAwareScrollView
-				{...PAGE_SCROLL}
-				style={{ flex: 1, backgroundColor: colors.background }}
-				contentContainerStyle={{ flexGrow: 1, gap: 16, padding: 16 }}
-				bottomOffset={footerHeight + gap}
-				refreshControl={refreshControl}
-			>
-				<Summary text={summary} hint={summaryHint} />
-				{children}
-			</KeyboardAwareScrollView>
-			<KeyboardStickyView
-				offset={{ opened: insets.bottom }}
-				onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
-			>
-				<View
-					className="px-4 pt-2"
-					style={{ paddingBottom: insets.bottom + gap }}
-				>
-					{footer}
-				</View>
-			</KeyboardStickyView>
-		</View>
+		<ScrollView
+			{...PAGE_SCROLL}
+			className="flex-1 bg-background"
+			contentContainerClassName="flex-grow gap-4 p-4"
+			// iOS: a field near the bottom scrolls above the keyboard.
+			automaticallyAdjustKeyboardInsets
+			refreshControl={refreshControl}
+		>
+			<Summary text={summary} hint={summaryHint} />
+			{children}
+		</ScrollView>
 	);
 }
