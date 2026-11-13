@@ -269,7 +269,7 @@ Do:
 - `kit:knowledge/git` (repo*, branch, paths, folder) → files: Copies the folders or files you choose of a git repository into the project's knowledge.
 - `kit:knowledge/github-wiki` (repo*, folder) → files: Copies the wiki of a GitHub repository into the project's knowledge, and takes the newest pages on each later sync.
 - `kit:knowledge/jira` (keys*, tool, folder) → files: Copies Jira work items into the project's knowledge as markdown, one file each.
-- `kit:knowledge/web` (urls*, folder) → files: Copies web pages into the project's knowledge as markdown.
+- `kit:knowledge/web` (urls*, follow, scope, limit, depth, folder) → files: Copies web pages into the project's knowledge as markdown.
 - `kit:message/send` (message*, webhook, format, field): Sends a message to the incoming webhook of a chat or another service.
 
 Decide:
