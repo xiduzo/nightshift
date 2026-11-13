@@ -24,7 +24,7 @@ import { WaysToSave } from "./ways-to-save";
 
 /**
  * Spend: the money of the Space, for the person who pays. One range for
- * the whole page. On top, what the runs spent against the days before,
+ * the whole page, in the toolbar. On top, what the runs spent against the days before,
  * how many flows have a steady cost, and what a change could save. Under
  * it, one row per flow with its cost against a usual run of that flow,
  * and beside it the ways to save, the biggest first. Home and a project's
@@ -45,12 +45,13 @@ export function SpendPage({
 
 	return (
 		<>
-			<SiteHeader crumbs={[{ label: "Spend" }]} />
+			<SiteHeader crumbs={[{ label: "Spend" }]}>
+				<RangeBar value={range} onValueChange={onRangeChange} />
+			</SiteHeader>
 			<div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
 				<PageHeading
 					title="Spend"
 					description="What your flows cost, how steady that cost is, and where a change saves money."
-					actions={<RangeBar value={range} onValueChange={onRangeChange} />}
 				/>
 
 				{spend.error && !days ? (

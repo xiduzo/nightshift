@@ -3,7 +3,6 @@ import { Button } from "@nightshift/ui/components/button";
 import { Card } from "@nightshift/ui/components/card";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import { ZapIcon } from "lucide-react";
 import { useState } from "react";
 import {
@@ -23,7 +22,7 @@ import { RangeBar } from "./range-bar";
  * The project's root: where each of its flows still needs you. One range
  * for the whole page. On top, one number: how often the flows needed you
  * without a plan, against the days before. Under it, one row per flow.
- * What the flows spent is on the Spend page, one button away.
+ * The range sits in the toolbar.
  */
 export function ProjectDashboardPage({
 	projectId,
@@ -39,7 +38,10 @@ export function ProjectDashboardPage({
 	const days = summary.data ? daysOf(summary.data, range) : undefined;
 
 	return (
-		<ProjectPage projectId={projectId}>
+		<ProjectPage
+			projectId={projectId}
+			actions={() => <RangeBar value={range} onValueChange={onRangeChange} />}
+		>
 			{(project) => (
 				<>
 					<PageHeading
@@ -47,14 +49,6 @@ export function ProjectDashboardPage({
 						description={<ProjectFolderLine project={project} />}
 						actions={
 							<>
-								<Button
-									variant="ghost"
-									size="sm"
-									nativeButton={false}
-									render={<Link to="/spend" search={{ range }} />}
-								>
-									Spend
-								</Button>
 								<Button
 									variant="outline"
 									size="sm"
@@ -70,7 +64,6 @@ export function ProjectDashboardPage({
 
 					<CopyProjectHere project={project} />
 
-					<RangeBar value={range} onValueChange={onRangeChange} />
 					<NeededYou days={days} range={range} />
 					<Card className="gap-0 py-0">
 						<FlowRows

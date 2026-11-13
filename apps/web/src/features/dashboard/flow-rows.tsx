@@ -42,7 +42,7 @@ import { RUN_STATUS_CHART } from "./run-statuses";
 import { LevelBadge, SignalIcon, WeekBars } from "./watch-parts";
 
 const GRID =
-	"grid grid-cols-[1.25rem_minmax(12rem,1.4fr)_9rem_11rem_10rem_10rem] items-center gap-6 px-4";
+	"grid grid-cols-[1.25rem_minmax(12rem,1.3fr)_9rem_10rem_minmax(16rem,1.4fr)] items-center gap-6 px-4";
 
 /** The most places an opened row shows. */
 const MAX_PLACES = 4;
@@ -50,7 +50,7 @@ const MAX_PLACES = 4;
 /**
  * Each flow of a project over the page's range, one row each: its level,
  * its last runs, how often it needed you without a plan, and how steady
- * the time and the cost of a run are. The flows that needed you most come
+ * the time and the cost of a run are, one above the other. The flows that needed you most come
  * first. A row opens only when the flow has a place to improve, and then
  * it shows only those places. A test run does not count.
  */
@@ -112,8 +112,7 @@ export function FlowRows({
 					<span>Flow</span>
 					<span>Last runs</span>
 					<span>Needed you without a plan</span>
-					<span>Time of a run</span>
-					<span>Cost of a run</span>
+					<span>Predictability</span>
 				</div>
 				{sorted.map((row) => {
 					const opens = hasPlaces(row);
@@ -163,18 +162,20 @@ export function FlowRows({
 								) : null}
 							</span>
 							<NeededCell watch={row.watch} />
-							<TimeCell
-								steadiness={row.steady?.time}
-								length={row.watch?.length}
-							/>
-							<CostCell
-								steadiness={row.steady?.cost}
-								cost={row.cost}
-								tokenUse={row.tokenUse}
-								unfinished={row.unfinished}
-								unknownCost={row.unknownCost}
-								freeRuns={row.freeRuns}
-							/>
+							<span className="flex flex-col gap-1">
+								<TimeCell
+									steadiness={row.steady?.time}
+									length={row.watch?.length}
+								/>
+								<CostCell
+									steadiness={row.steady?.cost}
+									cost={row.cost}
+									tokenUse={row.tokenUse}
+									unfinished={row.unfinished}
+									unknownCost={row.unknownCost}
+									freeRuns={row.freeRuns}
+								/>
+							</span>
 						</>
 					);
 					if (!opens) {
@@ -280,8 +281,8 @@ export function Against({ now, before }: { now: number; before: number }) {
 }
 
 /**
- * How often the flow needed you without a plan, against the days before,
- * and per week. The planned times show on hover. An older Host sends
+ * How often the flow needed you without a plan per week, and under the
+ * bars the number against the days before. The planned times show on hover. An older Host sends
  * nothing: a dash.
  */
 function NeededCell({ watch }: { watch: FlowWatch | undefined }) {
@@ -289,8 +290,11 @@ function NeededCell({ watch }: { watch: FlowWatch | undefined }) {
 	const { attention } = watch;
 	return (
 		<Tooltip>
-			<TooltipTrigger render={<span className="flex items-end gap-2" />}>
-				<span className="flex flex-col">
+			<TooltipTrigger
+				render={<span className="flex w-fit flex-col items-start gap-1.5" />}
+			>
+				<WeekBars weeks={attention.perWeek} />
+				<span className="flex items-baseline gap-2">
 					<span className="font-semibold text-lg tabular-nums leading-none">
 						{attention.unplanned}
 					</span>
@@ -299,7 +303,6 @@ function NeededCell({ watch }: { watch: FlowWatch | undefined }) {
 						before={attention.before.unplanned}
 					/>
 				</span>
-				<WeekBars weeks={attention.perWeek} className="ml-auto" />
 			</TooltipTrigger>
 			<TooltipContent className="flex flex-col items-start gap-0.5">
 				<span>

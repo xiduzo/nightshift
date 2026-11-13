@@ -19,6 +19,23 @@ import {
 import { SpreadStrip } from "@/shared/spread-strip";
 import { LocalTime } from "@/shared/time";
 
+/**
+ * One line of the Predictability column: the strip on the left, the usual
+ * value on the right. The value column has one width, so the strips of
+ * time and cost line up and share their scale.
+ */
+const LINE = "grid w-full grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-3";
+
+/** A line with no strip: a dash where the usual value goes. */
+function NoLine({ className }: { className?: string }) {
+	return (
+		<span className={LINE}>
+			<span />
+			<span className={className ?? "text-right text-muted-foreground"}>—</span>
+		</span>
+	);
+}
+
 /** The last runs as bars, oldest on the left, and when the last one started. */
 export function LastRuns({ row, now }: { row: FlowHealthRow; now: number }) {
 	if (!row.last) {
@@ -45,7 +62,7 @@ export function LastRuns({ row, now }: { row: FlowHealthRow; now: number }) {
 
 /**
  * What a finished run costs against a usual run of the flow, as a strip
- * with the usual cost under it. Its colour says how steady the cost is.
+ * with the usual cost on its right. Its colour says how steady the cost is.
  * What the runs that did not finish spent goes in the tooltip.
  */
 export function CostCell({
@@ -93,8 +110,9 @@ export function CostCell({
 	if (cost === null) {
 		return unfinishedLine || unknownLine || freeLine ? (
 			<Tooltip>
-				<TooltipTrigger render={<span className="text-muted-foreground" />}>
-					—
+				<TooltipTrigger render={<span className={LINE} />}>
+					<span />
+					<span className="text-right text-muted-foreground">—</span>
 				</TooltipTrigger>
 				<TooltipContent className="flex flex-col items-start gap-0.5 tabular-nums">
 					<span>No finished run with a known cost.</span>
@@ -104,15 +122,15 @@ export function CostCell({
 				</TooltipContent>
 			</Tooltip>
 		) : (
-			"—"
+			<NoLine />
 		);
 	}
 	return (
 		<Tooltip>
-			<TooltipTrigger render={<span className="flex flex-col gap-0.5" />}>
+			<TooltipTrigger render={<span className={LINE} />}>
 				<SpreadStrip spread={cost} steadiness={steadiness} />
-				<span className="text-muted-foreground text-xs">
-					{costWithTokens(formatCost(cost.median), tokenUse?.median)}
+				<span className="whitespace-nowrap text-right text-muted-foreground text-xs tabular-nums">
+					{formatCost(cost.median)}
 				</span>
 			</TooltipTrigger>
 			<TooltipContent className="flex flex-col items-start gap-0.5 tabular-nums">
@@ -138,7 +156,7 @@ export function CostCell({
 
 /**
  * How long a finished run works against a usual run of the flow, as a
- * strip with the usual time under it. Its colour says how steady the time
+ * strip with the usual time on its right. Its colour says how steady the time
  * is. A dash when no run finished, or from an older Host.
  */
 export function TimeCell({
@@ -148,12 +166,12 @@ export function TimeCell({
 	steadiness: CostSteadiness | null | undefined;
 	length: Spread | null | undefined;
 }) {
-	if (!length) return <span className="text-muted-foreground">—</span>;
+	if (!length) return <NoLine />;
 	return (
 		<Tooltip>
-			<TooltipTrigger render={<span className="flex flex-col gap-0.5" />}>
+			<TooltipTrigger render={<span className={LINE} />}>
 				<SpreadStrip spread={length} steadiness={steadiness} />
-				<span className="text-muted-foreground text-xs">
+				<span className="whitespace-nowrap text-right text-muted-foreground text-xs tabular-nums">
 					{formatDuration(length.median)}
 				</span>
 			</TooltipTrigger>
