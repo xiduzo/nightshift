@@ -7,9 +7,33 @@
  */
 import { type AssistantAgent, harnessTakesTools } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
+import { Button } from "@nightshift/ui/components/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@nightshift/ui/components/dialog";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuSeparator,
+	DropdownMenuShortcut,
+	DropdownMenuTrigger,
+} from "@nightshift/ui/components/dropdown-menu";
+import { Field, FieldLabel } from "@nightshift/ui/components/field";
+import { Input } from "@nightshift/ui/components/input";
 import {
 	InputGroup,
 	InputGroupAddon,
+	InputGroupButton,
 } from "@nightshift/ui/components/input-group";
 import {
 	Item,
@@ -29,13 +53,18 @@ import {
 } from "@nightshift/ui/components/table";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { CircleAlertIcon, CircleCheckIcon } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import {
+	ChevronDownIcon,
+	CircleAlertIcon,
+	CircleCheckIcon,
+} from "lucide-react";
+import { type ReactNode, useId, useState } from "react";
 import {
 	deciderQueries,
 	profileQueries,
 	useDeciderSetupStatus,
 } from "@/features/agents";
+import { SHORTLIST } from "../components/meaning-search-card";
 import { ollamaQueries, settingsQueries } from "../queries";
 import { type Builtin, TAKES_LABEL, type Takes } from "./model";
 
@@ -86,7 +115,14 @@ export const SEARCH: OtherRow = {
 };
 
 type Row = Builtin | OtherRow;
-type Choice = { agent: AssistantAgent; model: string | undefined };
+type Where = "here" | "there" | "off";
+type Choice = {
+	agent: AssistantAgent;
+	model: string | undefined;
+	/** Meaning search: where its model runs. */
+	where?: Where;
+	address?: string;
+};
 
 export type Choices = {
 	of: (row: Row) => Choice;
@@ -102,7 +138,13 @@ export function useChoices(): Choices {
 	const start = (row: Row): Choice => {
 		const takes = row.takes as string;
 		if (row.id === "search") {
-			return { agent: {}, model: values?.embeddingModel };
+			const address = values?.ollamaAddress.trim() ?? "";
+			return {
+				agent: {},
+				model: values?.embeddingModel,
+				where: values?.ollama === "off" ? "off" : address ? "there" : "here",
+				address,
+			};
 		}
 		if (row.id === "new-agent") {
 			return {
@@ -148,17 +190,145 @@ function useModelOptions(): ModelOption[] {
 	];
 }
 
-/** The models that search by meaning. */
-function useSearchOptions(current: string | undefined): ModelOption[] {
+/** Whether Ollama has a model, by its name with or without `:latest`. */
+function useDownloaded() {
 	const models = useQuery({
 		...ollamaQueries.models(),
 		meta: { quietErrors: true },
 	});
+	const have = (models.data ?? []).map((model) => model.name);
+	return {
+		have,
+		has: (name: string | undefined) =>
+			name !== undefined &&
+			(have.includes(name) || have.includes(`${name}:latest`)),
+	};
+}
+
+/** The models that search by meaning: the ones that work well, and the ones Ollama has. */
+function useSearchOptions(current: string | undefined): ModelOption[] {
+	const { have, has } = useDownloaded();
 	const names = new Set([
+		...SHORTLIST.map((model) => model.name),
+		...have.map((name) => name.replace(/:latest$/, "")),
 		...(current ? [current] : []),
-		...(models.data ?? []).map((model) => model.name),
 	]);
-	return [...names].map((name) => ({ value: name, label: name }));
+	return [...names].map((name) => ({
+		value: name,
+		label: name,
+		hint: has(name) ? "Downloaded" : "Downloads when you pick it",
+	}));
+}
+
+/** Where the model of meaning search runs: a second menu, like the effort of an agent. */
+function WhereMenu({
+	choice,
+	onChange,
+}: {
+	choice: Choice;
+	onChange: (change: Partial<Choice>) => void;
+}) {
+	const id = useId();
+	const [asking, setAsking] = useState(false);
+	const [address, setAddress] = useState(choice.address ?? "");
+	const where = choice.where ?? "here";
+	const label =
+		where === "off"
+			? "Off"
+			: where === "there"
+				? choice.address || "Another computer"
+				: "This computer";
+	return (
+		<>
+			<DropdownMenu>
+				<DropdownMenuTrigger
+					render={
+						<InputGroupButton
+							className="min-w-0 shrink font-normal text-muted-foreground"
+							aria-label={`Runs on: ${label}. Choose where search by meaning runs.`}
+						>
+							<span className="truncate">{label}</span>
+							<ChevronDownIcon />
+						</InputGroupButton>
+					}
+				/>
+				<DropdownMenuContent align="start" className="w-72">
+					<DropdownMenuGroup>
+						<DropdownMenuLabel>Runs on</DropdownMenuLabel>
+						<DropdownMenuRadioGroup
+							value={where}
+							onValueChange={(next: string) => {
+								if (next === "there" && !choice.address) setAsking(true);
+								else onChange({ where: next as Where });
+							}}
+						>
+							<DropdownMenuRadioItem value="here" closeOnClick>
+								This computer
+							</DropdownMenuRadioItem>
+							<DropdownMenuRadioItem value="there" closeOnClick>
+								<span className="truncate">Another computer</span>
+								{choice.address ? (
+									<DropdownMenuShortcut className="truncate tracking-normal">
+										{choice.address}
+									</DropdownMenuShortcut>
+								) : null}
+							</DropdownMenuRadioItem>
+							<DropdownMenuRadioItem value="off" closeOnClick>
+								Off: find by words only
+							</DropdownMenuRadioItem>
+						</DropdownMenuRadioGroup>
+					</DropdownMenuGroup>
+					<DropdownMenuSeparator />
+					<DropdownMenuItem onClick={() => setAsking(true)}>
+						{choice.address ? "Change the address…" : "Add an address…"}
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
+			<Dialog open={asking} onOpenChange={setAsking}>
+				<DialogContent className="sm:max-w-sm">
+					<form
+						className="flex flex-col gap-4"
+						onSubmit={(event) => {
+							event.preventDefault();
+							if (!address.trim()) return;
+							onChange({ where: "there", address: address.trim() });
+							setAsking(false);
+						}}
+					>
+						<DialogHeader>
+							<DialogTitle>Run search on another computer</DialogTitle>
+							<DialogDescription>
+								Night Shift sends your knowledge text to that computer, where
+								the model reads it.
+							</DialogDescription>
+						</DialogHeader>
+						<Field>
+							<FieldLabel htmlFor={id}>Ollama address</FieldLabel>
+							<Input
+								id={id}
+								className="font-mono"
+								placeholder="http://192.168.1.20:11434"
+								value={address}
+								onChange={(event) => setAddress(event.target.value)}
+							/>
+						</Field>
+						<DialogFooter>
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => setAsking(false)}
+							>
+								Cancel
+							</Button>
+							<Button type="submit" disabled={address.trim() === ""}>
+								Use this address
+							</Button>
+						</DialogFooter>
+					</form>
+				</DialogContent>
+			</Dialog>
+		</>
+	);
 }
 
 /** Who answers for one row: the same picker everywhere. */
@@ -214,6 +384,12 @@ function AnswersWith({
 									}
 								: undefined,
 				})}
+				{row.id === "search" ? (
+					<WhereMenu
+						choice={choice}
+						onChange={(change) => choices.set(row, change)}
+					/>
+				) : null}
 			</InputGroupAddon>
 		</InputGroup>
 	);
@@ -226,9 +402,16 @@ function useProblem(choices: Choices) {
 	const toolAgent = (agents.data ?? []).some((profile) =>
 		harnessTakesTools(profile.harness),
 	);
+	const { has } = useDownloaded();
 	return (row: Row): string | null => {
 		const choice = choices.of(row);
 		const takes = row.takes as string;
+		if (row.id === "search") {
+			if (choice.where === "off") return "Off";
+			if (choice.model === undefined) return "Choose a model";
+			if (choice.where === "there") return null;
+			return has(choice.model) ? null : "Downloads when you save";
+		}
 		if (choice.model !== undefined) return null;
 		if (takes === "model" || takes === "embedding") return "Choose a model";
 		if (row.id === "new-agent") return null;

@@ -46,7 +46,7 @@ import {
 const MEANING_KEYS = ["ollama", "embeddingModel", "ollamaAddress"] as const;
 
 /** Embedding models that work well, with what each is good at. */
-const SHORTLIST: readonly { name: string; about: string }[] = [
+export const SHORTLIST: readonly { name: string; about: string }[] = [
 	{ name: "qwen3-embedding:0.6b", about: "Default. Reads many languages." },
 	{ name: "embeddinggemma", about: "Small. Reads many languages." },
 	{ name: "bge-m3", about: "Reads many languages. Larger." },
