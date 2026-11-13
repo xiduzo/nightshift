@@ -21,6 +21,8 @@ import { z } from "zod";
 import {
 	type AgentEntryId,
 	agentEntryIdSchema,
+	type BuiltinAgentId,
+	type BuiltinCheck,
 	type BuiltinStatus,
 	type EntrySaving,
 	entryOpening,
@@ -340,4 +342,10 @@ export interface AssistantService {
 	): AsyncIterable<ExplanationEvent>;
 	/** Who answers for each of Night Shift's own agents on this computer now. */
 	agents(): BuiltinStatus[];
+	/**
+	 * Asks what answers for one of Night Shift's own agents one small
+	 * question, to prove that it answers. Never throws: a failure is a
+	 * result with its problem.
+	 */
+	check(id: BuiltinAgentId, signal: AbortSignal): Promise<BuiltinCheck>;
 }

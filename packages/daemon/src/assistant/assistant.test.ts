@@ -24,6 +24,8 @@ import {
 	type AssistantDeps,
 	BUSY,
 	createAssistant,
+	NO_CHAT_PROFILE,
+	NO_CHECK_MODEL,
 	NO_CLONE,
 	NO_MODEL_HERE,
 	NO_PROFILE,
@@ -1221,5 +1223,293 @@ describe("assistant.explain", () => {
 		);
 		const events = await explain(asked("member", assistant));
 		expect(events.at(-1)).toEqual({ type: "error", message: NO_MODEL_HERE });
+	});
+});
+
+describe("check", () => {
+	const never = new AbortController().signal;
+	/** A harness that answers the check with one word. */
+	const ready = () =>
+		fakeHarness({ steps: [{ type: "text", text: "ready" }], delayMs: 1 });
+	const withAgent = (over: Partial<AssistantDeps> = {}) => {
+		const harness = ready();
+		return {
+			harness,
+			assistant: createAssistant(
+				deps({
+					harnessFor: (name) => (name === "claude-code" ? harness : undefined),
+					ownFolder: async () => "/data/assistant",
+					...over,
+				}),
+			),
+		};
+	};
+
+	test("an agent answers: one small read-only question in the assistant's own folder, with no tools", async () => {
+		const { harness, assistant } = withAgent();
+		const result = await assistant.check("builder", never);
+		expect(result).toMatchObject({
+			id: "builder",
+			ok: true,
+			problem: null,
+			answers: {
+				kind: "agent",
+				profile: "b_claude",
+				harness: "claude-code",
+				model: "sonnet",
+			},
+		});
+		expect(result.ms).toBeGreaterThanOrEqual(0);
+		expect(harness.calls).toHaveLength(1);
+		const [input] = harness.calls;
+		expect(input?.prompt).toBe("Answer with the one word: ready.");
+		expect(input?.cwd).toBe("/data/assistant");
+		expect(input?.readOnly).toBe(true);
+		expect(input?.tools).toBeUndefined();
+		expect(input?.stepReport).toBeUndefined();
+		expect(input?.maxTurns).toBe(2);
+		expect(input?.maxBudgetUsd).toBe(0.1);
+	});
+
+	test("the agent the person chose for the Explainer is the one asked", async () => {
+		const { harness, assistant } = withAgent({
+			settings: settings("", {
+				explainer: { kind: "agent", harness: "claude-code", model: "haiku" },
+			}),
+		});
+		const result = await assistant.check("explainer", never);
+		expect(result.ok).toBe(true);
+		expect(result.answers).toEqual({
+			kind: "agent",
+			profile: null,
+			harness: "claude-code",
+			model: "haiku",
+		});
+		expect(harness.calls[0]?.model).toBe("haiku");
+	});
+
+	test("the Builder on an agent without Night Shift's tools: the problem, and nothing is asked", async () => {
+		const pi = fakeHarness();
+		const assistant = createAssistant(
+			deps({
+				profiles: profiles({ p_pi: settingsOf("pi") }),
+				settings: settings("", {
+					builder: { kind: "agent", profile: "p_pi" },
+				}),
+				harnessFor: () => pi,
+				installed: () => true,
+				ownFolder: async () => "/data/assistant",
+			}),
+		);
+		const result = await assistant.check("builder", never);
+		expect(result.ok).toBe(false);
+		expect(result.problem).toContain('The chat cannot use the profile "p_pi"');
+		expect(pi.calls).toHaveLength(0);
+		// The Explainer needs no tools: the same agent answers for it.
+		expect((await assistant.check("explainer", never)).ok).toBe(true);
+		expect(pi.calls).toHaveLength(1);
+	});
+
+	test("no agent on this computer: the problem says what to add", async () => {
+		const assistant = createAssistant(deps({ profiles: profiles({}) }));
+		expect(await assistant.check("improver", never)).toMatchObject({
+			ok: false,
+			answers: null,
+			problem: NO_CHAT_PROFILE,
+		});
+		expect(await assistant.check("field-writer", never)).toMatchObject({
+			ok: false,
+			answers: null,
+			problem: NO_PROFILE,
+		});
+	});
+
+	test("an agent whose program is not on this computer: nothing is asked", async () => {
+		const { harness, assistant } = withAgent({
+			// The profile for help counts, also when its program is gone.
+			settings: settings("b_claude"),
+			installed: () => false,
+		});
+		const result = await assistant.check("builder", never);
+		expect(result.ok).toBe(false);
+		expect(result.problem).toBe(
+			"Night Shift cannot find Claude Code on this computer. Install it, or choose another agent in Settings.",
+		);
+		expect(harness.calls).toHaveLength(0);
+	});
+
+	test("an agent that fails: a result with the problem, never a throw", async () => {
+		const harness = fakeHarness({
+			steps: [],
+			outcome: { type: "error", kind: "harness", message: "Not signed in." },
+			delayMs: 1,
+		});
+		const assistant = createAssistant(
+			deps({
+				harnessFor: () => harness,
+				ownFolder: async () => "/data/assistant",
+			}),
+		);
+		expect(await assistant.check("builder", never)).toMatchObject({
+			ok: false,
+			problem: "Claude Code did not answer. Not signed in.",
+		});
+	});
+
+	test("an agent that takes too long: the check stops it and says so", async () => {
+		const harness = fakeHarness({
+			steps: [{ type: "wait", ms: 5_000 }],
+			delayMs: 1,
+		});
+		const assistant = createAssistant(
+			deps({
+				harnessFor: () => harness,
+				ownFolder: async () => "/data/assistant",
+				checkTimeouts: { agentMs: 20, modelMs: 20 },
+			}),
+		);
+		const result = await assistant.check("builder", never);
+		expect(result.ok).toBe(false);
+		expect(result.problem).toBe(
+			"Claude Code did not answer in 1 seconds. Check that you are signed in to it, then try again.",
+		);
+		expect(harness.calls[0]?.signal.aborted).toBe(true);
+	});
+
+	test("the Decider with no choice: TypeSafe picks an option, as a Decision asks it", async () => {
+		const asks: { decider: string; labels: string[] }[] = [];
+		const assistant = createAssistant(
+			deps({
+				decideOption: async (input) => {
+					asks.push({
+						decider: input.decider,
+						labels: input.labels.map((label) => label.name),
+					});
+					return { kind: "decided", label: "ready", notes: "", costUsd: 0 };
+				},
+			}),
+		);
+		expect(await assistant.check("decider", never)).toMatchObject({
+			ok: true,
+			answers: { kind: "model", decider: "typesafe" },
+			problem: null,
+		});
+		expect(asks).toEqual([
+			{ decider: "typesafe", labels: ["ready", "not ready"] },
+		]);
+	});
+
+	test("the Decider without a call that picks: a value from a model that writes, else it cannot be checked", async () => {
+		const values: string[] = [];
+		const decide: AssistantDeps["decide"] = async (input) => {
+			values.push(input.decider);
+			return { kind: "made", data: { answer: "ready" }, costUsd: null };
+		};
+		const chosen = createAssistant(
+			deps({
+				settings: settings("", {
+					decider: { kind: "model", decider: "ollama", model: "llama3.2" },
+				}),
+				decide,
+			}),
+		);
+		expect(await chosen.check("decider", never)).toMatchObject({
+			ok: true,
+			answers: { kind: "model", decider: "ollama", model: "llama3.2" },
+		});
+		expect(values).toEqual(["ollama"]);
+		// TypeSafe only picks an option.
+		expect(
+			await createAssistant(deps({ decide })).check("decider", never),
+		).toMatchObject({ ok: false, problem: NO_CHECK_MODEL });
+		expect(values).toEqual(["ollama"]);
+	});
+
+	test("the Brief writer with no choice: the model a Gate's brief asks writes one field", async () => {
+		const asks: { decider: string; output: unknown }[] = [];
+		const assistant = createAssistant(
+			deps({
+				decide: async (input) => {
+					asks.push({ decider: input.decider, output: input.output });
+					return { kind: "made", data: { answer: "ready" }, costUsd: null };
+				},
+			}),
+		);
+		expect(await assistant.check("brief-writer", never)).toMatchObject({
+			ok: true,
+			answers: { kind: "model", decider: "openrouter" },
+		});
+		expect(asks).toHaveLength(1);
+		expect(asks[0]?.output).toMatchObject({ required: ["answer"] });
+	});
+
+	test("a model the person chose for the Field writer is asked, not an agent", async () => {
+		const { harness, assistant } = withAgent({
+			settings: settings("", {
+				"field-writer": { kind: "model", decider: "openai", model: "gpt" },
+			}),
+			decide: async () => ({
+				kind: "made",
+				data: { answer: "ready" },
+				costUsd: null,
+			}),
+		});
+		expect(await assistant.check("field-writer", never)).toMatchObject({
+			ok: true,
+			answers: { kind: "model", decider: "openai", model: "gpt" },
+		});
+		expect(harness.calls).toHaveLength(0);
+	});
+
+	test("a model that fails, throws or takes too long: the problem with what to check", async () => {
+		const failing = (decide: NonNullable<AssistantDeps["decide"]>) =>
+			createAssistant(
+				deps({ decide, checkTimeouts: { agentMs: 20, modelMs: 20 } }),
+			).check("brief-writer", never);
+		expect(
+			await failing(async () => ({
+				kind: "error",
+				errorKind: "harness",
+				message: "The key is not set",
+				costUsd: null,
+			})),
+		).toMatchObject({
+			ok: false,
+			problem:
+				"The model did not answer. The key is not set. Check its key and its model in Settings.",
+		});
+		expect(
+			await failing(async () => {
+				throw new Error("Boom.");
+			}),
+		).toMatchObject({
+			ok: false,
+			problem:
+				"The model did not answer. Boom. Check its key and its model in Settings.",
+		});
+		expect(await failing(() => new Promise(() => {}))).toMatchObject({
+			ok: false,
+			problem:
+				"The model did not answer in 1 seconds. Check its key and its model in Settings.",
+		});
+	});
+
+	test("a model profile that is gone: the problem, and nothing is asked", async () => {
+		let asked = 0;
+		const assistant = createAssistant(
+			deps({
+				settings: settings("", {
+					"brief-writer": { kind: "model", profile: "gone" },
+				}),
+				decide: async () => {
+					asked += 1;
+					return { kind: "made", data: {}, costUsd: null };
+				},
+			}),
+		);
+		const result = await assistant.check("brief-writer", never);
+		expect(result.ok).toBe(false);
+		expect(result.problem).toContain('There is no model profile "gone"');
+		expect(asked).toBe(0);
 	});
 });

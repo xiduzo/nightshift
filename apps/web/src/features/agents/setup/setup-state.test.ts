@@ -125,7 +125,10 @@ describe("the step of a setup", () => {
 		).toEqual({
 			kind: "choose",
 			action: "sign-in",
-			note: { tone: "done", text: "Claude Code is ready." },
+			note: {
+				tone: "done",
+				text: "Claude Code is ready. It answers for the Builder and the Improver.",
+			},
 		});
 	});
 

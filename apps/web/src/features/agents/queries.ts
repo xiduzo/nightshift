@@ -1,9 +1,10 @@
 /**
  * The query and mutation options of the agents: Agent Profiles, harnesses,
- * Connections and their Secrets, CLI Tools, deciders, and the guided setup
- * of an agent and of a decider.
+ * Connections and their Secrets, CLI Tools, deciders, the guided setup of
+ * an agent and of a decider, and the check of Night Shift's own agents.
  */
 
+import type { BuiltinAgentId } from "@nightshift/flows";
 import type {
 	AgentProfileRow,
 	AgentSetupJob,
@@ -241,4 +242,24 @@ export const deciderSetupMutations = {
 	useTypesafe: orpc.deciderSetup.useTypesafe.mutationOptions,
 	/** Stops the install or the download. */
 	cancel: orpc.deciderSetup.cancel.mutationOptions,
+};
+
+/** Night Shift's own agents: who answers for each, and the check that one answers. */
+export const builtinQueries = {
+	/** Who answers for each agent on this computer now. */
+	agents: () => orpc.assistant.agents.queryOptions(),
+	/**
+	 * The last check of one agent. It asks only when the person starts it
+	 * (`fetchQuery`): a check costs a little. The result stays while the app
+	 * is open, so each place that shows it reads the same one.
+	 */
+	check: (agent: BuiltinAgentId) =>
+		orpc.assistant.check.queryOptions({
+			input: { agent },
+			enabled: false,
+			staleTime: Number.POSITIVE_INFINITY,
+			gcTime: Number.POSITIVE_INFINITY,
+			retry: false,
+			meta: { quietErrors: true },
+		}),
 };

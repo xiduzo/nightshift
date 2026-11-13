@@ -903,6 +903,8 @@ async function makeDaemon(
 							message: "This computer has no model that writes an answer.",
 							costUsd: null,
 						},
+			// The check of the Decider picks an option, as a Decision does.
+			decideOption: (input) => decider.decide(input),
 			ownFolder: async () => {
 				const folder = join(dataDir, "assistant");
 				await mkdir(folder, { recursive: true });

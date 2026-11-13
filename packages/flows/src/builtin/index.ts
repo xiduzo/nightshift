@@ -10,6 +10,7 @@ export {
 	type BuiltinAgentId,
 	type BuiltinAnswer,
 	type BuiltinAnswers,
+	type BuiltinCheck,
 	type BuiltinStatus,
 	type BuiltinTakes,
 	builtinAgent,

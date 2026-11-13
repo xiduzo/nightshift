@@ -5,17 +5,28 @@ import {
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
 import {
+	Breadcrumb,
+	BreadcrumbItem,
+	BreadcrumbList,
+	BreadcrumbPage,
+	BreadcrumbSeparator,
+} from "@nightshift/ui/components/breadcrumb";
+import { Button } from "@nightshift/ui/components/button";
+import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
+	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from "@nightshift/ui/components/dialog";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { CircleAlertIcon } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { CircleAlertIcon, CircleCheckIcon, PlusIcon } from "lucide-react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { projectQueries } from "@/features/projects";
 import {
 	type AgentSetupJob,
 	type AgentSetupStatus,
@@ -31,10 +42,27 @@ import {
 	agentSetupQueries,
 	deciderSetupMutations,
 	deciderSetupQueries,
+	profileQueries,
 } from "../queries";
+import { allAnswer } from "./check-state";
+import { CheckStep } from "./check-step";
 import { justChosen, offerDecider, readyText } from "./decider-state";
 import { DeciderStep } from "./decider-step";
-import { justReady, pickAgent, setupRuns, setupStep } from "./setup-state";
+import {
+	nextPhase,
+	type PathDone,
+	pathDone,
+	pathSteps,
+	type SetupPhase,
+	stepLine,
+} from "./setup-path";
+import {
+	ANSWERS_FOR,
+	justReady,
+	pickAgent,
+	setupRuns,
+	setupStep,
+} from "./setup-state";
 import {
 	BrowserStep,
 	CheckingStep,
@@ -42,6 +70,7 @@ import {
 	InstallConfirmDialog,
 	InstallingStep,
 } from "./setup-steps";
+import { useAgentChecks } from "./use-agent-checks";
 
 /**
  * The guided setup of an agent on this computer (ADR 25): choose Claude
@@ -49,6 +78,10 @@ import {
  * Night Shift then adds the agent with a profile, and the profile opens.
  * Then, while no decider was chosen, the decider step (Q22): Local or
  * TypeSafe Jev, or Skip.
+ *
+ * On Home it is one path of four steps (`setup-path.ts`): connect an
+ * agent, choose a model that decides, check that Night Shift's agents
+ * answer, add a project. A line on top shows the steps and which are done.
  */
 
 /** What the setup can do here, and each agent's job. Quiet when it fails: what needs it hides. */
@@ -113,7 +146,7 @@ function useSetupEnd(
 			const ready = justReady(before, agent.job);
 			if (!ready) continue;
 			toast.success(`${agent.label} is ready`, {
-				description: `The profile ${ready.profileName} uses it.`,
+				description: `The profile ${ready.profileName} uses it. ${ANSWERS_FOR}`,
 			});
 			onReady(ready);
 		}
@@ -161,8 +194,28 @@ function useDeciderEnd(
 	}, [status, onChosen]);
 }
 
-/** What the setup dialog shows: an agent's setup, or the choice of a decider. */
-export type SetupPhase = "agent" | "decider";
+/**
+ * Which steps of the setup are done on this computer. With `enabled`
+ * false it does not ask who answers for Night Shift's agents.
+ */
+export function useSetupDone(enabled = true): PathDone {
+	const profiles = useQuery({
+		...profileQueries.agents(),
+		meta: { quietErrors: true },
+	});
+	const decider = useDeciderSetupStatus();
+	const projects = useQuery({
+		...projectQueries.list(),
+		meta: { quietErrors: true },
+	});
+	const { summary } = useAgentChecks(enabled);
+	return pathDone({
+		profiles: profiles.data?.length ?? 0,
+		decider: decider.data,
+		checked: allAnswer(summary),
+		projects: projects.data?.length,
+	});
+}
 
 /**
  * The setup dialog. `harness` picks the agent it opens on, `start` the
@@ -170,6 +223,10 @@ export type SetupPhase = "agent" | "decider";
  * job that runs, also while it is closed. When the agent is ready, it
  * offers the decider step, or closes. Then the new profile opens, unless
  * `openProfile` is false: Home keeps its Get started card in view.
+ *
+ * With `onAddProject` it is the whole path of four steps: after each step
+ * it opens the next one that is still open, and the last step calls
+ * `onAddProject`. A step that is skipped stays open for later.
  */
 export function AgentSetupDialog({
 	open,
@@ -177,13 +234,18 @@ export function AgentSetupDialog({
 	harness,
 	start = "agent",
 	openProfile = true,
+	onAddProject,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	harness?: HarnessRowName;
 	start?: SetupPhase;
 	openProfile?: boolean;
+	/** Opens the form of a new project. Given: the dialog is the path of four steps. */
+	onAddProject?: () => void;
 }) {
+	const guided = onAddProject !== undefined;
+	const done = useSetupDone(guided);
 	const status = useAgentSetupStatus();
 	const decider = useDeciderSetupStatus();
 	const navigate = useNavigate();
@@ -216,8 +278,21 @@ export function AgentSetupDialog({
 		if (next) onOpenChange(true);
 		else close();
 	};
+	/** Opens the next step that is still open after `after`, or closes. */
+	const advance = (after: SetupPhase, now: PathDone = done) => {
+		const next = nextPhase(after, now);
+		if (next === null) close();
+		else setPhase(next);
+	};
 	useSetupEnd(status.data, (ready) => {
-		if (open && offerDecider(decider.data)) {
+		if (open && guided) {
+			// Without the decider's status, its step cannot show: the check is next.
+			advance("agent", {
+				...done,
+				agent: true,
+				decider: done.decider || !decider.data,
+			});
+		} else if (open && offerDecider(decider.data)) {
 			setPhase("decider");
 			setProfile(ready.profileId);
 		} else {
@@ -229,19 +304,47 @@ export function AgentSetupDialog({
 	const chosen = useDeciderChosen();
 	const onChosen = (name: string) => {
 		chosen(name);
-		if (phase === "decider") close();
+		if (phase !== "decider") return;
+		if (guided) advance("decider", { ...done, decider: true });
+		else close();
 	};
+	// The step the dialog shows. Without the decider's status, the agent's
+	// step shows. Only the path has a check and a project step.
+	const shown: SetupPhase =
+		phase === "decider"
+			? decider.data
+				? "decider"
+				: "agent"
+			: guided
+				? phase
+				: "agent";
 	useDeciderEnd(decider.data, onChosen);
 	return (
 		<Dialog open={open} onOpenChange={change}>
 			<DialogContent className="sm:max-w-lg">
-				{!open ? null : phase === "decider" && decider.data ? (
+				{open && guided ? <StepLine at={shown} done={done} /> : null}
+				{!open ? null : shown === "check" ? (
+					<CheckStep
+						onFix={(fix) => setPhase(fix === "agent" ? "agent" : "decider")}
+						onSkip={() => advance("check")}
+						onContinue={() => advance("check", { ...done, check: true })}
+					/>
+				) : shown === "project" ? (
+					<ProjectStep
+						done={done.project}
+						onLater={close}
+						onAdd={() => {
+							close();
+							onAddProject?.();
+						}}
+					/>
+				) : shown === "decider" && decider.data ? (
 					<DeciderBody
 						status={decider.data}
 						onCheckAgain={() => decider.refetch()}
 						checking={decider.isFetching}
 						onChosen={onChosen}
-						onSkip={() => change(false)}
+						onSkip={() => (guided ? advance("decider") : change(false))}
 					/>
 				) : (
 					<SetupBody
@@ -253,6 +356,69 @@ export function AgentSetupDialog({
 				)}
 			</DialogContent>
 		</Dialog>
+	);
+}
+
+/** The line on top of the path: its four steps, which are done, and where the person is. */
+function StepLine({ at, done }: { at: SetupPhase; done: PathDone }) {
+	return (
+		<Breadcrumb aria-label={stepLine(at)} className="pr-8">
+			<BreadcrumbList>
+				{pathSteps(at, done).map((step, index) => (
+					<Fragment key={step.phase}>
+						{index > 0 ? <BreadcrumbSeparator /> : null}
+						<BreadcrumbItem>
+							{step.done ? (
+								<CircleCheckIcon
+									className="size-3.5 text-status-finished"
+									aria-hidden
+								/>
+							) : null}
+							{step.state === "current" ? (
+								<BreadcrumbPage aria-current="step">
+									{step.label}
+								</BreadcrumbPage>
+							) : (
+								step.label
+							)}
+							{step.done ? <span className="sr-only">, done</span> : null}
+						</BreadcrumbItem>
+					</Fragment>
+				))}
+			</BreadcrumbList>
+		</Breadcrumb>
+	);
+}
+
+/** The last step of the path: a project for the flows. */
+function ProjectStep({
+	done,
+	onLater,
+	onAdd,
+}: {
+	/** There is a project already. */
+	done: boolean;
+	onLater: () => void;
+	onAdd: () => void;
+}) {
+	return (
+		<>
+			<DialogHeader>
+				<DialogTitle>Add a project</DialogTitle>
+				<DialogDescription>
+					A project holds your flows and their runs. It needs no folder.
+				</DialogDescription>
+			</DialogHeader>
+			<DialogFooter>
+				<Button variant="outline" onClick={onLater}>
+					{done ? "Done" : "Later"}
+				</Button>
+				<Button variant={done ? "outline" : "default"} onClick={onAdd}>
+					<PlusIcon data-icon="inline-start" />
+					Add project
+				</Button>
+			</DialogFooter>
+		</>
 	);
 }
 

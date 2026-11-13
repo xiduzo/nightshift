@@ -195,29 +195,29 @@ function ChooseDecider({
 		) : (
 			<Button disabled={busy} onClick={actions.useLocal}>
 				{actions.pending ? <Spinner data-icon="inline-start" /> : null}
-				Use Local
+				Use this model
 			</Button>
 		);
 
 	return (
 		<>
 			<DialogHeader>
-				<DialogTitle>Choose a decider</DialogTitle>
+				<DialogTitle>Choose a model that decides</DialogTitle>
 				<DialogDescription>
-					A decider makes the small choices in your flows. You can change it in
-					Settings.
+					A flow can let a model pick the next step. The same model writes what
+					a Gate asks you. You can change it in Settings.
 				</DialogDescription>
 			</DialogHeader>
 			<RadioGroup
 				value={choice}
 				onValueChange={(next) => setChoice(next as DeciderChoice)}
 				className="gap-2"
-				aria-label="Decider"
+				aria-label="Model that decides"
 			>
 				<FieldLabel htmlFor={`${id}-local`}>
 					<Field orientation="horizontal">
 						<FieldContent>
-							<FieldTitle>Local</FieldTitle>
+							<FieldTitle>A model on this computer</FieldTitle>
 							<FieldDescription>{localSummary(status)}</FieldDescription>
 						</FieldContent>
 						<RadioGroupItem value="local" id={`${id}-local`} />
@@ -226,7 +226,7 @@ function ChooseDecider({
 				<FieldLabel htmlFor={`${id}-typesafe`}>
 					<Field orientation="horizontal">
 						<FieldContent>
-							<FieldTitle>TypeSafe Jev</FieldTitle>
+							<FieldTitle>TypeSafe Jev, with a key</FieldTitle>
 							<FieldDescription>
 								Fastest. Needs a key from TypeSafe.
 							</FieldDescription>
@@ -309,7 +309,7 @@ function ChooseDecider({
 
 			<DialogFooter>
 				<Button variant="outline" onClick={onSkip}>
-					Skip
+					Choose later
 				</Button>
 				{main}
 			</DialogFooter>

@@ -1,11 +1,12 @@
 /**
- * The Get started card on Home as it reads: one row for each thing a
- * first run needs (an agent, a decider, a project), whether it is done,
- * and what the row offers. Pure: the facts come from the profiles, the
- * projects and the two setup statuses. A status is `undefined` while it
- * loads and `null` when it did not load.
+ * The Get started card on Home as it reads: one row for each step of the
+ * setup (an agent, a model that decides, the check, a project), whether it
+ * is done, and what the row offers. Pure: the facts come from the
+ * profiles, the projects, the two setup statuses and the check. A status
+ * is `undefined` while it loads and `null` when it did not load.
  */
 import type { AgentSetupStatus, DeciderSetupStatus } from "@/shared/api";
+import { allAnswer, type CheckSummary } from "./check-state";
 import { readyText } from "./decider-state";
 import { setupRuns, setupStep } from "./setup-state";
 
@@ -15,6 +16,8 @@ export type SetupCardAction =
 	| { kind: "set-up"; running: "installing" | "signing-in" | null }
 	/** Opens the setup on the choice of a decider. */
 	| { kind: "choose" }
+	/** Opens the setup on the check. `again`: a check ran and something did not answer. */
+	| { kind: "check"; again: boolean }
 	| { kind: "add-project" }
 	/** The setup cannot act here: the page where the person does it. */
 	| { kind: "open"; page: "agents" | "settings" };
@@ -26,7 +29,8 @@ export type SetupCardRow = {
 };
 
 const AGENT_TEXT = "An agent does the work in your flows.";
-const DECIDER_TEXT = "A decider makes the small choices in your flows.";
+const DECIDER_TEXT = "A flow can let a model pick the next step.";
+const CHECK_TEXT = "Night Shift asks each of its agents one small question.";
 
 /** The agent row: done when this computer has an Agent Profile. */
 export function agentRow(
@@ -94,6 +98,49 @@ export function deciderRow(
 	};
 }
 
+/**
+ * The check row: done when each of Night Shift's agents answered. It
+ * offers the check once an agent is connected. `summary` is null until
+ * this computer says who answers.
+ */
+export function checkRow(
+	agentDone: boolean,
+	summary: CheckSummary | null,
+): SetupCardRow {
+	if (!agentDone) {
+		return {
+			done: false,
+			text: `${CHECK_TEXT} Connect an agent first.`,
+			action: null,
+		};
+	}
+	if (!summary || summary.total === 0) {
+		return { done: false, text: CHECK_TEXT, action: null };
+	}
+	if (allAnswer(summary)) {
+		return {
+			done: true,
+			text: "Night Shift's agents answer.",
+			action: null,
+		};
+	}
+	if (summary.failed > 0) {
+		return {
+			done: false,
+			text:
+				summary.failed === 1
+					? "One check found a problem. Open the check to fix it."
+					: `${summary.failed} checks found a problem. Open the check to fix them.`,
+			action: { kind: "check", again: true },
+		};
+	}
+	return {
+		done: false,
+		text: CHECK_TEXT,
+		action: { kind: "check", again: false },
+	};
+}
+
 /** The project row: done when there is a project. */
 export function projectRow(
 	projects: readonly { name: string }[] | undefined,
@@ -120,7 +167,7 @@ export function projectRow(
 export function setupCardLine(agentDone: boolean, projectDone: boolean) {
 	return agentDone && projectDone
 		? "You are ready. Open a project and start a run."
-		: "Set up an agent and add a project. Then start your first run.";
+		: "Connect an agent and add a project. Then start your first run.";
 }
 
 /** Where this browser remembers "Later" until the tab closes. */

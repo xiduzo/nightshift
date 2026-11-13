@@ -16,6 +16,9 @@ export type SetupNote =
 	/** `output`: what the installer printed last, for the details. */
 	| { tone: "problem"; text: string; output: string | null };
 
+/** What a new agent does for Night Shift itself, said when its setup ends. */
+export const ANSWERS_FOR = "It answers for the Builder and the Improver.";
+
 /** What the setup dialog shows for one agent. */
 export type SetupStep =
 	/** Nothing runs: choose an agent, then install it or sign in. */
@@ -47,7 +50,10 @@ export function setupStep(agent: AgentSetupView): SetupStep {
 			return {
 				kind: "choose",
 				action: "sign-in",
-				note: { tone: "done", text: `${agent.label} is ready.` },
+				note: {
+					tone: "done",
+					text: `${agent.label} is ready. ${ANSWERS_FOR}`,
+				},
 			};
 		case "install-failed":
 			return {

@@ -27,12 +27,12 @@ import type { AgentProfileRow } from "@/shared/api";
 import { profileQueries } from "../queries";
 import {
 	AgentSetupDialog,
-	type SetupPhase,
 	useAgentSetupStatus,
 	useDeciderSetupStatus,
 } from "./agent-setup-dialog";
 import {
 	agentRow,
+	checkRow,
 	chooseLater,
 	deciderRow,
 	laterChosen,
@@ -41,6 +41,8 @@ import {
 	type SetupCardRow,
 	setupCardLine,
 } from "./setup-card-state";
+import type { SetupPhase } from "./setup-path";
+import { useAgentChecks } from "./use-agent-checks";
 
 function sessionStore(): Storage | undefined {
 	try {
@@ -51,8 +53,9 @@ function sessionStore(): Storage | undefined {
 }
 
 /**
- * Get started, on Home: an agent, a decider (optional) and a project,
- * each with one action, like a project's readiness. It shows while this
+ * Get started, on Home: the four steps of the setup (an agent, a model
+ * that decides, the check, a project), each with its state and one action.
+ * A person who skipped a step continues from its row. It shows while this
  * computer has no Agent Profile. Once it shows, it stays while you work
  * through it, so each row turns done. Later hides it until the next
  * session.
@@ -96,6 +99,9 @@ function SetupCardBody({
 
 	const agent = agentRow(profiles, setup.isError ? null : setup.data);
 	const choice = deciderRow(decider.isError ? null : decider.data);
+	// Who answers is asked once an agent is connected: before that, nothing can.
+	const checks = useAgentChecks(agent.done);
+	const check = checkRow(agent.done, checks.loading ? null : checks.summary);
 	const project = projectRow(projects.data);
 	// The next required step gets the main button.
 	const next = !agent.done ? "agent" : !project.done ? "project" : null;
@@ -126,6 +132,16 @@ function SetupCardBody({
 						onClick={() => setDialog({ open: true, start: "decider" })}
 					>
 						Choose
+					</Button>
+				);
+			case "check":
+				return (
+					<Button
+						size="sm"
+						variant="outline"
+						onClick={() => setDialog({ open: true, start: "check" })}
+					>
+						{action.again ? "Open check" : "Check"}
 					</Button>
 				);
 			case "add-project":
@@ -172,18 +188,24 @@ function SetupCardBody({
 				<CardContent>
 					<ItemGroup className="gap-2">
 						<SetupRow
-							title="An agent"
+							title="Connect an agent"
 							row={agent}
 							action={agent.action && act(agent.action, next === "agent")}
 						/>
 						<SetupRow
-							title="A decider"
+							title="Choose a model that decides"
 							optional
 							row={choice}
 							action={choice.action && act(choice.action, false)}
 						/>
 						<SetupRow
-							title="A project"
+							title="Check Night Shift's agents"
+							optional
+							row={check}
+							action={check.action && act(check.action, false)}
+						/>
+						<SetupRow
+							title="Add a project"
 							row={project}
 							action={project.action && act(project.action, next === "project")}
 						/>
@@ -195,6 +217,7 @@ function SetupCardBody({
 				onOpenChange={(open) => setDialog((now) => ({ ...now, open }))}
 				start={dialog.start}
 				openProfile={false}
+				onAddProject={() => setAdding(true)}
 			/>
 			<AddProjectDialog open={adding} onOpenChange={setAdding} />
 		</>

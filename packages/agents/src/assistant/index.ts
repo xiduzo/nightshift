@@ -11,6 +11,7 @@ export {
 	chatTurn,
 	resumesOnAnotherModel,
 } from "./chat";
+export { checkAgent } from "./check";
 export { explainRun } from "./explain";
 export type { HistoryPort } from "./history";
 export { serveTools } from "./mcp";
