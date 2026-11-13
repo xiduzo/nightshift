@@ -3,7 +3,7 @@ import { endedEarly } from "@nightshift/engine/run-status";
 import type { RunStatus } from "./types";
 
 /**
- * "Improve the flow" on the desktop, and if it works:
+ * "Improve this flow" on the desktop, and if it works:
  * - `hidden`: the run did not end early, it has no flow file, or its
  *   project is not in the Space you work in.
  * - `disabled`: it shows with the reason it cannot work here.
@@ -59,8 +59,8 @@ export function askWhy({
 }
 
 /**
- * "Ask why" on the phone and "Ask an agent" on the desktop: one answer, no chat, from the computer the phone
- * talks to (`assistant.explain`). It needs no flow file, no copy of the
+ * "Ask why" on the phone and on the desktop: one answer, no chat, from
+ * the computer the app talks to (`assistant.explain`). It needs no flow file, no copy of the
  * project here and no ownership, so it shows for every run that ended
  * early. Your role decides on the server: a viewer gets a refusal.
  */

@@ -3,26 +3,36 @@ import {
 	type SpendSaving,
 	savingKindOf,
 } from "@nightshift/client";
-
-/** The way to save a chat about a run starts from: its kind, and the label of the step that cost most. */
-export type ChatSaving = { kind: SpendSaving["kind"]; step?: string };
+import type { AgentEntryId, EntrySaving } from "@nightshift/flows";
 
 /**
- * What the editor's `chat` search value opens: the chat panel as it is, or
- * a new chat about one run of the flow. A chat about a run can start from
- * the way to save the run shows. A link, so a run page, the Spend page or
- * a new flow can open the editor with the chat.
+ * What the editor's `chat` search value opens: the chat panel as it is, a
+ * new chat that finds what to change in the flow, or a new chat about one
+ * run of the flow. A chat about a run can start from the way to save the
+ * run shows. A link, so a run page, the Spend page or a new flow can open
+ * the editor with the chat.
  */
 export type ChatLink =
 	| { kind: "open" }
-	| { kind: "run"; runId: string; saving?: ChatSaving };
+	| { kind: "improve" }
+	| { kind: "run"; runId: string; saving?: EntrySaving };
+
+/**
+ * The entry that a link starts, or undefined when it only opens the panel:
+ * a way to save is the Spend page's, a run is the run page's.
+ */
+export function linkEntry(link: ChatLink): AgentEntryId | undefined {
+	if (link.kind === "open") return undefined;
+	if (link.kind === "improve") return "flow.improve";
+	return link.saving ? "spend.saving" : "run.improve";
+}
 
 const RUN_PREFIX = "run:";
 const SAVING_PREFIX = "save:";
 
 /** The `chat` search value of `link`. */
 export function chatSearch(link: ChatLink): string {
-	if (link.kind !== "run") return "open";
+	if (link.kind !== "run") return link.kind;
 	if (!link.saving) return `${RUN_PREFIX}${link.runId}`;
 	const { kind, step } = link.saving;
 	return `${SAVING_PREFIX}${kind}:${link.runId}${step ? `:${step}` : ""}`;
@@ -50,6 +60,7 @@ export function chatAboutSaving(
 /** The link in a `chat` search value, or undefined when it holds none. */
 export function parseChatLink(value: unknown): ChatLink | undefined {
 	if (value === "open") return { kind: "open" };
+	if (value === "improve") return { kind: "improve" };
 	if (typeof value !== "string") return undefined;
 	if (value.startsWith(RUN_PREFIX)) {
 		const runId = value.slice(RUN_PREFIX.length).trim();

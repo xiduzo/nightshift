@@ -12,7 +12,6 @@ export { type NodeLadder, nodeLadderLabel } from "./ladders";
 export { createDashboardQueries, readerTimeZone } from "./queries";
 export {
 	type CostSteadiness,
-	savingAsk,
 	savingKindOf,
 	savingTitle,
 	savingWhy,

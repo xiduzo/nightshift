@@ -6,6 +6,7 @@
  * kind of popover. Each shows nothing outside the editor of one flow.
  */
 import {
+	AGENT_ENTRIES,
 	type AgentNode,
 	argumentChanges,
 	type DecisionNode,
@@ -22,14 +23,13 @@ import {
 	type ValueNode,
 	writeChanges,
 } from "@nightshift/flows";
-import { Button } from "@nightshift/ui/components/button";
-import { SparklesIcon } from "lucide-react";
 import {
 	type KeyboardEvent,
 	type ReactNode,
 	type RefObject,
 	useState,
 } from "react";
+import { AgentButton, useBuiltinAgent } from "@/shared/agent-button";
 import { type FlowAssistant, useFlowAssistant } from "./flow-assistant";
 import {
 	ArgumentsPreview,
@@ -68,22 +68,25 @@ export function selectionOf(
 }
 
 /**
- * The one look of every helper: a small outline button with a sparkle,
- * "Suggest …", the size of the Add buttons beside it.
+ * The one look of every helper: the button of the Field writer with the
+ * word of its field, "Suggest prompt", the size of the Add buttons beside
+ * it.
  */
-function suggestButton(label: string, title?: string) {
-	return (
-		<Button variant="outline" size="sm" title={title}>
-			<SparklesIcon data-icon="inline-start" />
-			{label}
-		</Button>
+function suggestButton(field: string, title?: string) {
+	return <AgentButton entry="field.suggest" field={field} title={title} />;
+}
+
+/** Nothing can answer for the Field writer now: its Settings page fixes it. */
+function useCannotSuggest(): boolean {
+	return Boolean(
+		useBuiltinAgent(AGENT_ENTRIES["field.suggest"].agent)?.problem,
 	);
 }
 
 /** What one helper says and shows: its button, its popover's words, its preview. */
 type HelperCopy = {
-	/** The button: "Suggest outcomes". */
-	label: string;
+	/** The word of the field on the button: "outcomes" in "Suggest outcomes". */
+	field: string;
 	title: string;
 	description: string;
 	picks: readonly string[];
@@ -109,7 +112,10 @@ function FieldSuggest({
 }) {
 	const assistant = useFlowAssistant();
 	const [open, setOpen] = useState(false);
+	const cannotAnswer = useCannotSuggest();
 	if (!assistant) return null;
+	// Nothing can answer: the button leads to Settings, and opens no popover.
+	if (cannotAnswer) return suggestButton(copy.field);
 	return (
 		<SuggestPopover
 			assistant={assistant}
@@ -118,7 +124,7 @@ function FieldSuggest({
 			toolSchema={toolSchema}
 			open={open}
 			onOpenChange={setOpen}
-			trigger={suggestButton(copy.label)}
+			trigger={suggestButton(copy.field)}
 			title={copy.title}
 			description={copy.description}
 			picks={copy.picks}
@@ -151,11 +157,19 @@ export function PromptSuggest({
 	field: RefObject<HTMLElement | null>;
 }) {
 	const assistant = useFlowAssistant();
+	const cannotAnswer = useCannotSuggest();
 	if (!assistant) return null;
 	const selection = target?.selection;
 	const base = target?.base ?? value;
 	const node = assistant.flow.nodes.find((n) => n.id === nodeId);
 	const question = node?.type === "decision" && node.by === "person";
+	const button = suggestButton(
+		question ? "question" : "prompt",
+		"Also ⌘I or Ctrl+I in the field",
+	);
+	// Nothing can answer: the button leads to Settings, and opens no popover.
+	if (cannotAnswer)
+		return <div className="flex items-center gap-2">{button}</div>;
 	return (
 		<div className="flex items-center gap-2">
 			<SuggestPopover
@@ -165,10 +179,7 @@ export function PromptSuggest({
 				open={target !== null}
 				onOpenChange={(open) => (open ? onOpen() : onClose())}
 				finalFocus={field}
-				trigger={suggestButton(
-					question ? "Suggest question" : "Suggest prompt",
-					"Also ⌘I or Ctrl+I in the field",
-				)}
+				trigger={button}
 				title={
 					selection
 						? "Rewrite the selected part"
@@ -226,7 +237,7 @@ export function OutputSuggest({
 			kind="output"
 			nodeId={nodeId}
 			copy={{
-				label: "Suggest fields",
+				field: "fields",
 				title: "Suggest output fields",
 				description:
 					"The agent proposes the data fields from the prompt and from what later nodes read.",
@@ -254,7 +265,7 @@ export function SetSuggest({ node }: { node: FlowNode }) {
 			kind="set"
 			nodeId={node.id}
 			copy={{
-				label: "Suggest variables",
+				field: "variables",
 				title: "Suggest variables",
 				description:
 					"The agent proposes the variables that this node sets. Apply adds the new ones to the flow.",
@@ -292,7 +303,7 @@ export function OutcomesSuggest({ node }: { node: AgentNode | DecisionNode }) {
 			copy={
 				decision
 					? {
-							label: "Suggest options",
+							field: "options",
 							title: "Suggest options",
 							description:
 								"The agent proposes the options from the question and from where the flow goes next. A renamed option keeps its edges.",
@@ -301,7 +312,7 @@ export function OutcomesSuggest({ node }: { node: AgentNode | DecisionNode }) {
 								"What can be picked? For example: send, edit first, or skip.",
 						}
 					: {
-							label: "Suggest outcomes",
+							field: "outcomes",
 							title: "Suggest outcomes",
 							description:
 								"The agent proposes outcomes from this node's prompt and from where the flow goes next. A renamed outcome keeps its edges.",
@@ -333,7 +344,7 @@ export function RulesSuggest({ node }: { node: DecisionNode }) {
 			kind="rules"
 			nodeId={node.id}
 			copy={{
-				label: "Suggest rules",
+				field: "rules",
 				title: "Suggest rules",
 				description:
 					"The agent writes a rule for each option from the values of earlier nodes. The last option stays the default.",
@@ -363,7 +374,7 @@ export function ExpressionSuggest({ node }: { node: ValueNode }) {
 			kind="expression"
 			nodeId={node.id}
 			copy={{
-				label: "Suggest expression",
+				field: "expression",
 				title: "Suggest an expression",
 				description:
 					"The agent writes an expression from earlier values. Its result fits the output data of this node.",
@@ -400,7 +411,7 @@ export function CommandSuggest({ node }: { node: FlowNode }) {
 			copy={
 				node.type === "call"
 					? {
-							label: "Suggest command",
+							field: "command",
 							title: "Suggest a list command",
 							description:
 								"The agent reads the project and proposes a command that lists the items. The flow runs once for each item.",
@@ -414,7 +425,7 @@ export function CommandSuggest({ node }: { node: FlowNode }) {
 						}
 					: node.type === "wait"
 						? {
-								label: "Suggest command",
+								field: "command",
 								title: "Suggest a command",
 								description:
 									"The agent reads the project and proposes a command that passes when the wait is over.",
@@ -427,7 +438,7 @@ export function CommandSuggest({ node }: { node: FlowNode }) {
 									"What do you wait for? For example: the website to answer again.",
 							}
 						: {
-								label: "Suggest command",
+								field: "command",
 								title: "Suggest a command",
 								description:
 									"The agent reads the project's scripts and proposes a command for this step.",
@@ -468,7 +479,7 @@ export function ArgumentsSuggest({
 			nodeId={node.id}
 			toolSchema={toolSchema ?? undefined}
 			copy={{
-				label: "Suggest arguments",
+				field: "arguments",
 				title: "Suggest arguments",
 				description:
 					"The agent writes the arguments of the tool from the flow inputs and earlier steps.",
@@ -497,7 +508,7 @@ export function DescriptionSuggest({ before }: { before: string }) {
 		<FieldSuggest
 			kind="description"
 			copy={{
-				label: "Suggest description",
+				field: "description",
 				title: "Suggest a description",
 				description:
 					"The agent describes what this flow does from its steps, in one or two lines.",
@@ -528,7 +539,7 @@ export function InputsSuggest() {
 		<FieldSuggest
 			kind="inputs"
 			copy={{
-				label: "Suggest inputs",
+				field: "inputs",
 				title: "Suggest inputs",
 				description:
 					"The agent proposes the values you give when you start a run. It keeps the ones the steps use.",
