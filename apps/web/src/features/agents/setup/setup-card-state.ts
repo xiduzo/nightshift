@@ -163,6 +163,20 @@ export function projectRow(
 	};
 }
 
+/**
+ * Whether Home shows the card by itself: a required step is open. This
+ * computer has no Agent Profile, or there is no project. The optional
+ * steps (a model that decides, the check) never show it. A list that is
+ * `undefined` did not load, or loads still: the card waits for both.
+ */
+export function requiredStepOpen(
+	profiles: readonly unknown[] | undefined,
+	projects: readonly unknown[] | undefined,
+): boolean {
+	if (!profiles || !projects) return false;
+	return profiles.length === 0 || projects.length === 0;
+}
+
 /** The line under the title: what is left, or what to do next. */
 export function setupCardLine(agentDone: boolean, projectDone: boolean) {
 	return agentDone && projectDone

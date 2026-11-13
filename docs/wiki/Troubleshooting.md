@@ -121,7 +121,7 @@ A schedule's run starts on the Host, so the Host needs the project. A Host copie
 
 ### Search finds by words only
 
-Search by meaning needs Ollama and its model. The Knowledge page tells you when search by meaning stopped. Start Ollama, or open **Settings → Meaning search** and download the model. See [Search](Knowledge.md#search).
+Search by meaning needs Ollama and its model. The Knowledge page tells you when search by meaning stopped. Start Ollama, or open **Settings → Night Shift's agents** and click **Download** in the **Search** table. See [Search](Knowledge.md#search).
 
 ## Still stuck
 

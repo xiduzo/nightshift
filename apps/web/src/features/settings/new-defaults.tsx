@@ -1,7 +1,8 @@
 /**
  * What new work starts with: the agent of a new Agent node, the decider of
  * a new Decision node, and the model and the Ollama of meaning search.
- * Each is a row with the agent picker, and a pick saves at once.
+ * Each is a row with the agent picker, and a pick saves at once. This is
+ * the one place of these settings.
  */
 import { isCustomHarness } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
@@ -25,19 +26,33 @@ import {
 	DropdownMenuShortcut,
 	DropdownMenuTrigger,
 } from "@nightshift/ui/components/dropdown-menu";
-import { Field, FieldError, FieldLabel } from "@nightshift/ui/components/field";
+import {
+	Field,
+	FieldDescription,
+	FieldError,
+	FieldLabel,
+} from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
 import { InputGroupButton } from "@nightshift/ui/components/input-group";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
-import { useQuery } from "@tanstack/react-query";
-import { ChevronDownIcon } from "lucide-react";
+import { Spinner } from "@nightshift/ui/components/spinner";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+	ChevronDownIcon,
+	DownloadIcon,
+	RotateCcwIcon,
+	TriangleAlertIcon,
+} from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import {
 	deciderQueries,
 	harnessInfo,
 	harnessQueries,
+	KeyValueRows,
 	profileQueries,
+	recordFrom,
+	rowsFrom,
 } from "@/features/agents";
 import type { SettingsView } from "@/shared/api";
 import {
@@ -50,12 +65,84 @@ import {
 	useSaveNow,
 } from "./answers-table";
 import { deciderOfValue, deciderValue } from "./builtin-answer";
+import { SaveError } from "./components/setting-fields";
 import {
-	ollamaModes,
-	SHORTLIST,
-	useOllamaStatus,
-} from "./components/meaning-search-card";
-import { ollamaQueries } from "./queries";
+	type SettingKey,
+	type SettingsPatch,
+	useSaveSettings,
+} from "./hooks/use-settings-form";
+import { ollamaModes, SHORTLIST, useOllamaStatus } from "./meaning-search";
+import { PERMISSION_MODES } from "./permission-modes";
+import { ollamaMutations, ollamaQueries } from "./queries";
+
+/** The settings of the New nodes table, and of the Search table. */
+export const NEW_NODE_KEYS = [
+	"agentHarness",
+	"agentModel",
+	"agentPermissionMode",
+	"decisionDecider",
+] as const satisfies readonly SettingKey[];
+export const SEARCH_KEYS = [
+	"ollama",
+	"embeddingModel",
+	"ollamaAddress",
+] as const satisfies readonly SettingKey[];
+
+/**
+ * "Reset to defaults" for one table, beside its title. It shows when a
+ * setting of `keys` differs from its default.
+ */
+export function ResetDefaults({
+	data,
+	keys,
+	title,
+}: {
+	data: SettingsView;
+	keys: readonly SettingKey[];
+	/** The table's name, in the toast. */
+	title: string;
+}) {
+	const reset = useSaveSettings();
+	const saved = keys.filter((key) => data.fields[key]?.source === "saved");
+	if (saved.length === 0) return null;
+	const patch = (value: (key: SettingKey) => unknown) =>
+		Object.fromEntries(saved.map((key) => [key, value(key)])) as SettingsPatch;
+	return (
+		<Button
+			type="button"
+			variant="ghost"
+			size="sm"
+			disabled={reset.isPending}
+			onClick={() => {
+				const before = patch((key) => data.values[key]);
+				reset.mutate(
+					patch(() => null),
+					{
+						onSuccess: () =>
+							toast.success(`${title} reset to defaults`, {
+								action: {
+									label: "Undo",
+									onClick: () =>
+										reset.mutate(before, {
+											onError: (error) =>
+												toast.error(`Not undone: ${error.message}`),
+										}),
+								},
+							}),
+						onError: (error) => toast.error(`Not reset: ${error.message}`),
+					},
+				);
+			}}
+		>
+			{reset.isPending ? (
+				<Spinner data-icon="inline-start" />
+			) : (
+				<RotateCcwIcon data-icon="inline-start" />
+			)}
+			Reset to defaults
+		</Button>
+	);
+}
 
 /** What a new Agent node starts with: the harness and the model of the settings. */
 function NewAgentPicker({
@@ -97,7 +184,62 @@ function NewAgentPicker({
 					});
 				},
 			})}
+			<NewAgentPermission data={data} />
 		</PickerFrame>
+	);
+}
+
+/** What a new Agent node may do without you: its permission mode, a second menu. */
+function NewAgentPermission({ data }: { data: SettingsView }) {
+	const saveNow = useSaveNow();
+	const value = data.values.agentPermissionMode;
+	const mode = PERMISSION_MODES.find((option) => option.value === value);
+	const risky = value === "bypassPermissions";
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					<InputGroupButton
+						className="shrink-0 font-normal text-muted-foreground"
+						aria-label={`Permission mode: ${mode?.label ?? value}. Choose what the agent may do.`}
+						title="Choose what the agent may do without you"
+					>
+						{risky ? (
+							<TriangleAlertIcon className="text-status-waiting" />
+						) : null}
+						{mode?.label ?? value}
+						<ChevronDownIcon />
+					</InputGroupButton>
+				}
+			/>
+			<DropdownMenuContent align="start" className="w-80">
+				<DropdownMenuGroup>
+					<DropdownMenuLabel>Permission mode</DropdownMenuLabel>
+					<DropdownMenuRadioGroup
+						value={value}
+						onValueChange={(next: string) =>
+							saveNow({ agentPermissionMode: next as typeof value })
+						}
+					>
+						{PERMISSION_MODES.map((option) => (
+							<DropdownMenuRadioItem
+								key={option.value}
+								value={option.value}
+								closeOnClick
+								className="items-start"
+							>
+								<span className="flex min-w-0 flex-1 flex-col">
+									<span>{option.label}</span>
+									<span className="text-muted-foreground text-xs">
+										{option.description}
+									</span>
+								</span>
+							</DropdownMenuRadioItem>
+						))}
+					</DropdownMenuRadioGroup>
+				</DropdownMenuGroup>
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }
 
@@ -166,6 +308,18 @@ function NewDecisionState({ data }: { data: SettingsView }) {
 	);
 }
 
+/**
+ * What the Decision row says. Until the person chooses a decider, the
+ * default follows the TypeSafe key: TypeSafe Jev with it, Ollama without it.
+ */
+function deciderNote(data: SettingsView): string {
+	const what = "The model a new Decision uses to choose.";
+	if (data.fields.decisionDecider.source === "saved") return what;
+	return data.values.decisionDecider === "typesafe"
+		? `${what} Your TypeSafe key makes TypeSafe Jev the default.`
+		: `${what} Without a TypeSafe key, the default is Ollama on this computer.`;
+}
+
 /** What a new node starts with. Existing nodes keep their values. */
 export function NewNodesTable({
 	data,
@@ -181,14 +335,14 @@ export function NewNodesTable({
 				{
 					key: "new-agent",
 					name: "A new Agent node",
-					job: "What an Agent node starts with.",
+					job: "The agent a new Agent node starts with, and what it may do.",
 					answersWith: <NewAgentPicker data={data} agentPicker={agentPicker} />,
 					state: <NewAgentState data={data} />,
 				},
 				{
 					key: "new-decision",
 					name: "A new Decision node",
-					job: "The model a new Decision uses to choose.",
+					job: deciderNote(data),
 					answersWith: (
 						<NewDecisionPicker data={data} agentPicker={agentPicker} />
 					),
@@ -247,6 +401,7 @@ function SearchRunsOn({ data }: { data: SettingsView }) {
 	const saveNow = useSaveNow();
 	const saved = data.values.ollamaAddress.trim();
 	const [asking, setAsking] = useState(false);
+	const [headers, setHeaders] = useState(false);
 	const [address, setAddress] = useState(saved);
 	const mode = data.values.ollama;
 	const label = mode === "off" ? "Off" : saved || "This computer";
@@ -319,6 +474,14 @@ function SearchRunsOn({ data }: { data: SettingsView }) {
 							<DropdownMenuItem onClick={ask}>
 								Change the address…
 							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setHeaders(true)}>
+								Headers…
+								{Object.keys(data.values.ollamaHeaders).length > 0 ? (
+									<DropdownMenuShortcut className="tracking-normal">
+										{Object.keys(data.values.ollamaHeaders).length}
+									</DropdownMenuShortcut>
+								) : null}
+							</DropdownMenuItem>
 						</>
 					) : null}
 				</DropdownMenuContent>
@@ -370,13 +533,98 @@ function SearchRunsOn({ data }: { data: SettingsView }) {
 					</form>
 				</DialogContent>
 			</Dialog>
+			{headers ? (
+				<OllamaHeadersDialog
+					saved={data.values.ollamaHeaders}
+					onClose={() => setHeaders(false)}
+				/>
+			) : null}
 		</>
+	);
+}
+
+/**
+ * The headers Night Shift sends to an Ollama on another computer, for a
+ * proxy that asks for a key. A value names a secret as `${NAME}`.
+ */
+function OllamaHeadersDialog({
+	saved,
+	onClose,
+}: {
+	saved: Record<string, string>;
+	onClose: () => void;
+}) {
+	const [rows, setRows] = useState(() => rowsFrom(saved));
+	const save = useSaveSettings();
+	const draft = recordFrom(rows);
+	const changed = JSON.stringify(draft) !== JSON.stringify(saved);
+	return (
+		<Dialog open onOpenChange={(open) => (open ? null : onClose())}>
+			<DialogContent className="sm:max-w-lg">
+				<form
+					className="flex flex-col gap-4"
+					noValidate
+					onSubmit={(event) => {
+						event.preventDefault();
+						if (!changed || save.isPending) return;
+						save.mutate(
+							{ ollamaHeaders: draft },
+							{
+								onSuccess: () => {
+									toast.success("Headers saved");
+									onClose();
+								},
+							},
+						);
+					}}
+				>
+					<DialogHeader>
+						<DialogTitle>Headers for Ollama</DialogTitle>
+						<DialogDescription>
+							For an Ollama behind a proxy that asks for a key.
+						</DialogDescription>
+					</DialogHeader>
+					<Field>
+						<KeyValueRows
+							rows={rows}
+							onChange={(next) => {
+								save.reset();
+								setRows(next);
+							}}
+							keyLabel="Header"
+							keyPlaceholder="Authorization"
+							valuePlaceholder="Bearer ${OLLAMA_TOKEN}"
+							addLabel="Add header"
+						/>
+						<FieldDescription>
+							Write a key as <span className="font-mono">${"{NAME}"}</span> and
+							save its value on the Secrets page.
+						</FieldDescription>
+					</Field>
+					<SaveError error={save.error} />
+					<DialogFooter>
+						<Button type="button" variant="outline" onClick={onClose}>
+							Cancel
+						</Button>
+						<Button type="submit" disabled={!changed || save.isPending}>
+							{save.isPending ? <Spinner data-icon="inline-start" /> : null}
+							Save headers
+						</Button>
+					</DialogFooter>
+				</form>
+			</DialogContent>
+		</Dialog>
 	);
 }
 
 /** How search by meaning is now: off, ready, or what its Ollama lacks. */
 function SearchState({ data }: { data: SettingsView }) {
 	const status = useOllamaStatus();
+	const pull = useMutation(
+		ollamaMutations.pull({
+			onError: (error) => toast.error(`Not downloaded: ${error.message}`),
+		}),
+	);
 	if (data.values.ollama === "off") {
 		return (
 			<State problem="Off" detail="Search finds files by their words only." />
@@ -416,10 +664,30 @@ function SearchState({ data }: { data: SettingsView }) {
 	}
 	if (!s.hasModel) {
 		return (
-			<State
-				problem="No model"
-				detail={`Ollama does not have ${s.model}. Download it on the Models page of Settings.`}
-			/>
+			<div className="flex items-center justify-end gap-2">
+				<State
+					problem="No model"
+					detail={
+						s.download?.error
+							? `The download of ${s.model} stopped: ${s.download.error}`
+							: `Ollama does not have ${s.model}. Download it to find files by meaning.`
+					}
+				/>
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					disabled={pull.isPending}
+					onClick={() => pull.mutate({ model: s.model })}
+				>
+					{pull.isPending ? (
+						<Spinner data-icon="inline-start" />
+					) : (
+						<DownloadIcon data-icon="inline-start" />
+					)}
+					Download
+				</Button>
+			</div>
 		);
 	}
 	return <State problem={null} />;
@@ -435,36 +703,105 @@ export function SearchTable({
 }) {
 	const saveNow = useSaveNow();
 	const options = useSearchOptions(data.values.embeddingModel);
+	const [other, setOther] = useState(false);
 	return (
-		<AnswersTable
-			first="Search"
-			rows={[
-				{
-					key: "search",
-					name: "Meaning search",
-					job: "Finds knowledge by what it means.",
-					answersWith: (
-						<PickerFrame>
-							{agentPicker({
-								purpose: "run",
-								agents: false,
-								choice: {},
-								onChoiceChange: () => {},
-								models: {
-									label: "Models for search",
-									options,
-									value: data.values.embeddingModel,
-									onPick: (model) => {
-										if (model) saveNow({ embeddingModel: model });
+		<>
+			{other ? (
+				<OtherSearchModelDialog
+					initial={data.values.embeddingModel}
+					onClose={() => setOther(false)}
+					onPick={(model) => {
+						saveNow({ embeddingModel: model });
+						setOther(false);
+					}}
+				/>
+			) : null}
+			<AnswersTable
+				first="Search"
+				rows={[
+					{
+						key: "search",
+						name: "Meaning search",
+						job: "Finds knowledge by what it means.",
+						answersWith: (
+							<PickerFrame>
+								{agentPicker({
+									purpose: "run",
+									agents: false,
+									choice: {},
+									onChoiceChange: () => {},
+									models: {
+										label: "Models for search",
+										options,
+										value: data.values.embeddingModel,
+										onPick: (model) => {
+											if (model) saveNow({ embeddingModel: model });
+										},
+										onOther: () => setOther(true),
 									},
-								},
-							})}
-							<SearchRunsOn data={data} />
-						</PickerFrame>
-					),
-					state: <SearchState data={data} />,
-				},
-			]}
-		/>
+								})}
+								<SearchRunsOn data={data} />
+							</PickerFrame>
+						),
+						state: <SearchState data={data} />,
+					},
+				]}
+			/>
+		</>
+	);
+}
+
+/** A model for search that the list does not hold: Ollama takes any embedding model it can download. */
+function OtherSearchModelDialog({
+	initial,
+	onClose,
+	onPick,
+}: {
+	initial: string;
+	onClose: () => void;
+	onPick: (model: string) => void;
+}) {
+	const id = useId();
+	const [model, setModel] = useState(initial);
+	return (
+		<Dialog open onOpenChange={(open) => (open ? null : onClose())}>
+			<DialogContent className="sm:max-w-sm">
+				<form
+					className="flex flex-col gap-4"
+					onSubmit={(event) => {
+						event.preventDefault();
+						if (model.trim()) onPick(model.trim());
+					}}
+				>
+					<DialogHeader>
+						<DialogTitle>Use another model</DialogTitle>
+						<DialogDescription>
+							Type the name of an embedding model Ollama can download. A new
+							model prepares the search again.
+						</DialogDescription>
+					</DialogHeader>
+					<Field>
+						<FieldLabel htmlFor={id}>Model</FieldLabel>
+						<Input
+							id={id}
+							className="font-mono"
+							placeholder="qwen3-embedding:0.6b"
+							autoComplete="off"
+							spellCheck={false}
+							value={model}
+							onChange={(event) => setModel(event.target.value)}
+						/>
+					</Field>
+					<DialogFooter>
+						<Button type="button" variant="outline" onClick={onClose}>
+							Cancel
+						</Button>
+						<Button type="submit" disabled={model.trim() === ""}>
+							Use this model
+						</Button>
+					</DialogFooter>
+				</form>
+			</DialogContent>
+		</Dialog>
 	);
 }

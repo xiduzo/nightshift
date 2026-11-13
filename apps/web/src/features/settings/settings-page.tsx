@@ -35,15 +35,19 @@ import {
 } from "@/shared/page";
 import type { AgentPicker } from "./answers-table";
 import { BuiltinAgentDetail, BuiltinAgentsTable } from "./builtin-agents";
-import { AgentDefaultsCard } from "./components/agent-defaults-card";
 import { AppearanceCard } from "./components/appearance-card";
 import { CleanupCard } from "./components/cleanup-card";
-import { MeaningSearchCard } from "./components/meaning-search-card";
 import { MonitoringCard } from "./components/monitoring-card";
 import { PhoneCard } from "./components/phone-card";
 import { RunPolicyCard } from "./components/run-policy-card";
 import { RunsCard } from "./components/runs-card";
-import { NewNodesTable, SearchTable } from "./new-defaults";
+import {
+	NEW_NODE_KEYS,
+	NewNodesTable,
+	ResetDefaults,
+	SEARCH_KEYS,
+	SearchTable,
+} from "./new-defaults";
 import { settingsQueries } from "./queries";
 import {
 	AGENTS_PARTS,
@@ -110,13 +114,6 @@ export function SettingsPage({
 					}),
 				}}
 				partCrumbs={sectionCrumbs(current, true)}
-				after={
-					data && current.key === "agents" ? (
-						<AgentDefaultsCard data={data} />
-					) : data && current.key === "models" ? (
-						<MeaningSearchCard data={data} />
-					) : null
-				}
 				heading={
 					<PageHeading title={current.label} description={current.line} />
 				}
@@ -175,6 +172,15 @@ export function SettingsPage({
 						<PageSection
 							title="New nodes"
 							description="What a new node starts with. Existing nodes keep their values."
+							actions={
+								data ? (
+									<ResetDefaults
+										data={data}
+										keys={NEW_NODE_KEYS}
+										title="New nodes"
+									/>
+								) : null
+							}
 						>
 							{withSettings((view) => (
 								<NewNodesTable data={view} agentPicker={agentPicker} />
@@ -183,6 +189,15 @@ export function SettingsPage({
 						<PageSection
 							title="Search"
 							description="Search finds files by what they mean, not only by their words."
+							actions={
+								data ? (
+									<ResetDefaults
+										data={data}
+										keys={SEARCH_KEYS}
+										title="Search"
+									/>
+								) : null
+							}
 						>
 							{withSettings((view) => (
 								<SearchTable data={view} agentPicker={agentPicker} />

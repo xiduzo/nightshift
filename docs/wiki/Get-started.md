@@ -43,7 +43,7 @@ Run your real flows with `bun run night`, and change Night Shift in a separate g
 
 ## Your first run
 
-Until you set up an agent on this computer, Home shows **Get started**. It lists what a first run needs: an agent, a model that decides, a check, and a project. Each has one button. **Later** hides the card until you open Night Shift again.
+Until this computer has an agent and you have a project, Home shows **Get started**. It lists what a first run needs: an agent, a model that decides, a check, and a project. Each has one button. **Later** hides the card until you open Night Shift again.
 
 1. **Set up an agent.** On Home, choose **Set up** next to **An agent**. Night Shift installs Claude Code or Codex for you, and you sign in in your browser. See [Set up an agent](Agents-and-profiles.md#set-up-an-agent).
 2. **Choose a model that decides.** This step is optional. A flow can let a model pick the next step. After the agent, the setup asks for one. **A model on this computer** needs no account. **TypeSafe Jev** needs a key. **Choose later** leaves this step open, and you continue it on Home. See [Deciders](Flows-and-nodes.md#deciders).

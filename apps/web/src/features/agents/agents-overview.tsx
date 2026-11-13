@@ -79,13 +79,10 @@ export function AgentsOverview({
 	onAddTool,
 	part,
 	heading,
-	after,
 }: {
 	part: AgentsPart;
 	/** The heading of the page. */
 	heading: ReactNode;
-	/** More sections, after the list. */
-	after?: ReactNode;
 	agentProfiles: AgentProfileRow[];
 	modelProfiles: ModelProfileRow[];
 	/** The harnesses that are added. */
@@ -278,7 +275,6 @@ export function AgentsOverview({
 						</ListTable>
 					</PageSection>
 				) : null}
-				{after}
 				{canSetUp ? (
 					<AgentSetupDialog open={settingUp} onOpenChange={setSettingUp} />
 				) : null}

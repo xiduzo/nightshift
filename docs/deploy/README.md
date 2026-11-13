@@ -110,7 +110,8 @@ model downloads and while the first sections embed. Ollama takes about
 1 GB of memory while it embeds. Give the container at least 2 GB.
 
 - `-e NIGHTSHIFT_EMBEDDING_MODEL=nomic-embed-text` uses another model. The
-  owner can also pick one on the Settings page, under Meaning search. A
+  owner can also pick one in Settings, in the Search table of Night
+  Shift's agents. A
   saved choice wins.
 - `-e OLLAMA_HOST=http://gpu-box:11434` uses an Ollama on another computer.
   Then the container starts no Ollama, and your knowledge text goes to that

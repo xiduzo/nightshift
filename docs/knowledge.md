@@ -587,11 +587,12 @@ it by itself and downloads the model into its data folder on its first
 start. On your own computer:
 
 1. Install Ollama from https://ollama.com.
-2. Open Settings, then Meaning search. Click Download, or run
+2. Open Settings, then Night Shift's agents. In the Search table, click
+   Download, or run
    `ollama pull qwen3-embedding:0.6b` (639 MB).
 
-The Settings page has a Meaning search section, for the owner of the
-computer only:
+The Night Shift's agents page of Settings has a Search table, for the
+owner of the computer only. Its row holds:
 
 - **Search by meaning.** `auto` (the default): a Host starts Ollama
   itself, and another computer uses the Ollama that runs on it. `on`:

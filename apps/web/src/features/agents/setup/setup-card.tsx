@@ -37,6 +37,7 @@ import {
 	deciderRow,
 	laterChosen,
 	projectRow,
+	requiredStepOpen,
 	type SetupCardAction,
 	type SetupCardRow,
 	setupCardLine,
@@ -55,19 +56,24 @@ function sessionStore(): Storage | undefined {
 /**
  * Get started, on Home: the four steps of the setup (an agent, a model
  * that decides, the check, a project), each with its state and one action.
- * A person who skipped a step continues from its row. It shows while this
- * computer has no Agent Profile. Once it shows, it stays while you work
+ * A person who skipped a step continues from its row. It shows while a
+ * required step is open: this computer has no Agent Profile, or there is
+ * no project (`requiredStepOpen`). Once it shows, it stays while you work
  * through it, so each row turns done. Later hides it until the next
- * session.
+ * session. `always`: Settings shows it whatever is done.
  */
 export function SetupCard({ always = false }: { always?: boolean } = {}) {
 	const profiles = useQuery({
 		...profileQueries.agents(),
 		meta: { quietErrors: true },
 	});
+	const projects = useQuery({
+		...projectQueries.list(),
+		meta: { quietErrors: true },
+	});
 	const [later, setLater] = useState(() => laterChosen(sessionStore()));
 	const [shown, setShown] = useState(false);
-	if (profiles.data?.length === 0 && !shown) setShown(true);
+	if (requiredStepOpen(profiles.data, projects.data) && !shown) setShown(true);
 	if (!always && (!shown || later)) return null;
 	return (
 		<SetupCardBody

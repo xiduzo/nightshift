@@ -73,9 +73,12 @@ export function AskAgentButton({ agent }: { agent: AgentAsk }) {
 	return (
 		<AgentButton
 			entry="run.why"
-			again={asked && !pending}
 			disabled={pending}
-			title="An agent reads this run and tells you what went wrong."
+			title={
+				asked && !pending
+					? "An agent reads this run again and gives a new answer."
+					: "An agent reads this run and tells you what went wrong."
+			}
 			onClick={agent.ask}
 		/>
 	);

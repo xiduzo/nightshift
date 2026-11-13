@@ -83,6 +83,8 @@ export type ModelOptions = {
 	/** The model that answers. Undefined: an agent answers. */
 	value: string | undefined;
 	onPick: (value: string | undefined) => void;
+	/** Opens a way to name a model the list does not hold. Without it, the list is all. */
+	onOther?: () => void;
 };
 
 export type AgentMenusProps = {
@@ -363,6 +365,14 @@ export function AgentMenus({
 									</DropdownMenuGroup>
 								),
 							)}
+							{models.onOther ? (
+								<>
+									<DropdownMenuSeparator />
+									<DropdownMenuItem onClick={models.onOther}>
+										Other model…
+									</DropdownMenuItem>
+								</>
+							) : null}
 						</>
 					) : null}
 				</DropdownMenuContent>

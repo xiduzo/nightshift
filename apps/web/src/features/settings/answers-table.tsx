@@ -53,6 +53,7 @@ export type AgentPicker = (props: {
 		options: readonly ModelOption[];
 		value: string | undefined;
 		onPick: (value: string | undefined) => void;
+		onOther?: () => void;
 	};
 }) => ReactNode;
 

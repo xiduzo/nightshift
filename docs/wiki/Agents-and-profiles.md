@@ -29,7 +29,7 @@ To choose who answers:
 
 An agent without a choice follows this computer: the first of your agents that works, or the default model. The choice belongs to one computer. A Host has its own.
 
-One answer has a limit. The Builder and the Improver stop after 40 turns or $2.00. Ask again to continue. The Spend page shows what these agents cost, as **Help**.
+One answer has a limit. The Builder and the Improver stop after 40 turns or $2.00. Ask again to continue. The Spend page shows what these agents cost, as **Help**. In a Space that a Host keeps, it shows the cost from every computer in the Space.
 
 A node that names its own decider or its own profile keeps it. The Decider answers only for a node that names none.
 
@@ -70,7 +70,7 @@ Night Shift then adds the agent with a profile.
 
 If you have not chosen a decider yet, the setup asks for one: **Local** or **TypeSafe Jev**. Choose **Skip** to keep the default. Then the profile opens. See [Deciders](Flows-and-nodes.md#deciders).
 
-Until this computer has an agent, Home offers the same setup. Choose **Set up** in **Get started**. On Home, the profile does not open, so that you can continue with the next step. See [Your first run](Get-started.md#your-first-run).
+While this computer has no agent, Home offers the same setup. Choose **Set up** in **Get started**. On Home, the profile does not open, so that you can continue with the next step. See [Your first run](Get-started.md#your-first-run).
 
 An agent that is on this computer already skips the install. An agent that is signed in already shows **Add Claude Code** or **Add Codex**.
 

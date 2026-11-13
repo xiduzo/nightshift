@@ -40,7 +40,6 @@ type ButtonProps = ComponentProps<typeof Button>;
 export function AgentButton({
 	entry,
 	field,
-	again = false,
 	link,
 	variant = "outline",
 	size = "sm",
@@ -49,14 +48,12 @@ export function AgentButton({
 	entry: AgentEntryId;
 	/** `field.suggest` only: the word of its field, "prompt" in "Suggest prompt". */
 	field?: string;
-	/** `run.why` only: an answer is there, and the button asks again. */
-	again?: boolean;
 	/** Where the button leads, as a link. Without it, `onClick` acts. */
 	link?: ReactElement;
 }) {
 	const { agent, label: words } = AGENT_ENTRIES[entry];
 	const status = useBuiltinAgent(agent);
-	const label = again ? "Ask again" : field ? `${words} ${field}` : words;
+	const label = field ? `${words} ${field}` : words;
 	const content = (
 		<>
 			<SparklesIcon data-icon="inline-start" />

@@ -63,7 +63,6 @@ export function AgentsPage({
 	part,
 	partCrumbs,
 	heading,
-	after,
 }: {
 	/** Which list the page shows, and the Settings link of each of its items. */
 	part: AgentsPart;
@@ -71,8 +70,6 @@ export function AgentsPage({
 	partCrumbs: Crumb[];
 	/** The heading of the list. */
 	heading: ReactNode;
-	/** More sections, after the list. */
-	after?: ReactNode;
 	/** What is open in detail, for example `harness:claude-code`. None: the list. */
 	item: string | undefined;
 	/** Opens an item, or goes back to the list. */
@@ -218,7 +215,6 @@ export function AgentsPage({
 				<AgentsOverview
 					part={part}
 					heading={heading}
-					after={after}
 					agentProfiles={agentProfiles}
 					modelProfiles={modelProfiles}
 					harnesses={added}

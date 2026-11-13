@@ -12,6 +12,7 @@ import {
 	deciderRow,
 	laterChosen,
 	projectRow,
+	requiredStepOpen,
 	setupCardLine,
 } from "./setup-card-state";
 
@@ -279,5 +280,26 @@ describe("Later", () => {
 		expect(laterChosen(failing)).toBe(false);
 		expect(() => chooseLater(failing)).not.toThrow();
 		expect(() => chooseLater(undefined)).not.toThrow();
+	});
+});
+
+describe("requiredStepOpen", () => {
+	test("no Agent Profile: the card shows", () => {
+		expect(requiredStepOpen([], [{ name: "site" }])).toBe(true);
+	});
+
+	test("an Agent Profile and no project: the card shows", () => {
+		expect(requiredStepOpen([{ name: "worker" }], [])).toBe(true);
+	});
+
+	test("an Agent Profile and a project: the optional steps do not show it", () => {
+		expect(requiredStepOpen([{ name: "worker" }], [{ name: "site" }])).toBe(
+			false,
+		);
+	});
+
+	test("a list that loads still, or did not load: the card waits", () => {
+		expect(requiredStepOpen(undefined, [])).toBe(false);
+		expect(requiredStepOpen([], undefined)).toBe(false);
 	});
 });
