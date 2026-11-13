@@ -129,7 +129,7 @@ export function ollamaProblem(
 	const missing = MODEL_NOT_FOUND.exec(message);
 	if (missing) {
 		const name = missing[1] ?? model;
-		return `The model ${name} is not on this computer. Download it from its Model Profile on the Agents page. Then run the step again.`;
+		return `The model ${name} is not on this computer. Download it from its model profile in Settings. Then run the step again.`;
 	}
 	if (NOT_RUNNING.test(message)) {
 		return "Ollama is not running on this computer. Start it, or let Night Shift start it in Settings. Then run the step again.";

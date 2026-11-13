@@ -901,7 +901,7 @@ describe("the addresses of a run's Model Profiles", () => {
 		const asked: unknown[][] = [];
 		const mac = modelDevice(
 			"mac",
-			"Nothing answers there. Start the server, or change the address on the Agents page.",
+			"Nothing answers there. Start the server, or change the address in Settings.",
 			asked,
 		);
 		const start = planNodes(
@@ -916,7 +916,7 @@ describe("the addresses of a run's Model Profiles", () => {
 			null,
 		);
 		await expect(start).rejects.toThrow(
-			"The profile jev on mac uses the address http://127.0.0.1:8080 (triage, again). Nothing answers there. Start the server, or change the address on the Agents page.",
+			"The profile jev on mac uses the address http://127.0.0.1:8080 (triage, again). Nothing answers there. Start the server, or change the address in Settings.",
 		);
 		expect(asked).toEqual([["mac", jev]]);
 	});

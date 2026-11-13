@@ -109,7 +109,7 @@ describe("pickAgent", () => {
 		});
 		expect(pickAgent({ profile: "gone" }, deps())).toEqual({
 			error:
-				'There is no profile "gone" on this computer. Pick another one, or add it on the Agents page.',
+				'There is no profile "gone" on this computer. Pick another one, or add it in Settings.',
 		});
 	});
 
@@ -401,7 +401,7 @@ describe("assistant.suggest", () => {
 			{
 				type: "error",
 				message:
-					"The Codex harness is not added on this computer. Add it on the Agents page, or choose another harness.",
+					"The Codex harness is not added on this computer. Add it in Settings, or choose another harness.",
 			},
 		]);
 		expect(

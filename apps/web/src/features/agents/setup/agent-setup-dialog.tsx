@@ -262,8 +262,11 @@ export function AgentSetupDialog({
 	const showProfile = (id: string) => {
 		if (!openProfile) return;
 		void navigate({
-			to: "/agents",
-			search: { item: itemOf({ kind: "profile", id }) },
+			to: "/settings",
+			search: {
+				section: "agents",
+				item: itemOf({ kind: "profile", id }),
+			},
 		});
 	};
 	const close = () => {

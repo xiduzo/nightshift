@@ -719,11 +719,11 @@ export async function checkAddress(
 	} catch (error) {
 		switch (listingReason(error)) {
 			case "silent":
-				return "Nothing answers there. Start the server, or change the address on the Agents page.";
+				return "Nothing answers there. Start the server, or change the address in Settings.";
 			case "refused":
 				return address.apiKey
 					? `It refuses the API key. Check the secret ${address.apiKey}.`
-					: "It wants an API key. Add the secret of its key to the address on the Agents page.";
+					: "It wants an API key. Add the secret of its key to the address in Settings.";
 			default:
 				return null;
 		}

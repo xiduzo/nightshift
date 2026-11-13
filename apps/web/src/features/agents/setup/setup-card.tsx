@@ -159,7 +159,7 @@ function SetupCardBody({
 						nativeButton={false}
 						render={
 							action.page === "agents" ? (
-								<Link to="/agents" />
+								<Link to="/settings" search={{ section: "agents" }} />
 							) : (
 								<Link to="/settings" />
 							)

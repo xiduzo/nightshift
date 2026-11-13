@@ -382,7 +382,7 @@ describe("tanstackDecider: Ollama", () => {
 			kind: "error",
 			errorKind: "harness",
 			message:
-				"The model qwen3:8b is not on this computer. Download it from its Model Profile on the Agents page. Then run the step again.",
+				"The model qwen3:8b is not on this computer. Download it from its model profile in Settings. Then run the step again.",
 			costUsd: null,
 		});
 	});
@@ -776,7 +776,7 @@ describe("tanstackDecider: checkAddress", () => {
 			);
 		});
 		expect(await check({ baseUrl: "http://openjev:8080" })).toBe(
-			"Nothing answers there. Start the server, or change the address on the Agents page.",
+			"Nothing answers there. Start the server, or change the address in Settings.",
 		);
 		reply(() => new Response("no", { status: 401 }));
 		expect(
@@ -794,7 +794,7 @@ describe("tanstackDecider: checkAddress", () => {
 			throw new Error("Unable to connect.");
 		}) as unknown as typeof fetch;
 		expect(await check({ baseUrl: "http://gpu-box:11434" }, "ollama")).toBe(
-			"Nothing answers there. Start the server, or change the address on the Agents page.",
+			"Nothing answers there. Start the server, or change the address in Settings.",
 		);
 		expect(asked).toEqual(["http://gpu-box:11434/api/tags"]);
 	});

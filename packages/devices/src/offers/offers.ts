@@ -220,7 +220,7 @@ export function offersNothingOr(
 	not?: string,
 ): string {
 	if (offers.length === 0) {
-		return `${deviceName} offers nothing to this Space. Its owner can offer a profile on the Agents page.`;
+		return `${deviceName} offers nothing to this Space. Its owner can offer a profile in Settings.`;
 	}
 	return `${deviceName} offers ${names(offers)} to this Space${not ? `, not "${not}"` : ""}.`;
 }

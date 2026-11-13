@@ -69,7 +69,7 @@ export function agentRow(
 	}
 	return {
 		done: false,
-		text: `${AGENT_TEXT} ${setup?.message ?? "Add one on the Agents page."}`,
+		text: `${AGENT_TEXT} ${setup?.message ?? "Add one in Settings."}`,
 		action: { kind: "open", page: "agents" },
 	};
 }

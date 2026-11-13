@@ -18,7 +18,7 @@ const goose = {
 };
 
 describe("the harnesses of this computer", () => {
-	test("a harness counts once it is added on the Agents page, a custom agent once it is saved", () => {
+	test("a harness counts once it is added in Settings, a custom agent once it is saved", () => {
 		let current = {
 			harnesses: ["codex", "claude-code"],
 			customAgents: [goose],

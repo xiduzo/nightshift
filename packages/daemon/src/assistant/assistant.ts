@@ -281,7 +281,7 @@ export function pickAgent(
 		const picked = named(requested.profile);
 		if (!picked) {
 			return {
-				error: `There is no profile "${requested.profile}" on this computer. Pick another one, or add it on the Agents page.`,
+				error: `There is no profile "${requested.profile}" on this computer. Pick another one, or add it in Settings.`,
 			};
 		}
 		// The request's own fields win over the profile, as on an Agent node.
@@ -356,8 +356,8 @@ function harnessOf(
 		return {
 			error:
 				picked.profile !== null && !own
-					? `The profile "${picked.profile}" runs on the ${harnessNoun(name)}, which is not added on this computer. Add it on the Agents page, or pick another profile.`
-					: `The ${harnessNoun(name)} is not added on this computer. Add it on the Agents page, or choose another harness.`,
+					? `The profile "${picked.profile}" runs on the ${harnessNoun(name)}, which is not added on this computer. Add it in Settings, or pick another profile.`
+					: `The ${harnessNoun(name)} is not added on this computer. Add it in Settings, or choose another harness.`,
 		};
 	}
 	if (own && !deps.installed(name)) {

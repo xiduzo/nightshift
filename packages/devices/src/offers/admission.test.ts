@@ -389,7 +389,7 @@ for (const [path, call] of Object.entries(paths)) {
 
 		test("another Person's run takes an Offer in force: its offered sessions and the run's own folder work", async () => {
 			expect(await outcome(request({ call: offered() }))).toBe(
-				"hetzner-1 offers nothing to this Space. Its owner can offer a profile on the Agents page.",
+				"hetzner-1 offers nothing to this Space. Its owner can offer a profile in Settings.",
 			);
 			// Its own entry alone, or the Space's alone, is no Offer in force.
 			await offer();

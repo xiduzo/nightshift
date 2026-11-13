@@ -234,7 +234,7 @@ describe("model profiles", () => {
 		const decider = fakeDecider([{ label: "yes" }], {
 			addresses: {
 				"http://openjev:8080":
-					"Nothing answers there. Start the server, or change the address on the Agents page.",
+					"Nothing answers there. Start the server, or change the address in Settings.",
 			},
 		});
 		const engine = makeEngine(
@@ -255,7 +255,7 @@ describe("model profiles", () => {
 			flow: flowOf([triage()]),
 		});
 		await expect(started).rejects.toThrow(
-			"The profile small uses the address http://openjev:8080 (triage). Nothing answers there. Start the server, or change the address on the Agents page.",
+			"The profile small uses the address http://openjev:8080 (triage). Nothing answers there. Start the server, or change the address in Settings.",
 		);
 		expect(await engine.listRuns()).toEqual([]);
 		expect(decider.calls).toHaveLength(0);

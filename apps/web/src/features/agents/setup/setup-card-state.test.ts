@@ -120,7 +120,7 @@ describe("the agent row", () => {
 		});
 		expect(agentRow([], null)).toEqual({
 			done: false,
-			text: "An agent does the work in your flows. Add one on the Agents page.",
+			text: "An agent does the work in your flows. Add one in Settings.",
 			action: { kind: "open", page: "agents" },
 		});
 	});
