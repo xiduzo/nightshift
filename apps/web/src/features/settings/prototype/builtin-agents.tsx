@@ -68,7 +68,13 @@ import { SHORTLIST } from "../components/meaning-search-card";
 import { ollamaQueries, settingsQueries } from "../queries";
 import { type Builtin, TAKES_LABEL, type Takes } from "./model";
 
-type ModelOption = { value: string; label: string; hint?: string };
+type ModelOption = {
+	value: string;
+	label: string;
+	hint?: string;
+	about?: string;
+	group?: string;
+};
 
 /** The agent picker of the chat, handed in by the route. */
 export type AgentPicker = (props: {
@@ -180,12 +186,26 @@ function useModelOptions(): ModelOption[] {
 		...(profiles.data ?? []).map((profile) => ({
 			value: `profile:${profile.name}`,
 			label: profile.name,
-			hint: profile.model ?? profile.decider,
+			hint: profile.model ?? "default model",
+			about:
+				profile.description ||
+				(deciders.data?.find((d) => d.name === profile.decider)?.label ??
+					profile.decider),
+			group: "Your model profiles",
 		})),
 		...(deciders.data ?? []).map((decider) => ({
 			value: `decider:${decider.name}`,
 			label: decider.label,
 			hint: decider.defaultModel ?? undefined,
+			about:
+				decider.apiKeySource === "missing" && decider.apiKey
+					? `Needs the secret ${decider.apiKey}. Add it on the Secrets page.`
+					: decider.address === "required"
+						? "Needs the address of its server. Use a model profile."
+						: decider.apiKey
+							? "A provider. You pay for each answer."
+							: "Runs on this computer. Free.",
+			group: "Deciders",
 		})),
 	];
 }
@@ -216,7 +236,16 @@ function useSearchOptions(current: string | undefined): ModelOption[] {
 	return [...names].map((name) => ({
 		value: name,
 		label: name,
-		hint: has(name) ? "Downloaded" : "Downloads when you pick it",
+		hint: has(name) ? "Downloaded" : "Not downloaded",
+		about: [
+			SHORTLIST.find((model) => model.name === name)?.about,
+			has(name) ? null : "Downloads when you pick it.",
+		]
+			.filter(Boolean)
+			.join(" "),
+		group: SHORTLIST.some((model) => model.name === name)
+			? "Models that work well"
+			: "Other models you have",
 	}));
 }
 

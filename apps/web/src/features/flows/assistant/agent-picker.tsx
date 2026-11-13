@@ -77,7 +77,16 @@ type ChoiceStore = {
 export type ModelOptions = {
 	/** The group's label. */
 	label?: string;
-	options: readonly { value: string; label: string; hint?: string }[];
+	options: readonly {
+		value: string;
+		label: string;
+		/** Short, on the right: its state or its model. */
+		hint?: string;
+		/** One line under the name: what it is. */
+		about?: string;
+		/** The heading it sits under. */
+		group?: string;
+	}[];
 	/** The model that answers. Undefined: an agent answers. */
 	value: string | undefined;
 	onPick: (value: string | undefined) => void;
@@ -260,7 +269,10 @@ export function AgentMenus({
 						</InputGroupButton>
 					}
 				/>
-				<DropdownMenuContent align="start" className="w-72">
+				<DropdownMenuContent
+					align="start"
+					className={models ? "w-[30rem] max-w-[90vw]" : "w-72"}
+				>
 					{refusal ? (
 						<DropdownMenuGroup>
 							<DropdownMenuLabel className="font-normal text-destructive">
@@ -327,30 +339,44 @@ export function AgentMenus({
 					{models ? (
 						<>
 							{agents ? <DropdownMenuSeparator /> : null}
-							<DropdownMenuGroup>
-								<DropdownMenuLabel>
-									{models.label ?? "Models"}
-								</DropdownMenuLabel>
-								<DropdownMenuRadioGroup
-									value={models.value ?? ""}
-									onValueChange={(next: string) => models.onPick(next)}
-								>
-									{models.options.map((option) => (
-										<DropdownMenuRadioItem
-											key={option.value}
-											value={option.value}
-											closeOnClick
+							{[...new Set(models.options.map((option) => option.group))].map(
+								(group) => (
+									<DropdownMenuGroup key={group ?? ""}>
+										<DropdownMenuLabel>
+											{group ?? models.label ?? "Models"}
+										</DropdownMenuLabel>
+										<DropdownMenuRadioGroup
+											value={models.value ?? ""}
+											onValueChange={(next: string) => models.onPick(next)}
 										>
-											<span className="truncate">{option.label}</span>
-											{option.hint ? (
-												<DropdownMenuShortcut className="truncate tracking-normal">
-													{option.hint}
-												</DropdownMenuShortcut>
-											) : null}
-										</DropdownMenuRadioItem>
-									))}
-								</DropdownMenuRadioGroup>
-							</DropdownMenuGroup>
+											{models.options
+												.filter((option) => option.group === group)
+												.map((option) => (
+													<DropdownMenuRadioItem
+														key={option.value}
+														value={option.value}
+														closeOnClick
+														className="items-start"
+													>
+														<span className="flex min-w-0 flex-1 flex-col">
+															<span>{option.label}</span>
+															{option.about ? (
+																<span className="text-muted-foreground text-xs">
+																	{option.about}
+																</span>
+															) : null}
+														</span>
+														{option.hint ? (
+															<DropdownMenuShortcut className="shrink-0 tracking-normal">
+																{option.hint}
+															</DropdownMenuShortcut>
+														) : null}
+													</DropdownMenuRadioItem>
+												))}
+										</DropdownMenuRadioGroup>
+									</DropdownMenuGroup>
+								),
+							)}
 						</>
 					) : null}
 				</DropdownMenuContent>
