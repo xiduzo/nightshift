@@ -1,5 +1,5 @@
 import { useFollowHost } from "@nightshift/client";
-import { Redirect } from "expo-router";
+import { Redirect, useSegments } from "expo-router";
 import { useEffect } from "react";
 
 import { LockScreenRuns, updateGlance, useHomeWidget } from "@/features/glance";
@@ -21,8 +21,8 @@ import { TabBar } from "./tab-bar";
  * in and in front, the app follows the Host: the live cache reads again
  * what changed, and a new Gate shows as a banner in the app. The home
  * screen widget and the runs followed on the lock screen stay up to date.
- * While something waits, the bar above the tabs shows it and sends the
- * answer you chose on Needs you.
+ * While something waits, the bar above the tabs of Needs you shows it
+ * and sends the answer you chose there.
  */
 export function AppTabs() {
 	const { state } = useHost();
@@ -48,6 +48,8 @@ function SignedInTabs() {
 	useHomeWidget();
 	const waiting = useNeedsCount();
 	const accessory = useNeedsAccessory(waiting);
+	// The bar belongs to Needs you: Runs has its own work.
+	const onRuns = useSegments().includes("runs" as never);
 
 	return (
 		<>
@@ -55,7 +57,9 @@ function SignedInTabs() {
 			<TabBar
 				waiting={waiting}
 				needsLabel={needsTabLabel(waiting)}
-				accessory={accessory ? <AccessoryBar {...accessory} /> : undefined}
+				accessory={
+					accessory && !onRuns ? <AccessoryBar {...accessory} /> : undefined
+				}
 			/>
 		</>
 	);

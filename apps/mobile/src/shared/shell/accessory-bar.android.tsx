@@ -11,6 +11,9 @@ import { router } from "expo-router";
 import { useThemeColors } from "@/shared/theme";
 import type { AccessoryBarProps } from "./tabs";
 
+/** The toolbar's height, in dp. */
+const BAR_HEIGHT = 64;
+
 /** A tap on what waits opens Needs you. */
 function openNeeds() {
 	router.navigate("/");
@@ -31,7 +34,13 @@ export function AccessoryBar({
 }: AccessoryBarProps) {
 	const { scheme, colors } = useThemeColors();
 	return (
-		<Host matchContents colorScheme={scheme}>
+		// A fixed height: measured from its content, the toolbar grows
+		// into a tall oval.
+		<Host
+			matchContents={{ horizontal: true }}
+			style={{ height: BAR_HEIGHT }}
+			colorScheme={scheme}
+		>
 			<HorizontalFloatingToolbar>
 				<Column
 					verticalArrangement={{ spacedBy: 2 }}

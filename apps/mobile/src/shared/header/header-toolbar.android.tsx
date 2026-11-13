@@ -14,7 +14,10 @@ import { HeaderMenu } from "./header-menu";
 export function HeaderToolbar({ placement, items }: HeaderToolbarProps) {
 	return (
 		<Stack.Toolbar placement={placement} asChild>
-			<View className="flex-row items-center gap-2">
+			{/* Room between the avatar on the left and the title. */}
+			<View
+				className={`flex-row items-center gap-2 ${placement === "left" ? "mr-4" : ""}`}
+			>
 				{items.map((item) => {
 					if (item.kind === "button") {
 						return (
