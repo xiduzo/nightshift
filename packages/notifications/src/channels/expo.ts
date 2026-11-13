@@ -11,6 +11,7 @@ import {
 	PUSH_ANDROID_CHANNEL,
 	PUSH_CATEGORY,
 	type PushData,
+	parseNeedsALookKey,
 	withdrawData,
 } from "../contract";
 import type { PushTarget } from "../targets";
@@ -30,8 +31,9 @@ import type {
  * - The category says which buttons the phone shows: `gate-decide`
  *   (Approve and Reject, a Gate its author marked for the lock screen with
  *   exactly two options), `gate-open` (any other Gate: it opens the app),
- *   `run` (a run that finished or failed, or a step that waits for a
- *   Device: it opens the run).
+ *   `run` (a run that finished or failed, a step that waits for a
+ *   Device, or a flow that turned severe under Needs a look: it opens the
+ *   run).
  * - Android: a Gate goes to the `gates` channel (high importance), a
  *   run to `runs` (default importance). The phone app defines both.
  * - One notification per key: the key is the thread id, the collapse id
@@ -135,6 +137,23 @@ export function expoMessage(
 			channelId: PUSH_ANDROID_CHANNEL.runs,
 			priority: "normal",
 			interruptionLevel: "active",
+		};
+	}
+	if (message.kind === "flow-needs-a-look") {
+		// A Now alert, like a Gate marked Now: high priority, time-sensitive.
+		// A tap opens the run that turned the flow severe.
+		const look = parseNeedsALookKey(message.key);
+		return {
+			...once,
+			data: {
+				...data,
+				projectId: look?.projectId ?? null,
+				flowId: look?.flow ?? null,
+			},
+			categoryId: PUSH_CATEGORY.run,
+			channelId: PUSH_ANDROID_CHANNEL.runs,
+			priority: "high",
+			interruptionLevel: "time-sensitive",
 		};
 	}
 	if (message.kind === "schedule-missed") {

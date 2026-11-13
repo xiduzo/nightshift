@@ -1402,3 +1402,141 @@ describe("a missed schedule", () => {
 		expect(web.calls).toEqual([]);
 	});
 });
+
+describe("a flow that turns severe under Needs a look", () => {
+	const turn = (runId: string) => ({
+		projectId: "project-1",
+		flow: "triage",
+		runId,
+		signal: {
+			kind: "failing" as const,
+			severe: true,
+			since: NOON - 60 * MINUTE,
+			runId,
+			count: 2,
+		},
+	});
+	const keyOf = (runId: string) => `look:project-1:triage:${runId}`;
+	/** What a channel got about Needs a look. */
+	const looks = (channel: FakeChannel) =>
+		sentTo(channel).filter((sent) => sent.includes(":look:"));
+
+	beforeEach(() => {
+		events.setRun("run-2", {
+			title: "triage",
+			personId: "ada",
+			stopAt: null,
+			sleeping: false,
+		});
+	});
+
+	test("a run that does not turn its flow severe pushes no alert", async () => {
+		await notifier.start();
+		await register("ada", "expo");
+		await endRun("run-1", "failed");
+		expect(looks(expo)).toEqual([]);
+	});
+
+	test("the run that turns it severe pushes Now to every Member: the flow and why", async () => {
+		await notifier.start();
+		const ada = await register("ada", "expo");
+		const bob = await register("bob", "web");
+		events.setSevere("run-2", turn("run-2"));
+		await endRun("run-2", "failed");
+
+		expect(looks(expo)).toEqual([`${ada.id}:${keyOf("run-2")}`]);
+		expect(looks(web)).toEqual([`${bob.id}:${keyOf("run-2")}`]);
+		expect(
+			expo.sent().find((m) => m.kind === "flow-needs-a-look"),
+		).toMatchObject({
+			kind: "flow-needs-a-look",
+			key: keyOf("run-2"),
+			spaceId: SPACE,
+			runId: "run-2",
+			stepId: null,
+			title: "triage",
+			body: "Needs a look. Failed 2 runs in a row.",
+			alert: true,
+		});
+	});
+
+	test("a push only: an open page gets no item, and the push waits until it closes", async () => {
+		await notifier.start();
+		const ada = await register("ada", "expo");
+		const screen = openScreen("ada");
+		events.setSevere("run-2", turn("run-2"));
+		await endRun("run-2", "failed");
+		expect(
+			screen.filter((item) => "key" in item && item.key === keyOf("run-2")),
+		).toEqual([]);
+		expect(looks(expo)).toEqual([]);
+
+		await closeScreens();
+		clock += 2 * MINUTE;
+		await notifier.tick();
+		expect(looks(expo)).toEqual([`${ada.id}:${keyOf("run-2")}`]);
+	});
+
+	test("while it stays severe, nothing new; after it recovered, a new turn pushes again", async () => {
+		await notifier.start();
+		const ada = await register("ada", "expo");
+		events.setSevere("run-2", turn("run-2"));
+		await endRun("run-2", "failed");
+		// The run ends again after a resume: the same turn, told once.
+		await endRun("run-2", "failed");
+		// The next failure keeps it severe: the watch reads no turn.
+		await endRun("run-3", "failed");
+		expect(looks(expo)).toEqual([`${ada.id}:${keyOf("run-2")}`]);
+
+		await endRun("run-4", "finished");
+		events.setSevere("run-6", turn("run-6"));
+		await endRun("run-5", "failed");
+		await endRun("run-6", "failed");
+		expect(looks(expo)).toEqual([
+			`${ada.id}:${keyOf("run-2")}`,
+			`${ada.id}:${keyOf("run-6")}`,
+		]);
+	});
+
+	test("a restart does not push the same turn again", async () => {
+		await notifier.start();
+		const ada = await register("ada", "expo");
+		events.setSevere("run-2", turn("run-2"));
+		await endRun("run-2", "failed");
+		notifier.stop();
+
+		notifier = makeNotifier();
+		await notifier.start();
+		await endRun("run-2", "failed");
+		expect(looks(expo)).toEqual([`${ada.id}:${keyOf("run-2")}`]);
+	});
+
+	test("it follows the Now urgency of the push settings", async () => {
+		await settings.save("ada", { pushUrgencies: ["today"] });
+		await notifier.start();
+		await register("ada", "expo");
+		const bob = await register("bob", "expo");
+		events.setSevere("run-2", turn("run-2"));
+		await endRun("run-2", "failed");
+		expect(looks(expo)).toEqual([`${bob.id}:${keyOf("run-2")}`]);
+	});
+
+	test("held over quiet hours, it goes out when they end", async () => {
+		await settings.save("ada", {
+			quietHours: { start: "22:00", end: "07:00" },
+		});
+		clock = utc(2026, 9, 21, 23, 0);
+		await notifier.start();
+		const ada = await register("ada", "expo");
+		events.setSevere("run-2", turn("run-2"));
+		await endRun("run-2", "failed");
+		expect(looks(expo)).toEqual([]);
+
+		clock = utc(2026, 9, 22, 7, 0);
+		await notifier.tick();
+		expect(looks(expo)).toEqual([`${ada.id}:${keyOf("run-2")}`]);
+		expect(expo.sent().find((m) => m.kind === "flow-needs-a-look")?.body).toBe(
+			"Needs a look. Failed 2 runs in a row.",
+		);
+	});
+});

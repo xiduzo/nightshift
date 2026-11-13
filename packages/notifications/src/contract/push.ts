@@ -12,7 +12,10 @@ export const PUSH_CATEGORY = {
 	decide: "gate-decide",
 	/** Any other Gate, the end of quiet hours and a missed schedule: a tap opens the inbox. */
 	open: "gate-open",
-	/** A run that finished or failed, or a step that waits for a Device: a tap opens the run. */
+	/**
+	 * A run that finished or failed, a step that waits for a Device, or a
+	 * flow that turned severe under Needs a look: a tap opens the run.
+	 */
 	run: "run",
 } as const;
 
@@ -34,6 +37,7 @@ export const PUSH_MESSAGE_KINDS = [
 	"device-wait",
 	"schedule-missed",
 	"gates-waiting",
+	"flow-needs-a-look",
 ] as const;
 export type PushMessageKind = (typeof PUSH_MESSAGE_KINDS)[number];
 
@@ -55,6 +59,10 @@ export type PushData = {
 	runId: string | null;
 	/** The Gate's step, or the step that waits for a Device. Null for a run. */
 	stepId: string | null;
+	/** `flow-needs-a-look` only: the project of the flow. */
+	projectId?: string | null;
+	/** `flow-needs-a-look` only: the flow's name. `runId` is the run that turned it severe. */
+	flowId?: string | null;
 	/** `gates-waiting` only: how many Gates wait. */
 	count?: number | null;
 	/** `gate-decide` only: the two options in the author's order. */
@@ -84,6 +92,10 @@ export function pushDataOf(raw: unknown): PushData | null {
 		runId: text(raw.runId),
 		stepId: text(raw.stepId),
 	};
+	if (kind === "flow-needs-a-look") {
+		data.projectId = text(raw.projectId);
+		data.flowId = text(raw.flowId);
+	}
 	if (kind === "gates-waiting" && typeof raw.count === "number") {
 		data.count = raw.count;
 	}

@@ -143,6 +143,20 @@ describe("a push while the app is in front", () => {
 		expect(showInFront(wait, { pathname: "/runs/run-1" })).toBe(false);
 	});
 
+	test("a flow that needs a look shows, except on the run that turned it", () => {
+		const look = pushDataOf({
+			kind: "flow-needs-a-look",
+			key: "look:project-1:triage:run-4",
+			spaceId: "space-1",
+			runId: "run-4",
+			stepId: null,
+			projectId: "project-1",
+			flowId: "triage",
+		});
+		expect(showInFront(look, { pathname: "/" })).toBe(true);
+		expect(showInFront(look, { pathname: "/runs/run-4" })).toBe(false);
+	});
+
 	test("a run's end shows no banner", () => {
 		const run = pushDataOf({
 			kind: "run-failed",
@@ -180,6 +194,19 @@ describe("where a tap goes", () => {
 		expect(screenOf({ kind: "run-failed", key: "r:end:1" })).toEqual({
 			pathname: "/",
 		});
+	});
+
+	test("a flow that needs a look opens the run that turned it", () => {
+		expect(
+			screenOf({
+				kind: "flow-needs-a-look",
+				key: "look:project-1:triage:run-4",
+				spaceId: "space-1",
+				runId: "run-4",
+				projectId: "project-1",
+				flowId: "triage",
+			}),
+		).toEqual({ pathname: "/runs/[runId]", params: { runId: "run-4" } });
 	});
 
 	test("a push that is not the Host's goes nowhere", () => {

@@ -15,14 +15,17 @@ import { and, desc, eq, gte, inArray, lt, not, or } from "drizzle-orm";
  * What a notification tells. `device-wait`: a step waits for a Device that
  * is offline. `schedule-missed`: a schedule did
  * not start its run, because its time was missed by more than it allows.
- * It names no run: its entry has an empty `runId`.
+ * It names no run: its entry has an empty `runId`. `flow-needs-a-look`: a
+ * flow turned severe under Needs a look. Its entry names the run that
+ * turned it, and its key the project and the flow.
  */
 export type NoticeKind =
 	| "gate-opened"
 	| "run-finished"
 	| "run-failed"
 	| "device-wait"
-	| "schedule-missed";
+	| "schedule-missed"
+	| "flow-needs-a-look";
 
 /**
  * `sending`: claimed, and going out to `heldFor` now. A crash before it

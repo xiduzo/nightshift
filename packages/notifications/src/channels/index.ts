@@ -8,6 +8,7 @@ export {
 	type NoticeWords,
 	type NotificationChannel,
 	type NotificationMessage,
+	needsALookWords,
 	type PushChannels,
 	type SendResult,
 	scheduleMissedWords,

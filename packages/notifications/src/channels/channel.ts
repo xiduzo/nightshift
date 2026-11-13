@@ -1,6 +1,6 @@
 import { formatClock } from "@nightshift/time";
 
-import type { GateOption } from "../contract";
+import { type GateOption, type LookSignal, signalTitle } from "../contract";
 import type { NoticeKind } from "../deliveries";
 import type { PushKind, PushTarget } from "../targets";
 
@@ -102,6 +102,8 @@ export function titleOf(kind: NoticeKind): string {
 			return "A step waits for a device";
 		case "schedule-missed":
 			return "A schedule did not start";
+		case "flow-needs-a-look":
+			return "A flow needs a look";
 	}
 }
 
@@ -132,6 +134,21 @@ export function scheduleMissedWords(missed: {
 	return {
 		title: titleOf("schedule-missed"),
 		body: `${missed.flow} was due ${when}. Night Shift was off at that time.`,
+	};
+}
+
+/**
+ * The words of a flow that turned severe under Needs a look: the flow's
+ * name, and "Needs a look. Failed 2 runs in a row." in the words of its
+ * row on Home.
+ */
+export function needsALookWords(turn: {
+	flow: string;
+	signal: LookSignal;
+}): NoticeWords {
+	return {
+		title: turn.flow,
+		body: `Needs a look. ${signalTitle(turn.signal)}.`,
 	};
 }
 

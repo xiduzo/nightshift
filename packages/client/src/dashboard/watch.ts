@@ -1,5 +1,8 @@
 import type { DashboardSummary, FlowHealthRow } from "./types";
 
+/** What is unusual, as a row says it: the push of a flow that turns severe says it too. */
+export { signalTitle } from "@nightshift/notifications/contract";
+
 /**
  * The watch over a flow, in words: its level, why it needed you, and how
  * it left its usual range. Both apps say it the same way.
@@ -38,26 +41,6 @@ export function flowLevelLabel(level: FlowLevel): string {
 /** What the level says about the last runs. */
 export function flowLevelHint(level: FlowLevel): string {
 	return LEVEL[level].hint;
-}
-
-const runsInRow = (count: number | undefined) => `${count ?? 1} runs in a row`;
-
-/** What is unusual, as a row says it. */
-export function signalTitle(signal: FlowSignal): string {
-	switch (signal.kind) {
-		case "failing":
-			return (signal.count ?? 1) > 1
-				? `Failed ${runsInRow(signal.count)}`
-				: "Its last run failed";
-		case "nothing":
-			return `Nothing to do, ${runsInRow(signal.count)}`;
-		case "cost":
-			return "Its last run cost more than usual";
-		case "length":
-			return "Its last run took longer than usual";
-		case "slow":
-			return "Runs longer than usual";
-	}
 }
 
 /** The usual range and the value now, in words. Null for a signal without numbers. */

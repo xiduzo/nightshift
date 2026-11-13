@@ -96,7 +96,7 @@ export const notificationDelivery = sqliteTable(
 	{
 		personId: text("person_id").notNull(),
 		key: text("key").notNull(),
-		/** `gate-opened`, `run-finished`, `run-failed`, `device-wait` or `schedule-missed`. */
+		/** `gate-opened`, `run-finished`, `run-failed`, `device-wait`, `schedule-missed` or `flow-needs-a-look`. */
 		kind: text("kind").notNull(),
 		spaceId: text("space_id").notNull(),
 		runId: text("run_id").notNull(),

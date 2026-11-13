@@ -12,11 +12,13 @@ import {
 	type InAppChannel,
 	type NoticeWords,
 	type NotificationMessage,
+	needsALookWords,
 	type PushChannels,
 	scheduleMissedWords,
 	titleOf,
 } from "../channels";
 import {
+	needsALookKey,
 	parseGateKey,
 	runEndKey,
 	scheduleMissedKey,
@@ -71,6 +73,13 @@ import { createWaitTracker, type StartedWait } from "./wait-tracker";
  * - Answer once, clear everywhere: when a Gate closes, or a device wait
  *   is over, every screen that got it gets a withdraw, and what still
  *   waits is dropped.
+ * - A flow that turns severe under Needs a look (`look:<projectId>:<flow>:<runId>`):
+ *   after a run ends, the notifier asks whether that end turned its flow
+ *   severe. Only the turn tells: a flow that stays severe tells nobody
+ *   again, one that recovered and turns severe again tells again. The
+ *   turn comes from the runs themselves, and the log claims its key once,
+ *   so a restart never tells it twice. It pushes like a Gate marked Now,
+ *   to every Member, and has no item on the open pages (Home shows it).
  * - Lock-screen answers: a push about a Gate its author marked carries its
  *   options, only to a person whose role allows an answer (`mayAnswer`).
  *
@@ -217,6 +226,8 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		if (kind === "device-wait") return settings.events.deviceWait;
 		// A run that did not start, as a person sees it: like a run that failed.
 		if (kind === "schedule-missed") return settings.events.runFailed;
+		// A Now alert: the Now urgency of the Person's push settings decides (`tell`).
+		if (kind === "flow-needs-a-look") return true;
 		return settings.events.runFailed;
 	}
 
@@ -362,6 +373,31 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 	}
 
 	/**
+	 * A run's end turned its flow severe under Needs a look: every Member
+	 * of the Space hears "<flow>", "Needs a look. Failed 2 runs in a row."
+	 * A push only, of the Now urgency.
+	 */
+	async function tellSevere(spaceId: string, runId: string): Promise<void> {
+		const turn = await deps.events.severeTurn?.(spaceId, runId);
+		if (!turn) return;
+		const run = await deps.events.run(spaceId, runId);
+		await tell(
+			"flow-needs-a-look",
+			needsALookKey(turn),
+			{ spaceId, runId, stepId: null },
+			{
+				inApp: false,
+				urgency: "now",
+				words: () =>
+					needsALookWords({
+						flow: run?.title ?? turn.flow,
+						signal: turn.signal,
+					}),
+			},
+		);
+	}
+
+	/**
 	 * Pushes one event to one Person, or holds it: once per key. `sends`:
 	 * this daemon sends the Space's pushes. Else only this computer's own
 	 * screens get it.
@@ -470,6 +506,9 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 				);
 				told.add(fact.runId);
 			}
+			for (const fact of list) {
+				if (fact.kind === "run-ended") await tellSevere(spaceId, fact.runId);
+			}
 			await runsChanged(spaceId, list, told);
 		}
 	}
@@ -545,8 +584,9 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			// A run's end showed on the open screen: no push after it.
 			const seen =
 				row.kind !== "gate-opened" &&
-				// No page shows a missed schedule: it goes out.
+				// No page shows a missed schedule, or a flow that needs a look, as an item: it goes out.
 				row.kind !== "schedule-missed" &&
+				row.kind !== "flow-needs-a-look" &&
 				deps.inApp.isActive(row.personId);
 			const sent = seen
 				? []
@@ -576,16 +616,21 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			if (inQuietHours(settings, at)) continue;
 			const gates = rows.filter((row) => row.kind === "gate-opened");
 			// A wait that is over was withdrawn: what is left still waits.
-			// A missed schedule is still news when quiet hours end: it goes out too.
+			// A missed schedule, and a flow that needs a look, are still news
+			// when quiet hours end: they go out too.
 			const stillWait = rows.filter(
-				(row) => row.kind === "device-wait" || row.kind === "schedule-missed",
+				(row) =>
+					row.kind === "device-wait" ||
+					row.kind === "schedule-missed" ||
+					row.kind === "flow-needs-a-look",
 			);
 			// Runs that ended meanwhile go without a push.
 			for (const row of rows) {
 				if (
 					row.kind === "gate-opened" ||
 					row.kind === "device-wait" ||
-					row.kind === "schedule-missed"
+					row.kind === "schedule-missed" ||
+					row.kind === "flow-needs-a-look"
 				)
 					continue;
 				await deps.deliveries.update(personId, row.key, {

@@ -92,12 +92,12 @@ export type InFrontPlace = {
  * item of the stream through the live cache) shows as a banner in the
  * app. The phone never shows its own banner then: the app does it.
  * A Gate shows, unless the person already looks at the inbox or at that
- * Gate. A step that waits for a device shows, unless the person looks at
- * its run. A run's end shows nothing: the run list updates by itself.
+ * Gate. A step that waits for a device, or a flow that needs a look,
+ * shows, unless the person looks at its run. A run's end shows nothing: the run list updates by itself.
  */
 export function showInFront(data: PushData | null, place: InFrontPlace) {
 	if (!data) return false;
-	if (data.kind === "device-wait") {
+	if (data.kind === "device-wait" || data.kind === "flow-needs-a-look") {
 		return data.runId !== null && place.pathname !== `/runs/${data.runId}`;
 	}
 	if (data.kind !== "gate-opened" && data.kind !== "gates-waiting") {

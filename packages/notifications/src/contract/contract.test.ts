@@ -6,12 +6,15 @@ import {
 	deviceWaitKey,
 	gateKey,
 	isGateKey,
+	needsALookKey,
 	type PushData,
 	parseDeviceWaitKey,
 	parseGateKey,
+	parseNeedsALookKey,
 	pushDataOf,
 	routeOf,
 	runEndKey,
+	signalTitle,
 	waitingKey,
 	webPathOf,
 	withdrawKeyOf,
@@ -64,6 +67,26 @@ describe("a notification key", () => {
 		expect(parseDeviceWaitKey("run-1:build")).toBeNull();
 		expect(parseGateKey(key)).toBeNull();
 		expect(isGateKey(key)).toBe(false);
+	});
+
+	test("a flow that turns severe is keyed by its project, flow and run, and is no Gate", () => {
+		const key = needsALookKey({
+			projectId: "project-1",
+			flow: "triage",
+			runId: "run-1",
+		});
+		expect(key).toBe("look:project-1:triage:run-1");
+		expect(parseNeedsALookKey(key)).toEqual({
+			projectId: "project-1",
+			flow: "triage",
+			runId: "run-1",
+		});
+		expect(parseGateKey(key)).toBeNull();
+		expect(isGateKey(key)).toBe(false);
+		for (const bad of ["look:run-1", "look:p:f", "look:p:f:r:x"]) {
+			expect(parseKey(bad)).toBeNull();
+		}
+		expect(parseNeedsALookKey("run-1:review")).toBeNull();
 	});
 
 	test("a key Night Shift does not make names nothing", () => {
@@ -166,6 +189,14 @@ describe("where a tap goes", () => {
 		expect(at("run-failed", "run-1")).toBe("/runs/run-1");
 	});
 
+	test("a flow that needs a look opens the run that turned it", () => {
+		expect(
+			routeOf({ kind: "flow-needs-a-look", runId: "run-4", stepId: null }),
+		).toEqual({ to: "run", runId: "run-4" });
+		expect(at("flow-needs-a-look", "run-4")).toBe("/runs/run-4");
+		expect(at("flow-needs-a-look", null)).toBe("/inbox");
+	});
+
 	test("a step that waits for a device opens its run", () => {
 		expect(
 			routeOf({ kind: "device-wait", runId: "run-1", stepId: "build" }),
@@ -228,6 +259,13 @@ describe("from the Host to the phone", () => {
 				title: "A schedule did not start",
 				body: "Triage was due at 22:30.",
 			}),
+			message({
+				kind: "flow-needs-a-look",
+				key: "look:p1:triage:run-1",
+				stepId: null,
+				title: "triage",
+				body: "Needs a look. Failed 2 runs in a row.",
+			}),
 		];
 		for (const one of sent) {
 			const { data } = expoMessage("token", one);
@@ -256,9 +294,54 @@ describe("from the Host to the phone", () => {
 		});
 	});
 
+	test("a flow that needs a look is a Now alert: it names the flow and opens its run", () => {
+		const push = expoMessage(
+			"token",
+			message({
+				kind: "flow-needs-a-look",
+				key: "look:p1:triage:run-1",
+				stepId: null,
+				title: "triage",
+				body: "Needs a look. Failed 2 runs in a row.",
+			}),
+		);
+		expect(push).toMatchObject({
+			title: "triage",
+			body: "Needs a look. Failed 2 runs in a row.",
+			categoryId: "run",
+			channelId: "runs",
+			priority: "high",
+			interruptionLevel: "time-sensitive",
+			data: {
+				kind: "flow-needs-a-look",
+				key: "look:p1:triage:run-1",
+				spaceId: "space-1",
+				runId: "run-1",
+				stepId: null,
+				projectId: "p1",
+				flowId: "triage",
+			},
+		});
+	});
+
 	test("a withdraw push reads back its key", () => {
 		const { data } = expoWithdrawMessage("token", "run-1:review");
 		expect(withdrawKeyOf(data)).toBe("run-1:review");
 		expect(pushDataOf(data)).toBeNull();
+	});
+});
+
+describe("the words of Needs a look", () => {
+	test("say how the flow left its usual range", () => {
+		expect(signalTitle({ kind: "failing", count: 1 })).toBe(
+			"Its last run failed",
+		);
+		expect(signalTitle({ kind: "failing", count: 2 })).toBe(
+			"Failed 2 runs in a row",
+		);
+		expect(signalTitle({ kind: "nothing", count: 4 })).toBe(
+			"Nothing to do, 4 runs in a row",
+		);
+		expect(signalTitle({ kind: "slow" })).toBe("Runs longer than usual");
 	});
 });
