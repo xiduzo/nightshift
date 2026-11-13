@@ -126,7 +126,7 @@ Home is a short note about all your projects. Read it from top to bottom.
 A flow stays under **Needs a look** until it does its usual work again. To look at one:
 
 1. Choose **Look**. A panel shows what is unusual, and what is usual for this flow.
-2. If a run failed, choose **Ask an agent**. An agent reads the run and tells you what went wrong. It changes nothing.
+2. If a run failed, choose **Ask why**. An agent reads the run and tells you what went wrong. It changes nothing.
 3. Choose **Open the run** or **Open the flow** to fix the cause.
 4. Choose **Looked at it**. The flow folds to one line. It comes back when the problem starts again.
 
@@ -204,4 +204,4 @@ Click a row to open it. You see what each step costs per run, and the ways to sa
 - **Check for work before the agents start.** Some runs found nothing to do, and still cost money.
 - **Keep the costly runs near a usual run.** Some runs cost over twice a usual run. The card names the step with the most extra cost.
 
-**Open the run** shows the newest run behind a card. **Open the flow** opens the flow, where you make the change. **Improve with an agent** opens the flow with a chat. The agent reads that run and proposes a change. You apply it or discard it.
+**Open the run** shows the newest run behind a card. **Open the flow** opens the flow, where you make the change. **Improve this flow** opens the flow with a chat. The agent reads that run and proposes a change. You apply it or discard it.

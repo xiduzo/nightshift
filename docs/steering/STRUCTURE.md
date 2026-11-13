@@ -83,7 +83,7 @@ Examples:
 
 The fields of an event that name a path on its Walker's disk are listed once, like those that name a Person (`PATH_FIELDS` beside `PERSON_FIELDS`, engine `log/`).
 
-The schema is in `packages/db/src/schema/`, one file per owner: `auth.ts`, `devices.ts`, `projects.ts`, `runs.ts`, `device-config.ts`, `engine.ts`, `daemon.ts` and `notifications.ts`. A comment above each group of tables names the owning package and vertical. `schema/index.ts` lists every file with its owner. `auth:generate` writes `auth.ts`, so only the index names its owner. Put a new table in the file of its owner. When a table moves to another file, its migrations stay the same: `drizzle-kit generate` must report no changes.
+The schema is in `packages/db/src/schema/`, one file per owner: `auth.ts`, `devices.ts`, `projects.ts`, `runs.ts`, `device-config.ts`, `engine.ts`, `assistant.ts`, `daemon.ts` and `notifications.ts`. A comment above each group of tables names the owning package and vertical. `schema/index.ts` lists every file with its owner. `auth:generate` writes `auth.ts`, so only the index names its owner. Put a new table in the file of its owner. When a table moves to another file, its migrations stay the same: `drizzle-kit generate` must report no changes.
 
 Test fixtures and the fakes of `./testing` may set up and read any table. Example: the engine's `aloneDirectory` reads the `device` rows that a test adds.
 
@@ -206,7 +206,7 @@ apps/web/src/
     flows/                 canvas/ (+ viewer/ the last output on each node), editor/ (+ add-node/ the add-node dialog and its catalog, inspector/ one file per node type, io/, lib/, test-run/ the pins and skips of a test run and the node menu), start/ (Start run and Test, the flow's inputs), schedules/ (a flow's schedules and webhooks)
     runs/                  components/ (+ run-page.tsx, details/), hooks/, lib/, transcript/ (+ items/ per group of item kinds)
     settings/              settings-page.tsx, components/ (one file per card), hooks/use-settings-form.ts
-    agents/                connections/ (MCP servers, CLI tools and secrets, on the Agents page)
+    agents/                connections/ (MCP servers, CLI tools and secrets, in Settings)
     gates/                 inbox/ (the Needs-you inbox)
     notifications/         the stream (use-notification-stream.ts: the live cache follows the Host, with this browser's adapter in browser-notifications.ts), this browser's Web Push (browser.ts, with public/sw.js), components/ (the notification settings and screens cards)
 ```

@@ -1,6 +1,37 @@
 # Agents and profiles
 
-An Agent node names the agent that it runs on. Agents run with your own CLI logins. One flow can mix them.
+Night Shift has two groups of agents. **Your agents** do the work of a step: an Agent node names the agent that it runs on. **Night Shift's agents** help you build, explain and decide. Agents run with your own CLI logins. One flow can mix them.
+
+You set both in **Settings**. The Settings menu at the bottom of the sidebar opens each page.
+
+## Night Shift's agents
+
+Night Shift has six agents of its own. Each has one job. You choose who answers for each: one of your agents, or one of your models.
+
+| Agent | Its job | You start it with | Who can answer |
+| --- | --- | --- | --- |
+| **Builder** | Makes a flow from a sentence, and changes it when you ask. | **Build with an agent** in the flow editor | An agent |
+| **Improver** | Finds what goes wrong or costs too much in a flow, and proposes a change. | **Improve this flow** on a run and on Spend | An agent |
+| **Explainer** | Says why a run stopped early, and what you can do. | **Ask why** on a run, on Home and on your phone | An agent or a model |
+| **Field writer** | Fills one field, with a preview. | **Suggest …** under a field | An agent or a model |
+| **Decider** | Picks an option in a run. | A Decision or a Value that a model decides | A model |
+| **Brief writer** | Writes what a Gate asks you, and how urgent it is. | Every Gate, unless its author turns it off | A model |
+
+An agent works in turns and can read the files of your project. A model gives one answer: it is faster and costs less. The Builder and the Improver need an agent that takes Night Shift's own tools, see the table below.
+
+These agents only read and propose. You apply a change, and you save the flow. None of them reads a secret, opens another project or starts a run.
+
+To choose who answers:
+
+1. Open **Settings**, then **Night Shift's agents**.
+2. In the row of an agent, choose an agent or a model under **Answers with**. Night Shift saves the choice at once.
+3. To see what an agent reads and proposes, choose its name. **Try it** asks the agent one small question and shows whether it answers.
+
+An agent without a choice follows this computer: the first of your agents that works, or the default model. The choice belongs to one computer. A Host has its own.
+
+One answer has a limit. The Builder and the Improver stop after 40 turns or $2.00. Ask again to continue. The Spend page shows what these agents cost, as **Help**.
+
+A node that names its own decider or its own profile keeps it. The Decider answers only for a node that names none.
 
 ## Agents
 
@@ -21,13 +52,13 @@ All real work so far runs on Claude Code. pi is verified with an Ollama model.
 
 "Night Shift's own tools" are the tools that Night Shift gives a session, such as knowledge search. An agent without them still works on the project files.
 
-Any other agent that speaks the Agent Client Protocol works too. Add it on the Agents page as a custom agent, with its command, for example `goose acp`.
+Any other agent that speaks the Agent Client Protocol works too. Add it in Settings, under **Your harnesses**, as a custom agent, with its command, for example `goose acp`.
 
 ## Set up an agent
 
 Night Shift can install Claude Code or Codex for you, and sign you in. Do this on the computer that runs the agent.
 
-1. Open the Agents page.
+1. Open **Settings**, then **Your harnesses**.
 2. Choose **Set up an agent**.
 3. Choose Claude Code or Codex. Night Shift recommends Claude Code.
 4. Choose **Install Claude Code** or **Install Codex**. Night Shift asks before it starts. **Details** shows what it runs.
@@ -49,7 +80,7 @@ Night Shift sets up an agent only on the computer that you use, on macOS and Lin
 
 ## Profiles
 
-A profile holds an agent's setup under one name: the agent, the model, the effort, and the permission mode. A Model Profile holds the [decider](Flows-and-nodes.md#deciders) and the model of a Decision or a Value. Deciders include TypeSafe Jev, OpenAI Decisions, and Ollama on this computer. You make profiles on the Agents page of each computer.
+A profile holds an agent's setup under one name: the agent, the model, the effort, and the permission mode. A Model Profile holds the [decider](Flows-and-nodes.md#deciders) and the model of a Decision or a Value. Deciders include TypeSafe Jev, OpenAI Decisions, and Ollama on this computer. You make profiles in Settings of each computer: **Your agents** for profiles, **Models** for Model Profiles.
 
 A profile belongs to its computer. A node names the profile and its computer, for example "builder on LE2316". Night Shift never looks for a profile of the same name on another computer.
 
@@ -69,7 +100,7 @@ A node without backups waits for its computer until the stop time of the run. Ni
 
 ## CLI tools
 
-A node can give the agent CLI tools, such as `gh` or `acli`. Add a tool on the Agents page of the computer that runs the step.
+A node can give the agent CLI tools, such as `gh` or `acli`. Add a tool in Settings, under **Tools**, on the computer that runs the step.
 
 A tool can have its own login. A login sets variables for the program, and a value can read a secret, for example `GH_TOKEN = ${GH_WORK_TOKEN}`. So one program can run as two accounts:
 

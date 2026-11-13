@@ -22,7 +22,11 @@ type SetupDeps = Parameters<typeof createDeciderSetup>[0];
 
 /** A settings view with `decisionDecider` saved or not. */
 function settingsView(saved: string | null) {
-	const values = { decisionDecider: saved ?? "typesafe", ollama: "auto" };
+	const values = {
+		decisionDecider: saved ?? "typesafe",
+		ollama: "auto",
+		builtinAgents: {},
+	};
 	return {
 		values,
 		fields: {

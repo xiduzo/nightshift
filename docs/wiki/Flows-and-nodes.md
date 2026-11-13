@@ -97,7 +97,7 @@ Inside a filter of a rule, a name reads a key of each item. To read a node, an i
 
 ### Deciders
 
-A decider is the model of a Decision or a Value that a model decides. You choose it in a Model Profile on the Agents page.
+A decider is the model of a Decision or a Value that a model decides. You choose it in a Model Profile in Settings, under **Models**. A node that names no decider runs on the [Decider](Agents-and-profiles.md#night-shifts-agents) that you chose in Settings.
 
 For most choices, start with a small decision model, such as TypeSafe Jev. It is fast and cheap, because it only picks. In a Decision, it can pick only one of the node's options. It writes no text and adds no step.
 
@@ -256,8 +256,8 @@ An agent helps you in the editor, on your own logins:
 
 - **Chat beside the canvas.** Tell the agent what the flow must do. It proposes changes. The canvas marks each node that it adds, removes, or changes, and each edge that it adds or removes. Choose **Apply** or **Discard**.
 - **Suggest.** A prompt, the outcomes, a rule, a command, tool arguments, or output fields: one click gives a suggestion that fits the flow.
-- **Ask an agent.** When a run ends early, an agent reads the run. It tells you on the run page what went wrong and what you can do.
-- **Improve the flow.** Opens the flow with a chat about the run. The agent proposes a change to the flow, and you apply it. The agent can read the runs of the project, what each run and each step cost, what a step did, and how the flow changed. It reads only this project, and it changes nothing until you apply a proposal.
+- **Ask why.** When a run ends early, the Explainer reads the run. It tells you on the run page what went wrong and what you can do.
+- **Improve this flow.** Opens the flow with a chat about the run. The Improver proposes a change to the flow, and you apply it. The agent can read the runs of the project, what each run and each step cost, what a step did, and how the flow changed. It reads only this project, and it changes nothing until you apply a proposal.
 
 You choose the agent that answers: a profile, or an agent and a model.
 

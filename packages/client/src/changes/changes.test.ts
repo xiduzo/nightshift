@@ -109,6 +109,8 @@ const READS = new Set([
 	"devices.merge.preview",
 	"account.status",
 	"assistant.agents",
+	// A check asks an agent one question and writes nothing.
+	"assistant.check",
 ]);
 
 /** The streams: a screen follows them, they save nothing. */

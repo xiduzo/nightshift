@@ -16,11 +16,11 @@ A clone does not put `nightshift` on your PATH. Run `bun <clone>/apps/server/src
 
 ### Setup is not available
 
-The Agents page has no **Set up an agent**, or the page of an agent says where to set it up. Night Shift installs an agent only on the computer that runs it.
+**Your harnesses** in Settings has no **Set up an agent**, or the page of an agent says where to set it up. Night Shift installs an agent only on the computer that runs it.
 
 - "Open Night Shift on that computer to set up an agent there." You use Night Shift from another computer. Open Night Shift on the computer that runs the agent.
 - "Night Shift runs in a container here, so an install would not last." Add the agent to the image of your Host. See [Add your tools](https://github.com/xiduzo/nightshift/blob/main/docs/deploy/README.md#add-your-tools).
-- "Night Shift can set up an agent on macOS and Linux only." Install the agent yourself. Then add it under Harnesses on the Agents page.
+- "Night Shift can set up an agent on macOS and Linux only." Install the agent yourself. Then add it in Settings, under **Your harnesses**.
 
 ### The install did not finish
 
@@ -40,11 +40,11 @@ The setup says that the agent is not signed in yet, or that the sign-in took too
 
 ### "The model … is not on this computer."
 
-A Decision or a Value runs on an Ollama model that this computer does not have. Open the Model Profile of the step on the Agents page, and choose **Download**. Then run the step again.
+A Decision or a Value runs on an Ollama model that this computer does not have. Open the Model Profile of the step in Settings, under **Models**, and choose **Download**. Then run the step again.
 
 ### "Needs OpenCode 1.x. Version 2.x does not work yet."
 
-Night Shift drives OpenCode 1.x only. Install an OpenCode 1.x build, and set its path on the Agents page.
+Night Shift drives OpenCode 1.x only. Install an OpenCode 1.x build, and set its path in Settings, under **Your harnesses**.
 
 ### pi does not start
 

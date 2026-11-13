@@ -43,18 +43,19 @@ Run your real flows with `bun run night`, and change Night Shift in a separate g
 
 ## Your first run
 
-Until you set up an agent on this computer, Home shows **Get started**. It lists what a first run needs: an agent, a decider, and a project. Each has one button. **Later** hides the card until you open Night Shift again.
+Until you set up an agent on this computer, Home shows **Get started**. It lists what a first run needs: an agent, a model that decides, a check, and a project. Each has one button. **Later** hides the card until you open Night Shift again.
 
 1. **Set up an agent.** On Home, choose **Set up** next to **An agent**. Night Shift installs Claude Code or Codex for you, and you sign in in your browser. See [Set up an agent](Agents-and-profiles.md#set-up-an-agent).
-2. **Choose a decider.** This step is optional. A decider makes the small choices in your flows. After the agent, the setup asks for one. **Local** needs no account. **TypeSafe Jev** needs a key. To choose one later, use **Choose** next to **A decider** on Home. See [Deciders](Flows-and-nodes.md#deciders).
-3. **Add a project.** On Home, choose **Add project**. Choose its folder, copy a repository from GitHub, or choose **No folder**. A project can hold any files: notes, documents, data, or code. Only a project with a folder gets the starter flows. The next steps use them. For a project without a folder, see [A project without a folder](#a-project-without-a-folder).
-4. **Set up git if Night Shift asks.** Night Shift keeps the history of your project folder with git, and gives each run its own copy. For a folder without git, choose **Set up git**. Night Shift saves every file in a first commit. Runs do not change the files in your folder.
-5. **Keep the starter flows.** Leave **Add the starter flows** checked. Then choose which of your agents runs each part of the [starter flows](Flows-and-nodes.md#starter-flows). Night Shift keeps the flows outside your project folder.
-6. **Start `scout-and-pick`** with a topic that you want to know more about, for example "podcast hosting services" or "PDF libraries for Bun". An agent searches the project's knowledge and the web for candidates.
-7. **Pick one in your inbox.** Night Shift asks you when it needs you. Here it asks which candidate gets a report. You can also follow each step live on the run page.
-8. **Read the report.** Another agent writes it into the project's knowledge. Open **Knowledge**, then **Files**, and look in the `scout` folder.
+2. **Choose a model that decides.** This step is optional. A flow can let a model pick the next step. After the agent, the setup asks for one. **A model on this computer** needs no account. **TypeSafe Jev** needs a key. **Choose later** leaves this step open, and you continue it on Home. See [Deciders](Flows-and-nodes.md#deciders).
+3. **Check that the agents answer.** Choose **Check now**. Night Shift asks each of its own agents one small question. A row that fails says what happened and how to fix it. **Skip** leaves this step open. See [Night Shift's agents](Agents-and-profiles.md#night-shifts-agents).
+4. **Add a project.** On Home, choose **Add project**. Choose its folder, copy a repository from GitHub, or choose **No folder**. A project can hold any files: notes, documents, data, or code. Only a project with a folder gets the starter flows. The next steps use them. For a project without a folder, see [A project without a folder](#a-project-without-a-folder).
+5. **Set up git if Night Shift asks.** Night Shift keeps the history of your project folder with git, and gives each run its own copy. For a folder without git, choose **Set up git**. Night Shift saves every file in a first commit. Runs do not change the files in your folder.
+6. **Keep the starter flows.** Leave **Add the starter flows** checked. Then choose which of your agents runs each part of the [starter flows](Flows-and-nodes.md#starter-flows). Night Shift keeps the flows outside your project folder.
+7. **Start `scout-and-pick`** with a topic that you want to know more about, for example "podcast hosting services" or "PDF libraries for Bun". An agent searches the project's knowledge and the web for candidates.
+8. **Pick one in your inbox.** Night Shift asks you when it needs you. Here it asks which candidate gets a report. You can also follow each step live on the run page.
+9. **Read the report.** Another agent writes it into the project's knowledge. Open **Knowledge**, then **Files**, and look in the `scout` folder.
 
-The Agents page has the same setup: **Set up an agent**. It also lists the agent CLIs (`claude`, `codex`, `opencode`, `pi`) and tools (`gh`, `acli`) that it finds on this computer. Choose **Add profile** or **Add tool** for each one that you want.
+**Your harnesses** in Settings has the same setup: **Set up an agent**. Settings also lists the agent CLIs (`claude`, `codex`, `opencode`, `pi`) and tools (`gh`, `acli`) that it finds on this computer. Choose **Add profile** or **Add tool** for each one that you want.
 
 When a flow does what you want, give it a schedule. See [Runs and schedules](Runs-and-schedules.md).
 
