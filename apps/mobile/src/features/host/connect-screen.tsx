@@ -10,7 +10,7 @@ import { Label } from "@nightshift/ui-native/components/ui/label";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { router, Stack } from "expo-router";
 import { CircleAlert, ScanQrCode } from "lucide-react-native";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type TextInput, View } from "react-native";
 import { ENV } from "@/env";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
@@ -39,7 +39,17 @@ export function ConnectScreen() {
 	const [code, setCode] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
+	/** The sign-in went through: leave once the app knows it too. */
+	const [connected, setConnected] = useState(false);
 	const passwordInput = useRef<TextInput>(null);
+
+	// Back to the tabs that wait under this screen, or to new ones. Only once
+	// the Host state says signed in: the session reaches it a render later
+	// than `signIn` resolves, and tabs that still read "signed out" send the
+	// person straight back here.
+	useEffect(() => {
+		if (connected && state.status === "signed-in") router.dismissTo("/");
+	}, [connected, state.status]);
 
 	async function submit() {
 		setBusy(true);
@@ -54,8 +64,7 @@ export function ConnectScreen() {
 			} else {
 				await verifyCode(code, codeKind);
 			}
-			// Back to the tabs that wait under this screen, or to new ones.
-			router.dismissTo("/");
+			setConnected(true);
 		} catch (failed) {
 			setError(failed instanceof Error ? failed.message : String(failed));
 		} finally {
@@ -63,12 +72,13 @@ export function ConnectScreen() {
 		}
 	}
 
+	const waiting = busy || connected;
 	const submitLabel =
 		step === "sign-in"
-			? busy
+			? waiting
 				? "Connecting…"
 				: "Connect"
-			: busy
+			: waiting
 				? "Checking the code…"
 				: "Verify code";
 
@@ -209,7 +219,7 @@ export function ConnectScreen() {
 				<Button
 					size="lg"
 					onPress={submit}
-					disabled={busy}
+					disabled={waiting}
 					className="h-auto min-h-11 py-2"
 				>
 					<Text>{submitLabel}</Text>
