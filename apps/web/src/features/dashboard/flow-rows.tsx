@@ -1,11 +1,4 @@
-import {
-	type AttentionCause,
-	causeLabel,
-	type FlowWatch,
-	signalFacts,
-	signalTitle,
-} from "@nightshift/client";
-import { Button } from "@nightshift/ui/components/button";
+import { type FlowWatch, signalTitle } from "@nightshift/client";
 import {
 	Collapsible,
 	CollapsibleContent,
@@ -24,35 +17,25 @@ import {
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
 import { cn } from "@nightshift/ui/lib/utils";
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowDownIcon, ArrowUpIcon, ChevronRightIcon } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { FlowHealthRow, NightRange, Project } from "@/shared/api";
-import {
-	formatCost,
-	formatDuration,
-	formatRelative,
-	useNow,
-} from "@/shared/format";
+import { formatRelative, useNow } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { CostCell, LastRuns, TimeCell } from "./flow-cells";
-import { dashboardQueries } from "./queries";
-import { RUN_STATUS_CHART } from "./run-statuses";
+import { FlowChanges } from "./flow-changes";
 import { LevelBadge, SignalIcon, WeekBars } from "./watch-parts";
 
 const GRID =
 	"grid grid-cols-[1.25rem_minmax(12rem,1.3fr)_9rem_10rem_minmax(16rem,1.4fr)] items-center gap-6 px-4";
 
-/** The most places an opened row shows. */
-const MAX_PLACES = 4;
-
 /**
  * Each flow of a project over the page's range, one row each: its level,
  * its last runs, how often it needed you without a plan, and how steady
- * the time and the cost of a run are, one above the other. The flows that needed you most come
- * first. A row opens only when the flow has a place to improve, and then
- * it shows only those places. A test run does not count.
+ * the time and the cost of a run are, one above the other. The flows that
+ * needed you most come first. A row with a run opens: what your changes
+ * did, and what to change next (`FlowChanges`). A test run does not count.
  */
 export function FlowRows({
 	project,
@@ -115,7 +98,7 @@ export function FlowRows({
 					<span>Predictability</span>
 				</div>
 				{sorted.map((row) => {
-					const opens = hasPlaces(row);
+					const opens = row.runs > 0;
 					const open = opens && openName === row.name;
 					const cells = (
 						<>
@@ -208,7 +191,7 @@ export function FlowRows({
 							</CollapsibleTrigger>
 							<CollapsibleContent>
 								{open ? (
-									<Places project={project} row={row} range={range} />
+									<FlowChanges project={project} row={row} range={range} />
 								) : null}
 							</CollapsibleContent>
 						</Collapsible>
@@ -216,22 +199,6 @@ export function FlowRows({
 				})}
 			</div>
 		</div>
-	);
-}
-
-/**
- * A row opens only when the flow has a place to improve: something
- * unusual, a time it needed you, or a run that did not finish. What came
- * out opens it too: the numbers a flow writes about its own work, and how
- * many runs people found useful.
- */
-function hasPlaces(row: FlowHealthRow): boolean {
-	return (
-		(row.watch?.signals.length ?? 0) > 0 ||
-		(row.watch?.attention.causes.length ?? 0) > 0 ||
-		row.unfinished.count > 0 ||
-		(row.scores?.length ?? 0) > 0 ||
-		(row.useful?.answered ?? 0) > 0
 	);
 }
 
@@ -316,226 +283,5 @@ function NeededCell({ watch }: { watch: FlowWatch | undefined }) {
 				<span className="text-muted-foreground">The bars show 12 weeks.</span>
 			</TooltipContent>
 		</Tooltip>
-	);
-}
-
-/** One place to improve: how often, what, one line of evidence, and one link. */
-function Place({
-	times,
-	title,
-	evidence,
-	link,
-}: {
-	times?: number;
-	title: ReactNode;
-	evidence?: ReactNode;
-	link?: ReactNode;
-}) {
-	return (
-		<div className="flex items-baseline gap-3 text-sm">
-			<span className="w-8 shrink-0 text-right font-semibold tabular-nums">
-				{times === undefined ? "" : `${times}×`}
-			</span>
-			<span className="flex min-w-0 flex-1 flex-col">
-				<span>{title}</span>
-				{evidence ? (
-					<span className="text-muted-foreground text-xs">{evidence}</span>
-				) : null}
-			</span>
-			{link}
-		</div>
-	);
-}
-
-function RunLink({ runId, children }: { runId: string; children: string }) {
-	return (
-		<Button
-			size="xs"
-			variant="link"
-			className="h-auto shrink-0 px-0"
-			nativeButton={false}
-			render={<Link to="/runs/$runId" params={{ runId }} />}
-		>
-			{children}
-		</Button>
-	);
-}
-
-/** What you did and where: "You answered a Gate at approve: “Send these?”". */
-function Cause({ cause }: { cause: AttentionCause }) {
-	return (
-		<>
-			{causeLabel(cause)}
-			{cause.nodeId ? (
-				<>
-					{" at "}
-					<span className="font-mono">{cause.nodeId}</span>
-				</>
-			) : null}
-			{cause.question ? (
-				<span className="text-muted-foreground">: “{cause.question}”</span>
-			) : null}
-		</>
-	);
-}
-
-/** A number a flow writes as a short number: whole as it is, else two decimals. */
-function formatMetric(value: number): string {
-	return Number.isInteger(value)
-		? String(value)
-		: value.toLocaleString(undefined, { maximumFractionDigits: 2 });
-}
-
-/**
- * The opened row: the places to improve, the most pressing first. What is
- * unusual, where the flow needed you without a plan, why runs did not
- * finish, a warning that more than one run shares, and last the times it
- * asked you as planned. Under them, what came out: the numbers the flow
- * writes about its own work, and how many runs people found useful.
- */
-function Places({
-	project,
-	row,
-	range,
-}: {
-	project: Project;
-	row: FlowHealthRow;
-	range: NightRange;
-}) {
-	const detail = useQuery(dashboardQueries.flow(project.id, row.name));
-	const inRange = detail.data?.ranges.find((r) => r.nights === range);
-	const flowLink = (
-		<Button
-			size="xs"
-			variant="link"
-			className="h-auto shrink-0 px-0"
-			nativeButton={false}
-			render={
-				<Link
-					to="/projects/$projectId/flows/$name"
-					params={{ projectId: project.id, name: row.name }}
-				/>
-			}
-		>
-			Open the flow
-		</Button>
-	);
-	const causes = row.watch?.attention.causes ?? [];
-	const places: ReactNode[] = [];
-	for (const signal of row.watch?.signals ?? []) {
-		const facts = signalFacts(signal, {
-			cost: formatCost,
-			time: formatDuration,
-		});
-		places.push(
-			<Place
-				key={`signal-${signal.kind}`}
-				title={
-					<span className="flex items-center gap-1.5">
-						<SignalIcon signal={signal} />
-						{signalTitle(signal)}
-					</span>
-				}
-				evidence={facts ? `Usual: ${facts.usual}. Now: ${facts.now}.` : null}
-				link={<RunLink runId={signal.runId}>Open the run</RunLink>}
-			/>,
-		);
-	}
-	for (const cause of causes.filter((c) => !c.planned)) {
-		places.push(
-			<Place
-				key={`cause-${cause.reason}-${cause.nodeId ?? ""}`}
-				times={cause.times}
-				title={<Cause cause={cause} />}
-				evidence="Without a plan."
-				link={flowLink}
-			/>,
-		);
-	}
-	if (row.unfinished.count > 0) {
-		const reason = inRange?.whyUnfinished.rows[0];
-		const last = inRange?.latest.find((run) => run.status !== "finished");
-		places.push(
-			<Place
-				key="unfinished"
-				times={row.unfinished.count}
-				title={
-					row.unfinished.count === 1
-						? "A run did not finish"
-						: "Runs did not finish"
-				}
-				evidence={
-					reason
-						? `Most often: ${reason.reason ?? RUN_STATUS_CHART[reason.status].label} (${reason.runs}×).`
-						: null
-				}
-				link={
-					last ? <RunLink runId={last.runId}>Open the last one</RunLink> : null
-				}
-			/>,
-		);
-	}
-	for (const warning of (inRange?.warningRows.rows ?? []).filter(
-		(w) => w.runs > 1,
-	)) {
-		places.push(
-			<Place
-				key={`warning-${warning.key}`}
-				times={warning.runs}
-				title={
-					<>
-						The same warning
-						{warning.nodeId ? (
-							<>
-								{" at "}
-								<span className="font-mono">{warning.nodeId}</span>
-							</>
-						) : null}
-					</>
-				}
-				evidence={warning.message}
-				link={<RunLink runId={warning.last.runId}>Open the last one</RunLink>}
-			/>,
-		);
-	}
-	for (const cause of causes.filter((c) => c.planned)) {
-		places.push(
-			<Place
-				key={`planned-${cause.reason}-${cause.nodeId ?? ""}`}
-				times={cause.times}
-				title={<Cause cause={cause} />}
-				evidence="As planned."
-				link={flowLink}
-			/>,
-		);
-	}
-	const hidden = places.length - MAX_PLACES;
-	const scores = row.scores ?? [];
-	const useful = row.useful;
-	return (
-		<div className="flex max-w-4xl flex-col gap-3 bg-muted/30 px-4 py-4 pl-13">
-			{places.slice(0, MAX_PLACES)}
-			{hidden > 0 ? (
-				<span className="pl-11 text-muted-foreground text-xs">
-					And {hidden} more.
-				</span>
-			) : null}
-			{scores.length > 0 ? (
-				<p className="pl-11 text-muted-foreground text-xs">
-					What it counted per run:{" "}
-					{scores
-						.map((score) => `${score.name} ${formatMetric(score.mean)}`)
-						.join(", ")}
-					.
-				</p>
-			) : null}
-			{useful && useful.answered > 0 ? (
-				<p className="pl-11 text-muted-foreground text-xs">
-					{useful.useful} of {useful.answered}{" "}
-					{useful.answered === 1 ? "run" : "runs"} with an answer{" "}
-					{useful.answered === 1 ? "was" : "were"} useful.
-				</p>
-			) : null}
-		</div>
 	);
 }

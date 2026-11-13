@@ -77,11 +77,11 @@ An overview shows **at most 5 rows** in a list or table: the Failed lane and Lat
 
 A project's page shows where each of its flows still needs you (`docs/research/dashboards-2026-11.md`). Keep its shape:
 
-- One range for the whole page, on top: 7, 30 or 90 days, in the URL (`?range=30`). A day runs from midnight to midnight on your clock. No section has a range of its own.
+- One range for the whole page, in the toolbar: 7, 30 or 90 days, in the URL (`?range=30`). A day runs from midnight to midnight on your clock. No section has a range of its own.
 - One number on top: how often a flow needed you without a plan in the range, against the same days just before. That is not a choice. It counts each time you stepped in, not each run.
-- The page has no details dialog and no chart. A number that leads to no run and no flow does not go on it.
+- The page has no details dialog. A number that leads to no run and no flow does not go on it.
 - Under it, one card with one row per flow (see Flow health). The flows that needed you most without a plan come first.
-- The page shows no spend of its own. **Spend** in the heading opens the Spend page at the page's range. Cost stays only as evidence of a flow: how steady the cost of a run is.
+- The page shows no spend of its own. The Spend page is in the sidebar. Cost stays only as evidence of a flow: how steady the cost of a run is, and what a run cost before and after a change.
 - A test run counts only in the spend. Every other number leaves it out (`isTestRun`, one rule for every number). So does the sidebar's runs donut. The run page and every run list show a **Test run** badge. On the phone, the Runs chips and the Watch numbers leave it out, and the cost caption names it ("Of 8 runs and 1 test run").
 - An older Host sends no level and no planned split: a dash. It sends no steadiness: a grey strip.
 - Setup does not go on this page. Its other pages sit under the project in the sidebar.
@@ -108,7 +108,7 @@ Home is a note over every project that you read top to bottom. It guards the flo
 
 Spend is the page for the money of a Space, for the person who pays (`docs/research/dashboards-2026-11.md`, Q9). It sits under the Inbox in the sidebar. Keep its shape:
 
-- One range for the whole page, in the heading: 7, 30 or 90 days, in the URL (`?range=90`). It opens at 30 days.
+- One range for the whole page, in the toolbar: 7, 30 or 90 days, in the URL (`?range=90`). It opens at 30 days.
 - Four cards on top: **Spent** against the same days before, with one bar per day, **Steady flows**, **Hard to predict**, and **You could save**.
 - **How predictable each flow is** has one row per flow that cost money, the most spend first. A strip shows what its runs cost against a usual run of that flow. A usual run is the median of its finished runs with a known cost. Every strip has the same scale, 0× to 6× a usual run, so a short strip means a steady cost.
 - **Cost is** says **Steady**, **Varies** or **Hard to predict**. Night Shift reads it from the runs. Nobody sets a threshold. A flow with fewer than 3 such runs has none.
@@ -164,15 +164,18 @@ The Devices page shows the Space you work in, around its Host:
 
 Flow health is the card of flows on a project's page, one row per flow. Keep its shape:
 
-- Columns: Flow, Last runs, **Needed you without a plan**, Time of a run, Cost of a run. Under the flow's name: its level (**You decide**, **You check**, **On its own**) and since when. A flow with fewer than 3 ended runs has no level yet. The name opens the flow.
+- Columns: Flow, Last runs, **Needed you without a plan**, **Predictability**. Under the flow's name: its level (**You decide**, **You check**, **On its own**) and since when. A flow with fewer than 3 ended runs has no level yet. The name opens the flow.
 - The level is measured from the flow's last 10 ended runs: You decide when you stepped in on more than half, On its own when on none, else You check. Nobody sets it.
-- Needed you without a plan shows the count, the count of the days before, and one small bar per week for 12 weeks. Its tooltip adds the planned times.
-- Time of a run and Cost of a run are the strip of the Spend page (`shared/spread-strip`): the finished runs against a usual run of that flow, with the usual value under it. The colour says how steady: green for steady, amber for varies, red for hard to predict, grey with fewer than 3 runs. The rule is the same as on the Spend page (`steadinessOf`).
+- Needed you without a plan shows one small bar per week for 12 weeks, and under them the count and the count of the days before. Its tooltip adds the planned times.
+- Predictability holds the time of a run over the cost of a run. Each is the strip of the Spend page (`shared/spread-strip`): the finished runs against a usual run of that flow, with the usual value on its right. The two strips share their scale. The colour says how steady: green for steady, amber for varies, red for hard to predict, grey with fewer than 3 runs. The rule is the same as on the Spend page (`steadinessOf`).
 - The row has no Needs a look column. A flow that left its usual range shows the icon of each signal after its name, with the signal on hover.
-- A row opens in place (a Collapsible), one at a time, and only when the flow has something to show. A row with nothing has no chevron.
-- An opened row shows places to improve, at most 4, the most pressing first: what is unusual (usual against now), where the flow needed you without a plan (the step and the question), the runs that did not finish (the reason most of them share), a warning that more than one run shares, and last the times it asked you as planned. Each place has one line of evidence and one link: the run or the flow.
-- Under the places, what came out: the numbers the flow counted per run, and how many runs with an answer were useful.
-- An opened row has no chart, no table and no details dialog.
+- A row opens in place (a Collapsible), one at a time, when the flow has a run. A flow without a run has no chevron.
+- An opened row shows what your changes did, and what to change next (`dashboard.changes`, Q17). It uses the full width:
+  - **The timeline:** the flow's runs over twice the range, the days before it dimmed. A run is a dot: green when it finished, red when not, with a ring when it needed you without a plan. A mark shows each change of the flow, with what it changed on hover. A dot opens its run.
+  - **Before and after:** one Table with two comparisons. Your last change: the runs since it against the 10 runs before it. The range: the days against as many days before. Rows: Runs, Finished, Needed you without a plan, Waited for you, Work time, Cost, and Results (pull requests merged, runs found useful). The newer value carries an arrow when it moved by 10% or more, green when better. Each comparison has a Badge: **Better**, **About the same**, **Worse**, or **Too few runs to tell** with fewer than 3 runs on a side.
+  - A change is saves less than 30 minutes apart. A save that only moves steps, and Night Shift's own upgrade, are no change. When no run ran after your newest change, an Alert says so, and the table shows the change before it.
+  - **The next change to try:** at most 4 Items, the most pressing first. Each says what to do, the runs that show why, **Improve with an agent** (a chat in the editor about the newest run that shows it, with a first message for that kind of change) and **Open the run**. Night Shift reads them from the steps of the last 30 runs of the range. It never changes a flow by itself.
+- An opened row has no details dialog. Its numbers come from the runs, never from a guess.
 - A test run is not in a row: not in its last runs, its numbers or its latest report.
 
 ## Copy

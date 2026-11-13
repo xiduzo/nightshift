@@ -1,4 +1,4 @@
-import { savingAsk } from "@nightshift/client";
+import { moveAsk, savingAsk } from "@nightshift/client";
 import { type Flow, isSavable } from "@nightshift/flows";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -25,8 +25,8 @@ const SEND_BLOCKED = "Fix the fields marked in the issues first.";
  * the canvas shows, and Apply, Undo, Discard and Restore on the draft. A new, blank
  * flow opens with the panel. A `link` opens the panel too: a link about a
  * run starts a chat about that run, with its first message sent. The
- * message asks why the run did not finish, or about the way to save the
- * link names.
+ * message asks why the run did not finish, or about the way to save or
+ * the next change to try the link names.
  * `onLinkUsed` then drops the link, so a reload does not ask again.
  */
 export function useChatPanel(
@@ -65,7 +65,11 @@ export function useChatPanel(
 				if (isSavable(assistant.flow))
 					chat.startAboutRun(
 						link.runId,
-						link.saving ? savingAsk(link.saving) : ASK_WHY_MESSAGE,
+						link.move
+							? moveAsk(link.move)
+							: link.saving
+								? savingAsk(link.saving)
+								: ASK_WHY_MESSAGE,
 						assistant.flow,
 					);
 				else chat.startAboutRun(link.runId);

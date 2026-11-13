@@ -1,6 +1,6 @@
 # Dashboards that get you out of the loop
 
-**Status (2026-11-12):** Decided. The first part is built: planned and unplanned attention, the level of a flow, Needs a look from a flow's usual range, Home as a note, a project's page with one row per flow, and the Spend page (spend, how steady the cost of each flow is, and the ways to save that the runs show). Not built yet: a missed schedule as a signal, spot checks, the judge, suggestions, the shadow decider, trials, the before and after of a change, the range of 1 year, and on the Spend page a budget, a forecast, spend by agent and rung, and what improving saved.
+**Status (2026-11-13):** Decided. The first part is built: planned and unplanned attention, the level of a flow, Needs a look from a flow's usual range, Home as a note, a project's page with one row per flow, and the Spend page (spend, how steady the cost of each flow is, and the ways to save that the runs show). Since 2026-11-13 an opened flow row shows the before and after of the last change (Q17), the range against the days before, and the next changes to try that the steps of the runs show (Q15, without tests). Not built yet: a missed schedule as a signal, spot checks, the judge, the shadow decider, trials, tested suggestions, the undo of a change, the range of 1 year, and on the Spend page a budget, a forecast, spend by agent and rung, and what improving saved.
 
 On 2026-11-12 the owner and Claude Code decided what Home and a project's page
 are for. Claude Code asked 37 questions in six rounds, and the owner answered each

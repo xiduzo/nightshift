@@ -1,6 +1,6 @@
 import type { ApiQueryUtils } from "../api";
 import { localZone } from "../time";
-import type { DashboardInput } from "./types";
+import type { DashboardInput, NightRange } from "./types";
 
 /**
  * How often the dashboard reads its numbers again by itself: "the last 24
@@ -38,6 +38,22 @@ export function createDashboardQueries(orpc: ApiQueryUtils) {
 		flow: (projectId: string, flowName: string) => ({
 			...orpc.dashboard.flow.queryOptions({
 				input: { projectId, flowName, timeZone: readerTimeZone() },
+			}),
+			refetchInterval: POLL_MS,
+			meta: { quietRefetchErrors: true },
+		}),
+		/**
+		 * Before and after for one flow over the last `nights` days, and the
+		 * next changes to try. Polls every 5 minutes.
+		 */
+		changes: (projectId: string, flowName: string, nights: NightRange) => ({
+			...orpc.dashboard.changes.queryOptions({
+				input: {
+					projectId,
+					flowName,
+					nights,
+					timeZone: readerTimeZone(),
+				},
 			}),
 			refetchInterval: POLL_MS,
 			meta: { quietRefetchErrors: true },

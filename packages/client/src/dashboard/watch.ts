@@ -11,8 +11,6 @@ export type FlowWatch = NonNullable<FlowHealthRow["watch"]>;
 export type FlowLevel = NonNullable<FlowWatch["level"]>["level"];
 /** One way a flow left its usual range. */
 export type FlowSignal = FlowWatch["signals"][number];
-/** One reason a flow needed you, at one node. */
-export type AttentionCause = FlowWatch["attention"]["causes"][number];
 /** The watch over every flow of a dashboard. */
 export type SpaceWatch = NonNullable<DashboardSummary["watch"]>;
 /** A flow that needs a look. */
@@ -100,19 +98,6 @@ export function signalScale(
 /** One signal of one flow, as an app remembers that you looked at it. */
 export function signalId(flowKey: string, signal: FlowSignal): string {
 	return `${flowKey}\n${signal.kind}\n${signal.since}`;
-}
-
-const CAUSE: Record<AttentionCause["reason"], string> = {
-	gate: "You answered a Gate",
-	ask: "You answered an Ask",
-	resumed: "You continued a run",
-	stopped: "You stopped a run",
-	"took-over": "You took a run over",
-};
-
-/** What you did, as the list of causes says it. */
-export function causeLabel(cause: AttentionCause): string {
-	return CAUSE[cause.reason];
 }
 
 /** "3 fewer than the 30 days before", "the same as the 30 days before". */

@@ -199,6 +199,7 @@ function recording(
 					if (method === "space.listGates") return gatesIn.get(spaceId) ?? [];
 					if (method === "space.watchRun") return (async function* () {})();
 					if (method === "space.listRuns") return [];
+					if (method === "space.flows.revisions") return [];
 					return undefined;
 				},
 			},
@@ -455,6 +456,7 @@ const ROUTES: Route[] = [
 	// The dashboard.
 	route("dashboard.summary", { everySpace: false }, "session", ["space.listRuns", "space.listProjects"]),
 	route("dashboard.flow", { ...project, flowName: "night", timeZone: "UTC" }, "session", "space.listRuns", [{ projectId: "p1" }]),
+	route("dashboard.changes", { ...project, flowName: "night", nights: 7, timeZone: "UTC" }, "session", ["space.listRuns", "space.flows.revisions"]),
 	route("dashboard.spend", { timeZone: "UTC" }, "session", "space.listRuns", []),
 	// This computer's own configuration: its owner's.
 	// The decider of new nodes shows its effective default: the TypeSafe key decides it.

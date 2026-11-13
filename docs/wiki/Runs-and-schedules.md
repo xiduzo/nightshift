@@ -157,7 +157,7 @@ A flow with fewer than 3 runs that ended has no level yet.
 
 A project's page shows one row for each flow: its level, its last runs, how often it needed you without a plan, and how steady the time and the cost of a run are. The number on top of the page compares with the same days before. Choose 7, 30 or 90 days. Flow health leaves [test runs](#test-runs) out.
 
-**Time of a run** and **Cost of a run** each show a strip: the finished runs of the flow against a usual run of that flow. A short strip means that you can predict the next run. The colour says how steady the runs are:
+**Predictability** shows two strips: the time of a run over the cost of a run. Each strip shows the finished runs of the flow against a usual run of that flow. A short strip means that you can predict the next run. The colour says how steady the runs are:
 
 | Colour | What it means |
 | --- | --- |
@@ -168,19 +168,17 @@ A project's page shows one row for each flow: its level, its last runs, how ofte
 
 An icon after the name of a flow means that the flow needs a look. Point at the icon to see why.
 
-A row with an arrow opens. An opened row shows where to improve the flow, the most pressing first:
+A row with an arrow opens. An opened row shows what your changes to the flow did, and what to change next.
 
-- what is not usual, with the usual range and the value now,
-- where the flow needed you without a plan, with the step and the question,
-- the runs that did not finish, with the reason that most of them share,
-- a warning that more than one run has,
-- where the flow asked you as planned.
+- **The timeline** shows the runs of the flow over twice the days you chose. A green dot finished, a red dot did not. A ring means that the run needed you without a plan. A mark shows each change of the flow. Point at it to see what changed. Select a dot to open its run.
+- **Before and after** compares the runs since your last change with the 10 runs before it. It also compares the days you chose with as many days before. An arrow shows a number that moved by 10% or more: green when it got better, red when it got worse.
+- **The next change to try** lists what the runs show, the most pressing first. Each line says what to do and why. **Improve with an agent** opens the flow with a chat. The agent reads the run and proposes a change. You decide whether to apply it.
 
-Each line has a link to the run or to the flow. Under the lines, you see the numbers that the flow counted per run, and how many runs with an answer were useful. A step reports a number with `{"scores": {"found": 4}}` in its data. See [Scores](Flows-and-nodes.md#scores).
+Saves less than 30 minutes apart count as one change. A save that only moves steps on the canvas is no change. After you change a flow, the table shows the effect when the next runs end.
 
-A row without an arrow has nothing to show.
+Make one change at a time. Then you can see what each change did.
 
-**Spend** on top of the page opens the [Spend](#spend) page.
+A row without an arrow has no runs yet. The [Spend](#spend) page is in the sidebar.
 
 ## Spend
 
