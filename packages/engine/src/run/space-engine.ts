@@ -174,8 +174,9 @@ export interface SpaceEngine {
 	 */
 	listRuns(input?: { projectId?: string } & RunPage): Promise<RunSummary[]>;
 	/**
-	 * What the answers of Night Shift's own agents cost in the Space, as
-	 * this computer kept them, the oldest first. `since`: only the answers
+	 * What the answers of Night Shift's own agents cost in the Space, the
+	 * oldest first: this computer's answers, and in a Space a Host keeps,
+	 * the ones that Host gave it of the Space's other computers. `since`: only the answers
 	 * that ended at or after it. Not part of a run's cost.
 	 */
 	listAnswerCosts(since?: number): Promise<AnswerCost[]>;

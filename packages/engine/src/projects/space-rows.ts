@@ -2,6 +2,7 @@ import { spaceExists } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import {
 	agentSession,
+	answerCost,
 	clone,
 	event,
 	keptVariable,
@@ -39,8 +40,12 @@ import { personFieldTypes } from "../log";
  * What moves with a Project: its row, its Clones, its runs with their
  * steps, Agent sessions and events, the facts of no run that name it
  * (`ProjectAdded`, a schedule's `ScheduleFired`, a webhook), its kept
- * variables, and what its Since last run nodes saw (`node_memory`). The Space document and the flow documents are Yjs documents,
- * not rows: the caller changes those after the batch.
+ * variables, what its Since last run nodes saw (`node_memory`), and what
+ * the answers of Night Shift's own agents about it cost (`answer_cost`).
+ * A moved answer cost goes to the Host of its new Space as a new row
+ * there: it loses the number and the receipt of the Host it came from.
+ * The Space document and the flow documents are Yjs documents, not rows:
+ * the caller changes those after the batch.
  *
  * - `projectMap` names each Project to move, by its id in `from`, with
  *   its id in `to`: its own, or the id of the Project of `to` with the
@@ -61,7 +66,8 @@ import { personFieldTypes } from "../log";
  *   Agent sessions and events. The others stay in `from` as they are: a
  *   Device that leaves its Home Host takes the runs it walked, and the
  *   Host keeps all. Every Project then keeps its id (`projectMap` maps
- *   each one onto itself), so the runs that stay still name it.
+ *   each one onto itself), so the runs that stay still name it. Of the
+ *   answer costs, only this computer's own answers move.
  */
 export type SpaceMove = {
 	from: string;
@@ -395,6 +401,44 @@ export async function spaceMoveBatch(
 				),
 		);
 	}
+	// What the answers about a moved Project cost. A Person of `from` takes
+	// their id in `to`. The Host of `to` has none of them yet.
+	statements.push(
+		db
+			.update(answerCost)
+			.set({
+				spaceId: to,
+				hostSeq: null,
+				sentAt: null,
+				...(merged.length === 0
+					? {}
+					: {
+							projectId: sql`case ${answerCost.projectId} ${sql.join(
+								merged.map(
+									([source, target]) => sql`when ${source} then ${target}`,
+								),
+								sql` `,
+							)} else ${answerCost.projectId} end`,
+						}),
+				...(persons.length === 0
+					? {}
+					: {
+							personId: sql`case ${answerCost.personId} ${sql.join(
+								persons.map(
+									([local, there]) => sql`when ${local} then ${there}`,
+								),
+								sql` `,
+							)} else ${answerCost.personId} end`,
+						}),
+			})
+			.where(
+				and(
+					eq(answerCost.spaceId, from),
+					inArray(answerCost.projectId, sources),
+					move.runsOf === undefined ? undefined : isNull(answerCost.deviceId),
+				),
+			),
+	);
 	statements.push(
 		db
 			.update(run)
@@ -535,7 +579,7 @@ export async function spaceProjectRows(
 
 /**
  * Removes the events a Space left on this Replica that belong to no run
- * here (a Member that joined), once the Space's own row, every Project
+ * here (a Member that joined), and its answer costs, once the Space's own row, every Project
  * and every run of it are gone. False, and nothing removed, while one is
  * here. Runs again safely.
  */
@@ -552,6 +596,7 @@ export async function forgetSpaceRows(
 		.union(db.select({ id: run.id }).from(run).where(eq(run.spaceId, spaceId)))
 		.limit(1);
 	if (left) return false;
+	await db.delete(answerCost).where(eq(answerCost.spaceId, spaceId));
 	await db
 		.delete(event)
 		.where(

@@ -347,3 +347,29 @@ describe("migration project_folder", () => {
 		]);
 	});
 });
+
+describe("migration answer_cost_shared", () => {
+	test("each answer kept before gets a key of its own, as this computer's", async () => {
+		const db = await databaseBefore("answer_cost_shared");
+		for (const at of [1, 2]) {
+			await db.run(
+				sql.raw(
+					`INSERT INTO answer_cost (space_id, person_id, agent, input_tokens, output_tokens, at) VALUES ('s', 'p', 'explainer', 1, 1, ${at})`,
+				),
+			);
+		}
+		await migrateDb(db);
+		const kept = await rows<{
+			key: string;
+			device_id: string | null;
+			host_seq: number | null;
+			sent_at: number | null;
+		}>(db, "SELECT key, device_id, host_seq, sent_at FROM answer_cost");
+		expect(kept.map((row) => row.key.length)).toEqual([32, 32]);
+		expect(new Set(kept.map((row) => row.key)).size).toBe(2);
+		expect(kept.map(({ key: _, ...rest }) => rest)).toEqual([
+			{ device_id: null, host_seq: null, sent_at: null },
+			{ device_id: null, host_seq: null, sent_at: null },
+		]);
+	});
+});

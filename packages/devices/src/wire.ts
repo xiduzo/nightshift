@@ -1,12 +1,13 @@
 import { type Auth, roleAllows } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import type {
-	Device,
-	EngineOptions,
-	FlowDocuments,
-	MoveRows,
-	SpaceArchive,
-	SyncedDocuments,
+import {
+	type Device,
+	type EngineOptions,
+	type FlowDocuments,
+	type MoveRows,
+	type SpaceArchive,
+	type SyncedDocuments,
+	sharedAnswerCosts,
 } from "@nightshift/engine";
 import {
 	createDeviceCopies,
@@ -24,12 +25,14 @@ import {
 	type SpaceDocuments,
 	systemGitHubCli,
 } from "@nightshift/engine/projects";
+import { now } from "@nightshift/time";
 import type { HostClient, HostHello, HostRelay } from "./contract";
 import {
 	type AppliedCommands,
 	createDeviceExchange,
 	createHostExchange,
 	type HostExchange,
+	shareAnswerCosts,
 } from "./exchange";
 import {
 	createDevices,
@@ -503,6 +506,16 @@ async function startNow(deps: DevicesDeps): Promise<DevicesRuntime> {
 						dev: process.env.NIGHTSHIFT_DEV === "true",
 						// A guest Host is another Person's: it never hears of this computer.
 						machine: hostLink.role === "home" ? machine : null,
+					}),
+				),
+				// What the answers of Night Shift's own agents cost, both ways, for
+				// the Spaces this Host keeps.
+				link.stream(
+					"Sharing what Night Shift's agents cost",
+					shareAnswerCosts({
+						spaces: () => engine.hostSpaces.ofHost(hostId),
+						costs: sharedAnswerCosts(db),
+						now,
 					}),
 				),
 				// The leases of the runs here, each time the link comes online:

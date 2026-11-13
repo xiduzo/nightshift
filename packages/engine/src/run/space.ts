@@ -76,7 +76,7 @@ export type SpacesDeps = {
 		list(flow: MemoryFlow): Promise<NodeMemory[]>;
 		forget(flow: MemoryFlow, node: string, scope?: string): Promise<void>;
 	};
-	/** What the answers of Night Shift's own agents cost in a Space, on this computer. */
+	/** What the answers of Night Shift's own agents cost in a Space, as this Replica has them. */
 	answerCosts(spaceId: string, since?: number): Promise<AnswerCost[]>;
 	scheduleFiles: ScheduleFiles;
 	reads: ReadModel;

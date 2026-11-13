@@ -8,12 +8,19 @@ import {
 	RUN_NOT_FOUND,
 	type SpaceArchive,
 	type StartRunInput,
+	sharedAnswerCosts,
 	withoutPrivatePaths,
 } from "@nightshift/engine";
 import { PROJECT_NOT_FOUND } from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/server";
-import type { ArchiveRef, Caller, SyncBatch, SyncCursors } from "../contract";
+import {
+	ANSWER_COSTS_MAX,
+	type ArchiveRef,
+	type Caller,
+	type SyncBatch,
+	type SyncCursors,
+} from "../contract";
 import type { HostSpaces } from "../links";
 import type { EngineOffers, OfferAdmission } from "../offers";
 import type { DeviceRegistry } from "../registry";
@@ -50,6 +57,9 @@ import type { HostExchange } from "./types";
  * - The archive keeps what a Walker puts for its own runs, and gives a
  *   Member what it asks of their Spaces' runs: a copy of a step's file
  *   only when its stamp holds the step as this Host's log says.
+ * - What the answers of Night Shift's own agents cost comes from the
+ *   Device that answered, in its Person's name, and goes to every Member
+ *   of its Space, for the Spaces this Host keeps (`answerCosts`).
  * - A Walker's paths (its worktree, its transcripts and logs on disk) stay
  *   with its owner's Replicas: the Host drops them from the rows of a
  *   Device of another Person before it keeps them, and from the rows it
@@ -104,6 +114,7 @@ export function createHostExchange(deps: {
 }): HostExchange {
 	const { db, engine, registry } = deps;
 	const { exchange } = engine;
+	const answerCosts = sharedAnswerCosts(db);
 	/**
 	 * The stops of the calls Walkers make through this Host with a
 	 * `stopId`, by the Walker's Device and that id, while the call is open.
@@ -295,6 +306,33 @@ export function createHostExchange(deps: {
 				}
 				throw error;
 			}
+		},
+
+		async answerCosts(caller, input) {
+			// Only the Spaces of the Person that this Host keeps: another
+			// Host's Space has its own costs.
+			const spaces: string[] = [];
+			for (const spaceId of await caller.spaces()) {
+				if ((await engine.hostSpaces.hostOf(spaceId)) === null) {
+					spaces.push(spaceId);
+				}
+			}
+			const taken = await answerCosts.take(
+				input.rows.filter((row) => spaces.includes(row.spaceId)),
+				{ deviceId: caller.deviceId, personId: caller.personId },
+			);
+			// One more than a call carries says whether more wait.
+			const rows = await answerCosts.after({
+				spaces,
+				cursors: input.cursors,
+				selfId: deps.selfId,
+				limit: ANSWER_COSTS_MAX + 1,
+			});
+			return {
+				taken,
+				rows: rows.slice(0, ANSWER_COSTS_MAX),
+				more: rows.length > ANSWER_COSTS_MAX,
+			};
 		},
 
 		async command(caller, input) {

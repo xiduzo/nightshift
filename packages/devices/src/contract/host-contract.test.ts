@@ -41,6 +41,7 @@ describe("the Host's contract", () => {
 			"sync.addClone",
 			"sync.setClones",
 			"sync.mergePersonal",
+			"sync.answerCosts",
 			"leases.take",
 			"leases.renew",
 			"leases.release",

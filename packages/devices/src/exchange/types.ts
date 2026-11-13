@@ -5,11 +5,13 @@ import type {
 	LeaseTake,
 	OwnDevice,
 	RunCommandInput,
+	SentAnswerCost,
 	StartRunInput,
 	TestRunRequest,
 	TranscriptEntry,
 } from "@nightshift/engine";
 import type {
+	AnswerCostsBatch,
 	ArchiveRef,
 	Caller,
 	CommandBatch,
@@ -55,6 +57,18 @@ export type HostExchange = {
 	commands(caller: Caller, signal?: AbortSignal): AsyncIterable<CommandBatch>;
 	/** Takes the Device's own rows. Refuses a batch with a row of another Walker or Space. */
 	push(caller: Caller, rows: RunRows): Promise<{ events: number }>;
+	/**
+	 * Keeps what the Device's own answers of Night Shift's agents cost, in
+	 * the Spaces of its Person that this Host keeps, and gives the costs of
+	 * those Spaces after its cursors. A row of any other Space is left out.
+	 */
+	answerCosts(
+		caller: Caller,
+		input: {
+			rows: readonly SentAnswerCost[];
+			cursors: Readonly<Record<string, number>>;
+		},
+	): Promise<AnswerCostsBatch>;
 	/** A person's action on a run another Device walks, in the name of the Caller's Person. */
 	command(
 		caller: Caller,

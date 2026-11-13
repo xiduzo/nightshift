@@ -1,4 +1,4 @@
-/** What the answers of Night Shift's own agents cost on this computer: kept per answer, read for the Spend page. */
+/** What the answers of Night Shift's own agents cost: kept per answer, read for the Spend page, shared with the Host that keeps their Space. */
 
 export {
 	type AnswerCost,
@@ -6,4 +6,7 @@ export {
 	type HelpAgent,
 	keepAnswerCost,
 	listAnswerCosts,
+	type SentAnswerCost,
+	type ServedAnswerCost,
+	sharedAnswerCosts,
 } from "./answer-costs";

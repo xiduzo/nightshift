@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Role } from "@nightshift/auth";
 import {
+	answerCost,
 	event,
 	organization,
 	project as projectTable,
@@ -8,6 +9,7 @@ import {
 	step as stepTable,
 	user,
 } from "@nightshift/db/schema";
+import { sharedAnswerCosts } from "@nightshift/engine";
 import {
 	createSpaceDocuments,
 	type SpaceDocuments,
@@ -26,6 +28,7 @@ import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import type { DeviceRegistry, PairedDevice } from "../registry";
 import { callerOf, withPeers } from "../testing";
 import { createWorkHub } from "../work";
+import { shareAnswerCosts } from "./answer-costs";
 import { createHostExchange } from "./host-exchange";
 
 /**
@@ -747,6 +750,153 @@ describe("a Device's stream of rows", () => {
 		} finally {
 			stop.abort();
 			engine.exchange.rowsAfter = rowsAfter;
+		}
+	});
+});
+
+describe("what Night Shift's agents cost", () => {
+	const sent = (key: string, spaceId = sandbox.spaceId) => ({
+		key,
+		spaceId,
+		projectId,
+		agent: "explainer",
+		entry: "run.why",
+		inputTokens: 100,
+		outputTokens: 20,
+		costUsd: 0.03,
+		at: 1_000,
+	});
+
+	test("the Host keeps a Device's rows as that Device's and its Person's, and serves them to a Member", async () => {
+		const mine = keyOf("device-mine", ownerId);
+		const first = await host().answerCosts(mine, {
+			rows: [sent("answer-01")],
+			cursors: {},
+		});
+		expect(first.taken).toEqual(["answer-01"]);
+		// Its own row comes back too: its cursor is the Host's order.
+		expect(first.rows.map((row) => [row.key, row.deviceId])).toEqual([
+			["answer-01", "device-mine"],
+		]);
+
+		const theirs = await host().answerCosts(
+			keyOf("device-colleague", "colleague"),
+			{ rows: [sent("answer-02")], cursors: {} },
+		);
+		expect(
+			theirs.rows.map((row) => [row.key, row.deviceId, row.personId]),
+		).toEqual([
+			["answer-01", "device-mine", ownerId],
+			["answer-02", "device-colleague", "colleague"],
+		]);
+		expect(theirs.more).toBe(false);
+
+		const next = await host().answerCosts(mine, {
+			rows: [sent("answer-01")],
+			cursors: { [sandbox.spaceId]: first.rows[0]?.seq ?? 0 },
+		});
+		expect(next.rows.map((row) => row.key)).toEqual(["answer-02"]);
+		expect(await sandbox.db.select().from(answerCost)).toHaveLength(2);
+	});
+
+	test("a Person who is in no Space here gives nothing and gets nothing", async () => {
+		await host().answerCosts(keyOf("device-mine", ownerId), {
+			rows: [sent("answer-01")],
+			cursors: {},
+		});
+		const answer = await host().answerCosts(
+			keyOf("device-stranger", "stranger"),
+			{ rows: [sent("answer-09")], cursors: {} },
+		);
+		expect(answer).toEqual({ taken: [], rows: [], more: false });
+		expect(
+			(await sandbox.db.select().from(answerCost)).map((row) => row.key),
+		).toEqual(["answer-01"]);
+	});
+
+	test("a Device's loop gives its own answers and takes the others', and a second turn changes nothing", async () => {
+		const device = await createSandbox();
+		try {
+			// The Host answered once itself, and the colleague's Device once.
+			await sandbox.db.insert(answerCost).values({
+				key: "answer-host",
+				spaceId: sandbox.spaceId,
+				personId: ownerId,
+				agent: "builder",
+				inputTokens: 1,
+				outputTokens: 1,
+				at: asDate(500),
+			});
+			await host().answerCosts(keyOf("device-colleague", "colleague"), {
+				rows: [sent("answer-theirs")],
+				cursors: {},
+			});
+			await device.db.insert(answerCost).values([
+				{
+					key: "answer-mine",
+					spaceId: sandbox.spaceId,
+					personId: "me-here",
+					agent: "improver",
+					inputTokens: 5,
+					outputTokens: 5,
+					at: asDate(2_000),
+				},
+				{
+					key: "answer-elsewhere",
+					spaceId: "a-local-space",
+					personId: "me-here",
+					agent: "improver",
+					inputTokens: 5,
+					outputTokens: 5,
+					at: asDate(2_000),
+				},
+			]);
+
+			let calls = 0;
+			const stop = new AbortController();
+			const loop = shareAnswerCosts({
+				spaces: async () => [sandbox.spaceId],
+				costs: sharedAnswerCosts(device.db),
+				now: () => 9_000,
+				idleMs: 5,
+			})(
+				{
+					sync: {
+						answerCosts: async (input: {
+							rows?: ReturnType<typeof sent>[];
+							cursors?: Record<string, number>;
+						}) => {
+							calls++;
+							return host().answerCosts(keyOf("device-mine", ownerId), {
+								rows: input.rows ?? [],
+								cursors: input.cursors ?? {},
+							});
+						},
+					},
+				} as never,
+				stop.signal,
+			);
+			await waitFor(() => calls >= 3);
+			stop.abort();
+			await loop;
+
+			const onHost = await sandbox.db.select().from(answerCost);
+			expect(onHost.map((row) => [row.key, row.deviceId]).sort()).toEqual([
+				["answer-host", null],
+				["answer-mine", "device-mine"],
+				["answer-theirs", "device-colleague"],
+			]);
+			const here = await device.db.select().from(answerCost);
+			expect(
+				here.map((row) => [row.key, row.deviceId, row.sentAt !== null]).sort(),
+			).toEqual([
+				["answer-elsewhere", null, false],
+				["answer-host", sandbox.deviceId, true],
+				["answer-mine", null, true],
+				["answer-theirs", "device-colleague", true],
+			]);
+		} finally {
+			await device.cleanup();
 		}
 	});
 });

@@ -14,6 +14,7 @@ import {
 import type { RefusalKind } from "@nightshift/refusal";
 import { type ContractRouterClient, oc } from "@orpc/contract";
 import { z } from "zod";
+import { answerCostsBatchSchema, answerCostsInputSchema } from "./answers";
 import {
 	archiveRefSchema,
 	copyStampSchema,
@@ -467,6 +468,20 @@ export const hostContract = {
 			})
 			.input(personalMergeInputSchema)
 			.output(described(personalMergeSchema)),
+		/**
+		 * What the answers of Night Shift's own agents cost in the Spaces
+		 * this Host keeps: the Device gives its own rows the Host lacks, and
+		 * gets the rows of its Person's Spaces after its cursors. A row is
+		 * one answer by its key, so a call that comes again changes nothing.
+		 * An older Host has none: the rows wait on the Device.
+		 */
+		answerCosts: sync
+			.route({
+				summary:
+					"Takes what a paired Device's answers of Night Shift's agents cost, and gives it the costs of its Spaces after its cursors.",
+			})
+			.input(answerCostsInputSchema)
+			.output(described(answerCostsBatchSchema)),
 	},
 	/**
 	 * The leases of the Spaces this Host keeps (ADR 7), for the runs a

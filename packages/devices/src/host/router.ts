@@ -155,6 +155,9 @@ export const hostRouter = os.router({
 		mergePersonal: keyed.sync.mergePersonal.handler(({ context, input }) =>
 			context.exchange.mergePersonal(context.caller, input),
 		),
+		answerCosts: keyed.sync.answerCosts.handler(({ context, input }) =>
+			context.exchange.answerCosts(context.caller, input),
+		),
 	},
 	leases: {
 		take: keyed.leases.take.handler(({ context, input }) =>

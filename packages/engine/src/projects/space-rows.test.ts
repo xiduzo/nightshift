@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
 	agentSession,
+	answerCost,
 	clone,
 	device,
 	event,
@@ -219,6 +220,37 @@ async function seed(options: { hostedRow: boolean }) {
 		await keep("hosted", to, "newer-there", "hosted", 20);
 	}
 }
+
+/** What an answer about a project cost. `deviceId`: another computer's, as a Host gave it. */
+async function addAnswer(
+	key: string,
+	projectId: string | null,
+	spaceId: string,
+	deviceId: string | null = null,
+) {
+	await sandbox.db.insert(answerCost).values({
+		key,
+		spaceId,
+		projectId,
+		personId: LOCAL,
+		agent: "explainer",
+		entry: "run.why",
+		inputTokens: 10,
+		outputTokens: 5,
+		costUsd: 0.01,
+		at: asDate(1_000),
+		deviceId,
+		hostSeq: deviceId === null ? null : 7,
+		sentAt: asDate(2_000),
+	});
+}
+
+const answers = async () =>
+	Object.fromEntries(
+		(
+			await sandbox.db.select().from(answerCost).orderBy(asc(answerCost.key))
+		).map((row) => [row.key, row]),
+	);
 
 const move = (extra: Partial<SpaceMove> = {}): SpaceMove => ({
 	from,
@@ -611,6 +643,61 @@ describe("spaceMoveBatch", () => {
 			.where(eq(event.type, "MemberJoined"));
 		expect(joined?.spaceId).toBe(from);
 		expect(JSON.parse(joined?.payload ?? "{}").personId).toBe(LOCAL);
+	});
+
+	test("what the answers about a moved project cost moves with it, as rows its new Host lacks", async () => {
+		await seed({ hostedRow: true });
+		await addAnswer("a-mine", "mine", from);
+		await addAnswer("a-dup", "dup", from, STUDIO);
+		await addAnswer("a-stay", "stay", from);
+		await addAnswer("a-none", null, from);
+		await runMove();
+
+		const kept = await answers();
+		expect(kept["a-mine"]).toMatchObject({
+			spaceId: to,
+			projectId: "mine",
+			personId: HOSTED,
+			hostSeq: null,
+			sentAt: null,
+		});
+		// It maps onto the project of the new Space, and stays another computer's.
+		expect(kept["a-dup"]).toMatchObject({
+			spaceId: to,
+			projectId: "hosted",
+			personId: HOSTED,
+			deviceId: STUDIO,
+			hostSeq: null,
+			sentAt: null,
+		});
+		for (const key of ["a-stay", "a-none"]) {
+			expect(kept[key]).toMatchObject({
+				spaceId: from,
+				personId: LOCAL,
+				sentAt: asDate(2_000),
+			});
+		}
+	});
+
+	test("with one Walker's runs, only this computer's own answer costs move", async () => {
+		await seed({ hostedRow: false });
+		await addAnswer("a-own", "mine", from);
+		await addAnswer("a-theirs", "mine", from, STUDIO);
+		await runMove({
+			from,
+			to,
+			projectMap: { mine: "mine" },
+			personMap: { [LOCAL]: HOSTED },
+			runsOf: walker,
+		});
+
+		const kept = await answers();
+		expect(kept["a-own"]).toMatchObject({ spaceId: to, personId: HOSTED });
+		expect(kept["a-theirs"]).toMatchObject({
+			spaceId: from,
+			personId: LOCAL,
+			hostSeq: 7,
+		});
 	});
 
 	test("with one Walker's runs, the runs another Walker walks stay, with their steps, sessions and events", async () => {
