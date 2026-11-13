@@ -21,6 +21,7 @@ import {
 	fillMaxWidth,
 	padding,
 	selectable,
+	semantics,
 } from "@expo/ui/jetpack-compose/modifiers";
 import { Icon } from "@nightshift/ui-native/components/ui/icon";
 import {
@@ -149,12 +150,16 @@ export function NativeRow({
 	muted,
 	onPress,
 	actions,
+	accessibilityLabel,
 }: NativeRowProps) {
 	const [menu, setMenu] = useState(false);
 	const hasMenu = Boolean(actions && actions.length > 0);
 	const item = (
 		<ListItem
 			modifiers={[
+				...(accessibilityLabel
+					? [semantics({ contentDescription: accessibilityLabel })]
+					: []),
 				...(onPress || hasMenu
 					? [
 							combinedClickable({

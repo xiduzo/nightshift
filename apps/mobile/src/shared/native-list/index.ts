@@ -4,16 +4,15 @@
  * long-press menus). One API, two drawings.
  */
 
+// NativeOptionRow, NativePickerRow, NativeToggleRow and RowAction go back
+// on the barrel with the first screen that imports them (STRUCTURE.md 4).
 export {
 	NativeButtonRow,
 	NativeCustomRow,
 	NativeList,
-	NativeOptionRow,
-	NativePickerRow,
 	NativeRow,
 	NativeSection,
 	NativeTextRow,
 	NativeTitleRow,
-	NativeToggleRow,
 } from "./native-list";
-export type { NativeIcon, RowAction } from "./types";
+export type { NativeIcon } from "./types";
