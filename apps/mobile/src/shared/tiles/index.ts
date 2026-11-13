@@ -1,3 +1,3 @@
-/** Tiles two by two: FactTiles, each a label and a value. */
+/** A tile: a label and a value (FactTile). */
 
-export { FactGrid, FactTile } from "./fact-tile";
+export { FactTile } from "./fact-tile";

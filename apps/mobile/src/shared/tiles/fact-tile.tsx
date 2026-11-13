@@ -1,12 +1,10 @@
 import { Card } from "@nightshift/ui-native/components/ui/card";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { cn } from "@nightshift/ui-native/lib/utils";
-import type { ReactNode } from "react";
 import { View } from "react-native";
 
 import { StatusText } from "@/shared/status";
 import type { Look } from "@/shared/tone";
-import { TwoColumns } from "./two-columns";
 
 /**
  * One fact of a FactGrid: a small muted label, the value, an optional sub
@@ -56,9 +54,4 @@ export function FactTile({
 			</Card>
 		</View>
 	);
-}
-
-/** FactTiles two by two: the details of a run. */
-export function FactGrid({ children }: { children: ReactNode }) {
-	return <TwoColumns>{children}</TwoColumns>;
 }

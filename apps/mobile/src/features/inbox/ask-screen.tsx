@@ -10,17 +10,9 @@ import {
 	sentText,
 } from "@nightshift/client";
 import type { AskForm } from "@nightshift/flows";
-import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui-native/components/ui/alert";
-import { Button } from "@nightshift/ui-native/components/ui/button";
-import { Icon } from "@nightshift/ui-native/components/ui/icon";
-import { Text } from "@nightshift/ui-native/components/ui/text";
-import type { Href } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import {
+	CircleAlert,
 	CircleCheck,
 	ExternalLink,
 	Eye,
@@ -28,24 +20,33 @@ import {
 	Loader,
 } from "lucide-react-native";
 import { useState } from "react";
-import { View } from "react-native";
 
 import { useSignedIn } from "@/features/host";
-import { ActionBar } from "@/shared/action-bar";
-import { SectionHead } from "@/shared/list";
-import { InlineMarkdown } from "@/shared/markdown";
-import { Screen } from "@/shared/page";
+import { HeaderToolbar } from "@/shared/header";
+import {
+	NativeButtonRow,
+	NativeCustomRow,
+	NativeList,
+	NativeSection,
+	NativeTextRow,
+} from "@/shared/native-list";
+import { useThemeColors } from "@/shared/theme";
+import {
+	type AnswerBar,
+	type GateQueue,
+	SendSection,
+	useQueueBar,
+} from "./answer-bar";
 import { AskFields } from "./ask-fields";
 import { AskFiles } from "./ask-files";
 import { askSentSummary, askWebUrl } from "./ask-view";
 import { BriefSections } from "./brief-sections";
-import { Breadcrumbs } from "./gate-breadcrumbs";
-import type { GateQueue, GateSent } from "./gate-briefing";
+import type { GateSent } from "./gate-briefing";
 import { nextGate } from "./gate-list";
-import { GateStatus, GateUrgent } from "./gate-times";
-import { ProblemAlert } from "./problem-alert";
+import { GateHead, GateUrgent } from "./gate-times";
+import { ProblemRow } from "./problem-row";
 import { QuestionSections } from "./question-sections";
-import { SentCard } from "./sent-card";
+import { SentSection } from "./sent-section";
 import { type GoneRefusal, useGateAnswer } from "./use-gate-answer";
 
 /**
@@ -73,11 +74,12 @@ export function AskScreen({
 	onRefresh: () => Promise<unknown>;
 	onSent: (sent: GateSent) => void;
 	onGone: (refusal: GoneRefusal) => void;
-	/** In the Needs you queue: what shows above the question. */
+	/** In the Needs you queue: what shows at the top, in the header and in the bar above the tabs. */
 	queue?: GateQueue;
 }) {
 	const { host } = useSignedIn();
-	const { headline, context } = gateParts(gate.question);
+	const { colors } = useThemeColors();
+	const { context } = gateParts(gate.question);
 	const [values, setValues] = useState<AskValues>(() => askStartValues(form));
 	const [tried, setTried] = useState(false);
 	const elsewhere =
@@ -98,163 +100,160 @@ export function AskScreen({
 		address: host.address,
 		walkedHere: gate.walker.thisDevice,
 	};
-	const runHref: Href = {
-		pathname: "/runs/[runId]",
-		params: { runId: gate.runId },
-	};
 
 	function send() {
 		setTried(true);
 		if ("data" in ready) void answer.sendForm(ready.data);
 	}
 
+	const bar: AnswerBar = {
+		choice: null,
+		prompt: "data" in ready ? "Ready to send" : "Fill in the form",
+		action:
+			native && answerable && !answer.sent
+				? {
+						label: "Send",
+						busyLabel: answer.checking ? "Checking…" : "Sending…",
+						busy: answer.checking || answer.sending,
+						disabled: gate.branchesWork,
+					}
+				: null,
+	};
+	useQueueBar(queue, bar, send);
+
 	return (
-		<Screen
-			onRefresh={onRefresh}
-			footer={
-				native && answerable && !answer.sent ? (
-					<ActionBar
-						caption="Your answer"
-						label={"data" in ready ? "Ready to send" : "Fill in the form"}
-						action={{
-							label: "Send",
-							onPress: send,
-							disabled: gate.branchesWork,
-							busy: answer.checking || answer.sending,
-							busyLabel: answer.checking ? "Checking…" : "Sending…",
-							variant: "default",
-						}}
-					/>
-				) : undefined
-			}
-		>
-			{queue?.lead}
+		<>
+			{queue && queue.right.length > 0 ? (
+				<HeaderToolbar placement="right" items={queue.right} />
+			) : null}
+			<NativeList onRefresh={onRefresh}>
+				{queue?.lead}
 
-			{answerable && !answer.sent ? <GateUrgent gate={gate} /> : null}
+				{answerable && !answer.sent ? <GateUrgent gate={gate} /> : null}
 
-			<View className="gap-3">
-				<Breadcrumbs gate={gate} manySpaces={manySpaces} runHref={runHref} />
-				<Text
-					accessibilityRole="header"
-					selectable
-					className="font-bold text-2xl tracking-tight"
-				>
-					<InlineMarkdown text={headline} />
-				</Text>
-				<View className="flex-row flex-wrap items-center gap-2">
-					<GateStatus
-						openedAt={gate.openedAt}
-						sent={answer.sent !== null}
-						answerable={answerable}
-					/>
-				</View>
-			</View>
-
-			{answer.sent && !queue ? (
-				<SentCard
-					answer={{
-						choice: askSentSummary(form, answer.sent.data),
-						note: null,
-					}}
-					outcome={sentText(undefined, gate.runTitle, elsewhere)}
-					next={nextGate(inbox, gate)}
+				<GateHead
+					gate={gate}
+					manySpaces={manySpaces}
+					sent={answer.sent !== null}
+					answerable={answerable}
+					flowAndStep={false}
 				/>
-			) : null}
 
-			<BriefSections brief={briefView(gate)} />
-
-			<QuestionSections context={context} />
-
-			{form.attachments && form.attachments.length > 0 ? (
-				<View className="gap-2">
-					<SectionHead title="Files and links" />
-					<AskFiles attachments={form.attachments} {...files} />
-				</View>
-			) : null}
-
-			{answer.sent ? null : (
-				<View className="gap-3">
-					<SectionHead
-						title="Your answer"
-						hint={
-							native && answerable
-								? "Your phone checks that it is you before Night Shift sends your answer."
-								: undefined
-						}
+				{answer.sent && !queue ? (
+					<SentSection
+						answer={{
+							choice: askSentSummary(form, answer.sent.data),
+							note: null,
+						}}
+						outcome={sentText(undefined, gate.runTitle, elsewhere)}
+						next={nextGate(inbox, gate)}
 					/>
-					{gate.answerPending ? (
-						<Alert icon={CircleCheck}>
-							<AlertTitle>Someone already answered this question</AlertTitle>
-							<AlertDescription>
-								{elsewhere
+				) : null}
+
+				<BriefSections brief={briefView(gate)} />
+
+				<QuestionSections context={context} />
+
+				{form.attachments && form.attachments.length > 0 ? (
+					<NativeSection title="Files and links">
+						<NativeCustomRow>
+							<AskFiles attachments={form.attachments} {...files} />
+						</NativeCustomRow>
+					</NativeSection>
+				) : null}
+
+				{answer.sent ? null : gate.answerPending ? (
+					<NativeSection title="Your answer">
+						<NativeTextRow
+							icon={{ sf: "checkmark.circle", lucide: CircleCheck }}
+							text="**Someone already answered this question**"
+							note={
+								elsewhere
 									? `The run continues when ${elsewhere} is online.`
-									: "The run continues in a moment."}
-							</AlertDescription>
-						</Alert>
-					) : !gate.canAnswer ? (
-						<Alert icon={Eye}>
-							<AlertTitle>You can read this question only</AlertTitle>
-							<AlertDescription>
-								{`Your role in ${gate.spaceName} does not let you answer. Ask an owner or admin of the Space to answer it, or to give you another role.`}
-							</AlertDescription>
-						</Alert>
-					) : native ? (
-						<>
-							{gate.branchesWork ? (
-								<Alert icon={Loader}>
-									<AlertTitle>The run is still busy</AlertTitle>
-									<AlertDescription>
-										Another branch of this run still works. You can send your
-										answer when its step ends.
-									</AlertDescription>
-								</Alert>
-							) : null}
-							<AskFields
-								form={form}
-								values={values}
-								onChange={(name, value) =>
-									setValues((current) => ({ ...current, [name]: value }))
-								}
-								disabled={answer.busy}
-								files={files}
-							/>
+									: "The run continues in a moment."
+							}
+						/>
+					</NativeSection>
+				) : !gate.canAnswer ? (
+					<NativeSection title="Your answer">
+						<NativeTextRow
+							icon={{ sf: "eye", lucide: Eye }}
+							text="**You can read this question only**"
+							note={`Your role in ${gate.spaceName} does not let you answer. Ask an owner or admin of the Space to answer it, or to give you another role.`}
+						/>
+					</NativeSection>
+				) : native ? (
+					<>
+						{gate.branchesWork ? (
+							<NativeSection>
+								<NativeTextRow
+									icon={{ sf: "hourglass", lucide: Loader }}
+									text="**The run is still busy**"
+									note="Another branch of this run still works. You can send your answer when its step ends."
+								/>
+							</NativeSection>
+						) : null}
+						<NativeSection
+							title="Your answer"
+							footer={[
+								answerable
+									? "Your phone checks that it is you before Night Shift sends your answer."
+									: null,
+								elsewhere
+									? `Your answer goes to ${elsewhere}. The run continues when ${elsewhere} is online.`
+									: null,
+							]
+								.filter(Boolean)
+								.join(" ")}
+						>
+							<NativeCustomRow>
+								<AskFields
+									form={form}
+									values={values}
+									onChange={(name, value) =>
+										setValues((current) => ({ ...current, [name]: value }))
+									}
+									disabled={answer.busy}
+									files={files}
+								/>
+							</NativeCustomRow>
 							{tried && "problem" in ready ? (
-								<Text className="text-destructive text-sm">
-									{ready.problem}
-								</Text>
+								<NativeTextRow
+									icon={{
+										sf: "exclamationmark.circle.fill",
+										lucide: CircleAlert,
+									}}
+									iconColor={colors.destructive}
+									text={ready.problem}
+								/>
 							) : null}
-						</>
-					) : (
-						<>
-							<Alert icon={Globe}>
-								<AlertTitle>Answer this question on the web</AlertTitle>
-								<AlertDescription>
-									This form has fields that the phone cannot show yet.
-								</AlertDescription>
-							</Alert>
-							<Button
-								size="lg"
-								onPress={() =>
-									void WebBrowser.openBrowserAsync(
-										askWebUrl(host.address, gate),
-									)
-								}
-								accessibilityHint="Opens the question in the browser"
-								className="h-auto min-h-11 py-2"
-							>
-								<Text>Open in the browser</Text>
-								<Icon as={ExternalLink} className="text-primary-foreground" />
-							</Button>
-						</>
-					)}
-					{elsewhere && native && answerable ? (
-						<Text className="text-muted-foreground text-xs">
-							{`Your answer goes to ${elsewhere}. The run continues when ${elsewhere} is online.`}
-						</Text>
-					) : null}
-					{answer.problem ? <ProblemAlert problem={answer.problem} /> : null}
-				</View>
-			)}
-		</Screen>
+						</NativeSection>
+					</>
+				) : (
+					<NativeSection title="Your answer">
+						<NativeTextRow
+							icon={{ sf: "globe", lucide: Globe }}
+							text="**Answer this question on the web**"
+							note="This form has fields that the phone cannot show yet."
+						/>
+						<NativeButtonRow
+							label="Open in the browser"
+							icon={{ sf: "arrow.up.right.square", lucide: ExternalLink }}
+							onPress={() =>
+								void WebBrowser.openBrowserAsync(askWebUrl(host.address, gate))
+							}
+						/>
+					</NativeSection>
+				)}
+
+				{answer.problem ? (
+					<NativeSection>
+						<ProblemRow problem={answer.problem} />
+					</NativeSection>
+				) : null}
+
+				{queue ? null : <SendSection bar={bar} onSend={send} />}
+			</NativeList>
+		</>
 	);
 }

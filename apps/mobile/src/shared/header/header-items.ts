@@ -19,6 +19,8 @@ export type HeaderItem =
 			hint?: string;
 			sf: SfIcon;
 			icon: LucideIcon;
+			/** iOS: the word on the button instead of the icon: "Skip". */
+			text?: string;
 			onPress: () => void;
 	  }
 	| { kind: "view"; key: string; element: ReactElement };

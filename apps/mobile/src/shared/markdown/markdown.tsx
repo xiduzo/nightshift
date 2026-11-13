@@ -7,7 +7,7 @@ import {
 import { cn } from "@nightshift/ui-native/lib/utils";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
-import { Fragment, type ReactNode, useContext, useMemo } from "react";
+import { type ReactNode, useContext, useMemo } from "react";
 import { Text as RNText, ScrollView, View } from "react-native";
 import { Renderer, useMarkdown } from "react-native-marked";
 
@@ -252,79 +252,6 @@ class BlockRenderer extends Renderer {
 }
 
 /**
- * The same pieces in one line, for a line inside a heading: blocks lose
- * their box, so a heading or a list in it reads as text.
- */
-class InlineRenderer extends BlockRenderer {
-	override paragraph(children: ReactNode[]): ReactNode {
-		return <Fragment key={this.getKey()}>{children}</Fragment>;
-	}
-
-	override blockquote(children: ReactNode[]): ReactNode {
-		return this.paragraph(children);
-	}
-
-	override heading(text: Inline): ReactNode {
-		return <Fragment key={this.getKey()}>{text}</Fragment>;
-	}
-
-	override code(text: string): ReactNode {
-		return this.codespan(text);
-	}
-
-	override hr(): ReactNode {
-		return null;
-	}
-
-	override listItem(children: ReactNode[]): ReactNode {
-		return this.paragraph(children);
-	}
-
-	override list(
-		ordered: boolean,
-		li: ReactNode[],
-		_listStyle?: unknown,
-		_textStyle?: unknown,
-		startIndex?: number,
-	): ReactNode {
-		return (
-			<Fragment key={this.getKey()}>
-				{li.map((item, index) => (
-					<Fragment key={index}>
-						{index > 0 ? "\n" : null}
-						{`${listMarker(ordered, startIndex, index)} `}
-						{item}
-					</Fragment>
-				))}
-			</Fragment>
-		);
-	}
-
-	override text(text: Inline): ReactNode {
-		if (typeof text === "string") return text;
-		return <Fragment key={this.getKey()}>{text}</Fragment>;
-	}
-
-	override table(header: ReactNode[][], rows: ReactNode[][][]): ReactNode {
-		return (
-			<Fragment key={this.getKey()}>
-				{[header, ...rows].map((cells, index) => (
-					<Fragment key={index}>
-						{index > 0 ? "\n" : null}
-						{cells.map((cell, column) => (
-							<Fragment key={column}>
-								{column > 0 ? " · " : null}
-								{cell}
-							</Fragment>
-						))}
-					</Fragment>
-				))}
-			</Fragment>
-		);
-	}
-}
-
-/**
  * Text an agent or a flow wrote, as Markdown: headings, lists, code, tables
  * and links. Raw HTML in it shows as text, and a picture as a link.
  * `className` sets the text of every block, such as "text-sm".
@@ -344,25 +271,5 @@ export function Markdown({
 		<TextClassContext.Provider value={textClass}>
 			<View className="min-w-0 gap-2">{nodes}</View>
 		</TextClassContext.Provider>
-	);
-}
-
-/**
- * One line an agent or a flow wrote, such as a Gate's question: bold,
- * italic, code and links. Put it inside a `Text`: it takes that text's size
- * and color.
- */
-export function InlineMarkdown({ text }: { text: string }) {
-	const renderer = useMemo(() => new InlineRenderer(undefined), []);
-	const nodes = useMarkdown(text, { renderer });
-	return (
-		<>
-			{nodes.map((node, index) => (
-				<Fragment key={index}>
-					{index > 0 ? "\n" : null}
-					{node}
-				</Fragment>
-			))}
-		</>
 	);
 }

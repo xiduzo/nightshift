@@ -16,11 +16,13 @@ export function HeaderToolbar({ placement, items }: HeaderToolbarProps) {
 				item.kind === "button" ? (
 					<Stack.Toolbar.Button
 						key={item.key}
-						icon={item.sf}
+						icon={item.text ? undefined : item.sf}
 						accessibilityLabel={item.label}
 						accessibilityHint={item.hint}
 						onPress={item.onPress}
-					/>
+					>
+						{item.text}
+					</Stack.Toolbar.Button>
 				) : (
 					<Stack.Toolbar.View key={item.key} hidesSharedBackground>
 						{item.element}
