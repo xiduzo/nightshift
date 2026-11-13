@@ -15,6 +15,8 @@ import {
 	VStack,
 } from "@expo/ui/swift-ui";
 import {
+	accessibilityElement,
+	accessibilityLabel as accessibilityLabelModifier,
 	disabled as disabledModifier,
 	font,
 	foregroundStyle,
@@ -25,6 +27,7 @@ import {
 	pickerStyle,
 	refreshable,
 	tag,
+	textSelection,
 	tint,
 } from "@expo/ui/swift-ui/modifiers";
 import type { ReactNode } from "react";
@@ -133,9 +136,19 @@ export function NativeRow({
 	onPress,
 	chevron,
 	actions,
+	accessibilityLabel: label,
 }: NativeRowProps) {
 	const content = (
-		<HStack spacing={12} modifiers={muted ? [opacity(0.5)] : []}>
+		<HStack
+			spacing={12}
+			modifiers={[
+				...(muted ? [opacity(0.5)] : []),
+				// One element for VoiceOver, in the words the screen gives.
+				...(label
+					? [accessibilityElement("combine"), accessibilityLabelModifier(label)]
+					: []),
+			]}
+		>
 			{icon ? <Image systemName={icon.sf} color={iconColor} size={20} /> : null}
 			<VStack alignment="leading" spacing={2}>
 				{overline ? (
@@ -227,10 +240,17 @@ export function NativeTextRow({
 	note,
 	icon,
 	iconColor,
+	selectable,
 }: NativeTextRowProps) {
 	const body = (
 		<VStack alignment="leading" spacing={4}>
-			<Text markdownEnabled modifiers={secondary ? [SECONDARY] : []}>
+			<Text
+				markdownEnabled
+				modifiers={[
+					...(secondary ? [SECONDARY] : []),
+					...(selectable ? [textSelection(true)] : []),
+				]}
+			>
 				{text}
 			</Text>
 			{note ? (

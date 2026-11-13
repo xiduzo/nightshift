@@ -76,6 +76,8 @@ export type NativeTextRowProps = {
 	note?: string;
 	icon?: NativeIcon;
 	iconColor?: string;
+	/** iOS: touch and hold to select and copy the text. */
+	selectable?: boolean;
 };
 
 /** One option you pick, in its flow color, with what happens when you pick it. */

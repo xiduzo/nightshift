@@ -1,5 +1,4 @@
 import {
-	type Artifact,
 	createGateQueries,
 	createProjectQueries,
 	createRunQueries,
@@ -12,13 +11,10 @@ import {
 	type OpenGate,
 	plainText,
 	type RunDetail,
-	type RunStatus,
 	rerunStarts,
 	runNow,
 	runningStep,
 	runningSteps,
-	type StepChanges,
-	type StepSummary,
 	stepChangedFiles,
 	stepName,
 	stepState,
@@ -26,71 +22,87 @@ import {
 	TEST_RUN_LABEL,
 	now as timeNow,
 } from "@nightshift/client";
-import { Badge } from "@nightshift/ui-native/components/ui/badge";
-import { Button } from "@nightshift/ui-native/components/ui/button";
-import { Card, CardContent } from "@nightshift/ui-native/components/ui/card";
-import { Icon } from "@nightshift/ui-native/components/ui/icon";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
-import { Text } from "@nightshift/ui-native/components/ui/text";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, Redirect } from "expo-router";
+import { Redirect } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import {
+	Bell,
+	BellOff,
+	CircleStop,
 	FileDiff,
-	FileText,
 	FlaskConical,
 	GitPullRequest,
 	Hand,
-	Link2,
+	Play,
+	RotateCcw,
 	Share as ShareIcon,
 	SquareTerminal,
 } from "lucide-react-native";
-import { useCallback, useState } from "react";
-import { View } from "react-native";
+import { useCallback } from "react";
+import { Platform, View } from "react-native";
 
-import { FollowOnLockScreen } from "@/features/glance";
+import { useLockScreenFollow } from "@/features/glance";
 import { useHost, useHostQueries } from "@/features/host";
-import { GateRow, useShareTakeOver } from "@/features/inbox";
+import { useShareTakeOver } from "@/features/inbox";
 import { ErrorAlert } from "@/shared/feedback";
 import { formatTime } from "@/shared/format";
-import { ListGroup, ListRow, SectionHead } from "@/shared/list";
-import { Screen } from "@/shared/page";
-import { useWhileFocused } from "@/shared/refresh";
-import { StatusText } from "@/shared/status";
-import { FactTile } from "@/shared/tiles";
-import { TimeText } from "@/shared/time";
-import { runStatusLook } from "@/shared/tone";
-import { StepTrail, trailItemOf } from "@/shared/trail";
-import { AskWhyCard } from "./ask-why-card";
 import {
-	type RunAct,
-	RunActionButton,
+	NativeCustomRow,
+	type NativeIcon,
+	NativeList,
+	NativeRow,
+	NativeSection,
+	NativeTextRow,
+	NativeTitleRow,
+} from "@/shared/native-list";
+import { useWhileFocused } from "@/shared/refresh";
+import { useThemeColors } from "@/shared/theme";
+import { runStatusLook } from "@/shared/tone";
+import { AskWhySection } from "./ask-why-section";
+import { toneColor } from "./native-looks";
+import {
+	confirmRunAction,
+	failedAction,
+	type RunActionContext,
 	RunActionFailure,
 	useRunAct,
 } from "./run-actions";
 import {
-	changesSummary,
 	computerName,
-	linkCaption,
 	linkLook,
 	moreActions,
+	type PrimaryAction,
 	primaryAction,
 	type RunActionKind,
-	type RunLink,
 	runFacts,
 	runLinks,
 	runTimeLine,
 	runVerdict,
-	sizeLabel,
 } from "./run-facts";
-import { RunUseful } from "./run-useful";
+import { RunHeader } from "./run-header";
+import type { HeaderAction } from "./run-header-types";
+import {
+	ChangesSection,
+	CostSection,
+	GatesSection,
+	NowSection,
+	openChanges,
+	openGate,
+	openTranscript,
+	StepsSection,
+	TakeOverSection,
+} from "./run-sections";
+import { RunUsefulSection } from "./run-useful-section";
 import { type PhoneLiveRun, usePhoneLiveRun } from "./use-live-run";
 
 /**
- * One run, live: where it is from, its status and one sentence about it,
- * its one main action, what it cost and changed, and its details (steps,
- * transcript, more actions, take over) folded away. Opened from the Runs
- * tab, after a start, or from a notification.
+ * One run, live, as a native grouped list: where it is from, its status
+ * and one sentence about it, its open Gates, what it cost and changed,
+ * its steps and how to take it over. Its one main action sits in the
+ * header, the rarer ones in the ⋯ menu, and on iOS its other views in
+ * the bottom toolbar. Opened from the Runs tab, after a start, or from a
+ * notification.
  */
 export function RunScreen({ runId }: { runId: string }) {
 	const { state } = useHost();
@@ -126,37 +138,65 @@ function SignedInRun({ runId }: { runId: string }) {
 		[queryClient, runQueries, gateQueries, runId],
 	);
 
+	if (run.data) {
+		return (
+			<RunBody
+				run={run.data}
+				partial={run.isPlaceholderData}
+				live={live}
+				gates={(gates.data ?? []).filter((gate) => gate.runId === runId)}
+				projectName={
+					projects.data?.find((p) => p.id === run.data.projectId)?.name ?? null
+				}
+				refresh={refresh}
+			/>
+		);
+	}
 	return (
-		<Screen onRefresh={refresh}>
-			{run.data ? (
-				<RunBody
-					run={run.data}
-					partial={run.isPlaceholderData}
-					live={live}
-					gates={(gates.data ?? []).filter((gate) => gate.runId === runId)}
-					projectName={
-						projects.data?.find((p) => p.id === run.data.projectId)?.name ??
-						null
-					}
-				/>
-			) : run.isError ? (
-				<ErrorAlert
-					title="This run did not load"
-					message={run.error.message}
-					fix="Pull down to try again."
-					onRetry={() => void run.refetch()}
-				/>
-			) : (
-				<>
-					<Skeleton className="h-5 w-1/2" />
-					<Skeleton className="h-8 w-3/4" />
-					<Skeleton className="h-12 w-full rounded-md" />
-					<Skeleton className="h-40 w-full rounded-xl" />
-				</>
-			)}
-		</Screen>
+		<NativeList onRefresh={refresh}>
+			<NativeSection>
+				<NativeCustomRow>
+					{run.isError ? (
+						<ErrorAlert
+							title="This run did not load"
+							message={run.error.message}
+							fix="Pull down to try again."
+							onRetry={() => void run.refetch()}
+						/>
+					) : (
+						<View className="gap-3 py-2">
+							<Skeleton className="h-4 w-1/2" />
+							<Skeleton className="h-7 w-3/4" />
+							<Skeleton className="h-4 w-2/3" />
+						</View>
+					)}
+				</NativeCustomRow>
+			</NativeSection>
+		</NativeList>
 	);
 }
+
+/** The icon of each run action, in the header and the ⋯ menu. */
+const ACTION_ICON: Record<RunActionKind, NativeIcon> = {
+	stop: { sf: "stop.circle", lucide: CircleStop },
+	resume: { sf: "play", lucide: Play },
+	restart: { sf: "arrow.counterclockwise", lucide: RotateCcw },
+	rerun: { sf: "arrow.clockwise", lucide: RotateCcw },
+};
+
+/** The words of each run action in the ⋯ menu. */
+const ACTION_LABEL: Record<RunActionKind, string> = {
+	stop: "Stop run",
+	resume: "Resume run",
+	restart: "Restart step",
+	rerun: "Run again",
+};
+
+/** What following shows, on this phone. */
+const FOLLOW_HINT =
+	Platform.OS === "android"
+		? "Shows the step and status of this run in a notification until it ends."
+		: "Shows the step and status of this run on your lock screen until it ends.";
 
 function RunBody({
 	run,
@@ -164,6 +204,7 @@ function RunBody({
 	live,
 	gates,
 	projectName,
+	refresh,
 }: {
 	run: RunDetail;
 	/** Only what a list knows of the run: its steps load still. */
@@ -171,13 +212,17 @@ function RunBody({
 	live: PhoneLiveRun;
 	gates: OpenGate[];
 	projectName: string | null;
+	refresh: () => Promise<unknown>;
 }) {
+	const { colors } = useThemeColors();
 	const steps = mergeSteps(run.steps, live.steps);
 	// The run's own status, live: an action lets go once the run gets there.
 	const act = useRunAct(run.id, runNow(run, { status: live.status }).status);
 	// A stop or resume on its way shows its result at once.
 	const shown = runNow(run, { status: live.status, steps, acting: act.acting });
 	const { status, ended, allows } = shown;
+	const follow = useLockScreenFollow(run.id);
+	const share = useShareTakeOver(run.id, run.takeOverCommand);
 	const ownSteps = steps.filter((step) => step.scope === null);
 	const labels = nodeLabels(run);
 	// Parallel branches run several steps at once: each that talks shows.
@@ -217,7 +262,7 @@ function RunBody({
 		notice: shown.notice,
 		pullRequests: links.filter((link) => linkLook(link.url).pullRequest).length,
 	});
-	const buttonProps = {
+	const context: RunActionContext = {
 		runId: run.id,
 		act,
 		labels,
@@ -225,422 +270,203 @@ function RunBody({
 		restartStep,
 		rerunFrom,
 	};
+	const stepIds = steps.map((step) => step.id);
+	const changed = stepChangedFiles(live.entries.changes, stepIds).length > 0;
+	const look = runStatusLook(status, shown.result);
+	const reconnecting = live.connection === "reconnecting" && !ended;
+	const canFollow = follow.available && !ended;
+
+	/** A run action that asks first. `label` is what the button says. */
+	const runAction = (
+		kind: RunActionKind,
+		label: string,
+		resumeLabel?: string,
+	): HeaderAction => {
+		const busy = act.acting?.action === kind;
+		return {
+			key: kind,
+			label: busy ? `${label}…` : label,
+			icon: ACTION_ICON[kind],
+			destructive: kind === "stop",
+			disabled: busy,
+			onPress: () => confirmRunAction(kind, { ...context, label: resumeLabel }),
+		};
+	};
+
+	const header = {
+		primary: primary ? primaryItem(primary, run.id, runAction) : null,
+		menu: [
+			...more.map((kind) => runAction(kind, ACTION_LABEL[kind])),
+			...(canFollow
+				? [
+						{
+							key: "follow",
+							label: follow.following
+								? "Stop following on the lock screen"
+								: "Follow on the lock screen",
+							subtitle: follow.following ? undefined : FOLLOW_HINT,
+							icon: follow.following
+								? { sf: "bell.slash" as const, lucide: BellOff }
+								: { sf: "bell" as const, lucide: Bell },
+							disabled: follow.busy,
+							onPress: () =>
+								void (follow.following ? follow.unfollow() : follow.follow()),
+						},
+					]
+				: []),
+		],
+		views: [
+			{
+				key: "transcript",
+				label: "Transcript",
+				icon: { sf: "text.bubble" as const, lucide: SquareTerminal },
+				onPress: () => openTranscript(run.id),
+			},
+			{
+				key: "changes",
+				label: "Changed files",
+				icon: { sf: "doc.on.doc" as const, lucide: FileDiff },
+				disabled: !changed,
+				onPress: () => openChanges(run.id),
+			},
+			...(run.takeOverCommand
+				? [
+						{
+							key: "share",
+							label: "Share the take-over command",
+							icon: { sf: "square.and.arrow.up" as const, lucide: ShareIcon },
+							onPress: share,
+						},
+					]
+				: []),
+		],
+	};
+
+	// Following on the lock screen: that it is on, or why it did not start.
+	const followLine = !canFollow
+		? undefined
+		: (follow.problem ??
+			(follow.following
+				? "You follow this run on the lock screen."
+				: undefined));
 
 	return (
 		<>
-			<View className="gap-2">
-				<View className="flex-row flex-wrap items-center gap-x-1.5">
-					{projectName ? (
-						<>
-							<Text className="py-3 text-muted-foreground text-sm">
-								{projectName}
-							</Text>
-							<Text
-								className="text-muted-foreground text-sm"
-								importantForAccessibility="no"
-							>
-								·
-							</Text>
-						</>
-					) : null}
-					<Text className="py-3 text-muted-foreground text-sm">
-						{flowLabel(run)}
-					</Text>
+			<RunHeader {...header} />
+			<NativeList onRefresh={refresh}>
+				<NativeSection footer={followLine}>
+					<NativeTitleRow
+						overline={[projectName, flowLabel(run)]
+							.filter((part) => part !== null)
+							.join(" · ")}
+						title={run.title}
+						caption={[
+							look.label,
+							runTimeLine(run, status, formatTime),
+							...(reconnecting ? ["Reconnecting…"] : []),
+						].join(" · ")}
+						captionColor={toneColor(look.tone, colors)}
+					/>
+					{verdict ? <NativeTextRow text={verdict} /> : null}
 					{isTestRun(run) ? (
-						<Badge
-							variant="outline"
-							className="ml-1.5"
-							accessibilityLabel={`${TEST_RUN_LABEL}. ${TEST_RUN_HINT}`}
-						>
-							<Icon
-								as={FlaskConical}
-								className="size-3 text-muted-foreground"
-							/>
-							<Text>{TEST_RUN_LABEL}</Text>
-						</Badge>
+						<NativeRow
+							icon={{ sf: "flask", lucide: FlaskConical }}
+							iconColor={colors.mutedForeground}
+							title={TEST_RUN_LABEL}
+							subtitle={TEST_RUN_HINT}
+						/>
 					) : null}
-				</View>
-				<Text
-					accessibilityRole="header"
-					className="font-bold text-2xl tracking-tight"
-				>
-					{run.title}
-				</Text>
-				<View className="flex-row flex-wrap items-center gap-1.5">
-					<StatusText look={runStatusLook(status, shown.result)} />
-					<TimeText
-						at={run.endedAt ?? run.createdAt}
-						className="text-muted-foreground text-sm"
-					>
-						{`· ${runTimeLine(run, status, formatTime)}`}
-					</TimeText>
-					{live.connection === "reconnecting" && !ended ? (
-						<Text className="text-muted-foreground text-sm">
-							· Reconnecting…
-						</Text>
-					) : null}
-				</View>
-				{verdict ? (
-					<Text className="text-base" numberOfLines={6}>
-						{verdict}
-					</Text>
+				</NativeSection>
+
+				{failedAction(act) ? (
+					<NativeSection>
+						<NativeCustomRow>
+							<RunActionFailure act={act} />
+						</NativeCustomRow>
+					</NativeSection>
 				) : null}
-			</View>
 
-			<View className="gap-3">
-				{primary ? (
-					<PrimaryButton
-						primary={primary}
-						runId={run.id}
-						buttonProps={buttonProps}
-					/>
-				) : null}
-				<AskWhyCard runId={run.id} status={status} />
-				<RunUseful run={run} status={status} />
-				<FollowOnLockScreen runId={run.id} ended={ended} />
-				<RunActionFailure act={act} />
-			</View>
+				{gates.length > 0 ? <GatesSection gates={gates} /> : null}
 
-			{gates.length > 1 ? (
-				<View className="gap-3">
-					<SectionHead
-						title="Gates"
-						hint={`${gates.length} wait in this run`}
-					/>
-					<ListGroup>
-						{gates.map((open) => (
-							<GateRow key={open.stepId} gate={open} overline={null} />
-						))}
-					</ListGroup>
-				</View>
-			) : null}
+				<AskWhySection runId={run.id} status={status} />
+				<RunUsefulSection run={run} status={status} />
 
-			{talking.map((step) => {
-				const message = live.entries.messages.get(step.id);
-				return (
-					<View key={step.id} className="gap-3">
-						<SectionHead title="Now" hint={stepName(step, labels)} />
-						<Card className="py-4">
-							<CardContent className="px-4">
-								<Text
-									numberOfLines={8}
-									className={message ? undefined : "text-muted-foreground"}
-								>
-									{message
-										? markdownPreview(message.text)
-										: "No message from this step yet."}
-								</Text>
-							</CardContent>
-						</Card>
-					</View>
-				);
-			})}
+				{talking.map((step) => {
+					const message = live.entries.messages.get(step.id);
+					return (
+						<NowSection
+							key={step.id}
+							step={stepName(step, labels)}
+							message={message ? markdownPreview(message.text) : null}
+						/>
+					);
+				})}
 
-			<View className="gap-3">
-				<SectionHead title="What it cost and changed" />
-				<View className="flex-row gap-3">
-					{runFacts(run, { status, now }).map((fact) => (
-						<FactTile key={fact.label} {...fact} />
-					))}
-				</View>
-				<Evidence
+				<CostSection facts={runFacts(run, { status, now })} />
+				<ChangesSection
 					run={run}
 					ended={ended}
 					links={links}
 					changes={live.entries.changes}
-					stepIds={steps.map((step) => step.id)}
+					stepIds={stepIds}
 					connecting={live.connection === "connecting"}
 				/>
-			</View>
-
-			<Details
-				runId={run.id}
-				steps={ownSteps}
-				labels={labels}
-				status={status}
-				now={now}
-				loading={partial}
-				more={more}
-				buttonProps={buttonProps}
-				command={run.takeOverCommand}
-				computer={computer}
-			/>
+				<StepsSection
+					runId={run.id}
+					steps={ownSteps}
+					labels={labels}
+					status={status}
+					now={now}
+					loading={partial}
+				/>
+				{run.takeOverCommand ? (
+					<TakeOverSection
+						command={run.takeOverCommand}
+						computer={computer}
+						onShare={share}
+					/>
+				) : null}
+			</NativeList>
 		</>
 	);
 }
 
-type ButtonProps = Omit<
-	Parameters<typeof RunActionButton>[0],
-	"action" | "primary" | "label"
-> & { act: RunAct };
-
-/** The run's one main action, full width. */
-function PrimaryButton({
-	primary,
-	runId,
-	buttonProps,
-}: {
-	primary: NonNullable<ReturnType<typeof primaryAction>>;
-	runId: string;
-	buttonProps: ButtonProps;
-}) {
+/** The run's one main action as a header button. */
+function primaryItem(
+	primary: PrimaryAction,
+	runId: string,
+	runAction: (
+		kind: RunActionKind,
+		label: string,
+		resumeLabel?: string,
+	) => HeaderAction,
+): HeaderAction {
 	switch (primary.kind) {
 		case "answer":
-			return (
-				<Link
-					href={{
-						pathname: "/gates/[runId]/[stepId]",
-						params: { runId, stepId: primary.stepId },
-					}}
-					asChild
-				>
-					<Button
-						size="lg"
-						className="h-auto min-h-11 py-2"
-						accessibilityHint="Opens the Gate"
-					>
-						<Icon as={Hand} />
-						<Text>Answer the Gate</Text>
-					</Button>
-				</Link>
-			);
+			return {
+				key: "answer",
+				label: "Answer",
+				subtitle: "Opens the Gate",
+				icon: { sf: "hand.raised", lucide: Hand },
+				onPress: () => openGate(runId, primary.stepId),
+			};
 		case "open":
-			return (
-				<Button
-					size="lg"
-					className="h-auto min-h-11 py-2"
-					onPress={() => void WebBrowser.openBrowserAsync(primary.url)}
-					accessibilityHint="Opens the pull request in the browser"
-				>
-					<Icon as={GitPullRequest} />
-					<Text>{primary.label}</Text>
-				</Button>
-			);
+			return {
+				key: "open",
+				label: primary.label,
+				subtitle: "Opens the pull request in the browser",
+				icon: { sf: "arrow.triangle.pull", lucide: GitPullRequest },
+				onPress: () => void WebBrowser.openBrowserAsync(primary.url),
+			};
 		case "resume":
-			return (
-				<RunActionButton
-					{...buttonProps}
-					action="resume"
-					label={primary.label}
-					primary
-				/>
+			return runAction(
+				"resume",
+				primary.label === "Retry" ? "Retry" : "Resume",
+				primary.label,
 			);
-		default:
-			return <RunActionButton {...buttonProps} action={primary.kind} primary />;
+		case "stop":
+			return runAction("stop", "Stop");
+		case "rerun":
+			return runAction("rerun", "Run again");
 	}
-}
-
-/**
- * What the run changed and made: a row that opens its changed files, a
- * row per link of its items (a pull request opens on GitHub), and the
- * files its agents kept.
- */
-function Evidence({
-	run,
-	ended,
-	links,
-	changes,
-	stepIds,
-	connecting,
-}: {
-	run: RunDetail;
-	ended: boolean;
-	links: RunLink[];
-	changes: StepChanges;
-	stepIds: string[];
-	/** The changes load still: no row says "none" yet. */
-	connecting: boolean;
-}) {
-	const runQueries = useHostQueries(createRunQueries);
-	const artifacts = useQuery({
-		...runQueries.artifacts(run.id, !ended),
-		...useWhileFocused(),
-	});
-	const files: Artifact[] = artifacts.data ?? [];
-	const groups = stepChangedFiles(changes, stepIds);
-
-	return (
-		<ListGroup>
-			{groups.length > 0 ? (
-				<ListRow
-					icon={FileDiff}
-					title="Changed files"
-					caption={changesSummary(groups)}
-					href={{ pathname: "/changes/[runId]", params: { runId: run.id } }}
-					accessibilityHint="Opens the files this run changed"
-				/>
-			) : connecting ? (
-				<Skeleton className="m-4 h-6 w-1/2" />
-			) : (
-				<ListRow
-					icon={FileDiff}
-					title={ended ? "No files changed" : "No files changed yet"}
-				/>
-			)}
-			{links.map((link) => {
-				const look = linkLook(link.url);
-				return (
-					<ListRow
-						key={link.url}
-						icon={look.pullRequest ? GitPullRequest : Link2}
-						title={link.title}
-						caption={linkCaption(look)}
-						onPress={() => void WebBrowser.openBrowserAsync(link.url)}
-						accessibilityHint="Opens the link in the browser"
-					/>
-				);
-			})}
-			{files.map((file) => (
-				<ListRow
-					key={file.id}
-					icon={FileText}
-					title={file.title || file.name}
-					caption={[
-						{ text: file.name, mono: true },
-						sizeLabel(file.size),
-						"Opens on the desktop",
-					]}
-				/>
-			))}
-		</ListGroup>
-	);
-}
-
-/**
- * Details, folded away at first: the run's own steps as a trail, a row
- * that opens the transcript, the rarer actions, and how to take the run
- * over in a terminal.
- */
-function Details({
-	runId,
-	steps,
-	labels,
-	status,
-	now,
-	loading,
-	more,
-	buttonProps,
-	command,
-	computer,
-}: {
-	runId: string;
-	steps: StepSummary[];
-	labels: Map<string, string>;
-	status: RunStatus;
-	now: number;
-	/** The steps load still: the trail shows as loading. */
-	loading: boolean;
-	more: RunActionKind[];
-	buttonProps: ButtonProps;
-	command: string | null;
-	computer: string;
-}) {
-	const [open, setOpen] = useState(false);
-	return (
-		<View className="gap-3">
-			<SectionHead
-				title="Details"
-				hint="Steps, transcript and take over"
-				seeAll={{
-					onPress: () => setOpen((was) => !was),
-					label: open ? "Hide" : "Show",
-				}}
-			/>
-			{open ? (
-				<>
-					<Card className="py-4">
-						<CardContent className="px-4">
-							{loading ? (
-								<Skeleton className="h-32 w-full rounded-xl" />
-							) : steps.length === 0 ? (
-								<Text className="text-muted-foreground">
-									The first step starts soon.
-								</Text>
-							) : (
-								<StepTrail
-									items={steps.map((step) =>
-										trailItemOf(step, { labels, runStatus: status, now }),
-									)}
-								/>
-							)}
-						</CardContent>
-					</Card>
-					<ListGroup>
-						<ListRow
-							icon={SquareTerminal}
-							title="Transcript"
-							caption="What the agent did, step by step"
-							href={{ pathname: "/transcript/[runId]", params: { runId } }}
-							accessibilityHint="Opens the transcript of this run"
-						/>
-					</ListGroup>
-					{more.length > 0 ? (
-						<View className="gap-2">
-							<Text className="font-medium text-muted-foreground text-sm">
-								More actions
-							</Text>
-							{more.map((action) => (
-								<RunActionButton
-									key={action}
-									{...buttonProps}
-									action={action}
-								/>
-							))}
-						</View>
-					) : null}
-					{command ? (
-						<TakeOver runId={runId} command={command} computer={computer} />
-					) : null}
-				</>
-			) : null}
-		</View>
-	);
-}
-
-/**
- * The command that opens the agent's session of this run in a terminal,
- * in mono. Touch and hold it to copy it, or share it. A share tells Night
- * Shift you took the run over: Needed you counts it.
- */
-function TakeOver({
-	runId,
-	command,
-	computer,
-}: {
-	runId: string;
-	command: string;
-	computer: string;
-}) {
-	const share = useShareTakeOver(runId, command);
-	return (
-		<Card className="py-4">
-			<CardContent className="gap-3 px-4">
-				<Text className="font-medium text-muted-foreground text-sm">
-					Take over
-				</Text>
-				<View className="rounded-md bg-muted p-3">
-					<Text
-						selectable
-						accessibilityHint="Touch and hold to copy the command."
-						className="font-mono text-sm"
-					>
-						{command}
-					</Text>
-				</View>
-				<Text className="text-muted-foreground text-sm">
-					{`Go on with the agent in a terminal on ${computer}.`}
-				</Text>
-				<Button
-					size="lg"
-					variant="outline"
-					className="h-auto min-h-11 py-2"
-					onPress={share}
-					accessibilityHint="Opens the share sheet. Choose Copy to paste the command in a terminal."
-				>
-					<Icon as={ShareIcon} />
-					<Text>Share the command</Text>
-				</Button>
-			</CardContent>
-		</Card>
-	);
 }
