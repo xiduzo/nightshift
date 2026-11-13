@@ -8,7 +8,14 @@ import {
 import { atLocal } from "@nightshift/client/testing";
 
 import type { TonightEntry } from "@/features/schedules";
-import { lineLabel, nowLines, runCaption, tonightLines } from "./agenda";
+import {
+	nowHint,
+	nowLines,
+	runCaption,
+	type ScheduleLine,
+	tonightHint,
+	tonightLines,
+} from "./agenda";
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -168,11 +175,47 @@ describe("tonightLines", () => {
 	});
 });
 
-describe("lineLabel", () => {
-	test("says the time, the title and the caption", () => {
-		expect(lineLabel({ at: TONIGHT_3, title: "a", caption: "b" })).toBe(
-			`${formatTime(TONIGHT_3)}, a, b`,
+describe("nowHint", () => {
+	test("says how to stop a run, by swipe or by hold", () => {
+		expect(nowHint(2, 30, "swipe")).toBe("Swipe a run left to stop it.");
+		expect(nowHint(2, 30, "hold")).toBe("Hold a run to stop it.");
+	});
+
+	test("says nothing without runs", () => {
+		expect(nowHint(0, 30, "swipe")).toBeUndefined();
+	});
+
+	test("says the list ends at the limit", () => {
+		expect(nowHint(30, 30, "swipe")).toBe(
+			"Swipe a run left to stop it. Shows 30 runs at most.",
 		);
-		expect(lineLabel({ at: null, title: "a", caption: "b" })).toBe("a, b");
+	});
+});
+
+describe("tonightHint", () => {
+	const line = (
+		action: ScheduleLine["action"],
+		runNow: ScheduleLine["runNow"],
+	) => ({ action, runNow });
+
+	test("says how to pause and how to run now", () => {
+		const lines = [line("pause", "yes")];
+		expect(tonightHint(lines, "swipe")).toBe(
+			"Swipe left to pause a schedule tonight. Swipe right to run it now.",
+		);
+		expect(tonightHint(lines, "hold")).toBe(
+			"Hold a schedule to pause it tonight or run it now.",
+		);
+	});
+
+	test("says only what the lines offer", () => {
+		expect(tonightHint([line("undo", "no")], "swipe")).toBe(
+			"Swipe left to pause a schedule tonight.",
+		);
+		expect(tonightHint([line(null, "yes")], "hold")).toBe(
+			"Hold a schedule to run it now.",
+		);
+		expect(tonightHint([line("open", "no")], "swipe")).toBeUndefined();
+		expect(tonightHint([line(null, "offline")], "hold")).toBeUndefined();
 	});
 });

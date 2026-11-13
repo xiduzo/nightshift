@@ -1,100 +1,144 @@
-import { formatTime } from "@nightshift/client";
-import { Text } from "@nightshift/ui-native/components/ui/text";
-import { cn } from "@nightshift/ui-native/lib/utils";
-import type { ReactNode } from "react";
-import { type AccessibilityActionEvent, Pressable, View } from "react-native";
+import { formatTime, type RunStatus } from "@nightshift/client";
+import {
+	CircleAlert,
+	CircleDot,
+	CirclePause,
+	Clock,
+	Moon,
+	RotateCcw,
+} from "lucide-react-native";
 
-import { lineLabel, type Rail } from "./agenda";
+import {
+	NativeButtonRow,
+	type NativeIcon,
+	NativeRow,
+	NativeTextRow,
+	type RowAction,
+} from "@/shared/native-list";
+import { useThemeColors } from "@/shared/theme";
+import type { Rail } from "./agenda";
 
-const RAIL: Record<Rail, string> = {
-	running: "bg-status-running",
-	offline: "bg-destructive",
-	quiet: "bg-border",
-};
+const ICON = {
+	running: { sf: "circle.dotted.circle", lucide: CircleDot },
+	sleeping: { sf: "moon.fill", lucide: Moon },
+	offline: { sf: "exclamationmark.triangle.fill", lucide: CircleAlert },
+	paused: { sf: "pause.circle", lucide: CirclePause },
+	quiet: { sf: "clock", lucide: Clock },
+	problem: { sf: "exclamationmark.circle.fill", lucide: CircleAlert },
+	retry: { sf: "arrow.clockwise", lucide: RotateCcw },
+} as const satisfies Record<string, NativeIcon>;
+
+type Colors = ReturnType<typeof useThemeColors>["colors"];
+
+/** The icon of a line and its color: what it is at a glance. */
+function look(
+	rail: Rail,
+	status: RunStatus | null,
+	muted: boolean,
+	colors: Colors,
+): { icon: NativeIcon; color: string } {
+	if (rail === "running") {
+		return status === "sleeping"
+			? { icon: ICON.sleeping, color: colors.statusSleeping }
+			: { icon: ICON.running, color: colors.statusRunning };
+	}
+	if (rail === "offline") {
+		return { icon: ICON.offline, color: colors.destructive };
+	}
+	return {
+		icon: muted ? ICON.paused : ICON.quiet,
+		color: colors.mutedForeground,
+	};
+}
 
 /**
- * One line of the agenda: the time in its own column, a thin line in the
- * color of what it is, the title and one caption, and one button at the
- * end. The button sits next to the line, not in it, so a screen reader
- * reaches both.
+ * One line of the agenda as a native row: an icon in the color of what it
+ * is, the title, one caption, and the time at the end. Its actions are
+ * swipes on iOS and a long-press menu on Android.
  */
 export function AgendaLine({
 	at,
 	title,
 	caption,
 	rail,
+	status = null,
 	muted = false,
-	action,
 	onPress,
-	onPressIn,
-	onLongPress,
-	longPressLabel,
-	accessibilityHint,
+	actions,
 }: {
 	at: number | null;
 	title: string;
 	caption: string;
 	rail: Rail;
+	/** The status of a run: a sleeping run has a moon. */
+	status?: RunStatus | null;
 	muted?: boolean;
-	/** The one button at the end. */
-	action?: ReactNode;
 	onPress?: () => void;
-	onPressIn?: () => void;
-	/** A long press. A screen reader offers it as an action named `longPressLabel`. */
-	onLongPress?: () => void;
-	longPressLabel?: string;
-	accessibilityHint?: string;
+	actions?: readonly RowAction[];
 }) {
-	const longPress = onLongPress && longPressLabel ? onLongPress : undefined;
+	const { colors } = useThemeColors();
+	const { icon, color } = look(rail, status, muted, colors);
 	return (
-		<View className="min-h-14 flex-row items-center gap-3">
-			<Pressable
-				onPress={onPress}
-				onPressIn={onPressIn}
-				onLongPress={longPress}
-				accessibilityRole={onPress ? "button" : undefined}
-				accessibilityLabel={lineLabel({ at, title, caption })}
-				accessibilityHint={accessibilityHint}
-				accessibilityActions={
-					longPress && longPressLabel
-						? [{ name: "hold", label: longPressLabel }]
-						: undefined
-				}
-				onAccessibilityAction={(event: AccessibilityActionEvent) => {
-					if (event.nativeEvent.actionName === "hold") longPress?.();
-				}}
-				className={cn(
-					"min-h-14 flex-1 flex-row items-center gap-3 py-2 active:opacity-70",
-					muted && "opacity-50",
-				)}
-			>
-				<Text
-					numberOfLines={1}
-					adjustsFontSizeToFit
-					className={cn(
-						"w-18 font-semibold tabular-nums",
-						rail === "running" && "text-status-running",
-					)}
-				>
-					{at === null ? "—" : formatTime(at)}
-				</Text>
-				<View className={cn("w-0.5 self-stretch rounded-full", RAIL[rail])} />
-				<View className="flex-1 gap-0.5">
-					<Text className="font-medium text-base" numberOfLines={1}>
-						{title}
-					</Text>
-					<Text
-						className={cn(
-							"text-sm",
-							rail === "offline" ? "text-destructive" : "text-muted-foreground",
-						)}
-						numberOfLines={1}
-					>
-						{caption}
-					</Text>
-				</View>
-			</Pressable>
-			{action}
-		</View>
+		<NativeRow
+			title={title}
+			subtitle={caption}
+			value={at === null ? undefined : formatTime(at)}
+			icon={icon}
+			iconColor={color}
+			muted={muted}
+			onPress={onPress}
+			actions={actions}
+		/>
 	);
+}
+
+/** Why an action did not work, and how to fix it: a row under its line. */
+export function ProblemLine({
+	title,
+	message,
+	fix,
+}: {
+	title: string;
+	/** The reason, often the Host's own message. */
+	message: string;
+	fix?: string;
+}) {
+	const { colors } = useThemeColors();
+	return (
+		<NativeTextRow
+			text={title}
+			note={fix ? `${message} ${fix}` : message}
+			icon={ICON.problem}
+			iconColor={colors.destructive}
+		/>
+	);
+}
+
+/**
+ * A part of the agenda that did not load: what happened, and Try again.
+ * Rows in an array, so a section on Android draws a divider between them.
+ */
+export function problemRows({
+	title,
+	message,
+	onRetry,
+}: {
+	title: string;
+	message: string;
+	onRetry: () => void;
+}) {
+	return [
+		<ProblemLine
+			key="problem"
+			title={title}
+			message={message}
+			fix="Check that this phone is online, then try again."
+		/>,
+		<NativeButtonRow
+			key="retry"
+			label="Try again"
+			icon={ICON.retry}
+			onPress={onRetry}
+		/>,
+	];
 }

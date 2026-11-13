@@ -260,7 +260,7 @@ apps/mobile/src/
     shell/                 the app frame (AppShell), the tabs (AppTabs: native tabs on iOS, JS tabs on Android) and the stack of each tab (TabStack: large titles)
   features/
     host/                  sign-in (address, the Host code, two-factor or backup code), the session, useHostQueries
-    spaces/                the Space picker of Runs, Projects and New run, the Space remembered per Host
+    spaces/                the Space menu in the header of Runs, the Space remembered per Host
     glance/                the glances outside the app: the home screen widget (Gates that wait, the latest runs) and a run followed on the lock screen (Live Activity, Android ongoing notification), on expo-widgets
     push/                  notifications on this phone: the permission card, the Expo push token registered with the Host, the categories and Android channels, the lock-screen buttons and withdraws (background task), the banner in front and the live cache's adapter (phoneNotifications), where a tap goes
     devices/               the person's computers and whether each can run a flow now (the Computers sheet)

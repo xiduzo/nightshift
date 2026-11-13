@@ -18,7 +18,7 @@ Your phone needs a [Host](Computers-and-Hosts.md#run-a-host).
 | Tab | Shows |
 | --- | --- |
 | **Needs you** | One thing at a time: first the Gates and Asks that wait for you, the most urgent first, then the runs that stopped in the last day. Each shows in full: when to answer, the brief, what happened and what to check. The options show in the colors of the flow. You sign off on your answer in the color of the option you chose. **Skip** moves a thing to the end. For a run that stopped, choose **Retry** or **Resume**, or **Leave it**. |
-| **Runs** | One timeline from now to tomorrow morning. Now shows the runs at work, each with **Stop**. Tonight shows each schedule at its time, with **Pause**, or **Undo** for a paused one. Hold a schedule to run it now. |
+| **Runs** | One list from now to tomorrow morning, in the Space you choose in the menu at the top. Now shows the runs at work. Swipe a run left to **Stop** it. Tonight shows each schedule at its time. Swipe a schedule left to **Pause tonight**, or to **Undo pause**. Swipe it right to **Run now**. On Android, hold a run or a schedule for the same actions. |
 
 - **Answer** a Gate, or a simple Ask.
 - **Follow a run.** The run screen shows its steps, transcripts and changed files, with **Stop**.
