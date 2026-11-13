@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { parseInstant } from "@nightshift/time";
+import type { AnswerCost } from "../assistant";
 import type { RunRung, RunSummary } from "../read";
 import { steadinessOf, summarizeSpend } from "./spend";
 import { spreadOf } from "./stats";
@@ -242,5 +243,107 @@ describe("the ways to save", () => {
 			"day",
 			"night",
 		]);
+	});
+});
+
+/** An answer of a built-in agent that cost `costUsd`, `daysAgo` days ago. */
+const answer = (
+	agent: AnswerCost["agent"],
+	costUsd: number | null,
+	daysAgo = 0,
+): AnswerCost => ({
+	at: NOW - HOUR - daysAgo * DAY,
+	agent,
+	entry: null,
+	projectId: "p1",
+	spaceId: "space",
+	personId: "ada",
+	inputTokens: 100,
+	outputTokens: 10,
+	costUsd,
+});
+
+describe("what help cost", () => {
+	const summarize = (help: AnswerCost[], runs: RunSummary[] = []) =>
+		summarizeSpend(runs, { now: NOW, timeZone: "UTC", help });
+	const days = (spend: ReturnType<typeof summarize>, nights: number) =>
+		spend.ranges.find((range) => range.nights === nights)?.help;
+
+	test("without answers, help cost nothing", () => {
+		const spend = summarizeSpend([cost(1)], { now: NOW, timeZone: "UTC" });
+		expect(days(spend, 7)).toEqual({
+			total: 0,
+			answers: 0,
+			unknown: 0,
+			agents: [],
+		});
+		expect(spend.helpThisMonth).toBe(0);
+	});
+
+	test("the total of the days, split by agent, the most cost first", () => {
+		const spend = summarize([
+			answer("builder", 0.5),
+			answer("improver", 2),
+			answer("improver", 1, 3),
+			answer("field-writer", 0.25, 6),
+			// Outside 7 days, inside 30.
+			answer("explainer", 4, 10),
+		]);
+		expect(days(spend, 7)).toEqual({
+			total: 3.75,
+			answers: 4,
+			unknown: 0,
+			agents: [
+				{ agent: "improver", answers: 2, costUsd: 3 },
+				{ agent: "builder", answers: 1, costUsd: 0.5 },
+				{ agent: "field-writer", answers: 1, costUsd: 0.25 },
+			],
+		});
+		expect(days(spend, 30)?.total).toBe(7.75);
+		expect(days(spend, 30)?.agents[0]).toEqual({
+			agent: "explainer",
+			answers: 1,
+			costUsd: 4,
+		});
+	});
+
+	test("an answer with no known cost counts as an answer, not in the total", () => {
+		const spend = summarize([
+			answer("explainer", null),
+			answer("explainer", 1),
+		]);
+		expect(days(spend, 7)).toEqual({
+			total: 1,
+			answers: 2,
+			unknown: 1,
+			agents: [{ agent: "explainer", answers: 2, costUsd: 1 }],
+		});
+	});
+
+	test("help is not in the spend of the runs", () => {
+		const spend = summarize([answer("builder", 5)], [cost(2)]);
+		const week = spend.ranges.find((range) => range.nights === 7);
+		expect(week?.total).toBe(2);
+		expect(week?.help.total).toBe(5);
+	});
+
+	test("this month holds the answers since the first day of the month", () => {
+		// NOW is 21 October: 20 days ago is 1 October, 21 days ago is 30 September.
+		const spend = summarize([
+			answer("builder", 1),
+			answer("builder", 2, 20),
+			answer("builder", 8, 21),
+		]);
+		expect(spend.helpThisMonth).toBe(3);
+	});
+
+	test("the month starts on the reader's clock", () => {
+		// 1 November 00:30 in Amsterdam is still 31 October in UTC.
+		const now = parseInstant("2026-10-31T23:30:00Z");
+		const help = [{ ...answer("builder", 2), at: now - HOUR }];
+		const read = (timeZone: string) =>
+			summarizeSpend([], { now, timeZone, help }).helpThisMonth;
+		expect(read("UTC")).toBe(2);
+		expect(read("Europe/Amsterdam")).toBe(0);
 	});
 });

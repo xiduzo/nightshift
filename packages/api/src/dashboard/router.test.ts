@@ -5,7 +5,12 @@ import {
 	createAuthSandbox,
 	OPEN_HOST,
 } from "@nightshift/auth/testing";
-import type { RunSummary, SpaceEngine, SpaceFlows } from "@nightshift/engine";
+import type {
+	AnswerCost,
+	RunSummary,
+	SpaceEngine,
+	SpaceFlows,
+} from "@nightshift/engine";
 import type { Project } from "@nightshift/engine/projects";
 import type { FlowListItem } from "@nightshift/flows";
 import { now } from "@nightshift/time";
@@ -69,6 +74,8 @@ type SpaceData = {
 	projects: { id: string; name: string }[];
 	runs: RunSummary[];
 	flows: string[];
+	/** What the answers of Night Shift's own agents cost. */
+	help?: AnswerCost[];
 };
 
 /** An engine whose Spaces hold `data`, and the Spaces it was asked for. */
@@ -87,6 +94,7 @@ function engineOf(data: Record<string, SpaceData>) {
 							input?.projectId === undefined ||
 							run.projectId === input.projectId,
 					),
+				listAnswerCosts: async () => space.help ?? [],
 				flows: stub<SpaceFlows>("flows", {
 					list: async () =>
 						space.flows.map((name) => stub<FlowListItem>("flow", { name })),
@@ -415,5 +423,60 @@ describe("dashboard.spend", () => {
 				runId: "b",
 			},
 		]);
+		expect(week?.help).toEqual({
+			total: 0,
+			answers: 0,
+			unknown: 0,
+			agents: [],
+		});
+	});
+
+	test("gives what Night Shift's own agents cost in the Space, apart from the runs", async () => {
+		const { headers, personal, platform } = await ada();
+		const answer = (fields: Partial<AnswerCost>): AnswerCost => ({
+			at: now() - 60_000,
+			agent: "builder",
+			entry: "flow.build",
+			projectId: "web",
+			spaceId: platform,
+			personId: "ada",
+			inputTokens: 100,
+			outputTokens: 10,
+			costUsd: 1,
+			...fields,
+		});
+		const { engine } = engineOf({
+			[platform]: {
+				projects: [{ id: "web", name: "website" }],
+				runs: [aRun({ id: "a", projectId: "web", costUsd: 2 })],
+				flows: [],
+				help: [
+					answer({ costUsd: 0.5 }),
+					answer({ agent: "explainer", entry: "run.why", costUsd: 1.5 }),
+				],
+			},
+			[personal]: {
+				projects: [],
+				runs: [],
+				flows: [],
+				help: [answer({ spaceId: personal, costUsd: 100 })],
+			},
+		});
+		const spend = await call(
+			appRouter.dashboard.spend,
+			{ timeZone: "UTC" },
+			{ context: await contextFor(headers, engine) },
+		);
+		const week = spend.ranges.find((range) => range.nights === 7);
+		expect(week?.total).toBe(2);
+		expect(week?.help).toEqual({
+			total: 2,
+			answers: 2,
+			unknown: 0,
+			agents: [
+				{ agent: "explainer", answers: 1, costUsd: 1.5 },
+				{ agent: "builder", answers: 1, costUsd: 0.5 },
+			],
+		});
 	});
 });

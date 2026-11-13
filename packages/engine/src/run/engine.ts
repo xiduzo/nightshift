@@ -2,6 +2,7 @@ import { harnessFacts } from "@nightshift/agents/harness-facts";
 import { isCustomHarness, type Schedule } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
 import { createArtifactStore } from "../artifacts";
+import { type AnswerCost, keepAnswerCost, listAnswerCosts } from "../assistant";
 import { createRunCopies, createRunFiles, startCleanupJob } from "../cleanup";
 import type { Actor, LeaseHost, MemberChange } from "../contract";
 import {
@@ -173,6 +174,12 @@ export interface Engine {
 	 * then it goes through that Space's view.
 	 */
 	spaceOfRun(runId: string): Promise<string | null>;
+	/**
+	 * Keeps what one answer of one of Night Shift's own agents cost on this
+	 * computer. The Spend page of its Space reads it
+	 * (`SpaceEngine.listAnswerCosts`).
+	 */
+	keepAnswerCost(cost: AnswerCost): Promise<void>;
 	/**
 	 * Logs a change of a Space's Members in that Space's event log
 	 * (`MemberJoined`, `MemberRemoved`, `MemberRoleChanged`), with who made it.
@@ -902,6 +909,7 @@ export function createEngine(
 			list: (flow) => listMemory(db, flow),
 			forget: (flow, node, scope) => forgetMemory(db, flow, node, scope),
 		},
+		answerCosts: (spaceId, since) => listAnswerCosts(db, spaceId, since),
 		scheduleFiles: createScheduleFiles({
 			now,
 			flows: projectFlows,
@@ -924,6 +932,10 @@ export function createEngine(
 		async spaceOfRun(runId) {
 			await ready;
 			return spaceOfRun(db, runId);
+		},
+		async keepAnswerCost(cost) {
+			await ready;
+			await keepAnswerCost(db, cost);
 		},
 		logMemberChange: (change) => logMemberChange(runLog, change),
 		leases: {

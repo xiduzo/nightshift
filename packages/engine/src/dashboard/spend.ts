@@ -1,9 +1,11 @@
+import { type AnswerCost, HELP_AGENTS } from "../assistant";
 import type { RunSummary } from "../read";
 import { isTestRun } from "../run-status";
-import { dayStart, lastDays } from "./clock";
+import { dayStart, lastDays, wall } from "./clock";
 import { hasEnded, spreadOf } from "./stats";
 import {
 	type CostSteadiness,
+	type HelpSpend,
 	NIGHT_RANGES,
 	type NightRange,
 	type SavingKind,
@@ -24,6 +26,9 @@ import {
  * A run counts under its own flow. What a Subflow cost is in the run that
  * called it, so the flows add up to the total. A test run counts in the
  * spend only: not in a usual run, and not in a way to save.
+ *
+ * What Night Shift's own agents cost for their answers is its own line
+ * (`help`): it is in no run, so it is in no total of the runs.
  */
 
 /** Fewer finished runs with a known cost: the flow has no steadiness yet. */
@@ -234,10 +239,30 @@ function flowSpend(
 	};
 }
 
+/** What the answers cost together, and per agent that answered, the most cost first. */
+export function helpSpend(answers: readonly AnswerCost[]): HelpSpend {
+	const agents = HELP_AGENTS.map((agent) => {
+		const own = answers.filter((answer) => answer.agent === agent);
+		return {
+			agent,
+			answers: own.length,
+			costUsd: own.reduce((sum, answer) => sum + (answer.costUsd ?? 0), 0),
+		};
+	}).filter((agent) => agent.answers > 0);
+	return {
+		total: agents.reduce((sum, agent) => sum + agent.costUsd, 0),
+		answers: answers.length,
+		unknown: answers.filter((answer) => answer.costUsd === null).length,
+		// A stable sort: agents with the same cost keep the order of the list.
+		agents: agents.sort((a, b) => b.costUsd - a.costUsd),
+	};
+}
+
 /** The Spend page over the last `range` days. */
 function spendDays(
 	range: NightRange,
 	runs: readonly Placed[],
+	help: readonly AnswerCost[],
 	now: number,
 	timeZone: string,
 ): SpendDays {
@@ -294,22 +319,32 @@ function spendDays(
 		quick: { runs: quick.length, spent: total(quick) },
 		savings,
 		saves: savings.reduce((sum, saving) => sum + saving.saves, 0),
+		help: helpSpend(help.filter((answer) => answer.at >= first)),
 	};
 }
 
-/** The Spend page of `runs`, for each day range. */
+/**
+ * The Spend page of `runs`, for each day range. `help`: what the answers
+ * of Night Shift's own agents cost. Without it, help cost nothing.
+ */
 export function summarizeSpend(
 	runs: readonly RunSummary[],
-	options: { now: number; timeZone: string },
+	options: { now: number; timeZone: string; help?: readonly AnswerCost[] },
 ): SpaceSpend {
+	const { now, timeZone, help = [] } = options;
 	const placed = runs.map((run) => ({
 		run,
-		day: dayStart(run.createdAt, options.timeZone),
+		day: dayStart(run.createdAt, timeZone),
 	}));
+	// The first day of this month on the reader's clock.
+	const month = lastDays(wall(now, timeZone).day, now, timeZone)[0] ?? now;
 	return {
-		at: options.now,
+		at: now,
 		ranges: NIGHT_RANGES.map((range) =>
-			spendDays(range, placed, options.now, options.timeZone),
+			spendDays(range, placed, help, now, timeZone),
 		),
+		helpThisMonth: help
+			.filter((answer) => answer.at >= month && answer.at <= now)
+			.reduce((sum, answer) => sum + (answer.costUsd ?? 0), 0),
 	};
 }

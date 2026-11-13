@@ -17,6 +17,7 @@ import { RangeBar } from "@/features/dashboard";
 import { projectQueries } from "@/features/projects";
 import type { NightRange } from "@/shared/api";
 import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
+import { HelpCost } from "./help-cost";
 import { spendQuery } from "./queries";
 import { SpendFlows } from "./spend-flows";
 import { SpendTiles } from "./spend-tiles";
@@ -27,7 +28,8 @@ import { WaysToSave } from "./ways-to-save";
  * the whole page, in the toolbar. On top, what the runs spent against the days before,
  * how many flows have a steady cost, and what a change could save. Under
  * it, one row per flow with its cost against a usual run of that flow,
- * and beside it the ways to save, the biggest first. Home and a project's
+ * and beside it the ways to save, the biggest first, then what Night
+ * Shift's own agents cost (Help), which is in no run. Home and a project's
  * page keep cost only as evidence of a flow.
  */
 export function SpendPage({
@@ -73,7 +75,7 @@ export function SpendPage({
 						</div>
 						<Skeleton className="h-64 w-full rounded-xl" />
 					</>
-				) : days.runs === 0 ? (
+				) : days.runs === 0 && days.help.answers === 0 ? (
 					<Empty className="border border-dashed">
 						<EmptyHeader>
 							<EmptyMedia variant="icon">
@@ -108,7 +110,10 @@ export function SpendPage({
 							>
 								<SpendFlows days={days} projectName={projectName} />
 							</PageSection>
-							<WaysToSave days={days} projectName={projectName} />
+							<div className="flex min-w-0 flex-col gap-8">
+								<WaysToSave days={days} projectName={projectName} />
+								<HelpCost days={days} />
+							</div>
 						</div>
 					</>
 				)}

@@ -20,6 +20,7 @@ export {
 	type Artifact,
 	createArtifactStore,
 } from "./artifacts";
+export { type AnswerCost, HELP_AGENTS } from "./assistant";
 export type { RunFiles } from "./cleanup";
 export type {
 	Actor,
