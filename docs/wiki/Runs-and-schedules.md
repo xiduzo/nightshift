@@ -123,7 +123,7 @@ Home is a short note about all your projects. Read it from top to bottom.
 - **Needs a look** lists each flow that does not do what it usually does: its last runs failed, its last runs found nothing to do, or its last run cost more or took longer than usual. Night Shift learns what is usual from the runs of the flow. You set no limits.
 - **What came out** lists the latest report of each flow from the last 7 days.
 
-A flow stays under **Needs a look** until it does its usual work again. To look at one:
+A flow stays under **Needs a look** until it does its usual work again. When its last 2 runs failed, your phone and your other screens get a notification, once. It follows **Push for** Now and your quiet hours. To look at one:
 
 1. Choose **Look**. A panel shows what is unusual, and what is usual for this flow.
 2. If a run failed, choose **Ask why**. An agent reads the run and tells you what went wrong. It changes nothing.
