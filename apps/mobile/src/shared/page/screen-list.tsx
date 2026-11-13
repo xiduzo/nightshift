@@ -29,9 +29,7 @@ type ScreenListProps<T> = Omit<
 /**
  * A screen that is one long list: `Screen` as a FlashList. Return it as
  * the root of the screen, so it is the first native child and the large
- * title collapses. Each row renders and recycles on its own: draw it as a
- * ListCell (the card look) split by `ItemSeparatorComponent={CellSeparator}`.
- * Rows are `memo`, and `renderItem`, `keyExtractor` and `getItemType` are
+ * title collapses. Each row renders and recycles on its own. Rows are `memo`, and `renderItem`, `keyExtractor` and `getItemType` are
  * stable (module level, or `useCallback`).
  */
 export function ScreenList<T>({

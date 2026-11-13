@@ -1,19 +1,17 @@
+import { type OpenGate, type RunDetail, waitedText } from "@nightshift/client";
 import {
-	deadlineText,
-	type OpenGate,
-	type RunDetail,
-	waitedText,
-} from "@nightshift/client";
+	Alert,
+	AlertDescription,
+	AlertTitle,
+} from "@nightshift/ui-native/components/ui/alert";
 import { Card } from "@nightshift/ui-native/components/ui/card";
-import { Icon } from "@nightshift/ui-native/components/ui/icon";
-import { Text } from "@nightshift/ui-native/components/ui/text";
-import { AlarmClock } from "lucide-react-native";
-import { View } from "react-native";
+import { AlarmClock, CircleAlert } from "lucide-react-native";
 
-import { Countdown, useClock } from "@/shared/clock";
+import { useClock } from "@/shared/clock";
 import { StatusBadge } from "@/shared/status";
 import { type Look, NEEDS_YOU } from "@/shared/tone";
 import { StepTrail, trailItemOf } from "@/shared/trail";
+import { urgentText } from "./gate-view";
 
 /*
  * The parts of the Gate screen that show a time. Each keeps its time
@@ -64,27 +62,26 @@ export function RunSteps({
 }
 
 /**
- * What Night Shift picks when nobody answers, and the time left, counting
- * down each second.
+ * Why the Gate is urgent, at its top: when you must answer and what
+ * Night Shift picks when you do not (`urgentText`). Nothing for a Gate
+ * without a deadline that is not for now.
  */
-export function GateDeadline({
-	deadline,
+export function GateUrgent({
+	gate,
 }: {
-	deadline: NonNullable<OpenGate["deadline"]>;
+	gate: Pick<OpenGate, "deadline" | "urgency" | "form">;
 }) {
 	const now = useClock();
+	const text = urgentText(gate, now);
+	if (!text) return null;
 	return (
-		<View className="flex-row items-start gap-2">
-			<Icon as={AlarmClock} className="mt-0.5 size-4 text-muted-foreground" />
-			<Text className="flex-1 text-muted-foreground text-sm">
-				{deadlineText(deadline, now)}
-			</Text>
-			{deadline.at > now ? (
-				<Countdown
-					until={deadline.at}
-					className="font-medium font-mono text-foreground text-sm tabular-nums"
-				/>
-			) : null}
-		</View>
+		<Alert
+			icon={gate.deadline ? AlarmClock : CircleAlert}
+			variant="destructive"
+			accessibilityLiveRegion="polite"
+		>
+			<AlertTitle>{text.title}</AlertTitle>
+			<AlertDescription>{text.description}</AlertDescription>
+		</Alert>
 	);
 }

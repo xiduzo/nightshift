@@ -1,8 +1,17 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
-import { type ContextItem, parseGateQuestion } from "@nightshift/client";
+import {
+	type ContextItem,
+	type OpenGate,
+	parseGateQuestion,
+} from "@nightshift/client";
 
-import { openLinkText, questionSections, stepsHint } from "./gate-view";
+import {
+	openLinkText,
+	questionSections,
+	stepsHint,
+	urgentText,
+} from "./gate-view";
 
 describe("questionSections", () => {
 	test("splits the rest of the question, short facts and long parts", () => {
@@ -69,5 +78,56 @@ describe("labels", () => {
 		expect(openLinkText({ url: "https://example.com", kind: "web" })).toBe(
 			"Open in the browser",
 		);
+	});
+});
+
+describe("urgentText", () => {
+	const MIN = 60_000;
+	const at = 10 * 60 * MIN;
+
+	test("a deadline within the hour counts down in minutes", () => {
+		expect(
+			urgentText({ deadline: { at, choose: "Keep" } }, at - 14 * MIN),
+		).toEqual({
+			title: "Answer in 14 min",
+			description: "If you do not, Night Shift picks Keep.",
+		});
+	});
+
+	test("a later deadline gives its time", () => {
+		const text = urgentText(
+			{ deadline: { at, choose: "Keep" } },
+			at - 3 * 60 * MIN,
+		);
+		expect(text?.title.startsWith("Answer by ")).toBe(true);
+	});
+
+	test("a deadline that passed asks for an answer now", () => {
+		expect(
+			urgentText({ deadline: { at, choose: "Keep" } }, at + MIN)?.title,
+		).toBe("Answer now");
+	});
+
+	test("an Ask takes its default, or its step fails", () => {
+		const deadline = { at, choose: "answer" };
+		expect(
+			urgentText(
+				{ deadline, form: { default: {} } as OpenGate["form"] },
+				at - MIN,
+			)?.description,
+		).toBe("If you do not, Night Shift takes the default.");
+		expect(
+			urgentText({ deadline, form: {} as OpenGate["form"] }, at - MIN)
+				?.description,
+		).toBe("If you do not, the step fails.");
+	});
+
+	test("a Gate for now without a deadline: the run waits", () => {
+		expect(urgentText({ deadline: null, urgency: "now" }, 0)).toEqual({
+			title: "This needs you now",
+			description: "The run waits until you answer.",
+		});
+		expect(urgentText({ deadline: null, urgency: "today" }, 0)).toBeNull();
+		expect(urgentText({ deadline: null }, 0)).toBeNull();
 	});
 });

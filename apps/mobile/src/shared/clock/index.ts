@@ -1,4 +1,3 @@
-/** Times that keep current on one shared ticker: useClock for a row, Countdown for a ticking text. */
+/** Times that keep current on one shared ticker: useClock for a row or a text. */
 
-export { Countdown } from "./countdown";
 export { useClock } from "./use-clock";

@@ -249,7 +249,7 @@ to do, drop it.
 
 ## Responsive Behavior
 
-The product is a desktop app first. The web UI must still work in a narrow window. The phone app is a controller for when you are away: Needs you (Gates and stopped runs) and Runs (running now, tonight). It shows no numbers, reports, history or learnings. Those are the work of the desktop and web app. It uses React Native Reusables, not the web UI (see `docs/research/mobile.md`).
+The product is a desktop app first. The web UI must still work in a narrow window. The phone app is a controller for when you are away: Needs you (Gates and stopped runs) and Runs (running now, tonight). Needs you shows one thing at a time, in full, with Skip: a person who steps in must know all of it before they decide. The options and the send button take the colour of the flow's outcome. It shows no numbers, reports, history or learnings. Those are the work of the desktop and web app. It uses React Native Reusables, not the web UI (see `docs/research/mobile.md`).
 
 | Breakpoint | Width | Layout behavior |
 | --- | --- | --- |
