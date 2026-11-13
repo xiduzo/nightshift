@@ -121,12 +121,12 @@ export function confirmText(
 			};
 		case "node":
 			return {
-				title: `Send ${choiceName}?`,
+				title: `Sign off on ${choiceName}?`,
 				body: `${routeText(route)} in the run ${runTitle}.`,
 			};
 		default:
 			return {
-				title: `Send ${choiceName}?`,
+				title: `Sign off on ${choiceName}?`,
 				body: `The run ${runTitle} gets this answer.`,
 			};
 	}

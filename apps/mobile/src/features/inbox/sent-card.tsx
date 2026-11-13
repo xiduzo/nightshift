@@ -79,7 +79,7 @@ export function SentCard({
 				<Button
 					size="lg"
 					variant="outline"
-					onPress={() => router.dismissTo("/needs")}
+					onPress={() => router.dismissTo("/")}
 					className="h-auto min-h-11 py-2"
 				>
 					<Text>Back to Needs you</Text>

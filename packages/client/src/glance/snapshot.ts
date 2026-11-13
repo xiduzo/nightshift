@@ -1,84 +1,127 @@
-import { type OpenGate, waitingForYou } from "../gates";
-import {
-	flowLabel,
-	isTestRun,
-	type RunStatus,
-	type RunSummary,
-	statusOf,
-	TEST_RUN_LABEL,
-} from "../runs";
+import { gateOrder, mayAnswer, type OpenGate, urgencyOf } from "../gates";
 import { type GlanceTone, glanceTone } from "./tone";
 
-/** How many runs a glance shows: the newest. A screen reads only these. */
-export const GLANCE_RUNS = 3;
+/** How many things a glance shows: the first in queue order. */
+const GLANCE_ITEMS = 3;
 
-/** One run on a glance: its flow and status, nothing more. */
-export type GlanceRun = {
+/** One thing that needs you now, on a glance: its flow and why, nothing more. */
+export type GlanceItem = {
 	id: string;
+	/** The flow's name, or "Quick run". */
 	flow: string;
-	status: RunStatus;
-	/** "Finished", "Nothing to do" (`statusOf`), or "Finished · Test run" for a test run. */
-	statusText: string;
+	/** "Answer by 07:30", "Waits for your answer" or "Needs a look". */
+	detail: string;
 	tone: GlanceTone;
 };
 
 /**
- * What the home screen widget shows: how many Gates wait for you and the
- * latest runs with their status. It holds only counts, flow names and
- * statuses, never what a Gate asks or what a run started with: a widget
- * shows on a locked phone too. Every text is ready to show, because a
- * widget cannot format anything itself.
+ * What the home screen widget shows: only what needs you now. That is
+ * what a phone pushes for: the Gates marked Now that you may answer, and
+ * the flows that need a look now. It holds only counts, flow names and
+ * times, never what a Gate asks: a widget shows on a locked phone too.
+ * Every text is ready to show, because a widget cannot format anything.
  */
 export type GlanceSnapshot = {
-	waiting: number;
-	/** "Nothing waits for you", "1 Gate waits for you", "3 Gates wait for you". */
-	waitingText: string;
-	/** The newest runs first, at most three. */
-	runs: GlanceRun[];
-	/** What the widget shows instead of runs when there are none. */
-	noRunsText: string;
+	now: number;
+	/** "Nothing needs you now", "1 thing needs you now", "3 things need you now". */
+	nowText: string;
+	/** The first things, Gates before flows, at most three. */
+	items: GlanceItem[];
+	/** The line under an empty widget: what waits for later, or nothing. */
+	laterText: string;
 };
 
-/** The words for a count of Gates that wait for you. */
-export function waitingText(count: number): string {
-	if (count === 0) return "Nothing waits for you";
-	return count === 1 ? "1 Gate waits for you" : `${count} Gates wait for you`;
+/** The words for a count of things that need you now. */
+export function nowText(count: number): string {
+	if (count === 0) return "Nothing needs you now";
+	return count === 1 ? "1 thing needs you now" : `${count} things need you now`;
 }
 
+/** "2 Gates wait for later" under an empty widget, or "" when none wait. */
+function laterText(count: number): string {
+	if (count === 0) return "";
+	return count === 1
+		? "1 Gate waits for later"
+		: `${count} Gates wait for later`;
+}
+
+/** A flow that needs a look now: a flow with a severe signal. */
+export type GlanceLook = { key: string; flow: string };
+
+type GlanceGate = Pick<
+	OpenGate,
+	| "runId"
+	| "stepId"
+	| "flowName"
+	| "canAnswer"
+	| "answerPending"
+	| "deadline"
+	| "openedAt"
+	| "urgency"
+>;
+
 /**
- * The widget's snapshot from the open Gates (of every Space) and the runs
- * (of the active Space). Gates the person may not answer do not count.
- * The newest runs are a list: a test run stays in it, and its status says
- * "Test run", as the run lists of the app do.
+ * The widget's snapshot from the open Gates (of every Space) and the flows
+ * that need a look now. A Gate counts when you may answer it and it is
+ * marked Now. The other Gates only show as a count under an empty widget.
+ * `time` writes a deadline as this phone shows times ("07:30").
  */
 export function glanceSnapshot({
 	gates,
-	runs,
+	looks = [],
+	time,
 }: {
-	gates: readonly Pick<OpenGate, "canAnswer">[];
-	runs: readonly Pick<
-		RunSummary,
-		"id" | "flowName" | "status" | "result" | "createdAt" | "test"
-	>[];
+	gates: readonly GlanceGate[];
+	looks?: readonly GlanceLook[];
+	time: (epochMs: number) => string;
 }): GlanceSnapshot {
-	const waiting = waitingForYou(gates);
-	const latest = [...runs]
-		.sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
-		.slice(0, GLANCE_RUNS)
-		.map((run) => {
-			const { word } = statusOf(run);
-			return {
-				id: run.id,
-				flow: flowLabel(run),
-				status: run.status,
-				statusText: isTestRun(run) ? `${word} · ${TEST_RUN_LABEL}` : word,
-				tone: glanceTone(run.status),
-			};
-		});
+	const open = gates.filter(mayAnswer);
+	const nowGates = gateOrder(open.filter((gate) => urgencyOf(gate) === "now"));
+	const items: GlanceItem[] = [
+		...nowGates.map(
+			(gate): GlanceItem => ({
+				id: `gate:${gate.runId}:${gate.stepId}`,
+				flow: gate.flowName ?? "Quick run",
+				detail: gate.deadline
+					? `Answer by ${time(gate.deadline.at)}`
+					: "Waits for your answer",
+				tone: glanceTone("waiting"),
+			}),
+		),
+		...looks.map(
+			(look): GlanceItem => ({
+				id: `look:${look.key}`,
+				flow: look.flow,
+				detail: "Needs a look",
+				tone: glanceTone("failed"),
+			}),
+		),
+	];
 	return {
-		waiting,
-		waitingText: waitingText(waiting),
-		runs: latest,
-		noRunsText: "No runs yet",
+		now: items.length,
+		nowText: nowText(items.length),
+		items: items.slice(0, GLANCE_ITEMS),
+		laterText: laterText(open.length - nowGates.length),
 	};
+}
+
+/**
+ * The flows that need a look now, from the watch of a dashboard summary:
+ * those with a severe signal, the severe first as the watch sorts them.
+ * An older Host sends no watch: then none.
+ */
+export function glanceLooks(
+	watch:
+		| {
+				flows: readonly {
+					key: string;
+					flow: string;
+					signals: readonly { severe: boolean }[];
+				}[];
+		  }
+		| undefined,
+): GlanceLook[] {
+	return (watch?.flows ?? [])
+		.filter((flow) => flow.signals.some((signal) => signal.severe))
+		.map((flow) => ({ key: flow.key, flow: flow.flow }));
 }

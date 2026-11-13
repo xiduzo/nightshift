@@ -14,7 +14,7 @@ export function NotFoundScreen() {
 				title="This page does not exist"
 				description="The link may be old."
 			>
-				<Link href="/needs" dismissTo asChild>
+				<Link href="/" dismissTo asChild>
 					<Button size="lg" className="h-auto min-h-11 py-2">
 						<Text>Open Needs you</Text>
 					</Button>

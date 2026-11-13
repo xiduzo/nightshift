@@ -18,8 +18,8 @@ import type {
 /** One item of the in-app stream. */
 export type InAppItem =
 	| {
-			/** A missed schedule is a push only. */
-			kind: Exclude<NoticeKind, "schedule-missed">;
+			/** A missed schedule and a flow that needs a look are pushes only. */
+			kind: Exclude<NoticeKind, "schedule-missed" | "flow-needs-a-look">;
 			key: string;
 			spaceId: string;
 			runId: string;
@@ -189,6 +189,7 @@ export function createInAppChannel(
 			if (
 				message.kind === "gates-waiting" ||
 				message.kind === "schedule-missed" ||
+				message.kind === "flow-needs-a-look" ||
 				message.spaceId === null ||
 				message.runId === null
 			) {

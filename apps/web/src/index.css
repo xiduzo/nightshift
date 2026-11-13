@@ -29,25 +29,27 @@
 
 /*
  * Outcome colors: the Tailwind colors a person can pick for an outcome, one
- * shade per theme. An outcome without a color takes one from its name: pass
+ * shade per theme, dark enough on light (700 or 800) and light enough on
+ * dark (300 or 400) to keep 4.5:1 (WCAG AA) as text. The phone's contrast.test.ts
+ * checks both files. An outcome without a color takes one from its name: pass
  * green, fail red, needs-input amber. Every other outcome (a Decision label, a
  * Gate choice) shares the cyan accent; its name is the signal.
  */
 :root {
-	--outcome-red: var(--color-red-600);
-	--outcome-orange: var(--color-orange-600);
-	--outcome-amber: var(--color-amber-600);
-	--outcome-yellow: var(--color-yellow-600);
-	--outcome-lime: var(--color-lime-600);
-	--outcome-green: var(--color-green-600);
-	--outcome-teal: var(--color-teal-600);
-	--outcome-cyan: var(--color-cyan-600);
-	--outcome-sky: var(--color-sky-600);
-	--outcome-blue: var(--color-blue-600);
-	--outcome-indigo: var(--color-indigo-600);
-	--outcome-violet: var(--color-violet-600);
-	--outcome-pink: var(--color-pink-600);
-	--outcome-gray: var(--color-gray-600);
+	--outcome-red: var(--color-red-700);
+	--outcome-orange: var(--color-orange-700);
+	--outcome-amber: var(--color-amber-800);
+	--outcome-yellow: var(--color-yellow-800);
+	--outcome-lime: var(--color-lime-800);
+	--outcome-green: var(--color-green-800);
+	--outcome-teal: var(--color-teal-700);
+	--outcome-cyan: var(--color-cyan-700);
+	--outcome-sky: var(--color-sky-700);
+	--outcome-blue: var(--color-blue-700);
+	--outcome-indigo: var(--color-indigo-700);
+	--outcome-violet: var(--color-violet-700);
+	--outcome-pink: var(--color-pink-700);
+	--outcome-gray: var(--color-gray-700);
 	--outcome-pass: var(--outcome-green);
 	--outcome-fail: var(--outcome-red);
 	--outcome-needs-input: var(--outcome-amber);
@@ -55,7 +57,7 @@
 }
 
 .dark {
-	--outcome-red: var(--color-red-400);
+	--outcome-red: var(--color-red-300);
 	--outcome-orange: var(--color-orange-400);
 	--outcome-amber: var(--color-amber-400);
 	--outcome-yellow: var(--color-yellow-400);
@@ -64,11 +66,11 @@
 	--outcome-teal: var(--color-teal-400);
 	--outcome-cyan: var(--color-cyan-400);
 	--outcome-sky: var(--color-sky-400);
-	--outcome-blue: var(--color-blue-400);
-	--outcome-indigo: var(--color-indigo-400);
-	--outcome-violet: var(--color-violet-400);
-	--outcome-pink: var(--color-pink-400);
-	--outcome-gray: var(--color-gray-400);
+	--outcome-blue: var(--color-blue-300);
+	--outcome-indigo: var(--color-indigo-300);
+	--outcome-violet: var(--color-violet-300);
+	--outcome-pink: var(--color-pink-300);
+	--outcome-gray: var(--color-gray-300);
 }
 
 /*

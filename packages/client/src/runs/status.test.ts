@@ -1,12 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-	groupCounts,
-	groupStatuses,
-	hasEnded,
-	runStatusLabel,
-	statusOf,
-} from "./status";
+import { groupStatuses, hasEnded, runStatusLabel, statusOf } from "./status";
 import type { RunStatus } from "./types";
 
 const STATUSES: RunStatus[] = [
@@ -49,41 +43,6 @@ describe("the group a run counts in", () => {
 			"stopped",
 			"interrupted",
 		]);
-	});
-
-	test("counts per status add up per group, and every run counts once", () => {
-		const counts = {
-			running: 1,
-			sleeping: 2,
-			waiting: 3,
-			finished: 4,
-			failed: 5,
-			stopped: 6,
-			interrupted: 7,
-		};
-		expect(groupCounts(counts)).toEqual({
-			running: 3,
-			"needs-you": 3,
-			failed: 5,
-			stopped: 13,
-			finished: 4,
-		});
-		const total = Object.values(groupCounts(counts)).reduce((a, b) => a + b);
-		expect(total).toBe(28);
-	});
-
-	test("a count of something that is no status counts nowhere", () => {
-		expect(groupCounts({ failed: 2, archived: 9 })).toMatchObject({
-			failed: 2,
-			stopped: 0,
-		});
-		expect(groupCounts({})).toEqual({
-			running: 0,
-			"needs-you": 0,
-			failed: 0,
-			stopped: 0,
-			finished: 0,
-		});
 	});
 
 	test("knows which statuses have ended", () => {

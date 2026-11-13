@@ -1,5 +1,3 @@
-import type { RunDevice, RunPlacement } from "./types";
-
 /**
  * One place a run can go, for the start of a run: a Device that can take
  * it now, or one of your Devices that is offline (shown, not chosen).
@@ -19,40 +17,6 @@ export type PlacementChoice = {
 	/** Where a run goes when the person chooses none, as Night Shift decides it. */
 	default?: boolean;
 };
-
-/**
- * Where a run of the project can go: the Devices of `runs.placements`
- * (online, this one first), then your Devices with this project that are
- * offline, so the person sees why they cannot choose them.
- */
-export function placementChoices(
-	placements: readonly RunPlacement[],
-	devices: readonly RunDevice[] = [],
-): PlacementChoice[] {
-	const online: PlacementChoice[] = placements.map((placement) => ({
-		deviceId: placement.deviceId,
-		name: placement.name,
-		thisDevice: placement.thisDevice,
-		...(placement.offers !== undefined ? { offers: placement.offers } : {}),
-		...(placement.ownerName ? { ownerName: placement.ownerName } : {}),
-		...(placement.lastRun ? { lastRun: true } : {}),
-		...(placement.default ? { default: true } : {}),
-		online: true,
-	}));
-	const known = new Set(online.map((choice) => choice.deviceId));
-	const offline: PlacementChoice[] = devices
-		.filter(
-			(device) =>
-				!device.online && device.hasClone && !known.has(device.deviceId),
-		)
-		.map((device) => ({
-			deviceId: device.deviceId,
-			name: device.name,
-			thisDevice: device.thisDevice,
-			online: false,
-		}));
-	return [...online, ...offline];
-}
 
 /**
  * What the Host is when another person runs it: whose it is, and what

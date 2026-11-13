@@ -47,22 +47,13 @@ export default function RootLayout() {
 					name="changes/[runId]"
 					options={{ title: "Changed files" }}
 				/>
-				<Stack.Screen name="report/[runId]" options={{ title: "Report" }} />
 				<Stack.Screen
 					name="gates/[runId]/[stepId]"
 					options={{ title: "Gate", presentation: "modal" }}
 				/>
 				<Stack.Screen
-					name="projects/[projectId]"
-					options={{ title: "Project", headerLargeTitleEnabled: true }}
-				/>
-				<Stack.Screen
 					name="settings"
 					options={{ title: "Settings", headerLargeTitleEnabled: true }}
-				/>
-				<Stack.Screen
-					name="start"
-					options={{ title: "New run", presentation: "modal" }}
 				/>
 				<Stack.Screen name="computers" options={sheet("Computers")} />
 				<Stack.Screen name="gate-link" options={sheet("Link")} />

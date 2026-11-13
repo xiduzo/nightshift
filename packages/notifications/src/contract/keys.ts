@@ -37,6 +37,20 @@ export function scheduleMissedKey(missed: {
 	return `${MISSED}:${missed.projectId}:${missed.scheduleId}:${missed.at}`;
 }
 
+/**
+ * One time a flow turned severe under Needs a look
+ * (`look:<projectId>:<flow>:<runId>`), by the run whose end turned it. A
+ * flow that stays severe makes no new key. One that turns severe again
+ * after it recovered does: a later run turned it.
+ */
+export function needsALookKey(turn: {
+	projectId: string;
+	flow: string;
+	runId: string;
+}): string {
+	return `${LOOK}:${turn.projectId}:${turn.flow}:${turn.runId}`;
+}
+
 /** The notification at the end of quiet hours (`waiting:<ms>`). */
 export function waitingKey(at: number): string {
 	return `waiting:${at}`;
@@ -47,10 +61,12 @@ export type NotificationKey =
 	| { kind: "gate"; runId: string; stepId: string }
 	| { kind: "run-end"; runId: string; seq: number }
 	| { kind: "device-wait"; runId: string; stepId: string }
-	| { kind: "waiting"; at: number };
+	| { kind: "waiting"; at: number }
+	| { kind: "look"; projectId: string; flow: string; runId: string };
 
 const WAITING = "waiting";
 const MISSED = "missed";
+const LOOK = "look";
 
 function integer(part: string): number | null {
 	return /^\d+$/.test(part) ? Number(part) : null;
@@ -62,6 +78,12 @@ export function parseKey(key: string): NotificationKey | null {
 	if (parts.some((part) => part === "")) return null;
 	const [first, second, third] = parts;
 	if (first === undefined || second === undefined) return null;
+	if (first === LOOK) {
+		const [, projectId, flow, runId] = parts;
+		return parts.length === 4 && projectId && flow && runId
+			? { kind: "look", projectId, flow, runId }
+			: null;
+	}
 	if (parts.length === 2) {
 		if (first !== WAITING)
 			return { kind: "gate", runId: first, stepId: second };
@@ -95,6 +117,16 @@ export function parseDeviceWaitKey(
 	const parsed = parseKey(key);
 	return parsed?.kind === "device-wait"
 		? { runId: parsed.runId, stepId: parsed.stepId }
+		: null;
+}
+
+/** The flow and the run of a Needs a look key. Null for any other key. */
+export function parseNeedsALookKey(
+	key: string,
+): { projectId: string; flow: string; runId: string } | null {
+	const parsed = parseKey(key);
+	return parsed?.kind === "look"
+		? { projectId: parsed.projectId, flow: parsed.flow, runId: parsed.runId }
 		: null;
 }
 

@@ -153,7 +153,7 @@ describe("confirmText", () => {
 				"Fix login",
 			),
 		).toEqual({
-			title: "Send approve?",
+			title: "Sign off on approve?",
 			body: "Goes to Build in the run Fix login.",
 		});
 		expect(confirmText(undefined, "approve", "Fix login").body).toBe(

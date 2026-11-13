@@ -66,7 +66,7 @@ To move through the queue, use **Previous** and **Next**, or the arrow keys. **S
 
 **Answered** shows the Gates that closed, by day, for 90 days. Each one shows the option it took, who chose it, and the run's status now. Open one to see your note, every option it offered, and what it asked. **Sleeping** shows the runs that wait on a usage limit or the network. They continue on their own.
 
-A Gate sends a notification only for the levels that you choose. Go to Settings, Notifications, and set **Push for**. The default is Now. A Gate of another level waits in the inbox without a notification.
+A Gate sends a notification only for the levels that you choose. Go to Settings, Notifications, and set **Push for**. The default is Now. A Gate of another level waits in the inbox without a notification. **Push for** Now also sends a notification when a flow starts to fail again and again.
 
 Home does not list your Gates. It shows the flows that need a look, and what your flows produced. See [Home](Runs-and-schedules.md#home).
 

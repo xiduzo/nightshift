@@ -41,7 +41,8 @@ function pathOf(push) {
 	if (
 		(push.kind === "run-finished" ||
 			push.kind === "run-failed" ||
-			push.kind === "device-wait") &&
+			push.kind === "device-wait" ||
+			push.kind === "flow-needs-a-look") &&
 		push.runId
 	) {
 		return `/runs/${encodeURIComponent(push.runId)}`;

@@ -1,4 +1,8 @@
-import type { LandedFact, ScheduleMissed } from "@nightshift/engine";
+import type {
+	LandedFact,
+	ScheduleMissed,
+	SevereTurn,
+} from "@nightshift/engine";
 
 import type {
 	NotificationChannel,
@@ -58,12 +62,15 @@ export type FakeRunEvents = {
 	land(facts: readonly LandedFact[]): void;
 	/** A schedule of the Replica skips a missed cron time, as the engine would say it. */
 	miss(missed: ScheduleMissed): void;
+	/** The end of this run turns its flow severe, as the watch would read it. Null: it does not. */
+	setSevere(runId: string, turn: SevereTurn | null): void;
 };
 
 /** Run events and open Gates that a test sets. */
 export function fakeRunEvents(): FakeRunEvents {
 	const open = new Map<string, OpenGateRef[]>();
 	const runs = new Map<string, RunRef>();
+	const severe = new Map<string, SevereTurn>();
 	const listeners = new Set<(facts: readonly LandedFact[]) => void>();
 	const missedListeners = new Set<(missed: ScheduleMissed) => void>();
 	return {
@@ -78,6 +85,7 @@ export function fakeRunEvents(): FakeRunEvents {
 				missedListeners.add(listener);
 				return () => missedListeners.delete(listener);
 			},
+			severeTurn: async (_spaceId, runId) => severe.get(runId) ?? null,
 		},
 		setOpen: (spaceId, gates) => open.set(spaceId, gates),
 		setRun: (runId, run) => runs.set(runId, run),
@@ -86,6 +94,10 @@ export function fakeRunEvents(): FakeRunEvents {
 		},
 		miss(missed) {
 			for (const listener of [...missedListeners]) listener(missed);
+		},
+		setSevere(runId, turn) {
+			if (turn) severe.set(runId, turn);
+			else severe.delete(runId);
 		},
 	};
 }

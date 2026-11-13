@@ -41,8 +41,8 @@ export function useGateAnswer(
 		onSent,
 		onGone,
 	}: {
-		/** The Host took the answer: keep the Gate on screen while the inbox drops it. */
-		onSent: () => void;
+		/** The Host took the answer: keep the Gate on screen while the inbox drops it, or move on. */
+		onSent: (answer: SentAnswer) => void;
 		/** Night Shift refused the answer: the Gate closed in the meantime, or is not in your Spaces. */
 		onGone: (refusal: GoneRefusal) => void;
 	},
@@ -57,12 +57,13 @@ export function useGateAnswer(
 	const resolve = useAnswerGate(host, {
 		onSuccess: (result, input) => {
 			if (result.kind === "answered") {
-				setSent({
+				const answer: SentAnswer = {
 					choice: input.choice,
 					note: input.note ?? null,
 					...(input.data !== undefined ? { data: input.data } : {}),
-				});
-				onSent();
+				};
+				setSent(answer);
+				onSent(answer);
 			} else if (
 				result.refusal === "closed" ||
 				result.refusal === "not-found"

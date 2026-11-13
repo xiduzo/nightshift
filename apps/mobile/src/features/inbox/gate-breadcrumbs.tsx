@@ -7,18 +7,15 @@ import { ChevronRight } from "lucide-react-native";
 import { View } from "react-native";
 
 /**
- * "Acme › website › Fix the login bug": the run opens its screen, and so
- * does the project when it is in the Space this phone works in.
+ * "Acme › website › Fix the login bug": the run opens its screen.
  */
 export function Breadcrumbs({
 	gate,
 	manySpaces,
-	projectHere,
 	runHref,
 }: {
 	gate: OpenGate;
 	manySpaces: boolean;
-	projectHere: boolean;
 	runHref: Href;
 }) {
 	return (
@@ -31,17 +28,7 @@ export function Breadcrumbs({
 					<Icon as={ChevronRight} className="size-3.5 text-muted-foreground" />
 				</>
 			) : null}
-			<Crumb
-				label={gate.projectName}
-				href={
-					projectHere
-						? {
-								pathname: "/projects/[projectId]",
-								params: { projectId: gate.projectId },
-							}
-						: undefined
-				}
-			/>
+			<Crumb label={gate.projectName} href={undefined} />
 			<Icon as={ChevronRight} className="size-3.5 text-muted-foreground" />
 			<Crumb label={gate.runTitle} href={runHref} />
 		</View>

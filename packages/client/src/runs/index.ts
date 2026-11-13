@@ -44,7 +44,6 @@ export { metricsByNode, type NodeMetrics } from "./node-metrics";
 export {
 	hostOwnerHint,
 	type PlacementChoice,
-	placementChoices,
 } from "./placements";
 export { useRunPrefetch } from "./prefetch";
 export {
@@ -78,7 +77,6 @@ export {
 } from "./samples";
 export { finishedShare } from "./share";
 export {
-	groupCounts,
 	groupStatuses,
 	hasEnded,
 	type RunGroup,

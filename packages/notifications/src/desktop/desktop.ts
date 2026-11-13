@@ -153,5 +153,10 @@ export function noticeOf(message: NotificationMessage): DesktopNotice {
 				...base,
 				body: message.body ?? "Night Shift was off at its time.",
 			};
+		case "flow-needs-a-look":
+			return {
+				...base,
+				body: message.body ?? "Open the run to see what changed.",
+			};
 	}
 }

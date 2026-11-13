@@ -40,7 +40,7 @@ Night Shift runs on the person's own computers, with their own agent logins. It 
 - [x] The rpgdotexe night runs as a flow for one full Epic, and `night-shift.py` retires.
 - [ ] Night Shift builds Night Shift: its own Epics run through its own flow.
 - [ ] One person runs Night Shift on several computers: a laptop and a server pair with a Host, and a flow's steps run where they are placed.
-- [ ] From the phone alone, a person starts, follows and unblocks an overnight flow. Night Shift tells them when a Gate waits, on the screen they use. See `docs/research/mobile.md`.
+- [ ] From the phone alone, a person follows, stops and unblocks an overnight flow, and pauses or runs a schedule now. Night Shift tells them when a Gate waits, on the screen they use. See `docs/research/mobile.md`.
 - [ ] Another person runs Night Shift for a week on their own agents, with no help from the author.
 - [ ] One flow that is not code runs every day for a month.
 - [x] For each flow, a person sees where the work landed on each ladder, what each rung cost, and how often the flow needed them.
