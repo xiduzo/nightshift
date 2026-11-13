@@ -137,9 +137,11 @@ export const runs = {
 				scopeKey: input.scopeKey,
 			}),
 		})),
-	/** The files the run's agents kept, oldest first. Fetch one at `GET /api/runs/:id/artifacts/:artifactId`. */
+	/** The files the run's agents and commands kept, oldest first. Fetch one at `GET /api/runs/:id/artifacts/:artifactId`. */
 	artifacts: runProcedure(z.object({ runId: z.string() }))
-		.route({ summary: "Lists the files the agents of a run kept." })
+		.route({
+			summary: "Lists the files the agents and commands of a run kept.",
+		})
 		.output(output(z.array(artifactSchema)))
 		.handler(({ context, input }) => context.space.listArtifacts(input.runId)),
 	/**

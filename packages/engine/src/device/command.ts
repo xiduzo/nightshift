@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { ARTIFACTS_ENV } from "./kept-files";
 import type { Device, ExecEvent, ExecInput } from "./types";
 
 /** How many lines and bytes of output `log_tail` keeps. */
@@ -134,6 +135,7 @@ export async function* spawnCommand(
 	const inherited = { ...process.env };
 	for (const name of scrubEnv) delete inherited[name];
 	delete inherited[OUTPUT_ENV];
+	delete inherited[ARTIFACTS_ENV];
 	const queue: ExecEvent[] = [];
 	let wake: (() => void) | null = null;
 	const push = (event: ExecEvent) => {

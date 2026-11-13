@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { Command } from "@langchain/langgraph";
 import { step } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
+import { createArtifactStore } from "../artifacts/store";
 import { foldRun } from "../log";
 import { readTranscriptFile } from "../log/transcripts";
 import { deriveSteps } from "../read/run-views";
@@ -402,6 +403,34 @@ describe("the Command node", () => {
 		expect(await readFile(join(folder("project-1"), "home.md"), "utf8")).toBe(
 			"# Home\n",
 		);
+	});
+
+	test("the files the command puts in NS_ARTIFACTS become artifacts of its step", async () => {
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "design",
+				nodes: [command("design", 'printf png > "$NS_ARTIFACTS/frame.png"')],
+				edges: [],
+			}),
+		);
+		const store = createArtifactStore(sandbox.dataDir);
+		h.local.artifacts = store;
+		await drive(h, { inputs: {} });
+		const [derived] = deriveSteps(foldRun(await h.events()));
+		expect(
+			(await store.list(h.runId)).map(({ stepId, title, mediaType }) => ({
+				stepId,
+				title,
+				mediaType,
+			})),
+		).toEqual([
+			{
+				stepId: derived?.id as string,
+				title: "frame.png",
+				mediaType: "image/png",
+			},
+		]);
 	});
 
 	describe("secrets", () => {

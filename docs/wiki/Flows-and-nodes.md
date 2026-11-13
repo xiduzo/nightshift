@@ -71,6 +71,7 @@ A Decision or a Value that a model decides can have a cascade too. A model's pic
 - **Data shape** in its **Output** says what that data holds. See [Data shapes](#data-shapes).
 - `{"scores": {"found": 4}}` in that data scores the run. See [Scores](#scores).
 - `$NS_KNOWLEDGE` is the project's [knowledge](Knowledge.md) folder.
+- Files that the command puts in the folder `$NS_ARTIFACTS` stay with the run, such as a screenshot or a report. The run page shows them with the step. Example: `cp report.pdf "$NS_ARTIFACTS/"`.
 
 ### Web request
 

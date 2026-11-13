@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	defaultDeciderModel,
@@ -9,7 +10,7 @@ import {
 } from "@nightshift/agents/testing";
 import type { Decider, McpServerConfig } from "@nightshift/agents/types";
 import { FLOW_VERSION } from "@nightshift/flows";
-
+import { createArtifactStore } from "../artifacts/store";
 import {
 	type CliToolStore,
 	createCliToolStore,
@@ -902,6 +903,68 @@ describe("exec", () => {
 		const events = await collect(
 			d.exec({
 				command: 'printf "%s" "${OTEL_EXPORTER_OTLP_HEADERS-none}"',
+				cwd: sandbox.repoPath,
+				signal: new AbortController().signal,
+			}),
+		);
+		expect(
+			events.flatMap((e) => (e.type === "output" ? [e.text] : [])).join(""),
+		).toBe("none");
+	});
+
+	test("the files a step's command puts in NS_ARTIFACTS become artifacts of the step, and the folder goes", async () => {
+		const dataDir = mkdtempSync(join(tmpdir(), "ns-artifacts-test-"));
+		try {
+			const store = createArtifactStore(dataDir);
+			const d = device({ artifacts: store });
+			const events = await collect(
+				d.exec({
+					command: [
+						'printf "%s" "$NS_ARTIFACTS" > folder.txt',
+						'printf png > "$NS_ARTIFACTS/b-design.png"',
+						'mkdir "$NS_ARTIFACTS/notes"',
+						'printf hi > "$NS_ARTIFACTS/notes/a.md"',
+					].join(" && "),
+					cwd: sandbox.repoPath,
+					artifacts: { runId: "r1", stepId: "s1" },
+					signal: new AbortController().signal,
+				}),
+			);
+			expect(events.at(-1)).toMatchObject({ type: "exit", exitCode: 0 });
+			const kept = await store.list("r1");
+			expect(
+				kept.map(({ stepId, title, mediaType, size }) => ({
+					stepId,
+					title,
+					mediaType,
+					size,
+				})),
+			).toEqual([
+				{
+					stepId: "s1",
+					title: "b-design.png",
+					mediaType: "image/png",
+					size: 3,
+				},
+				{
+					stepId: "s1",
+					title: join("notes", "a.md"),
+					mediaType: "text/markdown",
+					size: 2,
+				},
+			]);
+			const folder = readFileSync(join(sandbox.repoPath, "folder.txt"), "utf8");
+			expect(folder).not.toBe("");
+			expect(existsSync(folder)).toBe(false);
+		} finally {
+			rmSync(dataDir, { recursive: true, force: true });
+		}
+	});
+
+	test("a command that runs for no step gets no NS_ARTIFACTS", async () => {
+		const events = await collect(
+			device({ artifacts: createArtifactStore(sandbox.repoPath) }).exec({
+				command: 'printf "%s" "${NS_ARTIFACTS-none}"',
 				cwd: sandbox.repoPath,
 				signal: new AbortController().signal,
 			}),

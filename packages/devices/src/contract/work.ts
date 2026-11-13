@@ -410,6 +410,8 @@ const workCallSchema = z.discriminatedUnion("kind", [
 			outputFile: z.boolean().optional(),
 			/** The project whose knowledge folder goes in `NS_KNOWLEDGE`. */
 			knowledge: z.object({ projectId: z.string() }).optional(),
+			/** A Command step: a folder in `NS_ARTIFACTS` whose files the run keeps. */
+			artifacts: z.object({ runId: z.string(), stepId: z.string() }).optional(),
 			/** A service: a first `started` event with the process id. */
 			pid: z.boolean().optional(),
 			run: stepRunSchema.optional(),

@@ -117,6 +117,8 @@ async function runShell(
 		outputFile: true,
 		// A sync flow writes the project's knowledge: `NS_KNOWLEDGE`.
 		knowledge: { projectId: ctx.run.projectId },
+		// The files it puts in `NS_ARTIFACTS` stay with the run.
+		artifacts: { runId: ctx.run.id, stepId },
 		logPath: ctx.log.files(ctx.run.id).commandLog(stepId),
 		signal,
 		onOutput: (stream, text) => {

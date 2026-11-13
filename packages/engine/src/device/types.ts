@@ -359,6 +359,13 @@ export type ExecInput = {
 	 */
 	knowledge?: { projectId: string };
 	/**
+	 * The step the command runs for (a Command step): it gets a new, empty
+	 * folder in `NS_ARTIFACTS`, and the files it puts there become artifacts
+	 * of that step when it exits. The Device that runs it keeps them. A
+	 * Device of an older Night Shift gives no folder.
+	 */
+	artifacts?: { runId: string; stepId: string };
+	/**
 	 * Yields a `started` event with the process id first (a service, ADR 9):
 	 * its process group has the same id. A Device of an older Night Shift
 	 * sends none.

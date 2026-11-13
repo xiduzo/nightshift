@@ -129,6 +129,10 @@ export const commandNodeSchema = z.object({
 	 * file that is not valid JSON ends the step on the catch-all. stdout
 	 * stays the log. Data that is an object with an `outcome` that names
 	 * one of the node's exits ends the step on that exit (`dataExitFor`).
+	 *
+	 * `$NS_ARTIFACTS` names a new, empty folder: the files the command puts
+	 * there stay with the run as artifacts of the step, as an agent's
+	 * `save_artifact` files do. A Device of an older Night Shift gives none.
 	 */
 	command: z.string().min(1),
 	/**

@@ -43,6 +43,7 @@ import {
 } from "../projects";
 import type { RunFolders } from "../run-folders";
 import { spawnCommand } from "./command";
+import { ARTIFACTS_ENV, type KeptFiles, openKeptFiles } from "./kept-files";
 import { readFolderFile } from "./read-file";
 import { redactExec, redactSession, redactText } from "./redact";
 import { callServerTool } from "./tool-call";
@@ -657,7 +658,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 	 * to the launcher only, and come back as `•••` too.
 	 */
 	async function* exec(input: ExecInput): AsyncGenerator<ExecEvent> {
-		const { secrets = [], knowledge, run, ...command } = input;
+		const { secrets = [], knowledge, run, artifacts, ...command } = input;
 		// The secrets of the CLI tools' logins go to their launchers only. A
 		// command that names one in `secrets` gets it below.
 		const scrub = (deps.toolLaunchers?.guarded() ?? []).filter(
@@ -681,8 +682,15 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				? await deps.knowledge.forCommand(knowledge.projectId)
 				: null;
 		let tools: Awaited<ReturnType<ToolLaunchers["forCommand"]>> | null = null;
+		let kept: KeptFiles | null = null;
 		try {
 			tools = (await deps.toolLaunchers?.forCommand(useOf(run))) ?? null;
+			// The files the command puts in `NS_ARTIFACTS` become artifacts of
+			// the run here, on the computer that runs it, as an agent's do.
+			kept =
+				artifacts && deps.artifacts
+					? openKeptFiles(deps.artifacts, artifacts)
+					: null;
 			const leftOut = (tools?.leftOut ?? []).filter(({ tool }) =>
 				namesTool(command.command, tool),
 			);
@@ -691,6 +699,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				...command.env,
 				...tools?.env,
 				...found.env,
+				...(kept ? { [ARTIFACTS_ENV]: kept.path } : {}),
 			};
 			if (tools?.toolsPath) {
 				env.PATH = [tools.toolsPath, command.env?.PATH ?? process.env.PATH]
@@ -709,10 +718,17 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 						yield { type: "output", stream: "stderr", text: `${message}\n` };
 					}
 				}
+				// The files it kept, before the step ends.
+				if (event.type === "exit" && kept) {
+					for (const problem of await kept.keep()) {
+						yield { type: "output", stream: "stderr", text: `${problem}\n` };
+					}
+				}
 				yield event;
 			}
 		} finally {
 			await tools?.cleanup();
+			kept?.remove();
 			// What the command changed, a sync's files, go to the Space.
 			await known?.done();
 		}
