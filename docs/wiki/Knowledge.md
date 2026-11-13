@@ -50,6 +50,18 @@ Any flow that writes markdown into `$NS_KNOWLEDGE` is a source too.
 
 An agent can propose what it learned about the project: short notes that help the next agent. A proposed note waits for you. No agent reads it until you keep it.
 
+Night Shift also looks back at a run when it ends. It does this only when the run needed a fix or your answer:
+
+- A step failed, and a later try worked.
+- The run before failed at a step, and this run passed it.
+- The run failed at the same step as the run before.
+- A step asked you, or an agent could not go on without you.
+- You answered a Gate and wrote why.
+
+Then the **Learner** proposes at most five notes. A note from a run shows "Night Shift learned this from a run", with a link to the run. It waits for you like the other notes. Other runs cost nothing. The Learner never keeps a note itself.
+
+To stop these notes for a project, open **Review** and turn off **Learn from runs**. This holds for every computer of the Space. To choose who answers for the Learner, see [Agents and profiles](Agents-and-profiles.md).
+
 The **Review** page shows each note, with the notes close to it. Keep it, delete it, or put it off. The keys are K, D, and S. The `review-learnings` starter flow asks you in a Gate in place of the page.
 
 ## Search

@@ -437,6 +437,7 @@ commit, and the patterns still pick the files.
 ## Learnings
 
 An agent that reads the knowledge may add `learnings` to its step report.
+Night Shift also proposes learnings from runs that ended (see below).
 That is a list of short notes about the project that help the next agent.
 Its report instructions say so in one sentence:
 
@@ -473,6 +474,61 @@ reconcile finds that what waits changed. That covers what a step proposes when
 it ends, the Review page, a review by the kit, and each of these on another
 computer. One reconcile tells them once, however many files it brings. No
 push goes out for this. The Gate of the review sends its own push.
+
+### Learnings from runs that ended
+
+An agent busy with its task seldom adds `learnings`. One real project had 0
+proposed learnings in about 680 agent steps. So Night Shift also looks back at
+a run when it ends ([ADR 37](adr/0037-night-shift-learns-from-runs-that-ended.md)).
+
+The Walker of the run does it: a Host for its own runs, a Device for the runs
+it walks. There the transcripts are. `createRunLearnings`
+(`packages/engine/src/knowledge/run-learnings.ts`) follows the landed facts.
+For each `run-ended` of a run walked here, it does these steps, one run at a
+time:
+
+1. It stops when the run is a test run, or when the project turned it off
+   (`learnFromRuns: false` in the settings of the knowledge document).
+2. It reads the run and the run of the same flow that ended before it.
+3. `learningSignals` (`run-signals.ts`, pure) finds the signals. No signal:
+   it stops. No evidence is built, and no model is asked.
+4. `learningEvidence` (`run-evidence.ts`, pure) writes the evidence: the run's
+   facts, its signals, its steps, the answers of a person with their reason,
+   what went wrong with the last 60 lines of each transcript, what worked, and
+   the notes the project has (waiting and kept, this computer only). It is
+   24 000 characters at most.
+5. The Learner answers with at most five notes (`learnFromRun` of `agents`).
+6. `Learnings.proposeFromRun` holds the folder as a step does and appends
+   the notes to `learnings/proposed/<run id>.md`. The reconcile at its end puts
+   the file in the Space. No note: no file.
+
+The signals:
+
+| Signal | When |
+| --- | --- |
+| `fixed` | A step failed (`fail` or `error`), and a later try of the same node in the run held. |
+| `fixed-since` | The run before failed at a node, and this run passed it. |
+| `same-failure` | The run failed at the node the run before failed at. |
+| `asked` | An agent ended on `needs-input`, a person answered for an agent, or a person answered after the tries before ran out (not `planned`). |
+| `gate-reason` | A person (not a deadline) answered a Decision's Gate with a note. |
+
+The run's file uses the old name form `<run id>.md`. The Review page, the
+Gate of the review kit and Keep and Delete already take it, and no step writes
+it any more. Its header says "What Night Shift learned from run <id>." The
+Gate hides that line, as it hides the header of a step's file. The Review
+page shows "Night Shift learned this from a run" for a learning with no step.
+
+The daemon wires the Learner of this computer (`createLearner`). It is the
+built-in agent `learner`: what the person chose in Settings, else the first
+agent that works here. An agent works in the assistant's own folder, read
+only, with no tools, at most 10 turns and 0.25 USD. A model answers in one
+call. Each answer that spent something keeps an `answer_cost` row in the
+run's Space, in the name of this computer's owner (ADR 36). A look that
+fails is logged, and the run is not looked at again.
+
+The Review page has the switch **Learn from runs**
+(`knowledge.setLearnsFromRuns`). `knowledge.get` says how it stands
+(`learnsFromRuns`).
 
 ### Close notes
 

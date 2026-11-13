@@ -28,7 +28,7 @@ export const SECTIONS = [
 		key: "builtin",
 		label: "Night Shift's agents",
 		icon: SparklesIcon,
-		line: "Six agents help you build, explain and decide. Choose who answers for each.",
+		line: "Seven agents help you build, explain, learn and decide. Choose who answers for each.",
 	},
 	{
 		key: "agents",

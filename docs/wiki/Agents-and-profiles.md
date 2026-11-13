@@ -6,7 +6,7 @@ You set both in **Settings**. The Settings menu at the bottom of the sidebar ope
 
 ## Night Shift's agents
 
-Night Shift has six agents of its own. Each has one job. You choose who answers for each: one of your agents, or one of your models.
+Night Shift has seven agents of its own. Each has one job. You choose who answers for each: one of your agents, or one of your models.
 
 | Agent | Its job | You start it with | Who can answer |
 | --- | --- | --- | --- |
@@ -14,6 +14,7 @@ Night Shift has six agents of its own. Each has one job. You choose who answers 
 | **Improver** | Finds what goes wrong or costs too much in a flow, and proposes a change. | **Improve this flow** on a run and on Spend | An agent |
 | **Explainer** | Says why a run stopped early, and what you can do. | **Ask why** on a run, on Home and on your phone | An agent or a model |
 | **Field writer** | Fills one field, with a preview. | **Suggest …** under a field | An agent or a model |
+| **Learner** | Proposes what to learn from a run that needed a fix or your answer. | A run that ends, unless the project turns it off | An agent or a model |
 | **Decider** | Picks an option in a run. | A Decision or a Value that a model decides | A model |
 | **Brief writer** | Writes what a Gate asks you, and how urgent it is. | Every Gate, unless its author turns it off | A model |
 
