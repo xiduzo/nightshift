@@ -57,7 +57,7 @@ const BUILD = [
 /**
  * The tools of each built-in agent. The Builder reads the draft and the
  * names a node may use. The Improver also reads what happened: the runs,
- * their cost and the changes of the flow. The other four get none: what
+ * their cost and the changes of the flow. The other five get none: what
  * they need is in their prompt.
  */
 export const BUILTIN_TOOLS: Record<BuiltinAgentId, readonly string[]> = {
@@ -74,6 +74,7 @@ export const BUILTIN_TOOLS: Record<BuiltinAgentId, readonly string[]> = {
 	],
 	explainer: [],
 	"field-writer": [],
+	learner: [],
 	decider: [],
 	"brief-writer": [],
 };

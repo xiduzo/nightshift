@@ -16,6 +16,7 @@ export {
 	chooseProject,
 	explainRun,
 	type HistoryPort,
+	learnFromRun,
 	resumesOnAnotherModel,
 	type SuggestFieldInput,
 	serveTools,

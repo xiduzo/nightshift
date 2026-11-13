@@ -1,11 +1,12 @@
 /**
- * Night Shift's own agents: six agents with a fixed job. The product owns
+ * Night Shift's own agents: seven agents with a fixed job. The product owns
  * the prompt and the tools of each. The person chooses only what answers
  * for it: one of their agents (an Agent Profile, or a harness and a model)
  * or one of their models (a Model Profile, or a decider).
  *
  * Four work for the person on Night Shift itself (Builder, Improver,
- * Explainer, Field writer). Two work inside a run (Decider, Brief writer).
+ * Explainer, Field writer). One looks back at a run that ended (Learner,
+ * ADR 37). Two work inside a run (Decider, Brief writer).
  * The profiles that do the work of a step are not here: those are the
  * person's own agents.
  */
@@ -27,6 +28,7 @@ export const builtinAgentIds = [
 	"improver",
 	"explainer",
 	"field-writer",
+	"learner",
 	"decider",
 	"brief-writer",
 ] as const;
@@ -84,7 +86,7 @@ export type BuiltinAgent = {
 	limits: { turns?: number; usd?: number };
 };
 
-/** The six agents, in the order the Settings page lists them. */
+/** The seven agents, in the order the Settings page lists them. */
 export const BUILTIN_AGENTS: readonly BuiltinAgent[] = [
 	{
 		id: "builder",
@@ -129,6 +131,19 @@ export const BUILTIN_AGENTS: readonly BuiltinAgent[] = [
 		never: "Changes another field. Saves the flow.",
 		takes: "either",
 		limits: { turns: 15, usd: 0.5 },
+	},
+	{
+		id: "learner",
+		name: "Learner",
+		job: "Proposes what to learn from a run.",
+		startedBy:
+			"A run that ends after a fix, a question to you or an answer with a note.",
+		reads:
+			"One run: its steps, what went wrong, what fixed it and your answers.",
+		proposes: "At most five learnings. You keep or delete them.",
+		never: "Reads a file or a secret. Keeps a learning.",
+		takes: "either",
+		limits: { turns: 10, usd: 0.25 },
 	},
 	{
 		id: "decider",
@@ -207,7 +222,8 @@ export type BuiltinAnswers = z.infer<typeof builtinAnswersSchema>;
 /**
  * The places in the product that start a built-in agent. A button names
  * its entry, and the entry names the agent: no button starts an agent that
- * is not one of the six.
+ * is not one of the seven. The Learner has no button: a run that ends
+ * starts it.
  */
 export const agentEntryIds = [
 	"run.why",

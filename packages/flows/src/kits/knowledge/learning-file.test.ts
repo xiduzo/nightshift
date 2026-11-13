@@ -56,6 +56,18 @@ describe("a new file", () => {
 		);
 	});
 
+	test("of a run's own says Night Shift learned it from the run", () => {
+		const text = formatLearnings(["One."], {
+			runId: "0123456789",
+			isNew: true,
+			by: "run",
+		});
+		expect(text).toBe(
+			"# Learnings of run 01234567\n\nWhat Night Shift learned from run 0123456789.\n\n- One.\n",
+		);
+		expect(parseLearnings(text)).toEqual(["One."]);
+	});
+
 	test("is nothing without a note to keep", () => {
 		expect(formatLearnings([" ", "\n"], { runId: "r", isNew: true })).toBe("");
 	});

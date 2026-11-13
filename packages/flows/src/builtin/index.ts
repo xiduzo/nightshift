@@ -1,4 +1,4 @@
-/** Night Shift's own agents: the six built-in agents, who answers for each, and the places that start one. */
+/** Night Shift's own agents: the seven built-in agents, who answers for each, and the places that start one. */
 
 export {
 	AGENT_ENTRIES,

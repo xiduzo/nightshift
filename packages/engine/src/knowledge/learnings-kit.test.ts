@@ -331,9 +331,11 @@ describe("what the Gate lists", () => {
 	/** A folder with every kind of file, as a document lists it. */
 	const tree: Tree = {
 		"learnings/proposed/run-1.s1.md": NEW_FILE,
+		// The run's own file: what Night Shift learned from it (ADR 37).
 		"learnings/proposed/run-2.md": formatLearnings(["Three."], {
 			runId: "run-2",
 			isNew: true,
+			by: "run",
 		}),
 		"learnings/proposed/sweep.2026-11-04.md": "- Four.\n",
 		"learnings/proposed/.hidden.md": "- Hidden.\n",
@@ -364,6 +366,7 @@ describe("what the Gate lists", () => {
 		);
 		expect(gate.text).not.toContain("Learnings of run");
 		expect(gate.text).not.toContain("proposed to learn");
+		expect(gate.text).not.toContain("learned from run");
 		// The rule of the page, for each file.
 		expect(
 			Object.keys(tree).filter((path) => proposedLearningAt(path)).length,

@@ -40,6 +40,7 @@ export const HELP_AGENTS = [
 	"improver",
 	"explainer",
 	"field-writer",
+	"learner",
 ] as const satisfies readonly BuiltinAgentId[];
 export type HelpAgent = (typeof HELP_AGENTS)[number];
 

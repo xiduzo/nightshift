@@ -15,6 +15,11 @@ const TITLE_START = "# Learnings of run ";
 /** The header's second line, around the run's id. */
 const INTRO_START = "What the agents of run ";
 const INTRO_END = " proposed to learn about this project";
+/**
+ * The second line of a run's own file (`<runId>.md`), before the run's id:
+ * Night Shift looked back at the run when it ended (the Learner, ADR 37).
+ */
+const RUN_INTRO_START = "What Night Shift learned from run ";
 
 /**
  * The notes as they are kept: each on one line and trimmed, the empty ones
@@ -30,18 +35,25 @@ export function learningNotes(notes: readonly string[]): string[] {
 }
 
 /**
- * What to add to a step's file for these notes: the header when the file is
- * new, then one line per note. Empty when no note is left to keep.
+ * What to add to a file for these notes: the header when the file is new,
+ * then one line per note. Empty when no note is left to keep. `by`: who
+ * proposed them. `agents` (the default): the agents of a run's step, in the
+ * step's file. `run`: Night Shift, when it looked back at the run, in the
+ * run's own file.
  */
 export function formatLearnings(
 	notes: readonly string[],
-	file: { runId: string; isNew: boolean },
+	file: { runId: string; isNew: boolean; by?: "agents" | "run" },
 ): string {
 	const lines = learningNotes(notes);
 	if (lines.length === 0) return "";
 	const { runId, isNew } = file;
+	const intro =
+		file.by === "run"
+			? `${RUN_INTRO_START}${runId}.`
+			: `${INTRO_START}${runId}${INTRO_END}.`;
 	const head = isNew
-		? `${TITLE_START}${runId.slice(0, 8)}\n\n${INTRO_START}${runId}${INTRO_END}.\n\n`
+		? `${TITLE_START}${runId.slice(0, 8)}\n\n${intro}\n\n`
 		: "";
 	return `${head}${lines.map((line) => `${NOTE_START}${line}`).join("\n")}\n`;
 }
@@ -73,4 +85,5 @@ export const LEARNINGS_GATE_TEXT_AWK = String.raw`BEGIN { ORS = "" }
 /^[ \t\r]*$/ { next }
 /^${TITLE_START}${RUN_ID_AWK}\r?$/ { next }
 /^${INTRO_START}${RUN_ID_AWK}${INTRO_END}\.\r?$/ { next }
+/^${RUN_INTRO_START}${RUN_ID_AWK}\.\r?$/ { next }
 { gsub(/\\/, "&&"); gsub(/"/, "\\\""); gsub(/\t/, " "); gsub(/\r/, ""); print $0 "\\n" }`;

@@ -14,6 +14,7 @@ export {
 export { checkAgent } from "./check";
 export { explainRun } from "./explain";
 export type { HistoryPort } from "./history";
+export { learnFromRun } from "./learn";
 export { serveTools } from "./mcp";
 export type { ChatExchange } from "./prompts";
 export type { AssistantVia } from "./session";
