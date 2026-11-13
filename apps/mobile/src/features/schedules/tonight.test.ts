@@ -11,7 +11,6 @@ import {
 	scheduleKey,
 	startWhen,
 	tonightEntries,
-	tonightHint,
 } from "./tonight";
 
 const HOUR = 60 * 60 * 1000;
@@ -125,25 +124,6 @@ describe("tonightEntries", () => {
 	});
 });
 
-describe("tonightHint", () => {
-	test("counts the schedules that are not paused", () => {
-		const entries = tonightEntries(
-			[
-				planned(schedule("a")),
-				planned(schedule("b", { pausedUntil: NOW + 20 * HOUR })),
-			],
-			known,
-			flowDevices,
-			"Host",
-			NOW,
-			none,
-		);
-		expect(tonightHint(entries)).toBe("1 flow runs tonight.");
-		expect(tonightHint([])).toBe("Nothing runs tonight.");
-		expect(tonightHint([...entries, ...entries])).toBe("2 flows run tonight.");
-	});
-});
-
 describe("startWhen", () => {
 	test("says tonight for a start in the night ahead", () => {
 		expect(startWhen(TONIGHT_3, NOW)).toMatch(/^at .+ tonight$/);
@@ -171,10 +151,6 @@ describe("offlineNotices", () => {
 		);
 		const notices = offlineNotices(entries, NOW);
 		expect(notices.map((notice) => notice.key)).toEqual(["p:lighthouse"]);
-		expect(notices[0]?.title).toBe("MacBook Pro is offline");
-		expect(notices[0]?.caption).toMatch(
-			/^lighthouse needs it at .+ tonight\.$/,
-		);
 		expect(notices[0]?.sentence).toMatch(
 			/^lighthouse needs MacBook Pro at .+ tonight\.$/,
 		);

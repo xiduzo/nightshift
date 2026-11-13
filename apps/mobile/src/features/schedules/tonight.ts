@@ -15,7 +15,7 @@ export function scheduleKey(projectId: string, scheduleId: string): string {
 	return `${projectId}:${scheduleId}`;
 }
 
-/** One schedule on Watch, under Tonight: where it runs, and whether it can. */
+/** One schedule of tonight on Runs: where it runs, and whether it can. */
 export type TonightEntry = PlannedSchedule & {
 	key: string;
 	/** The computer its runs run on. Null when the phone cannot tell. */
@@ -72,15 +72,6 @@ export function tonightEntries(
 	});
 }
 
-/** How many of them start tonight: the ones not paused. */
-export function tonightHint(entries: readonly TonightEntry[]): string {
-	const starting = entries.filter((entry) => !entry.paused).length;
-	if (starting === 0) return "Nothing runs tonight.";
-	return starting === 1
-		? "1 flow runs tonight."
-		: `${starting} flows run tonight.`;
-}
-
 /**
  * When a start is, for a sentence: "at 03:00 tonight" between 18:00 and
  * 06:00 within the next day, else "tomorrow at 14:00".
@@ -97,17 +88,13 @@ export function startWhen(at: number, now: number): string {
 /** A computer that a schedule needs, and that is offline now. */
 export type OfflineNotice = {
 	key: string;
-	/** "MacBook Pro is offline". */
-	title: string;
-	/** "Lighthouse check needs it at 03:00 tonight." */
-	caption: string;
 	/** "Lighthouse check needs MacBook Pro at 03:00 tonight." */
 	sentence: string;
 	entry: TonightEntry;
 };
 
 /**
- * The notices on Watch: each schedule that starts and whose computer is
+ * The notices on Computers: each schedule that starts and whose computer is
  * offline now. A paused schedule, or one whose run is on its way, needs
  * nothing.
  */
@@ -126,8 +113,6 @@ export function offlineNotices(
 		return [
 			{
 				key: entry.key,
-				title: `${offline} is offline`,
-				caption: `${name} needs it ${when}.`,
 				sentence: `${name} needs ${offline} ${when}.`,
 				entry,
 			},

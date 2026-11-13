@@ -7,44 +7,30 @@ import {
 	AlertDialogFooter,
 	AlertDialogHeader,
 	AlertDialogTitle,
-	AlertDialogTrigger,
 } from "@nightshift/ui-native/components/ui/alert-dialog";
-import {
-	Button,
-	buttonTextVariants,
-} from "@nightshift/ui-native/components/ui/button";
-import { Icon } from "@nightshift/ui-native/components/ui/icon";
+import { buttonTextVariants } from "@nightshift/ui-native/components/ui/button";
 import {
 	Text,
 	TextClassContext,
 } from "@nightshift/ui-native/components/ui/text";
-import { Play } from "lucide-react-native";
 
-/** Run now: asks in an Alert Dialog first. */
-export function RunNowButton({
+/**
+ * Run now asks first, in an Alert Dialog. It has no button of its own: the
+ * screen opens it, from a long press or from a screen reader's action.
+ */
+export function RunNowDialog({
 	name,
-	busy,
-	disabled,
+	open,
+	onOpenChange,
 	onConfirm,
 }: {
 	name: string;
-	busy: boolean;
-	disabled?: boolean;
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
 	onConfirm: () => void;
 }) {
 	return (
-		<AlertDialog>
-			<AlertDialogTrigger asChild>
-				<Button
-					size="lg"
-					variant="secondary"
-					disabled={busy || disabled}
-					className="h-auto min-h-11 py-2"
-				>
-					<Icon as={Play} />
-					<Text>{busy ? "Starting…" : "Run now"}</Text>
-				</Button>
-			</AlertDialogTrigger>
+		<AlertDialog open={open} onOpenChange={onOpenChange}>
 			<AlertDialogContent className="w-[90%]">
 				<AlertDialogHeader>
 					<AlertDialogTitle>{`Run ${name} now?`}</AlertDialogTitle>

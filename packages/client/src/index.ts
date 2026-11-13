@@ -374,6 +374,5 @@ export {
 	iso,
 	localZone,
 	now,
-	wall,
 } from "./time";
 export { createUsageQueries } from "./usage";

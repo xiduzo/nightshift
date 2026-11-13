@@ -1,24 +1,22 @@
-import { createProjectQueries, groupStatuses } from "@nightshift/client";
+import { groupStatuses } from "@nightshift/client";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
+import { Text } from "@nightshift/ui-native/components/ui/text";
+import { cn } from "@nightshift/ui-native/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { Moon } from "lucide-react-native";
 import { useMemo } from "react";
 import { View } from "react-native";
 
-import { useHostQueries, useSignedIn } from "@/features/host";
-import { RunRow } from "@/features/runs";
-import {
-	OfflineNotices,
-	TonightSection,
-	useTonight,
-} from "@/features/schedules";
+import { useSignedIn } from "@/features/host";
+import { useTonight } from "@/features/schedules";
 import { SpacePicker } from "@/features/spaces";
 import { useClock } from "@/shared/clock";
 import { ErrorAlert } from "@/shared/feedback";
 import { TabRootHeader } from "@/shared/header";
-import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { useScreenRefresh, useWhileFocused } from "@/shared/refresh";
+import { nowLines, tonightLines } from "./agenda";
+import { RunLine } from "./run-line";
+import { ScheduleLine } from "./schedule-line";
 
 /** The statuses of a run on its way: running or asleep. */
 const ON_ITS_WAY = groupStatuses("running");
@@ -27,10 +25,11 @@ const ON_ITS_WAY = groupStatuses("running");
 const LIMIT = 30;
 
 /**
- * Runs on the phone: what runs now and what runs tonight, in the Space you
- * chose in the header. A run opens its screen, with Stop. A schedule has
- * Pause tonight and Run now. How the runs went, and every older run, is
- * the work of the computer: the phone shows no history and no numbers.
+ * Runs on the phone, as one agenda from now to tomorrow morning, in the
+ * Space you chose in the header. Now: the runs on their way, each with
+ * Stop. Tonight: the schedules of the next 24 hours, each with Pause or
+ * Undo, and Run now on a long press. The phone shows no history and no
+ * numbers: that is the work of the computer.
  */
 export function RunsScreen() {
 	const { person, host } = useSignedIn();
@@ -43,22 +42,16 @@ export function RunsScreen() {
 		}),
 		subscribed,
 	});
-	const projectQueries = useHostQueries(createProjectQueries);
-	const projects = useQuery({ ...projectQueries.list(), subscribed });
 	const tonight = useTonight(now);
-	const refresh = useScreenRefresh([
-		running.refetch,
-		projects.refetch,
-		tonight.refetch,
-	]);
+	const refresh = useScreenRefresh([running.refetch, tonight.refetch]);
 
-	const projectNames = useMemo(
-		() => new Map((projects.data ?? []).map((p) => [p.id, p.name])),
-		[projects.data],
-	);
 	const runs = useMemo(
-		() => [...(running.data ?? [])].sort((a, b) => b.createdAt - a.createdAt),
-		[running.data],
+		() => nowLines(running.data ?? [], now),
+		[running.data, now],
+	);
+	const schedules = useMemo(
+		() => tonightLines(tonight.entries, now),
+		[tonight.entries, now],
 	);
 
 	return (
@@ -68,12 +61,10 @@ export function RunsScreen() {
 				right={[{ kind: "view", key: "space", element: <SpacePicker /> }]}
 			/>
 
-			<OfflineNotices tonight={tonight} />
-
-			<View className="gap-3">
-				<SectionHead title="Running now" />
+			<View>
+				<Heading title="Now" />
 				{running.isPending ? (
-					<Skeleton className="h-24 w-full rounded-xl" />
+					<Skeleton className="h-14 w-full rounded-xl" />
 				) : running.isError && running.data === undefined ? (
 					<ErrorAlert
 						title="The runs did not load"
@@ -82,27 +73,64 @@ export function RunsScreen() {
 						onRetry={() => void running.refetch()}
 					/>
 				) : runs.length > 0 ? (
-					<ListGroup>
-						{runs.map((item) => (
-							<RunRow
-								key={item.id}
-								run={item}
-								projectName={projectNames.get(item.projectId) ?? null}
-							/>
-						))}
-					</ListGroup>
+					runs.map((line) => <RunLine key={line.key} line={line} />)
 				) : (
-					<ListGroup>
-						<ListRow
-							icon={Moon}
-							title="Nothing runs right now"
-							caption="Run now on a schedule below starts one."
-						/>
-					</ListGroup>
+					<Quiet>Nothing runs right now</Quiet>
 				)}
 			</View>
 
-			<TonightSection tonight={tonight} now={now} />
+			<View>
+				<Heading title="Tonight" className="pt-4" />
+				{schedules.length > 0 ? (
+					<>
+						{schedules.map((line) => (
+							<ScheduleLine key={line.key} line={line} />
+						))}
+						{schedules.some((line) => line.runNow === "yes") ? (
+							<Text className="pt-2 text-muted-foreground text-xs">
+								Hold a schedule to run it now.
+							</Text>
+						) : null}
+					</>
+				) : tonight.error ? (
+					<ErrorAlert
+						title="The schedules did not load"
+						message={tonight.error.message}
+						fix="Check that this phone is online, then try again."
+						onRetry={() => void tonight.refetch()}
+					/>
+				) : tonight.loading ? (
+					<Skeleton className="h-14 w-full rounded-xl" />
+				) : (
+					<Quiet>
+						{tonight.any
+							? "Nothing runs tonight"
+							: "No schedules yet. Add one on your computer."}
+					</Quiet>
+				)}
+			</View>
 		</Screen>
+	);
+}
+
+/** "Now", "Tonight": a small label over a part of the agenda. */
+function Heading({ title, className }: { title: string; className?: string }) {
+	return (
+		<Text
+			accessibilityRole="header"
+			className={cn(
+				"pb-1 font-medium text-muted-foreground text-xs uppercase",
+				className,
+			)}
+		>
+			{title}
+		</Text>
+	);
+}
+
+/** One quiet line where a part of the agenda is empty. */
+function Quiet({ children }: { children: string }) {
+	return (
+		<Text className="min-h-14 py-4 text-muted-foreground">{children}</Text>
 	);
 }
