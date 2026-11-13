@@ -22,6 +22,7 @@ export type { WaitingLearning } from "./learnings";
 export type { KnowledgeMap } from "./map";
 export { type KnowledgeMeaning, ollamaMeaning } from "./meaning";
 export type { KnowledgeQuestion } from "./questions";
+export { type AskLearner, createRunLearnings } from "./run-learnings";
 export type { KnowledgeHit, KnowledgeMeaningStatus } from "./search";
 export type { KnowledgeRequest, KnowledgeUseEvent } from "./step-knowledge";
 export {

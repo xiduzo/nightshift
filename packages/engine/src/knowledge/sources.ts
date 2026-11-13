@@ -183,6 +183,8 @@ type KnowledgeOverview = {
 	shared: boolean;
 	/** The Host that keeps the Space runs an older version of Night Shift: it cannot take this knowledge yet. */
 	olderHost: boolean;
+	/** Night Shift proposes learnings from the runs of the project that ended (ADR 37). */
+	learnsFromRuns: boolean;
 };
 
 /** What the person who asks may do, as the API checked it. */
@@ -355,11 +357,13 @@ export function knowledgeSources<Run extends SourceRun>(
 			projectId: string,
 			can: SourcePermissions,
 		): Promise<KnowledgeOverview> {
-			const [{ files, proposed, shared, olderHost }, { syncs, reviews }] =
-				await Promise.all([
-					deps.files.listing(projectId),
-					fillingFlows(projectId),
-				]);
+			const [
+				{ files, proposed, shared, olderHost, learnsFromRuns },
+				{ syncs, reviews },
+			] = await Promise.all([
+				deps.files.listing(projectId),
+				fillingFlows(projectId),
+			]);
 			return {
 				files,
 				tooLarge: files.length > KNOWLEDGE_FILES_WARNING,
@@ -371,6 +375,7 @@ export function knowledgeSources<Run extends SourceRun>(
 				reviews,
 				shared,
 				olderHost,
+				learnsFromRuns,
 			};
 		},
 		/** The flows that fill the knowledge, with no reconcile: what `list` says of each. */

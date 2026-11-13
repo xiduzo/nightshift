@@ -27,6 +27,8 @@ export type KnowledgeListing = {
 	 * it cannot take this knowledge yet. This Device works on its own copy.
 	 */
 	olderHost: boolean;
+	/** Night Shift proposes learnings from the runs of the project that ended (ADR 37). */
+	learnsFromRuns: boolean;
 };
 
 type KnowledgeReaderDeps = {
@@ -97,6 +99,7 @@ export function createKnowledgeReader(deps: KnowledgeReaderDeps) {
 				proposed: await learnings.count(projectId),
 				shared: spaceId ? await status.isShared(spaceId) : false,
 				olderHost: spaceId ? status.isOlder(spaceId) : false,
+				learnsFromRuns: (await documents.open(projectId)).learnsFromRunsOn(),
 			};
 		},
 		/**

@@ -386,6 +386,69 @@ function sameAgent(a: ThreadAgent, b: ThreadAgent): boolean {
 	);
 }
 
+/** The built-in agents that give one report: an agent or a model answers. */
+type ReportAgent = "explainer" | "field-writer" | "learner";
+
+export const NO_LEARNER =
+	"No agent can look back at runs on this computer. Add an agent in Settings, or choose a model for the Learner.";
+
+/**
+ * What answers for a built-in agent that gives one report: the agent
+ * the request picks, else what the person chose for it in Settings (an
+ * agent or a model), else the first agent that works. `folder`: where an
+ * agent reads, asked only when an agent answers.
+ */
+export async function reportAgentVia(
+	deps: Pick<
+		AssistantDeps,
+		"settings" | "profiles" | "decide" | "harnessFor" | "installed"
+	>,
+	id: ReportAgent,
+	requested: AssistantAgent,
+	folder: () => Promise<string | null>,
+	none: string,
+): Promise<AssistantVia | { error: string }> {
+	const answer: BuiltinAnswer | undefined =
+		deps.settings.current().builtinAgents[id];
+	if (!picksAgent(requested) && answer?.kind === "model") {
+		const { decide } = deps;
+		if (!decide) return { error: NO_MODEL_HERE };
+		const pick = builtinModel(answer, deps.profiles.list(), {
+			values: true,
+		});
+		if ("problem" in pick) return { error: pick.problem };
+		return {
+			kind: "model",
+			ask: ({ prompt, output, signal }) =>
+				decide({
+					decider: pick.decider,
+					prompt,
+					output,
+					...(pick.model !== undefined ? { model: pick.model } : {}),
+					...(pick.address !== undefined ? { address: pick.address } : {}),
+					signal,
+				}),
+		};
+	}
+	const picked = pickAgent(requested, deps, { builtin: id, none });
+	if ("error" in picked) return picked;
+	const harness = harnessOf(
+		picked,
+		picksAgent(requested) ? requested : chosenAgent(id, deps),
+		deps,
+	);
+	if ("error" in harness) return harness;
+	const cwd = await folder();
+	if (cwd === null) return { error: NO_CLONE };
+	return {
+		kind: "agent",
+		harness,
+		profile: picked.settings,
+		cwd,
+		limits: builtinAgent(id).limits,
+	};
+}
+
 /** The daemon's assistant: suggestions and chats on the agent the person picks, read only in the project's Clone. */
 export function createAssistant(deps: AssistantDeps): AssistantService {
 	const threads = deps.threads ?? createThreadStore();
@@ -417,58 +480,13 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 			: null;
 	};
 
-	/**
-	 * What answers for a built-in agent that gives one report: the agent
-	 * the request picks, else what the person chose for it in Settings (an
-	 * agent or a model), else the first agent that works. `folder`: where an
-	 * agent reads, asked only when an agent answers.
-	 */
-	async function reportVia(
-		id: "explainer" | "field-writer",
+	/** What answers for a built-in agent that gives one report. */
+	const reportVia = (
+		id: ReportAgent,
 		requested: AssistantAgent,
 		folder: () => Promise<string | null>,
 		none: string,
-	): Promise<AssistantVia | { error: string }> {
-		const answer: BuiltinAnswer | undefined =
-			deps.settings.current().builtinAgents[id];
-		if (!picksAgent(requested) && answer?.kind === "model") {
-			const { decide } = deps;
-			if (!decide) return { error: NO_MODEL_HERE };
-			const pick = builtinModel(answer, deps.profiles.list(), {
-				values: true,
-			});
-			if ("problem" in pick) return { error: pick.problem };
-			return {
-				kind: "model",
-				ask: ({ prompt, output, signal }) =>
-					decide({
-						decider: pick.decider,
-						prompt,
-						output,
-						...(pick.model !== undefined ? { model: pick.model } : {}),
-						...(pick.address !== undefined ? { address: pick.address } : {}),
-						signal,
-					}),
-			};
-		}
-		const picked = pickAgent(requested, deps, { builtin: id, none });
-		if ("error" in picked) return picked;
-		const harness = harnessOf(
-			picked,
-			picksAgent(requested) ? requested : chosenAgent(id, deps),
-			deps,
-		);
-		if ("error" in harness) return harness;
-		const cwd = await folder();
-		if (cwd === null) return { error: NO_CLONE };
-		return {
-			kind: "agent",
-			harness,
-			profile: picked.settings,
-			cwd,
-			limits: builtinAgent(id).limits,
-		};
-	}
+	) => reportAgentVia(deps, id, requested, folder, none);
 
 	/** Who answers for one built-in agent now, or why nothing can. */
 	function statusOf(id: BuiltinAgentId): BuiltinStatus {

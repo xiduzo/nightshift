@@ -250,6 +250,25 @@ export type Knowledge = {
 	 */
 	setMeaning(projectId: string, on: boolean): Promise<KnowledgeMeaningStatus>;
 	/**
+	 * Whether Night Shift proposes learnings from the runs of the project
+	 * that ended (ADR 37): on unless a person turned it off.
+	 */
+	learnsFromRuns(projectId: string): Promise<boolean>;
+	/** Turns the learnings from runs on or off for the project, for every Device of its Space. */
+	setLearnsFromRuns(projectId: string, on: boolean): Promise<void>;
+	/**
+	 * Proposes what Night Shift learned from a run that ended, in the run's
+	 * own file in `learnings/proposed/`. It waits for a person as a step's
+	 * learnings do. No note: nothing is written.
+	 */
+	proposeFromRun(
+		projectId: string,
+		runId: string,
+		notes: readonly string[],
+	): Promise<void>;
+	/** The notes the project has on this computer, waiting and kept: what not to propose again. */
+	knownLearnings(projectId: string): Promise<string[]>;
+	/**
 	 * The project's sources, in `space` as the person who asks sees it.
 	 * What the person may do comes with each change (`SourceRights`).
 	 */
@@ -659,6 +678,14 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 			await (await documents.open(projectId)).setMeaning(on);
 			return search.meaning(projectId);
 		},
+		async learnsFromRuns(projectId) {
+			return (await documents.open(projectId)).learnsFromRunsOn();
+		},
+		async setLearnsFromRuns(projectId, on) {
+			await (await documents.open(projectId)).setLearnsFromRuns(on);
+		},
+		proposeFromRun: learnings.proposeFromRun,
+		knownLearnings: learnings.known,
 		sources: sourcesIn,
 		async moved(move) {
 			for (const [projectId, to] of Object.entries(move.projects)) {

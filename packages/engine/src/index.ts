@@ -126,8 +126,10 @@ export {
 } from "./flows";
 export {
 	type AskedQuestion,
+	type AskLearner,
 	createKnowledge,
 	createKnowledgeFolderLocks,
+	createRunLearnings,
 	type Knowledge,
 	type KnowledgeEvaluation,
 	type KnowledgeFile,
@@ -200,6 +202,7 @@ export {
 	RUNGS,
 	type RunBundleSummary,
 	runReading,
+	transcriptLines,
 } from "./read";
 export type {
 	Engine,

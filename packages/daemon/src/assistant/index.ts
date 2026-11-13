@@ -5,4 +5,5 @@
  */
 export { createAssistant } from "./assistant";
 export { chatRun } from "./authoring";
+export { createLearner } from "./learner";
 export { recordingAssistant } from "./recording";

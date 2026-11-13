@@ -42,10 +42,12 @@ import {
 	createKnowledgeFolderLocks,
 	createOllama,
 	createRunFolders,
+	createRunLearnings,
 	createSpaceArchive,
 	createSyncedDocuments,
 	createToolLaunchers,
 	localDevice,
+	transcriptLines,
 } from "@nightshift/engine";
 import {
 	createAgentSetup,
@@ -77,7 +79,11 @@ import {
 import { deliveryMoves } from "@nightshift/notifications";
 import { createTelemetry } from "@nightshift/telemetry";
 import { instant } from "@nightshift/time";
-import { createAssistant, recordingAssistant } from "./assistant";
+import {
+	createAssistant,
+	createLearner,
+	recordingAssistant,
+} from "./assistant";
 import {
 	harnessLookup,
 	localHarnesses,
@@ -857,6 +863,61 @@ async function makeDaemon(
 		reach: devices.reach,
 	};
 
+	// Suggestions and chats in the flow editor: on this computer's
+	// profiles, read only in the project's Clone. A chat reads the
+	// project's flows and runs as the Person sees them in the Space.
+	const assistantDeps: Parameters<typeof createAssistant>[0] = {
+		profiles,
+		settings,
+		...harnessLookup(harnesses, settings),
+		clonePath,
+		withoutFolder: withoutFolderOf(db),
+		space: ({ spaceId, personId }) => engine.space(spaceId, { personId }),
+		cliTools,
+		connections,
+		// The Explainer, the Field writer and the Learner on a model of this computer.
+		decide: async (input) =>
+			decider.value
+				? decider.value(input)
+				: {
+						kind: "error",
+						errorKind: "harness",
+						message: "This computer has no model that writes an answer.",
+						costUsd: null,
+					},
+		// The check of the Decider picks an option, as a Decision does.
+		decideOption: (input) => decider.decide(input),
+		ownFolder: async () => {
+			const folder = join(dataDir, "assistant");
+			await mkdir(folder, { recursive: true });
+			return folder;
+		},
+	};
+
+	/**
+	 * Learnings from runs that ended (ADR 37): when a run this computer
+	 * walks ends with a signal, the Learner proposes what to learn, into the
+	 * project's knowledge. Its cost goes to the run's Space. A reload stops
+	 * the one before: one look back follows the runs.
+	 */
+	await slots.replace(
+		"nightshiftRunLearnings",
+		() => {
+			const learnings = createRunLearnings({
+				runs: engine,
+				knowledge,
+				learn: createLearner({
+					...assistantDeps,
+					keep: (cost) => engine.keepAnswerCost(cost),
+					personId: person.userId,
+				}),
+				lines: transcriptLines,
+			});
+			return { stop: learnings.follow() };
+		},
+		(before) => before.stop(),
+	);
+
 	// The assistant, with one record kept per answer that spent something:
 	// the Spend page shows what Night Shift's own agents cost.
 	const assistantWithCosts = (deps: Parameters<typeof createAssistant>[0]) =>
@@ -893,33 +954,7 @@ async function makeDaemon(
 		// Suggestions and chats in the flow editor: on this computer's
 		// profiles, read only in the project's Clone. A chat reads the
 		// project's flows and runs as the Person sees them in the Space.
-		assistant: assistantWithCosts({
-			profiles,
-			settings,
-			...harnessLookup(harnesses, settings),
-			clonePath,
-			withoutFolder: withoutFolderOf(db),
-			space: ({ spaceId, personId }) => engine.space(spaceId, { personId }),
-			cliTools,
-			connections,
-			// The Explainer and the Field writer on a model of this computer.
-			decide: async (input) =>
-				decider.value
-					? decider.value(input)
-					: {
-							kind: "error",
-							errorKind: "harness",
-							message: "This computer has no model that writes an answer.",
-							costUsd: null,
-						},
-			// The check of the Decider picks an option, as a Decision does.
-			decideOption: (input) => decider.decide(input),
-			ownFolder: async () => {
-				const folder = join(dataDir, "assistant");
-				await mkdir(folder, { recursive: true });
-				return folder;
-			},
-		}),
+		assistant: assistantWithCosts(assistantDeps),
 		checks,
 		agentSetup,
 		deciderSetup,

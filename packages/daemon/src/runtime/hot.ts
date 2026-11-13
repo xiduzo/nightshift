@@ -63,6 +63,8 @@ export type HotRegistry = KeptDevices &
 		nightshiftInApp?: InAppChannel;
 		nightshiftNotifications?: Notifications;
 		nightshiftKeepAwake?: KeepAwake;
+		/** The look back at the runs that end (ADR 37): its stop lets go of the engine. */
+		nightshiftRunLearnings?: { stop: () => void };
 		/** The export to monitoring: its providers stop with it. */
 		nightshiftTelemetry?: Telemetry;
 		nightshiftScheduler?: AbortController;

@@ -97,6 +97,23 @@ export type Learnings = {
 		notes: readonly string[],
 	): Promise<void>;
 	/**
+	 * Adds what Night Shift learned when it looked back at a run that ended
+	 * (ADR 37) to the run's own file, `<runId>.md`. It holds the folder as a
+	 * step does: the reconcile at its end puts the file in the Space. No
+	 * note: nothing is written.
+	 */
+	proposeFromRun(
+		projectId: string,
+		runId: string,
+		notes: readonly string[],
+	): Promise<void>;
+	/**
+	 * The notes the project has, as this computer has them: the waiting ones,
+	 * newest first, then the kept ones. No Host is asked. The look back at a
+	 * run reads them, so it does not propose them again.
+	 */
+	known(projectId: string): Promise<string[]>;
+	/**
 	 * The session's events as they are, with the learnings of its reports
 	 * proposed for the run's step. A note that cannot be kept is left out:
 	 * the step goes on.
@@ -266,6 +283,7 @@ export function createLearnings(deps: LearningsDeps): Learnings {
 		projectId: string,
 		step: LearningStep,
 		notes: readonly string[],
+		by: "agents" | "run" = "agents",
 	): Promise<void> {
 		const dir = join(
 			folders.folder(projectId),
@@ -273,7 +291,7 @@ export function createLearnings(deps: LearningsDeps): Learnings {
 		);
 		const file = join(dir, proposedLearningFileName(step));
 		const isNew = (await stat(file).catch(() => null)) === null;
-		const text = formatLearnings(notes, { runId: step.runId, isNew });
+		const text = formatLearnings(notes, { runId: step.runId, isNew, by });
 		if (text === "") return;
 		await mkdir(dir, { recursive: true });
 		await appendFile(file, text);
@@ -281,6 +299,22 @@ export function createLearnings(deps: LearningsDeps): Learnings {
 
 	return {
 		propose,
+		async proposeFromRun(projectId, runId, notes) {
+			if (notes.length === 0) return;
+			const hold = await deps.startStep(projectId);
+			try {
+				await propose(projectId, { runId }, notes, "run");
+			} finally {
+				await hold.done();
+			}
+		},
+		async known(projectId) {
+			const waiting = (await listed(projectId, { onlyHere: true }))
+				.sort((a, b) => b.proposedAt - a.proposedAt)
+				.flatMap((learning) => learning.notes ?? []);
+			const kept = (await keptNotes(projectId)).map((note) => note.text);
+			return [...waiting, ...kept];
+		},
 		async *keepReported(events, projectId, step) {
 			for await (const event of events) {
 				if (event.type === "report" && event.learnings?.length) {

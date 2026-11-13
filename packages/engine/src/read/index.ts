@@ -58,6 +58,7 @@ export {
 	runWorktree,
 	withEnclosing,
 } from "./run-views";
+export { transcriptLines } from "./transcript-lines";
 export type {
 	AnsweredGate,
 	OpenGate,

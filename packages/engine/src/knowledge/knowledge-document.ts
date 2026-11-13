@@ -27,6 +27,8 @@ import { isKnowledgePath } from "./folder-snapshot";
  * `settings`: the project's knowledge settings, one plain value per name,
  * so every Device of the Space searches the same way. `meaning: false`:
  * search finds by words only for this project, though Ollama is there.
+ * `learnFromRuns: false`: Night Shift proposes no learnings from the runs
+ * of this project that ended (ADR 37).
  */
 
 /** One file of the knowledge, as the document lists it. */
@@ -83,12 +85,20 @@ type KnowledgeDocument = {
 	meaningOn(): boolean;
 	/** Turns search by meaning on or off for the Project, for every Device of its Space. */
 	setMeaning(on: boolean): Promise<void>;
+	/**
+	 * Whether Night Shift proposes learnings from the runs of the Project that
+	 * ended (ADR 37): on unless a person turned it off.
+	 */
+	learnsFromRunsOn(): boolean;
+	/** Turns the learnings from runs on or off for the Project, for every Device of its Space. */
+	setLearnsFromRuns(on: boolean): Promise<void>;
 };
 
 function knowledgeDocument(document: PersistedDocument): KnowledgeDocument {
 	const files = document.doc.getMap<unknown>("files");
 	const settings = document.doc.getMap<unknown>("settings");
 	const meaningOn = () => settings.get("meaning") !== false;
+	const learnsFromRunsOn = () => settings.get("learnFromRuns") !== false;
 	return {
 		name: document.name,
 		entries() {
@@ -126,6 +136,14 @@ function knowledgeDocument(document: PersistedDocument): KnowledgeDocument {
 			await document.change(() => {
 				if (on) settings.delete("meaning");
 				else settings.set("meaning", false);
+			});
+		},
+		learnsFromRunsOn,
+		async setLearnsFromRuns(on) {
+			if (learnsFromRunsOn() === on) return;
+			await document.change(() => {
+				if (on) settings.delete("learnFromRuns");
+				else settings.set("learnFromRuns", false);
 			});
 		},
 	};
