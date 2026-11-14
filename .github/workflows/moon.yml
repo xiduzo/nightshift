@@ -34,7 +34,7 @@ jobs:
 
       - name: Push the moon branch
         run: |
-          git fetch origin moon || true
+          git fetch origin moon:refs/remotes/origin/moon || true
           if git rev-parse --verify --quiet origin/moon; then
             git switch --discard-changes -C moon origin/moon
           else
