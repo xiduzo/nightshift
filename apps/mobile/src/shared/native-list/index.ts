@@ -13,8 +13,9 @@ export {
 	NativePickerRow,
 	NativeRow,
 	NativeSection,
+	NativeTextFieldRow,
 	NativeTextRow,
 	NativeTitleRow,
 	NativeToggleRow,
 } from "./native-list";
-export type { NativeIcon, RowAction } from "./types";
+export type { NativeFieldHandle, NativeIcon, RowAction } from "./types";

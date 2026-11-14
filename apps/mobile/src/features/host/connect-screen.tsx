@@ -1,29 +1,29 @@
-import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui-native/components/ui/alert";
-import { Button } from "@nightshift/ui-native/components/ui/button";
-import { Card, CardContent } from "@nightshift/ui-native/components/ui/card";
-import { Input } from "@nightshift/ui-native/components/ui/input";
-import { Label } from "@nightshift/ui-native/components/ui/label";
-import { Text } from "@nightshift/ui-native/components/ui/text";
 import { router, Stack } from "expo-router";
 import { CircleAlert, ScanQrCode } from "lucide-react-native";
-import { type ReactNode, useEffect, useRef, useState } from "react";
-import { type TextInput, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
 import { ENV } from "@/env";
-import { ListGroup, ListRow, SectionHead } from "@/shared/list";
-import { Screen } from "@/shared/page";
+import {
+	NativeButtonRow,
+	type NativeFieldHandle,
+	NativeList,
+	NativeRow,
+	NativeSection,
+	NativeTextFieldRow,
+	NativeTextRow,
+} from "@/shared/native-list";
 import { CodeScanner } from "./code-scanner";
 import { type CodeKind, useHost } from "./host-provider";
 
 type Step = "sign-in" | "scan" | "code";
 
+const RED = "#dc2626";
+
 /**
  * Connect this phone to a Host: its address (typed, or scanned from the
  * code in Night Shift's Settings), the person's email and password, and a
- * two-factor code or a backup code when the Host asks for one.
+ * two-factor code or a backup code when the Host asks for one. A native
+ * grouped list: SwiftUI form rows on iOS, Material 3 fields on Android.
+ * The list keeps the field you type in above the keyboard.
  */
 export function ConnectScreen() {
 	const { state, signIn, verifyCode } = useHost();
@@ -41,7 +41,7 @@ export function ConnectScreen() {
 	const [busy, setBusy] = useState(false);
 	/** The sign-in went through: leave once the app knows it too. */
 	const [connected, setConnected] = useState(false);
-	const passwordInput = useRef<TextInput>(null);
+	const passwordField = useRef<NativeFieldHandle>(null);
 
 	// Back to the tabs that wait under this screen, or to new ones. Only once
 	// the Host state says signed in: the session reaches it a render later
@@ -51,7 +51,11 @@ export function ConnectScreen() {
 		if (connected && state.status === "signed-in") router.dismissTo("/");
 	}, [connected, state.status]);
 
+	const waiting = busy || connected;
+
 	async function submit() {
+		// The return key can send the form again while it is on its way.
+		if (waiting) return;
 		setBusy(true);
 		setError(null);
 		try {
@@ -72,7 +76,6 @@ export function ConnectScreen() {
 		}
 	}
 
-	const waiting = busy || connected;
 	const submitLabel =
 		step === "sign-in"
 			? waiting
@@ -82,172 +85,128 @@ export function ConnectScreen() {
 				? "Checking the code…"
 				: "Verify code";
 
+	const problem = error ? (
+		<NativeSection>
+			<NativeTextRow
+				icon={{ sf: "exclamationmark.triangle.fill", lucide: CircleAlert }}
+				iconColor={RED}
+				text="**You are not connected**"
+				note={error}
+			/>
+		</NativeSection>
+	) : null;
+
 	return (
-		<Screen
-			summary={
-				step === "code"
-					? "Your Host asks for a second code before you sign in."
-					: "Sign in to the Host that runs your flows. Then answer Gates and follow runs from this phone."
-			}
-		>
+		<>
 			<Stack.Screen
 				options={{
 					title: step === "code" ? "Second code" : "Connect",
 				}}
 			/>
-			{step === "scan" ? (
-				<CodeScanner
-					onScanned={(scanned) => {
-						setAddress(scanned);
-						setError(null);
-						setStep("sign-in");
-					}}
-					onCancel={() => setStep("sign-in")}
-				/>
-			) : step === "sign-in" ? (
-				<>
-					<ListGroup>
-						<ListRow
-							icon={ScanQrCode}
-							title="Scan the code"
-							caption="In Night Shift on your computer, under Settings"
-							onPress={() => setStep("scan")}
-							accessibilityHint="Opens the camera to read the Host address"
-						/>
-					</ListGroup>
-					<SectionHead title="Or sign in by hand" />
-					<Card className="py-4">
-						<CardContent className="gap-5 px-4">
-							<Field
+			<NativeList>
+				{step === "scan" ? (
+					<CodeScanner
+						onScanned={(scanned) => {
+							setAddress(scanned);
+							setError(null);
+							setStep("sign-in");
+						}}
+						onCancel={() => setStep("sign-in")}
+					/>
+				) : step === "sign-in" ? (
+					<>
+						<NativeSection footer="Sign in to the Host that runs your flows. Then answer Gates and follow runs from this phone.">
+							<NativeRow
+								icon={{ sf: "qrcode.viewfinder", lucide: ScanQrCode }}
+								title="Scan the code"
+								subtitle="In Night Shift on your computer, under Settings"
+								onPress={() => setStep("scan")}
+								accessibilityLabel="Scan the code. Opens the camera to read the Host address."
+							/>
+						</NativeSection>
+						<NativeSection
+							title="Or sign in by hand"
+							footer="The Host address is where you open Night Shift in a browser."
+						>
+							<NativeTextFieldRow
 								label="Host address"
-								hint="The address where you open Night Shift in a browser."
-							>
-								<Input
-									value={address}
-									onChangeText={setAddress}
-									placeholder="nightshift.example.com"
-									autoCapitalize="none"
-									autoCorrect={false}
-									keyboardType="url"
-									textContentType="URL"
-									accessibilityLabel="Host address"
-								/>
-							</Field>
-							<Field label="Email">
-								<Input
-									value={email}
-									onChangeText={setEmail}
-									placeholder="you@example.com"
-									autoCapitalize="none"
-									autoComplete="email"
-									keyboardType="email-address"
-									textContentType="emailAddress"
-									returnKeyType="next"
-									submitBehavior="submit"
-									onSubmitEditing={() => passwordInput.current?.focus()}
-									accessibilityLabel="Email"
-								/>
-							</Field>
-							<Field label="Password">
-								<Input
-									ref={passwordInput}
-									value={password}
-									onChangeText={setPassword}
-									secureTextEntry
-									autoComplete="password"
-									textContentType="password"
-									returnKeyType="go"
-									onSubmitEditing={submit}
-									accessibilityLabel="Password"
-								/>
-							</Field>
-						</CardContent>
-					</Card>
-				</>
-			) : (
-				<Card className="py-4">
-					<CardContent className="gap-3 px-4">
-						<Field
-							label={codeKind === "app" ? "Two-factor code" : "Backup code"}
-							hint={
+								kind="url"
+								value={address}
+								onChange={setAddress}
+								placeholder="nightshift.example.com"
+							/>
+							<NativeTextFieldRow
+								label="Email"
+								kind="email"
+								value={email}
+								onChange={setEmail}
+								placeholder="you@example.com"
+								returnKey="next"
+								onSubmit={() => passwordField.current?.focus()}
+							/>
+							<NativeTextFieldRow
+								ref={passwordField}
+								label="Password"
+								kind="password"
+								value={password}
+								onChange={setPassword}
+								placeholder="Required"
+								returnKey="go"
+								onSubmit={() => void submit()}
+							/>
+						</NativeSection>
+						{problem}
+						<NativeSection>
+							<NativeButtonRow
+								label={submitLabel}
+								disabled={waiting}
+								onPress={() => void submit()}
+							/>
+						</NativeSection>
+					</>
+				) : (
+					<>
+						<NativeSection
+							footer={
 								codeKind === "app"
-									? "Enter the 6-digit code from your authenticator app."
-									: "Enter one of the backup codes you saved. Each code works once."
+									? "Your Host asks for a second code before you sign in. Enter the 6-digit code from your authenticator app."
+									: "Your Host asks for a second code before you sign in. Enter one of the backup codes you saved. Each code works once."
 							}
 						>
-							<Input
+							<NativeTextFieldRow
+								label={codeKind === "app" ? "Two-factor code" : "Backup code"}
+								kind={codeKind === "app" ? "one-time-code" : "code"}
 								value={code}
-								onChangeText={setCode}
+								onChange={setCode}
 								placeholder={codeKind === "app" ? "123456" : "abcde-fghij"}
-								autoCapitalize="none"
-								autoCorrect={false}
-								autoComplete={codeKind === "app" ? "one-time-code" : "off"}
-								keyboardType={codeKind === "app" ? "number-pad" : "default"}
-								textContentType={codeKind === "app" ? "oneTimeCode" : "none"}
-								onSubmitEditing={submit}
-								accessibilityLabel={
-									codeKind === "app" ? "Two-factor code" : "Backup code"
-								}
+								returnKey="go"
+								onSubmit={() => void submit()}
 							/>
-						</Field>
-						<Button
-							size="lg"
-							variant="link"
-							className="h-auto min-h-11 self-start px-0 py-2"
-							onPress={() => {
-								setCode("");
-								setError(null);
-								setCodeKind(codeKind === "app" ? "backup" : "app");
-							}}
-						>
-							<Text>
-								{codeKind === "app"
-									? "Use a backup code"
-									: "Use the code from your app"}
-							</Text>
-						</Button>
-					</CardContent>
-				</Card>
-			)}
-			{error ? (
-				<Alert icon={CircleAlert} variant="destructive">
-					<AlertTitle>You are not connected</AlertTitle>
-					<AlertDescription>{error}</AlertDescription>
-				</Alert>
-			) : null}
-			{step === "scan" ? null : (
-				<Button
-					size="lg"
-					onPress={submit}
-					disabled={waiting}
-					className="h-auto min-h-11 py-2"
-				>
-					<Text>{submitLabel}</Text>
-				</Button>
-			)}
-		</Screen>
-	);
-}
-
-/** A label, its control and an optional hint: the shadcn Field, in parts. */
-function Field({
-	label,
-	hint,
-	children,
-}: {
-	label: string;
-	hint?: string;
-	children: ReactNode;
-}) {
-	return (
-		<View className="gap-2">
-			<Label>{label}</Label>
-			{children}
-			{hint ? (
-				<Text variant="muted" className="text-muted-foreground">
-					{hint}
-				</Text>
-			) : null}
-		</View>
+						</NativeSection>
+						{problem}
+						<NativeSection>
+							<NativeButtonRow
+								label={submitLabel}
+								disabled={waiting}
+								onPress={() => void submit()}
+							/>
+							<NativeButtonRow
+								label={
+									codeKind === "app"
+										? "Use a backup code"
+										: "Use the code from your app"
+								}
+								disabled={waiting}
+								onPress={() => {
+									setCode("");
+									setError(null);
+									setCodeKind(codeKind === "app" ? "backup" : "app");
+								}}
+							/>
+						</NativeSection>
+					</>
+				)}
+			</NativeList>
+		</>
 	);
 }

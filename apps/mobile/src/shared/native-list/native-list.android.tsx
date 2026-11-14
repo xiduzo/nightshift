@@ -14,6 +14,10 @@ import {
 	Switch,
 	Text,
 	TextButton,
+	TextField,
+	type TextFieldKeyboardType,
+	type TextFieldRef,
+	useNativeState,
 } from "@expo/ui/jetpack-compose";
 import {
 	alpha,
@@ -31,6 +35,9 @@ import {
 	Fragment,
 	isValidElement,
 	type ReactNode,
+	useEffect,
+	useImperativeHandle,
+	useRef,
 	useState,
 } from "react";
 import { View } from "react-native";
@@ -39,6 +46,7 @@ import { useThemeColors } from "@/shared/theme";
 import type {
 	NativeButtonRowProps,
 	NativeCustomRowProps,
+	NativeFieldKind,
 	NativeIcon,
 	NativeListProps,
 	NativeLoadingRowProps,
@@ -46,6 +54,7 @@ import type {
 	NativePickerRowProps,
 	NativeRowProps,
 	NativeSectionProps,
+	NativeTextFieldRowProps,
 	NativeTextRowProps,
 	NativeTitleRowProps,
 	NativeToggleRowProps,
@@ -448,5 +457,108 @@ export function NativeCustomRow({ children }: NativeCustomRowProps) {
 		>
 			<View>{children as ReactNode}</View>
 		</RNHostView>
+	);
+}
+
+/**
+ * The field's text as native state that follows `value`: what the person
+ * types goes out through `onChange`, a new value from the screen (a
+ * scanned address, a cleared code) goes into the field.
+ */
+function useFieldText(value: string, onChange: (value: string) => void) {
+	const text = useNativeState(value);
+	const last = useRef(value);
+	useEffect(() => {
+		if (value === last.current) return;
+		last.current = value;
+		text.set(value);
+	}, [value, text]);
+	return {
+		text,
+		change(next: string) {
+			last.current = next;
+			onChange(next);
+		},
+	};
+}
+
+/** The keyboard and the autofill hint of each kind of field. */
+const FIELD_INPUT = {
+	url: { keyboard: "uri", content: undefined },
+	email: { keyboard: "email", content: "email" },
+	password: { keyboard: "password", content: "password" },
+	"one-time-code": { keyboard: "number", content: "one-time-code" },
+	code: { keyboard: "ascii", content: undefined },
+} as const satisfies Record<
+	NativeFieldKind,
+	{ keyboard: TextFieldKeyboardType; content: string | undefined }
+>;
+
+const CLEAR = "#00000000";
+
+/**
+ * A Material 3 TextField without its own fill or line: the card is the
+ * container and the dividers split the fields. The label floats above
+ * the text. Autofill offers the saved email and password.
+ */
+export function NativeTextFieldRow({
+	label,
+	value,
+	onChange,
+	kind,
+	placeholder,
+	returnKey,
+	onSubmit,
+	ref,
+}: NativeTextFieldRowProps) {
+	const { text, change } = useFieldText(value, onChange);
+	const field = useRef<TextFieldRef>(null);
+	useImperativeHandle(
+		ref,
+		() => ({
+			focus() {
+				void field.current?.focus();
+			},
+		}),
+		[],
+	);
+	const input = FIELD_INPUT[kind];
+	const submit = onSubmit ? () => onSubmit() : undefined;
+	return (
+		<TextField
+			ref={field}
+			value={text}
+			onValueChange={change}
+			singleLine
+			visualTransformation={kind === "password" ? "password" : "none"}
+			keyboardOptions={{
+				capitalization: "none",
+				autoCorrectEnabled: false,
+				keyboardType: input.keyboard,
+				imeAction: returnKey ?? "default",
+			}}
+			keyboardActions={{ onNext: submit, onGo: submit }}
+			colors={{
+				focusedContainerColor: CLEAR,
+				unfocusedContainerColor: CLEAR,
+				disabledContainerColor: CLEAR,
+				focusedIndicatorColor: CLEAR,
+				unfocusedIndicatorColor: CLEAR,
+				disabledIndicatorColor: CLEAR,
+			}}
+			modifiers={[
+				fillMaxWidth(),
+				...(input.content ? [semantics({ contentType: input.content })] : []),
+			]}
+		>
+			<TextField.Label>
+				<Text>{label}</Text>
+			</TextField.Label>
+			{placeholder ? (
+				<TextField.Placeholder>
+					<Text>{placeholder}</Text>
+				</TextField.Placeholder>
+			) : null}
+		</TextField>
 	);
 }
