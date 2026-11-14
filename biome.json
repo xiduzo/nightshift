@@ -61,12 +61,9 @@
 				"noReExportAll": "error"
 			},
 			"nursery": {
-				"useSortedClasses": {
+				"useTailwindSortedClasses": {
 					"level": "warn",
-					"fix": "safe",
-					"options": {
-						"functions": ["clsx", "cva", "cn"]
-					}
+					"fix": "safe"
 				}
 			},
 			"style": {
@@ -937,5 +934,8 @@
 				}
 			}
 		}
-	]
+	],
+	"tailwind": { "mergeFunctions": ["clsx", "cn"], "variantFunctions": ["cva"] },
+	"markdown": { "formatter": { "enabled": false } },
+	"yaml": { "formatter": { "enabled": false } }
 }

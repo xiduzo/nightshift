@@ -79,7 +79,7 @@
 		"zod": "catalog:"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.5.12",
+		"@biomejs/biome": "^2.6.7",
 		"@nightshift/config": "workspace:*",
 		"@resvg/resvg-js": "^2.6.2",
 		"@types/bun": "catalog:",
