@@ -98,6 +98,7 @@ describe("cron helpers", () => {
 		expect(cronError("0 22 * * 1-5")).toBeNull();
 		expect(cronError("61 22 * * *")).toContain("minute");
 		expect(cronError("0 22 * *")).not.toBeNull();
+		expect(cronError("0 0 5L * *")).toContain("L");
 		// Five fields only: no seconds.
 		expect(cronError("0 0 22 * * *")).not.toBeNull();
 	});
