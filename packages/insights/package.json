@@ -21,10 +21,10 @@
 		"postgres": "3.4.7"
 	},
 	"devDependencies": {
-		"@electric-sql/pglite": "0.3.14",
+		"@electric-sql/pglite": "0.5.16",
 		"@nightshift/config": "workspace:*",
 		"@types/bun": "catalog:",
-		"drizzle-kit": "1.0.0-rc.4",
+		"drizzle-kit": "1.0.0-rc.5",
 		"typescript": "catalog:"
 	}
 }

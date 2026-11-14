@@ -31,7 +31,7 @@ async function databaseBefore(before: string): Promise<Database> {
 	return db;
 }
 
-const rows = <T>(db: Database, query: string) =>
+const rows = <T extends Record<string, unknown>>(db: Database, query: string) =>
 	db.all<T>(sql.raw(query)) as Promise<T[]>;
 
 describe("migration devices_clones_walkers", () => {
