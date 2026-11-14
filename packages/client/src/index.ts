@@ -373,6 +373,8 @@ export {
 	hoverTime,
 	iso,
 	localZone,
+	type MoonPhase,
+	moonPhase,
 	now,
 } from "./time";
 export { createUsageQueries } from "./usage";

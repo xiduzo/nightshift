@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="apps/web/public/favicon.svg" alt="" width="96" height="96">
+<img src="https://raw.githubusercontent.com/xiduzo/nightshift/moon/moon.svg" alt="The moon of tonight" width="96" height="96">
 
 # Night Shift
 
@@ -154,3 +154,5 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request. To repor
 ## License
 
 [Apache-2.0](LICENSE)
+
+The logo follows the phase of the moon. The moon icons are from [OpenMoji](https://openmoji.org), the open-source emoji and icon project, under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).

@@ -1,6 +1,8 @@
+import { moonPhase } from "@nightshift/time";
 import Electrobun, {
 	ApplicationMenu,
 	BrowserWindow,
+	PATHS,
 	Tray,
 	Updater,
 	Utils,
@@ -17,6 +19,7 @@ import {
 	downloadScript,
 	externalUrl,
 } from "../features/external";
+import { followMoon, setDockIcon, trayImage } from "../features/moon";
 import { electrobunNotifier, trackWindow } from "../features/notifications";
 import { startUpdates } from "../features/updates";
 
@@ -207,14 +210,20 @@ function showWindow(): void {
 }
 
 // Runs go on when the window closes: the app stays in the menu bar until you quit.
-// A template image: macOS tints it to match the menu bar.
+// The icon is the moon in its phase of tonight, in color: no template image.
 tray = new Tray({
-	image: "views://tray-icon.png",
-	template: true,
+	image: trayImage(moonPhase()),
+	template: false,
 	width: 18,
 	height: 18,
 });
 setMenus();
+// The menu bar and Dock icons follow the moon, like the logo in the app.
+followMoon({
+	tray: (image) => tray?.setImage(image),
+	dock: setDockIcon,
+	viewsFolder: PATHS.VIEWS_FOLDER,
+});
 
 function onAction(action: string): void {
 	if (action === "open") showWindow();

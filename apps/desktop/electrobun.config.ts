@@ -91,8 +91,8 @@ export default {
 			// A Worker's own file, next to the bundle that starts it.
 			[watchdogWorker]: "bun/watchdog-worker.ts",
 			[libsqlNative]: `bun/node_modules/@libsql/${libsqlNative.split("/").pop()}`,
-			// The menu bar icon, for `views://tray-icon.png`.
-			"assets/tray-icon.png": "views/tray-icon.png",
+			// The menu bar and Dock icons of each moon phase, for `views://moon/`.
+			"assets/moon": "views/moon",
 		},
 		// The worker is no entrypoint and its bundle is in node_modules: watch its source.
 		watch: ["src/features/watchdog"],

@@ -19,6 +19,8 @@ export {
 	hoverTime,
 	iso,
 	localZone,
+	type MoonPhase,
+	moonPhase,
 	now,
 	wall,
 } from "@nightshift/time";

@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><title>Night Shift: a Gate waits for you</title><style>.dot{fill:#975800}@media (prefers-color-scheme: dark){.dot{fill:#f7bc50}}</style>
+	<mask id="cut"><rect width="64" height="64" fill="#fff"/><circle cx="50" cy="14" r="17" fill="#000"/></mask>
+	<g mask="url(#cut)"><image href="data:image/svg+xml;base64,PHN2ZyBpZD0iZW1vamkiIHZpZXdCb3g9IjcgNyA1OCA1OCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZyBpZD0iY29sb3IiPgogICAgPGNpcmNsZSBjeD0iMzYiIGN5PSIzNiIgcj0iMjgiIGZpbGw9IiNmY2VhMmIiIHN0cm9rZT0iI2ZjZWEyYiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8L2c+CiAgPGcgaWQ9ImxpbmUiPgogICAgPGNpcmNsZSBjeD0iMzYiIGN5PSIzNiIgcj0iMjgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8L2c+Cjwvc3ZnPgo=" x="2" y="2" width="60" height="60" /></g>
+	<circle class="dot" cx="50" cy="14" r="13"/></svg>

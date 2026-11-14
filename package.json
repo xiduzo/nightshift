@@ -84,6 +84,7 @@
 		"@resvg/resvg-js": "^2.6.2",
 		"@types/bun": "catalog:",
 		"lefthook": "^2.1.12",
+		"openmoji": "17.0.0",
 		"turbo": "^2.10.12",
 		"typescript": "catalog:",
 		"varlock": "catalog:"
