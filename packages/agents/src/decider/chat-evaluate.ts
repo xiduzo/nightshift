@@ -9,6 +9,7 @@
  * not measure (see `probabilities`).
  */
 
+import { randomUUID } from "node:crypto";
 import {
 	type AnyTextAdapter,
 	BaseEvaluateAdapter,
@@ -89,6 +90,7 @@ export class ChatEvaluateAdapter extends BaseEvaluateAdapter<string> {
 			try {
 				const data = (await chat({
 					adapter: await this.text(model),
+					threadId: `nightshift-evaluate-${randomUUID()}`,
 					systemPrompts: [SYSTEM_PROMPT],
 					messages: [{ role: "user", content: choicePrompt(state, question) }],
 					outputSchema: {

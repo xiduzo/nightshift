@@ -8,6 +8,7 @@
  * first call, not when Night Shift starts: the model lists here are copies.
  */
 
+import { randomUUID } from "node:crypto";
 import {
 	addressRoot,
 	canMakeValue,
@@ -587,6 +588,7 @@ async function valueOnce(
 	try {
 		const data: unknown = await chat({
 			adapter: await maker.create(model, access, options),
+			threadId: `nightshift-value-${randomUUID()}`,
 			messages: [{ role: "user", content: input.prompt }],
 			outputSchema: input.output as Parameters<typeof chat>[0]["outputSchema"],
 			stream: false,

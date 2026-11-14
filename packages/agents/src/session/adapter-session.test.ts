@@ -503,57 +503,103 @@ describe("sessionEnvironment", () => {
 	});
 });
 
+/** What `command` prints when the harness of a session runs it in its sandbox. */
+async function runInSession(
+	command: string,
+	overrides: Partial<AgentSessionInput>,
+	harness: HarnessSpec = spec(),
+): Promise<string> {
+	const seen: string[] = [];
+	let handle: Awaited<ReturnType<SandboxProvider["create"]>> | undefined;
+	const adapter = {
+		...fakeAdapter([]),
+		chatStream: async function* (options: TextOptions) {
+			const out = await handle?.process.exec(command);
+			seen.push(out?.stdout ?? "");
+			for (const chunk of finishedTurn(options.threadId)) {
+				yield chunk as never;
+			}
+		},
+	} as unknown as AnyTextAdapter;
+	await collect(
+		harnessSession({
+			input: input(overrides),
+			spec: harness,
+			adapter: (): AdapterSetup => ({
+				adapter,
+				wrapProvider: (provider) => ({
+					name: provider.name,
+					capabilities: () => provider.capabilities(),
+					create: async (create) => {
+						handle = await provider.create(create);
+						return handle;
+					},
+					resume: (resume) => provider.resume(resume),
+					destroy: (destroy) => provider.destroy(destroy),
+				}),
+			}),
+		}),
+	);
+	return seen[0] ?? "";
+}
+
+/** Sets host variables for the duration of `run`, then restores them. */
+async function withHostEnv<T>(
+	vars: Record<string, string>,
+	run: () => Promise<T>,
+): Promise<T> {
+	const previous = Object.fromEntries(
+		Object.keys(vars).map((name) => [name, process.env[name]]),
+	);
+	Object.assign(process.env, vars);
+	try {
+		return await run();
+	} finally {
+		for (const [name, value] of Object.entries(previous)) {
+			if (value === undefined) delete process.env[name];
+			else process.env[name] = value;
+		}
+	}
+}
+
 describe("harnessSession: environment", () => {
 	test("the harness's processes get the session's variables and the launchers, never a scrubbed one", async () => {
 		const tools = await mkdtemp(join(tmpdir(), "nightshift-tools-"));
-		const seen: string[] = [];
-		const previous = process.env.NIGHTSHIFT_TEST_SECRET;
-		process.env.NIGHTSHIFT_TEST_SECRET = "leaked";
 		try {
-			let handle: Awaited<ReturnType<SandboxProvider["create"]>> | undefined;
-			const adapter = {
-				...fakeAdapter([]),
-				chatStream: async function* (options: TextOptions) {
-					const out = await handle?.process.exec(
-						'printf "%s|%s|%s" "$NS_SESSION" "${NIGHTSHIFT_TEST_SECRET:-none}" "$PATH"',
-					);
-					seen.push(out?.stdout ?? "");
-					for (const chunk of finishedTurn(options.threadId)) {
-						yield chunk as never;
-					}
-				},
-			} as unknown as AnyTextAdapter;
-			await collect(
-				harnessSession({
-					input: input({
+			const out = await withHostEnv({ NIGHTSHIFT_TEST_SECRET: "leaked" }, () =>
+				runInSession(
+					'printf "%s|%s|%s" "$NS_SESSION" "${NIGHTSHIFT_TEST_SECRET:-none}" "$PATH"',
+					{
 						env: { NS_SESSION: "on" },
 						toolsPath: tools,
 						scrubEnv: ["NIGHTSHIFT_TEST_SECRET"],
-					}),
-					spec: spec(),
-					adapter: (): AdapterSetup => ({
-						adapter,
-						wrapProvider: (provider) => ({
-							name: provider.name,
-							capabilities: () => provider.capabilities(),
-							create: async (create) => {
-								handle = await provider.create(create);
-								return handle;
-							},
-							resume: (resume) => provider.resume(resume),
-							destroy: (destroy) => provider.destroy(destroy),
-						}),
-					}),
-				}),
+					},
+				),
 			);
+			const [session, secret, path] = out.split("|");
+			expect(session).toBe("on");
+			expect(secret).toBe("none");
+			expect(path).toStartWith(`${tools}:`);
 		} finally {
-			if (previous === undefined) delete process.env.NIGHTSHIFT_TEST_SECRET;
-			else process.env.NIGHTSHIFT_TEST_SECRET = previous;
 			await rm(tools, { recursive: true, force: true });
 		}
-		const [session, secret, path] = (seen[0] ?? "").split("|");
-		expect(session).toBe("on");
-		expect(secret).toBe("none");
-		expect(path).toStartWith(`${tools}:`);
+	});
+
+	test("the harness inherits the whole host environment (logins, ssh agent), less the spec's scrubbed names", async () => {
+		const out = await withHostEnv(
+			{
+				NIGHTSHIFT_TEST_HOST: "kept",
+				USER: "night-owl",
+				SSH_AUTH_SOCK: "/tmp/agent.sock",
+				ANTHROPIC_API_KEY: "sk-test",
+			},
+			() =>
+				runInSession(
+					'printf "%s|%s|%s|%s" "${NIGHTSHIFT_TEST_HOST:-none}" "${USER:-none}" "${SSH_AUTH_SOCK:-none}" "${ANTHROPIC_API_KEY:-none}"',
+					{},
+					spec({ scrubEnv: ["ANTHROPIC_API_KEY"] }),
+				),
+		);
+		expect(out).toBe("kept|night-owl|/tmp/agent.sock|none");
 	});
 });

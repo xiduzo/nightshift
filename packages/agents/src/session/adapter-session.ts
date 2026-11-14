@@ -404,6 +404,11 @@ export function harnessSession(options: {
 				dir: input.cwd,
 				// Never delete the run's worktree when the sandbox is destroyed.
 				removeOnDestroy: false,
+				// TanStack AI passes only a few host variables by default. Night
+				// Shift runs the person's own CLIs with their own logins (USER for
+				// the keychain, SSH_AUTH_SOCK, GH_TOKEN, CLAUDE_CONFIG_DIR): they
+				// get the whole environment, less the scrubbed names.
+				passEnv: Object.keys(process.env),
 				...(environment.scrubEnv.length > 0
 					? { scrubEnv: environment.scrubEnv }
 					: {}),

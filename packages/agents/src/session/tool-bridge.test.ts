@@ -14,6 +14,7 @@ const open: Array<{ close: () => Promise<void> }> = [];
 async function provision(tool = "echo", provider = "local-process") {
 	const bridge = await sharedToolBridgeProvisioner.provision([echo(tool)], {
 		provider,
+		threadId: "t-1",
 	});
 	open.push(bridge);
 	return bridge;

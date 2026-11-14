@@ -319,14 +319,14 @@ describe("opencodeHarness", () => {
 
 		expect(events).toEqual([
 			{ type: "session", sessionId: expect.stringMatching(/^ses_fake/) },
-			{ type: "report", outcome: "pass", summary: "Done it." },
-			// The adapter streams a text part whole, when it ends.
-			{ type: "text", messageId: expect.any(String), delta: "All good." },
 			// The usage so far, sent while the session runs.
 			{
 				type: "usage",
 				usage: { inputTokens: 110, outputTokens: 6, costUsd: 0.002 },
 			},
+			{ type: "report", outcome: "pass", summary: "Done it." },
+			// The adapter streams a text part whole, when it ends.
+			{ type: "text", messageId: expect.any(String), delta: "All good." },
 			{
 				type: "finished",
 				usage: { inputTokens: 110, outputTokens: 6, costUsd: 0.002 },
