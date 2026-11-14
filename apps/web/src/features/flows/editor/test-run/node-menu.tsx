@@ -189,7 +189,7 @@ function NodeMenuItems({
 							<span className="flex flex-col">
 								Pin output
 								{problem ? (
-									<span className="text-muted-foreground text-xs">
+									<span className="text-xs text-muted-foreground">
 										{problem}
 									</span>
 								) : null}

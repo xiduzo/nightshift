@@ -27,7 +27,7 @@ export function ConvertCard({ item }: { item: ConvertItem }) {
 			}
 		>
 			{failed ? (
-				<p className="whitespace-pre-wrap break-words leading-relaxed">
+				<p className="leading-relaxed break-words whitespace-pre-wrap">
 					{item.problem}
 				</p>
 			) : null}

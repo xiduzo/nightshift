@@ -104,7 +104,7 @@ export const DataEdge = memo(function DataEdge({
 					<Badge
 						variant="outline"
 						title={refs.join(", ")}
-						className="nodrag nopan pointer-events-auto absolute h-5 border-dashed bg-card font-mono font-normal text-[11px] text-muted-foreground shadow-xs"
+						className="nodrag nopan pointer-events-auto absolute h-5 border-dashed bg-card font-mono text-[11px] font-normal text-muted-foreground shadow-xs"
 						style={{
 							transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
 						}}

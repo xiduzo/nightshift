@@ -138,7 +138,7 @@ export function RunStory({
 								{step === firstNew && index > 0 && seen !== null ? (
 									<Marker
 										variant="separator"
-										className="font-medium text-destructive text-xs before:bg-destructive/40 after:bg-destructive/40"
+										className="text-xs font-medium text-destructive before:bg-destructive/40 after:bg-destructive/40"
 									>
 										<MarkerContent>
 											New since you looked · {formatTime(seen)}

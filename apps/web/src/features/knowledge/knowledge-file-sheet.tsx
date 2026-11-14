@@ -39,7 +39,7 @@ export function KnowledgeFileSheet({
 			<SheetContent className="data-[side=right]:w-full data-[side=right]:sm:max-w-3xl">
 				<SheetHeader>
 					<SheetTitle>{file.data?.title ?? path}</SheetTitle>
-					<SheetDescription className="break-all font-mono text-xs">
+					<SheetDescription className="font-mono text-xs break-all">
 						{path}
 						{file.data ? ` · ${formatSize(file.data.size)}` : ""}
 					</SheetDescription>
@@ -63,7 +63,7 @@ export function KnowledgeFileSheet({
 				) : (
 					<>
 						{file.data.truncated ? (
-							<p className="mx-4 text-muted-foreground text-sm">
+							<p className="mx-4 text-sm text-muted-foreground">
 								This file is large. You see its start.
 							</p>
 						) : null}

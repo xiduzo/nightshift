@@ -164,7 +164,7 @@ function runColumns(
 			cell: ({ row }) => (
 				<>
 					<RunFacts run={row.original} />
-					<p className="mt-0.5 whitespace-nowrap text-right text-muted-foreground text-xs">
+					<p className="mt-0.5 text-right text-xs whitespace-nowrap text-muted-foreground">
 						<Started at={row.original.createdAt} clock={clockTimes} />
 						<Took run={row.original} />
 					</p>
@@ -211,13 +211,13 @@ function RunTitle({
 					{run.title}
 				</Link>
 				{context.length > 0 ? (
-					<span className="truncate text-muted-foreground text-xs">
+					<span className="truncate text-xs text-muted-foreground">
 						{context.join(" · ")}
 					</span>
 				) : null}
 				{isTestRun(run) ? <TestRunBadge /> : null}
 				{run.status === "sleeping" && run.wakeAt ? (
-					<span className="shrink-0 text-status-sleeping text-xs">
+					<span className="shrink-0 text-xs text-status-sleeping">
 						wakes{" "}
 						<LocalTime at={run.wakeAt}>{formatTime(run.wakeAt)}</LocalTime>
 					</span>
@@ -225,7 +225,7 @@ function RunTitle({
 			</div>
 			{run.reason ? (
 				<p
-					className="mt-0.5 truncate pl-6 text-muted-foreground text-xs"
+					className="mt-0.5 truncate pl-6 text-xs text-muted-foreground"
 					title={run.reason}
 				>
 					{run.reason}

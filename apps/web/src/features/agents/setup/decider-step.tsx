@@ -112,7 +112,7 @@ export function DeciderStep({
 					<DialogHeader>
 						<DialogTitle>Starting Ollama</DialogTitle>
 					</DialogHeader>
-					<p className="flex items-center gap-2 text-muted-foreground text-sm">
+					<p className="flex items-center gap-2 text-sm text-muted-foreground">
 						<Spinner />
 						Waiting for Ollama to answer
 					</p>

@@ -27,7 +27,7 @@ export function McpTestOutcome({
 	if (pending) {
 		return (
 			<p
-				className="flex items-center gap-2 text-muted-foreground text-sm"
+				className="flex items-center gap-2 text-sm text-muted-foreground"
 				aria-live="polite"
 			>
 				<Spinner />

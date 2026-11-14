@@ -36,7 +36,7 @@ export function RunWarnings({
 						>
 							<span className="min-w-0 flex-1">
 								{warning.nodeId ? (
-									<span className="font-medium font-mono text-foreground">
+									<span className="font-mono font-medium text-foreground">
 										{warning.nodeId}:{" "}
 									</span>
 								) : null}

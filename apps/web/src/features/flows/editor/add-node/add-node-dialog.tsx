@@ -200,7 +200,7 @@ function CatalogItem({
 			<span className="flex min-w-0 flex-1 flex-col">
 				<span className="font-medium">{entry.label}</span>
 				{blurb ? (
-					<span className="text-muted-foreground text-xs">{blurb}</span>
+					<span className="text-xs text-muted-foreground">{blurb}</span>
 				) : null}
 			</span>
 			{entry.badge ? (

@@ -42,10 +42,10 @@ export function RunTitle({
 
 	return (
 		<div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 px-3 pt-3 lg:px-5 lg:pt-4">
-			<h1 className="min-w-0 truncate font-semibold text-lg tracking-tight">
+			<h1 className="min-w-0 truncate text-lg font-semibold tracking-tight">
 				{run.title}
 			</h1>
-			<p className="ml-auto shrink-0 text-muted-foreground text-sm tabular-nums">
+			<p className="ml-auto shrink-0 text-sm text-muted-foreground tabular-nums">
 				{time.waited || time.slept ? (
 					<Tooltip>
 						<TooltipTrigger render={<span />}>

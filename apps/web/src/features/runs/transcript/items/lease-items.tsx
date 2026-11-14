@@ -13,7 +13,7 @@ export function LeaseCard({ item }: { item: LeaseItem }) {
 			tone={item.held ? "text-status-finished" : "text-muted-foreground"}
 		>
 			{!item.held && item.holderTitle ? (
-				<p className="break-words leading-relaxed">
+				<p className="leading-relaxed break-words">
 					The run “{item.holderTitle}” holds it.
 				</p>
 			) : null}

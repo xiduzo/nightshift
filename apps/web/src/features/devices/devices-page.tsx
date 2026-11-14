@@ -250,7 +250,7 @@ export function DevicesPage({
 						>
 							<h2
 								id="devices-computers"
-								className="font-semibold text-lg tracking-tight"
+								className="text-lg font-semibold tracking-tight"
 							>
 								{space.personal ? "Your computers" : "Computers in this Space"}
 							</h2>

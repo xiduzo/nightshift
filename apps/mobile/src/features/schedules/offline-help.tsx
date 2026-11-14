@@ -30,7 +30,7 @@ function PauseForComputer({ notice }: { notice: OfflineNotice }) {
 	const nudges = useScheduleNudges(entry.projectId, entry.schedule);
 	return (
 		<View className="gap-3">
-			<Text className="text-muted-foreground text-sm">
+			<Text className="text-sm text-muted-foreground">
 				{`${notice.sentence} Turn it on before then, or pause the flow for tonight.`}
 			</Text>
 			{nudges.hidden ? null : (

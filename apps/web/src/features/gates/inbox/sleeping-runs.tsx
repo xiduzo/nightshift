@@ -56,7 +56,7 @@ export function SleepingRuns({
 
 	return (
 		<div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-6 md:px-8">
-			<p className="text-muted-foreground text-xs">
+			<p className="text-xs text-muted-foreground">
 				Each one continues on its own.
 			</p>
 			<ItemGroup className="gap-1.5">

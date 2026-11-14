@@ -103,7 +103,7 @@ export function DetailShell({
 		</>
 	) : null;
 	const saveState = showBar ? (
-		<span className="text-muted-foreground text-sm">
+		<span className="text-sm text-muted-foreground">
 			{save.isNew ? "Not saved yet" : "Unsaved changes"}
 		</span>
 	) : null;
@@ -138,17 +138,17 @@ export function DetailShell({
 						{icon}
 					</div>
 					<div className="flex min-w-0 flex-1 flex-col gap-1">
-						<p className="text-muted-foreground text-xs">{kicker}</p>
+						<p className="text-xs text-muted-foreground">{kicker}</p>
 						<h1
 							className={cn(
-								"truncate font-semibold text-2xl tracking-tight",
+								"truncate text-2xl font-semibold tracking-tight",
 								mono && "font-mono",
 							)}
 						>
 							{title}
 						</h1>
 						{subtitle ? (
-							<div className="text-muted-foreground text-sm">{subtitle}</div>
+							<div className="text-sm text-muted-foreground">{subtitle}</div>
 						) : null}
 					</div>
 					{menu}
@@ -191,9 +191,9 @@ export function DetailSection({
 			<Separator />
 			<section className="grid gap-4 md:grid-cols-[16rem_1fr] md:gap-12">
 				<div className="flex flex-col gap-1">
-					<h2 className="font-medium text-sm">{title}</h2>
+					<h2 className="text-sm font-medium">{title}</h2>
 					{description ? (
-						<p className="text-muted-foreground text-xs">{description}</p>
+						<p className="text-xs text-muted-foreground">{description}</p>
 					) : null}
 				</div>
 				<div className="min-w-0">{children}</div>

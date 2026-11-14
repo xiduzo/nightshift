@@ -181,7 +181,7 @@ export function AnswersTable({
 						<TableRow key={row.key}>
 							<TableCell className="px-3 py-2.5">
 								<span className="font-medium">{row.name}</span>
-								<div className="text-muted-foreground text-xs">{row.job}</div>
+								<div className="text-xs text-muted-foreground">{row.job}</div>
 							</TableCell>
 							<TableCell className="px-3 py-2.5">
 								<div className="flex items-center gap-1">{row.answersWith}</div>

@@ -117,13 +117,13 @@ export function ReportCard({
 			{hasSummary || item.data !== undefined ? (
 				<>
 					{hasSummary ? (
-						<p className="whitespace-pre-wrap break-words leading-relaxed">
+						<p className="leading-relaxed break-words whitespace-pre-wrap">
 							{item.summary}
 						</p>
 					) : null}
 					{item.data !== undefined ? (
 						<div className="flex flex-col gap-1.5">
-							<p className="text-muted-foreground text-xs">Data</p>
+							<p className="text-xs text-muted-foreground">Data</p>
 							<JsonBlock value={item.data} />
 						</div>
 					) : null}
@@ -179,7 +179,7 @@ export function SessionError({ item }: { item: ErrorItem }) {
 				{usageLimit ? "Usage limit reached" : "The agent failed"}
 			</AlertTitle>
 			<AlertDescription className="flex flex-col gap-1">
-				<p className="whitespace-pre-wrap break-words">{item.message}</p>
+				<p className="break-words whitespace-pre-wrap">{item.message}</p>
 				{usageLimit && item.resetAt ? (
 					<p>
 						Resets{" "}

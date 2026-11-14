@@ -28,7 +28,7 @@ export function CostStrip({ flow }: { flow: SpendFlow }) {
 	const { usual, steadiness } = flow;
 	if (!usual || !steadiness) {
 		return (
-			<span className="text-muted-foreground text-xs">
+			<span className="text-xs text-muted-foreground">
 				{usual ? "Too few runs to compare" : "No finished run with a cost"}
 			</span>
 		);
@@ -61,7 +61,7 @@ export function CostStrip({ flow }: { flow: SpendFlow }) {
 /** What the colours and the marks of a strip mean. */
 export function CostStripLegend() {
 	return (
-		<div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-muted-foreground text-xs">
+		<div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
 			{STEADINESS_ORDER.map((steadiness) => (
 				<Tooltip key={steadiness}>
 					<TooltipTrigger

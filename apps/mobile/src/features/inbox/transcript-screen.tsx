@@ -144,7 +144,7 @@ const Line = memo(function Line({
 					{divided ? <Separator /> : null}
 					<Text
 						accessibilityRole="header"
-						className="font-mono font-semibold text-sm"
+						className="font-mono text-sm font-semibold"
 					>
 						{text}
 					</Text>
@@ -154,13 +154,13 @@ const Line = memo(function Line({
 			return (
 				<View className="flex-row items-center gap-1.5" accessible>
 					<Icon as={ListChecks} className="size-4 text-muted-foreground" />
-					<Text className="flex-1 text-muted-foreground text-sm">{text}</Text>
+					<Text className="flex-1 text-sm text-muted-foreground">{text}</Text>
 				</View>
 			);
 		case "output":
 			return (
 				<View className="rounded-md bg-muted p-3">
-					<Text selectable className="font-mono text-muted-foreground text-xs">
+					<Text selectable className="font-mono text-xs text-muted-foreground">
 						{text.trimEnd()}
 					</Text>
 				</View>
@@ -171,7 +171,7 @@ const Line = memo(function Line({
 				<View className="gap-1" accessible>
 					<View className="flex-row items-center gap-1.5">
 						<Icon as={who.icon} className="size-4 text-muted-foreground" />
-						<Text className="font-medium text-muted-foreground text-xs">
+						<Text className="text-xs font-medium text-muted-foreground">
 							{who.label}
 						</Text>
 					</View>
@@ -188,7 +188,7 @@ const Line = memo(function Line({
 							</Text>
 						</View>
 					) : (
-						<Text selectable className="text-muted-foreground text-sm">
+						<Text selectable className="text-sm text-muted-foreground">
 							{text}
 						</Text>
 					)}

@@ -197,7 +197,7 @@ function ChatHead({
 				className="shrink-0 p-3 pb-2"
 				actions={actions}
 			/>
-			<p className="shrink-0 border-b px-3 pb-2 text-muted-foreground text-xs">
+			<p className="shrink-0 border-b px-3 pb-2 text-xs text-muted-foreground">
 				{status?.problem ?? CHAT_JOB[agent]}
 			</p>
 		</>
@@ -276,7 +276,7 @@ function ChatEmpty({
 					<Button
 						variant="outline"
 						size="sm"
-						className="h-auto w-full justify-start whitespace-normal py-1.5 text-left"
+						className="h-auto w-full justify-start py-1.5 text-left whitespace-normal"
 						disabled={sendBlockedBy !== null}
 						onClick={onOpen}
 					>
@@ -317,7 +317,7 @@ function ChatMessages(props: Props) {
 													className="max-w-[92%]"
 												>
 													<BubbleContent>
-														<p className="whitespace-pre-wrap break-words">
+														<p className="break-words whitespace-pre-wrap">
 															{message.text}
 														</p>
 													</BubbleContent>
@@ -449,7 +449,7 @@ function AgentAnswer({
 					</Alert>
 				) : null}
 				{message.stopped ? (
-					<p className="text-muted-foreground text-xs">
+					<p className="text-xs text-muted-foreground">
 						You stopped the answer.
 					</p>
 				) : null}

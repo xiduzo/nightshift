@@ -20,7 +20,7 @@ export function ImproveFlowButton({
 		return (
 			<>
 				<AgentButton entry="run.improve" disabled />
-				<span className="self-center text-muted-foreground text-xs">
+				<span className="self-center text-xs text-muted-foreground">
 					{ask.reason}
 				</span>
 			</>

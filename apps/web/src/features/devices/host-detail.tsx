@@ -113,14 +113,14 @@ function LinkedHostDetail({
 							<OnlineDot online={address === host.address ? true : null} />
 							<code className="truncate text-xs">{address}</code>
 							{address === host.address ? (
-								<span className="text-muted-foreground text-xs">
+								<span className="text-xs text-muted-foreground">
 									answers now
 								</span>
 							) : null}
 						</div>
 					))}
 					{host.fingerprint ? (
-						<p className="mt-2 break-all text-muted-foreground text-xs">
+						<p className="mt-2 text-xs break-all text-muted-foreground">
 							Certificate fingerprint{" "}
 							<span className="font-mono">{host.fingerprint}</span>
 						</p>

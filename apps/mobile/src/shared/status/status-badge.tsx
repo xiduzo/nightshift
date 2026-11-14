@@ -44,7 +44,7 @@ export function StatusText({
 	return (
 		<View className={cn("flex-row items-center gap-1", className)}>
 			<Icon as={iconOf(look.icon)} className={cn("size-3.5", tone.text)} />
-			<Text className={cn("font-medium text-sm", tone.text)} numberOfLines={1}>
+			<Text className={cn("text-sm font-medium", tone.text)} numberOfLines={1}>
 				{look.label}
 			</Text>
 		</View>

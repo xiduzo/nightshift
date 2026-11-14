@@ -46,18 +46,18 @@ export function StepTrail({ items }: { items: readonly TrailItem[] }) {
 						</View>
 						<View className={cn("flex-1 gap-1 pt-1", last ? "pb-0" : "pb-4")}>
 							<View className="flex-row flex-wrap items-center gap-2">
-								<Text className="flex-shrink font-mono font-semibold text-sm">
+								<Text className="flex-shrink font-mono text-sm font-semibold">
 									{item.label}
 								</Text>
 								<StatusBadge look={item.look} />
 							</View>
 							{item.detail ? (
-								<Text className="text-muted-foreground text-sm">
+								<Text className="text-sm text-muted-foreground">
 									{item.detail}
 								</Text>
 							) : null}
 							{item.meta ? (
-								<Text className="text-muted-foreground text-xs">
+								<Text className="text-xs text-muted-foreground">
 									{item.meta}
 								</Text>
 							) : null}

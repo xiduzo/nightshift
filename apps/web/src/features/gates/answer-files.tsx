@@ -104,7 +104,7 @@ export function AnswerFilesField({
 		<Field
 			className={cn(
 				"gap-2 rounded-lg transition-colors",
-				over && "bg-muted/60 outline-dashed outline-2 outline-ring",
+				over && "bg-muted/60 outline-2 outline-ring outline-dashed",
 			)}
 			onDragOver={(event) => {
 				if (disabled || !event.dataTransfer.types.includes("Files")) return;

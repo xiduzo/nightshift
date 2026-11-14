@@ -53,7 +53,7 @@ export function Fact({
 		<div className={cn("flex min-w-0 flex-col gap-1", className)}>
 			<dt
 				className={cn(
-					"truncate text-muted-foreground text-xs",
+					"truncate text-xs text-muted-foreground",
 					mono && "font-mono",
 				)}
 			>
@@ -93,7 +93,7 @@ export function CopyValue({
 				>
 					{short ?? value}
 				</TooltipTrigger>
-				<TooltipContent className="max-w-md break-all font-mono">
+				<TooltipContent className="max-w-md font-mono break-all">
 					{value}
 				</TooltipContent>
 			</Tooltip>

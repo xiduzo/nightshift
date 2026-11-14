@@ -371,7 +371,7 @@ export function AgentMenus({
 														<span className="flex min-w-0 flex-1 flex-col">
 															<span>{option.label}</span>
 															{option.about ? (
-																<span className="text-muted-foreground text-xs">
+																<span className="text-xs text-muted-foreground">
 																	{option.about}
 																</span>
 															) : null}

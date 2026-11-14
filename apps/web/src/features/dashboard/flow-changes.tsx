@@ -113,7 +113,7 @@ export function FlowChanges({
 					</CardContent>
 				</Card>
 			</div>
-			<span className="text-muted-foreground text-xs">
+			<span className="text-xs text-muted-foreground">
 				The next changes come from the last {data.read}{" "}
 				{data.read === 1 ? "run" : "runs"} of these days.
 			</span>

@@ -48,7 +48,7 @@ export function fileColumns(
 							<div className="flex flex-wrap items-center gap-2">
 								<Button
 									variant="link"
-									className="h-auto whitespace-normal break-all p-0 text-left"
+									className="h-auto p-0 text-left break-all whitespace-normal"
 									title={path}
 									onClick={() => open(path)}
 								>
@@ -67,7 +67,7 @@ export function fileColumns(
 								) : null}
 							</div>
 							{inner !== folder ? (
-								<span className="break-all font-mono text-muted-foreground text-xs">
+								<span className="font-mono text-xs break-all text-muted-foreground">
 									{inner}
 								</span>
 							) : null}
@@ -89,7 +89,7 @@ export function fileColumns(
 					<div className="flex flex-wrap items-center gap-2">
 						{used ? (
 							<span
-								className="whitespace-nowrap text-muted-foreground text-sm tabular-nums"
+								className="text-sm whitespace-nowrap text-muted-foreground tabular-nums"
 								title={`Last used ${hoverTime(used.lastAt)}`}
 							>
 								Found {used.found}, read {used.read}
@@ -116,7 +116,7 @@ export function fileColumns(
 			cell: ({ row }) => (
 				<LocalTime
 					at={row.original.changedAt}
-					className="whitespace-nowrap text-muted-foreground text-sm"
+					className="text-sm whitespace-nowrap text-muted-foreground"
 				>
 					{formatRelative(row.original.changedAt)}
 				</LocalTime>
@@ -126,7 +126,7 @@ export function fileColumns(
 		column.accessor("size", {
 			header: "Size",
 			cell: ({ row }) => (
-				<span className="whitespace-nowrap text-muted-foreground text-sm tabular-nums">
+				<span className="text-sm whitespace-nowrap text-muted-foreground tabular-nums">
 					{formatSize(row.original.size)}
 				</span>
 			),

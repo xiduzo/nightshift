@@ -235,7 +235,7 @@ function FilesCard() {
 							<ItemContent>
 								<ItemTitle>{folder.name}</ItemTitle>
 							</ItemContent>
-							<ItemActions className="text-muted-foreground text-xs tabular-nums">
+							<ItemActions className="text-xs text-muted-foreground tabular-nums">
 								{folder.count}
 							</ItemActions>
 						</Item>

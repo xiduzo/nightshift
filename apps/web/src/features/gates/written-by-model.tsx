@@ -13,7 +13,7 @@ export function WrittenByModel({
 	return (
 		<span
 			className={cn(
-				"inline-flex items-center gap-1 font-normal text-muted-foreground text-xs normal-case tracking-normal",
+				"inline-flex items-center gap-1 text-xs font-normal tracking-normal text-muted-foreground normal-case",
 				className,
 			)}
 		>

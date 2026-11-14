@@ -110,7 +110,7 @@ export function SkillCombobox({
 									) : null}
 								</span>
 								{description ? (
-									<span className="line-clamp-2 text-muted-foreground text-xs">
+									<span className="line-clamp-2 text-xs text-muted-foreground">
 										{description}
 									</span>
 								) : null}

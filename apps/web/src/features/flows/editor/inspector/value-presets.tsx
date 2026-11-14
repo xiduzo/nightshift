@@ -130,7 +130,7 @@ export function ValuePresetMenu({
 							onClick={() => setPreset(entry.name)}
 						>
 							<span>{entry.label}</span>
-							<span className="text-muted-foreground text-xs">
+							<span className="text-xs text-muted-foreground">
 								{entry.description}
 							</span>
 						</DropdownMenuItem>

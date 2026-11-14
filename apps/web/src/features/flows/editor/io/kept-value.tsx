@@ -45,7 +45,7 @@ export function KeptValue({
 	const value = values.data?.find((one) => one.name === name);
 	if (!value) {
 		return (
-			<p id={id} className="text-muted-foreground text-xs">
+			<p id={id} className="text-xs text-muted-foreground">
 				Nothing kept yet. The next run starts from the initial value.
 			</p>
 		);

@@ -37,7 +37,7 @@ const CHANGE_BADGE: Record<
 
 function ChangeBadge({ change }: { change: SuggestionChange }) {
 	if (change === "same") {
-		return <span className="text-muted-foreground text-xs">Same</span>;
+		return <span className="text-xs text-muted-foreground">Same</span>;
 	}
 	const { label, variant } = CHANGE_BADGE[change];
 	return <Badge variant={variant}>{label}</Badge>;
@@ -101,14 +101,14 @@ export function TextPreview({
 	const lines = lineDiff(before, after);
 	return (
 		<div className="flex flex-col gap-1.5">
-			<p className="font-medium text-xs">{label}</p>
+			<p className="text-xs font-medium">{label}</p>
 			<pre className="max-h-72 overflow-auto rounded-md border bg-muted/40 py-1.5 font-mono text-xs leading-relaxed">
 				{lines.map((line, index) => (
 					<div
 						// A diff line has no id; its place is its identity.
 						key={index}
 						className={cn(
-							"whitespace-pre-wrap break-words px-2",
+							"px-2 break-words whitespace-pre-wrap",
 							line.kind === "added" && "bg-status-finished/10 text-foreground",
 							line.kind === "removed" &&
 								"bg-destructive/10 text-muted-foreground line-through",
@@ -116,7 +116,7 @@ export function TextPreview({
 					>
 						<span
 							aria-hidden="true"
-							className="mr-2 select-none text-muted-foreground"
+							className="mr-2 text-muted-foreground select-none"
 						>
 							{line.kind === "added"
 								? "+"
@@ -150,7 +150,7 @@ export function OutputPreview({
 	const fields = outputChanges(before, after);
 	if (fields.length === 0) {
 		return (
-			<p className="text-muted-foreground text-xs">
+			<p className="text-xs text-muted-foreground">
 				No fields: the data is a {String(after.type ?? "value")}. Apply to see
 				it under JSON.
 			</p>
@@ -180,7 +180,7 @@ function FieldRow({ field }: { field: OutputFieldChange }) {
 					)}
 				>
 					{field.name}
-					<span className="font-normal font-sans text-muted-foreground">
+					<span className="font-sans font-normal text-muted-foreground">
 						{field.type}
 						{field.required ? "" : ", optional"}
 					</span>
@@ -216,7 +216,7 @@ export function SetPreview({
 	return (
 		<div className="flex flex-col gap-3">
 			{writes.length === 0 ? (
-				<p className="text-muted-foreground text-xs">
+				<p className="text-xs text-muted-foreground">
 					This step sets no variables.
 				</p>
 			) : (
@@ -238,12 +238,12 @@ export function SetPreview({
 								>
 									{write.variable}
 									{write.on && write.on.length > 0 ? (
-										<span className="font-normal font-sans text-muted-foreground">
+										<span className="font-sans font-normal text-muted-foreground">
 											on {write.on.join(", ")}
 										</span>
 									) : null}
 								</ItemTitle>
-								<ItemDescription className="break-all font-mono text-xs">
+								<ItemDescription className="font-mono text-xs break-all">
 									{write.expression !== undefined ? (
 										writeText(write)
 									) : (
@@ -260,14 +260,14 @@ export function SetPreview({
 			)}
 			{variables.length > 0 ? (
 				<div className="flex flex-col gap-1.5">
-					<p className="font-medium text-xs">The flow gets these variables</p>
+					<p className="text-xs font-medium">The flow gets these variables</p>
 					<ItemGroup className="gap-1">
 						{variables.map((variable) => (
 							<Item key={variable.name} variant="outline" size="xs">
 								<ItemContent className="min-w-0">
 									<ItemTitle className="font-mono text-xs">
 										{variable.name}
-										<span className="font-normal font-sans text-muted-foreground">
+										<span className="font-sans font-normal text-muted-foreground">
 											{variable.type}
 										</span>
 									</ItemTitle>
@@ -310,7 +310,7 @@ function ChangeList({
 	empty: string;
 }) {
 	if (rows.length === 0) {
-		return <p className="text-muted-foreground text-xs">{empty}</p>;
+		return <p className="text-xs text-muted-foreground">{empty}</p>;
 	}
 	return (
 		<ItemGroup className="gap-1">
@@ -330,14 +330,14 @@ function ChangeList({
 						>
 							{row.title}
 							{row.meta ? (
-								<span className="font-normal font-sans text-muted-foreground">
+								<span className="font-sans font-normal text-muted-foreground">
 									{row.meta}
 								</span>
 							) : null}
 						</ItemTitle>
 						{row.description ? (
 							<ItemDescription
-								className={cn("text-xs", row.code && "break-all font-mono")}
+								className={cn("text-xs", row.code && "font-mono break-all")}
 							>
 								{row.description}
 							</ItemDescription>

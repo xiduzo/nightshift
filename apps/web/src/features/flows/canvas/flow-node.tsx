@@ -396,7 +396,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 	return (
 		<div
 			className={cn(
-				"relative w-56 rounded-xl border bg-card text-card-foreground text-xs shadow-xs transition-[box-shadow,opacity,border-color] motion-reduce:transition-none",
+				"relative w-56 rounded-xl border bg-card text-xs text-card-foreground shadow-xs transition-[box-shadow,opacity,border-color] motion-reduce:transition-none",
 				selected && "border-ring ring-3 ring-ring/30",
 				// Not reached, or removed: the card stays opaque, so edges and
 				// nodes behind it do not show through. Only its content fades.
@@ -462,7 +462,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 					</div>
 					<div className="flex min-w-0 flex-1 flex-col">
 						<span
-							className="truncate font-medium font-mono text-[13px] leading-5"
+							className="truncate font-mono text-[13px] leading-5 font-medium"
 							title={node.id}
 						>
 							{node.id}
@@ -647,7 +647,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 						className="size-[0.9em] shrink-0 text-muted-foreground"
 						aria-hidden="true"
 					/>
-					<span className="line-clamp-2 break-all font-medium font-mono leading-tight">
+					<span className="line-clamp-2 font-mono leading-tight font-medium break-all">
 						{node.id}
 					</span>
 				</div>

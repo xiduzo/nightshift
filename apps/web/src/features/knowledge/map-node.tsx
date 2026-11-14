@@ -53,7 +53,7 @@ function MapNodeView({ data }: NodeProps<MapNode>) {
 		<div
 			title={node.path ?? node.label}
 			className={cn(
-				"flex max-w-52 items-center gap-1.5 border bg-card px-2.5 py-1 text-card-foreground text-xs shadow-xs transition-opacity",
+				"flex max-w-52 items-center gap-1.5 border bg-card px-2.5 py-1 text-xs text-card-foreground shadow-xs transition-opacity",
 				node.kind === "file" && "rounded-md",
 				node.kind === "topic" &&
 					"rounded-full border-transparent bg-primary font-medium text-primary-foreground",

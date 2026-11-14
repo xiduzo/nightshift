@@ -322,7 +322,7 @@ function MergingStep({ step }: { step: Extract<Step, { kind: "merging" }> }) {
 				</DialogDescription>
 			</DialogHeader>
 			{step.preview ? <MergePreviewList preview={step.preview} /> : null}
-			<p className="flex items-center gap-2 text-muted-foreground text-sm">
+			<p className="flex items-center gap-2 text-sm text-muted-foreground">
 				<Spinner />
 				{step.preview ? "Merging your Personal…" : "Reading your Personal…"}
 			</p>
@@ -421,7 +421,7 @@ function CodeStep({ step }: { step: Extract<Step, { kind: "code" }> }) {
 				</DialogDescription>
 			</DialogHeader>
 			<div className="flex items-center justify-center gap-2">
-				<p className="font-mono font-semibold text-3xl tracking-widest">
+				<p className="font-mono text-3xl font-semibold tracking-widest">
 					{code}
 				</p>
 				<Button
@@ -440,13 +440,13 @@ function CodeStep({ step }: { step: Extract<Step, { kind: "code" }> }) {
 					<AlertDescription>
 						The Host uses its own certificate. Allow this computer only if the
 						Host shows this fingerprint:
-						<span className="mt-1 block break-all font-mono text-xs">
+						<span className="mt-1 block font-mono text-xs break-all">
 							{step.fingerprint}
 						</span>
 					</AlertDescription>
 				</Alert>
 			) : null}
-			<p className="flex items-center gap-2 text-muted-foreground text-sm">
+			<p className="flex items-center gap-2 text-sm text-muted-foreground">
 				<Spinner />
 				Keep this window open. The code works until{" "}
 				<LocalTime at={step.expiresAt}>{formatTime(step.expiresAt)}</LocalTime>.

@@ -119,7 +119,7 @@ export function AgentAnswer({
 				<Spinner className="text-muted-foreground" />
 				<div className="flex min-w-0 flex-col gap-0.5">
 					<span className="text-sm">The agent reads the run.</span>
-					<span className="truncate text-muted-foreground text-xs">
+					<span className="truncate text-xs text-muted-foreground">
 						{activity ?? "This can take a minute."}
 					</span>
 				</div>
@@ -138,7 +138,7 @@ export function AgentAnswer({
 
 	return (
 		<section className="flex flex-col gap-2 rounded-md border p-3">
-			<h3 className="flex items-center gap-2 font-medium text-sm">
+			<h3 className="flex items-center gap-2 text-sm font-medium">
 				<MessageCircleQuestionIcon
 					className="size-4 text-muted-foreground"
 					aria-hidden="true"

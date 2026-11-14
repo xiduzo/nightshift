@@ -56,7 +56,7 @@ export function FeedbackPage() {
 							/>
 						</Section>
 						<Section title="Pull requests">
-							<p className="text-muted-foreground text-sm">
+							<p className="text-sm text-muted-foreground">
 								Only a schedule that scores pull requests sends these.
 							</p>
 							<Stats>

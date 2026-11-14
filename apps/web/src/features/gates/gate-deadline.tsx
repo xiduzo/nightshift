@@ -22,7 +22,7 @@ export function GateDeadline({
 	return (
 		<p
 			className={cn(
-				"flex items-start gap-1.5 text-muted-foreground text-xs leading-snug",
+				"flex items-start gap-1.5 text-xs leading-snug text-muted-foreground",
 				className,
 			)}
 		>
@@ -36,7 +36,7 @@ export function GateDeadline({
 					{time}
 				</LocalTime>
 				{day}. Then Night Shift picks{" "}
-				<span className="font-medium font-mono text-foreground">
+				<span className="font-mono font-medium text-foreground">
 					{outcomeLabel(deadline.choose)}
 				</span>
 				.

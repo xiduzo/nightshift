@@ -55,13 +55,13 @@ export function StepCitation({
 			</HoverCardTrigger>
 			<HoverCardContent className="flex w-64 flex-col gap-1">
 				<div className="flex min-w-0 items-center justify-between gap-2">
-					<span className="truncate font-medium font-mono">{step.nodeId}</span>
+					<span className="truncate font-mono font-medium">{step.nodeId}</span>
 					<OutcomeBadge
 						state={stepState(step, runStatus)}
 						className="shrink-0"
 					/>
 				</div>
-				<p className="text-muted-foreground text-xs tabular-nums">
+				<p className="text-xs text-muted-foreground tabular-nums">
 					{step.visit > 1 ? `Visit ${step.visit} · ` : null}
 					<WorkTime steps={[step]} start={step.startedAt} />
 					{hasCost(step) ? ` · ${formatStepUsage(step)}` : null}

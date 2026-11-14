@@ -150,7 +150,7 @@ function PairDeviceSteps({
 						<AlertDescription>
 							The device shows a fingerprint next to the code. Allow it only if
 							it is this one:
-							<span className="mt-1 block break-all font-mono text-xs">
+							<span className="mt-1 block font-mono text-xs break-all">
 								{review.fingerprint}
 							</span>
 						</AlertDescription>

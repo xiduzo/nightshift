@@ -73,7 +73,7 @@ export function PhoneCard() {
 								<p className="text-muted-foreground">
 									Or type this address in the app:
 								</p>
-								<p className="break-all font-mono">{address}</p>
+								<p className="font-mono break-all">{address}</p>
 							</div>
 						</div>
 					) : (

@@ -104,7 +104,7 @@ export function ProjectReadiness({
 	return (
 		<div className="flex flex-col gap-3">
 			<div className="flex items-center justify-between gap-2">
-				<p className="font-medium text-sm">
+				<p className="text-sm font-medium">
 					{readiness.ready
 						? "Before you add some knowledge sources"
 						: "Before runs can start"}

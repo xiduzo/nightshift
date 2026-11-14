@@ -92,7 +92,7 @@ export function FocusGate({
 
 			<header className="flex flex-col gap-2">
 				<GateFrom gate={gate} />
-				<h1 className="whitespace-pre-wrap text-balance break-words font-semibold text-2xl leading-tight tracking-tight md:text-3xl">
+				<h1 className="text-2xl leading-tight font-semibold tracking-tight text-balance break-words whitespace-pre-wrap md:text-3xl">
 					<InlineMarkdown text={headline} />
 				</h1>
 				{situation ? (
@@ -158,7 +158,7 @@ export function FocusGate({
 							<CollapsibleContent className="flex flex-col gap-4">
 								{background ? (
 									<section className="flex flex-col gap-1.5">
-										<h3 className="flex items-baseline gap-2 font-medium text-muted-foreground text-xs uppercase tracking-wide">
+										<h3 className="flex items-baseline gap-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
 											What is done
 											{background.byModel ? <WrittenByModel /> : null}
 										</h3>
@@ -266,14 +266,14 @@ function UrgencyBand({
 				) : (
 					<LocalTime
 						at={gate.openedAt}
-						className="text-muted-foreground text-xs tabular-nums"
+						className="text-xs text-muted-foreground tabular-nums"
 					>
 						Waits {waitedText(now - gate.openedAt)}
 					</LocalTime>
 				)}
 			</div>
 			{used !== null ? <Progress value={used} className="h-1" /> : null}
-			<p className="flex flex-wrap items-baseline gap-x-1 text-muted-foreground text-xs">
+			<p className="flex flex-wrap items-baseline gap-x-1 text-xs text-muted-foreground">
 				{urgencyWho(gate)}
 				{reach ? ` ${reach}` : null}
 				{byModel ? <WrittenByModel /> : null}
@@ -292,7 +292,7 @@ function DeadlineText({
 }) {
 	const { time, day } = deadlineWhen(deadline.at, now);
 	return (
-		<span className="inline-flex flex-wrap items-center gap-1 text-status-waiting text-xs">
+		<span className="inline-flex flex-wrap items-center gap-1 text-xs text-status-waiting">
 			<AlarmClockIcon className="size-3.5" aria-hidden />
 			<LocalTime at={deadline.at} className="font-medium tabular-nums">
 				Due {time}
@@ -301,7 +301,7 @@ function DeadlineText({
 			<span className="tabular-nums">({untilText(deadline.at - now)}).</span>
 			<span>
 				Then Night Shift picks{" "}
-				<span className="font-medium font-mono">
+				<span className="font-mono font-medium">
 					{outcomeLabel(deadline.choose)}
 				</span>
 				.

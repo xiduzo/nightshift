@@ -62,7 +62,7 @@ export function MemorySection({
 			{memory.isLoading ? (
 				<Skeleton className="h-6 w-full" />
 			) : rows.length === 0 ? (
-				<p className="text-muted-foreground text-xs">
+				<p className="text-xs text-muted-foreground">
 					Nothing remembered yet. The next run is a first run.
 				</p>
 			) : (

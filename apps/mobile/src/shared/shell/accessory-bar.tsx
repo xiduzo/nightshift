@@ -35,7 +35,7 @@ export function AccessoryBar({
 				accessibilityRole="button"
 				accessibilityHint="Opens Needs you"
 			>
-				<Text className="font-semibold text-sm" numberOfLines={1}>
+				<Text className="text-sm font-semibold" numberOfLines={1}>
 					{short}
 				</Text>
 			</Pressable>
@@ -51,11 +51,11 @@ export function AccessoryBar({
 				accessibilityLabel={`${caption}, ${label}`}
 				accessibilityHint="Opens Needs you"
 			>
-				<Text className="text-muted-foreground text-xs" numberOfLines={1}>
+				<Text className="text-xs text-muted-foreground" numberOfLines={1}>
 					{caption}
 				</Text>
 				<Text
-					className="font-semibold text-sm"
+					className="text-sm font-semibold"
 					style={color ? { color } : undefined}
 					numberOfLines={1}
 				>

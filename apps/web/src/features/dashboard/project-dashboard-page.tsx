@@ -105,7 +105,7 @@ function NeededYou({
 	const before = watches.reduce((sum, a) => sum + a.before.unplanned, 0);
 	return (
 		<p className="flex flex-wrap items-baseline gap-x-2 text-sm">
-			<span className="font-semibold text-xl tabular-nums">{now}</span>
+			<span className="text-xl font-semibold tabular-nums">{now}</span>
 			<span className="text-muted-foreground">
 				{now === 1 ? "time" : "times"} a flow needed you without a plan in the
 				last {range} days

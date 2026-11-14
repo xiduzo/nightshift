@@ -115,5 +115,5 @@ export function AgentSetupHint({
 	const offer = setupOffer(agent, check);
 	if (status.data?.available !== false || !status.data.message) return null;
 	if (offer !== "install" && offer !== "sign-in") return null;
-	return <p className="text-muted-foreground text-sm">{status.data.message}</p>;
+	return <p className="text-sm text-muted-foreground">{status.data.message}</p>;
 }

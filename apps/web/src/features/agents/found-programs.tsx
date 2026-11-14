@@ -90,7 +90,7 @@ function FoundItem({
 				<span className="font-medium text-muted-foreground">
 					{program.label}
 				</span>
-				<div className="text-muted-foreground text-xs">
+				<div className="text-xs text-muted-foreground">
 					{problem ??
 						(program.kind === "agent"
 							? "On this computer, no profile uses it yet"

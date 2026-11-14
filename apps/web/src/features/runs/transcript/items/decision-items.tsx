@@ -45,7 +45,7 @@ export function DecisionAsk({ item }: { item: DecisionAskItem }) {
 				details={[formatTime(item.at), item.model]}
 			/>
 			<PromptBubble label="Prompt" prompt={item.prompt} empty="No prompt.">
-				<p className="flex flex-wrap items-center gap-1 text-muted-foreground text-xs">
+				<p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
 					Picks one of
 					{item.labels.map((label) => (
 						<Badge
@@ -73,7 +73,7 @@ export function DecisionCard({ item }: { item: DecisionItem }) {
 			tone={text}
 		>
 			{item.notes.trim() ? (
-				<p className="whitespace-pre-wrap break-words leading-relaxed">
+				<p className="leading-relaxed break-words whitespace-pre-wrap">
 					{item.notes}
 				</p>
 			) : (
@@ -156,7 +156,7 @@ export function ValueCard({ item }: { item: ValueItem }) {
 			{made ? (
 				<JsonBlock value={item.data} />
 			) : (
-				<p className="whitespace-pre-wrap break-words leading-relaxed">
+				<p className="leading-relaxed break-words whitespace-pre-wrap">
 					{item.problem}
 				</p>
 			)}
@@ -227,14 +227,14 @@ export function GateResolved({ item }: { item: GateResolvedItem }) {
 				</MarkerIcon>
 				<MarkerContent>
 					{item.byDeadline ? "Nobody answered in time. Picked " : "Answered "}
-					<span className={cn("font-medium font-mono", text)}>
+					<span className={cn("font-mono font-medium", text)}>
 						{outcomeLabel(item.choice)}
 					</span>{" "}
 					· <LocalTime at={item.at}>{formatTime(item.at)}</LocalTime>
 				</MarkerContent>
 			</Marker>
 			{item.note.trim() ? (
-				<p className="ml-6 whitespace-pre-wrap break-words border-l-2 pl-3 text-muted-foreground text-xs leading-relaxed">
+				<p className="ml-6 border-l-2 pl-3 text-xs leading-relaxed break-words whitespace-pre-wrap text-muted-foreground">
 					{item.note}
 				</p>
 			) : null}

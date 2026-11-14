@@ -120,7 +120,7 @@ function AnswerBadge({
 function RunNow({ run }: { run: AnsweredGate["run"] }) {
 	const { key, word } = statusOf(run);
 	return (
-		<span className="inline-flex items-center gap-1.5 text-muted-foreground text-xs">
+		<span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
 			<span className={cn("size-1.5 shrink-0 rounded-full", RUN_DOT[key])} />
 			{word}
 		</span>
@@ -183,7 +183,7 @@ export function AnsweredList({
 		<div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6 md:px-8">
 			{days.map(({ label, gates: list }) => (
 				<section key={label} className="flex flex-col gap-2">
-					<h2 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+					<h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
 						{label}
 					</h2>
 					<ItemGroup className="gap-1.5">
@@ -249,7 +249,7 @@ export function AnsweredList({
 					</ItemGroup>
 				</section>
 			))}
-			<p className="text-muted-foreground text-xs">
+			<p className="text-xs text-muted-foreground">
 				Answered Gates stay here for 90 days.
 			</p>
 
@@ -295,7 +295,7 @@ function AnsweredSheet({ gate, now }: { gate: AnsweredGate; now: number }) {
 						{URGENCY_LABEL[gate.urgency]}
 					</span>
 				</SheetDescription>
-				<SheetTitle className="whitespace-pre-wrap text-balance break-words text-xl leading-snug">
+				<SheetTitle className="text-xl leading-snug text-balance break-words whitespace-pre-wrap">
 					<InlineMarkdown text={headline} />
 				</SheetTitle>
 			</SheetHeader>
@@ -309,7 +309,7 @@ function AnsweredSheet({ gate, now }: { gate: AnsweredGate; now: number }) {
 						)}
 					>
 						<div className="flex flex-wrap items-center gap-2">
-							<span className="flex items-center gap-1 text-foreground text-sm">
+							<span className="flex items-center gap-1 text-sm text-foreground">
 								{gate.answeredBy === "deadline" ? (
 									<TimerIcon className="size-3.5" aria-hidden />
 								) : gate.answeredBy === "person" ? (
@@ -322,17 +322,17 @@ function AnsweredSheet({ gate, now }: { gate: AnsweredGate; now: number }) {
 							) : null}
 							<LocalTime
 								at={gate.closedAt}
-								className="ml-auto text-muted-foreground text-xs"
+								className="ml-auto text-xs text-muted-foreground"
 							>
 								{formatRelative(gate.closedAt, now)}
 							</LocalTime>
 						</div>
 						{gate.note ? (
-							<blockquote className="whitespace-pre-wrap border-current/30 border-l-2 pl-3 text-foreground text-sm">
+							<blockquote className="border-l-2 border-current/30 pl-3 text-sm whitespace-pre-wrap text-foreground">
 								{gate.note}
 							</blockquote>
 						) : null}
-						<p className="text-muted-foreground text-xs">
+						<p className="text-xs text-muted-foreground">
 							It waited{" "}
 							{waited < 60 ? `${waited} min` : `${Math.round(waited / 60)} h`}{" "}
 							for an answer.
@@ -340,7 +340,7 @@ function AnsweredSheet({ gate, now }: { gate: AnsweredGate; now: number }) {
 					</section>
 
 					<section className="flex flex-col gap-2">
-						<h3 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+						<h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
 							The run now
 						</h3>
 						<Item variant="outline" size="sm">
@@ -363,7 +363,7 @@ function AnsweredSheet({ gate, now }: { gate: AnsweredGate; now: number }) {
 
 					{gate.choices.length > 0 ? (
 						<section className="flex flex-col gap-2">
-							<h3 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+							<h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
 								The options
 							</h3>
 							<ul className="flex flex-col gap-1.5">
@@ -396,7 +396,7 @@ function AnsweredSheet({ gate, now }: { gate: AnsweredGate; now: number }) {
 													) : null}
 												</span>
 												{(choice.impact ?? choice.description) ? (
-													<span className="text-muted-foreground text-xs">
+													<span className="text-xs text-muted-foreground">
 														{choice.impact ?? choice.description}
 													</span>
 												) : null}
@@ -411,7 +411,7 @@ function AnsweredSheet({ gate, now }: { gate: AnsweredGate; now: number }) {
 					<Separator />
 
 					<section className="flex flex-col gap-3">
-						<h3 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+						<h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
 							What it asked
 						</h3>
 						{gate.brief.situation ? (
@@ -420,7 +420,7 @@ function AnsweredSheet({ gate, now }: { gate: AnsweredGate; now: number }) {
 						{context.length > 0 ? (
 							<ContextList items={context} plain />
 						) : gate.brief.situation ? null : (
-							<p className="text-muted-foreground text-sm">
+							<p className="text-sm text-muted-foreground">
 								The Gate asked only its question.
 							</p>
 						)}

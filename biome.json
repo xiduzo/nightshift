@@ -935,7 +935,11 @@
 			}
 		}
 	],
-	"tailwind": { "mergeFunctions": ["clsx", "cn"], "variantFunctions": ["cva"] },
+	"tailwind": {
+		"stylesheet": "./apps/web/src/index.css",
+		"mergeFunctions": ["clsx", "cn"],
+		"variantFunctions": ["cva"]
+	},
 	"markdown": { "formatter": { "enabled": false } },
 	"yaml": { "formatter": { "enabled": false } }
 }

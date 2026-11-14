@@ -10,7 +10,7 @@ export function ActionText({
 		<span className="flex flex-col">
 			{label}
 			{hint ? (
-				<span className="text-muted-foreground text-xs">{hint}</span>
+				<span className="text-xs text-muted-foreground">{hint}</span>
 			) : null}
 		</span>
 	);

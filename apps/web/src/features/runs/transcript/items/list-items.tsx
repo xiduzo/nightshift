@@ -54,7 +54,7 @@ export function ItemStart({ item }: { item: ItemStartItem }) {
 				details={[formatTime(item.at)]}
 			/>
 			{item.branch ? (
-				<p className="flex min-w-0 items-center justify-center gap-1 text-muted-foreground text-xs">
+				<p className="flex min-w-0 items-center justify-center gap-1 text-xs text-muted-foreground">
 					<GitBranchIcon className="size-3 shrink-0" aria-hidden="true" />
 					<span className="truncate font-mono text-foreground">
 						{item.branch}
@@ -98,12 +98,12 @@ export function ItemEnd({
 					</span>
 				</ItemTitle>
 				{item.reason ? (
-					<ItemDescription className="line-clamp-none whitespace-pre-wrap break-words text-xs">
+					<ItemDescription className="line-clamp-none text-xs break-words whitespace-pre-wrap">
 						{item.reason}
 					</ItemDescription>
 				) : null}
 			</ItemContent>
-			<ItemActions className="self-start text-muted-foreground text-xs tabular-nums">
+			<ItemActions className="self-start text-xs text-muted-foreground tabular-nums">
 				<LocalTime at={item.at}>{formatTime(item.at)}</LocalTime>
 			</ItemActions>
 		</Item>

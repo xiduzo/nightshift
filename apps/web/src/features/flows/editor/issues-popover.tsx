@@ -87,7 +87,7 @@ export function IssuesPopover({
 				<ScrollArea className="max-h-80 [&>[data-slot=scroll-area-viewport]]:max-h-80">
 					<div className="flex flex-col gap-1 p-1.5">
 						{check.validatorError ? (
-							<p className="flex items-start gap-2 px-2 py-1.5 text-muted-foreground text-xs">
+							<p className="flex items-start gap-2 px-2 py-1.5 text-xs text-muted-foreground">
 								<InfoIcon
 									className="mt-px size-3.5 shrink-0"
 									aria-hidden="true"
@@ -97,7 +97,7 @@ export function IssuesPopover({
 							</p>
 						) : null}
 						{sorted.length === 0 ? (
-							<p className="flex items-center gap-2 px-2 py-1.5 text-status-finished text-xs">
+							<p className="flex items-center gap-2 px-2 py-1.5 text-xs text-status-finished">
 								<CircleCheckIcon className="size-3.5" aria-hidden="true" />
 								No issues. Save the flow, then run it.
 							</p>
@@ -138,7 +138,7 @@ export function IssuesPopover({
 													/>
 												</ItemMedia>
 												<ItemContent className="min-w-0">
-													<ItemTitle className="line-clamp-none block w-full font-normal text-xs leading-relaxed">
+													<ItemTitle className="line-clamp-none block w-full text-xs leading-relaxed font-normal">
 														{target ? (
 															<span className="mr-1.5 font-mono text-muted-foreground">
 																{issue.nodeId ??

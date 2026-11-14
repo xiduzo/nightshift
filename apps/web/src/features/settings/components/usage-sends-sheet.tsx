@@ -135,7 +135,7 @@ export function UsageSendsSheet({
 						{reset.isPending ? <Spinner data-icon="inline-start" /> : null}
 						Reset id
 					</Button>
-					<p id={resetId} className="text-muted-foreground text-sm">
+					<p id={resetId} className="text-sm text-muted-foreground">
 						This computer gets a new anonymous id, and older events no longer
 						count as this computer.
 					</p>
@@ -213,7 +213,7 @@ function WaitingList({ waiting }: { waiting: unknown }) {
 function JsonBlock({ value }: { value: unknown }) {
 	return (
 		<ScrollArea className="max-h-64 rounded-md border bg-muted/40">
-			<pre className="whitespace-pre-wrap break-all p-3 font-mono text-xs">
+			<pre className="p-3 font-mono text-xs break-all whitespace-pre-wrap">
 				{JSON.stringify(value, null, 2)}
 			</pre>
 		</ScrollArea>

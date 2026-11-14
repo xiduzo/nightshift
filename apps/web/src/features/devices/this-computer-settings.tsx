@@ -381,7 +381,7 @@ function HostSettings({ computer }: { computer: ThisComputer }) {
 							<AlertDescription>
 								A device that pairs shows this fingerprint. Allow it only when
 								the two match.
-								<span className="mt-1 block break-all font-mono text-xs">
+								<span className="mt-1 block font-mono text-xs break-all">
 									{host.fingerprint}
 								</span>
 							</AlertDescription>
@@ -417,8 +417,8 @@ function Hosts({ hosts }: { hosts: ThisComputer["hosts"] }) {
 			<CardContent className="flex flex-col gap-3">
 				<div className="flex items-end justify-between gap-4">
 					<div className="flex flex-col gap-1">
-						<h3 className="font-medium text-sm">Hosts it joined</h3>
-						<p className="text-muted-foreground text-sm">
+						<h3 className="text-sm font-medium">Hosts it joined</h3>
+						<p className="text-sm text-muted-foreground">
 							{hosts.length === 0
 								? "Join a Host to work in a Space that another computer keeps."
 								: "Your home Host also keeps the settings of this computer."}

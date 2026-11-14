@@ -38,7 +38,7 @@ function DiffLine({
 				variant === "added" &&
 					"bg-green-600/10 after:text-green-700 dark:bg-green-400/10 dark:after:text-green-400",
 				indent > 0 &&
-					"ps-[calc(var(--spacing)*4+var(--hang))] indent-[calc(var(--hang)*-1)] after:indent-0 group-data-[size=sm]/code-block:ps-[calc(var(--spacing)*3+var(--hang))]",
+					"ps-[calc(var(--spacing)*4+var(--hang))] indent-[calc(var(--hang)*-1)] group-data-[size=sm]/code-block:ps-[calc(var(--spacing)*3+var(--hang))] after:indent-0",
 			)}
 		>
 			{children}

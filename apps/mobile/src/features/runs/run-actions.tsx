@@ -381,7 +381,7 @@ function RerunConfirm({
 					))}
 				</RadioGroup>
 			) : (
-				<Text className="text-muted-foreground text-sm">
+				<Text className="text-sm text-muted-foreground">
 					{starts[0] ? `From ${stepName(starts[0].step, labels)}` : null}
 				</Text>
 			)}

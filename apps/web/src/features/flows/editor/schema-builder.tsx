@@ -92,7 +92,7 @@ export function ShapeDetails({
 					<Field className="gap-1.5">
 						<FieldLabel
 							htmlFor={`${id}-items`}
-							className="font-normal text-muted-foreground text-xs"
+							className="text-xs font-normal text-muted-foreground"
 						>
 							Each item is
 						</FieldLabel>
@@ -347,7 +347,7 @@ function FieldRow({
 						onChange({ ...field, required: checked === true })
 					}
 				/>
-				<FieldLabel htmlFor={`${id}-required`} className="font-normal text-xs">
+				<FieldLabel htmlFor={`${id}-required`} className="text-xs font-normal">
 					Required
 				</FieldLabel>
 			</Field>

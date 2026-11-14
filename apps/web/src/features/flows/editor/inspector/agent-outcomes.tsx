@@ -117,7 +117,7 @@ export function AgentOutcomeSection({
 						<OutcomePill key={outcome} outcome={outcome} />
 					))}
 				</div>
-				<p className="text-muted-foreground text-xs">
+				<p className="text-xs text-muted-foreground">
 					The standard outcomes are{" "}
 					{asks ? "pass or fail" : "pass, fail, or needs input"}. You can use
 					your own, such as approved and changes-requested.

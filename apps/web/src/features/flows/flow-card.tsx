@@ -232,7 +232,7 @@ function LastRuns({ overview }: { overview: FlowOverview }) {
 	const { lastRuns } = overview;
 	return (
 		<div className="flex flex-col gap-1.5">
-			<span className="text-muted-foreground text-xs">
+			<span className="text-xs text-muted-foreground">
 				{lastRuns.length === 0 ? "Never run" : "Last runs"}
 			</span>
 			{lastRuns.length > 0 ? (
@@ -306,7 +306,7 @@ function Blockers({ overview }: { overview: FlowOverview }) {
 			{lines.map((line) => (
 				<li
 					key={line}
-					className="flex items-start gap-1.5 text-destructive text-xs"
+					className="flex items-start gap-1.5 text-xs text-destructive"
 				>
 					<CircleAlertIcon
 						className="mt-px size-3.5 shrink-0"

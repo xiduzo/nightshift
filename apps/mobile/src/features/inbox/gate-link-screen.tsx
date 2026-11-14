@@ -32,17 +32,17 @@ export function GateLinkScreen() {
 		<Screen>
 			<Stack.Screen options={{ title: LINK_WORD[kind] }} />
 			<View className="gap-2">
-				<Text className="font-mono text-muted-foreground text-sm">
+				<Text className="font-mono text-sm text-muted-foreground">
 					{params.short}
 				</Text>
 				<Text
 					accessibilityRole="header"
-					className="font-bold text-2xl tracking-tight"
+					className="text-2xl font-bold tracking-tight"
 				>
 					{params.label}
 				</Text>
 				{params.where && params.where !== params.short ? (
-					<Text className="text-muted-foreground text-sm">{params.where}</Text>
+					<Text className="text-sm text-muted-foreground">{params.where}</Text>
 				) : null}
 			</View>
 			{params.from ? (
@@ -61,7 +61,7 @@ export function GateLinkScreen() {
 			</Button>
 			<Text
 				selectable
-				className="text-muted-foreground text-xs"
+				className="text-xs text-muted-foreground"
 				numberOfLines={2}
 			>
 				{params.url}

@@ -70,7 +70,7 @@ export function LastDelivery({
 	device?: string | null;
 }) {
 	return (
-		<p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 whitespace-normal text-muted-foreground text-xs">
+		<p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs whitespace-normal text-muted-foreground">
 			<LocalTime at={delivery.at} zone={zone} device={device}>
 				{formatDayTime(delivery.at)}
 			</LocalTime>

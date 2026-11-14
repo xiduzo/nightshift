@@ -29,7 +29,7 @@ export function RunFilesList({
 }) {
 	if (!files.here) {
 		return (
-			<p className="text-muted-foreground text-xs">
+			<p className="text-xs text-muted-foreground">
 				{files.removed ? (
 					<>
 						Removed on{" "}
@@ -79,7 +79,7 @@ export function RunFilesList({
 									<span className="truncate">{file.path}</span>
 								</Button>
 							</TableCell>
-							<TableCell className="whitespace-nowrap text-right text-muted-foreground tabular-nums">
+							<TableCell className="text-right whitespace-nowrap text-muted-foreground tabular-nums">
 								{formatSize(file.size)}
 							</TableCell>
 							<TableCell className="w-0 p-0">
@@ -99,12 +99,12 @@ export function RunFilesList({
 				</TableBody>
 			</Table>
 			{files.more ? (
-				<p className="text-muted-foreground text-xs">
+				<p className="text-xs text-muted-foreground">
 					This run has more files than the list shows.
 				</p>
 			) : null}
 			{files.cleanupAt !== null ? (
-				<p className="text-muted-foreground text-xs">
+				<p className="text-xs text-muted-foreground">
 					Removed after{" "}
 					<LocalTime at={files.cleanupAt}>
 						{formatDateTime(files.cleanupAt)}

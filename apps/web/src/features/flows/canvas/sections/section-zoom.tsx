@@ -420,7 +420,7 @@ export function OpenSectionBar({
 						{around.map((section) => (
 							<Fragment key={section.id}>
 								<BreadcrumbSeparator />
-								<BreadcrumbItem className="min-w-0 max-w-32">
+								<BreadcrumbItem className="max-w-32 min-w-0">
 									{link(nameOf(section), section.id)}
 								</BreadcrumbItem>
 							</Fragment>

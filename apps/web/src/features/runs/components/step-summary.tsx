@@ -115,7 +115,7 @@ export function StepSummary({
 	return (
 		<div className="flex min-w-0 flex-col gap-4">
 			{context ? (
-				<div className="min-w-0 text-muted-foreground text-xs">{context}</div>
+				<div className="min-w-0 text-xs text-muted-foreground">{context}</div>
 			) : null}
 			{step.test ? <StandIn step={step} test={step.test} /> : null}
 			<StepClimb steps={steps} step={step} runStatus={run.status} />
@@ -123,13 +123,13 @@ export function StepSummary({
 				<Alert variant="destructive">
 					<CircleXIcon aria-hidden="true" />
 					<AlertTitle>Why it failed</AlertTitle>
-					<AlertDescription className="whitespace-pre-wrap break-words">
+					<AlertDescription className="break-words whitespace-pre-wrap">
 						{step.error}
 					</AlertDescription>
 				</Alert>
 			) : null}
 			{prose ? (
-				<p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+				<p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
 					{prose}
 				</p>
 			) : null}
@@ -176,7 +176,7 @@ export function StepSummary({
 				</div>
 			) : null}
 			{hasBody ? null : (
-				<p className="text-muted-foreground text-xs">
+				<p className="text-xs text-muted-foreground">
 					{step.outcome === null
 						? "The summary shows when the step ends. Follow the step live in the transcript."
 						: "This step left no summary. The transcript shows what it did."}

@@ -160,7 +160,7 @@ export function SearchEvaluation({
 						</TableBody>
 					</Table>
 					<Ranks evaluation={result} />
-					<p className="text-muted-foreground text-xs">
+					<p className="text-xs text-muted-foreground">
 						Tested{" "}
 						<LocalTime at={result.at}>{formatRelative(result.at)}</LocalTime> on
 						this computer.
@@ -303,7 +303,7 @@ function Ranks({ evaluation }: { evaluation: Evaluation }) {
 					<TableBody>
 						{evaluation.rows.map((row) => (
 							<TableRow key={row.query}>
-								<TableCell className="max-w-0 whitespace-normal break-words">
+								<TableCell className="max-w-0 break-words whitespace-normal">
 									{row.query}
 								</TableCell>
 								{MODES.map(({ mode }) => (

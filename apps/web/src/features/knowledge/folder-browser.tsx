@@ -161,7 +161,7 @@ export function FolderBrowser({
 								])}
 							</BreadcrumbList>
 						</Breadcrumb>
-						<span className="whitespace-nowrap text-muted-foreground text-sm tabular-nums">
+						<span className="text-sm whitespace-nowrap text-muted-foreground tabular-nums">
 							{shown.length} {shown.length === 1 ? "file" : "files"}
 						</span>
 					</div>
@@ -181,7 +181,7 @@ export function FolderBrowser({
 
 function FolderCount({ count }: { count: number }) {
 	return (
-		<span className="ml-auto text-muted-foreground text-xs tabular-nums">
+		<span className="ml-auto text-xs text-muted-foreground tabular-nums">
 			{count}
 		</span>
 	);

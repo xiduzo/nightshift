@@ -81,7 +81,7 @@ export function SpaceSwitcher() {
 							<span className="truncate font-semibold">
 								{active ? spaceName(active) : "Night Shift"}
 							</span>
-							<span className="truncate text-muted-foreground text-xs">
+							<span className="truncate text-xs text-muted-foreground">
 								Night Shift
 							</span>
 						</div>

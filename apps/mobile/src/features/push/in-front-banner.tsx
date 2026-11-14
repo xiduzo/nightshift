@@ -84,7 +84,7 @@ export function InFrontBanner() {
 				hideBanner(banner);
 				openPhoneRoute(route);
 			}}
-			className="absolute right-4 left-4 rounded-lg shadow-black/10 shadow-lg active:opacity-80"
+			className="absolute right-4 left-4 rounded-lg shadow-lg shadow-black/10 active:opacity-80"
 			style={{ top: insets.top + 8 }}
 		>
 			<Alert

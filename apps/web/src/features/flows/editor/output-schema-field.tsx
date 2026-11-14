@@ -304,7 +304,7 @@ export function OutputSchemaField({
 						<Field className="gap-1.5">
 							<FieldLabel
 								htmlFor={`${id}-root`}
-								className="font-normal text-muted-foreground text-xs"
+								className="text-xs font-normal text-muted-foreground"
 							>
 								The data is
 							</FieldLabel>

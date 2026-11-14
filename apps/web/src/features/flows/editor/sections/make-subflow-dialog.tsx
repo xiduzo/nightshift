@@ -190,7 +190,7 @@ function MakeSubflowForm({
 			</Field>
 
 			{plan === null ? (
-				<p className="flex items-center gap-2 text-muted-foreground text-sm">
+				<p className="flex items-center gap-2 text-sm text-muted-foreground">
 					<Spinner />
 					Loading the flows of this project…
 				</p>
@@ -289,7 +289,7 @@ function ChangeGroup({
 }) {
 	return (
 		<section className="flex flex-col gap-2">
-			<h3 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+			<h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
 				{title}
 			</h3>
 			<ItemGroup className="gap-1.5">

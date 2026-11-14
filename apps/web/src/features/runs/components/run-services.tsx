@@ -96,7 +96,7 @@ function ServiceRow({
 			</Item>
 			<CollapsibleContent>
 				<ScrollArea className="mt-2 h-64 rounded-md border bg-muted/40">
-					<pre className="whitespace-pre-wrap break-words p-3 font-mono text-xs">
+					<pre className="p-3 font-mono text-xs break-words whitespace-pre-wrap">
 						{log.isPending
 							? "Loading the log…"
 							: log.data?.text

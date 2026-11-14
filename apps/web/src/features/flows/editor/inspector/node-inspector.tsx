@@ -112,7 +112,7 @@ export function NodeInspector({
 							value={node.label ?? ""}
 							placeholder={node.id}
 							autoComplete="off"
-							className="-mx-1.5 h-7 w-[calc(100%+0.75rem)] border-transparent bg-transparent px-1.5 font-semibold text-base shadow-none hover:border-input focus-visible:border-input md:text-base dark:bg-transparent"
+							className="-mx-1.5 h-7 w-[calc(100%+0.75rem)] border-transparent bg-transparent px-1.5 text-base font-semibold shadow-none hover:border-input focus-visible:border-input md:text-base dark:bg-transparent"
 							onChange={(event) => {
 								const label = event.target.value;
 								onChange((current) => ({
@@ -122,7 +122,7 @@ export function NodeInspector({
 							}}
 						/>
 					</h2>
-					<div className="flex min-w-0 items-center gap-1.5 text-muted-foreground text-xs">
+					<div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
 						<span className="shrink-0">{typeLabel}</span>
 						<span aria-hidden="true">·</span>
 						<IdField
@@ -516,7 +516,7 @@ function IdField({
 				title={`Later nodes read its outputs as {{${nodeId}.field}}. A new id also changes every edge and reference to it.`}
 				value={text}
 				size={Math.max(text.length, 2)}
-				className="min-w-0 max-w-full rounded-sm bg-transparent px-0.5 font-mono text-foreground outline-none hover:bg-muted focus-visible:bg-muted focus-visible:ring-1 focus-visible:ring-ring aria-invalid:text-destructive"
+				className="max-w-full min-w-0 rounded-sm bg-transparent px-0.5 font-mono text-foreground outline-none hover:bg-muted focus-visible:bg-muted focus-visible:ring-1 focus-visible:ring-ring aria-invalid:text-destructive"
 				autoComplete="off"
 				spellCheck={false}
 				aria-invalid={error !== null}

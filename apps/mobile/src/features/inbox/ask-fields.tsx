@@ -67,7 +67,7 @@ function FieldHead({ field, id }: { field: AskField; id: string }) {
 				{field.required ? field.label : `${field.label} (optional)`}
 			</Label>
 			{field.hint ? (
-				<Text className="text-muted-foreground text-xs">{field.hint}</Text>
+				<Text className="text-xs text-muted-foreground">{field.hint}</Text>
 			) : null}
 		</View>
 	);
@@ -230,9 +230,9 @@ function OptionCard({
 				)}
 			>
 				<View className="flex-1 gap-1.5">
-					<Text className="font-semibold text-base">{option.label}</Text>
+					<Text className="text-base font-semibold">{option.label}</Text>
 					{option.description ? (
-						<Text className="text-muted-foreground text-sm">
+						<Text className="text-sm text-muted-foreground">
 							{option.description}
 						</Text>
 					) : null}

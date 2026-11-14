@@ -163,7 +163,7 @@ export function SectionInspector({
 						>
 							<span
 								aria-hidden="true"
-								className="flex size-5 items-center justify-center rounded-full border border-muted-foreground/50 border-dashed text-muted-foreground"
+								className="flex size-5 items-center justify-center rounded-full border border-dashed border-muted-foreground/50 text-muted-foreground"
 							>
 								{section.color === undefined ? (
 									<CheckIcon className="size-3.5" />

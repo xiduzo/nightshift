@@ -32,7 +32,7 @@ export function FlowTitleCard({
 	return (
 		<Card size="sm" className={cn("gap-2 px-3 py-2.5 shadow-sm", className)}>
 			<div className="flex min-w-0 items-center gap-2">
-				<h1 className="min-w-0 truncate font-mono font-semibold text-base">
+				<h1 className="min-w-0 truncate font-mono text-base font-semibold">
 					{name}
 				</h1>
 				<Button
@@ -47,11 +47,11 @@ export function FlowTitleCard({
 				</Button>
 			</div>
 			{flow.description ? (
-				<p className="line-clamp-2 text-muted-foreground text-xs">
+				<p className="line-clamp-2 text-xs text-muted-foreground">
 					{flow.description}
 				</p>
 			) : null}
-			<dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-3 gap-y-1.5 text-muted-foreground text-xs">
+			<dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
 				<dt>Gets</dt>
 				<dd className="flex flex-wrap gap-1">
 					{flow.inputs.length === 0 ? (

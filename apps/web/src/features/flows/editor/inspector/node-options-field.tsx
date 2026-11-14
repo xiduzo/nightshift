@@ -81,7 +81,7 @@ export function NodeOptionsField<T extends OptionNode>({
 			className="gap-3"
 		>
 			{lead}
-			<p id={`${id}-hint`} className="text-muted-foreground text-xs">
+			<p id={`${id}-hint`} className="text-xs text-muted-foreground">
 				{hint}
 			</p>
 			<OptionsEditor

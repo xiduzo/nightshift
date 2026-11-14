@@ -235,10 +235,10 @@ export function FlowList({ projectId }: { projectId: string }) {
 					className="flex flex-col gap-3"
 				>
 					<div className="flex flex-col gap-1">
-						<h2 id="loose-schedules-heading" className="font-medium text-sm">
+						<h2 id="loose-schedules-heading" className="text-sm font-medium">
 							Schedules without a flow
 						</h2>
-						<p className="text-muted-foreground text-sm">
+						<p className="text-sm text-muted-foreground">
 							These start no flow of this project. Change them, or remove them.
 						</p>
 					</div>

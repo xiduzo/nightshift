@@ -232,7 +232,7 @@ const SectionBox = memo(function SectionBox({
 	return (
 		<div
 			className={cn(
-				"relative w-64 rounded-lg border-2 bg-card text-card-foreground text-xs shadow-sm transition-[box-shadow,opacity] motion-reduce:transition-none",
+				"relative w-64 rounded-lg border-2 bg-card text-xs text-card-foreground shadow-sm transition-[box-shadow,opacity] motion-reduce:transition-none",
 				selected && "ring-2 ring-ring",
 				active &&
 					"shadow-[0_0_0_1px_var(--status-running),0_0_18px_0_color-mix(in_oklch,var(--status-running)_35%,transparent)]",
@@ -262,26 +262,26 @@ const SectionBox = memo(function SectionBox({
 					className="flex min-w-0 flex-col gap-0.5 rounded-t-md px-3 pt-2.5 pb-2"
 					style={{ background: mix(color, 8) }}
 				>
-					<div className="flex h-5 min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wider">
+					<div className="flex h-5 min-w-0 items-center gap-1.5 text-[11px] tracking-wider text-muted-foreground uppercase">
 						<GroupIcon className="size-3.5 shrink-0" aria-hidden="true" />
 						<span className="truncate">Section</span>
 						{isStart ? (
 							<Badge
 								variant="outline"
-								className="h-4 gap-0.5 px-1.5 font-mono text-[10px] text-foreground lowercase tracking-normal"
+								className="h-4 gap-0.5 px-1.5 font-mono text-[10px] tracking-normal text-foreground lowercase"
 								title="The run starts in this Section"
 							>
 								<PlayIcon aria-hidden="true" />
 								start
 							</Badge>
 						) : null}
-						<span className="ml-auto flex shrink-0 items-center gap-1 normal-case tracking-normal">
+						<span className="ml-auto flex shrink-0 items-center gap-1 tracking-normal normal-case">
 							<SectionIssues issues={issues} />
 							<OpenButton section={section} className="-my-1 -mr-1.5" />
 						</span>
 					</div>
 					<span
-						className="truncate font-medium text-sm leading-6"
+						className="truncate text-sm leading-6 font-medium"
 						style={{ color: section.color ? color : undefined }}
 						title={name}
 					>
@@ -357,7 +357,7 @@ const SectionBox = memo(function SectionBox({
 						aria-hidden="true"
 					/>
 					<span
-						className="line-clamp-3 break-all font-medium leading-tight"
+						className="line-clamp-3 leading-tight font-medium break-all"
 						style={{ color: section.color ? color : undefined }}
 					>
 						{name}
@@ -378,7 +378,7 @@ const Outside = memo(function Outside({ data }: NodeProps<OutsideNode>) {
 	const color = section ? sectionColor(section.color) : undefined;
 	return (
 		<div
-			className="relative flex w-44 items-center gap-2 rounded-lg border-2 border-dashed bg-card py-2 pr-1.5 pl-3 text-card-foreground text-xs"
+			className="relative flex w-44 items-center gap-2 rounded-lg border-2 border-dashed bg-card py-2 pr-1.5 pl-3 text-xs text-card-foreground"
 			style={color ? { borderColor: mix(color, 60) } : undefined}
 		>
 			{side === "out" ? (
@@ -390,7 +390,7 @@ const Outside = memo(function Outside({ data }: NodeProps<OutsideNode>) {
 				/>
 			) : null}
 			<div className="flex min-w-0 flex-1 flex-col">
-				<span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+				<span className="text-[10px] tracking-wider text-muted-foreground uppercase">
 					{side === "in" ? "From" : "To"}
 				</span>
 				<span

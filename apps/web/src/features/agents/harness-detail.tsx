@@ -120,7 +120,7 @@ export function HarnessDetail({
 							))}
 						</ul>
 					)}
-					<p className="text-muted-foreground text-xs">
+					<p className="text-xs text-muted-foreground">
 						<ModelSourceHint harness={harness.name} listing={harness.listing} />
 					</p>
 				</div>
@@ -131,7 +131,7 @@ export function HarnessDetail({
 				description="You cannot remove a harness that has profiles."
 			>
 				{harness.profiles.length === 0 ? (
-					<p className="text-muted-foreground text-sm">None yet.</p>
+					<p className="text-sm text-muted-foreground">None yet.</p>
 				) : (
 					<div className="flex flex-wrap gap-1.5">
 						{harness.profiles.map((name) => (

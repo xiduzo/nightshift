@@ -84,13 +84,13 @@ export function ItemList({
 			className="flex flex-col gap-3 p-4"
 		>
 			<header className="flex flex-wrap items-center gap-2">
-				<h3 id={`items-${step.id}`} className="font-medium text-sm">
+				<h3 id={`items-${step.id}`} className="text-sm font-medium">
 					{items.length} {items.length === 1 ? "item" : "items"}
 				</h3>
 				{[...counts].map(([state, count]) => (
 					<span
 						key={state}
-						className="flex items-center gap-1 text-muted-foreground text-xs tabular-nums"
+						className="flex items-center gap-1 text-xs text-muted-foreground tabular-nums"
 					>
 						<ItemStateBadge state={state} />
 						{count}
@@ -180,7 +180,7 @@ function ItemRow({
 					</ItemDescription>
 				) : null}
 				{item.reason ? (
-					<ItemDescription className="line-clamp-none whitespace-pre-wrap break-words text-xs">
+					<ItemDescription className="line-clamp-none text-xs break-words whitespace-pre-wrap">
 						{item.reason}
 					</ItemDescription>
 				) : null}
@@ -190,7 +190,7 @@ function ItemRow({
 			</ItemContent>
 			<ItemActions className="gap-1">
 				<span
-					className="text-muted-foreground text-xs tabular-nums"
+					className="text-xs text-muted-foreground tabular-nums"
 					title={`Started ${hoverTime(item.startedAt)}`}
 				>
 					<Elapsed start={item.startedAt} end={item.endedAt ?? null} />

@@ -173,7 +173,7 @@ export function NextStepCard(input: StepsInput) {
 						<Icon />
 					</div>
 					<div className="flex flex-col gap-1">
-						<p className="text-muted-foreground text-xs">
+						<p className="text-xs text-muted-foreground">
 							Next step · {steps.length - left.length + 1} of {steps.length}
 						</p>
 						<CardTitle>{next.title}</CardTitle>

@@ -37,7 +37,7 @@ function whereItGoes(
 export function MergePreviewList({ preview }: { preview: MergePreview }) {
 	if (preview.projects.length === 0) {
 		return (
-			<p className="text-muted-foreground text-sm">
+			<p className="text-sm text-muted-foreground">
 				Personal on this computer has no projects. Only its name changes.
 			</p>
 		);

@@ -162,7 +162,7 @@ export function AgentsOverview({
 						}
 					>
 						{modelProfiles.length === 0 ? (
-							<p className="text-muted-foreground text-sm">
+							<p className="text-sm text-muted-foreground">
 								No model profiles yet.
 							</p>
 						) : (
@@ -191,7 +191,7 @@ export function AgentsOverview({
 						}
 					>
 						{harnesses.length === 0 && found.agents.length === 0 ? (
-							<p className="text-muted-foreground text-sm">
+							<p className="text-sm text-muted-foreground">
 								No harnesses yet. Add one, such as Claude Code or Codex.
 							</p>
 						) : (
@@ -216,7 +216,7 @@ export function AgentsOverview({
 						{cliTools.length === 0 &&
 						connections.length === 0 &&
 						found.tools.length === 0 ? (
-							<p className="text-muted-foreground text-sm">
+							<p className="text-sm text-muted-foreground">
 								No tools yet. Add a CLI, such as gh, or an MCP server.
 							</p>
 						) : (
@@ -371,7 +371,7 @@ function OpenRow({
 					{title}
 				</Link>
 				{line ? (
-					<div className="truncate text-muted-foreground text-xs">{line}</div>
+					<div className="truncate text-xs text-muted-foreground">{line}</div>
 				) : null}
 			</TableCell>
 			<TableCell className="px-3 py-2.5 text-muted-foreground">
@@ -386,7 +386,7 @@ function OpenRow({
 function UsedIn({ usedBy }: { usedBy: ProfileRow["usedBy"] }) {
 	return (
 		<span
-			className="text-muted-foreground text-xs"
+			className="text-xs text-muted-foreground"
 			title={usedBy.map((u) => u.flowName).join(", ")}
 		>
 			{usedBy.length === 0

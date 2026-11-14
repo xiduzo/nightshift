@@ -63,7 +63,7 @@ function ErrorText({ error }: { error: StackTrace["error"] }) {
 		? `${error.type}${error.message ? `: ${error.message}` : ""}`
 		: error.message;
 	return text ? (
-		<p className="whitespace-pre-wrap break-words text-destructive">{text}</p>
+		<p className="break-words whitespace-pre-wrap text-destructive">{text}</p>
 	) : null;
 }
 

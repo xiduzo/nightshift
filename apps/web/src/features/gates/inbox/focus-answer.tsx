@@ -182,7 +182,7 @@ export function FocusAnswer({
 									: undefined
 							}
 							className={cn(
-								"flex items-start gap-3 rounded-xl border p-3 text-left outline-none transition-[background-color,opacity] focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60",
+								"flex items-start gap-3 rounded-xl border p-3 text-left transition-[background-color,opacity] outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60",
 								selected ? cn(style.badge, "ring-2") : "hover:bg-muted/60",
 								draft.choice && !selected && "opacity-60 hover:opacity-100",
 							)}
@@ -191,7 +191,7 @@ export function FocusAnswer({
 								<Kbd className="mt-0.5">{index + 1}</Kbd>
 							) : null}
 							<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-								<span className="flex flex-wrap items-center gap-2 font-medium font-mono">
+								<span className="flex flex-wrap items-center gap-2 font-mono font-medium">
 									<Icon className={cn("size-4", style.text)} aria-hidden />
 									<span className="text-foreground">
 										{outcomeLabel(choice.name)}
@@ -208,7 +208,7 @@ export function FocusAnswer({
 									) : null}
 								</span>
 								{what ? (
-									<span className="text-muted-foreground text-xs">{what}</span>
+									<span className="text-xs text-muted-foreground">{what}</span>
 								) : null}
 							</span>
 							{selected ? (
@@ -278,7 +278,7 @@ function AnswerSection({
 		<section className="flex flex-col gap-3" aria-labelledby={`${id}-title`}>
 			<h2
 				id={`${id}-title`}
-				className="font-medium text-muted-foreground text-xs uppercase tracking-wide"
+				className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
 			>
 				Your answer
 			</h2>

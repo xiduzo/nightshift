@@ -71,7 +71,7 @@ export function PromptBubble({
 						) : (
 							<p
 								className={cn(
-									"whitespace-pre-wrap break-words",
+									"break-words whitespace-pre-wrap",
 									long && !open && "line-clamp-[12]",
 								)}
 							>
@@ -120,7 +120,7 @@ export function ResultCard({
 		// Inset ring: transcript items skip painting offscreen (content-visibility), which clips an outer ring.
 		<Card size="sm" className={cn("ring-inset", className)}>
 			<CardHeader>
-				<CardTitle className="flex flex-wrap items-center gap-x-1.5 gap-y-1 font-normal text-xs">
+				<CardTitle className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs font-normal">
 					<Icon className={cn("size-4", tone)} aria-hidden="true" />
 					{kicker ? (
 						<span className="text-muted-foreground">{kicker}</span>

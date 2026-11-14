@@ -89,7 +89,7 @@ export function WaitCard({ item }: { item: WaitItem }) {
 			</AlertTitle>
 			<AlertDescription className="flex flex-col gap-1">
 				{item.message ? (
-					<p className="whitespace-pre-wrap break-words text-foreground">
+					<p className="break-words whitespace-pre-wrap text-foreground">
 						{item.message}
 					</p>
 				) : null}

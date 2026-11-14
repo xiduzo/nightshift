@@ -157,7 +157,7 @@ function VariableTable({
 	return (
 		<section className="flex flex-col gap-1.5">
 			{titled ? (
-				<h3 className="text-muted-foreground text-xs">{title}</h3>
+				<h3 className="text-xs text-muted-foreground">{title}</h3>
 			) : null}
 			<ItemGroup className="gap-1.5">
 				{group.rows.map((row) => (
@@ -234,7 +234,7 @@ export function ValueItem({
 						</span>
 					) : null}
 				</ItemTitle>
-				<ItemDescription className="break-all font-mono text-xs">
+				<ItemDescription className="font-mono text-xs break-all">
 					<ValuePreview value={value} />
 				</ItemDescription>
 			</ItemContent>
@@ -331,7 +331,7 @@ function VariableHistory({
 									</ItemDescription>
 								</div>
 								{change.value === null ? (
-									<span className="text-muted-foreground text-xs">
+									<span className="text-xs text-muted-foreground">
 										No value
 									</span>
 								) : (

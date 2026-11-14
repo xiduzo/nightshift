@@ -313,7 +313,7 @@ export function AgentFields({
 				</NativeSelect>
 				{(node.permissionMode ?? profile?.permissionMode) ===
 				"bypassPermissions" ? (
-					<p className="flex items-start gap-1.5 text-status-waiting text-xs">
+					<p className="flex items-start gap-1.5 text-xs text-status-waiting">
 						<TriangleAlertIcon
 							className="mt-px size-3.5 shrink-0"
 							aria-hidden="true"

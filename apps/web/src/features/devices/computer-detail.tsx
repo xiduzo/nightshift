@@ -127,7 +127,7 @@ export function ComputerDetail({
 				description={`Runs of ${space.name} with steps on this computer.`}
 			>
 				{runs.length === 0 ? (
-					<p className="text-muted-foreground text-sm">
+					<p className="text-sm text-muted-foreground">
 						Nothing runs here now.
 					</p>
 				) : (
@@ -168,7 +168,7 @@ export function ComputerDetail({
 				description={`The projects of ${space.name} on this computer.`}
 			>
 				{computer.clones.length === 0 ? (
-					<p className="text-muted-foreground text-sm">
+					<p className="text-sm text-muted-foreground">
 						No project of this Space is on it yet.
 					</p>
 				) : (
@@ -194,7 +194,7 @@ export function ComputerDetail({
 					}
 				>
 					{computer.offers.length === 0 ? (
-						<p className="text-muted-foreground text-sm">
+						<p className="text-sm text-muted-foreground">
 							{computer.owner ?? "Its owner"} offers nothing on it.
 						</p>
 					) : (
@@ -303,7 +303,7 @@ function ThisComputerOffers({ spaceId }: { spaceId: string }) {
 		>
 			<div className="flex flex-col items-start gap-3">
 				{offers.length === 0 ? (
-					<p className="text-muted-foreground text-sm">
+					<p className="text-sm text-muted-foreground">
 						Only you run on this computer.
 					</p>
 				) : (
@@ -324,7 +324,7 @@ function ThisComputerOffers({ spaceId }: { spaceId: string }) {
 									</ItemTitle>
 									<ItemDescription>{caps(offer)}</ItemDescription>
 									{offer.runs.length === 0 ? (
-										<p className="mt-1 text-muted-foreground text-xs">
+										<p className="mt-1 text-xs text-muted-foreground">
 											Nobody ran it here yet.
 										</p>
 									) : (

@@ -39,7 +39,7 @@ function NoLine({ className }: { className?: string }) {
 /** The last runs as bars, oldest on the left, and when the last one started. */
 export function LastRuns({ row, now }: { row: FlowHealthRow; now: number }) {
 	if (!row.last) {
-		return <span className="text-muted-foreground text-xs">Never run</span>;
+		return <span className="text-xs text-muted-foreground">Never run</span>;
 	}
 	return (
 		<div className="flex flex-col gap-1">
@@ -52,7 +52,7 @@ export function LastRuns({ row, now }: { row: FlowHealthRow; now: number }) {
 			/>
 			<LocalTime
 				at={row.last.startedAt}
-				className="text-muted-foreground text-xs"
+				className="text-xs text-muted-foreground"
 			>
 				Last run {formatRelative(row.last.startedAt, now)}
 			</LocalTime>
@@ -129,7 +129,7 @@ export function CostCell({
 		<Tooltip>
 			<TooltipTrigger render={<span className={LINE} />}>
 				<SpreadStrip spread={cost} steadiness={steadiness} />
-				<span className="whitespace-nowrap text-right text-muted-foreground text-xs tabular-nums">
+				<span className="text-right text-xs whitespace-nowrap text-muted-foreground tabular-nums">
 					{formatCost(cost.median)}
 				</span>
 			</TooltipTrigger>
@@ -171,7 +171,7 @@ export function TimeCell({
 		<Tooltip>
 			<TooltipTrigger render={<span className={LINE} />}>
 				<SpreadStrip spread={length} steadiness={steadiness} />
-				<span className="whitespace-nowrap text-right text-muted-foreground text-xs tabular-nums">
+				<span className="text-right text-xs whitespace-nowrap text-muted-foreground tabular-nums">
 					{formatDuration(length.median)}
 				</span>
 			</TooltipTrigger>

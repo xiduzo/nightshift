@@ -54,7 +54,7 @@ export function CallDetail({
 	return (
 		<section aria-label="The called flow" className="flex flex-col gap-4 p-4">
 			<header className="flex flex-wrap items-center gap-x-3 gap-y-2">
-				<h3 className="flex min-w-0 items-center gap-2 font-medium text-sm">
+				<h3 className="flex min-w-0 items-center gap-2 text-sm font-medium">
 					<WorkflowIcon
 						className="size-4 shrink-0 text-muted-foreground"
 						aria-hidden="true"
@@ -64,7 +64,7 @@ export function CallDetail({
 						{node?.type === "call" ? node.flow : "a flow"}
 					</span>
 				</h3>
-				<span className="text-muted-foreground text-xs tabular-nums">
+				<span className="text-xs text-muted-foreground tabular-nums">
 					{childCount} {childCount === 1 ? "step" : "steps"}
 					{typeof ended === "string" && ended !== ""
 						? ` · ended on ${ended}`
@@ -90,7 +90,7 @@ export function CallDetail({
 					</CardHeader>
 					<CardContent>
 						{declared.length === 0 && bindings.length === 0 ? (
-							<p className="text-muted-foreground text-xs italic">None</p>
+							<p className="text-xs text-muted-foreground italic">None</p>
 						) : (
 							<dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs">
 								{(declared.length > 0
@@ -105,7 +105,7 @@ export function CallDetail({
 											<dt className="font-mono text-muted-foreground">
 												{name}
 											</dt>
-											<dd className="break-words font-mono">
+											<dd className="font-mono break-words">
 												{template ?? (
 													<span className="font-sans text-muted-foreground italic">
 														{input?.default !== undefined
@@ -127,7 +127,7 @@ export function CallDetail({
 					</CardHeader>
 					<CardContent>
 						{returned.length === 0 ? (
-							<p className="text-muted-foreground text-xs italic">
+							<p className="text-xs text-muted-foreground italic">
 								{step.outcome === null
 									? "The outputs show when the flow ends."
 									: "No outputs."}

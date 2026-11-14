@@ -144,7 +144,7 @@ export function HostCard({
 					</Alert>
 				) : null}
 				<div className="flex flex-col gap-2">
-					<p className="text-muted-foreground text-xs">Your phones on it</p>
+					<p className="text-xs text-muted-foreground">Your phones on it</p>
 					<div className="flex flex-wrap items-center gap-2">
 						{(phones ?? []).map((phone) => (
 							<Button
@@ -176,11 +176,11 @@ export function HostCard({
 							</Button>
 						))}
 						{phones === undefined ? (
-							<span className="text-muted-foreground text-sm">
+							<span className="text-sm text-muted-foreground">
 								{phonesError ? `${name} does not answer now.` : "Loading."}
 							</span>
 						) : phones.length === 0 ? (
-							<span className="text-muted-foreground text-sm">
+							<span className="text-sm text-muted-foreground">
 								No phone yet.{" "}
 								<Button
 									variant="link"

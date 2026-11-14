@@ -37,8 +37,8 @@ export function Page({
 	return (
 		<div className="flex flex-col gap-6 p-6">
 			<div className="flex flex-col gap-1">
-				<h1 className="font-medium text-2xl">{title}</h1>
-				<p className="max-w-2xl text-muted-foreground text-sm">{detail}</p>
+				<h1 className="text-2xl font-medium">{title}</h1>
+				<p className="max-w-2xl text-sm text-muted-foreground">{detail}</p>
 			</div>
 			{children}
 		</div>
@@ -74,7 +74,7 @@ export function Section({
 }) {
 	return (
 		<section className="flex flex-col gap-3">
-			<h2 className="font-medium text-lg">{title}</h2>
+			<h2 className="text-lg font-medium">{title}</h2>
 			{children}
 		</section>
 	);
@@ -148,7 +148,7 @@ export function LoadState({
 	}
 	if (pending) {
 		return (
-			<p className="text-muted-foreground text-sm">Loading the numbers.</p>
+			<p className="text-sm text-muted-foreground">Loading the numbers.</p>
 		);
 	}
 	return children;

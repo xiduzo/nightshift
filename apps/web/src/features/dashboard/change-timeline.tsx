@@ -91,14 +91,14 @@ export function ChangeTimeline({
 					</Tooltip>
 				))}
 			</div>
-			<div className="relative h-4 text-muted-foreground text-xs">
+			<div className="relative h-4 text-xs text-muted-foreground">
 				<span className="absolute left-0">{changes.nights * 2} days ago</span>
 				<span className="absolute -translate-x-1/2" style={{ left: x(split) }}>
 					{changes.nights} days ago
 				</span>
 				<span className="absolute right-0">Now</span>
 			</div>
-			<div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground text-xs">
+			<div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
 				<span className="flex items-center gap-1.5">
 					<span className="size-2 rounded-full bg-status-finished" />
 					Finished

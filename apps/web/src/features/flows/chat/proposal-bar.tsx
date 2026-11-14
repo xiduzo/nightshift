@@ -53,7 +53,7 @@ export function ProposalBar({
 					<span className="flex items-center gap-1.5">
 						<span
 							aria-hidden="true"
-							className="size-2.5 rounded-full border border-muted-foreground border-dashed"
+							className="size-2.5 rounded-full border border-dashed border-muted-foreground"
 						/>
 						Removed
 					</span>

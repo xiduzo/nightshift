@@ -43,7 +43,7 @@ export function GateQuestion({
 		<div className={cn("flex min-w-0 flex-col gap-3", className)}>
 			<h2
 				id={headingId}
-				className="max-w-prose whitespace-pre-wrap break-words font-semibold text-base leading-snug tracking-tight"
+				className="max-w-prose text-base leading-snug font-semibold tracking-tight break-words whitespace-pre-wrap"
 			>
 				<InlineMarkdown text={headline} />
 			</h2>
@@ -154,7 +154,7 @@ function ContextBlock({
 			className={cn("flex min-w-0 flex-col gap-1", !plain && "border-l-2 pl-3")}
 		>
 			{label ? (
-				<div className="font-mono text-muted-foreground text-xs">{label}</div>
+				<div className="font-mono text-xs text-muted-foreground">{label}</div>
 			) : null}
 			<div className="min-w-0">{children}</div>
 		</div>

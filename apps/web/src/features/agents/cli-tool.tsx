@@ -162,7 +162,7 @@ export function CliToolDetail({
 									{
 										label: "Path",
 										value: (
-											<span className="break-all font-mono text-xs leading-5">
+											<span className="font-mono text-xs leading-5 break-all">
 												{data.path ?? "Not found"}
 											</span>
 										),
@@ -221,7 +221,7 @@ export function CliToolDetail({
 							contentClassName="max-h-96"
 						/>
 					) : (
-						<p className="text-muted-foreground text-sm">
+						<p className="text-sm text-muted-foreground">
 							<span className="font-mono">{tool.name}</span> shows no help.
 							Agents get its name and description only.
 						</p>

@@ -213,7 +213,7 @@ export function SetupDetails({
 			<CollapsibleContent className="flex flex-col gap-3">
 				{facts.map((fact) => (
 					<Field key={fact.label} className="gap-1.5">
-						<FieldTitle className="font-normal text-muted-foreground text-xs">
+						<FieldTitle className="text-xs font-normal text-muted-foreground">
 							{fact.label}
 						</FieldTitle>
 						<CodeBlock size="sm" className="bg-muted/40">
@@ -330,7 +330,7 @@ export function CheckingStep({
 			<DialogHeader>
 				<DialogTitle>Sign in to {signInAccount(agent)}</DialogTitle>
 			</DialogHeader>
-			<p className="flex items-center gap-2 text-muted-foreground text-sm">
+			<p className="flex items-center gap-2 text-sm text-muted-foreground">
 				<Spinner />
 				Checking the sign-in
 			</p>

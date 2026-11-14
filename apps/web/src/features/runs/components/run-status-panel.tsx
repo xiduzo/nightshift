@@ -143,14 +143,14 @@ export function RunStatusPanel({
 							aria-hidden="true"
 						/>
 						<Icon className={cn("size-4", tone)} aria-hidden="true" />
-						<span className={cn("font-medium text-sm", tone)}>
+						<span className={cn("text-sm font-medium", tone)}>
 							<Parts parts={notice.title} code="font-mono" />
 						</span>
 						{notice.wakeAt ? (
 							<Countdown until={notice.wakeAt} className={tone} />
 						) : null}
 						{open ? null : (
-							<span className="min-w-0 truncate font-normal text-muted-foreground text-xs">
+							<span className="min-w-0 truncate text-xs font-normal text-muted-foreground">
 								{notice.gist}
 							</span>
 						)}
@@ -159,7 +159,7 @@ export function RunStatusPanel({
 				<CollapsibleContent className="flex flex-col gap-3 border-t p-3">
 					{notice.body.length > 0 ? (
 						<ScrollArea className="max-h-32 [&>[data-slot=scroll-area-viewport]]:max-h-32">
-							<div className="whitespace-pre-wrap break-words text-muted-foreground text-sm leading-relaxed">
+							<div className="text-sm leading-relaxed break-words whitespace-pre-wrap text-muted-foreground">
 								<Parts parts={notice.body} code="font-mono text-foreground" />
 							</div>
 						</ScrollArea>

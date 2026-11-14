@@ -204,7 +204,7 @@ export function ToolsField({
 														{nameOf(key)}
 													</span>
 													{info?.description ? (
-														<span className="line-clamp-2 text-muted-foreground text-xs">
+														<span className="line-clamp-2 text-xs text-muted-foreground">
 															{info.description}
 														</span>
 													) : null}

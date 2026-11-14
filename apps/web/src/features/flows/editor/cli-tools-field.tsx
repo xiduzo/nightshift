@@ -200,7 +200,7 @@ export function CliToolsField({
 									<div className="flex min-w-0 flex-col gap-0.5">
 										<span className="truncate font-mono">{name}</span>
 										{description ? (
-											<span className="line-clamp-2 text-muted-foreground text-xs">
+											<span className="line-clamp-2 text-xs text-muted-foreground">
 												{description}
 											</span>
 										) : null}

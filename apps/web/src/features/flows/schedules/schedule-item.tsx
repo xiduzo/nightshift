@@ -193,7 +193,7 @@ function Fact({
 function Part({ label, children }: { label: string; children: ReactNode }) {
 	return (
 		<div className="flex flex-col gap-1.5">
-			<span className="text-muted-foreground text-xs">{label}</span>
+			<span className="text-xs text-muted-foreground">{label}</span>
 			{children}
 		</div>
 	);
@@ -358,13 +358,13 @@ function LastResult({
 	);
 	if (result.kind === "failed") {
 		return (
-			<p className="text-destructive text-xs">
+			<p className="text-xs text-destructive">
 				{when}: did not start. {result.error}
 			</p>
 		);
 	}
 	return (
-		<p className="text-muted-foreground text-xs">
+		<p className="text-xs text-muted-foreground">
 			Skipped{" "}
 			<LocalTime at={result.at} zone={zone} device={device}>
 				{formatTime(result.at)}
@@ -393,7 +393,7 @@ function OfflineLines({ machines }: { machines: Machine[] }) {
 	return (
 		<div className="flex flex-col gap-0.5">
 			{offline.map((machine) => (
-				<p key={machine.name} className="text-destructive text-xs">
+				<p key={machine.name} className="text-xs text-destructive">
 					{machine.name} is offline now. Its steps cannot run until it is back.
 				</p>
 			))}
@@ -416,7 +416,7 @@ function InputsFact({
 	if (baseRef) parts.push(`from ${baseRef}`);
 	if (parts.length === 0) return null;
 	return (
-		<Fact icon={TextCursorInputIcon} className="min-w-0 max-w-full font-mono">
+		<Fact icon={TextCursorInputIcon} className="max-w-full min-w-0 font-mono">
 			<span className="sr-only">Inputs: </span>
 			<span className="truncate">{parts.join(" · ")}</span>
 		</Fact>
@@ -431,8 +431,8 @@ export function IssueLines({ issues }: { issues: readonly ScheduleIssue[] }) {
 					key={`${issue.scheduleId ?? ""}:${issue.message}`}
 					className={
 						issue.severity === "error"
-							? "text-destructive text-xs"
-							: "text-muted-foreground text-xs"
+							? "text-xs text-destructive"
+							: "text-xs text-muted-foreground"
 					}
 				>
 					{issue.message}

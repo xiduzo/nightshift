@@ -105,7 +105,7 @@ export function RunSidebar({
 										knowledge.find((use) => use.source.path === source.path)
 											?.steps ?? [];
 									return (
-										<span className="flex flex-wrap gap-x-2 text-muted-foreground text-xs">
+										<span className="flex flex-wrap gap-x-2 text-xs text-muted-foreground">
 											{users.map((step) => (
 												<button
 													key={step.id}
@@ -142,7 +142,7 @@ function Section({
 }) {
 	return (
 		<section aria-label={title} className="flex flex-col gap-2">
-			<h2 className="flex items-center gap-2 font-semibold text-sm">
+			<h2 className="flex items-center gap-2 text-sm font-semibold">
 				{title}
 				{count === undefined ? null : (
 					<Badge variant="secondary" className="tabular-nums">
@@ -150,7 +150,7 @@ function Section({
 					</Badge>
 				)}
 			</h2>
-			{hint ? <p className="text-muted-foreground text-xs">{hint}</p> : null}
+			{hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
 			{children}
 		</section>
 	);

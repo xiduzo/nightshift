@@ -52,7 +52,7 @@ export function OverviewPage() {
 							<Stat label="Needed you" value={percent(data.neededYouRate)} />
 						</Stats>
 						<Section title="Flagged installs">
-							<p className="text-muted-foreground text-sm">
+							<p className="text-sm text-muted-foreground">
 								These installs send far more events than the usual day.
 							</p>
 							{data.flaggedInstallIds.length === 0 ? (

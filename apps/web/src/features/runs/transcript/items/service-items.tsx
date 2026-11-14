@@ -36,7 +36,7 @@ export function ServiceCard({ item }: { item: ServiceItem }) {
 			tone={look.tone}
 		>
 			{item.state === "failed" && item.reason ? (
-				<p className="break-words leading-relaxed">{item.reason}</p>
+				<p className="leading-relaxed break-words">{item.reason}</p>
 			) : null}
 		</ResultCard>
 	);

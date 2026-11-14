@@ -296,7 +296,7 @@ export function FlowInspector({
 				title="How to edit"
 				defaultOpen={flow.nodes.length <= 1}
 			>
-				<ul className="flex list-disc flex-col gap-1.5 pl-4 text-muted-foreground text-xs leading-relaxed marker:text-border">
+				<ul className="flex list-disc flex-col gap-1.5 pl-4 text-xs leading-relaxed text-muted-foreground marker:text-border">
 					<li>
 						To add a node, press <Kbd>Tab</Kbd> or double-click the canvas. The
 						buttons on the left add one too.

@@ -50,7 +50,7 @@ export function VariablesSection({
 			{groups.map((group) => (
 				<section key={group.key} className="flex flex-col gap-3">
 					{groups.length > 1 ? (
-						<h4 className="text-muted-foreground text-xs">
+						<h4 className="text-xs text-muted-foreground">
 							{group.scope ? (
 								<ScopeTitle run={run} steps={steps} scope={group.scope} />
 							) : (

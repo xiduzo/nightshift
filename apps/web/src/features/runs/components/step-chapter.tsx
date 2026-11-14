@@ -68,7 +68,7 @@ export function StepChapter(props: ChapterProps) {
 						<Icon />
 					</MarkerIcon>
 					<MarkerContent className="flex items-center gap-2">
-						<span className="font-medium font-mono text-foreground">
+						<span className="font-mono font-medium text-foreground">
 							{step.nodeId}
 						</span>
 						{step.visit > 1 ? <span>visit {step.visit}</span> : null}
@@ -136,7 +136,7 @@ function ChapterBody({
 	return (
 		<>
 			{context ? (
-				<div className="min-w-0 text-muted-foreground text-xs">{context}</div>
+				<div className="min-w-0 text-xs text-muted-foreground">{context}</div>
 			) : null}
 			{todos ? <StepPlan todos={todos} running={!ended} /> : null}
 			{step.sources && step.sources.length > 0 ? (
@@ -179,7 +179,7 @@ function ChapterBody({
 					overlapped={transcript.changes?.overlapped === true}
 					omitted={transcript.changes?.omitted ?? 0}
 					title={
-						<h4 className="flex items-center gap-2 font-medium text-muted-foreground text-xs">
+						<h4 className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
 							Changed files
 							<Badge variant="secondary" className="tabular-nums">
 								{files.length}

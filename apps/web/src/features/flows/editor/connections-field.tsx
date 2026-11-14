@@ -143,12 +143,12 @@ export function ConnectionsField({
 									<div className="flex min-w-0 flex-col gap-0.5">
 										<span className="flex items-baseline gap-2">
 											<span className="truncate font-mono">{name}</span>
-											<span className="shrink-0 text-muted-foreground text-xs">
+											<span className="shrink-0 text-xs text-muted-foreground">
 												{connection ? connectionKind(connection) : null}
 											</span>
 										</span>
 										{connection?.description ? (
-											<span className="line-clamp-2 text-muted-foreground text-xs">
+											<span className="line-clamp-2 text-xs text-muted-foreground">
 												{connection.description}
 											</span>
 										) : null}

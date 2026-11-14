@@ -38,7 +38,7 @@ export function Suggestions({
 					size="sm"
 					className={cn(
 						"font-normal",
-						wrap ? "min-w-0 max-w-full" : "shrink-0",
+						wrap ? "max-w-full min-w-0" : "shrink-0",
 					)}
 					title={wrap ? item : undefined}
 					disabled={disabled}

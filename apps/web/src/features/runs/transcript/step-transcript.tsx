@@ -273,7 +273,7 @@ export function StepTranscript({
 					<Alert variant="destructive">
 						<CircleXIcon aria-hidden="true" />
 						<AlertTitle>The step failed</AlertTitle>
-						<AlertDescription className="whitespace-pre-wrap break-words font-mono text-xs">
+						<AlertDescription className="font-mono text-xs break-words whitespace-pre-wrap">
 							{step.error}
 						</AlertDescription>
 					</Alert>

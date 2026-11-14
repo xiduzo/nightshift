@@ -278,7 +278,7 @@ function SettingsForm({ data }: { data: NotificationSettings }) {
 					</Select>
 				</SettingRow>
 				<SettingNote>
-					<span className="text-muted-foreground text-xs">
+					<span className="text-xs text-muted-foreground">
 						An open Night Shift page always shows what happens.
 					</span>
 				</SettingNote>

@@ -32,7 +32,7 @@ export function StepClimb({
 		>
 			<h3
 				id="step-climb-heading"
-				className="font-medium text-muted-foreground text-xs uppercase tracking-wider"
+				className="text-xs font-medium tracking-wider text-muted-foreground uppercase"
 			>
 				Cascade
 			</h3>
@@ -47,14 +47,14 @@ export function StepClimb({
 						<ItemContent className="min-w-0">
 							<ItemTitle className="font-mono text-xs">
 								{entry.tier}
-								<span className="font-normal font-sans text-muted-foreground">
+								<span className="font-sans font-normal text-muted-foreground">
 									try {entry.try}
 								</span>
 							</ItemTitle>
 						</ItemContent>
 						<ItemActions className="gap-2">
 							{entry.confidence !== null ? (
-								<span className="text-muted-foreground text-xs tabular-nums">
+								<span className="text-xs text-muted-foreground tabular-nums">
 									{Math.round(entry.confidence * 100)}% sure
 								</span>
 							) : null}

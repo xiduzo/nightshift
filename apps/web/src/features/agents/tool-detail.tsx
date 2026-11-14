@@ -122,7 +122,7 @@ export function ToolDetail({
 								? {
 										label: "Command",
 										value: (
-											<span className="break-all font-mono text-xs leading-5">
+											<span className="font-mono text-xs leading-5 break-all">
 												{commandLine(local.command, local.args)}
 											</span>
 										),
@@ -130,7 +130,7 @@ export function ToolDetail({
 								: {
 										label: "URL",
 										value: (
-											<span className="break-all font-mono text-xs leading-5">
+											<span className="font-mono text-xs leading-5 break-all">
 												{remote?.url}
 											</span>
 										),
@@ -183,7 +183,7 @@ export function ToolDetail({
 				}
 			>
 				{connection.variables.length === 0 ? (
-					<p className="text-muted-foreground text-sm">None.</p>
+					<p className="text-sm text-muted-foreground">None.</p>
 				) : (
 					<div className="flex flex-col items-start gap-3">
 						<ul className="flex flex-wrap gap-1.5">
@@ -259,7 +259,7 @@ export function UsedBySection({
 	return (
 		<DetailSection title="Used by">
 			{profiles.length === 0 && flows.length === 0 ? (
-				<p className="text-muted-foreground text-sm">Nothing uses it yet.</p>
+				<p className="text-sm text-muted-foreground">Nothing uses it yet.</p>
 			) : (
 				<div className="flex flex-col gap-3">
 					{profiles.length > 0 ? (

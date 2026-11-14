@@ -272,7 +272,7 @@ function SuggestBody({
 					{state.suggestion.note ? (
 						<Markdown
 							text={state.suggestion.note}
-							className="text-muted-foreground text-xs"
+							className="text-xs text-muted-foreground"
 						/>
 					) : null}
 					{renderPreview(state.suggestion)}
@@ -303,7 +303,7 @@ function SuggestBody({
 						<Button variant="ghost" size="sm" onClick={onClose}>
 							Discard
 						</Button>
-						<span className="ml-auto text-muted-foreground text-xs">
+						<span className="ml-auto text-xs text-muted-foreground">
 							<Kbd>Esc</Kbd> closes
 						</span>
 					</div>

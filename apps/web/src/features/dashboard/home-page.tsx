@@ -121,7 +121,7 @@ export function HomePage() {
 			<div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-10 p-4 py-10 md:p-6 md:py-14">
 				<header className="flex flex-col gap-3">
 					{before ? (
-						<p className="text-muted-foreground text-sm">
+						<p className="text-sm text-muted-foreground">
 							Since you last looked,{" "}
 							<LocalTime at={before.at}>
 								{formatRelative(before.at, now)}
@@ -131,7 +131,7 @@ export function HomePage() {
 					{summary.isLoading ? (
 						<Skeleton className="h-9 w-80 max-w-full" />
 					) : (
-						<h1 className="text-balance font-semibold text-3xl tracking-tight">
+						<h1 className="text-3xl font-semibold tracking-tight text-balance">
 							{headline(open.length, fresh, before !== null)}
 						</h1>
 					)}
@@ -151,7 +151,7 @@ export function HomePage() {
 				<SetupCard />
 
 				{summary.data && !watch ? (
-					<p className="text-muted-foreground text-sm">
+					<p className="text-sm text-muted-foreground">
 						Update Night Shift on the computer that runs your flows. Then Home
 						shows the flows that need a look.
 					</p>
@@ -220,7 +220,7 @@ export function HomePage() {
 						{back.map(([key, name]) => (
 							<p
 								key={key}
-								className="flex items-center gap-2 px-1 text-muted-foreground text-sm"
+								className="flex items-center gap-2 px-1 text-sm text-muted-foreground"
 							>
 								<CircleCheckIcon
 									className="size-4 text-status-finished"
@@ -235,7 +235,7 @@ export function HomePage() {
 						{lookedAt.map((flow) => (
 							<p
 								key={flow.key}
-								className="flex items-center gap-2 px-1 text-muted-foreground text-sm"
+								className="flex items-center gap-2 px-1 text-sm text-muted-foreground"
 							>
 								<CheckIcon className="size-4" aria-hidden="true" />
 								<span className="flex-1">
@@ -279,7 +279,7 @@ export function HomePage() {
 									))}
 								</ItemGroup>
 								{newReports.length === 0 ? (
-									<p className="px-1 text-muted-foreground text-sm">
+									<p className="px-1 text-sm text-muted-foreground">
 										No new report since you last looked.
 									</p>
 								) : null}

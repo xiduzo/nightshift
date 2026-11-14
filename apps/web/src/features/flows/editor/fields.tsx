@@ -228,7 +228,7 @@ export function InspectorSection({
 						/>
 					}
 				>
-					<span className="flex-1 text-left font-semibold text-sm">
+					<span className="flex-1 text-left text-sm font-semibold">
 						{title}
 					</span>
 					{aside}

@@ -14,7 +14,7 @@ export function HelpCostLine() {
 	const cost = spend.data?.helpThisMonth ?? 0;
 	if (cost <= 0) return null;
 	return (
-		<p className="flex flex-wrap items-baseline gap-x-1.5 text-muted-foreground text-sm">
+		<p className="flex flex-wrap items-baseline gap-x-1.5 text-sm text-muted-foreground">
 			<span>Help cost {formatCost(cost)} this month.</span>
 			<Button
 				size="xs"

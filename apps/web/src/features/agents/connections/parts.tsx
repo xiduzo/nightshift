@@ -24,7 +24,7 @@ import type { SecretSource } from "@/shared/api";
 export function MonoTile({ children }: { children: string }) {
 	return (
 		<Avatar size="lg" className="rounded-lg after:rounded-lg" aria-hidden>
-			<AvatarFallback className="rounded-lg font-medium font-mono text-foreground text-xs">
+			<AvatarFallback className="rounded-lg font-mono text-xs font-medium text-foreground">
 				{children}
 			</AvatarFallback>
 		</Avatar>

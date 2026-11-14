@@ -24,7 +24,7 @@ export function ReportPreview({
 		return (
 			<p
 				className={cn(
-					"line-clamp-3 whitespace-pre-line break-words text-muted-foreground text-xs leading-relaxed",
+					"line-clamp-3 text-xs leading-relaxed break-words whitespace-pre-line text-muted-foreground",
 					className,
 				)}
 			>
@@ -38,7 +38,7 @@ export function ReportPreview({
 				<Markdown text={text} className="max-w-none text-xs" />
 			</div>
 			{more ? (
-				<p className="text-muted-foreground text-xs">
+				<p className="text-xs text-muted-foreground">
 					Open the run to read all of it.
 				</p>
 			) : null}

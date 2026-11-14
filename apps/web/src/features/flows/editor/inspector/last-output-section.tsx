@@ -166,7 +166,7 @@ function TestFields({
 				</Button>
 				{/* A step that runs says so above. */}
 				{problem !== null && last.endedAt !== null ? (
-					<p className="text-muted-foreground text-xs">{problem}</p>
+					<p className="text-xs text-muted-foreground">{problem}</p>
 				) : null}
 			</div>
 		);
@@ -237,7 +237,7 @@ function SampleView({ node, sample }: { node: FlowNode; sample: NodeSample }) {
 	if (sample.endedAt === null) {
 		return (
 			<>
-				<p className="text-muted-foreground text-xs">
+				<p className="text-xs text-muted-foreground">
 					This node runs now. Its output shows here when it ends.
 				</p>
 				{openRun}
@@ -246,7 +246,7 @@ function SampleView({ node, sample }: { node: FlowNode; sample: NodeSample }) {
 	}
 	return (
 		<>
-			<p className="text-muted-foreground text-xs">
+			<p className="text-xs text-muted-foreground">
 				From the run of {formatDateTime(sample.endedAt)}.
 			</p>
 			{sample.changed ? (
@@ -272,7 +272,7 @@ function SampleView({ node, sample }: { node: FlowNode; sample: NodeSample }) {
 							contentClassName="max-h-48 text-xs"
 						/>
 						{shown.cut ? (
-							<p className="text-muted-foreground text-xs">
+							<p className="text-xs text-muted-foreground">
 								This shows the start only. Open the run to see all of it.
 							</p>
 						) : null}

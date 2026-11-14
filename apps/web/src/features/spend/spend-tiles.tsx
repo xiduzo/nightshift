@@ -43,16 +43,16 @@ export function SpendTiles({ days }: { days: SpendDays }) {
 							{days.runs} {days.runs === 1 ? "run" : "runs"}
 						</span>
 					</CardDescription>
-					<CardTitle className="flex flex-wrap items-baseline gap-x-2.5 font-semibold text-2xl tabular-nums tracking-tight">
+					<CardTitle className="flex flex-wrap items-baseline gap-x-2.5 text-2xl font-semibold tracking-tight tabular-nums">
 						{formatCost(days.total)}
-						<span className="font-normal text-muted-foreground text-xs tracking-normal">
+						<span className="text-xs font-normal tracking-normal text-muted-foreground">
 							{againstBefore(days)}
 						</span>
 					</CardTitle>
 				</CardHeader>
 				<CardContent className="flex flex-col gap-2">
 					<DayBars days={days} />
-					<div className="flex flex-wrap gap-x-3.5 gap-y-1 text-muted-foreground text-xs">
+					<div className="flex flex-wrap gap-x-3.5 gap-y-1 text-xs text-muted-foreground">
 						<span className="flex items-center gap-1.5">
 							<span
 								className="size-2 rounded-xs bg-chart-1"
@@ -135,12 +135,12 @@ function Tile({
 		<Card size="sm">
 			<CardHeader>
 				<CardDescription>{label}</CardDescription>
-				<CardTitle className="font-semibold text-2xl tabular-nums tracking-tight">
+				<CardTitle className="text-2xl font-semibold tracking-tight tabular-nums">
 					{value}
 				</CardTitle>
 			</CardHeader>
 			{hint ? (
-				<CardContent className="text-muted-foreground text-xs">
+				<CardContent className="text-xs text-muted-foreground">
 					{hint}
 				</CardContent>
 			) : null}

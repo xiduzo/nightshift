@@ -532,12 +532,12 @@ function NodeDetail({
 			<ScrollArea className="min-h-0 flex-1">
 				<div className="flex flex-col gap-4 p-4">
 					{path ? (
-						<p className="break-all font-mono text-muted-foreground text-xs">
+						<p className="font-mono text-xs break-all text-muted-foreground">
 							{path}
 						</p>
 					) : null}
 					{near.length === 0 ? (
-						<p className="text-muted-foreground text-sm">
+						<p className="text-sm text-muted-foreground">
 							Nothing connects to this yet.
 						</p>
 					) : null}
@@ -550,7 +550,7 @@ function NodeDetail({
 						const KindIcon = KIND_ICON[kind];
 						return (
 							<div key={kind} className="flex flex-col gap-1">
-								<h4 className="font-medium text-muted-foreground text-xs">
+								<h4 className="text-xs font-medium text-muted-foreground">
 									{KIND_NAME[kind].many}{" "}
 									<span className="tabular-nums">{items.length}</span>
 								</h4>

@@ -380,7 +380,7 @@ function TemplateVariables({
 										key={variable.text}
 										variant="outline"
 										size="xs"
-										className="h-6 px-1.5 font-mono font-normal text-[11px]"
+										className="h-6 px-1.5 font-mono text-[11px] font-normal"
 										onClick={() => onInsert(variable)}
 										title={[
 											`Insert ${variable.text}`,
@@ -411,7 +411,7 @@ function TemplateVariables({
 										key={tool.name}
 										variant="outline"
 										size="xs"
-										className="h-6 px-1.5 font-mono font-normal text-[11px]"
+										className="h-6 px-1.5 font-mono text-[11px] font-normal"
 										onClick={() => onInsertTool(tool.name)}
 										title={[
 											`Insert ${tool.name}. It runs ${tool.program ?? tool.name} signed in.`,

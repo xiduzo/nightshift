@@ -359,7 +359,7 @@ function SettingsMenu({
 				<div className="grid flex-1 text-left text-sm leading-tight">
 					<span className="truncate font-medium">Settings</span>
 					<span
-						className="truncate text-muted-foreground text-xs"
+						className="truncate text-xs text-muted-foreground"
 						aria-live="polite"
 					>
 						{status}

@@ -71,7 +71,7 @@ export function RunReport({
 				<Markdown text={text} className="max-w-none" />
 			</CardContent>
 			{cut ? (
-				<CardFooter className="text-muted-foreground text-xs">
+				<CardFooter className="text-xs text-muted-foreground">
 					Night Shift kept the first 64 KB of this report.
 				</CardFooter>
 			) : null}

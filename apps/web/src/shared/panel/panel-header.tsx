@@ -44,7 +44,7 @@ export function PanelHeader({
 				<Icon aria-hidden="true" />
 			</ItemMedia>
 			<ItemContent className="min-w-0 gap-0.5">
-				<ItemDescription className="flex items-center gap-1.5 text-xs uppercase tracking-wider">
+				<ItemDescription className="flex items-center gap-1.5 text-xs tracking-wider uppercase">
 					{kicker}
 					{badges}
 				</ItemDescription>

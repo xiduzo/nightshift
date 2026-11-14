@@ -48,7 +48,7 @@ export function SpendFlows({
 				<div
 					className={cn(
 						GRID,
-						"border-b py-2 font-medium text-muted-foreground text-xs",
+						"border-b py-2 text-xs font-medium text-muted-foreground",
 					)}
 				>
 					<span />
@@ -82,10 +82,10 @@ export function SpendFlows({
 									aria-hidden="true"
 								/>
 								<span className="flex min-w-0 flex-col gap-0.5">
-									<span className="truncate font-medium font-mono">
+									<span className="truncate font-mono font-medium">
 										{flow.flow}
 									</span>
-									<span className="truncate text-muted-foreground text-xs">
+									<span className="truncate text-xs text-muted-foreground">
 										{[
 											project ?? "Removed project",
 											flow.usual
@@ -136,7 +136,7 @@ export function SpendFlows({
 						<span className="font-semibold">
 							Total in the last {days.nights} days
 						</span>
-						<span className="text-muted-foreground text-xs tabular-nums">
+						<span className="text-xs text-muted-foreground tabular-nums">
 							{days.runs} {days.runs === 1 ? "run" : "runs"}
 						</span>
 					</span>
@@ -186,7 +186,7 @@ function PlainRow({
 			<span />
 			<span className="col-span-2 flex min-w-0 flex-col gap-0.5">
 				<span>{title}</span>
-				<span className="truncate text-muted-foreground text-xs">{sub}</span>
+				<span className="truncate text-xs text-muted-foreground">{sub}</span>
 			</span>
 			<span className="text-right font-medium tabular-nums">{spent}</span>
 			<span className="text-right text-muted-foreground">—</span>
@@ -212,7 +212,7 @@ function FlowDetail({
 		<div className="flex flex-col gap-5 bg-muted/50 px-3 pt-1 pb-4 pl-11">
 			{flow.steps.length > 0 ? (
 				<div className="flex flex-col">
-					<div className="grid grid-cols-[minmax(0,1fr)_12rem_minmax(0,1fr)] gap-4 py-2 font-medium text-muted-foreground text-xs">
+					<div className="grid grid-cols-[minmax(0,1fr)_12rem_minmax(0,1fr)] gap-4 py-2 text-xs font-medium text-muted-foreground">
 						<span>Step</span>
 						<span>Cost per run</span>
 						<span>What stands out</span>
@@ -235,14 +235,14 @@ function FlowDetail({
 									{formatCost(step.perRun)}
 								</span>
 							</span>
-							<span className="text-muted-foreground text-xs">
+							<span className="text-xs text-muted-foreground">
 								{stepNote(step) ?? "—"}
 							</span>
 						</div>
 					))}
 				</div>
 			) : (
-				<p className="pt-2 text-muted-foreground text-sm">
+				<p className="pt-2 text-sm text-muted-foreground">
 					{flow.usual
 						? "The runs did not say what each step cost."
 						: "No run finished with a known cost in these days."}

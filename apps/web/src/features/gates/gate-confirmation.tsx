@@ -89,7 +89,7 @@ export function GateConfirmation({
 				onClick={() => answer(choice.name)}
 				className={cn(
 					!beside &&
-						"h-auto min-h-9 w-full flex-col items-start gap-0.5 whitespace-normal py-1.5 text-left",
+						"h-auto min-h-9 w-full flex-col items-start gap-0.5 py-1.5 text-left whitespace-normal",
 				)}
 			>
 				<span className="flex items-center gap-1.5 font-mono">
@@ -101,7 +101,7 @@ export function GateConfirmation({
 					{outcomeLabel(choice.name)}
 				</span>
 				{!beside && choice.description ? (
-					<span className="font-normal text-muted-foreground text-xs leading-snug">
+					<span className="text-xs leading-snug font-normal text-muted-foreground">
 						{choice.description}
 					</span>
 				) : null}
@@ -123,7 +123,7 @@ export function GateConfirmation({
 			<ItemContent className="min-w-0">
 				<ItemTitle
 					id={`${id}-question`}
-					className="line-clamp-none w-auto whitespace-pre-wrap break-words"
+					className="line-clamp-none w-auto break-words whitespace-pre-wrap"
 				>
 					<span>
 						<InlineMarkdown text={headline} />

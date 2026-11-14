@@ -43,7 +43,7 @@ export function PhoneHowToDialog({
 						<li>Install the Night Shift app on your phone.</li>
 						<li>
 							Sign in with your account at this address:
-							<code className="mt-1 block break-all rounded bg-muted px-2 py-1 text-xs">
+							<code className="mt-1 block rounded bg-muted px-2 py-1 text-xs break-all">
 								{address}
 							</code>
 						</li>

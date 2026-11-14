@@ -66,7 +66,7 @@ export function Summary({
 }) {
 	if (!text) return null;
 	return (
-		<Text className="text-muted-foreground text-sm" accessibilityHint={hint}>
+		<Text className="text-sm text-muted-foreground" accessibilityHint={hint}>
 			{text}
 		</Text>
 	);

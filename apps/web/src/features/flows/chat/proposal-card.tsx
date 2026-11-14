@@ -85,7 +85,7 @@ export function ProposalCard({
 						<Badge variant="secondary">Discarded</Badge>
 					) : null}
 				</ItemTitle>
-				<Markdown text={summary} className="text-muted-foreground text-sm" />
+				<Markdown text={summary} className="text-sm text-muted-foreground" />
 				{/* The counts compare with the draft as it is now: only while the choice is open. */}
 				{open ? (
 					<div className="flex flex-wrap gap-1.5">

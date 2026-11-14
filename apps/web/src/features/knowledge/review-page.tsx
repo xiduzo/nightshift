@@ -216,7 +216,7 @@ function ReviewQueue() {
 					aria-label="Review progress"
 					className="h-1.5 flex-1"
 				/>
-				<span className="whitespace-nowrap text-muted-foreground text-sm tabular-nums">
+				<span className="text-sm whitespace-nowrap text-muted-foreground tabular-nums">
 					{queue.length} left
 				</span>
 			</div>
@@ -231,7 +231,7 @@ function ReviewQueue() {
 			/>
 			{queue.length > 1 ? (
 				<div className="flex flex-col gap-1">
-					<h3 className="font-medium text-muted-foreground text-sm">Next</h3>
+					<h3 className="text-sm font-medium text-muted-foreground">Next</h3>
 					<ItemGroup className="gap-1">
 						{queue.slice(1, NEXT_SHOWN + 1).map((task) => (
 							<Item
@@ -274,7 +274,7 @@ function CloseNotes({
 			{notes.map(({ key, label, note, taskId }) => (
 				<Item key={key} size="xs" variant="muted" role="listitem">
 					<ItemContent>
-						<ItemTitle className="text-muted-foreground text-xs">
+						<ItemTitle className="text-xs text-muted-foreground">
 							{label}
 						</ItemTitle>
 						<ItemDescription className="line-clamp-none text-foreground">
@@ -404,7 +404,7 @@ function TaskCard({
 								</Button>
 							</>
 						) : (
-							<p className="text-muted-foreground text-sm">{ASK_A_MEMBER}</p>
+							<p className="text-sm text-muted-foreground">{ASK_A_MEMBER}</p>
 						)}
 						{onMap}
 						{later}

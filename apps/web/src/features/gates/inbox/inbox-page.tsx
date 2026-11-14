@@ -259,7 +259,7 @@ export function InboxPage({
 				) : (
 					<div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pt-6 md:px-8">
 						<div className="flex flex-col gap-2">
-							<div className="flex items-center justify-between gap-2 text-muted-foreground text-xs">
+							<div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
 								<span className="tabular-nums">
 									{index + 1} of {queue.length}
 									{nowCount > 0 ? ` · ${nowCount} need you now` : ""}
@@ -285,7 +285,7 @@ export function InboxPage({
 														aria-current={i === index ? "step" : undefined}
 														onClick={() => focus(g)}
 														className={cn(
-															"h-1.5 flex-1 rounded-full outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring/50",
+															"h-1.5 flex-1 rounded-full transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
 															SEGMENT[g.urgency],
 															i === index
 																? "opacity-100 ring-2 ring-ring/50"

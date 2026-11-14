@@ -28,7 +28,7 @@ export function EndCard({ item }: { item: EndItem }) {
 			}
 		>
 			{item.message ? (
-				<p className="whitespace-pre-wrap break-words leading-relaxed">
+				<p className="leading-relaxed break-words whitespace-pre-wrap">
 					{item.message}
 				</p>
 			) : null}

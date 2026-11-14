@@ -88,7 +88,7 @@ export function FlowRows({
 				<div
 					className={cn(
 						GRID,
-						"border-b py-2 font-medium text-muted-foreground text-xs",
+						"border-b py-2 text-xs font-medium text-muted-foreground",
 					)}
 				>
 					<span />
@@ -120,7 +120,7 @@ export function FlowRows({
 										params={{ projectId: project.id, name: row.name }}
 										// Inside a row that opens, the name opens only its flow.
 										onClick={(event) => event.stopPropagation()}
-										className="min-w-0 truncate font-medium font-mono outline-none hover:underline focus-visible:underline"
+										className="min-w-0 truncate font-mono font-medium outline-none hover:underline focus-visible:underline"
 									>
 										{row.name}
 									</Link>
@@ -139,7 +139,7 @@ export function FlowRows({
 							<span className="flex flex-col gap-1">
 								<LastRuns row={row} now={now} />
 								{row.rate !== null ? (
-									<span className="text-muted-foreground text-xs tabular-nums">
+									<span className="text-xs text-muted-foreground tabular-nums">
 										{row.rate}% finished
 									</span>
 								) : null}
@@ -213,13 +213,13 @@ function LevelLine({
 	if (!watch) return null;
 	if (!watch.level) {
 		return (
-			<span className="text-muted-foreground text-xs">
+			<span className="text-xs text-muted-foreground">
 				Too few runs for a level
 			</span>
 		);
 	}
 	return (
-		<span className="flex items-center gap-2 text-muted-foreground text-xs">
+		<span className="flex items-center gap-2 text-xs text-muted-foreground">
 			<LevelBadge level={watch.level.level} />
 			<LocalTime at={watch.level.since}>
 				since {formatRelative(watch.level.since, now)}
@@ -231,7 +231,7 @@ function LevelLine({
 /** A number against the days before: an arrow and the number then. Fewer is better. */
 export function Against({ now, before }: { now: number; before: number }) {
 	if (now === before) {
-		return <span className="text-muted-foreground text-xs">as before</span>;
+		return <span className="text-xs text-muted-foreground">as before</span>;
 	}
 	const Icon = now > before ? ArrowUpIcon : ArrowDownIcon;
 	return (
@@ -262,7 +262,7 @@ function NeededCell({ watch }: { watch: FlowWatch | undefined }) {
 			>
 				<WeekBars weeks={attention.perWeek} />
 				<span className="flex items-baseline gap-2">
-					<span className="font-semibold text-lg tabular-nums leading-none">
+					<span className="text-lg leading-none font-semibold tabular-nums">
 						{attention.unplanned}
 					</span>
 					<Against

@@ -24,7 +24,7 @@ export function ProfileUsedIn({ usedBy }: { usedBy: ProfileRow["usedBy"] }) {
 			description="Your changes apply from the next run of each flow."
 		>
 			{usedBy.length === 0 ? (
-				<p className="text-muted-foreground text-sm">No flow uses it yet.</p>
+				<p className="text-sm text-muted-foreground">No flow uses it yet.</p>
 			) : (
 				<ItemGroup className="gap-1">
 					{usedBy.map((use) => (
@@ -78,7 +78,7 @@ export function ProfileOffers({
 		>
 			{offered.length === 0 ? (
 				<div className="flex flex-wrap items-center gap-3">
-					<p className="text-muted-foreground text-sm">Only you can run it.</p>
+					<p className="text-sm text-muted-foreground">Only you can run it.</p>
 					<Button variant="outline" size="sm" onClick={onOffer}>
 						<ShareIcon data-icon="inline-start" />
 						Offer to a Space…

@@ -80,7 +80,7 @@ class BlockRenderer extends Renderer {
 				key={this.getKey()}
 				value={cn(this.textClass, "text-muted-foreground")}
 			>
-				<View className="gap-2 border-border border-l-2 pl-3">{children}</View>
+				<View className="gap-2 border-l-2 border-border pl-3">{children}</View>
 			</TextClassContext.Provider>
 		);
 	}
@@ -226,12 +226,12 @@ class BlockRenderer extends Renderer {
 		const row = (cells: ReactNode[][], head: boolean, index: number) => (
 			<View
 				key={index}
-				className={cn("flex-row", index > 0 && "border-border border-t")}
+				className={cn("flex-row", index > 0 && "border-t border-border")}
 			>
 				{cells.map((cell, column) => (
 					<View
 						key={column}
-						className={cn("w-40 p-2", column > 0 && "border-border border-l")}
+						className={cn("w-40 p-2", column > 0 && "border-l border-border")}
 					>
 						<Text selectable className={cn(head && "font-semibold")}>
 							{cell}

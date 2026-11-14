@@ -112,7 +112,7 @@ export function KnowledgeSearch({
 										<Badge variant="secondary">By meaning</Badge>
 									) : null}
 								</ItemTitle>
-								<p className="break-all text-muted-foreground text-xs">
+								<p className="text-xs break-all text-muted-foreground">
 									<span className="font-mono">{hit.path}</span>
 									{hit.section ? ` · ${hit.section}` : ""}
 									{hit.page ? ` · page ${hit.page}` : ""}
@@ -173,7 +173,7 @@ function MeaningLine({ projectId }: { projectId: string }) {
 	const done =
 		status.total > 0 ? Math.floor((status.done / status.total) * 100) : 0;
 	return (
-		<p className="text-muted-foreground text-sm">
+		<p className="text-sm text-muted-foreground">
 			{status.state === "on" ? (
 				"Search finds files by their words and by their meaning."
 			) : status.state === "preparing" ? (

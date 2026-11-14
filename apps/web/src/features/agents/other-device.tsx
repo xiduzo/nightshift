@@ -139,7 +139,7 @@ export function OtherDevicesSecrets({ devices }: { devices: OtherDevice[] }) {
 			{devices.map((device) => (
 				<Card key={device.id} className="py-0">
 					<CardContent className="flex flex-col gap-3 p-4">
-						<h3 className="font-medium text-sm">{device.name}</h3>
+						<h3 className="text-sm font-medium">{device.name}</h3>
 						<SecretNames device={device} now={now} />
 					</CardContent>
 				</Card>

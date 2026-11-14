@@ -401,7 +401,7 @@ export function CustomAgentDetail({
 						{data ? (
 							<LocalTime
 								at={data.checkedAt}
-								className="ml-auto text-muted-foreground text-xs"
+								className="ml-auto text-xs text-muted-foreground"
 							>
 								Checked {formatTime(data.checkedAt)}
 							</LocalTime>
@@ -414,7 +414,7 @@ export function CustomAgentDetail({
 				title="Models"
 				description={`Model default: the model set in ${agent.label}.`}
 			>
-				<p className="text-muted-foreground text-sm">
+				<p className="text-sm text-muted-foreground">
 					To use another model, type its name on a profile or an Agent node, for
 					example ollama/qwen3-coder:latest. {agent.label} must offer it.
 				</p>
@@ -425,7 +425,7 @@ export function CustomAgentDetail({
 				description="You cannot remove a custom agent that has profiles."
 			>
 				{harness.profiles.length === 0 ? (
-					<p className="text-muted-foreground text-sm">None yet.</p>
+					<p className="text-sm text-muted-foreground">None yet.</p>
 				) : (
 					<div className="flex flex-wrap gap-1.5">
 						{harness.profiles.map((name) => (

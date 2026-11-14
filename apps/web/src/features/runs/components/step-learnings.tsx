@@ -36,7 +36,7 @@ export function StepLearnings({ notes }: { notes: string[] }) {
 						</TraceLine>
 					</TraceCollapsibleTrigger>
 					<TraceCollapsibleContent>
-						<ul className="flex list-disc flex-col gap-1.5 pl-4 text-foreground text-sm marker:text-muted-foreground">
+						<ul className="flex list-disc flex-col gap-1.5 pl-4 text-sm text-foreground marker:text-muted-foreground">
 							{notes.map((note, index) => (
 								<li key={index} className="break-words">
 									{note}

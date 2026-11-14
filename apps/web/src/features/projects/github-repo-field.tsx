@@ -129,7 +129,7 @@ export function GitHubRepoField({
 											) : null}
 										</span>
 										{descriptions.get(name) ? (
-											<span className="truncate text-muted-foreground text-xs">
+											<span className="truncate text-xs text-muted-foreground">
 												{descriptions.get(name)}
 											</span>
 										) : null}

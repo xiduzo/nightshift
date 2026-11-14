@@ -121,24 +121,24 @@ export function ListRow({
 			) : null}
 			<View className="flex-1 gap-0.5">
 				{overline ? (
-					<Text className="text-muted-foreground text-xs" numberOfLines={1}>
+					<Text className="text-xs text-muted-foreground" numberOfLines={1}>
 						{overline}
 					</Text>
 				) : null}
-				<Text className="font-medium text-base" numberOfLines={titleLines}>
+				<Text className="text-base font-medium" numberOfLines={titleLines}>
 					{title}
 				</Text>
 				{status ? <StatusText look={status} /> : null}
 				<CaptionLine caption={caption} />
 				<CaptionLine caption={detail} />
 				{value && stacked ? (
-					<Text className="text-muted-foreground text-sm tabular-nums">
+					<Text className="text-sm text-muted-foreground tabular-nums">
 						{value}
 					</Text>
 				) : null}
 			</View>
 			{value && !stacked ? (
-				<Text className="text-muted-foreground text-sm tabular-nums">
+				<Text className="text-sm text-muted-foreground tabular-nums">
 					{value}
 				</Text>
 			) : null}
@@ -188,7 +188,7 @@ function CaptionLine({ caption }: { caption: Caption | undefined }) {
 	const parts = captionParts(caption);
 	if (parts.length === 0) return null;
 	return (
-		<Text className="text-muted-foreground text-sm" numberOfLines={1}>
+		<Text className="text-sm text-muted-foreground" numberOfLines={1}>
 			{parts.map((part, index) => (
 				<Fragment key={index}>
 					{index > 0 ? " · " : null}
@@ -197,7 +197,7 @@ function CaptionLine({ caption }: { caption: Caption | undefined }) {
 					) : (
 						<Text
 							className={cn(
-								"text-muted-foreground text-sm",
+								"text-sm text-muted-foreground",
 								part.mono && "font-mono",
 								part.tone && cn("font-medium", TONE_CLASS[part.tone].text),
 							)}

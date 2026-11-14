@@ -48,7 +48,7 @@ export function WaysToSave({
 			description={`What each change could have saved in the last ${days.nights} days. The biggest first.`}
 		>
 			{shown.length === 0 ? (
-				<p className="rounded-md border border-dashed px-4 py-10 text-center text-muted-foreground text-sm">
+				<p className="rounded-md border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
 					No way to save in the last {days.nights} days. Each run finished, did
 					work, and cost near a usual run.
 				</p>
@@ -57,7 +57,7 @@ export function WaysToSave({
 					<Item className="bg-status-finished/10 text-status-finished">
 						<ItemContent className="gap-2">
 							<span className="flex items-baseline gap-2">
-								<span className="font-semibold text-xl tabular-nums tracking-tight">
+								<span className="text-xl font-semibold tracking-tight tabular-nums">
 									{formatCost(days.saves)}
 								</span>
 								<span className="text-sm tabular-nums">
@@ -87,7 +87,7 @@ export function WaysToSave({
 						))}
 					</ItemGroup>
 					{rest.length > 0 ? (
-						<p className="px-1 text-muted-foreground text-sm">
+						<p className="px-1 text-sm text-muted-foreground">
 							{rest.length} smaller{" "}
 							{rest.length === 1 ? "way saves" : "ways save"}{" "}
 							{formatCost(rest.reduce((sum, saving) => sum + saving.saves, 0))}{" "}
@@ -133,13 +133,13 @@ function SavingItem({
 				</ItemDescription>
 			</ItemContent>
 			<ItemContent className="items-end gap-0 self-start">
-				<span className="font-semibold text-base tabular-nums">
+				<span className="text-base font-semibold tabular-nums">
 					{formatCost(saving.saves)}
 				</span>
-				<span className="text-muted-foreground text-xs">in {range} days</span>
+				<span className="text-xs text-muted-foreground">in {range} days</span>
 			</ItemContent>
 			<ItemFooter className="flex-wrap pl-9">
-				<span className="flex items-center gap-1.5 text-muted-foreground text-xs">
+				<span className="flex items-center gap-1.5 text-xs text-muted-foreground">
 					<CircleCheckIcon className="size-3" aria-hidden="true" />
 					Seen in {saving.runs} {saving.runs === 1 ? "run" : "runs"}
 				</span>

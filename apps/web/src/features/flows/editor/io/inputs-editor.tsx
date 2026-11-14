@@ -385,7 +385,7 @@ function InputRow({
 					/>
 					<FieldLabel
 						htmlFor={`${id}-required`}
-						className="gap-1 font-normal text-xs"
+						className="gap-1 text-xs font-normal"
 					>
 						Required
 						{input.default ? (

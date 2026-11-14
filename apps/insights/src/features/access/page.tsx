@@ -176,7 +176,7 @@ function CodeForm({
 			<FieldGroup>
 				<Field data-invalid={error ? true : undefined}>
 					<FieldLabel htmlFor={`${id}-code`}>Code</FieldLabel>
-					<p className="text-muted-foreground text-sm">
+					<p className="text-sm text-muted-foreground">
 						Enter the code from your authenticator app.
 					</p>
 					<Input

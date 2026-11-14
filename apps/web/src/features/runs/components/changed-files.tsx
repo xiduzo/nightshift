@@ -111,7 +111,7 @@ export function ChangedFiles({
 				))}
 			</div>
 			{notes.map((note) => (
-				<p key={note} className="text-muted-foreground text-xs">
+				<p key={note} className="text-xs text-muted-foreground">
 					{note}
 				</p>
 			))}
@@ -192,7 +192,7 @@ function TreeNode({
 			<span
 				className={
 					status === "deleted"
-						? "truncate font-mono text-muted-foreground text-xs line-through"
+						? "truncate font-mono text-xs text-muted-foreground line-through"
 						: "truncate font-mono text-xs"
 				}
 			>
@@ -251,24 +251,24 @@ function FileChanges({
 		<>
 			<SheetHeader>
 				<SheetTitle className="truncate pr-8 font-mono">{name}</SheetTitle>
-				<SheetDescription className="break-all font-mono text-xs">
+				<SheetDescription className="font-mono text-xs break-all">
 					{STATUS_LABEL[file.status]} · {file.path}
 					{file.lines && !file.binary ? ` · ${linesText(file.lines)}` : ""}
 				</SheetDescription>
 				{file.oldPath ? (
-					<p className="break-all font-mono text-muted-foreground text-xs">
+					<p className="font-mono text-xs break-all text-muted-foreground">
 						Renamed from {file.oldPath}
 					</p>
 				) : null}
 				{marksCommands && file.byCommand ? (
-					<p className="text-muted-foreground text-xs">
+					<p className="text-xs text-muted-foreground">
 						A command changed this file.
 					</p>
 				) : null}
 			</SheetHeader>
 			<div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4">
 				{file.changes.length === 0 ? (
-					<p className="text-muted-foreground text-sm">{noChangeText(file)}</p>
+					<p className="text-sm text-muted-foreground">{noChangeText(file)}</p>
 				) : file.diff !== undefined ? (
 					<Tabs defaultValue="all" className="gap-3">
 						<TabsList>
@@ -320,7 +320,7 @@ function EachChange({
 				/>
 			))}
 			{cut ? (
-				<p className="text-muted-foreground text-sm">
+				<p className="text-sm text-muted-foreground">
 					The change is longer than this. The rest does not show here.
 				</p>
 			) : null}
@@ -390,13 +390,13 @@ function ChangeView({
 		}
 		case "delete":
 			return (
-				<p className="text-muted-foreground text-sm">
+				<p className="text-sm text-muted-foreground">
 					The agent deleted this file.
 				</p>
 			);
 		case "unknown":
 			return (
-				<p className="text-muted-foreground text-sm">
+				<p className="text-sm text-muted-foreground">
 					The changes to this file do not show here. The transcript shows what
 					the agent did.
 				</p>

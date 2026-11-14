@@ -124,9 +124,9 @@ export function GateAnswer({
 								aria-describedby={
 									choice.description ? `${id}-${choice.name}` : undefined
 								}
-								className="h-auto min-h-11 flex-col items-start justify-center gap-0.5 whitespace-normal px-3 py-2 text-left"
+								className="h-auto min-h-11 flex-col items-start justify-center gap-0.5 px-3 py-2 text-left whitespace-normal"
 							>
-								<span className="flex items-center gap-1.5 font-medium font-mono text-sm">
+								<span className="flex items-center gap-1.5 font-mono text-sm font-medium">
 									{sending ? (
 										<Spinner className="size-3.5" aria-hidden="true" />
 									) : (
@@ -140,7 +140,7 @@ export function GateAnswer({
 								{choice.description ? (
 									<span
 										id={`${id}-${choice.name}`}
-										className="font-normal text-muted-foreground text-xs leading-snug"
+										className="text-xs leading-snug font-normal text-muted-foreground"
 									>
 										{choice.description}
 									</span>

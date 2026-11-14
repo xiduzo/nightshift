@@ -124,7 +124,7 @@ export function AskForm({
 				<AnswerFilesField files={files} disabled={busy} />
 			</FieldGroup>
 			{deadline ? (
-				<p className="flex items-start gap-1.5 text-muted-foreground text-xs leading-snug">
+				<p className="flex items-start gap-1.5 text-xs leading-snug text-muted-foreground">
 					<AlarmClockIcon
 						className="mt-px size-3.5 shrink-0"
 						aria-hidden="true"
@@ -317,7 +317,7 @@ function OptionCard({
 				<FieldContent className="min-w-0">
 					<FieldTitle>{option.label}</FieldTitle>
 					{option.description ? (
-						<FieldDescription className="whitespace-pre-wrap text-xs">
+						<FieldDescription className="text-xs whitespace-pre-wrap">
 							{option.description}
 						</FieldDescription>
 					) : null}

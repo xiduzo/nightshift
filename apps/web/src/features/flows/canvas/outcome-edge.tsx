@@ -429,7 +429,7 @@ const OutcomeEdge = memo(function OutcomeEdge({
 							stacked && "h-auto flex-col items-start gap-0.5 rounded-md py-1",
 							!merged && outcomeStyle(only.outcome, only.color).text,
 							selected && "ring-2 ring-ring",
-							hasError && "border-destructive border-dashed",
+							hasError && "border-dashed border-destructive",
 							(segments.every(untaken) || segments.every(removed)) &&
 								"opacity-60",
 							segments.every(removed) && "border-dashed",

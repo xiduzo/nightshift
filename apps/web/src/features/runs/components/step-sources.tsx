@@ -75,7 +75,7 @@ export function SourceList({
 				return (
 					<li key={source.path} className="flex flex-col gap-0.5">
 						<span className="flex flex-wrap items-center gap-2">
-							<span className="break-all font-mono text-foreground text-xs">
+							<span className="font-mono text-xs break-all text-foreground">
 								{source.path}
 							</span>
 							<Badge variant={source.read ? "secondary" : "outline"}>
@@ -83,7 +83,7 @@ export function SourceList({
 							</Badge>
 						</span>
 						{spot ? (
-							<span className="text-muted-foreground text-xs">{spot}</span>
+							<span className="text-xs text-muted-foreground">{spot}</span>
 						) : null}
 						{note?.(source)}
 					</li>

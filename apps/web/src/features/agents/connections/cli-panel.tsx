@@ -206,7 +206,7 @@ export function CliPanel({
 				{data ? (
 					<LocalTime
 						at={data.checkedAt}
-						className="ml-auto text-muted-foreground text-xs"
+						className="ml-auto text-xs text-muted-foreground"
 					>
 						Checked {formatTime(data.checkedAt)}
 					</LocalTime>

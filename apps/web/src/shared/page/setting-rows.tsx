@@ -55,7 +55,7 @@ export function SettingRow({
 }) {
 	return (
 		<TableRow>
-			<TableCell className="whitespace-normal px-3 py-2.5 align-top">
+			<TableCell className="px-3 py-2.5 align-top whitespace-normal">
 				{htmlFor ? (
 					<Label htmlFor={htmlFor} className="leading-5">
 						{label}
@@ -64,18 +64,18 @@ export function SettingRow({
 					<span className="font-medium">{label}</span>
 				)}
 				{description ? (
-					<div className="mt-0.5 text-muted-foreground text-xs">
+					<div className="mt-0.5 text-xs text-muted-foreground">
 						{description}
 					</div>
 				) : null}
 				{error ? (
-					<div role="alert" className="mt-0.5 text-destructive text-xs">
+					<div role="alert" className="mt-0.5 text-xs text-destructive">
 						{error}
 					</div>
 				) : null}
 			</TableCell>
-			<TableCell className="whitespace-normal px-3 py-2.5">
-				<div className="flex min-w-0 max-w-80 items-center gap-2">
+			<TableCell className="px-3 py-2.5 whitespace-normal">
+				<div className="flex max-w-80 min-w-0 items-center gap-2">
 					{children}
 				</div>
 			</TableCell>
@@ -87,7 +87,7 @@ export function SettingRow({
 export function SettingNote({ children }: { children: ReactNode }) {
 	return (
 		<TableRow className="hover:bg-transparent">
-			<TableCell colSpan={2} className="whitespace-normal px-3 py-2.5">
+			<TableCell colSpan={2} className="px-3 py-2.5 whitespace-normal">
 				{children}
 			</TableCell>
 		</TableRow>

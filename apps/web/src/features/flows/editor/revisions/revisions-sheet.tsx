@@ -364,7 +364,7 @@ function RestoreDialog({
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				{labels.length > 0 ? (
-					<div className="flex flex-wrap items-center gap-1.5 text-muted-foreground text-xs">
+					<div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
 						What changes in the saved flow:
 						{labels.map((label) => (
 							<Badge key={label} variant="outline">

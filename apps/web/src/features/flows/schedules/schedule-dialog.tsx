@@ -526,7 +526,7 @@ function ScheduleForm({
 													setWhen({ ...when, time: event.target.value })
 												}
 											/>
-											<span className="text-muted-foreground text-sm">on</span>
+											<span className="text-sm text-muted-foreground">on</span>
 											<div className="ml-auto flex gap-1">
 												<Button
 													type="button"
@@ -735,7 +735,7 @@ function ScheduleForm({
 
 			<DialogFooter className="items-center">
 				{problem ? (
-					<p className="text-muted-foreground text-xs sm:mr-auto">{problem}</p>
+					<p className="text-xs text-muted-foreground sm:mr-auto">{problem}</p>
 				) : null}
 				<DialogClose render={<Button variant="outline" type="button" />}>
 					Cancel

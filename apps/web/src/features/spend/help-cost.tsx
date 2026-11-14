@@ -24,7 +24,7 @@ export function HelpCost({ days }: { days: SpendDays }) {
 			description="What Night Shift's agents cost when they build, explain and suggest. This is not part of a run's cost."
 		>
 			{help.answers === 0 ? (
-				<p className="rounded-md border border-dashed px-4 py-10 text-center text-muted-foreground text-sm">
+				<p className="rounded-md border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
 					No help in the last {days.nights} days. Ask an agent to build a flow,
 					explain a run or fill a field, and its cost shows here.
 				</p>
@@ -39,7 +39,7 @@ export function HelpCost({ days }: { days: SpendDays }) {
 								{answers(help.answers)}
 							</span>
 						</CardDescription>
-						<CardTitle className="font-semibold text-2xl tabular-nums tracking-tight">
+						<CardTitle className="text-2xl font-semibold tracking-tight tabular-nums">
 							{formatCost(help.total)}
 						</CardTitle>
 					</CardHeader>
@@ -50,7 +50,7 @@ export function HelpCost({ days }: { days: SpendDays }) {
 									<span className="min-w-0 flex-1 truncate">
 										{builtinAgent(agent.agent).name}
 									</span>
-									<span className="text-muted-foreground text-xs tabular-nums">
+									<span className="text-xs text-muted-foreground tabular-nums">
 										{answers(agent.answers)}
 									</span>
 									<span className="shrink-0 text-right font-medium tabular-nums">
@@ -60,7 +60,7 @@ export function HelpCost({ days }: { days: SpendDays }) {
 							))}
 						</ul>
 						{help.unknown > 0 ? (
-							<p className="text-muted-foreground text-xs">
+							<p className="text-xs text-muted-foreground">
 								{help.unknown === 1
 									? "1 answer did not report its cost."
 									: `${help.unknown} answers did not report their cost.`}{" "}

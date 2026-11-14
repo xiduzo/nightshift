@@ -30,7 +30,7 @@ export function FloatingInspector({
 			className={cn("flex max-h-full min-h-0 flex-col", className)}
 		>
 			<Card className="pointer-events-auto flex max-h-full min-h-0 flex-col gap-0 py-0 shadow-lg">
-				<div className="flex h-9 shrink-0 items-center gap-2 border-b pr-1.5 pl-3 text-muted-foreground text-xs">
+				<div className="flex h-9 shrink-0 items-center gap-2 border-b pr-1.5 pl-3 text-xs text-muted-foreground">
 					<span className="min-w-0 flex-1 truncate">{label}</span>
 					<Button
 						variant="ghost"

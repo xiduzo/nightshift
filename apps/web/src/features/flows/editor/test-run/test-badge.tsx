@@ -59,7 +59,7 @@ export function TestBadge({
 							>
 								<SkipForwardIcon aria-hidden="true" />
 								<span className="truncate font-mono">{nodeId}</span>
-								<span className="ml-auto shrink-0 text-muted-foreground text-xs">
+								<span className="ml-auto shrink-0 text-xs text-muted-foreground">
 									takes {outcomeLabel(outcome)}
 								</span>
 							</DropdownMenuItem>

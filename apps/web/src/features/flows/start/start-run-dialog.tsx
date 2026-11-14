@@ -784,7 +784,7 @@ function FlowUseText({ use }: { use: FlowUse | undefined }) {
 	const runs = use.runs === 1 ? "1 run" : `${use.runs} runs`;
 	return (
 		<span
-			className="ml-auto shrink-0 text-muted-foreground text-xs tabular-nums"
+			className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums"
 			title={
 				use.manual > 0
 					? `${runs} in the last 30 days, ${use.manual} started by hand`

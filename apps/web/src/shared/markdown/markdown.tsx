@@ -36,7 +36,7 @@ export type LinkView = (link: {
 
 /** Every heading in the text sits below the title of the block that shows it. */
 function Heading({ children }: { children?: React.ReactNode }) {
-	return <h3 className="pt-1 font-semibold text-sm">{children}</h3>;
+	return <h3 className="pt-1 text-sm font-semibold">{children}</h3>;
 }
 
 const COMPONENTS: Components = {
@@ -120,7 +120,7 @@ export function Markdown({
 	return (
 		<div
 			className={cn(
-				"flex min-w-0 max-w-prose flex-col gap-2 break-words text-sm",
+				"flex max-w-prose min-w-0 flex-col gap-2 text-sm break-words",
 				className,
 			)}
 		>

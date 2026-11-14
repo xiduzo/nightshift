@@ -446,7 +446,7 @@ function AsField({
 				/>
 			)}
 			{picked?.type === "text" ? (
-				<p className="flex items-start gap-1.5 text-status-waiting text-xs">
+				<p className="flex items-start gap-1.5 text-xs text-status-waiting">
 					<TriangleAlertIcon
 						className="mt-px size-3.5 shrink-0"
 						aria-hidden="true"
@@ -508,7 +508,7 @@ function HaltOnField({
 				}
 			/>
 			{suggestions.length > 0 ? (
-				<div className="flex flex-wrap items-center gap-1 text-muted-foreground text-xs">
+				<div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
 					<span className="mr-0.5">
 						From <span className="font-mono">{node.flow}</span>:
 					</span>
@@ -517,7 +517,7 @@ function HaltOnField({
 							key={name}
 							variant="outline"
 							size="xs"
-							className="h-6 border-dashed px-1.5 font-mono font-normal text-[11px]"
+							className="h-6 border-dashed px-1.5 font-mono text-[11px] font-normal"
 							title={`Halt on ${name}`}
 							aria-label={`+ ${name}`}
 							onClick={() => onChange([...each.haltOn, name])}

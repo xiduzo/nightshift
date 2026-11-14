@@ -49,7 +49,7 @@ export function UsedBy({ users }: { users: readonly string[] }) {
 				<Tooltip>
 					<TooltipTrigger
 						render={
-							<span className="cursor-default whitespace-nowrap font-sans text-foreground underline decoration-dotted underline-offset-4" />
+							<span className="cursor-default font-sans whitespace-nowrap text-foreground underline decoration-dotted underline-offset-4" />
 						}
 					>
 						+{rest.length} more

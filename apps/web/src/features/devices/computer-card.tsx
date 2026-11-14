@@ -71,7 +71,7 @@ export function ComputerCard({
 			</CardHeader>
 			<CardContent className="flex flex-col gap-1.5">
 				{runs.length === 0 ? (
-					<p className="text-muted-foreground text-sm">
+					<p className="text-sm text-muted-foreground">
 						{computerLine(computer, now)}
 					</p>
 				) : (
@@ -86,12 +86,12 @@ export function ComputerCard({
 					))
 				)}
 				{runs.length > SHOWN_RUNS ? (
-					<p className="text-muted-foreground text-xs">
+					<p className="text-xs text-muted-foreground">
 						and {runs.length - SHOWN_RUNS} more
 					</p>
 				) : null}
 			</CardContent>
-			<CardFooter className="gap-3 text-muted-foreground text-xs">
+			<CardFooter className="gap-3 text-xs text-muted-foreground">
 				<span>
 					{computer.clones.length}{" "}
 					{computer.clones.length === 1 ? "project" : "projects"}

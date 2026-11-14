@@ -257,7 +257,7 @@ export function CommandFields({
 											</span>
 											<span className="flex min-w-0 flex-col">
 												<span className="font-mono">{entry.name}</span>
-												<span className="text-muted-foreground text-xs">
+												<span className="text-xs text-muted-foreground">
 													{entry.description}
 												</span>
 											</span>
@@ -291,7 +291,7 @@ export function CommandFields({
 									<span className="w-8 shrink-0 font-mono">data</span>
 									<span className="flex min-w-0 flex-col">
 										<span>Picked by the command</span>
-										<span className="text-muted-foreground text-xs">
+										<span className="text-xs text-muted-foreground">
 											It writes {'{"outcome": "picked"}'} to "$NS_OUTPUT".
 										</span>
 									</span>

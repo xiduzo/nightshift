@@ -49,7 +49,7 @@ export function GateWhere({
 	return (
 		<nav
 			aria-label="Where"
-			className="flex min-w-0 items-center gap-1 text-muted-foreground text-xs"
+			className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"
 		>
 			<Badge variant="outline" className="shrink-0">
 				{gate.spaceName}
@@ -84,16 +84,16 @@ export function GateFrom({
 }) {
 	const { flow, detail } = gateRun(gate);
 	return (
-		<p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-muted-foreground text-xs">
+		<p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
 			<Link
 				to="/runs/$runId"
 				params={{ runId: gate.runId }}
-				className={`min-w-0 truncate font-medium font-mono text-foreground ${LINK}`}
+				className={`min-w-0 truncate font-mono font-medium text-foreground ${LINK}`}
 				title={gate.runTitle}
 			>
 				{flow}
 				{detail ? (
-					<span className="font-normal font-sans text-muted-foreground">
+					<span className="font-sans font-normal text-muted-foreground">
 						{" "}
 						{detail}
 					</span>

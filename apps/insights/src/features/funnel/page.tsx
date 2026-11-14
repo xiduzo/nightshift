@@ -48,7 +48,7 @@ export function FunnelPage() {
 							/>
 						</Stats>
 						<Section title="Steps">
-							<p className="text-muted-foreground text-sm">
+							<p className="text-sm text-muted-foreground">
 								The time is the median between steps.
 							</p>
 							{data.steps.length === 0 ? (
@@ -73,7 +73,7 @@ export function FunnelPage() {
 							)}
 						</Section>
 						<Section title="Where installs stop">
-							<p className="text-muted-foreground text-sm">
+							<p className="text-sm text-muted-foreground">
 								Stopped means the next step never happens.
 							</p>
 							<p>

@@ -67,7 +67,7 @@ export function ResumeComposer({
 		>
 			<label
 				htmlFor={`${id}-prompt`}
-				className="text-muted-foreground text-xs leading-relaxed"
+				className="text-xs leading-relaxed text-muted-foreground"
 			>
 				<span className="font-medium text-foreground">
 					Follow-up prompt (optional).
@@ -111,7 +111,7 @@ export function ResumeComposer({
 				</InputGroupAddon>
 			</InputGroup>
 			{resumeRun.error ? (
-				<p role="alert" className="text-destructive text-xs">
+				<p role="alert" className="text-xs text-destructive">
 					{resumeRun.error.message}
 				</p>
 			) : null}

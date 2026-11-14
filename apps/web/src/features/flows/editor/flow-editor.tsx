@@ -850,8 +850,8 @@ function Editor({
 									</>
 								)}
 								{dragging ? (
-									<div className="absolute inset-3 flex items-end justify-center rounded-xl border-2 border-primary/40 border-dashed pb-20">
-										<span className="rounded-full bg-background px-3 py-1 text-muted-foreground text-xs shadow-sm">
+									<div className="absolute inset-3 flex items-end justify-center rounded-xl border-2 border-dashed border-primary/40 pb-20">
+										<span className="rounded-full bg-background px-3 py-1 text-xs text-muted-foreground shadow-sm">
 											Drop to add the {paletteMeta(dragging).label} node here
 										</span>
 									</div>

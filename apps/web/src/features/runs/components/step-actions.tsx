@@ -218,7 +218,7 @@ export function StepRowMenu({
 						<RotateCcwIcon />
 						<span className="flex flex-col">
 							Run again from here
-							<span className="text-muted-foreground text-xs">
+							<span className="text-xs text-muted-foreground">
 								{nested
 									? "Run the step that calls this flow again instead."
 									: "Runs this step again, then the steps after it."}

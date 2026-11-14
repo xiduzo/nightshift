@@ -20,11 +20,11 @@ export function PageHeading({
 	return (
 		<div className="flex items-end gap-4">
 			<div className="flex min-w-0 flex-1 flex-col gap-1">
-				<h1 id={id} className="truncate font-semibold text-2xl tracking-tight">
+				<h1 id={id} className="truncate text-2xl font-semibold tracking-tight">
 					{title}
 				</h1>
 				{description ? (
-					<p className="text-muted-foreground text-sm">{description}</p>
+					<p className="text-sm text-muted-foreground">{description}</p>
 				) : null}
 			</div>
 			{actions ? (
@@ -60,11 +60,11 @@ export function PageSection({
 		>
 			<div className="flex items-end gap-4">
 				<div className="flex min-w-0 flex-1 flex-col gap-1">
-					<h2 id={id} className="font-semibold text-lg tracking-tight">
+					<h2 id={id} className="text-lg font-semibold tracking-tight">
 						{title}
 					</h2>
 					{description ? (
-						<p className="text-muted-foreground text-sm">{description}</p>
+						<p className="text-sm text-muted-foreground">{description}</p>
 					) : null}
 				</div>
 				{actions ? (

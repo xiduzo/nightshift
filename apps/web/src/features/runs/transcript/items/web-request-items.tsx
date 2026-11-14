@@ -26,11 +26,11 @@ export function WebRequestCard({ item }: { item: WebRequestItem }) {
 		<ResultCard
 			icon={item.status === null ? GlobeLockIcon : GlobeIcon}
 			kicker={item.method}
-			value={<code className="break-all font-mono">{item.url}</code>}
+			value={<code className="font-mono break-all">{item.url}</code>}
 			tone={toneOf(item.status)}
 		>
 			{answered ? (
-				<p className="break-words leading-relaxed">
+				<p className="leading-relaxed break-words">
 					{item.status === null
 						? item.text
 						: `${item.status} ${item.text}`.trim()}

@@ -105,7 +105,7 @@ function SignalCard({ signal }: { signal: FlowSignal }) {
 	});
 	return (
 		<section className="flex flex-col gap-3">
-			<h3 className="flex items-center gap-2 font-medium text-lg">
+			<h3 className="flex items-center gap-2 text-lg font-medium">
 				<SignalIcon signal={signal} />
 				{signalTitle(signal)}
 			</h3>
@@ -130,7 +130,7 @@ function SignalCard({ signal }: { signal: FlowSignal }) {
 				{signal.kind === "nothing" ? (
 					<>
 						<Separator />
-						<p className="text-muted-foreground text-sm">
+						<p className="text-sm text-muted-foreground">
 							Every run finished. Check that the flow still gets what it reads.
 						</p>
 					</>
@@ -147,7 +147,7 @@ function AskWhy({ runId }: { runId: string }) {
 	if (agent.missing) return null;
 	return (
 		<div className="flex flex-col gap-3 rounded-xl border bg-muted/40 p-4">
-			<p className="text-muted-foreground text-sm">
+			<p className="text-sm text-muted-foreground">
 				An agent reads the run and tells you what went wrong. It changes
 				nothing.
 			</p>

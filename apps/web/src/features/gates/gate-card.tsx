@@ -34,7 +34,7 @@ export function GateCard({ gate, now }: { gate: OpenGate; now: number }) {
 			className="gap-0 py-0 ring-status-waiting/35 [--card-spacing:--spacing(4)] sm:[--card-spacing:--spacing(6)]"
 		>
 			<CardHeader className="gap-2 border-b border-b-status-waiting/20 bg-status-waiting/5 py-3 [.border-b]:pb-3">
-				<div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 text-muted-foreground text-xs">
+				<div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-muted-foreground">
 					<nav aria-label="Where" className="flex min-w-0 items-center gap-1">
 						<Link
 							to="/projects/$projectId"

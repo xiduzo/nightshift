@@ -299,7 +299,7 @@ export function ModelProfileDetail({
 											)}
 										</FieldTitle>
 										{d.apiKeySource === "missing" ? (
-											<FieldDescription className="text-status-waiting text-xs">
+											<FieldDescription className="text-xs text-status-waiting">
 												Needs the secret {d.apiKey}
 											</FieldDescription>
 										) : null}

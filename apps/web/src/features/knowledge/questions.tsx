@@ -130,12 +130,12 @@ function AskedQuestions({
 							<TableBody>
 								{asked.map((question) => (
 									<TableRow key={question.query}>
-										<TableCell className="max-w-0 whitespace-normal py-3 pl-6 align-top">
+										<TableCell className="max-w-0 py-3 pl-6 align-top whitespace-normal">
 											<div className="flex flex-col gap-1">
 												<span className="break-words">{question.query}</span>
 												<LocalTime
 													at={question.lastAt}
-													className="text-muted-foreground text-xs"
+													className="text-xs text-muted-foreground"
 												>
 													{question.times === 1
 														? `Asked ${formatRelative(question.lastAt)}`
@@ -143,7 +143,7 @@ function AskedQuestions({
 												</LocalTime>
 											</div>
 										</TableCell>
-										<TableCell className="max-w-0 whitespace-normal py-3 align-top">
+										<TableCell className="max-w-0 py-3 align-top whitespace-normal">
 											<FoundFiles hits={question.hits} />
 										</TableCell>
 										<TableCell className="w-72 py-3 pr-6 align-top">
@@ -177,21 +177,21 @@ function choicesFor(hits: readonly Hit[], files: readonly string[]): string[] {
 /** The first files a search found, and which it found only by meaning. */
 function FoundFiles({ hits }: { hits: readonly Hit[] }) {
 	if (hits.length === 0) {
-		return <span className="text-muted-foreground text-sm">Nothing</span>;
+		return <span className="text-sm text-muted-foreground">Nothing</span>;
 	}
 	const more = hits.length - SHOWN_HITS;
 	return (
 		<ul className="flex flex-col gap-1">
 			{hits.slice(0, SHOWN_HITS).map((hit) => (
 				<li key={hit.path} className="flex flex-wrap items-center gap-2">
-					<span className="break-all font-mono text-xs">{hit.path}</span>
+					<span className="font-mono text-xs break-all">{hit.path}</span>
 					{hit.found.length === 1 && hit.found[0] === "meaning" ? (
 						<Badge variant="outline">By meaning</Badge>
 					) : null}
 				</li>
 			))}
 			{more > 0 ? (
-				<li className="text-muted-foreground text-xs">{more} more</li>
+				<li className="text-xs text-muted-foreground">{more} more</li>
 			) : null}
 		</ul>
 	);
@@ -228,7 +228,7 @@ function Answer({
 			<div className="flex items-start gap-2">
 				<div className="flex min-w-0 flex-1 flex-col gap-1">
 					{answers.map((path) => (
-						<span key={path} className="break-all font-mono text-xs">
+						<span key={path} className="font-mono text-xs break-all">
 							{path}
 						</span>
 					))}
@@ -249,7 +249,7 @@ function Answer({
 		);
 	}
 	if (!mayChange) {
-		return <span className="text-muted-foreground text-sm">Not marked</span>;
+		return <span className="text-sm text-muted-foreground">Not marked</span>;
 	}
 	const needle = typed.trim().toLowerCase();
 	const shown = needle
@@ -280,7 +280,7 @@ function Answer({
 				<ComboboxList>
 					{(path: string) => (
 						<ComboboxItem key={path} value={path}>
-							<span className="break-all font-mono text-xs">{path}</span>
+							<span className="font-mono text-xs break-all">{path}</span>
 						</ComboboxItem>
 					)}
 				</ComboboxList>

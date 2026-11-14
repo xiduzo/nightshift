@@ -71,7 +71,7 @@ export function LaddersPage() {
 							/>
 						</Section>
 						<Section title="Choices">
-							<p className="text-muted-foreground text-sm">
+							<p className="text-sm text-muted-foreground">
 								Not sure enough is a share of every Decision that a rule did not
 								make.
 							</p>
