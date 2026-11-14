@@ -209,7 +209,7 @@
         "@nightshift/flows": "workspace:*",
         "@nightshift/refusal": "workspace:*",
         "@nightshift/time": "workspace:*",
-        "@pydantic/genai-prices": "0.1.13",
+        "@pydantic/genai-prices": "0.2.3",
         "@tanstack/ai": "0.69.0",
         "@tanstack/ai-acp": "0.3.25",
         "@tanstack/ai-claude-code": "0.9.0",
@@ -1237,7 +1237,7 @@
 
     "@oxc-project/types": ["@oxc-project/types@0.156.0", "", {}, "sha512-1Duyg48TdJNdyhEB8Xn1L36bT9Pv6GUtlKjHxOys8xkaF/rQq3XJE+bAurSK/AgIz5mGFsb77cn9Pb20+WCScw=="],
 
-    "@pydantic/genai-prices": ["@pydantic/genai-prices@0.1.13", "", { "bin": { "genai-prices": "dist/cli.js" } }, "sha512-kKzGgPFJmKK/muihOFYDtuS8PXYliRFFYWDfzwDFy7bOgyZUnEnDXpBZpo4eT2aM8bz3bXvO50F8AhFSKvMxlw=="],
+    "@pydantic/genai-prices": ["@pydantic/genai-prices@0.2.3", "", { "bin": { "genai-prices": "dist/cli.js" } }, "sha512-xnoMsceJA+V/RHvlYqrkpo+A3r7pARvZmtMYZfctGX8S6kYFXcBY3XvgtDGWQiUJ7g/QSVAaTYangPcxy1OZ+A=="],
 
     "@quansync/fs": ["@quansync/fs@1.1.0", "", { "dependencies": { "quansync": "^1.0.0" } }, "sha512-qAPG/t3HqML1TlN7sY/pTbEjzFVAKsMjNNMGheyDosro+kT4iw2KCUoHcVdmliwWjorm4elZbgNQyU2eD97eDg=="],
 

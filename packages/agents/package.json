@@ -20,7 +20,7 @@
 		"@nightshift/flows": "workspace:*",
 		"@nightshift/refusal": "workspace:*",
 		"@nightshift/time": "workspace:*",
-		"@pydantic/genai-prices": "0.1.13",
+		"@pydantic/genai-prices": "0.2.3",
 		"@tanstack/ai": "0.69.0",
 		"@tanstack/ai-acp": "0.3.25",
 		"@tanstack/ai-claude-code": "0.9.0",
