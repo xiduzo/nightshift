@@ -110,7 +110,7 @@
         "react-native": "catalog:",
         "react-native-gesture-handler": "~3.3.0",
         "react-native-keyboard-controller": "1.22.7",
-        "react-native-marked": "8.3.2",
+        "react-native-marked": "8.3.4",
         "react-native-reanimated": "catalog:",
         "react-native-safe-area-context": "catalog:",
         "react-native-screens": "~4.30.0",
@@ -621,7 +621,7 @@
     "drizzle-orm": "1.0.0-rc.5",
     "libsql": "0.5.29",
     "lucide-react": "^1.73.0",
-    "lucide-react-native": "^1.61.0",
+    "lucide-react-native": "^1.73.0",
     "next-themes": "^0.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -633,7 +633,7 @@
     "sonner": "^2.0.8",
     "tailwindcss": "^4.3.5",
     "typescript": "^6.0.3",
-    "uniwind": "^1.13.0",
+    "uniwind": "^1.13.2",
     "varlock": "1.25.0",
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.33",
@@ -2536,7 +2536,7 @@
 
     "lucide-react": ["lucide-react@1.73.0", "", { "peerDependencies": { "@types/react": "*", "react": "^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0" }, "optionalPeers": ["@types/react"] }, "sha512-fVOzGviL9mTfHenG1PbCfIceavyGlnpYNSYr+aGZHLRymAJ7DTP6KHuqt0uBkCKAoenr1UVkwSbDIYt2xIesEQ=="],
 
-    "lucide-react-native": ["lucide-react-native@1.61.0", "", { "peerDependencies": { "@types/react": "*", "react": "^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react-native": "*", "react-native-svg": "^12.0.0 || ^13.0.0 || ^14.0.0 || ^15.0.0" }, "optionalPeers": ["@types/react"] }, "sha512-y4BwRjROTIOGBOIVztPbgopuozw3uJ2Q8vTdSmcvNH7L+y1FBzSj0OcJrqwr1CF8oNUuEUYdD9jm5IDXaaf9JA=="],
+    "lucide-react-native": ["lucide-react-native@1.73.0", "", { "peerDependencies": { "@types/react": "*", "react": "^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react-native": "*", "react-native-svg": "^12.0.0 || ^13.0.0 || ^14.0.0 || ^15.0.0" }, "optionalPeers": ["@types/react"] }, "sha512-Ve10c2nMfU27OAbZ00Y2oSW98c7mbR/R+I84C8Jz6Ne88Hk8/577jO9faQjaLdWoVY2QYtEp0EyMftx8QD1t+Q=="],
 
     "lz-string": ["lz-string@1.5.0", "", { "bin": { "lz-string": "bin/bin.js" } }, "sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ=="],
 
@@ -2548,7 +2548,7 @@
 
     "markdown-table": ["markdown-table@3.1.0", "", {}, "sha512-xpeSCdM+B+6P3ncfgaB7FoDbtJ30xAe6Z18TGT7AgXJsHqCElCICZovQqdRMm7kHgpTyYv36EupqewoFFSB8vw=="],
 
-    "marked": ["marked@18.0.14", "", { "bin": { "marked": "bin/marked.js" } }, "sha512-mBHK6FBHuBAlhgRe88w9F0O1AbwwXJUcQibUbC/QcdTbVGAD7aWza+xt3N6oT/jCZx3/OMeS+8rnuiHZcQ9s7A=="],
+    "marked": ["marked@18.1.3", "", { "bin": { "marked": "bin/marked.js" } }, "sha512-9ChMH8EVVgjgID49nsL6IWxWk5c6GtAsq/xw7U1ggkjkU5AGuv68oLTVlFRtvcUYZtpbNyjyvGo3YDu0fGapiw=="],
 
     "mdast-util-find-and-replace": ["mdast-util-find-and-replace@3.0.3", "", { "dependencies": { "@types/mdast": "^4.0.0", "escape-string-regexp": "^5.0.0", "unist-util-is": "^6.0.0", "unist-util-visit-parents": "^6.0.0" } }, "sha512-xPgpDNl0/OXHsI7TlaIs22lWnH3KlpvZdXG1ET/m/YT2Hhdkx8lJV4kLphE6l9simyM4KPDFBwas08BgEob6Jw=="],
 
@@ -2884,7 +2884,7 @@
 
     "react-native-keyboard-controller": ["react-native-keyboard-controller@1.22.7", "", { "dependencies": { "react-native-is-edge-to-edge": "^1.2.1" }, "peerDependencies": { "react": "*", "react-native": "*", "react-native-reanimated": ">=3.0.0" } }, "sha512-IBR9z6Nl/iDLRfiv1zN9QQroOXAwYMugeAjVDb+CFbRBNC8fayXlHTBbshVcWc4j95Itsv+1/FgwfxKnIn1Vmg=="],
 
-    "react-native-marked": ["react-native-marked@8.3.2", "", { "dependencies": { "@jsamr/counter-style": "2.0.2", "@jsamr/react-native-li": "2.3.1", "github-slugger": "2.0.0", "html-entities": "2.6.0", "marked": "18.0.14", "react-native-reanimated-table": "0.0.2", "svg-parser": "2.1.0" }, "peerDependencies": { "react": ">=16.8.6", "react-native": ">=0.76.0", "react-native-svg": ">=12.3.0" } }, "sha512-6Rk1nopU7YsAJH4kVc4liCbUi3JctjIGV6y8pE45Id5D4KpzobBT93fSQifi8qY9fxlKebugq/BkdZsDjRkQ8g=="],
+    "react-native-marked": ["react-native-marked@8.3.4", "", { "dependencies": { "@jsamr/counter-style": "2.0.2", "@jsamr/react-native-li": "2.3.1", "github-slugger": "2.0.0", "html-entities": "2.6.0", "marked": "18.1.3", "react-native-reanimated-table": "0.0.2", "svg-parser": "2.1.0" }, "peerDependencies": { "react": ">=16.8.6", "react-native": ">=0.76.0", "react-native-svg": ">=12.3.0" } }, "sha512-KqHQvHd+3l9rpMLO4t0XwwemLnD+k+dqoaQPJsnRc5bNK81ioiJfIg4DajVsUaSMAJ0lxbkU10czwlNnrq0sjA=="],
 
     "react-native-reanimated": ["react-native-reanimated@4.7.1", "", { "dependencies": { "react-native-is-edge-to-edge": "^1.3.1", "semver": "^7.7.3" }, "peerDependencies": { "react": "*", "react-native": "0.86 - 0.88", "react-native-worklets": "0.13.x" } }, "sha512-HviDFSZ6V4KTRsrLS6hRbBJ4j63l/L8a5az0EoWdJwaMLYnBNyYISTDxwXpEYkMbAbLzCMCviIdiOxXHYQWcNA=="],
 
@@ -3204,7 +3204,7 @@
 
     "universalify": ["universalify@2.0.1", "", {}, "sha512-gptHNQghINnc/vTGIk0SOFGFNXw7JVrlRUtConJRlvaw6DuX0wO5Jeko9sWrMBhh+PsYAZ7oXAiOnf/UKogyiw=="],
 
-    "uniwind": ["uniwind@1.13.0", "", { "dependencies": { "@tailwindcss/node": "4.3.3", "@tailwindcss/oxide": "4.3.3", "culori": "4.0.2", "lightningcss": "1.30.1" }, "peerDependencies": { "@expo/metro-config": "*", "metro": "*", "metro-cache": "*", "metro-transform-worker": "*", "react": ">=19.0.0", "react-native": ">=0.81.0", "tailwindcss": ">=4" }, "optionalPeers": ["@expo/metro-config", "metro-transform-worker"], "bin": { "uniwind": "dist/cli/index.mjs" } }, "sha512-kr9mFYQIUmYlyV6Pm663EsE9UVJSRZM1XYOwQ8BVUpRIhfKw6dOoqqZCFzCj9PqVIcVXY16J702C8rFmUjNR6Q=="],
+    "uniwind": ["uniwind@1.13.2", "", { "dependencies": { "@tailwindcss/node": "4.3.3", "@tailwindcss/oxide": "4.3.3", "culori": "4.0.2", "lightningcss": "1.30.1" }, "peerDependencies": { "@expo/metro-config": "*", "metro": "*", "metro-cache": "*", "metro-transform-worker": "*", "react": ">=19.0.0", "react-native": ">=0.81.0", "tailwindcss": ">=4" }, "optionalPeers": ["@expo/metro-config", "metro-transform-worker"], "bin": { "uniwind": "dist/cli/index.mjs" } }, "sha512-9huLBRBtZkVbKG8UZoJEo6ubX/R7oVj8zTORdq8c+lfOpjWlEjAS04FaqShuaecgEfO+oqSraxQ+mWgtsu6BqQ=="],
 
     "unpdf": ["unpdf@2.2.0", "", { "peerDependencies": { "@napi-rs/canvas": "^0.1.69 || ^1.0.0", "pdfjs-dist": "*" }, "optionalPeers": ["@napi-rs/canvas", "pdfjs-dist"] }, "sha512-E33ir6FPxrLuRlhLJ3KbPwcOnHozd6ITe/uhr22+Oiis6e7YQ9N/9K7hfMe1aZ9yoO6eypgI1Cc7UuYP6BkyWw=="],
 
