@@ -20,7 +20,7 @@
 		"@orpc/server": "catalog:",
 		"@orpc/tanstack-query": "catalog:",
 		"@tanstack/react-query": "catalog:",
-		"@tanstack/react-router": "^1.170.32",
+		"@tanstack/react-router": "^1.170.46",
 		"@tailwindcss/vite": "^4.3.5",
 		"better-auth": "catalog:",
 		"drizzle-orm": "catalog:",
@@ -34,7 +34,7 @@
 		"zod": "catalog:"
 	},
 	"devDependencies": {
-		"@tanstack/router-plugin": "^1.168.48",
+		"@tanstack/router-plugin": "^1.169.0",
 		"@types/bun": "catalog:",
 		"@types/react": "catalog:",
 		"@types/react-dom": "catalog:",
