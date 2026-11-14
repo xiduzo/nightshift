@@ -52,7 +52,7 @@
         "hono": "^4.13.18",
         "lucide-react": "catalog:",
         "next-themes": "catalog:",
-        "postgres": "3.4.7",
+        "postgres": "4.1.1",
         "react": "catalog:",
         "react-dom": "catalog:",
         "tailwindcss": "catalog:",
@@ -439,7 +439,7 @@
         "@nightshift/semconv": "workspace:*",
         "@nightshift/time": "workspace:*",
         "drizzle-orm": "catalog:",
-        "postgres": "3.4.7",
+        "postgres": "4.1.1",
       },
       "devDependencies": {
         "@electric-sql/pglite": "0.5.16",
@@ -2873,7 +2873,7 @@
 
     "postcss-selector-parser": ["postcss-selector-parser@7.1.6", "", { "dependencies": { "cssesc": "^3.0.0", "util-deprecate": "^1.0.2" } }, "sha512-7qASPzhKF2l2KLboRZux8CCTRMdGiV08vWmyKzPz22qZ7ZjQBOeY7rNzNoCLSUiftJ7HUq0GERHmxw/t0dCdMw=="],
 
-    "postgres": ["postgres@3.4.7", "", {}, "sha512-Jtc2612XINuBjIl/QTWsV5UvE8UHuNblcO3vVADSrKsrc6RqGX6lOW1cEo3CM2v0XG4Nat8nI+YM7/f26VxXLw=="],
+    "postgres": ["postgres@4.1.1", "", {}, "sha512-1kJDojqNZC+iTHHXh6eif0J98LUtyLAePe/qkW1GK35eh2JixlsAiIKq3FGI+xqI+SUGTNodzf7TScVeIIyUug=="],
 
     "powershell-utils": ["powershell-utils@0.2.1", "", {}, "sha512-C+y9x90UElAddDZmV4qOx9W53B61PO7cIqWz2dQsWlwswuq4mr8NEwytdGKboYbQlGZ3awrkTeNvcZiZNHnQ8A=="],
 
