@@ -142,7 +142,7 @@ export function handle(state: FocusState, item: NeedsItem): FocusState {
 
 /**
  * You let the thing go another way (you left a run): the first of the
- * queue shows. The thing comes back if it returns to the queue (Undo).
+ * queue shows. The thing comes back if it returns to the queue.
  */
 export function release(state: FocusState): FocusState {
 	return { ...state, pinned: null };

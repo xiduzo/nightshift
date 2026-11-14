@@ -9,10 +9,10 @@ import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import {
 	CircleCheck,
+	EyeOff,
 	Inbox,
 	Info,
 	SkipForward,
-	Undo2,
 } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
@@ -25,12 +25,11 @@ import {
 	type GateSent,
 } from "@/features/inbox";
 import { PushCard } from "@/features/push";
-import { leaveRun, unleaveRun } from "@/features/runs";
+import { leaveRun } from "@/features/runs";
 import { EmptyState } from "@/shared/empty";
 import { ErrorSection } from "@/shared/feedback";
 import { type HeaderItem, TabRootHeader } from "@/shared/header";
 import {
-	NativeButtonRow,
 	NativeCustomRow,
 	type NativeIcon,
 	NativeList,
@@ -54,7 +53,7 @@ import { useNeedsYou } from "./use-needs";
 import { needsBar } from "./use-needs-accessory";
 import { useRetryRuns } from "./use-retry";
 
-/** How long a notice stays: what went, or Undo after you leave a run. */
+/** How long a notice stays: what went, or what left the queue. */
 const NOTICE_MS = 10_000;
 
 /** What just happened, at the top: what you sent, or what left the queue. */
@@ -62,8 +61,6 @@ type Notice = {
 	kind: "sent" | "info" | "left";
 	title: string;
 	description: string;
-	/** Puts a run you left back. */
-	undo?: () => void;
 };
 
 /** Why the thing you read left the queue without you. */
@@ -81,7 +78,7 @@ const VANISHED: Record<NeedsItem["kind"], Omit<Notice, "kind">> = {
 const NOTICE_ICON: Record<Notice["kind"], NativeIcon> = {
 	sent: { sf: "checkmark.circle.fill", lucide: CircleCheck },
 	info: { sf: "info.circle", lucide: Info },
-	left: { sf: "arrow.uturn.backward.circle", lucide: Undo2 },
+	left: { sf: "eye.slash", lucide: EyeOff },
 };
 
 const ONLINE_FIX =
@@ -161,15 +158,12 @@ export function NeedsScreen() {
 			kind: "left",
 			title: `You left ${run.title}`,
 			description: "It stays in Runs.",
-			undo: () => unleaveRun(run.id),
 		});
 	}, []);
 
 	const lead = (
 		<>
-			{notice ? (
-				<NoticeSection notice={notice} onDone={() => setNotice(null)} />
-			) : null}
+			{notice ? <NoticeSection notice={notice} /> : null}
 			{needs.gatesError ? (
 				<ErrorSection
 					title="Your Gates did not load"
@@ -312,16 +306,9 @@ export function NeedsScreen() {
 	);
 }
 
-/** What just happened: what went, what left the queue, or Undo of a run you left. */
-function NoticeSection({
-	notice,
-	onDone,
-}: {
-	notice: Notice;
-	onDone: () => void;
-}) {
+/** What just happened: what went, or what left the queue. */
+function NoticeSection({ notice }: { notice: Notice }) {
 	const { colors } = useThemeColors();
-	const { undo } = notice;
 	return (
 		<NativeSection>
 			<NativeTextRow
@@ -330,16 +317,6 @@ function NoticeSection({
 				text={`**${notice.title}**`}
 				note={notice.description}
 			/>
-			{undo ? (
-				<NativeButtonRow
-					label="Undo"
-					icon={{ sf: "arrow.uturn.backward", lucide: Undo2 }}
-					onPress={() => {
-						undo();
-						onDone();
-					}}
-				/>
-			) : null}
 		</NativeSection>
 	);
 }

@@ -130,14 +130,14 @@ describe("handle", () => {
 });
 
 describe("release", () => {
-	test("a run you left goes without a notice, and comes back on Undo", () => {
+	test("a run you left goes without a notice, and comes back if it returns", () => {
 		const items = [run("x"), run("y")];
 		let { state } = settle(FOCUS_START, items);
 		state = release(state);
 		const left = settle(state, [run("y")]);
 		expect(left.view.current?.key).toBe("run:y");
 		expect(left.view.vanished).toBeNull();
-		// Undo: the run is back in its place, the one on screen stays.
+		// Back in the queue: the run is in its place, the one on screen stays.
 		expect(focusView(left.state, items).current?.key).toBe("run:y");
 	});
 });

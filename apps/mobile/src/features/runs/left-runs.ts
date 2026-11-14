@@ -34,11 +34,6 @@ export function leaveRun(runId: string): void {
 	write([runId, ...left].slice(0, KEEP));
 }
 
-/** Puts a run you left back on Needs you: the Undo of "Leave it". */
-export function unleaveRun(runId: string): void {
-	write(left.filter((id) => id !== runId));
-}
-
 function subscribe(listener: () => void): () => void {
 	listeners.add(listener);
 	return () => listeners.delete(listener);
