@@ -24,7 +24,7 @@
 		"@tailwindcss/vite": "^4.3.5",
 		"better-auth": "catalog:",
 		"drizzle-orm": "catalog:",
-		"hono": "^4.13.7",
+		"hono": "^4.13.18",
 		"lucide-react": "catalog:",
 		"next-themes": "catalog:",
 		"postgres": "3.4.7",
