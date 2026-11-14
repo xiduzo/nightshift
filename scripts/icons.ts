@@ -106,12 +106,33 @@ function write(path: string, data: string | Buffer) {
 	console.log(path);
 }
 
-function png(source: string, size: number, path: string) {
+function png(source: string, size: number, path: string, retina = false) {
 	const image = new Resvg(source, {
 		fitTo: { mode: "width", value: size },
 		font: { loadSystemFonts: false },
 	});
-	write(path, image.render().asPng());
+	const data = image.render().asPng();
+	write(path, retina ? at144Dpi(data) : data);
+}
+
+/**
+ * Marks a PNG as 144 dpi, so macOS shows it at half its pixel size: a
+ * 36-pixel menu bar icon is 18 points. Electrobun's `Tray.setImage` loads
+ * the file without a size, so the size must come from the file.
+ */
+function at144Dpi(png: Buffer): Buffer {
+	const pixelsPerMetre = Math.round(144 / 0.0254);
+	const body = Buffer.alloc(13);
+	body.write("pHYs", 0, "latin1");
+	body.writeUInt32BE(pixelsPerMetre, 4);
+	body.writeUInt32BE(pixelsPerMetre, 8);
+	body.writeUInt8(1, 12); // the unit is the metre
+	const chunk = Buffer.alloc(21);
+	chunk.writeUInt32BE(9, 0);
+	body.copy(chunk, 4);
+	chunk.writeUInt32BE(Bun.hash.crc32(body), 17);
+	// The chunk goes right after the signature (8 bytes) and IHDR (25 bytes).
+	return Buffer.concat([png.subarray(0, 33), chunk, png.subarray(33)]);
 }
 
 const web = "apps/web/public";
@@ -166,7 +187,8 @@ MOON.forEach((code, phase) => {
 			"Night Shift: a Gate waits for you",
 		),
 	);
-	png(svg(place(moon, 64)), 36, `${desktop}/moon/tray-${phase}.png`);
+	// 16 of 18 points: a margin like the other icons in the menu bar.
+	png(svg(place(moon, 57)), 36, `${desktop}/moon/tray-${phase}.png`, true);
 	png(
 		svg(
 			`<rect x="6.25" y="6.25" width="51.5" height="51.5" rx="11.6" fill="${DARK}"/>${place(moon, 36)}`,
