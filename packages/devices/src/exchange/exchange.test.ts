@@ -864,6 +864,8 @@ describe("a run walked elsewhere", () => {
 	test("the Host keeps a command until its Walker reports it done", async () => {
 		const engineA = engineOf(a);
 		const { commands } = engineA.exchange;
+		const changes: { spaceId: string; runId: string }[] = [];
+		const off = commands.onChanged((change) => changes.push(change));
 		const kept = await commands.enqueue({
 			kind: "signal.send",
 			payload: { name: "go" },
@@ -881,6 +883,10 @@ describe("a run walked elsewhere", () => {
 		expect(await commands.pendingFor("device-b")).toHaveLength(1);
 		await commands.done(kept.id, "device-b", null);
 		expect(await commands.pendingFor("device-b")).toEqual([]);
+		// The run's screens hear of the kept command and of its end, not of a refused report.
+		off();
+		const run = { spaceId: a.spaceId, runId: "run-1" };
+		expect(changes).toEqual([run, run]);
 	});
 });
 
