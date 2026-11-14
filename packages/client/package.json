@@ -17,7 +17,7 @@
 		"@nightshift/notifications": "workspace:*",
 		"@nightshift/time": "workspace:*",
 		"@orpc/client": "catalog:",
-		"@orpc/tanstack-query": "^1.15.0",
+		"@orpc/tanstack-query": "^1.16.2",
 		"mdast-util-from-markdown": "^2.1.0",
 		"mdast-util-gfm": "^3.1.0",
 		"micromark-extension-gfm": "^3.0.0"
