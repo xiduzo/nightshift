@@ -11,7 +11,7 @@
 		"test": "bun test"
 	},
 	"dependencies": {
-		"@hocuspocus/provider": "^4.7.1",
+		"@hocuspocus/provider": "^4.8.0",
 		"@nightshift/agents": "workspace:*",
 		"@nightshift/auth": "workspace:*",
 		"@nightshift/db": "workspace:*",

@@ -9,8 +9,8 @@
 		"test": "bun test"
 	},
 	"dependencies": {
-		"@hocuspocus/provider": "^4.7.1",
-		"@hocuspocus/server": "^4.7.1",
+		"@hocuspocus/provider": "^4.8.0",
+		"@hocuspocus/server": "^4.8.0",
 		"@nightshift/agents": "workspace:*",
 		"@nightshift/api": "workspace:*",
 		"@nightshift/auth": "workspace:*",
