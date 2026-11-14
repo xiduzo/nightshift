@@ -12,9 +12,6 @@ export const HOURS = Array.from(
 	(_, hour) => `${String(hour).padStart(2, "0")}:00`,
 );
 
-/** One choice of a Select in Settings: a time or a delay. */
-export type Choice = { value: string; label: string };
-
 /** The phone's time zone, for quiet hours. */
 export function phoneTimeZone(): string {
 	return localZone();

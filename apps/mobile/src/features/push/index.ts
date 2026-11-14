@@ -3,6 +3,7 @@
 export { startPushHandling } from "./background";
 export { InFrontBanner } from "./in-front-banner";
 export { PushCard } from "./push-card";
+export { PushSection } from "./push-section";
 export { removeThisPhone } from "./registration";
 export { phoneNotifications } from "./shown";
 export { useNotificationTaps } from "./use-notification-taps";

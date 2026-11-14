@@ -84,6 +84,18 @@ export function openLinkText(link: Pick<GateLink, "url" | "kind">): string {
 	return "Open in the browser";
 }
 
+/** A line that starts a Markdown block: a list item, a heading, a quote, a fence or a table row. */
+const BLOCK_LINE = /^\s{0,3}([-*+]\s|\d+[.)]\s|#{1,6}\s|>|```|~~~|\|)/m;
+
+/**
+ * Whether a text has only inline Markdown (bold, links, code), so a
+ * native text row shows it. A text with lists, headings, quotes, code
+ * blocks or tables needs the full Markdown view.
+ */
+export function isInlineMarkdown(text: string): boolean {
+	return !BLOCK_LINE.test(text);
+}
+
 /** A deadline this close counts down in minutes: "Answer in 14 min". */
 const SOON_MS = 60 * 60_000;
 

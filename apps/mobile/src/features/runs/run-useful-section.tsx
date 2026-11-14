@@ -11,21 +11,23 @@ import {
 	usefulLabel,
 	usefulView,
 } from "@nightshift/client";
-import { Button } from "@nightshift/ui-native/components/ui/button";
-import { Card, CardContent } from "@nightshift/ui-native/components/ui/card";
-import { Text } from "@nightshift/ui-native/components/ui/text";
 import { useMutation } from "@tanstack/react-query";
+import { ThumbsDown, ThumbsUp } from "lucide-react-native";
 import { useRef, useState } from "react";
-import { View } from "react-native";
 
 import { useHostQueries } from "@/features/host";
+import {
+	NativeButtonRow,
+	NativeSection,
+	NativeTextRow,
+} from "@/shared/native-list";
 
 /**
- * One tap on a finished run: was it useful? After it lands, the card
+ * One tap on a finished run: was it useful? After it lands, the section
  * shows the choice and does not ask again. `status` is the one the screen
  * shows, an action on its way too. A test run does not ask.
  */
-export function RunUseful({
+export function RunUsefulSection({
 	run,
 	status,
 }: {
@@ -68,51 +70,29 @@ export function RunUseful({
 	if (view === "hidden") return null;
 	if (view !== "ask") {
 		return (
-			<Text className="text-muted-foreground text-sm">{usefulLabel(view)}</Text>
+			<NativeSection>
+				<NativeTextRow text={usefulLabel(view)} secondary />
+			</NativeSection>
 		);
 	}
 
 	return (
-		<Card className="py-4">
-			<CardContent className="gap-3 px-4">
-				<Text className="font-medium">{USEFUL_QUESTION}</Text>
-				<View className="flex-row flex-wrap gap-2">
-					<Button
-						variant="outline"
-						disabled={sending !== null}
-						accessibilityState={{
-							disabled: sending !== null,
-							busy: sending === true,
-						}}
-						onPress={() => choose(true)}
-						className="h-auto min-h-11 px-4"
-					>
-						<Text>Yes</Text>
-					</Button>
-					<Button
-						variant="outline"
-						disabled={sending !== null}
-						accessibilityState={{
-							disabled: sending !== null,
-							busy: sending === false,
-						}}
-						onPress={() => choose(false)}
-						className="h-auto min-h-11 px-4"
-					>
-						<Text>No</Text>
-					</Button>
-				</View>
-				<Text
-					accessibilityRole={failed ? "alert" : undefined}
-					className={
-						failed
-							? "text-destructive text-sm"
-							: "text-muted-foreground text-sm"
-					}
-				>
-					{failed ? USEFUL_ERROR : USEFUL_HINT}
-				</Text>
-			</CardContent>
-		</Card>
+		<NativeSection
+			title={USEFUL_QUESTION}
+			footer={failed ? USEFUL_ERROR : USEFUL_HINT}
+		>
+			<NativeButtonRow
+				label={sending === true ? "Yes…" : "Yes"}
+				icon={{ sf: "hand.thumbsup", lucide: ThumbsUp }}
+				disabled={sending !== null}
+				onPress={() => choose(true)}
+			/>
+			<NativeButtonRow
+				label={sending === false ? "No…" : "No"}
+				icon={{ sf: "hand.thumbsdown", lucide: ThumbsDown }}
+				disabled={sending !== null}
+				onPress={() => choose(false)}
+			/>
+		</NativeSection>
 	);
 }

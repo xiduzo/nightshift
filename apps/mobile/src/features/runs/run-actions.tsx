@@ -41,7 +41,7 @@ import {
 	RotateCcw,
 } from "lucide-react-native";
 import { type ReactNode, useEffect, useState } from "react";
-import { View } from "react-native";
+import { Alert, View } from "react-native";
 
 import { useSignedIn } from "@/features/host";
 import { ErrorAlert } from "@/shared/feedback";
@@ -113,26 +113,10 @@ const FAILED: Record<Action, string> = {
 	rerun: "The run did not start again",
 };
 
-/**
- * One action of a run: Stop, Resume (or Retry), Restart step or Run
- * again. Each asks first. `primary`: the run's main action, filled (Stop
- * in the destructive color). Otherwise an outline button. Full width.
- */
-export function RunActionButton({
-	runId,
-	action,
-	act,
-	primary = false,
-	label,
-	resumeAt = null,
-	restartStep,
-	rerunFrom = [],
-	labels,
-}: {
+/** What a run action needs to know to ask and to act. */
+export type RunActionContext = {
 	runId: string;
-	action: RunActionKind;
 	act: RunAct;
-	primary?: boolean;
 	/** The words of a resume: "Retry", "Resume at build". */
 	label?: string;
 	/** The step a resume continues at. */
@@ -142,84 +126,193 @@ export function RunActionButton({
 	/** Where the run can run again from (`rerunStarts`). */
 	rerunFrom?: RerunStart<StepSummary>[];
 	labels: ReadonlyMap<string, string>;
-}) {
-	const { stop, resume, restart, rerun, acting, only } = act;
-	const busy = acting?.action === action;
+};
+
+/** What one action asks before it acts, and what it does. */
+type Ask = {
+	button: string;
+	icon: LucideIcon;
+	title: string;
+	description: string;
+	confirm: string;
+	destructive?: boolean;
+	run: () => void;
+};
+
+/** Stop, Resume and Restart step: the question, its words and the act. Run again asks where from first. */
+function askOf(
+	action: Exclude<RunActionKind, "rerun">,
+	{ runId, act, label, resumeAt = null, restartStep, labels }: RunActionContext,
+): Ask | null {
+	const { stop, resume, restart, only } = act;
 	switch (action) {
 		case "resume": {
 			const retry = label === "Retry";
-			return (
-				<Confirm
-					button={label ?? "Resume run"}
-					icon={retry ? RotateCcw : Play}
-					busy={busy}
-					primary={primary}
-					title={retry ? "Retry this run?" : "Resume this run?"}
-					description={
-						retry
-							? "The run continues at the step that failed."
-							: `The run continues at ${resumeAt ?? "its last step"}.`
-					}
-					confirm={retry ? "Retry" : "Resume run"}
-					onConfirm={() => {
-						only("resume");
-						resume.mutate({ runId });
-					}}
-				/>
-			);
+			return {
+				button: label ?? "Resume run",
+				icon: retry ? RotateCcw : Play,
+				title: retry ? "Retry this run?" : "Resume this run?",
+				description: retry
+					? "The run continues at the step that failed."
+					: `The run continues at ${resumeAt ?? "its last step"}.`,
+				confirm: retry ? "Retry" : "Resume run",
+				run: () => {
+					only("resume");
+					resume.mutate({ runId });
+				},
+			};
 		}
-		case "rerun":
-			return rerunFrom.length > 0 ? (
-				<RerunConfirm
-					starts={rerunFrom}
-					labels={labels}
-					busy={busy}
-					primary={primary}
-					onConfirm={(step) => {
-						only("rerun");
-						rerun.mutate({ runId, nodeId: step.nodeId, stepId: step.id });
-					}}
-				/>
-			) : null;
 		case "restart":
-			return restartStep ? (
-				<Confirm
-					button="Restart step"
-					icon={RotateCcw}
-					busy={busy}
-					primary={primary}
-					title={`Restart ${stepName(restartStep, labels)}?`}
-					description="The step stops and starts again at once. An agent continues its conversation."
-					confirm="Restart step"
-					onConfirm={() => {
-						only("restart");
-						restart.mutate({ runId, stepId: restartStep.id });
-					}}
-				/>
-			) : null;
+			return restartStep
+				? {
+						button: "Restart step",
+						icon: RotateCcw,
+						title: `Restart ${stepName(restartStep, labels)}?`,
+						description:
+							"The step stops and starts again at once. An agent continues its conversation.",
+						confirm: "Restart step",
+						run: () => {
+							only("restart");
+							restart.mutate({ runId, stepId: restartStep.id });
+						},
+					}
+				: null;
 		case "stop":
-			return (
-				<Confirm
-					button="Stop"
-					icon={CircleStop}
-					busy={busy}
-					primary={primary}
-					title="Stop this run?"
-					description="The running step stops now, and no new step starts. You can resume the run later."
-					confirm="Stop run"
-					destructive
-					onConfirm={() => {
-						only("stop");
-						stop.mutate({ runId, when: "now" });
-					}}
-				/>
-			);
+			return {
+				button: "Stop",
+				icon: CircleStop,
+				title: "Stop this run?",
+				description:
+					"The running step stops now, and no new step starts. You can resume the run later.",
+				confirm: "Stop run",
+				destructive: true,
+				run: () => {
+					only("stop");
+					stop.mutate({ runId, when: "now" });
+				},
+			};
 	}
+}
+
+const RERUN_TITLE = "Run this again?";
+const RERUN_DESCRIPTION =
+	"The step you choose runs again. The steps after it follow as the flow says.";
+
+/** "From the start: Gather", "From the last step: Review". */
+function rerunChoice(
+	start: RerunStart<StepSummary>,
+	labels: ReadonlyMap<string, string>,
+): string {
+	return `${start.from === "start" ? "From the start" : "From the last step"}: ${stepName(start.step, labels)}`;
+}
+
+/**
+ * Asks in the system alert before a run action acts: for a header button
+ * or a menu item, which hold no dialog of their own. Run again offers
+ * where it runs from as the buttons of the alert.
+ */
+export function confirmRunAction(
+	action: RunActionKind,
+	context: RunActionContext,
+): void {
+	if (action !== "rerun") {
+		const ask = askOf(action, context);
+		if (!ask) return;
+		Alert.alert(ask.title, ask.description, [
+			{ text: "Cancel", style: "cancel" },
+			{
+				text: ask.confirm,
+				style: ask.destructive ? "destructive" : "default",
+				onPress: ask.run,
+			},
+		]);
+		return;
+	}
+	const { runId, act, rerunFrom = [], labels } = context;
+	if (rerunFrom.length === 0) return;
+	const run = (start: RerunStart<StepSummary>) => {
+		act.only("rerun");
+		act.rerun.mutate({
+			runId,
+			nodeId: start.step.nodeId,
+			stepId: start.step.id,
+		});
+	};
+	Alert.alert(
+		RERUN_TITLE,
+		[
+			RERUN_DESCRIPTION,
+			...rerunFrom.map((start) => rerunChoice(start, labels)),
+		].join("\n\n"),
+		[
+			{ text: "Cancel", style: "cancel" },
+			...rerunFrom.map((start) => ({
+				text:
+					rerunFrom.length === 1
+						? "Run again"
+						: start.from === "start"
+							? "From the start"
+							: "From the last step",
+				onPress: () => run(start),
+			})),
+		],
+	);
+}
+
+/**
+ * One action of a run: Stop, Resume (or Retry), Restart step or Run
+ * again. Each asks first. `primary`: the run's main action, filled (Stop
+ * in the destructive color). Otherwise an outline button. Full width.
+ */
+export function RunActionButton({
+	action,
+	primary = false,
+	...context
+}: RunActionContext & {
+	action: RunActionKind;
+	primary?: boolean;
+}) {
+	const { runId, act, rerunFrom = [], labels } = context;
+	const busy = act.acting?.action === action;
+	if (action === "rerun") {
+		return rerunFrom.length > 0 ? (
+			<RerunConfirm
+				starts={rerunFrom}
+				labels={labels}
+				busy={busy}
+				primary={primary}
+				onConfirm={(step) => {
+					act.only("rerun");
+					act.rerun.mutate({ runId, nodeId: step.nodeId, stepId: step.id });
+				}}
+			/>
+		) : null;
+	}
+	const ask = askOf(action, context);
+	if (!ask) return null;
+	return (
+		<Confirm
+			button={ask.button}
+			icon={ask.icon}
+			busy={busy}
+			primary={primary}
+			title={ask.title}
+			description={ask.description}
+			confirm={ask.confirm}
+			destructive={ask.destructive}
+			onConfirm={ask.run}
+		/>
+	);
+}
+
+/** The action that failed last. Undefined when none failed. */
+export function failedAction(act: RunAct): Action | undefined {
+	return ACTIONS.find((action) => act[action].error);
 }
 
 /** Why the last action did not work, and how to fix it. Nothing when none failed. */
 export function RunActionFailure({ act }: { act: RunAct }) {
-	const failed = ACTIONS.find((action) => act[action].error);
+	const failed = failedAction(act);
 	if (!failed) return null;
 	return (
 		<ErrorAlert
@@ -256,8 +349,8 @@ function RerunConfirm({
 			icon={RotateCcw}
 			busy={busy}
 			primary={primary}
-			title="Run this again?"
-			description="The step you choose runs again. The steps after it follow as the flow says."
+			title={RERUN_TITLE}
+			description={RERUN_DESCRIPTION}
 			confirm="Run again"
 			onConfirm={() => {
 				if (chosen) onConfirm(chosen.step);
@@ -282,7 +375,7 @@ function RerunConfirm({
 								nativeID={`rerun-${start.from}`}
 								onPress={() => setFrom(start.from)}
 							>
-								{`${start.from === "start" ? "From the start" : "From the last step"}: ${stepName(start.step, labels)}`}
+								{rerunChoice(start, labels)}
 							</Label>
 						</View>
 					))}

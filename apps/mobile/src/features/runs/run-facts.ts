@@ -19,7 +19,7 @@ import {
  * Which actions a run allows is the engine's rule (`runActions`).
  */
 
-/** One fact tile: "Cost / $0.42". "—" when it is not known. */
+/** One fact row: "Cost / $0.42". "—" when it is not known. */
 export type RunFact = { label: string; value: string; sub?: string };
 
 /** What a fact says when it is not known. */
@@ -33,7 +33,7 @@ export function computerName(device: Computer): string {
 	return device.thisDevice ? "your Host" : "another computer";
 }
 
-/** The cost tile: its value, and why it may be lower than the real cost. */
+/** The cost row: its value, and why it may be lower than the real cost. */
 function costFact(
 	run: Pick<
 		RunDetail,
@@ -225,7 +225,7 @@ export function runVerdict({
 /** The action a run offers besides its main one. */
 export type RunActionKind = "stop" | "resume" | "restart" | "rerun";
 
-/** The one main action of a run, full width under its verdict. */
+/** The one main action of a run: in the header of the run screen. */
 export type PrimaryAction =
 	| { kind: "answer"; stepId: string }
 	| { kind: "stop" }

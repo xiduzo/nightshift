@@ -1,14 +1,13 @@
 /**
  * What a status means on screen, without React Native: the tone (color
  * token), the icon name and the word of a run status, a step's state and
- * outcome, and a step's kind. `shared/status` draws them. The classes of
- * the colors a flow gives a Gate's options.
+ * outcome, and a step's kind. `shared/status` draws them. The colors a
+ * flow gives a Gate's options, as values for native views.
  */
 
 export {
 	gateLook,
 	type Look,
-	NEEDS_YOU,
 	runStatusLook,
 	type StatusIconName,
 	type StepKind,
@@ -18,4 +17,4 @@ export {
 	TONE_CLASS,
 	type Tone,
 } from "./looks";
-export { OUTCOME_CLASS } from "./outcome-colors";
+export { OUTCOME_HEX } from "./outcome-hex";

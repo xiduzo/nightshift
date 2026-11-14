@@ -3,10 +3,6 @@
 export { ChangesScreen } from "./changes-screen";
 export { leaveRun, unleaveRun } from "./left-runs";
 export { openRun } from "./open-run";
-export {
-	RunActionButton,
-	RunActionFailure,
-	useRunAct,
-} from "./run-actions";
+export { useRunAct } from "./run-actions";
 export { RunScreen } from "./run-screen";
 export { useStoppedRuns } from "./stopped-runs";
