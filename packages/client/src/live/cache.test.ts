@@ -247,13 +247,19 @@ function fakeHost() {
 }
 
 /** A live cache on a query client that holds every query of `KEYS`. */
-function setUp(wait: Wait = async () => {}) {
+/** An open Gate of a run no test changes: a change of r1 or r2 does not read the Gates. */
+const OTHER_GATES = () => [gate("r9", "z")];
+
+function setUp(
+	wait: Wait = async () => {},
+	open: ReturnType<typeof gate>[] = [gate("r1", "a"), gate("r2", "b")],
+) {
 	const queryClient = new QueryClient();
 	for (const key of Object.values(KEYS)) {
 		// Only whether they are read again counts, not what they hold.
 		queryClient.setQueryData(key as readonly unknown[], {});
 	}
-	queryClient.setQueryData(gatesKey, [gate("r1", "a"), gate("r2", "b")]);
+	queryClient.setQueryData(gatesKey, open);
 	const timers = handSchedule();
 	const live = createLiveCache({
 		queryClient,
@@ -343,7 +349,7 @@ describe("the live cache follows the Host", () => {
 	});
 
 	test("a run that changes reads that run, the lists, the dashboard, the schedules and the projects again", async () => {
-		const { live, stale, timers } = setUp();
+		const { live, stale, timers } = setUp(undefined, OTHER_GATES());
 		const { host } = follow(live);
 		await host.send(runChanged);
 		timers.due(300);
@@ -353,7 +359,7 @@ describe("the live cache follows the Host", () => {
 
 	test("a run that ends reads the same, and the Knowledge page's sources: it may have synced one", async () => {
 		for (const item of [ended("run-finished"), ended("run-failed")]) {
-			const { live, stale, timers } = setUp();
+			const { live, stale, timers } = setUp(undefined, OTHER_GATES());
 			const { host } = follow(live);
 			await host.send(item);
 			timers.due(300);
@@ -361,16 +367,27 @@ describe("the live cache follows the Host", () => {
 		}
 	});
 
-	test("a change of a run whose Gate waits for another branch reads the Gates again too", async () => {
-		const { queryClient, live, stale, timers } = setUp();
-		queryClient.setQueryData(gatesKey, [
+	test("a change of a run with an open Gate reads the Gates again too: an answer may be on its way to its Device", async () => {
+		for (const open of [
+			gate("r1", "a"),
 			{ ...gate("r1", "a"), branchesWork: true },
-			gate("r2", "b"),
-		]);
+		]) {
+			const { queryClient, live, stale, timers } = setUp();
+			queryClient.setQueryData(gatesKey, [open, gate("r2", "b")]);
+			const { host } = follow(live);
+			await host.send(runChanged);
+			timers.due(300);
+			expect(stale()).toEqual(sorted(["gates", ...RUN_1]));
+		}
+	});
+
+	test("a change of a run without an open Gate does not read the Gates", async () => {
+		const { queryClient, live, stale, timers } = setUp();
+		queryClient.setQueryData(gatesKey, [gate("r2", "b")]);
 		const { host } = follow(live);
 		await host.send(runChanged);
 		timers.due(300);
-		expect(stale()).toEqual(sorted(["gates", ...RUN_1]));
+		expect(stale()).toEqual(sorted(RUN_1));
 	});
 
 	test("a pause tonight that begins or ends reads the schedules again, and nothing else", async () => {
@@ -388,7 +405,10 @@ describe("the live cache follows the Host", () => {
 	});
 
 	test("a burst of items of two runs reads each run once, and the lists once", async () => {
-		const { live, stale, timers, queryClient } = setUp();
+		const { live, stale, timers, queryClient } = setUp(
+			undefined,
+			OTHER_GATES(),
+		);
 		const { host } = follow(live);
 		const reads: unknown[] = [];
 		const invalidate = queryClient.invalidateQueries.bind(queryClient);
@@ -628,7 +648,7 @@ describe("the live cache follows the Host", () => {
 	});
 
 	test("a step that waits for a device shows its own words and opens its run; its end takes the notice away", async () => {
-		const { live, stale, timers } = setUp();
+		const { live, stale, timers } = setUp(undefined, OTHER_GATES());
 		const { host, shown, closed } = follow(live);
 		await host.send({
 			kind: "device-wait",
@@ -799,7 +819,7 @@ describe("the one Gate refusal rule", () => {
 
 describe("a run the person acted on", () => {
 	test("reads that run again, in one burst with the items of the stream", async () => {
-		const { live, stale, timers } = setUp();
+		const { live, stale, timers } = setUp(undefined, OTHER_GATES());
 		const { host } = follow(live);
 		live.runActed("r1");
 		await host.send(runChanged);

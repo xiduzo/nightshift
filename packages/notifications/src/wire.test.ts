@@ -279,3 +279,24 @@ async function waitFor(
 		await Bun.sleep(5);
 	}
 }
+
+test("a run that changed without an event of its own reaches the open screens of its Space", async () => {
+	const ada = await sandbox.signUp("Ada");
+	const spaceId = (await personalSpaceId(sandbox.db, ada.userId)) ?? "";
+	const kinds: string[] = [];
+	const controller = new AbortController();
+	void (async () => {
+		for await (const item of notifications.watch(
+			ada.userId,
+			controller.signal,
+		)) {
+			kinds.push(`${item.kind}:${"runId" in item ? item.runId : ""}`);
+		}
+	})();
+	await notifications.runChanged(spaceId, "run-1");
+	await waitFor(() => kinds.length === 1);
+	controller.abort();
+	expect(kinds).toEqual(["run-changed:run-1"]);
+	// Quiet: no push.
+	expect(sender.requests).toEqual([]);
+});

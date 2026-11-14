@@ -713,6 +713,14 @@ async function makeDaemon(
 			slots,
 		},
 	);
+	// An action that travels to another Device as a command logs nothing
+	// here until that Device applies it: the open screens hear of it now,
+	// so an answered Gate leaves every screen at once.
+	engine.exchange.commands.onChanged(({ spaceId, runId }) => {
+		notifications.runChanged(spaceId, runId).catch((error: unknown) => {
+			console.error("Could not tell the open screens of a run:", error);
+		});
+	});
 	projectsChanged = (spaceId) => {
 		notifications.projectsChanged(spaceId).catch((error: unknown) => {
 			console.error("Could not tell the open screens of new projects:", error);

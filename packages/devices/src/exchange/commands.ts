@@ -57,9 +57,20 @@ export function commandMoves(db: Database): MoveRows {
 
 export type RunCommands = ReturnType<typeof createRunCommands>;
 
+/**
+ * The run whose commands changed. A kept command changes what the run's
+ * screens show (an answer on its way), and so does one the Walker applied
+ * or refused, before or without any event of the run.
+ */
+export type CommandsChange = { spaceId: string; runId: string };
+
 export function createRunCommands(deps: { db: Database }) {
 	const { db } = deps;
-	const listeners = new Set<() => void>();
+	const listeners = new Set<(change: CommandsChange) => void>();
+
+	function changed(change: CommandsChange) {
+		for (const listener of [...listeners]) listener(change);
+	}
 
 	function toCommand(row: typeof runCommand.$inferSelect): RunCommand {
 		return {
@@ -97,7 +108,7 @@ export function createRunCommands(deps: { db: Database }) {
 				})
 				.returning();
 			if (!row) throw new Error("Could not keep the command.");
-			for (const listener of [...listeners]) listener();
+			changed({ spaceId: row.spaceId, runId: row.runId });
 			return toCommand(row);
 		},
 
@@ -135,15 +146,19 @@ export function createRunCommands(deps: { db: Database }) {
 			walkerId: string,
 			error: string | null,
 		): Promise<void> {
-			await db
+			const rows = await db
 				.update(runCommand)
 				.set({ doneAt: asDate(), error })
-				.where(and(eq(runCommand.id, id), eq(runCommand.walkerId, walkerId)));
-			for (const listener of [...listeners]) listener();
+				.where(and(eq(runCommand.id, id), eq(runCommand.walkerId, walkerId)))
+				.returning({ spaceId: runCommand.spaceId, runId: runCommand.runId });
+			for (const row of rows) changed(row);
 		},
 
-		/** Calls `listener` when a command is kept, or reported done. Returns the unsubscribe. */
-		onChanged(listener: () => void): () => void {
+		/**
+		 * Calls `listener` with the command's run when a command is kept, or
+		 * reported done. Returns the unsubscribe.
+		 */
+		onChanged(listener: (change: CommandsChange) => void): () => void {
 			listeners.add(listener);
 			return () => listeners.delete(listener);
 		},

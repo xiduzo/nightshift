@@ -106,6 +106,13 @@ export type Notifications = {
 		publicKey(): Promise<string | null>;
 	};
 	/**
+	 * Tells the open screens of every Member of the Space that a run
+	 * changed without an event of its own: an answer, a stop or a resume is
+	 * on its way to the Device that walks it, or that Device applied or
+	 * refused it. Quiet: no push. A screen reads the run and its Gate again.
+	 */
+	runChanged(spaceId: string, runId: string): Promise<void>;
+	/**
 	 * Tells the open screens of every Member of the Space that a project's
 	 * schedules changed without a run (a pause tonight). Quiet: no push.
 	 */
@@ -202,6 +209,14 @@ export function createNotifications(
 		},
 		webPush: {
 			publicKey: async () => (vapid ? (await vapid.get()).publicKey : null),
+		},
+		async runChanged(spaceId, runId) {
+			for (const personId of await audience(spaceId)) {
+				options.inApp.runChanged(
+					{ kind: "in-app", personId },
+					{ spaceId, runId },
+				);
+			}
 		},
 		async schedulesChanged(spaceId, projectId) {
 			for (const personId of await audience(spaceId)) {

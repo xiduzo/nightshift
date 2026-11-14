@@ -258,12 +258,15 @@ export function createLiveCache({
 	/** Stops the poll of the open Gates. Null while the stream is live, or nothing follows. */
 	let stopPoll: (() => void) | null = null;
 
-	/** The run has an open Gate that waits for another branch of the run. */
+	/**
+	 * The run has an open Gate on this screen. A change of the run may
+	 * change its Gate without a Gate item: an answer on its way to the
+	 * Device that walks the run (`answerPending`), an answer that Device
+	 * refused, or the run's other branch that ended (`branchesWork`).
+	 */
 	function holdsGate(runId: string): boolean {
 		const open = queryClient.getQueryData<OpenGate[]>(openKey);
-		return (
-			open?.some((gate) => gate.runId === runId && gate.branchesWork) ?? false
-		);
+		return open?.some((gate) => gate.runId === runId) ?? false;
 	}
 
 	function invalidate(queryKey: readonly unknown[]) {
@@ -281,7 +284,6 @@ export function createLiveCache({
 					pending.everyRun = true;
 					break;
 				case "run":
-					// A Gate on hold opens to answers when its run's other branch ends.
 					if (holdsGate(one.runId)) pending.gates = true;
 					pending.details.add(one.runId);
 					pending.steps.add(one.runId);
