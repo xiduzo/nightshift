@@ -37,6 +37,7 @@ import {
 } from "./flow-assistant";
 import { PromptInput } from "./prompt-input";
 import { Suggestions } from "./suggestions";
+import { useBuiltinPick } from "./use-builtin-pick";
 import { useSuggestion } from "./use-suggestion";
 
 /**
@@ -183,6 +184,7 @@ function SuggestBody({
 	onClose: () => void;
 }) {
 	const { state, start, stop } = useSuggestion();
+	const pick = useBuiltinPick("field-writer");
 	const [instruction, setInstruction] = useState("");
 	const sent = useRef("");
 
@@ -197,6 +199,7 @@ function SuggestBody({
 			instruction: text.trim(),
 			...(selection ? { selection } : {}),
 			...(toolSchema ? { toolSchema } : {}),
+			...pick.request,
 		});
 	};
 
@@ -259,6 +262,7 @@ function SuggestBody({
 						submitLabel={state.status === "failed" ? "Try again" : "Suggest"}
 						answering={state.status === "running"}
 						onStop={stop}
+						agent={pick.menus}
 					/>
 				</>
 			) : null}

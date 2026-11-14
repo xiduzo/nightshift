@@ -10,6 +10,7 @@ import {
 import { toast } from "sonner";
 import { runQueries } from "@/features/runs/flows-port";
 import { type FlowAssistant, replaceDraft } from "../assistant/flow-assistant";
+import { useBuiltinPick } from "../assistant/use-builtin-pick";
 import { type ChatLink, linkEntry } from "./chat-link";
 import type { FlowChatPanel } from "./chat-panel";
 import {
@@ -106,14 +107,20 @@ export function useChatPanel(
 		[shown, draft],
 	);
 
+	const agent = chatAgent(chat.thread);
+	const pick = useBuiltinPick(agent);
+	// The Builder and the Improver take an agent, never a model.
+	const { modelAnswer: _, ...picked } = pick.request;
+
 	const send = (text: string) => {
-		chat.send(text, draft);
+		chat.send(text, draft, picked);
 		setShownId(null);
 	};
 
 	const panel: ComponentProps<typeof FlowChatPanel> = {
 		thread: chat.thread,
-		agent: chatAgent(chat.thread),
+		agent,
+		agentMenus: pick.menus,
 		opening:
 			chat.thread.messages.length === 0 ? threadOpening(chat.thread) : null,
 		streaming: chat.streaming,
@@ -132,12 +139,13 @@ export function useChatPanel(
 		shownId: shown ? shownId : null,
 		onSend: send,
 		onOpen: () => {
-			chat.open(draft);
+			chat.open(draft, picked);
 			setShownId(null);
 		},
 		onStop: chat.stop,
 		onNewChat: () => {
 			chat.reset();
+			pick.reset();
 			setShownId(null);
 		},
 		onClose: () => setOpen(false),

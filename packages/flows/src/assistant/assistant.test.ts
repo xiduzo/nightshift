@@ -51,4 +51,21 @@ describe("the agent of a request", () => {
 			);
 		}
 	});
+
+	test("a suggestion takes a model instead of an agent, not both", () => {
+		const ask = { ...base, nodeId: "plan", kind: "prompt" };
+		const modelAnswer = { kind: "model", decider: "ollama", model: "gemma" };
+		expect(
+			suggestionRequestSchema.safeParse({ ...ask, modelAnswer }).success,
+		).toBe(true);
+		const both = suggestionRequestSchema.safeParse({
+			...ask,
+			modelAnswer,
+			profile: "worker",
+		});
+		expect(both.success).toBe(false);
+		expect(both.error?.issues[0]?.message).toBe(
+			"Choose an agent or a model, not both.",
+		);
+	});
 });

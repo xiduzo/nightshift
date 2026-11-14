@@ -44,10 +44,22 @@ export type BuiltinTakes = "agent-with-tools" | "either" | "model";
 const agentFields = agentNodeSchema.shape;
 
 /**
+ * A model that answers for a built-in agent: a Model Profile, or a decider
+ * with its model (unset: the decider's default).
+ */
+export const builtinModelAnswerSchema = z.object({
+	kind: z.literal("model"),
+	/** A Model Profile of this computer, by its name. */
+	profile: nameSchema.optional(),
+	decider: deciderNameSchema.optional(),
+	model: z.string().trim().min(1).max(200).optional(),
+});
+export type BuiltinModelAnswer = z.infer<typeof builtinModelAnswerSchema>;
+
+/**
  * Who answers for one built-in agent. An agent is picked as an Agent node
  * picks its agent: a profile with overrides on top, or a harness and a
- * model. A model is a Model Profile, or a decider with its model (unset:
- * the decider's default).
+ * model. A model is a `builtinModelAnswerSchema`.
  */
 export const builtinAnswerSchema = z.discriminatedUnion("kind", [
 	z.object({
@@ -57,13 +69,7 @@ export const builtinAnswerSchema = z.discriminatedUnion("kind", [
 		model: agentFields.model,
 		effort: agentFields.effort,
 	}),
-	z.object({
-		kind: z.literal("model"),
-		/** A Model Profile of this computer, by its name. */
-		profile: nameSchema.optional(),
-		decider: deciderNameSchema.optional(),
-		model: z.string().trim().min(1).max(200).optional(),
-	}),
+	builtinModelAnswerSchema,
 ]);
 export type BuiltinAnswer = z.infer<typeof builtinAnswerSchema>;
 

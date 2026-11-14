@@ -24,6 +24,7 @@ import {
 	type BuiltinAgentId,
 	type BuiltinCheck,
 	type BuiltinStatus,
+	builtinModelAnswerSchema,
 	type EntryMove,
 	type EntrySaving,
 	entryMoveSchema,
@@ -89,8 +90,11 @@ const agentFields = agentNodeSchema.shape;
 /**
  * Which agent answers, picked as an Agent node picks its agent: an Agent
  * Profile, with `harness`, `model` and `effort` as overrides on top, or no
- * profile and its own harness and model. Nothing set: the profile for help
- * in the settings, else the first profile that works. The session is read
+ * profile and its own harness and model. Nothing set: the agent the person
+ * chose in Settings for the built-in agent that answers, else the profile
+ * for help, else the first profile that works. A pick here wins over
+ * Settings for this one request: the built-in agent's prompt, tools and
+ * limits stay. The session is read
  * only whatever the choice: a profile's permission mode, CLI tools and
  * connections never apply.
  */
@@ -111,6 +115,16 @@ function isCompleteAgent(agent: AssistantAgent): boolean {
 		agent.model !== undefined ||
 		agent.effort !== undefined;
 	return !chosen || (agent.harness !== undefined && agent.model !== undefined);
+}
+
+/** Whether a request sets any field of an agent. */
+function picksAgentField(agent: AssistantAgent): boolean {
+	return (
+		agent.profile !== undefined ||
+		agent.harness !== undefined ||
+		agent.model !== undefined ||
+		agent.effort !== undefined
+	);
 }
 
 const INCOMPLETE_AGENT = {
@@ -144,8 +158,17 @@ export const suggestionRequestSchema = z
 		 * to the editor. Unset: the server did not answer.
 		 */
 		toolSchema: jsonSchemaSchema.optional(),
+		/**
+		 * A model answers this one ask instead of an agent. Unset: the agent
+		 * the request picks, else the Field writer's choice in Settings.
+		 */
+		modelAnswer: builtinModelAnswerSchema.optional(),
 	})
-	.refine(isCompleteAgent, INCOMPLETE_AGENT);
+	.refine(isCompleteAgent, INCOMPLETE_AGENT)
+	.refine(
+		(request) => request.modelAnswer === undefined || !picksAgentField(request),
+		{ message: "Choose an agent or a model, not both.", path: ["modelAnswer"] },
+	);
 export type SuggestionRequest = z.infer<typeof suggestionRequestSchema>;
 
 /** An outcome or an option of a suggestion, and the one it replaces. */

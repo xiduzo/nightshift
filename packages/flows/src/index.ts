@@ -58,6 +58,7 @@ export {
 	type BuiltinAnswer,
 	type BuiltinAnswers,
 	type BuiltinCheck,
+	type BuiltinModelAnswer,
 	type BuiltinStatus,
 	type BuiltinTakes,
 	builtinAgent,

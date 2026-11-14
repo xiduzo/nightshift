@@ -21,8 +21,10 @@ const SEND_TITLE = "Send (Enter). Shift + Enter starts a new line.";
  * Suggest popover and Quick run (the AI Elements Prompt Input). A text box
  * over a row with Send. Enter sends, Shift+Enter starts a new line. While
  * the agent answers, Send becomes Stop. Send waits until there is
- * something to send. Only a run chooses its agent here (the Model
- * Selector): Settings says who answers for Night Shift's own agents.
+ * something to send. Each box says who answers in its row (the Model
+ * Selector): a run its own agent, and the chat and Suggest one of Night
+ * Shift's own agents, its default from Settings until the person picks
+ * another one.
  */
 export function PromptInput({
 	value,
@@ -59,7 +61,7 @@ export function PromptInput({
 	allowEmpty?: boolean;
 	/** Words on Send. Without them, Send is an arrow. */
 	submitLabel?: string;
-	/** A run only: which agent does the work, as profile, model and effort menus, first in the row under the text. */
+	/** Which agent does the work, as profile, model and effort menus, first in the row under the text. */
 	agent?: AgentMenusProps;
 	/** More menus in that row, after the agent's and before Send. */
 	tools?: ReactNode;

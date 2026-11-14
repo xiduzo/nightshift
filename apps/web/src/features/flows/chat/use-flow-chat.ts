@@ -1,4 +1,4 @@
-import type { Flow } from "@nightshift/flows";
+import type { AssistantAgent, Flow } from "@nightshift/flows";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { client } from "@/shared/api";
 import {
@@ -29,8 +29,9 @@ function sessionStore(): Storage | undefined {
  * The chat about one flow: its messages, the answer that streams now and
  * the line about what the agent does. The tab keeps the chat over a
  * reload. Leaving the editor stops an answer. Each message carries the
- * entry of the chat, and its run when it is about one. Which agent answers
- * is Night Shift's choice (Settings), not a field of the message.
+ * entry of the chat, and its run when it is about one, and who answers it:
+ * the agent picked in the message box (`useBuiltinPick`). A first message
+ * that a button sends picks none: the default in Settings answers.
  */
 export function useFlowChat(projectId: string, flowName: string) {
 	const key = threadKey(projectId, flowName);
@@ -53,19 +54,27 @@ export function useFlowChat(projectId: string, flowName: string) {
 	 * the request sends none.
 	 */
 	const post = useCallback(
-		(text: string | null, flow: Flow, base: ChatThread) => {
+		(
+			text: string | null,
+			flow: Flow,
+			base: ChatThread,
+			agent: AssistantAgent = {},
+		) => {
 			const message = text === null ? threadOpening(base) : text.trim();
 			if (!message || running.current) return;
 			const controller = new AbortController();
 			running.current = controller;
 			const baseJson = JSON.stringify(flow);
 			const id = crypto.randomUUID();
-			const request = chatRequest(base, {
-				projectId,
-				flowName,
-				flow,
-				...(text === null ? {} : { message }),
-			});
+			const request = {
+				...chatRequest(base, {
+					projectId,
+					flowName,
+					flow,
+					...(text === null ? {} : { message }),
+				}),
+				...agent,
+			};
 			const started = startAnswer(base, message, {
 				person: `${id}:person`,
 				agent: `${id}:agent`,
@@ -100,7 +109,8 @@ export function useFlowChat(projectId: string, flowName: string) {
 	);
 
 	const send = useCallback(
-		(text: string, flow: Flow) => post(text, flow, current.current),
+		(text: string, flow: Flow, agent?: AssistantAgent) =>
+			post(text, flow, current.current, agent),
 		[post],
 	);
 
@@ -114,7 +124,8 @@ export function useFlowChat(projectId: string, flowName: string) {
 
 	/** Sends the first message of the chat's entry, when it has one. */
 	const open = useCallback(
-		(flow: Flow) => post(null, flow, current.current),
+		(flow: Flow, agent?: AssistantAgent) =>
+			post(null, flow, current.current, agent),
 		[post],
 	);
 

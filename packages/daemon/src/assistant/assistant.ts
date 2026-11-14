@@ -34,6 +34,7 @@ import {
 	type BuiltinAgentId,
 	type BuiltinAnswer,
 	type BuiltinCheck,
+	type BuiltinModelAnswer,
 	type BuiltinStatus,
 	builtinAgent,
 	builtinModel,
@@ -393,10 +394,10 @@ export const NO_LEARNER =
 	"No agent can look back at runs on this computer. Add an agent in Settings, or choose a model for the Learner.";
 
 /**
- * What answers for a built-in agent that gives one report: the agent
- * the request picks, else what the person chose for it in Settings (an
- * agent or a model), else the first agent that works. `folder`: where an
- * agent reads, asked only when an agent answers.
+ * What answers for a built-in agent that gives one report: the model or
+ * the agent the request picks, else what the person chose for it in
+ * Settings (an agent or a model), else the first agent that works.
+ * `folder`: where an agent reads, asked only when an agent answers.
  */
 export async function reportAgentVia(
 	deps: Pick<
@@ -404,13 +405,16 @@ export async function reportAgentVia(
 		"settings" | "profiles" | "decide" | "harnessFor" | "installed"
 	>,
 	id: ReportAgent,
-	requested: AssistantAgent,
+	requested: AssistantAgent & { modelAnswer?: BuiltinModelAnswer },
 	folder: () => Promise<string | null>,
 	none: string,
 ): Promise<AssistantVia | { error: string }> {
 	const answer: BuiltinAnswer | undefined =
-		deps.settings.current().builtinAgents[id];
-	if (!picksAgent(requested) && answer?.kind === "model") {
+		requested.modelAnswer ??
+		(picksAgent(requested)
+			? undefined
+			: deps.settings.current().builtinAgents[id]);
+	if (answer?.kind === "model") {
 		const { decide } = deps;
 		if (!decide) return { error: NO_MODEL_HERE };
 		const pick = builtinModel(answer, deps.profiles.list(), {

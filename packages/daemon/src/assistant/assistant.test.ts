@@ -31,6 +31,7 @@ import {
 	NO_PROFILE,
 	NOT_ENDED_EARLY,
 	pickAgent,
+	reportAgentVia,
 } from "./assistant";
 import { authoringPort, chatRun, historyPort } from "./authoring";
 
@@ -1511,5 +1512,68 @@ describe("check", () => {
 		expect(result.ok).toBe(false);
 		expect(result.problem).toContain('There is no model profile "gone"');
 		expect(asked).toBe(0);
+	});
+});
+
+describe("reportAgentVia", () => {
+	const folder = async () => "/repo";
+	const chosenModel = settings("", {
+		"field-writer": { kind: "model", decider: "openai", model: "gpt" },
+	});
+
+	test("a model the request picks answers over the agent in Settings", async () => {
+		const via = await reportAgentVia(
+			deps({
+				settings: settings("", {
+					"field-writer": { kind: "agent", profile: "b_claude" },
+				}),
+				decide: async () => ({ kind: "made", data: {}, costUsd: null }),
+			}),
+			"field-writer",
+			{ modelAnswer: { kind: "model", decider: "ollama", model: "llama3.2" } },
+			folder,
+			NO_PROFILE,
+		);
+		expect(via).toMatchObject({ kind: "model" });
+	});
+
+	test("an agent the request picks answers over the model in Settings", async () => {
+		const via = await reportAgentVia(
+			deps({ settings: chosenModel }),
+			"field-writer",
+			{ harness: "claude-code", model: "opus", effort: "high" },
+			folder,
+			NO_PROFILE,
+		);
+		expect(via).toMatchObject({
+			kind: "agent",
+			profile: { harness: "claude-code", model: "opus", effort: "high" },
+			cwd: "/repo",
+			limits: { turns: 15, usd: 0.5 },
+		});
+	});
+
+	test("a request that picks nothing gets the choice in Settings", async () => {
+		const asks: string[] = [];
+		const via = await reportAgentVia(
+			deps({
+				settings: chosenModel,
+				decide: async (input) => {
+					asks.push(`${input.decider} ${input.model}`);
+					return { kind: "made", data: {}, costUsd: null };
+				},
+			}),
+			"field-writer",
+			{},
+			folder,
+			NO_PROFILE,
+		);
+		if (!("kind" in via) || via.kind !== "model") throw new Error("no model");
+		await via.ask({
+			prompt: "p",
+			output: {},
+			signal: new AbortController().signal,
+		});
+		expect(asks).toEqual(["openai gpt"]);
 	});
 });

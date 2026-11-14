@@ -2,10 +2,11 @@
  * Which agent answers, as two menus in the row under a Prompt Input (the
  * AI Elements Model Selector): one for the agent (a profile, or a model
  * of a harness), one for the effort. Its owner keeps the choice: a quick
- * run, or the Settings page of one of Night Shift's own agents. The chat
- * and the field helpers have no picker: Settings says who answers there.
+ * run, the Settings page of one of Night Shift's own agents, or a place
+ * that asks one of them (`useBuiltinPick`). There the menu starts on the
+ * agent's default from Settings, and a pick holds for that place only.
  */
-import { harnessTakesTools } from "@nightshift/flows";
+import { type BuiltinAgentId, harnessTakesTools } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Dialog,
@@ -33,6 +34,7 @@ import {
 import { Field, FieldLabel } from "@nightshift/ui/components/field";
 import { InputGroupButton } from "@nightshift/ui/components/input-group";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import {
 	BotIcon,
 	ChevronDownIcon,
@@ -51,6 +53,7 @@ import {
 	useHarnessModels,
 } from "@/features/agents";
 import { settingsQueries } from "@/features/settings/queries";
+import { builtinSettingsSearch } from "@/shared/agent-button";
 import type { AgentProfileRow, Effort } from "@/shared/api";
 import { type AgentChoice, pickModel, profileModel } from "./agent-choice";
 
@@ -62,6 +65,11 @@ export type AgentPurpose = "suggest" | "chat" | "run";
 
 /** Who keeps the choice. */
 type ChoiceStore = {
+	/**
+	 * The default from Settings, first in the agent menu. Unset: the
+	 * profile for help is the first item, or none for a run.
+	 */
+	fallback?: DefaultAnswer;
 	choice: AgentChoice;
 	onChoiceChange: (choice: AgentChoice) => void;
 };
@@ -85,6 +93,18 @@ export type ModelOptions = {
 	onPick: (value: string | undefined) => void;
 	/** Opens a way to name a model the list does not hold. Without it, the list is all. */
 	onOther?: () => void;
+};
+
+/** The default that answers when the person picks nothing here. */
+export type DefaultAnswer = {
+	/** The built-in agent whose Settings page holds the default. */
+	agent: BuiltinAgentId;
+	/** What answers by default: "opus", "Claude Code · sonnet". */
+	label: string;
+	/** Nothing is picked here: the default answers. */
+	active: boolean;
+	/** Goes back to the default. */
+	onPick: () => void;
 };
 
 export type AgentMenusProps = {
@@ -210,6 +230,7 @@ export function AgentMenus({
 	models,
 	agents = true,
 	effort = true,
+	fallback,
 }: AgentMenusProps) {
 	const modelOn = models?.value !== undefined || !agents;
 	const pickedModel = models?.options.find((o) => o.value === models.value);
@@ -277,6 +298,7 @@ export function AgentMenus({
 								options={options}
 								now={now}
 								off={modelOn}
+								fallback={fallback}
 							/>
 							<DropdownMenuSeparator />
 							<DropdownMenuGroup>
@@ -334,7 +356,7 @@ export function AgentMenus({
 											{group ?? models.label ?? "Models"}
 										</DropdownMenuLabel>
 										<DropdownMenuRadioGroup
-											value={models.value ?? ""}
+											value={fallback?.active ? "" : (models.value ?? "")}
 											onValueChange={(next: string) => models.onPick(next)}
 										>
 											{models.options
@@ -375,6 +397,21 @@ export function AgentMenus({
 							) : null}
 						</>
 					) : null}
+					{fallback ? (
+						<>
+							<DropdownMenuSeparator />
+							<DropdownMenuItem
+								render={
+									<Link
+										to="/settings"
+										search={builtinSettingsSearch(fallback.agent)}
+									/>
+								}
+							>
+								Change the default…
+							</DropdownMenuItem>
+						</>
+					) : null}
 				</DropdownMenuContent>
 			</DropdownMenu>
 			{modelOn || !effort ? null : (
@@ -411,9 +448,11 @@ function ProfileGroup({
 	options,
 	now,
 	off = false,
+	fallback,
 }: {
 	/** A model answers: no profile is the picked one. */
 	off?: boolean;
+	fallback?: DefaultAnswer | undefined;
 	choice: AgentChoice;
 	set: (choice: AgentChoice) => void;
 	purpose: AgentPurpose;
@@ -421,13 +460,15 @@ function ProfileGroup({
 	now: ReturnType<typeof resolve>;
 }) {
 	const { profiles, forHelp, fits, info } = options;
-	const value = off
-		? ""
-		: now.usesHelp
-			? HELP
-			: now.none
-				? NONE
-				: (choice.profile ?? "");
+	const value = fallback?.active
+		? HELP
+		: off
+			? ""
+			: now.usesHelp
+				? HELP
+				: now.none
+					? NONE
+					: (choice.profile ?? "");
 	const unknown =
 		choice.profile !== undefined &&
 		!profiles.some((p) => p.name === choice.profile);
@@ -437,7 +478,8 @@ function ProfileGroup({
 			<DropdownMenuRadioGroup
 				value={value}
 				onValueChange={(next: string) => {
-					if (next === HELP) set({});
+					if (next === HELP && fallback) fallback.onPick();
+					else if (next === HELP) set({});
 					else if (next === NONE)
 						// Keep what the profile gave, so the same agent answers.
 						set({
@@ -448,7 +490,14 @@ function ProfileGroup({
 					else set({ profile: next });
 				}}
 			>
-				{purpose === "run" ? null : (
+				{fallback ? (
+					<DropdownMenuRadioItem value={HELP} closeOnClick>
+						<span className="truncate">Default</span>
+						<DropdownMenuShortcut className="truncate tracking-normal">
+							{fallback.label}
+						</DropdownMenuShortcut>
+					</DropdownMenuRadioItem>
+				) : purpose === "run" ? null : (
 					<DropdownMenuRadioItem value={HELP} closeOnClick>
 						<span className="truncate">Profile for help</span>
 						<DropdownMenuShortcut className="tracking-normal">

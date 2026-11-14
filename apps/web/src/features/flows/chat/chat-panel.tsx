@@ -53,13 +53,13 @@ import {
 	XIcon,
 } from "lucide-react";
 import { type ReactNode, useCallback, useMemo, useState } from "react";
-import { harnessInfo, useCustomAgents } from "@/features/agents";
-import { AnswersLink, useBuiltinAgent } from "@/shared/agent-button";
+import { useBuiltinAgent } from "@/shared/agent-button";
 import type { RunStatus, StepSummary } from "@/shared/api";
 import { formatCost } from "@/shared/format";
 import { type LinkView, Markdown } from "@/shared/markdown";
 import { PanelHeader } from "@/shared/panel";
 import { UsageContext } from "@/shared/usage";
+import type { AgentMenusProps } from "../assistant/agent-picker";
 import { PromptInput } from "../assistant/prompt-input";
 import { Suggestions } from "../assistant/suggestions";
 import {
@@ -77,6 +77,8 @@ type Props = {
 	thread: ChatThread;
 	/** Which of Night Shift's agents answers in this chat. */
 	agent: "builder" | "improver";
+	/** Who answers, in the message box: the default from Settings, or the person's pick. */
+	agentMenus: AgentMenusProps;
 	/** The first message of a new chat, as its entry words it. Null: the person writes it. */
 	opening: string | null;
 	streaming: boolean;
@@ -173,9 +175,9 @@ const CHAT_JOB: Record<Props["agent"], string> = {
 };
 
 /**
- * The head of every chat: the agent that answers by its name, what it
- * does, and on the right what answers for it, as a link to its Settings
- * page. When nothing can answer, the line says why.
+ * The head of every chat: the agent that answers by its name and what it
+ * does. When nothing can answer by default, the line says why. The
+ * message box says who answers, and changes it.
  */
 function ChatHead({
 	agent,
@@ -185,7 +187,6 @@ function ChatHead({
 	actions: ReactNode;
 }) {
 	const status = useBuiltinAgent(agent);
-	const customAgents = useCustomAgents();
 	return (
 		<>
 			<PanelHeader
@@ -196,16 +197,9 @@ function ChatHead({
 				className="shrink-0 p-3 pb-2"
 				actions={actions}
 			/>
-			<div className="flex shrink-0 items-start justify-between gap-3 border-b px-3 pb-2 text-xs">
-				<p className="min-w-0 text-muted-foreground">
-					{status?.problem ?? CHAT_JOB[agent]}
-				</p>
-				<AnswersLink
-					agent={agent}
-					harnessLabel={(harness) => harnessInfo(harness, customAgents).label}
-					className="max-w-40 shrink-0"
-				/>
-			</div>
+			<p className="shrink-0 border-b px-3 pb-2 text-muted-foreground text-xs">
+				{status?.problem ?? CHAT_JOB[agent]}
+			</p>
 		</>
 	);
 }
@@ -543,6 +537,7 @@ function ProposalMessage({
 function Composer({
 	thread,
 	agent,
+	agentMenus,
 	blank,
 	run,
 	streaming,
@@ -582,6 +577,7 @@ function Composer({
 				blockedBy={sendBlockedBy}
 				answering={streaming}
 				onStop={onStop}
+				agent={agentMenus}
 			/>
 		</div>
 	);

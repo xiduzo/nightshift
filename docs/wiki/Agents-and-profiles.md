@@ -30,6 +30,8 @@ To choose who answers:
 
 An agent without a choice follows this computer: the first of your agents that works, or the default model. The choice belongs to one computer. A Host has its own.
 
+The choice in Settings is the default. The message box of the chat and of each **Suggest …** shows who answers, under the text. To use another agent, model or effort for one ask, choose it there. Settings does not change. The agent keeps its job, its tools and its limits. Choose **Default** to go back. **New chat** starts on the default again.
+
 One answer has a limit. The Builder and the Improver stop after 40 turns or $2.00. Ask again to continue. The Spend page shows what these agents cost, as **Help**. In a Space that a Host keeps, it shows the cost from every computer in the Space.
 
 A node that names its own decider or its own profile keeps it. The Decider answers only for a node that names none.

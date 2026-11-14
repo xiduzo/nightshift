@@ -10,12 +10,11 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
-import { cn } from "@nightshift/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { SparklesIcon } from "lucide-react";
 import type { ComponentProps, ReactElement } from "react";
-import { answersLabel, builtinSettingsSearch } from "./answers";
+import { builtinSettingsSearch } from "./answers";
 import { builtinQueries } from "./queries";
 
 /**
@@ -97,43 +96,6 @@ export function AgentButton({
 			{...(link ? { nativeButton: false, render: link } : {})}
 		>
 			{content}
-		</Button>
-	);
-}
-
-/**
- * What answers for a built-in agent, as a quiet link to the Settings page
- * of that agent: the profile, or the harness and its model. With nothing
- * to answer, the link says to choose one.
- */
-export function AnswersLink({
-	agent,
-	harnessLabel,
-	className,
-}: {
-	agent: BuiltinAgentId;
-	/** The name of a harness in the product. */
-	harnessLabel: Parameters<typeof answersLabel>[1];
-	className?: string;
-}) {
-	const status = useBuiltinAgent(agent);
-	if (!status) return null;
-	const label = status.answers
-		? answersLabel(status.answers, harnessLabel)
-		: "Choose an agent";
-	return (
-		<Button
-			variant="link"
-			size="xs"
-			className={cn(
-				"h-auto min-w-0 p-0 font-normal text-muted-foreground",
-				className,
-			)}
-			title="Choose in Settings what answers"
-			nativeButton={false}
-			render={<Link to="/settings" search={builtinSettingsSearch(agent)} />}
-		>
-			<span className="truncate">{label}</span>
 		</Button>
 	);
 }
