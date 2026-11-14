@@ -30,7 +30,7 @@ import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import {
 	LATEST_PROTOCOL_VERSION,
 	SUPPORTED_PROTOCOL_VERSIONS,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/server";
 import { defineChatMiddleware } from "@tanstack/ai";
 import {
 	BRIDGED_MCP_SERVER_NAME,

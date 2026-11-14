@@ -36,7 +36,8 @@ test("importing the package loads no adapter until a session needs it", async ()
 		"@tanstack/ai-openai",
 		"@tanstack/ai-typesafe",
 		"@tanstack/ai-ollaya",
-		"@modelcontextprotocol/sdk",
+		"@modelcontextprotocol/client",
+		"@modelcontextprotocol/server",
 	]) {
 		expect(loaded).not.toContain(`/node_modules/${pkg}/`);
 	}

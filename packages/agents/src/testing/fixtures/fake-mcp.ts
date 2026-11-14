@@ -1,6 +1,6 @@
 /**
  * A fake MCP server on stdio, for the MCP client and Tool node tests. It
- * speaks the real protocol through `@modelcontextprotocol/sdk`. Its tools
+ * speaks the real protocol through `@modelcontextprotocol/server`. Its tools
  * cover what a Tool node must handle: structured content, text that is
  * JSON, plain text, an `isError` result, typed arguments echoed back with
  * their types, and a slow answer.
@@ -8,8 +8,9 @@
  * `FAKE_MCP_TOKEN`: when set, the `whoami` tool returns it, so a test can
  * see that a `${NAME}` secret reached the server's environment.
  */
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+
+import { McpServer } from "@modelcontextprotocol/server";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { z } from "zod";
 
 const server = new McpServer({ name: "fake-mcp", version: "1.0.0" });
@@ -18,11 +19,15 @@ server.registerTool(
 	"create_issue",
 	{
 		description: "Creates an issue and returns it.",
-		inputSchema: {
+		inputSchema: z.object({
 			title: z.string().describe("The issue title"),
 			teamId: z.string().optional(),
-		},
-		outputSchema: { id: z.string(), title: z.string(), url: z.string() },
+		}),
+		outputSchema: z.object({
+			id: z.string(),
+			title: z.string(),
+			url: z.string(),
+		}),
 	},
 	async ({ title }) => {
 		const issue = {
@@ -41,7 +46,7 @@ server.registerTool(
 	"list_json",
 	{
 		description: "Answers with JSON text only.",
-		inputSchema: { count: z.number().int().optional() },
+		inputSchema: z.object({ count: z.number().int().optional() }),
 	},
 	async ({ count }) => ({
 		content: [
@@ -59,7 +64,7 @@ server.registerTool(
 	"say",
 	{
 		description: "Answers with plain text.",
-		inputSchema: { text: z.string() },
+		inputSchema: z.object({ text: z.string() }),
 	},
 	async ({ text }) => ({
 		content: [
@@ -73,7 +78,7 @@ server.registerTool(
 	"fail",
 	{
 		description: "Always fails.",
-		inputSchema: { reason: z.string().optional() },
+		inputSchema: z.object({ reason: z.string().optional() }),
 	},
 	async ({ reason }) => ({
 		content: [{ type: "text", text: reason ?? "It did not work." }],
@@ -85,14 +90,14 @@ server.registerTool(
 	"typed",
 	{
 		description: "Echoes each argument with its type.",
-		inputSchema: {
+		inputSchema: z.object({
 			name: z.string(),
 			count: z.number(),
 			whole: z.number().int(),
 			flag: z.boolean(),
 			tags: z.array(z.string()),
 			meta: z.object({}).passthrough(),
-		},
+		}),
 	},
 	async (args) => ({
 		content: [{ type: "text", text: "ok" }],
@@ -110,7 +115,10 @@ server.registerTool(
 
 server.registerTool(
 	"slow",
-	{ description: "Answers after a while.", inputSchema: { ms: z.number() } },
+	{
+		description: "Answers after a while.",
+		inputSchema: z.object({ ms: z.number() }),
+	},
 	async ({ ms }) => {
 		await new Promise((resolve) => setTimeout(resolve, ms));
 		return { content: [{ type: "text", text: "done" }] };

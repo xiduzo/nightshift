@@ -15,15 +15,15 @@ afterEach(async () => {
 
 describe("testMcpServer", () => {
 	const sdk = (path: string) =>
-		fileURLToPath(import.meta.resolve(`@modelcontextprotocol/sdk/${path}`));
+		fileURLToPath(import.meta.resolve(`@modelcontextprotocol/server${path}`));
 
 	/** A stdio MCP server: an `echo` tool, plus a tool named by FIXTURE_TOOL. FIXTURE_HANG never answers. */
 	async function fixtureServer(): Promise<string> {
 		const path = join(dir, "server.ts");
 		await writeFile(
 			path,
-			`import { McpServer } from ${JSON.stringify(sdk("server/mcp.js"))};
-import { StdioServerTransport } from ${JSON.stringify(sdk("server/stdio.js"))};
+			`import { McpServer } from ${JSON.stringify(sdk(""))};
+import { StdioServerTransport } from ${JSON.stringify(sdk("/stdio"))};
 
 if (process.env.FIXTURE_HANG) await new Promise(() => {});
 const server = new McpServer({ name: "fixture", version: "1.2.3" });

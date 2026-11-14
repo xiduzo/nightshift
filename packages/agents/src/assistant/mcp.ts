@@ -7,9 +7,11 @@
  *
  * The MCP SDK loads on first use: the package root must not load it.
  */
-import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type {
+	CallToolResult,
+	Server,
+	Transport,
+} from "@modelcontextprotocol/server";
 import type { BridgedTool } from "../port";
 import { toolAnnotations } from "./builtin-tools";
 
@@ -50,19 +52,9 @@ async function toolServer(
 	tools: readonly BridgedTool[],
 	info: ToolServerInfo,
 ): Promise<Server> {
-	const [
-		{ Server },
-		{
-			CallToolRequestSchema,
-			ListResourcesRequestSchema,
-			ListToolsRequestSchema,
-			McpError,
-			ReadResourceRequestSchema,
-		},
-	] = await Promise.all([
-		import("@modelcontextprotocol/sdk/server/index.js"),
-		import("@modelcontextprotocol/sdk/types.js"),
-	]);
+	const { ProtocolError, Server } = await import(
+		"@modelcontextprotocol/server"
+	);
 	const { resources } = info;
 	const server = new Server(
 		{ name: info.name, version: info.version },
@@ -72,26 +64,28 @@ async function toolServer(
 		},
 	);
 	if (resources) {
-		server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+		server.setRequestHandler("resources/list", async () => ({
 			resources: await resources.list(),
 		}));
-		server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+		server.setRequestHandler("resources/read", async (request) => {
 			const { uri } = request.params;
 			const read = await resources.read(uri).catch((error: unknown) => {
-				throw new McpError(
+				throw new ProtocolError(
 					RESOURCE_NOT_FOUND,
 					error instanceof Error ? error.message : String(error),
 					{ uri },
 				);
 			});
 			if (!read) {
-				throw new McpError(RESOURCE_NOT_FOUND, "Resource not found", { uri });
+				throw new ProtocolError(RESOURCE_NOT_FOUND, "Resource not found", {
+					uri,
+				});
 			}
 			return { contents: [{ uri, mimeType: read.mimeType, text: read.text }] };
 		});
 	}
 	const byName = new Map(tools.map((tool) => [tool.name, tool]));
-	server.setRequestHandler(ListToolsRequestSchema, () => ({
+	server.setRequestHandler("tools/list", () => ({
 		tools: tools.map((tool) => ({
 			name: tool.name,
 			description: tool.description,
@@ -104,7 +98,7 @@ async function toolServer(
 		})),
 	}));
 	server.setRequestHandler(
-		CallToolRequestSchema,
+		"tools/call",
 		async (request): Promise<CallToolResult> => {
 			const tool = byName.get(request.params.name);
 			if (!tool?.execute) {
@@ -146,7 +140,7 @@ export async function serveTools(
 ): Promise<Server> {
 	const server = await toolServer(tools, info);
 	const { StdioServerTransport } = await import(
-		"@modelcontextprotocol/sdk/server/stdio.js"
+		"@modelcontextprotocol/server/stdio"
 	);
 	await server.connect(transport ?? new StdioServerTransport());
 	return server;

@@ -1,9 +1,10 @@
 import { homedir } from "node:os";
 
-import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-
+import type {
+	CallToolResult,
+	Client,
+	RequestOptions,
+} from "@modelcontextprotocol/client";
 import type { McpServerConfig } from "../port";
 
 /**
@@ -46,7 +47,7 @@ export type McpSession = {
 async function transportFor(config: McpServerConfig) {
 	if ("command" in config) {
 		const { getDefaultEnvironment, StdioClientTransport } = await import(
-			"@modelcontextprotocol/sdk/client/stdio.js"
+			"@modelcontextprotocol/client/stdio"
 		);
 		return new StdioClientTransport({
 			command: config.command,
@@ -57,7 +58,7 @@ async function transportFor(config: McpServerConfig) {
 		});
 	}
 	const { StreamableHTTPClientTransport } = await import(
-		"@modelcontextprotocol/sdk/client/streamableHttp.js"
+		"@modelcontextprotocol/client"
 	);
 	return new StreamableHTTPClientTransport(new URL(config.url), {
 		requestInit: { headers: config.headers },
@@ -80,7 +81,7 @@ export async function withMcpClient<T>(
 	} = {},
 ): Promise<T> {
 	const timeoutMs = options.timeoutMs ?? MCP_TIMEOUT_MS;
-	const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+	const { Client } = await import("@modelcontextprotocol/client");
 	const client = new Client({ name: "nightshift", version: "1.0.0" });
 	const transport = await transportFor(config);
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -183,14 +184,7 @@ export async function callMcpTool(
 	args: Record<string, unknown>,
 	options?: RequestOptions,
 ): Promise<McpToolCall> {
-	const { CallToolResultSchema } = await import(
-		"@modelcontextprotocol/sdk/types.js"
-	);
-	const result = await client.callTool(
-		{ name, arguments: args },
-		CallToolResultSchema,
-		options,
-	);
+	const result = await client.callTool({ name, arguments: args }, options);
 	return toolCallOf(result);
 }
 
