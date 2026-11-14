@@ -154,11 +154,13 @@ export function recordingAssistant(
 			);
 		},
 
-		explain: (runId, signal, scope) =>
-			metered(service.explain(runId, signal, scope), scope, async () => ({
+		explain: (request, signal, scope) =>
+			metered(service.explain(request, signal, scope), scope, async () => ({
 				agent: "explainer",
 				entry: "run.why",
-				projectId: await deps.projectOfRun(runId, scope).catch(() => null),
+				projectId: await deps
+					.projectOfRun(request.runId, scope)
+					.catch(() => null),
 			})),
 
 		agents: () => service.agents(),

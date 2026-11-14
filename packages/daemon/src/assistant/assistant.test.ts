@@ -1085,10 +1085,13 @@ describe("assistant.explain", () => {
 		});
 	}
 
-	async function explain(context: Context): Promise<ExplanationEvent[]> {
+	async function explain(
+		context: Context,
+		pick: Record<string, unknown> = {},
+	): Promise<ExplanationEvent[]> {
 		const stream = await call(
 			appRouter.assistant.explain,
-			{ runId: "r1" },
+			{ ...pick, runId: "r1" },
 			{ context, path: ["assistant", "explain"] },
 		);
 		const events: ExplanationEvent[] = [];
@@ -1211,6 +1214,34 @@ describe("assistant.explain", () => {
 		expect(asks).toHaveLength(1);
 		expect(asks[0]).toMatchObject({ decider: "ollama", model: "llama3.2" });
 		expect(asks[0]?.prompt).toContain("You cannot read files");
+	});
+
+	test("a model picked beside Ask why answers over the agent in Settings", async () => {
+		const asks: string[] = [];
+		const assistant = createAssistant(
+			deps({
+				space: runSpace(failed),
+				settings: settings("", {
+					explainer: { kind: "agent", profile: "b_claude" },
+				}),
+				decide: async (input) => {
+					asks.push(`${input.decider} ${input.model}`);
+					return {
+						kind: "made",
+						data: { summary: "The test step failed." },
+						costUsd: null,
+					};
+				},
+			}),
+		);
+		const events = await explain(asked("member", assistant), {
+			modelAnswer: { kind: "model", decider: "ollama", model: "gemma" },
+		});
+		expect(events.at(-2)).toEqual({
+			type: "answer",
+			answer: "The test step failed.",
+		});
+		expect(asks).toEqual(["ollama gemma"]);
 	});
 
 	test("a model the person chose, on a computer that cannot ask one: says what to do", async () => {

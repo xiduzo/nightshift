@@ -18,26 +18,30 @@ back. Quick run already has the menus for this under its prompt box.
 
 1. **Settings holds the default.** The choice of ADR 35, decision 3 stays. It is what
    answers when the person picks nothing.
-2. **Every message box that asks a built-in agent shows who answers.** The chat (Builder,
+2. **Every place that asks a built-in agent shows who answers.** The chat (Builder,
    Improver) and Suggest (Field writer) have the menus of quick run under the text: the
-   agent, and the effort. The menu starts on **Default**, which shows what answers in
-   Settings.
+   agent, and the effort. "Ask why" (Explainer) has them beside its button, and the phone
+   has the rows "Answers with" and "Effort" above it. The menu starts on **Default**,
+   which shows what answers in Settings.
 3. **A pick holds for that place only.** It holds in the open chat until **New chat**,
-   and in a Suggest popover until it closes. Settings does not change. **Default** goes
-   back. **Change the default…** opens the agent's page in Settings.
+   in a Suggest popover until it closes, and beside "Ask why" while the page is open.
+   Settings does not change. **Default** goes back. **Change the default…** opens the
+   agent's page in Settings.
 4. **A pick changes who answers, never the job.** The built-in agent keeps its prompt,
    its tools, its limits and its kind. The menu offers only what the agent takes: an
    agent with Night Shift's tools for the Builder and the Improver, an agent or a model
-   for the Field writer.
+   for the Field writer and the Explainer.
 5. **The request says who answers.** The web sends what the menu shows, the default
    included, so a chat that had another agent comes back to the default. A suggestion
-   request takes a model too (`modelAnswer`). A request that picks nothing still gets
-   the choice in Settings.
+   and an "Ask why" request take a model too (`modelAnswer`). A request that picks
+   nothing still gets the choice in Settings.
 
 ## Consequences
 
 - The link with the default in the chat header is gone. The menu in the message box
   shows it.
-- "Ask why" has no message box. It still answers with the default of the Explainer.
-- The phone has no picker. It asks the Host, which answers with its own defaults.
-- An older daemon ignores `modelAnswer`. A model pick there gets the choice in Settings.
+- The phone asks the Host, so its rows list the Host's agents and models. Only an owner
+  of the Host gets the lists. Anyone else asks with the default.
+- An older daemon or Host ignores a pick. It answers with its choice in Settings.
+- The Learner, the Decider and the Brief writer have no place a person asks them. They
+  keep the choice in Settings.

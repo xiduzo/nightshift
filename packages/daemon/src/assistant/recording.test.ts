@@ -144,8 +144,8 @@ describe("one record per answer", () => {
 				{ type: "done" },
 			],
 		});
-		await all(assistant.explain("run-1", signal, SCOPE));
-		await all(assistant.explain("run-gone", signal, SCOPE));
+		await all(assistant.explain({ runId: "run-1" }, signal, SCOPE));
+		await all(assistant.explain({ runId: "run-gone" }, signal, SCOPE));
 		expect(kept).toMatchObject([
 			{ agent: "explainer", entry: "run.why", projectId: "p-of-run" },
 			{ agent: "explainer", entry: "run.why", projectId: null },
@@ -166,7 +166,7 @@ describe("one record per answer", () => {
 		const { assistant, kept } = recording({
 			explain: [usage(400, 0, 0.05), { type: "error", message: "No answer." }],
 		});
-		await all(assistant.explain("run-1", signal, SCOPE));
+		await all(assistant.explain({ runId: "run-1" }, signal, SCOPE));
 		expect(kept).toMatchObject([{ agent: "explainer", costUsd: 0.05 }]);
 	});
 
@@ -176,7 +176,7 @@ describe("one record per answer", () => {
 			explain: [usage(0, 0), { type: "done" }],
 		});
 		await all(assistant.suggest(suggestion, signal, SCOPE));
-		await all(assistant.explain("run-1", signal, SCOPE));
+		await all(assistant.explain({ runId: "run-1" }, signal, SCOPE));
 		expect(kept).toEqual([]);
 	});
 

@@ -873,9 +873,9 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 			}
 		},
 
-		async *explain(runId, signal, scope): AsyncGenerator<ExplanationEvent> {
+		async *explain(request, signal, scope): AsyncGenerator<ExplanationEvent> {
 			const space = deps.space(scope);
-			const detail = await space.getRun(runId).catch(() => null);
+			const detail = await space.getRun(request.runId).catch(() => null);
 			if (!detail) {
 				yield { type: "error", message: NO_RUN };
 				return;
@@ -887,7 +887,7 @@ export function createAssistant(deps: AssistantDeps): AssistantService {
 			// An agent that works here, or a model: the explanation needs no tools.
 			const via = await reportVia(
 				"explainer",
-				{},
+				request,
 				async () =>
 					(await deps.clonePath(detail.projectId, scope.spaceId)) ??
 					(await deps.ownFolder?.()) ??

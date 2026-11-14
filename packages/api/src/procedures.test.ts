@@ -417,7 +417,7 @@ const ROUTES: Route[] = [
 	route("assistant.check", { agent: "builder" }, "owner", undefined, undefined, { given: { assistant: { check: async () => ({ id: "builder", ok: true, ms: 1, answers: null, problem: null }) } } }),
 	route("assistant.suggest", { ...inEditor, kind: "prompt", nodeId: "agent" }, "owner", "assistant.suggest", [like({ kind: "prompt", nodeId: "agent" }), any, { spaceId: SPACE, personId: PERSON }]),
 	route("assistant.chat", { ...inEditor, message: "Hi." }, "owner", "assistant.chat", [like({ message: "Hi." }), any, { spaceId: SPACE, personId: PERSON }]),
-	route("assistant.explain", run, RESUME, "assistant.explain", ["r", any, { spaceId: SPACE, personId: PERSON }]),
+	route("assistant.explain", run, RESUME, "assistant.explain", [{ runId: "r" }, any, { spaceId: SPACE, personId: PERSON }]),
 	// Schedules.
 	route("schedules.list", project, "session", "space.listSchedules", ["p1"]),
 	route("schedules.save", { ...project, schedules: [schedule] }, "owner", "space.saveSchedules", ["p1", [like(schedule)], undefined]),

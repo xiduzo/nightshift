@@ -127,6 +127,23 @@ function picksAgentField(agent: AssistantAgent): boolean {
 	);
 }
 
+/**
+ * A model answers this one ask instead of an agent: for a built-in agent
+ * that takes either. Unset: the agent the request picks, else the choice
+ * in Settings.
+ */
+const modelAnswerField = { modelAnswer: builtinModelAnswerSchema.optional() };
+
+/** A request picks an agent or a model, not both. */
+function oneAnswer(request: AssistantAgent & { modelAnswer?: unknown }) {
+	return request.modelAnswer === undefined || !picksAgentField(request);
+}
+
+const ONE_ANSWER = {
+	message: "Choose an agent or a model, not both.",
+	path: ["modelAnswer"],
+};
+
 const INCOMPLETE_AGENT = {
 	message: "Choose a profile, or a harness and a model.",
 	path: ["harness"],
@@ -158,18 +175,25 @@ export const suggestionRequestSchema = z
 		 * to the editor. Unset: the server did not answer.
 		 */
 		toolSchema: jsonSchemaSchema.optional(),
-		/**
-		 * A model answers this one ask instead of an agent. Unset: the agent
-		 * the request picks, else the Field writer's choice in Settings.
-		 */
-		modelAnswer: builtinModelAnswerSchema.optional(),
+		...modelAnswerField,
 	})
 	.refine(isCompleteAgent, INCOMPLETE_AGENT)
-	.refine(
-		(request) => request.modelAnswer === undefined || !picksAgentField(request),
-		{ message: "Choose an agent or a model, not both.", path: ["modelAnswer"] },
-	);
+	.refine(oneAnswer, ONE_ANSWER);
 export type SuggestionRequest = z.infer<typeof suggestionRequestSchema>;
+
+/**
+ * "Ask why" about one run: the Explainer answers, on the agent or the
+ * model the request picks, else on its choice in Settings.
+ */
+export const explainRequestSchema = z
+	.object({
+		runId: z.string().min(1),
+		...assistantAgentSchema.shape,
+		...modelAnswerField,
+	})
+	.refine(isCompleteAgent, INCOMPLETE_AGENT)
+	.refine(oneAnswer, ONE_ANSWER);
+export type ExplainRequest = z.infer<typeof explainRequestSchema>;
 
 /** An outcome or an option of a suggestion, and the one it replaces. */
 const suggestedOutcomeSchema = option.extend({
@@ -362,10 +386,11 @@ export interface AssistantService {
 	): AsyncIterable<ChatEvent>;
 	/**
 	 * Why a run of the Space did not finish, in one short answer, on the
-	 * profile for help. No thread: each call asks again.
+	 * agent or model the request picks, else the Explainer's choice. No
+	 * thread: each call asks again.
 	 */
 	explain(
-		runId: string,
+		request: ExplainRequest,
 		signal: AbortSignal,
 		scope: AssistantScope,
 	): AsyncIterable<ExplanationEvent>;

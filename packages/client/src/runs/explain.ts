@@ -1,10 +1,10 @@
-import type { ExplanationEvent } from "@nightshift/flows";
+import type { ExplainRequest, ExplanationEvent } from "@nightshift/flows";
 
 /** The one procedure "Ask why" needs. The app's client has it, a test passes a fake. */
 export type ExplainClient = {
 	assistant: {
 		explain: (
-			input: { runId: string },
+			input: ExplainRequest,
 			options: { signal?: AbortSignal },
 		) => Promise<AsyncIterable<ExplanationEvent>>;
 	};
@@ -13,20 +13,28 @@ export type ExplainClient = {
 /** Why an answer did not come. The server's own words when it says why. */
 export const NO_EXPLANATION = "The agent stopped without an answer. Ask again.";
 
+/** Who answers "Ask why": an agent or a model. Empty: the Explainer's choice in Settings. */
+export type ExplainPick = Omit<ExplainRequest, "runId">;
+
 /**
  * Asks the computer the app talks to why a run did not finish, and reads
- * the stream to its answer: what went wrong, and what you can do. Each
- * `activity` goes to `onActivity` ("Reads the run"). Throws an `Error`
+ * the stream to its answer: what went wrong, and what you can do. `pick`
+ * says who answers. Each `activity` goes to `onActivity` ("Reads the
+ * run"). Throws an `Error`
  * with words for the person when no answer comes, and the API's error
  * for a refusal (the role, a run not found).
  */
 export async function explainRun(
 	client: ExplainClient,
 	runId: string,
-	options: { signal?: AbortSignal; onActivity?: (text: string) => void } = {},
+	options: {
+		signal?: AbortSignal;
+		onActivity?: (text: string) => void;
+		pick?: ExplainPick;
+	} = {},
 ): Promise<string> {
 	const events = await client.assistant.explain(
-		{ runId },
+		{ ...options.pick, runId },
 		options.signal ? { signal: options.signal } : {},
 	);
 	let answer: string | null = null;

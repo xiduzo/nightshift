@@ -33,13 +33,15 @@ type ButtonProps = ComponentProps<typeof Button>;
  * names the agent and the words: "Ask why", "Improve this flow", "Build
  * with an agent", "Suggest prompt". Every such button has the same icon.
  *
- * When nothing can answer for its agent, the button stays. It then opens
- * the Settings page of that agent, and its tooltip says what is wrong.
+ * When nothing can answer for its agent by default, the button stays. It
+ * then opens the Settings page of that agent, and its tooltip says what is
+ * wrong. Not when the person picked who answers beside it (`picked`).
  */
 export function AgentButton({
 	entry,
 	field,
 	link,
+	picked = false,
 	variant = "outline",
 	size = "sm",
 	...props
@@ -49,6 +51,8 @@ export function AgentButton({
 	field?: string;
 	/** Where the button leads, as a link. Without it, `onClick` acts. */
 	link?: ReactElement;
+	/** The person picked who answers here, not the default: the button asks. */
+	picked?: boolean;
 }) {
 	const { agent, label: words } = AGENT_ENTRIES[entry];
 	const status = useBuiltinAgent(agent);
@@ -60,7 +64,7 @@ export function AgentButton({
 		</>
 	);
 
-	if (status?.problem && !props.disabled) {
+	if (status?.problem && !props.disabled && !picked) {
 		// Only what the button looks like stays: it leads to Settings now.
 		const { className, id } = props;
 		return (

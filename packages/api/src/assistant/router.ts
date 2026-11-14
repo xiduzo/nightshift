@@ -1,6 +1,7 @@
 import {
 	builtinAgentIdSchema,
 	chatRequestSchema,
+	explainRequestSchema,
 	suggestionRequestSchema,
 } from "@nightshift/flows";
 import { z } from "zod";
@@ -83,10 +84,11 @@ export const assistant = {
 	 * what the person can do. Unlike the chat, it is for a Member of the
 	 * run's Space who may continue or retry the run (`run.resume`), on any
 	 * computer of the Space: the phone asks the Host. The answer costs the
-	 * computer's agent, so a viewer may not ask. It runs on the profile for
-	 * help of the computer that answers, in the project's Clone there, read only.
+	 * computer's agent, so a viewer may not ask. It runs on the agent or the
+	 * model the request picks, else on the Explainer's choice of the
+	 * computer that answers, in the project's Clone there, read only.
 	 */
-	explain: runProcedure(z.object({ runId: z.string() }), { run: ["resume"] })
+	explain: runProcedure(explainRequestSchema, { run: ["resume"] })
 		.route({
 			summary:
 				"Streams one short answer: why a run that stopped early did not finish, and what the person can do.",
@@ -94,7 +96,7 @@ export const assistant = {
 		.output(stream(explanationEventSchema))
 		.handler(
 			streamed(({ context, input, signal }) =>
-				context.assistant.explain(input.runId, signal, {
+				context.assistant.explain(input, signal, {
 					spaceId: context.spaceId,
 					personId: context.session.user.id,
 				}),

@@ -13,6 +13,11 @@ import { useMutation, useMutationState } from "@tanstack/react-query";
 import { MessageCircleQuestionIcon } from "lucide-react";
 import { useState } from "react";
 
+import {
+	AgentMenus,
+	type PickedAnswer,
+	useBuiltinPick,
+} from "@/features/flows";
 import { AgentButton } from "@/shared/agent-button";
 import { client } from "@/shared/api";
 import { Markdown } from "@/shared/markdown";
@@ -26,7 +31,8 @@ type LastAsk = {
 
 /** "Ask why" for one run: the button and the answer share it. */
 export type AgentAsk = {
-	ask: () => void;
+	/** Asks again, on the agent or model `pick` names: empty for the default. */
+	ask: (pick: PickedAnswer) => void;
 	last: LastAsk | undefined;
 	activity: string | null;
 	/** The computer that answers does not have it (an older Host). */
@@ -43,9 +49,9 @@ export function useAgentAsk(runId: string): AgentAsk {
 	const options = askWhyMutation(client, runId);
 	const mutation = useMutation({
 		...options,
-		mutationFn: () => {
+		mutationFn: (pick: PickedAnswer) => {
 			setActivity(null);
-			return explainRun(client, runId, { onActivity: setActivity });
+			return explainRun(client, runId, { onActivity: setActivity, pick });
 		},
 	});
 	const asks = useMutationState({
@@ -58,29 +64,38 @@ export function useAgentAsk(runId: string): AgentAsk {
 	});
 	const last = asks.at(-1);
 	return {
-		ask: () => mutation.mutate(),
+		ask: (pick) => mutation.mutate(pick),
 		last,
 		activity,
 		missing: Boolean(last?.error && isMissingOnHost(last.error)),
 	};
 }
 
-/** "Ask why": the Explainer reads the run and tells you what went wrong. */
+/**
+ * "Ask why": the Explainer reads the run and tells you what went wrong.
+ * Beside the button, the menus of every message box say who answers: the
+ * default from Settings, or another agent or model for this ask.
+ */
 export function AskAgentButton({ agent }: { agent: AgentAsk }) {
+	const pick = useBuiltinPick("explainer");
 	if (agent.missing) return null;
 	const pending = agent.last?.status === "pending";
 	const asked = agent.last !== undefined && agent.last.status !== "idle";
 	return (
-		<AgentButton
-			entry="run.why"
-			disabled={pending}
-			title={
-				asked && !pending
-					? "An agent reads this run again and gives a new answer."
-					: "An agent reads this run and tells you what went wrong."
-			}
-			onClick={agent.ask}
-		/>
+		<div className="flex min-w-0 items-center gap-1">
+			<AgentButton
+				entry="run.why"
+				disabled={pending}
+				picked={!pick.menus.fallback?.active}
+				title={
+					asked && !pending
+						? "An agent reads this run again and gives a new answer."
+						: "An agent reads this run and tells you what went wrong."
+				}
+				onClick={() => agent.ask(pick.request)}
+			/>
+			<AgentMenus {...pick.menus} />
+		</div>
 	);
 }
 

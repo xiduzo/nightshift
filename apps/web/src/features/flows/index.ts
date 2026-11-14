@@ -4,10 +4,12 @@ export {
 	type AgentChoice,
 	requestAgent,
 } from "./assistant/agent-choice";
-// Settings chooses who answers with the picker of the chat.
+// Who answers: the menus under every message box, and on Settings.
 export { AgentMenus } from "./assistant/agent-picker";
+export type { PickedAnswer } from "./assistant/picked-answer";
 export { PromptInput } from "./assistant/prompt-input";
 export { Suggestions } from "./assistant/suggestions";
+export { useBuiltinPick } from "./assistant/use-builtin-pick";
 export type { FlowCanvasNode, NodeRunState } from "./canvas/flow-node";
 export {
 	END_STATUS_LABEL,
