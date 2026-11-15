@@ -4,7 +4,9 @@
 		"./.hutch/devkit/tsconfig.json"
 	],
 	"compilerOptions": {
-		"ignoreDeprecations": "6.0",
+		// `electrobun prepare` writes `baseUrl` into the devkit config. TypeScript 7
+		// removed the option. Its `paths` resolve from that file without it.
+		"baseUrl": null,
 		"lib": ["ESNext", "DOM"],
 		"target": "ESNext",
 		"module": "ESNext",

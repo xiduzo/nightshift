@@ -11,7 +11,7 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import ts from "typescript";
+import ts from "@typescript/typescript6";
 
 const CALENDAR = new Set([
 	"getFullYear",

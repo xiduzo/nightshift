@@ -8,7 +8,7 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import ts from "typescript";
+import ts from "@typescript/typescript6";
 
 /** The packages the source may import, and whether only `import type` may. */
 const ALLOWED: Record<string, "types" | "values"> = {

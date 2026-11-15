@@ -63,7 +63,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import ts from "typescript";
+import ts from "@typescript/typescript6";
 
 import { ENTRY_EXCEPTIONS, isTest, isTestingEntry } from "./check-layers";
 
