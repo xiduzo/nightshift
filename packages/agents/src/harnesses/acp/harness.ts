@@ -108,6 +108,8 @@ export const ACP_AGENTS: Record<AcpAgentName, AcpAgent> = {
 		args: ({ model }) => [...modelFlag(model), "acp"],
 	},
 	// github.com/svkozak/pi-acp: `PI_ACP_PI_COMMAND` is the pi it runs.
+	// pi-acp 0.0.34 drops pi's model errors (svkozak/pi-acp#135): the
+	// patch in `patches/` ends a failed turn with an `Error:` text line.
 	pi: {
 		label: ACP_FACTS.pi.label,
 		args: () => [],
