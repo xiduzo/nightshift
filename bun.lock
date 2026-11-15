@@ -601,6 +601,9 @@
       },
     },
   },
+  "patchedDependencies": {
+    "pi-acp@0.0.34": "patches/pi-acp@0.0.34.patch",
+  },
   "catalog": {
     "@better-auth/api-key": "1.7.25",
     "@better-auth/core": "1.7.25",

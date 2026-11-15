@@ -91,5 +91,8 @@
 		"typescript": "catalog:",
 		"varlock": "catalog:"
 	},
-	"packageManager": "bun@1.4.4"
+	"packageManager": "bun@1.4.4",
+	"patchedDependencies": {
+		"pi-acp@0.0.34": "patches/pi-acp@0.0.34.patch"
+	}
 }

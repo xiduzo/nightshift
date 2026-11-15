@@ -1,0 +1,53 @@
+diff --git a/dist/index.js b/dist/index.js
+index 64758f027a38a7ecbe7d6e05e88edcc72ee9f193..62c2e94c07652042ffec034d34b57904cb9dc311 100755
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -820,6 +820,8 @@ var PiAcpSession = class {
+   // Used to map abort semantics to ACP stopReason.
+   // Applies to the currently running turn.
+   cancelRequested = false;
++  // Night Shift patch (svkozak/pi-acp#135): the error of the turn, if any.
++  turnError = null;
+   // Current in-flight turn (if any). Additional prompts are queued.
+   pendingTurn = null;
+   turnQueue = [];
+@@ -937,6 +939,15 @@ var PiAcpSession = class {
+     await this.flushEmits();
+   }
+   async settleTurn() {
++    // Night Shift patch (svkozak/pi-acp#135): say why pi's turn failed.
++    const failure = this.turnError;
++    this.turnError = null;
++    if (failure && !this.cancelRequested) {
++      this.emit({
++        sessionUpdate: "agent_message_chunk",
++        content: { type: "text", text: `Error: ${failure}` }
++      });
++    }
+     await this.publishContextUsage();
+     const reason = this.cancelRequested ? "cancelled" : "end_turn";
+     this.pendingTurn?.resolve(reason);
+@@ -993,6 +1004,7 @@ var PiAcpSession = class {
+   }
+   startTurn(t) {
+     this.cancelRequested = false;
++    this.turnError = null;
+     this.inAgentLoop = false;
+     this.pendingTurn = { resolve: t.resolve, reject: t.reject };
+     this.emit({
+@@ -1280,6 +1292,15 @@ var PiAcpSession = class {
+       case "turn_end": {
+         break;
+       }
++      case "message_end": {
++        // Night Shift patch (svkozak/pi-acp#135): keep the error of the
++        // last assistant message. A later message (a retry) clears it.
++        const msg = ev.message;
++        if (msg?.role === "assistant") {
++          this.turnError = msg.stopReason === "error" && typeof msg.errorMessage === "string" && msg.errorMessage ? msg.errorMessage : null;
++        }
++        break;
++      }
+       case "agent_end": {
+         this.inAgentLoop = false;
+         break;
