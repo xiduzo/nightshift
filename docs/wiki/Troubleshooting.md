@@ -42,10 +42,6 @@ The setup says that the agent is not signed in yet, or that the sign-in took too
 
 A Decision or a Value runs on an Ollama model that this computer does not have. Open the Model Profile of the step in Settings, under **Models**, and choose **Download**. Then run the step again.
 
-### "Needs OpenCode 1.x. Version 2.x does not work yet."
-
-Night Shift drives OpenCode 1.x only. Install an OpenCode 1.x build, and set its path in Settings, under **Your harnesses**.
-
 ### pi does not start
 
 Night Shift needs pi 0.81 or later. Update pi.

@@ -12,6 +12,7 @@ import {
 	acpAgentHarness,
 	acpHarness,
 	acpPermission,
+	acpSpec,
 	customAcpHarness,
 	observeAcpEvent,
 } from "./harness";
@@ -449,5 +450,16 @@ describe("customAcpHarness", () => {
 			type: "error",
 			message: "Goose needs the secret GOOSE_API_KEY.",
 		});
+	});
+});
+
+describe("acpSpec", () => {
+	test("passes the agent's reader of nested tool calls to the profile", () => {
+		const nestedToolCalls = () => [];
+		expect(
+			acpSpec("fake", { ...bySession, nestedToolCalls }).profile
+				.nestedToolCalls,
+		).toBe(nestedToolCalls);
+		expect(acpSpec("fake", bySession).profile.nestedToolCalls).toBeUndefined();
 	});
 });

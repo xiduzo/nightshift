@@ -732,6 +732,51 @@ describe("step reports", () => {
 		});
 	});
 
+	test("a report run inside another tool counts, when the profile reads it", () => {
+		const nested = (status: string) =>
+			createTranslator({
+				fallbackSessionId: "fallback",
+				stepReport: true,
+				profile: {
+					...CLAUDE_CODE_PROFILE,
+					nestedToolCalls: (content) =>
+						content === "ran"
+							? [
+									{
+										name: "report_step",
+										input: { outcome: "pass", summary: "Done." },
+										failed: status !== "completed",
+									},
+								]
+							: [],
+				},
+			});
+		const chunks = [
+			session,
+			{ type: "TOOL_CALL_START", toolCallId: "e1", toolCallName: "execute" },
+			{ type: "TOOL_CALL_END", toolCallId: "e1", input: {} },
+			{ type: "TOOL_CALL_RESULT", toolCallId: "e1", content: "ran" },
+			runFinished,
+		];
+		const events = feed(nested("completed"), chunks);
+		expect(events.map((e) => e.type)).toEqual([
+			"session",
+			"tool-start",
+			"tool-end",
+			"tool-result",
+			"report",
+			"finished",
+		]);
+		expect(events[4]).toEqual({
+			type: "report",
+			outcome: "pass",
+			summary: "Done.",
+		});
+		expect(feed(nested("error"), chunks).some((e) => e.type === "report")).toBe(
+			false,
+		);
+	});
+
 	test("accepts the prefixed MCP name and the input from metadata", () => {
 		const translator = reporting();
 		const events = feed(translator, [

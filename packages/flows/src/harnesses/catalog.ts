@@ -54,7 +54,7 @@ export const HARNESS_CATALOG = {
 		name: "opencode",
 		label: "OpenCode",
 		initials: "OC",
-		note: "Needs OpenCode 1.x. Version 2.x does not work yet. Model: provider/model.",
+		note: "Model: provider/model.",
 		defaultModel: "anthropic/claude-sonnet-4-5",
 		suggestedModels: [
 			"anthropic/claude-sonnet-4-5",

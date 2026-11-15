@@ -406,6 +406,15 @@ export type HarnessProfile = {
 	 * the harness asks before it runs one (Claude Code: `mcp__tanstack__<name>`).
 	 */
 	bridgedToolId?: (name: string) => string;
+	/**
+	 * The tool calls a harness ran inside another tool, read from that tool's
+	 * result. OpenCode 2.x runs MCP tools inside its `execute` tool, so the
+	 * stream never names `report_step`: a completed nested report counts as
+	 * the step report. `name` is the bridged tool's own name (`report_step`).
+	 */
+	nestedToolCalls?: (
+		content: unknown,
+	) => { name: string; input: unknown; failed: boolean }[];
 };
 
 export type Translator = {
@@ -619,6 +628,13 @@ export function createTranslator(options: {
 				}
 				const held = heldEnds.get(toolCallId);
 				heldEnds.delete(toolCallId);
+				const nested = rules
+					? (profile.nestedToolCalls?.(content) ?? []).flatMap((call) => {
+							if (call.failed || !isReportTool(call.name)) return [];
+							const report = parseStepReport(call.input, rules);
+							return report ? [{ type: "report" as const, ...report }] : [];
+						})
+					: [];
 				return emit([
 					...(held
 						? [{ ...held, input: rawInput(toolCallId, held.input) }]
@@ -632,6 +648,7 @@ export function createTranslator(options: {
 								: JSON.stringify(content ?? ""),
 						...(failed ? { isError: true as const } : {}),
 					},
+					...nested,
 				]);
 			}
 			case "RUN_FINISHED": {

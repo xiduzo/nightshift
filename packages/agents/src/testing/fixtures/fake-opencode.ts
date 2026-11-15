@@ -17,7 +17,8 @@
  * events, and the assistant message: with the error `$FAKE_OPENCODE_ERROR`
  * (JSON) when that is set, and the cost `$FAKE_OPENCODE_COST` (default 0.002).
  *
- * It sends `server.heartbeat` events, as OpenCode does.
+ * It sends `server.heartbeat` events, as OpenCode does. `--version` prints
+ * the 1.x version it replays.
  *
  * Each prompt appends `{ argv, config, prompt, tools, sessionId }` as one
  * JSON line to `$FAKE_OPENCODE_LOG` (`config`: the parsed
@@ -29,6 +30,10 @@ import { now } from "@nightshift/time";
 type Call = { name: string; arguments: unknown };
 
 const argv = process.argv.slice(2);
+if (argv[0] === "--version") {
+	console.log("1.19.2");
+	process.exit(0);
+}
 const flag = (name: string) =>
 	argv.find((arg) => arg.startsWith(`--${name}=`))?.split("=")[1];
 const hostname = flag("hostname") ?? "127.0.0.1";

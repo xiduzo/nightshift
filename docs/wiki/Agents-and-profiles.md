@@ -42,7 +42,7 @@ A node that names its own decider or its own profile keeps it. The Decider answe
 | Agent | Login and model | Night Shift's own tools | Where your files go |
 | --- | --- | --- | --- |
 | **Claude Code** | Uses your Claude login. Model: an alias such as sonnet, or a full model id. | Yes | Prompts and your project's files go to Anthropic under your Claude login. |
-| **OpenCode** | Needs OpenCode 1.x. Version 2.x does not work yet. Model: provider/model. | Yes | Prompts and project files go to the model provider set in OpenCode. |
+| **OpenCode** | Model: provider/model. | Yes | Prompts and project files go to the model provider set in OpenCode. |
 | **Codex** | Not fully tested yet. Uses your Codex login. | Yes | Prompts and project files go to OpenAI under your Codex login. |
 | **Grok Build** | Not fully tested yet. Run grok login once to use your Grok login. | No | Prompts and project files go to xAI under your Grok login. |
 | **GitHub Copilot** | Not fully tested yet. Uses your GitHub login. Model default: the model set in Copilot. | Yes | Prompts and project files go to GitHub Copilot under your GitHub login. |
