@@ -22,13 +22,13 @@ const fakeCli = (name: string, answers: Record<string, CliAnswer>) =>
 	fakeCliIn(dir, name, answers);
 
 describe("checkHarness: opencode", () => {
-	test("OpenCode 2.x is flagged as unsupported, with the version normalised", async () => {
+	test("OpenCode 2.x is fine, with the version normalised", async () => {
 		const bin = await fakeCli("opencode", {
 			"--version": { stdout: "opencode v2.0.22\n" },
 		});
 		const check = await checkHarness("opencode", bin);
 		expect(check.version).toBe("2.0.22");
-		expect(check.problem).toContain("OpenCode 2.0.22 is not supported");
+		expect(check.problem).toBeNull();
 	});
 
 	test("OpenCode 1.x is fine", async () => {

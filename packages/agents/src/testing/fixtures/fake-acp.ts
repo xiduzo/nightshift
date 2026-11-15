@@ -5,7 +5,8 @@
  * MCP server, calls its `report_step` tool the way a real agent would.
  *
  * `FAKE_ACP_LOG`: a file that gets one JSON line per event (argv, session,
- * prompt, permission, report, config), for the test to read.
+ * prompt, permission, report, config), for the test to read. The argv line
+ * also has the parsed `OPENCODE_CONFIG_CONTENT`, when it is set.
  *
  * `FAKE_ACP_CONFIG`: `options` offers the model and a thought level as
  * session config options (as pi-acp and OpenCode 2.x do). A model it does
@@ -31,7 +32,14 @@ const logPath = process.env.FAKE_ACP_LOG;
 const log = (entry: Record<string, unknown>) => {
 	if (logPath) appendFileSync(logPath, `${JSON.stringify(entry)}\n`);
 };
-log({ type: "argv", argv: process.argv.slice(2) });
+log({
+	type: "argv",
+	argv: process.argv.slice(2),
+	// OpenCode 2.x gets its permission rules here.
+	...(process.env.OPENCODE_CONFIG_CONTENT
+		? { config: JSON.parse(process.env.OPENCODE_CONFIG_CONTENT) }
+		: {}),
+});
 
 type HttpServer = { name: string; url: string; headers: acp.HttpHeader[] };
 

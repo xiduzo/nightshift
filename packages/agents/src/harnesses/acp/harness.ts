@@ -28,6 +28,7 @@ import {
 } from "../../port";
 import {
 	type AdapterSetup,
+	type HarnessProfile,
 	type HarnessSpec,
 	harnessSession,
 	readOnlyInput,
@@ -80,6 +81,8 @@ export type AcpAgent = {
 	readOnly?: (
 		executable: string,
 	) => Promise<{ executable: string; cleanup: () => Promise<void> }>;
+	/** Tool calls the agent runs inside another tool (`HarnessProfile.nestedToolCalls`). */
+	nestedToolCalls?: HarnessProfile["nestedToolCalls"];
 };
 
 const modelFlag = (model: string | undefined) =>
@@ -251,6 +254,9 @@ export function acpSpec(name: string, agent: AcpAgent): HarnessSpec {
 			sessionEvent: `${name}.session-id`,
 			planEvent: acpPlanEvent(name),
 			createObserver: () => (mcp ? observeAcpEvent : observeAcpTextEvent),
+			...(agent.nestedToolCalls
+				? { nestedToolCalls: agent.nestedToolCalls }
+				: {}),
 		},
 		report: mcp ? "tool" : "text",
 		mcpAsSkills: mcp,

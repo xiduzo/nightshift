@@ -360,7 +360,7 @@ Each path comes from the `PATH`, unless you set it there or in `apps/server/.env
 
 ```bash
 NIGHTSHIFT_CLAUDE_BIN=/path/to/claude
-NIGHTSHIFT_OPENCODE_BIN=/path/to/opencode   # must be a 1.x build (see section 7)
+NIGHTSHIFT_OPENCODE_BIN=/path/to/opencode   # 1.x or 2.x (see section 7)
 NIGHTSHIFT_CODEX_BIN=/path/to/codex
 NIGHTSHIFT_GROK_BIN=/path/to/grok
 NIGHTSHIFT_COPILOT_BIN=/path/to/copilot
@@ -413,7 +413,7 @@ Settings, connections and secrets stay out. The values of saved secrets, and of 
 - `timeoutMinutes` on a Subflow node with `each` is not enforced. Every step inside the body keeps its own limit.
 - Item branches are `nightshift/<run8>-<id>-<title>`: git cannot nest a branch under the run branch `nightshift/<run8>`.
 - Network sleeps are tested with fakes only. Usage-limit sleeps ran for real on 2026-10-19 and 2026-10-25.
-- `@tanstack/ai-opencode` 0.5 drives OpenCode 1.x servers only (verified with 1.19.2). OpenCode 2.x serves a different API. Point the OpenCode harness at a 1.x `opencode` until the adapter catches up. The harness works around four adapter quirks: an empty first tool input, the prompt echoed as text, a finish held until the next heartbeat, and abort teardown. Report them upstream.
+- `@tanstack/ai-opencode` 1.0 drives OpenCode 1.x servers only (verified with 1.19.2). OpenCode 2.x serves a different API under `/api/…` and prints another ready line. The harness asks the executable for its version before each session. A 2.x build runs over ACP (`opencode acp`, verified with 2.0.22) and gets the permission rules of its mode in `OPENCODE_CONFIG_CONTENT`, because 2.x asks no permission by default. 2.x runs MCP tools inside its `execute` tool, so the step report comes from that tool's result. For 1.x, the harness works around four adapter quirks: an empty first tool input, the prompt echoed as text, a finish held until the next heartbeat, and abort teardown. Report them upstream.
 - The Codex harness is tested against a fake `codex` only. The event shapes, `exec resume`, error wording and the TOML MCP overrides are unverified. In `workspace-write`, commits from a linked worktree may need the git common dir in `additionalDirectories`.
 - The take-over commands for OpenCode (`opencode --session <id>`) and Codex (`codex resume <id>`) come from the CLI docs. Neither was run against a real session.
 - Slices 5 to 8 run real nights since 2026-10-18. The first planner that feeds a Subflow with `each`, and the first OpenCode or Codex step, are still the real tests of slices 6 and 8.

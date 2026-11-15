@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import {
+	chmod,
+	mkdtemp,
+	readdir,
+	readFile,
+	rm,
+	writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { now } from "@nightshift/time";
@@ -9,6 +16,7 @@ import { fakeBin } from "../../testing/fixtures/bin";
 import { fakeKnowledgeTools } from "../../testing/knowledge-tools";
 import {
 	createOpencodeObserver,
+	opencodeAcpConfig,
 	opencodeHarness,
 	opencodeMcpConfig,
 	opencodeSessionConfig,
@@ -544,5 +552,77 @@ describe("opencodeHarness", () => {
 		});
 		const events = await collect(harness.run(input()));
 		expect(events.at(-1)).toMatchObject({ type: "error", kind: "harness" });
+	});
+});
+
+describe("OpenCode 2.x", () => {
+	/** An `opencode` that says it is 2.0.22 and speaks ACP (the fake agent). */
+	async function opencode2(log: string): Promise<string> {
+		const agent = await fakeBin(dir, "fake-acp", "fake-acp", {
+			FAKE_ACP_LOG: log,
+			FAKE_ACP_CONFIG: "options",
+		});
+		const path = join(dir, "opencode");
+		await writeFile(
+			path,
+			`#!/bin/sh\nif [ "$1" = "--version" ]; then echo "opencode v2.0.22"; exit 0; fi\nexec '${agent}' "$@"\n`,
+		);
+		await chmod(path, 0o755);
+		return path;
+	}
+
+	test("runs over ACP, with the model chosen over ACP and the rules of its mode", async () => {
+		const log = join(dir, "acp.jsonl");
+		const harness = opencodeHarness({
+			opencodeExecutable: await opencode2(log),
+			config: { username: "night" },
+		});
+		const events = await collect(
+			harness.run(
+				input({
+					model: "ollama/qwen3-coder:latest",
+					permissionMode: "acceptEdits",
+					stepReport: true,
+				}),
+			),
+		);
+		expect(events).toContainEqual({
+			type: "report",
+			outcome: "pass",
+			summary: "The tests pass.",
+		});
+		expect(events.at(-1)?.type).toBe("finished");
+		const lines = (await readFile(log, "utf8"))
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line));
+		const argv = lines.find((line) => line.type === "argv");
+		expect(argv.argv).toEqual(["acp"]);
+		expect(argv.config).toEqual(
+			opencodeAcpConfig(
+				{ permissionMode: "acceptEdits" },
+				{ username: "night" },
+			),
+		);
+		expect(lines.filter((line) => line.type === "config")).toEqual([
+			{ type: "config", configId: "model", value: "ollama/qwen3-coder:latest" },
+		]);
+	});
+
+	test("the config turns off updates and sharing, and keeps the extra config under it", () => {
+		const config = opencodeAcpConfig(
+			{ permissionMode: "default" },
+			{ share: "auto", username: "night" },
+		);
+		expect(config).toMatchObject({
+			update: "disable",
+			share: "disabled",
+			username: "night",
+		});
+		expect(config.permissions).toContainEqual({
+			action: "execute",
+			resource: "*",
+			effect: "allow",
+		});
 	});
 });

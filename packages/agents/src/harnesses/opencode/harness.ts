@@ -22,10 +22,11 @@
  * maps it back). It is allowed in every mode, plan mode too, so the report
  * always uses the tool.
  *
- * Versions. `@tanstack/ai-opencode` 0.5 speaks the OpenCode 1.x server API
+ * Versions. `@tanstack/ai-opencode` 1.0 speaks the OpenCode 1.x server API
  * (`@opencode-ai/sdk` 1.x). OpenCode 2.x serves a different API (`/api/…`,
- * password auth) and prints another ready line: the adapter cannot drive it.
- * Point `opencodeExecutable` at a 1.x `opencode`. A 1.x server also refuses a
+ * password auth) and prints another ready line, so each session first asks
+ * the executable for its version: 2.x runs over ACP instead (`acp.ts`), 1.x
+ * (or a version it cannot tell) as described here. A 1.x server refuses a
  * data directory that a 2.x server already migrated.
  *
  * Lifecycle quirks of the adapter, handled here:
@@ -42,6 +43,7 @@
 import { parseInstant, now as timeNow } from "@nightshift/time";
 import type { SandboxHandle, SandboxProvider } from "@tanstack/ai-sandbox";
 import type {
+	AgentEvent,
 	AgentHarness,
 	AgentSessionInput,
 	AgentUsage,
@@ -56,7 +58,9 @@ import {
 	harnessSession,
 	readOnlyInput,
 } from "../../session";
+import { acpAgentHarness } from "../acp";
 import { harnessFacts } from "../facts";
+import { OPENCODE_ACP_AGENT, opencodeMajor, opencodeRules } from "./acp";
 import { adapterPermissionMode, opencodePermission } from "./permissions";
 
 export type OpencodeHarnessOptions = {
@@ -485,6 +489,73 @@ async function opencodeAdapter(
 }
 
 /**
+ * The OpenCode 2.x config of one session, in `OPENCODE_CONFIG_CONTENT`: the
+ * permission rules of the mode (2.x asks nothing by default), no updates,
+ * no sharing. `extra` goes under it, as for 1.x.
+ */
+export function opencodeAcpConfig(
+	input: Pick<
+		AgentSessionInput,
+		"permissionMode" | "mcpServers" | "clis" | "addDirs"
+	>,
+	extra: Record<string, unknown> = {},
+): Record<string, unknown> {
+	return mergeConfig(extra, {
+		update: "disable",
+		share: "disabled",
+		permissions: opencodeRules(
+			opencodePermission(
+				input.permissionMode,
+				Object.keys(input.mcpServers ?? {}),
+				input.clis ?? [],
+				input.addDirs ?? [],
+			),
+		),
+	});
+}
+
+/** One session on OpenCode 2.x, over ACP (see `acp.ts`). */
+function opencodeAcpSession(
+	input: AgentSessionInput,
+	options: OpencodeHarnessOptions,
+	executable: string,
+): AsyncIterable<AgentEvent> {
+	return acpAgentHarness("opencode", OPENCODE_ACP_AGENT, {
+		executable,
+		env: {
+			...options.env,
+			OPENCODE_CONFIG_CONTENT: JSON.stringify(
+				opencodeAcpConfig(input, options.config),
+			),
+		},
+		...(options.abortGraceMs !== undefined
+			? { abortGraceMs: options.abortGraceMs }
+			: {}),
+	}).run(input);
+}
+
+/** One session: over ACP on OpenCode 2.x, through the 1.x server API otherwise. */
+async function* opencodeSession(
+	input: AgentSessionInput,
+	options: OpencodeHarnessOptions,
+): AsyncIterable<AgentEvent> {
+	const executable = options.opencodeExecutable ?? "opencode";
+	const major = await opencodeMajor(executable);
+	if (major !== undefined && major >= 2) {
+		yield* opencodeAcpSession(input, options, executable);
+		return;
+	}
+	yield* harnessSession({
+		input,
+		spec: OPENCODE_SPEC,
+		adapter: () => opencodeAdapter(input, options),
+		...(options.abortGraceMs !== undefined
+			? { abortGraceMs: options.abortGraceMs }
+			: {}),
+	});
+}
+
+/**
  * Runs OpenCode sessions through TanStack AI, on the host, in `input.cwd`.
  * `model` is OpenCode's `provider/model`, for example
  * `anthropic/claude-sonnet-4-5` or `ollama/qwen3:8b`.
@@ -495,16 +566,6 @@ export function opencodeHarness(
 	return {
 		name: "opencode",
 		...harnessFacts("opencode"),
-		run: (raw) => {
-			const input = readOnlyInput(raw);
-			return harnessSession({
-				input,
-				spec: OPENCODE_SPEC,
-				adapter: () => opencodeAdapter(input, options),
-				...(options.abortGraceMs !== undefined
-					? { abortGraceMs: options.abortGraceMs }
-					: {}),
-			});
-		},
+		run: (raw) => opencodeSession(readOnlyInput(raw), options),
 	};
 }
