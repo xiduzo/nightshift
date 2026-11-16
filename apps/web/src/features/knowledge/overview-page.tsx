@@ -18,7 +18,7 @@ import { Switch } from "@nightshift/ui/components/switch";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { BookOpenIcon } from "lucide-react";
-import { useCallback, useId, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AskAnswer } from "./ask-answer";
 import { AskTellBox, type BoxMode } from "./ask-tell-box";
@@ -57,6 +57,8 @@ export function KnowledgeOverviewPage() {
 	const [agentOften, setAgentOften] = useState<HowOften>(AGENT_OFTEN);
 	const [sending, setSending] = useState(false);
 	const agentId = useId();
+	// Each Tell of this visit gets its own key in the thread.
+	const tellCount = useRef(0);
 
 	const unsay = useCallback(
 		(key: string) => setSaid((now) => now.filter((one) => one.key !== key)),
@@ -172,11 +174,13 @@ export function KnowledgeOverviewPage() {
 					linksIn(text).length > 0 && can.save ? toldNote(text) : text;
 				if (note !== null) outcome.note = await notes.tell({ note });
 			}
+			tellCount.current += 1;
+			const key = `told:${tellCount.current}`;
 			setSaid((now) => [
 				...now,
 				{
 					kind: "told",
-					key: `told:${now.length}`,
+					key,
 					text,
 					reply: tellReply(outcome),
 				},
