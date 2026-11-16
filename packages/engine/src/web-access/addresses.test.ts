@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { addressProblem, checkHost } from "./web-addresses";
+import { addressProblem, checkHost } from "./addresses";
 
 /**
  * Where a web request may go: the table of address ranges, on a laptop

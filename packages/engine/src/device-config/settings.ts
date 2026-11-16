@@ -562,7 +562,7 @@ export const HARNESS_BIN = Object.fromEntries(
 
 /**
  * Whether a web request from this computer may reach loopback and its
- * private network (`device/web-addresses.ts`): always on a computer that
+ * private network (`web-access/addresses.ts`): always on a computer that
  * is not a Host, else only when "Web requests reach this network" is on.
  * A Host serves every Member of its Spaces.
  */

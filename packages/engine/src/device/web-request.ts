@@ -1,12 +1,11 @@
 import type { JsonValue, WebRequestMethod } from "@nightshift/flows";
-
+import { type AddressRules, checkHost } from "../web-access";
 import type { WebRequestResult, WebResponse } from "./types";
-import { type AddressRules, checkHost } from "./web-addresses";
 
 /**
  * One HTTP request as the Device sends it, with every secret filled in:
  * the core of a Web request step and of a Wait for a URL. It checks every
- * address before it connects (`web-addresses.ts`), follows at most
+ * address before it connects (`web-access/addresses.ts`), follows at most
  * `MAX_REDIRECTS` redirects itself, and reads at most `maxBytes` of the
  * answer. Never throws.
  */
