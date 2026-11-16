@@ -7,7 +7,7 @@ import type { ApiQueryUtils } from "../api";
  * a step that ends on another computer may have proposed new ones.
  *
  * A mutation with a rule is here (`keep`, `delete`: `useSettleLearnings` holds
- * the rule). The others are the app's `orpc` ones, used as they are.
+ * the rule; `settleNote`, `tell`: `useCheckNotes`). The others are the app's `orpc` ones, used as they are.
  */
 export function createKnowledgeQueries(orpc: ApiQueryUtils) {
 	return {
@@ -66,5 +66,9 @@ export function createKnowledgeQueries(orpc: ApiQueryUtils) {
 		keep: () => orpc.knowledge.keepLearning.mutationOptions(),
 		/** Deletes one step's learnings. */
 		delete: () => orpc.knowledge.deleteLearning.mutationOptions(),
+		/** Keeps or deletes one note of a step's learnings. */
+		settleNote: () => orpc.knowledge.settleNote.mutationOptions(),
+		/** Keeps a note a person wrote, in place of a waiting one if given. */
+		tell: () => orpc.knowledge.tell.mutationOptions(),
 	};
 }

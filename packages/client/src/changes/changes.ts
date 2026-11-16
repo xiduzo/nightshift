@@ -239,7 +239,7 @@ type RoutePath = PathsOf<AppRouterClient>;
  * A test checks that every route of the API that is not a read has a row.
  *
  * An empty row: the screen owns the read (`useRunActed`, `useAnswerGate`,
- * `useSettleLearnings`, or `spaceChanged` when every read changes), a job
+ * `useSettleLearnings`, `useCheckNotes`, or `spaceChanged` when every read changes), a job
  * that the screen follows (its end calls `changed`), or nothing a screen
  * reads changes. A row names a document the route writes only for
  * some inputs too. It never names what changes later: another computer
@@ -301,6 +301,8 @@ export const SAVES: {
 	"knowledge.setLearnsFromRuns": ["knowledge"],
 	"knowledge.keepLearning": [],
 	"knowledge.deleteLearning": [],
+	"knowledge.settleNote": [],
+	"knowledge.tell": [],
 
 	"gates.resolve": [],
 	"schedules.runNow": [],

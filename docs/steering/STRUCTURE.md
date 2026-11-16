@@ -320,4 +320,5 @@ When code must break a rule for a while, add an entry here: the rule it breaks, 
 
 | Rule | Files | Until |
 | --- | --- | --- |
+| An entry name needs an importer (rule (m), `PENDING_NAMES` in `scripts/check-verticals.ts`) | `useCheckNotes` of `@nightshift/client` (`packages/client/src/knowledge/use-check-notes.ts`): the Knowledge overview checks one note at a time with it. | the web app's Knowledge overview imports it |
 | The clock (`scripts/check-time.ts`) | The lock-screen widget builds a `Date` for the native timer (`apps/mobile/src/features/glance/lock-screen.ios.tsx`). Its `widget` function cannot import a Night Shift package. `scripts/time-debt.txt` lists that file. | the widget timer takes an instant |

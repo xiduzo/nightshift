@@ -170,6 +170,7 @@ export {
 	type ReviewTask,
 	type SettleFailure,
 	taskLine,
+	useCheckNotes,
 	useSettleLearnings,
 	type WaitingLearning,
 } from "./knowledge";

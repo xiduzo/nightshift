@@ -1116,7 +1116,9 @@ function allWorkspaces(root: string): string[] {
  *
  * Shape: { entry: ["name"] }
  */
-export const PENDING_NAMES: Record<string, string[]> = {};
+export const PENDING_NAMES: Record<string, string[]> = {
+	"@nightshift/client": ["useCheckNotes"],
+};
 
 type Entry = {
 	/** How another workspace imports it: `@nightshift/db/migrate`. */
