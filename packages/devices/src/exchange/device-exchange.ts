@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
 import { documentName, type Engine, OlderHostError } from "@nightshift/engine";
-import type { HostClient, RunCommand, RunRows } from "../contract";
+import type {
+	HostClient,
+	PendingElsewhere,
+	RunCommand,
+	RunRows,
+} from "../contract";
 import { type HostSpaces, type Link, pause } from "../links";
 import { isEmpty, MissingProjectError, mergeCursors } from "./rows";
 import type { RunHistoryExchange } from "./run-history";
@@ -8,7 +13,7 @@ import type { RunHistoryExchange } from "./run-history";
 /**
  * This Device's half of the exchange of run history with one Host (the
  * Host's half is `HostExchange`; both go through `RunHistoryExchange`).
- * One per Host and engine. It runs as three streams of its Link
+ * One per Host and engine. It runs as four streams of its Link
  * (`attach`), all outbound. The Link starts them when it is online, stops
  * them when it drops, and starts them again after a failure:
  *
@@ -32,6 +37,12 @@ import type { RunHistoryExchange } from "./run-history";
  *   wait until it arrived, however long that takes, and go as soon as a
  *   row lands here. A Host of an older version has none: its Commands
  *   come with the rows, and this stream waits until the link drops.
+ * - Pending: `sync.pending`, the Commands that wait on the Host for other
+ *   Devices, in the Spaces of this computer's Person. This computer keeps
+ *   the last set in memory (`PendingOnHosts`), so its screens show an
+ *   answer on its way to another Device as such. A Host of an older
+ *   version has none: this computer knows only its own table, and asks
+ *   again in an hour.
  *
  * A Command is checked again here, from this Replica, and applied like a
  * local action (`RunHistoryExchange.apply`); then the Host is told. It is
@@ -320,6 +331,27 @@ export function createDeviceExchange(deps: {
 	}
 
 	/**
+	 * The Commands that wait on the Host for other Devices: each set the
+	 * Host sends replaces what this computer knew of it. A Host of an
+	 * older version has none: what it kept goes, and the stream waits.
+	 */
+	async function pending(client: HostClient, signal: AbortSignal) {
+		let stream: AsyncIterable<{ commands: PendingElsewhere[] }>;
+		try {
+			stream = await client.sync.pending({}, { signal });
+		} catch (error) {
+			if (!(error instanceof OlderHostError)) throw error;
+			exchange.pendingOnHosts.forget(hostId);
+			// It may be updated meanwhile: ask again in an hour.
+			await pause(OLDER_HOST_WAIT_MS, signal);
+			return;
+		}
+		for await (const batch of stream) {
+			exchange.pendingOnHosts.set(hostId, batch.commands);
+		}
+	}
+
+	/**
 	 * Ingests a batch. A run whose project is not here yet waits for the
 	 * Space documents that bring it to be in step with the Host, a while
 	 * at most, and then is tried once more: else the stream starts again,
@@ -355,6 +387,7 @@ export function createDeviceExchange(deps: {
 					pull(link, client, signal),
 				),
 				link.stream("sync.commands", commands),
+				link.stream("sync.pending", pending),
 			];
 			return () => {
 				for (const stop of stops) stop();

@@ -22,6 +22,7 @@ import {
 	type FeedPorts,
 	type TranscriptFeeds,
 } from "./feeds";
+import { createPendingOnHosts, type PendingOnHosts } from "./pending-on-hosts";
 import { createTakeOvers } from "./take-overs";
 
 /** Why a Command waits: its run is not walked here yet. It comes again. */
@@ -55,7 +56,9 @@ const NOT_HERE = "This device does not run this run.";
  *   events in this Space after `walker_seq` N".
  *
  * Beside it: the Commands a Host keeps for their Walkers (`commands`), the
- * live transcripts (`feeds`) and the Host's archive files (`archive`).
+ * Commands that wait on this Device's Hosts for other Walkers
+ * (`pendingOnHosts`), the live transcripts (`feeds`) and the Host's
+ * archive files (`archive`).
  */
 export type RunHistoryExchange = {
 	/**
@@ -135,6 +138,8 @@ export type RunHistoryExchange = {
 	): Promise<{ runId: string; walkerId: string; spaceId: string } | null>;
 	/** On a Host: the Commands it keeps for their Walkers. */
 	commands: RunCommands;
+	/** On a Device: the Commands that wait on its Hosts for other Walkers. */
+	pendingOnHosts: PendingOnHosts;
 	/** Live transcripts: one feed per step, wherever its run is walked. */
 	feeds: TranscriptFeeds;
 	/** The archive files on this Replica, as a Host keeps and serves them. */
@@ -411,6 +416,7 @@ export function createRunHistoryExchange(deps: {
 		runOwner,
 		stepOwner: history.stepOwner,
 		commands: createRunCommands({ db }),
+		pendingOnHosts: createPendingOnHosts(),
 		feeds,
 		archive: {
 			async read(ref) {

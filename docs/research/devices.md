@@ -1301,8 +1301,10 @@ The ADR table of `docs/steering/TECH.md` says why each one changed.
      that move it here, and for the run's take-over. A command
      to an offline Walker waits; the run page, the inbox and the run
      header show it as sent ("Answer sent"). Pending commands are known
-     where they wait: on the Host. A Device whose Host is offline refuses
-     the action; there is no outbox.
+     where they wait: on the Host. The other Devices follow the Host's set
+     of them (`sync.pending`, kept in memory), and count their own as
+     pending from the moment the Host takes it. A Device whose Host is
+     offline refuses the action; there is no outbox.
    - **Read-only elsewhere.** Recovery, the daemon's resume and a
      person's resume touch only runs this Device walks. Every other
      action on a run walked elsewhere is refused. `RunSummary.walker`

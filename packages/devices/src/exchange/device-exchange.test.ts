@@ -30,6 +30,7 @@ import type { Link } from "../links";
 import { httpsLink } from "../links/link";
 import { createPeerEngine, type PeerEngine } from "../peers";
 import { type PairedReplicas, pairedReplicas, withPeers } from "../testing";
+import type { CommandsChange } from "./commands";
 import {
 	type AppliedCommands,
 	createDeviceExchange,
@@ -382,6 +383,75 @@ function watch(engine: PeerEngine, runId: string, afterSeq?: number) {
 			controller.abort();
 			await done;
 		},
+	};
+}
+
+/**
+ * B walks a run to its Gate and takes no Command until `release`. C, a
+ * desktop of the same Person, follows A over its own Link (`wrap` changes
+ * C's client): it has the run at its Gate, and A's first answer of what
+ * waits there (or its refusal). `changes`: the runs C's screens heard of.
+ */
+async function desktopBesideB(
+	wrap: (client: HostClient) => HostClient = (c) => c,
+) {
+	const c = await createSandbox();
+	others.push(c);
+	const desktop = await paired.pair(c, "C");
+	await desktop.projectOnDevice(projectId);
+	const run = await walkOnB(gateFlow);
+
+	// B's Commands wait at the Host's door until `release`.
+	const held = Promise.withResolvers<void>();
+	const client = paired.memory.client(paired.key);
+	online(
+		withSync(client, {
+			commands: (async (input, options) => {
+				await new Promise<void>((resolve, reject) => {
+					held.promise.then(resolve);
+					options?.signal?.addEventListener("abort", () =>
+						reject(new Error("The stream stopped.")),
+					);
+				});
+				return client.sync.commands(input, options);
+			}) as HostClient["sync"]["commands"],
+		}),
+	);
+
+	let answered = 0;
+	const own = wrap(paired.memory.client(desktop.key));
+	online(
+		withSync(own, {
+			pending: (async (input, options) => {
+				try {
+					const sets = await own.sync.pending(input, options);
+					return (async function* () {
+						for await (const set of sets) {
+							answered++;
+							yield set;
+						}
+					})();
+				} catch (error) {
+					answered++;
+					throw error;
+				}
+			}) as HostClient["sync"]["pending"],
+		}),
+		deviceExchange(desktop.engine, c.deviceId),
+	);
+	await untilStatus(desktop.engine, run.id, "waiting");
+	await waitFor(() => answered > 0, { label: "A's answer of what waits" });
+
+	const changes: CommandsChange[] = [];
+	desktop.engine.exchange.pendingOnHosts.onChanged((change) =>
+		changes.push(change),
+	);
+	return {
+		run,
+		desktop,
+		onC: desktop.engine.space(a.spaceId, { personId: paired.personId }),
+		changes,
+		release: () => held.resolve(),
 	};
 }
 
@@ -1031,6 +1101,130 @@ describe("the Device's exchange with its Host", () => {
 		});
 		// It asked once, and waits: no stream that starts again and again.
 		expect(asked).toBe(1);
+	});
+
+	test("an answer C sends shows on C as on its way at once, and stays so until B applies it", async () => {
+		// A's sets after the first wait until `late`: only C itself can know.
+		const late = Promise.withResolvers<void>();
+		const { run, desktop, onC, changes, release } = await desktopBesideB(
+			(client) =>
+				withSync(client, {
+					pending: (async (input, options) => {
+						const sets = await client.sync.pending(input, options);
+						return (async function* () {
+							let first = true;
+							for await (const set of sets) {
+								if (!first) await late.promise;
+								first = false;
+								yield set;
+							}
+						})();
+					}) as HostClient["sync"]["pending"],
+				}),
+		);
+		const [gate] = await onC.listGates();
+		expect(gate).toMatchObject({ runId: run.id, answerPending: false });
+
+		await onC.act(run.id, {
+			kind: "answer",
+			stepId: gate?.stepId as string,
+			choice: "approve",
+		});
+		// At once: C never shows the Gate open again in between.
+		expect((await onC.listGates())[0]?.answerPending).toBe(true);
+		expect(changes).toContainEqual({ spaceId: a.spaceId, runId: run.id });
+
+		// A's set takes its place. B takes no Command: it stays on its way.
+		late.resolve();
+		const [kept] = await paired.host.exchange.commands.pendingOf([run.id]);
+		await waitFor(
+			() =>
+				desktop.engine.exchange.pendingOnHosts.of([run.id]).get(run.id)?.[0]
+					?.id === kept?.id,
+			{ label: "A's set on C" },
+		);
+		await Bun.sleep(1_000);
+		expect((await onC.listGates())[0]?.answerPending).toBe(true);
+		expect(
+			desktop.engine.exchange.pendingOnHosts
+				.of([run.id])
+				.get(run.id)
+				?.map((c) => c.kind),
+		).toEqual(["gate.resolve"]);
+
+		release();
+		await untilStatus(desktop.engine, run.id, "finished");
+		await waitFor(
+			() => desktop.engine.exchange.pendingOnHosts.of([run.id]).size === 0,
+			{ label: "the answer gone from C's set" },
+		);
+		expect(await onC.listGates()).toEqual([]);
+	});
+
+	test("an answer kept on the Host, as from the phone, reaches C as on its way, and C refuses a second one", async () => {
+		const { run, desktop, onC, changes, release } = await desktopBesideB();
+		const [gate] = await onC.listGates();
+		await paired.host
+			.space(a.spaceId, { personId: paired.personId })
+			.act(run.id, {
+				kind: "answer",
+				stepId: gate?.stepId as string,
+				choice: "approve",
+			});
+		await waitFor(
+			async () => (await onC.listGates())[0]?.answerPending === true,
+			{ label: "the answer on its way on C" },
+		);
+		// C's screens hear of it.
+		expect(changes).toContainEqual({ spaceId: a.spaceId, runId: run.id });
+		await expect(
+			onC.act(run.id, {
+				kind: "answer",
+				stepId: gate?.stepId as string,
+				choice: "reject",
+			}),
+		).rejects.toThrow(
+			"An answer to this Gate is already on its way to the device that runs it.",
+		);
+		expect(
+			await paired.host.exchange.commands.pendingOf([run.id]),
+		).toHaveLength(1);
+
+		// B applies it: it leaves C's set, and C's screens hear of that too.
+		changes.length = 0;
+		release();
+		await untilStatus(paired.device, run.id, "finished");
+		await waitFor(() => changes.some((change) => change.runId === run.id), {
+			label: "the tell that the answer is done",
+		});
+		await untilStatus(desktop.engine, run.id, "finished");
+		expect(await onC.listGates()).toEqual([]);
+	});
+
+	test("a Host of an older version has no pending stream: C knows only its own Commands, and asks once", async () => {
+		let asked = 0;
+		const { run, desktop, onC } = await desktopBesideB((client) =>
+			withSync(client, {
+				pending: (async () => {
+					asked++;
+					throw new ORPCError("NOT_FOUND", { status: 404 });
+				}) as HostClient["sync"]["pending"],
+			}),
+		);
+		const [gate] = await onC.listGates();
+		await onC.act(run.id, {
+			kind: "answer",
+			stepId: gate?.stepId as string,
+			choice: "approve",
+		});
+		// As before: nothing says the answer waits on the Host.
+		expect((await onC.listGates())[0]?.answerPending).toBe(false);
+		expect(desktop.engine.exchange.pendingOnHosts.of([run.id]).size).toBe(0);
+		await Bun.sleep(500);
+		expect(asked).toBe(1);
+		expect(
+			await paired.host.exchange.commands.pendingOf([run.id]),
+		).toHaveLength(1);
 	});
 
 	test("B keeps walking while A is away, and A catches up from the cursor when the link is back", async () => {

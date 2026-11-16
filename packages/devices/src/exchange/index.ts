@@ -8,6 +8,7 @@ export {
 	createDeviceExchange,
 } from "./device-exchange";
 export { createHostExchange } from "./host-exchange";
+export type { PendingOnHosts } from "./pending-on-hosts";
 export {
 	createRunHistoryExchange,
 	type RunHistoryExchange,

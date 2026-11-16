@@ -239,15 +239,25 @@ export function createPeers(
 				device,
 				documents,
 			}),
+			// The Commands this Replica keeps as a Host, and the ones its Hosts
+			// keep for other Walkers.
 			pendingCommands: async (runIds) => {
 				const byRun = new Map<
 					string,
 					Pick<RunCommand, "id" | "kind" | "createdAt">[]
 				>();
-				for (const c of await exchange.commands.pendingOf(runIds)) {
+				const onHosts = [...exchange.pendingOnHosts.of(runIds).values()];
+				for (const c of [
+					...(await exchange.commands.pendingOf(runIds)),
+					...onHosts.flat(),
+				]) {
 					const pending = byRun.get(c.runId) ?? [];
+					if (pending.some((known) => known.id === c.id)) continue;
 					pending.push({ id: c.id, kind: c.kind, createdAt: c.createdAt });
 					byRun.set(c.runId, pending);
+				}
+				for (const pending of byRun.values()) {
+					pending.sort((x, y) => x.createdAt - y.createdAt);
 				}
 				return byRun;
 			},

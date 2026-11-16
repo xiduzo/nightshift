@@ -726,6 +726,13 @@ async function makeDaemon(
 			console.error("Could not tell the open screens of new projects:", error);
 		});
 	};
+	// The same for an action that waits on a Host for another Device: this
+	// computer's own answer, or one from the phone.
+	engine.exchange.pendingOnHosts.onChanged(({ spaceId, runId }) => {
+		notifications.runChanged(spaceId, runId).catch((error: unknown) => {
+			console.error("Could not tell the open screens of a run:", error);
+		});
+	});
 	// A reload binds the kept documents to this daemon's notifications.
 	if (typeof documents.watchStored === "function") {
 		documents.watchStored((document) => tellDocument(document.name));
