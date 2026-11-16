@@ -140,6 +140,34 @@ function keepUpToDate(
 	return { cron };
 }
 
+type Kind = (typeof KNOWLEDGE_SOURCE_KINDS)[number];
+
+/** One kind of source to choose, as a card. */
+function KindOption({
+	id,
+	kind,
+	elsewhere,
+}: {
+	id: string;
+	kind: Kind;
+	/** The computer of a folder source that is not this one. */
+	elsewhere: string | null;
+}) {
+	return (
+		<FieldLabel htmlFor={id}>
+			<Field orientation="horizontal">
+				<FieldContent>
+					<FieldTitle>
+						{kind.local && elsewhere ? `Folder on ${elsewhere}` : kind.label}
+					</FieldTitle>
+					<FieldDescription>{kind.blurb}</FieldDescription>
+				</FieldContent>
+				<RadioGroupItem value={kind.kit} id={id} />
+			</Field>
+		</FieldLabel>
+	);
+}
+
 function SourceForm({
 	projectId,
 	edited,
@@ -157,7 +185,7 @@ function SourceForm({
 }) {
 	const id = useId();
 	const [kit, setKit] = useState<KnowledgeSourceKit>(
-		edited?.source.kit ?? "kit:knowledge/folder",
+		edited?.source.kit ?? "kit:knowledge/web",
 	);
 	const [values, setValues] = useState<InputTexts>(() => ({
 		...edited?.source.inputs,
@@ -281,24 +309,31 @@ function SourceForm({
 						disabled={edited !== null}
 						className="grid gap-2 sm:grid-cols-2"
 					>
-						{kinds.map((option) => (
-							<FieldLabel key={option.kit} htmlFor={`${id}-${option.kit}`}>
-								<Field orientation="horizontal">
-									<FieldContent>
-										<FieldTitle>
-											{option.local && elsewhere
-												? `Folder on ${elsewhere}`
-												: option.label}
-										</FieldTitle>
-										<FieldDescription>{option.blurb}</FieldDescription>
-									</FieldContent>
-									<RadioGroupItem
-										value={option.kit}
-										id={`${id}-${option.kit}`}
-									/>
-								</Field>
-							</FieldLabel>
-						))}
+						{kinds
+							.filter((option) => !option.more)
+							.map((option) => (
+								<KindOption
+									key={option.kit}
+									id={`${id}-${option.kit}`}
+									kind={option}
+									elsewhere={elsewhere}
+								/>
+							))}
+						{kinds.some((option) => option.more) ? (
+							<FieldSeparator className="sm:col-span-2">
+								More sources
+							</FieldSeparator>
+						) : null}
+						{kinds
+							.filter((option) => option.more)
+							.map((option) => (
+								<KindOption
+									key={option.kit}
+									id={`${id}-${option.kit}`}
+									kind={option}
+									elsewhere={elsewhere}
+								/>
+							))}
 					</RadioGroup>
 				</FieldSet>
 

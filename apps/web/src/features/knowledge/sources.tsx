@@ -63,6 +63,7 @@ import {
 	useKnowledge,
 } from "./knowledge-layout";
 import { knowledgeMutations } from "./queries";
+import { ReaderSetting } from "./reader-setting";
 import type { EditedSource } from "./source-dialog";
 import {
 	computerText,
@@ -112,6 +113,7 @@ export function KnowledgeSourcesPage() {
 					</EmptyHeader>
 				</Empty>
 			)}
+			<ReaderSetting />
 		</KnowledgeSection>
 	);
 }

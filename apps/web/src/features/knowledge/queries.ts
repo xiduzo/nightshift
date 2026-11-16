@@ -20,4 +20,6 @@ export const knowledgeMutations = {
 	setMeaning: orpc.knowledge.setMeaning.mutationOptions,
 	/** Turns the learnings from runs that ended on or off for the project. */
 	setLearnsFromRuns: orpc.knowledge.setLearnsFromRuns.mutationOptions,
+	/** Chooses the page reader of the project. */
+	setReader: orpc.knowledge.setReader.mutationOptions,
 };
