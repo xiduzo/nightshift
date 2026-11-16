@@ -963,9 +963,6 @@ describe("an Agent node that names no agent", () => {
 	});
 
 	test("runs on the first agent profile of the device it runs on: in a kit too (`kit:knowledge/agent`), under the Subflow's device", async () => {
-		const sources = {
-			"kit:knowledge/agent": { json: flow([nameless("sync")]) },
-		};
 		const call = {
 			id: "fetch",
 			type: "call",
