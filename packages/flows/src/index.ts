@@ -213,6 +213,7 @@ export {
 export {
 	ACCEPTED_LEARNINGS_DIR,
 	formatLearnings,
+	formatPersonNote,
 	isHiddenFromReaders,
 	isKitName,
 	isKnowledgeId,
@@ -242,6 +243,7 @@ export {
 	knowledgeSourceKitSchema,
 	knowledgeSourceSchema,
 	learningNotes,
+	learningPreface,
 	NOT_TOPICS_FILE,
 	PROPOSED_LEARNINGS_DIR,
 	parseLearnings,
@@ -250,6 +252,8 @@ export {
 	proposedLearningOf,
 	QUESTION_SET_FILE,
 	REVIEW_LEARNINGS_KIT,
+	toldLearningFileName,
+	withoutNote,
 } from "./kits";
 export {
 	blockersFirst,

@@ -30,11 +30,15 @@ export {
 	proposedLearningFileName,
 	proposedLearningOf,
 	QUESTION_SET_FILE,
+	toldLearningFileName,
 } from "./knowledge/layout";
 export {
 	formatLearnings,
+	formatPersonNote,
 	learningNotes,
+	learningPreface,
 	parseLearnings,
+	withoutNote,
 } from "./knowledge/learning-file";
 export {
 	KNOWLEDGE_SOURCE_KINDS,

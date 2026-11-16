@@ -1,3 +1,5 @@
+import { iso } from "@nightshift/time";
+
 /**
  * The text of a proposed learning's file: Night Shift's header, then one
  * note per `- ` line. It is in `flows` because every layer that holds notes
@@ -62,9 +64,84 @@ export function formatLearnings(
 export function parseLearnings(text: string): string[] {
 	return text
 		.split("\n")
-		.filter((line) => line.startsWith(NOTE_START))
-		.map((line) => line.slice(NOTE_START.length).trim())
-		.filter((note) => note !== "");
+		.filter(isNoteLine)
+		.map((line) => line.slice(NOTE_START.length).trim());
+}
+
+/** Whether a line of a file is a note: what `parseLearnings` reads. */
+function isNoteLine(line: string): boolean {
+	return (
+		line.startsWith(NOTE_START) && line.slice(NOTE_START.length).trim() !== ""
+	);
+}
+
+/**
+ * The file without its note at `index` (in the order of `parseLearnings`),
+ * and how many notes it has left. Every other line stays as it was. Null:
+ * the file has no note at that index.
+ */
+export function withoutNote(
+	text: string,
+	index: number,
+): { text: string; notes: number } | null {
+	const lines = text.split("\n");
+	let at = -1;
+	let line = -1;
+	for (const [i, candidate] of lines.entries()) {
+		if (!isNoteLine(candidate)) continue;
+		at++;
+		if (at === index) line = i;
+	}
+	if (line === -1) return null;
+	lines.splice(line, 1);
+	return { text: lines.join("\n"), notes: at };
+}
+
+/**
+ * The lines of a file before its first note, without the blank lines at
+ * their end: Night Shift's header, or what a Command wrote above its notes.
+ * Empty when the file starts with a note.
+ */
+export function learningPreface(text: string): string {
+	const lines = text.split("\n");
+	const first = lines.findIndex(isNoteLine);
+	return lines
+		.slice(0, first === -1 ? lines.length : first)
+		.join("\n")
+		.trimEnd();
+}
+
+/** The header of the file that keeps the notes one person told. */
+const TOLD_HEADER =
+	"# Learnings people told\n\nWhat a person of this Space told agents about this project.";
+
+/**
+ * One note a person decided on, as `learnings/accepted/` keeps it: the note
+ * on its `- ` line, then a line that says who and when. `told`: the person
+ * wrote it. `kept`: an agent or Night Shift proposed it, and the person
+ * kept it. The second line does not start with `- `, so no reader counts it
+ * as a note, and Markdown shows it under its note. `isNew`: the file is new,
+ * so the text starts with a header: the told one, else `preface` (the
+ * proposed file's, `learningPreface`). Empty when the note is.
+ */
+export function formatPersonNote(
+	note: string,
+	mark: { how: "told" | "kept"; by: string; at: number },
+	file: { isNew: boolean; preface?: string },
+): string {
+	const [line] = learningNotes([note]);
+	if (line === undefined) return "";
+	const who = mark.by.replace(/\s+/g, " ").trim() || "a person";
+	const day = iso(mark.at).slice(0, 10);
+	const head = !file.isNew
+		? ""
+		: mark.how === "told"
+			? `${TOLD_HEADER}\n\n`
+			: file.preface
+				? `${file.preface}\n\n`
+				: "";
+	const how = mark.how === "told" ? "Told" : "Kept";
+	return `${head}${NOTE_START}${line}\n  ${how} by ${who} on ${day}.\n`;
 }
 
 /** An id of a run, in the shell's awk. `layout.ts` holds the rule for a name. */

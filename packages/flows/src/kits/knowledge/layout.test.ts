@@ -18,6 +18,7 @@ import {
 	proposedLearningFileName,
 	proposedLearningOf,
 	QUESTION_SET_FILE,
+	toldLearningFileName,
 } from "./layout";
 
 describe("the layout of the knowledge folder", () => {
@@ -200,5 +201,17 @@ done`,
 			"research/papers",
 			"research/replications",
 		]);
+	});
+});
+
+describe("the file of the notes one person told", () => {
+	test("is named by the person, with nothing that could leave the folder", () => {
+		expect(toldLearningFileName("u_Ab-12")).toBe("told-u_Ab-12.md");
+		expect(toldLearningFileName("../x y")).toBe("told----x-y.md");
+		expect(toldLearningFileName("")).toBe("told-person.md");
+		expect(toldLearningFileName("..")).toBe("told-person.md");
+		expect(toldLearningFileName("a".repeat(100))).toBe(
+			`told-${"a".repeat(64)}.md`,
+		);
 	});
 });

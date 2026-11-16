@@ -156,6 +156,17 @@ export function proposedLearningAt(
 }
 
 /**
+ * The name of the file in `learnings/accepted/` that keeps the notes one
+ * person told: `told-<person>.md`. One file per person, so two people who
+ * tell at once on two Devices never write the same file. A character the
+ * rule for an id does not take becomes `-`.
+ */
+export function toldLearningFileName(personId: string): string {
+	const key = personId.replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 64);
+	return `told-${/[A-Za-z0-9]/.test(key) ? key : "person"}.md`;
+}
+
+/**
  * The folders of the knowledge an Agent node may pick, from the paths the
  * Knowledge page lists: every folder that holds a file, at any depth,
  * sorted. The listing already leaves out what is hidden from readers, so
