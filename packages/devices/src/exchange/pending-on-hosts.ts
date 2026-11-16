@@ -11,7 +11,9 @@ import type { CommandsChange } from "./commands";
  *
  * - Each set from a Host replaces what this Device knew of that Host.
  * - An action this Device just sent counts at once (`add`). The Host's
- *   next set replaces it.
+ *   next set replaces it. It also goes by itself after `sentMs`: the
+ *   Host sends a set only when it changes, and the sets with this action
+ *   may have come before it, the last one without it.
  * - A Host of an older version says nothing: this Device knows only its
  *   own table, as before.
  * - A link that drops keeps the last set: the next one replaces it when
@@ -37,9 +39,28 @@ export type PendingOnHosts = {
 	onChanged(listener: (change: CommandsChange) => void): () => void;
 };
 
-export function createPendingOnHosts(): PendingOnHosts {
+/** How long an action this Device sent counts without the Host's word. */
+const SENT_MS = 30_000;
+
+export function createPendingOnHosts(
+	options: {
+		/** How long an action this Device sent counts without a new set. Default 30 s. */
+		sentMs?: number;
+		/** Runs `run` after `ms`. Returns how to cancel it. Default: a timer. */
+		after?: (ms: number, run: () => void) => () => void;
+	} = {},
+): PendingOnHosts {
 	const byHost = new Map<string, readonly PendingElsewhere[]>();
 	const listeners = new Set<(change: CommandsChange) => void>();
+	/** The actions this Device sent that no set replaced yet: how to cancel each one's end. */
+	const sent = new Map<string, () => void>();
+	const schedule =
+		options.after ??
+		((ms: number, run: () => void) => {
+			const timer = setTimeout(run, ms);
+			timer.unref?.();
+			return () => clearTimeout(timer);
+		});
 
 	/** The ids of each run's Commands, as one string per run. */
 	function idsByRun(commands: readonly PendingElsewhere[]) {
@@ -66,6 +87,13 @@ export function createPendingOnHosts(): PendingOnHosts {
 		next: readonly PendingElsewhere[] | undefined,
 	) {
 		const before = idsByRun(byHost.get(hostId) ?? []);
+		// A sent action the next set leaves out has no end to wait for.
+		const kept = new Set((next ?? []).map((c) => c.id));
+		for (const c of byHost.get(hostId) ?? []) {
+			if (kept.has(c.id)) continue;
+			sent.get(c.id)?.();
+			sent.delete(c.id);
+		}
 		if (next) byHost.set(hostId, next);
 		else byHost.delete(hostId);
 		const after = idsByRun(next ?? []);
@@ -98,6 +126,20 @@ export function createPendingOnHosts(): PendingOnHosts {
 				return;
 			}
 			replace(hostId, [...known, command]);
+			// No set may come after it: it goes by itself.
+			sent.set(
+				command.id,
+				schedule(options.sentMs ?? SENT_MS, () => {
+					sent.delete(command.id);
+					const now = byHost.get(hostId);
+					if (now?.some((c) => c.id === command.id)) {
+						replace(
+							hostId,
+							now.filter((c) => c.id !== command.id),
+						);
+					}
+				}),
+			);
 		},
 
 		forget(hostId) {
