@@ -43,6 +43,7 @@ import {
 import {
 	commandBatchSchema,
 	feedStepSchema,
+	pendingBatchSchema,
 	syncBatchSchema,
 	transcriptEntrySchema,
 } from "./sync";
@@ -320,6 +321,19 @@ export const hostContract = {
 			})
 			.input(z.object({}).default({}))
 			.output(describedStream(commandBatchSchema)),
+		/**
+		 * The Commands that wait for other Devices, in the Spaces of the
+		 * key's Person: the whole set, then again each time it changes. The
+		 * Device shows an action on its way until its Walker applies it. An
+		 * older Host has none: the Device knows only its own.
+		 */
+		pending: sync
+			.route({
+				summary:
+					"Streams the Commands that wait for other Devices in the Spaces of a Device's Person, then the whole set each time it changes.",
+			})
+			.input(z.object({}).default({}))
+			.output(describedStream(pendingBatchSchema)),
 		/** Starts a run placed on another Device, for the key's Person: this Host walks it. */
 		startRun: sync
 			.route({

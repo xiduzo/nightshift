@@ -53,7 +53,9 @@ import type { HostExchange } from "./types";
  *   run's events as they happened.
  * - A command needs the role that allows the action, checked here. A run
  *   this Host walks gets it at once; any other waits for its Walker, which
- *   takes it on its own stream (`commands`), never behind rows.
+ *   takes it on its own stream (`commands`), never behind rows. The other
+ *   Devices of its Space's Members hear that it waits (`pending`), but not
+ *   what it carries.
  * - The archive keeps what a Walker puts for its own runs, and gives a
  *   Member what it asks of their Spaces' runs: a copy of a step's file
  *   only when its stamp holds the step as this Host's log says.
@@ -274,6 +276,45 @@ export function createHostExchange(deps: {
 				});
 				try {
 					const commands = await exchange.commands.pendingFor(caller.deviceId);
+					const ids = commands.map((c) => c.id).join();
+					if (ids !== sent) {
+						sent = ids;
+						yield { commands };
+						continue;
+					}
+					await changed;
+				} finally {
+					cycle.abort();
+				}
+			}
+		},
+
+		async *pending(caller, signal) {
+			let sent: string | null = null;
+			while (!signal?.aborted) {
+				const cycle = new AbortController();
+				const signals = signal ? [signal, cycle.signal] : [cycle.signal];
+				// Listen before reading, so no Command is kept unseen between the two.
+				const changed = change(AbortSignal.any(signals), caller.deviceId, {
+					rows: null,
+					commands: true,
+				});
+				try {
+					// Read again each cycle: a long stream follows a change of Membership.
+					const kept = await exchange.commands.pendingIn(
+						await caller.spaces(),
+						caller.deviceId,
+					);
+					// What it carries stays with its Walker: the others know it waits.
+					const commands = kept.map(
+						({ id, spaceId, runId, kind, createdAt }) => ({
+							id,
+							spaceId,
+							runId,
+							kind,
+							createdAt,
+						}),
+					);
 					const ids = commands.map((c) => c.id).join();
 					if (ids !== sent) {
 						sent = ids;

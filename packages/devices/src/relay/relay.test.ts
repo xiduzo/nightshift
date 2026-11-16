@@ -195,6 +195,8 @@ function relayWith(
 	options: { inStep?: InStepFake; flowSyncMs?: number } = {},
 ) {
 	const enqueued: unknown[] = [];
+	/** The actions this computer counts as waiting on a Host, once sent there. */
+	const sent: unknown[] = [];
 	const relay = createRelay({
 		engine: () => ({
 			hostSpaces,
@@ -204,6 +206,9 @@ function relayWith(
 						enqueued.push(command);
 						return { id: "command-1" } as never;
 					},
+				},
+				pendingOnHosts: {
+					add: (hostId, command) => sent.push({ hostId, ...command }),
 				},
 			},
 		}),
@@ -222,7 +227,7 @@ function relayWith(
 			? { flowSyncMs: options.flowSyncMs }
 			: {}),
 	});
-	return { relay, host, enqueued };
+	return { relay, host, enqueued, sent };
 }
 
 const command = (spaceId: string, walkerId = "walker-b") => ({
@@ -389,10 +394,11 @@ describe("the relay, for a Space kept here", () => {
 	});
 
 	test("a command waits here for its paired Walker", async () => {
-		const { relay, enqueued, host } = relayWith();
+		const { relay, enqueued, host, sent } = relayWith();
 		await relay.command(command("space-own"));
 		expect(enqueued).toEqual([command("space-own")]);
 		expect(host.taken).toEqual([]);
+		expect(sent).toEqual([]);
 	});
 
 	test("a command for a Walker that is not paired, or revoked, is refused", async () => {
@@ -436,9 +442,20 @@ describe("the relay, for a Space kept here", () => {
 
 describe("the relay, for a Space a Host keeps", () => {
 	test("each call goes to the Host over its Link, shaped for it", async () => {
-		const { relay, host, enqueued } = relayWith();
+		const { relay, host, enqueued, sent } = relayWith();
 		const act = actions(relay, "space-team");
 		await act.command();
+		// It waits on the Host now: this computer counts it at once.
+		expect(sent).toEqual([
+			{
+				hostId: "host-1",
+				id: expect.stringMatching(/^sent-/),
+				spaceId: "space-team",
+				runId: "run-1",
+				kind: "run.stop",
+				createdAt: expect.any(Number),
+			},
+		]);
 		expect(await act.addProject()).toEqual({ projectId: "project-on-host" });
 		await act.addClone();
 		await act.offer();
@@ -504,6 +521,15 @@ describe("the relay, for a Space a Host keeps", () => {
 			},
 		]);
 		expect(enqueued).toEqual([]);
+	});
+
+	test("a command for a run the Host walks waits nowhere: this computer counts nothing as sent", async () => {
+		const { relay, host, sent } = relayWith();
+		await relay.command(command("space-team", "host-1"));
+		expect(host.taken).toEqual([
+			{ procedure: "sync.command", input: command("space-team", "host-1") },
+		]);
+		expect(sent).toEqual([]);
 	});
 
 	test("a Host of an older version, which cannot add a project, says to update it", async () => {

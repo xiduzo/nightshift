@@ -1,4 +1,5 @@
 import {
+	COMMAND_KINDS,
 	type FeedStep,
 	type RunCommandInput,
 	runCommandSchema,
@@ -83,6 +84,38 @@ export type CommandBatch = { commands: RunCommand[] };
 /** The Commands that wait for a Device, as the Host describes them (`CommandBatch`). */
 export const commandBatchSchema = exact<CommandBatch>()(
 	z.object({ commands: z.array(keptCommandSchema) }),
+);
+
+/**
+ * A Command that waits on the Host for another Device, as a Device that
+ * does not walk its run knows of it: enough to say an action is on its
+ * way, without what it carries.
+ */
+export type PendingElsewhere = Pick<
+	RunCommand,
+	"id" | "spaceId" | "runId" | "kind" | "createdAt"
+>;
+
+/**
+ * The Commands that wait on the Host for Devices other than the caller,
+ * in the Spaces of the caller's Person: the whole set each time it
+ * changes (`sync.pending`). A Command it lacks is done there.
+ */
+export type PendingBatch = { commands: PendingElsewhere[] };
+
+/** The Commands that wait for other Devices, as the Host describes them (`PendingBatch`). */
+export const pendingBatchSchema = exact<PendingBatch>()(
+	z.object({
+		commands: z.array(
+			z.object({
+				id: z.string(),
+				spaceId: z.string(),
+				runId: z.string(),
+				kind: z.enum(COMMAND_KINDS),
+				createdAt: z.number(),
+			}),
+		),
+	}),
 );
 
 /** One answer of the exchange, as the Host describes it (`SyncBatch`). */

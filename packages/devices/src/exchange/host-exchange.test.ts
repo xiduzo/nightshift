@@ -517,6 +517,59 @@ describe("the Commands that wait for a Device", () => {
 	});
 });
 
+describe("the Commands that wait for other Devices", () => {
+	test("reach the other Devices of the Space's Members, without what they carry, again each time they change", async () => {
+		await sandbox.db.insert(organization).values({
+			id: "space-other",
+			name: "Other",
+			slug: "space-other",
+			createdAt: asDate(),
+		});
+		const keep = (spaceId: string, walkerId: string) =>
+			engine.exchange.commands.enqueue({
+				kind: "gate.resolve",
+				payload: { stepId: "step-1", choice: "approve" },
+				spaceId,
+				runId: `run-of-${walkerId}-in-${spaceId}`,
+				walkerId,
+				personId: ownerId,
+			});
+		// The owner's laptop walks a run: the colleague's Device hears it waits.
+		const forLaptop = await keep(sandbox.spaceId, "device-mine");
+		// Its own: it takes those on `commands`. Another Space's: not its business.
+		await keep(sandbox.spaceId, "device-colleague");
+		await keep("space-other", "device-mine");
+		const stop = new AbortController();
+		try {
+			const pending = host()
+				.pending(keyOf("device-colleague", "colleague"), stop.signal)
+				[Symbol.asyncIterator]();
+			expect((await pending.next()).value).toEqual({
+				commands: [
+					{
+						id: forLaptop.id,
+						spaceId: sandbox.spaceId,
+						runId: forLaptop.runId,
+						kind: "gate.resolve",
+						createdAt: forLaptop.createdAt,
+					},
+				],
+			});
+			const next = pending.next();
+			await engine.exchange.commands.done(forLaptop.id, "device-mine", null);
+			expect((await next).value).toEqual({ commands: [] });
+
+			// A Person in none of the Spaces hears of none.
+			const stranger = host()
+				.pending(keyOf("device-stranger", "stranger"), stop.signal)
+				[Symbol.asyncIterator]();
+			expect((await stranger.next()).value).toEqual({ commands: [] });
+		} finally {
+			stop.abort();
+		}
+	});
+});
+
 describe("a push the Host refuses", () => {
 	/** A run of `walkerId` in the owner's Space, of `project`, with one event. */
 	const rowsOf = (walkerId: string, project = projectId) => ({

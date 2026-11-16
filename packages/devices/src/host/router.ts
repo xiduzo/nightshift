@@ -115,6 +115,9 @@ export const hostRouter = os.router({
 		}) {
 			yield* context.exchange.commands(context.caller, signal);
 		}),
+		pending: keyed.sync.pending.handler(async function* ({ context, signal }) {
+			yield* context.exchange.pending(context.caller, signal);
+		}),
 		push: keyed.sync.push.handler(({ context, input }) =>
 			context.exchange.push(context.caller, input),
 		),

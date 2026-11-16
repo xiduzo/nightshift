@@ -32,6 +32,7 @@ export const STREAMING_PROCEDURES: readonly string[] = [
 	"devices.call",
 	"sync.stream",
 	"sync.commands",
+	"sync.pending",
 	"archive.follow",
 ];
 

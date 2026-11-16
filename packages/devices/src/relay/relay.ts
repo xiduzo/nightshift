@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
 	type FlowDocuments,
 	HostUnreachableError,
@@ -6,8 +7,9 @@ import {
 	type WalkFile,
 } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
+import { now } from "@nightshift/time";
 import type { HostClient, HostRelay, InStep } from "../contract";
-import type { RunCommands } from "../exchange";
+import type { PendingOnHosts, RunCommands } from "../exchange";
 import type { DeviceLinks, HostSpaces } from "../links";
 import type { DeviceRegistry } from "../registry";
 import { createSpaceRoutes } from "./route";
@@ -50,7 +52,10 @@ export function createRelay(deps: {
 	/** Lazy: the engine is made with this relay. */
 	engine(): {
 		hostSpaces: Pick<HostSpaces, "hostOf">;
-		exchange: { commands: Pick<RunCommands, "enqueue"> };
+		exchange: {
+			commands: Pick<RunCommands, "enqueue">;
+			pendingOnHosts: Pick<PendingOnHosts, "add">;
+		};
 	};
 	registry(): Pick<DeviceRegistry, "get">;
 	links(): Pick<DeviceLinks, "get">;
@@ -105,6 +110,17 @@ export function createRelay(deps: {
 			if (to.at === "host") {
 				// The Host acts in the name of the key's Person, never a Person the call names.
 				await to.ask((client) => client.sync.command(command));
+				// A run the Host walks takes it at once. Any other waits on the
+				// Host now: this computer shows it at once, and the Host's next
+				// set replaces it.
+				if (command.walkerId === to.hostId) return;
+				deps.engine().exchange.pendingOnHosts.add(to.hostId, {
+					id: `sent-${randomUUID()}`,
+					spaceId: command.spaceId,
+					runId: command.runId,
+					kind: command.kind,
+					createdAt: now(),
+				});
 				return;
 			}
 			const walker = await deps.registry().get(command.walkerId);
