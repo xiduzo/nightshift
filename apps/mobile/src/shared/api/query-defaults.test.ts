@@ -1,6 +1,6 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
-import { QueryClient } from "@tanstack/react-query";
+import { onlineManager, QueryClient } from "@tanstack/react-query";
 
 import { KEPT_MAX_AGE_MS } from "./kept-queries";
 import { setPhoneQueryDefaults } from "./query-defaults";
@@ -60,5 +60,40 @@ describe("how long a read stays in the cache on the phone", () => {
 
 	test("the detail of a run keeps the shared default", () => {
 		expect(defaultsOf(["runs", "get"]).gcTime).toBeUndefined();
+	});
+});
+
+describe("a write on the phone", () => {
+	test("goes also when the phone thinks it is offline", () => {
+		const client = new QueryClient({
+			defaultOptions: { mutations: { retry: 2 } },
+		});
+		setPhoneQueryDefaults(client);
+		const { mutations } = client.getDefaultOptions();
+		expect(mutations?.networkMode).toBe("always");
+		// The defaults it had stay.
+		expect(mutations?.retry).toBe(2);
+	});
+
+	test("an answer does not pause while the phone thinks it is offline", async () => {
+		const client = new QueryClient();
+		setPhoneQueryDefaults(client);
+		onlineManager.setOnline(false);
+		try {
+			let sent = false;
+			const answer = client
+				.getMutationCache()
+				.build(client, {
+					mutationFn: async () => {
+						sent = true;
+						return "answered";
+					},
+				})
+				.execute(undefined);
+			expect(await answer).toBe("answered");
+			expect(sent).toBe(true);
+		} finally {
+			onlineManager.setOnline(true);
+		}
 	});
 });

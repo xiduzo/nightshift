@@ -36,8 +36,21 @@ function keyOf(path: string): [string[]] {
  * for a kept read, how long it stays in the cache. A kept read stays as
  * long as the phone keeps it (`KEPT_MAX_AGE_MS`). Else a tab that is not
  * in front would drop it, and the next write would forget it too.
+ *
+ * A write (an answer, a retry) always goes, also when the phone thinks it
+ * is offline. That state can be wrong: iOS can miss the "back online"
+ * event while the app sleeps. A paused write kept "Sending…" on screen
+ * forever and never reached the Host. Now it goes, or fails, and the
+ * screen says why.
  */
 export function setPhoneQueryDefaults(queryClient: QueryClient): void {
+	queryClient.setDefaultOptions({
+		...queryClient.getDefaultOptions(),
+		mutations: {
+			...queryClient.getDefaultOptions().mutations,
+			networkMode: "always",
+		},
+	});
 	const paths = new Set([...Object.keys(PHONE_STALE_MS), ...KEPT_PATHS]);
 	for (const path of paths) {
 		const staleTime = PHONE_STALE_MS[path];

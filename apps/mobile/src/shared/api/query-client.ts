@@ -24,18 +24,28 @@ function followAppState() {
 
 /**
  * A phone without a network is offline: reads wait instead of failing,
- * and go once the network is back.
+ * and go once the network is back. The phone asks again each time the app
+ * comes to the front: iOS can miss the "back online" event while the app
+ * sleeps, and the app would stay offline until it restarts.
  */
 function followNetwork() {
 	onlineManager.setEventListener((setOnline) => {
-		getNetworkStateAsync().then(
-			(state) => setOnline(state.isConnected !== false),
-			() => undefined,
-		);
-		const subscription = addNetworkStateListener((state) => {
+		const ask = () =>
+			getNetworkStateAsync().then(
+				(state) => setOnline(state.isConnected !== false),
+				() => undefined,
+			);
+		void ask();
+		const network = addNetworkStateListener((state) => {
 			setOnline(state.isConnected !== false);
 		});
-		return () => subscription.remove();
+		const app = AppState.addEventListener("change", (state) => {
+			if (state === "active") void ask();
+		});
+		return () => {
+			network.remove();
+			app.remove();
+		};
 	});
 }
 
