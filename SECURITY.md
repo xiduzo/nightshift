@@ -32,7 +32,7 @@ Examples:
 
 ## Web requests
 
-A Web request node and a Wait for a URL send HTTP requests from the computer of their step. Night Shift checks every address that the host name resolves to, and the address of every redirect, before it connects. It follows at most 5 redirects.
+A Web request node, a Wait for a URL and the page readers of the knowledge (ADR 39) send HTTP requests from the computer of their step. Night Shift checks every address that the host name resolves to, and the address of every redirect, before it connects. It follows at most 5 redirects.
 
 - **Never:** link-local addresses (`169.254.0.0/16`, `fe80::/10`, where cloud metadata services live), the cloud metadata addresses `fd00:ec2::254` and `100.100.100.200`, `0.0.0.0` and `::`, broadcast, multicast and reserved ranges. An IPv6 address that holds an IPv4 address counts as that IPv4 address.
 - **On a Host, only when its Settings allow it:** loopback, private (RFC 1918), unique local (`fc00::/7`) and carrier-grade NAT (`100.64.0.0/10`) addresses. The switch is **Web requests reach this network** in the Host settings, or `NIGHTSHIFT_WEB_REQUESTS_PRIVATE_NETWORK=on`. It is off by default, because a Host runs the flows of every Member of its Spaces. A computer that is not a Host may reach them: they are its person's own network.

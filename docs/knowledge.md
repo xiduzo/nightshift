@@ -347,7 +347,7 @@ Kits do the common syncs. Call one from a Subflow node:
 | `kit:knowledge/folder` | A folder anywhere on the computer (`~/notes` or a full path), with optional patterns, one per line: `*.md`. Hidden files stay out. At most 5 000 files. | Nothing. Runs on the computer that has the folder |
 | `kit:knowledge/github-wiki` | The wiki of a repository (`owner/name`), or any git address. | git, signed in for a private wiki |
 | `kit:knowledge/git` | Some folders or files of any git repository (`owner/name` or any git address), with an optional branch. "Only these paths" takes gitignore-style patterns, one per line: `docs/standaard/**/*.md`, `!docs/standaard/archief/**`. Empty copies the whole repository. The clone is shallow, blobless and sparse, so git fetches only the contents of matching files. | git, signed in for a private repository |
-| `kit:knowledge/web` | Web pages as markdown, through `r.jina.ai`. A page that cannot be read keeps its last copy and does not stop the others. The sync fails only when it reads no page. With `follow`, also the pages they link to (see Web pages that follow links). | curl, no account |
+| `kit:knowledge/web` | Web pages as markdown, through the project's page reader (see Page readers). A page that cannot be read keeps its last copy and does not stop the others. The sync fails only when it reads no page. With `follow`, also the pages they link to (see Web pages that follow links). | curl. A key only for Firecrawl at its default address |
 | `kit:knowledge/jira` | Jira work items, one markdown file each. | A CLI tool for `acli`, signed in, and jq |
 | `kit:knowledge/confluence` | Confluence pages by id, one markdown file each. | The secret `CONFLUENCE_API_TOKEN`, curl and jq |
 | `kit:knowledge/agent` | What a person describes in `what`, fetched by an agent with its own tools, as markdown files. See An agent fetches it. | An Agent Profile on the computer that runs it |
@@ -416,9 +416,14 @@ With `follow` set to `true`, `kit:knowledge/web` treats each address in
    at most 20 sitemap files. Gzipped sitemaps are not read.
 3. When a sitemap lists pages in scope, the kit reads the start pages and
    those pages, and follows no link.
-4. Otherwise the kit follows the markdown links (`[text](address)`) of each
-   page, breadth first, up to `depth`. Absolute and root-relative links
-   count. Other relative links do not: the reader writes absolute links.
+4. Otherwise the kit follows the links of each page, breadth first, up to
+   `depth`: every link the page reader saw on the page (`links` of the
+   step's reader), the navigation too. Without a step's reader, the
+   markdown links (`[text](address)`) of the page: absolute and
+   root-relative links count, other relative links do not.
+
+A page reader with a map of a site (Firecrawl) lists the pages of each
+start page's folder before step 2. A site it mapped needs no sitemap.
 
 A link loses its `#fragment` and its `?query`. Two addresses with the same
 file name are one page, so `/docs` and `/docs/` are read once. A crawl does
@@ -426,13 +431,13 @@ not follow images, media, fonts, archives, CSS, scripts, JSON, XML, feeds
 or PDFs. A PDF can still be a start page. The reader turns it into one
 long file, which is why a crawl does not follow it.
 
-The kit sends one request at a time. It waits `NS_WEB_PAUSE` seconds
-between two reader requests (default 3): without a key, the reader takes
-20 requests a minute. Every request has the User-Agent
-`NightShift-knowledge/1 (+https://github.com/xiduzo/nightshift)`. It names
-the product, never the person. `NS_WEB_READER` sets the address of the
-reader (default `https://r.jina.ai/`). The tests point it at a local
-`Bun.serve` site.
+The kit reads one page at a time. It waits `NS_WEB_PAUSE` seconds between
+two pages (default 3): without a key, Jina Reader takes 20 requests a
+minute, and a site deserves a polite reader. Every request has the
+User-Agent `NightShift-knowledge/1 (+https://github.com/xiduzo/nightshift)`.
+It names the product, never the person. Without a step's reader,
+`NS_WEB_READER` sets the address of the reader (default
+`https://r.jina.ai/`). The tests point it at a local `Bun.serve` site.
 
 Pages that leave the crawl leave the folder, but only after a whole crawl.
 A crawl removes nothing when:
@@ -446,12 +451,106 @@ A sitemap crawl lists every page. There, a page that cannot be read keeps
 its last copy, and the other removals still happen. Only top-level `*.md`
 files of the folder are removed. Subfolders stay.
 
-Each later sync reads every page again. A sitemap `lastmod` could skip
-unchanged pages, but sites set it unreliably, and the reader has no cheap
-change check. Measured on 2026-11-13 against a public documentation site
+Each later sync asks for every page again. The page reader tells which
+pages did not change (see Page readers): those keep their file. A sitemap
+`lastmod` could skip pages, but sites set it unreliably. Measured on 2026-11-13 against a public documentation site
 through the real reader: 6 pages in 56 seconds, so about 9 seconds a page
 with the 3 second pause. 100 pages take about 15 minutes. The shell runs
 on macOS and on the Host's Wolfi image (busybox `sed`, `grep` and `find`).
+
+### Page readers
+
+A page reader reads one web page as Markdown for `kit:knowledge/web` and
+for the quick look at a link
+([ADR 39](adr/0039-a-page-reader-the-person-chooses-reads-the-web.md)).
+The code is in `packages/engine/src/knowledge/readers/`.
+
+| Reader | How it reads | Key |
+| --- | --- | --- |
+| Night Shift (`nightshift`, the default) | On the computer that runs the sync: Bun `fetch`, then linkedom and defuddle for HTML, the knowledge's own loaders for PDF and Word, and the 30 newest items of an RSS, Atom or JSON feed. No headless browser. | None |
+| Jina Reader (`jina`) | `GET <address><url>`. Default address `https://r.jina.ai/`, or a self-hosted Reader. | Optional, secret `JINA_API_KEY` |
+| Firecrawl (`firecrawl`) | `POST <address>/v2/scrape` (markdown and links) and `POST <address>/v2/map`. Default address `https://api.firecrawl.dev`, or a self-hosted Firecrawl. | Needed for the default address, secret `FIRECRAWL_API_KEY` |
+
+The reader is a setting of the project's knowledge, `reader` in the
+`settings` of the knowledge document: `{ kind, address?, secret? }`. It
+syncs to every computer of the Space. `secret` names the secret with the
+key. The computer that reads resolves it through the secret scopes of the
+step (Personal, the Space, the Project, this computer). The key is never in
+the setting, a flow or the kit's shell. `knowledge.setReader` changes it.
+`knowledge.get` shows it.
+
+Every request of a reader follows the address rule of a Web request
+(`packages/engine/src/web-access/`). A Host reads its private network, and
+a self-hosted reader there, only when its Settings allow it.
+
+A read ends as one of these:
+
+| Status | What it means | What the kit does |
+| --- | --- | --- |
+| `read` | The page, as a file: front matter with `title` and `source`, then the Markdown. | Writes the file. |
+| `unchanged` | The page did not change since the last read on this computer. | Keeps the file. With no file, asks for the page whole. |
+| `signin` | A 401, a redirect to a sign-in address, or a password field on a page with little text. | Keeps the last copy, logs why. |
+| `gone` | A 404 or 410. | As above. |
+| `blocked` | A 403, a bot check, or an address the rule refuses. | As above. |
+| `needs-browser` | Almost no text after extraction, and scripts. | As above. |
+| `failed` | Any other problem: the reader's own error, a missing key, a file that does not open. | As above. |
+
+#### The step's reader
+
+A Command step of a project with knowledge gets two variables from
+`Knowledge.forCommand`, next to `NS_KNOWLEDGE`:
+
+- `NS_READER_URL`: the step's own route on a loopback listener of the
+  computer's Night Shift process, `http://127.0.0.1:<port>/reader/<id>`.
+- `NS_READER_TOKEN`: the step's bearer token for it.
+
+| Request | Answer |
+| --- | --- |
+| `GET $NS_READER_URL/read?url=<page>&fresh=` | 200, the status in the header `x-nightshift-read`, and the file (`read`) or the reason. `fresh=1` reads the page whole. |
+| `GET $NS_READER_URL/links?url=<page>` | Every link the reader saw on that page, one per line. |
+| `GET $NS_READER_URL/map?url=<folder>&limit=<n>` | The pages the reader's map lists, one per line, or 204 when the reader has no map. |
+
+A step that ended gets 410. A wrong token gets 401. The listener is one
+`Bun.serve` per process, like the tool bridge of `@nightshift/agents`: it
+keeps its state on `globalThis` across `bun --hot`, checks itself before
+each step and every 2 seconds while steps are open, and opens again on the
+same port. Without `NS_READER_URL` (a computer of an older version), the
+kit reads through `r.jina.ai` as before readers. A reader that does not
+answer fails the page. The kit never falls back to a third party on its
+own.
+
+#### Change detection
+
+The computer that reads keeps the last read of each page, per project and
+reader, in `<data folder>/knowledge/.reads/<project id>.json`: its ETag,
+its Last-Modified, a sha256 of its title and Markdown, and its links. It is
+this computer's cache, like the search index. It does not sync, and losing
+it costs one whole read of each page. Night Shift's own reader asks with
+`If-None-Match` and `If-Modified-Since`. A 304, or the same sha256, is
+`unchanged`. Jina Reader and Firecrawl read the whole page each time, so
+only the sha256 tells.
+
+#### The quick look
+
+`knowledge.look({ projectId, urls })` looks at up to 20 links before
+anything is saved, for a role that may save a source. One result per link:
+
+| Field | What it holds |
+| --- | --- |
+| `kind` | `page`, `section` (the link starts a folder of more pages), `feed`, `file`, `signin`, `media`, `gone`, `needs-browser`, `blocked` (robots.txt or the site keeps readers out) or `failed`. |
+| `title` | The page's title, or null. |
+| `section` | For a page: the folder, how many pages it has, where that count comes from (`sitemap`, `map` or `links`), and whether the link starts the folder. Null when no other page was found. |
+| `feed` | The feed a page names (`<link rel="alternate">`), or null. |
+| `items` | For a feed: how many items, and how many a week over the last four weeks. |
+| `fileType` | For a file: `pdf`, `word` or `text`. |
+| `reason` | Why it cannot be read as it is, or null. |
+
+It is one cheap pass: one request for the page, robots.txt, and at most 5
+sitemap files, 8 seconds per link. A look is kept 5 minutes. The kind
+comes from the answer: its status, its content type, `og:video`,
+`og:audio` and `og:type`. Never from a list of sites. When this computer
+cannot read a page and the project reads with Jina Reader or Firecrawl,
+that reader tries.
 
 Each sync kit is one declaration in
 `packages/flows/src/kits/knowledge/source-kits.ts`. The list of kits, the
@@ -1066,7 +1165,10 @@ and so do the locks of the folders: a step that started before the reload
 still holds its folder, and the new `Knowledge` leaves that folder alone. `close` stops the timers and the preparation of vectors, and closes
 the index file. The next search opens the file again. Sections that did not
 change are not embedded again. A session that outlives the reload still
-searches, on its own connection to the index, and prepares nothing.
+searches, on its own connection to the index, and prepares nothing. The
+listener of the step's page reader stays too: a sync step that started
+before the reload keeps its route, and `close` writes the marks of the page
+reads that wait.
 
 ## What the page waits for
 
