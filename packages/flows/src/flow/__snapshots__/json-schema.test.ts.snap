@@ -8139,6 +8139,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "outcomeColorSchema": "a08d55161170d015984cde21947f73357d874c2c1469cf21d5df857936510817",
   "outcomeSchema": "71f189789579b92afec5143845c2121d3d596711dad7343aa3a39aeb378953bc",
   "outputInferredSchema": "4c68b1a7097781a1cec26621324283e942646f6a0b758ce2767d29cf3119eece",
+  "pageReaderSettingSchema": "b93ce971d49b7f783fd125b9e458653e44c6dcaba4cd19ca1cfb66e45c340b0c",
   "permissionModeSchema": "759773decf0c9f4a4772f09d6bb1732999436b3b8f7b763134ae9a4b7478b3bd",
   "personTierSchema": "9d80c61466abdf1ec04e5221887f7d907c46f6382d470c0a6548424cfb982e95",
   "policySchema": "fedfbecaffb7cf8c448cefd0ace896279f26e28d10f7d633245dd2876451a7b1",
