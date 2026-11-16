@@ -1439,6 +1439,200 @@ describe("the knowledge kits", () => {
 		});
 	});
 
+	/**
+	 * The step's page reader (ADR 39), as the Device gives it: a stub of the
+	 * loopback reader at `NS_READER_URL`, with the step's token. Real curl.
+	 */
+	describe("web: through the page reader", () => {
+		/** What the reader answers for a page, by address: its status and body. */
+		let answers: Record<string, { status: string; body: string }> = {};
+		/** The links of each page, by address. */
+		let links: Record<string, string[]> = {};
+		/** What the map lists, or null: the reader has no map. */
+		let map: string[] | null = null;
+		/** What the kit asked: the action and its query, in order. */
+		let asked: string[] = [];
+		let server: ReturnType<typeof Bun.serve>;
+		let base = "";
+		const TOKEN = "step-token";
+
+		beforeAll(() => {
+			server = Bun.serve({
+				port: 0,
+				hostname: "127.0.0.1",
+				fetch(request) {
+					const url = new URL(request.url);
+					if (request.headers.get("authorization") !== `Bearer ${TOKEN}`) {
+						return new Response("Unauthorized.", { status: 401 });
+					}
+					const action = url.pathname.replace("/reader/step/", "");
+					const page = url.searchParams.get("url") ?? "";
+					asked.push(`${action} ${url.searchParams.toString()}`);
+					if (action === "map") {
+						return map === null
+							? new Response(null, { status: 204 })
+							: new Response(`${map.join("\n")}\n`);
+					}
+					if (action === "links") {
+						return new Response((links[page] ?? []).join("\n"));
+					}
+					const fresh = url.searchParams.get("fresh") === "1";
+					const answer = answers[page] ?? {
+						status: "gone",
+						body: "The page is not there any more.",
+					};
+					const status =
+						fresh && answer.status === "unchanged" ? "read" : answer.status;
+					return new Response(
+						status === "read" && answer.status === "unchanged"
+							? `---\ntitle: "Again"\n---\n\nRead again.\n`
+							: answer.body,
+						{ headers: { "x-nightshift-read": status } },
+					);
+				},
+			});
+			base = `http://127.0.0.1:${server.port}`;
+		});
+
+		afterAll(() => server.stop(true));
+
+		beforeEach(() => {
+			answers = {};
+			links = {};
+			map = null;
+			asked = [];
+		});
+
+		const sync = (inputs: Record<string, string>) =>
+			step(
+				kit("kit:knowledge/web"),
+				"sync",
+				inputs,
+				{},
+				{
+					env: {
+						PATH: process.env.PATH ?? "",
+						NS_READER_URL: `${base}/reader/step`,
+						NS_READER_TOKEN: TOKEN,
+						// Never the public reader: a test that reaches it fails.
+						NS_WEB_READER: "http://127.0.0.1:9/",
+					},
+				},
+			);
+
+		test("reads each page through it; a page it did not read keeps its last copy", async () => {
+			await mkdir(join(knowledge, "web"), { recursive: true });
+			await writeFile(join(knowledge, "web/example.com-old.md"), "Last copy.");
+			await writeFile(join(knowledge, "web/example.com-same.md"), "Kept.");
+			answers = {
+				"https://example.com/docs?page=1": {
+					status: "read",
+					body: '---\ntitle: "Docs"\nsource: https://example.com/docs?page=1\n---\n\nThe docs.\n',
+				},
+				"https://example.com/same": { status: "unchanged", body: "" },
+				"https://example.com/new": { status: "unchanged", body: "" },
+				"https://example.com/app": {
+					status: "needs-browser",
+					body: "The page shows its text only in a browser.",
+				},
+			};
+			const ran = await sync({
+				urls: "https://example.com/docs?page=1\nhttps://example.com/old\nhttps://example.com/same\nhttps://example.com/new\nhttps://example.com/app",
+			});
+			expect(ran.outcome).toBe("synced");
+			expect(await read("web/example.com-docs-page-1.md")).toContain(
+				'title: "Docs"\nsource: https://example.com/docs?page=1\n---\n\nThe docs.',
+			);
+			expect(await read("web/example.com-old.md")).toBe("Last copy.");
+			expect(await read("web/example.com-same.md")).toBe("Kept.");
+			// Unchanged, but no file here yet: it asks for the page whole.
+			expect(await read("web/example.com-new.md")).toContain("Read again.");
+			expect(ran.log).toContain(
+				"Could not read https://example.com/old: The page is not there any more.",
+			);
+			expect(ran.log).toContain(
+				"Could not read https://example.com/app: The page shows its text only in a browser.",
+			);
+			expect(ran.data).toEqual({
+				files: 4,
+				skipped:
+					". Could not read: https://example.com/old https://example.com/app",
+			});
+			expect(asked).toEqual([
+				"read url=https%3A%2F%2Fexample.com%2Fdocs%3Fpage%3D1&fresh=",
+				"read url=https%3A%2F%2Fexample.com%2Fold&fresh=",
+				"read url=https%3A%2F%2Fexample.com%2Fsame&fresh=",
+				"read url=https%3A%2F%2Fexample.com%2Fnew&fresh=",
+				"read url=https%3A%2F%2Fexample.com%2Fnew&fresh=1",
+				"read url=https%3A%2F%2Fexample.com%2Fapp&fresh=",
+			]);
+			expect(await calls()).toEqual([]);
+		});
+
+		test("a reader that does not answer reads no page, and never falls back", async () => {
+			const ran = await step(
+				kit("kit:knowledge/web"),
+				"sync",
+				{ urls: "https://example.com/docs" },
+				{},
+				{
+					env: {
+						PATH: process.env.PATH ?? "",
+						NS_READER_URL: `${base}/reader/step`,
+						NS_READER_TOKEN: "wrong",
+					},
+				},
+			);
+			expect(ran.outcome).toBe("fail");
+			expect(ran.log).toContain(
+				"Could not read https://example.com/docs: the page reader did not answer.",
+			);
+		});
+
+		test("a crawl follows every link the reader saw, and takes its map before the sitemap", async () => {
+			const page = (title: string) => ({
+				status: "read",
+				body: `---\ntitle: "${title}"\n---\n\n${title}.\n`,
+			});
+			// The site itself is not there: robots.txt and the sitemap do not load.
+			const site = "http://127.0.0.1:9";
+			answers = {
+				[`${site}/docs/`]: page("Docs"),
+				[`${site}/docs/a`]: page("A"),
+				[`${site}/docs/b`]: page("B"),
+			};
+			links = {
+				[`${site}/docs/`]: [
+					`${site}/docs/a`,
+					`${site}/blog/x`,
+					`${site}/docs/a#part`,
+				],
+				[`${site}/docs/a`]: [`${site}/docs/b`],
+			};
+			const linked = await sync({ urls: `${site}/docs/`, follow: "true" });
+			expect(linked.outcome).toBe("synced");
+			expect(linked.data).toEqual({ files: 3, skipped: "" });
+			expect(asked.filter((line) => line.startsWith("read"))).toEqual([
+				"read url=http%3A%2F%2F127.0.0.1%3A9%2Fdocs%2F&fresh=",
+				"read url=http%3A%2F%2F127.0.0.1%3A9%2Fdocs%2Fa&fresh=",
+				"read url=http%3A%2F%2F127.0.0.1%3A9%2Fdocs%2Fb&fresh=",
+			]);
+			expect(asked[0]).toBe(
+				"map url=http%3A%2F%2F127.0.0.1%3A9%2Fdocs%2F&limit=5000",
+			);
+
+			// With a map, the pages it lists in scope, and no link followed.
+			asked = [];
+			map = [`${site}/docs/b`, `${site}/other/c`];
+			const mapped = await sync({ urls: `${site}/docs/`, follow: "true" });
+			expect(mapped.outcome).toBe("synced");
+			expect(asked.filter((line) => !line.startsWith("map"))).toEqual([
+				"read url=http%3A%2F%2F127.0.0.1%3A9%2Fdocs%2F&fresh=",
+				"read url=http%3A%2F%2F127.0.0.1%3A9%2Fdocs%2Fb&fresh=",
+			]);
+		});
+	});
+
 	test("jira: each work item as markdown, its description as text", async () => {
 		await fixture("jira-workitem", {
 			key: "PROJ-1",

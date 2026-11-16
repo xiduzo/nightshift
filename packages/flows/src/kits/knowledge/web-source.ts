@@ -1,12 +1,18 @@
 import { KNOWLEDGE_STAGING_SUFFIX } from "./layout";
+import { PAGE_READ_HEADER, PAGE_READER_ENV } from "./readers";
 import { defineSyncKit } from "./sync-kit";
 
 /**
- * The Web pages source: pages as markdown, through the free reader at
- * r.jina.ai. No account. A page that cannot be read keeps its last copy and
- * does not stop the others: the sync fails only when it reads no page at
- * all. The reader answers 200 for a page that is gone or behind a bot
- * check, and says so in a `Warning:` line above the content.
+ * The Web pages source: pages as markdown. The project's page reader reads
+ * each page (ADR 39): Night Shift's own on this computer, Jina Reader or
+ * Firecrawl, as a person chose. The step asks it at `NS_READER_URL`, with
+ * its token in `NS_READER_TOKEN`, and gets the page's file, or why the
+ * page was not read. A page that did not change since the last sync keeps
+ * its file. A Device of an older version gives no `NS_READER_URL`: then the
+ * sync reads through the free reader at r.jina.ai, as before readers, and
+ * reads its `Warning:` line for a page that is gone or behind a bot check.
+ * A page that cannot be read keeps its last copy and does not stop the
+ * others: the sync fails only when it reads no page at all.
  *
  * With `follow`, the given pages are where a crawl starts:
  *
@@ -16,7 +22,9 @@ import { defineSyncKit } from "./sync-kit";
  *   `<origin>/sitemap.xml` (one level of sitemap index, at most
  *   {@link WEB_MAX_SITEMAPS} files). When it lists pages in scope, the sync
  *   reads those and follows no link. Otherwise it follows the links of the
- *   markdown, breadth first, to `depth` links away.
+ *   page, breadth first, to `depth` links away: every link the page reader
+ *   saw on it, else the links of its markdown. A page reader that maps a
+ *   site itself (Firecrawl) lists the pages first, in place of the sitemap.
  * - A link loses its `#fragment` and its `?query`, and two addresses with
  *   the same file name are one page. Images, media, fonts, archives, code,
  *   feeds and PDFs are not pages: a PDF can be a start page, but a crawl
@@ -24,9 +32,9 @@ import { defineSyncKit } from "./sync-kit";
  * - robots.txt: the `Disallow` lines of the `User-agent: *` group, read as
  *   address prefixes (a `*` ends the prefix, a final `$` is dropped).
  *   `Allow` lines do not lift them: the sync reads less, never more.
- * - One request at a time, `NS_WEB_PAUSE` seconds apart (default 3: the
- *   reader takes 20 requests a minute without a key), with a User-Agent
- *   that names Night Shift, not the person.
+ * - One page at a time, `NS_WEB_PAUSE` seconds apart (default 3: Jina
+ *   Reader takes 20 requests a minute without a key, and a site deserves a
+ *   polite reader), with a User-Agent that names Night Shift, not the person.
  * - At most `limit` pages (default 100, never more than
  *   {@link WEB_MAX_PAGES}).
  * - A page that left the crawl leaves the folder, but only after a whole
@@ -34,12 +42,13 @@ import { defineSyncKit } from "./sync-kit";
  *   not when a page it followed links from could not be read (the pages
  *   below it are unknown). A sitemap crawl lists every page, so a page that
  *   could not be read there keeps its copy and removes nothing else.
- * - Every later sync reads every page again. A sitemap `lastmod` would
- *   skip unchanged pages, but sites set it unreliably, and the reader
- *   gives no cheap change check.
+ * - Every later sync asks for every page again. The page reader asks the
+ *   site whether the page changed (its ETag and Last-Modified), else
+ *   compares the text with the last read's: an unchanged page keeps its
+ *   file, and its links come from the last read.
  *
- * `NS_WEB_READER` sets the reader's address (default `https://r.jina.ai/`):
- * tests point it at a local server.
+ * Without a page reader, `NS_WEB_READER` sets the reader's address (default
+ * `https://r.jina.ai/`): tests point it at a local server.
  */
 
 /** The most pages one sync of a crawl reads, whatever the source says. */
@@ -47,6 +56,9 @@ const WEB_MAX_PAGES = 500;
 
 /** The most sitemap files one crawl reads, sitemap indexes included. */
 const WEB_MAX_SITEMAPS = 20;
+
+/** The most addresses a page reader that maps sites lists for one start page. */
+const WEB_MAX_MAP = 5_000;
 
 /** The User-Agent of every request: it names the product, never the person. */
 const WEB_USER_AGENT =
@@ -118,7 +130,11 @@ reader="$NS_WEB_READER"
 pause="$NS_WEB_PAUSE"
 case "$pause" in ""|*[!0-9]*) pause=3 ;; esac
 agent="${WEB_USER_AGENT}"
+# This computer's page reader for the step: the one the project chose. Without it, the reader at $reader.
+pages="$${PAGE_READER_ENV.url}"
 mkdir -p "$dest"
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
 # Split the list, but never read a pattern in it.
 set -f
 # The file name of an address: two addresses with one name are one page.
@@ -126,10 +142,39 @@ name_of() {
 	printf '%s' "$1" | sed -e 's#^[A-Za-z]*://##' -e 's#[/?=&:]#-#g' -e 's#[^A-Za-z0-9._-]##g' -e 's#-*$##'
 }
 requests=0
+# Asks this computer's page reader: $1 what (read, links, map), $2 the address, $3 one more field (fresh=1, limit=5000). The answer goes to $work/answer, its headers to $work/head, and its HTTP status to stdout.
+ask_pages() {
+	: > "$work/head"
+	curl -sS --max-time 300 -o "$work/answer" -D "$work/head" -w '%{http_code}' -H "Authorization: Bearer $${PAGE_READER_ENV.token}" -G --data-urlencode "url=$2" --data-urlencode "$3" "$pages/$1" || :
+}
+# Reads page $1 through this computer's page reader into $dest/$name.md. $2: 1 reads it whole, also when it did not change.
+read_with_pages() {
+	code=$(ask_pages read "$1" "fresh=$2")
+	status=$(tr -d '\r' < "$work/head" | tr 'A-Z' 'a-z' | sed -n 's/^${PAGE_READ_HEADER}:[[:space:]]*//p' | tail -n 1)
+	if [ "$code" != 200 ]; then
+		echo "Could not read $1: the page reader did not answer." >&2
+	elif [ "$status" = read ]; then
+		part="$dest/$name.md${KNOWLEDGE_STAGING_SUFFIX}"
+		mv "$work/answer" "$part"
+		mv "$part" "$dest/$name.md"
+		return 0
+	elif [ "$status" = unchanged ]; then
+		if [ -f "$dest/$name.md" ]; then return 0; fi
+		if [ "$2" != 1 ]; then read_with_pages "$1" 1; return; fi
+		echo "Could not read $1: the page reader did not answer." >&2
+	else
+		echo "Could not read $1: $(tr '\n' ' ' < "$work/answer" | cut -c 1-300)" >&2
+	fi
+	return 1
+}
 # Reads page $1 through the reader into $dest/$name.md. Fails, and keeps the last copy, when the page cannot be read.
 read_page() {
 	if [ "$requests" -gt 0 ] && [ "$pause" -gt 0 ]; then sleep "$pause"; fi
 	requests=$((requests + 1))
+	if [ -n "$pages" ]; then
+		read_with_pages "$1" ""
+		return
+	fi
 	part="$dest/$name.md${KNOWLEDGE_STAGING_SUFFIX}"
 	if ! curl -fsL --max-time 120 -A "$agent" "$reader$1" > "$part"; then
 		echo "Could not read $1: the page did not load." >&2
@@ -164,9 +209,7 @@ case "$limit" in ????*) limit=${WEB_MAX_PAGES} ;; esac
 if [ "$limit" -gt ${WEB_MAX_PAGES} ]; then limit=${WEB_MAX_PAGES}; fi
 if [ "$limit" -lt 1 ]; then limit=1; fi
 case "$depth" in ""|*[!0-9]*) depth=3 ;; esac
-work=$(mktemp -d)
-trap 'rm -rf "$work"' EXIT
-for file in queue seen scopes blocked origins listed mapped crawled; do : > "$work/$file"; done
+for file in queue seen scopes blocked origins listed mapped crawled reader-mapped; do : > "$work/$file"; done
 # An address without its #fragment and ?query.
 clean() {
 	printf '%s' "$1" | sed -e 's/#.*//' -e 's/?.*//'
@@ -235,6 +278,8 @@ read_robots() {
 			*) agents=0 ;;
 		esac
 	done < "$work/robots"
+	# A site the page reader mapped needs no sitemap.
+	if grep -qxF "$1" "$work/reader-mapped"; then return 0; fi
 	sed -n 's/^[Ss][Ii][Tt][Ee][Mm][Aa][Pp]:[[:space:]]*//p' "$work/robots" | sed 's/[[:space:]]*$//' > "$work/todo"
 	if [ ! -s "$work/todo" ]; then printf '%s/sitemap.xml\n' "$1" > "$work/todo"; fi
 	maps=0
@@ -256,6 +301,13 @@ read_robots() {
 for url in $urls; do
 	url=$(clean "$url")
 	if [ -z "$scope" ]; then folder_of "$url" >> "$work/scopes"; echo >> "$work/scopes"; fi
+	# A page reader that maps sites itself lists the pages before the sitemap.
+	if [ -n "$pages" ] && [ "$(ask_pages map "$(folder_of "$url")" "limit=${WEB_MAX_MAP}")" = 200 ] && [ -s "$work/answer" ]; then
+		cat "$work/answer" >> "$work/listed"
+		echo >> "$work/listed"
+		origin_of "$url" >> "$work/reader-mapped"
+		echo >> "$work/reader-mapped"
+	fi
 	read_robots "$(origin_of "$url")"
 done
 if [ -n "$scope" ]; then
@@ -307,7 +359,13 @@ while [ -s "$work/queue" ]; do
 	kept=$((kept + 1))
 	if [ "$at" -ge "$depth" ]; then continue; fi
 	site=$(origin_of "$url")
-	{ grep -oE '[]][(](https?://|/)[^) ]*' "$dest/$name.md" || :; } | sed 's/^](//' | while IFS= read -r link; do
+	# The page reader knows every link of the page. Without it, the links of its markdown.
+	if [ -n "$pages" ]; then
+		if [ "$(ask_pages links "$url" "fresh=")" = 200 ]; then mv "$work/answer" "$work/links"; else : > "$work/links"; fi
+	else
+		{ grep -oE '[]][(](https?://|/)[^) ]*' "$dest/$name.md" || :; } | sed 's/^](//' > "$work/links"
+	fi
+	cat "$work/links" | while IFS= read -r link || [ -n "$link" ]; do
 		case "$link" in
 			//*) link="$(printf '%s' "$url" | sed 's#:.*##'):$link" ;;
 			/*) link="$site$link" ;;
