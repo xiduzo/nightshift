@@ -193,7 +193,12 @@ describe("a step's knowledge", () => {
 		});
 		await a.put("wiki/Home.md", "# Home\n");
 		const sync = await a.knowledge.forCommand("p1");
-		expect(sync.env).toEqual({ NS_KNOWLEDGE: a.dir });
+		expect(sync.env).toEqual({
+			NS_KNOWLEDGE: a.dir,
+			// The project's page reader for the step (ADR 39).
+			NS_READER_URL: expect.stringMatching(/^http:\/\/127\.0\.0\.1:/),
+			NS_READER_TOKEN: expect.any(String),
+		});
 		// The reconcile before the step published what was there.
 		expect(await a.paths()).toEqual(["wiki/Home.md"]);
 
