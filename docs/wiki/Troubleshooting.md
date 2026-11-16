@@ -2,15 +2,35 @@
 
 Each entry says what you see, why, and how to fix it.
 
+## First, ask why
+
+When a run fails or ends early, start here:
+
+1. Open the run.
+2. Choose **Ask why**. An agent reads the run, and tells you what went wrong and what you can do. It changes nothing.
+3. Open the step that failed. Its transcript shows what the agent or the command did.
+
+When the editor shows a problem, open **Issues** at the bottom of the canvas. It lists the errors and the warnings of the flow. Fix the errors before you run the flow.
+
+## Flows
+
+### The run ends after a step, but the flow has more steps
+
+The step ended on an outcome without an edge. An outcome without an edge ends the run there. The editor warns about it under **Issues**. Connect the outcome to the next node, or add an End node to it with a clear message.
+
+### A template is empty, or the editor warns about a field
+
+A template names the node by its id, not by its title. Check the id of the node in the panel on the right, and check the field name. For example, `{{planner.data.taks}}` has a typo. See [Data between nodes](How-Night-Shift-works.md#data-between-nodes).
+
+### "This flow has errors. Fix them, or the schedule cannot start it."
+
+A schedule cannot start a flow with errors. Open the flow, and fix each error under **Issues**.
+
 ## Install
 
 ### macOS does not open the app
 
 The macOS app is not signed yet. Open **System Settings > Privacy & Security**, and choose **Open Anyway**. Later updates install without this step.
-
-### `nightshift: command not found`
-
-A clone does not put `nightshift` on your PATH. Run `bun <clone>/apps/server/src/cli.ts`, or make an alias. See [Terminal and MCP](Terminal-and-MCP.md#get-the-command).
 
 ## Agents
 
@@ -80,10 +100,6 @@ Another install of the same computer is online. One computer is one Device, and 
 
 The computer or the Host runs an older version of Night Shift. It cannot add a project without a folder, or run the steps of one. Update Night Shift there.
 
-### A development install does not connect to the Host
-
-By design, a development install (`bun run dev`) pairs and connects only with a Host on the same computer. To test against a remote Host, set `NIGHTSHIFT_DEV_LINK_HOST=true`.
-
 ## Runs
 
 ### A run ended without its report file
@@ -118,6 +134,16 @@ A schedule's run starts on the Host, so the Host needs the project. A Host copie
 ### Search finds by words only
 
 Search by meaning needs Ollama and its model. The Knowledge page tells you when search by meaning stopped. Start Ollama, or open **Settings → Night Shift's agents** and click **Download** in the **Search** table. See [Search](Knowledge.md#search).
+
+## From source
+
+### `nightshift: command not found`
+
+A clone does not put `nightshift` on your PATH. Run `bun <clone>/apps/server/src/cli.ts`, or make an alias. See [Terminal and MCP](Terminal-and-MCP.md#get-the-command).
+
+### A development install does not connect to the Host
+
+By design, a development install (`bun run dev`) pairs and connects only with a Host on the same computer. To test against a remote Host, set `NIGHTSHIFT_DEV_LINK_HOST=true`.
 
 ## Still stuck
 

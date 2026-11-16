@@ -13,21 +13,23 @@ The flows are in the [community folder](https://github.com/xiduzo/nightshift/tre
 
 ## Import a flow
 
-1. Open the folder of the flow, and read its README.
+1. Open the folder of the flow in the [community folder](https://github.com/xiduzo/nightshift/tree/main/community), and read its README.
 2. Set up what the flow needs on the computer that runs it. See [CLI tools](Agents-and-profiles.md#cli-tools), [connections](Agents-and-profiles.md#connections), and [secrets](Computers-and-Hosts.md#secrets).
-3. In a terminal, in the folder of your project, run this command. Put the name of the flow in place of `<name>`.
+3. Open the file `flow.json` of the flow, and download it. Rename it to the name of the flow, for example `review-pr.json`.
+4. In Night Shift, open the **Flows** page of your project, and choose **Import flow**. Pick the file. Night Shift names the flow after the file.
+5. Choose which of your profiles takes each agent of the flow.
+6. Open the flow. Change its prompts, models, and inputs to fit your project.
 
-   ```bash
-   curl -fsSL https://raw.githubusercontent.com/xiduzo/nightshift/main/community/<name>/flow.json \
-     | nightshift flows import - --name <name>
-   ```
+For scripts: the `nightshift` command imports a flow in one line. Run it in the folder of your project, and put the name of the flow in place of `<name>`. See [Terminal and MCP](Terminal-and-MCP.md).
 
-   Or save the `flow.json` of the flow as `<name>.json`, and choose **Import flow** on the Flows page. Night Shift names the flow after the file.
-4. Open the flow. Change its prompts, models, and inputs to fit your project.
+```bash
+curl -fsSL https://raw.githubusercontent.com/xiduzo/nightshift/main/community/<name>/flow.json \
+  | nightshift flows import - --name <name>
+```
 
 ## Share your flow
 
-When a flow does its work for you, share it. There are two ways.
+When a flow does its work for you, share it. You can share it in two ways.
 
 **Send the file to one person:**
 

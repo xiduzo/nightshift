@@ -1,6 +1,45 @@
 # Terminal and MCP
 
-A person or an agent in a terminal reads and saves flows through `nightshift`, never as files. Night Shift must run on this computer.
+This page is for people who work in a terminal. You do not need it to use Night Shift.
+
+The most common use: let an agent in your terminal, such as Claude Code, read and change your flows, start runs, and answer Gates. The `nightshift` command gives it the tools for that over MCP. You can also read and save flows yourself with `nightshift flows`.
+
+Night Shift must run on the same computer.
+
+## Let Claude Code work on your flows
+
+1. Get the `nightshift` command. See [Get the command](#get-the-command).
+2. Add Night Shift to Claude Code:
+
+   ```bash
+   claude mcp add nightshift -- nightshift mcp
+   ```
+
+3. Start Claude Code in the folder of your project, and ask it, for example: "List my flows, and add a Gate before the email step of weekly-brief."
+
+The agent checks each flow before it saves it. Each save is a new revision of the flow, so you can restore an earlier one in the editor.
+
+Other agents, such as Codex, work too. Give them the command `nightshift mcp` as an MCP server.
+
+### The tools
+
+<!-- checked:mcp-tools: every tool of nightshift mcp has a row. bun run docs:reference checks it. -->
+| Tool | What it does |
+| --- | --- |
+| `list_projects`, `list_flows`, `get_flow` | Read the projects and their flows. |
+| `list_profiles`, `list_tools`, `list_skills` | Look up the names that a node may use. |
+| `check_flow`, `save_flow` | Check a flow, and save it when it has no errors. |
+| `start_run` | Start a saved flow with its inputs. |
+| `list_runs` | The newest runs, by status and since a time. Each with its cost and pull request. A test run says which nodes it pinned and skipped. |
+| `get_run` | One run: its status, cost, pull request, steps, why it failed, and its report. A test run says so, and so does each step whose node did not run. |
+| `stop_run` | Stop a run now, or after the step that runs now. |
+| `needs_me` | The Gates that wait for you, in every project, with the question and the options. |
+| `answer_gate` | Answer a Gate with one of its options and a note. The run continues. |
+| `search_knowledge` | Search the project's knowledge by keyword, and by meaning when Ollama runs. Gives the best files, each with its path, section, and an excerpt. |
+| `read_knowledge` | Read one file of the knowledge by its path. |
+<!-- /checked:mcp-tools -->
+
+The knowledge files are also MCP resources.
 
 ## Get the command
 
@@ -13,7 +52,64 @@ To make it short, run this once in the clone, or add the alias to your shell pro
 alias nightshift="bun $PWD/apps/server/src/cli.ts"
 ```
 
-## Commands
+From a clone, put the full `bun` command after `--` in `claude mcp add`.
+
+## Read and save flows
+
+Run these commands in the folder of a project. They use the project of the current folder. Night Shift checks each save and keeps it as a new revision of the flow.
+
+```bash
+nightshift flows list                             # name, steps, errors, description
+nightshift flows get weekly-brief > brief.json    # the flow as JSON
+nightshift flows save weekly-brief brief.json     # or from stdin, and prints its problems
+nightshift flows export weekly-brief --out ./     # a file to import elsewhere
+nightshift flows import weekly-brief.json         # a new flow, and a taken name gets a suffix
+nightshift flows revisions weekly-brief           # who saved what, newest first
+nightshift flows revision weekly-brief <id>       # one earlier revision as JSON
+```
+
+An import gives each agent of the flow to one of your profiles. To choose another profile, add `--agent claude-code:opus=reviewer`.
+
+<!-- generated:cli-flows: bun run docs:reference writes this from `nightshift flows --help`. Do not edit it here. -->
+```text
+Usage:
+  nightshift flows list [--json]              The flows of the project: name, steps,
+                                              errors and description, one per line.
+  nightshift flows get <name> [--out <file>]  The flow as JSON.
+  nightshift flows save <name> [<file>]       Save the flow of the file (else of stdin)
+                                              as <name>: a new flow, or a new revision.
+  nightshift flows export <name> [--out <file or folder>]
+                                              The flow as a file to import elsewhere.
+  nightshift flows import <file> [--name <name>] [--agent <agent>=<profile>]...
+                                              Save the flow of the file as a new flow.
+                                              A name the project has gets a suffix.
+                                              Prints the name it got. One of your
+                                              profiles takes each agent the flow names:
+                                              the same harness and model, else the same
+                                              harness, else your first profile. Prints
+                                              each choice.
+  nightshift flows revisions <name> [--json]  The revisions of the flow, newest first.
+  nightshift flows revision <name> <id> [--out <file>]
+                                              One revision of the flow as JSON.
+
+Options:
+  --project <id, name or folder>  The project. Default: the project of this folder.
+  --daemon <address>              Where Night Shift runs. NIGHTSHIFT_DAEMON_URL,
+                                  default http://localhost:$PORT.
+  --agent <agent>=<profile>       With import: the profile for one agent of the flow,
+                                  for example claude-code:opus=reviewer. Repeat it
+                                  for each agent you choose.
+  --keep-agents                   With import: keep the agents the flow names.
+```
+<!-- /generated:cli-flows -->
+
+## Start a flow from another tool
+
+To start a flow from GitHub Actions, n8n, Zapier, or a script, send a webhook to a schedule. See [Webhooks](Runs-and-schedules.md#webhooks).
+
+## Advanced: all commands
+
+The other commands run a Host and pair computers. [Computers and Hosts](Computers-and-Hosts.md) tells when you need them.
 
 <!-- generated:cli: bun run docs:reference writes this from `nightshift help`. Do not edit it here. -->
 ```text
@@ -63,88 +159,3 @@ else BETTER_AUTH_SECRET in NIGHTSHIFT_SECRETS_DIR or systemd's credentials,
 else one Night Shift makes once in the data folder.
 ```
 <!-- /generated:cli -->
-
-## Flows
-
-Night Shift checks each save and keeps it as a new revision of the flow.
-
-```bash
-nightshift flows list                             # name, steps, errors, description
-nightshift flows get weekly-brief > brief.json    # the flow as JSON
-nightshift flows save weekly-brief brief.json     # or from stdin, and prints its problems
-nightshift flows export weekly-brief --out ./     # a file to import elsewhere
-nightshift flows import weekly-brief.json         # a new flow, and a taken name gets a suffix
-nightshift flows revisions weekly-brief           # who saved what, newest first
-nightshift flows revision weekly-brief <id>       # one earlier revision as JSON
-```
-
-The commands use the project of the current folder.
-
-An import gives each agent of the flow to one of your profiles, and `--agent claude-code:opus=reviewer` chooses another.
-
-<!-- generated:cli-flows: bun run docs:reference writes this from `nightshift flows --help`. Do not edit it here. -->
-```text
-Usage:
-  nightshift flows list [--json]              The flows of the project: name, steps,
-                                              errors and description, one per line.
-  nightshift flows get <name> [--out <file>]  The flow as JSON.
-  nightshift flows save <name> [<file>]       Save the flow of the file (else of stdin)
-                                              as <name>: a new flow, or a new revision.
-  nightshift flows export <name> [--out <file or folder>]
-                                              The flow as a file to import elsewhere.
-  nightshift flows import <file> [--name <name>] [--agent <agent>=<profile>]...
-                                              Save the flow of the file as a new flow.
-                                              A name the project has gets a suffix.
-                                              Prints the name it got. One of your
-                                              profiles takes each agent the flow names:
-                                              the same harness and model, else the same
-                                              harness, else your first profile. Prints
-                                              each choice.
-  nightshift flows revisions <name> [--json]  The revisions of the flow, newest first.
-  nightshift flows revision <name> <id> [--out <file>]
-                                              One revision of the flow as JSON.
-
-Options:
-  --project <id, name or folder>  The project. Default: the project of this folder.
-  --daemon <address>              Where Night Shift runs. NIGHTSHIFT_DAEMON_URL,
-                                  default http://localhost:$PORT.
-  --agent <agent>=<profile>       With import: the profile for one agent of the flow,
-                                  for example claude-code:opus=reviewer. Repeat it
-                                  for each agent you choose.
-  --keep-agents                   With import: keep the agents the flow names.
-```
-<!-- /generated:cli-flows -->
-
-## MCP for an agent
-
-`nightshift mcp` gives an agent the same flows, the runs, and a project's knowledge as MCP tools. The agent can be Claude Code, Codex, or an orchestrator.
-
-Add it to Claude Code:
-
-```bash
-claude mcp add nightshift -- nightshift mcp
-```
-
-From a clone, put the full `bun` command after `--`.
-
-<!-- checked:mcp-tools: every tool of nightshift mcp has a row. bun run docs:reference checks it. -->
-| Tool | What it does |
-| --- | --- |
-| `list_projects`, `list_flows`, `get_flow` | Read the projects and their flows. |
-| `list_profiles`, `list_tools`, `list_skills` | Look up the names that a node may use. |
-| `check_flow`, `save_flow` | Check a flow, and save it when it has no errors. |
-| `start_run` | Start a saved flow with its inputs. |
-| `list_runs` | The newest runs, by status and since a time. Each with its cost and pull request. A test run says which nodes it pinned and skipped. |
-| `get_run` | One run: its status, cost, pull request, steps, why it failed, and its report. A test run says so, and so does each step whose node did not run. |
-| `stop_run` | Stop a run now, or after the step that runs now. |
-| `needs_me` | The Gates that wait for you, in every project, with the question and the options. |
-| `answer_gate` | Answer a Gate with one of its options and a note. The run continues. |
-| `search_knowledge` | Search the project's knowledge by keyword, and by meaning when Ollama runs. Gives the best files, each with its path, section, and an excerpt. |
-| `read_knowledge` | Read one file of the knowledge by its path. |
-<!-- /checked:mcp-tools -->
-
-The knowledge files are also MCP resources.
-
-## Webhooks
-
-To start a flow from another tool, such as GitHub Actions, n8n, or Zapier, send a webhook to a schedule. See [Webhooks](Runs-and-schedules.md#webhooks).

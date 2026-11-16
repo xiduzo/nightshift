@@ -17,7 +17,8 @@ here end to end.
    page, for example as `NIGHTSHIFT_HOOK_SECRET`. A Personal secret does
    not work on a Host. On a Host without a screen, an environment variable
    of the same name also works.
-3. Open the project's **Schedules** page and choose **New schedule**.
+3. Open the project's **Flows** page. On the card of the flow, open its ⋯
+   menu, choose **Schedules**, then **Add schedule**.
 4. Choose **When a webhook arrives** and the flow to start.
 5. In **Secret**, type the secret's name: `NIGHTSHIFT_HOOK_SECRET`.
 6. Give the flow's inputs values that read the webhook, for example
@@ -160,7 +161,7 @@ Night Shift answers at once. The run starts after the answer.
 | --- | --- |
 | `202 {"result":"accepted"}` | The run starts, or the signal goes to the waiting runs. |
 | `202 {"result":"filtered"}` | The **Only when** rule does not hold for this webhook. Nothing starts. |
-| `404 {"message":"Not found."}` | The address is wrong, or the secret does not match. Night Shift gives one answer for both, so nobody learns which schedules exist. On the Schedules page, the schedule shows its last webhook and why Night Shift refused it. |
+| `404 {"message":"Not found."}` | The address is wrong, or the secret does not match. Night Shift gives one answer for both, so nobody learns which schedules exist. In the schedules of the flow, the schedule shows its last webhook and why Night Shift refused it. |
 | `409 {"message":"…"}` | The secret matched, but the schedule takes no webhook now. The message says why: the schedule is paused, schedules are paused, or another computer takes this webhook. |
 | `413` | The body is larger than 1 MiB. |
 

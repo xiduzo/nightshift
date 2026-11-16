@@ -1,8 +1,19 @@
 # Flows and nodes
 
-A flow is a graph of nodes. Each edge leaves a node on a named outcome, such as `pass`, `fail`, or `approved`. Night Shift follows the edges from node to node. A model never adds a node or changes the flow during a run, and every loop has a maximum count.
+A flow is the steps of a job, drawn as nodes and edges. This page tells how to pick a node, what each node does, and how to use the editor.
 
-This page is the reference. To learn the editor step by step, do [Your first flow](Your-first-flow.md) first.
+New to flows? Read [How Night Shift works](How-Night-Shift-works.md) and do [Your first flow](Your-first-flow.md) first. This page is the reference.
+
+## How a flow fits together
+
+- **Nodes.** Each node does one thing: it runs an agent, runs a command, makes a choice, or waits.
+- **Start.** A run starts at the node with the **Start** badge.
+- **Outcomes.** Every node ends with an outcome, such as `pass`, `fail`, or `approved`.
+- **Edges.** An edge goes from one outcome of a node to the next node. So the outcome picks the next step.
+- **Data.** A node reads the data of earlier nodes with a template, such as `{{news.body}}`. See [Inputs, outputs, and templates](#inputs-outputs-and-templates).
+- **End.** The run ends at an End node, or at an outcome that has no edge.
+
+A model never adds a node or changes the flow during a run. Every loop has a maximum count.
 
 This is the `scout-and-pick` starter. An agent finds candidates for a topic, you pick one, and another agent writes a report on it:
 
@@ -23,6 +34,30 @@ flowchart LR
   picked -- picked --> write
   write -- pass --> save
 ```
+
+## Pick a node
+
+| I want to… | Use |
+| --- | --- |
+| Let an AI agent do a task | [Agent](#agent) |
+| Try a cheap agent first, and a strong agent when it fails | [Cascade](#cascade) on an Agent |
+| Run a script or a CLI | [Command](#command) |
+| Call an API or read a web page | [Web request](#web-request) |
+| Call one tool of an MCP server | [Tool](#tool) |
+| Ask a person to choose | Gate, a [Decision](#decision) that a person picks |
+| Choose by a rule, such as "more than 10 items" | Branch, a [Decision](#decision) that a rule picks |
+| Let a model choose | A [Decision](#decision) that a model picks |
+| Ask a person to fill in a form | Ask, a [Value](#value) that a person makes |
+| Filter, sort, or limit a list | [Value presets](#value-presets) |
+| Read CSV, a feed, XML, or HTML | [Convert](#convert) |
+| Do something only for new items | [Since last run](#since-last-run) |
+| Wait for a time, a signal, or a web page | [Wait](#wait) |
+| Run another flow, or one flow for each item of a list | [Subflow](#subflow) |
+| Run branches at the same time, and wait for them | [Join](#join) |
+| Let only one run at a time do a step | [Lease](#lease-and-service) |
+| Start a server for the next steps | [Service](#lease-and-service) |
+| End the run with a result and a report | [End](#end) |
+| Send a message or an email, or read a feed | A [kit](#kits) |
 
 ## Node types
 
@@ -47,94 +82,162 @@ flowchart LR
 
 ### Agent
 
-- **Prompt and skill.** With a skill, the agent gets `/<skill> <prompt>`.
-- **Outcomes.** An Agent can declare its own outcomes, such as `found` and `noise`, in place of `pass` and `fail`.
-- **Output.** The shape of the step's data. See [Data shapes](#data-shapes).
-- **Scores.** `{"scores": {"leads": 12}}` in its data scores the run. See [Scores](#scores).
+An Agent node runs one agent session with a prompt. Example: "Read these support tickets and list the three most common problems."
+
+- **Profile.** The agent, the model, and the permission mode that the step uses. See [Agents and profiles](Agents-and-profiles.md).
+- **Prompt.** What the agent must do. Use templates to give it data, such as `{{news.data.items}}`.
+- **Skill.** Optional. With a skill, the agent gets `/<skill> <prompt>`.
+- **Outcomes.** By default `pass` and `fail`. You can declare your own outcomes, such as `found` and `noise`. The agent picks one at the end.
+- **Output.** Optional. The shape of the data that the step gives. See [Data shapes](#data-shapes).
 - **Ask a person.** An agent that needs input opens a Gate. Your answer goes back to the same session.
-- **Backups.** Other profiles, on other computers, that take the step when its computer is offline. See [Agents and profiles](Agents-and-profiles.md#backups).
+- **Backups.** Profiles on other computers that take the step when its computer is offline. See [Backups](Agents-and-profiles.md#backups).
+
+Later nodes read `{{<node>.output}}`, the final message of the agent. With an output shape, they read `{{<node>.data}}`.
 
 ### Cascade
 
-A step can climb a **cascade**. It tries the first tier, and moves up when a try does not hold. Each tier has a number of tries. Each try gets the failure of the try before. A new tier starts a new session. The last tier can be you.
+A cascade lets a step climb from a cheap helper to a strong one. The step tries the first tier. When a try does not hold, it tries again, and then moves up a tier.
 
-The prompt of a step with a cascade can read its try: `{{cascade.tier}}`, `{{cascade.try}}` and `{{cascade.previous}}`. Nodes and inputs cannot use the name `cascade`.
+- Each tier has a number of tries.
+- Each try gets the failure of the try before.
+- A new tier starts a new session.
+- The last tier can be you.
 
-The `implement-and-check` starter is one Agent with a cascade. Sonnet tries up to 3 times, then Opus. After each try, the check runs. A try holds only when the check passes.
+Example: the `implement-and-check` starter is one Agent with a cascade. Sonnet tries up to 3 times, then Opus. After each try, a check runs. A try holds only when the check passes.
 
-A Decision or a Value that a model decides can have a cascade too. A model's pick below the confidence you set goes to the next tier: a stronger model, or you.
+A Decision or a Value that a model decides can have a cascade too. When the model is less sure than the confidence that you set, the choice goes to the next tier: a stronger model, or you.
+
+For scripts: the prompt can read the current try as `{{cascade.tier}}`, `{{cascade.try}}`, and `{{cascade.previous}}`. Nodes and inputs cannot use the name `cascade`.
 
 ### Command
 
-- Template values arrive as environment variables, never as shell text. So `sh -c "{{check}}"` runs the input `check` as a command, and a value cannot inject shell code.
-- Secrets arrive as environment variables too.
-- JSON that the command writes to `$NS_OUTPUT` is its data. `{"outcome": "approved"}` picks the outcome.
-- A command that prints JSON can give that as its data. Set **What it prints** to **JSON** (`"stdout": "json"` in the flow file).
+A Command node runs a shell command in the project folder, such as a CLI or a script. Example: `python3 scripts/count_signups.py`.
+
+- **Outcomes.** The exit code picks the outcome. A new Command starts with `success` (exit code 0), `failure` (exit code 1), and `other` (any other code). You can add an outcome for another exit code.
+- **Values.** Template values and secrets arrive as environment variables, never as shell text. So a value cannot inject shell code.
+- **Data.** A command can give data to later nodes. See the hints below.
+
+For scripts:
+
+- `sh -c "{{check}}"` runs the input `check` as a command.
+- Write JSON to the file `$NS_OUTPUT` to give data. `{"outcome": "approved"}` in it picks the outcome.
+- Or print JSON, and set **What it prints** to **JSON** (`"stdout": "json"` in the flow file).
 - **Data shape** in its **Output** says what that data holds. See [Data shapes](#data-shapes).
-- `{"scores": {"found": 4}}` in that data scores the run. See [Scores](#scores).
-- `$NS_KNOWLEDGE` is the project's [knowledge](Knowledge.md) folder.
-- Files that the command puts in the folder `$NS_ARTIFACTS` stay with the run, such as a screenshot or a report. The run page shows them with the step. Example: `cp report.pdf "$NS_ARTIFACTS/"`.
+- `{"scores": {"found": 4}}` in the data scores the run. See [Scores](#scores).
+- `$NS_KNOWLEDGE` is the folder of the project's [knowledge](Knowledge.md).
+- Files that you put in `$NS_ARTIFACTS` stay with the run, such as a screenshot or a report. The run page shows them with the step. Example: `cp report.pdf "$NS_ARTIFACTS/"`.
 
 ### Web request
 
-A Web request sends one request from the computer of its step, and reads the answer.
+A Web request sends one request to a web address, and gives the answer as data. It needs no shell and no project folder. Example: `GET https://api.example.com/items`.
 
-- **Address.** A URL such as `https://api.example.com/items`, or a secret that holds the whole URL. Use a secret for a webhook address, because the address is its key. Night Shift never shows it.
-- **Query, headers and body.** Each value is a template. The body is JSON, text or a form. In JSON, put each template in quotes: `"{{plan.data.tasks}}"`. A quoted template that is one reference keeps its JSON value.
-- **Secrets.** Write `${API_TOKEN}` in the node's own text, for example in the header `Authorization: Bearer ${API_TOKEN}`. The computer of the step fills it in. A value that a template gives is never filled in, so data from a webhook cannot read your secrets. The answer shows each secret value as `•••`.
-- **Outcomes.** `pass` on a 2xx answer. `fail` on any other answer, or on an answer that is too large. When the server says it is busy (429) or fails (5xx), the step waits and asks again, as an agent does at a usage limit.
-- **Outputs.** `{{fetch.status}}`, `{{fetch.headers.content-type}}` and `{{fetch.body}}`. The body is JSON when the server sends JSON, else text. Later nodes read a field of it: `{{fetch.body.items}}`. Its **Body shape** says what the body of a 2xx answer holds. See [Data shapes](#data-shapes).
+- **Address.** A URL, or a secret that holds the whole URL. Use a secret for a webhook address, because the address is its key. Night Shift never shows it.
+- **Query, headers, and body.** Each value is a template. The body is JSON, text, or a form.
+- **Secrets.** Write `${API_TOKEN}` in the node's own text, for example in the header `Authorization: Bearer ${API_TOKEN}`. The answer shows each secret value as `•••`.
+- **Outcomes.** `pass` on a 2xx answer. `fail` on any other answer, or on an answer that is too large. When the server is busy (429) or fails (5xx), the step waits and asks again.
+- **Outputs.** `{{fetch.status}}`, `{{fetch.headers.content-type}}`, and `{{fetch.body}}`. The body is JSON when the server sends JSON, else text. Later nodes read a field of it, such as `{{fetch.body.items}}`.
+- **Body shape.** What the body of a 2xx answer holds. See [Data shapes](#data-shapes).
 - **Limits.** The step waits 30 seconds for an answer, and keeps up to 1 MB of it. You can set up to 10 minutes and 10 MB.
 
 On a Host, a Web request reaches public addresses only. To let it reach the Host itself and its private network, turn on **Web requests reach this network** in the Host settings. No request reaches a link-local or a cloud metadata address.
 
+For scripts:
+
+- In a JSON body, put each template in quotes: `"{{plan.data.tasks}}"`. A quoted template that is one reference keeps its JSON value.
+- Only the node's own text fills in secrets. A value that a template gives is never filled in, so data from a webhook cannot read your secrets.
+
+### Tool
+
+A Tool node calls one tool of an MCP server, with typed arguments. No model is in the loop. Add the MCP server first as a [connection](Agents-and-profiles.md#connections).
+
+The node takes the shape of the tool's answer from the MCP server, marked as inferred. See [Data shapes](#data-shapes).
+
 ### Decision
+
+A Decision node picks one of its options. Each option is an outcome, with its own edge. Who picks it gives the node its name:
 
 | Who picks | Shows as | How |
 | --- | --- | --- |
-| A person | **Gate** | You pick an option in the inbox or on the phone. A deadline picks an option for you when nobody answers in time. |
-| A rule | **Branch** | It takes the first option whose JSONata rule holds. |
+| A person | **Gate** | You pick an option in the inbox or on the phone. A deadline picks an option for you when nobody answers in time. See [Gates and the inbox](Gates-and-the-inbox.md). |
+| A rule | **Branch** | It takes the first option whose rule holds. A rule is a JSONata expression, such as `count > 10`. |
 | A model | **Decision** | A [decider](#deciders) picks an option, with its confidence. |
 
-Inside a filter of a rule, a name reads a key of each item. To read a node, an input or a variable there, start with `$$`: `tasks[p > $$.vars.limit]`.
+Give a choice to the cheapest picker that can make it. A rule first, then a decider. Use a Gate for an approval, or when the others cannot decide.
+
+For scripts: inside a filter of a rule, a name reads a key of each item. To read a node, an input, or a variable there, start with `$$`: `tasks[p > $$.vars.limit]`.
 
 ### Deciders
 
-A decider is the model of a Decision or a Value that a model decides. You choose it in a Model Profile in Settings, under **Models**. A node that names no decider runs on the [Decider](Agents-and-profiles.md#night-shifts-agents) that you chose in Settings.
+A decider is the model of a Decision, or of a Value that a model makes. Start with a small decision model, such as TypeSafe Jev. It is fast and cheap, because it only picks. In a Decision, it can pick only one of the node's options. It writes no text and adds no step.
 
-For most choices, start with a small decision model, such as TypeSafe Jev. It is fast and cheap, because it only picks. In a Decision, it can pick only one of the node's options. It writes no text and adds no step.
+After you set up an agent, Night Shift asks you to choose a decider. You can skip this step.
 
-After you set up an agent, Night Shift asks you to choose a decider. You can also skip this step.
+- **Local.** Ollama on this computer. It is private and needs no account. Night Shift downloads a small model of about 2 GB, and shows the size first. On a Mac with Homebrew, Night Shift installs Ollama for you, after you confirm. Otherwise, download Ollama from its page, then choose **Check again**.
+- **TypeSafe Jev.** The fastest. Paste the key that TypeSafe gives you. Night Shift keeps it on this computer.
 
-- **Local**: Ollama on this computer. It is private and needs no account. Night Shift downloads a small model of about 2 GB, and shows the size before the download starts. On a Mac with Homebrew, Night Shift installs Ollama for you, after you confirm. Otherwise, download Ollama from its page, then choose **Check again**.
-- **TypeSafe Jev**: the fastest. Paste the key that TypeSafe gives you. Night Shift keeps it on this computer.
+Each choice makes a Model Profile: `local` or `jev`. You find Model Profiles in Settings, under **Models**.
 
-Each choice makes a Model Profile: `local` or `jev`. New Decision nodes then start on that decider. Until you choose one, new nodes start on TypeSafe Jev when its key is saved, else on Ollama. **Settings** shows which one. A Decision that names no decider still runs on TypeSafe Jev.
+- A node can name its own decider in a Model Profile.
+- A node that names no decider runs on the [Decider](Agents-and-profiles.md#night-shifts-agents) that you chose in Settings. Without a choice, it runs on TypeSafe Jev.
+- New Decision nodes start on your choice. Until you choose, they start on TypeSafe Jev when its key is saved, else on Ollama.
 
-When a step needs an Ollama model that is not on this computer, open its Model Profile and choose **Download**. A local decider gives no confidence with its pick. So it cannot be a middle tier of a [cascade](#cascade) with a minimum confidence.
+When a step needs an Ollama model that is not on this computer, open its Model Profile and choose **Download**.
 
-A pick below the confidence that you set goes to the next tier of the [cascade](#cascade): a large model, or you. To run a decider on your own server, see [A model on your own server](https://github.com/xiduzo/nightshift/blob/main/docs/deploy/local-models.md).
+A local decider gives no confidence with its pick. So it cannot be a middle tier of a [cascade](#cascade) with a minimum confidence. A pick below the confidence that you set goes to the next tier: a large model, or you.
+
+To run a decider on your own server, see [A model on your own server](https://github.com/xiduzo/nightshift/blob/main/docs/deploy/local-models.md).
+
+### Value
+
+A Value node makes data that matches a shape. A rule, a model, or a person makes it.
+
+- **A rule** computes the data from earlier data, with a JSONata expression. The [presets](#value-presets) write the expression for you.
+- **A model** fills the shape, for example "extract the date and the amount from this invoice".
+- **A person** fills in a form in the inbox. This is an **Ask**. See [Asks](Gates-and-the-inbox.md#asks).
 
 ### Value presets
 
-A Value made by a rule can start from a preset. Under the expression, choose **Start from**: Filter, Pick fields, Sort, Limit, or Remove duplicates. Pick a list of an earlier step and fill in the fields. Night Shift writes the expression and the output for you, and you can change them after. The add-node dialog has the presets too, under **Shape**: each adds a new Value.
+A preset makes a Value from a rule without an expression to write. Example: keep the 10 newest items of a feed.
 
-The data is a record with one list: `{{small.data.items}}`. The list must come from a step whose output has a shape, such as a Convert node.
+1. Select the node that gives the list, such as a Convert node.
+2. Press **Tab**, and pick a preset under **Shape**: Filter, Pick fields, Sort, Limit, or Remove duplicates.
+3. Pick the list, and fill in the fields.
+
+Night Shift writes the expression and the output for you. You can change them after. On an existing Value, choose **Start from** under the expression.
+
+The data is a record with one list, such as `{{small.data.items}}`. The list must come from a step whose output has a shape, such as a Convert node.
 
 ### Convert
 
-A Convert node reads text of one format into JSON, or writes JSON as text. One side is always JSON, apart from HTML to text. To go from CSV to YAML, use two Convert nodes.
+A Convert node turns text of one format into JSON, or JSON back into text. It uses no model. Example: turn the CSV export of a shop into a list of orders.
 
 - **CSV and Markdown tables** give one record per row, with text in each column. A number stays text: `007` stays `007`. Night Shift finds the delimiter of a CSV file, or you set it.
-- **Feeds** give the same fields for RSS, Atom and JSON Feed. Each item has `id`, `title`, `link`, `summary`, `content`, `published`, `updated`, `authors` and `categories`. A later step reads `{{news.data.items}}`.
+- **Feeds** give the same fields for RSS, Atom, and JSON Feed. Each item has `id`, `title`, `link`, `summary`, `content`, `published`, `updated`, `authors`, and `categories`. A later step reads `{{news.data.items}}`.
 - **XML** gives a record per element. An attribute is `@name`.
-- **HTML to text** keeps headings, paragraphs, lists and the address of each link.
+- **HTML to text** keeps headings, paragraphs, lists, and the address of each link.
 
-The value can have at most 1 MB. Raise the size limit of the node up to 10 MB. A value that does not fit its format ends the step `fail`, and `{{<node>.note}}` says why.
+One side is always JSON, except for HTML to text. To go from CSV to YAML, use two Convert nodes.
+
+The value can have at most 1 MB. You can raise the size limit of the node to 10 MB. A value that does not fit its format ends the step on `fail`, and `{{<node>.note}}` says why.
+
+### Since last run
+
+A Since last run node remembers what it saw. The next run gets only what is new or changed. Example: send only the new posts of a feed.
+
+- **A list.** Give it a list, such as `{{feed.data.items}}`, and the key of an item, such as `link`. An item with a new key is new. An item with other fields than last time is changed. **Compare** sets the fields that count.
+- **A value.** Give it one value, such as `{{price.data.usd}}`. A rule over `previous` and `current` says when it changed: `current > 100 and previous <= 100`. Without a rule, any change counts. Nodes and inputs cannot use these two names.
+- **Outcomes.** `new` when anything is new, else `changed`, else `same`. An outcome without an edge ends the run.
+- **Data.** `{{fresh.data.new}}` and `{{fresh.data.changed}}` hold the items. `first_run` is true when the node remembered nothing yet.
+- **The first run.** On its first run, everything is new. To only remember what is there, set **First run** to **Nothing is new**.
+- **Scope.** A scope, such as `{{feed_url}}`, gives each value its own memory. Two Subflows that call the same flow each have their own memory too.
+
+The node remembers what it saw when its step ends. A later step that fails does not undo that. To see everything again, select the node and click **Forget what it saw**. The next run is a first run. For a node inside a Subflow, select the Subflow node.
+
+It remembers up to 10,000 items, and forgets the oldest first. A quick run remembers nothing.
 
 ### Wait
 
-A Wait waits for one of these:
+A Wait node holds the run until something happens. Example: wait until 07:00, then send the brief. A Wait waits for one of these:
 
 - A duration, such as 15 minutes.
 - A time, such as `07:00`.
@@ -143,132 +246,157 @@ A Wait waits for one of these:
 - A signal or a command, whichever comes first.
 - A URL that answers 2xx, for example a status page of a job. Night Shift asks it every few minutes. The body of the answer is its data.
 
-A Wait ends on its own outcomes. A command, a signal or a URL can pick one. A rule over the answer of a URL reads it as `data`: `data.state = "done"`. Every Wait has a timeout. A signal comes from a webhook schedule, by name and key. See [Runs and schedules](Runs-and-schedules.md#webhooks).
+Every Wait has a timeout. A Wait ends on its own outcomes. A command, a signal, or a URL can pick one. A signal comes from a webhook schedule, by name and key. See [Webhooks](Runs-and-schedules.md#webhooks).
+
+For scripts: a rule over the answer of a URL reads it as `data`, such as `data.state = "done"`.
 
 ### Subflow
 
-A Subflow runs another flow of the project, or a kit. With a list, it runs the flow once per item. The list can come from a planner's data, such as `{{planner.data.tasks}}`. It can also come from a command such as `gh` or `curl`, or from the files that match a glob. Each item can get its own branch, stacked on the item before, or all items share one branch.
+A Subflow node runs another flow of the project, or a [kit](#kits). Use it to reuse steps, or to do the same steps for each item of a list. Example: write one summary for each new paper.
+
+With a list, it runs the flow once per item. The list can come from:
+
+- the data of an earlier step, such as `{{planner.data.tasks}}`,
+- a command such as `gh` or `curl`,
+- the files that match a glob.
+
+In a project with a folder, each item can get its own branch, stacked on the item before. Or all items share one branch.
+
+### Join
+
+Two or more edges on one outcome run their branches at the same time. A Join node waits for them: all of them, or the first. With the first, the other branches stop.
 
 ### Lease and Service
 
-A **Lease** takes a named lease of the Space, for example `deploy` or `branch:{{pr.data.head}}`. It ends `held` when the run holds the lease. It ends `busy` when another run holds it after the wait you set. The run keeps the lease until it leaves the node's scope or ends.
+A **Lease** lets one run at a time do the next steps. Example: one deploy at a time. It takes a named lease of the Space, such as `deploy` or `branch:{{pr.data.head}}`.
 
-A **Service** starts a process for the next steps and stops it when the run leaves its scope. It is ready when a command exits 0, or when a URL answers with a 2xx status. See [Services](https://github.com/xiduzo/nightshift/blob/main/docs/deploy/services.md).
+- It ends `held` when the run holds the lease.
+- It ends `busy` when another run still holds it after the wait that you set.
+- Runs on other computers of the Space take turns too.
+- The run keeps the lease until it leaves the node's scope or ends.
 
-### Since last run
-
-A **Since last run** node remembers what it saw. The next run gets only what is new or changed.
-
-- **A list.** Give it a list, such as `{{feed.data.items}}`, and the key of an item, such as `link`. An item with a key it never saw is new. An item with other fields than last time is changed. **Compare** sets the fields that count.
-- **A value.** Give it one value, such as `{{price.data.usd}}`. A rule over `previous` and `current` says when it changed: `current > 100 and previous <= 100`. Without a rule, any change counts. Nodes and inputs cannot use these two names.
-- **Outcomes.** `new` when anything is new, else `changed`, else `same`. Each one ends the run when no edge leaves on it.
-- **Data.** `{{fresh.data.new}}` and `{{fresh.data.changed}}` hold the items. `first_run` is true when it remembered nothing yet.
-- **The first run.** On its first run, everything is new. Set **First run** to **Nothing is new** to only remember what is there.
-- **Scope.** A scope, such as `{{feed_url}}`, gives each value its own memory. Two Subflows that call the same flow each have their own memory too.
-- **Forget what it saw.** The node remembers what it saw when its step ends. A later step that fails does not undo that. To see everything again, select the node and click **Forget what it saw**. The next run is a first run. For a node inside a Subflow, select the Subflow node.
-
-It remembers up to 10,000 items, and forgets the oldest first. A quick run remembers nothing.
+A **Service** starts a process for the next steps, such as a Docker Compose stack, a dev server, or a model server. It stops the process when the run leaves its scope. It is ready when a command exits 0, or when a URL answers with a 2xx status. See [Services](https://github.com/xiduzo/nightshift/blob/main/docs/deploy/services.md).
 
 ### End
 
-An **End** node ends the run with a result: **Done**, **Nothing to do** or **Failed**. Its **Message** is one line for the runs list and the notification.
+An End node ends the run on purpose, with a result: **Done**, **Nothing to do**, or **Failed**. Its **Message** is one line for the list of runs and the notification.
 
-Set **Report** to **Write it** to give the run a report: what the run produced, in Markdown. It is a template, such as `## What is new` and then `{{summary.output}}`. The report shows on the run page, on the flow's card and on Home. Night Shift never sends it as a notification. See [The report of a run](Runs-and-schedules.md#the-report-of-a-run).
+An End node can also give the run a report: what the run produced, in Markdown. The report shows on the run page, on the flow's card, and on Home. Night Shift never sends it as a notification. See [The report of a run](Runs-and-schedules.md#the-report-of-a-run).
 
-Set **Report** to **A file the run wrote** when a step writes the report itself, such as an agent that saves `report.md`. **File** is a path inside the folder the run works in, for example `report.md` or `reports/{{topic}}.md`. A path that starts with `/`, or that has `..` or `.git` in it, is not valid. The End node reads the file as text when the run gets there.
+- **Write it.** The report is a template, such as `## What is new` and then `{{summary.output}}`.
+- **A file the run wrote.** A step writes the report itself, such as an agent that saves `report.md`. **File** is a path inside the folder that the run works in, for example `reports/{{topic}}.md`. A path that starts with `/`, or that has `..` or `.git` in it, is not valid. The End node reads the file as text when the run gets there.
 
-In a subflow, the End node ends only the subflow. The Subflow node reads the result as `ended`, the message as `end_message` and the report as `end_report`.
+In a subflow, the End node ends only the subflow. The Subflow node reads the result as `ended`, the message as `end_message`, and the report as `end_report`.
 
 ## Inputs, outputs, and templates
 
-A flow declares inputs and outputs, like a function. The start dialog asks for the inputs.
+A flow declares inputs and outputs, like the arguments and the result of a script. The start dialog asks for the inputs.
 
-Steps read earlier values through templates:
+A step reads earlier values through templates:
 
-- `{{task}}`: an input of the flow.
-- `{{verify.log_tail}}`: the end of the log of the step `verify`.
-- `{{planner.data.tasks}}`: a field of the data of the step `planner`.
-- `{{run.branch}}`: a fact of the run.
+| Template | Gives |
+| --- | --- |
+| `{{task}}` | The input `task` of the flow. |
+| `{{summary.output}}` | The final message of the Agent step `summary`. |
+| `{{planner.data.tasks}}` | The field `tasks` of the data of the step `planner`. |
+| `{{verify.log_tail}}` | The end of the log of the step `verify`. |
+| `{{run.branch}}` | A fact of the run, such as its branch. |
 
-Two or more edges on one outcome run their branches at once. A Join waits for them.
-
-A variable with **Keep between runs** starts each run with the value that the last run left. Use it to remember a value between runs. For the items of a list, use a [Since last run](#since-last-run) node.
+To keep a value for the next run, give a variable **Keep between runs**. Each run then starts with the value that the last run left. For the items of a list, use a [Since last run](#since-last-run) node.
 
 ### Data shapes
 
-Data has a shape: text, a number, yes or no, a choice, a file, a list, or a record with named fields. You set the shape in the **Output** of an Agent, a Value, a Command, or a Tool, and the **Body shape** of a Web request. A Convert node gives the shape of its format. A flow output can have a type too, so the node that calls the flow knows what it holds.
+A shape says what data holds: text, a number, yes or no, a choice, a file, a list, or a record with named fields. With a shape, the editor knows which fields a later node can read.
 
-When a template reads a field that the shape does not have, such as `{{planner.data.taks}}`, the editor shows a warning. The run still starts.
+You set the shape in the **Output** of an Agent, a Value, a Command, or a Tool. A Web request has a **Body shape**. A Convert node gives the shape of its format. A flow output can have a type too, so the node that calls the flow knows what it holds.
 
-You do not have to write a shape. When a node has none, Night Shift takes it from the first run that gives data. A flow output without a type gets one from the first run that calls the flow. The editor marks it **Inferred from a run**.
+You do not have to write a shape. When a node has none, Night Shift takes it from the first run that gives data. The editor marks it **Inferred from a run**.
 
-- **Confirm** keeps the shape as it is. An edit or an applied **Suggest** confirms it too.
+- **Confirm** keeps the shape as it is. An edit, or an applied **Suggest**, confirms it too.
+- An inferred shape only warns. The run shows the warning and continues.
 - A shape that you wrote or confirmed holds every run. When the data does not fit, an Agent, a Command, a Tool, or a Web request stops with an error. A Value or a Convert ends on `fail`.
+- When a template reads a field that the shape does not have, such as `{{planner.data.taks}}`, the editor shows a warning. The run still starts.
 - When a flow output does not fit the type that you set, the Subflow node that called the flow stops with an error. A Subflow that runs once per item fails only that item. An empty output fits every type.
-- An inferred shape only warns. The run shows the warning and goes on.
+- A flow output without a type gets one from the first run that calls the flow.
 - A Tool takes the shape that its MCP server gives for the tool's answer, marked as inferred.
 - A kit and a **Quick run** keep no shape.
 
 ### Scores
 
-An Agent, a Command or a Value scores the run with `scores` in its data: `{"scores": {"leads": 12, "replies": 3}}`. Each name gets a number of 0 or more. A shape does not have to name `scores`.
+A score is a number that a run gives, such as the leads it found. Flow health shows each score per run, so you see whether a change to the flow helps. See [Flow health](Runs-and-schedules.md#flow-health).
 
-- Flow health shows each name with its value per run when you open the row of the flow. See [Flow health](Runs-and-schedules.md#flow-health).
+An Agent, a Command, or a Value scores the run with `scores` in its data: `{"scores": {"leads": 12, "replies": 3}}`.
+
+- Each name gets a number of 0 or more. A shape does not have to name `scores`.
 - A name that Night Shift uses itself, such as `useful`, gives a warning and does not count.
 - When a cascade moves up to the next try, the try before scores nothing.
 
 ## The editor
 
-- **Add a node.** Click the canvas and press **Tab**, or double-click an empty spot of the canvas. Type what you need, such as "http", "approve" or "csv", and pick a node. The buttons on the left of the canvas add nodes too. The first one opens the same search. Drag any other one to place it.
-- **Families.** The nodes are in families by their role, each with its own color: **Do** (Agent, Command, Tool, Web request), **Decide** (Gate, Branch), **Shape** (Value, the Value presets, Since last run, Convert), **Hold** (Wait, Lease, Service), and **Compose** (Subflow, Join, End).
-- **Kits.** The same search finds the kits, each in its family and marked **Kit**. **My kits** comes last. It lists the flows that another flow already runs, also in the other projects of your Space. Pick a flow of another project, and Night Shift copies it into this project first. In a project without a folder, you cannot pick a kit or a flow that needs a folder.
-- **Takes a value.** A Branch, a Value, a Value preset, Since last run and Convert take a value. Select a node first, then add one of them. It goes after that node and reads its output. An edge comes from the first outcome of that node, if that outcome has no edge yet.
-- **Last output.** After the first run of the flow, each node shows what it gave in the newest run, in one line at its bottom. A node that runs now shows **Running**. A node that the run did not reach shows **Not in the last run**. The **Results** tab of the node shows each output field, with its shape. **Open the run** opens that run at the step. When you change the node after that run, the tab says so. The template variables also show their values from the newest run.
-- **Data links.** Select a node to see dotted lines to the nodes it reads and the nodes that read it. The label on a line names what it reads, such as `data.tasks`.
+- **Add a node.** Click the canvas and press **Tab**, or double-click an empty spot. Type what you need, such as "http", "approve", or "csv", and pick a node. The buttons on the left of the canvas add nodes too.
+- **Add a node after another.** Select a node first. Then add a Branch, a Value, a Value preset, a Since last run, or a Convert. It goes after the selected node and reads its output. An edge comes from the first free outcome of that node.
+- **Connect two nodes.** Drag from the dot of an outcome to the next node.
+- **Set the start.** Select a node, and choose ▶ (**Start the run here**) at the top of its panel.
+- **Families.** Each family of nodes has its own color: **Do** (Agent, Command, Tool, Web request), **Decide** (Gate, Branch), **Shape** (Value, the Value presets, Since last run, Convert), **Hold** (Wait, Lease, Service), and **Compose** (Subflow, Join, End).
+- **Kits.** The search finds the kits too, marked **Kit**. **My kits** comes last. It lists the flows that another flow already runs, also in the other projects of your Space. When you pick a flow of another project, Night Shift copies it into this project first. In a project without a folder, you cannot pick a kit or a flow that needs a folder.
+- **Last output.** After the first run, each node shows what it gave in the newest run, in one line at its bottom. A node that runs now shows **Running**. A node that the run did not reach shows **Not in the last run**.
+- **Results.** The **Results** tab of a node shows each output field, with its shape. **Open the run** opens that run at the step. The template variables show their values from the newest run too.
+- **Data links.** Select a node to see dotted lines to the nodes that it reads and the nodes that read it. The label on a line names what it reads, such as `data.tasks`.
 - **Sections.** Put related nodes in a Section, a box on the canvas that you zoom into. A Section can hold other Sections. You can move a Section into a flow of its own.
 - **Auto layout** arranges the nodes for you.
 - **Undo, redo, cut, copy, and paste** work with the keyboard.
-- **Issues** at the bottom of the canvas lists the errors and warnings of the flow.
+- **Issues** at the bottom of the canvas lists the errors and warnings of the flow. A schedule cannot start a flow with errors.
 - **Revisions.** Every save is a revision. You see who saved what, and from which computer. You can restore an earlier revision. When Night Shift takes a shape from a run, that is a revision too: **Shape from a run**.
 
-Night Shift keeps your flows outside your project folder. Your project needs no Night Shift files. To move a flow, open its ⋯ menu in the editor and choose **Export as file**. Then choose **Import flow** on the Flows page of another project. The import asks which of your profiles takes each agent of the flow.
+Night Shift keeps your flows outside your project folder. Your project needs no Night Shift files.
+
+To copy a flow to another project, open its ⋯ menu in the editor and choose **Export as file**. Then choose **Import flow** on the Flows page of the other project. The import asks which of your profiles takes each agent of the flow.
 
 ### Test a flow
 
-A test run tries one part of a flow. A pinned node gives an output of an earlier run again, and a skipped node gives the outcome you choose. Neither does its work. The other nodes run for real.
+A test run tries one part of a flow, without a run of the slow or costly parts. A pinned node gives its output of an earlier run again. A skipped node gives the outcome that you choose. Neither does its work. The other nodes run for real.
 
 1. Run the flow once, so that each node has a last output.
-2. To pin a node, right-click it and choose **Pin output**. The node gives its last output again in each test run.
-3. To skip a node, right-click it and choose **Skip with outcome**. Then choose the outcome that the node gives.
-4. Choose **Run**. The dialog lists your pins and skips. Choose **Start test**.
+2. To pin a node, right-click it and choose **Pin output**.
+3. To skip a node, right-click it and choose **Skip with outcome**. Then choose the outcome.
+4. Choose **Run**. The dialog lists your pins and skips.
+5. Choose **Start test**.
+
+You stay in the editor, and the nodes show what the test run gives. **Open the run** opens it. **Show the newest runs** goes back.
+
+Know these limits before you test:
+
+- **A skipped Gate does not ask.** The steps after it run for real, also a send or a publish.
+- **A pinned output is what the step gave, not the files that it changed.** A later step that reads those files does not find them.
+- A test run keeps nothing for the next run: no kept variables, and no memory of a Since last run node.
+- An End, a Join, a Lease, and a Service always run. A test run takes at most 50 pins and skips.
+- Your pins and skips stay in this browser. A schedule, a webhook, and the Flows page never use them.
+
+More ways to work with pins and skips:
 
 - **On the canvas**, a pinned node shows a pin and its pinned output. A skipped node fades, and the outcome that it gives lights up.
 - **With the keyboard**, focus a node and press **Shift+F10**. The **Results** tab of a node has the same choices.
-- **After the start**, you stay in the editor, and the nodes show what the test run gives. **Open the run** opens it. **Show the newest runs** goes back.
-- **The button beside Run** counts your pins and skips, for example "2 pinned · 1 skipped". It lists the nodes, and **Clear pins and skips** removes them all.
+- **The button beside Run** counts your pins and skips, for example "2 pinned · 1 skipped". **Clear pins and skips** removes them all.
 - **Use pins and skips** in the dialog is on. Turn it off to run the whole flow.
-- **A skipped Gate does not ask.** The steps after it run for real, also a send or a publish.
-- **A pinned output is what the step gave, not the files it changed.** A step after it that reads those files does not find them.
-- An End, a Join, a Lease and a Service always run. A test run takes at most 50 pins and skips.
-- Your pins and skips stay in this browser. They are not part of the flow, so a schedule, a webhook and the Flows page never use them.
-- A test run keeps nothing for the next run: no kept variables, and no memory of a Since last run node.
 
 ## Build a flow with an agent
 
-An agent helps you in the editor, on your own logins:
+An agent can help you build and fix flows, on your own logins. It proposes changes, and you choose to apply them.
 
-- **Chat beside the canvas.** Tell the agent what the flow must do. It proposes changes. The canvas marks each node that it adds, removes, or changes, and each edge that it adds or removes. Choose **Apply** or **Discard**.
-- **Suggest.** A prompt, the outcomes, a rule, a command, tool arguments, or output fields: one click gives a suggestion that fits the flow.
+- **Chat beside the canvas.** Tell the agent what the flow must do. Example: "Each morning, read this feed, and write a brief of the five most important items." The canvas marks each node and edge that it adds, removes, or changes. Choose **Apply** or **Discard**.
+- **Suggest.** One click under a field gives a suggestion that fits the flow. It works for a prompt, the outcomes, a rule, a command, tool arguments, and output fields.
 - **Ask why.** When a run ends early, the Explainer reads the run. It tells you on the run page what went wrong and what you can do.
-- **Improve this flow.** Opens the flow with a chat about the run. The Improver proposes a change to the flow, and you apply it. The agent can read the runs of the project, what each run and each step cost, what a step did, and how the flow changed. It reads only this project, and it changes nothing until you apply a proposal.
+- **Improve this flow.** Opens the flow with a chat about the run. The Improver proposes a change, and you apply it. It reads the runs of this project, their cost, what each step did, and how the flow changed. It changes nothing until you apply a proposal.
 
-You choose the agent that answers: a profile, or an agent and a model.
+You choose the agent that answers: a profile, or an agent and a model. See [Night Shift's agents](Agents-and-profiles.md#night-shifts-agents).
 
 ## Kits
 
-Kits are small flows that ship with Night Shift. A Subflow runs one by its name, for example `kit:feeds/read`. To change a kit, copy it into the project. The copy is a flow of your own.
+A kit is a small flow that comes with Night Shift, for a common step. Examples: send a message, send an email, or read a feed. A Subflow runs a kit by its name, such as `kit:feeds/read`.
 
-Night Shift has no app catalog. An app is a command in your flow, such as `gh`, `acli`, or `curl`, a web request, or a tool of the agent. The kits wrap common steps: send a message or an email, read a feed, and work with `git`, `gh`, and `acli`.
+To change a kit, copy it into the project. The copy is a flow of your own.
+
+Night Shift has no app catalog. A flow reaches an app through a command such as `gh`, `acli`, or `curl`, a web request, or a tool of the agent. The kits wrap common steps.
 
 <!-- generated:kits: bun run docs:reference writes this table from the code. Do not edit it here. -->
 | Kit | Family | Does | Inputs |
@@ -285,15 +413,16 @@ Night Shift has no app catalog. An app is a command in your flow, such as `gh`, 
 | `kit:message/send` | Do | Sends a message to the incoming webhook of a chat or another service. Save its URL as the secret MESSAGE_WEBHOOK_URL, or name another secret in webhook. | `message`, `webhook`, `format`, `field` |
 <!-- /generated:kits -->
 
-The knowledge kits are on the [Knowledge](Knowledge.md#sources) page.
+The knowledge kits are on the [Knowledge](Knowledge.md#advanced) page.
 
 ### Send a message
 
 `kit:message/send` sends a message to an incoming webhook, such as one of a chat channel. Any service that gives you a webhook URL works.
 
-Save the webhook URL as the secret `MESSAGE_WEBHOOK_URL` on the Secrets page. The URL is a key: anyone with it can post. Night Shift never shows it. For another channel, save another secret, and give its name in `webhook`.
-
-Set `format` and `field` to what the service takes:
+1. Get an incoming webhook URL from your chat service.
+2. Save it as the secret `MESSAGE_WEBHOOK_URL` on the Secrets page.
+3. Add a Subflow that runs `kit:message/send`, and fill in `message`.
+4. Set `format` and `field` to what the service takes:
 
 | Service | `format` | `field` |
 | --- | --- | --- |
@@ -301,11 +430,15 @@ Set `format` and `field` to what the service takes:
 | Discord | `json` | `content` |
 | ntfy | `plain` | not used |
 
+The URL is a key: anyone with it can post. Night Shift never shows it. For another channel, save another secret, and give its name in `webhook`.
+
 ### Read a feed
 
-`kit:feeds/read` reads an RSS, Atom or JSON feed, and gives the items that are new since the last run. When the Subflow is the step `feed`, later steps read them in `{{feed.items}}`. It needs no secret.
+`kit:feeds/read` reads an RSS, Atom, or JSON feed, and gives the items that are new since the last run. It needs no secret. When the Subflow is the step `feed`, later steps read the items as `{{feed.items}}`.
 
-On its first run, it only remembers what the feed holds, so the next run gives what is new. Set `first_run` to `new` to get those items too. It remembers each feed on its own. To read the whole feed again, select the Subflow node and click **Forget what it saw** under **Results**.
+On its first run, it only remembers what the feed holds. The next run gives what is new. To get the items of the first run too, set `first_run` to `new`.
+
+It remembers each feed on its own. To read the whole feed again, select the Subflow node and click **Forget what it saw** under **Results**.
 
 ### Send an email
 
@@ -314,13 +447,13 @@ On its first run, it only remembers what the feed holds, so the next run gives w
 - `EMAIL_SMTP_URL`: the server, for example `smtps://smtp.example.com:465`. The server must use TLS.
 - `EMAIL_SMTP_USER` and `EMAIL_SMTP_PASSWORD`: the login of the mail account. Many providers give you an app password for this.
 
-The email comes from that user, or from `from`. To send to more people, separate the addresses in `to` with commas.
+The email comes from that user, or from `from`. To send to more people, put commas between the addresses in `to`.
 
 You cannot undo a message or an email that went out. When it goes to other people, put a Gate before it.
 
 ## Starter flows
 
-When you add a project, Night Shift saves these flows into it, with the flows they call. You choose which of your agents runs each part. Change them to fit the project.
+When you add a project with a folder, Night Shift saves these flows into it, with the flows that they call. You choose which of your agents runs each part. Change them to fit the project.
 
 <!-- generated:starters: bun run docs:reference writes this table from the code. Do not edit it here. -->
 | Flow | Does | Inputs |

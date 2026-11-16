@@ -4,7 +4,14 @@ The flows on this page do not exist yet. Each one is an idea. Anyone can build o
 
 When you build an idea, remove it from this page in the same pull request.
 
-Each idea climbs the ladder. A rule, or a check for what is new, comes first, so most runs end without a model. A decider makes the next choices, and an agent does the work. A Gate asks you only when the ladder runs out, or before an act that you cannot undo.
+Each idea follows the same pattern, so that most runs cost little and need nobody:
+
+1. A rule, or a check for what is new, comes first. Most runs end here, without a model.
+2. A decider makes the next choices. It is a small model that only picks an option.
+3. An agent does the work.
+4. A Gate asks you only when the others cannot decide, or before an act that you cannot undo.
+
+New to building flows? Do [Your first flow](Your-first-flow.md) first. It uses the same nodes as the first ideas on this page.
 
 ## Keep a market brief up to date
 
