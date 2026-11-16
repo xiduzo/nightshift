@@ -49,6 +49,8 @@ export type {
 export type {
 	CommandBatch,
 	FollowWant,
+	PendingBatch,
+	PendingElsewhere,
 	RunCommand,
 	SyncBatch,
 } from "./sync";

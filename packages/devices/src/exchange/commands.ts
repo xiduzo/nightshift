@@ -3,7 +3,7 @@ import type { Database } from "@nightshift/db";
 import { runCommand } from "@nightshift/db/schema";
 import type { MoveRows, RunCommandInput } from "@nightshift/engine";
 import { asDate, instant } from "@nightshift/time";
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import type { RunCommand } from "../contract";
 
 /**
@@ -133,6 +133,26 @@ export function createRunCommands(deps: { db: Database }) {
 				.where(
 					and(
 						inArray(runCommand.runId, [...runIds]),
+						isNull(runCommand.doneAt),
+					),
+				)
+				.orderBy(asc(runCommand.createdAt));
+			return rows.map(toCommand);
+		},
+
+		/** The commands of `spaces` that wait for any Walker but `except`, oldest first. */
+		async pendingIn(
+			spaces: readonly string[],
+			except: string,
+		): Promise<RunCommand[]> {
+			if (spaces.length === 0) return [];
+			const rows = await db
+				.select()
+				.from(runCommand)
+				.where(
+					and(
+						inArray(runCommand.spaceId, [...spaces]),
+						ne(runCommand.walkerId, except),
 						isNull(runCommand.doneAt),
 					),
 				)

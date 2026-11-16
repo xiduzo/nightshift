@@ -30,6 +30,8 @@ describe("the Host's contract", () => {
 			"sync.command",
 			"sync.commandDone",
 			"sync.commands",
+			// An older Host has none: the Device knows only its own Commands.
+			"sync.pending",
 			"sync.startRun",
 			// ADR 27: an older Host has none, and the Device says to update it.
 			"sync.startTest",

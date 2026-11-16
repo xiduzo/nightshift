@@ -17,6 +17,7 @@ import type {
 	CommandBatch,
 	KnowledgeRef,
 	OfferCaps,
+	PendingBatch,
 	PersonalMerge,
 	PersonalMergeInput,
 	RunRows,
@@ -55,6 +56,12 @@ export type HostExchange = {
 	 * again each time it changes, until the signal aborts.
 	 */
 	commands(caller: Caller, signal?: AbortSignal): AsyncIterable<CommandBatch>;
+	/**
+	 * The Commands that wait for Devices other than the Caller's, in the
+	 * Spaces of the Caller's Person: the whole set, then again each time
+	 * it changes, until the signal aborts.
+	 */
+	pending(caller: Caller, signal?: AbortSignal): AsyncIterable<PendingBatch>;
 	/** Takes the Device's own rows. Refuses a batch with a row of another Walker or Space. */
 	push(caller: Caller, rows: RunRows): Promise<{ events: number }>;
 	/**
