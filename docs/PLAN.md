@@ -374,6 +374,7 @@ NIGHTSHIFT_PI_BIN=/path/to/pi
 - A profile belongs to one Device. Its identity is the Device and the profile's id, and its name is a label.
 - An Agent node names that pair in `profile` (the editor shows "builder on LE2316"). The node may set any of those fields itself. Its own value wins, and tool sets and connections add up.
 - A node without a profile needs its own harness, model and permission mode.
+- A node that names none of these four runs on the first Agent Profile of the Device that runs it. The run's plan fills in that profile. A kit needs this, because it cannot name a profile of anyone's computer (`kit:knowledge/agent`). A Device with no Agent Profile refuses the start.
 - The run resolves its profiles into its copy of the flows when it starts. So a later edit reaches the next run, and a resumed run keeps what it started with.
 - A flow that names a profile on a Device that the Space no longer has does not start. The editor marks the node and asks for another profile. Night Shift never takes another Device's profile with the same label.
 - Flows reference the id, so a rename changes no flow.

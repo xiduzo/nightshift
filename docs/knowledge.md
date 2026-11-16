@@ -90,8 +90,8 @@ Every Member of the Space can read the knowledge, on any computer and on
 the Host. A computer publishes its changes when its Member has a role that
 may start runs. A browser never writes the folder. A person changes knowledge
 through flows (the syncs, the review of learnings), through Keep and Delete on
-the Review page, and by marking a question or a word that is not a topic. These
-need the same role. In a shared Space, the Knowledge page says
+the Review page, by checking or telling one note, and by marking a question or
+a word that is not a topic. These need the same role. In a shared Space, the Knowledge page says
 that every Member can read what you sync there. Before you sync a client's
 Jira or Confluence into a shared Space, make sure that each Member may see
 it.
@@ -295,7 +295,8 @@ it from the Knowledge page with **Sync now**.
 
 **Add source** on the Knowledge page fills the knowledge without the
 canvas. Choose the kind (a folder on this computer, project files, web
-pages, a GitHub wiki, Jira or Confluence) and fill in the kit's inputs.
+pages, a GitHub wiki, Jira, Confluence or an agent) and fill in the kit's
+inputs.
 Night Shift then:
 
 - saves a flow that calls the kit from one Subflow node, with your values
@@ -349,8 +350,50 @@ Kits do the common syncs. Call one from a Subflow node:
 | `kit:knowledge/web` | Web pages as markdown, through `r.jina.ai`. A page that cannot be read keeps its last copy and does not stop the others. The sync fails only when it reads no page. With `follow`, also the pages they link to (see Web pages that follow links). | curl, no account |
 | `kit:knowledge/jira` | Jira work items, one markdown file each. | A CLI tool for `acli`, signed in, and jq |
 | `kit:knowledge/confluence` | Confluence pages by id, one markdown file each. | The secret `CONFLUENCE_API_TOKEN`, curl and jq |
+| `kit:knowledge/agent` | What a person describes in `what`, fetched by an agent with its own tools, as markdown files. See An agent fetches it. | An Agent Profile on the computer that runs it |
 
 `kit:knowledge/review-learnings` is not a sync. See Learnings below.
+
+Each kind of source can say how often a new source of it syncs on its own
+(`every` of the kind in `source-kits.ts`). Web pages and an agent sync each
+week. The Knowledge page uses this as the default of **How often**. A feed
+syncs each day: the page tells a feed from a page when it looks at the link.
+The person can pick **Only now**: then `saveSource` gets no schedule.
+
+### An agent fetches it
+
+Some knowledge has no kit: text in a tool that no source reads, a page behind
+a sign-in, the transcript of a video. `kit:knowledge/agent` gives the work to an
+agent. Its input `what` describes what to fetch, for example "the meeting notes
+in our shared drive".
+
+The kit has one Agent node (`defineSyncKit` with `agent` in place of a script,
+`packages/flows/src/kits/knowledge/sync-kit.ts`). The node gets the knowledge
+folder (`knowledge: true`). Its prompt asks the agent to:
+
+- find and read it with the tools it has (its profile's CLI tools,
+  connections and web access)
+- save it as markdown files in the source's folder, one file for each document,
+  with its title and its address
+- replace what it saved there before, and write nothing outside that folder
+- report `files` (how many files the folder holds) and `missed` (what it could
+  not reach, and why) in its data, and end `fail` when it reached nothing
+
+The source's flow and its outputs are the same as for a script: `files` comes
+from `{{sync.data.files}}`. The step's summary says what the agent could not
+reach.
+
+A kit cannot name a profile of anyone's computer, so the kit's Agent node names
+no agent. The run's plan gives such a node the first Agent Profile of the
+Device that runs it (`withComputerAgents` in
+`packages/engine/src/placement/run-plan.ts`): the Device the node names, else
+the Device of the nearest Subflow around it, else the run's Device. A schedule
+runs on the Host, so the Host's agent fetches. **Sync now** runs on the
+computer that starts it. A Device with no Agent Profile refuses the start, and
+says to add one on the Agents page.
+
+The same kit serves "Find it for me" for a question that found nothing: the
+page saves the source with no schedule and syncs it once.
 
 ### Web pages that follow links
 
@@ -468,6 +511,51 @@ the Space.
 You can also keep or delete proposed learnings on the Review page of Knowledge,
 one step at a time. Each decision acts on all notes of that step. The
 page sends it after 5 seconds, so you can undo it.
+
+### One note at a time
+
+The Knowledge overview checks one note at a time, not a whole step's file:
+
+- `knowledge.settleNote({ projectId, learningId, index, note?, decision })`
+  keeps or deletes one note. `learningId` is the file, `index` the place of
+  the note in `notes`, and `note` its text as the person saw it.
+- `knowledge.tell({ projectId, note, replaces? })` keeps a note that the
+  person writes. With `replaces` (`{ learningId, index, note? }`), the note
+  takes the place of a note that waits ("Change it").
+
+Both need a role that may start runs, as Keep and Delete do.
+
+A kept note goes to the step's file in `learnings/accepted/`, as a whole
+kept file does. A told note goes to the person's own file,
+`learnings/accepted/told-<person id>.md`. One file for each person means that
+two people who tell at once on two computers never write the same file. Each
+note gets a second line that says who decided and when:
+
+```md
+- Deploys wait for two people.
+  Told by Ada Lovelace on 2026-11-16.
+```
+
+That line does not start with `- `, so no reader counts it as a note. A new
+file of kept notes starts with the header of the proposed file. A new file
+of told notes starts with its own header.
+
+The proposed file loses the note, and every other line stays. When no note
+is left, the file goes. With `note`, Night Shift finds a note that moved in
+its file because another note of it was settled first. It refuses a note that
+is gone ("This note no longer waits"), and never settles another one. A told
+note that replaces a gone note is not kept either.
+
+`Learnings.settleNote` and `Learnings.tell` hold the folder as a step does, as
+`settle` does. The reconcile at the end puts the change in the Space, and the
+open screens hear of it. The whole-file `settle`, the Review page, the phone and
+`kit:knowledge/review-learnings` stay as they were. The kit settles what a
+per-note check left (`learnings-kit.test.ts`). Close notes (`nearTo`) stay one
+list per note.
+
+Both apps can use `useCheckNotes` of `@nightshift/client`. It lists the notes
+one at a time with the notes close to each, leaves out a note from the moment
+its decision goes out, and reads the learnings, the page and the review again.
 
 The open screens of the Members read the proposed learnings again each time a
 reconcile finds that what waits changed. That covers what a step proposes when
