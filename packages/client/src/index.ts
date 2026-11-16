@@ -200,8 +200,10 @@ export {
 	type PushRoute,
 	phoneDelayLabel,
 	pushDataOf,
+	type ReadGate,
 	routeOf,
 	type ShownNotification,
+	staleGates,
 	webPathOf,
 	withdrawKeyOf,
 } from "./notifications";

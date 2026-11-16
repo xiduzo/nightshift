@@ -24,8 +24,8 @@ import type { VapidKeyStore, VapidKeys } from "./vapid-keys";
  * `userVisibleOnly`: every push must show a notification, and a push that
  * shows none costs the site (Safari ends the subscription after a few,
  * Chrome shows a notice of its own). An open Night Shift page closes the
- * notifications of the Gates that no longer wait instead (`apps/web`,
- * `features/notifications`).
+ * notifications of the Gates that no longer wait instead, and "N Gates
+ * wait for you" once none waits (`staleGates` in `@nightshift/client`).
  */
 
 /**

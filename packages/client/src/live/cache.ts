@@ -339,14 +339,16 @@ export function createLiveCache({
 		for (const path of staleAfter(changes)) invalidate([path]);
 	}
 
-	/** Takes away the shown Gate notifications whose Gate this read of the open Gates misses. */
+	/**
+	 * Takes away the shown Gate notifications whose Gate this read of the
+	 * open Gates misses, and "N Gates wait for you" once no Gate waits.
+	 */
 	async function clearStale(open: readonly OpenGate[], readAt: number) {
 		const screen = shown;
 		if (!screen) return;
 		try {
 			const listed = await screen.list();
-			const openKeys = new Set(open.map(gateKey));
-			for (const stale of staleGates(listed, openKeys, readAt)) {
+			for (const stale of staleGates(listed, open, readAt)) {
 				await stale.dismiss();
 			}
 		} catch {

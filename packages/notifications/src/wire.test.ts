@@ -300,3 +300,40 @@ test("a run that changed without an event of its own reaches the open screens of
 	// Quiet: no push.
 	expect(sender.requests).toEqual([]);
 });
+
+test("a run that changed because an answer waits for its Device closes the Gate on the open screens", async () => {
+	const ada = await sandbox.signUp("Ada");
+	const spaceId = (await personalSpaceId(sandbox.db, ada.userId)) ?? "";
+	await notifications.start();
+	const kinds: string[] = [];
+	const controller = new AbortController();
+	void (async () => {
+		for await (const item of notifications.watch(
+			ada.userId,
+			controller.signal,
+		)) {
+			kinds.push(item.kind);
+		}
+	})();
+	events.setOpen(spaceId, [{ runId: "run-1", stepId: "review" }]);
+	events.land([
+		{
+			spaceId,
+			runId: "run-1",
+			stepId: "review",
+			kind: "gate-opened",
+			urgency: "now",
+			seq: 1,
+			changes: "summary",
+		},
+	]);
+	await waitFor(() => kinds.length === 1);
+
+	events.setOpen(spaceId, [
+		{ runId: "run-1", stepId: "review", answerPending: true },
+	]);
+	await notifications.runChanged(spaceId, "run-1");
+	await waitFor(() => kinds.length === 3);
+	controller.abort();
+	expect(kinds).toEqual(["gate-opened", "run-changed", "gate-closed"]);
+});

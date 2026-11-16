@@ -72,7 +72,12 @@ import { createWaitTracker, type StartedWait } from "./wait-tracker";
  *   again instead of polling.
  * - Answer once, clear everywhere: when a Gate closes, or a device wait
  *   is over, every screen that got it gets a withdraw, and what still
- *   waits is dropped.
+ *   waits is dropped. An answer on its way to the Device that walks the
+ *   run closes the Gate here at once (`commandsChanged`). When that Device
+ *   refuses it, the Gate waits again without a new push.
+ * - A screen that got "N Gates wait for you" counts as told of each of
+ *   those Gates: each one's close withdraws it there. The last one's
+ *   close also withdraws the summary, while this notifier still runs.
  * - A flow that turns severe under Needs a look (`look:<projectId>:<flow>:<runId>`):
  *   after a run ends, the notifier asks whether that end turned its flow
  *   severe. Only the turn tells: a flow that stays severe tells nobody
@@ -128,6 +133,12 @@ export type Notifier = {
 	stop(): void;
 	/** Sends what is due: held pushes, and the end of quiet hours. */
 	tick(): Promise<void>;
+	/**
+	 * A command of the run was kept for the Device that walks it, or that
+	 * Device applied or refused it. Reads the run's Gates again: a Gate
+	 * with an answer on its way closes everywhere now.
+	 */
+	commandsChanged(spaceId: string, runId: string): Promise<void>;
 	/** Resolves once every piece of work so far is done. For tests. */
 	idle(): Promise<void>;
 };
@@ -159,6 +170,12 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 	/** The steps that wait for an offline Device. */
 	const waits = createWaitTracker();
 	const mayAnswer = deps.mayAnswer ?? (async () => false);
+	/**
+	 * The "N Gates wait for you" pushes that went out, and the Gates each
+	 * one still names: the last Gate's close withdraws it. Only in memory:
+	 * after a restart the screens clear it themselves when no Gate waits.
+	 */
+	const bundles: { targetId: string; key: string; gates: Set<string> }[] = [];
 	let queue: Promise<void> = Promise.resolve();
 	let stopped = false;
 	let unsubscribe: (() => void) | null = null;
@@ -470,6 +487,22 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 				withdrawnAt: now(),
 			});
 		}
+		await withdrawBundles(key);
+	}
+
+	/** Withdraws each "N Gates wait for you" push whose last Gate just closed. */
+	async function withdrawBundles(key: string): Promise<void> {
+		for (const bundle of [...bundles]) {
+			if (!bundle.gates.delete(key) || bundle.gates.size > 0) continue;
+			bundles.splice(bundles.indexOf(bundle), 1);
+			for (const target of await deps.targets.byIds([bundle.targetId])) {
+				try {
+					await deps.push[target.kind]?.withdraw(target, bundle.key);
+				} catch (error) {
+					onError(`A ${target.kind} withdraw did not go out.`, error);
+				}
+			}
+		}
 	}
 
 	async function handle(facts: readonly LandedFact[]): Promise<void> {
@@ -653,8 +686,10 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 					const sent = await sendTo([target], await messageOf(one));
 					sentTo.set(one.key, [...(sentTo.get(one.key) ?? []), ...sent]);
 				} else if (waiting.length > 1) {
-					await sendTo([target], {
-						key: waitingKey(at),
+					const key = waitingKey(at);
+					// The screen was told of each Gate: each one's close withdraws it there.
+					const sent = await sendTo([target], {
+						key,
 						kind: "gates-waiting",
 						spaceId: null,
 						runId: null,
@@ -664,6 +699,16 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 						count: waiting.length,
 						at,
 					});
+					for (const row of waiting) {
+						sentTo.set(row.key, [...(sentTo.get(row.key) ?? []), ...sent]);
+					}
+					if (sent.length > 0) {
+						bundles.push({
+							targetId: target.id,
+							key,
+							gates: new Set(waiting.map((row) => row.key)),
+						});
+					}
 				}
 			}
 			for (const row of stillWait) {
@@ -750,6 +795,13 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			timer = null;
 		},
 		tick: () => enqueue("Held pushes were not sent.", tick),
+		commandsChanged: (spaceId, runId) =>
+			stopped
+				? Promise.resolve()
+				: enqueue("The Gates of a run were not read again.", async () => {
+						const { closed } = await gates.recheck(spaceId, runId);
+						for (const key of closed) await close(spaceId, key);
+					}),
 		idle: () => queue,
 	};
 

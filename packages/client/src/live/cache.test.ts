@@ -736,6 +736,28 @@ describe("the live cache follows the Host", () => {
 		await Bun.sleep(0);
 		expect(dismissed).toEqual(["r2:b", "r9:z"]);
 	});
+
+	test("a read of the open Gates without a Gate that waits takes away the end of quiet hours", async () => {
+		const { live, queryClient } = setUp();
+		const readAt = now() + 120_000;
+		const { dismissed } = follow(
+			live,
+			fakeScreen([
+				{ key: "waiting:5", at: 0 },
+				{ key: "r1:a", at: 0 },
+			]),
+		);
+		await Bun.sleep(0);
+		expect(dismissed).toEqual([]);
+		// The answer to the last Gate is on its way: no Gate waits now.
+		queryClient.setQueryData(
+			gatesKey,
+			[{ ...gate("r1", "a"), answerPending: true }],
+			{ updatedAt: readAt },
+		);
+		await Bun.sleep(0);
+		expect(dismissed).toEqual(["waiting:5", "r1:a"]);
+	});
 });
 
 describe("the open Gates while the stream is down", () => {

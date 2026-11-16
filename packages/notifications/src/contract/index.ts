@@ -9,6 +9,7 @@ export {
 	deviceWaitKey,
 	gateKey,
 	isGateKey,
+	isWaitingKey,
 	needsALookKey,
 	parseDeviceWaitKey,
 	parseGateKey,

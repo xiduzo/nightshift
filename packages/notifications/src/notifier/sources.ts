@@ -28,6 +28,11 @@ export type OpenGateRef = {
 	lockScreen?: boolean;
 	/** The names of its options, in the author's order. */
 	choices?: string[];
+	/**
+	 * An answer to it waits for the Device that walks its run. The Gate
+	 * waits for nobody now: the notifier counts it as closed. Default: false.
+	 */
+	answerPending?: boolean;
 };
 
 /** What a notification about a run names, and whether the run still sleeps. */
@@ -45,7 +50,7 @@ export type RunRef = {
 export type RunEventSource = {
 	/** Calls `listener` with the facts of the run events that land from now on. Returns the unsubscribe. */
 	subscribe(listener: (facts: readonly LandedFact[]) => void): () => void;
-	/** The open Gates of the Space's runs. */
+	/** The open Gates of the Space's runs, also those with an answer on its way. */
 	openGates(spaceId: string): Promise<OpenGateRef[]>;
 	/** One run of the Space. Null: this Replica has no such run. */
 	run(spaceId: string, runId: string): Promise<RunRef | null>;
@@ -78,6 +83,7 @@ export function engineRunEvents(
 				stepId: g.stepId,
 				lockScreen: g.lockScreen,
 				choices: g.choices.map((choice) => choice.name),
+				answerPending: g.answerPending,
 			}));
 		},
 		async run(spaceId, runId) {

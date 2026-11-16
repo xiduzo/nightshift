@@ -570,6 +570,38 @@ describe("quiet hours", () => {
 		expect(expo.withdrawn()).toEqual(["run-1:step-1"]);
 	});
 
+	test("a Gate the summary named counts as sent there: its close withdraws it, and the last close withdraws the summary", async () => {
+		await notifier.start();
+		const phone = await register("ada", "expo");
+		const own = await register("ada", "desktop");
+
+		await openGate("run-1", "step-1");
+		await openGate("run-2", "step-2");
+
+		clock = utc(2026, 9, 22, 7, 30);
+		await notifier.tick();
+		const summary = `waiting:${clock}`;
+		expect(sentTo(expo)).toEqual([`${phone.id}:${summary}`]);
+		for (const key of ["run-1:step-1", "run-2:step-2"]) {
+			const [row, ...more] = await deliveries.live(key);
+			expect(more).toEqual([]);
+			expect(row).toMatchObject({ personId: "ada", status: "sent" });
+			expect(row?.sentTo.toSorted()).toEqual([phone.id, own.id].toSorted());
+		}
+
+		await answerGate("run-1", "step-1");
+		expect(expo.withdrawn()).toEqual(["run-1:step-1"]);
+		expect(desktop.withdrawn()).toEqual(["run-1:step-1"]);
+
+		await answerGate("run-2", "step-2");
+		expect(expo.withdrawn()).toEqual(["run-1:step-1", "run-2:step-2", summary]);
+		expect(desktop.withdrawn()).toEqual([
+			"run-1:step-1",
+			"run-2:step-2",
+			summary,
+		]);
+	});
+
 	test("are in the person's own time zone", async () => {
 		await settings.save("ada", { timeZone: "Asia/Tokyo" });
 		await notifier.start();
@@ -848,6 +880,94 @@ describe("answer once, clear everywhere", () => {
 		await endRun("run-1", "stopped");
 
 		expect(web.withdrawn()).toEqual(["run-1:step-1"]);
+	});
+
+	describe("an answer that waits for the Device that walks the run", () => {
+		/** The answer is kept for the run's Device, or that Device refused it: the engine reads it so. */
+		async function setPending(runId: string, stepId: string, pending: boolean) {
+			events.setOpen(
+				SPACE,
+				(await events.source.openGates(SPACE)).map((g) =>
+					g.runId === runId && g.stepId === stepId
+						? { ...g, answerPending: pending }
+						: g,
+				),
+			);
+			await notifier.commandsChanged(SPACE, runId);
+		}
+
+		test("closes the Gate everywhere at once", async () => {
+			await notifier.start();
+			const browser = await register("ada", "web");
+			const phone = await register("ada", "expo");
+			await openGate("run-1", "step-1");
+			const screen = openScreen("ada");
+
+			await setPending("run-1", "step-1", true);
+
+			expect(web.calls.filter((c) => c.call === "withdraw")).toEqual([
+				{ call: "withdraw", targetId: browser.id, key: "run-1:step-1" },
+			]);
+			expect(expo.calls.at(-1)).toEqual({
+				call: "withdraw",
+				targetId: phone.id,
+				key: "run-1:step-1",
+			});
+			expect(screen).toMatchObject([
+				{ kind: "gate-closed", key: "run-1:step-1" },
+			]);
+		});
+
+		test("refused, the Gate waits again without a new push, and its real close still tells the screens", async () => {
+			await notifier.start();
+			await register("ada", "web");
+			await openGate("run-1", "step-1");
+			await setPending("run-1", "step-1", true);
+			const screen = openScreen("ada");
+
+			await setPending("run-1", "step-1", false);
+			expect(web.sent()).toHaveLength(1);
+			expect(web.withdrawn()).toEqual(["run-1:step-1"]);
+			expect(screen).toEqual([]);
+
+			await answerGate("run-1", "step-1");
+			expect(screen).toMatchObject([
+				{ kind: "gate-closed", key: "run-1:step-1" },
+			]);
+		});
+
+		test("applied, the Gate goes without a second withdraw", async () => {
+			await notifier.start();
+			await register("ada", "web");
+			await openGate("run-1", "step-1");
+			await setPending("run-1", "step-1", true);
+			const screen = openScreen("ada");
+
+			await answerGate("run-1", "step-1");
+			await notifier.commandsChanged(SPACE, "run-1");
+
+			expect(web.withdrawn()).toEqual(["run-1:step-1"]);
+			// The run changed, but its Gate closed already.
+			expect(screen.map((item) => item.kind)).toEqual(["run-changed"]);
+		});
+
+		test("a Gate found with an answer on its way at start is not pushed, and its told push is withdrawn", async () => {
+			const phone = await register("ada", "expo");
+			await notifier.start();
+			await openGate("run-1", "step-1");
+			notifier.stop();
+			events.setOpen(SPACE, [
+				{ runId: "run-1", stepId: "step-1", answerPending: true },
+			]);
+			expo.calls.length = 0;
+
+			notifier = makeNotifier();
+			await notifier.start();
+
+			expect(expo.calls).toEqual([
+				{ call: "withdraw", targetId: phone.id, key: "run-1:step-1" },
+			]);
+		});
 	});
 
 	test("an event of another run leaves an open Gate alone", async () => {

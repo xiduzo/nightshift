@@ -6,6 +6,7 @@ import {
 	deviceWaitKey,
 	gateKey,
 	isGateKey,
+	isWaitingKey,
 	needsALookKey,
 	type PushData,
 	parseDeviceWaitKey,
@@ -49,6 +50,13 @@ describe("a notification key", () => {
 		for (const key of ["run-1:end:7", "waiting:1"]) {
 			expect(parseGateKey(key)).toBeNull();
 			expect(isGateKey(key)).toBe(false);
+		}
+	});
+
+	test("only the end of quiet hours is a waiting key", () => {
+		expect(isWaitingKey(waitingKey(1700000000000))).toBe(true);
+		for (const key of ["run-1:review", "run-1:end:7", "waiting:x", "waiting"]) {
+			expect(isWaitingKey(key)).toBe(false);
 		}
 	});
 

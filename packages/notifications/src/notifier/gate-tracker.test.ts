@@ -113,3 +113,75 @@ describe("the gate tracker", () => {
 		]);
 	});
 });
+
+describe("a Gate with an answer on its way", () => {
+	const review = { runId: "r1", stepId: "review" };
+	const pending = { ...review, answerPending: true };
+
+	test("closes at the recheck of its run, and opens again without a tell when refused", async () => {
+		const { tracker, set } = engine([review]);
+		await tracker.baseline([SPACE]);
+
+		set([pending]);
+		expect(await tracker.recheck(SPACE, "r1")).toEqual({
+			opened: [],
+			closed: ["r1:review"],
+		});
+		expect(tracker.isOpen(SPACE, "r1:review")).toBe(false);
+		expect(tracker.open()).toEqual([]);
+
+		set([review]);
+		expect(await tracker.recheck(SPACE, "r1")).toEqual({
+			opened: [],
+			closed: [],
+		});
+		expect(tracker.isOpen(SPACE, "r1:review")).toBe(true);
+
+		// Its real close closes it again.
+		set([]);
+		expect((await tracker.apply(SPACE, [stepEnded("r1")])).closed).toEqual([
+			"r1:review",
+		]);
+	});
+
+	test("applied, it goes without a second close", async () => {
+		const { tracker, set } = engine([review]);
+		await tracker.baseline([SPACE]);
+		set([pending]);
+		await tracker.recheck(SPACE, "r1");
+
+		set([]);
+		expect(await tracker.apply(SPACE, [stepEnded("r1")])).toEqual({
+			opened: [],
+			closed: [],
+		});
+		// Gone: a later recheck of its run reads nothing.
+		set([review]);
+		expect(await tracker.recheck(SPACE, "r1")).toEqual({
+			opened: [],
+			closed: [],
+		});
+		expect(tracker.isOpen(SPACE, "r1:review")).toBe(false);
+	});
+
+	test("found at the baseline, it is not open, and opens again when refused", async () => {
+		const { tracker, set } = engine([pending]);
+		await tracker.baseline([SPACE]);
+		expect(tracker.isOpen(SPACE, "r1:review")).toBe(false);
+		expect(tracker.open()).toEqual([]);
+
+		set([review]);
+		await tracker.recheck(SPACE, "r1");
+		expect(tracker.isOpen(SPACE, "r1:review")).toBe(true);
+	});
+
+	test("the recheck of a run without a Gate reads nothing", async () => {
+		const { tracker, reads } = engine([review]);
+		await tracker.baseline([SPACE]);
+		expect(await tracker.recheck(SPACE, "r2")).toEqual({
+			opened: [],
+			closed: [],
+		});
+		expect(reads()).toBe(1);
+	});
+});

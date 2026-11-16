@@ -1,4 +1,8 @@
-import { pushDataOf, type ShownNotifications } from "@nightshift/client";
+import {
+	pushDataOf,
+	type ReadGate,
+	type ShownNotifications,
+} from "@nightshift/client";
 import * as Notifications from "expo-notifications";
 
 import { inFrontPlace, showBanner } from "./in-front";
@@ -7,6 +11,7 @@ import {
 	showInFront,
 	shownAtMs,
 	shownWithKey,
+	staleShown,
 } from "./push-data";
 
 /** The notifications the phone shows now, with the Host's key of each. */
@@ -34,6 +39,18 @@ export async function dismissKey(key: string): Promise<void> {
 
 export function dismissOne(id: string): Promise<void> {
 	return dismiss([id]);
+}
+
+/**
+ * Takes away what a read of the open Gates shows is over: the
+ * notification of a Gate that no longer waits, and "N Gates wait for you"
+ * once no Gate waits. The same rule as the live cache (`staleGates`).
+ */
+export async function dismissStale(
+	open: readonly ReadGate[],
+	readAt: number,
+): Promise<void> {
+	await dismiss(staleShown(await shown(), open, readAt));
 }
 
 /**

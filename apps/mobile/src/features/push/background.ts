@@ -3,10 +3,12 @@ import {
 	gateRefusalText,
 	glanceLooks,
 	glanceSnapshot,
+	now,
 	PUSH_ANDROID_CHANNEL,
 	PUSH_CATEGORY,
 	type PushData,
 	pushDataOf,
+	type ReadGate,
 	unreachableAnswerText,
 	withdrawKeyOf,
 } from "@nightshift/client";
@@ -21,7 +23,7 @@ import { defineCategories } from "./categories";
 import { inFrontPlace, showBanner } from "./in-front";
 import { lockScreenAnswer } from "./lock-answer";
 import { answerOfAction, showInFront, taskDataOf } from "./push-data";
-import { dismissKey, dismissOne } from "./shown";
+import { dismissKey, dismissOne, dismissStale } from "./shown";
 
 /** The background task that gets the Host's pushes while the app is not in front. */
 const TASK = "nightshift-push";
@@ -116,12 +118,13 @@ async function tellOpenGate(
  * Reads the open Gates and the flows that need a look again for the home
  * screen widget, so it is right while the app is not in front. Without a Host the
  * widget shows nothing. A failed read keeps what the widget shows.
+ * Returns the open Gates it read. Null: no Host.
  */
-async function refreshGlance(): Promise<void> {
+async function refreshGlance(): Promise<readonly ReadGate[] | null> {
 	const host = await savedHost();
 	if (!host) {
 		updateGlance(null);
-		return;
+		return null;
 	}
 	const [gates, summary] = await Promise.all([
 		host.client.gates.list(),
@@ -135,13 +138,15 @@ async function refreshGlance(): Promise<void> {
 			time: formatTime,
 		}),
 	);
+	return gates;
 }
 
 /**
  * The background task: a withdraw push takes away the notification of its
- * key. On Android a button on a notification also comes here when the app
- * does not run. Either way the home screen widget reads the Gates and runs
- * again.
+ * key. The read of the open Gates for the widget then takes away "N Gates
+ * wait for you" once no Gate waits. On Android a button on a notification
+ * also comes here when the app does not run. Either way the home screen
+ * widget reads the Gates and runs again.
  */
 async function onTask({
 	data,
@@ -154,7 +159,8 @@ async function onTask({
 	const key = withdrawKeyOf(taskDataOf(data));
 	if (!key) return Notifications.BackgroundNotificationTaskResult.NoData;
 	await dismissKey(key).catch(() => undefined);
-	await refreshGlance().catch(() => undefined);
+	const open = await refreshGlance().catch(() => null);
+	if (open) await dismissStale(open, now()).catch(() => undefined);
 	return Notifications.BackgroundNotificationTaskResult.NewData;
 }
 

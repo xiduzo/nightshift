@@ -10,7 +10,9 @@ import {
 	PUSH_ACTION,
 	type PushData,
 	type PushRoute,
+	type ReadGate,
 	type ShownNotification as Shown,
+	staleGates,
 } from "@nightshift/client";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -79,6 +81,19 @@ export function shownWithKey(
 	key: string,
 ): string[] {
 	return shown.filter((item) => item.key === key).map((item) => item.id);
+}
+
+/**
+ * The shown notifications a read of the open Gates (at `readAt`, ms)
+ * shows are over: a Gate that no longer waits, and "N Gates wait for you"
+ * once no Gate waits. The live cache keeps the same rule (`staleGates`).
+ */
+export function staleShown(
+	shown: ShownNotification[],
+	open: readonly ReadGate[],
+	readAt: number,
+): string[] {
+	return staleGates(shown, open, readAt).map((item) => item.id);
 }
 
 /** Where the person is in the app, for a push that comes while the app is in front. */

@@ -134,3 +134,8 @@ export function parseNeedsALookKey(
 export function isGateKey(key: string): boolean {
 	return parseGateKey(key) !== null;
 }
+
+/** Whether a key names the end of quiet hours: "N Gates wait for you" (`waitingKey`). */
+export function isWaitingKey(key: string): boolean {
+	return parseKey(key)?.kind === "waiting";
+}

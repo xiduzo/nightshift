@@ -11,6 +11,7 @@ import {
 	showInFront,
 	shownAtMs,
 	shownWithKey,
+	staleShown,
 	taskDataOf,
 } from "./push-data";
 
@@ -100,6 +101,20 @@ describe("withdraw", () => {
 		];
 		expect(shownWithKey(shown, "run-1:review")).toEqual(["n1", "n3"]);
 		expect(shownWithKey(shown, "run-9:review")).toEqual([]);
+	});
+
+	test("after the read of the open Gates, the end of quiet hours goes once no Gate waits", () => {
+		const readAt = 1_000_000;
+		const shown = [
+			{ id: "n1", key: "waiting:5", at: readAt - 60_000 },
+			{ id: "n2", key: "run-1:end:7", at: readAt - 60_000 },
+		];
+		const gate = { runId: "run-1", stepId: "review", answerPending: false };
+		expect(staleShown(shown, [gate], readAt)).toEqual([]);
+		expect(
+			staleShown(shown, [{ ...gate, answerPending: true }], readAt),
+		).toEqual(["n1"]);
+		expect(staleShown(shown, [], readAt)).toEqual(["n1"]);
 	});
 });
 

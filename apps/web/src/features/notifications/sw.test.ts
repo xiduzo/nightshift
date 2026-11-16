@@ -180,8 +180,14 @@ describe("the service worker", () => {
 			at: one.data.shownAt,
 		}));
 		const readAt = Math.max(...shown.map((one) => one.at)) + 60_000;
-		expect(staleGates(shown, new Set(["run-1:review"]), readAt)).toEqual([
-			{ key: "run-1:review step", at: shown[0]?.at ?? 0 },
+		expect(
+			staleGates(shown, [{ runId: "run-1", stepId: "review" }], readAt),
+		).toEqual([{ key: "run-1:review step", at: shown[0]?.at ?? 0 }]);
+		// No Gate waits: "N Gates wait for you" goes too.
+		expect(staleGates(shown, [], readAt).map((one) => one.key)).toEqual([
+			"run-1:review step",
+			"run-1:review",
+			"waiting:5",
 		]);
 	});
 

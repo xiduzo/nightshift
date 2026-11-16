@@ -110,6 +110,8 @@ export type Notifications = {
 	 * changed without an event of its own: an answer, a stop or a resume is
 	 * on its way to the Device that walks it, or that Device applied or
 	 * refused it. Quiet: no push. A screen reads the run and its Gate again.
+	 * A Gate with an answer on its way closes everywhere: its in-app item
+	 * and its pushes are withdrawn, as if it closed.
 	 */
 	runChanged(spaceId: string, runId: string): Promise<void>;
 	/**
@@ -217,6 +219,7 @@ export function createNotifications(
 					{ spaceId, runId },
 				);
 			}
+			await notifier.commandsChanged(spaceId, runId);
 		},
 		async schedulesChanged(spaceId, projectId) {
 			for (const personId of await audience(spaceId)) {

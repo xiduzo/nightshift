@@ -13,6 +13,7 @@ export {
 	type PushData,
 	type PushRoute,
 	pushDataOf,
+	type ReadGate,
 	routeOf,
 	type ShownNotification,
 	staleGates,

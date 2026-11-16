@@ -5,7 +5,11 @@
  * passes them on, and adds the rule a screen needs to clear what it shows.
  */
 
-import { isGateKey } from "@nightshift/notifications/contract";
+import {
+	gateKey,
+	isGateKey,
+	isWaitingKey,
+} from "@nightshift/notifications/contract";
 
 export {
 	gateKey,
@@ -30,21 +34,32 @@ export type ShownNotification = { key: string | null; at: number };
  */
 const READ_MARGIN_MS = 30_000;
 
+/** A Gate a read of the open Gates found: its run and step, and whether an answer to it is on its way. */
+export type ReadGate = {
+	runId: string;
+	stepId: string;
+	answerPending?: boolean;
+};
+
 /**
  * The shown Gate notifications whose Gate no longer waits: someone answered
- * it, or its run ended. Only Gate keys count, not in `openKeys`, and only
- * notifications shown more than 30 s before the read (`readAt`).
+ * it, an answer to it is on its way, or its run ended. "N Gates wait for
+ * you" no longer counts when the read (`open`) holds no Gate that waits.
+ * Only notifications shown more than 30 s before the read (`readAt`) count.
  */
 export function staleGates<T extends ShownNotification>(
 	shown: readonly T[],
-	openKeys: ReadonlySet<string>,
+	open: readonly ReadGate[],
 	readAt: number,
 ): T[] {
+	const waiting = new Set(
+		open.filter((gate) => !gate.answerPending).map(gateKey),
+	);
 	return shown.filter(
 		(item) =>
 			item.at < readAt - READ_MARGIN_MS &&
 			item.key !== null &&
-			isGateKey(item.key) &&
-			!openKeys.has(item.key),
+			((isGateKey(item.key) && !waiting.has(item.key)) ||
+				(isWaitingKey(item.key) && waiting.size === 0)),
 	);
 }
