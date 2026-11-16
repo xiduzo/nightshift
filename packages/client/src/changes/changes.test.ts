@@ -47,6 +47,8 @@ const READS = new Set([
 	"knowledge.read",
 	"knowledge.questions",
 	"knowledge.graph",
+	// A look reads the web and writes nothing.
+	"knowledge.look",
 	"knowledge.evaluate",
 	"knowledge.use",
 	"flows.list",
