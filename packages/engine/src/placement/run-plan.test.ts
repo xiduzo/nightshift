@@ -941,3 +941,66 @@ describe("the addresses of a run's Model Profiles", () => {
 		expect(planned.flow.nodes[0]).toMatchObject({ address: jev.address });
 	});
 });
+
+describe("an Agent node that names no agent", () => {
+	const nameless = (id: string, device?: string) =>
+		({
+			id,
+			type: "agent",
+			position: { x: 0, y: 0 },
+			prompt: "Fetch it.",
+			...(device ? { device } : {}),
+		}) as FlowNode;
+	const listing = (byDevice: Record<string, string[]>) => ({
+		profilesOf: async (id: string) =>
+			(byDevice[id] ?? []).map((profile) => ({
+				id: profile,
+				name: profile,
+				kind: profile.startsWith("m-")
+					? ("model" as const)
+					: ("agent" as const),
+			})),
+	});
+
+	test("runs on the first agent profile of the device it runs on: in a kit too (`kit:knowledge/agent`), under the Subflow's device", async () => {
+		const sources = {
+			"kit:knowledge/agent": { json: flow([nameless("sync")]) },
+		};
+		const call = {
+			id: "fetch",
+			type: "call",
+			position: { x: 0, y: 0 },
+			flow: "kit:knowledge/agent",
+			inputs: { what: "The meeting notes." },
+			device: "studio",
+		} as FlowNode;
+		const planned = await planNodes(
+			{ projectId: "p", flow: flow([nameless("here"), call]) },
+			{
+				...devices(["m-judge", "builder"]),
+				...listing({ this: ["m-judge", "builder"], studio: ["everywhere"] }),
+			},
+			"the-person",
+		);
+		const node = (f: Flow, id: string) => f.nodes.find((n) => n.id === id);
+		expect(node(planned.flow, "here")).toMatchObject({
+			profile: { device: "this", profile: "builder" },
+			model: "sonnet",
+		});
+		expect(
+			node(planned.calledFlows["kit:knowledge/agent"] as Flow, "sync"),
+		).toMatchObject({ profile: { device: "studio", profile: "everywhere" } });
+	});
+
+	test("is refused when its device has no agent profile", async () => {
+		await expect(
+			planNodes(
+				{ projectId: "p", flow: flow([nameless("here")]) },
+				{ ...devices(), ...listing({ this: ["m-judge"] }) },
+				"the-person",
+			),
+		).rejects.toThrow(
+			'Node "here" names no agent, and Night Shift found no agent profile on this. Add one on the Agents page of this.',
+		);
+	});
+});

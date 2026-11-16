@@ -155,6 +155,33 @@ describe("save", () => {
 		]);
 	});
 
+	test("an agent source keeps itself up to date each week, or syncs only now", async () => {
+		const agent = {
+			kit: "kit:knowledge/agent" as const,
+			inputs: { what: "The meeting notes in our shared drive." },
+		};
+		const weekly = await sources().save(
+			projectId,
+			{ source: agent, keepUpToDate: { cron: "0 6 * * 1" } },
+			owner,
+		);
+		expect(weekly).toEqual({ name: "knowledge-agent", issues: [] });
+		// Only now: no schedule.
+		const once = await sources().save(projectId, { source: agent }, owner);
+		expect(once).toEqual({ name: "knowledge-agent-2", issues: [] });
+		const saved = await flows();
+		expect(saved["knowledge-agent"]?.nodes[0]).toMatchObject({
+			type: "call",
+			flow: "kit:knowledge/agent",
+			inputs: { what: "The meeting notes in our shared drive." },
+		});
+		// No computer: the run's device runs the agent.
+		expect(saved["knowledge-agent"]?.nodes[0]).not.toHaveProperty("device");
+		expect((await schedules()).map(({ flow, cron }) => [flow, cron])).toEqual([
+			["knowledge-agent", "0 6 * * 1"],
+		]);
+	});
+
 	test("a folder of this computer syncs on this computer: its Subflow names it, whoever starts the run", async () => {
 		await sources().save(
 			projectId,
