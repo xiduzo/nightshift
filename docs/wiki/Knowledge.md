@@ -4,26 +4,56 @@ Knowledge is what your agents read besides the project files: notes, web pages, 
 
 Each project has its own knowledge. Night Shift keeps it outside the project folder. Every computer of the project's Space sees the same files.
 
+## Ask and tell
+
+Open the project, then **Knowledge**. The page asks: "What should your agents know?" Under the question is one box with two modes.
+
+**Ask** shows what an agent would find. Type a question, for example "When do invoices go out?". The page shows the files that an agent who asks the same reads first. When it finds nothing, choose **Write the answer** to tell it, or **Find it for me** to let an agent look for it once.
+
+**Tell** adds to the knowledge. To tell your agents a fact:
+
+1. Choose **Tell**.
+2. Type the fact, for example "Refunds take 14 days.".
+3. Press Enter.
+
+Agents read the note from their next run. Night Shift answers under the box with what it saved.
+
+To give your agents a web page, a feed or a file:
+
+1. Choose **Tell**.
+2. Paste the link. You can paste more than one, and add words around them.
+3. Wait for the row of each link. It shows what Night Shift found there.
+4. For a page in a folder of more pages, choose **How much**: just this page, or the pages of its folder.
+5. Choose **How often** Night Shift checks it for changes, or **Only now**. A feed is checked every day, the rest every week.
+6. Press Enter.
+
+Night Shift reads the links now, and adds each one as a source. **All knowledge** shows the files.
+
+Some links Night Shift cannot read: a page that asks you to sign in, a page that shows its text only in a browser, or a video. The row then offers **Let an agent fetch it**, or **Get the transcript** for a video. Turn it on to let an agent fetch it with its own tools. An agent costs money, so it is never on by default.
+
+To give your agents something that has no link, such as the meeting notes in your shared drive, describe where it is. Then turn on **Let an agent fetch this from where it lives**.
+
 ## Add a source
 
-A source fills the knowledge from one place, such as a website or a folder of notes. For example, copy the documentation of a tool that your agents use:
+A source fills the knowledge from one place, such as a website or a folder of notes. Tell adds a source for each link. To choose every setting of a source yourself, add it on the Sources page. For example, copy the documentation of a tool that your agents use:
 
 1. Open the project, then **Knowledge**.
-2. Choose **Add source**.
-3. Choose **Web pages**.
+2. Open the **Knowledge** menu at the top, and choose **Sources**.
+3. Choose **Add source**, then **Web pages**.
 4. In **Pages**, type the address, for example `https://example.com/docs/`.
 5. To copy the pages that it links to as well, turn on **Follow links**.
 6. To copy the pages again each day, turn on **Keep it up to date**, and choose a time.
 7. Turn on **Sync now**, and choose **Add source**.
 
-Night Shift copies the pages as Markdown files, into a folder of their own. Open **Files** on the Knowledge page to see them.
+Night Shift copies the pages as Markdown files, into a folder of their own. Choose **All knowledge** on the Knowledge page to see them.
 
 ## Kinds of sources
 
 | Source | Copies | Needs |
 | --- | --- | --- |
-| **Web pages** | Web pages, and with **Follow links** a whole part of a site. | Nothing. |
+| **Web pages** | Web pages, and with **Follow links** a whole part of a site. | Nothing. A key for Firecrawl, if you choose it as the page reader. |
 | **Folder on this computer** | A folder of notes outside the project. | Nothing. |
+| **Fetched by an agent** | What you describe, such as a page behind a sign-in or the transcript of a video. An agent fetches it with its own tools. | An agent on the computer that fetches it. |
 | **Project files** | Files of the project, also files that git ignores, such as private notes. | A project with a folder. |
 | **Git repository** | The folders or files that you choose of a repository. | git signed in, for a private repository. |
 | **GitHub wiki** | The wiki of a GitHub repository. | git signed in to GitHub, for a private wiki. |
@@ -40,7 +70,22 @@ With **Follow links** on, three more fields set how much to copy:
 - **Most pages**: at most 500.
 - **Links away**: how far to go from your pages.
 
-Night Shift reads one page at a time, so 100 pages take about 15 minutes. It skips images, PDFs, and the pages that the site asks readers to skip. A page that cannot be read does not stop the others. A page that left the site leaves the knowledge at the next full sync. When a sync stops at **Most pages**, it removes nothing.
+Night Shift reads one page at a time, so 100 pages take about 15 minutes. A page that did not change since the last sync keeps its copy. It skips images, PDFs, and the pages that the site asks readers to skip. A page that cannot be read does not stop the others. A page that left the site leaves the knowledge at the next full sync. When a sync stops at **Most pages**, it removes nothing.
+
+### Page reader
+
+The page reader reads each web page as text. Choose it on the Sources page, under the list of sources. It holds for every computer of the Space.
+
+- **Night Shift** reads on the computer that syncs. It needs no account.
+- **Jina Reader** and **Firecrawl** are services that also read pages that show their text only in a browser. Firecrawl needs a key. Jina Reader reads more pages a minute with a key.
+
+To use Firecrawl:
+
+1. Get a key from Firecrawl.
+2. Save it on the **Secrets** page as `FIRECRAWL_API_KEY`.
+3. On the Sources page, choose **Firecrawl** as the **Page reader**, then **Save reader**.
+
+If you host the service yourself, type its address in **Address**. To keep the key under another name, type that name in **Secret with the key**.
 
 ### Git repository
 
@@ -65,10 +110,16 @@ For scripts: every Command step, and every command that an agent runs, finds the
 
 An agent can propose a short note about the project that helps the next agent, such as "The client writes prices in euros". A proposed note waits for you. No agent reads it until you keep it.
 
-To check the proposed notes:
+**Learnings to check** on the Knowledge page shows one note at a time, with how many are left:
 
-1. Open **Knowledge**, then **Review**.
-2. For each note, choose to keep it, delete it, or decide later. The keys are K, D, and S.
+- **True** keeps the note. Agents read it from their next run.
+- **Not true** deletes it.
+- **Change it** puts the note in the box. Write it as it should be, and press Enter. Your note takes the place of the old one.
+- **Later** shows the note again after the others.
+
+A note can be close to a note that you kept before. Then the page shows both, and asks which is right: **Both are right**, **Only the kept one**, or **Change it**.
+
+Each answer is saved at once. To keep or delete all the notes of one step together, open the **Review** page from the **Knowledge** menu. There the keys are K, D, and S.
 
 The starter flow `review-learnings` asks you the same in a Gate. Schedule it to check the notes once a week.
 
@@ -80,7 +131,7 @@ To stop these notes for a project, open **Review** and turn off **Learn from run
 
 ## Search
 
-The Knowledge page has a search field. Search finds a file by its words. When Ollama runs, search also finds a section by its meaning, so a question in other words finds the answer too. Your agents use the same search.
+**Ask** on the Knowledge page and the search on the Files page find a file by its words. When Ollama runs, search also finds a section by its meaning, so a question in other words finds the answer too. Your agents use the same search.
 
 To search by meaning on your own computer:
 

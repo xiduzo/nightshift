@@ -293,10 +293,13 @@ it from the Knowledge page with **Sync now**.
 
 ### Add a source on the Knowledge page
 
-**Add source** on the Knowledge page fills the knowledge without the
-canvas. Choose the kind (a folder on this computer, project files, web
-pages, a GitHub wiki, Jira, Confluence or an agent) and fill in the kit's
-inputs.
+**Add source** on the Sources page fills the knowledge without the
+canvas. Choose the kind and fill in the kit's inputs. The dialog lists the
+kinds of content first (web pages, a folder on this computer, fetched by an
+agent, project files) and the sources of one tool after **More sources**
+(a git repository, a GitHub wiki, Jira, Confluence): `more` of the kind in
+`source-kits.ts`. Tell on the overview adds sources too (see Tell on the
+overview).
 Night Shift then:
 
 - saves a flow that calls the kit from one Subflow node, with your values
@@ -356,9 +359,44 @@ Kits do the common syncs. Call one from a Subflow node:
 
 Each kind of source can say how often a new source of it syncs on its own
 (`every` of the kind in `source-kits.ts`). Web pages and an agent sync each
-week. The Knowledge page uses this as the default of **How often**. A feed
-syncs each day: the page tells a feed from a page when it looks at the link.
-The person can pick **Only now**: then `saveSource` gets no schedule.
+week. A feed syncs each day: the page tells a feed from a page when it looks
+at the link. The person can pick **Only now**: then `saveSource` gets no
+schedule.
+
+### Tell on the overview
+
+The Knowledge overview has one box. Tell turns what a person writes into
+knowledge, with one rule for both apps: `told-links.ts` in
+`packages/client/src/knowledge/`.
+
+- The words become a told note (`knowledge.tell`, see One note at a time).
+  When the text has links, the note is the whole text, links and all, but
+  only when it has words besides the links.
+- Each link gets a quick look (`knowledge.look`, one query a link). Its
+  `linkPlan` says what the row offers:
+
+| Look | Row | Source | How often, by default |
+| --- | --- | --- | --- |
+| `page`, no folder | One page | `kit:knowledge/web`, `urls` | Every week |
+| `page` or `section` in a folder of more pages | How much: just this page, the first 100, or all (at most 500, `WEB_MAX_PAGES`). The start of a folder reads all up to 100, else the first 100. An article reads just itself. | `kit:knowledge/web`, and for the folder `follow: true`, `scope` = the folder, `limit` = the pages | Every week |
+| `feed` | A feed | `kit:knowledge/web` | Every day |
+| `file` | A PDF, Word or text file | `kit:knowledge/web` | Every week |
+| `signin`, `needs-browser`, `blocked`, `failed` | Let an agent fetch it (off until the person turns it on) | `kit:knowledge/agent`, `what` = "The page at …" | Every week |
+| `media` | Get the transcript (off until the person turns it on) | `kit:knowledge/agent`, `what` = "The transcript of the video or audio at …" | Only now: a recording does not change |
+| `gone` | Does not load | none | |
+
+- Text without links goes to an agent when the person turns on **Let an
+  agent fetch this from where it lives**: `kit:knowledge/agent` with the
+  text as `what`, every week by default.
+- How often is a schedule at 06:00 on the person's clock: every day, each
+  Monday, or the first of each month. Only the owner of this computer
+  schedules (as for Add source). Anyone else gets **Only now**.
+- Send saves each source (`saveSource`) and starts its first sync
+  (`syncSource`). Night Shift answers in the thread under the box with what
+  it saved, what it reads, and what stays out.
+- **Find it for me**, on a question that found nothing, saves
+  `kit:knowledge/agent` with `what` = "What answers this question: …", with
+  no schedule, and syncs it once.
 
 ### An agent fetches it
 
@@ -477,7 +515,9 @@ syncs to every computer of the Space. `secret` names the secret with the
 key. The computer that reads resolves it through the secret scopes of the
 step (Personal, the Space, the Project, this computer). The key is never in
 the setting, a flow or the kit's shell. `knowledge.setReader` changes it.
-`knowledge.get` shows it.
+`knowledge.get` shows it, and `readerReady`: whether the reader's secret is
+saved where the computer that answers finds it outside a run (always true
+for Night Shift's own). The Sources page uses it to ask for the key.
 
 Every request of a reader follows the address rule of a Web request
 (`packages/engine/src/web-access/`). A Host reads its private network, and
@@ -652,7 +692,8 @@ open screens hear of it. The whole-file `settle`, the Review page, the phone and
 per-note check left (`learnings-kit.test.ts`). Close notes (`nearTo`) stay one
 list per note.
 
-Both apps can use `useCheckNotes` of `@nightshift/client`. It lists the notes
+Both apps can use `useCheckNotes` of `@nightshift/client`. The web overview
+does (Learnings to check). It lists the notes
 one at a time with the notes close to each, leaves out a note from the moment
 its decision goes out, and reads the learnings, the page and the review again.
 
