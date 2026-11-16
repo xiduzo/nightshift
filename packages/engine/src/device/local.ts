@@ -207,7 +207,7 @@ export type LocalDeviceDeps = {
 	secretValues?: (use?: SecretUse) => Promise<readonly string[]>;
 	/**
 	 * Whether a web request from this computer may reach loopback and
-	 * private addresses (`web-addresses.ts`), read at each request. A
+	 * private addresses (`web-access/addresses.ts`), read at each request. A
 	 * Host's Settings decide it there. Without it: they may, as on a laptop.
 	 */
 	privateNetwork?: () => boolean;
@@ -676,10 +676,16 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			return;
 		}
 		// The knowledge as the Space has it now, before the command reads it.
-		// The sync flows write in its folder.
+		// The sync flows write in its folder. The key of its page reader comes
+		// from the scopes of this step, as a secret the command names would.
 		const known =
 			knowledge && deps.knowledge
-				? await deps.knowledge.forCommand(knowledge.projectId)
+				? await deps.knowledge.forCommand(knowledge.projectId, {
+						secret: async (name) => {
+							const one = await connections.secretEnv([name], useOf(run));
+							return one.ok ? one.env[name] : undefined;
+						},
+					})
 				: null;
 		let tools: Awaited<ReturnType<ToolLaunchers["forCommand"]>> | null = null;
 		let kept: KeptFiles | null = null;

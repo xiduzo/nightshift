@@ -1,4 +1,9 @@
 import type { Database } from "@nightshift/db";
+import {
+	DEFAULT_PAGE_READER,
+	type PageReaderSetting,
+	pageReaderSettingSchema,
+} from "@nightshift/flows";
 import { z } from "zod";
 import {
 	createSyncedDocuments,
@@ -28,7 +33,9 @@ import { isKnowledgePath } from "./folder-snapshot";
  * so every Device of the Space searches the same way. `meaning: false`:
  * search finds by words only for this project, though Ollama is there.
  * `learnFromRuns: false`: Night Shift proposes no learnings from the runs
- * of this project that ended (ADR 37).
+ * of this project that ended (ADR 37). `reader`: the page reader of the
+ * Web pages source and of the quick look (ADR 39), absent for Night
+ * Shift's own: a value that does not read as a setting reads as absent.
  */
 
 /** One file of the knowledge, as the document lists it. */
@@ -92,6 +99,10 @@ type KnowledgeDocument = {
 	learnsFromRunsOn(): boolean;
 	/** Turns the learnings from runs on or off for the Project, for every Device of its Space. */
 	setLearnsFromRuns(on: boolean): Promise<void>;
+	/** The page reader of the Project (ADR 39): Night Shift's own unless a person chose another. */
+	reader(): PageReaderSetting;
+	/** Chooses the page reader of the Project, for every Device of its Space. */
+	setReader(setting: PageReaderSetting): Promise<void>;
 };
 
 function knowledgeDocument(document: PersistedDocument): KnowledgeDocument {
@@ -99,6 +110,10 @@ function knowledgeDocument(document: PersistedDocument): KnowledgeDocument {
 	const settings = document.doc.getMap<unknown>("settings");
 	const meaningOn = () => settings.get("meaning") !== false;
 	const learnsFromRunsOn = () => settings.get("learnFromRuns") !== false;
+	const reader = (): PageReaderSetting => {
+		const parsed = pageReaderSettingSchema.safeParse(settings.get("reader"));
+		return parsed.success ? parsed.data : DEFAULT_PAGE_READER;
+	};
 	return {
 		name: document.name,
 		entries() {
@@ -144,6 +159,15 @@ function knowledgeDocument(document: PersistedDocument): KnowledgeDocument {
 			await document.change(() => {
 				if (on) settings.delete("learnFromRuns");
 				else settings.set("learnFromRuns", false);
+			});
+		},
+		reader,
+		async setReader(setting) {
+			const next = pageReaderSettingSchema.parse(setting);
+			if (JSON.stringify(reader()) === JSON.stringify(next)) return;
+			await document.change(() => {
+				if (next.kind === "nightshift") settings.delete("reader");
+				else settings.set("reader", next);
 			});
 		},
 	};

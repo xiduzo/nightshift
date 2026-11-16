@@ -212,6 +212,7 @@ export {
 } from "./harnesses";
 export {
 	ACCEPTED_LEARNINGS_DIR,
+	DEFAULT_PAGE_READER,
 	formatLearnings,
 	formatPersonNote,
 	isHiddenFromReaders,
@@ -245,7 +246,12 @@ export {
 	learningNotes,
 	learningPreface,
 	NOT_TOPICS_FILE,
+	PAGE_READ_HEADER,
+	PAGE_READER_DEFAULTS,
+	PAGE_READER_ENV,
+	type PageReaderSetting,
 	PROPOSED_LEARNINGS_DIR,
+	pageReaderSettingSchema,
 	parseLearnings,
 	proposedLearningAt,
 	proposedLearningFileName,

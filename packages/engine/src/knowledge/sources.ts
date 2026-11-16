@@ -6,6 +6,7 @@ import {
 	type KnowledgeSource,
 	knowledgeKitsOf,
 	legacyDeviceName,
+	type PageReaderSetting,
 	REVIEW_LEARNINGS_KIT,
 	type Schedule,
 	scheduleSchema,
@@ -185,6 +186,8 @@ type KnowledgeOverview = {
 	olderHost: boolean;
 	/** Night Shift proposes learnings from the runs of the project that ended (ADR 37). */
 	learnsFromRuns: boolean;
+	/** The page reader of the project (ADR 39). */
+	reader: PageReaderSetting;
 };
 
 /** What the person who asks may do, as the API checked it. */
@@ -358,7 +361,7 @@ export function knowledgeSources<Run extends SourceRun>(
 			can: SourcePermissions,
 		): Promise<KnowledgeOverview> {
 			const [
-				{ files, proposed, shared, olderHost, learnsFromRuns },
+				{ files, proposed, shared, olderHost, learnsFromRuns, reader },
 				{ syncs, reviews },
 			] = await Promise.all([
 				deps.files.listing(projectId),
@@ -376,6 +379,7 @@ export function knowledgeSources<Run extends SourceRun>(
 				shared,
 				olderHost,
 				learnsFromRuns,
+				reader,
 			};
 		},
 		/** The flows that fill the knowledge, with no reconcile: what `list` says of each. */

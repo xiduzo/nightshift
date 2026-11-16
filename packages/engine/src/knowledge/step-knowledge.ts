@@ -11,6 +11,7 @@ import { indexFolder, type KnowledgeFolders } from "./folder";
 import type { FolderSnapshot } from "./folder-snapshot";
 import type { KnowledgeReader } from "./knowledge-reader";
 import type { Learnings } from "./learnings";
+import type { PageReaders, ReaderSecret } from "./readers/service";
 import type { KnowledgeReconciler } from "./reconcile";
 import type { KnowledgeSearch } from "./search";
 import { createKnowledgeView, inFolders, type KnowledgeView } from "./view";
@@ -48,7 +49,10 @@ export type KnowledgeRequest = {
 	knowledgeOnly?: { projectId: string; folders: string[] };
 };
 
-/** What a Command step gets: the folder in `NS_KNOWLEDGE`. */
+/**
+ * What a Command step gets: the folder in `NS_KNOWLEDGE`, and the project's
+ * page reader in `NS_READER_URL` and `NS_READER_TOKEN` (ADR 39).
+ */
 export type CommandKnowledge = {
 	env: Record<string, string>;
 	/** The step ended: what it wrote goes to the Space. */
@@ -109,8 +113,20 @@ export function createStepKnowledge(deps: {
 	reader: Pick<KnowledgeReader, "read">;
 	search: Pick<KnowledgeSearch, "search" | "refresh">;
 	learnings: Pick<Learnings, "keepReported">;
+	/** The page readers: a Command step gets the project's. Without them, none. */
+	readers?: Pick<PageReaders, "forStep">;
 }) {
 	const { folders, reconciler, reader, search, learnings } = deps;
+
+	/** The step's page reader. One that cannot open leaves the step without it: the kit reads as before. */
+	async function pageReader(projectId: string, secret: ReaderSecret) {
+		try {
+			return (await deps.readers?.forStep(projectId, secret)) ?? null;
+		} catch (error) {
+			console.warn("The page reader of the step did not open:", error);
+			return null;
+		}
+	}
 
 	/** The step holds the folder: a reconcile first, and `done` for the one after. */
 	async function begin(projectId: string) {
@@ -195,14 +211,31 @@ export function createStepKnowledge(deps: {
 	}
 
 	return {
-		async forCommand(projectId: string): Promise<CommandKnowledge> {
+		async forCommand(
+			projectId: string,
+			step: { secret?: ReaderSecret } = {},
+		): Promise<CommandKnowledge> {
 			const { hold, path } = await begin(projectId);
 			// The sync flows write here. A folder that cannot be made is left out.
 			const made = await folders
 				.ensure(projectId)
 				.then(() => true)
 				.catch(() => false);
-			return { env: made ? knowledgeEnv(path) : {}, done: hold.done };
+			if (!made) return { env: {}, done: hold.done };
+			const pages = await pageReader(
+				projectId,
+				step.secret ?? (async () => undefined),
+			);
+			return {
+				env: { ...knowledgeEnv(path), ...pages?.env },
+				async done() {
+					try {
+						await pages?.close();
+					} finally {
+						await hold.done();
+					}
+				},
+			};
 		},
 		async forSession(
 			request: KnowledgeRequest,

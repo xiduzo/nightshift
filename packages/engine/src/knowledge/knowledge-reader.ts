@@ -1,5 +1,9 @@
 import type { KnowledgeReadFrom } from "@nightshift/agents/tools";
-import { isProposedLearning, isQuestionSetPath } from "@nightshift/flows";
+import {
+	isProposedLearning,
+	isQuestionSetPath,
+	type PageReaderSetting,
+} from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { SpaceArchive } from "../archive";
 import { OLDER_HOST } from "../contract";
@@ -29,6 +33,8 @@ export type KnowledgeListing = {
 	olderHost: boolean;
 	/** Night Shift proposes learnings from the runs of the project that ended (ADR 37). */
 	learnsFromRuns: boolean;
+	/** The page reader of the project (ADR 39). */
+	reader: PageReaderSetting;
 };
 
 type KnowledgeReaderDeps = {
@@ -99,7 +105,10 @@ export function createKnowledgeReader(deps: KnowledgeReaderDeps) {
 				proposed: await learnings.count(projectId),
 				shared: spaceId ? await status.isShared(spaceId) : false,
 				olderHost: spaceId ? status.isOlder(spaceId) : false,
-				learnsFromRuns: (await documents.open(projectId)).learnsFromRunsOn(),
+				...(await documents.open(projectId).then((document) => ({
+					learnsFromRuns: document.learnsFromRunsOn(),
+					reader: document.reader(),
+				}))),
 			};
 		},
 		/**

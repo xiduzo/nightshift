@@ -6,7 +6,11 @@ import {
 	useHit,
 } from "@nightshift/agents/tools";
 import type { Database } from "@nightshift/db";
-import { NOT_TOPICS_FILE, QUESTION_SET_FILE } from "@nightshift/flows";
+import {
+	NOT_TOPICS_FILE,
+	type PageReaderSetting,
+	QUESTION_SET_FILE,
+} from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { type SpaceArchive, writeWhole } from "../archive";
 import type { SyncedDocuments } from "../documents";
@@ -39,6 +43,8 @@ import {
 	parseQuestions,
 	questionKey,
 } from "./questions";
+import type { LinkLook } from "./readers/look";
+import { createPageReaders, type ReaderSecret } from "./readers/service";
 import { createKnowledgeReconciler } from "./reconcile";
 import { type ReviewTask, reviewTasks } from "./review";
 import {
@@ -124,8 +130,15 @@ export type Knowledge = {
 	 * that no document lists any more. Nothing of that before this call.
 	 */
 	connect(hosts: KnowledgeHosts): void;
-	/** A Command step starts: the folder, made for it, in `NS_KNOWLEDGE`. */
-	forCommand(projectId: string): Promise<CommandKnowledge>;
+	/**
+	 * A Command step starts: the folder, made for it, in `NS_KNOWLEDGE`, and
+	 * the project's page reader for it on this computer (ADR 39), with a key
+	 * from the step's own secrets (`secret`).
+	 */
+	forCommand(
+		projectId: string,
+		step?: { secret?: ReaderSecret },
+	): Promise<CommandKnowledge>;
 	/**
 	 * An Agent session starts: the folder in `NS_KNOWLEDGE`, and when it
 	 * has files or the node asks for it, the folder to read with a fresh
@@ -283,6 +296,16 @@ export type Knowledge = {
 	learnsFromRuns(projectId: string): Promise<boolean>;
 	/** Turns the learnings from runs on or off for the project, for every Device of its Space. */
 	setLearnsFromRuns(projectId: string, on: boolean): Promise<void>;
+	/** Chooses the page reader of the project (ADR 39), for every Device of its Space. Returns it. */
+	setReader(
+		projectId: string,
+		setting: PageReaderSetting,
+	): Promise<PageReaderSetting>;
+	/**
+	 * The quick look at links a person tells, before anything is saved: what
+	 * each one is, by the project's page reader (ADR 39), in their order.
+	 */
+	look(projectId: string, urls: readonly string[]): Promise<LinkLook[]>;
 	/**
 	 * Proposes what Night Shift learned from a run that ended, in the run's
 	 * own file in `learnings/proposed/`. It waits for a person as a step's
@@ -359,6 +382,13 @@ export type KnowledgeDeps = {
 	notifications: LearningsNotifications;
 	/** Other times for `TIMERS`. */
 	timers?: Partial<typeof TIMERS>;
+	/**
+	 * Whether a page reader of this computer may reach its private network:
+	 * a Host only when its Settings allow it, as for a Web request. Default: yes.
+	 */
+	privateNetwork?: () => boolean;
+	/** A secret of this computer outside a run: the key of a page reader for the quick look. */
+	secret?: ReaderSecret;
 };
 
 /**
@@ -417,12 +447,19 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		reconcileUnlessHeld: reconciler.reconcileUnlessHeld,
 		...(deps.pageWaitMs !== undefined ? { pageWaitMs: deps.pageWaitMs } : {}),
 	});
+	const readers = createPageReaders({
+		dataDir: deps.dataDir,
+		setting: async (projectId) => (await documents.open(projectId)).reader(),
+		rules: () => ({ privateNetwork: deps.privateNetwork?.() ?? true }),
+		...(deps.secret ? { secret: deps.secret } : {}),
+	});
 	const steps = createStepKnowledge({
 		folders,
 		reconciler,
 		reader,
 		search,
 		learnings,
+		readers,
 	});
 	const mapMemo = createMapMemo();
 	/** Facts of a project with no run: an agent's use through the MCP server. No landing feed reads them. */
@@ -713,6 +750,12 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		async setLearnsFromRuns(projectId, on) {
 			await (await documents.open(projectId)).setLearnsFromRuns(on);
 		},
+		async setReader(projectId, setting) {
+			const document = await documents.open(projectId);
+			await document.setReader(setting);
+			return document.reader();
+		},
+		look: readers.look,
 		proposeFromRun: learnings.proposeFromRun,
 		knownLearnings: learnings.known,
 		sources: sourcesIn,
@@ -731,6 +774,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		close() {
 			stopTimers();
 			search.close();
+			readers.close().catch(() => {});
 		},
 	};
 }

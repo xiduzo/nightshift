@@ -142,6 +142,7 @@ export {
 	type KnowledgeQuestion,
 	type KnowledgeText,
 	type KnowledgeUseReport,
+	type LinkLook,
 	LOCAL_ONLY_BYTES,
 	type WaitingLearning,
 } from "./knowledge";

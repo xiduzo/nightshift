@@ -41,6 +41,14 @@ export {
 	withoutNote,
 } from "./knowledge/learning-file";
 export {
+	DEFAULT_PAGE_READER,
+	PAGE_READ_HEADER,
+	PAGE_READER_DEFAULTS,
+	PAGE_READER_ENV,
+	type PageReaderSetting,
+	pageReaderSettingSchema,
+} from "./knowledge/readers";
+export {
 	KNOWLEDGE_SOURCE_KINDS,
 	type KnowledgeSourceKit,
 	knowledgeSourceKind,

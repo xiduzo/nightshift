@@ -520,6 +520,10 @@ async function makeDaemon(
 				device,
 				usage: telemetry,
 				meaning: () => ollama.meaning(),
+				// The page readers reach this computer's network as a Web request
+				// does, and take their key from this computer's secrets for a look.
+				privateNetwork: () => reachesPrivateNetwork(settings.current()),
+				secret: (name) => connections.secret(name),
 				notifications: {
 					learningsChanged: (spaceId, projectId) =>
 						learningsChanged(spaceId, projectId),
