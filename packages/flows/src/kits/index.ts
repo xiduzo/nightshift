@@ -62,3 +62,4 @@ export {
 	knowledgeSourceSchema,
 } from "./knowledge/sources";
 export { KNOWLEDGE_FOLDER_INPUT } from "./knowledge/sync-kit";
+export { WEB_MAX_PAGES } from "./knowledge/web-source";

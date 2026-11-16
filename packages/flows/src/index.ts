@@ -259,6 +259,7 @@ export {
 	QUESTION_SET_FILE,
 	REVIEW_LEARNINGS_KIT,
 	toldLearningFileName,
+	WEB_MAX_PAGES,
 	withoutNote,
 } from "./kits";
 export {

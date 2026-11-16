@@ -84,7 +84,18 @@ export function KnowledgeLayout({
 								})),
 							},
 						]
-					: [{ label: "Knowledge" }]
+					: [
+							{
+								label: "Knowledge",
+								// The overview has no cards for the pages: its crumb opens them.
+								menu: KNOWLEDGE_PAGES.map((page) => ({
+									label: page.label,
+									icon: page.icon,
+									link: { to: page.to, params },
+									current: false,
+								})),
+							},
+						]
 			}
 		>
 			{() => (

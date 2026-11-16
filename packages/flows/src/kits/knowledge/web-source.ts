@@ -52,7 +52,7 @@ import { defineSyncKit } from "./sync-kit";
  */
 
 /** The most pages one sync of a crawl reads, whatever the source says. */
-const WEB_MAX_PAGES = 500;
+export const WEB_MAX_PAGES = 500;
 
 /** The most sitemap files one crawl reads, sitemap indexes included. */
 const WEB_MAX_SITEMAPS = 20;

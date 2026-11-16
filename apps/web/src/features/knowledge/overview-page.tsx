@@ -1,404 +1,339 @@
-import { taskLine } from "@nightshift/client";
-import { Badge } from "@nightshift/ui/components/badge";
+import {
+	agentSource,
+	type HowOften,
+	linksIn,
+	localZone,
+	type NoteToCheck,
+	readSource,
+	type ToldSource,
+	toldNote,
+} from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import {
-	Card,
-	CardAction,
-	CardContent,
-	CardDescription,
-	CardFooter,
-	CardHeader,
-	CardTitle,
-} from "@nightshift/ui/components/card";
+	Field,
+	FieldContent,
+	FieldLabel,
+} from "@nightshift/ui/components/field";
+import { Switch } from "@nightshift/ui/components/switch";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { BookOpenIcon } from "lucide-react";
+import { useCallback, useId, useState } from "react";
+import { toast } from "sonner";
+import { AskAnswer } from "./ask-answer";
+import { AskTellBox, type BoxMode } from "./ask-tell-box";
+import { KnowledgeSection, useKnowledge } from "./knowledge-layout";
+import { MeaningLine } from "./knowledge-search";
 import {
-	Empty,
-	EmptyContent,
-	EmptyDescription,
-	EmptyHeader,
-	EmptyMedia,
-	EmptyTitle,
-} from "@nightshift/ui/components/empty";
-import {
-	Item,
-	ItemActions,
-	ItemContent,
-	ItemDescription,
-	ItemGroup,
-	ItemMedia,
-	ItemTitle,
-} from "@nightshift/ui/components/item";
-import { Skeleton } from "@nightshift/ui/components/skeleton";
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import {
-	ArrowRightIcon,
-	BookOpenIcon,
-	CheckCircle2Icon,
-	FolderIcon,
-	PlusIcon,
-	SearchXIcon,
-} from "lucide-react";
-import { useMemo } from "react";
-import { OVERVIEW_ROWS } from "@/features/dashboard";
-import { formatRelative } from "@/shared/format";
-import { folderTree } from "./folder-tree";
-import {
-	AddSourceButton,
-	KnowledgeSection,
-	useKnowledge,
-} from "./knowledge-layout";
-import type { KNOWLEDGE_PAGES } from "./knowledge-nav";
-import { KnowledgeSearch } from "./knowledge-search";
-import { knowledgeQueries } from "./queries";
-import { lastSyncText } from "./source-words";
-import { sourceLabel } from "./sources";
+	NotesThread,
+	noteKey,
+	type Said,
+	useNotesToCheck,
+} from "./notes-thread";
+import { factsLine, type TellOutcome, tellReply } from "./overview-words";
+import { knowledgeMutations, knowledgeQueries } from "./queries";
+import { OftenSelect, ToldLinkRows, useToldLinks } from "./told-links";
+import { useKnowledgeHits } from "./use-knowledge-hits";
 
-/** The topics the Map card shows, at most. */
-const TOPICS_SHOWN = 14;
-
-const count = (n: number, one: string, many: string) =>
-	`${n} ${n === 1 ? one : many}`;
+/** How often an agent fetches what a person describes, unless they choose. */
+const AGENT_OFTEN: HowOften = "week";
 
 /**
- * A project's Knowledge at a glance: the search, what waits for you, and one
- * card for each child page with the facts that matter.
+ * A project's Knowledge as Ask and tell: what agents would find, a box to
+ * tell them more, and the learnings to check one note at a time. The child
+ * pages hold the details: All knowledge opens Files, the breadcrumb the
+ * others.
  */
 export function KnowledgeOverviewPage() {
-	const { projectId, knowledge, addSource } = useKnowledge();
-	const nothing =
-		knowledge.files.length === 0 &&
-		knowledge.syncs.length === 0 &&
-		knowledge.proposed === 0;
-	return (
-		<KnowledgeSection
-			title="Knowledge"
-			description="What your agents read besides the project folder. Every computer in this Space gets the same files."
-			actions={<AddSourceButton />}
-		>
-			{nothing ? (
-				<Empty className="border">
-					<EmptyHeader>
-						<EmptyMedia variant="icon">
-							<BookOpenIcon aria-hidden="true" />
-						</EmptyMedia>
-						<EmptyTitle>No knowledge yet</EmptyTitle>
-						<EmptyDescription>
-							Add a folder of notes, web pages or a wiki. Night Shift keeps a
-							copy, and your agents read it while they work.
-						</EmptyDescription>
-					</EmptyHeader>
-					{addSource ? (
-						<EmptyContent>
-							<Button onClick={addSource}>
-								<PlusIcon data-icon="inline-start" />
-								Add source
-							</Button>
-						</EmptyContent>
-					) : null}
-				</Empty>
-			) : (
-				<KnowledgeSearch projectId={projectId} idle={<OverviewCards />} />
-			)}
-		</KnowledgeSection>
-	);
-}
+	const { projectId, knowledge, openFile } = useKnowledge();
+	const navigate = useNavigate();
+	const { can } = knowledge;
+	const tells = can.startRuns;
+	const [mode, setMode] = useState<BoxMode>("ask");
+	const search = useKnowledgeHits(projectId, { enabled: mode === "ask" });
+	const [changing, setChanging] = useState<NoteToCheck | null>(null);
+	const [said, setSaid] = useState<Said[]>([]);
+	const [byAgent, setByAgent] = useState(false);
+	const [agentOften, setAgentOften] = useState<HowOften>(AGENT_OFTEN);
+	const [sending, setSending] = useState(false);
+	const agentId = useId();
 
-function OverviewCards() {
-	return (
-		<div className="grid gap-4 lg:grid-cols-2">
-			<ReviewCard />
-			<FilesCard />
-			<SourcesCard />
-			<QuestionsCard />
-			<MapCard />
-		</div>
+	const unsay = useCallback(
+		(key: string) => setSaid((now) => now.filter((one) => one.key !== key)),
+		[],
 	);
-}
-
-/** The link to a child page, in the corner of its card. */
-function OpenPage({
-	to,
-	label,
-}: {
-	to: (typeof KNOWLEDGE_PAGES)[number]["to"];
-	label: string;
-}) {
-	const { projectId } = useKnowledge();
-	return (
-		<CardAction>
-			<Button
-				variant="ghost"
-				size="sm"
-				nativeButton={false}
-				render={<Link to={to} params={{ projectId }} />}
-			>
-				{label}
-				<ArrowRightIcon data-icon="inline-end" />
-			</Button>
-		</CardAction>
-	);
-}
-
-function ReviewCard() {
-	const { projectId, review } = useKnowledge();
-	const [first] = review.queue;
-	if (review.loading) {
-		return <Skeleton className="h-40 w-full lg:col-span-2" />;
-	}
-	if (!first) {
-		return (
-			<Card className="lg:col-span-2">
-				<CardHeader>
-					<CardTitle className="flex items-center gap-2">
-						<CheckCircle2Icon aria-hidden="true" className="size-4" />
-						Nothing to review
-					</CardTitle>
-					<CardDescription>
-						When an agent learns something, it shows here.
-					</CardDescription>
-				</CardHeader>
-			</Card>
-		);
-	}
-	return (
-		<Card className="lg:col-span-2">
-			<CardHeader>
-				<CardDescription>Waiting for you</CardDescription>
-				<CardTitle className="text-lg">
-					{count(review.queue.length, "item", "items")} to review
-				</CardTitle>
-			</CardHeader>
-			<CardContent>
-				<p className="line-clamp-2 text-muted-foreground">{taskLine(first)}</p>
-			</CardContent>
-			<CardFooter>
-				<Button
-					nativeButton={false}
-					render={
-						<Link
-							to="/projects/$projectId/knowledge/review"
-							params={{ projectId }}
-						/>
-					}
-				>
-					Start review
-				</Button>
-			</CardFooter>
-		</Card>
-	);
-}
-
-function FilesCard() {
-	const { projectId, knowledge } = useKnowledge();
-	const use = useQuery({
-		...knowledgeQueries.use(projectId),
-		meta: { quietErrors: true },
+	const notes = useNotesToCheck(projectId, unsay);
+	const told = useToldLinks(projectId, search.text, {
+		enabled: mode === "tell" && changing === null && can.save,
+		schedules: can.schedules,
 	});
-	const folders = useMemo(
-		() =>
-			[...folderTree(knowledge.files.map((file) => file.path)).children].sort(
-				(a, b) => b.count - a.count,
-			),
-		[knowledge.files],
-	);
-	const unused = use.data?.unused.length ?? 0;
-	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>Files</CardTitle>
-				<CardDescription>
-					{count(knowledge.files.length, "file", "files")}.
-					{unused > 0 ? ` ${unused} not used lately.` : ""}
-				</CardDescription>
-				<OpenPage
-					to="/projects/$projectId/knowledge/files"
-					label="Open files"
-				/>
-			</CardHeader>
-			<CardContent>
-				<ItemGroup className="gap-1">
-					{folders.slice(0, OVERVIEW_ROWS).map((folder) => (
-						<Item
-							key={folder.path}
-							size="xs"
-							variant="muted"
-							render={
-								<Link
-									to="/projects/$projectId/knowledge/files"
-									params={{ projectId }}
-								/>
-							}
-						>
-							<ItemMedia variant="icon">
-								<FolderIcon aria-hidden="true" />
-							</ItemMedia>
-							<ItemContent>
-								<ItemTitle>{folder.name}</ItemTitle>
-							</ItemContent>
-							<ItemActions className="text-xs text-muted-foreground tabular-nums">
-								{folder.count}
-							</ItemActions>
-						</Item>
-					))}
-				</ItemGroup>
-			</CardContent>
-		</Card>
-	);
-}
-
-function SourcesCard() {
-	const { projectId, knowledge } = useKnowledge();
-	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>Sources</CardTitle>
-				<CardDescription>
-					{knowledge.syncs.length > 0
-						? "Where your files come from."
-						: "No source adds files yet."}
-				</CardDescription>
-				<OpenPage
-					to="/projects/$projectId/knowledge/sources"
-					label="Open sources"
-				/>
-			</CardHeader>
-			<CardContent>
-				<ItemGroup className="gap-1">
-					{knowledge.syncs.slice(0, OVERVIEW_ROWS).map((sync) => (
-						<Item
-							key={sync.flow}
-							size="xs"
-							variant="muted"
-							render={
-								<Link
-									to="/projects/$projectId/knowledge/sources"
-									params={{ projectId }}
-								/>
-							}
-						>
-							<ItemContent>
-								<ItemTitle>{sourceLabel(sync)}</ItemTitle>
-								<ItemDescription>
-									{lastSyncText(sync.lastRun, (at) => formatRelative(at))}
-								</ItemDescription>
-							</ItemContent>
-							{sync.health ? (
-								<ItemActions>
-									<Badge
-										variant={
-											sync.health === "failed" ? "destructive" : "outline"
-										}
-									>
-										{sync.health === "failed" ? "Failed" : "Out of date"}
-									</Badge>
-								</ItemActions>
-							) : null}
-						</Item>
-					))}
-				</ItemGroup>
-			</CardContent>
-		</Card>
-	);
-}
-
-function QuestionsCard() {
-	const { projectId } = useKnowledge();
 	const questions = useQuery({
 		...knowledgeQueries.questions(projectId),
 		meta: { quietErrors: true },
 	});
 	const asked = questions.data?.asked ?? [];
-	const nothing = asked.filter((question) => question.hits.length === 0).length;
-	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>Questions</CardTitle>
-				<CardDescription>
-					{asked.length === 0
-						? "When an agent searches your files, its question shows here."
-						: `Agents asked ${count(asked.length, "question", "questions")}.${nothing > 0 ? ` ${nothing} found nothing.` : ""}`}
-				</CardDescription>
-				<OpenPage
-					to="/projects/$projectId/knowledge/questions"
-					label="Open questions"
-				/>
-			</CardHeader>
-			<CardContent>
-				<ItemGroup className="gap-1">
-					{asked.slice(0, OVERVIEW_ROWS).map((question) => (
-						<Item
-							key={question.query}
-							size="xs"
-							variant="muted"
-							render={
-								<Link
-									to="/projects/$projectId/knowledge/questions"
-									params={{ projectId }}
-								/>
-							}
-						>
-							{question.hits.length === 0 ? (
-								<ItemMedia variant="icon">
-									<SearchXIcon aria-hidden="true" />
-								</ItemMedia>
-							) : null}
-							<ItemContent className="min-w-0">
-								<ItemTitle className="w-full">
-									<span className="truncate">{question.query}</span>
-								</ItemTitle>
-								<ItemDescription>
-									{question.hits.length === 0
-										? "Found nothing"
-										: `Found ${count(question.hits.length, "file", "files")}`}
-								</ItemDescription>
-							</ItemContent>
-						</Item>
-					))}
-				</ItemGroup>
-			</CardContent>
-		</Card>
-	);
-}
 
-function MapCard() {
-	const { projectId } = useKnowledge();
-	const map = useQuery({
-		...knowledgeQueries.map(projectId),
-		meta: { quietErrors: true },
+	const save = useMutation(knowledgeMutations.saveSource());
+	const sync = useMutation(knowledgeMutations.syncSource());
+
+	/** Saves one source, and starts it when the person may. Returns what did not work, or null. */
+	const addSource = async (one: ToldSource): Promise<string | null> => {
+		let name: string;
+		try {
+			const saved = await save.mutateAsync({
+				projectId,
+				...one,
+				...(one.keepUpToDate ? { timeZone: localZone() } : {}),
+			});
+			name = saved.name;
+		} catch (error) {
+			return `This did not save: ${error instanceof Error ? error.message : String(error)}`;
+		}
+		if (!can.startRuns) return null;
+		try {
+			await sync.mutateAsync({ projectId, name });
+			return null;
+		} catch (error) {
+			return `Saved, but the first read did not start: ${error instanceof Error ? error.message : String(error)}`;
+		}
+	};
+
+	const clearBox = () => {
+		search.clear();
+		told.reset();
+		setByAgent(false);
+		setAgentOften(AGENT_OFTEN);
+		setChanging(null);
+	};
+
+	const send = async () => {
+		const text = search.text.trim();
+		if (mode !== "tell" || text === "" || sending) return;
+		setSending(true);
+		try {
+			if (changing) {
+				const kept = await notes.tell({ note: text, replaces: changing });
+				if (kept) {
+					setSaid((now) => [
+						...now,
+						{
+							kind: "answer",
+							key: noteKey(changing),
+							note: changing.note,
+							answer: text,
+						},
+					]);
+					clearBox();
+				}
+				return;
+			}
+			const outcome: TellOutcome = {
+				note: false,
+				read: [],
+				agent: 0,
+				started: can.startRuns,
+				gone: 0,
+				unread: 0,
+				failed: [],
+			};
+			const links = told.links;
+			if (links.length === 0 && byAgent) {
+				const problem = await addSource(agentSource({ text }, agentOften));
+				if (problem) outcome.failed.push(problem);
+				else outcome.agent++;
+			} else {
+				for (const link of links) {
+					const { look, plan } = link;
+					if (!look || !plan || plan.action === "none") {
+						outcome.gone++;
+						continue;
+					}
+					if (plan.action === "agent" && !link.agent) {
+						outcome.unread++;
+						continue;
+					}
+					const problem = await addSource(
+						plan.action === "read"
+							? readSource(look, {
+									much: link.much ?? "page",
+									often: link.often,
+								})
+							: agentSource(
+									{ link: link.url, transcript: plan.transcript },
+									link.often,
+								),
+					);
+					if (problem) outcome.failed.push(problem);
+					else if (plan.action === "read") outcome.read.push(link.often);
+					else outcome.agent++;
+				}
+				// Links Night Shift looked at become sources: the words around them are the note.
+				const note =
+					linksIn(text).length > 0 && can.save ? toldNote(text) : text;
+				if (note !== null) outcome.note = await notes.tell({ note });
+			}
+			setSaid((now) => [
+				...now,
+				{
+					kind: "told",
+					key: `told:${now.length}`,
+					text,
+					reply: tellReply(outcome),
+				},
+			]);
+			clearBox();
+		} finally {
+			setSending(false);
+		}
+	};
+
+	const findIt = useMutation({
+		mutationFn: async (question: string) => {
+			const saved = await save.mutateAsync({
+				projectId,
+				...agentSource({ question }, "once"),
+			});
+			return sync.mutateAsync({ projectId, name: saved.name });
+		},
+		onSuccess: (run) =>
+			toast.success("An agent looks for it now", {
+				action: {
+					label: "View run",
+					onClick: () =>
+						void navigate({ to: "/runs/$runId", params: { runId: run.id } }),
+				},
+			}),
+		onError: (error) =>
+			toast.error(`The agent did not start: ${error.message}`),
 	});
-	const topics = (map.data?.nodes ?? [])
-		.filter((node) => node.kind === "topic")
-		.sort((a, b) => b.degree - a.degree)
-		.slice(0, TOPICS_SHOWN);
+
+	const asking = mode === "ask" && search.query !== "";
+	const linkCount = linksIn(search.text).length;
+	const blockedBy =
+		mode === "tell" && changing === null && told.looking
+			? "Night Shift still looks at the links."
+			: null;
+
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>Map</CardTitle>
-				<CardDescription>
-					{topics.length > 0
-						? "The topics your files share most."
-						: "How your files connect."}
-				</CardDescription>
-				<OpenPage to="/projects/$projectId/knowledge/map" label="Open map" />
-			</CardHeader>
-			<CardContent className="flex flex-wrap gap-1">
-				{map.isLoading ? <Skeleton className="h-16 w-full" /> : null}
-				{topics.map((topic) => (
-					<Badge
-						key={topic.id}
-						variant="secondary"
+		<div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+			<KnowledgeSection
+				title="What should your agents know?"
+				description={factsLine({
+					files: knowledge.files.length,
+					sources: knowledge.syncs.length,
+					asked: asked.length,
+					answered: asked.filter((question) => question.hits.length > 0).length,
+				})}
+				actions={
+					<Button
+						variant="outline"
+						nativeButton={false}
 						render={
 							<Link
-								to="/projects/$projectId/knowledge/map"
+								to="/projects/$projectId/knowledge/files"
 								params={{ projectId }}
-								search={{ node: topic.id }}
 							/>
 						}
 					>
-						{topic.label}
-					</Badge>
-				))}
-			</CardContent>
-		</Card>
+						<BookOpenIcon data-icon="inline-start" />
+						All knowledge
+					</Button>
+				}
+			>
+				<div className="flex flex-col gap-2">
+					{changing ? (
+						<p className="text-sm text-muted-foreground">
+							Write the note as it should be. It takes the place of the old one.{" "}
+							<Button
+								variant="link"
+								size="sm"
+								className="h-auto p-0"
+								onClick={clearBox}
+							>
+								Cancel
+							</Button>
+						</p>
+					) : null}
+					<AskTellBox
+						mode={mode}
+						onMode={(next) => {
+							setMode(next);
+							if (next === "ask") setChanging(null);
+						}}
+						text={search.text}
+						onText={search.setText}
+						onSend={() => void send()}
+						tells={tells}
+						sending={sending}
+						blockedBy={blockedBy}
+						inside={
+							mode !== "tell" || changing ? null : linkCount > 0 && can.save ? (
+								<ToldLinkRows told={told} schedules={can.schedules} />
+							) : search.text.trim() !== "" && can.save ? (
+								<Field orientation="horizontal" className="border-t px-3 py-2">
+									<Switch
+										id={agentId}
+										checked={byAgent}
+										onCheckedChange={setByAgent}
+									/>
+									<FieldContent>
+										<FieldLabel htmlFor={agentId} className="font-normal">
+											Let an agent fetch this from where it lives
+										</FieldLabel>
+									</FieldContent>
+									{byAgent ? (
+										<OftenSelect
+											value={can.schedules ? agentOften : "once"}
+											schedules={can.schedules}
+											onChange={setAgentOften}
+										/>
+									) : null}
+								</Field>
+							) : null
+						}
+					/>
+					{mode === "ask" ? <MeaningLine projectId={projectId} /> : null}
+				</div>
+				{asking ? (
+					<AskAnswer
+						query={search.query}
+						hits={search.hits.data}
+						error={search.hits.error}
+						onOpen={openFile}
+						onTell={
+							tells
+								? () => {
+										setMode("tell");
+										search.setText("");
+									}
+								: undefined
+						}
+						onFind={
+							can.save && can.startRuns
+								? () => findIt.mutate(search.query)
+								: undefined
+						}
+						finding={findIt.isPending}
+					/>
+				) : (
+					<NotesThread
+						notes={notes}
+						said={said}
+						onAnswer={(note, decision, answer) => {
+							setSaid((now) => [
+								...now,
+								{ kind: "answer", key: noteKey(note), note: note.note, answer },
+							]);
+							notes.settle(note, decision);
+						}}
+						onChange={(note) => {
+							setChanging(note);
+							setMode("tell");
+							search.setText(note.note);
+						}}
+					/>
+				)}
+			</KnowledgeSection>
+		</div>
 	);
 }

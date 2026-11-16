@@ -72,6 +72,7 @@ export type {
 	Knowledge,
 	KnowledgeEvaluation,
 	KnowledgeFile,
+	KnowledgeHit,
 	KnowledgeMap,
 	KnowledgeUse,
 	McpServer,

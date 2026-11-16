@@ -30,6 +30,7 @@ import { Spinner } from "@nightshift/ui/components/spinner";
 import { useQuery } from "@tanstack/react-query";
 import { CircleAlertIcon, SearchIcon, XIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import type { KnowledgeHit } from "@/shared/api";
 import { KnowledgeFileSheet } from "./knowledge-file-sheet";
 import { knowledgeQueries } from "./queries";
 import { useKnowledgeHits } from "./use-knowledge-hits";
@@ -102,48 +103,7 @@ export function KnowledgeSearch({
 					</EmptyHeader>
 				</Empty>
 			) : (
-				<ItemGroup className="gap-2">
-					{hits.data.map((hit) => (
-						<Item key={hit.path} variant="outline">
-							<ItemContent>
-								<ItemTitle>
-									{hit.title}
-									{hit.found.length === 1 && hit.found[0] === "meaning" ? (
-										<Badge variant="secondary">By meaning</Badge>
-									) : null}
-								</ItemTitle>
-								<p className="text-xs break-all text-muted-foreground">
-									<span className="font-mono">{hit.path}</span>
-									{hit.section ? ` · ${hit.section}` : ""}
-									{hit.page ? ` · page ${hit.page}` : ""}
-								</p>
-								<ItemDescription>
-									{hit.snippet.map((part, index) =>
-										part.match ? (
-											<mark
-												key={`${index}:${part.text}`}
-												className="rounded-sm bg-primary/15 px-0.5 text-foreground"
-											>
-												{part.text}
-											</mark>
-										) : (
-											<span key={`${index}:${part.text}`}>{part.text}</span>
-										),
-									)}
-								</ItemDescription>
-							</ItemContent>
-							<ItemActions>
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={() => setOpen(hit.path)}
-								>
-									Open file
-								</Button>
-							</ItemActions>
-						</Item>
-					))}
-				</ItemGroup>
+				<SearchHits hits={hits.data} onOpen={setOpen} />
 			)}
 			<KnowledgeFileSheet
 				projectId={projectId}
@@ -154,8 +114,62 @@ export function KnowledgeSearch({
 	);
 }
 
+/** The files a search found, each with its title, path, the part found and its words. */
+export function SearchHits({
+	hits,
+	onOpen,
+}: {
+	hits: readonly KnowledgeHit[];
+	onOpen: (path: string) => void;
+}) {
+	return (
+		<ItemGroup className="gap-2">
+			{hits.map((hit) => (
+				<Item key={hit.path} variant="outline">
+					<ItemContent>
+						<ItemTitle>
+							{hit.title}
+							{hit.found.length === 1 && hit.found[0] === "meaning" ? (
+								<Badge variant="secondary">By meaning</Badge>
+							) : null}
+						</ItemTitle>
+						<p className="text-xs break-all text-muted-foreground">
+							<span className="font-mono">{hit.path}</span>
+							{hit.section ? ` · ${hit.section}` : ""}
+							{hit.page ? ` · page ${hit.page}` : ""}
+						</p>
+						<ItemDescription>
+							{hit.snippet.map((part, index) =>
+								part.match ? (
+									<mark
+										key={`${index}:${part.text}`}
+										className="rounded-sm bg-primary/15 px-0.5 text-foreground"
+									>
+										{part.text}
+									</mark>
+								) : (
+									<span key={`${index}:${part.text}`}>{part.text}</span>
+								),
+							)}
+						</ItemDescription>
+					</ItemContent>
+					<ItemActions>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => onOpen(hit.path)}
+						>
+							Open file
+						</Button>
+					</ItemActions>
+				</Item>
+			))}
+		</ItemGroup>
+	);
+}
+
 /** What the page says about search by meaning, and which Ollama does it. Nothing when it is off. */
-function MeaningLine({ projectId }: { projectId: string }) {
+export function MeaningLine({ projectId }: { projectId: string }) {
 	const meaning = useQuery({
 		...knowledgeQueries.meaning(projectId),
 		refetchInterval: (query) => {

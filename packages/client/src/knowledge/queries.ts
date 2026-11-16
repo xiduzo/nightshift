@@ -1,5 +1,8 @@
 import type { ApiQueryUtils } from "../api";
 
+/** How long a quick look at a link stays fresh: as long as the server keeps it. */
+const LOOK_FRESH_MS = 5 * 60_000;
+
 /**
  * The query options of a project's knowledge. No list polls: the live cache
  * reads the learnings and the review again when this computer's reconcile
@@ -59,6 +62,18 @@ export function createKnowledgeQueries(orpc: ApiQueryUtils) {
 		/** The Map: the files, their topics and what connects to them. */
 		map: (projectId: string) =>
 			orpc.knowledge.graph.queryOptions({ input: { projectId } }),
+		/**
+		 * The quick look at one link a person tells: what it is, before
+		 * anything is saved. One link a query, so a new link does not look at
+		 * the others again. The server keeps a look 5 minutes too.
+		 */
+		look: (projectId: string, url: string) => ({
+			...orpc.knowledge.look.queryOptions({
+				input: { projectId, urls: [url] },
+			}),
+			staleTime: LOOK_FRESH_MS,
+			retry: false,
+		}),
 		/** One file, by its path in the knowledge. */
 		read: (projectId: string, path: string) =>
 			orpc.knowledge.read.queryOptions({ input: { projectId, path } }),

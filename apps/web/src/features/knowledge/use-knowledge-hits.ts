@@ -5,8 +5,12 @@ import { knowledgeQueries } from "./queries";
 /** How long the words rest before the search runs, in ms. */
 const TYPING_PAUSE = 250;
 
-/** A search over the project's knowledge, once the typing rests. */
-export function useKnowledgeHits(projectId: string) {
+/** A search over the project's knowledge, once the typing rests. `enabled: false` keeps the words and does not search. */
+export function useKnowledgeHits(
+	projectId: string,
+	options: { enabled?: boolean } = {},
+) {
+	const { enabled = true } = options;
 	const [text, setText] = useState("");
 	const [query, setQuery] = useState("");
 
@@ -17,7 +21,7 @@ export function useKnowledgeHits(projectId: string) {
 
 	const hits = useQuery({
 		...knowledgeQueries.search(projectId, query),
-		enabled: query !== "",
+		enabled: enabled && query !== "",
 		placeholderData: keepPreviousData,
 	});
 
