@@ -103,6 +103,8 @@ export const knowledgeSchema = z.object({
 	learnsFromRuns: z.boolean(),
 	/** The page reader of the Web pages source and of the quick look at a link (ADR 39). */
 	reader: pageReaderSettingSchema,
+	/** The secret of that reader is saved where this computer finds it. Always true for Night Shift's own reader. */
+	readerReady: z.boolean(),
 });
 export type KnowledgePage = z.infer<typeof knowledgeSchema>;
 

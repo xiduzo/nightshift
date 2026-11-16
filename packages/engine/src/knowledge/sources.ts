@@ -188,6 +188,8 @@ type KnowledgeOverview = {
 	learnsFromRuns: boolean;
 	/** The page reader of the project (ADR 39). */
 	reader: PageReaderSetting;
+	/** The secret of that reader is saved where this computer finds it. Always true for Night Shift's own. */
+	readerReady: boolean;
 };
 
 /** What the person who asks may do, as the API checked it. */
@@ -207,6 +209,8 @@ type KnowledgeSourcesDeps<Run extends SourceRun> = {
 		listing(projectId: string): Promise<KnowledgeListing>;
 		removeFolder(projectId: string, folder: string): Promise<number>;
 	};
+	/** The secret of the project's page reader is saved where this computer finds it. */
+	readerReady(projectId: string): Promise<boolean>;
 	/** This computer: a source that reads a folder here syncs here. */
 	device: { id: string; name: string };
 };
@@ -363,9 +367,11 @@ export function knowledgeSources<Run extends SourceRun>(
 			const [
 				{ files, proposed, shared, olderHost, learnsFromRuns, reader },
 				{ syncs, reviews },
+				readerReady,
 			] = await Promise.all([
 				deps.files.listing(projectId),
 				fillingFlows(projectId),
+				deps.readerReady(projectId),
 			]);
 			return {
 				files,
@@ -380,6 +386,7 @@ export function knowledgeSources<Run extends SourceRun>(
 				olderHost,
 				learnsFromRuns,
 				reader,
+				readerReady,
 			};
 		},
 		/** The flows that fill the knowledge, with no reconcile: what `list` says of each. */

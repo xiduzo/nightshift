@@ -69,6 +69,7 @@ function sourcesOn(
 			listing: built.knowledge.listing,
 			removeFolder: async () => 0,
 		},
+		readerReady: async () => true,
 		device,
 	});
 }

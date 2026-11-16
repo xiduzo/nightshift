@@ -565,6 +565,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		return knowledgeSources({
 			space,
 			files: { listing: reader.listing, removeFolder: reconciler.removeFolder },
+			readerReady: readers.ready,
 			device,
 		});
 	}

@@ -35,6 +35,12 @@ export type PageReaders = {
 	): Promise<{ env: Record<string, string>; close(): Promise<void> }>;
 	/** The quick look at each link, in their order, with the project's reader. */
 	look(projectId: string, urls: readonly string[]): Promise<LinkLook[]>;
+	/**
+	 * The secret of the project's reader is saved where this computer finds
+	 * it outside a run. Always true for Night Shift's own reader, which has
+	 * no key.
+	 */
+	ready(projectId: string): Promise<boolean>;
 	/** Writes the marks that wait. */
 	close(): Promise<void>;
 };
@@ -198,6 +204,13 @@ export function createPageReaders(deps: PageReadersDeps): PageReaders {
 				Array.from({ length: Math.min(LOOKS_AT_ONCE, urls.length) }, worker),
 			);
 			return results;
+		},
+		async ready(projectId) {
+			const setting = await deps.setting(projectId);
+			if (setting.kind === "nightshift") return true;
+			const name = setting.secret ?? PAGE_READER_DEFAULTS[setting.kind].secret;
+			const key = await deps.secret?.(name).catch(() => undefined);
+			return Boolean(key);
 		},
 		close: () => marks.flush(),
 	};

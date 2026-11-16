@@ -104,6 +104,25 @@ describe("knowledge.get", () => {
 		expect(asOwner.can.schedules).toBe(true);
 	});
 
+	test("says whether the key of the page reader is saved on this computer", async () => {
+		const ready = async () =>
+			(
+				await call(
+					appRouter.knowledge.get,
+					{ projectId },
+					{ context: context("member") },
+				)
+			).readerReady;
+		expect(await ready()).toBe(true);
+		await call(
+			appRouter.knowledge.setReader,
+			{ projectId, reader: { kind: "firecrawl" } },
+			{ context: context("member") },
+		);
+		// No secret store here: FIRECRAWL_API_KEY is not saved.
+		expect(await ready()).toBe(false);
+	});
+
 	test("any Member of the Space reads the files and the sources, and only of its projects", async () => {
 		await call(
 			appRouter.knowledge.saveSource,
