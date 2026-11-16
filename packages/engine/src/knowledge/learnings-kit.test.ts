@@ -413,6 +413,42 @@ describe("what the Gate lists", () => {
 	});
 });
 
+describe("after one note was settled on its own", () => {
+	test("the Gate shows the notes left, and both forms settle the rest", async () => {
+		const tree = { "learnings/proposed/run-1.s1.md": NEW_FILE };
+		const person = { id: "ada", name: "Ada" };
+		const byNote = async () => {
+			const knowledge = await folderOf(tree);
+			await learningsOver(knowledge).settleNote(
+				"p1",
+				{ id: "run-1.s1.md", index: 0, note: "One." },
+				"keep",
+				person,
+			);
+			return knowledge;
+		};
+
+		const inTypeScript = await byNote();
+		await learningsOver(inTypeScript).settle("p1", "run-1.s1.md", "keep");
+
+		const byShell = await byNote();
+		const list = rendered("list", "");
+		const { output } = await inShell(byShell, list.command, list.env);
+		const gate = JSON.parse(output) as { files: string; text: string };
+		expect(gate.files).toBe(" run-1.s1.md");
+		expect(parseLearnings(gate.text)).toEqual(["Two."]);
+		const keep = rendered("keep", gate.files);
+		await inShell(byShell, keep.command, keep.env);
+
+		const left = await treeOf(inTypeScript);
+		expect(await treeOf(byShell)).toEqual(left);
+		expect(left).not.toHaveProperty(["learnings/proposed/run-1.s1.md"]);
+		expect(
+			parseLearnings(left["learnings/accepted/run-1.s1.md"] ?? ""),
+		).toEqual(["One.", "Two."]);
+	});
+});
+
 /**
  * A project can hold a copy of the kit from before: "Copy into project" saves
  * the commands as they were then, and nothing updates them. These are those

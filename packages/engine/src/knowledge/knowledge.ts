@@ -25,7 +25,9 @@ import {
 import {
 	createLearnings,
 	type LearningsNotifications,
+	type NotePerson,
 	type ProjectLearning,
+	type WaitingNote,
 } from "./learnings";
 import { createMapMemo, type KnowledgeMap, knowledgeMapOf } from "./map";
 import type { KnowledgeMeaning } from "./meaning";
@@ -199,6 +201,31 @@ export type Knowledge = {
 		projectId: string,
 		id: string,
 		decision: "keep" | "delete",
+	): Promise<void>;
+	/**
+	 * Keeps or deletes one note of a learning that waits, not the whole
+	 * step's: a kept note goes to `learnings/accepted/` with who kept it and
+	 * when. The proposed file loses the note, and goes when none is left.
+	 * It holds the folder as `settleLearning` does, and refuses what it
+	 * refuses, and a note that no longer waits.
+	 */
+	settleNote(
+		projectId: string,
+		note: WaitingNote,
+		decision: "keep" | "delete",
+		by: NotePerson,
+	): Promise<void>;
+	/**
+	 * Keeps a note a person wrote, with who told it and when, in their own
+	 * file of `learnings/accepted/`: agents read it. With `replaces`, it
+	 * takes the place of a note that waits. It holds the folder as
+	 * `settleLearning` does.
+	 */
+	tellLearning(
+		projectId: string,
+		note: string,
+		by: NotePerson,
+		replaces?: WaitingNote,
 	): Promise<void>;
 	/**
 	 * The questions agents asked, newest first (at most `limit`), with the
@@ -582,6 +609,8 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 			});
 		},
 		settleLearning: learnings.settle,
+		settleNote: learnings.settleNote,
+		tellLearning: learnings.tell,
 		async questions(projectId, options = {}) {
 			const [asked, set] = await Promise.all([
 				askedQuestions(db, projectId, options),

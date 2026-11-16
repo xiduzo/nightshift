@@ -4,14 +4,20 @@ import type { AgentEvent } from "@nightshift/agents/types";
 import {
 	ACCEPTED_LEARNINGS_DIR,
 	formatLearnings,
+	formatPersonNote,
+	learningNotes,
+	learningPreface,
 	PROPOSED_LEARNINGS_DIR,
 	parseLearnings,
 	proposedLearningAt,
 	proposedLearningFileName,
 	proposedLearningOf,
+	toldLearningFileName,
+	withoutNote,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import type { SpaceArchive } from "../archive";
+import { now } from "@nightshift/time";
+import { type SpaceArchive, writeWhole } from "../archive";
 import type { CloseNote, CloseNotes, NoteToCompare } from "./close-notes";
 import type { KnowledgeFolders } from "./folder";
 import type { KnowledgeDocuments } from "./knowledge-document";
@@ -62,6 +68,17 @@ export type WaitingLearning = {
 
 /** A learning that waits, with the project it is for. */
 export type ProjectLearning = WaitingLearning & { projectId: string };
+
+/**
+ * One note of a learning that waits: the file (`WaitingLearning.id`) and
+ * its place in `notes`. `note`: its text as the person saw it. With it, a
+ * note that moved in its file (another note of it was settled first) is
+ * still found, and a note that is gone is refused, never another one.
+ */
+export type WaitingNote = { id: string; index: number; note?: string };
+
+/** The person who keeps, deletes or tells a note: their id names their file, their name marks the note. */
+export type NotePerson = { id: string; name: string };
 
 /** A step of a run, as its proposed learnings are named. */
 type LearningStep = { runId: string; stepId?: string };
@@ -151,6 +168,32 @@ export type Learnings = {
 		projectId: string,
 		id: string,
 		decision: "keep" | "delete",
+	): Promise<void>;
+	/**
+	 * Keeps or deletes one note of a learning that waits: keep adds it to
+	 * the learning's file in `learnings/accepted/` with who kept it and when,
+	 * and both take it out of the proposed file. A proposed file with no
+	 * note left goes. Refuses as `settle` does, and a note the file no
+	 * longer has.
+	 */
+	settleNote(
+		projectId: string,
+		note: WaitingNote,
+		decision: "keep" | "delete",
+		by: NotePerson,
+	): Promise<void>;
+	/**
+	 * Keeps a note a person wrote, in their own file of `learnings/accepted/`
+	 * (`told-<person>.md`) with who told it and when: agents read it. With
+	 * `replaces`, the note takes the place of a note that waits, which leaves
+	 * its proposed file as a delete does. Refuses an empty note, and a note
+	 * to replace that no longer waits: then nothing is kept.
+	 */
+	tell(
+		projectId: string,
+		note: string,
+		by: NotePerson,
+		replaces?: WaitingNote,
 	): Promise<void>;
 	/**
 	 * A reconcile ended. Every way what waits can change comes through here:
@@ -297,6 +340,96 @@ export function createLearnings(deps: LearningsDeps): Learnings {
 		await appendFile(file, text);
 	}
 
+	/** No such learning waits any more: someone settled it. */
+	const gone = () =>
+		new Refusal(
+			"not-found",
+			"This learning no longer waits. Someone kept or deleted it.",
+		);
+
+	/**
+	 * The text of a proposed file in this folder, by its name. Refuses a name
+	 * that is no proposed learning, one that no longer waits, and one whose
+	 * content did not reach this folder. The caller holds the folder.
+	 */
+	async function proposedText(
+		projectId: string,
+		id: string,
+	): Promise<{ path: string; content: Buffer }> {
+		if (!proposedLearningOf(id)) throw gone();
+		const path = join(
+			folders.folder(projectId),
+			...PROPOSED_LEARNINGS_DIR.split("/"),
+			id,
+		);
+		const content = await readFile(path).catch(() => null);
+		if (content !== null) return { path, content };
+		// Listed in the Space, but its content did not reach this folder.
+		const isListed = (await documents.open(projectId))
+			.entries()
+			.has(`${PROPOSED_LEARNINGS_DIR}/${id}`);
+		if (!isListed) throw gone();
+		throw new Refusal(
+			"unavailable",
+			"Night Shift cannot get this learning now. Try again when the computer that keeps this Space is online.",
+		);
+	}
+
+	/**
+	 * One note of a proposed file, found by its text when the person saw
+	 * one, else by its place. Refuses a note the file no longer has. The
+	 * caller holds the folder.
+	 */
+	async function waitingNote(projectId: string, at: WaitingNote) {
+		const { path, content } = await proposedText(projectId, at.id);
+		const text = content.toString("utf8");
+		const notes = parseLearnings(text);
+		const index =
+			at.note === undefined || notes[at.index] === at.note
+				? at.index
+				: notes.indexOf(at.note);
+		const note = notes[index];
+		const rest = withoutNote(text, index);
+		if (note === undefined || rest === null) {
+			throw new Refusal(
+				"not-found",
+				"This note no longer waits. Someone kept, changed or deleted it.",
+			);
+		}
+		return {
+			note,
+			preface: learningPreface(text),
+			/** Takes the note out of its file, and the file when no note is left. */
+			take: () =>
+				rest.notes === 0
+					? rm(path, { force: true })
+					: writeWhole(path, rest.text),
+		};
+	}
+
+	/** Adds a note a person decided on to a file of `learnings/accepted/`. */
+	async function accept(
+		projectId: string,
+		name: string,
+		note: string,
+		mark: { how: "told" | "kept"; by: NotePerson },
+		preface?: string,
+	): Promise<void> {
+		const dir = join(
+			folders.folder(projectId),
+			...ACCEPTED_LEARNINGS_DIR.split("/"),
+		);
+		const file = join(dir, name);
+		const isNew = (await stat(file).catch(() => null)) === null;
+		const text = formatPersonNote(
+			note,
+			{ how: mark.how, by: mark.by.name, at: now() },
+			{ isNew, ...(preface ? { preface } : {}) },
+		);
+		await mkdir(dir, { recursive: true });
+		await appendFile(file, text);
+	}
+
 	return {
 		propose,
 		async proposeFromRun(projectId, runId, notes) {
@@ -343,33 +476,58 @@ export function createLearnings(deps: LearningsDeps): Learnings {
 			);
 		},
 		async settle(projectId, id, decision) {
-			const gone = new Refusal(
-				"not-found",
-				"This learning no longer waits. Someone kept or deleted it.",
-			);
-			if (!proposedLearningOf(id)) throw gone;
+			if (!proposedLearningOf(id)) throw gone();
 			const hold = await deps.startStep(projectId);
 			try {
-				const root = folders.folder(projectId);
-				const proposed = join(root, ...PROPOSED_LEARNINGS_DIR.split("/"), id);
-				const content = await readFile(proposed).catch(() => null);
-				if (content === null) {
-					// Listed in the Space, but its content did not reach this folder.
-					const isListed = (await documents.open(projectId))
-						.entries()
-						.has(`${PROPOSED_LEARNINGS_DIR}/${id}`);
-					if (!isListed) throw gone;
-					throw new Refusal(
-						"unavailable",
-						"Night Shift cannot get this learning now. Try again when the computer that keeps this Space is online.",
-					);
-				}
+				const { path, content } = await proposedText(projectId, id);
 				if (decision === "keep") {
-					const accepted = join(root, ...ACCEPTED_LEARNINGS_DIR.split("/"));
+					const accepted = join(
+						folders.folder(projectId),
+						...ACCEPTED_LEARNINGS_DIR.split("/"),
+					);
 					await mkdir(accepted, { recursive: true });
 					await appendFile(join(accepted, id), content);
 				}
-				await rm(proposed, { force: true });
+				await rm(path, { force: true });
+			} finally {
+				await hold.done();
+			}
+		},
+		async settleNote(projectId, at, decision, by) {
+			if (!proposedLearningOf(at.id)) throw gone();
+			const hold = await deps.startStep(projectId);
+			try {
+				const found = await waitingNote(projectId, at);
+				if (decision === "keep") {
+					await accept(
+						projectId,
+						at.id,
+						found.note,
+						{ how: "kept", by },
+						found.preface,
+					);
+				}
+				await found.take();
+			} finally {
+				await hold.done();
+			}
+		},
+		async tell(projectId, note, by, replaces) {
+			if (learningNotes([note]).length === 0) {
+				throw new Refusal("invalid", "Write the note first.");
+			}
+			if (replaces && !proposedLearningOf(replaces.id)) throw gone();
+			const hold = await deps.startStep(projectId);
+			try {
+				// What it replaces is found first: when it is gone, nothing is kept.
+				const replaced = replaces
+					? await waitingNote(projectId, replaces)
+					: null;
+				await accept(projectId, toldLearningFileName(by.id), note, {
+					how: "told",
+					by,
+				});
+				await replaced?.take();
 			} finally {
 				await hold.done();
 			}
