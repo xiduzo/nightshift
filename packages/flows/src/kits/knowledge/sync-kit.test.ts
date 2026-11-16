@@ -42,6 +42,7 @@ describe("defineSyncKit", () => {
 			switches: {},
 			local: false,
 			needsFolder: false,
+			more: false,
 			programs: ["curl", "jq"],
 			every: null,
 			byAgent: false,

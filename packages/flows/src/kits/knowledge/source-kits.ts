@@ -43,6 +43,9 @@ Report in data: "files", how many files the folder holds now, and "missed", what
 
 /** The kits of the sources, in the order the page offers them. */
 export const KNOWLEDGE_SYNC_KITS = [
+	/** Web pages as markdown, also the pages they link to: `web-source.ts`. */
+	WEB_SOURCE,
+
 	/**
 	 * A folder anywhere on the computer, such as notes or specs that live
 	 * outside any repository. A folder exists on one computer only: run the
@@ -146,6 +149,43 @@ mv "$part" "$dest"`,
 	}),
 
 	/**
+	 * What a person describes, fetched by an agent with the tools it has:
+	 * text somewhere no other source reads, a page behind a sign-in, the
+	 * transcript of a video. One Agent node, on the agent of the computer
+	 * that runs it. It replaces what it fetched before.
+	 */
+	defineSyncKit({
+		name: "agent",
+		label: "Fetched by an agent",
+		blurb:
+			"What no other source reads, such as a page behind a sign-in. An agent fetches it with its own tools.",
+		flowName: "knowledge-agent",
+		main: "what",
+		lines: [],
+		programs: [],
+		description:
+			"An agent fetches what you describe with its own tools, as markdown. It replaces what it saved before, and says what it could not reach.",
+		inputs: [
+			{
+				name: "what",
+				label: "What to fetch",
+				type: "text",
+				description:
+					"What to fetch and where it is, for example the meeting notes in our shared drive.",
+				required: true,
+			},
+		],
+		folder: "agent",
+		stepLabel: "Fetch it",
+		every: "week",
+		agent: AGENT_PROMPT,
+		messages: {
+			synced: "Fetched",
+			notSynced: "Could not fetch it",
+		},
+	}),
+
+	/**
 	 * Files of the project's own folder. The run's copy of the project has
 	 * only what git tracks, so the paths are read in the project's folder
 	 * itself: files git ignores, such as `docs/private/`, become knowledge
@@ -214,55 +254,6 @@ mv "$part" "$dest"`,
 		],
 	}),
 
-	/** Web pages as markdown, also the pages they link to: `web-source.ts`. */
-	WEB_SOURCE,
-
-	/**
-	 * The wiki of a GitHub repository, with plain git. The first sync clones
-	 * it, a later one takes the newest pages. A private wiki needs git signed
-	 * in to GitHub.
-	 */
-	defineSyncKit({
-		name: "github-wiki",
-		label: "GitHub wiki",
-		blurb: "The wiki of a repository, also a private one.",
-		flowName: "knowledge-github-wiki",
-		main: "repo",
-		lines: [],
-		programs: [],
-		description:
-			"Copies the wiki of a GitHub repository into the project's knowledge, and takes the newest pages on each later sync. A private wiki needs git signed in to GitHub.",
-		inputs: [
-			{
-				name: "repo",
-				label: "Repository",
-				type: "text",
-				description:
-					"The repository, for example owner/name. Or the git address of any wiki.",
-				required: true,
-			},
-		],
-		folder: "wiki",
-		stepLabel: "Sync the wiki",
-		script: String.raw`repo="{{repo}}"
-case "$repo" in
-	*://*|*@*) url="$repo" ;;
-	*) url="https://github.com/$repo.wiki.git" ;;
-esac
-if [ -d "$dest/.git" ]; then
-	git -C "$dest" fetch -q --depth 1 "$url"
-	git -C "$dest" reset -q --hard FETCH_HEAD
-else
-	rm -rf "$dest"
-	mkdir -p "$NS_KNOWLEDGE"
-	git clone -q --depth 1 "$url" "$dest"
-fi`,
-		messages: {
-			synced: "Wiki synced",
-			notSynced: "Could not sync the wiki",
-		},
-	}),
-
 	/**
 	 * Some folders or files of any git repository, such as the markdown of
 	 * a documentation site. The clone is shallow, blobless and sparse: git
@@ -273,6 +264,7 @@ fi`,
 	 */
 	defineSyncKit({
 		name: "git",
+		more: true,
 		label: "Git repository",
 		blurb: "Only the folders or files you choose, such as the docs.",
 		flowName: "knowledge-git",
@@ -357,9 +349,57 @@ fi`,
 		],
 	}),
 
+	/**
+	 * The wiki of a GitHub repository, with plain git. The first sync clones
+	 * it, a later one takes the newest pages. A private wiki needs git signed
+	 * in to GitHub.
+	 */
+	defineSyncKit({
+		name: "github-wiki",
+		more: true,
+		label: "GitHub wiki",
+		blurb: "The wiki of a repository, also a private one.",
+		flowName: "knowledge-github-wiki",
+		main: "repo",
+		lines: [],
+		programs: [],
+		description:
+			"Copies the wiki of a GitHub repository into the project's knowledge, and takes the newest pages on each later sync. A private wiki needs git signed in to GitHub.",
+		inputs: [
+			{
+				name: "repo",
+				label: "Repository",
+				type: "text",
+				description:
+					"The repository, for example owner/name. Or the git address of any wiki.",
+				required: true,
+			},
+		],
+		folder: "wiki",
+		stepLabel: "Sync the wiki",
+		script: String.raw`repo="{{repo}}"
+case "$repo" in
+	*://*|*@*) url="$repo" ;;
+	*) url="https://github.com/$repo.wiki.git" ;;
+esac
+if [ -d "$dest/.git" ]; then
+	git -C "$dest" fetch -q --depth 1 "$url"
+	git -C "$dest" reset -q --hard FETCH_HEAD
+else
+	rm -rf "$dest"
+	mkdir -p "$NS_KNOWLEDGE"
+	git clone -q --depth 1 "$url" "$dest"
+fi`,
+		messages: {
+			synced: "Wiki synced",
+			notSynced: "Could not sync the wiki",
+		},
+	}),
+
 	/** Jira work items as markdown, with the Atlassian CLI (`acli`) and `jq`. */
 	defineSyncKit({
 		name: "jira",
+		more: true,
 		label: "Jira",
 		blurb: "Work items, through your Jira CLI tool. You must be signed in.",
 		flowName: "knowledge-jira",
@@ -415,6 +455,7 @@ done`,
 	 */
 	defineSyncKit({
 		name: "confluence",
+		more: true,
 		label: "Confluence",
 		blurb: "Pages by id, with an API token you save as a secret.",
 		flowName: "knowledge-confluence",
@@ -467,42 +508,6 @@ done`,
 		messages: {
 			synced: "Pages synced",
 			notSynced: "Could not sync the pages",
-		},
-	}),
-
-	/**
-	 * What a person describes, fetched by an agent with the tools it has:
-	 * text somewhere no other source reads, a page behind a sign-in, the
-	 * transcript of a video. One Agent node, on the agent of the computer
-	 * that runs it. It replaces what it fetched before.
-	 */
-	defineSyncKit({
-		name: "agent",
-		label: "An agent",
-		blurb: "Describe what to fetch. An agent finds it with its own tools.",
-		flowName: "knowledge-agent",
-		main: "what",
-		lines: [],
-		programs: [],
-		description:
-			"An agent fetches what you describe with its own tools, as markdown. It replaces what it saved before, and says what it could not reach.",
-		inputs: [
-			{
-				name: "what",
-				label: "What to fetch",
-				type: "text",
-				description:
-					"What to fetch and where it is, for example the meeting notes in our shared drive.",
-				required: true,
-			},
-		],
-		folder: "agent",
-		stepLabel: "Fetch it",
-		every: "week",
-		agent: AGENT_PROMPT,
-		messages: {
-			synced: "Fetched",
-			notSynced: "Could not fetch it",
 		},
 	}),
 ];

@@ -21,15 +21,27 @@ describe("the list of sources", () => {
 
 	test("the page offers them in this order", () => {
 		expect(KNOWLEDGE_SOURCE_KINDS.map((kind) => kind.label)).toEqual([
-			"Folder on this computer",
-			"Project files",
 			"Web pages",
-			"GitHub wiki",
+			"Folder on this computer",
+			"Fetched by an agent",
+			"Project files",
 			"Git repository",
+			"GitHub wiki",
 			"Jira",
 			"Confluence",
-			"An agent",
 		]);
+	});
+
+	test("the sources of one tool come after the kinds of content, under More sources", () => {
+		expect(
+			KNOWLEDGE_SOURCE_KINDS.filter((kind) => kind.more).map(
+				(kind) => kind.label,
+			),
+		).toEqual(["Git repository", "GitHub wiki", "Jira", "Confluence"]);
+		const firstMore = KNOWLEDGE_SOURCE_KINDS.findIndex((kind) => kind.more);
+		expect(
+			KNOWLEDGE_SOURCE_KINDS.slice(firstMore).every((kind) => kind.more),
+		).toBe(true);
 	});
 
 	test("only Project files needs the project's folder: a project without one cannot use it", () => {

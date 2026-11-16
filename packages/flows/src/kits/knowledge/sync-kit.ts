@@ -106,6 +106,8 @@ type SyncSource<Name extends string, Input extends string> = SyncStep & {
 	local?: true;
 	/** It reads the project's own folder: a project without one (ADR 22) cannot use it. */
 	needsFolder?: true;
+	/** It reads one tool, not a kind of content: the page lists it under More sources. */
+	more?: true;
 	/** What its script runs. A CLI tool the person picks (`acli`) has its own check. */
 	programs: readonly SourceProgram[];
 	/** The kit's description. */
@@ -141,6 +143,8 @@ export type SourceKind<Kit extends string> = {
 	local: boolean;
 	/** It reads the project's own folder: not offered for a project without one. */
 	needsFolder: boolean;
+	/** It reads one tool, not a kind of content: the page lists it under More sources. */
+	more: boolean;
 	/** The programs to name when they are missing. */
 	programs: readonly string[];
 	/** How often a new source of this kind syncs on its own. Null: the person picks. */
@@ -257,6 +261,7 @@ export function defineSyncKit<
 			>,
 			local: source.local ?? false,
 			needsFolder: source.needsFolder ?? false,
+			more: source.more ?? false,
 			programs: source.programs.map((program) => program.name),
 			every: source.every ?? null,
 			byAgent,
