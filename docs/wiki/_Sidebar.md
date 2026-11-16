@@ -1,17 +1,27 @@
 **[Night Shift](README.md)**
 
+**Start here**
+
 - [Get started](Get-started.md)
-- [Flows and nodes](Flows-and-nodes.md)
-- [Community flows](Community-flows.md)
-- [Ideas](Ideas.md)
-- [Agents and profiles](Agents-and-profiles.md)
+- [How Night Shift works](How-Night-Shift-works.md)
+- [Your first flow](Your-first-flow.md)
+
+**Use Night Shift**
+
 - [Runs and schedules](Runs-and-schedules.md)
 - [Gates and the inbox](Gates-and-the-inbox.md)
 - [Knowledge](Knowledge.md)
-- [Computers and Hosts](Computers-and-Hosts.md)
+- [Community flows](Community-flows.md)
+- [Ideas](Ideas.md)
 - [Phone app](Phone-app.md)
-- [Terminal and MCP](Terminal-and-MCP.md)
 - [Troubleshooting](Troubleshooting.md)
+
+**Reference**
+
+- [Flows and nodes](Flows-and-nodes.md)
+- [Agents and profiles](Agents-and-profiles.md)
+- [Computers and Hosts](Computers-and-Hosts.md)
+- [Terminal and MCP](Terminal-and-MCP.md)
 
 **Repository**
 

@@ -157,9 +157,9 @@ A flow with fewer than 3 runs that ended has no level yet.
 
 A project's page shows one row for each flow: its level, its last runs, how often it needed you without a plan, and how steady the time and the cost of a run are. The number on top of the page compares with the same days before. Choose 7, 30 or 90 days. Flow health leaves [test runs](#test-runs) out.
 
-**Predictability** shows two strips: the time of a run over the cost of a run. Each strip shows the finished runs of the flow against a usual run of that flow. A short strip means that you can predict the next run. The colour says how steady the runs are:
+**Predictability** shows two strips: the time of a run over the cost of a run. Each strip shows the finished runs of the flow against a usual run of that flow. A short strip means that you can predict the next run. The color says how steady the runs are:
 
-| Colour | What it means |
+| Color | What it means |
 | --- | --- |
 | Green | Most runs stay within 20% of a usual run. |
 | Amber | Some runs take or cost a lot more or less than a usual run. |
@@ -186,9 +186,9 @@ A row without an arrow has no runs yet. The [Spend](#spend) page is in the sideb
 
 The cards on top show what the runs spent against the same days before, how many flows have a steady cost, and what a change could save.
 
-**How predictable each flow is** has one row for each flow that cost money. The strip shows what its runs cost against a usual run of that flow. A short strip means a steady cost. The colour of the strip says how steady the cost is. The legend under the list names each colour.
+**How predictable each flow is** has one row for each flow that cost money. The strip shows what its runs cost against a usual run of that flow. A short strip means a steady cost. The color of the strip says how steady the cost is. The legend under the list names each color.
 
-| Colour | What it means |
+| Color | What it means |
 | --- | --- |
 | Green: **Steady** | Most runs cost within 20% of a usual run. |
 | Amber: **Varies** | Some runs cost a lot more or less than a usual run. |

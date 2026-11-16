@@ -73,7 +73,7 @@ Night Shift then adds the agent with a profile.
 
 If you have not chosen a decider yet, the setup asks for one: **Local** or **TypeSafe Jev**. Choose **Skip** to keep the default. Then the profile opens. See [Deciders](Flows-and-nodes.md#deciders).
 
-While this computer has no agent, Home offers the same setup. Choose **Set up** in **Get started**. On Home, the profile does not open, so that you can continue with the next step. See [Your first run](Get-started.md#your-first-run).
+While this computer has no agent, Home offers the same setup. Choose **Set up** in **Get started**. On Home, the profile does not open, so that you can continue with the next step. See [Get started](Get-started.md#2-follow-get-started-on-home).
 
 An agent that is on this computer already skips the install. An agent that is signed in already shows **Add Claude Code** or **Add Codex**.
 

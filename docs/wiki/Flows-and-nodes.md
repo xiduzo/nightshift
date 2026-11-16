@@ -1,6 +1,8 @@
 # Flows and nodes
 
-A flow is a graph of steps. Each step is a node. Each edge leaves a node on a named outcome, such as `pass`, `fail`, or `approved`. The engine walks the graph. A model never adds a node or changes the graph during a run, and every loop has a maximum count.
+A flow is a graph of nodes. Each edge leaves a node on a named outcome, such as `pass`, `fail`, or `approved`. Night Shift follows the edges from node to node. A model never adds a node or changes the flow during a run, and every loop has a maximum count.
+
+This page is the reference. To learn the editor step by step, do [Your first flow](Your-first-flow.md) first.
 
 This is the `scout-and-pick` starter. An agent finds candidates for a topic, you pick one, and another agent writes a report on it:
 
@@ -134,12 +136,12 @@ The value can have at most 1 MB. Raise the size limit of the node up to 10 MB. A
 
 A Wait waits for one of these:
 
-- a duration, such as 15 minutes;
-- a time, such as `07:00`;
-- a command that passes, run every few minutes;
-- a signal, from the run page or from a webhook;
-- a signal or a command, whichever comes first;
-- a URL that answers 2xx, asked every few minutes, for example a status page of a job. The body of the answer is its data.
+- A duration, such as 15 minutes.
+- A time, such as `07:00`.
+- A command that passes. Night Shift runs it every few minutes.
+- A signal, from the run page or from a webhook.
+- A signal or a command, whichever comes first.
+- A URL that answers 2xx, for example a status page of a job. Night Shift asks it every few minutes. The body of the answer is its data.
 
 A Wait ends on its own outcomes. A command, a signal or a URL can pick one. A rule over the answer of a URL reads it as `data`: `data.state = "done"`. Every Wait has a timeout. A signal comes from a webhook schedule, by name and key. See [Runs and schedules](Runs-and-schedules.md#webhooks).
 

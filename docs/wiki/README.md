@@ -1,27 +1,39 @@
 # Night Shift
 
-Stop babysitting your agents. Draw once how your agents and you work together. Night Shift runs it on your own computers, day and night, and asks you only what needs you.
+Night Shift runs your AI agents for you. You draw once how a job goes: which agent does each step, and where you want to decide. Night Shift then runs the job on your own computers, day and night, and asks you only what needs you.
 
-Night Shift is a workflow builder like n8n or Zapier. A step can be an agent that works for an hour. A choice can go to a small decision model.
+Night Shift works like n8n or Zapier, but a step can be an agent that works for an hour.
 
-In a flow, work climbs a ladder: a cheap agent tries, a strong agent rescues it, and you are the last rung. Choices climb too: a rule, a decision model, a large model, and then you. A Gate asks you only when the ladder runs out, or before an act that you cannot undo.
+This wiki is the user guide.
 
-This wiki is the user guide. It tells you how to install Night Shift, draw flows, run them, and answer what waits for you.
+## Start here
+
+New to Night Shift? Read these pages in this order:
+
+1. [Get started](Get-started.md). Install the app, connect an agent, and run your first flow. About 15 minutes.
+2. [How Night Shift works](How-Night-Shift-works.md). The main words: project, flow, node, run, Gate, schedule.
+3. [Your first flow](Your-first-flow.md). Build a flow that writes a news brief each morning. About 15 minutes.
+
+## Use Night Shift
+
+| Page | Read it to |
+| --- | --- |
+| [Runs and schedules](Runs-and-schedules.md) | Start a run, schedule a flow, start a flow from a webhook, and resume a run. Read Home, Flow health, and Spend. |
+| [Gates and the inbox](Gates-and-the-inbox.md) | Answer what waits for you, and choose when your phone tells you. |
+| [Knowledge](Knowledge.md) | Give your agents notes, web pages, and documents to read. |
+| [Community flows](Community-flows.md) | Import a flow that another person made, or share yours. |
+| [Ideas](Ideas.md) | Find a flow that nobody has built yet. |
+| [Phone app](Phone-app.md) | Answer Gates and follow your runs from your phone. |
+| [Troubleshooting](Troubleshooting.md) | Find what a message means, and how to fix it. |
+
+## Reference
 
 | Page | What is in it |
 | --- | --- |
-| [Get started](Get-started.md) | Install the desktop app, the Docker image, or a clone. Set up an agent, add a project, and run a starter flow. |
-| [Flows and nodes](Flows-and-nodes.md) | Outcomes, cascades, deciders, every node type, templates, Sections, kits, and starter flows. |
-| [Community flows](Community-flows.md) | Flows that people share: what each one needs, how to import one, and how to share yours. |
-| [Ideas](Ideas.md) | Flows that nobody has built yet. Build one and share it. |
-| [Agents and profiles](Agents-and-profiles.md) | The agents that Night Shift runs, profiles, backups, CLI tools, and connections. |
-| [Runs and schedules](Runs-and-schedules.md) | Start a run, schedule a flow, start a flow from a webhook, and resume a run. |
-| [Gates and the inbox](Gates-and-the-inbox.md) | What a Gate is for, who answers it, Asks, and deadlines. |
-| [Knowledge](Knowledge.md) | The files that agents read besides the project files, and how to fill them. |
-| [Computers and Hosts](Computers-and-Hosts.md) | Pair your computers with a Host. Spaces, Offers, and secrets. |
-| [Phone app](Phone-app.md) | Follow your runs and answer Gates from your phone. |
+| [Flows and nodes](Flows-and-nodes.md) | Every node type, templates, data shapes, the editor, kits, and the starter flows. |
+| [Agents and profiles](Agents-and-profiles.md) | The agents that Night Shift runs, profiles, CLI tools, and connections. |
+| [Computers and Hosts](Computers-and-Hosts.md) | Join your computers with a Host. Spaces, Offers, and secrets. |
 | [Terminal and MCP](Terminal-and-MCP.md) | The `nightshift` command, and the MCP tools for an agent in a terminal. |
-| [Troubleshooting](Troubleshooting.md) | What a message means, and how to fix it. |
 
 ## Before you start
 
