@@ -42,8 +42,8 @@ describe("the peer protocol", () => {
 		// before the `spaceSecrets` group (ADR 18), 48 before
 		// `sync.addWithoutFolder` (ADR 22), 49 before `sync.startTest`
 		// (ADR 27), 50 before `devices.stop` (a stop that waits for the
-		// Device's cleanup) and 51 before `sync.answerCosts`, which an older
-		// Host lacks.
-		expect(served).toBe(52);
+		// Device's cleanup), 51 before `sync.answerCosts` and 52 before
+		// `sync.pending`, which an older Host lacks.
+		expect(served).toBe(53);
 	});
 });
