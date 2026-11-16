@@ -111,6 +111,59 @@ describe("the size of the knowledge documents", () => {
 	});
 });
 
+describe("the page reader (ADR 39)", () => {
+	test("is the project's setting, for every Device of the Space, and a step gets it", async () => {
+		const host = memoryHost();
+		const a = await device(host);
+		const b = await device(host);
+		expect((await a.knowledge.listing("p1")).reader).toEqual({
+			kind: "nightshift",
+		});
+		const chosen = {
+			kind: "firecrawl",
+			address: "https://crawl.example.com",
+			secret: "CRAWL_KEY",
+		} as const;
+		expect(await a.knowledge.setReader("p1", chosen)).toEqual(chosen);
+		applyUpdate(
+			(await b.persisted("p1")).doc,
+			encodeStateAsUpdate((await a.persisted("p1")).doc),
+		);
+		expect((await b.knowledge.listing("p1")).reader).toEqual(chosen);
+		await expect(
+			a.knowledge.setReader("p1", {
+				kind: "jina",
+				address: "ftp://reader.example.com",
+			}),
+		).rejects.toThrow();
+
+		// A Command step gets the reader on this computer, with the step's own token.
+		const asked: string[] = [];
+		const step = await a.knowledge.forCommand("p1", {
+			secret: async (name) => {
+				asked.push(name);
+				return undefined;
+			},
+		});
+		expect(step.env.NS_READER_URL).toMatch(
+			/^http:\/\/127\.0\.0\.1:\d+\/reader\/[\w-]+$/,
+		);
+		expect(step.env.NS_READER_TOKEN).toMatch(/^[0-9a-f]{48}$/);
+		expect(asked).toEqual(["CRAWL_KEY"]);
+		await step.done();
+		const ended = await fetch(`${step.env.NS_READER_URL}/read?url=x`, {
+			headers: { authorization: `Bearer ${step.env.NS_READER_TOKEN}` },
+		});
+		expect(ended.status).toBe(410);
+
+		// Back to Night Shift's own: the document holds no value for it.
+		await a.knowledge.setReader("p1", { kind: "nightshift" });
+		expect((await a.persisted("p1")).doc.getMap("settings").has("reader")).toBe(
+			false,
+		);
+	});
+});
+
 describe("a step's knowledge", () => {
 	// `bun --hot` makes a new Knowledge beside a step that goes on: the daemon
 	// keeps one `KnowledgeFolderLocks` across the reload.
