@@ -263,6 +263,7 @@ Do:
 - `kit:github/publish-draft-pr` (title*, body, base) → number, url, created, branch, base: Pushes the current branch to GitHub and opens a draft pull request for it.
 - `kit:jira/assign` (key*, assignee, tool): Assigns a Jira work item to a person, or to you.
 - `kit:jira/move` (key*, status*, tool): Moves a Jira work item to another status, for example In Progress.
+- `kit:knowledge/agent` (what*, folder) → files: An agent fetches what you describe with its own tools, as markdown.
 - `kit:knowledge/confluence` (site*, email*, pages*, folder) → files: Copies Confluence pages into the project's knowledge as markdown, one file each.
 - `kit:knowledge/files` (from*, folder) → files: Copies files of the project into its knowledge, also files that git ignores, such as private notes.
 - `kit:knowledge/folder` (path*, patterns, folder) → files: Copies a folder of this computer into the project's knowledge, such as notes outside the project.

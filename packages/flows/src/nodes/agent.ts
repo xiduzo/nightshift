@@ -372,8 +372,10 @@ export const agentOutputFields = [
 
 /**
  * An Agent node needs a prompt or a skill, and a profile or its own
- * harness, model and permission mode. Its own outcomes follow the outcome
- * rules (`checkOptions`), and its output schema describes an object.
+ * harness, model and permission mode. A node that names none of the four
+ * runs on the agent of its computer (`namesNoAgent`): a kit cannot name a
+ * profile. Its own outcomes follow the outcome rules (`checkOptions`), and
+ * its output schema describes an object.
  */
 export function checkAgentNode(node: AgentNode, check: NodeCheck): void {
 	if (node.prompt.trim() === "" && node.skill === undefined) {
@@ -386,7 +388,11 @@ export function checkAgentNode(node: AgentNode, check: NodeCheck): void {
 			`Agent node "${node.id}" has a check, but no cascade. Only a cascade runs a check after each try. Add a cascade, or remove the check.`,
 		);
 	}
-	if (node.profile === undefined && node.cascade === undefined) {
+	if (
+		node.profile === undefined &&
+		node.cascade === undefined &&
+		!namesNoAgent(node)
+	) {
 		const unset = [
 			node.harness === undefined ? "harness" : null,
 			node.model === undefined ? "model" : null,
@@ -510,6 +516,22 @@ function checkAgentCascade(node: AgentNode, check: NodeCheck): void {
 			);
 		}
 	});
+}
+
+/**
+ * Whether an Agent node names no agent at all: no profile, harness, model,
+ * permission mode or cascade. The run gives it the first Agent Profile of
+ * the computer it runs on, as a kit's Agent node needs: a kit cannot name a
+ * profile of anyone's computer.
+ */
+export function namesNoAgent(node: AgentNode): boolean {
+	return (
+		node.profile === undefined &&
+		node.harness === undefined &&
+		node.model === undefined &&
+		node.permissionMode === undefined &&
+		node.cascade === undefined
+	);
 }
 
 /** The model a new Agent node runs when Settings → New nodes names none. */

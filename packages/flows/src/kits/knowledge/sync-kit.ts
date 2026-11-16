@@ -7,7 +7,9 @@ import { KNOWLEDGE_OWN_FOLDERS, KNOWLEDGE_OWN_FOLDERS_WORDS } from "./layout";
  * `defineSyncKit`. Its implementation holds what every sync does the same:
  * find its folder, check its programs, count its files, end as synced or
  * not. Each command holds its own copy of this shell, so a kit copied into
- * a project reads on its own.
+ * a project reads on its own. A source an agent fills (`agent`) has one
+ * Agent node instead of the command: it fetches with its own tools and
+ * reports its count of files the same way.
  */
 
 /**
@@ -51,8 +53,36 @@ type SyncStop = {
 	message: string;
 };
 
+/**
+ * How a source fills its folder: a shell script with what it reports and
+ * where it stops, or the prompt of an agent that fetches with the tools it
+ * has. The agent's prompt may name the inputs and the folder (`{{folder}}`).
+ */
+type SyncStep =
+	| {
+			/** The shell between finding `dest` and counting its files. */
+			script: string;
+			/** The secrets the script reads. */
+			secrets?: readonly string[];
+			/** More strings for the step's data, by name, each from a shell value: `"$skipped"`. */
+			data?: Readonly<Record<string, string>>;
+			stops?: readonly SyncStop[];
+			agent?: never;
+	  }
+	| {
+			/** The prompt of the agent that fills the folder. */
+			agent: string;
+			script?: never;
+			secrets?: never;
+			data?: never;
+			stops?: never;
+	  };
+
+/** How often a new source of a kind keeps itself up to date, unless the person picks "Only now". */
+type SourceEvery = "day" | "week";
+
 /** One Knowledge source, whole. `main` and `lines` can name only its inputs. */
-type SyncSource<Name extends string, Input extends string> = {
+type SyncSource<Name extends string, Input extends string> = SyncStep & {
 	/** The kit's name after `kit:knowledge/`. */
 	name: Name;
 	/** What it fills the knowledge from, for a person: "Web pages". */
@@ -86,12 +116,8 @@ type SyncSource<Name extends string, Input extends string> = {
 	folder: string;
 	/** The label of the step that syncs. */
 	stepLabel: string;
-	/** The secrets the script reads. */
-	secrets?: readonly string[];
-	/** The shell between finding `dest` and counting its files. */
-	script: string;
-	/** More strings for the step's data, by name, each from a shell value: `"$skipped"`. */
-	data?: Readonly<Record<string, string>>;
+	/** How often a new source of this kind syncs on its own. Unset: the person picks. */
+	every?: SourceEvery;
 	messages: {
 		/** Starts the message of a sync, before its file count. */
 		synced: string;
@@ -100,7 +126,6 @@ type SyncSource<Name extends string, Input extends string> = {
 		/** The message of a sync that failed. */
 		notSynced: string;
 	};
-	stops?: readonly SyncStop[];
 };
 
 /** One kind of source, as the page shows it and a new flow is named. */
@@ -118,6 +143,10 @@ export type SourceKind<Kit extends string> = {
 	needsFolder: boolean;
 	/** The programs to name when they are missing. */
 	programs: readonly string[];
+	/** How often a new source of this kind syncs on its own. Null: the person picks. */
+	every: SourceEvery | null;
+	/** An agent fills it with its own tools, not a script. */
+	byAgent: boolean;
 };
 
 /** What a declaration yields: the kit under its name, and its kind. */
@@ -136,6 +165,67 @@ function reportFiles(data: Readonly<Record<string, string>>): string {
 printf '{"files": %s${format}}' "$files"${values} > "$NS_OUTPUT"`;
 }
 
+/**
+ * What an agent that fills a source reports: how many files its folder
+ * holds, as a sync command does, and what it could not reach.
+ */
+const AGENT_SYNC_OUTPUT = {
+	type: "object",
+	properties: {
+		files: {
+			type: "integer",
+			description: "How many files the folder holds now.",
+		},
+		missed: {
+			type: "string",
+			description:
+				"What you could not reach, and why. Empty when you reached everything.",
+		},
+	},
+	required: ["files", "missed"],
+};
+
+/** The step that syncs: the command with the shell every sync shares, or the agent. */
+function syncNode<Name extends string, Input extends string>(
+	source: SyncSource<Name, Input>,
+) {
+	const base = {
+		id: "sync",
+		label: source.stepLabel,
+		position: { x: 0, y: 0 },
+	};
+	if (source.agent !== undefined) {
+		return {
+			...base,
+			type: "agent" as const,
+			prompt: source.agent,
+			knowledge: true,
+			output: AGENT_SYNC_OUTPUT,
+		};
+	}
+	const stops = source.stops ?? [];
+	return {
+		...base,
+		type: "command" as const,
+		...(source.secrets ? { secrets: [...source.secrets] } : {}),
+		command: [
+			KNOWLEDGE_DEST,
+			...source.programs.flatMap(programCheck),
+			source.script,
+			reportFiles(source.data ?? {}),
+		].join("\n"),
+		exits: [
+			{ name: "synced", code: 0, color: "green" as const },
+			...stops.map((stop) => ({
+				name: stop.outcome,
+				code: stop.code,
+				color: "orange" as const,
+			})),
+			{ name: "fail", color: "red" as const },
+		],
+	};
+}
+
 /** The line that stops a script when this computer has no `name`. */
 function programCheck({ name, why }: SourceProgram): string[] {
 	if (why === undefined) return [];
@@ -151,6 +241,7 @@ export function defineSyncKit<
 >(source: SyncSource<Name, Input>): SyncKit<Name> {
 	const kit = `kit:knowledge/${source.name}` as const;
 	const stops = source.stops ?? [];
+	const byAgent = source.agent !== undefined;
 	const { synced, syncedMore = "", notSynced } = source.messages;
 	return {
 		kit,
@@ -167,6 +258,8 @@ export function defineSyncKit<
 			local: source.local ?? false,
 			needsFolder: source.needsFolder ?? false,
 			programs: source.programs.map((program) => program.name),
+			every: source.every ?? null,
+			byAgent,
 		},
 		flow: {
 			version: 9,
@@ -190,28 +283,7 @@ export function defineSyncKit<
 				},
 			],
 			nodes: [
-				{
-					id: "sync",
-					type: "command",
-					label: source.stepLabel,
-					position: { x: 0, y: 0 },
-					...(source.secrets ? { secrets: [...source.secrets] } : {}),
-					command: [
-						KNOWLEDGE_DEST,
-						...source.programs.flatMap(programCheck),
-						source.script,
-						reportFiles(source.data ?? {}),
-					].join("\n"),
-					exits: [
-						{ name: "synced", code: 0, color: "green" },
-						...stops.map((stop) => ({
-							name: stop.outcome,
-							code: stop.code,
-							color: "orange" as const,
-						})),
-						{ name: "fail", color: "red" },
-					],
-				},
+				syncNode(source),
 				{
 					id: "synced",
 					type: "end",
@@ -235,8 +307,24 @@ export function defineSyncKit<
 				})),
 			],
 			edges: [
-				{ id: "sync-synced", from: "sync", outcome: "synced", to: "synced" },
+				{
+					id: "sync-synced",
+					from: "sync",
+					// An agent ends `pass` where a command exits 0.
+					outcome: byAgent ? "pass" : "synced",
+					to: "synced",
+				},
 				{ id: "sync-fail", from: "sync", outcome: "fail", to: "not_synced" },
+				...(byAgent
+					? [
+							{
+								id: "sync-needs-input",
+								from: "sync",
+								outcome: "needs-input",
+								to: "not_synced",
+							},
+						]
+					: []),
 				...stops.map((stop) => ({
 					id: `sync-${stop.outcome}`,
 					from: "sync",

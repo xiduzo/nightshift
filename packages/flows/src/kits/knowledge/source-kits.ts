@@ -28,6 +28,19 @@ const WORK_ITEM_MARKDOWN = String.raw`def adf: if type == "string" then . elif t
  */
 const PAGE_MARKDOWN = String.raw`"# \(.title)\n\n" + ((.body.storage.value // "") | gsub("<h[1-6][^>]*>"; "\n## ") | gsub("<li[^>]*>"; "- ") | gsub("</(p|h[1-6]|li|tr|div|ul|ol|table|pre)>|<br ?/?>"; "\n") | gsub("<[^>]+>"; "") | gsub("&nbsp;"; " ") | gsub("&lt;"; "<") | gsub("&gt;"; ">") | gsub("&quot;"; "\"") | gsub("&amp;"; "&"))`;
 
+/**
+ * What the agent of `kit:knowledge/agent` is asked: fetch what the person
+ * described with the tools it has, into its folder only, replacing what it
+ * fetched before, and say what it could not reach.
+ */
+const AGENT_PROMPT = `Fetch this into the project's knowledge: {{what}}
+
+Use the tools you have to find it and read it. Save it as Markdown files (.md) in the folder "{{folder}}" inside the knowledge folder: one file for each document, page or transcript. Start each file with its title and the address it came from.
+
+Replace what you saved there before: remove the files of an earlier fetch that you do not save again. Write nothing outside that folder. Do not save passwords, keys or other secrets.
+
+Report in data: "files", how many files the folder holds now, and "missed", what you could not reach and why (empty when you reached everything). End with fail when you could reach nothing.`;
+
 /** The kits of the sources, in the order the page offers them. */
 export const KNOWLEDGE_SYNC_KITS = [
 	/**
@@ -454,6 +467,42 @@ done`,
 		messages: {
 			synced: "Pages synced",
 			notSynced: "Could not sync the pages",
+		},
+	}),
+
+	/**
+	 * What a person describes, fetched by an agent with the tools it has:
+	 * text somewhere no other source reads, a page behind a sign-in, the
+	 * transcript of a video. One Agent node, on the agent of the computer
+	 * that runs it. It replaces what it fetched before.
+	 */
+	defineSyncKit({
+		name: "agent",
+		label: "An agent",
+		blurb: "Describe what to fetch. An agent finds it with its own tools.",
+		flowName: "knowledge-agent",
+		main: "what",
+		lines: [],
+		programs: [],
+		description:
+			"An agent fetches what you describe with its own tools, as markdown. It replaces what it saved before, and says what it could not reach.",
+		inputs: [
+			{
+				name: "what",
+				label: "What to fetch",
+				type: "text",
+				description:
+					"What to fetch and where it is, for example the meeting notes in our shared drive.",
+				required: true,
+			},
+		],
+		folder: "agent",
+		stepLabel: "Fetch it",
+		every: "week",
+		agent: AGENT_PROMPT,
+		messages: {
+			synced: "Fetched",
+			notSynced: "Could not fetch it",
 		},
 	}),
 ];

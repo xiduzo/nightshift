@@ -126,8 +126,8 @@ describe("flowAuthoringGuide", () => {
 		// under their families, as the add-node dialog lists them. 5105:
 		// a name inside a filter reads each item (`$$.vars.limit`), and
 		// `cascade` with the names not to use. 5135: the git knowledge kit
-		// (one line).
-		expect(words).toBeLessThan(5135);
+		// (one line). 5155: the agent knowledge kit (one line).
+		expect(words).toBeLessThan(5155);
 	});
 });
 

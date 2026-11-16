@@ -27,6 +27,7 @@ export {
 	loginSchema,
 	type McpServer,
 	mcpServerSchema,
+	namesNoAgent,
 	permissionModeSchema,
 } from "./agent";
 export {

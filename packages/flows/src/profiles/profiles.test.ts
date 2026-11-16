@@ -180,10 +180,17 @@ describe("validateFlow and profiles", () => {
 	});
 
 	test("a node without a profile needs a harness, a model and a permission mode", () => {
-		const issues = validateFlow(flowOf(node({ profile: undefined })));
-		expect(issues.map((i) => i.message)).toContain(
-			'Agent node "work" needs a profile, or its own harness, model and permission mode.',
+		const issues = validateFlow(
+			flowOf(node({ profile: undefined, harness: "claude-code" })),
 		);
+		expect(issues.map((i) => i.message)).toContain(
+			'Agent node "work" needs a profile, or its own model and permission mode.',
+		);
+	});
+
+	test("a node that names no agent at all runs on its computer's agent", () => {
+		const issues = validateFlow(flowOf(node({ profile: undefined })));
+		expect(issues.filter((i) => i.severity === "error")).toEqual([]);
 	});
 });
 

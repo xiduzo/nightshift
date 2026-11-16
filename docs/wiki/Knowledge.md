@@ -103,6 +103,7 @@ Each source is a flow that runs a kit. You can run the same kits from your own f
 <!-- generated:knowledge-kits: bun run docs:reference writes this table from the code. Do not edit it here. -->
 | Kit | Family | Does | Inputs |
 | --- | --- | --- | --- |
+| `kit:knowledge/agent` | Do | An agent fetches what you describe with its own tools, as markdown. It replaces what it saved before, and says what it could not reach. | `what`, `folder` |
 | `kit:knowledge/confluence` | Do | Copies Confluence pages into the project's knowledge as markdown, one file each. Save an Atlassian API token as the secret CONFLUENCE_API_TOKEN. Needs jq. | `site`, `email`, `pages`, `folder` |
 | `kit:knowledge/files` | Do | Copies files of the project into its knowledge, also files that git ignores, such as private notes. It replaces what the folder had. | `from`, `folder` |
 | `kit:knowledge/folder` | Do | Copies a folder of this computer into the project's knowledge, such as notes outside the project. It replaces what the folder had. | `path`, `patterns`, `folder` |

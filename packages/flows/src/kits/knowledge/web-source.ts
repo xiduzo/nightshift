@@ -336,6 +336,7 @@ export const WEB_SOURCE = defineSyncKit({
 	label: "Web pages",
 	blurb: "Any public page as text, and the pages it links to.",
 	flowName: "knowledge-web-pages",
+	every: "week",
 	main: "urls",
 	lines: ["urls", "scope"],
 	switches: { follow: ["scope", "limit", "depth"] },

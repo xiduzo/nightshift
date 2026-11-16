@@ -28,6 +28,7 @@ describe("the list of sources", () => {
 			"Git repository",
 			"Jira",
 			"Confluence",
+			"An agent",
 		]);
 	});
 

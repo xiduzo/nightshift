@@ -378,6 +378,7 @@ export {
 	type NodeFamily,
 	type NodeProfile,
 	nameSchema,
+	namesNoAgent,
 	nodeIdSchema,
 	type Option,
 	type OutcomeColor,

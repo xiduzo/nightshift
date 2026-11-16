@@ -41,6 +41,7 @@ describe("kits", () => {
 			"kit:github/watch-pr",
 			"kit:jira/assign",
 			"kit:jira/move",
+			"kit:knowledge/agent",
 			"kit:knowledge/confluence",
 			"kit:knowledge/files",
 			"kit:knowledge/folder",

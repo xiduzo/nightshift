@@ -43,6 +43,8 @@ describe("defineSyncKit", () => {
 			local: false,
 			needsFolder: false,
 			programs: ["curl", "jq"],
+			every: null,
+			byAgent: false,
 		});
 		const parsed = flowSchema.parse(flow);
 		expect(parsed.inputs.map((input) => input.name)).toEqual([
@@ -54,6 +56,34 @@ describe("defineSyncKit", () => {
 			"sync",
 			"synced",
 			"not_synced",
+		]);
+	});
+
+	test("a source an agent fills has one Agent node with the knowledge, which reports its files as a command does", () => {
+		const { script: _script, programs: _programs, ...rest } = source;
+		const { kind, flow } = defineSyncKit({
+			...rest,
+			programs: [],
+			every: "week",
+			agent: "Fetch {{from}} into {{folder}}.",
+		});
+		expect(kind).toMatchObject({ byAgent: true, every: "week", programs: [] });
+		const parsed = flowSchema.parse(flow);
+		const sync = parsed.nodes.find((node) => node.id === "sync");
+		expect(sync).toMatchObject({
+			type: "agent",
+			label: "Copy the notes",
+			prompt: "Fetch {{from}} into {{folder}}.",
+			knowledge: true,
+			output: { required: ["files", "missed"] },
+		});
+		expect(sync).not.toHaveProperty("profile");
+		expect(sync).not.toHaveProperty("harness");
+		expect(parsed.outputs[0]?.value).toBe("{{sync.data.files}}");
+		expect(parsed.edges.map(({ outcome, to }) => [outcome, to])).toEqual([
+			["pass", "synced"],
+			["fail", "not_synced"],
+			["needs-input", "not_synced"],
 		]);
 	});
 
