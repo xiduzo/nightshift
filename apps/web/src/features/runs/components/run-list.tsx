@@ -1,4 +1,4 @@
-import { isTestRun, walkerName } from "@nightshift/client";
+import { isTestRun, lastActivityAt, walkerName } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Empty,
@@ -42,10 +42,11 @@ import { RunStatusIcon } from "./run-status-badge";
 import { TestRunBadge } from "./test-run-badge";
 
 /**
- * Runs as a table, newest first. Each row: a status icon, the title (a link
- * to the run) and its outcome under it; icons for the trigger, the device,
- * the cost and the branch, with how long ago it started under them, or the
- * time with `clockTimes`, and how long an ended run took. What every run shares (one project) does not repeat
+ * Runs as a table: the run that last did something comes first. Each row:
+ * a status icon, the title (a link to the run) and its outcome under it;
+ * icons for the trigger, the device, the cost and the branch, with how long
+ * ago it last did something under them, or the time with `clockTimes`, and
+ * how long an ended run took. What every run shares (one project) does not repeat
  * on each row. Narrow screens drop the icons. With `pageSize`, the runs show
  * in pages. With `more`, a button under the list loads the next runs.
  */
@@ -70,7 +71,7 @@ export function RunList({
 	pageSize?: number;
 	/** There are more runs than the list holds: load them. */
 	more?: { load: () => void; loading: boolean };
-	/** Show when each run started ("10:37 PM"), for the runs of one day. */
+	/** Show when each run last did something as a time ("10:37 PM"), for the runs of one day. */
 	clockTimes?: boolean;
 }) {
 	if (isLoading) {
@@ -110,7 +111,7 @@ export function RunList({
 				columns={runColumns(projectNames, clockTimes)}
 				data={runs}
 				getRowId={(run) => run.id}
-				initialSorting={[{ id: "started", desc: true }]}
+				initialSorting={[{ id: "activity", desc: true }]}
 				rowClassName={() => "relative"}
 				pageSize={pageSize}
 			/>
@@ -135,7 +136,7 @@ const column = dataTableColumns<RunSummary>();
 
 /**
  * The columns of a run list; with `projectNames`, each title names its
- * project. With `clockTimes`, a run's start shows as a time of day.
+ * project. With `clockTimes`, a run's last activity shows as a time of day.
  */
 function runColumns(
 	projectNames: Map<string, string> | undefined,
@@ -157,15 +158,15 @@ function runColumns(
 				cellClassName: "w-full max-w-0 py-2.5 pl-6",
 			},
 		}),
-		// Sorted by, never sortable: the newest run stays on top.
-		column.accessor("createdAt", {
-			id: "started",
+		// Sorted by, never sortable: the run that last did something stays on top.
+		column.accessor(lastActivityAt, {
+			id: "activity",
 			header: () => <span className="sr-only">Details</span>,
 			cell: ({ row }) => (
 				<>
 					<RunFacts run={row.original} />
 					<p className="mt-0.5 text-right text-xs whitespace-nowrap text-muted-foreground">
-						<Started at={row.original.createdAt} clock={clockTimes} />
+						<LastActive run={row.original} clock={clockTimes} />
 						<Took run={row.original} />
 					</p>
 				</>
@@ -347,7 +348,9 @@ function Fact({
 	);
 }
 
-function Started({ at, clock }: { at: number; clock: boolean }) {
+/** When the run last did something: how long ago, or the time of day with `clock`. */
+function LastActive({ run, clock }: { run: RunSummary; clock: boolean }) {
+	const at = lastActivityAt(run);
 	return (
 		<LocalTime at={at}>{clock ? formatTime(at) : formatRelative(at)}</LocalTime>
 	);

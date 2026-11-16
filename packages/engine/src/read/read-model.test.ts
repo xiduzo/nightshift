@@ -296,6 +296,81 @@ describe("the read model", () => {
 		expect(ids(running)).toEqual(["r1"]);
 	});
 
+	test("a run list by activity puts the run that last did something first", async () => {
+		// r1 started first, and its log has the only event. The others have
+		// no event yet: their start stands in.
+		await sandbox.db
+			.update(run)
+			.set({ createdAt: asDate(1_000) })
+			.where(eq(run.id, "r1"));
+		for (const id of ["r2", "r3", "r4"]) {
+			await sandbox.db.insert(run).values({
+				id,
+				spaceId: sandbox.spaceId,
+				projectId: "p",
+				flow: "{}",
+				title: id,
+				worktreePath: "/w",
+				branch: "b",
+				baseRef: "main",
+				walkerId: sandbox.deviceId,
+				createdAt: asDate(id === "r4" ? 3_000 : 2_000),
+			});
+		}
+		const ids = (runs: { id: string }[]) => runs.map((r) => r.id);
+		const byActivity = { order: "activity" } as const;
+		const all = await reads.listRuns(sandbox.spaceId, undefined, byActivity);
+		expect(ids(all)).toEqual(["r1", "r4", "r3", "r2"]);
+		expect(all[0]?.lastActivityAt).toBeGreaterThan(3_000);
+		expect(all.slice(1).map((r) => r.lastActivityAt)).toEqual([
+			3_000, 2_000, 2_000,
+		]);
+
+		const first = await reads.listRuns(sandbox.spaceId, undefined, {
+			...byActivity,
+			limit: 2,
+		});
+		expect(ids(first)).toEqual(["r1", "r4"]);
+		const last = first.at(-1);
+		if (!last) throw new Error("No page.");
+		const second = await reads.listRuns(sandbox.spaceId, "p", {
+			...byActivity,
+			limit: 2,
+			cursor: {
+				createdAt: last.createdAt,
+				id: last.id,
+				lastActivityAt: last.lastActivityAt,
+			},
+		});
+		expect(ids(second)).toEqual(["r3", "r2"]);
+
+		// Feedback is no work of the run: a rating leaves it where it is.
+		await log.append({
+			type: "Scored",
+			runId: "r2",
+			payload: { score: "useful", value: 1, label: null },
+		});
+		const rated = await reads.listRuns(sandbox.spaceId, undefined, byActivity);
+		expect(ids(rated)).toEqual(["r1", "r4", "r3", "r2"]);
+		expect(rated[3]?.lastActivityAt).toBe(2_000);
+
+		// The run does something: it goes to the top.
+		await log.append({
+			type: "RunStarted",
+			runId: "r2",
+			payload: { projectId: "p", flowName: "f", title: "t", start: "a" },
+		});
+		const moved = await reads.listRuns(sandbox.spaceId, undefined, byActivity);
+		expect(ids(moved)[0]).toBe("r2");
+		// By start, nothing moved.
+		expect(ids(await reads.listRuns(sandbox.spaceId))).toEqual([
+			"r4",
+			"r3",
+			"r2",
+			"r1",
+		]);
+	});
+
 	test("each project's runs come counted by status, with the newest run", async () => {
 		await sandbox.db
 			.insert(project)

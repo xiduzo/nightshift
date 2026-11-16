@@ -58,7 +58,7 @@ export {
 	stepState,
 } from "./progress";
 export { projectPath } from "./project-path";
-export { createRunQueries } from "./queries";
+export { createRunQueries, lastActivityAt } from "./queries";
 export { runReport } from "./report";
 export { type RerunStart, rerunStarts, runningStep } from "./retry";
 export {

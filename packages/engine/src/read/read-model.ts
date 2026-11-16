@@ -1,11 +1,11 @@
 import { shellQuote } from "@nightshift/agents/harness-facts";
 import type { AgentHarness, AgentHarnessName } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
-import { project, run } from "@nightshift/db/schema";
+import { event, project, run } from "@nightshift/db/schema";
 import { type Flow, flowSchema, migrateFlow } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { asDate, instant, lastDays, now } from "@nightshift/time";
-import { and, desc, eq, gte, isNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lt, or, sql } from "drizzle-orm";
 import { stepSources } from "../knowledge";
 import {
 	type CostTally,
@@ -141,6 +141,15 @@ export function parseCalledFlows(row: RunRow): Record<string, Flow> {
 }
 
 /**
+ * When a run last did something, as SQL: the time of the latest event of
+ * its log that is not feedback (`Scored`), else its start. The same
+ * moment as `RunState.lastAt`, so the order of a list agrees with the
+ * `lastActivityAt` of its summaries. The index on the event's run reads
+ * the latest row first: one row per run.
+ */
+const LAST_ACTIVITY = sql<number>`coalesce((select ${event.at} from ${event} where ${event.runId} = ${run.id} and ${event.type} <> 'Scored' order by ${event.seq} desc limit 1), ${run.createdAt})`;
+
+/**
  * What a run summary reads from the run state. The run log keeps it per
  * run until the next append.
  */
@@ -163,6 +172,8 @@ export function runFacts(run: RunState) {
 		inputs: deriveInputs(run),
 		stopAt: run.stopAt,
 		stopAfterStep: open && run.stopAfterStep,
+		/** When the run last did something. Null for an empty log: the summary has its start. */
+		lastAt: run.lastAt,
 		...costFields(cost),
 		warnings: runWarnings(run),
 		endedAt,
@@ -282,7 +293,7 @@ export function toSummary(
 	walker: RunWalker,
 	device: RunDevice = walker,
 ): RunSummary {
-	const { calls, waitReason: _, worktree, ...rest } = facts;
+	const { calls, waitReason: _, worktree, lastAt, ...rest } = facts;
 	const where = worktree ?? row;
 	return {
 		id: row.id,
@@ -298,6 +309,7 @@ export function toSummary(
 		...rest,
 		subflows: subflowRuns(row, calls, facts.status),
 		createdAt: instant(row.createdAt),
+		lastActivityAt: lastAt ?? instant(row.createdAt),
 	};
 }
 
@@ -659,6 +671,19 @@ export function createReadModel(deps: ReadModelDeps) {
 		const { cursor, statuses } = page;
 		// A status is the log's, not a column's: those pages are cut after the facts.
 		const limit = statuses ? undefined : page.limit;
+		const byActivity = page.order === "activity";
+		const after = !cursor
+			? undefined
+			: byActivity
+				? // A cursor of an older client names no activity: its start stands in.
+					sql`(${LAST_ACTIVITY}, ${run.id}) < (${cursor.lastActivityAt ?? cursor.createdAt}, ${cursor.id})`
+				: or(
+						lt(run.createdAt, asDate(cursor.createdAt)),
+						and(
+							eq(run.createdAt, asDate(cursor.createdAt)),
+							lt(run.id, cursor.id),
+						),
+					);
 		const query = db
 			.select()
 			.from(run)
@@ -666,18 +691,10 @@ export function createReadModel(deps: ReadModelDeps) {
 				and(
 					eq(run.spaceId, spaceId),
 					projectId ? eq(run.projectId, projectId) : undefined,
-					cursor
-						? or(
-								lt(run.createdAt, asDate(cursor.createdAt)),
-								and(
-									eq(run.createdAt, asDate(cursor.createdAt)),
-									lt(run.id, cursor.id),
-								),
-							)
-						: undefined,
+					after,
 				),
 			)
-			.orderBy(desc(run.createdAt), desc(run.id));
+			.orderBy(desc(byActivity ? LAST_ACTIVITY : run.createdAt), desc(run.id));
 		const read = await (limit === undefined ? query : query.limit(limit));
 		const facts = await log.derive(
 			read.map((r) => r.id),

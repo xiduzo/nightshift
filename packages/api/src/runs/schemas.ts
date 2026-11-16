@@ -238,6 +238,8 @@ export const runSummarySchema = exact<RunSummary>()(
 		stopAt: z.number().nullable(),
 		stopAfterStep: z.boolean(),
 		createdAt: z.number(),
+		/** Absent from a Host of a version before it. */
+		lastActivityAt: z.number().optional(),
 		endedAt: z.number().nullable(),
 		...costFields,
 		warnings: z.array(

@@ -47,9 +47,11 @@ export const runs = {
 			context.space.listPlacements(input.projectId),
 		),
 	/**
-	 * Newest first. With `limit`, one page: the next page starts after the
-	 * last run of this one (`cursor`). Without it, every run, as older
-	 * screens ask. Older Hosts send every run whatever the input.
+	 * Newest first: by start, or with `order: "activity"` by when each run
+	 * last did something. With `limit`, one page: the next page starts
+	 * after the last run of this one (`cursor`). Without it, every run, as
+	 * older screens ask. Older Hosts send every run whatever the input, and
+	 * a Host from before `order` sends them by start.
 	 */
 	list: protectedProcedure
 		.route({
@@ -65,10 +67,17 @@ export const runs = {
 					limit: z.number().int().min(1).max(RUNS_PAGE_MAX).optional(),
 					/** The last run of the page before: the runs after it follow. */
 					cursor: z
-						.object({ createdAt: z.number(), id: z.string() })
+						.object({
+							createdAt: z.number(),
+							id: z.string(),
+							/** Places the run in the order `activity`. */
+							lastActivityAt: z.number().optional(),
+						})
 						.optional(),
 					/** Only runs with one of these statuses. */
 					statuses: z.array(runStatusSchema).min(1).optional(),
+					/** By start (the default), or by when each run last did something. */
+					order: z.enum(["started", "activity"]).optional(),
 				})
 				.optional(),
 		)

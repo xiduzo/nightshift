@@ -234,6 +234,12 @@ export type RunSummary = {
 	/** Set when a person asked to stop after the running step. */
 	stopAfterStep: boolean;
 	createdAt: number;
+	/**
+	 * When the run last did something: its latest event that is not
+	 * feedback (a rating, the fate of its pull request). Absent from a Host
+	 * of a version before it, and on a summary a caller built by hand.
+	 */
+	lastActivityAt?: number;
 	/** When the run ended. Null while it is running, waiting or sleeping, or when it never ended. */
 	endedAt: number | null;
 	/** Sum over all steps. */
@@ -321,17 +327,31 @@ export type ProjectRuns = {
 	nextWakeAt: number | null;
 };
 
-/** Where a page of runs starts: after this run, in the order newest first. */
-export type RunCursor = { createdAt: number; id: string };
+/**
+ * Where a page of runs starts: after this run, in the order of the list.
+ * `lastActivityAt` places it in the order `activity`.
+ */
+export type RunCursor = {
+	createdAt: number;
+	id: string;
+	lastActivityAt?: number;
+};
+
+/**
+ * The order of a run list, newest first: by when each run started, or by
+ * when it last did something.
+ */
+type RunOrder = "started" | "activity";
 
 /**
  * A page of a run list: at most `limit` runs, after `cursor`, with one of
- * `statuses`. Without them, every run.
+ * `statuses`, in `order` (default `started`). Without them, every run.
  */
 export type RunPage = {
 	limit?: number;
 	cursor?: RunCursor;
 	statuses?: readonly RunStatus[];
+	order?: RunOrder;
 };
 
 /**

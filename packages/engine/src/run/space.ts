@@ -311,6 +311,7 @@ export function createSpaces(deps: SpacesDeps) {
 					...(input?.statuses !== undefined
 						? { statuses: input.statuses }
 						: {}),
+					...(input?.order !== undefined ? { order: input.order } : {}),
 				});
 				const shown = await deps.pathsFor(spaceId, actor);
 				return Promise.all(runs.map(shown));

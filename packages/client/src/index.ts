@@ -251,6 +251,7 @@ export {
 	isTestRun,
 	type KnownCost,
 	knownUseful,
+	lastActivityAt,
 	lastWorktreeChanges,
 	linesLabel,
 	markdownPreview,

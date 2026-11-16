@@ -12,7 +12,20 @@ import type { RunStatus, RunSummary } from "./types";
 const ARTIFACTS_POLL_MS = 15_000;
 
 /** Where the next page of a run list starts: after this run. */
-export type RunCursor = Pick<RunSummary, "createdAt" | "id">;
+export type RunCursor = Pick<RunSummary, "createdAt" | "id" | "lastActivityAt">;
+
+/** The order of a run list, newest first: by start, or by when each run last did something. */
+type RunOrder = "started" | "activity";
+
+/**
+ * When a run last did something. A Host from before it names none: the
+ * run's start stands in, which is the order that Host sends.
+ */
+export function lastActivityAt(
+	run: Pick<RunSummary, "createdAt" | "lastActivityAt">,
+): number {
+	return run.lastActivityAt ?? run.createdAt;
+}
 
 /**
  * The cursor of the page after `page`, or none when it was the last. An
@@ -23,19 +36,29 @@ export function nextRunCursor(
 	page: readonly RunCursor[],
 	pageSize: number,
 	cursor: RunCursor | undefined,
+	order: RunOrder = "started",
 ): RunCursor | undefined {
 	if (page.length !== pageSize) return undefined;
+	const at = (run: RunCursor) =>
+		order === "activity" ? lastActivityAt(run) : run.createdAt;
 	const first = page[0];
 	if (
 		cursor &&
 		first &&
-		(first.createdAt > cursor.createdAt ||
-			(first.createdAt === cursor.createdAt && first.id >= cursor.id))
+		(at(first) > at(cursor) ||
+			(at(first) === at(cursor) && first.id >= cursor.id))
 	) {
 		return undefined;
 	}
 	const last = page.at(-1);
-	return last ? { createdAt: last.createdAt, id: last.id } : undefined;
+	if (!last) return undefined;
+	return {
+		createdAt: last.createdAt,
+		id: last.id,
+		...(order === "activity" && last.lastActivityAt !== undefined
+			? { lastActivityAt: last.lastActivityAt }
+			: {}),
+	};
 }
 
 /**
@@ -111,10 +134,15 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 		/**
 		 * The runs of the Space (of one project, with one of `statuses`),
 		 * newest first, `pageSize` at a time: the next page loads when the
-		 * screen asks for more.
+		 * screen asks for more. With `order: "activity"`, the run that last
+		 * did something comes first.
 		 */
 		pages: (
-			filter: { projectId?: string; statuses?: RunStatus[] },
+			filter: {
+				projectId?: string;
+				statuses?: RunStatus[];
+				order?: RunOrder;
+			},
 			pageSize: number,
 		) =>
 			orpc.runs.list.infiniteOptions({
@@ -125,7 +153,7 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 				}),
 				initialPageParam: undefined as RunCursor | undefined,
 				getNextPageParam: (page, _pages, cursor) =>
-					nextRunCursor(page, pageSize, cursor),
+					nextRunCursor(page, pageSize, cursor, filter.order),
 				meta: { quietRefetchErrors: true },
 			}),
 		/**

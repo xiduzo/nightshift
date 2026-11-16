@@ -376,6 +376,12 @@ export type RunState = {
 	/** The seq of the latest event folded in. */
 	lastSeq: number;
 	/**
+	 * When the run last did something: the time of the latest event folded
+	 * in that is not feedback (`Scored`). A rating or the fate of a pull
+	 * request comes days later and is no work of the run. Null for an empty log.
+	 */
+	lastAt: number | null;
+	/**
 	 * The run's status. An end gives its status; a run with no run event is
 	 * `interrupted`; else `waiting` with a Gate open, `sleeping` in a wait,
 	 * `running` otherwise.
@@ -496,6 +502,7 @@ function emptyState(): Draft {
 	return {
 		runId: null,
 		lastSeq: Number.NEGATIVE_INFINITY,
+		lastAt: null,
 		status: "interrupted",
 		end: null,
 		gates: [],
@@ -691,6 +698,7 @@ function apply(
 	owned: WeakSet<readonly unknown[]> = new WeakSet(),
 ): void {
 	run.lastSeq = e.seq;
+	if (e.type !== "Scored") run.lastAt = e.at;
 	run.runId ??= e.runId;
 	switch (e.type) {
 		case "RunStarted":
