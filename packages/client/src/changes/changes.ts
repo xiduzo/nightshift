@@ -299,6 +299,7 @@ export const SAVES: {
 	"knowledge.markQuestion": ["knowledge"],
 	"knowledge.setMeaning": ["knowledge"],
 	"knowledge.setLearnsFromRuns": ["knowledge"],
+	"knowledge.setReader": ["knowledge"],
 	"knowledge.keepLearning": [],
 	"knowledge.deleteLearning": [],
 	"knowledge.settleNote": [],

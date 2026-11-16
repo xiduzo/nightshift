@@ -3,6 +3,7 @@ import {
 	flowNameSchema,
 	isTimeZone,
 	knowledgeSourceSchema,
+	pageReaderSettingSchema,
 } from "@nightshift/flows";
 import { z } from "zod";
 
@@ -28,6 +29,7 @@ import {
 	knowledgeSchema,
 	knowledgeTextSchema,
 	knowledgeUseSchema,
+	linkLookSchema,
 	listedLearningSchema,
 	reviewTaskSchema,
 } from "./schemas";
@@ -549,6 +551,46 @@ export const knowledge = {
 			await context.knowledge.setLearnsFromRuns(input.projectId, input.on);
 			return { on: input.on };
 		}),
+	/**
+	 * Chooses the page reader of the project, on every computer of its Space
+	 * (ADR 39): Night Shift's own, Jina Reader or Firecrawl, at its default
+	 * address or a self-hosted one, with the name of the secret that holds its
+	 * key. It changes how the knowledge fills, so it asks a role that may
+	 * start runs (ADR 4). Returns the setting.
+	 */
+	setReader: projectProcedure(
+		projectInput.extend({ reader: pageReaderSettingSchema }),
+		permitted(MAY.changeKnowledge),
+	)
+		.route({
+			summary:
+				"Chooses the page reader that reads web pages for a project's knowledge, on every computer of its Space.",
+		})
+		.output(output(pageReaderSettingSchema))
+		.handler(({ context, input }) =>
+			context.knowledge.setReader(input.projectId, input.reader),
+		),
+	/**
+	 * The quick look at links a person tells, before anything is saved: what
+	 * each one is (a page, a section, a feed, a file, or why it cannot be
+	 * read), its title, and for a page how many pages share its folder. By the
+	 * project's page reader, on this computer, within a few seconds per link.
+	 */
+	look: projectProcedure(
+		projectInput.extend({
+			urls: z.array(z.string().trim().min(1).max(2000)).min(1).max(20),
+		}),
+		// A look reads the web from this computer: for a role that may add a source.
+		permitted(MAY.save),
+	)
+		.route({
+			summary:
+				"Takes a quick look at web links for a project's knowledge: what each one is, its title, and how many pages share its folder.",
+		})
+		.output(output(z.array(linkLookSchema)))
+		.handler(({ context, input }) =>
+			context.knowledge.look(input.projectId, input.urls),
+		),
 	/**
 	 * How often agents found and read each file of the project's knowledge
 	 * in the last 90 days, when a run last used it, and which files no run

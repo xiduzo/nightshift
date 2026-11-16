@@ -8,9 +8,13 @@ import type {
 	KnowledgeQuestion,
 	KnowledgeText,
 	KnowledgeUseReport,
+	LinkLook,
 	WaitingLearning,
 } from "@nightshift/engine";
-import { knowledgeSourceSchema } from "@nightshift/flows";
+import {
+	knowledgeSourceSchema,
+	pageReaderSettingSchema,
+} from "@nightshift/flows";
 import { z } from "zod";
 
 import { exact } from "../output";
@@ -97,6 +101,8 @@ export const knowledgeSchema = z.object({
 	olderHost: z.boolean(),
 	/** Night Shift proposes learnings from the runs of the project that ended (ADR 37). */
 	learnsFromRuns: z.boolean(),
+	/** The page reader of the Web pages source and of the quick look at a link (ADR 39). */
+	reader: pageReaderSettingSchema,
 });
 export type KnowledgePage = z.infer<typeof knowledgeSchema>;
 
@@ -382,5 +388,55 @@ export const knowledgeMapSchema = exact<KnowledgeMap>()(
 		),
 		filesLeftOut: z.number(),
 		notTopics: z.array(z.string()),
+	}),
+);
+
+/** The quick look at one link a person tells: what it is, before anything is saved (ADR 39). */
+export const linkLookSchema = exact<LinkLook>()(
+	z.object({
+		/** The link as it was given. */
+		url: z.string(),
+		/**
+		 * `page`: one page. `section`: the page starts a folder of more pages.
+		 * `feed`: an RSS, Atom or JSON feed. `file`: a PDF, Word or text file.
+		 * `signin`: the page asks to sign in. `media`: video or audio. `gone`:
+		 * nothing there. `needs-browser`: the text shows only in a browser.
+		 * `blocked`: the site keeps readers out. `failed`: no answer.
+		 */
+		kind: z.enum([
+			"page",
+			"section",
+			"feed",
+			"file",
+			"signin",
+			"media",
+			"gone",
+			"needs-browser",
+			"blocked",
+			"failed",
+		]),
+		/** Null when the look found none. */
+		title: z.string().nullable(),
+		/** For a page or a section: the pages that share its folder. Null: no other page found. */
+		section: z
+			.object({
+				folder: z.string(),
+				pages: z.number(),
+				/** Where the count comes from: the sitemap, the reader's own map, or the page's links. */
+				from: z.enum(["sitemap", "map", "links"]),
+				/** The link starts the folder, not one article in it. */
+				starts: z.boolean(),
+			})
+			.nullable(),
+		/** For a page: the feed it names. */
+		feed: z.string().nullable(),
+		/** For a feed: its items, and how many it had a week over the last four weeks. */
+		items: z
+			.object({ count: z.number(), perWeek: z.number().nullable() })
+			.nullable(),
+		/** For a file: what it is. */
+		fileType: z.enum(["pdf", "word", "text"]).nullable(),
+		/** Why it cannot be read as it is. Null for a page, section, feed or file. */
+		reason: z.string().nullable(),
 	}),
 );
