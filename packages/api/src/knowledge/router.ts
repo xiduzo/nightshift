@@ -69,6 +69,34 @@ const projectInput = z.object({ projectId: z.string() });
 /** One step's proposed learnings that wait, in a project of the Space. */
 const learningInput = projectInput.extend({ id: z.string().min(1).max(300) });
 
+/** The longest note a person tells. */
+const NOTE_MAX_CHARS = 2000;
+
+/**
+ * One note of a learning that waits: its step's file (the learning's `id`),
+ * its place in `notes`, and its text as the person saw it. With the text, a
+ * note that moved in its file is still found, and one that is gone is refused.
+ */
+const waitingNoteSchema = z.object({
+	learningId: z.string().min(1).max(300),
+	index: z.number().int().min(0).max(100_000),
+	note: z.string().max(100_000).optional(),
+});
+
+/** The note as the Learnings module names it. */
+function waitingNote(input: z.infer<typeof waitingNoteSchema>) {
+	const { learningId: id, index, note } = input;
+	return { id, index, ...(note !== undefined ? { note } : {}) };
+}
+
+/** The person who decides on a note: their name marks it in the knowledge. */
+function notePerson(context: {
+	session: { user: { id: string; name: string } };
+}) {
+	const { id, name } = context.session.user;
+	return { id, name };
+}
+
 /**
  * A project's knowledge belongs to its Space (ADR 4): every Member of the
  * Space reads it, on any of its Devices and on its Host. A browser changes
@@ -178,6 +206,60 @@ export const knowledge = {
 		.handler(({ context, input }) =>
 			context.knowledge.settleLearning(input.projectId, input.id, "delete"),
 		),
+	/**
+	 * Keeps or deletes one note of a learning that waits, not the whole
+	 * step's. A kept note goes where agents read it, with who kept it and
+	 * when. A role that may start runs, as for keep.
+	 */
+	settleNote: projectProcedure(
+		projectInput.extend({
+			...waitingNoteSchema.shape,
+			decision: z.enum(["keep", "delete"]),
+		}),
+		permitted(MAY.changeKnowledge),
+	)
+		.route({
+			summary:
+				"Keeps or deletes one note of the learnings that wait. Agents read a kept note in later runs.",
+		})
+		.output(output(z.void()))
+		.handler(({ context, input }) =>
+			context.knowledge.settleNote(
+				input.projectId,
+				waitingNote(input),
+				input.decision,
+				notePerson(context),
+			),
+		),
+	/**
+	 * Keeps a note the person writes, with who told it and when: agents read
+	 * it in later runs. With `replaces`, it takes the place of a note that
+	 * waits ("Change it"). A role that may start runs, as for keep.
+	 */
+	tell: projectProcedure(
+		projectInput.extend({
+			note: z.string().trim().min(1).max(NOTE_MAX_CHARS),
+			replaces: waitingNoteSchema.optional(),
+		}),
+		permitted(MAY.changeKnowledge),
+	)
+		.route({
+			summary:
+				"Keeps a note a person writes in the project's knowledge, where agents read it, in place of a note that waits if one is given.",
+		})
+		.output(output(z.void()))
+		.handler(({ context, input }) => {
+			const { projectId, note, replaces } = input;
+			const by = notePerson(context);
+			return replaces
+				? context.knowledge.tellLearning(
+						projectId,
+						note,
+						by,
+						waitingNote(replaces),
+					)
+				: context.knowledge.tellLearning(projectId, note, by);
+		}),
 	/**
 	 * Adds a source to the project's knowledge, or changes one the page
 	 * added (`name`): its flow, which calls the kit with the values given

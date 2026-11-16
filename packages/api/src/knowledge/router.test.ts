@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { Role } from "@nightshift/auth";
 import { event } from "@nightshift/db/schema";
@@ -11,6 +11,7 @@ import {
 	waitFor,
 	withDevice,
 } from "@nightshift/engine/testing";
+import { iso, now } from "@nightshift/time";
 import { call, ORPCError } from "@orpc/server";
 
 import { appRouter } from "../router";
@@ -672,6 +673,99 @@ describe("knowledge.learnings, keepLearning and deleteLearning", () => {
 		).toEqual([]);
 		expect(got.files.map((f) => f.path)).toContain(
 			"learnings/accepted/run-1.s1.md",
+		);
+	});
+});
+
+describe("knowledge.settleNote and knowledge.tell", () => {
+	test("check one note at a time, ask a role that may start runs, and mark who decided", async () => {
+		await putFile(
+			"learnings/proposed/run-1.s1.md",
+			"# Learnings of run run-1\n\n- Use bun.\n- Tests run with bun.\n- The API is in packages/api.\n",
+		);
+		await call(
+			appRouter.knowledge.get,
+			{ projectId },
+			{ context: context("viewer", "viewer") },
+		);
+		const note = { projectId, learningId: "run-1.s1.md" };
+		const notes = async () =>
+			(
+				await call(
+					appRouter.knowledge.learnings,
+					{ projectId },
+					{ context: context("viewer", "viewer") },
+				)
+			).flatMap((learning) => learning.notes);
+
+		await expect(
+			call(
+				appRouter.knowledge.settleNote,
+				{ ...note, index: 0, decision: "keep" },
+				{ context: context("viewer", "viewer") },
+			),
+		).rejects.toBeInstanceOf(ORPCError);
+		await expect(
+			call(
+				appRouter.knowledge.tell,
+				{ projectId, note: "Deploys wait." },
+				{ context: context("viewer", "viewer") },
+			),
+		).rejects.toBeInstanceOf(ORPCError);
+
+		await call(
+			appRouter.knowledge.settleNote,
+			{ ...note, index: 0, note: "Use bun.", decision: "keep" },
+			{ context: context("member", "member") },
+		);
+		// Seen at 2 before the first went: found by its text.
+		await call(
+			appRouter.knowledge.tell,
+			{
+				projectId,
+				note: "The API is in packages/api/src.",
+				replaces: { ...note, index: 2, note: "The API is in packages/api." },
+			},
+			{ context: context("member", "member") },
+		);
+		expect(await notes()).toEqual(["Tests run with bun."]);
+		await expect(
+			call(
+				appRouter.knowledge.settleNote,
+				{ ...note, index: 0, note: "Use bun.", decision: "delete" },
+				{ context: context("member", "member") },
+			),
+		).rejects.toMatchObject({ code: "NOT_FOUND" });
+		await call(
+			appRouter.knowledge.settleNote,
+			{ ...note, index: 0, decision: "delete" },
+			{ context: context("member", "member") },
+		);
+		expect(await notes()).toEqual([]);
+
+		const folder = built.folder(projectId);
+		const today = iso(now()).slice(0, 10);
+		expect(
+			await readFile(join(folder, "learnings/accepted/run-1.s1.md"), "utf8"),
+		).toBe(
+			`# Learnings of run run-1\n\n- Use bun.\n  Kept by Ada on ${today}.\n`,
+		);
+		expect(
+			await readFile(join(folder, "learnings/accepted/told-member.md"), "utf8"),
+		).toContain(
+			`- The API is in packages/api/src.\n  Told by Ada on ${today}.\n`,
+		);
+		const got = await call(
+			appRouter.knowledge.get,
+			{ projectId },
+			{ context: context("viewer", "viewer") },
+		);
+		expect(got.proposed).toBe(0);
+		expect(got.files.map((f) => f.path)).toEqual(
+			expect.arrayContaining([
+				"learnings/accepted/run-1.s1.md",
+				"learnings/accepted/told-member.md",
+			]),
 		);
 	});
 });
