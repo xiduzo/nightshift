@@ -41,7 +41,6 @@ import type {
 	FlowCanvasNode,
 	FlowNodeData,
 } from "../canvas/flow-node";
-import type { PaletteItem } from "../canvas/node-type";
 import {
 	canvasEdges,
 	edgeTypes,
@@ -75,11 +74,11 @@ import {
 } from "../canvas/sections/use-section-canvas";
 import { useMeasured } from "../canvas/use-measured";
 import { markedLine, sampleLine } from "../canvas/viewer/gist";
+import { NODE_DRAG_TYPE } from "./add-node/drag";
 import { CanvasControls } from "./canvas-controls";
 import { fitViewOptions } from "./fit-view";
 import { loadElk } from "./lib/elk";
 import { layoutFlow, type NodeHandles, type Size } from "./lib/flow-layout";
-import { isPaletteItem, NODE_DRAG_TYPE } from "./node-dock";
 import {
 	applyNodeSelection,
 	canvasIds,
@@ -214,8 +213,8 @@ export function EditorCanvas({
 	onSelect: SelectionSetter;
 	/** "Make section" from the selected nodes. */
 	onMakeSection: (nodeIds: string[], sectionIds: string[]) => void;
-	/** A node type dragged from the dock was dropped at this point of the screen. */
-	onDropNode: (type: PaletteItem, at: { x: number; y: number }) => void;
+	/** A node, kit or preset dragged from the dock or the grid was dropped at this point of the screen, by its catalog key. */
+	onDropNode: (key: string, at: { x: number; y: number }) => void;
 	/** A node was double-clicked, for example a Subflow to look inside. */
 	onNodeDoubleClick?: (nodeId: string) => void;
 	/** The empty canvas was double-clicked at this point of the screen: add a node there. */
@@ -690,10 +689,10 @@ export function EditorCanvas({
 							event.dataTransfer.dropEffect = "move";
 						}}
 						onDrop={(event) => {
-							const type = event.dataTransfer.getData(NODE_DRAG_TYPE);
-							if (preview || !isPaletteItem(type)) return;
+							const key = event.dataTransfer.getData(NODE_DRAG_TYPE);
+							if (preview || !key) return;
 							event.preventDefault();
-							onDropNode(type, { x: event.clientX, y: event.clientY });
+							onDropNode(key, { x: event.clientX, y: event.clientY });
 						}}
 						deleteKeyCode={preview ? null : DELETE_KEYS}
 						selectionKeyCode="Shift"

@@ -163,11 +163,11 @@ export function ValuePresetMenu({
 }
 
 /**
- * The form of one preset, inside a Dialog: the list, the fields, and Use.
- * The inspector fills the Value it is on. The add-node dialog adds a new
- * Value with what it makes, in one change. `nodeId` is the Value, whose own
+ * The form of one preset: the list, the fields, and Use. The inspector
+ * fills the Value it is on, in a Dialog. The node grid adds a new Value
+ * with what it makes, in one change. `nodeId` is the Value, whose own
  * lists it leaves out. `from` is a node whose lists come first. With
- * `onBack`, the form goes back instead of closing the dialog.
+ * `onBack`, the form goes back instead of closing what holds it.
  */
 export function PresetForm({
 	preset,

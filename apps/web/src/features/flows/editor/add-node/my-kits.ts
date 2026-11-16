@@ -1,4 +1,4 @@
-// "My kits" in the add-node dialog: the flows of the Space that another
+// "My kits" in the node grid: the flows of the Space that another
 // flow already runs, this project's first. A person made them to reuse.
 
 import {

@@ -9,6 +9,7 @@ import {
 	type Position,
 	type ProjectFlowMap,
 	updateNode,
+	type ValuePresetName,
 	type ValuePresetResult,
 } from "@nightshift/flows";
 import { useReactFlow } from "@xyflow/react";
@@ -17,8 +18,9 @@ import type { PaletteItem } from "../../canvas/node-type";
 import { freeSpot, useNewNodeSpot } from "../canvas-controls";
 import type { EditingSession } from "../session/editing-session";
 import { useEditingSession } from "../session/use-editing-session";
-import type { CatalogAdd } from "./catalog";
+import { CATALOG, type CatalogAdd, type CatalogEntry } from "./catalog";
 import { opensAddNode, trackFocusInput } from "./open-keys";
+import { useRecentNodes } from "./recent-nodes";
 import { useMyKits } from "./use-my-kits";
 
 /** What picking a kit, or a flow of "My kits", adds. */
@@ -32,16 +34,19 @@ const AFTER_GAP = 96;
 type Point = { x: number; y: number };
 
 /**
- * The add-node dialog of the editor: Tab, a double-click on the canvas and
- * the dock's first button open it. A node that takes a value goes after
- * the one node selected and reads it (`addNodeAfter`). Every other node
- * lands where the canvas was double-clicked, or in the middle of the view.
- * A kit, or a flow of "My kits", goes in as a Subflow that runs it. A flow
- * of another project is copied here first. Each add is one step of the
- * session, joins the open Section and selects the new node. While
- * `disabled` (a proposal, a revision or a Subflow on view), nothing opens it.
+ * How the editor adds nodes: the node grid, the recent nodes of the dock,
+ * and a drop on the canvas. Tab, a double-click on the canvas and the
+ * dock's first button open the grid. A Value preset shows its form in the
+ * grid. A picked node that takes a value goes after the one node selected
+ * and reads it (`addNodeAfter`). Every other node lands where the canvas
+ * was double-clicked, or in the middle of the view. A dropped node, kit or
+ * preset lands where it was dropped. A kit, or a flow of "My kits", goes
+ * in as a Subflow that runs it. A flow of another project is copied here
+ * first. Each add is one step of the session, joins the open Section and
+ * selects the new node. While `disabled` (a proposal, a revision or a
+ * Subflow on view), nothing opens the grid and nothing is added.
  */
-export function useAddNodeDialog({
+export function useNodeAdder({
 	session,
 	projectId,
 	flowName,
@@ -60,11 +65,14 @@ export function useAddNodeDialog({
 }) {
 	const { draft: flow, selection } = useEditingSession(session);
 	const [open, setOpen] = useState(false);
-	// The point on the screen the canvas was double-clicked at, if it was.
+	// The Value preset whose form the grid shows, if one.
+	const [preset, setPreset] = useState<ValuePresetName | null>(null);
+	// The point on the screen the canvas was double-clicked or dropped at, if it was.
 	const anchor = useRef<Point | undefined>(undefined);
 	const spot = useNewNodeSpot();
 	const { getInternalNode } = useReactFlow();
 	const myKits = useMyKits({ projectId, flowName, flows, draft: flow, open });
+	const recent = useRecentNodes();
 
 	const show = useCallback(
 		(at?: Point) => {
@@ -75,10 +83,16 @@ export function useAddNodeDialog({
 		[disabled],
 	);
 
+	const close = useCallback(() => {
+		setOpen(false);
+		setPreset(null);
+		anchor.current = undefined;
+	}, []);
+
 	// A proposal, a revision or a Subflow that comes on view shuts it.
 	useEffect(() => {
-		if (disabled) setOpen(false);
-	}, [disabled]);
+		if (disabled) close();
+	}, [disabled, close]);
 
 	// Tab opens it, where Tab has no other job (`opensAddNode`).
 	const disabledRef = useRef(disabled);
@@ -134,27 +148,78 @@ export function useAddNodeDialog({
 		commit(addCalledNode(now, name, spot(now, at)));
 	};
 
+	/** Adds a picked entry. A preset shows its form first. */
+	const pick = (entry: CatalogEntry) => {
+		if (disabled) return;
+		if (entry.add.kind === "preset") {
+			setPreset(entry.add.preset);
+			setOpen(true);
+			return;
+		}
+		if (entry.add.kind === "kit") void addKit(entry.add);
+		else {
+			recent.remember(entry.add.item);
+			commit(place(entry.add.item));
+		}
+		close();
+	};
+
+	/** Adds the entry with this key where it was dropped, at `at` on the screen. */
+	const drop = (key: string, at: Point) => {
+		if (disabled) return;
+		const entry = [...CATALOG, ...myKits.entries].find(
+			(candidate) => candidate.key === key,
+		);
+		if (!entry) return;
+		anchor.current = at;
+		if (entry.add.kind === "preset") {
+			// Its form opens in the grid. Use places the Value at `at`.
+			setPreset(entry.add.preset);
+			setOpen(true);
+			return;
+		}
+		if (entry.add.kind === "kit") void addKit(entry.add);
+		else {
+			recent.remember(entry.add.item);
+			const now = session.get().draft;
+			commit(addNode(now, entry.add.item, spot(now, at), defaults));
+		}
+		anchor.current = undefined;
+	};
+
+	/** One Value by rule, with what the preset made, in one change. */
+	const applyPreset = ({ expression, output }: ValuePresetResult) => {
+		const added = place("value");
+		recent.remember("value");
+		commit({
+			id: added.id,
+			flow: updateNode(added.flow, added.id, (node) =>
+				node.type === "value" ? { ...node, expression, output } : node,
+			),
+		});
+		close();
+	};
+
 	return {
-		/** Opens the dialog, to place a node at `at` on the screen, if given. */
+		open,
+		/** Opens the grid, to place a node at `at` on the screen, if given. */
 		show,
-		props: {
-			open,
-			onOpenChange: setOpen,
-			flow,
-			from,
-			myKits: myKits.entries,
-			onAddNode: (item: PaletteItem) => commit(place(item)),
-			onAddKit: (add: KitAdd) => void addKit(add),
-			// One Value by rule, with what the preset made, in one change.
-			onUsePreset: ({ expression, output }: ValuePresetResult) => {
-				const added = place("value");
-				commit({
-					id: added.id,
-					flow: updateNode(added.flow, added.id, (node) =>
-						node.type === "value" ? { ...node, expression, output } : node,
-					),
-				});
-			},
-		},
+		close,
+		flow,
+		/** The one node selected: what takes a value goes after it and reads its main output. */
+		from,
+		/** The Value preset whose form the grid shows, and how to go back to the list. */
+		preset,
+		closePreset: () => setPreset(null),
+		/** The flows of the Space that another flow runs (`myKitEntries`). */
+		myKits: myKits.entries,
+		/** The nodes added last, the newest first. */
+		recent: recent.items,
+		pick,
+		drop,
+		applyPreset,
 	};
 }
+
+/** What the node dock and the grid read and call. */
+export type NodeAdder = ReturnType<typeof useNodeAdder>;

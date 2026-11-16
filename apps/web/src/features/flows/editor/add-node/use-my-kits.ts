@@ -15,12 +15,12 @@ import { spaceQueries } from "@/features/spaces";
 import { flowMutations, flowQueries } from "../../queries";
 import { myKitEntries, type OtherProject } from "./my-kits";
 
-/** The other projects' flows change rarely while the dialog is open. */
+/** The other projects' flows change rarely while the grid is open. */
 const STALE_MS = 30_000;
 
 /**
- * "My kits" of the add-node dialog (`myKitEntries`). The other projects'
- * flows are read only while the dialog is open. A viewer cannot copy a
+ * "My kits" of the node grid (`myKitEntries`). The other projects'
+ * flows are read only while the grid is open. A viewer cannot copy a
  * flow into this project, so a viewer sees this project's flows only.
  */
 export function useMyKits({

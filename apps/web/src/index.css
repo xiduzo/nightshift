@@ -136,7 +136,7 @@
 
 /*
  * Family tints: the role of a node type on its icon tile, in the editor,
- * the node dock and the add-node dialog. A run view shows the run status
+ * the node dock and the node grid. A run view shows the run status
  * instead, so a tint never reads as a status. Each icon keeps a contrast of
  * at least 3:1 on its tile (the tint at 15–18% over the card).
  */

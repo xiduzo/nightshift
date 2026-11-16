@@ -84,13 +84,13 @@ CLI when you need them.
 | ✓ [Alert Dialog](https://ui.shadcn.com/docs/components/alert-dialog) | Confirm a destructive or irreversible step (stop a run, delete a flow), or a step that changes this computer (install an agent, install Ollama). |
 | ✓ [Sheet](https://ui.shadcn.com/docs/components/sheet) | A panel that slides in from an edge: details beside a list, a run's facts (branch, worktree, times), a flow's revisions in the editor, a flow's schedules on the Flows page, what an agent changed in one file, a flow that needs a look on Home (`LookSheet`), the mobile sidebar. |
 | [Drawer](https://ui.shadcn.com/docs/components/drawer) | A bottom sheet for mobile (Vaul). |
-| ✓ [Popover](https://ui.shadcn.com/docs/components/popover) | Small floating content on click: a picker, a short form, the flow editor's issues, the variables a template field offers after `{{`. |
+| ✓ [Popover](https://ui.shadcn.com/docs/components/popover) | Small floating content on click: a picker, a short form, the flow editor's issues, the variables a template field offers after `{{`. The node grid of the flow editor (Tab, a double-click on the canvas, or the dock's first button): an `InputGroup` search, then each family as ghost `Button` tiles, its kits after its nodes, and a Value preset's form in place (`features/flows/editor/add-node/`). In a project without a folder, a kit or flow that needs one is a disabled tile whose `Tooltip` says why. |
 | ✓ [Tooltip](https://ui.shadcn.com/docs/components/tooltip) | A short label on hover or focus, mostly for icon buttons. The hint of an inspector field, behind an info icon beside its label. Needs `TooltipProvider` (in the root). |
 | ✓ [Hover Card](https://ui.shadcn.com/docs/components/hover-card) | A preview on hover (a PR, an issue, a node, the tokens a step used). |
 | ✓ [Context Menu](https://ui.shadcn.com/docs/components/context-menu) | A right-click menu. One menu over the flow editor's canvas opens on a node only: "Pin output" and "Skip with outcome" for a test run (`features/flows/editor/test-run/`). Shift+F10 opens it on a focused node. The Results tab of the node has the same choices. |
 | ✓ [Dropdown Menu](https://ui.shadcn.com/docs/components/dropdown-menu) | Actions behind a button ("…" menus, user menu). The editor's "2 pinned · 1 skipped" button lists the marked nodes and clears them. |
 | [Menubar](https://ui.shadcn.com/docs/components/menubar) | A desktop-app menubar (File, Edit, View). |
-| ✓ [Command](https://ui.shadcn.com/docs/components/command) | A searchable list of commands. `CommandDialog` is the add-node dialog of the flow editor (Tab, a double-click on the canvas, or the dock's first button): one group per family, with the Value presets under Shape and the kits after the nodes of their family, each with an outline "Kit" `Badge`. "My kits" comes last: the flows that another flow runs, a flow of another project with its project as a `Badge` (`features/flows/editor/add-node/`). In a project without a folder, a kit or flow that needs one is a disabled `CommandItem` that says why. The list of variables a template field offers after `{{`. |
+| ✓ [Command](https://ui.shadcn.com/docs/components/command) | A searchable list of commands. The list of variables a template field offers after `{{`. |
 
 ### Feedback and status
 
@@ -117,7 +117,7 @@ CLI when you need them.
 | [Aspect Ratio](https://ui.shadcn.com/docs/components/aspect-ratio) | Keeps media at a fixed ratio. |
 | [Typography](https://ui.shadcn.com/docs/components/typography) | Class recipes for headings, paragraphs, lists, blockquotes and inline code. Copy the classes. There is nothing to install. |
 | ✓ [Item](https://ui.shadcn.com/docs/components/item) | One row of a list with media, title, description and actions: `ItemGroup`, `ItemMedia`, `ItemContent`, `ItemTitle`, `ItemDescription`, `ItemActions`. Runs in a list, gates, projects, settings rows, the links of a Gate, the phones and browsers that can notify you. The rows of Needs a look and of What came out on Home (`features/dashboard/home-page.tsx`). The steps of Get started on Home (`SetupCard` in `features/agents/setup`). |
-| ✓ [Kbd](https://ui.shadcn.com/docs/components/kbd) | A keyboard key or shortcut (⌘K, Tab on the node dock's Add a node, the keys of the Review page of Knowledge). |
+| ✓ [Kbd](https://ui.shadcn.com/docs/components/kbd) | A keyboard key or shortcut (⌘K, Tab on the node dock's All nodes, the keys of the Review page of Knowledge). |
 
 ### More
 

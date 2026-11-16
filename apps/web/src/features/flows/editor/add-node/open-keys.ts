@@ -1,4 +1,4 @@
-// The key that opens the add-node dialog: Tab, where Tab has no other job.
+// The key that opens the node grid: Tab, where Tab has no other job.
 
 /** What moved the focus: a click (or a touch), or Tab. */
 export type FocusInput = "pointer" | "tab";
@@ -33,7 +33,7 @@ const CANVAS =
 	".react-flow__pane, .react-flow__renderer, .react-flow__node, .react-flow__edge";
 
 /**
- * Whether a key press opens the add-node dialog: Tab with no modifier,
+ * Whether a key press opens the node grid: Tab with no modifier,
  * after a click on the page or on the canvas. The focus is on the page
  * itself, or on a node that a click focused. A node the focus reached with
  * Tab keeps Tab, so a keyboard moves on through the canvas. A keyboard
@@ -66,7 +66,7 @@ function isKeyTarget(target: unknown): target is KeyTarget {
 /**
  * Follows what moves the focus, for `opensAddNode`. `history()` reads it
  * during a key press. `keep()` says the key press moved nothing: the
- * dialog took it. A dialog that gives the focus back as it closes counts
+ * grid took it. A grid that gives the focus back as it closes counts
  * as the input before it. Returns the stop too.
  */
 export function trackFocusInput(target: Window): {

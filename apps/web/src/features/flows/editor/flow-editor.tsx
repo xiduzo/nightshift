@@ -60,7 +60,6 @@ import { hoverTime } from "@/shared/format";
 import { SiteHeader } from "@/shared/page";
 import { FlowAssistantContext } from "../assistant/flow-assistant";
 import { DeviceNamesContext } from "../canvas/device-names-context";
-import { type PaletteItem, paletteMeta } from "../canvas/node-type";
 import {
 	EnterSubflowContext,
 	OpenFlowContext,
@@ -77,9 +76,8 @@ import { CopyFlowDialog } from "../move/copy-flow-dialog";
 import { saveFile } from "../move/flow-file";
 import { flowMutations, flowQueries } from "../queries";
 import { StartRunDialog } from "../start/start-run-dialog";
-import { AddNodeDialog } from "./add-node/add-node-dialog";
-import { useAddNodeDialog } from "./add-node/use-add-node-dialog";
-import { useAddNode } from "./canvas-controls";
+import type { CatalogEntry } from "./add-node/catalog";
+import { useNodeAdder } from "./add-node/use-node-adder";
 import { useFlowClipboard } from "./clipboard/use-flow-clipboard";
 import { EdgeInspector } from "./edge-inspector";
 import { type EditKeys, editKeyOf, leavesKeyToPage } from "./edit-keys";
@@ -218,8 +216,7 @@ function Editor({
 	const savable = useMemo(() => isSavable(draft), [draft]);
 	// The flow's settings show in the inspector while nothing is selected.
 	const [settingsOpen, setSettingsOpen] = useState(false);
-	const [dragging, setDragging] = useState<PaletteItem | null>(null);
-	const addNode = useAddNode(session, nodeDefaults);
+	const [dragging, setDragging] = useState<CatalogEntry | null>(null);
 	const errorCount = check.issues.filter(
 		(issue) => issue.severity === "error",
 	).length;
@@ -523,8 +520,8 @@ function Editor({
 					...clipboard,
 				};
 
-	// The add-node dialog: Tab, a double-click on the canvas, or the dock.
-	const addNodeDialog = useAddNodeDialog({
+	// The node grid, the dock's recent nodes and a drop: Tab, a double-click on the canvas, or the dock.
+	const nodeAdder = useNodeAdder({
 		session,
 		projectId,
 		flowName: name,
@@ -772,9 +769,9 @@ function Editor({
 											coveredRight={chat.open ? CHAT_PANEL_COVERS_PX : 0}
 											onSelect={session.select}
 											onMakeSection={sections.makeSection}
-											onDropNode={addNode}
+											onDropNode={nodeAdder.drop}
 											onNodeDoubleClick={subflows.enterNode}
-											onPaneDoubleClick={addNodeDialog.show}
+											onPaneDoubleClick={nodeAdder.show}
 											openSection={preview ? null : openSection}
 											onOpenSection={session.openSection}
 											flowLabel={name}
@@ -837,8 +834,7 @@ function Editor({
 											/>
 										) : null}
 										<NodeDock
-											onAdd={(type) => addNode(type)}
-											onSearch={() => addNodeDialog.show()}
+											adder={nodeAdder}
 											onDragChange={setDragging}
 											className="pointer-events-auto absolute top-1/2 left-3 -translate-y-1/2"
 										/>
@@ -852,7 +848,9 @@ function Editor({
 								{dragging ? (
 									<div className="absolute inset-3 flex items-end justify-center rounded-xl border-2 border-dashed border-primary/40 pb-20">
 										<span className="rounded-full bg-background px-3 py-1 text-xs text-muted-foreground shadow-sm">
-											Drop to add the {paletteMeta(dragging).label} node here
+											{dragging.add.kind === "node"
+												? `Drop to add the ${dragging.label} node here`
+												: `Drop to add ${dragging.label} here`}
 										</span>
 									</div>
 								) : null}
@@ -904,7 +902,6 @@ function Editor({
 								</OpenFlowContext.Provider>
 							) : null}
 						</div>
-						<AddNodeDialog {...addNodeDialog.props} />
 					</ProjectFolderContext.Provider>
 				</ProjectFlowsContext.Provider>
 			</DeviceNamesContext.Provider>

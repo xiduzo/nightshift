@@ -3,20 +3,19 @@ import { kitList, NODE_FAMILIES, VALUE_PRESETS } from "@nightshift/flows";
 import type { PaletteItem } from "../../canvas/node-type";
 import {
 	CATALOG,
-	catalogGroups,
+	catalogFamilies,
 	firstSentence,
+	isPaletteItem,
 	offHere,
 	PALETTE,
 	paletteFamily,
 } from "./catalog";
 
-/** The entries a search word finds by name or keyword, as cmdk would. */
+/** The entries the grid's search finds for a word. */
 function find(word: string): string[] {
-	return CATALOG.filter((entry) =>
-		[entry.key, entry.label, ...entry.keywords].some((text) =>
-			text.toLowerCase().includes(word),
-		),
-	).map((entry) => entry.key);
+	return catalogFamilies(CATALOG, word).flatMap((family) =>
+		[...family.nodes, ...family.kits].map((entry) => entry.key),
+	);
 }
 
 describe("the add-node catalog", () => {
@@ -51,26 +50,38 @@ describe("the add-node catalog", () => {
 		}
 	});
 
-	test("groups follow the families, nothing before a value, never mixed", () => {
-		const groups = catalogGroups();
-		const seen = groups.map((group) => `${group.family}:${group.takes}`);
-		expect(seen).toEqual([
-			"do:nothing",
-			"decide:nothing",
-			"decide:value",
-			"shape:value",
-			"hold:nothing",
-			"compose:nothing",
-		]);
-		for (const group of groups) {
-			for (const entry of group.entries) {
-				expect(entry.takes, entry.key).toBe(group.takes);
+	test("the grid follows the families, nodes apart from kits, all entries once", () => {
+		const families = catalogFamilies(CATALOG);
+		expect(families.map((group) => group.family)).toEqual([...NODE_FAMILIES]);
+		for (const group of families) {
+			for (const entry of group.nodes) {
 				expect(entry.family, entry.key).toBe(group.family);
+				expect(entry.add.kind, entry.key).not.toBe("kit");
+			}
+			for (const entry of group.kits) {
+				expect(entry.family, entry.key).toBe(group.family);
+				expect(entry.add.kind, entry.key).toBe("kit");
 			}
 		}
-		expect(groups.flatMap((group) => group.entries)).toHaveLength(
-			CATALOG.length,
-		);
+		expect(
+			families.flatMap((group) => [...group.nodes, ...group.kits]),
+		).toHaveLength(CATALOG.length);
+	});
+
+	test("a search leaves out the families with no match", () => {
+		const families = catalogFamilies(CATALOG, "approve");
+		expect(families.map((group) => group.family)).toEqual(["decide"]);
+		expect(families[0]?.nodes.map((entry) => entry.key)).toEqual(["gate"]);
+		expect(catalogFamilies(CATALOG, "Decide").map((g) => g.family)).toEqual([
+			"decide",
+		]);
+		expect(catalogFamilies(CATALOG, "zzz-nothing")).toEqual([]);
+	});
+
+	test("a palette item is a node type the palette has", () => {
+		expect(isPaletteItem("agent")).toBe(true);
+		expect(isPaletteItem("preset-filter")).toBe(false);
+		expect(isPaletteItem(3)).toBe(false);
 	});
 
 	test("each kit is under its family, after the nodes, and says it is a kit", () => {
@@ -88,12 +99,6 @@ describe("the add-node catalog", () => {
 				add: { kind: "kit", flow: kit.name },
 			});
 			expect(kit.flow.description?.startsWith(entry?.blurb ?? "-")).toBe(true);
-		}
-		for (const group of catalogGroups()) {
-			const kinds = group.entries.map((entry) => entry.add.kind);
-			const firstKit = kinds.indexOf("kit");
-			if (firstKit < 0) continue;
-			expect(kinds.slice(firstKit).every((kind) => kind === "kit")).toBe(true);
 		}
 		expect(
 			kits.find((entry) => entry.key === "kit:github/watch-pr")?.family,

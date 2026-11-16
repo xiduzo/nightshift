@@ -1,5 +1,4 @@
-import type { Flow, NewNodeKind, Position } from "@nightshift/flows";
-import { addNode, type NodeDefaults } from "@nightshift/flows";
+import type { Flow, Position } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import { ButtonGroup } from "@nightshift/ui/components/button-group";
 import {
@@ -15,7 +14,6 @@ import {
 } from "@xyflow/react";
 import { MaximizeIcon, MinusIcon, PlusIcon, WorkflowIcon } from "lucide-react";
 import { FIT_VIEW } from "./fit-view";
-import type { EditingSession } from "./session/editing-session";
 
 // Adding a node, and the zoom, fit and layout buttons: the parts of a flow
 // canvas around its nodes and edges.
@@ -57,24 +55,6 @@ export function useNewNodeSpot() {
 					})
 				: { x: 0, y: 0 };
 		return freeSpot(flow, { x: center.x - 120, y: center.y });
-	};
-}
-
-/**
- * Adds a node and selects it: where it was dropped (`at`, a point on the
- * screen), or else in the middle of the visible canvas (`useNewNodeSpot`).
- * While a Section is open, the node joins it.
- */
-export function useAddNode(
-	session: EditingSession,
-	defaults: NodeDefaults | undefined,
-) {
-	const spot = useNewNodeSpot();
-	return (type: NewNodeKind, at?: { x: number; y: number }) => {
-		const flow = session.get().draft;
-		const result = addNode(flow, type, spot(flow, at), defaults);
-		session.add(result.flow);
-		session.select({ kind: "node", id: result.id });
 	};
 }
 

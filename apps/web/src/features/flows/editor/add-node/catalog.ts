@@ -1,11 +1,12 @@
-// What the add-node dialog and the node dock offer: every node a person can
-// add, the Value presets and the kits, each in the family of its role.
+// What the node grid offers: every node a person can add, the Value
+// presets and the kits, each in the family of its role.
 
 import {
 	kitList,
 	NEW_NODE_TAKES,
 	NODE_FAMILIES,
 	NODE_FAMILY,
+	NODE_FAMILY_LABEL,
 	type NodeFamily,
 	VALUE_PRESETS,
 	type ValuePresetName,
@@ -77,7 +78,7 @@ export type CatalogAdd =
 	  };
 
 export type CatalogEntry = {
-	/** Unique in the catalog. The dialog's search reads it too. */
+	/** Unique in the catalog. A drag onto the canvas carries it. */
 	key: string;
 	family: NodeFamily;
 	takes: Takes;
@@ -242,27 +243,43 @@ export const CATALOG: readonly CatalogEntry[] = [
 	),
 ];
 
-/** One group of the dialog: entries of one family that all start from nothing, or all take a value. */
-export type CatalogGroup = {
+/** One family of the node grid: its nodes and Value presets, then its kits. */
+export type CatalogFamily = {
 	family: NodeFamily;
-	takes: Takes;
-	entries: readonly CatalogEntry[];
+	nodes: readonly CatalogEntry[];
+	kits: readonly CatalogEntry[];
 };
 
-/**
- * The dialog's groups, in `NODE_FAMILIES` order. In each family the
- * entries that start from nothing come first, then those that take a
- * value. A group never mixes the two. An empty group is left out.
- */
-export function catalogGroups(
-	entries: readonly CatalogEntry[] = CATALOG,
-): CatalogGroup[] {
-	return NODE_FAMILIES.flatMap((family) =>
-		(["nothing", "value"] as const).flatMap((takes) => {
-			const inGroup = entries.filter(
-				(entry) => entry.family === family && entry.takes === takes,
-			);
-			return inGroup.length > 0 ? [{ family, takes, entries: inGroup }] : [];
-		}),
+/** Whether an entry matches a search: by its name, its family or a keyword. */
+export function matchesSearch(entry: CatalogEntry, query: string): boolean {
+	const words = query.trim().toLowerCase();
+	if (!words) return true;
+	return [entry.label, NODE_FAMILY_LABEL[entry.family], ...entry.keywords].some(
+		(word) => word.toLowerCase().includes(words),
 	);
+}
+
+/**
+ * The node grid's families, in `NODE_FAMILIES` order, with what matches
+ * `query`. In each family the nodes and presets come first, then the kits:
+ * the kits of Night Shift, then the flows of "My kits" in that family. A
+ * family with no match is left out.
+ */
+export function catalogFamilies(
+	entries: readonly CatalogEntry[],
+	query = "",
+): CatalogFamily[] {
+	return NODE_FAMILIES.flatMap((family) => {
+		const found = entries.filter(
+			(entry) => entry.family === family && matchesSearch(entry, query),
+		);
+		const nodes = found.filter((entry) => entry.add.kind !== "kit");
+		const kits = found.filter((entry) => entry.add.kind === "kit");
+		return found.length > 0 ? [{ family, nodes, kits }] : [];
+	});
+}
+
+/** Whether a value names a palette item: a recent node a browser kept, for one. */
+export function isPaletteItem(value: unknown): value is PaletteItem {
+	return (PALETTE as readonly unknown[]).includes(value);
 }

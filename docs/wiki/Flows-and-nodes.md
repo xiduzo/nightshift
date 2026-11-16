@@ -333,12 +333,13 @@ An Agent, a Command, or a Value scores the run with `scores` in its data: `{"sco
 
 ## The editor
 
-- **Add a node.** Click the canvas and press **Tab**, or double-click an empty spot. Type what you need, such as "http", "approve", or "csv", and pick a node. The buttons on the left of the canvas add nodes too.
+- **Add a node.** Click the canvas and press **Tab**, or double-click an empty spot. The grid of all nodes opens, by family. Type what you need, such as "http", "approve", or "csv", and press **Enter** for the first match, or click a node. The grid button on the left of the canvas opens it too. Below that button are the nodes you added last.
+- **Drag a node.** Drag a node from the grid or from the left of the canvas, and drop it where you want it. Kits and Value presets drag too.
 - **Add a node after another.** Select a node first. Then add a Branch, a Value, a Value preset, a Since last run, or a Convert. It goes after the selected node and reads its output. An edge comes from the first free outcome of that node.
 - **Connect two nodes.** Drag from the dot of an outcome to the next node.
 - **Set the start.** Select a node, and choose ▶ (**Start the run here**) at the top of its panel.
 - **Families.** Each family of nodes has its own color: **Do** (Agent, Command, Tool, Web request), **Decide** (Gate, Branch), **Shape** (Value, the Value presets, Since last run, Convert), **Hold** (Wait, Lease, Service), and **Compose** (Subflow, Join, End).
-- **Kits.** The search finds the kits too, marked **Kit**. **My kits** comes last. It lists the flows that another flow already runs, also in the other projects of your Space. When you pick a flow of another project, Night Shift copies it into this project first. In a project without a folder, you cannot pick a kit or a flow that needs a folder.
+- **Kits.** Each family in the grid shows its kits after its nodes. The search finds them too. The kits of Compose include your own: the flows that another flow already runs, also in the other projects of your Space. When you pick a flow of another project, Night Shift copies it into this project first. In a project without a folder, you cannot pick a kit or a flow that needs a folder.
 - **Last output.** After the first run, each node shows what it gave in the newest run, in one line at its bottom. A node that runs now shows **Running**. A node that the run did not reach shows **Not in the last run**.
 - **Results.** The **Results** tab of a node shows each output field, with its shape. **Open the run** opens that run at the step. The template variables show their values from the newest run too.
 - **Data links.** Select a node to see dotted lines to the nodes that it reads and the nodes that read it. The label on a line names what it reads, such as `data.tasks`.

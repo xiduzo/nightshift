@@ -164,7 +164,7 @@ export const FAMILY_TINT: Record<NodeFamily, string> = {
 
 /**
  * An icon tile in its family's tint: a light wash and the icon in the
- * tint. In the dock and the add-node dialog, where no run status shows.
+ * tint. In the dock and the node grid, where no run status shows.
  */
 export const FAMILY_TILE: Record<NodeFamily, string> = {
 	do: "bg-family-do/15 text-family-do dark:bg-family-do/15",
