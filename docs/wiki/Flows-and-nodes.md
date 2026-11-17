@@ -315,6 +315,7 @@ You do not have to write a shape. When a node has none, Night Shift takes it fro
 - **Confirm** keeps the shape as it is. An edit, or an applied **Suggest**, confirms it too.
 - An inferred shape only warns. The run shows the warning and continues.
 - A shape that you wrote or confirmed holds every run. When the data does not fit, an Agent, a Command, a Tool, or a Web request stops with an error. A Value or a Convert ends on `fail`.
+  An Agent sees the shape when it reports. When its data does not fit, Night Shift tells the agent what is wrong, and the agent fixes it in the same session.
 - When a template reads a field that the shape does not have, such as `{{planner.data.taks}}`, the editor shows a warning. The run still starts.
 - When a flow output does not fit the type that you set, the Subflow node that called the flow stops with an error. A Subflow that runs once per item fails only that item. An empty output fits every type.
 - A flow output without a type gets one from the first run that calls the flow.

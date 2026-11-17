@@ -5,7 +5,7 @@ import {
 	type JsonValue,
 	typedOutput,
 } from "@nightshift/flows";
-import { dataProblem } from "../../output-schema";
+import { dataProblem } from "@nightshift/flows/json-schema";
 import { type Converted, convertValue } from "./formats";
 import { ConvertProblem } from "./problem";
 

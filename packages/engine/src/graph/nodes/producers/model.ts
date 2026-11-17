@@ -8,10 +8,10 @@ import {
 	type ValueTier,
 	valueDecider,
 } from "@nightshift/flows";
+import { schemaProblem } from "@nightshift/flows/json-schema";
 import { type Climb, trailData } from "../../cascade";
 import { isWaitKind, type StepContext, stepFailure } from "../../context";
 import { deciderCostSource, warnDeciderCost } from "../../cost";
-import { schemaProblem } from "../../output-schema";
 import { RESUME_RULES } from "../../resume-point";
 import { type BodyResult, runStep, type StepHandle } from "../../step-runner";
 import { withinGrace } from "../choosers/model";

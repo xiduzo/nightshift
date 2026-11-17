@@ -6,6 +6,7 @@ import {
 } from "../harnesses/claude-code/profile";
 import { CODEX_PROFILE } from "../harnesses/codex/harness";
 import type { AgentEvent } from "../port/types";
+import { INVALID_DATA_TEXT } from "./step-report";
 import {
 	createTranslator,
 	failureKind,
@@ -1044,6 +1045,58 @@ describe("step reports", () => {
 				outcome: "fail",
 				summary: "b",
 			});
+		});
+	});
+
+	test("a report whose data the tool refused counts until a fixed one comes", () => {
+		const shaped = () =>
+			createTranslator({
+				fallbackSessionId: "fallback",
+				stepReport: {
+					output: {
+						type: "object",
+						properties: { coverage: { type: "array" } },
+						required: ["coverage"],
+					},
+				},
+				profile: CLAUDE_CODE_PROFILE,
+			});
+		const call = (
+			id: string,
+			input: unknown,
+			result: Record<string, unknown>,
+		) =>
+			reportCall(input, result).map((chunk) => ({ ...chunk, toolCallId: id }));
+		const refused = {
+			content: `Tool execution failed: ${INVALID_DATA_TEXT} data/coverage must be array.`,
+			state: "output-error",
+		};
+		const prose = { outcome: "pass", summary: "a", data: { coverage: "UI" } };
+		const fixed = { outcome: "pass", summary: "b", data: { coverage: ["UI"] } };
+		// The agent gave up: the engine sees the data and says what is wrong.
+		const gaveUp = feed(shaped(), [
+			session,
+			...call("r1", prose, refused),
+			runFinished,
+		]);
+		expect(gaveUp.map((e) => e.type)).toEqual([
+			"session",
+			"tool-start",
+			"tool-end",
+			"tool-result",
+			"report",
+			"finished",
+		]);
+		// It fixed the data: the fixed report is the last one.
+		const fixedLater = feed(shaped(), [
+			session,
+			...call("r1", prose, refused),
+			...call("r2", fixed, { content: "Step report recorded." }),
+			runFinished,
+		]);
+		expect(fixedLater.filter((e) => e.type === "report").at(-1)).toEqual({
+			type: "report",
+			...fixed,
 		});
 	});
 

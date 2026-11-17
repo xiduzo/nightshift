@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { StepReportSpec } from "../port/types";
 import {
 	DEFAULT_RULES,
+	INVALID_DATA_TEXT,
 	isRefusedReport,
 	parseStepReport,
 	parseTextReport,
@@ -163,6 +164,14 @@ describe("isRefusedReport", () => {
 		expect(isRefusedReport(text)).toBe(true);
 	});
 
+	test("data that does not match counts: the engine judges it", () => {
+		expect(
+			isRefusedReport(
+				`Tool execution failed: ${INVALID_DATA_TEXT} data/permissions must be array.`,
+			),
+		).toBe(false);
+	});
+
 	test.each([
 		'MCP server "tanstack" rejected the Authorization header in its config (update it, then run /mcp to reconnect)',
 		"MCP error -32000: Connection closed",
@@ -269,19 +278,41 @@ describe("a spec with its own outcomes and an output schema", () => {
 		});
 	});
 
-	test("the tool checks the outcome and that data is there, not its shape", async () => {
+	test("the tool checks the outcome, that data is there, and its shape", async () => {
 		const { execute } = reportStepTool(REVIEW);
 		if (!execute) throw new Error("expected a server tool");
 		expect(
 			await execute({
 				outcome: "approved",
 				summary: "x",
-				data: { issues: [] },
+				data: { issues: ["a"] },
 			}),
 		).toBe(REPORT_ACK);
+		// JSON text of the object is read as the object, as the engine does.
 		expect(
-			await execute({ outcome: "approved", summary: "x", data: "anything" }),
+			await execute({
+				outcome: "approved",
+				summary: "x",
+				data: JSON.stringify({ issues: [] }),
+			}),
 		).toBe(REPORT_ACK);
+		expect(() =>
+			execute({ outcome: "approved", summary: "x", data: "anything" }),
+		).toThrow(INVALID_DATA_TEXT);
+		// The error says what is wrong, by the engine's words, and to call again.
+		expect(() =>
+			execute({
+				outcome: "approved",
+				summary: "x",
+				data: { issues: "two regressions" },
+			}),
+		).toThrow(
+			`${INVALID_DATA_TEXT} data/issues must be array. Fix \`data\` so it matches the schema, then call report_step again.`,
+		);
+		// A $ref into the schema's $defs resolves.
+		expect(() =>
+			execute({ outcome: "approved", summary: "x", data: { issues: [3] } }),
+		).toThrow("data/issues/0 must be string");
 		expect(() => execute({ outcome: "pass", summary: "x", data: {} })).toThrow(
 			/"approved" \| "changes-requested"/,
 		);

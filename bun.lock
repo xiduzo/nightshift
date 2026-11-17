@@ -394,7 +394,6 @@
         "@nightshift/flows": "workspace:*",
         "@nightshift/refusal": "workspace:*",
         "@nightshift/time": "workspace:*",
-        "ajv": "^8.20.0",
         "defuddle": "0.19.6",
         "drizzle-orm": "catalog:",
         "fast-xml-parser": "5.12.1",
@@ -428,6 +427,7 @@
       "dependencies": {
         "@nightshift/refusal": "workspace:*",
         "@nightshift/time": "workspace:*",
+        "ajv": "^8.20.0",
         "croner": "^11.0.1",
         "jsonata": "^2.2.2",
         "zod": "catalog:",
@@ -605,6 +605,7 @@
   },
   "patchedDependencies": {
     "pi-acp@0.0.34": "patches/pi-acp@0.0.34.patch",
+    "@tanstack/ai-claude-code@1.0.2": "patches/@tanstack%2Fai-claude-code@1.0.2.patch",
   },
   "catalog": {
     "@better-auth/api-key": "1.7.25",

@@ -1,11 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { FlowNode } from "@nightshift/flows";
-import {
-	dataProblem,
-	flowOutputsVerdict,
-	outputVerdict,
-	schemaProblem,
-} from "./output-schema";
+import { dataProblem, schemaProblem } from "@nightshift/flows/json-schema";
+import { flowOutputsVerdict, outputVerdict } from "./output-schema";
 
 describe("output schemas", () => {
 	test("a file shape is a string of the format file", () => {

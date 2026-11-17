@@ -27,7 +27,6 @@
 		"@nightshift/flows": "workspace:*",
 		"@nightshift/refusal": "workspace:*",
 		"@nightshift/time": "workspace:*",
-		"ajv": "^8.20.0",
 		"defuddle": "0.19.6",
 		"drizzle-orm": "catalog:",
 		"fast-xml-parser": "5.12.1",

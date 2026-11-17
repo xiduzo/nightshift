@@ -7,6 +7,7 @@ import {
 	type TemplateContext,
 	type VariableResult,
 } from "@nightshift/flows";
+import { dataProblem } from "@nightshift/flows/json-schema";
 import type { Device } from "../device";
 import { type KnowledgeUseEvent, knowledgeUseEvent } from "../knowledge";
 import {
@@ -55,7 +56,6 @@ import {
 import { openGate } from "./gate";
 import type { WrittenBrief } from "./gate-brief";
 import { keepShapes, stepShapes } from "./kept-shapes";
-import { dataProblem } from "./output-schema";
 import {
 	entryOf,
 	type ResumeRules,

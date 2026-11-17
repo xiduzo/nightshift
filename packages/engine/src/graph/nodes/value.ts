@@ -6,6 +6,7 @@ import {
 	renderTemplate,
 	type ValueNode,
 } from "@nightshift/flows";
+import { dataProblem } from "@nightshift/flows/json-schema";
 import { type Climb, climbBackground, climbLines } from "../cascade";
 import { climbing } from "../climb";
 import {
@@ -16,7 +17,6 @@ import {
 	type Requirement,
 	type StepContext,
 } from "../context";
-import { dataProblem } from "../output-schema";
 import { RESUME_RULES } from "../resume-point";
 import type { CascadeTry } from "../state";
 import type { GateAsk } from "./choosers/person";

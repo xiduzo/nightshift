@@ -1,68 +1,26 @@
 import {
 	type AskForm,
-	FILE_FORMAT,
 	type Flow,
 	type FlowNode,
 	fitOutput,
 	type JsonValue,
 	NODE_FAMILY,
-	RESERVED_DATA_KEYS,
 	typedOutput,
 } from "@nightshift/flows";
-import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js";
+import {
+	dataProblem,
+	outputDataProblem,
+	schemaProblem,
+} from "@nightshift/flows/json-schema";
 
 /**
- * Checks data against a node's output schema (JSON Schema draft 2020-12):
- * an Agent's report `data`, the value a Value node made, the data of a
- * Command or a Tool step. The harness or the decider shows the schema to
- * the model; only the engine enforces it (`outputVerdict`): a schema a
- * person wrote or confirmed holds the step to it, an inferred one warns.
+ * Checks a step's data against its node's output schema: an Agent's
+ * report `data`, the value a Value node made, the data of a Command or a
+ * Tool step. The check itself is `@nightshift/flows/json-schema`: the
+ * report tool runs it too, so the agent can fix its data in the session.
+ * Here the engine enforces it (`outputVerdict`): a schema a person wrote
+ * or confirmed holds the step to it, an inferred one warns.
  */
-
-const ajv = new Ajv2020({ allErrors: true, strict: false });
-// A file shape (`{ "type": "string", "format": "file" }`) names a file the
-// run wrote. Any string passes.
-ajv.addFormat(FILE_FORMAT, true);
-/** Compiled schemas by their JSON text: a flow's schemas rarely change. */
-const compiled = new Map<string, ValidateFunction>();
-
-function compile(schema: Record<string, unknown>): ValidateFunction {
-	const key = JSON.stringify(schema);
-	const known = compiled.get(key);
-	if (known) return known;
-	const validate = ajv.compile(schema);
-	compiled.set(key, validate);
-	return validate;
-}
-
-/** Null when the schema compiles, else why it is not a valid JSON Schema. */
-export function schemaProblem(schema: Record<string, unknown>): string | null {
-	try {
-		compile(schema);
-		return null;
-	} catch (error) {
-		return `The output schema of this node is not a valid JSON Schema: ${error instanceof Error ? error.message : String(error)}`;
-	}
-}
-
-/**
- * Null when `data` matches the schema, else ajv's problems in one line
- * (`data/tests must be array`). A schema that does not compile is reported
- * the same way; check it first with `schemaProblem` when that matters.
- */
-export function dataProblem(
-	schema: Record<string, unknown>,
-	data: unknown,
-): string | null {
-	let validate: ValidateFunction;
-	try {
-		validate = compile(schema);
-	} catch (error) {
-		return error instanceof Error ? error.message : String(error);
-	}
-	if (validate(data)) return null;
-	return ajv.errorsText(validate.errors, { dataVar: "data", separator: "; " });
-}
 
 /**
  * An Agent's report `data` as the schema wants it. A model sometimes sends
@@ -110,34 +68,9 @@ function checkData(
 			? "The agent's step report has no data, but this node has an output schema."
 			: "The step gave no data, but this node has an output schema.";
 	}
-	const problems = dataProblem(schema, withoutReservedKeys(schema, data));
+	const problems = outputDataProblem(schema, data);
 	if (problems === null) return null;
 	return `${DATA_WORDS[type] ?? "The data of this step"} does not match the output schema: ${problems}.`;
-}
-
-/**
- * The data without the keys a node's data may hold whatever its schema
- * says (`RESERVED_DATA_KEYS`: a command's `outcome` and `scores`), unless
- * the schema names them itself.
- */
-function withoutReservedKeys(
-	schema: Record<string, unknown>,
-	data: unknown,
-): unknown {
-	if (typeof data !== "object" || data === null || Array.isArray(data)) {
-		return data;
-	}
-	const named =
-		typeof schema.properties === "object" && schema.properties !== null
-			? Object.keys(schema.properties)
-			: [];
-	const extra = RESERVED_DATA_KEYS.filter(
-		(key) => key in data && !named.includes(key),
-	);
-	if (extra.length === 0) return data;
-	const kept: Record<string, unknown> = { ...data };
-	for (const key of extra) delete kept[key];
-	return kept;
 }
 
 /**

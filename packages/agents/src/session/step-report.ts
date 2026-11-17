@@ -16,14 +16,18 @@
  * input schema then has `outcome` as an enum of those outcomes and a required
  * `data` property that carries the JSON Schema as is. TanStack AI takes a
  * plain JSON Schema as a tool's `inputSchema` and the MCP bridge advertises
- * it unchanged, so the model sees the exact schema. The harness only checks
- * the outcome and that `data` is there; validating `data` is the engine's job.
+ * it unchanged, so the model sees the exact schema. Most harnesses do not
+ * hold a tool call to its schema, so the tool checks `data` itself with the
+ * engine's own check (`outputDataProblem`). Data that does not match gets an
+ * error result that says what is wrong, and the agent calls again in the
+ * same session. The engine still judges the last report's data.
  *
  * The translator turns either channel into a `report` event (see `translate.ts`).
  * A valid tool report counts even when its delivery fails, unless the
  * result says it was refused (`isRefusedReport`).
  */
 import { learningNotes } from "@nightshift/flows";
+import { outputDataProblem } from "@nightshift/flows/json-schema";
 import { toolDefinition } from "@tanstack/ai";
 import { LEARNINGS_FIELD_DESCRIPTION, LEARNINGS_RULE } from "../knowledge";
 import type {
@@ -161,6 +165,7 @@ export function toolReportInstruction(rules: ReportRules): string {
 		...(rules.output
 			? [
 					"Put the structured result in `data`; it must match the tool's schema for `data`.",
+					`When the tool answers that \`data\` does not match, fix \`data\` and call \`${REPORT_TOOL_NAME}\` again.`,
 				]
 			: []),
 		...(rules.learnings ? [LEARNINGS_RULE] : []),
@@ -248,6 +253,15 @@ export function isReportTool(
 export const INVALID_REPORT_TEXT = "Invalid report. Expected";
 
 /**
+ * The start of the error `reportStepTool` gives a report whose `data` does
+ * not match the output schema. Such a report still counts (see
+ * `isRefusedReport`): a later report replaces it, and when none comes the
+ * engine ends the step with what is wrong with the data.
+ */
+export const INVALID_DATA_TEXT =
+	"The report was not recorded: `data` does not match its schema.";
+
+/**
  * What a failed `report_step` result says when the report itself was
  * refused, not lost on the way:
  * - Night Shift's own check (`reportStepTool`). It runs `parseStepReport`
@@ -281,16 +295,19 @@ const REFUSED_REPORT = new RegExp(
 /**
  * True when the text of a failed `report_step` result says the report was
  * refused: by Night Shift's own check, by the harness's input check, or by
- * a permission denial. False for a report that was lost on the way.
+ * a permission denial. False for a report that was lost on the way, and
+ * for one whose `data` did not match (`INVALID_DATA_TEXT`): the engine
+ * judges that data, so the step ends with what is wrong with it.
  */
 export function isRefusedReport(text: string): boolean {
+	if (text.includes(INVALID_DATA_TEXT)) return false;
 	return REFUSED_REPORT.test(text);
 }
 
 /**
  * Check a report: an outcome of the rules, a string summary, and `data`
  * when the rules have an output schema. Returns undefined when it is not a
- * valid report. `data` is passed on as is (the engine validates it), except
+ * valid report. `data` is passed on as is (the tool and the engine check it), except
  * an object or array sent as JSON text, which models do now and then.
  */
 export function parseStepReport(
@@ -543,8 +560,9 @@ export function reportInputSchema(rules: ReportRules): Record<string, unknown> {
 
 /**
  * The `report_step` tool. It only checks and acknowledges: the report
- * itself is read from the tool call in the stream. An invalid input throws,
- * so the agent gets an error result and can call again.
+ * itself is read from the tool call in the stream. An invalid input, or
+ * `data` that does not match the output schema, throws, so the agent gets
+ * an error result that says what is wrong and can call again.
  */
 export function reportStepTool(
 	stepReport: boolean | StepReportSpec | undefined = true,
@@ -574,8 +592,17 @@ export function reportStepTool(
 				: `${TOOL_DESCRIPTION} Outcomes: ${outcomeList(rules)}.`,
 		inputSchema: reportInputSchema(rules),
 	}).server((args: unknown) => {
-		if (!parseStepReport(args, rules)) {
+		const report = parseStepReport(args, rules);
+		if (!report) {
 			throw new Error(`${INVALID_REPORT_TEXT} { ${expected} }.`);
+		}
+		const problem = rules.output
+			? outputDataProblem(rules.output, report.data)
+			: null;
+		if (problem !== null) {
+			throw new Error(
+				`${INVALID_DATA_TEXT} ${problem}. Fix \`data\` so it matches the schema, then call ${REPORT_TOOL_NAME} again.`,
+			);
 		}
 		return REPORT_ACK;
 	});
