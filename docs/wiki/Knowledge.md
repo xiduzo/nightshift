@@ -110,7 +110,7 @@ For scripts: every Command step, and every command that an agent runs, finds the
 
 An agent can propose a short note about the project that helps the next agent, such as "The client writes prices in euros". A proposed note waits for you. No agent reads it until you keep it.
 
-**Learnings to check** on the Knowledge page shows one note at a time, with how many are left:
+**Learnings to check** on the Knowledge page shows one note at a time. The bar at the bottom of the page shows how many are left, and the answers:
 
 - **True** keeps the note. Agents read it from their next run.
 - **Not true** deletes it.

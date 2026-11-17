@@ -18,18 +18,17 @@ import { Switch } from "@nightshift/ui/components/switch";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { BookOpenIcon } from "lucide-react";
-import { useCallback, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import { toast } from "sonner";
 import { AskAnswer } from "./ask-answer";
 import { AskTellBox, type BoxMode } from "./ask-tell-box";
 import { KnowledgeSection, useKnowledge } from "./knowledge-layout";
 import { MeaningLine } from "./knowledge-search";
 import {
-	NotesThread,
-	noteKey,
-	type Said,
+	LearningsFooter,
+	LearningsToCheck,
 	useNotesToCheck,
-} from "./notes-thread";
+} from "./learnings-to-check";
 import { factsLine, type TellOutcome, tellReply } from "./overview-words";
 import { knowledgeMutations, knowledgeQueries } from "./queries";
 import { OftenSelect, ToldLinkRows, useToldLinks } from "./told-links";
@@ -52,19 +51,11 @@ export function KnowledgeOverviewPage() {
 	const [mode, setMode] = useState<BoxMode>("ask");
 	const search = useKnowledgeHits(projectId, { enabled: mode === "ask" });
 	const [changing, setChanging] = useState<NoteToCheck | null>(null);
-	const [said, setSaid] = useState<Said[]>([]);
 	const [byAgent, setByAgent] = useState(false);
 	const [agentOften, setAgentOften] = useState<HowOften>(AGENT_OFTEN);
 	const [sending, setSending] = useState(false);
 	const agentId = useId();
-	// Each Tell of this visit gets its own key in the thread.
-	const tellCount = useRef(0);
-
-	const unsay = useCallback(
-		(key: string) => setSaid((now) => now.filter((one) => one.key !== key)),
-		[],
-	);
-	const notes = useNotesToCheck(projectId, unsay);
+	const notes = useNotesToCheck(projectId);
 	const told = useToldLinks(projectId, search.text, {
 		enabled: mode === "tell" && changing === null && can.save,
 		schedules: can.schedules,
@@ -116,15 +107,7 @@ export function KnowledgeOverviewPage() {
 			if (changing) {
 				const kept = await notes.tell({ note: text, replaces: changing });
 				if (kept) {
-					setSaid((now) => [
-						...now,
-						{
-							kind: "answer",
-							key: noteKey(changing),
-							note: changing.note,
-							answer: text,
-						},
-					]);
+					toast.success("Changed. Agents read your note from their next run.");
 					clearBox();
 				}
 				return;
@@ -174,17 +157,13 @@ export function KnowledgeOverviewPage() {
 					linksIn(text).length > 0 && can.save ? toldNote(text) : text;
 				if (note !== null) outcome.note = await notes.tell({ note });
 			}
-			tellCount.current += 1;
-			const key = `told:${tellCount.current}`;
-			setSaid((now) => [
-				...now,
-				{
-					kind: "told",
-					key,
-					text,
-					reply: tellReply(outcome),
-				},
-			]);
+			// Night Shift answers in a toast: what it saved, what it reads, what stays out.
+			const reply = tellReply(outcome);
+			if (outcome.failed.length > 0 || outcome.gone > 0 || outcome.unread > 0) {
+				toast.warning(reply);
+			} else {
+				toast.success(reply);
+			}
 			clearBox();
 		} finally {
 			setSending(false);
@@ -219,125 +198,130 @@ export function KnowledgeOverviewPage() {
 			: null;
 
 	return (
-		<div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-			<KnowledgeSection
-				title="What should your agents know?"
-				description={factsLine({
-					files: knowledge.files.length,
-					sources: knowledge.syncs.length,
-					asked: asked.length,
-					answered: asked.filter((question) => question.hits.length > 0).length,
-				})}
-				actions={
-					<Button
-						variant="outline"
-						nativeButton={false}
-						render={
-							<Link
-								to="/projects/$projectId/knowledge/files"
-								params={{ projectId }}
-							/>
-						}
-					>
-						<BookOpenIcon data-icon="inline-start" />
-						All knowledge
-					</Button>
-				}
-			>
-				<div className="flex flex-col gap-2">
-					{changing ? (
-						<p className="text-sm text-muted-foreground">
-							Write the note as it should be. It takes the place of the old one.{" "}
-							<Button
-								variant="link"
-								size="sm"
-								className="h-auto p-0"
-								onClick={clearBox}
-							>
-								Cancel
-							</Button>
-						</p>
-					) : null}
-					<AskTellBox
-						mode={mode}
-						onMode={(next) => {
-							setMode(next);
-							if (next === "ask") setChanging(null);
-						}}
-						text={search.text}
-						onText={search.setText}
-						onSend={() => void send()}
-						tells={tells}
-						sending={sending}
-						blockedBy={blockedBy}
-						inside={
-							mode !== "tell" || changing ? null : linkCount > 0 && can.save ? (
-								<ToldLinkRows told={told} schedules={can.schedules} />
-							) : search.text.trim() !== "" && can.save ? (
-								<Field orientation="horizontal" className="border-t px-3 py-2">
-									<Switch
-										id={agentId}
-										checked={byAgent}
-										onCheckedChange={setByAgent}
-									/>
-									<FieldContent>
-										<FieldLabel htmlFor={agentId} className="font-normal">
-											Let an agent fetch this from where it lives
-										</FieldLabel>
-									</FieldContent>
-									{byAgent ? (
-										<OftenSelect
-											value={can.schedules ? agentOften : "once"}
-											schedules={can.schedules}
-											onChange={setAgentOften}
+		<div className="flex flex-1 flex-col gap-6">
+			<div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+				<KnowledgeSection
+					title="What should your agents know?"
+					description={factsLine({
+						files: knowledge.files.length,
+						sources: knowledge.syncs.length,
+						asked: asked.length,
+						answered: asked.filter((question) => question.hits.length > 0)
+							.length,
+					})}
+					actions={
+						<Button
+							variant="outline"
+							nativeButton={false}
+							render={
+								<Link
+									to="/projects/$projectId/knowledge/files"
+									params={{ projectId }}
+								/>
+							}
+						>
+							<BookOpenIcon data-icon="inline-start" />
+							All knowledge
+						</Button>
+					}
+				>
+					<div className="flex flex-col gap-2">
+						{changing ? (
+							<p className="text-sm text-muted-foreground">
+								Write the note as it should be. It takes the place of the old
+								one.{" "}
+								<Button
+									variant="link"
+									size="sm"
+									className="h-auto p-0"
+									onClick={clearBox}
+								>
+									Cancel
+								</Button>
+							</p>
+						) : null}
+						<AskTellBox
+							mode={mode}
+							onMode={(next) => {
+								setMode(next);
+								if (next === "ask") setChanging(null);
+							}}
+							text={search.text}
+							onText={search.setText}
+							onSend={() => void send()}
+							tells={tells}
+							sending={sending}
+							blockedBy={blockedBy}
+							inside={
+								mode !== "tell" || changing ? null : linkCount > 0 &&
+									can.save ? (
+									<ToldLinkRows told={told} schedules={can.schedules} />
+								) : search.text.trim() !== "" && can.save ? (
+									<Field
+										orientation="horizontal"
+										className="border-t px-3 py-2"
+									>
+										<Switch
+											id={agentId}
+											checked={byAgent}
+											onCheckedChange={setByAgent}
 										/>
-									) : null}
-								</Field>
-							) : null
-						}
-					/>
-					{mode === "ask" ? <MeaningLine projectId={projectId} /> : null}
-				</div>
-				{asking ? (
-					<AskAnswer
-						query={search.query}
-						hits={search.hits.data}
-						error={search.hits.error}
-						onOpen={openFile}
-						onTell={
-							tells
-								? () => {
-										setMode("tell");
-										search.setText("");
-									}
-								: undefined
-						}
-						onFind={
-							can.save && can.startRuns
-								? () => findIt.mutate(search.query)
-								: undefined
-						}
-						finding={findIt.isPending}
-					/>
-				) : (
-					<NotesThread
-						notes={notes}
-						said={said}
-						onAnswer={(note, decision, answer) => {
-							setSaid((now) => [
-								...now,
-								{ kind: "answer", key: noteKey(note), note: note.note, answer },
-							]);
-							notes.settle(note, decision);
-						}}
-						onChange={(note) => {
-							setChanging(note);
-							setMode("tell");
-							search.setText(note.note);
-						}}
-					/>
-				)}
-			</KnowledgeSection>
+										<FieldContent>
+											<FieldLabel htmlFor={agentId} className="font-normal">
+												Let an agent fetch this from where it lives
+											</FieldLabel>
+										</FieldContent>
+										{byAgent ? (
+											<OftenSelect
+												value={can.schedules ? agentOften : "once"}
+												schedules={can.schedules}
+												onChange={setAgentOften}
+											/>
+										) : null}
+									</Field>
+								) : null
+							}
+						/>
+						{mode === "ask" ? <MeaningLine projectId={projectId} /> : null}
+					</div>
+					{asking ? (
+						<AskAnswer
+							query={search.query}
+							hits={search.hits.data}
+							error={search.hits.error}
+							onOpen={openFile}
+							onTell={
+								tells
+									? () => {
+											setMode("tell");
+											search.setText("");
+										}
+									: undefined
+							}
+							onFind={
+								can.save && can.startRuns
+									? () => findIt.mutate(search.query)
+									: undefined
+							}
+							finding={findIt.isPending}
+						/>
+					) : (
+						<LearningsToCheck notes={notes} />
+					)}
+				</KnowledgeSection>
+			</div>
+			{asking || changing ? null : (
+				<LearningsFooter
+					notes={notes}
+					onAnswer={notes.settle}
+					onChange={(note) => {
+						setChanging(note);
+						setMode("tell");
+						search.setText(note.note);
+						window.scrollTo({ top: 0, behavior: "smooth" });
+					}}
+				/>
+			)}
 		</div>
 	);
 }
