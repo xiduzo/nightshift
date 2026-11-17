@@ -38,6 +38,7 @@ import type { Climb } from "../cascade";
 import { climbing } from "../climb";
 import { closeStream, consumeStream } from "../consume";
 import {
+	DEFAULT_RESUME_PROMPT,
 	harnessLabel,
 	isWaitKind,
 	type NodeAction,
@@ -648,8 +649,14 @@ async function runSession(
 		else spentTimer = setTimeout(logSpent, wait);
 	};
 
+	/** The harness did more than name the session: it took a turn. */
+	let tookATurn = false;
+
 	const onEvent = async (agentEvent: SessionEvent): Promise<void> => {
 		if (agentEvent.type === "ready" || agentEvent.type === "refused") return;
+		if (agentEvent.type !== "session" && agentEvent.type !== "error") {
+			tookATurn = true;
+		}
 		step.touch();
 		// A search or a read of the knowledge goes to the log, not the transcript.
 		if (agentEvent.type === "knowledge") {
@@ -776,6 +783,22 @@ async function runSession(
 	sessionOver = true;
 	clearTimeout(spentTimer);
 	await session.ended(final);
+	// The resume failed before a single turn: the harness has no
+	// conversation to go on with (the session ended before its first turn,
+	// or another computer keeps it). A new session starts instead.
+	if (
+		resumeSessionId !== null &&
+		!tookATurn &&
+		!signal.aborted &&
+		final.outcome === "failed" &&
+		final.errorKind === "harness"
+	) {
+		return runSession(ctx, node, step, {
+			...input,
+			resumeSessionId: null,
+			prompt: freshPrompt(node, step, input.prompt),
+		});
+	}
 	if (final.outcome === "finished" && final.costUsd === null) {
 		await step.warn(
 			"cost-unknown",
@@ -880,6 +903,21 @@ async function runSession(
 		final.error ?? "The agent failed.",
 		harnessSessionId,
 	);
+}
+
+/**
+ * The prompt of a new session in place of a resume that failed: the node's
+ * own prompt, then the follow-up when it says more than "go on".
+ */
+function freshPrompt(
+	node: AgentNode,
+	step: StepHandle,
+	followUp: string | null,
+): string {
+	const own = agentPrompt(node, step.tctx);
+	return followUp === null || followUp === DEFAULT_RESUME_PROMPT
+		? own
+		: `${own}\n\n${followUp}`;
 }
 
 /**

@@ -1062,6 +1062,90 @@ describe("the Agent node", () => {
 		});
 	});
 
+	test("a resume the harness cannot go on with starts a new session with the node's prompt", async () => {
+		// The first session fails before its first turn; Claude Code then has
+		// no conversation for its id, and the resume fails at once too.
+		const noTurn = (message: string) => ({
+			steps: [],
+			outcome: { type: "error" as const, kind: "harness" as const, message },
+		});
+		const harness = fakeHarness((_input: AgentSessionInput, call: number) =>
+			call === 0
+				? noTurn("withSandbox is not defined")
+				: call === 1
+					? noTurn("No conversation found with session ID: fake-session-1")
+					: reportingScript("pass", "Fixed"),
+		);
+		const h = await startRun(
+			sandbox,
+			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
+			{ harness },
+		);
+		await drive(h, { inputs: {} });
+		const [stepRow] = deriveSteps(foldRun(await h.events()));
+		await h.log.append({
+			type: "RunResumed",
+			runId: h.runId,
+			payload: {
+				nodeId: "worker",
+				stepId: stepRow?.id as string,
+				prompt: "Also add tests",
+				scope: null,
+				by: "person",
+			},
+		});
+		const second = await drive(
+			h,
+			new Command({ resume: { kind: "resume", prompt: "Also add tests" } }),
+		);
+		expect(second.state.ended?.status).toBe("finished");
+		const own = harness.calls[0]?.prompt ?? "";
+		expect(
+			harness.calls.map((c) => [c.prompt, c.resumeSessionId ?? null]),
+		).toEqual([
+			[own, null],
+			["Also add tests", "fake-session-1"],
+			[`${own}\n\nAlso add tests`, null],
+		]);
+		const steps = deriveSteps(foldRun(await h.events()));
+		expect(steps).toHaveLength(1);
+		expect(steps[0]?.outcome).toBe("pass");
+		expect(steps[0]?.sessions.map((s) => s.ending?.outcome)).toEqual([
+			"failed",
+			"failed",
+			"finished",
+		]);
+	});
+
+	test("a resume that fails after a turn does not start over", async () => {
+		const harness = fakeHarness((_input: AgentSessionInput, call: number) =>
+			call === 0 ? failingScript("boom") : failingScript("boom again"),
+		);
+		const h = await startRun(
+			sandbox,
+			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
+			{ harness },
+		);
+		await drive(h, { inputs: {} });
+		const [stepRow] = deriveSteps(foldRun(await h.events()));
+		await h.log.append({
+			type: "RunResumed",
+			runId: h.runId,
+			payload: {
+				nodeId: "worker",
+				stepId: stepRow?.id as string,
+				prompt: null,
+				scope: null,
+				by: "person",
+			},
+		});
+		await drive(h, new Command({ resume: { kind: "resume" } }));
+		expect(harness.calls.map((c) => c.resumeSessionId ?? null)).toEqual([
+			null,
+			"fake-session-1",
+		]);
+	});
+
 	test("a parked step without a harness session resumes as a new visit", async () => {
 		const harness = fakeHarness(reportingScript("pass"));
 		const h = await startRun(
