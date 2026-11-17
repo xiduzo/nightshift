@@ -93,6 +93,7 @@
 	},
 	"packageManager": "bun@1.4.4",
 	"patchedDependencies": {
-		"pi-acp@0.0.34": "patches/pi-acp@0.0.34.patch"
+		"pi-acp@0.0.34": "patches/pi-acp@0.0.34.patch",
+		"@tanstack/ai-claude-code@1.0.2": "patches/@tanstack%2Fai-claude-code@1.0.2.patch"
 	}
 }

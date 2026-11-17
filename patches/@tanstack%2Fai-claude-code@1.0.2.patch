@@ -1,0 +1,18 @@
+diff --git a/dist/esm/stream/translate.js b/dist/esm/stream/translate.js
+index fda8587108a63e0fa077d6524210976e265165f2..44fb9a99baac9f612ecc25249e1defa91fc6621f 100644
+--- a/dist/esm/stream/translate.js
++++ b/dist/esm/stream/translate.js
+@@ -149,8 +149,11 @@ async function* translateSdkStream(sdkMessages, ctx) {
+ 			try {
+ 				const parsed = toolCall.args ? JSON.parse(toolCall.args) : {};
+ 				input = parsed && typeof parsed === "object" ? parsed : {};
+-			} catch (error) {
+-				if (!interrupted) throw error;
++			} catch {
++				// Night Shift: the model sent arguments that are not valid JSON.
++				// Claude Code refuses the call with an error result, and the model
++				// can call again. Throwing here would end the whole session.
++				if (!interrupted) input = { __unparsedToolInput: { raw: toolCall.args } };
+ 			}
+ 			partialToolCalls.delete(index);
+ 			yield {
