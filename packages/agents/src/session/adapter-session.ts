@@ -237,13 +237,26 @@ function withArtifactTool(
  * session, not when Night Shift starts.
  */
 async function sandboxKit() {
-	const [sandbox, { localProcessSandbox }, { withSharedToolBridge }] =
-		await Promise.all([
-			import("@tanstack/ai-sandbox"),
-			import("@tanstack/ai-sandbox-local-process"),
-			import("./tool-bridge"),
-		]);
-	return { ...sandbox, localProcessSandbox, withSharedToolBridge };
+	const [
+		{ defineSandbox, defineWorkspace, localSource, mcpSkill, withSandbox },
+		{ localProcessSandbox },
+		{ withSharedToolBridge },
+	] = await Promise.all([
+		import("@tanstack/ai-sandbox"),
+		import("@tanstack/ai-sandbox-local-process"),
+		import("./tool-bridge"),
+	]);
+	// Only the names a session uses: a spread of the module reads every
+	// export, and one the bundle left out ends every session.
+	return {
+		defineSandbox,
+		defineWorkspace,
+		localSource,
+		mcpSkill,
+		withSandbox,
+		localProcessSandbox,
+		withSharedToolBridge,
+	};
 }
 
 /**

@@ -115,6 +115,11 @@ jobs:
           ELECTROBUN_APPLEID: ${{ secrets.ELECTROBUN_APPLEID }}
           ELECTROBUN_APPLEIDPASS: ${{ secrets.ELECTROBUN_APPLEIDPASS }}
 
+      # Bun now and then leaves modules out of the bundle. The app starts, but
+      # code it loads later fails. This fails the build instead of the release.
+      - name: Check the bundle
+        run: bun apps/desktop/scripts/check-bundle.ts
+
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.target }}
