@@ -4,6 +4,6 @@
  * `public/sw.js`), and your notification settings and screens.
  */
 
-export { NotificationSettingsCard } from "./components/notification-settings-card";
 export { usePushUrgencies } from "./push-urgencies";
+export { NotificationSettingsCard } from "./settings";
 export { NotificationStream } from "./use-notification-stream";

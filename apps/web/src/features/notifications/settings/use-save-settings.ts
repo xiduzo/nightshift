@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import type { NotificationSettings } from "@/shared/api";
-import { notificationMutations, notificationQueries } from "./queries";
+import { notificationMutations, notificationQueries } from "../queries";
 
 /**
  * Saves a change of your notification settings at once. The page shows

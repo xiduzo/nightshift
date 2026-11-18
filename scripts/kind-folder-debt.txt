@@ -10,6 +10,5 @@
 # The check fails a kind folder that is not listed, and fails a line once
 # its folder is gone. Do not add a line: rename or move the new folder.
 # Remove a line in the change that removes the folder.
-apps/web/src/features/notifications/components
 apps/web/src/features/settings/components
 apps/web/src/features/settings/hooks

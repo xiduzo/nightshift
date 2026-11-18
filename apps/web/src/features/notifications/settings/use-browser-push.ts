@@ -11,8 +11,8 @@ import {
 	setOwnScreenId,
 	subscribe,
 	subscriptionParts,
-} from "./browser";
-import { notificationMutations, notificationQueries } from "./queries";
+} from "../browser";
+import { notificationMutations, notificationQueries } from "../queries";
 
 /**
  * Whether this browser gets your notifications while no Night Shift page is

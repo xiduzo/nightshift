@@ -42,9 +42,9 @@ import {
 import { UrgencyMarker } from "@/shared/urgency";
 import { browserPushErrorText } from "../browser";
 import { notificationQueries } from "../queries";
-import { useBrowserPush } from "../use-browser-push";
-import { useSaveSettings } from "../use-save-settings";
 import { ScreensCard } from "./screens-card";
+import { useBrowserPush } from "./use-browser-push";
+import { useSaveSettings } from "./use-save-settings";
 
 const EVENTS: {
 	key: keyof NotificationSettings["events"];
