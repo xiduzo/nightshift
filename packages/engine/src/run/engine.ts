@@ -797,8 +797,8 @@ export function createEngine(
 			return options.secret(name, { spaceId, projectId });
 		},
 		firesHere,
-		// The Settings switch, and NIGHTSHIFT_SCHEDULER=off: no schedule starts.
-		enabled: () => options.scheduler !== false && runSettings().scheduler,
+		started: () => options.scheduler !== false,
+		enabled: () => runSettings().scheduler,
 		startRun: places.startForSchedule,
 		scorePullRequests: (projectId, webhook) =>
 			pullRequestScores.take(projectId, webhook),
