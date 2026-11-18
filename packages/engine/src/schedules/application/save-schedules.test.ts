@@ -1,0 +1,186 @@
+import { describe, expect, test } from "bun:test";
+import type { Schedule } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
+import type { Actor } from "../../contract";
+import { NOT_ON_THIS_COMPUTER } from "../../projects";
+import type { UsageMoment } from "../../usage";
+import { inMemorySchedulePorts } from "../adapters/out/in-memory-neighbours";
+import { saveSchedules } from "./save-schedules";
+
+/** The save of a project's schedules, on in-memory adapters. */
+
+const P = "project-1";
+const SPACE = "space-1";
+const ANN: Actor = { personId: "person-ann" };
+// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
+const HOOK_SECRET = "${HOOK_SECRET}";
+
+function nightly(extra: Partial<Schedule> = {}): Schedule {
+	return {
+		id: "nightly",
+		flow: "night",
+		inputs: {},
+		cron: "0 22 * * *",
+		enabled: true,
+		...extra,
+	};
+}
+
+/** A project in a Space, with a Clone here unless the test says otherwise. */
+function project(clone: { hasFolder?: boolean; clonedHere?: boolean } = {}) {
+	const ports = inMemorySchedulePorts(0);
+	ports.projects.add({ id: P, spaceId: SPACE, ...clone });
+	ports.store.seed(P);
+	const usage: UsageMoment[] = [];
+	const save = saveSchedules({
+		...ports,
+		usage: { note: (moment) => usage.push(moment) },
+	});
+	return {
+		ports,
+		usage,
+		save: (schedules: Schedule[], timeZone?: string, spaceId = SPACE) =>
+			save(ANN, {
+				spaceId,
+				projectId: P,
+				schedules,
+				...(timeZone !== undefined ? { timeZone } : {}),
+			}),
+		saved: async () =>
+			(await ports.store.list(P, { validate: false })).schedules,
+	};
+}
+
+/** What a request refuses with, or null. */
+const refusalOf = (work: Promise<unknown>) =>
+	work.then(
+		() => null,
+		(error: unknown) => error,
+	);
+
+describe("the save of a project's schedules", () => {
+	test("saves schedules with problems too, and returns the issues", async () => {
+		const { save, saved } = project();
+		expect(await save([nightly({ flow: "gone" })])).toEqual([
+			{
+				severity: "error",
+				message: 'The flow "gone" does not exist.',
+				scheduleId: "nightly",
+			},
+		]);
+		expect(await saved()).toEqual([nightly({ flow: "gone" })]);
+	});
+
+	test("replaces every schedule of the project", async () => {
+		const { save, saved } = project();
+		await save([nightly({ id: "a" }), nightly({ id: "b" })]);
+		await save([nightly({ id: "b", enabled: false })]);
+		expect(await saved()).toEqual([nightly({ id: "b", enabled: false })]);
+	});
+
+	test("gives the saver's clock to each schedule with a time and no time zone of its own", async () => {
+		const { save, saved } = project();
+		await save(
+			[
+				nightly({ id: "mine" }),
+				nightly({ id: "tokyo", timeZone: "Asia/Tokyo" }),
+			],
+			"Europe/Amsterdam",
+		);
+		expect((await saved()).map((schedule) => schedule.timeZone)).toEqual([
+			"Europe/Amsterdam",
+			"Asia/Tokyo",
+		]);
+
+		// Without the saver's clock, a schedule keeps none.
+		await save([nightly()]);
+		expect((await saved())[0]?.timeZone).toBeUndefined();
+	});
+
+	test("asks the Offer rule for the Space and the person who saves, with the project's flows", async () => {
+		const { ports, save } = project();
+		const flows = { night: { json: { name: "night" } } };
+		ports.store.seed(P, { flows });
+		await save([nightly()], "Europe/Amsterdam");
+		expect(ports.offers.asked).toEqual([
+			{
+				projectId: P,
+				spaceId: SPACE,
+				actor: ANN,
+				// The rule sees the schedules with the saver's clock.
+				schedules: [nightly({ timeZone: "Europe/Amsterdam" })],
+			},
+		]);
+	});
+
+	test("saves what the Offer rule writes: a schedule on another Person's Device runs for the saver", async () => {
+		const { ports, save, saved } = project();
+		ports.offers.writeFor("person-ann");
+		await save([nightly()]);
+		expect(await saved()).toEqual([nightly({ person: "person-ann" })]);
+	});
+
+	test("what the Offer rule refuses passes through, and nothing is saved", async () => {
+		const { ports, save, saved, usage } = project();
+		const refusal = new Refusal("forbidden", "No Offer covers this flow.");
+		ports.offers.refuse(refusal);
+		expect(await refusalOf(save([nightly()]))).toBe(refusal);
+		expect(await saved()).toEqual([]);
+		expect(usage).toEqual([]);
+	});
+
+	test("refuses a project with a folder and no Clone on this computer, before the Offers are asked", async () => {
+		const { ports, save, saved } = project({ clonedHere: false });
+		const refused = await refusalOf(save([nightly()]));
+		expect(refused).toBeInstanceOf(Refusal);
+		expect(refused).toMatchObject({
+			kind: "conflict",
+			message: NOT_ON_THIS_COMPUTER,
+		});
+		expect(ports.offers.asked).toEqual([]);
+		expect(await saved()).toEqual([]);
+	});
+
+	test("a project without a folder needs no Clone", async () => {
+		const { save, saved } = project({ hasFolder: false, clonedHere: false });
+		await save([nightly()]);
+		expect(await saved()).toEqual([nightly()]);
+	});
+
+	test("a project of another Space is not found", async () => {
+		const { ports, save } = project();
+		expect(
+			await refusalOf(save([nightly()], undefined, "space-2")),
+		).toMatchObject({ kind: "not-found" });
+		expect(ports.offers.asked).toEqual([]);
+	});
+
+	test("notes each saved schedule for the usage numbers", async () => {
+		const { save, usage } = project();
+		await save([
+			nightly(),
+			{
+				id: "review",
+				flow: "night",
+				inputs: {},
+				enabled: false,
+				webhook: { secret: HOOK_SECRET },
+				scorePullRequests: true,
+			},
+		]);
+		expect(usage).toEqual([
+			{
+				kind: "schedule-changed",
+				enabled: true,
+				webhook: false,
+				scorePullRequests: false,
+			},
+			{
+				kind: "schedule-changed",
+				enabled: false,
+				webhook: true,
+				scorePullRequests: true,
+			},
+		]);
+	});
+});

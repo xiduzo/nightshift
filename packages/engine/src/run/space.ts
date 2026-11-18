@@ -411,31 +411,37 @@ export function createSpaces(deps: SpacesDeps) {
 			async listSchedules(projectId) {
 				await ready;
 				await projects.find(projectId, spaceId);
-				return deps.scheduleFiles.list(projectId);
+				return deps.scheduleFiles.list(actor, { spaceId, projectId });
 			},
 
 			async pauseScheduleTonight(projectId, scheduleId) {
 				await ready;
 				await projects.find(projectId, spaceId);
-				return deps.scheduleFiles.pauseTonight(projectId, scheduleId);
+				return deps.scheduleFiles.pauseTonight(actor, {
+					spaceId,
+					projectId,
+					scheduleId,
+				});
 			},
 
 			async resumeScheduleTonight(projectId, scheduleId) {
 				await ready;
 				await projects.find(projectId, spaceId);
-				return deps.scheduleFiles.resumeTonight(projectId, scheduleId);
+				return deps.scheduleFiles.resumeTonight(actor, {
+					spaceId,
+					projectId,
+					scheduleId,
+				});
 			},
 
 			async runScheduleNow(projectId, scheduleId) {
 				await ready;
 				await projects.find(projectId, spaceId);
-				return (await deps.pathsFor(spaceId, actor))(
-					await deps.scheduleFiles.runNow(
-						projectId,
-						scheduleId,
-						actor?.personId ?? null,
-					),
-				);
+				return deps.scheduleFiles.runNow(actor, {
+					spaceId,
+					projectId,
+					scheduleId,
+				});
 			},
 
 			async saveSchedules(projectId, schedules, timeZone) {
@@ -446,13 +452,12 @@ export function createSpaces(deps: SpacesDeps) {
 				if (row.folder && row.repoPath === null) {
 					throw new Refusal("conflict", NOT_ON_THIS_COMPUTER);
 				}
-				return deps.scheduleFiles.save(
+				return deps.scheduleFiles.save(actor, {
 					spaceId,
 					projectId,
-					actor,
 					schedules,
-					timeZone,
-				);
+					...(timeZone !== undefined ? { timeZone } : {}),
+				});
 			},
 
 			watchRun(runId, { signal: watching, afterSeq }) {

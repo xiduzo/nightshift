@@ -21,12 +21,9 @@ import { drizzleScheduleLog } from "./adapters/out/drizzle-schedule-log";
 import { scheduledStart } from "./domain/scheduled-start";
 import {
 	createWebhookRefusals,
-	DELIVERIES_SHOWN,
-	latestDeliveries,
 	WEBHOOK_ERROR_WORDS,
 	WEBHOOK_SECRET_WORDS,
 	type WebhookAnswer,
-	type WebhookDelivery,
 	webhookRefusal,
 	webhookScheduleOf,
 } from "./domain/webhook-delivery";
@@ -262,15 +259,7 @@ export function createWebhooks(deps: WebhooksDeps) {
 			};
 		},
 
-		/** The latest webhooks of a schedule, newest first: logged ones and refusals. */
-		async deliveries(
-			projectId: string,
-			scheduleId: string,
-		): Promise<WebhookDelivery[]> {
-			return latestDeliveries(
-				await log.deliveries(projectId, scheduleId, DELIVERIES_SHOWN),
-				refusals.of(projectId, scheduleId),
-			);
-		},
+		/** The refused webhooks of this engine: what the Schedules page lists beside the logged ones. */
+		refusals,
 	};
 }

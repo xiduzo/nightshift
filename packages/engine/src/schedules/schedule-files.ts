@@ -1,41 +1,38 @@
-import type { Schedule } from "@nightshift/flows";
-import type { Actor, OffersPort } from "../contract";
 import type { ProjectFlows } from "../flows";
-import type { RunSummary } from "../read";
-import type { RunStatus } from "../run-status";
 import type { UsageNotes } from "../usage";
-import {
-	pausedTonight,
-	type SchedulePause,
-	withoutEndedPause,
-	withoutPause,
-} from "./domain/pause-tonight";
-import {
-	scheduleOf,
-	withSchedule,
-	withTimeZone,
-} from "./domain/saved-schedules";
-import type { ScheduleRecord } from "./domain/schedule-history";
-import type { ScheduleList, ScheduleResult, Scheduler } from "./scheduler";
+import { flowDocumentScheduleStore } from "./adapters/out/flow-document-schedule-store";
+import { listSchedules } from "./application/list-schedules";
+import { pauseScheduleTonight } from "./application/pause-schedule-tonight";
+import type { ScheduledRuns, ScheduleOffers } from "./application/ports";
+import { resumeScheduleTonight } from "./application/resume-schedule-tonight";
+import { runScheduleNow } from "./application/run-schedule-now";
+import { saveSchedules } from "./application/save-schedules";
+import type { Scheduler } from "./scheduler";
 import type { Webhooks } from "./webhooks";
 
 /**
- * A project's schedules file as a person reads and saves it: each
- * schedule with its next start and how its last cron time went (a
- * webhook's: its latest deliveries), and on a save the Person each
- * schedule on another Person's Device runs for.
+ * A project's schedules as a person reads, saves, pauses and starts
+ * them, as the engine still makes them: a facade that binds the five use
+ * cases of `application/` to their ports. It goes when `wire.ts` binds
+ * them.
  */
 export type ScheduleFilesDeps = {
 	now(): number;
 	/** The project's schedules and flows. */
 	flows: Pick<ProjectFlows, "flows" | "schedules" | "saveSchedules">;
-	scheduler: Pick<Scheduler, "refresh" | "nextAt" | "last" | "runNow">;
-	/** The latest webhooks of each webhook schedule. */
-	webhooks: Pick<Webhooks, "deliveries">;
-	/** The run's status, or null when the log knows no such run. */
-	runStatus(runId: string): Promise<RunStatus | null>;
-	/** The schedules as a Person saves them, with the Offers of another Person's Device (`Peers.offers`). */
-	schedulesWithOffers: OffersPort["schedulesWithOffers"];
+	/** The scheduler's log, watch and runs: one of each for the engine. */
+	scheduler: Pick<Scheduler, "log" | "watch" | "runs">;
+	/** The refused webhooks this engine remembers. */
+	webhooks: Pick<Webhooks, "refusals">;
+	/** Hides the worktree paths of runs on Devices the actor does not own. */
+	pathsFor: ScheduledRuns["shownTo"];
+	/** The project's row when it is in the Space, else "not found". */
+	project(
+		projectId: string,
+		spaceId: string,
+	): Promise<{ folder: boolean; repoPath: string | null }>;
+	/** The Offer rule of a schedule on another Person's Device (`Peers.offers`). */
+	offers: ScheduleOffers;
 	/** Anonymous usage, when this computer records it. */
 	usage?: UsageNotes;
 };
@@ -43,139 +40,31 @@ export type ScheduleFilesDeps = {
 export type ScheduleFiles = ReturnType<typeof createScheduleFiles>;
 
 export function createScheduleFiles(deps: ScheduleFilesDeps) {
-	const { scheduler } = deps;
-
-	/** The project's schedules as the file has them, and the one of `scheduleId`. */
-	async function find(projectId: string, scheduleId: string) {
-		const { schedules } = await deps.flows.schedules(projectId, {
-			validate: false,
-		});
-		return { schedules, schedule: scheduleOf(schedules, scheduleId) };
-	}
-
-	/** Writes the schedule's pause (or none), and what it does to its next start. */
-	async function setPause(
-		projectId: string,
-		schedules: readonly Schedule[],
-		changed: Schedule,
-	): Promise<SchedulePause> {
-		await deps.flows.saveSchedules(projectId, withSchedule(schedules, changed));
-		const at = deps.now();
-		await scheduler.refresh();
-		return {
-			pausedUntil: changed.pausedUntil ?? null,
-			nextAt: scheduler.nextAt(projectId, changed, at),
-		};
-	}
-
-	/** A logged schedule fact, with the status of the run it started. */
-	async function scheduleResult(
-		record: ScheduleRecord | null,
-	): Promise<ScheduleResult | null> {
-		if (!record) return null;
-		if (record.kind !== "fired") return record;
-		return { ...record, runStatus: await deps.runStatus(record.runId) };
-	}
-
+	const { log, watch } = deps.scheduler;
+	const ports = {
+		clock: () => deps.now(),
+		store: flowDocumentScheduleStore(deps.flows),
+		log,
+		watch,
+		refusals: deps.webhooks.refusals,
+		runs: { ...deps.scheduler.runs, shownTo: deps.pathsFor },
+		projects: {
+			inSpace: async (projectId: string, spaceId: string) => {
+				const row = await deps.project(projectId, spaceId);
+				return {
+					hasFolder: Boolean(row.folder),
+					clonedHere: row.repoPath !== null,
+				};
+			},
+		},
+		offers: deps.offers,
+		...(deps.usage ? { usage: deps.usage } : {}),
+	};
 	return {
-		/** The project's schedules, each with its next start, its last result and its issues. */
-		async list(projectId: string): Promise<ScheduleList> {
-			const loaded = await deps.flows.schedules(projectId);
-			await scheduler.refresh();
-			const at = deps.now();
-			const schedules = [];
-			for (const stored of loaded.schedules) {
-				const schedule = withoutEndedPause(stored, at);
-				schedules.push({
-					...schedule,
-					nextAt: scheduler.nextAt(projectId, schedule, at),
-					last: await scheduleResult(scheduler.last(projectId, schedule.id)),
-					deliveries: schedule.webhook
-						? await deps.webhooks.deliveries(projectId, schedule.id)
-						: [],
-					issues: loaded.issues.filter(
-						(issue) => issue.scheduleId === schedule.id,
-					),
-				});
-			}
-			return {
-				path: loaded.path,
-				schedules,
-				issues: loaded.issues.filter((issue) => issue.scheduleId === undefined),
-			};
-		},
-
-		/**
-		 * Pauses the schedule tonight (`pauseTonightEnds`): its next start
-		 * and every start until the morning after it start no run. Refuses
-		 * (`invalid`) a schedule that is off, has a webhook, or has no next
-		 * start.
-		 */
-		async pauseTonight(
-			projectId: string,
-			scheduleId: string,
-		): Promise<SchedulePause> {
-			const { schedules, schedule } = await find(projectId, scheduleId);
-			const at = deps.now();
-			await scheduler.refresh();
-			const next = scheduler.nextAt(projectId, withoutPause(schedule), at);
-			return setPause(projectId, schedules, pausedTonight(schedule, next));
-		},
-
-		/** Ends the schedule's pause tonight: it starts at its next time again. A schedule without a pause stays as it is. */
-		async resumeTonight(
-			projectId: string,
-			scheduleId: string,
-		): Promise<SchedulePause> {
-			const { schedules, schedule } = await find(projectId, scheduleId);
-			return setPause(projectId, schedules, withoutPause(schedule));
-		},
-
-		/**
-		 * Starts the schedule's run now, as if it fired now (`Scheduler.runNow`),
-		 * for `personId` when the schedule names no Person. A pause stays.
-		 */
-		async runNow(
-			projectId: string,
-			scheduleId: string,
-			personId: string | null,
-		): Promise<RunSummary> {
-			const { schedule } = await find(projectId, scheduleId);
-			return scheduler.runNow(projectId, schedule, personId);
-		},
-
-		/**
-		 * Saves the project's schedules, with the Person of each schedule on
-		 * another Person's Device. `timeZone` is the saver's clock: each
-		 * schedule with a time and no time zone of its own gets it.
-		 */
-		async save(
-			spaceId: string,
-			projectId: string,
-			actor: Actor | undefined,
-			schedules: readonly Schedule[],
-			timeZone?: string,
-		) {
-			const project = {
-				id: projectId,
-				flows: () => deps.flows.flows(projectId),
-			};
-			const written = await deps.schedulesWithOffers(
-				project,
-				spaceId,
-				actor,
-				timeZone ? withTimeZone(schedules, timeZone) : schedules,
-			);
-			const issues = await deps.flows.saveSchedules(projectId, written);
-			for (const schedule of written) {
-				deps.usage?.note({
-					kind: "schedule-changed",
-					enabled: schedule.enabled,
-					webhook: schedule.webhook !== undefined,
-					scorePullRequests: schedule.scorePullRequests === true,
-				});
-			}
-			return issues;
-		},
+		list: listSchedules(ports),
+		save: saveSchedules(ports),
+		pauseTonight: pauseScheduleTonight(ports),
+		resumeTonight: resumeScheduleTonight(ports),
+		runNow: runScheduleNow(ports),
 	};
 }

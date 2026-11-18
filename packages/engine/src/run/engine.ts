@@ -76,7 +76,6 @@ import {
 	createScheduleFiles,
 	createScheduler,
 	createWebhooks,
-	DEFAULT_SCHEDULE_TICK_MS,
 	type ScheduleMissed,
 	type WebhookAnswer,
 	type WebhookRequest,
@@ -733,7 +732,7 @@ export function createEngine(
 	const scheduler = createScheduler({
 		db,
 		now,
-		tickMs: internals.scheduleTickMs ?? DEFAULT_SCHEDULE_TICK_MS,
+		tickMs: internals.scheduleTickMs,
 		startRun: places.startForSchedule,
 		log: runLog,
 		// Also a project without a Clone here: its runs run on another Device.
@@ -915,8 +914,9 @@ export function createEngine(
 			usage: options.usage,
 			scheduler,
 			webhooks,
-			runStatus: reads.runStatus,
-			schedulesWithOffers: peers.offers.schedulesWithOffers,
+			pathsFor: peers.pathsFor,
+			project: (projectId, spaceId) => projects.find(projectId, spaceId),
+			offers: peers.offers,
 		}),
 		reads,
 		artifacts,

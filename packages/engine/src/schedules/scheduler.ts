@@ -1,26 +1,22 @@
 import type { Database } from "@nightshift/db";
-import type { Schedule, ScheduleIssue } from "@nightshift/flows";
-import { Refusal } from "@nightshift/refusal";
 import type { StartRunInput } from "../contract";
 import type { ProjectFlows } from "../flows";
 import type { RunLog, RunTrigger } from "../log";
 import type { RunSummary } from "../read";
 import type { RunStatus } from "../run-status";
 import type { UsageNotes } from "../usage";
-import { createScheduleTicker } from "./adapters/in/schedule-ticker";
+import {
+	createScheduleTicker,
+	DEFAULT_SCHEDULE_TICK_MS,
+} from "./adapters/in/schedule-ticker";
 import { drizzleScheduleLog } from "./adapters/out/drizzle-schedule-log";
 import { fireDueSchedules } from "./application/fire-due-schedules";
-import { openRunOf, openRunRefusalWords } from "./domain/open-run";
-import type {
-	ScheduleHistories,
-	ScheduleRecord,
-} from "./domain/schedule-history";
+import type { ScheduledRuns, ScheduleLog } from "./application/ports";
 import {
 	createScheduleWatch,
 	type MissedScheduleTime,
+	type ScheduleWatch,
 } from "./domain/schedule-watch";
-import { scheduledStart } from "./domain/scheduled-start";
-import type { WebhookDelivery } from "./domain/webhook-delivery";
 
 /**
  * The scheduler, as the engine still makes it: a facade over the tick's
@@ -31,7 +27,8 @@ import type { WebhookDelivery } from "./domain/webhook-delivery";
 export type SchedulerDeps = {
 	db: Database;
 	now: () => number;
-	tickMs: number;
+	/** How often it looks for due schedules. Default `DEFAULT_SCHEDULE_TICK_MS`. */
+	tickMs?: number;
 	/** Appends `ScheduleFired` and `ScheduleSkipped`. */
 	log: RunLog;
 	/** The projects a person has not removed, with their folder on this computer. */
@@ -67,31 +64,18 @@ export type Scheduler = {
 	stop(): void;
 	/** One pass over every project. Ticks never overlap: a second call waits for the running one. */
 	tick(): Promise<void>;
-	/** Reads the schedule facts the log gained since the last read. */
-	refresh(): Promise<void>;
 	/**
 	 * Holds the ticks: none starts a run until the release. Resolves once
 	 * the tick under way ended, so its runs are in the log. The release
 	 * ticks at once when the scheduler runs, and is safe to call twice.
 	 */
 	hold(): Promise<() => void>;
-	last(projectId: string, scheduleId: string): ScheduleRecord | null;
-	/**
-	 * The next start: a due time that still starts on the next tick, else
-	 * the next cron time. Paused tonight: the first cron time at or after
-	 * the pause ends. Null when off.
-	 */
-	nextAt(projectId: string, schedule: Schedule, now: number): number | null;
-	/**
-	 * Starts the schedule's run now, as if it fired now, for `personId`
-	 * when the schedule names no Person of its own. Refuses (`conflict`)
-	 * while an earlier run of it is open, and a schedule without a flow.
-	 */
-	runNow(
-		projectId: string,
-		schedule: Schedule,
-		personId: string | null,
-	): Promise<RunSummary>;
+	/** The schedule facts of the log, as the tick reads and writes them. */
+	log: ScheduleLog;
+	/** The watch of this engine: it began when the scheduler was made. */
+	watch: ScheduleWatch;
+	/** The runs a schedule starts and asks about. */
+	runs: Pick<ScheduledRuns, "start" | "status">;
 };
 
 export function createScheduler(deps: SchedulerDeps): Scheduler {
@@ -99,16 +83,10 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 	/** It begins now: a cron time before this moment fell while the daemon was down. */
 	const watch = createScheduleWatch(now());
 	const log = drizzleScheduleLog({ db: deps.db, log: deps.log });
-	/** The histories as the log gave them last. One live view: null before the first read. */
-	let histories: ScheduleHistories | null = null;
-
-	async function refresh(): Promise<ScheduleHistories> {
-		histories = await log.histories();
-		return histories;
-	}
+	const runs = { start: deps.startRun, status: deps.runStatus };
 
 	const ticker = createScheduleTicker({
-		tickMs: deps.tickMs,
+		tickMs: deps.tickMs ?? DEFAULT_SCHEDULE_TICK_MS,
 		fire: fireDueSchedules({
 			log,
 			switch: { on: () => deps.enabled?.() ?? true },
@@ -121,7 +99,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			store: {
 				list: (projectId, options) => deps.flows.schedules(projectId, options),
 			},
-			runs: { start: deps.startRun, status: deps.runStatus },
+			runs,
 			notices: { missed: (time) => deps.missed?.(time) },
 			...(deps.usage ? { usage: deps.usage } : {}),
 			watch,
@@ -132,88 +110,9 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 		start: ticker.start,
 		stop: ticker.stop,
 		tick: ticker.tick,
-		async refresh() {
-			await refresh();
-		},
 		hold: ticker.hold,
-		last(projectId, scheduleId) {
-			return histories?.of(projectId, scheduleId)?.last ?? null;
-		},
-		async runNow(projectId, schedule, personId) {
-			const { flow } = schedule;
-			if (flow === undefined) {
-				throw new Refusal("invalid", "This schedule starts no flow.");
-			}
-			const read = await refresh();
-			const open = await openRunOf(
-				read.of(projectId, schedule.id),
-				deps.runStatus,
-			);
-			if (open) throw new Refusal("conflict", openRunRefusalWords(open));
-			const at = now();
-			const run = await deps.startRun(
-				scheduledStart(projectId, schedule, flow, at, {
-					startedBy: personId ?? undefined,
-				}),
-				{ kind: "schedule", scheduleId: schedule.id, at },
-			);
-			// A cron time before now counts as handled: it does not fire as well.
-			await log.fired({
-				projectId,
-				scheduleId: schedule.id,
-				at,
-				runId: run.id,
-				error: null,
-			});
-			return run;
-		},
-		nextAt(projectId, schedule, at) {
-			return watch.nextStart(
-				projectId,
-				schedule,
-				at,
-				histories?.of(projectId, schedule.id),
-			);
-		},
+		log,
+		watch,
+		runs,
 	};
 }
-
-/** How the last cron time of a schedule went. */
-export type ScheduleResult =
-	| {
-			kind: "fired";
-			/** The cron time (epoch ms). */
-			at: number;
-			runId: string;
-			/** The run's status now. Null when the run is gone. */
-			runStatus: RunStatus | null;
-	  }
-	/** The run did not start, for example the flow has errors or the run cap was reached. */
-	| { kind: "failed"; at: number; error: string }
-	/** The time was not started: missed while the daemon was down, or an earlier run still runs. */
-	| {
-			kind: "skipped";
-			at: number;
-			reason: string;
-			/** The earlier run that still ran, when that is the reason. */
-			runId: string | null;
-	  };
-
-export type ScheduleSummary = Schedule & {
-	/** The next start (epoch ms). Null when paused, for a webhook, or when the cron line does not parse. */
-	nextAt: number | null;
-	/** How the last cron time went. Null for a webhook. */
-	last: ScheduleResult | null;
-	/** A webhook's latest deliveries, newest first. Empty for a cron line. */
-	deliveries: WebhookDelivery[];
-	/** Problems of this schedule. One with an error fails to start. */
-	issues: ScheduleIssue[];
-};
-
-export type ScheduleList = {
-	/** Where the schedules are. */
-	path: string;
-	schedules: ScheduleSummary[];
-	/** Problems of the whole file, for example JSON that does not parse. */
-	issues: ScheduleIssue[];
-};
