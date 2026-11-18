@@ -1,0 +1,668 @@
+import { describe, expect, test } from "bun:test";
+import {
+	type AgentNode,
+	type CallNode,
+	type CommandNode,
+	type ConvertNode,
+	type DecisionNode,
+	type EndNode,
+	type FlowNode,
+	type FlowNodeType,
+	type JoinNode,
+	type LeaseNode,
+	type Outcome,
+	type ServiceNode,
+	type SinceLastRunNode,
+	type ToolNode,
+	touchesDevice,
+	type ValueNode,
+	type WaitNode,
+	type WebRequestNode,
+} from "@nightshift/flows";
+
+import type { DerivedItem, DerivedStep } from "../../log";
+import { testDevice } from "../../testing/test-support";
+import { RESUME_RULES } from "../step/resume-point";
+import { kindOf, kindOfType, NODE_KINDS } from "./node-kinds";
+
+/**
+ * The node-kind descriptors as a table: one fact, every kind. Each table
+ * pins what the switches said before the descriptor took them over
+ * (`compile.ts`, `route.ts`, the step runner, `closeOpenWork`,
+ * `placement/fit.ts` `REQUIREMENTS`), so a new kind shows up here first and
+ * an old one cannot drift. Whether an end is a chosen end (`endsFlow`) and
+ * a Call's `ended` label (`endedLabel`) are facts of the node type in
+ * `@nightshift/flows`, pinned in its table test.
+ */
+
+const node = <N extends FlowNode>(fields: Record<string, unknown>): N =>
+	({ id: "n", position: { x: 0, y: 0 }, ...fields }) as unknown as N;
+
+const agent = (fields: Record<string, unknown> = {}) =>
+	node<AgentNode>({ type: "agent", prompt: "work", ...fields });
+const command = (fields: Record<string, unknown> = {}) =>
+	node<CommandNode>({ type: "command", command: "true", ...fields });
+const tool = (fields: Record<string, unknown> = {}) =>
+	node<ToolNode>({
+		type: "tool",
+		connection: "github",
+		tool: "search",
+		...fields,
+	});
+const decision = (
+	by: DecisionNode["by"],
+	fields: Record<string, unknown> = {},
+) =>
+	node<DecisionNode>({
+		type: "decision",
+		by,
+		options: [{ name: "yes" }, { name: "no" }],
+		...fields,
+	});
+const value = (by: ValueNode["by"], fields: Record<string, unknown> = {}) =>
+	node<ValueNode>({ type: "value", by, ...fields });
+const wait = (
+	until: Record<string, unknown>,
+	fields: Record<string, unknown> = {},
+) => node<WaitNode>({ type: "wait", until, ...fields });
+const call = (fields: Record<string, unknown> = {}) =>
+	node<CallNode>({ type: "call", flow: "other", ...fields });
+const callEach = (source: Record<string, unknown> = { kind: "json" }) =>
+	call({ each: { source } });
+const end = (status: EndNode["status"] = "done") =>
+	node<EndNode>({ type: "end", status });
+const reportFile = () =>
+	node<EndNode>({
+		type: "end",
+		status: "done",
+		report: { kind: "file", path: "report.md" },
+	});
+const join = (fields: Record<string, unknown> = {}) =>
+	node<JoinNode>({ type: "join", wait: "all", ...fields });
+const lease = (fields: Record<string, unknown> = {}) =>
+	node<LeaseNode>({ type: "lease", name: "stack", ...fields });
+const service = (fields: Record<string, unknown> = {}) =>
+	node<ServiceNode>({
+		type: "service",
+		start: "docker compose up -d",
+		ready: { url: "http://127.0.0.1:8080" },
+		...fields,
+	});
+const convert = () =>
+	node<ConvertNode>({ type: "convert", from: "csv", to: "json", value: "a" });
+
+const sinceLastRun = (fields: Record<string, unknown> = {}) =>
+	node<SinceLastRunNode>({
+		type: "since-last-run",
+		items: "{{feed.data.items}}",
+		...fields,
+	});
+
+const webRequest = (fields: Record<string, unknown> = {}) =>
+	node<WebRequestNode>({
+		type: "web-request",
+		method: "GET",
+		url: "https://api.example.com/items",
+		...fields,
+	});
+
+const ALL_TYPES: FlowNodeType[] = [
+	"agent",
+	"command",
+	"tool",
+	"decision",
+	"value",
+	"wait",
+	"call",
+	"end",
+	"join",
+	"lease",
+	"service",
+	"since-last-run",
+	"convert",
+	"web-request",
+];
+
+describe("NODE_KINDS", () => {
+	test("has one descriptor per node type, keyed by its own type", () => {
+		expect(Object.keys(NODE_KINDS).sort()).toEqual([...ALL_TYPES].sort());
+		for (const type of ALL_TYPES) {
+			expect(kindOfType(type).type).toBe(type);
+		}
+	});
+
+	test("kindOf answers for a node what kindOfType answers for its type", () => {
+		for (const n of [
+			agent(),
+			command(),
+			tool(),
+			decision("rule"),
+			value("rule"),
+			wait({ kind: "duration", minutes: 1 }),
+			call(),
+			end(),
+			join(),
+			lease(),
+			service(),
+			sinceLastRun(),
+			convert(),
+			webRequest(),
+		]) {
+			expect(kindOf(n)).toBe(kindOfType(n.type));
+		}
+	});
+});
+
+describe("make and resumeRules", () => {
+	test("every kind has a factory and names its RESUME_RULES entry", () => {
+		const table: [
+			FlowNode,
+			(typeof RESUME_RULES)[keyof typeof RESUME_RULES],
+		][] = [
+			[agent(), RESUME_RULES.agent],
+			[command(), RESUME_RULES.fresh],
+			[tool(), RESUME_RULES.fresh],
+			[decision("person"), RESUME_RULES.gate],
+			[decision("rule"), RESUME_RULES.fresh],
+			[decision("model"), RESUME_RULES.model],
+			[value("rule"), RESUME_RULES.fresh],
+			[value("model"), RESUME_RULES.model],
+			[wait({ kind: "duration", minutes: 1 }), RESUME_RULES.wait],
+			[call(), RESUME_RULES.call],
+			[callEach(), RESUME_RULES.callEach],
+			[end(), RESUME_RULES.fresh],
+			[join(), RESUME_RULES.fresh],
+			[lease(), RESUME_RULES.wait],
+			[service(), RESUME_RULES.fresh],
+			[sinceLastRun(), RESUME_RULES.fresh],
+			[convert(), RESUME_RULES.fresh],
+			[webRequest(), RESUME_RULES.fresh],
+		];
+		for (const [n, rules] of table) {
+			expect(typeof kindOf(n).make).toBe("function");
+			expect(kindOf(n).resumeRules(n)).toBe(rules);
+		}
+	});
+});
+
+describe("aux: the auxiliary graph nodes compile.ts adds", () => {
+	const auxKinds = (n: FlowNode) =>
+		kindOf(n)
+			.aux(n)
+			.map((a) => a.kind);
+
+	test("an Agent, a model Decision, a model Value, a Wait, a Lease and a Service have a wait node", () => {
+		expect(auxKinds(lease())).toEqual(["wait"]);
+		expect(auxKinds(service())).toEqual(["wait"]);
+		expect(auxKinds(webRequest())).toEqual(["wait"]);
+		expect(auxKinds(agent())).toEqual(["wait"]);
+		expect(auxKinds(decision("model"))).toEqual(["wait"]);
+		expect(auxKinds(value("model"))).toEqual(["wait"]);
+		expect(auxKinds(wait({ kind: "duration", minutes: 1 }))).toEqual(["wait"]);
+	});
+
+	test("a person Decision (a Gate) has an ask node with its own factory", () => {
+		const aux = kindOf(decision("person")).aux(decision("person"));
+		expect(aux.map((a) => a.kind)).toEqual(["ask"]);
+		expect(aux[0]?.kind === "ask" && typeof aux[0].make).toBe("function");
+	});
+
+	test("an Agent that asks a person has an ask node too", () => {
+		const asks = agent({ ask: "person" });
+		const aux = kindOf(asks).aux(asks);
+		expect(aux.map((a) => a.kind)).toEqual(["wait", "ask"]);
+		expect(aux[1]?.kind === "ask" && typeof aux[1].make).toBe("function");
+	});
+
+	test("a Command and a Tool wait while their Device is offline", () => {
+		expect(auxKinds(command())).toEqual(["wait"]);
+		expect(auxKinds(tool())).toEqual(["wait"]);
+	});
+
+	test("a Call, an End and a rule Decision or Value have the park node only", () => {
+		expect(auxKinds(end())).toEqual([]);
+		expect(auxKinds(call())).toEqual([]);
+		expect(auxKinds(callEach())).toEqual([]);
+		expect(auxKinds(decision("rule"))).toEqual([]);
+		expect(auxKinds(value("rule"))).toEqual([]);
+		expect(auxKinds(sinceLastRun())).toEqual([]);
+		expect(auxKinds(convert())).toEqual([]);
+	});
+});
+
+describe("endReason and endResult: what route() says of a chosen end", () => {
+	const reason = (n: FlowNode, outcome: Outcome) =>
+		kindOf(n).endReason(n, outcome, {});
+	const result = (n: FlowNode, outcome: Outcome) =>
+		kindOf(n).endResult(n, outcome);
+	const endedAt = (outcome: string) => `Ended at node "n" with "${outcome}".`;
+
+	test("pass is the plain end of an Agent, a Tool, a Value and a Convert", () => {
+		for (const n of [
+			agent(),
+			tool(),
+			value("rule"),
+			value("model"),
+			convert(),
+		]) {
+			expect(reason(n, "pass")).toBeNull();
+		}
+	});
+
+	test("an Agent's own outcome ends with a reason", () => {
+		const own = agent({ outcomes: [{ name: "shipped" }, { name: "fail" }] });
+		expect(reason(own, "shipped")).toBe(endedAt("shipped"));
+	});
+
+	test("a Command's exit on code 0 is its plain end, whatever its name", () => {
+		expect(reason(command(), "pass")).toBeNull();
+		const exits = command({
+			exits: [
+				{ name: "clean", code: 0 },
+				{ name: "dirty", code: 1 },
+				{ name: "broken", code: null },
+			],
+		});
+		expect(reason(exits, "clean")).toBeNull();
+	});
+
+	test("a Decision option ends with a reason unless it is named pass", () => {
+		for (const by of ["person", "rule", "model"] as const) {
+			expect(reason(decision(by), "yes")).toBe(endedAt("yes"));
+			expect(reason(decision(by), "pass")).toBeNull();
+		}
+	});
+
+	test("a Wait that is done ends the flow plainly", () => {
+		const w = wait({ kind: "duration", minutes: 1 });
+		expect(reason(w, "done")).toBeNull();
+	});
+
+	test("a Lease that is held ends the flow plainly", () => {
+		expect(reason(lease(), "held")).toBeNull();
+	});
+
+	test("a Service that is ready ends the flow plainly", () => {
+		expect(reason(service(), "ready")).toBeNull();
+	});
+
+	test("every outcome of a Since last run node ends with a reason", () => {
+		for (const outcome of ["new", "changed", "same"]) {
+			expect(reason(sinceLastRun(), outcome)).toBe(endedAt(outcome));
+		}
+	});
+
+	test("a Join that is done ends the flow plainly", () => {
+		expect(reason(join(), "done")).toBeNull();
+	});
+
+	test("a Call once ends plainly on pass; a Call with each on done", () => {
+		expect(reason(call(), "pass")).toBeNull();
+		expect(reason(callEach(), "done")).toBeNull();
+		expect(reason(callEach(), "halted")).toBe(endedAt("halted"));
+		expect(reason(callEach(), "pass")).toBe(endedAt("pass"));
+	});
+
+	test("an End's result is its status, its reason its message", () => {
+		for (const status of ["done", "nothing-to-do", "failed"] as const) {
+			expect(result(end(status), status)).toBe(status);
+			expect(reason(end(status), status)).toBeNull();
+			expect(
+				kindOf(end(status)).endReason(end(status), status, {
+					message: "No open issues",
+				}),
+			).toBe("No open issues");
+		}
+	});
+
+	test("no other kind gives the run a result", () => {
+		for (const n of [
+			agent(),
+			command(),
+			tool(),
+			decision("person"),
+			value("rule"),
+			wait({ kind: "duration", minutes: 1 }),
+			call(),
+			callEach(),
+		]) {
+			expect(result(n, "pass")).toBeNull();
+		}
+	});
+});
+
+describe("logsCommandOutput: which steps get a command log path", () => {
+	test("a Command, a Call with a command source and a Wait that polls a command", () => {
+		const logs = (n: FlowNode) => kindOf(n).logsCommandOutput(n);
+		expect(logs(command())).toBe(true);
+		expect(logs(callEach({ kind: "command", command: "ls" }))).toBe(true);
+		expect(
+			logs(wait({ kind: "command", command: "test -f x", everyMinutes: 1 })),
+		).toBe(true);
+		expect(logs(callEach({ kind: "json", path: "items" }))).toBe(false);
+		expect(logs(call())).toBe(false);
+		expect(logs(wait({ kind: "duration", minutes: 1 }))).toBe(false);
+		for (const n of [agent(), tool(), decision("rule"), value("rule"), end()]) {
+			expect(logs(n)).toBe(false);
+		}
+	});
+});
+
+describe("timeBudget: the step's timers", () => {
+	const budget = (n: FlowNode) => kindOf(n).timeBudget(n, { idleMinutes: 15 });
+
+	test("an Agent has the step timer and the idle clock: its own, else the policy's", () => {
+		expect(budget(agent({ timeoutMinutes: 30, idleMinutes: 5 }))).toEqual({
+			timeoutMinutes: 30,
+			idleMinutes: 5,
+		});
+		expect(budget(agent())).toEqual({
+			timeoutMinutes: undefined,
+			idleMinutes: 15,
+		});
+	});
+
+	test("a Gate, a Wait, a Lease and a Service node have no step timer; the other kinds have their own", () => {
+		expect(budget(lease({ timeoutMinutes: 10, waitMinutes: 5 }))).toEqual({
+			timeoutMinutes: undefined,
+			idleMinutes: undefined,
+		});
+		expect(budget(service({ timeoutMinutes: 10 }))).toEqual({
+			timeoutMinutes: undefined,
+			idleMinutes: undefined,
+		});
+		expect(budget(decision("person", { timeoutMinutes: 10 }))).toEqual({
+			timeoutMinutes: undefined,
+			idleMinutes: undefined,
+		});
+		expect(
+			budget(wait({ kind: "duration", minutes: 1 }, { timeoutMinutes: 10 })),
+		).toEqual({
+			timeoutMinutes: undefined,
+			idleMinutes: undefined,
+		});
+		for (const n of [
+			command({ timeoutMinutes: 10 }),
+			tool({ timeoutMinutes: 10 }),
+			decision("rule", { timeoutMinutes: 10 }),
+			decision("model", { timeoutMinutes: 10 }),
+			value("model", { timeoutMinutes: 10 }),
+			call({ timeoutMinutes: 10 }),
+		]) {
+			expect(budget(n)).toEqual({ timeoutMinutes: 10, idleMinutes: undefined });
+		}
+	});
+});
+
+describe("cutShortOutputs: what a cut ends an open step with", () => {
+	const OUTCOMES = ["stopped", "error", "interrupted"] as const;
+	const open = (fields: Partial<DerivedStep>): DerivedStep =>
+		({
+			id: "s1",
+			nodeId: "n",
+			visit: 2,
+			outputs: { visit: 2, summary: "so far" },
+			items: [],
+			...fields,
+		}) as DerivedStep;
+	const item = (state: DerivedItem["state"]): DerivedItem =>
+		({
+			state,
+			facts: { id: state },
+			index: 1,
+			open: false,
+			branch: null,
+		}) as DerivedItem;
+
+	test("a Decision ends with an empty note", () => {
+		const step = open({ nodeType: "decision" });
+		for (const outcome of OUTCOMES) {
+			expect(
+				kindOfType("decision").cutShortOutputs(
+					step,
+					decision("person"),
+					outcome,
+				),
+			).toEqual({ outcome, note: "", visit: 2 });
+		}
+	});
+
+	test("a Call once ends with an empty label; a Call with each counts its items, also when the snapshot has no node", () => {
+		const once = open({ nodeType: "call" });
+		const each = open({
+			nodeType: "call",
+			items: [item("done"), item("failed")],
+		});
+		for (const outcome of OUTCOMES) {
+			expect(kindOfType("call").cutShortOutputs(once, call(), outcome)).toEqual(
+				{ outcome, ended: "", visit: 2 },
+			);
+			const counted = kindOfType("call").cutShortOutputs(
+				each,
+				callEach(),
+				outcome,
+			);
+			expect(counted).toMatchObject({
+				outcome,
+				done_count: 1,
+				failed_count: 1,
+			});
+			expect(
+				kindOfType("call").cutShortOutputs(each, undefined, outcome),
+			).toEqual(counted);
+			expect(
+				kindOfType("call").cutShortOutputs(
+					open({ nodeType: "call" }),
+					undefined,
+					outcome,
+				),
+			).toEqual({ outcome, ended: "", visit: 2 });
+		}
+	});
+
+	test("every other kind keeps the outputs it had, marked with the outcome", () => {
+		for (const type of [
+			"agent",
+			"command",
+			"tool",
+			"value",
+			"wait",
+			"end",
+			"lease",
+			"service",
+			"since-last-run",
+			"web-request",
+		] as const) {
+			for (const outcome of OUTCOMES) {
+				expect(
+					kindOfType(type).cutShortOutputs(
+						open({ nodeType: type }),
+						undefined,
+						outcome,
+					),
+				).toEqual({ visit: 2, summary: "so far", outcome });
+			}
+		}
+	});
+});
+
+describe("connections and requirements: what run start asks", () => {
+	/** A Device with nothing: no harness, connection, CLI tool, program or decider. */
+	const has = () =>
+		testDevice({ harnesses: {}, which: () => null }).capabilities({
+			programs: ["gh"],
+		});
+
+	test("an Agent names its connections, a Tool its one; the other kinds none", async () => {
+		expect(
+			kindOf(agent({ connections: ["jira", "github"] })).connections(
+				agent({ connections: ["jira", "github"] }),
+			),
+		).toEqual(["jira", "github"]);
+		expect(kindOf(agent()).connections(agent())).toEqual([]);
+		expect(kindOf(tool()).connections(tool())).toEqual(["github"]);
+		for (const n of [
+			command(),
+			decision("model"),
+			value("model"),
+			wait({ kind: "duration", minutes: 1 }),
+			call(),
+			end(),
+		]) {
+			expect(kindOf(n).connections(n)).toEqual([]);
+		}
+	});
+
+	test("the Agent kind requires its CLI tools and its harness", async () => {
+		const caps = await has();
+		const nodes = [agent({ harness: "codex", clis: ["gh"] })];
+		expect(NODE_KINDS.agent.requirements.map((r) => r(nodes, caps))).toEqual([
+			'The flow uses the CLI tool "gh", but this computer does not have it. Install gh, or remove it from the flow.',
+			"The flow has an Agent node on Codex (n), but no Codex harness is added. Add it under Agents.",
+		]);
+	});
+
+	test("a model Decision and a model Value require the decider; by a rule or a person they require nothing", async () => {
+		const caps = await has();
+		expect(
+			NODE_KINDS.decision.requirements.map((r) => r([decision("model")], caps)),
+		).toEqual([
+			"The flow has a Decision node decided by a model, but no decider is configured.",
+		]);
+		expect(
+			NODE_KINDS.decision.requirements.map((r) =>
+				r([decision("person"), decision("rule")], caps),
+			),
+		).toEqual([null]);
+		expect(
+			NODE_KINDS.value.requirements.map((r) => r([value("model")], caps)),
+		).toEqual([
+			"The flow has a Value node made by a model, but no decider is configured.",
+		]);
+		expect(
+			NODE_KINDS.value.requirements.map((r) =>
+				r([value("rule"), value("person")], caps),
+			),
+		).toEqual([null]);
+	});
+
+	test("a Command, a Tool and a Call require nothing of their own", async () => {
+		for (const type of ["command", "tool", "call"] as const) {
+			expect(NODE_KINDS[type].requirements).toEqual([]);
+		}
+	});
+
+	test("an End that reads its report from a file requires a Device that reads files", async () => {
+		const current = await has();
+		const older = { ...current, readFiles: undefined, elsewhere: "nas" };
+		const report = { kind: "text" as const, text: "## News" };
+		expect(
+			NODE_KINDS.end.requirements.map((r) =>
+				r([end(), { ...end(), report }], older),
+			),
+		).toEqual([null]);
+		expect(
+			NODE_KINDS.end.requirements.map((r) => r([reportFile()], older)),
+		).toEqual([
+			"The flow ends with a report from a file (n), but nas runs an older version of Night Shift. Update Night Shift on nas.",
+		]);
+		expect(
+			NODE_KINDS.end.requirements.map((r) => r([reportFile()], current)),
+		).toEqual([null]);
+	});
+
+	test("a Web request and a Wait for a URL require a Device that sends web requests", async () => {
+		const older = { ...(await has()), requests: undefined, elsewhere: "nas" };
+		expect(
+			NODE_KINDS["web-request"].requirements.map((r) =>
+				r([webRequest({ id: "fetch" })], older),
+			),
+		).toEqual([
+			"The flow sends web requests (fetch), but nas runs an older version of Night Shift. Update Night Shift on nas.",
+		]);
+		const url = wait({
+			kind: "url",
+			url: "https://x.example",
+			everyMinutes: 5,
+		});
+		expect(
+			NODE_KINDS.wait.requirements.map((r) =>
+				r([url, wait({ kind: "duration", minutes: 1 })], older),
+			),
+		).toEqual([
+			"The flow waits for a URL (n), but nas runs an older version of Night Shift. Update Night Shift on nas.",
+		]);
+		expect(
+			NODE_KINDS.wait.requirements.map((r) =>
+				r([wait({ kind: "duration", minutes: 1 })], older),
+			),
+		).toEqual([null]);
+		const caps = await has();
+		expect(
+			NODE_KINDS["web-request"].requirements.map((r) =>
+				r([webRequest()], caps),
+			),
+		).toEqual([null]);
+	});
+});
+
+describe("works: what a step needs of its Device", () => {
+	test("the worktree, the Device only, or nothing", () => {
+		const works = (n: FlowNode) => kindOf(n).works(n);
+		expect(works(agent())).toBe("worktree");
+		expect(works(command())).toBe("worktree");
+		expect(works(service())).toBe("worktree");
+		expect(works(tool())).toBe("device");
+		expect(works(webRequest())).toBe("device");
+		expect(
+			works(wait({ kind: "url", url: "https://x.example", everyMinutes: 5 })),
+		).toBe("device");
+		expect(works(decision("model"))).toBe("device");
+		expect(works(decision("person"))).toBeNull();
+		expect(works(value("model"))).toBe("device");
+		expect(works(value("rule"))).toBeNull();
+		expect(works(wait({ kind: "duration", minutes: 1 }))).toBeNull();
+		expect(works(callEach())).toBe("worktree");
+		expect(works(call())).toBeNull();
+		expect(works(end())).toBeNull();
+		expect(works(reportFile())).toBe("worktree");
+		expect(works(sinceLastRun())).toBeNull();
+		expect(works(convert())).toBeNull();
+	});
+
+	test("a step that touches its computer (touchesDevice of @nightshift/flows) needs one at run time", () => {
+		const works = (n: FlowNode) => kindOf(n).works(n);
+		const nodes = [
+			agent(),
+			command(),
+			tool(),
+			webRequest(),
+			service(),
+			decision("model"),
+			value("model"),
+			wait({ kind: "command", command: "test -f x", everyMinutes: 1 }),
+			wait({ kind: "url", url: "https://x.example", everyMinutes: 5 }),
+			callEach({ kind: "command", command: "ls" }),
+		];
+		for (const n of nodes) {
+			expect(touchesDevice(n), n.type).toBe(true);
+			expect(works(n), n.type).not.toBeNull();
+		}
+		// The run's folder only: an End that reads its report, and a Call
+		// whose items each get a branch.
+		for (const n of [reportFile(), callEach()]) {
+			expect(touchesDevice(n), n.type).toBe(false);
+			expect(works(n), n.type).toBe("worktree");
+		}
+	});
+
+	test("only an End that reads a report file goes where the run's work is; every other step gets it by a Hand-off", () => {
+		const follows = (n: FlowNode) => kindOf(n).followsWork(n);
+		expect(follows(reportFile())).toBe(true);
+		expect(follows(end())).toBe(false);
+		expect(follows(agent())).toBe(false);
+		expect(follows(command())).toBe(false);
+		expect(follows(service())).toBe(false);
+		expect(follows(callEach())).toBe(false);
+	});
+});

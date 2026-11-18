@@ -30,11 +30,8 @@ packages/engine/src/device-config/connections.ts 1178
 packages/engine/src/device-config/settings.ts 848
 packages/engine/src/device/local.ts 902
 packages/engine/src/flows/flow-document.ts 1285
-packages/engine/src/graph/context.ts 620
-packages/engine/src/graph/nodes/agent.ts 933
-packages/engine/src/graph/runner.ts 1207
-packages/engine/src/graph/sleep.ts 640
-packages/engine/src/graph/step-runner.ts 1386
+packages/engine/src/graph/runner/runner.ts 1207
+packages/engine/src/graph/step/step-runner.ts 1382
 packages/engine/src/knowledge/folder.ts 691
 packages/engine/src/knowledge/knowledge.ts 781
 packages/engine/src/knowledge/reconcile.ts 632

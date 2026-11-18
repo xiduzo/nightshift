@@ -1,0 +1,292 @@
+import type { Command } from "@langchain/langgraph";
+import {
+	type CallNode,
+	endedLabel,
+	personTierIndex,
+	runsEach,
+} from "@nightshift/flows";
+import type { InputValues, StepOutputs } from "../../../log";
+import type { Climb } from "../../cascade";
+import {
+	endedAtReason,
+	messageOf,
+	type NodeAction,
+	type NodeKind,
+	PLAIN_KIND,
+	type StepContext,
+	stopAtOf,
+} from "../../context";
+import { eachOutputs, renderBindings, resolveInputs } from "../../data";
+import { scopeOf } from "../../route";
+import type { RunStateUpdate } from "../../state";
+import {
+	beginStep,
+	doneAndGo,
+	entryOf,
+	RESUME_RULES,
+	resumePoint,
+} from "../../step";
+import { climbAskNode, climbing, retryAsk } from "../decide";
+
+import {
+	type BodyGraph,
+	bodyGraph,
+	bodyOutputs,
+	failedEndReason,
+	hasStoppedEdge,
+	runBody,
+	typedOutputs,
+} from "./body";
+import { callEachNode } from "./call-each";
+
+/**
+ * The Call node: runs another flow as a subgraph of the node (design rule
+ * 6). With `each` it runs the flow once per element of a list, one element
+ * per super-step (`callEachNode`); without, once, as below.
+ *
+ * Once: binds the called flow's inputs (`FlowCalled`), runs the flow in the
+ * scope `{ parentStepId: stepId, itemId: null }` and ends `pass` with the
+ * flow's declared outputs, `ended` and `visit` when it finished on a chosen
+ * end, `fail` with the reason when it failed. An End node is a chosen end
+ * with a result: `done` and `nothing-to-do` end the Call `pass`, `failed`
+ * ends it `fail`, and `ended`, `end_message` and `end_report` hold its
+ * status, message and report. The outputs of a flow that finished hold
+ * to their types (`typedOutputs`, Q42): one that does not fit a type a
+ * person gave it ends the step `error`.
+ *
+ * Everything before the body runs again on a resume and after a daemon
+ * death (rule 4), so it is idempotent: the resume point (`resumePoint`,
+ * `RESUME_RULES.call`) continues the step the log has for this node that
+ * the graph never committed (open) or reopens it (ended: stopped, or
+ * `interrupted` by recovery) with its `FlowCalled` inputs, and the body
+ * resumes under the same namespace. A run parked at this node's own park
+ * node (no edge on `fail`) resumes as a new visit, as today.
+ *
+ * The node opens its step through the step runner's lower seam
+ * (`beginStep`, `OpenStep`), not `runStep`: its step stays open while the
+ * called flow runs as a subgraph and rethrows that flow's interrupts.
+ */
+export function callNode(node: CallNode, ctx: StepContext): NodeAction {
+	if (runsEach(node)) return callEachNode(node, ctx);
+	// One compiled body per flow: a cascade's tiers may call other flows.
+	const graphs = new Map<string, BodyGraph>();
+	// A Call with a cascade (ADR 6): each try runs the flow of its tier with
+	// its inputs, which may read `{{cascade.previous}}`. A try holds when
+	// the called flow ends `pass`; any other end climbs to the next try. The
+	// person tier is a Gate with "try-again" and "stop" (`climb-gate.ts`).
+	if (node.cascade !== undefined) {
+		return climbing(node, ctx, {
+			person: retryAsk,
+			attempt: (own, climb) => (state, config) =>
+				callOnce(ctx, own, graphs, state, config, climb),
+		});
+	}
+	return (state, config) => callOnce(ctx, node, graphs, state, config);
+}
+
+/**
+ * One run of the called flow: a step that opens, runs the body and ends.
+ * With `climb`, a try of the node's cascade.
+ */
+async function callOnce(
+	ctx: StepContext,
+	node: CallNode,
+	graphs: Map<string, BodyGraph>,
+	state: Parameters<NodeAction>[0],
+	config: Parameters<NodeAction>[1],
+	climb?: Climb,
+): Promise<Command> {
+	const runId = ctx.run.id;
+	const runState = await ctx.log.state(runId);
+	const point = resumePoint(
+		node,
+		state,
+		runState,
+		scopeOf(config),
+		CALL.resumeRules(node),
+	);
+	if (point.kind === "done") {
+		return doneAndGo(ctx, state, node, point, config, climb);
+	}
+	const start = entryOf(point);
+	const begun = await beginStep(
+		ctx,
+		node,
+		state,
+		config,
+		climb ? { ...start, climb } : start,
+		runState,
+	);
+	if (begun.kind === "parked") return begun.command;
+	const step = begun.step;
+	const { stepId, visit } = step;
+	const all = (outcome: string, outputs: StepOutputs): StepOutputs => ({
+		...outputs,
+		ended: outputs.ended ?? "",
+		outcome,
+		visit,
+	});
+
+	/** Ends the step, then climbs (a try that did not hold, with a try left) or routes. */
+	const end = (
+		outcome: "pass" | "fail" | "error" | "stopped",
+		outputs: StepOutputs,
+		error: string | null,
+		update?: RunStateUpdate,
+	): Promise<Command> =>
+		step.endAndGo(outcome, all(outcome, outputs), error, { update });
+	/** Ends the step and goes nowhere: the run parks on the interrupt that follows. */
+	const close = (
+		outcome: "error" | "stopped",
+		outputs: StepOutputs,
+		error: string | null,
+	) => step.end(outcome, all(outcome, outputs), error);
+
+	const called = ctx.flows[node.flow];
+	if (!called) {
+		return end(
+			"error",
+			{},
+			`The flow "${node.flow}" is not in the run's snapshot.`,
+		);
+	}
+
+	let inputs: InputValues;
+	if (step.existing?.call) {
+		inputs = step.existing.call.inputs;
+	} else {
+		try {
+			inputs = resolveInputs(
+				called.inputs ?? [],
+				renderBindings(node.inputs, step.tctx),
+				{ what: `The flow "${node.flow}"`, jsonText: "lenient" },
+			);
+		} catch (error) {
+			return end("error", {}, messageOf(error));
+		}
+		await ctx.log.append({
+			type: "FlowCalled",
+			runId,
+			stepId,
+			payload: { flow: node.flow, inputs },
+		});
+	}
+
+	let graph = graphs.get(node.flow);
+	if (!graph) {
+		graph = bodyGraph(ctx, node, called);
+		graphs.set(node.flow, graph);
+	}
+	const body = {
+		called,
+		flowName: node.flow,
+		inputs,
+		scope: { parentStepId: stepId, itemId: null },
+		run: {
+			branch: step.tctx.run.branch,
+			base_branch: "",
+			index: "",
+			due_at: step.tctx.run.due_at,
+		},
+	};
+	const ended = await runBody({
+		graph,
+		config,
+		stopAt: stopAtOf(state, config),
+		...body,
+	});
+	switch (ended.kind) {
+		case "paused":
+			// The step stays open: the called flow continues after the wait.
+			step.leaveOpen();
+			throw ended.interrupt;
+		case "stopped": {
+			if (ended.atStopTime && hasStoppedEdge(ctx.flow, node)) {
+				// The stop time ended the called flow: wrap the run up along the edge.
+				const outputs = await bodyOutputs(ctx, body);
+				return end("stopped", outputs, null, { wrappingUp: true });
+			}
+			await close("stopped", {}, null);
+			throw ended.interrupt;
+		}
+		case "aborted":
+			await close("error", {}, ended.reason);
+			throw ended.interrupt;
+		case "failed": {
+			const outputs = await bodyOutputs(ctx, body);
+			return end("fail", outputs, ended.reason);
+		}
+		case "finished": {
+			let outputs = await bodyOutputs(ctx, body, ended);
+			const label = endedLabel(ended.node, ended.outcome);
+			// An End node: its status is the label, its message the end_message,
+			// its report the end_report.
+			const own: StepOutputs =
+				ended.result !== undefined
+					? {
+							ended: label,
+							end_message: ended.reason ?? "",
+							end_report: ended.report ?? "",
+						}
+					: { ended: label };
+			const failed = ended.result === "failed";
+			if (!failed) {
+				// The outputs a person typed hold, or the step errors (Q42).
+				const typed = await typedOutputs(ctx, step, body, outputs);
+				if (typed.kind === "broken") {
+					return end("error", { ...outputs, ...own }, typed.error);
+				}
+				outputs = typed.outputs;
+			}
+			return end(
+				failed ? "fail" : "pass",
+				{ ...outputs, ...own },
+				failed ? failedEndReason(ended) : null,
+			);
+		}
+	}
+}
+
+/** A chosen end of a Call: `pass` once, and whatever outcome a Call with `each` ends on. */
+/**
+ * The Call kind. Its facts follow `node.each`: a Call with `each` takes up
+ * a cut-short loop, every outcome is a chosen end and `done` the plain
+ * end, a command source writes the command log, and a cut-short step
+ * counts its items; a Call once reports `pass` as the plain end and an
+ * empty `ended` when cut short. The one kind that may follow a `stopped` edge
+ * (`hasStoppedEdge`, `wrappingUp`).
+ */
+export const CALL: NodeKind<CallNode> = {
+	...PLAIN_KIND,
+	type: "call",
+	make: callNode,
+	// A Call with each works in the worktree: its item branches, its files
+	// or command source. Its body's nodes run where they are placed.
+	works: (node) =>
+		node.each !== undefined &&
+		((node.each.branch ?? "per-item") === "per-item" ||
+			node.each.source.kind !== "json")
+			? "worktree"
+			: null,
+	resumeRules: (node) =>
+		runsEach(node) ? RESUME_RULES.callEach : RESUME_RULES.call,
+	endReason: (node, outcome) =>
+		outcome === (runsEach(node) ? "done" : "pass")
+			? null
+			: endedAtReason(node, outcome),
+	logsCommandOutput: (node) => node.each?.source.kind === "command",
+	// A cascade's person tier is a Gate: its ask node.
+	aux: (node) =>
+		personTierIndex(node) !== null ? [{ kind: "ask", make: climbAskNode }] : [],
+	cutShortOutputs: (open, node, outcome) => {
+		const each = node ? runsEach(node) : open.items.length > 0;
+		return each
+			? eachOutputs({
+					items: open.items,
+					visit: open.visit,
+					outcome,
+					waiting: [],
+				})
+			: { outcome, ended: "", visit: open.visit };
+	},
+};

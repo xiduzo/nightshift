@@ -1,30 +1,34 @@
 /** A flow compiled to a graph and walked: the nodes, the step runner, sleeps, the checkpointer, the stand-ins of a test run, and the input, output and policy rules a step follows. */
 
-export { pruneCheckpoints } from "./checkpointer";
-export type {
-	NodeKind,
-	Requirement,
-	ServiceBringUp,
-	ServiceBroughtUp,
-	ServiceRunner,
-	StepMove,
-	StepPlacement,
-	StepShared,
-	StopService,
-} from "./context";
-export { createRecorders, messageOf, onDevice } from "./context";
-export { combineHolds, type RunHolds } from "./holds";
-export { resolveInputs } from "./inputs";
-export { kindOf, kindOfType, NODE_KINDS } from "./node-kinds";
-export { missingNames } from "./nodes/agent";
-export { closeOpenWork, openWork } from "./open-work";
-export { askAnswerProblem } from "./output-schema";
-export { rerunNodeRefusal } from "./reentry";
-export { runFolderOn } from "./run-worktree";
-export type { Runner } from "./runner";
-export { createRunner } from "./runner";
 export {
 	createRunWalks,
+	pruneCheckpoints,
 	type RunWalks,
 	type WalkFiles,
-} from "./walk-state";
+} from "./checkpoints";
+export {
+	messageOf,
+	type NodeKind,
+	onDevice,
+	type Requirement,
+	type ServiceBringUp,
+	type ServiceBroughtUp,
+	type ServiceRunner,
+	type StepMove,
+	type StepPlacement,
+	type StepShared,
+	type StopService,
+} from "./context";
+export { askAnswerProblem, resolveInputs } from "./data";
+export { kindOf, kindOfType, missingNames, NODE_KINDS } from "./nodes";
+export { createRecorders } from "./recorders";
+export {
+	closeOpenWork,
+	combineHolds,
+	createRunner,
+	openWork,
+	type RunHolds,
+	type Runner,
+	rerunNodeRefusal,
+} from "./runner";
+export { runFolderOn } from "./step";

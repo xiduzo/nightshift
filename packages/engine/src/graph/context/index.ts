@@ -1,0 +1,36 @@
+/** What a step may touch (`StepShared`, `StepContext`) and what a node kind gives back (`NodeKind`). */
+
+export {
+	DEFAULT_RESUME_PROMPT,
+	emit,
+	harnessLabel,
+	isWaitKind,
+	keptFlowOf,
+	messageOf,
+	type OutputType,
+	pastStopTime,
+	type ServiceBringUp,
+	type ServiceBroughtUp,
+	type ServiceRunner,
+	STOP_AFTER_STEP_REASON,
+	STOP_GRACE_MS,
+	STOP_TIME_REASON,
+	type StepContext,
+	type StepMove,
+	type StepPlacement,
+	type StepShared,
+	type StopService,
+	stepFailure,
+	stopAtOf,
+	templateContext,
+} from "./context";
+export {
+	type CutShortOutcome,
+	endedAtReason,
+	type NodeAction,
+	type NodeKind,
+	onDevice,
+	PLAIN_KIND,
+	type Requirement,
+	type ResumeRules,
+} from "./node-kind";

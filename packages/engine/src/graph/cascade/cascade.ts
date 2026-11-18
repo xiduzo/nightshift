@@ -1,0 +1,336 @@
+import { Command } from "@langchain/langgraph";
+import {
+	type CascadeNode,
+	cascadeOf,
+	type FlowNode,
+	isPersonTier,
+	type JsonValue,
+	lastModelTier,
+	tierLabel,
+} from "@nightshift/flows";
+import type {
+	GateBackgroundItem,
+	StepOutcome,
+	StepOutputs,
+	StepRung,
+} from "../../log";
+import { CASCADE_RUNGS } from "../../read";
+import { commitVisit } from "../position";
+import type { StepEnd } from "../route";
+import type {
+	CascadePosition,
+	CascadeTry,
+	RunStateUpdate,
+	RunStateValues,
+} from "../state";
+
+/**
+ * The climb of a cascade (ADR 6), walked inside the node: where it stands,
+ * what a try gives the next one, and the words of the person tier. The
+ * dispatch over the tiers is `climbing` (`climb.ts`). Each try is a step
+ * of its own: a visit with its tier, so budgets and the step cap count
+ * every try. A try runs as the node of its tier (`tierNode`): that tier's
+ * profile, on that profile's Device.
+ *
+ * A try that does not hold ends its step `fail` (or `error`), and the node
+ * goes back to itself with the next position (`climbCommand`), not along an
+ * edge: the graph and its loop rules stay as they are. The position lives
+ * in the state (`cascades`), so it commits with the checkpoint of the try
+ * before: a park, a resume or a daemon death continues at the tier and try
+ * where it stopped. `route()` clears it when the node goes on.
+ *
+ * What holds is the node's: a Decision's pick with enough probability, a
+ * Value that matches and passes its `accept` rule, an Agent that ends
+ * `pass` and whose check exits 0, a Call whose flow ends `pass`. Every
+ * node ends a try that does not hold with `fail`, or `error` when it could
+ * not try, so the climb reads only the outcome.
+ */
+
+/** Where a node starts its cascade: the first tier, the first try. */
+const START: CascadePosition = { tier: 0, try: 1, trail: [] };
+
+/** The node's position on its cascade, from the state. */
+export function climbAt(
+	state: Pick<RunStateValues, "cascades">,
+	node: Pick<FlowNode, "id">,
+): CascadePosition {
+	return state.cascades?.[node.id] ?? START;
+}
+
+/** An outcome that does not hold: the node tries again, or ends there. */
+function notHolding(outcome: StepOutcome): boolean {
+	return outcome === "fail" || outcome === "error";
+}
+
+/**
+ * One try of a cascade as its node runs it: the node with the cascade
+ * (`root`), the position, and the tier's own fields (`minConfidence`,
+ * `accept`, `session`, `check` is the root's). The person tier's `tier` is
+ * the person tier.
+ */
+export type Climb<T = unknown> = {
+	root: CascadeNode;
+	at: CascadePosition;
+	tier: T;
+};
+
+/** The name of the tier at a position. */
+function tierLabelAt(node: CascadeNode, at: CascadePosition): string {
+	const tier = cascadeOf(node)?.[at.tier];
+	return tier === undefined ? "" : tierLabel(tier, at.tier);
+}
+
+/** What `{{cascade.tier}}`, `{{cascade.try}}` and `{{cascade.previous}}` read. */
+export function climbValues(
+	node: CascadeNode,
+	at: CascadePosition,
+): Record<string, JsonValue> {
+	const previous = at.trail.at(-1);
+	return {
+		tier: tierLabelAt(node, at),
+		try: at.try,
+		previous: previous === undefined ? "" : (previous as JsonValue),
+	};
+}
+
+/** The fields a try adds to its step's outputs: its tier and the tries so far. */
+export function climbOutputs(
+	node: CascadeNode,
+	at: CascadePosition,
+): StepOutputs {
+	return { tier: tierLabelAt(node, at), tries: at.trail.length + 1 };
+}
+
+/** How often a tier is tried: its `tries`, else once. A person tier once. */
+function triesOf(node: CascadeNode, index: number): number {
+	const tier = cascadeOf(node)?.[index];
+	if (tier === undefined || isPersonTier(tier)) return 1;
+	return tier.tries ?? 1;
+}
+
+/** The tier and try after `at`, or null when no tier is left. */
+function nextPlace(
+	node: CascadeNode,
+	at: Pick<CascadePosition, "tier" | "try">,
+): Pick<CascadePosition, "tier" | "try"> | null {
+	const tiers = cascadeOf(node) ?? [];
+	if (at.try < triesOf(node, at.tier))
+		return { tier: at.tier, try: at.try + 1 };
+	if (at.tier + 1 < tiers.length) return { tier: at.tier + 1, try: 1 };
+	return null;
+}
+
+/**
+ * The position after a try that did not hold: the next try of the tier,
+ * else the first of the next tier, else null (no tier left: the step ends
+ * on the try's outcome). `done` is the try that did not hold.
+ */
+function nextTry(
+	node: CascadeNode,
+	at: CascadePosition,
+	done: CascadeTry,
+): CascadePosition | null {
+	const next = nextPlace(node, at);
+	return next === null ? null : { ...next, trail: [...at.trail, done] };
+}
+
+/**
+ * Where a new step of `root` stands on its ladder (`StepStarted.rung`,
+ * Q31): its tier and who tries it, from the node's position on its
+ * cascade, and whether a try follows when it does not hold. A node
+ * without a cascade has one rung: its `by`, an Agent, or its flow. Null
+ * for a node on no ladder: a Value by rule, a Command and the rest.
+ *
+ * `root` is the node as its flow has it: a tier's node has no cascade.
+ */
+export function stepRung(
+	root: FlowNode,
+	state: Pick<RunStateValues, "cascades">,
+): StepRung | null {
+	const tiers = cascadeOf(root);
+	if (tiers !== undefined) {
+		// Only a node that can have a cascade has one.
+		const node = root as CascadeNode;
+		const at = climbAt(state, node);
+		const tier = tiers[at.tier];
+		if (tier === undefined) return null;
+		return {
+			// Who tries a tier that is not a person: by the node's type.
+			by: isPersonTier(tier) ? "person" : CASCADE_RUNGS[node.type].by,
+			tier: at.tier,
+			...(nextPlace(node, at) === null ? { last: true as const } : {}),
+		};
+	}
+	switch (root.type) {
+		case "agent":
+			return { by: "agent", last: true };
+		case "call":
+			return { by: "flow", last: true };
+		case "decision":
+			return { by: root.by, last: true };
+		case "value":
+			return root.by === "rule" ? null : { by: root.by, last: true };
+		default:
+			return null;
+	}
+}
+
+/**
+ * The position after a person chose "try-again": one more try on the last
+ * tier that is not a person, with the person's note.
+ */
+export function tryAgain(
+	node: CascadeNode,
+	at: CascadePosition,
+	note: string,
+): CascadePosition {
+	const last = lastModelTier(node);
+	const tries = at.trail.filter(
+		(done) => done.tier === tierLabelAt(node, { ...at, tier: last }),
+	).length;
+	return {
+		tier: last,
+		try: tries + 1,
+		trail: at.trail,
+		...(note === "" ? {} : { note }),
+	};
+}
+
+/** At most this many characters of a try's text in the trail: the state stays small. */
+const TRAIL_TEXT = 4000;
+
+const clip = (text: string) =>
+	text.length > TRAIL_TEXT ? `…${text.slice(-TRAIL_TEXT)}` : text;
+
+/** What a try that ended gives the next one: its outcome and what it said, from its outputs. */
+function tryRecord(
+	node: CascadeNode,
+	at: CascadePosition,
+	end: Pick<StepEnd, "outcome" | "outputs" | "error">,
+): CascadeTry {
+	const { outputs } = end;
+	const text = (field: string) =>
+		typeof outputs[field] === "string" ? (outputs[field] as string) : "";
+	const said =
+		text("summary") || text("note") || text("end_message") || text("ended");
+	const summary = [said, end.error ?? ""]
+		.filter((part) => part !== "")
+		.join(" ");
+	const record: CascadeTry = {
+		tier: tierLabelAt(node, at),
+		try: at.try,
+		outcome: end.outcome,
+		summary: clip(summary),
+	};
+	if (text("pick") !== "") record.pick = text("pick");
+	if (typeof outputs.confidence === "number") {
+		record.confidence = outputs.confidence;
+	}
+	if (text("log_tail") !== "") record.log_tail = clip(text("log_tail"));
+	if (text("session_id") !== "") record.session_id = text("session_id");
+	return record;
+}
+
+/**
+ * The node goes back to itself for the next try: the try's outputs in the
+ * state, its visit committed, nothing held, the next position. No edge is
+ * taken.
+ */
+export function climbCommand(
+	node: Pick<FlowNode, "id">,
+	end: StepEnd,
+	next: CascadePosition,
+	extra?: RunStateUpdate,
+): Command {
+	return new Command({
+		update: {
+			...extra,
+			nodes: { [node.id]: end.outputs },
+			...commitVisit(node, end.visit),
+			pending: { [node.id]: null },
+			cascades: { [node.id]: next },
+		},
+		goto: node.id,
+	});
+}
+
+/** At most this many characters of a Value's answer in the trail: a larger one is left out. */
+const TRAIL_DATA = 16_000;
+
+/** A Value's answer, for the trail: left out when it is too large. */
+export function trailData(data: JsonValue | undefined): Partial<CascadeTry> {
+	if (data === undefined || data === null) return {};
+	return JSON.stringify(data).length > TRAIL_DATA ? {} : { data };
+}
+
+/**
+ * Where a try's end sends its node: the next position when the end does
+ * not hold and a try is left, else null (the node routes on the end).
+ * `trail` is what the try keeps besides its outputs (a Value's answer).
+ */
+export function climbNext(
+	{ root, at }: Pick<Climb, "root" | "at">,
+	end: Pick<StepEnd, "outcome" | "outputs" | "error">,
+	trail?: Partial<CascadeTry>,
+): CascadePosition | null {
+	if (!notHolding(end.outcome)) return null;
+	return nextTry(root, at, { ...tryRecord(root, at, end), ...trail });
+}
+
+/** One try of the climb in words: the tier, its pick and probability, or what went wrong. */
+function tryLine(done: CascadeTry): string {
+	const where = done.try > 1 ? `${done.tier} (try ${done.try})` : done.tier;
+	if (done.pick !== undefined) {
+		const sure =
+			done.confidence === undefined
+				? ""
+				: ` with ${Math.round(done.confidence * 100)}%`;
+		return `${where} picked ${done.pick}${sure}.`;
+	}
+	const said = done.summary.split("\n")[0]?.trim() ?? "";
+	return `${where} ended ${done.outcome}${said === "" ? "." : `: ${said}`}`;
+}
+
+/**
+ * What the person tier shows of the climb: one line per try, with the
+ * tier, its pick and probability, or what went wrong.
+ */
+export function climbLines(trail: readonly CascadeTry[]): string {
+	return trail.map((done) => `- ${tryLine(done)}`).join("\n");
+}
+
+/**
+ * The background of the person tier's Gate when the flow writes none (ADR
+ * 21): what each try did, one item per try, with its tier as the source.
+ */
+export function climbBackground(
+	trail: readonly CascadeTry[],
+): GateBackgroundItem[] {
+	return trail.map((done) => ({ text: tryLine(done), source: done.tier }));
+}
+
+/**
+ * The recommendation of a Decision's person tier when the flow writes
+ * none (ADR 21): the pick of the most confident try, else the latest
+ * pick. Undefined when no try picked.
+ */
+export function climbRecommendation(
+	trail: readonly CascadeTry[],
+): { option: string; reason: string } | undefined {
+	const picks = trail.filter((done) => done.pick !== undefined);
+	const best = picks.reduce<CascadeTry | undefined>(
+		(top, done) =>
+			top === undefined || (done.confidence ?? -1) >= (top.confidence ?? -1)
+				? done
+				: top,
+		undefined,
+	);
+	if (best?.pick === undefined) return undefined;
+	return {
+		option: best.pick,
+		reason:
+			best.confidence === undefined
+				? `The tier ${best.tier} picked it.`
+				: `The tier ${best.tier} was the most sure: ${Math.round(best.confidence * 100)}%.`,
+	};
+}

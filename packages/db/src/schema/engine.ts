@@ -6,8 +6,8 @@ import {
 	text,
 } from "drizzle-orm/sqlite-core";
 
-// Owner: `@nightshift/engine`, `graph/checkpointer.ts`: LangGraph's
-// checkpoints and pending writes. `graph/walk-state.ts` puts a run's latest
+// Owner: `@nightshift/engine`, `graph/checkpoints/checkpointer.ts`: LangGraph's
+// checkpoints and pending writes. `graph/checkpoints/walk-state.ts` puts a run's latest
 // in one file of its walk state, which `@nightshift/devices` archives with a
 // moved run.
 

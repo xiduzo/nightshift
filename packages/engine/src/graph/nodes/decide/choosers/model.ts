@@ -1,0 +1,234 @@
+import type { DecisionInput, DecisionResult } from "@nightshift/agents/types";
+import {
+	type DecisionNode,
+	type DecisionTier,
+	decisionDecider,
+	optionProblem,
+	renderTemplate,
+} from "@nightshift/flows";
+
+import type { Device } from "../../../../device";
+import type { StepOutputs } from "../../../../log";
+import type { Climb } from "../../../cascade";
+import {
+	isWaitKind,
+	STOP_GRACE_MS,
+	type StepContext,
+	stepFailure,
+} from "../../../context";
+import {
+	type BodyResult,
+	deciderCostSource,
+	RESUME_RULES,
+	runStep,
+	type StepHandle,
+	warnDeciderCost,
+} from "../../../step";
+
+import { type Chooser, decisionOutputs, visibleOptions } from "./chooser";
+
+/**
+ * A Decision decided by a model: the node's decider (a TanStack AI
+ * decision model, `decide()`) reads the rendered prompt and picks an
+ * option. The transcript gets `decision-start` (the prompt, the option
+ * names, the model) and, on an answer, `decision`; `StepEnded` carries the
+ * decider's cost as `costUsd`, also on an error or a stop. The decider's
+ * reasons go in the `note` output.
+ *
+ * The step lifecycle is the step runner's (`runStep` with
+ * `RESUME_RULES.model`): the step that waited for a usage limit or the
+ * network continues (same step id and visit; nothing is appended before the
+ * decider is asked again), or is reopened first when recovery ended it
+ * after the wake. Otherwise a new visit: a parked or interrupted step has
+ * no session to reopen. A usage limit or a network failure is a wait
+ * request; the runner plans the wait and parks at the node's wait node
+ * (`wait__<id>`), or ends the step `error` on a give-up. This module is
+ * the body: `decide`.
+ */
+export function modelChooser(
+	node: DecisionNode,
+	ctx: StepContext,
+	/**
+	 * A try of a cascade (ADR 6): `node` is its tier's node. The pick holds
+	 * only with the tier's `minConfidence`; one that does not ends the try
+	 * `fail`, and the node climbs.
+	 */
+	climb?: Climb<DecisionTier>,
+): Chooser {
+	return (state, config) =>
+		runStep(ctx, node, state, config, {
+			rules: RESUME_RULES.model,
+			outputs: (step) => decisionOutputs("", "", step.visit),
+			body: (step) => decide(node, step, climb),
+			...(climb ? { climb } : {}),
+		});
+}
+
+/** Asks the decider and ends the step on its answer, or asks for a wait. */
+async function decide(
+	node: DecisionNode,
+	step: StepHandle,
+	climb?: Climb<DecisionTier>,
+): Promise<BodyResult> {
+	const { visit, signal } = step;
+	const prompt = renderTemplate(node.prompt, step.tctx);
+	const options = visibleOptions(node);
+	const decider = (await step.device.capabilities()).decider;
+	if (!decider) {
+		return {
+			kind: "end",
+			outcome: "error",
+			outputs: decisionOutputs("error", "", visit),
+			error: "No decider is configured for Decision nodes.",
+		};
+	}
+	// A node that names no decider runs on Night Shift's Decider of this
+	// Device, when its person chose one. The Device says which model a
+	// node without one starts on.
+	const own = node.decider === undefined ? decider.builtin?.decider : undefined;
+	const picker = own?.decider ?? decisionDecider(node);
+	const model =
+		node.model ?? own?.model ?? decider.defaultModels[picker].decision;
+	const address = node.address ?? own?.address;
+	step.record(null, {
+		type: "decision-start",
+		prompt,
+		labels: options.map((option) => option.name),
+		model,
+	});
+	const result = await decideWithin(
+		step.device,
+		{
+			decider: picker,
+			prompt,
+			labels: options,
+			model,
+			...(address !== undefined ? { address } : {}),
+			signal,
+		},
+		signal,
+	);
+	const cost = {
+		costUsd: result.costUsd,
+		costSource: deciderCostSource(result),
+	};
+	await warnDeciderCost(step, cost.costSource, "decision", model);
+	if (result.kind === "decided") {
+		step.record(null, {
+			type: "decision",
+			label: result.label,
+			notes: result.notes,
+		});
+	}
+	const note = result.kind === "decided" ? result.notes : "";
+	const sure: StepOutputs =
+		result.kind === "decided" && result.probability !== undefined
+			? { confidence: result.probability }
+			: {};
+	const end = (
+		outcome: string,
+		error: string | null,
+		more: StepOutputs = {},
+	): BodyResult => ({
+		kind: "end",
+		outcome,
+		outputs: {
+			...decisionOutputs(outcome, note, visit),
+			// The probability is a fact of the climb (ADR 6.9).
+			...(climb ? sure : {}),
+			...more,
+		},
+		error,
+		...cost,
+	});
+	if (signal.aborted) {
+		return {
+			kind: "aborted",
+			outputs: decisionOutputs("", note, visit),
+			...cost,
+		};
+	}
+	if (result.kind === "error") {
+		if (isWaitKind(result.errorKind)) {
+			return {
+				kind: "wait",
+				reason: result.errorKind,
+				message: result.message,
+				resetAt: null,
+				harnessSessionId: null,
+				...cost,
+			};
+		}
+		return end("error", `The decider failed: ${result.message}`);
+	}
+	const problem = optionProblem(node.options, result.label);
+	if (problem !== null) return end("error", problem);
+	const minimum = climb?.tier.minConfidence;
+	// A decider that gives no probability: its pick always holds (ADR 6.8).
+	if (
+		minimum !== undefined &&
+		result.probability !== undefined &&
+		result.probability < minimum
+	) {
+		return end("fail", null, { pick: result.label });
+	}
+	return end(result.label, null);
+}
+
+/**
+ * Asks the Device's decider, but never waits on it longer than
+ * `STOP_GRACE_MS` past an abort: a decider that ignores its signal cannot
+ * hold the run. A decider that throws (against its contract) counts as an
+ * error.
+ */
+function decideWithin(
+	device: Pick<Device, "decide">,
+	input: DecisionInput,
+	signal: AbortSignal,
+): Promise<DecisionResult> {
+	return withinGrace(
+		() =>
+			device.decide(input).catch(
+				(error): DecisionResult => ({
+					kind: "error",
+					errorKind: "harness",
+					message: stepFailure(error, "a decider"),
+					costUsd: null,
+				}),
+			),
+		signal,
+		() => ({
+			kind: "error",
+			errorKind: "aborted",
+			message: "The decider did not stop when Night Shift asked it to.",
+			costUsd: null,
+		}),
+	);
+}
+
+/**
+ * Runs `ask` but settles with `late()` once `STOP_GRACE_MS` has passed
+ * after an abort: a decider that ignores its signal cannot hold the run.
+ * Shared by the Decision chooser and the Value producer.
+ */
+export async function withinGrace<T>(
+	ask: () => Promise<T>,
+	signal: AbortSignal,
+	late: () => T,
+): Promise<T> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	let onAbort: (() => void) | undefined;
+	const expired = new Promise<T>((resolve) => {
+		onAbort = () => {
+			timer = setTimeout(() => resolve(late()), STOP_GRACE_MS);
+		};
+		if (signal.aborted) onAbort();
+		else signal.addEventListener("abort", onAbort, { once: true });
+	});
+	try {
+		return await Promise.race([ask(), expired]);
+	} finally {
+		clearTimeout(timer);
+		if (onAbort) signal.removeEventListener("abort", onAbort);
+	}
+}

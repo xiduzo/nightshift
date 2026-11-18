@@ -18,24 +18,20 @@ import { eq } from "drizzle-orm";
 import { createArtifactStore } from "../artifacts/store";
 import type { Device } from "../device/types";
 import { defaultRunSettings } from "../device-config/settings";
-import { compileFlow } from "../graph/compile";
+import { compileFlow } from "../graph/compile/compile";
+import type {
+	LeaseTaker,
+	ServiceRunner,
+	StepContext,
+	StepShared,
+} from "../graph/context/context";
+import { kindOf } from "../graph/nodes/node-kinds";
+import { createRecorders } from "../graph/recorders/recorders";
 import {
-	createRecorders,
-	type LeaseTaker,
-	type ServiceRunner,
-	type StepContext,
-	type StepShared,
-} from "../graph/context";
-import { kindOf } from "../graph/node-kinds";
-import { createRunner, type Runner, type RunnerDeps } from "../graph/runner";
-import {
-	heldOf,
-	type Parked,
-	type Pending,
-	type PendingValue,
-	type RunEvent,
-	type RunStateValues,
-} from "../graph/state";
+	createRunner,
+	type Runner,
+	type RunnerDeps,
+} from "../graph/runner/runner";
 import {
 	type DriveOutcome,
 	driveGraph,
@@ -44,7 +40,15 @@ import {
 	type StreamInput,
 	type Thread,
 	type ThreadDeps,
-} from "../graph/thread";
+} from "../graph/runner/thread";
+import {
+	heldOf,
+	type Parked,
+	type Pending,
+	type PendingValue,
+	type RunEvent,
+	type RunStateValues,
+} from "../graph/state/state";
 import { createRunBus } from "../log/bus";
 import type {
 	EngineEventType,

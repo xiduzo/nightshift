@@ -10,9 +10,16 @@ import {
 	type ValueNode,
 } from "@nightshift/flows";
 import type { Capabilities } from "../device/types";
-import { AGENT, cliToolsInstalled, harnessesAdded } from "../graph/nodes/agent";
-import { DECISION, modelDecisionsHaveDecider } from "../graph/nodes/decision";
-import { modelValuesHaveDecider, VALUE } from "../graph/nodes/value";
+import { AGENT } from "../graph/nodes/agent/agent";
+import {
+	cliToolsInstalled,
+	harnessesAdded,
+} from "../graph/nodes/agent/requirements";
+import {
+	DECISION,
+	modelDecisionsHaveDecider,
+} from "../graph/nodes/decide/decision";
+import { modelValuesHaveDecider, VALUE } from "../graph/nodes/shape/value";
 import {
 	cliToolsOf,
 	connectionsOf,

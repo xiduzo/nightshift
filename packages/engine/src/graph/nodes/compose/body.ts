@@ -1,0 +1,307 @@
+import {
+	type GraphInterrupt,
+	isGraphInterrupt,
+	type LangGraphRunnableConfig,
+} from "@langchain/langgraph";
+import {
+	type CallNode,
+	type Flow,
+	type FlowNode,
+	type JsonValue,
+	type NodeOutputs,
+	type Outcome,
+	placesItself,
+} from "@nightshift/flows";
+import {
+	type InputValues,
+	type Scope,
+	type StepOutputs,
+	scopeKey,
+} from "../../../log";
+import { deriveNodeOutputs, deriveVariables } from "../../../read";
+import { isTestRun, type RunResult } from "../../../run-status";
+import { compileFlow } from "../../compile";
+import type { StepContext } from "../../context";
+import {
+	flowOutputs,
+	flowOutputsVerdict,
+	keepOutputTypes,
+	outputTypes,
+} from "../../data";
+
+import type { Parked, RunStateValues } from "../../state";
+import type { OpenStep } from "../../step";
+
+/**
+ * What a Call node does, once and per element: running a called flow as a
+ * subgraph of the node and reading how it ended (design rule 6).
+ *
+ * The body is compiled once per node (`bodyGraph`) and invoked with the
+ * node's config passed through, so it checkpoints under the node's task
+ * namespace and an interrupt inside it resumes inside it. The body's own
+ * `StepContext` is the caller's with `flow` and `flowName` replaced, and
+ * `placement.deviceFor` when the Subflow names a computer.
+ *
+ * How a body ends, in the walk's terms (`ScopeEnd` in engine.ts):
+ *
+ * - `finished`: the body reached a chosen end (`state.ended`). An End node
+ *   gives its `result` and its message as `reason`: a `failed` End fails
+ *   the Call step (`fail`) or the element (`ItemEnded failed`).
+ * - `failed`: a body step ended `fail`/`needs-input` with no edge, errored,
+ *   or exhausted its edge: the body parked at that step (rule 2). The park
+ *   is swallowed here, because today a failed body fails the Call step
+ *   (`fail`) or the element (`ItemEnded failed`) and the walk goes on; the
+ *   body's namespace is left parked and is never invoked again (the next
+ *   invoke of the node is a new task, so a new namespace).
+ * - `stopped`: a person stopped the run, or the stop time or a stop after
+ *   the step fired inside the body. The caller ends its step `stopped` and
+ *   rethrows the interrupt, so the run parks; a resume lands back inside.
+ * - `aborted`: the body parked `failed` before a step started (the step
+ *   cap). The caller ends its step `error` and rethrows.
+ * - `paused`: a wait or a Gate inside the body. The caller leaves its step
+ *   open and rethrows.
+ */
+
+/** The caller's run fields a body reads differently, and `due_at`, which a body's own state lacks. */
+export type BodyRun = {
+	branch: string;
+	base_branch: string;
+	index: string;
+	due_at: string;
+};
+
+export type BodyEnd =
+	| {
+			kind: "finished";
+			node: FlowNode;
+			outcome: Outcome;
+			/** The result of the End node the body ended at, else undefined. */
+			result?: RunResult;
+			/** The reason of the chosen end: an End node's message. */
+			reason: string | null;
+			/** The report of the End node the body ended at, when it gave one. */
+			report?: string;
+			/** The body's node outputs, from its final state. */
+			nodes: NodeOutputs;
+			/** The body's variables, from its final state. */
+			vars: Record<string, JsonValue>;
+	  }
+	| { kind: "failed"; reason: string }
+	| {
+			kind: "stopped";
+			reason: string | null;
+			/** The stop time stopped the body, not a person. */
+			atStopTime: boolean;
+			interrupt: GraphInterrupt;
+	  }
+	| { kind: "aborted"; reason: string; interrupt: GraphInterrupt }
+	| { kind: "paused"; interrupt: GraphInterrupt };
+
+export type BodyGraph = ReturnType<ReturnType<typeof compileFlow>["compile"]>;
+
+/**
+ * The called flow compiled for the caller's run, with its own `flow` and
+ * `flowName`. A Subflow that names a computer (`device`) runs its steps
+ * there: a body node that does not say where it runs (`placesItself`)
+ * gets the Call node's Device, as the run's plan placed it. A Subflow
+ * inside it asks the same `placement`, so the nearest one that names a
+ * computer wins. The run's plan grouped the body's nodes on that Device,
+ * so run start checked it has what they need (`planNodes`). Nothing else
+ * is new: a step placed on another Device runs there as any placed
+ * Command or Agent does, through the work relay, with the run's work
+ * moved by a Hand-off (`readyDevice`), and it waits while that Device is
+ * offline. Its knowledge is that Device's working copy, reconciled there.
+ */
+export function bodyGraph(
+	ctx: StepContext,
+	caller: CallNode,
+	called: Flow,
+): BodyGraph {
+	const placement: StepContext["placement"] =
+		caller.device === undefined
+			? ctx.placement
+			: {
+					...ctx.placement,
+					// A body step that moved goes on where it moved to, by its own fallbacks.
+					deviceFor: (node, run, movedTo) =>
+						movedTo
+							? ctx.placement.deviceFor(node, run, movedTo)
+							: ctx.placement.deviceFor(
+									placesItself(node) ? node : caller,
+									run,
+								),
+				};
+	return compileFlow(called, {
+		...ctx,
+		flow: called,
+		flowName: caller.flow,
+		callPath: [...ctx.callPath, caller.id],
+		placement,
+	}).compile();
+}
+
+/**
+ * Runs the body for the given inputs under the caller's config, with the
+ * scope and the element's `run` fields in `configurable`.
+ */
+export async function runBody(input: {
+	graph: BodyGraph;
+	called: Flow;
+	flowName: string;
+	inputs: InputValues;
+	config: LangGraphRunnableConfig;
+	scope: Scope;
+	run: BodyRun;
+	/** The caller's stop time, as `stopAtOf` reads it: the body checks the same one. */
+	stopAt: number | null;
+}): Promise<BodyEnd> {
+	const config: LangGraphRunnableConfig = {
+		...input.config,
+		configurable: {
+			...input.config.configurable,
+			scope: input.scope,
+			run: input.run,
+			stopAt: input.stopAt,
+		},
+	};
+	let result: RunStateValues;
+	try {
+		result = (await input.graph.invoke(
+			{ inputs: input.inputs },
+			config,
+		)) as RunStateValues;
+	} catch (error) {
+		if (!isGraphInterrupt(error)) throw error;
+		const value = error.interrupts[0]?.value as Parked | undefined;
+		if (value?.kind !== "parked") return { kind: "paused", interrupt: error };
+		if (value.status === "stopped") {
+			return {
+				kind: "stopped",
+				reason: value.reason,
+				atStopTime: value.atStopTime === true,
+				interrupt: error,
+			};
+		}
+		if (value.stepId === null) {
+			return {
+				kind: "aborted",
+				reason: value.reason ?? "The run was aborted.",
+				interrupt: error,
+			};
+		}
+		return { kind: "failed", reason: value.reason ?? "unknown error" };
+	}
+	const ended = result.ended;
+	if (!ended) {
+		throw new Error(`The flow "${input.flowName}" ended without an outcome.`);
+	}
+	const node = input.called.nodes.find((n) => n.id === ended.nodeId);
+	if (!node) {
+		throw new Error(
+			`The flow "${input.flowName}" has no node "${ended.nodeId}".`,
+		);
+	}
+	return {
+		kind: "finished",
+		node,
+		outcome: ended.outcome as Outcome,
+		...(ended.result ? { result: ended.result } : {}),
+		reason: ended.reason,
+		...(ended.report !== undefined ? { report: ended.report } : {}),
+		nodes: result.nodes,
+		vars: result.vars ?? {},
+	};
+}
+
+/**
+ * The called flow's declared outputs, rendered in the body's own context:
+ * from the node outputs and variables of a finished body's state, or from
+ * the log for a body that failed (its state was never returned).
+ */
+export async function bodyOutputs(
+	ctx: StepContext,
+	input: {
+		called: Flow;
+		flowName: string;
+		inputs: InputValues;
+		scope: Scope;
+		run: BodyRun;
+	},
+	finished?: { nodes: NodeOutputs; vars: Record<string, JsonValue> },
+): Promise<StepOutputs> {
+	const runState = finished ? null : await ctx.log.state(ctx.run.id);
+	const key = scopeKey(input.scope);
+	return flowOutputs(input.called, {
+		nodes:
+			finished?.nodes ?? (runState ? deriveNodeOutputs(runState, key) : {}),
+		vars: finished?.vars ?? (runState ? deriveVariables(runState, key) : {}),
+		inputs: input.inputs,
+		run: {
+			...input.run,
+			worktree: ctx.run.worktreePath,
+			base_ref: ctx.run.baseRef,
+			flow: input.flowName,
+		},
+	});
+}
+
+/**
+ * What the outputs of a finished body promise (Q42): a body that finished
+ * at a chosen end (not a `failed` End) gives the outputs of its flow held
+ * to their types (`flowOutputsVerdict`).
+ *
+ * - An output that does not fit a type a person wrote or confirmed breaks
+ *   the promise: `broken`, and the caller fails the step or the element.
+ * - An output that does not fit a type Night Shift inferred lands a
+ *   `shape` warning on the step, once per output and step (`seen`).
+ * - An output without a type gets one from its value, which the Walker
+ *   keeps on the called flow (`keepOutputTypes`), once per step. Not in a
+ *   test run (ADR 27).
+ */
+export async function typedOutputs(
+	ctx: StepContext,
+	step: Pick<OpenStep, "runState" | "warn">,
+	body: { called: Flow; flowName: string },
+	outputs: StepOutputs,
+	seen: OutputsSeen = newOutputsSeen(),
+): Promise<
+	{ kind: "holds"; outputs: StepOutputs } | { kind: "broken"; error: string }
+> {
+	const verdict = flowOutputsVerdict(body.called, body.flowName, outputs);
+	if (verdict.broken !== null) return { kind: "broken", error: verdict.broken };
+	for (const warning of verdict.warnings) {
+		if (seen.warned.has(warning.output)) continue;
+		seen.warned.add(warning.output);
+		await step.warn("shape", warning.message);
+	}
+	if (!seen.kept && !isTestRun(step.runState)) {
+		const types = outputTypes(body.called, body.flowName, outputs);
+		if (types.length > 0) {
+			seen.kept = true;
+			await keepOutputTypes(ctx, body.flowName, types);
+		}
+	}
+	return { kind: "holds", outputs: verdict.values };
+}
+
+/** What a step already did about its called flow's outputs: the outputs it warned about, whether it kept types. */
+export type OutputsSeen = { warned: Set<string>; kept: boolean };
+
+export function newOutputsSeen(): OutputsSeen {
+	return { warned: new Set(), kept: false };
+}
+
+/**
+ * Why a body that ended at a `failed` End node failed: its message, else
+ * which End node chose it.
+ */
+export function failedEndReason(
+	ended: Extract<BodyEnd, { kind: "finished" }>,
+): string {
+	return ended.reason ?? `The flow ended as failed at node "${ended.node.id}".`;
+}
+
+/** Whether the Call node has an edge on `stopped`: it wraps the run up after the stop time. */
+export function hasStoppedEdge(flow: Flow, node: FlowNode): boolean {
+	return flow.edges.some((e) => e.from === node.id && e.outcome === "stopped");
+}

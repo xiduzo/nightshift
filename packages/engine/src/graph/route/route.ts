@@ -1,0 +1,493 @@
+import {
+	Command,
+	END,
+	type LangGraphRunnableConfig,
+} from "@langchain/langgraph";
+import {
+	endsFlow,
+	type FlowEdge,
+	type FlowNode,
+	type JsonValue,
+	nextEdge,
+} from "@nightshift/flows";
+import type { Device } from "../../device";
+import {
+	leavingHolds,
+	provedEndReason,
+	type Scope,
+	type StepGuard,
+	type StepOutcome,
+	type StepOutputs,
+} from "../../log";
+import { arrive, openRound, outrun, placeOf } from "../branches";
+import {
+	messageOf,
+	type NodeAction,
+	type StepContext,
+	type StopService,
+} from "../context";
+import { commitVisit, type DoneStep } from "../position";
+import type { PendingParked, RunStateUpdate, RunStateValues } from "../state";
+import { interruptNode } from "./interrupt";
+
+/**
+ * Where a node goes after its step: the edge the outcome picks, a chosen
+ * end, or the node's park node. Ported from `walkScope` in engine.ts. Which
+ * ends are chosen is a fact of the node type (`endsFlow` of
+ * `@nightshift/flows`), and what `RunEnded` says is the node kind's
+ * (`ctx.kindOf(node).endReason`): this module switches on no node type.
+ *
+ * Node naming in the compiled graph: the step node is the flow node's id;
+ * its park node is `park__<id>`; the wait node of an Agent node or a
+ * Decision decided by a model is `wait__<id>`; the ask node of a Decision
+ * decided by a person (a Gate) is `ask__<id>`.
+ */
+
+export const parkNodeId = (nodeId: string) => `park__${nodeId}`;
+export const waitNodeId = (nodeId: string) => `wait__${nodeId}`;
+export const askNodeId = (nodeId: string) => `ask__${nodeId}`;
+
+/** The scope of the flow this graph runs in: null at the top level. */
+export function scopeOf(config: LangGraphRunnableConfig): Scope | null {
+	return (config.configurable?.scope as Scope | null | undefined) ?? null;
+}
+
+/** How a step ended: what `StepEnded` recorded, plus what a park needs to continue it. */
+export type StepEnd = {
+	stepId: string;
+	visit: number;
+	outcome: StepOutcome;
+	outputs: StepOutputs;
+	error: string | null;
+	/** The guard that stopped the step, when one did. */
+	guard?: StepGuard;
+	/** Agent steps: the harness session the step has, for a reopen. */
+	harnessSessionId?: string | null;
+	/** The variables the step's writes changed (`StepEnded.variables`). */
+	variables?: Record<string, JsonValue>;
+};
+
+/**
+ * Parks the run at the node's park node (design rule 2): `pending` keeps
+ * the step so a resume reopens it, and the park node interrupts with the
+ * status and reason `RunEnded` records. `step` is null when the run parks
+ * before the node's step started (stop after step, stop time, step cap).
+ */
+export function parkCommand(input: {
+	node: FlowNode;
+	status: "failed" | "stopped";
+	reason: string | null;
+	step: StepEnd | null;
+	update?: RunStateUpdate;
+	/** The stop time stopped the run (`PendingParked.atStopTime`). */
+	atStopTime?: boolean;
+}): Command {
+	const { node, step } = input;
+	const pending: PendingParked = {
+		kind: "parked",
+		stepId: step?.stepId ?? null,
+		nodeId: node.id,
+		visit: step?.visit ?? 0,
+		harnessSessionId: step?.harnessSessionId ?? null,
+		prompt: null,
+		status: input.status,
+		reason: input.reason,
+		endReason: provedEndReason({
+			status: input.status,
+			reason: input.reason,
+			atStopTime: input.atStopTime,
+			guard: step?.guard,
+		}),
+		...(input.atStopTime ? { atStopTime: true } : {}),
+	};
+	return new Command({
+		update: { ...input.update, pending },
+		goto: parkNodeId(node.id),
+	});
+}
+
+/**
+ * Parks the run as stopped on a step that ended `stopped`, with the step's
+ * outputs and visit in the state: the stop time came while it was open.
+ */
+export function parkStopped(
+	node: FlowNode,
+	end: StepEnd,
+	reason: string,
+	update?: RunStateUpdate,
+): Command {
+	return parkCommand({
+		node,
+		status: "stopped",
+		reason,
+		step: end,
+		atStopTime: true,
+		update: {
+			...update,
+			nodes: { [node.id]: end.outputs },
+			...commitVisit(node, end.visit),
+		},
+	});
+}
+
+/**
+ * Parks the run as failed on a step that a guard of the run policy ended
+ * (the budget), with the step's outputs and visit in the state: a resume
+ * reopens the step.
+ */
+export function parkFailed(
+	node: FlowNode,
+	end: StepEnd,
+	reason: string,
+	update?: RunStateUpdate,
+): Command {
+	return parkCommand({
+		node,
+		status: "failed",
+		reason,
+		step: end,
+		update: {
+			...update,
+			nodes: { [node.id]: end.outputs },
+			...commitVisit(node, end.visit),
+		},
+	});
+}
+
+/**
+ * Records the ended step's outputs in the state, commits its visit
+ * (`commitVisit`) and jumps along
+ * the edge the outcome picks, with `EdgeTaken` in the log; or ends the flow
+ * on a chosen end; or parks the run. Exactly `walkScope`'s rules:
+ *
+ * - `stopped` parks as stopped with no reason, except a step that ends
+ *   `stopped` with `wrappingUp` in `extra` (a Call node the stop time
+ *   ended, with a `stopped` edge): it takes the edge.
+ * - `error` and `interrupted` park as failed: `Node "x" failed: <error>`.
+ * - no edge: a chosen end of the kind (`pass`, a Decision option, an
+ *   Agent's own outcome, a Command's exit on code 0, a Wait's `done`, the
+ *   outcome of a Call with `each`, every End) ends the flow (`ended` set,
+ *   with the End's result, goto END); `fail`, `needs-input` and the rest
+ *   park as failed.
+ * - every edge on the outcome at its max parks as failed.
+ *
+ * Parallel branches (`branches.ts`): a fan-out takes every edge at once and
+ * opens a round of its Join; a branch that reaches its Join arrives in
+ * that round; a step of a branch its Join left behind goes no further; and
+ * an outcome with no edge on a branch parks as failed, since a branch ends
+ * at its Join, never at the end of the flow.
+ */
+export function route(
+	ctx: StepContext,
+	state: RunStateValues,
+	node: FlowNode,
+	end: StepEnd,
+	config: LangGraphRunnableConfig,
+	extra?: RunStateUpdate,
+): Promise<Command> {
+	return routeOn(ctx, state, node, end, config, extra, null);
+}
+
+/**
+ * Goes on from a step that is done (`Position.done`): it ended on its own,
+ * and the commit after its end never landed. The route is the one its end
+ * took: the same state update, and the edge the log took, if it took one.
+ * Nothing is appended twice: an `EdgeTaken` the log has is taken in the
+ * state only.
+ */
+export function routeDone(
+	ctx: StepContext,
+	state: RunStateValues,
+	node: FlowNode,
+	done: DoneStep,
+	config: LangGraphRunnableConfig,
+	extra?: RunStateUpdate,
+): Promise<Command> {
+	const { ended } = done;
+	const end: StepEnd = {
+		stepId: done.step.id,
+		visit: done.step.visit,
+		outcome: ended.outcome,
+		outputs: ended.outputs,
+		error: ended.error,
+		...(ended.variables ? { variables: ended.variables } : {}),
+	};
+	return routeOn(ctx, state, node, end, config, extra, done.edges);
+}
+
+async function routeOn(
+	ctx: StepContext,
+	state: RunStateValues,
+	node: FlowNode,
+	end: StepEnd,
+	config: LangGraphRunnableConfig,
+	extra: RunStateUpdate | undefined,
+	taken: DoneStep["edges"] | null,
+): Promise<Command> {
+	const { outcome, visit } = end;
+	const update: RunStateUpdate = {
+		...extra,
+		nodes: { [node.id]: end.outputs },
+		...(end.variables ? { vars: end.variables } : {}),
+		...commitVisit(node, visit),
+		pending: { [node.id]: null },
+	};
+	// A park keeps the node's cascade (ADR 6): a resume climbs on where it
+	// stopped. Every other way on ends it.
+	const kept = { ...update };
+	const park = (status: "failed" | "stopped", reason: string | null) =>
+		parkCommand({ node, status, reason, step: end, update: kept });
+	if (state.cascades?.[node.id]) {
+		update.cascades = { [node.id]: null };
+	}
+	// A branch another branch outran goes no further, whatever its end:
+	// its Join went on without it (`branches.ts`).
+	if (outrun(ctx, state, node, config)) return new Command({ update });
+	// A stop parks. The one exception: a Call node the stop time ended
+	// follows its `stopped` edge to the nodes that wrap the run up. Only a
+	// Call node passes `wrappingUp` (`hasStoppedEdge` in nodes/body.ts).
+	if (outcome === "stopped" && !extra?.wrappingUp) {
+		return park("stopped", null);
+	}
+	if (outcome === "error" || outcome === "interrupted") {
+		return park(
+			"failed",
+			`Node "${node.id}" failed: ${end.error ?? "unknown error"}`,
+		);
+	}
+	const choice = nextEdge({
+		flow: ctx.flow,
+		from: node.id,
+		outcome,
+		traversals: state.traversals,
+	});
+	const [first] = taken ?? [];
+	if (first && choice.kind !== "fan-out") {
+		// The walk took this edge before the commit was lost.
+		await leaveScopes(ctx, end, [{ from: node.id, to: first.to }], config);
+		return new Command({
+			update: {
+				...update,
+				...arrivalAt(ctx, state, node, first.to, config),
+				traversals: {
+					[first.edgeId]: (state.traversals[first.edgeId] ?? 0) + 1,
+				},
+			},
+			goto: first.to,
+		});
+	}
+	if (choice.kind === "end") {
+		const kind = ctx.kindOf(node);
+		if (placeOf(ctx.flow, node.id)) {
+			return park(
+				"failed",
+				`Node "${node.id}" ended with "${outcome}" on a branch, and no edge leads on to its Join.`,
+			);
+		}
+		if (endsFlow(node, outcome)) {
+			// The end of a called flow goes on in its caller: a Call step that
+			// ends here ends the Sections of its own flow.
+			await leaveScopes(ctx, end, [], config);
+			const result = kind.endResult(node, outcome);
+			const report = kind.endReport(node, end.outputs);
+			return new Command({
+				update: {
+					...update,
+					ended: {
+						status: "finished",
+						nodeId: node.id,
+						outcome,
+						reason: kind.endReason(node, outcome, end.outputs),
+						...(result !== null ? { result } : {}),
+						...(report !== null ? { report } : {}),
+					},
+				},
+				goto: END,
+			});
+		}
+		return park(
+			"failed",
+			`Node "${node.id}" ended with "${outcome}" and no edge leaves it on that outcome.`,
+		);
+	}
+	if (choice.kind === "exhausted") {
+		const edges = choice.edges
+			.map(
+				(e) =>
+					`"${e.id}" (${e.from} → ${e.to} on ${e.outcome}, max ${e.max ?? "∞"})`,
+			)
+			.join(", ");
+		return park(
+			"failed",
+			`Node "${node.id}" ended with "${outcome}", but edge ${edges} reached its max.`,
+		);
+	}
+	if (choice.kind === "fan-out") {
+		// Every branch at once. An edge the log has already (the commit
+		// after it was lost) is not appended again.
+		const logged = new Set((taken ?? []).map((e) => e.edgeId));
+		const traversals: Record<string, number> = {};
+		for (const edge of choice.edges) {
+			traversals[edge.id] = (state.traversals[edge.id] ?? 0) + 1;
+			if (logged.has(edge.id)) continue;
+			await takeEdge(ctx, edge, outcome, config);
+		}
+		await leaveScopes(ctx, end, choice.edges, config);
+		return new Command({
+			update: {
+				...update,
+				...openRound(ctx, state, node.id, outcome),
+				traversals,
+			},
+			goto: choice.edges.map((edge) => edge.to),
+		});
+	}
+	const { edge } = choice;
+	await takeEdge(ctx, edge, outcome, config);
+	await leaveScopes(ctx, end, [edge], config);
+	return new Command({
+		update: {
+			...update,
+			...arrivalAt(ctx, state, node, edge.to, config),
+			traversals: { [edge.id]: (state.traversals[edge.id] ?? 0) + 1 },
+		},
+		goto: edge.to,
+	});
+}
+
+/** `EdgeTaken` in the log, in the flow's scope. */
+async function takeEdge(
+	ctx: StepContext,
+	edge: FlowEdge,
+	outcome: string,
+	config: LangGraphRunnableConfig,
+): Promise<void> {
+	await ctx.log.append({
+		type: "EdgeTaken",
+		runId: ctx.run.id,
+		payload: {
+			edgeId: edge.id,
+			from: edge.from,
+			to: edge.to,
+			outcome,
+			scope: scopeOf(config),
+		},
+	});
+}
+
+/**
+ * Lets go of what the run holds for a Section the step leaves
+ * (`leavingHolds`): it takes an edge out of the Section, or it is the Call
+ * step whose flow the hold was taken in. `LeaseReleased` and
+ * `ServiceStopped` go in the log first, so a resume does not take the
+ * lease again or start the service again. A lease that cannot be released
+ * at its keeper expires after its ttl, and a service that does not stop
+ * is logged: the walk goes on. A hold the log already let go of (an end
+ * whose commit was lost) is not let go of twice.
+ */
+async function leaveScopes(
+	ctx: StepContext,
+	end: StepEnd,
+	edges: readonly { from: string; to: string }[],
+	config: LangGraphRunnableConfig,
+): Promise<void> {
+	const { holds } = await ctx.log.state(ctx.run.id);
+	if (holds.length === 0) return;
+	const left = leavingHolds(holds, {
+		stepId: end.stepId,
+		scope: scopeOf(config),
+		edges,
+	});
+	if (left.length === 0) return;
+	const leases: string[] = [];
+	const services: StopService[] = [];
+	for (const hold of left) {
+		switch (hold.kind) {
+			case "lease":
+				await ctx.log.append({
+					type: "LeaseReleased",
+					runId: ctx.run.id,
+					payload: { name: hold.name, why: "scope" },
+				});
+				leases.push(hold.name);
+				break;
+			case "service":
+				await ctx.log.append({
+					type: "ServiceStopped",
+					runId: ctx.run.id,
+					payload: { nodeId: hold.nodeId, scope: hold.scope, why: "scope" },
+				});
+				services.push({ service: hold, device: deviceOfService(ctx, hold) });
+				break;
+		}
+	}
+	if (services.length > 0) await ctx.services.stop(ctx.run.id, services);
+	if (leases.length === 0) return;
+	try {
+		await ctx.leases.release(ctx.run.id, leases);
+	} catch (error) {
+		console.warn(
+			`[engine] run ${ctx.run.id} could not let go of a lease: ${messageOf(error)}`,
+		);
+	}
+}
+
+/** The Device a service runs on, as a step of the run reaches it, or null. */
+function deviceOfService(
+	ctx: StepContext,
+	hold: { deviceId: string },
+): Device | null {
+	try {
+		return ctx.placement.deviceById(hold.deviceId, ctx.run);
+	} catch {
+		return null;
+	}
+}
+
+/** A branch's arrival when the edge leads to a Join, else nothing (`arrive`). */
+function arrivalAt(
+	ctx: StepContext,
+	state: RunStateValues,
+	node: FlowNode,
+	to: string,
+	config: LangGraphRunnableConfig,
+): RunStateUpdate {
+	const target = ctx.flow.nodes.find((n) => n.id === to);
+	if (target?.type !== "join") return {};
+	return arrive(ctx, state, node.id, target, ctx.now(), config);
+}
+
+/**
+ * The park node of every flow node (`interruptNode`). It interrupts with the
+ * parked step (the runner appends `RunEnded`), after nothing else (design
+ * rule 4). A resume jumps back to the node with `pending.prompt` set; the
+ * node reopens the parked step when it can, else starts a new visit.
+ */
+export function parkNode(node: FlowNode): NodeAction {
+	return interruptNode({
+		kind: "parked",
+		nodeId: node.id,
+		missing: `Nothing waits at node "${node.id}".`,
+		value: (pending) => ({
+			kind: "parked",
+			stepId: pending.stepId,
+			nodeId: node.id,
+			status: pending.status,
+			reason: pending.reason,
+			...(pending.endReason !== undefined
+				? { endReason: pending.endReason }
+				: {}),
+			...(pending.atStopTime ? { atStopTime: true } : {}),
+		}),
+		answer: (pending, answer) => {
+			const prompt =
+				answer && "prompt" in answer && answer.prompt !== undefined
+					? answer.prompt
+					: null;
+			return new Command({
+				update: { pending: { ...pending, prompt } },
+				goto: node.id,
+			});
+		},
+	});
+}

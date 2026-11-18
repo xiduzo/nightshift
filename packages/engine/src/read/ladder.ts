@@ -122,7 +122,7 @@ export type RunLadder = {
  * The node types that can have a cascade (ADR 6), one entry each: the
  * ladder each climbs, and who tries a tier that is not a person. Only
  * these types are on a ladder. A new type with a cascade does not
- * compile without its entry. The climb (`graph/cascade.ts`) reads `by`
+ * compile without its entry. The climb (`graph/cascade/cascade.ts`) reads `by`
  * for a new step's rung; this module reads it for a step of an older
  * Walker, which names no rung.
  */
