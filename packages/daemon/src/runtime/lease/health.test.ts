@@ -6,7 +6,7 @@ import { createDb } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 import { daemonLease } from "@nightshift/db/schema";
 import { asDate, now as timeNow } from "@nightshift/time";
-import { type Heartbeat, readHeartbeatFile } from "../heartbeat";
+import { type Heartbeat, readHeartbeatFile } from "../../heartbeat";
 import {
 	checkHealth,
 	elapsedSeconds,

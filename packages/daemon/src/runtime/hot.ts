@@ -14,7 +14,7 @@ import type { Telemetry } from "@nightshift/telemetry";
 
 import type { KeepAwake } from "../keep-awake";
 import type { KeptSync } from "../sync";
-import type { HeldLease } from "./hold-lease";
+import type { HeldLease } from "./lease";
 
 /**
  * What one daemon process keeps across `bun --hot` reloads. `bun --hot`

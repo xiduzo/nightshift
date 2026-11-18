@@ -10,14 +10,6 @@ export {
 export { processDatabase } from "./database";
 export { canChooseFolder, chooseFolder } from "./folder-picker";
 export {
-	checkHealth,
-	HEALTH_STALE_AFTER_MS,
-	type HealthCheck,
-	leaseHealth,
-	readHeartbeat,
-} from "./health";
-export { holdLease } from "./hold-lease";
-export {
 	type HotRegistry,
 	type HotSlots,
 	hot,
@@ -26,6 +18,14 @@ export {
 	stopOlderDocuments,
 	stopOlderKnowledge,
 } from "./hot";
+export {
+	checkHealth,
+	HEALTH_STALE_AFTER_MS,
+	type HealthCheck,
+	holdLease,
+	leaseHealth,
+	readHeartbeat,
+} from "./lease";
 export { DEFAULT_PORT, DESKTOP_PORT, daemonPort } from "./port";
 export { guardProcess, onProcessCrashed } from "./process-guard";
 export { boundedStop, stopOnSignals } from "./signals";
