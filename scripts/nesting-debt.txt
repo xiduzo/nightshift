@@ -53,22 +53,3 @@ packages/engine/src/knowledge/readers
 packages/engine/src/log
 packages/engine/src/projects
 packages/flows/src/nodes
-
-# (o) The harnesses: five sub-verticals had a barrel before the rule.
-packages/agents/src/harnesses/acp/index.ts exports ACP_AGENTS
-packages/agents/src/harnesses/acp/index.ts exports acpPermission
-packages/agents/src/harnesses/acp/index.ts exports isAcpAgent
-packages/agents/src/harnesses/claude-code/index.ts exports cliAllowRules
-packages/agents/src/harnesses/codex/index.ts exports codexPolicy
-packages/agents/src/harnesses/facts-table.ts -> packages/agents/src/harnesses/acp
-packages/agents/src/harnesses/facts-table.ts -> packages/agents/src/harnesses/claude-code
-packages/agents/src/harnesses/facts-table.ts -> packages/agents/src/harnesses/codex
-packages/agents/src/harnesses/facts-table.ts -> packages/agents/src/harnesses/grok-build
-packages/agents/src/harnesses/facts-table.ts -> packages/agents/src/harnesses/opencode
-packages/agents/src/harnesses/grok-build/index.ts exports grokPolicy
-packages/agents/src/harnesses/opencode/index.ts exports opencodePermission
-packages/agents/src/harnesses/registry.ts -> packages/agents/src/harnesses/acp
-packages/agents/src/harnesses/registry.ts -> packages/agents/src/harnesses/claude-code
-packages/agents/src/harnesses/registry.ts -> packages/agents/src/harnesses/codex
-packages/agents/src/harnesses/registry.ts -> packages/agents/src/harnesses/grok-build
-packages/agents/src/harnesses/registry.ts -> packages/agents/src/harnesses/opencode

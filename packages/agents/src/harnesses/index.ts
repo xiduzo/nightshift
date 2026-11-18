@@ -1,11 +1,10 @@
 /**
  * The harnesses: one folder per harness (`claude-code/`, `codex/`,
- * `opencode/`, `grok-build/`, `acp/` for every agent that speaks ACP), and
- * the registry of one record per harness (`registry.ts`, `facts.ts`).
+ * `opencode/`, `grok-build/`, `acp/` for every agent that speaks ACP), the
+ * facts of each harness as pure data (`facts-table/`), and the registry of
+ * one record per harness (`registry.ts`, `facts.ts`).
  */
 export {
-	ACP_DEFAULT_MODEL,
-	type AcpAgentName,
 	type AcpHarnessOptions,
 	acpHarness,
 	customAcpHarness,
@@ -21,7 +20,11 @@ export {
 	codexHarness,
 } from "./codex";
 export { harnessFacts } from "./facts";
-export { HARNESS_FACTS } from "./facts-table";
+export {
+	ACP_DEFAULT_MODEL,
+	type AcpAgentName,
+	HARNESS_FACTS,
+} from "./facts-table";
 export {
 	type GrokBuildHarnessOptions,
 	grokBuildHarness,

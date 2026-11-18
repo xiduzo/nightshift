@@ -1,7 +1,7 @@
 import type { CODEX_MODELS } from "@tanstack/ai-codex";
 import { baseCheck, type CliCheck, firstLine, probe } from "../../doctor";
+import { CODEX_FACTS } from "../facts-table";
 import type { HarnessAdapter } from "../harness-record";
-import { CODEX_FACTS } from "./facts";
 
 /** The version, and the login (`codex login status`). */
 async function codexCheck(bin: string): Promise<CliCheck> {

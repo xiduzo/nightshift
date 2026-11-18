@@ -1,13 +1,13 @@
 /**
- * The shape of one record in the harness registry. Each harness folder
- * gives its record in two parts:
- * - `facts.ts`: pure data (`HarnessFacts`). It imports no adapter code, so
- *   the browser-safe `./harness-facts` entry and the engine read it
- *   without loading a harness.
- * - `record.ts`: the facts, plus the models of its TanStack adapter and its
- *   install check (`HarnessAdapter`). The models are a copy, typed against
- *   the adapter's list, so the registry loads no adapter. `registry.ts`
- *   collects them.
+ * The shape of one record in the harness registry. Each harness gives
+ * its record in two parts:
+ * - `facts-table/<harness>.ts`: pure data (`HarnessFacts`). It imports no
+ *   adapter code, so the browser-safe `./harness-facts` entry and the
+ *   engine read it without loading a harness.
+ * - `<harness>/record.ts`: the facts, plus the models of its TanStack
+ *   adapter and its install check (`HarnessAdapter`). The models are a
+ *   copy, typed against the adapter's list, so the registry loads no
+ *   adapter package. `registry.ts` collects them.
  */
 import type { HarnessCatalogEntry } from "@nightshift/flows";
 

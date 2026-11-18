@@ -4,11 +4,12 @@
  * (`testing/fake.ts`) implement `label` and `takeOverCommand` from this
  * table, so a fake and a real harness are interchangeable at the same seam.
  *
- * Each harness folder gives its own facts (`<harness>/facts.ts`), and
- * `facts-table.ts` collects them. This module is the `./harness-facts` entry: it imports
- * no adapter code and no `node:` module, so it is browser-safe, an adapter
- * may import it without a cycle, and the engine may use `HARNESS_LABELS`
- * for a harness it has no instance of (one that is not added).
+ * Each harness gives its own facts in `facts-table/` (`claude-code.ts`),
+ * and `facts-table/table.ts` collects them. This module is the
+ * `./harness-facts` entry: it imports no adapter code and no `node:` module,
+ * so it is browser-safe, an adapter may import it without a cycle, and the
+ * engine may use `HARNESS_LABELS` for a harness it has no instance of (one
+ * that is not added).
  */
 import { customAgentSlug, isCustomHarness } from "@nightshift/flows";
 import {

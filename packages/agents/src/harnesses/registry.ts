@@ -7,10 +7,10 @@
  * chat adapters: they cannot run tools in a worktree, so they cannot run
  * an Agent node.
  *
- * Add a harness: a folder with its `facts.ts`, `record.ts` and harness,
- * one line here, one line in `facts.ts`, and its name in `@nightshift/flows`
- * (`harnessNameSchema`). The `Record<HarnessName, …>` types fail until all
- * are there.
+ * Add a harness: a folder with its `record.ts` and harness, its facts in
+ * `facts-table/`, one line here, one line in `facts-table/table.ts`, and its
+ * name in `@nightshift/flows` (`harnessNameSchema`). The
+ * `Record<HarnessName, …>` types fail until all are there.
  */
 
 import {
@@ -27,13 +27,13 @@ import {
 	resolveBin,
 } from "../doctor";
 import type { AgentHarnessName, HarnessName } from "../port";
-import { ACP_DEFAULT_MODEL } from "./acp/facts";
-import { ACP_ADAPTERS } from "./acp/record";
-import { CLAUDE_CODE_ADAPTER } from "./claude-code/record";
-import { CODEX_ADAPTER } from "./codex/record";
-import { GROK_BUILD_ADAPTER } from "./grok-build/record";
+import { ACP_ADAPTERS } from "./acp";
+import { CLAUDE_CODE_ADAPTER } from "./claude-code";
+import { CODEX_ADAPTER } from "./codex";
+import { ACP_DEFAULT_MODEL } from "./facts-table";
+import { GROK_BUILD_ADAPTER } from "./grok-build";
 import type { HarnessAdapter } from "./harness-record";
-import { OPENCODE_ADAPTER } from "./opencode/record";
+import { OPENCODE_ADAPTER } from "./opencode";
 
 export const HARNESS_ADAPTERS: Record<HarnessName, HarnessAdapter> = {
 	"claude-code": CLAUDE_CODE_ADAPTER,

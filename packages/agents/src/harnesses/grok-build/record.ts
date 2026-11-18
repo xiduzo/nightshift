@@ -1,6 +1,6 @@
 import type { GROK_BUILD_MODELS } from "@tanstack/ai-grok-build";
+import { GROK_BUILD_FACTS } from "../facts-table";
 import type { HarnessAdapter } from "../harness-record";
-import { GROK_BUILD_FACTS } from "./facts";
 
 /**
  * The models `@tanstack/ai-grok-build` knows. A copy, so the registry does

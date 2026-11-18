@@ -1,7 +1,7 @@
 import type { OPENCODE_MODELS } from "@tanstack/ai-opencode";
 import { baseCheck, type CliCheck } from "../../doctor";
+import { OPENCODE_FACTS } from "../facts-table";
 import type { HarnessAdapter } from "../harness-record";
-import { OPENCODE_FACTS } from "./facts";
 
 /**
  * The version, as `x.y.z`. Both OpenCode 1.x and 2.x work: 2.x runs over

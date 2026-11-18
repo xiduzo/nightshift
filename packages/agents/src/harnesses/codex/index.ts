@@ -1,5 +1,2 @@
-export {
-	type CodexHarnessOptions,
-	codexHarness,
-	codexPolicy,
-} from "./harness";
+export { type CodexHarnessOptions, codexHarness } from "./harness";
+export { CODEX_ADAPTER } from "./record";

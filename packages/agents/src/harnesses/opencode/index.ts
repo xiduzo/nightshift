@@ -1,2 +1,2 @@
 export { type OpencodeHarnessOptions, opencodeHarness } from "./harness";
-export { opencodePermission } from "./permissions";
+export { OPENCODE_ADAPTER } from "./record";

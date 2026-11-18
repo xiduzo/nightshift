@@ -35,7 +35,11 @@ import {
 	type SdkSignals,
 } from "../../session";
 import { harnessFacts } from "../facts";
-import { ACP_DEFAULT_MODEL, ACP_FACTS, type AcpAgentName } from "./facts";
+import {
+	ACP_DEFAULT_MODEL,
+	ACP_FACTS,
+	type AcpAgentName,
+} from "../facts-table";
 import { piAcpCommand, piReadOnly } from "./pi";
 import { type SessionConfig, withSessionConfig } from "./session-config";
 

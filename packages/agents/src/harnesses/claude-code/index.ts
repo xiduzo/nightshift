@@ -2,5 +2,5 @@ export {
 	type ClaudeCodeHarnessOptions,
 	type ClaudeCodeProcessOptions,
 	claudeCodeHarness,
-	cliAllowRules,
 } from "./harness";
+export { CLAUDE_CODE_ADAPTER } from "./record";

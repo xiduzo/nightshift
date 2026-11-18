@@ -1,7 +1,7 @@
 import type { CLAUDE_CODE_MODELS } from "@tanstack/ai-claude-code";
 import { baseCheck, type CliCheck, probe } from "../../doctor";
+import { CLAUDE_CODE_FACTS } from "../facts-table";
 import type { HarnessAdapter } from "../harness-record";
-import { CLAUDE_CODE_FACTS } from "./facts";
 
 /** The version, and whose Claude login it uses (`claude auth status --json`). */
 async function claudeCheck(bin: string): Promise<CliCheck> {

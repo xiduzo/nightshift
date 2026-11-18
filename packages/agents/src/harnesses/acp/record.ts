@@ -1,5 +1,9 @@
+import {
+	ACP_DEFAULT_MODEL,
+	ACP_FACTS,
+	type AcpAgentName,
+} from "../facts-table";
 import type { HarnessAdapter } from "../harness-record";
-import { ACP_DEFAULT_MODEL, ACP_FACTS, type AcpAgentName } from "./facts";
 import { piCheck, piModels } from "./pi";
 
 /**
