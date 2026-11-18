@@ -63,5 +63,6 @@ pre-commit:
     - name: check tests
       glob:
         - "scripts/check-*.ts"
+        - "scripts/verticals/**"
         - "scripts/test-workspaces*.ts"
       run: bun test ./scripts/
