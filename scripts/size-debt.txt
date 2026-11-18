@@ -9,7 +9,6 @@
 apps/web/src/features/flows/editor/editor-canvas.tsx 694
 apps/web/src/features/flows/editor/flow-editor.tsx 989
 packages/daemon/src/daemon.ts 1013
-packages/devices/src/contract/host-contract.ts 860
 packages/devices/src/exchange/host-exchange.ts 728
 packages/engine/src/dashboard/types.ts 1246
 packages/engine/src/device-config/connections.ts 1178

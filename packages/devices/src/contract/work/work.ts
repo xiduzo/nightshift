@@ -21,8 +21,8 @@ import {
 	WEB_REQUEST_METHODS,
 } from "@nightshift/flows";
 import { z } from "zod";
-import { exact } from "./described";
-import { type SecretMove, secretMoveSchema } from "./secrets";
+import { exact } from "../procedure";
+import { type SecretMove, secretMoveSchema } from "../secrets";
 
 /**
  * The wire of the work relay: a call of the Device port as plain data

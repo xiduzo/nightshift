@@ -1,6 +1,6 @@
 import type { SentAnswerCost, ServedAnswerCost } from "@nightshift/engine";
 import { z } from "zod";
-import { exact } from "./described";
+import { exact } from "../procedure";
 
 /**
  * What the answers of Night Shift's own agents cost, on the wire: the rows

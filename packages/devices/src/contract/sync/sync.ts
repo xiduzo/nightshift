@@ -5,7 +5,7 @@ import {
 	runCommandSchema,
 } from "@nightshift/engine";
 import { z } from "zod";
-import { exact } from "./described";
+import { exact } from "../procedure";
 import {
 	type RunRows,
 	runRowsSchema,

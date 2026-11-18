@@ -6,16 +6,9 @@
  * may name these types without a cycle.
  */
 
-export { ANSWER_COSTS_MAX, type AnswerCostsBatch } from "./answers";
 export type { ArchiveRef, KnowledgeRef } from "./archive";
 export type { Caller } from "./caller";
-export {
-	type HostClient,
-	type HostProcedureMeta,
-	hostContract,
-	NOT_A_HOST,
-	refusalDataSchema,
-} from "./host-contract";
+export { type HostClient, hostContract } from "./host-contract";
 export {
 	type HostHello,
 	type ListedSpace,
@@ -38,21 +31,29 @@ export type {
 	SplitResult,
 	SplitState,
 } from "./personal";
+export {
+	type HostProcedureMeta,
+	NOT_A_HOST,
+	refusalDataSchema,
+} from "./procedure";
 export { READS, READS_HEADER, reads } from "./reads";
 export type { HostRelay, InStep } from "./relay";
-export type { RunRows, SyncCursors } from "./rows";
 export type {
 	PersonalSecretName,
 	ProjectSecretName,
 	SecretMove,
 } from "./secrets";
-export type {
-	CommandBatch,
-	FollowWant,
-	PendingBatch,
-	PendingElsewhere,
-	RunCommand,
-	SyncBatch,
+export {
+	ANSWER_COSTS_MAX,
+	type AnswerCostsBatch,
+	type CommandBatch,
+	type FollowWant,
+	type PendingBatch,
+	type PendingElsewhere,
+	type RunCommand,
+	type RunRows,
+	type SyncBatch,
+	type SyncCursors,
 } from "./sync";
 export {
 	secretRequestSchema,

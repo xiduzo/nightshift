@@ -25,7 +25,10 @@ import { asDate, now as timeNow } from "@nightshift/time";
 import { ORPCError } from "@orpc/client";
 import { and, eq } from "drizzle-orm";
 import type { HostClient } from "../contract";
-import { onReplyMismatch, type ReplyMismatch } from "../contract/described";
+import {
+	onReplyMismatch,
+	type ReplyMismatch,
+} from "../contract/procedure/described";
 import type { Link } from "../links";
 import { httpsLink } from "../links/link";
 import { createPeerEngine, type PeerEngine } from "../peers";

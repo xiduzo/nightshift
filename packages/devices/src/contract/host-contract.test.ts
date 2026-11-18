@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { hostContract } from "./host-contract";
-import { commandBatchSchema } from "./sync";
+import { commandBatchSchema } from "./sync/sync";
 
 /**
  * The Host's contract is the wire format between daemons of different
