@@ -1,5 +1,4 @@
 import { personalSpaceIdBySlug, personNames } from "@nightshift/auth";
-import type { Database } from "@nightshift/db";
 import {
 	type Actor,
 	type Device,
@@ -8,8 +7,6 @@ import {
 	type NodeToPlace,
 	type OfferedPlacement,
 	type OwnDevice,
-	type PeerProfiles,
-	type PeerProjects,
 	type PlacedDevice,
 	type PlacedRun,
 	type Placement,
@@ -19,30 +16,21 @@ import {
 	planNodes,
 	UNREACHABLE_DEVICE,
 } from "@nightshift/engine";
-import type {
-	DeviceCopies,
-	DeviceCopy,
-} from "@nightshift/engine/device-config";
-import {
-	deviceNameIn,
-	type ListedProject,
-	type SpaceDocuments,
-} from "@nightshift/engine/projects";
-import type { FlowSources } from "@nightshift/flows";
+import { deviceNameIn, type ListedProject } from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
-import type { HostRelay, WorkRelay } from "../contract";
-import { type HostSpaces, keptByHomeHost, personInSpace } from "../links";
+import { keptByHomeHost, personInSpace } from "../links";
 import {
-	type DeviceOffer,
 	hostOffersNothing,
-	NO_STARTER,
 	offerRefusal,
 	offersNothing,
 	offerTakes,
 	spaceOffers,
 } from "../offers";
-import { type DeviceRegistry, selfOwnerId } from "../registry";
+import { selfOwnerId } from "../registry";
 import { remoteDevice } from "../work";
+import { hasProject, offeredChoice } from "./listed-device";
+import { NO_STARTER_RELAY, UNREACHABLE } from "./no-relay";
+import type { PlacementDeps } from "./placement-deps";
 
 /**
  * The Devices Placement chooses among (the engine's `PlacementPort`): who
@@ -71,82 +59,7 @@ import { remoteDevice } from "../work";
  * it (`hasClone`), also in the list of a Host of a version before it.
  */
 
-/** Whether a Device can work for the project: it has a Clone, or the project needs none (ADR 22). */
-function hasProject(project: ListedProject, hasClone: boolean): boolean {
-	return hasClone || project.folder === false;
-}
-
-export type PlacementDeps = {
-	db: Database;
-	/** This computer as a Device. */
-	device: Device;
-	/** This computer as the Walker of its runs (`PeerContext.walkerId`). */
-	walkerId(): Promise<string>;
-	registry: DeviceRegistry;
-	documents: SpaceDocuments;
-	hostSpaces: HostSpaces;
-	/** A project a person has not removed, with its Clone here or null, and the Devices with a Clone of it. */
-	projects: Pick<PeerProjects, "find" | "clones">;
-	/** The profiles of this computer and of the Devices this Replica knows. */
-	profiles: Pick<PeerProfiles, "here" | "lastKnown">;
-	/** What the Device document this Replica keeps of another Device says: its profiles. */
-	keptDevice(deviceId: string): Promise<DeviceCopy | null>;
-	/** The project's flows, from this Replica's flow document: what a run starts from. */
-	flows(projectId: string): Promise<FlowSources>;
-	/** How calls reach other Devices. Without it, every step runs here. */
-	work?: WorkRelay;
-	/** The Hosts this computer links to. */
-	relay?: HostRelay;
-	/**
-	 * This computer for a step of a run: itself, or for another Person's
-	 * run, itself through its Offer admission (`OfferAdmission.deviceFor`).
-	 * Default: itself.
-	 */
-	localFor?(run: PlacedRun): Device;
-	/** "Be a Host" is on here: this computer is the Host among the run's Devices. Default: no. */
-	isHost?(): boolean;
-	/** This computer's own Offers into a Space that are in force. Default: none. */
-	offersHere?(spaceId: string): Promise<DeviceOffer[]>;
-	/** This computer's profiles, for its owner. Default: unknown. */
-	ownProfiles?(): readonly DeviceProfile[];
-	/**
-	 * The copies of the documents of this computer's owner's other Devices,
-	 * from the home Host (`createDeviceCopies`). Default: none.
-	 */
-	copies?: Pick<DeviceCopies, "list">;
-	/** Whether a Person's role in a Space uses Offers. Default: nobody's. */
-	mayUseOffers?(spaceId: string, personId: string): Promise<boolean>;
-};
-
 export type PlacementModule = ReturnType<typeof createPlacement>;
-
-/** An offered profile as a Person picks it: only an Agent Profile is offered. */
-function offeredChoice(offer: {
-	profile: string;
-	profileName: string;
-}): DeviceProfile {
-	return { id: offer.profile, name: offer.profileName, kind: "agent" };
-}
-
-/** A work relay that reaches nobody. */
-const UNREACHABLE: WorkRelay = {
-	async *call() {
-		yield {
-			kind: "error",
-			message: "This computer cannot reach the device this step is placed on.",
-			offline: true,
-		};
-	},
-	online: () => false,
-};
-
-/** A run with no starter: nothing is sent, and every call is refused here. */
-const NO_STARTER_RELAY: WorkRelay = {
-	async *call() {
-		yield { kind: "error", message: NO_STARTER };
-	},
-	online: () => true,
-};
 
 export function createPlacement(deps: PlacementDeps) {
 	const { db, device, registry, documents, hostSpaces } = deps;
