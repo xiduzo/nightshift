@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
-
+import type { OpenGate } from "../inbox/types";
 import { briefView, choiceLine } from "./brief";
-import type { OpenGate } from "./types";
 
 type Brief = OpenGate["brief"];
 

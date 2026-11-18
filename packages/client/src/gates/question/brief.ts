@@ -1,4 +1,4 @@
-import type { GateChoice, OpenGate } from "./types";
+import type { GateChoice, OpenGate } from "../inbox";
 
 /**
  * The brief of a Gate (ADR 21) as both apps show it: why you decide

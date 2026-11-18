@@ -1,8 +1,7 @@
 import { ORPCError } from "@orpc/client";
 
-import { type ApiClient, type ApiInputs, isHostUnreachable } from "../api";
-import { mayAnswer } from "./queue";
-import type { OpenGate } from "./types";
+import { type ApiClient, type ApiInputs, isHostUnreachable } from "../../api";
+import { mayAnswer, type OpenGate } from "../inbox";
 
 /** An answer to one Gate: its run, its step and the choice. `via: "lock-screen"` for a notification button. */
 export type GateAnswer = ApiInputs["gates"]["resolve"];

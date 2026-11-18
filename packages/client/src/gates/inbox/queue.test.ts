@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-
 import { gateOrder, mayAnswer, URGENCY_LABEL, urgencyOf } from "./queue";
 import type { OpenGate } from "./types";
 

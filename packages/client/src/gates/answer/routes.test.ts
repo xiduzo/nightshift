@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import type { RunDetail } from "../runs";
+import type { RunDetail } from "../../runs";
 import {
 	choiceRoutes,
 	confirmText,

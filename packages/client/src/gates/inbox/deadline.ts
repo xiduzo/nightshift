@@ -1,4 +1,4 @@
-import { dayStart, formatTime, formatWeekday } from "../time";
+import { dayStart, formatTime, formatWeekday } from "../../time";
 import { waitedText } from "./inbox";
 import type { OpenGate } from "./types";
 

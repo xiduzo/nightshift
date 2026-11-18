@@ -1,7 +1,7 @@
 import { nextEdge } from "@nightshift/flows";
 
-import type { RunDetail } from "../runs";
-import type { GateChoice } from "./types";
+import type { RunDetail } from "../../runs";
+import type { GateChoice } from "../inbox";
 
 /**
  * Where a choice leads, from the run's flow:
