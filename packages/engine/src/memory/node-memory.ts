@@ -154,7 +154,7 @@ function capOf(
 /**
  * The statements that save the memory of a step this Walker ended, as its
  * `StepEnded` names it (`memory`), in the batch of that event
- * (`log/event-rows.ts`). The Space and Project are the run's, read in the
+ * (`log/run-log/event-rows.ts`). The Space and Project are the run's, read in the
  * same statement. The latest write wins, as between two steps.
  */
 export function saveMemoryOfStep(

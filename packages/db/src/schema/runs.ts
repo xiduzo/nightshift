@@ -14,7 +14,7 @@ import { project } from "./projects";
 // Owner: `@nightshift/engine`: `log/` appends the event log and writes the
 // run and step rows, `run/` starts and recovers runs, `graph/` adds steps
 // and Agent sessions while a run walks, and `read/` reads them all.
-// `log/history.ts` reads and adds the rows that `@nightshift/devices`
+// `log/history/history.ts` reads and adds the rows that `@nightshift/devices`
 // `exchange/` copies between Replicas by cursor, and the files of own steps
 // that its archive keeps.
 //

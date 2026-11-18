@@ -90,7 +90,7 @@ export async function keptValues(
 /**
  * The statements that save the kept writes of a step this Walker ended, as
  * its `StepEnded` names them (`kept`, `variables`), in the batch of that
- * event (`log/event-rows.ts`). The flow's Space and Project are the run's,
+ * event (`log/run-log/event-rows.ts`). The flow's Space and Project are the run's,
  * read in the same statement. The latest write wins, as between two steps.
  */
 export function saveKeptOfStep(

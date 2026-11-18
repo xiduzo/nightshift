@@ -35,7 +35,7 @@ import { CONVERT, SINCE_LAST_RUN, VALUE } from "./shape";
  * label (`endsFlow`, `endedLabel`: the type's definition in
  * `@nightshift/flows`, which `route()` and the Call read); the zod union in `packages/flows` and the
  * web's `NODE_TYPE` record (inherent to a kind, out of this package); the
- * transcript-event unions in `log/step-events.ts` (one per kind, typed data, no
+ * transcript-event unions in `log/transcript/step-events.ts` (one per kind, typed data, no
  * switch asks them); the `WaitReason` enum in `state.ts` (it enumerates a
  * Wait node's `until` kinds and the policy's reasons, not node kinds); and
  * which flow a Call calls (`flows/run-flows.ts`, `open-work.nodesOf`):
