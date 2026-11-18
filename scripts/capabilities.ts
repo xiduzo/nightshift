@@ -15,11 +15,15 @@
  *   a vertical a capability: the run log, the Space archive and a Lease are
  *   machinery that the capabilities use.
  * - The **wiring** is the piece of a workspace that composes its
- *   capabilities. A workspace has at most one, and it is the `shared/shell`
- *   of an app: the frame of the app, which puts the features on the screen
- *   together. It may import every capability, so V2 and V5 do not apply to
- *   it. No vertical imports it: only the routes, the entry folders and the
- *   entry files do. Rule (h) of `scripts/check-verticals.ts` checks that.
+ *   capabilities. A workspace has at most one. It may import every
+ *   capability, so V2 and V5 do not apply to it. No vertical imports it:
+ *   only the routes, the entry folders and the entry files do. In an app it
+ *   is `shared/shell`: the frame of the app, which puts the features on the
+ *   screen together. Rule (h) of `scripts/check-verticals.ts` closes that
+ *   folder. In a package without rings it is one vertical that only the
+ *   entry files of the package import (`live` of `packages/client`). The
+ *   capability check closes it. A server package has none: it composes its
+ *   slices in a `wire.ts` outside the verticals.
  *
  * The rules (the check has the details):
  *
@@ -28,7 +32,8 @@
  *   vertical that is part of a capability under another name is on the
  *   rename debt list (`scripts/capability-debt.txt`). Two verticals of one
  *   workspace with one capability become one vertical with sub-verticals.
- * - V2 A mechanism imports no capability of its workspace. The wiring may.
+ * - V2 A mechanism imports no capability of its workspace. The wiring may,
+ *   and no vertical imports the wiring.
  * - V5 A capability imports at most 5 other capability verticals of its
  *   workspace.
  *
@@ -45,9 +50,14 @@
  *    that imports no feature is a mechanism (the Insights admin: its route
  *    passes in what the frame shows). An app that composes in its entry
  *    files has no wiring piece (`apps/desktop`, `apps/server`).
- * 5. A vertical of a package that composes the others (`devices/peers`) is
- *    a mechanism. Its imports of capabilities are V2 debt until the wiring
- *    moves to a `wire.ts` outside the verticals.
+ * 5. A vertical of a server package that composes the others
+ *    (`devices/peers`) is a mechanism. Its imports of capabilities are V2
+ *    debt until the wiring moves to a `wire.ts` outside the verticals.
+ * 6. A package without rings has no `wire.ts`. When one vertical of it
+ *    composes its capabilities, and its work is that composition, it is
+ *    WIRING (`client/live`). Give a vertical WIRING only when its rules are
+ *    about how the capabilities work together. A vertical that could take
+ *    what it needs as arguments is a mechanism.
  *
  * A vertical is named as `scripts/check-verticals.ts` names it: its path in
  * `src/` (`graph`, `features/runs`, `shared/api`).
@@ -166,7 +176,8 @@ export const MECHANISM = "mechanism";
 
 /**
  * The piece of a workspace that composes its capabilities: an app's
- * `shared/shell`. V2 and V5 do not apply to it.
+ * `shared/shell`, or one vertical of a package without rings. V2 and V5 do
+ * not apply to it, and no vertical imports it.
  */
 export const WIRING = "wiring";
 
@@ -356,8 +367,14 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		// What a widget and a lock-screen run show.
 		glance: "widgets",
 		knowledge: "knowledge",
-		// The live cache: the one follower of a Host for both apps.
-		live: M,
+		// The live cache: the one follower of a Host for both apps. It is the
+		// composition of the client (rule 6). It makes the Gate queries and the
+		// run queries, follows the notifications stream and the run streams,
+		// and holds the one rule that needs all three: what each item of the
+		// stream reads again, shows and takes away. No capability owns that
+		// rule, and each app would pass in the same functions. No vertical
+		// imports it: the root entry passes its hooks on to the apps.
+		live: WIRING,
 		notifications: "notifications",
 		projects: "projects",
 		runs: "runs",

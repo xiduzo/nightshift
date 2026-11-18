@@ -373,11 +373,11 @@ describe("the wiring piece composes the capabilities (decision 30)", () => {
 				places(W, W),
 			),
 		).toEqual([
-			'scripts/capabilities.ts: "shared/frame" of apps/demo has WIRING, and the wiring of a workspace is the shared/shell of an app (V1a). Write MECHANISM. An app composes its features in shared/shell, and a package in a wire.ts outside the verticals.',
+			'scripts/capabilities.ts: "shared/frame" of apps/demo has WIRING, and the wiring of an app is its shared/shell (V1a). Write MECHANISM. An app composes its features in shared/shell.',
 		]);
 	});
 
-	test("a feature is no wiring piece, and a package has none", () => {
+	test("a feature of an app is no wiring piece", () => {
 		const inApp = check(
 			{ "shared/shell": features },
 			{ ...places(W), "features/a": W },
@@ -385,13 +385,6 @@ describe("the wiring piece composes the capabilities (decision 30)", () => {
 		expect(inApp).toHaveLength(2);
 		expect(inApp[0]).toContain('"features/a" of apps/demo has WIRING');
 		expect(inApp[1]).toContain('no vertical has the capability "a"');
-
-		const inPackage = checkCapabilities(
-			tree(pkg(["runs", "peers"], { peers: ["runs"] })),
-			map({ runs: "runs", peers: W }, ["runs"]),
-		);
-		expect(inPackage).toHaveLength(1);
-		expect(inPackage[0]).toContain('"peers" of packages/demo has WIRING');
 	});
 
 	test("a wiring piece that composes nothing is a mechanism", () => {
@@ -432,6 +425,103 @@ describe("the wiring piece composes the capabilities (decision 30)", () => {
 		expect(closed).toEqual([
 			"apps/demo/src/features/a/index.ts: imports shared/shell, which composes the features. Only the routes and the app's entry files import it.",
 		]);
+	});
+});
+
+describe("the wiring piece of a package without rings (decision 53)", () => {
+	const names = ["a", "b", "c", "d", "e", "f"];
+	const all = [...names, "live", "api", "follow"];
+	const places = (live: string, follow: string = M) => ({
+		...Object.fromEntries(names.map((name) => [name, name])),
+		live,
+		api: M,
+		follow,
+	});
+	const check = (
+		imports: Record<string, string[]>,
+		verticals: Record<string, string>,
+		more: Record<string, string> = {},
+		workspace = PKG,
+	) =>
+		checkCapabilities(
+			tree({ ...pkg(all, imports, workspace), ...more }),
+			map(verticals, names, workspace),
+		);
+
+	test("it imports every capability: V2 and V5 do not apply", () => {
+		expect(names.length).toBeGreaterThan(MAX_CAPABILITY_IMPORTS);
+		expect(check({ live: [...names, "api"] }, places(W))).toEqual([]);
+	});
+
+	test("the same vertical as a mechanism fails V2, once per capability", () => {
+		const problems = check({ live: names }, places(M));
+		expect(problems).toHaveLength(names.length);
+		expect(problems[0]).toContain(
+			'the mechanism "live" imports the capability vertical "a" (V2)',
+		);
+	});
+
+	test("the entry file of the package imports it, and that is fine", () => {
+		expect(
+			check({ live: names }, places(W), {
+				"packages/demo/src/index.ts":
+					'export { value as live } from "./live";\n',
+			}),
+		).toEqual([]);
+	});
+
+	test("a capability that imports it fails", () => {
+		expect(check({ live: names, a: ["live"] }, places(W))).toEqual([
+			'packages/demo/src/a/index.ts: the vertical "a" imports "live", the wiring piece of packages/demo (V2). No vertical imports the wiring: only the entry files of the package do. Move what "a" needs into a vertical below both.',
+		]);
+	});
+
+	test("a mechanism that imports it fails", () => {
+		const problems = check({ live: names, api: ["live"] }, places(W));
+		expect(problems).toHaveLength(1);
+		expect(problems[0]).toContain('the vertical "api" imports "live"');
+	});
+
+	test("a test that imports it fails too", () => {
+		expect(
+			check({ live: names }, places(W), {
+				"packages/demo/src/a/a.test.ts":
+					'import { value } from "../live";\nexport const used = value;\n',
+			}),
+		).toEqual([
+			'packages/demo/src/a/a.test.ts: the vertical "a" imports "live", the wiring piece of packages/demo (V2). No vertical imports the wiring: only the entry files of the package do. Move what "a" needs into a vertical below both.',
+		]);
+	});
+
+	test("its own test imports it, and that is fine", () => {
+		expect(
+			check({ live: names }, places(W), {
+				"packages/demo/src/live/live.test.ts":
+					'import { value } from "./index";\nexport const used = value;\n',
+			}),
+		).toEqual([]);
+	});
+
+	test("a second wiring piece in one package fails", () => {
+		expect(check({ live: names, follow: names }, places(W, W))).toEqual([
+			'scripts/capabilities.ts: "live" of packages/demo has WIRING, and so has "follow" (V1a). A workspace has at most one wiring piece. Write MECHANISM for the one that does not compose the capabilities.',
+		]);
+	});
+
+	test("a wiring piece that composes nothing is a mechanism", () => {
+		expect(check({ live: ["api"] }, places(W))).toEqual([
+			'packages/demo/src/live/: the wiring piece "live" imports no capability vertical (V1a). A piece that composes nothing is a mechanism: write MECHANISM in scripts/capabilities.ts.',
+		]);
+	});
+
+	test("a server package has none: it composes in a wire.ts", () => {
+		expect(check({ live: names }, places(W), {}, "packages/engine")).toEqual([
+			'scripts/capabilities.ts: "live" of packages/engine has WIRING, and a server package has no wiring piece (V1a). Write MECHANISM. A package with rings composes its slices in a wire.ts outside the verticals.',
+		]);
+		// As a mechanism, its imports are V2 problems, as before.
+		expect(
+			check({ live: names }, places(M), {}, "packages/engine"),
+		).toHaveLength(names.length);
 	});
 });
 

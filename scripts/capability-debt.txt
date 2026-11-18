@@ -70,19 +70,15 @@ rename packages/notifications targets
 # --- V2: a mechanism that imports a capability vertical of its workspace.
 # Let the caller pass in what the mechanism needs, or move the rule into
 # the capability.
-# The shell of an app is its wiring (WIRING on the map), so its imports of
-# features are no debt.
+# The wiring piece of a workspace (WIRING on the map: the shell of an app,
+# `live` of `packages/client`) composes the capabilities, so its imports of
+# them are no debt.
 
 # The step report and the tools of a session read the knowledge rules.
 imports packages/agents session knowledge
 imports packages/agents tools knowledge
 # The skills read the facts of a harness.
 imports packages/agents skills harnesses
-
-# The live cache knows what a Gate, a notification and a run change.
-imports packages/client live gates
-imports packages/client live notifications
-imports packages/client live runs
 
 # The transport reads the Device rows and the Offers itself.
 imports packages/devices exchange offers

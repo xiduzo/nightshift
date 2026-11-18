@@ -2,8 +2,8 @@
  * Checks the capability rules on the capability map
  * (`scripts/capabilities.ts`). The map says of every vertical what it is:
  * a capability (a product area, named with a word of the glossary), a
- * mechanism (shared machinery), or the wiring (the piece of an app that
- * composes its capabilities).
+ * mechanism (shared machinery), or the wiring (the piece of a workspace
+ * that composes its capabilities).
  *
  * It finds the workspaces and their verticals as `check-verticals.ts`
  * does, and reads the imports with the same reader. It fails on:
@@ -12,9 +12,9 @@
  *   map that is not on disk. Also a map that cannot be right: a name that
  *   is no capability, a capability that no vertical has, a shared piece of
  *   an app that is a capability, and a capability whose word is not a term
- *   of `docs/glossary.md`. Also a wiring piece that is not the
- *   `shared/shell` of an app (so a workspace has at most one), and a wiring
- *   piece that imports no capability vertical: that one is a mechanism.
+ *   of `docs/glossary.md`. Also a wiring piece in the wrong place (below),
+ *   a second one in a workspace, and a wiring piece that imports no
+ *   capability vertical: that one is a mechanism.
  * - V1b A capability vertical whose folder name is not the name of its
  *   capability. So two verticals of one workspace cannot share a
  *   capability: they become one vertical with sub-verticals. Also a
@@ -24,14 +24,22 @@
  *   verticals of its workspace. A mechanism does not count.
  *
  * V2 and V5 do not apply to the wiring piece: to compose the capabilities
- * is its work. In return no vertical imports it. This check does not test
- * that, because rule (h) of `scripts/check-verticals.ts` already does: in an
- * app, only the routes, the entry folders and the entry files import
- * `shared/shell`. That is why the wiring piece must be that folder.
+ * is its work. In return no vertical imports it, and a workspace has at
+ * most one. Where it sits:
+ *
+ * - In an app it is `shared/shell`. Rule (h) of `scripts/check-verticals.ts`
+ *   closes that folder: only the routes, the entry folders and the entry
+ *   files import it. So this check does not test that again.
+ * - In a package without rings it is one vertical that no vertical of the
+ *   package imports, a test included (V2). Only the entry files of the
+ *   package import it (`live` of `packages/client`). This check tests that.
+ * - A server package (`SERVER_PACKAGES` of `.dependency-cruiser.mjs`) has
+ *   none. It composes its slices in a `wire.ts` outside the verticals.
  *
  * An import is any import the reader finds: `import type`, `export from`,
  * `import()` and `require()` count. An import through a peer port or of a
- * leaf contract counts too. A test does not count.
+ * leaf contract counts too. A test does not count, except as an importer
+ * of the wiring piece of a package.
  *
  * `scripts/capability-debt.txt` lists what breaks V1b, V2 and V5 today,
  * one line each:
@@ -53,6 +61,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
+import { SERVER_PACKAGES } from "../.dependency-cruiser.mjs";
 import {
 	CAPABILITIES,
 	INSIGHTS_CAPABILITIES,
@@ -74,11 +83,14 @@ import {
 export const MAX_CAPABILITY_IMPORTS = 5;
 
 /**
- * The one folder that may be a wiring piece: the shared piece of an app
+ * The one folder of an app that may be its wiring piece: the shared piece
  * that rule (h) of `check-verticals.ts` closes to every vertical (`SHELL`
  * in `scripts/verticals/workspace.ts`).
  */
 const WIRING_PIECE = "shared/shell";
+
+/** The packages with rings: each composes in a `wire.ts`, not in a vertical. */
+const RINGED = new Set(SERVER_PACKAGES.map((pkg) => `packages/${pkg}`));
 
 const MAP_FILE = "scripts/capabilities.ts";
 const DEBT_FILE = "scripts/capability-debt.txt";
@@ -100,11 +112,14 @@ export type VerticalImports = {
 	verticals: Vertical[];
 	/** from → to → the first production file of `from` that imports `to`. */
 	imports: Map<string, Map<string, string>>;
+	/** to → from → the first file of `from` that imports `to`, a test too. */
+	importers: Map<string, Map<string, string>>;
 };
 
 /**
  * The verticals of one workspace and the imports between them. A test
- * does not count. Every other import does, a type-only one too.
+ * does not count in `imports`. Every other import does, a type-only one
+ * too. `importers` counts the tests as well.
  */
 export function verticalImports(
 	root: string,
@@ -121,20 +136,25 @@ export function verticalImports(
 	const paths: string[] = [];
 	walk(wsDir, paths, true);
 	const imports: VerticalImports["imports"] = new Map();
+	const importers: VerticalImports["importers"] = new Map();
 	for (const path of paths) {
-		if (isTest(relative(wsDir, path))) continue;
+		const test = isTest(relative(wsDir, path));
 		const from = verticalOf(path);
 		if (!from) continue;
 		for (const { specifier } of parse(path).imports) {
 			const target = resolveImport(path, specifier);
 			const to = target ? verticalOf(target) : undefined;
 			if (!to || to === from) continue;
+			const into = importers.get(to.name) ?? new Map<string, string>();
+			if (!into.has(from.name)) into.set(from.name, path);
+			importers.set(to.name, into);
+			if (test) continue;
 			const out = imports.get(from.name) ?? new Map<string, string>();
 			if (!out.has(to.name)) out.set(to.name, path);
 			imports.set(from.name, out);
 		}
 	}
-	return { verticals, imports };
+	return { verticals, imports, importers };
 }
 
 export type Rename = { workspace: string; vertical: string };
@@ -236,7 +256,11 @@ export function measure(root: string, map: CapabilityMap): Measured {
 	for (const workspace of workspaces) {
 		const app = workspace.startsWith("apps/");
 		const listed = map.verticals[workspace] ?? {};
-		const { verticals, imports } = verticalImports(root, workspace);
+		const { verticals, imports, importers } = verticalImports(root, workspace);
+		/** The one piece that may be the wiring: of a package, the first. */
+		const wiring = app
+			? WIRING_PIECE
+			: verticals.find((v) => listed[v.name] === WIRING)?.name;
 		const onDisk = new Set(verticals.map((v) => v.name));
 
 		// V1a: the map and the disk name the same verticals.
@@ -283,16 +307,33 @@ export function measure(root: string, map: CapabilityMap): Measured {
 			}
 			if (place === WIRING) {
 				found.counts.wiring += 1;
-				// V1a: the wiring is the one folder that rule (h) of the vertical
-				// check closes to the verticals, and it composes capabilities.
-				if (!app || name !== WIRING_PIECE) {
+				// V1a: the wiring sits where no vertical imports it, a workspace
+				// has one at most, and it composes capabilities.
+				if (app && name !== WIRING_PIECE) {
 					found.problems.push(
-						`${MAP_FILE}: "${name}" of ${workspace} has WIRING, and the wiring of a workspace is the ${WIRING_PIECE} of an app (V1a). Write MECHANISM. An app composes its features in ${WIRING_PIECE}, and a package in a wire.ts outside the verticals.`,
+						`${MAP_FILE}: "${name}" of ${workspace} has WIRING, and the wiring of an app is its ${WIRING_PIECE} (V1a). Write MECHANISM. An app composes its features in ${WIRING_PIECE}.`,
+					);
+				} else if (RINGED.has(workspace)) {
+					found.problems.push(
+						`${MAP_FILE}: "${name}" of ${workspace} has WIRING, and a server package has no wiring piece (V1a). Write MECHANISM. A package with rings composes its slices in a wire.ts outside the verticals.`,
+					);
+				} else if (name !== wiring) {
+					found.problems.push(
+						`${MAP_FILE}: "${name}" of ${workspace} has WIRING, and so has "${wiring}" (V1a). A workspace has at most one wiring piece. Write MECHANISM for the one that does not compose the capabilities.`,
 					);
 				} else if (![...(imports.get(name)?.keys() ?? [])].some(capabilityOf)) {
 					found.problems.push(
 						`${rel(dir)}/: the wiring piece "${name}" imports no capability vertical (V1a). A piece that composes nothing is a mechanism: write MECHANISM in ${MAP_FILE}.`,
 					);
+				} else if (!app) {
+					// V2: no vertical imports the wiring of a package. In an app,
+					// rule (h) of the vertical check says so.
+					const into = importers.get(name) ?? new Map<string, string>();
+					for (const from of [...into.keys()].sort()) {
+						found.problems.push(
+							`${rel(into.get(from) as string)}: the vertical "${from}" imports "${name}", the wiring piece of ${workspace} (V2). No vertical imports the wiring: only the entry files of the package do. Move what "${from}" needs into a vertical below both.`,
+						);
+					}
 				}
 				continue;
 			}
