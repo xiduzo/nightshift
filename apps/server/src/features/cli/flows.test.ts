@@ -4,11 +4,10 @@ import { FLOW_VERSION } from "@nightshift/flows";
 import {
 	type FlowsClient,
 	type FlowsIo,
-	type FlowsOptions,
-	flowsOptions,
 	importedFileName,
 	runFlows,
 } from "./flows";
+import { type FlowsOptions, flowsOptions } from "./flows-options";
 
 describe("nightshift flows' arguments", () => {
 	const env = { PORT: "4100" };
