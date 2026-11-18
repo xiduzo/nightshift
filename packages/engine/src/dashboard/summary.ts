@@ -2,6 +2,12 @@ import type { RunSummary } from "../read";
 import { isTestRun } from "../run-status";
 import { DAY_MS, dayStart, HOUR_MS, lastDays, lastHours } from "./clock";
 import { FLOW_HEALTH_DAYS, flowHealthRows } from "./flow-health";
+import {
+	HOUR_RANGES,
+	type HourRange,
+	NIGHT_RANGES,
+	OVERVIEW_ROWS,
+} from "./measure-types";
 import { askedGates, nightsRange, notTests, type PlacedRun } from "./nights";
 import {
 	isOpen,
@@ -10,20 +16,16 @@ import {
 	topRows,
 	usedTokens,
 } from "./stats";
-import {
-	type ActivityRange,
-	type AtWorkGroup,
-	type CardHour,
-	type DashboardCards,
-	type DashboardSummary,
-	type DayCounts,
-	HOUR_RANGES,
-	type HourRange,
-	NIGHT_RANGES,
-	type NightOutput,
-	OVERVIEW_ROWS,
-	type UpcomingRun,
-} from "./types";
+import type {
+	ActivityRange,
+	AtWorkGroup,
+	CardHour,
+	DashboardCards,
+	DashboardSummary,
+	DayCounts,
+	NightOutput,
+	UpcomingRun,
+} from "./summary-types";
 import { spaceWatch } from "./watch";
 
 /** The hours of the stat cards' small charts. */

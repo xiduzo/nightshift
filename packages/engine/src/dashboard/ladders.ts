@@ -1,15 +1,15 @@
 import type { RungBy } from "../log";
 import type { Ladder, Rung, RunRung } from "../read";
-import { topRows } from "./stats";
 import type {
 	ChoiceLadderSummary,
 	FlowLadders,
 	FlowRangeLadders,
-	KnownCost,
 	LadderRungRow,
 	LadderSummary,
 	NodeLadder,
-} from "./types";
+} from "./flow-health-types";
+import type { KnownCost } from "./measure-types";
+import { topRows } from "./stats";
 
 /**
  * Where the work of a flow landed (Q31), from its runs' ladder rows

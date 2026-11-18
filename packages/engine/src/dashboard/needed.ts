@@ -1,12 +1,8 @@
 import { NEEDED_YOU_REASONS, type NeededYouReason } from "../read";
+import type { NeededReasonCount } from "./flow-health-types";
+import { type NightCounts, OVERVIEW_ROWS } from "./measure-types";
 import { topRows } from "./stats";
-import {
-	type NeededGroup,
-	type NeededRange,
-	type NeededReasonCount,
-	type NightCounts,
-	OVERVIEW_ROWS,
-} from "./types";
+import type { NeededGroup, NeededRange } from "./summary-types";
 
 /**
  * Needed you, over runs: how many runs a person stepped in on, and why.

@@ -1,18 +1,15 @@
 import type { SpaceFlows } from "../flows";
 import type { SpaceEngine } from "../run";
 import { ownEndedRuns, summarizeChanges } from "./changes";
+import type { FlowChanges } from "./changes-types";
 import { lastDays } from "./clock";
+import type { FlowSignal } from "./flow-health-types";
+import { NIGHT_RANGES, type NightRange } from "./measure-types";
 import { MOVE_RUNS, nextMoves } from "./moves";
 import { summarizeSpend } from "./spend";
+import type { SpaceSpend } from "./spend-types";
 import { summarizeDashboard } from "./summary";
-import {
-	type DashboardSummary,
-	type FlowChanges,
-	type FlowSignal,
-	NIGHT_RANGES,
-	type NightRange,
-	type SpaceSpend,
-} from "./types";
+import type { DashboardSummary } from "./summary-types";
 import { turnedSevere, watchRunsOf } from "./watch";
 
 /** The days of help cost the Spend page reads: its longest range. A month is shorter. */

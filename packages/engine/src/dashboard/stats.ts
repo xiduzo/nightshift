@@ -1,14 +1,14 @@
 import { isOpenStatus, type RunSummary } from "../read";
 import { isTestRun, type RunStatus } from "../run-status";
+import type { LatestReport } from "./flow-health-types";
 import {
 	type DashboardRun,
 	type KnownCost,
-	type LatestReport,
 	OVERVIEW_ROWS,
 	type Spread,
 	type StatusCount,
 	type TopRows,
-} from "./types";
+} from "./measure-types";
 
 /** The small rules every part of the dashboard shares. */
 

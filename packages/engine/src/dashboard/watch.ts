@@ -6,7 +6,6 @@ import {
 } from "../read";
 import { isTestRun } from "../run-status";
 import { DAY_MS } from "./clock";
-import { hasEnded, spreadOf } from "./stats";
 import type {
 	AttentionCause,
 	FlowAttention,
@@ -15,7 +14,8 @@ import type {
 	FlowWatch,
 	SpaceWatch,
 	WatchedFlow,
-} from "./types";
+} from "./flow-health-types";
+import { hasEnded, spreadOf } from "./stats";
 
 /**
  * The watch over a flow (docs/research/dashboards-2026-11.md): how much it

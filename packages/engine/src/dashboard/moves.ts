@@ -2,7 +2,7 @@ import type { RunDetail } from "../read";
 
 type StepSummary = RunDetail["steps"][number];
 
-import type { FlowMove, MoveGuard, MoveSetupCause } from "./types";
+import type { FlowMove, MoveGuard, MoveSetupCause } from "./changes-types";
 
 /**
  * The next changes to try on a flow (Q15, docs/research/dashboards-2026-11.md),

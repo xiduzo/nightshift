@@ -1,8 +1,6 @@
 import type { FlowRevisionItem } from "../flows";
 import { isPlanned, type RunSummary } from "../read";
 import { isTestRun } from "../run-status";
-import { lastDays } from "./clock";
-import { hasEnded } from "./stats";
 import type {
 	ChangeComparison,
 	ChangeMeasure,
@@ -12,8 +10,10 @@ import type {
 	FlowChange,
 	FlowChanges,
 	FlowMove,
-	NightRange,
-} from "./types";
+} from "./changes-types";
+import { lastDays } from "./clock";
+import type { NightRange } from "./measure-types";
+import { hasEnded } from "./stats";
 
 /**
  * Before and after for one flow (Q17, docs/research/dashboards-2026-11.md):

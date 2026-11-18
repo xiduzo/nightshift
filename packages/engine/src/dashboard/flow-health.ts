@@ -2,18 +2,6 @@ import type { RunScore } from "../log";
 import type { NeededYouReason, RunRung, RunSummary } from "../read";
 import { finishedShare, isTestRun, usefulAnswer } from "../run-status";
 import { dayStart, lastDays } from "./clock";
-import { flowLadders, flowRangeLadders } from "./ladders";
-import { countReasons, neededReasons } from "./needed";
-import { steadinessOf } from "./spend";
-import {
-	countStatuses,
-	hasEnded,
-	reportedTokens,
-	spreadOf,
-	sumKnownCost,
-	toLatestReport,
-	topRows,
-} from "./stats";
 import {
 	type FlowDay,
 	type FlowHealthDetail,
@@ -27,13 +15,27 @@ import {
 	LAST_FLOW_RUNS,
 	type LastFlowRun,
 	type LatestReport,
+	type UnfinishedReason,
+} from "./flow-health-types";
+import { flowLadders, flowRangeLadders } from "./ladders";
+import {
 	NIGHT_RANGES,
 	type NightRange,
 	OVERVIEW_ROWS,
 	type Spread,
 	type TopRows,
-	type UnfinishedReason,
-} from "./types";
+} from "./measure-types";
+import { countReasons, neededReasons } from "./needed";
+import { steadinessOf } from "./spend";
+import {
+	countStatuses,
+	hasEnded,
+	reportedTokens,
+	spreadOf,
+	sumKnownCost,
+	toLatestReport,
+	topRows,
+} from "./stats";
 import { flowWatch, watchRunsOf } from "./watch";
 
 /** The days a Flow health row covers. */
