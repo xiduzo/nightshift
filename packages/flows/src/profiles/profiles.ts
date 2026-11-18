@@ -1,11 +1,12 @@
 import { z } from "zod";
 import {
-	cascadeOf,
 	type Flow,
 	type FlowNode,
 	hasCascade,
 	lastModelTier,
-	tierNode,
+	nodeProfiles,
+	profileOf,
+	tierUsers,
 	withTierNode,
 } from "../flow";
 import {
@@ -141,32 +142,6 @@ export function profileSecrets(profile: ProfileSettings): string[] {
 }
 
 /**
- * The profile a node names, when its kind reads one: an Agent, or a
- * Decision or a Value decided by a model. A `ProfileRef`, or a name left
- * from format 6 that must be picked again.
- */
-export function profileOf(node: FlowNode): NodeProfile | undefined {
-	if (node.type === "agent") return node.profile;
-	if (node.type === "decision" || node.type === "value") {
-		return node.by === "model" ? node.profile : undefined;
-	}
-	return undefined;
-}
-
-/**
- * Every profile a node names: its own, or each tier's of its cascade
- * (ADR 6). Each tier's profile places that tier's tries.
- */
-export function nodeProfiles(node: FlowNode): NodeProfile[] {
-	const own = profileOf(node);
-	if (own !== undefined) return [own];
-	return tierUsers(node).flatMap(({ node: tier }) => {
-		const profile = profileOf(tier);
-		return profile === undefined ? [] : [profile];
-	});
-}
-
-/**
  * The backups of a node with a profile, first one first (ADR 19). A node
  * that does not read its profile has none.
  */
@@ -178,18 +153,6 @@ export function fallbacksOf(node: FlowNode): readonly ProfileRef[] {
 /** Every profile a flow depends on through a node: its own and its backups. */
 export function everyProfileOf(node: FlowNode): NodeProfile[] {
 	return [...nodeProfiles(node), ...fallbacksOf(node)];
-}
-
-/**
- * The nodes a cascade's tiers run as (`tierNode`), with their index: what
- * run start resolves and places one by one. None for a node without one.
- */
-export function tierUsers(node: FlowNode): { index: number; node: FlowNode }[] {
-	const tiers = cascadeOf(node) ?? [];
-	return tiers.flatMap((_tier, index) => {
-		const tier = tierNode(node, index);
-		return tier === null ? [] : [{ index, node: tier }];
-	});
 }
 
 /**

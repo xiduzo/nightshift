@@ -6,6 +6,7 @@ export {
 	type FlowAgent,
 	flowAgents,
 	prefilledProfile,
+	starterAgents,
 	withAgentProfiles,
 } from "./flow-agents";
 export {
@@ -20,12 +21,10 @@ export {
 	type ModelProfileSettings,
 	modelAddressProblem,
 	modelProfileSchema,
-	nodeProfiles,
 	type Profile,
 	type ProfileSettings,
 	placesItself,
 	profileLabel,
-	profileOf,
 	profileSchema,
 	profileSecrets,
 	profileSettingsSchema,
@@ -33,5 +32,4 @@ export {
 	resolvedAgent,
 	resolveNodeProfile,
 	runsAs,
-	tierUsers,
 } from "./profiles";

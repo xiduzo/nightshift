@@ -1,4 +1,4 @@
-/** The node types of the flow schema with their definitions (`NODE_DEFINITIONS`), the facts of a node that read them, and a cascade's tiers as nodes. */
+/** The node types of the flow schema with their definitions (`NODE_DEFINITIONS`), the facts of a node that read them, a cascade's tiers as nodes, and the profile a node names. */
 
 export {
 	type CascadeNode,
@@ -7,6 +7,7 @@ export {
 	lastModelTier,
 	personTierIndex,
 	tierNode,
+	tierUsers,
 	withTierNode,
 } from "./cascade";
 export {
@@ -29,3 +30,4 @@ export {
 	standsIn,
 	touchesDevice,
 } from "./node";
+export { nodeProfiles, profileOf } from "./profile";

@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow, type FlowNode } from "../../flow";
 import type { AgentNode, CallNode } from "../../nodes";
-import { starterAgents } from "../../starters";
 import { validateFlow } from "../../validate";
 import {
 	agentKey,
@@ -10,6 +9,7 @@ import {
 	prefilledProfile,
 	withAgentProfiles,
 } from "./flow-agents";
+import { starterAgents } from "./starter-agents";
 
 const at = { x: 0, y: 0 };
 

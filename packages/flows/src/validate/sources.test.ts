@@ -11,7 +11,6 @@ import {
 	listFlowSources,
 	loadFlowSource,
 	parsedFlows,
-	scheduleFlowInfos,
 	suffixedName,
 } from "./sources";
 
@@ -218,17 +217,6 @@ describe("parsedFlows", () => {
 			quick: quick(),
 			shape: null,
 			zeta: caller(),
-		});
-	});
-});
-
-describe("scheduleFlowInfos", () => {
-	test("gives each flow its inputs and its error count, and null when it does not parse", () => {
-		expect(scheduleFlowInfos(sources())).toEqual({
-			alpha: { inputs: quick().inputs, errorCount: 1 },
-			broken: null,
-			quick: { inputs: quick().inputs, errorCount: 0 },
-			zeta: { inputs: [], errorCount: 0 },
 		});
 	});
 });

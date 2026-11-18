@@ -190,6 +190,7 @@ export {
 	type PolicyValues,
 	personTierIndex,
 	policyFromSettings,
+	profileOf,
 	QUICK_RUN_HARNESS,
 	type ResolvedPolicy,
 	runsEach,
@@ -199,6 +200,7 @@ export {
 	standInOutcomes,
 	standsIn,
 	tierNode,
+	tierUsers,
 	touchesDevice,
 	type VariableType,
 	variableTypeSchema,
@@ -461,7 +463,6 @@ export {
 	placesItself,
 	prefilledProfile,
 	profileLabel,
-	profileOf,
 	profileSchema,
 	profileSecrets,
 	profileSettingsSchema,
@@ -469,7 +470,7 @@ export {
 	resolvedAgent,
 	resolveNodeProfile,
 	runsAs,
-	tierUsers,
+	starterAgents,
 	withAgentProfiles,
 } from "./profiles";
 export { githubSubIssuesCommand } from "./recipes";
@@ -486,6 +487,7 @@ export {
 	type Schedule,
 	type ScheduleFlowInfo,
 	type ScheduleIssue,
+	scheduleFlowInfos,
 	scheduleSchema,
 	type TimeAndDays,
 	timeAndDaysToCron,
@@ -529,7 +531,7 @@ export {
 	toJsonSchema,
 	typedOutput,
 } from "./shapes";
-export { type Starter, starterAgents, starterList } from "./starters";
+export { type Starter, starterList } from "./starters";
 export {
 	acceptsValue,
 	applyVariableWrites,
@@ -570,7 +572,6 @@ export {
 	type ProjectFlowMap,
 	parsedFlows,
 	parseFlow,
-	scheduleFlowInfos,
 	schemaFields,
 	suffixedName,
 	type TemplateField,

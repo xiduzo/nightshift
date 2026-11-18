@@ -1,5 +1,6 @@
 /** Schedules: when a flow runs on its own, at set times or when a webhook arrives. */
 
+export { scheduleFlowInfos } from "./flow-infos";
 export {
 	cronError,
 	cronToTimeAndDays,

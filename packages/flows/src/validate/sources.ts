@@ -5,6 +5,7 @@ import {
 	type FlowNodeType,
 	flowSchema,
 	migrateFlow,
+	nodeProfiles,
 } from "../flow";
 import {
 	calledFlowNames,
@@ -13,8 +14,6 @@ import {
 	isProfileRef,
 	waitSignalOf,
 } from "../nodes";
-import { nodeProfiles } from "../profiles";
-import type { ScheduleFlowInfo } from "../schedules";
 import { parseFlow } from "./flow";
 import type {
 	FlowDevices,
@@ -25,8 +24,8 @@ import type {
 
 /**
  * The flows of a project as plain data: what a Clone's flow files hold,
- * read anywhere, and what the list, the editor, a run and the schedules
- * make of them. Pure: reading them is the caller's.
+ * read anywhere, and what the list, the editor and a run make of them.
+ * Pure: reading them is the caller's.
  */
 
 /**
@@ -81,30 +80,6 @@ export function loadFlowSource(sources: FlowSources, name: string): LoadedFlow {
 /** Every source as a flow, null when it does not parse (`ValidateOptions.flows`). */
 export function parsedFlows(sources: FlowSources): Record<string, Flow | null> {
 	return flowsOf(sorted(sources));
-}
-
-/** The inputs and the error count of every flow of the sources, for `validateSchedules`. */
-export function scheduleFlowInfos(
-	sources: FlowSources,
-): Record<string, ScheduleFlowInfo | null> {
-	const files = sorted(sources);
-	const flows = flowsOf(files);
-	const infos: Record<string, ScheduleFlowInfo | null> = {};
-	for (const [name, file] of files) {
-		if (!("json" in file)) {
-			infos[name] = null;
-			continue;
-		}
-		const loaded = parseFlow(file.json, { flows, name });
-		infos[name] = loaded.flow
-			? {
-					inputs: loaded.flow.inputs,
-					errorCount: loaded.issues.filter((i) => i.severity === "error")
-						.length,
-				}
-			: null;
-	}
-	return infos;
 }
 
 /** The flows of the project that call `name` through a Call node. */

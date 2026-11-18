@@ -105,11 +105,6 @@ imports packages/engine read knowledge
 imports packages/engine ollama device-config
 imports packages/engine ollama knowledge
 
-# The flow format knows the profiles and the schedules.
-imports packages/flows starters profiles
-imports packages/flows validate profiles
-imports packages/flows validate schedules
-
 # A channel takes a push target.
 imports packages/notifications channels targets
 imports packages/notifications desktop targets

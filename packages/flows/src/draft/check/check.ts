@@ -1,12 +1,12 @@
 /** Checks a draft in its place: the schema, the connections, profiles, Devices and CLI programs it names, what needs the project's folder, and `validateFlow`. */
-import { type Flow, type FlowNode, flowSchema } from "../../flow";
+import { type Flow, type FlowNode, flowSchema, profileOf } from "../../flow";
 import {
 	type AgentNode,
 	deviceIdOf,
 	isProfileRef,
 	type ProfileRef,
 } from "../../nodes";
-import { everyProfileOf, profileOf, runsAs } from "../../profiles";
+import { everyProfileOf, runsAs } from "../../profiles";
 import {
 	type FlowIssue,
 	type ProjectFlowMap,

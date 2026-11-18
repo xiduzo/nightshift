@@ -1,11 +1,10 @@
-import { type Flow, type FlowNode, touchesDevice } from "../flow";
+import { type Flow, type FlowNode, profileOf, touchesDevice } from "../flow";
 import {
 	deviceIdOf,
 	isProfileRef,
 	type ServiceNode,
 	serviceSection,
 } from "../nodes";
-import { profileOf } from "../profiles";
 import { nodesWithin, sectionPath } from "../sections";
 import type { Report } from "./issues";
 

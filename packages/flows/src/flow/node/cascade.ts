@@ -171,3 +171,15 @@ export function withTierNode<N extends FlowNode>(
 	const cascade = tiers.map((each, at) => (at === index ? written : each));
 	return { ...node, cascade } as N;
 }
+
+/**
+ * The nodes a cascade's tiers run as (`tierNode`), with their index: what
+ * run start resolves and places one by one. None for a node without one.
+ */
+export function tierUsers(node: FlowNode): { index: number; node: FlowNode }[] {
+	const tiers = cascadeOf(node) ?? [];
+	return tiers.flatMap((_tier, index) => {
+		const tier = tierNode(node, index);
+		return tier === null ? [] : [{ index, node: tier }];
+	});
+}

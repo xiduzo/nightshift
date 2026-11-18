@@ -525,6 +525,10 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		shapes: M,
 		starters: M,
 		template: M,
+		// The checks of a whole flow: its names, edges, loops, references and
+		// calls. They are the grammar of the format, and they hold for a flow
+		// of any Project. So `validate` is a mechanism and not a part of the
+		// capability `flows`, which is what a Project does with its flows.
 		validate: M,
 	},
 	"packages/insights": {

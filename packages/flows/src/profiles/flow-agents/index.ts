@@ -8,3 +8,4 @@ export {
 	prefilledProfile,
 	withAgentProfiles,
 } from "./flow-agents";
+export { starterAgents } from "./starter-agents";
