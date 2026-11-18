@@ -1,6 +1,5 @@
 import { randomBytes } from "node:crypto";
 import type { Database } from "@nightshift/db";
-import { event } from "@nightshift/db/schema";
 import {
 	type FlowInputDef,
 	type JsonValue,
@@ -14,16 +13,15 @@ import {
 	webhookSignalKey,
 } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
-import { and, desc, eq, sql } from "drizzle-orm";
 import type { StartRunInput } from "../contract";
 import type { ProjectFlows } from "../flows";
-import { parseEventRow, type RunLog, type RunTrigger } from "../log";
+import type { RunLog, RunTrigger } from "../log";
 import type { RunSummary } from "../read";
+import { drizzleScheduleLog } from "./adapters/out/drizzle-schedule-log";
 import { scheduledStart } from "./domain/scheduled-start";
 import {
 	createWebhookRefusals,
 	DELIVERIES_SHOWN,
-	deliveryOf,
 	latestDeliveries,
 	WEBHOOK_ERROR_WORDS,
 	WEBHOOK_SECRET_WORDS,
@@ -84,6 +82,7 @@ const NO_SECRET = randomBytes(32).toString("hex");
 export function createWebhooks(deps: WebhooksDeps) {
 	/** The latest refusals of each schedule. In memory only. */
 	const refusals = createWebhookRefusals();
+	const log = drizzleScheduleLog({ db: deps.db, log: deps.log });
 
 	/** The schedule, or null for any reason the sender may not learn. */
 	async function find(
@@ -175,17 +174,14 @@ export function createWebhooks(deps: WebhooksDeps) {
 				errors.push(wordsFor(cause));
 			}
 		}
-		await deps.log.append({
-			type: "WebhookReceived",
-			payload: {
-				projectId,
-				scheduleId: schedule.id,
-				at,
-				result: "accepted",
-				runId,
-				woke,
-				error: errors.length > 0 ? errors.join(" ") : null,
-			},
+		await log.received({
+			projectId,
+			scheduleId: schedule.id,
+			at,
+			result: "accepted",
+			runId,
+			woke,
+			error: errors.length > 0 ? errors.join(" ") : null,
 		});
 	}
 
@@ -248,21 +244,16 @@ export function createWebhooks(deps: WebhooksDeps) {
 			);
 			const holds = await webhookHolds(schedule, webhook);
 			if ("error" in holds || !holds.holds) {
-				const filtered = deps.log
-					.append({
-						type: "WebhookReceived",
-						payload: {
-							projectId,
-							scheduleId,
-							at,
-							result: "filtered",
-							runId: null,
-							woke: 0,
-							error:
-								"error" in holds ? WEBHOOK_ERROR_WORDS.rule(holds.error) : null,
-						},
-					})
-					.then(() => {});
+				const filtered = log.received({
+					projectId,
+					scheduleId,
+					at,
+					result: "filtered",
+					runId: null,
+					woke: 0,
+					error:
+						"error" in holds ? WEBHOOK_ERROR_WORDS.rule(holds.error) : null,
+				});
 				return { answer: { kind: "filtered" }, done: filtered };
 			}
 			return {
@@ -276,25 +267,10 @@ export function createWebhooks(deps: WebhooksDeps) {
 			projectId: string,
 			scheduleId: string,
 		): Promise<WebhookDelivery[]> {
-			const rows = await deps.db
-				.select()
-				.from(event)
-				.where(
-					and(
-						eq(event.type, "WebhookReceived"),
-						sql`json_extract(${event.payload}, '$.projectId') = ${projectId}`,
-						sql`json_extract(${event.payload}, '$.scheduleId') = ${scheduleId}`,
-					),
-				)
-				.orderBy(desc(event.seq))
-				.limit(DELIVERIES_SHOWN);
-			const logged: WebhookDelivery[] = [];
-			for (const row of rows) {
-				const e = parseEventRow(row);
-				if (e.type !== "WebhookReceived") continue;
-				logged.push(deliveryOf(e.payload));
-			}
-			return latestDeliveries(logged, refusals.of(projectId, scheduleId));
+			return latestDeliveries(
+				await log.deliveries(projectId, scheduleId, DELIVERIES_SHOWN),
+				refusals.of(projectId, scheduleId),
+			);
 		},
 	};
 }

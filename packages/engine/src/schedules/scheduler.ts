@@ -1,29 +1,22 @@
 import type { Database } from "@nightshift/db";
-import { event } from "@nightshift/db/schema";
 import type { Schedule, ScheduleIssue } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
-import { and, asc, gt, inArray } from "drizzle-orm";
 import type { StartRunInput } from "../contract";
 import type { ProjectFlows } from "../flows";
-import {
-	type EngineEventType,
-	type LoggedEvent,
-	parseEventRow,
-	type RunLog,
-	type RunTrigger,
-} from "../log";
+import type { RunLog, RunTrigger } from "../log";
 import type { RunSummary } from "../read";
 import type { RunStatus } from "../run-status";
 import type { UsageNotes } from "../usage";
+import { drizzleScheduleLog } from "./adapters/out/drizzle-schedule-log";
 import {
 	openRunOf,
 	openRunRefusalWords,
 	openRunSkipWords,
 } from "./domain/open-run";
-import {
-	createScheduleHistories,
-	type ScheduleFact,
-	type ScheduleRecord,
+import type {
+	ScheduleHistories,
+	ScheduleHistory,
+	ScheduleRecord,
 } from "./domain/schedule-history";
 import {
 	type CronSchedule,
@@ -110,71 +103,22 @@ export type Scheduler = {
 	): Promise<RunSummary>;
 };
 
-const SCHEDULE_EVENT_TYPES = [
-	"RunStarted",
-	"ScheduleFired",
-	"ScheduleSkipped",
-] as const satisfies readonly EngineEventType[];
-
-/** What a logged event tells of a schedule, or null: a run that no schedule started. */
-function factOf(e: LoggedEvent): ScheduleFact | null {
-	if (e.type === "RunStarted") {
-		const trigger = e.payload.trigger;
-		if (trigger?.kind !== "schedule" || !e.runId) return null;
-		return {
-			kind: "run-started",
-			projectId: e.payload.projectId,
-			scheduleId: trigger.scheduleId,
-			at: trigger.at,
-			runId: e.runId,
-		};
-	}
-	if (e.type === "ScheduleFired") {
-		const { projectId, scheduleId, at, runId, error } = e.payload;
-		return { kind: "fired", projectId, scheduleId, at, runId, error };
-	}
-	if (e.type === "ScheduleSkipped") {
-		const { projectId, scheduleId, at, reason, runId } = e.payload;
-		return {
-			kind: "skipped",
-			projectId,
-			scheduleId,
-			at,
-			reason,
-			runId: runId ?? null,
-		};
-	}
-	return null;
-}
-
 export function createScheduler(deps: SchedulerDeps): Scheduler {
-	const { db, now } = deps;
+	const { now } = deps;
 	/** It begins now: a cron time before this moment fell while the daemon was down. */
 	const watch = createScheduleWatch(now());
-	const histories = createScheduleHistories();
-	let cursor = 0;
+	const log = drizzleScheduleLog({ db: deps.db, log: deps.log });
+	/** The histories as the log gave them last. One live view: null before the first read. */
+	let histories: ScheduleHistories | null = null;
 	let running: Promise<void> | null = null;
 	let timer: ReturnType<typeof setInterval> | undefined;
 	let stopped = false;
 	/** How many holds are not released. */
 	let holds = 0;
 
-	async function refresh(): Promise<void> {
-		const rows = await db
-			.select()
-			.from(event)
-			.where(
-				and(
-					gt(event.seq, cursor),
-					inArray(event.type, [...SCHEDULE_EVENT_TYPES]),
-				),
-			)
-			.orderBy(asc(event.seq));
-		for (const row of rows) {
-			cursor = Math.max(cursor, row.seq);
-			const fact = factOf(parseEventRow(row));
-			if (fact) histories.apply(fact);
-		}
+	async function refresh(): Promise<ScheduleHistories> {
+		histories = await log.histories();
+		return histories;
 	}
 
 	async function skip(
@@ -184,27 +128,16 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 		reason: string,
 		runId: string | null = null,
 	): Promise<void> {
-		await deps.log.append({
-			type: "ScheduleSkipped",
-			payload: { projectId, scheduleId, at, reason, runId },
-		});
+		await log.skipped({ projectId, scheduleId, at, reason, runId });
 		deps.usage?.note({ kind: "schedule-skipped", reason });
-		histories.apply({
-			kind: "skipped",
-			projectId,
-			scheduleId,
-			at,
-			reason,
-			runId,
-		});
 	}
 
 	async function consider(
 		projectId: string,
 		schedule: CronSchedule,
 		at: number,
+		current: ScheduleHistory | undefined,
 	): Promise<void> {
-		const current = histories.of(projectId, schedule.id);
 		const decision = watch.decide(projectId, schedule, at, current);
 		if (decision.kind === "none") return;
 		const { due } = decision;
@@ -254,23 +187,18 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			}
 			error = wordsFor(cause);
 		}
-		await deps.log.append({
-			type: "ScheduleFired",
-			payload: { projectId, scheduleId: schedule.id, at: due, runId, error },
-		});
-		if (runId) deps.usage?.note({ kind: "schedule-fired" });
-		histories.apply({
-			kind: "fired",
+		await log.fired({
 			projectId,
 			scheduleId: schedule.id,
 			at: due,
 			runId,
 			error,
 		});
+		if (runId) deps.usage?.note({ kind: "schedule-fired" });
 	}
 
 	async function pass(): Promise<void> {
-		await refresh();
+		const read = await refresh();
 		if (holds > 0) return;
 		if (deps.enabled && !deps.enabled()) {
 			// Off counts as paused: turning it on again starts from now.
@@ -305,7 +233,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 					continue;
 				}
 				watch.watch(projectId, schedule.id, at);
-				await consider(projectId, cron, at);
+				await consider(projectId, cron, at, read.of(projectId, schedule.id));
 			}
 		}
 	}
@@ -344,7 +272,9 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 		},
 		stop,
 		tick,
-		refresh,
+		async refresh() {
+			await refresh();
+		},
 		async hold() {
 			holds++;
 			let released = false;
@@ -358,16 +288,16 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			return release;
 		},
 		last(projectId, scheduleId) {
-			return histories.of(projectId, scheduleId)?.last ?? null;
+			return histories?.of(projectId, scheduleId)?.last ?? null;
 		},
 		async runNow(projectId, schedule, personId) {
 			const { flow } = schedule;
 			if (flow === undefined) {
 				throw new Refusal("invalid", "This schedule starts no flow.");
 			}
-			await refresh();
+			const read = await refresh();
 			const open = await openRunOf(
-				histories.of(projectId, schedule.id),
+				read.of(projectId, schedule.id),
 				deps.runStatus,
 			);
 			if (open) throw new Refusal("conflict", openRunRefusalWords(open));
@@ -379,18 +309,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 				{ kind: "schedule", scheduleId: schedule.id, at },
 			);
 			// A cron time before now counts as handled: it does not fire as well.
-			await deps.log.append({
-				type: "ScheduleFired",
-				payload: {
-					projectId,
-					scheduleId: schedule.id,
-					at,
-					runId: run.id,
-					error: null,
-				},
-			});
-			histories.apply({
-				kind: "fired",
+			await log.fired({
 				projectId,
 				scheduleId: schedule.id,
 				at,
@@ -404,7 +323,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 				projectId,
 				schedule,
 				at,
-				histories.of(projectId, schedule.id),
+				histories?.of(projectId, schedule.id),
 			);
 		},
 	};
