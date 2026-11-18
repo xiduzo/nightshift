@@ -10,14 +10,11 @@ import { now } from "@nightshift/time";
 import { z } from "zod";
 import { output } from "../output";
 import { protectedProcedure } from "../procedures";
-import {
-	dashboardSummarySchema,
-	flowChangesSchema,
-	flowHealthDetailSchema,
-	nightRangeSchema,
-	spaceSpendSchema,
-	timeZoneSchema,
-} from "./schemas";
+import { flowChangesSchema } from "./changes-schemas";
+import { flowHealthDetailSchema } from "./flow-health-schemas";
+import { nightRangeSchema, timeZoneSchema } from "./measure-schemas";
+import { spaceSpendSchema } from "./spend-schemas";
+import { dashboardSummarySchema } from "./summary-schemas";
 
 /**
  * The dashboard's numbers, computed from the runs here, so the web app and
