@@ -59,12 +59,12 @@ import type { Knowledge } from "@/shared/api";
 import { formatRelative, hoverTime } from "@/shared/format";
 import {
 	AddSourceButton,
+	type EditedSource,
 	KnowledgeSection,
 	useKnowledge,
-} from "./knowledge-layout";
-import { knowledgeMutations } from "./queries";
+} from "../layout";
+import { knowledgeMutations } from "../queries";
 import { ReaderSetting } from "./reader-setting";
-import type { EditedSource } from "./source-dialog";
 import {
 	computerText,
 	lastSyncText,

@@ -20,19 +20,18 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { BookOpenIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
+import { KnowledgeSection, useKnowledge } from "../layout";
+import { knowledgeMutations, knowledgeQueries } from "../queries";
+import { MeaningLine, useKnowledgeHits } from "../search";
 import { AskAnswer } from "./ask-answer";
 import { AskTellBox, type BoxMode } from "./ask-tell-box";
-import { KnowledgeSection, useKnowledge } from "./knowledge-layout";
-import { MeaningLine } from "./knowledge-search";
 import {
 	LearningsFooter,
 	LearningsToCheck,
 	useNotesToCheck,
 } from "./learnings-to-check";
 import { factsLine, type TellOutcome, tellReply } from "./overview-words";
-import { knowledgeMutations, knowledgeQueries } from "./queries";
 import { OftenSelect, ToldLinkRows, useToldLinks } from "./told-links";
-import { useKnowledgeHits } from "./use-knowledge-hits";
 
 /** How often an agent fetches what a person describes, unless they choose. */
 const AGENT_OFTEN: HowOften = "week";

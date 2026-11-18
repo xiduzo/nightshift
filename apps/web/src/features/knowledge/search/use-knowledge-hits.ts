@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { knowledgeQueries } from "./queries";
+import { knowledgeQueries } from "../queries";
 
 /** How long the words rest before the search runs, in ms. */
 const TYPING_PAUSE = 250;

@@ -35,9 +35,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { formatRelative } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
+import { KnowledgeSection, useKnowledge } from "../layout";
+import { knowledgeMutations, knowledgeQueries } from "../queries";
 import { SearchEvaluation } from "./evaluation";
-import { KnowledgeSection, useKnowledge } from "./knowledge-layout";
-import { knowledgeMutations, knowledgeQueries } from "./queries";
 
 /** The files a search found that the table shows, best first. */
 const SHOWN_HITS = 3;

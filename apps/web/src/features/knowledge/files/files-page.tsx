@@ -4,13 +4,9 @@ import {
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
 import { TriangleAlertIcon } from "lucide-react";
+import { AddSourceButton, KnowledgeSection, useKnowledge } from "../layout";
+import { KnowledgeSearch } from "../search";
 import { FolderBrowser } from "./folder-browser";
-import {
-	AddSourceButton,
-	KnowledgeSection,
-	useKnowledge,
-} from "./knowledge-layout";
-import { KnowledgeSearch } from "./knowledge-search";
 
 /** Every file agents can read: the search on top, then the files by folder. */
 export function KnowledgeFilesPage() {

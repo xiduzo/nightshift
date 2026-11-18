@@ -35,7 +35,7 @@ import {
 	XIcon,
 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
-import { knowledgeQueries } from "./queries";
+import { knowledgeQueries } from "../queries";
 
 /** How long the typing rests before Night Shift looks at the links, in ms. */
 const TYPING_PAUSE = 600;

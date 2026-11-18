@@ -31,6 +31,7 @@ import {
 import { useMemo, useState } from "react";
 import type { KnowledgeFile } from "@/shared/api";
 import { DataTable } from "@/shared/data-table";
+import { knowledgeQueries } from "../queries";
 import { fileColumns, fileUse } from "./file-columns";
 import {
 	type FolderNode,
@@ -38,7 +39,6 @@ import {
 	folderTree,
 	isInFolder,
 } from "./folder-tree";
-import { knowledgeQueries } from "./queries";
 
 /**
  * Every file of the knowledge: the folders on the left, the files of the

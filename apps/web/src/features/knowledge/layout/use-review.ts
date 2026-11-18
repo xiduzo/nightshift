@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { orpc } from "@/shared/api";
-import { knowledgeQueries } from "./queries";
+import { knowledgeQueries } from "../queries";
 
 /** How long a person can take back a Keep or a Delete, in ms. */
 const UNDO_MS = 5000;

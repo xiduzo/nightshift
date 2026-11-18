@@ -57,7 +57,9 @@ import { toast } from "sonner";
 import { loadElk } from "@/features/flows";
 import type { KnowledgeMap } from "@/shared/api";
 import { PanelHeader } from "@/shared/panel";
-import { KnowledgeSection, useKnowledge } from "./knowledge-layout";
+import { KnowledgeSection, useKnowledge } from "../layout";
+import { knowledgeMutations, knowledgeQueries } from "../queries";
+import { useKnowledgeHits } from "../search";
 import {
 	KIND_ICON,
 	KIND_NAME,
@@ -68,8 +70,6 @@ import {
 	mapNodeTypes,
 	type NodeKind,
 } from "./map-node";
-import { knowledgeMutations, knowledgeQueries } from "./queries";
-import { useKnowledgeHits } from "./use-knowledge-hits";
 
 const KINDS: NodeKind[] = ["file", "topic", "question", "learning"];
 

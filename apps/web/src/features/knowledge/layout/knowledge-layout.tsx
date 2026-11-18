@@ -19,9 +19,9 @@ import {
 import { ProjectPage } from "@/features/projects";
 import type { Knowledge } from "@/shared/api";
 import { PageHeading } from "@/shared/page";
+import { knowledgeQueries } from "../queries";
 import { KnowledgeFileSheet } from "./knowledge-file-sheet";
 import { KNOWLEDGE_PAGES } from "./knowledge-nav";
-import { knowledgeQueries } from "./queries";
 import { type EditedSource, SourceDialog } from "./source-dialog";
 import { type Review, useReview } from "./use-review";
 

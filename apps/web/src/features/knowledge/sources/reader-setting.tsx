@@ -27,8 +27,8 @@ import { Link } from "@tanstack/react-router";
 import { KeyRoundIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-import { useKnowledge } from "./knowledge-layout";
-import { knowledgeMutations } from "./queries";
+import { useKnowledge } from "../layout";
+import { knowledgeMutations } from "../queries";
 
 type ReaderKind = PageReaderSetting["kind"];
 

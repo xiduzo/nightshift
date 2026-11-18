@@ -39,7 +39,7 @@ import { toast } from "sonner";
 import { orpc } from "@/shared/api";
 import { formatRelative } from "@/shared/format";
 import { PageSection } from "@/shared/page";
-import { knowledgeQueries } from "./queries";
+import { knowledgeQueries } from "../queries";
 
 /** A note's key: its file and its text. */
 const noteKey = (note: Pick<NoteToCheck, "learningId" | "note">) =>

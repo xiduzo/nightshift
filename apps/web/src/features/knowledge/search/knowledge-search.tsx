@@ -31,8 +31,8 @@ import { useQuery } from "@tanstack/react-query";
 import { CircleAlertIcon, SearchIcon, XIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { KnowledgeHit } from "@/shared/api";
-import { KnowledgeFileSheet } from "./knowledge-file-sheet";
-import { knowledgeQueries } from "./queries";
+import { KnowledgeFileSheet } from "../layout";
+import { knowledgeQueries } from "../queries";
 import { useKnowledgeHits } from "./use-knowledge-hits";
 
 /** How often the page asks again while search by meaning gets ready or stopped, in ms. A look is also what tries a stopped one again. */

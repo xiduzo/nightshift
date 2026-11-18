@@ -63,16 +63,15 @@ import {
 import { type ReactNode, useEffect, useId } from "react";
 import { toast } from "sonner";
 import { formatRelative } from "@/shared/format";
+import { fileNameOf } from "../files";
+import { KnowledgeSection, type Review, useKnowledge } from "../layout";
+import { knowledgeMutations } from "../queries";
+import { SyncNowButton } from "../sources";
 import {
 	closeNotesShown,
 	closeNotesTitle,
 	type ShownCloseNote,
 } from "./close-notes-words";
-import { fileNameOf } from "./folder-tree";
-import { KnowledgeSection, useKnowledge } from "./knowledge-layout";
-import { knowledgeMutations } from "./queries";
-import { SyncNowButton } from "./sources";
-import type { Review } from "./use-review";
 
 /** The tasks the list of what comes next shows, at most. */
 const NEXT_SHOWN = 5;

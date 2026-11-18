@@ -32,7 +32,6 @@ apps/mobile/src/features/inbox
 apps/web/src/features/agents
 apps/web/src/features/agents/connections
 apps/web/src/features/agents/setup
-apps/web/src/features/knowledge
 packages/engine/src/graph
 packages/engine/src/graph/nodes
 packages/engine/src/knowledge

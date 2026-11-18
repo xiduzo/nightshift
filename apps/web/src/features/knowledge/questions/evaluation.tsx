@@ -38,7 +38,7 @@ import { toast } from "sonner";
 import type { KnowledgeEvaluation } from "@/shared/api";
 import { formatRelative } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
-import { knowledgeMutations, knowledgeQueries } from "./queries";
+import { knowledgeMutations, knowledgeQueries } from "../queries";
 
 /** The ways to search, as the page names them. */
 const MODES = [

@@ -16,7 +16,7 @@ import { Spinner } from "@nightshift/ui/components/spinner";
 import { CircleAlertIcon, SearchXIcon } from "lucide-react";
 import { OVERVIEW_ROWS } from "@/features/dashboard";
 import type { KnowledgeHit } from "@/shared/api";
-import { SearchHits } from "./knowledge-search";
+import { SearchHits } from "../search";
 
 /**
  * What Ask found: the files an agent who asks this reads first, or, when it

@@ -15,7 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CircleAlertIcon } from "lucide-react";
 import { CodeView, languageOfPath } from "@/shared/code";
 import { formatSize } from "@/shared/format";
-import { knowledgeQueries } from "./queries";
+import { knowledgeQueries } from "../queries";
 
 /**
  * One file of the knowledge, in a sheet beside the list. This computer's
