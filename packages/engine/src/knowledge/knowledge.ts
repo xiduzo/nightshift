@@ -14,7 +14,7 @@ import {
 import { now } from "@nightshift/time";
 import { type SpaceArchive, writeWhole } from "../archive";
 import type { SyncedDocuments } from "../documents";
-import { createRunLog } from "../log";
+import { createRunLog, knowledgeUseEvent } from "../log";
 import type { UsageNotes } from "../usage";
 import { collectContent } from "./collect";
 import { evaluateKnowledge, type KnowledgeEvaluation } from "./evaluate";
@@ -71,7 +71,6 @@ import {
 	askedQuestions,
 	type KnowledgeUseReport,
 	knowledgeFileUse,
-	knowledgeUseEvent,
 } from "./use";
 
 /** The Hosts of the Spaces, once the devices runtime is up. */

@@ -2,11 +2,11 @@ import type { Command } from "@langchain/langgraph";
 import type { CostSource } from "@nightshift/agents/pricing";
 import type { TemplateContext } from "@nightshift/flows";
 import type { Device } from "../../device";
-import type { KnowledgeUseEvent } from "../../knowledge";
 import type {
 	DerivedStep,
 	EnginePayloads,
 	GateChoice,
+	KnowledgeUseEvent,
 	RunState,
 	RunWarningKind,
 	StandIn,

@@ -3,11 +3,11 @@ import type { KnowledgeUse } from "@nightshift/agents/tools";
 import { project, run } from "@nightshift/db/schema";
 import { now as timeNow } from "@nightshift/time";
 import { createRunLog, type KnowledgeUseFact, type RunLog } from "../log";
+import { knowledgeUseEvent } from "../log/events/knowledge-use";
 import { createSandbox, type Sandbox } from "../testing";
 import {
 	askedQuestions,
 	knowledgeFileUse,
-	knowledgeUseEvent,
 	stepSources,
 	unusedFiles,
 } from "./use";

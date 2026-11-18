@@ -8,6 +8,7 @@
  * interface writes, and what the run's log and the Host contract share.
  */
 
+export type { KnowledgeUseEvent } from "../log";
 export { LOCAL_ONLY_BYTES } from "./documents";
 export { DEFAULT_EMBEDDING_MODEL } from "./embedding-model";
 export type { KnowledgeEvaluation } from "./evaluate";
@@ -25,11 +26,10 @@ export type { KnowledgeQuestion } from "./questions";
 export type { LinkLook } from "./readers/look";
 export { type AskLearner, createRunLearnings } from "./run-learnings";
 export type { KnowledgeHit, KnowledgeMeaningStatus } from "./search";
-export type { KnowledgeRequest, KnowledgeUseEvent } from "./step-knowledge";
+export type { KnowledgeRequest } from "./step-knowledge";
 export {
 	type AskedQuestion,
 	type KnowledgeUseReport,
-	knowledgeUseEvent,
 	type StepSource,
 	stepSources,
 } from "./use";

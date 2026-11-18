@@ -7,6 +7,7 @@ import {
 } from "@nightshift/agents/tools";
 import type { AgentEvent, SessionContribution } from "@nightshift/agents/types";
 import { knowledgeFolderPath } from "@nightshift/flows";
+import type { KnowledgeUseEvent } from "../log";
 import { indexFolder, type KnowledgeFolders } from "./folder";
 import type { FolderSnapshot } from "./folder-snapshot";
 import type { KnowledgeReader } from "./knowledge-reader";
@@ -57,16 +58,6 @@ export type CommandKnowledge = {
 	env: Record<string, string>;
 	/** The step ended: what it wrote goes to the Space. */
 	done(): Promise<void>;
-};
-
-/**
- * The agent of a session searched or read the project's knowledge, with
- * its tools: the step logs it (`KnowledgeSearched`, `KnowledgeRead`).
- */
-export type KnowledgeUseEvent = {
-	type: "knowledge";
-	projectId: string;
-	use: KnowledgeUse;
 };
 
 /** What an Agent session gets. */

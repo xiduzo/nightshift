@@ -7,12 +7,12 @@ import {
 	type VariableResult,
 } from "@nightshift/flows";
 import { dataProblem } from "@nightshift/flows/json-schema";
-import { knowledgeUseEvent } from "../../knowledge";
 import {
 	type DerivedStep,
 	type FlowScore,
 	flowScores,
 	type Hold,
+	knowledgeUseEvent,
 	type RunState,
 	type Scope,
 	type StepBudget,

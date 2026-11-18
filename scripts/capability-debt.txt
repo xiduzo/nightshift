@@ -93,7 +93,6 @@ imports packages/engine device projects
 # The walk reads the capabilities itself (decision 9: `graph` is a
 # mechanism).
 imports packages/engine graph device-config
-imports packages/engine graph knowledge
 imports packages/engine graph projects
 # The read model shows the knowledge sources of a step. `read` is a
 # mechanism since decision 37 of the hexagon series, so this import is debt.

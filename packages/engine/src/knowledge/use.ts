@@ -1,12 +1,7 @@
-import type { KnowledgeUse, KnowledgeUseHit } from "@nightshift/agents/tools";
+import type { KnowledgeUseHit } from "@nightshift/agents/tools";
 import type { Database } from "@nightshift/db";
 import { now as timeNow } from "@nightshift/time";
-import {
-	type EventInput,
-	type KnowledgeUseFact,
-	type KnowledgeVia,
-	knowledgeUseEvents,
-} from "../log";
+import { type KnowledgeUseFact, knowledgeUseEvents } from "../log";
 import { questionKey } from "./questions";
 
 /**
@@ -16,29 +11,6 @@ import { questionKey } from "./questions";
  * nightshift MCP server's calls are logged with no run (`Knowledge.search`,
  * `Knowledge.read`).
  */
-
-/** The event of one use of the knowledge, without its run, step or session. */
-export function knowledgeUseEvent(
-	projectId: string,
-	use: KnowledgeUse,
-	via: KnowledgeVia,
-): EventInput<"KnowledgeSearched"> | EventInput<"KnowledgeRead"> {
-	return use.kind === "search"
-		? {
-				type: "KnowledgeSearched",
-				payload: { projectId, query: use.query, hits: use.hits, via },
-			}
-		: {
-				type: "KnowledgeRead",
-				payload: {
-					projectId,
-					path: use.path,
-					found: use.found,
-					via,
-					...(use.from ? { from: use.from } : {}),
-				},
-			};
-}
 
 /** A question agents asked the knowledge, and what the last asking found. */
 export type AskedQuestion = {

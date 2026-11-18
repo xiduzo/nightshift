@@ -7,6 +7,7 @@ export {
 	groupByRun,
 	type LoggedEvent,
 } from "./events";
+export { type KnowledgeUseEvent, knowledgeUseEvent } from "./knowledge-use";
 export { personFieldTypes } from "./person-fields";
 export {
 	type GateVia,
@@ -32,7 +33,6 @@ export {
 	type RunScore,
 	runScore,
 } from "./scores";
-export type { KnowledgeVia } from "./space-payloads";
 export {
 	type GateBackgroundItem,
 	type GateBrief,
