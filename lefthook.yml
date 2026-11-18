@@ -71,6 +71,18 @@ pre-commit:
         - "scripts/barrel-debt.txt"
         - "scripts/peer-port-debt.txt"
       run: bun scripts/check-budgets.ts
+    # The rings of a slice: domain/, application/, adapters/. It reads the
+    # source, the capability map, its debt list and biome.json (H4).
+    - name: rings
+      glob:
+        - "*.{ts,tsx}"
+        - "package.json"
+        - "**/package.json"
+        - "**/tsconfig.json"
+        - ".dependency-cruiser.mjs"
+        - "biome.json"
+        - "scripts/hexagon-debt.txt"
+      run: bun run check:rings
     # The reference tables of the docs match the code.
     - name: docs reference
       glob:
@@ -98,7 +110,12 @@ pre-commit:
       glob:
         - "scripts/check-*.ts"
         - "scripts/verticals/**"
+        - "scripts/rings/**"
+        - ".dependency-cruiser.mjs"
+        - "scripts/hexagon-debt.txt"
         - "scripts/capabilities.ts"
         - "scripts/capability-debt.txt"
         - "scripts/test-workspaces*.ts"
-      run: bun test ./scripts/
+      # Some tests read the whole repository. On a busy computer they take
+      # longer than the 5 seconds a test gets by default.
+      run: bun test --timeout 60000 ./scripts/

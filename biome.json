@@ -940,6 +940,32 @@
 					}
 				}
 			}
+		},
+		{
+			"includes": [
+				"packages/*/src/**/domain/**",
+				"packages/*/src/**/application/**",
+				"packages/engine/src/contract/**",
+				"packages/engine/src/run-status/**",
+				"packages/devices/src/contract/**",
+				"packages/notifications/src/contract/**"
+			],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedGlobals": {
+							"level": "error",
+							"options": {
+								"deniedGlobals": {
+									"Bun": "Only adapters/out/ uses Bun. In domain/, application/ and a kernel mechanism, take a port (H4 of scripts/check-rings.ts).",
+									"fetch": "Only adapters/out/ uses fetch. In domain/, application/ and a kernel mechanism, take a port (H4 of scripts/check-rings.ts).",
+									"process": "Only adapters/out/ uses process. In domain/, application/ and a kernel mechanism, take a port or an argument (H4 of scripts/check-rings.ts)."
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 	],
 	"tailwind": {

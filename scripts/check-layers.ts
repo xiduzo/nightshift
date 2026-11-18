@@ -229,13 +229,26 @@ function sourceFiles(dir: string, out: string[], top = false): void {
 	}
 }
 
+/**
+ * The test code of a slice's driven adapters, by its path: an in-memory
+ * adapter (`adapters/out/in-memory-*.ts`) and a contract suite
+ * (`adapters/out/*.contract.ts`). Tests run on them, production code never
+ * imports them, and they do not count as source for a size rule.
+ */
+export function isAdapterTestCode(path: string): boolean {
+	return /(^|[\\/])adapters[\\/]out[\\/](in-memory-[^\\/]*|[^\\/]*\.contract)\.tsx?$/.test(
+		path,
+	);
+}
+
 /** A test, by its path in the workspace (`src/runs/run.test.ts`, `test/x.ts`). */
 export function isTest(path: string): boolean {
 	return (
 		/\.test\.tsx?$/.test(path) ||
 		/(^|[\\/])test-support\.tsx?$/.test(path) ||
 		/(^|[\\/])(testing|fixtures)[\\/]/.test(path) ||
-		/^test[\\/]/.test(path)
+		/^test[\\/]/.test(path) ||
+		isAdapterTestCode(path)
 	);
 }
 

@@ -25,7 +25,9 @@
  * folder of a workspace, or in the `scripts/` folder of the repository. A
  * test (`*.test.ts`, `*.test.tsx`), a declaration file (`*.d.ts`) and a
  * generated file (GENERATED below) do not count. A fake or a fixture is not
- * a test here: it counts.
+ * a test here: it counts. The test code of a slice's driven adapters does
+ * not count (`adapters/out/in-memory-*.ts`, `adapters/out/*.contract.ts`:
+ * `isAdapterTestCode` of `scripts/check-layers.ts`).
  *
  * It checks the workspaces that `scripts/check-verticals.ts` checks (not
  * `ui`, `ui-native` and `config`), and it finds the verticals the same way.
@@ -51,6 +53,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
+import { isAdapterTestCode } from "./check-layers";
 import {
 	entryFiles,
 	PEER_PORTS,
@@ -213,7 +216,11 @@ export function measure(
 			const path = join(dir, entry.name);
 			if (entry.isDirectory()) {
 				if (!skipped(entry.name)) walk(path);
-			} else if (isSource(entry.name) && !generated.includes(rel(path))) {
+			} else if (
+				isSource(entry.name) &&
+				!isAdapterTestCode(path) &&
+				!generated.includes(rel(path))
+			) {
 				sizes.files.set(rel(path), linesOf(readFileSync(path)));
 				count++;
 			}

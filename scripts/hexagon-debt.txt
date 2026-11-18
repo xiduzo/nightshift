@@ -1,0 +1,41 @@
+# Verticals of the server packages that are not in shape yet (H10).
+# One line each: <package>/<vertical>. scripts/check-rings.ts says what
+# "in shape" means. Remove a line in the change that brings the vertical
+# into shape. Add no line: a new slice starts in shape. The one exception
+# is a new vertical that splits out of a listed one.
+agents/assistant
+agents/decider
+agents/harnesses
+agents/knowledge
+auth/access
+auth/device-keys
+auth/host-access
+auth/local-session
+auth/login
+auth/pairing
+auth/spaces
+auth/two-factor
+devices/host
+devices/membership
+devices/offers
+devices/placement
+devices/registry
+devices/secrets
+engine/agent-setup
+engine/assistant
+engine/cleanup
+engine/dashboard
+engine/device-config
+engine/flows
+engine/knowledge
+engine/placement
+engine/projects
+engine/run
+engine/schedules
+notifications/notifier
+notifications/settings
+notifications/targets
+telemetry/runs
+# Files of a package's kernel that are not pure yet: kernel <file>.
+# The Command reads its kinds from the database schema, by value.
+kernel packages/engine/src/contract/command.ts

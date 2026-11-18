@@ -83,6 +83,11 @@ jobs:
       - name: Budgets
         run: bun scripts/check-budgets.ts
 
+      # The rings of a slice in the server packages, and the list of the
+      # verticals that are not in shape yet (scripts/check-rings.ts).
+      - name: Rings
+        run: bun run check:rings
+
       # The kits, starters, agents, CLI help and MCP tools in the docs match
       # the code (apps/server/scripts/docs-reference.ts).
       - name: Docs reference
