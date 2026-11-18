@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { MECHANISM } from "./capabilities";
+import { MECHANISM, WIRING } from "./capabilities";
 import {
 	type CapabilityMap,
 	checkCapabilities,
@@ -18,6 +18,7 @@ import {
 	MAX_CAPABILITY_IMPORTS,
 	verticalImports,
 } from "./check-capabilities";
+import { checkWorkspace } from "./check-verticals";
 
 const roots: string[] = [];
 
@@ -28,6 +29,7 @@ afterAll(() => {
 const PKG = "packages/demo";
 const APP = "apps/demo";
 const M = MECHANISM;
+const W = WIRING;
 
 /** Writes `files` (path in the repository → source) to a new root. */
 function tree(files: Record<string, string>): string {
@@ -116,7 +118,9 @@ describe("the map and the disk (V1a)", () => {
 		);
 		expect(problems).toHaveLength(1);
 		expect(problems[0]).toContain('"log" of packages/demo has "machinery"');
-		expect(problems[0]).toContain("Use a name of CAPABILITIES, or MECHANISM");
+		expect(problems[0]).toContain(
+			"Use a name of CAPABILITIES, MECHANISM or WIRING",
+		);
 	});
 
 	test("a capability that no vertical has fails", () => {
@@ -317,6 +321,117 @@ describe("a mechanism imports no capability (V2)", () => {
 		);
 		expect(problems).toHaveLength(1);
 		expect(problems[0]).toContain("is not needed any more (V2)");
+	});
+});
+
+describe("the wiring piece composes the capabilities (decision 30)", () => {
+	const names = ["a", "b", "c", "d", "e", "f"];
+	const features = names.map((name) => `features/${name}`);
+	const all = [...features, "shared/shell", "shared/api", "shared/frame"];
+	const places = (shell: string, frame: string = M) => ({
+		...Object.fromEntries(names.map((name) => [`features/${name}`, name])),
+		"shared/shell": shell,
+		"shared/api": M,
+		"shared/frame": frame,
+	});
+	const check = (
+		imports: Record<string, string[]>,
+		verticals: Record<string, string>,
+	) =>
+		checkCapabilities(tree(pkg(all, imports, APP)), map(verticals, names, APP));
+
+	test("it imports every capability: V2 and V5 do not apply", () => {
+		expect(features.length).toBeGreaterThan(MAX_CAPABILITY_IMPORTS);
+		expect(
+			check({ "shared/shell": [...features, "shared/api"] }, places(W)),
+		).toEqual([]);
+	});
+
+	test("the same shell as a mechanism fails V2, once per capability", () => {
+		const problems = check({ "shared/shell": features }, places(M));
+		expect(problems).toHaveLength(features.length);
+		expect(problems[0]).toBe(
+			'apps/demo/src/shared/shell/index.ts: the mechanism "shared/shell" imports the capability vertical "features/a" (V2). A mechanism imports no capability: let its caller pass in what it needs, or move the rule into the capability.',
+		);
+	});
+
+	test("a mechanism beside the wiring piece still fails V2", () => {
+		expect(
+			check(
+				{ "shared/shell": features, "shared/api": ["features/a"] },
+				places(W),
+			),
+		).toEqual([
+			'apps/demo/src/shared/api/index.ts: the mechanism "shared/api" imports the capability vertical "features/a" (V2). A mechanism imports no capability: let its caller pass in what it needs, or move the rule into the capability.',
+		]);
+	});
+
+	test("a second wiring piece in one workspace fails", () => {
+		expect(
+			check(
+				{ "shared/shell": features, "shared/frame": features },
+				places(W, W),
+			),
+		).toEqual([
+			'scripts/capabilities.ts: "shared/frame" of apps/demo has WIRING, and the wiring of a workspace is the shared/shell of an app (V1a). Write MECHANISM. An app composes its features in shared/shell, and a package in a wire.ts outside the verticals.',
+		]);
+	});
+
+	test("a feature is no wiring piece, and a package has none", () => {
+		const inApp = check(
+			{ "shared/shell": features },
+			{ ...places(W), "features/a": W },
+		);
+		expect(inApp).toHaveLength(2);
+		expect(inApp[0]).toContain('"features/a" of apps/demo has WIRING');
+		expect(inApp[1]).toContain('no vertical has the capability "a"');
+
+		const inPackage = checkCapabilities(
+			tree(pkg(["runs", "peers"], { peers: ["runs"] })),
+			map({ runs: "runs", peers: W }, ["runs"]),
+		);
+		expect(inPackage).toHaveLength(1);
+		expect(inPackage[0]).toContain('"peers" of packages/demo has WIRING');
+	});
+
+	test("a wiring piece that composes nothing is a mechanism", () => {
+		expect(check({ "shared/shell": ["shared/api"] }, places(W))).toEqual([
+			'apps/demo/src/shared/shell/: the wiring piece "shared/shell" imports no capability vertical (V1a). A piece that composes nothing is a mechanism: write MECHANISM in scripts/capabilities.ts.',
+		]);
+		expect(check({ "shared/shell": ["shared/api"] }, places(M))).toEqual([]);
+	});
+
+	test("a capability does not count the wiring piece (V5)", () => {
+		const root = tree(
+			pkg(
+				all,
+				{
+					"shared/shell": features,
+					"features/a": [...features.slice(1), "shared/shell"],
+				},
+				APP,
+			),
+		);
+		expect(checkCapabilities(root, map(places(W), names, APP))).toEqual([]);
+	});
+
+	test("no vertical imports it: rule (h) of the vertical check says so", () => {
+		const root = tree({
+			...pkg(
+				all,
+				{ "shared/shell": features, "features/a": ["shared/shell"] },
+				APP,
+			),
+			"apps/demo/src/routes/index.ts":
+				'import { value } from "../shared/shell";\nexport default value;\n',
+		});
+		// The route imports the piece too, and that is fine.
+		const closed = checkWorkspace(root, APP, { entryDirs: ["routes"] }).filter(
+			(problem) => problem.includes("imports shared/shell"),
+		);
+		expect(closed).toEqual([
+			"apps/demo/src/features/a/index.ts: imports shared/shell, which composes the features. Only the routes and the app's entry files import it.",
+		]);
 	});
 });
 

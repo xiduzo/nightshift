@@ -2,7 +2,7 @@
  * The capability map: every vertical of every checked workspace, and what
  * it is. `scripts/check-capabilities.ts` reads it.
  *
- * A vertical is one of two kinds.
+ * A vertical is one of three kinds.
  *
  * - A **capability** is a product area. It holds rules or data of one thing
  *   a person meets in Night Shift: what they may do there, and what it
@@ -14,6 +14,12 @@
  *   area. Its name is its folder name. A word of the glossary does not make
  *   a vertical a capability: the run log, the Space archive and a Lease are
  *   machinery that the capabilities use.
+ * - The **wiring** is the piece of a workspace that composes its
+ *   capabilities. A workspace has at most one, and it is the `shared/shell`
+ *   of an app: the frame of the app, which puts the features on the screen
+ *   together. It may import every capability, so V2 and V5 do not apply to
+ *   it. No vertical imports it: only the routes, the entry folders and the
+ *   entry files do. Rule (h) of `scripts/check-verticals.ts` checks that.
  *
  * The rules (the check has the details):
  *
@@ -22,7 +28,7 @@
  *   vertical that is part of a capability under another name is on the
  *   rename debt list (`scripts/capability-debt.txt`). Two verticals of one
  *   workspace with one capability become one vertical with sub-verticals.
- * - V2 A mechanism imports no capability of its workspace.
+ * - V2 A mechanism imports no capability of its workspace. The wiring may.
  * - V5 A capability imports at most 5 other capability verticals of its
  *   workspace.
  *
@@ -33,8 +39,13 @@
  *    `read` and `run-status` are `runs`).
  * 2. It only serves other verticals and has no product rule of its own:
  *    MECHANISM. Say why in a comment when the name does not.
- * 3. An app's `shared/<name>` piece is always a mechanism.
- * 4. A vertical that composes the others (a composition root, a shell) is
+ * 3. An app's `shared/<name>` piece is a mechanism. The one exception is
+ *    rule 4.
+ * 4. An app's `shared/shell` that composes its features is WIRING. A shell
+ *    that imports no feature is a mechanism (the Insights admin: its route
+ *    passes in what the frame shows). An app that composes in its entry
+ *    files has no wiring piece (`apps/desktop`, `apps/server`).
+ * 5. A vertical of a package that composes the others (`devices/peers`) is
  *    a mechanism. Its imports of capabilities are V2 debt until the wiring
  *    moves to a `wire.ts` outside the verticals.
  *
@@ -153,13 +164,19 @@ export type Capability =
 /** A vertical that is shared machinery. Its name is its folder name. */
 export const MECHANISM = "mechanism";
 
-export type Place = Capability | typeof MECHANISM;
+/**
+ * The piece of a workspace that composes its capabilities: an app's
+ * `shared/shell`. V2 and V5 do not apply to it.
+ */
+export const WIRING = "wiring";
+
+export type Place = Capability | typeof MECHANISM | typeof WIRING;
 
 const M = MECHANISM;
 
 /**
- * Each workspace, and each of its verticals with its capability, or
- * MECHANISM. Sorted by workspace, then by vertical.
+ * Each workspace, and each of its verticals with its capability,
+ * MECHANISM or WIRING. Sorted by workspace, then by vertical.
  */
 export const VERTICALS: Record<string, Record<string, Place>> = {
 	"apps/desktop": {
@@ -192,6 +209,8 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		"shared/format": M,
 		"shared/page": M,
 		"shared/rpc": M,
+		// The frame of the admin. It imports no feature: the route passes in
+		// what it shows. So it is a mechanism, and V2 holds for it.
 		"shared/shell": M,
 	},
 	"apps/mobile": {
@@ -226,7 +245,7 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		"shared/page": M,
 		"shared/refresh": M,
 		// The shell composes the features (rule 4).
-		"shared/shell": M,
+		"shared/shell": WIRING,
 		"shared/status": M,
 		"shared/theme": M,
 		"shared/tone": M,
@@ -264,7 +283,7 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		"shared/page": M,
 		"shared/panel": M,
 		// The shell composes the features (rule 4).
-		"shared/shell": M,
+		"shared/shell": WIRING,
 		"shared/spread-strip": M,
 		"shared/time": M,
 		"shared/urgency": M,
@@ -385,7 +404,7 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		membership: "devices",
 		offers: "devices",
 		// The engine's `Peers` port, composed from the other verticals
-		// (rule 4).
+		// (rule 5).
 		peers: M,
 		// Which of a Person's Devices a run may use.
 		placement: "devices",

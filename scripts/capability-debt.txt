@@ -79,22 +79,8 @@ rename packages/notifications targets
 # --- V2: a mechanism that imports a capability vertical of its workspace.
 # Let the caller pass in what the mechanism needs, or move the rule into
 # the capability.
-
-# The shell of an app composes its features. The wiring belongs outside
-# the verticals.
-imports apps/mobile shared/shell features/glance
-imports apps/mobile shared/shell features/host
-imports apps/mobile shared/shell features/needs
-imports apps/mobile shared/shell features/push
-imports apps/mobile shared/shell features/spaces
-imports apps/web shared/shell features/access
-imports apps/web shared/shell features/dashboard
-imports apps/web shared/shell features/devices
-imports apps/web shared/shell features/gates
-imports apps/web shared/shell features/notifications
-imports apps/web shared/shell features/projects
-imports apps/web shared/shell features/settings
-imports apps/web shared/shell features/spaces
+# The shell of an app is its wiring (WIRING on the map), so its imports of
+# features are no debt.
 
 # The step report and the tools of a session read the knowledge rules.
 imports packages/agents session knowledge

@@ -1,8 +1,9 @@
 /**
  * Checks the capability rules on the capability map
- * (`scripts/capabilities.ts`). The map says of every vertical whether it
- * is a capability (a product area, named with a word of the glossary) or a
- * mechanism (shared machinery).
+ * (`scripts/capabilities.ts`). The map says of every vertical what it is:
+ * a capability (a product area, named with a word of the glossary), a
+ * mechanism (shared machinery), or the wiring (the piece of an app that
+ * composes its capabilities).
  *
  * It finds the workspaces and their verticals as `check-verticals.ts`
  * does, and reads the imports with the same reader. It fails on:
@@ -10,8 +11,10 @@
  * - V1a A vertical on disk that the map does not have, and an entry of the
  *   map that is not on disk. Also a map that cannot be right: a name that
  *   is no capability, a capability that no vertical has, a shared piece of
- *   an app that is not a mechanism, and a capability whose word is not a
- *   term of `docs/glossary.md`.
+ *   an app that is a capability, and a capability whose word is not a term
+ *   of `docs/glossary.md`. Also a wiring piece that is not the
+ *   `shared/shell` of an app (so a workspace has at most one), and a wiring
+ *   piece that imports no capability vertical: that one is a mechanism.
  * - V1b A capability vertical whose folder name is not the name of its
  *   capability. So two verticals of one workspace cannot share a
  *   capability: they become one vertical with sub-verticals. Also a
@@ -19,6 +22,12 @@
  * - V2 A mechanism that imports a capability vertical of its workspace.
  * - V5 A capability vertical that imports more than 5 other capability
  *   verticals of its workspace. A mechanism does not count.
+ *
+ * V2 and V5 do not apply to the wiring piece: to compose the capabilities
+ * is its work. In return no vertical imports it. This check does not test
+ * that, because rule (h) of `scripts/check-verticals.ts` already does: in an
+ * app, only the routes, the entry folders and the entry files import
+ * `shared/shell`. That is why the wiring piece must be that folder.
  *
  * An import is any import the reader finds: `import type`, `export from`,
  * `import()` and `require()` count. An import through a peer port or of a
@@ -49,6 +58,7 @@ import {
 	INSIGHTS_CAPABILITIES,
 	MECHANISM,
 	VERTICALS,
+	WIRING,
 } from "./capabilities";
 import { isTest } from "./check-layers";
 import {
@@ -63,6 +73,13 @@ import {
 /** V5: the most other capability verticals a capability vertical imports. */
 export const MAX_CAPABILITY_IMPORTS = 5;
 
+/**
+ * The one folder that may be a wiring piece: the shared piece of an app
+ * that rule (h) of `check-verticals.ts` closes to every vertical (`SHELL`
+ * in `scripts/verticals/workspace.ts`).
+ */
+const WIRING_PIECE = "shared/shell";
+
 const MAP_FILE = "scripts/capabilities.ts";
 const DEBT_FILE = "scripts/capability-debt.txt";
 
@@ -70,7 +87,7 @@ const DEBT_FILE = "scripts/capability-debt.txt";
 export type CapabilityMap = {
 	/** The names of the capabilities. */
 	capabilities: string[];
-	/** workspace → vertical → the name of its capability, or MECHANISM. */
+	/** workspace → vertical → the name of its capability, MECHANISM or WIRING. */
 	verticals: Record<string, Record<string, string>>;
 };
 
@@ -181,7 +198,12 @@ type Measured = Debt & {
 	files: Map<string, string>;
 	/** The capability verticals each capability vertical imports. */
 	widths: Map<string, string[]>;
-	counts: { verticals: number; capabilities: number; mechanisms: number };
+	counts: {
+		verticals: number;
+		capabilities: number;
+		mechanisms: number;
+		wiring: number;
+	};
 };
 
 /**
@@ -197,7 +219,7 @@ export function measure(root: string, map: CapabilityMap): Measured {
 		problems: [],
 		files: new Map(),
 		widths: new Map(),
-		counts: { verticals: 0, capabilities: 0, mechanisms: 0 },
+		counts: { verticals: 0, capabilities: 0, mechanisms: 0, wiring: 0 },
 	};
 	const rel = (path: string) => relative(root, path).split(sep).join("/");
 	const workspaces = workspacesOf(root);
@@ -212,6 +234,7 @@ export function measure(root: string, map: CapabilityMap): Measured {
 	}
 
 	for (const workspace of workspaces) {
+		const app = workspace.startsWith("apps/");
 		const listed = map.verticals[workspace] ?? {};
 		const { verticals, imports } = verticalImports(root, workspace);
 		const onDisk = new Set(verticals.map((v) => v.name));
@@ -258,9 +281,24 @@ export function measure(root: string, map: CapabilityMap): Measured {
 				}
 				continue;
 			}
+			if (place === WIRING) {
+				found.counts.wiring += 1;
+				// V1a: the wiring is the one folder that rule (h) of the vertical
+				// check closes to the verticals, and it composes capabilities.
+				if (!app || name !== WIRING_PIECE) {
+					found.problems.push(
+						`${MAP_FILE}: "${name}" of ${workspace} has WIRING, and the wiring of a workspace is the ${WIRING_PIECE} of an app (V1a). Write MECHANISM. An app composes its features in ${WIRING_PIECE}, and a package in a wire.ts outside the verticals.`,
+					);
+				} else if (![...(imports.get(name)?.keys() ?? [])].some(capabilityOf)) {
+					found.problems.push(
+						`${rel(dir)}/: the wiring piece "${name}" imports no capability vertical (V1a). A piece that composes nothing is a mechanism: write MECHANISM in ${MAP_FILE}.`,
+					);
+				}
+				continue;
+			}
 			if (!capabilities.has(place)) {
 				found.problems.push(
-					`${MAP_FILE}: "${name}" of ${workspace} has "${place}", which is no capability (V1a). Use a name of CAPABILITIES, or MECHANISM.`,
+					`${MAP_FILE}: "${name}" of ${workspace} has "${place}", which is no capability (V1a). Use a name of CAPABILITIES, MECHANISM or WIRING.`,
 				);
 				continue;
 			}
@@ -278,7 +316,7 @@ export function measure(root: string, map: CapabilityMap): Measured {
 		for (const { name: from } of verticals) {
 			const out = imports.get(from) ?? new Map<string, string>();
 			const targets = [...out.keys()].sort();
-			// V2: a mechanism imports no capability.
+			// V2: a mechanism imports no capability. The wiring piece may.
 			if (isMechanism(from)) {
 				for (const to of targets) {
 					if (!capabilityOf(to)) continue;
@@ -452,6 +490,6 @@ if (import.meta.main) {
 	const listed = debtOf(debt);
 	const ms = Math.round(performance.now() - started);
 	console.log(
-		`Capability check passed: ${counts.verticals} verticals (${counts.capabilities} of a capability, ${counts.mechanisms} mechanisms). Debt: ${listed.rename.length} rename, ${listed.imports.length} imports, ${listed.wide.length} wide (${ms} ms).`,
+		`Capability check passed: ${counts.verticals} verticals (${counts.capabilities} of a capability, ${counts.mechanisms} mechanisms, ${counts.wiring} wiring). Debt: ${listed.rename.length} rename, ${listed.imports.length} imports, ${listed.wide.length} wide (${ms} ms).`,
 	);
 }
