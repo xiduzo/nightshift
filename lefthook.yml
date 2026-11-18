@@ -41,6 +41,16 @@ pre-commit:
         - "**/package.json"
         - "**/tsconfig.json"
       run: bun scripts/check-verticals.ts
+    # The capability map names every vertical. It reads the same files.
+    - name: capabilities
+      glob:
+        - "*.{ts,tsx}"
+        - "package.json"
+        - "**/package.json"
+        - "**/tsconfig.json"
+        - "scripts/capability-debt.txt"
+        - "docs/glossary.md"
+      run: bun scripts/check-capabilities.ts
     - name: time
       glob:
         - "*.{ts,tsx}"
@@ -76,5 +86,7 @@ pre-commit:
       glob:
         - "scripts/check-*.ts"
         - "scripts/verticals/**"
+        - "scripts/capabilities.ts"
+        - "scripts/capability-debt.txt"
         - "scripts/test-workspaces*.ts"
       run: bun test ./scripts/
