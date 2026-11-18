@@ -1,5 +1,5 @@
-import { nodeLadderLabel } from "./ladders";
-import type { SpendFlow, SpendSaving } from "./types";
+import { nodeLadderLabel } from "../health";
+import type { SpendFlow, SpendSaving } from "../types";
 
 /**
  * The Spend page in words both apps can share: how steady the cost of a

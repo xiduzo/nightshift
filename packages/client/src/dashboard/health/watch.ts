@@ -1,4 +1,4 @@
-import type { DashboardSummary, FlowHealthRow } from "./types";
+import type { DashboardSummary, FlowHealthRow } from "../types";
 
 /** What is unusual, as a row says it: the push of a flow that turns severe says it too. */
 export { signalTitle } from "@nightshift/notifications/contract";

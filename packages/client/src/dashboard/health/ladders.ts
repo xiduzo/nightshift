@@ -1,4 +1,4 @@
-import type { FlowRange } from "./types";
+import type { FlowRange } from "../types";
 
 /** One node's ladder in a flow's detail. */
 export type NodeLadder = NonNullable<

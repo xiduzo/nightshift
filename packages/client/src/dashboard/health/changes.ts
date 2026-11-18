@@ -1,4 +1,4 @@
-import type { ChangeVerdict, FlowChange, FlowMove } from "./types";
+import type { ChangeVerdict, FlowChange, FlowMove } from "../types";
 
 /**
  * Before and after for a flow in words both apps can share: what a change

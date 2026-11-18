@@ -14,7 +14,6 @@ apps/web/src/features/agents/index.ts 31
 apps/web/src/features/flows/index.ts 44
 apps/web/src/shared/api/index.ts 87
 packages/auth/src/spaces/index.ts 36
-packages/client/src/dashboard/index.ts 46
 packages/daemon/src/runtime/index.ts 31
 packages/devices/src/contract/index.ts 55
 packages/engine/src/contract/index.ts 31

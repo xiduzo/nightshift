@@ -1,17 +1,29 @@
 /** The dashboard: its query, computed on the server, the reader's clock, and its view types. */
 
+export { daysOf } from "./console";
 export {
+	againstBefore,
 	changeSummary,
+	type FlowLevel,
+	type FlowSignal,
+	type FlowWatch,
+	flowLevelHint,
+	flowLevelLabel,
 	type MoveTone,
 	moveKindOf,
 	moveStep,
 	moveText,
 	moveTone,
 	moveToneLabel,
+	type NodeLadder,
+	nodeLadderLabel,
+	signalFacts,
+	signalId,
+	signalScale,
+	signalTitle,
 	verdictLabel,
-} from "./changes";
-export { daysOf } from "./console";
-export { type NodeLadder, nodeLadderLabel } from "./ladders";
+	type WatchedFlow,
+} from "./health";
 export { createDashboardQueries, readerTimeZone } from "./queries";
 export {
 	type CostSteadiness,
@@ -39,16 +51,3 @@ export type {
 	SpendSaving,
 	Spread,
 } from "./types";
-export {
-	againstBefore,
-	type FlowLevel,
-	type FlowSignal,
-	type FlowWatch,
-	flowLevelHint,
-	flowLevelLabel,
-	signalFacts,
-	signalId,
-	signalScale,
-	signalTitle,
-	type WatchedFlow,
-} from "./watch";
