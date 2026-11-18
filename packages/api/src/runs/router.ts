@@ -4,19 +4,16 @@ import { z } from "zod";
 
 import { output, stream } from "../output";
 import { permitted, protectedProcedure, streamed } from "../procedures";
+import { runDetailSchema } from "./detail-schemas";
+import { artifactSchema, runFilesSchema } from "./file-schemas";
+import { ownDeviceSchema, placementSchema } from "./placement-schemas";
 import { runProcedure } from "./run-space";
+import { stepDetailSchema } from "./step-schemas";
+import { runStatusSchema, runSummarySchema } from "./summary-schemas";
 import {
-	artifactSchema,
-	ownDeviceSchema,
-	placementSchema,
-	runDetailSchema,
-	runFilesSchema,
-	runStatusSchema,
 	runStreamItemSchema,
-	runSummarySchema,
-	stepDetailSchema,
 	stepTranscriptSchema,
-} from "./schemas";
+} from "./transcript-schemas";
 
 /** The most runs one page holds. */
 const RUNS_PAGE_MAX = 200;

@@ -12,4 +12,4 @@ export {
 	runStatusSchema,
 	runSummarySchema,
 	runWalkerSchema,
-} from "./schemas";
+} from "./summary-schemas";

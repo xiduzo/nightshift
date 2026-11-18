@@ -31,7 +31,7 @@ import type { Context } from "./context";
 import { notificationItemSchema } from "./notifications/schemas";
 import { type OutputMismatch, onOutputMismatch, output } from "./output";
 import { appRouter } from "./router";
-import { runStreamItemSchema } from "./runs/schemas";
+import { runStreamItemSchema } from "./runs/transcript-schemas";
 import { accessAs, testContext } from "./testing";
 
 /**
