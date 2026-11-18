@@ -10,7 +10,7 @@ apps/server/src/features/cli/flows.ts 608
 apps/web/src/features/agents/connections/secrets-card.tsx 743
 apps/web/src/features/agents/setup/agent-setup-dialog.tsx 606
 apps/web/src/features/flows/assistant/agent-picker.tsx 687
-apps/web/src/features/flows/editor/editor-canvas.tsx 771
+apps/web/src/features/flows/editor/editor-canvas.tsx 694
 apps/web/src/features/flows/editor/flow-editor.tsx 1083
 apps/web/src/features/flows/schedules/schedule-dialog.tsx 749
 apps/web/src/features/flows/start/start-run-dialog.tsx 792

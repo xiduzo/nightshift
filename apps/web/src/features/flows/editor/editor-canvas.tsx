@@ -1,5 +1,5 @@
 import type { NodeSample } from "@nightshift/client";
-import type { Flow, FlowIssue, FlowNode, Outcome } from "@nightshift/flows";
+import type { Flow, FlowIssue, Outcome } from "@nightshift/flows";
 import {
 	addEdge,
 	type FlowCheck,
@@ -18,7 +18,6 @@ import {
 	type Connection,
 	type EdgeChange,
 	type EdgeTypes,
-	type InternalNode,
 	type IsValidConnection,
 	MiniMap,
 	type NodeChange,
@@ -33,7 +32,7 @@ import {
 import { GroupIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { DiffMark, FlowCanvasNode, FlowNodeData } from "../canvas";
+import type { DiffMark, FlowCanvasNode } from "../canvas";
 import {
 	CanvasControls,
 	type CanvasNode,
@@ -43,7 +42,6 @@ import {
 	DataEdge,
 	DataMarker,
 	edgeTypes,
-	exitHandleId,
 	type FlowCanvasEdge,
 	fitViewOptions,
 	groupEdges,
@@ -51,20 +49,15 @@ import {
 	isOutsideId,
 	layoutFlow,
 	loadElk,
-	markedLine,
 	moveSection,
-	type NodeHandles,
 	OpenSectionBar,
 	OutcomeMarkers,
 	type RouteBook,
 	readRoutes,
 	recordRoutes,
 	SectionActionsContext,
-	type SectionBoxData,
 	SectionZoom,
 	SelectEdgeContext,
-	type Size,
-	sampleLine,
 	sectionDragDelta,
 	sectionEnds,
 	sectionIdOf,
@@ -76,8 +69,10 @@ import {
 	writeRoutes,
 } from "../canvas";
 import type { TestMarksApi } from "../test-run";
-import { markOf, NodeMenu, type TestMarks } from "../test-run";
+import { NodeMenu } from "../test-run";
 import { NODE_DRAG_TYPE } from "./add-node";
+import { measuredHandles } from "./measured-handles";
+import { viewerOf } from "./node-viewer";
 import {
 	applyNodeSelection,
 	canvasIds,
@@ -100,82 +95,10 @@ export type CanvasPreview = {
 /** One empty list for every node without issues, so its data stays the same. */
 const NO_ISSUES: FlowIssue[] = [];
 
-/**
- * What a node's card shows of the runs: its pinned output or the outcome
- * it takes in a test run, else what it gave in the newest runs.
- */
-function viewerOf(
-	node: FlowNode,
-	samples: ReadonlyMap<string, NodeSample> | null | undefined,
-	marks: TestMarks | undefined,
-	pinned: ReadonlyMap<string, NodeSample> | undefined,
-): Pick<FlowNodeData, "sample" | "mark"> {
-	const mark = marks ? markOf(marks, node.id) : null;
-	if (mark?.kind === "skipped")
-		return { mark, sample: markedLine(node, mark, undefined) };
-	if (mark?.kind === "pinned") {
-		const sample = pinned?.get(node.id);
-		return {
-			mark: { kind: "pinned", outcome: sample?.outcome ?? null },
-			sample: markedLine(node, mark, sample),
-		};
-	}
-	return samples ? { sample: sampleLine(node, samples.get(node.id)) } : {};
-}
-
 /** The flow's edges, and the dotted lines of the selected node. */
 type CanvasEdge = FlowCanvasEdge | DataCanvasEdge;
 
 const EDGE_TYPES: EdgeTypes = { ...edgeTypes, data: DataEdge };
-
-/**
- * Where React Flow measured each node's handles, from the node's top-left
- * corner, and each box's size and handles, by Section id. Only the
- * height counts: inputs sit on the left side of a node and outcomes on its
- * right. A box names its exits as the layout does ("verdict · pass").
- */
-function measuredHandles(
-	nodeLookup: ReadonlyMap<string, InternalNode<CanvasNode>>,
-) {
-	const handles: Record<string, NodeHandles> = {};
-	const sectionHandles: Record<string, NodeHandles> = {};
-	const sectionSizes: Record<string, Size> = {};
-	for (const [id, node] of nodeLookup) {
-		const bounds = node.internals.handleBounds;
-		const { width, height } = node.measured;
-		if (!bounds || width === undefined) continue;
-		const labels =
-			node.type === "sectionBox"
-				? new Map(
-						(node.data as SectionBoxData).exits.map((exit) => [
-							exitHandleId(exit.from, exit.outcome),
-							exit.label,
-						]),
-					)
-				: undefined;
-		const input = bounds.target?.[0];
-		const measuredHandles: NodeHandles = {
-			input: input ? { x: 0, y: input.y + input.height / 2 } : undefined,
-			outcomes: Object.fromEntries(
-				(bounds.source ?? []).flatMap((handle) => {
-					const name =
-						handle.id && (labels ? labels.get(handle.id) : handle.id);
-					return name
-						? [[name, { x: width, y: handle.y + handle.height / 2 }]]
-						: [];
-				}),
-			),
-		};
-		const sectionId = sectionIdOf(id);
-		if (sectionId === undefined) {
-			handles[id] = measuredHandles;
-			continue;
-		}
-		sectionHandles[sectionId] = measuredHandles;
-		if (height !== undefined) sectionSizes[sectionId] = { width, height };
-	}
-	return { handles, sectionHandles, sectionSizes };
-}
 
 const MINI_MAP_COLOR =
 	"color-mix(in oklch, var(--muted-foreground) 45%, transparent)";
