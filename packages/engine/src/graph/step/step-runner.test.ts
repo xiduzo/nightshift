@@ -26,7 +26,8 @@ import {
 import { STOP_AFTER_STEP_REASON, STOP_TIME_REASON } from "../context/context";
 import type { PendingWait, RunStateValues } from "../state/state";
 import { RESUME_RULES, type StepEntry } from "./resume-point";
-import { type BodyResult, runStep, type StepHandle } from "./step-runner";
+import type { BodyResult, StepHandle } from "./step-handle";
+import { runStep } from "./step-runner";
 
 /**
  * The step runner's lifecycle as a table: how a step enters (a new visit,

@@ -37,7 +37,7 @@ const SETUP_ENDS = {
 	"agent.network": "network",
 	"agent.signed_out": "signedOut",
 } as const;
-/** How a hand-off between Devices fails (`step-runner.ts`). */
+/** How a hand-off between Devices fails (`graph/step/ready-device.ts`). */
 const HANDOFF_FAILED = "could not take the run's work";
 
 const GUARD_ENDS: Record<string, MoveGuard> = {

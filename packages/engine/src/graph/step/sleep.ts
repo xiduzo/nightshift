@@ -17,7 +17,7 @@ import type {
 	PendingWait,
 	RunStateValues,
 } from "../state";
-import type { OpenStep } from "./step-runner";
+import type { OpenStep } from "./step-handle";
 
 /**
  * The sleep module: one deep module owns a sleep from the moment a step

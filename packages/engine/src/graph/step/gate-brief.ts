@@ -20,7 +20,7 @@ import type {
 } from "../../log";
 import type { StepContext } from "../context";
 import { deciderCostSource } from "./cost";
-import type { StepHandle } from "./step-runner";
+import type { StepHandle } from "./step-handle";
 
 /**
  * The brief of a Gate (ADR 21), written as the Gate opens: how urgent it

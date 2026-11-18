@@ -1,7 +1,7 @@
 import type { CostSource } from "@nightshift/agents/pricing";
 import type { DecisionResult, ValueResult } from "@nightshift/agents/types";
 
-import type { StepHandle } from "./step-runner";
+import type { StepHandle } from "./step-handle";
 
 /**
  * Where a decider's cost came from, for `StepEnded`. Null: it answered, but

@@ -5,7 +5,7 @@ import { DEFAULT_RESUME_PROMPT, type ResumeRules } from "../context";
 import { type DoneStep, isCutShort, positionOf } from "../position";
 import type { PositionState } from "../state";
 import { pendingWaitOf } from "./sleep";
-import type { StepStart } from "./step-runner";
+import type { StepStart } from "./step-handle";
 
 /**
  * The one resume point: how a node re-enters after a park, a wake, a resume

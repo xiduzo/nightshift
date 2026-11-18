@@ -4,7 +4,7 @@ import type { Device } from "../../device";
 import { type DerivedStep, readTranscriptFile } from "../../log";
 import { deriveSteps } from "../../read";
 import { messageOf, type StepContext } from "../context";
-import type { OpenStep } from "./step-runner";
+import type { OpenStep } from "./step-handle";
 
 /**
  * What a step changed in the run's worktree, as git sees it: every file,
