@@ -4,8 +4,9 @@ import { memo } from "react";
 import { Alert } from "react-native";
 
 import { useSignedIn } from "@/features/access";
-import { openRun, useRunAct } from "@/features/runs";
 import type { RowAction } from "@/shared/native-list";
+import { openRun } from "../open-run";
+import { useRunAct } from "../run-actions";
 import type { RunLine as Line } from "./agenda";
 import { AgendaLine, ProblemLine } from "./agenda-line";
 

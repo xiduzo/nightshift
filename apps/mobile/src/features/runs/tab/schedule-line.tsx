@@ -2,9 +2,9 @@ import { Moon, Play, RotateCcw } from "lucide-react-native";
 import { memo } from "react";
 import { Alert } from "react-native";
 
-import { openRun } from "@/features/runs";
 import { useScheduleNudges } from "@/features/schedules";
 import type { RowAction } from "@/shared/native-list";
+import { openRun } from "../open-run";
 import type { ScheduleLine as Line } from "./agenda";
 import { AgendaLine, ProblemLine } from "./agenda-line";
 

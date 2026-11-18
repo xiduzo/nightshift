@@ -233,9 +233,9 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		"features/gates": "gates",
 		// This phone's notifications.
 		"features/notifications": "notifications",
+		// One run live, and the Runs tab (`tab/`): the runs on their way
+		// and tonight's schedules.
 		"features/runs": "runs",
-		// The Runs tab: the runs on their way and tonight's schedules.
-		"features/runs-tab": "runs",
 		"features/schedules": "schedules",
 		"features/settings": "settings",
 		"features/spaces": "spaces",

@@ -1,6 +1,5 @@
-/** Runs on this phone: open a run, one run live with its steps, Gates and actions (Stop also on Runs), and the files it changed. */
+/** Runs on this phone: one run live with its steps, Gates and actions, the files it changed, and the Runs tab (`tab/`). */
 
 export { ChangesScreen } from "./changes-screen";
-export { openRun } from "./open-run";
-export { useRunAct } from "./run-actions";
 export { RunScreen } from "./run-screen";
+export { RunsScreen } from "./tab";

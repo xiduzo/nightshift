@@ -1,3 +1,3 @@
-import { RunsScreen } from "@/features/runs-tab";
+import { RunsScreen } from "@/features/runs";
 
 export default RunsScreen;

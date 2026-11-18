@@ -19,9 +19,6 @@ rename packages/insights queries
 
 # widgets: the home screen widget and the followed run on the lock screen.
 rename packages/client glance
-# runs: the Runs tab. As `runs/tab` it closes a cycle: the tab imports
-# schedules, and schedules imports runs (`openRun`).
-rename apps/mobile features/runs-tab
 
 # agents: harnesses, deciders and profiles.
 rename packages/agents decider

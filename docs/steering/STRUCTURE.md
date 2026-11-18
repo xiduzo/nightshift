@@ -319,16 +319,15 @@ apps/mobile/src/
     widgets/               the glances outside the app: the home screen widget (Gates that wait, the latest runs) and a run followed on the lock screen (Live Activity, Android ongoing notification), on expo-widgets
     notifications/         notifications on this phone: the permission card, the Expo push token registered with the Host, the categories and Android channels, the lock-screen buttons and withdraws (background task), the banner in front and the live cache's adapter (phoneNotifications), where a tap goes
     gates/                 inbox/ (the Needs-you inbox), briefing/ (one Gate in full), answer/, transcript/, actions/ (the "More" sheet), needs/ (the Needs you tab: the queue of everything that waits)
-    runs/                  one run live with its steps, Gates and actions, and the files it changed
     schedules/             what runs tonight, with Pause tonight, Undo pause and Run now
+    runs/                  one run live with its steps, Gates and actions, and the files it changed. tab/ (the Runs tab: the runs on their way and the schedules of tonight)
     devices/               the person's computers and whether each can run a flow now (the Computers sheet)
-    runs-tab/              the Runs tab: the runs on their way and the schedules of tonight
     settings/
 ```
 
 - The phone UI and its building blocks are in `docs/research/mobile.md`, "Phone UI". A block composes React Native Reusables pieces and tokens. A new block goes in a new named `shared/<name>/`, or in its vertical when only that vertical uses it.
 
-- The features, from the bottom: `access`, `spaces`, `widgets`, `notifications`, `gates`, `runs`, `schedules`, then `devices`, `runs-tab` and `settings`. `shared/shell` composes them, as on the web. `notifications` sits below the screens because Needs you and Settings show its card. The shell gives its adapter (`phoneNotifications`) to the live cache (`useFollowHost`). `widgets` sits below `notifications` because the background task of a push updates the widget.
+- The features, from the bottom: `access`, `spaces`, `widgets`, `notifications`, `gates`, `schedules`, `runs`, then `devices` and `settings`. `schedules` sits below `runs` because the Runs tab shows the schedules of tonight. A feature opens the screen of another feature by its route (`router.push`), not by an import. `shared/shell` composes them, as on the web. `notifications` sits below the screens because Needs you and Settings show its card. The shell gives its adapter (`phoneNotifications`) to the live cache (`useFollowHost`). `widgets` sits below `notifications` because the background task of a push updates the widget.
 - `app/_layout.tsx` calls `startPushHandling()` in its module scope. iOS and Android start the app for a push in the background, and the background task must be defined before any screen renders.
 - A screen takes query options from `@nightshift/client` on the Host's client: `useHostQueries(createRunQueries)`. The phone keeps no module-level `orpc`, because its client changes with the Host. A mutation is the procedure's own options on that client: `host.orpc.runs.stop.mutationOptions()`.
 - Words and rules that both apps show come from `@nightshift/client` or the `flows` root, never from a copy of a web file. Only the look (icons, colors, layout) belongs to the phone.
