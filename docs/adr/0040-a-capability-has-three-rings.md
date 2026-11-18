@@ -1,7 +1,7 @@
 # 40. A capability has three rings
 
 Status: accepted, 2026-11-18. The rules, their checks and their debt lists are built,
-2026-11-18, in the hexagon series, phase 0 (73561423 to 59905e21). The code moves into
+2026-11-18, in the hexagon series, phase 0 (73561423 to 3353f49f). The code moves into
 shape in phases 1 to 4.
 
 ## Context
@@ -21,7 +21,7 @@ product, a query and a call to git. Measured on main 9775e6a3, on 2026-11-18:
 | Engine functions that take the database handle (`db: Database`) | 63 |
 | Drizzle statements in the engine | about 201, in 37 files |
 | Engine test files that need a database, a folder or a process | 130 of 202 |
-| The same for every server package | 229 of 369 |
+| The same for the eight packages on the server side | 229 of 369 |
 | Source files over 600 lines | 57 (25 in the engine, 12 in the web app) |
 | Folders with more than 25 source files | 9 |
 | Verticals over 5,000 lines | 9 |

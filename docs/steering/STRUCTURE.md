@@ -438,6 +438,8 @@ The kernel is what every ring may import:
 
 It never imports `adapters/`.
 
+Only `adapters/out/` touches the outside. `domain/` and `application/` import no module that reaches a database, a folder, a process or the network. A type-only import counts. The list: `@nightshift/db`, `drizzle-orm`, `@libsql/*`, `bun:sqlite`, `node:fs`, `node:child_process`, `node:net`, `node:http*`, `node:dns*`, `yjs`, `@langchain/*` and `@hocuspocus/*`. They also use none of the globals `Bun`, `fetch` and `process`.
+
 **P3. A use case takes its ports as its first argument.** It reads no global and builds no adapter. Its other arguments fit who asks:
 
 - A request of a person: `(ports) => (actor, request)`.
@@ -462,7 +464,7 @@ export const answerGate =
 
 **P7. Every driven port has an in-memory twin and one contract suite.** Every type that `application/ports.ts` exports is a port. A data shape goes in `domain/`. A store port is narrow and belongs to one slice (`ScheduleStore`). There is never a port for the whole database. The twin sits beside the real adapter in `adapters/out/`, and the contract suite runs on both. A use-case test runs on the twins.
 
-A port that another slice or another package implements says so in the comment of its type: `/** The runs a schedule starts. @filledBy engine/run */`. The name is a package (`@filledBy devices`) or a vertical of one, on disk, and not the slice itself. Such a port has an in-memory twin and no contract suite. One file `adapters/out/in-memory-*.ts` may hold the twins of several of these ports. When the slice that fills the port is in shape, import its barrel in the use case and remove the port. The check does not ask for that.
+A port that another slice or another package implements says so in the comment of its type: `/** The runs a schedule starts. @filledBy engine/run */`. The name is a package (`@filledBy devices`) or a vertical of one, on disk, and not the slice itself. Such a port has an in-memory twin and no contract suite. One file `adapters/out/in-memory-*.ts` may hold the twins of several of these ports. When a slice of the same package fills the port and is in shape, import its barrel in the use case and remove the port. The check does not ask for that.
 
 Twins and contract suites are test code. Production code never imports them. They do not count for the size, folder and nesting rules of section 4.
 
