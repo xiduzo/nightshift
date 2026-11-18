@@ -23,7 +23,7 @@ import {
 	foldContributions,
 	type PermissionMode,
 } from "../port";
-import { reportRules } from "../session/step-report";
+import { LEARNINGS_RULE, reportRules } from "../session/step-report";
 import { reportInputSchema } from "../session/step-report-tool";
 import { fakeBin } from "../testing/fixtures/bin";
 import {
@@ -31,7 +31,6 @@ import {
 	KNOWLEDGE_TERMINAL_INSTRUCTION,
 	knowledgeBrief,
 	knowledgeEnv,
-	LEARNINGS_RULE,
 } from "./brief";
 import { knowledgeTools } from "./tools";
 

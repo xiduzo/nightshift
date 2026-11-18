@@ -74,11 +74,9 @@ rename packages/notifications targets
 # `live` of `packages/client`) composes the capabilities, so its imports of
 # them are no debt.
 
-# The step report and the tools of a session read the knowledge rules.
-imports packages/agents session knowledge
+# The `./tools` entry is the barrel of `tools`, and it passes on the
+# knowledge tools.
 imports packages/agents tools knowledge
-# The skills read the facts of a harness.
-imports packages/agents skills harnesses
 
 # The transport reads the Device rows and the Offers itself.
 imports packages/devices exchange offers

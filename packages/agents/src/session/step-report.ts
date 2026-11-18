@@ -62,6 +62,14 @@ export const REPORT_MARKER = "NIGHTSHIFT-REPORT:";
 export const MAX_LEARNINGS = 10;
 export const MAX_LEARNING_LENGTH = 500;
 
+/** One sentence of the report's instruction, only for an agent that may propose learnings. */
+export const LEARNINGS_RULE =
+	"If you learned something about this project that would help the next agent, add it to `learnings`: a list of short notes. Leave it out otherwise.";
+
+/** The report's `learnings` field, in its schema. */
+export const LEARNINGS_FIELD_DESCRIPTION =
+	"Optional. Short notes about this project that would help the next agent. Leave it out when you have none.";
+
 /** The longest text of one part of an agent's brief. */
 export const MAX_BRIEF_TEXT = 2000;
 /** The most background items an agent's brief keeps. */

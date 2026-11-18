@@ -3,8 +3,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { isCustomHarness } from "@nightshift/flows";
-import { HARNESS_FACTS } from "../harnesses";
-import type { AgentHarnessName } from "../port";
+import type { AgentHarnessName } from "../../port";
+import { HARNESS_FACTS } from "../facts-table";
 
 /** A skill the harness can run: the project's own, or one for every project on this computer. */
 export type InstalledSkill = {

@@ -8,8 +8,6 @@ export {
 	KNOWLEDGE_TERMINAL_INSTRUCTION,
 	knowledgeBrief,
 	knowledgeEnv,
-	LEARNINGS_FIELD_DESCRIPTION,
-	LEARNINGS_RULE,
 } from "./brief";
 export {
 	type KnowledgePort,

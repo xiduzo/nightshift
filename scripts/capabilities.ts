@@ -305,7 +305,10 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		decider: "agents",
 		// Is a program on this computer, which version, whose login.
 		doctor: M,
-		// One adapter and one record of facts per harness.
+		// One adapter and one record of facts per harness, and the skills
+		// each harness can run. The skills were a mechanism of their own.
+		// They read the skill folders of each harness from its facts and
+		// the plugins of Claude Code, so they are rules of a harness.
 		harnesses: "agents",
 		knowledge: "knowledge",
 		// The contract between the engine and a harness or a decider.
@@ -315,8 +318,6 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		// One harness session behind every adapter: the sandbox, the stream,
 		// the tool bridge. It runs a session and decides nothing about agents.
 		session: M,
-		// The skill files a harness can run.
-		skills: M,
 		// The MCP client and the help of a CLI program. The definitions of
 		// the tools are `settings` (the Device document of the engine).
 		tools: M,

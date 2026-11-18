@@ -210,9 +210,11 @@ set `knowledge` on the Agent node: `true` gives it always, `false` never,
 and a list of folders gives only those ([Only some folders](#only-some-folders)).
 In the editor, this is the Knowledge section on the Setup tab.
 
-One module holds all of this text: `packages/agents/src/knowledge/brief.ts`.
-The snapshot next to its test shows what each harness gets, in each mode. A
-test checks the quotes in this file against that module.
+One module holds this text: `packages/agents/src/knowledge/brief.ts`. The
+sentence about `learnings` is a part of the step report, in
+`packages/agents/src/session/step-report.ts`. The snapshot next to the test of
+the brief shows what each harness gets, in each mode. That test checks the
+quotes in this file against both modules.
 
 The agent gets one line next to its prompt, not the files:
 

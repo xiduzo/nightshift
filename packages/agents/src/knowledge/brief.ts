@@ -1,21 +1,23 @@
 /**
  * The session brief: what an agent is told about the project's knowledge,
- * all of it in one module. `brief.test.ts` shows the result on each harness.
+ * in one module. `brief.test.ts` shows the result on each harness.
  *
  * A step gets it from `knowledgeBrief`, as a `SessionContribution` that the
  * Device folds like any other. The text the others read:
  * - `tools.ts`: the tools' names, descriptions and fields. It keeps what the
  *   tools answer at a call, next to the code that decides that answer.
- * - `session/step-report-prompt.ts` and `session/step-report-tool.ts`: the
- *   rule and the field for `learnings`.
  * - the engine's `knowledge/folder.ts`: the first line of `INDEX.md`. It keeps
  *   the format of the lines under it.
  * - `nightshift mcp` in `apps/server`: its sentences about the knowledge. It
  *   keeps the rest of what that server tells an agent in a terminal.
  *
- * One text stays out, by the layer rule. `flows/assistant/guide.ts` says what
- * the `knowledge` field of a node does, and that package sits below this one.
- * It speaks to the assistant that writes a flow, not to the agent of a step.
+ * Two texts stay out:
+ * - By the layer rule: `flows/assistant/guide.ts` says what the `knowledge`
+ *   field of a node does, and that package sits below this one. It speaks to
+ *   the assistant that writes a flow, not to the agent of a step.
+ * - By the direction rule (a mechanism imports no capability): the rule and
+ *   the field description of `learnings` are words of the step report. They
+ *   sit with the field, its limit and its parse, in `session/step-report.ts`.
  */
 import { KNOWLEDGE_INDEX_FILE } from "@nightshift/flows";
 import type { BridgedTool, SessionContribution } from "../port";
@@ -91,14 +93,6 @@ export const READ_KNOWLEDGE_TOOL = {
 	} satisfies Record<string, JsonSchemaProperty>,
 	required: ["path"],
 };
-
-/** One sentence of the report's instruction, only for an agent that may propose learnings. */
-export const LEARNINGS_RULE =
-	"If you learned something about this project that would help the next agent, add it to `learnings`: a list of short notes. Leave it out otherwise.";
-
-/** The report's `learnings` field, in its schema. */
-export const LEARNINGS_FIELD_DESCRIPTION =
-	"Optional. Short notes about this project that would help the next agent. Leave it out when you have none.";
 
 /**
  * The first line of the index's text: an index without it is written again.

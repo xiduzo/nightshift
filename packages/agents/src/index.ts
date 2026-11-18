@@ -55,6 +55,8 @@ export {
 	harnessFacts,
 	harnessModels,
 	harnessViews,
+	type InstalledSkill,
+	installedSkills,
 	type OpencodeHarnessOptions,
 	opencodeHarness,
 	runPiAcp,
@@ -85,10 +87,6 @@ export {
 	type PriceUpdates,
 	startPriceUpdates,
 } from "./pricing";
-export {
-	type InstalledSkill,
-	installedSkills,
-} from "./skills";
 export {
 	type CliToolCheck,
 	checkCli,

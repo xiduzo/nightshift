@@ -3,9 +3,9 @@
  * (the tool, or a text line in plan mode), and what a step report adds to
  * a session (`stepReportSetup`). See `step-report.ts`.
  */
-import { LEARNINGS_RULE } from "../knowledge";
 import type { AgentSessionInput } from "../port";
 import {
+	LEARNINGS_RULE,
 	outcomeList,
 	REPORT_MARKER,
 	REPORT_TOOL_NAME,

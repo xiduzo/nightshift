@@ -4,10 +4,10 @@
  */
 import { outputDataProblem } from "@nightshift/flows/json-schema";
 import { toolDefinition } from "@tanstack/ai";
-import { LEARNINGS_FIELD_DESCRIPTION } from "../knowledge";
 import type { StepReportSpec } from "../port";
 import {
 	DEFAULT_RULES,
+	LEARNINGS_FIELD_DESCRIPTION,
 	MAX_BACKGROUND,
 	MAX_LEARNINGS,
 	outcomeList,
