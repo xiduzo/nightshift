@@ -1,41 +1,32 @@
 import type { Database } from "@nightshift/db";
 import type { Schedule, ScheduleIssue } from "@nightshift/flows";
-import { Refusal, wordsFor } from "@nightshift/refusal";
+import { Refusal } from "@nightshift/refusal";
 import type { StartRunInput } from "../contract";
 import type { ProjectFlows } from "../flows";
 import type { RunLog, RunTrigger } from "../log";
 import type { RunSummary } from "../read";
 import type { RunStatus } from "../run-status";
 import type { UsageNotes } from "../usage";
+import { createScheduleTicker } from "./adapters/in/schedule-ticker";
 import { drizzleScheduleLog } from "./adapters/out/drizzle-schedule-log";
-import {
-	openRunOf,
-	openRunRefusalWords,
-	openRunSkipWords,
-} from "./domain/open-run";
+import { fireDueSchedules } from "./application/fire-due-schedules";
+import { openRunOf, openRunRefusalWords } from "./domain/open-run";
 import type {
 	ScheduleHistories,
-	ScheduleHistory,
 	ScheduleRecord,
 } from "./domain/schedule-history";
 import {
-	type CronSchedule,
 	createScheduleWatch,
-	cronScheduleOf,
 	type MissedScheduleTime,
 } from "./domain/schedule-watch";
 import { scheduledStart } from "./domain/scheduled-start";
 import type { WebhookDelivery } from "./domain/webhook-delivery";
 
 /**
- * The scheduler: starts the runs of the projects' schedules when their
- * cron times come due. It lives inside the engine and ticks on an interval
- * (and once at start). Each tick reads every project's schedules again, so
- * an edit applies without a restart. The rules are in `domain/`:
- * `schedule-watch.ts` has them all, in words.
+ * The scheduler, as the engine still makes it: a facade over the tick's
+ * use case (`application/fire-due-schedules.ts`) and its ticker
+ * (`adapters/in/schedule-ticker.ts`). It goes when `wire.ts` binds them.
  */
-
-export const DEFAULT_SCHEDULE_TICK_MS = 30_000;
 
 export type SchedulerDeps = {
 	db: Database;
@@ -61,7 +52,7 @@ export type SchedulerDeps = {
 	 * fires once, and runs it there (ADR 15). Default:
 	 * every schedule fires here.
 	 */
-	firesHere?: (projectId: string, schedule: Schedule) => Promise<boolean>;
+	firesHere?: (projectId: string) => Promise<boolean>;
 	/**
 	 * A cron time was missed by more than its schedule allows, after its
 	 * `ScheduleSkipped`. Not called for a pause or for an earlier run that
@@ -110,183 +101,41 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 	const log = drizzleScheduleLog({ db: deps.db, log: deps.log });
 	/** The histories as the log gave them last. One live view: null before the first read. */
 	let histories: ScheduleHistories | null = null;
-	let running: Promise<void> | null = null;
-	let timer: ReturnType<typeof setInterval> | undefined;
-	let stopped = false;
-	/** How many holds are not released. */
-	let holds = 0;
 
 	async function refresh(): Promise<ScheduleHistories> {
 		histories = await log.histories();
 		return histories;
 	}
 
-	async function skip(
-		projectId: string,
-		scheduleId: string,
-		at: number,
-		reason: string,
-		runId: string | null = null,
-	): Promise<void> {
-		await log.skipped({ projectId, scheduleId, at, reason, runId });
-		deps.usage?.note({ kind: "schedule-skipped", reason });
-	}
-
-	async function consider(
-		projectId: string,
-		schedule: CronSchedule,
-		at: number,
-		current: ScheduleHistory | undefined,
-	): Promise<void> {
-		const decision = watch.decide(projectId, schedule, at, current);
-		if (decision.kind === "none") return;
-		const { due } = decision;
-		if (decision.kind === "missed") {
-			await skip(projectId, schedule.id, due, decision.reason);
-			try {
-				deps.missed?.(decision.missed);
-			} catch (error) {
-				console.error(
-					`[schedules] ${schedule.id}: telling of a miss failed`,
-					error,
-				);
-			}
-			return;
-		}
-
-		if (decision.kind === "paused") {
-			await skip(projectId, schedule.id, due, decision.reason);
-			return;
-		}
-
-		const open = await openRunOf(current, deps.runStatus);
-		if (open) {
-			await skip(
-				projectId,
-				schedule.id,
-				due,
-				openRunSkipWords(open),
-				open.runId,
-			);
-			return;
-		}
-
-		let runId: string | null = null;
-		let error: string | null = null;
-		try {
-			// It stops on the first stop time after now; its trigger keeps the cron time.
-			const run = await deps.startRun(
-				scheduledStart(projectId, schedule, schedule.flow, at),
-				{ kind: "schedule", scheduleId: schedule.id, at: due },
-			);
-			runId = run.id;
-		} catch (cause) {
-			// The schedule shows why in words for people. A failure goes to the log.
-			if (!(cause instanceof Refusal)) {
-				console.error(`[schedules] ${schedule.id} did not start a run`, cause);
-			}
-			error = wordsFor(cause);
-		}
-		await log.fired({
-			projectId,
-			scheduleId: schedule.id,
-			at: due,
-			runId,
-			error,
-		});
-		if (runId) deps.usage?.note({ kind: "schedule-fired" });
-	}
-
-	async function pass(): Promise<void> {
-		const read = await refresh();
-		if (holds > 0) return;
-		if (deps.enabled && !deps.enabled()) {
-			// Off counts as paused: turning it on again starts from now.
-			watch.switchedOff();
-			return;
-		}
-		const at = now();
-		watch.switchedOn(at);
-		for (const { id: projectId } of await deps.projects()) {
-			if (stopped || holds > 0) return;
-			let schedules: Schedule[];
-			try {
-				({ schedules } = await deps.flows.schedules(projectId, {
-					validate: false,
-				}));
-			} catch {
-				continue;
-			}
-			const seen = new Set<string>();
-			for (const schedule of schedules) {
-				if (stopped || holds > 0) return;
-				// A duplicate id is an issue in the UI; the first one counts.
-				if (seen.has(schedule.id)) continue;
-				seen.add(schedule.id);
-				// A webhook's schedule starts when the webhook arrives (`webhooks.ts`).
-				const cron = cronScheduleOf(schedule);
-				if (
-					cron === null ||
-					(deps.firesHere && !(await deps.firesHere(projectId, schedule)))
-				) {
-					watch.unwatch(projectId, schedule.id);
-					continue;
-				}
-				watch.watch(projectId, schedule.id, at);
-				await consider(projectId, cron, at, read.of(projectId, schedule.id));
-			}
-		}
-	}
-
-	function tick(): Promise<void> {
-		if (running) return running;
-		running = pass()
-			.catch((error) => {
-				if (!stopped)
-					console.error("[nightshift] The scheduler tick failed:", error);
-			})
-			.finally(() => {
-				running = null;
-			});
-		return running;
-	}
-
-	function stop(): void {
-		stopped = true;
-		if (timer !== undefined) clearInterval(timer);
-		timer = undefined;
-	}
+	const ticker = createScheduleTicker({
+		tickMs: deps.tickMs,
+		fire: fireDueSchedules({
+			log,
+			switch: { on: () => deps.enabled?.() ?? true },
+			clock: now,
+			projects: {
+				all: () => deps.projects(),
+				firesHere: async (projectId) =>
+					deps.firesHere ? deps.firesHere(projectId) : true,
+			},
+			store: {
+				list: (projectId, options) => deps.flows.schedules(projectId, options),
+			},
+			runs: { start: deps.startRun, status: deps.runStatus },
+			notices: { missed: (time) => deps.missed?.(time) },
+			...(deps.usage ? { usage: deps.usage } : {}),
+			watch,
+		}),
+	});
 
 	return {
-		start(signal) {
-			if (stopped || timer !== undefined) return;
-			if (signal?.aborted) {
-				stop();
-				return;
-			}
-			signal?.addEventListener("abort", stop, { once: true });
-			timer = setInterval(() => void tick(), deps.tickMs);
-			// The HTTP server keeps the daemon alive; a test may end without stopping it.
-			(timer as { unref?: () => void }).unref?.();
-			void tick();
-		},
-		stop,
-		tick,
+		start: ticker.start,
+		stop: ticker.stop,
+		tick: ticker.tick,
 		async refresh() {
 			await refresh();
 		},
-		async hold() {
-			holds++;
-			let released = false;
-			const release = () => {
-				if (released) return;
-				released = true;
-				holds--;
-				if (holds === 0 && timer !== undefined) void tick();
-			};
-			await running;
-			return release;
-		},
+		hold: ticker.hold,
 		last(projectId, scheduleId) {
 			return histories?.of(projectId, scheduleId)?.last ?? null;
 		},

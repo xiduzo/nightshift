@@ -1,5 +1,5 @@
 import { harnessFacts } from "@nightshift/agents/harness-facts";
-import { isCustomHarness, type Schedule } from "@nightshift/flows";
+import { isCustomHarness } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
 import { createArtifactStore } from "../artifacts";
 import { type AnswerCost, keepAnswerCost, listAnswerCosts } from "../assistant";
@@ -724,7 +724,7 @@ export function createEngine(
 	// or the one Device of a Space without one), so one that is always on
 	// starts them, and its runs run there (ADR 15). A webhook schedule's
 	// webhooks go to the same Replica.
-	const firesHere = async (projectId: string, _schedule: Schedule) => {
+	const firesHere = async (projectId: string) => {
 		const row = await projects.find(projectId);
 		return !(await directory.hostedElsewhere(row.spaceId));
 	};
