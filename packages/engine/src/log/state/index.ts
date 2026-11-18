@@ -2,6 +2,7 @@
 
 export { type CopyStamp, copyStamps, stampHolds } from "./copy-stamp";
 export { addCost, type CostTally, NO_COST, sessionCost } from "./cost";
+export { foldRun, nextState } from "./fold-run";
 export {
 	type Hold,
 	holdCovers,
@@ -14,9 +15,7 @@ export {
 	type DerivedSession,
 	type DerivedStep,
 	type EarlyWake,
-	foldRun,
 	type KnowledgeUseFact,
-	nextState,
 	type OpenGateFact,
 	type RunState,
 	type SleepFact,

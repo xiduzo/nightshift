@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { runEvents } from "../../testing/run-events";
-import { foldRun, nextState } from "./run-state";
+import { foldRun, nextState } from "./fold-run";
 
 /**
  * Scale of folding a run's items. The batch fold reads each item a

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { runEvents as log } from "../../testing/run-events";
-import { foldRun, nextState, type RunState } from "./run-state";
+import { foldRun, nextState } from "./fold-run";
+import type { RunState } from "./run-state";
 
 /*
  * The folded facts of the run state: its status, its end, the Gates it

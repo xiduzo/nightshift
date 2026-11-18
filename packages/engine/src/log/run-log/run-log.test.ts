@@ -14,7 +14,8 @@ import { asc, eq } from "drizzle-orm";
 import { createSandbox, type Sandbox } from "../../testing/test-support";
 import { type EventInput, type LoggedEvent, parseEventRow } from "../events";
 import { RUN_NOT_FOUND } from "../run-row/run-row";
-import { foldRun, type RunState } from "../state/run-state";
+import { foldRun } from "../state/fold-run";
+import type { RunState } from "../state/run-state";
 import { createRunLog } from "./run-log";
 
 let sandbox: Sandbox;

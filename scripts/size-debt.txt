@@ -22,7 +22,6 @@ packages/engine/src/knowledge/reconcile.ts 632
 packages/engine/src/knowledge/search-store.ts 668
 packages/engine/src/knowledge/search.ts 764
 packages/engine/src/log/events.ts 1105
-packages/engine/src/log/state/run-state.ts 1470
 packages/engine/src/projects/projects.ts 942
 packages/engine/src/projects/space-rows.ts 638
 packages/engine/src/projects/worktrees.ts 750

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { LoggedEvent } from "../events";
 import { type CopyStamp, copyStamps, stampHolds } from "./copy-stamp";
-import { foldRun } from "./run-state";
+import { foldRun } from "./fold-run";
 
 /**
  * The stamp of a copy of a step's file: which opening of the step, and
