@@ -29,7 +29,7 @@ import { OUTRUN_ERROR } from "../../branches/branches";
 import { heldOf } from "../../state/state";
 
 /**
- * Parallel branches and the Join (`branches.ts`, `nodes/join.ts`): a
+ * Parallel branches and the Join (`branches/branches.ts`, `nodes/compose/join.ts`): a
  * fan-out runs its branches in one super-step, the Join goes on once its
  * rule holds and holds each branch's data, a `first` Join stops the other
  * branches, a failing branch parks the run and a resume runs that branch

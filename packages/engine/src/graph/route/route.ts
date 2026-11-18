@@ -245,7 +245,7 @@ async function routeOn(
 	if (outrun(ctx, state, node, config)) return new Command({ update });
 	// A stop parks. The one exception: a Call node the stop time ended
 	// follows its `stopped` edge to the nodes that wrap the run up. Only a
-	// Call node passes `wrappingUp` (`hasStoppedEdge` in nodes/body.ts).
+	// Call node passes `wrappingUp` (`hasStoppedEdge` in nodes/compose/body.ts).
 	if (outcome === "stopped" && !extra?.wrappingUp) {
 		return park("stopped", null);
 	}

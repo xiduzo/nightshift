@@ -5,7 +5,7 @@
  * run asks nothing:
  *
  *   OPENJEV_LIVE_URL=http://127.0.0.1:18080 OPENJEV_LIVE_MODEL=openjev-latest \
- *     bun test src/graph/cascade-openjev.live.test.ts
+ *     bun test src/graph/nodes/decide/cascade-openjev.live.test.ts
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";

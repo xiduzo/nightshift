@@ -83,131 +83,149 @@ concerns. They live in `@nightshift/daemon` (`src/runtime/`).
 
 ```
 packages/engine/src/
-  graph/state.ts           RunState (zod): inputs, stopAt, nodes, visits,
+  graph/                   The walk, in sub-verticals. Each has an index.ts
+                           barrel. Their imports point one way.
+    state/state.ts         RunState (zod): inputs, stopAt, nodes, visits,
                            traversals, loops, pending (a wait with its
                            streak, a parked step, or an open Gate), ended.
                            Also the typed payloads that cross the graph's
                            boundary: Parked (an interrupt), ResumeValue,
                            RunEvent (custom stream chunks).
-  graph/checkpointer.ts    LibsqlSaver: BaseCheckpointSaver on db.$client.
+    checkpoints/checkpointer.ts
+                           LibsqlSaver: BaseCheckpointSaver on db.$client.
                            Tables lg_checkpoint and lg_write (drizzle schema in
                            packages/db, migration
                            20261016155422_langgraph_checkpoints). A put
                            keeps only the latest checkpoint of its
                            namespace; pruneThread also drops the
                            namespaces LangGraph never enters again.
-  graph/compile.ts         compileFlow(flow, ctx): StateGraph. START →
+    compile/compile.ts     compileFlow(flow, ctx): StateGraph. START →
                            flow.start; every flow node, made by its kind's
                            factory, plus its park node park__<id> and the
                            auxiliary nodes its kind asks for (a wait node
                            wait__<id>, or the Gate's ask node ask__<id>).
                            One loop over flow.nodes; no node type named.
                            No static edges.
-  graph/node-kinds.ts      The registry (below): NODE_KINDS, one NodeKind
+    nodes/node-kinds.ts    The registry (below): NODE_KINDS, one NodeKind
                            descriptor per node type, exported by the
                            kind's module; kindOf(node), kindOfType(type).
-                           The NodeKind interface itself is in context.ts.
+                           The NodeKind interface itself is in
+                           context/node-kind.ts.
                            Only the runner and run start import it. A
                            graph node asks ctx.kindOf(node).
-  graph/route.ts           route(): picks the edge with `nextEdge`, logs
+    route/route.ts         route(): picks the edge with `nextEdge`, logs
                            EdgeTaken and returns `new Command({ update,
                            goto })`; or ends the flow (`endsFlow` of
                            the node type, the kind's endReason); or parks
                            (parkCommand). parkNode, the node ids, scopeOf.
-  graph/context.ts         StepShared (what a step may touch, the same for
+    context/context.ts     StepShared (what a step may touch, the same for
                            every run) and StepContext (below, with kindOf:
-                           the registry, given by the engine), NodeKind
-                           (the descriptor a node module gives back, with
-                           PLAIN_KIND, the facts most kinds share), the
-                           recorders, the template context, stopAtOf.
-  graph/step-runner.ts     The step runner (below): runStep() owns the step
+                           the registry, given by the engine), the
+                           template context, stopAtOf.
+    context/node-kind.ts   NodeKind (the descriptor a node module gives
+                           back, with PLAIN_KIND, the facts most kinds
+                           share) and ResumeRules.
+    recorders/recorders.ts The transcript recorders of a run's steps.
+    step/step-runner.ts    The step runner (below): runStep() owns the step
                            lifecycle every node shares, from the resume
-                           point to route(); beginStep/OpenStep is the lower
-                           seam for the loop-shaped nodes (Subflow, Subflow with
-                           `each`, the Gate).
-  graph/stand-in.ts        The stand-in of a test run (below): a pinned or
+                           point to route(). beginStep (begin-step.ts) is
+                           the lower seam for the loop-shaped nodes (Subflow,
+                           Subflow with `each`, the Gate). It gives an
+                           OpenStep (step-handle.ts: the types of the seam).
+                           ready-device.ts makes the step's Device ready.
+                           abort.ts has the end of a step whose signal
+                           aborted.
+    compile/stand-in.ts    The stand-in of a test run (below): a pinned or
                            skipped node of the run's own flow gives its
                            output through runStep, without its work.
-  graph/run-position.ts    The run position (below): where a run is, as
+    position/run-position.ts
+                           The run position (below): where a run is, as
                            the checkpoint and the log agree. commitVisit
                            (the one writer of visits), positionOf (the held
                            step, a loop mid-way, the uncommitted step, a
                            step that is done, the next visit), the front of
                            the walk, the re-entry seeds, a stale hold.
-  graph/resume-point.ts    The one resume point (below): resumePoint()
+    step/resume-point.ts   The one resume point (below): resumePoint()
                            decides how a node re-enters (new, continue,
                            reopen, done) from the run position, per kind
                            rules (RESUME_RULES); rerunEntryOf, sessionOf.
-  graph/reentry.ts         The re-entry planner (below), the daemon side of
+    runner/reentry.ts      The re-entry planner (below), the daemon side of
                            the same question: planReentry() says what
                            RunResumed records and how the thread moves for a
                            resume, a restart or a rerun, pure; with
                            resumeTarget and reentryUpdate.
-  graph/sleep.ts           The sleep module (below): sleep() plans a wait
+    step/sleep.ts          The sleep module (below): sleep() plans a wait
                            (the policy's, or a Wait node's own) and persists
                            it; waitNode(nodeId) is the one wait node;
                            pendingWaitOf reads the pending wait (old
-                           checkpoints too); createSleeps(deps) is the
-                           daemon side: the timers, wake(runId, how),
-                           restore(runId, events).
-  graph/interrupt.ts       interruptNode(spec): the one interrupting graph
+                           checkpoints too).
+    runner/wake.ts         The daemon side of a sleep: createSleeps(deps)
+                           has the timers, wake(runId, how) and
+                           restore(runId, events). planWake and recordWake
+                           are here too.
+    route/interrupt.ts     interruptNode(spec): the one interrupting graph
                            node; the wait, park and ask nodes give it the
                            copy of pending the interrupt carries and what
                            the answer does.
-  graph/nodes/agent.ts     agent node: the body runSession; AGENT, with
-                           the Agent's requirements (CLI tools, harness).
-  graph/nodes/agent-ask.ts the ask node of an Agent that asks a person
+    nodes/agent/agent.ts   agent node: AGENT, with the Agent's requirements
+                           (requirements.ts: CLI tools, harness). Its body
+                           is runSession (session.ts). report.ts holds its
+                           outcomes and its step report.
+    nodes/agent/agent-ask.ts
+                           the ask node of an Agent that asks a person
                            (`ask`): answer reopens the step with the note,
                            stop ends it `fail`.
-  graph/gate.ts            openGate: GateOpened, the transcript and the
+    step/gate.ts           openGate: GateOpened, the transcript and the
                            bus, for a Gate and an Agent that asks.
-  graph/nodes/command.ts   command node: the body runShell; COMMAND.
-  graph/nodes/decision.ts  decision node: routes on the step; a chooser
+    nodes/do/command.ts    command node: the body runShell; COMMAND.
+    nodes/decide/decision.ts
+                           decision node: routes on the step; a chooser
                            per `by` gets the option. DECISION, whose
                            facts follow `by`.
-  graph/nodes/choosers/    chooser.ts (the Chooser seam and the outputs
+    nodes/decide/choosers/ chooser.ts (the Chooser seam and the outputs
                            every chooser shares), person.ts (the Gate: the
                            node opens it, its ask node interrupts),
                            rule.ts (JSONata rules),
                            model.ts (the decider).
-  graph/nodes/call.ts      the Subflow node: runs its flow once, or hands
+    nodes/compose/call.ts  the Subflow node: runs its flow once, or hands
                            over to call-each.ts; CALL, whose facts follow
                            `each`.
-  graph/nodes/call-each.ts the per-element loop of a Subflow with `each`
+    nodes/compose/call-each.ts
+                           the per-element loop of a Subflow with `each`
                            (one element per super-step)
-  graph/nodes/body.ts      What a Subflow does once and per element: bodyGraph,
+    nodes/compose/body.ts  What a Subflow does once and per element: bodyGraph,
                            runBody (a called flow as a subgraph of the node),
                            BodyEnd (how the body ended) and hasStoppedEdge.
-  graph/nodes/value.ts     value node, the Decision's twin: routes on the
+    nodes/shape/value.ts   value node, the Decision's twin: routes on the
                            step; a producer per `by` makes the data, which
                            is checked against the output schema. VALUE.
-  graph/nodes/producers/   producer.ts (the Producer seam and the ends of a
+    nodes/shape/producers/ producer.ts (the Producer seam and the ends of a
                            step every producer shares), rule.ts (one
                            JSONata expression), model.ts (the decider's
                            text adapter, `chat()` with the schema; waits
                            like a model Decision).
-  graph/nodes/wait.ts      Wait node: works out the wake time (a duration,
+    nodes/hold/wait.ts     Wait node: works out the wake time (a duration,
                            a time, a command poll, a signal) and asks the
                            sleep module to sleep; a wake ends it done or
                            timeout, or sleeps again. WAIT.
-  graph/nodes/tool.ts      tool node: one tools/call on a Connection's MCP
+    nodes/do/tool.ts       tool node: one tools/call on a Connection's MCP
                            server through the step's Device
                            (Device.callTool), the Connection resolved as
                            for an Agent node. No wait node: a transport
                            failure is `fail`. TOOL.
-  graph/each.ts            the pure parts of a Subflow with `each`: list items
+    data/each.ts           the pure parts of a Subflow with `each`: list items
                            from a source, item facts, the step's outputs
-  graph/inputs.ts          a flow's input values, a Subflow's bindings, outputs
-  graph/output-schema.ts   the output schema check (ajv)
-  graph/policy.ts          the run policy's wait plan (planWait), pure
-  graph/consume.ts         reads a harness stream, gives up after a grace
-  graph/open-work.ts       Open work that is cut short (below): openWork
+    data/inputs.ts         a flow's input values, a Subflow's bindings, outputs
+    data/output-schema.ts  the output schema check (ajv)
+    policy/policy.ts       the run policy's wait plan (planWait), pure
+    nodes/agent/consume.ts reads a harness stream, gives up after a grace
+    runner/open-work.ts    Open work that is cut short (below): openWork
                            (what a stop, a missed deadline or a daemon
                            death ends), closingEvents (the pure list of
                            SessionEnded, StepEnded and RunEnded events,
                            inside out, with each kind's cutShortOutputs)
                            and closeOpenWork (appends them, tells the bus).
-  graph/thread.ts          One Run's Thread: openThread() builds the one
+    runner/thread.ts       One Run's Thread: openThread() builds the one
                            StepContext from StepShared and the run's own,
                            the fenced log and checkpoint saver, and
                            compiles the flow; driveGraph() is the one
@@ -215,7 +233,7 @@ packages/engine/src/
                            limit); endingOf() says what RunEnded a drive's
                            outcome asks for; inputOf() builds the LangGraph
                            input of a start, continue, resume or jump.
-  graph/runner.ts          Per-run driver behind one entry: take(runId,
+    runner/runner.ts       Per-run driver behind one entry: take(runId,
                            intent) is a Turn (start, answer, wake, resume,
                            restart, rerun, stop, overdue) and hold(runId,
                            fn) a Turn that drives nothing. It owns the
@@ -294,7 +312,7 @@ packages/engine/src/
                            listGates, runStatus and watch.
                            Reads only.
   log/events.ts            Unchanged payloads, append and parse.
-  read/derive-*.ts         The derivations for the read model and the walk.
+  read/run-views.ts        The derivations for the read model and the walk.
                            Derivations only the old walk used are deleted.
 ```
 
@@ -358,7 +376,7 @@ packages/engine/src/
    resume past it writes it null. A body reads its caller's stop time
    through `configurable.stopAt`. Every invoke sets it, because a resume's
    update reaches the root namespace only.
-8. **Waits.** One module owns every wait (`graph/sleep.ts`, below).
+8. **Waits.** One module owns every wait (`graph/step/sleep.ts`, below).
    1. A body that hits a usage limit or loses the network returns a wait
       request.
    2. The step runner gives it to `sleep()`. `sleep()` plans the wait
@@ -377,7 +395,7 @@ packages/engine/src/
    7. The Agent node re-enters with `pending` and continues the session.
 
    A Wait node sleeps the same way with its own `until`
-   (`graph/nodes/wait.ts`, below). Its body returns `{ kind: "sleep" }`
+   (`graph/nodes/hold/wait.ts`, below). Its body returns `{ kind: "sleep" }`
    with the time and its deadline. Its five kinds are `WaitReason`s next to
    the policy's two. A wait with no time (a signal with no timeout) has
    `until: null` and no timer. A signal is
@@ -456,7 +474,7 @@ packages/engine/src/
 
 Decisions taken during the build, from the code and its comments:
 
-- **A body failure does not park the run** (`graph/nodes/body.ts`). A body
+- **A body failure does not park the run** (`graph/nodes/compose/body.ts`). A body
   step that fails inside a Subflow parks the *body's* thread namespace
   (rule 2). But `runBody` swallows that interrupt. The Subflow step ends
   `fail`, or the element ends `ItemEnded failed` and the items that depend
@@ -466,7 +484,7 @@ Decisions taken during the build, from the code and its comments:
   step-cap abort, or a wait or Gate inside the body rethrows the
   interrupt. So those park or pause the run at any depth.
 - **Decision and Gate are one node, with the chooser behind a seam**
-  (`graph/nodes/decision.ts`). The node routes on its step's end. `node.by`
+  (`graph/nodes/decide/decision.ts`). The node routes on its step's end. `node.by`
   sets who gets the option: `choosers/person.ts` (the Gate),
   `choosers/rule.ts` (JSONata rules) or `choosers/model.ts` (the decider).
   Every chooser ends its step with `{ outcome, note, visit }`. The option
@@ -505,7 +523,7 @@ Decisions taken during the build, from the code and its comments:
   `error`. A parked or interrupted model Decision step starts a new visit:
   it has no session to reopen.
 - **A Value node is a Decision with data instead of a label**
-  (`graph/nodes/value.ts`, `producers/`). The node routes on its step's
+  (`graph/nodes/shape/value.ts`, `producers/`). The node routes on its step's
   end. `node.by` picks the producer:
   - `producers/rule.ts` evaluates one JSONata expression (pure, no wait
     node).
@@ -515,13 +533,13 @@ Decisions taken during the build, from the code and its comments:
     `wait__<id>`).
 
   Both end the step through one place (`endWithValue`). It checks the data
-  against the output schema with ajv (`graph/output-schema.ts`). The step
+  against the output schema with ajv (`graph/data/output-schema.ts`). The step
   ends `pass` with the data, or `fail` with why in `note`. A schema that
   does not compile, or no decider, ends `error`. Only a decider with a text
   adapter can make a value (`valueDeciderNameSchema` in flows,
   `DECIDER_ADAPTERS[name].value` in agents). TypeSafe and Ollaya are
   evaluate adapters only.
-- **A Wait node is a step that is all wait** (`graph/nodes/wait.ts`,
+- **A Wait node is a step that is all wait** (`graph/nodes/hold/wait.ts`,
   2026-10-17). It sleeps through the sleep module as the Agent node does.
   Its pending wait has `session: null`: the step continues nothing.
   - The streak's `since` is when the wait started. The deadline
@@ -565,7 +583,7 @@ Decisions taken during the build, from the code and its comments:
   keeps one open step to end, and the read model shows the step's real
   outcome and cost. This is the resume point's one rule for an existing
   step (below).
-- **Recovery ends work as a stop does** (`graph/open-work.ts`, 2026-10-22).
+- **Recovery ends work as a stop does** (`graph/runner/open-work.ts`, 2026-10-22).
   Rules 3 and 12 kept recovery's own `StepEnded` events: the raw outputs,
   outside in. Now every cut (a stop, a missed deadline, a daemon death)
   appends the events `closingEvents` gives. Two things changed for an
@@ -592,7 +610,7 @@ Decisions taken during the build, from the code and its comments:
   run no longer waits when the caller looks again. A full run cap leaves
   the Gate open.
 
-## The run position (`graph/run-position.ts`)
+## The run position (`graph/position/run-position.ts`)
 
 One rule keeps the checkpoint and the event log in agreement. The
 checkpoint counts the visits of each node it committed (`visits`). The log
@@ -616,7 +634,7 @@ re-entry left uncommitted on purpose. One module owns this rule (since
 - `holdEnded`: a held wait or Gate whose step a stop ended in the log.
 
 The log is at most one super-step ahead of the checkpoint. A crash test
-at every write of one flow (`graph/crash.test.ts`) found four places where
+at every write of one flow (`graph/runner/crash.test.ts`) found four places where
 the two did not agree. Before each log append, row and checkpoint write,
 the test kills the daemon, or a person stops the run. Each place is now a
 rule of the run position:
@@ -653,9 +671,9 @@ rule of the run position:
 The checkpoint is still the walk's, and the log is still the read model
 (ADR "The walk reads the checkpoint; the event log is the read model").
 The run position is the one place that compares the two.
-`graph/run-position.test.ts` holds the rule as tables.
+`graph/position/run-position.test.ts` holds the rule as tables.
 
-## Fan-out and join (`graph/branches.ts`, `graph/nodes/join.ts`)
+## Fan-out and join (`graph/branches/branches.ts`, `graph/nodes/compose/join.ts`)
 
 Built 2026-10-26 (node review, `docs/research/node-review-2026-10.md`
 §5.1). The flow file uses plain edges. Two or more edges without a `max`
@@ -730,7 +748,7 @@ answer goes to its own step. An Agent's ask closes in the log when its
 step reopens, in the super-step after the answer. So while another
 branch still waits, the answered ask looks open.
 
-## The resume point (`graph/resume-point.ts`)
+## The resume point (`graph/step/resume-point.ts`)
 
 One module answers one question for every node: how does the node
 re-enter after a park, a wake, a resume or a daemon death? It is a deep
@@ -779,10 +797,10 @@ all `ResumeRules` lets them say (`RESUME_RULES`):
 | Wait | `new` | `new` |
 | Command, Tool, Decision or Value by a rule (`fresh`) | `new` | `new` |
 
-`graph/resume-point.test.ts` holds the rule as a table: one situation,
+`graph/step/resume-point.test.ts` holds the rule as a table: one situation,
 every kind.
 
-## The re-entry planner (`graph/reentry.ts`)
+## The re-entry planner (`graph/runner/reentry.ts`)
 
 This is the daemon side of the same question. A person or the daemon asks
 a run that is not going to resume, to restart its running step, or to run
@@ -815,14 +833,16 @@ The run position says where the run is: `reenteredNode` (the last
 top-level step the walk did not move on from), `takeBackVisit` (a finished
 run's last visit) and `loggedVisits` (a rerun's visits). One call gives
 both the payload and the entry. So the engine promises in `RunResumed`
-what the node finds when it re-enters. `graph/reentry.test.ts` holds the
+what the node finds when it re-enters. `graph/runner/reentry.test.ts` holds the
 plans as a table. Its promise rows apply each plan and ask the resume
 point (`resumePoint`, `rerunEntryOf`) what the node then does.
 
-## The step runner (`graph/step-runner.ts`)
+## The step runner (`graph/step/step-runner.ts`)
 
 One module runs one visit of every step node: `runStep(ctx, node, state,
-config, spec)`. It is a deep module behind a small interface. The node
+config, spec)`. It is a deep module behind a small interface. It is five
+files of `graph/step/`: `step-runner.ts`, `begin-step.ts`, `ready-device.ts`,
+`abort.ts` and the types of its seam in `step-handle.ts`. The node
 gives a `StepSpec`: its resume rules (`RESUME_RULES`), its body, and the
 outputs of a step that ends before the body spoke. The runner does the
 rest, in this order:
@@ -855,7 +875,7 @@ The `StepHandle` holds what a body reads and records: `stepId`, `visit`,
 `session()`. `session()` records a harness session: the `agent_session`
 row, `SessionStarted`, `HarnessSessionAssigned`, `SessionEnded`. No node
 module writes a database row. A row and the event that names it are one
-write of the drive (`StepContext.write`, `graph/fence.ts`). A stop lands
+write of the drive (`StepContext.write`, `graph/checkpoints/fence.ts`). A stop lands
 before both or after both. So it never leaves a `step` or
 `agent_session` row without its event.
 
@@ -872,11 +892,11 @@ spans many super-steps, or ends in another graph node. They open and close
 the step through the lower seam in the same module: `beginStep` and
 `OpenStep` (`end()`, `leaveOpen()`, `opened`).
 
-The log is written exactly as before (rule 3). `graph/step-runner.test.ts`
+The log is written exactly as before (rule 3). `graph/step/step-runner.test.ts`
 holds the lifecycle as a table: a new or a continued entry, crossed with
 what the run and the body do.
 
-### The stand-in of a test run (`graph/stand-in.ts`, ADR 27)
+### The stand-in of a test run (`graph/compile/stand-in.ts`, ADR 27)
 
 A test run pins or skips nodes of the run's own flow
 (`RunStarted.test`). `compile.ts` wraps each node of the root graph that
@@ -912,7 +932,7 @@ first, and sends them as refs on `sync.startTest`. The Host resolves them
 again from its own log. A pin whose run has not reached the Host yet says
 to try again in a moment.
 
-## The sleep module (`graph/sleep.ts`)
+## The sleep module (`graph/step/sleep.ts`, `graph/runner/wake.ts`)
 
 One module owns a sleep, from the step that asks for it to the step that
 continues after it. It is a deep module behind two small interfaces: one
@@ -930,7 +950,7 @@ The module:
 
 1. Finds the streak. It takes the pending wait's streak when the step
    continues after a wait for the same reason, else a new one.
-2. Plans the wait. A policy wait goes through `planWait` (`graph/policy.ts`,
+2. Plans the wait. A policy wait goes through `planWait` (`graph/policy/policy.ts`,
    pure). The module refuses it when it would pass the stop time
    (`stop-time`) or spend the network grace (`give-up`). An own wait is
    cut to its deadline.
@@ -947,7 +967,8 @@ with the sleep and answers three things:
 - a `resume`: the run was stopped while it slept. The step is parked as
   stopped, and the node reopens or restarts it.
 
-The daemon side is the runner's wake Turn over three parts of this module:
+The daemon side is the runner's wake Turn over the three parts of
+`graph/runner/wake.ts`:
 
 - `planWake(events, threadState, how, now)` (pure) checks that the run
   still sleeps in the log, and that the wait is the interrupt the thread
@@ -972,19 +993,19 @@ follow-up prompt. It is null for a Wait node. A checkpoint written before
 2026-10-19 holds the continuation flat (`harnessSessionId`, `prompt`, and
 a `resetAt` nobody read). `pendingWaitOf` is the one reader of a pending
 wait, and it reads both shapes. A run that slept across the upgrade
-continues, and its next wake writes today's shape. `graph/sleep.test.ts`
+continues, and its next wake writes today's shape. `graph/step/sleep.test.ts`
 runs plan, persist, interrupt and wake for both kinds of wait. It covers
 the timer, a signal, an early resume, the stop time, a full run cap, and
 a new daemon's restore.
 
 The three interrupting graph nodes share one skeleton
-(`graph/interrupt.ts`, `interruptNode`). It checks that `pending` is this
+(`graph/route/interrupt.ts`, `interruptNode`). It checks that `pending` is this
 node's, interrupts with a copy of it, and jumps back on the answer. The
 wait node, the park node and the Gate's ask node give it only the copy
 the interrupt carries and what the answer does. The interrupt payloads
 (`Parked`) did not change.
 
-## What a run holds (`graph/holds.ts`, `log/state/holds.ts`, `leases/`, `services/`)
+## What a run holds (`graph/runner/holds.ts`, `log/state/holds.ts`, `leases/`, `services/`)
 
 A run can hold something for a scope: a lease (ADR 7) or a service
 (ADR 9). The scope is the run, or a Section of the flow the node is in.
@@ -1028,13 +1049,13 @@ The engine, not the flow, lets go of it.
   places a working step of a service's scope on another Device
   (`run/service-devices.ts`).
 
-## The node-kind descriptor (`graph/node-kinds.ts`)
+## The node-kind descriptor (`graph/nodes/node-kinds.ts`)
 
 One module per node kind says what the engine must know about that kind.
 Each node module exports one `NodeKind<N>` next to its factory (`AGENT`,
 `COMMAND`, `TOOL`, `DECISION`, `VALUE`, `WAIT`, `CALL`, `LEASE`, `SERVICE`). `NODE_KINDS` lists
 them by type. `kindOf(node)` or `kindOfType(type)` gives a caller the
-descriptor. The interface is in `context.ts`, next to `StepContext`: what
+descriptor. The interface is in `context/node-kind.ts`, beside `StepContext`: what
 a node factory gets, and what a node module gives back. `PLAIN_KIND` holds
 the facts most kinds share. A kind spreads it and overrides what differs.
 
@@ -1051,7 +1072,7 @@ module. Now the engine asks the descriptor:
 | `endReason(node, outcome)` | `route()` | `finishedReason` in route.ts |
 | `logsCommandOutput(node)` | `beginStep` | the three-kind `logPath` rule |
 | `timeBudget(node)` | `beginStep`, `abortEnd` | the Gate and Wait timeout rule, the Agent idle rule |
-| `cutShortOutputs(open, node, outcome)` | `closingEvents` (`graph/open-work.ts`) | the `nodeType` ternary of the stop, and recovery's raw outputs |
+| `cutShortOutputs(open, node, outcome)` | `closingEvents` (`graph/runner/open-work.ts`) | the `nodeType` ternary of the stop, and recovery's raw outputs |
 | `connections(node)` | `placement/fit.ts` `connectionsExist` | the Agent-or-Tool branch |
 | `requirements` | `placement/fit.ts` `REQUIREMENTS` | the per-kind requirement functions |
 
@@ -1085,26 +1106,27 @@ imports the registry. The runner puts `kindOf` on the `StepContext`. So
 own (`choosers/chooser.ts`, `producers/producer.ts`). So a chooser does
 not import the Decision node that picks it. `graph/` has no import cycle,
 and Biome's `noImportCycles` also holds it there.
-`graph/node-kinds.test.ts` holds every fact for every kind as a table.
+`graph/nodes/node-kinds.test.ts` holds every fact for every kind as a table.
 
 ### How to add a node kind
 
-1. In `packages/flows/src/nodes/<kind>.ts`, write the node schema, its
-   checks and its output fields. Add it to the `flowNodeSchema` union and
-   the per-type switches in `packages/flows/src/flow/`. Add its check to
+1. In `packages/flows/src/nodes/<family>/<kind>.ts`, write the node schema, its
+   checks and its output fields. Add it to the `flowNodeSchema` union
+   (`packages/flows/src/flow/schema/flow.ts`) and to `NODE_DEFINITIONS`
+   (`packages/flows/src/flow/node/node.ts`). Add its check to
    `packages/flows/src/validate/nodes.ts`. When old flows must migrate,
    bump the flow version.
-2. In `packages/engine/src/graph/nodes/<kind>.ts`, write the factory and
+2. In `packages/engine/src/graph/nodes/<family>/<kind>.ts`, write the factory and
    the descriptor. The factory is `runStep` with a body, or the lower seam
    `beginStep` for a loop-shaped node. The descriptor is
    `{ ...PLAIN_KIND, type, make, resumeRules, ... }`, and overrides only
    the facts that differ. A new way to re-enter is a new `RESUME_RULES`
-   entry in `resume-point.ts`.
-3. In `packages/engine/src/graph/node-kinds.ts`, add one entry in
+   entry in `graph/step/resume-point.ts`.
+3. In `packages/engine/src/graph/nodes/node-kinds.ts`, add one entry in
    `NODE_KINDS`. The type of the registry refuses a missing kind.
 4. In `packages/engine/src/log/transcript/step-events.ts`, add the kind's transcript
    events, when it records any.
-5. In `packages/engine/src/graph/node-kinds.test.ts`, add the kind's row
+5. In `packages/engine/src/graph/nodes/node-kinds.test.ts`, add the kind's row
    in every table. Add a node test next to the others
    (`<kind>-node.test.ts`), shaped as the next section says.
 6. In `apps/web`, add the `NODE_TYPE` record, the inspector form and the
@@ -1116,8 +1138,8 @@ and Biome's `noImportCycles` also holds it there.
 ## Test shape
 
 The interface is the test surface. Test a shared rule once, at the module
-that owns it. `graph/step-runner.test.ts`, `graph/sleep.test.ts`,
-`graph/resume-point.test.ts` and `graph/node-kinds.test.ts` hold the
+that owns it. `graph/step/step-runner.test.ts`, `graph/step/sleep.test.ts`,
+`graph/step/resume-point.test.ts` and `graph/nodes/node-kinds.test.ts` hold the
 shared rules as tables: the entry checks, the stop time, the step cap,
 the time budget, an abort, a wait and its wake, and how every kind
 re-enters.
