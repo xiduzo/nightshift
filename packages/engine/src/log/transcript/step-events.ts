@@ -1,7 +1,7 @@
 import type { AgentEvent } from "@nightshift/agents/types";
 import type { ItemState, JsonValue } from "@nightshift/flows";
-import type { RunResult } from "../run-status";
-import type { GateChoice, GateDeadline } from "./events";
+import type { RunResult } from "../../run-status";
+import type { GateChoice, GateDeadline } from "../events";
 
 /**
  * What a step writes to its transcript, one entry per line, by step type.

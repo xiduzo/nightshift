@@ -23,7 +23,7 @@ import {
 	defaultRunSettings,
 	type RunSettings,
 } from "../device-config/settings";
-import { createRunLog, type RunLog } from "../log/run-log";
+import { createRunLog, type RunLog } from "../log/run-log/run-log";
 import type { RunDetail } from "../read/views";
 import {
 	createSandbox,

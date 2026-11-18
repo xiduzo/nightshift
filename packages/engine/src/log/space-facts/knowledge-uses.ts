@@ -2,7 +2,7 @@ import type { Database } from "@nightshift/db";
 import { event } from "@nightshift/db/schema";
 import { asDate } from "@nightshift/time";
 import { and, desc, gte, inArray, sql } from "drizzle-orm";
-import { parseEventRow } from "./events";
+import { parseEventRow } from "../events";
 
 /**
  * The knowledge events of a project, newest first, at most `limit`. A use

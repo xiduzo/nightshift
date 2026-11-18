@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { DecisionNode, Flow } from "@nightshift/flows";
 import { hourOf, parseInstant } from "@nightshift/time";
 import { foldRun } from "../../../log";
-import { getRunRow } from "../../../log/run-row";
-import { readTranscriptFile } from "../../../log/transcripts";
+import { getRunRow } from "../../../log/run-row/run-row";
+import { readTranscriptFile } from "../../../log/transcript/transcripts";
 import { deriveSteps } from "../../../read/run-views";
 import {
 	command,

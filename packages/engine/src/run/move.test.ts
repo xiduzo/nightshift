@@ -14,12 +14,12 @@ import { iso, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import type { WalkFile, WalkRef } from "../archive";
 import type { OwnDevice } from "../contract";
-import { createRunLog } from "../log/run-log";
+import { createRunLog } from "../log/run-log/run-log";
 import {
 	parseTranscript,
 	readTranscriptFile,
 	transcriptPath,
-} from "../log/transcripts";
+} from "../log/transcript/transcripts";
 import { alonePeers } from "../testing/alone-peers";
 import { seedFlows } from "../testing/seed-flows";
 import {

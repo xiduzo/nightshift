@@ -9,7 +9,7 @@ import {
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import type { LoggedEvent } from "./events";
+import type { LoggedEvent } from "../events";
 
 /**
  * The run's row: what a run is beside its event log (its project, flow

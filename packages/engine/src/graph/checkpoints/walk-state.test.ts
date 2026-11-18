@@ -8,8 +8,8 @@ import { FLOW_VERSION } from "@nightshift/flows";
 import { asc, eq } from "drizzle-orm";
 import type { WalkFile } from "../../archive";
 import { createRunHistory, ForeignRowsError } from "../../log";
-import { createRunBus } from "../../log/bus";
-import { createRunLog } from "../../log/run-log";
+import { createRunLog } from "../../log/run-log/run-log";
+import { createRunBus } from "../../log/transcript/bus";
 import { createEngine, type PeerContext, type SpaceEngine } from "../../run";
 
 import { alonePeers } from "../../testing/alone-peers";

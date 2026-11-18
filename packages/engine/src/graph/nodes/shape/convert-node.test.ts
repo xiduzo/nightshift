@@ -5,7 +5,7 @@ import {
 	valuePreset,
 } from "@nightshift/flows";
 import { foldRun } from "../../../log";
-import { readTranscriptFile } from "../../../log/transcripts";
+import { readTranscriptFile } from "../../../log/transcript/transcripts";
 import { deriveSteps } from "../../../read/run-views";
 import {
 	command,

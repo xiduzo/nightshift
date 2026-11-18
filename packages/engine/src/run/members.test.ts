@@ -5,7 +5,7 @@ import type { Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { and, eq, isNull } from "drizzle-orm";
 import { parseEventRow } from "../log/events";
-import { createRunLog, type RunLog } from "../log/run-log";
+import { createRunLog, type RunLog } from "../log/run-log/run-log";
 import {
 	createSpaceDocuments,
 	type SpaceDocuments,

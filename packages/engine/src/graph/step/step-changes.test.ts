@@ -6,7 +6,7 @@ import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import type { JoinNode } from "@nightshift/flows";
 import { foldRun, type StepEvent, type WorktreeChanges } from "../../log";
 
-import { readTranscriptFile } from "../../log/transcripts";
+import { readTranscriptFile } from "../../log/transcript/transcripts";
 import { deriveSteps } from "../../read";
 import {
 	agent,

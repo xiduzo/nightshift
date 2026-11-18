@@ -9,7 +9,7 @@ import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { defaultRunSettings } from "../device-config/settings";
 import { parseEventRow } from "../log/events";
-import type { WorktreeRemoval } from "../log/worktree-removals";
+import type { WorktreeRemoval } from "../log/space-facts/worktree-removals";
 import { createEngine, type EngineInternals } from "../run/engine";
 import type { SpaceEngine } from "../run/space-engine";
 import {

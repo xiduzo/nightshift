@@ -20,7 +20,7 @@ import { now } from "@nightshift/time";
 import { defaultRunSettings } from "../../../device-config/settings";
 import { type DerivedStep, foldRun } from "../../../log";
 
-import { readTranscriptFile } from "../../../log/transcripts";
+import { readTranscriptFile } from "../../../log/transcript/transcripts";
 import { itemBranchName } from "../../../projects/worktrees";
 import { deriveSteps } from "../../../read/run-views";
 import {

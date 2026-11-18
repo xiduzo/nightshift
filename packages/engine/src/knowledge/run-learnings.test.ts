@@ -10,7 +10,7 @@ import {
 	type FlowEdge,
 	PROPOSED_LEARNINGS_DIR,
 } from "@nightshift/flows";
-import { createRunLog, type RunLog } from "../log/run-log";
+import { createRunLog, type RunLog } from "../log/run-log/run-log";
 import { transcriptLines } from "../read/transcript-lines";
 import { createEngine, type Engine } from "../run/engine";
 import { testKnowledge } from "../testing/knowledge";

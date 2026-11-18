@@ -984,7 +984,7 @@ wait node, the park node and the Gate's ask node give it only the copy
 the interrupt carries and what the answer does. The interrupt payloads
 (`Parked`) did not change.
 
-## What a run holds (`graph/holds.ts`, `log/holds.ts`, `leases/`, `services/`)
+## What a run holds (`graph/holds.ts`, `log/state/holds.ts`, `leases/`, `services/`)
 
 A run can hold something for a scope: a lease (ADR 7) or a service
 (ADR 9). The scope is the run, or a Section of the flow the node is in.
@@ -1069,7 +1069,7 @@ These are not on the descriptor, on purpose:
 
 - the zod union in `packages/flows` and the web's `NODE_TYPE` record
   (inherent, outside this package)
-- the transcript-event unions in `log/step-events.ts` (typed data, no
+- the transcript-event unions in `log/transcript/step-events.ts` (typed data, no
   switch asks them)
 - the `WaitReason` enum in `state.ts` (a Wait node's `until` kinds and the
   policy's reasons, not node kinds)
@@ -1102,7 +1102,7 @@ and Biome's `noImportCycles` also holds it there.
    entry in `resume-point.ts`.
 3. In `packages/engine/src/graph/node-kinds.ts`, add one entry in
    `NODE_KINDS`. The type of the registry refuses a missing kind.
-4. In `packages/engine/src/log/step-events.ts`, add the kind's transcript
+4. In `packages/engine/src/log/transcript/step-events.ts`, add the kind's transcript
    events, when it records any.
 5. In `packages/engine/src/graph/node-kinds.test.ts`, add the kind's row
    in every table. Add a node test next to the others
@@ -1165,7 +1165,7 @@ type StepContext = StepShared & {
 
 A node factory is `(node, ctx) => (state, config) => Promise<Command>`.
 No member is the database or a folder on disk. The log writes the rows an
-event implies with the event (`log/event-rows.ts`): the `step` row of
+event implies with the event (`log/run-log/event-rows.ts`): the `step` row of
 `StepStarted`, the `agent_session` row of `SessionStarted`, its harness id,
 the kept values of `StepEnded`. A body touches a computer only through
 `step.device` (`device/types.ts`): sessions, commands, tool calls, the

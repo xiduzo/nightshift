@@ -9,7 +9,7 @@ import type { AgentSessionInput } from "@nightshift/agents/types";
 import type { WaitNode } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
 import { foldRun } from "../../log";
-import { readTranscriptFile } from "../../log/transcripts";
+import { readTranscriptFile } from "../../log/transcript/transcripts";
 import { deriveSteps } from "../../read/run-views";
 import {
 	agent,

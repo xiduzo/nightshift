@@ -1,7 +1,7 @@
 import type { Database } from "@nightshift/db";
 import { event } from "@nightshift/db/schema";
 import { and, asc, eq, sql } from "drizzle-orm";
-import { type LoggedEvent, parseEventRow } from "./events";
+import { type LoggedEvent, parseEventRow } from "../events";
 
 /** A `WorktreeRemoved` as logged. */
 export type WorktreeRemoval = Extract<LoggedEvent, { type: "WorktreeRemoved" }>;

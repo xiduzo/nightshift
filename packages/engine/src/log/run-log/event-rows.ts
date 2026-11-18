@@ -2,14 +2,14 @@ import type { Database } from "@nightshift/db";
 import { agentSession, run, step } from "@nightshift/db/schema";
 import { eq, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
-import { saveMemoryOfStep } from "../memory";
-import { saveKeptOfStep } from "../variables";
+import { saveMemoryOfStep } from "../../memory";
+import { saveKeptOfStep } from "../../variables";
 import type {
 	EngineEventType,
 	EnginePayloads,
 	EventInput,
 	EventWrites,
-} from "./events";
+} from "../events";
 
 /**
  * The rows an event of this Walker implies, written in the batch of its

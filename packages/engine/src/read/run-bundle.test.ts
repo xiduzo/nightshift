@@ -10,7 +10,7 @@ import { FLOW_VERSION } from "@nightshift/flows";
 import { asc, eq, sql } from "drizzle-orm";
 import { foldRun } from "../log";
 import { parseEventRow } from "../log/events";
-import { readRunTranscript } from "../log/transcripts";
+import { readRunTranscript } from "../log/transcript/transcripts";
 import { createEngine } from "../run/engine";
 import {
 	createSandbox,

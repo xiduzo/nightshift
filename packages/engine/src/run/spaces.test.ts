@@ -13,7 +13,7 @@ import {
 import type { DecisionNode, Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
-import { createRunLog, type RunLog } from "../log/run-log";
+import { createRunLog, type RunLog } from "../log/run-log/run-log";
 import {
 	createSpaceDocuments,
 	type SpaceDocuments,

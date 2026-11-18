@@ -1,5 +1,9 @@
-import type { HoldSection, Scope, ServiceSpec } from "./events";
-import { scopeKey } from "./events";
+import {
+	type HoldSection,
+	type Scope,
+	type ServiceSpec,
+	scopeKey,
+} from "../events";
 
 /**
  * What a run holds for a scope, as its log says: a lease (ADR 7) or a

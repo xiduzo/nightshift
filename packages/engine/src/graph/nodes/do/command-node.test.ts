@@ -7,7 +7,7 @@ import { step } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 import { createArtifactStore } from "../../../artifacts/store";
 import { foldRun } from "../../../log";
-import { readTranscriptFile } from "../../../log/transcripts";
+import { readTranscriptFile } from "../../../log/transcript/transcripts";
 import { deriveSteps } from "../../../read/run-views";
 import {
 	drive,

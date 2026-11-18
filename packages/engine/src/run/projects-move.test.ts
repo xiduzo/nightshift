@@ -18,7 +18,7 @@ import type { DecisionNode, Flow, Schedule } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { and, eq, inArray } from "drizzle-orm";
-import { createRunLog, type RunLog } from "../log/run-log";
+import { createRunLog, type RunLog } from "../log/run-log/run-log";
 import {
 	createSpaceDocuments,
 	recordClone,

@@ -11,7 +11,7 @@ import { Command } from "@langchain/langgraph";
 import type { WaitNode, WebRequestNode } from "@nightshift/flows";
 import { utc } from "@nightshift/time/testing";
 import { foldRun } from "../../../log";
-import { readTranscriptFile } from "../../../log/transcripts";
+import { readTranscriptFile } from "../../../log/transcript/transcripts";
 import { deriveSteps } from "../../../read/run-views";
 import {
 	command,

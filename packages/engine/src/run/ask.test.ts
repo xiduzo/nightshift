@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fakeHarness } from "@nightshift/agents/testing";
 import type { CommandNode, Flow, FlowEdge, ValueNode } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
-import { createRunLog, type RunLog } from "../log/run-log";
+import { createRunLog, type RunLog } from "../log/run-log/run-log";
 import {
 	createSandbox,
 	expectRunLogsInSync,

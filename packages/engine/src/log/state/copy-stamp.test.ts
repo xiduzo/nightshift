@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import type { LoggedEvent } from "../events";
 import { type CopyStamp, copyStamps, stampHolds } from "./copy-stamp";
-import type { LoggedEvent } from "./events";
 import { foldRun } from "./run-state";
 
 /**

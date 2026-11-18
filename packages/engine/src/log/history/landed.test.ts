@@ -8,14 +8,18 @@ import {
 	otherSpace,
 	type Sandbox,
 	waitFor,
-} from "../testing/test-support";
-import type { EventInput } from "./events";
+} from "../../testing/test-support";
+import type { EventInput } from "../events";
+import {
+	createRunLog,
+	type ForeignEvent,
+	type RunLog,
+} from "../run-log/run-log";
 import {
 	createLandedFeed,
 	type LandedFeed,
 	type LandedRunEvent,
 } from "./landed";
-import { createRunLog, type ForeignEvent, type RunLog } from "./run-log";
 
 let sandbox: Sandbox;
 let other: string;

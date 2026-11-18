@@ -3,7 +3,7 @@ import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import type { CallEachNode, Flow } from "@nightshift/flows";
 import { foldRun, type LoggedEvent } from "../../log";
 
-import { getRunRow } from "../../log/run-row";
+import { getRunRow } from "../../log/run-row/run-row";
 import { deriveSteps, parseCalledFlows, parseRunFlow } from "../../read";
 import type { RunStatus } from "../../run-status";
 import {

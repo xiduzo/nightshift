@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { runEvents as log } from "../testing/run-events";
+import { runEvents as log } from "../../testing/run-events";
 import { foldRun, nextState, type RunState } from "./run-state";
 
 /*

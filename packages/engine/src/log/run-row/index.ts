@@ -1,0 +1,26 @@
+/** The run's row: what a run is beside its event log, with its plan. */
+
+export {
+	applyWalkerMoves,
+	type FallbackDevice,
+	fallbackKey,
+	followWalkerMoves,
+	getRunRow,
+	hasRunRow,
+	lastRunDevice,
+	type NodeFields,
+	type PlacedRun,
+	type PlannedDevice,
+	placedRun,
+	planColumns,
+	planOf,
+	RUN_NOT_FOUND,
+	type RunFallbacks,
+	type RunPlan,
+	type RunRow,
+	runIdsOfProject,
+	runIdsWalkedBy,
+	runsArriving,
+	spaceOfRun,
+	stepIdsOfRun,
+} from "./run-row";

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Flow, ValueNode } from "@nightshift/flows";
 import { parseInstant } from "@nightshift/time";
 import { foldRun } from "../../../log";
-import { getRunRow } from "../../../log/run-row";
+import { getRunRow } from "../../../log/run-row/run-row";
 import { deriveSteps } from "../../../read/run-views";
 import {
 	command,

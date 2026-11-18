@@ -7,7 +7,7 @@ import type { FlowEdge, JoinNode } from "@nightshift/flows";
 import type { FlowInput } from "@nightshift/flows/testing";
 import { now } from "@nightshift/time";
 import { foldRun } from "../../../log";
-import { getRunRow } from "../../../log/run-row";
+import { getRunRow } from "../../../log/run-row/run-row";
 import { deriveSteps } from "../../../read";
 import {
 	agent,

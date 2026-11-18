@@ -5,7 +5,7 @@ import type { WaitNode } from "@nightshift/flows";
 import { parseInstant, now as timeNow } from "@nightshift/time";
 import { atLocal } from "@nightshift/time/testing";
 import { foldRun } from "../../../log";
-import { readTranscriptFile } from "../../../log/transcripts";
+import { readTranscriptFile } from "../../../log/transcript/transcripts";
 import { deriveSteps } from "../../../read/run-views";
 import {
 	command,

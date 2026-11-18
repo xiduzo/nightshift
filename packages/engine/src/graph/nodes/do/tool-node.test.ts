@@ -5,7 +5,7 @@ import type { McpServerConfig } from "@nightshift/agents/types";
 import type { ToolNode } from "@nightshift/flows";
 import { coerceArguments } from "../../../device/tool-call";
 import { foldRun } from "../../../log";
-import { readTranscriptFile } from "../../../log/transcripts";
+import { readTranscriptFile } from "../../../log/transcript/transcripts";
 import { deriveSteps } from "../../../read/run-views";
 import {
 	command,

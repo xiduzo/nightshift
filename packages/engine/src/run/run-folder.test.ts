@@ -7,7 +7,7 @@ import type { AgentHarness } from "@nightshift/agents/types";
 import { event } from "@nightshift/db/schema";
 import { FLOW_VERSION, type Flow, type FlowNode } from "@nightshift/flows";
 import { asc } from "drizzle-orm";
-import { createRunLog } from "../log/run-log";
+import { createRunLog } from "../log/run-log/run-log";
 import { createRunFolders } from "../run-folders/run-folders";
 import {
 	createSandbox,

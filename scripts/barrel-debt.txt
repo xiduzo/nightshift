@@ -16,5 +16,5 @@ packages/daemon/src/runtime/index.ts 31
 packages/devices/src/contract/index.ts 55
 packages/engine/src/contract/index.ts 31
 packages/engine/src/device/index.ts 33
-packages/engine/src/log/index.ts 125
+packages/engine/src/log/index.ts 50
 packages/engine/src/read/index.ts 65

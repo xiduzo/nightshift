@@ -30,5 +30,4 @@
 # (p) Verticals that must split, and their folders with no index.ts.
 packages/engine/src/knowledge
 packages/engine/src/knowledge/readers
-packages/engine/src/log
 packages/engine/src/projects

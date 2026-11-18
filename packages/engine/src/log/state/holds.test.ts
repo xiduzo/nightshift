@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Scope } from "./events";
+import type { Scope } from "../events";
 import { holdCovers, type LeaseHold, leavingHolds } from "./holds";
 
 const body: Scope = { parentStepId: "call-step", itemId: null };

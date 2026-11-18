@@ -18,7 +18,7 @@ import { eq } from "drizzle-orm";
 import type { Capabilities, Device } from "../../../device";
 import { foldRun } from "../../../log";
 
-import { readTranscriptFile } from "../../../log/transcripts";
+import { readTranscriptFile } from "../../../log/transcript/transcripts";
 import { refusalOf } from "../../../placement";
 import { deriveSteps } from "../../../read/run-views";
 import { createRunFolders } from "../../../run-folders";

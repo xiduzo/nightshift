@@ -8,7 +8,7 @@ import type {
 } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import type { Relay } from "../contract";
-import { createRunLog } from "../log/run-log";
+import { createRunLog } from "../log/run-log/run-log";
 import { RunRefusal } from "../run-status";
 import { alonePeers } from "../testing/alone-peers";
 import {

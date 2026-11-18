@@ -3,7 +3,7 @@ import { Command } from "@langchain/langgraph";
 import { fakeDecider } from "@nightshift/agents/testing";
 import type { ValueNode } from "@nightshift/flows";
 import { foldRun } from "../../../log";
-import { readTranscriptFile } from "../../../log/transcripts";
+import { readTranscriptFile } from "../../../log/transcript/transcripts";
 import { deriveSteps } from "../../../read/run-views";
 import {
 	command,

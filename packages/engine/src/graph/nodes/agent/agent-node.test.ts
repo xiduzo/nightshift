@@ -15,7 +15,7 @@ import type { AgentNode } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { foldRun } from "../../../log";
-import { readTranscriptFile } from "../../../log/transcripts";
+import { readTranscriptFile } from "../../../log/transcript/transcripts";
 import { deriveSteps } from "../../../read/run-views";
 import {
 	agent as agentNode,

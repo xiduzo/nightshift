@@ -1,10 +1,10 @@
-import type { EngineEventType, EnginePayloads } from "./events";
+import type { EngineEventType, EnginePayloads } from "../events";
 import type {
 	HistoryRows,
 	HistoryRun,
 	HistorySession,
 	HistoryStep,
-} from "./history";
+} from "./history-rows";
 
 /**
  * The fields that name a place on the disk of a run's Walker (its

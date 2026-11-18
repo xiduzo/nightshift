@@ -1,5 +1,5 @@
 import type { CostSource } from "@nightshift/agents/pricing";
-import type { EnginePayloads } from "./events";
+import type { EnginePayloads } from "../events";
 import type { DerivedSession } from "./run-state";
 
 /**

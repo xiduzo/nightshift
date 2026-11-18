@@ -1,5 +1,5 @@
-import type { MemberChange } from "../contract";
-import type { RunLog } from "./run-log";
+import type { MemberChange } from "../../contract";
+import type { RunLog } from "../run-log";
 
 /**
  * Logs a change of a Space's Members in that Space's event log

@@ -3,7 +3,7 @@ import { mkdir, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { clone, device, event, project } from "@nightshift/db/schema";
 import { asc, eq } from "drizzle-orm";
-import { createRunLog } from "../log/run-log";
+import { createRunLog } from "../log/run-log/run-log";
 import { aloneDirectory } from "../testing/alone-directory";
 import {
 	createSandbox,

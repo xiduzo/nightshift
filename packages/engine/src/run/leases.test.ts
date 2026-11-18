@@ -17,7 +17,7 @@ import {
 	type RunSettings,
 } from "../device-config/settings";
 import { createLeaseStore } from "../leases";
-import { createRunLog, type RunLog } from "../log/run-log";
+import { createRunLog, type RunLog } from "../log/run-log/run-log";
 import type { RunDetail } from "../read/views";
 import { aloneDirectory } from "../testing/alone-directory";
 import { alonePeers } from "../testing/alone-peers";
