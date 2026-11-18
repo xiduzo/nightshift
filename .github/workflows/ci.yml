@@ -93,6 +93,11 @@ jobs:
       - name: Docs reference
         run: bun run docs:reference --check
 
+      # A path that a living doc, the pre-commit hook or a workflow names
+      # exists (scripts/check-doc-paths.ts).
+      - name: Doc paths
+        run: bun scripts/check-doc-paths.ts
+
       # The check scripts and the capability map are typed data and code
       # with no workspace of their own (scripts/tsconfig.json). The Types
       # step runs this too. Here it fails early, under its own name.

@@ -34,6 +34,7 @@ bun scripts/check-capabilities.ts  # every vertical is on the capability map
 bun scripts/check-budgets.ts       # file size, folder size, barrel width, peer ports
 bun run check:rings                # the rings of a capability in a server package
 bun run docs:reference --check     # the tables in the docs match the code
+bun scripts/check-doc-paths.ts     # a path that a doc names exists
 ```
 
 Some old code breaks a size or a structure rule. A debt list in `scripts/` names it (`size-debt.txt` and the other `*-debt.txt` files). Never add a line to a debt list. When a check tells you that a line is clean, remove that line in your change. [STRUCTURE.md](docs/steering/STRUCTURE.md) section 8 gives the steps.

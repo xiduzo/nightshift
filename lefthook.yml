@@ -97,6 +97,15 @@ pre-commit:
         - "apps/server/src/features/cli/**"
         - "apps/server/scripts/docs-reference.ts"
       run: bun run docs:reference --check
+    # A path that a living doc, this file or a workflow names exists. A file
+    # that moves breaks the docs that name it.
+    - name: doc paths
+      glob:
+        - "*.md"
+        - "*.{ts,tsx}"
+        - "lefthook.yml"
+        - ".github/**"
+      run: bun scripts/check-doc-paths.ts
     # The scripts of the repository have their own tsconfig. A wrong name on
     # the capability map is a type error.
     - name: script types

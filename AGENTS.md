@@ -145,6 +145,9 @@ the same rules as the UI copy, in STE-flavored mode (`ste-writing` skill).
   ("continues", "the Secrets page").
 - **Records stay as written.** `docs/research/` and `docs/adr/` record past
   decisions. Do not rewrite them.
+- **A path in a doc exists.** When you move or rename a file, fix the docs
+  that name it in the same change. `bun scripts/check-doc-paths.ts` fails a
+  path that the repository does not have. The pre-commit hook and CI run it.
 - **The user guide is `docs/wiki/`.** `.github/workflows/wiki.yml` publishes
   it to the GitHub wiki. Never edit the wiki itself. The pages are for the
   person who uses Night Shift: they follow the UI copy rules, with no
