@@ -24,16 +24,13 @@ import { FLOW_VERSION } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import * as Y from "yjs";
 import type { HostClient, WorkReply, WorkRequest } from "./contract";
+import type { DevicesRuntime } from "./devices-runtime";
+import type { KeptDevices } from "./handover";
 import { setDeviceOffer } from "./offers/offers";
 import type { PeerEngine } from "./peers";
 import { OFFLINE_AFTER_MS } from "./registry";
 import { type PairedReplicas, pairedReplicas, withPeers } from "./testing";
-import {
-	type DevicesRuntime,
-	documentsWithHost,
-	type KeptDevices,
-	startDevices,
-} from "./wire";
+import { documentsWithHost, startDevices } from "./wire";
 import { createWorkHub } from "./work";
 
 /**

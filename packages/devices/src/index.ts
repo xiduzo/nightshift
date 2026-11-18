@@ -38,7 +38,9 @@ export {
 	type WorkReply,
 	type WorkRequest,
 } from "./contract";
+export type { DevicesRuntime } from "./devices-runtime";
 export type { HostExchange } from "./exchange";
+export type { KeptDevices } from "./handover";
 export {
 	type Devices,
 	type DevicesOverview,
@@ -62,4 +64,4 @@ export {
 	selfOwnerId,
 	setSelfOwner,
 } from "./registry";
-export { type DevicesRuntime, type KeptDevices, startDevices } from "./wire";
+export { startDevices } from "./wire";
