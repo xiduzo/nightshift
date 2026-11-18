@@ -33,28 +33,26 @@ import {
 	PageSection,
 	SiteHeader,
 } from "@/shared/page";
-import type { AgentPicker } from "./answers-table";
-import { BuiltinAgentDetail, BuiltinAgentsTable } from "./builtin-agents";
-import { AppearanceCard } from "./components/appearance-card";
-import { CleanupCard } from "./components/cleanup-card";
-import { MonitoringCard } from "./components/monitoring-card";
-import { PhoneCard } from "./components/phone-card";
-import { RunPolicyCard } from "./components/run-policy-card";
-import { RunsCard } from "./components/runs-card";
 import {
+	type AgentPicker,
+	BuiltinAgentDetail,
+	BuiltinAgentsTable,
 	NEW_NODE_KEYS,
 	NewNodesTable,
 	ResetDefaults,
 	SEARCH_KEYS,
 	SearchTable,
-} from "./new-defaults";
+} from "./builtin";
+import { MonitoringCard, PhoneCard } from "./computer";
 import { settingsQueries } from "./queries";
+import { CleanupCard, RunPolicyCard, RunsCard } from "./runs";
 import {
 	AGENTS_PARTS,
 	SECTIONS,
 	type Section,
 	type SettingsSearch,
 } from "./sections";
+import { AppearanceCard } from "./you";
 
 export function SettingsPage({
 	search,

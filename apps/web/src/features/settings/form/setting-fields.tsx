@@ -37,7 +37,7 @@ import {
 	type SettingKey,
 	type SettingsForm,
 	useSaveSettings,
-} from "../hooks/use-settings-form";
+} from "./use-settings-form";
 
 /** The daemon's answer when it refused a save. */
 export function SaveError({ error }: { error: Error | null }) {

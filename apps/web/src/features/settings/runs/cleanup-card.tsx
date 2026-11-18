@@ -1,13 +1,14 @@
 import type { SettingsView } from "@/shared/api";
 import { PageSection, SettingRows } from "@/shared/page";
-import { useSettingsForm, useToggleSetting } from "../hooks/use-settings-form";
 import {
 	CardForm,
 	ResetSection,
 	SaveErrorRow,
 	SwitchSetting,
 	TextSetting,
-} from "./setting-fields";
+	useSettingsForm,
+	useToggleSetting,
+} from "../form";
 
 const CLEANUP_KEYS = ["cleanUpAfterDays"] as const;
 

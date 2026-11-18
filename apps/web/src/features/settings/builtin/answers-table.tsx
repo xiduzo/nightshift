@@ -29,9 +29,9 @@ import { CircleAlertIcon, CircleCheckIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 import { deciderQueries, profileQueries } from "@/features/agents";
+import { type SettingsPatch, useSaveSettings } from "../form";
+import { builtinQueries } from "../queries";
 import { deciderValue, profileValue } from "./builtin-answer";
-import { type SettingsPatch, useSaveSettings } from "./hooks/use-settings-form";
-import { builtinQueries } from "./queries";
 
 export type ModelOption = {
 	value: string;

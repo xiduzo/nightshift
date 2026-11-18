@@ -8,8 +8,6 @@ import { useId, useState } from "react";
 import { SpaceUsageSection } from "@/features/spaces";
 import type { SettingsView } from "@/shared/api";
 import { PageSection, SettingNote, SettingRows } from "@/shared/page";
-import { useSettingsForm, useToggleSetting } from "../hooks/use-settings-form";
-import { readUsage, usagePatch } from "../usage-setting";
 import {
 	CardForm,
 	HeadersCard,
@@ -18,8 +16,15 @@ import {
 	SelectSetting,
 	SwitchSetting,
 	TextSetting,
-} from "./setting-fields";
-import { UsageSendsButton, UsageSendsSheet } from "./usage-sends-sheet";
+	useSettingsForm,
+	useToggleSetting,
+} from "../form";
+import {
+	readUsage,
+	UsageSendsButton,
+	UsageSendsSheet,
+	usagePatch,
+} from "../usage";
 
 const MONITORING_KEYS = ["telemetryEndpoint", "telemetryProtocol"] as const;
 

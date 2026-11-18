@@ -7,14 +7,15 @@ import { LockIcon } from "lucide-react";
 import { useId } from "react";
 import type { SettingsView } from "@/shared/api";
 import { PageSection, SettingNote, SettingRows } from "@/shared/page";
-import { useSettingsForm, useToggleSetting } from "../hooks/use-settings-form";
 import {
 	CardForm,
 	ResetSection,
 	SaveErrorRow,
 	SwitchSetting,
 	TextSetting,
-} from "./setting-fields";
+	useSettingsForm,
+	useToggleSetting,
+} from "../form";
 
 const RUN_KEYS = [
 	"maxConcurrentRuns",

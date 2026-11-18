@@ -23,6 +23,7 @@ import { RotateCcwIcon } from "lucide-react";
 import { harnessInfo, TryAgentButton } from "@/features/agents";
 import type { SettingsView } from "@/shared/api";
 import { PageSection, SettingRow, SettingRows } from "@/shared/page";
+import { builtinQueries, settingsQueries } from "../queries";
 import {
 	type AgentPicker,
 	AnswersTable,
@@ -38,7 +39,6 @@ import {
 	shownAnswer,
 	TAKES_LABEL,
 } from "./builtin-answer";
-import { builtinQueries, settingsQueries } from "./queries";
 
 /**
  * The saved answers of Night Shift's agents, who answers for each now, and

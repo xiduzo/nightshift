@@ -11,10 +11,10 @@ import {
 import { FieldGroup } from "@nightshift/ui/components/field";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { useToggleSetting } from "../hooks/use-settings-form";
+import { useToggleSetting } from "../form";
 import { settingsQueries } from "../queries";
-import { readUsage, usagePatch } from "../usage-setting";
 import { UsageSendsButton, UsageSendsSheet } from "./usage-sends-sheet";
+import { readUsage, usagePatch } from "./usage-setting";
 import { UsageSwitch } from "./usage-switch";
 
 /**

@@ -1,5 +1,5 @@
 import type { SettingsView } from "@/shared/api";
-import type { SettingsPatch } from "./hooks/use-settings-form";
+import type { SettingsPatch } from "../form";
 
 /**
  * `usage` and `usageSeen` on the settings view. Missing means the default:

@@ -3,7 +3,7 @@
  * well, the words of when it runs, and how its Ollama is now.
  */
 import { useQuery } from "@tanstack/react-query";
-import { ollamaQueries } from "./queries";
+import { ollamaQueries } from "../queries";
 
 /** Embedding models that work well, with what each is good at. */
 export const SHORTLIST: readonly { name: string; about: string }[] = [
