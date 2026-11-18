@@ -1,11 +1,4 @@
-import {
-	cronError,
-	describeCron,
-	isTimeZone,
-	nextCronTimes,
-	scheduleSchema,
-} from "@nightshift/flows";
-import { now } from "@nightshift/time";
+import { isTimeZone, scheduleSchema } from "@nightshift/flows";
 import { z } from "zod";
 import { output } from "../output";
 import { ownerProcedure, permitted, protectedProcedure } from "../procedures";
@@ -122,14 +115,5 @@ export const schedules = {
 				timeZone: timeZoneSchema.optional(),
 			}),
 		)
-		.handler(({ input }) => {
-			const error = cronError(input.cron);
-			return {
-				error,
-				description: error ? null : describeCron(input.cron),
-				times: error
-					? []
-					: nextCronTimes(input.cron, now(), input.count ?? 3, input.timeZone),
-			};
-		}),
+		.handler(({ context, input }) => context.space.previewCron(input)),
 };

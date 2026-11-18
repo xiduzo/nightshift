@@ -80,7 +80,12 @@ export type SpacesDeps = {
 	/** The schedules of the projects: each use case checks the Space itself (`schedules/`). */
 	schedules: Pick<
 		Schedules,
-		"list" | "save" | "pauseTonight" | "resumeTonight" | "runNow"
+		| "list"
+		| "save"
+		| "pauseTonight"
+		| "resumeTonight"
+		| "runNow"
+		| "previewCron"
 	>;
 	reads: ReadModel;
 	/** The artifacts kept on this computer. */
@@ -452,6 +457,9 @@ export function createSpaces(deps: SpacesDeps) {
 					...(timeZone !== undefined ? { timeZone } : {}),
 				});
 			},
+
+			// It reads no row: it does not wait for the engine to be ready.
+			previewCron: (input) => deps.schedules.previewCron(actor, input),
 
 			watchRun(runId, { signal: watching, afterSeq }) {
 				// A disposed engine publishes nothing more on its bus: the watch

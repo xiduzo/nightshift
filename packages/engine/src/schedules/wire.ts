@@ -26,6 +26,7 @@ import type {
 	ScheduleSwitch,
 	WebhookSecrets,
 } from "./application/ports";
+import { previewCron } from "./application/preview-cron";
 import { receiveWebhook } from "./application/receive-webhook";
 import { resumeScheduleTonight } from "./application/resume-schedule-tonight";
 import { runScheduleNow } from "./application/run-schedule-now";
@@ -72,6 +73,8 @@ export type Schedules = {
 	resumeTonight: ReturnType<typeof resumeScheduleTonight>;
 	/** Starts one schedule's run now. */
 	runNow: ReturnType<typeof runScheduleNow>;
+	/** Reads a cron line for the person who types it. */
+	previewCron: ReturnType<typeof previewCron>;
 	/** Takes one webhook for a schedule. */
 	receiveWebhook: ReturnType<typeof receiveWebhook>;
 	/**
@@ -110,6 +113,7 @@ export function wireSchedules(deps: SchedulesDeps): Schedules {
 		pauseTonight: pauseScheduleTonight(ports),
 		resumeTonight: resumeScheduleTonight(ports),
 		runNow: runScheduleNow(ports),
+		previewCron: previewCron(ports),
 		receiveWebhook: receiveWebhook(ports),
 		ticker: createScheduleTicker({
 			tickMs: deps.tickMs ?? DEFAULT_SCHEDULE_TICK_MS,

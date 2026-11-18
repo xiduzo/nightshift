@@ -169,6 +169,21 @@ export interface SpaceEngine {
 		timeZone?: string,
 	): Promise<ScheduleIssue[]>;
 	/**
+	 * Reads a cron line for the person who types it: how it reads, and
+	 * its next times from now (`count`, default 3) on the clock of
+	 * `timeZone` (default: this computer's). A line that is not valid comes
+	 * back with the reason and no times.
+	 */
+	previewCron(input: {
+		cron: string;
+		count?: number | undefined;
+		timeZone?: string | undefined;
+	}): Promise<{
+		error: string | null;
+		description: string | null;
+		times: number[];
+	}>;
+	/**
 	 * The Space's runs (of one project), newest first. With `limit`, a page
 	 * of them, after the run of `cursor`.
 	 */
