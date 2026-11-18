@@ -24,9 +24,26 @@ Read `docs/steering/STRUCTURE.md` before you add a file, a folder or a package.
   writes it (TS2883). No `export *`.
 - **Apps wire, packages decide.** Domain logic goes in a package, not in `apps/*`.
   Routes in `apps/web` stay thin. Each web vertical owns its `queries.ts`.
-- **Run the checks.** `bun scripts/check-layers.ts` and
-  `bun scripts/check-verticals.ts` check these rules in every workspace. The
-  pre-commit hook and CI run them too.
+- **One capability, one name.** `scripts/capabilities.ts` names every vertical: a
+  capability (a product area), a mechanism (shared machinery) or the wiring. A
+  capability has the same folder name in every workspace. A mechanism imports no
+  capability. When you add, move or rename a vertical, change the map in the same change.
+- **Sub-verticals, not kind folders.** No `components/`, `hooks/`, `lib/`, `types/`,
+  `queries/` or `mutations/` folder inside a vertical. Split a big vertical by
+  sub-domain: each sub-vertical has its own `index.ts`. Hard limits: 600 lines for a
+  source file, 25 source files in a folder, 30 names of its own on a barrel.
+- **One request, one use case.** In a server package (`engine`, `devices`,
+  `notifications`, `agents`, `auth`, `telemetry`), a capability has three rings:
+  `domain/`, `application/` and `adapters/`. A use case takes its ports, decides who may
+  act and throws a `Refusal`. Only a `wire.ts` builds a real adapter. Read section 9 of
+  `STRUCTURE.md` before you add code there.
+- **A debt list only gets shorter.** Never add a line to a `scripts/*-debt.txt` file, and
+  never raise a number in one. Fix the new offender. A listed file may not grow: split it
+  first.
+- **Run the checks.** `bun scripts/check-layers.ts`, `bun scripts/check-verticals.ts`,
+  `bun scripts/check-capabilities.ts`, `bun scripts/check-budgets.ts` and
+  `bun run check:rings` check these rules in every workspace. The pre-commit hook and CI
+  run them too.
 - **Do not copy a known deviation** (section 8 of `STRUCTURE.md`). Old code that breaks
   a rule is debt, not a pattern.
 

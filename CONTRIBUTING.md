@@ -12,7 +12,7 @@ Thank you for your interest. Night Shift is pre-alpha. Read this before you star
 
 ```bash
 bun install
-bun lefthook install   # git hooks: format, lint, the layer and vertical checks on commit
+bun lefthook install   # git hooks: format, lint and the structure checks on commit
 bun run dev            # web UI, API and phone app with hot reload, no .env needed
 bun run dev:mobile     # the phone app alone, in Expo
 bun run dev:desktop    # the desktop app
@@ -26,12 +26,17 @@ A development install connects only to a Host on this computer. It does not pair
 
 ```bash
 bun test               # tests, next to the code as *.test.ts
-bun run check-types    # TypeScript
+bun run check-types    # TypeScript: the scripts, then every workspace
 bun run check          # Biome: lint and format
-bun scripts/check-layers.ts      # packages depend only on lower layers
-bun scripts/check-verticals.ts   # imports go through a vertical's barrel
-bun run docs:reference --check   # the tables in the docs match the code
+bun scripts/check-layers.ts        # packages depend only on lower layers
+bun scripts/check-verticals.ts     # imports go through a vertical's barrel
+bun scripts/check-capabilities.ts  # every vertical is on the capability map
+bun scripts/check-budgets.ts       # file size, folder size, barrel width, peer ports
+bun run check:rings                # the rings of a capability in a server package
+bun run docs:reference --check     # the tables in the docs match the code
 ```
+
+Some old code breaks a size or a structure rule. A debt list in `scripts/` names it (`size-debt.txt` and the other `*-debt.txt` files). Never add a line to a debt list. When a check tells you that a line is clean, remove that line in your change. [STRUCTURE.md](docs/steering/STRUCTURE.md) section 8 gives the steps.
 
 ## The rules
 
