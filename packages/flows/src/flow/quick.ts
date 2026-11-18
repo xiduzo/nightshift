@@ -1,5 +1,5 @@
 import type { AgentNode, HarnessName } from "../nodes";
-import { FLOW_VERSION, type Flow } from "./flow";
+import { FLOW_VERSION, type Flow } from "./schema";
 
 /** The harness a quick run's agent runs on when it names neither a profile nor a harness. */
 export const QUICK_RUN_HARNESS: HarnessName = "claude-code";

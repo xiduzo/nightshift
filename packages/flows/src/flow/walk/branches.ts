@@ -1,4 +1,4 @@
-import type { Flow, FlowEdge, Outcome } from "./flow";
+import type { Flow, FlowEdge, Outcome } from "../schema";
 
 /**
  * Parallel branches: the shape of a fan-out and the Join where its

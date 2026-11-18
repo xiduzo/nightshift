@@ -9,8 +9,8 @@ import {
 	type PersonTier,
 	type ValueNode,
 	type ValueTier,
-} from "../nodes";
-import type { FlowNode } from "./flow";
+} from "../../nodes";
+import type { FlowNode } from "../schema";
 
 /**
  * A cascade's tiers as plain nodes (ADR 6). The engine runs each try of a

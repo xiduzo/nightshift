@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { validateFlow } from "../validate";
-import { FLOW_VERSION, flowSchema } from "./flow";
 import { singleAgentFlow } from "./quick";
+import { FLOW_VERSION, flowSchema } from "./schema/flow";
 
 describe("singleAgentFlow", () => {
 	test("builds a valid one-node flow", () => {

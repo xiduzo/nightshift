@@ -19,7 +19,7 @@ import {
 	valueNodeSchema,
 	waitNodeSchema,
 	webRequestNodeSchema,
-} from "../nodes";
+} from "../../nodes";
 
 /**
  * The flow format: what Night Shift keeps for each flow of a project.

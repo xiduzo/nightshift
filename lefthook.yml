@@ -91,7 +91,7 @@ pre-commit:
         - "packages/flows/src/kits/**"
         - "packages/flows/src/starters/**"
         - "packages/flows/src/harnesses/**"
-        - "packages/flows/src/flow/node.ts"
+        - "packages/flows/src/flow/node/node.ts"
         - "packages/agents/src/assistant/**"
         - "packages/agents/src/knowledge/**"
         - "apps/server/src/features/cli/**"

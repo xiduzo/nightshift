@@ -2,12 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { decisionDecider } from "../nodes";
-import { gitFilesCommand, githubSubIssuesCommand } from "../recipes";
-import { renderCommand, templateRefs } from "../template";
-import { parseFlow, validateFlow } from "../validate";
-import { FLOW_VERSION, type Flow, flowSchema } from "./flow";
-import { type FlowMigration, migrateFlow } from "./migrate";
+import { decisionDecider } from "../../nodes";
+import { gitFilesCommand, githubSubIssuesCommand } from "../../recipes";
+import { renderCommand, templateRefs } from "../../template";
+import { parseFlow, validateFlow } from "../../validate";
+import { FLOW_VERSION, type Flow, flowSchema } from "../schema/flow";
+import { migrateFlow } from "./migrate";
+import type { FlowMigration } from "./v5-to-v9";
 
 const agent = {
 	type: "agent",

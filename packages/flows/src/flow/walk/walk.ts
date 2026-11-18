@@ -1,5 +1,5 @@
+import type { Flow, FlowEdge, Outcome } from "../schema";
 import { isFanOut } from "./branches";
-import type { Flow, FlowEdge, Outcome } from "./flow";
 
 export type NextEdgeInput = {
 	flow: Flow;

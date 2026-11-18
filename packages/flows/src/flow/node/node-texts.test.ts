@@ -18,10 +18,14 @@ import {
 	type NodeCheck,
 	nodeBasePlain,
 	nodeBaseTexts,
-} from "../nodes/base/base";
-import { type NodeText, type TextKind, textsIn } from "../nodes/base/texts";
-import { checkNodeWith } from "../validate";
-import { type FlowNode, type FlowNodeType, flowNodeSchema } from "./flow";
+} from "../../nodes/base/base";
+import { type NodeText, type TextKind, textsIn } from "../../nodes/base/texts";
+import { checkNodeWith } from "../../validate";
+import {
+	type FlowNode,
+	type FlowNodeType,
+	flowNodeSchema,
+} from "../schema/flow";
 import { NODE_DEFINITIONS, nodeTexts } from "./node";
 
 type Json = { [key: string]: unknown };

@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { NODE_FAMILIES, type NodeCheck } from "../nodes";
-import { checkNodeWith } from "../validate";
+import { NODE_FAMILIES, type NodeCheck } from "../../nodes";
+import { checkNodeWith } from "../../validate";
 import {
 	FLOW_VERSION,
 	type FlowNode,
 	type FlowNodeType,
 	flowNodeSchema,
 	flowSchema,
-} from "./flow";
+} from "../schema/flow";
 import {
 	endedLabel,
 	endsFlow,

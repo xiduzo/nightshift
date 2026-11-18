@@ -27,8 +27,14 @@ import {
 	valueDefinition,
 	waitDefinition,
 	webRequestDefinition,
-} from "../nodes";
-import type { Flow, FlowInput, FlowNode, FlowNodeType, Outcome } from "./flow";
+} from "../../nodes";
+import type {
+	Flow,
+	FlowInput,
+	FlowNode,
+	FlowNodeType,
+	Outcome,
+} from "../schema";
 
 /**
  * The node types of the flow schema, each with its definition: every fact

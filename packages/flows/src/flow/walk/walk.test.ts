@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Flow, FlowEdge } from "./flow";
-import { FLOW_VERSION } from "./flow";
+import { FLOW_VERSION, type Flow, type FlowEdge } from "../schema/flow";
 import { nextEdge } from "./walk";
 
 function flowWith(edges: FlowEdge[]): Flow {

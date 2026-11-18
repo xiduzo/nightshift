@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import * as flows from "../index";
-import { FLOW_VERSION } from "./flow";
+import { FLOW_VERSION } from "./schema/flow";
 
 /**
  * The schemas of the package, as JSON Schema. A move of a schema between
@@ -69,7 +69,7 @@ describe("published schemas", () => {
 	});
 
 	test("the version 1 fixtures parse to the same flows", () => {
-		const dir = join(import.meta.dir, "fixtures", "v1-rpgdotexe");
+		const dir = join(import.meta.dir, "migrate", "fixtures", "v1-rpgdotexe");
 		const parsed = ["night", "feature", "trace"].map((name) =>
 			flows.parseFlow(
 				JSON.parse(readFileSync(join(dir, `${name}.json`), "utf8")),

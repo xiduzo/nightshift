@@ -5,21 +5,35 @@
  * Project's flows (ADR 2).
  */
 
-export {
-	type BranchPlace,
-	branchPlaces,
-	type FanOut,
-	fanOutsOf,
-} from "./branches";
+export { type FlowMigration, migrateFlow, migrateToolSets } from "./migrate";
 export {
 	type CascadeNode,
 	cascadeOf,
+	DECISION_LABEL,
+	definitionOf,
+	endedLabel,
+	endsFlow,
 	hasCascade,
+	jsonOutputFields,
 	lastModelTier,
+	mapNodeTexts,
+	NODE_DEFINITIONS,
+	NODE_FAMILY,
+	NODE_TYPE_LABEL,
+	nodeOutcomes,
+	nodeOutputFields,
+	nodeTexts,
+	outcomeColor,
+	outputFieldsByType,
 	personTierIndex,
+	runsEach,
+	standInOutcomes,
+	standsIn,
 	tierNode,
+	touchesDevice,
 	withTierNode,
-} from "./cascade";
+} from "./node";
+export { QUICK_RUN_HARNESS, singleAgentFlow } from "./quick";
 export {
 	DEFAULT_POLICY,
 	FLOW_VERSION,
@@ -45,34 +59,12 @@ export {
 	type VariableType,
 	variableTypeSchema,
 	withFlowDevices,
-} from "./flow";
+} from "./schema";
 export {
-	type FlowMigration,
-	migrateFlow,
-	migrateToolSets,
-} from "./migrate";
-export {
-	DECISION_LABEL,
-	definitionOf,
-	endedLabel,
-	endsFlow,
-	jsonOutputFields,
-	mapNodeTexts,
-	NODE_DEFINITIONS,
-	NODE_FAMILY,
-	NODE_TYPE_LABEL,
-	nodeOutcomes,
-	nodeOutputFields,
-	nodeTexts,
-	outcomeColor,
-	outputFieldsByType,
-	runsEach,
-	standInOutcomes,
-	standsIn,
-	touchesDevice,
-} from "./node";
-export { QUICK_RUN_HARNESS, singleAgentFlow } from "./quick";
-export {
+	type BranchPlace,
+	branchPlaces,
+	type FanOut,
+	fanOutsOf,
 	type NextEdge,
 	type NextEdgeInput,
 	nextEdge,
