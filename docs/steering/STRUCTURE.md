@@ -259,7 +259,7 @@ apps/web/src/
     notifications/         the stream (use-notification-stream.ts: the live cache follows the Host, with this browser's adapter in browser-notifications.ts), this browser's Web Push (browser.ts, with public/sw.js), components/ (the notification settings and screens cards)
 ```
 
-The kind folders in this tree are older than the rule of section 4: `components/`, `hooks/` and `lib/` in `runs`, `settings`, `notifications` and `flows/editor`. They are on `scripts/kind-folder-debt.txt`. A new kind folder fails.
+Some verticals in this tree hold kind folders (`components/`, `hooks/`, `lib/`). They are older than the rule of section 4, and `scripts/kind-folder-debt.txt` lists each one. A new kind folder fails.
 
 Imports point one way, so no barrel closes a cycle. Biome's `noImportCycles` fails a cycle through barrels too. `scripts/check-verticals.ts` fails a cycle between verticals that has type-only imports in it.
 
@@ -460,9 +460,13 @@ export const answerGate =
 
 **P5. A driving adapter holds no rule.** It reads the input, calls one use case and maps the answer. The API is the driving adapter for people. `Engine` and `SpaceEngine` are thin objects that list the use cases for it, and they hold no rule. A driving adapter that is not the API sits in `adapters/in/`. A file there imports nothing of its slice: the wire hands it the bound use case.
 
-**P6. Only a `wire.ts` builds a real adapter.** A slice with `application/` has a `wire.ts`. It exports one function, `wire<Slice>(deps)`, and types. It is the only file that builds the real adapters and the long-lived domain objects of the slice. It returns the use cases bound to their ports. Only that `wire.ts`, a file of the same `adapters/out/` and a test import a real adapter. The `wire.ts` of the package calls the slice wires (in the engine, `createEngine` does until it moves). It never builds the adapter of a slice itself.
+**P6. Only a `wire.ts` builds a real adapter.** A slice with `application/` has a `wire.ts`. It exports one function, `wire<Slice>(deps)`, and types. It is the only file that builds the real adapters and the long-lived domain objects of the slice. It returns the use cases bound to their ports.
 
-**P7. Every driven port has an in-memory twin and one contract suite.** Every type that `application/ports.ts` exports is a port. A data shape goes in `domain/`. A store port is narrow and belongs to one slice (`ScheduleStore`). There is never a port for the whole database. The twin sits beside the real adapter in `adapters/out/`, and the contract suite runs on both. A use-case test runs on the twins.
+Only that `wire.ts`, a file of the same `adapters/out/` and a test import a real adapter. The `wire.ts` of the package calls the slice wires (in the engine, `createEngine` does until it moves). It never builds the adapter of a slice itself.
+
+**P7. Every driven port has an in-memory twin and one contract suite.** Every type that `application/ports.ts` exports is a port. A data shape goes in `domain/`. A store port is narrow and belongs to one slice (`ScheduleStore`). There is never a port for the whole database.
+
+The twin sits beside the real adapter in `adapters/out/`, and the contract suite runs on both. A use-case test runs on the twins.
 
 A port that another slice or another package implements says so in the comment of its type: `/** The runs a schedule starts. @filledBy engine/run */`. The name is a package (`@filledBy devices`) or a vertical of one, on disk, and not the slice itself. Such a port has an in-memory twin and no contract suite. One file `adapters/out/in-memory-*.ts` may hold the twins of several of these ports. When a slice of the same package fills the port and is in shape, import its barrel in the use case and remove the port. The check does not ask for that.
 
