@@ -58,7 +58,7 @@ import { createHostSpaces } from "../links";
 import { type DeviceOffer, NO_STARTER } from "../offers";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { withPeers } from "../testing";
-import { serveWork } from "../work/remote";
+import { serveWork } from "../work/serve-work";
 import { createPlacement } from "./placement";
 
 /** No profile of this computer, and no Device document kept here. */

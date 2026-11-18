@@ -19,12 +19,8 @@ import {
 	workRequestSchema,
 } from "../contract";
 import { partialHostClient } from "../testing";
-import {
-	CALL_DEADLINES_MS,
-	CLEANUP_WAIT_MS,
-	remoteDevice,
-	serveWork,
-} from "./remote";
+import { CALL_DEADLINES_MS, CLEANUP_WAIT_MS, remoteDevice } from "./remote";
+import { serveWork } from "./serve-work";
 import { createWorkServer } from "./work";
 import { createWorkHub } from "./work-hub";
 
