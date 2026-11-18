@@ -426,8 +426,8 @@ const ROUTES: Route[] = [
 	// Schedules.
 	route("schedules.list", project, "session", "space.listSchedules", ["p1"]),
 	route("schedules.save", { ...project, schedules: [schedule] }, "owner", "space.saveSchedules", ["p1", [like(schedule)], undefined]),
-	route("schedules.pauseTonight", one, STOP, ["space.pauseScheduleTonight", "notifications.schedulesChanged"], ["p1", "nightly"]),
-	route("schedules.resumeTonight", one, STOP, ["space.resumeScheduleTonight", "notifications.schedulesChanged"], ["p1", "nightly"]),
+	route("schedules.pauseTonight", one, STOP, "space.pauseScheduleTonight", ["p1", "nightly"]),
+	route("schedules.resumeTonight", one, STOP, "space.resumeScheduleTonight", ["p1", "nightly"]),
 	route("schedules.runNow", one, START, "space.runScheduleNow", ["p1", "nightly"]),
 	route("schedules.preview", { cron: "0 22 * * 1-5" }, "session"),
 	// Runs. A procedure keyed by a run id goes to the run's own Space.

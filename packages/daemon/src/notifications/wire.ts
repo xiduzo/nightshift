@@ -1,5 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { deviceDirectory } from "@nightshift/devices";
+import type { Engine } from "@nightshift/engine";
 import type { SettingsStore } from "@nightshift/engine/device-config";
 import {
 	createDesktopChannel,
@@ -31,7 +32,8 @@ export type DesktopScreen = {
 export type NotificationsWiring = {
 	db: Database;
 	env: DaemonEnv;
-	engine: Parameters<typeof engineRunEvents>[0];
+	engine: Parameters<typeof engineRunEvents>[0] &
+		Pick<Engine, "onSchedulesChanged">;
 	/** This computer's settings: whether it is a Host, and its old notification switches. */
 	settings: SettingsStore;
 	/** This computer's Device. */
@@ -118,6 +120,11 @@ export async function wireNotifications(
 	// awaited: it reads every Space's open Gates first, and pushes the ones
 	// that opened while no notifier listened.
 	void notifications.start();
+	// A pause tonight changes a project's schedules without a run: the
+	// engine says so, and the open screens of the Space read them again.
+	wiring.engine.onSchedulesChanged((spaceId, projectId) =>
+		notifications.schedulesChanged(spaceId, projectId),
+	);
 	// The switches this computer kept before notification settings moved
 	// to the Person: its owner gets them once.
 	await notifications.settings.seed(owner.userId, settings.current());

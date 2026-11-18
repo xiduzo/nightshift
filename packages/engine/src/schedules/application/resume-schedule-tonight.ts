@@ -6,6 +6,7 @@ import type {
 	Clock,
 	ScheduledProjects,
 	ScheduleLog,
+	ScheduleNotices,
 	ScheduleStore,
 } from "./ports";
 
@@ -16,6 +17,7 @@ export type ResumeScheduleTonightPorts = {
 	clock: Clock;
 	/** The watch of this engine: what its scheduler does next. */
 	watch: Pick<ScheduleWatch, "nextStart">;
+	notices: Pick<ScheduleNotices, "changed">;
 };
 
 export type ResumeScheduleTonight = {
@@ -26,8 +28,10 @@ export type ResumeScheduleTonight = {
 
 /**
  * Ends one schedule's pause tonight: it starts at its next time again. A
- * schedule without a pause is saved as it is. Refuses (`not-found`) a
- * project that is not in the Space and a schedule that does not exist.
+ * schedule without a pause is saved as it is. The open screens of the
+ * Space hear of it last, and the request waits for that. Refuses
+ * (`not-found`) a project that is not in the Space and a schedule that
+ * does not exist.
  */
 export const resumeScheduleTonight =
 	(ports: ResumeScheduleTonightPorts) =>
@@ -35,7 +39,7 @@ export const resumeScheduleTonight =
 		_actor: Actor | undefined,
 		request: ResumeScheduleTonight,
 	): Promise<SchedulePause> => {
-		const { projects, store, log, clock, watch } = ports;
+		const { projects, store, log, clock, watch, notices } = ports;
 		const { spaceId, projectId, scheduleId } = request;
 
 		await projects.inSpace(projectId, spaceId);
@@ -46,7 +50,7 @@ export const resumeScheduleTonight =
 		// The save took time: the clock is read after it, then the log.
 		const saved = clock();
 		const histories = await log.histories();
-		return {
+		const pause = {
 			pausedUntil: resumed.pausedUntil ?? null,
 			nextAt: watch.nextStart(
 				projectId,
@@ -55,4 +59,6 @@ export const resumeScheduleTonight =
 				histories.of(projectId, resumed.id),
 			),
 		};
+		await notices.changed(spaceId, projectId);
+		return pause;
 	};

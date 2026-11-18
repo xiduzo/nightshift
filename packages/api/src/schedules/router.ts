@@ -78,17 +78,9 @@ export const schedules = {
 		})
 		.output(output(schedulePauseSchema))
 		.input(oneScheduleSchema)
-		.handler(async ({ context, input }) => {
-			const pause = await context.space.pauseScheduleTonight(
-				input.projectId,
-				input.scheduleId,
-			);
-			await context.notifications.schedulesChanged(
-				context.spaceId,
-				input.projectId,
-			);
-			return pause;
-		}),
+		.handler(({ context, input }) =>
+			context.space.pauseScheduleTonight(input.projectId, input.scheduleId),
+		),
 	/** Ends a pause tonight: the schedule starts at its next time again. */
 	resumeTonight: permitted({ run: ["stop"] })
 		.route({
@@ -97,17 +89,9 @@ export const schedules = {
 		})
 		.output(output(schedulePauseSchema))
 		.input(oneScheduleSchema)
-		.handler(async ({ context, input }) => {
-			const pause = await context.space.resumeScheduleTonight(
-				input.projectId,
-				input.scheduleId,
-			);
-			await context.notifications.schedulesChanged(
-				context.spaceId,
-				input.projectId,
-			);
-			return pause;
-		}),
+		.handler(({ context, input }) =>
+			context.space.resumeScheduleTonight(input.projectId, input.scheduleId),
+		),
 	/**
 	 * Run now, a nudge and not an edit: starts the schedule's run at once,
 	 * as if it fired now, with the schedule as its trigger. A person who

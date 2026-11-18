@@ -92,8 +92,34 @@ describe("Resume tonight", () => {
 		});
 	});
 
+	test("tells the open screens of the Space after the save, and waits for it", async () => {
+		const { ports, resume } = project([nightly({ pausedUntil: at(17, 6) })]);
+		let pausedWhenTold: number | undefined = 0;
+		const changed = ports.notices.changed;
+		ports.notices.changed = async (spaceId, projectId) => {
+			pausedWhenTold = (await ports.store.list(P, { validate: false }))
+				.schedules[0]?.pausedUntil;
+			await changed(spaceId, projectId);
+		};
+		await resume("nightly");
+		expect(ports.notices.changes).toEqual([{ spaceId: SPACE, projectId: P }]);
+		expect(pausedWhenTold).toBeUndefined();
+	});
+
+	test("when the screens cannot be told, the request fails, and the pause stays ended", async () => {
+		const { ports, resume, saved } = project([
+			nightly({ pausedUntil: at(17, 6) }),
+		]);
+		const failure = new Error("the stream is gone");
+		ports.notices.failChanged(failure);
+		expect(await refusalOf(resume("nightly"))).toBe(failure);
+		expect(await saved()).toEqual([nightly()]);
+	});
+
 	test("a schedule that does not exist, or a project of another Space, is not found", async () => {
-		const { resume, saved } = project([nightly({ pausedUntil: at(17, 6) })]);
+		const { ports, resume, saved } = project([
+			nightly({ pausedUntil: at(17, 6) }),
+		]);
 		expect(await refusalOf(resume("gone"))).toMatchObject({
 			kind: "not-found",
 			message: "This schedule does not exist. Someone may have removed it.",
@@ -102,5 +128,6 @@ describe("Resume tonight", () => {
 			kind: "not-found",
 		});
 		expect(await saved()).toEqual([nightly({ pausedUntil: at(17, 6) })]);
+		expect(ports.notices.changes).toEqual([]);
 	});
 });

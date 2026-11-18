@@ -91,6 +91,7 @@ import {
 import { createRecovery } from "./recovery";
 import { createRunRelay } from "./relay";
 import { createRunStart } from "./run-start";
+import { createScheduleNotices } from "./schedule-notices";
 import { createSignals } from "./signals";
 import { createSpaces } from "./space";
 import type { SpaceEngine } from "./space-engine";
@@ -204,6 +205,14 @@ export interface Engine {
 	 * the Space of it. Returns the unsubscribe.
 	 */
 	onScheduleMissed(listener: (missed: ScheduleMissed) => void): () => void;
+	/**
+	 * Calls `listener` when a project's schedules changed without a run (a
+	 * pause tonight), and waits for it: the daemon tells the open screens
+	 * of the Space. Returns the unsubscribe.
+	 */
+	onSchedulesChanged(
+		listener: (spaceId: string, projectId: string) => Promise<void>,
+	): () => void;
 	/**
 	 * Moves Projects from one Space to others, as one operation (a Space
 	 * move, `projects-move.ts`): no run becomes active in `move.from` and
@@ -728,7 +737,10 @@ export function createEngine(
 		usage: options.usage,
 	});
 
-	const missedListeners = new Set<(missed: ScheduleMissed) => void>();
+	/** What the schedules tell, and who listens (`onScheduleMissed`, `onSchedulesChanged`). */
+	const scheduleNotices = createScheduleNotices({
+		spaceOf: async (projectId) => (await projects.find(projectId)).spaceId,
+	});
 	/** The schedules of the projects: its watch begins here, while the engine is made. */
 	const schedules = wireSchedules({
 		log: { db, log: runLog },
@@ -776,20 +788,7 @@ export function createEngine(
 			on: () => runSettings().scheduler,
 			started: () => options.scheduler !== false,
 		},
-		notices: {
-			missed: (time) => {
-				void projects
-					.find(time.projectId)
-					.then(({ spaceId }) => {
-						for (const listener of [...missedListeners]) {
-							listener({ ...time, spaceId });
-						}
-					})
-					.catch((error) =>
-						console.error("[schedules] could not tell of a missed time", error),
-					);
-			},
-		},
+		notices: scheduleNotices.notices,
 		usage: options.usage,
 	});
 	const pullRequestWatch = createPullRequestWatch({
@@ -948,10 +947,8 @@ export function createEngine(
 		},
 		onLandedFacts: (listener, scope) =>
 			landed.subscribe((events) => listener(landedFacts(events)), scope),
-		onScheduleMissed(listener) {
-			missedListeners.add(listener);
-			return () => missedListeners.delete(listener);
-		},
+		onScheduleMissed: scheduleNotices.onMissed,
+		onSchedulesChanged: scheduleNotices.onChanged,
 		moveProjects,
 		async forgetSpace(spaceId) {
 			await ready;

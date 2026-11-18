@@ -125,6 +125,37 @@ describe("Pause tonight", () => {
 		expect(await saved()).toEqual(schedules);
 	});
 
+	test("tells the open screens of the Space after the save, and waits for it", async () => {
+		const { ports, pause } = project([nightly()]);
+		// The screens hear of it when the pause is saved.
+		let savedWhenTold: number | undefined;
+		const changed = ports.notices.changed;
+		ports.notices.changed = async (spaceId, projectId) => {
+			savedWhenTold = (await ports.store.list(P, { validate: false }))
+				.schedules[0]?.pausedUntil;
+			await changed(spaceId, projectId);
+		};
+		await pause("nightly");
+		expect(ports.notices.changes).toEqual([{ spaceId: SPACE, projectId: P }]);
+		expect(savedWhenTold).toBe(at(17, 6));
+	});
+
+	test("a refused pause tells nobody", async () => {
+		const { ports, pause } = project([nightly({ enabled: false })]);
+		await refusalOf(pause("nightly"));
+		await refusalOf(pause("gone"));
+		await refusalOf(pause("nightly", "space-2"));
+		expect(ports.notices.changes).toEqual([]);
+	});
+
+	test("when the screens cannot be told, the request fails, and the pause stays saved", async () => {
+		const { ports, pause, saved } = project([nightly()]);
+		const failure = new Error("the stream is gone");
+		ports.notices.failChanged(failure);
+		expect(await refusalOf(pause("nightly"))).toBe(failure);
+		expect(await saved()).toEqual([nightly({ pausedUntil: at(17, 6) })]);
+	});
+
 	test("a project of another Space is not found", async () => {
 		const { pause, saved } = project([nightly()]);
 		expect(await refusalOf(pause("nightly", "space-2"))).toMatchObject({

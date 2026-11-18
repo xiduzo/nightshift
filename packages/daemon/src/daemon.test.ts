@@ -232,6 +232,55 @@ describe("the daemon, wired in one process", () => {
 		expect(heard).toContain('"projectId":"p1"');
 	});
 
+	test("tells a screen that listens when a schedule is paused tonight", async () => {
+		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
+		const daemon = await start(envIn(dir));
+		const { active } = await rpc<{ active: string }>(daemon, "spaces/list");
+		// A project without a folder: its schedules need no Clone here.
+		await processDatabase(daemon.info.databaseUrl)
+			.insert(projectTable)
+			.values({ id: "p1", spaceId: active, name: "p1", folder: false });
+		await rpc(daemon, "schedules/save", {
+			projectId: "p1",
+			schedules: [
+				{
+					id: "nightly",
+					flow: "night",
+					inputs: {},
+					cron: "0 22 * * *",
+					enabled: true,
+				},
+			],
+		});
+		const stop = new AbortController();
+		const watch = await call(daemon, "/rpc/notifications/watch", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({}),
+			signal: stop.signal,
+		});
+		const stream = watch?.body?.getReader();
+		if (!stream) throw new Error("The stream did not open.");
+
+		const pause = await rpc<{ pausedUntil: number | null }>(
+			daemon,
+			"schedules/pauseTonight",
+			{ projectId: "p1", scheduleId: "nightly" },
+		);
+		expect(pause.pausedUntil).not.toBeNull();
+
+		let heard = "";
+		while (!heard.includes("schedules-changed")) {
+			const { done, value } = await stream.read();
+			if (done) break;
+			heard += new TextDecoder().decode(value);
+		}
+		stop.abort();
+		await stream.cancel().catch(() => {});
+		expect(heard).toContain("schedules-changed");
+		expect(heard).toContain('"projectId":"p1"');
+	});
+
 	test("pairs with a Host in memory: the Host walks a run it starts, and its stop is clean", async () => {
 		dir = await mkdtemp(join(tmpdir(), "nightshift-daemon-"));
 		const env = envIn(dir);

@@ -10,6 +10,7 @@ import type {
 	Clock,
 	ScheduledProjects,
 	ScheduleLog,
+	ScheduleNotices,
 	ScheduleStore,
 } from "./ports";
 
@@ -20,6 +21,7 @@ export type PauseScheduleTonightPorts = {
 	clock: Clock;
 	/** The watch of this engine: what its scheduler does next. */
 	watch: Pick<ScheduleWatch, "nextStart">;
+	notices: Pick<ScheduleNotices, "changed">;
 };
 
 export type PauseScheduleTonight = {
@@ -31,7 +33,8 @@ export type PauseScheduleTonight = {
 /**
  * Pauses one schedule tonight: its next start and every start until the
  * morning after it start no run (`domain/pause-tonight.ts`). The pause is
- * saved in the schedule, so every Device and the Host see it.
+ * saved in the schedule, so every Device and the Host see it. The open
+ * screens of the Space hear of it last, and the request waits for that.
  *
  * Refuses (`not-found`) a project that is not in the Space and a schedule
  * that does not exist, and (`invalid`) a schedule that is off, has a
@@ -43,7 +46,7 @@ export const pauseScheduleTonight =
 		_actor: Actor | undefined,
 		request: PauseScheduleTonight,
 	): Promise<SchedulePause> => {
-		const { projects, store, log, clock, watch } = ports;
+		const { projects, store, log, clock, watch, notices } = ports;
 		const { spaceId, projectId, scheduleId } = request;
 
 		await projects.inSpace(projectId, spaceId);
@@ -63,7 +66,7 @@ export const pauseScheduleTonight =
 		// The save took time: the clock and the log are read again.
 		const saved = clock();
 		const after = await log.histories();
-		return {
+		const pause = {
 			pausedUntil: paused.pausedUntil ?? null,
 			nextAt: watch.nextStart(
 				projectId,
@@ -72,4 +75,6 @@ export const pauseScheduleTonight =
 				after.of(projectId, paused.id),
 			),
 		};
+		await notices.changed(spaceId, projectId);
+		return pause;
 	};

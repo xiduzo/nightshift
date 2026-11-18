@@ -295,16 +295,29 @@ export function inMemoryScheduleSwitch(): InMemoryScheduleSwitch {
 export type InMemoryScheduleNotices = ScheduleNotices & {
 	/** The missed times that were told, in order. */
 	misses: MissedScheduleTime[];
+	/** The changes of schedules that were told, in order. */
+	changes: { spaceId: string; projectId: string }[];
 	/** From now on telling of a miss throws this. */
 	failMissed(error: unknown): void;
+	/** From now on telling of a change throws this. */
+	failChanged(error: unknown): void;
 };
 
 export function inMemoryScheduleNotices(): InMemoryScheduleNotices {
 	let failure: { error: unknown } | null = null;
+	let changeFailure: { error: unknown } | null = null;
 	const notices: InMemoryScheduleNotices = {
 		misses: [],
+		changes: [],
 		failMissed: (error) => {
 			failure = { error };
+		},
+		failChanged: (error) => {
+			changeFailure = { error };
+		},
+		async changed(spaceId, projectId) {
+			if (changeFailure) throw changeFailure.error;
+			notices.changes.push({ spaceId, projectId });
 		},
 		missed(time) {
 			if (failure) throw failure.error;

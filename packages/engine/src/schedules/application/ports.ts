@@ -157,6 +157,12 @@ export type ScheduleSwitch = {
  * @filledBy engine/run
  */
 export type ScheduleNotices = {
+	/**
+	 * A project's schedules changed without a run (a pause tonight): the
+	 * open screens of the Space read them again. It waits until they are
+	 * told, and what it throws fails the request.
+	 */
+	changed(spaceId: string, projectId: string): Promise<void>;
 	/** A cron time was missed by more than its schedule allows. */
 	missed(time: MissedScheduleTime): void;
 };
