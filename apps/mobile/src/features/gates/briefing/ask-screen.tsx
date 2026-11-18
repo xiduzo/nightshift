@@ -34,20 +34,21 @@ import { useThemeColors } from "@/shared/theme";
 import {
 	type AnswerBar,
 	type GateQueue,
+	type GoneRefusal,
+	ProblemRow,
 	SendSection,
+	SentSection,
+	useGateAnswer,
 	useQueueBar,
-} from "./answer-bar";
+} from "../answer";
+import { nextGate } from "../inbox";
 import { AskFields } from "./ask-fields";
 import { AskFiles } from "./ask-files";
 import { askSentSummary, askWebUrl } from "./ask-view";
 import { BriefSections } from "./brief-sections";
 import type { GateSent } from "./gate-briefing";
-import { nextGate } from "./gate-list";
 import { GateHead, GateUrgent } from "./gate-times";
-import { ProblemRow } from "./problem-row";
 import { QuestionSections } from "./question-sections";
-import { SentSection } from "./sent-section";
-import { type GoneRefusal, useGateAnswer } from "./use-gate-answer";
 
 /**
  * One open Ask (ADR 10), to answer it: its brief (Situation, Background),

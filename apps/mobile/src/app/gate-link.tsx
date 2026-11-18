@@ -1,3 +1,3 @@
-import { GateLinkScreen } from "@/features/inbox";
+import { GateLinkScreen } from "@/features/gates";
 
 export default GateLinkScreen;

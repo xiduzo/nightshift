@@ -1,5 +1,5 @@
+import { TranscriptScreen } from "@/features/gates";
 import { SignedInOnly } from "@/features/host";
-import { TranscriptScreen } from "@/features/inbox";
 
 export default function TranscriptRoute() {
 	return (

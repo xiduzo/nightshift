@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 
-import { useInbox } from "@/features/inbox";
-import { useStoppedRuns } from "@/features/runs";
+import { useInbox } from "../inbox";
 import { type NeedsItem, needsItems } from "./queue";
+import { useStoppedRuns } from "./stopped-runs";
 
 /**
  * Everything that waits for you: the Gates you may answer and the runs

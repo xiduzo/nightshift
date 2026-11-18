@@ -1,6 +1,6 @@
 import type { OutcomeColor } from "@nightshift/flows";
 
-import type { AnswerBar } from "@/features/inbox";
+import type { AnswerBar } from "../answer";
 import { waitsText } from "./queue";
 
 /**

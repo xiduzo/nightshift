@@ -42,9 +42,9 @@ import {
 import { useCallback } from "react";
 import { Platform, View } from "react-native";
 
+import { useShareTakeOver } from "@/features/gates";
 import { useLockScreenFollow } from "@/features/glance";
 import { useHost, useHostQueries } from "@/features/host";
-import { useShareTakeOver } from "@/features/inbox";
 import { ErrorAlert } from "@/shared/feedback";
 import { formatTime } from "@/shared/format";
 import {

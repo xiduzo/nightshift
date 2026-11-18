@@ -11,9 +11,9 @@ import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
 import { Screen } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";
+import type { GoneRefusal } from "../answer";
+import { useInbox } from "../inbox";
 import { GateBriefing } from "./gate-briefing";
-import type { GoneRefusal } from "./use-gate-answer";
-import { useInbox } from "./use-inbox";
 
 /**
  * One open Gate, to answer it: `gates/<runId>/<stepId>`, also the link

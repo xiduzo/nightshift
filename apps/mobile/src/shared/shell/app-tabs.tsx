@@ -2,13 +2,13 @@ import { useFollowHost } from "@nightshift/client";
 import { Redirect, useSegments } from "expo-router";
 import { useEffect } from "react";
 
-import { LockScreenRuns, updateGlance, useHomeWidget } from "@/features/glance";
-import { useHost, useSignedIn } from "@/features/host";
 import {
 	needsTabLabel,
 	useNeedsAccessory,
 	useNeedsCount,
-} from "@/features/needs";
+} from "@/features/gates";
+import { LockScreenRuns, updateGlance, useHomeWidget } from "@/features/glance";
+import { useHost, useSignedIn } from "@/features/host";
 import { phoneNotifications, usePhonePush } from "@/features/push";
 import { useRememberedSpace } from "@/features/spaces";
 import { useInFront } from "@/shared/in-front";

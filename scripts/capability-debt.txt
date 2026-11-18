@@ -22,9 +22,6 @@ rename apps/mobile features/glance
 rename packages/client glance
 # access: this phone's sign-in on its Host.
 rename apps/mobile features/host
-# gates: the open Gates and the Needs you queue.
-rename apps/mobile features/inbox
-rename apps/mobile features/needs
 # notifications: this phone's notifications.
 rename apps/mobile features/push
 # runs: the Runs tab.

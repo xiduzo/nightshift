@@ -23,8 +23,8 @@ import {
 } from "lucide-react-native";
 import { View } from "react-native";
 
+import { gateRowText } from "@/features/gates";
 import { useHostQueries } from "@/features/host";
-import { gateRowText } from "@/features/inbox";
 import { useClock } from "@/shared/clock";
 import {
 	NativeButtonRow,

@@ -1,3 +1,3 @@
-import { NeedsScreen } from "@/features/needs";
+import { NeedsScreen } from "@/features/gates";
 
 export default NeedsScreen;

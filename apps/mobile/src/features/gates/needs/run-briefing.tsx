@@ -4,12 +4,6 @@ import { CirclePlay, TriangleAlert } from "lucide-react-native";
 import { useEffect, useState } from "react";
 
 import { useSignedIn } from "@/features/host";
-import {
-	type AnswerBar,
-	ChoiceSection,
-	type GateQueue,
-	useQueueBar,
-} from "@/features/inbox";
 import { formatTime } from "@/shared/format";
 import { HeaderToolbar } from "@/shared/header";
 import {
@@ -21,6 +15,12 @@ import {
 } from "@/shared/native-list";
 import { useThemeColors } from "@/shared/theme";
 import { runStatusLook } from "@/shared/tone";
+import {
+	type AnswerBar,
+	ChoiceSection,
+	type GateQueue,
+	useQueueBar,
+} from "../answer";
 import { stoppedFacts, stoppedOptions } from "./stopped-view";
 
 const NO_ROUTES = new Map();

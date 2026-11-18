@@ -215,14 +215,13 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 	},
 	"apps/mobile": {
 		"features/devices": "devices",
+		// The Needs-you inbox, one Gate in full, and the Needs you queue with
+		// the bar that sends an answer.
+		"features/gates": "gates",
 		// The home screen widget and the followed run on the lock screen.
 		"features/glance": "widgets",
 		// This phone's sign-in on its Host, and the session.
 		"features/host": "access",
-		// The open Gates, and one Gate in full.
-		"features/inbox": "gates",
-		// The Needs you queue and the bar that sends an answer.
-		"features/needs": "gates",
 		// This phone's notifications.
 		"features/push": "notifications",
 		"features/runs": "runs",

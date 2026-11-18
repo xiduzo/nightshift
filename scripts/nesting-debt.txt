@@ -28,7 +28,6 @@
 #                             export (o)
 
 # (p) Verticals that must split, and their folders with no index.ts.
-apps/mobile/src/features/inbox
 packages/engine/src/knowledge
 packages/engine/src/knowledge/readers
 packages/engine/src/log

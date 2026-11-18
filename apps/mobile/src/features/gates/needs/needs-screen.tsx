@@ -18,14 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
 
 import { useHostQueries, useSignedIn } from "@/features/host";
-import {
-	type AnswerBar,
-	GateBriefing,
-	type GateQueue,
-	type GateSent,
-} from "@/features/inbox";
 import { PushCard } from "@/features/push";
-import { leaveRun } from "@/features/runs";
 import { EmptyState } from "@/shared/empty";
 import { ErrorSection } from "@/shared/feedback";
 import { type HeaderItem, TabRootHeader } from "@/shared/header";
@@ -38,6 +31,8 @@ import {
 } from "@/shared/native-list";
 import { useScreenRefresh, useWhileFocused } from "@/shared/refresh";
 import { useThemeColors } from "@/shared/theme";
+import type { AnswerBar, GateQueue } from "../answer";
+import { GateBriefing, type GateSent } from "../briefing";
 import {
 	FOCUS_START,
 	type FocusState,
@@ -46,6 +41,7 @@ import {
 	release,
 	skip,
 } from "./focus";
+import { leaveRun } from "./left-runs";
 import { type NeedsItem, runItem } from "./queue";
 import { retryState } from "./retry";
 import { RunBriefing } from "./run-briefing";

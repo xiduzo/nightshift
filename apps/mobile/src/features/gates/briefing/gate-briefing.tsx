@@ -49,24 +49,22 @@ import {
 import { useWhileFocused } from "@/shared/refresh";
 import {
 	type AnswerBar,
+	ChoiceSection,
 	type GateQueue,
+	type GoneRefusal,
+	ProblemRow,
 	SendSection,
+	type SentAnswer,
+	SentSection,
+	useGateAnswer,
 	useQueueBar,
-} from "./answer-bar";
+} from "../answer";
+import { nextGate } from "../inbox";
 import { AskScreen } from "./ask-screen";
 import { BriefSections } from "./brief-sections";
-import { ChoiceSection } from "./choice-section";
-import { nextGate } from "./gate-list";
 import { GateHead, GateUrgent, RunSteps } from "./gate-times";
 import { LINK_WORD, stepsHint } from "./gate-view";
-import { ProblemRow } from "./problem-row";
 import { QuestionSections } from "./question-sections";
-import { SentSection } from "./sent-section";
-import {
-	type GoneRefusal,
-	type SentAnswer,
-	useGateAnswer,
-} from "./use-gate-answer";
 
 /** What went out, in words: "Roll back", and "Fix the bug continues at Build." */
 export type GateSent = { choice: string; outcome: string };

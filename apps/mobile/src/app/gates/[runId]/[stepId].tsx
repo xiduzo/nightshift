@@ -1,3 +1,3 @@
-import { GateAnswerScreen } from "@/features/inbox";
+import { GateAnswerScreen } from "@/features/gates";
 
 export default GateAnswerScreen;
