@@ -189,13 +189,13 @@ describe("folder size", () => {
 });
 
 describe("barrel width", () => {
-	test("a barrel of 30 names passes", () => {
+	test("a barrel of 30 names of its own passes", () => {
 		expect(check(under(`${PKG}/src/runs`, barrelOf(30)))).toEqual([]);
 	});
 
-	test("a barrel of 31 names fails, with the number, the limit and the fix", () => {
+	test("a barrel of 31 names of its own fails, with the number, the limit and the fix", () => {
 		expect(check(under(`${PKG}/src/runs`, barrelOf(31)))).toEqual([
-			"packages/demo/src/runs/index.ts: 31 names, and the limit is 30 (barrel width). Split the vertical by sub-domain, or take names off the barrel.",
+			"packages/demo/src/runs/index.ts: 31 names of its own, and the limit is 30 (barrel width). Split the vertical into sub-verticals by sub-domain (a name counts on the barrel of its sub-vertical), or take names off the barrel.",
 		]);
 	});
 
@@ -205,8 +205,8 @@ describe("barrel width", () => {
 			...under(`${APP}/src/shared/api`, barrelOf(32)),
 		});
 		expect(problems.map((problem) => problem.split(",")[0])).toEqual([
-			"apps/demo/src/features/runs/index.ts: 31 names",
-			"apps/demo/src/shared/api/index.ts: 32 names",
+			"apps/demo/src/features/runs/index.ts: 31 names of its own",
+			"apps/demo/src/shared/api/index.ts: 32 names of its own",
 		]);
 	});
 
@@ -222,7 +222,7 @@ describe("barrel width", () => {
 				.join(""),
 		});
 		expect(problems).toHaveLength(1);
-		expect(problems[0]).toContain("32 names");
+		expect(problems[0]).toContain("32 names of its own");
 	});
 
 	test("a namespace counts as one name", () => {
@@ -242,7 +242,7 @@ describe("barrel width", () => {
 			[`${PKG}/src/runs/names.ts`]: barrelOf(31)["names.ts"] as string,
 		});
 		expect(problems).toHaveLength(1);
-		expect(problems[0]).toContain("31 names");
+		expect(problems[0]).toContain("31 names of its own");
 	});
 
 	test("an index.ts in a folder below a vertical counts, at any depth", () => {
@@ -253,7 +253,7 @@ describe("barrel width", () => {
 		});
 		expect(problems).toHaveLength(1);
 		expect(problems[0]).toContain(
-			"packages/demo/src/runs/steps/agent/index.ts: 31 names",
+			"packages/demo/src/runs/steps/agent/index.ts: 31 names of its own",
 		);
 	});
 
@@ -412,8 +412,8 @@ describe("the debt lists", () => {
 		).toEqual([
 			"packages/demo/src/steps: 28 source files, and scripts/folder-debt.txt allows 27 (folder size, the limit is 25). A listed entry only shrinks. Move the files of one sub-domain into a sub-folder.",
 			"scripts/folder-debt.txt: packages/demo/src/runs has 2 source files, within the limit of 25 (folder size). Remove its line.",
-			"packages/demo/src/runs/index.ts: 32 names, and scripts/barrel-debt.txt allows 31 (barrel width, the limit is 30). A listed entry only shrinks. Split the vertical by sub-domain, or take names off the barrel.",
-			"scripts/barrel-debt.txt: packages/demo/src/steps/index.ts has 0 names, within the limit of 30 (barrel width). Remove its line.",
+			"packages/demo/src/runs/index.ts: 32 names of its own, and scripts/barrel-debt.txt allows 31 (barrel width, the limit is 30). A listed entry only shrinks. Split the vertical into sub-verticals by sub-domain (a name counts on the barrel of its sub-vertical), or take names off the barrel.",
+			"scripts/barrel-debt.txt: packages/demo/src/steps/index.ts has 0 names of its own, within the limit of 30 (barrel width). Remove its line.",
 			"scripts/barrel-debt.txt: packages/demo/src/gone/index.ts is not a barrel in a vertical (barrel width). Remove its line.",
 		]);
 	});

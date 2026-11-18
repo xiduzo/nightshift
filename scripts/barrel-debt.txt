@@ -1,11 +1,14 @@
-# Barrel width: the index.ts barrel of a vertical exports at most 30 names.
-# So does an index.ts in a folder below it. Types and values both count.
+# Barrel width: the index.ts barrel of a vertical holds at most 30 names of
+# its own. So does an index.ts in a folder below it. Types and values both
+# count. A name that a barrel passes on from the index.ts of a sub-vertical
+# counts on that barrel, not on the parent.
 # `bun scripts/check-budgets.ts` checks it.
-# Each line is a barrel over the limit: its path, and its names on the day it
-# was listed. The check fails when the barrel exports more names than that.
-# To get off the list: split the vertical by sub-domain, or take names off
-# the barrel. When it exports 30 names or fewer, remove its line: the check
-# fails a listed barrel that is within the limit. Add no line here.
+# Each line is a barrel over the limit: its path, and its own names on the
+# day it was listed. The check fails when the barrel holds more than that.
+# To get off the list: split the vertical into sub-verticals by sub-domain,
+# or take names off the barrel. When it holds 30 names of its own or fewer,
+# remove its line: the check fails a listed barrel that is within the limit.
+# Add no line here.
 # `bun scripts/check-budgets.ts --tighten` lowers the numbers to today's.
 apps/web/src/features/agents/index.ts 31
 apps/web/src/features/flows/index.ts 44

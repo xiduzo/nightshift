@@ -5,9 +5,16 @@
  *   count of `wc -l`: the newline characters in the file.
  * - Folder size (V6): a folder holds at most 25 source files directly in it.
  *   The files of its sub-folders do not count.
- * - Barrel width (V4): the `index.ts` barrel of a vertical exports at most
- *   30 names. So does an `index.ts` in a folder below it, at any depth. A
- *   type and a value both count. A namespace (`export * as x from`) counts
+ * - Barrel width (V4): the `index.ts` barrel of a vertical holds at most 30
+ *   names of its own. So does an `index.ts` in a folder below it, at any
+ *   depth. A name is a barrel's own when it comes from a file of its folder,
+ *   its ring folders (`domain/`, `application/`, `adapters/`) included. A
+ *   name that a barrel passes on from the `index.ts` of a sub-vertical (a
+ *   folder below it, at any depth, with its own `index.ts`) counts on that
+ *   barrel, and not again on the parent. So a wide vertical is a set of
+ *   sub-verticals, each a door of at most 30 names. A name from a file
+ *   inside a sub-vertical that is not its `index.ts` counts on the parent.
+ *   A type and a value both count. A namespace (`export * as x from`) counts
  *   as one name. `export * from` counts every name it passes on. A package's
  *   root `index.ts` and the entries that its `exports` names are not in
  *   scope: they compose verticals.
@@ -42,7 +49,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import {
 	entryFiles,
@@ -143,11 +150,17 @@ export const FOLDER_SIZE: Budget = {
 export const BARREL_WIDTH: Budget = {
 	rule: "barrel width",
 	limit: 30,
-	unit: "names",
+	unit: "names of its own",
 	list: "scripts/barrel-debt.txt",
 	kind: "a barrel in a vertical",
-	fix: "Split the vertical by sub-domain, or take names off the barrel.",
+	fix: "Split the vertical into sub-verticals by sub-domain (a name counts on the barrel of its sub-vertical), or take names off the barrel.",
 };
+
+/**
+ * The ring folders of a slice. An `index.ts` in one, or below one, is no
+ * barrel of a sub-vertical: its names are the slice's own.
+ */
+const RING_FOLDERS = new Set(["domain", "application", "adapters"]);
 
 /** The debt list of the peer ports, by its path in the repository. */
 export const PEER_PORT_LIST = "scripts/peer-port-debt.txt";
@@ -174,7 +187,7 @@ export type Sizes = {
 	files: Map<string, number>;
 	/** The source files directly in each folder. */
 	folders: Map<string, number>;
-	/** The names on each barrel in a vertical. */
+	/** The names of its own on each barrel in a vertical. */
 	barrels: Map<string, number>;
 };
 
@@ -230,11 +243,46 @@ export function measure(
 			return names;
 		};
 		const entries = entryFiles(wsDir);
+		/**
+		 * `target` is the barrel of a sub-vertical of `dir`: an `index.ts`
+		 * in a folder below it. Not one in a ring folder, and not an entry
+		 * of the package, which this check does not measure.
+		 */
+		const subBarrel = (dir: string, target: string | undefined) =>
+			target !== undefined &&
+			/^index\.tsx?$/.test(basename(target)) &&
+			dirname(target).startsWith(`${dir}${sep}`) &&
+			!entries.has(target) &&
+			!relative(dir, dirname(target))
+				.split(sep)
+				.some((folder) => RING_FOLDERS.has(folder));
+		/** The names of its own on a barrel: not the ones it passes on. */
+		const ownNames = (barrel: string): Set<string> => {
+			const dir = dirname(barrel);
+			const file = parse(barrel);
+			const passedOn = (specifier: string | undefined) =>
+				specifier !== undefined &&
+				subBarrel(dir, resolveImport(barrel, specifier));
+			const passed = new Set<string>();
+			for (const { specifier, exported } of file.reexports)
+				if (passedOn(specifier)) passed.add(exported);
+			for (const { local, exported } of file.localExports)
+				if (passedOn(file.bindings.get(local)?.specifier)) passed.add(exported);
+			const names = new Set(
+				file.exports.names.filter((name) => !passed.has(name)),
+			);
+			for (const star of file.exports.stars) {
+				const target = resolveImport(barrel, star);
+				if (!target || subBarrel(dir, target)) continue;
+				for (const name of namesOn(target, new Set([barrel]))) names.add(name);
+			}
+			return names;
+		};
 		// The barrel of a vertical, and each index.ts in a folder below it.
 		const barrelsIn = (dir: string): void => {
 			const barrel = resolveFile(join(dir, "index"));
 			if (barrel && !entries.has(barrel))
-				sizes.barrels.set(rel(barrel), new Set(namesOn(barrel)).size);
+				sizes.barrels.set(rel(barrel), ownNames(barrel).size);
 			for (const entry of readdirSync(dir, { withFileTypes: true }))
 				if (entry.isDirectory() && !skipped(entry.name))
 					barrelsIn(join(dir, entry.name));
