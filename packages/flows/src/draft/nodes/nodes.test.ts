@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { FlowNode } from "../flow";
-import type { ToolNode } from "../nodes";
+import type { FlowNode } from "../../flow";
+import type { ToolNode } from "../../nodes";
 import { withOutputSchema, withTool } from "./nodes";
 
 describe("withOutputSchema", () => {

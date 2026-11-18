@@ -1,14 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { FLOW_VERSION, type Flow, type FlowInput, flowSchema } from "../flow";
-import { validateFlow } from "../validate";
 import {
-	planSubflowFromSection,
-	type SubflowChange,
-	type SubflowOptions,
-	type SubflowPlan,
-} from "./subflow";
+	FLOW_VERSION,
+	type Flow,
+	type FlowInput,
+	flowSchema,
+} from "../../flow";
+import { validateFlow } from "../../validate";
+import type { SubflowChange, SubflowOptions, SubflowPlan } from "./plan";
+import { planSubflowFromSection } from "./subflow";
 
 /**
  * The fixture has the shape of a real build flow (ids, types, outcomes,

@@ -12,12 +12,11 @@ import {
 	nodeOutcomes,
 	type Outcome,
 	type Policy,
-} from "../flow";
-import type { NewNode, NodeDefaults, Position } from "../nodes";
-import { jsonataPath } from "../presets";
-import { mainOutputField, outputFieldShape } from "../shapes";
-import { takenNames, uniqueEdgeId, uniqueNodeId } from "./names";
-import { renameInFlow } from "./refs";
+} from "../../flow";
+import type { NewNode, NodeDefaults, Position } from "../../nodes";
+import { jsonataPath } from "../../presets";
+import { mainOutputField, outputFieldShape } from "../../shapes";
+import { renameInFlow, takenNames, uniqueEdgeId, uniqueNodeId } from "../names";
 import { sectionsWithoutNode, sectionsWithRenamedNode } from "./sections";
 
 /**

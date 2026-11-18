@@ -1,6 +1,6 @@
 /** New nodes and flows, and edits of one node. */
 
-import { FLOW_VERSION, type Flow, type FlowNode } from "../flow";
+import { FLOW_VERSION, type Flow, type FlowNode } from "../../flow";
 import {
 	type AgentNode,
 	agentNode,
@@ -18,8 +18,8 @@ import {
 	type VariableWrite,
 	valueDeciderNameSchema,
 	type WaitUntil,
-} from "../nodes";
-import { typedOutput } from "../shapes";
+} from "../../nodes";
+import { typedOutput } from "../../shapes";
 
 /**
  * Changes who decides. A rule's `when` fields go, and `title`,

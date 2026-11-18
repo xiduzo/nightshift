@@ -4,13 +4,13 @@
  * branches, no GitHub repository. The editor warns at the step that fails
  * there, before a run does.
  */
-import type { Flow, FlowNode } from "../flow";
-import { folderKit, isKitName } from "../kits";
-import { calledFlowNames } from "../nodes";
-import { walkCalledFlows } from "../secrets";
-import type { ProjectFlowMap } from "../validate";
+import type { Flow, FlowNode } from "../../flow";
+import { folderKit, isKitName } from "../../kits";
+import { calledFlowNames } from "../../nodes";
+import { walkCalledFlows } from "../../secrets";
+import type { ProjectFlowMap } from "../../validate";
+import { nodeReads } from "../names";
 import { callPattern, commandsOf, withoutComment } from "./cli-programs";
-import { nodeReads } from "./reads";
 
 /**
  * The run fields that name a branch or a base: `{{run.branch}}`. Always

@@ -5,40 +5,53 @@
  */
 
 export {
+	BRANCH_RUN_FIELDS,
+	type CliToolRef,
 	checkDraft,
 	type DraftMessages,
 	type DraftSchemaIssue,
 	type FlowCheck,
 	type FlowPlace,
+	type FolderNeed,
+	folderNeeds,
 	isSavable,
 	type PlaceDevice,
+	programsWithoutLogin,
 } from "./check";
-export { type CliToolRef, programsWithoutLogin } from "./cli-programs";
 export { copyNodes, type FlowClip, pasteNodes } from "./clipboard";
-export { BRANCH_RUN_FIELDS, type FolderNeed, folderNeeds } from "./folder";
 export {
 	addCalledNode,
 	addEdge,
 	addNode,
 	addNodeAfter,
+	addSection,
 	edgeInLoop,
 	moveNodes,
 	NEW_NODE_TAKES,
 	type NewNodeKind,
 	removeEdge,
 	removeNode,
+	removeSection,
 	renameNode,
+	type SectionFields,
 	setInputs,
 	setOutputs,
 	setPolicyValue,
 	setVariables,
 	updateEdge,
 	updateNode,
+	updateSection,
 } from "./graph";
 export {
+	type DataLink,
+	dataLinks,
+	type FlowRead,
+	flowReads,
 	type NameClash,
 	type NameOwner,
 	nameClash,
+	renameInput,
+	renameVariable,
 	uniqueName,
 	uniqueOutputName,
 } from "./names";
@@ -46,18 +59,10 @@ export {
 	defaultEach,
 	emptySource,
 	emptyUntil,
-	newElementFlow,
-	newFlow,
-	withConnections,
-	withDecidedBy,
-	withOutputSchema,
-	withTool,
-	withValueBy,
-	withWrites,
-} from "./nodes";
-export {
 	isOptionNode,
 	type NodeOption,
+	newElementFlow,
+	newFlow,
 	nodeOptions,
 	type OptionNode,
 	removeOutcome,
@@ -68,24 +73,14 @@ export {
 	setAgentOutcomes,
 	setCallEach,
 	uniqueOptionName,
+	withConnections,
+	withDecidedBy,
 	withOptions,
-} from "./outcomes";
-export {
-	type DataLink,
-	dataLinks,
-	type FlowRead,
-	flowReads,
-} from "./reads";
-export {
-	renameInput,
-	renameVariable,
-} from "./refs";
-export {
-	addSection,
-	removeSection,
-	type SectionFields,
-	updateSection,
-} from "./sections";
+	withOutputSchema,
+	withTool,
+	withValueBy,
+	withWrites,
+} from "./nodes";
 export {
 	planSubflowFromSection,
 	type SubflowBlocker,

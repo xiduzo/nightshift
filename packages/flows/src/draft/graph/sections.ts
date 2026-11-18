@@ -1,11 +1,11 @@
 /** Edits of the flow's Sections: add, change and remove, and keep them in step with the nodes. */
-import type { Flow, FlowSection } from "../flow";
+import type { Flow, FlowSection } from "../../flow";
 import {
 	canMakeSection,
 	parentSection,
 	type SectionProblem,
 	sectionOf,
-} from "../sections";
+} from "../../sections";
 
 /** What a new Section shows. The label defaults to "Section". */
 export type SectionFields = Partial<

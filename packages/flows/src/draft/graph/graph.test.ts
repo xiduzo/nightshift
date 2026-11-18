@@ -5,16 +5,17 @@ import {
 	type FlowNode,
 	NODE_FAMILY,
 	nodeOutputFields,
-} from "../flow";
-import type {
-	ConvertNode,
-	DecisionNode,
-	SinceLastRunNode,
-	ValueNode,
-} from "../nodes";
-import { NODE_FAMILIES, NODE_FAMILY_LABEL } from "../nodes";
-import { commandNode } from "../nodes/do/command";
-import { mainOutputField } from "../shapes";
+} from "../../flow";
+import {
+	type ConvertNode,
+	type DecisionNode,
+	NODE_FAMILIES,
+	NODE_FAMILY_LABEL,
+	type SinceLastRunNode,
+	type ValueNode,
+} from "../../nodes";
+import { commandNode } from "../../nodes/do/command";
+import { mainOutputField } from "../../shapes";
 import {
 	addCalledNode,
 	addEdge,

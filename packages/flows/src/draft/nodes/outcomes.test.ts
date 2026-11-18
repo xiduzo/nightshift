@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { FLOW_VERSION, type Flow, flowSchema } from "../flow";
+import { FLOW_VERSION, type Flow, flowSchema } from "../../flow";
 import {
 	nodeOptions,
 	removeOutcome,

@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { FLOW_VERSION, type Flow, type FlowInput, flowSchema } from "../flow";
+import {
+	FLOW_VERSION,
+	type Flow,
+	type FlowInput,
+	flowSchema,
+} from "../../flow";
 import { dataLinks, flowReads, readsOf } from "./reads";
 
 const at = { x: 0, y: 0 };

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { FLOW_VERSION, type Flow, flowSchema } from "../flow";
-import { renameNode, setVariables } from "./graph";
+import { FLOW_VERSION, type Flow, flowSchema } from "../../flow";
+import { renameNode, setVariables } from "../graph/graph";
+import { withWrites } from "../nodes/nodes";
 import { takenNames } from "./names";
-import { withWrites } from "./nodes";
 import {
 	renameInput,
 	renameRefs,

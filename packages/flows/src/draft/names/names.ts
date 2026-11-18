@@ -1,6 +1,6 @@
 /** Free names for new nodes, inputs, outputs and edges, and the clash of a new name. */
-import type { Flow } from "../flow";
-import { reservedNames, ruleOwnNames, templateOwnNames } from "../nodes";
+import type { Flow } from "../../flow";
+import { reservedNames, ruleOwnNames, templateOwnNames } from "../../nodes";
 
 /**
  * The names a new node, input or variable does not get: node ids, inputs

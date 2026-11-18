@@ -9,9 +9,8 @@ import {
 import type { Position } from "../nodes";
 import { nodesWithin } from "../sections";
 import { rewriteRuleNames } from "../template";
-import { uniqueEdgeId, uniqueNodeId } from "./names";
-import { rewriteRefs } from "./refs";
-import { uniqueSectionId } from "./sections";
+import { uniqueSectionId } from "./graph";
+import { rewriteRefs, uniqueEdgeId, uniqueNodeId } from "./names";
 
 /**
  * Nodes as they were copied: the edges between them, and the Sections

@@ -1,17 +1,20 @@
 /** Checks a draft in its place: the schema, the connections, profiles, Devices and CLI programs it names, what needs the project's folder, and `validateFlow`. */
-import { type Flow, type FlowNode, flowSchema } from "../flow";
+import { type Flow, type FlowNode, flowSchema } from "../../flow";
 import {
 	type AgentNode,
 	deviceIdOf,
 	isProfileRef,
 	type ProfileRef,
-} from "../nodes";
-import { everyProfileOf, profileOf, runsAs } from "../profiles";
-import type { FlowIssue, ProjectFlowMap } from "../validate";
-import { validateFlow } from "../validate";
+} from "../../nodes";
+import { everyProfileOf, profileOf, runsAs } from "../../profiles";
+import {
+	type FlowIssue,
+	type ProjectFlowMap,
+	validateFlow,
+} from "../../validate";
+import { missingConnections } from "../nodes";
 import { type CliToolRef, programsWithoutLogin } from "./cli-programs";
 import { type FolderNeed, folderNeeds } from "./folder";
-import { missingConnections } from "./nodes";
 
 export type FlowCheck = {
 	issues: FlowIssue[];

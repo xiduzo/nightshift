@@ -5,10 +5,10 @@
  * that read it (`dataLinks`), and an agent learns who reads what
  * (`flowReads`).
  */
-import { type Flow, type FlowNode, nodeTexts } from "../flow";
-import type { HeldText } from "../nodes";
-import { ruleRefs, templateRefs } from "../template";
-import { checkNodeWith } from "../validate";
+import { type Flow, type FlowNode, nodeTexts } from "../../flow";
+import type { HeldText } from "../../nodes";
+import { ruleRefs, templateRefs } from "../../template";
+import { checkNodeWith } from "../../validate";
 
 /** Who reads: a node, an output of the flow, or the initial value of a variable. */
 export type Reader =

@@ -6,7 +6,7 @@ import {
 	type FlowNode,
 	nodeOutcomes,
 	type Outcome,
-} from "../flow";
+} from "../../flow";
 import {
 	type AgentNode,
 	type CallEach,
@@ -20,8 +20,8 @@ import {
 	isPersonTier,
 	type PersonTier,
 	type WaitNode,
-} from "../nodes";
-import { updateNode } from "./graph";
+} from "../../nodes";
+import { updateNode } from "../graph";
 
 /** A Decision option or an Agent's own outcome. Each one is an outcome of its node. */
 /** A Decision option, an Agent or Wait outcome, or a Command exit (with its `code`). */

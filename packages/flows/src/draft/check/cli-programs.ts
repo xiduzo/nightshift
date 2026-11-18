@@ -1,5 +1,5 @@
 /** Programs that a command calls by their own name while only other CLI tools sign in to them. */
-import { type FlowNode, nodeTexts } from "../flow";
+import { type FlowNode, nodeTexts } from "../../flow";
 
 /** A CLI tool, as a check reads it. `program` null: the tool runs the program of its own name. */
 export type CliToolRef = {

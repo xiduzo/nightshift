@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { FLOW_VERSION, type Flow } from "../flow";
-import type { AgentNode } from "../nodes";
-import { agentNode } from "../nodes/do/agent";
-import { commandNode } from "../nodes/do/command";
+import { FLOW_VERSION, type Flow } from "../../flow";
+import type { AgentNode } from "../../nodes";
+import { agentNode } from "../../nodes/do/agent";
+import { commandNode } from "../../nodes/do/command";
 import {
 	checkDraft,
 	type DraftMessages,

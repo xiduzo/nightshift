@@ -1,12 +1,12 @@
 /** Renames in templates, rules and expressions. */
-import { type Flow, type FlowNode, mapNodeTexts } from "../flow";
-import { mapTexts, type NodeText, type TextRewrite } from "../nodes";
-import type { TemplateRef } from "../template";
+import { type Flow, type FlowNode, mapNodeTexts } from "../../flow";
+import { mapTexts, type NodeText, type TextRewrite } from "../../nodes";
 import {
 	rewriteRuleNames,
 	rewriteRuleVariables,
+	type TemplateRef,
 	templateRefs,
-} from "../template";
+} from "../../template";
 
 /** A name a template can reference: a node id, an input, `run` or `vars`. */
 const REF_NAME = /^[a-z][a-z0-9_]*$/;
