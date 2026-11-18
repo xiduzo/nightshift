@@ -46,6 +46,18 @@ pre-commit:
         - "*.{ts,tsx}"
         - "scripts/time-debt.txt"
       run: bun scripts/check-time.ts
+    # File size, folder size, barrel width and the peer ports. Each has a
+    # debt list, and each may only shrink.
+    - name: budgets
+      glob:
+        - "*.{ts,tsx}"
+        - "package.json"
+        - "**/package.json"
+        - "scripts/size-debt.txt"
+        - "scripts/folder-debt.txt"
+        - "scripts/barrel-debt.txt"
+        - "scripts/peer-port-debt.txt"
+      run: bun scripts/check-budgets.ts
     # The reference tables of the docs match the code.
     - name: docs reference
       glob:
