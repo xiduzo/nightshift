@@ -7,7 +7,8 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { deciderModels, tanstackDecider } from "./decider";
+import { tanstackDecider } from "./decider";
+import { deciderModels } from "./models";
 
 const baseUrl = process.env.OPENJEV_LIVE_URL;
 const key = process.env.OPENJEV_LIVE_KEY;

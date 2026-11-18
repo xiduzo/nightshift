@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { DecisionInput, ValueInput } from "../port/types";
+import { tanstackDecider } from "./decider";
+import { deciderModels } from "./models";
 import {
 	cannotMakeValueMessage,
 	DECIDER_ADAPTERS,
 	DECIDER_SETUP,
-	deciderModels,
-	tanstackDecider,
-} from "./decider";
+} from "./registry";
 
 const realFetch = globalThis.fetch;
 afterEach(() => {

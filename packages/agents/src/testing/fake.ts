@@ -1,4 +1,4 @@
-import { defaultDeciderModel } from "../decider/decider";
+import { defaultDeciderModel } from "../decider/registry";
 import { harnessFacts } from "../harnesses/facts";
 import type {
 	AgentErrorKind,

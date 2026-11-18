@@ -7,7 +7,8 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { deciderModels, tanstackDecider } from "./decider";
+import { tanstackDecider } from "./decider";
+import { deciderModels } from "./models";
 
 const model = process.env.OLLAMA_LIVE_MODEL;
 const offered = model ? await deciderModels("ollama") : null;

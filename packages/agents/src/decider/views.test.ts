@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { deciderNameSchema } from "@nightshift/flows";
 
-import { DECIDER_ADAPTERS } from "./decider";
+import { DECIDER_ADAPTERS } from "./registry";
 import { deciderViews } from "./views";
 
 const realFetch = globalThis.fetch;

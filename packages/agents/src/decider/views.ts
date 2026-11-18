@@ -1,11 +1,9 @@
 import { deciderAddress, deciderNameSchema } from "@nightshift/flows";
 
 import type { DeciderName } from "../port";
-import {
-	DECIDER_ADAPTERS,
-	type DeciderContext,
-	deciderModels,
-} from "./decider";
+import type { DeciderContext } from "./decider-record";
+import { deciderModels } from "./models";
+import { DECIDER_ADAPTERS } from "./registry";
 
 /**
  * A decider as the Agents page lists it. `Source` is the caller's: where
