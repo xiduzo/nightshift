@@ -1,6 +1,7 @@
 /**
- * The rules of one workspace: (a) to (l) of `scripts/check-verticals.ts`.
- * That file holds the header with every rule, and the listed exceptions.
+ * The rules of one workspace: (a) to (l) and (n) to (p) of
+ * `scripts/check-verticals.ts`. That file holds the header with every
+ * rule, and the listed exceptions.
  */
 
 import { existsSync, readdirSync } from "node:fs";
@@ -8,6 +9,14 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { isTest } from "../check-layers";
 import { cyclicGroups, shortestCycle } from "./cycles";
+import { KIND_FOLDER_DEBT, NESTING_DEBT, ratchet } from "./debt";
+import {
+	CATCH_ALL_FILES,
+	CATCH_ALL_FOLDERS,
+	KIND_BUCKETS,
+	kindFolderFindings,
+} from "./folder-names";
+import { nestingFindings } from "./nesting";
 import {
 	aliases,
 	entryFiles,
@@ -15,34 +24,8 @@ import {
 	resolveFile,
 	resolverFor,
 } from "./resolve";
-import { parse, type SourceFile, skipped, walk } from "./source-file";
-
-/** Kind buckets: never a folder at the top of `src/`. */
-export const KIND_BUCKETS = new Set([
-	"lib",
-	"utils",
-	"helpers",
-	"hooks",
-	"components",
-	"types",
-	"common",
-	"misc",
-]);
-
-/**
- * Catch-all names: they say nothing of what a file holds, so anything ends
- * up in them. Never a file name or a folder name, at any depth. `shared` is
- * an app's folder of named shared pieces, so only a file may not take it.
- */
-export const CATCH_ALL_FOLDERS = new Set([
-	"utils",
-	"util",
-	"helpers",
-	"helper",
-	"common",
-	"misc",
-]);
-const CATCH_ALL_FILES = new Set([...CATCH_ALL_FOLDERS, "shared"]);
+import { parse, type SourceFile, walk } from "./source-file";
+import { type Vertical, verticalsOf } from "./vertical";
 
 /** The app's shared piece that composes the features. */
 const SHELL = "shared/shell";
@@ -54,33 +37,11 @@ export type Options = {
 	entryDirs?: string[];
 	/** The verticals whose imports the cycle check skips (KNOWN_CYCLES). */
 	knownCycles?: string[];
+	/** The lines of `scripts/kind-folder-debt.txt` for this workspace (n). */
+	kindFolderDebt?: string[];
+	/** The lines of `scripts/nesting-debt.txt` for this workspace (o, p). */
+	nestingDebt?: string[];
 };
-
-export type Vertical = { name: string; dir: string; barrel?: string };
-
-export function verticalsOf(src: string, app: boolean): Vertical[] {
-	const roots = app
-		? [
-				{ dir: join(src, "features"), prefix: "features/" },
-				{ dir: join(src, "shared"), prefix: "shared/" },
-			]
-		: [{ dir: src, prefix: "" }];
-	const found: Vertical[] = [];
-	for (const { dir, prefix } of roots) {
-		if (!existsSync(dir)) continue;
-		for (const entry of readdirSync(dir, { withFileTypes: true })) {
-			if (!entry.isDirectory() || skipped(entry.name)) continue;
-			if (!app && entry.name === "testing") continue;
-			const path = join(dir, entry.name);
-			found.push({
-				name: `${prefix}${entry.name}`,
-				dir: path,
-				barrel: resolveFile(join(path, "index")),
-			});
-		}
-	}
-	return found;
-}
 
 /**
  * The problems of one workspace (`apps/web`, `packages/engine`), as
@@ -458,6 +419,28 @@ export function checkWorkspace(
 			);
 		}
 	}
+
+	// (n) No kind folder inside a vertical. (o) and (p) Sub-verticals. Each
+	// has a debt list: what is on it passes until it is clean.
+	problems.push(
+		...ratchet(
+			KIND_FOLDER_DEBT,
+			options.kindFolderDebt ?? [],
+			kindFolderFindings(verticals, rel),
+		),
+		...ratchet(
+			NESTING_DEBT,
+			options.nestingDebt ?? [],
+			nestingFindings({
+				verticals,
+				files,
+				entries,
+				resolveImport,
+				exportsOf,
+				rel,
+			}),
+		),
+	);
 
 	return problems;
 }

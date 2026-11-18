@@ -36,18 +36,43 @@
  *     included. An import through a peer port or of a leaf contract is
  *     not part of a cycle, nor is a test. KNOWN_CYCLES lists the ones that
  *     wait for their fix
+ * (n) a kind folder inside a vertical, at any depth: a folder named
+ *     components, hooks, lib, types, queries or mutations. (The other kind
+ *     names, utils, helpers, common and misc, fail as catch-all names (k).)
+ * (o) a sub-vertical that breaks a barrel rule. A folder inside a vertical
+ *     that has its own `index.ts` is a sub-vertical, at every depth. It
+ *     fails on an import from outside the sub-vertical, but inside its
+ *     vertical, into a file of it other than that barrel. It fails on a
+ *     statement on that barrel that is not an import or an export, and on
+ *     a name on it that no file outside the sub-vertical imports
+ * (p) a vertical or a sub-vertical with more than 25 source files or more
+ *     than 5,000 lines (tests do not count, everything below it does) that
+ *     does not consist of sub-verticals: a folder directly in it that has
+ *     no `index.ts`, and own code over the same two limits. Its own code
+ *     is the files directly in it and in its ring folders
  * And across the workspaces it checks:
  * (m) a name on a package entry that no production file of another
  *     workspace imports. A test counts only for a `./testing` entry. A
  *     type may stay when a used name's declaration writes it, in turn
  *     (`checkEntries`. PENDING_NAMES wait for their importer)
  *
+ * The ring folders of a slice (`domain/`, `application/`, `adapters/`,
+ * `adapters/in/` and `adapters/out/`, directly in a vertical or a
+ * sub-vertical) are not sub-verticals for (o) and (p): they need no
+ * barrel, and an `index.ts` in one makes no barrel. A folder in a ring
+ * folder counts as a folder directly in the vertical.
+ *
+ * Rules (n), (o) and (p) started with a debt list each, for what broke them
+ * that day: `scripts/kind-folder-debt.txt` (n) and `scripts/nesting-debt.txt`
+ * (o, p). An offender that is not on its list fails. A line fails once it
+ * is clean, so a list only gets shorter.
+ *
  * It reads every file of the workspace, not only `src/`. A file outside
  * `src/` (a config file, a script) belongs to no vertical: it imports a
  * vertical through its barrel, and it counts as an importer for (b).
  *
- * Tests may deep-import, and they do not count as importers for (b), except
- * for a vertical named `testing`. A test is a `*.test.ts(x)` file, a
+ * Tests may deep-import, and they do not count as importers for (b) and
+ * (o), except for a vertical named `testing`. A test is a `*.test.ts(x)` file, a
  * `test-support.ts` file, a file in a `testing/` or `fixtures/` folder, or a
  * file in the workspace's `test/` folder.
  * A namespace import (`import * as x`), `export * from` and a dynamic
@@ -57,13 +82,20 @@
  *   bun scripts/check-verticals.ts                  every workspace
  *   bun scripts/check-verticals.ts packages/engine  only that workspace
  *
- * Exits 1 and names each violation. Fix the import, do not add an exception.
+ * Exits 1 and names each violation. Fix the import, do not add an exception
+ * or a line to a debt list.
  */
 
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { ENTRY_EXCEPTIONS } from "./check-layers";
+import {
+	debtList,
+	KIND_FOLDER_DEBT,
+	linesOf,
+	NESTING_DEBT,
+} from "./verticals/debt";
 import { entryProblems } from "./verticals/entries";
 import { checkWorkspace } from "./verticals/workspace";
 
@@ -83,12 +115,8 @@ export {
 	type SourceFile,
 	walk,
 } from "./verticals/source-file";
-export {
-	checkWorkspace,
-	type Options,
-	type Vertical,
-	verticalsOf,
-} from "./verticals/workspace";
+export { type Vertical, verticalsOf } from "./verticals/vertical";
+export { checkWorkspace, type Options } from "./verticals/workspace";
 
 /**
  * The workspaces that section 4 does not cover: `ui` and `ui-native` (React
@@ -255,12 +283,27 @@ export function checkEntries(
 }
 
 /**
- * The problems of each named workspace, with the listed exceptions of
- * each, and of the entries of those workspaces. A name that is not a
- * workspace is a problem too.
+ * The problems of each named workspace, with the listed exceptions and the
+ * debt lists of each, and of the entries of those workspaces. A name that
+ * is not a workspace is a problem too. So is a line of a debt list that
+ * names no checked workspace.
  */
 export function checkWorkspaces(root: string, workspaces: string[]): string[] {
 	const problems: string[] = [];
+	const kindFolderDebt = debtList(root, KIND_FOLDER_DEBT);
+	const nestingDebt = debtList(root, NESTING_DEBT);
+	const checked = workspacesOf(root);
+	for (const [file, lines] of [
+		[KIND_FOLDER_DEBT, kindFolderDebt],
+		[NESTING_DEBT, nestingDebt],
+	] as const) {
+		for (const line of lines) {
+			if (!checked.some((workspace) => line.startsWith(`${workspace}/`)))
+				problems.push(
+					`${file}: "${line}" names no path of a checked workspace. Remove the line.`,
+				);
+		}
+	}
 	for (const workspace of workspaces) {
 		if (!existsSync(join(root, workspace, "package.json"))) {
 			problems.push(`${workspace}: is not a workspace.`);
@@ -272,6 +315,8 @@ export function checkWorkspaces(root: string, workspaces: string[]): string[] {
 				peerPorts: PEER_PORTS[workspace],
 				entryDirs: ENTRY_DIRS[workspace],
 				knownCycles: KNOWN_CYCLES[workspace],
+				kindFolderDebt: linesOf(kindFolderDebt, workspace),
+				nestingDebt: linesOf(nestingDebt, workspace),
 			}),
 		);
 	}

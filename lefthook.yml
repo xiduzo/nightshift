@@ -33,13 +33,16 @@ pre-commit:
         - "packages/semconv/**"
         - "scripts/check-collector-allowlist.ts"
       run: bun scripts/check-collector-allowlist.ts
-    # The vertical check reads the source, the entries and the path aliases.
+    # The vertical check reads the source, the entries, the path aliases and
+    # its two debt lists.
     - name: verticals
       glob:
         - "*.{ts,tsx}"
         - "package.json"
         - "**/package.json"
         - "**/tsconfig.json"
+        - "scripts/kind-folder-debt.txt"
+        - "scripts/nesting-debt.txt"
       run: bun scripts/check-verticals.ts
     # The capability map names every vertical. It reads the same files.
     - name: capabilities

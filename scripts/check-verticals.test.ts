@@ -48,8 +48,8 @@ const PKG = "packages/demo";
 const runs = {
 	"src/features/runs/index.ts": 'export { RunList } from "./run-list";\n',
 	"src/features/runs/run-list.ts":
-		'import { format } from "./lib/format";\nexport const RunList = () => format("runs");\n',
-	"src/features/runs/lib/format.ts":
+		'import { format } from "./text/format";\nexport const RunList = () => format("runs");\n',
+	"src/features/runs/text/format.ts":
 		"export const format = (s: string) => s;\n",
 };
 
@@ -95,7 +95,7 @@ describe("deep imports (a)", () => {
 		const problems = check(APP, {
 			...runs,
 			"src/main.ts":
-				'export { format } from "./features/runs/lib/format";\nexport const load = () => import("./features/runs/run-list");\n',
+				'export { format } from "./features/runs/text/format";\nexport const load = () => import("./features/runs/run-list");\n',
 		});
 		expect(problems.filter((p) => p.includes("past the barrel"))).toHaveLength(
 			2,
@@ -106,11 +106,11 @@ describe("deep imports (a)", () => {
 		const problems = check(APP, {
 			...runs,
 			"src/main.ts":
-				'export type List = import("./features/runs/run-list").RunList;\nexport const format = require("./features/runs/lib/format");\n',
+				'export type List = import("./features/runs/run-list").RunList;\nexport const format = require("./features/runs/text/format");\n',
 		});
 		expect(problems.filter((p) => p.includes("past the barrel"))).toEqual([
 			'apps/demo/src/main.ts: imports "./features/runs/run-list" past the barrel of features/runs. Import "./features/runs" instead.',
-			'apps/demo/src/main.ts: imports "./features/runs/lib/format" past the barrel of features/runs. Import "./features/runs" instead.',
+			'apps/demo/src/main.ts: imports "./features/runs/text/format" past the barrel of features/runs. Import "./features/runs" instead.',
 		]);
 	});
 
@@ -119,7 +119,7 @@ describe("deep imports (a)", () => {
 			check(APP, {
 				...runs,
 				"src/features/runs/index.ts":
-					'export { RunList } from "./run-list";\nexport { format } from "./lib/format";\n',
+					'export { RunList } from "./run-list";\nexport { format } from "./text/format";\n',
 				"src/main.ts":
 					'export type List = typeof import("./features/runs").RunList;\n',
 			}),
@@ -129,7 +129,7 @@ describe("deep imports (a)", () => {
 	});
 
 	test("inside a vertical, relative imports may reach any file", () => {
-		// run-list.ts imports ./lib/format: no problem.
+		// run-list.ts imports ./text/format: no problem.
 		expect(
 			check(APP, {
 				...runs,
@@ -146,7 +146,7 @@ describe("deep imports (a)", () => {
 				"src/main.ts":
 					'import { RunList } from "./features/runs";\nexport default RunList;\n',
 				"src/routes/runs.test.ts":
-					'import { format } from "../features/runs/lib/format";\nformat("x");\n',
+					'import { format } from "../features/runs/text/format";\nformat("x");\n',
 			}),
 		).toEqual([]);
 	});
@@ -221,7 +221,7 @@ describe("barrel reachability (b)", () => {
 			check(APP, {
 				...runs,
 				"src/features/runs/index.ts":
-					'export { RunList } from "./run-list";\nexport { format } from "./lib/format";\nexport type { Unused } from "./run-list";\n',
+					'export { RunList } from "./run-list";\nexport { format } from "./text/format";\nexport type { Unused } from "./run-list";\n',
 				"src/main.ts":
 					'import { RunList } from "./features/runs";\nexport default RunList;\n',
 			}),
@@ -256,7 +256,7 @@ describe("barrel reachability (b)", () => {
 		const problems = check(APP, {
 			...runs,
 			"src/features/runs/index.ts":
-				'export * from "./run-list";\nexport * from "./lib/format";\n',
+				'export * from "./run-list";\nexport * from "./text/format";\n',
 			"src/main.ts":
 				'import { RunList } from "./features/runs";\nexport default RunList;\n',
 		});
@@ -269,7 +269,7 @@ describe("barrel reachability (b)", () => {
 		const files = {
 			...runs,
 			"src/features/runs/index.ts":
-				'export { RunList } from "./run-list";\nexport { format } from "./lib/format";\n',
+				'export { RunList } from "./run-list";\nexport { format } from "./text/format";\n',
 		};
 		expect(
 			check(APP, {
@@ -291,7 +291,7 @@ describe("barrel reachability (b)", () => {
 			check(APP, {
 				...runs,
 				"src/features/runs/index.ts":
-					'export { RunList } from "./run-list";\nexport { format } from "./lib/format";\n',
+					'export { RunList } from "./run-list";\nexport { format } from "./text/format";\n',
 				"src/main.ts":
 					'export async function load() {\n\tconst { RunList } = await import("./features/runs");\n\treturn RunList;\n}\n',
 			}),
@@ -346,11 +346,12 @@ describe("top-level layout (c)", () => {
 		]);
 	});
 
-	test("a kind folder inside a vertical is fine", () => {
+	// A kind folder inside a vertical: scripts/verticals/folder-names.test.ts.
+	test("a folder named for a sub-domain inside a vertical is fine", () => {
 		expect(
 			check(APP, {
 				...runs,
-				"src/features/runs/hooks/use-runs.ts": "export const useRuns = 1;\n",
+				"src/features/runs/live/use-runs.ts": "export const useRuns = 1;\n",
 				"src/main.ts":
 					'import { RunList } from "./features/runs";\nexport default RunList;\n',
 			}),

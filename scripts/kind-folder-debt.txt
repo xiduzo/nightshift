@@ -1,0 +1,19 @@
+# Kind folders inside a vertical: rule (n) of scripts/check-verticals.ts.
+#
+# The rule: no folder inside a vertical, at any depth, takes the name of a
+# kind of code: components, hooks, lib, types, queries or mutations. Name a
+# folder for its sub-domain. The names utils, helpers, common and misc fail
+# as catch-all names (k), and they have no debt list. packages/ui and
+# packages/ui-native keep the shadcn layout: the check does not read them.
+#
+# This list holds the folders that broke the rule on the day it started.
+# The check fails a kind folder that is not listed, and fails a line once
+# its folder is gone. Do not add a line: rename or move the new folder.
+# Remove a line in the change that removes the folder.
+apps/web/src/features/flows/editor/lib
+apps/web/src/features/notifications/components
+apps/web/src/features/runs/components
+apps/web/src/features/runs/hooks
+apps/web/src/features/runs/lib
+apps/web/src/features/settings/components
+apps/web/src/features/settings/hooks

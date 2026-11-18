@@ -31,6 +31,8 @@ export type Import = {
 export type SourceFile = {
 	path: string;
 	test: boolean;
+	/** The lines it holds: its line ends, as `wc -l` counts them. */
+	lines: number;
 	imports: Import[];
 	exports: { names: string[]; stars: string[] };
 	/** Every statement is an import or an export of names (rule j). */
@@ -284,6 +286,7 @@ export function parse(path: string): SourceFile {
 	const file: SourceFile = {
 		path,
 		test: false,
+		lines: text.split("\n").length - 1,
 		imports,
 		exports: { names: exportNames, stars },
 		onlyImportsAndExports: source.statements.every(importOrExport),

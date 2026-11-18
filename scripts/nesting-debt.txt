@@ -1,0 +1,74 @@
+# Sub-verticals: rules (o) and (p) of scripts/check-verticals.ts.
+#
+# The rule (o): a folder inside a vertical that has its own index.ts is a
+# sub-vertical, at every depth. Code outside it imports it only through
+# that barrel. The barrel holds only imports and exports. Every name on it
+# has an importer outside the sub-vertical. Tests may deep-import.
+#
+# The rule (p): a vertical or a sub-vertical with more than 25 source files
+# or more than 5,000 lines (tests do not count) consists of sub-verticals.
+# Each folder directly in it has an index.ts. Its own code, the files
+# directly in it, stays within the same two limits. The ring folders
+# domain/, application/, adapters/, adapters/in/ and adapters/out/ need no
+# barrel, and their files count as its own code.
+#
+# This list holds what broke the rules on the day they started. The check
+# fails an offender that is not listed, and fails a line once it is clean.
+# Do not add a line: fix the new offender. Remove a line in the change
+# that fixes it.
+#
+# A line is one of:
+#   <folder>                  a vertical or sub-vertical with too much code
+#                             of its own, or a folder with no index.ts in
+#                             one that must split (p)
+#   <file> -> <sub-vertical>  the file imports past that barrel (o)
+#   <barrel> exports <name>   no file outside the sub-vertical imports the
+#                             name (o)
+#   <barrel> holds code       a statement that is not an import or an
+#                             export (o)
+
+# (p) Verticals that must split, and their folders with no index.ts.
+apps/mobile/src/features/inbox
+apps/web/src/features/agents
+apps/web/src/features/agents/connections
+apps/web/src/features/agents/setup
+apps/web/src/features/flows/assistant
+apps/web/src/features/flows/canvas
+apps/web/src/features/flows/chat
+apps/web/src/features/flows/editor
+apps/web/src/features/flows/move
+apps/web/src/features/flows/schedules
+apps/web/src/features/flows/start
+apps/web/src/features/knowledge
+apps/web/src/features/runs/components
+apps/web/src/features/runs/hooks
+apps/web/src/features/runs/lib
+apps/web/src/features/runs/transcript
+packages/client/src/runs
+packages/client/src/runs/command-output
+packages/engine/src/graph
+packages/engine/src/graph/nodes
+packages/engine/src/knowledge
+packages/engine/src/knowledge/readers
+packages/engine/src/log
+packages/engine/src/projects
+packages/flows/src/nodes
+
+# (o) The harnesses: five sub-verticals had a barrel before the rule.
+packages/agents/src/harnesses/acp/index.ts exports ACP_AGENTS
+packages/agents/src/harnesses/acp/index.ts exports acpPermission
+packages/agents/src/harnesses/acp/index.ts exports isAcpAgent
+packages/agents/src/harnesses/claude-code/index.ts exports cliAllowRules
+packages/agents/src/harnesses/codex/index.ts exports codexPolicy
+packages/agents/src/harnesses/facts-table.ts -> packages/agents/src/harnesses/acp
+packages/agents/src/harnesses/facts-table.ts -> packages/agents/src/harnesses/claude-code
+packages/agents/src/harnesses/facts-table.ts -> packages/agents/src/harnesses/codex
+packages/agents/src/harnesses/facts-table.ts -> packages/agents/src/harnesses/grok-build
+packages/agents/src/harnesses/facts-table.ts -> packages/agents/src/harnesses/opencode
+packages/agents/src/harnesses/grok-build/index.ts exports grokPolicy
+packages/agents/src/harnesses/opencode/index.ts exports opencodePermission
+packages/agents/src/harnesses/registry.ts -> packages/agents/src/harnesses/acp
+packages/agents/src/harnesses/registry.ts -> packages/agents/src/harnesses/claude-code
+packages/agents/src/harnesses/registry.ts -> packages/agents/src/harnesses/codex
+packages/agents/src/harnesses/registry.ts -> packages/agents/src/harnesses/grok-build
+packages/agents/src/harnesses/registry.ts -> packages/agents/src/harnesses/opencode
