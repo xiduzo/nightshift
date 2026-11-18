@@ -8,7 +8,7 @@ import {
  * What a person sees of each built-in harness, as pure data: the web app's
  * pickers, the canvas and new nodes read it before the API answers, and
  * the harness records of `@nightshift/agents` start from it. A harness's
- * name is `harnessNameSchema` (in `nodes/agent.ts`).
+ * name is `harnessNameSchema` (in `nodes/harness/harness.ts`).
  */
 export type HarnessCatalogEntry = {
 	name: HarnessName;

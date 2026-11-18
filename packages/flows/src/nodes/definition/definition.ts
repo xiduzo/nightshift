@@ -7,7 +7,7 @@ import type { OutcomeColor } from "./outcomes";
 /**
  * The definition of one node type: every fact of the type that holds
  * without a run. Each file in `nodes/` exports the definition of its type,
- * and `NODE_DEFINITIONS` (`flow/node.ts`) lists them, one per type of the
+ * and `NODE_DEFINITIONS` (`flow/node/node.ts`) lists them, one per type of the
  * flow schema. A type without a definition, or a definition without a
  * fact, does not compile. The facts that need a run stay in the engine
  * (`NodeKind`).
