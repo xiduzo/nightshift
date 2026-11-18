@@ -8,8 +8,16 @@ export {
 	applySuggestion,
 	argumentChanges,
 	type Change,
+	diffFlows,
+	type FlowDiff,
+	type FlowDiffSummary,
+	flowDiffSummary,
+	type ItemChange,
 	inputChanges,
+	type ListDiff,
 	type NamedChange,
+	type NodeChange,
+	type NodeMove,
 	newVariables,
 	type OutcomeChange,
 	type OutputFieldChange,
@@ -20,7 +28,7 @@ export {
 	takesSuggestion,
 	type WriteChange,
 	writeChanges,
-} from "./apply";
+} from "./changes";
 export {
 	type AssistantAgent,
 	type AssistantScope,
@@ -30,6 +38,7 @@ export {
 	type ChatRequest,
 	chatMessage,
 	chatRequestSchema,
+	citedStepId,
 	type ExplainRequest,
 	type ExplanationEvent,
 	explainRequestSchema,
@@ -40,20 +49,10 @@ export {
 	type SuggestionEvent,
 	type SuggestionKind,
 	type SuggestionRequest,
+	stepCitation,
 	suggestionRequestSchema,
 	suggestionSchema,
 	type TextRange,
-} from "./assistant";
-export { citedStepId, stepCitation } from "./citation";
-export {
-	diffFlows,
-	type FlowDiff,
-	type FlowDiffSummary,
-	flowDiffSummary,
-	type ItemChange,
-	type ListDiff,
-	type NodeChange,
-	type NodeMove,
-} from "./diff";
+} from "./contract";
 export { flowAuthoringGuide } from "./guide";
 export { proposalIssues } from "./proposal";

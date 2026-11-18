@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { TemplateContext } from "./context";
-import { renderTemplate } from "./template";
+import type { TemplateContext } from "./refs/context";
+import { renderTemplate } from "./refs/template";
 import {
 	applyVariableWrites,
 	coerceVariable,

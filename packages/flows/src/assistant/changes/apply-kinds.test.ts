@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { FLOW_VERSION, type Flow, flowSchema } from "../flow";
+import { FLOW_VERSION, type Flow, flowSchema } from "../../flow";
+import {
+	isFlowSuggestion,
+	suggestionRequestSchema,
+} from "../contract/assistant";
 import {
 	applySuggestion,
 	argumentChanges,
@@ -8,7 +12,6 @@ import {
 	ruleChanges,
 	takesSuggestion,
 } from "./apply";
-import { isFlowSuggestion, suggestionRequestSchema } from "./assistant";
 
 const flow: Flow = flowSchema.parse({
 	version: FLOW_VERSION,

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { TemplateContext } from "./context";
+import type { TemplateContext } from "../refs/context";
 import {
 	chooseByRule,
 	evaluateRule,

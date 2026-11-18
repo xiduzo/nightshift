@@ -1,4 +1,4 @@
-import type { JsonValue } from "../nodes";
+import type { JsonValue } from "../../nodes";
 
 /** What a template or a rule reads: the run, the inputs, the variables and the node outputs. */
 

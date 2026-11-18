@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { knowledgeSourceBracesProblem, knowledgeSourceFields } from "./sources";
-import { KNOWLEDGE_FOLDER_INPUT } from "./sync-kit";
+import { KNOWLEDGE_FOLDER_INPUT } from "./knowledge/sync-kit";
+import {
+	knowledgeSourceBracesProblem,
+	knowledgeSourceFields,
+} from "./knowledge-sources";
 
 describe("knowledgeSourceFields", () => {
 	test("a person fills in every input of the kit but its folder", () => {

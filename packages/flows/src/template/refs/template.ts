@@ -1,4 +1,4 @@
-import { GATE_TITLE_MAX, type JsonValue } from "../nodes";
+import { GATE_TITLE_MAX, type JsonValue } from "../../nodes";
 import type { TemplateContext, TemplateRef } from "./context";
 
 /**

@@ -1,7 +1,7 @@
 import { Refusal } from "@nightshift/refusal";
 import jsonata from "jsonata";
-import type { JsonValue, Option } from "../nodes";
-import type { TemplateContext } from "./context";
+import type { JsonValue, Option } from "../../nodes";
+import type { TemplateContext } from "../refs";
 
 /**
  * Rules: the `when` of a Decision option, a JSONata expression over the

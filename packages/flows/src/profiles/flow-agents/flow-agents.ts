@@ -1,4 +1,4 @@
-import type { Flow, FlowNode } from "../flow";
+import type { Flow, FlowNode } from "../../flow";
 import {
 	type AgentHarnessName,
 	type AgentNode,
@@ -6,7 +6,7 @@ import {
 	calledFlowNames,
 	isPersonTier,
 	type ProfileRef,
-} from "../nodes";
+} from "../../nodes";
 
 /**
  * The agents a flow names, and the person's own profiles in their place.

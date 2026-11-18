@@ -9,8 +9,7 @@ import { waitForChecksKit } from "./github/wait-for-checks";
 import { watchPrKit } from "./github/watch-pr";
 import { jiraAssignKit } from "./jira/assign";
 import { jiraMoveKit } from "./jira/move";
-import { knowledgeReviewLearningsKit } from "./knowledge/review-learnings";
-import { KNOWLEDGE_SYNC_KITS } from "./knowledge/source-kits";
+import { KNOWLEDGE_SYNC_KITS, knowledgeReviewLearningsKit } from "./knowledge";
 import { messageSendKit } from "./message/send";
 
 /**

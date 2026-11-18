@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { FLOW_VERSION } from "../flow";
+import { FLOW_VERSION } from "../../flow";
 import { chatRequestSchema, suggestionRequestSchema } from "./assistant";
 
 const flow = {

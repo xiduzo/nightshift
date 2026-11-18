@@ -2,9 +2,9 @@ import type { FlowInput } from "../../flow";
 import {
 	ACCEPTED_LEARNINGS_DIR,
 	IS_PROPOSED_LEARNING_SHELL,
+	LEARNINGS_GATE_TEXT_AWK,
 	PROPOSED_LEARNINGS_DIR,
 } from "./layout";
-import { LEARNINGS_GATE_TEXT_AWK } from "./learning-file";
 
 /** The start of each command: the proposed learnings, the accepted ones, and the rule for a name. */
 const LEARNINGS = String.raw`set -e

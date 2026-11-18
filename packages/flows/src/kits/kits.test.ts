@@ -46,7 +46,7 @@ import {
 	kitList,
 	knowledgeKitsOf,
 } from "./kits";
-import { formatLearnings } from "./knowledge/learning-file";
+import { formatLearnings } from "./knowledge/layout/learning-file";
 import { KNOWLEDGE_SOURCE_KINDS } from "./knowledge/source-kits";
 
 /**

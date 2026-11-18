@@ -30,13 +30,13 @@ import {
 	entryMoveSchema,
 	entryOpening,
 	entrySavingSchema,
-} from "../builtin";
+} from "../../builtin";
 import {
 	type Flow,
 	flowInputSchema,
 	flowSchema,
 	flowVariableSchema,
-} from "../flow";
+} from "../../flow";
 import {
 	agentNodeSchema,
 	flowNameSchema,
@@ -46,8 +46,8 @@ import {
 	nodeIdSchema,
 	option,
 	variableWriteSchema,
-} from "../nodes";
-import type { FlowIssue } from "../validate";
+} from "../../nodes";
+import type { FlowIssue } from "../../validate";
 
 /**
  * What a suggestion fills in. Of a node: its prompt, its output schema, its

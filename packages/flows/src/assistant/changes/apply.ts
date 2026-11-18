@@ -12,22 +12,22 @@ import {
 	withOptions,
 	withOutputSchema,
 	withWrites,
-} from "../draft";
+} from "../../draft";
 import {
 	type Flow,
 	type FlowInputDef,
 	type FlowNode,
 	type FlowVariableDef,
 	nodeOutcomes,
-} from "../flow";
-import { type VariableWrite, waitCommandOf } from "../nodes";
-import { typedOutput } from "../shapes";
+} from "../../flow";
+import { type VariableWrite, waitCommandOf } from "../../nodes";
+import { typedOutput } from "../../shapes";
 import type {
 	SuggestedOutcome,
 	Suggestion,
 	SuggestionKind,
 	TextRange,
-} from "./assistant";
+} from "../contract";
 
 /**
  * The prompt a `prompt` suggestion rewrites: an Agent's prompt, or the

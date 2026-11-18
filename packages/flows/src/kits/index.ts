@@ -13,53 +13,47 @@ export {
 } from "./kits";
 export {
 	ACCEPTED_LEARNINGS_DIR,
+	DEFAULT_PAGE_READER,
+	formatLearnings,
+	formatPersonNote,
 	isHiddenFromReaders,
 	isKnowledgeId,
 	isKnowledgeOwnFolder,
 	isProposedLearning,
 	isQuestionSetPath,
+	KNOWLEDGE_FOLDER_INPUT,
 	KNOWLEDGE_INDEX_FILE,
 	KNOWLEDGE_OWN_FOLDERS_WORDS,
 	KNOWLEDGE_RECONCILE_FILE,
 	KNOWLEDGE_SEARCH_FILE,
+	KNOWLEDGE_SOURCE_KINDS,
 	KNOWLEDGE_STAGING_SUFFIX,
+	type KnowledgeSourceKit,
 	knowledgeFoldersOf,
+	knowledgeSourceKind,
+	knowledgeSourceKitSchema,
+	learningNotes,
+	learningPreface,
 	NOT_TOPICS_FILE,
+	PAGE_READ_HEADER,
+	PAGE_READER_DEFAULTS,
+	PAGE_READER_ENV,
+	type PageReaderSetting,
 	PROPOSED_LEARNINGS_DIR,
+	pageReaderSettingSchema,
+	parseLearnings,
 	proposedLearningAt,
 	proposedLearningFileName,
 	proposedLearningOf,
 	QUESTION_SET_FILE,
 	toldLearningFileName,
-} from "./knowledge/layout";
-export {
-	formatLearnings,
-	formatPersonNote,
-	learningNotes,
-	learningPreface,
-	parseLearnings,
+	WEB_MAX_PAGES,
 	withoutNote,
-} from "./knowledge/learning-file";
-export {
-	DEFAULT_PAGE_READER,
-	PAGE_READ_HEADER,
-	PAGE_READER_DEFAULTS,
-	PAGE_READER_ENV,
-	type PageReaderSetting,
-	pageReaderSettingSchema,
-} from "./knowledge/readers";
-export {
-	KNOWLEDGE_SOURCE_KINDS,
-	type KnowledgeSourceKit,
-	knowledgeSourceKind,
-	knowledgeSourceKitSchema,
-} from "./knowledge/source-kits";
+} from "./knowledge";
 export {
 	type KnowledgeSource,
 	knowledgeKitInputs,
 	knowledgeSourceBracesProblem,
 	knowledgeSourceFields,
 	knowledgeSourceSchema,
-} from "./knowledge/sources";
-export { KNOWLEDGE_FOLDER_INPUT } from "./knowledge/sync-kit";
-export { WEB_MAX_PAGES } from "./knowledge/web-source";
+} from "./knowledge-sources";

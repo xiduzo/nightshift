@@ -1,12 +1,12 @@
 import { z } from "zod";
-import type { Flow } from "../../flow";
-import { nameSchema } from "../../nodes";
-import { kitFlow } from "../kits";
+import type { Flow } from "../flow";
+import { nameSchema } from "../nodes";
+import { kitFlow } from "./kits";
 import {
+	KNOWLEDGE_FOLDER_INPUT,
 	type KnowledgeSourceKit,
 	knowledgeSourceKitSchema,
-} from "./source-kits";
-import { KNOWLEDGE_FOLDER_INPUT } from "./sync-kit";
+} from "./knowledge";
 
 /**
  * Knowledge sources: what a person adds on the Knowledge page. A source

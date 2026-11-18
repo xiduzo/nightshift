@@ -4,12 +4,21 @@
  */
 
 export {
+	lookupRef,
 	type NodeOutputs,
 	type RunField,
+	renderCommand,
+	renderGateQuestion,
+	renderReadable,
+	renderTemplate,
+	renderValue,
 	runFields,
+	TEMPLATE_REF,
 	type TemplateContext,
 	type TemplateRef,
-} from "./context";
+	templateRefs,
+	templatesInLiteralShellText,
+} from "./refs";
 export {
 	acceptsValue,
 	chooseByRule,
@@ -27,17 +36,6 @@ export {
 	ruleVariableNames,
 	signalOutcome,
 } from "./rule";
-export { templatesInLiteralShellText } from "./shell-quotes";
-export {
-	lookupRef,
-	renderCommand,
-	renderGateQuestion,
-	renderReadable,
-	renderTemplate,
-	renderValue,
-	TEMPLATE_REF,
-	templateRefs,
-} from "./template";
 export {
 	applyVariableWrites,
 	coerceVariable,

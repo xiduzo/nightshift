@@ -6,9 +6,8 @@ import type {
 	VariableType,
 } from "../flow";
 import type { JsonValue, VariableWrite } from "../nodes";
-import type { TemplateContext } from "./context";
+import { isOnlyRef, renderValue, type TemplateContext } from "./refs";
 import { evaluateRule, ruleMessage } from "./rule";
-import { isOnlyRef, renderValue } from "./template";
 
 /**
  * Variables: named, typed values a flow keeps while it runs. A flow
