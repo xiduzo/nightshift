@@ -14,9 +14,9 @@ import {
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
 import { useId } from "react";
-import { Field, InspectorSection, Note } from "../fields";
-import { TemplateField } from "../template-field";
-import { MemorySection } from "./memory-section";
+import { Field, InspectorSection, Note } from "./form";
+import { MemorySection } from "./results";
+import { TemplateField } from "./template";
 
 type Watch = "list" | "value";
 

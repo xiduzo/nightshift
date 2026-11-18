@@ -33,52 +33,51 @@ import {
 import { GroupIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { type DataCanvasEdge, DataEdge, DataMarker } from "../canvas/data-edge";
-import { isDataEdgeId, useDataLinks } from "../canvas/data-links";
-import { exitHandleId, groupEdges } from "../canvas/edge-groups";
-import type {
-	DiffMark,
-	FlowCanvasNode,
-	FlowNodeData,
-} from "../canvas/flow-node";
+import type { DiffMark, FlowCanvasNode, FlowNodeData } from "../canvas";
 import {
+	CanvasControls,
+	type CanvasNode,
 	canvasEdges,
+	canvasNodeTypes,
+	type DataCanvasEdge,
+	DataEdge,
+	DataMarker,
 	edgeTypes,
+	exitHandleId,
 	type FlowCanvasEdge,
+	fitViewOptions,
+	groupEdges,
+	isDataEdgeId,
+	isOutsideId,
+	layoutFlow,
+	loadElk,
+	markedLine,
+	moveSection,
+	type NodeHandles,
+	OpenSectionBar,
 	OutcomeMarkers,
-	SelectEdgeContext,
-} from "../canvas/outcome-edge";
-import {
 	type RouteBook,
 	readRoutes,
 	recordRoutes,
-	writeRoutes,
-} from "../canvas/route-cache";
-import { sectionEnds } from "../canvas/sections/folded-edges";
-import { useOpenSection } from "../canvas/sections/section-focus";
-import {
-	moveSection,
-	sectionDragDelta,
-} from "../canvas/sections/section-geometry";
-import { isOutsideId, sectionIdOf } from "../canvas/sections/section-ids";
-import {
-	type CanvasNode,
-	canvasNodeTypes,
 	SectionActionsContext,
 	type SectionBoxData,
-} from "../canvas/sections/section-nodes";
-import { OpenSectionBar, SectionZoom } from "../canvas/sections/section-zoom";
-import {
+	SectionZoom,
+	SelectEdgeContext,
+	type Size,
+	sampleLine,
+	sectionDragDelta,
+	sectionEnds,
+	sectionIdOf,
 	sectionIds,
+	useDataLinks,
+	useMeasured,
+	useOpenSection,
 	useSectionCanvas,
-} from "../canvas/sections/use-section-canvas";
-import { useMeasured } from "../canvas/use-measured";
-import { markedLine, sampleLine } from "../canvas/viewer/gist";
-import { NODE_DRAG_TYPE } from "./add-node/drag";
-import { CanvasControls } from "./canvas-controls";
-import { fitViewOptions } from "./fit-view";
-import { loadElk } from "./lib/elk";
-import { layoutFlow, type NodeHandles, type Size } from "./lib/flow-layout";
+	writeRoutes,
+} from "../canvas";
+import type { TestMarksApi } from "../test-run";
+import { markOf, NodeMenu, type TestMarks } from "../test-run";
+import { NODE_DRAG_TYPE } from "./add-node";
 import {
 	applyNodeSelection,
 	canvasIds,
@@ -87,10 +86,7 @@ import {
 	selectedNodeIds,
 	selectedSectionIds,
 	withoutNodes,
-} from "./selection";
-import { markOf, type TestMarks } from "./test-run/marks";
-import { NodeMenu } from "./test-run/node-menu";
-import type { TestMarksApi } from "./test-run/use-test-marks";
+} from "./session";
 
 /** The keys that delete what is selected. */
 const DELETE_KEYS = ["Backspace", "Delete"];

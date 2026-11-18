@@ -6,12 +6,12 @@ import {
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { useId, useRef } from "react";
-import { CommandSuggest } from "../../assistant/field-helpers";
-import { WAIT_KINDS } from "../../flow-draft";
-import { useCommandToolField } from "../cli-tools-field";
-import { Field, InspectorSection, Note, PositiveIntInput } from "../fields";
-import { TemplateField } from "../template-field";
-import { NodeOptionsField } from "./node-options-field";
+import { CommandSuggest } from "../../assistant";
+import { WAIT_KINDS } from "../draft";
+import { useCommandToolField } from "./access";
+import { Field, InspectorSection, Note, PositiveIntInput } from "./form";
+import { NodeOptionsField } from "./outcomes";
+import { TemplateField } from "./template";
 import { NamedTemplates } from "./web-request-fields";
 
 const KIND_ORDER: WaitUntil["kind"][] = [

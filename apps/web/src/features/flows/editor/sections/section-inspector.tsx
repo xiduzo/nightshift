@@ -33,8 +33,8 @@ import {
 } from "lucide-react";
 import { useId } from "react";
 import { PanelHeader } from "@/shared/panel";
-import { OUTCOME_COLOR_STYLE } from "../../canvas/outcome-badge";
-import { Field, InspectorSection, Note } from "../fields";
+import { OUTCOME_COLOR_STYLE } from "../../canvas";
+import { Field, InspectorSection, Note } from "../inspector";
 
 /** No colour: the box takes a neutral grey. */
 const NO_COLOR = "none";

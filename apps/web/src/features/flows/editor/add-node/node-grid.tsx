@@ -13,9 +13,9 @@ import {
 import { cn } from "@nightshift/ui/lib/utils";
 import { SearchIcon } from "lucide-react";
 import { type RefObject, useState } from "react";
-import { FAMILY_TILE } from "../../canvas/node-type";
-import { PresetForm } from "../inspector/value-presets";
-import { useProjectFolder } from "../project-folder-context";
+import { FAMILY_TILE } from "../../canvas";
+import { PresetForm } from "../inspector";
+import { useProjectFolder } from "../project";
 import {
 	CATALOG,
 	type CatalogEntry,

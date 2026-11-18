@@ -33,8 +33,8 @@ import {
 } from "@xyflow/react";
 import { ArrowUpIcon, GroupIcon } from "lucide-react";
 import { Fragment, useEffect, useLayoutEffect, useRef } from "react";
-import { readSubflowKey } from "../../editor/subflow/use-subflow-stack";
-import type { Measured } from "../use-measured";
+import type { Measured } from "../nodes";
+import { readSubflowKey } from "../subflow";
 import {
 	closesOnZoomOut,
 	handOver,

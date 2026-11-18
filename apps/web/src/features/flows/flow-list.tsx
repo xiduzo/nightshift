@@ -54,19 +54,19 @@ import { settingsQueries } from "@/features/settings/queries";
 import type { FlowListItem } from "@/shared/api";
 import { PageHeading } from "@/shared/page";
 
-import { chatSearch } from "./chat/chat-link";
+import { chatSearch } from "./chat";
 import { FlowCard } from "./flow-card";
 import { flowsSummary, useFlowFilter } from "./flow-filter";
 import { FlowNotices } from "./flow-notices";
-import { ImportFlowButton } from "./move/import-flow-button";
+import { ImportFlowButton } from "./move";
 import { flowMutations, flowQueries } from "./queries";
-import { scheduleQueries } from "./schedules/queries";
 import {
 	FlowSchedulesSheet,
+	IssueLines,
+	scheduleQueries,
 	useScheduleBoard,
-} from "./schedules/schedule-board";
-import { IssueLines } from "./schedules/schedule-item";
-import { StartRunDialog } from "./start/start-run-dialog";
+} from "./schedules";
+import { StartRunDialog } from "./start";
 
 /**
  * The project's flows as a grid of cards (`FlowCard`): what each is, what

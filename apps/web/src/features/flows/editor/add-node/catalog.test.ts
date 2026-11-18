@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { kitList, NODE_FAMILIES, VALUE_PRESETS } from "@nightshift/flows";
-import type { PaletteItem } from "../../canvas/node-type";
+import type { PaletteItem } from "../../canvas/nodes/node-type";
 import {
 	CATALOG,
 	catalogFamilies,

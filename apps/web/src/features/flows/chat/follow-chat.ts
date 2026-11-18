@@ -1,5 +1,5 @@
 import type { ChatEvent, ChatRequest } from "@nightshift/flows";
-import { followStream, type StreamEnd } from "../assistant/follow-stream";
+import { followStream, type StreamEnd } from "../stream";
 
 /** The one procedure the chat needs. The app's client has it, a test passes a fake. */
 export type ChatClient = {

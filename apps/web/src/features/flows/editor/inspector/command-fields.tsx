@@ -32,13 +32,12 @@ import {
 	projectSecretQueries,
 	spaceSecretQueries,
 } from "@/features/agents";
-import { CommandSuggest } from "../../assistant/field-helpers";
-import { useCommandToolField } from "../cli-tools-field";
-import { Field, InspectorSection, Note } from "../fields";
-import { SecretsField } from "../secrets-field";
-import { TemplateField } from "../template-field";
-import { DataShapeSection } from "./data-shape-section";
-import { NodeOptionsField } from "./node-options-field";
+import { CommandSuggest } from "../../assistant";
+import { SecretsField, useCommandToolField } from "./access";
+import { DataShapeSection } from "./data-shape";
+import { Field, InspectorSection, Note } from "./form";
+import { NodeOptionsField } from "./outcomes";
+import { TemplateField } from "./template";
 
 /** What a Command node keeps of its output, in the order the toggle shows them. */
 const COMMAND_OUTPUTS: { value: CommandNode["stdout"]; label: string }[] = [

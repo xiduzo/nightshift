@@ -23,9 +23,9 @@ import {
 	projectSecretQueries,
 	spaceSecretQueries,
 } from "@/features/agents";
-import { Field, InspectorSection, Note, PositiveIntInput } from "../fields";
-import { SecretsField } from "../secrets-field";
-import { TemplateField } from "../template-field";
+import { SecretsField } from "./access";
+import { Field, InspectorSection, Note, PositiveIntInput } from "./form";
+import { TemplateField } from "./template";
 
 /** The value of the scope select for the whole run: a Section id is never empty. */
 const WHOLE_RUN = "";

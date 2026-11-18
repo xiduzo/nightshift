@@ -9,8 +9,7 @@ import type { ReactNode } from "react";
 import { stepGist, WorkTime } from "@/features/runs/flows-port";
 import type { RunStatus, StepSummary } from "@/shared/api";
 import { formatStepUsage } from "@/shared/format";
-import { hasCost } from "../canvas/node-type";
-import { OutcomeBadge, stepState } from "../canvas/outcome-badge";
+import { hasCost, OutcomeBadge, stepState } from "../canvas";
 
 /**
  * A step of the run that the agent's answer cites (the AI Elements Inline

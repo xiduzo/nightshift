@@ -9,8 +9,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { runQueries } from "@/features/runs/flows-port";
-import { type FlowAssistant, replaceDraft } from "../assistant/flow-assistant";
-import { useBuiltinPick } from "../assistant/use-builtin-pick";
+import { type FlowAssistant, replaceDraft, useBuiltinPick } from "../assistant";
 import { type ChatLink, linkEntry } from "./chat-link";
 import type { FlowChatPanel } from "./chat-panel";
 import {

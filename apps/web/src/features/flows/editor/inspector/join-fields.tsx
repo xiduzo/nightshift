@@ -4,7 +4,7 @@ import {
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { useId } from "react";
-import { Field, InspectorSection } from "../fields";
+import { Field, InspectorSection } from "./form";
 
 const WAIT_ORDER: JoinWait[] = ["all", "first"];
 

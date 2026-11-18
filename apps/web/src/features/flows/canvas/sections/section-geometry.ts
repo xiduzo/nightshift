@@ -3,8 +3,8 @@
 // moving the box moves the members. Positions in the flow file stay per node.
 
 import { type Flow, type FlowSection, moveNodes } from "@nightshift/flows";
-import type { Point } from "../edge-route";
-import type { Measured } from "../use-measured";
+import type { Point } from "../edges";
+import type { Measured } from "../nodes";
 
 /** A node React Flow has not measured yet: `w-64` and a typical body. */
 const FALLBACK_SIZE = { width: 256, height: 160 };

@@ -5,8 +5,8 @@ import { connectionQueries } from "@/features/agents";
 import { useHasFolder } from "@/features/projects";
 import { runQueries } from "@/features/runs/flows-port";
 import { settingsQueries } from "@/features/settings/queries";
-import { useProjectFlows } from "../use-project-flows";
-import { useCommandTools } from "./cli-tools-field";
+import { useCommandTools } from "./inspector";
+import { useProjectFlows } from "./project";
 
 /**
  * What the editor reads besides the draft: the project's other flows, the

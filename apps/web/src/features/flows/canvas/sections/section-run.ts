@@ -2,8 +2,8 @@
 // hides, and which of them runs now.
 
 import type { OutcomeColor } from "@nightshift/flows";
-import type { NodeRunState } from "../flow-node";
-import type { StepState } from "../outcome-badge";
+import type { NodeRunState } from "../nodes";
+import type { StepState } from "../outcomes";
 
 export type SectionRunSummary = {
 	/** The member whose step runs now, or waits for a person, if any. */

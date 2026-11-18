@@ -11,8 +11,8 @@ import {
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { useId } from "react";
-import { Field, InspectorSection, Note, PositiveIntInput } from "../fields";
-import { TemplateField } from "../template-field";
+import { Field, InspectorSection, Note, PositiveIntInput } from "./form";
+import { TemplateField } from "./template";
 
 /** The value of the scope select for the whole run: a Section id is never empty. */
 const WHOLE_RUN = "";

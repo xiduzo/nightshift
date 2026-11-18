@@ -14,10 +14,10 @@ import {
 } from "@nightshift/flows";
 import { useReactFlow } from "@xyflow/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { PaletteItem } from "../../canvas/node-type";
-import { freeSpot, useNewNodeSpot } from "../canvas-controls";
-import type { EditingSession } from "../session/editing-session";
-import { useEditingSession } from "../session/use-editing-session";
+import type { PaletteItem } from "../../canvas";
+import { freeSpot, useNewNodeSpot } from "../../canvas";
+import type { EditingSession } from "../session";
+import { useEditingSession } from "../session";
 import { CATALOG, type CatalogAdd, type CatalogEntry } from "./catalog";
 import { opensAddNode, trackFocusInput } from "./open-keys";
 import { useRecentNodes } from "./recent-nodes";

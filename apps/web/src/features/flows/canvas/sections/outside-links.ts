@@ -12,9 +12,8 @@ import {
 	type SectionColor,
 	sectionPath,
 } from "@nightshift/flows";
-import { type EdgeGroup, pairKey } from "../edge-groups";
-import type { Point } from "../edge-route";
-import type { EndOf } from "../route-cache";
+import type { EndOf, Point } from "../edges";
+import { type EdgeGroup, pairKey } from "../edges";
 import type { Rect } from "./section-geometry";
 import { outsideNodeId, sectionNodeId } from "./section-ids";
 

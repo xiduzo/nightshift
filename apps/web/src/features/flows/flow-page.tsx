@@ -21,8 +21,8 @@ import { ArrowLeftIcon, CircleAlertIcon, FileWarningIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { projectQueries } from "@/features/projects";
 import { type Crumb, SiteHeader } from "@/shared/page";
-import { parseChatLink } from "./chat/chat-link";
-import { FlowEditor } from "./editor/flow-editor";
+import { parseChatLink } from "./chat";
+import { FlowEditor } from "./editor";
 
 import { flowQueries } from "./queries";
 

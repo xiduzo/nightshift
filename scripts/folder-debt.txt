@@ -9,8 +9,6 @@
 # `bun scripts/check-budgets.ts --tighten` lowers the numbers to today's.
 apps/mobile/src/features/inbox 27
 apps/web/src/features/agents 29
-apps/web/src/features/flows/editor 32
-apps/web/src/features/flows/editor/inspector 36
 apps/web/src/features/knowledge 28
 packages/engine/src/graph 37
 packages/engine/src/knowledge 34

@@ -3,7 +3,7 @@
 // layout's boxes, handles and routes line up with the canvas. Node ids hold
 // no `:`, so the prefix never meets a node.
 
-import { sectionNodeId } from "../../editor/lib/flow-layout";
+import { sectionNodeId } from "../layout";
 
 export { sectionNodeId };
 

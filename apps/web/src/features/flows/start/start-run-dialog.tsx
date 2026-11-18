@@ -78,14 +78,9 @@ import {
 	useNow,
 } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
-import { outcomeLabel } from "../canvas/outcome-badge";
-import {
-	markCount,
-	marksText,
-	type TestMarks,
-	testRequest,
-} from "../editor/test-run/marks";
+import { outcomeLabel } from "../canvas";
 import { flowQueries } from "../queries";
+import { markCount, marksText, type TestMarks, testRequest } from "../test-run";
 import { StartFromField } from "./base-ref-combobox";
 import { FlowInputFields } from "./flow-input-fields";
 import { placementDescription } from "./placement-words";

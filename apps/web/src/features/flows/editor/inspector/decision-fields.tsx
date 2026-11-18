@@ -19,17 +19,19 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useId } from "react";
 import { settingsQueries } from "@/features/settings";
-import { OutcomesSuggest, RulesSuggest } from "../../assistant/field-helpers";
-import { DECIDED_BY_ICON } from "../../canvas/node-type";
-import { Field, InspectorSection, Note } from "../fields";
-import { TemplateField } from "../template-field";
-import { CascadeSection } from "./cascade-fields";
-import { GateBriefSection, withBrief } from "./gate-brief-fields";
-import { GateDeadlineSection } from "./gate-deadline-fields";
-import { GateTitleField } from "./gate-title-field";
-import { lockScreenHint } from "./lock-screen-hint";
-import { ModelSettings } from "./model-settings";
-import { NodeOptionsField } from "./node-options-field";
+import { OutcomesSuggest, RulesSuggest } from "../../assistant";
+import { DECIDED_BY_ICON } from "../../canvas";
+import { CascadeSection, ModelSettings } from "./agent";
+import { Field, InspectorSection, Note } from "./form";
+import {
+	GateBriefSection,
+	GateDeadlineSection,
+	GateTitleField,
+	lockScreenHint,
+	withBrief,
+} from "./gate";
+import { NodeOptionsField } from "./outcomes";
+import { TemplateField } from "./template";
 
 /** Who decides, in the order the toggle shows them. */
 const DECIDED_BY: {

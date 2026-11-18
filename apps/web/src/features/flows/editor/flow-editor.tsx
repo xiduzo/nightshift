@@ -58,60 +58,59 @@ import { CopyProjectHere, notHere, projectQueries } from "@/features/projects";
 import { AgentButton } from "@/shared/agent-button";
 import { hoverTime } from "@/shared/format";
 import { SiteHeader } from "@/shared/page";
-import { FlowAssistantContext } from "../assistant/flow-assistant";
-import { DeviceNamesContext } from "../canvas/device-names-context";
+import { FlowAssistantContext } from "../assistant";
 import {
+	DeviceNamesContext,
 	EnterSubflowContext,
+	NodeSamplesContext,
 	OpenFlowContext,
-} from "../canvas/open-flow-context";
-import { NodeSamplesContext } from "../canvas/viewer/node-samples-context";
-import { useNodeSamples } from "../canvas/viewer/use-node-samples";
-import type { ChatLink } from "../chat/chat-link";
-import { FlowChatPanel } from "../chat/chat-panel";
-import { ProposalBar } from "../chat/proposal-bar";
-import { proposalCanvas } from "../chat/proposal-canvas";
-import { useChatPanel } from "../chat/use-chat-panel";
-import { checkFlow } from "../flow-draft";
-import { CopyFlowDialog } from "../move/copy-flow-dialog";
-import { saveFile } from "../move/flow-file";
+	useSubflowStack,
+} from "../canvas";
+import type { ChatLink } from "../chat";
+import {
+	FlowChatPanel,
+	ProposalBar,
+	proposalCanvas,
+	useChatPanel,
+} from "../chat";
+import { CopyFlowDialog, saveFile } from "../move";
 import { flowMutations, flowQueries } from "../queries";
-import { StartRunDialog } from "../start/start-run-dialog";
-import type { CatalogEntry } from "./add-node/catalog";
-import { useNodeAdder } from "./add-node/use-node-adder";
-import { useFlowClipboard } from "./clipboard/use-flow-clipboard";
-import { EdgeInspector } from "./edge-inspector";
+import { StartRunDialog } from "../start";
+import {
+	FollowingBar,
+	TestBadge,
+	TestMarksContext,
+	useTestMarks,
+} from "../test-run";
+import type { CatalogEntry } from "./add-node";
+import { NodeDock, useNodeAdder } from "./add-node";
+import { useFlowClipboard } from "./clipboard";
+import { checkFlow } from "./draft";
 import { type EditKeys, editKeyOf, leavesKeyToPage } from "./edit-keys";
 import { EditorCanvas } from "./editor-canvas";
-import { FloatingInspector } from "./floating-inspector";
-import { FlowInspector } from "./flow-inspector";
 import { FlowTitleCard } from "./flow-title-card";
-import { NodeInspector } from "./inspector/node-inspector";
+import {
+	EdgeInspector,
+	FloatingInspector,
+	FlowInspector,
+	NodeInspector,
+} from "./inspector";
 import { IssuesPopover } from "./issues-popover";
 import { LeaveDialog } from "./leave-dialog";
-import { NodeDock } from "./node-dock";
 import { nodeEdits } from "./node-edits";
-import { ProjectFlowsContext } from "./project-flows-context";
-import { ProjectFolderContext } from "./project-folder-context";
+import { ProjectFlowsContext, ProjectFolderContext } from "./project";
+import { type RevisionOnCanvas, RevisionsSheet } from "./revisions";
+import { MakeSubflowDialog, SectionInspector, sectionEdits } from "./sections";
 import {
-	type RevisionOnCanvas,
-	RevisionsSheet,
-} from "./revisions/revisions-sheet";
-import { MakeSubflowDialog } from "./sections/make-subflow-dialog";
-import { sectionEdits } from "./sections/section-edits";
-import { SectionInspector } from "./sections/section-inspector";
-import {
+	createEditingSession,
 	type Selection,
 	selectedNodeIds,
 	selectedSectionIds,
-} from "./selection";
-import { createEditingSession } from "./session/editing-session";
-import { useEditingSession } from "./session/use-editing-session";
-import { SubflowView } from "./subflow/subflow-view";
-import { useSubflowStack } from "./subflow/use-subflow-stack";
-import { FollowingBar } from "./test-run/following-bar";
-import { TestBadge } from "./test-run/test-badge";
-import { TestMarksContext, useTestMarks } from "./test-run/use-test-marks";
+	useEditingSession,
+} from "./session";
+import { SubflowView } from "./subflow-view";
 import { useEditorData } from "./use-editor-data";
+import { useNodeSamples } from "./use-node-samples";
 
 type Props = {
 	projectId: string;

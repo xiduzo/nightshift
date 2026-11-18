@@ -42,7 +42,7 @@ import { toast } from "sonner";
 import type { FlowRevisionItem } from "@/shared/api";
 import { formatDateTime } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
-import { summaryLabels } from "../../chat/proposal-canvas";
+import { summaryLabels } from "../../chat";
 import { flowMutations, flowQueries } from "../../queries";
 import {
 	diffLines,

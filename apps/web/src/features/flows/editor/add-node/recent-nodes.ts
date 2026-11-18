@@ -2,7 +2,7 @@
 // them: a convenience, never shared, so a lost list starts over.
 
 import { useState } from "react";
-import type { PaletteItem } from "../../canvas/node-type";
+import type { PaletteItem } from "../../canvas";
 import { isPaletteItem } from "./catalog";
 
 /** The most the dock keeps, and shows when the screen has room. */

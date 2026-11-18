@@ -59,9 +59,8 @@ import { formatCost } from "@/shared/format";
 import { type LinkView, Markdown } from "@/shared/markdown";
 import { PanelHeader } from "@/shared/panel";
 import { UsageContext } from "@/shared/usage";
-import type { AgentMenusProps } from "../assistant/agent-picker";
-import { PromptInput } from "../assistant/prompt-input";
-import { Suggestions } from "../assistant/suggestions";
+import type { AgentMenusProps } from "../assistant";
+import { PromptInput, Suggestions } from "../assistant";
 import {
 	type AgentMessage,
 	type ChatProposal,

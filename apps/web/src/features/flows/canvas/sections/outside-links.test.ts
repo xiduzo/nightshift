@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow } from "@nightshift/flows";
-import featureFactory from "../../editor/lib/fixtures/feature-factory.json";
+import featureFactory from "../layout/fixtures/feature-factory.json";
 import { outsideLinks, placeOutside } from "./outside-links";
 
 /** The feature-factory flow, with Build and Review inside Work. */

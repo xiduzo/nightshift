@@ -27,19 +27,19 @@ import {
 	ZoomInIcon,
 } from "lucide-react";
 import { createContext, memo, useContext } from "react";
-import { exitHandleId } from "../edge-groups";
+import { exitHandleId } from "../edges";
 import {
 	type FlowCanvasNode,
 	IssueBadge,
 	nodeTypes,
 	useOverviewText,
-} from "../flow-node";
+} from "../nodes";
 import {
 	OUTCOME_COLOR_STYLE,
 	OutcomeBadge,
 	outcomeLabel,
 	outcomeStyle,
-} from "../outcome-badge";
+} from "../outcomes";
 import type { OutsideEnd } from "./outside-links";
 import type { SectionRunSummary } from "./section-run";
 

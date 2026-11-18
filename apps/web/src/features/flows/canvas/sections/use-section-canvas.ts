@@ -11,11 +11,9 @@ import {
 	sectionBoundary,
 } from "@nightshift/flows";
 import { useMemo } from "react";
-import { type EdgeGroup, groupEdges } from "../edge-groups";
-import type { Point } from "../edge-route";
-import type { NodeRunState } from "../flow-node";
-import type { EndOf } from "../route-cache";
-import type { Measured } from "../use-measured";
+import type { EndOf, Point } from "../edges";
+import { type EdgeGroup, groupEdges } from "../edges";
+import type { Measured, NodeRunState } from "../nodes";
 import { foldEdgeGroups, foldedMembers, sectionEnds } from "./folded-edges";
 import { outsideLinks, placeOutside } from "./outside-links";
 import { boxPosition, membersBounds, type Rect } from "./section-geometry";

@@ -15,9 +15,9 @@ import {
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { useId } from "react";
-import { Field, InspectorSection, Note, PositiveIntInput } from "../fields";
-import { OutputSchemaField } from "../output-schema-field";
-import { TemplateField } from "../template-field";
+import { OutputSchemaField } from "./data-shape";
+import { Field, InspectorSection, Note, PositiveIntInput } from "./form";
+import { TemplateField } from "./template";
 
 const MB = 1024 * 1024;
 

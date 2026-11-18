@@ -18,33 +18,38 @@ import { useQuery } from "@tanstack/react-query";
 import { PlayIcon, Trash2Icon } from "lucide-react";
 import { useId, useState } from "react";
 import { runQueries } from "@/features/runs/flows-port";
-import { nodeMeta } from "../../canvas/node-type";
-import type { DaemonConnection } from "../connections-field";
+import { nodeMeta } from "../../canvas";
+import type { DaemonConnection } from "./access";
+import { AgentAdvanced, AgentFields } from "./agent";
+import type { CalledFlowSupport } from "./call";
+import { CallFields } from "./call";
+import { CommandFields } from "./command-fields";
+import { ConvertFields } from "./convert-fields";
+import { DecisionFields } from "./decision-fields";
 import {
 	DeviceField,
 	runsOnDevice,
 	SUBFLOW_DEVICE_COPY,
 	withDevice,
-} from "../device-field";
-import { Field, InspectorSection, PositiveIntInput } from "../fields";
-import { InspectorTabs } from "../inspector-tabs";
-import { VariableWritesSection } from "../variable-writes-field";
-import { AgentAdvanced } from "./agent-advanced";
-import { AgentFields } from "./agent-fields";
-import { CallFields } from "./call-fields";
-import type { CalledFlowSupport } from "./called-flow-fields";
-import { CommandFields } from "./command-fields";
-import { ConvertFields } from "./convert-fields";
-import { DecisionFields } from "./decision-fields";
+} from "./devices";
 import { EndFields } from "./end-fields";
+import {
+	Field,
+	InspectorSection,
+	InspectorTabs,
+	PositiveIntInput,
+} from "./form";
 import { JoinFields } from "./join-fields";
-import { LastOutputSection } from "./last-output-section";
 import { LeaseFields } from "./lease-fields";
-import { MemorySection } from "./memory-section";
+import {
+	LastOutputSection,
+	MemorySection,
+	VariableWritesSection,
+} from "./results";
 import { ServiceFields } from "./service-fields";
 import { SinceLastRunFields } from "./since-last-run-fields";
 import { ToolFields } from "./tool-fields";
-import { ValueFields } from "./value-fields";
+import { ValueFields } from "./value";
 import { WaitFields } from "./wait-fields";
 import { WebRequestFields } from "./web-request-fields";
 

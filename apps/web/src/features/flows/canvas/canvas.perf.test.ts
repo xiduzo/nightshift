@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow } from "@nightshift/flows";
 import { commandNode } from "@nightshift/flows/testing";
-import { flowGraph, walk } from "../editor/lib/flow-layout";
-import { groupEdges } from "./edge-groups";
-import { canvasEdges } from "./outcome-edge";
+import { groupEdges } from "./edges/edge-groups";
+import { canvasEdges } from "./edges/outcome-edge";
+import { flowGraph, walk } from "./layout/flow-layout";
 
 /**
  * Scale of the canvas build, before React Flow draws it. Four times the

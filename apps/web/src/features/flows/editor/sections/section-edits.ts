@@ -5,7 +5,7 @@ import {
 	removeSection,
 } from "@nightshift/flows";
 import { toast } from "sonner";
-import type { EditingSession } from "../session/editing-session";
+import type { EditingSession } from "../session";
 import type { SubflowMade } from "./make-subflow";
 import { sectionName, sectionProblemText } from "./section-problems";
 

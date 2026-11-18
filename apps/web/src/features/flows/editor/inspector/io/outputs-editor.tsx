@@ -1,0 +1,240 @@
+/** The flow's outputs: what a run gives back when it ends. */
+import {
+	type Flow,
+	type FlowOutputDef,
+	outputFieldsByType,
+	setOutputs,
+	uniqueOutputName,
+	type VariableType,
+	variableTypeSchema,
+} from "@nightshift/flows";
+import { Button } from "@nightshift/ui/components/button";
+import { Input } from "@nightshift/ui/components/input";
+import { Item } from "@nightshift/ui/components/item";
+import {
+	NativeSelect,
+	NativeSelectOption,
+} from "@nightshift/ui/components/native-select";
+import { PlusIcon } from "lucide-react";
+import { useId, useState } from "react";
+import { InferredShape, OutputSchemaField } from "../data-shape";
+import { TemplateField } from "../template";
+import { type Change, move, NameInput, RowButtons } from "./io-rows";
+
+/** Fields a Subflow node has on its own; an output may not shadow them. */
+const RESERVED_OUTPUTS: readonly string[] = outputFieldsByType.call;
+
+/** What each type of an output holds, for its select. No type: any value. */
+const OUTPUT_TYPES: Record<VariableType, string> = {
+	text: "text",
+	number: "number",
+	boolean: "yes or no",
+	json: "json",
+};
+
+/**
+ * The output with this type and, for `json`, this schema. A person set
+ * them: an inferred type counts as confirmed (no `inferred`).
+ */
+function withType(
+	output: FlowOutputDef,
+	type: VariableType | undefined,
+	schema: Record<string, unknown> | undefined,
+): FlowOutputDef {
+	const { type: _, schema: __, inferred: ___, ...rest } = output;
+	if (type === undefined) return rest;
+	return type === "json" && schema !== undefined
+		? { ...rest, type, schema }
+		: { ...rest, type };
+}
+
+/** The output with its type as it is, confirmed by a person. */
+function confirmed(output: FlowOutputDef): FlowOutputDef {
+	const { inferred: _, ...rest } = output;
+	return rest;
+}
+
+/**
+ * The flow's outputs: values it returns to the Call node that calls
+ * it, rendered from templates when the flow ends. A type Night Shift
+ * took from a run shows as such, with Confirm, until a person confirms
+ * or changes it.
+ */
+export function OutputsEditor({
+	flow,
+	describedBy,
+	onChange,
+}: {
+	flow: Flow;
+	describedBy?: string;
+	onChange: Change;
+}) {
+	const id = useId();
+	const [focusIndex, setFocusIndex] = useState<number | null>(null);
+	const outputs = flow.outputs;
+
+	const update = (
+		index: number,
+		change: (output: FlowOutputDef) => FlowOutputDef,
+	) =>
+		onChange((current) =>
+			setOutputs(
+				current,
+				current.outputs.map((output, at) =>
+					at === index ? change(output) : output,
+				),
+			),
+		);
+
+	return (
+		<div className="flex flex-col gap-2">
+			{outputs.length > 0 ? (
+				<ol className="flex flex-col gap-1.5" aria-describedby={describedBy}>
+					{outputs.map((output, index) => {
+						const rowId = `${id}-${index}`;
+						const position = `output ${index + 1}`;
+						return (
+							<Item
+								render={<li />}
+								// Outputs have no ids; the row follows its place in the list.
+								key={index}
+								variant="outline"
+								size="xs"
+								className="flex-col items-stretch gap-1.5 bg-card"
+							>
+								<NameInput
+									id={`${rowId}-name`}
+									name={output.name}
+									label={`Name of ${position}`}
+									autoFocus={focusIndex === index}
+									onCommit={(name) => {
+										if (RESERVED_OUTPUTS.includes(name))
+											return `The name ${name} is taken. Pick another name.`;
+										if (
+											outputs.some(
+												(other, at) => at !== index && other.name === name,
+											)
+										)
+											return `Another output is named ${name}.`;
+										update(index, (current) => ({ ...current, name }));
+										return null;
+									}}
+								>
+									<div className="w-24 shrink-0">
+										<NativeSelect
+											id={`${rowId}-type`}
+											size="sm"
+											value={output.type ?? ""}
+											aria-label={`Type of ${position}`}
+											className="w-full font-mono text-xs"
+											onChange={(event) => {
+												const picked = event.target.value;
+												update(index, (current) =>
+													withType(
+														current,
+														picked === ""
+															? undefined
+															: (picked as VariableType),
+														current.schema,
+													),
+												);
+											}}
+										>
+											<NativeSelectOption value="">any</NativeSelectOption>
+											{variableTypeSchema.options.map((type) => (
+												<NativeSelectOption key={type} value={type}>
+													{OUTPUT_TYPES[type]}
+												</NativeSelectOption>
+											))}
+										</NativeSelect>
+									</div>
+									<RowButtons
+										name={output.name}
+										noun="output"
+										index={index}
+										count={outputs.length}
+										onMove={(to) =>
+											onChange((current) =>
+												setOutputs(current, move(current.outputs, index, to)),
+											)
+										}
+										onRemove={() =>
+											onChange((current) =>
+												setOutputs(
+													current,
+													current.outputs.filter((_, at) => at !== index),
+												),
+											)
+										}
+									/>
+								</NameInput>
+								<TemplateField
+									id={`${rowId}-value`}
+									label="Value"
+									flow={flow}
+									nodeId={null}
+									value={output.value}
+									multiline={false}
+									placeholder="{{review.data}}"
+									onChange={(value) =>
+										update(index, (current) => ({ ...current, value }))
+									}
+								/>
+								<Input
+									id={`${rowId}-description`}
+									value={output.description ?? ""}
+									aria-label={`Description of ${position}`}
+									placeholder="What it holds (optional)"
+									className="h-8 text-xs"
+									autoComplete="off"
+									onChange={(event) => {
+										const description = event.target.value;
+										update(index, ({ description: _, ...rest }) =>
+											description === "" ? rest : { ...rest, description },
+										);
+									}}
+								/>
+								{output.type === "json" ? (
+									<OutputSchemaField
+										id={`${rowId}-schema`}
+										nodeId={output.name}
+										reference={`call.${output.name}`}
+										label="Shape"
+										output={output.schema}
+										description="The node that calls this flow reads its fields."
+										inferred={output.inferred === true}
+										onConfirm={() => update(index, confirmed)}
+										onChange={(schema) =>
+											update(index, (current) =>
+												withType(current, "json", schema),
+											)
+										}
+									/>
+								) : output.type !== undefined && output.inferred ? (
+									<InferredShape onConfirm={() => update(index, confirmed)} />
+								) : null}
+							</Item>
+						);
+					})}
+				</ol>
+			) : null}
+			<Button
+				variant="outline"
+				size="sm"
+				className="self-start"
+				onClick={() => {
+					setFocusIndex(outputs.length);
+					onChange((current) =>
+						setOutputs(current, [
+							...current.outputs,
+							{ name: uniqueOutputName(current, "result"), value: "" },
+						]),
+					);
+				}}
+			>
+				<PlusIcon data-icon="inline-start" />
+				Add output
+			</Button>
+		</div>
+	);
+}

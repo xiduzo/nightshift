@@ -3,7 +3,7 @@ import type {
 	SuggestionEvent,
 	SuggestionRequest,
 } from "@nightshift/flows";
-import { followStream } from "./follow-stream";
+import { followStream } from "../stream";
 
 /** What one suggestion request gave: the suggestion, or why there is none. */
 export type SuggestionResult =

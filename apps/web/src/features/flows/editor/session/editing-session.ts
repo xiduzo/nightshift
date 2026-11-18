@@ -16,19 +16,19 @@ import {
 	updateSection,
 } from "@nightshift/flows";
 import {
-	type Selection,
-	type SelectionSetter,
-	selectedNodeIds,
-	selectedSectionIds,
-	selectionIn,
-} from "../selection";
-import {
 	type DraftHistory,
 	record,
 	redo,
 	startHistory,
 	undo,
 } from "./draft-history";
+import {
+	type Selection,
+	type SelectionSetter,
+	selectedNodeIds,
+	selectedSectionIds,
+	selectionIn,
+} from "./selection";
 
 /** How long a pause ends a gesture: typing in one field after it is a new step. */
 const GESTURE_PAUSE_MS = 1000;

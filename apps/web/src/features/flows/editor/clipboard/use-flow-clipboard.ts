@@ -11,8 +11,8 @@ import {
 import { useReactFlow, useStoreApi } from "@xyflow/react";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { type Selection, selectedNodeIds } from "../selection";
-import type { EditingSession } from "../session/editing-session";
+import type { EditingSession } from "../session";
+import { type Selection, selectedNodeIds } from "../session";
 
 /** Each paste on the same spot lands this far down and right of the one before. */
 const PASTE_STEP = 32;

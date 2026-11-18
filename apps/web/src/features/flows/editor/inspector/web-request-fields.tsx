@@ -25,9 +25,9 @@ import {
 } from "@nightshift/ui/components/toggle-group";
 import { PlusIcon, XIcon } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
-import { Field, InspectorSection, Note, PositiveIntInput } from "../fields";
-import { TemplateField } from "../template-field";
-import { DataShapeSection } from "./data-shape-section";
+import { DataShapeSection } from "./data-shape";
+import { Field, InspectorSection, Note, PositiveIntInput } from "./form";
+import { TemplateField } from "./template";
 
 type WebRequestBody = NonNullable<WebRequestNode["body"]>;
 type BodyKind = WebRequestBody["kind"] | "none";

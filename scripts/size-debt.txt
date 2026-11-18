@@ -10,11 +10,11 @@ apps/server/src/features/cli/flows.ts 608
 apps/web/src/features/agents/connections/secrets-card.tsx 743
 apps/web/src/features/agents/setup/agent-setup-dialog.tsx 606
 apps/web/src/features/flows/assistant/agent-picker.tsx 687
-apps/web/src/features/flows/canvas/flow-node.tsx 807
+apps/web/src/features/flows/canvas/layout/flow-layout.ts 912
+apps/web/src/features/flows/canvas/nodes/flow-node.tsx 807
 apps/web/src/features/flows/editor/editor-canvas.tsx 775
 apps/web/src/features/flows/editor/flow-editor.tsx 1084
-apps/web/src/features/flows/editor/inspector/cascade-fields.tsx 714
-apps/web/src/features/flows/editor/lib/flow-layout.ts 912
+apps/web/src/features/flows/editor/inspector/agent/cascade-fields.tsx 714
 apps/web/src/features/flows/schedules/schedule-dialog.tsx 750
 apps/web/src/features/flows/start/start-run-dialog.tsx 797
 apps/web/src/features/settings/new-defaults.tsx 807

@@ -59,8 +59,7 @@ import { CopyProjectHere, projectQueries } from "@/features/projects";
 import { formatDayTime } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { flowQueries } from "../queries";
-import { BaseRefCombobox } from "../start/base-ref-combobox";
-import { FlowInputFields } from "../start/flow-input-fields";
+import { BaseRefCombobox, FlowInputFields } from "../start";
 import { scheduleQueries } from "./queries";
 import {
 	WebhookFields,

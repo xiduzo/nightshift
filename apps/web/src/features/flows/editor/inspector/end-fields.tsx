@@ -5,9 +5,9 @@ import {
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
 import { useId } from "react";
-import { END_STATUS_LABEL } from "../../canvas/node-type";
-import { Field, InspectorSection, Note } from "../fields";
-import { TemplateField } from "../template-field";
+import { END_STATUS_LABEL } from "../../canvas";
+import { Field, InspectorSection, Note } from "./form";
+import { TemplateField } from "./template";
 
 /** The results, in the order the toggle shows them. */
 const STATUSES: EndStatus[] = ["done", "nothing-to-do", "failed"];

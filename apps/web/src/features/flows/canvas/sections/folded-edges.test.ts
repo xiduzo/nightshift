@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow } from "@nightshift/flows";
-import featureFactory from "../../editor/lib/fixtures/feature-factory.json";
-import { groupEdges, groupSegments, labelText } from "../edge-groups";
-import { canvasEdges } from "../outcome-edge";
-import { recordRoutes } from "../route-cache";
+import { groupEdges, groupSegments, labelText } from "../edges/edge-groups";
+import { canvasEdges } from "../edges/outcome-edge";
+import { recordRoutes } from "../edges/route-cache";
+import featureFactory from "../layout/fixtures/feature-factory.json";
 import { foldEdgeGroups, foldedMembers, sectionEnds } from "./folded-edges";
 
 /** The feature-factory flow with the Sections of the research sketch. */

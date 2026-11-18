@@ -4,8 +4,8 @@
 // still holds: two outside edges into the box from one node are one line.
 
 import { type Flow, type FlowEdge, nodeOutcomes } from "@nightshift/flows";
-import { type EdgeGroup, pairKey } from "../edge-groups";
-import type { EndOf } from "../route-cache";
+import type { EndOf } from "../edges";
+import { type EdgeGroup, pairKey } from "../edges";
 import { sectionNodeId } from "./section-ids";
 
 /**

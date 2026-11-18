@@ -19,11 +19,7 @@ import {
 	ListStartIcon,
 	type LucideIcon,
 } from "lucide-react";
-import {
-	NODE_TYPE,
-	type PaletteItem,
-	paletteMeta,
-} from "../../canvas/node-type";
+import { NODE_TYPE, type PaletteItem, paletteMeta } from "../../canvas";
 
 /**
  * Every palette item. A Decision shows twice, as the words people look

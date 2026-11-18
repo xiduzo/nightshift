@@ -14,9 +14,9 @@ import {
 	setCallEach,
 } from "@nightshift/flows";
 import { toast } from "sonner";
-import { outcomeLabel } from "../canvas/outcome-badge";
-import { optionNoun } from "../flow-draft";
-import type { EditingSession } from "./session/editing-session";
+import { outcomeLabel } from "../canvas";
+import { optionNoun } from "./draft";
+import type { EditingSession } from "./session";
 
 /** Why a node cannot take a name, by what the name clashes with. */
 const NODE_NAME_TAKEN: Record<NameClash, (name: string) => string> = {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { NodeRunState } from "../flow-node";
+import type { NodeRunState } from "../nodes/flow-node";
 import { sectionRunSummary } from "./section-run";
 
 const states = new Map<string, NodeRunState>([
