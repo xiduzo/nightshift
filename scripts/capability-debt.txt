@@ -1,0 +1,156 @@
+# What breaks the capability rules today (scripts/check-capabilities.ts).
+# The check fails a new offender, and fails a line that is not needed any
+# more. So this list only gets shorter. Remove a line in the change that
+# fixes the code. Do not add one.
+#
+#   rename <workspace> <vertical>         V1b
+#   imports <workspace> <from> <to>       V2
+#   wide <workspace> <vertical> <count>   V5
+
+# --- V1b: a vertical that is part of a capability under another name.
+# The map (scripts/capabilities.ts) says which capability. Name the folder
+# for it. When the workspace has more than one vertical of that capability,
+# make them one vertical with sub-verticals.
+
+# access: the admin's own sign-in.
+rename apps/insights features/session
+# reports: the SQL of the admin pages.
+rename packages/insights queries
+
+# widgets: the home screen widget and the followed run on the lock screen.
+rename apps/mobile features/glance
+rename packages/client glance
+# access: this phone's sign-in on its Host.
+rename apps/mobile features/host
+# gates: the open Gates and the Needs you queue.
+rename apps/mobile features/inbox
+rename apps/mobile features/needs
+# notifications: this phone's notifications.
+rename apps/mobile features/push
+# runs: the Runs tab.
+rename apps/mobile features/runs-tab
+
+# agents: harnesses, deciders and profiles.
+rename packages/agents decider
+rename packages/agents harnesses
+rename packages/daemon harnesses
+rename packages/engine agent-setup
+rename packages/flows harnesses
+rename packages/flows profiles
+# assistant: the built-in agents.
+rename packages/flows builtin
+# flows: the edits of the flow editor.
+rename packages/flows draft
+
+# settings: this computer's configuration.
+rename packages/api config
+rename packages/engine device-config
+
+# access: who may sign in, and how.
+rename packages/auth host-access
+rename packages/auth local-session
+rename packages/auth login
+rename packages/auth two-factor
+# devices: pairing and Device keys.
+rename packages/auth device-keys
+rename packages/auth pairing
+
+# devices: the Device rows, a Host, Offers, the home membership, and the
+# Devices a run may use.
+rename packages/devices host
+rename packages/devices membership
+rename packages/devices offers
+rename packages/devices placement
+rename packages/devices registry
+
+# runs: the start and the walk, the read model, the status, the plan of
+# where the steps run, and the cleanup.
+rename packages/engine cleanup
+rename packages/engine placement
+rename packages/engine read
+rename packages/engine run
+rename packages/engine run-status
+
+# notifications: the rules, a Person's settings, the push targets.
+rename packages/notifications notifier
+rename packages/notifications settings
+rename packages/notifications targets
+
+# --- V2: a mechanism that imports a capability vertical of its workspace.
+# Let the caller pass in what the mechanism needs, or move the rule into
+# the capability.
+
+# The shell of an app composes its features. The wiring belongs outside
+# the verticals.
+imports apps/mobile shared/shell features/glance
+imports apps/mobile shared/shell features/host
+imports apps/mobile shared/shell features/needs
+imports apps/mobile shared/shell features/push
+imports apps/mobile shared/shell features/spaces
+imports apps/web shared/shell features/access
+imports apps/web shared/shell features/dashboard
+imports apps/web shared/shell features/devices
+imports apps/web shared/shell features/gates
+imports apps/web shared/shell features/notifications
+imports apps/web shared/shell features/projects
+imports apps/web shared/shell features/settings
+imports apps/web shared/shell features/spaces
+
+# The step report and the tools of a session read the knowledge rules.
+imports packages/agents session knowledge
+imports packages/agents tools knowledge
+# The skills read the facts of a harness.
+imports packages/agents skills harnesses
+
+# The live cache knows what a Gate, a notification and a run change.
+imports packages/client live gates
+imports packages/client live notifications
+imports packages/client live runs
+
+# The transport reads the Device rows and the Offers itself.
+imports packages/devices exchange offers
+imports packages/devices exchange registry
+imports packages/devices relay registry
+imports packages/devices work registry
+# `peers` composes the verticals into the engine's port.
+imports packages/devices peers offers
+imports packages/devices peers placement
+imports packages/devices peers registry
+
+# The execution port reads this computer's configuration, the knowledge
+# folder and the project.
+imports packages/engine device device-config
+imports packages/engine device knowledge
+imports packages/engine device projects
+# The walk reads the capabilities itself (decision 9: `graph` is a
+# mechanism).
+imports packages/engine graph device-config
+imports packages/engine graph knowledge
+imports packages/engine graph projects
+imports packages/engine graph read
+imports packages/engine graph run-status
+# The status of a run is a leaf of `runs` that the machinery reads.
+imports packages/engine leases run-status
+imports packages/engine log run-status
+imports packages/engine services run-status
+# Ollama reads its setting and gives the knowledge its meaning model.
+imports packages/engine ollama device-config
+imports packages/engine ollama knowledge
+
+# The flow format knows the profiles and the schedules.
+imports packages/flows starters profiles
+imports packages/flows validate profiles
+imports packages/flows validate schedules
+
+# A channel takes a push target.
+imports packages/notifications channels targets
+imports packages/notifications desktop targets
+
+# --- V5: a capability vertical that imports more than 5 other capability
+# verticals of its workspace. The count only goes down.
+
+# agents, dashboard, devices, projects, runs, settings, spaces.
+wide apps/web features/flows 7
+# assistant, cleanup, device-config, flows, placement, projects, read,
+# run-status, schedules.
+wide packages/engine run 9
