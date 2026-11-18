@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Schedule } from "@nightshift/flows";
+import { FLOW_VERSION, type Flow, type Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { Actor } from "../../contract";
 import { NOT_ON_THIS_COMPUTER } from "../../projects";
@@ -14,6 +14,23 @@ const SPACE = "space-1";
 const ANN: Actor = { personId: "person-ann" };
 // biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
 const HOOK_SECRET = "${HOOK_SECRET}";
+
+const night: Flow = {
+	version: FLOW_VERSION,
+	inputs: [],
+	outputs: [],
+	start: "work",
+	nodes: [
+		{
+			id: "work",
+			type: "command",
+			position: { x: 0, y: 0 },
+			command: "echo night",
+			stdout: "text",
+		},
+	],
+	edges: [],
+};
 
 function nightly(extra: Partial<Schedule> = {}): Schedule {
 	return {
@@ -69,6 +86,12 @@ describe("the save of a project's schedules", () => {
 			},
 		]);
 		expect(await saved()).toEqual([nightly({ flow: "gone" })]);
+	});
+
+	test("a schedule without a problem has no issue", async () => {
+		const { ports, save } = project();
+		ports.store.seed(P, { flows: { night: { json: night } } });
+		expect(await save([nightly()])).toEqual([]);
 	});
 
 	test("replaces every schedule of the project", async () => {

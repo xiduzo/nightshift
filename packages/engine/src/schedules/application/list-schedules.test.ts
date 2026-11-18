@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow, type Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import { atLocal } from "@nightshift/time/testing";
+import { atLocal, utc } from "@nightshift/time/testing";
 import { inMemorySchedulePorts } from "../adapters/out/in-memory-neighbours";
 import { createScheduleWatch } from "../domain/schedule-watch";
 import { createWebhookRefusals } from "../domain/webhook-delivery";
@@ -187,6 +187,55 @@ describe("the schedules of a project", () => {
 		const { ports, list } = project([nightly()]);
 		ports.clock.set(at(16, 22, 1));
 		expect((await list()).schedules[0]?.nextAt).toBe(at(16, 22));
+	});
+
+	test("a schedule without a fact lists as it is saved, with its next start and no last result", async () => {
+		const { list } = project([nightly()], at(16, 12));
+		expect((await list()).schedules).toEqual([
+			{
+				...nightly(),
+				nextAt: at(16, 22),
+				last: null,
+				deliveries: [],
+				issues: [],
+			},
+		]);
+	});
+
+	test("the next start is on the schedule's clock, not this computer's", async () => {
+		// 22:00 in Tokyo on the 16th is 13:00 UTC.
+		const { list } = project(
+			[nightly({ timeZone: "Asia/Tokyo" })],
+			utc(2026, 9, 16, 12, 59),
+		);
+		expect((await list()).schedules[0]?.nextAt).toBe(utc(2026, 9, 16, 13));
+	});
+
+	test("lateMinutes do not make a time from before the schedule existed the next start", async () => {
+		const { list } = project([nightly({ lateMinutes: 1440 })], at(16, 23));
+		const [listed] = (await list()).schedules;
+		expect(listed?.last).toBeNull();
+		expect(listed?.nextAt).toBe(at(17, 22));
+	});
+
+	test("a time skipped for an earlier run names that run", async () => {
+		const { ports, list } = project(
+			[nightly({ cron: "0 * * * *" })],
+			at(16, 23, 0, 30),
+		);
+		await ports.log.skipped({
+			projectId: P,
+			scheduleId: "nightly",
+			at: at(16, 23),
+			reason: "An earlier run of this schedule is still waiting.",
+			runId: "run-1",
+		});
+		expect((await list()).schedules[0]?.last).toEqual({
+			kind: "skipped",
+			at: at(16, 23),
+			reason: "An earlier run of this schedule is still waiting.",
+			runId: "run-1",
+		});
 	});
 
 	test("a schedule that is off has no next start", async () => {
