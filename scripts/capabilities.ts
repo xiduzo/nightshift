@@ -36,7 +36,7 @@
  *
  * 1. It holds the rules or the data of a product area: give it that
  *    capability, also when its folder has another name (engine `run`,
- *    `read` and `run-status` are `runs`).
+ *    `placement` and `cleanup` are `runs`).
  * 2. It only serves other verticals and has no product rule of its own:
  *    MECHANISM. Say why in a comment when the name does not.
  * 3. An app's `shared/<name>` piece is a mechanism. The one exception is
@@ -455,14 +455,17 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		// The plan of where a run's steps run, made once at the start.
 		placement: "runs",
 		projects: "projects",
-		// The read model of a run.
-		read: "runs",
+		// The read model of a run: pure projections of the log. The walk
+		// (`graph`) reads them too, so they are machinery, not part of `runs`.
+		read: M,
 		// The start, the walk and the actions of a run.
 		run: "runs",
 		// The store of a run's own folder.
 		"run-folders": M,
-		// A run's status and the actions it allows.
-		"run-status": "runs",
+		// A run's status and the actions it allows. The pure rule kernel of
+		// the engine (decision 37 of the hexagon series): the machinery and
+		// the capabilities both read it.
+		"run-status": M,
 		schedules: "schedules",
 		// The keeper of the processes a Service node starts.
 		services: M,

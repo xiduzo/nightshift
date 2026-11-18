@@ -63,13 +63,11 @@ rename packages/devices offers
 rename packages/devices placement
 rename packages/devices registry
 
-# runs: the start and the walk, the read model, the status, the plan of
-# where the steps run, and the cleanup.
+# runs: the start and the walk, the plan of where the steps run, and the
+# cleanup.
 rename packages/engine cleanup
 rename packages/engine placement
-rename packages/engine read
 rename packages/engine run
-rename packages/engine run-status
 
 # notifications: the rules, a Person's settings, the push targets.
 rename packages/notifications notifier
@@ -113,12 +111,9 @@ imports packages/engine device projects
 imports packages/engine graph device-config
 imports packages/engine graph knowledge
 imports packages/engine graph projects
-imports packages/engine graph read
-imports packages/engine graph run-status
-# The status of a run is a leaf of `runs` that the machinery reads.
-imports packages/engine leases run-status
-imports packages/engine log run-status
-imports packages/engine services run-status
+# The read model shows the knowledge sources of a step. `read` is a
+# mechanism since decision 37 of the hexagon series, so this import is debt.
+imports packages/engine read knowledge
 # Ollama reads its setting and gives the knowledge its meaning model.
 imports packages/engine ollama device-config
 imports packages/engine ollama knowledge
@@ -137,6 +132,5 @@ imports packages/notifications desktop targets
 
 # agents, dashboard, devices, projects, runs, settings, spaces.
 wide apps/web features/flows 7
-# assistant, cleanup, device-config, flows, placement, projects, read,
-# run-status, schedules.
-wide packages/engine run 9
+# assistant, cleanup, device-config, flows, placement, projects, schedules.
+wide packages/engine run 7
