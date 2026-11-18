@@ -12,8 +12,5 @@
 # Remove a line in the change that removes the folder.
 apps/web/src/features/flows/editor/lib
 apps/web/src/features/notifications/components
-apps/web/src/features/runs/components
-apps/web/src/features/runs/hooks
-apps/web/src/features/runs/lib
 apps/web/src/features/settings/components
 apps/web/src/features/settings/hooks

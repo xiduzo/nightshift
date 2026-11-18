@@ -24,7 +24,6 @@ import {
 	GateQuestion as GateQuestionText,
 } from "@/features/gates";
 import type { RunSummary, SessionSummary, StepSummary } from "@/shared/api";
-import { useOpenedStep } from "../hooks/use-opened-step";
 import { CommandExit, CommandLog, CommandRun } from "./items/command-items";
 import { ConvertCard } from "./items/convert-items";
 import {
@@ -57,6 +56,7 @@ import { WebRequestCard } from "./items/web-request-items";
 import type { TranscriptState } from "./transcript";
 import type { TranscriptItem } from "./transcript-items";
 import { type TranscriptRow, transcriptRows } from "./transcript-rows";
+import { useOpenedStep } from "./use-opened-step";
 
 /**
  * The transcript of one step, inline in the run's story: the story scrolls,

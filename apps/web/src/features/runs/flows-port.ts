@@ -6,11 +6,14 @@
  * it did, for a step the chat cites. The run page imports the flow canvas,
  * so the runs barrel would close a cycle. These files import only
  * `shared/*` and the packages.
+ *
+ * The port reaches three sub-verticals through their barrels: `report`,
+ * `status` and `steps`. So every file of those three imports only
+ * `shared/*` and the packages. The check follows the port into them and
+ * fails on an import of another vertical.
  */
 
-export { WorkTime } from "./components/elapsed";
-export { ReportPreview } from "./components/report-preview";
-export { RunBars } from "./components/run-bars";
-export { reportLink } from "./lib/report";
-export { stepGist } from "./lib/step-gist";
 export { runMutations, runQueries } from "./queries";
+export { ReportPreview, reportLink } from "./report";
+export { RunBars, WorkTime } from "./status";
+export { stepGist } from "./steps";

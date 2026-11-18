@@ -35,7 +35,7 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import { permissionLabel, WithdrawOfferDialog } from "@/features/agents";
-import { RunStatusBadge } from "@/features/runs/components/run-status-badge";
+import { RunStatusBadge } from "@/features/runs/status/run-status-badge";
 import type { OfferView, RunSummary } from "@/shared/api";
 import { DetailSection, DetailShell } from "@/shared/detail";
 import { formatDateTime, formatRelative, useNow } from "@/shared/format";

@@ -40,9 +40,6 @@ apps/web/src/features/flows/move
 apps/web/src/features/flows/schedules
 apps/web/src/features/flows/start
 apps/web/src/features/knowledge
-apps/web/src/features/runs/components
-apps/web/src/features/runs/hooks
-apps/web/src/features/runs/lib
 apps/web/src/features/runs/transcript
 packages/engine/src/graph
 packages/engine/src/graph/nodes
