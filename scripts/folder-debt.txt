@@ -8,5 +8,4 @@
 # fails a listed folder that is within the limit. Add no line here.
 # `bun scripts/check-budgets.ts --tighten` lowers the numbers to today's.
 apps/mobile/src/features/inbox 27
-apps/web/src/features/agents 29
 packages/engine/src/knowledge 34

@@ -9,7 +9,7 @@ import { Spinner } from "@nightshift/ui/components/spinner";
 import { cn } from "@nightshift/ui/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlertIcon, CircleCheckIcon, PlayIcon } from "lucide-react";
-import { harnessInfo, useCustomAgents } from "../harnesses";
+import { harnessInfo, useCustomAgents } from "../catalog";
 import { builtinQueries } from "../queries";
 import { answeredBy, answeredIn } from "./check-state";
 

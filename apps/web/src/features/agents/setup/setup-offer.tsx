@@ -4,13 +4,10 @@ import { DownloadIcon, LogInIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { CheckTarget, CliCheck } from "@/shared/api";
-import {
-	AgentSetupDialog,
-	useAgentSetupActions,
-	useAgentSetupStatus,
-} from "./agent-setup-dialog";
+import { AgentSetupDialog } from "./agent-setup-dialog";
 import { setupOffer, setupStep } from "./setup-state";
 import { InstallConfirmDialog } from "./setup-steps";
+import { useAgentSetupActions, useAgentSetupStatus } from "./use-agent-setup";
 
 /**
  * What an agent's panel offers from the guided setup: Install for a

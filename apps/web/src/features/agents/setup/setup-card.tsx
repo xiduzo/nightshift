@@ -25,11 +25,7 @@ import { type ReactNode, useState } from "react";
 import { AddProjectDialog, projectQueries } from "@/features/projects";
 import type { AgentProfileRow } from "@/shared/api";
 import { profileQueries } from "../queries";
-import {
-	AgentSetupDialog,
-	useAgentSetupStatus,
-	useDeciderSetupStatus,
-} from "./agent-setup-dialog";
+import { AgentSetupDialog } from "./agent-setup-dialog";
 import {
 	agentRow,
 	checkRow,
@@ -44,6 +40,7 @@ import {
 } from "./setup-card-state";
 import type { SetupPhase } from "./setup-path";
 import { useAgentChecks } from "./use-agent-checks";
+import { useAgentSetupStatus, useDeciderSetupStatus } from "./use-agent-setup";
 
 function sessionStore(): Storage | undefined {
 	try {

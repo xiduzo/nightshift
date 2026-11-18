@@ -1,25 +1,25 @@
 /** Agents: harnesses, profiles, custom agents, connections, CLI tools and secrets as pages of Settings, a project's secrets too, and the Get started card on Home. */
 
-export { EFFORTS, PERMISSION_MODES, permissionLabel } from "./agent-options";
-export type { AgentsPart } from "./agents-overview";
-export { AgentsPage } from "./agents-page";
 export { agentsPartOfItem } from "./agents-selection";
+export {
+	EFFORTS,
+	HARNESSES,
+	type HarnessName,
+	harnessInfo,
+	PERMISSION_MODES,
+	permissionLabel,
+	switchHarness,
+	useCustomAgents,
+} from "./catalog";
+export { FlowAgentsStep, useFlowAgents } from "./flow-agents-step";
+export { ModelCombobox, useHarnessModels } from "./harnesses";
 export {
 	KeyValueRows,
 	recordFrom,
 	rowsFrom,
-} from "./connections/key-value-rows";
-export { FlowAgentsStep, useFlowAgents } from "./flow-agents-step";
-export type { HarnessName } from "./harnesses";
-export {
-	HARNESSES,
-	harnessInfo,
-	switchHarness,
-	useCustomAgents,
-} from "./harnesses";
-export { ModelCombobox, useHarnessModels } from "./model-combobox";
-export { WithdrawOfferDialog } from "./offer-dialog";
-export { ProjectSecretsPage } from "./project-secrets-page";
+} from "./key-values";
+export { AgentsPage, type AgentsPart } from "./page";
+export { WithdrawOfferDialog } from "./profiles";
 export {
 	cliToolQueries,
 	connectionQueries,
@@ -29,7 +29,5 @@ export {
 	projectSecretQueries,
 	spaceSecretQueries,
 } from "./queries";
-export { SecretsPage } from "./secrets-page";
-export { SetupCard } from "./setup/setup-card";
-export { TryAgentButton } from "./setup/try-agent-button";
-export { SpaceSecretsPage } from "./space-secrets-page";
+export { ProjectSecretsPage, SecretsPage, SpaceSecretsPage } from "./secrets";
+export { SetupCard, TryAgentButton } from "./setup";

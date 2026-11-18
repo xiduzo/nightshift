@@ -38,7 +38,7 @@ import { useQuery } from "@tanstack/react-query";
 import { BotIcon } from "lucide-react";
 import { useId, useState } from "react";
 import type { AgentProfileRow } from "@/shared/api";
-import { harnessInfo, useCustomAgents } from "./harnesses";
+import { harnessInfo, useCustomAgents } from "./catalog";
 import { profileQueries } from "./queries";
 
 /** The choice that keeps the agent the flow names. A profile's id holds no colon. */

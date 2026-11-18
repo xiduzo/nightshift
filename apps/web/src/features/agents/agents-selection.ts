@@ -1,6 +1,6 @@
 /** What a page of the agents shows in detail, and its `item` in the URL. */
 import type { HarnessRowName } from "@/shared/api";
-import { isHarnessName } from "./harnesses";
+import { isHarnessName } from "./catalog";
 
 /** What the detail pane shows, as it sits in the URL (`?item=profile:<id>`). */
 export type Selection =

@@ -39,14 +39,14 @@ import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Connection, McpServer } from "@/shared/api";
 import { LargerTextarea } from "@/shared/larger-window";
-import { connectionMutations } from "../queries";
 import {
 	type KeyValueRow,
 	KeyValueRows,
 	newRow,
 	recordFrom,
 	rowsFrom,
-} from "./key-value-rows";
+} from "../key-values";
+import { connectionMutations } from "../queries";
 import { McpTestOutcome } from "./test-result";
 
 const NAME = /^[a-z][a-z0-9_]{0,39}$/;

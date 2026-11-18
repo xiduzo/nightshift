@@ -225,7 +225,8 @@ export const PEER_PORTS: Record<
 			// Adding the starter flows asks which of your profiles takes each
 			// agent they name. The agents pages import projects (a project's
 			// secrets), so the agents barrel would close a cycle. The step
-			// imports only the agents' queries and harnesses.
+			// imports only the agents' queries and its `catalog` sub-vertical:
+			// the harnesses with their words, which imports no other vertical.
 			"features/agents": "flow-agents-step",
 		},
 	},

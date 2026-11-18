@@ -10,7 +10,6 @@
 # remove its line: the check fails a listed barrel that is within the limit.
 # Add no line here.
 # `bun scripts/check-budgets.ts --tighten` lowers the numbers to today's.
-apps/web/src/features/agents/index.ts 31
 apps/web/src/shared/api/index.ts 87
 packages/auth/src/spaces/index.ts 36
 packages/daemon/src/runtime/index.ts 31
