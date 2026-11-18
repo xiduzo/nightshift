@@ -250,9 +250,9 @@ bun run build:desktop  # the desktop app: apps/desktop/artifacts/*.dmg
 
 - When the window closes, the app stays in the menu bar (☾), so runs continue. Quit there releases the database lease.
 - When a daemon already answers on port 3000 (`bun run night` or `bun run dev`), the app opens its window on that daemon and starts no daemon.
-- The packaged app has no `.env` files. The bundle replaces varlock with `process.env` (`apps/desktop/src/bun/shims`). It takes PATH from the login shell and keeps its auth secret in the data folder (`auth-secret`).
+- The packaged app has no `.env` files. The daemon reads `process.env` there, after `prepareDaemonEnv` (`packages/daemon/src/runtime/daemon-env.ts`). It takes PATH from the login shell and keeps its auth secret in the data folder (`auth-secret`).
 - `PORT` moves the daemon, with a web build whose `VITE_SERVER_URL` matches.
-- The build is not signed or notarized.
+- A release build on macOS is signed and notarized when the Apple secrets exist (`docs/releasing.md`). Without them, the build gets an ad-hoc signature.
 
 **Nights.** `bun run night` builds the web app. Then it serves the API server and the built web app on the usual ports (3000 and 3001). Set `PORT` and `WEB_PORT` to change them. The server runs from source with plain `bun`, without `--hot`. The web app is a production build behind `vite preview`. So no file change restarts a running night.
 
@@ -408,7 +408,7 @@ Settings, connections and secrets stay out. The values of saved secrets, and of 
 - Our own TanStack AI tools reach a Claude Code session over MCP as `mcp__tanstack__<name>` (Slice 2, the `report_step` tool). Claude Code's plan mode denies them. So a plan-mode Claude Code node reports with a text line instead. OpenCode allows them in every mode. Codex is unverified.
 - Session resume works through the adapter (Slice 1). The usage-limit reset time is parsed from the harness's raw messages. Real usage limits tested it on 2026-10-19 and 2026-10-25.
 - The desktop window loads the prerendered TanStack Start build from `views://mainview`. Routes with parameters (a run page) are not prerendered: a reload there may not find the page. Navigation inside the app works.
-- The desktop app has no icon (`apps/desktop/icon.iconset`), no signing and no notarization yet. When a daemon holds the lease on another port, the app quits at start with only a log line.
+- When a daemon holds the lease on another port, the desktop app quits at start with only a log line.
 - The decider runs Claude Code with no built-in tools (`--tools "" --strict-mcp-config`). `@tanstack/ai-claude-code` 0.9 cannot pass that next to several bridged tools. So we append the flags to the `claude` executable string, which the adapter splits on spaces. Check again on every adapter upgrade, and ask upstream for an option.
 - An item cut short by a stop or a daemon death shows `failed` with a reason until the run resumes. After a daemon death, that resume comes on its own a few seconds later. The item then continues. Consider `stopped` and `interrupted` item states.
 - `timeoutMinutes` on a Subflow node with `each` is not enforced. Every step inside the body keeps its own limit.
