@@ -19,7 +19,6 @@ apps/web/src/features/flows/schedules/schedule-dialog.tsx 750
 apps/web/src/features/flows/start/start-run-dialog.tsx 797
 apps/web/src/features/runs/transcript/transcript.ts 766
 apps/web/src/features/settings/new-defaults.tsx 807
-packages/agents/src/assistant/suggestion-prompt.ts 666
 packages/api/src/dashboard/schemas.ts 869
 packages/api/src/knowledge/router.ts 606
 packages/api/src/runs/schemas.ts 817

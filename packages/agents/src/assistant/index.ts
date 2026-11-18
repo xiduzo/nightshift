@@ -18,7 +18,7 @@ export { learnFromRun } from "./learn";
 export { serveTools } from "./mcp";
 export type { ChatExchange } from "./prompts";
 export type { AssistantVia } from "./session";
-export { type SuggestFieldInput, suggestField } from "./suggest";
+export { type SuggestFieldInput, suggestField } from "./suggestion";
 export {
 	type TerminalPort,
 	terminalTools,

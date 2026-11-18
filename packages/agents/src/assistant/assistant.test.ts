@@ -22,8 +22,8 @@ import {
 	checkSuggestion,
 	suggestField,
 	suggestionDataSchema,
-} from "./suggest";
-import { suggestionPrompt } from "./suggestion-prompt";
+} from "./suggestion/suggest";
+import { suggestionPrompt } from "./suggestion/suggestion-prompt";
 
 const flow: Flow = flowSchema.parse({
 	version: FLOW_VERSION,

@@ -20,13 +20,13 @@ import {
 	takesSuggestion,
 } from "@nightshift/flows";
 import { z } from "zod";
-import { readProjectFacts } from "./project-facts";
-import { retryPrompt } from "./prompts";
+import { retryPrompt } from "../prompts";
 import {
 	type AssistantReport,
 	type AssistantVia,
 	runReportSession,
-} from "./session";
+} from "../session";
+import { readProjectFacts } from "./project-facts";
 import { suggestionPrompt } from "./suggestion-prompt";
 
 /** How many times the agent may answer: once, and once more with the problems. */

@@ -2,7 +2,7 @@
  * What the assistant's prompts share: the draft as JSON and in a few lines,
  * what a template in a node can read, who reads a node's data, the retry
  * after an invalid suggestion, and the prompts of a chat. The prompt of a
- * field suggestion, kind by kind, is in `suggestion-prompt.ts`.
+ * field suggestion, kind by kind, is in `suggestion/`.
  */
 import {
 	type Flow,
