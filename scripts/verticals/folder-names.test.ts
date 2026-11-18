@@ -147,14 +147,20 @@ describe("the debt list of kind folders", () => {
 	});
 
 	test("the command reads scripts/kind-folder-debt.txt, for each workspace its own lines", () => {
+		// The command also runs rule (q), so each file has an importer here.
+		const list = (folder: string) => ({
+			"src/features/runs/run-list.ts": `import { part } from "./${folder}/part";\nexport const RunList = part;\n`,
+		});
 		const tree = (debt: string) =>
 			writeTree({
 				...inWorkspace(APP, {
 					...app(["hooks"]),
+					...list("hooks"),
 					"package.json": "{}",
 				}),
 				...inWorkspace("apps/other", {
 					...app(["lib"]),
+					...list("lib"),
 					"package.json": "{}",
 				}),
 				[KIND_FOLDER_DEBT]: debt,

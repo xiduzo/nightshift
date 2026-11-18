@@ -14,7 +14,6 @@ export {
 	formatTime,
 	formatWeekday,
 	formatWeekdayDate,
-	formatWeekdayDateYear,
 	hourOf,
 	hoverTime,
 	iso,
@@ -22,5 +21,4 @@ export {
 	type MoonPhase,
 	moonPhase,
 	now,
-	wall,
 } from "@nightshift/time";

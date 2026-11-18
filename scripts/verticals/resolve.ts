@@ -78,6 +78,7 @@ export function resolverFor(
 export function packageJson(workspace: string): {
 	name?: string;
 	exports?: unknown;
+	scripts?: Record<string, string>;
 } {
 	const file = join(workspace, "package.json");
 	return existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};

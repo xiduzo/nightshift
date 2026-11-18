@@ -76,18 +76,6 @@ export function formatWeekdayDate(
 	);
 }
 
-/** "Tue 30 Dec 2025": the weekday, the date and the year on the viewer's clock. */
-export function formatWeekdayDateYear(
-	at: Instant,
-	timeZone: string = localZone(),
-): string {
-	return zoned(
-		at,
-		{ weekday: "short", day: "numeric", month: "short", year: "numeric" },
-		timeZone,
-	);
-}
-
 /** "Friday": the weekday on the viewer's clock. */
 export function formatWeekday(
 	at: Instant,

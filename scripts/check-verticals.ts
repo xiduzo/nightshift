@@ -50,6 +50,14 @@
  *     does not consist of sub-verticals: a folder directly in it that has
  *     no `index.ts`, and own code over the same two limits. Its own code
  *     is the files directly in it and in its ring folders
+ * (q) a source file of a vertical that no production file of its
+ *     workspace imports. The barrel rules start at a barrel, so they do
+ *     not see a file that is on none. An import of one platform file
+ *     (`x.ios.tsx`, `x.android.tsx`, `x.native.tsx`, `x.web.tsx`, `x.tsx`)
+ *     counts for its siblings. A file that an entry of `package.json`
+ *     names, or that one of its scripts runs, counts as imported. A test
+ *     is no importer: a file that only its test imports fails. The command
+ *     runs this rule (`checkUnusedFiles`), not `checkWorkspace`
  * And across the workspaces it checks:
  * (m) a name on a package entry that no production file of another
  *     workspace imports. A test counts only for a `./testing` entry. A
@@ -97,6 +105,7 @@ import {
 	NESTING_DEBT,
 } from "./verticals/debt";
 import { entryProblems } from "./verticals/entries";
+import { checkUnusedFiles } from "./verticals/unused-files";
 import { checkWorkspace } from "./verticals/workspace";
 
 // The rules live in `scripts/verticals/`. This file is the command, and it
@@ -321,6 +330,7 @@ export function checkWorkspaces(root: string, workspaces: string[]): string[] {
 				kindFolderDebt: linesOf(kindFolderDebt, workspace),
 				nestingDebt: linesOf(nestingDebt, workspace),
 			}),
+			...checkUnusedFiles(root, workspace),
 		);
 	}
 	problems.push(...checkEntries(root, workspaces));

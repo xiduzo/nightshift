@@ -37,7 +37,6 @@ export {
 	formatTime,
 	formatWeekday,
 	formatWeekdayDate,
-	formatWeekdayDateYear,
 	hoverTime,
 } from "./format";
 export { type MoonPhase, moonPhase } from "./moon";
