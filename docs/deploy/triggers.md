@@ -6,7 +6,8 @@ Kestra, Windmill, Cursor automations, or a script of your own. You need no
 connector for each tool.
 
 Tested here: the `curl` example below, against a running Night Shift. A
-unit test checks its signature (`packages/engine/src/schedules/webhooks.test.ts`).
+unit test checks its signature
+(`packages/engine/src/schedules/domain/webhook-proof.test.ts`).
 The GitHub Actions workflow follows GitHub's documentation. Nobody tested it
 here end to end.
 
