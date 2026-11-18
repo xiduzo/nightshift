@@ -1,19 +1,22 @@
 import type { Schedule } from "@nightshift/flows";
-import { Refusal } from "@nightshift/refusal";
 import type { Actor, OffersPort } from "../contract";
 import type { ProjectFlows } from "../flows";
 import type { RunSummary } from "../read";
 import type { RunStatus } from "../run-status";
 import type { UsageNotes } from "../usage";
 import {
-	pausedAt,
-	pauseTonightEnds,
-	type ScheduleList,
+	pausedTonight,
 	type SchedulePause,
-	type ScheduleRecord,
-	type ScheduleResult,
-	type Scheduler,
-} from "./scheduler";
+	withoutEndedPause,
+	withoutPause,
+} from "./domain/pause-tonight";
+import {
+	scheduleOf,
+	withSchedule,
+	withTimeZone,
+} from "./domain/saved-schedules";
+import type { ScheduleRecord } from "./domain/schedule-history";
+import type { ScheduleList, ScheduleResult, Scheduler } from "./scheduler";
 import type { Webhooks } from "./webhooks";
 
 /**
@@ -39,35 +42,6 @@ export type ScheduleFilesDeps = {
 
 export type ScheduleFiles = ReturnType<typeof createScheduleFiles>;
 
-/**
- * Each schedule that starts at a time (`cron`) or stops at one (`stopAt`)
- * and has no time zone, on the clock of `timeZone`. One on another clock
- * keeps it.
- */
-export function withTimeZone(
-	schedules: readonly Schedule[],
-	timeZone: string,
-): Schedule[] {
-	return schedules.map((schedule) =>
-		schedule.timeZone === undefined &&
-		(schedule.cron !== undefined || schedule.stopAt !== undefined)
-			? { ...schedule, timeZone }
-			: schedule,
-	);
-}
-
-/** The schedule without a pause that has ended: a past `pausedUntil` means nothing. */
-function withoutEndedPause(schedule: Schedule, at: number): Schedule {
-	if (schedule.pausedUntil === undefined || pausedAt(schedule, at)) {
-		return schedule;
-	}
-	const { pausedUntil: _ended, ...rest } = schedule;
-	return rest;
-}
-
-const SCHEDULE_NOT_FOUND =
-	"This schedule does not exist. Someone may have removed it.";
-
 export function createScheduleFiles(deps: ScheduleFilesDeps) {
 	const { scheduler } = deps;
 
@@ -76,9 +50,7 @@ export function createScheduleFiles(deps: ScheduleFilesDeps) {
 		const { schedules } = await deps.flows.schedules(projectId, {
 			validate: false,
 		});
-		const schedule = schedules.find((one) => one.id === scheduleId);
-		if (!schedule) throw new Refusal("not-found", SCHEDULE_NOT_FOUND);
-		return { schedules, schedule };
+		return { schedules, schedule: scheduleOf(schedules, scheduleId) };
 	}
 
 	/** Writes the schedule's pause (or none), and what it does to its next start. */
@@ -87,10 +59,7 @@ export function createScheduleFiles(deps: ScheduleFilesDeps) {
 		schedules: readonly Schedule[],
 		changed: Schedule,
 	): Promise<SchedulePause> {
-		await deps.flows.saveSchedules(
-			projectId,
-			schedules.map((one) => (one.id === changed.id ? changed : one)),
-		);
+		await deps.flows.saveSchedules(projectId, withSchedule(schedules, changed));
 		const at = deps.now();
 		await scheduler.refresh();
 		return {
@@ -150,27 +119,7 @@ export function createScheduleFiles(deps: ScheduleFilesDeps) {
 			const at = deps.now();
 			await scheduler.refresh();
 			const next = scheduler.nextAt(projectId, withoutPause(schedule), at);
-			if (next === null) {
-				throw new Refusal(
-					"invalid",
-					!schedule.enabled
-						? "This schedule is off. It starts nothing tonight."
-						: schedule.webhook
-							? "This schedule starts on a webhook. It has no times to pause."
-							: "This schedule has no next start to pause.",
-				);
-			}
-			const until = pauseTonightEnds(next, schedule.timeZone);
-			if (until === null) {
-				throw new Refusal(
-					"invalid",
-					"This schedule has no next start to pause.",
-				);
-			}
-			return setPause(projectId, schedules, {
-				...schedule,
-				pausedUntil: until,
-			});
+			return setPause(projectId, schedules, pausedTonight(schedule, next));
 		},
 
 		/** Ends the schedule's pause tonight: it starts at its next time again. A schedule without a pause stays as it is. */
@@ -229,9 +178,4 @@ export function createScheduleFiles(deps: ScheduleFilesDeps) {
 			return issues;
 		},
 	};
-}
-
-function withoutPause(schedule: Schedule): Schedule {
-	const { pausedUntil: _pause, ...rest } = schedule;
-	return rest;
 }

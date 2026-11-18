@@ -26,7 +26,8 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
-import { createScheduler, SCHEDULE_GRACE_MS } from "./scheduler";
+import { SCHEDULE_GRACE_MS } from "./domain/schedule-watch";
+import { createScheduler } from "./scheduler";
 
 /** The scheduler with an injected clock: each test moves `clock` and waits for a tick. */
 

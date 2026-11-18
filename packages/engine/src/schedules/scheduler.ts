@@ -1,13 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { event } from "@nightshift/db/schema";
-import {
-	lateMinutesOf,
-	latestCronTime,
-	nextCronTimes,
-	nextTimeOfDay,
-	type Schedule,
-	type ScheduleIssue,
-} from "@nightshift/flows";
+import type { Schedule, ScheduleIssue } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import { and, asc, gt, inArray } from "drizzle-orm";
 import type { StartRunInput } from "../contract";
@@ -22,110 +15,34 @@ import {
 import type { RunSummary } from "../read";
 import type { RunStatus } from "../run-status";
 import type { UsageNotes } from "../usage";
-import { scheduledStart } from "./scheduled-start";
-import type { WebhookDelivery } from "./webhooks";
+import {
+	openRunOf,
+	openRunRefusalWords,
+	openRunSkipWords,
+} from "./domain/open-run";
+import {
+	createScheduleHistories,
+	type ScheduleFact,
+	type ScheduleRecord,
+} from "./domain/schedule-history";
+import {
+	type CronSchedule,
+	createScheduleWatch,
+	cronScheduleOf,
+	type MissedScheduleTime,
+} from "./domain/schedule-watch";
+import { scheduledStart } from "./domain/scheduled-start";
+import type { WebhookDelivery } from "./domain/webhook-delivery";
 
 /**
  * The scheduler: starts the runs of the projects' schedules when their
  * cron times come due. It lives inside the engine and ticks on an interval
  * (and once at start). Each tick reads every project's schedules again, so
- * an edit applies without a restart.
- *
- * Durable rules, all derived from the event log:
- * - A cron time fires at most once. The latest handled cron time of each
- *   schedule comes from `ScheduleFired`, `ScheduleSkipped` and the trigger
- *   of `RunStarted` (which closes the gap when the daemon dies between the
- *   start and the `ScheduleFired`).
- * - Only the latest due cron time counts. It fires when it is at most
- *   `SCHEDULE_GRACE_MS` late, for example after a daemon restart. A time
- *   that was missed fires up to the schedule's own `lateMinutes` late
- *   (default 15): one the scheduler watched come due (the computer slept),
- *   or one that fell while the daemon was down for a schedule that fired
- *   or was skipped before. Its run's trigger keeps the cron time, so the
- *   run knows when it was due (`{{run.due_at}}`). Later than that window
- *   a missed time is skipped (`ScheduleSkipped`) and `missed` tells the
- *   people of the Space. A time from before a schedule existed or was
- *   resumed is ignored without a log entry.
- * - A schedule does not start while an earlier run of it is still running,
- *   waiting or sleeping: that cron time is skipped.
- * - A start that fails (flow errors, the run cap) is recorded with its error
- *   and not retried.
- * - A hold (`hold`, while a merge of Spaces moves rows) skips the ticks
- *   and changes nothing else: a cron time that came due meanwhile fires
- *   on the first tick after it, under the rules above.
- * - A schedule paused tonight (`pausedUntil`) skips each cron time
- *   before that moment (`ScheduleSkipped`), then fires as before. The
- *   pause lives in the schedule in the flow document, so it survives a
- *   restart and reaches the Host that fires it from any Device.
- * - Run now (`runNow`) starts the schedule's run at once, as if it fired
- *   now: the same flow, inputs, base ref, stop time, Device and Person,
- *   with the schedule as its trigger (`at` is now). It refuses while an
- *   earlier run of the schedule is still open, as a cron time skips.
+ * an edit applies without a restart. The rules are in `domain/`:
+ * `schedule-watch.ts` has them all, in words.
  */
 
-/**
- * The morning a pause tonight lasts until, on the schedule's clock.
- *
- * The rule: Pause tonight skips the schedule's next start and every
- * start after it until the first 06:00 after that next start. So a
- * 22:00 schedule paused at noon skips 22:00 and fires again the next
- * evening. An hourly one paused at 23:00 skips 00:00 to 05:00 and fires
- * at 06:00. It always skips at least the next start, also of a schedule
- * that runs in the day.
- */
-export const PAUSE_TONIGHT_UNTIL = "06:00";
-
-/** When a pause tonight ends for a schedule whose next start is `nextStart`. */
-export function pauseTonightEnds(
-	nextStart: number,
-	timeZone?: string,
-): number | null {
-	return nextTimeOfDay(PAUSE_TONIGHT_UNTIL, nextStart, timeZone);
-}
-
-/** Whether the schedule is paused at `at`: its pause has not ended. */
-export function pausedAt(schedule: Schedule, at: number): boolean {
-	return schedule.pausedUntil !== undefined && schedule.pausedUntil > at;
-}
-
-/**
- * How late any cron time may still start, also one from before the
- * schedule was watched. A missed time may start as late as the schedule's
- * `lateMinutes`, and no later than those minutes when they are fewer.
- */
-export const SCHEDULE_GRACE_MS = 15 * 60_000;
-
-/** A cron time that was missed by more than its schedule allows: it did not start. */
-export type MissedScheduleTime = {
-	projectId: string;
-	scheduleId: string;
-	/** The flow it would have started. */
-	flow: string;
-	/** The cron time (epoch ms). */
-	at: number;
-	/** The schedule's clock, when it names one. */
-	timeZone?: string;
-};
-
-/** A missed cron time, with the Space of its project: what the notifier tells. */
-export type ScheduleMissed = MissedScheduleTime & { spaceId: string };
 export const DEFAULT_SCHEDULE_TICK_MS = 30_000;
-/** How many of a schedule's latest runs the overlap check looks at. */
-const OVERLAP_LOOKBACK = 5;
-
-/** How the latest handled cron time of a schedule went, as logged. */
-export type ScheduleRecord =
-	| { kind: "fired"; at: number; runId: string }
-	| { kind: "failed"; at: number; error: string }
-	| { kind: "skipped"; at: number; reason: string; runId: string | null };
-
-type History = {
-	/** The latest cron time that fired or was skipped. */
-	lastAt: number;
-	last: ScheduleRecord;
-	/** The runs this schedule started, oldest first. */
-	runIds: string[];
-};
 
 export type SchedulerDeps = {
 	db: Database;
@@ -199,95 +116,48 @@ const SCHEDULE_EVENT_TYPES = [
 	"ScheduleSkipped",
 ] as const satisfies readonly EngineEventType[];
 
-const OPEN_STATUSES: readonly RunStatus[] = ["running", "waiting", "sleeping"];
-
-/** A schedule the cron line starts: one with a cron line and a flow, and no webhook. */
-type CronSchedule = Schedule & { cron: string; flow: string };
-
-function keyOf(projectId: string, scheduleId: string): string {
-	return `${projectId}/${scheduleId}`;
-}
-
-/** "45 min", "2 h 5 min", "3 days". */
-function lateness(ms: number): string {
-	const minutes = Math.floor(ms / 60_000);
-	if (minutes < 60) return `${minutes} min`;
-	const hours = Math.floor(minutes / 60);
-	if (hours < 48) {
-		return minutes % 60 === 0 ? `${hours} h` : `${hours} h ${minutes % 60} min`;
+/** What a logged event tells of a schedule, or null: a run that no schedule started. */
+function factOf(e: LoggedEvent): ScheduleFact | null {
+	if (e.type === "RunStarted") {
+		const trigger = e.payload.trigger;
+		if (trigger?.kind !== "schedule" || !e.runId) return null;
+		return {
+			kind: "run-started",
+			projectId: e.payload.projectId,
+			scheduleId: trigger.scheduleId,
+			at: trigger.at,
+			runId: e.runId,
+		};
 	}
-	return `${Math.floor(hours / 24)} days`;
+	if (e.type === "ScheduleFired") {
+		const { projectId, scheduleId, at, runId, error } = e.payload;
+		return { kind: "fired", projectId, scheduleId, at, runId, error };
+	}
+	if (e.type === "ScheduleSkipped") {
+		const { projectId, scheduleId, at, reason, runId } = e.payload;
+		return {
+			kind: "skipped",
+			projectId,
+			scheduleId,
+			at,
+			reason,
+			runId: runId ?? null,
+		};
+	}
+	return null;
 }
 
 export function createScheduler(deps: SchedulerDeps): Scheduler {
 	const { db, now } = deps;
-	/** When the scheduler began: a cron time before it fell while the daemon was down. */
-	const startedAt = now();
-	const history = new Map<string, History>();
-	/** The first tick that saw each enabled schedule. Forgotten while it is paused. */
-	const watchedSince = new Map<string, number>();
-	/** Whether the last tick found the scheduler switched off. */
-	let off = false;
-	/** The first tick after the scheduler was switched on again: a cron time before it neither fires nor counts as missed. */
-	let onSince: number | null = null;
+	/** It begins now: a cron time before this moment fell while the daemon was down. */
+	const watch = createScheduleWatch(now());
+	const histories = createScheduleHistories();
 	let cursor = 0;
 	let running: Promise<void> | null = null;
 	let timer: ReturnType<typeof setInterval> | undefined;
 	let stopped = false;
 	/** How many holds are not released. */
 	let holds = 0;
-
-	function record(
-		projectId: string,
-		scheduleId: string,
-		fact: ScheduleRecord,
-	): void {
-		const key = keyOf(projectId, scheduleId);
-		const current = history.get(key);
-		const runId = fact.kind === "fired" ? fact.runId : null;
-		if (!current) {
-			history.set(key, {
-				lastAt: fact.at,
-				last: fact,
-				runIds: runId ? [runId] : [],
-			});
-			return;
-		}
-		if (runId && !current.runIds.includes(runId)) current.runIds.push(runId);
-		if (fact.at >= current.lastAt) {
-			current.lastAt = fact.at;
-			current.last = fact;
-		}
-	}
-
-	function apply(e: LoggedEvent): void {
-		if (e.type === "RunStarted") {
-			const trigger = e.payload.trigger;
-			if (trigger?.kind !== "schedule" || !e.runId) return;
-			record(e.payload.projectId, trigger.scheduleId, {
-				kind: "fired",
-				at: trigger.at,
-				runId: e.runId,
-			});
-		} else if (e.type === "ScheduleFired") {
-			const { projectId, scheduleId, at, runId, error } = e.payload;
-			record(
-				projectId,
-				scheduleId,
-				runId
-					? { kind: "fired", at, runId }
-					: { kind: "failed", at, error: error ?? "The run did not start." },
-			);
-		} else if (e.type === "ScheduleSkipped") {
-			const { projectId, scheduleId, at, reason, runId } = e.payload;
-			record(projectId, scheduleId, {
-				kind: "skipped",
-				at,
-				reason,
-				runId: runId ?? null,
-			});
-		}
-	}
 
 	async function refresh(): Promise<void> {
 		const rows = await db
@@ -302,21 +172,9 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			.orderBy(asc(event.seq));
 		for (const row of rows) {
 			cursor = Math.max(cursor, row.seq);
-			apply(parseEventRow(row));
+			const fact = factOf(parseEventRow(row));
+			if (fact) histories.apply(fact);
 		}
-	}
-
-	/** An earlier run of the schedule that is still running, waiting or sleeping. */
-	async function openRun(
-		current: History | undefined,
-	): Promise<{ runId: string; status: RunStatus } | null> {
-		for (const runId of (current?.runIds ?? [])
-			.slice(-OVERLAP_LOOKBACK)
-			.reverse()) {
-			const status = await deps.runStatus(runId);
-			if (status && OPEN_STATUSES.includes(status)) return { runId, status };
-		}
-		return null;
 	}
 
 	async function skip(
@@ -331,33 +189,14 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			payload: { projectId, scheduleId, at, reason, runId },
 		});
 		deps.usage?.note({ kind: "schedule-skipped", reason });
-		record(projectId, scheduleId, { kind: "skipped", at, reason, runId });
-	}
-
-	/**
-	 * What the due time `due` of a schedule does at `at`, when no earlier
-	 * fact handled it: it starts, it was missed by more than the schedule
-	 * allows, or it is ignored (it fell before the schedule was watched).
-	 * Within the grace any time starts. Later, only a time that was missed:
-	 * one this scheduler watched come due, or one that fell while the
-	 * daemon was down for a schedule with history. It starts while it is
-	 * within the schedule's `lateMinutes`.
-	 */
-	function timingOf(
-		key: string,
-		schedule: Schedule,
-		due: number,
-		at: number,
-		current: History | undefined,
-	): "start" | "missed" | "ignore" {
-		const late = at - due;
-		const window = lateMinutesOf(schedule) * 60_000;
-		if (late <= Math.min(SCHEDULE_GRACE_MS, window)) return "start";
-		const watched = watchedSince.get(key) ?? at;
-		const missedWhileWatching = due >= watched;
-		const missedWhileDown = current !== undefined && due < startedAt;
-		if (!missedWhileWatching && !missedWhileDown) return "ignore";
-		return late <= window ? "start" : "missed";
+		histories.apply({
+			kind: "skipped",
+			projectId,
+			scheduleId,
+			at,
+			reason,
+			runId,
+		});
 	}
 
 	async function consider(
@@ -365,32 +204,14 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 		schedule: CronSchedule,
 		at: number,
 	): Promise<void> {
-		const key = keyOf(projectId, schedule.id);
-		const due = latestCronTime(schedule.cron, at, schedule.timeZone);
-		if (due === null) return;
-		const current = history.get(key);
-		if (current && due <= current.lastAt) return;
-		// It came due while the scheduler was off.
-		if (onSince !== null && due < onSince) return;
-
-		const timing = timingOf(key, schedule, due, at, current);
-		if (timing === "ignore") return;
-		if (timing === "missed") {
-			const late = at - due;
-			await skip(
-				projectId,
-				schedule.id,
-				due,
-				`Missed by ${lateness(late)}. Night Shift was off, or the computer was asleep. This schedule starts at most ${lateness(lateMinutesOf(schedule) * 60_000)} late.`,
-			);
+		const current = histories.of(projectId, schedule.id);
+		const decision = watch.decide(projectId, schedule, at, current);
+		if (decision.kind === "none") return;
+		const { due } = decision;
+		if (decision.kind === "missed") {
+			await skip(projectId, schedule.id, due, decision.reason);
 			try {
-				deps.missed?.({
-					projectId,
-					scheduleId: schedule.id,
-					flow: schedule.flow,
-					at: due,
-					...(schedule.timeZone ? { timeZone: schedule.timeZone } : {}),
-				});
+				deps.missed?.(decision.missed);
 			} catch (error) {
 				console.error(
 					`[schedules] ${schedule.id}: telling of a miss failed`,
@@ -400,23 +221,18 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			return;
 		}
 
-		if (schedule.pausedUntil !== undefined && due < schedule.pausedUntil) {
-			await skip(
-				projectId,
-				schedule.id,
-				due,
-				"You paused this schedule for tonight.",
-			);
+		if (decision.kind === "paused") {
+			await skip(projectId, schedule.id, due, decision.reason);
 			return;
 		}
 
-		const open = await openRun(current);
+		const open = await openRunOf(current, deps.runStatus);
 		if (open) {
 			await skip(
 				projectId,
 				schedule.id,
 				due,
-				`An earlier run of this schedule is still ${open.status}.`,
+				openRunSkipWords(open),
 				open.runId,
 			);
 			return;
@@ -443,13 +259,14 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			payload: { projectId, scheduleId: schedule.id, at: due, runId, error },
 		});
 		if (runId) deps.usage?.note({ kind: "schedule-fired" });
-		record(
+		histories.apply({
+			kind: "fired",
 			projectId,
-			schedule.id,
-			runId
-				? { kind: "fired", at: due, runId }
-				: { kind: "failed", at: due, error: error ?? "The run did not start." },
-		);
+			scheduleId: schedule.id,
+			at: due,
+			runId,
+			error,
+		});
 	}
 
 	async function pass(): Promise<void> {
@@ -457,15 +274,11 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 		if (holds > 0) return;
 		if (deps.enabled && !deps.enabled()) {
 			// Off counts as paused: turning it on again starts from now.
-			watchedSince.clear();
-			off = true;
+			watch.switchedOff();
 			return;
 		}
 		const at = now();
-		if (off) {
-			off = false;
-			onSince = at;
-		}
+		watch.switchedOn(at);
 		for (const { id: projectId } of await deps.projects()) {
 			if (stopped || holds > 0) return;
 			let schedules: Schedule[];
@@ -482,21 +295,17 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 				// A duplicate id is an issue in the UI; the first one counts.
 				if (seen.has(schedule.id)) continue;
 				seen.add(schedule.id);
-				const key = keyOf(projectId, schedule.id);
-				const { cron, flow } = schedule;
 				// A webhook's schedule starts when the webhook arrives (`webhooks.ts`).
+				const cron = cronScheduleOf(schedule);
 				if (
-					cron === undefined ||
-					flow === undefined ||
-					schedule.webhook !== undefined ||
-					!schedule.enabled ||
+					cron === null ||
 					(deps.firesHere && !(await deps.firesHere(projectId, schedule)))
 				) {
-					watchedSince.delete(key);
+					watch.unwatch(projectId, schedule.id);
 					continue;
 				}
-				if (!watchedSince.has(key)) watchedSince.set(key, at);
-				await consider(projectId, { ...schedule, cron, flow }, at);
+				watch.watch(projectId, schedule.id, at);
+				await consider(projectId, cron, at);
 			}
 		}
 	}
@@ -549,7 +358,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			return release;
 		},
 		last(projectId, scheduleId) {
-			return history.get(keyOf(projectId, scheduleId))?.last ?? null;
+			return histories.of(projectId, scheduleId)?.last ?? null;
 		},
 		async runNow(projectId, schedule, personId) {
 			const { flow } = schedule;
@@ -557,13 +366,11 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 				throw new Refusal("invalid", "This schedule starts no flow.");
 			}
 			await refresh();
-			const open = await openRun(history.get(keyOf(projectId, schedule.id)));
-			if (open) {
-				throw new Refusal(
-					"conflict",
-					`An earlier run of this schedule is still ${open.status}. Wait for it to end, or stop it.`,
-				);
-			}
+			const open = await openRunOf(
+				histories.of(projectId, schedule.id),
+				deps.runStatus,
+			);
+			if (open) throw new Refusal("conflict", openRunRefusalWords(open));
 			const at = now();
 			const run = await deps.startRun(
 				scheduledStart(projectId, schedule, flow, at, {
@@ -582,36 +389,23 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 					error: null,
 				},
 			});
-			record(projectId, schedule.id, { kind: "fired", at, runId: run.id });
+			histories.apply({
+				kind: "fired",
+				projectId,
+				scheduleId: schedule.id,
+				at,
+				runId: run.id,
+				error: null,
+			});
 			return run;
 		},
 		nextAt(projectId, schedule, at) {
-			const { cron } = schedule;
-			if (!schedule.enabled || cron === undefined || schedule.webhook) {
-				return null;
-			}
-			if (pausedAt(schedule, at) && schedule.pausedUntil !== undefined) {
-				// The first cron time at or after the pause ends.
-				return (
-					nextCronTimes(
-						cron,
-						schedule.pausedUntil - 1,
-						1,
-						schedule.timeZone,
-					)[0] ?? null
-				);
-			}
-			const due = latestCronTime(cron, at, schedule.timeZone);
-			const current = history.get(keyOf(projectId, schedule.id));
-			if (
-				due !== null &&
-				(!current || due > current.lastAt) &&
-				timingOf(keyOf(projectId, schedule.id), schedule, due, at, current) ===
-					"start"
-			) {
-				return due;
-			}
-			return nextCronTimes(cron, at, 1, schedule.timeZone)[0] ?? null;
+			return watch.nextStart(
+				projectId,
+				schedule,
+				at,
+				histories.of(projectId, schedule.id),
+			);
 		},
 	};
 }
@@ -646,14 +440,6 @@ export type ScheduleSummary = Schedule & {
 	deliveries: WebhookDelivery[];
 	/** Problems of this schedule. One with an error fails to start. */
 	issues: ScheduleIssue[];
-};
-
-/** A schedule's pause tonight after a change, and its next start with it. */
-export type SchedulePause = {
-	/** When the pause ends (epoch ms). Null: not paused. */
-	pausedUntil: number | null;
-	/** The next start (epoch ms), after the pause. Null when off. */
-	nextAt: number | null;
 };
 
 export type ScheduleList = {

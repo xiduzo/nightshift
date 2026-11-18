@@ -1,9 +1,4 @@
-import {
-	createHash,
-	createHmac,
-	randomBytes,
-	timingSafeEqual,
-} from "node:crypto";
+import { randomBytes } from "node:crypto";
 import type { Database } from "@nightshift/db";
 import { event } from "@nightshift/db/schema";
 import {
@@ -24,34 +19,25 @@ import type { StartRunInput } from "../contract";
 import type { ProjectFlows } from "../flows";
 import { parseEventRow, type RunLog, type RunTrigger } from "../log";
 import type { RunSummary } from "../read";
-import { scheduledStart } from "./scheduled-start";
+import { scheduledStart } from "./domain/scheduled-start";
+import {
+	createWebhookRefusals,
+	DELIVERIES_SHOWN,
+	deliveryOf,
+	latestDeliveries,
+	WEBHOOK_ERROR_WORDS,
+	WEBHOOK_SECRET_WORDS,
+	type WebhookAnswer,
+	type WebhookDelivery,
+	webhookRefusal,
+	webhookScheduleOf,
+} from "./domain/webhook-delivery";
+import { webhookAuthentic } from "./domain/webhook-proof";
 
 /**
- * Webhooks: a schedule with `webhook` starts its flow, sends its signal,
- * scores runs by their pull requests, or more than one, when a request
- * arrives at `/hooks/<project id>/<schedule id>`. The daemon's HTTP
- * server reads the request (its body capped) and hands it here; this
- * module decides, and answers before the run starts.
- *
- * The address is public on a Host, so the rules are strict:
- * - The sender proves it knows the schedule's secret: GitHub's
- *   `X-Hub-Signature-256` (an HMAC of the body), else
- *   `Authorization: Bearer <secret>`. Both compare in constant time.
- * - An unknown project or schedule, a schedule without a webhook, and a
- *   wrong or missing secret all answer the same `not-found`, after the
- *   same work: nobody learns whether a schedule exists.
- * - Nothing logs a secret or a body. The event (the body and the headers,
- *   without the ones that carry a secret) goes only to the run it starts,
- *   as its inputs, and to the Waits it wakes, as their data.
- * - A refused webhook is never logged: anyone may send one. The last few
- *   refusals of a schedule stay in memory, so the Schedules page can say
- *   why a webhook did nothing. An authenticated one is logged
- *   (`WebhookReceived`), accepted or filtered out.
- *
- * The same Device that fires a schedule's cron times takes its webhooks
- * (`firesHere`): the Space's Host, else the one Device of a Space without
- * a Host. The run starts on that Device too (ADR 15): a schedule names no
- * Device.
+ * Webhooks: the daemon's HTTP server reads the request (its body capped)
+ * and hands it here. This module decides, and answers before the run
+ * starts. The rules are in `domain/webhook-delivery.ts`.
  */
 
 /** A webhook as the HTTP server hands it over. */
@@ -62,39 +48,6 @@ export type WebhookRequest = {
 	/** The raw body: the signature is over these bytes. */
 	body: Uint8Array;
 };
-
-/**
- * What the sender is told. `not-found`: no such schedule, or the secret did
- * not check out (one answer for both). `refused`: the secret checked out,
- * but the schedule does not take webhooks now (paused, or another Device
- * takes them).
- */
-export type WebhookAnswer =
-	| { kind: "accepted" }
-	| { kind: "filtered" }
-	| { kind: "refused"; reason: string }
-	| { kind: "not-found" };
-
-/** One webhook as the Schedules page lists it, newest first. */
-export type WebhookDelivery = {
-	/** When it arrived (epoch ms). */
-	at: number;
-	/**
-	 * `accepted`: it started a run or sent its signal, or tried to.
-	 * `filtered`: the schedule's rule did not hold. `refused`: the secret
-	 * did not check out, or the schedule did not take it.
-	 */
-	result: "accepted" | "filtered" | "refused";
-	/** Why it was refused, why the rule or the key failed, or why the run did not start. */
-	reason: string | null;
-	/** The run it started. */
-	runId: string | null;
-	/** How many runs its signal woke. */
-	woke: number;
-};
-
-/** How many deliveries of a schedule the Schedules page shows. */
-export const DELIVERIES_SHOWN = 10;
 
 export type WebhooksDeps = {
 	db: Database;
@@ -125,54 +78,12 @@ export type WebhooksDeps = {
 
 export type Webhooks = ReturnType<typeof createWebhooks>;
 
-/** Whether two texts are equal, in a time that does not depend on where they differ. */
-function sameText(a: string, b: string): boolean {
-	const digest = (text: string) => createHash("sha256").update(text).digest();
-	return timingSafeEqual(digest(a), digest(b));
-}
-
-/**
- * Whether the request proves it knows `secret`: GitHub's
- * `X-Hub-Signature-256: sha256=<hmac of the body>`, else
- * `Authorization: Bearer <secret>`.
- */
-export function webhookAuthentic(
-	headers: Headers,
-	body: Uint8Array,
-	secret: string,
-): boolean {
-	const signature = headers.get("x-hub-signature-256");
-	if (signature !== null) {
-		const expected = createHmac("sha256", secret).update(body).digest("hex");
-		return sameText(signature.trim(), `sha256=${expected}`);
-	}
-	const bearer = /^Bearer\s+(\S.*)$/i.exec(
-		headers.get("authorization")?.trim() ?? "",
-	)?.[1];
-	return bearer !== undefined && sameText(bearer, secret);
-}
-
 /** A key that no secret is: what a request for an unknown schedule is checked against. */
 const NO_SECRET = randomBytes(32).toString("hex");
 
 export function createWebhooks(deps: WebhooksDeps) {
-	/** The latest refusals of each schedule, newest first. In memory only. */
-	const refusals = new Map<string, WebhookDelivery[]>();
-
-	const keyOf = (projectId: string, scheduleId: string) =>
-		`${projectId}/${scheduleId}`;
-
-	function refuse(
-		projectId: string,
-		scheduleId: string,
-		at: number,
-		reason: string,
-	): void {
-		const key = keyOf(projectId, scheduleId);
-		const list = refusals.get(key) ?? [];
-		list.unshift({ at, result: "refused", reason, runId: null, woke: 0 });
-		refusals.set(key, list.slice(0, DELIVERIES_SHOWN));
-	}
+	/** The latest refusals of each schedule. In memory only. */
+	const refusals = createWebhookRefusals();
 
 	/** The schedule, or null for any reason the sender may not learn. */
 	async function find(
@@ -183,9 +94,8 @@ export function createWebhooks(deps: WebhooksDeps) {
 			const { schedules } = await deps.flows.schedules(projectId, {
 				validate: false,
 			});
-			// A duplicate id is an issue in the UI; the first one counts.
-			const schedule = schedules.find((s) => s.id === scheduleId);
-			return schedule?.webhook ? { schedule } : null;
+			const schedule = webhookScheduleOf(schedules, scheduleId);
+			return schedule ? { schedule } : null;
 		} catch {
 			return null;
 		}
@@ -217,7 +127,7 @@ export function createWebhooks(deps: WebhooksDeps) {
 		if (schedule.signal) {
 			const key = await webhookSignalKey(schedule, webhook);
 			if ("error" in key) {
-				errors.push(`The signal's key failed: ${key.error}`);
+				errors.push(WEBHOOK_ERROR_WORDS.signalKey(key.error));
 			} else {
 				try {
 					woke = await deps.signal(projectId, {
@@ -301,36 +211,34 @@ export function createWebhooks(deps: WebhooksDeps) {
 			const authentic = webhookAuthentic(headers, body, secret ?? NO_SECRET);
 			if (!found) return { answer: { kind: "not-found" }, done };
 			if (secret === undefined || secret === "") {
-				refuse(
+				refusals.add(
 					projectId,
 					scheduleId,
 					at,
-					`The secret ${secretName ?? "of this schedule"} has no value here. Add it on the project's Secrets page.`,
+					WEBHOOK_SECRET_WORDS.noValue(secretName),
 				);
 				return { answer: { kind: "not-found" }, done };
 			}
 			if (!authentic) {
-				refuse(
+				refusals.add(
 					projectId,
 					scheduleId,
 					at,
 					headers.has("x-hub-signature-256") || headers.has("authorization")
-						? "The secret did not match."
-						: "The request had no secret.",
+						? WEBHOOK_SECRET_WORDS.wrong
+						: WEBHOOK_SECRET_WORDS.none,
 				);
 				return { answer: { kind: "not-found" }, done };
 			}
 
 			const { schedule } = found;
-			const refusal = !schedule.enabled
-				? "The schedule is paused."
-				: !deps.enabled()
-					? "Schedules are paused."
-					: !(await deps.firesHere(projectId, schedule))
-						? "The Host of this Space takes this webhook. Send it there."
-						: null;
+			const refusal = await webhookRefusal(
+				schedule,
+				() => deps.enabled(),
+				() => deps.firesHere(projectId, schedule),
+			);
 			if (refusal !== null) {
-				refuse(projectId, scheduleId, at, refusal);
+				refusals.add(projectId, scheduleId, at, refusal);
 				return { answer: { kind: "refused", reason: refusal }, done };
 			}
 
@@ -351,7 +259,7 @@ export function createWebhooks(deps: WebhooksDeps) {
 							runId: null,
 							woke: 0,
 							error:
-								"error" in holds ? `The rule failed: ${holds.error}` : null,
+								"error" in holds ? WEBHOOK_ERROR_WORDS.rule(holds.error) : null,
 						},
 					})
 					.then(() => {});
@@ -384,12 +292,9 @@ export function createWebhooks(deps: WebhooksDeps) {
 			for (const row of rows) {
 				const e = parseEventRow(row);
 				if (e.type !== "WebhookReceived") continue;
-				const { at, result, runId, woke, error } = e.payload;
-				logged.push({ at, result, reason: error, runId, woke });
+				logged.push(deliveryOf(e.payload));
 			}
-			return [...logged, ...(refusals.get(keyOf(projectId, scheduleId)) ?? [])]
-				.sort((a, b) => b.at - a.at)
-				.slice(0, DELIVERIES_SHOWN);
+			return latestDeliveries(logged, refusals.of(projectId, scheduleId));
 		},
 	};
 }

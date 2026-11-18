@@ -3,7 +3,7 @@ import {
 	nextTimeOfDay,
 	type Schedule,
 } from "@nightshift/flows";
-import type { StartRunInput } from "../contract";
+import type { StartRunInput } from "../../contract";
 
 /**
  * The run a schedule starts at `at`, as the scheduler's tick, Run now and
