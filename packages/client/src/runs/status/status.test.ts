@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
-
+import type { RunStatus } from "../types";
 import { groupStatuses, hasEnded, runStatusLabel, statusOf } from "./status";
-import type { RunStatus } from "./types";
 
 const STATUSES: RunStatus[] = [
 	"running",

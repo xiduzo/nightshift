@@ -1,4 +1,4 @@
-import type { RunResult, RunStatus } from "./types";
+import type { RunResult, RunStatus } from "../types";
 
 /**
  * Where a run is, as every screen reads it: its word, the look it takes

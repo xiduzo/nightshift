@@ -5,7 +5,7 @@ import type {
 	RunStreamItem,
 	StepSummary,
 	TranscriptEntry,
-} from "./types";
+} from "../types";
 
 /**
  * The state of the stream of one run, for a "Reconnecting" hint.

@@ -4,7 +4,7 @@ import {
 	standInOutcomes,
 	standsIn,
 } from "@nightshift/flows";
-import type { RunDetail, StepSummary } from "./types";
+import type { RunDetail, StepSummary } from "../types";
 
 /**
  * What a node gave in its newest run: the editor shows it on the node, in

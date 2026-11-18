@@ -1,3 +1,4 @@
+import type { WorktreeChangesEvent } from "../types";
 import { projectPath } from "./project-path";
 import {
 	type AgentToolCall,
@@ -6,7 +7,6 @@ import {
 	stringField,
 	toolName,
 } from "./tool-input";
-import type { WorktreeChangesEvent } from "./types";
 
 /**
  * One change an agent made to a file: text it replaced, a whole new

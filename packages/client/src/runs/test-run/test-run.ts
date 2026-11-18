@@ -5,7 +5,7 @@
  * Needed you, Latest reports and the useful question leave it out.
  */
 
-import type { StepSummary } from "./types";
+import type { StepSummary } from "../types";
 
 export { isTestRun } from "@nightshift/engine/run-status";
 

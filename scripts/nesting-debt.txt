@@ -44,8 +44,6 @@ apps/web/src/features/runs/components
 apps/web/src/features/runs/hooks
 apps/web/src/features/runs/lib
 apps/web/src/features/runs/transcript
-packages/client/src/runs
-packages/client/src/runs/command-output
 packages/engine/src/graph
 packages/engine/src/graph/nodes
 packages/engine/src/knowledge

@@ -1,5 +1,5 @@
-import type { KnownCost } from "./format";
-import type { StepSummary } from "./types";
+import type { StepSummary } from "../types";
+import type { KnownCost } from "../words";
 
 /** The tokens a run's or a step's agents used (`metrics.tokens`). */
 export type TokenCounts = NonNullable<StepSummary["metrics"]>["tokens"];

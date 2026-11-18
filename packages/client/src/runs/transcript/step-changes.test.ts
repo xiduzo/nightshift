@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-
+import type { TranscriptEntry, WorktreeChangesEvent } from "../types";
 import {
 	applyStepChanges,
 	lastWorktreeChanges,
@@ -7,7 +7,6 @@ import {
 	type StepChanges,
 	stepChangedFiles,
 } from "./step-changes";
-import type { TranscriptEntry, WorktreeChangesEvent } from "./types";
 
 const changes = (
 	files: WorktreeChangesEvent["files"],

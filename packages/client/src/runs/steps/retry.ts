@@ -1,4 +1,4 @@
-import type { StepSummary } from "./types";
+import type { StepSummary } from "../types";
 
 type Step = Pick<StepSummary, "id" | "nodeId" | "endedAt" | "scope">;
 

@@ -1,5 +1,5 @@
+import type { TranscriptEntry, WorktreeChangesEvent } from "../types";
 import { type ChangedFile, changedFiles } from "./changed-files";
-import type { TranscriptEntry, WorktreeChangesEvent } from "./types";
 
 /**
  * What each step of a run changed in the run's copy of the project, by

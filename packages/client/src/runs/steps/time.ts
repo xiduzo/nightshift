@@ -1,4 +1,4 @@
-import type { StepSummary } from "./types";
+import type { StepSummary } from "../types";
 
 /** How long a run took: open from start to end, and how much of that it waited for a person or slept. */
 export type RunTime = {

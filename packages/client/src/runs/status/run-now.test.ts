@@ -1,8 +1,7 @@
 import { describe, expect, test } from "bun:test";
-
+import type { RunStatus, StepSummary } from "../types";
 import { runActions } from "./actions";
 import { openGates, type RunLive, runNow, walkerName } from "./run-now";
-import type { RunStatus, StepSummary } from "./types";
 
 const here = { id: "this", thisDevice: true, name: null };
 const laptop = { id: "laptop", thisDevice: false, name: "Sander's laptop" };

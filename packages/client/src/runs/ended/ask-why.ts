@@ -1,6 +1,6 @@
 import { endedEarly } from "@nightshift/engine/run-status";
 
-import type { RunStatus } from "./types";
+import type { RunStatus } from "../types";
 
 /**
  * "Improve this flow" on the desktop, and if it works:

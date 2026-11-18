@@ -1,12 +1,11 @@
 import { describe, expect, test } from "bun:test";
-
+import type { TranscriptEntry } from "../types";
 import {
 	applyAgentMessages,
 	markdownPreview,
 	runningSteps,
 	stepState,
 } from "./progress";
-import type { TranscriptEntry } from "./types";
 
 describe("where a step is", () => {
 	const gate = {

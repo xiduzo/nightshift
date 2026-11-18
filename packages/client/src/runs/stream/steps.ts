@@ -1,4 +1,4 @@
-import type { StepSummary } from "./types";
+import type { StepSummary } from "../types";
 
 /**
  * The run's steps: the fetched list, with the live summaries from the stream

@@ -7,7 +7,7 @@
 
 import { runActions } from "@nightshift/engine/run-status";
 
-import type { RunResult, RunStatus } from "./types";
+import type { RunResult, RunStatus } from "../types";
 
 export {
 	type RunActions,

@@ -1,7 +1,4 @@
 import type { RunAction, RunActions } from "@nightshift/engine/run-status";
-
-import { actedRunStatus, type RunActing, runActions, whyNot } from "./actions";
-import { type RunStatusView, statusOf } from "./status";
 import type {
 	RunDetail,
 	RunResult,
@@ -9,7 +6,9 @@ import type {
 	RunSummary,
 	StepSummary,
 	WaitEvent,
-} from "./types";
+} from "../types";
+import { actedRunStatus, type RunActing, runActions, whyNot } from "./actions";
+import { type RunStatusView, statusOf } from "./status";
 
 /**
  * Where one run is now and what it needs, for the screen of a run: the

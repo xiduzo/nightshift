@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { now } from "@nightshift/time";
 import { ORPCError } from "@orpc/client";
+import type { RunStreamItem, StepSummary, TranscriptEntry } from "../types";
 import {
 	followRun,
 	type RunStreamConnection,
 	type RunWatchClient,
 	retryDelay,
 } from "./stream";
-import type { RunStreamItem, StepSummary, TranscriptEntry } from "./types";
 
 /** One connection of the fake: what it sends, then how it ends. */
 type Connection = {

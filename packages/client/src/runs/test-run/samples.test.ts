@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow, flowSchema } from "@nightshift/flows";
+import type { RunDetail, StepSummary } from "../types";
 import type { NodeSample } from "./samples";
 import { nodeSamples, pinnedSamples, pinProblem } from "./samples";
-import type { RunDetail, StepSummary } from "./types";
 
 const flow: Flow = flowSchema.parse({
 	version: FLOW_VERSION,

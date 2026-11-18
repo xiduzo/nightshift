@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { now } from "../time";
+import { now } from "../../time";
 
 /**
  * The time now, again every `everyMs`, for labels such as "waiting 5 min"

@@ -1,4 +1,4 @@
-import type { RunDetail, StepSummary, TranscriptEntry } from "./types";
+import type { RunDetail, StepSummary, TranscriptEntry } from "../types";
 
 /**
  * Where one step is: running, waiting for a person at its Gate, failed,

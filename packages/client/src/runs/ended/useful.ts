@@ -6,7 +6,7 @@
 
 import { isTestRun, usefulAnswer } from "@nightshift/engine/run-status";
 
-import type { RunStatus } from "./types";
+import type { RunStatus } from "../types";
 
 /** What the run page shows for Useful: nothing, the question, or the choice. */
 export type UsefulView = "hidden" | "ask" | "yes" | "no";
