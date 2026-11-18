@@ -214,9 +214,6 @@ export const PEER_PORTS: Record<
 			"features/settings": "queries",
 		},
 		"features/flows": {
-			// The editor reads the new-node defaults, the flow list creates a
-			// flow with them. The settings page counts the flows of a project.
-			"features/settings": "queries",
 			// Start run starts a run and reads a project's runs and Devices.
 			// The Flows page shows each flow's last runs with their status.
 			// The run page imports the flow canvas.

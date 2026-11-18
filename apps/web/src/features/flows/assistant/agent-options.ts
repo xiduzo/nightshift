@@ -7,7 +7,7 @@ import {
 	profileQueries,
 	useCustomAgents,
 } from "@/features/agents";
-import { settingsQueries } from "@/features/settings/queries";
+import { settingsQueries } from "@/features/settings";
 import type { AgentProfileRow } from "@/shared/api";
 import type { AgentChoice } from "./agent-choice";
 

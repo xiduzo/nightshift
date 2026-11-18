@@ -50,7 +50,7 @@ import {
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { dashboardQueries } from "@/features/dashboard/queries";
-import { settingsQueries } from "@/features/settings/queries";
+import { settingsQueries } from "@/features/settings";
 import type { FlowListItem } from "@/shared/api";
 import { PageHeading } from "@/shared/page";
 

@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { connectionQueries } from "@/features/agents";
 import { useHasFolder } from "@/features/projects";
 import { runQueries } from "@/features/runs/flows-port";
-import { settingsQueries } from "@/features/settings/queries";
+import { settingsQueries } from "@/features/settings";
 import { useCommandTools } from "./inspector";
 import { useProjectFlows } from "./project";
 

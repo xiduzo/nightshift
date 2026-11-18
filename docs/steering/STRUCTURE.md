@@ -211,9 +211,9 @@ Two exceptions exist, as in yapyap. `scripts/check-verticals.ts` lists each one 
 
 The check fails on a leaf contract or a peer port that nothing uses any more, so neither outlives its reason.
 
-Today there is one leaf contract: `features/updates/update-feeds.ts` in `apps/desktop`. The build config (`electrobun.config.ts`) reads the feeds. The barrel of `updates` loads `electrobun/main`, which only the app's main process can load. There are nine peer ports, all in `apps/web` (section 5).
+Today there is one leaf contract: `features/updates/update-feeds.ts` in `apps/desktop`. The build config (`electrobun.config.ts`) reads the feeds. The barrel of `updates` loads `electrobun/main`, which only the app's main process can load. There are eight peer ports, all in `apps/web` (section 5).
 
-**No new peer port (V8).** `PEER_PORTS` only gets shorter. `scripts/peer-port-debt.txt` holds the nine pairs of verticals, and the budget check fails a pair that is not on it. When two verticals need the same thing, move it into the lower one, or let an entry file pass it in.
+**No new peer port (V8).** `PEER_PORTS` only gets shorter. `scripts/peer-port-debt.txt` holds the eight pairs of verticals, and the budget check fails a pair that is not on it. When two verticals need the same thing, move it into the lower one, or let an entry file pass it in.
 
 ### Growth
 
@@ -272,8 +272,8 @@ Imports point one way, so no barrel closes a cycle. Biome's `noImportCycles` fai
 - `shared/shell` composes the features. It is the wiring of the app on the capability map (section 4). It is the only shared piece that imports a feature. No feature and no other shared piece imports it. Only the routes and the entry files do. The check enforces this, tests included.
 - The other shared pieces import no feature (checked, tests included). Every feature may use them. When a shared piece needs a feature's rule, `router.tsx` passes it in. Example: `createQueryClient` takes `sendToAccess` from `access`, which sends a refused session to sign in.
 - The features, from the bottom: `access`, `spaces`, `projects`, `agents`, `devices`, then `notifications` and `settings`, then `flows`, `gates`, `runs`, `dashboard`, then `knowledge` and `spend`. A feature imports only features below it. `notifications` imports no feature, and the inbox and the Settings page show its parts. The Settings page shows the agents, this computer and the notification settings, so `settings` sits above them. The flow editor reads the settings, so `flows` sits above `settings`.
-- Data can go the other way. Examples: the flow editor reads the settings, and the inbox lists runs. A vertical below the owner of the data imports the owner's `queries.ts` through a peer port (`scripts/check-verticals.ts`), not its barrel. A `queries.ts` imports only `shared/api`, so the port closes no cycle. The check fails on a port that imports another feature. The ports today:
-  - `agents`, `flows` and `devices` read `settings/queries`.
+- Data can go the other way. Examples: the Agents page reads the settings, and the inbox lists runs. A vertical below the owner of the data imports the owner's `queries.ts` through a peer port (`scripts/check-verticals.ts`), not its barrel. A `queries.ts` imports only `shared/api`, so the port closes no cycle. The check fails on a port that imports another feature. The ports today:
+  - `agents` and `devices` read `settings/queries`.
   - `gates` reads `runs/queries`.
   - `agents` reads `devices/queries` (the Offers of a profile).
   - The Flows page reads `dashboard/queries` (each flow's last runs).
