@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-
+import { itemBranchName } from "../contract";
 import {
 	commitFile,
 	createSandbox,
@@ -20,12 +20,10 @@ import {
 	createWorktree,
 	currentBranch,
 	freeBranchName,
-	itemBranchName,
 	keptRefsOf,
 	listBranches,
 	resolveRepoTopLevel,
 	restoreWorktree,
-	slugify,
 	uncommittedChanges,
 } from "./worktrees";
 
@@ -302,17 +300,6 @@ describe("listBranches", () => {
 });
 
 describe("item branches", () => {
-	test("names are git-safe, from the item id and title, beside the run's branch", () => {
-		expect(slugify("  Add Login — über Fast!! ")).toBe("add-login-uber-fast");
-		expect(slugify("a".repeat(60))).toHaveLength(48);
-		expect(
-			itemBranchName("abcd1234", { id: "12", title: "Add: the/login" }),
-		).toBe("nightshift/abcd1234-12-add-the-login");
-		expect(itemBranchName("abcd1234", { id: "!", title: "?" })).toBe(
-			"nightshift/abcd1234-item",
-		);
-	});
-
 	test("create, check out, find a free name, and refuse a dirty worktree", async () => {
 		const worktree = await createWorktree({
 			repoPath: sandbox.repoPath,

@@ -17,11 +17,10 @@ import type {
 	FlowOutputDef,
 } from "@nightshift/flows";
 import { now } from "@nightshift/time";
+import { itemBranchName } from "../../../contract";
 import { defaultRunSettings } from "../../../device-config/settings";
 import { type DerivedStep, foldRun } from "../../../log";
-
 import { readTranscriptFile } from "../../../log/transcript/transcripts";
-import { itemBranchName } from "../../../projects/worktrees";
 import { deriveSteps } from "../../../read/run-views";
 import {
 	agent,

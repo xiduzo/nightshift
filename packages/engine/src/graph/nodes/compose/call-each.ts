@@ -9,7 +9,7 @@ import {
 	type TemplateContext,
 	unfinishedBlockers,
 } from "@nightshift/flows";
-
+import { itemBranchName } from "../../../contract";
 import { runCommand } from "../../../device";
 import type {
 	DerivedStep,
@@ -21,7 +21,6 @@ import type {
 	StepOutcome,
 	StepOutputs,
 } from "../../../log";
-import { itemBranchName } from "../../../projects";
 import { itemStates } from "../../../read";
 import {
 	messageOf,

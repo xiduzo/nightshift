@@ -8,10 +8,11 @@
  * `OwnDevice`, `NodeToPlace`), and the ports a vertical asks of the
  * devices: the Device rows (`DeviceDirectory`), the Hosts (`Relay`, and
  * `HostUnreachableError` when one cannot be reached), the leases a Host
- * keeps (`LeaseHost`, ADR 7) and the Offer rule of a schedule (`OffersPort`). It imports no other vertical.
+ * keeps (`LeaseHost`, ADR 7), the Offer rule of a schedule (`OffersPort`) and the name of the branch of one item of a Call (`itemBranchName`, in `branches/`). It imports no other vertical.
  */
 
 export type { Actor, MemberChange } from "./actor";
+export { itemBranchName } from "./branches";
 export {
 	COMMAND_KINDS,
 	commandOf,
