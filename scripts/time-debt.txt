@@ -1,4 +1,4 @@
 # Files that still call Date or date-fns. Remove a line when the file is clean.
 # The lock-screen widget builds a Date for the native timer. That function
 # cannot import a Night Shift package.
-apps/mobile/src/features/glance/lock-screen.ios.tsx
+apps/mobile/src/features/widgets/lock-screen.ios.tsx

@@ -7,10 +7,14 @@ import {
 	useNeedsAccessory,
 	useNeedsCount,
 } from "@/features/gates";
-import { LockScreenRuns, updateGlance, useHomeWidget } from "@/features/glance";
 import { useHost, useSignedIn } from "@/features/host";
 import { phoneNotifications, usePhonePush } from "@/features/push";
 import { useRememberedSpace } from "@/features/spaces";
+import {
+	LockScreenRuns,
+	updateGlance,
+	useHomeWidget,
+} from "@/features/widgets";
 import { useInFront } from "@/shared/in-front";
 import { AccessoryBar } from "./accessory-bar";
 import { TabBar } from "./tab-bar";

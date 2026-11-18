@@ -218,8 +218,6 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		// The Needs-you inbox, one Gate in full, and the Needs you queue with
 		// the bar that sends an answer.
 		"features/gates": "gates",
-		// The home screen widget and the followed run on the lock screen.
-		"features/glance": "widgets",
 		// This phone's sign-in on its Host, and the session.
 		"features/host": "access",
 		// This phone's notifications.
@@ -230,6 +228,8 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		"features/schedules": "schedules",
 		"features/settings": "settings",
 		"features/spaces": "spaces",
+		// The home screen widget and the followed run on the lock screen.
+		"features/widgets": "widgets",
 		"shared/api": M,
 		"shared/avatar": M,
 		"shared/clock": M,
