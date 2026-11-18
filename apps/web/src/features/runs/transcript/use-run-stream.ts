@@ -1,11 +1,8 @@
 import { type EntryFold, useLiveRun } from "@nightshift/client";
 
 import { client, orpc } from "@/shared/api";
-import {
-	applyEntries,
-	emptyRunTranscript,
-	type RunTranscript,
-} from "./transcript";
+import { applyEntries } from "./transcript";
+import { emptyRunTranscript, type RunTranscript } from "./transcript-state";
 
 /** The run page keeps the transcript grouped by step. */
 const BY_STEP: EntryFold<RunTranscript> = {

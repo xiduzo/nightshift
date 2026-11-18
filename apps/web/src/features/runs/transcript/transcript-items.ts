@@ -1,4 +1,4 @@
-/** The display items of a transcript, one type per kind. `transcript.ts` folds the entries of a run into them. */
+/** The display items of a transcript, one type per kind. `transcript.ts` and `step-entries.ts` fold the entries of a run into them. */
 import type { JsonValue, OutcomeColor } from "@nightshift/flows";
 import type {
 	AgentErrorKind,

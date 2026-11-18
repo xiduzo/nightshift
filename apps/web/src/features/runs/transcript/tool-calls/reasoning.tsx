@@ -11,8 +11,8 @@ import {
 import { BrainIcon } from "lucide-react";
 import { memo, useState } from "react";
 import { Markdown } from "@/shared/markdown";
-import { thoughtTitle } from "../transcript";
 import type { ThinkingItem } from "../transcript-items";
+import { thoughtTitle } from "./thought-title";
 
 /**
  * One thought. While the model thinks it reads "Thinking…" and is open on

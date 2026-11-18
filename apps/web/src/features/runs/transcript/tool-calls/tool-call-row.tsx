@@ -34,8 +34,8 @@ import {
 	type TerminalState,
 	useStackTrace,
 } from "../terminal";
-import { formatToolInput, summarizeToolInput } from "../transcript";
 import type { ToolItem } from "../transcript-items";
+import { formatToolInput, summarizeToolInput } from "./tool-input";
 
 /** A recognisable icon for each kind of tool. */
 const KIND_ICON: Record<ToolKind, LucideIcon> = {

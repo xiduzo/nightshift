@@ -60,9 +60,9 @@ import {
 	ToolCallRow,
 	ToolCallsGroup,
 } from "./tool-calls";
-import type { TranscriptState } from "./transcript";
 import type { TranscriptItem } from "./transcript-items";
 import { type TranscriptRow, transcriptRows } from "./transcript-rows";
+import type { TranscriptState } from "./transcript-state";
 import { useOpenedStep } from "./use-opened-step";
 
 /**
