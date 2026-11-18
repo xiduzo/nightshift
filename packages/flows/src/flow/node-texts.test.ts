@@ -14,8 +14,12 @@
  */
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
-import { type NodeCheck, nodeBasePlain, nodeBaseTexts } from "../nodes/base";
-import { type NodeText, type TextKind, textsIn } from "../nodes/texts";
+import {
+	type NodeCheck,
+	nodeBasePlain,
+	nodeBaseTexts,
+} from "../nodes/base/base";
+import { type NodeText, type TextKind, textsIn } from "../nodes/base/texts";
 import { checkNodeWith } from "../validate";
 import { type FlowNode, type FlowNodeType, flowNodeSchema } from "./flow";
 import { NODE_DEFINITIONS, nodeTexts } from "./node";

@@ -7,5 +7,5 @@
  */
 
 export type { FlowInput } from "../flow";
-export { commandNode } from "../nodes/command";
+export { commandNode } from "../nodes/do/command";
 export { kitCommand } from "./kit-command";

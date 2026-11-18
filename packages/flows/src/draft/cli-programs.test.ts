@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { FlowNode } from "../flow";
-import { agentNode } from "../nodes/agent";
-import { commandNode } from "../nodes/command";
+import { agentNode } from "../nodes/do/agent";
+import { commandNode } from "../nodes/do/command";
 import { type CliToolRef, programsWithoutLogin } from "./cli-programs";
 
 const work: CliToolRef = {

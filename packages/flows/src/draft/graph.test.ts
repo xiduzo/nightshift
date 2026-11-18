@@ -13,7 +13,7 @@ import type {
 	ValueNode,
 } from "../nodes";
 import { NODE_FAMILIES, NODE_FAMILY_LABEL } from "../nodes";
-import { commandNode } from "../nodes/command";
+import { commandNode } from "../nodes/do/command";
 import { mainOutputField } from "../shapes";
 import {
 	addCalledNode,

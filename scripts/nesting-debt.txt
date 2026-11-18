@@ -39,4 +39,3 @@ packages/engine/src/knowledge
 packages/engine/src/knowledge/readers
 packages/engine/src/log
 packages/engine/src/projects
-packages/flows/src/nodes
