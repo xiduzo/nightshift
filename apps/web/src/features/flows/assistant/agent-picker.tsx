@@ -6,16 +6,6 @@
  * that asks one of them (`useBuiltinPick`). There the menu starts on the
  * agent's default from Settings, and a pick holds for that place only.
  */
-import { type BuiltinAgentId, harnessTakesTools } from "@nightshift/flows";
-import { Button } from "@nightshift/ui/components/button";
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@nightshift/ui/components/dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -31,9 +21,7 @@ import {
 	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from "@nightshift/ui/components/dropdown-menu";
-import { Field, FieldLabel } from "@nightshift/ui/components/field";
 import { InputGroupButton } from "@nightshift/ui/components/input-group";
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
 	BotIcon,
@@ -41,27 +29,21 @@ import {
 	CpuIcon,
 	TriangleAlertIcon,
 } from "lucide-react";
-import { useId, useState } from "react";
-import {
-	EFFORTS,
-	type HarnessName,
-	harnessInfo,
-	harnessQueries,
-	ModelCombobox,
-	profileQueries,
-	useCustomAgents,
-	useHarnessModels,
-} from "@/features/agents";
-import { settingsQueries } from "@/features/settings/queries";
+import { useState } from "react";
+import type { HarnessName } from "@/features/agents";
 import { builtinSettingsSearch } from "@/shared/agent-button";
-import type { AgentProfileRow, Effort } from "@/shared/api";
 import { type AgentChoice, pickModel, profileModel } from "./agent-choice";
-
-/**
- * What the agent is for: the chat needs a harness that can use its tools.
- * A run has no profile for help: it names its own agent.
- */
-export type AgentPurpose = "suggest" | "chat" | "run";
+import type { AgentPurpose, DefaultAnswer } from "./agent-options";
+import {
+	chatRefusal,
+	choiceLabel,
+	harnessList,
+	resolve,
+	useAgentOptions,
+} from "./agent-options";
+import { EffortMenu } from "./effort-menu";
+import { HarnessModels, OtherModelDialog } from "./harness-models";
+import { ProfileGroup } from "./profile-group";
 
 /** Who keeps the choice. */
 type ChoiceStore = {
@@ -95,18 +77,6 @@ export type ModelOptions = {
 	onOther?: () => void;
 };
 
-/** The default that answers when the person picks nothing here. */
-export type DefaultAnswer = {
-	/** The built-in agent whose Settings page holds the default. */
-	agent: BuiltinAgentId;
-	/** What answers by default: "opus", "Claude Code · sonnet". */
-	label: string;
-	/** Nothing is picked here: the default answers. */
-	active: boolean;
-	/** Goes back to the default. */
-	onPick: () => void;
-};
-
 export type AgentMenusProps = {
 	purpose: AgentPurpose;
 	models?: ModelOptions;
@@ -115,112 +85,6 @@ export type AgentMenusProps = {
 	/** False: no effort menu, for a choice that keeps no effort. */
 	effort?: boolean;
 } & ChoiceStore;
-
-/** The profile radio's value for the profile for help, and for no profile. Profile names cannot hold a colon. */
-const HELP = ":help";
-const NONE = ":none";
-/** The effort radio's value for "no effort set here". */
-const NO_EFFORT = ":default";
-
-const quiet = { staleTime: 30_000, meta: { quietErrors: true } } as const;
-
-/**
- * The profiles and harnesses of this computer, and the profile the
- * settings' "Profile for help" resolves to, as the daemon picks it: the
- * setting, else the first profile on a harness that is added. For the
- * chat, only one that can chat counts.
- */
-function useAgentOptions(purpose: AgentPurpose) {
-	const profiles = useQuery({ ...profileQueries.agents(), ...quiet });
-	const harnesses = useQuery({ ...harnessQueries.list(), ...quiet });
-	const settings = useQuery({ ...settingsQueries.get(), ...quiet });
-	const customAgents = useCustomAgents();
-	const added = (harnesses.data ?? []).filter((h) => h.added);
-	const fits = (harness: HarnessName) =>
-		purpose !== "chat" || harnessTakesTools(harness);
-	const list = profiles.data ?? [];
-	const setting = settings.data?.values.assistantProfile?.trim() ?? "";
-	const fromSetting = list.find((p) => p.name === setting);
-	const forHelp =
-		fromSetting && fits(fromSetting.harness)
-			? fromSetting
-			: list.find(
-					(p) => added.some((h) => h.name === p.harness) && fits(p.harness),
-				);
-	return {
-		profiles: list,
-		harnesses: added,
-		forHelp,
-		fits,
-		info: (name: HarnessName) => harnessInfo(name, customAgents),
-	};
-}
-
-type Options = ReturnType<typeof useAgentOptions>;
-
-/** What the menus show for a choice: the profile in use, the harness, model and effort that answer. */
-function resolve(choice: AgentChoice, options: Options) {
-	const none = choice.profile === undefined && choice.harness !== undefined;
-	const usesHelp = choice.profile === undefined && !none;
-	const profile: AgentProfileRow | undefined = usesHelp
-		? options.forHelp
-		: options.profiles.find((p) => p.name === choice.profile);
-	const harness: HarnessName =
-		choice.harness ??
-		profile?.harness ??
-		options.harnesses[0]?.name ??
-		"claude-code";
-	const model =
-		choice.model ??
-		(none ? options.info(harness).defaultModel : (profile?.model ?? ""));
-	const effort = choice.effort ?? (none ? undefined : profile?.effort);
-	return {
-		none,
-		usesHelp,
-		profile,
-		harness,
-		model,
-		effort,
-		// The profile for help, and there is none: only a harness and model can answer.
-		locked: usesHelp && !options.forHelp,
-	};
-}
-
-/** The trigger's words: "Profile for help", "worker · haiku", "Claude Code · haiku". */
-function choiceLabel(
-	choice: AgentChoice,
-	info: (name: HarnessName) => { label: string },
-): string {
-	const parts =
-		choice.profile !== undefined
-			? [
-					choice.profile,
-					choice.harness ? info(choice.harness).label : null,
-					choice.model,
-				]
-			: choice.harness !== undefined
-				? [info(choice.harness).label, choice.model]
-				: ["Profile for help"];
-	return parts.filter(Boolean).join(" · ");
-}
-
-/** Why the chat cannot run on the choice, or null. */
-function chatRefusal(
-	choice: AgentChoice,
-	purpose: AgentPurpose,
-	options: Options,
-): string | null {
-	if (purpose !== "chat") return null;
-	const profile =
-		choice.profile !== undefined
-			? options.profiles.find((p) => p.name === choice.profile)
-			: choice.harness === undefined
-				? options.forHelp
-				: undefined;
-	const harness = choice.harness ?? profile?.harness;
-	if (harness === undefined || options.fits(harness)) return null;
-	return `${options.info(harness).label} cannot read your flow or propose changes. Choose Claude Code, Codex or OpenCode.`;
-}
 
 /** The agent's two menus, for the `block-end` row of a Prompt Input. */
 export function AgentMenus({
@@ -430,258 +294,5 @@ export function AgentMenus({
 				/>
 			) : null}
 		</>
-	);
-}
-
-/** The harnesses the menu offers: the added ones, and the chosen one when it is not added. */
-function harnessList(choice: AgentChoice, options: Options) {
-	const list = options.harnesses.map((h) => ({ name: h.name, added: true }));
-	if (choice.harness && !list.some((h) => h.name === choice.harness))
-		list.push({ name: choice.harness, added: false });
-	return list;
-}
-
-function ProfileGroup({
-	choice,
-	set,
-	purpose,
-	options,
-	now,
-	off = false,
-	fallback,
-}: {
-	/** A model answers: no profile is the picked one. */
-	off?: boolean;
-	fallback?: DefaultAnswer | undefined;
-	choice: AgentChoice;
-	set: (choice: AgentChoice) => void;
-	purpose: AgentPurpose;
-	options: Options;
-	now: ReturnType<typeof resolve>;
-}) {
-	const { profiles, forHelp, fits, info } = options;
-	const value = fallback?.active
-		? HELP
-		: off
-			? ""
-			: now.usesHelp
-				? HELP
-				: now.none
-					? NONE
-					: (choice.profile ?? "");
-	const unknown =
-		choice.profile !== undefined &&
-		!profiles.some((p) => p.name === choice.profile);
-	return (
-		<DropdownMenuGroup>
-			<DropdownMenuLabel>Profile</DropdownMenuLabel>
-			<DropdownMenuRadioGroup
-				value={value}
-				onValueChange={(next: string) => {
-					if (next === HELP && fallback) fallback.onPick();
-					else if (next === HELP) set({});
-					else if (next === NONE)
-						// Keep what the profile gave, so the same agent answers.
-						set({
-							harness: now.harness,
-							model: now.model || info(now.harness).defaultModel,
-							...(now.effort ? { effort: now.effort } : {}),
-						});
-					else set({ profile: next });
-				}}
-			>
-				{fallback ? (
-					<DropdownMenuRadioItem value={HELP} closeOnClick>
-						<span className="truncate">Default</span>
-						<DropdownMenuShortcut className="truncate tracking-normal">
-							{fallback.label}
-						</DropdownMenuShortcut>
-					</DropdownMenuRadioItem>
-				) : purpose === "run" ? null : (
-					<DropdownMenuRadioItem value={HELP} closeOnClick>
-						<span className="truncate">Profile for help</span>
-						<DropdownMenuShortcut className="tracking-normal">
-							{forHelp ? forHelp.name : "none yet"}
-						</DropdownMenuShortcut>
-					</DropdownMenuRadioItem>
-				)}
-				{profiles.map((p) => (
-					<DropdownMenuRadioItem
-						key={p.name}
-						value={p.name}
-						closeOnClick
-						disabled={purpose === "chat" && !fits(p.harness)}
-					>
-						<span className="truncate">{p.name}</span>
-						<DropdownMenuShortcut className="truncate tracking-normal">
-							{info(p.harness).label} · {p.model}
-							{purpose === "chat" && !fits(p.harness) ? " (cannot chat)" : ""}
-						</DropdownMenuShortcut>
-					</DropdownMenuRadioItem>
-				))}
-				{unknown ? (
-					<DropdownMenuRadioItem value={choice.profile ?? ""} closeOnClick>
-						{choice.profile} (not found)
-					</DropdownMenuRadioItem>
-				) : null}
-				<DropdownMenuRadioItem value={NONE} closeOnClick>
-					No profile: choose a model below
-				</DropdownMenuRadioItem>
-			</DropdownMenuRadioGroup>
-			{now.locked ? (
-				<DropdownMenuLabel className="font-normal">
-					Add a profile under Your agents in Settings, or choose a model below.
-				</DropdownMenuLabel>
-			) : null}
-		</DropdownMenuGroup>
-	);
-}
-
-/** The models of one harness, the one in use checked, and a way to name another. */
-function HarnessModels({
-	harness,
-	current,
-	onPick,
-	onOther,
-}: {
-	harness: HarnessName;
-	/** The model in use, when this harness answers. */
-	current: string | null;
-	onPick: (model: string) => void;
-	onOther: () => void;
-}) {
-	const { models } = useHarnessModels(harness);
-	const list =
-		current && !models.includes(current) ? [current, ...models] : models;
-	return (
-		<>
-			<DropdownMenuRadioGroup value={current ?? ""} onValueChange={onPick}>
-				{list.map((model) => (
-					<DropdownMenuRadioItem key={model} value={model} closeOnClick>
-						{model}
-					</DropdownMenuRadioItem>
-				))}
-			</DropdownMenuRadioGroup>
-			<DropdownMenuSeparator />
-			<DropdownMenuItem onClick={onOther}>Other model…</DropdownMenuItem>
-		</>
-	);
-}
-
-function EffortMenu({
-	choice,
-	set,
-	now,
-}: {
-	choice: AgentChoice;
-	set: (choice: AgentChoice) => void;
-	now: ReturnType<typeof resolve>;
-}) {
-	const fromProfile = !now.none && now.profile?.effort;
-	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger
-				render={
-					<InputGroupButton
-						className="shrink-0 font-normal text-muted-foreground"
-						disabled={now.locked}
-						aria-label={`Effort: ${now.effort ?? "model default"}. Choose the effort.`}
-						title="Choose how hard the agent thinks"
-					>
-						{now.effort ?? "Effort"}
-						<ChevronDownIcon />
-					</InputGroupButton>
-				}
-			/>
-			<DropdownMenuContent align="start" className="w-48">
-				<DropdownMenuGroup>
-					<DropdownMenuLabel>Effort</DropdownMenuLabel>
-					<DropdownMenuRadioGroup
-						value={choice.effort ?? NO_EFFORT}
-						onValueChange={(next: string) => {
-							const effort = next === NO_EFFORT ? undefined : (next as Effort);
-							// A change on the profile for help pins that profile.
-							const base: AgentChoice = now.usesHelp
-								? now.profile
-									? { profile: now.profile.name }
-									: {}
-								: { ...choice };
-							const { effort: _, ...rest } = base;
-							set(effort ? { ...rest, effort } : rest);
-						}}
-					>
-						<DropdownMenuRadioItem value={NO_EFFORT} closeOnClick>
-							{fromProfile ? "From the profile" : "Model default"}
-							{fromProfile ? (
-								<DropdownMenuShortcut className="tracking-normal">
-									{fromProfile}
-								</DropdownMenuShortcut>
-							) : null}
-						</DropdownMenuRadioItem>
-						{EFFORTS.map((value) => (
-							<DropdownMenuRadioItem key={value} value={value} closeOnClick>
-								{value}
-							</DropdownMenuRadioItem>
-						))}
-					</DropdownMenuRadioGroup>
-				</DropdownMenuGroup>
-			</DropdownMenuContent>
-		</DropdownMenu>
-	);
-}
-
-/** A model the list does not hold: the harness takes any model its CLI knows. */
-function OtherModelDialog({
-	harness,
-	label,
-	initial,
-	onClose,
-	onPick,
-}: {
-	harness: HarnessName;
-	label: string;
-	initial: string;
-	onClose: () => void;
-	onPick: (model: string) => void;
-}) {
-	const id = useId();
-	const [model, setModel] = useState(initial);
-	return (
-		<Dialog open onOpenChange={(open) => (open ? null : onClose())}>
-			<DialogContent className="sm:max-w-sm">
-				<form
-					className="flex flex-col gap-4"
-					onSubmit={(event) => {
-						event.preventDefault();
-						if (model.trim()) onPick(model.trim());
-					}}
-				>
-					<DialogHeader>
-						<DialogTitle>Use another model</DialogTitle>
-						<DialogDescription>
-							Type the name of a model {label} supports. It does not need to be
-							in the list.
-						</DialogDescription>
-					</DialogHeader>
-					<Field>
-						<FieldLabel htmlFor={id}>Model</FieldLabel>
-						<ModelCombobox
-							id={id}
-							harness={harness}
-							value={model}
-							onChange={setModel}
-						/>
-					</Field>
-					<DialogFooter>
-						<Button type="button" variant="outline" onClick={onClose}>
-							Cancel
-						</Button>
-						<Button type="submit" disabled={model.trim() === ""}>
-							Use this model
-						</Button>
-					</DialogFooter>
-				</form>
-			</DialogContent>
-		</Dialog>
 	);
 }

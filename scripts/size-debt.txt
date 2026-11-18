@@ -7,7 +7,6 @@
 # limit. Add no line here.
 # `bun scripts/check-budgets.ts --tighten` lowers the numbers to today's.
 apps/server/src/features/cli/flows.ts 608
-apps/web/src/features/flows/assistant/agent-picker.tsx 687
 apps/web/src/features/flows/editor/editor-canvas.tsx 694
 apps/web/src/features/flows/editor/flow-editor.tsx 989
 packages/api/src/dashboard/schemas.ts 869
