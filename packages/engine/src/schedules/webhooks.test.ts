@@ -5,7 +5,7 @@ import { event } from "@nightshift/db/schema";
 import type { Flow, Schedule } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
-import { parseEventRow } from "../log/events";
+import { parseEventRow } from "../log/run-log/append";
 import { createEngine, type Engine } from "../run/engine";
 import type { SpaceEngine } from "../run/space-engine";
 import { seedFlows } from "../testing/seed-flows";

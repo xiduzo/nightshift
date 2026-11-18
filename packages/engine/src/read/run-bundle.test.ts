@@ -9,7 +9,7 @@ import type { AgentNode, CommandNode, Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { asc, eq, sql } from "drizzle-orm";
 import { foldRun } from "../log";
-import { parseEventRow } from "../log/events";
+import { parseEventRow } from "../log/run-log/append";
 import { readRunTranscript } from "../log/transcript/transcripts";
 import { createEngine } from "../run/engine";
 import {

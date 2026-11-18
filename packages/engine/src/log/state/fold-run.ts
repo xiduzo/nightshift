@@ -1,5 +1,9 @@
-import { provedEndReason } from "../end-reason";
-import { type EngineEventType, type LoggedEvent, scopeKey } from "../events";
+import {
+	type EngineEventType,
+	type LoggedEvent,
+	provedEndReason,
+	scopeKey,
+} from "../events";
 import { closeLast, type Draft, draftOf, emptyState, logged } from "./draft";
 import { applySessionEvent } from "./fold-session";
 import { applyStepEvent, enterCallers } from "./fold-step";

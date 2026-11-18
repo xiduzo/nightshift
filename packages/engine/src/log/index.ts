@@ -1,16 +1,12 @@
 /** The event log of each run: the event payloads, append and parse, the run state (one fold of a run's log) and its cost arithmetic, the run log in memory, the landed feed, the run bus, the run row, the transcript files, the run history the exchange copies between Replicas, the stamps of the copies of a step's files, the worktrees removed on this computer, the fields of each event that name a Person, and those that name a path on the Walker's disk. */
 
 export {
-	provedEndReason,
-	RUN_END_REASONS,
-	type RunEndReason,
-	type StepGuard,
-} from "./end-reason";
-export {
+	type AnsweredBy,
 	type EngineEventType,
 	type EnginePayloads,
 	type EventInput,
-	type EventWrites,
+	type FlowScore,
+	flowScores,
 	type GateBackgroundItem,
 	type GateBrief,
 	type GateBriefPart,
@@ -26,20 +22,26 @@ export {
 	type LoggedEvent,
 	type PinnedOutput,
 	type PolicyWaitReason,
-	parseEventRow,
+	personFieldTypes,
+	provedEndReason,
 	type ResumeAction,
 	type ResumedBy,
+	RUN_END_REASONS,
 	type RunEnding,
+	type RunEndReason,
 	type RungBy,
+	type RunScore,
 	type RunTrigger,
 	type RunWarningKind,
 	runDueAt,
+	runScore,
 	type Scope,
 	type ScoreName,
 	type ServiceSpec,
 	type SessionOutcome,
 	type StandIn,
 	type StepBudget,
+	type StepGuard,
 	type StepOutcome,
 	type StepOutputs,
 	type StepRung,
@@ -58,8 +60,13 @@ export {
 	type RunHistory,
 	withoutPrivatePaths,
 } from "./history";
-export { personFieldTypes } from "./person-fields";
-export { createRunLog, type Derive, type RunLog } from "./run-log";
+export {
+	createRunLog,
+	type Derive,
+	type EventWrites,
+	parseEventRow,
+	type RunLog,
+} from "./run-log";
 export {
 	applyWalkerMoves,
 	type FallbackDevice,
@@ -83,13 +90,6 @@ export {
 	spaceOfRun,
 	stepIdsOfRun,
 } from "./run-row";
-export {
-	type AnsweredBy,
-	type FlowScore,
-	flowScores,
-	type RunScore,
-	runScore,
-} from "./scores";
 export {
 	knowledgeUseEvents,
 	logMemberChange,

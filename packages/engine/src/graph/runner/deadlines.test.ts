@@ -8,9 +8,8 @@ import type {
 	EngineEventType,
 	EnginePayloads,
 	LoggedEvent,
-	Scope,
-	StepBudget,
-} from "../../log/events";
+} from "../../log/events/events";
+import type { Scope, StepBudget } from "../../log/events/step/step-payloads";
 import { findOverdue } from "./deadlines";
 
 const MINUTE = 1_000;

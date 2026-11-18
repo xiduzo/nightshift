@@ -11,7 +11,8 @@ import {
 	defaultRunSettings,
 	type RunSettings,
 } from "../device-config/settings";
-import { appendEvent, type EnginePayloads, parseEventRow } from "../log/events";
+import type { EnginePayloads } from "../log/events/events";
+import { appendEvent, parseEventRow } from "../log/run-log/append";
 import type { RunSummary } from "../read/views";
 import { createEngine, type Engine, type EngineInternals } from "../run/engine";
 import type { SpaceEngine } from "../run/space-engine";

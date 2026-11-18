@@ -8,7 +8,7 @@ import { FLOW_VERSION } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { defaultRunSettings } from "../device-config/settings";
-import { parseEventRow } from "../log/events";
+import { parseEventRow } from "../log/run-log/append";
 import type { WorktreeRemoval } from "../log/space-facts/worktree-removals";
 import { createEngine, type EngineInternals } from "../run/engine";
 import type { SpaceEngine } from "../run/space-engine";

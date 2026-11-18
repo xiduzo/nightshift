@@ -1,7 +1,8 @@
 import { createDb } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 import { project, run } from "@nightshift/db/schema";
-import { appendEvent, type EnginePayloads } from "../../../log/events";
+import type { EnginePayloads } from "../../../log/events/events";
+import { appendEvent } from "../../../log/run-log/append";
 import { ownDevice } from "../../../testing/alone-directory";
 import { localSpaceId } from "../../../testing/test-support";
 import { drizzleScheduleLog } from "./drizzle-schedule-log";

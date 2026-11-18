@@ -1,6 +1,7 @@
 import type { JsonValue } from "@nightshift/flows";
 
-import type { EnginePayloads, ScoreName } from "./events";
+import type { EnginePayloads } from "./events";
+import type { ScoreName } from "./run";
 
 /**
  * What a score means: the one place that reads a `Scored` event's name,

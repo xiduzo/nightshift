@@ -1,6 +1,7 @@
 import type { JsonValue } from "@nightshift/flows";
 
-import type { EngineEventType, ItemFacts, Scope } from "./events";
+import type { EngineEventType } from "./events";
+import type { ItemFacts, Scope } from "./step";
 
 type Raw = Record<string, unknown>;
 

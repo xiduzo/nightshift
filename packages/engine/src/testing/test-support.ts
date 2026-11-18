@@ -27,7 +27,7 @@ import {
 	type DeviceDocument,
 	openDeviceDocument,
 } from "../device-config/device-document";
-import { parseEventRow } from "../log/events";
+import { parseEventRow } from "../log/run-log/append";
 import type { RunLog } from "../log/run-log/run-log";
 import { systemGit } from "../projects/git";
 import { clonePathOf } from "../projects/projects";

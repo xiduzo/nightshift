@@ -4,8 +4,8 @@ import type {
 	EngineEventType,
 	EnginePayloads,
 	LoggedEvent,
-	Scope,
-} from "../../log/events";
+} from "../../log/events/events";
+import type { Scope } from "../../log/events/step/step-payloads";
 import { deriveSteps } from "../../read/run-views";
 import type { Pending, RunStateValues } from "../state/state";
 import {

@@ -5,8 +5,8 @@ import type {
 	EngineEventType,
 	EnginePayloads,
 	LoggedEvent,
-	Scope,
-} from "../../log/events";
+} from "../../log/events/events";
+import type { Scope } from "../../log/events/step/step-payloads";
 import { DEFAULT_RESUME_PROMPT } from "../context/context";
 import { reenteredNode } from "../position/run-position";
 import type { Parked, RunStateValues } from "../state/state";

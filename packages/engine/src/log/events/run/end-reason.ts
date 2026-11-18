@@ -20,9 +20,6 @@ export const RUN_END_REASONS = [
 
 export type RunEndReason = (typeof RUN_END_REASONS)[number];
 
-/** A guard that stopped a step. The idle guard's warning kind is `stalled`. */
-export type StepGuard = "budget" | "turns" | "looping" | "idle" | "max_steps";
-
 const GUARDS = new Set<string>([
 	"budget",
 	"turns",

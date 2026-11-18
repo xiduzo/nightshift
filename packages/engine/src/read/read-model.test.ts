@@ -10,7 +10,7 @@ import {
 	type RunLog,
 	type TranscriptEntry,
 } from "../log";
-import type { EventInput } from "../log/events";
+import type { EventInput } from "../log/events/events";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { createReadModel, type ReadModel } from "./read-model";
 import * as derivedSteps from "./run-views";

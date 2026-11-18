@@ -312,7 +312,8 @@ packages/engine/src/
                            createReadModel(deps) adds listRuns, getRun,
                            listGates, runStatus and watch.
                            Reads only.
-  log/events.ts            Unchanged payloads, append and parse.
+  log/events/              Unchanged payloads. log/run-log/append.ts appends
+                           and parses an event.
   read/run-views.ts        The derivations for the read model and the walk.
                            Derivations only the old walk used are deleted.
 ```

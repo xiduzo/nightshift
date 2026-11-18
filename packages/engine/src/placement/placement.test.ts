@@ -10,7 +10,7 @@ import {
 	type RunRow,
 	type RunState,
 } from "../log";
-import type { EngineEventType, EventInput } from "../log/events";
+import type { EngineEventType, EventInput } from "../log/events/events";
 import { testDevice } from "../testing/test-support";
 
 type Appended = EventInput<EngineEventType>;

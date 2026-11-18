@@ -19,7 +19,7 @@ import type {
 import { FLOW_VERSION, parseFlow } from "@nightshift/flows";
 import type { FlowInput } from "@nightshift/flows/testing";
 import { saverFor } from "../graph/checkpoints/checkpointer";
-import { appendEvent } from "../log/events";
+import { appendEvent } from "../log/run-log/append";
 import { createRunLog, type RunLog } from "../log/run-log/run-log";
 import type { RunDetail, StepSummary } from "../read/views";
 import { seedFlowFolder } from "../testing/seed-flows";

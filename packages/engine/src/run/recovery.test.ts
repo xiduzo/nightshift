@@ -12,8 +12,8 @@ import type {
 	EngineEventType,
 	EnginePayloads,
 	LoggedEvent,
-	Scope,
-} from "../log/events";
+} from "../log/events/events";
+import type { Scope } from "../log/events/step/step-payloads";
 import { createRunLog } from "../log/run-log/run-log";
 import { type BusItem, createRunBus } from "../log/transcript/bus";
 import { createSandbox, type Sandbox } from "../testing/test-support";

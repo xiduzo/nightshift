@@ -2,8 +2,7 @@ import type { Database } from "@nightshift/db";
 import { event } from "@nightshift/db/schema";
 import { isNotNull, max } from "drizzle-orm";
 
-import type { LandedEvent } from "../events";
-import type { RunLog } from "../run-log";
+import type { LandedEvent, RunLog } from "../run-log";
 
 /**
  * The landed feed of this Replica: every event of a run as it lands here,

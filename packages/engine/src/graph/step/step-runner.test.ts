@@ -6,7 +6,7 @@ import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import type { Device } from "../../device/types";
 import { foldRun } from "../../log";
-import type { EngineEventType } from "../../log/events";
+import type { EngineEventType } from "../../log/events/events";
 import { deriveSteps } from "../../read/run-views";
 import {
 	command,

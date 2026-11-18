@@ -12,10 +12,11 @@ import {
 import { asc, eq } from "drizzle-orm";
 
 import { createSandbox, type Sandbox } from "../../testing/test-support";
-import { type EventInput, type LoggedEvent, parseEventRow } from "../events";
+import type { EventInput, LoggedEvent } from "../events/events";
 import { RUN_NOT_FOUND } from "../run-row/run-row";
 import { foldRun } from "../state/fold-run";
 import type { RunState } from "../state/run-state";
+import { parseEventRow } from "./append";
 import { createRunLog } from "./run-log";
 
 let sandbox: Sandbox;

@@ -8,8 +8,8 @@ import type {
 	NodeOutputs,
 } from "@nightshift/flows";
 import type { RunResult, RunStatus } from "../../run-status";
-import type { RunEndReason } from "../end-reason";
 import type {
+	AnsweredBy,
 	EnginePayloads,
 	GateBrief,
 	GateChoice,
@@ -17,6 +17,7 @@ import type {
 	InputValues,
 	ItemFacts,
 	RunEnding,
+	RunEndReason,
 	Scope,
 	StandIn,
 	StepOutcome,
@@ -26,7 +27,6 @@ import type {
 	TestRun,
 	WaitReason,
 } from "../events";
-import type { AnsweredBy } from "../scores";
 import type { CostTally } from "./cost";
 import type { Hold } from "./holds";
 

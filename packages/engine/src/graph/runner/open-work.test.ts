@@ -6,8 +6,8 @@ import type {
 	EngineEventType,
 	EnginePayloads,
 	LoggedEvent,
-	Scope,
-} from "../../log/events";
+} from "../../log/events/events";
+import type { Scope } from "../../log/events/step/step-payloads";
 import {
 	type ClosingEvent,
 	type CutShort,

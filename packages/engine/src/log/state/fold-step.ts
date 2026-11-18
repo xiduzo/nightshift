@@ -4,12 +4,12 @@ import {
 	type ItemState,
 } from "@nightshift/flows";
 import {
+	answeredBy,
 	type GateBrief,
 	type LoggedEvent,
 	type StepOutputs,
 	scopeKey,
 } from "../events";
-import { answeredBy } from "../scores";
 import {
 	addCost,
 	deciderCost,

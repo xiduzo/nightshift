@@ -4,7 +4,7 @@ import { device, event, user } from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { and, eq, isNull } from "drizzle-orm";
-import { parseEventRow } from "../log/events";
+import { parseEventRow } from "../log/run-log/append";
 import { createRunLog, type RunLog } from "../log/run-log/run-log";
 import {
 	createSpaceDocuments,

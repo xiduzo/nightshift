@@ -49,10 +49,10 @@ import {
 import type {
 	EngineEventType,
 	EnginePayloads,
-	InputValues,
 	LoggedEvent,
-	TestRun,
-} from "../log/events";
+} from "../log/events/events";
+import type { TestRun } from "../log/events/run/run-payloads";
+import type { InputValues } from "../log/events/step/step-payloads";
 import { createRunLog, type RunLog } from "../log/run-log/run-log";
 import type { PlacedRun } from "../log/run-row/run-row";
 import { createRunBus } from "../log/transcript/bus";

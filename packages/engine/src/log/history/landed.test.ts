@@ -9,7 +9,7 @@ import {
 	type Sandbox,
 	waitFor,
 } from "../../testing/test-support";
-import type { EventInput } from "../events";
+import type { EventInput } from "../events/events";
 import {
 	createRunLog,
 	type ForeignEvent,
