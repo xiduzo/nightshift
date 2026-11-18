@@ -1,23 +1,13 @@
 import {
 	CONVERT_FORMAT_LABEL,
-	commandExits,
-	DATA_EXIT_CODE,
-	type DeviceRef,
-	type EndStatus,
 	type FlowIssue,
 	type FlowNode,
 	type FlowNodeType,
 	nodeOutcomes,
 	outcomeColor,
 	runsEach,
-	type WaitUntil,
 } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@nightshift/ui/components/tooltip";
 import { cn } from "@nightshift/ui/lib/utils";
 import {
 	Handle,
@@ -25,21 +15,15 @@ import {
 	type NodeProps,
 	type NodeTypes,
 	Position,
-	type ReactFlowState,
-	useStore,
 	useUpdateNodeInternals,
 } from "@xyflow/react";
 import {
 	ArrowRightLeftIcon,
-	CircleAlertIcon,
-	LoaderCircleIcon,
 	LockIcon,
-	MonitorIcon,
 	PinIcon,
 	PlayIcon,
 	ServerIcon,
 	SkipForwardIcon,
-	TriangleAlertIcon,
 	VariableIcon,
 } from "lucide-react";
 import { memo, useEffect, useRef } from "react";
@@ -51,16 +35,19 @@ import {
 } from "../outcomes";
 import type { SampleLine } from "../viewer";
 import { CalledFlowName } from "./called-flow-name";
-import { useDeviceLabel } from "./device-names-context";
+import { EndRow, SubflowDevice } from "./card-rows";
+import { IssueBadge } from "./issue-badge";
 import {
 	CALL_EACH_ICON,
 	DECIDED_BY_ICON,
-	END_STATUS_LABEL,
 	FAMILY_TINT,
 	nodeFamily,
 	nodeMeta,
 	VALUE_BY_ICON,
 } from "./node-type";
+import { optionDescriptions } from "./outcome-descriptions";
+import { useOverviewText } from "./overview-text";
+import { SampleStrip } from "./sample-strip";
 
 export type NodeRunState = {
 	/** The state of the node's latest step. */
@@ -105,219 +92,6 @@ const DIFF_WORD: Record<DiffMark, string> = {
 };
 
 export type FlowCanvasNode = Node<FlowNodeData, FlowNodeType>;
-
-/** The descriptions of a node's options, by name, to show beside their handles. */
-function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
-	if (runsEach(node)) {
-		return new Map([
-			["done", "No item left to start"],
-			[
-				"halted",
-				node.each.haltOn.length > 0
-					? `A call ended on ${node.each.haltOn.join(", ")}`
-					: undefined,
-			],
-			["stopped", "The stop time came"],
-		]);
-	}
-	if (node.type === "call") {
-		return new Map([
-			["pass", "It finished"],
-			["fail", "It failed"],
-			["stopped", "The stop time came"],
-		]);
-	}
-	if (node.type === "value") {
-		return new Map([
-			["pass", "The data fits"],
-			["fail", "No value made"],
-		]);
-	}
-	if (node.type === "wait") {
-		return new Map([
-			...(node.outcomes ?? []).map(
-				(outcome) =>
-					[outcome.name, outcome.description ?? outcome.when] as const,
-			),
-			["done", WAIT_DONE[node.until.kind]],
-			[
-				"timeout",
-				node.timeoutMinutes
-					? `Not within ${node.timeoutMinutes} min`
-					: "Never: it has no timeout",
-			],
-		]);
-	}
-	if (node.type === "tool") {
-		return new Map([
-			["pass", "The tool answered"],
-			["fail", "It reported an error"],
-		]);
-	}
-	if (node.type === "convert") {
-		return new Map([
-			["pass", "It converted the value"],
-			["fail", "The value does not fit the format"],
-		]);
-	}
-	if (node.type === "web-request") {
-		return new Map([
-			["pass", "The server answered 2xx"],
-			["fail", "Any other answer, or none"],
-		]);
-	}
-	if (node.type === "service") {
-		return new Map([
-			["ready", "The service is ready"],
-			["failed", "It ended, or was not ready in time"],
-		]);
-	}
-	if (node.type === "lease") {
-		return new Map([
-			["held", "The run holds the lease"],
-			[
-				"busy",
-				node.waitMinutes
-					? `Another run holds it after ${node.waitMinutes} min`
-					: "Another run holds it",
-			],
-		]);
-	}
-	if (node.type === "since-last-run") {
-		return new Map([
-			["new", node.value === undefined ? "Something is new" : "The first run"],
-			["changed", "Something changed"],
-			["same", node.value === undefined ? "Nothing new" : "No change"],
-		]);
-	}
-	if (node.type === "join") {
-		return new Map([
-			[
-				"done",
-				node.wait === "first"
-					? "The first branch arrived"
-					: "Every branch arrived",
-			],
-		]);
-	}
-	if (node.type === "command") {
-		return new Map(
-			commandExits(node).map((exit) => [
-				exit.name,
-				exit.code === undefined
-					? "any other exit"
-					: exit.code === DATA_EXIT_CODE
-						? "picked by the command"
-						: `exit ${exit.code}`,
-			]),
-		);
-	}
-	const options =
-		node.type === "decision"
-			? node.options
-			: node.type === "agent"
-				? (node.outcomes ?? [])
-				: [];
-	return new Map(options.map((option) => [option.name, option.description]));
-}
-
-/** What ends a Wait node as done, by what it waits for. */
-const WAIT_DONE: Record<WaitUntil["kind"], string> = {
-	duration: "The time is up",
-	time: "The time came",
-	command: "The command passed",
-	signal: "The signal came",
-	any: "The signal came, or the command passed",
-	url: "The URL answered",
-};
-
-/** Below this zoom a node's text is too small to read, so the node shows its
- *  type and id in large type instead, and a big flow reads as an overview. */
-const OVERVIEW_ZOOM = 0.55;
-/** The id's size on screen in the overview, and the most it may take up in
- *  the node. */
-const OVERVIEW_TEXT = 14;
-const OVERVIEW_TEXT_MAX = 44;
-
-/** The zoom in steps of 0.05 below `OVERVIEW_ZOOM`, else null: a node redraws
- *  a few times in a zoom gesture, not on every frame. */
-function overviewZoom(state: ReactFlowState): number | null {
-	const zoom = state.transform[2];
-	return zoom < OVERVIEW_ZOOM
-		? Math.max(0.05, Math.round(zoom * 20) / 20)
-		: null;
-}
-
-/**
- * The font size, in canvas pixels, that reads as `OVERVIEW_TEXT` on screen
- * when zoomed out to the overview (at most `max`). Zero when zoomed in.
- */
-export function useOverviewText(max = OVERVIEW_TEXT_MAX): number {
-	const overview = useStore(overviewZoom);
-	return overview ? Math.min(OVERVIEW_TEXT / overview, max) : 0;
-}
-
-/**
- * The count of a node's errors, or of its warnings when it has none. Its
- * tooltip lists every issue of the node, errors first.
- */
-export function IssueBadge({
-	errors,
-	warnings,
-}: {
-	errors: readonly FlowIssue[];
-	warnings: readonly FlowIssue[];
-}) {
-	const isError = errors.length > 0;
-	const count = isError ? errors.length : warnings.length;
-	const Icon = isError ? CircleAlertIcon : TriangleAlertIcon;
-	return (
-		<Tooltip>
-			<TooltipTrigger
-				render={
-					<Badge
-						variant={isError ? "destructive" : "outline"}
-						className={cn(
-							"h-4 gap-0.5 px-1.5 text-[10px] tabular-nums",
-							!isError &&
-								"border-status-waiting bg-status-waiting text-background",
-						)}
-					/>
-				}
-			>
-				<Icon aria-hidden="true" />
-				<span className="sr-only">{isError ? "Errors:" : "Warnings:"}</span>
-				{count}
-			</TooltipTrigger>
-			<TooltipContent side="top" className="max-w-72">
-				<ul className="flex flex-col gap-1">
-					{[...errors, ...warnings].map((issue, index) => {
-						const IssueIcon =
-							issue.severity === "error" ? CircleAlertIcon : TriangleAlertIcon;
-						return (
-							<li
-								// The same message can come twice.
-								key={`${issue.severity}:${issue.message}:${index}`}
-								className="flex items-start gap-1.5"
-							>
-								<IssueIcon
-									className={cn(
-										"mt-0.5 size-3 shrink-0",
-										issue.severity === "error"
-											? "text-destructive"
-											: "text-status-waiting",
-									)}
-									aria-hidden="true"
-								/>
-								<span>{issue.message}</span>
-							</li>
-						);
-					})}
-				</ul>
-			</TooltipContent>
-		</Tooltip>
-	);
-}
 
 /** Where the input handle sits, from the top: level with the icon tile.
  *  `flow-layout.ts` routes edges to the same spot. */
@@ -675,106 +449,6 @@ function MarkBadge({ mark }: { mark: NodeMark }) {
 	);
 }
 
-/** The strip's title: what it shows, in full. */
-function stripTitle(line: SampleLine): string | undefined {
-	switch (line.kind) {
-		case "output":
-			return `${line.field}: ${line.text}`;
-		case "pinned":
-			return line.text === null
-				? "Pinned output"
-				: `Pinned output: ${line.text}`;
-		case "skipped":
-			return `Skipped: takes ${outcomeLabel(line.outcome)}`;
-		default:
-			return undefined;
-	}
-}
-
-/**
- * The node's viewer: what it gave in the flow's newest run, in one line,
- * or what it gives in a test run when it is pinned or skipped. It sits at
- * the bottom of the card with a fixed height, so no handle moves and the
- * routes of the last layout hold. A click selects the node.
- */
-function SampleStrip({ line }: { line: SampleLine }) {
-	return (
-		<div
-			className="flex h-6 min-w-0 items-center gap-1.5 rounded-b-[calc(var(--radius-xl)-1px)] border-t bg-muted/50 px-2.5 text-[11px] text-muted-foreground"
-			title={stripTitle(line)}
-		>
-			{line.kind === "pinned" ? (
-				<>
-					<PinIcon className="size-3 shrink-0" aria-hidden="true" />
-					<span className="sr-only">Pinned output: </span>
-					<span className="truncate">{line.text ?? "Pinned output"}</span>
-				</>
-			) : line.kind === "skipped" ? (
-				<>
-					<SkipForwardIcon className="size-3 shrink-0" aria-hidden="true" />
-					<span className="truncate">
-						Skipped · takes {outcomeLabel(line.outcome)}
-					</span>
-				</>
-			) : line.kind === "running" ? (
-				<>
-					<LoaderCircleIcon
-						className="size-3 shrink-0 animate-spin motion-reduce:animate-none"
-						aria-hidden="true"
-					/>
-					Running
-				</>
-			) : line.kind === "absent" ? (
-				<span className="truncate italic">Not in the last run</span>
-			) : (
-				<>
-					<span className="sr-only">Last output: </span>
-					<span className="truncate">{line.text}</span>
-				</>
-			)}
-		</div>
-	);
-}
-
-/**
- * How an End node ends the run, where other nodes list their outcomes:
- * no edge leaves it, so no handle. In a run, it lights up once reached.
- */
-function EndRow({
-	status,
-	message,
-	reached,
-}: {
-	status: EndStatus;
-	message: string | undefined;
-	/** Run view only: whether the run ended here. */
-	reached: boolean | undefined;
-}) {
-	const tone =
-		status === "failed"
-			? "text-destructive"
-			: status === "done"
-				? "text-status-finished"
-				: "text-muted-foreground";
-	return (
-		<div
-			className={cn(
-				"flex flex-col gap-0.5 border-t border-dashed px-3.5 py-1.5 text-[11px]",
-				reached === false && "opacity-35",
-			)}
-		>
-			<span className={cn("font-medium", tone)}>
-				Ends: {END_STATUS_LABEL[status].toLowerCase()}
-			</span>
-			{message?.trim() ? (
-				<span className="truncate text-muted-foreground" title={message}>
-					{message}
-				</span>
-			) : null}
-		</div>
-	);
-}
-
 export const nodeTypes: NodeTypes = {
 	agent: FlowNodeCard,
 	command: FlowNodeCard,
@@ -791,17 +465,3 @@ export const nodeTypes: NodeTypes = {
 	convert: FlowNodeCard,
 	"web-request": FlowNodeCard,
 } satisfies Record<FlowNodeType, unknown>;
-
-/** The computer a Subflow's steps run on, by its name. */
-function SubflowDevice({ device }: { device: DeviceRef }) {
-	const name = useDeviceLabel(device);
-	return (
-		<span
-			className="mt-0.5 flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground"
-			title={`Its steps run on ${name}`}
-		>
-			<MonitorIcon className="size-3 shrink-0" aria-hidden="true" />
-			<span className="truncate">On {name}</span>
-		</span>
-	);
-}

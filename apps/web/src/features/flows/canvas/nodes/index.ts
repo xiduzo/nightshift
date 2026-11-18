@@ -8,11 +8,10 @@ export {
 	type DiffMark,
 	type FlowCanvasNode,
 	type FlowNodeData,
-	IssueBadge,
 	type NodeRunState,
 	nodeTypes,
-	useOverviewText,
 } from "./flow-node";
+export { IssueBadge } from "./issue-badge";
 export {
 	DECIDED_BY_ICON,
 	END_STATUS_LABEL,
@@ -25,4 +24,5 @@ export {
 	VALUE_BY_ICON,
 } from "./node-type";
 export { EnterSubflowContext, OpenFlowContext } from "./open-flow-context";
+export { useOverviewText } from "./overview-text";
 export { type Measured, useMeasured } from "./use-measured";
