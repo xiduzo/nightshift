@@ -8,7 +8,6 @@
 # `bun scripts/check-budgets.ts --tighten` lowers the numbers to today's.
 apps/web/src/features/flows/editor/editor-canvas.tsx 694
 apps/web/src/features/flows/editor/flow-editor.tsx 989
-packages/daemon/src/assistant/assistant.ts 906
 packages/daemon/src/daemon.ts 1013
 packages/devices/src/contract/host-contract.ts 860
 packages/devices/src/exchange/host-exchange.ts 728

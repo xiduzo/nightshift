@@ -11,7 +11,8 @@ import { learnFromRun } from "@nightshift/agents";
 import type { AnswerCost, AskLearner } from "@nightshift/engine";
 import type { AssistantUsage } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
-import { type AssistantDeps, NO_LEARNER, reportAgentVia } from "./assistant";
+import type { AssistantDeps } from "./assistant-deps";
+import { NO_LEARNER, reportAgentVia } from "./pick-agent";
 
 export type LearnerDeps = Pick<
 	AssistantDeps,

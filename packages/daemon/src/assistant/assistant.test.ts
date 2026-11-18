@@ -20,20 +20,18 @@ import type {
 import { FLOW_VERSION, flowSchema } from "@nightshift/flows";
 import type { FlowInput } from "@nightshift/flows/testing";
 import { call } from "@orpc/server";
+import { NO_CHECK_MODEL } from "./agent-check";
+import { BUSY, createAssistant, NOT_ENDED_EARLY } from "./assistant";
+import type { AssistantDeps } from "./assistant-deps";
+import { authoringPort, chatRun, historyPort } from "./authoring";
 import {
-	type AssistantDeps,
-	BUSY,
-	createAssistant,
 	NO_CHAT_PROFILE,
-	NO_CHECK_MODEL,
 	NO_CLONE,
 	NO_MODEL_HERE,
 	NO_PROFILE,
-	NOT_ENDED_EARLY,
 	pickAgent,
 	reportAgentVia,
-} from "./assistant";
-import { authoringPort, chatRun, historyPort } from "./authoring";
+} from "./pick-agent";
 
 const settingsOf = (
 	harness: AgentHarnessName,
