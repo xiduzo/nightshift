@@ -73,12 +73,10 @@ import {
 } from "../read";
 import { createRunFolders } from "../run-folders";
 import {
-	createScheduleFiles,
-	createScheduler,
-	createWebhooks,
 	type ScheduleMissed,
 	type WebhookAnswer,
 	type WebhookRequest,
+	wireSchedules,
 } from "../schedules";
 import { createPullRequestScores, createPullRequestWatch } from "../scores";
 import { createServiceKeeper, serviceHolds } from "../services";
@@ -719,62 +717,6 @@ export function createEngine(
 			startHolds.start(spaceId, () => runStart.start(input, trigger)),
 	});
 
-	// The Replica that keeps the Space fires every schedule of it (its Host,
-	// or the one Device of a Space without one), so one that is always on
-	// starts them, and its runs run there (ADR 15). A webhook schedule's
-	// webhooks go to the same Replica.
-	const firesHere = async (projectId: string) => {
-		const row = await projects.find(projectId);
-		return !(await directory.hostedElsewhere(row.spaceId));
-	};
-
-	const missedListeners = new Set<(missed: ScheduleMissed) => void>();
-	const scheduler = createScheduler({
-		db,
-		now,
-		tickMs: internals.scheduleTickMs,
-		startRun: places.startForSchedule,
-		log: runLog,
-		// Also a project without a Clone here: its runs run on another Device.
-		projects: () => projects.listInSpace(),
-		flows: projectFlows,
-		enabled: () => runSettings().scheduler,
-		firesHere,
-		runStatus: reads.runStatus,
-		usage: options.usage,
-		missed: (time) => {
-			void projects
-				.find(time.projectId)
-				.then(({ spaceId }) => {
-					for (const listener of [...missedListeners]) {
-						listener({ ...time, spaceId });
-					}
-				})
-				.catch((error) =>
-					console.error("[schedules] could not tell of a missed time", error),
-				);
-		},
-	});
-	const pullRequestWatch = createPullRequestWatch({
-		db,
-		log: runLog,
-		now,
-		usage: options.usage,
-		github: options.github ?? { viewPullRequest: async () => null },
-	});
-	if (options.scheduler !== false) {
-		const schedulerSignal = options.scheduler?.signal;
-		signal.addEventListener("abort", () => scheduler.stop(), { once: true });
-		ready.then(
-			() => {
-				if (disposed) return;
-				scheduler.start(schedulerSignal);
-				if (options.github) pullRequestWatch.everyMorning(signal);
-			},
-			() => {},
-		);
-	}
-
 	/** A webhook schedule's signal: the project's runs this computer walks that wait for it. */
 	const signals = createSignals({ db, log: runLog, runner });
 
@@ -786,24 +728,91 @@ export function createEngine(
 		usage: options.usage,
 	});
 
-	const webhooks = createWebhooks({
-		db,
-		now,
-		log: runLog,
+	const missedListeners = new Set<(missed: ScheduleMissed) => void>();
+	/** The schedules of the projects: its watch begins here, while the engine is made. */
+	const schedules = wireSchedules({
+		log: { db, log: runLog },
 		flows: projectFlows,
-		secret: async (name, projectId) => {
-			if (!options.secret) return process.env[name];
-			const { spaceId } = await projects.find(projectId);
-			return options.secret(name, { spaceId, projectId });
+		clock: now,
+		tickMs: internals.scheduleTickMs,
+		runs: {
+			start: places.startForSchedule,
+			status: reads.runStatus,
+			signal: (projectId, signal) => signals.send(projectId, signal),
+			shownTo: peers.pathsFor,
 		},
-		firesHere,
-		started: () => options.scheduler !== false,
-		enabled: () => runSettings().scheduler,
-		startRun: places.startForSchedule,
-		scorePullRequests: (projectId, webhook) =>
-			pullRequestScores.take(projectId, webhook),
-		signal: (projectId, signal) => signals.send(projectId, signal),
+		projects: {
+			// Also a project without a Clone here: its runs run on another Device.
+			all: () => projects.listInSpace(),
+			inSpace: async (projectId, spaceId) => {
+				const row = await projects.find(projectId, spaceId);
+				return {
+					hasFolder: Boolean(row.folder),
+					clonedHere: row.repoPath !== null,
+				};
+			},
+			// The Replica that keeps the Space fires every schedule of it (its
+			// Host, or the one Device of a Space without one), so one that is
+			// always on starts them, and its runs run there (ADR 15). A webhook
+			// schedule's webhooks go to the same Replica.
+			firesHere: async (projectId) => {
+				const row = await projects.find(projectId);
+				return !(await directory.hostedElsewhere(row.spaceId));
+			},
+		},
+		offers: peers.offers,
+		scorer: {
+			take: (projectId, webhook) => pullRequestScores.take(projectId, webhook),
+		},
+		secrets: {
+			value: async (name, projectId) => {
+				if (!options.secret) return process.env[name];
+				const { spaceId } = await projects.find(projectId);
+				return options.secret(name, { spaceId, projectId });
+			},
+		},
+		// The Settings switch, and NIGHTSHIFT_SCHEDULER=off.
+		switch: {
+			on: () => runSettings().scheduler,
+			started: () => options.scheduler !== false,
+		},
+		notices: {
+			missed: (time) => {
+				void projects
+					.find(time.projectId)
+					.then(({ spaceId }) => {
+						for (const listener of [...missedListeners]) {
+							listener({ ...time, spaceId });
+						}
+					})
+					.catch((error) =>
+						console.error("[schedules] could not tell of a missed time", error),
+					);
+			},
+		},
+		usage: options.usage,
 	});
+	const pullRequestWatch = createPullRequestWatch({
+		db,
+		log: runLog,
+		now,
+		usage: options.usage,
+		github: options.github ?? { viewPullRequest: async () => null },
+	});
+	if (options.scheduler !== false) {
+		const schedulerSignal = options.scheduler?.signal;
+		signal.addEventListener("abort", () => schedules.ticker.stop(), {
+			once: true,
+		});
+		ready.then(
+			() => {
+				if (disposed) return;
+				schedules.ticker.start(schedulerSignal);
+				if (options.github) pullRequestWatch.everyMorning(signal);
+			},
+			() => {},
+		);
+	}
 
 	const actions = createRunActions({
 		db,
@@ -862,7 +871,7 @@ export function createEngine(
 		db,
 		ready,
 		holds: startHolds,
-		holdSchedules: () => scheduler.hold(),
+		holdSchedules: () => schedules.ticker.hold(),
 		walkerId: () => runLog.walkerId(),
 		flows: projectFlows,
 		documents,
@@ -908,16 +917,7 @@ export function createEngine(
 			forget: (flow, node, scope) => forgetMemory(db, flow, node, scope),
 		},
 		answerCosts: (spaceId, since) => listAnswerCosts(db, spaceId, since),
-		scheduleFiles: createScheduleFiles({
-			now,
-			flows: projectFlows,
-			usage: options.usage,
-			scheduler,
-			webhooks,
-			pathsFor: peers.pathsFor,
-			project: (projectId, spaceId) => projects.find(projectId, spaceId),
-			offers: peers.offers,
-		}),
+		schedules,
 		reads,
 		artifacts,
 		actions,
@@ -988,7 +988,7 @@ export function createEngine(
 		},
 		async webhook(request) {
 			await ready;
-			return webhooks.receive(request);
+			return schedules.receiveWebhook(request);
 		},
 		async dispose() {
 			lifetime.abort();

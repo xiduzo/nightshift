@@ -1,11 +1,9 @@
-/** The scheduler: it starts the runs of each project's schedules when their cron times come due, or when a webhook arrives. */
+/** Schedules: when a flow runs on its own. The scheduler starts the run of each project's schedule when its cron time comes due, or when a webhook arrives, and a person lists, saves, pauses and starts them. `wireSchedules` binds the use cases to their ports. */
 
 export type { ScheduleList } from "./application/list-schedules";
 export type { WebhookRequest } from "./application/receive-webhook";
 export type { SchedulePause } from "./domain/pause-tonight";
 export type { ScheduleMissed } from "./domain/schedule-watch";
 export type { WebhookAnswer } from "./domain/webhook-delivery";
-export type { ScheduleFiles } from "./schedule-files";
-export { createScheduleFiles } from "./schedule-files";
-export { createScheduler } from "./scheduler";
-export { createWebhooks } from "./webhooks";
+export type { Schedules } from "./wire";
+export { wireSchedules } from "./wire";

@@ -18,7 +18,6 @@ import type { PlacementPort } from "../placement";
 import {
 	type Branches,
 	type ListedProject,
-	NOT_ON_THIS_COMPUTER,
 	PROJECT_NOT_FOUND,
 	type Projects,
 	type SpaceDocuments,
@@ -26,7 +25,7 @@ import {
 	toProject,
 } from "../projects";
 import type { ReadModel, RunStreamItem, RunSummary } from "../read";
-import type { ScheduleFiles } from "../schedules";
+import type { Schedules } from "../schedules";
 import { readServiceLog } from "../services";
 import type { KeptFlow, KeptValue } from "../variables";
 import type { RunActions } from "./actions";
@@ -78,7 +77,11 @@ export type SpacesDeps = {
 	};
 	/** What the answers of Night Shift's own agents cost in a Space, as this Replica has them. */
 	answerCosts(spaceId: string, since?: number): Promise<AnswerCost[]>;
-	scheduleFiles: ScheduleFiles;
+	/** The schedules of the projects: each use case checks the Space itself (`schedules/`). */
+	schedules: Pick<
+		Schedules,
+		"list" | "save" | "pauseTonight" | "resumeTonight" | "runNow"
+	>;
 	reads: ReadModel;
 	/** The artifacts kept on this computer. */
 	artifacts: Pick<ArtifactStore, "list" | "file">;
@@ -410,14 +413,12 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async listSchedules(projectId) {
 				await ready;
-				await projects.find(projectId, spaceId);
-				return deps.scheduleFiles.list(actor, { spaceId, projectId });
+				return deps.schedules.list(actor, { spaceId, projectId });
 			},
 
 			async pauseScheduleTonight(projectId, scheduleId) {
 				await ready;
-				await projects.find(projectId, spaceId);
-				return deps.scheduleFiles.pauseTonight(actor, {
+				return deps.schedules.pauseTonight(actor, {
 					spaceId,
 					projectId,
 					scheduleId,
@@ -426,8 +427,7 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async resumeScheduleTonight(projectId, scheduleId) {
 				await ready;
-				await projects.find(projectId, spaceId);
-				return deps.scheduleFiles.resumeTonight(actor, {
+				return deps.schedules.resumeTonight(actor, {
 					spaceId,
 					projectId,
 					scheduleId,
@@ -436,8 +436,7 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async runScheduleNow(projectId, scheduleId) {
 				await ready;
-				await projects.find(projectId, spaceId);
-				return deps.scheduleFiles.runNow(actor, {
+				return deps.schedules.runNow(actor, {
 					spaceId,
 					projectId,
 					scheduleId,
@@ -446,13 +445,7 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async saveSchedules(projectId, schedules, timeZone) {
 				await ready;
-				// A project without a Clone here is refused before the Offers
-				// check. A project without a folder needs none (ADR 22).
-				const row = await projects.find(projectId, spaceId);
-				if (row.folder && row.repoPath === null) {
-					throw new Refusal("conflict", NOT_ON_THIS_COMPUTER);
-				}
-				return deps.scheduleFiles.save(actor, {
+				return deps.schedules.save(actor, {
 					spaceId,
 					projectId,
 					schedules,

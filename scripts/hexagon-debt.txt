@@ -31,7 +31,6 @@ engine/knowledge
 engine/placement
 engine/projects
 engine/run
-engine/schedules
 notifications/notifier
 notifications/settings
 notifications/targets

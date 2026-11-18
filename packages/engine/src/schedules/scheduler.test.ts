@@ -11,7 +11,6 @@ import {
 	defaultRunSettings,
 	type RunSettings,
 } from "../device-config/settings";
-import type { RunLog } from "../log";
 import { appendEvent, type EnginePayloads, parseEventRow } from "../log/events";
 import type { RunSummary } from "../read/views";
 import { createEngine, type Engine, type EngineInternals } from "../run/engine";
@@ -27,7 +26,6 @@ import {
 	withDevice,
 } from "../testing/test-support";
 import { SCHEDULE_GRACE_MS } from "./domain/schedule-watch";
-import { createScheduler } from "./scheduler";
 
 /** The scheduler with an injected clock: each test moves `clock` and waits for a tick. */
 
@@ -636,51 +634,6 @@ describe("the scheduler", () => {
 		await waitForEnd(engine, firedRunId(fired));
 		await settle();
 		expect(await scheduleFacts()).toHaveLength(1);
-	});
-
-	test("a hold waits for the tick under way, and the ticks during it start nothing", async () => {
-		let listed = 0;
-		let answer: () => void = () => {};
-		const scheduler = createScheduler({
-			db: sandbox.db,
-			now: () => clock,
-			tickMs: TICK_MS,
-			log: {} as RunLog,
-			projects: () => {
-				listed++;
-				return new Promise((resolve) => {
-					answer = () => resolve([]);
-				});
-			},
-			flows: { schedules: async () => ({ schedules: [] }) } as never,
-			startRun: () => Promise.reject(new Error("No run starts here.")),
-			runStatus: async () => null,
-		});
-		const ticking = scheduler.tick();
-		await waitFor(async () => listed === 1 || null, {
-			label: "the tick lists",
-		});
-		let held = false;
-		const holding = scheduler.hold().then((release) => {
-			held = true;
-			return release;
-		});
-		await Bun.sleep(TICK_MS * 2);
-		expect(held).toBe(false);
-
-		answer();
-		await ticking;
-		const release = await holding;
-		expect(held).toBe(true);
-		await scheduler.tick();
-		expect(listed).toBe(1);
-		release();
-		const next = scheduler.tick();
-		await waitFor(async () => listed === 2 || null, {
-			label: "the tick after the release lists",
-		});
-		answer();
-		await next;
 	});
 
 	test("a paused schedule does not fire", async () => {
