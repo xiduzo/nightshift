@@ -33,9 +33,10 @@
  *      (`contract/`, and `run-status/` in the engine).
  * (H2) `application/` imports only its own `domain/` and `application/`,
  *      the barrel of another vertical of its package, and what H1 allows.
- *      Never `adapters/`. Another package comes through a port. From a
- *      mechanism that is not kernel it imports only types (`import type`):
- *      what the mechanism does comes in through a port.
+ *      Never `adapters/`. From a mechanism that is not kernel, and from
+ *      a public entry of another `@nightshift` package, it imports only
+ *      types (`import type`): what they do comes in through a port.
+ *      `@nightshift/db` stays out, as a type too (H3).
  * (H3) Neither imports `@nightshift/db`, `drizzle-orm`, `@libsql/*`,
  *      `bun:sqlite`, `node:fs`, `node:child_process`, `node:net`,
  *      `node:http*`, `node:dns*`, `yjs`, `@langchain/*` or `@hocuspocus/*`.

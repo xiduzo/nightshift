@@ -80,6 +80,18 @@ describe("domain/ imports (H1)", () => {
 		expect(problems[0]).toContain('imports "../../contract/actor"');
 	});
 
+	test("another package fails in domain/, as a type and as a value", async () => {
+		for (const line of [
+			'import type { Harness } from "@nightshift/agents/types";',
+			'import { shellQuote } from "@nightshift/agents/types";',
+		]) {
+			const problems = await check(domain([line, "export const window = 1;"]));
+			expect(problems).toHaveLength(1);
+			expect(problems[0]).toContain('imports "@nightshift/agents/types"');
+			expect(problems[0]).toContain("(H1)");
+		}
+	});
+
 	test("an entry of flows other than the root fails", async () => {
 		const problems = await check(
 			domain([
@@ -178,17 +190,76 @@ describe("application/ imports (H2)", () => {
 		expect(problems[0]).toContain('imports "../../projects/project"');
 	});
 
-	test("another package fails: it comes through a port", async () => {
+	test("a type of another package passes, a value of it fails", async () => {
+		for (const line of [
+			'import type { Harness } from "@nightshift/agents/types";',
+			'import { type Harness } from "@nightshift/agents/types";',
+		])
+			expect(
+				await check(useCase([line, "export type Used = Harness;"])),
+			).toEqual([]);
 		const problems = await check(
 			useCase([
-				'import type { membersOf } from "@nightshift/auth";',
-				"export type Members = typeof membersOf;",
+				'import { type Harness, shellQuote } from "@nightshift/agents/types";',
+				'import { membersOf } from "@nightshift/auth";',
+				"export type Used = [Harness, typeof shellQuote, typeof membersOf];",
+			]),
+		);
+		expect(problems).toEqual([
+			`${SLICE}/application/list-schedules.ts: imports "@nightshift/agents/types" (packages/agents/src/port/index.ts). application/ imports only types from another package (import type), apart from the kernel. What the package does comes in through a port (H2).`,
+			`${SLICE}/application/list-schedules.ts: imports "@nightshift/auth" (packages/auth/src/index.ts). application/ imports only types from another package (import type), apart from the kernel. What the package does comes in through a port (H2).`,
+		]);
+	});
+
+	test("a type of the database package fails, and so does a value of it", async () => {
+		for (const line of [
+			'import type { Database } from "@nightshift/db";',
+			'import { Database } from "@nightshift/db";',
+		]) {
+			const problems = await check(
+				useCase([line, "export type Used = Database;"]),
+			);
+			expect(problems).toHaveLength(1);
+			expect(problems[0]).toContain('imports "@nightshift/db"');
+			expect(problems[0]).toContain("(H3, H8)");
+		}
+	});
+
+	test("a use-case test imports types of another package, and values of the kernel's ./testing only", async () => {
+		const TEST = `${SLICE}/application/create-schedule.test.ts`;
+		const withTest = (lines: string[]): Files => ({
+			...repository,
+			[TEST]: ['import { test } from "bun:test";', ...lines],
+		});
+		expect(
+			await check(
+				withTest([
+					'import type { Harness } from "@nightshift/agents/types";',
+					'import { utc } from "@nightshift/time/testing";',
+					'test("x", () => [utc, {} as Harness]);',
+				]),
+			),
+		).toEqual([]);
+		const problems = await check(
+			withTest([
+				'import { shellQuote } from "@nightshift/agents/types";',
+				'test("x", () => shellQuote);',
 			]),
 		);
 		expect(problems).toHaveLength(1);
-		expect(problems[0]).toContain(
-			'imports "@nightshift/auth" (packages/auth/src/index.ts)',
+		expect(problems[0]).toContain(TEST);
+		expect(problems[0]).toContain("comes in through a port (H2)");
+	});
+
+	test("production code in application/ imports no value of a ./testing entry", async () => {
+		const problems = await check(
+			useCase([
+				'import { utc } from "@nightshift/time/testing";',
+				"export type Used = typeof utc;",
+			]),
 		);
+		expect(problems).toHaveLength(1);
+		expect(problems[0]).toContain('imports "@nightshift/time/testing"');
 	});
 
 	test("its own barrel and the root index of the package fail", async () => {

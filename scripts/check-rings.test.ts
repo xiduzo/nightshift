@@ -509,7 +509,12 @@ describe("the debt list (H10)", () => {
 	test("a mechanism is not checked", async () => {
 		expect(
 			await check(flat, {
-				mechanisms: ["engine/contract", "engine/log", "engine/usage"],
+				mechanisms: [
+					"engine/contract",
+					"engine/log",
+					"engine/usage",
+					"agents/port",
+				],
 			}),
 		).toEqual([]);
 	});

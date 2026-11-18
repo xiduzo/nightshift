@@ -110,6 +110,22 @@ const OWN_APPLICATION = "^packages/$1/src/$2/application/";
 const OTHER_BARREL =
 	"^packages/$1/src/(?!$2/index\\.ts$)(?!testing/)(?!.*(?<=/)(?:domain|application|adapters)/).+/index\\.ts$";
 
+/**
+ * A public entry of another `@nightshift` package. A file of another
+ * workspace resolves only through its package.json `exports`, and the
+ * layer check says which package may import which.
+ */
+const OTHER_PACKAGE = "^packages/(?!$1/)[^/]+/src/";
+
+/** The shared kernel packages, by the entries a ring may import as values. */
+const KERNEL_PACKAGES = [
+	"^packages/(?:refusal|time|semconv)/src/(?!testing/)",
+	"^packages/flows/src/index\\.ts$",
+];
+
+const PACKAGE_VALUE =
+	"application/ imports only types from another package (import type), apart from the kernel. What the package does comes in through a port (H2).";
+
 /** An in-memory adapter of any slice of the package. */
 const IN_MEMORY_OF_PACKAGE = `^packages/$1/src/.+${IN_MEMORY}`;
 
@@ -158,10 +174,38 @@ export default {
 			name: "h2-application",
 			severity: "error",
 			comment:
-				"application/ imports only its own domain/ and application/, the barrel of another vertical of the package, and what domain/ may import. Never adapters/ (H2).",
+				"application/ imports only its own domain/ and application/, the barrel of another vertical of the package, types of another package, and what domain/ may import. Never adapters/ (H2).",
 			from: { path: inRing("application"), pathNot: TESTS },
 			to: {
-				pathNot: [OWN_DOMAIN, OWN_APPLICATION, OTHER_BARREL, ...KERNEL],
+				pathNot: [
+					OWN_DOMAIN,
+					OWN_APPLICATION,
+					OTHER_BARREL,
+					OTHER_PACKAGE,
+					...KERNEL,
+				],
+			},
+		},
+		{
+			name: "h2-package-value",
+			severity: "error",
+			comment: PACKAGE_VALUE,
+			from: { path: inRing("application"), pathNot: TESTS },
+			to: {
+				path: OTHER_PACKAGE,
+				pathNot: KERNEL_PACKAGES,
+				dependencyTypesNot: ["type-only"],
+			},
+		},
+		{
+			name: "h2-package-value-test",
+			severity: "error",
+			comment: PACKAGE_VALUE,
+			from: { path: testInRing("application") },
+			to: {
+				path: OTHER_PACKAGE,
+				pathNot: [...KERNEL_PACKAGES, ...KERNEL_FOR_TESTS],
+				dependencyTypesNot: ["type-only"],
 			},
 		},
 		{
@@ -175,6 +219,7 @@ export default {
 					OWN_DOMAIN,
 					OWN_APPLICATION,
 					OTHER_BARREL,
+					OTHER_PACKAGE,
 					IN_MEMORY_OF_PACKAGE,
 					...KERNEL,
 					...KERNEL_FOR_TESTS,

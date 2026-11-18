@@ -44,7 +44,7 @@ export function write(files: Files, roots: string[]): string {
 /** The debt list and the mechanisms of `repository`. */
 export const DEFAULTS: Options = {
 	debt: "engine/projects\n",
-	mechanisms: ["engine/contract", "engine/log"],
+	mechanisms: ["engine/contract", "engine/log", "agents/port"],
 };
 
 /** The problems of the repository in `files`, with DEFAULTS and `options`. */
@@ -65,7 +65,8 @@ export const SLICE = "packages/engine/src/schedules";
 /**
  * `engine/schedules` is in shape. `engine/contract` is the kernel of the
  * engine, `engine/log` is a mechanism that is not kernel, and
- * `engine/projects` is on the debt list.
+ * `engine/projects` is on the debt list. `agents` is another package, with
+ * its `./types` entry (the mechanism `agents/port`).
  */
 export const repository: Files = {
 	"packages/time/package.json": manifest("time", {
@@ -93,6 +94,15 @@ export const repository: Files = {
 	"packages/db/src/index.ts": "export type Database = { run(): void };\n",
 	"packages/auth/package.json": manifest("auth", { ".": "./src/index.ts" }),
 	"packages/auth/src/index.ts": "export const membersOf = () => [];\n",
+	"packages/agents/package.json": manifest("agents", {
+		".": "./src/index.ts",
+		"./types": "./src/port/index.ts",
+	}),
+	"packages/agents/src/index.ts": "export const harnesses = [];\n",
+	"packages/agents/src/port/index.ts": [
+		"export type Harness = { id: string };",
+		"export const shellQuote = (text: string) => text;",
+	],
 	"packages/engine/package.json": manifest("engine", {
 		".": "./src/index.ts",
 	}),
