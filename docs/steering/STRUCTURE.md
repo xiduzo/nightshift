@@ -3,12 +3,13 @@
 > The rules for where code lives. Read this before you add a file, a folder or a package.
 > When a rule changes, change it here and record the change in the ADR table of `TECH.md`.
 
-Last updated: 2026-11-12
+Last updated: 2026-11-18
 
 Night Shift is a **layered vertical codebase**.
 
 - **Layered:** packages sit in layers. A package imports only from packages in a lower layer.
 - **Vertical:** inside a package, code is grouped by domain (what it does), not by kind (what it is).
+- **Rings:** inside a server package, a capability has three rings: `domain/`, `application/` and `adapters/` (section 9).
 
 Code that changes together lives together. A boundary that is not enforced is not a boundary.
 
@@ -89,7 +90,7 @@ Test fixtures and the fakes of `./testing` may set up and read any table. Exampl
 
 ### Ports for external I/O
 
-Every call to `git`, `gh`, a harness CLI, `osascript` or another OS program goes through a port. The port is an interface in the package that needs it. The adapter implements it. Tests use a fake adapter.
+Every call to `git`, `gh`, a harness CLI, `osascript` or another OS program goes through a port. The port is an interface in the package that needs it. The adapter implements it. Tests use a fake adapter. In a capability of a server package, the port, its adapters and their tests have a fixed place and fixed names (section 9).
 
 ## 3. Public surfaces
 
@@ -143,8 +144,44 @@ Every app and every package except `ui`, `ui-native` and `config` is cut into ve
 - Code outside the vertical imports from the barrel only. A deep import into another vertical (`features/runs/components/run-list`) is an error.
 - Inside the vertical, code uses relative imports and may reach any file.
 - A vertical holds everything about its domain: components, hooks, query options, types, utilities, constants and tests.
-- A big vertical may use kind folders inside it: `components/`, `hooks/`, `lib/`, `queries/`, `mutations/`. A small vertical stays flat.
+- **No kind folder inside a vertical, at any depth (V7).** No folder named `components`, `hooks`, `lib`, `types`, `queries` or `mutations`. The names `utils`, `helpers`, `common` and `misc` fail as catch-all names (below). A small vertical stays flat. A big vertical splits into sub-verticals by sub-domain (below). A capability of a server package has only the ring folders (section 9).
 - Every name on a barrel has an importer outside the vertical. A name that nobody imports comes off the barrel.
+
+### The capability map
+
+`scripts/capabilities.ts` names every vertical of every checked workspace, and says what it is. It is typed data, not a document. `scripts/check-capabilities.ts` reads it. A vertical is one of three kinds:
+
+- **A capability** is a product area. It holds the rules or the data of one thing a person meets in Night Shift. Its name is a word of `docs/glossary.md`, in the folder form: `runs`, `gates`, `flows`. The areas of the Insights admin have their own table, because the glossary does not name them.
+- **A mechanism** is shared machinery. It carries, stores, formats or connects for the capabilities. It decides nothing about a product area. Its name is its folder name. A word of the glossary does not make a vertical a capability: the run log, the Space archive and a Lease are mechanisms. An app's `shared/<name>` piece is a mechanism.
+- **The wiring** is the piece of a workspace that composes its capabilities. It is an app's `shared/shell`, when that shell imports a feature: the web app and the phone app have one. A workspace has at most one. A shell that imports no feature is a mechanism (the Insights admin). An app that composes in its entry files has no wiring piece (`apps/desktop`, `apps/server`).
+
+The rules:
+
+- **V1: one map, one name.** Every vertical on disk is on the map, and every entry of the map is on disk. A capability has the same folder name in every workspace that holds a part of it. Two verticals of one workspace with one capability become one vertical with sub-verticals. A mechanism in a package or in `features/` never takes the name of a capability.
+- **V2: the direction.** A capability may import a mechanism. A mechanism imports no capability of its workspace. The wiring may import every capability, and no vertical imports the wiring. Only the routes, the entry folders and the entry files do.
+- **V5: at most five.** A capability imports at most five other capabilities of its workspace. A mechanism does not count, nor does the wiring. Code that wires many capabilities is a `wire.ts` outside the verticals.
+
+For V2 and V5, an import is every import the check finds: `import type`, `export from`, `import()` and `require()`. An import through a peer port or of a leaf contract counts too. A test does not count.
+
+When you add, move, rename or remove a vertical, change `VERTICALS` in the same change. The check names the line. A wrong name also fails the type check of `scripts/`.
+
+### Sub-verticals
+
+A folder inside a vertical that has its own `index.ts` is a **sub-vertical**, at every depth. The barrel rules hold at every depth:
+
+- Code outside a sub-vertical imports only its barrel. Inside it, files reach each other freely.
+- From inside the vertical, the outermost barrel guards. `flows/page.ts` does not import `./editor/inspector`, also when `inspector/` has a barrel: it imports `./editor`.
+- From another vertical, the import goes through the barrel of the vertical, as before.
+- The barrel of a sub-vertical holds only import and export statements. Every name on it has a production importer outside the sub-vertical. Tests may deep-import, and they do not count as importers.
+
+**When a vertical must split (V3).** A vertical or a sub-vertical with more than 25 source files or more than 5,000 lines consists of sub-verticals. Everything below it counts. Tests do not count. Then both of these hold:
+
+1. Each folder directly in it that holds a source file has an `index.ts`.
+2. Its own code stays within the same two limits. Its own code is the files directly in it and in its ring folders.
+
+So a flat vertical over a limit fails too. Name a sub-vertical for its sub-domain, with a word the product or the code already uses (`transcript`, `canvas`, `inspector`). Never name it for a kind of code.
+
+The ring folders of section 9 (`domain/`, `application/`, `adapters/`, `adapters/in/`, `adapters/out/`) are not sub-verticals. They need no barrel, and an `index.ts` in one makes no barrel. A folder inside a ring folder counts as a folder directly in the vertical.
 
 ### Where verticals live
 
@@ -170,7 +207,9 @@ Two exceptions exist, as in yapyap. `scripts/check-verticals.ts` lists each one 
 
 The check fails on a leaf contract or a peer port that nothing uses any more, so neither outlives its reason.
 
-Today there is one leaf contract: `features/updates/update-feeds.ts` in `apps/desktop`. The build config (`electrobun.config.ts`) reads the feeds. The barrel of `updates` loads `electrobun/main`, which only the app's main process can load. There are ten peer ports, all in `apps/web` (section 5).
+Today there is one leaf contract: `features/updates/update-feeds.ts` in `apps/desktop`. The build config (`electrobun.config.ts`) reads the feeds. The barrel of `updates` loads `electrobun/main`, which only the app's main process can load. There are nine peer ports, all in `apps/web` (section 5).
+
+**No new peer port (V8).** `PEER_PORTS` only gets shorter. `scripts/peer-port-debt.txt` holds the nine pairs of verticals, and the budget check fails a pair that is not on it. When two verticals need the same thing, move it into the lower one, or let an entry file pass it in.
 
 ### Growth
 
@@ -179,11 +218,20 @@ Today there is one leaf contract: `features/updates/update-feeds.ts` in `apps/de
 
 ### Size limits
 
-These are signals, not hard limits. A file past the limit needs a reason in its header comment.
+The limits for a file, a folder, a barrel and a vertical are hard limits. Each has a debt list of what broke it on the day the check started (section 8). A new offender fails. A listed entry may not grow: a change that must add to a listed file splits it first.
 
-- A source file over 600 lines (tests do not count): split it by sub-domain. Example: one file per node type, not one inspector for all types.
-- A route file over 80 lines: move the page body into its vertical.
-- A folder with more than 25 source files (tests do not count, they stay next to their files): look for sub-verticals.
+- **A source file has at most 600 lines (V6).** Split a longer file by sub-domain. Example: one file per node type, not one inspector for all types.
+- **A folder holds at most 25 source files directly in it (V6).** The files of its sub-folders do not count. Move the files of one sub-domain into a sub-vertical.
+- **A barrel holds at most 30 names of its own (V4).** A name is a barrel's own when it comes from a file of its folder, its ring folders included. A name that it passes on from the `index.ts` of a sub-vertical counts on that barrel, and not again on the parent. So a vertical with a wide surface is a set of sub-verticals, each a door of at most 30 names. A type and a value both count. The limit holds for the barrel of a vertical and for every `index.ts` below it. A package's root `index.ts` and the entries that `exports` names are out of scope: they compose verticals.
+- **A vertical over 25 source files or 5,000 lines consists of sub-verticals (V3).** See "Sub-verticals" above.
+- A route file over 80 lines: move the page body into its vertical. This limit stays a signal: no check reads it.
+
+What counts:
+
+- A source file is a `.ts` or `.tsx` file in `src/` or `scripts/` of a workspace. The `scripts/` folder of the repository counts too.
+- A test does not count, and it stays next to its file. For a file, a folder and a barrel, a test is a `*.test.ts(x)` file only. A fake and a fixture count there. For V3, a test is also a `test-support.ts` file and a file in a `testing/` or `fixtures/` folder.
+- A declaration file (`*.d.ts`) does not count. A generated file does not count: `GENERATED` of `scripts/check-budgets.ts` lists each one with the tool that writes it.
+- The in-memory adapters and the contract suites of a slice do not count (section 9).
 
 ## 5. The web app
 
@@ -199,10 +247,10 @@ apps/web/src/
   features/
     <vertical>/            projects, flows, runs, gates, agents, devices, notifications, settings, spaces, access, dashboard
       index.ts             the barrel: the only public surface
-      queries.ts           query and mutation option factories, polling rules (or queries/ + mutations/)
+      queries.ts           query and mutation option factories, polling rules
       <name>-page.tsx      the page a route renders
       types.ts             this vertical's slice of the API types, when contract.ts is not enough
-      components/ hooks/ lib/   when the vertical is big enough
+      <sub-domain>/        a sub-vertical with its own index.ts, when the vertical is big (section 4). Never a kind folder
     flows/                 canvas/ (+ viewer/ the last output on each node), editor/ (+ add-node/ the node grid, its catalog and the recent nodes, inspector/ one file per node type, io/, lib/, test-run/ the pins and skips of a test run and the node menu), start/ (Start run and Test, the flow's inputs), schedules/ (a flow's schedules and webhooks)
     runs/                  components/ (+ run-page.tsx, details/), hooks/, lib/, transcript/ (+ items/ per group of item kinds)
     settings/              settings-page.tsx, components/ (one file per card), hooks/use-settings-form.ts
@@ -211,10 +259,12 @@ apps/web/src/
     notifications/         the stream (use-notification-stream.ts: the live cache follows the Host, with this browser's adapter in browser-notifications.ts), this browser's Web Push (browser.ts, with public/sw.js), components/ (the notification settings and screens cards)
 ```
 
+The kind folders in this tree are older than the rule of section 4: `components/`, `hooks/` and `lib/` in `runs`, `settings`, `notifications` and `flows/editor`. They are on `scripts/kind-folder-debt.txt`. A new kind folder fails.
+
 Imports point one way, so no barrel closes a cycle. Biome's `noImportCycles` fails a cycle through barrels too. `scripts/check-verticals.ts` fails a cycle between verticals that has type-only imports in it.
 
 - Routes and `router.tsx` may import any vertical, through its barrel.
-- `shared/shell` composes the features. It is the only shared piece that imports a feature. No feature and no other shared piece imports it. Only the routes and the entry files do. The check enforces this, tests included.
+- `shared/shell` composes the features. It is the wiring of the app on the capability map (section 4). It is the only shared piece that imports a feature. No feature and no other shared piece imports it. Only the routes and the entry files do. The check enforces this, tests included.
 - The other shared pieces import no feature (checked, tests included). Every feature may use them. When a shared piece needs a feature's rule, `router.tsx` passes it in. Example: `createQueryClient` takes `sendToAccess` from `access`, which sends a refused session to sign in.
 - The features, from the bottom: `access`, `spaces`, `projects`, `agents`, then `flows`, `devices`, `gates`, `runs`, then `notifications`, then `settings` and `dashboard`. A feature imports only features below it. The notifications stream follows the Host for every page, so `notifications` sits above the pages it keeps live. The Settings page shows projects, flows, runs, agent defaults and the notification settings, so `settings` sits above them.
 - Data can go the other way. Examples: the flow editor reads the settings, and the inbox lists runs. A vertical below the owner of the data imports the owner's `queries.ts` through a peer port (`scripts/check-verticals.ts`), not its barrel. A `queries.ts` imports only `shared/api`, so the port closes no cycle. The check fails on a port that imports another feature. The ports today:
@@ -302,17 +352,23 @@ The pre-commit hook is `lefthook.yml` (install it with `bun lefthook install`). 
 | Entry names: the same script fails when a name on a package entry has no importer, with the rules of section 3 (production code of another workspace, tests only for `./testing`, a type that a used name's declaration writes). `PENDING_NAMES` lists names that code on its way imports, and fails once they have an importer. | lefthook pre-commit, CI | Active |
 | Cycles between verticals: the same script fails on a cycle between the verticals of a workspace, type-only imports included. An import through a peer port or of a leaf contract is not part of a cycle. `KNOWN_CYCLES` lists the cycles that wait for their fix, and fails once a cycle is gone. Today it is empty. | lefthook pre-commit, CI | Active |
 | Top-level layout: the same script fails on a kind bucket at the top of `src/`, and on a folder at the top of an app's `src/` other than `features/`, `shared/` and its entry folder. It fails on a loose file in an app's `shared/`, a shared piece that imports a feature, and a vertical that imports `shared/shell`. It fails on a catch-all file or folder name at any depth (section 4). | lefthook pre-commit, CI | Active |
+| Sub-verticals and kind folders: the same script fails on a kind folder inside a vertical, at any depth (rule n, V7). It fails on a sub-vertical that breaks a barrel rule (rule o). It fails on a vertical or a sub-vertical over 25 source files or 5,000 lines that does not consist of sub-verticals (rule p, V3). Nine verticals were over 5,000 lines on the day the rule started, and three of them were flat. So a flat vertical over a limit fails too. `scripts/kind-folder-debt.txt` (n) and `scripts/nesting-debt.txt` (o, p) list what broke the rules that day. The check fails an offender that is not listed, and fails a line once it is clean. The rules are modules in `scripts/verticals/`. | lefthook pre-commit (job `verticals`, also when one of the two debt lists changes), CI (step "Verticals") | Active |
+| Capability map (V1, V2, V5): `scripts/check-capabilities.ts` compares `scripts/capabilities.ts` with the verticals on disk. It finds them as the vertical check does. It fails on a vertical that the map does not have, and on an entry that is not on disk. It fails on a capability whose word is not a term of `docs/glossary.md`. It fails on a capability vertical under another folder name, and on a mechanism that imports a capability. It fails on a capability that imports more than five others. It fails on a wiring piece that is not an app's `shared/shell`, or that imports no capability. `scripts/capability-debt.txt` lists what breaks V1, V2 and V5 today, as `rename`, `imports` and `wide` lines. A `wide` line fails when its count goes up, and when the vertical is at five or less. | lefthook pre-commit (job `capabilities`: when a source file, a `package.json`, a `tsconfig.json`, the debt list or `docs/glossary.md` changes), CI (step "Capability map") | Active |
+| Budgets (V4, V6, V8): `scripts/check-budgets.ts` fails a source file over 600 lines and a folder with more than 25 source files. It fails a barrel with more than 30 names of its own, and a peer port that `scripts/peer-port-debt.txt` does not list. It checks the workspaces of the vertical check, and the `scripts/` folder of the repository. Each rule has a debt list in `scripts/`: `size-debt.txt`, `folder-debt.txt`, `barrel-debt.txt` and `peer-port-debt.txt`. A listed entry fails when its number is above the listed number. It also fails when it is within the limit or gone, until its line is removed. `--tighten` lowers the listed numbers to those of today and removes the clean lines. It never adds a line. `bun scripts/check-budgets.ts <workspace>` checks one workspace. | lefthook pre-commit (job `budgets`: when a source file, a `package.json` or one of the four lists changes), CI (step "Budgets") | Active |
+| Rings (section 9): `bun run check:rings` (`scripts/check-rings.ts`) checks each slice of the server packages. dependency-cruiser runs the import rules of `.dependency-cruiser.mjs`: H1, H2, H3, H5, H8 and the rule for `adapters/in/`. dependency-cruiser 18.8 cannot use the compiler API of TypeScript 7.0, so swc reads the files. But swc does not report a type written as `import("x").Name`. So `scripts/rings/import-types.ts` fails that form where a rule applies. The script adds the one rule that needs the capability map: `application/` imports only types from a mechanism that is not kernel. The script also holds the file rules. They are the shape of a slice, its `wire.ts`, one use case per file with its test (H6), and the files of each port (H7). It keeps the kernel of a package pure. It fails a server package with tsconfig `paths`, because the rules do not read them. `scripts/hexagon-debt.txt` lists the verticals that are not in shape yet (H10). A listed vertical that keeps every rule and has `application/` fails until its line is gone. Plain `depcruise` reads the same rules, but it reports every vertical, listed or not. | lefthook pre-commit (job `rings`: when a source file, a `package.json`, a `tsconfig.json`, `.dependency-cruiser.mjs`, `biome.json` or the debt list changes), CI (step "Rings") | Active |
+| No `Bun`, `fetch` or `process` in a ring (H4): one override of Biome `style/noRestrictedGlobals` denies them. It covers every `domain/` and `application/` folder of a package, tests included, and the kernel of a package. It does not read the debt list, so it holds from the first file. It does not catch `globalThis.fetch`. `scripts/check-rings.ts` fails when the override does not name exactly those folders and the kernel list (`PACKAGE_KERNEL`). | `biome.json`: lefthook pre-commit (staged files), CI (`biome ci`). The ring check reads the override. | Active |
+| The scripts are type-checked: `bun run check-types:scripts` runs `tsc` on `scripts/tsconfig.json`. So a name on the capability map that is no capability fails `tsc` too. `bun run check-types` starts with it. | lefthook pre-commit (job `script types`: when a file of `scripts/` or the base tsconfig changes), CI (step "Types of the scripts", and again in "Types") | Active |
 | The clock: `scripts/check-time.ts` fails a call to `Date`, `Intl.DateTimeFormat`, `Intl.RelativeTimeFormat` or date-fns outside `packages/time`. A type `Date` and `instanceof Date` stay. A number's `toLocaleString` is not a clock. `apps/desktop/.hutch` and `apps/desktop/build` are not scanned. `scripts/time-debt.txt` lists the files that still call them. The check fails a file that is not listed, and fails a listed file once it is clean. | lefthook pre-commit (when a source file or the debt list changes), CI | Active |
 | Semantic convention strings: `scripts/check-semconv.ts` fails a `gen_ai.*` or `nightshift.*` telemetry name written as a string literal in a `.ts` or `.tsx` file outside `packages/semconv` and `packages/telemetry/registry`. A comment is not a string literal. `@nightshift/telemetry` and `nightshift` alone do not match. A file name, an email, a host, a bundle id and an app storage key are not telemetry names. | lefthook pre-commit (when a source file changes), CI | Active |
 | Collector allowlist: `scripts/check-collector-allowlist.ts` fails when `deploy/insights/collector.yaml` allows a key the registry does not define, or misses a key the usage export sends. The list is the usage-event attributes, the resource attributes in the usage export, and the event name. | lefthook pre-commit (when the Collector config, the usage export, or `packages/semconv` changes), CI | Active |
 | The Weaver registry: `weaver registry check --v2 --registry packages/telemetry/registry` fails an invalid registry. CI installs the Weaver version in `packages/telemetry/registry/weaver-version.txt`. | CI | Active |
 | Emitted telemetry matches the registry: `packages/telemetry/src/runs/conform.test.ts` fails a name, a type, a unit or a required attribute the registry does not allow. `packages/telemetry/src/wire.test.ts` runs the same check on a run from the in-memory engine. | `bun test` in `packages/telemetry`, CI | Active |
-| The checks have tests. `scripts/check-verticals.test.ts`, `scripts/check-layers.test.ts`, `scripts/check-time.test.ts` and `scripts/check-semconv.test.ts` prove each rule on small workspaces, with one tree that breaks it and one that keeps it. They also prove that each script passes on this repository. `scripts/test-workspaces.test.ts` does the same for the list of tested workspaces. | `bun test ./scripts/`: lefthook pre-commit (when a check script changes), CI | Active |
-| Types and tests: `bun run check-types` (every workspace, with the web build), and `bun test` per workspace (without `*.live.test.ts`). `scripts/test-workspaces.ts` finds the workspaces with tests, so CI tests a new workspace without an edit. | CI | Active |
+| The checks have tests. `scripts/check-verticals.test.ts`, `scripts/check-layers.test.ts`, `scripts/check-time.test.ts` and `scripts/check-semconv.test.ts` prove each rule on small workspaces, with one tree that breaks it and one that keeps it. They also prove that each script passes on this repository. `scripts/test-workspaces.test.ts` does the same for the list of tested workspaces. The checks of sections 4 and 9 have tests too. The vertical rules: `scripts/verticals/folder-names.test.ts`, `nesting.test.ts` and `nesting-size.test.ts`. The capability map: `scripts/check-capabilities.test.ts`. The budgets: `scripts/check-budgets.test.ts` and `check-budgets-barrels.test.ts`. The rings: `scripts/check-rings.test.ts` and `scripts/rings/imports.test.ts`, on fixture repositories. | `bun test ./scripts/`: lefthook pre-commit (job `check tests`), CI (step "Tests of the checks"). The hook job runs when a check script changes, or a module of `scripts/verticals/` or `scripts/rings/`. It also runs when `.dependency-cruiser.mjs`, `scripts/hexagon-debt.txt`, the capability map or its debt list changes. It gives each test 60 seconds, because some tests read the whole repository. | Active |
+| Types and tests: `bun run check-types` (the scripts, then every workspace, with the web build), and `bun test` per workspace (without `*.live.test.ts`). `scripts/test-workspaces.ts` finds the workspaces with tests, so CI tests a new workspace without an edit. | CI | Active |
 | The compiled binary starts: `apps/server/scripts/smoke-binary.ts` builds it and starts it as the Docker image does. | CI | Active |
 | API contract: every procedure has a one-line summary and an output schema, and the OpenAPI document builds with both. Real replies of a sandbox engine match their schemas. `exact<T>()` fails the build when an output schema differs from its domain type. | `packages/api/src/contract.test.ts` (CI), TypeScript | Active |
 
-`scripts/check-verticals.ts` checks every workspace except `ui`, `ui-native` and `config`. When a check exists, change its status to "Active". The scripts find the workspaces themselves, so a new workspace needs no list entry. Fix a violation. Do not add an exception. If a rule is wrong, change this document first.
+`scripts/check-verticals.ts` checks every workspace except `ui`, `ui-native` and `config`. When a check exists, change its status to "Active". The scripts find the workspaces themselves, so a new workspace needs no list entry. Fix a violation. Do not add an exception, and do not add a line to a debt list (section 8). If a rule is wrong, change this document first.
 
 ## 8. Known deviations
 
@@ -321,3 +377,135 @@ When code must break a rule for a while, add an entry here: the rule it breaks, 
 | Rule | Files | Until |
 | --- | --- | --- |
 | The clock (`scripts/check-time.ts`) | The lock-screen widget builds a `Date` for the native timer (`apps/mobile/src/features/glance/lock-screen.ios.tsx`). Its `widget` function cannot import a Night Shift package. `scripts/time-debt.txt` lists that file. | the widget timer takes an instant |
+
+The rules of 2026-11-18 (sections 4 and 9) each started with a **debt list**: a file in `scripts/` that names what broke the rule on that day. The lists are `scripts/hexagon-debt.txt` (the rings), `capability-debt.txt` (V1, V2, V5), `size-debt.txt` and `folder-debt.txt` (V6), `barrel-debt.txt` (V4), `nesting-debt.txt` (V3), `kind-folder-debt.txt` (V7) and `peer-port-debt.txt` (V8). Each list only gets shorter: never add a line, and never raise a number. A line leaves when its code is clean: the check then fails and names the line, and you remove it in that change. For the three lists with numbers (size, folder, barrel), `bun scripts/check-budgets.ts --tighten` lowers each number to the number of today and removes the clean lines. One case adds a line: when a listed vertical of a server package splits, the new vertical gets a line on `scripts/hexagon-debt.txt`. It gets its place on the capability map in the same commit.
+
+## 9. Rings: the inside of a capability
+
+A capability of a server package is a **slice** with three rings. Imports point inward: `adapters/` to `application/` to `domain/`. [ADR 40](../adr/0040-a-capability-has-three-rings.md) records why.
+
+- The server packages are `engine`, `devices`, `notifications`, `agents`, `auth` and `telemetry` (`SERVER_PACKAGES` of `.dependency-cruiser.mjs`).
+- A slice is a vertical of a server package that the capability map gives a capability (section 4). Each sub-vertical of it is a slice too.
+- Only a slice has rings. A mechanism has none. `api` has none: it is the driving adapter for people. The apps and the other packages have none. The rules of section 4 hold for all of them.
+- A vertical that is not in shape yet is on `scripts/hexagon-debt.txt` (section 8). A new slice starts in shape.
+
+### The slice
+
+```
+packages/engine/src/<capability>/
+  index.ts                     the barrel: the wire function, use cases and types. Never a store, never a real adapter
+  wire.ts                      wire<Capability>(deps): builds the real adapters, returns the use cases bound to their ports
+  domain/                      the rules, as pure TypeScript: no I/O, no framework
+    <thing>.ts  <thing>.test.ts
+  application/                 flat: no folder in it
+    ports.ts                   the driven ports: types only
+    <verb>-<object>.ts         one use case: one exported function
+    <verb>-<object>.test.ts    its test, on in-memory adapters
+  adapters/
+    out/                       the driven adapters
+      <tech>-<port>.ts           the real adapter: drizzle, node:fs, git, Yjs, fetch
+      in-memory-<port>.ts        the in-memory twin (test code)
+      <port>.contract.ts         one suite for both adapters (test code)
+      <port>.contract.test.ts    runs the suite on both
+    in/                        a driving adapter that is not the API: a timer, a listener
+  <sub-vertical>/              a folder with its own index.ts, in shape too
+```
+
+- The slice folder holds only `index.ts`, `wire.ts` and tests (`*.test.ts`, `test-support.ts`).
+- Each folder in it is a ring or a sub-vertical.
+- A slice has `domain/` or `application/`, or a sub-vertical that has one.
+- `application/` is flat. `adapters/` holds only `out/` and `in/`.
+- No folder below a ring has the name `domain`, `application` or `adapters`.
+
+### The rules (P1 to P8)
+
+**P1. `domain/` is pure.** It imports only its own `domain/` and the kernel. It takes an instant as an argument: it does not read the clock. A type of another slice does not enter `domain/`. An answer type that names one sits in `application/`.
+
+The kernel is what every ring may import:
+
+- `@nightshift/refusal`, `@nightshift/time` and `@nightshift/semconv`, by any entry but `./testing`.
+- The root of `@nightshift/flows`.
+- `zod`: a schema is domain.
+- `node:crypto`, for a pure computation only: an HMAC, a constant-time compare. It is not for a random value. A function gets an id or a random value as an argument or through a port.
+- The kernel of its own package: its pure mechanisms, through their barrels (`../../contract`, not `../../contract/command`). `PACKAGE_KERNEL` of `.dependency-cruiser.mjs` is the list: `contract` and `run-status` in the engine, `contract` in `devices`, `contract` in `notifications`. A kernel mechanism imports no database, folder, process or network module. It uses no `Bun`, `fetch` or `process`.
+
+**P2. One request is one use case.** A use case is one file in `application/`, with one exported function and one test file beside it. A step that two use cases share is a pure function in `domain/` that takes a function. `application/` imports only:
+
+- Its own `domain/` and `application/`, and what `domain/` may import.
+- The barrel of another vertical or sub-vertical of its package. So a use case may call the use case of another slice through that barrel.
+- From a mechanism that is not kernel: types only (`import type`). A use case gets a value of a mechanism that does I/O through a port: the run log, the runner.
+- From a lower-layer `@nightshift` package that is not kernel: types only, from a public entry. `@nightshift/db` is the exception: no import at all. A use case gets a value of such a package through a port.
+
+It never imports `adapters/`.
+
+**P3. A use case takes its ports as its first argument.** It reads no global and builds no adapter. Its other arguments fit who asks:
+
+- A request of a person: `(ports) => (actor, request)`.
+- The clock or a public webhook: `(ports) => (request)`.
+
+```ts
+export type AnswerGatePorts = { gates: OpenGates; walkers: Walkers; members: SpaceMembers; clock: Clock };
+export const answerGate =
+  (ports: AnswerGatePorts) =>
+  async (actor: Actor, request: AnswerGate): Promise<void> => {
+    // load, ask the domain rule, save
+  };
+```
+
+`application/` takes a `now` port only where a test must set the time. State that outlives a request (a watch, a short memory) is a pure domain object. The wire makes it once and gives it to the use case beside the ports. It is not a port, and it needs no twin. The same holds for a collaborator with no I/O.
+
+**P4. The use case decides who may act.** It takes the `Actor`. The API keeps the session check and the input schema. For an expected outcome, the use case throws a `Refusal`. There is no `Result` type. Until the run path is in shape, `actor` is `Actor | undefined`.
+
+**P5. A driving adapter holds no rule.** It reads the input, calls one use case and maps the answer. The API is the driving adapter for people. `Engine` and `SpaceEngine` are thin objects that list the use cases for it, and they hold no rule. A driving adapter that is not the API sits in `adapters/in/`. A file there imports nothing of its slice: the wire hands it the bound use case.
+
+**P6. Only a `wire.ts` builds a real adapter.** A slice with `application/` has a `wire.ts`. It exports one function, `wire<Slice>(deps)`, and types. It is the only file that builds the real adapters and the long-lived domain objects of the slice. It returns the use cases bound to their ports. Only that `wire.ts`, a file of the same `adapters/out/` and a test import a real adapter. The `wire.ts` of the package calls the slice wires (in the engine, `createEngine` does until it moves). It never builds the adapter of a slice itself.
+
+**P7. Every driven port has an in-memory twin and one contract suite.** Every type that `application/ports.ts` exports is a port. A data shape goes in `domain/`. A store port is narrow and belongs to one slice (`ScheduleStore`). There is never a port for the whole database. The twin sits beside the real adapter in `adapters/out/`, and the contract suite runs on both. A use-case test runs on the twins.
+
+A port that another slice or another package implements says so in the comment of its type: `/** The runs a schedule starts. @filledBy engine/run */`. The name is a package (`@filledBy devices`) or a vertical of one, on disk, and not the slice itself. Such a port has an in-memory twin and no contract suite. One file `adapters/out/in-memory-*.ts` may hold the twins of several of these ports. When the slice that fills the port is in shape, import its barrel in the use case and remove the port. The check does not ask for that.
+
+Twins and contract suites are test code. Production code never imports them. They do not count for the size, folder and nesting rules of section 4.
+
+**P8. A slice calls another slice through its barrel.** The barrel exports the wire function, use cases and types. It never exports a store or a real adapter.
+
+### Tests in a ring
+
+- A test in `domain/` or `application/` keeps the import rules of its ring. It may also import `bun:test` and the `./testing` entry of a kernel package (`@nightshift/time/testing`, `@nightshift/flows/testing`).
+- A use-case test may also import an in-memory twin of any slice of its package. It imports no real adapter, no `testing/` folder, no `@nightshift/db` and no `node:fs`. So it starts no database, folder or process.
+- No `Bun`, `fetch` or `process` in `domain/` and `application/`, tests included. A port type does not write `typeof fetch` either: write the function type.
+- In `domain/`, `application/` and `adapters/in/`, write `import type`. A type written as `import("x").Name` fails, because the import rules do not read that form.
+
+### The names the ring check expects
+
+| Place | File | What the check asks |
+| --- | --- | --- |
+| The slice folder | `wire.ts` | One exported function, `wire` and the folder name in PascalCase: `schedules` gives `wireSchedules`, `run-status` gives `wireRunStatus`. Types are fine too. |
+| `application/` | `ports.ts` | Types only: no value export. |
+| `application/` | `<verb>-<object>.ts` | Lower case with dashes. One exported function with the camelCase name of the file: `answer-gate.ts` exports `answerGate`. Write it as `export function` or as `export const x = (...) => ...`. Types are fine too. |
+| `application/` | `<verb>-<object>.test.ts` | One per use case, beside it. No other test file. |
+| `adapters/out/` | `<tech>-schedule-store.ts` | The real adapter of the port `ScheduleStore`. `<tech>` is any prefix in lower case: `drizzle-`, `flow-document-`, `node-`. |
+| `adapters/out/` | `in-memory-schedule-store.ts` | The twin. It imports `ScheduleStore` from `../../application/ports`. |
+| `adapters/out/` | `schedule-store.contract.ts` | The contract suite. It exports one function, `scheduleStoreContract`, and imports the port. |
+| `adapters/out/` | `schedule-store.contract.test.ts` | It imports the suite, the twin and the real adapter. |
+| `adapters/in/` | `<name>.ts` | It imports nothing of its slice. Its test may. |
+
+The check makes the file name from the port name: `ScheduleStore` is `schedule-store`, `HTTPClient` is `http-client`, `Clock` is `clock`. A port with `@filledBy` that has a real adapter in its own slice fails.
+
+### Bring a slice into shape
+
+1. Read the header of `scripts/check-rings.ts`. It holds the rule text.
+2. Move each rule that needs no I/O into `domain/`. Give it the instant as an argument.
+3. Write `application/ports.ts`: one type for each thing the slice asks of the outside.
+4. If another slice or another package implements a port, write `@filledBy` in its comment.
+5. Write one use case file for each request, in `application/`. Move the check of who may act into it.
+6. Write the test of each use case beside it, on in-memory twins.
+7. Move each call to the database, a folder, a process or the network into a real adapter in `adapters/out/`.
+8. Write the in-memory twin and the contract suite of each port. Run the suite on both adapters.
+9. If a timer or a listener drives the slice, move it to `adapters/in/`.
+10. Write `wire.ts`. Build the real adapters there, and return the use cases bound to their ports.
+11. Export the wire function and the types from the barrel. Remove each store from it.
+12. Call the wire function from the `wire.ts` of the package (in the engine, from `createEngine`).
+13. Keep each old test that goes through `createEngine` until a use-case test with the same assertion passes beside it.
+14. If the slice splits and a new vertical comes of it, add that vertical to `scripts/capabilities.ts` and to `scripts/hexagon-debt.txt`.
+15. Remove the line of the slice from `scripts/hexagon-debt.txt` in the same commit.
+16. Run `bun run check:rings`, `bun scripts/check-verticals.ts`, `bun scripts/check-capabilities.ts` and `bun scripts/check-budgets.ts`.
