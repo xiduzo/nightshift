@@ -2,4 +2,5 @@
 
 export { BaseRefCombobox, StartFromField } from "./base-ref-combobox";
 export { FlowInputFields } from "./flow-input-fields";
-export { PickFlowRunForm, StartRunDialog } from "./start-run-dialog";
+export { PickFlowRunForm } from "./pick-flow-run-form";
+export { StartRunDialog } from "./start-run-dialog";
