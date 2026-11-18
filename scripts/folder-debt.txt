@@ -1,0 +1,18 @@
+# Folder size: a folder holds at most 25 source files directly in it. Tests,
+# generated files and the files of sub-folders do not count.
+# `bun scripts/check-budgets.ts` checks it.
+# Each line is a folder over the limit: its path, and its source files on the
+# day it was listed. The check fails when the folder holds more than that.
+# To get off the list: move the files of one sub-domain into a sub-folder.
+# When the folder holds 25 source files or fewer, remove its line: the check
+# fails a listed folder that is within the limit. Add no line here.
+# `bun scripts/check-budgets.ts --tighten` lowers the numbers to today's.
+apps/mobile/src/features/inbox 27
+apps/web/src/features/agents 29
+apps/web/src/features/flows/editor 32
+apps/web/src/features/flows/editor/inspector 36
+apps/web/src/features/knowledge 28
+apps/web/src/features/runs/components 41
+packages/client/src/runs 32
+packages/engine/src/graph 37
+packages/engine/src/knowledge 34

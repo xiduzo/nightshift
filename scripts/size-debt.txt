@@ -1,0 +1,65 @@
+# File size: a source file has at most 600 lines. Tests and generated files
+# do not count. `bun scripts/check-budgets.ts` checks it.
+# Each line is a file over the limit: its path, and its lines (`wc -l`) on the
+# day it was listed. The check fails when the file has more lines than that.
+# To get off the list: split the file by sub-domain. When it has 600 lines or
+# fewer, remove its line: the check fails a listed file that is within the
+# limit. Add no line here.
+# `bun scripts/check-budgets.ts --tighten` lowers the numbers to today's.
+apps/server/src/features/cli/flows.ts 608
+apps/web/src/features/agents/connections/secrets-card.tsx 743
+apps/web/src/features/agents/setup/agent-setup-dialog.tsx 606
+apps/web/src/features/flows/assistant/agent-picker.tsx 687
+apps/web/src/features/flows/canvas/flow-node.tsx 807
+apps/web/src/features/flows/editor/editor-canvas.tsx 775
+apps/web/src/features/flows/editor/flow-editor.tsx 1084
+apps/web/src/features/flows/editor/inspector/cascade-fields.tsx 714
+apps/web/src/features/flows/editor/lib/flow-layout.ts 912
+apps/web/src/features/flows/schedules/schedule-dialog.tsx 750
+apps/web/src/features/flows/start/start-run-dialog.tsx 797
+apps/web/src/features/runs/transcript/transcript.ts 766
+apps/web/src/features/settings/new-defaults.tsx 807
+packages/agents/src/assistant/suggestion-prompt.ts 666
+packages/agents/src/decider/decider.ts 775
+packages/agents/src/session/step-report.ts 609
+packages/agents/src/session/translate.ts 821
+packages/api/src/dashboard/schemas.ts 869
+packages/api/src/knowledge/router.ts 606
+packages/api/src/runs/schemas.ts 817
+packages/daemon/src/assistant/assistant.ts 906
+packages/daemon/src/daemon.ts 1013
+packages/devices/src/contract/host-contract.ts 860
+packages/devices/src/exchange/host-exchange.ts 728
+packages/devices/src/offers/admission.ts 689
+packages/devices/src/placement/placement.ts 680
+packages/devices/src/wire.ts 777
+packages/devices/src/work/remote.ts 645
+packages/engine/src/dashboard/types.ts 1246
+packages/engine/src/device-config/connections.ts 1178
+packages/engine/src/device-config/settings.ts 848
+packages/engine/src/device/local.ts 902
+packages/engine/src/flows/flow-document.ts 1285
+packages/engine/src/graph/context.ts 620
+packages/engine/src/graph/nodes/agent.ts 933
+packages/engine/src/graph/runner.ts 1207
+packages/engine/src/graph/sleep.ts 640
+packages/engine/src/graph/step-runner.ts 1386
+packages/engine/src/knowledge/folder.ts 691
+packages/engine/src/knowledge/knowledge.ts 781
+packages/engine/src/knowledge/reconcile.ts 632
+packages/engine/src/knowledge/search-store.ts 668
+packages/engine/src/knowledge/search.ts 764
+packages/engine/src/log/events.ts 1105
+packages/engine/src/log/history.ts 773
+packages/engine/src/log/run-state.ts 1470
+packages/engine/src/projects/projects.ts 942
+packages/engine/src/projects/space-rows.ts 638
+packages/engine/src/projects/worktrees.ts 750
+packages/engine/src/read/read-model.ts 1168
+packages/engine/src/run/actions.ts 619
+packages/engine/src/run/engine.ts 1000
+packages/engine/src/schedules/scheduler.ts 665
+packages/flows/src/draft/subflow.ts 1299
+packages/flows/src/flow/migrate.ts 652
+packages/flows/src/nodes/agent.ts 630
+packages/notifications/src/notifier/notifier.ts 822

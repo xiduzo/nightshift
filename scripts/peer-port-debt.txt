@@ -1,0 +1,17 @@
+# Peer ports: PEER_PORTS of scripts/check-verticals.ts gets no new pair of
+# verticals. `bun scripts/check-budgets.ts` checks it.
+# Each line is a peer port of the day this list was frozen: the workspace,
+# the vertical that imports, and the vertical that owns the port file.
+# The check fails on a peer port that is not listed here.
+# To get off the list: move what both verticals need into the lower one, and
+# remove the port from PEER_PORTS. Then remove its line: the check fails a
+# listed pair that PEER_PORTS does not hold. Add no line here.
+apps/web features/agents features/devices
+apps/web features/agents features/settings
+apps/web features/devices features/runs
+apps/web features/devices features/settings
+apps/web features/flows features/dashboard
+apps/web features/flows features/runs
+apps/web features/flows features/settings
+apps/web features/gates features/runs
+apps/web features/projects features/agents
