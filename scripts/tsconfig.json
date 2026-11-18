@@ -1,0 +1,7 @@
+{
+	"extends": "@nightshift/config/tsconfig.base.json",
+	"compilerOptions": {
+		"noEmit": true
+	},
+	"include": ["**/*.ts"]
+}
