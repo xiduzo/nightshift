@@ -9,11 +9,9 @@ import {
 	deviceWaitWords,
 	type GateFacts,
 	gatesWaitingTitle,
-	type InAppChannel,
 	type NoticeWords,
 	type NotificationMessage,
 	needsALookWords,
-	type PushChannels,
 	scheduleMissedWords,
 	titleOf,
 } from "../channels";
@@ -24,16 +22,15 @@ import {
 	scheduleMissedKey,
 	waitingKey,
 } from "../contract";
-import type { Claim, Delivery, DeliveryLog, NoticeKind } from "../deliveries";
+import type { Claim, Delivery, NoticeKind } from "../deliveries";
 import {
 	inQuietHours,
 	type NotificationSettings,
 	pushesUrgency,
-	type SettingsStore,
 } from "../settings";
-import type { PushTarget, TargetStore } from "../targets";
+import type { PushTarget } from "../targets";
 import { createGateTracker } from "./gate-tracker";
-import type { RunEventSource } from "./sources";
+import type { Notifier, NotifierDeps } from "./types";
 import { createWaitTracker, type StartedWait } from "./wait-tracker";
 
 /**
@@ -97,51 +94,6 @@ import { createWaitTracker, type StartedWait } from "./wait-tracker";
  * notifier still sends. Every piece of work runs one after the other, so
  * two landings never race.
  */
-
-export type NotifierDeps = {
-	events: RunEventSource;
-	/** Who may see the runs of the Space. */
-	audience(spaceId: string): Promise<string[]>;
-	/** Every Space on this Replica: their open Gates are the baseline. */
-	spaces(): Promise<string[]>;
-	/** Whether this daemon sends the pushes of the Space (`oneSenderPerSpace`). */
-	sendsFor(spaceId: string): Promise<boolean>;
-	/**
-	 * Whether the Person's role in the Space allows an answer to a Gate.
-	 * Default: nobody, so no push carries a Gate's options.
-	 */
-	mayAnswer?(spaceId: string, personId: string): Promise<boolean>;
-	settings: Pick<SettingsStore, "get">;
-	targets: Pick<TargetStore, "of" | "byIds" | "forget">;
-	deliveries: DeliveryLog;
-	inApp: InAppChannel;
-	push: PushChannels;
-	now?: () => number;
-	/** How often held pushes and the end of quiet hours are checked. Default 15 s. */
-	tickMs?: number;
-	/** Where errors go. Default: the console. */
-	onError?: (message: string, error: unknown) => void;
-};
-
-export type Notifier = {
-	/**
-	 * Listens at once, and reads the open Gates first: the events that land
-	 * meanwhile wait for that read. Resolves once it is done.
-	 */
-	start(): Promise<void>;
-	/** Stops listening and checking. What was held stays in the log. */
-	stop(): void;
-	/** Sends what is due: held pushes, and the end of quiet hours. */
-	tick(): Promise<void>;
-	/**
-	 * A command of the run was kept for the Device that walks it, or that
-	 * Device applied or refused it. Reads the run's Gates again: a Gate
-	 * with an answer on its way closes everywhere now.
-	 */
-	commandsChanged(spaceId: string, runId: string): Promise<void>;
-	/** Resolves once every piece of work so far is done. For tests. */
-	idle(): Promise<void>;
-};
 
 const DEFAULT_TICK_MS = 15_000;
 

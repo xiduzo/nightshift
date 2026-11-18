@@ -16,8 +16,9 @@ import { createTargetStore, type TargetStore } from "../targets";
 import { type FakeRunEvents, fakeRunEvents } from "../testing";
 import { testDatabase } from "../testing/database";
 import { type FakeChannel, fakeChannel } from "../testing/fakes";
-import { createNotifier, type Notifier } from "./notifier";
+import { createNotifier } from "./notifier";
 import { type OpenGateRef, oneSenderPerSpace } from "./sources";
+import type { Notifier } from "./types";
 
 /**
  * The rules of the notifier, on a real database with fake run events and

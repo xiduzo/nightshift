@@ -30,4 +30,4 @@ packages/engine/src/projects/worktrees.ts 750
 packages/engine/src/read/read-model.ts 1168
 packages/engine/src/run/actions.ts 619
 packages/engine/src/run/engine.ts 999
-packages/notifications/src/notifier/notifier.ts 822
+packages/notifications/src/notifier/notifier.ts 774
