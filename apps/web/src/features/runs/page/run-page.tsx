@@ -51,7 +51,7 @@ import {
 	traversalsIn,
 } from "../steps";
 import { RunStory, type StepPick } from "../story";
-import { useRunStream } from "../transcript/use-run-stream";
+import { useRunStream } from "../transcript";
 import { FocusBreadcrumb, StepContext } from "./run-focus";
 import { RunGraph } from "./run-graph";
 import { RunBadges, RunTitle } from "./run-header";

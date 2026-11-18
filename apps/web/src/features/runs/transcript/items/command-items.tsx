@@ -7,9 +7,8 @@ import {
 import { CircleCheckIcon, CircleXIcon } from "lucide-react";
 import { formatTime } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
+import { Terminal, TerminalOutput, type TerminalState } from "../terminal";
 import type { CommandItem, ExitItem, LogItem } from "../transcript-items";
-import { Terminal, type TerminalState } from "./terminal";
-import { TerminalOutput } from "./terminal-output";
 
 /** All a command wrote, in order. */
 function logText(log: LogItem): string {

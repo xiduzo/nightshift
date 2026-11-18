@@ -23,18 +23,19 @@ import { memo } from "react";
 
 import { CodeView } from "@/shared/code";
 import { truncate } from "@/shared/format";
-import { formatToolInput, summarizeToolInput } from "../transcript";
-import type { ToolItem } from "../transcript-items";
 import {
 	isLongOutput,
 	OutputSheet,
+	OutputViews,
 	PREVIEW_CHARS,
 	PREVIEW_LINES,
-} from "./output-sheet";
-import { useStackTrace } from "./parsed-output";
-import { StackTraceView } from "./stack-trace";
-import { Terminal, type TerminalState } from "./terminal";
-import { OutputViews } from "./terminal-output";
+	StackTraceView,
+	Terminal,
+	type TerminalState,
+	useStackTrace,
+} from "../terminal";
+import { formatToolInput, summarizeToolInput } from "../transcript";
+import type { ToolItem } from "../transcript-items";
 
 /** A recognisable icon for each kind of tool. */
 const KIND_ICON: Record<ToolKind, LucideIcon> = {

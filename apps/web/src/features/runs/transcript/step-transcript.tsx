@@ -1,6 +1,7 @@
 /**
  * The transcript of one step: its items in order.
  * Each kind of item has its view in `items/`, one file per group of kinds.
+ * An agent's thoughts, tool calls and subagents have theirs in `tool-calls/`.
  */
 import { walkerName } from "@nightshift/client";
 import type { FlowNode } from "@nightshift/flows";
@@ -24,35 +25,41 @@ import {
 	GateQuestion as GateQuestionText,
 } from "@/features/gates";
 import type { RunSummary, SessionSummary, StepSummary } from "@/shared/api";
-import { CommandExit, CommandLog, CommandRun } from "./items/command-items";
-import { ConvertCard } from "./items/convert-items";
 import {
+	CommandExit,
+	CommandLog,
+	CommandRun,
+	ConvertCard,
 	DecisionAsk,
 	DecisionCard,
+	EndCard,
 	GateQuestion,
 	GateResolved,
-	RuleCard,
-	ValueAsk,
-	ValueCard,
-} from "./items/decision-items";
-import { EndCard } from "./items/end-items";
-import { LeaseCard } from "./items/lease-items";
-import { ItemEnd, ItemStart, ItemsRead } from "./items/list-items";
-import { Reasoning } from "./items/reasoning";
-import { ServiceCard } from "./items/service-items";
-import {
+	ItemEnd,
+	ItemStart,
+	ItemsRead,
+	LeaseCard,
 	MessageBlock,
 	ReportCard,
+	RuleCard,
+	ServiceCard,
 	SessionBoundary,
 	SessionError,
 	SessionFinished,
-} from "./items/session-items";
-import { SinceLastRunCard } from "./items/since-last-run-items";
-import { isSubagentCall, SubagentRun } from "./items/subagent";
-import { ToolCallRow } from "./items/tool-call-row";
-import { ToolCallsGroup } from "./items/tool-calls-group";
-import { WaitCard, WakeMarker } from "./items/wait-items";
-import { WebRequestCard } from "./items/web-request-items";
+	SinceLastRunCard,
+	ValueAsk,
+	ValueCard,
+	WaitCard,
+	WakeMarker,
+	WebRequestCard,
+} from "./items";
+import {
+	isSubagentCall,
+	Reasoning,
+	SubagentRun,
+	ToolCallRow,
+	ToolCallsGroup,
+} from "./tool-calls";
 import type { TranscriptState } from "./transcript";
 import type { TranscriptItem } from "./transcript-items";
 import { type TranscriptRow, transcriptRows } from "./transcript-rows";

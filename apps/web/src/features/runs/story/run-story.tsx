@@ -19,10 +19,7 @@ import { Fragment, type ReactNode, useEffect } from "react";
 import type { Artifact, RunDetail, RunStatus, StepSummary } from "@/shared/api";
 import { formatTime } from "@/shared/format";
 import { type ItemScope, nodeOfStep, stepOutcomeColor } from "../steps";
-import {
-	emptyTranscript,
-	type TranscriptState,
-} from "../transcript/transcript";
+import { emptyTranscript, type TranscriptState } from "../transcript";
 import { StepChapter } from "./step-chapter";
 
 /** A pick of a step: each one scrolls the story to it, also the same step again. */

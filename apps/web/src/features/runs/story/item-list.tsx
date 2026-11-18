@@ -33,7 +33,7 @@ import { JsonDetails } from "@/shared/code";
 import { hoverTime } from "@/shared/format";
 import { Elapsed } from "../status";
 import { type ItemScope, itemsOf, scopeKey } from "../steps";
-import { useOpenedStep } from "../transcript/use-opened-step";
+import { useOpenedStep } from "../transcript";
 
 /**
  * The elements of one Call step with `each`, in the order they started: state, id

@@ -1,5 +1,5 @@
 import { learningNotes } from "@nightshift/flows";
-import type { TranscriptItem } from "../transcript/transcript-items";
+import type { TranscriptItem } from "../transcript";
 
 /**
  * What a step proposed to learn, in the words of the Gate that reviews it
