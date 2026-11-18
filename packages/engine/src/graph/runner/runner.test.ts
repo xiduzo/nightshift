@@ -24,8 +24,9 @@ import {
 	scriptedHarness,
 	waitFor,
 } from "../../testing/test-support";
-import { ENGINE_FAILED, RELEASED, type Runner } from "./runner";
+import type { Runner } from "./runner";
 import { openThread } from "./thread";
+import { ENGINE_FAILED, RELEASED } from "./turn";
 
 /**
  * The runner's one entry, `take(runId, intent)`, and `hold`, on a real

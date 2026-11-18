@@ -27,11 +27,7 @@ import type {
 } from "../graph/context/context";
 import { kindOf } from "../graph/nodes/node-kinds";
 import { createRecorders } from "../graph/recorders/recorders";
-import {
-	createRunner,
-	type Runner,
-	type RunnerDeps,
-} from "../graph/runner/runner";
+import { createRunner, type Runner } from "../graph/runner/runner";
 import {
 	type DriveOutcome,
 	driveGraph,
@@ -41,6 +37,7 @@ import {
 	type Thread,
 	type ThreadDeps,
 } from "../graph/runner/thread";
+import type { RunnerDeps } from "../graph/runner/turn";
 import {
 	heldOf,
 	type Parked,
