@@ -15,7 +15,7 @@ import { useMutation } from "@tanstack/react-query";
 import { ThumbsDown, ThumbsUp } from "lucide-react-native";
 import { useRef, useState } from "react";
 
-import { useHostQueries } from "@/features/host";
+import { useHostQueries } from "@/features/access";
 import {
 	NativeButtonRow,
 	NativeSection,

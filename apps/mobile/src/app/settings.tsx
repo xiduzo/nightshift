@@ -1,4 +1,4 @@
-import { SignedInOnly } from "@/features/host";
+import { SignedInOnly } from "@/features/access";
 import { SettingsScreen } from "@/features/settings";
 
 export default function SettingsRoute() {

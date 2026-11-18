@@ -16,7 +16,7 @@ import * as Notifications from "expo-notifications";
 import * as TaskManager from "expo-task-manager";
 import { AppState, Platform } from "react-native";
 
-import { savedHost } from "@/features/host";
+import { savedHost } from "@/features/access";
 import { updateGlance } from "@/features/widgets";
 import { formatTime } from "@/shared/format";
 import { defineCategories } from "./categories";

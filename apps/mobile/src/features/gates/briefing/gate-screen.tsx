@@ -6,7 +6,7 @@ import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { CircleCheck } from "lucide-react-native";
 import { useState } from "react";
 
-import { useHost } from "@/features/host";
+import { useHost } from "@/features/access";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
 import { Screen } from "@/shared/page";

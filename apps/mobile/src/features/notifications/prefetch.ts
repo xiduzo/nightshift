@@ -8,7 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
 import { useEffect } from "react";
 
-import { useHostQueries } from "@/features/host";
+import { useHostQueries } from "@/features/access";
 import { pushReadsOf } from "./push-data";
 
 /**

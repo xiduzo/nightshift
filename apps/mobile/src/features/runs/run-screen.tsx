@@ -42,8 +42,8 @@ import {
 import { useCallback } from "react";
 import { Platform, View } from "react-native";
 
+import { useHost, useHostQueries } from "@/features/access";
 import { useShareTakeOver } from "@/features/gates";
-import { useHost, useHostQueries } from "@/features/host";
 import { useLockScreenFollow } from "@/features/widgets";
 import { ErrorAlert } from "@/shared/feedback";
 import { formatTime } from "@/shared/format";

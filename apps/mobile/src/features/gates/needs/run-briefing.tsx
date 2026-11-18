@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { CirclePlay, TriangleAlert } from "lucide-react-native";
 import { useEffect, useState } from "react";
 
-import { useSignedIn } from "@/features/host";
+import { useSignedIn } from "@/features/access";
 import { formatTime } from "@/shared/format";
 import { HeaderToolbar } from "@/shared/header";
 import {

@@ -3,7 +3,7 @@ import { CircleStop } from "lucide-react-native";
 import { memo } from "react";
 import { Alert } from "react-native";
 
-import { useSignedIn } from "@/features/host";
+import { useSignedIn } from "@/features/access";
 import { openRun, useRunAct } from "@/features/runs";
 import type { RowAction } from "@/shared/native-list";
 import type { RunLine as Line } from "./agenda";

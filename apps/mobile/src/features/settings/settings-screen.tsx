@@ -1,4 +1,4 @@
-import { PushSection } from "@/features/push";
+import { PushSection } from "@/features/notifications";
 import { NativeList } from "@/shared/native-list";
 import { AccountSection } from "./account-section";
 import { AppearanceSection } from "./appearance-section";

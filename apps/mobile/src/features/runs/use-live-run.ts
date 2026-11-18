@@ -8,7 +8,7 @@ import {
 	useLiveRun,
 } from "@nightshift/client";
 
-import { useSignedIn } from "@/features/host";
+import { useSignedIn } from "@/features/access";
 import { useInFront } from "@/shared/in-front";
 import { useWhileFocused } from "@/shared/refresh";
 

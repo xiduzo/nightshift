@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from "expo-router";
 
-import { SignedInOnly } from "@/features/host";
+import { SignedInOnly } from "@/features/access";
 import { ChangesScreen } from "@/features/runs";
 
 export default function ChangesRoute() {

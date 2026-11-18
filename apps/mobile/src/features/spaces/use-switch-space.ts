@@ -2,7 +2,7 @@ import { spaceChanged } from "@nightshift/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Alert } from "react-native";
 
-import { useSignedIn } from "@/features/host";
+import { useSignedIn } from "@/features/access";
 import { saveSpaceChoice } from "./space-choice";
 
 /**

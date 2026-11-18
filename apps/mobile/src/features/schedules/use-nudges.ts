@@ -8,7 +8,7 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 
-import { useHostQueries, useSignedIn } from "@/features/host";
+import { useHostQueries, useSignedIn } from "@/features/access";
 import { openRun } from "@/features/runs";
 import { type Nudge, problemCopy } from "./schedule-words";
 

@@ -43,7 +43,7 @@ import {
 import { type ReactNode, useEffect, useState } from "react";
 import { Alert, View } from "react-native";
 
-import { useSignedIn } from "@/features/host";
+import { useSignedIn } from "@/features/access";
 import { ErrorAlert } from "@/shared/feedback";
 import type { RunActionKind } from "./run-facts";
 

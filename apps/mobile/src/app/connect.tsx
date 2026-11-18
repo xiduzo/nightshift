@@ -1,3 +1,3 @@
-import { ConnectScreen } from "@/features/host";
+import { ConnectScreen } from "@/features/access";
 
 export default ConnectScreen;

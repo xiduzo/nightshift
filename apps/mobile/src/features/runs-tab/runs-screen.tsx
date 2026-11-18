@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { Platform } from "react-native";
 
-import { useSignedIn } from "@/features/host";
+import { useSignedIn } from "@/features/access";
 import { useTonight } from "@/features/schedules";
 import { useSpaceMenu } from "@/features/spaces";
 import { useClock } from "@/shared/clock";

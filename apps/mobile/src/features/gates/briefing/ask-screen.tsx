@@ -21,7 +21,7 @@ import {
 } from "lucide-react-native";
 import { useState } from "react";
 
-import { useSignedIn } from "@/features/host";
+import { useSignedIn } from "@/features/access";
 import { HeaderToolbar } from "@/shared/header";
 import {
 	NativeButtonRow,

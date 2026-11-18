@@ -2,7 +2,7 @@ import { createSpaceQueries } from "@nightshift/client";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 
-import { useHostQueries, useSignedIn } from "@/features/host";
+import { useHostQueries, useSignedIn } from "@/features/access";
 import { loadSpaceChoice } from "./space-choice";
 import { useSwitchSpace } from "./use-switch-space";
 

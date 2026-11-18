@@ -6,7 +6,7 @@ import {
 } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 
-import { useSignedIn } from "@/features/host";
+import { useSignedIn } from "@/features/access";
 import type { RetrySend } from "./retry";
 
 /** One tap of the mutation cache, as the rows read it. */

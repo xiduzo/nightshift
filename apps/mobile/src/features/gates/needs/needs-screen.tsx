@@ -17,8 +17,8 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
 
-import { useHostQueries, useSignedIn } from "@/features/host";
-import { PushCard } from "@/features/push";
+import { useHostQueries, useSignedIn } from "@/features/access";
+import { PushCard } from "@/features/notifications";
 import { EmptyState } from "@/shared/empty";
 import { ErrorSection } from "@/shared/feedback";
 import { type HeaderItem, TabRootHeader } from "@/shared/header";

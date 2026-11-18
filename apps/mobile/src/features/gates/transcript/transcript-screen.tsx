@@ -22,7 +22,7 @@ import {
 import { memo, useMemo } from "react";
 import { View } from "react-native";
 
-import { useHostQueries } from "@/features/host";
+import { useHostQueries } from "@/features/access";
 import { EmptyState } from "@/shared/empty";
 import { ScreenList } from "@/shared/page";
 import { useWhileFocused } from "@/shared/refresh";

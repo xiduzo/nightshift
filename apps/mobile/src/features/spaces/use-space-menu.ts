@@ -1,7 +1,7 @@
 import { createSpaceQueries } from "@nightshift/client";
 import { useQuery } from "@tanstack/react-query";
 
-import { useHostQueries } from "@/features/host";
+import { useHostQueries } from "@/features/access";
 import type { HeaderItem } from "@/shared/header";
 import { spaceMenu } from "./space-menu";
 import { useSwitchSpace } from "./use-switch-space";

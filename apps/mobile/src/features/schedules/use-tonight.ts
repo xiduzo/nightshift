@@ -6,7 +6,7 @@ import {
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { useHostQueries } from "@/features/host";
+import { useHostQueries } from "@/features/access";
 import { useWhileFocused } from "@/shared/refresh";
 import { offlineNotices, tonightEntries } from "./tonight";
 import { usePendingPauses, useSchedulePlan } from "./use-schedule-plan";

@@ -6,8 +6,8 @@ import { type ReactNode, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 
-import { HostProvider } from "@/features/host";
-import { InFrontBanner, useNotificationTaps } from "@/features/push";
+import { HostProvider } from "@/features/access";
+import { InFrontBanner, useNotificationTaps } from "@/features/notifications";
 import { createQueryClient } from "@/shared/api";
 import { applyKeptAppearance, useThemeColors } from "@/shared/theme";
 import { NAV_THEME } from "./nav-theme";

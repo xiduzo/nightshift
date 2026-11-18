@@ -2,8 +2,8 @@ import Constants from "expo-constants";
 import { Smartphone } from "lucide-react-native";
 import { Alert as NativeAlert } from "react-native";
 
-import { hostLabel, useHost, useSignedIn } from "@/features/host";
-import { removeThisPhone } from "@/features/push";
+import { hostLabel, useHost, useSignedIn } from "@/features/access";
+import { removeThisPhone } from "@/features/notifications";
 import { forgetSpaceChoice } from "@/features/spaces";
 import {
 	NativeButtonRow,

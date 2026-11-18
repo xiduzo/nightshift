@@ -2,8 +2,8 @@ import { CircleUserRound } from "lucide-react-native";
 import { useState } from "react";
 import { Alert as NativeAlert } from "react-native";
 
-import { hostLabel, useHost, useSignedIn } from "@/features/host";
-import { removeThisPhone } from "@/features/push";
+import { hostLabel, useHost, useSignedIn } from "@/features/access";
+import { removeThisPhone } from "@/features/notifications";
 import {
 	NativeButtonRow,
 	NativeRow,

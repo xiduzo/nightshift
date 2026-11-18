@@ -7,7 +7,7 @@ import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { Laptop, Server } from "lucide-react-native";
 
-import { useHostQueries } from "@/features/host";
+import { useHostQueries } from "@/features/access";
 import { OfflineHelp, useTonight } from "@/features/schedules";
 import { useClock } from "@/shared/clock";
 import { EmptyState } from "@/shared/empty";

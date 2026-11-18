@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { Share } from "react-native";
 
-import { useHostQueries } from "@/features/host";
+import { useHostQueries } from "@/features/access";
 
 /**
  * Opens the share sheet with the command that takes a run over by hand.

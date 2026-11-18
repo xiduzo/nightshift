@@ -8,7 +8,7 @@ import {
 import { useEffect, useState } from "react";
 import { Image, View } from "react-native";
 
-import { useSignedIn } from "@/features/host";
+import { useSignedIn } from "@/features/access";
 import { ListGroup, ListRow } from "@/shared/list";
 import { askImageUrl } from "./ask-view";
 

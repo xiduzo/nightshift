@@ -12,7 +12,7 @@ import {
 } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { useHostQueries, useSignedIn } from "@/features/host";
+import { useHostQueries, useSignedIn } from "@/features/access";
 import { useWhileFocused } from "@/shared/refresh";
 import { scheduleKey } from "./tonight";
 

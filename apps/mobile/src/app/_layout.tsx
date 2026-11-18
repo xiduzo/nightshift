@@ -4,7 +4,7 @@ import { Stack } from "expo-router";
 import type { ComponentProps } from "react";
 import { Platform } from "react-native";
 
-import { startPushHandling } from "@/features/push";
+import { startPushHandling } from "@/features/notifications";
 import { AppShell } from "@/shared/shell";
 
 // Before any screen: iOS and Android start the app for a push in the

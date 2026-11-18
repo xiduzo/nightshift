@@ -7,7 +7,7 @@ import {
 import type { JsonValue } from "@nightshift/flows";
 import { useState } from "react";
 
-import { useSignedIn } from "@/features/host";
+import { useSignedIn } from "@/features/access";
 import type { CheckFailure } from "./answer-check";
 import { phoneGateAnswer } from "./gate-via";
 import { checkBeforeAnswer } from "./person-check";

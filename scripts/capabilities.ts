@@ -214,14 +214,14 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		"shared/shell": M,
 	},
 	"apps/mobile": {
+		// This phone's sign-in on its Host, and the session.
+		"features/access": "access",
 		"features/devices": "devices",
 		// The Needs-you inbox, one Gate in full, and the Needs you queue with
 		// the bar that sends an answer.
 		"features/gates": "gates",
-		// This phone's sign-in on its Host, and the session.
-		"features/host": "access",
 		// This phone's notifications.
-		"features/push": "notifications",
+		"features/notifications": "notifications",
 		"features/runs": "runs",
 		// The Runs tab: the runs on their way and tonight's schedules.
 		"features/runs-tab": "runs",

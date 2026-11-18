@@ -7,7 +7,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 
-import { useHostQueries } from "@/features/host";
+import { useHostQueries } from "@/features/access";
 import { formatTime } from "@/shared/format";
 import { updateGlance } from "./update-glance";
 

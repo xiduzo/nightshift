@@ -2,7 +2,7 @@ import type { RunSummary } from "@nightshift/client";
 import { groupStatuses, now as timeNow } from "@nightshift/client";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useSignedIn } from "@/features/host";
+import { useSignedIn } from "@/features/access";
 import { useLeftRuns } from "./left-runs";
 
 /** The statuses of a run that ended before its work was done: failed or stopped. */

@@ -4,7 +4,7 @@ import * as Notifications from "expo-notifications";
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 
-import { type Host, useSignedIn } from "@/features/host";
+import { type Host, useSignedIn } from "@/features/access";
 import { keptStore } from "@/shared/api";
 import { usePushPermission } from "./permission";
 import { targetKeyOf, withRetry } from "./retry";

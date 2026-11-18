@@ -2,7 +2,7 @@ import { createRunQueries, runProgress } from "@nightshift/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
-import { useHostQueries, useSignedIn } from "@/features/host";
+import { useHostQueries, useSignedIn } from "@/features/access";
 import { createFollower } from "./follow";
 import { followedRuns, loadFollowedRuns } from "./followed-runs";
 import { lockScreen } from "./lock-screen";

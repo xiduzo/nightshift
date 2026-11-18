@@ -20,7 +20,7 @@ import {
 import { useCallback, useMemo } from "react";
 import { View } from "react-native";
 
-import { useHostQueries } from "@/features/host";
+import { useHostQueries } from "@/features/access";
 import { ErrorAlert } from "@/shared/feedback";
 import {
 	NativeCustomRow,

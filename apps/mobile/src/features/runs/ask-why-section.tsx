@@ -14,7 +14,7 @@ import {
 } from "lucide-react-native";
 import { memo, useState } from "react";
 
-import { useSignedIn } from "@/features/host";
+import { useSignedIn } from "@/features/access";
 import {
 	NativeButtonRow,
 	NativePickerRow,

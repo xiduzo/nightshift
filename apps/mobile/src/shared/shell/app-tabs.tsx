@@ -2,13 +2,13 @@ import { useFollowHost } from "@nightshift/client";
 import { Redirect, useSegments } from "expo-router";
 import { useEffect } from "react";
 
+import { useHost, useSignedIn } from "@/features/access";
 import {
 	needsTabLabel,
 	useNeedsAccessory,
 	useNeedsCount,
 } from "@/features/gates";
-import { useHost, useSignedIn } from "@/features/host";
-import { phoneNotifications, usePhonePush } from "@/features/push";
+import { phoneNotifications, usePhonePush } from "@/features/notifications";
 import { useRememberedSpace } from "@/features/spaces";
 import {
 	LockScreenRuns,

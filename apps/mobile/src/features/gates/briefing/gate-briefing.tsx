@@ -36,7 +36,7 @@ import {
 } from "lucide-react-native";
 import { Alert } from "react-native";
 
-import { useHostQueries } from "@/features/host";
+import { useHostQueries } from "@/features/access";
 import { HeaderToolbar } from "@/shared/header";
 import {
 	NativeCustomRow,

@@ -5,7 +5,7 @@ import {
 	useLiveRun,
 } from "@nightshift/client";
 
-import { useSignedIn } from "@/features/host";
+import { useSignedIn } from "@/features/access";
 import { useWhileFocused } from "@/shared/refresh";
 
 /** The most entries the sheet keeps: the newest ones. */

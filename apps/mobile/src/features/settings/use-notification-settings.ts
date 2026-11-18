@@ -7,7 +7,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert as NativeAlert } from "react-native";
 
-import { useHostQueries, useSignedIn } from "@/features/host";
+import { useHostQueries, useSignedIn } from "@/features/access";
 
 /** The person's notification settings on the Host, the same on every screen. */
 export function useNotificationSettings() {

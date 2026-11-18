@@ -1,7 +1,7 @@
 import { createGateQueries } from "@nightshift/client";
 import { useQuery } from "@tanstack/react-query";
 
-import { useHostQueries } from "@/features/host";
+import { useHostQueries } from "@/features/access";
 
 /**
  * The open Gates of every Space you are in, oldest first. The live cache
