@@ -1,0 +1,595 @@
+import {
+	canStart,
+	filledInputs,
+	hasFolder,
+	type InputTexts,
+	inputProblem,
+	missingInputs,
+} from "@nightshift/client";
+import {
+	cronError,
+	cronToTimeAndDays,
+	type JsonValue,
+	type Schedule,
+} from "@nightshift/flows";
+import { Button } from "@nightshift/ui/components/button";
+import {
+	DialogClose,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@nightshift/ui/components/dialog";
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldError,
+	FieldGroup,
+	FieldLabel,
+	FieldLegend,
+	FieldSet,
+} from "@nightshift/ui/components/field";
+import { Input } from "@nightshift/ui/components/input";
+import {
+	NativeSelect,
+	NativeSelectOption,
+} from "@nightshift/ui/components/native-select";
+import { Spinner } from "@nightshift/ui/components/spinner";
+import { Switch } from "@nightshift/ui/components/switch";
+import {
+	Tabs,
+	TabsContent,
+	TabsList,
+	TabsTrigger,
+} from "@nightshift/ui/components/tabs";
+import {
+	ToggleGroup,
+	ToggleGroupItem,
+} from "@nightshift/ui/components/toggle-group";
+import { useQuery } from "@tanstack/react-query";
+import { useId, useState } from "react";
+import { useSpaceMachines } from "@/features/devices";
+import { CopyProjectHere, projectQueries } from "@/features/projects";
+import { formatDayTime } from "@/shared/format";
+import { LocalTime } from "@/shared/time";
+import { flowQueries } from "../queries";
+import { BaseRefCombobox, FlowInputFields } from "../start";
+import { hasProject } from "./project-copy";
+import { scheduleQueries } from "./queries";
+import { freeId } from "./schedule-id";
+import type { When } from "./schedule-when";
+import {
+	cronOf,
+	DEFAULT_STOP,
+	DEFAULT_TIME,
+	EVERY_DAY,
+	initialWhen,
+	LATE_CHOICES,
+	WEEK,
+	WEEKDAYS,
+} from "./schedule-when";
+import { WebhookFields, webhookAddress } from "./webhook-fields";
+import {
+	initialWebhook,
+	isTemplate,
+	webhookInputs,
+	webhookProblem,
+} from "./webhook-form";
+
+/** The flow choice of a webhook that starts no flow: it only wakes waiting runs. */
+const NO_FLOW = "-";
+
+/** Stored values as field text: JSON values as pretty JSON. */
+function textsOf(values: Readonly<Record<string, JsonValue>>): InputTexts {
+	const texts: InputTexts = {};
+	for (const [name, value] of Object.entries(values)) {
+		if (value === null) continue;
+		texts[name] =
+			typeof value === "string" ? value : JSON.stringify(value, null, 2);
+	}
+	return texts;
+}
+
+/** What starts the schedule: a time, or a webhook. */
+type Trigger = "times" | "webhook";
+
+export function ScheduleForm({
+	projectId,
+	schedule,
+	flow: firstFlow,
+	takenIds,
+	saving,
+	onSave,
+}: {
+	projectId: string;
+	schedule: Schedule | null;
+	flow?: string;
+	takenIds: readonly string[];
+	saving: boolean;
+	onSave: (schedule: Schedule) => void;
+}) {
+	const id = useId();
+	const list = useQuery(flowQueries.list(projectId));
+	const flowNames = (list.data ?? []).map((flow) => flow.name);
+	const [trigger, setTrigger] = useState<Trigger>(
+		schedule?.webhook ? "webhook" : "times",
+	);
+	const [webhook, setWebhook] = useState(() => initialWebhook(schedule));
+	const [flow, setFlow] = useState(
+		schedule ? (schedule.flow ?? NO_FLOW) : (firstFlow ?? ""),
+	);
+	// No flow: a webhook that only wakes waiting runs.
+	const startsFlow = !(trigger === "webhook" && flow === NO_FLOW);
+	// Until the person picks one: the first flow that runs.
+	const chosen =
+		(flow === NO_FLOW ? "" : flow) ||
+		list.data?.find(canStart)?.name ||
+		flowNames[0] ||
+		"";
+	const [values, setValues] = useState<InputTexts>(() =>
+		textsOf(schedule?.inputs ?? {}),
+	);
+	const [when, setWhen] = useState<When>(() => initialWhen(schedule));
+	const [stop, setStop] = useState(() => ({
+		on: schedule ? schedule.stopAt !== undefined : true,
+		time: schedule?.stopAt ?? DEFAULT_STOP,
+	}));
+	const [baseRef, setBaseRef] = useState(schedule?.baseRef ?? "");
+	const [late, setLate] = useState(
+		schedule?.lateMinutes === undefined ? "" : String(schedule.lateMinutes),
+	);
+	const machines = useSpaceMachines();
+	const project = useQuery(projectQueries.list()).data?.find(
+		(p) => p.id === projectId,
+	);
+	const runsOnMachine = machines?.starter ?? null;
+	// A project without a folder: no copy to wait for, no branch to start from.
+	const withFolder = project ? hasFolder(project) : true;
+	const here = hasProject(runsOnMachine, projectId, withFolder);
+
+	const chosenItem = startsFlow
+		? list.data?.find((item) => item.name === chosen)
+		: undefined;
+	const inputs = chosenItem?.inputs ?? [];
+	const cron = trigger === "times" ? cronOf(when) : null;
+	const cronProblem = cron === null ? null : cronError(cron);
+	const preview = useQuery({
+		...scheduleQueries.preview(cron ?? ""),
+		enabled: cron !== null && cronProblem === null,
+	});
+	const missing = missingInputs(inputs, values);
+	const badInputs = inputs.filter((input) => {
+		const text = values[input.name];
+		if (trigger === "webhook" && text && isTemplate(text)) return false;
+		return inputProblem(input, text) !== null;
+	});
+	const stopInvalid = stop.on && !/^([01]\d|2[0-3]):[0-5]\d$/.test(stop.time);
+	const whenProblem =
+		trigger === "webhook"
+			? webhookProblem(webhook, startsFlow)
+			: cron === null
+				? when.mode === "simple"
+					? "Choose a time and at least one day."
+					: "Enter a cron expression."
+				: cronProblem
+					? `This cron expression is not valid: ${cronProblem}`
+					: null;
+	const problem =
+		startsFlow && chosen === ""
+			? "Choose a flow."
+			: (whenProblem ??
+				(missing.length > 0
+					? `Fill in ${missing.map((input) => input.label || input.name).join(", ")}.`
+					: badInputs.length > 0
+						? `Check the format of ${badInputs.map((input) => input.label || input.name).join(", ")}.`
+						: stopInvalid
+							? "Enter a stop time, for example 07:00."
+							: null));
+
+	const scheduleId =
+		schedule?.id ??
+		freeId(
+			startsFlow
+				? chosen
+				: webhook.signal.name ||
+						(webhook.scorePullRequests ? "pull-requests" : "webhook"),
+			takenIds,
+		);
+
+	const save = () => {
+		if (problem !== null || saving) return;
+		const ref = withFolder ? baseRef.trim() : "";
+		const shared = {
+			id: scheduleId,
+			...(stop.on ? { stopAt: stop.time } : {}),
+			...(ref === "" ? {} : { baseRef: ref }),
+			enabled: schedule?.enabled ?? true,
+		};
+		if (trigger === "times") {
+			if (cron === null) return;
+			onSave({
+				...shared,
+				flow: chosen,
+				inputs: filledInputs(inputs, values),
+				cron,
+				...(late === "" ? {} : { lateMinutes: Number(late) }),
+			});
+			return;
+		}
+		const rule = webhook.when.trim();
+		const key = webhook.signal.key.trim();
+		onSave({
+			...shared,
+			...(startsFlow ? { flow: chosen } : {}),
+			inputs: startsFlow ? webhookInputs(inputs, values) : {},
+			webhook: {
+				secret: `\${${webhook.secret}}`,
+				...(rule === "" ? {} : { when: rule }),
+			},
+			...(webhook.signal.on
+				? {
+						signal: {
+							name: webhook.signal.name,
+							...(key === "" ? {} : { key }),
+						},
+					}
+				: {}),
+			...(webhook.scorePullRequests ? { scorePullRequests: true } : {}),
+		});
+	};
+
+	/** Switches between time-and-days and a cron line, keeping what it can. */
+	const setMode = (mode: When["mode"]) => {
+		if (mode === when.mode) return;
+		if (mode === "cron") {
+			setWhen({ mode: "cron", cron: cron ?? "0 22 * * *" });
+		} else if (when.mode === "cron") {
+			const simple = cronToTimeAndDays(when.cron);
+			setWhen(
+				simple
+					? { mode: "simple", ...simple }
+					: { mode: "simple", time: DEFAULT_TIME, days: EVERY_DAY },
+			);
+		}
+	};
+
+	return (
+		<form
+			className="contents"
+			onSubmit={(event) => {
+				event.preventDefault();
+				save();
+			}}
+		>
+			<DialogHeader>
+				<DialogTitle>{schedule ? "Edit schedule" : "New schedule"}</DialogTitle>
+				<DialogDescription>
+					Choose a flow and when it runs. Night Shift starts it for you.
+				</DialogDescription>
+			</DialogHeader>
+
+			<FieldGroup className="gap-6">
+				<Tabs
+					value={trigger}
+					onValueChange={(value) => setTrigger(value as Trigger)}
+				>
+					<TabsList className="w-full" aria-label="When it starts">
+						<TabsTrigger value="times">At set times</TabsTrigger>
+						<TabsTrigger value="webhook">When a webhook arrives</TabsTrigger>
+					</TabsList>
+				</Tabs>
+
+				<Field
+					data-invalid={
+						(chosenItem !== undefined && !canStart(chosenItem)) || undefined
+					}
+				>
+					<FieldLabel htmlFor={`${id}-flow`}>Flow</FieldLabel>
+					<NativeSelect
+						id={`${id}-flow`}
+						value={startsFlow ? chosen : NO_FLOW}
+						disabled={flowNames.length === 0 && trigger === "times"}
+						className="w-full font-mono"
+						onChange={(event) => setFlow(event.target.value)}
+					>
+						{flowNames.length === 0 ? (
+							<NativeSelectOption value="">No flows yet</NativeSelectOption>
+						) : null}
+						{(list.data ?? []).map((item) => (
+							<NativeSelectOption key={item.name} value={item.name}>
+								{item.name}
+								{canStart(item) ? "" : " (has errors)"}
+							</NativeSelectOption>
+						))}
+						{trigger === "webhook" ? (
+							<NativeSelectOption value={NO_FLOW}>
+								No flow, only wake waiting runs
+							</NativeSelectOption>
+						) : null}
+					</NativeSelect>
+					{chosenItem && !canStart(chosenItem) ? (
+						<FieldError>
+							This flow has errors. Fix them, or the schedule cannot start it.
+						</FieldError>
+					) : null}
+				</Field>
+
+				{trigger === "webhook" && inputs.length > 0 ? (
+					<FieldDescription className="-mb-3">
+						A value can read the webhook, for example{" "}
+						<code className="font-mono">{"{{event.body.number}}"}</code> or{" "}
+						<code className="font-mono">
+							{"{{event.headers.x-github-event}}"}
+						</code>
+						.
+					</FieldDescription>
+				) : null}
+				<FlowInputFields
+					idPrefix={id}
+					inputs={inputs}
+					values={values}
+					onChange={setValues}
+					templates={trigger === "webhook"}
+				/>
+
+				{trigger === "webhook" ? (
+					<WebhookFields
+						idPrefix={id}
+						address={webhookAddress(projectId, scheduleId)}
+						value={webhook}
+						onChange={setWebhook}
+					/>
+				) : null}
+
+				{trigger === "times" ? (
+					<FieldSet className="gap-3">
+						<FieldLegend variant="label" className="mb-0">
+							When
+						</FieldLegend>
+						<Tabs
+							value={when.mode}
+							onValueChange={(mode) => setMode(mode as When["mode"])}
+						>
+							<TabsList className="w-full">
+								<TabsTrigger value="simple">Time and days</TabsTrigger>
+								<TabsTrigger value="cron">Cron</TabsTrigger>
+							</TabsList>
+							<TabsContent value="simple" className="flex flex-col gap-3 pt-1">
+								{when.mode === "simple" ? (
+									<>
+										<div className="flex flex-wrap items-center gap-2">
+											<FieldLabel htmlFor={`${id}-time`} className="sr-only">
+												Start time
+											</FieldLabel>
+											<Input
+												id={`${id}-time`}
+												type="time"
+												value={when.time}
+												className="w-28 font-mono tabular-nums"
+												onChange={(event) =>
+													setWhen({ ...when, time: event.target.value })
+												}
+											/>
+											<span className="text-sm text-muted-foreground">on</span>
+											<div className="ml-auto flex gap-1">
+												<Button
+													type="button"
+													size="sm"
+													variant="ghost"
+													onClick={() => setWhen({ ...when, days: EVERY_DAY })}
+												>
+													Every day
+												</Button>
+												<Button
+													type="button"
+													size="sm"
+													variant="ghost"
+													onClick={() => setWhen({ ...when, days: WEEKDAYS })}
+												>
+													Weekdays
+												</Button>
+											</div>
+										</div>
+										<ToggleGroup
+											multiple
+											variant="outline"
+											size="sm"
+											spacing={0}
+											aria-label="Days"
+											className="w-full"
+											value={when.days.map(String)}
+											onValueChange={(days) =>
+												setWhen({
+													...when,
+													days: days.map(Number).sort((a, b) => a - b),
+												})
+											}
+										>
+											{WEEK.map(({ day, short, long }) => (
+												<ToggleGroupItem
+													key={day}
+													value={String(day)}
+													aria-label={long}
+													className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+												>
+													{short}
+												</ToggleGroupItem>
+											))}
+										</ToggleGroup>
+									</>
+								) : null}
+							</TabsContent>
+							<TabsContent value="cron" className="pt-1">
+								{when.mode === "cron" ? (
+									<Field data-invalid={cronProblem !== null || undefined}>
+										<FieldLabel htmlFor={`${id}-cron`} className="sr-only">
+											Cron expression
+										</FieldLabel>
+										<Input
+											id={`${id}-cron`}
+											value={when.cron}
+											placeholder="0 22 * * 1-5"
+											className="font-mono"
+											autoComplete="off"
+											spellCheck={false}
+											aria-invalid={cronProblem !== null}
+											aria-describedby={`${id}-when`}
+											onChange={(event) =>
+												setWhen({ mode: "cron", cron: event.target.value })
+											}
+										/>
+										<FieldDescription>
+											For example, 0 22 * * 1-5 runs at 22:00 on weekdays. Times
+											are in this computer's time zone.
+										</FieldDescription>
+									</Field>
+								) : null}
+							</TabsContent>
+						</Tabs>
+						<FieldDescription
+							id={`${id}-when`}
+							aria-live="polite"
+							className={cronProblem ? "text-destructive" : undefined}
+						>
+							{cronProblem ? (
+								`Not valid: ${cronProblem}`
+							) : preview.data && preview.data.times.length > 0 ? (
+								<>
+									<span className="text-foreground">
+										{preview.data.description}
+									</span>
+									. Next:{" "}
+									{preview.data.times.map((time, index) => (
+										<span key={time}>
+											{index > 0 ? ", " : null}
+											<LocalTime at={time}>{formatDayTime(time)}</LocalTime>
+										</span>
+									))}
+								</>
+							) : preview.data ? (
+								"This schedule never runs."
+							) : (
+								" "
+							)}
+						</FieldDescription>
+					</FieldSet>
+				) : null}
+
+				<Field
+					orientation="horizontal"
+					data-invalid={stopInvalid || undefined}
+					className="items-start"
+				>
+					<Switch
+						id={`${id}-stop`}
+						checked={stop.on}
+						className="mt-0.5"
+						onCheckedChange={(on) => setStop((current) => ({ ...current, on }))}
+					/>
+					<FieldContent>
+						<FieldLabel htmlFor={`${id}-stop`}>Stop by a set time</FieldLabel>
+						<FieldDescription>
+							{stop.on
+								? `After ${stop.time || "…"}, the run starts no new steps and stops.`
+								: "Each run continues until the flow is done."}
+						</FieldDescription>
+					</FieldContent>
+					<Input
+						type="time"
+						value={stop.time}
+						disabled={!stop.on}
+						aria-label="Stop time"
+						aria-invalid={stopInvalid}
+						className="w-28 shrink-0 font-mono tabular-nums"
+						onChange={(event) =>
+							setStop({ on: true, time: event.target.value })
+						}
+					/>
+				</Field>
+
+				{trigger === "times" ? (
+					<Field>
+						<FieldLabel htmlFor={`${id}-late`}>Start late up to</FieldLabel>
+						<NativeSelect
+							id={`${id}-late`}
+							value={late}
+							className="w-full"
+							onChange={(event) => setLate(event.target.value)}
+						>
+							{LATE_CHOICES.map((choice) => (
+								<NativeSelectOption key={choice.minutes} value={choice.minutes}>
+									{choice.label}
+								</NativeSelectOption>
+							))}
+							{LATE_CHOICES.some((choice) => choice.minutes === late) ? null : (
+								<NativeSelectOption value={late}>
+									{late} minutes
+								</NativeSelectOption>
+							)}
+						</NativeSelect>
+						<FieldDescription>
+							When Night Shift is off at the start time, the run starts once it
+							is back within this time. Later, you get a notification instead.
+						</FieldDescription>
+					</Field>
+				) : null}
+
+				{machines ? (
+					<Field data-invalid={!here || undefined}>
+						{!here && runsOnMachine?.thisDevice && project ? (
+							<CopyProjectHere project={project} />
+						) : !here ? (
+							<FieldError>
+								{runsOnMachine?.name} does not have this project. The schedule
+								cannot start until it does.
+							</FieldError>
+						) : runsOnMachine?.online === false ? (
+							<FieldError>
+								{runsOnMachine.name} is offline now. The run cannot start until
+								it is back.
+							</FieldError>
+						) : (
+							<FieldDescription>
+								{machines.starterIsHost
+									? `Runs on ${machines.starter.name}, the Host, at its time.`
+									: "Night Shift starts the run here at its time."}
+							</FieldDescription>
+						)}
+					</Field>
+				) : null}
+
+				{withFolder ? (
+					<Field>
+						<FieldLabel htmlFor={`${id}-base`}>
+							Start from
+							<span className="font-normal text-muted-foreground">
+								(optional)
+							</span>
+						</FieldLabel>
+						<BaseRefCombobox
+							id={`${id}-base`}
+							projectId={projectId}
+							value={baseRef}
+							placeholder="The current branch"
+							onChange={setBaseRef}
+						/>
+					</Field>
+				) : null}
+			</FieldGroup>
+
+			<DialogFooter className="items-center">
+				{problem ? (
+					<p className="text-xs text-muted-foreground sm:mr-auto">{problem}</p>
+				) : null}
+				<DialogClose render={<Button variant="outline" type="button" />}>
+					Cancel
+				</DialogClose>
+				<Button type="submit" disabled={problem !== null || saving}>
+					{saving ? <Spinner data-icon="inline-start" /> : null}
+					{saving ? "Saving…" : schedule ? "Save" : "Add schedule"}
+				</Button>
+			</DialogFooter>
+		</form>
+	);
+}
