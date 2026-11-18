@@ -94,7 +94,7 @@ const DIFF_WORD: Record<DiffMark, string> = {
 export type FlowCanvasNode = Node<FlowNodeData, FlowNodeType>;
 
 /** Where the input handle sits, from the top: level with the icon tile.
- *  `flow-layout.ts` routes edges to the same spot. */
+ *  `layout/layout-graph.ts` routes edges to the same spot. */
 const INPUT_Y = 26;
 /** The id's largest size in the overview: two lines and the icon fit in a
  *  card with one outcome. */

@@ -9,7 +9,7 @@ import {
 import { cn } from "@nightshift/ui/lib/utils";
 import { CheckIcon, CircleAlertIcon, SaveIcon } from "lucide-react";
 
-/** Undo or Redo in the header, with its keys in the tooltip. */
+/** Where the draft stands against the saved flow. */
 type SaveState = "saved" | "unsaved" | "saving" | "failed" | "blocked";
 
 const saveLooks: Record<

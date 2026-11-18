@@ -4,24 +4,26 @@
 // down, ports in a fixed order, labels that need room and loops to route
 // around the nodes. That is not a few lines of our own code.
 //
-// Three steps, each its own function:
+// Three steps, each its own function in its own file:
 //
-// 1. `flowGraph` turns the flow into a `LayoutGraph`: nodes with their
-//    handles as ports, one edge per node pair, the model order that tells
-//    ELK which edges loop back, and the flow's Sections as groups. A folded
-//    Section is one node: its members go, and their edges end on its box.
-// 2. `elkGraph` turns a `LayoutGraph` into ELK's JSON for one candidate
-//    (left to right, top to bottom, or wrapped into rows), and `readLayout`
-//    reads ELK's answer back into boxes and routes.
-// 3. `layoutBest` lays out every candidate and keeps the one whose nodes
-//    show biggest when fitted to the viewport.
+// 1. `flowGraph` (`layout-graph.ts`) turns the flow into a `LayoutGraph`:
+//    nodes with their handles as ports, one edge per node pair, the model
+//    order that tells ELK which edges loop back, and the flow's Sections as
+//    groups. A folded Section is one node: its members go, and their edges
+//    end on its box.
+// 2. `elkGraph` (`elk-graph.ts`) turns a `LayoutGraph` into ELK's JSON for
+//    one candidate (left to right, top to bottom, or wrapped into rows), and
+//    `readLayout` (`read-layout.ts`) reads ELK's answer back into boxes and
+//    routes.
+// 3. `layoutBest` (`layout-best.ts`) lays out every candidate and keeps the
+//    one whose nodes show biggest when fitted to the viewport.
 //
 // An open Section is a compound node with `hierarchyHandling:
 // SEPARATE_CHILDREN`: ELK lays out its members first, always left to right,
 // then the top level in the candidate's direction. In that mode an edge
-// that crosses a frame gets no route, so `splitEdges` cuts it in up to
-// three pieces: node to a port on the frame (inside), port to port (top
-// level), port to node (inside the other Section). `readLayout` joins the
+// that crosses a frame gets no route, so `splitEdges` (`elk-graph.ts`) cuts
+// it in up to three pieces: node to a port on the frame (inside), port to
+// port (top level), port to node (inside the other Section). `readLayout` joins the
 // pieces back into one route under the edge's own id. Loops keep their
 // `back` hint on the top-level piece, or ELK may put a later Section first
 // (research §5.1).
