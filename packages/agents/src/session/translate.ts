@@ -55,69 +55,42 @@
  * plan) show as a `todo_list` call: the list as `{items}` in its input
  * while the agent works, each update a new `tool-end` that replaces it.
  *
- * Over 600 lines on purpose: the translator is one state machine over one
- * stream, and the failure texts it sorts belong with it. What one harness
- * reads in its raw messages is in that harness's profile.
+ * The translator is one state machine over one stream. What it reads and
+ * sorts is in the files beside it: the fields of a chunk (`ag-ui-chunk.ts`),
+ * the failure texts (`failure.ts`), and how it reads one harness
+ * (`harness-profile.ts`). What one harness reads in its raw messages is in
+ * that harness's profile.
  */
 
-import { Refusal } from "@nightshift/refusal";
 import type {
 	AgentErrorKind,
 	AgentEvent,
 	AgentUsage,
-	SessionLimit,
 	StepReportSpec,
 } from "../port";
 import {
+	type AgUiChunk,
+	isErrorResult,
+	toolInput,
+	toolName,
+	usageFromChunk,
+} from "./ag-ui-chunk";
+import {
+	errorEvent,
+	failureKind,
+	PROCESS_EXIT,
+	parseLegacyResetAt,
+	thrownText,
+	thrownWords,
+} from "./failure";
+import type { HarnessProfile, SdkSignals } from "./harness-profile";
+import { asString, isRecord } from "./raw-value";
+import { isReportTool, reportRules, type StepReport } from "./step-report";
+import {
 	isRefusedReport,
-	isReportTool,
 	parseStepReport,
 	parseTextReport,
-	reportRules,
-	type StepReport,
-} from "./step-report";
-
-/** The AG-UI chunk shape this module reads. Every field is checked at runtime. */
-export type AgUiChunk = { type: string; [key: string]: unknown };
-
-type UsageLimit = { message: string; resetAt?: number };
-
-/** What the raw harness messages say about how the session ended. */
-export type SdkSignals = {
-	/** An assistant message reported a rate or usage limit. */
-	usageLimit?: UsageLimit;
-	/** An assistant message reported an API error that means the network or the service is down. */
-	networkError?: string;
-	/** Reset time of the last `rate_limit_event` with status `rejected`. */
-	rejectedResetAt?: number;
-	/** The result message reported a failure. */
-	resultError?: string;
-	/** Usage from the result message, a fallback for RUN_FINISHED usage. */
-	resultUsage?: AgentUsage;
-	/**
-	 * The harness stopped the session at a limit the session set: its turn
-	 * limit, or its budget (Claude Code's `error_max_turns` and
-	 * `error_max_budget_usd`). The session finishes with that limit.
-	 */
-	limit?: SessionLimit;
-	/** What the session has used so far, while it runs: a running total. */
-	liveUsage?: AgentUsage;
-	/** The `result` text of the result message: the final assistant text. */
-	resultText?: string;
-	/**
-	 * The harness's turn is over (OpenCode: the prompt call returned). The
-	 * translator settles: the session can end without waiting for the
-	 * adapter's RUN_FINISHED.
-	 */
-	done?: boolean;
-	/**
-	 * Tool inputs by call id, read from the raw messages (the last one wins).
-	 * They win over the input of the adapter's TOOL_CALL_END.
-	 */
-	toolInputs?: Readonly<Record<string, unknown>>;
-	/** Text message ids that are not assistant text (OpenCode echoes the prompt). */
-	hiddenTextIds?: ReadonlySet<string>;
-};
+} from "./step-report-parse";
 
 export type FinishInput = {
 	/** The caller aborted the session. Wins over every other outcome. */
@@ -125,108 +98,6 @@ export type FinishInput = {
 	/** The chunk stream threw instead of ending. */
 	thrown?: unknown;
 };
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-export function asString(value: unknown): string | undefined {
-	return typeof value === "string" ? value : undefined;
-}
-
-export function asNumber(value: unknown): number | undefined {
-	return typeof value === "number" && Number.isFinite(value)
-		? value
-		: undefined;
-}
-
-/** Claude Code reports reset times in epoch seconds. Accept milliseconds too. */
-export function toEpochMs(value: number): number {
-	return value < 1e12 ? value * 1000 : value;
-}
-
-/**
- * A usage or primary rate limit: the account is out of usage for now. Ported
- * from `LIMITED` in `night-shift.py`, plus Claude Code's own wording.
- */
-const USAGE_LIMIT_TEXT =
-	/usage limit|session limit|weekly limit|hit your (?:\w+ )?limit|limit reached|out of (?:extra )?usage|rate.?limit|\b429\b|too many requests|quota/i;
-
-/**
- * The service cannot be reached: DNS, refused or reset connections, timeouts,
- * TLS, HTTP 5xx, and GitHub's secondary rate limit (a short back-off, not an
- * exhausted account). Ported from `OFFLINE` in `night-shift.py` (without its
- * own "did not finish in" timeout text), plus the wording of Claude Code's API
- * errors (`API Error: 529 …`, `Connection error.`, `Request timed out.`),
- * Bun's fetch errors as OpenCode reports them (`Unable to connect`), Codex's
- * (`stream disconnected …`, `error sending request …`), and Node's socket
- * error codes.
- */
-const NETWORK_TEXT = new RegExp(
-	[
-		"error connecting to",
-		"could not resolve host",
-		"no such host",
-		"name resolution",
-		"network is (?:unreachable|down)",
-		"connection (?:refused|reset|timed out|closed|error)",
-		"operation timed out",
-		"request timed out",
-		"i/o timeout",
-		"tls handshake",
-		"unexpected eof",
-		"remote end hung up",
-		"socket hang up",
-		"fetch failed",
-		"unable to connect",
-		"socket connection was closed",
-		"stream disconnected",
-		"error sending request",
-		"\\bHTTP 5\\d\\d\\b",
-		"\\bapi error\\W{0,3}5\\d\\d\\b",
-		"bad gateway",
-		"service unavailable",
-		"gateway time-?out",
-		"overloaded",
-		"secondary rate.?limit",
-		"\\b(?:ECONNREFUSED|ECONNRESET|ECONNABORTED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ENETUNREACH|ENETDOWN|EHOSTUNREACH|EPIPE|ConnectionRefused)\\b",
-	].join("|"),
-	"i",
-);
-
-/** GitHub's secondary rate limit says "rate limit" but is a network wait. */
-const SECONDARY_RATE_LIMIT = /secondary rate.?limit/i;
-
-/** Older Claude Code versions end the message with `|<epoch seconds>`. */
-const LEGACY_RESET = /\|(\d{10,13})\s*$/;
-
-/**
- * What a failure text says about why the harness stopped: `usage-limit`,
- * `network`, or undefined for any other failure. A secondary rate limit is
- * `network`; a usage limit, a primary rate limit, a 429, or a quota is
- * `usage-limit`, also when the text mentions the network too.
- */
-export function failureKind(
-	text: string,
-): "usage-limit" | "network" | undefined {
-	if (SECONDARY_RATE_LIMIT.test(text)) return "network";
-	if (USAGE_LIMIT_TEXT.test(text)) return "usage-limit";
-	if (NETWORK_TEXT.test(text)) return "network";
-	return undefined;
-}
-
-export function isUsageLimitText(text: string): boolean {
-	return failureKind(text) === "usage-limit";
-}
-
-export function isNetworkText(text: string): boolean {
-	return failureKind(text) === "network";
-}
-
-export function parseLegacyResetAt(text: string): number | undefined {
-	const match = LEGACY_RESET.exec(text);
-	return match?.[1] === undefined ? undefined : toEpochMs(Number(match[1]));
-}
 
 /** Same tokens and cost: a `usage` event would tell nothing new. */
 function sameUsage(a: AgentUsage | undefined, b: AgentUsage): boolean {
@@ -241,64 +112,6 @@ function sameUsage(a: AgentUsage | undefined, b: AgentUsage): boolean {
 	);
 }
 
-function usageFromChunk(chunk: AgUiChunk): AgentUsage | undefined {
-	const metadata = isRecord(chunk.metadata) ? chunk.metadata : undefined;
-	const tanstack =
-		metadata && isRecord(metadata.tanstack) ? metadata.tanstack : undefined;
-	const usage = isRecord(chunk.usage)
-		? chunk.usage
-		: tanstack && isRecord(tanstack.usage)
-			? tanstack.usage
-			: undefined;
-	if (!usage) return undefined;
-	const details = isRecord(usage.providerUsageDetails)
-		? usage.providerUsageDetails
-		: undefined;
-	const costUsd = details ? asNumber(details.totalCostUsd) : undefined;
-	const prompt = isRecord(usage.promptTokensDetails)
-		? usage.promptTokensDetails
-		: undefined;
-	const cacheReadTokens = prompt ? asNumber(prompt.cachedTokens) : undefined;
-	const cacheWriteTokens = prompt
-		? asNumber(prompt.cacheWriteTokens)
-		: undefined;
-	return {
-		inputTokens: asNumber(usage.promptTokens) ?? 0,
-		outputTokens: asNumber(usage.completionTokens) ?? 0,
-		...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
-		...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
-		...(costUsd !== undefined ? { costUsd } : {}),
-	};
-}
-
-function toolInput(chunk: AgUiChunk): unknown {
-	if ("input" in chunk && chunk.input !== undefined) return chunk.input;
-	const metadata = isRecord(chunk.metadata) ? chunk.metadata : undefined;
-	const tanstack =
-		metadata && isRecord(metadata.tanstack) ? metadata.tanstack : undefined;
-	return tanstack?.input ?? {};
-}
-
-function toolName(chunk: AgUiChunk): string | undefined {
-	const metadata = isRecord(chunk.metadata) ? chunk.metadata : undefined;
-	const tanstack =
-		metadata && isRecord(metadata.tanstack) ? metadata.tanstack : undefined;
-	return (
-		asString(chunk.toolCallName) ??
-		asString(chunk.toolName) ??
-		asString(tanstack?.toolCallName) ??
-		asString(tanstack?.toolName)
-	);
-}
-
-function isErrorResult(chunk: AgUiChunk): boolean {
-	if (chunk.state === "output-error") return true;
-	const metadata = isRecord(chunk.metadata) ? chunk.metadata : undefined;
-	const tanstack =
-		metadata && isRecord(metadata.tanstack) ? metadata.tanstack : undefined;
-	return tanstack?.state === "output-error";
-}
-
 /** The tool name of a to-do list the harness keeps itself: Codex's, and an ACP agent's plan. */
 export const TODO_LIST = "todo_list";
 
@@ -307,115 +120,6 @@ const PLAN_CALL_ID = "plan";
 
 /** The result the adapter synthesizes for a call the run never resolved. */
 const INTERRUPTED_RESULT = JSON.stringify({ status: "interrupted" });
-
-/**
- * The adapter's report that the harness program itself failed: its exit
- * code and the tail of its error output. A crash, not the harness's own
- * words, so it is sorted like a throw.
- */
-const PROCESS_EXIT = /^Agent process exited with code \d+/;
-
-/** The error output of a program the system could not find or start. */
-const NOT_STARTED = /\bENOENT\b|command not found|No such file or directory/i;
-
-/** The text of an error the chunk stream threw: what the failure checks read, never what a person sees. */
-function thrownText(error: unknown, label: string): string {
-	if (error instanceof Error && error.message) return error.message;
-	if (typeof error === "string" && error) return error;
-	return `${label} session failed`;
-}
-
-/**
- * What a person sees for an error the chunk stream threw. A refusal keeps
- * its words: Night Shift wrote them for people (a secret that is not
- * saved, a harness that cannot use connections). Any other throw is a
- * failure: plain words for its kind, and the error goes to the log.
- */
-function thrownWords(
-	error: unknown,
-	label: string,
-	kind: AgentErrorKind,
-): string {
-	if (error instanceof Refusal) return error.message;
-	console.error(`[agents] the ${label} session failed:`, error);
-	if (kind === "usage-limit") return `${label} reached its usage limit.`;
-	if (kind === "network") return `${label} lost its connection.`;
-	if (error instanceof Error && NOT_STARTED.test(error.message)) {
-		return `${label} did not start. Check that it is installed on this computer.`;
-	}
-	return `${label} stopped with an error. Night Shift saved the details. Try again.`;
-}
-
-function errorEvent(
-	kind: AgentErrorKind,
-	message: string,
-	resetAt?: number,
-): AgentEvent {
-	return {
-		type: "error",
-		kind,
-		message,
-		...(resetAt !== undefined ? { resetAt } : {}),
-	};
-}
-
-/** How a translator reads one harness: its name, session event, and raw messages. */
-export type HarnessProfile = {
-	/** The harness name in error texts, for example "Claude Code". */
-	label: string;
-	/** The name of the adapter's CUSTOM event that carries the session id. */
-	sessionEvent: string;
-	/**
-	 * A fresh fold of the raw messages into signals, one per session (it may
-	 * keep state). Claude Code's is `observeSdkMessage`.
-	 */
-	createObserver: () => (signals: SdkSignals, message: unknown) => SdkSignals;
-	/**
-	 * Report `resultUsage` instead of the RUN_FINISHED usage: the harness's
-	 * own total over every step of the turn.
-	 */
-	usageFromSignals?: boolean;
-	/**
-	 * The adapter's TOOL_CALL_END carries no input yet (OpenCode opens a call
-	 * on its first, empty update). Emit `tool-end` with the result instead,
-	 * with the input from `toolInputs`.
-	 */
-	toolInputFromSignals?: boolean;
-	/**
-	 * The report tool's name in the harness's allow rules and tool calls,
-	 * when it is not `report_step` (Claude Code: `mcp__tanstack__report_step`).
-	 */
-	reportToolId?: string;
-	/** The same for the artifact tool (`mcp__tanstack__save_artifact`). */
-	artifactToolId?: string;
-	/**
-	 * A fresh reader of the raw messages for the events the chunks do not
-	 * carry, one per session: a subagent's message (each event with
-	 * `parentToolCallId`), an update of a to-do list. It returns no events
-	 * for any other message.
-	 */
-	createEventReader?: () => (message: unknown) => AgentEvent[];
-	/**
-	 * The name of the adapter's CUSTOM event that carries the agent's plan
-	 * (ACP's `plan` update, `{entries}`). Each plan replaces the whole list:
-	 * it shows as one `todo_list` call per session.
-	 */
-	planEvent?: string;
-	/**
-	 * The name of any other bridged tool in the harness's allow rules, when
-	 * the harness asks before it runs one (Claude Code: `mcp__tanstack__<name>`).
-	 */
-	bridgedToolId?: (name: string) => string;
-	/**
-	 * The tool calls a harness ran inside another tool, read from that tool's
-	 * result. OpenCode 2.x runs MCP tools inside its `execute` tool, so the
-	 * stream never names `report_step`: a completed nested report counts as
-	 * the step report. `name` is the bridged tool's own name (`report_step`).
-	 */
-	nestedToolCalls?: (
-		content: unknown,
-	) => { name: string; input: unknown; failed: boolean }[];
-};
 
 export type Translator = {
 	/** Translate one AG-UI chunk. Returns the events to emit now. */

@@ -23,7 +23,8 @@ import {
 	foldContributions,
 	type PermissionMode,
 } from "../port";
-import { reportInputSchema, reportRules } from "../session/step-report";
+import { reportRules } from "../session/step-report";
+import { reportInputSchema } from "../session/step-report-tool";
 import { fakeBin } from "../testing/fixtures/bin";
 import {
 	KNOWLEDGE_INDEX_INTRO,

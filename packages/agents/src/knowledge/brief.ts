@@ -6,7 +6,8 @@
  * Device folds like any other. The text the others read:
  * - `tools.ts`: the tools' names, descriptions and fields. It keeps what the
  *   tools answer at a call, next to the code that decides that answer.
- * - `session/step-report.ts`: the rule and the field for `learnings`.
+ * - `session/step-report-prompt.ts` and `session/step-report-tool.ts`: the
+ *   rule and the field for `learnings`.
  * - the engine's `knowledge/folder.ts`: the first line of `INDEX.md`. It keeps
  *   the format of the lines under it.
  * - `nightshift mcp` in `apps/server`: its sentences about the knowledge. It

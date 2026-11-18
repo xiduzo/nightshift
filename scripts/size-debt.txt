@@ -21,8 +21,6 @@ apps/web/src/features/runs/transcript/transcript.ts 766
 apps/web/src/features/settings/new-defaults.tsx 807
 packages/agents/src/assistant/suggestion-prompt.ts 666
 packages/agents/src/decider/decider.ts 775
-packages/agents/src/session/step-report.ts 609
-packages/agents/src/session/translate.ts 821
 packages/api/src/dashboard/schemas.ts 869
 packages/api/src/knowledge/router.ts 606
 packages/api/src/runs/schemas.ts 817

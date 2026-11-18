@@ -13,7 +13,7 @@ import {
 	sessionEnvironment,
 	sessionReport,
 } from "./adapter-session";
-import type { SdkSignals } from "./translate";
+import type { SdkSignals } from "./harness-profile";
 
 let cwd: string;
 

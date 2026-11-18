@@ -2,23 +2,29 @@ import { describe, expect, test } from "bun:test";
 import type { StepReportSpec } from "../port/types";
 import {
 	DEFAULT_RULES,
+	REPORT_TOOL_NAME,
+	type ReportRules,
+	reportRules,
+	type StepReport,
+} from "./step-report";
+import {
 	INVALID_DATA_TEXT,
 	isRefusedReport,
 	parseStepReport,
 	parseTextReport,
-	REPORT_ACK,
-	REPORT_TOOL_NAME,
-	type ReportRules,
-	reportInputSchema,
-	reportRules,
-	reportStepTool,
-	type StepReport,
+} from "./step-report-parse";
+import {
 	stepReportSetup,
 	TEXT_REPORT_INSTRUCTION,
 	TOOL_REPORT_INSTRUCTION,
 	textReportInstruction,
 	toolReportInstruction,
-} from "./step-report";
+} from "./step-report-prompt";
+import {
+	REPORT_ACK,
+	reportInputSchema,
+	reportStepTool,
+} from "./step-report-tool";
 
 /** A harness's own name for the report tool, as Claude Code has one. */
 const REPORT_TOOL_ID = "mcp__tanstack__report_step";

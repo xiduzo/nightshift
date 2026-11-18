@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { now } from "@nightshift/time";
 import type { AgentEvent, AgentSessionInput } from "../../port/types";
-import type { SdkSignals } from "../../session/translate";
+import type { SdkSignals } from "../../session/harness-profile";
 import { fakeBin } from "../../testing/fixtures/bin";
 import { fakeKnowledgeTools } from "../../testing/knowledge-tools";
 import {

@@ -34,13 +34,11 @@ import {
 	shellQuoteAlways,
 } from "../port";
 import { ARTIFACT_INSTRUCTION, saveArtifactTool } from "./artifact-tool";
+import type { HarnessProfile } from "./harness-profile";
 import { streamSession } from "./session-stream";
-import { reportStepTool, stepReportSetup } from "./step-report";
-import {
-	createTranslator,
-	type HarnessProfile,
-	type Translator,
-} from "./translate";
+import { stepReportSetup } from "./step-report-prompt";
+import { reportStepTool } from "./step-report-tool";
+import { createTranslator, type Translator } from "./translate";
 
 /** A TanStack AI server tool, as `chat({ tools })` takes it. */
 export type SessionTool = NonNullable<
@@ -49,7 +47,7 @@ export type SessionTool = NonNullable<
 
 /**
  * The session knobs of one harness: what `harnessSession` must know that
- * differs per harness. Translation knobs live in `profile` (`translate.ts`).
+ * differs per harness. Translation knobs live in `profile` (`harness-profile.ts`).
  */
 export type HarnessSpec = {
 	/** How the translator reads this harness's stream. */
