@@ -10,19 +10,11 @@ import { commandNode } from "@nightshift/flows/testing";
 import type { ElkNode } from "elkjs/lib/elk-api.js";
 
 import { groupEdges } from "../edges/edge-groups";
+import { type ElkLayout, elkGraph, SECTION_PADDING } from "./elk-graph";
 import featureFactory from "./fixtures/feature-factory.json";
-import {
-	type Box,
-	type ElkLayout,
-	elkGraph,
-	flowGraph,
-	type LaidFlow,
-	layoutFlow,
-	readLayout,
-	SECTION_PADDING,
-	sectionNodeId,
-	walk,
-} from "./flow-layout";
+import { type LaidFlow, layoutFlow } from "./flow-layout";
+import { type Box, flowGraph, sectionNodeId, walk } from "./layout-graph";
+import { readLayout } from "./read-layout";
 
 // elkjs in this thread. Bun defines `self`, so elkjs would look for a Web
 // Worker: hide it while elkjs loads.

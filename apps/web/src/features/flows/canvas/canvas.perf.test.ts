@@ -3,7 +3,7 @@ import { FLOW_VERSION, type Flow } from "@nightshift/flows";
 import { commandNode } from "@nightshift/flows/testing";
 import { groupEdges } from "./edges/edge-groups";
 import { canvasEdges } from "./edges/outcome-edge";
-import { flowGraph, walk } from "./layout/flow-layout";
+import { flowGraph, walk } from "./layout/layout-graph";
 
 /**
  * Scale of the canvas build, before React Flow draws it. Four times the

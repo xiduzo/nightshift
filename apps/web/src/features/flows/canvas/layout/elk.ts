@@ -2,7 +2,7 @@
 // runs in a Web Worker: the page stays responsive while it lays out.
 
 import type { ElkNode } from "elkjs/lib/elk-api.js";
-import type { ElkLayout } from "./flow-layout";
+import type { ElkLayout } from "./elk-graph";
 
 let loading: Promise<ElkLayout> | undefined;
 
