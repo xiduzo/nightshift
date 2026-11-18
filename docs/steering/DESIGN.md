@@ -221,7 +221,7 @@ example, a Gate is a fallback or an approval before an act that cannot be
 undone, not a review of every result.
 
 **In code.** A field component takes an optional `description` and renders
-nothing without it (`apps/web/src/features/settings/components/setting-fields.tsx`).
+nothing without it (`apps/web/src/features/settings/form/setting-fields.tsx`).
 No empty `FieldDescription` or `ItemDescription` in the DOM. Copy that
 comes from a package (harness notes, run end reasons, flow issues) follows
 the same rules: fix it at its source, not in the app.

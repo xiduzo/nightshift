@@ -141,7 +141,7 @@ Every app and every package except `ui`, `ui-native` and `config` is cut into ve
 
 - A vertical is a folder named with a domain word from `docs/glossary.md`: `runs/`, `gates/`, `schedules/`, `projects/`.
 - Its `index.ts` is a barrel. The barrel is the **only** public surface of the vertical. A barrel holds only import and export statements. So does a package's root `index.ts`. Code goes in a file of the vertical.
-- Code outside the vertical imports from the barrel only. A deep import into another vertical (`features/runs/components/run-list`) is an error.
+- Code outside the vertical imports from the barrel only. A deep import into another vertical (`features/runs/list/run-list`) is an error.
 - Inside the vertical, code uses relative imports and may reach any file.
 - A vertical holds everything about its domain: components, hooks, query options, types, utilities, constants and tests.
 - **No kind folder inside a vertical, at any depth (V7).** No folder named `components`, `hooks`, `lib`, `types`, `queries` or `mutations`. The names `utils`, `helpers`, `common` and `misc` fail as catch-all names (below). A small vertical stays flat. A big vertical splits into sub-verticals by sub-domain (below). A capability of a server package has only the ring folders (section 9).
@@ -173,7 +173,7 @@ When you add, move, rename or remove a vertical, change `VERTICALS` in the same 
 A folder inside a vertical that has its own `index.ts` is a **sub-vertical**, at every depth. The barrel rules hold at every depth:
 
 - Code outside a sub-vertical imports only its barrel. Inside it, files reach each other freely.
-- From inside the vertical, the outermost barrel guards. `flows/page.ts` does not import `./editor/inspector`, also when `inspector/` has a barrel: it imports `./editor`.
+- From inside the vertical, the outermost barrel guards. `flows/flow-page.tsx` does not import `./editor/inspector`, also when `inspector/` has a barrel: it imports `./editor`.
 - From another vertical, the import goes through the barrel of the vertical, as before.
 - The barrel of a sub-vertical holds only import and export statements. Every name on it has a production importer outside the sub-vertical. Tests may deep-import, and they do not count as importers.
 
@@ -248,28 +248,29 @@ apps/web/src/
     shell/                 the app frame (AppShell): theme, sidebar, toasts, the notifications stream, the tab badge
     format/  time/  code/  data-table/  media-query/   other named cross-cutting pieces, each with a barrel
   features/
-    <vertical>/            projects, flows, runs, gates, agents, devices, notifications, settings, spaces, access, dashboard
+    <vertical>/            access, spaces, projects, agents, devices, notifications, settings, flows, gates, runs, dashboard, knowledge, spend
       index.ts             the barrel: the only public surface
       queries.ts           query and mutation option factories, polling rules
       <name>-page.tsx      the page a route renders
       types.ts             this vertical's slice of the API types, when contract.ts is not enough
       <sub-domain>/        a sub-vertical with its own index.ts, when the vertical is big (section 4). Never a kind folder
-    flows/                 canvas/ (+ viewer/ the last output on each node), editor/ (+ add-node/ the node grid, its catalog and the recent nodes, inspector/ one file per node type, io/, lib/, test-run/ the pins and skips of a test run and the node menu), start/ (Start run and Test, the flow's inputs), schedules/ (a flow's schedules and webhooks)
-    runs/                  components/ (+ run-page.tsx, details/), hooks/, lib/, transcript/ (+ items/ per group of item kinds)
-    settings/              settings-page.tsx, components/ (one file per card), hooks/use-settings-form.ts
-    agents/                connections/ (MCP servers, CLI tools and secrets, in Settings)
+    flows/                 canvas/ (nodes/, edges/, outcomes/, layout/, sections/, viewer/ the last output on each node), editor/ (add-node/ the node grid, its catalog and the recent nodes, inspector/ one file per node type and a sub-vertical per group of fields, session/, draft/, revisions/, sections/), assistant/, chat/, start/ (Start run and Test, the flow's inputs), schedules/ (a flow's schedules and webhooks), test-run/ (the pins and skips of a test run and the node menu), move/ (copy, import, save as a file)
+    runs/                  page/ (run-page.tsx), list/, status/, steps/, story/ (a chapter per step), transcript/ (items/ per group of item kinds, tool-calls/, terminal/), details/, files/, variables/, report/, actions/, ask/, quick-run/
+    settings/              settings-page.tsx, form/ (use-settings-form.ts and the fields the cards share), usage/, and one sub-vertical per page: builtin/, runs/, computer/, you/
+    agents/                page/ (the Agents pages of Settings), catalog/, setup/, harnesses/, profiles/, models/, connections/ (MCP servers), cli-tools/, secrets/, key-values/
+    knowledge/             layout/ (the frame of every Knowledge page), search/, and one sub-vertical per page: overview/, files/, sources/, review/, questions/, map/
     gates/                 inbox/ (the Needs-you inbox)
-    notifications/         the stream (use-notification-stream.ts: the live cache follows the Host, with this browser's adapter in browser-notifications.ts), this browser's Web Push (browser.ts, with public/sw.js), components/ (the notification settings and screens cards)
+    notifications/         the stream (use-notification-stream.ts: the live cache follows the Host, with this browser's adapter in browser-notifications.ts), this browser's Web Push (browser.ts, with public/sw.js), settings/ (the notification settings and screens cards)
 ```
 
-Some verticals in this tree hold kind folders (`components/`, `hooks/`, `lib/`). They are older than the rule of section 4, and `scripts/kind-folder-debt.txt` lists each one. A new kind folder fails.
+No vertical in this tree holds a kind folder (`components/`, `hooks/`, `lib/`). `scripts/kind-folder-debt.txt` is empty, so a new kind folder fails.
 
 Imports point one way, so no barrel closes a cycle. Biome's `noImportCycles` fails a cycle through barrels too. `scripts/check-verticals.ts` fails a cycle between verticals that has type-only imports in it.
 
 - Routes and `router.tsx` may import any vertical, through its barrel.
 - `shared/shell` composes the features. It is the wiring of the app on the capability map (section 4). It is the only shared piece that imports a feature. No feature and no other shared piece imports it. Only the routes and the entry files do. The check enforces this, tests included.
 - The other shared pieces import no feature (checked, tests included). Every feature may use them. When a shared piece needs a feature's rule, `router.tsx` passes it in. Example: `createQueryClient` takes `sendToAccess` from `access`, which sends a refused session to sign in.
-- The features, from the bottom: `access`, `spaces`, `projects`, `agents`, then `flows`, `devices`, `gates`, `runs`, then `notifications`, then `settings` and `dashboard`. A feature imports only features below it. The notifications stream follows the Host for every page, so `notifications` sits above the pages it keeps live. The Settings page shows projects, flows, runs, agent defaults and the notification settings, so `settings` sits above them.
+- The features, from the bottom: `access`, `spaces`, `projects`, `agents`, `devices`, then `notifications` and `settings`, then `flows`, `gates`, `runs`, `dashboard`, then `knowledge` and `spend`. A feature imports only features below it. `notifications` imports no feature, and the inbox and the Settings page show its parts. The Settings page shows the agents, this computer and the notification settings, so `settings` sits above them. The flow editor reads the settings, so `flows` sits above `settings`.
 - Data can go the other way. Examples: the flow editor reads the settings, and the inbox lists runs. A vertical below the owner of the data imports the owner's `queries.ts` through a peer port (`scripts/check-verticals.ts`), not its barrel. A `queries.ts` imports only `shared/api`, so the port closes no cycle. The check fails on a port that imports another feature. The ports today:
   - `agents`, `flows` and `devices` read `settings/queries`.
   - `gates` reads `runs/queries`.
@@ -299,32 +300,34 @@ apps/mobile/src/
     api/                   the auth client per Host, the Host address, the transport (expo/fetch + cookie), the query client (app focus, network), the reads kept between starts
     page/  empty/          the screen body (Screen: the one scroll view under the native header, a summary line) and the empty state
     feedback/              ErrorAlert and ErrorSection (on a native list page): what went wrong on a screen, and how to try again
-    format/  time/          a time of day (formatTime); TimeText shows it and gives the screen reader the UTC time. The time now for "12 min ago" (useNow), costs and the words of "5 min ago" come from @nightshift/client
+    format/  clock/        a time of day (formatTime), and times that keep current on one shared ticker (useClock). Costs and the words of "5 min ago" come from @nightshift/client
     in-front/              whether the app is in front (useInFront): the streams follow only then
     refresh/               reading a screen again: on focus and on pull-down (useScreenRefresh)
     theme/                 useThemeColors: the light or dark colors for props that take a color
     tone/                  the status map, pure: tone, icon name and word of a run status, a step, a step kind
     status/                StatusBadge and StatusText: a tone drawn with its icon and word
     list/                  ListGroup, ListRow: lists in a card
-    match/                 matching a typed query, pure: its words, and the Gates that hold them all (the Inbox search and Search)
-    header/  avatar/       the native header's actions (HeaderToolbar on Stack.Toolbar), its search field (HeaderSearch) and AvatarButton; InitialsAvatar
-    chips/                 filter chips (ChipRail, Chip)
+    markdown/              text an agent or a flow wrote, as Markdown (Markdown, CodeBlock)
+    header/  avatar/       the native header's actions (HeaderToolbar on Stack.Toolbar) and the header of a tab's first screen (TabRootHeader). InitialsAvatar
     trail/                 a run's steps as a timeline (StepTrail)
     native-list/           a page as a native grouped list: SwiftUI on iOS, Jetpack Compose on Android (NativeList, NativeSection and the rows)
     shell/                 the app frame (AppShell), the tabs (AppTabs: native tabs on iOS, JS tabs on Android), the bar above the tabs (AccessoryBar: what waits, and Send) and the stack of each tab (TabStack: large titles)
   features/
-    host/                  sign-in (address, the Host code, two-factor or backup code), the session, useHostQueries
+    access/                sign-in (address, the Host code, two-factor or backup code), the session, useHostQueries
     spaces/                the Space menu in the header of Runs, the Space remembered per Host
-    glance/                the glances outside the app: the home screen widget (Gates that wait, the latest runs) and a run followed on the lock screen (Live Activity, Android ongoing notification), on expo-widgets
-    push/                  notifications on this phone: the permission card, the Expo push token registered with the Host, the categories and Android channels, the lock-screen buttons and withdraws (background task), the banner in front and the live cache's adapter (phoneNotifications), where a tap goes
+    widgets/               the glances outside the app: the home screen widget (Gates that wait, the latest runs) and a run followed on the lock screen (Live Activity, Android ongoing notification), on expo-widgets
+    notifications/         notifications on this phone: the permission card, the Expo push token registered with the Host, the categories and Android channels, the lock-screen buttons and withdraws (background task), the banner in front and the live cache's adapter (phoneNotifications), where a tap goes
+    gates/                 inbox/ (the Needs-you inbox), briefing/ (one Gate in full), answer/, transcript/, actions/ (the "More" sheet), needs/ (the Needs you tab: the queue of everything that waits)
+    runs/                  one run live with its steps, Gates and actions, and the files it changed
+    schedules/             what runs tonight, with Pause tonight, Undo pause and Run now
     devices/               the person's computers and whether each can run a flow now (the Computers sheet)
-    dashboard/             how each flow did, or each project over every Space (the Flows sheet)
-    home/  inbox/  runs/  projects/  start/  search/  settings/
+    runs-tab/              the Runs tab: the runs on their way and the schedules of tonight
+    settings/
 ```
 
 - The phone UI and its building blocks are in `docs/research/mobile.md`, "Phone UI". A block composes React Native Reusables pieces and tokens. A new block goes in a new named `shared/<name>/`, or in its vertical when only that vertical uses it.
 
-- The features, from the bottom: `host`, `spaces`, `glance`, `push`, `devices`, then the tabs. `shared/shell` composes them, as on the web. `push` sits below the screens because the inbox and Settings show its card. The shell gives its adapter (`phoneNotifications`) to the live cache (`useFollowHost`). `glance` sits below `push` because the background task of a push updates the widget.
+- The features, from the bottom: `access`, `spaces`, `widgets`, `notifications`, `gates`, `runs`, `schedules`, then `devices`, `runs-tab` and `settings`. `shared/shell` composes them, as on the web. `notifications` sits below the screens because Needs you and Settings show its card. The shell gives its adapter (`phoneNotifications`) to the live cache (`useFollowHost`). `widgets` sits below `notifications` because the background task of a push updates the widget.
 - `app/_layout.tsx` calls `startPushHandling()` in its module scope. iOS and Android start the app for a push in the background, and the background task must be defined before any screen renders.
 - A screen takes query options from `@nightshift/client` on the Host's client: `useHostQueries(createRunQueries)`. The phone keeps no module-level `orpc`, because its client changes with the Host. A mutation is the procedure's own options on that client: `host.orpc.runs.stop.mutationOptions()`.
 - Words and rules that both apps show come from `@nightshift/client` or the `flows` root, never from a copy of a web file. Only the look (icons, colors, layout) belongs to the phone.
@@ -379,7 +382,7 @@ When code must break a rule for a while, add an entry here: the rule it breaks, 
 
 | Rule | Files | Until |
 | --- | --- | --- |
-| The clock (`scripts/check-time.ts`) | The lock-screen widget builds a `Date` for the native timer (`apps/mobile/src/features/glance/lock-screen.ios.tsx`). Its `widget` function cannot import a Night Shift package. `scripts/time-debt.txt` lists that file. | the widget timer takes an instant |
+| The clock (`scripts/check-time.ts`) | The lock-screen widget builds a `Date` for the native timer (`apps/mobile/src/features/widgets/lock-screen.ios.tsx`). Its `widget` function cannot import a Night Shift package. `scripts/time-debt.txt` lists that file. | the widget timer takes an instant |
 
 The rules of 2026-11-18 (sections 4 and 9) each started with a **debt list**: a file in `scripts/` that names what broke the rule on that day. The lists are `scripts/hexagon-debt.txt` (the rings), `capability-debt.txt` (V1, V2, V5), `size-debt.txt` and `folder-debt.txt` (V6), `barrel-debt.txt` (V4), `nesting-debt.txt` (V3), `kind-folder-debt.txt` (V7) and `peer-port-debt.txt` (V8). Each list only gets shorter: never add a line, and never raise a number. A line leaves when its code is clean: the check then fails and names the line, and you remove it in that change. For the three lists with numbers (size, folder, barrel), `bun scripts/check-budgets.ts --tighten` lowers each number to the number of today and removes the clean lines. One case adds a line: when a listed vertical of a server package splits, the new vertical gets a line on `scripts/hexagon-debt.txt`. It gets its place on the capability map in the same commit.
 
