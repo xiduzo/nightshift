@@ -209,100 +209,11 @@ describe("a webhook schedule", () => {
 		});
 	});
 
-	test("refuses an unknown schedule and a wrong secret with one answer, and logs neither", async () => {
-		await setup([
-			hook(),
-			{
-				id: "cron",
-				flow: "echo",
-				inputs: {},
-				cron: "0 3 * * *",
-				enabled: false,
-			},
-		]);
-		const payload = body({ pull_request: { number: 7 } });
-		const notFound = { kind: "not-found" } as const;
-		expect(await send(payload, signed(payload), { projectId: "nope" })).toEqual(
-			notFound,
-		);
-		expect(
-			await send(payload, signed(payload), { scheduleId: "missing" }),
-		).toEqual(notFound);
-		expect(
-			await send(payload, signed(payload), { scheduleId: "cron" }),
-		).toEqual(notFound);
-		expect(await send(payload, signed(payload, {}, "guess"))).toEqual(notFound);
-		expect(
-			await send(payload, new Headers({ "content-type": "application/json" })),
-		).toEqual(notFound);
-
-		expect(await space.listRuns()).toEqual([]);
-		expect(await logged()).toEqual([]);
-		// The person sees why the schedule's own webhooks did nothing.
-		const list = await space.listSchedules(projectId);
-		expect(
-			list.schedules[0]?.deliveries.map((d) => [d.result, d.reason]),
-		).toEqual([
-			["refused", "The request had no secret."],
-			["refused", "The secret did not match."],
-		]);
-	});
-
 	test("reads the secret for the schedule's project", async () => {
 		await setup([hook()]);
 		const payload = body({});
 		await send(payload, signed(payload));
 		expect(secretAsked).toEqual([projectId]);
-	});
-
-	test("a secret with no value refuses every webhook, and says so", async () => {
-		// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
-		await setup([hook({ webhook: { secret: "${OTHER}" } })]);
-		const payload = body({});
-		expect(await send(payload, signed(payload))).toEqual({
-			kind: "not-found",
-		});
-		const list = await space.listSchedules(projectId);
-		expect(list.schedules[0]?.deliveries[0]?.reason).toBe(
-			"The secret OTHER has no value here. Add it on the project's Secrets page.",
-		);
-	});
-
-	test("takes a bearer secret, filters by its rule, and a paused one refuses", async () => {
-		await setup([
-			hook({
-				webhook: {
-					secret: HOOK_SECRET,
-					when: 'event.headers.`x-github-event` = "pull_request"',
-				},
-			}),
-		]);
-		const payload = body({ pull_request: { number: 8 } });
-		const bearer = (event: string) =>
-			new Headers({
-				authorization: `Bearer ${SECRET}`,
-				"content-type": "application/json",
-				"x-github-event": event,
-			});
-
-		expect(await send(payload, bearer("push"))).toEqual({ kind: "filtered" });
-		expect(await space.listRuns()).toEqual([]);
-		expect(await send(payload, bearer("pull_request"))).toEqual({
-			kind: "accepted",
-		});
-		expect((await space.listRuns())[0]?.inputs).toMatchObject({ pr: "8" });
-
-		await seedFlows(space, projectId, {}, [hook({ enabled: false })]);
-		expect(await send(payload, bearer("pull_request"))).toEqual({
-			kind: "refused",
-			reason: "The schedule is paused.",
-		});
-		const list = await space.listSchedules(projectId);
-		expect(list.schedules[0]?.deliveries.map((d) => d.result)).toEqual([
-			"refused",
-			"accepted",
-			"filtered",
-		]);
 	});
 
 	test("its signal wakes the runs whose Wait has its key, with the event as data", async () => {

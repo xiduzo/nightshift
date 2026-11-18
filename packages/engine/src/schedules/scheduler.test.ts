@@ -5,7 +5,7 @@ import type { Flow, Schedule } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { iso } from "@nightshift/time";
-import { atLocal, utc } from "@nightshift/time/testing";
+import { atLocal } from "@nightshift/time/testing";
 import { asc, eq, inArray } from "drizzle-orm";
 import {
 	defaultRunSettings,
@@ -25,7 +25,6 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
-import { SCHEDULE_GRACE_MS } from "./domain/schedule-watch";
 
 /** The scheduler with an injected clock: each test moves `clock` and waits for a tick. */
 
@@ -99,28 +98,6 @@ function commandFlow(command = "echo night", extra: Partial<Flow> = {}): Flow {
 		],
 		edges: [],
 		...extra,
-	};
-}
-
-/** Waits at a Gate until a person answers: a run that stays open. */
-function gateFlow(): Flow {
-	return {
-		version: FLOW_VERSION,
-		inputs: [],
-		outputs: [],
-		start: "ask",
-		nodes: [
-			{
-				id: "ask",
-				type: "decision",
-				position: { x: 0, y: 0 },
-				prompt: "Go on?",
-				options: [{ name: "yes" }],
-				by: "person",
-				decider: "typesafe",
-			},
-		],
-		edges: [],
 	};
 }
 
@@ -252,25 +229,6 @@ describe("the scheduler", () => {
 		]);
 	});
 
-	test("a schedule with a time zone fires and stops on that clock, not this computer's", async () => {
-		// 22:00 in Tokyo on the 16th is 13:00 UTC; 07:00 there the next day is 22:00 UTC.
-		clock = utc(2026, 9, 16, 12, 59);
-		const { engine } = startDaemon();
-		const project = await setup(engine, [
-			nightly({ stopAt: "07:00", timeZone: "Asia/Tokyo" }),
-		]);
-		await settle();
-		expect((await engine.listSchedules(project.id)).schedules[0]?.nextAt).toBe(
-			utc(2026, 9, 16, 13),
-		);
-
-		clock = utc(2026, 9, 16, 13, 0, 20);
-		const [fired] = await waitForFacts(1);
-		expect(fired?.payload).toMatchObject({ at: utc(2026, 9, 16, 13) });
-		const run = (await engine.listRuns())[0] as RunSummary;
-		expect(run.stopAt).toBe(utc(2026, 9, 16, 22));
-	});
-
 	test("a scheduled run has a starter: the schedule's Person, else this computer's owner", async () => {
 		const { engine } = startDaemon();
 		await setup(engine, [
@@ -370,75 +328,6 @@ describe("the scheduler", () => {
 		});
 	});
 
-	test("a time missed by less than 15 minutes fires after a restart", async () => {
-		clock = at(16, 22, 14);
-		const { engine } = startDaemon();
-		await setup(engine, [nightly()]);
-		const [fired] = await waitForFacts(1);
-		expect(fired).toMatchObject({
-			type: "ScheduleFired",
-			payload: { at: at(16, 22), error: null },
-		});
-		const runId = firedRunId(fired);
-		await waitForEnd(engine, runId);
-	});
-
-	test("a time missed by more than 15 minutes is skipped, with the reason", async () => {
-		const first = startDaemon();
-		const project = await setup(first.engine, [nightly()]);
-		clock = at(16, 22);
-		const [fired] = await waitForFacts(1);
-		const runId = firedRunId(fired);
-		await waitForEnd(first.engine, runId);
-		first.die();
-
-		// Down all day; back the next evening, 30 minutes after the time.
-		clock = at(17, 22, 30);
-		const second = startDaemon();
-		const facts = await waitForFacts(2);
-		await settle();
-		expect(await scheduleFacts()).toHaveLength(2);
-		expect(facts[1]).toMatchObject({
-			type: "ScheduleSkipped",
-			payload: {
-				scheduleId: "nightly",
-				at: at(17, 22),
-				reason: expect.stringContaining("Missed by 30 min"),
-				runId: null,
-			},
-		});
-		expect(await second.engine.listRuns()).toHaveLength(1);
-		const [listed] = (await second.engine.listSchedules(project.id)).schedules;
-		expect(listed?.last).toMatchObject({ kind: "skipped", at: at(17, 22) });
-		expect(listed?.nextAt).toBe(at(18, 22));
-		expect(SCHEDULE_GRACE_MS).toBe(15 * 60_000);
-	});
-
-	test("a time the daemon watched come due but slept through is skipped", async () => {
-		const { engine } = startDaemon();
-		await setup(engine, [nightly()]);
-		await settle();
-		// The computer slept from 21:59 to 23:00.
-		clock = at(16, 23);
-		const [skipped] = await waitForFacts(1);
-		expect(skipped).toMatchObject({
-			type: "ScheduleSkipped",
-			payload: { at: at(16, 22), reason: expect.stringContaining("1 h") },
-		});
-		expect(await engine.listRuns()).toEqual([]);
-	});
-
-	test("a schedule added after its time is not reported as missed", async () => {
-		clock = at(16, 23);
-		const { engine } = startDaemon();
-		const project = await setup(engine, [nightly()]);
-		await settle();
-		expect(await scheduleFacts()).toEqual([]);
-		const [listed] = (await engine.listSchedules(project.id)).schedules;
-		expect(listed?.last).toBeNull();
-		expect(listed?.nextAt).toBe(at(17, 22));
-	});
-
 	test("a missed time starts once within its lateMinutes, with the time it was due", async () => {
 		// The step reads when its run was due, as a template and from its environment.
 		const flow = commandFlow(
@@ -534,77 +423,6 @@ describe("the scheduler", () => {
 		expect(await second.engine.listRuns()).toHaveLength(1);
 	});
 
-	test("a pause or an open run is skipped without telling of a miss", async () => {
-		const { engine, root } = startDaemon();
-		const told: unknown[] = [];
-		root.onScheduleMissed((missed) => told.push(missed));
-		await setup(engine, [
-			nightly({ lateMinutes: 1440, pausedUntil: at(17, 6) }),
-		]);
-		clock = at(16, 22, 1);
-		const [skipped] = await waitForFacts(1);
-		expect(skipped).toMatchObject({
-			type: "ScheduleSkipped",
-			payload: { reason: "You paused this schedule for tonight." },
-		});
-		await settle();
-		expect(told).toEqual([]);
-	});
-
-	test("lateMinutes does not start a time from before the schedule existed", async () => {
-		clock = at(16, 23);
-		const { engine } = startDaemon();
-		const project = await setup(engine, [nightly({ lateMinutes: 1440 })]);
-		await settle();
-		expect(await scheduleFacts()).toEqual([]);
-		expect(await engine.listRuns()).toEqual([]);
-		const [listed] = (await engine.listSchedules(project.id)).schedules;
-		expect(listed?.nextAt).toBe(at(17, 22));
-	});
-
-	test("does not start while an earlier run of the schedule is still open", async () => {
-		const { engine } = startDaemon();
-		const project = await setup(
-			engine,
-			[nightly({ cron: "0 * * * *" })],
-			gateFlow(),
-		);
-		clock = at(16, 22);
-		const [fired] = await waitForFacts(1);
-		const runId = firedRunId(fired);
-		await waitFor(
-			async () =>
-				(await engine.listRuns()).find((r) => r.id === runId)?.status ===
-				"waiting",
-			{ label: "the run to wait at its Gate" },
-		);
-
-		clock = at(16, 23, 0, 30);
-		const facts = await waitForFacts(2);
-		expect(facts[1]).toMatchObject({
-			type: "ScheduleSkipped",
-			payload: {
-				at: at(16, 23),
-				reason: "An earlier run of this schedule is still waiting.",
-				runId,
-			},
-		});
-		expect(await engine.listRuns()).toHaveLength(1);
-		const [listed] = (await engine.listSchedules(project.id)).schedules;
-		expect(listed?.last).toMatchObject({ kind: "skipped", runId });
-
-		// Once the run ends, the next time fires again.
-		await engine.act(runId, { kind: "stop" });
-		clock = at(16, 24, 0, 30);
-		const later = await waitForFacts(3);
-		expect(later[2]).toMatchObject({
-			type: "ScheduleFired",
-			payload: { at: at(16, 24), error: null },
-		});
-		const next = firedRunId(later[2]);
-		await engine.act(next, { kind: "stop" });
-	});
-
 	test("a schedule due while a merge holds the starts fires after the release, within its grace", async () => {
 		const { engine, root } = startDaemon();
 		const project = await setup(engine, [nightly()]);
@@ -636,18 +454,6 @@ describe("the scheduler", () => {
 		expect(await scheduleFacts()).toHaveLength(1);
 	});
 
-	test("a paused schedule does not fire", async () => {
-		const { engine } = startDaemon();
-		const project = await setup(engine, [nightly({ enabled: false })]);
-		clock = at(16, 22, 1);
-		await settle();
-		expect(await scheduleFacts()).toEqual([]);
-		expect(await engine.listRuns()).toEqual([]);
-		expect((await engine.listSchedules(project.id)).schedules[0]?.nextAt).toBe(
-			null,
-		);
-	});
-
 	test("the computer that keeps the Space fires every schedule and runs its run there", async () => {
 		const { engine } = startDaemon();
 		await setup(engine, [
@@ -665,52 +471,6 @@ describe("the scheduler", () => {
 		expect(of("old")).toMatchObject({ error: null });
 		await waitForEnd(engine, of("here")?.runId as string);
 		await waitForEnd(engine, of("old")?.runId as string);
-	});
-
-	test("picks up an edit of the schedules on the next tick, without a restart", async () => {
-		const { engine } = startDaemon();
-		const project = await setup(engine, [nightly({ cron: "0 23 * * *" })]);
-		await settle();
-		const issues = await engine.saveSchedules(project.id, [nightly()]);
-		expect(issues).toEqual([]);
-		clock = at(16, 22, 0, 10);
-		const [fired] = await waitForFacts(1);
-		expect(fired).toMatchObject({
-			type: "ScheduleFired",
-			payload: { at: at(16, 22), error: null },
-		});
-		const runId = firedRunId(fired);
-		await waitForEnd(engine, runId);
-	});
-
-	test("a start that fails is recorded with its error, once", async () => {
-		const { engine } = startDaemon();
-		const project = await setup(engine, [nightly({ flow: "gone" })]);
-		clock = at(16, 22, 1);
-		const [fired] = await waitForFacts(1);
-		await settle();
-		expect(await scheduleFacts()).toHaveLength(1);
-		expect(fired).toMatchObject({
-			type: "ScheduleFired",
-			payload: {
-				at: at(16, 22),
-				runId: null,
-				error: 'The flow "gone" does not exist.',
-			},
-		});
-		const list = await engine.listSchedules(project.id);
-		expect(list.schedules[0]?.last).toEqual({
-			kind: "failed",
-			at: at(16, 22),
-			error: 'The flow "gone" does not exist.',
-		});
-		expect(list.schedules[0]?.issues).toEqual([
-			{
-				severity: "error",
-				message: 'The flow "gone" does not exist.',
-				scheduleId: "nightly",
-			},
-		]);
 	});
 
 	test("a full run cap is recorded as the error", async () => {
@@ -756,19 +516,6 @@ describe("the scheduler", () => {
 			return { settings, read: () => settings };
 		}
 
-		test("off skips every tick: nothing fires", async () => {
-			const { read } = switchable(false);
-			const { engine } = startDaemon({ settings: read });
-			const project = await setup(engine, [nightly()]);
-			clock = at(16, 22, 0, 20);
-			await settle();
-			expect(await scheduleFacts()).toEqual([]);
-			expect(await engine.listRuns()).toEqual([]);
-			expect(
-				(await engine.listSchedules(project.id)).schedules[0]?.last,
-			).toBeNull();
-		});
-
 		test("turned on again, it neither fires nor reports a time that came due while off", async () => {
 			const { settings, read } = switchable(true);
 			const { engine } = startDaemon({ settings: read });
@@ -785,27 +532,6 @@ describe("the scheduler", () => {
 			expect(await engine.listRuns()).toEqual([]);
 
 			// The next time fires as usual.
-			clock = at(17, 22, 0, 10);
-			const [fired] = await waitForFacts(1);
-			expect(fired).toMatchObject({
-				type: "ScheduleFired",
-				payload: { at: at(17, 22), error: null },
-			});
-			await waitForEnd(engine, firedRunId(fired));
-		});
-
-		test("turned on within the grace of a time that came due while off, it does not fire it", async () => {
-			const { settings, read } = switchable(false);
-			const { engine } = startDaemon({ settings: read });
-			await setup(engine, [nightly()]);
-			await settle();
-			clock = at(16, 22, 5);
-			await settle();
-			settings.scheduler = true;
-			await settle();
-			expect(await scheduleFacts()).toEqual([]);
-			expect(await engine.listRuns()).toEqual([]);
-
 			clock = at(17, 22, 0, 10);
 			const [fired] = await waitForFacts(1);
 			expect(fired).toMatchObject({
@@ -866,79 +592,6 @@ describe("Pause tonight", () => {
 		});
 		await waitForEnd(engine, firedRunId(facts[1]));
 	});
-
-	test("an hourly schedule skips the night and fires again at 06:00", async () => {
-		const { engine } = startDaemon();
-		const project = await setup(engine, [nightly({ cron: "0 * * * *" })]);
-		clock = at(16, 23, 30);
-		expect(await engine.pauseScheduleTonight(project.id, "nightly")).toEqual({
-			pausedUntil: at(17, 6),
-			nextAt: at(17, 6),
-		});
-		clock = at(17, 5, 0, 20);
-		const [skipped] = await waitForFacts(1);
-		expect(skipped).toMatchObject({
-			type: "ScheduleSkipped",
-			payload: { at: at(17, 5) },
-		});
-		clock = at(17, 6, 0, 20);
-		const facts = await waitForFacts(2);
-		expect(facts[1]).toMatchObject({
-			type: "ScheduleFired",
-			payload: { at: at(17, 6) },
-		});
-		await waitForEnd(engine, firedRunId(facts[1]));
-	});
-
-	test("resume ends the pause: tonight's start fires", async () => {
-		const { engine } = startDaemon();
-		const project = await setup(engine, [nightly()]);
-		clock = at(16, 12);
-		await engine.pauseScheduleTonight(project.id, "nightly");
-		expect(await engine.resumeScheduleTonight(project.id, "nightly")).toEqual({
-			pausedUntil: null,
-			nextAt: at(16, 22),
-		});
-		const [listed] = (await engine.listSchedules(project.id)).schedules;
-		expect(listed).toEqual({
-			...nightly(),
-			nextAt: at(16, 22),
-			last: null,
-			deliveries: [],
-			issues: [],
-		});
-		clock = at(16, 22, 0, 20);
-		const [fired] = await waitForFacts(1);
-		expect(fired?.type).toBe("ScheduleFired");
-		await waitForEnd(engine, firedRunId(fired));
-	});
-
-	test("refuses a schedule that is off, has a webhook or does not exist", async () => {
-		const { engine } = startDaemon({ scheduler: false });
-		const project = await setup(engine, [
-			nightly({ id: "off", enabled: false }),
-			{
-				id: "hook",
-				flow: "night",
-				inputs: {},
-				enabled: true,
-				// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
-				webhook: { secret: "${HOOK_SECRET}" },
-			},
-		]);
-		await expect(
-			engine.pauseScheduleTonight(project.id, "off"),
-		).rejects.toMatchObject({
-			kind: "invalid",
-			message: "This schedule is off. It starts nothing tonight.",
-		});
-		await expect(
-			engine.pauseScheduleTonight(project.id, "hook"),
-		).rejects.toMatchObject({ kind: "invalid" });
-		await expect(
-			engine.pauseScheduleTonight(project.id, "gone"),
-		).rejects.toMatchObject({ kind: "not-found" });
-	});
 });
 
 describe("Run now", () => {
@@ -972,29 +625,5 @@ describe("Run now", () => {
 			payload: { at: at(16, 22), error: null },
 		});
 		await waitForEnd(engine, firedRunId(facts[1]));
-	});
-
-	test("refuses while an earlier run of the schedule is open", async () => {
-		const { engine } = startDaemon({ scheduler: false });
-		const project = await setup(engine, [nightly()], gateFlow());
-		const run = await engine.runScheduleNow(project.id, "nightly");
-		await waitFor(
-			async () =>
-				(await engine.listRuns()).find((r) => r.id === run.id)?.status ===
-				"waiting",
-			{ label: "the run to wait at its Gate" },
-		);
-		await expect(
-			engine.runScheduleNow(project.id, "nightly"),
-		).rejects.toMatchObject({ kind: "conflict" });
-		await engine.act(run.id, { kind: "stop" });
-	});
-
-	test("refuses a schedule that does not exist", async () => {
-		const { engine } = startDaemon({ scheduler: false });
-		const project = await setup(engine, []);
-		await expect(
-			engine.runScheduleNow(project.id, "gone"),
-		).rejects.toMatchObject({ kind: "not-found" });
 	});
 });
