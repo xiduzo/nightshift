@@ -2,16 +2,15 @@
 
 export {
 	createOfferAdmission,
-	createOfferUse,
 	NO_STARTER,
 	type OfferAdmission,
-	type OfferUse,
 } from "./admission";
 export {
 	createEngineOffers,
 	createOfferedSessions,
 	type EngineOffers,
 } from "./engine-offers";
+export { createOfferUse, type OfferUse } from "./offer-use";
 export {
 	type DeviceOffer,
 	deviceOffers,

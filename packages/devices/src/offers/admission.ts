@@ -2,38 +2,39 @@ import { roleAllows } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type {
 	Device,
-	OfferedSessionInput,
 	PeerContext,
 	PeerProjects,
 	PlacedRun,
 	ReadFileInput,
 	RunRef,
-	SessionInput,
 } from "@nightshift/engine";
 import {
 	memberRole,
 	type SpaceDocuments,
 	worktreeLocation,
 } from "@nightshift/engine/projects";
-import {
-	type AgentProfileSettings,
-	isAgentProfile,
-	type ProfileSettings,
-} from "@nightshift/flows";
+import { isAgentProfile, type ProfileSettings } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
-import type { WorkCall, WorkRelay, WorkReply, WorkRequest } from "../contract";
+import type { WorkRelay, WorkReply, WorkRequest } from "../contract";
 import { createHostSpaces, personInSpace, personOnHost } from "../links";
 import { selfOwnerId } from "../registry";
 import { remoteDevice, serveWork } from "../work";
 import type { OfferedSessions } from "./engine-offers";
+import { createOfferUse, type OfferUse, offerKey } from "./offer-use";
 import {
-	clampToCap,
-	type DeviceOffer,
-	inForce,
-	offerFor,
-	offersNothingOr,
-	spaceOffers,
-} from "./offers";
+	type ChangesInput,
+	cwdOf,
+	filesOf,
+	GIT_CALLS,
+	NEEDS_CLONE,
+	offeredCallRefusal,
+	offeredSession,
+	type RestoreInput,
+	runFoldersOf,
+	type SnapshotInput,
+	snapshotsOf,
+} from "./offered-call";
+import { type DeviceOffer, inForce, offerFor, spaceOffers } from "./offers";
 
 /**
  * Offer admission: whether this computer, as a Device, serves one call of
@@ -83,8 +84,6 @@ export type CallVia =
 /** A call of a run this computer walks itself. */
 const WALKED_HERE = { walkedHere: true } as const;
 
-/** Why a session that waited for a free one of the Offer did not start: it was stopped. */
-const SESSION_STOPPED = "The session was stopped.";
 type Via = CallVia | typeof WALKED_HERE;
 
 export type OfferAdmission = {
@@ -437,253 +436,6 @@ export function createOfferAdmission(deps: {
 						}
 					: {}),
 			};
-		},
-	};
-}
-
-/** The key of an Offer's sessions and calls. */
-const offerKey = (spaceId: string, profile: string) => `${spaceId}/${profile}`;
-
-type SnapshotInput = Parameters<NonNullable<Device["snapshotWorktree"]>>[0];
-type RestoreInput = Parameters<NonNullable<Device["restoreWorktree"]>>[0];
-type ChangesInput = Parameters<NonNullable<Device["worktreeChanges"]>>[0];
-
-/**
- * The snapshot calls of a Device. `deviceFor` has them only when this
- * computer has them, and its admitted path always does.
- */
-function snapshotsOf(
-	device: Device,
-): Required<Pick<Device, "snapshotWorktree" | "worktreeChanges">> {
-	const { snapshotWorktree, worktreeChanges } = device;
-	if (!snapshotWorktree || !worktreeChanges) {
-		throw new Error(`${device.name} takes no snapshots of a worktree.`);
-	}
-	return { snapshotWorktree, worktreeChanges };
-}
-
-/**
- * The run folder call of a Device. `deviceFor` has it only when this
- * computer has it, and its admitted path always does.
- */
-function runFoldersOf(device: Device): Required<Pick<Device, "runFolder">> {
-	const { runFolder } = device;
-	if (!runFolder) throw new Error(`${device.name} makes no run folders.`);
-	return { runFolder };
-}
-
-/**
- * The file call of a Device. `deviceFor` has it only when this computer
- * has it, and its admitted path always does.
- */
-function filesOf(device: Device): Required<Pick<Device, "readFile">> {
-	const { readFile } = device;
-	if (!readFile) throw new Error(`${device.name} reads no files.`);
-	return { readFile };
-}
-
-/** The calls that work in the project's Clone, or its run folder; a model or a tool needs none. */
-const NEEDS_CLONE: ReadonlySet<WorkCall["kind"]> = new Set([
-	"flows",
-	"worktree",
-	"restoreWorktree",
-	"runFolder",
-	"itemBranch",
-	"handOff",
-	"receiveHandOff",
-	"snapshotWorktree",
-	"worktreeChanges",
-	"session",
-	"exec",
-	"readFile",
-]);
-
-/** The calls that work with git: a project without a folder has none (ADR 22). */
-const GIT_CALLS: ReadonlySet<WorkCall["kind"]> = new Set([
-	"worktree",
-	"restoreWorktree",
-	"itemBranch",
-	"handOff",
-	"receiveHandOff",
-	"snapshotWorktree",
-	"worktreeChanges",
-]);
-
-/** The folder a call works in, for the calls that name one. */
-function cwdOf(call: WorkCall): string | null {
-	switch (call.kind) {
-		case "session":
-		case "exec":
-		case "readFile":
-			return call.input.cwd;
-		case "itemBranch":
-		case "handOff":
-		case "snapshotWorktree":
-		case "worktreeChanges":
-		case "restoreWorktree":
-			return call.cwd;
-		default:
-			return null;
-	}
-}
-
-/**
- * The check of one call of another Person's run, given this computer's
- * Offers in force into the run's Space: an offered session of one of
- * them, or the run's own folder work (its flows, its worktree, its item
- * branches, the Hand-off of its work to and from it, the snapshots that
- * tell what a step changed in it, the report file the run wrote there).
- * Anything
- * else is refused: a command, a tool, the decider, a session it did not
- * offer, and its capabilities (private to its owner). Null when it serves
- * the call.
- */
-function offeredCallRefusal(
-	call: WorkCall,
-	deviceName: string,
-	offers: readonly DeviceOffer[],
-): string | null {
-	if (offers.length === 0) return offersNothingOr(deviceName, offers);
-	const refused = `${deviceName} runs only the profiles its owner offers to this Space. ${offersNothingOr(deviceName, offers)}`;
-	switch (call.kind) {
-		case "flows":
-		case "worktree":
-		case "restoreWorktree":
-		case "runFolder":
-		case "itemBranch":
-		case "handOff":
-		case "receiveHandOff":
-		case "snapshotWorktree":
-		case "worktreeChanges":
-		case "readFile":
-			return null;
-		case "session": {
-			if (!("offered" in call.input)) return refused;
-			const { profile } = call.input.offered;
-			return offerFor(offers, profile) !== undefined
-				? null
-				: offersNothingOr(deviceName, offers, profile);
-		}
-		default:
-			return refused;
-	}
-}
-
-/**
- * An offered session as this computer runs it: its profile as its owner
- * set it (harness, model, effort, CLI tools, connections), and the
- * permission mode the node asks for, else the profile's, never wider than
- * the Offer's cap.
- */
-function offeredSession(
-	input: Omit<OfferedSessionInput, "signal">,
-	profile: AgentProfileSettings,
-	cap: DeviceOffer["permissionCap"],
-): Omit<SessionInput, "signal"> {
-	const { offered, ...rest } = input;
-	return {
-		...rest,
-		// Another Person's step: the engine's Secret scope rule reads it
-		// (ADR 13, decision 5). Set after the spread, so no Walker can take
-		// it off.
-		underOffer: true,
-		harness: profile.harness,
-		model: profile.model,
-		permissionMode: clampToCap(
-			offered.permissionMode ?? profile.permissionMode,
-			cap,
-		),
-		...(profile.effort !== undefined ? { effort: profile.effort } : {}),
-		...(profile.clis.length > 0 ? { clis: profile.clis } : {}),
-		...(profile.connections.length > 0
-			? { connections: profile.connections }
-			: {}),
-	};
-}
-
-/**
- * The Offers in use on this computer: the sessions running under each
- * Offer (`slots`, at most its cap at once) and the calls under each
- * (`calls`, to abort when it is withdrawn). They outlive an admission: a
- * `bun --hot` reload hands them to the next engine's, so a session that
- * runs on through the reload still counts against its Offer. Keyed by the
- * Space and the profile's id.
- */
-export type OfferUse = {
-	slots: {
-		/**
-		 * Waits for a free session of the Offer, first come first served, and
-		 * resolves to its release. A session over the cap waits; it is not
-		 * refused. Rejects when `signal` aborts while it waits.
-		 */
-		take(key: string, cap: number, signal: AbortSignal): Promise<() => void>;
-		/** The sessions running under the Offer now. */
-		running(key: string): number;
-	};
-	calls: {
-		/** Notes a call under an Offer; the returned function forgets it. */
-		add(spaceId: string, profile: string, abort: () => void): () => void;
-		/** Aborts the calls under a withdrawn Offer. */
-		withdrawn(spaceId: string, profile: string): void;
-	};
-};
-
-export function createOfferUse(): OfferUse {
-	return { slots: createOfferSlots(), calls: createOfferCalls() };
-}
-
-function createOfferSlots(): OfferUse["slots"] {
-	const running = new Map<string, number>();
-	const waiting = new Map<string, (() => void)[]>();
-
-	function release(key: string) {
-		running.set(key, (running.get(key) ?? 1) - 1);
-		waiting.get(key)?.shift()?.();
-	}
-
-	return {
-		running: (key) => running.get(key) ?? 0,
-		async take(key, cap, signal) {
-			while ((running.get(key) ?? 0) >= cap) {
-				if (signal.aborted) throw new Refusal("conflict", SESSION_STOPPED);
-				await new Promise<void>((resolve, reject) => {
-					const queue = waiting.get(key) ?? [];
-					waiting.set(key, queue);
-					const wake = () => {
-						signal.removeEventListener("abort", stop);
-						resolve();
-					};
-					const stop = () => {
-						const at = queue.indexOf(wake);
-						if (at >= 0) queue.splice(at, 1);
-						reject(new Refusal("conflict", SESSION_STOPPED));
-					};
-					queue.push(wake);
-					signal.addEventListener("abort", stop, { once: true });
-				});
-			}
-			running.set(key, (running.get(key) ?? 0) + 1);
-			let released = false;
-			return () => {
-				if (released) return;
-				released = true;
-				release(key);
-			};
-		},
-	};
-}
-
-function createOfferCalls(): OfferUse["calls"] {
-	const running = new Map<symbol, { key: string; abort: () => void }>();
-	return {
-		add(spaceId, profile, abort) {
-			const id = Symbol(profile);
-			running.set(id, { key: offerKey(spaceId, profile), abort });
-			return () => running.delete(id);
-		},
-		withdrawn(spaceId, profile) {
-			const key = offerKey(spaceId, profile);
-			for (const call of running.values()) if (call.key === key) call.abort();
 		},
 	};
 }
