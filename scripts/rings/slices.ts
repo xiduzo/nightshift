@@ -9,7 +9,7 @@ import { join, relative, sep } from "node:path";
 
 import { SERVER_PACKAGES } from "../../.dependency-cruiser.mjs";
 import { isTest } from "../check-layers";
-import { skipped } from "../verticals/source-file";
+import { parse, skipped } from "../verticals/source-file";
 import { verticalsOf } from "../verticals/vertical";
 
 /** The folders of a slice that are rings. */
@@ -136,6 +136,26 @@ export function shapeProblems(root: string, slice: Slice): string[] {
 		problems.push(
 			`${here}/: has no domain/ and no application/. A slice has at least one of them, or sub-verticals that do.`,
 		);
+	}
+
+	// A slice of rules alone: `domain/` and its barrel, nothing more.
+	if (!has("application")) {
+		if (has("adapters")) {
+			problems.push(
+				`${here}/adapters/: a slice without application/ has no adapters/. An adapter fills a port of application/ports.ts or drives a use case, and this slice has neither. A slice of rules alone holds domain/ and its barrel.`,
+			);
+		}
+		const barrel = join(slice.dir, "index.ts");
+		const outside = existsSync(barrel)
+			? parse(barrel)
+					.imports.map((imported) => imported.specifier)
+					.filter((specifier) => !specifier.startsWith("./"))
+			: [];
+		for (const specifier of [...new Set(outside)].sort()) {
+			problems.push(
+				`${rel(barrel)}: passes on "${specifier}". The barrel of a slice without application/ passes on only what the slice holds: the rules of its domain/ and its sub-verticals. A type counts too.`,
+			);
+		}
 	}
 
 	const adapters = join(slice.dir, "adapters");

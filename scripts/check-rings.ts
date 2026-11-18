@@ -14,6 +14,13 @@
  * - Each folder in it is a ring (`domain/`, `application/`, `adapters/`) or
  *   a sub-vertical: a folder with its own `index.ts` that is in shape too.
  * - It has `domain/` or `application/`, or a sub-vertical.
+ * - A slice without `application/` is a slice of rules alone: `domain/` and
+ *   its barrel, as a capability of pure rules has. It needs no `wire.ts`.
+ *   It has no `adapters/`: an adapter fills a port or drives a use case,
+ *   and this slice has neither. Its barrel passes on only what the slice
+ *   holds: the names of its `domain/` and of its sub-verticals, so every
+ *   name on it is a pure function, a pure value or a type (H1). It passes
+ *   on nothing of another vertical or package, a type included.
  * - `adapters/` holds only `out/` (the driven adapters) and `in/` (a
  *   driving adapter that is not the API: a timer, a listener).
  * - `application/` is flat: no folder in it.
@@ -97,7 +104,9 @@
  * shorter:
  * - A vertical that is not listed keeps every rule above.
  * - A listed vertical that keeps every rule, and has an `application/`
- *   folder, fails until its line is gone.
+ *   folder, fails until its line is gone. A listed slice of rules alone
+ *   that keeps every rule passes: remove its line when its rules are all
+ *   in `domain/`.
  * - A line that names no vertical, or a mechanism, fails.
  * One case adds a line: a new vertical that splits out of a listed one.
  * A line `kernel <file>` names a file of a package's kernel that is not

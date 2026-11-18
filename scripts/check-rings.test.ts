@@ -43,6 +43,87 @@ describe("a slice in shape", () => {
 		expect(await check({ ...repository, ...gates })).toEqual([]);
 	});
 
+	test("a slice of domain/ alone keeps H1 and H3", async () => {
+		const problems = await check({
+			...repository,
+			...gates,
+			"packages/engine/src/gates/domain/answer.ts": [
+				'import type { Database } from "@nightshift/db";',
+				'import { appendEvent } from "../../log";',
+				"export const mayAnswer = (db: Database) => appendEvent(db);",
+			],
+		});
+		expect(problems).toHaveLength(2);
+		expect(problems.join("\n")).toContain("(H3, H8)");
+		expect(problems.join("\n")).toContain("(H1)");
+	});
+
+	test("a slice of rules alone has no adapters/", async () => {
+		const problems = await check({
+			...repository,
+			...gates,
+			"packages/engine/src/gates/adapters/out/drizzle-gate-store.ts":
+				"export const drizzleGateStore = () => 1;\n",
+		});
+		expect(problems).toEqual([
+			"packages/engine/src/gates/adapters/: a slice without application/ has no adapters/. An adapter fills a port of application/ports.ts or drives a use case, and this slice has neither. A slice of rules alone holds domain/ and its barrel.",
+		]);
+	});
+
+	test("the barrel of a slice of rules alone passes on only its own rules", async () => {
+		const barrel = "packages/engine/src/gates/index.ts";
+		const own = 'export { mayAnswer } from "./domain/answer";';
+		const message = (specifier: string) =>
+			`${barrel}: passes on "${specifier}". The barrel of a slice without application/ passes on only what the slice holds: the rules of its domain/ and its sub-verticals. A type counts too.`;
+		// A value of a mechanism that does I/O, and a type of the kernel.
+		expect(
+			await check({
+				...repository,
+				...gates,
+				[barrel]: [
+					own,
+					'export { appendEvent } from "../log";',
+					'export type { Actor } from "../contract";',
+				],
+			}),
+		).toEqual([message("../contract"), message("../log")]);
+		// A name of another package.
+		expect(
+			await check({
+				...repository,
+				...gates,
+				[barrel]: [own, 'export { now } from "@nightshift/time";'],
+			}),
+		).toEqual([message("@nightshift/time")]);
+		// Its own sub-vertical passes.
+		expect(
+			await check({
+				...repository,
+				...gates,
+				[barrel]: [own, 'export { isLate } from "./deadline";'],
+				"packages/engine/src/gates/deadline/index.ts":
+					'export { isLate } from "./domain/late";\n',
+				"packages/engine/src/gates/deadline/domain/late.ts":
+					"export const isLate = (at: number, now: number) => at < now;\n",
+			}),
+		).toEqual([]);
+	});
+
+	test("a slice with use cases may pass on a type of another vertical", async () => {
+		// The rule above is for a slice of rules alone. H5 and P8 guard the
+		// barrel of a slice with application/.
+		expect(
+			await check({
+				...repository,
+				[`${SLICE}/index.ts`]: [
+					'export type { Actor } from "../contract";',
+					'export type { Schedule } from "./domain/schedule";',
+					'export { wireSchedules } from "./wire";',
+				],
+			}),
+		).toEqual([]);
+	});
+
 	test("a sub-vertical in shape passes, and one out of shape fails", async () => {
 		const sub = {
 			...repository,
@@ -435,6 +516,28 @@ describe("a port has an in-memory adapter and a contract suite (H7)", () => {
 		expect(problems).toEqual([
 			`${PORTS}: the port ScheduledRuns has @filledBy, but its real adapter is here (adapters/out/drizzle-scheduled-runs.ts). Remove the tag, and give the port its contract suite.`,
 		]);
+	});
+});
+
+describe("a slice of rules alone and the debt list (H10)", () => {
+	test("it passes when it is listed, and when it is not", async () => {
+		const files = { ...repository, ...gates };
+		expect(await check(files)).toEqual([]);
+		expect(
+			await check(files, { debt: "engine/projects\nengine/gates\n" }),
+		).toEqual([]);
+	});
+
+	test("out of shape, it passes only while it is listed", async () => {
+		const files = {
+			...repository,
+			...gates,
+			"packages/engine/src/gates/answer.ts": "export const late = 23;\n",
+		};
+		expect(await check(files)).toHaveLength(1);
+		expect(
+			await check(files, { debt: "engine/projects\nengine/gates\n" }),
+		).toEqual([]);
 	});
 });
 

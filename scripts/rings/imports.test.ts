@@ -422,6 +422,10 @@ describe("a real adapter (H5)", () => {
 		const problems = await check({
 			...repository,
 			...gates,
+			// A slice has adapters/ only with application/, and then a wire.ts.
+			"packages/engine/src/gates/application/ports.ts": "export {};\n",
+			"packages/engine/src/gates/wire.ts":
+				"export const wireGates = () => ({});\n",
 			"packages/engine/src/gates/adapters/out/drizzle-gates.ts": [
 				'import { drizzleScheduleStore } from "../../../schedules/adapters/out/drizzle-schedule-store";',
 				"export const status = drizzleScheduleStore;",
