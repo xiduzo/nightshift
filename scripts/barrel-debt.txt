@@ -18,7 +18,6 @@ packages/devices/src/contract/index.ts 55
 packages/engine/src/contract/index.ts 31
 packages/engine/src/device/index.ts 33
 packages/engine/src/log/index.ts 125
-packages/engine/src/projects/index.ts 32
 packages/engine/src/read/index.ts 65
 packages/flows/src/assistant/index.ts 48
 packages/flows/src/draft/index.ts 78

@@ -5,7 +5,6 @@ import type { Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { iso, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
-import type { PullRequestView } from "../projects";
 import { createEngine, type Engine } from "../run/engine";
 import type { SpaceEngine } from "../run/space-engine";
 import { seedFlows } from "../testing/seed-flows";
@@ -15,6 +14,7 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
+import type { PullRequestView } from "./pull-request-watch";
 
 /**
  * A pull request stored on the run is scored from `gh pr view`, with no

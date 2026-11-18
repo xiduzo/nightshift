@@ -467,6 +467,11 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		// the capabilities both read it.
 		"run-status": M,
 		schedules: "schedules",
+		// The keeper of the pull request Scores: it reads what GitHub says
+		// became of a run's pull request, and writes it to the run log. No
+		// person asks it for anything. Score is a word of the glossary, as
+		// Lease is: the capabilities that show Scores read the log.
+		scores: M,
 		// The keeper of the processes a Service node starts.
 		services: M,
 		// Moments noted for the anonymous usage export.

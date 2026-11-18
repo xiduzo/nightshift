@@ -1,7 +1,5 @@
-/** The scheduler: it starts the runs of each project's schedules when their cron times come due, or when a webhook arrives, and the pull request scores a webhook brings. */
+/** The scheduler: it starts the runs of each project's schedules when their cron times come due, or when a webhook arrives. */
 
-export { createPullRequestScores } from "./pull-request-scores";
-export { createPullRequestWatch } from "./pull-request-watch";
 export type { ScheduleFiles } from "./schedule-files";
 export { createScheduleFiles } from "./schedule-files";
 export type {

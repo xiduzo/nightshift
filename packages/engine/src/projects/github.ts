@@ -1,6 +1,7 @@
 import { findProgram } from "@nightshift/agents/types";
 import { Refusal } from "@nightshift/refusal";
 
+import type { PullRequestView } from "../scores";
 import { type GitResult, type GitRunOptions, runProcess } from "./git";
 
 /**
@@ -48,19 +49,6 @@ export type GitHubCli = {
 	 */
 	viewPullRequest(url: string): Promise<PullRequestView | null>;
 };
-
-/** What `gh pr view` says about a pull request. */
-export type PullRequestView = {
-	state: "open" | "merged" | "closed";
-	mergeSha: string | null;
-	mergedAt: string | null;
-	closedAt: string | null;
-	/** A revert found within the commits `gh` lists. Null when none shows. */
-	reverted: { label: string } | null;
-};
-
-/** The morning check asks this. A test passes its own. */
-export type PullRequestReader = Pick<GitHubCli, "viewPullRequest">;
 
 /** A GitHub user or organization name: letters, digits and single dashes, at most 39. */
 const OWNER = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/;

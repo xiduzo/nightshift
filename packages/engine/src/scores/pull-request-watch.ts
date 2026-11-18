@@ -3,7 +3,6 @@ import { event, run } from "@nightshift/db/schema";
 import { DAY_MS, nextClockTime, parseInstant } from "@nightshift/time";
 import { and, eq } from "drizzle-orm";
 import type { RunLog, RunState } from "../log";
-import type { PullRequestReader, PullRequestView } from "../projects";
 import type { UsageNotes } from "../usage";
 import {
 	REVERT_WINDOW_MS,
@@ -15,6 +14,24 @@ import {
  * `gh pr view` and writes the same scores a webhook would. No webhook
  * and no `scorePullRequests` schedule are required.
  */
+
+/** What `gh pr view` says about a pull request. */
+export type PullRequestView = {
+	state: "open" | "merged" | "closed";
+	mergeSha: string | null;
+	mergedAt: string | null;
+	closedAt: string | null;
+	/** A revert found within the commits `gh` lists. Null when none shows. */
+	reverted: { label: string } | null;
+};
+
+/**
+ * The morning check asks this. The GitHub port of `projects` (`GitHubCli`)
+ * answers it. A test passes its own.
+ */
+export type PullRequestReader = {
+	viewPullRequest(url: string): Promise<PullRequestView | null>;
+};
 
 /** How long until the next local 07:00. At least a minute, at most a day. */
 function msUntilMorning(at: number): number {

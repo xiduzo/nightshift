@@ -2,7 +2,6 @@
 
 export type { Git } from "./git";
 export { systemGit } from "./git";
-export type { PullRequestReader, PullRequestView } from "./github";
 export { moveSpaceEntries, type ProjectTarget } from "./moved-entries";
 export { checkProjectFolder } from "./project-setup";
 export type { ListedProject, Project, Projects } from "./projects";

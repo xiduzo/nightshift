@@ -73,8 +73,6 @@ import {
 } from "../read";
 import { createRunFolders } from "../run-folders";
 import {
-	createPullRequestScores,
-	createPullRequestWatch,
 	createScheduleFiles,
 	createScheduler,
 	createWebhooks,
@@ -83,6 +81,7 @@ import {
 	type WebhookAnswer,
 	type WebhookRequest,
 } from "../schedules";
+import { createPullRequestScores, createPullRequestWatch } from "../scores";
 import { createServiceKeeper, serviceHolds } from "../services";
 import { keptValues, listKeptValues, resetKeptValue } from "../variables";
 import { createRunActions } from "./actions";
