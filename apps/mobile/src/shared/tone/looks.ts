@@ -13,8 +13,9 @@ import { DECISION_LABEL, NODE_TYPE_LABEL } from "@nightshift/flows";
  * What a status means on screen, without React Native: its tone (the
  * color token), the name of its icon and its word. A tone never shows
  * alone: the icon and the word go with it. The web's run status badge and
- * outcome badge are the reference (`apps/web/src/features/runs/components/
- * run-status-badge.tsx`, `apps/web/src/features/flows/canvas/outcome-badge.tsx`).
+ * outcome badge are the reference (`apps/web/src/features/runs/status/
+ * run-status-badge.tsx`,
+ * `apps/web/src/features/flows/canvas/outcomes/outcome-badge.tsx`).
  */
 
 /**
