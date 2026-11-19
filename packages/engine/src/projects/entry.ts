@@ -7,6 +7,13 @@
  * names another workspace imports.
  */
 
+export type { SpaceDocument, SpaceDocuments } from "../documents";
+export {
+	createSpaceDocuments,
+	deviceNameIn,
+	memberName,
+	memberRole,
+} from "../documents";
 export type { Branches, GitInstall } from "../git";
 export { systemGitInstaller, worktreeLocation } from "../git";
 export type { GitHubAccess, GitHubRepo } from "../github";
@@ -22,10 +29,3 @@ export type { ProjectReadiness } from "./project-setup";
 export { checkProjectFolder, setUpGit } from "./project-setup";
 export type { ListedProject, Project, TakenProjects } from "./projects";
 export { clonePathOf, PROJECT_NOT_FOUND, withoutFolderOf } from "./projects";
-export type { SpaceDocument, SpaceDocuments } from "./space-document";
-export {
-	createSpaceDocuments,
-	deviceNameIn,
-	memberName,
-	memberRole,
-} from "./space-document";

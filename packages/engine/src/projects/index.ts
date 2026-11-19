@@ -1,4 +1,4 @@
-/** Projects, their Clones and the Space document that defines them, the git port, the git setup of a project folder, run worktrees, and the snapshots that tell what a step changed in one. */
+/** Projects, their Clones on this computer, the git setup of a project folder, and the rows of a Space move. The Space document that defines them is in `documents/space/`. */
 
 export { moveSpaceEntries, type ProjectTarget } from "./moved-entries";
 export { checkProjectFolder } from "./project-setup";
@@ -9,12 +9,4 @@ export {
 	PROJECT_NOT_FOUND,
 	toProject,
 } from "./projects";
-export type { SpaceDocuments } from "./space-document";
-export {
-	createSpaceDocuments,
-	memberName,
-	memberRole,
-	setSpaceUsage,
-	spaceUsageOn,
-} from "./space-document";
 export { forgetSpaceRows, spaceMoveBatch, spaceRunIds } from "./space-rows";

@@ -4,11 +4,11 @@ import type { Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { inArray } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
+import type { SpaceDocuments } from "../documents";
 import type { ProjectFlows } from "../flows";
 import {
 	moveSpaceEntries,
 	type ProjectTarget,
-	type SpaceDocuments,
 	spaceMoveBatch,
 	spaceRunIds,
 } from "../projects";

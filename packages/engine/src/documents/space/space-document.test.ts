@@ -12,16 +12,16 @@ import {
 import { asDate, now } from "@nightshift/time";
 import { asc, eq } from "drizzle-orm";
 import type * as Y from "yjs";
-import { NIGHT_SHIFT } from "../contract";
-import { aloneDirectory } from "../testing/alone-directory";
+import { NIGHT_SHIFT } from "../../contract";
+import { aloneDirectory } from "../../testing/alone-directory";
 import {
 	createSandbox,
 	otherSpace,
 	type Sandbox,
 	waitFor,
 	withDevice,
-} from "../testing/test-support";
-import { createEngine } from "../wire";
+} from "../../testing/test-support";
+import { createEngine } from "../../wire";
 import {
 	createSpaceDocuments,
 	memberName,

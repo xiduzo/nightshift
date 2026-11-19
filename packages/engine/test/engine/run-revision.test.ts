@@ -6,11 +6,11 @@ import { FLOW_VERSION } from "@nightshift/flows";
 import { and, eq } from "drizzle-orm";
 import * as Y from "yjs";
 import { NIGHT_SHIFT } from "../../src/contract";
-import { createProjectFlows } from "../../src/flows";
 import {
 	createFlowDocuments,
 	type FlowDocuments,
-} from "../../src/flows/flow-document";
+} from "../../src/documents/flow-documents";
+import { createProjectFlows } from "../../src/flows";
 import { seedFlows } from "../../src/testing/seed-flows";
 import {
 	createSandbox,

@@ -6,16 +6,11 @@ import { clone, project } from "@nightshift/db/schema";
 import { singleAgentFlow } from "@nightshift/flows";
 import { asDate, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
+import { createFlowDocuments, type FlowDocuments } from "../documents";
 import { systemGit } from "../git";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { createCloneImports } from "./clone-imports";
-import {
-	createFlowDocuments,
-	type FlowDocuments,
-	flowIdOf,
-	flowRevisions,
-	flowSources,
-} from "./flow-document";
+import { flowIdOf, flowRevisions, flowSources } from "./flow-document";
 
 let sandbox: Sandbox;
 let documents: FlowDocuments;

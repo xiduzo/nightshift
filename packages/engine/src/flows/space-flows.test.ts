@@ -7,8 +7,8 @@ import {
 	starterList,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { createFlowDocuments, type FlowDocuments } from "../documents";
 import { createSandbox, type Sandbox } from "../testing/test-support";
-import { createFlowDocuments, type FlowDocuments } from "./flow-document";
 import { createProjectFlows } from "./project-flows";
 import { createSpaceFlows, type SpaceFlows } from "./space-flows";
 

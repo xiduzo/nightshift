@@ -7,9 +7,6 @@ import { Refusal } from "@nightshift/refusal";
 import { instant, now as timeNow } from "@nightshift/time";
 import { and, asc, eq, getColumns, isNull } from "drizzle-orm";
 import type { DeviceDirectory, Relay } from "../contract";
-import { createWorktrees, type Git, systemGit } from "../git";
-import type { RunLog } from "../log";
-import { normaliseRemote } from "./remote";
 import {
 	cloneKey,
 	deviceEntries,
@@ -22,7 +19,10 @@ import {
 	type SpaceProject,
 	spaceProjectSchema,
 	withoutFolder,
-} from "./space-document";
+} from "../documents";
+import { createWorktrees, type Git, systemGit } from "../git";
+import type { RunLog } from "../log";
+import { normaliseRemote } from "./remote";
 import {
 	type MovingProject,
 	projectRowsOf,

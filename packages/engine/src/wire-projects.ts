@@ -1,15 +1,15 @@
 import type { Database } from "@nightshift/db";
 import type { DeviceDirectory } from "./contract";
+import type { FlowDocuments, SpaceDocuments } from "./documents";
 import type { EngineOptions } from "./engine-options";
 import {
 	createCloneImports,
 	createFlowMigrations,
 	createProjectFlows,
-	type FlowDocuments,
 } from "./flows";
 import { createWorktrees, systemGit } from "./git";
 import type { RunLog } from "./log";
-import { createProjects, type SpaceDocuments } from "./projects";
+import { createProjects } from "./projects";
 
 type ProjectsDeps = Parameters<typeof createProjects>[0];
 

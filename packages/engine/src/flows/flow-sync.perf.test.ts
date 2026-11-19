@@ -2,8 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow } from "@nightshift/flows";
 import { commandNode } from "@nightshift/flows/testing";
 import * as Y from "yjs";
+import type { FlowDocument } from "../documents";
 import type { PersistedDocument } from "../documents/ydoc";
-import { type FlowDocument, saveFlow } from "./flow-document";
+import { saveFlow } from "./flow-document";
 
 /**
  * Scale of the flow document a run writes into, and of the sync that

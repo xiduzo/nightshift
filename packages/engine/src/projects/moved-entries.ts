@@ -8,7 +8,7 @@ import {
 	type SpaceDocuments,
 	type SpaceProject,
 	spaceProjectSchema,
-} from "./space-document";
+} from "../documents";
 
 /** Where a moved Project goes: its Space, and its id there. */
 export type ProjectTarget = { spaceId: string; projectId: string };

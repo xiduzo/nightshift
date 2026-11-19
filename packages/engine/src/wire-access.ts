@@ -1,6 +1,6 @@
 import type { Database } from "@nightshift/db";
+import { memberRole, type SpaceDocuments } from "./documents";
 import type { RunLog } from "./log";
-import { memberRole, type SpaceDocuments } from "./projects";
 import { wireAccess } from "./runs";
 
 /**

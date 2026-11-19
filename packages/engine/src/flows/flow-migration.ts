@@ -2,7 +2,7 @@ import type { Database } from "@nightshift/db";
 import type { FlowMigration } from "@nightshift/flows";
 import type { DeviceDirectory } from "../contract";
 import { type ProfileStore, storedDevices } from "../device-config";
-import type { SpaceDocuments } from "../projects";
+import type { SpaceDocuments } from "../documents";
 
 /**
  * What brings a flow of an older format to the current one on this

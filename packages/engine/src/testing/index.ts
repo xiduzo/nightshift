@@ -11,13 +11,13 @@ export { createCliToolStore } from "../device-config/cli-tools";
 export { createConnectionStore } from "../device-config/connections";
 export { createProfileStore } from "../device-config/profiles";
 export { createSettingsStore } from "../device-config/settings";
+export { spaceDocumentName } from "../documents/space/space-document";
 export { createProjectFlows } from "../flows/project-flows";
 export { createRunHistory } from "../log/history/history";
 export { parseEventRow } from "../log/run-log/append";
 export { createRunLog, type RunLog } from "../log/run-log/run-log";
 export { placedRun } from "../log/run-row/run-row";
 export { createRunBus, type RunBus } from "../log/transcript/bus";
-export { spaceDocumentName } from "../projects/space-document";
 export type { LandedChange } from "../read/landed-facts";
 export { openRunBundle } from "../read/run-bundle";
 

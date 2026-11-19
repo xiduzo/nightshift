@@ -3,6 +3,7 @@ import type { WalkFile, WalkRef } from "./archive";
 import type { Actor, OffersPort, Relay } from "./contract";
 import type { Device } from "./device";
 import type { DeviceCopy } from "./device-config";
+import type { SpaceDocuments } from "./documents";
 import type { WalkFiles } from "./graph";
 import type {
 	CopyStamp,
@@ -13,7 +14,7 @@ import type {
 	TranscriptEntry,
 } from "./log";
 import type { PlacementPort } from "./placement";
-import type { Projects, SpaceDocuments } from "./projects";
+import type { Projects } from "./projects";
 import type { FeedStep, PendingCommand, RunWalker } from "./read";
 import type { RunFolders } from "./run-folders";
 

@@ -13,9 +13,9 @@ import {
 } from "@nightshift/flows";
 import { z } from "zod";
 import type { ProfileStore } from "../device-config";
+import type { FlowDocument } from "../documents";
 import {
 	addNotices,
-	type FlowDocument,
 	flowSources,
 	mark,
 	marked,

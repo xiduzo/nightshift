@@ -106,16 +106,17 @@ export {
 	type ToolLaunchers,
 } from "./device";
 export {
+	createFlowDocuments,
 	createSyncedDocuments,
 	documentKind,
 	documentName,
 	documentRows,
+	type FlowDocuments,
 	type SyncedDocuments,
 } from "./documents";
 export type { Engine } from "./engine";
 export type { EngineOptions } from "./engine-options";
 export type {
-	FlowDocuments,
 	FlowExport,
 	FlowNotice,
 	FlowRef,
@@ -127,7 +128,6 @@ export type {
 export {
 	type ConfigUse,
 	createConfigUse,
-	createFlowDocuments,
 	flowsForRun,
 	revisionKinds,
 } from "./flows";

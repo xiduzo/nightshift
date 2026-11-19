@@ -9,13 +9,13 @@ import {
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import * as Y from "yjs";
-import { createSandbox, type Sandbox } from "../testing/test-support";
 import {
-	addNotices,
 	createFlowDocuments,
 	type FlowDocument,
 	type FlowDocuments,
-} from "./flow-document";
+} from "../documents";
+import { createSandbox, type Sandbox } from "../testing/test-support";
+import { addNotices } from "./flow-document";
 import { createProjectFlows, type ProjectFlows } from "./project-flows";
 
 let sandbox: Sandbox;

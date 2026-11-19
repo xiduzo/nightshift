@@ -14,15 +14,15 @@ import type { DecisionNode, Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import { NIGHT_SHIFT } from "../../src/contract";
-import type { Engine, EngineInternals } from "../../src/engine";
-import { GateClosedError } from "../../src/gates";
-import { spaceOfRun } from "../../src/log";
-import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
 import {
 	createSpaceDocuments,
 	type SpaceDocuments,
 	spaceProjects,
-} from "../../src/projects/space-document";
+} from "../../src/documents/space/space-document";
+import type { Engine, EngineInternals } from "../../src/engine";
+import { GateClosedError } from "../../src/gates";
+import { spaceOfRun } from "../../src/log";
+import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
 import { aloneDirectory } from "../../src/testing/alone-directory";
 import {
 	commitFile,

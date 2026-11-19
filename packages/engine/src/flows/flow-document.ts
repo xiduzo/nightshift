@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto";
-import type { Database } from "@nightshift/db";
-import { project } from "@nightshift/db/schema";
 import {
 	FLOW_VERSION,
 	type Flow,
@@ -20,12 +18,7 @@ import {
 import { Refusal } from "@nightshift/refusal";
 import * as Y from "yjs";
 import { z } from "zod";
-import {
-	createSyncedDocuments,
-	documentName,
-	type PersistedDocument,
-	type SyncedDocuments,
-} from "../documents";
+import type { FlowDocument } from "../documents";
 import type { FlowMigrations, MigrationScope } from "./flow-migration";
 
 /**
@@ -57,16 +50,9 @@ import type { FlowMigrations, MigrationScope } from "./flow-migration";
  * the older removes it.
  *
  * This file is the only one that knows the Yjs encoding. Outside it a
- * flow document is the pair of documents a Link syncs (`FlowDocument`),
+ * flow document is the pair of documents a Link syncs (`FlowDocument`, in `documents/`),
  * and the engine reads and changes the flows through `ProjectFlows`.
  */
-export type FlowDocument = {
-	readonly projectId: string;
-	/** `flows:<projectId>`: the current flows and schedules. */
-	readonly current: PersistedDocument;
-	/** `flows-history:<projectId>`: the revisions. */
-	readonly history: PersistedDocument;
-};
 
 /** The flow document with the parts of `current` that hold the flows: only this file's. */
 type FlowMaps = FlowDocument & {
@@ -1245,41 +1231,4 @@ function copyOf(value: unknown): unknown {
 		return array;
 	}
 	return value === undefined ? undefined : structuredClone(value);
-}
-
-/** The flow documents of this Replica's Projects: views of its synced documents. */
-export type FlowDocuments = {
-	/** The Project's flow document and its history. */
-	open(projectId: string): Promise<FlowDocument>;
-	/** The documents of every Project this Replica knows. */
-	openAll(): Promise<FlowDocument[]>;
-	/** Flushes every document. */
-	flush(): Promise<void>;
-};
-
-export function createFlowDocuments(options: {
-	db: Database;
-	/** This Replica's synced documents. Default: its own over `db`. */
-	documents?: SyncedDocuments;
-}): FlowDocuments {
-	const { db } = options;
-	const documents =
-		options.documents ?? createSyncedDocuments({ db: options.db });
-
-	async function open(projectId: string): Promise<FlowDocument> {
-		const [current, history] = await Promise.all([
-			documents.open(documentName("flows", projectId)),
-			documents.open(documentName("flows-history", projectId)),
-		]);
-		return { projectId, current, history };
-	}
-
-	return {
-		open,
-		async openAll() {
-			const rows = await db.select({ id: project.id }).from(project);
-			return Promise.all(rows.map((row) => open(row.id)));
-		},
-		flush: () => documents.flush(),
-	};
 }

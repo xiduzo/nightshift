@@ -5,14 +5,14 @@ import type { Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { and, eq } from "drizzle-orm";
 import { NIGHT_SHIFT } from "../../src/contract";
+import {
+	createSpaceDocuments,
+	type SpaceDocuments,
+} from "../../src/documents/space/space-document";
 import type { Engine } from "../../src/engine";
 import { git } from "../../src/git/worktrees";
 import { parseEventRow } from "../../src/log/run-log/append";
 import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
-import {
-	createSpaceDocuments,
-	type SpaceDocuments,
-} from "../../src/projects/space-document";
 import { aloneDirectory } from "../../src/testing/alone-directory";
 import {
 	createSandbox,

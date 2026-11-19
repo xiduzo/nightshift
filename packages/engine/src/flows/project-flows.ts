@@ -14,10 +14,9 @@ import {
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
+import type { FlowDocument, FlowDocuments } from "../documents";
 import {
 	dismissNotice,
-	type FlowDocument,
-	type FlowDocuments,
 	type FlowMergePlan,
 	type FlowNotice,
 	type FlowRevision,

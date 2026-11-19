@@ -1,6 +1,7 @@
 import type { Database } from "@nightshift/db";
 import { type AnswerCost, keepAnswerCost } from "./assistant";
 import type { Actor, LeaseHost, MemberChange } from "./contract";
+import { type SpaceDocuments, spaceUsageOn } from "./documents";
 import type { ProjectFlows } from "./flows";
 import type { Runner } from "./graph";
 import type { createLeaseKeeper, createLeaseStore } from "./leases";
@@ -10,7 +11,7 @@ import {
 	logMemberChange,
 	type RunLog,
 } from "./log";
-import { forgetSpaceRows, type SpaceDocuments, spaceUsageOn } from "./projects";
+import { forgetSpaceRows } from "./projects";
 import { type LandedFact, landedFacts, type RunTrace } from "./read";
 import type { RunHere, Views } from "./runs";
 import type {

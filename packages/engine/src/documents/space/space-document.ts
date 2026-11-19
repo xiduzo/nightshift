@@ -5,14 +5,14 @@ import { asDate, instant, instantOrNull, now } from "@nightshift/time";
 import { eq, inArray } from "drizzle-orm";
 import type * as Y from "yjs";
 import { z } from "zod";
-import type { DeviceDirectory } from "../contract";
+import type { DeviceDirectory } from "../../contract";
 import {
 	createSyncedDocuments,
 	documentId,
 	documentName,
-	type PersistedDocument,
 	type SyncedDocuments,
-} from "../documents";
+} from "../synced-documents";
+import type { PersistedDocument } from "../ydoc";
 
 /**
  * The Space document: one Yjs document per Space, named `space:<id>`, that

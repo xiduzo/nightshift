@@ -4,6 +4,7 @@ import type { ArtifactStore } from "./artifacts";
 import type { AnswerCost } from "./assistant";
 import type { RunFilesService } from "./cleanup";
 import { type Actor, personOf } from "./contract";
+import { type SpaceDocuments, setSpaceUsage } from "./documents";
 import type { SpaceFlows } from "./flows";
 import type { Gates } from "./gates";
 import type { Branches } from "./git";
@@ -15,8 +16,6 @@ import {
 	type ListedProject,
 	PROJECT_NOT_FOUND,
 	type Projects,
-	type SpaceDocuments,
-	setSpaceUsage,
 	toProject,
 } from "./projects";
 import type { RunStreamItem } from "./read";

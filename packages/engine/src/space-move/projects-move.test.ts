@@ -19,15 +19,15 @@ import { FLOW_VERSION } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { and, eq, inArray } from "drizzle-orm";
 import { NIGHT_SHIFT } from "../contract";
-import type { Engine } from "../engine";
-import { createRunLog, type RunLog } from "../log/run-log/run-log";
 import {
 	createSpaceDocuments,
 	recordClone,
 	type SpaceDocuments,
 	spaceDocumentName,
 	spaceProjects,
-} from "../projects/space-document";
+} from "../documents/space/space-document";
+import type { Engine } from "../engine";
+import { createRunLog, type RunLog } from "../log/run-log/run-log";
 import { START_HOLD_WORDS } from "../runs/walk/domain/start-holds";
 import { aloneDirectory } from "../testing/alone-directory";
 import {

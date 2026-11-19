@@ -3,6 +3,7 @@ import { mkdir, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { clone, device, event, project } from "@nightshift/db/schema";
 import { asc, eq } from "drizzle-orm";
+import { createSpaceDocuments, type SpaceDocuments } from "../documents";
 import { createRunLog } from "../log/run-log/run-log";
 import { aloneDirectory } from "../testing/alone-directory";
 import {
@@ -19,7 +20,6 @@ import {
 	withoutFolderOf,
 } from "./projects";
 import { normaliseRemote } from "./remote";
-import { createSpaceDocuments, type SpaceDocuments } from "./space-document";
 
 let sandbox: Sandbox;
 let documents: SpaceDocuments;

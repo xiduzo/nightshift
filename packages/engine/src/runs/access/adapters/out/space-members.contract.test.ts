@@ -2,7 +2,7 @@ import { createDb } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 import { member, user } from "@nightshift/db/schema";
 import { asDate } from "@nightshift/time";
-import { createSpaceDocuments, memberRole } from "../../../../projects";
+import { createSpaceDocuments, memberRole } from "../../../../documents";
 import { aloneDirectory } from "../../../../testing/alone-directory";
 import { otherSpace } from "../../../../testing/test-support";
 import { authSpaceMembers } from "./auth-space-members";
