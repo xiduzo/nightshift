@@ -15,7 +15,7 @@ import {
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { type SpaceArchive, sha256Of, writeWhole } from "../archive";
-import { LOCAL_ONLY_BYTES } from "./documents";
+import { LOCAL_ONLY_BYTES } from "../file-loaders";
 import type { KnowledgeFolders } from "./folder";
 import type { KnowledgeFolderLocks } from "./folder-locks";
 import {

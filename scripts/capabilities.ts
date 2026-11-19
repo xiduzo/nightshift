@@ -193,8 +193,7 @@ const M = MECHANISM;
 
 /**
  * Each workspace, and each of its verticals with its capability,
- * MECHANISM or WIRING. Sorted by workspace, then by vertical.
- */
+ * MECHANISM or WIRING. Sorted by workspace, then by vertical. */
 export const VERTICALS: Record<string, Record<string, Place>> = {
 	"apps/desktop": {
 		// The desktop app is the shell around the daemon. Only its
@@ -466,6 +465,7 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		"device-config": "settings",
 		// The synced documents (Yjs).
 		documents: M,
+		"file-loaders": M,
 		flows: "flows",
 		// The answer to a Gate and the Needs-you inbox, in rings.
 		gates: "gates",

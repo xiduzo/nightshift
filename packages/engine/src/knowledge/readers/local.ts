@@ -1,6 +1,10 @@
 import { parseHTML } from "linkedom";
+import {
+	LOCAL_ONLY_BYTES,
+	loadDocumentContent,
+	textOf,
+} from "../../file-loaders";
 import type { AddressRules } from "../../web-access";
-import { LOCAL_ONLY_BYTES, loadDocumentContent, textOf } from "../documents";
 import { feedPage } from "./feed";
 import { type Fetched, fetchGuarded } from "./fetch";
 import {

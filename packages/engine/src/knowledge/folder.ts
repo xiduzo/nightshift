@@ -24,7 +24,7 @@ import {
 	loadDocument,
 	loadDocumentContent,
 	textOf,
-} from "./documents";
+} from "../file-loaders";
 import {
 	type FolderSnapshot,
 	isReadable,

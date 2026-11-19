@@ -115,6 +115,7 @@ export {
 } from "./documents";
 export type { Engine, SharedAnswerCosts } from "./engine";
 export type { EngineOptions } from "./engine-options";
+export { LOCAL_ONLY_BYTES } from "./file-loaders";
 export type {
 	FlowExport,
 	FlowNotice,
@@ -154,7 +155,6 @@ export {
 	type KnowledgeText,
 	type KnowledgeUseReport,
 	type LinkLook,
-	LOCAL_ONLY_BYTES,
 	type WaitingLearning,
 } from "./knowledge";
 export type {

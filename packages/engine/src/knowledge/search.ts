@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { Document } from "@langchain/core/documents";
+import { isDocument, loadDocument } from "../file-loaders";
 import { createCloseNotes } from "./close-notes";
-import { isDocument, loadDocument } from "./documents";
 import {
 	createKnowledgeFolders,
 	cutText,

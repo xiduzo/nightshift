@@ -11,8 +11,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Document } from "@langchain/core/documents";
 import { asDate, iso, now } from "@nightshift/time";
+import type { DocumentMetadata } from "../file-loaders";
 import { tinyDocx, tinyPdf } from "../testing/documents";
-import type { DocumentMetadata } from "./documents";
 import {
 	createKnowledgeFolders,
 	describeFile,

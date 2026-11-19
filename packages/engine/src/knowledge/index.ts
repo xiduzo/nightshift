@@ -8,7 +8,6 @@
  * interface writes, and what the run's log and the Host contract share.
  */
 
-export { LOCAL_ONLY_BYTES } from "./documents";
 export { DEFAULT_EMBEDDING_MODEL } from "./embedding-model";
 export type { KnowledgeEvaluation } from "./evaluate";
 export type { KnowledgeText } from "./folder";

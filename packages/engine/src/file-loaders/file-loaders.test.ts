@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { tinyDocx, tinyPdf } from "../testing/documents";
-import { loadDocument, loadDocumentContent, textOf } from "./documents";
+import { loadDocument, loadDocumentContent, textOf } from "./file-loaders";
 
 let dir: string;
 
