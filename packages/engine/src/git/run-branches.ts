@@ -2,7 +2,7 @@ import { realpath, rm, stat } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 
 import { type Git, GitError, gitOrThrow } from "./git";
-import { KEPT_REFS, worktreeLocation } from "./worktrees";
+import { KEPT_REFS, worktreeLocation } from "./worktree-places";
 
 /**
  * What a run left in a project's clone on this computer: its worktree

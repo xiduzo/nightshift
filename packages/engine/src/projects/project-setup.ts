@@ -4,7 +4,7 @@ import { findProgram } from "@nightshift/agents/types";
 import { KNOWLEDGE_SOURCE_KINDS } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 
-import { type Git, gitOrThrow, systemGit } from "./git";
+import { type Git, gitOrThrow, systemGit } from "../git";
 
 /**
  * Project readiness: what a folder needs before runs can start in it, in

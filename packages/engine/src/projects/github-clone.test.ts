@@ -10,10 +10,9 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-
+import { type Git, type GitResult, systemGit } from "../git";
+import type { GitHubAccess, GitHubCli } from "../github";
 import { commitFile, mustGit } from "../testing/test-support";
-import { type Git, type GitResult, systemGit } from "./git";
-import type { GitHubAccess, GitHubCli } from "./github";
 import {
 	cloneProblem,
 	createGitHubClones,

@@ -6,9 +6,9 @@ import {
 	startCleanupJob,
 } from "./cleanup";
 import type { EngineInternals } from "./engine";
+import { createRunBranches, type Git } from "./git";
 import type { Runner } from "./graph";
 import { getRunRow, type RunLog } from "./log";
-import { createRunBranches, type Git } from "./projects";
 import type { Views } from "./runs";
 
 type RunCopiesDeps = Parameters<typeof createRunCopies>[0];

@@ -31,15 +31,14 @@ import {
 	type ProfileStore,
 	unreachableNote,
 } from "../device-config";
-import type { Knowledge } from "../knowledge";
 import {
-	checkProjectFolder,
 	createWorktreeSnapshots,
 	createWorktrees,
 	type Git,
-	NOT_ON_THIS_COMPUTER,
 	systemGit,
-} from "../projects";
+} from "../git";
+import type { Knowledge } from "../knowledge";
+import { checkProjectFolder, NOT_ON_THIS_COMPUTER } from "../projects";
 import type { RunFolders } from "../run-folders";
 import { spawnCommand } from "./command";
 import { ARTIFACTS_ENV, type KeptFiles, openKeptFiles } from "./kept-files";

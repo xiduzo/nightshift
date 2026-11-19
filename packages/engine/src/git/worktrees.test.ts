@@ -11,6 +11,7 @@ import {
 } from "../testing/test-support";
 import { systemGit } from "./git";
 import { createRunBranches } from "./run-branches";
+import { keptRefsOf } from "./worktree-places";
 import {
 	baseDiverged,
 	baseNotFetched,
@@ -20,7 +21,6 @@ import {
 	createWorktree,
 	currentBranch,
 	freeBranchName,
-	keptRefsOf,
 	listBranches,
 	resolveRepoTopLevel,
 	restoreWorktree,

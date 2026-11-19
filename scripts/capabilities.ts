@@ -469,6 +469,12 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		flows: "flows",
 		// The answer to a Gate and the Needs-you inbox, in rings.
 		gates: "gates",
+		// The git port, the run worktrees and the branches of ended runs. It
+		// runs git, and no person asks it for anything.
+		git: M,
+		// The `gh` program: the sign-in, the repositories and the pull
+		// requests, for the project copies and the Scores.
+		github: M,
 		// It walks a flow (decision 9 of the hexagon series).
 		graph: M,
 		knowledge: "knowledge",

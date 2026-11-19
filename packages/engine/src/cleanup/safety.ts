@@ -1,8 +1,8 @@
-import type { RunBranchState, RunCopyState } from "../projects";
+import type { RunBranchState, RunCopyState } from "../git";
 
 /**
  * What the cleanup keeps of what a run left on this computer, and when.
- * Pure: the facts come from `projects/run-branches.ts`.
+ * Pure: the facts come from `git/run-branches.ts`.
  *
  * A run's copy of the project and its local branches go a day after the
  * run ended (`RUN_COPY_DAYS`). Work that is only on this computer stays

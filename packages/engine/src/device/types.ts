@@ -18,8 +18,8 @@ import type {
 	WebRequestMethod,
 } from "@nightshift/flows";
 import type { KnowledgeRequest, KnowledgeUseEvent, StepRun } from "../contract";
+import type { RestoredFrom } from "../git";
 import type { WorktreeChanges } from "../log";
-import type { RestoredFrom } from "../projects";
 
 /**
  * The Device port: what a step body needs from a computer, as one
@@ -162,7 +162,7 @@ export type Device = {
 	/**
 	 * What changed in the worktree at `cwd` since the snapshot `from`: a new
 	 * snapshot, and each file that differs, with its diff up to the limits
-	 * (`projects/worktree-changes.ts`). Present when `snapshotWorktree` is.
+	 * (`git/worktree-changes.ts`). Present when `snapshotWorktree` is.
 	 */
 	worktreeChanges?(input: {
 		cwd: string;

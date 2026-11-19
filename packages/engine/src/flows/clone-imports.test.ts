@@ -6,7 +6,7 @@ import { clone, project } from "@nightshift/db/schema";
 import { singleAgentFlow } from "@nightshift/flows";
 import { asDate, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
-import { systemGit } from "../projects";
+import { systemGit } from "../git";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { createCloneImports } from "./clone-imports";
 import {

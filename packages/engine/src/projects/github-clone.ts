@@ -8,7 +8,7 @@ import {
 	GitNotInstalledError,
 	type GitResult,
 	systemGit,
-} from "./git";
+} from "../git";
 import {
 	type GitHubAccess,
 	type GitHubCli,
@@ -17,7 +17,7 @@ import {
 	gitHubRepoLabel,
 	parseGitHubRepo,
 	systemGitHubCli,
-} from "./github";
+} from "../github";
 import { normaliseRemote } from "./remote";
 
 /**

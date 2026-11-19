@@ -1,6 +1,6 @@
 import { lstat, readdir, readFile, rmdir, unlink } from "node:fs/promises";
 import { join } from "node:path";
-import type { Git } from "../projects";
+import type { Git } from "../git";
 
 /**
  * The `.nightshift/` folder of a Clone from before ADR 2: the flows in

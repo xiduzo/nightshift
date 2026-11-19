@@ -7,10 +7,10 @@
  * names another workspace imports.
  */
 
-export type { GitInstall } from "./git";
-export { systemGitInstaller } from "./git";
-export type { GitHubAccess, GitHubRepo } from "./github";
-export { systemGitHubCli } from "./github";
+export type { Branches, GitInstall } from "../git";
+export { systemGitInstaller, worktreeLocation } from "../git";
+export type { GitHubAccess, GitHubRepo } from "../github";
+export { systemGitHubCli } from "../github";
 export type { GitHubClone, GitHubClones } from "./github-clone";
 export { createGitHubClones } from "./github-clone";
 export {
@@ -29,5 +29,3 @@ export {
 	memberName,
 	memberRole,
 } from "./space-document";
-export type { Branches } from "./worktrees";
-export { worktreeLocation } from "./worktrees";

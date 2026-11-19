@@ -2,7 +2,7 @@ import type { Database } from "@nightshift/db";
 import { clone, project } from "@nightshift/db/schema";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import type { ProfileStore } from "../device-config";
-import type { Git } from "../projects";
+import type { Git } from "../git";
 import type { FlowDocuments } from "./flow-document";
 import type { FlowMigrations } from "./flow-migration";
 import { importClone } from "./import";

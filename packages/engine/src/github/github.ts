@@ -1,8 +1,7 @@
 import { findProgram } from "@nightshift/agents/types";
 import { Refusal } from "@nightshift/refusal";
-
+import { type GitResult, type GitRunOptions, runProcess } from "../git";
 import type { PullRequestView } from "../scores";
-import { type GitResult, type GitRunOptions, runProcess } from "./git";
 
 /**
  * GitHub, for a project added from a repository there. `parseGitHubRepo`

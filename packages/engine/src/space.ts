@@ -6,12 +6,12 @@ import type { RunFilesService } from "./cleanup";
 import { type Actor, personOf } from "./contract";
 import type { SpaceFlows } from "./flows";
 import type { Gates } from "./gates";
+import type { Branches } from "./git";
 import type { Runner } from "./graph";
 import { type RunLog, scopeKey } from "./log";
 import type { MemoryFlow, NodeMemory } from "./memory";
 import type { WithPaths } from "./peers";
 import {
-	type Branches,
 	type ListedProject,
 	PROJECT_NOT_FOUND,
 	type Projects,

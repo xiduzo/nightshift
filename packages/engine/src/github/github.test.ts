@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import type { GitResult, GitRunOptions } from "./git";
+import type { GitResult, GitRunOptions } from "../git";
 import { parseGitHubRepo, reposOf, systemGitHubCli } from "./github";
 
 describe("parseGitHubRepo", () => {

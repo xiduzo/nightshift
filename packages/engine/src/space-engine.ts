@@ -11,8 +11,9 @@ import type {
 	StartRunInput,
 } from "./contract";
 import type { SpaceFlows } from "./flows";
+import type { Branches } from "./git";
 import type { NodeMemory } from "./memory";
-import type { Branches, Project } from "./projects";
+import type { Project } from "./projects";
 import type {
 	AnsweredGate,
 	OpenGate,

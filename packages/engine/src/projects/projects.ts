@@ -7,8 +7,8 @@ import { Refusal } from "@nightshift/refusal";
 import { instant, now as timeNow } from "@nightshift/time";
 import { and, asc, eq, getColumns, isNull } from "drizzle-orm";
 import type { DeviceDirectory, Relay } from "../contract";
+import { createWorktrees, type Git, systemGit } from "../git";
 import type { RunLog } from "../log";
-import { type Git, systemGit } from "./git";
 import { normaliseRemote } from "./remote";
 import {
 	cloneKey,
@@ -28,7 +28,6 @@ import {
 	projectRowsOf,
 	spaceProjectRows,
 } from "./space-rows";
-import { createWorktrees } from "./worktrees";
 
 /**
  * Projects by remote, and their Clones on this computer. A Project with a

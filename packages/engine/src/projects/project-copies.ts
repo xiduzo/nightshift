@@ -1,9 +1,9 @@
 import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
 import { type Actor, NIGHT_SHIFT } from "../contract";
+import { type Git, systemGit } from "../git";
+import { parseGitHubRepo } from "../github";
 import type { UsageNotes } from "../usage";
-import { type Git, systemGit } from "./git";
-import { parseGitHubRepo } from "./github";
 import type { GitHubClones } from "./github-clone";
 import { PROJECT_NOT_FOUND, type Project } from "./projects";
 import { normaliseRemote } from "./remote";

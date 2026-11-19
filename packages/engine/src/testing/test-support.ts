@@ -29,10 +29,10 @@ import {
 } from "../device-config/device-document";
 import type { Engine } from "../engine";
 import type { EngineOptions } from "../engine-options";
+import { systemGit } from "../git";
 import { parseEventRow } from "../log/run-log/append";
 import type { RunLog } from "../log/run-log/run-log";
 import type { PeersFactory } from "../peers";
-import { systemGit } from "../projects/git";
 import { clonePathOf } from "../projects/projects";
 import type { RunDetail } from "../read/views";
 import { createRunFolders } from "../run-folders/run-folders";

@@ -11,7 +11,8 @@ import {
 } from "../testing/test-support";
 import { systemGit } from "./git";
 import { createRunBranches } from "./run-branches";
-import { createWorktree, keptRefsOf } from "./worktrees";
+import { keptRefsOf } from "./worktree-places";
+import { createWorktree } from "./worktrees";
 
 const branches = createRunBranches(systemGit());
 const identity = [

@@ -9,8 +9,8 @@ import {
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { GIT_DOWNLOAD_URL, systemGit, systemGitInstaller } from "../git/git";
 import { mustGit } from "../testing/test-support";
-import { GIT_DOWNLOAD_URL, systemGit, systemGitInstaller } from "./git";
 import {
 	checkProjectFolder,
 	checkTools,

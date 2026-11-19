@@ -6,13 +6,13 @@ import { FLOW_VERSION } from "@nightshift/flows";
 import { and, eq } from "drizzle-orm";
 import { NIGHT_SHIFT } from "../../src/contract";
 import type { Engine } from "../../src/engine";
+import { git } from "../../src/git/worktrees";
 import { parseEventRow } from "../../src/log/run-log/append";
 import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
 import {
 	createSpaceDocuments,
 	type SpaceDocuments,
 } from "../../src/projects/space-document";
-import { git } from "../../src/projects/worktrees";
 import { aloneDirectory } from "../../src/testing/alone-directory";
 import {
 	createSandbox,

@@ -1,10 +1,6 @@
+import { keptRefsOf, type RunBranches, type RunCopyState } from "../git";
 import type { RunLog } from "../log";
-import {
-	keptRefsOf,
-	type Projects,
-	type RunBranches,
-	type RunCopyState,
-} from "../projects";
+import type { Projects } from "../projects";
 import { isOpenStatus, type RunSummary } from "../read";
 import type { RunStatus } from "../run-status";
 import {

@@ -7,13 +7,9 @@ import {
 	createProjectFlows,
 	type FlowDocuments,
 } from "./flows";
+import { createWorktrees, systemGit } from "./git";
 import type { RunLog } from "./log";
-import {
-	createProjects,
-	createWorktrees,
-	type SpaceDocuments,
-	systemGit,
-} from "./projects";
+import { createProjects, type SpaceDocuments } from "./projects";
 
 type ProjectsDeps = Parameters<typeof createProjects>[0];
 
