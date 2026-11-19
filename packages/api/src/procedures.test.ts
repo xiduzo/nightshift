@@ -195,8 +195,7 @@ function recording(
 			},
 			{
 				given: given.space,
-				reply: (method, args) => {
-					if (method === "space.listGates") return gatesIn.get(spaceId) ?? [];
+				reply: (method) => {
 					if (method === "space.watchRun") return (async function* () {})();
 					if (method === "space.listRuns") return [];
 					if (method === "space.flows.revisions") return [];
