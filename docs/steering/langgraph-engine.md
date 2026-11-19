@@ -251,6 +251,14 @@ packages/engine/src/
                            run a dead daemon left: the prune Turn of
                            startup recovery). A stop ends every run that
                            is going, also one that no drive holds.
+                           runner.ts composes three files:
+    runner/run-slots.ts    The runner's state per run, the Turn queue, the
+                           slots and the run cap.
+    runner/drive.ts        The drive of a run's thread, how it ended, the
+                           take of a run from its drive, the end of open
+                           work and the re-entry (reenter).
+    runner/turns.ts        One phase per intent, and turnFor, which reads
+                           the row and the log before the phase.
   testing/graph.ts         The one set of graph test helpers: node builders
                            (agent(), command(), edge(), flowOf()), startRun()
                            for a run row with its log and its Thread (opened
@@ -846,7 +854,7 @@ It throws the refusals with a message for the person: a run that runs,
 waits or sleeps, a node that is not a top-level node of the run's flow,
 and a step that is not that node's.
 
-The runner's re-entry Turn (`reenter` in `runner.ts`) is the one place
+The runner's re-entry Turn (`reenter` in `runner/drive.ts`) is the one place
 that appends `RunResumed`. With the run's slot held, it plans, appends,
 and drives the entry. A thread that cannot move ends the run `failed`
 ("The run could not start again: ..."). So the log never says a run runs

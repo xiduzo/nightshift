@@ -1,49 +1,13 @@
-import { AsyncLocalStorage } from "node:async_hooks";
-import { branchPlaces } from "@nightshift/flows";
-import { Refusal, wordsFor } from "@nightshift/refusal";
-import {
-	provedEndReason,
-	type RunEnding,
-	type RunEndReason,
-	type RunLog,
-	type RunRow,
-	type RunState,
-	runsArriving,
-} from "../../log";
-import { deriveSteps, firstDeadline } from "../../read";
-import {
-	ARRIVING,
-	RunRefusal,
-	type RunResult,
-	type RunStatus,
-	STILL_RUNNING,
-	WALKED_ELSEWHERE,
-} from "../../run-status";
-import { FencedError } from "../checkpoints";
-import type { Parked, ResumeValue, RunEvent } from "../state";
-import { findOverdue } from "./deadlines";
-import { letGo, NO_HOLDS } from "./holds";
-import { type CloseDeps, type CutShort, closeOpenWork } from "./open-work";
-import { planReentry, type ReentryRequest } from "./reentry";
-import {
-	endingOf,
-	inputOf,
-	openThread,
-	resumeEach,
-	type StreamInput,
-	type Thread,
-} from "./thread";
-import {
-	ENGINE_FAILED,
-	type Held,
-	type Intent,
-	RELEASED,
-	RestartTooLate,
-	type RunnerDeps,
-	type Taken,
-	type TakeOptions,
-} from "./turn";
-import { createSleeps, planWake, recordWake, type Wake } from "./wake";
+import { type RunState, runsArriving } from "../../log";
+import { ARRIVING, RunRefusal, WALKED_ELSEWHERE } from "../../run-status";
+import { createDrives } from "./drive";
+import { NO_HOLDS } from "./holds";
+import type { CloseDeps } from "./open-work";
+import { createRunnerState, createTurnQueue } from "./run-slots";
+import { openThread } from "./thread";
+import type { Held, Intent, RunnerDeps, Taken, TakeOptions } from "./turn";
+import { createTurns } from "./turns";
+import { createSleeps } from "./wake";
 
 /**
  * The per-run driver: every run is one LangGraph thread (thread id = run
@@ -123,41 +87,18 @@ import { createSleeps, planWake, recordWake, type Wake } from "./wake";
  *   The overdue check and the prune leave it. Its test moves a run
  *   between two computers (`test/engine/move.test.ts`).
  *
- * Over 600 lines on purpose: the drive, the slots, the queues and the
- * stop of a run share one state per run, so they stay in one module.
+ * The runner keeps one state per run (`RunnerState`, `run-slots.ts`) and
+ * splits its work by what each part does with it: the Turn queue, the
+ * slots and the cap (`run-slots.ts`), the drive and the end of open work
+ * (`drive.ts`), and one phase per intent (`turns.ts`). This file composes
+ * them, in the order they are made, with the sleeps, the overdue sweep and
+ * the release.
  */
 
-/** How long `release` waits for the Turns in flight. */
-const RELEASE_WAIT_MS = 5_000;
+/** How long the sweep waits between two looks at the steps' time. */
 const DEFAULT_OVERDUE_SWEEP_MS = 5_000;
 
-type Walk = {
-	/** Aborts when a person stops the run. */
-	controller: AbortController;
-	done: Promise<void>;
-	/** The thread the drive streams; null until the drive compiled it. */
-	thread: Thread | null;
-};
-
-/** "starting": reserved by the Turn that holds it, before its drive began (I3). */
-type Slot = Walk | "starting";
-
-/** What a Turn of a run did to its slot, for the end of the Turn. */
-type TurnState = { freed: boolean };
-
 export type Runner = ReturnType<typeof createRunner>;
-
-const DRIVING: Taken = { kind: "driving" };
-/** An answer to a Gate on one branch while another branch's step still runs. */
-const BRANCHES_WORK =
-	"Another branch of this run is still working. Answer the Gate when its step ends.";
-
-const HALTED: Taken = { kind: "halted" };
-const QUEUED: Taken = { kind: "queued" };
-const UNCHANGED: Taken = { kind: "unchanged" };
-
-const isGoing = (status: RunStatus) =>
-	status === "running" || status === "waiting" || status === "sleeping";
 
 export function createRunner(deps: RunnerDeps) {
 	const { db, shared } = deps;
@@ -171,22 +112,13 @@ export function createRunner(deps: RunnerDeps) {
 		calledFlowsOf: deps.calledFlowsOf,
 		holds,
 	};
-	/** Open threads by run id, kept while the run is likely to continue soon. */
-	const threads = new Map<string, Thread>();
-	/** Keyed by run id: the runs that walk in this process. */
-	const slots = new Map<string, Slot>();
-	/** Per-run queues of Turns (I1). */
-	const queues = new Map<string, Promise<void>>();
-	/** The Turns that began and have not ended, for `release`. */
-	const inFlight = new Set<Promise<void>>();
-	/** Turns a full run cap holds, by run id, in order: what each runs when a slot frees (I10). */
-	const capQueue = new Map<string, () => void>();
-	/** The runs whose Turn the current async context is in (I11). */
-	const turnOf = new AsyncLocalStorage<ReadonlySet<string>>();
-	let released = false;
-
-	/** Runs `fn` outside any Turn: what it starts is not part of the Turn that started it. */
-	const outside = <T>(fn: () => T): T => turnOf.exit(fn);
+	const state = createRunnerState();
+	const { threads, slots, capQueue } = state;
+	const queue = createTurnQueue(state, {
+		shared,
+		take: (runId, intent, options) => take(runId, intent, options),
+	});
+	const { outside, walkOf, refuseTurn, inTurn } = queue;
 
 	const sleeps = createSleeps({
 		now: shared.now,
@@ -231,7 +163,7 @@ export function createRunner(deps: RunnerDeps) {
 	 * engine's recovery reads the log.
 	 */
 	async function release(): Promise<void> {
-		released = true;
+		state.released = true;
 		capQueue.clear();
 		const held = [...slots];
 		slots.clear();
@@ -245,7 +177,7 @@ export function createRunner(deps: RunnerDeps) {
 				await settled;
 			}),
 		);
-		await settleTurns();
+		await queue.settleTurns();
 		dispose();
 	}
 
@@ -255,744 +187,22 @@ export function createRunner(deps: RunnerDeps) {
 		return (await runsArriving(db, here, [runId])).length > 0;
 	}
 
-	/** Waits for the Turns in flight, up to `RELEASE_WAIT_MS`. */
-	async function settleTurns(): Promise<void> {
-		if (inFlight.size === 0) return;
-		let timer: ReturnType<typeof setTimeout> | undefined;
-		await Promise.race([
-			Promise.allSettled([...inFlight]),
-			new Promise<void>((resolve) => {
-				timer = setTimeout(resolve, RELEASE_WAIT_MS);
-				timer.unref?.();
-			}),
-		]);
-		clearTimeout(timer);
-	}
-
-	/** The run's open thread; opened once per run, from its snapshot. */
-	function threadOf(row: RunRow): Thread {
-		const cached = threads.get(row.id);
-		if (cached) return cached;
-		const thread = open(row, deps);
-		threads.set(row.id, thread);
-		return thread;
-	}
-
-	/** The drive that holds the run's slot, if one does. */
-	function walkOf(runId: string): Walk | undefined {
-		const slot = slots.get(runId);
-		return slot === "starting" ? undefined : slot;
-	}
-
-	/** Throws when no Turn of `runId` may be asked for here: released (I7), or inside one (I11). */
-	function refuseTurn(runId: string): void {
-		if (released) throw new Refusal("unavailable", RELEASED);
-		if (turnOf.getStore()?.has(runId)) {
-			throw new Error(
-				`A Turn of run ${runId} cannot wait for another Turn of the same run.`,
-			);
-		}
-	}
-
-	/**
-	 * Runs `fn` as a Turn of the run: after every earlier Turn of it has
-	 * settled (I1). At its end, a slot still "starting" is freed, and a
-	 * freed slot lets the cap queue go.
-	 */
-	function inTurn<T>(
-		runId: string,
-		fn: (turn: TurnState) => Promise<T>,
-	): Promise<T> {
-		refuseTurn(runId);
-		const within = new Set([...(turnOf.getStore() ?? []), runId]);
-		const previous = queues.get(runId) ?? Promise.resolve();
-		const current = previous.then(() => {
-			if (released) throw new Refusal("unavailable", RELEASED);
-			return turnOf.run(within, () => runTurn(runId, fn));
-		});
-		const tail = current.then(
-			() => {},
-			() => {},
-		);
-		queues.set(runId, tail);
-		void tail.then(() => {
-			if (queues.get(runId) === tail) queues.delete(runId);
-		});
-		return current;
-	}
-
-	async function runTurn<T>(
-		runId: string,
-		fn: (turn: TurnState) => Promise<T>,
-	): Promise<T> {
-		const turn: TurnState = { freed: false };
-		const running = fn(turn);
-		const settled = running.then(
-			() => {},
-			() => {},
-		);
-		inFlight.add(settled);
-		try {
-			return await running;
-		} finally {
-			inFlight.delete(settled);
-			if (slots.get(runId) === "starting") {
-				slots.delete(runId);
-				turn.freed = true;
-			}
-			if (turn.freed) slotFreed(runId);
-		}
-	}
-
-	/**
-	 * Holds a slot for the run, in one synchronous step (I2). Throws when a
-	 * drive holds it already, and on a full run cap unless `whenFull` is
-	 * "queue": then the Turn waits in the cap queue, and this says false.
-	 */
-	function reserve(
-		runId: string,
-		intent: Intent,
-		options: TakeOptions,
-	): boolean {
-		if (slots.has(runId)) throw new RunRefusal("not-now", STILL_RUNNING);
-		const runCap = shared.settings().maxConcurrentRuns;
-		if (slots.size >= runCap) {
-			if (options.whenFull === "queue") {
-				capQueue.set(
-					runId,
-					options.retry ??
-						(() => {
-							take(runId, intent, options).catch((error) => {
-								console.error(`[engine] could not take run ${runId}`, error);
-							});
-						}),
-				);
-				return false;
-			}
-			throw new Refusal(
-				"conflict",
-				`The run cap is reached: ${slots.size} of ${runCap} runs are running. Stop a run or wait for one to end.`,
-			);
-		}
-		slots.set(runId, "starting");
-		return true;
-	}
-
-	/** A slot is free: the bus hears it, and every Turn the cap queue holds tries once more (I10). */
-	function slotFreed(runId: string): void {
-		bus.publish(runId, { kind: "status-changed" });
-		if (released) return;
-		const retries = [...capQueue.values()];
-		capQueue.clear();
-		for (const retry of retries) outside(retry);
-	}
-
-	/** Appends `RunEnded` through `writer`: a drive's own fenced log, or the runner's. */
-	async function endRun(
-		writer: RunLog,
-		runId: string,
-		status: RunEnding,
-		reason: string | null,
-		result?: RunResult,
-		endReason?: RunEndReason,
-	): Promise<void> {
-		const code =
-			endReason ?? provedEndReason({ status, reason, result: result ?? null });
-		try {
-			await writer.append({
-				type: "RunEnded",
-				runId,
-				payload: {
-					status,
-					reason,
-					endReason: code,
-					...(result ? { result } : {}),
-				},
-			});
-			await letGo(holds, runId, status);
-		} catch (error) {
-			// A stop took the run from the drive and wrote its end.
-			if (error instanceof FencedError) return;
-			// The next start marks the run interrupted.
-			console.error(`[engine] could not record the end of run ${runId}`, error);
-		}
-	}
-
-	/**
-	 * Takes over the Turn's reserved slot and drives the thread in the
-	 * background (I4). The slot is released when the drive ends, however it
-	 * ends. A released runner begins no drive (I7).
-	 */
-	function drive(row: RunRow, input: StreamInput): void {
-		if (released) throw new Refusal("unavailable", RELEASED);
-		const runId = row.id;
-		const walk: Walk = {
-			controller: new AbortController(),
-			done: Promise.resolve(),
-			thread: null,
-		};
-		slots.set(runId, walk);
-		bus.publish(runId, { kind: "status-changed" });
-		// The drive outlives the Turn that began it: it is not part of it.
-		walk.done = outside(() =>
-			driveThread(row, walk, input).finally(() => {
-				if (slots.get(runId) === walk) slots.delete(runId);
-				slotFreed(runId);
-			}),
-		);
-	}
-
-	/**
-	 * Drives the thread and records how the drive ended. A drive whose
-	 * fence a stop closed records nothing: the stop wrote the run's end.
-	 */
-	async function driveThread(
-		row: RunRow,
-		walk: Walk,
-		input: StreamInput,
-	): Promise<void> {
-		const runId = row.id;
-		let thread: Thread | undefined;
-		try {
-			// Before the first await: a stop that comes in later finds the thread.
-			thread = threadOf(row);
-			walk.thread = thread;
-			const outcome = await thread.drive(input, {
-				controller: walk.controller,
-				onEvent: (event) => onCustom(runId, event),
-			});
-			if (outcome.kind === "parked") onInterrupt(runId, outcome.interrupts);
-			const ending = endingOf(outcome);
-			if (!ending) {
-				// A run that waits or holds a Gate keeps only what its resume
-				// reads. The prune does not hold the slot, so an answer that
-				// comes at once is not refused: it is safe beside a drive.
-				if (outcome.kind === "parked") void pruneThread(thread, runId);
-				return;
-			}
-			dropThread(runId, thread);
-			// The prune comes first: once the log says the run ended, a
-			// person may resume it, and the slot frees right after the end.
-			await pruneThread(thread, runId);
-			await endRun(
-				thread.ctx.log,
-				runId,
-				ending.status,
-				ending.reason,
-				ending.result,
-				ending.endReason,
-			);
-		} catch (error) {
-			// A stop took the run from this drive: it writes nothing more.
-			if (thread?.fence.closed) return;
-			console.error(`[engine] the walk of run ${runId} failed`, error);
-			if (thread) await pruneThread(thread, runId);
-			await endRun(
-				thread?.ctx.log ?? log,
-				runId,
-				"failed",
-				error instanceof Refusal ? error.message : ENGINE_FAILED,
-			);
-		}
-	}
-
-	/** Drops the run's compiled thread from the cache, when it is still `thread`. */
-	function dropThread(runId: string, thread: Thread): void {
-		if (threads.get(runId) === thread) threads.delete(runId);
-	}
-
-	/**
-	 * Drops what the run's thread no longer needs (`Thread.prune`): it keeps
-	 * the latest root checkpoint and the namespaces of the tasks that are
-	 * not done. The event log is the record. What is kept is all a resume,
-	 * a restart, a rerun or a wake reads (`planReentry`, `planWake`): a
-	 * finished run's final state, or the interrupt or cut-short node of a
-	 * run that failed, stopped, waits or holds a Gate, with the body it
-	 * parked in.
-	 */
-	async function pruneThread(
-		thread: Thread | (() => Thread),
-		runId: string,
-	): Promise<void> {
-		try {
-			await (typeof thread === "function" ? thread() : thread).prune();
-		} catch (error) {
-			if (error instanceof FencedError) return;
-			console.error(
-				`[engine] could not prune the checkpoints of run ${runId}`,
-				error,
-			);
-		}
-	}
-
-	/** A step started or ended: the run's status may have changed with it. */
-	function onCustom(runId: string, event: RunEvent): void {
-		if (event.type === "step-started" || event.type === "step-ended") {
-			bus.publish(runId, { kind: "status-changed" });
-		}
-	}
-
-	/**
-	 * The root's interrupts ended the drive. A stop that came in while the
-	 * wait began or the Gate opened closed the drive's fence, so the drive
-	 * never gets here: the stop closed the parked step itself. A `parked`
-	 * step ends the run (`endingOf`); a Gate needs nothing. Parallel
-	 * branches may sleep at once: the timer is for the earliest wake.
-	 */
-	function onInterrupt(runId: string, interrupts: readonly Parked[]): void {
-		// A wait with no time (a signal with no timeout) has no timer.
-		// A Gate with a deadline: the timer answers it then (`deadlineTurn`).
-		// Parallel branches may wait at once: the timer is for the earliest.
-		const wakes = interrupts.flatMap((parked) =>
-			parked.kind === "wait" && parked.until !== null
-				? [parked.until]
-				: parked.kind === "gate" && parked.deadline
-					? [parked.deadline.at]
-					: [],
-		);
-		if (wakes.length > 0) sleeps.schedule(runId, Math.min(...wakes));
-	}
-
-	/**
-	 * Takes the run from its drive at once, without waiting for it: closes
-	 * the drive's fence (it writes nothing more, `fence.ts`), frees its slot
-	 * and its compiled thread (a resume drives a new thread while the old
-	 * drive unwinds, or hangs), and aborts it (the harness process is
-	 * signalled and killed). Resolves once the drive's writes in flight
-	 * settled; it waits on no timer (I6).
-	 */
-	async function takeFromDrive(
-		runId: string,
-		walk: Walk,
-		options: { keepSlot?: boolean } = {},
-	): Promise<void> {
-		const settled = walk.thread?.fence.close() ?? Promise.resolve();
-		if (slots.get(runId) === walk) {
-			// A restart keeps the slot for the drive that continues the run,
-			// so no other run takes it in between.
-			if (options.keepSlot) slots.set(runId, "starting");
-			else slots.delete(runId);
-		}
-		if (walk.thread) dropThread(runId, walk.thread);
-		walk.controller.abort();
-		await settled;
-	}
-
-	/**
-	 * Ends the run's open work as `cut` says (`graph/runner/open-work.ts`): its
-	 * open sessions, then its open steps from the inside out, then the run.
-	 * The run's wake timer goes first. The thread stays where it is: a
-	 * resume re-enters it (design rule 7), at its interrupt or at the node
-	 * the drive was in.
-	 */
-	async function halt(row: RunRow, cut: CutShort): Promise<void> {
-		sleeps.forget(row.id);
-		await closeOpenWork(closeDeps, row.id, cut);
-		// The drive's thread is fenced off: the run's open thread prunes.
-		await pruneThread(() => threadOf(row), row.id);
-	}
-
-	/**
-	 * Resolves once the run's log says the Gate of step `stepId` that was
-	 * asked at `askedSeq` closed, or no drive holds the run. A Gate closes
-	 * when its step ends, or when its step opens again (an Agent goes on
-	 * with the answer, and may ask again later). Subscribes before the first
-	 * look, so an append between the two is not missed.
-	 */
-	function untilGateClosed(
-		runId: string,
-		stepId: string,
-		askedSeq: number,
-	): Promise<void> {
-		return new Promise<void>((resolve) => {
-			let settled = false;
-			const unsubscribe = bus.subscribe(runId, () => void look());
-			async function look(): Promise<void> {
-				if (settled) return;
-				const runState = await log.state(runId);
-				if (settled) return;
-				const step = runState.steps.get(stepId);
-				const closed =
-					!step || step.endedAt !== null || step.openedSeq > askedSeq;
-				if (closed || !slots.has(runId)) {
-					settled = true;
-					unsubscribe();
-					resolve();
-				}
-			}
-			void look();
-		});
-	}
-
-	/**
-	 * Plans a re-entry from the log and the thread's latest checkpoint
-	 * (`planReentry`, which refuses a run that runs, waits or sleeps),
-	 * appends the plan's `RunResumed`, and moves the thread as the plan
-	 * says, on the slot the Turn holds (I5). A thread that cannot move ends
-	 * the run `failed`, so the log does not say it runs.
-	 */
-	async function reenter(row: RunRow, request: ReentryRequest): Promise<void> {
-		const runId = row.id;
-		const thread = threadOf(row);
-		const plan = planReentry({
-			flow: deps.flowOf(row),
-			run: await log.state(runId),
-			thread: await thread.snapshot(),
-			request,
-			now: shared.now(),
-		});
-		if (released) throw new Refusal("unavailable", RELEASED);
-		// What it held, it takes again before its next step, or it stays where it is.
-		await holds.resuming(row, await log.state(runId), {
-			nodeId: plan.resumed.nodeId,
-			scope: plan.resumed.scope ?? null,
-		});
-		await log.append({ type: "RunResumed", runId, payload: plan.resumed });
-		try {
-			if (plan.clearTasks) await thread.clearTasks();
-			drive(row, inputOf(plan.entry));
-		} catch (error) {
-			// The next engine's recovery takes the run from here.
-			if (released) throw error;
-			if (!(error instanceof Refusal)) {
-				console.error(`[engine] run ${runId} could not start again`, error);
-			}
-			const reason = `The run could not start again. ${wordsFor(error)}`;
-			await log.append({
-				type: "RunEnded",
-				runId,
-				payload: {
-					status: "failed",
-					reason,
-					endReason: provedEndReason({ status: "failed", reason }),
-				},
-			});
-			await letGo(holds, runId, "failed");
-			throw error;
-		}
-	}
-
-	/** A start: the slot first, before any await (I2), then `prepare`, then the drive. */
-	async function startTurn(
-		runId: string,
-		intent: Extract<Intent, { kind: "start" }>,
-	): Promise<Taken> {
-		reserve(runId, intent, {});
-		const { row, inputs, stopAt, dueAt } = await intent.prepare();
-		drive(row, inputOf({ kind: "start", inputs, stopAt, dueAt }));
-		return DRIVING;
-	}
-
-	/**
-	 * An answer: the thread continues at once, so it needs a slot. A full
-	 * cap leaves the Gate open. A Gate on one of parallel branches opens
-	 * while the other branches still work: the answer waits until they end.
-	 */
-	async function answerTurn(
-		row: RunRow,
-		intent: Extract<Intent, { kind: "answer" }>,
-		options: TakeOptions,
-	): Promise<Taken> {
-		const flow = walkOf(row.id)?.thread?.ctx.flow;
-		if (flow && branchPlaces(flow).size > 0) {
-			throw new RunRefusal("not-now", BRANCHES_WORK);
-		}
-		if (!reserve(row.id, intent, options)) return QUEUED;
-		// The Gate's deadline, if it has one, no longer applies.
-		sleeps.forget(row.id);
-		const { choice, note, byDeadline, data, via } = intent;
-		const asked =
-			(await log.state(row.id)).steps.get(intent.stepId)?.gate?.openedSeq ?? 0;
-		const value: ResumeValue = {
-			kind: "gate",
-			choice,
-			note,
-			...(byDeadline ? { byDeadline } : {}),
-			...(data !== undefined ? { data } : {}),
-			...(via ? { via } : {}),
-		};
-		// Parallel branches may hold several Gates: the answer goes to its own.
-		const each = resumeEach(await threadOf(row).state(), (parked) =>
-			parked.kind === "gate" && parked.stepId === intent.stepId ? value : null,
-		);
-		drive(row, inputOf({ kind: "resume", value, ...(each ? { each } : {}) }));
-		// The ask node ends the step on the answer, or an Agent's step opens
-		// again with it. The Turn ends once the Gate closed, so the run no
-		// longer waits when the caller looks again (I8).
-		await untilGateClosed(row.id, intent.stepId, asked);
-		return DRIVING;
-	}
-
-	/**
-	 * A timer fired on a run that waits at a Gate with a deadline: the Gate
-	 * takes the deadline's option, as an answer would, with a note that says
-	 * the deadline chose it. A timer before the deadline is set again. A
-	 * Gate a person answered first, or one without a deadline, is left as it
-	 * is.
-	 */
-	async function deadlineTurn(
-		row: RunRow,
-		runState: RunState,
-		options: TakeOptions,
-	): Promise<Taken> {
-		// Parallel branches may wait at several Gates: the first deadline is due.
-		const gate = firstDeadline(runState);
-		if (!gate) return UNCHANGED;
-		if (shared.now() < gate.deadline.at) {
-			sleeps.schedule(row.id, gate.deadline.at);
-			return UNCHANGED;
-		}
-		return answerTurn(
-			row,
-			{
-				kind: "answer",
-				stepId: gate.stepId,
-				choice: gate.deadline.choose,
-				note: "",
-				byDeadline: true,
-			},
-			options,
-		);
-	}
-
-	/**
-	 * A wake (`planWake`): `WaitEnded` and the transcript `wake`
-	 * (`recordWake`), then the resume into the wait node. A timer before
-	 * its time is set again.
-	 */
-	async function wakeTurn(
-		row: RunRow,
-		runState: RunState,
-		intent: Intent,
-		how: Wake,
-		options: TakeOptions,
-	): Promise<Taken> {
-		const runId = row.id;
-		const at = await threadOf(row).state();
-		const plan = planWake(runState, at, how, shared.now());
-		if (plan.kind === "not-sleeping") return UNCHANGED;
-		if (plan.kind === "too-soon") {
-			sleeps.schedule(runId, plan.until);
-			return UNCHANGED;
-		}
-		// The timer goes; a wake the cap holds stays queued.
-		sleeps.forget(runId);
-		if (!reserve(runId, intent, options)) return QUEUED;
-		await recordWake({ log, bus, recorders }, runId, plan, how);
-		const each = resumeEach(at, (parked) =>
-			parked.kind === "wait" && parked.stepId === plan.step.id
-				? plan.resume
-				: null,
-		);
-		drive(
-			row,
-			inputOf({
-				kind: "resume",
-				value: plan.resume,
-				...(each ? { each } : {}),
-			}),
-		);
-		return DRIVING;
-	}
-
-	/** A resume or a rerun of a run that is not going. */
-	async function reenterTurn(
-		row: RunRow,
-		intent: Intent,
-		request: ReentryRequest,
-		options: TakeOptions,
-	): Promise<Taken> {
-		if (!reserve(row.id, intent, options)) return QUEUED;
-		await reenter(row, request);
-		return DRIVING;
-	}
-
-	/**
-	 * A restart: the running drive is taken as a stop takes it, but its
-	 * slot stays reserved for the drive that continues the run (I6). A run
-	 * the log says runs but no drive in this process holds (its drive died)
-	 * is closed the same way: nothing can write to it. The open work ends
-	 * `stopped` (`StopRequested`, then `halt`), and the run continues as a
-	 * resume continues it, with the action `restart`.
-	 *
-	 * When the drive ended the run itself just before its fence closed,
-	 * there is nothing left to restart: throws `RestartTooLate` with the
-	 * run as it ended. When it ended the step but not the run, the run goes
-	 * on from the step's end on a new drive, as the old one would have
-	 * (the run position finds the step done), and the restart is too late
-	 * too.
-	 */
-	async function restartTurn(
-		row: RunRow,
-		intent: Extract<Intent, { kind: "restart" }>,
-		turn: TurnState,
-	): Promise<Taken> {
-		const runId = row.id;
-		const walk = walkOf(runId);
-		if (walk) await takeFromDrive(runId, walk, { keepSlot: true });
-		else reserve(runId, intent, {});
-		// The old drive may never unwind to free its slot itself.
-		turn.freed = true;
-		const runState = await log.state(runId);
-		const status = runState.status;
-		if (!isGoing(status)) throw new RestartTooLate(status);
-		if (walk && deriveSteps(runState).every((s) => s.endedAt !== null)) {
-			drive(row, inputOf({ kind: "continue" }));
-			throw new RestartTooLate(status);
-		}
-		await log.append({
-			type: "StopRequested",
-			runId,
-			payload: { by: intent.by, restart: true },
-		});
-		await halt(row, { kind: "stopped" });
-		await reenter(row, {
-			kind: "resume",
-			by: intent.by,
-			action: "restart",
-			...(intent.prompt !== undefined ? { prompt: intent.prompt } : {}),
-		});
-		return DRIVING;
-	}
-
-	/**
-	 * A stop, whatever the drive does: takes the run from the running drive
-	 * (`takeFromDrive`) and ends its open work as stopped, or closes a run
-	 * that waits at a Gate or sleeps. A run the log says runs but no drive
-	 * in this process holds (its drive died, or could not log its end) is
-	 * closed the same way: nothing else can end it. Waits on no drive and no
-	 * timer: a harness that hangs cannot hold a stop.
-	 */
-	async function stopTurn(
-		row: RunRow,
-		intent: Extract<Intent, { kind: "stop" }>,
-		turn: TurnState,
-	): Promise<Taken> {
-		const runId = row.id;
-		const walk = walkOf(runId);
-		if (walk) {
-			await takeFromDrive(runId, walk);
-			turn.freed = true;
-		}
-		const status = (await log.state(runId)).status;
-		if (!walk && !isGoing(status)) return UNCHANGED;
-		await log.append({
-			type: "StopRequested",
-			runId,
-			payload: { by: intent.by },
-		});
-		// A drive may have ended the run before the stop took it.
-		if (!isGoing(status)) return UNCHANGED;
-		await halt(row, { kind: "stopped" });
-		return HALTED;
-	}
-
-	/**
-	 * Ends the run's running step when it ran past its time budget or its
-	 * idle limit by `graceMs` or more, as the recorded limits say
-	 * (`findOverdue`): the step and the run end as the step's timer ends
-	 * them, through the stop's path, so a drive that hangs writes nothing
-	 * more.
-	 */
-	async function overdueTurn(
-		row: RunRow,
-		runState: RunState,
-		graceMs: number,
-		turn: TurnState,
-	): Promise<Taken> {
-		const runId = row.id;
-		if (runState.status !== "running") return UNCHANGED;
-		const overdue = await findOverdue(
-			runState,
-			{ now: shared.now(), graceMs, minuteMs: shared.minuteMs },
-			log.files(runId),
-		);
-		if (!overdue) return UNCHANGED;
-		const walk = walkOf(runId);
-		if (walk) {
-			await takeFromDrive(runId, walk);
-			turn.freed = true;
-		}
-		await halt(row, { kind: "overdue", ...overdue });
-		return HALTED;
-	}
-
-	/** One Turn: the row and the walker (I9), the log, the caller's check, then the intent. */
-	async function turnFor(
-		runId: string,
-		intent: Intent,
-		options: TakeOptions,
-		turn: TurnState,
-	): Promise<Taken> {
-		if (intent.kind === "start") return startTurn(runId, intent);
-		const row = await log.row(runId);
-		if (!(await log.walkedHere(row))) {
-			// The sweep and startup recovery look at runs; they refuse nothing.
-			if (intent.kind === "overdue" || intent.kind === "prune") {
-				return UNCHANGED;
-			}
-			throw new RunRefusal("walked-elsewhere", WALKED_ELSEWHERE);
-		}
-		// A drive holds a run that arrived. One without a drive may still
-		// arrive: it has no Checkpoint here yet (I12).
-		if (!slots.has(runId) && (await arriving(runId))) {
-			if (intent.kind === "overdue" || intent.kind === "prune") {
-				return UNCHANGED;
-			}
-			throw new RunRefusal("arriving", ARRIVING);
-		}
-		if (intent.kind === "prune") {
-			// The thread opens for the prune only: a resume opens its own.
-			await pruneThread(() => threads.get(runId) ?? open(row, deps), runId);
-			return UNCHANGED;
-		}
-		const runState = await log.state(runId);
-		options.check?.(runState);
-		switch (intent.kind) {
-			case "answer":
-				return answerTurn(row, intent, options);
-			case "wake":
-				// The timer of a Gate's deadline: the run waits, it does not sleep.
-				if (!intent.early && runState.status === "waiting") {
-					return deadlineTurn(row, runState, options);
-				}
-				return wakeTurn(row, runState, intent, intent, options);
-			case "resume": {
-				const { kind: _, ...request } = intent;
-				// A sleeping run wakes now, with the person's prompt.
-				if (runState.status === "sleeping") {
-					const prompt = request.prompt;
-					return wakeTurn(
-						row,
-						runState,
-						intent,
-						{
-							early: true,
-							by: request.by,
-							...(prompt !== undefined ? { prompt } : {}),
-						},
-						options,
-					);
-				}
-				return reenterTurn(
-					row,
-					intent,
-					{ kind: "resume", ...request },
-					options,
-				);
-			}
-			case "rerun": {
-				const { kind: _, ...request } = intent;
-				return reenterTurn(row, intent, { kind: "rerun", ...request }, options);
-			}
-			case "restart":
-				return restartTurn(row, intent, turn);
-			case "stop":
-				return stopTurn(row, intent, turn);
-			case "overdue":
-				return overdueTurn(row, runState, intent.graceMs, turn);
-		}
-	}
+	const drives = createDrives(state, {
+		deps,
+		open,
+		holds,
+		closeDeps,
+		queue,
+		sleeps,
+	});
+	const { turnFor } = createTurns(state, {
+		deps,
+		open,
+		queue,
+		drives,
+		sleeps,
+		arriving,
+	});
 
 	/**
 	 * Takes the run for one Turn: what `intent` asks, in the run's queue
@@ -1060,7 +270,7 @@ export function createRunner(deps: RunnerDeps) {
 	 * so the run cap bounds how many run at once.
 	 */
 	function sweepOverdue(): void {
-		if (released) return;
+		if (state.released) return;
 		for (const runId of slots.keys()) {
 			if (checking.has(runId)) continue;
 			checking.add(runId);
