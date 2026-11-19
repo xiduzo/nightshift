@@ -22,7 +22,13 @@ export type Daemon = {
 	dataDir: string;
 	env: Record<string, string>;
 	client: AppRouterClient;
-	process: Subprocess<"ignore", "ignore", "pipe">;
+	/**
+	 * The daemon's process. Its `stderr` is a copy of what the daemon
+	 * writes there, for a caller that keeps a log of its own.
+	 */
+	process: Subprocess<"ignore", "pipe", "pipe">;
+	/** The last lines the daemon wrote, stdout and stderr in the order they came. */
+	output: () => string;
 };
 
 /**
@@ -53,7 +59,37 @@ export async function freePort(): Promise<number> {
 	return port;
 }
 
-/** Starts a daemon in `<root>/<name>`, on `port` (a free one by default), and waits until it answers. */
+/**
+ * The longest a daemon may take to answer after its start. A start took
+ * 3.4 to 4.2 s with two daemons at once at load 170 to 180 (16 cores).
+ * This is seven times that. It stays below the 60 s `beforeAll` limit of
+ * the files that only start a daemon: a slow start fails with the error
+ * of `startDaemon`, not with the limit of the hook.
+ */
+const ANSWER_MS = 30_000;
+
+/** The daemon's own line once it listens (`packages/daemon/src/start.ts`). */
+const LISTENS = "Night Shift answers at";
+
+/** In the error the daemon writes when it cannot listen on its port. */
+const PORT_IN_USE = "EADDRINUSE";
+
+type Started = "listens" | "port in use";
+
+/** How much of the daemon's output an error shows. */
+const OUTPUT_LINES = 40;
+
+/** After the daemon ended: how long its streams may take to close. */
+const STREAMS_CLOSE_MS = 2_000;
+
+/** The children that `stopDaemon` stopped on purpose. */
+const stopped = new WeakSet<Subprocess>();
+
+/**
+ * Starts a daemon in `<root>/<name>`, on `port` (a free one by default),
+ * and waits until it says it listens and answers there. Throws when it
+ * stops first or does not answer within `ANSWER_MS`, with what it wrote.
+ */
 export async function startDaemon(
 	root: string,
 	name: string,
@@ -63,6 +99,7 @@ export async function startDaemon(
 	const at = port ?? (await freePort());
 	const url = `http://localhost:${at}`;
 	const dataDir = join(root, name);
+	const begun = now();
 	const child = Bun.spawn(["bun", "src/main.ts"], {
 		cwd: SERVER_DIR,
 		env: {
@@ -79,30 +116,163 @@ export async function startDaemon(
 			NIGHTSHIFT_DESKTOP_NOTIFICATIONS: "off",
 			...env,
 		},
-		stdout: "ignore",
+		// Both streams are read all the time: a full pipe stops the daemon.
+		stdout: "pipe",
 		stderr: "pipe",
 	});
-	const deadline = now() + 30_000;
-	while (now() < deadline) {
-		if (child.exitCode !== null) {
-			throw new Error(
-				`${name} stopped: ${await new Response(child.stderr).text()}`,
-			);
-		}
-		try {
-			if ((await fetch(url)).ok) break;
-		} catch {}
-		await Bun.sleep(100);
+	const output = readOutput(child);
+	/** What went wrong, and the daemon's last lines once it wrote them all. */
+	const said = async (line: string) => {
+		await output.read();
+		return `Daemon "${name}" (${url}): ${line} Its last output:\n${output.tail()}`;
+	};
+	const failure = await untilAnswers(child, output.started, url, begun);
+	if (failure !== null) {
+		child.kill("SIGKILL");
+		await child.exited;
+		throw new Error(await said(failure));
 	}
+	// A daemon that ends while a test still uses it fails that test with a
+	// refused call. This says why, in the test's output. A stop through
+	// `stopDaemon`, or any other that ends with code 0, is no news.
+	void child.exited.then(async () => {
+		if (!stopped.has(child) && child.exitCode !== 0) {
+			console.error(await said(`it stopped (${endOf(child)}) while in use.`));
+		}
+	});
 	const client: AppRouterClient = createORPCClient(
 		new RPCLink({ url: `${url}/rpc` }),
 	);
-	return { name, url, port: at, dataDir, env, client, process: child };
+	return {
+		name,
+		url,
+		port: at,
+		dataDir,
+		env,
+		client,
+		process: child,
+		output: output.tail,
+	};
+}
+
+/**
+ * Waits for the facts: the daemon says it listens, then GET / answers.
+ * The time is only a ceiling. Returns what went wrong, or null.
+ */
+async function untilAnswers(
+	child: Subprocess,
+	started: Promise<Started>,
+	url: string,
+	begun: number,
+): Promise<string | null> {
+	const ceiling = `${ANSWER_MS / 1000} s`;
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const said = await Promise.race([
+		started,
+		child.exited.then(() => "stopped" as const),
+		new Promise<"late">((resolve) => {
+			timer = setTimeout(() => resolve("late"), begun + ANSWER_MS - now());
+		}),
+	]);
+	clearTimeout(timer);
+	if (said === "stopped") {
+		return `it stopped (${endOf(child)}) before it listened.`;
+	}
+	if (said === "late") {
+		return `it did not say "${LISTENS}" within ${ceiling} of its start.`;
+	}
+	// The dev entry keeps running after this error: it never listens.
+	if (said === "port in use") {
+		return `it cannot listen: another process has the port (${PORT_IN_USE}).`;
+	}
+	// It listens, so GET / answers at once. A refusal now means that the
+	// daemon stopped or that another process has the port.
+	let last = "no answer";
+	while (true) {
+		try {
+			const response = await fetch(url, {
+				signal: AbortSignal.timeout(Math.max(begun + ANSWER_MS - now(), 1)),
+			});
+			if (response.ok) return null;
+			last = `GET / answered ${response.status}`;
+		} catch (error) {
+			last = `GET / failed: ${error instanceof Error ? error.message : String(error)}`;
+		}
+		if (child.exitCode !== null || child.signalCode !== null) {
+			return `it stopped (${endOf(child)}) after it said it listens. ${last}.`;
+		}
+		if (now() >= begun + ANSWER_MS) {
+			return `it said it listens, but did not answer within ${ceiling} of its start. ${last}.`;
+		}
+		await Bun.sleep(100);
+	}
+}
+
+/** How a process ended, for an error. */
+function endOf(child: Subprocess): string {
+	return child.signalCode !== null
+		? `signal ${child.signalCode}`
+		: `code ${child.exitCode}`;
+}
+
+/**
+ * Reads both streams of the daemon, and keeps their last lines. The
+ * child's `stderr` becomes a copy, for a caller that reads it itself.
+ */
+function readOutput(child: Subprocess<"ignore", "pipe", "pipe">): {
+	/** What the daemon said of its start: it listens, or its port is in use. */
+	started: Promise<Started>;
+	/** Settles once the process ended and its streams closed, or a little later. */
+	read: () => Promise<void>;
+	tail: () => string;
+} {
+	const lines: string[] = [];
+	let heard: (what: Started) => void = () => {};
+	const started = new Promise<Started>((resolve) => {
+		heard = resolve;
+	});
+	const follow = async (stream: ReadableStream<Uint8Array>) => {
+		const decoder = new TextDecoder();
+		let partial = "";
+		try {
+			for await (const chunk of stream) {
+				const parts = (partial + decoder.decode(chunk, { stream: true })).split(
+					"\n",
+				);
+				partial = parts.pop() ?? "";
+				for (const line of parts) {
+					if (line.includes(LISTENS)) heard("listens");
+					if (line.includes(PORT_IN_USE)) heard("port in use");
+					lines.push(line);
+				}
+				lines.splice(0, Math.max(lines.length - OUTPUT_LINES, 0));
+			}
+		} catch {
+			// The process is gone: what it wrote is in `lines`.
+		}
+		if (partial) lines.push(partial);
+	};
+	const [kept, copy] = child.stderr.tee();
+	Object.defineProperty(child, "stderr", { value: copy, configurable: true });
+	const streams = Promise.all([follow(child.stdout), follow(kept)]);
+	// A process the daemon started may hold a stream open after the daemon
+	// ended. Its lines do not count then.
+	const read = async () => {
+		await child.exited;
+		await Promise.race([streams, Bun.sleep(STREAMS_CLOSE_MS)]);
+	};
+	return {
+		started,
+		read,
+		tail: () =>
+			lines.length > 0 ? lines.slice(-OUTPUT_LINES).join("\n") : "(nothing)",
+	};
 }
 
 /** Stops a daemon the way a person does (SIGTERM), and waits for it. */
 export async function stopDaemon(daemon: Daemon | undefined): Promise<void> {
 	if (!daemon) return;
+	stopped.add(daemon.process);
 	daemon.process.kill("SIGTERM");
 	await daemon.process.exited;
 }
