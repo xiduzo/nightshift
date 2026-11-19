@@ -124,6 +124,9 @@ export async function waitFor<T>(
 	return value;
 }
 
+/** The longest the command line may take to show its pairing code. */
+const PAIR_CODE_MS = 60_000;
+
 /**
  * Pairs `device` with `host` through the command line, `host`'s Person
  * approving the code. Returns the joining Device's id.
@@ -138,11 +141,25 @@ export async function pair(host: Daemon, device: Daemon): Promise<string> {
 		const decoder = new TextDecoder();
 		for await (const chunk of cli.stdout) output.push(decoder.decode(chunk));
 	})();
+	// The command line is a new process: it loads the app, then asks the
+	// Host for the code. On a busy computer that takes much longer than the
+	// pairing. So this waits for the code or for the end of the process,
+	// and the time is only a ceiling.
+	let ended = false;
+	void cli.exited.then(() => {
+		ended = true;
+	});
 	const code = await waitFor(
 		() => /\b([A-Z0-9]{4})-([A-Z0-9]{4})\b/.exec(output.join("")),
-		(match) => match !== null,
+		(match) => match !== null || ended,
+		PAIR_CODE_MS,
 	);
-	const userCode = `${code?.[1]}${code?.[2]}`;
+	if (code === null) {
+		throw new Error(
+			`join ended without a code: ${await new Response(cli.stderr).text()}`,
+		);
+	}
+	const userCode = `${code[1]}${code[2]}`;
 	await host.client.devices.review({ userCode });
 	await host.client.devices.approve({ userCode });
 	if ((await cli.exited) !== 0) {

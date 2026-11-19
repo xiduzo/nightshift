@@ -194,14 +194,23 @@ describe("what a step changed in the worktree", () => {
 			position: { x: 0, y: 0 },
 			wait: "all",
 		};
+		// The two wait for each other's file, not for a time. The slow step
+		// says it began (its snapshot is taken by then), the quick one then
+		// writes, and the slow one ends after that. Each gives up after 20 s.
+		const began = join(sandbox.root, "slow-began");
+		const until = (file: string) =>
+			`i=0; until [ -f '${file}' ] || [ $i -ge 400 ]; do sleep 0.05; i=$((i+1)); done`;
 		const h = await withSnapshots(
 			await startRun(
 				sandbox,
 				flowOf(
 					[
 						command("start", "true"),
-						command("slow", "sleep 0.4 && echo slow > slow.txt"),
-						command("quick", "echo quick > quick.txt"),
+						command(
+							"slow",
+							`touch '${began}'; ${until("quick.txt")}; echo slow > slow.txt`,
+						),
+						command("quick", `${until(began)}; echo quick > quick.txt`),
 						joinNode,
 					],
 					[
