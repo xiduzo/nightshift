@@ -1,4 +1,11 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	setSystemTime,
+	test,
+} from "bun:test";
 import { personalSpaceId, requestAccess } from "@nightshift/auth";
 import {
 	type AuthSandbox,
@@ -13,7 +20,8 @@ import type {
 } from "@nightshift/engine";
 import type { Project } from "@nightshift/engine/projects";
 import type { FlowListItem } from "@nightshift/flows";
-import { now } from "@nightshift/time";
+import { asDate, now } from "@nightshift/time";
+import { utc } from "@nightshift/time/testing";
 import { call, ORPCError } from "@orpc/server";
 import type { Context } from "../context";
 import { appRouter } from "../router";
@@ -27,11 +35,23 @@ import { stub, testContext } from "../testing/context";
 
 const HOUR = 60 * 60 * 1000;
 
+/**
+ * The clock of every test here. The router reads the clock, and the runs
+ * below start one hour before it. With the real clock, such a run belongs
+ * to the day before in the first hour after midnight, and the last night
+ * is empty. 15:00 UTC is the same calendar day in UTC and in Amsterdam.
+ */
+const NOW = utc(2026, 9, 21, 15);
+
 let sandbox: AuthSandbox;
 beforeEach(async () => {
+	setSystemTime(asDate(NOW));
 	sandbox = await createAuthSandbox();
 });
-afterEach(() => sandbox.cleanup());
+afterEach(() => {
+	sandbox.cleanup();
+	setSystemTime();
+});
 
 function aRun(fields: Partial<RunSummary>): RunSummary {
 	const walker = { id: "device-1", name: null, thisDevice: true };
