@@ -1,59 +1,42 @@
 // The flow editor: the canvas, the floating panels, the inspector of what
-// is selected, saving, and the keys that act on the whole flow. Over 600
-// lines because it wires every inspector (node, edge, Section, flow) to the
-// one draft. The draft, its history, the selection and the open Section
-// live in the editing session (`session/editing-session.ts`). The edits
-// themselves live in `node-edits.ts`, `sections/section-edits.ts` and
-// `@nightshift/flows`.
+// is selected, saving, and the keys that act on the whole flow. `Editor`
+// wires each of them to the one draft: a hook or a component beside this
+// file holds each. The draft, its history, the selection and the open
+// Section live in the editing session (`session/editing-session.ts`).
+// The edits themselves live in `node-edits.ts`, `sections/section-edits.ts`
+// and `@nightshift/flows`.
 
 import type { Flow, FlowIssue } from "@nightshift/flows";
 import { callersOf, isSavable } from "@nightshift/flows";
-import { Button } from "@nightshift/ui/components/button";
-import { cn } from "@nightshift/ui/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBlocker, useNavigate } from "@tanstack/react-router";
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
-import { HistoryIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CopyProjectHere, notHere, projectQueries } from "@/features/projects";
-import { hoverTime } from "@/shared/format";
-import { FlowAssistantContext } from "../assistant";
+import { projectQueries } from "@/features/projects";
 import {
 	DeviceNamesContext,
 	EnterSubflowContext,
-	NodeSamplesContext,
 	OpenFlowContext,
 	useSubflowStack,
 } from "../canvas";
 import type { ChatLink } from "../chat";
-import {
-	FlowChatPanel,
-	ProposalBar,
-	proposalCanvas,
-	useChatPanel,
-} from "../chat";
+import { proposalCanvas, useChatPanel } from "../chat";
 import { CopyFlowDialog } from "../move";
 import { StartRunDialog } from "../start";
-import { FollowingBar, TestMarksContext, useTestMarks } from "../test-run";
+import { useTestMarks } from "../test-run";
 import type { CatalogEntry } from "./add-node";
-import { NodeDock, useNodeAdder } from "./add-node";
+import { useNodeAdder } from "./add-node";
 import { useFlowClipboard } from "./clipboard";
 import { checkFlow } from "./draft";
 import { EditorCanvas } from "./editing-canvas";
 import { EditorHeader } from "./editor-header";
-import { FlowTitleCard } from "./flow-title-card";
-import { FloatingInspector } from "./inspector";
-import { IssuesPopover } from "./issues-popover";
+import { EditorPanels } from "./editor-panels";
 import { LeaveDialog } from "./leave-dialog";
 import { ProjectFlowsContext, ProjectFolderContext } from "./project";
 import { RevisionsSheet, useRevisionView } from "./revisions";
 import { MakeSubflowDialog, sectionEdits } from "./sections";
 import { selectedInspector } from "./selected-inspector";
-import {
-	createEditingSession,
-	type Selection,
-	useEditingSession,
-} from "./session";
+import { createEditingSession, useEditingSession } from "./session";
 import { SubflowView } from "./subflow-view";
 import { useCalledFlows } from "./use-called-flows";
 import { useEditorData } from "./use-editor-data";
@@ -413,110 +396,36 @@ function Editor({
 
 							{/* The panels float over the canvas; the gaps between them pass
 					    clicks and drops through to it. */}
-							<div
-								className="pointer-events-none absolute inset-0"
-								hidden={subflows.inside}
-							>
-								<FlowTitleCard
-									projectId={projectId}
-									name={name}
-									flow={draft}
-									callers={callers}
-									settingsOpen={settingsOpen && selection === null}
-									onToggleSettings={() => {
-										// With a node selected, the button shows the settings.
-										setSettingsOpen((open) => selection !== null || !open);
-										session.select(null);
-									}}
-									className="pointer-events-auto absolute top-3 left-3 w-[min(24rem,calc(100%-1.5rem))]"
-								/>
-								{shownRevision ? (
-									<ProposalBar
-										title={`What the revision of ${hoverTime(shownRevision.at)} changed`}
-										onHide={() => setShownRevision(null)}
-										className="pointer-events-auto absolute bottom-3 left-1/2 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2"
-									>
-										<Button
-											variant="outline"
-											size="sm"
-											onClick={() => {
-												setShownRevision(null);
-												setRevisionsOpen(true);
-											}}
-										>
-											<HistoryIcon data-icon="inline-start" />
-											Back to revisions
-										</Button>
-									</ProposalBar>
-								) : preview ? (
-									<ProposalBar
-										onHide={chat.hidePreview}
-										className="pointer-events-auto absolute bottom-3 left-1/2 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2"
-									/>
-								) : (
-									<>
-										{testRunId ? (
-											<FollowingBar
-												runId={testRunId}
-												onShowNewest={() => setTestRunId(null)}
-												className="pointer-events-auto absolute bottom-3 left-1/2 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2"
-											/>
-										) : null}
-										<NodeDock
-											adder={nodeAdder}
-											onDragChange={setDragging}
-											className="pointer-events-auto absolute top-1/2 left-3 -translate-y-1/2"
-										/>
-										<IssuesPopover
-											check={check}
-											onSelect={selectIssue}
-											className="pointer-events-auto absolute right-3 bottom-3 lg:top-3 lg:right-auto lg:bottom-auto lg:left-1/2 lg:-translate-x-1/2"
-										/>
-									</>
-								)}
-								{dragging ? (
-									<div className="absolute inset-3 flex items-end justify-center rounded-xl border-2 border-dashed border-primary/40 pb-20">
-										<span className="rounded-full bg-background px-3 py-1 text-xs text-muted-foreground shadow-sm">
-											{dragging.add.kind === "node"
-												? `Drop to add the ${dragging.label} node here`
-												: `Drop to add ${dragging.label} here`}
-										</span>
-									</div>
-								) : null}
-								{chat.open ? (
-									<FlowChatPanel
-										{...chat.panel}
-										notice={
-											project && notHere(project) ? (
-												<CopyProjectHere project={project} />
-											) : null
-										}
-										className="pointer-events-auto absolute top-3 right-3 bottom-3 w-[min(380px,calc(100%-1.5rem))]"
-									/>
-								) : null}
-								{inspector && !preview ? (
-									<FloatingInspector
-										label={selection ? "Selected" : "Flow settings"}
-										onClose={closeInspector}
-										className={cn(
-											"absolute top-3 right-3 bottom-3 w-[min(400px,calc(100%-1.5rem))]",
-											// Beside the chat on a wide screen, over it on a narrow one.
-											chat.open && "lg:right-[calc(380px+1.5rem)]",
-										)}
-									>
-										<FlowAssistantContext.Provider value={assistant}>
-											{/* An undo or a redo starts the fields again from the draft. */}
-											<div key={`${selectionKey(selection)}#${revision}`}>
-												<NodeSamplesContext.Provider value={samples}>
-													<TestMarksContext.Provider value={testMarks}>
-														{inspector}
-													</TestMarksContext.Provider>
-												</NodeSamplesContext.Provider>
-											</div>
-										</FlowAssistantContext.Provider>
-									</FloatingInspector>
-								) : null}
-							</div>
+							<EditorPanels
+								subflows={subflows}
+								projectId={projectId}
+								name={name}
+								draft={draft}
+								callers={callers}
+								settingsOpen={settingsOpen}
+								selection={selection}
+								setSettingsOpen={setSettingsOpen}
+								session={session}
+								shownRevision={shownRevision}
+								setShownRevision={setShownRevision}
+								setRevisionsOpen={setRevisionsOpen}
+								preview={preview}
+								chat={chat}
+								testRunId={testRunId}
+								setTestRunId={setTestRunId}
+								nodeAdder={nodeAdder}
+								setDragging={setDragging}
+								check={check}
+								selectIssue={selectIssue}
+								dragging={dragging}
+								project={project}
+								inspector={inspector}
+								closeInspector={closeInspector}
+								assistant={assistant}
+								revision={revision}
+								samples={samples}
+								testMarks={testMarks}
+							/>
 
 							{subflows.inside ? (
 								<OpenFlowContext.Provider value={openFlow}>
@@ -619,10 +528,3 @@ function Editor({
 
 /** The canvas of a proposal is read only. */
 function ignoreChange() {}
-
-function selectionKey(selection: Selection): string {
-	if (!selection) return "flow";
-	return selection.kind === "nodes"
-		? `nodes:${selection.ids.join(",")}:${(selection.sections ?? []).join(",")}`
-		: `${selection.kind}:${selection.id}`;
-}
