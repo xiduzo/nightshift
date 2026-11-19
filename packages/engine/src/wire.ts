@@ -412,14 +412,14 @@ export function createEngine(
 		db,
 		log: runLog,
 		bus,
-		runner,
+		walk,
 		now,
 		settings: runSettings,
 		schedulerOn: options.scheduler !== false,
 		placedElsewhere: (row) => !placement.placedHere(row),
 		resumeGraceMs: internals.resumeGraceMs ?? DAEMON_RESUME_GRACE_MS,
 		signal,
-		holds: startHolds,
+		access,
 		runHolds,
 	});
 

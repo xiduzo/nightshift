@@ -7,7 +7,6 @@ export {
 	type WalkFiles,
 } from "./checkpoints";
 export {
-	messageOf,
 	type NodeKind,
 	onDevice,
 	type Requirement,

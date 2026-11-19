@@ -1,21 +1,14 @@
-import type { Runner } from "./graph";
-import type { RunLog } from "./log";
 import { parseCalledFlows, parseRunFlow } from "./read";
-import {
-	createRecovery,
-	createSignals,
-	wakeLeaseSleeps,
-	wakeOfflineSleeps,
-} from "./run";
+import { wireRecovery } from "./runs";
 
-type RecoveryDeps = Parameters<typeof createRecovery>[0];
+type RecoveryDeps = Parameters<typeof wireRecovery>[0];
 
 /**
  * The recovery block of the engine's composition (`wire.ts`): what Night
- * Shift does to a run on its own. Startup recovery and the resume of the
- * runs it interrupted (`run/recovery.ts`), the wakes (`run/wake.ts`), the
- * Signal of a webhook (`run/signals.ts`) and the stop of a run whose
- * Offer ended. Lane R7 of the hexagon series owns this file.
+ * Shift does to a run on its own (`runs/recovery`). Startup recovery and
+ * the resume of the runs it interrupted, the wakes, the Signal of a
+ * webhook and the stop of a run whose Offer ended. Lane R7 of the hexagon
+ * series owns this file.
  *
  * It gives every name it returns. The start order of `wire.ts` calls
  * `recoverInterruptedWork` and `armResumes`. The schedules read `signals`.
@@ -23,48 +16,49 @@ type RecoveryDeps = Parameters<typeof createRecovery>[0];
  * `stopForNightShift`.
  */
 export function wireEngineRecovery(
-	deps: Omit<RecoveryDeps, "log" | "runner" | "flowOf" | "calledFlowsOf"> & {
-		log: RunLog;
-		runner: Runner;
-	},
+	deps: Omit<
+		RecoveryDeps,
+		"openWork" | "waits" | "facts" | "turns" | "holds" | "openRun"
+	> &
+		Omit<RecoveryDeps["openWork"], "flowOf" | "calledFlowsOf"> & {
+			/** The walk block: the run's facts, its Turns and the start holds. */
+			walk: Pick<RecoveryDeps, "facts" | "turns" | "holds">;
+			/** The access block: the run, opened as Night Shift. */
+			access: Pick<RecoveryDeps, "openRun">;
+		},
 ) {
-	const { db, log, runner } = deps;
-
-	const recovery = createRecovery({
-		db,
-		log,
-		bus: deps.bus,
-		runner,
-		now: deps.now,
-		settings: deps.settings,
-		schedulerOn: deps.schedulerOn,
-		flowOf: parseRunFlow,
-		calledFlowsOf: parseCalledFlows,
-		placedElsewhere: deps.placedElsewhere,
-		resumeGraceMs: deps.resumeGraceMs,
-		signal: deps.signal,
-		holds: deps.holds,
-		runHolds: deps.runHolds,
+	const { db, log, walk } = deps;
+	const recovery = wireRecovery({
+		...deps,
+		facts: walk.facts,
+		turns: walk.turns,
+		holds: walk.holds,
+		openRun: deps.access.openRun,
+		openWork: {
+			db,
+			log,
+			bus: deps.bus,
+			flowOf: parseRunFlow,
+			calledFlowsOf: parseCalledFlows,
+			runHolds: deps.runHolds,
+		},
+		waits: { db, log },
 	});
-
-	/** A webhook schedule's signal: the project's runs this computer walks that wait for it. */
-	const signals = createSignals({ db, log, runner });
 
 	return {
 		/** Startup recovery: what the last daemon left open ends, and what continues is noted. */
-		recoverInterruptedWork: () => recovery.recoverInterruptedWork(),
+		recoverInterruptedWork: () => recovery.recoverRuns(),
 		/** The grace of the interrupted runs counts from this call: the engine is ready. */
 		armResumes: () => recovery.armResumes(),
-		signals,
+		/** A webhook schedule's signal: the project's runs this computer walks that wait for it. */
+		signals: { send: recovery.signalProjectRuns },
 		/** The runs here that wait for a lease ask again. It does not wait, and it never throws. */
 		wakeLeaseSleeps(): void {
-			void wakeLeaseSleeps({ db, log, runner }).catch(() => {});
+			void recovery.wakeSleepingRuns("lease").catch(() => {});
 		},
 		/** A Device is back: the steps here that sleep because it was offline look again. */
-		wakeOfflineSleeps: () => wakeOfflineSleeps({ db, log, runner }),
+		wakeOfflineSleeps: () => recovery.wakeSleepingRuns("device-offline"),
 		/** The Offer the run's step ran under ended: Night Shift stops it, not a person. */
-		async stopForNightShift(runId: string): Promise<void> {
-			await runner.take(runId, { kind: "stop", by: "daemon" });
-		},
+		stopForNightShift: (runId: string) => recovery.stopRunForNightShift(runId),
 	};
 }

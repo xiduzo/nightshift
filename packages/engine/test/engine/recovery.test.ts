@@ -1,13 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { join } from "node:path";
 import { project, run } from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
-import {
-	defaultRunSettings,
-	type RunSettings,
-} from "../../src/device-config/settings";
-import type { Runner } from "../../src/graph";
-import { foldRun } from "../../src/log";
+import { defaultRunSettings } from "../../src/device-config/settings";
 import type {
 	EngineEventType,
 	EnginePayloads,
@@ -16,18 +10,16 @@ import type {
 import type { Scope } from "../../src/log/events/step/step-payloads";
 import { createRunLog } from "../../src/log/run-log/run-log";
 import { type BusItem, createRunBus } from "../../src/log/transcript/bus";
-import {
-	createRecovery,
-	daemonResumeBlock,
-	type ResumeBlockDeps,
-} from "../../src/run/recovery";
+import { wireRecovery } from "../../src/runs";
+import type { Turns } from "../../src/runs/walk";
 import { createSandbox, type Sandbox } from "../../src/testing/test-support";
 
 /**
- * `daemonResumeBlock`: why a daemon leaves an interrupted run to a person,
- * and what startup recovery ends a dead daemon's work with. Recovery as a
- * whole (the grace timer, the queue on a full run cap, the resume) is
- * covered by engine.test.ts through the public interface.
+ * What startup recovery ends a dead daemon's work with, on a real run log
+ * over a sandbox. Why a daemon leaves an interrupted run to a person is
+ * the rule of `runs/recovery/domain/resume-block.ts`, tested beside it.
+ * Recovery as a whole (the grace timer, the queue on a full run cap, the
+ * resume) is covered by engine.test.ts through the public interface.
  */
 
 let sandbox: Sandbox;
@@ -48,36 +40,10 @@ const flow: Flow = {
 	edges: [],
 } as unknown as Flow;
 
-/** One run's log, in seq order. */
-function logOf(
-	...items: { type: keyof EnginePayloads; payload: unknown }[]
-): LoggedEvent[] {
-	return items.map(
-		(item, i) =>
-			({
-				seq: i + 1,
-				runId: RUN_ID,
-				stepId: null,
-				sessionId: null,
-				type: item.type,
-				payload: item.payload,
-				at: 1000 + i,
-			}) as LoggedEvent,
-	);
-}
-
 const started = (stopAt: number | null = null) => ({
 	type: "RunStarted" as const,
 	payload: { projectId: "p", flowName: "f", title: "f", start: "a", stopAt },
 });
-const daemonResumed = {
-	type: "RunResumed" as const,
-	payload: { nodeId: "a", stepId: null, prompt: null, by: "daemon" },
-};
-const personResumed = {
-	type: "RunResumed" as const,
-	payload: { nodeId: "a", stepId: null, prompt: null, by: "person" },
-};
 
 /** A run row whose worktree is `worktreePath` and whose flow is `ownFlow` (a string: the snapshot as stored). */
 async function insertRun(
@@ -104,165 +70,6 @@ async function insertRun(
 		walkerId: sandbox.deviceId,
 	});
 }
-
-function deps(overrides: Partial<ResumeBlockDeps> = {}): ResumeBlockDeps {
-	return {
-		db: sandbox.db,
-		now: () => 10_000,
-		settings: () => defaultRunSettings(),
-		schedulerOn: true,
-		flowOf: (row) => JSON.parse(row.flow) as Flow,
-		...overrides,
-	};
-}
-
-describe("daemonResumeBlock", () => {
-	test("lets a run continue when nothing stands in the way", async () => {
-		await insertRun(sandbox.repoPath);
-		expect(
-			await daemonResumeBlock(RUN_ID, foldRun(logOf(started())), deps()),
-		).toBeNull();
-	});
-
-	test("a daemon without the scheduler never continues the night's runs", async () => {
-		await insertRun(sandbox.repoPath);
-		expect(
-			await daemonResumeBlock(
-				RUN_ID,
-				foldRun(logOf(started())),
-				deps({ schedulerOn: false }),
-			),
-		).toBe("schedules are paused.");
-		const paused: RunSettings = { ...defaultRunSettings(), scheduler: false };
-		expect(
-			await daemonResumeBlock(
-				RUN_ID,
-				foldRun(logOf(started())),
-				deps({ settings: () => paused }),
-			),
-		).toBe("schedules are paused.");
-	});
-
-	test("a missing run record", async () => {
-		expect(
-			await daemonResumeBlock(RUN_ID, foldRun(logOf(started())), deps()),
-		).toBe("the run's record is missing.");
-	});
-
-	test("the flow's own policy wins over the Settings switch", async () => {
-		await insertRun(sandbox.repoPath, {
-			...flow,
-			policy: { resumeInterruptedRuns: false },
-		});
-		expect(
-			await daemonResumeBlock(RUN_ID, foldRun(logOf(started())), deps()),
-		).toBe("its flow turns automatic resume off.");
-	});
-
-	test("automatic resume off in Settings", async () => {
-		await insertRun(sandbox.repoPath);
-		const off: RunSettings = {
-			...defaultRunSettings(),
-			resumeInterruptedRuns: false,
-		};
-		expect(
-			await daemonResumeBlock(
-				RUN_ID,
-				foldRun(logOf(started())),
-				deps({ settings: () => off }),
-			),
-		).toBe("automatic resume is off in Settings.");
-	});
-
-	test("three daemon resumes in a row, with no person in between", async () => {
-		await insertRun(sandbox.repoPath);
-		const events = logOf(
-			started(),
-			daemonResumed,
-			daemonResumed,
-			daemonResumed,
-		);
-		expect(await daemonResumeBlock(RUN_ID, foldRun(events), deps())).toBe(
-			"it continued on its own 3 times in a row, and each time Night Shift stopped again.",
-		);
-		// A person's resume starts the count over.
-		const withPerson = logOf(
-			started(),
-			daemonResumed,
-			daemonResumed,
-			personResumed,
-			daemonResumed,
-		);
-		expect(
-			await daemonResumeBlock(RUN_ID, foldRun(withPerson), deps()),
-		).toBeNull();
-	});
-
-	test("a stop time that has passed", async () => {
-		await insertRun(sandbox.repoPath);
-		expect(
-			await daemonResumeBlock(RUN_ID, foldRun(logOf(started(9_000))), deps()),
-		).toBe("its stop time has passed.");
-		expect(
-			await daemonResumeBlock(RUN_ID, foldRun(logOf(started(11_000))), deps()),
-		).toBeNull();
-	});
-
-	test("a worktree that is gone", async () => {
-		await insertRun(join(sandbox.root, "gone"));
-		expect(
-			await daemonResumeBlock(RUN_ID, foldRun(logOf(started())), deps()),
-		).toBe("the copy of the project it worked in is gone.");
-	});
-
-	test("a run that waits for its worktree has none to lose", async () => {
-		await insertRun("", flow, {}, "");
-		expect(
-			await daemonResumeBlock(RUN_ID, foldRun(logOf(started())), deps()),
-		).toBeNull();
-	});
-
-	test("a worktree a step made later is checked from the log", async () => {
-		await insertRun("", flow, {}, "");
-		const made = {
-			type: "WorktreeCreated" as const,
-			payload: {
-				worktreePath: join(sandbox.root, "gone"),
-				branch: "nightshift/b",
-				baseRef: "main",
-			},
-		};
-		expect(
-			await daemonResumeBlock(RUN_ID, foldRun(logOf(started(), made)), deps()),
-		).toBe("the copy of the project it worked in is gone.");
-	});
-
-	test("a run folder that is gone does not stop it: its next step makes it again (ADR 22)", async () => {
-		await insertRun(join(sandbox.root, "gone"), flow, {}, "");
-		const inRunFolder = {
-			...started(),
-			payload: { ...started().payload, runFolder: true },
-		};
-		expect(
-			await daemonResumeBlock(RUN_ID, foldRun(logOf(inRunFolder)), deps()),
-		).toBeNull();
-	});
-
-	test("a check that throws is a reason, not a crash", async () => {
-		await insertRun(sandbox.repoPath);
-		expect(
-			await daemonResumeBlock(
-				RUN_ID,
-				foldRun(logOf(started())),
-				deps({
-					flowOf: () => {
-						throw new Error("bad snapshot");
-					},
-				}),
-			),
-		).toBe("Night Shift could not check it: bad snapshot");
-	});
-});
 
 describe("startup recovery: what a dead daemon's work ends with", () => {
 	/** A flow with a Call once, a Call with each and a Decision, both Calls calling `inner`. */
@@ -349,35 +156,44 @@ describe("startup recovery: what a dead daemon's work ends with", () => {
 		told = [];
 		holdsHeard = [];
 		bus.subscribe(RUN_ID, (item) => told.push(item));
-		const runner = {
+		const turns = {
 			take: async () => ({ kind: "unchanged" }),
 			restore: () => {},
-		} as unknown as Runner;
-		const recovery = createRecovery({
-			...deps({
+		} as unknown as Turns;
+		const recovery = wireRecovery({
+			openWork: {
+				db: sandbox.db,
+				log: runLog,
+				bus,
 				flowOf,
-				settings: () => ({
-					...defaultRunSettings(),
-					resumeInterruptedRuns: false,
-				}),
-			}),
-			log: runLog,
-			bus,
-			calledFlowsOf: (row) => JSON.parse(row.bodyFlows),
-			runner,
-			resumeGraceMs: 0,
-			holds: { start: (_spaceId, work) => work() },
-			runHolds: {
-				ended: async (runId, status) => {
-					holdsHeard.push(`${runId} ended ${status}`);
+				calledFlowsOf: (row) => JSON.parse(row.bodyFlows),
+				runHolds: {
+					ended: async (runId, status) => {
+						holdsHeard.push(`${runId} ended ${status}`);
+					},
+					notContinuing: async (runId) => {
+						holdsHeard.push(`${runId} does not continue`);
+					},
+					resuming: async () => {},
 				},
-				notContinuing: async (runId) => {
-					holdsHeard.push(`${runId} does not continue`);
-				},
-				resuming: async () => {},
 			},
+			waits: { db: sandbox.db, log: runLog },
+			facts: runLog,
+			turns,
+			holds: { start: (_spaceId, work) => work() },
+			openRun: async (_actor, { runId }) => ({
+				run: await runLog.row(runId),
+				walkedHere: true,
+			}),
+			now: () => 10_000,
+			settings: () => ({
+				...defaultRunSettings(),
+				resumeInterruptedRuns: false,
+			}),
+			schedulerOn: true,
+			resumeGraceMs: 0,
 		});
-		await recovery.recoverInterruptedWork();
+		await recovery.recoverRuns();
 		return runLog.events(RUN_ID);
 	}
 

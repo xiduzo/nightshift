@@ -305,14 +305,14 @@ packages/engine/src/
                            step now, a Device by id, and the move of a step
                            whose Device is offline to a backup (ADR 17), with
                            StepMoved and the run's warning.
-  run/recovery.ts          createRecovery(deps): startup recovery only.
-                           recoverInterruptedWork (a dead daemon's open
+  runs/recovery/            Startup recovery and what Night Shift does to a
+                           run on its own. recoverRuns (a dead daemon's open
                            sessions, steps and runs become interrupted
                            through closeOpenWork, as a stop ends them, and
                            a run that ends so is pruned; sleeping runs get
                            their timers back through runner.restore; after
                            a grace period the daemon resumes the rest
-                           unless daemonResumeBlock says why not, queued on
+                           unless resumeBlock says why not, queued on
                            a full run cap).
   read/read-model.ts       What people see of a run, from the log: runFacts,
                            toSummary, toStepSummary, toRunDetail,
@@ -412,10 +412,11 @@ packages/engine/src/
    `Command({ resume: { kind: "signal", name } })`, through the same wake
    Turn (`act` with `kind: "signal"`). A signal Wait with rules on its
    outcomes logs them in `WaitStarted.signalRules`: a webhook that matches
-   no rule wakes no run (`run/signals.ts`, ADR 8). A Lease node that waits
-   for a busy lease sleeps the same way, with the reason `lease` and the
+   no rule wakes no run (`runs/recovery/domain/signal-match.ts`, ADR 8).
+   A Lease node that waits for a busy lease sleeps the same way, with the reason `lease` and the
    lease in `WaitStarted.lease`. It asks again every minute, and a lease
-   that goes on this Replica wakes it at once (`run/wake.ts`, ADR 7).
+   that goes on this Replica wakes it at once
+   (`runs/recovery/application/wake-sleeping-runs.ts`, ADR 7).
 9. **Resume mapping** (`act` with `kind: "resume"`). The engine appends
    `RunResumed` before each of these:
    - Stopped or failed: the thread is parked, so
