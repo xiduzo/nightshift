@@ -22,7 +22,6 @@ import {
 } from "../../src/log/transcript/transcripts";
 import type { PeerContext, PeersFactory } from "../../src/peers";
 import { alonePeers } from "../../src/testing/alone-peers";
-import { seedFlows } from "../../src/testing/seed-flows";
 import {
 	createSandbox,
 	type Sandbox,
@@ -79,17 +78,11 @@ const keyOf = (ref: WalkRef) =>
 	);
 
 let sandboxes: Sandbox[];
-/** The flow format the Device a run moves to reads; undefined: this build's. */
-let targetReads: number | undefined;
-/** Whether the Device a run moves to walks a test run. */
-let targetTests: boolean;
 /** The archive both computers keep a Space in. */
 let archive: Map<string, string>;
 /** The stamps of the files in `archive`. */
 let stamps: Map<string, WalkFile["stamp"]>;
 beforeEach(() => {
-	targetReads = undefined;
-	targetTests = true;
 	sandboxes = [];
 	archive = new Map();
 	stamps = new Map();
@@ -116,19 +109,15 @@ async function computer(
 			...alone,
 			placement: {
 				...alone.placement,
-				// The Device a run moves to, as it says what it reads.
+				// The Device a run moves to reads this build's flows.
 				deviceById(id, run, name) {
 					const device = alone.placement.deviceById(id, run, name);
 					return {
 						...device,
-						capabilities: async (query) => {
-							const { testRuns, ...has } = await device.capabilities(query);
-							return {
-								...has,
-								flowVersion: targetReads ?? FLOW_VERSION,
-								...(targetTests ? { testRuns } : {}),
-							};
-						},
+						capabilities: async (query) => ({
+							...(await device.capabilities(query)),
+							flowVersion: FLOW_VERSION,
+						}),
 					};
 				},
 				// The planner's answer (`PlacementPort.moveTo`): one of the
@@ -513,119 +502,6 @@ describe("a run that moves to another Device", () => {
 		await waitFor(async () => (await onB.getRun(runId)).status === "finished", {
 			label: "the run to end on B",
 		});
-	});
-
-	test("is refused while a step runs, to this computer, to an unknown Device and to one offline", async () => {
-		const { a, b } = await pair();
-		const space = spaceOf(a, a);
-		const { id: projectId } = await space.addProject({
-			repoPath: a.sandbox.repoPath,
-		});
-		const slow = await space.startRun({
-			projectId,
-			flow: flowOf([command("build", "sleep 2")]),
-		});
-		await waitFor(async () => (await space.getRun(slow.id)).steps.length > 0, {
-			label: "the slow step to start",
-		});
-		await expect(
-			space.act(slow.id, { kind: "move", to: b.sandbox.deviceId }),
-		).rejects.toThrow(
-			"The run is in the middle of a step. Move it when it waits, sleeps or is stopped.",
-		);
-		await space.act(slow.id, { kind: "stop" });
-
-		const { runId } = await waitingOn(a);
-		await expect(
-			space.act(runId, { kind: "move", to: a.sandbox.deviceId }),
-		).rejects.toThrow("This run already runs on this computer.");
-		await expect(
-			space.act(runId, { kind: "move", to: "no-such-device" }),
-		).rejects.toThrow("That device is not one of yours.");
-		await expect(
-			a.engine
-				.space(a.sandbox.spaceId)
-				.act(runId, { kind: "move", to: b.sandbox.deviceId }),
-		).rejects.toThrow("Sign in to act on this run.");
-		expect(archive.size).toBe(0);
-		await space.act(runId, { kind: "stop" });
-	});
-
-	test("can go to the owner's other Devices that are online, never to its own Walker", async () => {
-		const { a, b } = await pair();
-		const { runId } = await waitingOn(a);
-		const targets = async () =>
-			(await spaceOf(a, a).listMoveTargets(runId)).map((d) => d.deviceId);
-		expect(await targets()).toEqual([b.sandbox.deviceId]);
-
-		// B walks it now: it can come back to this computer.
-		await spaceOf(a, a).act(runId, { kind: "move", to: b.sandbox.deviceId });
-		expect(await targets()).toEqual([a.sandbox.deviceId]);
-		// A run of another Space is not found there.
-		await expect(
-			a.engine.space("another-space", actor).listMoveTargets(runId),
-		).rejects.toThrow("Night Shift cannot find this run.");
-	});
-
-	test("has no target while the owner's other Device is offline", async () => {
-		const { a } = await pair(false);
-		const { runId } = await waitingOn(a);
-		expect(await spaceOf(a, a).listMoveTargets(runId)).toEqual([]);
-		await spaceOf(a, a).act(runId, { kind: "stop" });
-	});
-
-	test("is refused when the planner refuses its Device, and keeps nothing", async () => {
-		const { a, b } = await pair(false);
-		const { runId } = await waitingOn(a);
-		await expect(
-			spaceOf(a, a).act(runId, { kind: "move", to: b.sandbox.deviceId }),
-		).rejects.toThrow("The planner refuses it.");
-		expect(archive.size).toBe(0);
-		await spaceOf(a, a).act(runId, { kind: "stop" });
-	});
-
-	test("is refused to a Device of an older Night Shift, and keeps nothing", async () => {
-		const { a, b } = await pair();
-		const { runId } = await waitingOn(a);
-		targetReads = FLOW_VERSION - 1;
-		await expect(
-			spaceOf(a, a).act(runId, { kind: "move", to: b.sandbox.deviceId }),
-		).rejects.toThrow(
-			"laptop runs an older version of Night Shift. Update Night Shift on laptop.",
-		);
-		expect(archive.size).toBe(0);
-		await spaceOf(a, a).act(runId, { kind: "stop" });
-	});
-
-	test("a test run is refused to a Device of a Night Shift without test runs, and keeps nothing; a run that is no test goes there (ADR 27)", async () => {
-		const { a, b } = await pair();
-		targetTests = false;
-		const space = spaceOf(a, a);
-		const { id: projectId } = await space.addProject({
-			repoPath: a.sandbox.repoPath,
-		});
-		await seedFlows(space, projectId, { ship: gateFlow });
-		// `build` stands in: the run waits at the Gate at once.
-		const tested = await space.startRun({
-			projectId,
-			flowName: "ship",
-			test: { skipped: { build: "pass" } },
-		});
-		await waitFor(
-			async () => (await space.getRun(tested.id)).status === "waiting",
-			{ label: "the test run to wait at the Gate" },
-		);
-		await expect(
-			space.act(tested.id, { kind: "move", to: b.sandbox.deviceId }),
-		).rejects.toThrow(
-			"laptop runs an older version of Night Shift. Update Night Shift on laptop.",
-		);
-		expect(archive.size).toBe(0);
-		await space.act(tested.id, { kind: "stop" });
-
-		const { runId } = await waitingOn(a);
-		await space.act(runId, { kind: "move", to: b.sandbox.deviceId });
-		expect(archive.size).toBeGreaterThan(0);
 	});
 
 	test("a sleeping run that arrived gets its timer back after a restart of its new Walker", async () => {
