@@ -23,14 +23,14 @@ import {
 	sectionDragDelta,
 	sectionIdOf,
 	type useMeasured,
-} from "../canvas";
-import type { CanvasEdge, useCanvasEdges } from "./canvas-edges";
+} from "../../canvas";
 import {
 	applyNodeSelection,
 	type Selection,
 	type SelectionSetter,
 	withoutNodes,
-} from "./session";
+} from "../session";
+import type { CanvasEdge, useCanvasEdges } from "./canvas-edges";
 
 /**
  * Moves, removes and selects of nodes and Section boxes, as edits of the

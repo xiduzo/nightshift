@@ -18,7 +18,7 @@ import {
 	sectionIds,
 	type useMeasured,
 	writeRoutes,
-} from "../canvas";
+} from "../../canvas";
 import type { CanvasEdge } from "./canvas-edges";
 import { measuredHandles } from "./measured-handles";
 

@@ -12,9 +12,9 @@ import {
 	useDataLinks,
 	type useOpenSection,
 	type useSectionCanvas,
-} from "../canvas";
+} from "../../canvas";
+import type { Selection } from "../session";
 import type { CanvasPreview, useCanvasNodes } from "./canvas-nodes";
-import type { Selection } from "./session";
 
 /** The flow's edges, and the dotted lines of the selected node. */
 export type CanvasEdge = FlowCanvasEdge | DataCanvasEdge;

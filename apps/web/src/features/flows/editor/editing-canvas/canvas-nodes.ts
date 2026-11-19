@@ -3,16 +3,20 @@
 import type { NodeSample } from "@nightshift/client";
 import type { Flow, FlowCheck, FlowIssue } from "@nightshift/flows";
 import { useMemo } from "react";
-import type { DiffMark, FlowCanvasNode } from "../canvas";
+import type { DiffMark, FlowCanvasNode } from "../../canvas";
 import {
 	type CanvasNode,
 	type useMeasured,
 	useOpenSection,
 	useSectionCanvas,
-} from "../canvas";
-import type { TestMarksApi } from "../test-run";
+} from "../../canvas";
+import type { TestMarksApi } from "../../test-run";
+import {
+	type Selection,
+	selectedNodeIds,
+	selectedSectionIds,
+} from "../session";
 import { viewerOf } from "./node-viewer";
-import { type Selection, selectedNodeIds, selectedSectionIds } from "./session";
 
 /** How the nodes and edges of a proposed flow differ from the draft, by id. */
 export type CanvasPreview = {

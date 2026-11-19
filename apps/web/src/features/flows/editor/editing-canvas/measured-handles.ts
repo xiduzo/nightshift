@@ -6,7 +6,7 @@ import {
 	type SectionBoxData,
 	type Size,
 	sectionIdOf,
-} from "../canvas";
+} from "../../canvas";
 
 /**
  * Where React Flow measured each node's handles, from the node's top-left

@@ -34,15 +34,15 @@ import {
 	SelectEdgeContext,
 	sectionIdOf,
 	useMeasured,
-} from "../canvas";
-import type { TestMarksApi } from "../test-run";
-import { NodeMenu } from "../test-run";
-import { NODE_DRAG_TYPE } from "./add-node";
+} from "../../canvas";
+import type { TestMarksApi } from "../../test-run";
+import { NodeMenu } from "../../test-run";
+import { NODE_DRAG_TYPE } from "../add-node";
+import { canvasIds, type Selection, type SelectionSetter } from "../session";
 import { useAutoLayout } from "./auto-layout";
 import { useConnect, useEdgeChanges, useNodeChanges } from "./canvas-changes";
 import { type CanvasEdge, useCanvasEdges } from "./canvas-edges";
 import { type CanvasPreview, useCanvasNodes } from "./canvas-nodes";
-import { canvasIds, type Selection, type SelectionSetter } from "./session";
 
 /** The keys that delete what is selected. */
 const DELETE_KEYS = ["Backspace", "Delete"];

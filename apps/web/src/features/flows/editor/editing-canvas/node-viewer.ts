@@ -1,8 +1,8 @@
 import type { NodeSample } from "@nightshift/client";
 import type { FlowNode } from "@nightshift/flows";
-import type { FlowNodeData } from "../canvas";
-import { markedLine, sampleLine } from "../canvas";
-import { markOf, type TestMarks } from "../test-run";
+import type { FlowNodeData } from "../../canvas";
+import { markedLine, sampleLine } from "../../canvas";
+import { markOf, type TestMarks } from "../../test-run";
 
 /**
  * What a node's card shows of the runs: its pinned output or the outcome

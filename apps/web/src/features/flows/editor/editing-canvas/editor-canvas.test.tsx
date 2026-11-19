@@ -9,7 +9,7 @@ import type { Flow, FlowCheck } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { commandNode } from "@nightshift/flows/testing";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
-import type { TestMarksApi } from "../test-run";
+import type { TestMarksApi } from "../../test-run";
 
 // No request leaves the test: every fetch waits for ever.
 const realFetch = globalThis.fetch;

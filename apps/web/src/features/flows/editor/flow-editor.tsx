@@ -77,7 +77,7 @@ import { NodeDock, useNodeAdder } from "./add-node";
 import { useFlowClipboard } from "./clipboard";
 import { checkFlow } from "./draft";
 import { type EditKeys, editKeyOf, leavesKeyToPage } from "./edit-keys";
-import { EditorCanvas } from "./editor-canvas";
+import { EditorCanvas } from "./editing-canvas";
 import { FlowTitleCard } from "./flow-title-card";
 import {
 	EdgeInspector,
