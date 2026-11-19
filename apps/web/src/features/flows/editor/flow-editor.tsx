@@ -63,8 +63,8 @@ import {
 	proposalCanvas,
 	useChatPanel,
 } from "../chat";
-import { CopyFlowDialog, saveFile } from "../move";
-import { flowMutations, flowQueries } from "../queries";
+import { CopyFlowDialog } from "../move";
+import { flowMutations } from "../queries";
 import { StartRunDialog } from "../start";
 import {
 	FollowingBar,
@@ -101,6 +101,7 @@ import {
 } from "./session";
 import { SubflowView } from "./subflow-view";
 import { useEditorData } from "./use-editor-data";
+import { useFlowSave } from "./use-flow-save";
 import { useNodeSamples } from "./use-node-samples";
 
 type Props = {
@@ -204,67 +205,15 @@ function Editor({
 		(issue) => issue.severity === "error",
 	).length;
 
-	const saveFlow = useMutation(
-		flowMutations.save({
-			onError: (error) => toast.error(`Could not save: ${error.message}`),
-		}),
-	);
-
-	const canSave = dirty && savable && !saveFlow.isPending;
-
-	const exportFlow = async () => {
-		try {
-			const file = await queryClient.fetchQuery(
-				flowQueries.export(projectId, name),
-			);
-			saveFile(file.fileName, file.json);
-			if (dirty) {
-				toast.info(
-					"Exported the saved flow. Save first to export your changes too.",
-				);
-			}
-		} catch (error) {
-			toast.error(
-				`Could not export: ${error instanceof Error ? error.message : String(error)}`,
-			);
-		}
-	};
-
-	/** After a save: the draft is the file now, and the cached flow follows. */
-	const onSaved = useCallback(
-		(snapshot: Flow, issues: FlowIssue[]) => {
-			session.saved(snapshot);
-			queryClient.setQueryData(
-				flowQueries.get(projectId, name).queryKey,
-				(loaded) => (loaded ? { ...loaded, flow: snapshot, issues } : loaded),
-			);
-			// The live cache reads the lists, the map and the revisions.
-		},
-		[session, queryClient, projectId, name],
-	);
-
-	const save = useCallback(() => {
-		if (!canSave) return;
-		const snapshot = draft;
-		saveFlow.mutate(
-			{ projectId, name, flow: snapshot },
-			{
-				onSuccess: (issues) => {
-					onSaved(snapshot, issues);
-					const errors = issues.filter(
-						(issue) => issue.severity === "error",
-					).length;
-					if (errors > 0) {
-						toast.warning(
-							`Saved with ${errors} ${errors === 1 ? "error" : "errors"}. Fix them before you run the flow.`,
-						);
-					} else {
-						toast.success("Flow saved");
-					}
-				},
-			},
-		);
-	}, [canSave, saveFlow, projectId, name, draft, onSaved]);
+	const { saveFlow, exportFlow, onSaved, save } = useFlowSave({
+		session,
+		queryClient,
+		projectId,
+		name,
+		draft,
+		dirty,
+		savable,
+	});
 
 	const openFlow = useCallback(
 		(flowName: string) =>
