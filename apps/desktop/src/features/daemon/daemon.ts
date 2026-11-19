@@ -2,6 +2,7 @@ import {
 	startDaemon as bootDaemon,
 	DESKTOP_PORT,
 	type DesktopScreen,
+	PortTakenError,
 	tlsPortOf,
 } from "@nightshift/daemon";
 
@@ -25,13 +26,6 @@ export type Daemon = {
 	/** Stops serving, writes the Device document, and gives the database lease up, so the next daemon starts at once. */
 	stop(): Promise<void>;
 };
-
-export class PortTakenError extends Error {
-	constructor() {
-		super(`Another program uses port ${DAEMON_PORT}.`);
-		this.name = "PortTakenError";
-	}
-}
 
 /** What answers on the daemon port: Night Shift, another program, or nothing. */
 async function probe(): Promise<"nightshift" | "other" | "free"> {
@@ -59,7 +53,7 @@ export async function startDaemon(desktop: DesktopScreen): Promise<Daemon> {
 		console.log(`Using the Night Shift daemon at ${DAEMON_URL}.`);
 		return { kind: "shared", stop: async () => {} };
 	}
-	if (found === "other") throw new PortTakenError();
+	if (found === "other") throw new PortTakenError(DAEMON_PORT);
 
 	// This computer only, until it is a Host with an https:// address. With
 	// its own certificate it also serves https:// for other computers, on

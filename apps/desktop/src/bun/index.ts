@@ -1,3 +1,4 @@
+import { PortTakenError } from "@nightshift/daemon";
 import { moonPhase } from "@nightshift/time";
 import Electrobun, {
 	ApplicationMenu,
@@ -8,12 +9,7 @@ import Electrobun, {
 	Utils,
 } from "electrobun/main";
 
-import {
-	DAEMON_URL,
-	type Daemon,
-	PortTakenError,
-	startDaemon,
-} from "../features/daemon";
+import { DAEMON_URL, type Daemon, startDaemon } from "../features/daemon";
 import {
 	type DownloadState,
 	downloadScript,
@@ -156,7 +152,7 @@ try {
 		message: `${APP_NAME} cannot start.`,
 		detail:
 			error instanceof PortTakenError
-				? `${error.message} Close that program, then open ${APP_NAME} again.`
+				? `Another program uses port ${error.port}. Close that program, then open ${APP_NAME} again.`
 				: String(error instanceof Error ? error.message : error),
 		buttons: ["Quit"],
 	});
