@@ -219,11 +219,6 @@ export const PEER_PORTS: Record<
 			// The run page imports the flow canvas.
 			"features/runs": "flows-port",
 		},
-		"features/gates": {
-			// The inbox lists sleeping runs and refreshes the runs after an
-			// answer. The run page imports the gate question and answer.
-			"features/runs": "queries",
-		},
 		"features/projects": {
 			// Adding the starter flows asks which of your profiles takes each
 			// agent they name. The agents pages import projects (a project's

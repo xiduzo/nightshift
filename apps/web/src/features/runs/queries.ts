@@ -2,9 +2,9 @@
  * The query options of runs, and how often each run list polls
  * (`@nightshift/client`, on this app's client), and their mutations.
  *
- * Flows (start a run) and gates (the inbox) sit below runs and use these
- * too. They import this file through a peer port
- * (`scripts/check-verticals.ts`), because the runs vertical imports them.
+ * Flows (start a run) sits below runs and uses these too. It imports them
+ * through its peer port, `flows-port.ts` (`scripts/check-verticals.ts`),
+ * because the runs vertical imports flows.
  */
 
 import { createRunQueries } from "@nightshift/client";

@@ -19,11 +19,11 @@ import { useMutation } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { MoonIcon, SunriseIcon } from "lucide-react";
 import { toast } from "sonner";
-import { runMutations } from "@/features/runs/queries";
 import type { RunSummary } from "@/shared/api";
 import { orpc } from "@/shared/api";
 import { formatCountdown, formatTime, useNow } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
+import { runMutations } from "../queries";
 
 /** How long until a sleeping run wakes, again each second. Only this text updates. */
 function WakeCountdown({ at }: { at: number }) {

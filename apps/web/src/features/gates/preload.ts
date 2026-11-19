@@ -1,8 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 
-import { runQueries } from "@/features/runs/queries";
 import { preloadQuery } from "@/shared/api";
-import { gateQueries } from "./queries";
+import { gateQueries, runQueries } from "./queries";
 
 /**
  * The data of the inbox besides the open Gates, which the sidebar loads:

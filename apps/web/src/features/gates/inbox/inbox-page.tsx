@@ -44,11 +44,10 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { outcomeLabel } from "@/features/flows";
 import { projectQueries } from "@/features/projects";
-import { runQueries } from "@/features/runs/queries";
 import type { OpenGate } from "@/shared/api";
 import { useNow } from "@/shared/format";
 import { SiteHeader } from "@/shared/page";
-import { gateQueries } from "../queries";
+import { gateQueries, runQueries } from "../queries";
 import { useOpenGates } from "../use-open-gates";
 import { AnsweredList } from "./answered-list";
 import { EMPTY_DRAFT, typing } from "./focus-answer";
