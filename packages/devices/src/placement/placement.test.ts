@@ -93,6 +93,8 @@ let online: Set<string>;
 let requests: WorkRequest[];
 /** B's calls that are still running there. */
 let running: number;
+/** Runs when a call of that kind reaches B, before B serves it. */
+let onCall: { kind: WorkRequest["call"]["kind"]; do(): Promise<void> } | null;
 let personId: string;
 let projectId: string;
 const B = "device-b";
@@ -130,6 +132,7 @@ beforeEach(async () => {
 	online = new Set([B]);
 	requests = [];
 	running = 0;
+	onCall = null;
 	const onB = bDevice(() => projectId);
 	work = {
 		online: (id) => online.has(id),
@@ -148,11 +151,15 @@ beforeEach(async () => {
 				return;
 			}
 			const controller = new AbortController();
+			// An abort that came before the call began ends it too, as every
+			// relay does: no listener hears that abort.
+			if (signal?.aborted) controller.abort();
 			signal?.addEventListener("abort", () => controller.abort(), {
 				once: true,
 			});
 			running++;
 			try {
+				if (onCall?.kind === request.call.kind) await onCall.do();
 				yield* serveWork(onB, request, controller.signal);
 			} finally {
 				running--;
@@ -267,6 +274,9 @@ async function until(runId: string, status: RunStatus) {
 }
 
 const space = () => engine.space(a.spaceId, { personId });
+
+/** The call of a Command step is the newest one, and it runs on B now. */
+const commandRuns = () => running > 0 && requests.at(-1)?.call.kind === "exec";
 
 describe("a run placed on another Device", () => {
 	test("its steps and its worktree are on that Device; this computer walks it", async () => {
@@ -401,10 +411,42 @@ describe("a run placed on another Device", () => {
 			startedBy: personId,
 			deviceId: B,
 		});
-		await waitFor(() => running > 0, { label: "the command on B" });
+		// The command's own call, not one of the calls before it.
+		await waitFor(() => commandRuns(), { label: "the command on B" });
 		await space().act(started.id, { kind: "stop" });
 		await until(started.id, "stopped");
 		await waitFor(() => running === 0, { label: "B's command to end" });
+	});
+
+	test("a stop during the call before the command leaves no command there", async () => {
+		// B takes the call before the command, and the stop comes then.
+		let reached = () => {};
+		const atSnapshot = new Promise<void>((resolve) => {
+			reached = resolve;
+		});
+		let goOn = () => {};
+		const held = new Promise<void>((resolve) => {
+			goOn = resolve;
+		});
+		onCall = {
+			kind: "snapshotWorktree",
+			async do() {
+				reached();
+				await held;
+			},
+		};
+		const started = await space().startRun({
+			projectId,
+			flow: flow([command("long", "sleep 30")]),
+			startedBy: personId,
+			deviceId: B,
+		});
+		await atSnapshot;
+		await space().act(started.id, { kind: "stop" });
+		await until(started.id, "stopped");
+		goOn();
+		// The command sleeps 30 s: only its end at the stop lets this pass.
+		await waitFor(() => running === 0, { label: "B's calls to end" });
 	});
 
 	test("the flows come from this Replica's flow document, and the project is renamed without a Clone here", async () => {

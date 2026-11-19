@@ -252,6 +252,9 @@ export function createWorkHub(
 				};
 				return;
 			}
+			// Aborted before it began (the run stopped during the call before
+			// this one): no listener would hear that abort, so it never goes.
+			if (signal?.aborted) return;
 			const id = randomUUID();
 			const queue: WorkReply[] = [];
 			let ended = false;

@@ -361,6 +361,26 @@ describe("the work hub", () => {
 		taking.abort();
 	});
 
+	test("a call whose signal was aborted before it began ends at once and never reaches the Device", async () => {
+		const hub = createWorkHub();
+		const taking = new AbortController();
+		const deliveries = hub.take("b", taking.signal)[Symbol.asyncIterator]();
+		const delivered = deliveries.next().then(() => "delivered" as const);
+		// The run stopped while the call before this one ran.
+		const caller = new AbortController();
+		caller.abort();
+		const replies: WorkReply[] = [];
+		const ended = (async () => {
+			for await (const reply of hub.call("b", request(), caller.signal))
+				replies.push(reply);
+			return "ended" as const;
+		})();
+		// One of the two happens, never both: no wait on a time.
+		expect(await Promise.race([ended, delivered])).toBe("ended");
+		expect(replies).toEqual([]);
+		taking.abort();
+	});
+
 	test("a call the Device answered but no longer serves when it comes back ends", async () => {
 		const hub = createWorkHub();
 		const first = new AbortController();
