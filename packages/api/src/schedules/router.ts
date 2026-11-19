@@ -1,7 +1,10 @@
+import { ROLE_REFUSAL, RoleRefusal } from "@nightshift/auth";
+import { SpaceNotFound } from "@nightshift/engine";
 import { isTimeZone, scheduleSchema } from "@nightshift/flows";
+import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { output } from "../output";
-import { ownerProcedure, permitted, protectedProcedure } from "../procedures";
+import { ownerOnly, protectedProcedure, refusalError } from "../procedures";
 import { runSummarySchema } from "../runs";
 import {
 	cronPreviewSchema,
@@ -15,6 +18,27 @@ const timeZoneSchema = z.string().refine(isTimeZone, {
 	message: "Choose a time zone such as Europe/Amsterdam.",
 });
 
+/**
+ * A procedure on the schedules of the session's Space. The engine checks
+ * the Person's role there, in the use case. This says its refusals as the
+ * API said them before: a role that does not allow the request is
+ * `ROLE_REFUSAL` (403), a Space they are not a Member of is not found.
+ */
+const scheduleProcedure = protectedProcedure.use(async ({ next }) => {
+	try {
+		return await next();
+	} catch (error) {
+		if (error instanceof RoleRefusal) throw refusalError(ROLE_REFUSAL);
+		if (error instanceof SpaceNotFound) {
+			throw new ORPCError("NOT_FOUND", {
+				message: error.message,
+				cause: error,
+			});
+		}
+		throw error;
+	}
+});
+
 /** One schedule of a project. */
 const oneScheduleSchema = z.object({
 	projectId: z.string(),
@@ -23,7 +47,7 @@ const oneScheduleSchema = z.object({
 
 /** A project's schedules: runs Night Shift starts at a cron time or on a webhook. */
 export const schedules = {
-	list: protectedProcedure
+	list: scheduleProcedure
 		.route({
 			summary:
 				"Lists the schedules of a project, with the next start and how the last one went.",
@@ -38,7 +62,8 @@ export const schedules = {
 	 * issues. Writes this computer's Clone: its owner's. `timeZone` is the
 	 * saver's clock: a schedule with a time and no time zone gets it.
 	 */
-	save: ownerProcedure
+	save: scheduleProcedure
+		.use(ownerOnly)
 		.route({
 			summary:
 				"Replaces the schedules of a project, also with problems, and returns the problems.",
@@ -62,9 +87,10 @@ export const schedules = {
 	 * Pause tonight, a nudge and not an edit: the schedule's next start
 	 * and every start until 06:00 after it, on the schedule's clock, start
 	 * no run. Then it starts as before. A person who may stop runs may do
-	 * it. The pause is in the schedule, so every Device and the Host see it.
+	 * it: the engine checks their role. The pause is in the schedule, so
+	 * every Device and the Host see it.
 	 */
-	pauseTonight: permitted({ run: ["stop"] })
+	pauseTonight: scheduleProcedure
 		.route({
 			summary:
 				"Skips a schedule's starts tonight, until the next morning, then it starts as before.",
@@ -74,8 +100,11 @@ export const schedules = {
 		.handler(({ context, input }) =>
 			context.space.pauseScheduleTonight(input.projectId, input.scheduleId),
 		),
-	/** Ends a pause tonight: the schedule starts at its next time again. */
-	resumeTonight: permitted({ run: ["stop"] })
+	/**
+	 * Ends a pause tonight: the schedule starts at its next time again. A
+	 * person who may stop runs may do it: the engine checks their role.
+	 */
+	resumeTonight: scheduleProcedure
 		.route({
 			summary:
 				"Ends a schedule's pause tonight, so it starts at its next time again.",
@@ -92,7 +121,7 @@ export const schedules = {
 	 * the person's who asks. A pause tonight stays. The engine checks that
 	 * the person's role allows starting runs.
 	 */
-	runNow: protectedProcedure
+	runNow: scheduleProcedure
 		.route({
 			summary:
 				"Starts a schedule's run now, with its own inputs and Device, as if it fired.",

@@ -214,8 +214,9 @@ function engineChecks(access: Context["access"]) {
 /**
  * The context of a request with `access`, on a computer `ownerId` owns,
  * over recording services. The Space view of each Space records its
- * calls with the Space. Its starts (`startRun`, `runScheduleNow`) check
- * the Person's role first (`engineChecks`). The engine's run use cases (`Engine.runs`) check
+ * calls with the Space. Its starts (`startRun`, `runScheduleNow`) and the
+ * pause of a schedule (`pauseScheduleTonight`, `resumeScheduleTonight`)
+ * check the Person's role first (`engineChecks`). The engine's run use cases (`Engine.runs`) check
  * who may first (`engineChecks`), then record the call as `runs.<name>`
  * with the run's Space. The engine's inbox is its own use case over the
  * database, and records each Space's list of open Gates as `listGates`.
@@ -253,6 +254,8 @@ function recording(
 				given: {
 					startRun: checked("startRun", START),
 					runScheduleNow: checked("runScheduleNow", START),
+					pauseScheduleTonight: checked("pauseScheduleTonight", STOP),
+					resumeScheduleTonight: checked("resumeScheduleTonight", STOP),
 					...given.space,
 				},
 				reply: (method) => {
@@ -1178,6 +1181,53 @@ describe("sessions", () => {
 			),
 		).toBe("FORBIDDEN");
 		expect(seen().filter((c) => c.method === "moveProject")).toHaveLength(1);
+	});
+
+	test("the engine's refusals of a schedule's pause keep the words the API gave", async () => {
+		const { bob, cy, spaceId } = await platform();
+		const nightly = { projectId: "p1", scheduleId: "nightly" };
+		// Cy is a viewer: her role does not allow stopping runs.
+		const viewer = await contextFor(cy.headers);
+		for (const pause of [
+			appRouter.schedules.pauseTonight,
+			appRouter.schedules.resumeTonight,
+		]) {
+			expect(
+				await refusalOf(call(pause, nightly, { context: viewer })),
+			).toEqual({
+				code: "FORBIDDEN",
+				defined: false,
+				message: "Your role in this Space does not allow this.",
+			});
+		}
+		expect(seen()).toEqual([]);
+
+		// Bob is a member: he may.
+		const member = await contextFor(bob.headers);
+		await call(appRouter.schedules.pauseTonight, nightly, { context: member });
+		expect(seen()).toEqual([
+			{ space: spaceId, method: "pauseScheduleTonight" },
+		]);
+
+		// A Space the Person is no longer a Member of is not found.
+		const gone = await contextFor(bob.headers, {
+			given: {
+				space: {
+					pauseScheduleTonight: async () => {
+						throw new SpaceNotFound();
+					},
+				},
+			},
+		});
+		expect(
+			await refusalOf(
+				call(appRouter.schedules.pauseTonight, nightly, { context: gone }),
+			),
+		).toEqual({
+			code: "NOT_FOUND",
+			defined: false,
+			message: "That Space does not exist.",
+		});
 	});
 });
 
