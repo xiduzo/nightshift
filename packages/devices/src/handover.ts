@@ -32,7 +32,7 @@ export type KeptDevices = {
  * What one runtime hands the next across a reload. The parts outlive the
  * runtime that made them; each runtime binds them to its own engine.
  */
-type Handover = {
+export type Handover = {
 	/**
 	 * On a Host: the calls of the runs it walks, for the Devices they are
 	 * placed on. A Device's stream outlives a reload.

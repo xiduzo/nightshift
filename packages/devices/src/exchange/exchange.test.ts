@@ -29,8 +29,9 @@ import { FLOW_VERSION } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { and, eq, max, sql } from "drizzle-orm";
 import type { HostRelay as Relay, RunCommand } from "../contract";
-import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { withPeers } from "../testing";
+import { deviceDirectory } from "../wire-peers-directory";
+import { createPeerEngine, type PeerEngine } from "../wire-peers-engine";
 import {
 	ForeignRowsError,
 	MissingProjectError,

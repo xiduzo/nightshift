@@ -28,10 +28,11 @@ import type { HostClient, WorkReply, WorkRequest } from "./contract";
 import type { DevicesRuntime } from "./devices-runtime";
 import type { KeptDevices } from "./handover";
 import { setDeviceOffer } from "./offers/offers";
-import type { PeerEngine } from "./peers";
 import { OFFLINE_AFTER_MS } from "./registry";
 import { type PairedReplicas, pairedReplicas, withPeers } from "./testing";
-import { documentsWithHost, startDevices } from "./wire";
+import { startDevices } from "./wire";
+import { documentsWithHost } from "./wire-links";
+import type { PeerEngine } from "./wire-peers-engine";
 import { createWorkHub } from "./work";
 
 /**

@@ -1,8 +1,4 @@
-/** The engine's `Peers` port, implemented over the other verticals, and the engine of a Device among its peers. */
+/** Pieces of the engine's `Peers` port that read rows the composition hands them (`wire-peers.ts`): the Walkers a run view names, and who may see a run's worktree path. */
 
-export { deviceDirectory } from "./directory";
-export {
-	createPeerEngine,
-	type PeerEngine,
-	type PeerEngineOptions,
-} from "./peer-engine";
+export { createPrivatePaths } from "./private-paths";
+export { createWalkers } from "./walkers";

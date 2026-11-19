@@ -57,8 +57,9 @@ import {
 } from "../contract";
 import { createHostSpaces } from "../links";
 import { type DeviceOffer, NO_STARTER } from "../offers";
-import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { withPeers } from "../testing";
+import { deviceDirectory } from "../wire-peers-directory";
+import { createPeerEngine, type PeerEngine } from "../wire-peers-engine";
 import { serveWork } from "../work/serve-work";
 import { createPlacement } from "./placement";
 

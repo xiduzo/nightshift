@@ -33,8 +33,8 @@ import {
 } from "../contract/procedure/described";
 import type { Link } from "../links";
 import { httpsLink } from "../links/link";
-import { createPeerEngine, type PeerEngine } from "../peers";
 import { type PairedReplicas, pairedReplicas, withPeers } from "../testing";
+import { createPeerEngine, type PeerEngine } from "../wire-peers-engine";
 import type { CommandsChange } from "./commands";
 import {
 	type AppliedCommands,

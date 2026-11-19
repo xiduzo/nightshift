@@ -16,8 +16,8 @@ import { asDate, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import type { WorkRelay } from "../contract";
 import { httpsLink } from "../links/link";
-import type { PeerEngine } from "../peers";
 import { type PairedReplicas, pairedReplicas } from "../testing";
+import type { PeerEngine } from "../wire-peers-engine";
 import { serveWork } from "../work";
 import { createDeviceExchange, type DeviceExchange } from "./device-exchange";
 

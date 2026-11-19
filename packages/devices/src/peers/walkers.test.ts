@@ -17,8 +17,8 @@ import { FLOW_VERSION } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { withPeers } from "../testing";
-import { deviceDirectory } from "./directory";
-import { createPeerEngine, type PeerEngine } from "./peer-engine";
+import { deviceDirectory } from "../wire-peers-directory";
+import { createPeerEngine, type PeerEngine } from "../wire-peers-engine";
 
 /**
  * The Walker a run view names (`walkers.ts`, the peers' `runs.walkers`):

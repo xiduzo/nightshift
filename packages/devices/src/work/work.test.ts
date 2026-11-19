@@ -15,8 +15,9 @@ import { now } from "@nightshift/time";
 import type { WorkReply, WorkRequest } from "../contract";
 import { httpsLink } from "../links/link";
 import { createOfferAdmission, type DeviceOffer } from "../offers";
-import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { partialHostClient, withPeers } from "../testing";
+import { deviceDirectory } from "../wire-peers-directory";
+import { createPeerEngine, type PeerEngine } from "../wire-peers-engine";
 import { createWorkServer } from "./work";
 import { createWorkHub } from "./work-hub";
 

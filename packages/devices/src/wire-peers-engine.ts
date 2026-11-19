@@ -6,17 +6,17 @@ import {
 	type SpaceArchive,
 } from "@nightshift/engine";
 import type { DeviceCopy } from "@nightshift/engine/device-config";
-import { commandMoves, type RunHistoryExchange } from "../exchange";
-import type { HostSpaces } from "../links";
-import type { EngineOffers, OfferAdmission } from "../offers";
-import type { DeviceRegistry } from "../registry";
-import { deviceDirectory } from "./directory";
+import { commandMoves, type RunHistoryExchange } from "./exchange";
+import type { HostSpaces } from "./links";
+import type { EngineOffers, OfferAdmission } from "./offers";
+import type { DeviceRegistry } from "./registry";
 import {
 	type BuiltPeers,
 	createPeers,
 	type PeerOptions,
 	type SpaceMembers,
-} from "./peers";
+} from "./wire-peers";
+import { deviceDirectory } from "./wire-peers-directory";
 
 /** The engine of this Device among its peers, with the devices' half beside it. */
 export type PeerEngine = Engine & {

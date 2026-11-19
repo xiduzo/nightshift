@@ -1,7 +1,5 @@
-import type { Database } from "@nightshift/db";
 import type { RunWalker } from "@nightshift/engine";
 import { deviceNameIn, type SpaceDocuments } from "@nightshift/engine/projects";
-import { deviceNamesOf } from "../registry";
 
 /**
  * The Walkers of runs of a Space, as a run view names them: this
@@ -9,13 +7,14 @@ import { deviceNamesOf } from "../registry";
  * Space document has for it.
  */
 export function createWalkers(deps: {
-	db: Database;
+	/** The names the Device rows give these Devices, by id. */
+	names(ids: readonly string[]): Promise<Map<string, string>>;
 	/** This computer as the Walker of its runs (`PeerContext.walkerId`). */
 	walkerId(): Promise<string>;
 	device: { id: string; name: string };
 	documents: SpaceDocuments;
 }) {
-	const { db, device, documents } = deps;
+	const { device, documents } = deps;
 	return async function walkers(
 		spaceId: string,
 		ids: readonly string[],
@@ -23,7 +22,7 @@ export function createWalkers(deps: {
 		const self = await deps.walkerId();
 		const unique = [...new Set(ids)];
 		const others = unique.filter((id) => id !== self && id !== device.id);
-		const named = await deviceNamesOf(db, others);
+		const named = await deps.names(others);
 		const document =
 			others.length > 0 && others.some((id) => !named.has(id))
 				? await documents.open(spaceId)

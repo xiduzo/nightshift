@@ -78,10 +78,6 @@ imports packages/devices exchange offers
 imports packages/devices exchange registry
 imports packages/devices relay registry
 imports packages/devices work registry
-# `peers` composes the verticals into the engine's port.
-imports packages/devices peers offers
-imports packages/devices peers placement
-imports packages/devices peers registry
 
 # The execution port reads this computer's configuration, the knowledge
 # folder and the project.

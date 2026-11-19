@@ -19,9 +19,9 @@ import type { Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { asDate, now } from "@nightshift/time";
 import { eq, max } from "drizzle-orm";
-import type { HostRelay } from "../contract";
-import { withPeers } from "../testing";
-import { createPeerEngine, type PeerEngine } from "./peer-engine";
+import type { HostRelay } from "./contract";
+import { withPeers } from "./testing";
+import { createPeerEngine, type PeerEngine } from "./wire-peers-engine";
 
 /**
  * The engine of a Device among its peers (`createPeerEngine`): the

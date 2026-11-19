@@ -23,9 +23,13 @@ import type { KeptDevices } from "./handover";
 import type { Devices, Host } from "./host";
 import type { LinkOptions, OpenDocumentChannel } from "./links";
 import type { Offers } from "./offers";
-import type { createPeerEngine, PeerEngine, PeerEngineOptions } from "./peers";
 import type { Reach } from "./reach";
 import type { OwnSecrets } from "./secrets";
+import type {
+	createPeerEngine,
+	PeerEngine,
+	PeerEngineOptions,
+} from "./wire-peers-engine";
 
 /**
  * What the devices runtime gives the daemon (`DevicesRuntime`) and what it

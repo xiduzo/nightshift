@@ -1,7 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { type Actor, personOf } from "@nightshift/engine";
 import { personInSpace } from "../links";
-import type { DeviceRegistry } from "../registry";
 
 /**
  * A run as a Person may read it: where its worktree is on its Device
@@ -12,7 +11,10 @@ import type { DeviceRegistry } from "../registry";
  */
 export function createPrivatePaths(deps: {
 	db: Database;
-	registry: Pick<DeviceRegistry, "get">;
+	/** A Device row by id: whose Device it is. */
+	registry: {
+		get(deviceId: string): Promise<{ ownerId: string } | null>;
+	};
 	/** The Person who owns this computer, or null before the engine knows. */
 	ownerId(): string | null;
 }) {

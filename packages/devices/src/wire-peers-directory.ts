@@ -1,12 +1,12 @@
 import type { Database } from "@nightshift/db";
 import type { DeviceDirectory } from "@nightshift/engine";
-import { createHostSpaces } from "../links";
+import { createHostSpaces } from "./links";
 import {
 	deviceNamesOf,
 	knownDevices,
 	selfDevice,
 	selfOwnerId,
-} from "../registry";
+} from "./registry";
 
 /**
  * The engine's `DeviceDirectory`, over the Device rows this package owns:

@@ -54,7 +54,6 @@ export {
 } from "./host";
 export type { HostRole, JoinProgress, OpenDocumentChannel } from "./links";
 export type { Offers, OfferView, SpaceDeviceView } from "./offers";
-export { deviceDirectory, type PeerEngine } from "./peers";
 export {
 	defaultSelfDeviceHost,
 	inContainer,
@@ -65,3 +64,5 @@ export {
 	setSelfOwner,
 } from "./registry";
 export { startDevices } from "./wire";
+export { deviceDirectory } from "./wire-peers-directory";
+export type { PeerEngine } from "./wire-peers-engine";

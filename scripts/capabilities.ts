@@ -50,9 +50,10 @@
  *    that imports no feature is a mechanism (the Insights admin: its route
  *    passes in what the frame shows). An app that composes in its entry
  *    files has no wiring piece (`apps/desktop`, `apps/server`).
- * 5. A vertical of a server package that composes the others
- *    (`devices/peers`) is a mechanism. Its imports of capabilities are V2
- *    debt until the wiring moves to a `wire.ts` outside the verticals.
+ * 5. A vertical of a server package that composes the others is a
+ *    mechanism. Its imports of capabilities are V2 debt until the wiring
+ *    moves to a `wire.ts` outside the verticals (`devices/peers` did, to
+ *    `wire-peers.ts`).
  * 6. A package without rings has no `wire.ts`. When one vertical of it
  *    composes its capabilities, and its work is that composition, it is
  *    WIRING (`client/live`). Give a vertical WIRING only when its rules are
@@ -425,8 +426,8 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		// This computer's membership of its home Host.
 		membership: "devices",
 		offers: "devices",
-		// The engine's `Peers` port, composed from the other verticals
-		// (rule 5).
+		// Pieces of the engine's `Peers` port. The composition
+		// (`wire-peers.ts`) hands them the rows they read (rule 5).
 		peers: M,
 		// Which of a Person's Devices a run may use.
 		placement: "devices",

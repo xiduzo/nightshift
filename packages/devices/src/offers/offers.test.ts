@@ -20,9 +20,10 @@ import { atLocal } from "@nightshift/time/testing";
 import { eq } from "drizzle-orm";
 import type { WorkReply } from "../contract";
 import { createHostExchange } from "../exchange";
-import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { selfOwnerId } from "../registry";
 import { callerOf, withPeers } from "../testing";
+import { deviceDirectory } from "../wire-peers-directory";
+import { createPeerEngine, type PeerEngine } from "../wire-peers-engine";
 import { createWorkHub } from "../work";
 import { type DeviceOffer, offerRefusal, spaceOffers } from "./offers";
 

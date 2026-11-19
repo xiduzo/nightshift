@@ -17,7 +17,7 @@ import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
 import { now } from "@nightshift/time";
 import type { WorkReply, WorkRequest } from "../contract";
 import { createHostSpaces } from "../links";
-import { deviceDirectory } from "../peers";
+import { deviceDirectory } from "../wire-peers-directory";
 import { serveWork } from "../work";
 import {
 	createOfferAdmission,

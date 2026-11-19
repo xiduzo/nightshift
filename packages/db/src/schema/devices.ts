@@ -16,7 +16,7 @@ import { createdAt, spaceId, updatedAt } from "./columns";
 // Hosts and their Spaces (`links/`), the exchange of run history and
 // commands with them (`exchange/`), and the merge of this computer's own
 // personal Space into its home Host's and its split (`membership/`). The engine reads these rows through its
-// `DeviceDirectory` port (`deviceDirectory`, in `peers/`).
+// `DeviceDirectory` port (`deviceDirectory`, in `wire-peers-directory.ts`).
 
 /**
  * A computer that runs Night Shift. Exactly one row is this computer: the

@@ -10,9 +10,9 @@ import {
 } from "@nightshift/engine";
 import type { DeviceCopies } from "@nightshift/engine/device-config";
 import { memberName, memberRole } from "@nightshift/engine/projects";
-import type { HostRelay, RunCommand, WorkRelay } from "../contract";
-import { createRunHistoryExchange, type RunHistoryExchange } from "../exchange";
-import { createHostSpaces, type HostSpaces } from "../links";
+import type { HostRelay, RunCommand, WorkRelay } from "./contract";
+import { createRunHistoryExchange, type RunHistoryExchange } from "./exchange";
+import { createHostSpaces, type HostSpaces } from "./links";
 import {
 	createEngineOffers,
 	createOfferAdmission,
@@ -22,15 +22,15 @@ import {
 	type EngineOffers,
 	type OfferAdmission,
 	type OfferUse,
-} from "../offers";
-import { createPlacement } from "../placement";
+} from "./offers";
+import { createPrivatePaths, createWalkers } from "./peers";
+import { createPlacement } from "./placement";
 import {
 	createDeviceRegistry,
 	type DevicePresence,
 	type DeviceRegistry,
-} from "../registry";
-import { createPrivatePaths } from "./private-paths";
-import { createWalkers } from "./walkers";
+	deviceNamesOf,
+} from "./registry";
 
 /** What the peers take beside the engine's own parts. */
 export type PeerOptions = {
@@ -234,7 +234,7 @@ export function createPeers(
 		},
 		runs: {
 			walkers: createWalkers({
-				db,
+				names: (ids) => deviceNamesOf(db, ids),
 				walkerId: context.walkerId,
 				device,
 				documents,

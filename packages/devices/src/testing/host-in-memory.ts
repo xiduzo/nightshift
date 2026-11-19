@@ -34,8 +34,9 @@ import {
 } from "../links";
 // What a Link is made of, for its fake in memory: a test helper may reach past the barrel.
 import { hostCall, translated } from "../links/from-host";
-import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { createRelay } from "../relay";
+import { deviceDirectory } from "../wire-peers-directory";
+import { createPeerEngine, type PeerEngine } from "../wire-peers-engine";
 import { createWorkHub } from "../work";
 import { inMemoryHost, type MemoryHost } from "./in-memory-host";
 import { withPeers } from "./peers";

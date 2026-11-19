@@ -1,5 +1,5 @@
 import { type TestEngineOptions, withDevice } from "@nightshift/engine/testing";
-import type { createPeerEngine } from "../peers";
+import type { createPeerEngine } from "../wire-peers-engine";
 
 type PeerEngineOptions = Parameters<typeof createPeerEngine>[0];
 
