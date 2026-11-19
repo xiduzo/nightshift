@@ -26,9 +26,9 @@ import type { useChatPanel } from "../chat";
 import type { TestMarksApi } from "../test-run";
 import { TestBadge } from "../test-run";
 import type { useRevisionView } from "./revisions";
-import { SaveButton } from "./save-button";
+import type { useFlowSave } from "./saving";
+import { SaveButton } from "./saving";
 import type { EditingSession } from "./session";
-import type { useFlowSave } from "./use-flow-save";
 
 /** The editor's header: the breadcrumb, Save, the More menu, the chat button, the test marks and Run. */
 export function EditorHeader({

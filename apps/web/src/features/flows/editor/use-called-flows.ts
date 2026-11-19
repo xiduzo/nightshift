@@ -13,9 +13,9 @@ import type { useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { toast } from "sonner";
 import { flowMutations } from "../queries";
+import type { useFlowSave } from "./saving";
 import type { EditingSession } from "./session";
 import type { useEditorData } from "./use-editor-data";
-import type { useFlowSave } from "./use-flow-save";
 
 /**
  * The flows the Subflow nodes call: open one, or make a new one (blank,

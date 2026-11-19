@@ -32,6 +32,7 @@ import { EditorHeader } from "./editor-header";
 import { EditorPanels } from "./editor-panels";
 import { ProjectFlowsContext, ProjectFolderContext } from "./project";
 import { useRevisionView } from "./revisions";
+import { useFlowSave } from "./saving";
 import { sectionEdits } from "./sections";
 import { selectedInspector } from "./selected-inspector";
 import { createEditingSession, useEditingSession } from "./session";
@@ -39,7 +40,6 @@ import { SubflowView } from "./subflow-view";
 import { useCalledFlows } from "./use-called-flows";
 import { useEditorData } from "./use-editor-data";
 import { useEditorKeys, useEscapeCloses } from "./use-editor-keys";
-import { useFlowSave } from "./use-flow-save";
 import { useNodeSamples } from "./use-node-samples";
 
 type Props = {

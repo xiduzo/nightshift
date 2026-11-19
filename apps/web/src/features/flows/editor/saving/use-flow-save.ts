@@ -5,9 +5,9 @@ import type { QueryClient } from "@tanstack/react-query";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { toast } from "sonner";
-import { saveFile } from "../move";
-import { flowMutations, flowQueries } from "../queries";
-import type { EditingSession } from "./session";
+import { saveFile } from "../../move";
+import { flowMutations, flowQueries } from "../../queries";
+import type { EditingSession } from "../session";
 
 /**
  * Saving the draft: the save request, `save` (it saves a draft that

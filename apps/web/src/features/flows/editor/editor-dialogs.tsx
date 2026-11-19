@@ -7,13 +7,13 @@ import type { useChatPanel } from "../chat";
 import { CopyFlowDialog } from "../move";
 import { StartRunDialog } from "../start";
 import type { TestMarksApi } from "../test-run";
-import { LeaveDialog } from "./leave-dialog";
 import type { useRevisionView } from "./revisions";
 import { RevisionsSheet } from "./revisions";
+import type { useFlowSave } from "./saving";
+import { LeaveDialog } from "./saving";
 import { MakeSubflowDialog, type sectionEdits } from "./sections";
 import type { EditingSession } from "./session";
 import type { useEditorData } from "./use-editor-data";
-import type { useFlowSave } from "./use-flow-save";
 
 /** The editor's dialogs and sheet: Start run, Make subflow, Revisions, Copy into project and Leave. */
 export function EditorDialogs({
