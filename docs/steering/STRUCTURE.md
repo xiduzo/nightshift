@@ -395,7 +395,7 @@ A capability of a server package is a **slice** with three rings. Imports point 
 - The server packages are `engine`, `devices`, `notifications`, `agents`, `auth` and `telemetry` (`SERVER_PACKAGES` of `.dependency-cruiser.mjs`).
 - A slice is a vertical of a server package that the capability map gives a capability (section 4). Each sub-vertical of it is a slice too.
 - Only a slice has rings. A mechanism has none. `api` has none: it is the driving adapter for people. The apps and the other packages have none. The rules of section 4 hold for all of them.
-- A vertical that is not in shape yet is on `scripts/hexagon-debt.txt` (section 8). A new slice starts in shape.
+- A vertical that is not in shape yet is on `scripts/hexagon-debt.txt` (section 8). A new slice starts in shape. A line names a vertical, never a sub-vertical: a vertical is in shape with all its sub-verticals, or it is listed.
 
 ### The slice
 
@@ -477,7 +477,7 @@ Only that `wire.ts`, a file of the same `adapters/out/` and a test import a real
 
 The twin sits beside the real adapter in `adapters/out/`, and the contract suite runs on both. A use-case test runs on the twins.
 
-A port that another slice or another package implements says so in the comment of its type: `/** The runs a schedule starts. @filledBy engine/run */`. The name is a package (`@filledBy devices`) or a vertical of one, on disk, and not the slice itself. Such a port has an in-memory twin and no contract suite. One file `adapters/out/in-memory-*.ts` may hold the twins of several of these ports. When a slice of the same package fills the port and is in shape, import its barrel in the use case and remove the port. The check does not ask for that.
+A port that another slice or another package implements says so in the comment of its type: `/** The runs a schedule starts. @filledBy engine/run */`. The name is a package (`@filledBy devices`) or a vertical of one, on disk, and not the slice itself. A port that a sub-vertical fills names its vertical. When the `wire.ts` of a package builds the port from several things, the name is that composition: `@filledBy engine/wire`. The package then has a `src/wire.ts`. Such a port has an in-memory twin and no contract suite. One file `adapters/out/in-memory-*.ts` may hold the twins of several of these ports. When a slice of the same package fills the port and is in shape, import its barrel in the use case and remove the port. The check does not ask for that.
 
 Twins and contract suites are test code. Production code never imports them. They do not count for the size, folder and nesting rules of section 4.
 
@@ -494,7 +494,7 @@ Twins and contract suites are test code. Production code never imports them. The
 
 | Place | File | What the check asks |
 | --- | --- | --- |
-| The slice folder | `wire.ts` | One exported function, `wire` and the folder name in PascalCase: `schedules` gives `wireSchedules`, `run-status` gives `wireRunStatus`. Types are fine too. |
+| The slice folder | `wire.ts` | One exported function, `wire` and the folder name in PascalCase: `schedules` gives `wireSchedules`, `run-status` gives `wireRunStatus`. A sub-vertical takes the name of its own folder, not of its path: `runs/actions/` gives `wireActions`. Types are fine too. |
 | `application/` | `ports.ts` | Types only: no value export. |
 | `application/` | `<verb>-<object>.ts` | Lower case with dashes. One exported function with the camelCase name of the file: `answer-gate.ts` exports `answerGate`. Write it as `export function` or as `export const x = (...) => ...`. Types are fine too. |
 | `application/` | `<verb>-<object>.test.ts` | One per use case, beside it. No other test file. |

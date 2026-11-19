@@ -29,6 +29,8 @@
  *   `wire<Slice>` (`schedules/wire.ts` exports `wireSchedules`), and types.
  *   It builds the real adapters of the slice and returns the use cases
  *   bound to their ports. The barrel exports that function and types.
+ *   The name comes from the folder of the slice, not from its path: the
+ *   sub-vertical `runs/actions/` has `wireActions`.
  *
  * The import rules (`.dependency-cruiser.mjs`, run by dependency-cruiser):
  * (H1) `domain/` imports only its own `domain/` and the kernel. The
@@ -92,7 +94,11 @@
  *        in-memory adapter and a real adapter, and runs the suite on both.
  *      A port that another slice or another package implements says so in
  *      its comment: `@filledBy <package>` or `@filledBy <package>/<vertical>`
- *      (`@filledBy devices`, `@filledBy engine/run`). It has an in-memory
+ *      (`@filledBy devices`, `@filledBy engine/run`). When the composition
+ *      of a package builds the port from several things, the name is
+ *      `<package>/wire`: the package has a `src/wire.ts` (`@filledBy
+ *      engine/wire`). The name is never a sub-vertical: a port that a
+ *      sub-vertical fills names its vertical. It has an in-memory
  *      adapter and nothing else: a file `adapters/out/in-memory-*.ts` that
  *      imports the port. One such file may hold the in-memory adapters of
  *      several of these ports (`in-memory-neighbours.ts`).
@@ -100,8 +106,9 @@
  * `scripts/check-layers.ts`): production code never imports them.
  *
  * The debt list (H10): `scripts/hexagon-debt.txt` names each vertical that
- * is not in shape yet, as `<package>/<vertical>`. The list only gets
- * shorter:
+ * is not in shape yet, as `<package>/<vertical>`. A line never names a
+ * sub-vertical: a vertical is in shape with all its sub-verticals, or it
+ * is listed. The list only gets shorter:
  * - A vertical that is not listed keeps every rule above.
  * - A listed vertical that keeps every rule, and has an `application/`
  *   folder, fails until its line is gone. A listed slice of rules alone

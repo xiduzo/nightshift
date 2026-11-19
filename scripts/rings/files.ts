@@ -30,8 +30,22 @@ const pascal = (name: string): string =>
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
-/** Who fills a port from outside: `devices`, or `engine/run`. */
+/** Who fills a port from outside: `devices`, `engine/run`, or `engine/wire`. */
 const FILLER = /^[a-z0-9-]+(?:\/[a-z0-9-]+)?$/;
+
+/**
+ * `<package>/wire` names the composition of a package: its `src/wire.ts`,
+ * which builds the port from several things.
+ */
+const COMPOSITION = "wire";
+
+/** `filledBy` names a package, a vertical of one, or the composition of one, on disk. */
+function fillerExists(root: string, filledBy: string): boolean {
+	const [pkg, vertical] = filledBy.split("/");
+	const src = join(root, "packages", pkg ?? "", "src");
+	if (vertical === COMPOSITION && existsSync(join(src, "wire.ts"))) return true;
+	return existsSync(join(src, vertical ?? ""));
+}
 
 const list = (names: Iterable<string>) =>
 	[...names]
@@ -256,11 +270,9 @@ export function portProblems(root: string, slice: Slice): string[] {
 		const reals = files.filter((file) => real.test(file));
 
 		if (filledBy !== undefined) {
-			const [pkg, vertical] = filledBy.split("/");
-			const filler = join(root, "packages", pkg ?? "", "src", vertical ?? "");
-			if (!FILLER.test(filledBy) || !existsSync(filler)) {
+			if (!FILLER.test(filledBy) || !fillerExists(root, filledBy)) {
 				problems.push(
-					`${where} has @filledBy ${filledBy ? `"${filledBy}", which is no package and no vertical of one` : "without a name"}. Write who implements it: a package (@filledBy devices) or a vertical (@filledBy engine/run).`,
+					`${where} has @filledBy ${filledBy ? `"${filledBy}", which is no package and no vertical of one` : "without a name"}. Write who implements it: a package (@filledBy devices), a vertical (@filledBy engine/run), or the wire.ts of a package that builds it from several things (@filledBy engine/wire).`,
 				);
 			} else if (filledBy === `${slice.pkg}/${slice.path}`) {
 				problems.push(

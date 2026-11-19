@@ -143,6 +143,197 @@ describe("a slice in shape", () => {
 	});
 });
 
+/**
+ * `engine/runs`: a vertical of two sub-verticals, each a slice with its
+ * own rings and its own `wire.ts`. `actions` takes a use case of `access`
+ * as a port that its vertical fills.
+ */
+const RUNS = "packages/engine/src/runs";
+const runs: Files = {
+	...repository,
+	"packages/engine/src/index.ts": [
+		'export { wireAccess, wireActions } from "./runs";',
+		'export { wireSchedules } from "./schedules";',
+	],
+	[`${RUNS}/index.ts`]: [
+		'export { wireAccess } from "./access";',
+		'export { wireActions } from "./actions";',
+	],
+	[`${RUNS}/access/index.ts`]: [
+		'export type { OpenRun } from "./application/open-run";',
+		'export { wireAccess } from "./wire";',
+	],
+	[`${RUNS}/access/wire.ts`]: [
+		'import type { Database } from "@nightshift/db";',
+		'import { logRunRecords } from "./adapters/out/log-run-records";',
+		'import { openRun } from "./application/open-run";',
+		"export function wireAccess(deps: { db: Database }) {",
+		"\treturn { openRun: openRun({ runs: logRunRecords(deps.db) }) };",
+		"}",
+	],
+	[`${RUNS}/access/application/ports.ts`]:
+		"export type RunRecords = { find(id: string): Promise<string | null> };\n",
+	[`${RUNS}/access/application/open-run.ts`]: [
+		'import type { LoggedEvent } from "../../../log";',
+		'import type { RunRecords } from "./ports";',
+		"export type OpenRun = (id: string) => Promise<string | null>;",
+		"export type Seen = LoggedEvent;",
+		"export const openRun =",
+		"\t(ports: { runs: RunRecords }): OpenRun =>",
+		"\t(id) =>",
+		"\t\tports.runs.find(id);",
+	],
+	[`${RUNS}/access/application/open-run.test.ts`]: [
+		'import { expect, test } from "bun:test";',
+		'import { inMemoryRunRecords } from "../adapters/out/in-memory-run-records";',
+		'import { openRun } from "./open-run";',
+		'test("x", () => expect(openRun({ runs: inMemoryRunRecords() })).toBeDefined());',
+	],
+	[`${RUNS}/access/adapters/out/in-memory-run-records.ts`]: [
+		'import type { RunRecords } from "../../application/ports";',
+		"export const inMemoryRunRecords = (): RunRecords => ({ find: async () => null });",
+	],
+	[`${RUNS}/access/adapters/out/log-run-records.ts`]: [
+		'import type { Database } from "@nightshift/db";',
+		'import type { RunRecords } from "../../application/ports";',
+		"export const logRunRecords = (_db: Database): RunRecords => ({ find: async () => null });",
+	],
+	[`${RUNS}/access/adapters/out/run-records.contract.ts`]: [
+		'import { expect, test } from "bun:test";',
+		'import type { RunRecords } from "../../application/ports";',
+		"export function runRecordsContract(make: () => RunRecords): void {",
+		'\ttest("x", () => expect(make()).toBeDefined());',
+		"}",
+	],
+	[`${RUNS}/access/adapters/out/run-records.contract.test.ts`]: [
+		'import type { Database } from "@nightshift/db";',
+		'import { inMemoryRunRecords } from "./in-memory-run-records";',
+		'import { logRunRecords } from "./log-run-records";',
+		'import { runRecordsContract } from "./run-records.contract";',
+		"runRecordsContract(inMemoryRunRecords);",
+		"runRecordsContract(() => logRunRecords({} as Database));",
+	],
+	[`${RUNS}/actions/index.ts`]: 'export { wireActions } from "./wire";\n',
+	[`${RUNS}/actions/wire.ts`]: [
+		'import type { OpenRun } from "../access";',
+		'import { stopRun } from "./application/stop-run";',
+		"export function wireActions(deps: { open: OpenRun }) {",
+		"\treturn { stop: stopRun({ open: deps.open }) };",
+		"}",
+	],
+	[`${RUNS}/actions/application/ports.ts`]: [
+		'import type { OpenRun } from "../../access";',
+		"/** Opens the run. @filledBy engine/runs */",
+		"export type RunAccess = OpenRun;",
+	],
+	[`${RUNS}/actions/application/stop-run.ts`]: [
+		'import type { RunAccess } from "./ports";',
+		"export const stopRun =",
+		"\t(ports: { open: RunAccess }) =>",
+		"\t(id: string) =>",
+		"\t\tports.open(id);",
+	],
+	[`${RUNS}/actions/application/stop-run.test.ts`]: [
+		'import { expect, test } from "bun:test";',
+		'import { inMemoryRunAccess } from "../adapters/out/in-memory-neighbours";',
+		'import { stopRun } from "./stop-run";',
+		'test("x", () => expect(stopRun({ open: inMemoryRunAccess() })).toBeDefined());',
+	],
+	[`${RUNS}/actions/adapters/out/in-memory-neighbours.ts`]: [
+		'import type { RunAccess } from "../../application/ports";',
+		"export const inMemoryRunAccess = (): RunAccess => async (id) => id;",
+	],
+};
+
+describe("a vertical of sub-verticals, each with its own rings", () => {
+	test("each sub-vertical has its rings and its wire.ts, and the vertical has only its barrel", async () => {
+		expect(await check(runs)).toEqual([]);
+	});
+
+	test("the wire function of a sub-vertical has the name of its folder, not of its path", async () => {
+		expect(
+			await check({
+				...runs,
+				[`${RUNS}/actions/wire.ts`]: [
+					'import type { OpenRun } from "../access";',
+					'import { stopRun } from "./application/stop-run";',
+					"export function wireRunsActions(deps: { open: OpenRun }) {",
+					"\treturn { stop: stopRun({ open: deps.open }) };",
+					"}",
+				],
+			}),
+		).toEqual([
+			`${RUNS}/actions/wire.ts: a wire.ts exports one function, named for the slice ("wireActions"), and types. It exports the value "wireRunsActions".`,
+		]);
+	});
+
+	test("only the wire.ts of a sub-vertical builds its adapters: not its sibling, not its vertical", async () => {
+		const sibling = await check({
+			...runs,
+			[`${RUNS}/actions/wire.ts`]: [
+				'import type { OpenRun } from "../access";',
+				'import { logRunRecords } from "../access/adapters/out/log-run-records";',
+				'import { stopRun } from "./application/stop-run";',
+				"export function wireActions(deps: { open: OpenRun }) {",
+				"\treturn { stop: stopRun({ open: deps.open }), records: logRunRecords };",
+				"}",
+			],
+		});
+		expect(sibling).toHaveLength(1);
+		expect(sibling[0]).toContain(`${RUNS}/actions/wire.ts`);
+		expect(sibling[0]).toContain("(H5)");
+		const vertical = await check({
+			...runs,
+			[`${RUNS}/wire.ts`]: [
+				'import { logRunRecords } from "./access/adapters/out/log-run-records";',
+				"export const wireRuns = () => logRunRecords;",
+			],
+		});
+		expect(vertical).toHaveLength(1);
+		expect(vertical[0]).toContain(`${RUNS}/wire.ts`);
+		expect(vertical[0]).toContain("(H5)");
+	});
+
+	test("a port that a sibling sub-vertical fills names the vertical, never the sub-vertical", async () => {
+		const tagged = (tag: string): Files => ({
+			...runs,
+			[`${RUNS}/actions/application/ports.ts`]: [
+				'import type { OpenRun } from "../../access";',
+				`/** Opens the run. ${tag} */`,
+				"export type RunAccess = OpenRun;",
+			],
+		});
+		expect(await check(tagged("@filledBy engine/runs"))).toEqual([]);
+		const problems = await check(tagged("@filledBy engine/runs/access"));
+		expect(problems).toHaveLength(1);
+		expect(problems[0]).toContain(
+			'the port RunAccess has @filledBy "engine/runs/access", which is no package and no vertical of one',
+		);
+	});
+
+	test("the debt list names the vertical, never a sub-vertical", async () => {
+		const loose = {
+			...runs,
+			[`${RUNS}/actions/helper.ts`]: "export const helper = 1;\n",
+		};
+		expect(await check(loose)).toHaveLength(1);
+		expect(
+			await check(loose, { debt: "engine/projects\nengine/runs\n" }),
+		).toEqual([]);
+		expect(
+			await check(loose, { debt: "engine/projects\nengine/runs/actions\n" }),
+		).toContain(
+			"scripts/hexagon-debt.txt: engine/runs/actions is not a vertical of a server package. Remove it.",
+		);
+		// In shape with all its sub-verticals, a listed vertical fails.
+		expect(
+			await check(runs, { debt: "engine/projects\nengine/runs\n" }),
+		).toEqual([
+			"scripts/hexagon-debt.txt: engine/runs is in shape. Remove it.",
+		]);
+	});
+});
+
 describe("the shape of a slice", () => {
 	test("a file beside index.ts, wire.ts and the tests fails", async () => {
 		const problems = await check({
@@ -506,6 +697,32 @@ describe("a port has an in-memory adapter and a contract suite (H7)", () => {
 			expect(problems[0]).toContain(`the port ScheduledProjects ${words}`);
 			expect(problems[1]).toContain("the port ScheduledRuns");
 		}
+	});
+
+	test("@filledBy <package>/wire names the composition of a package, which has a src/wire.ts", async () => {
+		const tag = "@filledBy engine/wire";
+		const problems = await check(filled(tag, neighbours));
+		expect(problems).toHaveLength(2);
+		expect(problems[0]).toContain(
+			'the port ScheduledProjects has @filledBy "engine/wire", which is no package and no vertical of one',
+		);
+		expect(problems[0]).toContain("(@filledBy engine/wire)");
+		expect(
+			await check({
+				...filled(tag, neighbours),
+				"packages/engine/src/wire.ts": [
+					'import { wireSchedules } from "./schedules";',
+					"export const createEngine = () => wireSchedules;",
+				],
+			}),
+		).toEqual([]);
+		// The composition of another package has the same name.
+		expect(
+			await check({
+				...filled("@filledBy agents/wire", neighbours),
+				"packages/agents/src/wire.ts": "export const wired = 1;\n",
+			}),
+		).toEqual([]);
 	});
 
 	test("a port with @filledBy and a real adapter in its slice fails", async () => {
