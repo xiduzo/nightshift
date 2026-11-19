@@ -92,7 +92,7 @@ import { wireEngineWalk } from "./wire-walk";
  *   start itself: here (`run/run-start.ts`), or handed to the Host.
  * - `wire-schedules.ts`: the schedules slice (`schedules/`), what it tells
  *   and who listens, and the pull request scores.
- * - `wire-actions.ts` (R4): what a person does to a run (`run/actions.ts`).
+ * - `wire-actions.ts` (R4): what a person does to a run (`runs/actions/`).
  *   The action is taken here as a Turn of the runner, or handed to the
  *   run's Walker as a Command: the Walker is the only writer of its run's
  *   events.
@@ -555,19 +555,16 @@ export function createEngine(
 	});
 
 	// --- actions (R4): `wire-actions.ts` ---
-	// gives: acts.actions (the Space view)
+	// gives: acts.actions (the Space view), acts.runs (the engine)
 	const acts = wireEngineActions({
+		access,
+		walk,
 		db,
-		log: runLog,
 		artifacts,
-		bus,
-		runner,
-		...(hosts ? { hosts } : {}),
 		archive: peers.runs,
 		walks,
 		device,
 		placement: devices,
-		holds: startHolds,
 		leases,
 		...(options.usage ? { usage: options.usage } : {}),
 	});
@@ -700,7 +697,7 @@ export function createEngine(
 		leases,
 		landed,
 		runner,
-		runs: access.runs,
+		runs: { ...access.runs, ...acts.runs },
 		// schedules and scores
 		scheduleNotices: sched.notices,
 		schedules: sched.schedules,

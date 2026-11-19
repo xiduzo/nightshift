@@ -43,7 +43,7 @@ below it, from the bottom up:
 | `scores/` | The pull request scores: what became of the pull request a run opened, written as Scores of that run (`pull-request-scores.ts`, `pull-request-watch.ts`). |
 | `schedules/` | The schedules of the projects, as a slice with rings (`docs/steering/STRUCTURE.md`, section 9). The rules are in `domain/`. Each request is one use case in `application/`. The store of the schedules in the flow document and the timer that fires them are in `adapters/`. `wire.ts` builds them (`wireSchedules`). |
 | `space-move/` | The Space move: Projects to another Space as one operation (`projects-move.ts`). |
-| `run/` | Run start (with the start on a Host in `relay-start.ts`), startup recovery, the run actions (`actions.ts`, with the relay to a Walker in `relay-commands.ts`), the other end of a move (`take-over.ts`) and the wake when a Device is back (`wake.ts`). |
+| `run/` | Run start (with the start on a Host in `relay-start.ts`), startup recovery, the answer to a Gate (`answer.ts`) and the move of a run (`move.ts`), the other end of a move (`take-over.ts`) and the wake when a Device is back (`wake.ts`). |
 | The top of `src/` | The composition root (`wire.ts`: `createEngine`, with a file for each piece of the run path, `wire-<what>.ts`), the `Engine` it returns (`engine.ts`), what it takes (`engine-options.ts`), the port of the other Devices it walks with (`peers.ts`), and what a person does in one Space (`space-engine.ts` is the interface, `space.ts` the module). The tests that start a whole engine are in `packages/engine/test/engine/`. |
 
 No import points up, `import type` included. `scripts/check-verticals.ts`
@@ -271,17 +271,21 @@ packages/engine/src/
   space.ts                 createSpaces(deps): the SpaceEngine of one
                            Space. Each method waits for the engine and
                            hands over to the module that owns the action.
-  run/actions.ts           The run actions behind one entry, act(spaceId,
-                           actor, runId, request): stop, answer a Gate,
-                           send a Signal, move, resume, restart a step, run
-                           again. It reads the run's row once (its Space,
-                           its Walker), refuses by the run's one rule
-                           (run-status/, RunRefusal), and takes the action
-                           as a Turn of the runner (take, or hold for a
-                           stop after the step and a move), or hands it to
-                           the Walker as a command (relay-commands.ts): a stop, an
+  runs/actions/            The run actions, one use case each: stop,
+                           resume, restart a step, run again, send a
+                           Signal, release a lease, useful, take over.
+                           actOnRun(actor, { spaceId, runId, action })
+                           hands an action to the use case of its kind.
+                           Each opens the run for the actor (runs/access),
+                           refuses by the run's one rule (run-status/,
+                           RunRefusal), and takes the action as a Turn of
+                           the runner (take, or hold for a stop after the
+                           step), or hands it to the Walker as a Command
+                           (the Walkers port of runs/walk): a stop, an
                            answer, a signal and a move travel, the rest
-                           only the Walker takes. moveTargets lists the
+                           only the Walker takes.
+  run/answer.ts,           The answer to a Gate and the move of a run, as
+  run/move.ts              actOnRun takes them. moveTargets lists the
                            Devices a move may go to.
   run/take-over.ts,        takeOver: the other end of a move. wake.ts: the
   wake.ts                  runs that slept for a Device that is back look
@@ -615,7 +619,7 @@ Decisions taken during the build, from the code and its comments:
   (`runner.onCustom`). The `step-started` and `step-ended` custom stream
   chunks (`RunEvent`) make the runner publish `{ kind: "status-changed" }`
   on the bus. Transcript entries reach the bus from the recorder already.
-- **An answer to a Gate waits for the step to end** (`run/actions.ts`). It
+- **An answer to a Gate waits for the step to end** (`run/answer.ts`). It
   reserves a slot and resumes the thread with `{ kind: "gate", choice,
   note }`. It returns once the log has the step's `StepEnded`. So the
   run no longer waits when the caller looks again. A full run cap leaves

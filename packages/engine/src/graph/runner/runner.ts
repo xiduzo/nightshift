@@ -110,7 +110,7 @@ import { createSleeps, planWake, recordWake, type Wake } from "./wake";
  * - I9 A Turn reads the run's row and refuses a run another Device walks
  *   now (a move is a Turn too), with the one refusal for that rule
  *   (`walked-elsewhere`). The person's actions ask the same rule before
- *   they queue (`run/actions.ts`); this read is for a move that came
+ *   they queue (`runs/actions/`); this read is for a move that came
  *   between.
  * - I10 One cap queue, first in first out, one entry per run. A freed
  *   slot runs every queued retry once; each retry is a new Turn that

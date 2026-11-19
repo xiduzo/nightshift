@@ -48,7 +48,7 @@ import { type Producer, valueOutputs } from "./producer";
  * ends the step `error` with why: the Gate does not open.
  *
  * The engine refuses an answer whose data does not match the form before
- * it resumes the thread (`run/actions.ts`). At the deadline, the Ask takes
+ * it resumes the thread (`run/answer.ts`). At the deadline, the Ask takes
  * the node's `default`; with none, the step ends `fail`.
  */
 export function personProducer(node: ValueNode, ctx: StepContext): Producer {

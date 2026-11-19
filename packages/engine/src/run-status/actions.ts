@@ -4,7 +4,7 @@ import type { RunResult, RunStatus } from "./status";
 
 /**
  * Which actions a run allows now, and why not: one rule. The engine
- * refuses by it (`run/actions.ts`, the walk's own guards), and the screens
+ * refuses by it (`runs/actions/`, the walk's own guards), and the screens
  * offer only what it allows (`@nightshift/client` passes it on). It needs
  * only the run's status and whether the computer that takes the action
  * walks the run.

@@ -20,7 +20,7 @@ import {
 	type SpaceDocuments,
 	spaceProjects,
 } from "../../src/projects/space-document";
-import { GateClosedError } from "../../src/run/actions";
+import { GateClosedError } from "../../src/run/answer";
 import { aloneDirectory } from "../../src/testing/alone-directory";
 import {
 	commitFile,

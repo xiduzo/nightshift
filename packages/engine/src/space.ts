@@ -20,8 +20,8 @@ import {
 	toProject,
 } from "./projects";
 import type { ReadModel, RunStreamItem, RunSummary } from "./read";
-import type { RunActions, StartPlaces } from "./run";
-import type { Access } from "./runs";
+import type { MovePath, StartPlaces } from "./run";
+import type { Access, Actions } from "./runs";
 import type { Schedules } from "./schedules";
 import { readServiceLog } from "./services";
 import type { SpaceEngine } from "./space-engine";
@@ -33,8 +33,8 @@ import type { KeptFlow, KeptValue } from "./variables";
  * touches that Space's rows only: a project or run of another Space is
  * "not found", the same answer as one that does not exist. Each method
  * waits for the engine to be ready, then hands over to the module that
- * owns the action: the run actions to `actions.ts`, which reads the run's
- * row itself. The flows are the module itself (`flows`): it waits and
+ * owns the action: the run actions to `runs/actions`, which open the run
+ * themselves. The flows are the module itself (`flows`): it waits and
  * checks the Space on its own.
  */
 export type SpacesDeps = {
@@ -96,8 +96,11 @@ export type SpacesDeps = {
 	startRun(input: StartRunInput, trigger: RunTrigger): Promise<RunSummary>;
 
 	// --- actions (R4), move (R5), gates (R6) ---
-	/** Stop, answer, signal, move, resume, restart and run again (`actions.ts`). */
-	actions: RunActions;
+	/**
+	 * Stop, answer, signal, move, resume, restart and run again
+	 * (`runs/actions`), and the Devices a run can move to (`run/move.ts`).
+	 */
+	actions: { act: Actions["actOnRun"]; moveTargets: MovePath["moveTargets"] };
 
 	// --- schedules ---
 	/** The schedules of the projects: each use case checks the Space itself (`schedules/`). */
@@ -426,7 +429,11 @@ export function createSpaces(deps: SpacesDeps) {
 			// --- actions (R4) ---
 			async act(runId, request) {
 				await ready;
-				await actions.act(spaceId, actor, runId, request);
+				await actions.act(actor ?? NIGHT_SHIFT, {
+					spaceId,
+					runId,
+					action: request,
+				});
 			},
 
 			// --- move (R5) ---

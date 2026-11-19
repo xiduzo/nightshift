@@ -15,7 +15,7 @@ import { z } from "zod";
  * what (`RunCommandInput`, the wire's words), the permission each needs
  * in the run's Space (`permissionOf`) and the shape a Command has on the
  * wire and in the Host's row (`runCommandSchema`). `SpaceEngine.act`
- * takes either shape (`run/actions.ts`): here as a Turn of the runner,
+ * takes either shape (`runs/actions/`): here as a Turn of the runner,
  * or on the Walker elsewhere through the Relay.
  *
  * The stored kinds are the db schema's (`run_command.kind`): the one

@@ -1,7 +1,7 @@
-/** The run path before its slices (`runs/`, `gates/`): starting a run, what a person does to a run, the other end of a move, recovery after a restart, the wakes, and what the schedules tell. The composition (`wire.ts` and the `wire-*.ts` files beside it) makes each piece. */
+/** The run path before its slices (`runs/`, `gates/`): starting a run, the answer to a Gate and the move of a run (which `runs/actions` takes), the other end of a move, and what the schedules tell. The composition (`wire.ts` and the `wire-*.ts` files beside it) makes each piece. */
 
-export { createRunActions, GateClosedError, type RunActions } from "./actions";
-export { createCommandRelay } from "./relay-commands";
+export { createAnswerPath, GateClosedError } from "./answer";
+export { createMovePath, type MovePath } from "./move";
 export { createStartRelay } from "./relay-start";
 export { createRunStart, START_DEADLINE_MS } from "./run-start";
 export { createScheduleNotices } from "./schedule-notices";

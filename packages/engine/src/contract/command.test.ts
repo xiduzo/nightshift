@@ -14,7 +14,7 @@ import {
 /**
  * The Command module: one home for the kinds the schema stores, the
  * actions that travel as them, the permission each needs and the wire
- * shape. The engine applies them in `run/actions.ts` (`run/command.test.ts`).
+ * shape. The engine applies them in `runs/actions/` (`act-on-run.test.ts`).
  */
 
 const file = { name: "note.md", mediaType: "text/markdown", content: "aGk=" };

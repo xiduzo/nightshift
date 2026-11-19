@@ -1,0 +1,83 @@
+import { rerunNodeRefusal } from "../../../../graph";
+import { foldRun, type RunState } from "../../../../log";
+import {
+	deriveSteps,
+	lastHarnessSession,
+	parseRunFlow,
+} from "../../../../read";
+import {
+	runRecord,
+	THIS_COMPUTER,
+} from "../../../access/adapters/out/in-memory-run-records";
+import { inMemoryAccessPorts } from "../../../access/adapters/out/in-memory-space-members";
+import type { RunRecord } from "../../../access/application/open-run";
+import { openRun } from "../../../access/application/open-run";
+import { inMemoryRunFacts } from "../../../walk/adapters/out/in-memory-run-facts";
+import { inMemoryTurns } from "../../../walk/adapters/out/in-memory-turns";
+import { inMemoryWalkers } from "../../../walk/adapters/out/in-memory-walkers";
+import { createStartHolds } from "../../../walk/domain/start-holds";
+import { inMemoryRunLeases } from "./in-memory-run-leases";
+
+/** The Space every run of a test is in, unless it says another. */
+export const SPACE = "space-1";
+/** A Person who is a Member of `SPACE`, and one who only views it. */
+export const ADA = { personId: "person-ada" };
+export const VIC = { personId: "person-vic" };
+/** The Device that walks a run walked elsewhere. */
+export const FAR = "device-far";
+
+/** A run's state for a test: the fold of an empty log, with the fields the test names. */
+export function stateOf(fields: Partial<RunState>): RunState {
+	return { ...foldRun([]), ...fields };
+}
+
+/**
+ * Every port of the actions in memory at once, with the pure functions of
+ * the mechanisms they take: where each use-case test starts. `ADA` is a
+ * member of `SPACE`, `VIC` a viewer. A test puts a run in (`put`) with its
+ * state: the run's facts read that state, and its Turns check it.
+ */
+export function inMemoryActionPorts(options: { reachable?: boolean } = {}) {
+	const access = inMemoryAccessPorts(THIS_COMPUTER);
+	access.members.space(SPACE);
+	access.members.join(SPACE, ADA.personId, "member");
+	access.members.join(SPACE, VIC.personId, "viewer");
+	const states = new Map<string, RunState>();
+	const twin = inMemoryRunFacts(THIS_COMPUTER);
+	const facts = {
+		...twin,
+		/** The state `put` set, else the fold of what was appended. */
+		state: async (runId: string) => states.get(runId) ?? twin.state(runId),
+	};
+	const turns = inMemoryTurns();
+	return {
+		...access,
+		openRun: openRun(access),
+		facts,
+		turns,
+		walkers: inMemoryWalkers(options),
+		leases: inMemoryRunLeases(),
+		holds: createStartHolds(),
+		deriveSteps,
+		lastHarnessSession,
+		flowOf: parseRunFlow,
+		rerunNodeRefusal,
+		/**
+		 * Puts a run in: its row (walked here unless `walkerId` says
+		 * another Device), its state, and whether a drive holds it.
+		 */
+		put(
+			run: Pick<RunRecord, "id"> & Partial<RunRecord>,
+			state: RunState = stateOf({ status: "waiting" }),
+			active = false,
+		): RunRecord {
+			const row = runRecord({ spaceId: SPACE, ...run });
+			access.runs.add(row);
+			states.set(row.id, state);
+			turns.set(row.id, { row, runState: state, active });
+			return row;
+		},
+	};
+}
+
+export type InMemoryActionPorts = ReturnType<typeof inMemoryActionPorts>;

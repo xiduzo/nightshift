@@ -22,6 +22,5 @@ packages/engine/src/projects/projects.ts 942
 packages/engine/src/projects/space-rows.ts 638
 packages/engine/src/projects/worktrees.ts 750
 packages/engine/src/read/read-model.ts 1168
-packages/engine/src/run/actions.ts 619
-packages/engine/src/wire.ts 714
+packages/engine/src/wire.ts 711
 packages/notifications/src/notifier/notifier.ts 774

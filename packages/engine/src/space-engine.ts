@@ -255,7 +255,7 @@ export interface SpaceEngine {
 	startRun(input: StartRunInput): Promise<RunSummary>;
 
 	/**
-	 * What the person asks of a run (`run/actions.ts`): stop it, answer its
+	 * What the person asks of a run (`runs/actions/`): stop it, answer its
 	 * Gate, send its signal, move its Walk, resume it, restart its step or
 	 * walk it again from a node. In the person's words, or as the Command
 	 * that carried it to this Walker (`contract/command.ts`): the same
