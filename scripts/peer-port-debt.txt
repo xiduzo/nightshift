@@ -10,7 +10,6 @@ apps/web features/agents features/devices
 apps/web features/agents features/settings
 apps/web features/devices features/runs
 apps/web features/devices features/settings
-apps/web features/flows features/dashboard
 apps/web features/flows features/runs
 apps/web features/gates features/runs
 apps/web features/projects features/agents

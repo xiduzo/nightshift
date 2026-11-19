@@ -1,6 +1,10 @@
 /** The query options of flows (`@nightshift/client`, on this app's client), and their mutations. */
 
-import { createFlowQueries, createKnowledgeQueries } from "@nightshift/client";
+import {
+	createDashboardQueries,
+	createFlowQueries,
+	createKnowledgeQueries,
+} from "@nightshift/client";
 
 import { orpc } from "@/shared/api";
 
@@ -9,6 +13,11 @@ export const flowQueries = createFlowQueries(orpc);
 /** The files of a project's knowledge: the folders an Agent node may read come from them. */
 export const knowledgeFolderQueries = {
 	files: createKnowledgeQueries(orpc).get,
+};
+
+/** A project's numbers: the Flows page shows each flow's last runs (Flow health) from them. */
+export const flowHealthQueries = {
+	summary: createDashboardQueries(orpc).summary,
 };
 
 export const flowMutations = {

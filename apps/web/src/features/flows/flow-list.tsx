@@ -49,7 +49,6 @@ import {
 } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-import { dashboardQueries } from "@/features/dashboard/queries";
 import { settingsQueries } from "@/features/settings";
 import type { FlowListItem } from "@/shared/api";
 import { PageHeading } from "@/shared/page";
@@ -59,7 +58,7 @@ import { FlowCard } from "./flow-card";
 import { flowsSummary, useFlowFilter } from "./flow-filter";
 import { FlowNotices } from "./flow-notices";
 import { ImportFlowButton } from "./move";
-import { flowMutations, flowQueries } from "./queries";
+import { flowHealthQueries, flowMutations, flowQueries } from "./queries";
 import {
 	FlowSchedulesSheet,
 	IssueLines,
@@ -79,7 +78,7 @@ export function FlowList({ projectId }: { projectId: string }) {
 	const flows = useQuery(flowQueries.list(projectId));
 	// What starts each flow, and its last runs. The cards show without them while they load.
 	const schedules = useQuery(scheduleQueries.listLive(projectId));
-	const summary = useQuery(dashboardQueries.summary({ projectId }));
+	const summary = useQuery(flowHealthQueries.summary({ projectId }));
 	const overviews = flows.data
 		? flowOverviews(
 				flows.data,
