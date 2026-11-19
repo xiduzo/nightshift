@@ -139,7 +139,17 @@ const hold = (
 describe("bringUp", () => {
 	test("given a server that starts, when its ready command answers, then the service is ready with the command's data and its log", async () => {
 		const services = keeper();
-		const { result, started, logPath } = bringUp(services, spec());
+		// The server answers before its line is in the log: the two come to
+		// the keeper on their own paths. The tail of "ready" is the log at
+		// that moment. So this probe is ready only once the log has the line.
+		const { result, started, logPath } = bringUp(
+			services,
+			spec({
+				ready: {
+					command: `grep -q "listening on" logs/stack.log && ${READY_COMMAND}`,
+				},
+			}),
+		);
 
 		const up = await result;
 
