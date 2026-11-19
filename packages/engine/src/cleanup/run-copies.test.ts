@@ -8,10 +8,10 @@ import { FLOW_VERSION } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { defaultRunSettings } from "../device-config/settings";
+import type { EngineInternals } from "../engine";
 import { parseEventRow } from "../log/run-log/append";
 import type { WorktreeRemoval } from "../log/space-facts/worktree-removals";
-import { createEngine, type EngineInternals } from "../run/engine";
-import type { SpaceEngine } from "../run/space-engine";
+import type { SpaceEngine } from "../space-engine";
 import {
 	createSandbox,
 	mustGit,
@@ -19,6 +19,7 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
+import { createEngine } from "../wire";
 
 /**
  * What runs leave in the clone, through the engine: the scheduled cleanup a

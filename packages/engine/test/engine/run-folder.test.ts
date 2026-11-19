@@ -7,17 +7,17 @@ import type { AgentHarness } from "@nightshift/agents/types";
 import { event } from "@nightshift/db/schema";
 import { FLOW_VERSION, type Flow, type FlowNode } from "@nightshift/flows";
 import { asc } from "drizzle-orm";
-import { createRunLog } from "../log/run-log/run-log";
-import { createRunFolders } from "../run-folders/run-folders";
+import { createRunLog } from "../../src/log/run-log/run-log";
+import { NO_BRANCHES } from "../../src/run/run-start";
+import { createRunFolders } from "../../src/run-folders/run-folders";
+import type { SpaceEngine } from "../../src/space-engine";
 import {
 	createSandbox,
 	type Sandbox,
 	waitFor,
 	withDevice,
-} from "../testing/test-support";
-import { createEngine } from "./engine";
-import { NO_BRANCHES } from "./run-start";
-import type { SpaceEngine } from "./space-engine";
+} from "../../src/testing/test-support";
+import { createEngine } from "../../src/wire";
 
 /**
  * A run of a project without a folder (ADR 22), through the engine's

@@ -1,20 +1,21 @@
 import { Refusal } from "@nightshift/refusal";
 
-import type { ArtifactStore } from "../artifacts";
-import type { AnswerCost } from "../assistant";
-import type { RunFilesService } from "../cleanup";
-import type { Actor, StartRunInput } from "../contract";
-import type { SpaceFlows } from "../flows";
-import type { Runner } from "../graph";
+import type { ArtifactStore } from "./artifacts";
+import type { AnswerCost } from "./assistant";
+import type { RunFilesService } from "./cleanup";
+import type { Actor, StartRunInput } from "./contract";
+import type { SpaceFlows } from "./flows";
+import type { Runner } from "./graph";
 import {
 	RUN_NOT_FOUND,
 	type RunLog,
 	type RunRow,
 	type RunTrigger,
 	scopeKey,
-} from "../log";
-import type { MemoryFlow, NodeMemory } from "../memory";
-import type { PlacementPort } from "../placement";
+} from "./log";
+import type { MemoryFlow, NodeMemory } from "./memory";
+import type { WithPaths } from "./peers";
+import type { PlacementPort } from "./placement";
 import {
 	type Branches,
 	type ListedProject,
@@ -23,16 +24,14 @@ import {
 	type SpaceDocuments,
 	setSpaceUsage,
 	toProject,
-} from "../projects";
-import type { ReadModel, RunStreamItem, RunSummary } from "../read";
-import type { Schedules } from "../schedules";
-import { readServiceLog } from "../services";
-import type { KeptFlow, KeptValue } from "../variables";
-import type { RunActions } from "./actions";
-import type { WithPaths } from "./peers";
-import type { MovedProjects, ProjectsMove } from "./projects-move";
+} from "./projects";
+import type { ReadModel, RunStreamItem, RunSummary } from "./read";
+import type { RunActions, StartPlaces } from "./run";
+import type { Schedules } from "./schedules";
+import { readServiceLog } from "./services";
 import type { SpaceEngine } from "./space-engine";
-import type { StartPlaces } from "./start-place";
+import type { MovedProjects, ProjectsMove } from "./space-move";
+import type { KeptFlow, KeptValue } from "./variables";
 
 /**
  * What a person does in one Space (`SpaceEngine`). Every method reads and
@@ -49,18 +48,13 @@ export type SpacesDeps = {
 	signal: AbortSignal;
 	log: RunLog;
 	runner: Pick<Runner, "isActive">;
+
+	// --- projects, flows, kept values, node memory, answer costs (phase 3) ---
 	projects: Projects;
 	documents: SpaceDocuments;
 	/** The ids of the project's runs. */
 	runIdsOfProject(projectId: string): Promise<string[]>;
-	/** The run's row, or "not found". */
-	runRow(runId: string): Promise<RunRow>;
 	listBranches(repoPath: string): Promise<Branches>;
-	/** The files of run folders on this computer. */
-	runFiles: Pick<RunFilesService, "list" | "file">;
-	placement: Pick<PlacementPort, "devicesFor">;
-	/** The Devices a run of the project can run on, the default marked (`start-place.ts`). */
-	placements: StartPlaces["placements"];
 	/** The flows of the Space's projects, for the Person who acts (`flows/space-flows.ts`). */
 	flows(spaceId: string, personId?: string): SpaceFlows;
 	/** The import on upgrade of this Device's Clone of the project, once. Never throws. */
@@ -77,6 +71,40 @@ export type SpacesDeps = {
 	};
 	/** What the answers of Night Shift's own agents cost in a Space, as this Replica has them. */
 	answerCosts(spaceId: string, since?: number): Promise<AnswerCost[]>;
+	/** A Space move (`projects-move.ts`). */
+	moveProjects(move: ProjectsMove): Promise<MovedProjects>;
+
+	// --- the run's row, and the files of a run that other slices keep (R1) ---
+	/** The run's row, or "not found". */
+	runRow(runId: string): Promise<RunRow>;
+	/** The files of run folders on this computer. */
+	runFiles: Pick<RunFilesService, "list" | "file">;
+	/** The artifacts kept on this computer. */
+	artifacts: Pick<ArtifactStore, "list" | "file">;
+	/** Hides the worktree paths of runs on Devices the actor does not own. */
+	pathsFor(
+		spaceId: string,
+		actor: Actor | undefined,
+	): Promise<<T extends WithPaths>(summary: T) => Promise<T>>;
+
+	// --- views (R2) ---
+	reads: ReadModel;
+
+	// --- start (R3) ---
+	placement: Pick<PlacementPort, "devicesFor">;
+	/** The Devices a run of the project can run on, the default marked (`start-place.ts`). */
+	placements: StartPlaces["placements"];
+	/**
+	 * Starts a run where its start place says (`start-place.ts`): here, or
+	 * on the Host that keeps the Space.
+	 */
+	startRun(input: StartRunInput, trigger: RunTrigger): Promise<RunSummary>;
+
+	// --- actions (R4), move (R5), gates (R6) ---
+	/** Stop, answer, signal, move, resume, restart and run again (`actions.ts`). */
+	actions: RunActions;
+
+	// --- schedules ---
 	/** The schedules of the projects: each use case checks the Space itself (`schedules/`). */
 	schedules: Pick<
 		Schedules,
@@ -87,23 +115,6 @@ export type SpacesDeps = {
 		| "runNow"
 		| "previewCron"
 	>;
-	reads: ReadModel;
-	/** The artifacts kept on this computer. */
-	artifacts: Pick<ArtifactStore, "list" | "file">;
-	/** Stop, answer, signal, move, resume, restart and run again (`actions.ts`). */
-	actions: RunActions;
-	/**
-	 * Starts a run where its start place says (`start-place.ts`): here, or
-	 * on the Host that keeps the Space.
-	 */
-	startRun(input: StartRunInput, trigger: RunTrigger): Promise<RunSummary>;
-	/** A Space move (`projects-move.ts`). */
-	moveProjects(move: ProjectsMove): Promise<MovedProjects>;
-	/** Hides the worktree paths of runs on Devices the actor does not own. */
-	pathsFor(
-		spaceId: string,
-		actor: Actor | undefined,
-	): Promise<<T extends WithPaths>(summary: T) => Promise<T>>;
 };
 
 export function createSpaces(deps: SpacesDeps) {
@@ -148,14 +159,10 @@ export function createSpaces(deps: SpacesDeps) {
 	/** What a person does in one Space. */
 	return function space(spaceId: string, actor?: Actor): SpaceEngine {
 		return {
+			// --- projects (phase 3) ---
 			async listProjects() {
 				await ready;
 				return withClones(spaceId, await projects.listInSpace(spaceId));
-			},
-
-			async projectRuns(read) {
-				await ready;
-				return reads.projectRuns(spaceId, read);
 			},
 
 			async addProject(input) {
@@ -266,25 +273,7 @@ export function createSpaces(deps: SpacesDeps) {
 				return deps.listBranches(row.repoPath);
 			},
 
-			async listDevices(projectId, forNode) {
-				await ready;
-				if (!actor) {
-					throw new Refusal("signed-out", "Sign in to see your devices.");
-				}
-				return deps.placement.devicesFor(
-					spaceId,
-					actor.personId,
-					projectId,
-					forNode,
-				);
-			},
-
-			async listPlacements(projectId) {
-				await ready;
-				if (!actor) throw new Refusal("signed-out", "Sign in to start a run.");
-				return deps.placements(spaceId, actor.personId, projectId);
-			},
-
+			// --- kept values, node memory, flows, answer costs (phase 3) ---
 			async listKeptValues(projectId, flowName) {
 				await ready;
 				await projects.find(projectId, spaceId);
@@ -311,6 +300,17 @@ export function createSpaces(deps: SpacesDeps) {
 
 			flows: deps.flows(spaceId, actor?.personId),
 
+			async listAnswerCosts(since) {
+				await ready;
+				return deps.answerCosts(spaceId, since);
+			},
+
+			// --- views (R2) ---
+			async projectRuns(read) {
+				await ready;
+				return reads.projectRuns(spaceId, read);
+			},
+
 			async listRuns(input) {
 				await ready;
 				const runs = await reads.listRuns(spaceId, input?.projectId, {
@@ -323,11 +323,6 @@ export function createSpaces(deps: SpacesDeps) {
 				});
 				const shown = await deps.pathsFor(spaceId, actor);
 				return Promise.all(runs.map(shown));
-			},
-
-			async listAnswerCosts(since) {
-				await ready;
-				return deps.answerCosts(spaceId, since);
 			},
 
 			async getRun(runId) {
@@ -350,6 +345,18 @@ export function createSpaces(deps: SpacesDeps) {
 				);
 			},
 
+			watchRun(runId, { signal: watching, afterSeq }) {
+				// A disposed engine publishes nothing more on its bus: the watch
+				// ends with it, so the watcher reconnects to the next engine.
+				return watch(
+					runId,
+					spaceId,
+					AbortSignal.any([watching, deps.signal]),
+					afterSeq ?? 0,
+				);
+			},
+
+			// --- the files of a run that other slices keep (R1 opens the run, phase 3 moves them) ---
 			async serviceLog(runId, service) {
 				await ready;
 				const row = await getRunRow(runId, spaceId);
@@ -388,6 +395,26 @@ export function createSpaces(deps: SpacesDeps) {
 				return deps.runFiles.file(runId, path);
 			},
 
+			// --- start (R3) ---
+			async listDevices(projectId, forNode) {
+				await ready;
+				if (!actor) {
+					throw new Refusal("signed-out", "Sign in to see your devices.");
+				}
+				return deps.placement.devicesFor(
+					spaceId,
+					actor.personId,
+					projectId,
+					forNode,
+				);
+			},
+
+			async listPlacements(projectId) {
+				await ready;
+				if (!actor) throw new Refusal("signed-out", "Sign in to start a run.");
+				return deps.placements(spaceId, actor.personId, projectId);
+			},
+
 			async startRun(input: StartRunInput) {
 				await ready;
 				await projects.find(input.projectId, spaceId);
@@ -396,16 +423,19 @@ export function createSpaces(deps: SpacesDeps) {
 				);
 			},
 
+			// --- actions (R4) ---
 			async act(runId, request) {
 				await ready;
 				await actions.act(spaceId, actor, runId, request);
 			},
 
+			// --- move (R5) ---
 			async listMoveTargets(runId) {
 				await ready;
 				return actions.moveTargets(spaceId, actor, runId);
 			},
 
+			// --- gates (R6) ---
 			async listGates() {
 				await ready;
 				return reads.listGates(spaceId);
@@ -416,6 +446,7 @@ export function createSpaces(deps: SpacesDeps) {
 				return reads.listAnsweredGates(spaceId, since);
 			},
 
+			// --- schedules ---
 			async listSchedules(projectId) {
 				await ready;
 				return deps.schedules.list(actor, { spaceId, projectId });
@@ -460,17 +491,6 @@ export function createSpaces(deps: SpacesDeps) {
 
 			// It reads no row: it does not wait for the engine to be ready.
 			previewCron: (input) => deps.schedules.previewCron(actor, input),
-
-			watchRun(runId, { signal: watching, afterSeq }) {
-				// A disposed engine publishes nothing more on its bus: the watch
-				// ends with it, so the watcher reconnects to the next engine.
-				return watch(
-					runId,
-					spaceId,
-					AbortSignal.any([watching, deps.signal]),
-					afterSeq ?? 0,
-				);
-			},
 		};
 	};
 }

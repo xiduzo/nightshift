@@ -109,5 +109,3 @@ imports packages/notifications desktop targets
 
 # agents, dashboard, devices, projects, runs, settings, spaces.
 wide apps/web features/flows 7
-# assistant, cleanup, device-config, flows, placement, projects, schedules.
-wide packages/engine run 7

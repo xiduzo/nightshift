@@ -7,7 +7,7 @@
 		"emitDeclarationOnly": true,
 		"outDir": "dist"
 	},
-	"include": ["src/**/*.ts"],
+	"include": ["src/**/*.ts", "test/**/*.ts"],
 	"references": [
 		{ "path": "../db" },
 		{ "path": "../agents" },

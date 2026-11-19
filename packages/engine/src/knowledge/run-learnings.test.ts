@@ -10,9 +10,9 @@ import {
 	type FlowEdge,
 	PROPOSED_LEARNINGS_DIR,
 } from "@nightshift/flows";
+import type { Engine } from "../engine";
 import { createRunLog, type RunLog } from "../log/run-log/run-log";
 import { transcriptLines } from "../read/transcript-lines";
-import { createEngine, type Engine } from "../run/engine";
 import { testKnowledge } from "../testing/knowledge";
 import {
 	createSandbox,
@@ -21,6 +21,7 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
+import { createEngine } from "../wire";
 import { type AskLearner, createRunLearnings } from "./run-learnings";
 
 /**

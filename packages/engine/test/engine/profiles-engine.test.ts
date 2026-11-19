@@ -9,8 +9,9 @@ import type {
 	FlowEdge,
 } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
-import { createProfileStore } from "../device-config/profiles";
-import type { RunDetail } from "../read/views";
+import { createProfileStore } from "../../src/device-config/profiles";
+import type { RunDetail } from "../../src/read/views";
+import type { SpaceEngine } from "../../src/space-engine";
 import {
 	cliToolsOf,
 	createSandbox,
@@ -18,9 +19,8 @@ import {
 	type TestEngineOptions,
 	waitFor,
 	withDevice,
-} from "../testing/test-support";
-import { createEngine } from "./engine";
-import type { SpaceEngine } from "./space-engine";
+} from "../../src/testing/test-support";
+import { createEngine } from "../../src/wire";
 
 /** Profiles of this computer, by id: resolved into the run's copy when a run starts. */
 

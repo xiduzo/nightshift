@@ -1,27 +1,23 @@
 import type { Database } from "@nightshift/db";
 import { Refusal } from "@nightshift/refusal";
 import {
-	type Actor,
 	HostUnreachableError,
 	type Relay,
-	type RunCommandInput,
 	type StartRunInput,
 } from "../contract";
-import { hasRunRow, type RunLog, type RunRow } from "../log";
+import { hasRunRow, type RunLog } from "../log";
 import type { RunSummary } from "../read";
-import { RunRefusal } from "../run-status";
 import { resolveTestRun } from "./test-run";
 
 /** How long a Device waits for a run its Host started to arrive. */
 const RUN_ARRIVES_MS = 30_000;
 
 /**
- * Runs another Device walks. The Walker is the only writer of its run's
- * events, so an action on such a run travels to it as a command through
- * the Host (`Relay.command`), and the Walker applies it. A run placed on
- * another Device starts on the Host that keeps the Space.
+ * A run placed on another Device starts on the Host that keeps the Space.
+ * An action on a run another Device walks travels the same way
+ * (`relay-commands.ts`).
  */
-export function createRunRelay(deps: {
+export function createStartRelay(deps: {
 	db: Database;
 	log: Pick<RunLog, "events" | "row" | "state">;
 	relay?: Relay;
@@ -32,30 +28,6 @@ export function createRunRelay(deps: {
 	const { db, log, relay } = deps;
 
 	return {
-		/** Hands an action on a run walked elsewhere to its Walker, in the actor's name. */
-		async send(
-			row: RunRow,
-			actor: Actor | undefined,
-			command: RunCommandInput,
-		): Promise<void> {
-			if (!relay) {
-				throw new RunRefusal(
-					"walker-unreachable",
-					"Another device runs this run, and this computer cannot reach it.",
-				);
-			}
-			if (!actor) {
-				throw new RunRefusal("signed-out", "Sign in to act on this run.");
-			}
-			await relay.command({
-				...command,
-				spaceId: row.spaceId,
-				runId: row.id,
-				walkerId: row.walkerId,
-				personId: actor.personId,
-			});
-		},
-
 		/**
 		 * Has the Host of the Space start a run placed on another Device: the
 		 * Host walks it. Returns once the run's rows reached this Replica.
@@ -102,4 +74,4 @@ export function createRunRelay(deps: {
 	};
 }
 
-export type RunRelay = ReturnType<typeof createRunRelay>;
+export type StartRelay = ReturnType<typeof createStartRelay>;

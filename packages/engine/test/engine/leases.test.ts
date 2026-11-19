@@ -11,16 +11,19 @@ import type {
 } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { instant, now } from "@nightshift/time";
-import { HostUnreachableError, type Relay } from "../contract";
+import { HostUnreachableError, type Relay } from "../../src/contract";
 import {
 	defaultRunSettings,
 	type RunSettings,
-} from "../device-config/settings";
-import { createLeaseStore } from "../leases";
-import { createRunLog, type RunLog } from "../log/run-log/run-log";
-import type { RunDetail } from "../read/views";
-import { aloneDirectory } from "../testing/alone-directory";
-import { alonePeers } from "../testing/alone-peers";
+} from "../../src/device-config/settings";
+import type { Engine, EngineInternals } from "../../src/engine";
+import { createLeaseStore } from "../../src/leases";
+import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
+import type { PeersFactory } from "../../src/peers";
+import type { RunDetail } from "../../src/read/views";
+import type { SpaceEngine } from "../../src/space-engine";
+import { aloneDirectory } from "../../src/testing/alone-directory";
+import { alonePeers } from "../../src/testing/alone-peers";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -29,10 +32,8 @@ import {
 	type TestEngineOptions,
 	waitFor,
 	withDevice,
-} from "../testing/test-support";
-import { createEngine, type Engine, type EngineInternals } from "./engine";
-import type { PeersFactory } from "./peers";
-import type { SpaceEngine } from "./space-engine";
+} from "../../src/testing/test-support";
+import { createEngine } from "../../src/wire";
 
 /**
  * Leases through the engine's public seam (ADR 7): two runs that contend

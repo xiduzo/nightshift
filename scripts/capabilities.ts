@@ -133,6 +133,11 @@ export const CAPABILITIES = {
 		meaning:
 			"The configuration of one computer: settings, connections, CLI tools and profiles in its Device document.",
 	},
+	"space-move": {
+		word: "Space move",
+		meaning:
+			"Projects that go from one Space to another as one operation: a person's move, the merge on join and the split on leave.",
+	},
 	spaces: {
 		word: "Space",
 		meaning: "Spaces, their Members and their invitations.",
@@ -475,7 +480,8 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		// The read model of a run: pure projections of the log. The walk
 		// (`graph`) reads them too, so they are machinery, not part of `runs`.
 		read: M,
-		// The start, the walk and the actions of a run.
+		// The start and the actions of a run, before its slices (`runs`,
+		// `gates`). The composition left it for `src/wire.ts`.
 		run: "runs",
 		// The store of a run's own folder.
 		"run-folders": M,
@@ -491,6 +497,11 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		scores: M,
 		// The keeper of the processes a Service node starts.
 		services: M,
+		// Projects to another Space as one operation (`Engine.moveProjects`).
+		// It holds the order of a move and what a move refuses, so it is a
+		// capability. It imports `projects`, `flows` and `run`, so it is not a
+		// part of one of them: `projects` would close a cycle with `run`.
+		"space-move": "space-move",
 		// Moments noted for the anonymous usage export.
 		usage: M,
 		// The store of the kept variables.

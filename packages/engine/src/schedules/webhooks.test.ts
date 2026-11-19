@@ -5,9 +5,9 @@ import { event } from "@nightshift/db/schema";
 import type { Flow, Schedule } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
+import type { Engine } from "../engine";
 import { parseEventRow } from "../log/run-log/append";
-import { createEngine, type Engine } from "../run/engine";
-import type { SpaceEngine } from "../run/space-engine";
+import type { SpaceEngine } from "../space-engine";
 import { seedFlows } from "../testing/seed-flows";
 import {
 	createSandbox,
@@ -15,6 +15,7 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
+import { createEngine } from "../wire";
 
 /** Webhook schedules: a signed request starts a run, sends a signal, or is refused. */
 

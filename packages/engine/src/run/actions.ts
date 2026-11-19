@@ -32,6 +32,7 @@ import {
 	type RunRow,
 	type RunState,
 } from "../log";
+import type { RunsPort } from "../peers";
 import {
 	olderNightShift,
 	type PlacementPort,
@@ -46,8 +47,7 @@ import {
 	whyNot,
 } from "../run-status";
 import type { UsageNotes } from "../usage";
-import type { RunsPort } from "./peers";
-import type { RunRelay } from "./relay";
+import type { CommandRelay } from "./relay-commands";
 import type { StartHolds } from "./start-holds";
 
 /**
@@ -58,7 +58,7 @@ import type { StartHolds } from "./start-holds";
  * Command that carried it to this Walker (`contract/command.ts`, the one
  * home of the kinds). It reads the run's row once (its Space and its
  * Walker), then either hands the action to the run's Walker as a Command
- * (`relay.ts`) or takes it here as a Turn of the runner (`runner.take`,
+ * (`relay-commands.ts`) or takes it here as a Turn of the runner (`runner.take`,
  * or `runner.hold` for an action that drives nothing).
  *
  * Which actions a run allows is one rule (`run-status/`, which the screens
@@ -80,7 +80,7 @@ export type RunActionsDeps = {
 	/** Where the Walker keeps the files of an answer. */
 	artifacts: Pick<ArtifactStore, "saveAnswer">;
 	runner: Pick<Runner, "take" | "hold" | "forget">;
-	relay: RunRelay;
+	relay: CommandRelay;
 	archive: Pick<RunsPort, "keepWalk" | "pendingCommands">;
 	walks: Pick<RunWalks, "exportWalk">;
 	/** This computer as a Device. */

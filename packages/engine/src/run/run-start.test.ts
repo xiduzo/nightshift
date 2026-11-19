@@ -8,6 +8,7 @@ import {
 	type FlowNode,
 } from "@nightshift/flows";
 import type { StartRunInput } from "../contract";
+import type { Engine } from "../engine";
 import { seedFlows } from "../testing/seed-flows";
 import {
 	createSandbox,
@@ -16,7 +17,7 @@ import {
 	withDevice,
 } from "../testing/test-support";
 import type { UsageMoment } from "../usage";
-import { createEngine, type Engine } from "./engine";
+import { createEngine } from "../wire";
 import {
 	createRunStart,
 	quickRunTitle,

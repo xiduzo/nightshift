@@ -1,7 +1,7 @@
 import type { Schedule, ScheduleIssue } from "@nightshift/flows";
-import type { Artifact } from "../artifacts";
-import type { AnswerCost } from "../assistant";
-import type { RunFiles } from "../cleanup";
+import type { Artifact } from "./artifacts";
+import type { AnswerCost } from "./assistant";
+import type { RunFiles } from "./cleanup";
 import type {
 	NodeToPlace,
 	OwnDevice,
@@ -9,10 +9,10 @@ import type {
 	RunActionRequest,
 	RunCommandInput,
 	StartRunInput,
-} from "../contract";
-import type { SpaceFlows } from "../flows";
-import type { NodeMemory } from "../memory";
-import type { Branches, Project } from "../projects";
+} from "./contract";
+import type { SpaceFlows } from "./flows";
+import type { NodeMemory } from "./memory";
+import type { Branches, Project } from "./projects";
 import type {
 	AnsweredGate,
 	OpenGate,
@@ -23,10 +23,10 @@ import type {
 	RunSummary,
 	StepDetail,
 	StepTranscript,
-} from "../read";
-import type { RunFile } from "../run-folders";
-import type { ScheduleList, SchedulePause } from "../schedules";
-import type { KeptValue } from "../variables";
+} from "./read";
+import type { RunFile } from "./run-folders";
+import type { ScheduleList, SchedulePause } from "./schedules";
+import type { KeptValue } from "./variables";
 
 /** The engine as a person in one Space sees it: the API layer only calls this. */
 export interface SpaceEngine {

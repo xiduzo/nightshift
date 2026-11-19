@@ -16,7 +16,7 @@ a person. All six are LangGraph `interrupt`s. So a resume always lands at
 the exact node, at any depth.
 
 The move to LangGraph did **not** change: the `Engine` interface
-(`run/engine.ts`), the API, the web app, the event log as the read model,
+(`packages/engine/src/wire.ts`), the API, the web app, the event log as the read model,
 transcripts on disk, the bus, the scheduler, worktrees, leases, run bundles,
 settings, profiles, connections and the harnesses. The existing engine test
 suites were the acceptance criteria.
@@ -42,16 +42,18 @@ below it, from the bottom up:
 | `graph/` | The flow as a graph, below. |
 | `scores/` | The pull request scores: what became of the pull request a run opened, written as Scores of that run (`pull-request-scores.ts`, `pull-request-watch.ts`). |
 | `schedules/` | The schedules of the projects, as a slice with rings (`docs/steering/STRUCTURE.md`, section 9). The rules are in `domain/`. Each request is one use case in `application/`. The store of the schedules in the flow document and the timer that fires them are in `adapters/`. `wire.ts` builds them (`wireSchedules`). |
-| `run/` | The composition root (`engine.ts`, with the `Engine` it returns), what it takes (`engine-options.ts`), the port of the other Devices it walks with (`peers.ts`), what a person does in one Space (`space-engine.ts` is the interface, `space.ts` the module), run start, startup recovery, the run actions (`actions.ts`, with the relay to a Walker in `relay.ts`), the other end of a move (`take-over.ts`) and the wake when a Device is back (`wake.ts`). |
+| `space-move/` | The Space move: Projects to another Space as one operation (`projects-move.ts`). |
+| `run/` | Run start (with the start on a Host in `relay-start.ts`), startup recovery, the run actions (`actions.ts`, with the relay to a Walker in `relay-commands.ts`), the other end of a move (`take-over.ts`) and the wake when a Device is back (`wake.ts`). |
+| The top of `src/` | The composition root (`wire.ts`: `createEngine`, with a file for each piece of the run path, `wire-<what>.ts`), the `Engine` it returns (`engine.ts`), what it takes (`engine-options.ts`), the port of the other Devices it walks with (`peers.ts`), and what a person does in one Space (`space-engine.ts` is the interface, `space.ts` the module). The tests that start a whole engine are in `packages/engine/test/engine/`. |
 
 No import points up, `import type` included. `scripts/check-verticals.ts`
 fails on a cycle between verticals. `contract/` holds only types and the
 schema of a run start. It imports no vertical, so every vertical may name
 its types. The engine's interface (`Engine`, `SpaceEngine`, `EngineOptions`)
-and the `Peers` port name the types of many verticals. So they sit in
-`run/`, with `createEngine`.
+and the `Peers` port name the types of many verticals. So they sit at the
+top of `src/`, outside the verticals, with `createEngine`.
 
-The engine knows no other Device. `Peers` (`run/peers.ts`) is the port of
+The engine knows no other Device. `Peers` (`packages/engine/src/peers.ts`) is the port of
 the other Devices and Hosts. It covers where a step runs (Placement), the
 Offer rules, the Host that keeps a Space, and the runs walked elsewhere
 (their commands, transcripts and the archive of a moved run).
@@ -254,13 +256,18 @@ packages/engine/src/
                            as the runner opens it, on the sqlite saver), and
                            drive(), which runs the runner's stream loop and
                            collects the root's interrupts and custom events.
-  run/engine.ts            The composition root: createEngine makes the
+  wire.ts                  The composition root: createEngine makes the
                            runner, recovery, run start, the read model, the
                            scheduler, the peers (EngineOptions.peers) and
                            the run actions, each behind a small seam that takes its
                            dependencies (db, log, runner, bus, settings,
-                           clock), and wires them. It holds no logic.
-  run/space.ts             createSpaces(deps): the SpaceEngine of one
+                           clock), and wires them. It holds no logic. The
+                           pieces of the run path each have a file beside
+                           it (wire-views.ts, wire-start.ts, wire-actions.ts,
+                           wire-move.ts, wire-recovery.ts, wire-schedules.ts).
+                           engine.ts holds the Engine interface and the thin
+                           object behind it.
+  space.ts                 createSpaces(deps): the SpaceEngine of one
                            Space. Each method waits for the engine and
                            hands over to the module that owns the action.
   run/actions.ts           The run actions behind one entry, act(spaceId,
@@ -271,7 +278,7 @@ packages/engine/src/
                            (run-status/, RunRefusal), and takes the action
                            as a Turn of the runner (take, or hold for a
                            stop after the step and a move), or hands it to
-                           the Walker as a command (relay.ts): a stop, an
+                           the Walker as a command (relay-commands.ts): a stop, an
                            answer, a signal and a move travel, the rest
                            only the Walker takes. moveTargets lists the
                            Devices a move may go to.
@@ -929,7 +936,7 @@ values and memory. The run plan places no stand-in (`placement/run-plan.ts`),
 and run start resolves each pin from the Walker's own log before the plan
 (`run/test-run.ts`). The pinned outputs hold at most 4 MiB of JSON
 together, because every Replica keeps `RunStarted`. A Device that hands
-the start to its Host (`run/relay.ts`) checks the pins in its own log
+the start to its Host (`run/relay-start.ts`) checks the pins in its own log
 first, and sends them as refs on `sync.startTest`. The Host resolves them
 again from its own log. A pin whose run has not reached the Host yet says
 to try again in a moment.

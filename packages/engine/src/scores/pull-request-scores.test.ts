@@ -4,8 +4,8 @@ import { fakeHarness } from "@nightshift/agents/testing";
 import type { Flow, Schedule, WebhookEvent } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { now } from "@nightshift/time";
-import { createEngine, type Engine } from "../run/engine";
-import type { SpaceEngine } from "../run/space-engine";
+import type { Engine } from "../engine";
+import type { SpaceEngine } from "../space-engine";
 import { seedFlows } from "../testing/seed-flows";
 import {
 	createSandbox,
@@ -14,6 +14,7 @@ import {
 	withDevice,
 } from "../testing/test-support";
 import type { UsageMoment } from "../usage";
+import { createEngine } from "../wire";
 import {
 	type PullRequestScoresDeps,
 	pullRequestKey,

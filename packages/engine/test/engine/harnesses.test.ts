@@ -4,17 +4,17 @@ import { type FakeHarness, fakeHarness } from "@nightshift/agents/testing";
 import type { HarnessName } from "@nightshift/agents/types";
 import type { AgentNode, Flow, FlowEdge } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
-import { expandMcpServers } from "../device-config/mcp";
-import type { RunStatus } from "../run-status";
+import { expandMcpServers } from "../../src/device-config/mcp";
+import type { RunStatus } from "../../src/run-status";
+import type { SpaceEngine } from "../../src/space-engine";
 import {
 	createSandbox,
 	type Sandbox,
 	type TestEngineOptions,
 	waitFor,
 	withDevice,
-} from "../testing/test-support";
-import { createEngine } from "./engine";
-import type { SpaceEngine } from "./space-engine";
+} from "../../src/testing/test-support";
+import { createEngine } from "../../src/wire";
 
 let sandbox: Sandbox;
 beforeEach(async () => {

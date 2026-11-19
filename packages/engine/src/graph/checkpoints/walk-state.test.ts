@@ -10,8 +10,8 @@ import type { WalkFile } from "../../archive";
 import { createRunHistory, ForeignRowsError } from "../../log";
 import { createRunLog } from "../../log/run-log/run-log";
 import { createRunBus } from "../../log/transcript/bus";
-import { createEngine, type PeerContext, type SpaceEngine } from "../../run";
-
+import type { PeerContext } from "../../peers";
+import type { SpaceEngine } from "../../space-engine";
 import { alonePeers } from "../../testing/alone-peers";
 import {
 	createSandbox,
@@ -19,6 +19,7 @@ import {
 	waitFor,
 	withDevice,
 } from "../../testing/test-support";
+import { createEngine } from "../../wire";
 import { createRunWalks } from "./walk-state";
 
 /**

@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { fakeHarness } from "@nightshift/agents/testing";
 import type { CommandNode, Flow, FlowEdge, ValueNode } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
-import { createRunLog, type RunLog } from "../log/run-log/run-log";
+import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
+import type { SpaceEngine } from "../../src/space-engine";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -12,9 +13,8 @@ import {
 	type Sandbox,
 	waitFor,
 	withDevice,
-} from "../testing/test-support";
-import { createEngine } from "./engine";
-import type { SpaceEngine } from "./space-engine";
+} from "../../src/testing/test-support";
+import { createEngine } from "../../src/wire";
 
 /**
  * An Ask (a Value made by a person, ADR 10) through the whole engine: the

@@ -12,7 +12,6 @@ import {
 import { asDate, now } from "@nightshift/time";
 import { asc, eq } from "drizzle-orm";
 import type * as Y from "yjs";
-import { createEngine } from "../run/engine";
 import { aloneDirectory } from "../testing/alone-directory";
 import {
 	createSandbox,
@@ -21,6 +20,7 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
+import { createEngine } from "../wire";
 import {
 	createSpaceDocuments,
 	memberName,

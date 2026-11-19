@@ -1,5 +1,5 @@
 import type { SpaceFlows } from "../flows";
-import type { SpaceEngine } from "../run";
+import type { SpaceEngine } from "../space-engine";
 import { ownEndedRuns, summarizeChanges } from "./changes";
 import type { FlowChanges } from "./changes-types";
 import { lastDays } from "./clock";

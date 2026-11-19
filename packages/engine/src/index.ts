@@ -109,6 +109,8 @@ export {
 	documentRows,
 	type SyncedDocuments,
 } from "./documents";
+export type { Engine } from "./engine";
+export type { EngineOptions } from "./engine-options";
 export type {
 	FlowDocuments,
 	FlowExport,
@@ -170,6 +172,7 @@ export {
 	type OllamaService,
 	type OllamaStatus,
 } from "./ollama";
+export type { PeerContext, PeerProfiles, PeerProjects, Peers } from "./peers";
 export {
 	type OfferedPlacement,
 	type PlacedDevice,
@@ -207,22 +210,7 @@ export {
 	runReading,
 	transcriptLines,
 } from "./read";
-export type {
-	Engine,
-	EngineOptions,
-	MoveRows,
-	PeerContext,
-	PeerProfiles,
-	PeerProjects,
-	Peers,
-	SpaceEngine,
-} from "./run";
-export {
-	createEngine,
-	GateClosedError,
-	PinNotHereError,
-	START_DEADLINE_MS,
-} from "./run";
+export { GateClosedError, PinNotHereError, START_DEADLINE_MS } from "./run";
 export { createRunFolders, noRunFolders } from "./run-folders";
 export type {
 	ScheduleList,
@@ -230,5 +218,8 @@ export type {
 	SchedulePause,
 	WebhookAnswer,
 } from "./schedules";
+export type { SpaceEngine } from "./space-engine";
+export type { MoveRows } from "./space-move";
 export type { UsageMoment, UsageNotes } from "./usage";
 export type { KeptValue } from "./variables";
+export { createEngine } from "./wire";

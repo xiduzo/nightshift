@@ -13,13 +13,15 @@ import {
 import type { DecisionNode, Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
-import { createRunLog, type RunLog } from "../log/run-log/run-log";
+import type { Engine, EngineInternals } from "../../src/engine";
+import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
 import {
 	createSpaceDocuments,
 	type SpaceDocuments,
 	spaceProjects,
-} from "../projects/space-document";
-import { aloneDirectory } from "../testing/alone-directory";
+} from "../../src/projects/space-document";
+import { GateClosedError } from "../../src/run/actions";
+import { aloneDirectory } from "../../src/testing/alone-directory";
 import {
 	commitFile,
 	createSandbox,
@@ -29,10 +31,8 @@ import {
 	type Sandbox,
 	waitFor,
 	withDevice,
-} from "../testing/test-support";
-import { GateClosedError } from "./actions";
-import type { Engine } from "./engine";
-import { createEngine, type EngineInternals } from "./engine";
+} from "../../src/testing/test-support";
+import { createEngine } from "../../src/wire";
 
 /**
  * Spaces: every row carries its Space, and a Space's view of the engine

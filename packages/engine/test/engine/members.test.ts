@@ -4,14 +4,15 @@ import { device, event, user } from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { and, eq, isNull } from "drizzle-orm";
-import { parseEventRow } from "../log/run-log/append";
-import { createRunLog, type RunLog } from "../log/run-log/run-log";
+import type { Engine } from "../../src/engine";
+import { parseEventRow } from "../../src/log/run-log/append";
+import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
 import {
 	createSpaceDocuments,
 	type SpaceDocuments,
-} from "../projects/space-document";
-import { git } from "../projects/worktrees";
-import { aloneDirectory } from "../testing/alone-directory";
+} from "../../src/projects/space-document";
+import { git } from "../../src/projects/worktrees";
+import { aloneDirectory } from "../../src/testing/alone-directory";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -19,9 +20,8 @@ import {
 	type Sandbox,
 	waitFor,
 	withDevice,
-} from "../testing/test-support";
-import type { Engine } from "./engine";
-import { createEngine } from "./engine";
+} from "../../src/testing/test-support";
+import { createEngine } from "../../src/wire";
 
 /**
  * Members: the Person who started a run, their git identity in its

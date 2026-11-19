@@ -18,6 +18,7 @@ import type { DecisionNode, Flow, Schedule } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { and, eq, inArray } from "drizzle-orm";
+import type { Engine } from "../engine";
 import { createRunLog, type RunLog } from "../log/run-log/run-log";
 import {
 	createSpaceDocuments,
@@ -26,6 +27,7 @@ import {
 	spaceDocumentName,
 	spaceProjects,
 } from "../projects/space-document";
+import { START_HOLD_WORDS } from "../run/start-holds";
 import { aloneDirectory } from "../testing/alone-directory";
 import {
 	commitFile,
@@ -37,9 +39,8 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
-import { createEngine, type Engine } from "./engine";
+import { createEngine } from "../wire";
 import type { MovedRuns, MoveRows, ProjectsMoved } from "./projects-move";
-import { START_HOLD_WORDS } from "./start-holds";
 
 /**
  * The Space move (`Engine.moveProjects`), as its three callers use it: a

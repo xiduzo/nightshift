@@ -22,9 +22,11 @@ import { FLOW_VERSION } from "@nightshift/flows";
 import {
 	defaultRunSettings,
 	type RunSettings,
-} from "../device-config/settings";
-import { createRunLog, type RunLog } from "../log/run-log/run-log";
-import type { RunDetail } from "../read/views";
+} from "../../src/device-config/settings";
+import type { EngineInternals } from "../../src/engine";
+import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
+import type { RunDetail } from "../../src/read/views";
+import type { SpaceEngine } from "../../src/space-engine";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -33,9 +35,8 @@ import {
 	type TestEngineOptions,
 	waitFor,
 	withDevice,
-} from "../testing/test-support";
-import { createEngine, type EngineInternals } from "./engine";
-import type { SpaceEngine } from "./space-engine";
+} from "../../src/testing/test-support";
+import { createEngine } from "../../src/wire";
 
 /**
  * Services through the engine's public seam (ADR 9), with a real Bun web

@@ -6,7 +6,7 @@ import {
 	runsArriving,
 	stepIdsOfRun,
 } from "../log";
-import type { RunsPort } from "./peers";
+import type { RunsPort } from "../peers";
 
 /**
  * This computer walks a run another Device moved here (`WalkerMoved`, the

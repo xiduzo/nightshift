@@ -31,7 +31,7 @@ import type { StartHolds } from "./start-holds";
  * Startup recovery: what a new daemon does about the runs the last one
  * left open. A daemon that died left sessions, steps and runs open. They
  * become `interrupted` as a stop ends them (`closeOpenWork`,
- * `graph/open-work.ts`), a run that ends so keeps only the checkpoints a
+ * `graph/runner/open-work.ts`), a run that ends so keeps only the checkpoints a
  * re-entry reads (a `prune` Turn of the runner; a sweep first prunes every
  * thread the same way), sleeping runs get their
  * timers back, and after a grace period the daemon resumes the interrupted

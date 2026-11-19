@@ -2,7 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { flowSchema, migrateFlow, type Schedule } from "@nightshift/flows";
 import type { SpaceFlows } from "../flows";
-import type { SpaceEngine } from "../run/space-engine";
+import type { SpaceEngine } from "../space-engine";
 
 /**
  * Gives a project these flows, by name, in its flow document, as a person

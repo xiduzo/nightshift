@@ -7,8 +7,8 @@ import {
 	flowSchema,
 	type Schedule,
 } from "@nightshift/flows";
-import type { SpaceEngine } from "../run";
-import { createEngine, type Engine } from "../run";
+import type { Engine } from "../engine";
+import type { SpaceEngine } from "../space-engine";
 import { testKnowledge } from "../testing/knowledge";
 import {
 	createSandbox,
@@ -16,6 +16,7 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
+import { createEngine } from "../wire";
 import { knowledgeSources } from "./sources";
 
 /**

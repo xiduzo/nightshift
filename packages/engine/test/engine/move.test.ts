@@ -12,24 +12,24 @@ import type {
 import { FLOW_VERSION } from "@nightshift/flows";
 import { iso, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
-import type { WalkFile, WalkRef } from "../archive";
-import type { OwnDevice } from "../contract";
-import { createRunLog } from "../log/run-log/run-log";
+import type { WalkFile, WalkRef } from "../../src/archive";
+import type { OwnDevice } from "../../src/contract";
+import { createRunLog } from "../../src/log/run-log/run-log";
 import {
 	parseTranscript,
 	readTranscriptFile,
 	transcriptPath,
-} from "../log/transcript/transcripts";
-import { alonePeers } from "../testing/alone-peers";
-import { seedFlows } from "../testing/seed-flows";
+} from "../../src/log/transcript/transcripts";
+import type { PeerContext, PeersFactory } from "../../src/peers";
+import { alonePeers } from "../../src/testing/alone-peers";
+import { seedFlows } from "../../src/testing/seed-flows";
 import {
 	createSandbox,
 	type Sandbox,
 	waitFor,
 	withDevice,
-} from "../testing/test-support";
-import { createEngine } from "./engine";
-import type { PeerContext, PeersFactory } from "./peers";
+} from "../../src/testing/test-support";
+import { createEngine } from "../../src/wire";
 
 /**
  * "Move to …" between two computers in one process, each with its own

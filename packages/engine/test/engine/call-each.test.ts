@@ -23,11 +23,17 @@ import { FLOW_VERSION } from "@nightshift/flows";
 import type { FlowInput } from "@nightshift/flows/testing";
 import { now } from "@nightshift/time";
 import { asc, eq } from "drizzle-orm";
-import { createRunLog, type RunLog } from "../log/run-log/run-log";
-import type { TranscriptEntry } from "../log/transcript/step-events";
-import type { RunDetail, RunStreamItem, StepSummary } from "../read/views";
-import type { RunStatus } from "../run-status";
-import { seedFlowFolder, seedFlows } from "../testing/seed-flows";
+import type { EngineInternals } from "../../src/engine";
+import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
+import type { TranscriptEntry } from "../../src/log/transcript/step-events";
+import type {
+	RunDetail,
+	RunStreamItem,
+	StepSummary,
+} from "../../src/read/views";
+import type { RunStatus } from "../../src/run-status";
+import type { SpaceEngine } from "../../src/space-engine";
+import { seedFlowFolder, seedFlows } from "../../src/testing/seed-flows";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -38,9 +44,8 @@ import {
 	type TestEngineOptions,
 	waitFor,
 	withDevice,
-} from "../testing/test-support";
-import { createEngine, type EngineInternals } from "./engine";
-import type { SpaceEngine } from "./space-engine";
+} from "../../src/testing/test-support";
+import { createEngine } from "../../src/wire";
 
 let sandbox: Sandbox;
 /** The run log of each engine the test made, oldest first: checked against the database after it. */

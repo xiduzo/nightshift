@@ -1,15 +1,14 @@
-/** The run lifecycle: the engine of this Device (`Engine`, `EngineOptions`) and the view of one Space (`SpaceEngine`), the port of the other Devices it walks with (`Peers`), starting a run, what a person does to a run, and recovery after a restart. */
+/** The run path before its slices (`runs/`, `gates/`): starting a run, what a person does to a run, the other end of a move, recovery after a restart, the wakes, and what the schedules tell. The composition (`wire.ts` and the `wire-*.ts` files beside it) makes each piece. */
 
-export { GateClosedError } from "./actions";
-export { createEngine, type Engine } from "./engine";
-export type { EngineOptions } from "./engine-options";
-export type {
-	PeerContext,
-	PeerProfiles,
-	PeerProjects,
-	Peers,
-} from "./peers";
-export type { MoveRows } from "./projects-move";
-export { START_DEADLINE_MS } from "./run-start";
-export type { SpaceEngine } from "./space-engine";
+export { createRunActions, GateClosedError, type RunActions } from "./actions";
+export { createRecovery } from "./recovery";
+export { createCommandRelay } from "./relay-commands";
+export { createStartRelay } from "./relay-start";
+export { createRunStart, START_DEADLINE_MS } from "./run-start";
+export { createScheduleNotices } from "./schedule-notices";
+export { createSignals } from "./signals";
+export { createStartHolds, type StartHolds } from "./start-holds";
+export { createStartPlaces, type StartPlaces } from "./start-place";
+export { takeOver } from "./take-over";
 export { PinNotHereError } from "./test-run";
+export { wakeLeaseSleeps, wakeOfflineSleeps } from "./wake";

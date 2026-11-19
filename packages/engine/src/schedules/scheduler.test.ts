@@ -11,12 +11,12 @@ import {
 	defaultRunSettings,
 	type RunSettings,
 } from "../device-config/settings";
+import type { Engine, EngineInternals } from "../engine";
 import type { EnginePayloads } from "../log/events/events";
 import { appendEvent, parseEventRow } from "../log/run-log/append";
 import type { RunSummary } from "../read/views";
-import { createEngine, type Engine, type EngineInternals } from "../run/engine";
-import type { SpaceEngine } from "../run/space-engine";
 import { START_HOLD_WORDS } from "../run/start-holds";
+import type { SpaceEngine } from "../space-engine";
 import { seedFlows } from "../testing/seed-flows";
 import {
 	createSandbox,
@@ -26,6 +26,7 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
+import { createEngine } from "../wire";
 
 /** The scheduler with an injected clock: each test moves `clock` and waits for a tick. */
 

@@ -18,11 +18,12 @@ import type {
 } from "@nightshift/flows";
 import { FLOW_VERSION, parseFlow } from "@nightshift/flows";
 import type { FlowInput } from "@nightshift/flows/testing";
-import { saverFor } from "../graph/checkpoints/checkpointer";
-import { appendEvent } from "../log/run-log/append";
-import { createRunLog, type RunLog } from "../log/run-log/run-log";
-import type { RunDetail, StepSummary } from "../read/views";
-import { seedFlowFolder } from "../testing/seed-flows";
+import { saverFor } from "../../src/graph/checkpoints/checkpointer";
+import { appendEvent } from "../../src/log/run-log/append";
+import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
+import type { RunDetail, StepSummary } from "../../src/read/views";
+import type { SpaceEngine } from "../../src/space-engine";
+import { seedFlowFolder } from "../../src/testing/seed-flows";
 import {
 	cliToolsOf,
 	createSandbox,
@@ -33,9 +34,8 @@ import {
 	type TestEngineOptions,
 	waitFor,
 	withDevice,
-} from "../testing/test-support";
-import { createEngine } from "./engine";
-import type { SpaceEngine } from "./space-engine";
+} from "../../src/testing/test-support";
+import { createEngine } from "../../src/wire";
 
 /**
  * Flow format 2: inputs and outputs, templates with paths, the Call
@@ -1297,6 +1297,8 @@ describe("flow format 1", () => {
 		const fixtures = join(
 			import.meta.dir,
 			"..",
+			"..",
+			"src",
 			"testing",
 			"fixtures",
 			"rpgdotexe-v1",

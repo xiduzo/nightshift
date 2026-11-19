@@ -11,7 +11,6 @@ import { asc, eq, sql } from "drizzle-orm";
 import { foldRun } from "../log";
 import { parseEventRow } from "../log/run-log/append";
 import { readRunTranscript } from "../log/transcript/transcripts";
-import { createEngine } from "../run/engine";
 import {
 	createSandbox,
 	otherSpace,
@@ -19,6 +18,7 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
+import { createEngine } from "../wire";
 import { UNKNOWN_DEVICE, UNKNOWN_SPACE } from "./bundle-rows";
 import { exportRun, openRunBundle } from "./run-bundle";
 import { deriveNodeOutputs, deriveSteps, sumCost } from "./run-views";

@@ -1,9 +1,9 @@
 import type { FlowSources, ProfileSettings } from "@nightshift/flows";
-import type { WalkFile, WalkRef } from "../archive";
-import type { Actor, OffersPort, Relay } from "../contract";
-import type { Device } from "../device";
-import type { DeviceCopy } from "../device-config";
-import type { WalkFiles } from "../graph";
+import type { WalkFile, WalkRef } from "./archive";
+import type { Actor, OffersPort, Relay } from "./contract";
+import type { Device } from "./device";
+import type { DeviceCopy } from "./device-config";
+import type { WalkFiles } from "./graph";
 import type {
 	CopyStamp,
 	EnginePayloads,
@@ -11,11 +11,11 @@ import type {
 	LandedScope,
 	RunHistory,
 	TranscriptEntry,
-} from "../log";
-import type { PlacementPort } from "../placement";
-import type { Projects, SpaceDocuments } from "../projects";
-import type { FeedStep, PendingCommand, RunWalker } from "../read";
-import type { RunFolders } from "../run-folders";
+} from "./log";
+import type { PlacementPort } from "./placement";
+import type { Projects, SpaceDocuments } from "./projects";
+import type { FeedStep, PendingCommand, RunWalker } from "./read";
+import type { RunFolders } from "./run-folders";
 
 /**
  * The port of the other Devices and Hosts (`Peers`). The run engine walks

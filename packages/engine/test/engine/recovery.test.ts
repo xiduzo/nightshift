@@ -5,23 +5,23 @@ import type { Flow } from "@nightshift/flows";
 import {
 	defaultRunSettings,
 	type RunSettings,
-} from "../device-config/settings";
-import type { Runner } from "../graph";
-import { foldRun } from "../log";
+} from "../../src/device-config/settings";
+import type { Runner } from "../../src/graph";
+import { foldRun } from "../../src/log";
 import type {
 	EngineEventType,
 	EnginePayloads,
 	LoggedEvent,
-} from "../log/events/events";
-import type { Scope } from "../log/events/step/step-payloads";
-import { createRunLog } from "../log/run-log/run-log";
-import { type BusItem, createRunBus } from "../log/transcript/bus";
-import { createSandbox, type Sandbox } from "../testing/test-support";
+} from "../../src/log/events/events";
+import type { Scope } from "../../src/log/events/step/step-payloads";
+import { createRunLog } from "../../src/log/run-log/run-log";
+import { type BusItem, createRunBus } from "../../src/log/transcript/bus";
 import {
 	createRecovery,
 	daemonResumeBlock,
 	type ResumeBlockDeps,
-} from "./recovery";
+} from "../../src/run/recovery";
+import { createSandbox, type Sandbox } from "../../src/testing/test-support";
 
 /**
  * `daemonResumeBlock`: why a daemon leaves an interrupted run to a person,

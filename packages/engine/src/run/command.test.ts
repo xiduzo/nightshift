@@ -9,6 +9,7 @@ import type {
 import { FLOW_VERSION } from "@nightshift/flows";
 import type { Relay } from "../contract";
 import { createRunLog } from "../log/run-log/run-log";
+import type { PeersFactory } from "../peers";
 import { RunRefusal } from "../run-status";
 import { alonePeers } from "../testing/alone-peers";
 import {
@@ -17,8 +18,7 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
-import { createEngine } from "./engine";
-import type { PeersFactory } from "./peers";
+import { createEngine } from "../wire";
 
 /**
  * The Command at its seam, `SpaceEngine.act`: on a run another Device

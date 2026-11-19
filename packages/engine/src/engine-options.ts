@@ -1,14 +1,14 @@
 import type { Database } from "@nightshift/db";
 import type { ProfileSettings } from "@nightshift/flows";
-import type { DeviceDirectory } from "../contract";
-import type { Device } from "../device";
-import type { ProfileStore, RunSettings } from "../device-config";
-import type { FlowDocuments } from "../flows";
-import type { Git, SpaceDocuments } from "../projects";
-import type { PullRequestReader } from "../scores";
-import type { UsageNotes } from "../usage";
+import type { DeviceDirectory } from "./contract";
+import type { Device } from "./device";
+import type { ProfileStore, RunSettings } from "./device-config";
+import type { FlowDocuments } from "./flows";
 import type { PeersFactory } from "./peers";
-import type { MoveRows, ProjectsMoved } from "./projects-move";
+import type { Git, SpaceDocuments } from "./projects";
+import type { PullRequestReader } from "./scores";
+import type { MoveRows, ProjectsMoved } from "./space-move";
+import type { UsageNotes } from "./usage";
 
 /** What `createEngine` takes: the database, this computer as a Device, and the hooks of the daemon. */
 export type EngineOptions = {

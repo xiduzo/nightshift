@@ -5,19 +5,19 @@ import type { Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { and, eq } from "drizzle-orm";
 import * as Y from "yjs";
-import { createProjectFlows } from "../flows";
+import { createProjectFlows } from "../../src/flows";
 import {
 	createFlowDocuments,
 	type FlowDocuments,
-} from "../flows/flow-document";
-import { seedFlows } from "../testing/seed-flows";
+} from "../../src/flows/flow-document";
+import { seedFlows } from "../../src/testing/seed-flows";
 import {
 	createSandbox,
 	type Sandbox,
 	waitFor,
 	withDevice,
-} from "../testing/test-support";
-import { createEngine } from "./engine";
+} from "../../src/testing/test-support";
+import { createEngine } from "../../src/wire";
 
 /** A Run records the Flow revision it runs, and those of the flows it calls (ADR 2). */
 

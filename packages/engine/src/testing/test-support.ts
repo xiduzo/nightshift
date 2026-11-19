@@ -27,16 +27,16 @@ import {
 	type DeviceDocument,
 	openDeviceDocument,
 } from "../device-config/device-document";
+import type { Engine } from "../engine";
+import type { EngineOptions } from "../engine-options";
 import { parseEventRow } from "../log/run-log/append";
 import type { RunLog } from "../log/run-log/run-log";
+import type { PeersFactory } from "../peers";
 import { systemGit } from "../projects/git";
 import { clonePathOf } from "../projects/projects";
 import type { RunDetail } from "../read/views";
-import type { Engine } from "../run/engine";
-import type { EngineOptions } from "../run/engine-options";
-import type { PeersFactory } from "../run/peers";
-import type { SpaceEngine } from "../run/space-engine";
 import { createRunFolders } from "../run-folders/run-folders";
+import type { SpaceEngine } from "../space-engine";
 import { aloneDirectory, ownDevice } from "./alone-directory";
 import { alonePeers } from "./alone-peers";
 

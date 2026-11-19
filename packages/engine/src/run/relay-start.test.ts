@@ -3,7 +3,7 @@ import type { Database } from "@nightshift/db";
 import { Refusal } from "@nightshift/refusal";
 import type { Relay, StartRunInput } from "../contract";
 import type { RunLog, RunState } from "../log";
-import { createRunRelay } from "./relay";
+import { createStartRelay } from "./relay-start";
 import { PinNotHereError } from "./test-run";
 
 /**
@@ -51,7 +51,7 @@ function relayed() {
 	const asked: (StartRunInput & { spaceId: string })[] = [];
 	// The time runs out at once: the run never arrives here.
 	let time = 0;
-	const relay = createRunRelay({
+	const relay = createStartRelay({
 		db: {} as Database,
 		log,
 		relay: {

@@ -1,8 +1,7 @@
 import type { OwnDevice } from "../contract";
 import { followOwnStep } from "../log";
+import type { PeerContext, Peers, PeersFactory } from "../peers";
 import { type PlacedDevice, planNodes } from "../placement";
-import type { PeerContext, Peers } from "../run";
-import type { PeersFactory } from "../run/peers";
 
 /**
  * The peers of a computer that is alone: no other Device, no Host, no

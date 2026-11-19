@@ -10,12 +10,14 @@ import type {
 	ToolNode,
 } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
-import type { McpExpansion } from "../device-config/mcp";
+import type { McpExpansion } from "../../src/device-config/mcp";
 import {
 	defaultRunSettings,
 	type RunSettings,
-} from "../device-config/settings";
-import type { RunDetail } from "../read/views";
+} from "../../src/device-config/settings";
+import type { EngineInternals } from "../../src/engine";
+import type { RunDetail } from "../../src/read/views";
+import type { SpaceEngine } from "../../src/space-engine";
 import {
 	cliToolsOf,
 	connectionsOf,
@@ -26,9 +28,8 @@ import {
 	type TestEngineOptions,
 	waitFor,
 	withDevice,
-} from "../testing/test-support";
-import { createEngine, type EngineInternals } from "./engine";
-import type { SpaceEngine } from "./space-engine";
+} from "../../src/testing/test-support";
+import { createEngine } from "../../src/wire";
 
 /** The engine's hooks for the daemon's settings and connections. */
 

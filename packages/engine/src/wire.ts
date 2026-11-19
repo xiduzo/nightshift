@@ -1,0 +1,714 @@
+import { now as timeNow } from "@nightshift/time";
+import { createArtifactStore } from "./artifacts";
+import { listAnswerCosts } from "./assistant";
+import { createRunCopies, createRunFiles, startCleanupJob } from "./cleanup";
+import {
+	defaultRunSettings,
+	lastKnownProfiles,
+	type RunSettings,
+	storedDeviceCopy,
+} from "./device-config";
+import { type Engine, type EngineInternals, engineOf } from "./engine";
+import type { EngineOptions } from "./engine-options";
+import {
+	createCloneImports,
+	createFlowDocuments,
+	createFlowMigrations,
+	createProjectFlows,
+	createSpaceFlows,
+} from "./flows";
+import {
+	combineHolds,
+	createRecorders,
+	createRunner,
+	createRunWalks,
+	kindOf,
+	type StepShared,
+} from "./graph";
+import {
+	createLeaseKeeper,
+	createLeaseStore,
+	leaseHolds,
+	leasesLost,
+	trackHeldLeases,
+} from "./leases";
+import {
+	copyStamps,
+	createLandedFeed,
+	createRunBus,
+	createRunHistory,
+	createRunLog,
+	getRunRow,
+	runIdsOfProject,
+} from "./log";
+import { forgetMemory, listMemory, readMemory } from "./memory";
+import { createPlacement } from "./placement";
+import {
+	createProjects,
+	createRunBranches,
+	createSpaceDocuments,
+	createWorktrees,
+	memberName,
+	systemGit,
+} from "./projects";
+import {
+	gitAuthorOf,
+	landedFacts,
+	namesOf,
+	parseCalledFlows,
+	parseRunFlow,
+} from "./read";
+import { createStartHolds } from "./run";
+import { createRunFolders } from "./run-folders";
+import { createServiceKeeper, serviceHolds } from "./services";
+import { createSpaces } from "./space";
+import { createProjectsMove } from "./space-move";
+import { keptValues, listKeptValues, resetKeptValue } from "./variables";
+import { wireEngineActions } from "./wire-actions";
+import { wireEngineMove } from "./wire-move";
+import { wireEngineRecovery } from "./wire-recovery";
+import { wireEngineSchedules } from "./wire-schedules";
+import { wireEngineStart } from "./wire-start";
+import { wireEngineViews } from "./wire-views";
+
+/**
+ * The composition of the engine: `createEngine` makes each piece with what
+ * it needs and wires them. It holds no logic of its own. The engine is
+ * projects, flows, schedules, Gates and runs, over the event log as the
+ * read model. A run is one LangGraph thread that the runner
+ * (`graph/runner/runner.ts`) drives.
+ *
+ * `createEngine` is cut in blocks, in the order the pieces are made. A
+ * block that a lane of the hexagon series owns says so in its header, and
+ * the pieces of the run path each have a file beside this one. A lane
+ * changes its own file and its own block here, and keeps the names the
+ * other blocks read ("gives").
+ *
+ * - `wire-recovery.ts` (R7): startup recovery, the daemon's resume, the
+ *   wakes, the Signal of a webhook, the stop of a run by Night Shift.
+ * - `wire-views.ts` (R2): the read model (`read/read-model.ts`).
+ * - `wire-start.ts` (R3): who walks a new run and its Run's Device, and the
+ *   start itself: here (`run/run-start.ts`), or handed to the Host.
+ * - `wire-schedules.ts`: the schedules slice (`schedules/`), what it tells
+ *   and who listens, and the pull request scores.
+ * - `wire-actions.ts` (R4): what a person does to a run (`run/actions.ts`).
+ *   The action is taken here as a Turn of the runner, or handed to the
+ *   run's Walker as a Command: the Walker is the only writer of its run's
+ *   events.
+ * - `wire-move.ts` (R5): the other end of a move (`run/take-over.ts`).
+ * - `space.ts`: what a person does in one Space (`SpaceEngine`, in
+ *   `space-engine.ts`).
+ * - `engine.ts`: the `Engine` interface and the thin object behind it.
+ *
+ * What the blocks stand on:
+ *
+ * - `placement/`: where each step runs. The plan a run starts with
+ *   (`planNodes`), the one fit check, and the walk's reader of the plan
+ *   (`createPlacement`): the Device of a step now, and its move when that
+ *   Device is offline (ADR 17).
+ * - `flows/`: the flows and schedules of the projects in their flow
+ *   documents (`ProjectFlows`), what a person does with them in a Space
+ *   (`SpaceFlows`, `SpaceEngine.flows`), and the import of a Clone's
+ *   folder from before it.
+ * - `cleanup/`: what ended runs left on this computer (worktrees and
+ *   branches, the files of run folders), their removal, and the
+ *   scheduled sweep.
+ * - `projects/`: projects by remote and their Clones on this computer,
+ *   over the git port. A project is defined in its Space document. Its
+ *   `project` row is the document's projection.
+ * - `peers` (`EngineOptions.peers`, the port in `peers.ts`): who a run's
+ *   Devices are, Offers, the Host that keeps a Space and the runs walked
+ *   elsewhere. `@nightshift/devices` implements it over its Links.
+ *
+ * Spaces: `createEngine` returns the Device's engine. `space(id)` is what
+ * a person does in one Space. The walk, recovery and the scheduler run
+ * across every Space on this Device. Each row they write takes the Space
+ * of its project.
+ */
+
+const DEFAULT_MAX_CONCURRENT_RUNS = 2;
+const DEFAULT_MAX_STEPS_PER_RUN = 500;
+/** How long a new daemon waits before it resumes the runs the last one stopped mid-step. */
+const DAEMON_RESUME_GRACE_MS = 5_000;
+
+export function createEngine(
+	options: EngineOptions,
+	internals: EngineInternals = {},
+): Engine {
+	// --- ground: the knobs, the settings, the run log, the documents ---
+	const minuteMs = internals.minuteMs ?? 60_000;
+	const now = internals.now ?? timeNow;
+	const { db, dataDir, device, directory } = options;
+	const maxConcurrentRuns =
+		options.maxConcurrentRuns ?? DEFAULT_MAX_CONCURRENT_RUNS;
+	if (!Number.isInteger(maxConcurrentRuns) || maxConcurrentRuns < 1) {
+		throw new Error("maxConcurrentRuns must be a positive integer.");
+	}
+	const maxStepsPerRun = options.maxStepsPerRun ?? DEFAULT_MAX_STEPS_PER_RUN;
+	if (!Number.isInteger(maxStepsPerRun) || maxStepsPerRun < 1) {
+		throw new Error("maxStepsPerRun must be a positive integer.");
+	}
+	/** The daemon's settings, read when they apply. Without a store: the options, then the defaults. */
+	const runSettings = (): RunSettings =>
+		options.settings?.() ?? {
+			...defaultRunSettings(),
+			maxConcurrentRuns,
+			maxStepsPerRun,
+		};
+	const bus = createRunBus();
+	const runLog =
+		internals.runLog ??
+		createRunLog(db, {
+			walkerId: options.walkerId || directory.selfId,
+			dataDir,
+		});
+	const documents =
+		options.spaceDocuments ?? createSpaceDocuments({ db, directory });
+	const flowDocuments = options.flowDocuments ?? createFlowDocuments({ db });
+
+	/** The Person who owns this computer (`directory.selfOwnerId`), read when the engine is ready. */
+	let ownerId: string | null = null;
+
+	/** `ready` (below), for the peers made before it: it settles as `ready` does. */
+	let settleReady: [() => void, (error: unknown) => void] = [
+		() => {},
+		() => {},
+	];
+	const peersReady = new Promise<void>((resolve, reject) => {
+		settleReady = [resolve, reject];
+	});
+	peersReady.catch(() => {});
+
+	// --- the log's feeds, the walk files, the run folders (mechanisms) ---
+	/** Every run event as it lands here, appended or ingested. */
+	const landed = createLandedFeed({ db, log: runLog });
+	const history = createRunHistory({ db, dataDir, log: runLog, bus, landed });
+	/** The walk state of the runs this computer walks, as files (`graph/checkpoints/walk-state.ts`). */
+	const walks = createRunWalks({ db, log: runLog, history });
+
+	/** The run folders on this computer: where runs of projects without a folder work (ADR 22). */
+	const runFolders = createRunFolders(dataDir);
+
+	// --- peers: the other Devices and Hosts ---
+	// Its two run calls are the blocks' own: `move.arrive` (R5) and
+	// `recovery.stopForNightShift` (R7). Those lanes change their file.
+	/**
+	 * The other Devices and Hosts (`Peers`): where steps run, Offers, the
+	 * Host that keeps a Space, and the runs walked elsewhere.
+	 */
+	const peers = options.peers({
+		device,
+		walkerId: () => runLog.walkerId(),
+		ownerId: () => ownerId,
+		ready: peersReady,
+		now,
+		documents,
+		// Made below: the Projects record a Clone through the peers' relay.
+		projects: {
+			find: (projectId, spaceId) => projects.find(projectId, spaceId),
+			ofSpace: (spaceId) => projects.ofSpace(spaceId),
+			matching: (input) => projects.matching(input),
+			clones: (spaceId, projectId) => projects.clones(spaceId, projectId),
+			clonePath: (projectId, spaceId) => projects.clonePath(projectId, spaceId),
+			recordClone: (spaceId, record) => projects.recordClone(spaceId, record),
+			setClones: (spaceId, input) => projects.setClones(spaceId, input),
+			clonedHere: (spaceId) => projects.clonedHere(spaceId),
+			forgetDevice: (deviceId) => projects.forgetDevice(deviceId),
+			addFromRemote: (spaceId, input) => projects.addFromRemote(spaceId, input),
+			defineWithoutFolder: (spaceId, input) =>
+				projects.defineWithoutFolder(spaceId, input),
+			take: (spaceId, taken) => projects.take(spaceId, taken),
+		},
+		runFolders,
+		flows: (projectId) => projectFlows.flows(projectId),
+		profiles: {
+			here: options.profileFor ?? (() => null),
+
+			lastKnown: (deviceId) => lastKnownProfiles(db, deviceId),
+		},
+		keptDevice: (deviceId) => storedDeviceCopy(db, deviceId),
+		history: {
+			...history,
+			onLanded: (listener, scope) =>
+				landed.subscribe((events) => {
+					if (landedFacts(events).some((f) => f.changes !== "spend")) {
+						listener();
+					}
+				}, scope),
+		},
+		runs: {
+			exportWalk: walks.exportWalk,
+			ownFile: walks.ownFile,
+			// Every open step's reader asks on each change of the run: the run
+			// log derives the stamps once per append for all of them.
+			stepStamp: async ({ runId, stepId }) =>
+				(await runLog.derive([runId], copyStamps)).get(runId)?.get(stepId) ??
+				null,
+			takeOver: (runId) => move.arrive(runId),
+			// The Offer the run's step ran under ended: Night Shift stops it, not a person.
+			stop: async (runId) => recovery.stopForNightShift(runId),
+		},
+		async logFact(fact, writes) {
+			await runLog.append(fact, writes);
+		},
+	});
+	const { placement: devices, relay: hosts } = peers;
+	/** Where each run's steps run, as its plan says (`placement/`). */
+	const placement = createPlacement({ device, devices });
+
+	// --- projects and flows (phase 3) ---
+	const git = options.git ?? systemGit();
+	const { listBranches } = createWorktrees(git);
+	const projects = createProjects({
+		db,
+		log: runLog,
+		deviceId: runLog.walkerId,
+		documents,
+		directory,
+		git,
+		...(hosts ? { relay: hosts } : {}),
+	});
+	/** What brings a flow or a schedule of an older format to the current one: its nodes name a Device's profile, and their Device, by id. */
+	const thisDevice = async () => ({
+		id: await runLog.walkerId(),
+		name: device.name,
+	});
+	const migrations = createFlowMigrations({
+		db,
+		device: thisDevice,
+		profiles: options.profiles,
+		directory,
+		spaces: documents,
+	});
+	/** The flows and schedules of every project: its flow document (ADR 2). */
+	const projectFlows = createProjectFlows({
+		documents: flowDocuments,
+		project: (projectId) => projects.find(projectId),
+		deviceId: () => runLog.walkerId(),
+		now,
+		migrations,
+	});
+	/** The import on upgrade: each Clone's `.nightshift/` folder, once. */
+	const cloneImports = createCloneImports({
+		db,
+		documents: flowDocuments,
+		git,
+		device: thisDevice,
+		profiles: options.profiles,
+		migrations,
+		now,
+	});
+
+	// --- the lifetime of the engine ---
+	// The engine's lifetime: a test's signal, or `dispose` (a `bun --hot`
+	// handover) ends it.
+	const lifetime = new AbortController();
+	internals.signal?.addEventListener("abort", () => lifetime.abort(), {
+		once: true,
+	});
+	const signal = lifetime.signal;
+	let disposed = false;
+	signal.addEventListener(
+		"abort",
+		() => {
+			disposed = true;
+		},
+		{ once: true },
+	);
+
+	// --- leases, services, what a run holds (mechanisms) ---
+	// The wake of a freed lease is the recovery block's (R7).
+	/** The leases of the Spaces this Replica keeps, and of the runs it walks (ADR 7). */
+	const leaseStore = createLeaseStore({ db, now });
+	const leases = createLeaseKeeper({
+		db,
+		store: leaseStore,
+		hostedElsewhere: (spaceId) => directory.hostedElsewhere(spaceId),
+		...(hosts?.leases ? { relay: hosts.leases } : {}),
+		walkerId: () => runLog.walkerId(),
+		minuteMs,
+		// The runs here that wait for a lease ask again.
+		onFreed: () => recovery.wakeLeaseSleeps(),
+		onLost: (runId, names) => leasesLost({ log: runLog }, runId, names),
+	});
+	leases.start(signal);
+	/** The services of the runs this computer walks (ADR 9). */
+	const services = createServiceKeeper({
+		now,
+		...(internals.secondMs !== undefined
+			? { secondMs: internals.secondMs }
+			: {}),
+	});
+	/** What runs hold for a scope: the engine lets go of it when a run ends. */
+	const runHolds = combineHolds([
+		leaseHolds({ keeper: leases, log: runLog }),
+		serviceHolds({
+			keeper: services,
+			log: runLog,
+			deviceOf: async (runId, deviceId) =>
+				placement.deviceById(deviceId, await getRunRow(db, runId)),
+		}),
+	]);
+
+	// --- the walk: what a step may touch, the runner (graph) ---
+	/** The files runs keep for the person: an agent's artifacts, the answers' files. */
+	const artifacts = createArtifactStore(dataDir);
+	/** What a step may touch on this computer, the same for every run. */
+	const shared: StepShared = {
+		log: runLog,
+		bus,
+		recorders: createRecorders({ db, bus, log: runLog }),
+		placement,
+		now,
+		minuteMs,
+		settings: runSettings,
+		kindOf,
+		leases,
+		services,
+		artifacts,
+		keptValues: (flow) => keptValues(db, flow),
+		remembered: (at) => readMemory(db, at),
+		// The Walker keeps the shape of a step's data on its node (Q40).
+		keepShapes: async (flow, node, shapes) => {
+			await projectFlows.keepShapes(
+				flow.projectId,
+				flow.flowName,
+				node,
+				shapes,
+			);
+		},
+		// And the type of a called flow's output (Q40).
+		keepOutputTypes: async (flow, types) => {
+			await projectFlows.keepOutputTypes(flow.projectId, flow.flowName, types);
+		},
+		gitAuthor: (personId) => gitAuthorOf(db, personId),
+		...(options.usage ? { usage: options.usage } : {}),
+	};
+	const runner = createRunner({
+		shared,
+		db,
+		flowOf: parseRunFlow,
+		calledFlowsOf: parseCalledFlows,
+		signal,
+		holds: runHolds,
+		...(internals.overdueSweepMs !== undefined
+			? { overdueSweepMs: internals.overdueSweepMs }
+			: {}),
+	});
+
+	// --- access (R1) ---
+	// Nothing yet. Lane R1 wires `runs/access` here.
+
+	// --- walk (R1) ---
+	// gives: startHolds
+	/** The Spaces whose runs do not become active while their Projects move. */
+	const startHolds = createStartHolds();
+
+	// --- recovery (R7): `wire-recovery.ts` ---
+	// gives: recovery.recoverInterruptedWork, recovery.armResumes (the start
+	// order), recovery.signals (schedules), recovery.wakeLeaseSleeps (leases,
+	// the engine), recovery.wakeOfflineSleeps (the engine),
+	// recovery.stopForNightShift (peers)
+	const recovery = wireEngineRecovery({
+		db,
+		log: runLog,
+		bus,
+		runner,
+		now,
+		settings: runSettings,
+		schedulerOn: options.scheduler !== false,
+		placedElsewhere: (row) => !placement.placedHere(row),
+		resumeGraceMs: internals.resumeGraceMs ?? DAEMON_RESUME_GRACE_MS,
+		signal,
+		holds: startHolds,
+		runHolds,
+	});
+
+	// --- the start order ---
+	// Leases tracked, recovery, lease renewal, Space documents, remotes,
+	// clone imports, flow upgrade, the owner, the resumes. No lane changes
+	// this block: R7 changes the two calls of `recovery` in its own file.
+	// The leases the runs here held when the last daemon stopped are renewed
+	// from now on: before recovery, which lets go of those of the runs that
+	// do not continue.
+	const recovered = trackHeldLeases({ db, log: runLog, keeper: leases })
+		.catch((error) => {
+			console.warn("[engine] could not read the leases of the runs", error);
+		})
+		.then(() => recovery.recoverInterruptedWork());
+	const ready = recovered
+		// Those leases are renewed at once, not a minute from now: the last
+		// daemon renewed them up to a minute before it stopped, and a lease of
+		// 2 minutes would expire first. After recovery, so a run it ended
+		// interrupted takes back a lease it lost when it continues. The start
+		// does not wait for a Host that answers late. A Host whose link is not
+		// up yet gets the renewal when it is (`hostBack`).
+		.then(() => {
+			void leases.renewAll();
+		})
+		// Every Space's document: Projects from before it are imported once.
+		.then(() => documents.openAll())
+		.then(() =>
+			// Projects from before Clones get their remote. A git that fails
+			// leaves it for the next start.
+			projects.readRemotes().catch(() => {}),
+		)
+		// The flows of each Clone from before ADR 2, once: before a schedule fires.
+		.then(() => cloneImports.all())
+		// The flows of format 6 of the Spaces this Replica keeps, once (ADR 3).
+		.then(() => upgradeKeptFlows())
+		// Whose runs are this computer's own: another Person's take an Offer.
+		.then(async () => {
+			ownerId = await directory.selfOwnerId();
+		})
+		// The interrupted runs' grace counts from now: the engine is ready.
+		.then(() => recovery.armResumes());
+	// Every method awaits `ready` and sees the error there.
+	ready.catch(() => {});
+	ready.then(...settleReady);
+
+	/**
+	 * Brings the flows of format 6 of every Project whose Space this
+	 * Replica keeps to the current format, once (ADR 3). A failure is
+	 * logged, and the next start tries again; reads migrate meanwhile.
+	 */
+	async function upgradeKeptFlows(): Promise<void> {
+		try {
+			await projectFlows.upgrade(
+				async (spaceId) => !(await directory.hostedElsewhere(spaceId)),
+			);
+		} catch (error) {
+			console.warn(
+				"Night Shift could not bring the flows to their new format. It tries again at the next start:",
+				error,
+			);
+		}
+	}
+
+	// --- the names of Members (views and start read it) ---
+	/** A Person's name as the Space document's Members name them: a Device knows the Host's Persons only there. */
+	const membersName = async (spaceId: string, personId: string) =>
+		memberName(await documents.open(spaceId), personId);
+
+	// --- views (R2): `wire-views.ts` ---
+	// gives: views.reads (start, schedules, cleanup, the Space view, the engine)
+	const views = wireEngineViews({
+		db,
+		log: runLog,
+		bus,
+		deviceId: device.id,
+		walkers: peers.runs.walkers,
+		pendingCommands: peers.runs.pendingCommands,
+		stepEntries: peers.runs.stepEntries,
+		ownEntries: history.ownTranscript,
+		memberName: membersName,
+	});
+
+	// --- start (R3): `wire-start.ts` ---
+	// gives: start.places (schedules, the Space view)
+	const start = wireEngineStart({
+		ready,
+		db,
+		log: runLog,
+		runner,
+		now,
+		projects,
+		devices,
+		...(hosts ? { hosts } : {}),
+		directory,
+		selfName: device.name,
+		memberName: membersName,
+		listRuns: views.reads.listRuns,
+		holds: startHolds,
+	});
+
+	// --- schedules and scores: `wire-schedules.ts` ---
+	// gives: sched.schedules (the Space move, the Space view, the engine),
+	// sched.notices and sched.pullRequestWatch (the engine)
+	// The schedules of the projects: its watch begins here, while the engine is made.
+	const sched = wireEngineSchedules({
+		db,
+		log: runLog,
+		flows: projectFlows,
+		now,
+		tickMs: internals.scheduleTickMs,
+		runs: {
+			// start (R3)
+			start: start.places.startForSchedule,
+			// views (R2)
+			status: views.reads.runStatus,
+			// recovery (R7)
+			signal: (projectId, signal) => recovery.signals.send(projectId, signal),
+			// peers
+			shownTo: peers.pathsFor,
+		},
+		projects,
+		directory,
+		offers: peers.offers,
+		secret: options.secret,
+		settings: runSettings,
+		scheduler: options.scheduler,
+		usage: options.usage,
+		github: options.github,
+		signal,
+		ready,
+		disposed: () => disposed,
+	});
+
+	// --- actions (R4): `wire-actions.ts` ---
+	// gives: acts.actions (the Space view)
+	const acts = wireEngineActions({
+		db,
+		log: runLog,
+		artifacts,
+		bus,
+		runner,
+		...(hosts ? { hosts } : {}),
+		archive: peers.runs,
+		walks,
+		device,
+		placement: devices,
+		holds: startHolds,
+		leases,
+		...(options.usage ? { usage: options.usage } : {}),
+	});
+
+	// --- move (R5): `wire-move.ts` ---
+	// gives: move.arrive (peers)
+	const move = wireEngineMove({ db, log: runLog, runner, peers, walks });
+
+	// --- gates (R6) ---
+	// Nothing yet: the answer of a Gate is in the actions block, and the
+	// inbox is in `read/`. Lane R6 wires `gates/` here, in `wire-gates.ts`.
+
+	// --- cleanup (phase 3) ---
+	/** The scheduled cleanup of the worktrees and branches runs left on this computer. */
+	const runCopies = createRunCopies({
+		log: runLog,
+		branches: createRunBranches(git),
+		projects,
+		listRuns: views.reads.listRuns,
+		runStatus: views.reads.runStatus,
+		isActive: (runId) => runner.isActive(runId),
+		now,
+		settings: runSettings,
+	});
+	/** The files of run folders on this computer, and the scheduled cleanup of the folders. */
+	const runFiles = createRunFiles({
+		db,
+		log: runLog,
+		folders: runFolders,
+		runRow: (runId) => getRunRow(db, runId),
+		runState: (runId) => runLog.state(runId),
+		isActive: (runId) => runner.isActive(runId),
+		now,
+		settings: runSettings,
+	});
+	startCleanupJob({
+		sweeps: { "run copies": runCopies.sweep, "run folders": runFiles.sweep },
+		ready,
+		signal,
+		...(internals.cleanupDelayMs !== undefined
+			? { delayMs: internals.cleanupDelayMs }
+			: {}),
+		...(internals.cleanupEveryMs !== undefined
+			? { everyMs: internals.cleanupEveryMs }
+			: {}),
+		...(internals.cleanupSwept ? { swept: internals.cleanupSwept } : {}),
+	});
+
+	// --- the Space move (`space-move/`) ---
+	/** A Space move: Projects to other Spaces, as one operation. */
+	const moveProjects = createProjectsMove({
+		db,
+		ready,
+		holds: startHolds,
+		holdSchedules: () => sched.schedules.ticker.hold(),
+		walkerId: () => runLog.walkerId(),
+		flows: projectFlows,
+		documents,
+		// Their rows moved under the run log, in a batch that logged nothing.
+		reread: (runIds) => {
+			runLog.forget(runIds);
+			landed.reread();
+		},
+		rows: options.moveRows ?? [],
+		...(options.projectsMoved ? { moved: options.projectsMoved } : {}),
+	});
+
+	// --- the Space view: `space.ts` ---
+	// One group of arguments for each block. A lane changes its own group.
+	const space = createSpaces({
+		ready,
+		signal,
+		log: runLog,
+		runner,
+		// projects, flows, kept values, node memory, answer costs (phase 3)
+		projects,
+		documents,
+		runIdsOfProject: (projectId) => runIdsOfProject(db, projectId),
+		listBranches,
+		flows: createSpaceFlows({
+			ready,
+			flows: projectFlows,
+			usage: options.usage,
+			project: (projectId, spaceId) => projects.find(projectId, spaceId),
+			personNames: (ids) => namesOf(db, ids),
+			deviceNames: (ids) => directory.names(ids),
+			migration: async (scope) =>
+				migrations.forDevice(await runLog.walkerId(), scope),
+		}),
+		importClone: (projectId) => cloneImports.project(projectId),
+		kept: {
+			list: (flow) => listKeptValues(db, flow),
+			reset: (flow, name) => resetKeptValue(db, flow, name),
+		},
+		memory: {
+			list: (flow) => listMemory(db, flow),
+			forget: (flow, node, scope) => forgetMemory(db, flow, node, scope),
+		},
+		answerCosts: (spaceId, since) => listAnswerCosts(db, spaceId, since),
+		moveProjects,
+		// the run's row, and the reads of other slices' files (R1)
+		runRow: (runId) => getRunRow(db, runId),
+		runFiles,
+		artifacts,
+		pathsFor: peers.pathsFor,
+		// views (R2)
+		reads: views.reads,
+		// start (R3)
+		placement: devices,
+		placements: start.places.placements,
+		startRun: start.places.start,
+		// actions (R4), move (R5), gates (R6)
+		actions: acts.actions,
+		// schedules
+		schedules: sched.schedules,
+	});
+
+	// --- the engine: `engine.ts` ---
+	return engineOf({
+		ready,
+		recovered,
+		lifetime,
+		space,
+		db,
+		log: runLog,
+		documents,
+		flows: projectFlows,
+		moveProjects,
+		leaseStore,
+		leases,
+		landed,
+		runner,
+		// schedules and scores
+		scheduleNotices: sched.notices,
+		schedules: sched.schedules,
+		pullRequestWatch: sched.pullRequestWatch,
+		// views (R2)
+		reads: views.reads,
+		// recovery (R7)
+		wakeLeaseSleeps: recovery.wakeLeaseSleeps,
+		wakeOfflineSleeps: recovery.wakeOfflineSleeps,
+	});
+}

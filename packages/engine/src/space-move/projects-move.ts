@@ -12,7 +12,7 @@ import {
 	spaceMoveBatch,
 	spaceRunIds,
 } from "../projects";
-import type { StartHolds } from "./start-holds";
+import type { StartHolds } from "../run";
 
 /**
  * A Space move: Projects that go from one Space to other Spaces, as one
