@@ -21,20 +21,18 @@ import {
 } from "../canvas";
 import type { ChatLink } from "../chat";
 import { proposalCanvas, useChatPanel } from "../chat";
-import { CopyFlowDialog } from "../move";
-import { StartRunDialog } from "../start";
 import { useTestMarks } from "../test-run";
 import type { CatalogEntry } from "./add-node";
 import { useNodeAdder } from "./add-node";
 import { useFlowClipboard } from "./clipboard";
 import { checkFlow } from "./draft";
 import { EditorCanvas } from "./editing-canvas";
+import { EditorDialogs } from "./editor-dialogs";
 import { EditorHeader } from "./editor-header";
 import { EditorPanels } from "./editor-panels";
-import { LeaveDialog } from "./leave-dialog";
 import { ProjectFlowsContext, ProjectFolderContext } from "./project";
-import { RevisionsSheet, useRevisionView } from "./revisions";
-import { MakeSubflowDialog, sectionEdits } from "./sections";
+import { useRevisionView } from "./revisions";
+import { sectionEdits } from "./sections";
 import { selectedInspector } from "./selected-inspector";
 import { createEditingSession, useEditingSession } from "./session";
 import { SubflowView } from "./subflow-view";
@@ -444,83 +442,30 @@ function Editor({
 				</ProjectFlowsContext.Provider>
 			</DeviceNamesContext.Provider>
 
-			<StartRunDialog
-				open={starting}
-				onOpenChange={setStarting}
-				projectId={projectId}
-				flowName={name}
-				inputs={draft.inputs}
-				test={
-					testMarks.count.total > 0
-						? {
-								marks: testMarks.marks,
-								skippedGates: draft.nodes
-									.filter(
-										(node) =>
-											node.type === "decision" &&
-											node.by === "person" &&
-											Object.hasOwn(testMarks.marks.skipped, node.id),
-									)
-									.map((node) => node.id),
-								onStarted: setTestRunId,
-							}
-						: undefined
-				}
-			/>
-
-			{subflowSection ? (
-				<MakeSubflowDialog
-					open
-					onOpenChange={(open) => {
-						if (!open) setSubflowOf(null);
-					}}
-					projectId={projectId}
-					flowName={name}
-					draft={draft}
-					section={subflowSection}
-					flows={projectFlows.flows}
-					onMade={(made) => sections.applySubflow(subflowSection.id, made)}
-				/>
-			) : null}
-
-			<RevisionsSheet
+			<EditorDialogs
+				starting={starting}
+				setStarting={setStarting}
 				projectId={projectId}
 				name={name}
-				open={revisionsOpen}
-				onOpenChange={setRevisionsOpen}
-				selectedId={openRevision}
-				onSelect={setOpenRevision}
+				draft={draft}
+				testMarks={testMarks}
+				setTestRunId={setTestRunId}
+				subflowSection={subflowSection}
+				setSubflowOf={setSubflowOf}
+				projectFlows={projectFlows}
+				sections={sections}
+				revisionsOpen={revisionsOpen}
+				setRevisionsOpen={setRevisionsOpen}
+				openRevision={openRevision}
+				setOpenRevision={setOpenRevision}
 				dirty={dirty}
-				onShow={(revision) => {
-					chat.hidePreview();
-					session.select(null);
-					setRevisionsOpen(false);
-					setShownRevision(revision);
-				}}
-				onRestored={(flow, issues) => {
-					session.edit(flow);
-					onSaved(flow, issues);
-					setShownRevision(null);
-				}}
-			/>
-
-			<CopyFlowDialog
-				open={copying}
-				onOpenChange={setCopying}
-				projectId={projectId}
-				name={name}
-				dirty={dirty}
-			/>
-
-			<LeaveDialog
-				blocked={blocker.status === "blocked"}
-				name={name}
-				onStay={() => {
-					if (blocker.status === "blocked") blocker.reset();
-				}}
-				onLeave={() => {
-					if (blocker.status === "blocked") blocker.proceed();
-				}}
+				chat={chat}
+				session={session}
+				setShownRevision={setShownRevision}
+				onSaved={onSaved}
+				copying={copying}
+				setCopying={setCopying}
+				blocker={blocker}
 			/>
 		</>
 	);
