@@ -89,7 +89,7 @@ import { IssuesPopover } from "./issues-popover";
 import { LeaveDialog } from "./leave-dialog";
 import { nodeEdits } from "./node-edits";
 import { ProjectFlowsContext, ProjectFolderContext } from "./project";
-import { type RevisionOnCanvas, RevisionsSheet } from "./revisions";
+import { RevisionsSheet, useRevisionView } from "./revisions";
 import { SaveButton } from "./save-button";
 import { MakeSubflowDialog, SectionInspector, sectionEdits } from "./sections";
 import {
@@ -162,22 +162,15 @@ function Editor({
 		openSection,
 		madeSection,
 	} = useEditingSession(session);
-	const [revisionsOpen, setRevisionsOpen] = useState(
-		revisionLink !== undefined,
-	);
-	const [openRevision, setOpenRevision] = useState<string | null>(
-		revisionLink ?? null,
-	);
-	// The revision the canvas shows instead of the draft.
-	const [shownRevision, setShownRevision] = useState<RevisionOnCanvas | null>(
-		null,
-	);
+	const {
+		revisionsOpen,
+		setRevisionsOpen,
+		openRevision,
+		setOpenRevision,
+		shownRevision,
+		setShownRevision,
+	} = useRevisionView({ revisionLink, onRevisionLinkUsed });
 	const [copying, setCopying] = useState(false);
-	// The sheet opened with the revision link: drop it from the address.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: runs once, at the start.
-	useEffect(() => {
-		if (revisionLink !== undefined) onRevisionLinkUsed?.();
-	}, []);
 	// The Section "Make subflow" works on, while its dialog is open.
 	const [subflowOf, setSubflowOf] = useState<string | null>(null);
 

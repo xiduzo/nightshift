@@ -3,5 +3,6 @@
  * revision a run ran.
  */
 
-export { type RevisionOnCanvas, RevisionsSheet } from "./revisions-sheet";
+export { RevisionsSheet } from "./revisions-sheet";
 export { RunRevision } from "./run-revision";
+export { useRevisionView } from "./use-revision-view";
