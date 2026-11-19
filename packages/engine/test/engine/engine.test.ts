@@ -31,11 +31,11 @@ import {
 	type RunSettings,
 } from "../../src/device-config/settings";
 import type { Engine, EngineInternals } from "../../src/engine";
+import { GateClosedError } from "../../src/gates";
 import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
 import type { TranscriptEntry } from "../../src/log/transcript/step-events";
 import type { LandedFact } from "../../src/read/landed-facts";
 import type { RunDetail, RunStreamItem } from "../../src/read/views";
-import { GateClosedError } from "../../src/run/answer";
 import type { RunStatus } from "../../src/run-status";
 import { START_HOLD_WORDS } from "../../src/runs/walk/domain/start-holds";
 import type { SpaceEngine } from "../../src/space-engine";

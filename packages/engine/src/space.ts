@@ -5,6 +5,7 @@ import type { AnswerCost } from "./assistant";
 import type { RunFilesService } from "./cleanup";
 import { NIGHT_SHIFT, type PersonActor } from "./contract";
 import type { SpaceFlows } from "./flows";
+import type { Gates } from "./gates";
 import type { Runner } from "./graph";
 import { type RunLog, scopeKey } from "./log";
 import type { MemoryFlow, NodeMemory } from "./memory";
@@ -81,8 +82,6 @@ export type SpacesDeps = {
 	): Promise<<T extends WithPaths>(summary: T) => Promise<T>>;
 
 	// --- views (R2) ---
-	/** The views of the runs, for the readers that act for Night Shift (the Gates). */
-	reads: Views["reads"];
 	/** The reads of the runs (`runs/views`). The wire decides who opens a run (D6). */
 	views: Views;
 
@@ -95,6 +94,8 @@ export type SpacesDeps = {
 	actions: { act: Actions["actOnRun"] };
 	/** The Devices a run can move to (`runs/move`). */
 	moveTargets: Move["listMoveTargets"];
+	/** The open and the answered Gates of a Space (`gates/`). */
+	gates: Pick<Gates, "listOpenGates" | "listAnsweredGates">;
 
 	// --- schedules ---
 	/** The schedules of the projects: each use case checks the Space itself (`schedules/`). */
@@ -110,7 +111,7 @@ export type SpacesDeps = {
 };
 
 export function createSpaces(deps: SpacesDeps) {
-	const { ready, log, projects, documents, reads, actions, views } = deps;
+	const { ready, log, projects, documents, actions, views } = deps;
 
 	/** Rows as the engine's Projects, with their Clones from the Space document. */
 	async function withClones(spaceId: string, rows: ListedProject[]) {
@@ -429,12 +430,15 @@ export function createSpaces(deps: SpacesDeps) {
 			// --- gates (R6) ---
 			async listGates() {
 				await ready;
-				return reads.listGates(spaceId);
+				return deps.gates.listOpenGates(actor ?? NIGHT_SHIFT, { spaceId });
 			},
 
 			async listAnsweredGates(since) {
 				await ready;
-				return reads.listAnsweredGates(spaceId, since);
+				return deps.gates.listAnsweredGates(actor ?? NIGHT_SHIFT, {
+					spaceId,
+					since,
+				});
 			},
 
 			// --- schedules ---

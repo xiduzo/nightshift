@@ -1,15 +1,12 @@
-import type { ArtifactStore } from "./artifacts";
 import { NIGHT_SHIFT } from "./contract";
-import { createAnswerPath } from "./run";
 import { type Access, type Move, type Walk, wireActions } from "./runs";
 import type { UsageNotes } from "./usage";
 
 /**
  * The actions block of the engine's composition (`wire.ts`): what a person
- * does to a run (`runs/actions/`), with the answer to a Gate
- * (`run/answer.ts`) until lane R6 makes it a use case, and the move of a
- * run (`runs/move/`, from `wire-move.ts`). Lane R4 of the hexagon series
- * owns this file.
+ * does to a run (`runs/actions/`), with the answer to a Gate (`gates/`,
+ * from `wire-gates.ts`) and the move of a run (`runs/move/`, from
+ * `wire-move.ts`). Lane R4 of the hexagon series owns this file.
  *
  * It gives `actions`: the Space view reads `actions.act`. And `runs`: the
  * run use cases of `Engine.runs` this block holds. Both are the same use
@@ -19,8 +16,10 @@ import type { UsageNotes } from "./usage";
 export function wireEngineActions(deps: {
 	access: Pick<Access, "openRun">;
 	walk: Pick<Walk, "facts" | "turns" | "walkers" | "holds">;
-	/** Where the Walker keeps the files of an answer. */
-	artifacts: Pick<ArtifactStore, "saveAnswer">;
+	/** The answer to a Gate (`answerGate` of `gates/`), over a way to open a run. */
+	answer(
+		openRun: Access["openRun"],
+	): Parameters<typeof wireActions>[0]["answer"];
 	/** The move of a run (`runs/move/`), over a way to open a run. */
 	moveRunWith(openRun: Access["openRun"]): Move["moveRun"];
 	/** Lets go of a run's leases (`LeaseKeeper.release`). */
@@ -30,17 +29,12 @@ export function wireEngineActions(deps: {
 }) {
 	/** The actions, with the answer and the move, over one way to open a run. */
 	function bind(openRun: Access["openRun"]) {
-		const answer = createAnswerPath({
-			openRun,
-			walk: deps.walk,
-			artifacts: deps.artifacts,
-		});
 		const acts = wireActions({
 			access: { openRun },
 			walk: deps.walk,
 			leases: deps.leases,
 			...(deps.usage ? { usage: deps.usage } : {}),
-			answer,
+			answer: deps.answer(openRun),
 			move: deps.moveRunWith(openRun),
 		});
 		return { acts };

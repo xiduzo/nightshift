@@ -14,12 +14,12 @@ packages/engine/src/device/local.ts 902
 packages/engine/src/flows/flow-document.ts 1285
 packages/engine/src/graph/runner/runner.ts 1101
 packages/engine/src/knowledge/folder.ts 691
-packages/engine/src/knowledge/knowledge.ts 781
+packages/engine/src/knowledge/knowledge.ts 780
 packages/engine/src/knowledge/reconcile.ts 632
 packages/engine/src/knowledge/search-store.ts 668
 packages/engine/src/knowledge/search.ts 764
 packages/engine/src/projects/projects.ts 942
 packages/engine/src/projects/space-rows.ts 638
-packages/engine/src/projects/worktrees.ts 750
-packages/engine/src/wire.ts 709
+packages/engine/src/projects/worktrees.ts 726
+packages/engine/src/wire.ts 693
 packages/notifications/src/notifier/notifier.ts 774

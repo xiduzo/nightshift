@@ -26,6 +26,7 @@ import type { SpaceEngine } from "./space-engine";
 import type { MovedProjects, ProjectsMove } from "./space-move";
 import type { wireEngineAccess } from "./wire-access";
 import type { wireEngineActions } from "./wire-actions";
+import type { wireEngineGates } from "./wire-gates";
 import type { wireEngineMove } from "./wire-move";
 import type { wireEngineStart } from "./wire-start";
 import type { wireEngineViews } from "./wire-views";
@@ -194,6 +195,13 @@ export interface Engine {
 	 * who may. Each waits for the engine to be ready.
 	 */
 	readonly runs: RunUseCases;
+	/**
+	 * The Gate use cases for a door that holds the actor (decision 41 of
+	 * the hexagon series): the answer to a Gate, which opens its run and
+	 * decides who may, and the Needs-you inbox of a Person. Each waits for
+	 * the engine to be ready.
+	 */
+	readonly gates: GateUseCases;
 }
 
 /**
@@ -212,6 +220,9 @@ export type RunUseCases = ReturnType<typeof wireEngineAccess>["runs"] &
 
 /** The reads of `Engine.runs` (`wire-views.ts`). */
 type ViewRuns = ReturnType<typeof wireEngineViews>["runs"];
+
+/** The Gate use cases of `Engine.gates`: `answer`, `inbox`, `answeredInbox` (`wire-gates.ts`). */
+export type GateUseCases = ReturnType<typeof wireEngineGates>["cases"];
 
 /** Knobs for tests only. Not part of the engine contract. */
 export type EngineInternals = {
@@ -266,6 +277,8 @@ export type EngineParts = {
 	runner: Pick<Runner, "release">;
 	/** The run use cases (`Engine.runs`) of the blocks but the views, before the engine is ready. */
 	runs: Omit<RunUseCases, keyof ViewRuns>;
+	/** The Gate use cases (`Engine.gates`), before the engine is ready. */
+	gates: GateUseCases;
 
 	// --- schedules and scores (`wire-schedules.ts`) ---
 	scheduleNotices: Pick<
@@ -389,6 +402,9 @@ export function engineOf(parts: EngineParts): Engine {
 
 		// --- the run use cases: each waits for the engine to be ready ---
 		runs: whenReady(ready, { ...parts.runs, ...views.runs }),
+
+		// --- the Gate use cases (R6): each waits for the engine to be ready ---
+		gates: whenReady(ready, parts.gates),
 
 		// --- the end of the engine ---
 		async dispose() {

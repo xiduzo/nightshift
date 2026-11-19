@@ -14,13 +14,13 @@ import type { DecisionNode, Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import type { Engine, EngineInternals } from "../../src/engine";
+import { GateClosedError } from "../../src/gates";
 import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
 import {
 	createSpaceDocuments,
 	type SpaceDocuments,
 	spaceProjects,
 } from "../../src/projects/space-document";
-import { GateClosedError } from "../../src/run/answer";
 import { aloneDirectory } from "../../src/testing/alone-directory";
 import {
 	commitFile,

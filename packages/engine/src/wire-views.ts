@@ -13,8 +13,8 @@ import { type Access, wireViews } from "./runs";
  *
  * It gives `reads`, `forSpace`, `cases` and `runs`. The other blocks
  * read `listRuns` (start, cleanup) and `runStatus` (schedules, cleanup)
- * of `reads`. The Space view takes `forSpace`: the use cases, and
- * `reads` for its Gates. The engine calls `readRunHere` and
+ * of `reads`, and the gates block reads its Gates there. The Space view
+ * takes `forSpace`: the use cases. The engine calls `readRunHere` and
  * `readRunTrace` of `cases`. `runs` holds the reads of `Engine.runs`:
  * each opens the run for the actor and finds its Space.
  */
@@ -73,7 +73,7 @@ export function wireEngineViews(deps: {
 		reads: cases.reads,
 		cases,
 		/** The views group of the Space view (`createSpaces`). */
-		forSpace: { reads: cases.reads, views: spaceCases },
+		forSpace: { views: spaceCases },
 		runs: {
 			list: cases.listRuns,
 			get: cases.readRun,

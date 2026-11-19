@@ -463,6 +463,8 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		// The synced documents (Yjs).
 		documents: M,
 		flows: "flows",
+		// The answer to a Gate and the Needs-you inbox, in rings.
+		gates: "gates",
 		// It walks a flow (decision 9 of the hexagon series).
 		graph: M,
 		knowledge: "knowledge",
@@ -480,8 +482,8 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		// The read model of a run: pure projections of the log. The walk
 		// (`graph`) reads them too, so they are machinery, not part of `runs`.
 		read: M,
-		// The start and the actions of a run, before its slices (`runs`,
-		// `gates`). The composition left it for `src/wire.ts`.
+		// The move of a run, before its slice (`runs`). The composition left
+		// it for `src/wire.ts`.
 		run: "runs",
 		// The run path in rings, one sub-vertical per part: who may see or
 		// act on a run (`access`) and what every use case that writes to a

@@ -21,6 +21,7 @@ export { spaceDocumentName } from "../projects/space-document";
 export type { LandedChange } from "../read/landed-facts";
 export { openRunBundle } from "../read/run-bundle";
 
+export { testInbox } from "./gates";
 export { testKnowledge } from "./knowledge";
 export { runEvents } from "./run-events";
 export { seedFlows } from "./seed-flows";

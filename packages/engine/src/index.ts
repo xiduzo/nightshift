@@ -131,6 +131,13 @@ export {
 	revisionKinds,
 } from "./flows";
 export {
+	GateClosedError,
+	INBOX_KEEP_MS,
+	type InboxAnsweredGate,
+	type InboxGate,
+	NeedsApp,
+} from "./gates";
+export {
 	type AskedQuestion,
 	type AskLearner,
 	createKnowledge,
@@ -186,8 +193,6 @@ export {
 } from "./placement";
 export type {
 	FeedStep,
-	InboxAnsweredGate,
-	InboxGate,
 	LandedFact,
 	OpenGate,
 	ProjectRuns,
@@ -200,18 +205,13 @@ export type {
 	StepTranscript,
 } from "./read";
 export {
-	answeredOf,
 	exportRun,
-	INBOX_KEEP_MS,
-	inboxOf,
-	lockScreenRefusal,
 	NEEDED_YOU_REASONS,
 	RUNGS,
 	type RunBundleSummary,
 	runReading,
 	transcriptLines,
 } from "./read";
-export { GateClosedError } from "./run";
 export { createRunFolders, noRunFolders } from "./run-folders";
 export {
 	PinNotHereError,

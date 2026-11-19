@@ -1,8 +1,5 @@
-import {
-	GateClosedError,
-	lockScreenRefusal,
-	type SpaceEngine,
-} from "@nightshift/engine";
+import { RoleRefusal } from "@nightshift/auth";
+import { type Engine, GateClosedError, NeedsApp } from "@nightshift/engine";
 import type { ORPCErrorConstructorMap } from "@orpc/server";
 import type { z } from "zod";
 
@@ -34,39 +31,49 @@ export const answerRefusals = {
 	},
 } as const;
 
-type AnswerRefusals = ORPCErrorConstructorMap<typeof answerRefusals>;
+/** The declared errors the handler gets: the Gate's, and `FORBIDDEN` of `runProcedure`. */
+type AnswerRefusals = ORPCErrorConstructorMap<
+	typeof answerRefusals & { FORBIDDEN: { status: number; message: string } }
+>;
+
+type Via = "web" | "phone" | "lock_screen" | "_OTHER";
 
 /**
- * Answers the open Gate of a run, through the view of the run's own Space
- * (`runProcedure` found it and checked the role there). An answer from the
- * lock screen goes only where the engine's `lockScreenRefusal` lets it.
- * The engine refuses an answer to a Gate that no longer waits, and this
- * says so as `GATE_CLOSED`.
+ * Where the answer comes from, in the words the engine keeps:
+ * `lock-screen` is the older name of `lock_screen`, an unknown or absent
+ * place is `_OTHER`. The answer always names one.
+ */
+export function viaOf(raw: z.output<typeof gateAnswerSchema>["via"]): Via {
+	if (raw === "lock-screen" || raw === "lock_screen") return "lock_screen";
+	return raw === "web" || raw === "phone" ? raw : "_OTHER";
+}
+
+/**
+ * Answers the open Gate of a run in the run's own Space (`runProcedure`
+ * found it and checked the role there), as the session's Person. The
+ * engine's `answerGate` applies every rule, the lock-screen rule too. This
+ * says its refusals of the Gate in the Gate's declared words, and a role
+ * that does not allow an answer as `runProcedure` does. A run the engine
+ * does not find is its plain `NOT_FOUND` (`readable`), as before.
  */
 export async function answerGate(
-	space: Pick<SpaceEngine, "listGates" | "act">,
+	gates: Pick<Engine["gates"], "answer">,
+	who: { personId: string; spaceId: string },
 	input: z.output<typeof gateAnswerSchema>,
 	errors: AnswerRefusals,
 ): Promise<void> {
-	const { via: raw, ...answer } = input;
-	const via =
-		raw === "lock-screen" || raw === "lock_screen"
-			? "lock_screen"
-			: raw === "web" || raw === "phone"
-				? raw
-				: "_OTHER";
-	if (via === "lock_screen") {
-		const refusal = lockScreenRefusal(await space.listGates(), answer);
-		if (refusal === "gate-closed") throw errors.GATE_CLOSED();
-		if (refusal === "needs-app") throw errors.NEEDS_APP();
-	}
+	const { via, ...answer } = input;
 	try {
-		const { runId, ...choice } = answer;
-		await space.act(runId, { kind: "answer", ...choice, via });
+		await gates.answer(
+			{ personId: who.personId },
+			{ ...answer, spaceId: who.spaceId, via: viaOf(via) },
+		);
 	} catch (error) {
 		if (error instanceof GateClosedError) {
 			throw errors.GATE_CLOSED({ cause: error });
 		}
+		if (error instanceof NeedsApp) throw errors.NEEDS_APP({ cause: error });
+		if (error instanceof RoleRefusal) throw errors.FORBIDDEN({ cause: error });
 		throw error;
 	}
 }

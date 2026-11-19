@@ -26,13 +26,16 @@ import {
 } from "@nightshift/auth/testing";
 import { hostRouter } from "@nightshift/devices";
 import {
+	type Engine,
 	GateClosedError,
 	HOST_UNREACHABLE,
 	HostUnreachableError,
+	NeedsApp,
 	type OpenGate,
 	type SpaceEngine,
 } from "@nightshift/engine";
 import { PROJECT_NOT_FOUND } from "@nightshift/engine/projects";
+import { testInbox } from "@nightshift/engine/testing";
 import { singleAgentFlow } from "@nightshift/flows";
 import {
 	FAILURE_MESSAGE,
@@ -142,9 +145,9 @@ type Given = {
 
 /** The Space each run is in, for `engine.spaceOfRun`. */
 let runSpaces: Map<string, string>;
-/** The open Gates the fake Space view lists, per Space. */
+/** The open Gates the views of each Space list, for the engine's inbox. */
 let gatesIn: Map<string, OpenGate[]>;
-/** What the fake Space view's answer to a Gate (`act.answer`) does after it records the call. */
+/** What the fake engine's answer to a Gate (`gates.answer`) does after it records the call. */
 let onResolve: () => void;
 /** Every call of a fake service, in order. */
 let calls: Call[];
@@ -160,7 +163,10 @@ const daemonOf = (ownerId: string): Services["daemon"] => ({
 /**
  * The context of a request with `access`, on a computer `ownerId` owns,
  * over recording services. The Space view of each Space records its
- * calls with the Space, an action as `act.<kind>`. The database is real:
+ * calls with the Space, an action as `act.<kind>`. The engine's inbox is
+ * its own use case over the database, and records each Space's list of
+ * open Gates as `listGates`. Its answer to a Gate records the call as
+ * `gates.answer`, with the Space of the request. The database is real:
  * the procedures that read the Person's Spaces or Members read it.
  */
 function recording(
@@ -190,12 +196,6 @@ function recording(
 			{
 				given: given.space,
 				reply: (method, args) => {
-					if (
-						method === "space.act" &&
-						(args[1] as { kind: string }).kind === "answer"
-					) {
-						return (async () => onResolve())();
-					}
 					if (method === "space.listGates") return gatesIn.get(spaceId) ?? [];
 					if (method === "space.watchRun") return (async function* () {})();
 					if (method === "space.listRuns") return [];
@@ -211,10 +211,28 @@ function recording(
 	for (const name of Object.keys(SERVICES) as (keyof Services)[]) {
 		services[name] = recorder([name], record, { given: given[name] });
 	}
+	const gates: Engine["gates"] = {
+		...testInbox({
+			db,
+			open: async (spaceId) => {
+				calls.push({ space: spaceId, method: "listGates", args: [] });
+				return gatesIn.get(spaceId) ?? [];
+			},
+		}),
+		answer: async (actor, request) => {
+			calls.push({
+				space: request.spaceId,
+				method: "gates.answer",
+				args: [actor, request],
+			});
+			onResolve();
+		},
+	};
 	services.engine = recorder(["engine"], record, {
 		given: {
 			space,
 			spaceOfRun: async (runId: string) => runSpaces.get(runId) ?? null,
+			gates,
 			...given.engine,
 		},
 	});
@@ -416,7 +434,7 @@ const ROUTES: Route[] = [
 	// Gates: the Needs-you inbox.
 	route("gates.list", undefined, "session"),
 	route("gates.answered", undefined, "session"),
-	route("gates.resolve", { ...run, stepId: "s", choice: "yes" }, { gate: ["resolve"] }, "space.act.answer", ["r", { kind: "answer", stepId: "s", choice: "yes", via: "_OTHER" }]),
+	route("gates.resolve", { ...run, stepId: "s", choice: "yes" }, { gate: ["resolve"] }, "space.gates.answer", [{ personId: PERSON }, { runId: "r", spaceId: SPACE, stepId: "s", choice: "yes", via: "_OTHER" }]),
 	// The assistant.
 	route("assistant.agents", undefined, "owner", undefined, undefined, { given: { assistant: { agents: () => [] } } }),
 	route("assistant.check", { agent: "builder" }, "owner", undefined, undefined, { given: { assistant: { check: async () => ({ id: "builder", ok: true, ms: 1, answers: null, problem: null }) } } }),
@@ -1676,7 +1694,7 @@ function openGate(spaceId: string, runId: string, openedAt: number): OpenGate {
 
 describe("the Needs-you inbox", () => {
 	// The inbox rule (which Spaces, the order, who may answer) is the
-	// engine's `inboxOf`, tested there. This is the session's Person.
+	// engine's `listInbox`, tested there. This is the session's Person.
 	test("lists the inbox of the session's Person, not only their active Space", async () => {
 		const { ada, spaceId } = await platform();
 		const personal = (await personalSpaceId(sandbox.db, ada.userId)) ?? "";
@@ -1704,11 +1722,11 @@ describe("the Needs-you inbox", () => {
 
 		const answer = { runId: "ada-run", stepId: "step-1", choice: "yes" };
 		await call(appRouter.gates.resolve, answer, { context });
-		expect(seen()).toEqual([{ space: personal, method: "act.answer" }]);
-		// Bound to its run and step.
+		expect(seen()).toEqual([{ space: personal, method: "gates.answer" }]);
+		// Bound to its run and step, as the session's Person.
 		expect(calls.at(-1)?.args).toEqual([
-			"ada-run",
-			{ kind: "answer", stepId: "step-1", choice: "yes", via: "_OTHER" },
+			{ personId: ada.userId },
+			{ ...answer, spaceId: personal, via: "_OTHER" },
 		]);
 		// The session still works in Platform.
 		expect((await contextFor(ada.headers)).access.spaceId).toBe(spaceId);
@@ -1745,14 +1763,21 @@ describe("the Needs-you inbox", () => {
 		expect(seen()).toEqual([]);
 	});
 
-	test("takes an answer from the lock screen only for a Gate its author marked for it", async () => {
+	test("takes an answer from the lock screen only where the engine's rule lets it, with the Gate's codes and words", async () => {
 		const { bob, spaceId } = await platform();
-		runSpaces.set("marked-run", spaceId);
-		runSpaces.set("plain-run", spaceId);
-		gatesIn.set(spaceId, [
-			{ ...openGate(spaceId, "marked-run", 1), lockScreen: true },
-			openGate(spaceId, "plain-run", 2),
-		]);
+		for (const runId of ["marked-run", "plain-run", "closed-run"]) {
+			runSpaces.set(runId, spaceId);
+		}
+		// The rule is the engine's (`answerGate`, tested there): a Gate not
+		// marked for the lock screen needs the app, a Gate that is not open
+		// is closed.
+		onResolve = () => {
+			const request = calls.at(-1)?.args[1] as { runId: string } | undefined;
+			if (request?.runId === "plain-run") throw new NeedsApp();
+			if (request?.runId === "closed-run") {
+				throw new GateClosedError("This run does not wait at a Gate.");
+			}
+		};
 		const context = await contextFor(bob.headers);
 		const fromLockScreen = (runId: string) => ({
 			runId,
@@ -1765,9 +1790,10 @@ describe("the Needs-you inbox", () => {
 			context,
 		});
 		expect(calls.at(-1)?.args).toEqual([
-			"marked-run",
+			{ personId: bob.userId },
 			{
-				kind: "answer",
+				runId: "marked-run",
+				spaceId,
 				stepId: "step-marked-run",
 				choice: "yes",
 				via: "lock_screen",
@@ -1785,9 +1811,6 @@ describe("the Needs-you inbox", () => {
 			defined: true,
 			message: "Open this Gate in Night Shift to answer it.",
 		});
-		// A Gate that is no longer open is closed. Which answers the lock
-		// screen takes is the engine's `lockScreenRefusal`, tested there.
-		runSpaces.set("closed-run", spaceId);
 		expect(
 			await refusalOf(
 				call(appRouter.gates.resolve, fromLockScreen("closed-run"), {
@@ -1799,20 +1822,16 @@ describe("the Needs-you inbox", () => {
 			defined: true,
 			message: "This Gate does not wait anymore.",
 		});
-		expect(
-			seen()
-				.filter((c) => c.method === "act.answer")
-				.map((c) => c.space),
-		).toEqual([spaceId]);
 
-		// From the app, the same Gate takes the answer.
-		const { via: _via, ...inApp } = fromLockScreen("plain-run");
+		// From the app, the answer goes without a place.
+		const { via: _via, ...inApp } = fromLockScreen("marked-run");
 		await call(appRouter.gates.resolve, inApp, { context });
 		expect(calls.at(-1)?.args).toEqual([
-			"plain-run",
+			{ personId: bob.userId },
 			{
-				kind: "answer",
-				stepId: "step-plain-run",
+				runId: "marked-run",
+				spaceId,
+				stepId: "step-marked-run",
 				choice: "yes",
 				via: "_OTHER",
 			},

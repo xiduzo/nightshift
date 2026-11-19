@@ -32,7 +32,7 @@ export type ActionsDeps = {
 	leases: KeeperRunLeasesDeps;
 	/** Anonymous usage, when this computer records it. */
 	usage?: UsageNotes;
-	/** The answer to a Gate and the move of a run: the paths of `run/` until lanes R6 and R5. */
+	/** The answer to a Gate (`gates/`), and the move of a run (`run/move.ts` until lane R5). */
 	answer: ActOnRunPorts["answer"];
 	move: ActOnRunPorts["move"];
 };

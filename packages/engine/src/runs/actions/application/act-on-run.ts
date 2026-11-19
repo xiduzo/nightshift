@@ -21,9 +21,8 @@ type OnRun<K extends RunActionRequest["kind"]> = {
 
 /**
  * Each action as its own use case, bound to its ports: each opens the run
- * for the actor with the permission the action needs. An answer is the
- * path of `run/answer.ts` until lane R6 makes it a use case of `gates/`. A
- * move is `moveRun` of `runs/move/`.
+ * for the actor with the permission the action needs. An answer is the use
+ * case `answerGate` of `gates/`. A move is `moveRun` of `runs/move/`.
  */
 export type ActOnRunPorts = {
 	stop: ReturnType<typeof stopRun>;
@@ -34,7 +33,7 @@ export type ActOnRunPorts = {
 	restart: ReturnType<typeof restartStep>;
 	rerun: ReturnType<typeof rerunFromNode>;
 	takeOver: ReturnType<typeof recordTakeOver>;
-	/** Answers the run's open Gate (`run/answer.ts`). */
+	/** Answers the run's open Gate (`answerGate` of `gates/`). */
 	answer(actor: Actor, request: OnRun<"answer">): Promise<void>;
 	/** Moves the run's walk to another of the Person's Devices (`runs/move/`). */
 	move(actor: Actor, request: OnRun<"move">): Promise<void>;

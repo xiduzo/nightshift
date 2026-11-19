@@ -1,14 +1,6 @@
-/** The read model: the pure projections of the event log, the facts an assistant reads in a run, the landed facts, the Needs-you inbox, what a person did to a run (Needed you), where the work landed (the ladders), the run views, a run's summary (`run-summary/`), cost, the Persons a run names, and the run bundle. */
+/** The read model: the pure projections of the event log, the facts an assistant reads in a run, the landed facts, the order of open Gates, what a person did to a run (Needed you), where the work landed (the ladders), the run views, a run's summary (`run-summary/`), cost, the Persons a run names, and the run bundle. */
 
-export {
-	answeredOf,
-	INBOX_KEEP_MS,
-	type InboxAnsweredGate,
-	type InboxGate,
-	inboxOf,
-	inboxOrder,
-	lockScreenRefusal,
-} from "./inbox";
+export { inboxOrder } from "./inbox-order";
 export {
 	CASCADE_RUNGS,
 	type Ladder,

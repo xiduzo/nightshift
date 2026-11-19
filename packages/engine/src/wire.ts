@@ -64,6 +64,7 @@ import { keptValues, listKeptValues, resetKeptValue } from "./variables";
 import { wireEngineAccess } from "./wire-access";
 import { wireEngineActions } from "./wire-actions";
 import { wireEngineCleanup } from "./wire-cleanup";
+import { wireEngineGates } from "./wire-gates";
 import { wireEngineMove } from "./wire-move";
 import { wireEngineRecovery } from "./wire-recovery";
 import { wireEngineSchedules } from "./wire-schedules";
@@ -97,6 +98,7 @@ import { wireEngineWalk } from "./wire-walk";
  *   events.
  * - `wire-move.ts` (R5): the move of a run's walk to another Device, and
  *   its other end, where the new Walker takes the run over (`runs/move/`).
+ * - `wire-gates.ts` (R6): the answer to a Gate and the inbox (`gates/`).
  * - `wire-cleanup.ts`: what ended runs left on this computer (`cleanup/`).
  * - `space.ts`: what a person does in one Space (`SpaceEngine`, in
  *   `space-engine.ts`).
@@ -561,20 +563,19 @@ export function createEngine(
 	// (the Space view), move.runs (the engine)
 	const move = wireEngineMove({ access, walk, db, peers, walks, device });
 
+	// --- gates (R6): `wire-gates.ts` ---
+	const gates = wireEngineGates({ db, access, walk, artifacts, views, now });
+
 	// --- actions (R4): `wire-actions.ts` ---
 	// gives: acts.actions (the Space view), acts.runs (the engine)
 	const acts = wireEngineActions({
 		access,
 		walk,
-		artifacts,
+		answer: gates.answerWith,
 		moveRunWith: move.moveRunWith,
 		leases,
 		...(options.usage ? { usage: options.usage } : {}),
 	});
-
-	// --- gates (R6) ---
-	// Nothing yet: the answer of a Gate is in the actions block, and the
-	// inbox is in `read/`. Lane R6 wires `gates/` here, in `wire-gates.ts`.
 
 	// --- cleanup (phase 3): `wire-cleanup.ts` ---
 	// gives: runFiles (the Space view)
@@ -657,6 +658,7 @@ export function createEngine(
 		// actions (R4), move (R5), gates (R6)
 		actions: acts.actions,
 		moveTargets: move.moveTargets,
+		gates: gates.forSpace,
 		// schedules
 		schedules: sched.schedules,
 	});
@@ -677,6 +679,7 @@ export function createEngine(
 		landed,
 		runner,
 		runs: { ...access.runs, ...acts.runs, ...start.runs, ...move.runs },
+		gates: gates.cases,
 		// schedules and scores
 		scheduleNotices: sched.notices,
 		schedules: sched.schedules,
