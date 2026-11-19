@@ -5,9 +5,6 @@ import { listPlacements } from "./list-placements";
 
 /** The Devices a person chooses from to start a run, on in-memory adapters. */
 
-/** What access says of a Space the Person is not a Member of. */
-const NO_SPACE = { kind: "not-found", message: "That Space does not exist." };
-
 const laptop: Placement = {
 	deviceId: "laptop",
 	name: "Laptop",
@@ -27,7 +24,6 @@ const kims: Placement = {
 
 function placements() {
 	const ports = inMemoryStartPorts();
-	ports.access.members.join("space-own", "person-ada", "viewer");
 	return { ports, list: listPlacements(ports) };
 }
 
@@ -64,14 +60,14 @@ describe("the Devices a person chooses from", () => {
 		});
 	});
 
-	test("need a Member of the Space", async () => {
+	test("ask the Devices for the Person: the door checked their Membership", async () => {
 		const { ports, list } = placements();
-		await expect(
-			list(
-				{ personId: "person-eve" },
-				{ spaceId: "space-own", projectId: "project-1" },
-			),
-		).rejects.toMatchObject(NO_SPACE);
-		expect(ports.planner.listed).toEqual([]);
+		await list(
+			{ personId: "person-eve" },
+			{ spaceId: "space-own", projectId: "project-1" },
+		);
+		expect(ports.planner.listed).toEqual([
+			{ spaceId: "space-own", personId: "person-eve", projectId: "project-1" },
+		]);
 	});
 });
