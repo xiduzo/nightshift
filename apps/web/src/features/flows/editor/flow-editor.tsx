@@ -39,7 +39,7 @@ import {
 	Redo2Icon,
 	Undo2Icon,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CopyProjectHere, notHere, projectQueries } from "@/features/projects";
 import { AgentButton } from "@/shared/agent-button";
 import { hoverTime } from "@/shared/format";
@@ -71,7 +71,6 @@ import type { CatalogEntry } from "./add-node";
 import { NodeDock, useNodeAdder } from "./add-node";
 import { useFlowClipboard } from "./clipboard";
 import { checkFlow } from "./draft";
-import { type EditKeys, editKeyOf, leavesKeyToPage } from "./edit-keys";
 import { EditorCanvas } from "./editing-canvas";
 import { FlowTitleCard } from "./flow-title-card";
 import {
@@ -90,13 +89,12 @@ import { MakeSubflowDialog, SectionInspector, sectionEdits } from "./sections";
 import {
 	createEditingSession,
 	type Selection,
-	selectedNodeIds,
-	selectedSectionIds,
 	useEditingSession,
 } from "./session";
 import { SubflowView } from "./subflow-view";
 import { useCalledFlows } from "./use-called-flows";
 import { useEditorData } from "./use-editor-data";
+import { useEditorKeys, useEscapeCloses } from "./use-editor-keys";
 import { useFlowSave } from "./use-flow-save";
 import { useNodeSamples } from "./use-node-samples";
 
@@ -228,40 +226,7 @@ function Editor({
 		(section) => section.id === subflowOf,
 	);
 	const clipboard = useFlowClipboard(session);
-	// The keys that edit the canvas: undo, redo, copy, cut and paste. Not
-	// while a proposal or a Subflow is on view.
-	const editKeysRef = useRef<EditKeys | null>(null);
-
-	useEffect(() => {
-		const onKeyDown = (event: KeyboardEvent) => {
-			const mod = event.metaKey || event.ctrlKey;
-			const key = event.key.toLowerCase();
-			if (key === "s" && mod) {
-				event.preventDefault();
-				save();
-			}
-			const edit = editKeyOf(event);
-			const edits = editKeysRef.current;
-			if (edit && edits && !leavesKeyToPage(event, edit)) {
-				if (edits[edit]()) event.preventDefault();
-				return;
-			}
-			// Cmd/Ctrl+G: make a Section of the selected nodes and boxes.
-			if (key === "g" && mod && !event.shiftKey && !event.altKey) {
-				const target = event.target as HTMLElement | null;
-				if (target?.closest("input, textarea, [contenteditable='true']"))
-					return;
-				const { selection } = session.get();
-				const ids = selectedNodeIds(selection);
-				const sectionIds = selectedSectionIds(selection);
-				if (ids.length + sectionIds.length === 0) return;
-				event.preventDefault();
-				sections.makeSection(ids, sectionIds);
-			}
-		};
-		window.addEventListener("keydown", onKeyDown);
-		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [save, session, sections]);
+	const { editKeysRef } = useEditorKeys({ save, session, sections });
 
 	// Leaving with unsaved changes asks first, in the app and on reload.
 	const blocker = useBlocker({
@@ -481,24 +446,7 @@ function Editor({
 		setSettingsOpen(false);
 	}, [session]);
 	const inspectorOpen = inspector !== null && !preview;
-	// Escape closes the inspector, but not while you type in a field or a
-	// menu, a list or a dialog has the focus: Escape closes those first.
-	useEffect(() => {
-		if (!inspectorOpen || starting) return;
-		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.key !== "Escape" || event.defaultPrevented) return;
-			const target = event.target as HTMLElement | null;
-			if (
-				target?.closest(
-					"input, textarea, select, [contenteditable='true'], [role='dialog'], [role='alertdialog'], [role='menu'], [role='listbox'], [data-slot$='-content']",
-				)
-			)
-				return;
-			closeInspector();
-		};
-		window.addEventListener("keydown", onKeyDown);
-		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [inspectorOpen, starting, closeInspector]);
+	useEscapeCloses({ inspectorOpen, starting, closeInspector });
 
 	return (
 		<>
