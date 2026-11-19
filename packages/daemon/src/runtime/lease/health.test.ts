@@ -6,7 +6,6 @@ import { createDb } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 import { daemonLease } from "@nightshift/db/schema";
 import { asDate, now as timeNow } from "@nightshift/time";
-import { type Heartbeat, readHeartbeatFile } from "../../heartbeat";
 import {
 	checkHealth,
 	elapsedSeconds,
@@ -14,6 +13,7 @@ import {
 	readHeartbeat,
 	stopHolder,
 } from "./health";
+import { type Heartbeat, readHeartbeatFile } from "./heartbeat";
 import { acquireLease, pidAlive } from "./lease";
 
 const roots: string[] = [];

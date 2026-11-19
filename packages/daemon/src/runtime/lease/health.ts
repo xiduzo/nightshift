@@ -3,7 +3,7 @@ import { hostname } from "node:os";
 import { createDb, type Database } from "@nightshift/db";
 import { daemonLease } from "@nightshift/db/schema";
 import { instant, now as timeNow } from "@nightshift/time";
-import { type Heartbeat, readHeartbeatFile } from "../../heartbeat";
+import { type Heartbeat, readHeartbeatFile } from "./heartbeat";
 import { pidAlive } from "./lease";
 
 /**

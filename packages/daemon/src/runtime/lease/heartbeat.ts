@@ -1,6 +1,6 @@
 /**
  * The lease heartbeat as another process reads it: `nightshift health`.
- * The daemon writes the lease row (`runtime/lease.ts`).
+ * The daemon writes the lease row (`lease.ts`).
  *
  * Only from another process. bun:sqlite is a second copy of SQLite beside
  * the daemon's libsql: in one process the two do not see each other's
