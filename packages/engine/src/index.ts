@@ -216,6 +216,7 @@ export { createRunFolders, noRunFolders } from "./run-folders";
 export {
 	PinNotHereError,
 	type RunHere,
+	SpaceNotFound,
 	START_DEADLINE_MS,
 } from "./runs";
 export type {

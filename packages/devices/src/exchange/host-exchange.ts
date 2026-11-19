@@ -4,7 +4,6 @@ import {
 	type Engine,
 	type PeerProjects,
 	PinNotHereError,
-	permissionOf,
 	RUN_NOT_FOUND,
 	type SpaceArchive,
 	type StartRunInput,
@@ -25,6 +24,7 @@ import type { HostSpaces } from "../links";
 import type { EngineOffers, OfferAdmission } from "../offers";
 import type { DeviceRegistry } from "../registry";
 import type { WorkHub } from "../work";
+import { hostRunDoor } from "./host-run-door";
 import { mergePersonalHere } from "./personal-merge";
 import {
 	ForeignRowsError,
@@ -51,7 +51,8 @@ import type { HostExchange } from "./types";
  * - Rows go out in the order they landed in this Host's Replica
  *   (`RunHistoryExchange.rowsAfter`), so a third Replica stores a moved
  *   run's events as they happened.
- * - A command needs the role that allows the action, checked here. A run
+ * - A command needs the role that allows the action, checked by the
+ *   engine (`host-run-door.ts`), as a start's role is. A run
  *   this Host walks gets it at once; any other waits for its Walker, which
  *   takes it on its own stream (`commands`), never behind rows. The other
  *   Devices of its Space's Members hear that it waits (`pending`), but not
@@ -117,6 +118,8 @@ export function createHostExchange(deps: {
 	const { db, engine, registry } = deps;
 	const { exchange } = engine;
 	const answerCosts = sharedAnswerCosts(db);
+	/** The engine's run use cases, in the name of the Caller's Person. */
+	const door = hostRunDoor(engine);
 	/**
 	 * The stops of the calls Walkers make through this Host with a
 	 * `stopId`, by the Walker's Device and that id, while the call is open.
@@ -216,12 +219,7 @@ export function createHostExchange(deps: {
 		caller: Caller,
 		input: StartRunInput & { spaceId: string },
 	): Promise<{ runId: string }> {
-		const { spaceId, ...start } = input;
-		await caller.may(spaceId, STARTS_RUNS);
-		const run = await engine
-			.space(spaceId, { personId: caller.personId })
-			.startRun({ ...start, startedBy: caller.personId });
-		return { runId: run.id };
+		return { runId: (await door.start(caller, input)).id };
 	}
 
 	return {
@@ -377,16 +375,13 @@ export function createHostExchange(deps: {
 		},
 
 		async command(caller, input) {
+			// Not a Member of the run's Space: not found. Their role: checked.
+			await door.open(caller, input);
 			const owner = await exchange.runOwner(input.runId);
-			if (!owner || !(await caller.member(owner.spaceId))) {
-				throw new Refusal("not-found", RUN_NOT_FOUND);
-			}
-			await caller.may(owner.spaceId, permissionOf(input.kind));
+			if (!owner) throw new Refusal("not-found", RUN_NOT_FOUND);
 			if (owner.walkerId === deps.selfId) {
 				// This Host walks the run: the action is a local one.
-				await engine
-					.space(owner.spaceId, { personId: caller.personId })
-					.act(input.runId, input);
+				await door.act(caller, owner.spaceId, input);
 				return;
 			}
 			if (owner.walkerId === caller.deviceId) {
@@ -597,7 +592,7 @@ export function createHostExchange(deps: {
 				throw new Refusal("not-found", PROJECT_NOT_FOUND);
 			}
 			return engine
-				.space(input.spaceId, { personId: caller.personId })
+				.space(input.spaceId, door.actorOf(caller))
 				.listDevices(input.projectId);
 		},
 
