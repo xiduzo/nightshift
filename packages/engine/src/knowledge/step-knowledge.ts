@@ -4,7 +4,7 @@ import {
 	knowledgeBrief,
 	knowledgeEnv,
 	knowledgeTools,
-} from "@nightshift/agents/tools";
+} from "@nightshift/agents/knowledge";
 import type { AgentEvent } from "@nightshift/agents/types";
 import { knowledgeFolderPath } from "@nightshift/flows";
 import type {

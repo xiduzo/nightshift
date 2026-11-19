@@ -17,7 +17,14 @@ import type {
 	ProfileSettings,
 	WebRequestMethod,
 } from "@nightshift/flows";
-import type { KnowledgeRequest, KnowledgeUseEvent, StepRun } from "../contract";
+import type {
+	CommandKnowledge,
+	KnowledgeRequest,
+	KnowledgeUseEvent,
+	SessionKnowledge,
+	SessionStep,
+	StepRun,
+} from "../contract";
 import type { RestoredFrom } from "../git";
 import type { WorktreeChanges } from "../log";
 
@@ -572,4 +579,19 @@ export type RunFolder = Pick<
 	"worktreePath" | "branch" | "baseRef"
 > & {
 	made: boolean;
+};
+
+/**
+ * What this computer's Device asks of the projects' knowledge (ADR 4): what
+ * a Command step and an Agent session get. `createKnowledge` fills it.
+ */
+export type StepKnowledge = {
+	forCommand(
+		projectId: string,
+		step?: { secret?: (name: string) => Promise<string | undefined> },
+	): Promise<CommandKnowledge>;
+	forSession(
+		request: KnowledgeRequest,
+		step?: SessionStep,
+	): Promise<SessionKnowledge>;
 };

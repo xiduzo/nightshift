@@ -69,14 +69,8 @@ rename packages/notifications targets
 # `live` of `packages/client`) composes the capabilities, so its imports of
 # them are no debt.
 
-# The `./tools` entry is the barrel of `tools`, and it passes on the
-# knowledge tools.
-imports packages/agents tools knowledge
-
-# The execution port reads this computer's configuration, the knowledge
-# folder and the project.
+# The execution port reads this computer's configuration and the project.
 imports packages/engine device device-config
-imports packages/engine device knowledge
 imports packages/engine device projects
 # The walk reads the capabilities itself (decision 9: `graph` is a
 # mechanism).

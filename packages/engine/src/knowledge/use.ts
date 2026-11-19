@@ -1,4 +1,4 @@
-import type { KnowledgeUseHit } from "@nightshift/agents/tools";
+import type { KnowledgeUseHit } from "@nightshift/agents/knowledge";
 import type { Database } from "@nightshift/db";
 import { now as timeNow } from "@nightshift/time";
 import { type KnowledgeUseFact, knowledgeUseEvents } from "../log";

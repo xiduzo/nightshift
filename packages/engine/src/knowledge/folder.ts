@@ -12,7 +12,7 @@ import type { Document } from "@langchain/core/documents";
 import {
 	KNOWLEDGE_INDEX_INTRO,
 	type KnowledgeReadFrom,
-} from "@nightshift/agents/tools";
+} from "@nightshift/agents/knowledge";
 import { isKnowledgeId, KNOWLEDGE_INDEX_FILE } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { iso } from "@nightshift/time";

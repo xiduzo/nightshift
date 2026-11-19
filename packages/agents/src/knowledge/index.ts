@@ -1,7 +1,7 @@
 /**
  * The knowledge as an agent meets it: the session brief (`brief.ts`) and the
- * tools it reads with (`tools.ts`). The `./tools` entry publishes what the
- * engine needs of it.
+ * tools it reads with (`tools.ts`). It is the `./knowledge` entry of the
+ * package too.
  */
 export {
 	KNOWLEDGE_INDEX_INTRO,

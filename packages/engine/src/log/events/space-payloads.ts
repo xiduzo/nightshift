@@ -1,7 +1,7 @@
 import type {
 	KnowledgeReadFrom,
 	KnowledgeUseHit,
-} from "@nightshift/agents/tools";
+} from "@nightshift/agents/knowledge";
 
 /**
  * The events of a Space that belong to no walk of a run: its projects and

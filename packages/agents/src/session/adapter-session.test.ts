@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AnyTextAdapter, TextOptions } from "@tanstack/ai";
 import type { SandboxProvider } from "@tanstack/ai-sandbox";
+import { knowledgeTools } from "../knowledge";
 import type { AgentEvent, AgentSessionInput } from "../port/types";
-import { knowledgeTools } from "../tools";
 import {
 	type AdapterSetup,
 	type HarnessSpec,

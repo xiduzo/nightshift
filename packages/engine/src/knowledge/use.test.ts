@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { KnowledgeUse } from "@nightshift/agents/tools";
+import type { KnowledgeUse } from "@nightshift/agents/knowledge";
 import { project, run } from "@nightshift/db/schema";
 import { now as timeNow } from "@nightshift/time";
 import { createRunLog, type KnowledgeUseFact, type RunLog } from "../log";

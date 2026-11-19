@@ -1,4 +1,4 @@
-import type { KnowledgeReadFrom } from "@nightshift/agents/tools";
+import type { KnowledgeReadFrom } from "@nightshift/agents/knowledge";
 import {
 	isProposedLearning,
 	isQuestionSetPath,

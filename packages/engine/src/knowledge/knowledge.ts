@@ -4,7 +4,7 @@ import {
 	type KnowledgeReadFrom,
 	type KnowledgeUse,
 	useHit,
-} from "@nightshift/agents/tools";
+} from "@nightshift/agents/knowledge";
 import type { Database } from "@nightshift/db";
 import {
 	NOT_TOPICS_FILE,

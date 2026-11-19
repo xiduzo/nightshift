@@ -1,4 +1,4 @@
-import type { KnowledgeUse } from "@nightshift/agents/tools";
+import type { KnowledgeUse } from "@nightshift/agents/knowledge";
 import type { AgentEvent, SessionContribution } from "@nightshift/agents/types";
 
 /**

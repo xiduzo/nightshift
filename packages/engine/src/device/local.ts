@@ -37,7 +37,6 @@ import {
 	type Git,
 	systemGit,
 } from "../git";
-import type { Knowledge } from "../knowledge";
 import { checkProjectFolder, NOT_ON_THIS_COMPUTER } from "../projects";
 import type { RunFolders } from "../run-folders";
 import { spawnCommand } from "./command";
@@ -58,6 +57,7 @@ import {
 	type RequestText,
 	type SessionEvent,
 	type SessionInput,
+	type StepKnowledge,
 	type ToolResult,
 	type WebRequestInput,
 	type WebRequestResult,
@@ -176,7 +176,7 @@ export type LocalDeviceDeps = {
 	 * (ADR 4). A step that asks for it gets it here, and gives it back when
 	 * it ends. Without it, a step gets none.
 	 */
-	knowledge?: Pick<Knowledge, "forCommand" | "forSession">;
+	knowledge?: StepKnowledge;
 	/**
 	 * What a run step's harness session adds to its environment, read as
 	 * the session starts: the export to monitoring gives Claude Code its
@@ -551,7 +551,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			yield { type: "refused", message: tools.message };
 			return;
 		}
-		let known: Awaited<ReturnType<Knowledge["forSession"]>> | null = null;
+		let known: Awaited<ReturnType<StepKnowledge["forSession"]>> | null = null;
 		try {
 			// A new session learns its CLI tools after the prompt. A resumed
 			// session has them already.

@@ -4,6 +4,7 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./harness-facts": "./src/harnesses/facts.ts",
+		"./knowledge": "./src/knowledge/index.ts",
 		"./pricing": "./src/pricing/index.ts",
 		"./tools": "./src/tools/index.ts",
 		"./types": "./src/port/index.ts",
