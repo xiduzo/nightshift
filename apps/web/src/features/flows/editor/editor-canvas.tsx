@@ -1,102 +1,51 @@
 import type { NodeSample } from "@nightshift/client";
-import type { Flow, FlowIssue, Outcome } from "@nightshift/flows";
-import {
-	addEdge,
-	type FlowCheck,
-	moveNodes,
-	nodesWithin,
-	removeEdge,
-	removeNode,
-	sectionBoundary,
-	sectionLevel,
-} from "@nightshift/flows";
+import type { Flow, FlowCheck } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import { Kbd, KbdGroup } from "@nightshift/ui/components/kbd";
 import {
 	Background,
 	BackgroundVariant,
-	type Connection,
-	type EdgeChange,
 	type EdgeTypes,
-	type IsValidConnection,
 	MiniMap,
-	type NodeChange,
 	NodeToolbar,
 	Position,
 	ReactFlow,
 	useNodesInitialized,
 	useReactFlow,
 	useStore,
-	useStoreApi,
 } from "@xyflow/react";
 import { GroupIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
-import type { DiffMark, FlowCanvasNode } from "../canvas";
 import {
 	CanvasControls,
 	type CanvasNode,
-	canvasEdges,
 	canvasNodeTypes,
-	type DataCanvasEdge,
 	DataEdge,
 	DataMarker,
 	edgeTypes,
-	type FlowCanvasEdge,
 	fitViewOptions,
-	groupEdges,
-	isDataEdgeId,
 	isOutsideId,
-	layoutFlow,
-	loadElk,
-	moveSection,
 	OpenSectionBar,
 	OutcomeMarkers,
 	type RouteBook,
 	readRoutes,
-	recordRoutes,
 	SectionActionsContext,
 	SectionZoom,
 	SelectEdgeContext,
-	sectionDragDelta,
-	sectionEnds,
 	sectionIdOf,
-	sectionIds,
-	useDataLinks,
 	useMeasured,
-	useOpenSection,
-	useSectionCanvas,
-	writeRoutes,
 } from "../canvas";
 import type { TestMarksApi } from "../test-run";
 import { NodeMenu } from "../test-run";
 import { NODE_DRAG_TYPE } from "./add-node";
-import { measuredHandles } from "./measured-handles";
-import { viewerOf } from "./node-viewer";
-import {
-	applyNodeSelection,
-	canvasIds,
-	type Selection,
-	type SelectionSetter,
-	selectedNodeIds,
-	selectedSectionIds,
-	withoutNodes,
-} from "./session";
+import { useAutoLayout } from "./auto-layout";
+import { useConnect, useEdgeChanges, useNodeChanges } from "./canvas-changes";
+import { type CanvasEdge, useCanvasEdges } from "./canvas-edges";
+import { type CanvasPreview, useCanvasNodes } from "./canvas-nodes";
+import { canvasIds, type Selection, type SelectionSetter } from "./session";
 
 /** The keys that delete what is selected. */
 const DELETE_KEYS = ["Backspace", "Delete"];
-
-/** How the nodes and edges of a proposed flow differ from the draft, by id. */
-export type CanvasPreview = {
-	nodes: ReadonlyMap<string, DiffMark>;
-	edges: ReadonlyMap<string, "added" | "removed">;
-};
-
-/** One empty list for every node without issues, so its data stays the same. */
-const NO_ISSUES: FlowIssue[] = [];
-
-/** The flow's edges, and the dotted lines of the selected node. */
-type CanvasEdge = FlowCanvasEdge | DataCanvasEdge;
 
 const EDGE_TYPES: EdgeTypes = { ...edgeTypes, data: DataEdge };
 
@@ -181,370 +130,55 @@ export function EditorCanvas({
 		return () => cancelAnimationFrame(frame);
 	}, [initialized, fitView, fit]);
 
-	const counts = useMemo(() => {
-		const byNode = new Map<string, FlowIssue[]>();
-		const bySection = new Map<string, FlowIssue[]>();
-		const edgeErrors = new Set<string>();
-		for (const issue of check.issues) {
-			if (issue.nodeId) {
-				const issues = byNode.get(issue.nodeId) ?? [];
-				issues.push(issue);
-				byNode.set(issue.nodeId, issues);
-			}
-			if (issue.sectionId) {
-				const issues = bySection.get(issue.sectionId) ?? [];
-				issues.push(issue);
-				bySection.set(issue.sectionId, issues);
-			}
-			if (issue.edgeId && issue.severity === "error")
-				edgeErrors.add(issue.edgeId);
-		}
-		return { byNode, bySection, edgeErrors };
-	}, [check]);
-
-	// An open Section shows its nodes alone. Edits still go to the whole flow.
-	// The editor's session closes it when something outside is picked.
-	const open = useOpenSection(flow, openSection);
-	const view = open.view;
-
-	const selectedSections = useMemo(
-		() => selectedSectionIds(selection),
-		[selection],
-	);
-	const sections = useSectionCanvas(view, {
-		outside: open.section ? { flow, open: open.section.id } : undefined,
-		measured,
-		editable: !preview,
-		issues: counts.bySection,
-		selectedSections,
-	});
-	const { hidden } = sections;
-
-	const marks = preview ? undefined : test?.marks;
-	const pinned = preview ? undefined : test?.pinned;
-	const nodes = useMemo<CanvasNode[]>(() => {
-		const selected = new Set(selectedNodeIds(selection));
-		const flowNodes = view.nodes.flatMap((node): FlowCanvasNode[] =>
-			// A Section's nodes are not on the canvas at all, so no
-			// click, box or key can select or delete them.
-			hidden.has(node.id)
-				? []
-				: [
-						{
-							id: node.id,
-							type: node.type,
-							position: node.position,
-							measured: measured[node.id],
-							selected: !preview && selected.has(node.id),
-							data: {
-								node,
-								isStart: view.start === node.id,
-								issues: counts.byNode.get(node.id) ?? NO_ISSUES,
-								change: preview?.nodes.get(node.id),
-								...(preview ? {} : viewerOf(node, samples, marks, pinned)),
-							},
-						},
-					],
-		);
-		return [...flowNodes, ...sections.boxes];
-	}, [
-		view.nodes,
-		view.start,
-		counts,
-		measured,
+	const { counts, open, view, sections, nodes } = useCanvasNodes({
+		flow,
+		check,
 		selection,
-		hidden,
-		sections.boxes,
+		openSection,
+		measured,
 		preview,
 		samples,
-		marks,
-		pinned,
-	]);
+		test,
+	});
 
 	// The routes of the last "Lay out". Each holds while its nodes stay put.
 	const [routes, setRoutes] = useState<RouteBook>(() => readRoutes(routesKey));
-	const { groups, boxPositions } = sections;
-	const edges = useMemo<FlowCanvasEdge[]>(
-		() =>
-			// The whole flow: an edge from outside reads its colour there.
-			canvasEdges(flow, groups, {
-				routes,
-				errors: counts.edgeErrors,
-				selected: selection?.kind === "edge" ? selection.id : undefined,
-				boxes: boxPositions,
-				endOf: sections.endOf,
-				changes: preview?.edges,
-			}).map((edge) =>
-				// A line to a box, or to what lies outside the open Section,
-				// stands for edges you cannot see: Delete does not remove
-				// them. Select one on its label.
-				[edge.source, edge.target].some(
-					(end) => sectionIdOf(end) !== undefined || isOutsideId(end),
-				)
-					? { ...edge, deletable: false }
-					: edge,
-			),
-		[
-			flow,
-			groups,
-			routes,
-			counts,
-			selection,
-			boxPositions,
-			sections.endOf,
-			preview,
-		],
-	);
-	// The selected node's reads, dotted, under the flow's edges.
-	const dataEdges = useDataLinks(
+	const { allEdges, groupOf } = useCanvasEdges({
+		flow,
+		sections,
+		routes,
+		counts,
+		selection,
+		preview,
 		view,
-		!preview && selection?.kind === "node" ? selection.id : null,
-		sections.endOf,
-	);
-	const allEdges = useMemo<CanvasEdge[]>(
-		() => (dataEdges.length > 0 ? [...dataEdges, ...edges] : edges),
-		[dataEdges, edges],
-	);
-	// A drawn edge carries every edge of its node pair, under its first id.
-	const groupOf = useMemo(
-		() => new Map(groups.map((group) => [group.id, group])),
-		[groups],
-	);
+	});
 
-	// Each drag is one gesture, from its first move to the drop.
-	const drags = useRef({ count: 0, active: false });
-
-	const onNodesChange = useCallback(
-		(changes: NodeChange<CanvasNode>[]) => {
-			applyDimensions(changes);
-			const sectionMoves = new Map<string, { x: number; y: number }>();
-			const moves: { id: string; position: { x: number; y: number } }[] = [];
-			let dragging: boolean | undefined;
-			for (const change of changes) {
-				if (change.type !== "position") continue;
-				dragging ||= change.dragging;
-				if (!change.position) continue;
-				const sectionId = sectionIdOf(change.id);
-				if (sectionId !== undefined)
-					sectionMoves.set(sectionId, change.position);
-				else moves.push({ id: change.id, position: change.position });
-			}
-			const removed = changes.flatMap((change) =>
-				change.type === "remove" && sectionIdOf(change.id) === undefined
-					? [change.id]
-					: [],
-			);
-			// A drag is one gesture, and so are moves with the arrow keys.
-			let gesture: string | undefined;
-			if (dragging !== undefined && removed.length === 0) {
-				if (dragging && !drags.current.active)
-					drags.current = { count: drags.current.count + 1, active: true };
-				gesture = drags.current.active
-					? `drag:${drags.current.count}`
-					: "nudge";
-				if (!dragging) drags.current.active = false;
-			}
-			if (moves.length > 0 || sectionMoves.size > 0 || removed.length > 0) {
-				onFlowChange((current) => {
-					let next = current;
-					// Dragging a box moves its nodes as one block, from where
-					// they are now.
-					const carried = new Set<string>();
-					for (const [sectionId, to] of sectionMoves) {
-						const found = next.sections?.find((s) => s.id === sectionId);
-						if (!found) continue;
-						// With the nodes of the Sections inside it.
-						const section = { ...found, nodes: nodesWithin(next, found) };
-						const delta = sectionDragDelta(next, section, to);
-						if (delta) next = moveSection(next, section, delta);
-						for (const id of section.nodes) carried.add(id);
-					}
-					if (moves.length > 0) {
-						const positions = new Map<string, { x: number; y: number }>();
-						for (const { id, position } of moves) {
-							if (!carried.has(id)) positions.set(id, position);
-						}
-						next = moveNodes(next, positions);
-					}
-					for (const id of removed) next = removeNode(next, id);
-					return next;
-				}, gesture);
-			}
-			const selects = changes.flatMap((change) =>
-				change.type === "select"
-					? [{ id: change.id, selected: change.selected }]
-					: [],
-			);
-			if (selects.length > 0) {
-				onSelect((current) => applyNodeSelection(current, selects));
-			}
-			if (removed.length > 0) {
-				const gone = new Set(removed);
-				onSelect((current) => withoutNodes(current, gone));
-			}
-		},
-		[applyDimensions, onFlowChange, onSelect],
-	);
-
-	// A box drawn with Shift selects the nodes in it. React Flow selects
-	// their edges too: the selection stays the nodes.
-	const boxSelecting = useRef(false);
-
-	const onEdgesChange = useCallback(
-		(all: EdgeChange<CanvasEdge>[]) => {
-			// A dotted line is no edge of the flow.
-			const changes = all.filter(
-				(change) => !("id" in change && isDataEdgeId(change.id)),
-			);
-			const ids = (id: string) =>
-				groupOf.get(id)?.edges.map((edge) => edge.id) ?? [id];
-			const selected = selection?.kind === "edge" ? selection.id : undefined;
-			// Delete removes the edge you selected in a drawn edge, or all of
-			// them when none is selected (its node went).
-			const removed = changes.flatMap((change) => {
-				if (change.type !== "remove") return [];
-				const inGroup = ids(change.id);
-				return selected && inGroup.includes(selected) ? [selected] : inGroup;
-			});
-			if (removed.length > 0) {
-				onFlowChange((current) =>
-					removed.reduce((next, id) => removeEdge(next, id), current),
-				);
-			}
-			for (const change of changes) {
-				if (change.type !== "select" && change.type !== "remove") continue;
-				if (change.type === "select" && boxSelecting.current) continue;
-				const inGroup = ids(change.id);
-				const isIn = (current: Selection) =>
-					current?.kind === "edge" && inGroup.includes(current.id);
-				onSelect((current) =>
-					change.type === "select" && change.selected
-						? isIn(current)
-							? current
-							: { kind: "edge", id: change.id }
-						: isIn(current)
-							? null
-							: current,
-				);
-			}
-		},
-		[groupOf, selection, onFlowChange, onSelect],
-	);
-
-	/** An edge dropped on a box leads to the node the Section starts at. */
-	const targetOf = useCallback(
-		(target: string): string | null => {
-			const sectionId = sectionIdOf(target);
-			if (sectionId === undefined) return target;
-			const section = flow.sections?.find((s) => s.id === sectionId);
-			return section
-				? sectionBoundary(flow, nodesWithin(flow, section)).entry
-				: null;
-		},
-		[flow],
-	);
-
-	const onConnect = useCallback(
-		(connection: Connection) => {
-			const target = targetOf(connection.target);
-			if (!connection.sourceHandle || !target) return;
-			const result = addEdge(
-				flow,
-				connection.source,
-				connection.sourceHandle as Outcome,
-				target,
-			);
-			if (!result) return;
-			onFlowChange(() => result.flow);
-			onSelect({ kind: "edge", id: result.id });
-		},
-		[flow, targetOf, onFlowChange, onSelect],
-	);
-
-	const isValidConnection = useCallback<IsValidConnection<CanvasEdge>>(
-		(connection) => {
-			const target = targetOf(connection.target);
-			if (!target || sectionIdOf(connection.source) !== undefined) return false;
-			return !flow.edges.some(
-				(edge) =>
-					edge.from === connection.source &&
-					edge.outcome === connection.sourceHandle &&
-					edge.to === target,
-			);
-		},
-		[flow.edges, targetOf],
-	);
-
-	// Every node moves at once, so the toast offers the old places back. Fit
-	// after React Flow has the new positions: a layout you cannot see looks
-	// like nothing happened. The layout picks the direction that shows the
-	// nodes biggest in the canvas the fit will show, less its padding.
-	const store = useStoreApi<CanvasNode, CanvasEdge>();
-	const laying = useRef(false);
-	const autoLayout = useCallback(async () => {
-		if (laying.current) return;
-		laying.current = true;
-		const before = new Map(flow.nodes.map((node) => [node.id, node.position]));
-		const routesBefore = routes;
-		const { width, height, nodeLookup } = store.getState();
-		const viewport = { width: width / 1.15, height: height / 1.15 };
-		try {
-			// A Section is one box: the layout lays its nodes out inside, and
-			// their top-left corner lands where it put the box.
-			const folded = sectionIds(flow);
-			const laid = await layoutFlow(flow, {
-				layout: await loadElk(),
-				sizes: measured,
-				...measuredHandles(nodeLookup),
-				folded,
-				viewport,
-			});
-			const at = new Map(
-				laid.flow.nodes.map((node) => [node.id, node.position]),
-			);
-			const laidGroups = groupEdges(laid.flow);
-			// Each route with the ends of the level that draws it: the boxes
-			// of the Sections it shows, also while another level is open.
-			const endsOf = (level: Flow) => sectionEnds(level, sectionIds(level));
-			const book = Object.assign(
-				{},
-				// Inside a Section, the routes hold once it opens.
-				...laid.inside.map((level) =>
-					recordRoutes(
-						laid.flow.nodes,
-						laidGroups,
-						level.routes,
-						endsOf(level.flow),
-					),
-				),
-				recordRoutes(
-					laid.flow.nodes,
-					laidGroups,
-					laid.routes,
-					endsOf(sectionLevel(flow, null)),
-				),
-			);
-			setRoutes(book);
-			writeRoutes(routesKey, book);
-			onFlowChange((current) => moveNodes(current, at));
-		} catch {
-			toast.error("Could not lay out the flow. Try again.");
-			return;
-		} finally {
-			laying.current = false;
-		}
-		requestAnimationFrame(() => void fitView({ ...fit, duration: 200 }));
-		toast.info("Laid out the flow.", {
-			action: {
-				label: "Undo",
-				onClick: () => {
-					setRoutes(routesBefore);
-					writeRoutes(routesKey, routesBefore);
-					onFlowChange((current) => moveNodes(current, before));
-				},
-			},
-		});
-	}, [flow, routes, routesKey, measured, onFlowChange, fitView, fit, store]);
+	const { onNodesChange } = useNodeChanges({
+		applyDimensions,
+		onFlowChange,
+		onSelect,
+	});
+	const { boxSelecting, onEdgesChange } = useEdgeChanges({
+		groupOf,
+		selection,
+		onFlowChange,
+		onSelect,
+	});
+	const { onConnect, isValidConnection } = useConnect({
+		flow,
+		onFlowChange,
+		onSelect,
+	});
+	const { autoLayout } = useAutoLayout({
+		flow,
+		routes,
+		setRoutes,
+		routesKey,
+		measured,
+		onFlowChange,
+		fitView,
+		fit,
+	});
 
 	const selectEdge = useCallback(
 		(id: string) => onSelect({ kind: "edge", id }),
