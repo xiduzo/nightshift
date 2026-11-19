@@ -43,7 +43,8 @@ below it, from the bottom up:
 | `scores/` | The pull request scores: what became of the pull request a run opened, written as Scores of that run (`pull-request-scores.ts`, `pull-request-watch.ts`). |
 | `schedules/` | The schedules of the projects, as a slice with rings (`docs/steering/STRUCTURE.md`, section 9). The rules are in `domain/`. Each request is one use case in `application/`. The store of the schedules in the flow document and the timer that fires them are in `adapters/`. `wire.ts` builds them (`wireSchedules`). |
 | `space-move/` | The Space move: Projects to another Space as one operation (`projects-move.ts`). |
-| `run/` | Run start (with the start on a Host in `relay-start.ts`), startup recovery, the answer to a Gate (`answer.ts`) and the move of a run (`move.ts`), the other end of a move (`take-over.ts`) and the wake when a Device is back (`wake.ts`). |
+| `runs/` | The run path as a slice with rings, one sub-vertical per part: who may see or act on a run (`access/`), what every use case that writes to a run shares (`walk/`), what a person does to a run (`actions/`), what Night Shift does to a run on its own (`recovery/`), and a run's start (`start/`: here, or handed to the Host that keeps the Space). |
+| `run/` | The answer to a Gate (`answer.ts`) and the move of a run (`move.ts`), and the other end of a move (`take-over.ts`). |
 | The top of `src/` | The composition root (`wire.ts`: `createEngine`, with a file for each piece of the run path, `wire-<what>.ts`), the `Engine` it returns (`engine.ts`), what it takes (`engine-options.ts`), the port of the other Devices it walks with (`peers.ts`), and what a person does in one Space (`space-engine.ts` is the interface, `space.ts` the module). The tests that start a whole engine are in `packages/engine/test/engine/`. |
 
 No import points up, `import type` included. `scripts/check-verticals.ts`
@@ -290,18 +291,17 @@ packages/engine/src/
   run/take-over.ts,        takeOver: the other end of a move. wake.ts: the
   wake.ts                  runs that slept for a Device that is back look
                            again.
-  run/run-start.ts         Run start. prepareRun loads and validates the
-                           flow and its called flows, resolves profiles and
-                           asks every requirement in REQUIREMENTS
+  runs/start/              Run start. The plan loads and validates the
+                           flow and its called flows and resolves profiles.
+                           The start asks every requirement in REQUIREMENTS
                            (placement/fit.ts: the shared connections check,
                            then each kind's own from its descriptor: CLI
                            tools defined and installed, harnesses, the
                            decider) whether each Device has what its nodes
-                           need; it writes nothing. createRunStart(deps).start
-                           is the start's Turn: with the slot held, it
-                           creates the worktree and the run row, appends
-                           RunStarted and WorktreeCreated, and the runner
-                           drives.
+                           need. startRunHere is the start's Turn: with the
+                           slot held, it creates the worktree, writes the
+                           run row and RunStarted in one batch, appends
+                           WorktreeCreated, and the runner drives.
   placement/               Placement: the run plan (run-plan.ts,
                            device-order.ts, over PlacementPort), the one fit
                            check (fit.ts), and the walk's reader of the plan
@@ -940,9 +940,9 @@ In a test run, `end()` also drops `kept`, `memory` and `shapes` from every
 step's `StepEnded`, and calls no `keepShapes`. The steps still read kept
 values and memory. The run plan places no stand-in (`placement/run-plan.ts`),
 and run start resolves each pin from the Walker's own log before the plan
-(`run/test-run.ts`). The pinned outputs hold at most 4 MiB of JSON
+(`runs/start/domain/test-run.ts`). The pinned outputs hold at most 4 MiB of JSON
 together, because every Replica keeps `RunStarted`. A Device that hands
-the start to its Host (`run/relay-start.ts`) checks the pins in its own log
+the start to its Host (`runs/start/application/start-run-on-host.ts`) checks the pins in its own log
 first, and sends them as refs on `sync.startTest`. The Host resolves them
 again from its own log. A pin whose run has not reached the Host yet says
 to try again in a moment.
@@ -1062,7 +1062,7 @@ The engine, not the flow, lets go of it.
 - The step runner gives a later step the live `log_tail` of each running
   service of its scope (`withServiceTails`). Run start refuses a plan that
   places a working step of a service's scope on another Device
-  (`run/service-devices.ts`).
+  (`runs/start/domain/service-devices.ts`).
 
 ## The node-kind descriptor (`graph/nodes/node-kinds.ts`)
 

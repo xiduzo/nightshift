@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentNode, Flow, FlowNode, ServiceNode } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
-import type { PlacedDevice, PlannedRun } from "../placement";
-import { checkServiceDevices } from "./service-devices";
+import {
+	checkServiceDevices,
+	type PlannedNodes,
+	type Works,
+} from "./service-devices";
 
 /** One Device per service, with the Devices a plan placed the steps on. */
 
@@ -30,16 +33,22 @@ const done: FlowNode = {
 	status: "done",
 };
 
-const device = (id: string, name: string) =>
-	({ id, name }) as unknown as PlacedDevice;
-const macbook = device("mac", "MacBook");
-const box = device("box", "hetzner-1");
+/** An Agent works in the worktree, a Service on its Device, an End on no computer (as the walk says). */
+const works: Works = (node) =>
+	node.type === "agent"
+		? "worktree"
+		: node.type === "service"
+			? "device"
+			: null;
+
+const macbook = { id: "mac", name: "MacBook" };
+const box = { id: "box", name: "hetzner-1" };
 
 function plan(
 	nodes: FlowNode[],
-	groups: [PlacedDevice, FlowNode[]][],
+	groups: [{ id: string; name: string }, FlowNode[]][],
 	sections: Flow["sections"] = undefined,
-): PlannedRun {
+): PlannedNodes {
 	const flow: Flow = {
 		version: FLOW_VERSION,
 		inputs: [],
@@ -53,7 +62,7 @@ function plan(
 		flow,
 		calledFlows: {},
 		groups: groups.map(([on, placed]) => ({ at: on, nodes: placed })),
-	} as unknown as PlannedRun;
+	};
 }
 
 describe("checkServiceDevices", () => {
@@ -68,6 +77,7 @@ describe("checkServiceDevices", () => {
 						[box, [fix]],
 					],
 				),
+				works,
 			),
 		).toThrow(
 			'The flow runs node "fix" on hetzner-1, but the service "stack" runs on MacBook. Every step while the service runs must run on its device. Place them on the same device.',
@@ -79,6 +89,7 @@ describe("checkServiceDevices", () => {
 		expect(() =>
 			checkServiceDevices(
 				plan([service, fix, done], [[box, [service, fix, done]]]),
+				works,
 			),
 		).not.toThrow();
 	});
@@ -95,6 +106,23 @@ describe("checkServiceDevices", () => {
 					],
 					[{ id: "tests", label: "Tests", nodes: ["stack", "done"] }],
 				),
+				works,
+			),
+		).not.toThrow();
+	});
+
+	test("given a node that needs no computer on another device, then run start goes on", () => {
+		const service = stack();
+		expect(() =>
+			checkServiceDevices(
+				plan(
+					[service, fix, done],
+					[
+						[box, [service, fix]],
+						[macbook, [done]],
+					],
+				),
+				works,
 			),
 		).not.toThrow();
 	});

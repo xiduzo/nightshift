@@ -1,5 +1,5 @@
 import { Refusal } from "@nightshift/refusal";
-import { type Actor, personOf } from "../../contract";
+import { type Actor, NIGHT_SHIFT, personOf } from "../../contract";
 import type { RunSummary } from "../../read";
 import { openRunOf, openRunRefusalWords } from "../domain/open-run";
 import { scheduleOf } from "../domain/saved-schedules";
@@ -14,7 +14,7 @@ import type {
 
 export type RunScheduleNowPorts = {
 	projects: Pick<ScheduledProjects, "inSpace">;
-	runs: Pick<ScheduledRuns, "shownTo" | "status" | "start">;
+	runs: Pick<ScheduledRuns, "mayStart" | "shownTo" | "status" | "start">;
 	store: Pick<ScheduleStore, "list">;
 	log: Pick<ScheduleLog, "histories" | "fired">;
 	clock: Clock;
@@ -32,6 +32,8 @@ export type RunScheduleNow = {
  * is now). The run is the schedule's Person's, else the actor's. A pause
  * tonight stays. It works with the scheduler switched off.
  *
+ * Refuses a Person who may not start runs in the Space, before anything
+ * else (`runs.mayStart`: not a Member, or a role that does not allow it).
  * Refuses (`not-found`) a project that is not in the Space and a schedule
  * that does not exist, (`invalid`) a schedule that starts no flow, and
  * (`conflict`) while an earlier run of the schedule is still open, as a
@@ -46,6 +48,7 @@ export const runScheduleNow =
 		const { projects, runs, store, log, clock } = ports;
 		const { spaceId, projectId, scheduleId } = request;
 
+		await runs.mayStart(actor ?? NIGHT_SHIFT, spaceId);
 		await projects.inSpace(projectId, spaceId);
 		// Asked before the start: who may see the paths of the run.
 		const shown = await runs.shownTo(spaceId, actor);

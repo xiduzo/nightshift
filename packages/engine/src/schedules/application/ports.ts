@@ -72,7 +72,7 @@ export type ScheduleLog = {
 
 /**
  * The runs a schedule starts, asks about and wakes.
- * @filledBy engine/run
+ * @filledBy engine/runs
  */
 export type ScheduledRuns = {
 	/**
@@ -81,6 +81,12 @@ export type ScheduledRuns = {
 	 * the start.
 	 */
 	start(input: StartRunInput, trigger: RunTrigger): Promise<RunSummary>;
+	/**
+	 * Refuses an actor who may not start runs in the Space: a Person who is
+	 * not a Member of it (`not-found`), or whose role does not allow it
+	 * (`RoleRefusal`). Night Shift itself may.
+	 */
+	mayStart(actor: Actor, spaceId: string): Promise<void>;
 	/** The run's status, or null when the log knows no such run. */
 	status(runId: string): Promise<RunStatus | null>;
 	/** Wakes the project's runs that wait for the signal. Returns how many woke. */

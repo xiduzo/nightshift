@@ -8,8 +8,18 @@ import {
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 
-import { kindOf } from "../graph";
-import type { PlannedRun } from "../placement";
+/** Where a node works: in the run's worktree, on a Device, or on no computer (`NodeKind.works` of the walk). */
+export type Works = (node: FlowNode) => "worktree" | "device" | null;
+
+/** A run's plan as the rules of the start read it: the flows, and each Device with the nodes placed on it. */
+export type PlannedNodes = {
+	flow: Flow;
+	calledFlows: Record<string, Flow>;
+	groups: readonly {
+		at: { id: string; name: string };
+		nodes: readonly FlowNode[];
+	}[];
+};
 
 /**
  * One Device per service (ADR 9), with the Devices the plan placed each
@@ -17,12 +27,12 @@ import type { PlannedRun } from "../placement";
  * on the service's Device. The validator catches what the flow alone
  * shows (a step that names another Device). This catches the rest: a
  * profile on another computer, a Subflow placed elsewhere. Throws the
- * refusal.
+ * refusal. `works` says which nodes need a computer.
  *
- * The scope of a service for the run is every node of the run's flows; a
+ * The scope of a service for the run is every node of the run's flows. A
  * Section scope is the Section's nodes, with the flows its Subflows call.
  */
-export function checkServiceDevices(planned: PlannedRun): void {
+export function checkServiceDevices(planned: PlannedNodes, works: Works): void {
 	const placedOn = new Map<FlowNode, Map<string, string>>();
 	for (const { at, nodes } of planned.groups) {
 		for (const node of nodes) {
@@ -43,7 +53,7 @@ export function checkServiceDevices(planned: PlannedRun): void {
 					? allNodes
 					: sectionNodes(flow, service, planned.calledFlows);
 			for (const node of scope) {
-				if (node === service || kindOf(node).works(node) === null) continue;
+				if (node === service || works(node) === null) continue;
 				for (const [id, name] of placedOn.get(node) ?? []) {
 					if (own.has(id)) continue;
 					const [serviceAt] = [...own.values()];

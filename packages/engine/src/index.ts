@@ -212,8 +212,9 @@ export {
 	runReading,
 	transcriptLines,
 } from "./read";
-export { GateClosedError, PinNotHereError, START_DEADLINE_MS } from "./run";
+export { GateClosedError } from "./run";
 export { createRunFolders, noRunFolders } from "./run-folders";
+export { PinNotHereError, START_DEADLINE_MS } from "./runs";
 export type {
 	ScheduleList,
 	ScheduleMissed,

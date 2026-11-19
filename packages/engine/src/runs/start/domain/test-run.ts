@@ -7,8 +7,7 @@ import {
 	standsIn,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import type { StartRunInput, TestRunRequest } from "../contract";
-import type { PinnedOutput, RunLog, RunTrigger, TestRun } from "../log";
+import type { StartRunInput, TestRunRequest } from "../../../contract";
 
 /**
  * A test run (ADR 27): a person's start of a saved flow with pins and
@@ -18,7 +17,7 @@ import type { PinnedOutput, RunLog, RunTrigger, TestRun } from "../log";
  *
  * Two checks, each with the words a person sees:
  *
- * - `resolveTestRun`, before the plan: each pin names a step of a run of
+ * - `resolvePins`, before the plan: each pin names a step of a run of
  *   the same project in the same Space, at the top level, for the same
  *   node, that ended, and that was not skipped itself. A pin of a pinned
  *   step pins the output it gave, from the step it came from. A pinned
@@ -45,6 +44,48 @@ export const TEST_RUN_FROM_EDITOR =
 	"A test run starts only from the editor of a saved flow.";
 
 /**
+ * The output a pinned node of a test run gives: the end of the step of an
+ * earlier run it comes from (`PinnedOutput` of the run log).
+ */
+export type PinnedOutput = {
+	runId: string;
+	stepId: string;
+	endedAt: number;
+	outcome: string;
+	outputs: Record<string, unknown>;
+};
+
+/** A test run's pins and skips, as its `RunStarted` records them (`TestRun` of the run log). */
+export type TestRunMarks<P extends PinnedOutput = PinnedOutput> = {
+	pinned: Record<string, P>;
+	skipped: Record<string, Outcome>;
+};
+
+/** A step of a pinned run, as the rule reads it from the run's state. */
+export type PinStep<P extends PinnedOutput = PinnedOutput> = {
+	id: string;
+	nodeId: string;
+	nodeType: FlowNodeType;
+	/** Null at the top level of the run, else the Subflow it ran in. */
+	scope: unknown;
+	endedAt: number | null;
+	outcome: P["outcome"] | null;
+	outputs: P["outputs"];
+	/** How the step stood in, in a test run. Absent: it ran. */
+	test?: "pinned" | "skipped" | null;
+};
+
+/** A run a pin names, as this Walker's log has it: its project and Space, and its state. */
+export type PinSource<P extends PinnedOutput = PinnedOutput> = {
+	run: { projectId: string; spaceId: string };
+	state: {
+		/** The run's own pins, when it was a test run. */
+		test: { pinned: Record<string, P> } | null;
+		steps: ReadonlyMap<string, PinStep<P>>;
+	};
+};
+
+/**
  * A pin whose output this Walker's log does not hold: no such run of the
  * project here, no such step, or a step that has not ended here. On a
  * Host, the Device that hands it the start found the output in its own
@@ -68,7 +109,7 @@ export class PinNotHereError extends Refusal {
  */
 export function refuseTestStart(
 	input: StartRunInput,
-	trigger: RunTrigger,
+	trigger: { kind: string },
 ): void {
 	if (
 		input.test !== undefined &&
@@ -82,9 +123,9 @@ export function refuseTestStart(
 const NEWER = "Pin a newer output.";
 
 /** A test run's pins and skips as this Walker resolved them. */
-export type ResolvedTestRun = {
+export type ResolvedTestRun<P extends PinnedOutput = PinnedOutput> = {
 	/** What `RunStarted.test` records. */
-	test: TestRun;
+	test: TestRunMarks<P>;
 	/** The node type of each pinned step, by node id. */
 	types: Record<string, FlowNodeType>;
 };
@@ -98,19 +139,20 @@ const jsonBytes = (value: unknown) =>
 	Buffer.byteLength(JSON.stringify(value), "utf8");
 
 /**
- * Resolves a test run's pins from this Walker's log, and checks each one
- * and each skip as far as the log can tell. Null when the start pins and
+ * Resolves a test run's pins, each from the run it names (`source`: this
+ * Walker's log, null for a run it does not have), and checks each one and
+ * each skip as far as the log can tell. Null when the start pins and
  * skips nothing: every node runs. Throws the refusal a person sees.
  */
-export async function resolveTestRun(
+export async function resolvePins<P extends PinnedOutput>(
 	request: TestRunRequest | undefined,
 	project: { id: string; spaceId: string },
-	log: Pick<RunLog, "row" | "state">,
-): Promise<ResolvedTestRun | null> {
+	source: (runId: string) => Promise<PinSource<P> | null>,
+): Promise<ResolvedTestRun<P> | null> {
 	const pins = Object.entries(request?.pinned ?? {});
 	const skipped = { ...request?.skipped };
 	if (pins.length === 0 && Object.keys(skipped).length === 0) return null;
-	const pinned: Record<string, PinnedOutput> = {};
+	const pinned: Record<string, P> = {};
 	const types: Record<string, FlowNodeType> = {};
 	let bytes = 0;
 	for (const [nodeId, ref] of pins) {
@@ -125,20 +167,16 @@ export async function resolveTestRun(
 			`Night Shift cannot find the output you pinned on "${nodeId}". ${NEWER}`,
 			nodeId,
 		);
-		const row = await log.row(ref.runId).catch((error: unknown) => {
-			if (error instanceof Refusal && error.kind === "not-found") return null;
-			throw error;
-		});
+		const found = await source(ref.runId);
 		// A run of another project or Space is as good as gone: its output stays there.
 		if (
-			row === null ||
-			row.spaceId !== project.spaceId ||
-			row.projectId !== project.id
+			found === null ||
+			found.run.spaceId !== project.spaceId ||
+			found.run.projectId !== project.id
 		) {
 			throw lost;
 		}
-		const source = await log.state(ref.runId);
-		const step = source.steps.get(ref.stepId);
+		const step = found.state.steps.get(ref.stepId);
 		if (!step) throw lost;
 		if (step.nodeId !== nodeId) {
 			throw new Refusal(
@@ -166,16 +204,16 @@ export async function resolveTestRun(
 			);
 		}
 		// A pinned step gave the output it was pinned to: pin that one.
-		const pin: PinnedOutput | undefined =
+		const pin: P | undefined =
 			step.test === "pinned"
-				? source.test?.pinned[nodeId]
-				: {
+				? found.state.test?.pinned[nodeId]
+				: ({
 						runId: ref.runId,
 						stepId: step.id,
 						endedAt: step.endedAt,
 						outcome: step.outcome,
 						outputs: step.outputs,
-					};
+					} as P);
 		if (!pin) throw lost;
 		const size = jsonBytes(pin.outputs);
 		if (size > PIN_MAX_BYTES) {
@@ -202,13 +240,13 @@ export async function resolveTestRun(
 export function checkTestRun(flow: Flow, resolved: ResolvedTestRun): void {
 	const { pinned, skipped } = resolved.test;
 	const nodeOf = (nodeId: string) => flow.nodes.find((n) => n.id === nodeId);
-	const marks: [string, "pinned" | "skipped", Outcome][] = [
+	const marks: [string, "pinned" | "skipped", string][] = [
 		...Object.entries(pinned).map(
-			([id, pin]) => [id, "pinned", pin.outcome] as [string, "pinned", Outcome],
+			([id, pin]) => [id, "pinned", pin.outcome] as [string, "pinned", string],
 		),
 		...Object.entries(skipped).map(
 			([id, outcome]) =>
-				[id, "skipped", outcome] as [string, "skipped", Outcome],
+				[id, "skipped", outcome] as [string, "skipped", string],
 		),
 	];
 	for (const [nodeId, mark, outcome] of marks) {
@@ -228,7 +266,7 @@ export function checkTestRun(flow: Flow, resolved: ResolvedTestRun): void {
 				`"${nodeId}" is ${/^[AEIOU]/.test(label) ? "an" : "a"} ${label} node. A test run always runs it, so you cannot pin or skip it.`,
 			);
 		}
-		const outcomes = standInOutcomes(node);
+		const outcomes: readonly string[] = standInOutcomes(node);
 		if (mark === "skipped") {
 			if (!outcomes.includes(outcome)) {
 				throw new Refusal(

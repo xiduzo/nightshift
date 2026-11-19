@@ -89,7 +89,7 @@ import { wireEngineWalk } from "./wire-walk";
  *   wakes, the Signal of a webhook, the stop of a run by Night Shift.
  * - `wire-views.ts` (R2): the read model (`read/read-model.ts`).
  * - `wire-start.ts` (R3): who walks a new run and its Run's Device, and the
- *   start itself: here (`run/run-start.ts`), or handed to the Host.
+ *   start itself: here, or handed to the Host (`runs/start/`).
  * - `wire-schedules.ts`: the schedules slice (`schedules/`), what it tells
  *   and who listens, and the pull request scores.
  * - `wire-actions.ts` (R4): what a person does to a run (`runs/actions/`).
@@ -504,12 +504,11 @@ export function createEngine(
 	});
 
 	// --- start (R3): `wire-start.ts` ---
-	// gives: start.places (schedules, the Space view)
+	// gives: start.places (schedules, the Space view), start.runs (the engine)
 	const start = wireEngineStart({
 		ready,
 		db,
 		log: runLog,
-		runner,
 		now,
 		projects,
 		devices,
@@ -518,7 +517,8 @@ export function createEngine(
 		selfName: device.name,
 		memberName: membersName,
 		listRuns: views.reads.listRuns,
-		holds: startHolds,
+		access,
+		walk,
 	});
 
 	// --- schedules and scores: `wire-schedules.ts` ---
@@ -534,6 +534,7 @@ export function createEngine(
 		runs: {
 			// start (R3)
 			start: start.places.startForSchedule,
+			mayStart: start.places.mayStart,
 			// views (R2)
 			status: views.reads.runStatus,
 			// recovery (R7)
@@ -673,9 +674,7 @@ export function createEngine(
 		// views (R2)
 		reads: views.reads,
 		// start (R3)
-		placement: devices,
-		placements: start.places.placements,
-		startRun: start.places.start,
+		start: start.places,
 		// actions (R4), move (R5), gates (R6)
 		actions: acts.actions,
 		// schedules
@@ -697,7 +696,7 @@ export function createEngine(
 		leases,
 		landed,
 		runner,
-		runs: { ...access.runs, ...acts.runs },
+		runs: { ...access.runs, ...acts.runs, ...start.runs },
 		// schedules and scores
 		scheduleNotices: sched.notices,
 		schedules: sched.schedules,

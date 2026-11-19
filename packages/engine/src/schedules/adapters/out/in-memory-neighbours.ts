@@ -56,6 +56,10 @@ export type InMemoryScheduledRuns = ScheduledRuns & {
 	}[];
 	/** Who asked to see runs, in order. */
 	shown: { spaceId: string; actor: Actor | undefined }[];
+	/** Who was asked whether they may start runs, in order. */
+	askedToStart: { actor: Actor; spaceId: string }[];
+	/** From now on `mayStart` throws this for an actor that is a Person. */
+	refuseStarts(error: unknown): void;
 	/** A run's status from now on. A started run is `running` until a test says otherwise. Null: the run is gone. */
 	setStatus(runId: string, status: RunStatus | null): void;
 	/** The next start throws this. */
@@ -74,10 +78,15 @@ export function inMemoryScheduledRuns(): InMemoryScheduledRuns {
 	let signalFailure: { error: unknown } | null = null;
 	let woken = 0;
 	let hidden = false;
+	let startRefusal: { error: unknown } | null = null;
 	const runs: InMemoryScheduledRuns = {
 		started: [],
 		signals: [],
 		shown: [],
+		askedToStart: [],
+		refuseStarts: (error) => {
+			startRefusal = { error };
+		},
 		setStatus: (runId, status) => {
 			statuses.set(runId, status);
 		},
@@ -94,6 +103,10 @@ export function inMemoryScheduledRuns(): InMemoryScheduledRuns {
 			hidden = true;
 		},
 
+		async mayStart(actor, spaceId) {
+			runs.askedToStart.push({ actor, spaceId });
+			if (startRefusal && "personId" in actor) throw startRefusal.error;
+		},
 		async start(input, trigger) {
 			if (startFailure) {
 				const { error } = startFailure;

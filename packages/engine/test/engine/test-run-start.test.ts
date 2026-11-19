@@ -5,137 +5,23 @@ import {
 	type CommandNode,
 	FLOW_VERSION,
 	type Flow,
-	type FlowNode,
 } from "@nightshift/flows";
-import type { StartRunInput } from "../contract";
-import type { Engine } from "../engine";
-import { seedFlows } from "../testing/seed-flows";
+import type { Engine } from "../../src/engine";
+import { seedFlows } from "../../src/testing/seed-flows";
 import {
 	createSandbox,
 	type Sandbox,
 	waitFor,
 	withDevice,
-} from "../testing/test-support";
-import type { UsageMoment } from "../usage";
-import { createEngine } from "../wire";
-import {
-	createRunStart,
-	quickRunTitle,
-	type RunStartDeps,
-	START_TOO_LONG,
-} from "./run-start";
-import { TEST_RUN_FROM_EDITOR } from "./test-run";
+} from "../../src/testing/test-support";
+import type { UsageMoment } from "../../src/usage";
+import { createEngine } from "../../src/wire";
 
 /**
- * Run start's own rules: the title of a quick run, the deadline of a
- * start, and who may start a test run. The requirements a Device must
- * meet are Placement's (`placement/fit.test.ts`). The whole start path
- * (worktree, run row, `RunStarted`) is covered by engine.test.ts through
- * the public interface, and so is a test run's here.
+ * A test run's start through a whole engine (ADR 27): a pinned Agent
+ * stands in on a computer without its harness, and its output reaches the
+ * next step. The rules of the start are `runs/start/` (on twins).
  */
-
-const node = (fields: Record<string, unknown>): FlowNode =>
-	fields as unknown as FlowNode;
-
-const agent = (id: string, fields: Record<string, unknown> = {}) =>
-	node({ id, type: "agent", prompt: "work", ...fields }) as AgentNode;
-
-describe("quickRunTitle", () => {
-	const flow = (nodes: FlowNode[]): Flow =>
-		({
-			version: 2,
-			start: nodes[0]?.id ?? "a",
-			nodes,
-			edges: [],
-		}) as unknown as Flow;
-
-	test("is the first Agent prompt, whitespace folded", () => {
-		expect(
-			quickRunTitle(flow([agent("a", { prompt: "  fix\n the   bug " })])),
-		).toBe("fix the bug");
-	});
-
-	test("falls back when no Agent node has a prompt", () => {
-		expect(quickRunTitle(flow([node({ id: "c", type: "command" })]))).toBe(
-			"Quick run",
-		);
-	});
-
-	test("cuts a long prompt at 80 characters with an ellipsis", () => {
-		const title = quickRunTitle(
-			flow([agent("a", { prompt: "x".repeat(100) })]),
-		);
-		expect(title).toHaveLength(80);
-		expect(title.endsWith("…")).toBe(true);
-	});
-});
-
-describe("a start that hangs", () => {
-	test("is refused after its deadline, and writes nothing after that", async () => {
-		let settled = false;
-		let release = () => {};
-		const deps = {
-			startDeadlineMs: 20,
-			// The runner frees the start's slot when its prepare settles.
-			runner: {
-				take: async (_runId: string, turn: { prepare(): Promise<unknown> }) => {
-					try {
-						await turn.prepare();
-					} finally {
-						settled = true;
-					}
-				},
-			},
-			projectRow: async () => ({ id: "p1", spaceId: "s1" }),
-			// The Device never answers: the plan waits until the test ends it.
-			plan: () =>
-				new Promise((_, reject) => {
-					release = () => reject(new Error("released"));
-				}),
-		} as unknown as RunStartDeps;
-		const start = createRunStart(deps).start(
-			{ projectId: "p1", flowName: "nightly" },
-			{ kind: "manual" },
-		);
-		await expect(start).rejects.toThrow(START_TOO_LONG);
-		expect(settled).toBe(true);
-		release();
-	});
-});
-
-describe("a test run's start", () => {
-	/** A start with pins and skips: only a person's start of a saved flow takes them. */
-	const testStart = (input: Record<string, unknown>) =>
-		({
-			projectId: "p1",
-			test: { skipped: { check: "pass" } },
-			...input,
-		}) as unknown as StartRunInput;
-	const deps = {
-		runner: {
-			take: async (_runId: string, turn: { prepare(): Promise<unknown> }) => {
-				await turn.prepare();
-			},
-		},
-		projectRow: async () => {
-			throw new Error("A refused start asks for no project.");
-		},
-	} as unknown as RunStartDeps;
-
-	test("is refused for a schedule, a webhook and a quick run", async () => {
-		const { start } = createRunStart(deps);
-		const at = 1_000;
-		for (const [input, trigger] of [
-			[{ flowName: "watch" }, { kind: "schedule", scheduleId: "s", at }],
-			[{ flowName: "watch" }, { kind: "webhook", scheduleId: "s", at }],
-			[{ flow: { version: FLOW_VERSION } }, { kind: "manual" }],
-		] as const) {
-			await expect(start(testStart(input), trigger)).rejects.toThrow(
-				TEST_RUN_FROM_EDITOR,
-			);
-		}
-	});
-});
 
 describe("a test run that pins an Agent", () => {
 	let sandbox: Sandbox;

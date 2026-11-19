@@ -3,7 +3,7 @@ import { fakeHarness } from "@nightshift/agents/testing";
 import { device, event, user } from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Engine } from "../../src/engine";
 import { parseEventRow } from "../../src/log/run-log/append";
 import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
@@ -24,8 +24,9 @@ import {
 import { createEngine } from "../../src/wire";
 
 /**
- * Members: the Person who started a run, their git identity in its
- * worktree, and the audit of a Space's Members in its event log.
+ * Members: the Person who started a run, and their git identity in its
+ * worktree. A run without a Person is the owner's (`runs/start/application/start-run-here.test.ts`).
+ * The audit of a Space's Members is `log/space-facts/member-events.test.ts`.
  */
 
 let sandbox: Sandbox;
@@ -179,68 +180,5 @@ describe("who started a run", () => {
 		expect(started.startedBy?.id).toBe(local);
 		expect(await worktreeConfig(started.worktreePath, "user.email")).toBe("");
 		expect(await worktreeConfig(started.worktreePath, "user.name")).toBe("");
-	});
-
-	test("a run started without a Person is the run of this computer's owner", async () => {
-		const engine = makeEngine();
-		const { started } = await startAndWait(engine);
-		expect(started.startedBy?.id).toBe(await localPersonId());
-	});
-});
-
-describe("the audit of Members", () => {
-	test("joined, new role and removed go in the Space's log, with who did it", async () => {
-		const engine = makeEngine();
-		const carol = await person("Carol", "carol@example.com");
-		const ada = await localPersonId();
-		const spaceId = sandbox.spaceId;
-
-		await engine.logMemberChange({
-			kind: "joined",
-			spaceId,
-			personId: carol,
-			role: "member",
-			by: carol,
-			invitedBy: ada,
-		});
-		await engine.logMemberChange({
-			kind: "role",
-			spaceId,
-			personId: carol,
-			role: "viewer",
-			previousRole: "member",
-			by: ada,
-		});
-		await engine.logMemberChange({
-			kind: "removed",
-			spaceId,
-			personId: carol,
-			by: ada,
-		});
-
-		const rows = await sandbox.db
-			.select()
-			.from(event)
-			.where(and(eq(event.spaceId, spaceId), isNull(event.runId)));
-		const facts = rows
-			.map(parseEventRow)
-			.filter((e) => e.type.startsWith("Member"))
-			.map((e) => ({ type: e.type, payload: e.payload }));
-		expect(facts).toEqual([
-			{
-				type: "MemberJoined",
-				payload: { personId: carol, role: "member", by: carol, invitedBy: ada },
-			},
-			{
-				type: "MemberRoleChanged",
-				payload: {
-					personId: carol,
-					role: "viewer",
-					previousRole: "member",
-					by: ada,
-				},
-			},
-			{ type: "MemberRemoved", payload: { personId: carol, by: ada } },
-		]);
 	});
 });

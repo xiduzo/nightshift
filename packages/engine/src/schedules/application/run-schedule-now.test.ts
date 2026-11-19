@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { atLocal } from "@nightshift/time/testing";
-import type { Actor } from "../../contract";
+import { type Actor, NIGHT_SHIFT } from "../../contract";
 import { inMemorySchedulePorts } from "../adapters/out/in-memory-neighbours";
 import { createScheduleWatch } from "../domain/schedule-watch";
 import { fireDueSchedules } from "./fire-due-schedules";
@@ -203,6 +203,38 @@ describe("Run now", () => {
 		ports.runs.failNextStart(cap);
 		expect(await refusalOf(runNow("nightly"))).toBe(cap);
 		expect(ports.log.facts.schedule).toEqual([]);
+	});
+
+	test("asks whether the person may start runs in the Space, before it reads anything", async () => {
+		const { ports, runNow, runNowAsNobody } = project([nightly()]);
+		ports.runs.refuseStarts(new Refusal("forbidden", "Your role cannot."));
+		expect(await refusalOf(runNow("nightly"))).toMatchObject({
+			kind: "forbidden",
+			message: "Your role cannot.",
+		});
+		expect(ports.runs.askedToStart).toEqual([{ actor: ANN, spaceId: SPACE }]);
+		expect(ports.runs.shown).toEqual([]);
+		expect(ports.runs.started).toEqual([]);
+		expect(ports.log.facts.schedule).toEqual([]);
+
+		// A caller in this process acts as Night Shift: no role applies.
+		await runNowAsNobody("nightly");
+		expect(ports.runs.askedToStart[1]).toEqual({
+			actor: NIGHT_SHIFT,
+			spaceId: SPACE,
+		});
+		expect(ports.runs.started).toHaveLength(1);
+	});
+
+	test("asks the role before it looks for the project", async () => {
+		const { ports, runNowIn } = project([nightly()]);
+		ports.runs.refuseStarts(new Refusal("not-found", "No such Space."));
+		expect(await refusalOf(runNowIn("space-2"))).toMatchObject({
+			message: "No such Space.",
+		});
+		expect(ports.runs.askedToStart).toEqual([
+			{ actor: ANN, spaceId: "space-2" },
+		]);
 	});
 
 	test("works while the scheduler is switched off", async () => {

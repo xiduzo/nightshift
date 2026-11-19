@@ -3,13 +3,12 @@ import { Refusal } from "@nightshift/refusal";
 import type { ArtifactStore } from "./artifacts";
 import type { AnswerCost } from "./assistant";
 import type { RunFilesService } from "./cleanup";
-import { NIGHT_SHIFT, type PersonActor, type StartRunInput } from "./contract";
+import { NIGHT_SHIFT, type PersonActor } from "./contract";
 import type { SpaceFlows } from "./flows";
 import type { Runner } from "./graph";
-import { type RunLog, type RunRow, type RunTrigger, scopeKey } from "./log";
+import { type RunLog, type RunRow, scopeKey } from "./log";
 import type { MemoryFlow, NodeMemory } from "./memory";
 import type { WithPaths } from "./peers";
-import type { PlacementPort } from "./placement";
 import {
 	type Branches,
 	type ListedProject,
@@ -19,9 +18,9 @@ import {
 	setSpaceUsage,
 	toProject,
 } from "./projects";
-import type { ReadModel, RunStreamItem, RunSummary } from "./read";
-import type { MovePath, StartPlaces } from "./run";
-import type { Access, Actions } from "./runs";
+import type { ReadModel, RunStreamItem } from "./read";
+import type { MovePath } from "./run";
+import type { Access, Actions, Start } from "./runs";
 import type { Schedules } from "./schedules";
 import { readServiceLog } from "./services";
 import type { SpaceEngine } from "./space-engine";
@@ -86,14 +85,8 @@ export type SpacesDeps = {
 	reads: ReadModel;
 
 	// --- start (R3) ---
-	placement: Pick<PlacementPort, "devicesFor">;
-	/** The Devices a run of the project can run on, the default marked (`start-place.ts`). */
-	placements: StartPlaces["placements"];
-	/**
-	 * Starts a run where its start place says (`start-place.ts`): here, or
-	 * on the Host that keeps the Space.
-	 */
-	startRun(input: StartRunInput, trigger: RunTrigger): Promise<RunSummary>;
+	/** A run's start, and the Devices a person chooses from (`runs/start`): each use case checks the Space itself. */
+	start: Pick<Start, "startRun" | "listPlacements" | "listDevices">;
 
 	// --- actions (R4), move (R5), gates (R6) ---
 	/**
@@ -401,28 +394,30 @@ export function createSpaces(deps: SpacesDeps) {
 			// --- start (R3) ---
 			async listDevices(projectId, forNode) {
 				await ready;
-				if (!actor) {
-					throw new Refusal("signed-out", "Sign in to see your devices.");
-				}
-				return deps.placement.devicesFor(
+				return deps.start.listDevices(actor ?? NIGHT_SHIFT, {
 					spaceId,
-					actor.personId,
 					projectId,
-					forNode,
-				);
+					...(forNode !== undefined ? { forNode } : {}),
+				});
 			},
 
 			async listPlacements(projectId) {
 				await ready;
-				if (!actor) throw new Refusal("signed-out", "Sign in to start a run.");
-				return deps.placements(spaceId, actor.personId, projectId);
+				return deps.start.listPlacements(actor ?? NIGHT_SHIFT, {
+					spaceId,
+					projectId,
+				});
 			},
 
-			async startRun(input: StartRunInput) {
+			async startRun(input) {
 				await ready;
-				await projects.find(input.projectId, spaceId);
-				return (await deps.pathsFor(spaceId, actor))(
-					await deps.startRun(input, { kind: "manual" }),
+				// Asked before the start: who may see the paths of the run.
+				const shown = await deps.pathsFor(spaceId, actor);
+				return shown(
+					await deps.start.startRun(actor ?? NIGHT_SHIFT, {
+						...input,
+						spaceId,
+					}),
 				);
 			},
 
