@@ -130,7 +130,6 @@ export function inMemoryGatePorts(
 	options: { reachable?: boolean; now?: number } = {},
 ) {
 	const access = inMemoryAccessPorts(THIS_COMPUTER);
-	access.members.space(SPACE);
 	access.members.join(SPACE, ADA.personId, "member");
 	access.members.join(SPACE, VIC.personId, "viewer");
 	const states = new Map<string, RunState>();

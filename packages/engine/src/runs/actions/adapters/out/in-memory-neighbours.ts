@@ -39,7 +39,6 @@ export function stateOf(fields: Partial<RunState>): RunState {
  */
 export function inMemoryActionPorts(options: { reachable?: boolean } = {}) {
 	const access = inMemoryAccessPorts(THIS_COMPUTER);
-	access.members.space(SPACE);
 	access.members.join(SPACE, ADA.personId, "member");
 	access.members.join(SPACE, VIC.personId, "viewer");
 	const states = new Map<string, RunState>();

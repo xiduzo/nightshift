@@ -1,9 +1,4 @@
-import {
-	type Permissions,
-	roleAllows,
-	roleIn,
-	spacesOf,
-} from "@nightshift/auth";
+import { type Permissions, roleAllows, roleIn } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { SpaceMembers } from "../../application/ports";
 
@@ -41,14 +36,6 @@ export function authSpaceMembers(deps: AuthSpaceMembersDeps): SpaceMembers {
 					: await roleIn(deps.db, person.personId, spaceId);
 			if (!role) return "not-a-member";
 			return allows(role, need) ? "yes" : "no";
-		},
-		async spacesOf(person, need) {
-			const spaces = await spacesOf(deps.db, person.personId);
-			return spaces.map((space) => ({
-				id: space.id,
-				name: space.name,
-				allowed: allows(space.role, need),
-			}));
 		},
 	};
 }

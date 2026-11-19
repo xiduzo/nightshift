@@ -18,8 +18,6 @@ import { spaceMembersContract } from "./space-members.contract";
 
 spaceMembersContract("in memory", async () => {
 	const members = inMemorySpaceMembers();
-	members.space("space-platform", "Platform");
-	members.space("space-research", "Research");
 	return {
 		members,
 		space: { id: "space-platform", name: "Platform" },

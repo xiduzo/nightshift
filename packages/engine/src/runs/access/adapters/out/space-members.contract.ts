@@ -126,28 +126,5 @@ export function spaceMembersContract(
 			expect(await under.members.may(S, adaByCommand, ANSWER)).toBe("yes");
 			expect(await under.members.may(S, ada, ANSWER)).toBe("not-a-member");
 		});
-
-		test("spacesOf lists the Spaces of the Person, and what their role allows in each", async () => {
-			await under.join(S, "person-ada", "viewer");
-			await under.join(under.otherSpace.id, "person-ada", "member");
-			await under.join(S, "person-bob", "owner");
-			const spaces = await under.members.spacesOf(ada, ANSWER);
-			expect([...spaces].sort((a, b) => a.id.localeCompare(b.id))).toEqual(
-				[
-					{ id: S, name: under.space.name, allowed: false },
-					{
-						id: under.otherSpace.id,
-						name: under.otherSpace.name,
-						allowed: true,
-					},
-				].sort((a, b) => a.id.localeCompare(b.id)),
-			);
-			expect(
-				await under.members.spacesOf(
-					{ personId: "person-nobody", door: "session" },
-					{},
-				),
-			).toEqual([]);
-		});
 	});
 }
