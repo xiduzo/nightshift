@@ -85,10 +85,32 @@ function cost(run: () => void, times: number): number {
 	return workedMs() - started;
 }
 
+/** A measurement of `small` below this many ms is too small to mean something. */
+const FLOOR_MS = 8;
+
 /**
- * What `times` calls of `small` and of `large` cost. It measures the two
- * in turns, five times, and keeps the lowest of each. A disturbance only
- * adds to a measurement, so the lowest one is the nearest to the cost.
+ * The lowest of five rounds of `calls` calls of `small` and of `large`,
+ * measured in turns. A disturbance only adds to a measurement, so the
+ * lowest one is the nearest to the cost.
+ */
+function lowest(
+	small: () => void,
+	large: () => void,
+	calls: number,
+): { smallMs: number; largeMs: number } {
+	let smallMs = Number.POSITIVE_INFINITY;
+	let largeMs = Number.POSITIVE_INFINITY;
+	for (let round = 0; round < 5; round++) {
+		smallMs = Math.min(smallMs, cost(small, calls));
+		largeMs = Math.min(largeMs, cost(large, calls));
+	}
+	return { smallMs, largeMs };
+}
+
+/**
+ * What the same number of calls of `small` and of `large` cost. It starts
+ * at `times` calls and doubles them until `small` costs twice the floor. A
+ * fast machine does more calls, so the measurement always means something.
  */
 function costs(
 	small: () => void,
@@ -97,13 +119,13 @@ function costs(
 ): { smallMs: number; largeMs: number } {
 	small();
 	large();
-	let smallMs = Number.POSITIVE_INFINITY;
-	let largeMs = Number.POSITIVE_INFINITY;
-	for (let round = 0; round < 5; round++) {
-		smallMs = Math.min(smallMs, cost(small, times));
-		largeMs = Math.min(largeMs, cost(large, times));
+	let calls = times;
+	let measured = lowest(small, large, calls);
+	while (measured.smallMs < FLOOR_MS * 2 && calls < 1_000_000) {
+		calls *= 2;
+		measured = lowest(small, large, calls);
 	}
-	return { smallMs, largeMs };
+	return measured;
 }
 
 /**
@@ -114,7 +136,7 @@ function expectLinear(
 	{ smallMs, largeMs }: { smallMs: number; largeMs: number },
 	factor: number,
 ): void {
-	expect(smallMs).toBeGreaterThan(8);
+	expect(smallMs).toBeGreaterThan(FLOOR_MS);
 	expect(largeMs).toBeLessThan(smallMs * factor * 1.9 + 15);
 }
 
