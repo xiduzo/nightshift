@@ -1,0 +1,32 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import type { {{{port}}} } from "../../application/ports";
+
+/** One adapter of `{{{port}}}` to test. */
+export type {{{port}}}UnderTest = {
+	{{{portCamel}}}: {{{port}}};
+	close(): Promise<void>;
+};
+
+/**
+ * What every adapter of `{{{port}}}` does.
+ * `{{{portKebab}}}.contract.test.ts` runs it on the in-memory adapter and
+ * on the real one.
+ */
+export function {{{portCamel}}}Contract(
+	name: string,
+	make: () => Promise<{{{port}}}UnderTest>,
+): void {
+	describe(`{{{port}}} contract: ${name}`, () => {
+		let under: {{{port}}}UnderTest;
+		beforeEach(async () => {
+			under = await make();
+		});
+		afterEach(async () => {
+			await under.close();
+		});
+
+		test("an unknown id is null", async () => {
+			expect(await under.{{{portCamel}}}.find("nobody-has-it")).toBeNull();
+		});
+	});
+}

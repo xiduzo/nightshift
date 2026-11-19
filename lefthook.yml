@@ -125,6 +125,8 @@ pre-commit:
         - "scripts/capabilities.ts"
         - "scripts/capability-debt.txt"
         - "scripts/test-workspaces*.ts"
+        - "scripts/generators.test.ts"
+        - "turbo/generators/**"
       # Some tests read the whole repository. On a busy computer they take
       # longer than the 5 seconds a test gets by default.
       run: bun test --timeout 60000 ./scripts/

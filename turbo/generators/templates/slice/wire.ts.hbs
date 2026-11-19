@@ -1,0 +1,24 @@
+import type { {{{slicePascal}}}Access } from "./application/ports";
+
+/**
+ * The wiring of {{{slice}}}: the one place that builds its real adapters
+ * and binds each use case to its ports.
+ */
+
+/** What the package gives {{{slice}}}: the ports another slice fills, and what the real adapters stand on. */
+export type {{{slicePascal}}}Deps = {
+	/** Who may act in a Space (`openSpace` of the engine's `runs`). */
+	access: {{{slicePascal}}}Access;
+};
+
+/** The use cases of {{{slice}}}, bound to their ports. */
+export type {{{slicePascal}}} = {
+};
+
+export function wire{{{slicePascal}}}(deps: {{{slicePascal}}}Deps): {{{slicePascal}}} {
+	const ports = {
+		access: deps.access,
+	};
+	return {
+	};
+}

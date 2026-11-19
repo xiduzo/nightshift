@@ -1,0 +1,21 @@
+import type { Actor } from "{{{actorFromApplication}}}";
+import type { {{{slicePascal}}}Access } from "./ports";
+
+export type {{{useCasePascal}}}Ports = {
+	access: Pick<{{{slicePascal}}}Access, "openSpace">;
+};
+
+/** Which Space the request is for. */
+export type {{{useCasePascal}}} = { spaceId: string };
+
+/**
+ * {{{useCaseAbout}}}
+ *
+ * Refuses an actor who may not act in the Space, before anything else
+ * (`access.openSpace` throws the `Refusal`).
+ */
+export const {{{useCaseCamel}}} =
+	(ports: {{{useCasePascal}}}Ports) =>
+	async (actor: Actor, request: {{{useCasePascal}}}): Promise<void> => {
+		await ports.access.openSpace(actor, { spaceId: request.spaceId });
+	};

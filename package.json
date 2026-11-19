@@ -52,6 +52,7 @@
 	"scripts": {
 		"dev": "turbo run dev --filter='!insights'",
 		"night": "bun scripts/night.ts",
+		"gen": "turbo gen",
 		"docs:reference": "bun apps/server/scripts/docs-reference.ts",
 		"icons": "bun scripts/icons.ts",
 		"build": "turbo run build --filter='!desktop' && turbo run build -F desktop",
@@ -86,6 +87,7 @@
 		"@nightshift/config": "workspace:*",
 		"@resvg/resvg-js": "^2.6.2",
 		"@swc/core": "^1.16.22",
+		"@turbo/gen": "^2.11.11",
 		"@types/bun": "catalog:",
 		"@typescript/typescript6": "catalog:",
 		"dependency-cruiser": "^18.8.0",

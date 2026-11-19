@@ -1,0 +1,14 @@
+import type { {{{port}}} } from "../../application/ports";
+
+/**
+ * `{{{port}}}` over {{{tech}}}. It finds no record yet: read it here, and
+ * take what the adapter stands on (a database, a folder) as an argument.
+ * `wire{{{slicePascal}}}` builds it.
+ */
+export function {{{real}}}(): {{{port}}} {
+	return {
+		async find() {
+			return null;
+		},
+	};
+}

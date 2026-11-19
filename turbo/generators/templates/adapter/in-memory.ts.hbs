@@ -1,0 +1,21 @@
+import type { {{{port}}} } from "../../application/ports";
+
+/**
+ * `{{{port}}}` in memory. A test adds a record (`add`) where the real
+ * adapter would find one.
+ */
+export function inMemory{{{port}}}() {
+	const records = new Map<string, { id: string }>();
+	const twin = {
+		/** Adds a record, as the real adapter would find it. */
+		add(record: { id: string }) {
+			records.set(record.id, record);
+		},
+		async find(id: string) {
+			return records.get(id) ?? null;
+		},
+	};
+	return twin satisfies {{{port}}};
+}
+
+export type InMemory{{{port}}} = ReturnType<typeof inMemory{{{port}}}>;

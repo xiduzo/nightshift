@@ -58,6 +58,9 @@ export const EXAMPLES: Record<string, string> = {
 	"examples/starters": "an old name, named as history",
 	// AGENTS.md: the block that turbo writes names a file of its package.
 	"docs/README.md": "a file of the turbo package",
+	// The same block: `require.resolve('turbo/package.json')`. The folder
+	// `turbo/` of the repository holds the generators, so the check reads it.
+	"turbo/package.json": "a file of the turbo package",
 };
 
 const ROOT_DOCS = ["README.md", "CONTRIBUTING.md", "AGENTS.md", "SECURITY.md"];
