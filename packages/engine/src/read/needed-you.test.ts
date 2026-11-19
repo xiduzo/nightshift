@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { runEvents as log } from "../testing/run-events";
 import { neededYouOf } from "./needed-you";
-import { runFacts } from "./read-model";
+import { runFacts } from "./run-summary";
 
 /*
  * Needed you: only what a person did to a run counts. Each test builds a

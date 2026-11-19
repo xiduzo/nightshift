@@ -12,14 +12,9 @@ import {
 	spaceOfRun,
 } from "./log";
 import { forgetSpaceRows, type SpaceDocuments, spaceUsageOn } from "./projects";
-import {
-	type LandedFact,
-	landedFacts,
-	type ReadModel,
-	type RunHere,
-	type RunTrace,
-} from "./read";
+import { type LandedFact, landedFacts, type RunTrace } from "./read";
 import type { createScheduleNotices } from "./run";
+import type { RunHere, Views } from "./runs";
 import type {
 	ScheduleMissed,
 	Schedules,
@@ -33,6 +28,7 @@ import type { wireEngineAccess } from "./wire-access";
 import type { wireEngineActions } from "./wire-actions";
 import type { wireEngineMove } from "./wire-move";
 import type { wireEngineStart } from "./wire-start";
+import type { wireEngineViews } from "./wire-views";
 
 /**
  * The engine as its callers hold it: the `Engine` interface, the knobs of
@@ -205,12 +201,17 @@ export interface Engine {
  * own (`runs` of its `wire-*.ts` file): access gives `open`, the actions
  * give `act`, `stop`, `resume`, `restartStep`, `rerun`, `signal`,
  * `releaseLease`, `markUseful` and `takeOver`, the start gives `start`, the
- * move gives `move` and `moveTargets`.
+ * move gives `move` and `moveTargets`, the views give `list`, `get`, `step`,
+ * `stepTranscript` and `watch`.
  */
 export type RunUseCases = ReturnType<typeof wireEngineAccess>["runs"] &
 	ReturnType<typeof wireEngineActions>["runs"] &
 	ReturnType<typeof wireEngineStart>["runs"] &
-	ReturnType<typeof wireEngineMove>["runs"];
+	ReturnType<typeof wireEngineMove>["runs"] &
+	ReturnType<typeof wireEngineViews>["runs"];
+
+/** The reads of `Engine.runs` (`wire-views.ts`). */
+type ViewRuns = ReturnType<typeof wireEngineViews>["runs"];
 
 /** Knobs for tests only. Not part of the engine contract. */
 export type EngineInternals = {
@@ -263,8 +264,8 @@ export type EngineParts = {
 	leases: Pick<ReturnType<typeof createLeaseKeeper>, "renewAll">;
 	landed: Pick<ReturnType<typeof createLandedFeed>, "subscribe" | "close">;
 	runner: Pick<Runner, "release">;
-	/** The run use cases (`Engine.runs`), before the engine is ready. */
-	runs: RunUseCases;
+	/** The run use cases (`Engine.runs`) of the blocks but the views, before the engine is ready. */
+	runs: Omit<RunUseCases, keyof ViewRuns>;
 
 	// --- schedules and scores (`wire-schedules.ts`) ---
 	scheduleNotices: Pick<
@@ -275,7 +276,7 @@ export type EngineParts = {
 	pullRequestWatch: Pick<ReturnType<typeof createPullRequestWatch>, "score">;
 
 	// --- views (R2, `wire-views.ts`) ---
-	reads: Pick<ReadModel, "runHere" | "trace">;
+	views: { cases: Pick<Views, "readRunHere" | "readRunTrace">; runs: ViewRuns };
 
 	// --- recovery (R7, `wire-recovery.ts`) ---
 	/** The runs here that wait for a lease ask again. It does not wait, and it never throws. */
@@ -307,7 +308,7 @@ export function engineOf(parts: EngineParts): Engine {
 		scheduleNotices,
 		schedules,
 		pullRequestWatch,
-		reads,
+		views,
 	} = parts;
 
 	return {
@@ -373,11 +374,11 @@ export function engineOf(parts: EngineParts): Engine {
 		// --- views (R2) ---
 		async runHere(runId) {
 			await ready;
-			return reads.runHere(runId);
+			return views.cases.readRunHere({ runId });
 		},
 		async runTrace(runId) {
 			await ready;
-			return reads.trace(runId);
+			return views.cases.readRunTrace({ runId });
 		},
 
 		// --- recovery (R7) ---
@@ -387,7 +388,7 @@ export function engineOf(parts: EngineParts): Engine {
 		},
 
 		// --- the run use cases: each waits for the engine to be ready ---
-		runs: whenReady(ready, parts.runs),
+		runs: whenReady(ready, { ...parts.runs, ...views.runs }),
 
 		// --- the end of the engine ---
 		async dispose() {

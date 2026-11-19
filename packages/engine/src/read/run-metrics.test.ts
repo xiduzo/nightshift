@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { type EnginePayloads, foldRun, NO_COST } from "../log";
 import { runEvents as log } from "../testing/run-events";
-import { runFacts } from "./read-model";
 import {
 	costBasis,
 	pullRequestOf,
 	runMetrics,
 	stepMetrics,
 } from "./run-metrics";
+import { runFacts } from "./run-summary";
 import { deriveSteps, sumCost } from "./run-views";
 
 /** A finished session's usage and cost, unless `extra` says otherwise. */

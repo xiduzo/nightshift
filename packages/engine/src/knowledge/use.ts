@@ -2,6 +2,7 @@ import type { KnowledgeUseHit } from "@nightshift/agents/tools";
 import type { Database } from "@nightshift/db";
 import { now as timeNow } from "@nightshift/time";
 import { type KnowledgeUseFact, knowledgeUseEvents } from "../log";
+import type { StepSource } from "../read";
 import { questionKey } from "./questions";
 
 /**
@@ -65,20 +66,6 @@ export async function askedQuestions(
 	}
 	return [...asked.values()];
 }
-
-/**
- * A knowledge file an agent of a step used: one it read, or one a search
- * of it put at the top. At the section it read from, else the section the
- * search found.
- */
-export type StepSource = {
-	path: string;
-	section: string | null;
-	page: number | null;
-	line: number;
-	/** The agent read the file (`read_knowledge`). False: a search put it in its top 3. */
-	read: boolean;
-};
 
 /** The hits of each search that count as used: the top 3. */
 const SOURCE_HITS = 3;

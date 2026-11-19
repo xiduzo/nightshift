@@ -192,7 +192,6 @@ export type {
 	OpenGate,
 	ProjectRuns,
 	RunDetail,
-	RunHere,
 	RunStreamItem,
 	RunSummary,
 	RunTrace,
@@ -214,7 +213,11 @@ export {
 } from "./read";
 export { GateClosedError } from "./run";
 export { createRunFolders, noRunFolders } from "./run-folders";
-export { PinNotHereError, START_DEADLINE_MS } from "./runs";
+export {
+	PinNotHereError,
+	type RunHere,
+	START_DEADLINE_MS,
+} from "./runs";
 export type {
 	ScheduleList,
 	ScheduleMissed,

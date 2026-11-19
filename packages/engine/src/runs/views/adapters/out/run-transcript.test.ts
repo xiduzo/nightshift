@@ -8,8 +8,8 @@ import {
 	type RunBus,
 	type TranscriptEntry,
 	waker,
-} from "../log";
-import type { FeedStep } from "./run-transcript";
+} from "../../../../log";
+import type { FeedStep } from "../../../../read";
 import { followRunTranscript, type RunTranscriptPorts } from "./run-transcript";
 
 /**

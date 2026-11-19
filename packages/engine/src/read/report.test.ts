@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
 import { runEvents as log } from "../testing/run-events";
-import { runFacts } from "./read-model";
 import { REPORT_EXCERPT_CHARS, reportExcerpt } from "./report";
+import { runFacts } from "./run-summary";
 
 /*
  * The report of a run: the report of the End step that ended it. Each test

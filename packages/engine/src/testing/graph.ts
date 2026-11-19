@@ -59,7 +59,7 @@ import { createRunBus } from "../log/transcript/bus";
 import { readMemory } from "../memory";
 import { createPlacement } from "../placement/placement";
 import { gitAuthorOf } from "../read/people";
-import { parseCalledFlows, parseRunFlow } from "../read/read-model";
+import { parseCalledFlows, parseRunFlow } from "../read/run-summary";
 import { createRunFolders } from "../run-folders/run-folders";
 import { keptValues } from "../variables/kept";
 import {

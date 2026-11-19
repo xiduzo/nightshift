@@ -30,6 +30,5 @@ export type { KnowledgeRequest } from "./step-knowledge";
 export {
 	type AskedQuestion,
 	type KnowledgeUseReport,
-	type StepSource,
 	stepSources,
 } from "./use";

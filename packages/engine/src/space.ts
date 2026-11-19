@@ -6,7 +6,7 @@ import type { RunFilesService } from "./cleanup";
 import { NIGHT_SHIFT, type PersonActor } from "./contract";
 import type { SpaceFlows } from "./flows";
 import type { Runner } from "./graph";
-import { type RunLog, type RunRow, scopeKey } from "./log";
+import { type RunLog, scopeKey } from "./log";
 import type { MemoryFlow, NodeMemory } from "./memory";
 import type { WithPaths } from "./peers";
 import {
@@ -18,8 +18,8 @@ import {
 	setSpaceUsage,
 	toProject,
 } from "./projects";
-import type { ReadModel, RunStreamItem } from "./read";
-import type { Access, Actions, Move, Start } from "./runs";
+import type { RunStreamItem } from "./read";
+import type { Access, Actions, Move, Start, Views } from "./runs";
 import type { Schedules } from "./schedules";
 import { readServiceLog } from "./services";
 import type { SpaceEngine } from "./space-engine";
@@ -81,7 +81,10 @@ export type SpacesDeps = {
 	): Promise<<T extends WithPaths>(summary: T) => Promise<T>>;
 
 	// --- views (R2) ---
-	reads: ReadModel;
+	/** The views of the runs, for the readers that act for Night Shift (the Gates). */
+	reads: Views["reads"];
+	/** The reads of the runs, each for the actor of the view (`runs/views`). */
+	views: Views;
 
 	// --- start (R3) ---
 	/** A run's start, and the Devices a person chooses from (`runs/start`): each use case checks the Space itself. */
@@ -107,16 +110,7 @@ export type SpacesDeps = {
 };
 
 export function createSpaces(deps: SpacesDeps) {
-	const { ready, log, projects, documents, reads, actions } = deps;
-
-	/**
-	 * The run's row when it is in the Space, else "not found": the run
-	 * opened by Night Shift, so no role is read. The views (R2) pass their
-	 * actor once they know their callers (D6 of the run path plan).
-	 */
-	async function getRunRow(runId: string, spaceId: string): Promise<RunRow> {
-		return (await deps.openRun(NIGHT_SHIFT, { runId, spaceId })).run;
-	}
+	const { ready, log, projects, documents, reads, actions, views } = deps;
 
 	/** Rows as the engine's Projects, with their Clones from the Space document. */
 	async function withClones(spaceId: string, rows: ListedProject[]) {
@@ -137,14 +131,16 @@ export function createSpaces(deps: SpacesDeps) {
 		return runIds;
 	}
 
+	/**
+	 * The watch of a run for the actor: it waits for the engine, then opens
+	 * the run, at the first read of the stream.
+	 */
 	async function* watch(
-		runId: string,
-		spaceId: string,
-		signal: AbortSignal,
-		afterSeq: number,
+		actor: Parameters<Views["watchRun"]>[0],
+		request: Parameters<Views["watchRun"]>[1],
 	): AsyncGenerator<RunStreamItem> {
 		await ready;
-		yield* reads.watch(await getRunRow(runId, spaceId), signal, afterSeq);
+		yield* await views.watchRun(actor, request);
 	}
 
 	/** What a person does in one Space. */
@@ -300,55 +296,49 @@ export function createSpaces(deps: SpacesDeps) {
 				return deps.answerCosts(spaceId, since);
 			},
 
-			// --- views (R2) ---
+			// --- views (R2): each read is the actor's, Night Shift's without one ---
 			async projectRuns(read) {
 				await ready;
-				return reads.projectRuns(spaceId, read);
+				return views.listProjectRuns(actor ?? NIGHT_SHIFT, {
+					spaceId,
+					...(read !== undefined ? { read } : {}),
+				});
 			},
 
 			async listRuns(input) {
 				await ready;
-				const runs = await reads.listRuns(spaceId, input?.projectId, {
-					...(input?.limit !== undefined ? { limit: input.limit } : {}),
-					...(input?.cursor !== undefined ? { cursor: input.cursor } : {}),
-					...(input?.statuses !== undefined
-						? { statuses: input.statuses }
-						: {}),
-					...(input?.order !== undefined ? { order: input.order } : {}),
-				});
-				const shown = await deps.pathsFor(spaceId, actor);
-				return Promise.all(runs.map(shown));
+				return views.listRuns(actor ?? NIGHT_SHIFT, { ...input, spaceId });
 			},
 
 			async getRun(runId) {
 				await ready;
-				const row = await getRunRow(runId, spaceId);
-				return (await deps.pathsFor(spaceId, actor))(await reads.getRun(row));
+				return views.readRun(actor ?? NIGHT_SHIFT, { runId, spaceId });
 			},
 
 			async getStep(runId, stepId) {
 				await ready;
-				return reads.getStep(await getRunRow(runId, spaceId), stepId);
+				return views.readStep(actor ?? NIGHT_SHIFT, { runId, spaceId, stepId });
 			},
 
 			async stepTranscript(runId, stepId, signal) {
 				await ready;
-				return reads.stepTranscript(
-					await getRunRow(runId, spaceId),
+				return views.readStepTranscript(actor ?? NIGHT_SHIFT, {
+					runId,
+					spaceId,
 					stepId,
-					AbortSignal.any([signal, deps.signal]),
-				);
+					signal: AbortSignal.any([signal, deps.signal]),
+				});
 			},
 
 			watchRun(runId, { signal: watching, afterSeq }) {
 				// A disposed engine publishes nothing more on its bus: the watch
 				// ends with it, so the watcher reconnects to the next engine.
-				return watch(
+				return watch(actor ?? NIGHT_SHIFT, {
 					runId,
 					spaceId,
-					AbortSignal.any([watching, deps.signal]),
-					afterSeq ?? 0,
-				);
+					afterSeq: afterSeq ?? 0,
+					signal: AbortSignal.any([watching, deps.signal]),
+				});
 			},
 
 			// --- the files of a run that other slices keep (R1 opens the run, phase 3 moves them) ---

@@ -323,12 +323,18 @@ packages/engine/src/
                            a grace period the daemon resumes the rest
                            unless resumeBlock says why not, queued on
                            a full run cap).
-  read/read-model.ts       What people see of a run, from the log: runFacts,
-                           toSummary, toStepSummary, toRunDetail,
-                           takeOverCommand, the flow snapshot parsers;
-                           createReadModel(deps) adds listRuns, getRun,
-                           listGates, runStatus and watch.
-                           Reads only.
+  read/run-summary/        A run's summary from its row and its log:
+                           runFacts, toSummary, the flow snapshot parsers.
+                           Pure.
+  runs/views/              What people see of a run, as the actor may see
+                           it: one use case per read (listRuns, readRun,
+                           readStep, readStepTranscript, watchRun and
+                           more), each opens the run first. The adapter
+                           over the database and the run log
+                           (adapters/out/drizzle-run-views.ts) reads the
+                           rows. run-pages.ts makes each page (the run
+                           page, a step, the Gates), run-watch.ts follows a
+                           run. Reads only.
   log/events/              Unchanged payloads. log/run-log/append.ts appends
                            and parses an event.
   read/run-views.ts        The derivations for the read model and the walk.

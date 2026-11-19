@@ -7,7 +7,6 @@ import type {
 	JsonValue,
 } from "@nightshift/flows";
 import type { RunCommandKind } from "../contract";
-import type { StepSource } from "../knowledge";
 import type {
 	AnsweredBy,
 	GateBrief,
@@ -32,8 +31,21 @@ import type { RunMetrics } from "./run-metrics";
 /**
  * The run views the engine returns: a run, its steps, sessions and items,
  * its warnings and resumes, and an open Gate. Each is derived from the
- * event log (`read-model.ts`), never stored.
+ * event log (`run-summary/`, `runs/views`), never stored.
  */
+
+/** One step of a run, by its Space and run: what a transcript feed follows. */
+export type FeedStep = { spaceId: string; runId: string; stepId: string };
+
+/** A knowledge file an agent of a step used: one it read, or one a search put at its top. */
+export type StepSource = {
+	path: string;
+	section: string | null;
+	page: number | null;
+	line: number;
+	/** The agent read the file (`read_knowledge`). False: a search put it in its top 3. */
+	read: boolean;
+};
 
 export type SessionSummary = {
 	id: string;

@@ -87,7 +87,7 @@ import { wireEngineWalk } from "./wire-walk";
  *
  * - `wire-recovery.ts` (R7): startup recovery, the daemon's resume, the
  *   wakes, the Signal of a webhook, the stop of a run by Night Shift.
- * - `wire-views.ts` (R2): the read model (`read/read-model.ts`).
+ * - `wire-views.ts` (R2): what people see of the runs (`runs/views/`).
  * - `wire-start.ts` (R3): who walks a new run and its Run's Device, and the
  *   start itself: here, or handed to the Host (`runs/start/`).
  * - `wire-schedules.ts`: the schedules slice (`schedules/`), what it tells
@@ -491,16 +491,16 @@ export function createEngine(
 		memberName(await documents.open(spaceId), personId);
 
 	// --- views (R2): `wire-views.ts` ---
-	// gives: views.reads (start, schedules, cleanup, the Space view, the engine)
+	// gives: views.reads (start, schedules, cleanup), views.forSpace, views.cases, views.runs
 	const views = wireEngineViews({
 		db,
 		log: runLog,
 		bus,
-		deviceId: device.id,
-		walkers: peers.runs.walkers,
-		pendingCommands: peers.runs.pendingCommands,
-		stepEntries: peers.runs.stepEntries,
-		ownEntries: history.ownTranscript,
+		device,
+		peers,
+		history,
+		access,
+		signal,
 		memberName: membersName,
 	});
 
@@ -670,7 +670,7 @@ export function createEngine(
 		artifacts,
 		pathsFor: peers.pathsFor,
 		// views (R2)
-		reads: views.reads,
+		...views.forSpace,
 		// start (R3)
 		start: start.places,
 		// actions (R4), move (R5), gates (R6)
@@ -701,7 +701,7 @@ export function createEngine(
 		schedules: sched.schedules,
 		pullRequestWatch: sched.pullRequestWatch,
 		// views (R2)
-		reads: views.reads,
+		views,
 		// recovery (R7)
 		wakeLeaseSleeps: recovery.wakeLeaseSleeps,
 		wakeOfflineSleeps: recovery.wakeOfflineSleeps,

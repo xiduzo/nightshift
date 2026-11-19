@@ -5,8 +5,8 @@ import {
 	type RunLog,
 	type TranscriptEntry,
 	waker,
-} from "../log";
-import { deriveSteps } from "./run-views";
+} from "../../../../log";
+import { deriveSteps, type FeedStep } from "../../../../read";
 
 /*
  * A run's transcript, as the run page reads it: the entries of all its
@@ -14,9 +14,6 @@ import { deriveSteps } from "./run-views";
  * engine's. Where each step's entries come from (this computer's files,
  * the archive, a live feed) is the peers' (`RunsPort.stepEntries`).
  */
-
-/** One step, by its Space and run. */
-export type FeedStep = { spaceId: string; runId: string; stepId: string };
 
 /** A step's entries after `afterSeq`, then live, until its transcript is whole. */
 export type StepEntries = (

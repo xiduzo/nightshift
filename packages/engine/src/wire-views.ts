@@ -1,47 +1,75 @@
 import { harnessFacts } from "@nightshift/agents/harness-facts";
+import type { Database } from "@nightshift/db";
 import { isCustomHarness } from "@nightshift/flows";
-import { createReadModel } from "./read";
-
-type ReadModelDeps = Parameters<typeof createReadModel>[0];
+import type { RunBus, RunHistory, RunLog } from "./log";
+import type { Peers } from "./peers";
+import { type Access, wireViews } from "./runs";
 
 /**
- * The views block of the engine's composition (`wire.ts`): the read model
- * of the runs (`read/read-model.ts`). Lane R2 of the hexagon series owns
+ * The views block of the engine's composition (`wire.ts`): what people
+ * see of the runs (`runs/views/`). Lane R2 of the hexagon series owns
  * this file.
  *
- * It gives `reads`. The other blocks read `listRuns` (start),
- * `runStatus` (schedules, cleanup), `runHere` and `trace` (the engine),
- * and the Space view takes all of it.
+ * It gives `reads`, `forSpace`, `cases` and `runs`. The other blocks
+ * read `listRuns` (start, cleanup) and `runStatus` (schedules, cleanup)
+ * of `reads`. The Space view takes `forSpace`: the use cases, and
+ * `reads` for its Gates. The engine calls `readRunHere` and
+ * `readRunTrace` of `cases`. `runs` holds the reads of `Engine.runs`:
+ * each opens the run for the actor and finds its Space.
  */
-export function wireEngineViews(
-	deps: Pick<
-		ReadModelDeps,
-		| "db"
-		| "log"
-		| "bus"
-		| "deviceId"
-		| "walkers"
-		| "pendingCommands"
-		| "stepEntries"
-		| "ownEntries"
-		| "memberName"
-	>,
-) {
-	const reads = createReadModel({
+export function wireEngineViews(deps: {
+	db: Database;
+	log: RunLog;
+	bus: RunBus;
+	device: { id: string };
+	peers: Pick<Peers, "pathsFor" | "runs">;
+	history: Pick<RunHistory, "ownTranscript">;
+	access: Pick<Access, "openRun" | "openSpace">;
+	/** The engine's lifetime: a read or a watch ends with it. */
+	signal: AbortSignal;
+	memberName: (spaceId: string, personId: string) => Promise<string | null>;
+}) {
+	const { peers, signal } = deps;
+	const cases = wireViews({
 		db: deps.db,
 		log: deps.log,
 		bus: deps.bus,
-		deviceId: deps.deviceId,
+		deviceId: deps.device.id,
 		// Any harness, added or not: an old run's session stays takeable.
 		// A custom agent has no take-over command.
 		harnessOf: (name) =>
 			isCustomHarness(name) ? undefined : harnessFacts(name),
-		walkers: deps.walkers,
-		pendingCommands: deps.pendingCommands,
-		stepEntries: deps.stepEntries,
-		ownEntries: deps.ownEntries,
+		walkers: peers.runs.walkers,
+		pendingCommands: peers.runs.pendingCommands,
+		stepEntries: peers.runs.stepEntries,
+		ownEntries: deps.history.ownTranscript,
 		memberName: deps.memberName,
+		pathsFor: peers.pathsFor,
+		access: deps.access,
+	});
+	/** A disposed engine publishes nothing more: a read or a watch ends with it. */
+	const untilDisposed = <T extends { signal: AbortSignal }>(request: T): T => ({
+		...request,
+		signal: AbortSignal.any([request.signal, signal]),
 	});
 
-	return { reads };
+	return {
+		reads: cases.reads,
+		cases,
+		/** The views group of the Space view (`createSpaces`). */
+		forSpace: { reads: cases.reads, views: cases },
+		runs: {
+			list: cases.listRuns,
+			get: cases.readRun,
+			step: cases.readStep,
+			stepTranscript: (
+				actor: Parameters<typeof cases.readStepTranscript>[0],
+				request: Parameters<typeof cases.readStepTranscript>[1],
+			) => cases.readStepTranscript(actor, untilDisposed(request)),
+			watch: (
+				actor: Parameters<typeof cases.watchRun>[0],
+				request: Parameters<typeof cases.watchRun>[1],
+			) => cases.watchRun(actor, untilDisposed(request)),
+		},
+	};
 }

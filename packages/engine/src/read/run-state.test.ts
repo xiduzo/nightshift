@@ -10,8 +10,8 @@ import {
 } from "../log";
 import type { RunStatus } from "../run-status";
 import { runEvents as log } from "../testing/run-events";
-import { runFacts } from "./read-model";
 import { deriveScores } from "./run-metrics";
+import { runFacts } from "./run-summary";
 import { runTrace } from "./run-trace";
 import {
 	awaitsWorktree,
