@@ -1,14 +1,27 @@
 import type { Database } from "@nightshift/db";
-import type { Engine, LandedFact, UsageMoment } from "@nightshift/engine";
+import type {
+	Engine,
+	LandedFact,
+	RunTrace,
+	UsageMoment,
+} from "@nightshift/engine";
 import type {
 	ConnectionStore,
 	SettingsStore,
 	TelemetryProtocol,
 } from "@nightshift/engine/device-config";
-
+import type { Counter, Histogram } from "@opentelemetry/api";
+import {
+	innerSpanIdOf,
+	laterSpanIdOf,
+	runSpanIdOf,
+	stepSpanIdOf,
+	traceIdOf,
+} from "./conventions";
 import {
 	type ExportSinks,
 	type ExportTarget,
+	meterOf,
 	otlpSinks,
 	type RunningExport,
 	startExport,
@@ -16,8 +29,11 @@ import {
 import { traceRequests } from "./requests";
 import {
 	assertConforms,
-	createRunProjection,
-	type RunProjection,
+	INSTRUMENTS,
+	type InstrumentName,
+	type RunRecord,
+	recordsOf,
+	type SpanKey,
 } from "./runs";
 import { claudeCodeEnv, codexSession } from "./sessions";
 import type { UsageSnapshot } from "./usage";
@@ -36,6 +52,88 @@ import { createUsage, parseUsageEvent, sampleUsageEvent } from "./usage";
  * The anonymous usage export is separate. It never uses this endpoint,
  * and a session's own telemetry never uses the usage endpoint.
  */
+
+/** The run export: what each landing ended, written to the running export. */
+type RunProjection = {
+	/** Writes what the facts of one landing ended. In order, one landing at a time. */
+	take(facts: readonly LandedFact[]): Promise<void>;
+};
+
+/**
+ * The runs of this computer as spans and metric points (`runs/`): each
+ * landed fact that ends something reads the run (`read`), and its records
+ * go to the export, with the ids any process can work out
+ * (`conventions/ids.ts`).
+ */
+function projectRuns(deps: {
+	running: RunningExport;
+	read: (runId: string) => Promise<RunTrace | null>;
+	/** This computer's Device: the Walker of the runs, and where a step without one ran. */
+	deviceId: string;
+}): RunProjection {
+	const { running, read, deviceId } = deps;
+	const meter = meterOf(running);
+	const instruments = {} as Record<InstrumentName, Counter | Histogram>;
+	for (const [key, made] of Object.entries(INSTRUMENTS)) {
+		const options = { unit: made.metric.unit, description: made.description };
+		instruments[key as InstrumentName] =
+			made.kind === "histogram"
+				? meter.createHistogram(made.metric.name, options)
+				: meter.createCounter(made.metric.name, options);
+	}
+
+	function spanIdOf(key: SpanKey): string {
+		switch (key.of) {
+			case "run":
+				return runSpanIdOf(key.runId);
+			case "step":
+				return stepSpanIdOf(key.stepId);
+			case "later":
+				return laterSpanIdOf(key.id, key.seq);
+			case "inner":
+				return innerSpanIdOf(key.stepId, key.what, key.from);
+		}
+	}
+
+	function write(record: RunRecord): void {
+		if (record.kind === "point") {
+			const instrument = instruments[record.instrument];
+			if (INSTRUMENTS[record.instrument].kind === "histogram") {
+				(instrument as Histogram).record(record.value, record.attributes);
+			} else {
+				(instrument as Counter).add(record.value, record.attributes);
+			}
+			return;
+		}
+		running.writeSpan({
+			name: record.name,
+			traceId: traceIdOf(record.runId),
+			spanId: spanIdOf(record.span),
+			parentSpanId: record.parent ? spanIdOf(record.parent) : null,
+			from: record.from,
+			to: record.to,
+			attributes: record.attributes,
+			...("error" in record ? { error: record.error } : {}),
+		});
+	}
+
+	return {
+		async take(facts) {
+			for (const fact of facts) {
+				if (
+					fact.kind !== "step-ended" &&
+					fact.kind !== "run-ended" &&
+					fact.kind !== "scored"
+				) {
+					continue;
+				}
+				const run = await read(fact.runId);
+				if (!run) continue;
+				for (const record of recordsOf(run, fact, deviceId)) write(record);
+			}
+		},
+	};
+}
 
 export type Telemetry = {
 	/**
@@ -195,7 +293,7 @@ export async function createTelemetry(deps: {
 			target: next.target,
 			values: next.values,
 			running,
-			projection: createRunProjection({
+			projection: projectRuns({
 				running,
 				read: async (runId) => (engine ? engine.runTrace(runId) : null),
 				deviceId: deps.deviceId,

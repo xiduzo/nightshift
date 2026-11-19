@@ -8,14 +8,4 @@ export {
 	stepTraceparent,
 	traceIdOf,
 } from "./ids";
-export {
-	ATTR,
-	ERROR_TYPE,
-	METRIC,
-	OPERATION,
-	PROVIDER,
-	SCOPE_NAME,
-	SERVICE_NAME,
-	SPAN,
-	TOKEN_MODALITY,
-} from "./names";
+export { ATTR, SCOPE_NAME, SERVICE_NAME } from "./names";

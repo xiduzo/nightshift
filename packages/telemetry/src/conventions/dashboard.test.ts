@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { ATTR, METRIC } from "./index";
+import { METRIC } from "@nightshift/semconv";
+import { ATTR } from "./index";
 
 /**
  * The Grafana dashboard in docs/deploy reads the names the export writes.

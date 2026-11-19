@@ -8,6 +8,14 @@ import {
 	runEvents,
 	waitFor,
 } from "@nightshift/engine/testing";
+import {
+	ERROR_TYPE,
+	METRIC,
+	OPERATION,
+	PROVIDER,
+	SPAN,
+	TOKEN_MODALITY,
+} from "@nightshift/semconv";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
 import {
 	AggregationTemporality,
@@ -23,18 +31,11 @@ import {
 } from "@opentelemetry/sdk-trace";
 import { os } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
-
 import {
 	ATTR,
-	ERROR_TYPE,
-	METRIC,
-	OPERATION,
-	PROVIDER,
 	runSpanIdOf,
 	SERVICE_NAME,
-	SPAN,
 	stepSpanIdOf,
-	TOKEN_MODALITY,
 	traceIdOf,
 } from "./conventions";
 import { assertConforms } from "./runs";

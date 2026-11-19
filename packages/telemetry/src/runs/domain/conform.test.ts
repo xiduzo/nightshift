@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { ATTR, METRIC, OPERATION, SPAN } from "../conventions";
-import { assertConforms } from "./index";
+import { ATTR, METRIC, OPERATION, SPAN } from "@nightshift/semconv";
+import { assertConforms } from "./conform";
 
 /**
  * A span or metric the registry does not allow fails the check.
