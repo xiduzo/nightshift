@@ -31,13 +31,21 @@ const device = {
 } as unknown as Device;
 
 let dir: string;
-let keepers: ServiceKeeper[];
+/** The process groups the test started. A test that fails before its stop leaves its server running. */
+let groups: number[];
 beforeEach(() => {
 	dir = mkdtempSync(join(tmpdir(), "nightshift-service-"));
 	writeFileSync(join(dir, "server.ts"), SERVER);
-	keepers = [];
+	groups = [];
 });
 afterEach(async () => {
+	for (const group of groups) {
+		try {
+			process.kill(-group, "SIGKILL");
+		} catch {
+			// It stopped already.
+		}
+	}
 	rmSync(dir, { recursive: true, force: true });
 });
 
@@ -57,9 +65,7 @@ setInterval(() => {}, 1000);
 const READY_COMMAND = `"${BUN}" -e 'const p = require("node:fs").readFileSync("port", "utf8"); const r = await fetch("http://127.0.0.1:" + p); if (!r.ok) process.exit(1); require("node:fs").writeFileSync(process.env.NS_OUTPUT, JSON.stringify({ url: "http://127.0.0.1:" + p }));'`;
 
 function keeper(): ServiceKeeper {
-	const made = createServiceKeeper({ now: now, secondMs: SECOND_MS });
-	keepers.push(made);
-	return made;
+	return createServiceKeeper({ now: now, secondMs: SECOND_MS });
 }
 
 const spec = (extra: Partial<ServiceSpec> = {}): ServiceSpec => ({
@@ -113,6 +119,7 @@ function bringUp(
 		signal: extra.signal ?? new AbortController().signal,
 		onStarted: async (at) => {
 			started.push(at);
+			if (at.pid !== null) groups.push(at.pid);
 		},
 	});
 	return { result, started, logPath };
