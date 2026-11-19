@@ -473,6 +473,24 @@ export function sleepClock(start = now()) {
 }
 
 /**
+ * How far the database's clock is ahead of this process's clock, in ms.
+ * The database stamps the time of each event (`unixepoch()`), and the
+ * engine's `now` reads the process's clock. On one computer they are one
+ * clock, but a test that moves the process's clock moves only the engine's.
+ * A test that compares an event's time with its engine's `now` adds this
+ * to that `now`. The error is half the time the query takes.
+ */
+export async function databaseClockAhead(db: Database): Promise<number> {
+	const before = now();
+	const [row] = await db.all<{ at: number }>(
+		sql`select cast(unixepoch('subsecond') * 1000 as integer) as at`,
+	);
+	const after = now();
+	if (!row) throw new Error("The database did not say its time.");
+	return row.at - (before + after) / 2;
+}
+
+/**
  * Every run log keeps in memory exactly what a fresh read of the database
  * gives. The run logs are the engines of one test, oldest first. A run that
  * a later engine read is left out of the earlier ones: that engine is a

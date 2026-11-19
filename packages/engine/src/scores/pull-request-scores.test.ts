@@ -9,6 +9,7 @@ import type { SpaceEngine } from "../space-engine";
 import { seedFlows } from "../testing/seed-flows";
 import {
 	createSandbox,
+	databaseClockAhead,
 	type Sandbox,
 	waitFor,
 	withDevice,
@@ -151,6 +152,9 @@ let ahead = 0;
 beforeEach(async () => {
 	ahead = 0;
 	sandbox = await createSandbox();
+	// The log stamps a score with the database's time: the engine's clock
+	// starts from it, so `ahead` is the only distance between the two.
+	const skew = await databaseClockAhead(sandbox.db);
 	controller = new AbortController();
 	engine = createEngine(
 		withDevice({
@@ -159,7 +163,7 @@ beforeEach(async () => {
 			dataDir: sandbox.dataDir,
 			secret: async (name) => (name === "HOOK_SECRET" ? SECRET : undefined),
 		}),
-		{ signal: controller.signal, now: () => now() + ahead },
+		{ signal: controller.signal, now: () => now() + skew + ahead },
 	);
 	space = engine.space(sandbox.spaceId);
 	projectId = (await space.addProject({ repoPath: sandbox.repoPath })).id;

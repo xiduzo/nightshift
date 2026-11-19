@@ -14,6 +14,7 @@ import type { WorktreeRemoval } from "../log/space-facts/worktree-removals";
 import type { SpaceEngine } from "../space-engine";
 import {
 	createSandbox,
+	databaseClockAhead,
 	mustGit,
 	type Sandbox,
 	waitFor,
@@ -36,9 +37,12 @@ const COMMIT = `pwd >> work.txt && git add work.txt && ${GIT} commit -q -m work`
 let sandbox: Sandbox;
 let origin: string;
 let daemons: AbortController[];
+/** How far the database's clock is ahead of the process's (`databaseClockAhead`). */
+let skew: number;
 
 beforeEach(async () => {
 	sandbox = await createSandbox();
+	skew = await databaseClockAhead(sandbox.db);
 	origin = join(sandbox.root, "origin.git");
 	await mustGit(sandbox.root, ["init", "-q", "--bare", origin]);
 	await mustGit(sandbox.repoPath, ["remote", "add", "origin", origin]);
@@ -74,7 +78,11 @@ function startDaemon(
 	).space(sandbox.spaceId);
 }
 
-/** Stops every daemon, then starts one `days` later whose first sweep comes once it is ready. */
+/**
+ * Stops every daemon, then starts one `days` later whose first sweep comes
+ * once it is ready. "Later" counts from the database's clock: it stamped
+ * when each run ended.
+ */
 async function sweptLater(
 	days: number,
 	settings = defaultRunSettings(),
@@ -84,7 +92,7 @@ async function sweptLater(
 	const swept = Promise.withResolvers<void>();
 	const later = startDaemon(
 		{
-			now: () => now() + days * DAY_MS,
+			now: () => now() + skew + days * DAY_MS,
 			cleanupDelayMs: 0,
 			cleanupSwept: swept.resolve,
 		},
