@@ -63,7 +63,10 @@ export type SpacesDeps = {
 		forget(flow: MemoryFlow, node: string, scope?: string): Promise<void>;
 	};
 	/** What the answers of Night Shift's own agents cost in a Space, as this Replica has them. */
-	answerCosts(spaceId: string, since?: number): Promise<AnswerCost[]>;
+	answerCosts(
+		actor: Actor,
+		request: { spaceId: string; since?: number },
+	): Promise<AnswerCost[]>;
 	/** A Space move (`projects-move.ts`). */
 	moveProjects(move: ProjectsMove): Promise<MovedProjects>;
 
@@ -292,7 +295,7 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async listAnswerCosts(since) {
 				await ready;
-				return deps.answerCosts(spaceId, since);
+				return deps.answerCosts(actor, { spaceId, since });
 			},
 
 			// --- views (R2): each read opens the run, or the Space, for the actor ---

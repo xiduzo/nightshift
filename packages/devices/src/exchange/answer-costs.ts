@@ -1,4 +1,4 @@
-import { OlderHostError, type sharedAnswerCosts } from "@nightshift/engine";
+import { OlderHostError, type SharedAnswerCosts } from "@nightshift/engine";
 import { ANSWER_COSTS_MAX, type HostClient } from "../contract";
 import { pause } from "../links";
 
@@ -21,11 +21,8 @@ import { pause } from "../links";
 export function shareAnswerCosts(deps: {
 	/** The Spaces this Host keeps for this computer (`HostSpaces.ofHost`). */
 	spaces(): Promise<string[]>;
-	/** This Replica's answer costs (`sharedAnswerCosts`). */
-	costs: Pick<
-		ReturnType<typeof sharedAnswerCosts>,
-		"unsent" | "sent" | "cursors" | "ingest"
-	>;
+	/** This Replica's answer costs (`Engine.answerCosts`). */
+	costs: Pick<SharedAnswerCosts, "unsent" | "sent" | "cursors" | "ingest">;
 	now(): number;
 	/** How long it waits before it looks again. Default 30 s. */
 	idleMs?: number;

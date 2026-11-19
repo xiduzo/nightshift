@@ -20,7 +20,6 @@ devices/placement
 devices/registry
 devices/secrets
 engine/agent-setup
-engine/assistant
 engine/cleanup
 engine/dashboard
 engine/device-config

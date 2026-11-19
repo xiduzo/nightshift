@@ -1,5 +1,4 @@
 import { now as timeNow } from "@nightshift/time";
-import { listAnswerCosts } from "./assistant";
 import { defaultRunSettings, type RunSettings } from "./device-config";
 import {
 	createFlowDocuments,
@@ -27,6 +26,7 @@ import { createProjectsMove } from "./space-move";
 import { listKeptValues, resetKeptValue } from "./variables";
 import { wireEngineAccess } from "./wire-access";
 import { wireEngineActions } from "./wire-actions";
+import { wireEngineAnswerCosts } from "./wire-answer-costs";
 import { wireEngineCleanup } from "./wire-cleanup";
 import { wireEngineFlows } from "./wire-flows";
 import { wireEngineGates } from "./wire-gates";
@@ -436,6 +436,9 @@ export function createEngine(
 	// --- gates (R6): `wire-gates.ts` ---
 	const gates = wireEngineGates({ db, access, walk, artifacts, views, now });
 
+	// --- answer costs (AC): `wire-answer-costs.ts` ---
+	const answerCosts = wireEngineAnswerCosts({ db });
+
 	// --- actions (R4): `wire-actions.ts` ---
 	// gives: acts.actions (the Space view), acts.runs (the engine)
 	const acts = wireEngineActions({
@@ -514,7 +517,7 @@ export function createEngine(
 			list: (flow) => listMemory(db, flow),
 			forget: (flow, node, scope) => forgetMemory(db, flow, node, scope),
 		},
-		answerCosts: (spaceId, since) => listAnswerCosts(db, spaceId, since),
+		answerCosts: answerCosts.list,
 		moveProjects,
 		// access (R1), and the files of a run that other slices keep
 		openRun: access.openRun,
@@ -550,6 +553,7 @@ export function createEngine(
 		runner,
 		runs: { ...access.runs, ...acts.runs, ...start.runs, ...move.runs },
 		gates: gates.cases,
+		answerCosts,
 		// schedules and scores
 		scheduleNotices: sched.notices,
 		schedules: sched.schedules,

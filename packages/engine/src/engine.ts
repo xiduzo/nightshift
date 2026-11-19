@@ -1,5 +1,5 @@
 import type { Database } from "@nightshift/db";
-import { type AnswerCost, keepAnswerCost } from "./assistant";
+import type { AnswerCost } from "./assistant";
 import type { Actor, LeaseHost, MemberChange } from "./contract";
 import { type SpaceDocuments, spaceUsageOn } from "./documents";
 import type { ProjectFlows } from "./flows";
@@ -25,6 +25,7 @@ import type { SpaceEngine } from "./space-engine";
 import type { MovedProjects, ProjectsMove } from "./space-move";
 import type { wireEngineAccess } from "./wire-access";
 import type { wireEngineActions } from "./wire-actions";
+import type { wireEngineAnswerCosts } from "./wire-answer-costs";
 import type { wireEngineGates } from "./wire-gates";
 import type { wireEngineMove } from "./wire-move";
 import type { createScheduleNotices } from "./wire-schedules";
@@ -197,6 +198,12 @@ export interface Engine {
 	 * the engine to be ready.
 	 */
 	readonly gates: GateUseCases;
+	/**
+	 * What the answers of Night Shift's own agents cost, as a Host and its
+	 * Devices exchange them (`sync.answerCosts`): a Device's half and a
+	 * Host's half. They do not wait for the engine to be ready.
+	 */
+	readonly answerCosts: SharedAnswerCosts;
 }
 
 /**
@@ -218,6 +225,11 @@ type ViewRuns = ReturnType<typeof wireEngineViews>["runs"];
 
 /** The Gate use cases of `Engine.gates`: `answer`, `inbox`, `answeredInbox` (`wire-gates.ts`). */
 export type GateUseCases = ReturnType<typeof wireEngineGates>["cases"];
+
+/** The answer costs of `Engine.answerCosts`: `unsent`, `sent`, `cursors`, `ingest`, `take`, `after` (`wire-answer-costs.ts`). */
+export type SharedAnswerCosts = ReturnType<
+	typeof wireEngineAnswerCosts
+>["shared"];
 
 /** Knobs for tests only. Not part of the engine contract. */
 export type EngineInternals = {
@@ -274,6 +286,11 @@ export type EngineParts = {
 	runs: Omit<RunUseCases, keyof ViewRuns>;
 	/** The Gate use cases (`Engine.gates`), before the engine is ready. */
 	gates: GateUseCases;
+	/** What answers cost (`wire-answer-costs.ts`): the keep of one, and `Engine.answerCosts`. */
+	answerCosts: Pick<
+		ReturnType<typeof wireEngineAnswerCosts>,
+		"keep" | "shared"
+	>;
 
 	// --- schedules and scores (`wire-schedules.ts`) ---
 	scheduleNotices: Pick<
@@ -326,7 +343,7 @@ export function engineOf(parts: EngineParts): Engine {
 		// --- Spaces, Members and Projects (phase 3) ---
 		async keepAnswerCost(cost) {
 			await ready;
-			await keepAnswerCost(db, cost);
+			await parts.answerCosts.keep(cost);
 		},
 		logMemberChange: (change) => logMemberChange(runLog, change),
 		moveProjects,
@@ -396,6 +413,9 @@ export function engineOf(parts: EngineParts): Engine {
 
 		// --- the Gate use cases (R6): each waits for the engine to be ready ---
 		gates: whenReady(ready, parts.gates),
+
+		// --- answer costs (AC): the exchange did not wait for ready, and does not ---
+		answerCosts: parts.answerCosts.shared,
 
 		// --- the end of the engine ---
 		async dispose() {

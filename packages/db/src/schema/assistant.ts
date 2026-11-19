@@ -9,7 +9,7 @@ import {
 
 import { spaceId } from "./columns";
 
-// Owner: `@nightshift/engine`, `assistant/answer-costs.ts`: what each
+// Owner: `@nightshift/engine`, `assistant/adapters/out/`: what each
 // answer of Night Shift's own agents cost. The daemon keeps a row through
 // the engine when an answer ends. The Spend page reads them through the
 // engine. `@nightshift/devices` carries the rows of a Space a Host keeps

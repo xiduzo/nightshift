@@ -9,12 +9,13 @@ import {
 	step as stepTable,
 	user,
 } from "@nightshift/db/schema";
-import { NeedsApp, NIGHT_SHIFT, sharedAnswerCosts } from "@nightshift/engine";
+import { NeedsApp, NIGHT_SHIFT } from "@nightshift/engine";
 import {
 	createSpaceDocuments,
 	type SpaceDocuments,
 } from "@nightshift/engine/projects";
 import {
+	answerCostsOn,
 	createRunLog,
 	createSandbox,
 	type Sandbox,
@@ -994,7 +995,7 @@ describe("what Night Shift's agents cost", () => {
 			const stop = new AbortController();
 			const loop = shareAnswerCosts({
 				spaces: async () => [sandbox.spaceId],
-				costs: sharedAnswerCosts(device.db),
+				costs: answerCostsOn(device.db),
 				now: () => 9_000,
 				idleMs: 5,
 			})(

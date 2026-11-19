@@ -25,7 +25,6 @@ export {
 	HELP_AGENTS,
 	type SentAnswerCost,
 	type ServedAnswerCost,
-	sharedAnswerCosts,
 } from "./assistant";
 export type { RunFiles } from "./cleanup";
 export type {
@@ -114,7 +113,7 @@ export {
 	type FlowDocuments,
 	type SyncedDocuments,
 } from "./documents";
-export type { Engine } from "./engine";
+export type { Engine, SharedAnswerCosts } from "./engine";
 export type { EngineOptions } from "./engine-options";
 export type {
 	FlowExport,

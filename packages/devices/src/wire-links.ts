@@ -1,4 +1,4 @@
-import { type SyncedDocuments, sharedAnswerCosts } from "@nightshift/engine";
+import type { SyncedDocuments } from "@nightshift/engine";
 import type { DeviceCopies } from "@nightshift/engine/device-config";
 import { now } from "@nightshift/time";
 import type { HostHello } from "./contract";
@@ -32,7 +32,6 @@ type KeptForHost = Handover["hosts"] extends Map<string, infer K> ? K : never;
 export function wireLinks(
 	deps: Pick<
 		DevicesDeps,
-		| "db"
 		| "documents"
 		| "document"
 		| "settings"
@@ -55,7 +54,7 @@ export function wireLinks(
 		membership(): HomeMembership;
 	},
 ): DeviceLinks {
-	const { db, self, ownerId } = deps;
+	const { self, ownerId } = deps;
 	const { copies, keptFor, secretCalls, machine } = at;
 	return createDeviceLinks({
 		links: at.hostLinks,
@@ -135,7 +134,7 @@ export function wireLinks(
 					"Sharing what Night Shift's agents cost",
 					shareAnswerCosts({
 						spaces: () => engine.hostSpaces.ofHost(hostId),
-						costs: sharedAnswerCosts(db),
+						costs: engine.answerCosts,
 						now,
 					}),
 				),

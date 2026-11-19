@@ -1,4 +1,3 @@
-import { sharedAnswerCosts } from "@nightshift/engine";
 import { ANSWER_COSTS_MAX } from "../contract";
 import type { HostExchangeDeps } from "./host-deps";
 import type { HostExchange } from "./types";
@@ -8,10 +7,10 @@ import type { HostExchange } from "./types";
  * and takes them (`sync.answerCosts`), for the Spaces this Host keeps.
  */
 export function hostAnswerCosts(
-	deps: Pick<HostExchangeDeps, "db" | "engine" | "selfId">,
+	deps: Pick<HostExchangeDeps, "engine" | "selfId">,
 ): Pick<HostExchange, "answerCosts"> {
 	const { engine } = deps;
-	const answerCosts = sharedAnswerCosts(deps.db);
+	const { answerCosts } = engine;
 	return {
 		async answerCosts(caller, input) {
 			// Only the Spaces of the Person that this Host keeps: another
