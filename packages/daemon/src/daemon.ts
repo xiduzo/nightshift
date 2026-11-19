@@ -1,19 +1,6 @@
-import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import {
-	DECIDER_SETUP,
-	startPriceUpdates,
-	tanstackDecider,
-} from "@nightshift/agents";
+import { startPriceUpdates } from "@nightshift/agents";
 import type { Context } from "@nightshift/api/context";
-import {
-	createAuth,
-	createLocalSession,
-	hasLogin,
-	hostPolicyFromEnv,
-	localPerson,
-	spaceIds,
-} from "@nightshift/auth";
 import {
 	databaseUrl,
 	ensureDataDir,
@@ -21,99 +8,25 @@ import {
 	resolveDataDir,
 } from "@nightshift/db/data-dir";
 import { migrateDb } from "@nightshift/db/migrate";
-import {
-	defaultSelfDeviceHost,
-	deviceDirectory,
-	type HostClient,
-	inContainer,
-	machineFingerprint,
-	type OpenDocumentChannel,
-	selfDevice,
-	selfOwnerId,
-	servedDocuments,
-	setSelfOwner,
-	startDevices,
-} from "@nightshift/devices";
-import {
-	createArtifactStore,
-	createConfigUse,
-	createFlowDocuments,
-	createKnowledge,
-	createKnowledgeFolderLocks,
-	createOllama,
-	createRunFolders,
-	createRunLearnings,
-	createSpaceArchive,
-	createSyncedDocuments,
-	createToolLaunchers,
-	localDevice,
-	transcriptLines,
-} from "@nightshift/engine";
-import {
-	createAgentSetup,
-	createDeciderSetup,
-} from "@nightshift/engine/agent-setup";
-import {
-	openConfigStores,
-	openDeviceDocument,
-	type PersonalSecrets,
-	type ProjectSecrets,
-	reachesPrivateNetwork,
-	secretStore,
+import type { HostClient, OpenDocumentChannel } from "@nightshift/devices";
+import { createSyncedDocuments } from "@nightshift/engine";
+import type {
+	PersonalSecrets,
+	ProjectSecrets,
 } from "@nightshift/engine/device-config";
-import {
-	checkProjectFolder,
-	clonePathOf,
-	createGitHubClones,
-	createProjectCopies,
-	createSpaceDocuments,
-	setUpGit,
-	systemGitInstaller,
-	withoutFolderOf,
-} from "@nightshift/engine/projects";
-import {
-	type BuiltinAnswer,
-	builtinModel,
-	type ModelPick,
-} from "@nightshift/flows";
-import { deliveryMoves } from "@nightshift/notifications";
 import { createTelemetry } from "@nightshift/telemetry";
 import { instant } from "@nightshift/time";
-import {
-	createAssistant,
-	createLearner,
-	recordingAssistant,
-} from "./assistant";
-import {
-	harnessLookup,
-	localHarnesses,
-	programChecks,
-	reportDeviceFacts,
-} from "./harnesses";
-import {
-	authOriginsOf,
-	createHttp,
-	type DaemonServe,
-	hostAuthOrigins,
-	isThisComputer,
-	trustedOriginsOf,
-} from "./http";
+import { reportDeviceFacts } from "./harnesses";
+import { createHttp, type DaemonServe, trustedOriginsOf } from "./http";
 import {
 	createKeepAwake,
 	engineRunSource,
 	type SleepLock,
 	systemSleepLock,
 } from "./keep-awake";
-import {
-	type DesktopScreen,
-	documentAudience,
-	sendsPushesFor,
-	wireNotifications,
-} from "./notifications";
+import type { DesktopScreen } from "./notifications";
 import {
 	boundedStop,
-	canChooseFolder,
-	chooseFolder,
 	type DaemonEnv,
 	daemonAuthSecret,
 	daemonPort,
@@ -124,15 +37,21 @@ import {
 	oneStartAtATime,
 	onProcessCrashed,
 	processDatabase,
-	secretFiles,
-	secretsDir,
-	secretsKey,
 	stopOlderDocuments,
-	stopOlderKnowledge,
 	stopOnSignals,
 } from "./runtime";
-import { keepSync } from "./sync";
 import { moveTelemetryHeaders, usageFacts } from "./telemetry";
+import { wireDaemonAssistant } from "./wire-assistant";
+import { openOwner, wireDaemonAuth } from "./wire-auth";
+import { openDeviceConfig, wireDaemonConfig, wireSetups } from "./wire-config";
+import { openRegistry, wireDaemonDevices } from "./wire-devices";
+import { followRunLearnings, wireDaemonKnowledge } from "./wire-knowledge";
+import { wireLocalDevice } from "./wire-local";
+import {
+	notificationMoves,
+	wireDaemonNotifications,
+} from "./wire-notifications";
+import { wireDaemonProjects, wireProjectCopies } from "./wire-projects";
 
 export type DaemonOptions = {
 	/** The port the daemon listens on: its own addresses may call it. Default: PORT, else DEFAULT_PORT. */
@@ -205,6 +124,11 @@ export type Daemon = DaemonServe & {
  * --hot` calls it again on each reload, and each piece that must have one
  * owner names its slot and lifecycle here (`hotSlots`, `runtime/hot.ts`).
  * Two reloads at once start one after the other (`oneStartAtATime`).
+ *
+ * The blocks of a capability are in `wire-*.ts` beside this file: auth,
+ * config, devices, knowledge, notifications and projects. A lane of the
+ * hexagon series edits its block, not this file. This file keeps the
+ * order in which the blocks start.
  */
 export function createDaemon(
 	env: DaemonEnv,
@@ -276,123 +200,64 @@ async function makeDaemon(
 		},
 		(kept) => kept.flush(),
 	);
-	/**
-	 * The Space documents: each Space's Projects, Clones (existence only) and
-	 * Members. The engine defines Projects in them, the relay serves them to
-	 * Members, and the auth hooks keep their Members in step.
-	 */
+	// A block that needs what a later block makes gets a function that
+	// reads it when called. Each `let` below is set once that block exists.
 	/** Tells the open screens; set once the notifications below exist. */
 	let projectsChanged: (spaceId: string) => void = () => {};
 	/** A synced document was written. Set once the notifications below exist. */
 	let tellDocument: (name: string) => void = () => {};
-	const spaces = createSpaceDocuments({
+	const registry = openRegistry(db, { dev });
+	const projects = wireDaemonProjects({
 		db,
-		directory: deviceDirectory(db),
 		documents,
-		onProjected: (spaceId) => projectsChanged(spaceId),
+		directory: registry.directory,
+		// Read only when a project's folder is asked for, after the Device below.
+		selfId: async () => device.id,
+		projectsChanged: (spaceId) => projectsChanged(spaceId),
 	});
-	/** The flow documents: each Project's flows and schedules, and their revisions. */
-	const flows = createFlowDocuments({ db, documents });
+	const { spaces, flows, clonePath } = projects;
 
 	const trustedOrigins = trustedOriginsOf(env, port);
 	/** Whether this computer is a Host, and its addresses, once the settings below exist. */
 	let hostSettings: () => { host: boolean; hostAddresses: readonly string[] } =
 		() => ({ host: false, hostAddresses: [] });
-	const auth = createAuth(
-		{
-			BETTER_AUTH_URL: env.BETTER_AUTH_URL,
-			BETTER_AUTH_SECRET: authSecret,
-			CORS_ORIGIN: env.CORS_ORIGIN,
-		},
+	const { auth, hostPolicy, spaceIds } = wireDaemonAuth({
+		env,
 		db,
-		authOriginsOf(port),
-		{
-			onMembersChanged: (spaceId) => spaces.mirrorMembers(spaceId),
-			// The audit of Members, in the Space's event log. Called on requests,
-			// long after the engine below is made.
-			onMemberChange: (change) => engine.logMemberChange(change),
-			// A browser may sign in at any of the Host's addresses, the phone app
-			// only at a Host. Read per request; Better Auth also asks once now,
-			// before the settings exist.
-			trustedOrigins: () => hostAuthOrigins(hostSettings()),
-		},
-	);
-
-	/**
-	 * The Host's rules for sessions from other computers: two-factor sign-in
-	 * required or not (NIGHTSHIFT_REQUIRE_TWO_FACTOR). Read at start.
-	 */
-	const hostPolicy = hostPolicyFromEnv(env);
+		port,
+		authSecret,
+		onMembersChanged: (spaceId) => spaces.mirrorMembers(spaceId),
+		onMemberChange: (change) => engine.logMemberChange(change),
+		hostSettings: () => hostSettings(),
+	});
 
 	/** This computer's Device: the Walker of its runs, the owner of its Clones. */
-	const device = await selfDevice(db, defaultSelfDeviceHost({ dev }));
-
-	/**
-	 * This Device's document: its profiles, CLI tools, connections, settings
-	 * and facts. The stores below are views of it; the relay (`/sync`) serves
-	 * it to this computer's clients, and their edits land in the same stores.
-	 */
-	const document = await openDeviceDocument({
+	const device = await registry.self();
+	const document = await openDeviceConfig({
 		db,
 		deviceId: device.id,
 		documents,
 	});
-
 	/** The Person who owns this computer, and their personal Space. */
-	const person = await localPerson(db, {
-		ownerId: await selfOwnerId(db),
-		setOwner: (personId) => setSelfOwner(db, personId),
-	});
+	const owner = await openOwner({ db, auth, self: registry.owner });
+	const { person, localSession } = owner;
 
 	// Every Space's document, before the relay serves them: the Projects of a
 	// Replica from before them are imported here, once.
 	await documents.openAll();
 
-	/**
-	 * One person on one computer signs in to nothing: a request from this
-	 * computer without a session gets the session of the Person who owns it.
-	 */
-	const localSession = createLocalSession(auth, db, person.userId);
-
-	/**
-	 * The environment is the fallback of every setting and every `${NAME}`.
-	 * Under it, the secret files a service manager gives a headless computer
-	 * (NIGHTSHIFT_SECRETS_DIR, else systemd's credentials).
-	 */
-	const fallbacks: Record<string, string | undefined> = {
-		...secretFiles(secretsDir()),
-		...process.env,
-		...env,
-	};
-	/** Secrets saved on the Connections page: the keychain, else a file per secret (headless). */
-	const keyStore =
-		env.NIGHTSHIFT_KEY_STORE === "file" ? { prefer: "file" as const } : {};
-
-	/**
-	 * The Person's Personal secrets (ADR 13): at the Home Host, else kept
-	 * here. The devices below give them; a use before that reads a
-	 * Personal name as one that cannot be read now.
-	 */
+	/** The Personal secrets and the Projects' secrets (ADR 13): the devices below give them. */
 	let personalSecrets: PersonalSecrets | null = null;
-	/** The secrets of the Projects (ADR 13): at the Host of their Space, else kept here. The devices give them too. */
 	let projectSecrets: ProjectSecrets | null = null;
-	const config = await openConfigStores({
+	const { config, keyStore, toolLaunchers } = await wireDaemonConfig({
+		env,
+		dataDir,
 		document,
-		env: fallbacks,
-		secrets: await secretStore({ dataDir, ...keyStore }),
 		personal: () => personalSecrets,
 		projects: () => projectSecrets,
 	});
-	const { settings, connections, cliTools, profiles } = config;
+	const { settings, connections, profiles } = config;
 	hostSettings = () => settings.current();
-	// Each CLI tool with a login runs through a launcher of its step. A
-	// login's own folder is in the data folder, so it outlives a restart.
-	const toolLaunchers = createToolLaunchers({
-		tools: cliTools,
-		secretEnv: (names, use) => connections.secretEnv(names, use),
-		dataDir,
-		env: { ...process.env, ...env },
-	});
 
 	await slots.replace(
 		"nightshiftFacts",
@@ -414,14 +279,6 @@ async function makeDaemon(
 		() => new AbortController(),
 		(before) => before.abort(),
 	);
-
-	const harnesses = localHarnesses({
-		settings,
-		connections,
-		piAcp: options.piAcp,
-	});
-	/** The project's folder here: where its runs' worktrees branch from. */
-	const clonePath = clonePathOf(db, async () => device.id);
 
 	/**
 	 * "Send runs to your monitoring" (this computer's setting, off by
@@ -460,142 +317,35 @@ async function makeDaemon(
 		(before) => before.stop(),
 	);
 
-	/**
-	 * The Ollama search by meaning and Decision nodes use: the owner's
-	 * address, else OLLAMA_HOST, else this computer's. A Host (or a
-	 * computer whose owner turns it on) starts `ollama serve` itself when
-	 * none answers here, with its models in the data folder, and downloads
-	 * the embedding model. It follows the settings and the secrets.
-	 */
-	const ollama = await slots.replace(
-		"nightshiftOllama",
-		() =>
-			createOllama({
-				dataDir,
-				settings,
-				secrets: connections,
-				env: { ...process.env, ...env },
-			}),
-		(before) => before.stop(),
-	);
-	/**
-	 * This computer's Space archive (`<dataDir>/archive`): the walk files of
-	 * runs walked elsewhere and the knowledge content by hash, here and at
-	 * the Spaces' Hosts once the devices runtime below connects it. One
-	 * over the folder, for the knowledge and the devices both.
-	 */
-	const archive = createSpaceArchive(dataDir);
-	/**
-	 * The projects' knowledge on this computer (`<dataDir>/knowledge`):
-	 * each folder a working copy of its Project's knowledge in the Space
-	 * (ADR 4), in step before and after each step that gets it, and when
-	 * the Knowledge page reads it. The content travels by hash through the
-	 * archive. Search finds by words, and by meaning when the Ollama above
-	 * has the embedding model, unless a person turned it off for the
-	 * project.
-	 *
-	 * Replaced on a reload, whole: this daemon's closures and the code of
-	 * this reload, with nothing kept but what is on disk. The one before
-	 * closes first, so one Knowledge prepares vectors. The next search
-	 * opens the index file again, and what the one before knew of it comes
-	 * back from the file: unchanged sections are not embedded again.
-	 */
-	stopOlderKnowledge(hot);
 	/** Tells the open screens; set once the notifications below exist. */
 	let learningsChanged: (spaceId: string, projectId: string) => Promise<void> =
 		async () => {};
-	const folderLocks = await slots.keep(
-		"nightshiftKnowledgeFolderLocks",
-		createKnowledgeFolderLocks,
-	);
-	const knowledge = await slots.replace(
-		"nightshiftKnowledge",
-		() =>
-			createKnowledge({
-				db,
-				dataDir,
-				documents,
-				archive,
-				folderLocks,
-				device,
-				usage: telemetry,
-				meaning: () => ollama.meaning(),
-				// The page readers reach this computer's network as a Web request
-				// does, and take their key from this computer's secrets for a look.
-				privateNetwork: () => reachesPrivateNetwork(settings.current()),
-				secret: (name) => connections.secret(name),
-				notifications: {
-					learningsChanged: (spaceId, projectId) =>
-						learningsChanged(spaceId, projectId),
-				},
-			}),
-		(before) => before.close(),
-	);
-	// Decision nodes decided by a model: TanStack AI deciders, with API
-	// keys from the secrets: the run's Project first, when a step asks.
-	const decider = tanstackDecider({
-		secret: (name, run) => connections.secret(name, run ? { run } : undefined),
-		// The same Ollama search by meaning uses, with its headers.
-		ollama: () => {
-			const at = ollama.endpoint();
-			return { host: at.address, headers: at.headers };
-		},
+	const { ollama, archive, knowledge } = await wireDaemonKnowledge({
+		env,
+		slots,
+		db,
+		dataDir,
+		documents,
+		device,
+		usage: telemetry,
+		settings,
+		secrets: connections,
+		learningsChanged: (spaceId, projectId) =>
+			learningsChanged(spaceId, projectId),
 	});
-	/** This computer as a Device: every computer-touching piece of a step. */
-	const local = localDevice({
+	const { harnesses, decider, local } = wireLocalDevice({
 		id: device.id,
 		name: device.name,
-		harnesses,
-		decider,
-		// The models the person chose in Settings for Night Shift's own
-		// Decider and Brief writer. One that is gone counts as not chosen.
-		builtinModels: () => {
-			const chosen = settings.current().builtinAgents;
-			const pick = (
-				answer: BuiltinAnswer | undefined,
-				values: boolean,
-			): ModelPick | undefined => {
-				if (answer?.kind !== "model") return undefined;
-				const model = builtinModel(answer, profiles.list(), { values });
-				return "problem" in model ? undefined : model;
-			};
-			const own = pick(chosen.decider, false);
-			const briefWriter = pick(chosen["brief-writer"], true);
-			return {
-				...(own ? { decider: own } : {}),
-				...(briefWriter ? { briefWriter } : {}),
-			};
-		},
-		// This computer's configuration, as the stores of its Device document.
-		connections,
-		cliTools,
-		profiles,
+		config,
+		dataDir,
+		piAcp: options.piAcp,
 		toolLaunchers,
 		clonePath,
-		// A run of a project without a folder works in a folder of its own
-		// here, next to the run history (ADR 22).
-		runFolders: createRunFolders(dataDir),
-		// The flows another Device's older Walker asks this one for: the
-		// engine's (made below, before anyone can ask), a flow of format 6
-		// as the Device that saved it named its profiles.
-		flows: (projectId) => devices.engine.flows.flows(projectId),
-		// The files agents keep for the person, next to the run history.
-		artifacts: createArtifactStore(dataDir),
-		// The projects' knowledge, outside every repository, in step with the Space.
 		knowledge,
-		// What each step changed in the run's copy of the project, also by commands.
-		snapshots: true,
-		// A Claude Code session sends its own telemetry while the export is on.
-		sessionEnv: (session) => telemetry.sessionEnv(session),
-		// A session's output has every saved secret's value as •••, the
-		// Personal ones too, and those of Ollama's headers.
-		secretValues: async (use) => [
-			...(await connections.secretValues(use)),
-			...ollama.endpoint().secretValues,
-		],
-		// A Host reaches this computer and its network only when its
-		// Settings allow it: it serves every Member of its Spaces.
-		privateNetwork: () => reachesPrivateNetwork(settings.current()),
+		telemetry,
+		ollama,
+		// The engine's flows (made below, before anyone can ask).
+		flows: (projectId) => devices.engine.flows.flows(projectId),
 	});
 
 	/**
@@ -617,23 +367,12 @@ async function makeDaemon(
 		)
 		.catch((error) => console.warn("The price list was not updated:", error));
 
-	/**
-	 * This computer among Devices: the engine with its peers, the Host it
-	 * may be, its Offers and its Links to its Hosts. Secure by default: it
-	 * answers this computer only until it is a Host with an https://
-	 * address (read at start). On a `bun --hot` reload the runtime before
-	 * hands over to this one: its engine lets go of its runs first, and the
-	 * work of placed steps goes on.
-	 */
-	slots.handOver("nightshiftDevices", (handover) => handover.release());
-	const devices = await startDevices({
-		...(dev ? { dev: true } : {}),
-		...(env.NIGHTSHIFT_DEV_LINK_HOST === "true" ? { devLinkHost: true } : {}),
-		// Test daemons on one computer are Devices of their own.
-		machine: env.NODE_ENV === "test" ? null : await machineFingerprint({ dev }),
+	const { devices, sync } = await wireDaemonDevices({
+		dev,
+		env,
+		slots,
 		auth,
 		db,
-		env,
 		settings,
 		profiles,
 		document,
@@ -646,115 +385,49 @@ async function makeDaemon(
 		dataDir,
 		archive,
 		keyStore,
-		// What seals the Personal secrets this computer keeps (ADR 13).
-		secretsKey: secretsKey({ ...process.env, ...env }, dataDir),
-		// What this computer moves of its own secrets when its Home Host
-		// asks for its owner: saved in the new scope, then removed here.
-		ownSecrets: connections,
-		// NIGHTSHIFT_SCHEDULER=off: no scheduler at all, whatever Settings says.
-		// Otherwise the Settings switch is read on every tick.
-		scheduler:
-			env.NIGHTSHIFT_SCHEDULER === "off" ? false : { signal: scheduler.signal },
+		connections,
+		scheduler,
 		usage: telemetry,
-		// The secret a webhook schedule names: its project's first.
-		secret: (name, project) => connections.webhookSecret(name, project),
-		// The relay below is made once per process, before any access is removed.
-		disconnect: (deviceId) =>
-			hot.nightshiftSync?.disconnect(
-				(context) => context.deviceId === deviceId,
-			),
-		// A Space move takes the notifier's log of the moved runs along.
-		// Their new Space's sender notifies for them from then on.
-		moveRows: [deliveryMoves(db, sendsPushesFor(db, settings, person))],
+		moveRows: [notificationMoves(db, settings, person)],
 		// A moved Project's knowledge follows it, to its new id when it has one.
 		projectsMoved: (move) => knowledge.moved(move),
-		kept: hot,
-		...(outside.hosts ? { hostClient: outside.hosts } : {}),
-		...(outside.documents ? { documentChannel: outside.documents } : {}),
+		hosts: outside.hosts,
+		documentChannel: outside.documents,
+		sessions: {
+			auth,
+			localSession,
+			ownerId: person.userId,
+			policy: hostPolicy,
+		},
+		trustedOrigins,
+		started: (started) => {
+			personalSecrets = started.personalSecrets;
+			projectSecrets = started.projectSecrets;
+			knowledge.connect({
+				inStep: started.inStep,
+				// The Spaces with no Host: this Replica keeps their knowledge content.
+				keeps: async (spaceId) =>
+					(await started.engine.hostSpaces.hostOf(spaceId)) === null,
+			});
+		},
 	});
 	const { engine } = devices;
-	personalSecrets = devices.personalSecrets;
-	projectSecrets = devices.projectSecrets;
-	knowledge.connect({
-		inStep: devices.inStep,
-		// The Spaces with no Host: this Replica keeps their knowledge content.
-		keeps: async (spaceId) =>
-			(await engine.hostSpaces.hostOf(spaceId)) === null,
-	});
 
-	/**
-	 * The relay's document half: the owner's clients sync this Device's
-	 * document here. Kept across `bun --hot` reloads with its connections,
-	 * like the document, and bound to this daemon's closures.
-	 */
-	const sync = await keepSync(
+	const screens = await wireDaemonNotifications({
+		db,
+		env,
+		engine,
+		settings,
+		device,
+		owner: person,
+		desktop: options.desktop,
 		slots,
-		servedDocuments({
-			db,
-			documents,
-			registry: engine.devices,
-			deviceKey: (token) => devices.host.syncKey(token),
-			sessions: {
-				auth,
-				localSession,
-				ownerId: person.userId,
-				isThisComputer: (peer, request) =>
-					isThisComputer(peer, request, trustedOrigins),
-				policy: hostPolicy,
-			},
-		}),
-	);
-
-	const { notifications, settings: computerSettings } = await wireNotifications(
-		{
-			db,
-			env,
-			engine,
-			settings,
-			device,
-			owner: person,
-			desktop: options.desktop,
-			slots,
-		},
-	);
-	// An action that travels to another Device as a command logs nothing
-	// here until that Device applies it: the open screens hear of it now,
-	// so an answered Gate leaves every screen at once.
-	engine.exchange.commands.onChanged(({ spaceId, runId }) => {
-		notifications.runChanged(spaceId, runId).catch((error: unknown) => {
-			console.error("Could not tell the open screens of a run:", error);
-		});
+		documents,
 	});
-	projectsChanged = (spaceId) => {
-		notifications.projectsChanged(spaceId).catch((error: unknown) => {
-			console.error("Could not tell the open screens of new projects:", error);
-		});
-	};
-	// The same for an action that waits on a Host for another Device: this
-	// computer's own answer, or one from the phone.
-	engine.exchange.pendingOnHosts.onChanged(({ spaceId, runId }) => {
-		notifications.runChanged(spaceId, runId).catch((error: unknown) => {
-			console.error("Could not tell the open screens of a run:", error);
-		});
-	});
-	// A reload binds the kept documents to this daemon's notifications.
-	if (typeof documents.watchStored === "function") {
-		documents.watchStored((document) => tellDocument(document.name));
-	}
-	tellDocument = (name) => {
-		documentAudience(name, {
-			documentOf: (of) => documents.documentOf(of),
-			personId: person.userId,
-		})
-			.then(
-				(audience) =>
-					audience && notifications.documentChanged({ name, ...audience }),
-			)
-			.catch((error: unknown) => {
-				console.error("Could not tell the open screens of a document:", error);
-			});
-	};
-	learningsChanged = notifications.learningsChanged;
+	const { notifications, computerSettings } = screens;
+	projectsChanged = screens.projectsChanged;
+	tellDocument = screens.tellDocument;
+	learningsChanged = screens.learningsChanged;
 	usageSnapshot = () =>
 		usageFacts({
 			db,
@@ -784,7 +457,7 @@ async function makeDaemon(
 		() =>
 			createKeepAwake({
 				enabled: () => settings.current().keepAwake,
-				runs: engineRunSource(engine, () => spaceIds(db)),
+				runs: engineRunSource(engine, () => spaceIds()),
 				lock:
 					outside.sleepLock !== undefined
 						? outside.sleepLock
@@ -795,78 +468,27 @@ async function makeDaemon(
 	// Not awaited: it reads the runs that have not ended.
 	void keepAwake.start();
 
-	const gitInstaller = systemGitInstaller();
-	// A clone from GitHub outlives a `bun --hot` reload: keep who tracks it.
-	const gitHubClones = await slots.keep("nightshiftGitHubClones", () =>
-		createGitHubClones({ dataDir }),
-	);
-	/**
-	 * "Copy every project": a Host copies each project of its Spaces it has
-	 * no Clone of. New on each reload, so it adds Clones through this
-	 * engine. A clone it started goes on in `gitHubClones`.
-	 */
-	const projectCopies = await slots.replace(
-		"nightshiftProjectCopies",
-		() =>
-			createProjectCopies({
-				gitHub: gitHubClones,
-				spaceIds: () => spaceIds(db),
-				space: (spaceId, actor) => engine.space(spaceId, actor),
-				enabled: () => {
-					const current = settings.current();
-					return current.host && current.copyProjects;
-				},
-				usage: telemetry,
-			}),
-		(before) => before.stop(),
-	);
-	projectCopies.start();
+	const projectSetup = await wireProjectCopies({
+		slots,
+		dataDir,
+		spaceIds: () => spaceIds(),
+		space: (spaceId, actor) => engine.space(spaceId, actor),
+		settings,
+		usage: telemetry,
+	});
 
-	/** The read-only checks of programs. A harness's check notes `agent-checked`. */
-	const checks: Context["checks"] = {
-		...programChecks(),
-		harness: async (harness, bin) => {
-			const check = await programChecks().harness(harness, bin);
-			telemetry.note({
-				kind: "agent-checked",
-				harness,
-				installed: check.path !== null,
-				signIn: check.signIn,
-			});
-			return check;
-		},
-	};
-	/**
-	 * Installs an agent CLI and signs it in, when the person asks for it on
-	 * this computer (ADR 25). A reload stops what it runs.
-	 */
-	const agentSetup = await slots.replace(
-		"nightshiftAgentSetup",
-		() =>
-			createAgentSetup({
-				stores: config,
-				check: (harness, bin) => checks.harness(harness, bin),
-				container: inContainer(),
-			}),
-		(before) => before.stop(),
-	);
-	/**
-	 * Sets up a decider, when the person asks for it on this computer (Q22):
-	 * Ollama with its small model, or a TypeSafe key. A reload stops what
-	 * it runs.
-	 */
-	const deciderSetup = await slots.replace(
-		"nightshiftDeciderSetup",
-		() =>
-			createDeciderSetup({
-				stores: config,
-				ollama,
-				localModel: DECIDER_SETUP.localModel,
-				typesafeKey: DECIDER_SETUP.typesafeKey,
-				container: inContainer(),
-			}),
-		(before) => before.stop(),
-	);
+	// The Space view for the session's Person: these calls come behind the API.
+	const asked = (at: { spaceId: string; personId: string }) =>
+		engine.space(at.spaceId, { personId: at.personId, door: "session" });
+	const setups = await wireSetups({
+		slots,
+		config,
+		toolLaunchers,
+		deviceId: device.id,
+		space: asked,
+		ollama,
+		usage: telemetry,
+	});
 
 	const info: DaemonInfo = {
 		dataDir,
@@ -882,72 +504,23 @@ async function makeDaemon(
 		reach: devices.reach,
 	};
 
-	// The Space view for the session's Person: these calls come behind the API.
-	const asked = (at: { spaceId: string; personId: string }) =>
-		engine.space(at.spaceId, { personId: at.personId, door: "session" });
-	// Suggestions and chats in the flow editor: on this computer's
-	// profiles, read only in the project's Clone. A chat reads the
-	// project's flows and runs as the Person sees them in the Space.
-	const assistantDeps: Parameters<typeof createAssistant>[0] = {
-		profiles,
-		settings,
-		...harnessLookup(harnesses, settings),
+	const assistant = wireDaemonAssistant({
+		config,
+		harnesses,
+		decider,
+		dataDir,
 		clonePath,
-		withoutFolder: withoutFolderOf(db),
+		withoutFolder: projects.withoutFolder,
 		space: asked,
-		cliTools,
-		connections,
-		// The Explainer, the Field writer and the Learner on a model of this computer.
-		decide: async (input) =>
-			decider.value
-				? decider.value(input)
-				: {
-						kind: "error",
-						errorKind: "harness",
-						message: "This computer has no model that writes an answer.",
-						costUsd: null,
-					},
-		// The check of the Decider picks an option, as a Decision does.
-		decideOption: (input) => decider.decide(input),
-		ownFolder: async () => {
-			const folder = join(dataDir, "assistant");
-			await mkdir(folder, { recursive: true });
-			return folder;
-		},
-	};
-
-	/**
-	 * Learnings from runs that ended (ADR 37): when a run this computer
-	 * walks ends with a signal, the Learner proposes what to learn, into the
-	 * project's knowledge. Its cost goes to the run's Space. A reload stops
-	 * the one before: one look back follows the runs.
-	 */
-	await slots.replace(
-		"nightshiftRunLearnings",
-		() => {
-			const learnings = createRunLearnings({
-				runs: engine,
-				knowledge,
-				learn: createLearner({
-					...assistantDeps,
-					keep: (cost) => engine.keepAnswerCost(cost),
-					personId: person.userId,
-				}),
-				lines: transcriptLines,
-			});
-			return { stop: learnings.follow() };
-		},
-		(before) => before.stop(),
-	);
-
-	// The assistant, with one record kept per answer that spent something:
-	// the Spend page shows what Night Shift's own agents cost.
-	const assistantWithCosts = (deps: Parameters<typeof createAssistant>[0]) =>
-		recordingAssistant(createAssistant(deps), {
-			keep: (cost) => engine.keepAnswerCost(cost),
-			projectOfRun: async (runId, at) =>
-				(await asked(at).getRun(runId)).projectId,
-		});
+		engine,
+		personId: person.userId,
+	});
+	await followRunLearnings({
+		slots,
+		runs: engine,
+		knowledge,
+		learner: assistant.learner,
+	});
 
 	const http = createHttp({
 		...config,
@@ -965,30 +538,15 @@ async function makeDaemon(
 		settings: computerSettings,
 		notifications,
 		toolLaunchers,
-		configUse: createConfigUse({
-			deviceId: device.id,
-			space: asked,
-			connections,
-			cliTools,
-			profiles,
-			toolLaunchers,
-		}),
-		assistant: assistantWithCosts(assistantDeps),
-		checks,
-		agentSetup,
-		deciderSetup,
+		configUse: setups.configUse,
+		assistant: assistant.withCosts(),
+		checks: setups.checks,
+		agentSetup: setups.agentSetup,
+		deciderSetup: setups.deciderSetup,
 		usage: telemetry,
 		knowledge,
 		ollama,
-		projectSetup: {
-			check: (path) => checkProjectFolder(path),
-			setUpGit: (input) => setUpGit(input),
-			installGit: () => gitInstaller.install(),
-			chooseFolder: (prompt) => chooseFolder(prompt),
-			folderPicker: canChooseFolder(),
-			gitHub: gitHubClones,
-			copies: projectCopies,
-		},
+		projectSetup,
 		daemon: {
 			dataDir: info.dataDir,
 			device: info.device,
@@ -1006,7 +564,7 @@ async function makeDaemon(
 	return {
 		...http,
 		info,
-		ownerHasLogin: () => hasLogin(db, person.userId),
+		ownerHasLogin: owner.ownerHasLogin,
 		stop,
 		onLeaseHeartbeat: (listener) => lease.onHeartbeat(listener),
 	};

@@ -1,0 +1,112 @@
+import type { Context } from "@nightshift/api/context";
+import type { Database } from "@nightshift/db";
+import { createFlowDocuments } from "@nightshift/engine";
+import type { openConfigStores } from "@nightshift/engine/device-config";
+import {
+	checkProjectFolder,
+	clonePathOf,
+	createGitHubClones,
+	createProjectCopies,
+	createSpaceDocuments,
+	setUpGit,
+	systemGitInstaller,
+	withoutFolderOf,
+} from "@nightshift/engine/projects";
+import {
+	canChooseFolder,
+	chooseFolder,
+	type HotRegistry,
+	type HotSlots,
+} from "./runtime";
+
+type SpaceDocumentsDeps = Parameters<typeof createSpaceDocuments>[0];
+type CopiesDeps = Parameters<typeof createProjectCopies>[0];
+type Settings = Awaited<ReturnType<typeof openConfigStores>>["settings"];
+
+/**
+ * The projects block of the daemon's composition (`daemon.ts`): the Space
+ * and flow documents, and where a project's folder is here. The lanes of
+ * `projects` and `flows` edit this file, not `daemon.ts`. Nothing is read
+ * until a call asks.
+ */
+export function wireDaemonProjects(deps: {
+	db: Database;
+	documents: SpaceDocumentsDeps["documents"];
+	directory: SpaceDocumentsDeps["directory"];
+	/** This computer's Device id, once its row exists. */
+	selfId: () => Promise<string>;
+	/** Tells the open screens; set once the notifications exist. */
+	projectsChanged: (spaceId: string) => void;
+}) {
+	const { db, documents } = deps;
+	/**
+	 * The Space documents: each Space's Projects, Clones (existence only) and
+	 * Members. The engine defines Projects in them, the relay serves them to
+	 * Members, and the auth hooks keep their Members in step.
+	 */
+	const spaces = createSpaceDocuments({
+		db,
+		directory: deps.directory,
+		documents,
+		onProjected: (spaceId) => deps.projectsChanged(spaceId),
+	});
+	return {
+		spaces,
+		/** The flow documents: each Project's flows and schedules, and their revisions. */
+		flows: createFlowDocuments({ db, documents }),
+		/** The project's folder here: where its runs' worktrees branch from. */
+		clonePath: clonePathOf(db, deps.selfId),
+		/** Whether a project works without a folder (ADR 22). */
+		withoutFolder: withoutFolderOf(db),
+	};
+}
+
+/**
+ * The project copies and the guided setup of a project's folder: what the
+ * API's project setup routes call.
+ */
+export async function wireProjectCopies(deps: {
+	slots: Pick<HotSlots<HotRegistry>, "keep" | "replace">;
+	dataDir: string;
+	spaceIds: CopiesDeps["spaceIds"];
+	space: CopiesDeps["space"];
+	settings: Settings;
+	usage: CopiesDeps["usage"];
+}): Promise<Context["projectSetup"]> {
+	const { slots, settings } = deps;
+	const gitInstaller = systemGitInstaller();
+	// A clone from GitHub outlives a `bun --hot` reload: keep who tracks it.
+	const gitHubClones = await slots.keep("nightshiftGitHubClones", () =>
+		createGitHubClones({ dataDir: deps.dataDir }),
+	);
+	/**
+	 * "Copy every project": a Host copies each project of its Spaces it has
+	 * no Clone of. New on each reload, so it adds Clones through this
+	 * engine. A clone it started goes on in `gitHubClones`.
+	 */
+	const projectCopies = await slots.replace(
+		"nightshiftProjectCopies",
+		() =>
+			createProjectCopies({
+				gitHub: gitHubClones,
+				spaceIds: deps.spaceIds,
+				space: deps.space,
+				enabled: () => {
+					const current = settings.current();
+					return current.host && current.copyProjects;
+				},
+				usage: deps.usage,
+			}),
+		(before) => before.stop(),
+	);
+	projectCopies.start();
+	return {
+		check: (path) => checkProjectFolder(path),
+		setUpGit: (input) => setUpGit(input),
+		installGit: () => gitInstaller.install(),
+		chooseFolder: (prompt) => chooseFolder(prompt),
+		folderPicker: canChooseFolder(),
+		gitHub: gitHubClones,
+		copies: projectCopies,
+	};
+}
