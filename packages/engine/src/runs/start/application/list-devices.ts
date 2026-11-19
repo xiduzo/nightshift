@@ -5,9 +5,11 @@ import {
 	type OwnDevice,
 	personOf,
 } from "../../../contract";
+import type { Access } from "../../access";
 import type { RunPlanner } from "./ports";
 
 export type ListDevicesPorts = {
+	openSpace: Access["openSpace"];
 	planner: Pick<RunPlanner, "devicesFor">;
 };
 
@@ -21,8 +23,8 @@ export type ListDevices = {
 /**
  * The Devices the Person may place a run's steps on: their own, then
  * others' through Offers. With `forNode`, the Devices that node may name.
- * Needs a Person (`signed-out`). The door checks that they are a Member of
- * the Space (until lane R8 moves that check here).
+ * Needs a Person (`signed-out`) who is a Member of the Space
+ * (`SpaceNotFound`).
  */
 export const listDevices =
 	(ports: ListDevicesPorts) =>
@@ -32,5 +34,6 @@ export const listDevices =
 		if (personId === null) {
 			throw new Refusal("signed-out", "Sign in to see your devices.");
 		}
+		await ports.openSpace(actor, { spaceId });
 		return ports.planner.devicesFor(spaceId, personId, projectId, forNode);
 	};

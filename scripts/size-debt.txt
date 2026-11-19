@@ -7,7 +7,7 @@
 # limit. Add no line here.
 # `bun scripts/check-budgets.ts --tighten` lowers the numbers to today's.
 packages/daemon/src/daemon.ts 1013
-packages/devices/src/exchange/host-exchange.ts 723
+packages/devices/src/exchange/host-exchange.ts 715
 packages/engine/src/device-config/connections.ts 1178
 packages/engine/src/device-config/settings.ts 848
 packages/engine/src/device/local.ts 902

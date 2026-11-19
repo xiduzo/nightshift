@@ -1,4 +1,3 @@
-import { NIGHT_SHIFT } from "./contract";
 import { type Access, type Move, type Walk, wireActions } from "./runs";
 import type { UsageNotes } from "./usage";
 
@@ -10,48 +9,31 @@ import type { UsageNotes } from "./usage";
  *
  * It gives `actions`: the Space view reads `actions.act`. And `runs`: the
  * run use cases of `Engine.runs` this block holds. Both are the same use
- * cases. Only the way they open a run differs: the Space view reads no
- * role yet (see below).
+ * cases: each opens the run for its actor and checks the actor's role.
  */
 export function wireEngineActions(deps: {
 	access: Pick<Access, "openRun">;
 	walk: Pick<Walk, "facts" | "turns" | "walkers" | "holds">;
-	/** The answer to a Gate (`answerGate` of `gates/`), over a way to open a run. */
-	answer(
-		openRun: Access["openRun"],
-	): Parameters<typeof wireActions>[0]["answer"];
-	/** The move of a run (`runs/move/`), over a way to open a run. */
-	moveRunWith(openRun: Access["openRun"]): Move["moveRun"];
+	/** The answer to a Gate (`answerGate` of `gates/`). */
+	answer: Parameters<typeof wireActions>[0]["answer"];
+	/** The move of a run (`moveRun` of `runs/move/`). */
+	move: Move["moveRun"];
 	/** Lets go of a run's leases (`LeaseKeeper.release`). */
 	leases: Parameters<typeof wireActions>[0]["leases"];
 	/** Anonymous usage, when this computer records it. */
 	usage?: UsageNotes;
 }) {
-	/** The actions, with the answer and the move, over one way to open a run. */
-	function bind(openRun: Access["openRun"]) {
-		const acts = wireActions({
-			access: { openRun },
-			walk: deps.walk,
-			leases: deps.leases,
-			...(deps.usage ? { usage: deps.usage } : {}),
-			answer: deps.answer(openRun),
-			move: deps.moveRunWith(openRun),
-		});
-		return { acts };
-	}
-
-	// The Space view: each door checks the Person's role before it calls
-	// `act` (the API, the Host, the Walker). Until lane R8 moves that check
-	// into the use cases, the view opens the run as before: in its Space,
-	// with no role read. So no door answers differently.
-	const view = bind((_actor, { runId, spaceId }) =>
-		deps.access.openRun(NIGHT_SHIFT, { runId, spaceId }),
-	);
-	// `Engine.runs`: each use case checks the actor's role itself.
-	const { acts } = bind(deps.access.openRun);
+	const acts = wireActions({
+		access: deps.access,
+		walk: deps.walk,
+		leases: deps.leases,
+		...(deps.usage ? { usage: deps.usage } : {}),
+		answer: deps.answer,
+		move: deps.move,
+	});
 
 	return {
-		actions: { act: view.acts.actOnRun },
+		actions: { act: acts.actOnRun },
 		runs: {
 			act: acts.actOnRun,
 			stop: acts.stopRun,

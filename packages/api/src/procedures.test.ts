@@ -214,7 +214,8 @@ function engineChecks(access: Context["access"]) {
 /**
  * The context of a request with `access`, on a computer `ownerId` owns,
  * over recording services. The Space view of each Space records its
- * calls with the Space. The engine's run use cases (`Engine.runs`) check
+ * calls with the Space. Its starts (`startRun`, `runScheduleNow`) check
+ * the Person's role first (`engineChecks`). The engine's run use cases (`Engine.runs`) check
  * who may first (`engineChecks`), then record the call as `runs.<name>`
  * with the run's Space. The engine's inbox is its own use case over the
  * database, and records each Space's list of open Gates as `listGates`.
@@ -250,6 +251,7 @@ function recording(
 			(method, args) => record(method.slice("space.".length), args),
 			{
 				given: {
+					startRun: checked("startRun", START),
 					runScheduleNow: checked("runScheduleNow", START),
 					...given.space,
 				},

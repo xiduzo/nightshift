@@ -559,7 +559,7 @@ export function createEngine(
 	});
 
 	// --- move (R5): `wire-move.ts` ---
-	// gives: move.arrive (peers), move.moveRunWith (actions), move.moveTargets
+	// gives: move.arrive (peers), move.moveRun (actions), move.moveTargets
 	// (the Space view), move.runs (the engine)
 	const move = wireEngineMove({ access, walk, db, peers, walks, device });
 
@@ -571,8 +571,8 @@ export function createEngine(
 	const acts = wireEngineActions({
 		access,
 		walk,
-		answer: gates.answerWith,
-		moveRunWith: move.moveRunWith,
+		answer: gates.answer,
+		move: move.moveRun,
 		leases,
 		...(options.usage ? { usage: options.usage } : {}),
 	});

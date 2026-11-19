@@ -102,7 +102,7 @@ export function wireStart(deps: StartDeps): Start {
 	return {
 		startRun: startRun({ ...placing, openSpace: deps.openSpace }),
 		startScheduledRun: startScheduledRun(placing),
-		listPlacements: listPlacements({ planner }),
-		listDevices: listDevices({ planner }),
+		listPlacements: listPlacements({ planner, openSpace: deps.openSpace }),
+		listDevices: listDevices({ planner, openSpace: deps.openSpace }),
 	};
 }

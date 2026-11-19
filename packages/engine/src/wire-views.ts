@@ -1,7 +1,6 @@
 import { harnessFacts } from "@nightshift/agents/harness-facts";
 import type { Database } from "@nightshift/db";
 import { isCustomHarness } from "@nightshift/flows";
-import { NIGHT_SHIFT } from "./contract";
 import type { RunBus, RunHistory, RunLog } from "./log";
 import type { Peers } from "./peers";
 import { type Access, wireViews } from "./runs";
@@ -49,20 +48,6 @@ export function wireEngineViews(deps: {
 	};
 	/** Each read opens the run, or the Space, for its actor. */
 	const cases = wireViews({ ...stands, access: deps.access });
-	/**
-	 * The reads of the Space view open the run as Night Shift, as before
-	 * this lane: no role is read, and the actor still decides which paths
-	 * show. Whole-engine tests read as a Person who is no Member of the
-	 * Space (D6 of the run path plan). The API reaches the checked reads
-	 * of `Engine.runs` in lane R8.
-	 */
-	const spaceCases = wireViews({
-		...stands,
-		access: {
-			openRun: (_actor, request) => deps.access.openRun(NIGHT_SHIFT, request),
-			openSpace: async () => {},
-		},
-	});
 	/** A disposed engine publishes nothing more: a read or a watch ends with it. */
 	const untilDisposed = <T extends { signal: AbortSignal }>(request: T): T => ({
 		...request,
@@ -73,7 +58,7 @@ export function wireEngineViews(deps: {
 		reads: cases.reads,
 		cases,
 		/** The views group of the Space view (`createSpaces`). */
-		forSpace: { views: spaceCases },
+		forSpace: { views: cases },
 		runs: {
 			list: cases.listRuns,
 			get: cases.readRun,

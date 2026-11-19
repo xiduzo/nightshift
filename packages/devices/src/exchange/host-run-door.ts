@@ -1,6 +1,7 @@
 import { ROLE_REFUSAL, RoleRefusal } from "@nightshift/auth";
 import {
 	type Engine,
+	type OwnDevice,
 	type PersonActor,
 	permissionOf,
 	type RunCommandInput,
@@ -8,6 +9,8 @@ import {
 	SpaceNotFound,
 	type StartRunInput,
 } from "@nightshift/engine";
+import { PROJECT_NOT_FOUND } from "@nightshift/engine/projects";
+import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/server";
 import type { Caller } from "../contract";
 
@@ -27,8 +30,10 @@ type Command = RunCommandInput & { runId: string };
  *   (`readable` of `host/keyed-call.ts`).
  * - A start in a Space the Person is not a Member of: FORBIDDEN too, as
  *   `Caller.may` refuses a Person who is not a Member.
+ * - The Devices of a project in such a Space: the project's not-found
+ *   (`PROJECT_NOT_FOUND`), a BAD_REQUEST with its kind.
  */
-export function hostRunDoor(engine: Pick<Engine, "runs">) {
+export function hostRunDoor(engine: Pick<Engine, "runs" | "space">) {
 	const actorOf = (caller: Caller): PersonActor => ({
 		personId: caller.personId,
 		door: "device-key",
@@ -82,5 +87,24 @@ export function hostRunDoor(engine: Pick<Engine, "runs">) {
 			input: StartRunInput & { spaceId: string },
 		): Promise<RunSummary> =>
 			asCaller(() => engine.runs.start(actorOf(caller), input), byRoleOrSpace),
+		/**
+		 * The Caller's Person's Devices for a project. A Space they are not a
+		 * Member of has no such project for them: `PROJECT_NOT_FOUND`.
+		 */
+		async devices(
+			caller: Caller,
+			input: { spaceId: string; projectId: string },
+		): Promise<OwnDevice[]> {
+			try {
+				return await engine
+					.space(input.spaceId, actorOf(caller))
+					.listDevices(input.projectId);
+			} catch (error) {
+				if (error instanceof SpaceNotFound) {
+					throw new Refusal("not-found", PROJECT_NOT_FOUND);
+				}
+				throw error;
+			}
+		},
 	};
 }

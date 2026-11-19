@@ -1,6 +1,5 @@
 import type { Database } from "@nightshift/db";
 import type { ArtifactStore } from "./artifacts";
-import { NIGHT_SHIFT } from "./contract";
 import { wireGates } from "./gates";
 import type { Access, Views, Walk } from "./runs";
 
@@ -9,12 +8,9 @@ import type { Access, Views, Walk } from "./runs";
  * that wait for a person (`gates/`). Lane R6 of the hexagon series owns
  * this file.
  *
- * It gives `answerWith`: the actions block takes the answer to a Gate from
- * it, over each way it opens a run. `forSpace`: the Space view's lists of
- * the open and the answered Gates. And `cases`: the use cases of
- * `Engine.gates` (the answer and the inbox). Each binding is the same use
- * cases. Only the way they open a run or a Space differs: the Space view
- * reads no role yet (see below).
+ * It gives `answer`: the actions block takes the answer to a Gate from it.
+ * `forSpace`: the Space view's lists of the open and the answered Gates.
+ * And `cases`: the use cases of `Engine.gates` (the answer and the inbox).
  */
 export function wireEngineGates(deps: {
 	db: Database;
@@ -27,42 +23,29 @@ export function wireEngineGates(deps: {
 	now(): number;
 }) {
 	const { reads } = deps.views;
-	/** The Gates over one way to open a run or a Space. */
-	const bind = (access: Pick<Access, "openRun" | "openSpace">) =>
-		wireGates({
-			access,
-			walk: deps.walk,
-			members: { db: deps.db },
-			gates: {
-				open: (spaceId) => reads.listGates(spaceId),
-				answered: (spaceId, since) => reads.listAnsweredGates(spaceId, since),
+	// Each use case opens the run, or the Space, for its actor and checks
+	// the actor's role itself.
+	const cases = wireGates({
+		access: deps.access,
+		walk: deps.walk,
+		members: { db: deps.db },
+		gates: {
+			open: (spaceId) => reads.listGates(spaceId),
+			answered: (spaceId, since) => reads.listAnsweredGates(spaceId, since),
+		},
+		files: {
+			save: async (answer) => {
+				await deps.artifacts.saveAnswer(answer);
 			},
-			files: {
-				save: async (answer) => {
-					await deps.artifacts.saveAnswer(answer);
-				},
-			},
-			now: deps.now,
-		});
-	// `Engine.gates`: each use case checks the actor's role itself.
-	const cases = bind(deps.access);
-	// The Space view: each door checks the Person's role before it calls the
-	// view (the API, the Host, the Walker, the notifier as Night Shift).
-	// Until lane R8 moves that check into the use cases, the view opens the
-	// run, or the Space, as before: no role is read. So no door answers
-	// differently.
-	const view = bind({
-		openRun: (_actor, { runId, spaceId }) =>
-			deps.access.openRun(NIGHT_SHIFT, { runId, spaceId }),
-		openSpace: async () => {},
+		},
+		now: deps.now,
 	});
 
 	return {
-		answerWith: (openRun: Access["openRun"]) =>
-			bind({ openRun, openSpace: deps.access.openSpace }).answerGate,
+		answer: cases.answerGate,
 		forSpace: {
-			listOpenGates: view.listOpenGates,
-			listAnsweredGates: view.listAnsweredGates,
+			listOpenGates: cases.listOpenGates,
+			listAnsweredGates: cases.listAnsweredGates,
 		},
 		cases: {
 			answer: cases.answerGate,

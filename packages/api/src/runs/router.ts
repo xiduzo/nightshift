@@ -3,7 +3,7 @@ import { labelSchema } from "@nightshift/flows";
 import { z } from "zod";
 
 import { output, stream } from "../output";
-import { openedStream, permitted, protectedProcedure } from "../procedures";
+import { openedStream, protectedProcedure } from "../procedures";
 import { runDetailSchema } from "./detail-schemas";
 import { artifactSchema, runFilesSchema } from "./file-schemas";
 import { ownDeviceSchema, placementSchema } from "./placement-schemas";
@@ -177,9 +177,10 @@ export const runs = {
 	 * Starts a flow file by name, or a flow given inline (a quick run). A
 	 * Device it names goes first. Without one, the flow says where (ADR 17).
 	 * A flow file may start as a test run, with pins and skips (`test`,
-	 * ADR 27).
+	 * ADR 27). The engine checks that the Person's role allows starting
+	 * runs in the Space.
 	 */
-	start: permitted({ run: ["start"] })
+	start: protectedProcedure
 		.route({
 			summary:
 				"Starts a run of a flow file, or of a flow given inline, or a test run of a flow file.",

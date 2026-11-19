@@ -10,7 +10,6 @@ import {
 	sharedAnswerCosts,
 	withoutPrivatePaths,
 } from "@nightshift/engine";
-import { PROJECT_NOT_FOUND } from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/server";
 import {
@@ -587,14 +586,7 @@ export function createHostExchange(deps: {
 			});
 		},
 
-		async devices(caller, input) {
-			if (!(await caller.member(input.spaceId))) {
-				throw new Refusal("not-found", PROJECT_NOT_FOUND);
-			}
-			return engine
-				.space(input.spaceId, door.actorOf(caller))
-				.listDevices(input.projectId);
-		},
+		devices: (caller, input) => door.devices(caller, input),
 
 		async *call(caller, { deviceId, request, stopId }, signal) {
 			// Known before its first wait: a stop right after the start finds it.

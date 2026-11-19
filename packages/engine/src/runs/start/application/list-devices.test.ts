@@ -15,6 +15,7 @@ const laptop: OwnDevice = {
 
 function devices() {
 	const ports = inMemoryStartPorts();
+	ports.access.members.join("space-own", "person-ada", "member");
 	ports.planner.offer({ devices: [laptop] });
 	return { ports, list: listDevices(ports) };
 }
@@ -49,14 +50,17 @@ describe("the Devices a person may place a step on", () => {
 		});
 	});
 
-	test("ask the Devices for the Person: the door checked their Membership", async () => {
+	test("need a Member of the Space, and ask nothing for anyone else", async () => {
 		const { ports, list } = devices();
-		await list(
-			{ personId: "person-eve" },
-			{ spaceId: "space-own", projectId: "project-1" },
-		);
-		expect(ports.planner.listed).toEqual([
-			{ spaceId: "space-own", personId: "person-eve", projectId: "project-1" },
-		]);
+		await expect(
+			list(
+				{ personId: "person-eve", door: "session" },
+				{ spaceId: "space-own", projectId: "project-1" },
+			),
+		).rejects.toMatchObject({
+			kind: "not-found",
+			message: "That Space does not exist.",
+		});
+		expect(ports.planner.listed).toEqual([]);
 	});
 });

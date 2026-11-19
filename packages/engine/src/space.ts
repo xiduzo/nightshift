@@ -82,7 +82,7 @@ export type SpacesDeps = {
 	): Promise<<T extends WithPaths>(summary: T) => Promise<T>>;
 
 	// --- views (R2) ---
-	/** The reads of the runs (`runs/views`). The wire decides who opens a run (D6). */
+	/** The reads of the runs (`runs/views`): each opens the run, or the Space, for the actor. */
 	views: Views;
 
 	// --- start (R3) ---
@@ -402,12 +402,11 @@ export function createSpaces(deps: SpacesDeps) {
 				await ready;
 				// Asked before the start: who may see the paths of the run.
 				const shown = await deps.pathsFor(spaceId, actor);
-				// As Night Shift until the doors hand their actor to `Engine.runs.start`
-				// (lane R8): each door checks `run.start` itself and names its Person
-				// in `startedBy`, and engine tests start runs for Persons who have no
-				// Member row.
 				return shown(
-					await deps.start.startRun(NIGHT_SHIFT, { ...input, spaceId }),
+					await deps.start.startRun(actor ?? NIGHT_SHIFT, {
+						...input,
+						spaceId,
+					}),
 				);
 			},
 

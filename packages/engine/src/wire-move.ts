@@ -1,5 +1,4 @@
 import type { Database } from "@nightshift/db";
-import { NIGHT_SHIFT } from "./contract";
 import type { RunWalks } from "./graph";
 import type { Peers } from "./peers";
 import { type Access, type Move, type Walk, wireMove } from "./runs";
@@ -11,9 +10,9 @@ import { type Access, type Move, type Walk, wireMove } from "./runs";
  * series owns this file.
  *
  * It gives `arrive`: the peers call it when a run another Device moved
- * here lands (`PeerRuns.takeOver`). `moveRunWith`: the move as the actions
- * take it (`wire-actions.ts`), over the way they open a run. `moveTargets`:
- * what the Space view lists. And `runs`: the run use cases of
+ * here lands (`PeerRuns.takeOver`). `moveRun`: the move as the actions
+ * take it (`wire-actions.ts`). `moveTargets`: what the Space view lists.
+ * And `runs`: the run use cases of
  * `Engine.runs` this block holds (`move`, `moveTargets`).
  */
 export function wireEngineMove(deps: {
@@ -33,42 +32,30 @@ export function wireEngineMove(deps: {
 	/** This computer as a Device. */
 	device: { id: string };
 }) {
-	/** The move's use cases, over one way to open a run. */
-	function bind(openRun: Access["openRun"]): Move {
-		return wireMove({
-			access: { openRun },
-			walk: deps.walk,
-			devices: deps.peers.placement,
-			handover: {
-				db: deps.db,
-				walkerId: () => deps.walk.facts.walkerId(),
-				archive: deps.peers.runs,
-				walks: deps.walks,
-			},
-			device: deps.device,
-		});
-	}
-
-	// `Engine.runs`: each use case checks the actor's role itself.
-	const checked = bind(deps.access.openRun);
-	// The Space view: each door checks the Person's role before it asks
-	// (the API, the Host, the Walker). Until lane R8 moves that check into
-	// the use cases, the view opens the run as before: in its Space, as
-	// Night Shift, with no role read. So no door answers differently.
-	const view = bind((_actor, { runId, spaceId }) =>
-		deps.access.openRun(NIGHT_SHIFT, { runId, spaceId }),
-	);
+	// Each use case opens the run for its actor and checks the actor's role.
+	const move: Move = wireMove({
+		access: deps.access,
+		walk: deps.walk,
+		devices: deps.peers.placement,
+		handover: {
+			db: deps.db,
+			walkerId: () => deps.walk.facts.walkerId(),
+			archive: deps.peers.runs,
+			walks: deps.walks,
+		},
+		device: deps.device,
+	});
 
 	return {
 		/** This computer walks a run that another Device moved here. */
-		arrive: checked.arriveRun,
-		/** The move, over the way the actions open a run (`wire-actions.ts`). */
-		moveRunWith: (openRun: Access["openRun"]) => bind(openRun).moveRun,
+		arrive: move.arriveRun,
+		/** The move, as the actions take it (`wire-actions.ts`). */
+		moveRun: move.moveRun,
 		/** The Devices a run can move to, as the Space view lists them. */
-		moveTargets: view.listMoveTargets,
+		moveTargets: move.listMoveTargets,
 		runs: {
-			move: checked.moveRun,
-			moveTargets: checked.listMoveTargets,
+			move: move.moveRun,
+			moveTargets: move.listMoveTargets,
 		},
 	};
 }
