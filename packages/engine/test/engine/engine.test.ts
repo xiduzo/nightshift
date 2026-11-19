@@ -26,6 +26,7 @@ import {
 } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { asc, eq } from "drizzle-orm";
+import { NIGHT_SHIFT } from "../../src/contract";
 import {
 	defaultRunSettings,
 	type RunSettings,
@@ -84,7 +85,10 @@ function makeEngine(
 	> = {},
 	internals: EngineInternals = {},
 ): SpaceEngine {
-	return makeDaemon(harness, options, internals).space(sandbox.spaceId);
+	return makeDaemon(harness, options, internals).space(
+		sandbox.spaceId,
+		NIGHT_SHIFT,
+	);
 }
 
 /** The whole engine of a daemon, for what it does outside a Space. */
@@ -1194,7 +1198,10 @@ describe("stop and resume", () => {
 				},
 			};
 			const { harness, sessions } = scriptedHarness();
-			const engine = makeDaemon(harness, {}, { runLog }).space(sandbox.spaceId);
+			const engine = makeDaemon(harness, {}, { runLog }).space(
+				sandbox.spaceId,
+				NIGHT_SHIFT,
+			);
 			const run = await engine.startRun({
 				projectId: await projectId(engine),
 				flow: flowOf(
@@ -1834,7 +1841,7 @@ describe("watchRun", () => {
 	test("ends when the engine is disposed, so the watcher reconnects to the next one", async () => {
 		const { harness, sessions } = scriptedHarness({ hang: true });
 		const daemon = makeDaemon(harness);
-		const engine = daemon.space(sandbox.spaceId);
+		const engine = daemon.space(sandbox.spaceId, NIGHT_SHIFT);
 		const run = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: flowOf([agent("worker", "Go")]),
@@ -1877,7 +1884,7 @@ describe("a Space whose Projects move", () => {
 	test("a person's resume, restart and run again are refused as a start is, until the release", async () => {
 		const { harness, sessions } = scriptedHarness();
 		const daemon = makeDaemon(harness);
-		const engine = daemon.space(sandbox.spaceId);
+		const engine = daemon.space(sandbox.spaceId, NIGHT_SHIFT);
 		const run = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: flowOf([agent("worker", "Go")]),
@@ -2116,7 +2123,7 @@ describe("automatic resume after a restart", () => {
 			harnessSessionId: () => "harness-0",
 		});
 		const daemon = makeDaemon(old.harness);
-		const first = daemon.space(sandbox.spaceId);
+		const first = daemon.space(sandbox.spaceId, NIGHT_SHIFT);
 		const run = await first.startRun({
 			projectId: await projectId(first),
 			flow: flowOf(
@@ -2247,7 +2254,7 @@ describe("automatic resume after a restart", () => {
 		});
 		const daemon = makeDaemon(harness, {}, { resumeGraceMs: 100 });
 		const release = await holdSpace(daemon, sandbox.spaceId);
-		const engine = daemon.space(sandbox.spaceId);
+		const engine = daemon.space(sandbox.spaceId, NIGHT_SHIFT);
 		expect(await statusOf(engine, run.id)).toBe("interrupted");
 		await Bun.sleep(250);
 		expect(sessions).toHaveLength(0);
@@ -2418,7 +2425,7 @@ describe("deadlines without timers", () => {
 			{},
 			{ minuteMs: 100, overdueSweepMs: 20 },
 		);
-		const engine = daemon.space(sandbox.spaceId);
+		const engine = daemon.space(sandbox.spaceId, NIGHT_SHIFT);
 		const id = await projectId(engine);
 		// The step's own timers never fire: they are set while timers are frozen.
 		const run = await withFrozenTimers(async () => {
@@ -2922,7 +2929,7 @@ describe("gates", () => {
 
 	test("onLandedFacts tells what each run event that lands means, with its Space", async () => {
 		const daemon = makeDaemon(fakeHarness());
-		const engine = daemon.space(sandbox.spaceId);
+		const engine = daemon.space(sandbox.spaceId, NIGHT_SHIFT);
 		const landed: LandedFact[] = [];
 		const off = daemon.onLandedFacts((facts) => {
 			landed.push(...facts);

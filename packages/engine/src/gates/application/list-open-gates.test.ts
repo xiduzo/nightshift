@@ -31,7 +31,10 @@ describe("listOpenGates", () => {
 		const ports = inMemoryGatePorts();
 		ports.gates.setOpen(SPACE, [openGate(SPACE, "a", 1)]);
 		const refused = await refusalOf(
-			listOpenGates(ports)({ personId: "person-nobody" }, { spaceId: SPACE }),
+			listOpenGates(ports)(
+				{ personId: "person-nobody", door: "session" },
+				{ spaceId: SPACE },
+			),
 		);
 		expect(refused?.kind).toBe("not-found");
 		expect(ports.gates.asked).toEqual([]);

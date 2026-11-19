@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { type Device, localDevice } from "@nightshift/engine";
+import { type Device, localDevice, NIGHT_SHIFT } from "@nightshift/engine";
 import type { RunStatus } from "@nightshift/engine/run-status";
 import {
 	createSandbox,
@@ -47,7 +47,9 @@ beforeEach(async () => {
 	};
 	paired = await pairedReplicas(a, b, { hostWork: work });
 	projectId = (
-		await paired.host.space(a.spaceId).addProject({ repoPath: a.repoPath })
+		await paired.host
+			.space(a.spaceId, NIGHT_SHIFT)
+			.addProject({ repoPath: a.repoPath })
 	).id;
 	await paired.projectOnDevice(projectId, { clone: true });
 	await paired.hostExchange.addClone(await paired.caller(), {
@@ -84,7 +86,8 @@ afterEach(async () => {
 	await Promise.all([a, b].map((s) => s.cleanup()));
 });
 
-const space = () => paired.host.space(a.spaceId, { personId: paired.personId });
+const space = () =>
+	paired.host.space(a.spaceId, { personId: paired.personId, door: "session" });
 
 function until(runId: string, status: RunStatus) {
 	return waitFor(

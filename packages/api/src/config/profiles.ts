@@ -72,7 +72,7 @@ export const profiles = {
 				throw new Refusal("not-found", "That Space does not exist.");
 			}
 			const devices = await context.engine
-				.space(input.spaceId, { personId: context.session.user.id })
+				.space(input.spaceId, context.actor)
 				.listDevices(input.projectId);
 			return devices.map((d) => ({
 				deviceId: d.deviceId,

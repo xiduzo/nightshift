@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { Role } from "@nightshift/auth";
 import { event } from "@nightshift/db/schema";
-import { createEngine, type Engine } from "@nightshift/engine";
+import { createEngine, type Engine, NIGHT_SHIFT } from "@nightshift/engine";
 import {
 	createSandbox,
 	joinSpace,
@@ -52,7 +52,7 @@ beforeEach(async () => {
 		}),
 	);
 	({ id: projectId } = await engine
-		.space(sandbox.spaceId)
+		.space(sandbox.spaceId, NIGHT_SHIFT)
 		.addProject({ repoPath: sandbox.repoPath }));
 	// The Persons who ask are Members of the Space: the engine checks that too.
 	for (const role of ["owner", "member", "viewer"] as const) {

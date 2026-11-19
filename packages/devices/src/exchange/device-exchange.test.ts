@@ -11,6 +11,7 @@ import {
 	user,
 } from "@nightshift/db/schema";
 import type { RunStreamItem } from "@nightshift/engine";
+import { NIGHT_SHIFT } from "@nightshift/engine";
 import type { RunStatus } from "@nightshift/engine/run-status";
 import {
 	createRunLog,
@@ -82,7 +83,9 @@ beforeEach(async () => {
 	// The tests act on B as A's owner: B has their Membership of A's Space.
 	await joinSpace(b.db, a.spaceId, paired.personId, "owner");
 	projectId = (
-		await paired.host.space(a.spaceId).addProject({ repoPath: a.repoPath })
+		await paired.host
+			.space(a.spaceId, NIGHT_SHIFT)
+			.addProject({ repoPath: a.repoPath })
 	).id;
 	exchange = deviceExchange();
 	periods = [];
@@ -285,7 +288,7 @@ function slowFlow(marker: string): Flow {
 
 async function statusOn(engine: PeerEngine, runId: string) {
 	try {
-		return (await engine.space(a.spaceId).getRun(runId)).status;
+		return (await engine.space(a.spaceId, NIGHT_SHIFT).getRun(runId)).status;
 	} catch {
 		return null;
 	}
@@ -308,8 +311,14 @@ async function eventsOf(sandbox: Sandbox, runId: string) {
 /** B walks a run of A's project in A's Space. */
 async function walkOnB(flow: Flow, flows: Record<string, unknown> = {}) {
 	await paired.projectOnDevice(projectId, { clone: true });
-	await seedFlows(paired.device.space(a.spaceId), projectId, flows);
-	return paired.device.space(a.spaceId).startRun({ projectId, flow });
+	await seedFlows(
+		paired.device.space(a.spaceId, NIGHT_SHIFT),
+		projectId,
+		flows,
+	);
+	return paired.device
+		.space(a.spaceId, NIGHT_SHIFT)
+		.startRun({ projectId, flow });
 }
 
 /** What A recorded of a command: done, and why not. */
@@ -352,7 +361,7 @@ function watchItems(engine: PeerEngine, runId: string) {
 	const items: RunStreamItem[] = [];
 	const done = (async () => {
 		for await (const item of engine
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.watchRun(runId, { signal: controller.signal })) {
 			items.push(item);
 		}
@@ -371,10 +380,12 @@ function watch(engine: PeerEngine, runId: string, afterSeq?: number) {
 	const controller = new AbortController();
 	const items: RunStreamItem[] = [];
 	const done = (async () => {
-		for await (const item of engine.space(a.spaceId).watchRun(runId, {
-			signal: controller.signal,
-			...(afterSeq === undefined ? {} : { afterSeq }),
-		})) {
+		for await (const item of engine
+			.space(a.spaceId, NIGHT_SHIFT)
+			.watchRun(runId, {
+				signal: controller.signal,
+				...(afterSeq === undefined ? {} : { afterSeq }),
+			})) {
 			items.push(item);
 		}
 	})().catch(() => {});
@@ -456,7 +467,10 @@ async function desktopBesideB(
 	return {
 		run,
 		desktop,
-		onC: desktop.engine.space(a.spaceId, { personId: paired.personId }),
+		onC: desktop.engine.space(a.spaceId, {
+			personId: paired.personId,
+			door: "session",
+		}),
 		changes,
 		release: () => held.resolve(),
 	};
@@ -476,7 +490,9 @@ describe("the Device's exchange with its Host", () => {
 		expect(onA).toEqual(await eventsOf(b, run.id));
 		expect(new Set(onA.map((e) => e[1])).size).toBe(onA.length);
 
-		const [step] = (await paired.device.space(a.spaceId).getRun(run.id)).steps;
+		const [step] = (
+			await paired.device.space(a.spaceId, NIGHT_SHIFT).getRun(run.id)
+		).steps;
 		const ref = {
 			spaceId: a.spaceId,
 			runId: run.id,
@@ -506,7 +522,7 @@ describe("the Device's exchange with its Host", () => {
 			projectWaitMs: 50,
 		});
 		const run = await paired.host
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId, flow: gateFlow });
 		await untilStatus(paired.host, run.id, "waiting");
 
@@ -535,11 +551,13 @@ describe("the Device's exchange with its Host", () => {
 		const run = await walkOnB(gateFlow);
 		online();
 		await untilStatus(paired.host, run.id, "waiting");
-		const gate = (await paired.host.space(a.spaceId).listGates())[0];
+		const gate = (
+			await paired.host.space(a.spaceId, NIGHT_SHIFT).listGates()
+		)[0];
 		expect(gate?.walker.id).toBe(b.deviceId);
 
 		await paired.host
-			.space(a.spaceId, { personId: paired.personId })
+			.space(a.spaceId, { personId: paired.personId, door: "session" })
 			.act(run.id, {
 				kind: "answer",
 				stepId: gate?.stepId as string,
@@ -554,7 +572,10 @@ describe("the Device's exchange with its Host", () => {
 		const run = await walkOnB(gateFlow);
 		online();
 		await untilStatus(paired.host, run.id, "waiting");
-		const onA = paired.host.space(a.spaceId, { personId: paired.personId });
+		const onA = paired.host.space(a.spaceId, {
+			personId: paired.personId,
+			door: "session",
+		});
 		await onA.act(run.id, { kind: "stop" });
 		await untilStatus(paired.host, run.id, "stopped");
 
@@ -572,10 +593,14 @@ describe("the Device's exchange with its Host", () => {
 	test("a resume's follow-up prompt reaches the agent step B reopens", async () => {
 		const run = await walkOnB(agentFlow);
 		online();
-		const onA = paired.host.space(a.spaceId, { personId: paired.personId });
+		const onA = paired.host.space(a.spaceId, {
+			personId: paired.personId,
+			door: "session",
+		});
 		const step = await waitFor(
 			async () =>
-				(await paired.device.space(a.spaceId).getRun(run.id)).steps[0]?.id,
+				(await paired.device.space(a.spaceId, NIGHT_SHIFT).getRun(run.id))
+					.steps[0]?.id,
 			{ label: "the step on B" },
 		);
 		const onDisk = join(b.dataDir, "transcripts", run.id, `${step}.ndjson`);
@@ -609,7 +634,10 @@ describe("the Device's exchange with its Host", () => {
 		const run = await walkOnB(gateFlow);
 		const period = online();
 		await untilStatus(paired.host, run.id, "waiting");
-		const onA = paired.host.space(a.spaceId, { personId: paired.personId });
+		const onA = paired.host.space(a.spaceId, {
+			personId: paired.personId,
+			door: "session",
+		});
 		await onA.act(run.id, { kind: "stop" });
 		await untilStatus(paired.host, run.id, "stopped");
 		await period.stop();
@@ -628,7 +656,10 @@ describe("the Device's exchange with its Host", () => {
 
 	test("a resume on B travels to A, the Host that walks the run", async () => {
 		await paired.projectOnDevice(projectId);
-		const onA = paired.host.space(a.spaceId, { personId: paired.personId });
+		const onA = paired.host.space(a.spaceId, {
+			personId: paired.personId,
+			door: "session",
+		});
 		const run = await onA.startRun({ projectId, flow: gateFlow });
 		await untilStatus(paired.host, run.id, "waiting");
 		await onA.act(run.id, { kind: "stop" });
@@ -637,7 +668,7 @@ describe("the Device's exchange with its Host", () => {
 		await untilStatus(paired.device, run.id, "stopped");
 
 		await paired.device
-			.space(a.spaceId, { personId: paired.personId })
+			.space(a.spaceId, { personId: paired.personId, door: "session" })
 			.act(run.id, { kind: "resume" });
 
 		await untilStatus(paired.host, run.id, "waiting");
@@ -649,7 +680,7 @@ describe("the Device's exchange with its Host", () => {
 		online();
 		await untilStatus(paired.host, run.id, "waiting");
 		await paired.host
-			.space(a.spaceId, { personId: paired.personId })
+			.space(a.spaceId, { personId: paired.personId, door: "session" })
 			.act(run.id, { kind: "stop" });
 		await untilStatus(paired.host, run.id, "stopped");
 		const document = await paired.documents.open(a.spaceId);
@@ -706,9 +737,11 @@ describe("the Device's exchange with its Host", () => {
 			}),
 		);
 		await untilStatus(paired.host, run.id, "waiting");
-		const gate = (await paired.host.space(a.spaceId).listGates())[0];
+		const gate = (
+			await paired.host.space(a.spaceId, NIGHT_SHIFT).listGates()
+		)[0];
 		await paired.host
-			.space(a.spaceId, { personId: paired.personId })
+			.space(a.spaceId, { personId: paired.personId, door: "session" })
 			.act(run.id, {
 				kind: "answer",
 				stepId: gate?.stepId as string,
@@ -799,9 +832,11 @@ describe("the Device's exchange with its Host", () => {
 			);
 		}
 		await untilStatus(paired.host, run.id, "waiting");
-		const gate = (await paired.host.space(a.spaceId).listGates())[0];
+		const gate = (
+			await paired.host.space(a.spaceId, NIGHT_SHIFT).listGates()
+		)[0];
 		await paired.host
-			.space(a.spaceId, { personId: paired.personId })
+			.space(a.spaceId, { personId: paired.personId, door: "session" })
 			.act(run.id, {
 				kind: "answer",
 				stepId: gate?.stepId as string,
@@ -829,7 +864,9 @@ describe("the Device's exchange with its Host", () => {
 		document.doc.transact(() => {
 			document.members.set("viewer", { name: "Viewer", role: "viewer" });
 		});
-		const gate = (await paired.host.space(a.spaceId).listGates())[0];
+		const gate = (
+			await paired.host.space(a.spaceId, NIGHT_SHIFT).listGates()
+		)[0];
 		const { commands } = paired.host.exchange;
 		const elsewhere = await commands.enqueue({
 			kind: "signal.send",
@@ -870,7 +907,9 @@ describe("the Device's exchange with its Host", () => {
 		const run = await walkOnB(gateFlow);
 		online();
 		await untilStatus(paired.host, run.id, "waiting");
-		const gate = (await paired.host.space(a.spaceId).listGates())[0];
+		const gate = (
+			await paired.host.space(a.spaceId, NIGHT_SHIFT).listGates()
+		)[0];
 		// Kept on the Host as it came, with no check on the way.
 		const command = await paired.host.exchange.commands.enqueue({
 			kind: "gate.resolve",
@@ -906,9 +945,11 @@ describe("the Device's exchange with its Host", () => {
 		});
 		const first = online(lost);
 		await untilStatus(paired.host, run.id, "waiting");
-		const gate = (await paired.host.space(a.spaceId).listGates())[0];
+		const gate = (
+			await paired.host.space(a.spaceId, NIGHT_SHIFT).listGates()
+		)[0];
 		await paired.host
-			.space(a.spaceId, { personId: paired.personId })
+			.space(a.spaceId, { personId: paired.personId, door: "session" })
 			.act(run.id, {
 				kind: "answer",
 				stepId: gate?.stepId as string,
@@ -980,9 +1021,11 @@ describe("the Device's exchange with its Host", () => {
 			}),
 		);
 		await untilStatus(paired.host, run.id, "waiting");
-		const gate = (await paired.host.space(a.spaceId).listGates())[0];
+		const gate = (
+			await paired.host.space(a.spaceId, NIGHT_SHIFT).listGates()
+		)[0];
 		await paired.host
-			.space(a.spaceId, { personId: paired.personId })
+			.space(a.spaceId, { personId: paired.personId, door: "session" })
 			.act(run.id, {
 				kind: "answer",
 				stepId: gate?.stepId as string,
@@ -1027,9 +1070,11 @@ describe("the Device's exchange with its Host", () => {
 			personId: paired.personId,
 		});
 		await Bun.sleep(5);
-		const gate = (await paired.host.space(a.spaceId).listGates())[0];
+		const gate = (
+			await paired.host.space(a.spaceId, NIGHT_SHIFT).listGates()
+		)[0];
 		await paired.host
-			.space(a.spaceId, { personId: paired.personId })
+			.space(a.spaceId, { personId: paired.personId, door: "session" })
 			.act(run.id, {
 				kind: "answer",
 				stepId: gate?.stepId as string,
@@ -1123,9 +1168,11 @@ describe("the Device's exchange with its Host", () => {
 			}),
 		);
 		await untilStatus(paired.host, run.id, "waiting");
-		const gate = (await paired.host.space(a.spaceId).listGates())[0];
+		const gate = (
+			await paired.host.space(a.spaceId, NIGHT_SHIFT).listGates()
+		)[0];
 		await paired.host
-			.space(a.spaceId, { personId: paired.personId })
+			.space(a.spaceId, { personId: paired.personId, door: "session" })
 			.act(run.id, {
 				kind: "answer",
 				stepId: gate?.stepId as string,
@@ -1206,7 +1253,7 @@ describe("the Device's exchange with its Host", () => {
 		const { run, desktop, onC, changes, release } = await desktopBesideB();
 		const [gate] = await onC.listGates();
 		await paired.host
-			.space(a.spaceId, { personId: paired.personId })
+			.space(a.spaceId, { personId: paired.personId, door: "session" })
 			.act(run.id, {
 				kind: "answer",
 				stepId: gate?.stepId as string,
@@ -1283,7 +1330,7 @@ describe("the Device's exchange with its Host", () => {
 		});
 
 		const away = await paired.device
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId, flow: quickFlow });
 		await untilStatus(paired.device, away.id, "finished");
 		expect(await statusOn(paired.host, away.id)).toBeNull();
@@ -1315,16 +1362,18 @@ describe("the Device's exchange with its Host", () => {
 			],
 		} as Flow;
 		await paired.projectOnDevice(projectId, { clone: true });
-		await seedFlows(paired.device.space(a.spaceId), projectId, {
+		await seedFlows(paired.device.space(a.spaceId, NIGHT_SHIFT), projectId, {
 			count: counting,
 		});
 		online();
 		const run = await paired.device
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId, flowName: "count" });
 		await untilStatus(paired.host, run.id, "finished");
 		expect(
-			await paired.host.space(a.spaceId).listKeptValues(projectId, "count"),
+			await paired.host
+				.space(a.spaceId, NIGHT_SHIFT)
+				.listKeptValues(projectId, "count"),
 		).toEqual([
 			{ name: "runs", value: 1, runId: run.id, updatedAt: expect.any(Number) },
 		]);
@@ -1342,7 +1391,7 @@ describe("the Device's exchange with its Host", () => {
 		removed = true;
 		await waitFor(() => status(period) === "revoked", { label: "revoked" });
 		const after = await paired.device
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId, flow: quickFlow });
 		await untilStatus(paired.device, after.id, "finished");
 		await Bun.sleep(100);
@@ -1399,7 +1448,7 @@ describe("the Device's exchange with its Host", () => {
 		// A run in A's Space that B does take part in.
 		await paired.projectOnDevice(projectId);
 		const shared = await paired.host
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId, flow: gateFlow });
 
 		online();
@@ -1445,7 +1494,7 @@ describe("live transcripts over the exchange", () => {
 			async () =>
 				(
 					await paired.host
-						.space(a.spaceId)
+						.space(a.spaceId, NIGHT_SHIFT)
 						.getRun(run.id)
 						.catch(() => null)
 				)?.steps[0]?.endedAt === null,
@@ -1459,7 +1508,8 @@ describe("live transcripts over the exchange", () => {
 		});
 		// Still running: the line came live, not from the archive.
 		expect(
-			(await paired.host.space(a.spaceId).getRun(run.id)).steps[0]?.endedAt,
+			(await paired.host.space(a.spaceId, NIGHT_SHIFT).getRun(run.id)).steps[0]
+				?.endedAt,
 		).toBeNull();
 
 		await Bun.write(marker, "");
@@ -1479,14 +1529,14 @@ describe("live transcripts over the exchange", () => {
 		const marker = join(a.dataDir, "go");
 		await paired.projectOnDevice(projectId);
 		const run = await paired.host
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId, flow: slowFlow(marker) });
 		online();
 		await waitFor(
 			async () =>
 				(
 					await paired.device
-						.space(a.spaceId)
+						.space(a.spaceId, NIGHT_SHIFT)
 						.getRun(run.id)
 						.catch(() => null)
 				)?.steps[0]?.endedAt === null,
@@ -1498,7 +1548,8 @@ describe("live transcripts over the exchange", () => {
 			label: "the first line on B",
 		});
 		expect(
-			(await paired.host.space(a.spaceId).getRun(run.id)).steps[0]?.endedAt,
+			(await paired.host.space(a.spaceId, NIGHT_SHIFT).getRun(run.id)).steps[0]
+				?.endedAt,
 		).toBeNull();
 		await first.stop();
 
@@ -1517,7 +1568,10 @@ describe("live transcripts over the exchange", () => {
 
 	test("B shows a step A reopened whole, not the copy it kept of the step's first end", async () => {
 		await paired.projectOnDevice(projectId);
-		const onA = paired.host.space(a.spaceId, { personId: paired.personId });
+		const onA = paired.host.space(a.spaceId, {
+			personId: paired.personId,
+			door: "session",
+		});
 		const run = await onA.startRun({ projectId, flow: agentFlow });
 		const step = await waitFor(
 			async () => (await onA.getRun(run.id)).steps[0]?.id,
@@ -1592,7 +1646,10 @@ describe("live transcripts over the exchange", () => {
 			},
 		});
 		const run = await walkOnB(agentFlow);
-		const onB = paired.device.space(a.spaceId, { personId: paired.personId });
+		const onB = paired.device.space(a.spaceId, {
+			personId: paired.personId,
+			door: "session",
+		});
 		const step = await waitFor(
 			async () => (await onB.getRun(run.id)).steps[0]?.id,
 			{ label: "the step on B" },
@@ -1631,7 +1688,7 @@ describe("live transcripts over the exchange", () => {
 			waitFor(
 				async () => {
 					const steps = await engine
-						.space(a.spaceId)
+						.space(a.spaceId, NIGHT_SHIFT)
 						.getRun(run.id)
 						.then((r) => r.steps)
 						.catch(() => []);
@@ -1726,7 +1783,9 @@ describe("live transcripts over the exchange", () => {
 		online();
 		await untilStatus(paired.host, run.id, "finished");
 		// B's ended steps' files reach A's archive after their rows.
-		const steps = (await paired.host.space(a.spaceId).getRun(run.id)).steps;
+		const steps = (
+			await paired.host.space(a.spaceId, NIGHT_SHIFT).getRun(run.id)
+		).steps;
 		await waitFor(
 			async () => {
 				for (const s of steps) {

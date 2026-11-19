@@ -48,6 +48,7 @@ export {
 	COMMAND_KINDS,
 	HOST_UNREACHABLE,
 	HostUnreachableError,
+	NIGHT_SHIFT,
 	OLDER_HOST,
 	OlderHostError,
 	permissionOf,

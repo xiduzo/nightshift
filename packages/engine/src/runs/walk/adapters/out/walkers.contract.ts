@@ -24,7 +24,7 @@ export type WalkersUnderTest = {
 };
 
 const RUN = { id: "run-1", spaceId: "space-1", walkerId: "device-far" };
-const ADA = { personId: "person-ada" };
+const ADA = { personId: "person-ada", door: "session" as const };
 
 /** What a refused promise threw. */
 const refusalOf = (work: Promise<unknown>) =>

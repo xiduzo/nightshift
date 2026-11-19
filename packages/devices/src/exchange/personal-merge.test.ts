@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { device, member, organization, user } from "@nightshift/db/schema";
+import { NIGHT_SHIFT } from "@nightshift/engine";
 import {
 	createSandbox,
 	mustGit,
@@ -90,7 +91,9 @@ describe("sync.mergePersonal", () => {
 			personMap: { [localPerson]: paired.personId },
 			elsewhere: [],
 		});
-		const [project] = await paired.host.space(a.spaceId).listProjects();
+		const [project] = await paired.host
+			.space(a.spaceId, NIGHT_SHIFT)
+			.listProjects();
 		expect(project).toMatchObject({
 			id: "p-1",
 			name: "p-1",
@@ -108,7 +111,9 @@ describe("sync.mergePersonal", () => {
 			],
 		});
 
-		const projects = await paired.host.space(a.spaceId).listProjects();
+		const projects = await paired.host
+			.space(a.spaceId, NIGHT_SHIFT)
+			.listProjects();
 		expect(projects.map((p) => [p.id, p.folder, p.clones])).toEqual([
 			["p-feeds", false, []],
 			["p-older", true, [expect.objectContaining({ deviceId: b.deviceId })]],
@@ -123,11 +128,13 @@ describe("sync.mergePersonal", () => {
 		});
 
 		expect(answer.projectMap).toEqual({ "p-1": "p-1" });
-		expect(await paired.host.space(a.spaceId).listProjects()).toEqual([]);
+		expect(
+			await paired.host.space(a.spaceId, NIGHT_SHIFT).listProjects(),
+		).toEqual([]);
 	});
 
 	test("a remote the personal Space has takes the id of that project", async () => {
-		const hosted = await paired.host.space(a.spaceId).addProject({
+		const hosted = await paired.host.space(a.spaceId, NIGHT_SHIFT).addProject({
 			repoPath: await repoWithRemote(
 				a,
 				"app",
@@ -141,7 +148,9 @@ describe("sync.mergePersonal", () => {
 		});
 
 		expect(answer.projectMap).toEqual({ "p-1": hosted.id });
-		const projects = await paired.host.space(a.spaceId).listProjects();
+		const projects = await paired.host
+			.space(a.spaceId, NIGHT_SHIFT)
+			.listProjects();
 		expect(projects.map((p) => p.id)).toEqual([hosted.id]);
 		expect(projects[0]?.clones.map((c) => c.deviceId).sort()).toEqual(
 			[a.deviceId, b.deviceId].sort(),
@@ -157,13 +166,15 @@ describe("sync.mergePersonal", () => {
 		const second = await call().mergePersonal(input);
 
 		expect(second).toEqual(first);
-		const projects = await paired.host.space(a.spaceId).listProjects();
+		const projects = await paired.host
+			.space(a.spaceId, NIGHT_SHIFT)
+			.listProjects();
 		expect(projects.map((p) => p.id).sort()).toEqual(["p-1", "p-2"]);
 	});
 
 	test("a remote of a shared Space is listed and stays a personal project without that remote", async () => {
 		await sharedSpace("owner");
-		const shared = await paired.host.space("shared").addProject({
+		const shared = await paired.host.space("shared", NIGHT_SHIFT).addProject({
 			repoPath: await repoWithRemote(
 				a,
 				"api",
@@ -188,13 +199,15 @@ describe("sync.mergePersonal", () => {
 				joined: false,
 			},
 		]);
-		const [own] = await paired.host.space(a.spaceId).listProjects();
+		const [own] = await paired.host
+			.space(a.spaceId, NIGHT_SHIFT)
+			.listProjects();
 		expect(own).toMatchObject({ id: "p-1", remote: null });
 	});
 
 	test("a remote of a shared Space moves into its project only when the person chose it", async () => {
 		await sharedSpace("owner");
-		const shared = await paired.host.space("shared").addProject({
+		const shared = await paired.host.space("shared", NIGHT_SHIFT).addProject({
 			repoPath: await repoWithRemote(
 				a,
 				"api",
@@ -210,8 +223,12 @@ describe("sync.mergePersonal", () => {
 
 		expect(answer.projectMap).toEqual({ "p-1": shared.id });
 		expect(answer.elsewhere[0]?.joined).toBe(true);
-		expect(await paired.host.space(a.spaceId).listProjects()).toEqual([]);
-		const [joined] = await paired.host.space("shared").listProjects();
+		expect(
+			await paired.host.space(a.spaceId, NIGHT_SHIFT).listProjects(),
+		).toEqual([]);
+		const [joined] = await paired.host
+			.space("shared", NIGHT_SHIFT)
+			.listProjects();
 		expect(joined?.clones.map((c) => c.deviceId)).toContain(b.deviceId);
 	});
 
@@ -221,7 +238,7 @@ describe("sync.mergePersonal", () => {
 			.update(member)
 			.set({ role: "owner" })
 			.where(eq(member.id, "m-shared"));
-		await paired.host.space("shared").addProject({
+		await paired.host.space("shared", NIGHT_SHIFT).addProject({
 			repoPath: await repoWithRemote(
 				a,
 				"api",

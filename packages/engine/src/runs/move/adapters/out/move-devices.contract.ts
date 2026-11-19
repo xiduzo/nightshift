@@ -18,7 +18,7 @@ export type MoveDevicesUnderTest = {
 	close(): Promise<void>;
 };
 
-const ADA: PersonActor = { personId: "person-ada" };
+const ADA: PersonActor = { personId: "person-ada", door: "session" };
 const BEA = "person-bea";
 
 /** The run the suite moves: walked by this computer, in Space `space-1`. */

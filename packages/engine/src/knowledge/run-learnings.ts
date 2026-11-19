@@ -1,3 +1,4 @@
+import { type Actor, NIGHT_SHIFT } from "../contract";
 import type { TranscriptEntry } from "../log";
 import type { Knowledge } from "./knowledge";
 import {
@@ -44,7 +45,11 @@ export type RunsToLearnFrom = {
 	): () => void;
 	/** Whether this computer walks the run. */
 	runHere(runId: string): Promise<{ walkedHere: boolean } | null>;
-	space(spaceId: string): {
+	/** One Space, read as Night Shift (`NIGHT_SHIFT`): the look back acts for no Person. */
+	space(
+		spaceId: string,
+		actor: Actor,
+	): {
 		getRun(runId: string): Promise<EndedRun>;
 		listRuns(input: { projectId: string; limit?: number }): Promise<
 			{
@@ -151,7 +156,7 @@ export function createRunLearnings(deps: RunLearningsDeps): RunLearnings {
 	}
 
 	async function look(spaceId: string, runId: string): Promise<RunLookBack> {
-		const space = runs.space(spaceId);
+		const space = runs.space(spaceId, NIGHT_SHIFT);
 		const run = await space.getRun(runId);
 		if (run.endedAt === null || run.test !== undefined) return NOTHING;
 		if (!(await knowledge.learnsFromRuns(run.projectId))) return NOTHING;

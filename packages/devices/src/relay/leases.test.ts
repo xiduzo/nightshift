@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { runLease } from "@nightshift/db/schema";
+import { NIGHT_SHIFT } from "@nightshift/engine";
 import {
 	createSandbox,
 	type Sandbox,
@@ -24,7 +25,9 @@ beforeEach(async () => {
 	[a, b] = await Promise.all([createSandbox(), createSandbox()]);
 	paired = await pairedReplicas(a, b);
 	projectId = (
-		await paired.host.space(a.spaceId).addProject({ repoPath: a.repoPath })
+		await paired.host
+			.space(a.spaceId, NIGHT_SHIFT)
+			.addProject({ repoPath: a.repoPath })
 	).id;
 	await paired.projectOnDevice(projectId, { clone: true });
 });
@@ -94,7 +97,7 @@ async function statusOn(
 ) {
 	return waitFor(
 		async () => {
-			const detail = await engine.space(a.spaceId).getRun(runId);
+			const detail = await engine.space(a.spaceId, NIGHT_SHIFT).getRun(runId);
 			return detail.status === status ? detail : null;
 		},
 		{ label: `run ${runId} to be ${status}`, timeoutMs: 10_000 },
@@ -104,12 +107,12 @@ async function statusOn(
 describe("leases across Devices", () => {
 	test("given a run A walks that holds a lease, when B's run takes it, then it is busy and names A's run", async () => {
 		const first = await paired.host
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId, flow: holding });
 		await statusOn(paired.host, first.id, "sleeping");
 
 		const second = await paired.device
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId, flow: polite });
 		const ended = await statusOn(paired.device, second.id, "finished");
 		expect(ended.result).toBe("nothing-to-do");
@@ -118,7 +121,7 @@ describe("leases across Devices", () => {
 
 	test("given B's run takes a lease, then A keeps it for B, and lets go when B's run ends", async () => {
 		const run = await paired.device
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId, flow: holding });
 		await statusOn(paired.device, run.id, "sleeping");
 		expect(await leasesOnA()).toEqual([
@@ -127,7 +130,9 @@ describe("leases across Devices", () => {
 		// B has no lease of its own for A's Space.
 		expect(await b.db.select().from(runLease)).toEqual([]);
 
-		await paired.device.space(a.spaceId).act(run.id, { kind: "stop" });
+		await paired.device
+			.space(a.spaceId, NIGHT_SHIFT)
+			.act(run.id, { kind: "stop" });
 		await waitFor(async () => (await leasesOnA()).length === 0, {
 			label: "A to let go of the lease",
 		});
@@ -135,7 +140,7 @@ describe("leases across Devices", () => {
 
 	test("given a Device's run holds a lease at A, then another Device's key cannot renew or release it", async () => {
 		const run = await paired.device
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId, flow: holding });
 		await statusOn(paired.device, run.id, "sleeping");
 		const c = await createSandbox();
@@ -160,11 +165,11 @@ describe("leases across Devices", () => {
 
 	test("given B's run holds a lease, when B applies a person's release from A, then B logs it and A lets go", async () => {
 		const run = await paired.device
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId, flow: holding });
 		await statusOn(paired.device, run.id, "sleeping");
 		// As the Walker applies it: the Command as it came.
-		await paired.device.space(a.spaceId).act(run.id, {
+		await paired.device.space(a.spaceId, NIGHT_SHIFT).act(run.id, {
 			kind: "lease.release",
 			payload: { name: "docker-stack" },
 		});
@@ -172,7 +177,7 @@ describe("leases across Devices", () => {
 			label: "A to let go of the lease",
 		});
 		expect(
-			(await paired.device.space(a.spaceId).getRun(run.id)).leases,
+			(await paired.device.space(a.spaceId, NIGHT_SHIFT).getRun(run.id)).leases,
 		).toEqual([]);
 	});
 });

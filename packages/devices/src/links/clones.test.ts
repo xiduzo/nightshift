@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { clone } from "@nightshift/db/schema";
-import { OlderHostError } from "@nightshift/engine";
+import { NIGHT_SHIFT, OlderHostError } from "@nightshift/engine";
 import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
 import { Refusal } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
@@ -41,7 +41,7 @@ const devicesWithClone = async (projectId: string) =>
 
 test("a Clone the Host missed heals when the link comes online, and one the Device no longer has goes", async () => {
 	const { id: projectId } = await paired.host
-		.space(a.spaceId)
+		.space(a.spaceId, NIGHT_SHIFT)
 		.addProject({ repoPath: a.repoPath });
 	await paired.projectOnDevice(projectId, { clone: true });
 	expect(await devicesWithClone(projectId)).toContain(b.deviceId);

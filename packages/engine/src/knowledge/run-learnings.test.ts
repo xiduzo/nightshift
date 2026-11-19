@@ -10,6 +10,7 @@ import {
 	type FlowEdge,
 	PROPOSED_LEARNINGS_DIR,
 } from "@nightshift/flows";
+import { NIGHT_SHIFT } from "../contract";
 import type { Engine } from "../engine";
 import { createRunLog, type RunLog } from "../log/run-log/run-log";
 import { transcriptLines } from "../read/transcript-lines";
@@ -120,7 +121,8 @@ async function ended(
 ): Promise<void> {
 	await waitFor(
 		async () =>
-			(await engine.space(sandbox.spaceId).getRun(runId)).status === status,
+			(await engine.space(sandbox.spaceId, NIGHT_SHIFT).getRun(runId))
+				.status === status,
 		{ label: `status ${status}` },
 	);
 }
@@ -130,7 +132,7 @@ describe("learnings from runs that ended", () => {
 		const { engine, knowledge, asked } = setup([
 			"Release only from Monday to Thursday.",
 		]);
-		const space = engine.space(sandbox.spaceId);
+		const space = engine.space(sandbox.spaceId, NIGHT_SHIFT);
 		const projectId = (await space.addProject({ repoPath: sandbox.repoPath }))
 			.id;
 		const run = await space.startRun({
@@ -202,7 +204,7 @@ describe("learnings from runs that ended", () => {
 
 	test("a run without a signal writes nothing, and the Learner is not asked", async () => {
 		const { engine, knowledge, learnings, asked } = setup(["Never."]);
-		const space = engine.space(sandbox.spaceId);
+		const space = engine.space(sandbox.spaceId, NIGHT_SHIFT);
 		const projectId = (await space.addProject({ repoPath: sandbox.repoPath }))
 			.id;
 		const run = await space.startRun({
@@ -226,7 +228,7 @@ describe("learnings from runs that ended", () => {
 
 	test("a project that turned it off gets nothing, whatever the run", async () => {
 		const { engine, knowledge, learnings, asked } = setup(["Never."]);
-		const space = engine.space(sandbox.spaceId);
+		const space = engine.space(sandbox.spaceId, NIGHT_SHIFT);
 		const projectId = (await space.addProject({ repoPath: sandbox.repoPath }))
 			.id;
 		await knowledge.knowledge.setLearnsFromRuns(projectId, false);

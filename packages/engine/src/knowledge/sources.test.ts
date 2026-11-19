@@ -7,6 +7,7 @@ import {
 	flowSchema,
 	type Schedule,
 } from "@nightshift/flows";
+import { NIGHT_SHIFT } from "../contract";
 import type { Engine } from "../engine";
 import type { SpaceEngine } from "../space-engine";
 import { joinSpace } from "../testing/join-space";
@@ -47,7 +48,7 @@ beforeEach(async () => {
 			knowledge: built.knowledge,
 		}),
 	);
-	space = root.space(sandbox.spaceId);
+	space = root.space(sandbox.spaceId, NIGHT_SHIFT);
 	({ id: projectId } = await space.addProject({ repoPath: sandbox.repoPath }));
 });
 afterEach(async () => {
@@ -221,7 +222,7 @@ describe("save", () => {
 			(
 				await sourcesOn(
 					device,
-					root.space(sandbox.spaceId, { personId: "ada" }),
+					root.space(sandbox.spaceId, { personId: "ada", door: "session" }),
 				).list(projectId, all)
 			).syncs.find((sync) => sync.flow === "knowledge-folder")?.computer;
 		expect(await computer({ id: sandbox.deviceId, name: "test" })).toEqual({

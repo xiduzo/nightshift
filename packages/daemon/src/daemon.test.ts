@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { daemonLease, project as projectTable } from "@nightshift/db/schema";
 import { hostInMemory } from "@nightshift/devices/testing";
 import type { Knowledge } from "@nightshift/engine";
+import { NIGHT_SHIFT } from "@nightshift/engine";
 import {
 	createSandbox,
 	type Sandbox,
@@ -289,7 +290,7 @@ describe("the daemon, wired in one process", () => {
 		const a = other;
 		const host = await hostInMemory(a);
 		const project = await host.host
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.addProject({ repoPath: a.repoPath });
 
 		// Paired by hand: A takes the daemon's Device, and the daemon keeps the Link.

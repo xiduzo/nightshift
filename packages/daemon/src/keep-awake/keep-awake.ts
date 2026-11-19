@@ -1,4 +1,5 @@
 import type { Engine, RunHere } from "@nightshift/engine";
+import { NIGHT_SHIFT } from "@nightshift/engine";
 import { now as timeNow } from "@nightshift/time";
 import type { SleepHold, SleepLock } from "./sleep-lock";
 
@@ -83,7 +84,7 @@ export function engineRunSource(
 		async openRuns() {
 			const out: RunFacts[] = [];
 			for (const spaceId of await spaces()) {
-				const runs = await engine.space(spaceId).listRuns();
+				const runs = await engine.space(spaceId, NIGHT_SHIFT).listRuns();
 				for (const run of runs) {
 					if (run.endedAt !== null) continue;
 					// The summary does not say what a sleeping run waits for.

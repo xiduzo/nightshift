@@ -7,6 +7,7 @@ import {
 	user,
 } from "@nightshift/db/schema";
 import type { MoveRows, WalkRef } from "@nightshift/engine";
+import { NIGHT_SHIFT } from "@nightshift/engine";
 import {
 	createRunLog,
 	createSandbox,
@@ -101,7 +102,7 @@ function engineOf(
 
 /** A's run of `gateFlow` in its own Space, waiting at its Gate. */
 async function waitingRun(engine: PeerEngine, projectId: string) {
-	const space = engine.space(a.spaceId);
+	const space = engine.space(a.spaceId, NIGHT_SHIFT);
 	const { id } = await space.startRun({ projectId, flow: gateFlow });
 	await waitFor(async () => (await space.getRun(id)).status === "waiting", {
 		label: "the Gate",
@@ -122,7 +123,7 @@ describe("a Device's engine among its peers", () => {
 	test("a Space a Host lists is the Host's: no Project moves into it here", async () => {
 		const engine = engineOf(a);
 		const app = await engine
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.addProject({ repoPath: a.repoPath });
 		const [owner] = await a.db.select().from(user);
 		await engine.hostSpaces.update(
@@ -132,10 +133,12 @@ describe("a Device's engine among its peers", () => {
 		);
 
 		await expect(
-			engine.space(a.spaceId).moveProject(app.id, "space-studio"),
+			engine.space(a.spaceId, NIGHT_SHIFT).moveProject(app.id, "space-studio"),
 		).rejects.toThrow("Your Host keeps the projects of this Space.");
 		expect(
-			(await engine.space(a.spaceId).listProjects()).map((p) => p.id),
+			(await engine.space(a.spaceId, NIGHT_SHIFT).listProjects()).map(
+				(p) => p.id,
+			),
 		).toEqual([app.id]);
 	});
 
@@ -151,10 +154,10 @@ describe("a Device's engine among its peers", () => {
 		});
 		const platform = await otherSpace(a, "Platform");
 		const app = await engine
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.addProject({ repoPath: a.repoPath });
 		const runId = await waitingRun(engine, app.id);
-		await engine.space(a.spaceId).act(runId, { kind: "stop" });
+		await engine.space(a.spaceId, NIGHT_SHIFT).act(runId, { kind: "stop" });
 		const { commands } = engine.exchange;
 		// A Command for the run that moves, and one for a run that stays.
 		const moving = await commands.enqueue({
@@ -232,7 +235,7 @@ describe("a schedule in a Space a Host keeps", () => {
 			devices: async () => [],
 		};
 		const engine = engineOf(b, { relay });
-		const space = engine.space(b.spaceId);
+		const space = engine.space(b.spaceId, NIGHT_SHIFT);
 		const { id: projectId } = await space.addProject({
 			repoPath: b.repoPath,
 		});
@@ -308,7 +311,7 @@ describe("a disposed engine", () => {
 		const relay = relayOf(() => archive);
 		const before = engineOf(b, { relay });
 		const { id: projectId } = await engineA
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.addProject({ repoPath: a.repoPath });
 		const [row] = await a.db
 			.select()
@@ -322,7 +325,7 @@ describe("a disposed engine", () => {
 		const files = new Map<string, string>();
 		const refs: WalkRef[] = [
 			{ kind: "checkpoint", spaceId: a.spaceId, runId },
-			...(await engineA.space(a.spaceId).getRun(runId)).steps.map(
+			...(await engineA.space(a.spaceId, NIGHT_SHIFT).getRun(runId)).steps.map(
 				(s): WalkRef => ({
 					kind: "transcript",
 					spaceId: a.spaceId,

@@ -13,6 +13,7 @@ import {
 import type { DecisionNode, Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
+import { NIGHT_SHIFT } from "../../src/contract";
 import type { Engine, EngineInternals } from "../../src/engine";
 import { GateClosedError } from "../../src/gates";
 import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
@@ -116,8 +117,8 @@ const flow: Flow = {
 describe("Spaces", () => {
 	test("a Space sees and touches only its own projects, runs and Gates", async () => {
 		const engine = makeEngine();
-		const mine = engine.space(sandbox.spaceId);
-		const other = engine.space(await otherSpace(sandbox.db));
+		const mine = engine.space(sandbox.spaceId, NIGHT_SHIFT);
+		const other = engine.space(await otherSpace(sandbox.db), NIGHT_SHIFT);
 
 		const added = await mine.addProject({ repoPath: sandbox.repoPath });
 		const started = await mine.startRun({ projectId: added.id, flow });
@@ -176,9 +177,9 @@ describe("Spaces", () => {
 
 	test("each Space lists its own open Gates, and a run names its Space", async () => {
 		const engine = makeEngine();
-		const mine = engine.space(sandbox.spaceId);
+		const mine = engine.space(sandbox.spaceId, NIGHT_SHIFT);
 		const platform = await otherSpace(sandbox.db, "Platform");
-		const theirs = engine.space(platform);
+		const theirs = engine.space(platform, NIGHT_SHIFT);
 		const secondRepo = join(sandbox.root, "second");
 		await mkdir(secondRepo, { recursive: true });
 		await mustGit(secondRepo, ["init", "-q", "-b", "main"]);
@@ -224,7 +225,7 @@ describe("Spaces", () => {
 	});
 
 	test("every row a run writes carries its project's Space", async () => {
-		const mine = makeEngine().space(sandbox.spaceId);
+		const mine = makeEngine().space(sandbox.spaceId, NIGHT_SHIFT);
 		const added = await mine.addProject({ repoPath: sandbox.repoPath });
 		const started = await mine.startRun({ projectId: added.id, flow });
 		await waitFor(
@@ -258,9 +259,9 @@ describe("Spaces", () => {
 
 	test("a moved project takes its Clones, runs, steps, sessions and events along", async () => {
 		const engine = makeEngine();
-		const mine = engine.space(sandbox.spaceId);
+		const mine = engine.space(sandbox.spaceId, NIGHT_SHIFT);
 		const platform = await otherSpace(sandbox.db, "Platform");
-		const theirs = engine.space(platform);
+		const theirs = engine.space(platform, NIGHT_SHIFT);
 
 		const added = await mine.addProject({ repoPath: sandbox.repoPath });
 		const started = await mine.startRun({ projectId: added.id, flow });
@@ -310,7 +311,7 @@ describe("Spaces", () => {
 	});
 
 	test("a move to a Space that does not exist is refused", async () => {
-		const mine = makeEngine().space(sandbox.spaceId);
+		const mine = makeEngine().space(sandbox.spaceId, NIGHT_SHIFT);
 		const added = await mine.addProject({ repoPath: sandbox.repoPath });
 		await expect(mine.moveProject(added.id, "nowhere")).rejects.toThrow(
 			"That Space does not exist.",

@@ -21,7 +21,7 @@ import { startRunOnHost } from "./start-run-on-host";
  * (`host-h`).
  */
 
-const ADA: Actor = { personId: "person-ada" };
+const ADA: Actor = { personId: "person-ada", door: "session" };
 
 /** What access says of a Space the Person is not a Member of. */
 const NO_SPACE = { kind: "not-found", message: "That Space does not exist." };
@@ -142,7 +142,7 @@ describe("who may start a run", () => {
 		const p = places();
 		p.ports.access.members.join("space-own", "person-vic", "viewer");
 		const refused = p.start(
-			{ personId: "person-vic" },
+			{ personId: "person-vic", door: "session" },
 			{ projectId: "gone", flowName: "flow", spaceId: "space-own" },
 		);
 		await expect(refused).rejects.toBeInstanceOf(p.ports.access.RoleRefusal);
@@ -153,7 +153,7 @@ describe("who may start a run", () => {
 		const p = places();
 		await expect(
 			p.start(
-				{ personId: "person-eve" },
+				{ personId: "person-eve", door: "session" },
 				{ projectId: "project-1", flowName: "flow", spaceId: "space-own" },
 			),
 		).rejects.toMatchObject(NO_SPACE);

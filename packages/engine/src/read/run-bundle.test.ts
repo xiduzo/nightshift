@@ -8,6 +8,7 @@ import { event, run, step } from "@nightshift/db/schema";
 import type { AgentNode, CommandNode, Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { asc, eq, sql } from "drizzle-orm";
+import { NIGHT_SHIFT } from "../contract";
 import { foldRun } from "../log";
 import { parseEventRow } from "../log/run-log/append";
 import { readRunTranscript } from "../log/transcript/transcripts";
@@ -80,7 +81,7 @@ async function finishedRun(): Promise<string> {
 			},
 			dataDir: sandbox.dataDir,
 		}),
-	).space(sandbox.spaceId);
+	).space(sandbox.spaceId, NIGHT_SHIFT);
 	const { id: projectId } = await engine.addProject({
 		repoPath: sandbox.repoPath,
 	});

@@ -7,6 +7,7 @@ import type { AgentHarness } from "@nightshift/agents/types";
 import { event } from "@nightshift/db/schema";
 import { FLOW_VERSION, type Flow, type FlowNode } from "@nightshift/flows";
 import { asc } from "drizzle-orm";
+import { NIGHT_SHIFT } from "../../src/contract";
 import { createRunLog } from "../../src/log/run-log/run-log";
 import { createRunFolders } from "../../src/run-folders/run-folders";
 import { NO_BRANCHES } from "../../src/runs/start/domain/prepared-run";
@@ -60,7 +61,7 @@ function makeEngine(): SpaceEngine {
 				dataDir: sandbox.dataDir,
 			}),
 		},
-	).space(sandbox.spaceId);
+	).space(sandbox.spaceId, NIGHT_SHIFT);
 }
 
 const command = (id: string, line: string): FlowNode => ({

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { event, keptVariable, user } from "@nightshift/db/schema";
+import { NIGHT_SHIFT } from "@nightshift/engine";
 import type { RunStatus } from "@nightshift/engine/run-status";
 import {
 	createSandbox,
@@ -75,7 +76,9 @@ beforeEach(async () => {
 	};
 	paired = await pairedReplicas(a, b, { hostWalks: true, hostWork: work });
 	projectId = (
-		await paired.host.space(a.spaceId).addProject({ repoPath: a.repoPath })
+		await paired.host
+			.space(a.spaceId, NIGHT_SHIFT)
+			.addProject({ repoPath: a.repoPath })
 	).id;
 	await paired.projectOnDevice(projectId, { clone: true });
 	await paired.hostExchange.addClone(await paired.caller(), {
@@ -83,7 +86,7 @@ beforeEach(async () => {
 		projectId,
 		deviceName: "B",
 	});
-	await seedFlows(paired.host.space(a.spaceId), projectId, {
+	await seedFlows(paired.host.space(a.spaceId, NIGHT_SHIFT), projectId, {
 		count: countFlow,
 	});
 	exchange = createDeviceExchange({
@@ -132,12 +135,15 @@ afterEach(async () => {
  */
 async function ownerOnB() {
 	await joinSpace(b.db, a.spaceId, paired.personId, "owner");
-	return paired.device.space(a.spaceId, { personId: paired.personId });
+	return paired.device.space(a.spaceId, {
+		personId: paired.personId,
+		door: "session",
+	});
 }
 
 async function statusOn(engine: PeerEngine, runId: string) {
 	try {
-		return (await engine.space(a.spaceId).getRun(runId)).status;
+		return (await engine.space(a.spaceId, NIGHT_SHIFT).getRun(runId)).status;
 	} catch {
 		return null;
 	}
@@ -163,7 +169,7 @@ describe("the Host walks a run a Device starts", () => {
 	test("B starts a flow it saved a moment ago: A starts it once its copy has that flow", async () => {
 		// B saves it while its documents do not reach A.
 		paired.memory.down();
-		await seedFlows(paired.device.space(a.spaceId), projectId, {
+		await seedFlows(paired.device.space(a.spaceId, NIGHT_SHIFT), projectId, {
 			fresh: countFlow,
 		});
 		let started = false;
@@ -192,7 +198,9 @@ describe("the Host walks a run a Device starts", () => {
 
 		await untilStatus(paired.host, started.id, "finished");
 		await untilStatus(paired.device, started.id, "finished");
-		const detail = await paired.device.space(a.spaceId).getRun(started.id);
+		const detail = await paired.device
+			.space(a.spaceId, NIGHT_SHIFT)
+			.getRun(started.id);
 		expect(detail.steps.map((s) => [s.nodeId, s.device?.id])).toEqual([
 			["count", b.deviceId],
 		]);
@@ -225,16 +233,17 @@ describe("the Host walks a run a Device starts", () => {
 			await b.db.select().from(user).where(eq(user.id, paired.personId)),
 		).toEqual([]);
 		const started = await paired.host
-			.space(a.spaceId, { personId: paired.personId })
+			.space(a.spaceId, { personId: paired.personId, door: "session" })
 			.startRun({ projectId, flowName: "count", deviceId: b.deviceId });
 		await untilStatus(paired.device, started.id, "finished");
 		const expected = { id: paired.personId, name: "Ada" };
 		expect(
-			(await paired.device.space(a.spaceId).getRun(started.id)).startedBy,
+			(await paired.device.space(a.spaceId, NIGHT_SHIFT).getRun(started.id))
+				.startedBy,
 		).toEqual(expected);
-		const listed = (await paired.device.space(a.spaceId).listRuns()).find(
-			(r) => r.id === started.id,
-		);
+		const listed = (
+			await paired.device.space(a.spaceId, NIGHT_SHIFT).listRuns()
+		).find((r) => r.id === started.id);
 		expect(listed?.startedBy).toEqual(expected);
 	});
 

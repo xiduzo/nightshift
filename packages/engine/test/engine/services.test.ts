@@ -19,6 +19,7 @@ import type {
 	WaitNode,
 } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
+import { NIGHT_SHIFT } from "../../src/contract";
 import {
 	defaultRunSettings,
 	type RunSettings,
@@ -96,7 +97,7 @@ function makeEngine(
 			...options,
 		}),
 		{ runLog, minuteMs: MINUTE_MS, secondMs: SECOND_MS, ...internals },
-	).space(sandbox.spaceId);
+	).space(sandbox.spaceId, NIGHT_SHIFT);
 }
 
 const at = { x: 0, y: 0 };

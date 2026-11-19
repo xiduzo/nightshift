@@ -49,7 +49,7 @@ export const dashboard = {
 			const personId = context.session.user.id;
 			const spaces = input.everySpace
 				? (await spacesOf(context.db, personId)).map((space) =>
-						context.engine.space(space.id, { personId }),
+						context.engine.space(space.id, context.actor),
 					)
 				: [context.space];
 			return spacesDashboard(spaces, read);

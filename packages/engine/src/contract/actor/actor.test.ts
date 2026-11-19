@@ -3,7 +3,9 @@ import { NIGHT_SHIFT, personOf } from "./actor";
 
 describe("the actor", () => {
 	test("a Person's actor names them, through any door", () => {
-		expect(personOf({ personId: "person-ada" })).toBe("person-ada");
+		expect(personOf({ personId: "person-ada", door: "session" })).toBe(
+			"person-ada",
+		);
 		expect(personOf({ personId: "person-ada", door: "command" })).toBe(
 			"person-ada",
 		);

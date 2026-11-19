@@ -811,7 +811,7 @@ async function makeDaemon(
 			createProjectCopies({
 				gitHub: gitHubClones,
 				spaceIds: () => spaceIds(db),
-				space: (spaceId) => engine.space(spaceId),
+				space: (spaceId, actor) => engine.space(spaceId, actor),
 				enabled: () => {
 					const current = settings.current();
 					return current.host && current.copyProjects;
@@ -882,6 +882,9 @@ async function makeDaemon(
 		reach: devices.reach,
 	};
 
+	// The Space view for the session's Person: these calls come behind the API.
+	const asked = (at: { spaceId: string; personId: string }) =>
+		engine.space(at.spaceId, { personId: at.personId, door: "session" });
 	// Suggestions and chats in the flow editor: on this computer's
 	// profiles, read only in the project's Clone. A chat reads the
 	// project's flows and runs as the Person sees them in the Space.
@@ -891,7 +894,7 @@ async function makeDaemon(
 		...harnessLookup(harnesses, settings),
 		clonePath,
 		withoutFolder: withoutFolderOf(db),
-		space: ({ spaceId, personId }) => engine.space(spaceId, { personId }),
+		space: asked,
 		cliTools,
 		connections,
 		// The Explainer, the Field writer and the Learner on a model of this computer.
@@ -942,8 +945,8 @@ async function makeDaemon(
 	const assistantWithCosts = (deps: Parameters<typeof createAssistant>[0]) =>
 		recordingAssistant(createAssistant(deps), {
 			keep: (cost) => engine.keepAnswerCost(cost),
-			projectOfRun: async (runId, { spaceId, personId }) =>
-				(await engine.space(spaceId, { personId }).getRun(runId)).projectId,
+			projectOfRun: async (runId, at) =>
+				(await asked(at).getRun(runId)).projectId,
 		});
 
 	const http = createHttp({
@@ -964,15 +967,12 @@ async function makeDaemon(
 		toolLaunchers,
 		configUse: createConfigUse({
 			deviceId: device.id,
-			space: ({ spaceId, personId }) => engine.space(spaceId, { personId }),
+			space: asked,
 			connections,
 			cliTools,
 			profiles,
 			toolLaunchers,
 		}),
-		// Suggestions and chats in the flow editor: on this computer's
-		// profiles, read only in the project's Clone. A chat reads the
-		// project's flows and runs as the Person sees them in the Space.
 		assistant: assistantWithCosts(assistantDeps),
 		checks,
 		agentSetup,

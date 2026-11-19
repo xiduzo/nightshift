@@ -10,6 +10,7 @@ import {
 	user,
 } from "@nightshift/db/schema";
 import type { WalkRef } from "@nightshift/engine";
+import { NIGHT_SHIFT } from "@nightshift/engine";
 import {
 	createSpaceDocuments,
 	type SpaceDocuments,
@@ -115,7 +116,7 @@ function runLogFor(sandbox: Sandbox) {
 }
 
 async function statusOf(engine: PeerEngine, spaceId: string, runId: string) {
-	return (await engine.space(spaceId).getRun(runId)).status;
+	return (await engine.space(spaceId, NIGHT_SHIFT).getRun(runId)).status;
 }
 
 async function untilStatus(
@@ -163,11 +164,11 @@ describe("the run history exchange", () => {
 		const engineA = engineOf(a);
 		const engineB = engineOf(b);
 		const { id: projectId } = await engineA
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.addProject({ repoPath: a.repoPath });
 		await projectOnB(projectId);
 		const run = await engineA
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId, flow: gateFlow });
 		await untilStatus(engineA, a.spaceId, run.id, "waiting");
 
@@ -176,10 +177,12 @@ describe("the run history exchange", () => {
 		// Facts of no run (ProjectAdded) stay with their Replica.
 		expect(first.every((e) => e.runId === run.id)).toBe(true);
 		expect(await statusOf(engineB, a.spaceId, run.id)).toBe("waiting");
-		const onB = await engineB.space(a.spaceId).getRun(run.id);
+		const onB = await engineB.space(a.spaceId, NIGHT_SHIFT).getRun(run.id);
 		expect(onB.walker).toMatchObject({ id: a.deviceId, thisDevice: false });
 		expect(onB.takeOverCommand).toBeNull();
-		expect((await engineB.space(a.spaceId).listGates())[0]).toMatchObject({
+		expect(
+			(await engineB.space(a.spaceId, NIGHT_SHIFT).listGates())[0],
+		).toMatchObject({
 			runId: run.id,
 			walker: { id: a.deviceId, thisDevice: false },
 			answerPending: false,
@@ -195,8 +198,8 @@ describe("the run history exchange", () => {
 		expect(await engineB.exchange.ingest(again.rows)).toEqual([]);
 
 		// A answers; the rest comes after the cursor only.
-		const gate = (await engineA.space(a.spaceId).listGates())[0];
-		await engineA.space(a.spaceId).act(run.id, {
+		const gate = (await engineA.space(a.spaceId, NIGHT_SHIFT).listGates())[0];
+		await engineA.space(a.spaceId, NIGHT_SHIFT).act(run.id, {
 			kind: "answer",
 			stepId: gate?.stepId as string,
 			choice: "approve",
@@ -205,7 +208,7 @@ describe("the run history exchange", () => {
 		const rest = await copyRows(engineA, engineB);
 		expect(rest[0]?.seq).toBeGreaterThan(first.at(-1)?.seq ?? 0);
 		expect(await statusOf(engineB, a.spaceId, run.id)).toBe("finished");
-		expect(await engineB.space(a.spaceId).listGates()).toEqual([]);
+		expect(await engineB.space(a.spaceId, NIGHT_SHIFT).listGates()).toEqual([]);
 
 		// The walker's order, its identity and its time came along.
 		const own = await a.db
@@ -228,10 +231,10 @@ describe("the run history exchange", () => {
 		const engineA = engineOf(a, { harness });
 		const engineB = engineOf(b);
 		const { id: projectId } = await engineA
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.addProject({ repoPath: a.repoPath });
 		await projectOnB(projectId);
-		const run = await engineA.space(a.spaceId).startRun({
+		const run = await engineA.space(a.spaceId, NIGHT_SHIFT).startRun({
 			projectId,
 			flow: {
 				version: FLOW_VERSION,
@@ -271,10 +274,10 @@ describe("the run history exchange", () => {
 		const engineA = engineOf(a);
 		const engineB = engineOf(b);
 		const { id: projectId } = await engineA
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.addProject({ repoPath: a.repoPath });
 		const run = await engineA
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId, flow: gateFlow });
 		await untilStatus(engineA, a.spaceId, run.id, "waiting");
 		const { rows } = await engineA.exchange.rowsAfter({
@@ -329,11 +332,11 @@ describe("a batch and what follows from it", () => {
 	/** A's run of `gateFlow`, waiting at its Gate, with its project on B. */
 	async function waitingOnA(engineA: PeerEngine) {
 		const { id: projectId } = await engineA
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.addProject({ repoPath: a.repoPath });
 		await projectOnB(projectId);
 		const run = await engineA
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId, flow: gateFlow });
 		await untilStatus(engineA, a.spaceId, run.id, "waiting");
 		return { projectId, runId: run.id };
@@ -410,7 +413,9 @@ describe("a batch and what follows from it", () => {
 			if (content !== null) files.set(fileKey(ref), content);
 		};
 		await own({ kind: "checkpoint", spaceId: a.spaceId, runId });
-		for (const { id } of (await engineA.space(a.spaceId).getRun(runId)).steps) {
+		for (const { id } of (
+			await engineA.space(a.spaceId, NIGHT_SHIFT).getRun(runId)
+		).steps) {
 			await own({ kind: "transcript", spaceId: a.spaceId, runId, stepId: id });
 		}
 		await logOn(a, runId, a.deviceId, "WalkerMoved", {
@@ -442,16 +447,18 @@ describe("a batch and what follows from it", () => {
 		await expect(copyRows(engineA, engineB)).rejects.toThrow();
 		// Nothing of the batch landed, not even in the run log in memory.
 		expect(await typesOn(b, runId)).toEqual([]);
-		await expect(engineB.space(a.spaceId).getRun(runId)).rejects.toThrow();
+		await expect(
+			engineB.space(a.spaceId, NIGHT_SHIFT).getRun(runId),
+		).rejects.toThrow();
 		expect(await engineB.exchange.cursorsWith(HOST)).toEqual({});
 
 		// B starts again, and the batch comes again: all of it lands.
 		await b.db.run(sql.raw("drop trigger stop_here"));
 		await copyRows(engineA, engineB);
 		expect(await typesOn(b, runId)).toEqual(await typesOn(a, runId));
-		expect((await engineB.space(a.spaceId).getRun(runId)).walker.id).toBe(
-			"device-c",
-		);
+		expect(
+			(await engineB.space(a.spaceId, NIGHT_SHIFT).getRun(runId)).walker.id,
+		).toBe("device-c");
 
 		// A Replica that an older build left with the old Walker gets the
 		// new one back when the batch comes again.
@@ -464,9 +471,9 @@ describe("a batch and what follows from it", () => {
 			cursors: {},
 		});
 		expect(await engineB.exchange.ingest(again.rows)).toEqual([]);
-		expect((await engineB.space(a.spaceId).getRun(runId)).walker.id).toBe(
-			"device-c",
-		);
+		expect(
+			(await engineB.space(a.spaceId, NIGHT_SHIFT).getRun(runId)).walker.id,
+		).toBe("device-c");
 	});
 
 	test("comes in the order its events landed on the Host: a third Replica stores a moved run as it happened", async () => {
@@ -533,9 +540,9 @@ describe("a batch and what follows from it", () => {
 		const files = await moveToB(engineA, runId);
 		// The archive does not have the run's walk state yet.
 		await copyRows(engineA, engineB);
-		expect((await engineB.space(a.spaceId).getRun(runId)).walker.id).toBe(
-			b.deviceId,
-		);
+		expect(
+			(await engineB.space(a.spaceId, NIGHT_SHIFT).getRun(runId)).walker.id,
+		).toBe(b.deviceId);
 		await Bun.sleep(200);
 		expect(await typesOn(b, runId)).not.toContain(
 			`${b.deviceId}:WalkerArrived`,
@@ -570,7 +577,9 @@ describe("a batch and what follows from it", () => {
 			});
 			const { runId } = await waitingOnA(engineA);
 			const files = await moveToB(engineA, runId);
-			const gate = (await engineA.space(a.spaceId).getRun(runId)).steps.at(-1);
+			const gate = (
+				await engineA.space(a.spaceId, NIGHT_SHIFT).getRun(runId)
+			).steps.at(-1);
 			const command: RunCommand = {
 				id: "command-1",
 				spaceId: a.spaceId,
@@ -641,13 +650,13 @@ describe("a batch and what follows from it", () => {
 
 		// Another run of A finished there: it never moves to B any more.
 		const ended = await engineA
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId, flow: gateFlow });
 		await untilStatus(engineA, a.spaceId, ended.id, "waiting");
-		const gate = (await engineA.space(a.spaceId).listGates()).find(
+		const gate = (await engineA.space(a.spaceId, NIGHT_SHIFT).listGates()).find(
 			(g) => g.runId === ended.id,
 		);
-		await engineA.space(a.spaceId).act(ended.id, {
+		await engineA.space(a.spaceId, NIGHT_SHIFT).act(ended.id, {
 			kind: "answer",
 			stepId: gate?.stepId as string,
 			choice: "approve",
@@ -708,15 +717,15 @@ describe("a run walked elsewhere", () => {
 		const engineA = engineOf(a);
 		const engineB = engineOf(b, relay ? { relay } : {});
 		const { id: projectId } = await engineA
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.addProject({ repoPath: a.repoPath });
 		await projectOnB(projectId);
 		const run = await engineA
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId, flow: gateFlow });
 		await untilStatus(engineA, a.spaceId, run.id, "waiting");
 		await copyRows(engineA, engineB);
-		const gate = (await engineB.space(a.spaceId).listGates())[0];
+		const gate = (await engineB.space(a.spaceId, NIGHT_SHIFT).listGates())[0];
 		return { engineA, engineB, run, stepId: gate?.stepId as string };
 	}
 
@@ -743,7 +752,10 @@ describe("a run walked elsewhere", () => {
 		const { engineB, run, stepId } = await waitingOnB(relay);
 		// The Person is a Member of A's Space on B: B checks that before it sends.
 		await joinSpace(b.db, a.spaceId, "person-a");
-		const space = engineB.space(a.spaceId, { personId: "person-a" });
+		const space = engineB.space(a.spaceId, {
+			personId: "person-a",
+			door: "session",
+		});
 
 		await space.act(run.id, { kind: "answer", stepId, choice: "approve" });
 		await space.act(run.id, { kind: "stop", when: "after-step" });
@@ -780,11 +792,13 @@ describe("a run walked elsewhere", () => {
 		const { engineB, run, stepId } = await waitingOnB();
 		await joinSpace(b.db, a.spaceId, "p");
 		expect(
-			engineB.space(a.spaceId).act(run.id, { kind: "rerun", nodeId: "ship" }),
+			engineB
+				.space(a.spaceId, NIGHT_SHIFT)
+				.act(run.id, { kind: "rerun", nodeId: "ship" }),
 		).rejects.toThrow("Another device");
 		expect(
 			engineB
-				.space(a.spaceId, { personId: "p" })
+				.space(a.spaceId, { personId: "p", door: "session" })
 				.act(run.id, { kind: "answer", stepId, choice: "approve" }),
 		).rejects.toThrow("cannot reach");
 
@@ -794,7 +808,7 @@ describe("a run walked elsewhere", () => {
 			.from(event)
 			.where(eq(event.runId, run.id));
 		const restarted = engineOf(b);
-		await restarted.space(b.spaceId).listProjects();
+		await restarted.space(b.spaceId, NIGHT_SHIFT).listProjects();
 		await Bun.sleep(50);
 		const after = await b.db
 			.select()
@@ -831,8 +845,9 @@ describe("a run walked elsewhere", () => {
 		};
 		const { engineA, engineB, run } = await waitingOnB(relay);
 		// The Host has A's files: A pushed them when the command ended.
-		for (const { id } of (await engineA.space(a.spaceId).getRun(run.id))
-			.steps) {
+		for (const { id } of (
+			await engineA.space(a.spaceId, NIGHT_SHIFT).getRun(run.id)
+		).steps) {
 			const ref = {
 				kind: "transcript" as const,
 				spaceId: a.spaceId,
@@ -842,7 +857,8 @@ describe("a run walked elsewhere", () => {
 			const content = await engineA.exchange.archive.own(ref);
 			if (content !== null) files.set(id, content);
 		}
-		const hello = (await engineB.space(a.spaceId).getRun(run.id)).steps[0];
+		const hello = (await engineB.space(a.spaceId, NIGHT_SHIFT).getRun(run.id))
+			.steps[0];
 		const step = { spaceId: a.spaceId, runId: run.id, stepId: hello?.id ?? "" };
 		const read = async () => {
 			const texts: string[] = [];
@@ -899,17 +915,21 @@ describe("projects of a Space without a Clone here", () => {
 		const engineA = engineOf(a);
 		const engineB = engineOf(b);
 		const { id: projectId } = await engineA
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.addProject({ repoPath: a.repoPath });
 		await projectOnB(projectId);
-		const listed = await engineB.space(a.spaceId).listProjects();
+		const listed = await engineB.space(a.spaceId, NIGHT_SHIFT).listProjects();
 		expect(listed).toEqual([
 			expect.objectContaining({ id: projectId, repoPath: null }),
 		]);
 		expect(listed[0]?.clones.some((c) => c.thisDevice)).toBe(false);
-		expect(await engineB.space(a.spaceId).flows.list(projectId)).toEqual([]);
 		expect(
-			engineB.space(a.spaceId).startRun({ projectId, flow: gateFlow }),
+			await engineB.space(a.spaceId, NIGHT_SHIFT).flows.list(projectId),
+		).toEqual([]);
+		expect(
+			engineB
+				.space(a.spaceId, NIGHT_SHIFT)
+				.startRun({ projectId, flow: gateFlow }),
 		).rejects.toThrow("not on this computer");
 	});
 });
@@ -990,11 +1010,11 @@ describe("run logs", () => {
 			{ runLog },
 		);
 		const { id: projectId } = await engineA
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.addProject({ repoPath: a.repoPath });
 		await projectOnB(projectId);
 		const run = await engineA
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId, flow: gateFlow });
 		// B reads the run while it is empty, then ingests: the copy follows.
 		await untilStatus(engineA, a.spaceId, run.id, "waiting");

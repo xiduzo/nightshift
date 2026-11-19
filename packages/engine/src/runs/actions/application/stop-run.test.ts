@@ -122,7 +122,7 @@ describe("who may stop a run", () => {
 		for (const [actor, runId, spaceId] of [
 			[ADA, "run-1", "space-2"],
 			[ADA, "run-2", undefined],
-			[{ personId: "person-gone" }, "run-1", undefined],
+			[{ personId: "person-gone", door: "session" }, "run-1", undefined],
 		] as const) {
 			const refused = await refusalOf(stop(actor, { runId, spaceId }));
 			expect((refused as Refusal).kind).toBe("not-found");

@@ -9,6 +9,7 @@ import {
 	type Engine,
 	type FlowDocuments,
 	HostUnreachableError,
+	NIGHT_SHIFT,
 	type PeerProjects,
 } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
@@ -169,7 +170,9 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 	async function runsOf(spaceId: string) {
 		let total = 0;
 		let notDone = 0;
-		for (const runs of (await engine.space(spaceId).projectRuns()).values()) {
+		for (const runs of (
+			await engine.space(spaceId, NIGHT_SHIFT).projectRuns()
+		).values()) {
 			total += runs.total;
 			for (const status of NOT_DONE) notDone += runs.statuses[status] ?? 0;
 		}
@@ -300,7 +303,7 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 		const answer = await ask(link, from, input.join ?? [], true);
 		const targets = targetsOf(answer, to);
 		const projects = await engine.projects.ofSpace(from);
-		const projectRuns = await engine.space(from).projectRuns();
+		const projectRuns = await engine.space(from, NIGHT_SHIFT).projectRuns();
 		const elsewhere = new Map(answer.elsewhere.map((e) => [e.projectId, e]));
 		const views: MergeProjectView[] = [];
 		for (const p of projects) {

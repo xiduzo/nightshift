@@ -18,6 +18,7 @@ import type {
 } from "@nightshift/flows";
 import { FLOW_VERSION, parseFlow } from "@nightshift/flows";
 import type { FlowInput } from "@nightshift/flows/testing";
+import { NIGHT_SHIFT } from "../../src/contract";
 import { saverFor } from "../../src/graph/checkpoints/checkpointer";
 import { appendEvent } from "../../src/log/run-log/append";
 import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
@@ -78,7 +79,7 @@ function makeEngine(
 			...options,
 		}),
 		{ runLog },
-	).space(sandbox.spaceId);
+	).space(sandbox.spaceId, NIGHT_SHIFT);
 }
 
 function agent(

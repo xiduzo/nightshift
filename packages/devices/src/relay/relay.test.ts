@@ -1,6 +1,7 @@
 import { describe, expect, spyOn, test } from "bun:test";
 import {
 	HostUnreachableError,
+	NIGHT_SHIFT,
 	OLDER_HOST,
 	OlderHostError,
 	type OwnDevice,
@@ -989,7 +990,7 @@ describe("the relay of a paired Device", () => {
 		try {
 			const paired = await pairedReplicas(a, b);
 			const { id: projectId } = await paired.host
-				.space(a.spaceId)
+				.space(a.spaceId, NIGHT_SHIFT)
 				.addProject({ repoPath: a.repoPath });
 			const relayOver = (client: HostClient | null) =>
 				createRelay({
@@ -1018,7 +1019,7 @@ describe("the relay of a paired Device", () => {
 		try {
 			const paired = await pairedReplicas(a, b);
 			const { id: projectId } = await paired.host
-				.space(a.spaceId)
+				.space(a.spaceId, NIGHT_SHIFT)
 				.addProject({ repoPath: a.repoPath });
 			let key: typeof paired.key | null = paired.key;
 			const relay = createRelay({

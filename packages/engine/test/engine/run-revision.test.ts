@@ -5,6 +5,7 @@ import type { Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { and, eq } from "drizzle-orm";
 import * as Y from "yjs";
+import { NIGHT_SHIFT } from "../../src/contract";
 import { createProjectFlows } from "../../src/flows";
 import {
 	createFlowDocuments,
@@ -73,7 +74,7 @@ function engineWith(flowDocuments: FlowDocuments) {
 			flowDocuments,
 		}),
 		{ signal: signal.signal },
-	).space(sandbox.spaceId);
+	).space(sandbox.spaceId, NIGHT_SHIFT);
 }
 
 /** The id of the revision the flow of that name is now. */

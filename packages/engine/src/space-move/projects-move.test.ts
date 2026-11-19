@@ -18,6 +18,7 @@ import type { DecisionNode, Flow, Schedule } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { and, eq, inArray } from "drizzle-orm";
+import { NIGHT_SHIFT } from "../contract";
 import type { Engine } from "../engine";
 import { createRunLog, type RunLog } from "../log/run-log/run-log";
 import {
@@ -146,7 +147,7 @@ async function stoppedRun(
 	projectId: string,
 	spaceId: string = sandbox.spaceId,
 ): Promise<string> {
-	const space = engine.space(spaceId);
+	const space = engine.space(spaceId, NIGHT_SHIFT);
 	const { id } = await space.startRun({ projectId, flow });
 	await waitFor(async () => (await space.getRun(id)).status === "waiting", {
 		label: "the Gate",
@@ -167,7 +168,7 @@ async function otherRepo(): Promise<string> {
 describe("a Space move", () => {
 	test("moves each Project to its Space in one batch with the rows above the engine and the caller's own; the run log and the documents follow", async () => {
 		const engine = makeEngine();
-		const mine = engine.space(sandbox.spaceId);
+		const mine = engine.space(sandbox.spaceId, NIGHT_SHIFT);
 		const platform = await otherSpace(sandbox.db, "Platform");
 		const studio = await otherSpace(sandbox.db, "Studio");
 		const app = await mine.addProject({ repoPath: sandbox.repoPath });
@@ -223,7 +224,9 @@ describe("a Space move", () => {
 			.where(eq(organization.id, sandbox.spaceId));
 		expect(space?.name).toBe("Moved 1");
 		// The run log reads the run again: its new Space has it.
-		expect((await engine.space(platform).getRun(runId)).status).toBe("stopped");
+		expect(
+			(await engine.space(platform, NIGHT_SHIFT).getRun(runId)).status,
+		).toBe("stopped");
 		await expect(mine.getRun(runId)).rejects.toThrow(
 			"Night Shift cannot find this run.",
 		);
@@ -252,7 +255,7 @@ describe("a Space move", () => {
 
 	test("while it plans, no run starts in its Space; one that fails before its batch moves nothing and frees the Space", async () => {
 		const engine = makeEngine();
-		const mine = engine.space(sandbox.spaceId);
+		const mine = engine.space(sandbox.spaceId, NIGHT_SHIFT);
 		const platform = await otherSpace(sandbox.db, "Platform");
 		const app = await mine.addProject({ repoPath: sandbox.repoPath });
 		let started: unknown = null;
@@ -288,7 +291,7 @@ describe("a Space move", () => {
 
 	test("schedules change through the project's flows before the batch, and the caller's rows see how many", async () => {
 		const engine = makeEngine();
-		const mine = engine.space(sandbox.spaceId);
+		const mine = engine.space(sandbox.spaceId, NIGHT_SHIFT);
 		const home = await otherSpace(sandbox.db, "Home");
 		const app = await mine.addProject({ repoPath: sandbox.repoPath });
 		const schedules: Schedule[] = [
@@ -313,7 +316,7 @@ describe("a Space move", () => {
 		});
 
 		expect(counted).toBe(1);
-		const listed = await engine.space(home).listSchedules(app.id);
+		const listed = await engine.space(home, NIGHT_SHIFT).listSchedules(app.id);
 		expect(listed.schedules.map((s) => [s.id, s.enabled])).toEqual([
 			["nightly", false],
 			["studio", false],
@@ -322,7 +325,7 @@ describe("a Space move", () => {
 
 	test("with this computer's own runs only, the Space it leaves keeps the rest and its document, and only this computer's Clones go along", async () => {
 		const engine = makeEngine();
-		const mine = engine.space(sandbox.spaceId);
+		const mine = engine.space(sandbox.spaceId, NIGHT_SHIFT);
 		const copy = await otherSpace(sandbox.db, "Copy");
 		const app = await mine.addProject({ repoPath: sandbox.repoPath });
 		const own = await stoppedRun(engine, app.id);
@@ -411,10 +414,10 @@ describe("forgetting a Space a move emptied", () => {
 		const team = await otherSpace(sandbox.db, "Team");
 		const kept = await otherSpace(sandbox.db, "Kept");
 		const app = await engine
-			.space(team)
+			.space(team, NIGHT_SHIFT)
 			.addProject({ repoPath: sandbox.repoPath });
 		const tools = await engine
-			.space(kept)
+			.space(kept, NIGHT_SHIFT)
 			.addProject({ repoPath: await otherRepo() });
 		const teamRun = await stoppedRun(engine, app.id, team);
 		const keptRun = await stoppedRun(engine, tools.id, kept);
@@ -530,15 +533,17 @@ describe("forgetting a Space a move emptied", () => {
 		// Where its runs went, they stay whole.
 		expect(await whatIsLeft(platform)).toEqual(platformBefore);
 		expect(platformBefore).toMatchObject({ projects: 1, runs: 1 });
-		expect((await engine.space(platform).getRun(teamRun)).status).toBe(
-			"stopped",
-		);
+		expect(
+			(await engine.space(platform, NIGHT_SHIFT).getRun(teamRun)).status,
+		).toBe("stopped");
 		const onPlatform = await documents.open(platform);
 		expect([...spaceProjects(onPlatform).keys()]).toEqual([app.id]);
 		// Another Space keeps its Project, its run, its Member and its document.
 		expect(await whatIsLeft(kept)).toEqual(keptBefore);
 		expect(keptBefore).toMatchObject({ projects: 1, runs: 1, document: true });
-		expect((await engine.space(kept).getRun(keptRun)).status).toBe("stopped");
+		expect((await engine.space(kept, NIGHT_SHIFT).getRun(keptRun)).status).toBe(
+			"stopped",
+		);
 		const inKept = await documents.open(kept);
 		expect([...spaceProjects(inKept).keys()]).toEqual([tools.id]);
 

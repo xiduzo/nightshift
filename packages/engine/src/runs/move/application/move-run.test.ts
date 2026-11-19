@@ -223,7 +223,10 @@ describe("who may move a run", () => {
 		const viewer = await refusalOf(move(VIC, { runId: "run-1", to: "laptop" }));
 		expect(viewer?.kind).toBe("forbidden");
 		const stranger = await refusalOf(
-			move({ personId: "person-sam" }, { runId: "run-1", to: "laptop" }),
+			move(
+				{ personId: "person-sam", door: "session" },
+				{ runId: "run-1", to: "laptop" },
+			),
 		);
 		expect(stranger?.kind).toBe("not-found");
 		expect(stranger?.message).toBe("Night Shift cannot find this run.");

@@ -40,13 +40,19 @@ const run = (id: string, thisDevice = false) => ({
 
 describe("a run's worktree path", () => {
 	test("shows to the owner of its Device: this computer's, or another of theirs", async () => {
-		const shown = await pathsFor()(sandbox.spaceId, { personId: "ada" });
+		const shown = await pathsFor()(sandbox.spaceId, {
+			personId: "ada",
+			door: "session",
+		});
 		expect(await shown(run("here", true))).toEqual(run("here", true));
 		expect(await shown(run("ada-laptop"))).toEqual(run("ada-laptop"));
 	});
 
 	test("hides from another Person, with the take-over command that names it", async () => {
-		const shown = await pathsFor()(sandbox.spaceId, { personId: "kim" });
+		const shown = await pathsFor()(sandbox.spaceId, {
+			personId: "kim",
+			door: "session",
+		});
 		expect(await shown(run("here", true))).toEqual({
 			...run("here", true),
 			worktreePath: "",
@@ -62,14 +68,20 @@ describe("a run's worktree path", () => {
 		expect(
 			(
 				await (
-					await pathsFor()(sandbox.spaceId, { personId: "ada" })
+					await pathsFor()(sandbox.spaceId, {
+						personId: "ada",
+						door: "session",
+					})
 				)(run("gone"))
 			).worktreePath,
 		).toBe("");
 		expect(
 			(
 				await (
-					await pathsFor(null)(sandbox.spaceId, { personId: "ada" })
+					await pathsFor(null)(sandbox.spaceId, {
+						personId: "ada",
+						door: "session",
+					})
 				)(run("here", true))
 			).worktreePath,
 		).toBe("");

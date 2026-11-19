@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { fakeHarness } from "@nightshift/agents/testing";
 import { event, member, user } from "@nightshift/db/schema";
+import { NIGHT_SHIFT } from "@nightshift/engine";
 import {
 	createSpaceDocuments,
 	type SpaceDocuments,
@@ -242,12 +243,12 @@ describe("another Person's run on the computer that walks it", () => {
 	test("a node may name this computer only when its profile is offered, and the Person may use Offers", async () => {
 		await offer();
 		const { id: projectId } = await engine
-			.space(sandbox.spaceId)
+			.space(sandbox.spaceId, NIGHT_SHIFT)
 			.addProject({ repoPath: sandbox.repoPath });
 		const names = async (personId: string, forNode?: { profile?: string }) =>
 			(
 				await engine
-					.space(sandbox.spaceId, { personId })
+					.space(sandbox.spaceId, { personId, door: "session" })
 					.listDevices(projectId, forNode)
 			).map((d) => [d.name, d.offers]);
 		expect(await names(carol, { profile: "coder" })).toEqual([
@@ -264,7 +265,7 @@ describe("another Person's run on the computer that walks it", () => {
 	});
 
 	test("without an Offer it is refused at start", async () => {
-		const space = engine.space(sandbox.spaceId);
+		const space = engine.space(sandbox.spaceId, NIGHT_SHIFT);
 		const { id: projectId } = await space.addProject({
 			repoPath: sandbox.repoPath,
 		});
@@ -275,14 +276,14 @@ describe("another Person's run on the computer that walks it", () => {
 
 	test("through an Offer it runs the profile resolved here, never in the run's copy; withdrawing stops it", async () => {
 		await offer();
-		const space = engine.space(sandbox.spaceId);
+		const space = engine.space(sandbox.spaceId, NIGHT_SHIFT);
 		const { id: projectId } = await space.addProject({
 			repoPath: sandbox.repoPath,
 		});
 		expect(
 			(
 				await engine
-					.space(sandbox.spaceId, { personId: carol })
+					.space(sandbox.spaceId, { personId: carol, door: "session" })
 					.listPlacements(projectId)
 			)[0]?.offers,
 		).toEqual(["coder"]);
@@ -341,7 +342,7 @@ describe("another Person's run on the computer that walks it", () => {
 
 	test("its Offer's session cap holds for a session a Walker elsewhere sends through this Host too", async () => {
 		await offer();
-		const space = engine.space(sandbox.spaceId);
+		const space = engine.space(sandbox.spaceId, NIGHT_SHIFT);
 		const { id: projectId } = await space.addProject({
 			repoPath: sandbox.repoPath,
 		});
@@ -489,7 +490,7 @@ describe("a schedule that runs on another Person's computer", () => {
 	});
 
 	test("is refused when saved without an Offer; through one it starts Carol's runs, until it is withdrawn", async () => {
-		const owner = engine.space(sandbox.spaceId);
+		const owner = engine.space(sandbox.spaceId, NIGHT_SHIFT);
 		const { id: projectId } = await owner.addProject({
 			repoPath: sandbox.repoPath,
 		});
@@ -504,7 +505,10 @@ describe("a schedule that runs on another Person's computer", () => {
 			edges: [],
 		});
 		// Carol saves a schedule. It runs on this computer, which she does not own.
-		const space = engine.space(sandbox.spaceId, { personId: carol });
+		const space = engine.space(sandbox.spaceId, {
+			personId: carol,
+			door: "session",
+		});
 		const [here] = await space.listDevices(projectId);
 		const schedule = {
 			id: "nightly",

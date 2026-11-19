@@ -41,7 +41,12 @@ export function memberSpacesContract(
 			await under.join(under.otherSpace.id, "person-ada", "member");
 			await under.join(under.space.id, "person-bob", "owner");
 			expect(
-				byId(await under.spaces.of({ personId: "person-ada" }, ANSWER)),
+				byId(
+					await under.spaces.of(
+						{ personId: "person-ada", door: "session" },
+						ANSWER,
+					),
+				),
 			).toEqual(
 				byId([
 					{ id: under.space.id, name: under.space.name, allowed: false },
@@ -56,17 +61,26 @@ export function memberSpacesContract(
 
 		test("a Person who is a Member of no Space has none", async () => {
 			await under.join(under.space.id, "person-bob", "owner");
-			expect(await under.spaces.of({ personId: "person-ada" }, {})).toEqual([]);
+			expect(
+				await under.spaces.of({ personId: "person-ada", door: "session" }, {}),
+			).toEqual([]);
 		});
 
 		test("{} allows every Member, also a role this version does not know. A real need does not", async () => {
 			await under.join(under.space.id, "person-ada", "auditor");
-			expect(await under.spaces.of({ personId: "person-ada" }, {})).toEqual([
+			expect(
+				await under.spaces.of({ personId: "person-ada", door: "session" }, {}),
+			).toEqual([
 				{ id: under.space.id, name: under.space.name, allowed: true },
 			]);
-			expect(await under.spaces.of({ personId: "person-ada" }, ANSWER)).toEqual(
-				[{ id: under.space.id, name: under.space.name, allowed: false }],
-			);
+			expect(
+				await under.spaces.of(
+					{ personId: "person-ada", door: "session" },
+					ANSWER,
+				),
+			).toEqual([
+				{ id: under.space.id, name: under.space.name, allowed: false },
+			]);
 		});
 
 		test("the door of the Person does not change their Spaces", async () => {

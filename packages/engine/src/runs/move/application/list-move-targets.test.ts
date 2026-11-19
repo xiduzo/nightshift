@@ -89,7 +89,7 @@ describe("the Devices a run can move to", () => {
 		ports.put({ id: "run-1" });
 		expect(await targets(VIC, { runId: "run-1" })).toEqual([]);
 		const refused = await refusalOf(
-			targets({ personId: "person-sam" }, { runId: "run-1" }),
+			targets({ personId: "person-sam", door: "session" }, { runId: "run-1" }),
 		);
 		expect(refused?.kind).toBe("not-found");
 	});

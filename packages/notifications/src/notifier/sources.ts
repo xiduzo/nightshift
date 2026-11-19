@@ -4,6 +4,7 @@ import {
 	type Engine,
 	flowTurnedSevere,
 	type LandedFact,
+	NIGHT_SHIFT,
 	type ScheduleMissed,
 	type SevereTurn,
 } from "@nightshift/engine";
@@ -75,9 +76,9 @@ export function engineRunEvents(
 		subscribe: (listener) => engine.onLandedFacts(listener),
 		onScheduleMissed: (listener) => engine.onScheduleMissed(listener),
 		severeTurn: (spaceId, runId) =>
-			flowTurnedSevere(engine.space(spaceId), runId, now()),
+			flowTurnedSevere(engine.space(spaceId, NIGHT_SHIFT), runId, now()),
 		async openGates(spaceId) {
-			const gates = await engine.space(spaceId).listGates();
+			const gates = await engine.space(spaceId, NIGHT_SHIFT).listGates();
 			return gates.map((g) => ({
 				runId: g.runId,
 				stepId: g.stepId,
@@ -88,7 +89,7 @@ export function engineRunEvents(
 		},
 		async run(spaceId, runId) {
 			const run = await engine
-				.space(spaceId)
+				.space(spaceId, NIGHT_SHIFT)
 				.getRun(runId)
 				.catch(() => null);
 			if (!run) return null;

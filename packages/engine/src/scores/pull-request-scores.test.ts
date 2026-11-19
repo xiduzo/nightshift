@@ -4,6 +4,7 @@ import { fakeHarness } from "@nightshift/agents/testing";
 import type { Flow, Schedule, WebhookEvent } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { now } from "@nightshift/time";
+import { NIGHT_SHIFT } from "../contract";
 import type { Engine } from "../engine";
 import type { SpaceEngine } from "../space-engine";
 import { seedFlows } from "../testing/seed-flows";
@@ -165,7 +166,7 @@ beforeEach(async () => {
 		}),
 		{ signal: controller.signal, now: () => now() + skew + ahead },
 	);
-	space = engine.space(sandbox.spaceId);
+	space = engine.space(sandbox.spaceId, NIGHT_SHIFT);
 	projectId = (await space.addProject({ repoPath: sandbox.repoPath })).id;
 });
 afterEach(async () => {

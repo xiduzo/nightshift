@@ -1,5 +1,6 @@
 import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
+import { type Actor, NIGHT_SHIFT } from "../contract";
 import type { UsageNotes } from "../usage";
 import { type Git, systemGit } from "./git";
 import { parseGitHubRepo } from "./github";
@@ -69,7 +70,8 @@ export function createProjectCopies(deps: {
 	gitHub: Pick<GitHubClones, "copy">;
 	/** The Spaces of this computer. */
 	spaceIds: () => Promise<string[]>;
-	space: (spaceId: string) => CopySpace;
+	/** One Space, as Night Shift (`NIGHT_SHIFT`) sees it: the sweep acts for no Person. */
+	space: (spaceId: string, actor: Actor) => CopySpace;
 	/** Whether the sweep copies: a Host with "Copy every project" on. */
 	enabled: () => boolean;
 	git?: Git;
@@ -178,7 +180,7 @@ export function createProjectCopies(deps: {
 	async function sweepOnce() {
 		for (const spaceId of await deps.spaceIds()) {
 			if (!deps.enabled()) return;
-			const space = deps.space(spaceId);
+			const space = deps.space(spaceId, NIGHT_SHIFT);
 			for (const project of await space.listProjects()) {
 				// A project without a remote is only on the computer that has its
 				// folder. A project without a folder has nothing to copy.

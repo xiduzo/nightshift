@@ -75,7 +75,8 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 		},
 		offers: {
 			async schedulesWithOffers(_project, _spaceId, actor, schedules) {
-				if (!actor) return [...schedules];
+				// Night Shift saves the schedules as they are, as `devices` does.
+				if (!actor || personOf(actor) === null) return [...schedules];
 				return schedules.map(({ person: _old, ...rest }) => rest);
 			},
 		},

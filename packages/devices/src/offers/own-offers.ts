@@ -6,6 +6,7 @@ import {
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { Engine } from "@nightshift/engine";
+import { NIGHT_SHIFT } from "@nightshift/engine";
 import type {
 	DeviceDocument,
 	ProfileStore,
@@ -112,7 +113,9 @@ export function createOffers(deps: {
 				// This computer's Person, as the Space knows them.
 				const me = await personInSpace(db, offer.spaceId, deps.ownerId);
 				const runs = [];
-				for (const r of (await engine.space(offer.spaceId).listRuns())
+				for (const r of (
+					await engine.space(offer.spaceId, NIGHT_SHIFT).listRuns()
+				)
 					.filter(
 						(r) =>
 							r.device.id === self.id &&
@@ -241,7 +244,7 @@ export function createOffers(deps: {
 		},
 
 		async spaceDevices(spaceId, personId) {
-			const projects = await engine.space(spaceId).listProjects();
+			const projects = await engine.space(spaceId, NIGHT_SHIFT).listProjects();
 			const offers = await engine.offers.list(spaceId);
 			// This computer's owner, as the Space knows them: on the Host of a
 			// Space it keeps, they have the id of their link there.

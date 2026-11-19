@@ -8,7 +8,7 @@ import { openSpace } from "./open-space";
 /** Opening a Space for an actor, on in-memory adapters. */
 
 const SPACE = "space-1";
-const ADA = { personId: "person-ada" };
+const ADA = { personId: "person-ada", door: "session" as const };
 
 /** What a request refuses with, or null. */
 const refusalOf = (work: Promise<unknown>) =>

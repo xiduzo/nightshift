@@ -5,6 +5,7 @@ import type { Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { iso, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
+import { NIGHT_SHIFT } from "../contract";
 import type { Engine } from "../engine";
 import type { SpaceEngine } from "../space-engine";
 import { seedFlows } from "../testing/seed-flows";
@@ -68,7 +69,7 @@ beforeEach(async () => {
 		}),
 		{ signal: controller.signal },
 	);
-	space = engine.space(sandbox.spaceId);
+	space = engine.space(sandbox.spaceId, NIGHT_SHIFT);
 	projectId = (await space.addProject({ repoPath: sandbox.repoPath })).id;
 });
 

@@ -6,6 +6,7 @@ import {
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { Engine, FlowDocuments, PeerProjects } from "@nightshift/engine";
+import { NIGHT_SHIFT } from "@nightshift/engine";
 import type { SpaceDocuments } from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
@@ -123,7 +124,7 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 	/** Refuses while a run this computer walks in the Space is not done. */
 	async function noRunsNotDone(spaceId: string): Promise<void> {
 		const runs = await engine
-			.space(spaceId)
+			.space(spaceId, NIGHT_SHIFT)
 			.listRuns({ statuses: [...NOT_DONE] });
 		const here = runs.filter((r) => r.walker.id === self.id).length;
 		if (here > 0) throw new Refusal("conflict", SPLIT_WORDS.notDone(here));

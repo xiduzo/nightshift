@@ -17,7 +17,7 @@ function at(day: number, hours: number, minutes = 0, seconds = 0): number {
 
 const P = "project-1";
 const SPACE = "space-1";
-const ANN: Actor = { personId: "person-ann" };
+const ANN: Actor = { personId: "person-ann", door: "session" };
 
 function nightly(extra: Partial<Schedule> = {}): Schedule {
 	return {

@@ -1,6 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { type AnswerCost, keepAnswerCost } from "./assistant";
-import type { LeaseHost, MemberChange, PersonActor } from "./contract";
+import type { Actor, LeaseHost, MemberChange } from "./contract";
 import type { ProjectFlows } from "./flows";
 import type { Runner } from "./graph";
 import type { createLeaseKeeper, createLeaseStore } from "./leases";
@@ -48,11 +48,12 @@ export interface Engine {
 	/**
 	 * What a person does in one Space. Nothing it reads, returns or changes
 	 * is of another Space: a project or run of another Space is "not found".
-	 * `actor` is the Person who acts: an action on a run walked elsewhere
-	 * travels to its Walker in their name. Without one, Night Shift itself
-	 * acts.
+	 * `actor` is who acts: a Person, with the door their request came
+	 * through, whose role in the Space each use case checks. An action on
+	 * a run walked elsewhere travels to its Walker in their name. A caller
+	 * in this process that acts for no Person passes `NIGHT_SHIFT`.
 	 */
-	space(spaceId: string, actor?: PersonActor): SpaceEngine;
+	space(spaceId: string, actor: Actor): SpaceEngine;
 	/**
 	 * The Space of a run this computer keeps, or null when it has none of
 	 * that id. Who may see or act on the run there is the caller's check:

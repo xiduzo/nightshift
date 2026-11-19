@@ -17,6 +17,7 @@ import {
 	createRunFolders,
 	documentRows,
 	HostUnreachableError,
+	NIGHT_SHIFT,
 	type OwnDevice,
 	type PeerProfiles,
 } from "@nightshift/engine";
@@ -178,7 +179,9 @@ beforeEach(async () => {
 	personId = self?.ownerId as string;
 	// A's project, then its folder on A goes: only B has a Clone.
 	projectId = (
-		await engine.space(a.spaceId).addProject({ repoPath: a.repoPath })
+		await engine
+			.space(a.spaceId, NIGHT_SHIFT)
+			.addProject({ repoPath: a.repoPath })
 	).id;
 	await a.db.delete(clone).where(and(eq(clone.projectId, projectId)));
 	await engine.projects.recordClone(a.spaceId, {
@@ -266,14 +269,14 @@ const agent = (id: string, harness = "claude-code") =>
 async function until(runId: string, status: RunStatus) {
 	return waitFor(
 		async () => {
-			const run = await engine.space(a.spaceId).getRun(runId);
+			const run = await engine.space(a.spaceId, NIGHT_SHIFT).getRun(runId);
 			return run.status === status ? run : null;
 		},
 		{ label: `run ${status}`, timeoutMs: 10_000 },
 	);
 }
 
-const space = () => engine.space(a.spaceId, { personId });
+const space = () => engine.space(a.spaceId, { personId, door: "session" });
 
 /** The call of a Command step is the newest one, and it runs on B now. */
 const commandRuns = () => running > 0 && requests.at(-1)?.call.kind === "exec";
@@ -523,7 +526,7 @@ describe("a run placed on another Device", () => {
 			homeHost: null,
 		});
 		online.add("device-d");
-		expect(await engine.space(a.spaceId).listRuns()).toEqual([]);
+		expect(await engine.space(a.spaceId, NIGHT_SHIFT).listRuns()).toEqual([]);
 		// A pick without the project moves on to a Device that has it (ADR 17).
 		const moved = await space().startRun({
 			projectId,
@@ -1623,7 +1626,7 @@ describe("a scheduled run with a node on another of the Person's Devices", () =>
 		await mustGit(b.repoPath, ["remote", "add", "origin", remote]);
 		// The schedule names no Person: it fires here, for A's owner.
 		await seedFlows(
-			engine.space(a.spaceId),
+			engine.space(a.spaceId, NIGHT_SHIFT),
 			projectId,
 			{
 				night: flow([
@@ -1643,7 +1646,7 @@ describe("a scheduled run with a node on another of the Person's Devices", () =>
 		await Bun.sleep(TICK_MS * 4);
 		clock = at(16, 22, 0, 20);
 		const scheduled = await waitFor(
-			async () => (await engine.space(a.spaceId).listRuns())[0],
+			async () => (await engine.space(a.spaceId, NIGHT_SHIFT).listRuns())[0],
 			{ label: "the scheduled run", timeoutMs: 10_000 },
 		);
 		expect(scheduled.trigger.kind).toBe("schedule");
@@ -1669,7 +1672,7 @@ describe("a scheduled run with a node on another of the Person's Devices", () =>
 			path: a.repoPath,
 		});
 		await seedFlows(
-			engine.space(a.spaceId),
+			engine.space(a.spaceId, NIGHT_SHIFT),
 			projectId,
 			{ night: flow([command("hello", "echo from B")]) },
 			[
@@ -1687,15 +1690,15 @@ describe("a scheduled run with a node on another of the Person's Devices", () =>
 		clock = at(16, 22, 0, 20);
 		const last = await waitFor(
 			async () =>
-				(await engine.space(a.spaceId).listSchedules(projectId)).schedules[0]
-					?.last ?? undefined,
+				(await engine.space(a.spaceId, NIGHT_SHIFT).listSchedules(projectId))
+					.schedules[0]?.last ?? undefined,
 			{ label: "the schedule's start", timeoutMs: 10_000 },
 		);
 		expect(last).toMatchObject({
 			kind: "failed",
 			error: expect.stringContaining("does not have this project"),
 		});
-		expect(await engine.space(a.spaceId).listRuns()).toEqual([]);
+		expect(await engine.space(a.spaceId, NIGHT_SHIFT).listRuns()).toEqual([]);
 	}, 30_000);
 });
 
@@ -1748,7 +1751,9 @@ describe("a run in the Personal of another Person whose home Host this is", () =
 		});
 		// Ada's project, with a Clone on the Host.
 		adaProject = (
-			await engine.space(ADA_SPACE).addProject({ repoPath: b.repoPath })
+			await engine
+				.space(ADA_SPACE, NIGHT_SHIFT)
+				.addProject({ repoPath: b.repoPath })
 		).id;
 	});
 
@@ -1764,7 +1769,7 @@ describe("a run in the Personal of another Person whose home Host this is", () =
 		]);
 	const start = () =>
 		engine
-			.space(ADA_SPACE, { personId: ADA })
+			.space(ADA_SPACE, { personId: ADA, door: "session" })
 			.startRun({ projectId: adaProject, flow: onHost(), startedBy: ADA });
 	const refusal = () =>
 		`The Host test belongs to ${adminName}. Ask them to offer its profiles to your Personal, or pick one of your own devices.`;
@@ -1794,7 +1799,7 @@ describe("a run in the Personal of another Person whose home Host this is", () =
 
 	test("Ada's places name the Host admin on the Host", async () => {
 		const places = await engine
-			.space(ADA_SPACE, { personId: ADA })
+			.space(ADA_SPACE, { personId: ADA, door: "session" })
 			.listPlacements(adaProject);
 		expect(places.find((p) => p.deviceId === a.deviceId)).toMatchObject({
 			thisDevice: true,
@@ -1805,7 +1810,7 @@ describe("a run in the Personal of another Person whose home Host this is", () =
 
 	test("without an Offer, the run is refused: the Host is the admin's, and Ada learns what to do", async () => {
 		await expect(start()).rejects.toThrow(refusal());
-		expect(await engine.space(ADA_SPACE).listRuns()).toEqual([]);
+		expect(await engine.space(ADA_SPACE, NIGHT_SHIFT).listRuns()).toEqual([]);
 	});
 
 	test("the admin offers a profile to Ada's Personal: her run uses it on the Host", async () => {
@@ -1813,7 +1818,9 @@ describe("a run in the Personal of another Person whose home Host this is", () =
 		const started = await start();
 		const run = await waitFor(
 			async () => {
-				const found = await engine.space(ADA_SPACE).getRun(started.id);
+				const found = await engine
+					.space(ADA_SPACE, NIGHT_SHIFT)
+					.getRun(started.id);
 				return found.status === "finished" ? found : null;
 			},
 			{ label: "run finished", timeoutMs: 10_000 },
@@ -1839,7 +1846,7 @@ describe("a run in the Personal of another Person whose home Host this is", () =
 	test("a command on the Host is refused even with an Offer: an Offer runs only its profile", async () => {
 		await offer();
 		await expect(
-			engine.space(ADA_SPACE, { personId: ADA }).startRun({
+			engine.space(ADA_SPACE, { personId: ADA, door: "session" }).startRun({
 				projectId: adaProject,
 				flow: flow([command("hi", "echo hi")]),
 				startedBy: ADA,
@@ -1857,7 +1864,7 @@ describe("a run in the Personal of another Person whose home Host this is", () =
 		// B's fake serves the laptop's calls, from Ada's folder.
 		projectId = adaProject;
 		const hello = flow([command("hello", "echo hello")]);
-		const ada = engine.space(ADA_SPACE, { personId: ADA });
+		const ada = engine.space(ADA_SPACE, { personId: ADA, door: "session" });
 		const started = await ada.startRun({
 			projectId: adaProject,
 			flow: hello,

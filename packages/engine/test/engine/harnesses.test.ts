@@ -4,6 +4,7 @@ import { type FakeHarness, fakeHarness } from "@nightshift/agents/testing";
 import type { HarnessName } from "@nightshift/agents/types";
 import type { AgentNode, Flow, FlowEdge } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
+import { NIGHT_SHIFT } from "../../src/contract";
 import { expandMcpServers } from "../../src/device-config/mcp";
 import type { RunStatus } from "../../src/run-status";
 import type { SpaceEngine } from "../../src/space-engine";
@@ -40,7 +41,7 @@ function makeEngine(harnesses: TestEngineOptions["harnesses"]): SpaceEngine {
 			dataDir: sandbox.dataDir,
 			scheduler: false,
 		}),
-	).space(sandbox.spaceId);
+	).space(sandbox.spaceId, NIGHT_SHIFT);
 }
 
 function agent(id: string, extra: Partial<AgentNode> = {}): AgentNode {
@@ -200,7 +201,7 @@ describe("custom agents", () => {
 				dataDir: sandbox.dataDir,
 				scheduler: false,
 			}),
-		).space(sandbox.spaceId);
+		).space(sandbox.spaceId, NIGHT_SHIFT);
 		const run = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: flowOf([

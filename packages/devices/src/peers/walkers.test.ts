@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { project, user } from "@nightshift/db/schema";
 import type { RunWalker } from "@nightshift/engine";
+import { NIGHT_SHIFT } from "@nightshift/engine";
 import {
 	createSpaceDocuments,
 	type SpaceDocuments,
@@ -85,7 +86,7 @@ beforeEach(async () => {
 	engineA = engineOf(a);
 	engineB = engineOf(b, documentsB);
 	const { id: projectId } = await engineA
-		.space(a.spaceId)
+		.space(a.spaceId, NIGHT_SHIFT)
 		.addProject({ repoPath: a.repoPath });
 	// B gets A's project row, as the Space document would bring it.
 	const [row] = await a.db
@@ -95,11 +96,14 @@ beforeEach(async () => {
 	if (!row) throw new Error("A has no project.");
 	await b.db.insert(project).values(row);
 	runId = (
-		await engineA.space(a.spaceId).startRun({ projectId, flow: gateFlow })
+		await engineA
+			.space(a.spaceId, NIGHT_SHIFT)
+			.startRun({ projectId, flow: gateFlow })
 	).id;
 	await waitFor(
 		async () =>
-			(await engineA.space(a.spaceId).getRun(runId)).status === "waiting",
+			(await engineA.space(a.spaceId, NIGHT_SHIFT).getRun(runId)).status ===
+			"waiting",
 		{ label: "the Gate" },
 	);
 	// A's rows into B, by cursor, as the exchange brings them.
@@ -119,7 +123,7 @@ afterEach(async () => {
 
 /** The Walker each view of the run on `engine` names: the run list, the run, its open Gate. */
 async function walkersOn(engine: PeerEngine): Promise<(RunWalker | null)[]> {
-	const space = engine.space(a.spaceId);
+	const space = engine.space(a.spaceId, NIGHT_SHIFT);
 	const listed = (await space.listRuns()).find((r) => r.id === runId);
 	const gate = (await space.listGates()).find((g) => g.runId === runId);
 	return [

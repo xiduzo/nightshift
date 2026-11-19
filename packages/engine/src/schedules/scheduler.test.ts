@@ -7,6 +7,7 @@ import { Refusal } from "@nightshift/refusal";
 import { iso } from "@nightshift/time";
 import { atLocal } from "@nightshift/time/testing";
 import { asc, eq, inArray } from "drizzle-orm";
+import { NIGHT_SHIFT } from "../contract";
 import {
 	defaultRunSettings,
 	type RunSettings,
@@ -77,7 +78,7 @@ function startDaemon(
 		},
 	);
 	return {
-		engine: root.space(sandbox.spaceId),
+		engine: root.space(sandbox.spaceId, NIGHT_SHIFT),
 		root,
 		die: () => controller.abort(),
 	};

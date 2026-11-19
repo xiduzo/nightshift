@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { fakeHarness } from "@nightshift/agents/testing";
 import type { CommandNode, Flow, FlowEdge, ValueNode } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
+import { NIGHT_SHIFT } from "../../src/contract";
 import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
 import type { SpaceEngine } from "../../src/space-engine";
 import {
@@ -50,7 +51,7 @@ function makeEngine(): SpaceEngine {
 			dataDir: sandbox.dataDir,
 		}),
 		{ runLog },
-	).space(sandbox.spaceId);
+	).space(sandbox.spaceId, NIGHT_SHIFT);
 }
 
 const at = { x: 0, y: 0 };

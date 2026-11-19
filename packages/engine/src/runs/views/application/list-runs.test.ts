@@ -9,7 +9,7 @@ import { listRuns } from "./list-runs";
 
 const SPACE = "space-1";
 const OTHER = "space-2";
-const ADA = { personId: "person-ada" };
+const ADA = { personId: "person-ada", door: "session" as const };
 
 /** Three runs: two of `SPACE` (one on Ada's Device, one on another), one of `OTHER`. */
 function setup() {

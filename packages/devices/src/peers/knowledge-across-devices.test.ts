@@ -6,6 +6,7 @@ import { member } from "@nightshift/db/schema";
 import {
 	type ExecEvent,
 	localDevice,
+	NIGHT_SHIFT,
 	type SpaceArchive,
 	type SyncedDocuments,
 } from "@nightshift/engine";
@@ -43,7 +44,7 @@ beforeEach(async () => {
 	]);
 	paired = await pairedReplicas(a, b);
 	({ id: projectId } = await paired.host
-		.space(a.spaceId)
+		.space(a.spaceId, NIGHT_SHIFT)
 		.addProject({ repoPath: a.repoPath }));
 	await paired.projectOnDevice(projectId);
 });

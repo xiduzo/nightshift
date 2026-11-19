@@ -5,6 +5,7 @@ import {
 	createSyncedDocuments,
 	type FlowDocuments,
 	HostUnreachableError,
+	NIGHT_SHIFT,
 	type SyncedDocuments,
 } from "@nightshift/engine";
 import {
@@ -246,7 +247,9 @@ export async function pairedReplicas(
 					);
 				}
 				const { spaceId } = await host.projects.find(projectId);
-				await engine.space(spaceId).addProject({ repoPath: sandbox.repoPath });
+				await engine
+					.space(spaceId, NIGHT_SHIFT)
+					.addProject({ repoPath: sandbox.repoPath });
 				// The Clone's import marks the flows: the link brings that to A.
 				await syncWithHost();
 			},

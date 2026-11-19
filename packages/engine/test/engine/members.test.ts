@@ -4,6 +4,7 @@ import { device, event, user } from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { and, eq } from "drizzle-orm";
+import { NIGHT_SHIFT } from "../../src/contract";
 import type { Engine } from "../../src/engine";
 import { parseEventRow } from "../../src/log/run-log/append";
 import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
@@ -112,7 +113,7 @@ async function worktreeConfig(cwd: string, key: string): Promise<string> {
 }
 
 async function startAndWait(engine: Engine, startedBy?: string) {
-	const space = engine.space(sandbox.spaceId);
+	const space = engine.space(sandbox.spaceId, NIGHT_SHIFT);
 	const project = await space.addProject({ repoPath: sandbox.repoPath });
 	const started = await space.startRun({
 		projectId: project.id,

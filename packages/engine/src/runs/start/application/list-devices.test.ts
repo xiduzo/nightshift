@@ -23,7 +23,7 @@ function devices() {
 describe("the Devices a person may place a step on", () => {
 	test("are the Person's own and others' through Offers, also for one node", async () => {
 		const { ports, list } = devices();
-		const ada = { personId: "person-ada" };
+		const ada = { personId: "person-ada", door: "session" as const };
 		expect(
 			await list(ada, { spaceId: "space-own", projectId: "project-1" }),
 		).toEqual([laptop]);

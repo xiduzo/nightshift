@@ -137,7 +137,7 @@ describe("who may answer", () => {
 		expect(asViewer).toBeInstanceOf(ports.RoleRefusal);
 		const asStranger = await refusalOf(
 			answer(
-				{ personId: "person-nobody" },
+				{ personId: "person-nobody", door: "session" },
 				{ runId: "run-1", stepId: "step-1", choice: "approve" },
 			),
 		);

@@ -7,6 +7,7 @@ import {
 	createSpaceArchive,
 	type Device,
 	type FlowDocuments,
+	NIGHT_SHIFT,
 	type SessionInput,
 } from "@nightshift/engine";
 import type { DeviceDocument } from "@nightshift/engine/device-config";
@@ -245,7 +246,7 @@ const gateFlow = {
 
 async function statusOn(engine: PeerEngine, runId: string) {
 	try {
-		return (await engine.space(a.spaceId).getRun(runId)).status;
+		return (await engine.space(a.spaceId, NIGHT_SHIFT).getRun(runId)).status;
 	} catch {
 		return null;
 	}
@@ -270,7 +271,7 @@ async function commandOnA(id: string) {
 /** A project of A, with B's Clone of it. */
 async function projectOnBoth() {
 	const { id } = await paired.host
-		.space(a.spaceId)
+		.space(a.spaceId, NIGHT_SHIFT)
 		.addProject({ repoPath: a.repoPath });
 	await paired.projectOnDevice(id, { clone: true });
 	return id;
@@ -500,7 +501,7 @@ describe("the devices runtime across a reload", () => {
 			},
 		});
 		const run = await first.engine
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId, flow: gateFlow });
 		expect(run.walker).toMatchObject({ id: b.deviceId, thisDevice: true });
 		linked = true;
@@ -515,9 +516,11 @@ describe("the devices runtime across a reload", () => {
 			await go.promise;
 			return apply(command, engine);
 		};
-		const gate = (await paired.host.space(a.spaceId).listGates())[0];
+		const gate = (
+			await paired.host.space(a.spaceId, NIGHT_SHIFT).listGates()
+		)[0];
 		await paired.host
-			.space(a.spaceId, { personId: paired.personId })
+			.space(a.spaceId, { personId: paired.personId, door: "session" })
 			.act(run.id, {
 				kind: "answer",
 				stepId: gate?.stepId as string,

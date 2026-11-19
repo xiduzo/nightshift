@@ -8,7 +8,7 @@ import { listProjectRuns } from "./list-project-runs";
 /** How the runs of each project stand, for an actor, on in-memory adapters. */
 
 const SPACE = "space-1";
-const ADA = { personId: "person-ada" };
+const ADA = { personId: "person-ada", door: "session" as const };
 const AT = 10 * 86_400_000;
 
 function setup() {

@@ -9,7 +9,7 @@ import {
 	step as stepTable,
 	user,
 } from "@nightshift/db/schema";
-import { NeedsApp, sharedAnswerCosts } from "@nightshift/engine";
+import { NeedsApp, NIGHT_SHIFT, sharedAnswerCosts } from "@nightshift/engine";
 import {
 	createSpaceDocuments,
 	type SpaceDocuments,
@@ -72,7 +72,7 @@ beforeEach(async () => {
 		.values({ id: "colleague", name: "Colleague", email: "c@example.invalid" });
 	projectId = (
 		await engine
-			.space(sandbox.spaceId)
+			.space(sandbox.spaceId, NIGHT_SHIFT)
 			.addProject({ repoPath: sandbox.repoPath })
 	).id;
 });
@@ -154,12 +154,12 @@ const commandFlow = {
 describe("a Walker's paths", () => {
 	test("are served to its owner's Devices only", async () => {
 		const started = await engine
-			.space(sandbox.spaceId)
+			.space(sandbox.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId, flow: commandFlow });
 		await waitFor(
 			async () =>
-				(await engine.space(sandbox.spaceId).getRun(started.id)).status ===
-				"finished",
+				(await engine.space(sandbox.spaceId, NIGHT_SHIFT).getRun(started.id))
+					.status === "finished",
 		);
 		const mine = await host().pull(keyOf("device-mine", ownerId), {
 			cursors: {},
@@ -509,7 +509,7 @@ const gateFlow = (lockScreen: boolean) =>
 describe("a Command for a run this Host walks (the Host door)", () => {
 	/** A run of the owner's Space that waits at its Gate here, and the Gate. */
 	async function waitingRun(lockScreen: boolean) {
-		const view = engine.space(sandbox.spaceId);
+		const view = engine.space(sandbox.spaceId, NIGHT_SHIFT);
 		const started = await view.startRun({
 			projectId,
 			flow: gateFlow(lockScreen),
@@ -541,9 +541,9 @@ describe("a Command for a run this Host walks (the Host door)", () => {
 			kind: "forbidden",
 			message: "Open this Gate in Night Shift to answer it.",
 		});
-		expect((await engine.space(sandbox.spaceId).getRun(runId)).status).toBe(
-			"waiting",
-		);
+		expect(
+			(await engine.space(sandbox.spaceId, NIGHT_SHIFT).getRun(runId)).status,
+		).toBe("waiting");
 	});
 
 	test("takes an answer from the lock screen to a Gate marked for it", async () => {
@@ -555,8 +555,8 @@ describe("a Command for a run this Host walks (the Host door)", () => {
 		});
 		await waitFor(
 			async () =>
-				(await engine.space(sandbox.spaceId).getRun(runId)).status ===
-				"finished",
+				(await engine.space(sandbox.spaceId, NIGHT_SHIFT).getRun(runId))
+					.status === "finished",
 		);
 	});
 });

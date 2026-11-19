@@ -35,7 +35,7 @@ describe("the Devices a person chooses from", () => {
 		ports.planner.ranOn("project-1", "desktop");
 		expect(
 			await list(
-				{ personId: "person-ada" },
+				{ personId: "person-ada", door: "session" },
 				{ spaceId: "space-own", projectId: "project-1" },
 			),
 		).toEqual([laptop, { ...desktop, lastRun: true, default: true }, kims]);
@@ -45,7 +45,7 @@ describe("the Devices a person chooses from", () => {
 		ports.planner.offer({ placements: [] });
 		expect(
 			await list(
-				{ personId: "person-ada" },
+				{ personId: "person-ada", door: "session" },
 				{ spaceId: "space-own", projectId: "p" },
 			),
 		).toEqual([]);

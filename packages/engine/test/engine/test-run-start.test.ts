@@ -6,6 +6,7 @@ import {
 	FLOW_VERSION,
 	type Flow,
 } from "@nightshift/flows";
+import { NIGHT_SHIFT } from "../../src/contract";
 import type { Engine } from "../../src/engine";
 import { seedFlows } from "../../src/testing/seed-flows";
 import {
@@ -52,7 +53,7 @@ describe("a test run that pins an Agent", () => {
 			}),
 		);
 		engines.push(engine);
-		return engine.space(sandbox.spaceId);
+		return engine.space(sandbox.spaceId, NIGHT_SHIFT);
 	}
 
 	const research: AgentNode = {

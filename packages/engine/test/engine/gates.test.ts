@@ -4,6 +4,7 @@ import { member, user } from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { asDate } from "@nightshift/time";
+import { NIGHT_SHIFT } from "../../src/contract";
 import type { Engine } from "../../src/engine";
 import { GateClosedError, NeedsApp } from "../../src/gates";
 import {
@@ -43,7 +44,7 @@ beforeEach(async () => {
 	ownerId = owner?.id as string;
 	projectId = (
 		await engine
-			.space(sandbox.spaceId)
+			.space(sandbox.spaceId, NIGHT_SHIFT)
 			.addProject({ repoPath: sandbox.repoPath })
 	).id;
 });
@@ -83,7 +84,7 @@ const gateFlow = (lockScreen: boolean): Flow =>
 
 /** A run of the sandbox's Space that waits at its Gate, and the Gate. */
 async function waitingRun(lockScreen: boolean) {
-	const view = engine.space(sandbox.spaceId);
+	const view = engine.space(sandbox.spaceId, NIGHT_SHIFT);
 	const started = await view.startRun({
 		projectId,
 		flow: gateFlow(lockScreen),
@@ -96,11 +97,11 @@ async function waitingRun(lockScreen: boolean) {
 }
 
 const statusOf = async (runId: string) =>
-	(await engine.space(sandbox.spaceId).getRun(runId)).status;
+	(await engine.space(sandbox.spaceId, NIGHT_SHIFT).getRun(runId)).status;
 
 describe("the answer through Engine.gates", () => {
 	test("from the lock screen, goes only to a Gate marked for it", async () => {
-		const owner = { personId: ownerId };
+		const owner = { personId: ownerId, door: "session" as const };
 		const plain = await waitingRun(false);
 		const refused = await engine.gates
 			.answer(owner, {
@@ -151,7 +152,7 @@ describe("the answer through Engine.gates", () => {
 		const { runId, stepId } = await waitingRun(false);
 		await expect(
 			engine.gates.answer(
-				{ personId: "u-vic" },
+				{ personId: "u-vic", door: "session" },
 				{ runId, stepId, choice: "approve" },
 			),
 		).rejects.toBeInstanceOf(RoleRefusal);
@@ -162,11 +163,18 @@ describe("the answer through Engine.gates", () => {
 describe("the inbox through Engine.gates", () => {
 	test("lists the open Gates of the Person's Spaces, and none for a Person of no Space", async () => {
 		const { runId } = await waitingRun(false);
-		const inbox = await engine.gates.inbox({ personId: ownerId });
+		const inbox = await engine.gates.inbox({
+			personId: ownerId,
+			door: "session",
+		});
 		expect(inbox.map((g) => [g.runId, g.spaceId, g.canAnswer])).toEqual([
 			[runId, sandbox.spaceId, true],
 		]);
-		expect(await engine.gates.inbox({ personId: "nobody" })).toEqual([]);
-		expect(await engine.gates.answeredInbox({ personId: ownerId })).toEqual([]);
+		expect(
+			await engine.gates.inbox({ personId: "nobody", door: "session" }),
+		).toEqual([]);
+		expect(
+			await engine.gates.answeredInbox({ personId: ownerId, door: "session" }),
+		).toEqual([]);
 	});
 });

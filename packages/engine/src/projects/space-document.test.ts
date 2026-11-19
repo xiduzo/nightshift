@@ -12,6 +12,7 @@ import {
 import { asDate, now } from "@nightshift/time";
 import { asc, eq } from "drizzle-orm";
 import type * as Y from "yjs";
+import { NIGHT_SHIFT } from "../contract";
 import { aloneDirectory } from "../testing/alone-directory";
 import {
 	createSandbox,
@@ -135,7 +136,7 @@ describe("import", () => {
 
 	test("every Space's document opens with the engine; its Members are mirrored", async () => {
 		const engine = makeEngine();
-		await engine.space(sandbox.spaceId).listProjects();
+		await engine.space(sandbox.spaceId, NIGHT_SHIFT).listProjects();
 		const document = await documents.open(sandbox.spaceId);
 		const [owner] = await sandbox.db
 			.select({ id: user.id, name: user.name })
@@ -305,7 +306,7 @@ describe("remove", () => {
 
 describe("the engine writes the document", () => {
 	test("add, rename and remove a Project: the document first, the row follows", async () => {
-		const mine = makeEngine().space(sandbox.spaceId);
+		const mine = makeEngine().space(sandbox.spaceId, NIGHT_SHIFT);
 		const added = await mine.addProject({ repoPath: sandbox.repoPath });
 		expect(added.clones).toEqual([
 			{
@@ -339,7 +340,7 @@ describe("the engine writes the document", () => {
 	});
 
 	test("a Project renamed through the document shows under its new name", async () => {
-		const mine = makeEngine().space(sandbox.spaceId);
+		const mine = makeEngine().space(sandbox.spaceId, NIGHT_SHIFT);
 		const added = await mine.addProject({ repoPath: sandbox.repoPath });
 		const document = await documents.open(sandbox.spaceId);
 		const entry = spaceProjects(document).get(added.id);
@@ -352,7 +353,7 @@ describe("the engine writes the document", () => {
 	});
 
 	test("a Clone of another Device in the document shows beside this one", async () => {
-		const mine = makeEngine().space(sandbox.spaceId);
+		const mine = makeEngine().space(sandbox.spaceId, NIGHT_SHIFT);
 		const added = await mine.addProject({ repoPath: sandbox.repoPath });
 		const document = await documents.open(sandbox.spaceId);
 		asClient(document.doc, () => {

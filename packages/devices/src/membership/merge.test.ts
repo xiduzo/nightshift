@@ -15,7 +15,11 @@ import {
 	user,
 	ydoc,
 } from "@nightshift/db/schema";
-import { createFlowDocuments, OlderHostError } from "@nightshift/engine";
+import {
+	createFlowDocuments,
+	NIGHT_SHIFT,
+	OlderHostError,
+} from "@nightshift/engine";
 import {
 	createSandbox,
 	mustGit,
@@ -202,7 +206,7 @@ async function repoWithRemote(sandbox: Sandbox, name: string, remote: string) {
 
 /** A project in B's own Personal with one run that finished. */
 async function projectWithRun(repoPath: string = b.repoPath) {
-	const space = paired.device.space(b.spaceId);
+	const space = paired.device.space(b.spaceId, NIGHT_SHIFT);
 	const added = await space.addProject({ repoPath });
 	await seedFlows(space, added.id, { hello: quickFlow });
 	const run = await space.startRun({ projectId: added.id, flow: quickFlow });
@@ -256,18 +260,20 @@ describe("the merge of Personal", () => {
 			spaceId: a.spaceId,
 			startedBy: paired.personId,
 		});
-		const [onA] = await paired.host.space(a.spaceId).listProjects();
+		const [onA] = await paired.host
+			.space(a.spaceId, NIGHT_SHIFT)
+			.listProjects();
 		expect(onA?.id).toBe(projectId);
-		expect((await paired.host.space(a.spaceId).getRun(runId)).status).toBe(
-			"finished",
-		);
+		expect(
+			(await paired.host.space(a.spaceId, NIGHT_SHIFT).getRun(runId)).status,
+		).toBe("finished");
 		const [row] = await b.db.select().from(spaceMerge);
 		expect(row?.state).toBe("pushed");
 	});
 
 	test("a project without a folder stays one on the Host", async () => {
 		const leads = await paired.device
-			.space(b.spaceId)
+			.space(b.spaceId, NIGHT_SHIFT)
 			.addProjectWithoutFolder({ name: "Leads" });
 		const { link } = online();
 		await ready(link);
@@ -275,9 +281,13 @@ describe("the merge of Personal", () => {
 		const result = await merger(link).merge();
 
 		expect(result).toMatchObject({ state: "pushed", projects: 1 });
-		const [onA] = await paired.host.space(a.spaceId).listProjects();
+		const [onA] = await paired.host
+			.space(a.spaceId, NIGHT_SHIFT)
+			.listProjects();
 		expect(onA).toMatchObject({ id: leads.id, folder: false, clones: [] });
-		const [onB] = await paired.device.space(a.spaceId).listProjects();
+		const [onB] = await paired.device
+			.space(a.spaceId, NIGHT_SHIFT)
+			.listProjects();
 		expect(onB).toMatchObject({ id: leads.id, folder: false });
 	});
 
@@ -360,7 +370,7 @@ describe("the merge of Personal", () => {
 		const result = await merger(link).merge();
 
 		expect(result.state).toBe("pushed");
-		const onA = await paired.host.space(a.spaceId).listProjects();
+		const onA = await paired.host.space(a.spaceId, NIGHT_SHIFT).listProjects();
 		expect(onA.map((p) => [p.id, p.remote]).sort()).toEqual(
 			[
 				[first.projectId, "github.com/acme/acme-app"],
@@ -392,22 +402,22 @@ describe("the merge of Personal", () => {
 
 	test("a remote on both sides becomes one project with both histories", async () => {
 		const remote = "https://github.com/acme/app.git";
-		const onA = await paired.host.space(a.spaceId).addProject({
+		const onA = await paired.host.space(a.spaceId, NIGHT_SHIFT).addProject({
 			repoPath: await repoWithRemote(a, "app", remote),
 		});
-		await seedFlows(paired.host.space(a.spaceId), onA.id, {
+		await seedFlows(paired.host.space(a.spaceId, NIGHT_SHIFT), onA.id, {
 			hello: {
 				...quickFlow,
 				nodes: [{ ...quickFlow.nodes[0], command: "echo host" }],
 			},
 		});
 		const hostRun = await paired.host
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId: onA.id, flow: quickFlow });
 		await waitFor(
 			async () =>
-				(await paired.host.space(a.spaceId).getRun(hostRun.id)).status ===
-				"finished",
+				(await paired.host.space(a.spaceId, NIGHT_SHIFT).getRun(hostRun.id))
+					.status === "finished",
 			{ label: "A's run finished", timeoutMs: 10_000 },
 		);
 		const mine = await projectWithRun(await repoWithRemote(b, "app", remote));
@@ -430,13 +440,15 @@ describe("the merge of Personal", () => {
 			.where(eq(project.remote, "github.com/acme/app"));
 		expect(projects).toEqual([{ id: onA.id, remote: "github.com/acme/app" }]);
 		const runs = await paired.host
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.listRuns({ projectId: onA.id });
 		expect(runs.map((r) => r.id).sort()).toEqual(
 			[hostRun.id, mine.runId].sort(),
 		);
 		// Both flows, both histories.
-		const flows = await paired.device.space(a.spaceId).flows.list(onA.id);
+		const flows = await paired.device
+			.space(a.spaceId, NIGHT_SHIFT)
+			.flows.list(onA.id);
 		expect(flows.map((f) => f.name).sort()).toEqual(["hello", "hello-2"]);
 	});
 
@@ -461,7 +473,9 @@ describe("the merge of Personal", () => {
 		expect(await spaceOfRun(b, runId)).toMatchObject({ spaceId: b.spaceId });
 		expect(await b.db.select().from(spaceMerge)).toEqual([]);
 		expect(existsSync(join(b.dataDir, "backups"))).toBe(false);
-		expect(await paired.host.space(a.spaceId).listProjects()).toEqual([]);
+		expect(
+			await paired.host.space(a.spaceId, NIGHT_SHIFT).listProjects(),
+		).toEqual([]);
 	});
 
 	test("the copy of the database is there before the batch moves a row", async () => {
@@ -545,7 +559,7 @@ describe("the merge of Personal", () => {
 
 	test("the flows wait for the Host's copy of the project they join", async () => {
 		const remote = "https://github.com/acme/app.git";
-		const onA = await paired.host.space(a.spaceId).addProject({
+		const onA = await paired.host.space(a.spaceId, NIGHT_SHIFT).addProject({
 			repoPath: await repoWithRemote(a, "app", remote),
 		});
 		await projectWithRun(await repoWithRemote(b, "app", remote));
@@ -559,7 +573,9 @@ describe("the merge of Personal", () => {
 		const done = await merger(link).merge();
 
 		expect(done.state).toBe("pushed");
-		const flows = await paired.device.space(a.spaceId).flows.list(onA.id);
+		const flows = await paired.device
+			.space(a.spaceId, NIGHT_SHIFT)
+			.flows.list(onA.id);
 		expect(flows.map((f) => f.name)).toEqual(["hello"]);
 	});
 
@@ -653,7 +669,7 @@ describe("the merge of Personal", () => {
 	});
 
 	test("a run of Personal that is not done holds the merge back", async () => {
-		const space = paired.device.space(b.spaceId);
+		const space = paired.device.space(b.spaceId, NIGHT_SHIFT);
 		const added = await space.addProject({ repoPath: b.repoPath });
 		const gate = {
 			...quickFlow,
@@ -699,9 +715,9 @@ describe("the merge of Personal", () => {
 			walkerSeq: 1_000,
 		});
 		paired.deviceLog.forget([runId]);
-		expect((await paired.device.space(b.spaceId).getRun(runId)).status).toBe(
-			"interrupted",
-		);
+		expect(
+			(await paired.device.space(b.spaceId, NIGHT_SHIFT).getRun(runId)).status,
+		).toBe("interrupted");
 		const { link } = online();
 		await ready(link);
 

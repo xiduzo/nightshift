@@ -10,7 +10,7 @@ import { openRun } from "./open-run";
 
 const SPACE = "space-1";
 const OTHER = "space-2";
-const ADA = { personId: "person-ada" };
+const ADA = { personId: "person-ada", door: "session" as const };
 
 /** Ports with one run in `SPACE`, walked here, and one in `OTHER`, walked elsewhere. */
 function setup() {

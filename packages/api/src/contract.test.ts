@@ -184,7 +184,8 @@ describe("replies of a real engine", () => {
 			profiles,
 			configUse: createConfigUse({
 				deviceId: sandbox.deviceId,
-				space: ({ spaceId, personId }) => engine.space(spaceId, { personId }),
+				space: ({ spaceId, personId }) =>
+					engine.space(spaceId, { personId, door: "session" }),
 				connections,
 				cliTools,
 				profiles,

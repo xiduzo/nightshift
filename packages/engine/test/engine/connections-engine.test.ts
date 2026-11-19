@@ -10,6 +10,7 @@ import type {
 	ToolNode,
 } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
+import { NIGHT_SHIFT } from "../../src/contract";
 import type { McpExpansion } from "../../src/device-config/mcp";
 import {
 	defaultRunSettings,
@@ -58,7 +59,7 @@ function makeEngine(
 			...options,
 		}),
 		internals,
-	).space(sandbox.spaceId);
+	).space(sandbox.spaceId, NIGHT_SHIFT);
 }
 
 function agent(id: string, extra: Partial<AgentNode> = {}): AgentNode {

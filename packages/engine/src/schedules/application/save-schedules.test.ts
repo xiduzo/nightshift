@@ -11,7 +11,7 @@ import { saveSchedules } from "./save-schedules";
 
 const P = "project-1";
 const SPACE = "space-1";
-const ANN: Actor = { personId: "person-ann" };
+const ANN: Actor = { personId: "person-ann", door: "session" };
 // biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
 const HOOK_SECRET = "${HOOK_SECRET}";
 

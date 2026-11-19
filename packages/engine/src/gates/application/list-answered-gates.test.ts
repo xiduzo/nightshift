@@ -24,7 +24,7 @@ describe("listAnsweredGates", () => {
 	test("a Person who is not a Member of the Space does not find it", async () => {
 		const ports = inMemoryGatePorts();
 		const refused = await listAnsweredGates(ports)(
-			{ personId: "person-nobody" },
+			{ personId: "person-nobody", door: "session" },
 			{ spaceId: SPACE, since: 0 },
 		).then(
 			() => null,

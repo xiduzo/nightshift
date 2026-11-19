@@ -44,7 +44,7 @@ export function spaceMembersContract(
 			await under.close();
 		});
 
-		const ada: PersonActor = { personId: "person-ada" };
+		const ada: PersonActor = { personId: "person-ada", door: "session" };
 		const adaByCommand: PersonActor = {
 			personId: "person-ada",
 			door: "command",
@@ -84,9 +84,13 @@ export function spaceMembersContract(
 			await under.join(S, "person-ada", "viewer");
 			await under.join(S, "person-bob", "guest");
 			expect(await under.members.may(S, ada, {})).toBe("yes");
-			expect(await under.members.may(S, { personId: "person-bob" }, {})).toBe(
-				"yes",
-			);
+			expect(
+				await under.members.may(
+					S,
+					{ personId: "person-bob", door: "session" },
+					{},
+				),
+			).toBe("yes");
 		});
 
 		test("a Member of one Space is not a member of another", async () => {
@@ -139,7 +143,10 @@ export function spaceMembersContract(
 				].sort((a, b) => a.id.localeCompare(b.id)),
 			);
 			expect(
-				await under.members.spacesOf({ personId: "person-nobody" }, {}),
+				await under.members.spacesOf(
+					{ personId: "person-nobody", door: "session" },
+					{},
+				),
 			).toEqual([]);
 		});
 	});

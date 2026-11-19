@@ -3,7 +3,7 @@ import { Refusal } from "@nightshift/refusal";
 import type { ArtifactStore } from "./artifacts";
 import type { AnswerCost } from "./assistant";
 import type { RunFilesService } from "./cleanup";
-import { NIGHT_SHIFT, type PersonActor } from "./contract";
+import { type Actor, personOf } from "./contract";
 import type { SpaceFlows } from "./flows";
 import type { Gates } from "./gates";
 import type { Runner } from "./graph";
@@ -78,7 +78,7 @@ export type SpacesDeps = {
 	/** Hides the worktree paths of runs on Devices the actor does not own. */
 	pathsFor(
 		spaceId: string,
-		actor: PersonActor | undefined,
+		actor: Actor,
 	): Promise<<T extends WithPaths>(summary: T) => Promise<T>>;
 
 	// --- views (R2) ---
@@ -145,10 +145,9 @@ export function createSpaces(deps: SpacesDeps) {
 	}
 
 	/** What a person does in one Space. */
-	return function space(spaceId: string, actor?: PersonActor): SpaceEngine {
-		/** The run in this Space, opened for the actor: Night Shift when there is none. */
-		const open = (runId: string) =>
-			deps.openRun(actor ?? NIGHT_SHIFT, { runId, spaceId });
+	return function space(spaceId: string, actor: Actor): SpaceEngine {
+		/** The run in this Space, opened for the actor. */
+		const open = (runId: string) => deps.openRun(actor, { runId, spaceId });
 
 		return {
 			// --- projects (phase 3) ---
@@ -290,17 +289,17 @@ export function createSpaces(deps: SpacesDeps) {
 				await deps.memory.forget({ spaceId, projectId, flowName }, node, scope);
 			},
 
-			flows: deps.flows(spaceId, actor?.personId),
+			flows: deps.flows(spaceId, personOf(actor) ?? undefined),
 
 			async listAnswerCosts(since) {
 				await ready;
 				return deps.answerCosts(spaceId, since);
 			},
 
-			// --- views (R2): each read with the actor, Night Shift without one ---
+			// --- views (R2): each read opens the run, or the Space, for the actor ---
 			async projectRuns(read) {
 				await ready;
-				return views.listProjectRuns(actor ?? NIGHT_SHIFT, {
+				return views.listProjectRuns(actor, {
 					spaceId,
 					...(read !== undefined ? { read } : {}),
 				});
@@ -308,22 +307,22 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async listRuns(input) {
 				await ready;
-				return views.listRuns(actor ?? NIGHT_SHIFT, { ...input, spaceId });
+				return views.listRuns(actor, { ...input, spaceId });
 			},
 
 			async getRun(runId) {
 				await ready;
-				return views.readRun(actor ?? NIGHT_SHIFT, { runId, spaceId });
+				return views.readRun(actor, { runId, spaceId });
 			},
 
 			async getStep(runId, stepId) {
 				await ready;
-				return views.readStep(actor ?? NIGHT_SHIFT, { runId, spaceId, stepId });
+				return views.readStep(actor, { runId, spaceId, stepId });
 			},
 
 			async stepTranscript(runId, stepId, signal) {
 				await ready;
-				return views.readStepTranscript(actor ?? NIGHT_SHIFT, {
+				return views.readStepTranscript(actor, {
 					runId,
 					spaceId,
 					stepId,
@@ -334,7 +333,7 @@ export function createSpaces(deps: SpacesDeps) {
 			watchRun(runId, { signal: watching, afterSeq }) {
 				// A disposed engine publishes nothing more on its bus: the watch
 				// ends with it, so the watcher reconnects to the next engine.
-				return watch(actor ?? NIGHT_SHIFT, {
+				return watch(actor, {
 					runId,
 					spaceId,
 					afterSeq: afterSeq ?? 0,
@@ -383,7 +382,7 @@ export function createSpaces(deps: SpacesDeps) {
 			// --- start (R3) ---
 			async listDevices(projectId, forNode) {
 				await ready;
-				return deps.start.listDevices(actor ?? NIGHT_SHIFT, {
+				return deps.start.listDevices(actor, {
 					spaceId,
 					projectId,
 					...(forNode !== undefined ? { forNode } : {}),
@@ -392,7 +391,7 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async listPlacements(projectId) {
 				await ready;
-				return deps.start.listPlacements(actor ?? NIGHT_SHIFT, {
+				return deps.start.listPlacements(actor, {
 					spaceId,
 					projectId,
 				});
@@ -403,7 +402,7 @@ export function createSpaces(deps: SpacesDeps) {
 				// Asked before the start: who may see the paths of the run.
 				const shown = await deps.pathsFor(spaceId, actor);
 				return shown(
-					await deps.start.startRun(actor ?? NIGHT_SHIFT, {
+					await deps.start.startRun(actor, {
 						...input,
 						spaceId,
 					}),
@@ -413,7 +412,7 @@ export function createSpaces(deps: SpacesDeps) {
 			// --- actions (R4) ---
 			async act(runId, request) {
 				await ready;
-				await actions.act(actor ?? NIGHT_SHIFT, {
+				await actions.act(actor, {
 					spaceId,
 					runId,
 					action: request,
@@ -423,18 +422,18 @@ export function createSpaces(deps: SpacesDeps) {
 			// --- move (R5) ---
 			async listMoveTargets(runId) {
 				await ready;
-				return deps.moveTargets(actor ?? NIGHT_SHIFT, { spaceId, runId });
+				return deps.moveTargets(actor, { spaceId, runId });
 			},
 
 			// --- gates (R6) ---
 			async listGates() {
 				await ready;
-				return deps.gates.listOpenGates(actor ?? NIGHT_SHIFT, { spaceId });
+				return deps.gates.listOpenGates(actor, { spaceId });
 			},
 
 			async listAnsweredGates(since) {
 				await ready;
-				return deps.gates.listAnsweredGates(actor ?? NIGHT_SHIFT, {
+				return deps.gates.listAnsweredGates(actor, {
 					spaceId,
 					since,
 				});

@@ -8,7 +8,7 @@ import { readRun } from "./read-run";
 
 const SPACE = "space-1";
 const OTHER = "space-2";
-const ADA = { personId: "person-ada" };
+const ADA = { personId: "person-ada", door: "session" as const };
 const NOT_FOUND = {
 	kind: "not-found",
 	message: "Night Shift cannot find this run.",

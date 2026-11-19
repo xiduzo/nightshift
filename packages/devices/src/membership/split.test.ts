@@ -14,6 +14,7 @@ import {
 	spaceSplit,
 	user,
 } from "@nightshift/db/schema";
+import { NIGHT_SHIFT } from "@nightshift/engine";
 import {
 	createProjectFlows,
 	createSandbox,
@@ -244,7 +245,7 @@ async function runOf(sandbox: Sandbox, runId: string) {
  * that has a schedule, merged into A's: what B has before it leaves.
  */
 async function mergedIntoA() {
-	const space = paired.device.space(b.spaceId);
+	const space = paired.device.space(b.spaceId, NIGHT_SHIFT);
 	const added = await space.addProject({ repoPath: b.repoPath });
 	await seedFlows(space, added.id, { hello: quickFlow }, [
 		{
@@ -328,7 +329,7 @@ describe("leaving the home Host keeps a copy", () => {
 		await mkdir(lab, { recursive: true });
 		await mustGit(lab, ["init", "-q", "-b", "main"]);
 		const onlyOnA = await paired.host
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.addProject({ repoPath: lab, name: "Only on A" });
 		await paired.projectOnDevice(onlyOnA.id);
 		await revoke();
@@ -348,7 +349,7 @@ describe("leaving the home Host keeps a copy", () => {
 		expect(await spacesOf(b.db, localPerson)).toEqual([
 			{ id: own, name: "Personal", personal: true, role: "owner" },
 		]);
-		const projects = await paired.device.space(own).listProjects();
+		const projects = await paired.device.space(own, NIGHT_SHIFT).listProjects();
 		expect(projects.map((p) => [p.id, p.repoPath !== null])).toEqual([
 			[projectId, true],
 		]);
@@ -358,23 +359,27 @@ describe("leaving the home Host keeps a copy", () => {
 			projectId,
 			startedBy: localPerson,
 		});
-		expect((await paired.device.space(own).getRun(runId)).status).toBe(
-			"finished",
-		);
+		expect(
+			(await paired.device.space(own, NIGHT_SHIFT).getRun(runId)).status,
+		).toBe("finished");
 		// The run A walked stays with A's Space.
 		expect(await runOf(b, "run-walked-by-a")).toMatchObject({
 			spaceId: a.spaceId,
 		});
-		const runs = await paired.device.space(own).listRuns();
+		const runs = await paired.device.space(own, NIGHT_SHIFT).listRuns();
 		expect(runs.map((r) => r.id)).toEqual([runId]);
 		// The flow with its history, and its schedule.
-		const flows = await paired.device.space(own).flows.list(projectId);
+		const flows = await paired.device
+			.space(own, NIGHT_SHIFT)
+			.flows.list(projectId);
 		expect(flows.map((f) => f.name)).toEqual(["hello"]);
 		const revisions = await paired.device
-			.space(own)
+			.space(own, NIGHT_SHIFT)
 			.flows.revisions(projectId, "hello");
 		expect(revisions.length).toBeGreaterThanOrEqual(2);
-		const schedules = await paired.device.space(own).listSchedules(projectId);
+		const schedules = await paired.device
+			.space(own, NIGHT_SHIFT)
+			.listSchedules(projectId);
 		expect(schedules.schedules.map((s) => s.id)).toEqual(["nightly"]);
 		const [kept] = await b.db
 			.select()
@@ -396,7 +401,7 @@ describe("leaving the home Host keeps a copy", () => {
 			.where(eq(hostSpace.spaceId, a.spaceId));
 		expect(listed?.name).toBe("Personal on A");
 		// A keeps everything.
-		const onA = await paired.host.space(a.spaceId).listProjects();
+		const onA = await paired.host.space(a.spaceId, NIGHT_SHIFT).listProjects();
 		expect(onA.map((p) => p.id).sort()).toEqual([projectId, onlyOnA.id].sort());
 		expect(await runOf(a, runId)).toMatchObject({ spaceId: a.spaceId });
 		// The copy of the database before it.
@@ -409,7 +414,7 @@ describe("leaving the home Host keeps a copy", () => {
 	test("a project without a folder comes along: every Device has it", async () => {
 		const { projectId } = await mergedIntoA();
 		const leads = await paired.host
-			.space(a.spaceId)
+			.space(a.spaceId, NIGHT_SHIFT)
 			.addProjectWithoutFolder({ name: "Leads" });
 		await paired.projectOnDevice(leads.id);
 		await revoke();
@@ -418,7 +423,7 @@ describe("leaving the home Host keeps a copy", () => {
 
 		expect(result).toMatchObject({ state: "done", projects: 2 });
 		const own = result?.spaceId as string;
-		const projects = await paired.device.space(own).listProjects();
+		const projects = await paired.device.space(own, NIGHT_SHIFT).listProjects();
 		expect(
 			projects.map((p) => [p.id, p.folder, p.repoPath !== null]).sort(),
 		).toEqual(
@@ -456,7 +461,7 @@ describe("leaving the home Host keeps a copy", () => {
 		expect(result).toMatchObject({ state: "done", unpinned: 2 });
 		const own = result?.spaceId as string;
 		const { schedules } = await paired.device
-			.space(own)
+			.space(own, NIGHT_SHIFT)
 			.listSchedules(projectId);
 		const byId = new Map(schedules.map((s) => [s.id, s]));
 		expect(byId.get("nightly")).toMatchObject({ enabled: false });
@@ -476,7 +481,9 @@ describe("leaving the home Host keeps a copy", () => {
 				schedule.id === "on-c" ? { ...schedule, enabled: true } : schedule,
 			),
 		);
-		const turnedOn = await paired.device.space(own).listSchedules(projectId);
+		const turnedOn = await paired.device
+			.space(own, NIGHT_SHIFT)
+			.listSchedules(projectId);
 		expect(
 			turnedOn.schedules.find((s) => s.id === "on-c")?.nextAt,
 		).not.toBeNull();
@@ -612,7 +619,7 @@ describe("leaving the home Host keeps a copy", () => {
 		});
 		expect(await state()).toBe("done");
 		const projects = await paired.device
-			.space(row?.toSpace as string)
+			.space(row?.toSpace as string, NIGHT_SHIFT)
 			.listProjects();
 		expect(projects).toHaveLength(1);
 		// One copy of the database: the split made it once.
@@ -624,7 +631,7 @@ describe("leaving the home Host keeps a copy", () => {
 
 	test("a run B walks that is not done holds the split back, until it is done", async () => {
 		const { projectId } = await mergedIntoA();
-		const space = paired.device.space(a.spaceId);
+		const space = paired.device.space(a.spaceId, NIGHT_SHIFT);
 		const waiting = await space.startRun({ projectId, flow: gateFlow });
 		await waitFor(
 			async () => (await space.getRun(waiting.id)).status === "waiting",
@@ -823,7 +830,7 @@ describe("nightshift leave", () => {
 
 	test("a run B walks that is not done refuses the leave before anything changes", async () => {
 		const { projectId } = await mergedIntoA();
-		const space = paired.device.space(a.spaceId);
+		const space = paired.device.space(a.spaceId, NIGHT_SHIFT);
 		const waiting = await space.startRun({ projectId, flow: gateFlow });
 		await waitFor(
 			async () => (await space.getRun(waiting.id)).status === "waiting",

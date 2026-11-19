@@ -11,7 +11,11 @@ import type {
 } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { instant, now } from "@nightshift/time";
-import { HostUnreachableError, type Relay } from "../../src/contract";
+import {
+	HostUnreachableError,
+	NIGHT_SHIFT,
+	type Relay,
+} from "../../src/contract";
 import {
 	defaultRunSettings,
 	type RunSettings,
@@ -76,7 +80,7 @@ function makeEngine(
 			...options,
 		}),
 		{ runLog, minuteMs: MINUTE_MS, ...internals },
-	).space(sandbox.spaceId);
+	).space(sandbox.spaceId, NIGHT_SHIFT);
 }
 
 const at = { x: 0, y: 0 };
@@ -621,12 +625,16 @@ describe("after a restart, in a Space a Host keeps", () => {
 		const host = hostKeeping(clock.now);
 		const dies = new AbortController();
 		const first = engineWith(host, { ...clock, signal: dies.signal });
-		const project = await projectId(first.space(sandbox.spaceId));
+		const project = await projectId(first.space(sandbox.spaceId, NIGHT_SHIFT));
 		host.keep();
 		const run = await first
-			.space(sandbox.spaceId)
+			.space(sandbox.spaceId, NIGHT_SHIFT)
 			.startRun({ projectId: project, flow: holdingFlow({ ttlMinutes: 2 }) });
-		await statusOf(first.space(sandbox.spaceId), run.id, "sleeping");
+		await statusOf(
+			first.space(sandbox.spaceId, NIGHT_SHIFT),
+			run.id,
+			"sleeping",
+		);
 		expect(await holders(at)).toEqual({ "docker-stack": run.id });
 		const firstExpiry = await expiryOf();
 		// The first daemon dies a minute and a half after its last renewal.
@@ -638,7 +646,7 @@ describe("after a restart, in a Space a Host keeps", () => {
 		const ends = new AbortController();
 		const second = engineWith(host, { ...clock, signal: ends.signal });
 		try {
-			const space = second.space(sandbox.spaceId);
+			const space = second.space(sandbox.spaceId, NIGHT_SHIFT);
 			expect((await space.getRun(run.id)).status).toBe("sleeping");
 			// The renewal at the start does not reach the Host.
 			await waitFor(() => host.link.renewals > before, {

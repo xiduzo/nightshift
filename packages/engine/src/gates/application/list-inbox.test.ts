@@ -21,7 +21,10 @@ describe("listInbox", () => {
 		ports.gates.setOpen("docs", [openGate("docs", "docs-early", 10)]);
 		ports.gates.setOpen("elsewhere", [openGate("elsewhere", "not-hers", 1)]);
 
-		const inbox = await listInbox(ports)({ personId: "u-ada" });
+		const inbox = await listInbox(ports)({
+			personId: "u-ada",
+			door: "session",
+		});
 		expect(
 			inbox.map((gate) => [gate.runId, gate.spaceName, gate.canAnswer]),
 		).toEqual([

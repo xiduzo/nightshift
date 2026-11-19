@@ -71,7 +71,7 @@ const gateFlow = flowOf(
 	[{ id: "e1", from: "build", outcome: "pass", to: "gate" }],
 );
 
-const actor = { personId: "the-person" };
+const actor = { personId: "the-person", door: "session" as const };
 
 const keyOf = (ref: WalkRef) =>
 	[ref.kind, ref.spaceId, ref.runId, "stepId" in ref ? ref.stepId : ""].join(

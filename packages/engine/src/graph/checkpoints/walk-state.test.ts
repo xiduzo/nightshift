@@ -7,6 +7,7 @@ import type { CommandNode, DecisionNode, Flow } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { asc, eq } from "drizzle-orm";
 import type { WalkFile } from "../../archive";
+import { NIGHT_SHIFT } from "../../contract";
 import { createRunHistory, ForeignRowsError } from "../../log";
 import { createRunLog } from "../../log/run-log/run-log";
 import { createRunBus } from "../../log/transcript/bus";
@@ -94,7 +95,12 @@ async function computer() {
 		},
 	);
 	if (!context) throw new Error("The engine made no peers.");
-	return { sandbox, engine, space: engine.space(sandbox.spaceId), context };
+	return {
+		sandbox,
+		engine,
+		space: engine.space(sandbox.spaceId, NIGHT_SHIFT),
+		context,
+	};
 }
 
 /** Starts the flow and waits until it waits at the Gate. */

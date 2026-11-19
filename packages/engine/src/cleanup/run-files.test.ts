@@ -7,6 +7,7 @@ import { event } from "@nightshift/db/schema";
 import { FLOW_VERSION, type Flow, type FlowNode } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
+import { NIGHT_SHIFT } from "../contract";
 import { defaultRunSettings } from "../device-config/settings";
 import type { EngineInternals } from "../engine";
 import { parseEventRow } from "../log/run-log/append";
@@ -57,7 +58,7 @@ function startDaemon(
 			settings: () => settings,
 		}),
 		{ cleanupDelayMs: 60 * 60_000, signal: controller.signal, ...internals },
-	).space(sandbox.spaceId);
+	).space(sandbox.spaceId, NIGHT_SHIFT);
 }
 
 const command = (id: string, line: string): FlowNode => ({

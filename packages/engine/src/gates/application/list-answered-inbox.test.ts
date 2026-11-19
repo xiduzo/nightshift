@@ -28,7 +28,10 @@ describe("listAnsweredInbox", () => {
 			answered("elsewhere", "not-hers", now - 1),
 		]);
 
-		const inbox = await listAnsweredInbox(ports)({ personId: "u-ada" });
+		const inbox = await listAnsweredInbox(ports)({
+			personId: "u-ada",
+			door: "session",
+		});
 		expect(inbox.map((gate) => [gate.runId, gate.spaceName])).toEqual([
 			["newer", "Docs"],
 			["older", "Platform"],

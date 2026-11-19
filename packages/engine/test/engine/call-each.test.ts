@@ -23,6 +23,7 @@ import { FLOW_VERSION } from "@nightshift/flows";
 import type { FlowInput } from "@nightshift/flows/testing";
 import { now } from "@nightshift/time";
 import { asc, eq } from "drizzle-orm";
+import { NIGHT_SHIFT } from "../../src/contract";
 import type { EngineInternals } from "../../src/engine";
 import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
 import type { TranscriptEntry } from "../../src/log/transcript/step-events";
@@ -82,7 +83,7 @@ function makeEngine(
 			...options,
 		}),
 		{ runLog, ...internals },
-	).space(sandbox.spaceId);
+	).space(sandbox.spaceId, NIGHT_SHIFT);
 }
 
 function agent(

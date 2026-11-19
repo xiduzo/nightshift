@@ -74,8 +74,8 @@ export function inMemoryAnswerFiles() {
 /** The Space every run of a test is in, unless it says another. */
 export const SPACE = "space-1";
 /** A Person who is a Member of `SPACE`, and one who only views it. */
-export const ADA = { personId: "person-ada" };
-export const VIC = { personId: "person-vic" };
+export const ADA = { personId: "person-ada", door: "session" as const };
+export const VIC = { personId: "person-vic", door: "session" as const };
 /** The Device that walks a run walked elsewhere. */
 export const FAR = "device-far";
 
