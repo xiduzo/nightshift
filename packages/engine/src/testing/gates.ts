@@ -29,7 +29,6 @@ export function testInbox(deps: {
 		},
 		files: { save: refused },
 		now,
-		checksLockScreen: true,
 	});
 	return { inbox: gates.listInbox, answeredInbox: gates.listAnsweredInbox };
 }

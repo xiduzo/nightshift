@@ -857,6 +857,37 @@ describe("the Device's exchange with its Host", () => {
 		});
 	});
 
+	// Decision 77 of the hexagon series: the lock-screen rule holds at every
+	// door. A Device that applied it first sends only what it lets through.
+	test("B refuses an answer from the lock screen that skipped the rule, to a Gate not marked for it, and A records why", async () => {
+		const run = await walkOnB(gateFlow);
+		online();
+		await untilStatus(paired.host, run.id, "waiting");
+		const gate = (await paired.host.space(a.spaceId).listGates())[0];
+		// Kept on the Host as it came, with no check on the way.
+		const command = await paired.host.exchange.commands.enqueue({
+			kind: "gate.resolve",
+			payload: {
+				stepId: gate?.stepId as string,
+				choice: "approve",
+				via: "lock_screen",
+			},
+			spaceId: a.spaceId,
+			runId: run.id,
+			walkerId: b.deviceId,
+			personId: paired.personId,
+		});
+
+		await waitFor(async () => (await commandOnA(command.id)).done, {
+			label: "the lock-screen Command done",
+		});
+		expect(await commandOnA(command.id)).toEqual({
+			done: true,
+			error: "Open this Gate in Night Shift to answer it.",
+		});
+		expect(await statusOn(paired.device, run.id)).toBe("waiting");
+	});
+
 	test("a Command applied before a restart is not applied again: its id is in the event it wrote", async () => {
 		const run = await walkOnB(gateFlow);
 		// A never hears that B applied it: the link to A breaks at the report.

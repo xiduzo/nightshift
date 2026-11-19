@@ -28,12 +28,6 @@ export type AnswerGatePorts = {
 	files: AnswerFiles;
 	/** Why the data does not fill an Ask's form, or null (`graph/`). */
 	askProblem: typeof askAnswerProblem;
-	/**
-	 * Whether this binding applies the lock-screen rule. Only the door of
-	 * the API does: an answer that came as a Command does not meet it
-	 * (D3 of the run path plan).
-	 */
-	checksLockScreen: boolean;
 };
 
 /** The form of an Ask (ADR 10), as `askProblem` reads it. */
@@ -52,7 +46,8 @@ export type AnswerGate = { runId: string; spaceId?: string } & Omit<
  * An answer from the lock screen (`via: "lock_screen"`) goes only to a Gate
  * its author marked for it, with one of its own choices (`NeedsApp`), and
  * only while the Gate is open with no answer on its way
- * (`GateClosedError`), when the binding checks it (`checksLockScreen`).
+ * (`GateClosedError`). The rule holds at every door: the API, the Host and
+ * the Walker that applies a Command.
  *
  * On a run another Device walks, the answer travels to the Walker as a
  * Command, once the log here says the Gate takes it and no other answer is
@@ -70,7 +65,7 @@ export const answerGate =
 			need: permissionOf("answer"),
 		});
 		const runId = run.id;
-		if (ports.checksLockScreen && fields.via === "lock_screen") {
+		if (fields.via === "lock_screen") {
 			const open = await ports.gates.open(run.spaceId);
 			const refusal = lockScreenRefusal(open, { runId, ...fields });
 			if (refusal === "needs-app") throw new NeedsApp();

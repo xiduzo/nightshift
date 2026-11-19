@@ -9,7 +9,7 @@ import {
 	step as stepTable,
 	user,
 } from "@nightshift/db/schema";
-import { sharedAnswerCosts } from "@nightshift/engine";
+import { NeedsApp, sharedAnswerCosts } from "@nightshift/engine";
 import {
 	createSpaceDocuments,
 	type SpaceDocuments,
@@ -474,6 +474,90 @@ describe("live transcripts", () => {
 				})
 			).follows,
 		).toEqual([]);
+	});
+});
+
+/** A command, then a Gate a person answers, marked for the lock screen when `lockScreen`. */
+const gateFlow = (lockScreen: boolean) =>
+	({
+		version: FLOW_VERSION,
+		inputs: [],
+		outputs: [],
+		start: "hello",
+		nodes: [
+			{
+				id: "hello",
+				type: "command",
+				position: { x: 0, y: 0 },
+				command: "echo hello",
+				stdout: "text",
+			},
+			{
+				id: "ship",
+				type: "decision",
+				position: { x: 0, y: 0 },
+				prompt: "Ship it?",
+				options: [{ name: "approve" }, { name: "reject" }],
+				by: "person",
+				decider: "typesafe",
+				lockScreen,
+			},
+		],
+		edges: [{ id: "e1", from: "hello", outcome: "pass", to: "ship" }],
+	}) as never;
+
+describe("a Command for a run this Host walks (the Host door)", () => {
+	/** A run of the owner's Space that waits at its Gate here, and the Gate. */
+	async function waitingRun(lockScreen: boolean) {
+		const view = engine.space(sandbox.spaceId);
+		const started = await view.startRun({
+			projectId,
+			flow: gateFlow(lockScreen),
+		});
+		const gate = await waitFor(async () =>
+			(await view.listGates()).find((g) => g.runId === started.id),
+		);
+		return { runId: started.id, stepId: gate.stepId };
+	}
+
+	// Decision 77 of the hexagon series: the lock-screen rule holds at every
+	// door. A Device that applied it first sends only what it lets through.
+	test("refuses an answer from the lock screen to a Gate not marked for it, which the Device did not check", async () => {
+		const { runId, stepId } = await waitingRun(false);
+		const refused = await host()
+			.command(keyOf("device-mine", ownerId), {
+				kind: "gate.resolve",
+				runId,
+				payload: { stepId, choice: "approve", via: "lock_screen" },
+			})
+			.then(
+				() => null,
+				(error: unknown) => error,
+			);
+		// A plain refusal of kind forbidden: the Device gets BAD_REQUEST with
+		// the kind beside it, a code every version knows (`readable`).
+		expect(refused).toBeInstanceOf(NeedsApp);
+		expect(refused).toMatchObject({
+			kind: "forbidden",
+			message: "Open this Gate in Night Shift to answer it.",
+		});
+		expect((await engine.space(sandbox.spaceId).getRun(runId)).status).toBe(
+			"waiting",
+		);
+	});
+
+	test("takes an answer from the lock screen to a Gate marked for it", async () => {
+		const { runId, stepId } = await waitingRun(true);
+		await host().command(keyOf("device-mine", ownerId), {
+			kind: "gate.resolve",
+			runId,
+			payload: { stepId, choice: "approve", via: "lock_screen" },
+		});
+		await waitFor(
+			async () =>
+				(await engine.space(sandbox.spaceId).getRun(runId)).status ===
+				"finished",
+		);
 	});
 });
 

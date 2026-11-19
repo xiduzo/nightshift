@@ -39,7 +39,7 @@ const waiting = stateOf({
 
 function setup(options: { reachable?: boolean } = {}) {
 	const ports = inMemoryGatePorts(options);
-	return { ports, answer: answerGate({ ...ports, checksLockScreen: true }) };
+	return { ports, answer: answerGate(ports) };
 }
 
 describe("an answer to a run another Device walks", () => {
@@ -146,7 +146,7 @@ describe("who may answer", () => {
 	});
 });
 
-describe("an answer from the lock screen, where the binding checks it", () => {
+describe("an answer from the lock screen (decision 77: every door)", () => {
 	/** The run's Gate as the Space lists it: on `step-1`, marked or not. */
 	function listed(
 		ports: ReturnType<typeof setup>["ports"],
@@ -199,6 +199,20 @@ describe("an answer from the lock screen, where the binding checks it", () => {
 		expect(
 			await refusalOf(answer(ADA, { ...fromLockScreen, choice: "deploy" })),
 		).toBeInstanceOf(NeedsApp);
+		expect(ports.turns.taken).toEqual([]);
+	});
+
+	test("is refused the same way when it came as a Command to this Walker, which skipped the rule", async () => {
+		const { ports, answer } = setup();
+		ports.put({ id: "run-1" }, waiting);
+		listed(ports, false);
+		const refused = await refusalOf(
+			answer({ ...ADA, door: "command" }, fromLockScreen),
+		);
+		expect(refused).toBeInstanceOf(NeedsApp);
+		expect((refused as NeedsApp).message).toBe(
+			"Open this Gate in Night Shift to answer it.",
+		);
 		expect(ports.turns.taken).toEqual([]);
 	});
 

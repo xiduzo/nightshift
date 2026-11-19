@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { type DeviceKeyAccess, ROLE_REFUSAL } from "@nightshift/auth";
 import { member, user } from "@nightshift/db/schema";
+import { GateClosedError, NeedsApp } from "@nightshift/engine";
 import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
 import { Refusal } from "@nightshift/refusal";
 import { asDate } from "@nightshift/time";
@@ -8,7 +9,7 @@ import { ORPCError } from "@orpc/server";
 import { eq } from "drizzle-orm";
 import { NOT_A_HOST } from "../contract";
 import type { PairedDevice } from "../registry";
-import { admission } from "./keyed-call";
+import { admission, readable } from "./keyed-call";
 
 /**
  * A keyed call is admitted once, before its procedure: the key rules of
@@ -167,5 +168,31 @@ describe("the Caller", () => {
 		).resolves.toBeUndefined();
 		const next = await admit(keyOf(), "sync");
 		expect(await next.roleIn(sandbox.spaceId)).toBe("viewer");
+	});
+});
+
+describe("the refusals of an answer, as a Device reads them", () => {
+	// Decision 77 of the hexagon series: a Host that walks a run refuses an
+	// answer from the lock screen the rule does not let through. An older
+	// Device knows the code: BAD_REQUEST, with the words and the kind.
+	test("an answer that needs the app is a BAD_REQUEST of kind forbidden, with its words", () => {
+		expect(readable(new NeedsApp(), ["sync", "command"])).toMatchObject({
+			code: "BAD_REQUEST",
+			message: "Open this Gate in Night Shift to answer it.",
+			data: { kind: "forbidden" },
+		});
+	});
+
+	test("an answer to a Gate that does not wait is a BAD_REQUEST of kind conflict, with its words", () => {
+		expect(
+			readable(new GateClosedError("This Gate does not wait anymore."), [
+				"sync",
+				"command",
+			]),
+		).toMatchObject({
+			code: "BAD_REQUEST",
+			message: "This Gate does not wait anymore.",
+			data: { kind: "conflict" },
+		});
 	});
 });

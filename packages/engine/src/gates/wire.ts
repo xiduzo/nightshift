@@ -31,8 +31,6 @@ export type GatesDeps = {
 	files: AnswerFiles;
 	/** The time now. */
 	now(): number;
-	/** Whether the answer applies the lock-screen rule (`answerGate`). */
-	checksLockScreen: boolean;
 };
 
 /** The use cases of the Gates, bound to their ports. */
@@ -61,7 +59,6 @@ export function wireGates(deps: GatesDeps): Gates {
 			gates,
 			files: deps.files,
 			askProblem: askAnswerProblem,
-			checksLockScreen: deps.checksLockScreen,
 		}),
 		listOpenGates: listOpenGates({ openSpace: access.openSpace, gates }),
 		listAnsweredGates: listAnsweredGates({

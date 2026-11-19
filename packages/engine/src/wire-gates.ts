@@ -27,15 +27,8 @@ export function wireEngineGates(deps: {
 	now(): number;
 }) {
 	const { reads } = deps.views;
-	/**
-	 * The Gates over one way to open a run or a Space. Only the API's door
-	 * (`Engine.gates`) applies the lock-screen rule, as before: the Space
-	 * view's `act` takes Commands from the Host and the Walker too.
-	 */
-	const bind = (
-		access: Pick<Access, "openRun" | "openSpace">,
-		checksLockScreen = false,
-	) =>
+	/** The Gates over one way to open a run or a Space. */
+	const bind = (access: Pick<Access, "openRun" | "openSpace">) =>
 		wireGates({
 			access,
 			walk: deps.walk,
@@ -50,10 +43,9 @@ export function wireEngineGates(deps: {
 				},
 			},
 			now: deps.now,
-			checksLockScreen,
 		});
 	// `Engine.gates`: each use case checks the actor's role itself.
-	const cases = bind(deps.access, true);
+	const cases = bind(deps.access);
 	// The Space view: each door checks the Person's role before it calls the
 	// view (the API, the Host, the Walker, the notifier as Night Shift).
 	// Until lane R8 moves that check into the use cases, the view opens the
