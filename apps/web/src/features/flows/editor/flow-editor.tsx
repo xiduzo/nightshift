@@ -10,9 +10,6 @@ import type { Flow, FlowIssue } from "@nightshift/flows";
 import {
 	callersOf,
 	isSavable,
-	kitFlow,
-	newElementFlow,
-	newFlow,
 	removeEdge,
 	removeNode,
 	updateEdge,
@@ -30,7 +27,7 @@ import {
 	DropdownMenuTrigger,
 } from "@nightshift/ui/components/dropdown-menu";
 import { cn } from "@nightshift/ui/lib/utils";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBlocker, useNavigate } from "@tanstack/react-router";
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import {
@@ -43,7 +40,6 @@ import {
 	Undo2Icon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
 import { CopyProjectHere, notHere, projectQueries } from "@/features/projects";
 import { AgentButton } from "@/shared/agent-button";
 import { hoverTime } from "@/shared/format";
@@ -64,7 +60,6 @@ import {
 	useChatPanel,
 } from "../chat";
 import { CopyFlowDialog } from "../move";
-import { flowMutations } from "../queries";
 import { StartRunDialog } from "../start";
 import {
 	FollowingBar,
@@ -100,6 +95,7 @@ import {
 	useEditingSession,
 } from "./session";
 import { SubflowView } from "./subflow-view";
+import { useCalledFlows } from "./use-called-flows";
 import { useEditorData } from "./use-editor-data";
 import { useFlowSave } from "./use-flow-save";
 import { useNodeSamples } from "./use-node-samples";
@@ -215,68 +211,17 @@ function Editor({
 		savable,
 	});
 
-	const openFlow = useCallback(
-		(flowName: string) =>
-			void navigate({
-				to: "/projects/$projectId/flows/$name",
-				params: { projectId, name: flowName },
-			}),
-		[navigate, projectId],
-	);
-
-	// A new called flow: write it, point the node at it, save this flow, open it.
-	// With `copy`, the new flow is a copy of that kit.
-	const createCalled = useMutation(flowMutations.save());
-	const createCalledFlow = async (
-		nodeId: string,
-		calledName: string,
-		copy?: { kit: string; flow: Flow },
-	) => {
-		const node = draft.nodes.find((candidate) => candidate.id === nodeId);
-		if (node?.type !== "call") return;
-		try {
-			await createCalled.mutateAsync({
-				projectId,
-				name: calledName,
-				flow: copy
-					? copy.flow
-					: node.each
-						? newElementFlow(node.each.as, nodeDefaults)
-						: newFlow(nodeDefaults),
-			});
-		} catch (error) {
-			toast.error(
-				`Could not ${copy ? `copy ${copy.kit}` : `create ${calledName}`}: ${error instanceof Error ? error.message : String(error)}`,
-			);
-			return;
-		}
-		const next = updateNode(draft, nodeId, (current) =>
-			current.type === "call" ? { ...current, flow: calledName } : current,
-		);
-		session.edit(next);
-		if (!isSavable(next)) {
-			toast.info(
-				`Created ${calledName}. Fix and save this flow, then open ${calledName} from the node.`,
-			);
-			return;
-		}
-		try {
-			const issues = await saveFlow.mutateAsync({
-				projectId,
-				name,
-				flow: next,
-			});
-			onSaved(next, issues);
-		} catch {
-			return;
-		}
-		toast.success(
-			copy
-				? `Copied ${copy.kit} into this project as ${calledName}, and saved ${name}.`
-				: `Created ${calledName} and saved ${name}.`,
-		);
-		openFlow(calledName);
-	};
+	const { openFlow, flowsSupport } = useCalledFlows({
+		navigate,
+		projectId,
+		name,
+		draft,
+		nodeDefaults,
+		session,
+		saveFlow,
+		onSaved,
+		projectFlows,
+	});
 
 	const sections = useMemo(() => sectionEdits(session), [session]);
 	const subflowSection = draft.sections?.find(
@@ -397,19 +342,6 @@ function Editor({
 		setSelectedCallEach,
 		setSelectedAgentOutcomes,
 	} = nodeEdits(session);
-
-	const flowsSupport = {
-		flowName: name,
-		flows: projectFlows.flows,
-		onOpen: openFlow,
-		onCreate: (nodeId: string, calledName: string) =>
-			void createCalledFlow(nodeId, calledName),
-		onCopyKit: (nodeId: string, kit: string, copyName: string) => {
-			const flow = kitFlow(kit);
-			if (flow) void createCalledFlow(nodeId, copyName, { kit, flow });
-		},
-		creating: createCalled.isPending || saveFlow.isPending,
-	};
 
 	// The field helpers of the inspector: they read the draft and change it.
 	const assistant = {
