@@ -6,4 +6,4 @@ export {
 	hostPolicyFromEnv,
 	OPEN_HOST,
 	TWO_FACTOR_REQUIRED,
-} from "./host-access";
+} from "./domain/host-access";

@@ -9,12 +9,10 @@ agents/harnesses
 agents/knowledge
 auth/access
 auth/device-keys
-auth/host-access
 auth/local-session
 auth/login
 auth/pairing
 auth/spaces
-auth/two-factor
 devices/host
 devices/membership
 devices/offers

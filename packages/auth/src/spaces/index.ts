@@ -19,11 +19,11 @@ export {
 } from "./members";
 export { personContact, personNames } from "./people";
 export {
-	ac,
 	type Permissions,
+	ROLE_PERMISSIONS,
 	type Role,
 	roleAllows,
-	roles,
+	statements,
 } from "./roles";
 export {
 	activeSpaceId,

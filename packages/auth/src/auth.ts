@@ -9,27 +9,54 @@ import { authSchema as schema } from "@nightshift/db";
 import { Refusal } from "@nightshift/refusal";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
+import { createAccessControl } from "better-auth/plugins/access";
 import { admin } from "better-auth/plugins/admin";
 import { organization } from "better-auth/plugins/organization";
+import { twoFactor } from "better-auth/plugins/two-factor";
 import { deviceKeyPlugin } from "./device-keys";
 import { pairingPlugin } from "./pairing";
 import {
-	ac,
 	activeSpaceId,
 	ensurePersonalSpace,
 	HOST_ADMIN,
 	hasHostAdmin,
 	type MemberChange,
-	roles,
+	ROLE_PERMISSIONS,
 	signUpRefusal,
+	statements,
 } from "./spaces";
-import { twoFactorPlugin } from "./two-factor";
+import { TRUSTED_BROWSER_DAYS } from "./two-factor";
 
 export type AuthConfig = {
 	BETTER_AUTH_URL: string;
 	BETTER_AUTH_SECRET: string;
 	CORS_ORIGIN: string;
 };
+
+/**
+ * Who may do what in a Space, as the organization plugin checks it on its
+ * own endpoints: Better Auth's access control over the roles of
+ * `spaces/roles.ts`. Night Shift's own checks use `roleAllows`, which
+ * answers the same (`spaces/roles.test.ts`).
+ */
+export const ac = createAccessControl(statements);
+export const roles = {
+	owner: ac.newRole(ROLE_PERMISSIONS.owner),
+	admin: ac.newRole(ROLE_PERMISSIONS.admin),
+	member: ac.newRole(ROLE_PERMISSIONS.member),
+	viewer: ac.newRole(ROLE_PERMISSIONS.viewer),
+};
+
+/**
+ * A Person may add a second factor to their password: a code from an
+ * authenticator app, or a backup code (`two-factor/`).
+ */
+function twoFactorPlugin() {
+	return twoFactor({
+		issuer: "Night Shift",
+		trustDeviceMaxAge: TRUSTED_BROWSER_DAYS * 24 * 3600,
+	});
+}
 
 const PERSONAL = "Nobody can join a personal Space. Create a Space to share.";
 
