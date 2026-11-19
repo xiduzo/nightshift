@@ -36,7 +36,8 @@ Read `docs/steering/STRUCTURE.md` before you add a file, a folder or a package.
   `notifications`, `agents`, `auth`, `telemetry`), a capability has three rings:
   `domain/`, `application/` and `adapters/`. A use case takes its ports, decides who may
   act and throws a `Refusal`. Only a `wire.ts` builds a real adapter. Read section 9 of
-  `STRUCTURE.md` before you add code there.
+  `STRUCTURE.md` before you add code there. Start a new slice, use case or adapter with
+  `bun run gen` (`turbo gen`).
 - **A debt list only gets shorter.** Never add a line to a `scripts/*-debt.txt` file, and
   never raise a number in one. Fix the new offender. A listed file may not grow: split it
   first.

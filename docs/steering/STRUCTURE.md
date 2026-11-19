@@ -371,7 +371,7 @@ The pre-commit hook is `lefthook.yml` (install it with `bun lefthook install`). 
 | Collector allowlist: `scripts/check-collector-allowlist.ts` fails when `deploy/insights/collector.yaml` allows a key the registry does not define, or misses a key the usage export sends. The list is the usage-event attributes, the resource attributes in the usage export, and the event name. | lefthook pre-commit (when the Collector config, the usage export, or `packages/semconv` changes), CI | Active |
 | The Weaver registry: `weaver registry check --v2 --registry packages/telemetry/registry` fails an invalid registry. CI installs the Weaver version in `packages/telemetry/registry/weaver-version.txt`. | CI | Active |
 | Emitted telemetry matches the registry: `packages/telemetry/src/runs/conform.test.ts` fails a name, a type, a unit or a required attribute the registry does not allow. `packages/telemetry/src/wire.test.ts` runs the same check on a run from the in-memory engine. | `bun test` in `packages/telemetry`, CI | Active |
-| The checks have tests. `scripts/check-verticals.test.ts`, `scripts/check-layers.test.ts`, `scripts/check-time.test.ts` and `scripts/check-semconv.test.ts` prove each rule on small workspaces, with one tree that breaks it and one that keeps it. They also prove that each script passes on this repository. `scripts/test-workspaces.test.ts` does the same for the list of tested workspaces. The checks of sections 4 and 9 have tests too. The vertical rules: `scripts/verticals/folder-names.test.ts`, `nesting.test.ts`, `nesting-size.test.ts` and `unused-files.test.ts`. The capability map: `scripts/check-capabilities.test.ts`. The budgets: `scripts/check-budgets.test.ts` and `check-budgets-barrels.test.ts`. The rings: `scripts/check-rings.test.ts` and `scripts/rings/imports.test.ts`, on fixture repositories. The doc paths: `scripts/check-doc-paths.test.ts`. | `bun test ./scripts/`: lefthook pre-commit (job `check tests`), CI (step "Tests of the checks"). The hook job runs when a check script changes, or a module of `scripts/verticals/` or `scripts/rings/`. It also runs when `.dependency-cruiser.mjs`, `scripts/hexagon-debt.txt`, the capability map or its debt list changes. It gives each test 60 seconds, because some tests read the whole repository. | Active |
+| The checks have tests. `scripts/check-verticals.test.ts`, `scripts/check-layers.test.ts`, `scripts/check-time.test.ts` and `scripts/check-semconv.test.ts` prove each rule on small workspaces, with one tree that breaks it and one that keeps it. They also prove that each script passes on this repository. `scripts/test-workspaces.test.ts` does the same for the list of tested workspaces. The checks of sections 4 and 9 have tests too. The vertical rules: `scripts/verticals/folder-names.test.ts`, `nesting.test.ts`, `nesting-size.test.ts` and `unused-files.test.ts`. The capability map: `scripts/check-capabilities.test.ts`. The budgets: `scripts/check-budgets.test.ts` and `check-budgets-barrels.test.ts`. The rings: `scripts/check-rings.test.ts` and `scripts/rings/imports.test.ts`, on fixture repositories. The generators of section 9: `scripts/generators.test.ts` runs each generator on a fixture repository, and the ring check must accept the result. The doc paths: `scripts/check-doc-paths.test.ts`. | `bun test ./scripts/`: lefthook pre-commit (job `check tests`), CI (step "Tests of the checks"). The hook job runs when a check script changes, or a module of `scripts/verticals/` or `scripts/rings/`, or a file of `turbo/generators/`. It also runs when `.dependency-cruiser.mjs`, `scripts/hexagon-debt.txt`, the capability map or its debt list changes. It gives each test 60 seconds, because some tests read the whole repository. | Active |
 | Types and tests: `bun run check-types` (the scripts, then every workspace, with the web build), and `bun test` per workspace (without `*.live.test.ts`). `scripts/test-workspaces.ts` finds the workspaces with tests, so CI tests a new workspace without an edit. | CI | Active |
 | The compiled binary starts: `apps/server/scripts/smoke-binary.ts` builds it and starts it as the Docker image does. | CI | Active |
 | API contract: every procedure has a one-line summary and an output schema, and the OpenAPI document builds with both. Real replies of a sandbox engine match their schemas. `exact<T>()` fails the build when an output schema differs from its domain type. | `packages/api/src/contract.test.ts` (CI), TypeScript | Active |
@@ -505,6 +505,36 @@ Twins and contract suites are test code. Production code never imports them. The
 | `adapters/in/` | `<name>.ts` | It imports nothing of its slice. Its test may. |
 
 The check makes the file name from the port name: `ScheduleStore` is `schedule-store`, `HTTPClient` is `http-client`, `Clock` is `clock`. A port with `@filledBy` that has a real adapter in its own slice fails.
+
+### Start a slice, a use case or an adapter
+
+A new slice, use case or adapter starts from a generator (H11). The generators are the `turbo gen` generators in `turbo/generators/`: plop with Handlebars templates. What they make keeps the ring check from the first commit. `scripts/generators.test.ts` proves it. Without `--args`, a generator asks its questions.
+
+To start a slice:
+
+1. Make sure that its capability is in `CAPABILITIES` of `scripts/capabilities.ts`. A slice has the name of its capability.
+2. Run `bun run gen slice --args <package> <capability> "<what it is>" <verb-object> "<what the use case does>"`. For example: `bun run gen slice --args engine spend "what the runs of a Space cost." show-spend "Shows what the runs of a Space cost."`
+3. The generator writes `index.ts`, `wire.ts`, `application/ports.ts` with the port `<Slice>Access`, and `adapters/out/in-memory-neighbours.ts`. It writes the first use case with its test, and the line of the capability map. Biome formats each file.
+4. Call `wire<Slice>` from the `wire.ts` of the package, and give its use cases to the door that calls them. Until then, the vertical check fails rules (b) and (q) on the barrel of the slice.
+
+To add a use case to a slice that the generator started:
+
+1. Run `bun run gen use-case --args <package> <slice> <verb-object> "<what it does>"`.
+2. The generator writes the use case and its test in `application/`, and binds the use case in `wire.ts`. It checks who may act first (`access.openSpace`).
+3. Give the use case the other ports it needs. Add each one to its `<UseCase>Ports` type with `Pick<>`.
+
+To add a port with its adapters:
+
+1. Run `bun run gen adapter --args <package> <slice> <Port> <tech> "<what the port does>"`. For example: `bun run gen adapter --args engine spend SpendStore drizzle "The spend of each run."`
+2. The generator adds the port to `application/ports.ts` with one call, `find(id)`. It writes the real adapter, the twin, the contract suite and the test that runs the suite on both. It adds the real adapter to the ports in `wire.ts`, and the twin to `inMemory<Slice>Ports`.
+3. Replace `find` with the calls of your port. Change the twin, the real adapter and the contract suite to match.
+4. If the real adapter reads the database, run its side of the contract on libsql in memory: `createDb({ DATABASE_URL: ":memory:" })` with `migrateDb`.
+
+A generator refuses, and writes nothing, in these cases:
+
+- A package below the engine (`agents`, `auth`). Its use cases have no `Actor` yet.
+- A slice that is no capability, or a vertical that exists.
+- A use case or a port of a slice made by hand. Such a slice has no `<Slice>Access` and no `inMemory<Slice>Ports`. Write the code by hand there.
 
 ### Bring a slice into shape
 
