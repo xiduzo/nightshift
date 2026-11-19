@@ -3,6 +3,8 @@ import { fakeHarness } from "@nightshift/agents/testing";
 import { appRouter } from "@nightshift/api";
 import type { Context } from "@nightshift/api/context";
 import { accessAs, testContext } from "@nightshift/api/testing";
+import { RoleRefusal, roleAllows } from "@nightshift/auth";
+import type { Engine } from "@nightshift/engine";
 import type {
 	ProfileStore,
 	SettingsStore,
@@ -1078,7 +1080,18 @@ describe("assistant.explain", () => {
 		return testContext({
 			access: accessAs({ personId: "ann", spaceId: "space", role }),
 			daemon: { device: { id: "d", name: "test", ownerId: "owner" } },
-			engine: { spaceOfRun: async () => "space" },
+			engine: {
+				// The engine opens the run in its Space, "space", and checks the
+				// Person's role there, as it reads it from the member rows.
+				runs: {
+					open: async (_actor, request) => {
+						if (request.need && !roleAllows(role, request.need)) {
+							throw new RoleRefusal();
+						}
+						return { run: { spaceId: "space" }, walkedHere: true };
+					},
+				} as Pick<Engine["runs"], "open"> as Engine["runs"],
+			},
 			assistant,
 		});
 	}

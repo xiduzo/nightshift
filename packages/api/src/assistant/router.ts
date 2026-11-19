@@ -1,3 +1,4 @@
+import type { Permissions } from "@nightshift/auth";
 import {
 	builtinAgentIdSchema,
 	chatRequestSchema,
@@ -7,8 +8,8 @@ import {
 import { z } from "zod";
 
 import { stream } from "../output";
-import { ownerProcedure, streamed } from "../procedures";
-import { runProcedure } from "../runs";
+import { openedStream, ownerProcedure, streamed } from "../procedures";
+import { runProcedure, runSpaceOf } from "../runs";
 import {
 	builtinCheckSchema,
 	builtinStatusSchema,
@@ -16,6 +17,9 @@ import {
 	explanationEventSchema,
 	suggestionEventSchema,
 } from "./schemas";
+
+/** Who may ask why a run stopped: a Member who may continue or retry it. */
+const MAY_EXPLAIN: Permissions = { run: ["resume"] };
 
 /**
  * The assistant runs on this computer's own profiles and reads its Clone of
@@ -88,18 +92,19 @@ export const assistant = {
 	 * model the request picks, else on the Explainer's choice of the
 	 * computer that answers, in the project's Clone there, read only.
 	 */
-	explain: runProcedure(explainRequestSchema, { run: ["resume"] })
+	explain: runProcedure(explainRequestSchema)
 		.route({
 			summary:
 				"Streams one short answer: why a run that stopped early did not finish, and what the person can do.",
 		})
 		.output(stream(explanationEventSchema))
 		.handler(
-			streamed(({ context, input, signal }) =>
-				context.assistant.explain(input, signal, {
-					spaceId: context.spaceId,
+			openedStream(async ({ context, input, signal }) => {
+				const { spaceId } = await runSpaceOf(context, input.runId, MAY_EXPLAIN);
+				return context.assistant.explain(input, signal, {
+					spaceId,
 					personId: context.session.user.id,
-				}),
-			),
+				});
+			}),
 		),
 };

@@ -1,13 +1,13 @@
-import { permissionOf, startRunRequestSchema } from "@nightshift/engine";
+import { startRunRequestSchema } from "@nightshift/engine";
 import { labelSchema } from "@nightshift/flows";
 import { z } from "zod";
 
 import { output, stream } from "../output";
-import { permitted, protectedProcedure, streamed } from "../procedures";
+import { openedStream, permitted, protectedProcedure } from "../procedures";
 import { runDetailSchema } from "./detail-schemas";
 import { artifactSchema, runFilesSchema } from "./file-schemas";
 import { ownDeviceSchema, placementSchema } from "./placement-schemas";
-import { runProcedure } from "./run-space";
+import { runProcedure, runSpaceOf } from "./run-space";
 import { stepDetailSchema } from "./step-schemas";
 import { runStatusSchema, runSummarySchema } from "./summary-schemas";
 import {
@@ -27,9 +27,9 @@ const STEP_TRANSCRIPT_MS = 8_000;
 
 /**
  * Lists, starts and the Devices of a project are the session's Space's. A
- * procedure keyed by a run id goes to the run's own Space instead
- * (`runProcedure`): a run of any of the Person's Spaces opens and steers
- * without a switch.
+ * procedure keyed by a run id goes to the engine's run use cases instead
+ * (`runProcedure`): each finds the run's own Space, so a run of any of the
+ * Person's Spaces opens and steers without a switch.
  */
 export const runs = {
 	/** The Person's Devices a run of the project can run on: this computer first. */
@@ -85,7 +85,9 @@ export const runs = {
 				"Reads one run of any of the Person's Spaces: its flow, steps, resumes, commands and variables.",
 		})
 		.output(output(runDetailSchema))
-		.handler(({ context, input }) => context.space.getRun(input.runId)),
+		.handler(({ context, input }) =>
+			context.engine.runs.get(context.actor, input),
+		),
 	/**
 	 * One step of a run with what `get` leaves out: the prompt of each
 	 * session and the element of each item. A screen reads it when a
@@ -98,7 +100,7 @@ export const runs = {
 		})
 		.output(output(stepDetailSchema))
 		.handler(({ context, input }) =>
-			context.space.getStep(input.runId, input.stepId),
+			context.engine.runs.step(context.actor, input),
 		),
 	/**
 	 * One step's transcript as Night Shift saved it, all at once, for a
@@ -117,11 +119,10 @@ export const runs = {
 		.output(output(stepTranscriptSchema))
 		.handler(({ context, input, signal }) => {
 			const bound = AbortSignal.timeout(STEP_TRANSCRIPT_MS);
-			return context.space.stepTranscript(
-				input.runId,
-				input.stepId,
-				signal ? AbortSignal.any([signal, bound]) : bound,
-			);
+			return context.engine.runs.stepTranscript(context.actor, {
+				...input,
+				signal: signal ? AbortSignal.any([signal, bound]) : bound,
+			});
 		}),
 	/**
 	 * The end of a service's log (ADR 9), by its node and scope
@@ -137,19 +138,25 @@ export const runs = {
 	)
 		.route({ summary: "Reads the end of the log of a service of a run." })
 		.output(output(z.object({ text: z.string().nullable() })))
-		.handler(async ({ context, input }) => ({
-			text: await context.space.serviceLog(input.runId, {
-				nodeId: input.nodeId,
-				scopeKey: input.scopeKey,
-			}),
-		})),
+		.handler(async ({ context, input }) => {
+			const { space } = await runSpaceOf(context, input.runId);
+			return {
+				text: await space.serviceLog(input.runId, {
+					nodeId: input.nodeId,
+					scopeKey: input.scopeKey,
+				}),
+			};
+		}),
 	/** The files the run's agents and commands kept, oldest first. Fetch one at `GET /api/runs/:id/artifacts/:artifactId`. */
 	artifacts: runProcedure(z.object({ runId: z.string() }))
 		.route({
 			summary: "Lists the files the agents and commands of a run kept.",
 		})
 		.output(output(z.array(artifactSchema)))
-		.handler(({ context, input }) => context.space.listArtifacts(input.runId)),
+		.handler(async ({ context, input }) => {
+			const { space } = await runSpaceOf(context, input.runId);
+			return space.listArtifacts(input.runId);
+		}),
 	/**
 	 * The files in the folder of a run of a project without a folder, on
 	 * this computer, and when the cleanup removes them. Empty for a run
@@ -162,7 +169,10 @@ export const runs = {
 				"Lists the files in the folder of a run of a project without a folder, and when they are removed.",
 		})
 		.output(output(runFilesSchema))
-		.handler(({ context, input }) => context.space.listRunFiles(input.runId)),
+		.handler(async ({ context, input }) => {
+			const { space } = await runSpaceOf(context, input.runId);
+			return space.listRunFiles(input.runId);
+		}),
 	/**
 	 * Starts a flow file by name, or a flow given inline (a quick run). A
 	 * Device it names goes first. Without one, the flow says where (ADR 17).
@@ -182,31 +192,24 @@ export const runs = {
 				startedBy: context.session.user.id,
 			}),
 		),
-	useful: runProcedure(
-		z.object({ runId: z.string(), useful: z.boolean() }),
-		permissionOf("useful"),
-	)
+	useful: runProcedure(z.object({ runId: z.string(), useful: z.boolean() }))
 		.route({
 			summary: "Records whether you found this run useful.",
 		})
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.space.act(input.runId, {
-				kind: "useful",
-				useful: input.useful,
-			}),
+			context.engine.runs.markUseful(context.actor, input),
 		),
 	stop: runProcedure(
 		z.object({
 			runId: z.string(),
 			when: z.enum(["now", "after-step", "cancel-after-step"]).optional(),
 		}),
-		permissionOf("stop"),
 	)
 		.route({ summary: "Stops a run now, or after its running step." })
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.space.act(input.runId, { kind: "stop", when: input.when }),
+			context.engine.runs.stop(context.actor, input),
 		),
 	/**
 	 * Another of the Person's Devices walks the run from here on: from its
@@ -214,14 +217,16 @@ export const runs = {
 	 */
 	move: runProcedure(
 		z.object({ runId: z.string(), deviceId: z.string().min(1).max(64) }),
-		permissionOf("move"),
 	)
 		.route({
 			summary: "Moves the walk of a run to another of the Person's Devices.",
 		})
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.space.act(input.runId, { kind: "move", to: input.deviceId }),
+			context.engine.runs.move(context.actor, {
+				runId: input.runId,
+				to: input.deviceId,
+			}),
 		),
 	/**
 	 * Lets go of a lease the run holds (ADR 7): the next run that waits for
@@ -229,17 +234,13 @@ export const runs = {
 	 */
 	releaseLease: runProcedure(
 		z.object({ runId: z.string(), name: z.string().min(1).max(500) }),
-		permissionOf("release-lease"),
 	)
 		.route({
 			summary: "Lets go of a lease a run holds, so another run can take it.",
 		})
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.space.act(input.runId, {
-				kind: "release-lease",
-				name: input.name,
-			}),
+			context.engine.runs.releaseLease(context.actor, input),
 		),
 	/** The Person's own Devices the run can move to now, from the run's own Space ("Move to…"). */
 	moveTargets: runProcedure(z.object({ runId: z.string() }))
@@ -249,7 +250,7 @@ export const runs = {
 		})
 		.output(output(z.array(ownDeviceSchema)))
 		.handler(({ context, input }) =>
-			context.space.listMoveTargets(input.runId),
+			context.engine.runs.moveTargets(context.actor, input),
 		),
 	/**
 	 * The Person's Devices for the project: online, with a Clone or not.
@@ -274,7 +275,6 @@ export const runs = {
 		),
 	resume: runProcedure(
 		z.object({ runId: z.string(), prompt: z.string().min(1).optional() }),
-		permissionOf("resume"),
 	)
 		.route({
 			summary:
@@ -282,7 +282,7 @@ export const runs = {
 		})
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.space.act(input.runId, { kind: "resume", prompt: input.prompt }),
+			context.engine.runs.resume(context.actor, input),
 		),
 	/**
 	 * Stops the running step and continues it at once, with an optional
@@ -294,18 +294,13 @@ export const runs = {
 			stepId: z.string().min(1).optional(),
 			prompt: z.string().min(1).optional(),
 		}),
-		permissionOf("restart"),
 	)
 		.route({
 			summary: "Stops the running step of a run and starts it again at once.",
 		})
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.space.act(input.runId, {
-				kind: "restart",
-				...(input.stepId !== undefined ? { stepId: input.stepId } : {}),
-				...(input.prompt !== undefined ? { prompt: input.prompt } : {}),
-			}),
+			context.engine.runs.restartStep(context.actor, input),
 		),
 	/**
 	 * Runs a run that is not going again from a node of its own flow. An
@@ -321,18 +316,11 @@ export const runs = {
 			prompt: z.string().min(1).optional(),
 			fresh: z.boolean().optional(),
 		}),
-		permissionOf("rerun"),
 	)
 		.route({ summary: "Runs a run again from one node of its own flow." })
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.space.act(input.runId, {
-				kind: "rerun",
-				nodeId: input.nodeId,
-				...(input.stepId !== undefined ? { stepId: input.stepId } : {}),
-				...(input.prompt !== undefined ? { prompt: input.prompt } : {}),
-				...(input.fresh ? { fresh: true } : {}),
-			}),
+			context.engine.runs.rerun(context.actor, input),
 		),
 	/** Live transcript and status over SSE. Replays from disk first. */
 	watch: runProcedure(
@@ -344,11 +332,8 @@ export const runs = {
 		})
 		.output(stream(runStreamItemSchema))
 		.handler(
-			streamed(({ context, input, signal }) =>
-				context.space.watchRun(input.runId, {
-					signal,
-					afterSeq: input.afterSeq,
-				}),
+			openedStream(({ context, input, signal }) =>
+				context.engine.runs.watch(context.actor, { ...input, signal }),
 			),
 		),
 	/**
@@ -357,26 +342,20 @@ export const runs = {
 	 * it without waiting and ignores a refusal: an older Host does not
 	 * know it.
 	 */
-	takeOver: runProcedure(
-		z.object({ runId: z.string() }),
-		permissionOf("take-over"),
-	)
+	takeOver: runProcedure(z.object({ runId: z.string() }))
 		.route({
 			summary:
 				"Records that you took a run over by hand with its take-over command.",
 		})
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.space.act(input.runId, { kind: "take-over" }),
+			context.engine.runs.takeOver(context.actor, input),
 		),
 	/** Sends a signal to a run whose Wait node waits for it. */
-	signal: runProcedure(
-		z.object({ runId: z.string(), name: labelSchema }),
-		permissionOf("signal"),
-	)
+	signal: runProcedure(z.object({ runId: z.string(), name: labelSchema }))
 		.route({ summary: "Sends a signal to a run whose Wait node waits for it." })
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.space.act(input.runId, { kind: "signal", name: input.name }),
+			context.engine.runs.signal(context.actor, input),
 		),
 };

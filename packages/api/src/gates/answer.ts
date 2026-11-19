@@ -1,5 +1,9 @@
-import { RoleRefusal } from "@nightshift/auth";
-import { type Engine, GateClosedError, NeedsApp } from "@nightshift/engine";
+import {
+	type Engine,
+	GateClosedError,
+	NeedsApp,
+	type PersonActor,
+} from "@nightshift/engine";
 import type { ORPCErrorConstructorMap } from "@orpc/server";
 import type { z } from "zod";
 
@@ -13,9 +17,9 @@ import type { gateAnswerSchema } from "./schemas";
  * - `NEEDS_APP`: a lock-screen answer to a Gate that its author did not
  *   mark for the lock screen, or with a choice it does not have.
  * - `NOT_FOUND`: the run is not in one of the Person's Spaces. These are
- *   the Gate's words for the refusal of `runProcedure`, which also refuses
- *   as `FORBIDDEN` when the Person's role in the Space does not allow an
- *   answer.
+ *   the Gate's words for the engine's refusal that `runProcedure` says,
+ *   as it says `FORBIDDEN` when the Person's role in the Space does not
+ *   allow an answer.
  * Any other refusal (the run cap, a choice that is not an option) is the
  * status of its kind with its words, and a failure a 500 (`readable`).
  */
@@ -31,10 +35,8 @@ export const answerRefusals = {
 	},
 } as const;
 
-/** The declared errors the handler gets: the Gate's, and `FORBIDDEN` of `runProcedure`. */
-type AnswerRefusals = ORPCErrorConstructorMap<
-	typeof answerRefusals & { FORBIDDEN: { status: number; message: string } }
->;
+/** The declared errors of the Gate the handler gives. */
+type AnswerRefusals = ORPCErrorConstructorMap<typeof answerRefusals>;
 
 type Via = "web" | "phone" | "lock_screen" | "_OTHER";
 
@@ -49,31 +51,27 @@ export function viaOf(raw: z.output<typeof gateAnswerSchema>["via"]): Via {
 }
 
 /**
- * Answers the open Gate of a run in the run's own Space (`runProcedure`
- * found it and checked the role there), as the session's Person. The
- * engine's `answerGate` applies every rule, the lock-screen rule too. This
- * says its refusals of the Gate in the Gate's declared words, and a role
- * that does not allow an answer as `runProcedure` does. A run the engine
- * does not find is its plain `NOT_FOUND` (`readable`), as before.
+ * Answers the open Gate of a run in the run's own Space, as the session's
+ * Person. The engine's `answerGate` finds the run, checks the Person's
+ * role in its Space and applies every rule, the lock-screen rule too. This
+ * says its refusals of the Gate in the Gate's declared words.
+ * `runProcedure` says a run the Person may not see as the Gate's
+ * `NOT_FOUND`, and a role that does not allow an answer as `FORBIDDEN`.
  */
 export async function answerGate(
 	gates: Pick<Engine["gates"], "answer">,
-	who: { personId: string; spaceId: string },
+	actor: PersonActor,
 	input: z.output<typeof gateAnswerSchema>,
 	errors: AnswerRefusals,
 ): Promise<void> {
 	const { via, ...answer } = input;
 	try {
-		await gates.answer(
-			{ personId: who.personId },
-			{ ...answer, spaceId: who.spaceId, via: viaOf(via) },
-		);
+		await gates.answer(actor, { ...answer, via: viaOf(via) });
 	} catch (error) {
 		if (error instanceof GateClosedError) {
 			throw errors.GATE_CLOSED({ cause: error });
 		}
 		if (error instanceof NeedsApp) throw errors.NEEDS_APP({ cause: error });
-		if (error instanceof RoleRefusal) throw errors.FORBIDDEN({ cause: error });
 		throw error;
 	}
 }

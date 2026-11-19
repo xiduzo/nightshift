@@ -1,4 +1,3 @@
-import { permissionOf } from "@nightshift/engine";
 import { z } from "zod";
 
 import { output } from "../output";
@@ -22,9 +21,7 @@ export const gates = {
 				"Lists the open Gates of every Space the Person is in, oldest first: the Needs-you inbox.",
 		})
 		.output(output(z.array(inboxGateSchema)))
-		.handler(({ context }) =>
-			context.engine.gates.inbox({ personId: context.session.user.id }),
-		),
+		.handler(({ context }) => context.engine.gates.inbox(context.actor)),
 	answered: protectedProcedure
 		.route({
 			summary:
@@ -32,11 +29,9 @@ export const gates = {
 		})
 		.output(output(z.array(answeredGateSchema)))
 		.handler(({ context }) =>
-			context.engine.gates.answeredInbox({
-				personId: context.session.user.id,
-			}),
+			context.engine.gates.answeredInbox(context.actor),
 		),
-	resolve: runProcedure(gateAnswerSchema, permissionOf("answer"))
+	resolve: runProcedure(gateAnswerSchema)
 		.errors(answerRefusals)
 		.route({
 			summary:
@@ -44,11 +39,6 @@ export const gates = {
 		})
 		.output(output(z.void()))
 		.handler(({ context, input, errors }) =>
-			answerGate(
-				context.engine.gates,
-				{ personId: context.session.user.id, spaceId: context.spaceId },
-				input,
-				errors,
-			),
+			answerGate(context.engine.gates, context.actor, input, errors),
 		),
 };

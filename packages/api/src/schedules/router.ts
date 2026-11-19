@@ -89,9 +89,10 @@ export const schedules = {
 	 * Run now, a nudge and not an edit: starts the schedule's run at once,
 	 * as if it fired now, with the schedule as its trigger. A person who
 	 * may start runs may do it. The run is the schedule's Person's, else
-	 * the person's who asks. A pause tonight stays.
+	 * the person's who asks. A pause tonight stays. The engine checks that
+	 * the person's role allows starting runs.
 	 */
-	runNow: permitted({ run: ["start"] })
+	runNow: protectedProcedure
 		.route({
 			summary:
 				"Starts a schedule's run now, with its own inputs and Device, as if it fired.",

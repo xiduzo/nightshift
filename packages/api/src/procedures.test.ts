@@ -13,6 +13,7 @@ import {
 	type Permissions,
 	personalSpaceId,
 	type Role,
+	RoleRefusal,
 	requestAccess,
 	roleAllows,
 	TRUSTED_BROWSER_DAYS,
@@ -32,7 +33,10 @@ import {
 	HostUnreachableError,
 	NeedsApp,
 	type OpenGate,
+	permissionOf,
+	RunNotFound,
 	type SpaceEngine,
+	SpaceNotFound,
 } from "@nightshift/engine";
 import { PROJECT_NOT_FOUND } from "@nightshift/engine/projects";
 import { testInbox } from "@nightshift/engine/testing";
@@ -161,13 +165,62 @@ const daemonOf = (ownerId: string): Services["daemon"] => ({
 });
 
 /**
+ * What each run use case of the engine needs the Person's role to allow
+ * (`permissionOf`). A read and the move targets need a Member only.
+ */
+const RUN_NEEDS: Record<string, Permissions> = {
+	stop: permissionOf("stop"),
+	markUseful: permissionOf("useful"),
+	releaseLease: permissionOf("release-lease"),
+	move: permissionOf("move"),
+	resume: permissionOf("resume"),
+	restartStep: permissionOf("restart"),
+	rerun: permissionOf("rerun"),
+	takeOver: permissionOf("take-over"),
+	signal: permissionOf("signal"),
+};
+
+/**
+ * The engine's check of who may act, as the engine makes it for a
+ * session: the Person's role in the run's Space, or in the Space of the
+ * Space view. A run they may not see is `RunNotFound`, a role that does
+ * not allow it `RoleRefusal`. The fake reads the role in the memberships
+ * the request read (`access.roleIn`): the rows the engine reads.
+ */
+function engineChecks(access: Context["access"]) {
+	async function may(spaceId: string, need?: Permissions) {
+		const role = await access.roleIn(spaceId);
+		if (!role) return "not-a-member" as const;
+		return !need || roleAllows(role, need) ? ("yes" as const) : ("no" as const);
+	}
+	return {
+		/** The Space of the run, for a Person whose role there allows `need`. */
+		async openRun(runId: string, need?: Permissions): Promise<string> {
+			const spaceId = runSpaces.get(runId);
+			const allowed = spaceId ? await may(spaceId, need) : "not-a-member";
+			if (!spaceId || allowed === "not-a-member") throw new RunNotFound();
+			if (allowed === "no") throw new RoleRefusal();
+			return spaceId;
+		},
+		/** Refuses a Person whose role in the Space does not allow `need`. */
+		async openSpace(spaceId: string, need?: Permissions): Promise<void> {
+			const allowed = await may(spaceId, need);
+			if (allowed === "not-a-member") throw new SpaceNotFound();
+			if (allowed === "no") throw new RoleRefusal();
+		},
+	};
+}
+
+/**
  * The context of a request with `access`, on a computer `ownerId` owns,
  * over recording services. The Space view of each Space records its
- * calls with the Space, an action as `act.<kind>`. The engine's inbox is
- * its own use case over the database, and records each Space's list of
- * open Gates as `listGates`. Its answer to a Gate records the call as
- * `gates.answer`, with the Space of the request. The database is real:
- * the procedures that read the Person's Spaces or Members read it.
+ * calls with the Space. The engine's run use cases (`Engine.runs`) check
+ * who may first (`engineChecks`), then record the call as `runs.<name>`
+ * with the run's Space. The engine's inbox is its own use case over the
+ * database, and records each Space's list of open Gates as `listGates`.
+ * Its answer to a Gate checks who may, then records the call as
+ * `gates.answer`, with the run's Space. The database is real: the
+ * procedures that read the Person's Spaces or Members read it.
  */
 function recording(
 	db: Context["db"],
@@ -179,30 +232,35 @@ function recording(
 	} = {},
 ): Context {
 	const { ownerId = OWNER, given = {}, deviceKey = null } = options;
-	const space = (spaceId: string) =>
-		recorder(
+	const checks = engineChecks(access);
+	const space = (spaceId: string) => {
+		const record = (method: string, args: unknown[]) => {
+			calls.push({ space: spaceId, method, args });
+		};
+		/** A member of the Space view that checks the Person's role in the Space first. */
+		const checked =
+			(method: string, need: Permissions) =>
+			async (...args: unknown[]) => {
+				await checks.openSpace(spaceId, need);
+				record(method, args);
+				return anything;
+			};
+		return recorder(
 			["space"],
-			(method, args) => {
-				const member = method.slice("space.".length);
-				calls.push({
-					space: spaceId,
-					method:
-						member === "act"
-							? `act.${(args[1] as { kind: string }).kind}`
-							: member,
-					args,
-				});
-			},
+			(method, args) => record(method.slice("space.".length), args),
 			{
-				given: given.space,
+				given: {
+					runScheduleNow: checked("runScheduleNow", START),
+					...given.space,
+				},
 				reply: (method) => {
-					if (method === "space.watchRun") return (async function* () {})();
 					if (method === "space.listRuns") return [];
 					if (method === "space.flows.revisions") return [];
 					return undefined;
 				},
 			},
 		) as SpaceEngine;
+	};
 	const record = (method: string, args: unknown[]) => {
 		calls.push({ method, args });
 	};
@@ -210,6 +268,37 @@ function recording(
 	for (const name of Object.keys(SERVICES) as (keyof Services)[]) {
 		services[name] = recorder([name], record, { given: given[name] });
 	}
+	const { runs: givenRuns, ...givenEngine } = given.engine ?? {};
+	const runs = new Proxy(
+		{},
+		{
+			get(_, name) {
+				if (typeof name !== "string" || name === "then") return undefined;
+				const own = (givenRuns as Record<string, unknown> | undefined)?.[name];
+				if (own) return own;
+				// The open of a run reads it, as `spaceOfRun` did: no call to record.
+				if (name === "open") {
+					return async (
+						_actor: unknown,
+						request: { runId: string; need?: Permissions },
+					) => ({
+						run: { spaceId: await checks.openRun(request.runId, request.need) },
+						walkedHere: true,
+					});
+				}
+				return async (actor: unknown, request: { runId: string }) => {
+					const runSpace = await checks.openRun(request.runId, RUN_NEEDS[name]);
+					calls.push({
+						space: runSpace,
+						method: `runs.${name}`,
+						args: [actor, request],
+					});
+					if (name === "watch") return (async function* () {})();
+					return anything;
+				};
+			},
+		},
+	);
 	const gates: Engine["gates"] = {
 		...testInbox({
 			db,
@@ -219,8 +308,12 @@ function recording(
 			},
 		}),
 		answer: async (actor, request) => {
+			const runSpace = await checks.openRun(
+				request.runId,
+				permissionOf("answer"),
+			);
 			calls.push({
-				space: request.spaceId,
+				space: runSpace,
 				method: "gates.answer",
 				args: [actor, request],
 			});
@@ -228,12 +321,7 @@ function recording(
 		},
 	};
 	services.engine = recorder(["engine"], record, {
-		given: {
-			space,
-			spaceOfRun: async (runId: string) => runSpaces.get(runId) ?? null,
-			gates,
-			...given.engine,
-		},
+		given: { space, runs, gates, ...givenEngine },
 	});
 	services.db = db;
 	services.daemon = daemonOf(ownerId);
@@ -286,6 +374,8 @@ const flowRef = { ...project, name: "night" };
 const at = { spaceId: SPACE, ...project };
 /** Who asks, in which Space: the session's Person in the session's Space. */
 const ASKER = { spaceId: SPACE, personId: PERSON };
+/** Who asks the engine: the session's Person, through the session's door. */
+const ASKING = { personId: PERSON, door: "session" };
 const secret = { name: "GH_TOKEN" };
 const schedule = { id: "nightly", flow: "night", cron: "0 22 * * 1-5" };
 const one = { ...project, scheduleId: "nightly" };
@@ -433,7 +523,7 @@ const ROUTES: Route[] = [
 	// Gates: the Needs-you inbox.
 	route("gates.list", undefined, "session"),
 	route("gates.answered", undefined, "session"),
-	route("gates.resolve", { ...run, stepId: "s", choice: "yes" }, { gate: ["resolve"] }, "space.gates.answer", [{ personId: PERSON }, { runId: "r", spaceId: SPACE, stepId: "s", choice: "yes", via: "_OTHER" }]),
+	route("gates.resolve", { ...run, stepId: "s", choice: "yes" }, { gate: ["resolve"] }, "space.gates.answer", [ASKING, { runId: "r", stepId: "s", choice: "yes", via: "_OTHER" }]),
 	// The assistant.
 	route("assistant.agents", undefined, "owner", undefined, undefined, { given: { assistant: { agents: () => [] } } }),
 	route("assistant.check", { agent: "builder" }, "owner", undefined, undefined, { given: { assistant: { check: async () => ({ id: "builder", ok: true, ms: 1, answers: null, problem: null }) } } }),
@@ -450,26 +540,26 @@ const ROUTES: Route[] = [
 	// Runs. A procedure keyed by a run id goes to the run's own Space.
 	route("runs.placements", project, "session", "space.listPlacements", ["p1"]),
 	route("runs.list", { projectId: "p1", limit: 10 }, "session", "space.listRuns", [{ projectId: "p1", limit: 10 }]),
-	route("runs.get", run, "session", "space.getRun", ["r"]),
-	route("runs.step", { ...run, stepId: "s" }, "session", "space.getStep", ["r", "s"]),
-	route("runs.stepTranscript", { ...run, stepId: "s" }, "session", "space.stepTranscript", ["r", "s", expect.any(AbortSignal)]),
+	route("runs.get", run, "session", "space.runs.get", [ASKING, run]),
+	route("runs.step", { ...run, stepId: "s" }, "session", "space.runs.step", [ASKING, { ...run, stepId: "s" }]),
+	route("runs.stepTranscript", { ...run, stepId: "s" }, "session", "space.runs.stepTranscript", [ASKING, { ...run, stepId: "s", signal: expect.any(AbortSignal) }]),
 	route("runs.serviceLog", { ...run, nodeId: "n", scopeKey: "k" }, "session", "space.serviceLog", ["r", { nodeId: "n", scopeKey: "k" }]),
 	route("runs.artifacts", run, "session", "space.listArtifacts", ["r"]),
 	route("runs.files", run, "session", "space.listRunFiles", ["r"]),
 	route("runs.start", { ...project, flowName: "night" }, START, "space.startRun", [{ projectId: "p1", flowName: "night", startedBy: PERSON }]),
-	route("runs.useful", { ...run, useful: true }, STOP, "space.act.useful", ["r", { kind: "useful", useful: true }]),
-	route("runs.stop", { ...run, when: "now" }, STOP, "space.act.stop", ["r", { kind: "stop", when: "now" }]),
-	route("runs.move", { ...run, deviceId: "d2" }, { run: ["move"] }, "space.act.move", ["r", { kind: "move", to: "d2" }]),
-	route("runs.releaseLease", { ...run, name: "deploy" }, STOP, "space.act.release-lease", ["r", { kind: "release-lease", name: "deploy" }]),
-	route("runs.moveTargets", run, "session", "space.listMoveTargets", ["r"]),
+	route("runs.useful", { ...run, useful: true }, STOP, "space.runs.markUseful", [ASKING, { ...run, useful: true }]),
+	route("runs.stop", { ...run, when: "now" }, STOP, "space.runs.stop", [ASKING, { ...run, when: "now" }]),
+	route("runs.move", { ...run, deviceId: "d2" }, { run: ["move"] }, "space.runs.move", [ASKING, { ...run, to: "d2" }]),
+	route("runs.releaseLease", { ...run, name: "deploy" }, STOP, "space.runs.releaseLease", [ASKING, { ...run, name: "deploy" }]),
+	route("runs.moveTargets", run, "session", "space.runs.moveTargets", [ASKING, run]),
 	route("runs.devices", { ...project, forNode: { profile: "fast" } }, "session", "space.listDevices", ["p1", { profile: "fast" }]),
-	route("runs.resume", { ...run, prompt: "Go." }, RESUME, "space.act.resume", ["r", { kind: "resume", prompt: "Go." }]),
-	route("runs.restartStep", { ...run, stepId: "s", prompt: "Report now." }, RESUME, "space.act.restart", ["r", { kind: "restart", stepId: "s", prompt: "Report now." }]),
-	route("runs.restartStep", run, RESUME, "space.act.restart", ["r", { kind: "restart" }]),
-	route("runs.rerun", { ...run, nodeId: "worker", prompt: "Again.", fresh: true }, RESUME, "space.act.rerun", ["r", { kind: "rerun", nodeId: "worker", prompt: "Again.", fresh: true }]),
-	route("runs.watch", run, "session", "space.watchRun", ["r", { signal: any, afterSeq: undefined }]),
-	route("runs.signal", { ...run, name: "go" }, { signal: ["send"] }, "space.act.signal", ["r", { kind: "signal", name: "go" }]),
-	route("runs.takeOver", run, RESUME, "space.act.take-over", ["r", { kind: "take-over" }]),
+	route("runs.resume", { ...run, prompt: "Go." }, RESUME, "space.runs.resume", [ASKING, { ...run, prompt: "Go." }]),
+	route("runs.restartStep", { ...run, stepId: "s", prompt: "Report now." }, RESUME, "space.runs.restartStep", [ASKING, { ...run, stepId: "s", prompt: "Report now." }]),
+	route("runs.restartStep", run, RESUME, "space.runs.restartStep", [ASKING, run]),
+	route("runs.rerun", { ...run, nodeId: "worker", prompt: "Again.", fresh: true }, RESUME, "space.runs.rerun", [ASKING, { ...run, nodeId: "worker", prompt: "Again.", fresh: true }]),
+	route("runs.watch", run, "session", "space.runs.watch", [ASKING, { ...run, signal: any }]),
+	route("runs.signal", { ...run, name: "go" }, { signal: ["send"] }, "space.runs.signal", [ASKING, { ...run, name: "go" }]),
+	route("runs.takeOver", run, RESUME, "space.runs.takeOver", [ASKING, run]),
 	// Notifications: the Person's own.
 	route("notifications.watch", undefined, "session", "notifications.watch", [PERSON, any, { here: false, phone: false }]),
 	route("notifications.settings.get", undefined, "session", "notifications.settings.get", [PERSON]),
@@ -1497,10 +1587,10 @@ describe("a run opened by its id", () => {
 			{ context },
 		);
 		expect(seen()).toEqual([
-			{ space: spaceId, method: "getRun" },
-			{ space: spaceId, method: "watchRun" },
-			{ space: spaceId, method: "act.stop" },
-			{ space: spaceId, method: "listMoveTargets" },
+			{ space: spaceId, method: "runs.get" },
+			{ space: spaceId, method: "runs.watch" },
+			{ space: spaceId, method: "runs.stop" },
+			{ space: spaceId, method: "runs.moveTargets" },
 		]);
 		// The session still works in its own Space, and lists stay there.
 		expect((await contextFor(bob.headers)).access.spaceId).toBe(own);
@@ -1549,16 +1639,21 @@ describe("a run opened by its id", () => {
 			started = resolve;
 		});
 		const waiting = contextOf(sandbox.db, owner, {
-			space: {
-				stepTranscript: (_run: string, _step: string, signal: AbortSignal) =>
-					new Promise((resolve) => {
-						signal.addEventListener(
-							"abort",
-							() => resolve({ entries: [], holds: "cut" }),
-							{ once: true },
-						);
-						started();
-					}),
+			engine: {
+				runs: {
+					stepTranscript: (
+						_actor: unknown,
+						{ signal }: { signal: AbortSignal },
+					) =>
+						new Promise((resolve) => {
+							signal.addEventListener(
+								"abort",
+								() => resolve({ entries: [], holds: "cut" }),
+								{ once: true },
+							);
+							started();
+						}),
+				},
 			},
 		});
 		const away = new AbortController();
@@ -1572,9 +1667,11 @@ describe("a run opened by its id", () => {
 		// Not a missing route: the declared NOT_FOUND, in the words of the step.
 		const words = "Night Shift cannot find this step of the run.";
 		const unknown = contextOf(sandbox.db, owner, {
-			space: {
-				stepTranscript: async () => {
-					throw new Refusal("not-found", words);
+			engine: {
+				runs: {
+					stepTranscript: async () => {
+						throw new Refusal("not-found", words);
+					},
 				},
 			},
 		});
@@ -1606,7 +1703,7 @@ describe("a run opened by its id", () => {
 			defined: true,
 			message: "Your role in this Space does not allow this.",
 		});
-		expect(seen()).toEqual([{ space: spaceId, method: "getRun" }]);
+		expect(seen()).toEqual([{ space: spaceId, method: "runs.get" }]);
 	});
 
 	test("outside a procedure (a run's file), refuses with the same code, status and words", async () => {
@@ -1724,8 +1821,8 @@ describe("the Needs-you inbox", () => {
 		expect(seen()).toEqual([{ space: personal, method: "gates.answer" }]);
 		// Bound to its run and step, as the session's Person.
 		expect(calls.at(-1)?.args).toEqual([
-			{ personId: ada.userId },
-			{ ...answer, spaceId: personal, via: "_OTHER" },
+			{ personId: ada.userId, door: "session" },
+			{ ...answer, via: "_OTHER" },
 		]);
 		// The session still works in Platform.
 		expect((await contextFor(ada.headers)).access.spaceId).toBe(spaceId);
@@ -1788,11 +1885,11 @@ describe("the Needs-you inbox", () => {
 		await call(appRouter.gates.resolve, fromLockScreen("marked-run"), {
 			context,
 		});
+		expect(calls.at(-1)).toMatchObject({ space: spaceId });
 		expect(calls.at(-1)?.args).toEqual([
-			{ personId: bob.userId },
+			{ personId: bob.userId, door: "session" },
 			{
 				runId: "marked-run",
-				spaceId,
 				stepId: "step-marked-run",
 				choice: "yes",
 				via: "lock_screen",
@@ -1826,10 +1923,9 @@ describe("the Needs-you inbox", () => {
 		const { via: _via, ...inApp } = fromLockScreen("marked-run");
 		await call(appRouter.gates.resolve, inApp, { context });
 		expect(calls.at(-1)?.args).toEqual([
-			{ personId: bob.userId },
+			{ personId: bob.userId, door: "session" },
 			{
 				runId: "marked-run",
-				spaceId,
 				stepId: "step-marked-run",
 				choice: "yes",
 				via: "_OTHER",

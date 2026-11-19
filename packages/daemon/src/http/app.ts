@@ -174,7 +174,10 @@ export function createHttp(
 				: refused(c, found);
 		}
 		return artifactFileResponse(
-			engine.space(found.spaceId, { personId: found.session.user.id }),
+			engine.space(found.spaceId, {
+				personId: found.session.user.id,
+				door: "session",
+			}),
 			c.req.raw,
 			runId,
 			c.req.param("artifactId"),
@@ -191,7 +194,10 @@ export function createHttp(
 			return found.code === "NOT_FOUND" ? runFileNotFound() : refused(c, found);
 		}
 		return runFileResponse(
-			engine.space(found.spaceId, { personId: found.session.user.id }),
+			engine.space(found.spaceId, {
+				personId: found.session.user.id,
+				door: "session",
+			}),
 			c.req.raw,
 			runId,
 		);

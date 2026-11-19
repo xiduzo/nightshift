@@ -4,7 +4,7 @@ import {
 	ROLE_REFUSAL,
 	spaceAccess,
 } from "@nightshift/auth";
-import { HostUnreachableError } from "@nightshift/engine";
+import { HostUnreachableError, type PersonActor } from "@nightshift/engine";
 import {
 	FAILURE_MESSAGE,
 	Refusal,
@@ -91,10 +91,7 @@ export function streamed<
 	body: (args: TArgs & { signal: AbortSignal }) => AsyncIterable<TItem>,
 ): (args: TArgs) => AsyncGenerator<TItem, void, undefined> {
 	return async function* (args) {
-		const controller = new AbortController();
-		args.signal?.addEventListener("abort", () => controller.abort(), {
-			once: true,
-		});
+		const controller = untilGone(args.signal);
 		try {
 			yield* body({ ...args, signal: controller.signal });
 		} catch (error) {
@@ -103,6 +100,47 @@ export function streamed<
 			controller.abort();
 		}
 	};
+}
+
+/**
+ * The handler of a streaming procedure that opens what it streams first,
+ * as `streamed` streams it. `open` runs before the stream starts: its
+ * refusal is the call's own error (a run that is not the Person's is a
+ * 404), not a stream that ends in an error.
+ */
+export function openedStream<
+	TArgs extends { signal?: AbortSignal; path: readonly string[] },
+	TItem,
+>(
+	open: (
+		args: TArgs & { signal: AbortSignal },
+	) => Promise<AsyncIterable<TItem>>,
+): (args: TArgs) => Promise<AsyncGenerator<TItem, void, undefined>> {
+	return async (args) => {
+		const controller = untilGone(args.signal);
+		const items = await open({ ...args, signal: controller.signal }).catch(
+			(error: unknown) => {
+				controller.abort();
+				throw error;
+			},
+		);
+		return (async function* () {
+			try {
+				yield* items;
+			} catch (error) {
+				throw readable(error, args.path);
+			} finally {
+				controller.abort();
+			}
+		})();
+	};
+}
+
+/** A signal that ends when the client goes away (`signal`), or when the stream ends. */
+function untilGone(signal: AbortSignal | undefined): AbortController {
+	const controller = new AbortController();
+	signal?.addEventListener("abort", () => controller.abort(), { once: true });
+	return controller;
 }
 
 /** No session needed: the health check only. */
@@ -123,20 +161,25 @@ export function refusalError(
 }
 
 /**
- * A session in a Space, that the Host lets in. The handler gets `space`:
- * the engine as that Space sees it, so nothing it reads or changes is of
- * another Space.
+ * A session in a Space, that the Host lets in. The handler gets `actor`:
+ * the session's Person, who acts through the session's door. And `space`:
+ * the engine as that Space sees it for them, so nothing it reads or
+ * changes is of another Space. The engine decides what their role there
+ * allows.
  */
 const requireSpace = o.middleware(async ({ context, next }) => {
 	const access = spaceAccess(context.access);
 	if (!access.allowed) throw refusalError(access);
+	const actor: PersonActor = {
+		personId: access.session.user.id,
+		door: "session",
+	};
 	return next({
 		context: {
 			session: access.session,
 			spaceId: access.spaceId,
-			space: context.engine.space(access.spaceId, {
-				personId: access.session.user.id,
-			}),
+			actor,
+			space: context.engine.space(access.spaceId, actor),
 		},
 	});
 });
