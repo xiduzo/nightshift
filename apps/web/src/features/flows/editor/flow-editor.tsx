@@ -7,15 +7,7 @@
 // `@nightshift/flows`.
 
 import type { Flow, FlowIssue } from "@nightshift/flows";
-import {
-	callersOf,
-	isSavable,
-	removeEdge,
-	removeNode,
-	updateEdge,
-	updateNode,
-	updateSection,
-} from "@nightshift/flows";
+import { callersOf, isSavable } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	DropdownMenu,
@@ -73,19 +65,14 @@ import { useFlowClipboard } from "./clipboard";
 import { checkFlow } from "./draft";
 import { EditorCanvas } from "./editing-canvas";
 import { FlowTitleCard } from "./flow-title-card";
-import {
-	EdgeInspector,
-	FloatingInspector,
-	FlowInspector,
-	NodeInspector,
-} from "./inspector";
+import { FloatingInspector } from "./inspector";
 import { IssuesPopover } from "./issues-popover";
 import { LeaveDialog } from "./leave-dialog";
-import { nodeEdits } from "./node-edits";
 import { ProjectFlowsContext, ProjectFolderContext } from "./project";
 import { RevisionsSheet, useRevisionView } from "./revisions";
 import { SaveButton } from "./save-button";
-import { MakeSubflowDialog, SectionInspector, sectionEdits } from "./sections";
+import { MakeSubflowDialog, sectionEdits } from "./sections";
+import { selectedInspector } from "./selected-inspector";
 import {
 	createEditingSession,
 	type Selection,
@@ -300,14 +287,6 @@ function Editor({
 		},
 	});
 
-	const {
-		renameSelected,
-		renameSelectedOutcome,
-		removeSelectedOutcome,
-		setSelectedCallEach,
-		setSelectedAgentOutcomes,
-	} = nodeEdits(session);
-
 	// The field helpers of the inspector: they read the draft and change it.
 	const assistant = {
 		projectId,
@@ -364,82 +343,24 @@ function Editor({
 		[preview, place],
 	);
 
-	const inspector = selectedNode ? (
-		<NodeInspector
-			key={selectedNode.id}
-			projectId={projectId}
-			flow={draft}
-			node={selectedNode}
-			onChange={(change) =>
-				session.edit(
-					(current) => updateNode(current, selectedNode.id, change),
-					`node:${selectedNode.id}`,
-				)
-			}
-			onRename={renameSelected(selectedNode)}
-			onRenameOutcome={renameSelectedOutcome(selectedNode)}
-			onRemoveOutcome={removeSelectedOutcome(selectedNode)}
-			onSetAgentOutcomes={setSelectedAgentOutcomes(selectedNode)}
-			onSetCallEach={setSelectedCallEach(selectedNode)}
-			onSetStart={() =>
-				session.edit((current) => ({
-					...current,
-					start: selectedNode.id,
-				}))
-			}
-			onDelete={() => {
-				session.edit((current) => removeNode(current, selectedNode.id));
-				session.select(null);
-			}}
-			calledFlows={flowsSupport}
-			connections={connections}
-		/>
-	) : selectedEdge ? (
-		<EdgeInspector
-			key={selectedEdge.id}
-			flow={draft}
-			edge={selectedEdge}
-			onSelectEdge={(id) => session.select({ kind: "edge", id })}
-			onChange={(change) =>
-				session.edit(
-					(current) => updateEdge(current, selectedEdge.id, change),
-					`edge:${selectedEdge.id}`,
-				)
-			}
-			onDelete={() => {
-				session.edit((current) => removeEdge(current, selectedEdge.id));
-				session.select(null);
-			}}
-		/>
-	) : selectedSection ? (
-		<SectionInspector
-			key={selectedSection.id}
-			flow={draft}
-			section={selectedSection}
-			issues={check.issues.filter(
-				(issue) => issue.sectionId === selectedSection.id,
-			)}
-			autoFocus={madeSection === selectedSection.id}
-			onChange={(change) =>
-				session.edit(
-					(current) => updateSection(current, selectedSection.id, change),
-					`section:${selectedSection.id}`,
-				)
-			}
-			onOpen={() => session.openSection(selectedSection.id)}
-			onRemove={() => sections.removeWithUndo(selectedSection.id)}
-			onSelectNode={selectNode}
-			onMakeSubflow={() => setSubflowOf(selectedSection.id)}
-		/>
-	) : settingsOpen ? (
-		<FlowInspector
-			flow={draft}
-			name={name}
-			projectId={projectId}
-			policyDefaults={policyDefaults}
-			onChange={(change) => session.edit(change, "settings")}
-		/>
-	) : null;
+	const inspector = selectedInspector({
+		selectedNode,
+		selectedEdge,
+		selectedSection,
+		settingsOpen,
+		projectId,
+		name,
+		draft,
+		session,
+		flowsSupport,
+		connections,
+		policyDefaults,
+		check,
+		madeSection,
+		sections,
+		selectNode,
+		setSubflowOf,
+	});
 
 	const closeInspector = useCallback(() => {
 		session.select(null);
