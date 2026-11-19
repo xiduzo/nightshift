@@ -15,6 +15,7 @@ import type { RunStatus } from "@nightshift/engine/run-status";
 import {
 	createRunLog,
 	createSandbox,
+	joinSpace,
 	type Sandbox,
 	seedFlows,
 	waitFor,
@@ -78,6 +79,8 @@ beforeEach(async () => {
 	paired = await pairedReplicas(a, b, {
 		harnesses: { "claude-code": agent },
 	});
+	// The tests act on B as A's owner: B has their Membership of A's Space.
+	await joinSpace(b.db, a.spaceId, paired.personId, "owner");
 	projectId = (
 		await paired.host.space(a.spaceId).addProject({ repoPath: a.repoPath })
 	).id;
@@ -401,6 +404,7 @@ async function desktopBesideB(
 	const c = await createSandbox();
 	others.push(c);
 	const desktop = await paired.pair(c, "C");
+	await joinSpace(c.db, a.spaceId, paired.personId, "owner");
 	await desktop.projectOnDevice(projectId);
 	const run = await walkOnB(gateFlow);
 
@@ -1564,6 +1568,7 @@ describe("live transcripts over the exchange", () => {
 		const c = await createSandbox();
 		others.push(c);
 		const viewer = await paired.pair(c, "C");
+		await joinSpace(c.db, a.spaceId, paired.personId, "owner");
 		await viewer.projectOnDevice(projectId);
 
 		// B's copies of the transcript wait at the Host's door while `held`.

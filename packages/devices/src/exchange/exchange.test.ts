@@ -19,6 +19,7 @@ import {
 	createRunLog,
 	createSandbox,
 	expectRunLogsInSync,
+	joinSpace,
 	type Sandbox,
 	waitFor,
 } from "@nightshift/engine/testing";
@@ -740,6 +741,8 @@ describe("a run walked elsewhere", () => {
 			devices: async () => [],
 		};
 		const { engineB, run, stepId } = await waitingOnB(relay);
+		// The Person is a Member of A's Space on B: B checks that before it sends.
+		await joinSpace(b.db, a.spaceId, "person-a");
 		const space = engineB.space(a.spaceId, { personId: "person-a" });
 
 		await space.act(run.id, { kind: "answer", stepId, choice: "approve" });
@@ -775,6 +778,7 @@ describe("a run walked elsewhere", () => {
 
 	test("it is never resumed or recovered here, and without a relay it is read-only", async () => {
 		const { engineB, run, stepId } = await waitingOnB();
+		await joinSpace(b.db, a.spaceId, "p");
 		expect(
 			engineB.space(a.spaceId).act(run.id, { kind: "rerun", nodeId: "ship" }),
 		).rejects.toThrow("Another device");

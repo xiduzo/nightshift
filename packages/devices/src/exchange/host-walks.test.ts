@@ -3,6 +3,7 @@ import { event, keptVariable, user } from "@nightshift/db/schema";
 import type { RunStatus } from "@nightshift/engine/run-status";
 import {
 	createSandbox,
+	joinSpace,
 	type Sandbox,
 	seedFlows,
 	testDevice,
@@ -124,6 +125,16 @@ afterEach(async () => {
 	await Promise.all([a.cleanup(), b.cleanup()]);
 });
 
+/**
+ * B's view of A's Space for A's owner. B has their Membership of the
+ * Space, so its engine lets them act there. (A real Device acts as its own
+ * Person, whose Membership the link brings: `links/host-spaces.ts`.)
+ */
+async function ownerOnB() {
+	await joinSpace(b.db, a.spaceId, paired.personId, "owner");
+	return paired.device.space(a.spaceId, { personId: paired.personId });
+}
+
 async function statusOn(engine: PeerEngine, runId: string) {
 	try {
 		return (await engine.space(a.spaceId).getRun(runId)).status;
@@ -156,8 +167,7 @@ describe("the Host walks a run a Device starts", () => {
 			fresh: countFlow,
 		});
 		let started = false;
-		const starting = paired.device
-			.space(a.spaceId, { personId: paired.personId })
+		const starting = (await ownerOnB())
 			.startRun({ projectId, flowName: "fresh" })
 			.finally(() => {
 				started = true;
@@ -172,9 +182,11 @@ describe("the Host walks a run a Device starts", () => {
 	});
 
 	test("A walks it, its unplaced steps run on the B you pick, and B gets the run and its kept value", async () => {
-		const started = await paired.device
-			.space(a.spaceId, { personId: paired.personId })
-			.startRun({ projectId, flowName: "count", deviceId: b.deviceId });
+		const started = await (await ownerOnB()).startRun({
+			projectId,
+			flowName: "count",
+			deviceId: b.deviceId,
+		});
 		expect(started.walker).toMatchObject({ id: a.deviceId, thisDevice: false });
 		expect(started.device).toMatchObject({ id: b.deviceId, thisDevice: true });
 
@@ -227,7 +239,7 @@ describe("the Host walks a run a Device starts", () => {
 	});
 
 	test("B starts a test run: A reads the pinned output from its own log, and the run keeps nothing (ADR 27)", async () => {
-		const space = paired.device.space(a.spaceId, { personId: paired.personId });
+		const space = await ownerOnB();
 		const first = await space.startRun({
 			projectId,
 			flowName: "count",
@@ -286,9 +298,10 @@ describe("the Host walks a run a Device starts", () => {
 			stepId: "a-step-of-b",
 			updatedAt: asDate(now() + 60_000),
 		});
-		const started = await paired.device
-			.space(a.spaceId, { personId: paired.personId })
-			.startRun({ projectId, flowName: "count" });
+		const started = await (await ownerOnB()).startRun({
+			projectId,
+			flowName: "count",
+		});
 		await untilStatus(paired.device, started.id, "finished");
 		expect(await keptOn(a)).toEqual([["runs", "1"]]);
 		expect(await keptOn(b)).toEqual([["runs", "7"]]);

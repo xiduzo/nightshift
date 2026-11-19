@@ -9,6 +9,7 @@ import {
 } from "@nightshift/flows";
 import type { Engine } from "../engine";
 import type { SpaceEngine } from "../space-engine";
+import { joinSpace } from "../testing/join-space";
 import { testKnowledge } from "../testing/knowledge";
 import {
 	createSandbox,
@@ -213,7 +214,9 @@ describe("save", () => {
 			device: sandbox.deviceId,
 		});
 		// The list names the computer by its id, and whether it is this one.
-		// A person's Devices name it: the Subflow keeps its id.
+		// A person's Devices name it: the Subflow keeps its id. The person is a
+		// Member of the Space: the engine checks that before it lists them.
+		await joinSpace(sandbox.db, sandbox.spaceId, "ada");
 		const computer = async (device: { id: string; name: string }) =>
 			(
 				await sourcesOn(

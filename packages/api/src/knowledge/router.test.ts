@@ -6,6 +6,7 @@ import { event } from "@nightshift/db/schema";
 import { createEngine, type Engine } from "@nightshift/engine";
 import {
 	createSandbox,
+	joinSpace,
 	type Sandbox,
 	testKnowledge,
 	waitFor,
@@ -53,6 +54,10 @@ beforeEach(async () => {
 	({ id: projectId } = await engine
 		.space(sandbox.spaceId)
 		.addProject({ repoPath: sandbox.repoPath }));
+	// The Persons who ask are Members of the Space: the engine checks that too.
+	for (const role of ["owner", "member", "viewer"] as const) {
+		await joinSpace(sandbox.db, sandbox.spaceId, role, role);
+	}
 });
 afterEach(async () => {
 	built.close();

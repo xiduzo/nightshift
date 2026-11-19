@@ -22,6 +22,7 @@ import {
 } from "../../src/log/transcript/transcripts";
 import type { PeerContext, PeersFactory } from "../../src/peers";
 import { alonePeers } from "../../src/testing/alone-peers";
+import { joinSpace } from "../../src/testing/join-space";
 import {
 	createSandbox,
 	type Sandbox,
@@ -184,6 +185,10 @@ async function pair(online = true) {
 	let b: Computer | undefined;
 	const a = await computer(() => (b ? [deviceOf(b, online)] : []));
 	b = await computer(() => [deviceOf(a)]);
+	// The Person acts in A's Space on both: each Replica has their Membership.
+	for (const on of [a, b]) {
+		await joinSpace(on.sandbox.db, a.sandbox.spaceId, actor.personId);
+	}
 	return { a, b };
 }
 
