@@ -53,11 +53,9 @@ rename packages/devices offers
 rename packages/devices placement
 rename packages/devices registry
 
-# runs: the start and the walk, the plan of where the steps run, and the
-# cleanup.
+# runs: the plan of where the steps run, and the cleanup.
 rename packages/engine cleanup
 rename packages/engine placement
-rename packages/engine run
 
 # notifications: the rules, a Person's settings, the push targets.
 rename packages/notifications notifier

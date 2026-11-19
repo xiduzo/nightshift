@@ -141,7 +141,7 @@ export type PullRequestScorer = {
 
 /**
  * A schedule's secret by name, its project's first.
- * @filledBy engine/run
+ * @filledBy engine/wire
  */
 export type WebhookSecrets = {
 	value(name: string, projectId: string): Promise<string | undefined>;
@@ -149,7 +149,7 @@ export type WebhookSecrets = {
 
 /**
  * The two switches of every schedule.
- * @filledBy engine/run
+ * @filledBy engine/wire
  */
 export type ScheduleSwitch = {
 	/** The Settings switch, read each time. Off: no cron time starts, like a pause of every schedule. */
@@ -160,7 +160,7 @@ export type ScheduleSwitch = {
 
 /**
  * What the slice tells the rest of Night Shift.
- * @filledBy engine/run
+ * @filledBy engine/wire
  */
 export type ScheduleNotices = {
 	/**
@@ -175,6 +175,6 @@ export type ScheduleNotices = {
 
 /**
  * The time now (epoch ms).
- * @filledBy engine/run
+ * @filledBy engine/wire
  */
 export type Clock = () => number;

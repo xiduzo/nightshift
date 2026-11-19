@@ -9,11 +9,9 @@ import {
 	type LandedScope,
 	logMemberChange,
 	type RunLog,
-	spaceOfRun,
 } from "./log";
 import { forgetSpaceRows, type SpaceDocuments, spaceUsageOn } from "./projects";
 import { type LandedFact, landedFacts, type RunTrace } from "./read";
-import type { createScheduleNotices } from "./run";
 import type { RunHere, Views } from "./runs";
 import type {
 	ScheduleMissed,
@@ -28,6 +26,7 @@ import type { wireEngineAccess } from "./wire-access";
 import type { wireEngineActions } from "./wire-actions";
 import type { wireEngineGates } from "./wire-gates";
 import type { wireEngineMove } from "./wire-move";
+import type { createScheduleNotices } from "./wire-schedules";
 import type { wireEngineStart } from "./wire-start";
 import type { wireEngineViews } from "./wire-views";
 
@@ -54,12 +53,6 @@ export interface Engine {
 	 * in this process that acts for no Person passes `NIGHT_SHIFT`.
 	 */
 	space(spaceId: string, actor: Actor): SpaceEngine;
-	/**
-	 * The Space of a run this computer keeps, or null when it has none of
-	 * that id. Who may see or act on the run there is the caller's check:
-	 * then it goes through that Space's view.
-	 */
-	spaceOfRun(runId: string): Promise<string | null>;
 	/**
 	 * Keeps what one answer of one of Night Shift's own agents cost on this
 	 * computer. The Spend page of its Space reads it
@@ -330,10 +323,6 @@ export function engineOf(parts: EngineParts): Engine {
 		space,
 
 		// --- Spaces, Members and Projects (phase 3) ---
-		async spaceOfRun(runId) {
-			await ready;
-			return spaceOfRun(db, runId);
-		},
 		async keepAnswerCost(cost) {
 			await ready;
 			await keepAnswerCost(db, cost);

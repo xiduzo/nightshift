@@ -40,7 +40,7 @@
  * How to place a vertical:
  *
  * 1. It holds the rules or the data of a product area: give it that
- *    capability, also when its folder has another name (engine `run`,
+ *    capability, also when its folder has another name (engine
  *    `placement` and `cleanup` are `runs`).
  * 2. It only serves other verticals and has no product rule of its own:
  *    MECHANISM. Say why in a comment when the name does not.
@@ -482,12 +482,10 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		// The read model of a run: pure projections of the log. The walk
 		// (`graph`) reads them too, so they are machinery, not part of `runs`.
 		read: M,
-		// The move of a run, before its slice (`runs`). The composition left
-		// it for `src/wire.ts`.
-		run: "runs",
 		// The run path in rings, one sub-vertical per part: who may see or
-		// act on a run (`access`) and what every use case that writes to a
-		// run shares (`walk`). The rest of `run` moves here, lane by lane.
+		// act on a run (`access`), what every use case that writes to a run
+		// shares (`walk`), what people see of the runs (`views`), the start,
+		// the actions, the move and the recovery.
 		runs: "runs",
 		// The store of a run's own folder.
 		"run-folders": M,
@@ -505,8 +503,8 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		services: M,
 		// Projects to another Space as one operation (`Engine.moveProjects`).
 		// It holds the order of a move and what a move refuses, so it is a
-		// capability. It imports `projects`, `flows` and `run`, so it is not a
-		// part of one of them: `projects` would close a cycle with `run`.
+		// capability. It imports `projects`, `flows` and `runs`, so it is not a
+		// part of one of them: `projects` would close a cycle with `runs`.
 		"space-move": "space-move",
 		// Moments noted for the anonymous usage export.
 		usage: M,

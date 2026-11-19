@@ -1,6 +1,6 @@
 import { describe, expect, spyOn, test } from "bun:test";
 import { Refusal } from "@nightshift/refusal";
-import { createScheduleNotices } from "./schedule-notices";
+import { createScheduleNotices } from "./wire-schedules";
 
 /** What the schedules slice tells, and who hears it. */
 

@@ -16,6 +16,7 @@ import { eq } from "drizzle-orm";
 import { NIGHT_SHIFT } from "../../src/contract";
 import type { Engine, EngineInternals } from "../../src/engine";
 import { GateClosedError } from "../../src/gates";
+import { spaceOfRun } from "../../src/log";
 import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
 import {
 	createSpaceDocuments,
@@ -200,9 +201,9 @@ describe("Spaces", () => {
 			(await view.listGates()).map((g) => [g.spaceId, g.runId]);
 		expect(await gatesOf(mine)).toEqual([[sandbox.spaceId, first.id]]);
 		expect(await gatesOf(theirs)).toEqual([[platform, second.id]]);
-		expect(await engine.spaceOfRun(first.id)).toBe(sandbox.spaceId);
-		expect(await engine.spaceOfRun(second.id)).toBe(platform);
-		expect(await engine.spaceOfRun("no-such-run")).toBeNull();
+		expect(await spaceOfRun(sandbox.db, first.id)).toBe(sandbox.spaceId);
+		expect(await spaceOfRun(sandbox.db, second.id)).toBe(platform);
+		expect(await spaceOfRun(sandbox.db, "no-such-run")).toBeNull();
 
 		// The answer is bound to its run and step, and refused once the Gate is closed.
 		const [open] = await theirs.listGates();

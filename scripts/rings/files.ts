@@ -272,7 +272,7 @@ export function portProblems(root: string, slice: Slice): string[] {
 		if (filledBy !== undefined) {
 			if (!FILLER.test(filledBy) || !fillerExists(root, filledBy)) {
 				problems.push(
-					`${where} has @filledBy ${filledBy ? `"${filledBy}", which is no package and no vertical of one` : "without a name"}. Write who implements it: a package (@filledBy devices), a vertical (@filledBy engine/run), or the wire.ts of a package that builds it from several things (@filledBy engine/wire).`,
+					`${where} has @filledBy ${filledBy ? `"${filledBy}", which is no package and no vertical of one` : "without a name"}. Write who implements it: a package (@filledBy devices), a vertical (@filledBy engine/runs), or the wire.ts of a package that builds it from several things (@filledBy engine/wire).`,
 				);
 			} else if (filledBy === `${slice.pkg}/${slice.path}`) {
 				problems.push(

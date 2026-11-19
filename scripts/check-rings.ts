@@ -94,7 +94,7 @@
  *        in-memory adapter and a real adapter, and runs the suite on both.
  *      A port that another slice or another package implements says so in
  *      its comment: `@filledBy <package>` or `@filledBy <package>/<vertical>`
- *      (`@filledBy devices`, `@filledBy engine/run`). When the composition
+ *      (`@filledBy devices`, `@filledBy engine/runs`). When the composition
  *      of a package builds the port from several things, the name is
  *      `<package>/wire`: the package has a `src/wire.ts` (`@filledBy
  *      engine/wire`). The name is never a sub-vertical: a port that a
