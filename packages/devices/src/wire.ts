@@ -3,11 +3,11 @@ import {
 	profileChoice,
 } from "@nightshift/engine/device-config";
 import { systemGitHubCli } from "@nightshift/engine/projects";
+import { OFFLINE_AFTER_MS } from "./contract";
 import type { DevicesDeps, DevicesRuntime } from "./devices-runtime";
 import { letGo, takeOver } from "./handover";
 import { createHostLinks, deviceKeyStore } from "./links";
 import { listenHostname, ownCertificate, reachFor } from "./reach";
-import { OFFLINE_AFTER_MS } from "./registry";
 import { createRelay, createWorkRelay } from "./relay";
 import { wireDevices, wireHost, wireHostExchange } from "./wire-host";
 import { wireLinks } from "./wire-links";

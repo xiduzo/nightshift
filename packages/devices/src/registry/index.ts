@@ -8,7 +8,6 @@ export {
 	deviceNamesOf,
 	homePersonsOf,
 	knownDevices,
-	OFFLINE_AFTER_MS,
 	type PairedDevice,
 } from "./registry";
 export {

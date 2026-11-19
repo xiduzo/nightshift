@@ -73,12 +73,6 @@ rename packages/notifications targets
 # knowledge tools.
 imports packages/agents tools knowledge
 
-# The transport reads the Device rows and the Offers itself.
-imports packages/devices exchange offers
-imports packages/devices exchange registry
-imports packages/devices relay registry
-imports packages/devices work registry
-
 # The execution port reads this computer's configuration, the knowledge
 # folder and the project.
 imports packages/engine device device-config

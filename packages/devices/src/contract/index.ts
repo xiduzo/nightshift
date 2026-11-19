@@ -31,6 +31,7 @@ export type {
 	SplitResult,
 	SplitState,
 } from "./personal";
+export { OFFLINE_AFTER_MS } from "./presence";
 export {
 	type HostProcedureMeta,
 	NOT_A_HOST,

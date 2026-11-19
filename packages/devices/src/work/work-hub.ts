@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
-import type { WorkDelivery, WorkRelay, WorkReply } from "../contract";
-import { OFFLINE_AFTER_MS } from "../registry";
+import {
+	OFFLINE_AFTER_MS,
+	type WorkDelivery,
+	type WorkRelay,
+	type WorkReply,
+} from "../contract";
 
 /**
  * The relay's work half on a Host (`devices.work`): the calls of runs this

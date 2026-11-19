@@ -11,7 +11,6 @@ import { now } from "@nightshift/time";
 import type { HostClient, HostRelay, InStep } from "../contract";
 import type { PendingOnHosts, RunCommands } from "../exchange";
 import type { DeviceLinks, HostSpaces } from "../links";
-import type { DeviceRegistry } from "../registry";
 import { createSpaceRoutes } from "./route";
 
 /**
@@ -57,7 +56,10 @@ export function createRelay(deps: {
 			pendingOnHosts: Pick<PendingOnHosts, "add">;
 		};
 	};
-	registry(): Pick<DeviceRegistry, "get">;
+	/** A Device row by id: whether its access is gone. Null: none (`DeviceRegistry.get` of `registry`). */
+	registry(): {
+		get(deviceId: string): Promise<{ revokedAt: number | null } | null>;
+	};
 	links(): Pick<DeviceLinks, "get">;
 	/** The flow documents of this Replica: a run starts on the Host from its copy. */
 	flows: Pick<FlowDocuments, "open">;
