@@ -20,7 +20,8 @@ import {
 import { WalkerBadge } from "@/features/devices";
 import type { RunDetail, StepSummary } from "@/shared/api";
 import { dayWord, formatTime, hoverTime } from "@/shared/format";
-import { CostText, RunStatusBadge, TestRunBadge, useWorkTime } from "../status";
+import { RunStatusBadge } from "@/shared/run-status";
+import { CostText, TestRunBadge, useWorkTime } from "../status";
 
 /**
  * The run on one line: its title, and how long it ran and what it cost.

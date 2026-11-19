@@ -17,7 +17,8 @@ import { useMemo } from "react";
 import { InspectorSection } from "@/features/flows";
 import type { RunDetail, StepSummary } from "@/shared/api";
 import { formatDuration, formatTokens } from "@/shared/format";
-import { CostText, RunStatusBadge } from "../status";
+import { RunStatusBadge } from "@/shared/run-status";
+import { CostText } from "../status";
 import { Fact } from "./run-facts";
 
 /** How far the run got: its steps, its Gates, and the flows it called. */

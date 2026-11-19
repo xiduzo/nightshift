@@ -198,14 +198,6 @@ export const PEER_PORTS: Record<
 			"features/settings": "queries",
 		},
 		"features/devices": {
-			// Runs and devices show each other: a run shows its Walker (a
-			// Device), and the Offers of a Device list the runs they started,
-			// with their status. Through the runs barrel the devices page would
-			// close a devices -> runs -> devices cycle (run-details shows the
-			// Walker). The status badge imports only the API types. It is a
-			// file of the `status` sub-vertical of runs: the port names the
-			// file, not that barrel, so it reaches nothing else.
-			"features/runs": "status/run-status-badge",
 			// This computer's card reads and saves its Host addresses in the
 			// settings. The settings page imports runs, and runs imports devices.
 			"features/settings": "queries",

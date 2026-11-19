@@ -298,6 +298,9 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		"shared/moon": M,
 		"shared/page": M,
 		"shared/panel": M,
+		// The mark of a run's status. Devices and runs both show it, as the
+		// engine's `run-status` is a mechanism that `graph` and `runs` read.
+		"shared/run-status": M,
 		// The shell composes the features (rule 4).
 		"shared/shell": WIRING,
 		"shared/spread-strip": M,

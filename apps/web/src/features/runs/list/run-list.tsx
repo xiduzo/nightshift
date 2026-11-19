@@ -37,8 +37,9 @@ import {
 	formatTokens,
 	hoverTime,
 } from "@/shared/format";
+import { RunStatusIcon } from "@/shared/run-status";
 import { LocalTime } from "@/shared/time";
-import { RunStatusIcon, TestRunBadge } from "../status";
+import { TestRunBadge } from "../status";
 
 /**
  * Runs as a table: the run that last did something comes first. Each row:
