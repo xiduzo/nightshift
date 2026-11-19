@@ -26,7 +26,7 @@ import type { Device } from "../device/types";
 import {
 	type DeviceDocument,
 	openDeviceDocument,
-} from "../device-config/device-document";
+} from "../documents/device-document";
 import type { Engine } from "../engine";
 import type { EngineOptions } from "../engine-options";
 import { systemGit } from "../git";

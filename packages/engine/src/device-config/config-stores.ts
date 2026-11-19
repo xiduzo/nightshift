@@ -1,3 +1,4 @@
+import type { DeviceDocument } from "../documents";
 import { type CliToolStore, createCliToolStore } from "./cli-tools";
 import {
 	type ConnectionStore,
@@ -6,7 +7,6 @@ import {
 	type ProjectSecrets,
 	type SecretBackend,
 } from "./connections";
-import type { DeviceDocument } from "./device-document";
 import { createProfileStore, type ProfileStore } from "./profiles";
 import { createSettingsStore, type SettingsStore } from "./settings";
 

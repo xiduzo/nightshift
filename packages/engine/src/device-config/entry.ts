@@ -6,6 +6,14 @@
  * entry carries only the names another workspace imports.
  */
 
+export type { DeviceDocument } from "../documents";
+export {
+	deviceDocumentName,
+	openDeviceDocument,
+	refreshDeviceFacts,
+} from "../documents";
+export type { KeyStoreKind } from "../key-store";
+export { valueStore } from "../key-store";
 export type { CliTool, CliToolStore } from "./cli-tools";
 export { cliToolGitSchema, cliToolInputSchema } from "./cli-tools";
 export { openConfigStores } from "./config-stores";
@@ -29,12 +37,6 @@ export {
 	type DeviceCopies,
 	type DeviceCopy,
 } from "./device-copies";
-export type { DeviceDocument } from "./device-document";
-export {
-	deviceDocumentName,
-	openDeviceDocument,
-	refreshDeviceFacts,
-} from "./device-document";
 export {
 	addHarness,
 	customAgentOf,
@@ -51,8 +53,6 @@ export {
 	type SetUpProgram,
 	setUpProgram,
 } from "./found-programs";
-export type { KeyStoreKind } from "./keychain";
-export { valueStore } from "./keychain";
 export type { ProfileStore, ProfileView } from "./profiles";
 export { profileChoice } from "./profiles";
 export type { ProjectRef, SecretUse, StepRun } from "./secret-scopes";

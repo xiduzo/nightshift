@@ -14,9 +14,8 @@ import {
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { z } from "zod";
-
+import { type DeviceDocument, mapView } from "../documents";
 import { DEFAULT_EMBEDDING_MODEL } from "../knowledge";
-import { type DeviceDocument, mapView } from "./device-document";
 
 /**
  * The daemon's settings. Each one is changed in the UI and saved in this

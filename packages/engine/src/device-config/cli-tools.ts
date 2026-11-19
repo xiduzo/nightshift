@@ -2,7 +2,7 @@ import { cliHelp } from "@nightshift/agents/tools";
 import { cliNameSchema, type Login, loginSchema } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { z } from "zod";
-import { type DeviceDocument, mapView } from "./device-document";
+import { type DeviceDocument, mapView } from "../documents";
 
 /**
  * CLI tools: programs on this computer (`gh`, `aws`), defined once in its

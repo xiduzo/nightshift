@@ -13,9 +13,9 @@ import type * as Y from "yjs";
 import {
 	createSyncedDocuments,
 	documentName,
-	type PersistedDocument,
 	type SyncedDocuments,
-} from "../documents";
+} from "./synced-documents";
+import type { PersistedDocument } from "./ydoc";
 
 /**
  * The Device document: one Yjs document per Device, named `device:<id>`,

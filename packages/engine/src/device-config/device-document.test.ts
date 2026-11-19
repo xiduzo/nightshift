@@ -11,16 +11,16 @@ import {
 } from "@nightshift/db/schema";
 import { asDate } from "@nightshift/time";
 import * as Y from "yjs";
-import { createSandbox, type Sandbox } from "../testing/test-support";
-import { createCliToolStore } from "./cli-tools";
-import { createConnectionStore, type SecretBackend } from "./connections";
 import {
 	type DeviceDocument,
 	deviceDocumentName,
 	deviceFacts,
 	refreshDeviceFacts,
 	setDeviceFacts,
-} from "./device-document";
+} from "../documents/device-document";
+import { createSandbox, type Sandbox } from "../testing/test-support";
+import { createCliToolStore } from "./cli-tools";
+import { createConnectionStore, type SecretBackend } from "./connections";
 import { createProfileStore } from "./profiles";
 import { createSettingsStore } from "./settings";
 

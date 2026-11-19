@@ -16,8 +16,8 @@ import type {
 	SecretUse,
 	StepRun,
 } from "../contract";
-import { type DeviceDocument, mapView } from "./device-document";
-import { type KeyStoreKind, keychainValues, valueStore } from "./keychain";
+import { type DeviceDocument, mapView } from "../documents";
+import { type KeyStoreKind, keychainValues, valueStore } from "../key-store";
 import { expandMcpServers, type McpExpansion } from "./mcp";
 import { PERSONAL_ON_HOST, secretScopes } from "./secret-scopes";
 

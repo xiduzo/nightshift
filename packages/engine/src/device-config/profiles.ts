@@ -11,7 +11,7 @@ import { now } from "@nightshift/time";
 import type * as Y from "yjs";
 import { z } from "zod";
 import type { DeviceProfile } from "../contract";
-import { type DeviceDocument, mapView } from "./device-document";
+import { type DeviceDocument, mapView } from "../documents";
 
 /**
  * Profiles: an Agent Profile (a harness, a model and its tools) or a Model

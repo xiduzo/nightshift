@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { setting } from "@nightshift/db/schema";
 import { DEFAULT_POLICY } from "@nightshift/flows";
+import type { DeviceDocument } from "../documents";
 import { createSandbox, type Sandbox } from "../testing/test-support";
-import type { DeviceDocument } from "./device-document";
 import {
 	createSettingsStore,
 	defaultRunSettings,

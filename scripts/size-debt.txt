@@ -7,7 +7,7 @@
 # limit. Add no line here.
 # `bun scripts/check-budgets.ts --tighten` lowers the numbers to today's.
 packages/engine/src/device-config/connections.ts 1156
-packages/engine/src/device-config/settings.ts 848
+packages/engine/src/device-config/settings.ts 847
 packages/engine/src/device/local.ts 900
 packages/engine/src/flows/flow-document.ts 1234
 packages/engine/src/knowledge/folder.ts 691

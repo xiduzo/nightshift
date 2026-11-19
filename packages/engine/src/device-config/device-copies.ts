@@ -6,6 +6,7 @@ import * as Y from "yjs";
 import type { DeviceProfile } from "../contract";
 import {
 	createSyncedDocuments,
+	deviceDocumentName,
 	documentId,
 	documentKind,
 	documentName,
@@ -14,7 +15,6 @@ import {
 	type SyncedDocuments,
 } from "../documents";
 import { savedSecretSchema } from "./connections";
-import { deviceDocumentName } from "./device-document";
 import { profileChoice, readProfiles } from "./profiles";
 
 /**

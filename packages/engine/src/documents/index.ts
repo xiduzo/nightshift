@@ -1,5 +1,12 @@
-/** The Yjs documents this Replica syncs, by name (`SyncedDocuments`), each kept in its `ydoc` table (`PersistedDocument`). */
+/** The Yjs documents this Replica syncs, by name (`SyncedDocuments`), each kept in its `ydoc` table (`PersistedDocument`), with the typed views that several verticals open: the Space document, the Device document and the flow documents. */
 
+export {
+	type DeviceDocument,
+	deviceDocumentName,
+	mapView,
+	openDeviceDocument,
+	refreshDeviceFacts,
+} from "./device-document";
 export {
 	createFlowDocuments,
 	type FlowDocument,

@@ -477,6 +477,9 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		github: M,
 		// It walks a flow (decision 9 of the hexagon series).
 		graph: M,
+		// Where this computer keeps values it must not show: the keychain,
+		// else files. The secrets of this computer and the Device keys use it.
+		"key-store": M,
 		knowledge: "knowledge",
 		// The keeper of the names a Lease node holds.
 		leases: M,
