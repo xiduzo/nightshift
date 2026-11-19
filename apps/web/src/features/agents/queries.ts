@@ -1,9 +1,11 @@
 /**
- * The query and mutation options of the agents: Agent Profiles, harnesses,
+ * The query and mutation options of the agents: Agent Profiles and their
+ * Offers, harnesses,
  * Connections and their Secrets, CLI Tools, deciders, the guided setup of
  * an agent and of a decider, and the check of Night Shift's own agents.
  */
 
+import { createOfferQueries } from "@nightshift/client";
 import type { BuiltinAgentId } from "@nightshift/flows";
 import type {
 	AgentProfileRow,
@@ -38,6 +40,18 @@ export const profileQueries = {
 export const profileMutations = {
 	save: orpc.profiles.save.mutationOptions,
 	remove: orpc.profiles.remove.mutationOptions,
+};
+
+/**
+ * The Offers of this computer's profiles. The Agents page makes and
+ * withdraws them. The devices vertical imports agents, so agents builds
+ * the Offers' factory here, on the same cache.
+ */
+export const offerQueries = createOfferQueries(orpc);
+
+export const offerMutations = {
+	make: orpc.offers.make.mutationOptions,
+	withdraw: orpc.offers.withdraw.mutationOptions,
 };
 
 export const harnessQueries = {

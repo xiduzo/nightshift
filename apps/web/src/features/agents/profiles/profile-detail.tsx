@@ -38,7 +38,6 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { BotIcon, CircleAlertIcon, SquareTerminalIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
-import { offerQueries } from "@/features/devices/queries";
 import type {
 	AgentProfileInput,
 	AgentProfileRow,
@@ -56,7 +55,7 @@ import { LargerTextarea } from "@/shared/larger-window";
 import { EFFORTS, harnessInfo, PERMISSION_MODES } from "../catalog";
 import { KindBadge } from "../connections";
 import { CliCheckBadge, ModelCombobox, ModelSourceHint } from "../harnesses";
-import { profileMutations } from "../queries";
+import { offerQueries, profileMutations } from "../queries";
 import { OfferDialog, WithdrawOfferDialog } from "./offer-dialog";
 import { ProfileOffers, ProfileUsedIn } from "./profile-sections";
 

@@ -1,10 +1,8 @@
 /**
  * The query options of Devices, pairing and Offers, and how often they
- * poll (`@nightshift/client`, on this app's client), and their mutations.
- *
- * The Agents page makes and withdraws Offers. The agents vertical sits
- * below devices, so it imports this file through a peer port
- * (`scripts/check-verticals.ts`).
+ * poll (`@nightshift/client`, on this app's client), and the mutations of
+ * Devices. The Agents page makes and withdraws Offers, with the mutations
+ * of agents.
  *
  * The Devices page shows what runs on each computer. The runs vertical
  * imports devices, so devices reads the runs here, on the same cache.
@@ -30,11 +28,6 @@ export const deviceMutations = {
 };
 
 export const offerQueries = createOfferQueries(orpc);
-
-export const offerMutations = {
-	make: orpc.offers.make.mutationOptions,
-	withdraw: orpc.offers.withdraw.mutationOptions,
-};
 
 /** The Space's runs, to show what runs on each computer now. */
 export const runQueries = createRunQueries(orpc);

@@ -211,9 +211,9 @@ Two exceptions exist, as in yapyap. `scripts/check-verticals.ts` lists each one 
 
 The check fails on a leaf contract or a peer port that nothing uses any more, so neither outlives its reason.
 
-Today there is one leaf contract: `features/updates/update-feeds.ts` in `apps/desktop`. The build config (`electrobun.config.ts`) reads the feeds. The barrel of `updates` loads `electrobun/main`, which only the app's main process can load. There are six peer ports, all in `apps/web` (section 5).
+Today there is one leaf contract: `features/updates/update-feeds.ts` in `apps/desktop`. The build config (`electrobun.config.ts`) reads the feeds. The barrel of `updates` loads `electrobun/main`, which only the app's main process can load. There are five peer ports, all in `apps/web` (section 5).
 
-**No new peer port (V8).** `PEER_PORTS` only gets shorter. `scripts/peer-port-debt.txt` holds the six pairs of verticals, and the budget check fails a pair that is not on it. When two verticals need the same thing, move it into the lower one, or let an entry file pass it in.
+**No new peer port (V8).** `PEER_PORTS` only gets shorter. `scripts/peer-port-debt.txt` holds the five pairs of verticals, and the budget check fails a pair that is not on it. When two verticals need the same thing, move it into the lower one, or let an entry file pass it in.
 
 ### Growth
 
@@ -274,7 +274,6 @@ Imports point one way, so no barrel closes a cycle. Biome's `noImportCycles` fai
 - The features, from the bottom: `access`, `spaces`, `projects`, `agents`, `devices`, then `notifications` and `settings`, then `flows`, `gates`, `runs`, `dashboard`, then `knowledge` and `spend`. A feature imports only features below it. `notifications` imports no feature, and the inbox and the Settings page show its parts. The Settings page shows the agents, this computer and the notification settings, so `settings` sits above them. The flow editor reads the settings, so `flows` sits above `settings`.
 - Data can go the other way. Examples: the Agents page reads the settings, and the inbox lists runs. When `@nightshift/client` has the factory of that data, the lower vertical builds it on the app's `orpc` in its own `queries.ts` (`createDashboardQueries(orpc)`). The factory holds the query keys and the polling rules, so both verticals read one cache. Else a vertical below the owner of the data imports the owner's `queries.ts` through a peer port (`scripts/check-verticals.ts`), not its barrel. A `queries.ts` imports only `shared/api`, so the port closes no cycle. The check fails on a port that imports another feature. The ports today:
   - `agents` and `devices` read `settings/queries`.
-  - `agents` reads `devices/queries` (the Offers of a profile).
   - `projects` reaches `agents/flow-agents-step` when you add a project: you choose which of your agents takes each agent of the starter flows.
 - `devices` and `runs` show each other (the Walker of a run, the runs of an Offer). `devices` reaches the run status badge through a peer port. `flows` reaches the run queries and the status icon through one port, `runs/flows-port.ts` (start a run, a flow's last runs).
 - A concept goes to the vertical that owns it in `docs/glossary.md`, not to its biggest user. Outcomes are declared by flow nodes, so `outcome-badge` is in `flows/canvas`. The Walker is a Device, so `walker-badge` is in `devices`.

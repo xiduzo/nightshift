@@ -6,7 +6,6 @@
 # To get off the list: move what both verticals need into the lower one, and
 # remove the port from PEER_PORTS. Then remove its line: the check fails a
 # listed pair that PEER_PORTS does not hold. Add no line here.
-apps/web features/agents features/devices
 apps/web features/agents features/settings
 apps/web features/devices features/runs
 apps/web features/devices features/settings
