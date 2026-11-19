@@ -21,5 +21,4 @@ packages/engine/src/knowledge/search.ts 764
 packages/engine/src/projects/projects.ts 942
 packages/engine/src/projects/space-rows.ts 638
 packages/engine/src/projects/worktrees.ts 726
-packages/engine/src/wire.ts 693
 packages/notifications/src/notifier/notifier.ts 774

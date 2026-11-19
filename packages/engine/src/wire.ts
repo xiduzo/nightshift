@@ -1,72 +1,36 @@
 import { now as timeNow } from "@nightshift/time";
-import { createArtifactStore } from "./artifacts";
 import { listAnswerCosts } from "./assistant";
-import {
-	defaultRunSettings,
-	lastKnownProfiles,
-	type RunSettings,
-	storedDeviceCopy,
-} from "./device-config";
+import { defaultRunSettings, type RunSettings } from "./device-config";
 import { type Engine, type EngineInternals, engineOf } from "./engine";
 import type { EngineOptions } from "./engine-options";
+import { createFlowDocuments, createSpaceFlows } from "./flows";
+import { createRunWalks } from "./graph";
+import { trackHeldLeases } from "./leases";
 import {
-	createCloneImports,
-	createFlowDocuments,
-	createFlowMigrations,
-	createProjectFlows,
-	createSpaceFlows,
-} from "./flows";
-import {
-	combineHolds,
-	createRecorders,
-	createRunner,
-	createRunWalks,
-	kindOf,
-	type StepShared,
-} from "./graph";
-import {
-	createLeaseKeeper,
-	createLeaseStore,
-	leaseHolds,
-	leasesLost,
-	trackHeldLeases,
-} from "./leases";
-import {
-	copyStamps,
 	createLandedFeed,
 	createRunBus,
 	createRunHistory,
 	createRunLog,
-	getRunRow,
 	runIdsOfProject,
 } from "./log";
-import { forgetMemory, listMemory, readMemory } from "./memory";
+import { forgetMemory, listMemory } from "./memory";
 import { createPlacement } from "./placement";
-import {
-	createProjects,
-	createSpaceDocuments,
-	createWorktrees,
-	memberName,
-	systemGit,
-} from "./projects";
-import {
-	gitAuthorOf,
-	landedFacts,
-	namesOf,
-	parseCalledFlows,
-	parseRunFlow,
-} from "./read";
+import { createSpaceDocuments, memberName } from "./projects";
+import { namesOf } from "./read";
 import { createRunFolders } from "./run-folders";
-import { createServiceKeeper, serviceHolds } from "./services";
 import { createSpaces } from "./space";
 import { createProjectsMove } from "./space-move";
-import { keptValues, listKeptValues, resetKeptValue } from "./variables";
+import { listKeptValues, resetKeptValue } from "./variables";
 import { wireEngineAccess } from "./wire-access";
 import { wireEngineActions } from "./wire-actions";
 import { wireEngineCleanup } from "./wire-cleanup";
 import { wireEngineGates } from "./wire-gates";
+import { wireEngineHolds } from "./wire-holds";
 import { wireEngineMove } from "./wire-move";
+import { wireEnginePeers } from "./wire-peers";
+import { wireEngineProjects } from "./wire-projects";
 import { wireEngineRecovery } from "./wire-recovery";
+import { wireEngineRunner } from "./wire-runner";
 import { wireEngineSchedules } from "./wire-schedules";
 import { wireEngineStart } from "./wire-start";
 import { wireEngineViews } from "./wire-views";
@@ -85,6 +49,12 @@ import { wireEngineWalk } from "./wire-walk";
  * changes its own file and its own block here, and keeps the names the
  * other blocks read ("gives").
  *
+ * - `wire-peers.ts`: the other Devices and Hosts (`Peers`).
+ * - `wire-projects.ts`: the projects, their flows and the flow upgrades.
+ * - `wire-holds.ts`: the leases, the services, and what a run holds.
+ * - `wire-runner.ts`: what a step may touch, and the runner.
+ * - `wire-access.ts`, `wire-walk.ts` (R1): who may see or act on a run,
+ *   and what every use case that writes to a run shares (`runs/`).
  * - `wire-recovery.ts` (R7): startup recovery, the daemon's resume, the
  *   wakes, the Signal of a webhook, the stop of a run by Night Shift.
  * - `wire-views.ts` (R2): what people see of the runs (`runs/views/`).
@@ -193,113 +163,48 @@ export function createEngine(
 	/** The run folders on this computer: where runs of projects without a folder work (ADR 22). */
 	const runFolders = createRunFolders(dataDir);
 
-	// --- peers: the other Devices and Hosts ---
+	// --- peers: the other Devices and Hosts: `wire-peers.ts` ---
 	// Its two run calls are the blocks' own: `move.arrive` (R5) and
-	// `recovery.stopForNightShift` (R7). Those lanes change their file.
-	/**
-	 * The other Devices and Hosts (`Peers`): where steps run, Offers, the
-	 * Host that keeps a Space, and the runs walked elsewhere.
-	 */
-	const peers = options.peers({
+	// `recovery.stopForNightShift` (R7). The pieces they call are made below.
+	const peers = wireEnginePeers({
+		db,
+		log: runLog,
+		options,
 		device,
-		walkerId: () => runLog.walkerId(),
 		ownerId: () => ownerId,
 		ready: peersReady,
 		now,
 		documents,
-		// Made below: the Projects record a Clone through the peers' relay.
-		projects: {
-			find: (projectId, spaceId) => projects.find(projectId, spaceId),
-			ofSpace: (spaceId) => projects.ofSpace(spaceId),
-			matching: (input) => projects.matching(input),
-			clones: (spaceId, projectId) => projects.clones(spaceId, projectId),
-			clonePath: (projectId, spaceId) => projects.clonePath(projectId, spaceId),
-			recordClone: (spaceId, record) => projects.recordClone(spaceId, record),
-			setClones: (spaceId, input) => projects.setClones(spaceId, input),
-			clonedHere: (spaceId) => projects.clonedHere(spaceId),
-			forgetDevice: (deviceId) => projects.forgetDevice(deviceId),
-			addFromRemote: (spaceId, input) => projects.addFromRemote(spaceId, input),
-			defineWithoutFolder: (spaceId, input) =>
-				projects.defineWithoutFolder(spaceId, input),
-			take: (spaceId, taken) => projects.take(spaceId, taken),
-		},
+		history,
+		landed,
+		walks,
 		runFolders,
+		projects: () => projects,
 		flows: (projectId) => projectFlows.flows(projectId),
-		profiles: {
-			here: options.profileFor ?? (() => null),
-
-			lastKnown: (deviceId) => lastKnownProfiles(db, deviceId),
-		},
-		keptDevice: (deviceId) => storedDeviceCopy(db, deviceId),
-		history: {
-			...history,
-			onLanded: (listener, scope) =>
-				landed.subscribe((events) => {
-					if (landedFacts(events).some((f) => f.changes !== "spend")) {
-						listener();
-					}
-				}, scope),
-		},
-		runs: {
-			exportWalk: walks.exportWalk,
-			ownFile: walks.ownFile,
-			// Every open step's reader asks on each change of the run: the run
-			// log derives the stamps once per append for all of them.
-			stepStamp: async ({ runId, stepId }) =>
-				(await runLog.derive([runId], copyStamps)).get(runId)?.get(stepId) ??
-				null,
-			takeOver: (runId) => move.arrive(runId),
-			// The Offer the run's step ran under ended: Night Shift stops it, not a person.
-			stop: async (runId) => recovery.stopForNightShift(runId),
-		},
-		async logFact(fact, writes) {
-			await runLog.append(fact, writes);
-		},
+		takeOver: (runId) => move.arrive(runId),
+		stop: async (runId) => recovery.stopForNightShift(runId),
 	});
 	const { placement: devices, relay: hosts } = peers;
 	/** Where each run's steps run, as its plan says (`placement/`). */
 	const placement = createPlacement({ device, devices });
 
-	// --- projects and flows (phase 3) ---
-	const git = options.git ?? systemGit();
-	const { listBranches } = createWorktrees(git);
-	const projects = createProjects({
+	// --- projects and flows (phase 3): `wire-projects.ts` ---
+	const {
+		git,
+		listBranches,
+		projects,
+		migrations,
+		projectFlows,
+		cloneImports,
+	} = wireEngineProjects({
 		db,
 		log: runLog,
-		deviceId: runLog.walkerId,
 		documents,
+		flowDocuments,
 		directory,
-		git,
-		...(hosts ? { relay: hosts } : {}),
-	});
-	/** What brings a flow or a schedule of an older format to the current one: its nodes name a Device's profile, and their Device, by id. */
-	const thisDevice = async () => ({
-		id: await runLog.walkerId(),
-		name: device.name,
-	});
-	const migrations = createFlowMigrations({
-		db,
-		device: thisDevice,
-		profiles: options.profiles,
-		directory,
-		spaces: documents,
-	});
-	/** The flows and schedules of every project: its flow document (ADR 2). */
-	const projectFlows = createProjectFlows({
-		documents: flowDocuments,
-		project: (projectId) => projects.find(projectId),
-		deviceId: () => runLog.walkerId(),
-		now,
-		migrations,
-	});
-	/** The import on upgrade: each Clone's `.nightshift/` folder, once. */
-	const cloneImports = createCloneImports({
-		db,
-		documents: flowDocuments,
-		git,
-		device: thisDevice,
-		profiles: options.profiles,
-		migrations,
+		hosts,
+		deviceName: device.name,
+		options,
 		now,
 	});
 
@@ -320,84 +225,38 @@ export function createEngine(
 		{ once: true },
 	);
 
-	// --- leases, services, what a run holds (mechanisms) ---
+	// --- leases, services, what a run holds (mechanisms): `wire-holds.ts` ---
 	// The wake of a freed lease is the recovery block's (R7).
-	/** The leases of the Spaces this Replica keeps, and of the runs it walks (ADR 7). */
-	const leaseStore = createLeaseStore({ db, now });
-	const leases = createLeaseKeeper({
+	const { leaseStore, leases, services, runHolds } = wireEngineHolds({
 		db,
-		store: leaseStore,
-		hostedElsewhere: (spaceId) => directory.hostedElsewhere(spaceId),
-		...(hosts?.leases ? { relay: hosts.leases } : {}),
-		walkerId: () => runLog.walkerId(),
-		minuteMs,
-		// The runs here that wait for a lease ask again.
-		onFreed: () => recovery.wakeLeaseSleeps(),
-		onLost: (runId, names) => leasesLost({ log: runLog }, runId, names),
-	});
-	leases.start(signal);
-	/** The services of the runs this computer walks (ADR 9). */
-	const services = createServiceKeeper({
+		log: runLog,
 		now,
-		...(internals.secondMs !== undefined
-			? { secondMs: internals.secondMs }
-			: {}),
+		minuteMs,
+		secondMs: internals.secondMs,
+		directory,
+		relay: hosts?.leases,
+		placement,
+		onFreed: () => recovery.wakeLeaseSleeps(),
+		signal,
 	});
-	/** What runs hold for a scope: the engine lets go of it when a run ends. */
-	const runHolds = combineHolds([
-		leaseHolds({ keeper: leases, log: runLog }),
-		serviceHolds({
-			keeper: services,
-			log: runLog,
-			deviceOf: async (runId, deviceId) =>
-				placement.deviceById(deviceId, await getRunRow(db, runId)),
-		}),
-	]);
 
-	// --- the walk: what a step may touch, the runner (graph) ---
-	/** The files runs keep for the person: an agent's artifacts, the answers' files. */
-	const artifacts = createArtifactStore(dataDir);
-	/** What a step may touch on this computer, the same for every run. */
-	const shared: StepShared = {
+	// --- the walk: what a step may touch, the runner (graph): `wire-runner.ts` ---
+	const { artifacts, runner } = wireEngineRunner({
+		db,
+		dataDir,
 		log: runLog,
 		bus,
-		recorders: createRecorders({ db, bus, log: runLog }),
 		placement,
 		now,
 		minuteMs,
 		settings: runSettings,
-		kindOf,
 		leases,
 		services,
-		artifacts,
-		keptValues: (flow) => keptValues(db, flow),
-		remembered: (at) => readMemory(db, at),
-		// The Walker keeps the shape of a step's data on its node (Q40).
-		keepShapes: async (flow, node, shapes) => {
-			await projectFlows.keepShapes(
-				flow.projectId,
-				flow.flowName,
-				node,
-				shapes,
-			);
-		},
-		// And the type of a called flow's output (Q40).
-		keepOutputTypes: async (flow, types) => {
-			await projectFlows.keepOutputTypes(flow.projectId, flow.flowName, types);
-		},
-		gitAuthor: (personId) => gitAuthorOf(db, personId),
-		...(options.usage ? { usage: options.usage } : {}),
-	};
-	const runner = createRunner({
-		shared,
-		db,
-		flowOf: parseRunFlow,
-		calledFlowsOf: parseCalledFlows,
+		flows: projectFlows,
+		usage: options.usage,
 		signal,
 		holds: runHolds,
-		...(internals.overdueSweepMs !== undefined
-			? { overdueSweepMs: internals.overdueSweepMs }
-			: {}),
+		overdueSweepMs: internals.overdueSweepMs,
 	});
 
 	// --- access and walk (R1): `wire-access.ts`, `wire-walk.ts` ---
