@@ -1,10 +1,10 @@
 import type {
 	NotificationChannel,
 	NotificationMessage,
+	PushTarget,
 	SendResult,
 } from "../channels";
 import { routeOf, webPathOf } from "../contract";
-import type { PushTarget } from "../targets";
 
 /**
  * The desktop notification: a native notification on this computer, from

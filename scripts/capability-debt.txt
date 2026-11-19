@@ -85,10 +85,6 @@ imports packages/engine graph device-config
 imports packages/engine ollama device-config
 imports packages/engine ollama knowledge
 
-# A channel takes a push target.
-imports packages/notifications channels targets
-imports packages/notifications desktop targets
-
 # --- V5: a capability vertical that imports more than 5 other capability
 # verticals of its workspace. The count only goes down.
 

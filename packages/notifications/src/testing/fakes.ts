@@ -3,10 +3,10 @@ import type {
 	ScheduleMissed,
 	SevereTurn,
 } from "@nightshift/engine";
-
 import type {
 	NotificationChannel,
 	NotificationMessage,
+	PushTarget,
 	SendResult,
 	VapidKeys,
 	WebPushSender,
@@ -14,7 +14,6 @@ import type {
 // What a push service gets: only the fake reads it, past the barrel.
 import type { WebPushPayload, WebPushRequest } from "../channels/web-push";
 import type { OpenGateRef, RunEventSource, RunRef } from "../notifier/sources";
-import type { PushTarget } from "../targets";
 
 /** What a fake channel got, in order. */
 export type ChannelCall =

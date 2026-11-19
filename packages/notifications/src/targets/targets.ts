@@ -11,6 +11,7 @@ import {
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { Expo } from "expo-server-sdk";
 import { z } from "zod";
+import { PUSH_KINDS, type PushKind, type PushTarget } from "../channels";
 
 /**
  * The push targets of each Person: the browsers (Web Push), phones (Expo
@@ -18,27 +19,8 @@ import { z } from "zod";
  * is open. A phone is one push target plus its session.
  */
 
-/** The kinds of push target, one channel each. */
-export const PUSH_KINDS = ["web", "expo", "desktop"] as const;
-export type PushKind = (typeof PUSH_KINDS)[number];
+/** The kinds of push target, as a request names them. */
 export const pushKindSchema = z.enum(PUSH_KINDS);
-
-/** A screen that gets pushes, as a channel needs it. */
-export type PushTarget = {
-	id: string;
-	personId: string;
-	kind: PushKind;
-	name: string;
-	platform: string;
-	/** The Web Push endpoint URL, the Expo push token, or the desktop app's Device id. */
-	endpoint: string;
-	/** The Web Push subscription keys (`p256dh`, `auth`). Null for the other kinds. */
-	keys: Record<string, string> | null;
-	/** The session that registered it, or null. */
-	sessionId: string | null;
-	createdAt: number;
-	lastSeenAt: number | null;
-};
 
 /** A push target as its Person sees it in Settings: no endpoint, no keys. */
 export type PushTargetView = {

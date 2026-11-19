@@ -1,6 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-
-import type { PushTarget } from "../targets";
 import { type FakeExpoClient, fakeExpoClient } from "../testing/expo";
 import type { NotificationMessage } from "./channel";
 import {
@@ -9,6 +7,7 @@ import {
 	type ExpoChannel,
 	expoMessage,
 } from "./expo";
+import type { PushTarget } from "./push-target";
 
 /**
  * The Expo Push channel against a fake Expo service: what each kind of

@@ -2,8 +2,6 @@
 
 export {
 	createTargetStore,
-	type PushKind,
-	type PushTarget,
 	type PushTargetView,
 	pushKindSchema,
 	type RegisterTarget,

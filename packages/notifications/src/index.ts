@@ -14,6 +14,8 @@ export {
 	type NotificationChannel,
 	type NotificationMessage,
 	type PushChannels,
+	type PushKind,
+	type PushTarget,
 	type SendResult,
 } from "./channels";
 export { deliveryMoves, type NoticeKind } from "./deliveries";
@@ -38,8 +40,6 @@ export {
 	notificationSettingsSchema,
 } from "./settings";
 export {
-	type PushKind,
-	type PushTarget,
 	type PushTargetView,
 	pushKindSchema,
 	type RegisterTarget,

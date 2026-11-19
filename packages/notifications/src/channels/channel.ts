@@ -2,7 +2,7 @@ import { formatClock } from "@nightshift/time";
 
 import { type GateOption, type LookSignal, signalTitle } from "../contract";
 import type { NoticeKind } from "../deliveries";
-import type { PushKind, PushTarget } from "../targets";
+import type { PushKind, PushTarget } from "./push-target";
 
 /**
  * The port every channel implements: one way the notifier reaches a

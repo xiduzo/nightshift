@@ -14,12 +14,12 @@ import {
 	parseNeedsALookKey,
 	withdrawData,
 } from "../contract";
-import type { PushTarget } from "../targets";
 import type {
 	NotificationChannel,
 	NotificationMessage,
 	SendResult,
 } from "./channel";
+import type { PushTarget } from "./push-target";
 
 /**
  * The Expo Push channel: the Night Shift phone app gets its notifications

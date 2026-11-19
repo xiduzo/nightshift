@@ -5,6 +5,7 @@ import {
 } from "@nightshift/engine";
 import type { GateUrgency } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
+import type { PushTarget } from "../channels";
 import {
 	deviceWaitWords,
 	type GateFacts,
@@ -28,7 +29,6 @@ import {
 	type NotificationSettings,
 	pushesUrgency,
 } from "../settings";
-import type { PushTarget } from "../targets";
 import { createGateTracker } from "./gate-tracker";
 import type { Notifier, NotifierDeps } from "./types";
 import { createWaitTracker, type StartedWait } from "./wait-tracker";

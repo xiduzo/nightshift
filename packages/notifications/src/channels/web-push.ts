@@ -2,12 +2,12 @@ import { createHash } from "node:crypto";
 import { sendNotification, WebPushError } from "web-push";
 
 import type { PushData } from "../contract";
-import type { PushTarget } from "../targets";
 import type {
 	NotificationChannel,
 	NotificationMessage,
 	SendResult,
 } from "./channel";
+import type { PushTarget } from "./push-target";
 import type { VapidKeyStore, VapidKeys } from "./vapid-keys";
 
 /**

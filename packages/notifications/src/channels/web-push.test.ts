@@ -1,8 +1,7 @@
 import { expect, test } from "bun:test";
-
-import type { PushTarget } from "../targets";
 import { fakeWebPushSender } from "../testing";
 import type { NotificationMessage } from "./channel";
+import type { PushTarget } from "./push-target";
 import { createWebPushChannel, topicOf } from "./web-push";
 
 /**

@@ -1,7 +1,5 @@
 import { describe, expect, test } from "bun:test";
-
-import type { NotificationMessage } from "../channels";
-import type { PushTarget } from "../targets";
+import type { NotificationMessage, PushTarget } from "../channels";
 import { fakeDesktopNotifier } from "../testing/desktop";
 import { createDesktopChannel, type DesktopWindowState } from "./desktop";
 
