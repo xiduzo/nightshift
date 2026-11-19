@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { runCommand } from "@nightshift/db/schema";
 import { z } from "zod";
 import { type RunAction, WALKED_ELSEWHERE, whyNot } from "../run-status";
 import {
@@ -7,6 +8,7 @@ import {
 	permissionOf,
 	type RunActionKind,
 	type RunActionRequest,
+	type RunCommandKind,
 	requestOf,
 	runCommandSchema,
 } from "./command";
@@ -46,6 +48,14 @@ const requests: {
 const actions = Object.keys(requests) as RunActionKind[];
 
 describe("the Command", () => {
+	test("names the kinds the schema stores, in its order", () => {
+		// Each list holds only kinds of the other: the type check fails first.
+		const stored: readonly RunCommandKind[] = runCommand.kind.enumValues;
+		const named: readonly (typeof runCommand.kind.enumValues)[number][] =
+			COMMAND_KINDS;
+		expect([...named]).toEqual([...stored]);
+	});
+
 	test("carries every kind the schema stores, each by one action", () => {
 		const carried = actions.flatMap((action) => {
 			const command = commandOf(requests[action]);

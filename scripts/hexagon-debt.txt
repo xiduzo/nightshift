@@ -33,5 +33,3 @@ notifications/notifier
 notifications/settings
 notifications/targets
 # Files of a package's kernel that are not pure yet: kernel <file>.
-# The Command reads its kinds from the database schema, by value.
-kernel packages/engine/src/contract/command.ts

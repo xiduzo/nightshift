@@ -2,15 +2,7 @@ import type { KnowledgeUse } from "@nightshift/agents/tools";
 import type { EventInput } from "./events";
 import type { KnowledgeVia } from "./space-payloads";
 
-/**
- * The agent of a session searched or read the project's knowledge, with
- * its tools: the step logs it (`KnowledgeSearched`, `KnowledgeRead`).
- */
-export type KnowledgeUseEvent = {
-	type: "knowledge";
-	projectId: string;
-	use: KnowledgeUse;
-};
+export type { KnowledgeUseEvent } from "../../contract";
 
 /** The event of one use of the knowledge, without its run, step or session. */
 export function knowledgeUseEvent(

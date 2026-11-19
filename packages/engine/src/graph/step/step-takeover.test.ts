@@ -6,8 +6,8 @@ import {
 	reportingScript,
 } from "@nightshift/agents/testing";
 import type { FlowNode } from "@nightshift/flows";
+import { fallbackKey, type RunFallbacks } from "../../contract";
 import type { Device } from "../../device/types";
-import { fallbackKey, type RunFallbacks } from "../../log/run-row/run-row";
 import {
 	agent,
 	command,

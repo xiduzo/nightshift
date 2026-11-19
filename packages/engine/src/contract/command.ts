@@ -1,5 +1,4 @@
 import type { Permissions } from "@nightshift/auth";
-import { runCommand } from "@nightshift/db/schema";
 import {
 	type AnswerFile,
 	answerFilesSchema,
@@ -18,14 +17,23 @@ import { z } from "zod";
  * takes either shape (`runs/actions/`): here as a Turn of the runner,
  * or on the Walker elsewhere through the Relay.
  *
- * The stored kinds are the db schema's (`run_command.kind`): the one
- * list, read here, that the actions below cover. Adding a kind is that
- * enum, a member of `RunActionRequest`, its row in the two tables, its
- * payload schema, and what `act` does with it.
+ * The stored kinds are the db schema's (`run_command.kind`). The list
+ * below repeats that enum, in its order, so the contract reads no
+ * schema: `command.test.ts` fails when the two differ. Adding a kind is
+ * that enum and this list, a member of `RunActionRequest`, its row in the
+ * two tables, its payload schema, and what `act` does with it.
  */
 
-/** The kinds of Command a Host keeps, as the schema stores them. */
-export const COMMAND_KINDS = runCommand.kind.enumValues;
+/** The kinds of Command a Host keeps, as the schema stores them (`run_command.kind`). */
+export const COMMAND_KINDS = [
+	"gate.resolve",
+	"signal.send",
+	"run.stop",
+	"run.move",
+	"run.resume",
+	"lease.release",
+	"run.useful",
+] as const;
 
 /** What a Command does, on the wire and in the Host's row. */
 export type RunCommandKind = (typeof COMMAND_KINDS)[number];

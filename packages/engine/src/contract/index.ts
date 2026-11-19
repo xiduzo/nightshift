@@ -8,7 +8,11 @@
  * `OwnDevice`, `NodeToPlace`), and the ports a vertical asks of the
  * devices: the Device rows (`DeviceDirectory`), the Hosts (`Relay`, and
  * `HostUnreachableError` when one cannot be reached), the leases a Host
- * keeps (`LeaseHost`, ADR 7), the Offer rule of a schedule (`OffersPort`) and the name of the branch of one item of a Call (`itemBranchName`, in `branches/`). It imports no other vertical.
+ * keeps (`LeaseHost`, ADR 7), the Offer rule of a schedule (`OffersPort`) and the name of the branch of one item of a Call (`itemBranchName`, in `branches/`).
+ * The words of the ports of more than one vertical are in sub-verticals:
+ * what the walk reads (`walk/`: the run's plan, `WalkSettings`), one use of
+ * a secret (`secrets/`) and what a step gets of the knowledge
+ * (`step-knowledge/`). It imports no other vertical.
  */
 
 export {
@@ -51,6 +55,13 @@ export {
 	OlderHostError,
 	type Relay,
 } from "./relay";
+export type {
+	NotRead,
+	ProjectRef,
+	SecretEnv,
+	SecretUse,
+	StepRun,
+} from "./secrets";
 export {
 	type StartRunInput,
 	startRunInputSchema,
@@ -58,3 +69,19 @@ export {
 	startTestInputSchema,
 	type TestRunRequest,
 } from "./start-run";
+export type {
+	CommandKnowledge,
+	KnowledgeRequest,
+	KnowledgeUseEvent,
+	SessionKnowledge,
+	SessionStep,
+} from "./step-knowledge";
+export {
+	type FallbackDevice,
+	fallbackKey,
+	type NodeFields,
+	type PlannedDevice,
+	type RunFallbacks,
+	type RunPlan,
+	type WalkSettings,
+} from "./walk";

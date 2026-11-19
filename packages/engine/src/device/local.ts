@@ -23,13 +23,12 @@ import {
 import { Refusal } from "@nightshift/refusal";
 
 import type { ArtifactStore } from "../artifacts";
+import type { SecretUse, StepRun } from "../contract";
 import {
 	type CliToolStore,
 	type ConnectionStore,
 	cliToolsInstruction,
 	type ProfileStore,
-	type SecretUse,
-	type StepRun,
 	unreachableNote,
 } from "../device-config";
 import type { Knowledge } from "../knowledge";

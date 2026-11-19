@@ -11,9 +11,8 @@ import type {
 } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import type { ArtifactStore } from "../../artifacts";
-import type { LeaseAnswer } from "../../contract";
+import type { LeaseAnswer, WalkSettings } from "../../contract";
 import type { Device, GitAuthor } from "../../device";
-import type { RunSettings } from "../../device-config";
 import type {
 	PolicyWaitReason,
 	RunBus,
@@ -84,7 +83,7 @@ export type StepShared = {
 	now(): number;
 	/** How long one minute of a timeout or a policy wait lasts. 60 000 in production. */
 	minuteMs: number;
-	settings(): RunSettings;
+	settings(): WalkSettings;
 	/** Anonymous usage, when this computer records it. */
 	usage?: UsageNotes;
 	/**

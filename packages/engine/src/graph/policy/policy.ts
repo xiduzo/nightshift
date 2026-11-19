@@ -1,11 +1,11 @@
 import type { Policy, ResolvedPolicy } from "@nightshift/flows";
-import type { RunSettings } from "../../device-config";
+import type { WalkSettings } from "../../contract";
 import type { PolicyWaitReason } from "../../log";
 
 /** The flow's own policy numbers, else the daemon's settings. */
 export function resolvePolicy(
 	own: Policy | undefined,
-	defaults: RunSettings["policy"],
+	defaults: WalkSettings["policy"],
 ): ResolvedPolicy {
 	return {
 		usageLimitFirstWaitMinutes:

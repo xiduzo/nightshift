@@ -9,16 +9,19 @@ import {
 import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
 import { z } from "zod";
+import type {
+	NotRead,
+	ProjectRef,
+	SecretEnv,
+	SecretUse,
+	StepRun,
+} from "../contract";
 import { type DeviceDocument, mapView } from "./device-document";
 import { type KeyStoreKind, keychainValues, valueStore } from "./keychain";
 import { expandMcpServers, type McpExpansion } from "./mcp";
-import {
-	PERSONAL_ON_HOST,
-	type ProjectRef,
-	type SecretUse,
-	type StepRun,
-	secretScopes,
-} from "./secret-scopes";
+import { PERSONAL_ON_HOST, secretScopes } from "./secret-scopes";
+
+export type { SecretEnv } from "../contract";
 
 /**
  * Connections: MCP servers defined once in this Device's document, named
@@ -164,18 +167,6 @@ export function unreachableNote(found: NotRead): string {
 		found.personalHere ? ` ${PERSONAL_ON_HOST}` : "",
 	].join("");
 }
-
-/**
- * Why a missing name may have a value after all: `unreachable`, the
- * Personal secrets could not be read now (`PERSONAL_UNREACHABLE`);
- * `projectUnreachable`, the Project's (`PROJECT_UNREACHABLE`);
- * `personalHere`, it is a Personal secret and this computer is a Host.
- */
-type NotRead = {
-	unreachable?: boolean;
-	projectUnreachable?: boolean;
-	personalHere?: boolean;
-};
 
 export type Connection = {
 	name: string;
@@ -399,19 +390,6 @@ export type ConnectionStore = {
 	 */
 	secretEnv(names: readonly string[], use?: SecretUse): Promise<SecretEnv>;
 };
-
-/**
- * Environment values read from the secrets, or the names that have no
- * value, and why a missing one may have a value after all (`NotRead`).
- */
-export type SecretEnv =
-	| {
-			ok: true;
-			env: Record<string, string>;
-			/** The names whose value is the run's Project's. */
-			fromProject?: string[];
-	  }
-	| ({ ok: false; missing: string[] } & NotRead);
 
 /** Values with `${NAME}` expanded, and the values read for them, or the names that have none. */
 export type ExpandedEnv =

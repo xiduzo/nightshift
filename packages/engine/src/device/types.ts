@@ -17,8 +17,7 @@ import type {
 	ProfileSettings,
 	WebRequestMethod,
 } from "@nightshift/flows";
-import type { StepRun } from "../device-config";
-import type { KnowledgeRequest, KnowledgeUseEvent } from "../knowledge";
+import type { KnowledgeRequest, KnowledgeUseEvent, StepRun } from "../contract";
 import type { WorktreeChanges } from "../log";
 import type { RestoredFrom } from "../projects";
 

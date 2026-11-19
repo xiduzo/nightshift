@@ -80,7 +80,6 @@ imports packages/engine device knowledge
 imports packages/engine device projects
 # The walk reads the capabilities itself (decision 9: `graph` is a
 # mechanism).
-imports packages/engine graph device-config
 # Ollama reads its setting and gives the knowledge its meaning model.
 imports packages/engine ollama device-config
 imports packages/engine ollama knowledge
