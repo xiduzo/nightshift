@@ -147,7 +147,7 @@ type Given = {
 	[K in keyof Services | "space"]?: Record<string, unknown>;
 } & { fromThisComputer?: boolean };
 
-/** The Space each run is in, for `engine.spaceOfRun`. */
+/** The Space each run is in, for the engine's open of a run. */
 let runSpaces: Map<string, string>;
 /** The open Gates the views of each Space list, for the engine's inbox. */
 let gatesIn: Map<string, OpenGate[]>;
@@ -281,7 +281,7 @@ function recording(
 				if (typeof name !== "string" || name === "then") return undefined;
 				const own = (givenRuns as Record<string, unknown> | undefined)?.[name];
 				if (own) return own;
-				// The open of a run reads it, as `spaceOfRun` did: no call to record.
+				// The open of a run reads it: no call to record.
 				if (name === "open") {
 					return async (
 						_actor: unknown,
@@ -861,11 +861,8 @@ describe("every route", () => {
 							`${route.path} should refuse ${name} with ${refusalFor(caller)}, ended in ${outcome}.`,
 						);
 					}
-					// A refused call reaches no service beyond the Space of a run.
-					expect(
-						calls.filter((c) => c.method !== "spaceOfRun"),
-						route.path,
-					).toEqual([]);
+					// A refused call reaches no service.
+					expect(calls, route.path).toEqual([]);
 				} else {
 					passed.push(`${route.path}: ${outcome}`);
 					expect(outcome, route.path).toBe(route.ends ?? "ok");
@@ -922,10 +919,8 @@ describe("every route", () => {
 		for (const route of forwarding) {
 			calls = [];
 			await callRoute(route, contextOf(sandbox.db, owner));
-			// The run's Space, then the one call. A project's procedure reads the Space's projects first.
-			const made = calls.filter(
-				(c) => c.method !== "spaceOfRun" && c.method !== "listProjects",
-			);
+			// The one call. A project's procedure reads the Space's projects first.
+			const made = calls.filter((c) => c.method !== "listProjects");
 			if (made.length !== 1) {
 				extra.push(`${route.path}: ${made.map((c) => c.method).join(", ")}`);
 			}
