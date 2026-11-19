@@ -266,7 +266,7 @@ async function settled(
 	);
 }
 
-/** A new daemon's startup recovery for the run, then its resume (`run/recovery.ts`). */
+/** A new daemon's startup recovery for the run, then its resume (`runs/recovery/`). */
 async function recover(runner: Runner, h: Harness): Promise<void> {
 	const events = await h.events();
 	const open = openWork(foldRun(events), "interrupted");

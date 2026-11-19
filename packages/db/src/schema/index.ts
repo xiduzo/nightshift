@@ -9,7 +9,7 @@
 //   writes this file, so its owner is named here.
 // - `devices.ts`: `@nightshift/devices`.
 // - `projects.ts`: `@nightshift/engine` `projects/`.
-// - `runs.ts`: `@nightshift/engine` `log/`, `run/`, `graph/` and `read/`.
+// - `runs.ts`: `@nightshift/engine` `log/`, `runs/`, `graph/` and `read/`.
 // - `device-config.ts`: `@nightshift/engine` `device-config/`.
 // - `engine.ts`: `@nightshift/engine` `graph/checkpoints/checkpointer.ts` (LangGraph).
 // - `daemon.ts`: `@nightshift/daemon` `runtime/` (the lease).

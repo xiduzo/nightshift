@@ -19,7 +19,7 @@ export type RelayWalkersDeps = {
  * The Walkers of the runs another Device walks. The Walker is the only
  * writer of its run's events, so an action on such a run travels to it
  * as a Command through the Host (`Relay.command`), and the Walker applies
- * it. Its words are those of `run/relay-commands.ts`, which this replaces.
+ * it.
  */
 export function relayWalkers(deps: RelayWalkersDeps): Walkers {
 	const { relay } = deps;

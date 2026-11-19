@@ -45,8 +45,7 @@ below it, from the bottom up:
 | `space-move/` | The Space move: Projects to another Space as one operation (`projects-move.ts`). |
 | `runs/` | The run path as a slice with rings, one sub-vertical per part: who may see or act on a run (`access/`), what every use case that writes to a run shares (`walk/`), what a person does to a run (`actions/`), the move of a run's walk to another Device and its other end (`move/`), what Night Shift does to a run on its own (`recovery/`), and a run's start (`start/`: here, or handed to the Host that keeps the Space). |
 | `gates/` | The questions that wait for a person, as a slice with rings: the answer to a Gate (`answer-gate.ts`, with the lock-screen rule for every door), the open and the answered Gates of a Space, and the Needs-you inbox of a Person across their Spaces. `wire.ts` builds them (`wireGates`). |
-| `run/` | What the schedules tell (`schedule-notices.ts`). |
-| The top of `src/` | The composition root (`wire.ts`: `createEngine`, with a file for each piece of the run path, `wire-<what>.ts`), the `Engine` it returns (`engine.ts`), what it takes (`engine-options.ts`), the port of the other Devices it walks with (`peers.ts`), and what a person does in one Space (`space-engine.ts` is the interface, `space.ts` the module). The tests that start a whole engine are in `packages/engine/test/engine/`. |
+| The top of `src/` | The composition root (`wire.ts`: `createEngine`, with a file for each of its blocks, `wire-<what>.ts`. `wire-schedules.ts` also tells the listeners of `Engine` what the schedules tell), the `Engine` it returns (`engine.ts`), what it takes (`engine-options.ts`), the port of the other Devices it walks with (`peers.ts`), and what a person does in one Space (`space-engine.ts` is the interface, `space.ts` the module). The tests that start a whole engine are in `packages/engine/test/engine/`. |
 
 No import points up, `import type` included. `scripts/check-verticals.ts`
 fails on a cycle between verticals. `contract/` holds only types and the
@@ -263,12 +262,13 @@ packages/engine/src/
                            scheduler, the peers (EngineOptions.peers) and
                            the run actions, each behind a small seam that takes its
                            dependencies (db, log, runner, bus, settings,
-                           clock), and wires them. It holds no logic. The
-                           pieces of the run path each have a file beside
-                           it (wire-access.ts, wire-walk.ts, wire-views.ts,
-                           wire-start.ts, wire-gates.ts, wire-actions.ts,
-                           wire-move.ts, wire-recovery.ts,
-                           wire-schedules.ts).
+                           clock), and wires them. It holds no logic. Each
+                           block has a file beside it (wire-peers.ts,
+                           wire-projects.ts, wire-holds.ts, wire-runner.ts,
+                           wire-access.ts, wire-walk.ts, wire-recovery.ts,
+                           wire-views.ts, wire-start.ts, wire-schedules.ts,
+                           wire-move.ts, wire-gates.ts, wire-actions.ts,
+                           wire-cleanup.ts).
                            engine.ts holds the Engine interface and the thin
                            object behind it.
   space.ts                 createSpaces(deps): the SpaceEngine of one
@@ -297,8 +297,6 @@ packages/engine/src/
                            end (arriveRun): the new Walker takes the
                            Checkpoint and the transcripts from the
                            archive and logs WalkerArrived.
-  wake.ts                  The runs that slept for a Device that is back
-                           look again.
   runs/start/              Run start. The plan loads and validates the
                            flow and its called flows and resolves profiles.
                            The start asks every requirement in REQUIREMENTS
@@ -325,7 +323,9 @@ packages/engine/src/
                            their timers back through runner.restore; after
                            a grace period the daemon resumes the rest
                            unless resumeBlock says why not, queued on
-                           a full run cap).
+                           a full run cap). The runs that slept for a
+                           lease or for a Device that is back look again
+                           (wakeSleepingRuns).
   read/run-summary/        A run's summary from its row and its log:
                            runFacts, toSummary, the flow snapshot parsers.
                            Pure.

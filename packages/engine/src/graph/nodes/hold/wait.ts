@@ -64,10 +64,10 @@ import { sendsRequests, shownUrl, statusLine, urlWaitRequest } from "../do";
  *   the event of the webhook that sent it as `data`; else the step keeps
  *   waiting. A `key` is rendered when the wait starts and logged with it
  *   (`WaitStarted.signalKey`): the webhook signals match on it
- *   (`run/signals.ts`). With rules on its outcomes (`signalRules`, logged
- *   as `WaitStarted.signalRules`), a webhook's signal ends the wait on the
- *   first outcome whose rule holds, and one that matches none keeps it
- *   waiting. A person's signal brings no event: it ends `done`.
+ *   (`runs/recovery/domain/signal-match.ts`). With rules on its outcomes
+ *   (`signalRules`, logged as `WaitStarted.signalRules`), a webhook's
+ *   signal ends the wait on the first outcome whose rule holds, and one
+ *   that matches none keeps it waiting. A person's signal brings no event: it ends `done`.
  *
  * The pending wait's streak carries what the node needs across its sleeps:
  * `since` is when the wait began (the deadline and `waited_minutes` count

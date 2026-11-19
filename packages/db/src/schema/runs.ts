@@ -12,7 +12,7 @@ import { createdAt, spaceId, updatedAt } from "./columns";
 import { project } from "./projects";
 
 // Owner: `@nightshift/engine`: `log/` appends the event log and writes the
-// run and step rows, `run/` starts and recovers runs, `graph/` adds steps
+// run and step rows, `runs/` starts and recovers runs, `graph/` adds steps
 // and Agent sessions while a run walks, and `read/` reads them all.
 // `log/history/history.ts` reads and adds the rows that `@nightshift/devices`
 // `exchange/` copies between Replicas by cursor, and the files of own steps
@@ -187,7 +187,7 @@ export const event = sqliteTable(
 );
 
 // Owner: `@nightshift/engine` `variables/`: `graph/` saves a kept value with
-// the step that writes it, and `run/` reads and resets them for a person.
+// the step that writes it, and `space.ts` reads and resets them for a person.
 
 /**
  * The value a kept variable (`keep: "project"`) has between runs: one per
@@ -223,7 +223,7 @@ export const keptVariable = sqliteTable(
 );
 
 // Owner: `@nightshift/engine` `memory/`: `graph/` saves what a Since last
-// run node saw with its step, and `run/` lists and forgets it for a person.
+// run node saw with its step, and `space.ts` lists and forgets it for a person.
 
 /**
  * What a Since last run node saw: one row per key it remembers, by
