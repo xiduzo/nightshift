@@ -1,4 +1,4 @@
-import { roleAllows } from "@nightshift/auth";
+import { RoleRefusal } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { syncCursor } from "@nightshift/db/schema";
 import {
@@ -7,11 +7,10 @@ import {
 	type LoggedEvent,
 	type PeerContext,
 	parseTranscript,
-	permissionOf,
+	RunNotFound,
 	type SpaceArchive,
 	type WalkFile,
 } from "@nightshift/engine";
-import { memberRole } from "@nightshift/engine/projects";
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import { eq, sql } from "drizzle-orm";
 import type { ArchiveRef, RunCommand, RunRows, SyncCursors } from "../contract";
@@ -33,6 +32,8 @@ const MOVED_ON = "The run moved to another device before this reached it.";
 const ENDED_ELSEWHERE = "The run ended before this reached it.";
 /** Why a Command is not applied: its run is of another Space here. */
 const NOT_HERE = "This device does not run this run.";
+/** Why a Command is not applied: its Person is no Member of the Space, or their role does not allow it. */
+const MAY_NOT = "The person who asked may not do this in this Space.";
 
 /**
  * Run history between this Replica and its Hosts: the one module both
@@ -113,14 +114,15 @@ export type RunHistoryExchange = {
 	 * Applies a Command for a run this computer walks, through `engine`,
 	 * once. Returns why not, or null when it is applied: now, or before
 	 * (its id is in the log). A run that moved on from here, or that ended
-	 * elsewhere, is a reason. Throws at once while the run is still on its
-	 * way here (`ON_ITS_WAY`: the rows that move it here, or its take-over,
-	 * have not arrived): the Command waits, however long that takes, and
-	 * comes again.
+	 * elsewhere, is a reason, and so is a Person who may not do it in the
+	 * Space (the engine decides, from the Members of the Space document).
+	 * Throws at once while the run is still on its way here (`ON_ITS_WAY`:
+	 * the rows that move it here, or its take-over, have not arrived): the
+	 * Command waits, however long that takes, and comes again.
 	 */
 	apply(
 		command: RunCommand,
-		engine: Pick<Engine, "space">,
+		engine: Pick<Engine, "runs">,
 	): Promise<string | null>;
 	/**
 	 * What the Host's archive takes after a pushed batch: the files of its
@@ -170,7 +172,7 @@ export function createRunHistoryExchange(deps: {
 	/** What the engine offers the peers. */
 	context: Pick<
 		PeerContext,
-		"device" | "walkerId" | "history" | "runs" | "documents" | "ready"
+		"device" | "walkerId" | "history" | "runs" | "ready"
 	>;
 	/** The Spaces the Hosts keep. */
 	hostSpaces: HostSpaces;
@@ -178,7 +180,7 @@ export function createRunHistoryExchange(deps: {
 	upstream?: FeedPorts["upstream"];
 }): RunHistoryExchange {
 	const { db, archive, context, hostSpaces } = deps;
-	const { history, runs, documents } = context;
+	const { history, runs } = context;
 	const { runOwner } = history;
 
 	/** This computer's ids: the runs it walks name one of them. */
@@ -368,25 +370,22 @@ export function createRunHistoryExchange(deps: {
 			if (!(await takeOvers.arrived(command.runId))) {
 				throw new Refusal("conflict", ON_ITS_WAY);
 			}
-			const role = memberRole(
-				await documents.open(command.spaceId),
-				command.personId,
-			);
-			if (!role || !roleAllows(role, permissionOf(command.kind))) {
-				return "The person who asked may not do this in this Space.";
-			}
 			try {
-				// Applied like the person's own action: the Walker writes the run's events.
+				// Applied like the person's own action: the Walker writes the
+				// run's events. The engine reads their role from the Members of
+				// the Space document (the door `command`).
 				await history.applying(command, () =>
-					engine
-						.space(command.spaceId, {
-							personId: command.personId,
-							door: "command",
-						})
-						.act(command.runId, command),
+					engine.runs.act(
+						{ personId: command.personId, door: "command" },
+						{ spaceId: command.spaceId, runId: command.runId, action: command },
+					),
 				);
 				return null;
 			} catch (error) {
+				// Not a Member of the Space, or a role that does not allow it.
+				if (error instanceof RunNotFound || error instanceof RoleRefusal) {
+					return MAY_NOT;
+				}
 				// The words go to the person who asked. A failure's details stay in this log.
 				if (!(error instanceof Refusal)) {
 					console.error(

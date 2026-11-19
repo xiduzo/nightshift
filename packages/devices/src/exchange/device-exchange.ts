@@ -70,7 +70,7 @@ export type AppliedCommands = Map<string, Promise<string | null>>;
 
 export function createDeviceExchange(deps: {
 	/** This Device's engine (`PeerEngine`): its run history and the Spaces its Hosts keep. */
-	engine: Pick<Engine, "space"> & {
+	engine: Pick<Engine, "runs"> & {
 		exchange: RunHistoryExchange;
 		hostSpaces: Pick<HostSpaces, "ofHost">;
 	};

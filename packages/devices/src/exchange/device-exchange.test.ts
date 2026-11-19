@@ -751,9 +751,12 @@ describe("the Device's exchange with its Host", () => {
 					return paired.device.exchange.apply(command, engine);
 				},
 			},
-			space(spaceId, actor) {
-				applies++;
-				return paired.device.space(spaceId, actor);
+			runs: {
+				...paired.device.runs,
+				act(actor, request) {
+					applies++;
+					return paired.device.runs.act(actor, request);
+				},
 			},
 		};
 		const reported: (string | null)[] = [];
