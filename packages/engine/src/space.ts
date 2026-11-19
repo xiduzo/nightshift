@@ -83,7 +83,7 @@ export type SpacesDeps = {
 	// --- views (R2) ---
 	/** The views of the runs, for the readers that act for Night Shift (the Gates). */
 	reads: Views["reads"];
-	/** The reads of the runs, each for the actor of the view (`runs/views`). */
+	/** The reads of the runs (`runs/views`). The wire decides who opens a run (D6). */
 	views: Views;
 
 	// --- start (R3) ---
@@ -296,7 +296,7 @@ export function createSpaces(deps: SpacesDeps) {
 				return deps.answerCosts(spaceId, since);
 			},
 
-			// --- views (R2): each read is the actor's, Night Shift's without one ---
+			// --- views (R2): each read with the actor, Night Shift without one ---
 			async projectRuns(read) {
 				await ready;
 				return views.listProjectRuns(actor ?? NIGHT_SHIFT, {
