@@ -1,5 +1,6 @@
 import { endSession, roleAllows, roleIn, spaceIds } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
+import { NIGHT_SHIFT, type PersonActor } from "@nightshift/engine";
 import { now as timeNow } from "@nightshift/time";
 import {
 	createVapidKeyStore,
@@ -15,10 +16,9 @@ import { createDeliveryLog } from "./deliveries";
 import { createNotifier, type RunEventSource, spaceAudience } from "./notifier";
 import {
 	type ComputerSwitches,
-	createSettingsStore,
-	eventsOfSwitches,
 	type NotificationSettings,
 	type NotificationSettingsPatch,
+	wireSettings,
 } from "./settings";
 import {
 	createTargetStore,
@@ -150,8 +150,14 @@ export function createNotifications(
 ): Notifications {
 	const { db } = options;
 	const now = options.now ?? timeNow;
-	const settings = createSettingsStore(db, {
+	const settings = wireSettings({
+		db,
 		...(options.timeZone ? { timeZone: options.timeZone } : {}),
+	});
+	/** The API passes the signed-in Person: their own settings. */
+	const person = (personId: string): PersonActor => ({
+		personId,
+		door: "session",
 	});
 	const targets = createTargetStore(db, now);
 	const vapid = options.webPush
@@ -176,7 +182,9 @@ export function createNotifications(
 			const role = await roleIn(db, personId, spaceId);
 			return role !== null && roleAllows(role, { gate: ["resolve"] });
 		},
-		settings,
+		settings: {
+			get: (personId) => settings.read(NIGHT_SHIFT, { personId }),
+		},
 		targets,
 		deliveries,
 		inApp: options.inApp,
@@ -188,12 +196,12 @@ export function createNotifications(
 		watch: (personId, signal, watch) =>
 			options.inApp.watch(personId, signal, watch),
 		settings: {
-			get: (personId) => settings.get(personId),
-			save: (personId, patch) => settings.save(personId, patch),
-			seed: (personId, switches) =>
-				settings.seed(personId, eventsOfSwitches(switches)),
+			get: (personId) => settings.read(person(personId), { personId }),
+			save: (personId, patch) =>
+				settings.save(person(personId), { personId, patch }),
+			seed: (personId, switches) => settings.seed({ personId, switches }),
 			adoptComputerSwitches: (personId, patch, switches) =>
-				settings.adoptComputerSwitches(personId, patch, switches),
+				settings.adoptSwitches({ personId, patch, switches }),
 		},
 		targets: {
 			list: async (personId) => (await targets.of(personId)).map(targetView),

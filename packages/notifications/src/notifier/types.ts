@@ -1,6 +1,6 @@
 import type { InAppChannel, PushChannels } from "../channels";
 import type { DeliveryLog } from "../deliveries";
-import type { SettingsStore } from "../settings";
+import type { NotificationSettings } from "../settings";
 import type { TargetStore } from "../targets";
 import type { RunEventSource } from "./sources";
 
@@ -19,7 +19,8 @@ export type NotifierDeps = {
 	 * Default: nobody, so no push carries a Gate's options.
 	 */
 	mayAnswer?(spaceId: string, personId: string): Promise<boolean>;
-	settings: Pick<SettingsStore, "get">;
+	/** A Person's notification settings, or the defaults. */
+	settings: { get(personId: string): Promise<NotificationSettings> };
 	targets: Pick<TargetStore, "of" | "byIds" | "forget">;
 	deliveries: DeliveryLog;
 	inApp: InAppChannel;

@@ -1,0 +1,66 @@
+import { describe, expect, test } from "bun:test";
+import type { Actor } from "@nightshift/engine";
+import { inMemorySettingsPorts } from "../adapters/out/in-memory-neighbours";
+import type { NotificationSettingsPatch } from "../domain/notification-settings";
+import { readSettings } from "./read-settings";
+import { saveSettings } from "./save-settings";
+
+/** The use case saveSettings, on in-memory adapters. */
+
+const ADA: Actor = { personId: "ada", door: "session" };
+
+function setUp() {
+	const ports = inMemorySettingsPorts();
+	return {
+		ports,
+		save: (patch: NotificationSettingsPatch) =>
+			saveSettings(ports)(ADA, { personId: "ada", patch }),
+		read: (personId: string) => readSettings(ports)(ADA, { personId }),
+	};
+}
+
+describe("saveSettings", () => {
+	test("a change keeps what it does not name", async () => {
+		const { save, read } = setUp();
+		await save({ events: { runFinished: false } });
+		const saved = await save({
+			quietHours: { start: "22:30", end: "06:45" },
+			screens: { expo: false },
+		});
+		expect(saved).toMatchObject({
+			events: { gateOpened: true, runFinished: false, runFailed: true },
+			quietHours: { start: "22:30", end: "06:45" },
+			screens: { web: true, expo: false, desktop: true },
+		});
+		expect(await read("ada")).toEqual(saved);
+		expect((await save({ quietHours: null })).quietHours).toBe(null);
+	});
+
+	test("the urgencies that push: a round trip, once each, in order", async () => {
+		const { save, read } = setUp();
+		const saved = await save({ pushUrgencies: ["later", "now", "later"] });
+		expect(saved.pushUrgencies).toEqual(["now", "later"]);
+		expect((await read("ada")).pushUrgencies).toEqual(["now", "later"]);
+		expect((await save({ pushUrgencies: [] })).pushUrgencies).toEqual([]);
+		await expect(save({ pushUrgencies: ["soon" as "now"] })).rejects.toThrow();
+	});
+
+	test("a save without the urgencies keeps them: an older phone app sends none", async () => {
+		const { save, read } = setUp();
+		await save({ pushUrgencies: ["now", "today"] });
+		const saved = await save({ holdMinutes: 5 });
+		expect(saved.pushUrgencies).toEqual(["now", "today"]);
+		expect((await read("ada")).pushUrgencies).toEqual(["now", "today"]);
+	});
+
+	test("refuses a time or a time zone it cannot read, and saves nothing", async () => {
+		const { ports, save } = setUp();
+		await expect(
+			save({ quietHours: { start: "25:00", end: "07:00" } }),
+		).rejects.toThrow("Use a time like 22:00.");
+		await expect(save({ timeZone: "Mars/Olympus" })).rejects.toThrow(
+			"Use a time zone like Europe/Amsterdam.",
+		);
+		expect(ports.settingsStore.writes).toEqual([]);
+	});
+});

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Database } from "@nightshift/db";
-import type { LandedFact } from "@nightshift/engine";
+import { type LandedFact, NIGHT_SHIFT } from "@nightshift/engine";
 import type { LandedChange } from "@nightshift/engine/testing";
 import type { GateUrgency } from "@nightshift/flows";
 import { utc } from "@nightshift/time/testing";
@@ -11,7 +11,11 @@ import {
 	type PushChannels,
 } from "../channels";
 import { createDeliveryLog, type DeliveryLog } from "../deliveries";
-import { createSettingsStore, type SettingsStore } from "../settings";
+import {
+	type NotificationSettings,
+	type NotificationSettingsPatch,
+	wireSettings,
+} from "../settings";
 import { createTargetStore, type TargetStore } from "../targets";
 import { type FakeRunEvents, fakeRunEvents } from "../testing";
 import { testDatabase } from "../testing/database";
@@ -40,7 +44,14 @@ let web: FakeChannel;
 let expo: FakeChannel;
 let desktop: FakeChannel;
 let inApp: InAppChannel;
-let settings: SettingsStore;
+/** What the notifier reads, and a save as each Person. */
+let settings: {
+	get(personId: string): Promise<NotificationSettings>;
+	save(
+		personId: string,
+		patch: NotificationSettingsPatch,
+	): Promise<NotificationSettings>;
+};
 let targets: TargetStore;
 let deliveries: DeliveryLog;
 let members: Record<string, string[]>;
@@ -58,7 +69,12 @@ beforeEach(async () => {
 	expo = fakeChannel();
 	desktop = fakeChannel();
 	inApp = createInAppChannel({ now: () => clock });
-	settings = createSettingsStore(db, { timeZone: "UTC" });
+	const wired = wireSettings({ db, timeZone: "UTC" });
+	settings = {
+		get: (personId) => wired.read(NIGHT_SHIFT, { personId }),
+		save: (personId, patch) =>
+			wired.save({ personId, door: "session" }, { personId, patch }),
+	};
 	targets = createTargetStore(db, () => clock);
 	deliveries = createDeliveryLog(db);
 	members = { [SPACE]: ["ada", "bob"], [OTHER_SPACE]: ["cy"] };

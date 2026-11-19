@@ -1,14 +1,12 @@
-/** A Person's notification settings: which events, quiet hours, which screens, and the phone delay. */
+/** A Person's notification settings: which events, quiet hours, which screens, and the phone delay. `wireSettings` binds the use cases to their ports. */
 
 export {
 	type ComputerSwitches,
-	createSettingsStore,
-	eventsOfSwitches,
 	inQuietHours,
 	type NotificationSettings,
 	type NotificationSettingsPatch,
 	notificationSettingsPatchSchema,
 	notificationSettingsSchema,
 	pushesUrgency,
-	type SettingsStore,
-} from "./settings";
+} from "./domain/notification-settings";
+export { wireSettings } from "./wire";

@@ -1,12 +1,9 @@
-import type { Database } from "@nightshift/db";
-import { notificationSettings } from "@nightshift/db/schema";
 import {
 	GATE_URGENCIES,
 	type GateUrgency,
 	gateUrgencySchema,
 } from "@nightshift/flows";
-import { asDate, isTimeZone, localZone, minuteOfDay } from "@nightshift/time";
-import { eq } from "drizzle-orm";
+import { isTimeZone, minuteOfDay } from "@nightshift/time";
 import { z } from "zod";
 
 /**
@@ -60,7 +57,7 @@ const pushUrgenciesSchema = z
 	.max(GATE_URGENCIES.length);
 
 /** The Gate urgencies that push by default: only a Gate that needs an answer now. */
-export const DEFAULT_PUSH_URGENCIES: readonly GateUrgency[] = ["now"];
+const DEFAULT_PUSH_URGENCIES: readonly GateUrgency[] = ["now"];
 
 /** The urgencies once each, in the order now, today, later. */
 function urgenciesOf(list: readonly GateUrgency[]): GateUrgency[] {
@@ -98,7 +95,7 @@ export type NotificationSettingsPatch = z.infer<
 >;
 
 /** How long a push waits while a screen is open, by default. */
-export const DEFAULT_HOLD_MINUTES = 3;
+const DEFAULT_HOLD_MINUTES = 3;
 
 /**
  * This computer's three notification switches: its own settings from
@@ -127,15 +124,15 @@ export function eventsOfSwitches(
 	};
 }
 
-/** This computer's time zone, else UTC. */
-export function localTimeZone(): string {
-	return localZone();
+/** Whether a save of the computer's settings named one of its three switches. */
+export function switchesChanged(
+	patch: Partial<Record<keyof ComputerSwitches, unknown>>,
+): boolean {
+	return SWITCH_KEYS.some((key) => patch[key] !== undefined);
 }
 
-/** The settings of a Person who never saved any. */
-export function defaultSettings(
-	timeZone: string = localTimeZone(),
-): NotificationSettings {
+/** The settings of a Person who never saved any, in this time zone. */
+export function defaultSettings(timeZone: string): NotificationSettings {
 	return {
 		events: {
 			gateOpened: true,
@@ -167,6 +164,40 @@ export function applyPatch(
 	});
 }
 
+/**
+ * A Person's settings as the store kept them. The screens and the
+ * urgencies may come from an older version, or be unreadable: `unknown`.
+ */
+export type StoredSettings = Omit<
+	NotificationSettings,
+	"screens" | "pushUrgencies"
+> & { screens: unknown; pushUrgencies: unknown };
+
+/**
+ * The settings of what the store kept. A screen it cannot read takes its
+ * default. Urgencies it cannot read push only for now. A time zone it
+ * cannot read is `fallbackZone`.
+ */
+export function settingsOfStored(
+	stored: StoredSettings,
+	fallbackZone: string,
+): NotificationSettings {
+	const screens = screensSchema.partial().catch({}).parse(stored.screens);
+	const defaults = defaultSettings(fallbackZone);
+	return {
+		events: stored.events,
+		quietHours: stored.quietHours,
+		timeZone: isTimeZone(stored.timeZone) ? stored.timeZone : fallbackZone,
+		screens: { ...defaults.screens, ...screens },
+		holdMinutes: stored.holdMinutes,
+		pushUrgencies: urgenciesOf(
+			pushUrgenciesSchema
+				.catch([...DEFAULT_PUSH_URGENCIES])
+				.parse(stored.pushUrgencies),
+		),
+	};
+}
+
 const minutesOf = (time: string) => {
 	const [hour = 0, minute = 0] = time.split(":").map(Number);
 	return hour * 60 + minute;
@@ -196,129 +227,4 @@ export function inQuietHours(
 	if (start === end) return false;
 	const now = minuteOfDay(at, settings.timeZone);
 	return start < end ? now >= start && now < end : now >= start || now < end;
-}
-
-export type SettingsStore = ReturnType<typeof createSettingsStore>;
-
-export function createSettingsStore(
-	db: Database,
-	options: { timeZone?: string } = {},
-) {
-	const fallbackZone = options.timeZone ?? localTimeZone();
-
-	function fromRow(
-		row: typeof notificationSettings.$inferSelect,
-	): NotificationSettings {
-		const screens = screensSchema
-			.partial()
-			.catch({})
-			.parse(safeJson(row.screens));
-		const defaults = defaultSettings(fallbackZone);
-		return {
-			events: {
-				gateOpened: row.gateOpened,
-				runFinished: row.runFinished,
-				runFailed: row.runFailed,
-				deviceWait: row.deviceWait,
-			},
-			quietHours:
-				row.quietStart && row.quietEnd
-					? { start: row.quietStart, end: row.quietEnd }
-					: null,
-			timeZone: isTimeZone(row.timeZone) ? row.timeZone : fallbackZone,
-			screens: { ...defaults.screens, ...screens },
-			holdMinutes: row.holdMinutes,
-			pushUrgencies: urgenciesOf(
-				pushUrgenciesSchema
-					.catch([...DEFAULT_PUSH_URGENCIES])
-					.parse(safeJson(row.pushUrgencies, null)),
-			),
-		};
-	}
-
-	function toRow(personId: string, settings: NotificationSettings) {
-		return {
-			personId,
-			gateOpened: settings.events.gateOpened,
-			runFinished: settings.events.runFinished,
-			runFailed: settings.events.runFailed,
-			deviceWait: settings.events.deviceWait,
-			quietStart: settings.quietHours?.start ?? null,
-			quietEnd: settings.quietHours?.end ?? null,
-			timeZone: settings.timeZone,
-			screens: JSON.stringify(settings.screens),
-			holdMinutes: settings.holdMinutes,
-			pushUrgencies: JSON.stringify(settings.pushUrgencies),
-			updatedAt: asDate(),
-		};
-	}
-
-	async function get(personId: string): Promise<NotificationSettings> {
-		const [row] = await db
-			.select()
-			.from(notificationSettings)
-			.where(eq(notificationSettings.personId, personId));
-		return row ? fromRow(row) : defaultSettings(fallbackZone);
-	}
-
-	/** Saves a change of the Person's settings and returns them all. */
-	async function save(
-		personId: string,
-		patch: NotificationSettingsPatch,
-	): Promise<NotificationSettings> {
-		const parsed = notificationSettingsPatchSchema.parse(patch);
-		const next = applyPatch(await get(personId), parsed);
-		const row = toRow(personId, next);
-		await db.insert(notificationSettings).values(row).onConflictDoUpdate({
-			target: notificationSettings.personId,
-			set: row,
-		});
-		return next;
-	}
-
-	return {
-		/** The Person's settings, or the defaults. */
-		get,
-
-		/** Saves a change of the Person's settings and returns them all. */
-		save,
-
-		/**
-		 * Gives a Person who has no settings yet these choices, once: the
-		 * copy of the settings a computer kept before they moved to the
-		 * Person. A Person with a row keeps it.
-		 */
-		async seed(
-			personId: string,
-			events: Partial<NotificationSettings["events"]>,
-		): Promise<void> {
-			const settings = applyPatch(defaultSettings(fallbackZone), { events });
-			await db
-				.insert(notificationSettings)
-				.values(toRow(personId, settings))
-				.onConflictDoNothing();
-		},
-
-		/**
-		 * After a save of the computer's settings that changed one of its
-		 * three switches: the Person's events take the switches' values, for
-		 * a client that still sends them. A save without them changes nothing.
-		 */
-		async adoptComputerSwitches(
-			personId: string,
-			patch: Partial<Record<keyof ComputerSwitches, unknown>>,
-			switches: ComputerSwitches,
-		): Promise<void> {
-			if (!SWITCH_KEYS.some((key) => patch[key] !== undefined)) return;
-			await save(personId, { events: eventsOfSwitches(switches) });
-		},
-	};
-}
-
-function safeJson(text: string, fallback: unknown = {}): unknown {
-	try {
-		return JSON.parse(text);
-	} catch {
-		return fallback;
-	}
 }
