@@ -19,6 +19,7 @@ import { pauseScheduleTonight } from "./application/pause-schedule-tonight";
 import type {
 	Clock,
 	PullRequestScorer,
+	ScheduleAccess,
 	ScheduledProjects,
 	ScheduledRuns,
 	ScheduleNotices,
@@ -50,6 +51,8 @@ export type SchedulesDeps = {
 	clock: Clock;
 	/** How often the scheduler looks for due schedules. Default 30 000 ms. */
 	tickMs?: number;
+	/** Who may act in a Space: each use case a person asks checks it first. */
+	access: ScheduleAccess;
 	runs: ScheduledRuns;
 	projects: ScheduledProjects;
 	offers: ScheduleOffers;
@@ -92,6 +95,7 @@ export type Schedules = {
 export function wireSchedules(deps: SchedulesDeps): Schedules {
 	const ports = {
 		clock: deps.clock,
+		access: deps.access,
 		runs: deps.runs,
 		projects: deps.projects,
 		offers: deps.offers,

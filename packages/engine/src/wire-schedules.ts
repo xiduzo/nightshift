@@ -81,8 +81,9 @@ export function createScheduleNotices(deps: {
  * It gives `schedules`, `notices` and `pullRequestWatch`. The Space move
  * holds `schedules.ticker`. The Space view and the engine read the rest.
  *
- * `runs` is what the slice asks of the run path. The blocks start (R3),
- * views (R2) and recovery (R7) each give one member of it, in `wire.ts`.
+ * `access` is who may act in a Space (`runs/access`). `runs` is what the
+ * slice asks of the run path. The blocks start (R3), views (R2) and
+ * recovery (R7) each give one member of it, in `wire.ts`.
  */
 export function wireEngineSchedules(deps: {
 	db: Database;
@@ -92,6 +93,8 @@ export function wireEngineSchedules(deps: {
 	now(): number;
 	/** How often the scheduler looks for due schedules. Default 30 000 ms. */
 	tickMs: SchedulesDeps["tickMs"];
+	/** Who may act in a Space (`runs/access`). */
+	access: SchedulesDeps["access"];
 	runs: SchedulesDeps["runs"];
 	projects: Pick<Projects, "find" | "listInSpace">;
 	directory: Pick<DeviceDirectory, "hostedElsewhere">;
@@ -130,6 +133,7 @@ export function wireEngineSchedules(deps: {
 		flows: deps.flows,
 		clock: now,
 		tickMs: deps.tickMs,
+		access: deps.access,
 		runs: deps.runs,
 		projects: {
 			// Also a project without a Clone here: its runs run on another Device.

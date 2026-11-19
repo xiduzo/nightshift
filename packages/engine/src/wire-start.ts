@@ -1,6 +1,5 @@
-import type { Permissions } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import type { Actor, DeviceDirectory, Relay, StartRunInput } from "./contract";
+import type { DeviceDirectory, Relay, StartRunInput } from "./contract";
 import type { RunLog, RunTrigger } from "./log";
 import type { PlacementPort } from "./placement";
 import type { Projects } from "./projects";
@@ -9,16 +8,13 @@ import { type Access, wireStart, type wireWalk } from "./runs";
 
 type StartDeps = Parameters<typeof wireStart>[0];
 
-/** What a role must allow to start a run (ADR 4). */
-const STARTS_RUNS: Permissions = { run: ["start"] };
-
 /**
  * The start block of the engine's composition (`wire.ts`): a run's start
  * (`runs/start/`), by a person, by Night Shift in this process, or by a
  * schedule. Lane R3 of the hexagon series owns this file.
  *
  * It gives `places`: the start's use cases, and for the schedules slice
- * `startForSchedule` and `mayStart` (`ScheduledRuns`). The Space view reads
+ * `startForSchedule` (`ScheduledRuns.start`). The Space view reads
  * the use cases. It also gives `runs`: the run use cases of `Engine.runs`
  * this block holds (`start`).
  */
@@ -71,9 +67,6 @@ export function wireEngineStart(deps: {
 			await deps.ready;
 			return start.startScheduledRun({ input, trigger });
 		},
-		/** Refuses an actor who may not start runs in the Space (`ScheduledRuns.mayStart`, for Run now). */
-		mayStart: (actor: Actor, spaceId: string) =>
-			deps.access.openSpace(actor, { spaceId, need: STARTS_RUNS }),
 	};
 
 	return { places, runs: { start: start.startRun } };

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow, type Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { atLocal, utc } from "@nightshift/time/testing";
+import { type Actor, NIGHT_SHIFT } from "../../contract";
 import { inMemorySchedulePorts } from "../adapters/out/in-memory-neighbours";
 import { createScheduleWatch } from "../domain/schedule-watch";
 import { createWebhookRefusals } from "../domain/webhook-delivery";
@@ -16,6 +17,7 @@ function at(day: number, hours: number, minutes = 0, seconds = 0): number {
 
 const P = "project-1";
 const SPACE = "space-1";
+const ANN: Actor = { personId: "person-ann", door: "session" };
 // biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
 const HOOK_SECRET = "${HOOK_SECRET}";
 const night: Flow = {
@@ -58,9 +60,11 @@ function project(schedules: Schedule[], now = at(16, 21, 59)) {
 		ports,
 		watch,
 		refusals,
-		list: () => list(undefined, { spaceId: SPACE, projectId: P }),
+		list: () => list(ANN, { spaceId: SPACE, projectId: P }),
 		listIn: (spaceId: string, projectId = P) =>
-			list(undefined, { spaceId, projectId }),
+			list(ANN, { spaceId, projectId }),
+		/** As Night Shift itself: a caller in this process. */
+		listAsNightShift: () => list(NIGHT_SHIFT, { spaceId: SPACE, projectId: P }),
 	};
 }
 
@@ -353,5 +357,24 @@ describe("the schedules of a project", () => {
 		}
 		// It is refused before anything is read.
 		expect(ports.log.facts.schedule).toEqual([]);
+	});
+
+	test("asks whether the person is a Member of the Space, before it reads anything", async () => {
+		const { ports, list, listAsNightShift } = project([nightly()]);
+		const gone = new Refusal("not-found", "No such Space.");
+		ports.access.refuse(gone);
+		expect(await list().catch((error: unknown) => error)).toBe(gone);
+		// Being a Member is enough: no role is asked for.
+		expect(ports.access.opened).toEqual([{ actor: ANN, spaceId: SPACE }]);
+
+		// A caller in this process acts as Night Shift: it may.
+		const listed = await listAsNightShift();
+		expect(listed.schedules.map((schedule) => schedule.id)).toEqual([
+			"nightly",
+		]);
+		expect(ports.access.opened[1]).toEqual({
+			actor: NIGHT_SHIFT,
+			spaceId: SPACE,
+		});
 	});
 });

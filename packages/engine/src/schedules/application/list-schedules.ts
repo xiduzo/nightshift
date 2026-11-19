@@ -12,6 +12,7 @@ import {
 } from "../domain/webhook-delivery";
 import type {
 	Clock,
+	ScheduleAccess,
 	ScheduledProjects,
 	ScheduledRuns,
 	ScheduleLog,
@@ -59,6 +60,7 @@ export type ScheduleList = {
 };
 
 export type ListSchedulesPorts = {
+	access: ScheduleAccess;
 	projects: Pick<ScheduledProjects, "inSpace">;
 	store: Pick<ScheduleStore, "list">;
 	log: Pick<ScheduleLog, "histories" | "deliveries">;
@@ -75,16 +77,17 @@ export type ListSchedules = { spaceId: string; projectId: string };
 /**
  * The schedules of a project as a person reads them: each with its next
  * start, how its last cron time went (a webhook's: its latest
- * deliveries) and its issues. A pause that has ended is dropped. Refuses
- * (`not-found`) a project that is not in the Space.
+ * deliveries) and its issues. A pause that has ended is dropped.
+ *
+ * Refuses a Person who is not a Member of the Space, before anything else
+ * (`access.openSpace`). Refuses (`not-found`) a project that is not in the
+ * Space.
  */
 export const listSchedules =
 	(ports: ListSchedulesPorts) =>
-	async (
-		_actor: Actor | undefined,
-		request: ListSchedules,
-	): Promise<ScheduleList> => {
-		const { projects, store, log, runs, clock, watch, refusals } = ports;
+	async (actor: Actor, request: ListSchedules): Promise<ScheduleList> => {
+		const { access, projects, store, log, runs, clock, watch, refusals } =
+			ports;
 		const { spaceId, projectId } = request;
 
 		/** A logged schedule fact, with the status of the run it started. */
@@ -96,6 +99,7 @@ export const listSchedules =
 			return { ...record, runStatus: await runs.status(record.runId) };
 		}
 
+		await access.openSpace(actor, { spaceId });
 		await projects.inSpace(projectId, spaceId);
 		const loaded = await store.list(projectId);
 		const histories = await log.histories();

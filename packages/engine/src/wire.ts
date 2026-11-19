@@ -260,7 +260,8 @@ export function createEngine(
 	});
 
 	// --- access and walk (R1): `wire-access.ts`, `wire-walk.ts` ---
-	// gives: access (the Space view, the engine), startHolds, walk (R4 to R7)
+	// gives: access (the run path, schedules, the Space view, the engine),
+	// startHolds, walk (R4 to R7)
 	const access = wireEngineAccess({ db, log: runLog, documents });
 	const walk = wireEngineWalk({ log: runLog, bus, runner, peers });
 	const startHolds = walk.holds;
@@ -393,10 +394,10 @@ export function createEngine(
 		flows: projectFlows,
 		now,
 		tickMs: internals.scheduleTickMs,
+		access,
 		runs: {
 			// start (R3)
 			start: start.places.startForSchedule,
-			mayStart: start.places.mayStart,
 			// views (R2)
 			status: views.reads.runStatus,
 			// recovery (R7)

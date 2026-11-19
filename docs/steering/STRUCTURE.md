@@ -465,7 +465,7 @@ export const answerGate =
 
 `application/` takes a `now` port only where a test must set the time. State that outlives a request (a watch, a short memory) is a pure domain object. The wire makes it once and gives it to the use case beside the ports. It is not a port, and it needs no twin. The same holds for a collaborator with no I/O.
 
-**P4. The use case decides who may act.** It takes the `Actor`. The API keeps the session check and the input schema. For an expected outcome, the use case throws a `Refusal`. There is no `Result` type. Each door passes the Person with the door their request came through (`session`, `device-key`, `command`) and says the refusals in its own words. A caller in the process that acts for no Person passes `NIGHT_SHIFT`. Until the schedules slice checks its roles, its use cases take `Actor | undefined`.
+**P4. The use case decides who may act.** It takes the `Actor`. The API keeps the session check and the input schema. For an expected outcome, the use case throws a `Refusal`. There is no `Result` type. Each door passes the Person with the door their request came through (`session`, `device-key`, `command`) and says the refusals in its own words. A caller in the process that acts for no Person passes `NIGHT_SHIFT`.
 
 **P5. A driving adapter holds no rule.** It reads the input, calls one use case and maps the answer. The API is the driving adapter for people. `Engine` and `SpaceEngine` are thin objects that list the use cases for it, and they hold no rule. A driving adapter that is not the API sits in `adapters/in/`. A file there imports nothing of its slice: the wire hands it the bound use case.
 

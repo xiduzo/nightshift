@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow, type Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import type { Actor } from "../../contract";
+import { type Actor, NIGHT_SHIFT } from "../../contract";
 import { NOT_ON_THIS_COMPUTER } from "../../projects";
 import type { UsageMoment } from "../../usage";
 import { inMemorySchedulePorts } from "../adapters/out/in-memory-neighbours";
@@ -63,6 +63,9 @@ function project(clone: { hasFolder?: boolean; clonedHere?: boolean } = {}) {
 				schedules,
 				...(timeZone !== undefined ? { timeZone } : {}),
 			}),
+		/** As Night Shift itself: a caller in this process. */
+		saveAsNightShift: (schedules: Schedule[]) =>
+			save(NIGHT_SHIFT, { spaceId: SPACE, projectId: P, schedules }),
 		saved: async () =>
 			(await ports.store.list(P, { validate: false })).schedules,
 	};
@@ -205,5 +208,24 @@ describe("the save of a project's schedules", () => {
 				scorePullRequests: true,
 			},
 		]);
+	});
+
+	test("asks whether the person is a Member of the Space, before it reads anything", async () => {
+		const { ports, save, saveAsNightShift, saved } = project();
+		const gone = new Refusal("not-found", "No such Space.");
+		ports.access.refuse(gone);
+		expect(await refusalOf(save([nightly({ enabled: false })]))).toBe(gone);
+		// Being a Member is enough: no role is asked for.
+		expect(ports.access.opened).toEqual([{ actor: ANN, spaceId: SPACE }]);
+		expect(ports.offers.asked).toEqual([]);
+		expect(await saved()).toEqual([]);
+
+		// A caller in this process acts as Night Shift: it may.
+		await saveAsNightShift([nightly({ enabled: false })]);
+		expect(ports.access.opened[1]).toEqual({
+			actor: NIGHT_SHIFT,
+			spaceId: SPACE,
+		});
+		expect(await saved()).toEqual([nightly({ enabled: false })]);
 	});
 });

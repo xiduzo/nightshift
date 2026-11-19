@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { Schedule } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
 import { atLocal } from "@nightshift/time/testing";
+import { type Actor, NIGHT_SHIFT } from "../../contract";
 import { inMemorySchedulePorts } from "../adapters/out/in-memory-neighbours";
 import { createScheduleWatch } from "../domain/schedule-watch";
 import { pauseScheduleTonight } from "./pause-schedule-tonight";
@@ -14,6 +16,7 @@ function at(day: number, hours: number, minutes = 0, seconds = 0): number {
 
 const P = "project-1";
 const SPACE = "space-1";
+const ANN: Actor = { personId: "person-ann", door: "session" };
 // biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
 const HOOK_SECRET = "${HOOK_SECRET}";
 
@@ -40,7 +43,10 @@ function project(schedules: Schedule[], now = at(16, 12)) {
 	return {
 		ports,
 		pause: (scheduleId: string, spaceId = SPACE) =>
-			pause(undefined, { spaceId, projectId: P, scheduleId }),
+			pause(ANN, { spaceId, projectId: P, scheduleId }),
+		/** As Night Shift itself: a caller in this process. */
+		pauseAsNightShift: (scheduleId: string) =>
+			pause(NIGHT_SHIFT, { spaceId: SPACE, projectId: P, scheduleId }),
 		saved: async () =>
 			(await ports.store.list(P, { validate: false })).schedules,
 	};
@@ -162,5 +168,36 @@ describe("Pause tonight", () => {
 			kind: "not-found",
 		});
 		expect(await saved()).toEqual([nightly()]);
+	});
+
+	test("asks whether the person may stop runs in the Space, before it reads anything", async () => {
+		const { ports, pause, pauseAsNightShift, saved } = project([nightly()]);
+		const role = new Refusal("forbidden", "Your role cannot.");
+		ports.access.refuse(role);
+		expect(await refusalOf(pause("nightly"))).toBe(role);
+		expect(ports.access.opened).toEqual([
+			{ actor: ANN, spaceId: SPACE, need: { run: ["stop"] } },
+		]);
+		expect(await saved()).toEqual([nightly()]);
+		expect(ports.notices.changes).toEqual([]);
+
+		// A caller in this process acts as Night Shift: no role applies.
+		await pauseAsNightShift("nightly");
+		expect(ports.access.opened[1]).toEqual({
+			actor: NIGHT_SHIFT,
+			spaceId: SPACE,
+			need: { run: ["stop"] },
+		});
+		expect(await saved()).toEqual([nightly({ pausedUntil: at(17, 6) })]);
+	});
+
+	test("asks the role before it looks for the project", async () => {
+		const { ports, pause } = project([nightly()]);
+		const gone = new Refusal("not-found", "No such Space.");
+		ports.access.refuse(gone);
+		expect(await refusalOf(pause("nightly", "space-2"))).toBe(gone);
+		expect(ports.access.opened).toEqual([
+			{ actor: ANN, spaceId: "space-2", need: { run: ["stop"] } },
+		]);
 	});
 });

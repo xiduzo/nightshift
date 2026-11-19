@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { Schedule } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
 import { atLocal } from "@nightshift/time/testing";
+import { type Actor, NIGHT_SHIFT } from "../../contract";
 import { inMemorySchedulePorts } from "../adapters/out/in-memory-neighbours";
 import { createScheduleWatch } from "../domain/schedule-watch";
 import { resumeScheduleTonight } from "./resume-schedule-tonight";
@@ -14,6 +16,7 @@ function at(day: number, hours: number, minutes = 0, seconds = 0): number {
 
 const P = "project-1";
 const SPACE = "space-1";
+const ANN: Actor = { personId: "person-ann", door: "session" };
 
 function nightly(extra: Partial<Schedule> = {}): Schedule {
 	return {
@@ -38,7 +41,10 @@ function project(schedules: Schedule[], now = at(16, 12)) {
 	return {
 		ports,
 		resume: (scheduleId: string, spaceId = SPACE) =>
-			resume(undefined, { spaceId, projectId: P, scheduleId }),
+			resume(ANN, { spaceId, projectId: P, scheduleId }),
+		/** As Night Shift itself: a caller in this process. */
+		resumeAsNightShift: (scheduleId: string) =>
+			resume(NIGHT_SHIFT, { spaceId: SPACE, projectId: P, scheduleId }),
 		saved: async () =>
 			(await ports.store.list(P, { validate: false })).schedules,
 	};
@@ -129,5 +135,27 @@ describe("Resume tonight", () => {
 		});
 		expect(await saved()).toEqual([nightly({ pausedUntil: at(17, 6) })]);
 		expect(ports.notices.changes).toEqual([]);
+	});
+
+	test("asks whether the person may stop runs in the Space, before it reads anything", async () => {
+		const paused = nightly({ pausedUntil: at(17, 6) });
+		const { ports, resume, resumeAsNightShift, saved } = project([paused]);
+		const role = new Refusal("forbidden", "Your role cannot.");
+		ports.access.refuse(role);
+		expect(await refusalOf(resume("nightly"))).toBe(role);
+		expect(ports.access.opened).toEqual([
+			{ actor: ANN, spaceId: SPACE, need: { run: ["stop"] } },
+		]);
+		expect(await saved()).toEqual([paused]);
+		expect(ports.notices.changes).toEqual([]);
+
+		// A caller in this process acts as Night Shift: no role applies.
+		await resumeAsNightShift("nightly");
+		expect(ports.access.opened[1]).toEqual({
+			actor: NIGHT_SHIFT,
+			spaceId: SPACE,
+			need: { run: ["stop"] },
+		});
+		expect(await saved()).toEqual([nightly()]);
 	});
 });

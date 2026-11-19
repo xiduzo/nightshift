@@ -1,20 +1,26 @@
+import type { Permissions } from "@nightshift/auth";
 import { Refusal } from "@nightshift/refusal";
-import { type Actor, NIGHT_SHIFT, personOf } from "../../contract";
+import { type Actor, personOf } from "../../contract";
 import type { RunSummary } from "../../read";
 import { openRunOf, openRunRefusalWords } from "../domain/open-run";
 import { scheduleOf } from "../domain/saved-schedules";
 import { scheduledStart } from "../domain/scheduled-start";
 import type {
 	Clock,
+	ScheduleAccess,
 	ScheduledProjects,
 	ScheduledRuns,
 	ScheduleLog,
 	ScheduleStore,
 } from "./ports";
 
+/** What a role must allow to start a run (ADR 4). */
+const STARTS_RUNS: Permissions = { run: ["start"] };
+
 export type RunScheduleNowPorts = {
+	access: ScheduleAccess;
 	projects: Pick<ScheduledProjects, "inSpace">;
-	runs: Pick<ScheduledRuns, "mayStart" | "shownTo" | "status" | "start">;
+	runs: Pick<ScheduledRuns, "shownTo" | "status" | "start">;
 	store: Pick<ScheduleStore, "list">;
 	log: Pick<ScheduleLog, "histories" | "fired">;
 	clock: Clock;
@@ -33,7 +39,7 @@ export type RunScheduleNow = {
  * tonight stays. It works with the scheduler switched off.
  *
  * Refuses a Person who may not start runs in the Space, before anything
- * else (`runs.mayStart`: not a Member, or a role that does not allow it).
+ * else (`access.openSpace`: not a Member, or a role that does not allow it).
  * Refuses (`not-found`) a project that is not in the Space and a schedule
  * that does not exist, (`invalid`) a schedule that starts no flow, and
  * (`conflict`) while an earlier run of the schedule is still open, as a
@@ -41,14 +47,11 @@ export type RunScheduleNow = {
  */
 export const runScheduleNow =
 	(ports: RunScheduleNowPorts) =>
-	async (
-		actor: Actor | undefined,
-		request: RunScheduleNow,
-	): Promise<RunSummary> => {
-		const { projects, runs, store, log, clock } = ports;
+	async (actor: Actor, request: RunScheduleNow): Promise<RunSummary> => {
+		const { access, projects, runs, store, log, clock } = ports;
 		const { spaceId, projectId, scheduleId } = request;
 
-		await runs.mayStart(actor ?? NIGHT_SHIFT, spaceId);
+		await access.openSpace(actor, { spaceId, need: STARTS_RUNS });
 		await projects.inSpace(projectId, spaceId);
 		// Asked before the start: who may see the paths of the run.
 		const shown = await runs.shownTo(spaceId, actor);
@@ -68,7 +71,7 @@ export const runScheduleNow =
 		const at = clock();
 		const run = await runs.start(
 			scheduledStart(projectId, schedule, flow, at, {
-				startedBy: (actor && personOf(actor)) ?? undefined,
+				startedBy: personOf(actor) ?? undefined,
 			}),
 			{ kind: "schedule", scheduleId: schedule.id, at },
 		);

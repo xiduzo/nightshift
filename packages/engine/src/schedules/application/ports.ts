@@ -1,3 +1,4 @@
+import type { Permissions } from "@nightshift/auth";
 import type {
 	FlowSources,
 	JsonValue,
@@ -27,6 +28,23 @@ import type {
  * package fills the others (`@filledBy`): `createEngine` passes them to
  * `wireSchedules`.
  */
+
+/**
+ * Who may act in a Space: the one check of a request a person makes.
+ * @filledBy engine/runs
+ */
+export type ScheduleAccess = {
+	/**
+	 * Refuses an actor who may not act in the Space: a Person who is not a
+	 * Member of it (`SpaceNotFound`), or whose role does not allow `need`
+	 * (`RoleRefusal`). Without `need`, a Member may. Night Shift itself
+	 * may act in every Space.
+	 */
+	openSpace(
+		actor: Actor,
+		request: { spaceId: string; need?: Permissions },
+	): Promise<void>;
+};
 
 /** The schedules of a project, as its flow document keeps them. */
 export type ScheduleStore = {
@@ -81,12 +99,6 @@ export type ScheduledRuns = {
 	 * the start.
 	 */
 	start(input: StartRunInput, trigger: RunTrigger): Promise<RunSummary>;
-	/**
-	 * Refuses an actor who may not start runs in the Space: a Person who is
-	 * not a Member of it (`not-found`), or whose role does not allow it
-	 * (`RoleRefusal`). Night Shift itself may.
-	 */
-	mayStart(actor: Actor, spaceId: string): Promise<void>;
 	/** The run's status, or null when the log knows no such run. */
 	status(runId: string): Promise<RunStatus | null>;
 	/** Wakes the project's runs that wait for the signal. Returns how many woke. */
@@ -97,7 +109,7 @@ export type ScheduledRuns = {
 	/** What hides the worktree paths of a run on a Device the actor does not own. */
 	shownTo(
 		spaceId: string,
-		actor: Actor | undefined,
+		actor: Actor,
 	): Promise<(run: RunSummary) => Promise<RunSummary>>;
 };
 

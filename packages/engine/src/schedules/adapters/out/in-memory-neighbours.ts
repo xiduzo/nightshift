@@ -1,3 +1,4 @@
+import type { Permissions } from "@nightshift/auth";
 import type { JsonValue, Schedule, WebhookEvent } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { Actor, StartRunInput } from "../../../contract";
@@ -8,6 +9,7 @@ import type { RunStatus } from "../../../run-status";
 import type {
 	Clock,
 	PullRequestScorer,
+	ScheduleAccess,
 	ScheduledProjects,
 	ScheduledRuns,
 	ScheduleNotices,
@@ -45,6 +47,29 @@ export function inMemoryClock(at: number): InMemoryClock {
 	return clock;
 }
 
+/** Who may act in the Spaces of a test: everyone, until the test refuses Persons. */
+export type InMemoryScheduleAccess = ScheduleAccess & {
+	/** Every Space that was opened, for whom and for what, in order. */
+	opened: { actor: Actor; spaceId: string; need?: Permissions }[];
+	/** From now on `openSpace` throws this for an actor that is a Person. */
+	refuse(error: unknown): void;
+};
+
+export function inMemoryScheduleAccess(): InMemoryScheduleAccess {
+	let refusal: { error: unknown } | null = null;
+	const access: InMemoryScheduleAccess = {
+		opened: [],
+		refuse: (error) => {
+			refusal = { error };
+		},
+		async openSpace(actor, request) {
+			access.opened.push({ actor, ...request });
+			if (refusal && "personId" in actor) throw refusal.error;
+		},
+	};
+	return access;
+}
+
 /** The runs a schedule started, and what a test says of them. */
 export type InMemoryScheduledRuns = ScheduledRuns & {
 	/** Every start that worked, in order. */
@@ -55,11 +80,7 @@ export type InMemoryScheduledRuns = ScheduledRuns & {
 		signal: { name: string; key: string | null; data: JsonValue };
 	}[];
 	/** Who asked to see runs, in order. */
-	shown: { spaceId: string; actor: Actor | undefined }[];
-	/** Who was asked whether they may start runs, in order. */
-	askedToStart: { actor: Actor; spaceId: string }[];
-	/** From now on `mayStart` throws this for an actor that is a Person. */
-	refuseStarts(error: unknown): void;
+	shown: { spaceId: string; actor: Actor }[];
 	/** A run's status from now on. A started run is `running` until a test says otherwise. Null: the run is gone. */
 	setStatus(runId: string, status: RunStatus | null): void;
 	/** The next start throws this. */
@@ -78,15 +99,10 @@ export function inMemoryScheduledRuns(): InMemoryScheduledRuns {
 	let signalFailure: { error: unknown } | null = null;
 	let woken = 0;
 	let hidden = false;
-	let startRefusal: { error: unknown } | null = null;
 	const runs: InMemoryScheduledRuns = {
 		started: [],
 		signals: [],
 		shown: [],
-		askedToStart: [],
-		refuseStarts: (error) => {
-			startRefusal = { error };
-		},
 		setStatus: (runId, status) => {
 			statuses.set(runId, status);
 		},
@@ -103,10 +119,6 @@ export function inMemoryScheduledRuns(): InMemoryScheduledRuns {
 			hidden = true;
 		},
 
-		async mayStart(actor, spaceId) {
-			runs.askedToStart.push({ actor, spaceId });
-			if (startRefusal && "personId" in actor) throw startRefusal.error;
-		},
 		async start(input, trigger) {
 			if (startFailure) {
 				const { error } = startFailure;
@@ -343,6 +355,7 @@ export function inMemoryScheduleNotices(): InMemoryScheduleNotices {
 /** Every port of the slice, in memory. */
 export type InMemorySchedulePorts = {
 	clock: InMemoryClock;
+	access: InMemoryScheduleAccess;
 	store: InMemoryScheduleStore;
 	log: InMemoryScheduleLog;
 	runs: InMemoryScheduledRuns;
@@ -358,6 +371,7 @@ export type InMemorySchedulePorts = {
 export function inMemorySchedulePorts(at: number): InMemorySchedulePorts {
 	return {
 		clock: inMemoryClock(at),
+		access: inMemoryScheduleAccess(),
 		store: inMemoryScheduleStore(),
 		log: inMemoryScheduleLog(),
 		runs: inMemoryScheduledRuns(),

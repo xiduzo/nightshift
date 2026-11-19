@@ -40,9 +40,9 @@ function project(schedules: Schedule[], now = at(16, 12)) {
 		ports,
 		runNow: (scheduleId: string) =>
 			runNow(ANN, { spaceId: SPACE, projectId: P, scheduleId }),
-		/** As a caller without a person: an in-process one. */
-		runNowAsNobody: (scheduleId: string) =>
-			runNow(undefined, { spaceId: SPACE, projectId: P, scheduleId }),
+		/** As Night Shift itself: a caller in this process. */
+		runNowAsNightShift: (scheduleId: string) =>
+			runNow(NIGHT_SHIFT, { spaceId: SPACE, projectId: P, scheduleId }),
 		runNowIn: (spaceId: string) =>
 			runNow(ANN, { spaceId, projectId: P, scheduleId: "nightly" }),
 	};
@@ -88,14 +88,14 @@ describe("Run now", () => {
 	});
 
 	test("the run is the schedule's Person's, else the person's who asks", async () => {
-		const { ports, runNow, runNowAsNobody } = project([
+		const { ports, runNow, runNowAsNightShift } = project([
 			nightly({ id: "mine" }),
 			nightly({ id: "carols", person: "person-carol" }),
 			nightly({ id: "nobodys" }),
 		]);
 		await runNow("mine");
 		await runNow("carols");
-		await runNowAsNobody("nobodys");
+		await runNowAsNightShift("nobodys");
 		expect(ports.runs.started.map((start) => start.input.startedBy)).toEqual([
 			"person-ann",
 			"person-carol",
@@ -206,34 +206,37 @@ describe("Run now", () => {
 	});
 
 	test("asks whether the person may start runs in the Space, before it reads anything", async () => {
-		const { ports, runNow, runNowAsNobody } = project([nightly()]);
-		ports.runs.refuseStarts(new Refusal("forbidden", "Your role cannot."));
+		const { ports, runNow, runNowAsNightShift } = project([nightly()]);
+		ports.access.refuse(new Refusal("forbidden", "Your role cannot."));
 		expect(await refusalOf(runNow("nightly"))).toMatchObject({
 			kind: "forbidden",
 			message: "Your role cannot.",
 		});
-		expect(ports.runs.askedToStart).toEqual([{ actor: ANN, spaceId: SPACE }]);
+		expect(ports.access.opened).toEqual([
+			{ actor: ANN, spaceId: SPACE, need: { run: ["start"] } },
+		]);
 		expect(ports.runs.shown).toEqual([]);
 		expect(ports.runs.started).toEqual([]);
 		expect(ports.log.facts.schedule).toEqual([]);
 
 		// A caller in this process acts as Night Shift: no role applies.
-		await runNowAsNobody("nightly");
-		expect(ports.runs.askedToStart[1]).toEqual({
+		await runNowAsNightShift("nightly");
+		expect(ports.access.opened[1]).toEqual({
 			actor: NIGHT_SHIFT,
 			spaceId: SPACE,
+			need: { run: ["start"] },
 		});
 		expect(ports.runs.started).toHaveLength(1);
 	});
 
 	test("asks the role before it looks for the project", async () => {
 		const { ports, runNowIn } = project([nightly()]);
-		ports.runs.refuseStarts(new Refusal("not-found", "No such Space."));
+		ports.access.refuse(new Refusal("not-found", "No such Space."));
 		expect(await refusalOf(runNowIn("space-2"))).toMatchObject({
 			message: "No such Space.",
 		});
-		expect(ports.runs.askedToStart).toEqual([
-			{ actor: ANN, spaceId: "space-2" },
+		expect(ports.access.opened).toEqual([
+			{ actor: ANN, spaceId: "space-2", need: { run: ["start"] } },
 		]);
 	});
 
