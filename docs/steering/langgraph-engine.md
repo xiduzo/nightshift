@@ -43,8 +43,8 @@ below it, from the bottom up:
 | `scores/` | The pull request scores: what became of the pull request a run opened, written as Scores of that run (`pull-request-scores.ts`, `pull-request-watch.ts`). |
 | `schedules/` | The schedules of the projects, as a slice with rings (`docs/steering/STRUCTURE.md`, section 9). The rules are in `domain/`. Each request is one use case in `application/`. The store of the schedules in the flow document and the timer that fires them are in `adapters/`. `wire.ts` builds them (`wireSchedules`). |
 | `space-move/` | The Space move: Projects to another Space as one operation (`projects-move.ts`). |
-| `runs/` | The run path as a slice with rings, one sub-vertical per part: who may see or act on a run (`access/`), what every use case that writes to a run shares (`walk/`), what a person does to a run (`actions/`), what Night Shift does to a run on its own (`recovery/`), and a run's start (`start/`: here, or handed to the Host that keeps the Space). |
-| `run/` | The answer to a Gate (`answer.ts`) and the move of a run (`move.ts`), and the other end of a move (`take-over.ts`). |
+| `runs/` | The run path as a slice with rings, one sub-vertical per part: who may see or act on a run (`access/`), what every use case that writes to a run shares (`walk/`), what a person does to a run (`actions/`), the move of a run's walk to another Device and its other end (`move/`), what Night Shift does to a run on its own (`recovery/`), and a run's start (`start/`: here, or handed to the Host that keeps the Space). |
+| `run/` | The answer to a Gate (`answer.ts`). |
 | The top of `src/` | The composition root (`wire.ts`: `createEngine`, with a file for each piece of the run path, `wire-<what>.ts`), the `Engine` it returns (`engine.ts`), what it takes (`engine-options.ts`), the port of the other Devices it walks with (`peers.ts`), and what a person does in one Space (`space-engine.ts` is the interface, `space.ts` the module). The tests that start a whole engine are in `packages/engine/test/engine/`. |
 
 No import points up, `import type` included. `scripts/check-verticals.ts`
@@ -285,12 +285,17 @@ packages/engine/src/
                            (the Walkers port of runs/walk): a stop, an
                            answer, a signal and a move travel, the rest
                            only the Walker takes.
-  run/answer.ts,           The answer to a Gate and the move of a run, as
-  run/move.ts              actOnRun takes them. moveTargets lists the
-                           Devices a move may go to.
-  run/take-over.ts,        takeOver: the other end of a move. wake.ts: the
-  wake.ts                  runs that slept for a Device that is back look
-                           again.
+  run/answer.ts            The answer to a Gate, as actOnRun takes it.
+  runs/move/               The move of a run's walk to another of the
+                           Person's Devices (moveRun, as actOnRun takes
+                           it): the walk state goes to the archive and
+                           WalkerMoved is logged, in a Turn. The Devices
+                           a move may go to (listMoveTargets). The other
+                           end (arriveRun): the new Walker takes the
+                           Checkpoint and the transcripts from the
+                           archive and logs WalkerArrived.
+  wake.ts                  The runs that slept for a Device that is back
+                           look again.
   runs/start/              Run start. The plan loads and validates the
                            flow and its called flows and resolves profiles.
                            The start asks every requirement in REQUIREMENTS

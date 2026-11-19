@@ -19,8 +19,7 @@ import {
 	toProject,
 } from "./projects";
 import type { ReadModel, RunStreamItem } from "./read";
-import type { MovePath } from "./run";
-import type { Access, Actions, Start } from "./runs";
+import type { Access, Actions, Move, Start } from "./runs";
 import type { Schedules } from "./schedules";
 import { readServiceLog } from "./services";
 import type { SpaceEngine } from "./space-engine";
@@ -89,11 +88,10 @@ export type SpacesDeps = {
 	start: Pick<Start, "startRun" | "listPlacements" | "listDevices">;
 
 	// --- actions (R4), move (R5), gates (R6) ---
-	/**
-	 * Stop, answer, signal, move, resume, restart and run again
-	 * (`runs/actions`), and the Devices a run can move to (`run/move.ts`).
-	 */
-	actions: { act: Actions["actOnRun"]; moveTargets: MovePath["moveTargets"] };
+	/** Stop, answer, signal, move, resume, restart and run again (`runs/actions`). */
+	actions: { act: Actions["actOnRun"] };
+	/** The Devices a run can move to (`runs/move`). */
+	moveTargets: Move["listMoveTargets"];
 
 	// --- schedules ---
 	/** The schedules of the projects: each use case checks the Space itself (`schedules/`). */
@@ -435,7 +433,7 @@ export function createSpaces(deps: SpacesDeps) {
 			// --- move (R5) ---
 			async listMoveTargets(runId) {
 				await ready;
-				return actions.moveTargets(spaceId, actor, runId);
+				return deps.moveTargets(actor ?? NIGHT_SHIFT, { spaceId, runId });
 			},
 
 			// --- gates (R6) ---

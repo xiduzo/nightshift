@@ -121,7 +121,7 @@ import { createSleeps, planWake, recordWake, type Wake } from "./wake";
  *   `WalkerArrived` yet, `runsArriving`) is refused (`arriving`): it has
  *   no Checkpoint here. Only its take-over holds it (`hold`, `arrival`).
  *   The overdue check and the prune leave it. Its test moves a run
- *   between two computers (`run/move.test.ts`).
+ *   between two computers (`test/engine/move.test.ts`).
  *
  * Over 600 lines on purpose: the drive, the slots, the queues and the
  * stop of a run share one state per run, so they stay in one module.

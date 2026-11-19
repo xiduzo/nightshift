@@ -96,7 +96,8 @@ import { wireEngineWalk } from "./wire-walk";
  *   The action is taken here as a Turn of the runner, or handed to the
  *   run's Walker as a Command: the Walker is the only writer of its run's
  *   events.
- * - `wire-move.ts` (R5): the other end of a move (`run/take-over.ts`).
+ * - `wire-move.ts` (R5): the move of a run's walk to another Device, and
+ *   its other end, where the new Walker takes the run over (`runs/move/`).
  * - `space.ts`: what a person does in one Space (`SpaceEngine`, in
  *   `space-engine.ts`).
  * - `engine.ts`: the `Engine` interface and the thin object behind it.
@@ -555,24 +556,21 @@ export function createEngine(
 		disposed: () => disposed,
 	});
 
+	// --- move (R5): `wire-move.ts` ---
+	// gives: move.arrive (peers), move.moveRunWith (actions), move.moveTargets
+	// (the Space view), move.runs (the engine)
+	const move = wireEngineMove({ access, walk, db, peers, walks, device });
+
 	// --- actions (R4): `wire-actions.ts` ---
 	// gives: acts.actions (the Space view), acts.runs (the engine)
 	const acts = wireEngineActions({
 		access,
 		walk,
-		db,
 		artifacts,
-		archive: peers.runs,
-		walks,
-		device,
-		placement: devices,
+		moveRunWith: move.moveRunWith,
 		leases,
 		...(options.usage ? { usage: options.usage } : {}),
 	});
-
-	// --- move (R5): `wire-move.ts` ---
-	// gives: move.arrive (peers)
-	const move = wireEngineMove({ db, log: runLog, runner, peers, walks });
 
 	// --- gates (R6) ---
 	// Nothing yet: the answer of a Gate is in the actions block, and the
@@ -677,6 +675,7 @@ export function createEngine(
 		start: start.places,
 		// actions (R4), move (R5), gates (R6)
 		actions: acts.actions,
+		moveTargets: move.moveTargets,
 		// schedules
 		schedules: sched.schedules,
 	});
@@ -696,7 +695,7 @@ export function createEngine(
 		leases,
 		landed,
 		runner,
-		runs: { ...access.runs, ...acts.runs, ...start.runs },
+		runs: { ...access.runs, ...acts.runs, ...start.runs, ...move.runs },
 		// schedules and scores
 		scheduleNotices: sched.notices,
 		schedules: sched.schedules,

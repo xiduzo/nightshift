@@ -31,6 +31,7 @@ import type { SpaceEngine } from "./space-engine";
 import type { MovedProjects, ProjectsMove } from "./space-move";
 import type { wireEngineAccess } from "./wire-access";
 import type { wireEngineActions } from "./wire-actions";
+import type { wireEngineMove } from "./wire-move";
 import type { wireEngineStart } from "./wire-start";
 
 /**
@@ -203,11 +204,13 @@ export interface Engine {
  * The run use cases of `Engine.runs`. Each block of the run path gives its
  * own (`runs` of its `wire-*.ts` file): access gives `open`, the actions
  * give `act`, `stop`, `resume`, `restartStep`, `rerun`, `signal`,
- * `releaseLease`, `markUseful` and `takeOver`, the start gives `start`.
+ * `releaseLease`, `markUseful` and `takeOver`, the start gives `start`, the
+ * move gives `move` and `moveTargets`.
  */
 export type RunUseCases = ReturnType<typeof wireEngineAccess>["runs"] &
 	ReturnType<typeof wireEngineActions>["runs"] &
-	ReturnType<typeof wireEngineStart>["runs"];
+	ReturnType<typeof wireEngineStart>["runs"] &
+	ReturnType<typeof wireEngineMove>["runs"];
 
 /** Knobs for tests only. Not part of the engine contract. */
 export type EngineInternals = {
