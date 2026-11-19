@@ -11,7 +11,13 @@
  * keeps (`LeaseHost`, ADR 7), the Offer rule of a schedule (`OffersPort`) and the name of the branch of one item of a Call (`itemBranchName`, in `branches/`). It imports no other vertical.
  */
 
-export type { Actor, MemberChange } from "./actor";
+export {
+	type Actor,
+	type MemberChange,
+	NIGHT_SHIFT,
+	type PersonActor,
+	personOf,
+} from "./actor";
 export { itemBranchName } from "./branches";
 export {
 	COMMAND_KINDS,

@@ -1,5 +1,5 @@
 import { Refusal } from "@nightshift/refusal";
-import type { Actor } from "../../contract";
+import { type Actor, personOf } from "../../contract";
 import type { RunSummary } from "../../read";
 import { openRunOf, openRunRefusalWords } from "../domain/open-run";
 import { scheduleOf } from "../domain/saved-schedules";
@@ -65,7 +65,7 @@ export const runScheduleNow =
 		const at = clock();
 		const run = await runs.start(
 			scheduledStart(projectId, schedule, flow, at, {
-				startedBy: actor?.personId ?? undefined,
+				startedBy: (actor && personOf(actor)) ?? undefined,
 			}),
 			{ kind: "schedule", scheduleId: schedule.id, at },
 		);

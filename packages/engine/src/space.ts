@@ -3,16 +3,10 @@ import { Refusal } from "@nightshift/refusal";
 import type { ArtifactStore } from "./artifacts";
 import type { AnswerCost } from "./assistant";
 import type { RunFilesService } from "./cleanup";
-import type { Actor, StartRunInput } from "./contract";
+import { NIGHT_SHIFT, type PersonActor, type StartRunInput } from "./contract";
 import type { SpaceFlows } from "./flows";
 import type { Runner } from "./graph";
-import {
-	RUN_NOT_FOUND,
-	type RunLog,
-	type RunRow,
-	type RunTrigger,
-	scopeKey,
-} from "./log";
+import { type RunLog, type RunRow, type RunTrigger, scopeKey } from "./log";
 import type { MemoryFlow, NodeMemory } from "./memory";
 import type { WithPaths } from "./peers";
 import type { PlacementPort } from "./placement";
@@ -27,6 +21,7 @@ import {
 } from "./projects";
 import type { ReadModel, RunStreamItem, RunSummary } from "./read";
 import type { RunActions, StartPlaces } from "./run";
+import type { Access } from "./runs";
 import type { Schedules } from "./schedules";
 import { readServiceLog } from "./services";
 import type { SpaceEngine } from "./space-engine";
@@ -74,9 +69,9 @@ export type SpacesDeps = {
 	/** A Space move (`projects-move.ts`). */
 	moveProjects(move: ProjectsMove): Promise<MovedProjects>;
 
-	// --- the run's row, and the files of a run that other slices keep (R1) ---
-	/** The run's row, or "not found". */
-	runRow(runId: string): Promise<RunRow>;
+	// --- access, and the files of a run that other slices keep (R1) ---
+	/** Opens a run for an actor: the one check of who may see or act on it (`runs/access`). */
+	openRun: Access["openRun"];
 	/** The files of run folders on this computer. */
 	runFiles: Pick<RunFilesService, "list" | "file">;
 	/** The artifacts kept on this computer. */
@@ -84,7 +79,7 @@ export type SpacesDeps = {
 	/** Hides the worktree paths of runs on Devices the actor does not own. */
 	pathsFor(
 		spaceId: string,
-		actor: Actor | undefined,
+		actor: PersonActor | undefined,
 	): Promise<<T extends WithPaths>(summary: T) => Promise<T>>;
 
 	// --- views (R2) ---
@@ -120,11 +115,13 @@ export type SpacesDeps = {
 export function createSpaces(deps: SpacesDeps) {
 	const { ready, log, projects, documents, reads, actions } = deps;
 
-	/** The run's row when it is in the Space, else "not found". */
+	/**
+	 * The run's row when it is in the Space, else "not found": the run
+	 * opened by Night Shift, so no role is read. The views (R2) pass their
+	 * actor once they know their callers (D6 of the run path plan).
+	 */
 	async function getRunRow(runId: string, spaceId: string): Promise<RunRow> {
-		const row = await deps.runRow(runId);
-		if (row.spaceId !== spaceId) throw new Refusal("not-found", RUN_NOT_FOUND);
-		return row;
+		return (await deps.openRun(NIGHT_SHIFT, { runId, spaceId })).run;
 	}
 
 	/** Rows as the engine's Projects, with their Clones from the Space document. */
@@ -157,7 +154,11 @@ export function createSpaces(deps: SpacesDeps) {
 	}
 
 	/** What a person does in one Space. */
-	return function space(spaceId: string, actor?: Actor): SpaceEngine {
+	return function space(spaceId: string, actor?: PersonActor): SpaceEngine {
+		/** The run in this Space, opened for the actor: Night Shift when there is none. */
+		const open = (runId: string) =>
+			deps.openRun(actor ?? NIGHT_SHIFT, { runId, spaceId });
+
 		return {
 			// --- projects (phase 3) ---
 			async listProjects() {
@@ -359,8 +360,7 @@ export function createSpaces(deps: SpacesDeps) {
 			// --- the files of a run that other slices keep (R1 opens the run, phase 3 moves them) ---
 			async serviceLog(runId, service) {
 				await ready;
-				const row = await getRunRow(runId, spaceId);
-				if (row.walkerId !== (await deps.log.walkerId())) return null;
+				if (!(await open(runId)).walkedHere) return null;
 				const state = await deps.log.state(runId);
 				const hold = [...state.holds, ...state.endedHolding].find(
 					(held) =>
@@ -373,25 +373,25 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async listArtifacts(runId) {
 				await ready;
-				await getRunRow(runId, spaceId);
+				await open(runId);
 				return deps.artifacts.list(runId);
 			},
 
 			async artifactFile(runId, artifactId) {
 				await ready;
-				await getRunRow(runId, spaceId);
+				await open(runId);
 				return deps.artifacts.file(runId, artifactId);
 			},
 
 			async listRunFiles(runId) {
 				await ready;
-				await getRunRow(runId, spaceId);
+				await open(runId);
 				return deps.runFiles.list(runId);
 			},
 
 			async runFile(runId, path) {
 				await ready;
-				await getRunRow(runId, spaceId);
+				await open(runId);
 				return deps.runFiles.file(runId, path);
 			},
 

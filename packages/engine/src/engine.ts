@@ -1,6 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { type AnswerCost, keepAnswerCost } from "./assistant";
-import type { Actor, LeaseHost, MemberChange } from "./contract";
+import type { LeaseHost, MemberChange, PersonActor } from "./contract";
 import type { ProjectFlows } from "./flows";
 import type { Runner } from "./graph";
 import type { createLeaseKeeper, createLeaseStore } from "./leases";
@@ -29,6 +29,7 @@ import type {
 import type { createPullRequestWatch } from "./scores";
 import type { SpaceEngine } from "./space-engine";
 import type { MovedProjects, ProjectsMove } from "./space-move";
+import type { wireEngineAccess } from "./wire-access";
 
 /**
  * The engine as its callers hold it: the `Engine` interface, the knobs of
@@ -48,9 +49,10 @@ export interface Engine {
 	 * What a person does in one Space. Nothing it reads, returns or changes
 	 * is of another Space: a project or run of another Space is "not found".
 	 * `actor` is the Person who acts: an action on a run walked elsewhere
-	 * travels to its Walker in their name.
+	 * travels to its Walker in their name. Without one, Night Shift itself
+	 * acts.
 	 */
-	space(spaceId: string, actor?: Actor): SpaceEngine;
+	space(spaceId: string, actor?: PersonActor): SpaceEngine;
 	/**
 	 * The Space of a run this computer keeps, or null when it has none of
 	 * that id. Who may see or act on the run there is the caller's check:
@@ -187,7 +189,19 @@ export interface Engine {
 	 * restart. Resolves once the drives' writes in flight settled.
 	 */
 	dispose(): Promise<void>;
+	/**
+	 * The run use cases for a door that holds the actor (decision 41 of
+	 * the hexagon series). Each opens the run, finds its Space and decides
+	 * who may. Each waits for the engine to be ready.
+	 */
+	readonly runs: RunUseCases;
 }
+
+/**
+ * The run use cases of `Engine.runs`. Each block of the run path gives its
+ * own (`runs` of its `wire-*.ts` file): access gives `open`.
+ */
+export type RunUseCases = ReturnType<typeof wireEngineAccess>["runs"];
 
 /** Knobs for tests only. Not part of the engine contract. */
 export type EngineInternals = {
@@ -240,6 +254,8 @@ export type EngineParts = {
 	leases: Pick<ReturnType<typeof createLeaseKeeper>, "renewAll">;
 	landed: Pick<ReturnType<typeof createLandedFeed>, "subscribe" | "close">;
 	runner: Pick<Runner, "release">;
+	/** The run use cases (`Engine.runs`), before the engine is ready. */
+	runs: RunUseCases;
 
 	// --- schedules and scores (`wire-schedules.ts`) ---
 	scheduleNotices: Pick<
@@ -361,6 +377,9 @@ export function engineOf(parts: EngineParts): Engine {
 			await parts.wakeOfflineSleeps();
 		},
 
+		// --- the run use cases: each waits for the engine to be ready ---
+		runs: whenReady(ready, parts.runs),
+
 		// --- the end of the engine ---
 		async dispose() {
 			lifetime.abort();
@@ -368,4 +387,23 @@ export function engineOf(parts: EngineParts): Engine {
 			await runner.release();
 		},
 	};
+}
+
+/**
+ * Each use case of `cases`, waiting for the engine to be ready first. A
+ * use case that returns a stream opens it after that, as it does now.
+ */
+function whenReady<T extends Record<string, (...args: never[]) => unknown>>(
+	ready: Promise<unknown>,
+	cases: T,
+): T {
+	return Object.fromEntries(
+		Object.entries(cases).map(([name, useCase]) => [
+			name,
+			async (...args: never[]) => {
+				await ready;
+				return useCase(...args);
+			},
+		]),
+	) as T;
 }

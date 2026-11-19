@@ -15,7 +15,7 @@ import type { Engine, EngineInternals } from "../engine";
 import type { EnginePayloads } from "../log/events/events";
 import { appendEvent, parseEventRow } from "../log/run-log/append";
 import type { RunSummary } from "../read/views";
-import { START_HOLD_WORDS } from "../run/start-holds";
+import { START_HOLD_WORDS } from "../runs/walk/domain/start-holds";
 import type { SpaceEngine } from "../space-engine";
 import { seedFlows } from "../testing/seed-flows";
 import {

@@ -1,5 +1,10 @@
 import type { Database } from "@nightshift/db";
-import { type Actor, flowsForRun, type OwnDevice } from "@nightshift/engine";
+import {
+	type Actor,
+	flowsForRun,
+	type OwnDevice,
+	personOf,
+} from "@nightshift/engine";
 import type { SpaceDocuments } from "@nightshift/engine/projects";
 import {
 	deviceIdOf,
@@ -44,8 +49,9 @@ export function createScheduleOffers(deps: {
 		actor: Actor | undefined,
 		schedules: readonly Schedule[],
 	): Promise<Schedule[]> {
-		if (!actor || schedules.length === 0) return [...schedules];
-		const personId = await personInSpace(db, spaceId, actor.personId);
+		const person = actor ? personOf(actor) : null;
+		if (person === null || schedules.length === 0) return [...schedules];
+		const personId = await personInSpace(db, spaceId, person);
 		const devices = await deps.devicesFor(spaceId, personId, project.id);
 		const document = await deps.documents.open(spaceId);
 		const keeperId = await deps.keeper(spaceId);

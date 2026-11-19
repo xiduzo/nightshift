@@ -2,12 +2,8 @@ import type { DeviceDirectory, Relay } from "./contract";
 import { lastRunDevice, type RunLog } from "./log";
 import type { PlacementPort } from "./placement";
 import type { Projects } from "./projects";
-import {
-	createRunStart,
-	createStartPlaces,
-	createStartRelay,
-	type StartHolds,
-} from "./run";
+import { createRunStart, createStartPlaces, createStartRelay } from "./run";
+import type { StartHolds } from "./runs";
 
 type RunStartDeps = Parameters<typeof createRunStart>[0];
 type StartRelayDeps = Parameters<typeof createStartRelay>[0];

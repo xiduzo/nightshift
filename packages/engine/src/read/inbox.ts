@@ -1,7 +1,7 @@
 import { roleAllows, spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 
-import type { Actor } from "../contract";
+import type { PersonActor } from "../contract";
 import type { AnsweredGate, OpenGate } from "./views";
 
 /**
@@ -44,7 +44,7 @@ export type InboxSources = {
 	engine: {
 		space(
 			spaceId: string,
-			actor: Actor,
+			actor: PersonActor,
 		): {
 			listGates(): Promise<OpenGate[]>;
 			listAnsweredGates(since: number): Promise<AnsweredGate[]>;

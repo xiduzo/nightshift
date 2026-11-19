@@ -1,12 +1,12 @@
 import { personalSpaceIdBySlug, personNames } from "@nightshift/auth";
 import {
-	type Actor,
 	type Device,
 	type DeviceProfile,
 	HostUnreachableError,
 	type NodeToPlace,
 	type OfferedPlacement,
 	type OwnDevice,
+	type PersonActor,
 	type PlacedDevice,
 	type PlacedRun,
 	type Placement,
@@ -566,7 +566,7 @@ export function createPlacement(deps: PlacementDeps) {
 	 */
 	async function moveTo(
 		run: PlacedRun,
-		actor: Actor,
+		actor: PersonActor,
 		to: string,
 	): Promise<{ id: string; name: string } | null> {
 		const personId = await personInSpace(db, run.spaceId, actor.personId);

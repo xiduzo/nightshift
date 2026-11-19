@@ -17,6 +17,7 @@ export {
 export {
 	type AccessRefusal,
 	ROLE_REFUSAL,
+	RoleRefusal,
 	type SpaceAccess,
 	spaceAccess,
 } from "./space-access";

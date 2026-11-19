@@ -8,6 +8,7 @@ export {
 	documentAccess,
 	type RequestAccess,
 	ROLE_REFUSAL,
+	RoleRefusal,
 	requestAccess,
 	type SpaceAccess,
 	type SyncAccess,

@@ -21,6 +21,7 @@ export type { SpaceDocuments } from "./space-document";
 export {
 	createSpaceDocuments,
 	memberName,
+	memberRole,
 	setSpaceUsage,
 	spaceUsageOn,
 } from "./space-document";

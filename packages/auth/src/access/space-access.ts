@@ -1,3 +1,4 @@
+import { Refusal } from "@nightshift/refusal";
 import type { Session } from "../auth";
 import type { TWO_FACTOR_REQUIRED } from "../host-access";
 import type { RequestAccess } from "./request";
@@ -34,6 +35,18 @@ export const ROLE_REFUSAL: AccessRefusal = {
 	status: 403,
 	message: "Your role in this Space does not allow this.",
 };
+
+/**
+ * The refusal of a Person whose role in the Space does not allow the
+ * request, in the words of `ROLE_REFUSAL`. A use case of the engine throws
+ * it, and each door answers it as `ROLE_REFUSAL` (403).
+ */
+export class RoleRefusal extends Refusal {
+	constructor() {
+		super("forbidden", ROLE_REFUSAL.message);
+		this.name = "RoleRefusal";
+	}
+}
 
 /**
  * The first rungs of every request that works in a Space: a session, in

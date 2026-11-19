@@ -2,6 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { Refusal } from "@nightshift/refusal";
 import { createStartHolds, START_HOLD_WORDS } from "./start-holds";
 
+/** Lets the timers and promises that wait now run first. */
+const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
 /** A promise and the function that resolves it. */
 function deferred<T>() {
 	let resolve: (value: T) => void = () => {};
@@ -41,7 +44,7 @@ describe("the start holds", () => {
 			return release;
 		});
 
-		await Bun.sleep(0);
+		await tick();
 		expect(held).toBe(false);
 		running.resolve("run");
 		failing.resolve("");
@@ -81,7 +84,7 @@ describe("the start holds", () => {
 		// A second hold does not wait for a start that has not begun.
 		const second = await holds.hold("space-a");
 		first();
-		await Bun.sleep(0);
+		await tick();
 		expect(began).toBe(false);
 
 		second();

@@ -25,7 +25,7 @@ import {
 	spaceOfRun,
 } from "../log";
 import { awaitsWorktree, runWorktree } from "../read";
-import type { StartHolds } from "./start-holds";
+import type { StartHolds } from "../runs";
 
 /**
  * Startup recovery: what a new daemon does about the runs the last one

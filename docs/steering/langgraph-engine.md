@@ -263,8 +263,9 @@ packages/engine/src/
                            dependencies (db, log, runner, bus, settings,
                            clock), and wires them. It holds no logic. The
                            pieces of the run path each have a file beside
-                           it (wire-views.ts, wire-start.ts, wire-actions.ts,
-                           wire-move.ts, wire-recovery.ts, wire-schedules.ts).
+                           it (wire-access.ts, wire-walk.ts, wire-views.ts,
+                           wire-start.ts, wire-actions.ts, wire-move.ts,
+                           wire-recovery.ts, wire-schedules.ts).
                            engine.ts holds the Engine interface and the thin
                            object behind it.
   space.ts                 createSpaces(deps): the SpaceEngine of one

@@ -10,9 +10,9 @@ import {
 import { Refusal } from "@nightshift/refusal";
 import type { ArtifactStore } from "../artifacts";
 import {
-	type Actor,
 	commandOf,
 	type OwnDevice,
+	type PersonActor,
 	type RunActionRequest,
 	type RunCommandInput,
 	requestOf,
@@ -46,9 +46,9 @@ import {
 	WALKED_ELSEWHERE,
 	whyNot,
 } from "../run-status";
+import type { StartHolds } from "../runs";
 import type { UsageNotes } from "../usage";
 import type { CommandRelay } from "./relay-commands";
-import type { StartHolds } from "./start-holds";
 
 /**
  * What a person does to a run: stop it, answer its Gate, send its Signal,
@@ -242,7 +242,7 @@ export function createRunActions(deps: RunActionsDeps) {
 	 */
 	async function onWalker(
 		row: RunRow,
-		actor: Actor | undefined,
+		actor: PersonActor | undefined,
 		request: RunActionRequest,
 	): Promise<void> {
 		const runState = await log.state(row.id);
@@ -325,7 +325,7 @@ export function createRunActions(deps: RunActionsDeps) {
 	 */
 	async function takeOver(
 		row: RunRow,
-		actor: Actor | undefined,
+		actor: PersonActor | undefined,
 	): Promise<void> {
 		const by = actor?.personId ?? null;
 		await runner.hold(row.id, async ({ runState }) => {
@@ -379,7 +379,7 @@ export function createRunActions(deps: RunActionsDeps) {
 	 * The run's plan stays: its steps run on the Devices it planned, for the
 	 * same Person.
 	 */
-	async function move(row: RunRow, actor: Actor, to: string): Promise<void> {
+	async function move(row: RunRow, actor: PersonActor, to: string) {
 		const runId = row.id;
 		const self = await log.walkerId();
 		if (to === self || to === deps.device.id) {
@@ -435,7 +435,7 @@ export function createRunActions(deps: RunActionsDeps) {
 	 */
 	async function here(
 		row: RunRow,
-		actor: Actor | undefined,
+		actor: PersonActor | undefined,
 		request: RunActionRequest,
 	): Promise<void> {
 		const runId = row.id;
@@ -575,7 +575,7 @@ export function createRunActions(deps: RunActionsDeps) {
 		 */
 		async act(
 			spaceId: string,
-			actor: Actor | undefined,
+			actor: PersonActor | undefined,
 			runId: string,
 			action: RunActionRequest | RunCommandInput,
 		): Promise<void> {
@@ -595,7 +595,7 @@ export function createRunActions(deps: RunActionsDeps) {
 		 */
 		async moveTargets(
 			spaceId: string,
-			actor: Actor | undefined,
+			actor: PersonActor | undefined,
 			runId: string,
 		): Promise<OwnDevice[]> {
 			const row = await rowIn(spaceId, runId);

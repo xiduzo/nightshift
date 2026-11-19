@@ -58,18 +58,19 @@ import {
 	parseCalledFlows,
 	parseRunFlow,
 } from "./read";
-import { createStartHolds } from "./run";
 import { createRunFolders } from "./run-folders";
 import { createServiceKeeper, serviceHolds } from "./services";
 import { createSpaces } from "./space";
 import { createProjectsMove } from "./space-move";
 import { keptValues, listKeptValues, resetKeptValue } from "./variables";
+import { wireEngineAccess } from "./wire-access";
 import { wireEngineActions } from "./wire-actions";
 import { wireEngineMove } from "./wire-move";
 import { wireEngineRecovery } from "./wire-recovery";
 import { wireEngineSchedules } from "./wire-schedules";
 import { wireEngineStart } from "./wire-start";
 import { wireEngineViews } from "./wire-views";
+import { wireEngineWalk } from "./wire-walk";
 
 /**
  * The composition of the engine: `createEngine` makes each piece with what
@@ -396,13 +397,11 @@ export function createEngine(
 			: {}),
 	});
 
-	// --- access (R1) ---
-	// Nothing yet. Lane R1 wires `runs/access` here.
-
-	// --- walk (R1) ---
-	// gives: startHolds
-	/** The Spaces whose runs do not become active while their Projects move. */
-	const startHolds = createStartHolds();
+	// --- access and walk (R1): `wire-access.ts`, `wire-walk.ts` ---
+	// gives: access (the Space view, the engine), startHolds, walk (R4 to R7)
+	const access = wireEngineAccess({ db, log: runLog, documents });
+	const walk = wireEngineWalk({ log: runLog, bus, runner, peers });
+	const startHolds = walk.holds;
 
 	// --- recovery (R7): `wire-recovery.ts` ---
 	// gives: recovery.recoverInterruptedWork, recovery.armResumes (the start
@@ -669,8 +668,8 @@ export function createEngine(
 		},
 		answerCosts: (spaceId, since) => listAnswerCosts(db, spaceId, since),
 		moveProjects,
-		// the run's row, and the reads of other slices' files (R1)
-		runRow: (runId) => getRunRow(db, runId),
+		// access (R1), and the files of a run that other slices keep
+		openRun: access.openRun,
 		runFiles,
 		artifacts,
 		pathsFor: peers.pathsFor,
@@ -701,6 +700,7 @@ export function createEngine(
 		leases,
 		landed,
 		runner,
+		runs: access.runs,
 		// schedules and scores
 		scheduleNotices: sched.notices,
 		schedules: sched.schedules,

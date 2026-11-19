@@ -26,9 +26,13 @@ export {
 	closeOpenWork,
 	combineHolds,
 	createRunner,
+	type Held,
+	type Intent,
 	openWork,
 	type RunHolds,
 	type Runner,
 	rerunNodeRefusal,
+	type Taken,
+	type TakeOptions,
 } from "./runner";
 export { runFolderOn } from "./step";

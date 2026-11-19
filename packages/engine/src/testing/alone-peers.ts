@@ -1,4 +1,4 @@
-import type { OwnDevice } from "../contract";
+import { type OwnDevice, personOf } from "../contract";
 import { followOwnStep } from "../log";
 import type { PeerContext, Peers, PeersFactory } from "../peers";
 import { type PlacedDevice, planNodes } from "../placement";
@@ -113,7 +113,7 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 			archived: async () => null,
 		},
 		async pathsFor(_spaceId, actor) {
-			const viewer = actor?.personId ?? null;
+			const viewer = actor ? personOf(actor) : null;
 			return async (summary) => {
 				if (viewer === null) return summary;
 				const owner = summary.device.thisDevice ? context.ownerId() : null;

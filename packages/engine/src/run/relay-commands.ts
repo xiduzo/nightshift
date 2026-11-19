@@ -1,4 +1,4 @@
-import type { Actor, Relay, RunCommandInput } from "../contract";
+import type { PersonActor, Relay, RunCommandInput } from "../contract";
 import type { RunRow } from "../log";
 import { RunRefusal } from "../run-status";
 
@@ -14,7 +14,7 @@ export function createCommandRelay(deps: { relay?: Relay }) {
 		/** Hands an action on a run walked elsewhere to its Walker, in the actor's name. */
 		async send(
 			row: RunRow,
-			actor: Actor | undefined,
+			actor: PersonActor | undefined,
 			command: RunCommandInput,
 		): Promise<void> {
 			if (!relay) {

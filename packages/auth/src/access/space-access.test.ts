@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
+import { Refusal } from "@nightshift/refusal";
+
 import { TWO_FACTOR_REQUIRED } from "../host-access";
 import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
 import { requestAccess } from "./request";
-import { spaceAccess } from "./space-access";
+import { ROLE_REFUSAL, RoleRefusal, spaceAccess } from "./space-access";
 
 /** The first rungs of a request in a Space: one answer for every way in. */
 
@@ -53,5 +55,17 @@ describe("spaceAccess", () => {
 		const answer = spaceAccess(access);
 		expect(answer.allowed && answer.session.user.id).toBe(userId);
 		expect(answer.allowed && answer.spaceId).toBe(access.spaceId ?? "");
+	});
+});
+
+describe("RoleRefusal", () => {
+	test("is a forbidden refusal in the words of ROLE_REFUSAL", () => {
+		const refusal = new RoleRefusal();
+		expect(refusal).toBeInstanceOf(Refusal);
+		expect(refusal.kind).toBe("forbidden");
+		expect(refusal.message).toBe(ROLE_REFUSAL.message);
+		expect(refusal.message).toBe(
+			"Your role in this Space does not allow this.",
+		);
 	});
 });

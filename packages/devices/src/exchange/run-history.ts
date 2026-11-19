@@ -379,7 +379,10 @@ export function createRunHistoryExchange(deps: {
 				// Applied like the person's own action: the Walker writes the run's events.
 				await history.applying(command, () =>
 					engine
-						.space(command.spaceId, { personId: command.personId })
+						.space(command.spaceId, {
+							personId: command.personId,
+							door: "command",
+						})
 						.act(command.runId, command),
 				);
 				return null;

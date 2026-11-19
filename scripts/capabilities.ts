@@ -483,6 +483,10 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		// The start and the actions of a run, before its slices (`runs`,
 		// `gates`). The composition left it for `src/wire.ts`.
 		run: "runs",
+		// The run path in rings, one sub-vertical per part: who may see or
+		// act on a run (`access`) and what every use case that writes to a
+		// run shares (`walk`). The rest of `run` moves here, lane by lane.
+		runs: "runs",
 		// The store of a run's own folder.
 		"run-folders": M,
 		// A run's status and the actions it allows. The pure rule kernel of

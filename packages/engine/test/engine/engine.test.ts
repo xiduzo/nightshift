@@ -36,8 +36,8 @@ import type { TranscriptEntry } from "../../src/log/transcript/step-events";
 import type { LandedFact } from "../../src/read/landed-facts";
 import type { RunDetail, RunStreamItem } from "../../src/read/views";
 import { GateClosedError } from "../../src/run/actions";
-import { START_HOLD_WORDS } from "../../src/run/start-holds";
 import type { RunStatus } from "../../src/run-status";
+import { START_HOLD_WORDS } from "../../src/runs/walk/domain/start-holds";
 import type { SpaceEngine } from "../../src/space-engine";
 import { seedFlowFolder } from "../../src/testing/seed-flows";
 import {

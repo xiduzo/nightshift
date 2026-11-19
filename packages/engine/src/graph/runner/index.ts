@@ -4,3 +4,4 @@ export { combineHolds, type RunHolds } from "./holds";
 export { closeOpenWork, openWork } from "./open-work";
 export { rerunNodeRefusal } from "./reentry";
 export { createRunner, type Runner } from "./runner";
+export type { Held, Intent, Taken, TakeOptions } from "./turn";

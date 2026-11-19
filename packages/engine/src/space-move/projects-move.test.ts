@@ -27,7 +27,7 @@ import {
 	spaceDocumentName,
 	spaceProjects,
 } from "../projects/space-document";
-import { START_HOLD_WORDS } from "../run/start-holds";
+import { START_HOLD_WORDS } from "../runs/walk/domain/start-holds";
 import { aloneDirectory } from "../testing/alone-directory";
 import {
 	commitFile,

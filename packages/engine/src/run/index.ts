@@ -7,7 +7,6 @@ export { createStartRelay } from "./relay-start";
 export { createRunStart, START_DEADLINE_MS } from "./run-start";
 export { createScheduleNotices } from "./schedule-notices";
 export { createSignals } from "./signals";
-export { createStartHolds, type StartHolds } from "./start-holds";
 export { createStartPlaces, type StartPlaces } from "./start-place";
 export { takeOver } from "./take-over";
 export { PinNotHereError } from "./test-run";

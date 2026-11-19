@@ -1,9 +1,9 @@
 import type { Flow, FlowNode, permissionModeSchema } from "@nightshift/flows";
 import type { z } from "zod";
 import type {
-	Actor,
 	NodeToPlace,
 	OwnDevice,
+	PersonActor,
 	Placement,
 	StartRunInput,
 } from "../contract";
@@ -47,7 +47,7 @@ export type PlacementPort = {
 	 */
 	moveTo(
 		run: PlacedRun,
-		actor: Actor,
+		actor: PersonActor,
 		to: string,
 	): Promise<{ id: string; name: string } | null>;
 	/**
