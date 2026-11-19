@@ -26,6 +26,10 @@ export type RunningDaemon = Daemon & { servers: Bun.Server<SocketData>[] };
  * systemd it started (nothing outside systemd). `stop` also stops the
  * listeners. Under `bun --hot` each reload calls it again: Bun reloads the
  * listeners in place, with the new daemon's handlers.
+ *
+ * When it cannot listen, it stops the daemon it made (the lease, the
+ * engine, the timers) and throws: a `PortTakenError` when the port is
+ * taken. The caller says so and exits.
  */
 export async function startDaemon(
 	options: StartOptions,
@@ -37,17 +41,25 @@ export async function startDaemon(
 		desktop: options.desktop,
 	});
 	const { web } = options;
-	const servers = serveDaemon(daemon, {
-		port: options.port,
-		tlsPort: options.tlsPort,
-		oneListener: options.oneListener,
-		...(web
-			? {
-					fetch: async (request, server) =>
-						(await web(request)) ?? daemon.fetch(request, server),
-				}
-			: {}),
-	});
+	let servers: Bun.Server<SocketData>[];
+	try {
+		servers = serveDaemon(daemon, {
+			port: options.port,
+			tlsPort: options.tlsPort,
+			oneListener: options.oneListener,
+			...(web
+				? {
+						fetch: async (request, server) =>
+							(await web(request)) ?? daemon.fetch(request, server),
+					}
+				: {}),
+		});
+	} catch (error) {
+		// A daemon that does not listen must not hold the lease, its
+		// engine or its timers: the next start would find the lease held.
+		await daemon.stop();
+		throw error;
+	}
 	for (const server of servers) {
 		console.log(`Night Shift answers at ${server.url}`);
 	}

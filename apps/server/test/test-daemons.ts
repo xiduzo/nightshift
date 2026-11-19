@@ -71,10 +71,27 @@ const ANSWER_MS = 30_000;
 /** The daemon's own line once it listens (`packages/daemon/src/start.ts`). */
 const LISTENS = "Night Shift answers at";
 
-/** In the error the daemon writes when it cannot listen on its port. */
-const PORT_IN_USE = "EADDRINUSE";
+/**
+ * The daemon's own line when another program has its port
+ * (`PortTakenError`). It then stops and exits with code 1.
+ */
+const PORT_IN_USE = "Night Shift cannot listen on port";
 
 type Started = "listens" | "port in use";
+
+/** What `untilAnswers` says when another program has the daemon's port. */
+const PORT_TAKEN = "it cannot listen: another process has the port.";
+
+/** The output of a daemon, as `readOutput` follows it. */
+type Output = {
+	/** What the daemon said of its start: it listens, or its port is in use. */
+	started: Promise<Started>;
+	/** What it said first of its start, or null. */
+	heard: () => Started | null;
+	/** Settles once the process ended and its streams closed, or a little later. */
+	read: () => Promise<void>;
+	tail: () => string;
+};
 
 /** How much of the daemon's output an error shows. */
 const OUTPUT_LINES = 40;
@@ -84,6 +101,32 @@ const STREAMS_CLOSE_MS = 2_000;
 
 /** The children that `stopDaemon` stopped on purpose. */
 const stopped = new WeakSet<Subprocess>();
+
+/**
+ * The environment of the dev entry (`bun src/main.ts`) for a daemon in
+ * `<root>/<name>` on `port`. `env` wins.
+ */
+export function daemonEnv(
+	root: string,
+	name: string,
+	port: number,
+	env: Record<string, string> = {},
+): Record<string, string> {
+	return {
+		PATH: process.env.PATH ?? "",
+		HOME: process.env.HOME ?? root,
+		NODE_ENV: "test",
+		PORT: String(port),
+		BETTER_AUTH_SECRET: `a-test-secret-of-at-least-32-characters-${name}`,
+		BETTER_AUTH_URL: `http://localhost:${port}`,
+		CORS_ORIGIN: "http://localhost:3001",
+		NIGHTSHIFT_DATA_DIR: join(root, name),
+		NIGHTSHIFT_SCHEDULER: "off",
+		NIGHTSHIFT_KEY_STORE: "file",
+		NIGHTSHIFT_DESKTOP_NOTIFICATIONS: "off",
+		...env,
+	};
+}
 
 /**
  * Starts a daemon in `<root>/<name>`, on `port` (a free one by default),
@@ -102,20 +145,7 @@ export async function startDaemon(
 	const begun = now();
 	const child = Bun.spawn(["bun", "src/main.ts"], {
 		cwd: SERVER_DIR,
-		env: {
-			PATH: process.env.PATH ?? "",
-			HOME: process.env.HOME ?? root,
-			NODE_ENV: "test",
-			PORT: String(at),
-			BETTER_AUTH_SECRET: `a-test-secret-of-at-least-32-characters-${name}`,
-			BETTER_AUTH_URL: url,
-			CORS_ORIGIN: "http://localhost:3001",
-			NIGHTSHIFT_DATA_DIR: dataDir,
-			NIGHTSHIFT_SCHEDULER: "off",
-			NIGHTSHIFT_KEY_STORE: "file",
-			NIGHTSHIFT_DESKTOP_NOTIFICATIONS: "off",
-			...env,
-		},
+		env: daemonEnv(root, name, at, env),
 		// Both streams are read all the time: a full pipe stops the daemon.
 		stdout: "pipe",
 		stderr: "pipe",
@@ -126,7 +156,7 @@ export async function startDaemon(
 		await output.read();
 		return `Daemon "${name}" (${url}): ${line} Its last output:\n${output.tail()}`;
 	};
-	const failure = await untilAnswers(child, output.started, url, begun);
+	const failure = await untilAnswers(child, output, url, begun);
 	if (failure !== null) {
 		child.kill("SIGKILL");
 		await child.exited;
@@ -161,14 +191,14 @@ export async function startDaemon(
  */
 async function untilAnswers(
 	child: Subprocess,
-	started: Promise<Started>,
+	output: Pick<Output, "started" | "heard" | "read">,
 	url: string,
 	begun: number,
 ): Promise<string | null> {
 	const ceiling = `${ANSWER_MS / 1000} s`;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	const said = await Promise.race([
-		started,
+		output.started,
 		child.exited.then(() => "stopped" as const),
 		new Promise<"late">((resolve) => {
 			timer = setTimeout(() => resolve("late"), begun + ANSWER_MS - now());
@@ -176,15 +206,16 @@ async function untilAnswers(
 	]);
 	clearTimeout(timer);
 	if (said === "stopped") {
+		// A daemon whose port is taken exits at once: its line may still be
+		// on its way.
+		await output.read();
+		if (output.heard() === "port in use") return PORT_TAKEN;
 		return `it stopped (${endOf(child)}) before it listened.`;
 	}
 	if (said === "late") {
 		return `it did not say "${LISTENS}" within ${ceiling} of its start.`;
 	}
-	// The dev entry keeps running after this error: it never listens.
-	if (said === "port in use") {
-		return `it cannot listen: another process has the port (${PORT_IN_USE}).`;
-	}
+	if (said === "port in use") return PORT_TAKEN;
 	// It listens, so GET / answers at once. A refusal now means that the
 	// daemon stopped or that another process has the port.
 	let last = "no answer";
@@ -219,18 +250,17 @@ function endOf(child: Subprocess): string {
  * Reads both streams of the daemon, and keeps their last lines. The
  * child's `stderr` becomes a copy, for a caller that reads it itself.
  */
-function readOutput(child: Subprocess<"ignore", "pipe", "pipe">): {
-	/** What the daemon said of its start: it listens, or its port is in use. */
-	started: Promise<Started>;
-	/** Settles once the process ended and its streams closed, or a little later. */
-	read: () => Promise<void>;
-	tail: () => string;
-} {
+function readOutput(child: Subprocess<"ignore", "pipe", "pipe">): Output {
 	const lines: string[] = [];
-	let heard: (what: Started) => void = () => {};
+	let first: Started | null = null;
+	let tell: (what: Started) => void = () => {};
 	const started = new Promise<Started>((resolve) => {
-		heard = resolve;
+		tell = resolve;
 	});
+	const heard = (what: Started) => {
+		first ??= what;
+		tell(what);
+	};
 	const follow = async (stream: ReadableStream<Uint8Array>) => {
 		const decoder = new TextDecoder();
 		let partial = "";
@@ -263,6 +293,7 @@ function readOutput(child: Subprocess<"ignore", "pipe", "pipe">): {
 	};
 	return {
 		started,
+		heard: () => first,
 		read,
 		tail: () =>
 			lines.length > 0 ? lines.slice(-OUTPUT_LINES).join("\n") : "(nothing)",

@@ -57,7 +57,29 @@ export function listeners(options: {
  */
 const REQUEST_TIMEOUT_S = 5 * 60;
 
-/** Starts the daemon's listeners. `fetch` wraps the daemon's own (the web UI of the binary). */
+/**
+ * The daemon cannot listen on `port`: another program uses it. Bun says
+ * EADDRINUSE for every failed listen, so an address that is not this
+ * computer's gets this error too.
+ */
+export class PortTakenError extends Error {
+	readonly port: number;
+
+	constructor(port: number, options?: { cause?: unknown }) {
+		super(
+			`Night Shift cannot listen on port ${port}: another program uses it. Stop that program or start Night Shift with another port.`,
+			options,
+		);
+		this.name = "PortTakenError";
+		this.port = port;
+	}
+}
+
+/**
+ * Starts the daemon's listeners. `fetch` wraps the daemon's own (the web
+ * UI of the binary). When one does not start, it stops the ones that
+ * started, and throws: a `PortTakenError` when the port is taken.
+ */
 export function serveDaemon(
 	daemon: DaemonServe,
 	options: {
@@ -68,27 +90,38 @@ export function serveDaemon(
 	},
 ): Bun.Server<SocketData>[] {
 	const fetch = options.fetch ?? daemon.fetch;
-	return listeners({
+	const servers: Bun.Server<SocketData>[] = [];
+	for (const listener of listeners({
 		hostname: daemon.hostname,
 		tls: Boolean(daemon.tls),
 		port: options.port,
 		tlsPort: options.tlsPort,
 		oneListener: options.oneListener,
-	}).map((listener) =>
-		Bun.serve<SocketData>({
-			// Under `bun --hot`, Bun reloads the server of the same id in place:
-			// the listener stays, and the new handlers answer.
-			id: `nightshift:${listener.port}`,
-			hostname: listener.hostname,
-			port: listener.port,
-			...(listener.tls && daemon.tls ? { tls: daemon.tls } : {}),
-			fetch(request, server) {
-				server.timeout(request, REQUEST_TIMEOUT_S);
-				return fetch(request, server);
-			},
-			websocket: daemon.websocket,
-		}),
-	);
+	})) {
+		try {
+			servers.push(
+				Bun.serve<SocketData>({
+					// Under `bun --hot`, Bun reloads the server of the same id in place:
+					// the listener stays, and the new handlers answer.
+					id: `nightshift:${listener.port}`,
+					hostname: listener.hostname,
+					port: listener.port,
+					...(listener.tls && daemon.tls ? { tls: daemon.tls } : {}),
+					fetch(request, server) {
+						server.timeout(request, REQUEST_TIMEOUT_S);
+						return fetch(request, server);
+					},
+					websocket: daemon.websocket,
+				}),
+			);
+		} catch (error) {
+			for (const server of servers) server.stop(true);
+			// Another error (a certificate Bun refuses) stays as it is.
+			if ((error as { code?: unknown }).code !== "EADDRINUSE") throw error;
+			throw new PortTakenError(listener.port, { cause: error });
+		}
+	}
+	return servers;
 }
 
 /** NIGHTSHIFT_TLS_PORT as a port, or undefined for the default. */

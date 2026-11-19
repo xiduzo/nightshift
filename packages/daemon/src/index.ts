@@ -18,6 +18,7 @@ export type {
 export {
 	directoryWeb,
 	embeddedWeb,
+	PortTakenError,
 	tlsPortOf,
 	type WebFiles,
 	webHandler,

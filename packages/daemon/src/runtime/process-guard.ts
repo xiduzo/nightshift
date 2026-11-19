@@ -12,6 +12,8 @@
  * - An uncaught exception is logged. A daemon under a service manager
  *   (`nightshift serve`) then exits with code 1, and the service manager
  *   starts it again. In dev and in the desktop app it keeps running.
+ * - A daemon that cannot listen on its port does not get here:
+ *   `startDaemon` stops it, and its caller says why and exits.
  */
 
 type Guard = {

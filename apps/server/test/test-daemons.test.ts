@@ -38,7 +38,9 @@ describe("startDaemon", () => {
 			);
 			expect(message).toContain("another process has the port");
 			expect(message).toContain("Its last output:");
-			expect(message).toContain("EADDRINUSE");
+			expect(message).toContain(
+				`Night Shift cannot listen on port ${other.port}`,
+			);
 		} finally {
 			other.stop(true);
 		}

@@ -3,7 +3,13 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { type DaemonServe, listeners, serveDaemon, tlsPortOf } from "./serve";
+import {
+	type DaemonServe,
+	listeners,
+	PortTakenError,
+	serveDaemon,
+	tlsPortOf,
+} from "./serve";
 
 /** A self-signed certificate for localhost, made with openssl. */
 function selfSigned() {
@@ -64,6 +70,71 @@ describe("where the daemon listens", () => {
 });
 
 describe("serveDaemon", () => {
+	const plainDaemon: DaemonServe = {
+		hostname: "127.0.0.1",
+		fetch: () => new Response("OK"),
+		websocket: { message() {} },
+	};
+
+	/** A server that another program runs, on a port of its own. */
+	function otherProgram() {
+		return Bun.serve({
+			port: 0,
+			hostname: "127.0.0.1",
+			fetch: () => new Response("other"),
+		});
+	}
+
+	test("given a port that another program has, when the daemon listens, then it throws a PortTakenError with that port", () => {
+		const other = otherProgram();
+		try {
+			const listen = () =>
+				serveDaemon(plainDaemon, { port: other.port as number });
+
+			expect(listen).toThrow(PortTakenError);
+			expect(listen).toThrow(
+				`Night Shift cannot listen on port ${other.port}: another program uses it. Stop that program or start Night Shift with another port.`,
+			);
+		} finally {
+			other.stop(true);
+		}
+	});
+
+	test.skipIf(!Bun.which("openssl"))(
+		"given the https port is taken, when the daemon listens, then it stops the http listener it started and names the https port",
+		() => {
+			const other = otherProgram();
+			const free = otherProgram();
+			const port = free.port as number;
+			free.stop(true);
+			try {
+				const error = (() => {
+					try {
+						serveDaemon(
+							{ ...plainDaemon, tls: selfSigned() },
+							{ port, tlsPort: other.port as number },
+						);
+						return null;
+					} catch (thrown) {
+						return thrown;
+					}
+				})();
+
+				expect(error).toBeInstanceOf(PortTakenError);
+				expect((error as PortTakenError).port).toBe(other.port as number);
+				// The http listener on `port` is gone: the port is free again.
+				const again = Bun.serve({
+					port,
+					hostname: "127.0.0.1",
+					fetch: () => new Response(),
+				});
+				again.stop(true);
+			} finally {
+				other.stop(true);
+			}
+		},
+	);
+
 	test.skipIf(!Bun.which("openssl"))(
 		"with a certificate, this computer gets http and the others https, from one daemon",
 		async () => {

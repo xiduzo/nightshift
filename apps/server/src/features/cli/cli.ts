@@ -6,6 +6,7 @@ import {
 	directoryWeb,
 	embeddedWeb,
 	guardProcess,
+	PortTakenError,
 	prepareDaemonEnv,
 	startDaemon,
 	tlsPortOf,
@@ -177,6 +178,12 @@ async function serve(argv: string[]) {
 		// Notifications on this computer's desktop, where it has one.
 		desktop: "system",
 		...(ui ? { web: ui } : {}),
+	}).catch((error: unknown) => {
+		// The daemon already stopped. Exit with code 1, as the process guard
+		// does, with the message only.
+		if (!(error instanceof PortTakenError)) throw error;
+		console.error(error.message);
+		process.exit(1);
 	});
 	if (daemon.info.reach === "this-computer") {
 		console.log(
