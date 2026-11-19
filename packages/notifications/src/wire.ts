@@ -1,4 +1,10 @@
-import { endSession, roleAllows, roleIn, spaceIds } from "@nightshift/auth";
+import {
+	endSession,
+	liveSessionIds,
+	roleAllows,
+	roleIn,
+	spaceIds,
+} from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { NIGHT_SHIFT, type PersonActor } from "@nightshift/engine";
 import { now as timeNow } from "@nightshift/time";
@@ -21,10 +27,9 @@ import {
 	wireSettings,
 } from "./settings";
 import {
-	createTargetStore,
 	type PushTargetView,
 	type RegisterTarget,
-	targetView,
+	wireTargets,
 } from "./targets";
 
 /**
@@ -154,12 +159,24 @@ export function createNotifications(
 		db,
 		...(options.timeZone ? { timeZone: options.timeZone } : {}),
 	});
-	/** The API passes the signed-in Person: their own settings. */
+	/**
+	 * The Person a call of `settings` or `targets` is for: the API passes
+	 * the signed-in Person, the daemon this computer's owner.
+	 */
 	const person = (personId: string): PersonActor => ({
 		personId,
 		door: "session",
 	});
-	const targets = createTargetStore(db, now);
+	const targets = wireTargets({
+		db,
+		clock: now,
+		sessions: {
+			live: (sessionIds, at) => liveSessionIds(db, sessionIds, at),
+			end: async (personId, sessionId) => {
+				await endSession(db, personId, sessionId);
+			},
+		},
+	});
 	const vapid = options.webPush
 		? createVapidKeyStore(db, options.webPush.generateKeys)
 		: null;
@@ -185,7 +202,11 @@ export function createNotifications(
 		settings: {
 			get: (personId) => settings.read(NIGHT_SHIFT, { personId }),
 		},
-		targets,
+		targets: {
+			of: (personId) => targets.listTargets({ personId }),
+			byIds: (ids) => targets.findTargets({ ids }),
+			forget: (id) => targets.forgetTarget({ id }),
+		},
 		deliveries,
 		inApp: options.inApp,
 		push,
@@ -204,18 +225,11 @@ export function createNotifications(
 				settings.adoptSwitches({ personId, patch, switches }),
 		},
 		targets: {
-			list: async (personId) => (await targets.of(personId)).map(targetView),
-			register: async (personId, input, sessionId = null) =>
-				targetView(await targets.register(personId, input, sessionId)),
-			remove: async (personId, id) => {
-				const removed = await targets.remove(personId, id);
-				if (!removed) return null;
-				// A phone is a push target plus its session: removing it signs it out.
-				if (removed.kind === "expo" && removed.sessionId) {
-					await endSession(db, personId, removed.sessionId);
-				}
-				return targetView(removed);
-			},
+			list: (personId) => targets.list(person(personId), { personId }),
+			register: (personId, screen, sessionId = null) =>
+				targets.register(person(personId), { personId, screen, sessionId }),
+			remove: (personId, id) =>
+				targets.remove(person(personId), { personId, id }),
 		},
 		webPush: {
 			publicKey: async () => (vapid ? (await vapid.get()).publicKey : null),

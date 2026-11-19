@@ -1,11 +1,9 @@
-/** The push targets of each Person: browsers, phones and desktop apps. */
+/** The push targets of each Person: browsers, phones and desktop apps. `wireTargets` binds the use cases to their ports. */
 
 export {
-	createTargetStore,
 	type PushTargetView,
 	pushKindSchema,
 	type RegisterTarget,
 	registerScreenSchema,
-	type TargetStore,
-	targetView,
-} from "./targets";
+} from "./domain/push-targets";
+export { wireTargets } from "./wire";

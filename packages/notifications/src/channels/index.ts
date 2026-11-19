@@ -26,6 +26,6 @@ export {
 	type InAppItem,
 	type WatchOptions,
 } from "./in-app";
-export { PUSH_KINDS, type PushKind, type PushTarget } from "./push-target";
+export type { PushKind, PushTarget } from "./push-target";
 export { createVapidKeyStore, type VapidKeys } from "./vapid-keys";
 export { createWebPushChannel, type WebPushSender } from "./web-push";

@@ -1,7 +1,6 @@
-import type { InAppChannel, PushChannels } from "../channels";
+import type { InAppChannel, PushChannels, PushTarget } from "../channels";
 import type { DeliveryLog } from "../deliveries";
 import type { NotificationSettings } from "../settings";
-import type { TargetStore } from "../targets";
 import type { RunEventSource } from "./sources";
 
 /** What the notifier reads and sends through (`NotifierDeps`), and the notifier as its owner drives it (`Notifier`). */
@@ -21,7 +20,12 @@ export type NotifierDeps = {
 	mayAnswer?(spaceId: string, personId: string): Promise<boolean>;
 	/** A Person's notification settings, or the defaults. */
 	settings: { get(personId: string): Promise<NotificationSettings> };
-	targets: Pick<TargetStore, "of" | "byIds" | "forget">;
+	/** The Person's push targets (a phone whose session ended is forgotten), targets by id, and the forget of one. */
+	targets: {
+		of(personId: string): Promise<PushTarget[]>;
+		byIds(ids: readonly string[]): Promise<PushTarget[]>;
+		forget(id: string): Promise<void>;
+	};
 	deliveries: DeliveryLog;
 	inApp: InAppChannel;
 	push: PushChannels;

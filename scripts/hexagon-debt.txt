@@ -30,5 +30,4 @@ engine/placement
 engine/projects
 engine/space-move
 notifications/notifier
-notifications/targets
 # Files of a package's kernel that are not pure yet: kernel <file>.

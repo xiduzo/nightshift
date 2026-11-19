@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { endSession, liveSessionIds } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { type LandedFact, NIGHT_SHIFT } from "@nightshift/engine";
 import type { LandedChange } from "@nightshift/engine/testing";
@@ -16,13 +17,17 @@ import {
 	type NotificationSettingsPatch,
 	wireSettings,
 } from "../settings";
-import { createTargetStore, type TargetStore } from "../targets";
+import {
+	type PushTargetView,
+	type RegisterTarget,
+	wireTargets,
+} from "../targets";
 import { type FakeRunEvents, fakeRunEvents } from "../testing";
 import { testDatabase } from "../testing/database";
 import { type FakeChannel, fakeChannel } from "../testing/fakes";
 import { createNotifier } from "./notifier";
 import { type OpenGateRef, oneSenderPerSpace } from "./sources";
-import type { Notifier } from "./types";
+import type { Notifier, NotifierDeps } from "./types";
 
 /**
  * The rules of the notifier, on a real database with fake run events and
@@ -52,7 +57,10 @@ let settings: {
 		patch: NotificationSettingsPatch,
 	): Promise<NotificationSettings>;
 };
-let targets: TargetStore;
+/** What the notifier reads, and a screen each Person registers. */
+let targets: NotifierDeps["targets"] & {
+	register(personId: string, screen: RegisterTarget): Promise<PushTargetView>;
+};
 let deliveries: DeliveryLog;
 let members: Record<string, string[]>;
 let senders: Set<string>;
@@ -75,7 +83,26 @@ beforeEach(async () => {
 		save: (personId, patch) =>
 			wired.save({ personId, door: "session" }, { personId, patch }),
 	};
-	targets = createTargetStore(db, () => clock);
+	const screens = wireTargets({
+		db,
+		clock: () => clock,
+		sessions: {
+			live: (ids, at) => liveSessionIds(db, ids, at),
+			end: async (personId, sessionId) => {
+				await endSession(db, personId, sessionId);
+			},
+		},
+	});
+	targets = {
+		of: (personId) => screens.listTargets({ personId }),
+		byIds: (ids) => screens.findTargets({ ids }),
+		forget: (id) => screens.forgetTarget({ id }),
+		register: (personId, screen) =>
+			screens.register(
+				{ personId, door: "session" },
+				{ personId, screen, sessionId: null },
+			),
+	};
 	deliveries = createDeliveryLog(db);
 	members = { [SPACE]: ["ada", "bob"], [OTHER_SPACE]: ["cy"] };
 	senders = new Set([SPACE, OTHER_SPACE]);
