@@ -7,6 +7,8 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("starting a page's data early", () => {
 	const browser = globalThis as { window?: unknown };
+	// The tests run in a DOM (`test/happy-dom.ts`): each test puts its window back.
+	const page = browser.window;
 	let calls = 0;
 	const runQuery = (fail = false) => ({
 		queryKey: ["runs", "get", "run-1"],
@@ -22,7 +24,7 @@ describe("starting a page's data early", () => {
 		browser.window = globalThis;
 	});
 	afterEach(() => {
-		delete browser.window;
+		browser.window = page;
 	});
 
 	test("loads what is not in the cache yet", async () => {

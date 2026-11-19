@@ -1,0 +1,4496 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`the editor canvas: what React Flow gets a plain draft 1`] = `
+{
+  "html": 
+"<div class="relative h-full min-h-0 overflow-hidden bg-muted/40 dark:bg-muted/20">
+<svg class="absolute size-0" aria-hidden="true">
+<defs>
+<marker id="ns-arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-red);">
+</path>
+</marker>
+<marker id="ns-arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-orange);">
+</path>
+</marker>
+<marker id="ns-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-amber);">
+</path>
+</marker>
+<marker id="ns-arrow-yellow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-yellow);">
+</path>
+</marker>
+<marker id="ns-arrow-lime" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-lime);">
+</path>
+</marker>
+<marker id="ns-arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-green);">
+</path>
+</marker>
+<marker id="ns-arrow-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-teal);">
+</path>
+</marker>
+<marker id="ns-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-cyan);">
+</path>
+</marker>
+<marker id="ns-arrow-sky" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-sky);">
+</path>
+</marker>
+<marker id="ns-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-blue);">
+</path>
+</marker>
+<marker id="ns-arrow-indigo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-indigo);">
+</path>
+</marker>
+<marker id="ns-arrow-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-violet);">
+</path>
+</marker>
+<marker id="ns-arrow-pink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-pink);">
+</path>
+</marker>
+<marker id="ns-arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-gray);">
+</path>
+</marker>
+<marker id="ns-arrow-mixed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--muted-foreground);">
+</path>
+</marker>
+</defs>
+</svg>
+<svg class="absolute size-0" aria-hidden="true">
+<defs>
+<marker id="ns-data-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: color-mix(in oklch, var(--muted-foreground) 70%, transparent);">
+</path>
+</marker>
+</defs>
+</svg>
+<div data-probe="react-flow">
+</div>
+</div>"
+,
+  "props": {
+    "aria-label": "Flow canvas",
+    "children": [
+      {
+        "element": "BackgroundComponent",
+        "props": {
+          "color": "color-mix(in oklch, var(--foreground) 16%, transparent)",
+          "gap": 16,
+          "size": 1.25,
+          "variant": "dots",
+        },
+      },
+      {
+        "element": "CanvasControls",
+        "props": {
+          "fit": {
+            "maxZoom": 1,
+            "padding": 0.15,
+          },
+          "onAutoLayout": "fn onAutoLayout",
+        },
+      },
+      {
+        "element": "SectionZoom",
+        "props": {
+          "fit": {
+            "maxZoom": 1,
+            "padding": 0.15,
+          },
+          "flow": "[the flow]",
+          "measured": {},
+          "onClose": "fn onClose",
+          "onOpen": "fn anonymous",
+          "open": null,
+        },
+      },
+      null,
+      null,
+      {
+        "element": "MiniMapComponent",
+        "props": {
+          "ariaLabel": "Mini map",
+          "className": "m-3! hidden overflow-hidden rounded-lg border shadow-xs lg:block",
+          "nodeBorderRadius": 6,
+          "nodeColor": "color-mix(in oklch, var(--muted-foreground) 45%, transparent)",
+          "pannable": true,
+          "style": {
+            "height": 112,
+            "width": 168,
+          },
+          "zoomable": true,
+        },
+      },
+    ],
+    "className": "[--xy-background-color:transparent]",
+    "deleteKeyCode": [
+      "Backspace",
+      "Delete",
+    ],
+    "edgeTypes": {
+      "data": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn DataEdge",
+      },
+      "outcome": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn OutcomeEdge",
+      },
+    },
+    "edges": [
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "hasError": false,
+              "id": "a-success-b",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+            {
+              "change": "undefined",
+              "color": "red",
+              "hasError": false,
+              "id": "a-failure-b",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "failure",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "id": "a-success-b",
+        "selected": false,
+        "source": "a",
+        "sourceHandle": "success",
+        "target": "b",
+        "type": "outcome",
+      },
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "hasError": true,
+              "id": "b-success-c",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "deletable": false,
+        "id": "b-success-c",
+        "selected": false,
+        "source": "b",
+        "sourceHandle": "success",
+        "target": "section:s1",
+        "type": "outcome",
+      },
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "from": "d",
+              "handle": "d:success",
+              "hasError": false,
+              "id": "d-success-e",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "deletable": false,
+        "id": "d-success-e",
+        "selected": false,
+        "source": "section:s1",
+        "sourceHandle": "d:success",
+        "target": "e",
+        "type": "outcome",
+      },
+    ],
+    "elementsSelectable": true,
+    "fitView": true,
+    "fitViewOptions": {
+      "maxZoom": 1,
+      "padding": 0.15,
+    },
+    "isValidConnection": "fn anonymous",
+    "minZoom": 0.2,
+    "multiSelectionKeyCode": [
+      "Meta",
+      "Control",
+    ],
+    "nodeTypes": {
+      "agent": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "call": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "command": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "convert": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "decision": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "end": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "join": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "lease": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "outside": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn Outside",
+      },
+      "sectionBox": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn SectionBox",
+      },
+      "service": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "since-last-run": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "tool": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "value": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "wait": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "web-request": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+    },
+    "nodes": [
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": true,
+          "issues": [],
+          "node": "[node a]",
+        },
+        "id": "a",
+        "measured": "undefined",
+        "position": {
+          "x": 0,
+          "y": 0,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [
+            {
+              "message": "Node issue",
+              "nodeId": "b",
+              "severity": "error",
+            },
+            {
+              "message": "Node warning",
+              "nodeId": "b",
+              "severity": "warning",
+            },
+          ],
+          "node": "[node b]",
+        },
+        "id": "b",
+        "measured": "undefined",
+        "position": {
+          "x": 320,
+          "y": 0,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [],
+          "node": "[node e]",
+        },
+        "id": "e",
+        "measured": "undefined",
+        "position": {
+          "x": 960,
+          "y": 0,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [],
+          "node": "[node f]",
+        },
+        "id": "f",
+        "measured": "undefined",
+        "position": {
+          "x": 960,
+          "y": 240,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "connectable": true,
+        "data": {
+          "count": 2,
+          "exits": [
+            {
+              "color": "green",
+              "from": "d",
+              "label": "d · success",
+              "outcome": "success",
+              "taken": "undefined",
+            },
+          ],
+          "isStart": false,
+          "issues": [
+            {
+              "message": "Section issue",
+              "sectionId": "s1",
+              "severity": "warning",
+            },
+          ],
+          "run": "undefined",
+          "section": {
+            "id": "s1",
+            "label": "Part",
+            "nodes": [
+              "c",
+              "d",
+            ],
+          },
+        },
+        "deletable": false,
+        "draggable": true,
+        "focusable": true,
+        "id": "section:s1",
+        "measured": "undefined",
+        "position": {
+          "x": 640,
+          "y": 0,
+        },
+        "selectable": true,
+        "selected": false,
+        "type": "sectionBox",
+      },
+    ],
+    "nodesConnectable": true,
+    "nodesDraggable": true,
+    "onConnect": "fn anonymous",
+    "onDoubleClick": "fn onDoubleClick",
+    "onDragOver": "fn onDragOver",
+    "onDrop": "fn onDrop",
+    "onEdgesChange": "fn anonymous",
+    "onNodeDoubleClick": "fn onNodeDoubleClick",
+    "onNodesChange": "fn anonymous",
+    "onPaneClick": "fn onPaneClick",
+    "onSelectionEnd": "fn onSelectionEnd",
+    "onSelectionStart": "fn onSelectionStart",
+    "selectionKeyCode": "Shift",
+    "snapGrid": [
+      8,
+      8,
+    ],
+    "snapToGrid": true,
+    "zoomOnDoubleClick": false,
+  },
+}
+`;
+
+exports[`the editor canvas: what React Flow gets a node selected 1`] = `
+{
+  "html": 
+"<div class="relative h-full min-h-0 overflow-hidden bg-muted/40 dark:bg-muted/20">
+<svg class="absolute size-0" aria-hidden="true">
+<defs>
+<marker id="ns-arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-red);">
+</path>
+</marker>
+<marker id="ns-arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-orange);">
+</path>
+</marker>
+<marker id="ns-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-amber);">
+</path>
+</marker>
+<marker id="ns-arrow-yellow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-yellow);">
+</path>
+</marker>
+<marker id="ns-arrow-lime" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-lime);">
+</path>
+</marker>
+<marker id="ns-arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-green);">
+</path>
+</marker>
+<marker id="ns-arrow-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-teal);">
+</path>
+</marker>
+<marker id="ns-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-cyan);">
+</path>
+</marker>
+<marker id="ns-arrow-sky" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-sky);">
+</path>
+</marker>
+<marker id="ns-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-blue);">
+</path>
+</marker>
+<marker id="ns-arrow-indigo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-indigo);">
+</path>
+</marker>
+<marker id="ns-arrow-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-violet);">
+</path>
+</marker>
+<marker id="ns-arrow-pink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-pink);">
+</path>
+</marker>
+<marker id="ns-arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-gray);">
+</path>
+</marker>
+<marker id="ns-arrow-mixed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--muted-foreground);">
+</path>
+</marker>
+</defs>
+</svg>
+<svg class="absolute size-0" aria-hidden="true">
+<defs>
+<marker id="ns-data-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: color-mix(in oklch, var(--muted-foreground) 70%, transparent);">
+</path>
+</marker>
+</defs>
+</svg>
+<div data-probe="react-flow">
+</div>
+</div>"
+,
+  "props": {
+    "aria-label": "Flow canvas",
+    "children": [
+      {
+        "element": "BackgroundComponent",
+        "props": {
+          "color": "color-mix(in oklch, var(--foreground) 16%, transparent)",
+          "gap": 16,
+          "size": 1.25,
+          "variant": "dots",
+        },
+      },
+      {
+        "element": "CanvasControls",
+        "props": {
+          "fit": {
+            "maxZoom": 1,
+            "padding": 0.15,
+          },
+          "onAutoLayout": "fn onAutoLayout",
+        },
+      },
+      {
+        "element": "SectionZoom",
+        "props": {
+          "fit": {
+            "maxZoom": 1,
+            "padding": 0.15,
+          },
+          "flow": "[the flow]",
+          "measured": {},
+          "onClose": "fn onClose",
+          "onOpen": "fn anonymous",
+          "open": null,
+        },
+      },
+      null,
+      null,
+      {
+        "element": "MiniMapComponent",
+        "props": {
+          "ariaLabel": "Mini map",
+          "className": "m-3! hidden overflow-hidden rounded-lg border shadow-xs lg:block",
+          "nodeBorderRadius": 6,
+          "nodeColor": "color-mix(in oklch, var(--muted-foreground) 45%, transparent)",
+          "pannable": true,
+          "style": {
+            "height": 112,
+            "width": 168,
+          },
+          "zoomable": true,
+        },
+      },
+    ],
+    "className": "[--xy-background-color:transparent]",
+    "deleteKeyCode": [
+      "Backspace",
+      "Delete",
+    ],
+    "edgeTypes": {
+      "data": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn DataEdge",
+      },
+      "outcome": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn OutcomeEdge",
+      },
+    },
+    "edges": [
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "hasError": false,
+              "id": "a-success-b",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+            {
+              "change": "undefined",
+              "color": "red",
+              "hasError": false,
+              "id": "a-failure-b",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "failure",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "id": "a-success-b",
+        "selected": false,
+        "source": "a",
+        "sourceHandle": "success",
+        "target": "b",
+        "type": "outcome",
+      },
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "hasError": true,
+              "id": "b-success-c",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "deletable": false,
+        "id": "b-success-c",
+        "selected": false,
+        "source": "b",
+        "sourceHandle": "success",
+        "target": "section:s1",
+        "type": "outcome",
+      },
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "from": "d",
+              "handle": "d:success",
+              "hasError": false,
+              "id": "d-success-e",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "deletable": false,
+        "id": "d-success-e",
+        "selected": false,
+        "source": "section:s1",
+        "sourceHandle": "d:success",
+        "target": "e",
+        "type": "outcome",
+      },
+    ],
+    "elementsSelectable": true,
+    "fitView": true,
+    "fitViewOptions": {
+      "maxZoom": 1,
+      "padding": 0.15,
+    },
+    "isValidConnection": "fn anonymous",
+    "minZoom": 0.2,
+    "multiSelectionKeyCode": [
+      "Meta",
+      "Control",
+    ],
+    "nodeTypes": {
+      "agent": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "call": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "command": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "convert": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "decision": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "end": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "join": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "lease": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "outside": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn Outside",
+      },
+      "sectionBox": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn SectionBox",
+      },
+      "service": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "since-last-run": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "tool": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "value": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "wait": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "web-request": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+    },
+    "nodes": [
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": true,
+          "issues": [],
+          "node": "[node a]",
+        },
+        "id": "a",
+        "measured": "undefined",
+        "position": {
+          "x": 0,
+          "y": 0,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [
+            {
+              "message": "Node issue",
+              "nodeId": "b",
+              "severity": "error",
+            },
+            {
+              "message": "Node warning",
+              "nodeId": "b",
+              "severity": "warning",
+            },
+          ],
+          "node": "[node b]",
+        },
+        "id": "b",
+        "measured": "undefined",
+        "position": {
+          "x": 320,
+          "y": 0,
+        },
+        "selected": true,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [],
+          "node": "[node e]",
+        },
+        "id": "e",
+        "measured": "undefined",
+        "position": {
+          "x": 960,
+          "y": 0,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [],
+          "node": "[node f]",
+        },
+        "id": "f",
+        "measured": "undefined",
+        "position": {
+          "x": 960,
+          "y": 240,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "connectable": true,
+        "data": {
+          "count": 2,
+          "exits": [
+            {
+              "color": "green",
+              "from": "d",
+              "label": "d · success",
+              "outcome": "success",
+              "taken": "undefined",
+            },
+          ],
+          "isStart": false,
+          "issues": [
+            {
+              "message": "Section issue",
+              "sectionId": "s1",
+              "severity": "warning",
+            },
+          ],
+          "run": "undefined",
+          "section": {
+            "id": "s1",
+            "label": "Part",
+            "nodes": [
+              "c",
+              "d",
+            ],
+          },
+        },
+        "deletable": false,
+        "draggable": true,
+        "focusable": true,
+        "id": "section:s1",
+        "measured": "undefined",
+        "position": {
+          "x": 640,
+          "y": 0,
+        },
+        "selectable": true,
+        "selected": false,
+        "type": "sectionBox",
+      },
+    ],
+    "nodesConnectable": true,
+    "nodesDraggable": true,
+    "onConnect": "fn anonymous",
+    "onDoubleClick": "fn onDoubleClick",
+    "onDragOver": "fn onDragOver",
+    "onDrop": "fn onDrop",
+    "onEdgesChange": "fn anonymous",
+    "onNodeDoubleClick": "fn onNodeDoubleClick",
+    "onNodesChange": "fn anonymous",
+    "onPaneClick": "fn onPaneClick",
+    "onSelectionEnd": "fn onSelectionEnd",
+    "onSelectionStart": "fn onSelectionStart",
+    "selectionKeyCode": "Shift",
+    "snapGrid": [
+      8,
+      8,
+    ],
+    "snapToGrid": true,
+    "zoomOnDoubleClick": false,
+  },
+}
+`;
+
+exports[`the editor canvas: what React Flow gets an edge selected 1`] = `
+{
+  "html": 
+"<div class="relative h-full min-h-0 overflow-hidden bg-muted/40 dark:bg-muted/20">
+<svg class="absolute size-0" aria-hidden="true">
+<defs>
+<marker id="ns-arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-red);">
+</path>
+</marker>
+<marker id="ns-arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-orange);">
+</path>
+</marker>
+<marker id="ns-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-amber);">
+</path>
+</marker>
+<marker id="ns-arrow-yellow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-yellow);">
+</path>
+</marker>
+<marker id="ns-arrow-lime" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-lime);">
+</path>
+</marker>
+<marker id="ns-arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-green);">
+</path>
+</marker>
+<marker id="ns-arrow-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-teal);">
+</path>
+</marker>
+<marker id="ns-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-cyan);">
+</path>
+</marker>
+<marker id="ns-arrow-sky" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-sky);">
+</path>
+</marker>
+<marker id="ns-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-blue);">
+</path>
+</marker>
+<marker id="ns-arrow-indigo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-indigo);">
+</path>
+</marker>
+<marker id="ns-arrow-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-violet);">
+</path>
+</marker>
+<marker id="ns-arrow-pink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-pink);">
+</path>
+</marker>
+<marker id="ns-arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-gray);">
+</path>
+</marker>
+<marker id="ns-arrow-mixed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--muted-foreground);">
+</path>
+</marker>
+</defs>
+</svg>
+<svg class="absolute size-0" aria-hidden="true">
+<defs>
+<marker id="ns-data-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: color-mix(in oklch, var(--muted-foreground) 70%, transparent);">
+</path>
+</marker>
+</defs>
+</svg>
+<div data-probe="react-flow">
+</div>
+</div>"
+,
+  "props": {
+    "aria-label": "Flow canvas",
+    "children": [
+      {
+        "element": "BackgroundComponent",
+        "props": {
+          "color": "color-mix(in oklch, var(--foreground) 16%, transparent)",
+          "gap": 16,
+          "size": 1.25,
+          "variant": "dots",
+        },
+      },
+      {
+        "element": "CanvasControls",
+        "props": {
+          "fit": {
+            "maxZoom": 1,
+            "padding": 0.15,
+          },
+          "onAutoLayout": "fn onAutoLayout",
+        },
+      },
+      {
+        "element": "SectionZoom",
+        "props": {
+          "fit": {
+            "maxZoom": 1,
+            "padding": 0.15,
+          },
+          "flow": "[the flow]",
+          "measured": {},
+          "onClose": "fn onClose",
+          "onOpen": "fn anonymous",
+          "open": null,
+        },
+      },
+      null,
+      null,
+      {
+        "element": "MiniMapComponent",
+        "props": {
+          "ariaLabel": "Mini map",
+          "className": "m-3! hidden overflow-hidden rounded-lg border shadow-xs lg:block",
+          "nodeBorderRadius": 6,
+          "nodeColor": "color-mix(in oklch, var(--muted-foreground) 45%, transparent)",
+          "pannable": true,
+          "style": {
+            "height": 112,
+            "width": 168,
+          },
+          "zoomable": true,
+        },
+      },
+    ],
+    "className": "[--xy-background-color:transparent]",
+    "deleteKeyCode": [
+      "Backspace",
+      "Delete",
+    ],
+    "edgeTypes": {
+      "data": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn DataEdge",
+      },
+      "outcome": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn OutcomeEdge",
+      },
+    },
+    "edges": [
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "hasError": false,
+              "id": "a-success-b",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+            {
+              "change": "undefined",
+              "color": "red",
+              "hasError": false,
+              "id": "a-failure-b",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "failure",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "a-failure-b",
+        },
+        "id": "a-success-b",
+        "selected": true,
+        "source": "a",
+        "sourceHandle": "failure",
+        "target": "b",
+        "type": "outcome",
+      },
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "hasError": true,
+              "id": "b-success-c",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "deletable": false,
+        "id": "b-success-c",
+        "selected": false,
+        "source": "b",
+        "sourceHandle": "success",
+        "target": "section:s1",
+        "type": "outcome",
+      },
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "from": "d",
+              "handle": "d:success",
+              "hasError": false,
+              "id": "d-success-e",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "deletable": false,
+        "id": "d-success-e",
+        "selected": false,
+        "source": "section:s1",
+        "sourceHandle": "d:success",
+        "target": "e",
+        "type": "outcome",
+      },
+    ],
+    "elementsSelectable": true,
+    "fitView": true,
+    "fitViewOptions": {
+      "maxZoom": 1,
+      "padding": 0.15,
+    },
+    "isValidConnection": "fn anonymous",
+    "minZoom": 0.2,
+    "multiSelectionKeyCode": [
+      "Meta",
+      "Control",
+    ],
+    "nodeTypes": {
+      "agent": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "call": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "command": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "convert": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "decision": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "end": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "join": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "lease": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "outside": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn Outside",
+      },
+      "sectionBox": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn SectionBox",
+      },
+      "service": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "since-last-run": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "tool": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "value": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "wait": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "web-request": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+    },
+    "nodes": [
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": true,
+          "issues": [],
+          "node": "[node a]",
+        },
+        "id": "a",
+        "measured": "undefined",
+        "position": {
+          "x": 0,
+          "y": 0,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [
+            {
+              "message": "Node issue",
+              "nodeId": "b",
+              "severity": "error",
+            },
+            {
+              "message": "Node warning",
+              "nodeId": "b",
+              "severity": "warning",
+            },
+          ],
+          "node": "[node b]",
+        },
+        "id": "b",
+        "measured": "undefined",
+        "position": {
+          "x": 320,
+          "y": 0,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [],
+          "node": "[node e]",
+        },
+        "id": "e",
+        "measured": "undefined",
+        "position": {
+          "x": 960,
+          "y": 0,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [],
+          "node": "[node f]",
+        },
+        "id": "f",
+        "measured": "undefined",
+        "position": {
+          "x": 960,
+          "y": 240,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "connectable": true,
+        "data": {
+          "count": 2,
+          "exits": [
+            {
+              "color": "green",
+              "from": "d",
+              "label": "d · success",
+              "outcome": "success",
+              "taken": "undefined",
+            },
+          ],
+          "isStart": false,
+          "issues": [
+            {
+              "message": "Section issue",
+              "sectionId": "s1",
+              "severity": "warning",
+            },
+          ],
+          "run": "undefined",
+          "section": {
+            "id": "s1",
+            "label": "Part",
+            "nodes": [
+              "c",
+              "d",
+            ],
+          },
+        },
+        "deletable": false,
+        "draggable": true,
+        "focusable": true,
+        "id": "section:s1",
+        "measured": "undefined",
+        "position": {
+          "x": 640,
+          "y": 0,
+        },
+        "selectable": true,
+        "selected": false,
+        "type": "sectionBox",
+      },
+    ],
+    "nodesConnectable": true,
+    "nodesDraggable": true,
+    "onConnect": "fn anonymous",
+    "onDoubleClick": "fn onDoubleClick",
+    "onDragOver": "fn onDragOver",
+    "onDrop": "fn onDrop",
+    "onEdgesChange": "fn anonymous",
+    "onNodeDoubleClick": "fn onNodeDoubleClick",
+    "onNodesChange": "fn anonymous",
+    "onPaneClick": "fn onPaneClick",
+    "onSelectionEnd": "fn onSelectionEnd",
+    "onSelectionStart": "fn onSelectionStart",
+    "selectionKeyCode": "Shift",
+    "snapGrid": [
+      8,
+      8,
+    ],
+    "snapToGrid": true,
+    "zoomOnDoubleClick": false,
+  },
+}
+`;
+
+exports[`the editor canvas: what React Flow gets several nodes and a Section box selected 1`] = `
+{
+  "html": 
+"<div class="relative h-full min-h-0 overflow-hidden bg-muted/40 dark:bg-muted/20">
+<svg class="absolute size-0" aria-hidden="true">
+<defs>
+<marker id="ns-arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-red);">
+</path>
+</marker>
+<marker id="ns-arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-orange);">
+</path>
+</marker>
+<marker id="ns-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-amber);">
+</path>
+</marker>
+<marker id="ns-arrow-yellow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-yellow);">
+</path>
+</marker>
+<marker id="ns-arrow-lime" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-lime);">
+</path>
+</marker>
+<marker id="ns-arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-green);">
+</path>
+</marker>
+<marker id="ns-arrow-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-teal);">
+</path>
+</marker>
+<marker id="ns-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-cyan);">
+</path>
+</marker>
+<marker id="ns-arrow-sky" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-sky);">
+</path>
+</marker>
+<marker id="ns-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-blue);">
+</path>
+</marker>
+<marker id="ns-arrow-indigo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-indigo);">
+</path>
+</marker>
+<marker id="ns-arrow-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-violet);">
+</path>
+</marker>
+<marker id="ns-arrow-pink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-pink);">
+</path>
+</marker>
+<marker id="ns-arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-gray);">
+</path>
+</marker>
+<marker id="ns-arrow-mixed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--muted-foreground);">
+</path>
+</marker>
+</defs>
+</svg>
+<svg class="absolute size-0" aria-hidden="true">
+<defs>
+<marker id="ns-data-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: color-mix(in oklch, var(--muted-foreground) 70%, transparent);">
+</path>
+</marker>
+</defs>
+</svg>
+<div data-probe="react-flow">
+</div>
+</div>"
+,
+  "props": {
+    "aria-label": "Flow canvas",
+    "children": [
+      {
+        "element": "BackgroundComponent",
+        "props": {
+          "color": "color-mix(in oklch, var(--foreground) 16%, transparent)",
+          "gap": 16,
+          "size": 1.25,
+          "variant": "dots",
+        },
+      },
+      {
+        "element": "CanvasControls",
+        "props": {
+          "fit": {
+            "maxZoom": 1,
+            "padding": 0.15,
+          },
+          "onAutoLayout": "fn onAutoLayout",
+        },
+      },
+      {
+        "element": "SectionZoom",
+        "props": {
+          "fit": {
+            "maxZoom": 1,
+            "padding": 0.15,
+          },
+          "flow": "[the flow]",
+          "measured": {},
+          "onClose": "fn onClose",
+          "onOpen": "fn anonymous",
+          "open": null,
+        },
+      },
+      null,
+      {
+        "element": "NodeToolbar",
+        "props": {
+          "children": {
+            "element": "Button",
+            "props": {
+              "children": [
+                {
+                  "element": "Group",
+                  "props": {
+                    "data-icon": "inline-start",
+                  },
+                },
+                "Make section",
+                {
+                  "element": "KbdGroup",
+                  "props": {
+                    "children": [
+                      {
+                        "element": "Kbd",
+                        "props": {
+                          "children": "⌘/Ctrl",
+                        },
+                      },
+                      {
+                        "element": "Kbd",
+                        "props": {
+                          "children": "G",
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+              "className": "bg-background shadow-sm dark:bg-background",
+              "onClick": "fn onClick",
+              "size": "sm",
+              "variant": "outline",
+            },
+          },
+          "isVisible": true,
+          "nodeId": [
+            "a",
+            "b",
+            "section:s1",
+          ],
+          "position": "top",
+        },
+      },
+      {
+        "element": "MiniMapComponent",
+        "props": {
+          "ariaLabel": "Mini map",
+          "className": "m-3! hidden overflow-hidden rounded-lg border shadow-xs lg:block",
+          "nodeBorderRadius": 6,
+          "nodeColor": "color-mix(in oklch, var(--muted-foreground) 45%, transparent)",
+          "pannable": true,
+          "style": {
+            "height": 112,
+            "width": 168,
+          },
+          "zoomable": true,
+        },
+      },
+    ],
+    "className": "[--xy-background-color:transparent]",
+    "deleteKeyCode": [
+      "Backspace",
+      "Delete",
+    ],
+    "edgeTypes": {
+      "data": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn DataEdge",
+      },
+      "outcome": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn OutcomeEdge",
+      },
+    },
+    "edges": [
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "hasError": false,
+              "id": "a-success-b",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+            {
+              "change": "undefined",
+              "color": "red",
+              "hasError": false,
+              "id": "a-failure-b",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "failure",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "id": "a-success-b",
+        "selected": false,
+        "source": "a",
+        "sourceHandle": "success",
+        "target": "b",
+        "type": "outcome",
+      },
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "hasError": true,
+              "id": "b-success-c",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "deletable": false,
+        "id": "b-success-c",
+        "selected": false,
+        "source": "b",
+        "sourceHandle": "success",
+        "target": "section:s1",
+        "type": "outcome",
+      },
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "from": "d",
+              "handle": "d:success",
+              "hasError": false,
+              "id": "d-success-e",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "deletable": false,
+        "id": "d-success-e",
+        "selected": false,
+        "source": "section:s1",
+        "sourceHandle": "d:success",
+        "target": "e",
+        "type": "outcome",
+      },
+    ],
+    "elementsSelectable": true,
+    "fitView": true,
+    "fitViewOptions": {
+      "maxZoom": 1,
+      "padding": 0.15,
+    },
+    "isValidConnection": "fn anonymous",
+    "minZoom": 0.2,
+    "multiSelectionKeyCode": [
+      "Meta",
+      "Control",
+    ],
+    "nodeTypes": {
+      "agent": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "call": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "command": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "convert": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "decision": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "end": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "join": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "lease": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "outside": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn Outside",
+      },
+      "sectionBox": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn SectionBox",
+      },
+      "service": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "since-last-run": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "tool": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "value": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "wait": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "web-request": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+    },
+    "nodes": [
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": true,
+          "issues": [],
+          "node": "[node a]",
+        },
+        "id": "a",
+        "measured": "undefined",
+        "position": {
+          "x": 0,
+          "y": 0,
+        },
+        "selected": true,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [
+            {
+              "message": "Node issue",
+              "nodeId": "b",
+              "severity": "error",
+            },
+            {
+              "message": "Node warning",
+              "nodeId": "b",
+              "severity": "warning",
+            },
+          ],
+          "node": "[node b]",
+        },
+        "id": "b",
+        "measured": "undefined",
+        "position": {
+          "x": 320,
+          "y": 0,
+        },
+        "selected": true,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [],
+          "node": "[node e]",
+        },
+        "id": "e",
+        "measured": "undefined",
+        "position": {
+          "x": 960,
+          "y": 0,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [],
+          "node": "[node f]",
+        },
+        "id": "f",
+        "measured": "undefined",
+        "position": {
+          "x": 960,
+          "y": 240,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "connectable": true,
+        "data": {
+          "count": 2,
+          "exits": [
+            {
+              "color": "green",
+              "from": "d",
+              "label": "d · success",
+              "outcome": "success",
+              "taken": "undefined",
+            },
+          ],
+          "isStart": false,
+          "issues": [
+            {
+              "message": "Section issue",
+              "sectionId": "s1",
+              "severity": "warning",
+            },
+          ],
+          "run": "undefined",
+          "section": {
+            "id": "s1",
+            "label": "Part",
+            "nodes": [
+              "c",
+              "d",
+            ],
+          },
+        },
+        "deletable": false,
+        "draggable": true,
+        "focusable": true,
+        "id": "section:s1",
+        "measured": "undefined",
+        "position": {
+          "x": 640,
+          "y": 0,
+        },
+        "selectable": true,
+        "selected": true,
+        "type": "sectionBox",
+      },
+    ],
+    "nodesConnectable": true,
+    "nodesDraggable": true,
+    "onConnect": "fn anonymous",
+    "onDoubleClick": "fn onDoubleClick",
+    "onDragOver": "fn onDragOver",
+    "onDrop": "fn onDrop",
+    "onEdgesChange": "fn anonymous",
+    "onNodeDoubleClick": "fn onNodeDoubleClick",
+    "onNodesChange": "fn anonymous",
+    "onPaneClick": "fn onPaneClick",
+    "onSelectionEnd": "fn onSelectionEnd",
+    "onSelectionStart": "fn onSelectionStart",
+    "selectionKeyCode": "Shift",
+    "snapGrid": [
+      8,
+      8,
+    ],
+    "snapToGrid": true,
+    "zoomOnDoubleClick": false,
+  },
+}
+`;
+
+exports[`the editor canvas: what React Flow gets a Section selected 1`] = `
+{
+  "html": 
+"<div class="relative h-full min-h-0 overflow-hidden bg-muted/40 dark:bg-muted/20">
+<svg class="absolute size-0" aria-hidden="true">
+<defs>
+<marker id="ns-arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-red);">
+</path>
+</marker>
+<marker id="ns-arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-orange);">
+</path>
+</marker>
+<marker id="ns-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-amber);">
+</path>
+</marker>
+<marker id="ns-arrow-yellow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-yellow);">
+</path>
+</marker>
+<marker id="ns-arrow-lime" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-lime);">
+</path>
+</marker>
+<marker id="ns-arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-green);">
+</path>
+</marker>
+<marker id="ns-arrow-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-teal);">
+</path>
+</marker>
+<marker id="ns-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-cyan);">
+</path>
+</marker>
+<marker id="ns-arrow-sky" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-sky);">
+</path>
+</marker>
+<marker id="ns-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-blue);">
+</path>
+</marker>
+<marker id="ns-arrow-indigo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-indigo);">
+</path>
+</marker>
+<marker id="ns-arrow-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-violet);">
+</path>
+</marker>
+<marker id="ns-arrow-pink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-pink);">
+</path>
+</marker>
+<marker id="ns-arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-gray);">
+</path>
+</marker>
+<marker id="ns-arrow-mixed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--muted-foreground);">
+</path>
+</marker>
+</defs>
+</svg>
+<svg class="absolute size-0" aria-hidden="true">
+<defs>
+<marker id="ns-data-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: color-mix(in oklch, var(--muted-foreground) 70%, transparent);">
+</path>
+</marker>
+</defs>
+</svg>
+<div data-probe="react-flow">
+</div>
+</div>"
+,
+  "props": {
+    "aria-label": "Flow canvas",
+    "children": [
+      {
+        "element": "BackgroundComponent",
+        "props": {
+          "color": "color-mix(in oklch, var(--foreground) 16%, transparent)",
+          "gap": 16,
+          "size": 1.25,
+          "variant": "dots",
+        },
+      },
+      {
+        "element": "CanvasControls",
+        "props": {
+          "fit": {
+            "maxZoom": 1,
+            "padding": 0.15,
+          },
+          "onAutoLayout": "fn onAutoLayout",
+        },
+      },
+      {
+        "element": "SectionZoom",
+        "props": {
+          "fit": {
+            "maxZoom": 1,
+            "padding": 0.15,
+          },
+          "flow": "[the flow]",
+          "measured": {},
+          "onClose": "fn onClose",
+          "onOpen": "fn anonymous",
+          "open": null,
+        },
+      },
+      null,
+      null,
+      {
+        "element": "MiniMapComponent",
+        "props": {
+          "ariaLabel": "Mini map",
+          "className": "m-3! hidden overflow-hidden rounded-lg border shadow-xs lg:block",
+          "nodeBorderRadius": 6,
+          "nodeColor": "color-mix(in oklch, var(--muted-foreground) 45%, transparent)",
+          "pannable": true,
+          "style": {
+            "height": 112,
+            "width": 168,
+          },
+          "zoomable": true,
+        },
+      },
+    ],
+    "className": "[--xy-background-color:transparent]",
+    "deleteKeyCode": [
+      "Backspace",
+      "Delete",
+    ],
+    "edgeTypes": {
+      "data": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn DataEdge",
+      },
+      "outcome": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn OutcomeEdge",
+      },
+    },
+    "edges": [
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "hasError": false,
+              "id": "a-success-b",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+            {
+              "change": "undefined",
+              "color": "red",
+              "hasError": false,
+              "id": "a-failure-b",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "failure",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "id": "a-success-b",
+        "selected": false,
+        "source": "a",
+        "sourceHandle": "success",
+        "target": "b",
+        "type": "outcome",
+      },
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "hasError": true,
+              "id": "b-success-c",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "deletable": false,
+        "id": "b-success-c",
+        "selected": false,
+        "source": "b",
+        "sourceHandle": "success",
+        "target": "section:s1",
+        "type": "outcome",
+      },
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "from": "d",
+              "handle": "d:success",
+              "hasError": false,
+              "id": "d-success-e",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "deletable": false,
+        "id": "d-success-e",
+        "selected": false,
+        "source": "section:s1",
+        "sourceHandle": "d:success",
+        "target": "e",
+        "type": "outcome",
+      },
+    ],
+    "elementsSelectable": true,
+    "fitView": true,
+    "fitViewOptions": {
+      "maxZoom": 1,
+      "padding": 0.15,
+    },
+    "isValidConnection": "fn anonymous",
+    "minZoom": 0.2,
+    "multiSelectionKeyCode": [
+      "Meta",
+      "Control",
+    ],
+    "nodeTypes": {
+      "agent": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "call": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "command": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "convert": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "decision": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "end": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "join": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "lease": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "outside": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn Outside",
+      },
+      "sectionBox": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn SectionBox",
+      },
+      "service": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "since-last-run": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "tool": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "value": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "wait": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "web-request": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+    },
+    "nodes": [
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": true,
+          "issues": [],
+          "node": "[node a]",
+        },
+        "id": "a",
+        "measured": "undefined",
+        "position": {
+          "x": 0,
+          "y": 0,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [
+            {
+              "message": "Node issue",
+              "nodeId": "b",
+              "severity": "error",
+            },
+            {
+              "message": "Node warning",
+              "nodeId": "b",
+              "severity": "warning",
+            },
+          ],
+          "node": "[node b]",
+        },
+        "id": "b",
+        "measured": "undefined",
+        "position": {
+          "x": 320,
+          "y": 0,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [],
+          "node": "[node e]",
+        },
+        "id": "e",
+        "measured": "undefined",
+        "position": {
+          "x": 960,
+          "y": 0,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [],
+          "node": "[node f]",
+        },
+        "id": "f",
+        "measured": "undefined",
+        "position": {
+          "x": 960,
+          "y": 240,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "connectable": true,
+        "data": {
+          "count": 2,
+          "exits": [
+            {
+              "color": "green",
+              "from": "d",
+              "label": "d · success",
+              "outcome": "success",
+              "taken": "undefined",
+            },
+          ],
+          "isStart": false,
+          "issues": [
+            {
+              "message": "Section issue",
+              "sectionId": "s1",
+              "severity": "warning",
+            },
+          ],
+          "run": "undefined",
+          "section": {
+            "id": "s1",
+            "label": "Part",
+            "nodes": [
+              "c",
+              "d",
+            ],
+          },
+        },
+        "deletable": false,
+        "draggable": true,
+        "focusable": true,
+        "id": "section:s1",
+        "measured": "undefined",
+        "position": {
+          "x": 640,
+          "y": 0,
+        },
+        "selectable": true,
+        "selected": true,
+        "type": "sectionBox",
+      },
+    ],
+    "nodesConnectable": true,
+    "nodesDraggable": true,
+    "onConnect": "fn anonymous",
+    "onDoubleClick": "fn onDoubleClick",
+    "onDragOver": "fn onDragOver",
+    "onDrop": "fn onDrop",
+    "onEdgesChange": "fn anonymous",
+    "onNodeDoubleClick": "fn onNodeDoubleClick",
+    "onNodesChange": "fn anonymous",
+    "onPaneClick": "fn onPaneClick",
+    "onSelectionEnd": "fn onSelectionEnd",
+    "onSelectionStart": "fn onSelectionStart",
+    "selectionKeyCode": "Shift",
+    "snapGrid": [
+      8,
+      8,
+    ],
+    "snapToGrid": true,
+    "zoomOnDoubleClick": false,
+  },
+}
+`;
+
+exports[`the editor canvas: what React Flow gets a Section open 1`] = `
+{
+  "html": 
+"<div class="relative h-full min-h-0 overflow-hidden bg-muted/40 dark:bg-muted/20">
+<svg class="absolute size-0" aria-hidden="true">
+<defs>
+<marker id="ns-arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-red);">
+</path>
+</marker>
+<marker id="ns-arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-orange);">
+</path>
+</marker>
+<marker id="ns-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-amber);">
+</path>
+</marker>
+<marker id="ns-arrow-yellow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-yellow);">
+</path>
+</marker>
+<marker id="ns-arrow-lime" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-lime);">
+</path>
+</marker>
+<marker id="ns-arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-green);">
+</path>
+</marker>
+<marker id="ns-arrow-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-teal);">
+</path>
+</marker>
+<marker id="ns-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-cyan);">
+</path>
+</marker>
+<marker id="ns-arrow-sky" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-sky);">
+</path>
+</marker>
+<marker id="ns-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-blue);">
+</path>
+</marker>
+<marker id="ns-arrow-indigo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-indigo);">
+</path>
+</marker>
+<marker id="ns-arrow-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-violet);">
+</path>
+</marker>
+<marker id="ns-arrow-pink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-pink);">
+</path>
+</marker>
+<marker id="ns-arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-gray);">
+</path>
+</marker>
+<marker id="ns-arrow-mixed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--muted-foreground);">
+</path>
+</marker>
+</defs>
+</svg>
+<svg class="absolute size-0" aria-hidden="true">
+<defs>
+<marker id="ns-data-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: color-mix(in oklch, var(--muted-foreground) 70%, transparent);">
+</path>
+</marker>
+</defs>
+</svg>
+<div data-probe="react-flow">
+</div>
+</div>"
+,
+  "props": {
+    "aria-label": "Flow canvas",
+    "children": [
+      {
+        "element": "BackgroundComponent",
+        "props": {
+          "color": "color-mix(in oklch, var(--foreground) 16%, transparent)",
+          "gap": 16,
+          "size": 1.25,
+          "variant": "dots",
+        },
+      },
+      {
+        "element": "CanvasControls",
+        "props": {
+          "fit": {
+            "maxZoom": 1,
+            "padding": 0.15,
+          },
+          "onAutoLayout": "fn onAutoLayout",
+        },
+      },
+      {
+        "element": "SectionZoom",
+        "props": {
+          "fit": {
+            "maxZoom": 1,
+            "padding": 0.15,
+          },
+          "flow": "[the flow]",
+          "measured": {},
+          "onClose": "fn onClose",
+          "onOpen": "fn anonymous",
+          "open": "s1",
+        },
+      },
+      {
+        "element": "OpenSectionBar",
+        "props": {
+          "flowLabel": "demo",
+          "onOpen": "fn anonymous",
+          "path": [
+            {
+              "id": "s1",
+              "label": "Part",
+              "nodes": [
+                "c",
+                "d",
+              ],
+            },
+          ],
+        },
+      },
+      null,
+      null,
+    ],
+    "className": "[--xy-background-color:transparent]",
+    "deleteKeyCode": [
+      "Backspace",
+      "Delete",
+    ],
+    "edgeTypes": {
+      "data": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn DataEdge",
+      },
+      "outcome": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn OutcomeEdge",
+      },
+    },
+    "edges": [
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "hasError": false,
+              "id": "c-success-d",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "id": "c-success-d",
+        "selected": false,
+        "source": "c",
+        "sourceHandle": "success",
+        "target": "d",
+        "type": "outcome",
+      },
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "from": "b",
+              "handle": "b:success",
+              "hasError": true,
+              "id": "b-success-c",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "deletable": false,
+        "id": "b-success-c",
+        "selected": false,
+        "source": "outside:in:b",
+        "sourceHandle": "b:success",
+        "target": "c",
+        "type": "outcome",
+      },
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "hasError": false,
+              "id": "d-success-e",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "deletable": false,
+        "id": "d-success-e",
+        "selected": false,
+        "source": "d",
+        "sourceHandle": "success",
+        "target": "outside:out:e",
+        "type": "outcome",
+      },
+    ],
+    "elementsSelectable": true,
+    "fitView": true,
+    "fitViewOptions": {
+      "maxZoom": 1,
+      "padding": 0.15,
+    },
+    "isValidConnection": "fn anonymous",
+    "minZoom": 0.2,
+    "multiSelectionKeyCode": [
+      "Meta",
+      "Control",
+    ],
+    "nodeTypes": {
+      "agent": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "call": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "command": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "convert": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "decision": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "end": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "join": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "lease": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "outside": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn Outside",
+      },
+      "sectionBox": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn SectionBox",
+      },
+      "service": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "since-last-run": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "tool": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "value": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "wait": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "web-request": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+    },
+    "nodes": [
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [],
+          "node": "[node c]",
+        },
+        "id": "c",
+        "measured": "undefined",
+        "position": {
+          "x": 640,
+          "y": 0,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [],
+          "node": "[node d]",
+        },
+        "id": "d",
+        "measured": "undefined",
+        "position": {
+          "x": 640,
+          "y": 240,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "connectable": false,
+        "data": {
+          "exits": [
+            {
+              "color": "green",
+              "from": "b",
+              "outcome": "success",
+            },
+          ],
+          "id": "outside:in:b",
+          "inside": [
+            "c",
+          ],
+          "label": "b",
+          "level": null,
+          "side": "in",
+        },
+        "deletable": false,
+        "draggable": false,
+        "focusable": false,
+        "id": "outside:in:b",
+        "measured": "undefined",
+        "position": {
+          "x": 224,
+          "y": 0,
+        },
+        "selectable": false,
+        "type": "outside",
+      },
+      {
+        "connectable": false,
+        "data": {
+          "exits": [],
+          "id": "outside:out:e",
+          "inside": [
+            "d",
+          ],
+          "label": "e",
+          "level": null,
+          "side": "out",
+        },
+        "deletable": false,
+        "draggable": false,
+        "focusable": false,
+        "id": "outside:out:e",
+        "measured": "undefined",
+        "position": {
+          "x": 1056,
+          "y": 240,
+        },
+        "selectable": false,
+        "type": "outside",
+      },
+    ],
+    "nodesConnectable": true,
+    "nodesDraggable": true,
+    "onConnect": "fn anonymous",
+    "onDoubleClick": "fn onDoubleClick",
+    "onDragOver": "fn onDragOver",
+    "onDrop": "fn onDrop",
+    "onEdgesChange": "fn anonymous",
+    "onNodeDoubleClick": "fn onNodeDoubleClick",
+    "onNodesChange": "fn anonymous",
+    "onPaneClick": "fn onPaneClick",
+    "onSelectionEnd": "fn onSelectionEnd",
+    "onSelectionStart": "fn onSelectionStart",
+    "selectionKeyCode": "Shift",
+    "snapGrid": [
+      8,
+      8,
+    ],
+    "snapToGrid": true,
+    "zoomOnDoubleClick": false,
+  },
+}
+`;
+
+exports[`the editor canvas: what React Flow gets a proposal on view 1`] = `
+{
+  "html": 
+"<div class="relative h-full min-h-0 overflow-hidden bg-muted/40 dark:bg-muted/20">
+<svg class="absolute size-0" aria-hidden="true">
+<defs>
+<marker id="ns-arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-red);">
+</path>
+</marker>
+<marker id="ns-arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-orange);">
+</path>
+</marker>
+<marker id="ns-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-amber);">
+</path>
+</marker>
+<marker id="ns-arrow-yellow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-yellow);">
+</path>
+</marker>
+<marker id="ns-arrow-lime" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-lime);">
+</path>
+</marker>
+<marker id="ns-arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-green);">
+</path>
+</marker>
+<marker id="ns-arrow-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-teal);">
+</path>
+</marker>
+<marker id="ns-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-cyan);">
+</path>
+</marker>
+<marker id="ns-arrow-sky" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-sky);">
+</path>
+</marker>
+<marker id="ns-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-blue);">
+</path>
+</marker>
+<marker id="ns-arrow-indigo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-indigo);">
+</path>
+</marker>
+<marker id="ns-arrow-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-violet);">
+</path>
+</marker>
+<marker id="ns-arrow-pink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-pink);">
+</path>
+</marker>
+<marker id="ns-arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-gray);">
+</path>
+</marker>
+<marker id="ns-arrow-mixed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--muted-foreground);">
+</path>
+</marker>
+</defs>
+</svg>
+<svg class="absolute size-0" aria-hidden="true">
+<defs>
+<marker id="ns-data-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: color-mix(in oklch, var(--muted-foreground) 70%, transparent);">
+</path>
+</marker>
+</defs>
+</svg>
+<div data-probe="react-flow">
+</div>
+</div>"
+,
+  "props": {
+    "aria-label": "Flow canvas",
+    "children": [
+      {
+        "element": "BackgroundComponent",
+        "props": {
+          "color": "color-mix(in oklch, var(--foreground) 16%, transparent)",
+          "gap": 16,
+          "size": 1.25,
+          "variant": "dots",
+        },
+      },
+      {
+        "element": "CanvasControls",
+        "props": {
+          "fit": {
+            "maxZoom": 1,
+            "padding": 0.15,
+          },
+          "onAutoLayout": "fn onAutoLayout",
+        },
+      },
+      {
+        "element": "SectionZoom",
+        "props": {
+          "fit": {
+            "maxZoom": 1,
+            "padding": 0.15,
+          },
+          "flow": {
+            "edges": [
+              {
+                "from": "a",
+                "id": "a-success-b",
+                "outcome": "success",
+                "to": "b",
+              },
+              {
+                "from": "a",
+                "id": "a-failure-b",
+                "outcome": "failure",
+                "to": "b",
+              },
+              {
+                "from": "b",
+                "id": "b-success-c",
+                "outcome": "success",
+                "to": "c",
+              },
+              {
+                "from": "c",
+                "id": "c-success-d",
+                "outcome": "success",
+                "to": "d",
+              },
+              {
+                "from": "d",
+                "id": "d-success-e",
+                "outcome": "success",
+                "to": "e",
+              },
+              {
+                "from": "e",
+                "id": "e-success-g",
+                "outcome": "success",
+                "to": "g",
+              },
+            ],
+            "inputs": [],
+            "nodes": [
+              "[node a]",
+              "[node b]",
+              "[node c]",
+              "[node d]",
+              "[node e]",
+              "[node f]",
+              {
+                "command": "",
+                "exits": [
+                  {
+                    "code": 0,
+                    "color": "green",
+                    "description": "The command succeeded.",
+                    "name": "success",
+                  },
+                  {
+                    "code": 1,
+                    "color": "red",
+                    "description": "General error.",
+                    "name": "failure",
+                  },
+                  {
+                    "color": "gray",
+                    "description": "Any other exit code.",
+                    "name": "other",
+                  },
+                ],
+                "id": "g",
+                "position": {
+                  "x": 1280,
+                  "y": 0,
+                },
+                "stdout": "text",
+                "type": "command",
+              },
+            ],
+            "outputs": [],
+            "sections": [
+              {
+                "id": "s1",
+                "label": "Part",
+                "nodes": [
+                  "c",
+                  "d",
+                ],
+              },
+            ],
+            "start": "a",
+            "version": 9,
+          },
+          "measured": {},
+          "onClose": "fn onClose",
+          "onOpen": "fn anonymous",
+          "open": null,
+        },
+      },
+      null,
+      null,
+      {
+        "element": "MiniMapComponent",
+        "props": {
+          "ariaLabel": "Mini map",
+          "className": "m-3! hidden overflow-hidden rounded-lg border shadow-xs lg:block",
+          "nodeBorderRadius": 6,
+          "nodeColor": "color-mix(in oklch, var(--muted-foreground) 45%, transparent)",
+          "pannable": true,
+          "style": {
+            "height": 112,
+            "width": 168,
+          },
+          "zoomable": true,
+        },
+      },
+    ],
+    "className": "[--xy-background-color:transparent]",
+    "deleteKeyCode": null,
+    "edgeTypes": {
+      "data": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn DataEdge",
+      },
+      "outcome": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn OutcomeEdge",
+      },
+    },
+    "edges": [
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "hasError": false,
+              "id": "a-success-b",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+            {
+              "change": "undefined",
+              "color": "red",
+              "hasError": false,
+              "id": "a-failure-b",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "failure",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "id": "a-success-b",
+        "selected": false,
+        "source": "a",
+        "sourceHandle": "success",
+        "target": "b",
+        "type": "outcome",
+      },
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "hasError": true,
+              "id": "b-success-c",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "deletable": false,
+        "id": "b-success-c",
+        "selected": false,
+        "source": "b",
+        "sourceHandle": "success",
+        "target": "section:s1",
+        "type": "outcome",
+      },
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "from": "d",
+              "handle": "d:success",
+              "hasError": false,
+              "id": "d-success-e",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "deletable": false,
+        "id": "d-success-e",
+        "selected": false,
+        "source": "section:s1",
+        "sourceHandle": "d:success",
+        "target": "e",
+        "type": "outcome",
+      },
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "added",
+              "color": "green",
+              "hasError": false,
+              "id": "e-success-g",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "id": "e-success-g",
+        "selected": false,
+        "source": "e",
+        "sourceHandle": "success",
+        "target": "g",
+        "type": "outcome",
+      },
+    ],
+    "elementsSelectable": false,
+    "fitView": true,
+    "fitViewOptions": {
+      "maxZoom": 1,
+      "padding": 0.15,
+    },
+    "isValidConnection": "fn anonymous",
+    "minZoom": 0.2,
+    "multiSelectionKeyCode": [
+      "Meta",
+      "Control",
+    ],
+    "nodeTypes": {
+      "agent": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "call": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "command": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "convert": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "decision": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "end": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "join": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "lease": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "outside": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn Outside",
+      },
+      "sectionBox": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn SectionBox",
+      },
+      "service": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "since-last-run": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "tool": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "value": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "wait": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "web-request": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+    },
+    "nodes": [
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": true,
+          "issues": [],
+          "node": "[node a]",
+        },
+        "id": "a",
+        "measured": "undefined",
+        "position": {
+          "x": 0,
+          "y": 0,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "changed",
+          "isStart": false,
+          "issues": [
+            {
+              "message": "Node issue",
+              "nodeId": "b",
+              "severity": "error",
+            },
+            {
+              "message": "Node warning",
+              "nodeId": "b",
+              "severity": "warning",
+            },
+          ],
+          "node": "[node b]",
+        },
+        "id": "b",
+        "measured": "undefined",
+        "position": {
+          "x": 320,
+          "y": 0,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [],
+          "node": "[node e]",
+        },
+        "id": "e",
+        "measured": "undefined",
+        "position": {
+          "x": 960,
+          "y": 0,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [],
+          "node": "[node f]",
+        },
+        "id": "f",
+        "measured": "undefined",
+        "position": {
+          "x": 960,
+          "y": 240,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "added",
+          "isStart": false,
+          "issues": [],
+          "node": {
+            "command": "",
+            "exits": [
+              {
+                "code": 0,
+                "color": "green",
+                "description": "The command succeeded.",
+                "name": "success",
+              },
+              {
+                "code": 1,
+                "color": "red",
+                "description": "General error.",
+                "name": "failure",
+              },
+              {
+                "color": "gray",
+                "description": "Any other exit code.",
+                "name": "other",
+              },
+            ],
+            "id": "g",
+            "position": {
+              "x": 1280,
+              "y": 0,
+            },
+            "stdout": "text",
+            "type": "command",
+          },
+        },
+        "id": "g",
+        "measured": "undefined",
+        "position": {
+          "x": 1280,
+          "y": 0,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "connectable": false,
+        "data": {
+          "count": 2,
+          "exits": [
+            {
+              "color": "green",
+              "from": "d",
+              "label": "d · success",
+              "outcome": "success",
+              "taken": "undefined",
+            },
+          ],
+          "isStart": false,
+          "issues": [
+            {
+              "message": "Section issue",
+              "sectionId": "s1",
+              "severity": "warning",
+            },
+          ],
+          "run": "undefined",
+          "section": {
+            "id": "s1",
+            "label": "Part",
+            "nodes": [
+              "c",
+              "d",
+            ],
+          },
+        },
+        "deletable": false,
+        "draggable": false,
+        "focusable": false,
+        "id": "section:s1",
+        "measured": "undefined",
+        "position": {
+          "x": 640,
+          "y": 0,
+        },
+        "selectable": false,
+        "selected": false,
+        "type": "sectionBox",
+      },
+    ],
+    "nodesConnectable": false,
+    "nodesDraggable": false,
+    "onConnect": "fn anonymous",
+    "onDoubleClick": "fn onDoubleClick",
+    "onDragOver": "fn onDragOver",
+    "onDrop": "fn onDrop",
+    "onEdgesChange": "fn anonymous",
+    "onNodeDoubleClick": "fn onNodeDoubleClick",
+    "onNodesChange": "fn anonymous",
+    "onPaneClick": "fn onPaneClick",
+    "onSelectionEnd": "fn onSelectionEnd",
+    "onSelectionStart": "fn onSelectionStart",
+    "selectionKeyCode": "Shift",
+    "snapGrid": [
+      8,
+      8,
+    ],
+    "snapToGrid": true,
+    "zoomOnDoubleClick": false,
+  },
+}
+`;
+
+exports[`the editor canvas: what React Flow gets test marks and samples, the chat beside it 1`] = `
+{
+  "html": 
+"<div data-slot="context-menu-trigger" class="select-none h-full w-full">
+<div class="relative h-full min-h-0 overflow-hidden bg-muted/40 dark:bg-muted/20">
+<svg class="absolute size-0" aria-hidden="true">
+<defs>
+<marker id="ns-arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-red);">
+</path>
+</marker>
+<marker id="ns-arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-orange);">
+</path>
+</marker>
+<marker id="ns-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-amber);">
+</path>
+</marker>
+<marker id="ns-arrow-yellow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-yellow);">
+</path>
+</marker>
+<marker id="ns-arrow-lime" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-lime);">
+</path>
+</marker>
+<marker id="ns-arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-green);">
+</path>
+</marker>
+<marker id="ns-arrow-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-teal);">
+</path>
+</marker>
+<marker id="ns-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-cyan);">
+</path>
+</marker>
+<marker id="ns-arrow-sky" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-sky);">
+</path>
+</marker>
+<marker id="ns-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-blue);">
+</path>
+</marker>
+<marker id="ns-arrow-indigo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-indigo);">
+</path>
+</marker>
+<marker id="ns-arrow-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-violet);">
+</path>
+</marker>
+<marker id="ns-arrow-pink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-pink);">
+</path>
+</marker>
+<marker id="ns-arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--outcome-gray);">
+</path>
+</marker>
+<marker id="ns-arrow-mixed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: var(--muted-foreground);">
+</path>
+</marker>
+</defs>
+</svg>
+<svg class="absolute size-0" aria-hidden="true">
+<defs>
+<marker id="ns-data-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style="fill: color-mix(in oklch, var(--muted-foreground) 70%, transparent);">
+</path>
+</marker>
+</defs>
+</svg>
+<div data-probe="react-flow">
+</div>
+</div>
+</div>"
+,
+  "props": {
+    "aria-label": "Flow canvas",
+    "children": [
+      {
+        "element": "BackgroundComponent",
+        "props": {
+          "color": "color-mix(in oklch, var(--foreground) 16%, transparent)",
+          "gap": 16,
+          "size": 1.25,
+          "variant": "dots",
+        },
+      },
+      {
+        "element": "CanvasControls",
+        "props": {
+          "fit": {
+            "maxZoom": 1,
+            "padding": 0.15,
+          },
+          "onAutoLayout": "fn onAutoLayout",
+        },
+      },
+      {
+        "element": "SectionZoom",
+        "props": {
+          "fit": {
+            "maxZoom": 1,
+            "padding": 0.15,
+          },
+          "flow": "[the flow]",
+          "measured": {},
+          "onClose": "fn onClose",
+          "onOpen": "fn anonymous",
+          "open": null,
+        },
+      },
+      null,
+      null,
+      {
+        "element": "MiniMapComponent",
+        "props": {
+          "ariaLabel": "Mini map",
+          "className": "m-3! hidden overflow-hidden rounded-lg border shadow-xs lg:block",
+          "nodeBorderRadius": 6,
+          "nodeColor": "color-mix(in oklch, var(--muted-foreground) 45%, transparent)",
+          "pannable": true,
+          "style": {
+            "height": 112,
+            "width": 168,
+          },
+          "zoomable": true,
+        },
+      },
+    ],
+    "className": "[--xy-background-color:transparent]",
+    "deleteKeyCode": [
+      "Backspace",
+      "Delete",
+    ],
+    "edgeTypes": {
+      "data": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn DataEdge",
+      },
+      "outcome": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn OutcomeEdge",
+      },
+    },
+    "edges": [
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "hasError": false,
+              "id": "a-success-b",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+            {
+              "change": "undefined",
+              "color": "red",
+              "hasError": false,
+              "id": "a-failure-b",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "failure",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "id": "a-success-b",
+        "selected": false,
+        "source": "a",
+        "sourceHandle": "success",
+        "target": "b",
+        "type": "outcome",
+      },
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "hasError": true,
+              "id": "b-success-c",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "deletable": false,
+        "id": "b-success-c",
+        "selected": false,
+        "source": "b",
+        "sourceHandle": "success",
+        "target": "section:s1",
+        "type": "outcome",
+      },
+      {
+        "data": {
+          "route": "undefined",
+          "segments": [
+            {
+              "change": "undefined",
+              "color": "green",
+              "from": "d",
+              "handle": "d:success",
+              "hasError": false,
+              "id": "d-success-e",
+              "max": "undefined",
+              "onNode": true,
+              "outcome": "success",
+              "traversals": "undefined",
+            },
+          ],
+          "selectedSegment": "undefined",
+        },
+        "deletable": false,
+        "id": "d-success-e",
+        "selected": false,
+        "source": "section:s1",
+        "sourceHandle": "d:success",
+        "target": "e",
+        "type": "outcome",
+      },
+    ],
+    "elementsSelectable": true,
+    "fitView": true,
+    "fitViewOptions": {
+      "maxZoom": 1,
+      "padding": 0.15,
+    },
+    "isValidConnection": "fn anonymous",
+    "minZoom": 0.2,
+    "multiSelectionKeyCode": [
+      "Meta",
+      "Control",
+    ],
+    "nodeTypes": {
+      "agent": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "call": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "command": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "convert": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "decision": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "end": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "join": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "lease": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "outside": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn Outside",
+      },
+      "sectionBox": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn SectionBox",
+      },
+      "service": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "since-last-run": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "tool": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "value": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "wait": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+      "web-request": {
+        "$$typeof": Symbol(react.memo),
+        "compare": null,
+        "type": "fn FlowNodeCard",
+      },
+    },
+    "nodes": [
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": true,
+          "issues": [],
+          "node": "[node a]",
+          "sample": {
+            "field": "log_tail",
+            "kind": "output",
+            "text": "success",
+          },
+        },
+        "id": "a",
+        "measured": "undefined",
+        "position": {
+          "x": 0,
+          "y": 0,
+        },
+        "selected": true,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [
+            {
+              "message": "Node issue",
+              "nodeId": "b",
+              "severity": "error",
+            },
+            {
+              "message": "Node warning",
+              "nodeId": "b",
+              "severity": "warning",
+            },
+          ],
+          "mark": {
+            "kind": "pinned",
+            "outcome": null,
+          },
+          "node": "[node b]",
+          "sample": {
+            "field": "log_tail",
+            "kind": "pinned",
+            "text": null,
+          },
+        },
+        "id": "b",
+        "measured": "undefined",
+        "position": {
+          "x": 320,
+          "y": 0,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [],
+          "mark": {
+            "kind": "skipped",
+            "outcome": "success",
+          },
+          "node": "[node e]",
+          "sample": {
+            "kind": "skipped",
+            "outcome": "success",
+          },
+        },
+        "id": "e",
+        "measured": "undefined",
+        "position": {
+          "x": 960,
+          "y": 0,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "data": {
+          "change": "undefined",
+          "isStart": false,
+          "issues": [],
+          "node": "[node f]",
+          "sample": {
+            "kind": "absent",
+          },
+        },
+        "id": "f",
+        "measured": "undefined",
+        "position": {
+          "x": 960,
+          "y": 240,
+        },
+        "selected": false,
+        "type": "command",
+      },
+      {
+        "connectable": true,
+        "data": {
+          "count": 2,
+          "exits": [
+            {
+              "color": "green",
+              "from": "d",
+              "label": "d · success",
+              "outcome": "success",
+              "taken": "undefined",
+            },
+          ],
+          "isStart": false,
+          "issues": [
+            {
+              "message": "Section issue",
+              "sectionId": "s1",
+              "severity": "warning",
+            },
+          ],
+          "run": "undefined",
+          "section": {
+            "id": "s1",
+            "label": "Part",
+            "nodes": [
+              "c",
+              "d",
+            ],
+          },
+        },
+        "deletable": false,
+        "draggable": true,
+        "focusable": true,
+        "id": "section:s1",
+        "measured": "undefined",
+        "position": {
+          "x": 640,
+          "y": 0,
+        },
+        "selectable": true,
+        "selected": false,
+        "type": "sectionBox",
+      },
+    ],
+    "nodesConnectable": true,
+    "nodesDraggable": true,
+    "onConnect": "fn anonymous",
+    "onDoubleClick": "fn onDoubleClick",
+    "onDragOver": "fn onDragOver",
+    "onDrop": "fn onDrop",
+    "onEdgesChange": "fn anonymous",
+    "onNodeDoubleClick": "fn onNodeDoubleClick",
+    "onNodesChange": "fn anonymous",
+    "onPaneClick": "fn onPaneClick",
+    "onSelectionEnd": "fn onSelectionEnd",
+    "onSelectionStart": "fn onSelectionStart",
+    "selectionKeyCode": "Shift",
+    "snapGrid": [
+      8,
+      8,
+    ],
+    "snapToGrid": true,
+    "zoomOnDoubleClick": false,
+  },
+}
+`;
+
+exports[`the editor canvas: node changes a drag is one gesture from its first move to the drop 1`] = `
+{
+  "onFlowChange": [
+    [
+      {
+        "edges": [
+          "a-success-b",
+          "a-failure-b",
+          "b-success-c",
+          "c-success-d",
+          "d-success-e",
+        ],
+        "nodes": [
+          "a@10,8",
+          "b@320,0",
+          "c@640,0",
+          "d@640,240",
+          "e@960,0",
+          "f@960,240",
+        ],
+        "sections": [
+          "s1:c,d",
+        ],
+        "start": "a",
+      },
+      "drag:1",
+    ],
+    [
+      {
+        "edges": [
+          "a-success-b",
+          "a-failure-b",
+          "b-success-c",
+          "c-success-d",
+          "d-success-e",
+        ],
+        "nodes": [
+          "a@20,8",
+          "b@320,0",
+          "c@640,0",
+          "d@640,240",
+          "e@960,0",
+          "f@960,240",
+        ],
+        "sections": [
+          "s1:c,d",
+        ],
+        "start": "a",
+      },
+      "drag:1",
+    ],
+    [
+      {
+        "edges": [
+          "a-success-b",
+          "a-failure-b",
+          "b-success-c",
+          "c-success-d",
+          "d-success-e",
+        ],
+        "nodes": [
+          "a@24,8",
+          "b@320,0",
+          "c@640,0",
+          "d@640,240",
+          "e@960,0",
+          "f@960,240",
+        ],
+        "sections": [
+          "s1:c,d",
+        ],
+        "start": "a",
+      },
+      "drag:1",
+    ],
+    [
+      {
+        "edges": [
+          "a-success-b",
+          "a-failure-b",
+          "b-success-c",
+          "c-success-d",
+          "d-success-e",
+        ],
+        "nodes": [
+          "a@40,8",
+          "b@320,0",
+          "c@640,0",
+          "d@640,240",
+          "e@960,0",
+          "f@960,240",
+        ],
+        "sections": [
+          "s1:c,d",
+        ],
+        "start": "a",
+      },
+      "drag:2",
+    ],
+    [
+      {
+        "edges": [
+          "a-success-b",
+          "a-failure-b",
+          "b-success-c",
+          "c-success-d",
+          "d-success-e",
+        ],
+        "nodes": [
+          "a@48,8",
+          "b@320,0",
+          "c@640,0",
+          "d@640,240",
+          "e@960,0",
+          "f@960,240",
+        ],
+        "sections": [
+          "s1:c,d",
+        ],
+        "start": "a",
+      },
+      "drag:2",
+    ],
+    [
+      {
+        "edges": [
+          "a-success-b",
+          "a-failure-b",
+          "b-success-c",
+          "c-success-d",
+          "d-success-e",
+        ],
+        "nodes": [
+          "a@0,0",
+          "b@328,0",
+          "c@640,0",
+          "d@640,240",
+          "e@960,0",
+          "f@960,240",
+        ],
+        "sections": [
+          "s1:c,d",
+        ],
+        "start": "a",
+      },
+      "nudge",
+    ],
+  ],
+}
+`;
+
+exports[`the editor canvas: node changes a Section box carries its nodes, and a node in it stays with the box 1`] = `
+{
+  "onFlowChange": [
+    [
+      {
+        "edges": [
+          "a-success-b",
+          "a-failure-b",
+          "b-success-c",
+          "c-success-d",
+          "d-success-e",
+        ],
+        "nodes": [
+          "a@16,16",
+          "b@320,0",
+          "c@700,40",
+          "d@700,280",
+          "e@960,0",
+          "f@960,240",
+        ],
+        "sections": [
+          "s1:c,d",
+        ],
+        "start": "a",
+      },
+      "drag:1",
+    ],
+  ],
+}
+`;
+
+exports[`the editor canvas: node changes a removed node goes from the flow and from the selection 1`] = `
+{
+  "onFlowChange": [
+    [
+      {
+        "edges": [
+          "c-success-d",
+          "d-success-e",
+        ],
+        "nodes": [
+          "a@0,0",
+          "c@640,0",
+          "d@640,240",
+          "e@960,0",
+          "f@960,240",
+        ],
+        "sections": [
+          "s1:c,d",
+        ],
+        "start": "a",
+      },
+      undefined,
+    ],
+  ],
+  "onSelect": [
+    [
+      {
+        "id": "a",
+        "kind": "node",
+      },
+    ],
+  ],
+}
+`;
+
+exports[`the editor canvas: node changes a select and a size 1`] = `
+{
+  "calls": {
+    "onSelect": [
+      [
+        {
+          "id": "b",
+          "kind": "node",
+        },
+      ],
+    ],
+  },
+  "measured": [
+    [
+      "a",
+      {
+        "height": 96,
+        "width": 240,
+      },
+    ],
+  ],
+}
+`;
+
+exports[`the editor canvas: edge changes Delete on a drawn line removes the selected edge of it only 1`] = `
+{
+  "onFlowChange": [
+    [
+      {
+        "edges": [
+          "a-success-b",
+          "b-success-c",
+          "c-success-d",
+          "d-success-e",
+        ],
+        "nodes": [
+          "a@0,0",
+          "b@320,0",
+          "c@640,0",
+          "d@640,240",
+          "e@960,0",
+          "f@960,240",
+        ],
+        "sections": [
+          "s1:c,d",
+        ],
+        "start": "a",
+      },
+      undefined,
+    ],
+  ],
+  "onSelect": [
+    [
+      null,
+    ],
+  ],
+}
+`;
+
+exports[`the editor canvas: edge changes Delete on a drawn line with none of it selected removes all of it 1`] = `
+{
+  "onFlowChange": [
+    [
+      {
+        "edges": [
+          "b-success-c",
+          "c-success-d",
+          "d-success-e",
+        ],
+        "nodes": [
+          "a@0,0",
+          "b@320,0",
+          "c@640,0",
+          "d@640,240",
+          "e@960,0",
+          "f@960,240",
+        ],
+        "sections": [
+          "s1:c,d",
+        ],
+        "start": "a",
+      },
+      undefined,
+    ],
+  ],
+  "onSelect": [
+    [
+      null,
+    ],
+  ],
+}
+`;
+
+exports[`the editor canvas: edge changes a select picks the edge, and a box drawn with Shift picks none 1`] = `
+{
+  "onSelect": [
+    [
+      {
+        "id": "b-success-c",
+        "kind": "edge",
+      },
+    ],
+    [
+      {
+        "id": "a-success-b",
+        "kind": "edge",
+      },
+    ],
+    [
+      {
+        "id": "c-success-d",
+        "kind": "edge",
+      },
+    ],
+  ],
+}
+`;
+
+exports[`the editor canvas: connect, clicks and drops an edge to a box leads to the node its Section starts at 1`] = `
+{
+  "calls": {
+    "onFlowChange": [
+      [
+        {
+          "edges": [
+            "a-success-b",
+            "a-failure-b",
+            "b-success-c",
+            "c-success-d",
+            "d-success-e",
+            "e-success-c",
+          ],
+          "nodes": [
+            "a@0,0",
+            "b@320,0",
+            "c@640,0",
+            "d@640,240",
+            "e@960,0",
+            "f@960,240",
+          ],
+          "sections": [
+            "s1:c,d",
+          ],
+          "start": "a",
+        },
+        undefined,
+      ],
+      [
+        {
+          "edges": [
+            "a-success-b",
+            "a-failure-b",
+            "b-success-c",
+            "c-success-d",
+            "d-success-e",
+            "e-failure-f",
+          ],
+          "nodes": [
+            "a@0,0",
+            "b@320,0",
+            "c@640,0",
+            "d@640,240",
+            "e@960,0",
+            "f@960,240",
+          ],
+          "sections": [
+            "s1:c,d",
+          ],
+          "start": "a",
+        },
+        undefined,
+      ],
+    ],
+    "onSelect": [
+      [
+        {
+          "id": "e-success-c",
+          "kind": "edge",
+        },
+      ],
+      [
+        {
+          "id": "e-failure-f",
+          "kind": "edge",
+        },
+      ],
+    ],
+  },
+  "valid": [
+    false,
+    true,
+    false,
+    false,
+  ],
+}
+`;
+
+exports[`the editor canvas: connect, clicks and drops clicks, double-clicks and a drop 1`] = `
+{
+  "calls": {
+    "onDropNode": [
+      [
+        "command",
+        {
+          "x": 90,
+          "y": 12,
+        },
+      ],
+    ],
+    "onNodeDoubleClick": [
+      [
+        "e",
+      ],
+    ],
+    "onOpenSection": [
+      [
+        "s1",
+      ],
+      [
+        null,
+      ],
+      [
+        "s1",
+      ],
+    ],
+    "onPaneDoubleClick": [
+      [
+        {
+          "x": 12,
+          "y": 34,
+        },
+      ],
+    ],
+    "onSelect": [
+      [
+        null,
+      ],
+    ],
+  },
+  "dropEffect": "move",
+  "prevented": [
+    "over",
+    "drop",
+  ],
+}
+`;
+
+exports[`the editor canvas: connect, clicks and drops on a proposal, double-clicks and drops do nothing 1`] = `{}`;
+
+exports[`the editor canvas: connect, clicks and drops Make section from the toolbar, and Escape out of an open Section 1`] = `
+{
+  "onMakeSection": [
+    [
+      [
+        "a",
+        "b",
+      ],
+      [
+        "s1",
+      ],
+    ],
+  ],
+  "onOpenSection": [
+    [
+      null,
+    ],
+    [
+      null,
+    ],
+  ],
+}
+`;
