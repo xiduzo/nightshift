@@ -22,7 +22,7 @@ import { createSandbox, type Sandbox } from "../testing/test-support";
 import { createCliToolStore } from "./cli-tools";
 import { createConnectionStore, type SecretBackend } from "./connections";
 import { createProfileStore } from "./profiles";
-import { createSettingsStore } from "./settings";
+import { wireSettings as createSettingsStore } from "./settings";
 
 let sandbox: Sandbox;
 beforeEach(async () => {

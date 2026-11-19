@@ -10,7 +10,7 @@
 export { createCliToolStore } from "../device-config/cli-tools";
 export { createConnectionStore } from "../device-config/connections";
 export { createProfileStore } from "../device-config/profiles";
-export { createSettingsStore } from "../device-config/settings";
+export { wireSettings as createSettingsStore } from "../device-config/settings";
 export { spaceDocumentName } from "../documents/space/space-document";
 export { createProjectFlows } from "../flows/project-flows";
 export { createRunHistory } from "../log/history/history";

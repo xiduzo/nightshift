@@ -10,12 +10,10 @@ import {
 	type HarnessName,
 	harnessNameSchema,
 	permissionModeSchema,
-	type ResolvedPolicy,
 } from "@nightshift/flows";
-import { Refusal } from "@nightshift/refusal";
 import { z } from "zod";
-import { type DeviceDocument, mapView } from "../documents";
-import { DEFAULT_EMBEDDING_MODEL } from "../knowledge";
+import { int, list, ollamaHostAddress, onOff, text } from "./env-values";
+import { hostAddressSchema, isHttpAddress } from "./host-address";
 
 /**
  * The daemon's settings. Each one is changed in the UI and saved in this
@@ -27,7 +25,7 @@ import { DEFAULT_EMBEDDING_MODEL } from "../knowledge";
  * `OTEL_SDK_DISABLED=true`.
  */
 
-type Def<T> = {
+export type Def<T> = {
 	schema: z.ZodType<T>;
 	default: T;
 	/** The environment variable that is the fallback. */
@@ -36,54 +34,7 @@ type Def<T> = {
 	fromEnv?: (raw: string) => T | undefined;
 };
 
-const int = (raw: string) => {
-	const n = Number(raw.trim());
-	return Number.isInteger(n) ? n : undefined;
-};
-const text = (raw: string) => (raw.trim() === "" ? undefined : raw.trim());
-
-const onOff = (raw: string) => {
-	const value = raw.trim().toLowerCase();
-	if (["on", "true", "1"].includes(value)) return true;
-	if (["off", "false", "0"].includes(value)) return false;
-	return undefined;
-};
-
 const positiveMinutes = z.number().positive().max(10_080);
-
-/**
- * A Host's address: an `https://` origin. A loopback `http://` one is
- * allowed too, for tests and local development: it never leaves the
- * computer.
- */
-export const hostAddressSchema = z
-	.string()
-	.trim()
-	.refine(isHostAddress, {
-		message: "Use an https:// address, for example https://studio.example.com.",
-	})
-	.transform((value) => new URL(value).origin);
-
-export function isHostAddress(value: string): boolean {
-	let url: URL;
-	try {
-		url = new URL(value);
-	} catch {
-		return false;
-	}
-	if (url.protocol === "https:") return true;
-	return url.protocol === "http:" && isLoopbackHost(url.hostname);
-}
-
-/** `localhost`, `127.x.x.x` or `[::1]`. */
-export function isLoopbackHost(hostname: string): boolean {
-	return (
-		hostname === "localhost" ||
-		hostname === "[::1]" ||
-		hostname === "::1" ||
-		/^127\.\d+\.\d+\.\d+$/.test(hostname)
-	);
-}
 
 /** The protocols of the OTLP export: HTTP with protobuf or with JSON. */
 export const telemetryProtocolSchema = z.enum(["http/protobuf", "http/json"]);
@@ -106,54 +57,11 @@ const telemetryHeadersSchema = z
 		message: "Use at most 32 headers.",
 	});
 
-/** An `http://` or `https://` address. */
-function isHttpAddress(value: string): boolean {
-	try {
-		const { protocol } = new URL(value);
-		return protocol === "http:" || protocol === "https:";
-	} catch {
-		return false;
-	}
-}
-
 /** Whether Night Shift searches by meaning, and when it starts Ollama for it. */
 const ollamaModeSchema = z.enum(["auto", "on", "off"]);
 type OllamaMode = z.infer<typeof ollamaModeSchema>;
 
-/**
- * `OLLAMA_HOST` as an address, read as Ollama's CLI reads it: a scheme is
- * optional (http), and so is the port (11434 over http).
- */
-function ollamaHostAddress(raw: string): string | undefined {
-	const value = raw.trim();
-	if (value === "") return undefined;
-	const scheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(value);
-	let url: URL;
-	try {
-		url = new URL(scheme ? value : `http://${value}`);
-	} catch {
-		return undefined;
-	}
-	if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
-	if (
-		url.port === "" &&
-		url.protocol === "http:" &&
-		!/:\d+(\/|$)/.test(value)
-	) {
-		url.port = "11434";
-	}
-	return `${url.origin}${url.pathname === "/" ? "" : url.pathname.replace(/\/$/, "")}`;
-}
-
-const list = (raw: string) => {
-	const items = raw
-		.split(/[\s,]+/)
-		.map((item) => item.trim())
-		.filter(Boolean);
-	return items.length > 0 ? items : undefined;
-};
-
-const DEFS = {
+export const DEFS = {
 	scheduler: {
 		schema: z.boolean(),
 		default: true,
@@ -502,7 +410,8 @@ const DEFS = {
 			.min(1, "Name a model, for example qwen3-embedding:0.6b.")
 			.max(200)
 			.regex(/^[\w.:/-]+$/, "Use a model name such as qwen3-embedding:0.6b."),
-		default: DEFAULT_EMBEDDING_MODEL,
+		// The wire gives the real default (`SettingsGround.embeddingModel`).
+		default: "",
 		env: "NIGHTSHIFT_EMBEDDING_MODEL",
 		fromEnv: text,
 	} satisfies Def<string>,
@@ -535,7 +444,7 @@ const DEFS = {
 	} satisfies Def<Record<string, string>>,
 };
 
-type Defs = typeof DEFS;
+export type Defs = typeof DEFS;
 export type SettingKey = keyof Defs;
 /** From each schema, not the default: a default's literal type (`true`, "claude-code") would be too narrow. */
 export type Settings = { [K in SettingKey]: z.output<Defs[K]["schema"]> };
@@ -559,18 +468,6 @@ export const HARNESS_BIN = Object.fromEntries(
 	[K in HarnessName]: (typeof HARNESS_CATALOG)[K]["binSetting"];
 } satisfies Record<HarnessName, SettingKey>;
 
-/**
- * Whether a web request from this computer may reach loopback and its
- * private network (`web-access/addresses.ts`): always on a computer that
- * is not a Host, else only when "Web requests reach this network" is on.
- * A Host serves every Member of its Spaces.
- */
-export function reachesPrivateNetwork(
-	settings: Pick<Settings, "host" | "webRequestsPrivateNetwork">,
-): boolean {
-	return !settings.host || settings.webRequestsPrivateNetwork;
-}
-
 /** A change: a value saves it, null forgets the saved value (back to the environment, then the default). */
 export const settingsPatchSchema = z
 	.object(
@@ -580,268 +477,3 @@ export const settingsPatchSchema = z
 	)
 	.strict();
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
-
-export type SettingSource = "saved" | "env" | "default";
-
-export type SettingField = {
-	source: SettingSource;
-	default: unknown;
-	/** The environment variable this setting falls back to. */
-	env?: string;
-	/** Its value, when it is set and valid. */
-	envValue?: unknown;
-	/** Why the setting cannot change here. */
-	locked?: string;
-};
-
-export type SettingsView = {
-	values: Settings;
-	fields: Record<SettingKey, SettingField>;
-};
-
-/** The settings the engine reads when they apply. */
-export type RunSettings = Pick<
-	Settings,
-	| "scheduler"
-	| "maxConcurrentRuns"
-	| "maxStepsPerRun"
-	| "budgetUsd"
-	| "maxTurns"
-	| "resumeInterruptedRuns"
-	| "cleanUpRuns"
-	| "cleanUpAfterDays"
-> & {
-	policy: Omit<
-		ResolvedPolicy,
-		"maxSteps" | "resumeInterruptedRuns" | "budgetUsd" | "maxTurns"
-	>;
-};
-
-export type SettingsStore = {
-	/** Reads the saved values. Call once before `current`. */
-	load(): Promise<void>;
-	current(): Settings;
-	view(): SettingsView;
-	save(patch: SettingsPatch): Promise<SettingsView>;
-	/** The engine's part of the settings. */
-	run(): RunSettings;
-	/** Calls `listener` after each change of the saved values, here or synced. Returns the unsubscribe. */
-	onChange(listener: () => void): () => void;
-};
-
-const SCHEDULER_LOCK =
-	"Night Shift was started with schedules turned off. You cannot turn them on here. To turn them on, start Night Shift again with schedules on.";
-
-const USAGE_LOCK =
-	"Night Shift was started with anonymous usage turned off. You cannot turn it on here. Start Night Shift again with usage on.";
-
-export function createSettingsStore(options: {
-	document: DeviceDocument;
-	env: Readonly<Record<string, string | undefined>>;
-}): SettingsStore {
-	const { document, env } = options;
-	const saved = mapView(document, document.settings, () => {
-		const out = new Map<SettingKey, unknown>();
-		for (const [key, value] of document.settings.entries()) {
-			if (!Object.hasOwn(DEFS, key)) continue;
-			const parsed = DEFS[key as SettingKey].schema.safeParse(value);
-			// A value saved by an older build that no longer parses is ignored.
-			if (parsed.success) out.set(key as SettingKey, parsed.data);
-		}
-		return out;
-	});
-
-	function fromEnv(key: SettingKey): unknown {
-		const def: Def<unknown> = DEFS[key];
-		if (!def.env || !def.fromEnv) return undefined;
-		const raw = env[def.env];
-		if (raw === undefined) return undefined;
-		const value = def.fromEnv(raw);
-		return value !== undefined && def.schema.safeParse(value).success
-			? value
-			: undefined;
-	}
-
-	function schedulerLocked(): boolean {
-		return env.NIGHTSHIFT_SCHEDULER?.trim().toLowerCase() === "off";
-	}
-
-	function envIs(name: string, expected: string): boolean {
-		return env[name]?.trim().toLowerCase() === expected;
-	}
-
-	/** An environment lock forces anonymous usage off for this start. */
-	function usageLocked(): boolean {
-		return (
-			envIs("DO_NOT_TRACK", "1") ||
-			envIs("OTEL_SDK_DISABLED", "true") ||
-			onOff(env.NIGHTSHIFT_USAGE ?? "") === false
-		);
-	}
-
-	function field(key: SettingKey): { value: unknown } & SettingField {
-		const def: Def<unknown> = DEFS[key];
-		const envValue = fromEnv(key);
-		const base = {
-			default: def.default,
-			...(def.env ? { env: def.env } : {}),
-			...(envValue !== undefined ? { envValue } : {}),
-		};
-		if (key === "scheduler" && schedulerLocked()) {
-			return {
-				value: false,
-				source: "env",
-				...base,
-				locked: SCHEDULER_LOCK,
-			};
-		}
-		if (key === "usage" && usageLocked()) {
-			return {
-				value: false,
-				source: "env",
-				...base,
-				locked: USAGE_LOCK,
-			};
-		}
-		if (saved().has(key))
-			return { value: saved().get(key), source: "saved", ...base };
-		if (envValue !== undefined)
-			return { value: envValue, source: "env", ...base };
-		return { value: def.default, source: "default", ...base };
-	}
-
-	function current(): Settings {
-		return Object.fromEntries(
-			SETTING_KEYS.map((key) => [key, field(key).value]),
-		) as Settings;
-	}
-
-	function view(): SettingsView {
-		const fields = {} as Record<SettingKey, SettingField>;
-		for (const key of SETTING_KEYS) {
-			const { value: _value, ...rest } = field(key);
-			fields[key] = rest;
-		}
-		return { values: current(), fields };
-	}
-
-	return {
-		// The document is read when it opens; a remote edit applies at once.
-		async load() {},
-		current,
-		view,
-		async save(patch) {
-			const parsed = settingsPatchSchema.parse(patch);
-			// The value after the patch: null goes back to the environment, then the default.
-			const after = (key: SettingKey) => {
-				const value = parsed[key];
-				if (value === undefined) return current()[key];
-				if (value === null) return fromEnv(key) ?? DEFS[key].default;
-				return value;
-			};
-			const waits = {
-				first: after("usageLimitFirstWaitMinutes") as number,
-				max: after("usageLimitMaxWaitMinutes") as number,
-			};
-			if (waits.first > waits.max) {
-				throw new Refusal(
-					"invalid",
-					"The first usage-limit wait cannot be longer than the longest one.",
-				);
-			}
-			await document.change(() => {
-				for (const key of SETTING_KEYS) {
-					const value = parsed[key];
-					if (value === null) document.settings.delete(key);
-					else if (value !== undefined) document.settings.set(key, value);
-				}
-				// Saving the switch, on or off, means the person has seen it.
-				if (typeof parsed.usage === "boolean") {
-					document.settings.set("usageSeen", true);
-				}
-			});
-			return view();
-		},
-		onChange(listener) {
-			const observer = () => listener();
-			document.settings.observe(observer);
-			return () => document.settings.unobserve(observer);
-		},
-		run() {
-			const s = current();
-			return {
-				scheduler: s.scheduler,
-				maxConcurrentRuns: s.maxConcurrentRuns,
-				maxStepsPerRun: s.maxStepsPerRun,
-				budgetUsd: s.budgetUsd,
-				maxTurns: s.maxTurns,
-				resumeInterruptedRuns: s.resumeInterruptedRuns,
-				cleanUpRuns: s.cleanUpRuns,
-				cleanUpAfterDays: s.cleanUpAfterDays,
-				policy: {
-					usageLimitFirstWaitMinutes: s.usageLimitFirstWaitMinutes,
-					usageLimitMaxWaitMinutes: s.usageLimitMaxWaitMinutes,
-					networkGraceMinutes: s.networkGraceMinutes,
-					idleMinutes: s.idleMinutes,
-				},
-			};
-		},
-	};
-}
-
-/**
- * The decider a new Decision node starts on (Q22): the one the person
- * saved, else TypeSafe Jev when its key is set, else Ollama on this
- * computer, which needs no account. Only new nodes follow it: a node that
- * names no decider still runs on TypeSafe (`decisionDecider` of
- * `@nightshift/flows`), so no flow file changes.
- */
-export function effectiveDecider(
-	view: Pick<SettingsView, "values" | "fields">,
-	typesafeKey: boolean,
-): DeciderName {
-	if (view.fields.decisionDecider.source !== "default") {
-		return view.values.decisionDecider;
-	}
-	return typesafeKey ? "typesafe" : "ollama";
-}
-
-/**
- * The settings as the screens read them: an unsaved decider is the
- * effective default (`effectiveDecider`), as its value and as its default.
- * The editor gives new nodes `values.decisionDecider`.
- */
-export function withEffectiveDecider(
-	view: SettingsView,
-	typesafeKey: boolean,
-): SettingsView {
-	const decider = effectiveDecider(view, typesafeKey);
-	if (view.fields.decisionDecider.source !== "default") return view;
-	return {
-		values: { ...view.values, decisionDecider: decider },
-		fields: {
-			...view.fields,
-			decisionDecider: { ...view.fields.decisionDecider, default: decider },
-		},
-	};
-}
-
-/** The built-in defaults, for an engine without a settings store. */
-export function defaultRunSettings(): RunSettings {
-	return {
-		scheduler: DEFS.scheduler.default,
-		maxConcurrentRuns: DEFS.maxConcurrentRuns.default,
-		maxStepsPerRun: DEFS.maxStepsPerRun.default,
-		budgetUsd: DEFS.budgetUsd.default,
-		maxTurns: DEFS.maxTurns.default,
-		resumeInterruptedRuns: DEFS.resumeInterruptedRuns.default,
-		cleanUpRuns: DEFS.cleanUpRuns.default,
-		cleanUpAfterDays: DEFS.cleanUpAfterDays.default,
-		policy: {
-			usageLimitFirstWaitMinutes: DEFS.usageLimitFirstWaitMinutes.default,
-			usageLimitMaxWaitMinutes: DEFS.usageLimitMaxWaitMinutes.default,
-			networkGraceMinutes: DEFS.networkGraceMinutes.default,
-			idleMinutes: DEFS.idleMinutes.default,
-		},
-	};
-}

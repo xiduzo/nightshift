@@ -4,7 +4,7 @@ import { DEFAULT_POLICY } from "@nightshift/flows";
 import type { DeviceDocument } from "../documents";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import {
-	createSettingsStore,
+	wireSettings as createSettingsStore,
 	defaultRunSettings,
 	effectiveDecider,
 	reachesPrivateNetwork,
