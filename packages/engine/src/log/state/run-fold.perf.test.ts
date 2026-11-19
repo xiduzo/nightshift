@@ -25,18 +25,50 @@ function itemLog(count: number) {
 	return log.events;
 }
 
-function elapsed(run: () => void, times: number): number {
-	run();
-	const started = performance.now();
+/**
+ * The time this thread worked so far, in ms. The time that the machine
+ * gives to other work does not count, so a busy machine does not change it.
+ */
+function workedMs(): number {
+	const { user, system } = process.threadCpuUsage();
+	return (user + system) / 1_000;
+}
+
+function cost(run: () => void, times: number): number {
+	const started = workedMs();
 	for (let i = 0; i < times; i++) run();
-	return performance.now() - started;
+	return workedMs() - started;
+}
+
+/**
+ * What `times` calls of `small` and of `large` cost. It measures the two
+ * in turns, five times, and keeps the lowest of each. A disturbance only
+ * adds to a measurement, so the lowest one is the nearest to the cost.
+ */
+function costs(
+	small: () => void,
+	large: () => void,
+	times: number,
+): { smallMs: number; largeMs: number } {
+	small();
+	large();
+	let smallMs = Number.POSITIVE_INFINITY;
+	let largeMs = Number.POSITIVE_INFINITY;
+	for (let round = 0; round < 5; round++) {
+		smallMs = Math.min(smallMs, cost(small, times));
+		largeMs = Math.min(largeMs, cost(large, times));
+	}
+	return { smallMs, largeMs };
 }
 
 /**
  * `large` did `factor` times the work. Twice a linear step is the line.
  * A cost that reads the list once per node lands past it.
  */
-function expectLinear(smallMs: number, largeMs: number, factor: number): void {
+function expectLinear(
+	{ smallMs, largeMs }: { smallMs: number; largeMs: number },
+	factor: number,
+): void {
 	expect(smallMs).toBeGreaterThan(8);
 	expect(largeMs).toBeLessThan(smallMs * factor * 1.9 + 15);
 }
@@ -45,22 +77,29 @@ describe("folding a run stays linear", () => {
 	test("a batch of items", () => {
 		const small = itemLog(2_000);
 		const large = itemLog(8_000);
-		const smallMs = elapsed(() => foldRun(small), 24);
-		const largeMs = elapsed(() => foldRun(large), 24);
-		expectLinear(smallMs, largeMs, 4);
+		const measured = costs(
+			() => foldRun(small),
+			() => foldRun(large),
+			24,
+		);
+		expectLinear(measured, 4);
 		expect(foldRun(large).steps.get("s1")?.items).toHaveLength(8_000);
 	}, 20_000);
 
 	test("one event at a time matches the batch and stays under the ceiling", () => {
 		const events = itemLog(1_500);
-		const started = performance.now();
 		let state = foldRun([]);
-		for (const event of events) {
-			const next = nextState(state, event);
-			if (!next) throw new Error("The event is not the next one.");
-			state = next;
-		}
-		expect(performance.now() - started).toBeLessThan(200);
+		const oneAtATime = () => {
+			state = foldRun([]);
+			for (const event of events) {
+				const next = nextState(state, event);
+				if (!next) throw new Error("The event is not the next one.");
+				state = next;
+			}
+		};
+		// The lowest of five rounds: other work on the machine does not count.
+		const rounds = [0, 1, 2, 3, 4].map(() => cost(oneAtATime, 1));
+		expect(Math.min(...rounds)).toBeLessThan(200);
 		expect(state.steps.get("s1")?.items).toHaveLength(1_500);
 		expect(state.steps.get("s1")?.items.at(-1)?.facts.id).toBe(
 			foldRun(events).steps.get("s1")?.items.at(-1)?.facts.id,

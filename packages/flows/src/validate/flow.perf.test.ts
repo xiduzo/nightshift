@@ -70,18 +70,50 @@ function star(count: number): Flow {
 	};
 }
 
-function elapsed(run: () => void, times: number): number {
-	run();
-	const started = performance.now();
+/**
+ * The time this thread worked so far, in ms. The time that the machine
+ * gives to other work does not count, so a busy machine does not change it.
+ */
+function workedMs(): number {
+	const { user, system } = process.threadCpuUsage();
+	return (user + system) / 1_000;
+}
+
+function cost(run: () => void, times: number): number {
+	const started = workedMs();
 	for (let i = 0; i < times; i++) run();
-	return performance.now() - started;
+	return workedMs() - started;
+}
+
+/**
+ * What `times` calls of `small` and of `large` cost. It measures the two
+ * in turns, five times, and keeps the lowest of each. A disturbance only
+ * adds to a measurement, so the lowest one is the nearest to the cost.
+ */
+function costs(
+	small: () => void,
+	large: () => void,
+	times: number,
+): { smallMs: number; largeMs: number } {
+	small();
+	large();
+	let smallMs = Number.POSITIVE_INFINITY;
+	let largeMs = Number.POSITIVE_INFINITY;
+	for (let round = 0; round < 5; round++) {
+		smallMs = Math.min(smallMs, cost(small, times));
+		largeMs = Math.min(largeMs, cost(large, times));
+	}
+	return { smallMs, largeMs };
 }
 
 /**
  * `large` did `factor` times the work. Twice a linear step is the line.
  * A cost that reads the list once per node lands past it.
  */
-function expectLinear(smallMs: number, largeMs: number, factor: number): void {
+function expectLinear(
+	{ smallMs, largeMs }: { smallMs: number; largeMs: number },
+	factor: number,
+): void {
 	expect(smallMs).toBeGreaterThan(8);
 	expect(largeMs).toBeLessThan(smallMs * factor * 1.9 + 15);
 }
@@ -90,17 +122,23 @@ describe("flow checks stay linear", () => {
 	test("a chain with Sections", () => {
 		const small = chain(400);
 		const large = chain(1600);
-		const smallMs = elapsed(() => validateFlow(small), 12);
-		const largeMs = elapsed(() => validateFlow(large), 12);
-		expectLinear(smallMs, largeMs, 4);
+		const measured = costs(
+			() => validateFlow(small),
+			() => validateFlow(large),
+			12,
+		);
+		expectLinear(measured, 4);
 	}, 20_000);
 
 	test("a fan-out", () => {
 		const small = star(400);
 		const large = star(1600);
-		const smallMs = elapsed(() => fanOutsOf(small), 160);
-		const largeMs = elapsed(() => fanOutsOf(large), 160);
-		expectLinear(smallMs, largeMs, 4);
+		const measured = costs(
+			() => fanOutsOf(small),
+			() => fanOutsOf(large),
+			160,
+		);
+		expectLinear(measured, 4);
 		expect(fanOutsOf(large)).toHaveLength(1);
 	}, 20_000);
 
@@ -113,9 +151,12 @@ describe("flow checks stay linear", () => {
 		};
 		const small = chain(400);
 		const large = chain(1600);
-		const smallMs = elapsed(() => place(small), 400);
-		const largeMs = elapsed(() => place(large), 400);
-		expectLinear(smallMs, largeMs, 4);
+		const measured = costs(
+			() => place(small),
+			() => place(large),
+			400,
+		);
+		expectLinear(measured, 4);
 		expect(place(large).nodes[3]?.position).toEqual({ x: 3, y: 8 });
 	}, 20_000);
 });
