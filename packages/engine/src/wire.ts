@@ -1,7 +1,6 @@
 import { now as timeNow } from "@nightshift/time";
 import { createArtifactStore } from "./artifacts";
 import { listAnswerCosts } from "./assistant";
-import { createRunCopies, createRunFiles, startCleanupJob } from "./cleanup";
 import {
 	defaultRunSettings,
 	lastKnownProfiles,
@@ -45,7 +44,6 @@ import { forgetMemory, listMemory, readMemory } from "./memory";
 import { createPlacement } from "./placement";
 import {
 	createProjects,
-	createRunBranches,
 	createSpaceDocuments,
 	createWorktrees,
 	memberName,
@@ -65,6 +63,7 @@ import { createProjectsMove } from "./space-move";
 import { keptValues, listKeptValues, resetKeptValue } from "./variables";
 import { wireEngineAccess } from "./wire-access";
 import { wireEngineActions } from "./wire-actions";
+import { wireEngineCleanup } from "./wire-cleanup";
 import { wireEngineMove } from "./wire-move";
 import { wireEngineRecovery } from "./wire-recovery";
 import { wireEngineSchedules } from "./wire-schedules";
@@ -98,6 +97,7 @@ import { wireEngineWalk } from "./wire-walk";
  *   events.
  * - `wire-move.ts` (R5): the move of a run's walk to another Device, and
  *   its other end, where the new Walker takes the run over (`runs/move/`).
+ * - `wire-cleanup.ts`: what ended runs left on this computer (`cleanup/`).
  * - `space.ts`: what a person does in one Space (`SpaceEngine`, in
  *   `space-engine.ts`).
  * - `engine.ts`: the `Engine` interface and the thin object behind it.
@@ -576,40 +576,21 @@ export function createEngine(
 	// Nothing yet: the answer of a Gate is in the actions block, and the
 	// inbox is in `read/`. Lane R6 wires `gates/` here, in `wire-gates.ts`.
 
-	// --- cleanup (phase 3) ---
-	/** The scheduled cleanup of the worktrees and branches runs left on this computer. */
-	const runCopies = createRunCopies({
-		log: runLog,
-		branches: createRunBranches(git),
-		projects,
-		listRuns: views.reads.listRuns,
-		runStatus: views.reads.runStatus,
-		isActive: (runId) => runner.isActive(runId),
-		now,
-		settings: runSettings,
-	});
-	/** The files of run folders on this computer, and the scheduled cleanup of the folders. */
-	const runFiles = createRunFiles({
+	// --- cleanup (phase 3): `wire-cleanup.ts` ---
+	// gives: runFiles (the Space view)
+	const { runFiles } = wireEngineCleanup({
 		db,
 		log: runLog,
+		git,
+		projects,
+		views,
+		runner,
 		folders: runFolders,
-		runRow: (runId) => getRunRow(db, runId),
-		runState: (runId) => runLog.state(runId),
-		isActive: (runId) => runner.isActive(runId),
 		now,
 		settings: runSettings,
-	});
-	startCleanupJob({
-		sweeps: { "run copies": runCopies.sweep, "run folders": runFiles.sweep },
 		ready,
 		signal,
-		...(internals.cleanupDelayMs !== undefined
-			? { delayMs: internals.cleanupDelayMs }
-			: {}),
-		...(internals.cleanupEveryMs !== undefined
-			? { everyMs: internals.cleanupEveryMs }
-			: {}),
-		...(internals.cleanupSwept ? { swept: internals.cleanupSwept } : {}),
+		internals,
 	});
 
 	// --- the Space move (`space-move/`) ---
