@@ -16,6 +16,7 @@ import {
 	selectedNodeIds,
 	selectedSectionIds,
 } from "../session";
+import { issuesByPlace } from "./issues-by-place";
 import { viewerOf } from "./node-viewer";
 
 /** How the nodes and edges of a proposed flow differ from the draft, by id. */
@@ -50,26 +51,7 @@ export function useCanvasNodes({
 	samples: ReadonlyMap<string, NodeSample> | null | undefined;
 	test: TestMarksApi | undefined;
 }) {
-	const counts = useMemo(() => {
-		const byNode = new Map<string, FlowIssue[]>();
-		const bySection = new Map<string, FlowIssue[]>();
-		const edgeErrors = new Set<string>();
-		for (const issue of check.issues) {
-			if (issue.nodeId) {
-				const issues = byNode.get(issue.nodeId) ?? [];
-				issues.push(issue);
-				byNode.set(issue.nodeId, issues);
-			}
-			if (issue.sectionId) {
-				const issues = bySection.get(issue.sectionId) ?? [];
-				issues.push(issue);
-				bySection.set(issue.sectionId, issues);
-			}
-			if (issue.edgeId && issue.severity === "error")
-				edgeErrors.add(issue.edgeId);
-		}
-		return { byNode, bySection, edgeErrors };
-	}, [check]);
+	const counts = useMemo(() => issuesByPlace(check), [check]);
 
 	// An open Section shows its nodes alone. Edits still go to the whole flow.
 	// The editor's session closes it when something outside is picked.

@@ -3,10 +3,8 @@
 import type { Flow, Outcome } from "@nightshift/flows";
 import {
 	addEdge,
-	moveNodes,
 	nodesWithin,
 	removeEdge,
-	removeNode,
 	sectionBoundary,
 } from "@nightshift/flows";
 import type {
@@ -19,8 +17,6 @@ import { useCallback, useRef } from "react";
 import {
 	type CanvasNode,
 	isDataEdgeId,
-	moveSection,
-	sectionDragDelta,
 	sectionIdOf,
 	type useMeasured,
 } from "../../canvas";
@@ -31,6 +27,7 @@ import {
 	withoutNodes,
 } from "../session";
 import type { CanvasEdge, useCanvasEdges } from "./canvas-edges";
+import { withNodeChanges } from "./node-moves";
 
 /**
  * Moves, removes and selects of nodes and Section boxes, as edits of the
@@ -79,30 +76,11 @@ export function useNodeChanges({
 				if (!dragging) drags.current.active = false;
 			}
 			if (moves.length > 0 || sectionMoves.size > 0 || removed.length > 0) {
-				onFlowChange((current) => {
-					let next = current;
-					// Dragging a box moves its nodes as one block, from where
-					// they are now.
-					const carried = new Set<string>();
-					for (const [sectionId, to] of sectionMoves) {
-						const found = next.sections?.find((s) => s.id === sectionId);
-						if (!found) continue;
-						// With the nodes of the Sections inside it.
-						const section = { ...found, nodes: nodesWithin(next, found) };
-						const delta = sectionDragDelta(next, section, to);
-						if (delta) next = moveSection(next, section, delta);
-						for (const id of section.nodes) carried.add(id);
-					}
-					if (moves.length > 0) {
-						const positions = new Map<string, { x: number; y: number }>();
-						for (const { id, position } of moves) {
-							if (!carried.has(id)) positions.set(id, position);
-						}
-						next = moveNodes(next, positions);
-					}
-					for (const id of removed) next = removeNode(next, id);
-					return next;
-				}, gesture);
+				onFlowChange(
+					(current) =>
+						withNodeChanges(current, { sectionMoves, moves, removed }),
+					gesture,
+				);
 			}
 			const selects = changes.flatMap((change) =>
 				change.type === "select"
