@@ -28,6 +28,7 @@ import { listKeptValues, resetKeptValue } from "./variables";
 import { wireEngineAccess } from "./wire-access";
 import { wireEngineActions } from "./wire-actions";
 import { wireEngineCleanup } from "./wire-cleanup";
+import { wireEngineFlows } from "./wire-flows";
 import { wireEngineGates } from "./wire-gates";
 import { wireEngineHolds } from "./wire-holds";
 import { wireEngineMove } from "./wire-move";
@@ -54,7 +55,8 @@ import { wireEngineWalk } from "./wire-walk";
  * other blocks read ("gives").
  *
  * - `wire-peers.ts`: the other Devices and Hosts (`Peers`).
- * - `wire-projects.ts`: the projects, their flows and the flow upgrades.
+ * - `wire-projects.ts`: the git port, and the projects with their Clones.
+ * - `wire-flows.ts`: the flows of the projects and the flow upgrades.
  * - `wire-holds.ts`: the leases, the services, and what a run holds.
  * - `wire-runner.ts`: what a step may touch, and the runner.
  * - `wire-access.ts`, `wire-walk.ts` (R1): who may see or act on a run,
@@ -192,21 +194,25 @@ export function createEngine(
 	/** Where each run's steps run, as its plan says (`placement/`). */
 	const placement = createPlacement({ device, devices });
 
-	// --- projects and flows (phase 3): `wire-projects.ts` ---
-	const {
-		git,
-		listBranches,
-		projects,
-		migrations,
-		projectFlows,
-		cloneImports,
-	} = wireEngineProjects({
+	// --- projects (phase 3): `wire-projects.ts` ---
+	const { git, listBranches, projects } = wireEngineProjects({
+		db,
+		log: runLog,
+		documents,
+		directory,
+		hosts,
+		options,
+	});
+
+	// --- flows (phase 3): `wire-flows.ts` ---
+	const { migrations, projectFlows, cloneImports } = wireEngineFlows({
 		db,
 		log: runLog,
 		documents,
 		flowDocuments,
 		directory,
-		hosts,
+		projects,
+		git,
 		deviceName: device.name,
 		options,
 		now,

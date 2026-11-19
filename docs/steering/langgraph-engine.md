@@ -274,7 +274,8 @@ packages/engine/src/
                            dependencies (db, log, runner, bus, settings,
                            clock), and wires them. It holds no logic. Each
                            block has a file beside it (wire-peers.ts,
-                           wire-projects.ts, wire-holds.ts, wire-runner.ts,
+                           wire-projects.ts, wire-flows.ts, wire-holds.ts,
+                           wire-runner.ts,
                            wire-access.ts, wire-walk.ts, wire-recovery.ts,
                            wire-views.ts, wire-start.ts, wire-schedules.ts,
                            wire-move.ts, wire-gates.ts, wire-actions.ts,
