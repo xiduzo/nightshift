@@ -19,6 +19,7 @@ import type {
 	SpaceFlows,
 } from "@nightshift/engine";
 import type { Project } from "@nightshift/engine/projects";
+import { dashboardOver } from "@nightshift/engine/testing";
 import type { FlowListItem } from "@nightshift/flows";
 import { asDate, now } from "@nightshift/time";
 import { utc } from "@nightshift/time/testing";
@@ -98,32 +99,40 @@ type SpaceData = {
 	help?: AnswerCost[];
 };
 
-/** An engine whose Spaces hold `data`, and the Spaces it was asked for. */
+/**
+ * An engine whose Spaces hold `data`, with its dashboard over them, and
+ * the Spaces it was asked for. The dashboard opens a Space once per read,
+ * so a test compares the Spaces, each once (`once`).
+ */
 function engineOf(data: Record<string, SpaceData>) {
 	const asked: string[] = [];
+	const space: Context["engine"]["space"] = (spaceId: string) => {
+		asked.push(spaceId);
+		const held = data[spaceId] ?? { projects: [], runs: [], flows: [] };
+		return stub<SpaceEngine>("space", {
+			listProjects: async () =>
+				held.projects.map((project) => stub<Project>("project", project)),
+			listRuns: async (input) =>
+				held.runs.filter(
+					(run) =>
+						input?.projectId === undefined || run.projectId === input.projectId,
+				),
+			listAnswerCosts: async () => held.help ?? [],
+			flows: stub<SpaceFlows>("flows", {
+				list: async () =>
+					held.flows.map((name) => stub<FlowListItem>("flow", { name })),
+			}),
+		});
+	};
 	const engine: Partial<Context["engine"]> = {
-		space: (spaceId: string) => {
-			asked.push(spaceId);
-			const space = data[spaceId] ?? { projects: [], runs: [], flows: [] };
-			return stub<SpaceEngine>("space", {
-				listProjects: async () =>
-					space.projects.map((project) => stub<Project>("project", project)),
-				listRuns: async (input) =>
-					space.runs.filter(
-						(run) =>
-							input?.projectId === undefined ||
-							run.projectId === input.projectId,
-					),
-				listAnswerCosts: async () => space.help ?? [],
-				flows: stub<SpaceFlows>("flows", {
-					list: async () =>
-						space.flows.map((name) => stub<FlowListItem>("flow", { name })),
-				}),
-			});
-		},
+		space,
+		dashboard: dashboardOver(space),
 	};
 	return { engine, asked };
 }
+
+/** Each Space once, in the order of its first ask. */
+const once = (spaces: readonly string[]) => [...new Set(spaces)];
 
 async function contextFor(
 	headers: Headers,
@@ -181,7 +190,7 @@ describe("dashboard.summary", () => {
 			{ timeZone: "Europe/Amsterdam" },
 			{ context: await contextFor(headers, engine) },
 		);
-		expect(asked).toEqual([platform]);
+		expect(once(asked)).toEqual([platform]);
 		expect(summary.cards.lastDay).toMatchObject({
 			runs: 2,
 			finished: 1,
@@ -215,7 +224,7 @@ describe("dashboard.summary", () => {
 			{ everySpace: true },
 			{ context: await contextFor(headers, engine) },
 		);
-		expect(asked.slice(1).sort()).toEqual([personal, platform].sort());
+		expect(once(asked.slice(1)).sort()).toEqual([personal, platform].sort());
 		expect(summary.cards.lastDay.runs).toBe(2);
 		expect(summary.cards.allTime.costUsd).toBe(4);
 		const week = summary.nights.find((range) => range.nights === 7);
@@ -427,7 +436,7 @@ describe("dashboard.spend", () => {
 			{ timeZone: "Europe/Amsterdam" },
 			{ context: await contextFor(headers, engine) },
 		);
-		expect(asked).toEqual([platform]);
+		expect(once(asked)).toEqual([platform]);
 		const week = spend.ranges.find((range) => range.nights === 7);
 		expect(week?.total).toBe(5);
 		expect(week?.flows).toMatchObject([
