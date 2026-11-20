@@ -3,7 +3,6 @@
 export {
 	type AnswerCost,
 	HELP_AGENTS,
-	type HelpAgent,
 	type SentAnswerCost,
 	type ServedAnswerCost,
 } from "./domain/answer-costs";

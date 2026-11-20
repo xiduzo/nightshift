@@ -2,7 +2,6 @@ import { spaceRoster } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import {
 	type Engine,
-	flowTurnedSevere,
 	type LandedFact,
 	NIGHT_SHIFT,
 	type ScheduleMissed,
@@ -70,13 +69,20 @@ export type RunEventSource = {
 
 /** The engine's run events, missed schedules, open Gates and flows that turn severe. */
 export function engineRunEvents(
-	engine: Pick<Engine, "onLandedFacts" | "onScheduleMissed" | "space">,
+	engine: Pick<
+		Engine,
+		"onLandedFacts" | "onScheduleMissed" | "space" | "dashboard"
+	>,
 ): RunEventSource {
 	return {
 		subscribe: (listener) => engine.onLandedFacts(listener),
 		onScheduleMissed: (listener) => engine.onScheduleMissed(listener),
 		severeTurn: (spaceId, runId) =>
-			flowTurnedSevere(engine.space(spaceId, NIGHT_SHIFT), runId, now()),
+			engine.dashboard.readSevereTurn(NIGHT_SHIFT, {
+				spaceId,
+				runId,
+				now: now(),
+			}),
 		async openGates(spaceId) {
 			const gates = await engine.space(spaceId, NIGHT_SHIFT).listGates();
 			return gates.map((g) => ({

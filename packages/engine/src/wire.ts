@@ -28,6 +28,7 @@ import { wireEngineAccess } from "./wire-access";
 import { wireEngineActions } from "./wire-actions";
 import { wireEngineAnswerCosts } from "./wire-answer-costs";
 import { wireEngineCleanup } from "./wire-cleanup";
+import { wireEngineDashboard } from "./wire-dashboard";
 import { wireEngineFlows } from "./wire-flows";
 import { wireEngineGates } from "./wire-gates";
 import { wireEngineHolds } from "./wire-holds";
@@ -536,6 +537,9 @@ export function createEngine(
 		schedules: sched.schedules,
 	});
 
+	// --- the dashboard: `wire-dashboard.ts` ---
+	const dashboard = wireEngineDashboard({ space });
+
 	// --- the engine: `engine.ts` ---
 	return engineOf({
 		ready,
@@ -554,6 +558,7 @@ export function createEngine(
 		runs: { ...access.runs, ...acts.runs, ...start.runs, ...move.runs },
 		gates: gates.cases,
 		answerCosts,
+		dashboard,
 		// schedules and scores
 		scheduleNotices: sched.notices,
 		schedules: sched.schedules,

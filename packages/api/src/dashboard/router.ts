@@ -1,11 +1,4 @@
 import { spacesOf } from "@nightshift/auth";
-import {
-	flowChanges,
-	projectDashboard,
-	spaceSpend,
-	spacesDashboard,
-	summarizeFlow,
-} from "@nightshift/engine";
 import { now } from "@nightshift/time";
 import { z } from "zod";
 import { output } from "../output";
@@ -43,16 +36,22 @@ export const dashboard = {
 		)
 		.handler(async ({ context, input }) => {
 			const read = { now: now(), timeZone: input.timeZone };
+			const { dashboard } = context.engine;
 			if (input.projectId !== undefined) {
-				return projectDashboard(context.space, input.projectId, read);
+				return dashboard.readProjectDashboard(context.actor, {
+					spaceId: context.spaceId,
+					projectId: input.projectId,
+					...read,
+				});
 			}
 			const personId = context.session.user.id;
-			const spaces = input.everySpace
-				? (await spacesOf(context.db, personId)).map((space) =>
-						context.engine.space(space.id, context.actor),
-					)
-				: [context.space];
-			return spacesDashboard(spaces, read);
+			const spaceIds = input.everySpace
+				? (await spacesOf(context.db, personId)).map((space) => space.id)
+				: [context.spaceId];
+			return dashboard.readSpacesDashboard(context.actor, {
+				spaceIds,
+				...read,
+			});
 		}),
 	/** One flow of a project, behind its Flow health row. */
 	flow: protectedProcedure
@@ -68,12 +67,14 @@ export const dashboard = {
 				timeZone: timeZoneSchema,
 			}),
 		)
-		.handler(async ({ context, input }) =>
-			summarizeFlow(
-				input.flowName,
-				await context.space.listRuns({ projectId: input.projectId }),
-				{ now: now(), timeZone: input.timeZone },
-			),
+		.handler(({ context, input }) =>
+			context.engine.dashboard.readFlowHealth(context.actor, {
+				spaceId: context.spaceId,
+				projectId: input.projectId,
+				flowName: input.flowName,
+				now: now(),
+				timeZone: input.timeZone,
+			}),
 		),
 	/**
 	 * Before and after for one flow of a project over the last `nights`
@@ -95,15 +96,14 @@ export const dashboard = {
 			}),
 		)
 		.handler(({ context, input }) =>
-			flowChanges(
-				context.space,
-				{
-					projectId: input.projectId,
-					name: input.flowName,
-					nights: input.nights,
-				},
-				{ now: now(), timeZone: input.timeZone },
-			),
+			context.engine.dashboard.readFlowChanges(context.actor, {
+				spaceId: context.spaceId,
+				projectId: input.projectId,
+				name: input.flowName,
+				nights: input.nights,
+				now: now(),
+				timeZone: input.timeZone,
+			}),
 		),
 	/** The Spend page of the session's Space. */
 	spend: protectedProcedure
@@ -113,7 +113,11 @@ export const dashboard = {
 		})
 		.output(output(spaceSpendSchema))
 		.input(z.object({ timeZone: timeZoneSchema }).default({ timeZone: "UTC" }))
-		.handler(async ({ context, input }) =>
-			spaceSpend(context.space, { now: now(), timeZone: input.timeZone }),
+		.handler(({ context, input }) =>
+			context.engine.dashboard.readSpaceSpend(context.actor, {
+				spaceId: context.spaceId,
+				now: now(),
+				timeZone: input.timeZone,
+			}),
 		),
 };

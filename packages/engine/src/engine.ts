@@ -1,6 +1,7 @@
 import type { Database } from "@nightshift/db";
 import type { AnswerCost } from "./assistant";
 import type { Actor, LeaseHost, MemberChange } from "./contract";
+import type { Dashboard } from "./dashboard";
 import { type SpaceDocuments, spaceUsageOn } from "./documents";
 import type { ProjectFlows } from "./flows";
 import type { Runner } from "./graph";
@@ -204,6 +205,13 @@ export interface Engine {
 	 * Host's half. They do not wait for the engine to be ready.
 	 */
 	readonly answerCosts: SharedAnswerCosts;
+	/**
+	 * The dashboard's numbers for a door that holds the actor (G8 of the
+	 * hexagon series): one project, Spaces, the spend, one flow's health and
+	 * changes, and whether a run's end turned its flow severe. Each reads
+	 * through the Space view, which waits for the engine to be ready.
+	 */
+	readonly dashboard: Dashboard;
 }
 
 /**
@@ -291,6 +299,8 @@ export type EngineParts = {
 		ReturnType<typeof wireEngineAnswerCosts>,
 		"keep" | "shared"
 	>;
+	/** The dashboard's use cases (`wire-dashboard.ts`). */
+	dashboard: Dashboard;
 
 	// --- schedules and scores (`wire-schedules.ts`) ---
 	scheduleNotices: Pick<
@@ -416,6 +426,9 @@ export function engineOf(parts: EngineParts): Engine {
 
 		// --- answer costs (AC): the exchange did not wait for ready, and does not ---
 		answerCosts: parts.answerCosts.shared,
+
+		// --- the dashboard (DB): through the Space view, which waits for ready ---
+		dashboard: parts.dashboard,
 
 		// --- the end of the engine ---
 		async dispose() {

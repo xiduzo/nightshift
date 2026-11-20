@@ -18,7 +18,7 @@ import {
 	runReading,
 	type SpaceEngine,
 	type SpaceFlows,
-	spaceSpend,
+	summarizeSpend,
 	transcriptLines,
 } from "@nightshift/engine";
 import type { ProfileStore } from "@nightshift/engine/device-config";
@@ -228,10 +228,10 @@ export function historyPort(
 			return { nodeId: step.nodeId, ...saved };
 		},
 		spend: async (days) => {
-			const spend = await spaceSpend(
-				{ listRuns: () => space.listRuns({ projectId }) },
-				{ now: now(), timeZone: "UTC" },
-			);
+			const spend = summarizeSpend(await space.listRuns({ projectId }), {
+				now: now(),
+				timeZone: "UTC",
+			});
 			const range = spend.ranges.find((each) => each.nights === days);
 			if (!range) return { days, runs: 0 };
 			return {

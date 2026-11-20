@@ -21,7 +21,6 @@ devices/registry
 devices/secrets
 engine/agent-setup
 engine/cleanup
-engine/dashboard
 engine/device-config
 engine/flows
 engine/knowledge

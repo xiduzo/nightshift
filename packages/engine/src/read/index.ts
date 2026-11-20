@@ -1,20 +1,9 @@
 /** The read model: the pure projections of the event log, the facts an assistant reads in a run, the landed facts, the order of open Gates, what a person did to a run (Needed you), where the work landed (the ladders), the run views, a run's summary (`run-summary/`), cost, the Persons a run names, and the run bundle. */
 
 export { inboxOrder } from "./inbox-order";
-export {
-	CASCADE_RUNGS,
-	type Ladder,
-	RUNGS,
-	type Rung,
-	type RunRung,
-} from "./ladder";
+export { CASCADE_RUNGS, RUNGS } from "./ladder";
 export { type LandedFact, landedFacts } from "./landed-facts";
-export {
-	isPlanned,
-	NEEDED_YOU_REASONS,
-	type NeededYou,
-	type NeededYouReason,
-} from "./needed-you";
+export { NEEDED_YOU_REASONS } from "./needed-you";
 export { gitAuthorOf, namesOf } from "./people";
 export type { RunBundleSummary } from "./run-bundle";
 export { exportRun } from "./run-bundle";
@@ -69,4 +58,4 @@ export type {
 	StepSource,
 	StepTranscript,
 } from "./views";
-export { NIGHT_RANGES, type NightRange } from "./views";
+export { NIGHT_RANGES } from "./views";

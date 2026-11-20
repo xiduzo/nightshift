@@ -14,7 +14,6 @@ import {
 	withDevice,
 } from "../testing/test-support";
 import { createEngine } from "../wire";
-import { projectDashboard } from "./spaces";
 
 /**
  * A flow scores its own runs: a Command step writes `scores` in its data,
@@ -86,7 +85,9 @@ test("a flow whose Command writes scores shows them in its Flow health row after
 	await finishedRun("0");
 	const last = await finishedRun("1");
 
-	const dashboard = await projectDashboard(space, projectId, {
+	const dashboard = await engine.dashboard.readProjectDashboard(NIGHT_SHIFT, {
+		spaceId: sandbox.spaceId,
+		projectId,
 		now: now(),
 		timeZone: "UTC",
 	});
@@ -147,7 +148,9 @@ test("a person's answer to Was this run useful? is the score useful, and Flow he
 		["useful", 1],
 	]);
 
-	const dashboard = await projectDashboard(space, projectId, {
+	const dashboard = await engine.dashboard.readProjectDashboard(NIGHT_SHIFT, {
+		spaceId: sandbox.spaceId,
+		projectId,
 		now: now(),
 		timeZone: "UTC",
 	});

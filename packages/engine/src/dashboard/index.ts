@@ -1,26 +1,22 @@
-/** The dashboard: its numbers, computed from the runs, over one project or all of them. */
+/**
+ * The dashboard: its numbers, computed from the runs, over one project, a
+ * Space or several Spaces. The rules are in `measures/`. `wireDashboard`
+ * binds the use cases of `Engine.dashboard`.
+ */
 
+export type { DashboardSummary } from "./application/read-project-dashboard";
+export type { SevereTurn } from "./application/read-severe-turn";
 export {
 	CHANGE_TRENDS,
 	CHANGE_VERDICTS,
+	COST_STEADINESS,
 	type FlowChanges,
+	type FlowHealthDetail,
+	isTimeZone,
 	MOVE_GUARDS,
 	MOVE_SETUP_CAUSES,
-} from "./domain/changes-types";
-export { isTimeZone } from "./domain/clock";
-export { summarizeFlow } from "./domain/flow-health";
-export type { FlowHealthDetail } from "./domain/flow-health-types";
-export {
-	COST_STEADINESS,
 	SAVING_KINDS,
 	type SpaceSpend,
-} from "./domain/spend-types";
-export type { DashboardSummary } from "./domain/summary-types";
-export {
-	flowChanges,
-	flowTurnedSevere,
-	projectDashboard,
-	type SevereTurn,
-	spaceSpend,
-	spacesDashboard,
-} from "./spaces";
+	summarizeSpend,
+} from "./measures";
+export { type Dashboard, wireDashboard } from "./wire";
