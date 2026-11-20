@@ -9,7 +9,7 @@ import type { PersistedDocument } from "./ydoc";
 
 /**
  * The flow document of one Project: the pair of documents a Link syncs.
- * Only `flows/flow-document.ts` knows what is in them.
+ * Only the Yjs adapters of `flows/store/` know what is in them.
  */
 export type FlowDocument = {
 	readonly projectId: string;

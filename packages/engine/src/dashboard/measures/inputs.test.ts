@@ -4,7 +4,7 @@ import {
 	HELP_AGENTS as ASSISTANT_HELP_AGENTS,
 } from "../../assistant";
 import type { FlowRevisionItem } from "../../flows";
-import type { RevisionKind } from "../../flows/flow-document";
+import type { RevisionKind } from "../../flows/store";
 import type {
 	RungBy as LoggedRungBy,
 	RunScore as LoggedRunScore,

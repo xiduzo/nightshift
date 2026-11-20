@@ -10,7 +10,11 @@ import { createFlowDocuments, type FlowDocuments } from "../documents";
 import { systemGit } from "../git";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { createCloneImports } from "./clone-imports";
-import { flowIdOf, flowRevisions, flowSources } from "./flow-document";
+import {
+	flowIdOf,
+	flowRevisions,
+	flowSources,
+} from "./store/adapters/out/yjs-flow-encoding";
 
 let sandbox: Sandbox;
 let documents: FlowDocuments;

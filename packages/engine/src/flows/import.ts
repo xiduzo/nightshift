@@ -15,6 +15,14 @@ import { z } from "zod";
 import type { ProfileStore } from "../device-config";
 import type { FlowDocument } from "../documents";
 import {
+	deleteLegacyFolder,
+	LEGACY_FOLDER,
+	type LegacyFolder,
+	readLegacyFolder,
+	type TrackedState,
+} from "./legacy-folder";
+import { parseLegacyProfiles } from "./legacy-profiles";
+import {
 	addNotices,
 	flowSources,
 	mark,
@@ -24,15 +32,7 @@ import {
 	same,
 	saveFlow,
 	saveSchedules,
-} from "./flow-document";
-import {
-	deleteLegacyFolder,
-	LEGACY_FOLDER,
-	type LegacyFolder,
-	readLegacyFolder,
-	type TrackedState,
-} from "./legacy-folder";
-import { parseLegacyProfiles } from "./legacy-profiles";
+} from "./store";
 
 /**
  * The import on upgrade (ADR 2, decision 8; ADR 3, decision 4): once per

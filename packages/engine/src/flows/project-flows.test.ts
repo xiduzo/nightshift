@@ -15,8 +15,8 @@ import {
 	type FlowDocuments,
 } from "../documents";
 import { createSandbox, type Sandbox } from "../testing/test-support";
-import { addNotices } from "./flow-document";
-import { createProjectFlows, type ProjectFlows } from "./project-flows";
+import { wireStore as createProjectFlows, type ProjectFlows } from "./store";
+import { addNotices } from "./store/adapters/out/yjs-notices";
 
 let sandbox: Sandbox;
 let documents: FlowDocuments;

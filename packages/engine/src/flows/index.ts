@@ -2,10 +2,8 @@
 
 export { createCloneImports } from "./clone-imports";
 export { type ConfigUse, createConfigUse } from "./config-use";
-export { type FlowNotice, revisionKinds } from "./flow-document";
 export { createFlowMigrations } from "./flow-migration";
 export type { FlowRef } from "./flow-use";
-export { createProjectFlows, type ProjectFlows } from "./project-flows";
 export { flowsForRun } from "./run-flows";
 export {
 	createSpaceFlows,
@@ -15,3 +13,9 @@ export {
 	type SavedFlow,
 	type SpaceFlows,
 } from "./space-flows";
+export {
+	type FlowNotice,
+	type ProjectFlows,
+	revisionKinds,
+	wireStore,
+} from "./store";

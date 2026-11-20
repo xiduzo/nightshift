@@ -9,8 +9,8 @@ import {
 import { Refusal } from "@nightshift/refusal";
 import { createFlowDocuments, type FlowDocuments } from "../documents";
 import { createSandbox, type Sandbox } from "../testing/test-support";
-import { createProjectFlows } from "./project-flows";
 import { createSpaceFlows, type SpaceFlows } from "./space-flows";
+import { wireStore as createProjectFlows } from "./store";
 
 const SPACE = "space";
 const PROJECT = "project";

@@ -24,8 +24,13 @@ import {
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { UsageNotes } from "../usage";
-import type { FlowNotice, FlowRevision, RevisionKind } from "./flow-document";
-import type { ProjectFlows } from "./project-flows";
+import {
+	type FlowNotice,
+	type FlowRevision,
+	flowNotFound,
+	type ProjectFlows,
+	type RevisionKind,
+} from "./store";
 
 /**
  * The flows of the projects of one Space as a Person lists, reads, saves
@@ -204,9 +209,7 @@ export function createSpaceFlows(
 			flows.revisions(projectId, name),
 		]);
 		const source = sources[name];
-		if (source === undefined) {
-			throw new Refusal("not-found", `The flow "${name}" does not exist.`);
-		}
+		if (source === undefined) throw flowNotFound(name);
 		const current = "json" in source ? (source.revision ?? null) : null;
 		const parsed = revisions.map(revisionFlow);
 		const [persons, devices] = await Promise.all([

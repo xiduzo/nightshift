@@ -10,7 +10,7 @@ import {
 	createFlowDocuments,
 	type FlowDocuments,
 } from "../../src/documents/flow-documents";
-import { createProjectFlows } from "../../src/flows";
+import { wireStore as createProjectFlows } from "../../src/flows";
 import { seedFlows } from "../../src/testing/seed-flows";
 import {
 	createSandbox,

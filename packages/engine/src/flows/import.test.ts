@@ -21,18 +21,17 @@ import {
 } from "../documents";
 import { systemGit } from "../git";
 import { createSandbox, mustGit, type Sandbox } from "../testing/test-support";
-import {
-	flowIdOf,
-	flowNotices,
-	flowRevisions,
-	flowSources,
-	marked,
-	readSchedules,
-	saveFlow,
-} from "./flow-document";
 import { createFlowMigrations } from "./flow-migration";
 import { type CloneImport, importClone, importMarker } from "./import";
 import { trackedState } from "./legacy-folder";
+import {
+	flowIdOf,
+	flowRevisions,
+	flowSources,
+} from "./store/adapters/out/yjs-flow-encoding";
+import { saveFlow } from "./store/adapters/out/yjs-flow-saves";
+import { flowNotices, marked } from "./store/adapters/out/yjs-notices";
+import { readSchedules } from "./store/adapters/out/yjs-schedules";
 
 /** A flow of one Command node that says `word`, and calls `calls` after it when given. */
 function flow(word: string, calls?: string): Flow {

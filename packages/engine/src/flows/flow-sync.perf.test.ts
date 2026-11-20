@@ -4,7 +4,7 @@ import { commandNode } from "@nightshift/flows/testing";
 import * as Y from "yjs";
 import type { FlowDocument } from "../documents";
 import type { PersistedDocument } from "../documents/ydoc";
-import { saveFlow } from "./flow-document";
+import { saveFlow } from "./store/adapters/out/yjs-flow-saves";
 
 /**
  * Scale of the flow document a run writes into, and of the sync that

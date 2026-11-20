@@ -144,7 +144,7 @@ export type StepIn = {
 	gate: { openedAt: number; deadline: unknown } | null;
 };
 
-/** One revision of a flow, as its changes read it (`flows/flow-document.ts`). */
+/** One revision of a flow, as its changes read it (`flows/store/`). */
 export type RevisionIn = {
 	at: number;
 	kind: "save" | "restore" | "import" | "merge" | "copy" | "upgrade" | "infer";

@@ -2,11 +2,7 @@ import type { Database } from "@nightshift/db";
 import type { DeviceDirectory } from "./contract";
 import type { FlowDocuments, SpaceDocuments } from "./documents";
 import type { EngineOptions } from "./engine-options";
-import {
-	createCloneImports,
-	createFlowMigrations,
-	createProjectFlows,
-} from "./flows";
+import { createCloneImports, createFlowMigrations, wireStore } from "./flows";
 import type { Git } from "./git";
 import type { RunLog } from "./log";
 import type { Projects } from "./projects";
@@ -57,7 +53,7 @@ export function wireEngineFlows(deps: {
 		spaces: documents,
 	});
 	/** The flows and schedules of every project: its flow document (ADR 2). */
-	const projectFlows = createProjectFlows({
+	const projectFlows = wireStore({
 		documents: flowDocuments,
 		project: (projectId) => projects.find(projectId),
 		deviceId: () => runLog.walkerId(),

@@ -19,15 +19,14 @@ import {
 	type FlowDocuments,
 } from "../documents";
 import { createSandbox, type Sandbox } from "../testing/test-support";
+import type { FlowMigrations } from "./flow-migration";
+import { wireStore as createProjectFlows, type ProjectFlows } from "./store";
 import {
 	flowIdOf,
 	flowRevisions,
 	flowSources,
-	saveFlow,
-	upgradeFlows,
-} from "./flow-document";
-import type { FlowMigrations } from "./flow-migration";
-import { createProjectFlows, type ProjectFlows } from "./project-flows";
+} from "./store/adapters/out/yjs-flow-encoding";
+import { saveFlow, upgradeFlows } from "./store/adapters/out/yjs-flow-saves";
 
 /** A flow with two Agent nodes, `a` then `b`. */
 const twoNodes = (): Flow => {
