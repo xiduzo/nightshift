@@ -1,0 +1,20 @@
+{{{actorImport}}}
+/**
+ * The ports {{{useCaseCamel}}} stands on. Add each one it needs, narrowed
+ * with `Pick<>` (`store: Pick<{{{slicePascal}}}Store, "find">`).
+ */
+export type {{{useCasePascal}}}Ports = object;
+
+/** What the request asks for. */
+export type {{{useCasePascal}}} = { id: string };
+
+/**
+ * {{{useCaseAbout}}}
+ *
+ * {{{whoAsks}}}
+ */
+export const {{{useCaseCamel}}} =
+	(_ports: {{{useCasePascal}}}Ports) =>
+	async ({{{actorParameter}}}_request: {{{useCasePascal}}}): Promise<void> => {
+		// Load, ask the domain rule, save.
+	};

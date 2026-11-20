@@ -1,0 +1,13 @@
+import { describe, expect, test } from "bun:test";
+{{{actorImport}}}import { inMemory{{{slicePascal}}}Ports } from "../adapters/out/in-memory-neighbours";
+import { {{{useCaseCamel}}} } from "./{{{useCase}}}";
+
+/** The use case {{{useCaseCamel}}}, on in-memory adapters. */
+
+{{{actorConstant}}}
+describe("{{{useCaseCamel}}}", () => {
+	test("answers the request", async () => {
+		const ports = inMemory{{{slicePascal}}}Ports();
+		expect(await {{{useCaseCamel}}}(ports)({{{actorArgument}}}{ id: "id-1" })).toBeUndefined();
+	});
+});

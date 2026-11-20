@@ -73,26 +73,26 @@ export const kebab = (name: string): string =>
 		.replace(/([a-z0-9])([A-Z])/g, "$1-$2")
 		.toLowerCase();
 
+/** The packages above `auth` and `agents`, whose use cases take an `Actor` of the engine. */
+const ACTOR_FROM_ENGINE = ["devices", "notifications", "telemetry"];
+
 /**
- * Where a slice of each package takes the `Actor` from, as seen from
- * `application/` and from `adapters/out/`. `agents` and `auth` are below
- * the engine: their use cases have no `Actor` yet.
+ * Where a slice takes the `Actor` from, as seen from its `application/`
+ * and its `adapters/out/`. `depth` is 1 for a slice and 2 for a
+ * sub-vertical. Null in `agents` and `auth`: they are below the engine,
+ * so their use cases take the request alone.
  */
-const ACTOR: Record<string, { application: string; adapters: string }> = {
-	engine: { application: "../../contract", adapters: "../../../contract" },
-	devices: {
-		application: "@nightshift/engine",
-		adapters: "@nightshift/engine",
-	},
-	notifications: {
-		application: "@nightshift/engine",
-		adapters: "@nightshift/engine",
-	},
-	telemetry: {
-		application: "@nightshift/engine",
-		adapters: "@nightshift/engine",
-	},
-};
+function actorOf(
+	pkg: string,
+	depth: number,
+): { application: string; adapters: string } | null {
+	if (pkg === "engine") {
+		const up = "../".repeat(depth);
+		return { application: `../${up}contract`, adapters: `../../${up}contract` };
+	}
+	if (!ACTOR_FROM_ENGINE.includes(pkg)) return null;
+	return { application: "@nightshift/engine", adapters: "@nightshift/engine" };
+}
 
 const refuse = (message: string): never => {
 	throw new GeneratorRefusal(message);
@@ -105,27 +105,32 @@ function sentence(text: string, what: string): string {
 	return /[.!?]$/.test(words) ? words : `${words}.`;
 }
 
-/** The package, checked: a server package whose use cases take an `Actor`. */
-function serverPackage(pkg: string) {
+/** The package, checked: a server package. */
+function serverPackage(pkg: string): void {
 	if (!SERVER_PACKAGES.includes(pkg)) {
 		refuse(
 			`"${pkg}" is no server package. Pick one of ${SERVER_PACKAGES.join(", ")}.`,
 		);
 	}
-	const actor = ACTOR[pkg];
-	if (!actor) {
-		return refuse(
-			`${pkg} is below the engine, so its use cases have no Actor yet. Shape this slice by hand (docs/steering/STRUCTURE.md, section 9).`,
-		);
-	}
-	return actor;
 }
 
-/** The paths of a slice, from the repository root. */
+/**
+ * The paths of a slice, from the repository root. `slice` is a folder of
+ * `src/` (`spend`) or a sub-vertical in one (`runs/start`). Its names come
+ * from its own folder: `runs/start` has `wireStart`.
+ */
 function sliceDir(pkg: string, slice: string) {
+	const folders = slice.split("/");
+	if (!folders.every((folder) => KEBAB.test(folder))) {
+		refuse(
+			`Name a slice in lower case with dashes (space-move), and a sub-vertical as <slice>/<folder> (runs/start), not "${slice}".`,
+		);
+	}
 	const dir = `packages/${pkg}/src/${slice}`;
 	return {
 		dir,
+		name: folders.at(-1) as string,
+		depth: folders.length,
 		wire: `${dir}/wire.ts`,
 		ports: `${dir}/application/ports.ts`,
 		neighbours: `${dir}/adapters/out/in-memory-neighbours.ts`,
@@ -134,7 +139,7 @@ function sliceDir(pkg: string, slice: string) {
 
 /** Where the use cases and the twins of a slice are listed, for the edits. */
 function anchors(slice: string) {
-	const name = pascal(slice);
+	const name = pascal(slice.split("/").at(-1) as string);
 	return {
 		wireFunction: new RegExp(`^export function wire${name}\\(`),
 		useCases: new RegExp(`^export type ${name} = \\{`),
@@ -163,12 +168,21 @@ function useCaseData(root: string, pkg: string, slice: string, name: string) {
 	};
 }
 
+/**
+ * The two shapes of a generated use case. `access` asks the port
+ * `<Slice>Access` who may act first. `plain` is for a slice without that
+ * port: it takes the actor (or, below the engine, the request alone) and
+ * asks nothing.
+ */
+type UseCaseShape = "access" | "plain";
+
 /** The steps that add a use case to a slice: its file, its test, and its line in `wire.ts`. */
 function useCaseFiles(
 	pkg: string,
 	slice: string,
 	useCase: { path: string; data: Data },
 	data: Data,
+	shape: UseCaseShape,
 ): { steps: Step[]; paths: string[] } {
 	const paths = sliceDir(pkg, slice);
 	const at = anchors(slice);
@@ -187,24 +201,25 @@ function useCaseFiles(
 					`/** ${all.useCaseAbout} */`,
 					`${useCaseCamel}: ReturnType<typeof ${useCaseCamel}>;`,
 				],
-				`the type ${pascal(slice)} in ${paths.wire}`,
+				`the type ${pascal(paths.name)} in ${paths.wire}`,
 			),
 			{ opener: at.returned, after: at.wireFunction },
 			[`${useCaseCamel}: ${useCaseCamel}(ports),`],
-			`the return of wire${pascal(slice)} in ${paths.wire}`,
+			`the return of wire${pascal(paths.name)} in ${paths.wire}`,
 		);
+	const template = shape === "access" ? "use-case" : "plain";
 	return {
 		steps: [
 			{
 				kind: "add",
 				path: useCase.path,
-				template: "use-case/use-case.ts.hbs",
+				template: `use-case/${template}.ts.hbs`,
 				data: all,
 			},
 			{
 				kind: "add",
 				path: test,
-				template: "use-case/use-case.test.ts.hbs",
+				template: `use-case/${template}.test.ts.hbs`,
 				data: all,
 			},
 			{ kind: "edit", path: paths.wire, edit: editWire },
@@ -215,45 +230,61 @@ function useCaseFiles(
 
 /** The data every template of a slice reads. */
 function sliceData(pkg: string, slice: string): Data {
-	const actor = serverPackage(pkg);
+	serverPackage(pkg);
+	const { name, depth } = sliceDir(pkg, slice);
+	const actor = actorOf(pkg, depth);
 	return {
 		package: pkg,
+		// The path, as plop renders it: an answer wins over a value of its name.
 		slice,
-		sliceTitle: slice
+		sliceTitle: name
 			.replace(/^[a-z]/, (letter) => letter.toUpperCase())
 			.replace(/-/g, " "),
-		slicePascal: pascal(slice),
-		actorFromApplication: actor.application,
-		actorFromAdapters: actor.adapters,
+		slicePascal: pascal(name),
+		actorFromApplication: actor?.application ?? "",
+		actorFromAdapters: actor?.adapters ?? "",
+		// The parts of a plain use case and its test that name the Actor.
+		actorImport: actor
+			? `import type { Actor } from "${actor.application}";\n`
+			: "",
+		actorParameter: actor ? "_actor: Actor, " : "",
+		actorArgument: actor ? "ADA, " : "",
+		actorConstant: actor
+			? 'const ADA: Actor = { personId: "person-ada", door: "session" };\n'
+			: "",
+		whoAsks: actor
+			? "It checks no role: the slice has no access port."
+			: `${pkg} is below the engine: the use case takes the request alone.`,
 	};
 }
 
+/** Does the file at `path` have a line that starts with `start`? */
+function declares(root: string, path: string, start: string): boolean {
+	const full = join(root, path);
+	const text = existsSync(full) ? readFileSync(full, "utf8") : "";
+	return new RegExp(`^${start}\\b`, "m").test(text);
+}
+
 /**
- * Fails when the slice lacks what a generated use case stands on: the port
- * `<Slice>Access` and the twins `inMemory<Slice>Ports`. A slice that
- * `turbo gen slice` started has both.
+ * The shape of a new use case of `slice`. Fails when the slice lacks the
+ * twins `inMemory<Slice>Ports`, where every generated use-case test
+ * starts. `access` when the slice has the port `<Slice>Access` and its
+ * package an `Actor`. A slice that `turbo gen slice` started has both.
  */
-function checkAccess(root: string, pkg: string, slice: string) {
+function shapeOf(root: string, pkg: string, slice: string): UseCaseShape {
 	const paths = sliceDir(pkg, slice);
-	const name = pascal(slice);
-	const needs = [
-		{ path: paths.ports, what: `port ${name}Access`, line: "export type" },
-		{
-			path: paths.neighbours,
-			what: `function inMemory${name}Ports`,
-			line: "export function",
-		},
-	];
-	for (const { path, what, line } of needs) {
-		const full = join(root, path);
-		const word = what.split(" ").at(-1);
-		const text = existsSync(full) ? readFileSync(full, "utf8") : "";
-		if (!new RegExp(`^${line} ${word}\\b`, "m").test(text)) {
-			refuse(
-				`${path} has no ${what}: a generated use case asks it who may act. Start the slice with "turbo gen slice", or write this use case by hand (docs/steering/STRUCTURE.md, section 9).`,
-			);
-		}
+	const name = pascal(paths.name);
+	if (
+		!declares(root, paths.neighbours, `export function inMemory${name}Ports`)
+	) {
+		refuse(
+			`${paths.neighbours} has no function inMemory${name}Ports: a generated use-case test starts from it. Add it (it returns every port of the slice in memory), or write this use case by hand (docs/steering/STRUCTURE.md, section 9).`,
+		);
 	}
+	const access =
+		actorOf(pkg, paths.depth) &&
+		declares(root, paths.ports, `export type ${name}Access`);
+	return access ? "access" : "plain";
 }
 
 /** Fails when a file of a slice is not the shape the generators made. */
@@ -272,53 +303,80 @@ function checkEdit(root: string, path: string, edit: (text: string) => string) {
 	}
 }
 
-/** The steps of `turbo gen slice`: a new capability slice with its first use case. */
-export function sliceSteps(root: string, answers: SliceAnswers): Step[] {
-	const { package: pkg, slice } = answers;
-	const data = sliceData(pkg, slice);
-	if (!KEBAB.test(slice)) {
+/**
+ * Fails unless `slice` may start here. A slice is a new folder of `src/`
+ * with the name of a capability. A sub-vertical (`runs/start`) is a new
+ * folder in a vertical that exists: it is not on the capability map.
+ */
+function checkNew(root: string, pkg: string, slice: string): void {
+	const paths = sliceDir(pkg, slice);
+	const [vertical = ""] = slice.split("/");
+	const known =
+		Boolean(VERTICALS[`packages/${pkg}`]?.[vertical]) ||
+		existsSync(join(root, `packages/${pkg}/src/${vertical}`));
+	if (paths.depth > 2) {
 		refuse(
-			`Name a slice in lower case with dashes (space-move), not "${slice}".`,
+			`A sub-vertical sits in a vertical (runs/start), not deeper: "${slice}".`,
 		);
+	}
+	if (paths.depth === 2) {
+		if (!known) refuse(`packages/${pkg} has no vertical ${vertical}.`);
+		if (existsSync(join(root, paths.dir))) {
+			refuse(`packages/${pkg}/src/${slice} exists already.`);
+		}
+		return;
 	}
 	if (!(slice in CAPABILITIES)) {
 		refuse(
 			`"${slice}" is no capability of scripts/capabilities.ts. A slice has the name of its capability. Add the capability to CAPABILITIES first, with its word of docs/glossary.md.`,
 		);
 	}
-	const paths = sliceDir(pkg, slice);
-	if (
-		VERTICALS[`packages/${pkg}`]?.[slice] ||
-		existsSync(join(root, paths.dir))
-	) {
-		refuse(`packages/${pkg} has a vertical ${slice} already.`);
+	if (known) refuse(`packages/${pkg} has a vertical ${slice} already.`);
+}
+
+/**
+ * The steps of `turbo gen slice`: a new capability slice, or a
+ * sub-vertical of one, with its first use case.
+ */
+export function sliceSteps(root: string, answers: SliceAnswers): Step[] {
+	const { package: pkg, slice } = answers;
+	const data = sliceData(pkg, slice);
+	if (!actorOf(pkg, 1)) {
+		refuse(
+			`${pkg} is below the engine, so it has no Actor for the access port of a new slice. Shape this slice by hand (docs/steering/STRUCTURE.md, section 9). "turbo gen use-case" and "turbo gen adapter" work in it.`,
+		);
 	}
+	checkNew(root, pkg, slice);
+	const paths = sliceDir(pkg, slice);
 	const all = {
 		...data,
 		about: sentence(answers.about, "what the slice is"),
 		useCaseAbout: sentence(answers.useCaseAbout, "what the use case does"),
 	};
 	const useCase = useCaseData(root, pkg, slice, answers.useCase);
-	const first = useCaseFiles(pkg, slice, useCase, all);
+	const first = useCaseFiles(pkg, slice, useCase, all, "access");
 	const added = [
 		{ path: `${paths.dir}/index.ts`, template: "slice/index.ts.hbs" },
 		{ path: paths.wire, template: "slice/wire.ts.hbs" },
 		{ path: paths.ports, template: "slice/ports.ts.hbs" },
 		{ path: paths.neighbours, template: "slice/in-memory-neighbours.ts.hbs" },
 	];
-	const map = "scripts/capabilities.ts";
+	// A sub-vertical is not on the capability map: its vertical is.
+	const map = paths.depth === 1 ? ["scripts/capabilities.ts"] : [];
 	return [
 		...added.map((file): Step => ({ kind: "add", ...file, data: all })),
-		{
-			kind: "edit",
-			path: map,
-			edit: (text) => withMapLine(text, pkg, slice, slice),
-		},
+		...map.map(
+			(path): Step => ({
+				kind: "edit",
+				path,
+				edit: (text) => withMapLine(text, pkg, slice, slice),
+			}),
+		),
 		...first.steps,
 		{
 			kind: "format",
 			paths: [
-				...new Set([...added.map((file) => file.path), map, ...first.paths]),
+				...new Set([...added.map((file) => file.path), ...map, ...first.paths]),
 			],
 		},
 	];
@@ -332,8 +390,8 @@ export function useCaseSteps(root: string, answers: UseCaseAnswers): Step[] {
 		useCaseAbout: sentence(answers.about, "what the use case does"),
 	};
 	const useCase = useCaseData(root, pkg, slice, answers.useCase);
-	checkAccess(root, pkg, slice);
-	const { steps, paths } = useCaseFiles(pkg, slice, useCase, data);
+	const shape = shapeOf(root, pkg, slice);
+	const { steps, paths } = useCaseFiles(pkg, slice, useCase, data, shape);
 	for (const step of steps) {
 		if (step.kind === "edit") checkEdit(root, step.path, step.edit);
 	}
@@ -406,7 +464,7 @@ export function adapterSteps(root: string, answers: AdapterAnswers): Step[] {
 			),
 			{ opener: at.ports, after: at.wireFunction },
 			[`${all.portCamel}: ${real}(),`],
-			`the ports of wire${pascal(slice)} in ${paths.wire}`,
+			`the ports of wire${pascal(paths.name)} in ${paths.wire}`,
 		);
 	const editTwins = (text: string) =>
 		withMember(
@@ -416,7 +474,7 @@ export function adapterSteps(root: string, answers: AdapterAnswers): Step[] {
 			),
 			{ opener: at.returned, after: at.twins },
 			[`${all.portCamel}: inMemory${port}(),`],
-			`the return of inMemory${pascal(slice)}Ports in ${paths.neighbours}`,
+			`the return of inMemory${pascal(paths.name)}Ports in ${paths.neighbours}`,
 		);
 	checkEdit(root, paths.wire, editWire);
 	checkEdit(root, paths.neighbours, editTwins);

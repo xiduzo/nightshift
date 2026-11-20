@@ -139,7 +139,7 @@ function generate(root: string, pkg: string): void {
 test("a template holds no Handlebars but {{{name}}}", () => {
 	const files = readdirSync(TEMPLATES, { recursive: true, encoding: "utf8" });
 	const templates = files.filter((file) => file.endsWith(".hbs"));
-	expect(templates.length).toBe(11);
+	expect(templates.length).toBe(13);
 	for (const file of templates) {
 		const rest = readFileSync(join(TEMPLATES, file), "utf8").replace(
 			PLACEHOLDER,
@@ -165,8 +165,8 @@ test("turbo gen has the three generators, and each file they add has its templat
 	if (typeof actions !== "function") throw new Error("no slice generator");
 	const actionsOf = (answers: PlopTypes.Answers) => actions(answers);
 	// A capability that no server package will hold: the widgets of the phone.
-	const slice = { slice: "widgets", about: "x", useCase: "show-widget" };
-	const adds = actionsOf({ ...slice, package: "engine", useCaseAbout: "y" })
+	const slice = { slice: "widgets", what: "x", useCase: "show-widget" };
+	const adds = actionsOf({ ...slice, package: "engine", useCaseWhat: "y" })
 		.filter((action) => typeof action === "object" && action.type === "add")
 		.map((action) => action as PlopTypes.AddActionConfig);
 	expect(adds.length).toBe(6);
@@ -175,9 +175,19 @@ test("turbo gen has the three generators, and each file they add has its templat
 			join(TEMPLATES, "../../../packages/engine/src/widgets/"),
 		);
 		expect(existsSync(add.templateFile ?? "")).toBe(true);
+		// Plop renders an answer over a value of the same name: the sentences keep their full stop.
+		expect(add.data).toMatchObject({ about: "x.", useCaseAbout: "y." });
+	}
+	for (const [name, config] of generators) {
+		const prompts = config.prompts as { name: string }[];
+		const names = prompts.map((prompt) => prompt.name);
+		expect({ name, clash: names.filter((key) => /about/i.test(key)) }).toEqual({
+			name,
+			clash: [],
+		});
 	}
 	// Answers that are not valid give one action, which fails with the reason.
-	const refused = actionsOf({ ...slice, package: "auth", useCaseAbout: "y" });
+	const refused = actionsOf({ ...slice, package: "auth", useCaseWhat: "y" });
 	expect(refused.length).toBe(1);
 	expect(() => (refused[0] as unknown as () => void)()).toThrow(
 		"below the engine",
@@ -218,6 +228,123 @@ describe("what the generators make keeps the ring check", () => {
 	}
 });
 
+/**
+ * A slice made by hand without an access port, in `pkg`: a wire, the
+ * twins and `ports.ts` in the shape the generators edit, and no port yet.
+ */
+function handSlice(root: string, pkg: string): string {
+	const dir = `packages/${pkg}/src/notes`;
+	const files: Record<string, string[]> = {
+		[`${dir}/index.ts`]: ['export { type Notes, wireNotes } from "./wire";'],
+		[`${dir}/wire.ts`]: [
+			"export type Notes = {",
+			"};",
+			"export function wireNotes(): Notes {",
+			"\tconst ports = {};",
+			"\treturn {",
+			"\t};",
+			"}",
+		],
+		[`${dir}/application/ports.ts`]: ["/** The driven ports of notes. */"],
+		[`${dir}/adapters/out/in-memory-neighbours.ts`]: [
+			"export function inMemoryNotesPorts() {",
+			"\treturn {};",
+			"}",
+		],
+	};
+	for (const [path, lines] of Object.entries(files)) {
+		mkdirSync(dirname(join(root, path)), { recursive: true });
+		writeFileSync(join(root, path), `${lines.join("\n")}\n`);
+	}
+	return dir;
+}
+
+describe("a use case of a slice without an access port", () => {
+	for (const [pkg, actor] of [
+		["engine", true],
+		["devices", true],
+		["auth", false],
+	] as const) {
+		test(`in ${pkg}: it ${actor ? "takes the actor" : "takes the request alone"}, and asks no access`, async () => {
+			const root = repositoryWithMap();
+			const dir = handSlice(root, pkg);
+			const at = { package: pkg, slice: "notes" };
+			run(
+				root,
+				useCaseSteps(root, {
+					...at,
+					useCase: "keep-note",
+					about: "Keeps a note.",
+				}),
+			);
+			run(
+				root,
+				adapterSteps(root, {
+					...at,
+					port: "NoteStore",
+					tech: "drizzle",
+					about: "The notes.",
+				}),
+			);
+			expect(await checkRings(root, OPTIONS)).toEqual([]);
+			const useCase = readFileSync(
+				join(root, `${dir}/application/keep-note.ts`),
+				"utf8",
+			);
+			expect(useCase).not.toContain("openSpace");
+			expect(useCase.includes("_actor: Actor, _request: KeepNote")).toBe(actor);
+			expect(useCase.includes("async (_request: KeepNote)")).toBe(!actor);
+			const wire = readFileSync(join(root, `${dir}/wire.ts`), "utf8");
+			expect(wire).toContain("\t\tkeepNote: keepNote(ports),\n");
+			expect(wire).toContain("\t\tnoteStore: drizzleNoteStore(),\n");
+		});
+	}
+});
+
+describe("a sub-vertical", () => {
+	test("starts in a slice that exists, off the capability map, named for its folder", async () => {
+		const root = repositoryWithMap();
+		const slice = `${SLICE.split("/").at(-1)}/pauses`;
+		const steps = sliceSteps(root, {
+			package: "engine",
+			slice,
+			about: "the pauses of a schedule.",
+			useCase: "pause-schedule",
+			useCaseAbout: "Pauses a schedule.",
+		});
+		expect(
+			steps.some(
+				(step) => "path" in step && step.path === "scripts/capabilities.ts",
+			),
+		).toBe(false);
+		run(root, steps);
+		const at = { package: "engine", slice };
+		run(
+			root,
+			useCaseSteps(root, { ...at, useCase: "resume-schedule", about: "x" }),
+		);
+		run(
+			root,
+			adapterSteps(root, {
+				...at,
+				port: "PauseStore",
+				tech: "drizzle",
+				about: "x",
+			}),
+		);
+		expect(await checkRings(root, OPTIONS)).toEqual([]);
+		const wire = readFileSync(join(root, `${SLICE}/pauses/wire.ts`), "utf8");
+		expect(wire).toContain("export function wirePauses(");
+		expect(wire).toContain("\t\tresumeSchedule: resumeSchedule(ports),\n");
+		const ports = readFileSync(
+			join(root, `${SLICE}/pauses/application/ports.ts`),
+			"utf8",
+		);
+		expect(ports).toContain('from "../../../contract"');
+		expect(ports).toContain("export type PausesAccess = {");
+	});
+});
+
 describe("the generators refuse, and write nothing", () => {
 	const refusal = (make: () => unknown) => {
 		try {
@@ -252,6 +379,23 @@ describe("the generators refuse, and write nothing", () => {
 		).toContain("has a vertical gates already");
 	});
 
+	test("a sub-vertical of no vertical, one that exists, one too deep", () => {
+		const root = repositoryWithMap();
+		const at = { ...slice, package: "engine" };
+		expect(
+			refusal(() => sliceSteps(root, { ...at, slice: "billing/limits" })),
+		).toContain("has no vertical billing");
+		expect(
+			refusal(() => sliceSteps(root, { ...at, slice: "schedules/domain" })),
+		).toContain("schedules/domain exists already");
+		expect(
+			refusal(() => sliceSteps(root, { ...at, slice: "schedules/a/b" })),
+		).toContain("not deeper");
+		expect(
+			refusal(() => sliceSteps(root, { ...at, slice: "schedules/Pauses" })),
+		).toContain("lower case");
+	});
+
 	test("a use case or an adapter of a slice made by hand", () => {
 		const root = repositoryWithMap();
 		const at = { package: "engine", slice: SLICE.split("/").at(-1) ?? "" };
@@ -259,7 +403,7 @@ describe("the generators refuse, and write nothing", () => {
 			refusal(() =>
 				useCaseSteps(root, { ...at, useCase: "pause-schedule", about: "x" }),
 			),
-		).toContain("has no port SchedulesAccess");
+		).toContain("has no function inMemorySchedulesPorts");
 		expect(
 			refusal(() =>
 				adapterSteps(root, {

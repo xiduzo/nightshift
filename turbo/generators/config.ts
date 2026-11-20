@@ -8,7 +8,10 @@
  *   bun run gen use-case --args <package> <slice> <verb-object> "<what it does>"
  *   bun run gen adapter  --args <package> <slice> <Port> <tech> "<what the port does>"
  *
- * Without `--args`, each asks its questions. `steps.ts` holds what each
+ * `<slice>` is a capability (`spend`) or a sub-vertical in one
+ * (`runs/start`). Without `--args`, each asks its questions. No question
+ * has the name of a template value (`about`): plop renders an answer over
+ * a value of the same name. `steps.ts` holds what each
  * generator does, `templates/` the files it writes.
  */
 
@@ -44,8 +47,8 @@ const PACKAGE: Question = {
 
 const SLICE = ask(
 	"slice",
-	"Which slice (its capability, in lower case)?",
-	KEBAB,
+	"Which slice (its capability, in lower case), or sub-vertical (runs/start)?",
+	/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*(?:\/[a-z][a-z0-9]*(?:-[a-z0-9]+)*)?$/,
 );
 
 /**
@@ -132,21 +135,21 @@ function format(root: string, paths: string[]): string {
 export default function generator(plop: PlopTypes.NodePlopAPI): void {
 	plop.setGenerator("slice", {
 		description:
-			"A new capability slice of a server package, in rings, with its first use case",
+			"A new capability slice of a server package, or a sub-vertical of one, in rings, with its first use case",
 		prompts: [
 			PACKAGE,
 			SLICE,
-			ask("about", "What is the slice, in one sentence?"),
+			ask("what", "What is the slice, in one sentence?"),
 			ask("useCase", "Its first use case (<verb>-<object>)?", KEBAB),
-			ask("useCaseAbout", "What does the use case do, in one sentence?"),
+			ask("useCaseWhat", "What does the use case do, in one sentence?"),
 		],
 		actions: actionsOf(plop, (root, answers) =>
 			sliceSteps(root, {
 				package: answers.package,
 				slice: answers.slice,
-				about: answers.about,
+				about: answers.what,
 				useCase: answers.useCase,
-				useCaseAbout: answers.useCaseAbout,
+				useCaseAbout: answers.useCaseWhat,
 			}),
 		),
 	});
@@ -157,14 +160,14 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
 			PACKAGE,
 			SLICE,
 			ask("useCase", "Which use case (<verb>-<object>)?", KEBAB),
-			ask("about", "What does it do, in one sentence?"),
+			ask("what", "What does it do, in one sentence?"),
 		],
 		actions: actionsOf(plop, (root, answers) =>
 			useCaseSteps(root, {
 				package: answers.package,
 				slice: answers.slice,
 				useCase: answers.useCase,
-				about: answers.about,
+				about: answers.what,
 			}),
 		),
 	});
@@ -181,7 +184,7 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
 				"What does the real adapter use (drizzle, node, git)?",
 				KEBAB,
 			),
-			ask("about", "What does the port do, in one sentence?"),
+			ask("what", "What does the port do, in one sentence?"),
 		],
 		actions: actionsOf(plop, (root, answers) =>
 			adapterSteps(root, {
@@ -189,7 +192,7 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
 				slice: answers.slice,
 				port: answers.port,
 				tech: answers.tech,
-				about: answers.about,
+				about: answers.what,
 			}),
 		),
 	});
