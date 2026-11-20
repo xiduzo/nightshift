@@ -10,9 +10,9 @@ import type {
 	FlowDocuments,
 	PeerProjects,
 	RowBatch,
+	SpaceDocuments,
 } from "@nightshift/engine";
 import { NIGHT_SHIFT } from "@nightshift/engine";
-import type { SpaceDocuments } from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
 import type { SplitResult, SplitState } from "../contract";

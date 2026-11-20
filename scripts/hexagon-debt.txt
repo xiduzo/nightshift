@@ -25,6 +25,5 @@ engine/device-config
 engine/flows
 engine/knowledge
 engine/placement
-engine/projects
 notifications/notifier
 # Files of a package's kernel that are not pure yet: kernel <file>.

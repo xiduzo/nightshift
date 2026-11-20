@@ -12,6 +12,7 @@ import type { Devices, HostExchange, Offers } from "@nightshift/devices";
 import type {
 	ConfigUse,
 	Engine,
+	GitInstall,
 	Knowledge,
 	OllamaService,
 	ToolLaunchers,
@@ -26,7 +27,6 @@ import type {
 } from "@nightshift/engine/device-config";
 import type {
 	GitHubClones,
-	GitInstall,
 	ProjectCopies,
 	ProjectReadiness,
 } from "@nightshift/engine/projects";

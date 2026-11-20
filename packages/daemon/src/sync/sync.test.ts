@@ -14,18 +14,16 @@ import { project } from "@nightshift/db/schema";
 import { deviceDirectory } from "@nightshift/devices";
 import {
 	createFlowDocuments,
+	createSpaceDocuments,
 	createSyncedDocuments,
 	type FlowDocuments,
+	type SpaceDocuments,
 	type SyncedDocuments,
 } from "@nightshift/engine";
 import {
 	type DeviceDocument,
 	openDeviceDocument,
 } from "@nightshift/engine/device-config";
-import {
-	createSpaceDocuments,
-	type SpaceDocuments,
-} from "@nightshift/engine/projects";
 import {
 	createCliToolStore,
 	createProjectFlows,

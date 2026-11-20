@@ -99,6 +99,7 @@ export function projectStoreContract(
 			expect(await store.clonePath("app", "s1")).toBe("/work/app");
 			expect(await store.clonePath("app", "s2")).toBeNull();
 			expect(await store.clonePath("gone", "s1")).toBeNull();
+			expect(await store.clonePath("app")).toBe("/work/app");
 		});
 
 		test("by remote, by ids or remotes, and the projects of a Space", async () => {
@@ -156,6 +157,9 @@ export function projectStoreContract(
 				folder: false,
 				remote: null,
 			});
+			expect(await store.withoutFolder("notes")).toBe(true);
+			expect(await store.withoutFolder("lib")).toBe(false);
+			expect(await store.withoutFolder("nothing")).toBe(false);
 		});
 
 		test("the statements of the Clones, run in a batch", async () => {

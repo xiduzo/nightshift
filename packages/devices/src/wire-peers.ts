@@ -3,13 +3,14 @@ import {
 	type ArchiveHost,
 	createSpaceArchive,
 	type DeviceProfile,
+	memberName,
+	memberRole,
 	type PeerContext,
 	type PeerProjects,
 	type Peers,
 	type SpaceArchive,
 } from "@nightshift/engine";
 import type { DeviceCopies } from "@nightshift/engine/device-config";
-import { memberName, memberRole } from "@nightshift/engine/projects";
 import type { HostRelay, RunCommand, WorkRelay } from "./contract";
 import { createRunHistoryExchange, type RunHistoryExchange } from "./exchange";
 import { createHostSpaces, type HostSpaces } from "./links";

@@ -292,7 +292,7 @@ Each failed step has a fix. A fix runs only after you confirm it.
 - Use top folder replaces a subfolder with the repository's top folder.
 - Set up git runs `git init` when needed, and writes a starter `.gitignore` when there is none. It sets the name and email in the repository's own config (never `--global`). It commits every file as "Initial commit".
 
-A run refuses to start in a project that is not ready (`checkProjectFolder` in `packages/engine/src/projects/project-setup.ts`).
+A run refuses to start in a project that is not ready (`checkProjectFolder` in `packages/engine/src/projects/setup/`).
 
 A project without a folder has nothing to check. The **No folder** tab of Add project asks only for a name (`projects.addWithoutFolder`, ADR 22). In such a project, the editor warns at each step that needs a folder (`folderNeeds` in `packages/flows/src/draft/check/folder.ts`). Those are a kit with `needsFolder` in the kit registry, and a command that runs git in the run's folder. A read of `run.branch`, `run.base_branch` or `run.base_ref` warns too: they are always empty. A Subflow warns when the flow it runs has such a step. The editor also does not let a person pick what fails there. The node grid and the kit lists of the inspector show such a kit, and a flow of "My kits" with such a step, as disabled. The template picker leaves out the three branch fields. A Subflow with `each` hides its Branch field. `nightshift mcp` gives the project's folder to `check_flow` too, so an agent in a terminal gets the same warnings.
 

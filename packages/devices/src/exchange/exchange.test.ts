@@ -10,11 +10,11 @@ import {
 	user,
 } from "@nightshift/db/schema";
 import type { WalkRef } from "@nightshift/engine";
-import { NIGHT_SHIFT } from "@nightshift/engine";
 import {
 	createSpaceDocuments,
+	NIGHT_SHIFT,
 	type SpaceDocuments,
-} from "@nightshift/engine/projects";
+} from "@nightshift/engine";
 import type { RunStatus } from "@nightshift/engine/run-status";
 import {
 	createRunLog,

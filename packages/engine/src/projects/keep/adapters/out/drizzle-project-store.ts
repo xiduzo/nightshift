@@ -153,6 +153,8 @@ export function drizzleProjectStore(deps: {
 		clonePath: (projectId, spaceId) =>
 			clonePathOf(db, deps.deviceId)(projectId, spaceId),
 
+		withoutFolder: (projectId) => withoutFolderOf(db)(projectId),
+
 		ofSpace: async (spaceId) =>
 			spaceProjectRows(db, spaceId, await deps.deviceId()),
 

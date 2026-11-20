@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { fakeHarness } from "@nightshift/agents/testing";
 import { event, member, user } from "@nightshift/db/schema";
-import { NIGHT_SHIFT } from "@nightshift/engine";
 import {
 	createSpaceDocuments,
+	NIGHT_SHIFT,
 	type SpaceDocuments,
 	worktreeLocation,
-} from "@nightshift/engine/projects";
+} from "@nightshift/engine";
 import {
 	createSandbox,
 	parseEventRow,

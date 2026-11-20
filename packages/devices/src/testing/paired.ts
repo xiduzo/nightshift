@@ -2,16 +2,14 @@ import type { DeviceKeyAccess } from "@nightshift/auth";
 import { user } from "@nightshift/db/schema";
 import {
 	createFlowDocuments,
+	createSpaceDocuments,
 	createSyncedDocuments,
 	type FlowDocuments,
 	HostUnreachableError,
 	NIGHT_SHIFT,
+	type SpaceDocuments,
 	type SyncedDocuments,
 } from "@nightshift/engine";
-import {
-	createSpaceDocuments,
-	type SpaceDocuments,
-} from "@nightshift/engine/projects";
 import {
 	createRunLog,
 	mustGit,

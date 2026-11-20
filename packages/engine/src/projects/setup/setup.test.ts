@@ -9,15 +9,27 @@ import {
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { GIT_DOWNLOAD_URL, systemGit, systemGitInstaller } from "../git/git";
-import { mustGit } from "../testing/test-support";
-import {
-	checkProjectFolder,
-	checkTools,
-	type ProjectReadiness,
-	STARTER_GITIGNORE,
-	setUpGit,
-} from "./project-setup";
+import { type Git, systemGit } from "../../git";
+import { mustGit } from "../../testing/test-support";
+import { type ProjectReadiness, STARTER_GITIGNORE } from "./domain/readiness";
+import { wireSetup } from "./wire";
+
+/** The setup as the daemon wires it, with this computer's git unless a test gives one. */
+const checkProjectFolder = (
+	path: string,
+	options: {
+		git?: Git;
+		tools?: { which(name: string): string | null; platform: string };
+	} = {},
+) =>
+	wireSetup({
+		...(options.git ? { git: options.git } : {}),
+		...(options.tools ? { programs: options.tools } : {}),
+	}).check(path);
+const setUpGit = (
+	input: { path: string; name?: string; email?: string },
+	options: { git?: Git } = {},
+) => wireSetup(options).setUpGit(input);
 
 /** The steps a run needs: the tools step has tests of its own. */
 const statuses = (readiness: ProjectReadiness) =>
@@ -191,120 +203,7 @@ describe("setUpGit", () => {
 	});
 });
 
-describe("systemGitInstaller", () => {
-	const which =
-		(...found: string[]) =>
-		(name: string) =>
-			found.includes(name) ? `/bin/${name}` : null;
-
-	test("macOS opens Apple's installer", async () => {
-		const ran: string[][] = [];
-		const installer = systemGitInstaller({
-			platform: "darwin",
-			which: which("xcode-select"),
-			run: async (argv) => {
-				ran.push(argv);
-				return { exitCode: 0, stderr: "" };
-			},
-		});
-		expect(await installer.install()).toEqual({ kind: "started" });
-		expect(ran).toEqual([["xcode-select", "--install"]]);
-	});
-
-	test("macOS falls back to brew when the installer does not start", async () => {
-		const installer = systemGitInstaller({
-			platform: "darwin",
-			which: which("xcode-select", "brew"),
-			run: async () => ({ exitCode: 1, stderr: "already installed" }),
-		});
-		expect(await installer.install()).toEqual({
-			kind: "command",
-			command: "brew install git",
-		});
-	});
-
-	test("Linux returns the command and never runs it", async () => {
-		const installer = systemGitInstaller({
-			platform: "linux",
-			which: which("dnf"),
-			run: async () => {
-				throw new Error("must not run");
-			},
-		});
-		expect(await installer.install()).toEqual({
-			kind: "command",
-			command: "sudo dnf install git",
-		});
-	});
-
-	test("Windows uses winget, else the download page", async () => {
-		const run = async () => ({ exitCode: 0, stderr: "" });
-		expect(
-			await systemGitInstaller({
-				platform: "win32",
-				which: which("winget"),
-				run,
-			}).install(),
-		).toEqual({
-			kind: "command",
-			command: "winget install --id Git.Git -e --source winget",
-		});
-		expect(
-			await systemGitInstaller({
-				platform: "win32",
-				which: which(),
-				run,
-			}).install(),
-		).toEqual({ kind: "manual", url: GIT_DOWNLOAD_URL });
-	});
-});
-
 describe("the programs of the knowledge sources", () => {
-	const which =
-		(...found: string[]) =>
-		(name: string) =>
-			found.includes(name) ? `/usr/bin/${name}` : null;
-
-	test("a missing one is named with the sources that need it and the command that installs it", () => {
-		expect(
-			checkTools({ which: which("curl", "brew"), platform: "darwin" }),
-		).toEqual({
-			step: {
-				id: "tools",
-				status: "failed",
-				problem:
-					"jq is not on this computer. Jira and Confluence sources need it.",
-				fix: "install-tools",
-			},
-			install: { kind: "command", command: "brew install jq" },
-		});
-		expect(
-			checkTools({ which: which("apk"), platform: "linux" }),
-		).toMatchObject({
-			step: {
-				problem:
-					"curl and jq are not on this computer. Web pages, Jira and Confluence sources need them.",
-			},
-			install: { kind: "command", command: "sudo apk add curl jq" },
-		});
-		// No package manager: the download page.
-		expect(
-			checkTools({ which: which("curl"), platform: "linux" }).install,
-		).toEqual({
-			kind: "manual",
-			url: "https://jqlang.org/download/",
-		});
-	});
-
-	test("none missing: the step is ok", () => {
-		expect(
-			checkTools({ which: which("curl", "jq"), platform: "linux" }),
-		).toEqual({
-			step: { id: "tools", status: "ok", problem: null, fix: null },
-			install: null,
-		});
-	});
-
 	test("never makes a folder not ready, and set-up still runs", async () => {
 		await withGlobalIdentity();
 		await mustGit(folder, ["init", "-q", "-b", "main"]);

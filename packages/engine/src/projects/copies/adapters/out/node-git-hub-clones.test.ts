@@ -10,17 +10,17 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { type Git, type GitResult, systemGit } from "../git";
-import type { GitHubAccess, GitHubCli } from "../github";
-import { commitFile, mustGit } from "../testing/test-support";
+import { type Git, type GitResult, systemGit } from "../../../../git";
+import type { GitHubAccess, GitHubCli } from "../../../../github";
+import { commitFile, mustGit } from "../../../../testing/test-support";
+import type { GitHubClones } from "../../application/ports";
 import {
 	cloneProblem,
-	createGitHubClones,
+	createCloneTracker,
 	type GitHubClone,
-	type GitHubClones,
-	gitHubClonePath,
 	NOT_A_GITHUB_REPO,
-} from "./github-clone";
+} from "../../domain/clones";
+import { gitHubClonePath, nodeGitHubClones } from "./node-git-hub-clones";
 
 let root: string;
 let dataDir: string;
@@ -97,7 +97,12 @@ async function settle(
 describe("createGitHubClones", () => {
 	test("clones with git into the managed folder when gh is not signed in", async () => {
 		const { git, gh, seen } = ports("signed-out");
-		const clones = createGitHubClones({ dataDir, git, gh });
+		const clones = nodeGitHubClones({
+			tracker: createCloneTracker(),
+			dataDir,
+			git,
+			gh,
+		});
 		expect(await clones.start("https://github.com/Acme/App")).toEqual({
 			state: "cloning",
 			repo: "Acme/App",
@@ -125,7 +130,12 @@ describe("createGitHubClones", () => {
 
 	test("clones with gh when it is signed in", async () => {
 		const { git, gh, seen } = ports("signed-in");
-		const clones = createGitHubClones({ dataDir, git, gh });
+		const clones = nodeGitHubClones({
+			tracker: createCloneTracker(),
+			dataDir,
+			git,
+			gh,
+		});
 		await clones.start("acme/app");
 		expect((await settle(clones, "acme/app")).state).toBe("done");
 		expect(seen.ghClones).toEqual(["acme/app"]);
@@ -134,7 +144,12 @@ describe("createGitHubClones", () => {
 
 	test("copy waits for the clone, and joins the one that runs", async () => {
 		const { git, gh, seen } = ports("signed-in");
-		const clones = createGitHubClones({ dataDir, git, gh });
+		const clones = nodeGitHubClones({
+			tracker: createCloneTracker(),
+			dataDir,
+			git,
+			gh,
+		});
 		const [first, second] = await Promise.all([
 			clones.copy("github.com/acme/app"),
 			clones.copy("acme/app"),
@@ -152,10 +167,20 @@ describe("createGitHubClones", () => {
 
 	test("uses a clone of the same repository that is already there", async () => {
 		const { git, gh, seen } = ports("signed-out");
-		const clones = createGitHubClones({ dataDir, git, gh });
+		const clones = nodeGitHubClones({
+			tracker: createCloneTracker(),
+			dataDir,
+			git,
+			gh,
+		});
 		await clones.start("acme/app");
 		await settle(clones, "acme/app");
-		const again = createGitHubClones({ dataDir, git, gh });
+		const again = nodeGitHubClones({
+			tracker: createCloneTracker(),
+			dataDir,
+			git,
+			gh,
+		});
 		expect(await again.start("git@github.com:acme/app.git")).toEqual({
 			state: "done",
 			repo: "acme/app",
@@ -170,7 +195,12 @@ describe("createGitHubClones", () => {
 		const path = gitHubClonePath(dataDir, { owner: "acme", repo: "app" });
 		await mkdir(path, { recursive: true });
 		await writeFile(join(path, "notes.txt"), "mine\n");
-		const clones = createGitHubClones({ dataDir, git, gh });
+		const clones = nodeGitHubClones({
+			tracker: createCloneTracker(),
+			dataDir,
+			git,
+			gh,
+		});
 		const result = await clones.start("acme/app");
 		expect(result.state).toBe("failed");
 		expect(result.state === "failed" && result.problem).toContain(
@@ -183,14 +213,24 @@ describe("createGitHubClones", () => {
 		const { git, gh } = ports("signed-out");
 		const path = gitHubClonePath(dataDir, { owner: "acme", repo: "app" });
 		await mkdir(path, { recursive: true });
-		const clones = createGitHubClones({ dataDir, git, gh });
+		const clones = nodeGitHubClones({
+			tracker: createCloneTracker(),
+			dataDir,
+			git,
+			gh,
+		});
 		await clones.start("acme/app");
 		expect((await settle(clones, "acme/app")).state).toBe("done");
 	});
 
 	test("joins a clone that runs instead of starting another", async () => {
 		const { git, gh, seen } = ports("signed-out");
-		const clones = createGitHubClones({ dataDir, git, gh });
+		const clones = nodeGitHubClones({
+			tracker: createCloneTracker(),
+			dataDir,
+			git,
+			gh,
+		});
 		await clones.start("acme/app");
 		expect((await clones.start("Acme/App")).state).toBe("cloning");
 		await settle(clones, "acme/app");
@@ -204,7 +244,12 @@ describe("createGitHubClones", () => {
 			stderr:
 				"fatal: could not read Username for 'https://github.com': terminal prompts disabled",
 		});
-		const clones = createGitHubClones({ dataDir, git, gh });
+		const clones = nodeGitHubClones({
+			tracker: createCloneTracker(),
+			dataDir,
+			git,
+			gh,
+		});
 		await clones.start("acme/secret");
 		const result = await settle(clones, "acme/secret");
 		expect(result).toEqual({
@@ -218,7 +263,12 @@ describe("createGitHubClones", () => {
 
 	test("refuses what is not a GitHub repository", async () => {
 		const { git, gh } = ports("signed-out");
-		const clones = createGitHubClones({ dataDir, git, gh });
+		const clones = nodeGitHubClones({
+			tracker: createCloneTracker(),
+			dataDir,
+			git,
+			gh,
+		});
 		await expect(clones.start("acme/app; rm -rf /")).rejects.toThrow(
 			NOT_A_GITHUB_REPO,
 		);
@@ -227,10 +277,18 @@ describe("createGitHubClones", () => {
 
 	test("lists repositories only when gh is signed in", async () => {
 		expect(
-			await createGitHubClones({ dataDir, ...ports("signed-out") }).repos(),
+			await nodeGitHubClones({
+				tracker: createCloneTracker(),
+				dataDir,
+				...ports("signed-out"),
+			}).repos(),
 		).toEqual([]);
 		expect(
-			await createGitHubClones({ dataDir, ...ports("signed-in") }).repos(),
+			await nodeGitHubClones({
+				tracker: createCloneTracker(),
+				dataDir,
+				...ports("signed-in"),
+			}).repos(),
 		).toHaveLength(1);
 	});
 });

@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { project, user } from "@nightshift/db/schema";
 import type { RunWalker } from "@nightshift/engine";
-import { NIGHT_SHIFT } from "@nightshift/engine";
 import {
 	createSpaceDocuments,
+	NIGHT_SHIFT,
 	type SpaceDocuments,
-} from "@nightshift/engine/projects";
+} from "@nightshift/engine";
 import {
 	createRunLog,
 	createSandbox,

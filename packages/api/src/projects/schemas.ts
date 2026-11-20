@@ -1,11 +1,13 @@
-import type { ProjectRuns } from "@nightshift/engine";
-import type { ProjectSecretName } from "@nightshift/engine/device-config";
 import type {
 	Branches,
 	GitHubAccess,
-	GitHubClone,
 	GitHubRepo,
 	GitInstall,
+	ProjectRuns,
+} from "@nightshift/engine";
+import type { ProjectSecretName } from "@nightshift/engine/device-config";
+import type {
+	GitHubClone,
 	Project,
 	ProjectCopy,
 	ProjectReadiness,

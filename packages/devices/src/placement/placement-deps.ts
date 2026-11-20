@@ -5,12 +5,12 @@ import type {
 	PeerProfiles,
 	PeerProjects,
 	PlacedRun,
+	SpaceDocuments,
 } from "@nightshift/engine";
 import type {
 	DeviceCopies,
 	DeviceCopy,
 } from "@nightshift/engine/device-config";
-import type { SpaceDocuments } from "@nightshift/engine/projects";
 import type { FlowSources } from "@nightshift/flows";
 import type { HostRelay, WorkRelay } from "../contract";
 import type { HostSpaces } from "../links";

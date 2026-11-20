@@ -1,5 +1,5 @@
 import type { RunWalker } from "@nightshift/engine";
-import { deviceNameIn, type SpaceDocuments } from "@nightshift/engine/projects";
+import { deviceNameIn, type SpaceDocuments } from "@nightshift/engine";
 
 /**
  * The Walkers of runs of a Space, as a run view names them: this

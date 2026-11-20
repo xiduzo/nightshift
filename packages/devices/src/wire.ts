@@ -1,8 +1,8 @@
+import { systemGitHubCli } from "@nightshift/engine";
 import {
 	createDeviceCopies,
 	profileChoice,
 } from "@nightshift/engine/device-config";
-import { systemGitHubCli } from "@nightshift/engine/projects";
 import { OFFLINE_AFTER_MS } from "./contract";
 import type { DevicesDeps, DevicesRuntime } from "./devices-runtime";
 import { letGo, takeOver } from "./handover";

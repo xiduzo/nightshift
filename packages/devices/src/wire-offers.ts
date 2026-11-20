@@ -1,5 +1,5 @@
 import { roleAllows } from "@nightshift/auth";
-import { memberRole } from "@nightshift/engine/projects";
+import { memberRole } from "@nightshift/engine";
 import type { DevicesDeps } from "./devices-runtime";
 import { createOffers, deviceOffers, offeredProfile } from "./offers";
 import type { PeerEngine } from "./wire-peers-engine";

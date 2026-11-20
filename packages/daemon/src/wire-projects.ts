@@ -1,16 +1,12 @@
 import type { Context } from "@nightshift/api/context";
 import type { Database } from "@nightshift/db";
-import { createFlowDocuments } from "@nightshift/engine";
+import { createFlowDocuments, createSpaceDocuments } from "@nightshift/engine";
 import type { openConfigStores } from "@nightshift/engine/device-config";
 import {
-	checkProjectFolder,
-	clonePathOf,
-	createGitHubClones,
-	createProjectCopies,
-	createSpaceDocuments,
-	setUpGit,
-	systemGitInstaller,
-	withoutFolderOf,
+	createCloneTracker,
+	wireCopies,
+	wireKeep,
+	wireSetup,
 } from "@nightshift/engine/projects";
 import {
 	canChooseFolder,
@@ -20,7 +16,7 @@ import {
 } from "./runtime";
 
 type SpaceDocumentsDeps = Parameters<typeof createSpaceDocuments>[0];
-type CopiesDeps = Parameters<typeof createProjectCopies>[0];
+type CopiesDeps = Parameters<typeof wireCopies>[0];
 type Settings = Awaited<ReturnType<typeof openConfigStores>>["settings"];
 
 /**
@@ -50,14 +46,21 @@ export function wireDaemonProjects(deps: {
 		documents,
 		onProjected: (spaceId) => deps.projectsChanged(spaceId),
 	});
+	/** The rows of the Projects, read for this computer's Device (`projects/keep`). */
+	const { store } = wireKeep({
+		db,
+		documents: spaces,
+		thisDevice: { deviceId: deps.selfId },
+	});
 	return {
 		spaces,
 		/** The flow documents: each Project's flows and schedules, and their revisions. */
 		flows: createFlowDocuments({ db, documents }),
 		/** The project's folder here: where its runs' worktrees branch from. */
-		clonePath: clonePathOf(db, deps.selfId),
+		clonePath: (projectId: string, spaceId?: string) =>
+			store.clonePath(projectId, spaceId),
 		/** Whether a project works without a folder (ADR 22). */
-		withoutFolder: withoutFolderOf(db),
+		withoutFolder: (projectId: string) => store.withoutFolder(projectId),
 	};
 }
 
@@ -74,39 +77,40 @@ export async function wireProjectCopies(deps: {
 	usage: CopiesDeps["usage"];
 }): Promise<Context["projectSetup"]> {
 	const { slots, settings } = deps;
-	const gitInstaller = systemGitInstaller();
+	const setup = wireSetup();
 	// A clone from GitHub outlives a `bun --hot` reload: keep who tracks it.
-	const gitHubClones = await slots.keep("nightshiftGitHubClones", () =>
-		createGitHubClones({ dataDir: deps.dataDir }),
+	const tracker = await slots.keep("nightshiftCloneTracker", () =>
+		createCloneTracker(),
 	);
 	/**
 	 * "Copy every project": a Host copies each project of its Spaces it has
 	 * no Clone of. New on each reload, so it adds Clones through this
-	 * engine. A clone it started goes on in `gitHubClones`.
+	 * engine. A clone it started goes on in the tracker.
 	 */
+	const { gitHub, copies } = wireCopies({
+		dataDir: deps.dataDir,
+		tracker,
+		spaceIds: deps.spaceIds,
+		space: deps.space,
+		enabled: () => {
+			const current = settings.current();
+			return current.host && current.copyProjects;
+		},
+		...(deps.usage ? { usage: deps.usage } : {}),
+	});
 	const projectCopies = await slots.replace(
 		"nightshiftProjectCopies",
-		() =>
-			createProjectCopies({
-				gitHub: gitHubClones,
-				spaceIds: deps.spaceIds,
-				space: deps.space,
-				enabled: () => {
-					const current = settings.current();
-					return current.host && current.copyProjects;
-				},
-				usage: deps.usage,
-			}),
+		() => copies,
 		(before) => before.stop(),
 	);
 	projectCopies.start();
 	return {
-		check: (path) => checkProjectFolder(path),
-		setUpGit: (input) => setUpGit(input),
-		installGit: () => gitInstaller.install(),
+		check: (path) => setup.check(path),
+		setUpGit: (input) => setup.setUpGit(input),
+		installGit: () => setup.installGit(),
 		chooseFolder: (prompt) => chooseFolder(prompt),
 		folderPicker: canChooseFolder(),
-		gitHub: gitHubClones,
+		gitHub,
 		copies: projectCopies,
 	};
 }

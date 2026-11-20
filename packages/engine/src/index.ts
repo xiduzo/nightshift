@@ -102,11 +102,17 @@ export {
 } from "./device";
 export {
 	createFlowDocuments,
+	createSpaceDocuments,
 	createSyncedDocuments,
+	deviceNameIn,
 	documentKind,
 	documentName,
 	documentRows,
 	type FlowDocuments,
+	memberName,
+	memberRole,
+	type SpaceDocument,
+	type SpaceDocuments,
 	type SyncedDocuments,
 } from "./documents";
 export type { Engine, SharedAnswerCosts } from "./engine";
@@ -134,6 +140,16 @@ export {
 	type InboxGate,
 	NeedsApp,
 } from "./gates";
+export {
+	type Branches,
+	type GitInstall,
+	worktreeLocation,
+} from "./git";
+export {
+	type GitHubAccess,
+	type GitHubRepo,
+	systemGitHubCli,
+} from "./github";
 export {
 	type AskedQuestion,
 	type AskLearner,

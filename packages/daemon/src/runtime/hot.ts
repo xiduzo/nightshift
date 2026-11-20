@@ -8,7 +8,7 @@ import type {
 	SyncedDocuments,
 } from "@nightshift/engine";
 import type { AgentSetup, DeciderSetup } from "@nightshift/engine/agent-setup";
-import type { GitHubClones, ProjectCopies } from "@nightshift/engine/projects";
+import type { CloneTracker, ProjectCopies } from "@nightshift/engine/projects";
 import type { InAppChannel, Notifications } from "@nightshift/notifications";
 import type { Telemetry } from "@nightshift/telemetry";
 
@@ -69,7 +69,7 @@ export type HotRegistry = KeptDevices &
 		nightshiftTelemetry?: Telemetry;
 		nightshiftScheduler?: AbortController;
 		/** The clones from GitHub that run, and how the last ones ended. */
-		nightshiftGitHubClones?: GitHubClones;
+		nightshiftCloneTracker?: CloneTracker;
 		/** The projects' knowledge on this computer. */
 		nightshiftKnowledge?: Knowledge;
 		/** Who may change each knowledge folder now. One set per process, as a folder has one writer. */

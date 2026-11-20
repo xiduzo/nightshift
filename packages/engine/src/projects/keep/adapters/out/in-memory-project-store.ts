@@ -172,12 +172,15 @@ export function inMemoryProjectStore(
 				null
 			);
 		},
-		async clonePath(projectId: string, spaceId: string) {
+		async clonePath(projectId: string, spaceId?: string) {
 			const row = records.projects.get(projectId);
-			if (!row || row.removedAt !== null || row.spaceId !== spaceId) {
-				return null;
-			}
+			if (!row || row.removedAt !== null) return null;
+			if (spaceId !== undefined && row.spaceId !== spaceId) return null;
 			return cloneOf(projectId)?.path ?? null;
+		},
+		async withoutFolder(projectId: string) {
+			const row = records.projects.get(projectId);
+			return row?.removedAt === null && row.folder === false;
 		},
 		async ofSpace(spaceId: string) {
 			return oldestFirst()

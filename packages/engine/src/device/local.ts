@@ -37,7 +37,7 @@ import {
 	type Git,
 	systemGit,
 } from "../git";
-import { checkProjectFolder, NOT_ON_THIS_COMPUTER } from "../projects";
+import { NOT_ON_THIS_COMPUTER, wireSetup } from "../projects";
 import type { RunFolders } from "../run-folders";
 import { spawnCommand } from "./command";
 import { ARTIFACTS_ENV, type KeptFiles, openKeptFiles } from "./kept-files";
@@ -831,7 +831,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		flows: async (projectId) => deps.flows?.(projectId) ?? {},
 		async worktree(run) {
 			const repoPath = await cloneOf(run.projectId);
-			const readiness = await checkProjectFolder(repoPath, { git });
+			const readiness = await wireSetup({ git }).check(repoPath);
 			// A missing name for git or program of a knowledge source does not stop a run.
 			const notReady = readiness.steps.find(
 				(step) =>

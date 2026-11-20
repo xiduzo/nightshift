@@ -45,7 +45,12 @@ export type ProjectStore = {
 	 * The folder of the project's Clone on this computer, or null: none
 	 * here, a project a person removed, or one of another Space.
 	 */
-	clonePath(projectId: string, spaceId: string): Promise<string | null>;
+	clonePath(projectId: string, spaceId?: string): Promise<string | null>;
+	/**
+	 * Whether a project has no folder (ADR 22). False for a project this
+	 * Replica does not know, or that a person removed.
+	 */
+	withoutFolder(projectId: string): Promise<boolean>;
 	/**
 	 * The projects of a Space, removed ones too, oldest first, with whether
 	 * this computer has a Clone of each and walked a run of it there.

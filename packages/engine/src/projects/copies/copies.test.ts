@@ -3,14 +3,21 @@ import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { mustGit } from "../testing/test-support";
-import type { GitHubClone } from "./github-clone";
-import type { Project } from "./keep";
+import { now as timeNow } from "@nightshift/time";
+import { systemGit } from "../../git";
+import { parseGitHubRepo } from "../../github";
+import { mustGit } from "../../testing/test-support";
+import type { Project } from "../keep";
+import { gitCloneOrigins } from "./adapters/out/git-clone-origins";
+import { copyProjectHere } from "./application/copy-project-here";
+import { listProjectCopies } from "./application/list-project-copies";
+import { sweepProjectCopies } from "./application/sweep-project-copies";
+import type { GitHubClone } from "./domain/clones";
 import {
 	type CopySpace,
-	createProjectCopies,
+	createCopyState,
 	NOT_ON_GITHUB,
-} from "./project-copies";
+} from "./domain/copies";
 
 let root: string;
 
@@ -70,18 +77,33 @@ function copies(
 	options: { enabled?: () => boolean; now?: () => number } = {},
 ) {
 	const asked: string[] = [];
-	const service = createProjectCopies({
+	// The copies as the wire binds them, over git on this computer.
+	const ports = {
 		gitHub: {
-			copy: (repo) => {
+			copy: (repo: string) => {
 				asked.push(repo);
 				return clone(repo);
 			},
 		},
-		spaceIds: async () => ["space-1"],
-		space: () => space,
-		enabled: options.enabled ?? (() => true),
-		now: options.now,
-	});
+		origins: gitCloneOrigins(systemGit()),
+		ground: {
+			now: options.now ?? timeNow,
+			isGitHub: (remote: string) => parseGitHubRepo(remote) !== null,
+			added: () => {},
+		},
+		spaces: {
+			spaceIds: async () => ["space-1"],
+			space: () => space,
+			enabled: options.enabled ?? (() => true),
+		},
+		state: createCopyState(),
+	};
+	const service = {
+		copy: (into: CopySpace, projectId: string) =>
+			copyProjectHere(ports)({ space: into, projectId }),
+		list: listProjectCopies(ports),
+		sweep: sweepProjectCopies(ports),
+	};
 	return { service, asked };
 }
 

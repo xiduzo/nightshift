@@ -1,11 +1,11 @@
 import type { Database } from "@nightshift/db";
+import type { SpaceDocuments } from "@nightshift/engine";
 import {
 	type Actor,
 	flowsForRun,
 	type OwnDevice,
 	personOf,
 } from "@nightshift/engine";
-import type { SpaceDocuments } from "@nightshift/engine/projects";
 import {
 	deviceIdOf,
 	type FlowNode,

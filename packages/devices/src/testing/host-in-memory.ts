@@ -8,15 +8,13 @@ import type { Database } from "@nightshift/db";
 import { hostLink, user } from "@nightshift/db/schema";
 import {
 	createFlowDocuments,
+	createSpaceDocuments,
 	createSyncedDocuments,
 	documentRows,
 	type FlowDocuments,
+	type SpaceDocuments,
 	type SyncedDocuments,
 } from "@nightshift/engine";
-import {
-	createSpaceDocuments,
-	type SpaceDocuments,
-} from "@nightshift/engine/projects";
 import {
 	createRunLog,
 	createSettingsStore,

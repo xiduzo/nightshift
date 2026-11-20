@@ -12,7 +12,7 @@ import {
 	memberRole,
 	type SpaceDocuments,
 	worktreeLocation,
-} from "@nightshift/engine/projects";
+} from "@nightshift/engine";
 import { isAgentProfile, type ProfileSettings } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
 import type { WorkRelay, WorkReply, WorkRequest } from "../contract";

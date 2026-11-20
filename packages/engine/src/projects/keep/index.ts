@@ -1,10 +1,5 @@
 /** The ports the requests of the Projects share: the rows, the Space documents, the log, git and the Device directory, with the words and steps they share. `wireKeep` builds the real adapters. */
 
-// Until P3 gives the daemon its own wire: the folder of a Clone here, and whether a project has none.
-export {
-	clonePathOf,
-	withoutFolderOf,
-} from "./adapters/out/drizzle-project-store";
 export type {
 	NewIds,
 	ProjectDirectory,

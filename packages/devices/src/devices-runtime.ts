@@ -6,6 +6,7 @@ import type {
 	FlowDocuments,
 	MoveRows,
 	SpaceArchive,
+	SpaceDocuments,
 	SyncedDocuments,
 } from "@nightshift/engine";
 import type {
@@ -16,7 +17,6 @@ import type {
 	ProjectSecrets,
 	SettingsStore,
 } from "@nightshift/engine/device-config";
-import type { SpaceDocuments } from "@nightshift/engine/projects";
 import type { HostClient, HostRelay } from "./contract";
 import type { HostExchange } from "./exchange";
 import type { KeptDevices } from "./handover";

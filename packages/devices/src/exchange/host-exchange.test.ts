@@ -9,11 +9,12 @@ import {
 	step as stepTable,
 	user,
 } from "@nightshift/db/schema";
-import { NeedsApp, NIGHT_SHIFT } from "@nightshift/engine";
 import {
 	createSpaceDocuments,
+	NeedsApp,
+	NIGHT_SHIFT,
 	type SpaceDocuments,
-} from "@nightshift/engine/projects";
+} from "@nightshift/engine";
 import {
 	answerCostsOn,
 	createRunLog,

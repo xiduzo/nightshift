@@ -2,6 +2,7 @@ import { personalSpaceIdBySlug, personNames } from "@nightshift/auth";
 import {
 	type Device,
 	type DeviceProfile,
+	deviceNameIn,
 	HostUnreachableError,
 	type NodeToPlace,
 	type OfferedPlacement,
@@ -16,7 +17,7 @@ import {
 	planNodes,
 	UNREACHABLE_DEVICE,
 } from "@nightshift/engine";
-import { deviceNameIn, type ListedProject } from "@nightshift/engine/projects";
+import type { ListedProject } from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
 import { keptByHomeHost, personInSpace } from "../links";
 import {
