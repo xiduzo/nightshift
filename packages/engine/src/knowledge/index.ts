@@ -15,8 +15,8 @@ export {
 	createKnowledgeFolderLocks,
 	type KnowledgeFolderLocks,
 } from "./folder-locks";
-export type { KnowledgeFile } from "./folder-snapshot";
 export { createKnowledge, type Knowledge } from "./knowledge";
+export type { KnowledgeFile } from "./knowledge-paths";
 export type { WaitingLearning } from "./learnings";
 export type { KnowledgeMap } from "./map";
 export { type KnowledgeMeaning, ollamaMeaning } from "./meaning";

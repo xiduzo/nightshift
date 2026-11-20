@@ -14,8 +14,8 @@ import type {
 	SessionKnowledge,
 	SessionStep,
 } from "../contract";
+import type { FolderSnapshot } from "../folder-snapshot";
 import { indexFolder, type KnowledgeFolders } from "./folder";
-import type { FolderSnapshot } from "./folder-snapshot";
 import type { KnowledgeReader } from "./knowledge-reader";
 import type { Learnings } from "./learnings";
 import type { PageReaders, ReaderSecret } from "./readers/service";

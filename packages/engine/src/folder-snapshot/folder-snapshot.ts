@@ -1,16 +1,13 @@
 import { lstat, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import {
-	isHiddenFromReaders,
-	KNOWLEDGE_INDEX_FILE,
-	KNOWLEDGE_STAGING_SUFFIX,
-} from "@nightshift/flows";
 import { sha256OfFile } from "../archive";
 
 /**
- * One look at a knowledge folder: which files count, as they are now, and
- * what differs from what a caller last knew. The reconcile, `INDEX.md` and
- * the search index ask this module, so "changed" has one definition: a file
+ * One look at a folder: which files count, as they are now, and what
+ * differs from what a caller last knew. Which paths count, and which of
+ * them a person or an agent reads, the caller says (`FolderPaths`). The
+ * knowledge's reconcile, `INDEX.md` and search index ask this module, so
+ * "changed" has one definition: a file
  * changed when its size or its time differ. A caller that must be sure asks
  * for the hash, which is read once per snapshot. An edit that keeps both
  * size and time is not seen. That is a choice: reading each file at each step
@@ -31,16 +28,22 @@ import { sha256OfFile } from "../archive";
  * each record moves only when its own work is done.
  */
 
-/** One file of the knowledge, as the index and the Knowledge page list it. */
-export type KnowledgeFile = {
+/** One file of a look at a folder. */
+export type FolderFile = {
 	/** Relative to the folder, with `/` between its parts. */
 	path: string;
 	/** Bytes. */
 	size: number;
 	/** Epoch ms: the file's time of change. */
 	changedAt: number;
-	/** Larger than 10 MB: it stays on the Device that has it. */
-	local?: true;
+};
+
+/** Which paths of a folder count, and which of them a person or an agent reads. */
+export type FolderPaths = {
+	/** A path that counts. A folder counts when `<folder>/x` does. */
+	counts(path: string): boolean;
+	/** A path that counts and that a person or an agent reads. */
+	readable(path: string): boolean;
 };
 
 /** A file as a caller last knew it. */
@@ -49,7 +52,7 @@ export type FileStamp = { size: number; mtimeMs: number };
 /** What differs from a caller's record. */
 type FolderChanges<Stamp> = {
 	/** Files that are new, or whose size or time differ, by path. */
-	changed: ReadonlyMap<string, KnowledgeFile>;
+	changed: ReadonlyMap<string, FolderFile>;
 	/** What the record has and the folder has not. */
 	gone: Stamp[];
 };
@@ -57,63 +60,33 @@ type FolderChanges<Stamp> = {
 export type FolderSnapshot = {
 	/** The folder this is a look at. */
 	dir: string;
-	/** Every file of the knowledge (`isKnowledgePath`), no link, in walk order. */
-	files: readonly KnowledgeFile[];
-	/** The files a person or an agent reads (`isReadable`), at most 20 000. */
-	readable: readonly KnowledgeFile[];
+	/** Every file that counts (`counts`), no link, in walk order. */
+	files: readonly FolderFile[];
+	/** The files a person or an agent reads (`readable`), at most 20 000. */
+	readable: readonly FolderFile[];
 	/** The newest change among `readable` and their folders: a file that went changes its folder. */
 	newestReadable: number;
 	/** One file of `files`, by its path. */
-	file(path: string): KnowledgeFile | undefined;
+	file(path: string): FolderFile | undefined;
 	/** What differs from `base`, among `files` unless given fewer. */
 	changedSince<Stamp extends FileStamp>(
 		base: ReadonlyMap<string, Stamp>,
-		among?: readonly KnowledgeFile[],
+		among?: readonly FolderFile[],
 	): FolderChanges<Stamp>;
 	/** A file's hash, read at the first question. Null when it cannot be read. */
 	sha256(path: string): Promise<string | null>;
 };
 
-/** The longest path the knowledge takes. */
-const MAX_PATH = 1024;
 /** The most files `readable` holds: a folder past it is far too large to read. */
 const MAX_READABLE = 20_000;
 
-/**
- * Whether a path is one of the knowledge, in the folder and in the
- * Space's document: relative, with `/` between its parts, none of them
- * empty, `.`, `..` or hidden, none a file or folder a sync kit still
- * writes (`*.part`), and not the index Night Shift writes. A path another
- * Device wrote that is not one is left out: it never leaves the folder.
- */
-export function isKnowledgePath(path: string): boolean {
-	if (path === "" || path.length > MAX_PATH) return false;
-	// Not even in another case: on macOS, `index.md` is the index.
-	if (path.toLowerCase() === KNOWLEDGE_INDEX_FILE.toLowerCase()) return false;
-	if (/[\\\0]/.test(path)) return false;
-	return path
-		.split("/")
-		.every(
-			(part) =>
-				part !== "" &&
-				!part.startsWith(".") &&
-				!part.endsWith(KNOWLEDGE_STAGING_SUFFIX),
-		);
-}
-
-/**
- * Whether a person or an agent reads a path: one of the knowledge, but no
- * proposed learning and nothing of the question set. The index, search and
- * `read_knowledge` take these only.
- */
-export function isReadable(path: string): boolean {
-	return isKnowledgePath(path) && !isHiddenFromReaders(path);
-}
-
 /** The folder `dir` as it is now. No folder there: a snapshot with no files. */
-export async function scanFolder(dir: string): Promise<FolderSnapshot> {
-	const files: KnowledgeFile[] = [];
-	const readable: KnowledgeFile[] = [];
+export async function snapshotFolder(
+	dir: string,
+	paths: FolderPaths,
+): Promise<FolderSnapshot> {
+	const files: FolderFile[] = [];
+	const readable: FolderFile[] = [];
 	let newestReadable = 0;
 	const visit = async (abs: string, rel: string): Promise<void> => {
 		const names = await readdir(abs).catch(() => null);
@@ -129,15 +102,15 @@ export async function scanFolder(dir: string): Promise<FolderSnapshot> {
 			const path = rel === "" ? name : `${rel}/${name}`;
 			if (info.isDirectory()) {
 				// A folder whose files would all be left out is not walked.
-				if (!isKnowledgePath(`${path}/x`)) continue;
-				if (isReadable(`${path}/x`) && readable.length < MAX_READABLE) {
+				if (!paths.counts(`${path}/x`)) continue;
+				if (paths.readable(`${path}/x`) && readable.length < MAX_READABLE) {
 					newestReadable = Math.max(newestReadable, info.mtimeMs);
 				}
 				await visit(join(abs, name), path);
-			} else if (info.isFile() && isKnowledgePath(path)) {
+			} else if (info.isFile() && paths.counts(path)) {
 				const file = { path, size: info.size, changedAt: info.mtimeMs };
 				files.push(file);
-				if (isReadable(path) && readable.length < MAX_READABLE) {
+				if (paths.readable(path) && readable.length < MAX_READABLE) {
 					readable.push(file);
 					newestReadable = Math.max(newestReadable, info.mtimeMs);
 				}
@@ -156,9 +129,9 @@ export async function scanFolder(dir: string): Promise<FolderSnapshot> {
 		file: (path) => byPath.get(path),
 		changedSince<Stamp extends FileStamp>(
 			base: ReadonlyMap<string, Stamp>,
-			among: readonly KnowledgeFile[] = files,
+			among: readonly FolderFile[] = files,
 		) {
-			const changed = new Map<string, KnowledgeFile>();
+			const changed = new Map<string, FolderFile>();
 			const seen = new Set<string>();
 			for (const file of among) {
 				seen.add(file.path);

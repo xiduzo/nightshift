@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { Document } from "@langchain/core/documents";
 import { isDocument, loadDocument } from "../file-loaders";
+import type { FolderSnapshot } from "../folder-snapshot";
 import { createCloseNotes } from "./close-notes";
 import {
 	createKnowledgeFolders,
@@ -9,7 +10,6 @@ import {
 	isText,
 	readStart,
 } from "./folder";
-import type { FolderSnapshot } from "./folder-snapshot";
 import type { KnowledgeMeaning, KnowledgeMeaningReady } from "./meaning";
 import {
 	createSearchStore,

@@ -50,7 +50,7 @@ it, but do not fetch it.
 A file changed when its size or its time of change differ. Then Night Shift
 compares its hash. An edit that keeps both size and time is not seen until
 one of them changes. The reconcile, `INDEX.md` and the search index share
-this rule (`folder-snapshot.ts`). A step's start scans the folder twice: the
+this rule (`folder-snapshot/`). A step's start scans the folder twice: the
 reconcile scans it, and after the reconcile one more scan serves `INDEX.md`
 and the search index.
 
@@ -901,7 +901,7 @@ the file yet, Night Shift gets its content from the Space by its hash.
 Both give the text of a PDF or Word file. Neither gives the learnings
 that wait for a person.
 
-Two small LangChain document loaders in `documents.ts` read the text:
+Two small LangChain document loaders in `file-loaders/` read the text:
 `PdfLoader` on `unpdf` for a PDF and `DocxLoader` on `mammoth` for a Word
 file. Neither library has native parts, so both work in the `nightshift`
 binary too. A PDF of scanned pages has no text to find. `INDEX.md` lists a PDF or Word file

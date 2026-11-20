@@ -20,8 +20,8 @@ import { collectContent } from "./collect";
 import { evaluateKnowledge, type KnowledgeEvaluation } from "./evaluate";
 import { createKnowledgeFolders, type KnowledgeText } from "./folder";
 import type { KnowledgeFolderLocks } from "./folder-locks";
-import { isReadable } from "./folder-snapshot";
 import { createKnowledgeDocuments } from "./knowledge-document";
+import { isReadable } from "./knowledge-paths";
 import {
 	createKnowledgeReader,
 	type KnowledgeListing,

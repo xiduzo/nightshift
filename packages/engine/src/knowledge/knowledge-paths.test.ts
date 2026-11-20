@@ -4,22 +4,21 @@ import {
 	mkdtemp,
 	readFile,
 	rm,
-	symlink,
 	utimes,
 	writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { sha256Of } from "../archive";
 import { createKnowledgeFolders, indexFolder } from "./folder";
-import { type FileStamp, scanFolder } from "./folder-snapshot";
+import { scanFolder } from "./knowledge-paths";
 import { createStepKnowledge } from "./step-knowledge";
 
 /**
- * One look at a knowledge folder: which files count, what differs from a
- * caller's own record, and that a step's start takes one look after its
- * reconcile. The merge's and the search index's use of it are in
- * `reconcile.test.ts` and `search.test.ts`.
+ * One look at a knowledge folder: which files count and which are read, and
+ * that a step's start takes one look after its reconcile. What a look is
+ * (`snapshotFolder`) is in `folder-snapshot/folder-snapshot.test.ts`. The
+ * merge's and the search index's use of it are in `reconcile.test.ts` and
+ * `search.test.ts`.
  */
 
 let dir: string;
@@ -36,17 +35,6 @@ const put = async (path: string, text: string, at?: number) => {
 	if (at !== undefined) await utimes(join(dir, path), at / 1000, at / 1000);
 };
 const paths = (files: readonly { path: string }[]) => files.map((f) => f.path);
-
-/** A caller's record of the files as the snapshot has them now. */
-const recordOf = (
-	files: readonly { path: string; size: number; changedAt: number }[],
-) =>
-	new Map<string, FileStamp & { path: string }>(
-		files.map((f) => [
-			f.path,
-			{ path: f.path, size: f.size, mtimeMs: f.changedAt },
-		]),
-	);
 
 describe("a scan", () => {
 	test("sees what syncs in `files`, and what is read in `readable`", async () => {
@@ -72,25 +60,6 @@ describe("a scan", () => {
 		expect(snapshot.file("INDEX.md")).toBeUndefined();
 	});
 
-	test("follows no link, and a folder that is not there has no files", async () => {
-		await put("real/a.md", "a");
-		await symlink(join(dir, "real"), join(dir, "linked"));
-		await symlink(join(dir, "real/a.md"), join(dir, "b.md"));
-		expect(paths((await scanFolder(dir)).files)).toEqual(["real/a.md"]);
-		expect((await scanFolder(join(dir, "none"))).files).toEqual([]);
-	});
-
-	test("keeps the walk's order, the one each `INDEX.md` lists", async () => {
-		await put("a-b/x.md", "1");
-		await put("a/x.md", "2");
-		await put("a.md", "3");
-		expect(paths((await scanFolder(dir)).readable)).toEqual([
-			"a/x.md",
-			"a-b/x.md",
-			"a.md",
-		]);
-	});
-
 	test("the newest change counts a file that went from its folder, not what no reader sees", async () => {
 		const old = 1_600_000_000_000;
 		await put("wiki/a.md", "a", old);
@@ -105,74 +74,6 @@ describe("a scan", () => {
 
 		await rm(join(dir, "wiki/b.md"));
 		expect((await scanFolder(dir)).newestReadable).toBeGreaterThan(old);
-	});
-});
-
-describe("what changed since a caller's record", () => {
-	test("a new file, one of another size, one of another time, and one that went", async () => {
-		const at = 1_600_000_000_000;
-		await put("same.md", "same", at);
-		await put("size.md", "1234", at);
-		await put("time.md", "time", at);
-		await put("went.md", "went", at);
-		const base = recordOf((await scanFolder(dir)).files);
-
-		// Another size at the same time is a change too.
-		await put("size.md", "12345", at);
-		await put("time.md", "time", at + 1000);
-		await put("new.md", "new", at);
-		await rm(join(dir, "went.md"));
-
-		const { changed, gone } = (await scanFolder(dir)).changedSince(base);
-		expect([...changed.keys()].sort()).toEqual([
-			"new.md",
-			"size.md",
-			"time.md",
-		]);
-		expect(paths(gone)).toEqual(["went.md"]);
-	});
-
-	test("an edit that keeps both size and time is not seen: no weaker, and no stronger", async () => {
-		const at = 1_600_000_000_000;
-		await put("a.md", "before", at);
-		const base = recordOf((await scanFolder(dir)).files);
-		await put("a.md", "after!", at);
-		expect((await scanFolder(dir)).changedSince(base).changed.size).toBe(0);
-	});
-
-	test("among fewer files, the rest of the record has gone", async () => {
-		await put("a.md", "a");
-		await put("b.png", "b");
-		const snapshot = await scanFolder(dir);
-		const base = recordOf(snapshot.files);
-		const { changed, gone } = snapshot.changedSince(
-			base,
-			snapshot.files.filter((f) => f.path === "a.md"),
-		);
-		expect(changed.size).toBe(0);
-		expect(paths(gone)).toEqual(["b.png"]);
-	});
-});
-
-describe("a file's hash", () => {
-	test("is read at the first question, and once per snapshot", async () => {
-		await put("a.md", "first");
-		const snapshot = await scanFolder(dir);
-		const expected = sha256Of(new TextEncoder().encode("first"));
-		expect(await snapshot.sha256("a.md")).toBe(expected);
-		await put("a.md", "second");
-		expect(await snapshot.sha256("a.md")).toBe(expected);
-		// A new look reads it again.
-		expect(await (await scanFolder(dir)).sha256("a.md")).toBe(
-			sha256Of(new TextEncoder().encode("second")),
-		);
-	});
-
-	test("of a file that went is null", async () => {
-		await put("a.md", "a");
-		const snapshot = await scanFolder(dir);
-		await rm(join(dir, "a.md"));
-		expect(await snapshot.sha256("a.md")).toBeNull();
 	});
 });
 

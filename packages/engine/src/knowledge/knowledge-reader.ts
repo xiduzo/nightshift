@@ -13,8 +13,8 @@ import {
 	type KnowledgeText,
 	knowledgeText,
 } from "./folder";
-import type { KnowledgeFile } from "./folder-snapshot";
 import type { KnowledgeDocuments } from "./knowledge-document";
+import type { KnowledgeFile } from "./knowledge-paths";
 import type { Learnings } from "./learnings";
 import type { SpaceHostStatus } from "./space-host-status";
 

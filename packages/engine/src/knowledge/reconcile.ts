@@ -18,12 +18,12 @@ import { type SpaceArchive, sha256Of, writeWhole } from "../archive";
 import { LOCAL_ONLY_BYTES } from "../file-loaders";
 import type { KnowledgeFolders } from "./folder";
 import type { KnowledgeFolderLocks } from "./folder-locks";
+import type { KnowledgeDocuments, KnowledgeEntry } from "./knowledge-document";
 import {
 	isKnowledgePath,
 	type KnowledgeFile,
 	scanFolder,
-} from "./folder-snapshot";
-import type { KnowledgeDocuments, KnowledgeEntry } from "./knowledge-document";
+} from "./knowledge-paths";
 import type { SpaceHostStatus } from "./space-host-status";
 
 /**

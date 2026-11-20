@@ -467,6 +467,7 @@ export const VERTICALS: Record<string, Record<string, Place>> = {
 		documents: M,
 		"file-loaders": M,
 		flows: "flows",
+		"folder-snapshot": M,
 		// The answer to a Gate and the Needs-you inbox, in rings.
 		gates: "gates",
 		// The git port, the run worktrees and the branches of ended runs. It

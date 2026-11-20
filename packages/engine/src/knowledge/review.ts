@@ -1,4 +1,4 @@
-import type { KnowledgeFile } from "./folder-snapshot";
+import type { KnowledgeFile } from "./knowledge-paths";
 import type { ProjectLearning } from "./learnings";
 import { learningNode, questionNode } from "./map";
 import type { KnowledgeSync } from "./sources";

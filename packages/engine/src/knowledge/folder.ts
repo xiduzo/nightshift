@@ -25,12 +25,8 @@ import {
 	loadDocumentContent,
 	textOf,
 } from "../file-loaders";
-import {
-	type FolderSnapshot,
-	isReadable,
-	type KnowledgeFile,
-	scanFolder,
-} from "./folder-snapshot";
+import type { FolderSnapshot } from "../folder-snapshot";
+import { isReadable, type KnowledgeFile, scanFolder } from "./knowledge-paths";
 import { isMarkdown, markdownHeadings } from "./sections";
 
 /**

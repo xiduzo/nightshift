@@ -2,7 +2,7 @@ import { copyFile, mkdir, mkdtemp, rm, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { indexFolder } from "./folder";
-import { type KnowledgeFile, scanFolder } from "./folder-snapshot";
+import { type KnowledgeFile, scanFolder } from "./knowledge-paths";
 
 /**
  * A view of a project's knowledge: what an Agent step gets when its node
