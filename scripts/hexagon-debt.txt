@@ -26,6 +26,5 @@ engine/flows
 engine/knowledge
 engine/placement
 engine/projects
-engine/space-move
 notifications/notifier
 # Files of a package's kernel that are not pure yet: kernel <file>.

@@ -41,7 +41,8 @@ import {
 	withDevice,
 } from "../testing/test-support";
 import { createEngine } from "../wire";
-import type { MovedRuns, MoveRows, ProjectsMoved } from "./projects-move";
+import type { MoveRows } from "./application/ports";
+import type { MovedRuns, ProjectsMoved } from "./domain/move";
 
 /**
  * The Space move (`Engine.moveProjects`), as its three callers use it: a

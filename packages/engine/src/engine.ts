@@ -1,4 +1,3 @@
-import type { Database } from "@nightshift/db";
 import type { AnswerCost } from "./assistant";
 import type { Actor, LeaseHost, MemberChange } from "./contract";
 import type { Dashboard } from "./dashboard";
@@ -12,7 +11,6 @@ import {
 	logMemberChange,
 	type RunLog,
 } from "./log";
-import { forgetSpaceRows } from "./projects";
 import { type LandedFact, landedFacts, type RunTrace } from "./read";
 import type { RunHere, Views } from "./runs";
 import type {
@@ -23,7 +21,7 @@ import type {
 } from "./schedules";
 import type { createPullRequestWatch } from "./scores";
 import type { SpaceEngine } from "./space-engine";
-import type { MovedProjects, ProjectsMove } from "./space-move";
+import type { MovedProjects, ProjectsMove, SpaceMove } from "./space-move";
 import type { wireEngineAccess } from "./wire-access";
 import type { wireEngineActions } from "./wire-actions";
 import type { wireEngineAnswerCosts } from "./wire-answer-costs";
@@ -100,7 +98,7 @@ export interface Engine {
 	): () => void;
 	/**
 	 * Moves Projects from one Space to others, as one operation (a Space
-	 * move, `projects-move.ts`): no run becomes active in `move.from` and
+	 * move, `space-move/`): no run becomes active in `move.from` and
 	 * no schedule fires from the caller's `plan` through the batch, the
 	 * schedules change through `ProjectFlows`, every row of the Projects
 	 * and of the packages above the engine (`EngineOptions.moveRows`)
@@ -278,11 +276,11 @@ export type EngineParts = {
 	lifetime: AbortController;
 	/** What a person does in one Space (`space.ts`). */
 	space: Engine["space"];
-	db: Database;
 	log: RunLog;
-	documents: Pick<SpaceDocuments, "openAll" | "remove">;
+	documents: Pick<SpaceDocuments, "openAll">;
 	flows: Engine["flows"];
-	moveProjects: Engine["moveProjects"];
+	/** The Space move (SM, `wire-space-move.ts`). */
+	spaceMove: Pick<SpaceMove, "moveProjects" | "forgetSpace">;
 	leaseStore: Pick<
 		ReturnType<typeof createLeaseStore>,
 		"take" | "renew" | "release"
@@ -331,11 +329,10 @@ export function engineOf(parts: EngineParts): Engine {
 		recovered,
 		lifetime,
 		space,
-		db,
 		log: runLog,
 		documents,
 		flows: projectFlows,
-		moveProjects,
+		spaceMove,
 		leaseStore,
 		leases,
 		landed,
@@ -356,12 +353,13 @@ export function engineOf(parts: EngineParts): Engine {
 			await parts.answerCosts.keep(cost);
 		},
 		logMemberChange: (change) => logMemberChange(runLog, change),
-		moveProjects,
+		async moveProjects(move) {
+			await ready;
+			return spaceMove.moveProjects(move);
+		},
 		async forgetSpace(spaceId) {
 			await ready;
-			if (!(await forgetSpaceRows(db, spaceId))) return false;
-			await documents.remove(spaceId);
-			return true;
+			return spaceMove.forgetSpace({ spaceId });
 		},
 		flows: projectFlows,
 		async usageAllowed() {

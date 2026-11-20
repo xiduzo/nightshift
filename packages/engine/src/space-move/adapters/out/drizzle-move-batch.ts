@@ -1,4 +1,3 @@
-import { spaceExists } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import {
 	agentSession,
@@ -21,14 +20,14 @@ import {
 	isNull,
 	lt,
 	lte,
-	notExists,
 	or,
 	type SQL,
 	sql,
 } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { type AnySQLiteColumn, alias } from "drizzle-orm/sqlite-core";
-import { personFieldTypes } from "../log";
+import { personFieldTypes } from "../../../log";
+import type { RowMove } from "../../domain/move";
 
 /**
  * The rows of Projects that move from one Space to another, as the
@@ -68,19 +67,6 @@ import { personFieldTypes } from "../log";
  *   each one onto itself), so the runs that stay still name it. Of the
  *   answer costs, only this computer's own answers move.
  */
-export type SpaceMove = {
-	from: string;
-	to: string;
-	/** Each Project to move, by its id in `from`: its id in `to`. */
-	projectMap: Readonly<Record<string, string>>;
-	/** A Person's id in `from`: their id in `to`. */
-	personMap?: Readonly<Record<string, string>>;
-	/** This computer: its moved events get new numbers after its latest. */
-	walkerId?: string;
-	/** Only the runs this Walker walks move. */
-	runsOf?: string;
-};
-
 /** The statements of one move, in the order they must run. */
 export type SpaceMoveBatch = [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]];
 
@@ -91,7 +77,7 @@ export type SpaceMoveBatch = [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]];
  */
 export async function spaceMoveBatch(
 	db: Database,
-	move: SpaceMove,
+	move: RowMove,
 ): Promise<SpaceMoveBatch> {
 	const { from, to } = move;
 	const persons = Object.entries(move.personMap ?? {}).filter(
@@ -472,64 +458,4 @@ export async function spaceMoveBatch(
 	const [first, ...rest] = statements;
 	if (!first) throw new Error("A move has no statements.");
 	return [first, ...rest];
-}
-
-/**
- * Removes the events a Space left on this Replica that belong to no run
- * here (a Member that joined), and its answer costs, once the Space's own row, every Project
- * and every run of it are gone. False, and nothing removed, while one is
- * here. Runs again safely.
- */
-export async function forgetSpaceRows(
-	db: Database,
-	spaceId: string,
-): Promise<boolean> {
-	// The Space's own row is `@nightshift/auth`'s: its caller removes it first.
-	if (await spaceExists(db, spaceId)) return false;
-	const [left] = await db
-		.select({ id: project.id })
-		.from(project)
-		.where(eq(project.spaceId, spaceId))
-		.union(db.select({ id: run.id }).from(run).where(eq(run.spaceId, spaceId)))
-		.limit(1);
-	if (left) return false;
-	await db.delete(answerCost).where(eq(answerCost.spaceId, spaceId));
-	await db
-		.delete(event)
-		.where(
-			and(
-				eq(event.spaceId, spaceId),
-				or(
-					isNull(event.runId),
-					notExists(
-						db.select({ id: run.id }).from(run).where(eq(run.id, event.runId)),
-					),
-				),
-			),
-		);
-	return true;
-}
-
-/**
- * The runs of these Projects in the Space: the runs a move of them takes
- * along. With `walkerId`, only the runs that Walker walks (`runsOf`).
- */
-export async function spaceRunIds(
-	db: Database,
-	spaceId: string,
-	projectIds: readonly string[],
-	walkerId?: string,
-): Promise<string[]> {
-	if (projectIds.length === 0) return [];
-	const rows = await db
-		.select({ id: run.id })
-		.from(run)
-		.where(
-			and(
-				eq(run.spaceId, spaceId),
-				inArray(run.projectId, [...projectIds]),
-				walkerId === undefined ? undefined : eq(run.walkerId, walkerId),
-			),
-		);
-	return rows.map((row) => row.id);
 }

@@ -13,16 +13,17 @@ import {
 } from "@nightshift/db/schema";
 import { asDate } from "@nightshift/time";
 import { asc, eq, inArray } from "drizzle-orm";
-import { createRunHistory } from "../log/history/history";
-import { createLandedFeed } from "../log/history/landed";
-import { createRunLog, type RunLog } from "../log/run-log/run-log";
-import { createRunBus } from "../log/transcript/bus";
+import { createRunHistory } from "../../../log/history/history";
+import { createLandedFeed } from "../../../log/history/landed";
+import { createRunLog, type RunLog } from "../../../log/run-log/run-log";
+import { createRunBus } from "../../../log/transcript/bus";
 import {
 	createSandbox,
 	otherSpace,
 	type Sandbox,
-} from "../testing/test-support";
-import { type SpaceMove, spaceMoveBatch } from "./space-rows";
+} from "../../../testing/test-support";
+import type { RowMove } from "../../domain/move";
+import { spaceMoveBatch } from "./drizzle-move-batch";
 
 /**
  * Two Spaces of one Replica: `from`, the Device's own personal Space, and
@@ -252,7 +253,7 @@ const answers = async () =>
 		).map((row) => [row.key, row]),
 	);
 
-const move = (extra: Partial<SpaceMove> = {}): SpaceMove => ({
+const move = (extra: Partial<RowMove> = {}): RowMove => ({
 	from,
 	to,
 	projectMap: { mine: "mine", dup: "hosted" },
@@ -261,7 +262,7 @@ const move = (extra: Partial<SpaceMove> = {}): SpaceMove => ({
 	...extra,
 });
 
-async function runMove(input: SpaceMove = move()) {
+async function runMove(input: RowMove = move()) {
 	await sandbox.db.batch(await spaceMoveBatch(sandbox.db, input));
 }
 

@@ -23,7 +23,7 @@ import type { Access, Actions, Move, Start, Views } from "./runs";
 import type { Schedules } from "./schedules";
 import { readServiceLog } from "./services";
 import type { SpaceEngine } from "./space-engine";
-import type { MovedProjects, ProjectsMove } from "./space-move";
+import type { SpaceMove } from "./space-move";
 import type { KeptFlow, KeptValue } from "./variables";
 
 /**
@@ -67,8 +67,8 @@ export type SpacesDeps = {
 		actor: Actor,
 		request: { spaceId: string; since?: number },
 	): Promise<AnswerCost[]>;
-	/** A Space move (`projects-move.ts`). */
-	moveProjects(move: ProjectsMove): Promise<MovedProjects>;
+	/** A person's move of a Project to another Space (`space-move/`). */
+	moveProject: SpaceMove["moveProject"];
 
 	// --- access, and the files of a run that other slices keep (R1) ---
 	/** Opens a run for an actor: the one check of who may see or act on it (`runs/access`). */
@@ -216,22 +216,7 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async moveProject(projectId, toSpaceId) {
 				await ready;
-				await projects.find(projectId, spaceId);
-				if (toSpaceId === spaceId) return;
-				await projects.refuseMove(projectId, spaceId, toSpaceId);
-				await deps.moveProjects({
-					from: spaceId,
-					plan: async () => {
-						await noActiveRun(projectId, "move the project");
-						return {
-							projects: { [projectId]: { spaceId: toSpaceId, projectId } },
-						};
-					},
-				});
-				await log.append({
-					type: "ProjectMoved",
-					payload: { projectId, from: spaceId, to: toSpaceId },
-				});
+				await deps.moveProject(actor, { spaceId, projectId, toSpaceId });
 			},
 
 			async removeProject(projectId) {

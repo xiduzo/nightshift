@@ -22,7 +22,6 @@ import { createPlacement } from "./placement";
 import { namesOf } from "./read";
 import { createRunFolders } from "./run-folders";
 import { createSpaces } from "./space";
-import { createProjectsMove } from "./space-move";
 import { listKeptValues, resetKeptValue } from "./variables";
 import { wireEngineAccess } from "./wire-access";
 import { wireEngineActions } from "./wire-actions";
@@ -38,6 +37,7 @@ import { wireEngineProjects } from "./wire-projects";
 import { wireEngineRecovery } from "./wire-recovery";
 import { wireEngineRunner } from "./wire-runner";
 import { wireEngineSchedules } from "./wire-schedules";
+import { wireEngineSpaceMove } from "./wire-space-move";
 import { wireEngineStart } from "./wire-start";
 import { wireEngineViews } from "./wire-views";
 import { wireEngineWalk } from "./wire-walk";
@@ -77,6 +77,8 @@ import { wireEngineWalk } from "./wire-walk";
  *   its other end, where the new Walker takes the run over (`runs/move/`).
  * - `wire-gates.ts` (R6): the answer to a Gate and the inbox (`gates/`).
  * - `wire-cleanup.ts`: what ended runs left on this computer (`cleanup/`).
+ * - `wire-space-move.ts` (SM): Projects that go to other Spaces, as one
+ *   operation (`space-move/`).
  * - `space.ts`: what a person does in one Space (`SpaceEngine`, in
  *   `space-engine.ts`).
  * - `engine.ts`: the `Engine` interface and the thin object behind it.
@@ -468,23 +470,20 @@ export function createEngine(
 		internals,
 	});
 
-	// --- the Space move (`space-move/`) ---
-	/** A Space move: Projects to other Spaces, as one operation. */
-	const moveProjects = createProjectsMove({
+	// --- the Space move (SM): `wire-space-move.ts` ---
+	// gives: spaceMove.moveProjects and forgetSpace (the engine),
+	// spaceMove.moveProject (the Space view)
+	const spaceMove = wireEngineSpaceMove({
 		db,
-		ready,
-		holds: startHolds,
-		holdSchedules: () => sched.schedules.ticker.hold(),
-		walkerId: () => runLog.walkerId(),
-		flows: projectFlows,
 		documents,
-		// Their rows moved under the run log, in a batch that logged nothing.
-		reread: (runIds) => {
-			runLog.forget(runIds);
-			landed.reread();
-		},
-		rows: options.moveRows ?? [],
-		...(options.projectsMoved ? { moved: options.projectsMoved } : {}),
+		startHolds,
+		holdSchedules: () => sched.schedules.ticker.hold(),
+		log: runLog,
+		landed,
+		flows: projectFlows,
+		projects,
+		runner,
+		options,
 	});
 
 	// --- the Space view: `space.ts` ---
@@ -519,7 +518,7 @@ export function createEngine(
 			forget: (flow, node, scope) => forgetMemory(db, flow, node, scope),
 		},
 		answerCosts: answerCosts.list,
-		moveProjects,
+		moveProject: spaceMove.moveProject,
 		// access (R1), and the files of a run that other slices keep
 		openRun: access.openRun,
 		runFiles,
@@ -546,11 +545,10 @@ export function createEngine(
 		recovered,
 		lifetime,
 		space,
-		db,
 		log: runLog,
 		documents,
 		flows: projectFlows,
-		moveProjects,
+		spaceMove,
 		leaseStore,
 		leases,
 		landed,
