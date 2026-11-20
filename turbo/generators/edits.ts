@@ -73,12 +73,17 @@ const key = (name: string) =>
 
 /** The name of the entry on a line of the map, or null. */
 const entryOf = (line: string) =>
-	/^\t\t"?([a-z0-9-]+)"?: /.exec(line)?.[1] ?? null;
+	/^\t"?([a-z0-9-]+)"?: /.exec(line)?.[1] ?? null;
+
+/** The file of the capability map that holds the verticals of `packages/<pkg>`. */
+export const mapFileOf = (pkg: string) =>
+	`scripts/capabilities/packages-${pkg}.ts`;
 
 /**
- * The text of `scripts/capabilities.ts` with the vertical `vertical` of
- * `packages/<pkg>` placed in `place`, in the name order of the map. The
- * line goes before the comment of the entry it precedes.
+ * The text of `packages/<pkg>`'s file of the capability map
+ * (`mapFileOf`) with the vertical `vertical` placed in `place`, in the name
+ * order of the map. The line goes before the comment of the entry it
+ * precedes.
  */
 export function withMapLine(
 	text: string,
@@ -87,13 +92,13 @@ export function withMapLine(
 	place: string,
 ): string {
 	const lines = text.split("\n");
-	const start = lines.indexOf(`\t"packages/${pkg}": {`);
-	const end = lines.findIndex(
-		(line, index) => index > start && line === "\t},",
+	const start = lines.findIndex(
+		(line) => line.startsWith("export const ") && line.endsWith(" = {"),
 	);
+	const end = lines.findIndex((line, index) => index > start && line === "};");
 	if (start < 0 || end < 0) {
 		throw new GeneratorRefusal(
-			`scripts/capabilities.ts: cannot find the map of packages/${pkg}.`,
+			`${mapFileOf(pkg)}: cannot find the map of packages/${pkg}.`,
 		);
 	}
 	let at = end;
@@ -101,14 +106,14 @@ export function withMapLine(
 		const name = entryOf(lines[index] ?? "");
 		if (name === vertical) {
 			throw new GeneratorRefusal(
-				`scripts/capabilities.ts: packages/${pkg} has ${vertical} already.`,
+				`${mapFileOf(pkg)}: packages/${pkg} has ${vertical} already.`,
 			);
 		}
 		if (name && name.localeCompare(vertical) > 0 && at === end) {
 			at = index;
-			while (lines[at - 1]?.startsWith("\t\t//")) at--;
+			while (lines[at - 1]?.startsWith("\t//")) at--;
 		}
 	}
-	lines.splice(at, 0, `\t\t${key(vertical)}: "${place}",`);
+	lines.splice(at, 0, `\t${key(vertical)}: "${place}",`);
 	return lines.join("\n");
 }

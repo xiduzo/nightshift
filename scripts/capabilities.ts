@@ -64,6 +64,26 @@
  * `src/` (`graph`, `features/runs`, `shared/api`).
  */
 
+import { APP_DESKTOP } from "./capabilities/apps-desktop";
+import { APP_INSIGHTS } from "./capabilities/apps-insights";
+import { APP_MOBILE } from "./capabilities/apps-mobile";
+import { APP_SERVER } from "./capabilities/apps-server";
+import { APP_WEB } from "./capabilities/apps-web";
+import { MECHANISM, WIRING } from "./capabilities/kinds";
+import { PACKAGE_AGENTS } from "./capabilities/packages-agents";
+import { PACKAGE_API } from "./capabilities/packages-api";
+import { PACKAGE_AUTH } from "./capabilities/packages-auth";
+import { PACKAGE_CLIENT } from "./capabilities/packages-client";
+import { PACKAGE_DAEMON } from "./capabilities/packages-daemon";
+import { PACKAGE_DB } from "./capabilities/packages-db";
+import { PACKAGE_DEVICES } from "./capabilities/packages-devices";
+import { PACKAGE_ENGINE } from "./capabilities/packages-engine";
+import { PACKAGE_FLOWS } from "./capabilities/packages-flows";
+import { PACKAGE_INSIGHTS } from "./capabilities/packages-insights";
+import { PACKAGE_NOTIFICATIONS } from "./capabilities/packages-notifications";
+import { PACKAGE_SEMCONV } from "./capabilities/packages-semconv";
+import { PACKAGE_TELEMETRY } from "./capabilities/packages-telemetry";
+
 /**
  * The capabilities of the product. `word` is the term of `docs/glossary.md`
  * that names it. The check fails a word the glossary does not have.
@@ -177,424 +197,32 @@ export type Capability =
 	| keyof typeof CAPABILITIES
 	| keyof typeof INSIGHTS_CAPABILITIES;
 
-/** A vertical that is shared machinery. Its name is its folder name. */
-export const MECHANISM = "mechanism";
-
-/**
- * The piece of a workspace that composes its capabilities: an app's
- * `shared/shell`, or one vertical of a package without rings. V2 and V5 do
- * not apply to it, and no vertical imports it.
- */
-export const WIRING = "wiring";
+export { MECHANISM, WIRING };
 
 export type Place = Capability | typeof MECHANISM | typeof WIRING;
 
-const M = MECHANISM;
-
 /**
  * Each workspace, and each of its verticals with its capability,
- * MECHANISM or WIRING. Sorted by workspace, then by vertical. */
+ * MECHANISM or WIRING. Sorted by workspace, then by vertical. Each
+ * workspace has its own file in `scripts/capabilities/`.
+ */
 export const VERTICALS: Record<string, Record<string, Place>> = {
-	"apps/desktop": {
-		// The desktop app is the shell around the daemon. Only its
-		// notifications are a product area. The rest starts, guards, updates
-		// and decorates the app.
-		"features/daemon": M,
-		"features/external": M,
-		"features/moon": M,
-		"features/notifications": "notifications",
-		"features/updates": M,
-		"features/watchdog": M,
-	},
-	"apps/insights": {
-		"features/access": "access",
-		"features/days": "days",
-		"features/feedback": "feedback",
-		"features/funnel": "funnel",
-		"features/ingest": "ingest",
-		"features/ladders": "ladders",
-		"features/mix": "mix",
-		"features/overview": "overview",
-		"features/proof": "proof",
-		"features/reports": "reports",
-		"features/retention": "retention",
-		// The admin's own sign-in (Better Auth, its tables, the one admin).
-		"features/session": "access",
-		"shared/api": M,
-		"shared/config": M,
-		"shared/format": M,
-		"shared/page": M,
-		"shared/rpc": M,
-		// The frame of the admin. It imports no feature: the route passes in
-		// what it shows. So it is a mechanism, and V2 holds for it.
-		"shared/shell": M,
-	},
-	"apps/mobile": {
-		// This phone's sign-in on its Host, and the session.
-		"features/access": "access",
-		"features/devices": "devices",
-		// The Needs-you inbox, one Gate in full, and the Needs you queue with
-		// the bar that sends an answer.
-		"features/gates": "gates",
-		// This phone's notifications.
-		"features/notifications": "notifications",
-		// One run live, and the Runs tab (`tab/`): the runs on their way
-		// and tonight's schedules.
-		"features/runs": "runs",
-		"features/schedules": "schedules",
-		"features/settings": "settings",
-		"features/spaces": "spaces",
-		// The home screen widget and the followed run on the lock screen.
-		"features/widgets": "widgets",
-		"shared/api": M,
-		"shared/avatar": M,
-		"shared/clock": M,
-		"shared/empty": M,
-		"shared/feedback": M,
-		"shared/format": M,
-		"shared/header": M,
-		"shared/in-front": M,
-		"shared/list": M,
-		"shared/markdown": M,
-		"shared/native-list": M,
-		"shared/page": M,
-		"shared/refresh": M,
-		// The shell composes the features (rule 4).
-		"shared/shell": WIRING,
-		"shared/status": M,
-		"shared/theme": M,
-		"shared/tone": M,
-		"shared/trail": M,
-	},
-	"apps/server": {
-		// The `nightshift` command line: a surface that calls the daemon, like
-		// the API. It holds no rule of a product area.
-		"features/cli": M,
-	},
-	"apps/web": {
-		"features/access": "access",
-		"features/agents": "agents",
-		"features/dashboard": "dashboard",
-		"features/devices": "devices",
-		"features/flows": "flows",
-		"features/gates": "gates",
-		"features/knowledge": "knowledge",
-		"features/notifications": "notifications",
-		"features/projects": "projects",
-		"features/runs": "runs",
-		"features/settings": "settings",
-		"features/spaces": "spaces",
-		"features/spend": "spend",
-		"shared/agent-button": M,
-		"shared/api": M,
-		"shared/code": M,
-		"shared/data-table": M,
-		"shared/detail": M,
-		"shared/format": M,
-		"shared/larger-window": M,
-		"shared/markdown": M,
-		"shared/media-query": M,
-		"shared/moon": M,
-		"shared/page": M,
-		"shared/panel": M,
-		// The mark of a run's status. Devices and runs both show it, as the
-		// engine's `run-status` is a mechanism that `graph` and `runs` read.
-		"shared/run-status": M,
-		// The shell composes the features (rule 4).
-		"shared/shell": WIRING,
-		"shared/spread-strip": M,
-		"shared/time": M,
-		"shared/urgency": M,
-		"shared/usage": M,
-	},
-	"packages/agents": {
-		assistant: "assistant",
-		// The decider providers and their list: the models of a Model Profile.
-		decider: "agents",
-		// Is a program on this computer, which version, whose login.
-		doctor: M,
-		// One adapter and one record of facts per harness, and the skills
-		// each harness can run. The skills were a mechanism of their own.
-		// They read the skill folders of each harness from its facts and
-		// the plugins of Claude Code, so they are rules of a harness.
-		harnesses: "agents",
-		knowledge: "knowledge",
-		// The contract between the engine and a harness or a decider.
-		port: M,
-		// What a session or a model call cost, from a price list.
-		pricing: M,
-		// One harness session behind every adapter: the sandbox, the stream,
-		// the tool bridge. It runs a session and decides nothing about agents.
-		session: M,
-		// The MCP client and the help of a CLI program. The definitions of
-		// the tools are `settings` (the Device document of the engine).
-		tools: M,
-	},
-	"packages/api": {
-		assistant: "assistant",
-		// This computer's configuration: settings, harnesses, profiles,
-		// connections, CLI tools and the guided setup.
-		config: "settings",
-		dashboard: "dashboard",
-		devices: "devices",
-		flows: "flows",
-		gates: "gates",
-		knowledge: "knowledge",
-		notifications: "notifications",
-		projects: "projects",
-		runs: "runs",
-		schedules: "schedules",
-		spaces: "spaces",
-		// Anonymous usage is not a word of the glossary. It is the export
-		// that `telemetry` owns.
-		usage: M,
-	},
-	"packages/auth": {
-		access: "access",
-		// What a paired Device signs in with on a Host.
-		"device-keys": "devices",
-		// Who may use this Host: one decision for every way in.
-		"host-access": "access",
-		// The session of this computer's own Person.
-		"local-session": "access",
-		// A Person's email and password.
-		login: "access",
-		// The device authorization that pairs a Device with a Host.
-		pairing: "devices",
-		spaces: "spaces",
-		"two-factor": "access",
-	},
-	"packages/client": {
-		// The typed client, its query client and how a call is refused.
-		api: M,
-		// What a write makes stale: one table for both apps.
-		changes: M,
-		dashboard: "dashboard",
-		devices: "devices",
-		flows: "flows",
-		gates: "gates",
-		// What a widget and a lock-screen run show.
-		glance: "widgets",
-		knowledge: "knowledge",
-		// The live cache: the one follower of a Host for both apps. It is the
-		// composition of the client (rule 6). It makes the Gate queries and the
-		// run queries, follows the notifications stream and the run streams,
-		// and holds the one rule that needs all three: what each item of the
-		// stream reads again, shows and takes away. No capability owns that
-		// rule, and each app would pass in the same functions. No vertical
-		// imports it: the root entry passes its hooks on to the apps.
-		live: WIRING,
-		notifications: "notifications",
-		projects: "projects",
-		runs: "runs",
-		schedules: "schedules",
-		spaces: "spaces",
-		usage: M,
-	},
-	"packages/daemon": {
-		assistant: "assistant",
-		// The harness table of this computer.
-		harnesses: "agents",
-		// The Hono app and its routes.
-		http: M,
-		// The OS's sleep lock behind a port. The rule for when to hold it is
-		// the engine's.
-		"keep-awake": M,
-		notifications: "notifications",
-		// The boot: the env, the database, the lease, health, the hot slots.
-		runtime: M,
-		// The transport of the synced documents.
-		sync: M,
-		// The export's headers, moved from their old store, and the counts of
-		// the daily usage event.
-		telemetry: M,
-	},
-	"packages/db": {
-		client: M,
-		"data-dir": M,
-		migrate: M,
-		schema: M,
-	},
-	"packages/devices": {
-		// The wire types of the peer protocol.
-		contract: M,
-		// Run history between a Replica and a Host, by cursor. It carries
-		// rows and Commands, and the engine decides what they mean.
-		exchange: M,
-		// This computer as a Host: pairing, Device keys, presence.
-		host: "devices",
-		// The outbound connection to a Host. A port with its adapter.
-		links: M,
-		// This computer's membership of its home Host.
-		membership: "devices",
-		offers: "devices",
-		// Pieces of the engine's `Peers` port. The composition
-		// (`wire-peers.ts`) hands them the rows they read (rule 5).
-		peers: M,
-		// Which of a Person's Devices a run may use.
-		placement: "devices",
-		// Whom the daemon answers, and the certificates.
-		reach: M,
-		// The Device rows: this computer's own, and the paired ones.
-		registry: "devices",
-		// Carries actions and work to the Hosts.
-		relay: M,
-		secrets: "secrets",
-		// The execution port for a Device behind a Host.
-		work: M,
-	},
-	"packages/engine": {
-		// The guided setup of an agent CLI and of a decider.
-		"agent-setup": "agents",
-		// What a Replica keeps of a Space for the other Replicas, by hash.
-		archive: M,
-		// The store of the files a run keeps.
-		artifacts: M,
-		assistant: "assistant",
-		// The removal of what ended runs left on this computer.
-		cleanup: "runs",
-		// The types the engine's ports name.
-		contract: M,
-		dashboard: "dashboard",
-		// The execution port (`Device`): how a command, a tool call or a web
-		// request of a step runs on this computer. Not the Devices a person
-		// pairs and offers: those are `devices`.
-		device: M,
-		// This computer's configuration in its Device document. It holds the
-		// secrets of this computer too, until `secrets` has its own vertical.
-		"device-config": "settings",
-		// The synced documents (Yjs).
-		documents: M,
-		"file-loaders": M,
-		flows: "flows",
-		"folder-snapshot": M,
-		// The answer to a Gate and the Needs-you inbox, in rings.
-		gates: "gates",
-		// The git port, the run worktrees and the branches of ended runs. It
-		// runs git, and no person asks it for anything.
-		git: M,
-		// The `gh` program: the sign-in, the repositories and the pull
-		// requests, for the project copies and the Scores.
-		github: M,
-		// It walks a flow (decision 9 of the hexagon series).
-		graph: M,
-		// Where this computer keeps values it must not show: the keychain,
-		// else files. The secrets of this computer and the Device keys use it.
-		"key-store": M,
-		knowledge: "knowledge",
-		// The keeper of the names a Lease node holds.
-		leases: M,
-		// The event log: the one door to a run's facts.
-		log: M,
-		// The store of what a Since last run node saw.
-		memory: M,
-		// The `ollama serve` Night Shift finds or starts, and its models.
-		ollama: M,
-		// The plan of where a run's steps run, made once at the start.
-		placement: "runs",
-		projects: "projects",
-		// The read model of a run: pure projections of the log. The walk
-		// (`graph`) reads them too, so they are machinery, not part of `runs`.
-		read: M,
-		// The run path in rings, one sub-vertical per part: who may see or
-		// act on a run (`access`), what every use case that writes to a run
-		// shares (`walk`), what people see of the runs (`views`), the start,
-		// the actions, the move and the recovery.
-		runs: "runs",
-		// The store of a run's own folder.
-		"run-folders": M,
-		// A run's status and the actions it allows. The pure rule kernel of
-		// the engine (decision 37 of the hexagon series): the machinery and
-		// the capabilities both read it.
-		"run-status": M,
-		schedules: "schedules",
-		// The keeper of the pull request Scores: it reads what GitHub says
-		// became of a run's pull request, and writes it to the run log. No
-		// person asks it for anything. Score is a word of the glossary, as
-		// Lease is: the capabilities that show Scores read the log.
-		scores: M,
-		// The keeper of the processes a Service node starts.
-		services: M,
-		// Projects to another Space as one operation (`Engine.moveProjects`).
-		// It holds the order of a move and what a move refuses, so it is a
-		// capability. It imports `projects`, `flows` and `runs`, so it is not a
-		// part of one of them: `projects` would close a cycle with `runs`.
-		"space-move": "space-move",
-		// Moments noted for the anonymous usage export.
-		usage: M,
-		// The store of the kept variables.
-		variables: M,
-		// The rule for every address this computer connects to.
-		"web-access": M,
-	},
-	"packages/flows": {
-		// The flow format is the language every capability speaks (the kernel
-		// of the hexagon series). Its parts are mechanisms: the schema
-		// (`flow`), the node types, templates, shapes, the checks of a flow,
-		// and the flows that ship (`kits`, `starters`). The capability `flows`
-		// is what a Project does with its flows.
-		assistant: "assistant",
-		// The built-in agents, and who answers for each.
-		builtin: "assistant",
-		// The edits of the flow editor on its draft.
-		draft: "flows",
-		flow: M,
-		// The built-in harnesses as a person sees them.
-		harnesses: "agents",
-		kits: M,
-		lists: M,
-		nodes: M,
-		presets: M,
-		// Agent Profiles and Model Profiles.
-		profiles: "agents",
-		recipes: M,
-		schedules: "schedules",
-		secrets: "secrets",
-		sections: M,
-		shapes: M,
-		starters: M,
-		template: M,
-		// The checks of a whole flow: its names, edges, loops, references and
-		// calls. They are the grammar of the format, and they hold for a flow
-		// of any Project. So `validate` is a mechanism and not a part of the
-		// capability `flows`, which is what a Project does with its flows.
-		validate: M,
-	},
-	"packages/insights": {
-		client: M,
-		ingest: "ingest",
-		migrate: M,
-		// The SQL of each admin page: what its numbers mean.
-		queries: "reports",
-		schema: M,
-	},
-	"packages/notifications": {
-		// The port every way to reach a screen implements, and Web Push.
-		channels: M,
-		// The keys of a notification, what a push carries, where a tap goes.
-		contract: M,
-		// The log of what the notifier sent.
-		deliveries: M,
-		// The channel to this computer's own desktop.
-		desktop: M,
-		// The rules that decide whom to tell, about what, on which screen.
-		notifier: "notifications",
-		// A Person's notification settings. Not this computer's settings.
-		settings: "notifications",
-		// The push targets of each Person.
-		targets: "notifications",
-	},
-	"packages/semconv": {
-		registry: M,
-	},
-	"packages/telemetry": {
-		conventions: M,
-		otlp: M,
-		requests: M,
-		// The runs of this computer as spans and metric points.
-		runs: "runs",
-		// The environment of a harness session while the export is on.
-		sessions: M,
-		usage: M,
-	},
+	"apps/desktop": APP_DESKTOP,
+	"apps/insights": APP_INSIGHTS,
+	"apps/mobile": APP_MOBILE,
+	"apps/server": APP_SERVER,
+	"apps/web": APP_WEB,
+	"packages/agents": PACKAGE_AGENTS,
+	"packages/api": PACKAGE_API,
+	"packages/auth": PACKAGE_AUTH,
+	"packages/client": PACKAGE_CLIENT,
+	"packages/daemon": PACKAGE_DAEMON,
+	"packages/db": PACKAGE_DB,
+	"packages/devices": PACKAGE_DEVICES,
+	"packages/engine": PACKAGE_ENGINE,
+	"packages/flows": PACKAGE_FLOWS,
+	"packages/insights": PACKAGE_INSIGHTS,
+	"packages/notifications": PACKAGE_NOTIFICATIONS,
+	"packages/semconv": PACKAGE_SEMCONV,
+	"packages/telemetry": PACKAGE_TELEMETRY,
 };

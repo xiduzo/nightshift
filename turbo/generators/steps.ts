@@ -13,7 +13,13 @@ import { join } from "node:path";
 
 import { SERVER_PACKAGES } from "../../.dependency-cruiser.mjs";
 import { CAPABILITIES, VERTICALS } from "../../scripts/capabilities";
-import { GeneratorRefusal, withImport, withMapLine, withMember } from "./edits";
+import {
+	GeneratorRefusal,
+	mapFileOf,
+	withImport,
+	withMapLine,
+	withMember,
+} from "./edits";
 
 /** The values a template reads. */
 export type Data = Record<string, string>;
@@ -362,7 +368,7 @@ export function sliceSteps(root: string, answers: SliceAnswers): Step[] {
 		{ path: paths.neighbours, template: "slice/in-memory-neighbours.ts.hbs" },
 	];
 	// A sub-vertical is not on the capability map: its vertical is.
-	const map = paths.depth === 1 ? ["scripts/capabilities.ts"] : [];
+	const map = paths.depth === 1 ? [mapFileOf(pkg)] : [];
 	return [
 		...added.map((file): Step => ({ kind: "add", ...file, data: all })),
 		...map.map(

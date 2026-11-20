@@ -21,6 +21,7 @@ import type { PlopTypes } from "@turbo/gen";
 import generator from "../turbo/generators/config";
 import {
 	GeneratorRefusal,
+	mapFileOf,
 	withMapLine,
 	withMember,
 } from "../turbo/generators/edits";
@@ -45,6 +46,14 @@ const TEMPLATES = join(
 	"templates",
 );
 const MAP = readFileSync(join(import.meta.dir, "capabilities.ts"), "utf8");
+/** The files of the capability map that the generators edit, by path. */
+const MAP_FILES = Object.fromEntries(
+	["engine", "devices"].map((pkg) => [
+		mapFileOf(pkg),
+		readFileSync(join(import.meta.dir, "..", mapFileOf(pkg)), "utf8"),
+	]),
+);
+const ENGINE_MAP = MAP_FILES[mapFileOf("engine")] as string;
 const PLACEHOLDER = /\{\{\{(\w+)\}\}\}/g;
 
 /** The ring check of the fixture, with `engine/runs` as a mechanism: it has no rings here. */
@@ -99,6 +108,7 @@ function repositoryWithMap(): string {
 			// What the access port of a generated slice names: @filledBy engine/runs.
 			"packages/engine/src/runs/index.ts": "export {};\n",
 			"scripts/capabilities.ts": MAP,
+			...MAP_FILES,
 		},
 		roots,
 	);
@@ -314,7 +324,8 @@ describe("a sub-vertical", () => {
 		});
 		expect(
 			steps.some(
-				(step) => "path" in step && step.path === "scripts/capabilities.ts",
+				(step) =>
+					"path" in step && step.path.startsWith("scripts/capabilities"),
 			),
 		).toBe(false);
 		run(root, steps);
@@ -424,14 +435,16 @@ describe("the generators refuse, and write nothing", () => {
 
 describe("the edits", () => {
 	test("a map line goes into its package, in name order, before the comment of the next entry", () => {
-		const lines = withMapLine(MAP, "engine", "spend", "spend").split("\n");
-		const at = lines.indexOf('\t\tspend: "spend",');
-		const block = lines.indexOf('\t"packages/engine": {');
+		const lines = withMapLine(ENGINE_MAP, "engine", "spend", "spend").split(
+			"\n",
+		);
+		const at = lines.indexOf('\tspend: "spend",');
+		const block = lines.findIndex((line) => line.endsWith(" = {"));
 		expect(at).toBeGreaterThan(block);
-		expect(lines.slice(block, at).includes("\t},")).toBe(false);
-		expect(lines[at - 1]).toBe('\t\t"space-move": "space-move",');
-		expect(lines[at + 1]?.startsWith("\t\t//")).toBe(true);
-		expect(() => withMapLine(MAP, "engine", "gates", "gates")).toThrow(
+		expect(lines.slice(block, at).includes("};")).toBe(false);
+		expect(lines[at - 1]).toBe('\t"space-move": "space-move",');
+		expect(lines[at + 1]?.startsWith("\t//")).toBe(true);
+		expect(() => withMapLine(ENGINE_MAP, "engine", "gates", "gates")).toThrow(
 			GeneratorRefusal,
 		);
 	});

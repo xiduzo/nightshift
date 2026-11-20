@@ -123,6 +123,7 @@ pre-commit:
         - ".dependency-cruiser.mjs"
         - "scripts/hexagon-debt.txt"
         - "scripts/capabilities.ts"
+        - "scripts/capabilities/**"
         - "scripts/capability-debt.txt"
         - "scripts/test-workspaces*.ts"
         - "scripts/generators.test.ts"

@@ -150,7 +150,7 @@ Every app and every package except `ui`, `ui-native` and `config` is cut into ve
 
 ### The capability map
 
-`scripts/capabilities.ts` names every vertical of every checked workspace, and says what it is. It is typed data, not a document. `scripts/check-capabilities.ts` reads it. A vertical is one of three kinds:
+`scripts/capabilities.ts` names every vertical of every checked workspace, and says what it is. It is typed data, not a document. Each workspace has its own file of the map in `scripts/capabilities/`, and `scripts/capabilities.ts` puts them together. `scripts/check-capabilities.ts` reads it. A vertical is one of three kinds:
 
 - **A capability** is a product area. It holds the rules or the data of one thing a person meets in Night Shift. Its name is a word of `docs/glossary.md`, in the folder form: `runs`, `gates`, `flows`. The areas of the Insights admin have their own table, because the glossary does not name them.
 - **A mechanism** is shared machinery. It carries, stores, formats or connects for the capabilities. It decides nothing about a product area. Its name is its folder name. A word of the glossary does not make a vertical a capability: the run log, the Space archive and a Lease are mechanisms. An app's `shared/<name>` piece is a mechanism.
@@ -551,6 +551,6 @@ A generator refuses, and writes nothing, in these cases:
 11. Export the wire function and the types from the barrel. Remove each store from it.
 12. Call the wire function from the `wire.ts` of the package (in the engine, from `createEngine`).
 13. Keep each old test that goes through `createEngine` until a use-case test with the same assertion passes beside it.
-14. If the slice splits and a new vertical comes of it, add that vertical to `scripts/capabilities.ts` and to `scripts/hexagon-debt.txt`.
+14. If the slice splits and a new vertical comes of it, add that vertical to its package file in `scripts/capabilities/` and to `scripts/hexagon-debt.txt`.
 15. Remove the line of the slice from `scripts/hexagon-debt.txt` in the same commit.
 16. Run `bun run check:rings`, `bun scripts/check-verticals.ts`, `bun scripts/check-capabilities.ts` and `bun scripts/check-budgets.ts`.
