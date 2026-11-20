@@ -1,14 +1,19 @@
 import type { Database } from "@nightshift/db";
+import type { RowBatch } from "./contract";
 import { lastKnownProfiles, storedDeviceCopy } from "./device-config";
+import { deviceDocumentName, documentRowDelete } from "./documents";
 import type { EngineOptions } from "./engine-options";
 import type { createRunWalks } from "./graph";
+import { adoptLeaseRows } from "./leases";
 import {
+	adoptWalkerRows,
 	copyStamps,
 	type createLandedFeed,
 	type createRunHistory,
 	type RunLog,
 } from "./log";
-import type { PeerContext, PeerProjects } from "./peers";
+import type { DeviceRows, PeerContext, PeerProjects } from "./peers";
+import { cloneRowsOfDevice, projectSpaceOf } from "./projects";
 import { landedFacts } from "./read";
 
 /**
@@ -35,7 +40,7 @@ export function wireEnginePeers(deps: {
 	walks: Pick<ReturnType<typeof createRunWalks>, "exportWalk" | "ownFile">;
 	runFolders: PeerContext["runFolders"];
 	/** The Projects, made after the peers: the Projects record a Clone through the peers' relay. */
-	projects(): PeerProjects;
+	projects(): Omit<PeerProjects, "spaceOf">;
 	flows: PeerContext["flows"];
 	/** The other end of a move (`move.arrive`, R5). */
 	takeOver: PeerContext["runs"]["takeOver"];
@@ -67,6 +72,7 @@ export function wireEnginePeers(deps: {
 			defineWithoutFolder: (spaceId, input) =>
 				projects().defineWithoutFolder(spaceId, input),
 			take: (spaceId, taken) => projects().take(spaceId, taken),
+			spaceOf: (projectId) => projectSpaceOf(db, projectId),
 		},
 		runFolders: deps.runFolders,
 		flows: deps.flows,
@@ -100,5 +106,29 @@ export function wireEnginePeers(deps: {
 		async logFact(fact, writes) {
 			await runLog.append(fact, writes);
 		},
+		deviceRows: deviceRowsOf(db),
 	});
+}
+
+/**
+ * The engine's rows of a Device on this database (`PeerContext.deviceRows`):
+ * the Clones (`projects`), the Device document (`documents`), the runs,
+ * steps and events (`log`) and the leases (`leases`). The statements leave
+ * as the opaque batch the port names (G2).
+ */
+export function deviceRowsOf(db: Database): DeviceRows {
+	const clones = cloneRowsOfDevice(db);
+	return {
+		forget: (deviceId) =>
+			[
+				clones.forget(deviceId),
+				documentRowDelete(db, deviceDocumentName(deviceId)),
+			] as unknown as RowBatch,
+		adopt: (move) =>
+			[
+				clones.adopt(move.from, move.to),
+				...adoptWalkerRows(db, move),
+				adoptLeaseRows(db, move.from, move.to),
+			] as unknown as RowBatch,
+	};
 }

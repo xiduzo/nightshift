@@ -58,6 +58,10 @@ export type PeerEngine = Engine & {
 	 * Hosts. The Host's exchange serves it.
 	 */
 	readonly archive: SpaceArchive;
+	/** The engine's rows of a Device: what an adoption or a forget puts in its batch. */
+	readonly deviceRows: BuiltPeers["deviceRows"];
+	/** A run's Walker, Space and Project, or null: what a keeper of secrets checks a step's run against. */
+	readonly runPlace: BuiltPeers["runPlace"];
 };
 
 /**
@@ -133,5 +137,7 @@ export function createPeerEngine(
 		projects: built.projects,
 		keptDevice: built.keptDevice,
 		archive: built.archive,
+		deviceRows: built.deviceRows,
+		runPlace: built.runPlace,
 	};
 }

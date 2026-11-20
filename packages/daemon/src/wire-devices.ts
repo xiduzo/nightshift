@@ -9,6 +9,7 @@ import {
 	setSelfOwner,
 	startDevices,
 } from "@nightshift/devices";
+import { documentRows } from "@nightshift/engine";
 import { isThisComputer } from "./http";
 import {
 	type DaemonEnv,
@@ -145,6 +146,7 @@ export async function wireDaemonDevices(
 		servedDocuments({
 			db,
 			documents,
+			rows: documentRows(db),
 			registry: devices.engine.devices,
 			deviceKey: (token) => devices.host.syncKey(token),
 			sessions: {

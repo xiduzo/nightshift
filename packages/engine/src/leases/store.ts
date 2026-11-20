@@ -2,6 +2,18 @@ import type { Database } from "@nightshift/db";
 import { runLease } from "@nightshift/db/schema";
 import { asDate, instant } from "@nightshift/time";
 import { and, eq, gt, inArray, lte, or, sql } from "drizzle-orm";
+
+/**
+ * The statement that makes `to` the holder of every lease `from` holds
+ * (ADR 20), for the batch of a Device's adoption. It reads nothing.
+ */
+export function adoptLeaseRows(db: Database, from: string, to: string) {
+	return db
+		.update(runLease)
+		.set({ walkerId: to })
+		.where(eq(runLease.walkerId, from));
+}
+
 import type {
 	LeaseAnswer,
 	LeaseHolder,

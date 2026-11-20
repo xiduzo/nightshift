@@ -30,6 +30,11 @@ export type DocumentRows = {
 	sizes(prefix: string): Promise<{ name: string; bytes: number }[]>;
 };
 
+/** The statement that removes a document's row, for the caller's batch. It reads nothing. */
+export function documentRowDelete(db: Database, name: string) {
+	return db.delete(ydoc).where(eq(ydoc.name, name));
+}
+
 export function documentRows(db: Database): DocumentRows {
 	return {
 		async fetch(name) {

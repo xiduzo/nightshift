@@ -5,6 +5,7 @@ import {
 	createRunHistory,
 	createRunLog,
 	createSandbox,
+	deviceRowsOn,
 	parseEventRow,
 	type Sandbox,
 } from "@nightshift/engine/testing";
@@ -25,6 +26,7 @@ function newRegistry() {
 	});
 	return createDeviceRegistry({
 		db: sandbox.db,
+		deviceRows: deviceRowsOn(sandbox.db),
 		logFact: async (fact, writes) => {
 			await log.append(fact, writes);
 		},

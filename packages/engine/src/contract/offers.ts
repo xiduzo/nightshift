@@ -12,7 +12,7 @@ export type OffersPort = {
 		/** `flows`: the project's flows, read only for a schedule on another Person's Device. */
 		project: { id: string; flows(): Promise<FlowSources> },
 		spaceId: string,
-		actor: Actor | undefined,
+		actor: Actor,
 		schedules: readonly Schedule[],
 	): Promise<Schedule[]>;
 };

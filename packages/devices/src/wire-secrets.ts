@@ -66,8 +66,14 @@ export function wireSecrets(
 	const projectStore = createProjectSecretStore({ db, cipher });
 	/** The Space secrets this computer keeps: of the Spaces it keeps, as their Host or without one. */
 	const spaceStore = createSpaceSecretStore({ db, cipher });
+	/** Where the engine has a Project (a removed one too) and a run. */
+	const places = {
+		spaceOf: (projectId: string) => engine.projects.spaceOf(projectId),
+		runPlace: (runId: string) => engine.runPlace(runId),
+	};
 	const projectSecrets = deviceProjectSecrets({
 		db,
+		places,
 		hostSpaces: engine.hostSpaces,
 		links,
 		store: projectStore,
@@ -85,6 +91,7 @@ export function wireSecrets(
 		personalSecrets: createPersonalSecretsHost({ store: personalStore }),
 		projectSecrets: createProjectSecretsHost({
 			db,
+			places,
 			store: projectStore,
 			spaceStore,
 			hostOf: (spaceId) => engine.hostSpaces.hostOf(spaceId),

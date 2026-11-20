@@ -8,3 +8,4 @@ export {
 	type LandedScope,
 } from "./landed";
 export { withoutPrivatePaths } from "./private-paths";
+export { adoptWalkerRows } from "./walker-rows";

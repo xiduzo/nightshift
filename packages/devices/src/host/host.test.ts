@@ -10,6 +10,7 @@ import {
 	createRunBus,
 	createRunHistory,
 	createRunLog,
+	deviceRowsOn,
 } from "@nightshift/engine/testing";
 import { eq } from "drizzle-orm";
 import { createDeviceRegistry, setSelfOwner } from "../registry";
@@ -33,6 +34,7 @@ beforeEach(async () => {
 		db: people.db,
 		registry: createDeviceRegistry({
 			db: people.db,
+			deviceRows: deviceRowsOn(people.db),
 			logFact: async (fact, writes) => {
 				await log.append(fact, writes);
 			},

@@ -104,3 +104,15 @@ export async function spaceProjectRows(
 		walked: Boolean(walked),
 	}));
 }
+
+/** The Space of a Project, a removed one too. Null for one this Replica lacks. */
+export async function projectSpaceOf(
+	db: Database,
+	projectId: string,
+): Promise<string | null> {
+	const [kept] = await db
+		.select({ spaceId: project.spaceId })
+		.from(project)
+		.where(eq(project.id, projectId));
+	return kept?.spaceId ?? null;
+}

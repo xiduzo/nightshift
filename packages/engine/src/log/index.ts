@@ -51,6 +51,7 @@ export {
 	type WaitReason,
 } from "./events";
 export {
+	adoptWalkerRows,
 	createLandedFeed,
 	createRunHistory,
 	ForeignRowsError,

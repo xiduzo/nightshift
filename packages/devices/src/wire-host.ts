@@ -85,7 +85,8 @@ export function wireDevices(
 		identity: {
 			machine: at.machine,
 			keysOf: at.keysOf,
-			adopt: (deviceId, walkerSeq) => adoptSelfDevice(db, deviceId, walkerSeq),
+			adopt: (deviceId, walkerSeq) =>
+				adoptSelfDevice(db, engine.deviceRows, deviceId, walkerSeq),
 		},
 		localOnly: at.localOnly,
 		settings: deps.settings,

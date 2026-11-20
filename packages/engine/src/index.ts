@@ -177,7 +177,13 @@ export {
 	type OllamaService,
 	type OllamaStatus,
 } from "./ollama";
-export type { PeerContext, PeerProfiles, PeerProjects, Peers } from "./peers";
+export type {
+	DeviceRows,
+	PeerContext,
+	PeerProfiles,
+	PeerProjects,
+	Peers,
+} from "./peers";
 export {
 	type OfferedPlacement,
 	type PlacedDevice,

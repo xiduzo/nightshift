@@ -5,9 +5,7 @@ import {
 	roleAllows,
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { project, run } from "@nightshift/db/schema";
 import { Refusal } from "@nightshift/refusal";
-import { eq } from "drizzle-orm";
 import type { Caller, ProjectSecretName } from "../contract";
 import type { WorkHub } from "../work";
 import type { KeptProjectSecret, ProjectSecretStore } from "./project-store";
@@ -119,12 +117,12 @@ export async function spaceAccess(
  * `who.saves`.
  */
 export async function projectAccess(
-	db: Database,
+	places: Pick<EnginePlaces, "spaceOf">,
 	hostSpaces: { hostOf(spaceId: string): Promise<string | null> },
 	at: ProjectRef,
 	who: SecretsAccess,
 ): Promise<void> {
-	await keptHere(db, hostSpaces, at);
+	await keptHere(places, hostSpaces, at);
 	memberWhoSaves(await who.roleIn(at.spaceId), who.saves);
 }
 
@@ -136,19 +134,29 @@ function memberWhoSaves(role: Role | null, saves: boolean): void {
 	}
 }
 
+/**
+ * The places the engine knows of a Project and of a run (`PeerContext`):
+ * a removed Project still has its Space.
+ */
+export type EnginePlaces = {
+	/** The Space of a Project, removed or not. Null for one this Replica lacks. */
+	spaceOf(projectId: string): Promise<string | null>;
+	/** A run's Walker, Space and Project, or null for a run this Replica lacks. */
+	runPlace(
+		runId: string,
+	): Promise<{ walkerId: string; spaceId: string; projectId: string } | null>;
+};
+
 /** Refuses a Project that is not in the Space named, or a Space another Host keeps. */
 async function keptHere(
-	db: Database,
+	places: Pick<EnginePlaces, "spaceOf">,
 	hostSpaces: { hostOf(spaceId: string): Promise<string | null> },
 	at: ProjectRef,
 ): Promise<void> {
-	const [kept] = await db
-		.select({ spaceId: project.spaceId })
-		.from(project)
-		.where(eq(project.id, at.projectId));
+	const kept = await places.spaceOf(at.projectId);
 	if (
-		!kept ||
-		kept.spaceId !== at.spaceId ||
+		kept === null ||
+		kept !== at.spaceId ||
 		(await hostSpaces.hostOf(at.spaceId)) !== null
 	) {
 		throw new Refusal("not-found", NOT_A_PROJECT_HERE);
@@ -194,6 +202,8 @@ export async function withNames(
 
 export function createProjectSecretsHost(deps: {
 	db: Database;
+	/** Where the engine has a Project and a run. */
+	places: EnginePlaces;
 	store: ProjectSecretStore;
 	spaceStore: SpaceSecretStore;
 	/** The Host that keeps a Space, or null for one this computer keeps. */
@@ -213,7 +223,10 @@ export function createProjectSecretsHost(deps: {
 		at: ProjectRef,
 		saves: boolean,
 	): Promise<void> {
-		return projectAccess(db, hostSpaces, at, { roleIn: caller.roleIn, saves });
+		return projectAccess(deps.places, hostSpaces, at, {
+			roleIn: caller.roleIn,
+			saves,
+		});
 	}
 
 	/** The Caller's Person is a Member of the Space, and may save Flows there when `saves`. */
@@ -231,15 +244,8 @@ export function createProjectSecretsHost(deps: {
 			return withNames(db, await deps.store.list(at.projectId));
 		},
 		async values(caller, { names, ...step }) {
-			await keptHere(db, hostSpaces, step);
-			const [row] = await db
-				.select({
-					spaceId: run.spaceId,
-					projectId: run.projectId,
-					walkerId: run.walkerId,
-				})
-				.from(run)
-				.where(eq(run.id, step.runId));
+			await keptHere(deps.places, hostSpaces, step);
+			const row = await deps.places.runPlace(step.runId);
 			if (
 				!row ||
 				row.spaceId !== step.spaceId ||

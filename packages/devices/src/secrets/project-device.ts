@@ -1,13 +1,12 @@
 import { roleIn } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { run } from "@nightshift/db/schema";
 import type { ProjectSecrets } from "@nightshift/engine/device-config";
 import { Refusal } from "@nightshift/refusal";
-import { eq } from "drizzle-orm";
 import type { HostClient } from "../contract";
 import type { DeviceLinks, HostSpaces } from "../links";
 import { askHost, PERSONAL_DEADLINE_MS } from "./device";
 import {
+	type EnginePlaces,
 	keptStepValues,
 	NOT_YOUR_STEP,
 	projectAccess,
@@ -43,6 +42,8 @@ export const OWNER_ONLY =
  */
 export function deviceProjectSecrets(deps: {
 	db: Database;
+	/** Where the engine has a Project and a run. */
+	places: EnginePlaces;
 	hostSpaces: Pick<HostSpaces, "hostOf">;
 	/** Lazy: the links are made after this. */
 	links(): Pick<DeviceLinks, "get">;
@@ -83,7 +84,12 @@ export function deviceProjectSecrets(deps: {
 	): Promise<T> {
 		const hostId = await deps.hostSpaces.hostOf(at.spaceId);
 		if (hostId === null) {
-			await projectAccess(db, deps.hostSpaces, at, byPerson(personId, saves));
+			await projectAccess(
+				deps.places,
+				deps.hostSpaces,
+				at,
+				byPerson(personId, saves),
+			);
 			return here();
 		}
 		if (personId !== deps.ownerId) throw new Refusal("forbidden", OWNER_ONLY);
@@ -124,10 +130,7 @@ export function deviceProjectSecrets(deps: {
 			const link = await keeper(step.spaceId);
 			if (link === null) {
 				// This computer keeps the Space: its own run of the Project.
-				const [row] = await db
-					.select({ spaceId: run.spaceId, projectId: run.projectId })
-					.from(run)
-					.where(eq(run.id, step.runId));
+				const row = await deps.places.runPlace(step.runId);
 				if (row?.spaceId !== step.spaceId || row.projectId !== step.projectId) {
 					throw new Refusal("forbidden", NOT_YOUR_STEP);
 				}

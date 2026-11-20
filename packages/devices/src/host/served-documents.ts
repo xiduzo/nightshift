@@ -1,6 +1,6 @@
 import { documentAccess, type SyncAuthorize } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { documentRows, type SyncedDocuments } from "@nightshift/engine";
+import type { SyncedDocuments } from "@nightshift/engine";
 import type * as Y from "yjs";
 import type { DeviceRegistry } from "../registry";
 
@@ -46,6 +46,8 @@ type SessionAccess = Pick<
 export function servedDocuments(deps: {
 	db: Database;
 	documents: Pick<SyncedDocuments, "find" | "documentOf">;
+	/** The rows of the documents in the Replica (the engine's `documentRows`, built by the composition). */
+	rows: Omit<KeptDocuments, "has">;
 	registry: Pick<DeviceRegistry, "keptDocumentOwner">;
 	/** A Device key as the relay checks it (`Host.syncKey`). */
 	deviceKey: NonNullable<Parameters<typeof documentAccess>[0]["deviceKey"]>;
@@ -56,7 +58,7 @@ export function servedDocuments(deps: {
 		document: async (name) => (await deps.documents.find(name))?.doc ?? null,
 		kept: {
 			has: async (name) => (await keptOwner(name)) !== null,
-			...documentRows(deps.db),
+			...deps.rows,
 		},
 		authorize: documentAccess({
 			...deps.sessions,

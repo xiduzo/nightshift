@@ -46,10 +46,10 @@ export function createScheduleOffers(deps: {
 	return async function schedulesWithOffers(
 		project: { id: string; flows(): Promise<FlowSources> },
 		spaceId: string,
-		actor: Actor | undefined,
+		actor: Actor,
 		schedules: readonly Schedule[],
 	): Promise<Schedule[]> {
-		const person = actor ? personOf(actor) : null;
+		const person = personOf(actor);
 		if (person === null || schedules.length === 0) return [...schedules];
 		const personId = await personInSpace(db, spaceId, person);
 		const devices = await deps.devicesFor(spaceId, personId, project.id);

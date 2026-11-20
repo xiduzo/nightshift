@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { NIGHT_SHIFT } from "@nightshift/engine";
 import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
 import { createPrivatePaths } from "./private-paths";
 
@@ -88,7 +89,7 @@ describe("a run's worktree path", () => {
 	});
 
 	test("shows to a call with no Person: this computer's own use", async () => {
-		const shown = await pathsFor()(sandbox.spaceId, undefined);
+		const shown = await pathsFor()(sandbox.spaceId, NIGHT_SHIFT);
 		expect(await shown(run("kim-pc"))).toEqual(run("kim-pc"));
 	});
 });

@@ -23,6 +23,7 @@ export { openRunBundle } from "../read/run-bundle";
 
 export { answerCostsOn } from "./answer-costs";
 export { dashboardOver } from "./dashboard";
+export { deviceRowsOn, placesOn } from "./device-rows";
 export { testInbox } from "./gates";
 export { joinSpace } from "./join-space";
 export { testKnowledge } from "./knowledge";

@@ -111,6 +111,10 @@ export type BuiltPeers = {
 	keptDevice: PeerContext["keptDevice"];
 	/** This Replica's Space archive, connected to its Hosts. */
 	archive: SpaceArchive;
+	/** The engine's rows of a Device, for a batch of its own rows (`PeerContext.deviceRows`). */
+	deviceRows: PeerContext["deviceRows"];
+	/** A run's Walker, Space and Project, or null for a run this Replica lacks. */
+	runPlace: PeerContext["history"]["runPlace"];
 };
 
 /** The Hosts of a computer alone: none, so it keeps every Space. */
@@ -137,6 +141,7 @@ export function createPeers(
 		db,
 		logFact: context.logFact,
 		history,
+		deviceRows: context.deviceRows,
 		now,
 		...(options.presence ? { presence: options.presence } : {}),
 	});
@@ -294,5 +299,7 @@ export function createPeers(
 		projects: context.projects,
 		keptDevice: context.keptDevice,
 		archive,
+		deviceRows: context.deviceRows,
+		runPlace: (runId) => history.runPlace(runId),
 	};
 }

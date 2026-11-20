@@ -1,6 +1,6 @@
 import type { FlowSources, ProfileSettings } from "@nightshift/flows";
 import type { WalkFile, WalkRef } from "./archive";
-import type { Actor, OffersPort, Relay } from "./contract";
+import type { Actor, OffersPort, Relay, RowBatch } from "./contract";
 import type { Device } from "./device";
 import type { DeviceCopy } from "./device-config";
 import type { SpaceDocuments } from "./documents";
@@ -48,7 +48,7 @@ export type Peers = {
 	 */
 	pathsFor(
 		spaceId: string,
-		actor: Actor | undefined,
+		actor: Actor,
 	): Promise<<T extends WithPaths>(summary: T) => Promise<T>>;
 };
 
@@ -101,6 +101,31 @@ export type PeerContext = {
 	 * the Space it names, in one batch with the rows it names (`before`).
 	 */
 	logFact(fact: PeerFact, writes?: Pick<EventWrites, "before">): Promise<void>;
+	/**
+	 * The engine's rows of a Device, as statements for the one batch a
+	 * peer runs with its own `device` rows (G2).
+	 */
+	deviceRows: DeviceRows;
+};
+
+/**
+ * The statements of the engine's rows that name a Device (`PeerContext.deviceRows`).
+ * They read nothing: the caller puts them in its batch, in this order.
+ */
+export type DeviceRows = {
+	/** A revoked Device is forgotten: its Clones and its Device document. */
+	forget(deviceId: string): RowBatch;
+	/**
+	 * This install becomes the Device `to` (ADR 20): the Clones, runs, steps,
+	 * events and leases of `from` name `to`. The events count on from
+	 * `lastSeq`, and `joined`, when given, holds the place at that count.
+	 */
+	adopt(move: {
+		from: string;
+		to: string;
+		lastSeq: number;
+		joined: Extract<PeerFact, { type: "DeviceJoined" }> | null;
+	}): RowBatch;
 };
 
 /** The facts of no run the peers log: a Device paired, gone, online or offline; an Offer made or withdrawn. */
@@ -121,6 +146,11 @@ export type PeerFact = {
 	};
 }[PeerFactType];
 
+/** The Space of a Project, removed or not. Null for one this Replica lacks. */
+type PeerProjectSpaces = {
+	spaceOf(projectId: string): Promise<string | null>;
+};
+
 /**
  * The Projects as the peers get them (`PeerContext.projects`): a project
  * a person has not removed (`find`), the Projects of a Space and those of
@@ -128,23 +158,25 @@ export type PeerFact = {
  * (`clones`, `clonePath`, and `clonedHere` that a Device tells its Host),
  * and on a Host, a Device's Clones, a Project it asks for and the
  * Projects it takes (`recordClone`, `setClones`, `addFromRemote`,
- * `defineWithoutFolder`, `take`).
+ * `defineWithoutFolder`, `take`), and the Space of a Project, a removed
+ * one too (`spaceOf`).
  */
-export type PeerProjects = Pick<
-	Projects,
-	| "find"
-	| "ofSpace"
-	| "matching"
-	| "clones"
-	| "clonePath"
-	| "recordClone"
-	| "setClones"
-	| "clonedHere"
-	| "forgetDevice"
-	| "addFromRemote"
-	| "defineWithoutFolder"
-	| "take"
->;
+export type PeerProjects = PeerProjectSpaces &
+	Pick<
+		Projects,
+		| "find"
+		| "ofSpace"
+		| "matching"
+		| "clones"
+		| "clonePath"
+		| "recordClone"
+		| "setClones"
+		| "clonedHere"
+		| "forgetDevice"
+		| "addFromRemote"
+		| "defineWithoutFolder"
+		| "take"
+	>;
 
 /** The profiles a run's steps may use, as this Replica knows them (`PeerContext.profiles`). */
 export type PeerProfiles = {

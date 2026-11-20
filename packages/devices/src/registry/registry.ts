@@ -1,7 +1,7 @@
 import { personalSpaceIdBySlug } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { clone, device, ydoc } from "@nightshift/db/schema";
-import type { PeerContext } from "@nightshift/engine";
+import { device } from "@nightshift/db/schema";
+import type { DeviceRows, PeerContext } from "@nightshift/engine";
 import { deviceDocumentName } from "@nightshift/engine/device-config";
 import { Refusal } from "@nightshift/refusal";
 import {
@@ -20,6 +20,7 @@ import {
 	ne,
 	sql,
 } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 
 /**
  * The Devices that paired with this Host: their `device` rows, whether they
@@ -125,6 +126,8 @@ export type DeviceRegistry = {
 	 * one whose home Host it is, with access. Null for any other name.
 	 */
 	keptDocumentOwner(documentName: string): Promise<string | null>;
+	/** The last event count this Replica has of a Device as a Walker: 0 for none (ADR 20). */
+	lastWalkerSeq(deviceId: string): Promise<number>;
 };
 
 /** The names of these Devices (this computer's own too), by id. A Device this Replica has no row of is missing. */
@@ -173,8 +176,10 @@ export function createDeviceRegistry(deps: {
 	db: Database;
 	/** Logs a Device's facts (`PeerContext.logFact`). */
 	logFact: PeerContext["logFact"];
-	/** The engine's event log: the latest presence of each Device. */
-	history: Pick<PeerContext["history"], "devicePresence">;
+	/** The engine's event log: the latest presence of each Device, and the last count of a Walker. */
+	history: Pick<PeerContext["history"], "devicePresence" | "lastWalkerSeq">;
+	/** The engine's rows of a Device, for the batch that forgets it (`PeerContext.deviceRows`). */
+	deviceRows: Pick<DeviceRows, "forget">;
 	/** The presence of the registry before a reload. Default: every Device offline. */
 	presence?: DevicePresence;
 	now?: () => number;
@@ -399,11 +404,14 @@ export function createDeviceRegistry(deps: {
 				);
 			}
 			online.delete(id);
-			await db.batch([
-				db.delete(clone).where(eq(clone.deviceId, id)),
-				db.delete(ydoc).where(eq(ydoc.name, deviceDocumentName(id))),
-				db.delete(device).where(and(eq(device.id, id), eq(device.self, false))),
-			]);
+			// The engine's statements first: its Clones, then its Device document.
+			const [first, ...rest] = deps.deviceRows.forget(
+				id,
+			) as unknown as BatchItem<"sqlite">[];
+			const forgetDevice = db
+				.delete(device)
+				.where(and(eq(device.id, id), eq(device.self, false)));
+			await db.batch(first ? [first, ...rest, forgetDevice] : [forgetDevice]);
 		},
 
 		async keptDocumentOwner(documentName) {
@@ -413,5 +421,7 @@ export function createDeviceRegistry(deps: {
 			if (!found || found.revokedAt || found.homeHost === null) return null;
 			return found.ownerId;
 		},
+
+		lastWalkerSeq: (deviceId) => deps.history.lastWalkerSeq(deviceId),
 	};
 }

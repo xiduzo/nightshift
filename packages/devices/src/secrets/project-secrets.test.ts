@@ -9,7 +9,11 @@ import {
 	user,
 } from "@nightshift/db/schema";
 import type { Device } from "@nightshift/engine";
-import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
+import {
+	createSandbox,
+	placesOn,
+	type Sandbox,
+} from "@nightshift/engine/testing";
 import { asDate } from "@nightshift/time";
 import type { WorkFor, WorkRequest } from "../contract";
 import type { HostExchange } from "../exchange";
@@ -172,6 +176,7 @@ describe("the Host's half", () => {
 		const space = spaceStore();
 		const host = createProjectSecretsHost({
 			db: sandbox.db,
+			places: placesOn(sandbox.db),
 			store: s,
 			spaceStore: space,
 			hostOf: async () => options.keptBy ?? null,
@@ -489,6 +494,7 @@ describe("the Device's half", () => {
 		const here = store();
 		const projects = deviceProjectSecrets({
 			db: sandbox.db,
+			places: placesOn(sandbox.db),
 			hostSpaces: { hostOf: async () => null },
 			links: () => linksTo(new Map()),
 			store: here,
@@ -529,6 +535,7 @@ describe("the Device's half", () => {
 			admit: admitEvery({ roles: { [sandbox.spaceId]: "member" } }),
 			projectSecrets: createProjectSecretsHost({
 				db: hostSandbox.db,
+				places: placesOn(hostSandbox.db),
 				store: hostStore,
 				spaceStore: hostSpaceStore,
 				hostOf: async () => null,
@@ -542,6 +549,7 @@ describe("the Device's half", () => {
 		const projects = deviceProjectSecrets({
 			// This Device's own records: the Host keeps the Space.
 			db: hostSandbox.db,
+			places: placesOn(hostSandbox.db),
 			hostSpaces: { hostOf: async () => "host" },
 			links: () => linksTo(new Map([["host", client]])),
 			store: store(),

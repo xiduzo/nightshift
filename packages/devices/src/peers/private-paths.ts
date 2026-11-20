@@ -19,8 +19,8 @@ export function createPrivatePaths(deps: {
 	ownerId(): string | null;
 }) {
 	const { db, registry } = deps;
-	return async function pathsFor(spaceId: string, actor: Actor | undefined) {
-		const person = actor ? personOf(actor) : null;
+	return async function pathsFor(spaceId: string, actor: Actor) {
+		const person = personOf(actor);
 		const viewer =
 			person !== null ? await personInSpace(db, spaceId, person) : null;
 		const here = await personInSpace(db, spaceId, deps.ownerId());

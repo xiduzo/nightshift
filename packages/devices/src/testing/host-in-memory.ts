@@ -9,6 +9,7 @@ import { hostLink, user } from "@nightshift/db/schema";
 import {
 	createFlowDocuments,
 	createSyncedDocuments,
+	documentRows,
 	type FlowDocuments,
 	type SyncedDocuments,
 } from "@nightshift/engine";
@@ -176,6 +177,7 @@ export async function hostInMemory(
 		documents: servedDocuments({
 			db: a.db,
 			documents: synced,
+			rows: documentRows(a.db),
 			registry: host.devices,
 			deviceKey: async (sent) => keys.get(sent) ?? null,
 			sessions: {

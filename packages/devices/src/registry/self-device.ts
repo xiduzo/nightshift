@@ -3,16 +3,10 @@ import { existsSync } from "node:fs";
 import { hostname } from "node:os";
 import { personalSpaceIdBySlug } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import {
-	clone,
-	device,
-	event,
-	run,
-	runCommand,
-	runLease,
-	step,
-} from "@nightshift/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { device, runCommand } from "@nightshift/db/schema";
+import type { DeviceRows } from "@nightshift/engine";
+import { eq } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 
 /**
  * This computer's Device: the one `device` row with `self` set. Its id is
@@ -182,9 +176,12 @@ export async function selfDevice(
  * drops an event whose identity it knows. So this install's events count
  * on from `lastSeq`, the last the Host has of that Device. A fact at that
  * count holds the place: the next event takes the number after the highest.
+ * The engine's rows (`rows`, `PeerContext.deviceRows`) go in the same batch,
+ * between this computer's `device` rows and its Commands.
  */
 export async function adoptSelfDevice(
 	db: Database,
+	rows: Pick<DeviceRows, "adopt">,
 	deviceId: string,
 	lastSeq = 0,
 ): Promise<void> {
@@ -204,38 +201,26 @@ export async function adoptSelfDevice(
 			.insert(device)
 			.values({ ...row, id: deviceId, self: true })
 			.onConflictDoUpdate({ target: device.id, set: { self: true } }),
-		db.update(clone).set({ deviceId }).where(eq(clone.deviceId, from)),
-		db.update(run).set({ walkerId: deviceId }).where(eq(run.walkerId, from)),
-		db.update(run).set({ deviceId }).where(eq(run.deviceId, from)),
-		db.update(step).set({ deviceId }).where(eq(step.deviceId, from)),
-		db
-			.update(event)
-			.set({
-				walkerId: deviceId,
-				walkerSeq: sql`${event.walkerSeq} + ${lastSeq}`,
-			})
-			.where(eq(event.walkerId, from)),
-		...(lastSeq > 0 && spaceId !== null
-			? [
-					db.insert(event).values({
-						spaceId,
-						type: "DeviceJoined",
-						payload: JSON.stringify({
-							deviceId,
-							name: row.name,
-							platform: row.platform,
-							ownerId: row.ownerId,
-							home: true,
-						}),
-						walkerId: deviceId,
-						walkerSeq: lastSeq,
-					}),
-				]
-			: []),
-		db
-			.update(runLease)
-			.set({ walkerId: deviceId })
-			.where(eq(runLease.walkerId, from)),
+		// The engine's statements: Clones, runs, steps, events and leases.
+		...(rows.adopt({
+			from,
+			to: deviceId,
+			lastSeq,
+			joined:
+				lastSeq > 0 && spaceId !== null && row.ownerId
+					? {
+							type: "DeviceJoined",
+							spaceId,
+							payload: {
+								deviceId,
+								name: row.name,
+								platform: row.platform,
+								ownerId: row.ownerId,
+								home: true,
+							},
+						}
+					: null,
+		}) as unknown as BatchItem<"sqlite">[]),
 		db
 			.update(runCommand)
 			.set({ walkerId: deviceId })

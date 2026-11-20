@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import type { Database } from "@nightshift/db";
 import { agentSession, event, run, step } from "@nightshift/db/schema";
 import { instant } from "@nightshift/time";
-import { and, asc, eq, gt, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNotNull, max, sql } from "drizzle-orm";
 import { asCommand, type RunLog } from "../run-log";
 import { runsArriving } from "../run-row";
 import {
@@ -58,6 +58,25 @@ import { createLandedFeed, type LandedFeed } from "./landed";
  */
 
 export type RunHistory = ReturnType<typeof createRunHistory>;
+
+/**
+ * A run's Walker, Space and Project, or null for a run this Replica
+ * lacks: what a keeper of secrets checks a step's run against.
+ */
+export async function runPlaceOf(
+	db: Database,
+	runId: string,
+): Promise<{ walkerId: string; spaceId: string; projectId: string } | null> {
+	const [row] = await db
+		.select({
+			spaceId: run.spaceId,
+			projectId: run.projectId,
+			walkerId: run.walkerId,
+		})
+		.from(run)
+		.where(eq(run.id, runId));
+	return row ?? null;
+}
 
 export function createRunHistory(deps: {
 	db: Database;
@@ -200,6 +219,18 @@ export function createRunHistory(deps: {
 		return row ?? null;
 	}
 
+	/** A run's Walker, Space and Project, or null (`runPlaceOf`). */
+	const runPlace = (runId: string) => runPlaceOf(db, runId);
+
+	/** The last event count this Replica has of a Walker: 0 for none (ADR 20). */
+	async function lastWalkerSeq(walkerId: string): Promise<number> {
+		const [row] = await db
+			.select({ last: max(event.walkerSeq) })
+			.from(event)
+			.where(eq(event.walkerId, walkerId));
+		return row?.last ?? 0;
+	}
+
 	/** A step's run, Walker and Space, or null. */
 	async function stepOwner(
 		stepId: string,
@@ -310,6 +341,8 @@ export function createRunHistory(deps: {
 		rowsAfter,
 		ingest,
 		runOwner,
+		runPlace,
+		lastWalkerSeq,
 		stepOwner,
 		ownStepFiles,
 		ownTranscript,

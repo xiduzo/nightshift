@@ -7,5 +7,5 @@
 
 export { leaseHolds } from "./holds";
 export { createLeaseKeeper } from "./keeper";
-export { createLeaseStore } from "./store";
+export { adoptLeaseRows, createLeaseStore } from "./store";
 export { leasesLost, trackHeldLeases } from "./tracking";

@@ -37,4 +37,8 @@ export {
 	documentName,
 	type SyncedDocuments,
 } from "./synced-documents";
-export { documentRows, type PersistedDocument } from "./ydoc";
+export {
+	documentRowDelete,
+	documentRows,
+	type PersistedDocument,
+} from "./ydoc";

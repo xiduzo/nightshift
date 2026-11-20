@@ -14,11 +14,9 @@ import {
 	startPairing,
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { event } from "@nightshift/db/schema";
 import type { SettingsStore } from "@nightshift/engine/device-config";
 import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
-import { eq, max } from "drizzle-orm";
 import {
 	type HostHello,
 	NOT_A_HOST,
@@ -116,14 +114,6 @@ export function createHost(deps: {
 				? [{ id: deps.self.id, name: deps.self.name }]
 				: [];
 		return [...host, ...others.map((d) => ({ id: d.id, name: d.name }))];
-	}
-	/** The last event count this Host has of a Walker. */
-	async function lastWalkerSeq(walkerId: string): Promise<number> {
-		const [row] = await deps.db
-			.select({ last: max(event.walkerSeq) })
-			.from(event)
-			.where(eq(event.walkerId, walkerId));
-		return row?.last ?? 0;
 	}
 	function prune() {
 		const now = timeNow();
@@ -233,7 +223,9 @@ export function createHost(deps: {
 				key,
 				personId: answer.personId,
 				deviceId: paired.id,
-				...(adopted ? { walkerSeq: await lastWalkerSeq(adopted.id) } : {}),
+				...(adopted
+					? { walkerSeq: await registry.lastWalkerSeq(adopted.id) }
+					: {}),
 				host: who(),
 				hostAdmin: await isHostAdmin(deps.db, answer.personId),
 			};

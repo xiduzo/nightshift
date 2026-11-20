@@ -3,6 +3,7 @@ import { clone, device, event, project } from "@nightshift/db/schema";
 import {
 	createRunLog,
 	createSandbox,
+	deviceRowsOn,
 	type Sandbox,
 } from "@nightshift/engine/testing";
 import { eq } from "drizzle-orm";
@@ -144,7 +145,11 @@ describe("adoptSelfDevice", () => {
 	test("this install becomes the Device, and its name and owner stay", async () => {
 		await sandbox.db.update(device).set({ name: "MacBook" });
 		const [before] = await sandbox.db.select().from(device);
-		await adoptSelfDevice(sandbox.db, "known-to-the-host");
+		await adoptSelfDevice(
+			sandbox.db,
+			deviceRowsOn(sandbox.db),
+			"known-to-the-host",
+		);
 		const rows = await sandbox.db.select().from(device);
 		expect(rows).toHaveLength(1);
 		expect(rows[0]).toMatchObject({
@@ -179,7 +184,11 @@ describe("adoptSelfDevice", () => {
 			spaceId: sandbox.spaceId,
 		});
 
-		await adoptSelfDevice(sandbox.db, "known-to-the-host");
+		await adoptSelfDevice(
+			sandbox.db,
+			deviceRowsOn(sandbox.db),
+			"known-to-the-host",
+		);
 
 		expect(
 			await sandbox.db.select({ deviceId: clone.deviceId }).from(clone),
@@ -207,7 +216,12 @@ describe("adoptSelfDevice", () => {
 			.from(event)
 			.where(eq(event.walkerId, from));
 
-		await adoptSelfDevice(sandbox.db, "known-to-the-host", 500);
+		await adoptSelfDevice(
+			sandbox.db,
+			deviceRowsOn(sandbox.db),
+			"known-to-the-host",
+			500,
+		);
 
 		const moved = (
 			await sandbox.db
@@ -241,7 +255,12 @@ describe("adoptSelfDevice", () => {
 
 	test("with no events of its own, the next event still comes after the Host's", async () => {
 		await sandbox.db.delete(event);
-		await adoptSelfDevice(sandbox.db, "known-to-the-host", 7);
+		await adoptSelfDevice(
+			sandbox.db,
+			deviceRowsOn(sandbox.db),
+			"known-to-the-host",
+			7,
+		);
 		await createRunLog(sandbox.db, {
 			walkerId: "known-to-the-host",
 			dataDir: sandbox.dataDir,
@@ -260,7 +279,11 @@ describe("adoptSelfDevice", () => {
 	});
 
 	test("the same id changes nothing", async () => {
-		await adoptSelfDevice(sandbox.db, sandbox.deviceId);
+		await adoptSelfDevice(
+			sandbox.db,
+			deviceRowsOn(sandbox.db),
+			sandbox.deviceId,
+		);
 		expect((await selfDevice(sandbox.db, host)).id).toBe(sandbox.deviceId);
 	});
 });
