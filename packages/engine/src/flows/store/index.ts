@@ -13,7 +13,6 @@ export { saveFlow } from "./adapters/out/yjs-flow-saves";
 export { addNotices, mark, marked } from "./adapters/out/yjs-notices";
 export { readSchedules, saveSchedules } from "./adapters/out/yjs-schedules";
 export {
-	type FlowRevision,
 	type RevisionKind,
 	revisionKinds,
 	same,

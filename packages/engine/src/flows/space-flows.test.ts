@@ -9,6 +9,12 @@ import {
 import { Refusal } from "@nightshift/refusal";
 import { createFlowDocuments, type FlowDocuments } from "../documents";
 import { createSandbox, type Sandbox } from "../testing/test-support";
+import { wireEditing } from "./editing";
+import {
+	inMemoryKeptValues,
+	inMemoryNodeMemory,
+} from "./editing/adapters/out/in-memory-neighbours";
+import type { Names } from "./editing/application/ports";
 import { createSpaceFlows, type SpaceFlows } from "./space-flows";
 import { wireStore as createProjectFlows } from "./store";
 
@@ -24,11 +30,13 @@ const SPACE_OF: Record<string, string> = {
 /** The flows of the Space for Ada, over the documents. */
 function adasFlows(
 	documents: FlowDocuments,
-	options: Partial<Parameters<typeof createSpaceFlows>[0]> & {
+	options: {
 		now?: () => number;
+		personNames?: Names["persons"];
+		deviceNames?: Names["devices"];
 	} = {},
 ): SpaceFlows {
-	const { now, ...rest } = options;
+	const { now } = options;
 	const spaceOf = async (projectId: string) => {
 		const spaceId = SPACE_OF[projectId];
 		if (spaceId === undefined) {
@@ -36,21 +44,34 @@ function adasFlows(
 		}
 		return spaceId;
 	};
+	const project = async (projectId: string, spaceId: string) => {
+		if ((await spaceOf(projectId)) !== spaceId) {
+			throw new Refusal("not-found", "This project does not exist.");
+		}
+	};
+	const flows = createProjectFlows({
+		documents,
+		project: async (projectId) => ({ spaceId: await spaceOf(projectId) }),
+		deviceId: "laptop",
+		...(now ? { now } : {}),
+	});
+	// The editing use cases as `wire-flows.ts` binds them.
+	const editing = wireEditing({
+		projects: { inSpace: project },
+		flows,
+		names: {
+			...(options.personNames ? { persons: options.personNames } : {}),
+			...(options.deviceNames ? { devices: options.deviceNames } : {}),
+		},
+		kept: inMemoryKeptValues(),
+		memory: inMemoryNodeMemory(),
+	});
 	return createSpaceFlows({
 		ready: Promise.resolve(),
-		flows: createProjectFlows({
-			documents,
-			project: async (projectId) => ({ spaceId: await spaceOf(projectId) }),
-			deviceId: "laptop",
-			...(now ? { now } : {}),
-		}),
-		project: async (projectId, spaceId) => {
-			if ((await spaceOf(projectId)) !== spaceId) {
-				throw new Refusal("not-found", "This project does not exist.");
-			}
-		},
-		...rest,
-	})(SPACE, "ada");
+		flows,
+		editing,
+		project,
+	})(SPACE, { personId: "ada", door: "session" });
 }
 
 const quick = (prompt: string): Flow =>

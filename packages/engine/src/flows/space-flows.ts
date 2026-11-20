@@ -1,62 +1,53 @@
 import {
 	type AgentChoice,
 	canonicalFlowJson,
-	diffFlows,
 	FLOW_VERSION,
 	type Flow,
-	type FlowDiff,
-	type FlowDiffSummary,
 	type FlowIssue,
 	type FlowListItem,
 	type FlowMigration,
 	type FlowSources,
-	flowDiffSummary,
 	flowSchema,
 	type LoadedFlow,
-	listFlowSources,
 	loadFlowSource,
 	migrateFlow,
 	type ProjectFlowMap,
-	parsedFlows,
 	starterList,
 	suffixedName,
 	withAgentProfiles,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { type Actor, personOf } from "../contract";
 import type { UsageNotes } from "../usage";
-import {
-	type FlowNotice,
-	type FlowRevision,
-	flowNotFound,
-	type ProjectFlows,
-	type RevisionKind,
-} from "./store";
+import type {
+	FlowEditing,
+	FlowRevisionItem,
+	FlowRevisionView,
+} from "./editing";
+import type { FlowNotice, ProjectFlows } from "./store";
 
 /**
  * The flows of the projects of one Space as a Person lists, reads, saves
- * and deletes them (`SpaceEngine.flows`), through `ProjectFlows`. Also
- * their notices, their revisions, a restore, and the moves between
- * projects: export, import and copy. Every verb waits for the engine to
- * be ready and checks the project is in the Space, here and nowhere
- * else: a project of another Space is "not found", the same answer as
- * one that does not exist.
+ * and deletes them (`SpaceEngine.flows`). The editing verbs are the use
+ * cases of `editing/`. The moves between projects (export, import, copy)
+ * stay here, over `ProjectFlows`, until lane F2 gives them their own.
+ * Every verb waits for the engine to be ready and checks the project is
+ * in the Space: a project of another Space is "not found", the same
+ * answer as one that does not exist.
  */
 export type SpaceFlowsDeps = {
 	/** The engine is ready. */
 	ready: Promise<unknown>;
 	flows: ProjectFlows;
+	/** What a Person does with the flows of a Space (`editing/`). */
+	editing: Omit<
+		FlowEditing,
+		"listKeptValues" | "resetKeptValue" | "listNodeMemory" | "forgetNodeMemory"
+	>;
 	/** Anonymous usage, when this computer records it. */
 	usage?: UsageNotes;
 	/** The project, in the Space. Throws (`not-found`) for one of another Space. */
 	project(projectId: string, spaceId: string): Promise<unknown>;
-	/** The names of these Persons, by id. One without a name is missing. */
-	personNames?: (
-		ids: readonly string[],
-	) => Promise<ReadonlyMap<string, string>>;
-	/** The names of these Devices, by id. One without a name is missing. */
-	deviceNames?: (
-		ids: readonly string[],
-	) => Promise<ReadonlyMap<string, string>>;
 	/**
 	 * What brings an imported file of an older format to the current
 	 * format: its nodes name the profiles of this Device, the one that
@@ -70,35 +61,7 @@ export type SpaceFlowsDeps = {
 	}) => Promise<FlowMigration>;
 };
 
-/** Who or what a revision names, with its name when known. */
-export type RevisionName = { id: string; name: string | null };
-
-/** One revision of a flow, as a Person lists it. */
-export type FlowRevisionItem = {
-	id: string;
-	at: number;
-	kind: RevisionKind;
-	/** Who saved it. Null for one that no Person saved (an import on upgrade, a merge). */
-	person: RevisionName | null;
-	/** The Device it was saved on. */
-	device: RevisionName;
-	/** The flow is this revision now. */
-	current: boolean;
-	/** What it changed from the revision before. Null for the first, and when either does not read as a flow. */
-	changes: FlowDiffSummary | null;
-};
-
-/** One revision with its flow, and how it differs from another flow. */
-export type FlowRevisionView = {
-	revision: FlowRevisionItem & {
-		/** Null when it does not read as a flow. */
-		flow: Flow | null;
-	};
-	/** What the revision is compared with: another revision, or the flow as it is now (`revisionId` null). */
-	against: { revisionId: string | null; flow: Flow | null };
-	/** From `against` to the revision. Null when either does not read as a flow. */
-	diff: FlowDiff | null;
-};
+export type { FlowRevisionItem, FlowRevisionView };
 
 /** A flow as a file to save and import elsewhere. */
 export type FlowExport = { fileName: string; json: string };
@@ -187,65 +150,11 @@ export type SpaceFlows = {
 	): Promise<SavedFlow>;
 };
 
-const NO_NAMES = async () => new Map<string, string>();
-
-/** A revision's flow as the schema reads it, or null. */
-function revisionFlow(revision: FlowRevision): Flow | null {
-	const parsed = flowSchema.safeParse(migrateFlow(revision.flow));
-	return parsed.success ? parsed.data : null;
-}
-
-/** The flows of each Space, for the Person who asks (none for Night Shift itself). */
+/** The flows of each Space, for the actor who asks. */
 export function createSpaceFlows(
 	deps: SpaceFlowsDeps,
-): (spaceId: string, personId?: string) => SpaceFlows {
-	const { flows } = deps;
-	const personNames = deps.personNames ?? NO_NAMES;
-	const deviceNames = deps.deviceNames ?? NO_NAMES;
-
-	async function revisionsOf(projectId: string, name: string) {
-		const [sources, revisions] = await Promise.all([
-			flows.flows(projectId),
-			flows.revisions(projectId, name),
-		]);
-		const source = sources[name];
-		if (source === undefined) throw flowNotFound(name);
-		const current = "json" in source ? (source.revision ?? null) : null;
-		const parsed = revisions.map(revisionFlow);
-		const [persons, devices] = await Promise.all([
-			personNames(
-				revisions.flatMap((revision) =>
-					revision.personId === null ? [] : [revision.personId],
-				),
-			),
-			deviceNames(revisions.map((revision) => revision.deviceId)),
-		]);
-		const items = revisions.map((revision, index): FlowRevisionItem => {
-			const before = index > 0 ? parsed[index - 1] : null;
-			const after = parsed[index];
-			return {
-				id: revision.id,
-				at: revision.at,
-				kind: revision.kind,
-				person:
-					revision.personId === null
-						? null
-						: {
-								id: revision.personId,
-								name: persons.get(revision.personId) ?? null,
-							},
-				device: {
-					id: revision.deviceId,
-					name: devices.get(revision.deviceId) ?? null,
-				},
-				current: revision.id === current,
-				changes:
-					before && after ? flowDiffSummary(diffFlows(before, after)) : null,
-			};
-		});
-		const currentFlow = loadFlowSource(sources, name).flow;
-		return { items, flows: parsed, currentFlow };
-	}
+): (spaceId: string, actor: Actor) => SpaceFlows {
+	const { flows, editing } = deps;
 
 	/** The flow of that name, or a refusal when it does not read as a flow. */
 	async function validFlow(projectId: string, name: string): Promise<Flow> {
@@ -259,7 +168,9 @@ export function createSpaceFlows(
 		return loaded.flow;
 	}
 
-	return (spaceId, personId) => {
+	return (spaceId, actor) => {
+		/** The Person who acts: none for Night Shift itself. */
+		const personId = personOf(actor) ?? undefined;
 		/** The one check of every verb: the engine is ready, and the project is in this Space. */
 		async function inSpace(projectId: string): Promise<void> {
 			await deps.ready;
@@ -267,94 +178,35 @@ export function createSpaceFlows(
 		}
 
 		return {
-			async list(projectId) {
-				await inSpace(projectId);
-				return listFlowSources(await flows.flows(projectId));
-			},
-
-			async get(projectId, name) {
-				await inSpace(projectId);
-				return loadFlowSource(await flows.flows(projectId), name);
-			},
-
-			async map(projectId) {
-				await inSpace(projectId);
-				return parsedFlows(await flows.flows(projectId));
-			},
-
-			async save(projectId, name, flow) {
-				await inSpace(projectId);
-				const existed = namesOf(await flows.flows(projectId)).has(name);
-				const issues = await flows.save(projectId, name, flow, { personId });
-				if (!existed) deps.usage?.note({ kind: "flow-created", from: "blank" });
-				return issues;
-			},
-
-			async remove(projectId, name) {
-				await inSpace(projectId);
-				await flows.remove(projectId, name);
-			},
-
-			async notices(projectId) {
-				await inSpace(projectId);
-				return flows.notices(projectId);
-			},
-
-			async dismissNotice(projectId, noticeId) {
-				await inSpace(projectId);
-				await flows.dismissNotice(projectId, noticeId);
-			},
-
-			async revisions(projectId, name) {
-				await inSpace(projectId);
-				const { items } = await revisionsOf(projectId, name);
-				return items.reverse();
-			},
-
-			async revision(projectId, name, revisionId, against) {
-				await inSpace(projectId);
-				const {
-					items,
-					flows: parsed,
-					currentFlow,
-				} = await revisionsOf(projectId, name);
-				const index = items.findIndex((item) => item.id === revisionId);
-				const item = items[index];
-				if (item === undefined) throw revisionNotFound();
-				const flow = parsed[index] ?? null;
-				let base: Flow | null = currentFlow;
-				if (against !== undefined) {
-					const other = items.findIndex(
-						(candidate) => candidate.id === against,
-					);
-					if (other === -1) throw revisionNotFound();
-					base = parsed[other] ?? null;
-				}
-				return {
-					revision: { ...item, flow },
-					against: { revisionId: against ?? null, flow: base },
-					diff: flow && base ? diffFlows(base, flow) : null,
-				};
-			},
-
-			async restore(projectId, name, revisionId) {
-				await inSpace(projectId);
-				const revision = (await flows.revisions(projectId, name)).find(
-					(candidate) => candidate.id === revisionId,
-				);
-				if (revision === undefined) throw revisionNotFound();
-				const flow = revisionFlow(revision);
-				if (flow === null) {
-					throw new Refusal(
-						"invalid",
-						"This revision is not a valid flow, so you cannot restore it.",
-					);
-				}
-				return flows.save(projectId, name, flow, {
-					kind: "restore",
-					personId,
-				});
-			},
+			list: (projectId) => editing.listFlows(actor, { spaceId, projectId }),
+			get: (projectId, name) =>
+				editing.readFlow(actor, { spaceId, projectId, name }),
+			map: (projectId) => editing.readFlowMap(actor, { spaceId, projectId }),
+			save: (projectId, name, flow) =>
+				editing.saveFlow(actor, { spaceId, projectId, name, flow }),
+			remove: (projectId, name) =>
+				editing.removeFlow(actor, { spaceId, projectId, name }),
+			notices: (projectId) =>
+				editing.listFlowNotices(actor, { spaceId, projectId }),
+			dismissNotice: (projectId, noticeId) =>
+				editing.dismissFlowNotice(actor, { spaceId, projectId, noticeId }),
+			revisions: (projectId, name) =>
+				editing.listFlowRevisions(actor, { spaceId, projectId, name }),
+			revision: (projectId, name, revisionId, against) =>
+				editing.readFlowRevision(actor, {
+					spaceId,
+					projectId,
+					name,
+					revisionId,
+					...(against !== undefined ? { against } : {}),
+				}),
+			restore: (projectId, name, revisionId) =>
+				editing.restoreFlowRevision(actor, {
+					spaceId,
+					projectId,
+					name,
+					revisionId,
+				}),
 
 			async export(projectId, name) {
 				await inSpace(projectId);
@@ -476,11 +328,4 @@ function migratedFlow(parsed: unknown, migration?: FlowMigration): Flow {
 		);
 	}
 	return flow.data;
-}
-
-function revisionNotFound(): Refusal {
-	return new Refusal(
-		"not-found",
-		"This revision does not exist. Open the flow's revisions again.",
-	);
 }

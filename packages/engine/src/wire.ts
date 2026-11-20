@@ -7,7 +7,6 @@ import {
 } from "./documents";
 import { type Engine, type EngineInternals, engineOf } from "./engine";
 import type { EngineOptions } from "./engine-options";
-import { createSpaceFlows } from "./flows";
 import { createRunWalks } from "./graph";
 import { trackHeldLeases } from "./leases";
 import {
@@ -16,18 +15,15 @@ import {
 	createRunHistory,
 	createRunLog,
 } from "./log";
-import { forgetMemory, listMemory } from "./memory";
 import { createPlacement } from "./placement";
-import { namesOf } from "./read";
 import { createRunFolders } from "./run-folders";
 import { createSpaces } from "./space";
-import { listKeptValues, resetKeptValue } from "./variables";
 import { wireEngineAccess } from "./wire-access";
 import { wireEngineActions } from "./wire-actions";
 import { wireEngineAnswerCosts } from "./wire-answer-costs";
 import { wireEngineCleanup } from "./wire-cleanup";
 import { wireEngineDashboard } from "./wire-dashboard";
-import { wireEngineFlows } from "./wire-flows";
+import { wireEngineFlows, wireEngineSpaceFlows } from "./wire-flows";
 import { wireEngineGates } from "./wire-gates";
 import { wireEngineHolds } from "./wire-holds";
 import { wireEngineMove } from "./wire-move";
@@ -488,6 +484,18 @@ export function createEngine(
 		options,
 	});
 
+	// --- the flows of the Space view (F1): `wire-flows.ts` ---
+	const spaceFlows = wireEngineSpaceFlows({
+		db,
+		log: runLog,
+		ready,
+		directory,
+		projects,
+		projectFlows,
+		migrations,
+		options,
+	});
+
 	// --- the Space view: `space.ts` ---
 	// One group of arguments for each block. A lane changes its own group.
 	const space = createSpaces({
@@ -497,25 +505,8 @@ export function createEngine(
 		// projects, flows, kept values, node memory, answer costs (phase 3)
 		catalog,
 		spaces,
-		projects,
-		flows: createSpaceFlows({
-			ready,
-			flows: projectFlows,
-			usage: options.usage,
-			project: (projectId, spaceId) => projects.find(projectId, spaceId),
-			personNames: (ids) => namesOf(db, ids),
-			deviceNames: (ids) => directory.names(ids),
-			migration: async (scope) =>
-				migrations.forDevice(await runLog.walkerId(), scope),
-		}),
-		kept: {
-			list: (flow) => listKeptValues(db, flow),
-			reset: (flow, name) => resetKeptValue(db, flow, name),
-		},
-		memory: {
-			list: (flow) => listMemory(db, flow),
-			forget: (flow, node, scope) => forgetMemory(db, flow, node, scope),
-		},
+		flows: spaceFlows.flows,
+		editing: spaceFlows.editing,
 		answerCosts: answerCosts.list,
 		moveProject: spaceMove.moveProject,
 		// access (R1), and the files of a run that other slices keep

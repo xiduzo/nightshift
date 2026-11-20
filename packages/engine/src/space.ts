@@ -1,13 +1,12 @@
 import type { ArtifactStore } from "./artifacts";
 import type { AnswerCost } from "./assistant";
 import type { RunFilesService } from "./cleanup";
-import { type Actor, personOf } from "./contract";
-import type { SpaceFlows } from "./flows";
+import type { Actor } from "./contract";
+import type { FlowEditing, SpaceFlows } from "./flows";
 import type { Gates } from "./gates";
 import { type RunLog, scopeKey } from "./log";
-import type { MemoryFlow, NodeMemory } from "./memory";
 import type { WithPaths } from "./peers";
-import type { Catalog, Projects } from "./projects";
+import type { Catalog } from "./projects";
 import type { RunStreamItem } from "./read";
 import type { Access, Actions, Move, Start, Views } from "./runs";
 import type { Schedules } from "./schedules";
@@ -15,7 +14,6 @@ import { readServiceLog } from "./services";
 import type { SpaceEngine } from "./space-engine";
 import type { SpaceMove } from "./space-move";
 import type { Spaces } from "./spaces";
-import type { KeptFlow, KeptValue } from "./variables";
 
 /**
  * What a person does in one Space (`SpaceEngine`). Every method reads and
@@ -37,20 +35,13 @@ export type SpacesDeps = {
 	catalog: Catalog;
 	/** The policy of the Space (`spaces/`). */
 	spaces: Pick<Spaces, "setSpaceUsage">;
-	/** The projects of the Space, as the kept values and node memory check them. */
-	projects: Pick<Projects, "find">;
-	/** The flows of the Space's projects, for the Person who acts (`flows/space-flows.ts`). */
-	flows(spaceId: string, personId?: string): SpaceFlows;
-	/** The kept variables of a project's flows on this computer. */
-	kept: {
-		list(flow: KeptFlow): Promise<KeptValue[]>;
-		reset(flow: KeptFlow, name: string): Promise<void>;
-	};
-	/** What the Since last run nodes of a project's flows saw, on this computer. */
-	memory: {
-		list(flow: MemoryFlow): Promise<NodeMemory[]>;
-		forget(flow: MemoryFlow, node: string, scope?: string): Promise<void>;
-	};
+	/** The flows of the Space's projects, for the actor (`flows/space-flows.ts`). */
+	flows(spaceId: string, actor: Actor): SpaceFlows;
+	/** The kept values and the node memory of a project's flows on this computer (`flows/editing/`): each use case checks the Space itself. */
+	editing: Pick<
+		FlowEditing,
+		"listKeptValues" | "resetKeptValue" | "listNodeMemory" | "forgetNodeMemory"
+	>;
 	/** What the answers of Night Shift's own agents cost in a Space, as this Replica has them. */
 	answerCosts(
 		actor: Actor,
@@ -102,7 +93,7 @@ export type SpacesDeps = {
 };
 
 export function createSpaces(deps: SpacesDeps) {
-	const { ready, projects, catalog, actions, views } = deps;
+	const { ready, catalog, actions, views } = deps;
 
 	/**
 	 * The watch of a run for the actor: it waits for the engine, then opens
@@ -173,31 +164,30 @@ export function createSpaces(deps: SpacesDeps) {
 			},
 
 			// --- kept values, node memory, flows, answer costs (phase 3) ---
-			async listKeptValues(projectId, flowName) {
-				await ready;
-				await projects.find(projectId, spaceId);
-				return deps.kept.list({ spaceId, projectId, flowName });
-			},
+			listKeptValues: (projectId, flowName) =>
+				deps.editing.listKeptValues(actor, { spaceId, projectId, flowName }),
 
-			async resetKeptValue(projectId, flowName, name) {
-				await ready;
-				await projects.find(projectId, spaceId);
-				await deps.kept.reset({ spaceId, projectId, flowName }, name);
-			},
+			resetKeptValue: (projectId, flowName, name) =>
+				deps.editing.resetKeptValue(actor, {
+					spaceId,
+					projectId,
+					flowName,
+					name,
+				}),
 
-			async listNodeMemory(projectId, flowName) {
-				await ready;
-				await projects.find(projectId, spaceId);
-				return deps.memory.list({ spaceId, projectId, flowName });
-			},
+			listNodeMemory: (projectId, flowName) =>
+				deps.editing.listNodeMemory(actor, { spaceId, projectId, flowName }),
 
-			async forgetNodeMemory(projectId, flowName, node, scope) {
-				await ready;
-				await projects.find(projectId, spaceId);
-				await deps.memory.forget({ spaceId, projectId, flowName }, node, scope);
-			},
+			forgetNodeMemory: (projectId, flowName, node, scope) =>
+				deps.editing.forgetNodeMemory(actor, {
+					spaceId,
+					projectId,
+					flowName,
+					node,
+					...(scope !== undefined ? { scope } : {}),
+				}),
 
-			flows: deps.flows(spaceId, personOf(actor) ?? undefined),
+			flows: deps.flows(spaceId, actor),
 
 			async listAnswerCosts(since) {
 				await ready;

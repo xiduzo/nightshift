@@ -2,6 +2,7 @@
 
 export { createCloneImports } from "./clone-imports";
 export { type ConfigUse, createConfigUse } from "./config-use";
+export { type FlowEditing, wireEditing } from "./editing";
 export { createFlowMigrations } from "./flow-migration";
 export type { FlowRef } from "./flow-use";
 export { flowsForRun } from "./run-flows";
