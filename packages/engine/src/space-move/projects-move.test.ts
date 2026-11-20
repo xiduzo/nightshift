@@ -18,7 +18,7 @@ import type { DecisionNode, Flow, Schedule } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { and, eq, inArray } from "drizzle-orm";
-import { NIGHT_SHIFT } from "../contract";
+import { NIGHT_SHIFT, type RowBatch } from "../contract";
 import {
 	createSpaceDocuments,
 	recordClone,
@@ -95,7 +95,7 @@ const commands: MoveRows = async (runs) => {
 					inArray(runCommand.runId, [...runs.runIds]),
 				),
 			),
-	];
+	] as unknown as RowBatch;
 };
 
 function makeEngine(): Engine {
@@ -192,12 +192,13 @@ describe("a Space move", () => {
 					[tools.id]: { spaceId: studio, projectId: tools.id },
 				},
 			}),
-			statements: (done) => [
-				sandbox.db
-					.update(organization)
-					.set({ name: `Moved ${done.runIds.length}` })
-					.where(eq(organization.id, sandbox.spaceId)),
-			],
+			statements: (done) =>
+				[
+					sandbox.db
+						.update(organization)
+						.set({ name: `Moved ${done.runIds.length}` })
+						.where(eq(organization.id, sandbox.spaceId)),
+				] as unknown as RowBatch,
 		});
 
 		expect(moved).toEqual({

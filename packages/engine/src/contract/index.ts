@@ -11,8 +11,9 @@
  * keeps (`LeaseHost`, ADR 7), the Offer rule of a schedule (`OffersPort`) and the name of the branch of one item of a Call (`itemBranchName`, in `branches/`).
  * The words of the ports of more than one vertical are in sub-verticals:
  * what the walk reads (`walk/`: the run's plan, `WalkSettings`), one use of
- * a secret (`secrets/`) and what a step gets of the knowledge
- * (`step-knowledge/`). It imports no other vertical.
+ * a secret (`secrets/`), what a step gets of the knowledge
+ * (`step-knowledge/`) and the statements of one database batch that
+ * slices hand on (`rows/`: `RowBatch`). It imports no other vertical.
  */
 
 export {
@@ -55,6 +56,7 @@ export {
 	OlderHostError,
 	type Relay,
 } from "./relay";
+export type { RowBatch } from "./rows";
 export type {
 	NotRead,
 	ProjectRef,

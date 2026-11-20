@@ -22,12 +22,12 @@ import {
 } from "../documents";
 import { createWorktrees, type Git, systemGit } from "../git";
 import type { RunLog } from "../log";
-import { normaliseRemote } from "./remote";
 import {
 	type MovingProject,
 	projectRowsOf,
 	spaceProjectRows,
-} from "./space-rows";
+} from "./project-rows";
+import { normaliseRemote } from "./remote";
 
 /**
  * Projects by remote, and their Clones on this computer. A Project with a

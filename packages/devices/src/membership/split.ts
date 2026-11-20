@@ -5,7 +5,12 @@ import {
 	splitPersonalSpaceBatch,
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import type { Engine, FlowDocuments, PeerProjects } from "@nightshift/engine";
+import type {
+	Engine,
+	FlowDocuments,
+	PeerProjects,
+	RowBatch,
+} from "@nightshift/engine";
 import { NIGHT_SHIFT } from "@nightshift/engine";
 import type { SpaceDocuments } from "@nightshift/engine/projects";
 import { Refusal } from "@nightshift/refusal";
@@ -169,21 +174,22 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 						},
 					};
 				},
-				statements: async (done) => [
-					...(await splitPersonalSpaceBatch(db, {
-						personId: row.personId,
-						from,
-						to,
-						hostName: row.hostName,
-					})),
-					engine.hostSpaces.named(from, personalSpaceName(row.hostName)),
-					merges.abandon(),
-					rows.moved(to, {
-						projects: done.projects,
-						runs: done.runIds.length,
-						unpinned: done.schedules,
-					}),
-				],
+				statements: async (done) =>
+					[
+						...(await splitPersonalSpaceBatch(db, {
+							personId: row.personId,
+							from,
+							to,
+							hostName: row.hostName,
+						})),
+						engine.hostSpaces.named(from, personalSpaceName(row.hostName)),
+						merges.abandon(),
+						rows.moved(to, {
+							projects: done.projects,
+							runs: done.runIds.length,
+							unpinned: done.schedules,
+						}),
+					] as unknown as RowBatch,
 			});
 			projects = moved.projects;
 			runs = moved.runIds.length;

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
 import { runCommand } from "@nightshift/db/schema";
-import type { MoveRows, RunCommandInput } from "@nightshift/engine";
+import type { MoveRows, RowBatch, RunCommandInput } from "@nightshift/engine";
 import { asDate, instant } from "@nightshift/time";
 import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import type { RunCommand } from "../contract";
@@ -29,7 +29,7 @@ export function commandMoves(db: Database): MoveRows {
 		const persons = Object.entries(personMap).filter(
 			([local, there]) => local !== there,
 		);
-		return [
+		const statements = [
 			db
 				.update(runCommand)
 				.set({
@@ -52,6 +52,7 @@ export function commandMoves(db: Database): MoveRows {
 					),
 				),
 		];
+		return statements as unknown as RowBatch;
 	};
 }
 

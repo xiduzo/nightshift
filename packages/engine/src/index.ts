@@ -39,6 +39,7 @@ export type {
 	PersonActor,
 	Placement,
 	Relay,
+	RowBatch,
 	RunCommandInput,
 	StartRunInput,
 	TestRunRequest,

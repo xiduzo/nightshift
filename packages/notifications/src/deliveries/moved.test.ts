@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Database } from "@nightshift/db";
 import { notificationDelivery } from "@nightshift/db/schema";
 import { asc } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import { testDatabase } from "../testing/database";
 import { createDeliveryLog, type DeliveryStatus } from "./deliveries";
 import { deliveryMoves } from "./moved";
@@ -18,10 +19,16 @@ const TO = "personal-on-host";
 
 /** Moves the entries of `runIds` from FROM to TO, as a Space move's batch does. */
 async function move(runIds: string[], sends: boolean) {
-	const [first, ...rest] = await deliveryMoves(db, async (spaceId) => {
+	// The statements this adapter made, out of the opaque batch it hands on.
+	const [first, ...rest] = (await deliveryMoves(db, async (spaceId) => {
 		expect(spaceId).toBe(TO);
 		return sends;
-	})({ from: FROM, to: TO, runIds, personMap: {} });
+	})({
+		from: FROM,
+		to: TO,
+		runIds,
+		personMap: {},
+	})) as unknown as BatchItem<"sqlite">[];
 	if (first) await db.batch([first, ...rest]);
 }
 

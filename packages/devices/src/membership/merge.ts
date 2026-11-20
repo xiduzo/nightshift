@@ -11,6 +11,7 @@ import {
 	HostUnreachableError,
 	NIGHT_SHIFT,
 	type PeerProjects,
+	type RowBatch,
 } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
@@ -395,14 +396,15 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 						renumber: true,
 					};
 				},
-				statements: async () => [
-					...(await adoptPersonalSpaceBatch(db, {
-						personId: row.personId,
-						from,
-						to,
-					})),
-					rows.moved(from),
-				],
+				statements: async () =>
+					[
+						...(await adoptPersonalSpaceBatch(db, {
+							personId: row.personId,
+							from,
+							to,
+						})),
+						rows.moved(from),
+					] as unknown as RowBatch,
 			});
 			runIds.push(...moved.runIds);
 			state = "moved";

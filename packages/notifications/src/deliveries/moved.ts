@@ -1,6 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { notificationDelivery } from "@nightshift/db/schema";
-import type { MoveRows } from "@nightshift/engine";
+import type { MoveRows, RowBatch } from "@nightshift/engine";
 import { and, eq, inArray } from "drizzle-orm";
 import type { DeliveryStatus } from "./deliveries";
 
@@ -29,13 +29,13 @@ export function deliveryMoves(
 			.update(notificationDelivery)
 			.set({ spaceId: to })
 			.where(ofMoved);
-		if (await sendsFor(to)) return [move];
+		if (await sendsFor(to)) return [move] as unknown as RowBatch;
 		return [
 			db
 				.update(notificationDelivery)
 				.set({ status: "dropped", heldFor: "[]", dueAt: null })
 				.where(and(ofMoved, inArray(notificationDelivery.status, PENDING))),
 			move,
-		];
+		] as unknown as RowBatch;
 	};
 }

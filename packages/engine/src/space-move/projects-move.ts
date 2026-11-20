@@ -4,6 +4,7 @@ import type { Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { inArray } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
+import type { RowBatch } from "../contract";
 import type { SpaceDocuments } from "../documents";
 import type { ProjectFlows } from "../flows";
 import {
@@ -74,9 +75,7 @@ export type ProjectsMove = {
 	/** Runs under the hold, before anything changes: throws to call the move off. */
 	plan(): Promise<ProjectsMovePlan>;
 	/** The caller's own rows of the move, for the same batch. */
-	statements?(
-		moved: MovedProjects,
-	): BatchItem<"sqlite">[] | Promise<BatchItem<"sqlite">[]>;
+	statements?(moved: MovedProjects): RowBatch | Promise<RowBatch>;
 };
 
 /** What a move moved. */
@@ -114,7 +113,7 @@ export type MovedRuns = {
  * Space move (a port: the engine does not import those packages). Each
  * adapter gives its statements for the move's batch.
  */
-export type MoveRows = (runs: MovedRuns) => Promise<BatchItem<"sqlite">[]>;
+export type MoveRows = (runs: MovedRuns) => Promise<RowBatch>;
 
 export type ProjectsMoveDeps = {
 	db: Database;
@@ -135,6 +134,11 @@ export type ProjectsMoveDeps = {
 	 */
 	moved?(move: ProjectsMoved): Promise<void>;
 };
+
+/** The drizzle statements of the adapter that made `rows`. */
+function asStatements(rows: readonly unknown[]): BatchItem<"sqlite">[] {
+	return rows as BatchItem<"sqlite">[];
+}
 
 export function createProjectsMove(deps: ProjectsMoveDeps) {
 	const { db } = deps;
@@ -233,10 +237,12 @@ export function createProjectsMove(deps: ProjectsMoveDeps) {
 				);
 				if (runIds.length === 0) continue;
 				for (const rowsOf of deps.rows) {
-					statements.push(...(await rowsOf({ from, to, runIds, personMap })));
+					statements.push(
+						...asStatements(await rowsOf({ from, to, runIds, personMap })),
+					);
 				}
 			}
-			statements.push(...((await move.statements?.(moved)) ?? []));
+			statements.push(...asStatements((await move.statements?.(moved)) ?? []));
 			const [first, ...rest] = statements;
 			if (first) await db.batch([first, ...rest]);
 			deps.reread(moved.runIds);
