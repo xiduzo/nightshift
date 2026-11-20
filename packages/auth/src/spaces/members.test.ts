@@ -8,8 +8,14 @@ import {
 	cookiesOf,
 	createAuthSandbox,
 } from "../testing/sandbox";
-import { invitationView, isHostAdmin, membersOf } from "./members";
-import { LOCAL_EMAIL, localPerson, personalSpaceId } from "./spaces";
+import {
+	invitationView,
+	isHostAdmin,
+	LOCAL_EMAIL,
+	localPerson,
+	membersOf,
+	personalSpaceId,
+} from "./facades";
 
 let sandbox: AuthSandbox;
 let changes: MemberChange[];

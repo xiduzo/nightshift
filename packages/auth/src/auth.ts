@@ -36,8 +36,8 @@ export type AuthConfig = {
 /**
  * Who may do what in a Space, as the organization plugin checks it on its
  * own endpoints: Better Auth's access control over the roles of
- * `spaces/roles.ts`. Night Shift's own checks use `roleAllows`, which
- * answers the same (`spaces/roles.test.ts`).
+ * `spaces/roles/`. Night Shift's own checks use `roleAllows`, which
+ * answers the same (`spaces/roles/roles.test.ts`).
  */
 export const ac = createAccessControl(statements);
 export const roles = {

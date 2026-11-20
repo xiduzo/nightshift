@@ -6,13 +6,8 @@ import {
 	memberAc,
 	ownerAc,
 } from "better-auth/plugins/organization/access";
-import { ac, roles } from "../auth";
-import {
-	type Permissions,
-	ROLE_PERMISSIONS,
-	roleAllows,
-	statements,
-} from "./roles";
+import { ac, roles } from "../../auth";
+import { type Permissions, ROLE_PERMISSIONS, roleAllows, statements } from ".";
 
 /**
  * The pure role table and `roleAllows` answer as Better Auth's access

@@ -1,23 +1,41 @@
 // InvitationView, PendingInvitation and SpaceMember are in the API's
 // router type: its declaration must be able to name them.
+
+export type { Space } from "./application/list-spaces";
 export {
+	activeSpaceId,
 	addMembership,
-	HOST_ADMIN,
+	adoptPersonalSpaceBatch,
+	ensurePersonalSpace,
 	hasHostAdmin,
-	type InvitationView,
 	invitationView,
 	isHostAdmin,
-	type MemberChange,
+	localPerson,
 	membershipOf,
 	membersOf,
-	type PendingInvitation,
+	mirrorHostSpace,
+	personalSpaceId,
+	personalSpaceIdBySlug,
+	personContact,
+	personNames,
 	removeMemberships,
-	type SpaceMember,
+	roleIn,
 	setMembershipRole,
 	signUpRefusal,
+	spaceExists,
+	spaceIds,
 	spaceRoster,
+	spacesOf,
+	splitPersonalSpaceBatch,
+} from "./facades";
+export {
+	HOST_ADMIN,
+	type InvitationView,
+	type MemberChange,
+	type PendingInvitation,
+	type SpaceMember,
 } from "./members";
-export { personContact, personNames } from "./people";
+export { personalSpaceName } from "./personal";
 export {
 	type Permissions,
 	ROLE_PERMISSIONS,
@@ -25,19 +43,3 @@ export {
 	roleAllows,
 	statements,
 } from "./roles";
-export {
-	activeSpaceId,
-	adoptPersonalSpaceBatch,
-	ensurePersonalSpace,
-	localPerson,
-	mirrorHostSpace,
-	personalSpaceId,
-	personalSpaceIdBySlug,
-	personalSpaceName,
-	roleIn,
-	type Space,
-	spaceExists,
-	spaceIds,
-	spacesOf,
-	splitPersonalSpaceBatch,
-} from "./spaces";

@@ -21,7 +21,7 @@ import {
 	personalSpaceId,
 	spacesOf,
 	splitPersonalSpaceBatch,
-} from "./spaces";
+} from "./facades";
 
 let sandbox: AuthSandbox;
 beforeEach(async () => {
