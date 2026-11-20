@@ -10,8 +10,9 @@ import {
 	createKnowledgeFolderLocks,
 	type KnowledgeFolderLocks,
 } from "../knowledge/folder-locks";
-import { createKnowledge, type KnowledgeDeps } from "../knowledge/knowledge";
+import { createKnowledge } from "../knowledge/knowledge";
 import { createKnowledgeDocuments } from "../knowledge/knowledge-document";
+import type { KnowledgeDeps } from "../knowledge/knowledge-door";
 
 /**
  * A computer's knowledge for a test, made as the daemon makes it:

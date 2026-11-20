@@ -1,6 +1,6 @@
 import { type Actor, NIGHT_SHIFT } from "../contract";
 import type { TranscriptEntry } from "../log";
-import type { Knowledge } from "./knowledge";
+import type { Knowledge } from "./knowledge-door";
 import {
 	evidenceSteps,
 	learningEvidence,
