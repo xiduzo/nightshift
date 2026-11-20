@@ -1,7 +1,6 @@
 import type { AnswerCost } from "./assistant";
 import type { Actor, LeaseHost, MemberChange } from "./contract";
 import type { Dashboard } from "./dashboard";
-import { type SpaceDocuments, spaceUsageOn } from "./documents";
 import type { ProjectFlows } from "./flows";
 import type { Runner } from "./graph";
 import type { createLeaseKeeper, createLeaseStore } from "./leases";
@@ -22,6 +21,7 @@ import type {
 import type { createPullRequestWatch } from "./scores";
 import type { SpaceEngine } from "./space-engine";
 import type { MovedProjects, ProjectsMove, SpaceMove } from "./space-move";
+import type { Spaces } from "./spaces";
 import type { wireEngineAccess } from "./wire-access";
 import type { wireEngineActions } from "./wire-actions";
 import type { wireEngineAnswerCosts } from "./wire-answer-costs";
@@ -277,7 +277,8 @@ export type EngineParts = {
 	/** What a person does in one Space (`space.ts`). */
 	space: Engine["space"];
 	log: RunLog;
-	documents: Pick<SpaceDocuments, "openAll">;
+	/** The policy of the Spaces (`spaces/`, in `wire-projects.ts`). */
+	spaces: Pick<Spaces, "readUsageAllowed">;
 	flows: Engine["flows"];
 	/** The Space move (SM, `wire-space-move.ts`). */
 	spaceMove: Pick<SpaceMove, "moveProjects" | "forgetSpace">;
@@ -330,7 +331,7 @@ export function engineOf(parts: EngineParts): Engine {
 		lifetime,
 		space,
 		log: runLog,
-		documents,
+		spaces,
 		flows: projectFlows,
 		spaceMove,
 		leaseStore,
@@ -364,8 +365,7 @@ export function engineOf(parts: EngineParts): Engine {
 		flows: projectFlows,
 		async usageAllowed() {
 			await ready;
-			const spaces = await documents.openAll();
-			return spaces.every(spaceUsageOn);
+			return spaces.readUsageAllowed();
 		},
 
 		// --- leases. The wake in `release` is the recovery block's (R7) ---

@@ -3,6 +3,7 @@ import { mkdir, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { clone, device, event, project } from "@nightshift/db/schema";
 import { asc, eq } from "drizzle-orm";
+import { type DeviceDirectory, NIGHT_SHIFT } from "../contract";
 import { createSpaceDocuments, type SpaceDocuments } from "../documents";
 import { createRunLog } from "../log/run-log/run-log";
 import { aloneDirectory } from "../testing/alone-directory";
@@ -12,14 +13,11 @@ import {
 	otherSpace,
 	type Sandbox,
 } from "../testing/test-support";
-import {
-	createProjects,
-	HOSTED_NEEDS_REMOTE,
-	NO_FOLDER,
-	PROJECT_NOT_FOUND,
-	withoutFolderOf,
-} from "./projects";
-import { normaliseRemote } from "./remote";
+import { wireEngineProjects } from "../wire-projects";
+import type { HostRelay } from "./catalog";
+import { HOSTED_NEEDS_REMOTE } from "./catalog/domain/words";
+import { type ListedProject, NO_FOLDER, PROJECT_NOT_FOUND } from "./keep";
+import { withoutFolderOf } from "./keep/adapters/out/drizzle-project-store";
 
 let sandbox: Sandbox;
 let documents: SpaceDocuments;
@@ -35,17 +33,69 @@ afterEach(async () => {
 	await sandbox.cleanup();
 });
 
-const projectsOf = (over: SpaceDocuments = documents) =>
-	createProjects({
+/**
+ * The Projects as the engine wires them (`wire-projects.ts`), with the
+ * person's requests of the catalog under the names these tests use: each
+ * answers with the project's row, read again after the request.
+ */
+function projectsOf(
+	over: SpaceDocuments = documents,
+	more: { directory?: Partial<DeviceDirectory>; relay?: HostRelay } = {},
+) {
+	const { projects, catalog } = wireEngineProjects({
 		db: sandbox.db,
 		log: createRunLog(sandbox.db, {
 			walkerId: sandbox.deviceId,
 			dataDir: sandbox.dataDir,
 		}),
-		deviceId: async () => sandbox.deviceId,
 		documents: over,
-		directory: aloneDirectory(sandbox.db),
+		directory: { ...aloneDirectory(sandbox.db), ...more.directory },
+		hosts: more.relay,
+		options: {},
+		runner: () => ({ isActive: () => false }),
+		cloneImports: () => ({ importClone: async () => {} }),
 	});
+	/** The project's row, with its folder here. */
+	const here = async (projectId: string, spaceId: string) =>
+		(await projects.find(projectId, spaceId)) as ListedProject & {
+			repoPath: string;
+		};
+	return {
+		...projects,
+		add: async (input: { repoPath: string; name?: string }, spaceId: string) =>
+			here(
+				(await catalog.addProject(NIGHT_SHIFT, { ...input, spaceId })).id,
+				spaceId,
+			),
+		useFolder: async (projectId: string, repoPath: string, spaceId: string) =>
+			here(
+				(
+					await catalog.useProjectFolder(NIGHT_SHIFT, {
+						spaceId,
+						projectId,
+						repoPath,
+					})
+				).id,
+				spaceId,
+			),
+		addWithoutFolder: async (input: { name: string }, spaceId: string) =>
+			projects.find(
+				(
+					await catalog.addProjectWithoutFolder(NIGHT_SHIFT, {
+						...input,
+						spaceId,
+					})
+				).id,
+				spaceId,
+			),
+		remove: async (projectId: string) =>
+			catalog.removeProject(NIGHT_SHIFT, {
+				spaceId: (await projects.spaceOf(projectId)) ?? "",
+				projectId,
+			}),
+		get: (projectId: string) => projects.find(projectId),
+	};
+}
 
 /** A new git repository under the sandbox, with `origin` set when given. */
 async function repo(name: string, origin?: string): Promise<string> {
@@ -65,42 +115,6 @@ const clones = () =>
 		})
 		.from(clone)
 		.orderBy(asc(clone.createdAt));
-
-describe("normaliseRemote", () => {
-	test("the ssh, scp-like and https URLs of one repository are one string", () => {
-		for (const url of [
-			"git@github.com:acme/app.git",
-			"git@github.com:acme/app",
-			"ssh://git@github.com/acme/app.git",
-			"ssh://git@github.com:22/acme/app.git",
-			"https://github.com/acme/app.git",
-			"https://github.com/acme/app/",
-			"https://ada:token@GitHub.com/acme/app.git",
-			"http://github.com:80/acme/app",
-			"git://github.com/acme/app.git",
-		]) {
-			expect(normaliseRemote(url)).toBe("github.com/acme/app");
-		}
-	});
-
-	test("the path keeps its case and its depth", () => {
-		expect(normaliseRemote("git@gitlab.com:Acme/Group/App.git")).toBe(
-			"gitlab.com/Acme/Group/App",
-		);
-	});
-
-	test("a path on this computer is no remote", () => {
-		for (const url of [
-			"/srv/git/app.git",
-			"../app",
-			"file:///srv/git/app.git",
-			"C:\\repos\\app",
-			"",
-		]) {
-			expect(normaliseRemote(url)).toBeNull();
-		}
-	});
-});
 
 describe("projects by remote", () => {
 	test("a folder becomes a project with its remote and a Clone here", async () => {
@@ -404,18 +418,8 @@ describe("a project without a folder", () => {
 			},
 		});
 		const asked: unknown[] = [];
-		const projects = createProjects({
-			db: sandbox.db,
-			log: createRunLog(sandbox.db, {
-				walkerId: sandbox.deviceId,
-				dataDir: sandbox.dataDir,
-			}),
-			deviceId: async () => sandbox.deviceId,
-			documents: replica,
-			directory: {
-				...aloneDirectory(sandbox.db),
-				hostedElsewhere: async (id: string) => id === team,
-			},
+		const projects = projectsOf(replica, {
+			directory: { hostedElsewhere: async (id: string) => id === team },
 			relay: {
 				addProject: () => Promise.reject(new Error("Not in this test.")),
 				async addWithoutFolder(input) {
@@ -467,14 +471,7 @@ describe("what the peers ask of the Projects", () => {
 			...aloneDirectory(sandbox.db),
 			hostedElsewhere: async (id: string) => id === team,
 		};
-		const projects = createProjects({
-			db: sandbox.db,
-			log: createRunLog(sandbox.db, {
-				walkerId: sandbox.deviceId,
-				dataDir: sandbox.dataDir,
-			}),
-			deviceId: async () => sandbox.deviceId,
-			documents: replica,
+		const projects = projectsOf(replica, {
 			directory,
 			relay: {
 				async addProject(input) {

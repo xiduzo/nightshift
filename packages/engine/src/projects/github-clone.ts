@@ -18,7 +18,7 @@ import {
 	parseGitHubRepo,
 	systemGitHubCli,
 } from "../github";
-import { normaliseRemote } from "./remote";
+import { normaliseRemote } from "./keep";
 
 /**
  * Clones from GitHub into a folder Night Shift manages:

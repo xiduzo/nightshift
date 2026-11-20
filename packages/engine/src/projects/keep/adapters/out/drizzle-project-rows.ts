@@ -2,18 +2,12 @@ import type { Database } from "@nightshift/db";
 import { clone, project, run } from "@nightshift/db/schema";
 import { instant, instantOrNull } from "@nightshift/time";
 import { and, eq, exists, inArray, or } from "drizzle-orm";
+import type { MovingProject } from "../../domain/project";
 
-/** A Project's row as a merge of Spaces reads it. */
-export type MovingProject = {
-	id: string;
-	spaceId: string;
-	name: string;
-	remote: string | null;
-	/** False: a project without a folder (ADR 22). */
-	folder: boolean;
-	createdAt: number;
-	removedAt: number | null;
-};
+/**
+ * The reads of the Projects a merge or a split of Spaces makes, for
+ * `drizzleProjectStore`: they move as they were.
+ */
 
 const movingColumns = {
 	id: project.id,

@@ -79,6 +79,7 @@ export const PACKAGE_ENGINE: Record<string, Place> = {
 	// capability. It imports `projects`, `flows` and `runs`, so it is not a
 	// part of one of them: `projects` would close a cycle with `runs`.
 	"space-move": "space-move",
+	spaces: "spaces",
 	// Moments noted for the anonymous usage export.
 	usage: M,
 	// The store of the kept variables.

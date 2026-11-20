@@ -5,12 +5,12 @@ import { join } from "node:path";
 
 import { mustGit } from "../testing/test-support";
 import type { GitHubClone } from "./github-clone";
+import type { Project } from "./keep";
 import {
 	type CopySpace,
 	createProjectCopies,
 	NOT_ON_GITHUB,
 } from "./project-copies";
-import type { Project } from "./projects";
 
 let root: string;
 

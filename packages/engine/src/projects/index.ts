@@ -1,12 +1,16 @@
-/** Projects, their Clones on this computer and the git setup of a project folder. The Space document that defines them is in `documents/space/`. */
+/** Projects and their Clones: the shared ports (`keep`), a person's requests (`catalog`), and what Night Shift and the Host ask (`clones`, as `Projects`). The git setup of a project folder and the project copies sit beside them. The Space document that defines the Projects is in `documents/space/`. */
 
-export { cloneRowsOfDevice } from "./device-rows";
-export { projectSpaceOf } from "./project-rows";
-export { checkProjectFolder } from "./project-setup";
-export type { ListedProject, Project, Projects } from "./projects";
 export {
-	createProjects,
+	type Catalog,
+	type CloneImports,
+	type HostRelay,
+	wireCatalog,
+} from "./catalog";
+export { type Projects, wireClones } from "./clones";
+export {
+	type ListedProject,
 	NOT_ON_THIS_COMPUTER,
-	PROJECT_NOT_FOUND,
-	toProject,
-} from "./projects";
+	type Project,
+	wireKeep,
+} from "./keep";
+export { checkProjectFolder } from "./project-setup";

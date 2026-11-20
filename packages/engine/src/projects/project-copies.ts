@@ -5,8 +5,7 @@ import { type Git, systemGit } from "../git";
 import { parseGitHubRepo } from "../github";
 import type { UsageNotes } from "../usage";
 import type { GitHubClones } from "./github-clone";
-import { PROJECT_NOT_FOUND, type Project } from "./projects";
-import { normaliseRemote } from "./remote";
+import { normaliseRemote, PROJECT_NOT_FOUND, type Project } from "./keep";
 
 /**
  * Copies projects to this computer from GitHub. A Host copies every

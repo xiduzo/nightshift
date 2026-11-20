@@ -13,5 +13,4 @@ packages/engine/src/knowledge/folder.ts 691
 packages/engine/src/knowledge/reconcile.ts 632
 packages/engine/src/knowledge/search-store.ts 668
 packages/engine/src/knowledge/search.ts 764
-packages/engine/src/projects/projects.ts 941
 packages/notifications/src/notifier/notifier.ts 774

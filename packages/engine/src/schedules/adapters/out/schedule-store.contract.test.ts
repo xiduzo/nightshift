@@ -5,7 +5,7 @@ import { FLOW_VERSION, type Flow } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { createFlowDocuments } from "../../../documents";
 import { createProjectFlows } from "../../../flows";
-import { PROJECT_NOT_FOUND } from "../../../projects";
+import { PROJECT_NOT_FOUND } from "../../../projects/keep";
 import { ownDevice } from "../../../testing/alone-directory";
 import { localSpaceId } from "../../../testing/test-support";
 import { flowDocumentScheduleStore } from "./flow-document-schedule-store";

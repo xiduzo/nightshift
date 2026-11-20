@@ -442,7 +442,7 @@ describe("the edits", () => {
 		const block = lines.findIndex((line) => line.endsWith(" = {"));
 		expect(at).toBeGreaterThan(block);
 		expect(lines.slice(block, at).includes("};")).toBe(false);
-		expect(lines[at - 1]).toBe('\t"space-move": "space-move",');
+		expect(lines[at - 1]).toBe('\tspaces: "spaces",');
 		expect(lines[at + 1]?.startsWith("\t//")).toBe(true);
 		expect(() => withMapLine(ENGINE_MAP, "engine", "gates", "gates")).toThrow(
 			GeneratorRefusal,

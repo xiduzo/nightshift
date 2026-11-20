@@ -3,7 +3,7 @@ import type { JsonValue, Schedule, WebhookEvent } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { Actor, StartRunInput } from "../../../contract";
 import type { RunTrigger } from "../../../log";
-import { PROJECT_NOT_FOUND } from "../../../projects";
+import { PROJECT_NOT_FOUND } from "../../../projects/keep";
 import type { RunSummary } from "../../../read";
 import type { RunStatus } from "../../../run-status";
 import type {

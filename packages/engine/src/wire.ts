@@ -15,7 +15,6 @@ import {
 	createRunBus,
 	createRunHistory,
 	createRunLog,
-	runIdsOfProject,
 } from "./log";
 import { forgetMemory, listMemory } from "./memory";
 import { createPlacement } from "./placement";
@@ -189,6 +188,7 @@ export function createEngine(
 		walks,
 		runFolders,
 		projects: () => projects,
+		cloneRows: () => cloneRows,
 		flows: (projectId) => projectFlows.flows(projectId),
 		takeOver: (runId) => move.arrive(runId),
 		stop: async (runId) => recovery.stopForNightShift(runId),
@@ -198,13 +198,15 @@ export function createEngine(
 	const placement = createPlacement({ device, devices });
 
 	// --- projects (phase 3): `wire-projects.ts` ---
-	const { git, listBranches, projects } = wireEngineProjects({
+	const { git, projects, catalog, cloneRows, spaces } = wireEngineProjects({
 		db,
 		log: runLog,
 		documents,
 		directory,
 		hosts,
 		options,
+		runner: () => runner,
+		cloneImports: () => ({ importClone: (id) => cloneImports.project(id) }),
 	});
 
 	// --- flows (phase 3): `wire-flows.ts` ---
@@ -492,12 +494,10 @@ export function createEngine(
 		ready,
 		signal,
 		log: runLog,
-		runner,
 		// projects, flows, kept values, node memory, answer costs (phase 3)
+		catalog,
+		spaces,
 		projects,
-		documents,
-		runIdsOfProject: (projectId) => runIdsOfProject(db, projectId),
-		listBranches,
 		flows: createSpaceFlows({
 			ready,
 			flows: projectFlows,
@@ -508,7 +508,6 @@ export function createEngine(
 			migration: async (scope) =>
 				migrations.forDevice(await runLog.walkerId(), scope),
 		}),
-		importClone: (projectId) => cloneImports.project(projectId),
 		kept: {
 			list: (flow) => listKeptValues(db, flow),
 			reset: (flow, name) => resetKeptValue(db, flow, name),
@@ -546,7 +545,7 @@ export function createEngine(
 		lifetime,
 		space,
 		log: runLog,
-		documents,
+		spaces,
 		flows: projectFlows,
 		spaceMove,
 		leaseStore,

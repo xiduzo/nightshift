@@ -1,21 +1,32 @@
+import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import { spaceExists } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { DeviceDirectory } from "./contract";
 import type { SpaceDocuments } from "./documents";
 import type { EngineOptions } from "./engine-options";
 import { createWorktrees, systemGit } from "./git";
-import type { RunLog } from "./log";
-import { createProjects } from "./projects";
-
-type ProjectsDeps = Parameters<typeof createProjects>[0];
+import type { Runner } from "./graph";
+import { type EventWrites, type RunLog, runIdsOfProject } from "./log";
+import {
+	type CloneImports,
+	type HostRelay,
+	wireCatalog,
+	wireClones,
+	wireKeep,
+} from "./projects";
+import { wireSpaces } from "./spaces";
 
 /**
  * The projects block of the engine's composition (`wire.ts`): the git
- * port (`git/`), and projects by remote with their Clones on this
- * computer (`projects/`). Phase 3 of the hexagon series makes `projects`
- * a slice. The flows of the projects are the next block
+ * port (`git/`), the shared ports of the Projects (`projects/keep`), a
+ * person's requests (`projects/catalog`), what Night Shift and the Host
+ * ask (`projects/clones`, as `Projects`), and the policy of each Space
+ * (`spaces/`). The flows of the projects are the next block
  * (`wire-flows.ts`).
  *
- * It gives `git` and `listBranches`, and `projects`.
+ * It gives `git`, `projects`, `catalog`, `cloneRows` (the peers' batch of
+ * a Device's rows) and `spaces`.
  */
 export function wireEngineProjects(deps: {
 	db: Database;
@@ -23,20 +34,64 @@ export function wireEngineProjects(deps: {
 	documents: SpaceDocuments;
 	directory: DeviceDirectory;
 	/** The relay to the Hosts, when this computer has one. */
-	hosts: ProjectsDeps["relay"] | undefined;
+	hosts: HostRelay | undefined;
 	options: Pick<EngineOptions, "git">;
+	/** The runner, made after this block: whether a run runs a step here. */
+	runner: () => Pick<Runner, "isActive">;
+	/** The import of a Clone's flows, made after this block (`wire-flows.ts`). */
+	cloneImports: () => CloneImports;
 }) {
 	const { db, log: runLog, documents, directory } = deps;
 	const git = deps.options.git ?? systemGit();
-	const { listBranches } = createWorktrees(git);
-	const projects = createProjects({
-		db,
-		log: runLog,
-		deviceId: runLog.walkerId,
-		documents,
+	const { originUrl, resolveRepoTopLevel, listBranches } = createWorktrees(git);
+	const thisDevice = { deviceId: () => runLog.walkerId() };
+	const keep = wireKeep({ db, documents, thisDevice });
+	const shared = {
+		...keep,
+		projectLog: {
+			async append(fact: Parameters<RunLog["append"]>[0], before?: unknown) {
+				await (before === undefined
+					? runLog.append(fact)
+					: runLog.append(fact, {
+							before: before as EventWrites["before"],
+						}));
+			},
+		},
+		thisDevice,
+		repos: {
+			topLevel: resolveRepoTopLevel,
+			origin: originUrl,
+			branches: listBranches,
+			exists: existsSync,
+		},
 		directory,
-		git,
-		...(deps.hosts ? { relay: deps.hosts } : {}),
+		ids: { projectId: () => randomUUID() },
+	};
+	const projects = wireClones({
+		...shared,
+		knownSpaces: { exists: (spaceId) => spaceExists(db, spaceId) },
 	});
-	return { git, listBranches, projects };
+	const catalog = wireCatalog({
+		...shared,
+		...(deps.hosts ? { relay: deps.hosts } : {}),
+		runs: {
+			runIds: (projectId) => runIdsOfProject(db, projectId),
+			isActive: (runId) => deps.runner().isActive(runId),
+			status: async (runId) => (await runLog.state(runId)).status,
+		},
+		cloneImports: {
+			importClone: (projectId) => deps.cloneImports().importClone(projectId),
+		},
+	});
+	const cloneRows = {
+		forget: keep.store.forgetClones,
+		adopt: keep.store.adoptClones,
+	};
+	return {
+		git,
+		projects,
+		catalog,
+		cloneRows,
+		spaces: wireSpaces({ documents }),
+	};
 }

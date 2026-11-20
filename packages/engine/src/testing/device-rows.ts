@@ -1,6 +1,7 @@
 import type { Database } from "@nightshift/db";
 import { runPlaceOf } from "../log/history/history";
-import { projectSpaceOf } from "../projects/project-rows";
+import { projectSpaceOf } from "../projects/keep/adapters/out/drizzle-project-rows";
+import { drizzleProjectStore } from "../projects/keep/adapters/out/drizzle-project-store";
 import { deviceRowsOf } from "../wire-peers";
 
 /**
@@ -8,7 +9,16 @@ import { deviceRowsOf } from "../wire-peers";
  * gives them: for a test that has a database and no engine.
  */
 export function deviceRowsOn(db: Database) {
-	return deviceRowsOf(db);
+	const store = drizzleProjectStore({
+		db,
+		deviceId: async () => {
+			throw new Error("The Device rows read no Device of this computer.");
+		},
+	});
+	return deviceRowsOf(db, () => ({
+		forget: store.forgetClones,
+		adopt: store.adoptClones,
+	}));
 }
 
 /**

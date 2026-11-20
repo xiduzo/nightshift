@@ -1,29 +1,20 @@
-import { Refusal } from "@nightshift/refusal";
-
 import type { ArtifactStore } from "./artifacts";
 import type { AnswerCost } from "./assistant";
 import type { RunFilesService } from "./cleanup";
 import { type Actor, personOf } from "./contract";
-import { type SpaceDocuments, setSpaceUsage } from "./documents";
 import type { SpaceFlows } from "./flows";
 import type { Gates } from "./gates";
-import type { Branches } from "./git";
-import type { Runner } from "./graph";
 import { type RunLog, scopeKey } from "./log";
 import type { MemoryFlow, NodeMemory } from "./memory";
 import type { WithPaths } from "./peers";
-import {
-	type ListedProject,
-	PROJECT_NOT_FOUND,
-	type Projects,
-	toProject,
-} from "./projects";
+import type { Catalog, Projects } from "./projects";
 import type { RunStreamItem } from "./read";
 import type { Access, Actions, Move, Start, Views } from "./runs";
 import type { Schedules } from "./schedules";
 import { readServiceLog } from "./services";
 import type { SpaceEngine } from "./space-engine";
 import type { SpaceMove } from "./space-move";
+import type { Spaces } from "./spaces";
 import type { KeptFlow, KeptValue } from "./variables";
 
 /**
@@ -40,18 +31,16 @@ export type SpacesDeps = {
 	/** The engine's lifetime: a watch ends with it. */
 	signal: AbortSignal;
 	log: RunLog;
-	runner: Pick<Runner, "isActive">;
 
 	// --- projects, flows, kept values, node memory, answer costs (phase 3) ---
-	projects: Projects;
-	documents: SpaceDocuments;
-	/** The ids of the project's runs. */
-	runIdsOfProject(projectId: string): Promise<string[]>;
-	listBranches(repoPath: string): Promise<Branches>;
+	/** A person's requests about the Projects (`projects/catalog`). */
+	catalog: Catalog;
+	/** The policy of the Space (`spaces/`). */
+	spaces: Pick<Spaces, "setSpaceUsage">;
+	/** The projects of the Space, as the kept values and node memory check them. */
+	projects: Pick<Projects, "find">;
 	/** The flows of the Space's projects, for the Person who acts (`flows/space-flows.ts`). */
 	flows(spaceId: string, personId?: string): SpaceFlows;
-	/** The import on upgrade of this Device's Clone of the project, once. Never throws. */
-	importClone(projectId: string): Promise<void>;
 	/** The kept variables of a project's flows on this computer. */
 	kept: {
 		list(flow: KeptFlow): Promise<KeptValue[]>;
@@ -113,26 +102,7 @@ export type SpacesDeps = {
 };
 
 export function createSpaces(deps: SpacesDeps) {
-	const { ready, log, projects, documents, actions, views } = deps;
-
-	/** Rows as the engine's Projects, with their Clones from the Space document. */
-	async function withClones(spaceId: string, rows: ListedProject[]) {
-		const document = await documents.open(spaceId);
-		const deviceId = await log.walkerId();
-		return rows.map((row) => toProject(row, document, deviceId));
-	}
-
-	/** Refuses while a run of the project runs a step. */
-	async function noActiveRun(projectId: string, what: string) {
-		const runIds = await deps.runIdsOfProject(projectId);
-		if (runIds.some((id) => deps.runner.isActive(id))) {
-			throw new Refusal(
-				"conflict",
-				`A run of this project is still running. Stop it to ${what}.`,
-			);
-		}
-		return runIds;
-	}
+	const { ready, projects, catalog, actions, views } = deps;
 
 	/**
 	 * The watch of a run for the actor: it waits for the engine, then opens
@@ -152,66 +122,39 @@ export function createSpaces(deps: SpacesDeps) {
 		const open = (runId: string) => deps.openRun(actor, { runId, spaceId });
 
 		return {
-			// --- projects (phase 3) ---
+			// --- projects and the Space's usage (phase 3): one use case each ---
 			async listProjects() {
 				await ready;
-				return withClones(spaceId, await projects.listInSpace(spaceId));
+				return catalog.listProjects(actor, { spaceId });
 			},
 
 			async addProject(input) {
 				await ready;
-				const row = await projects.add(input, spaceId);
-				// A folder from before ADR 2 brings its flows in.
-				await deps.importClone(row.id);
-				const [added] = await withClones(spaceId, [row]);
-				if (!added) throw new Error("Could not add the project.");
-				return added;
+				return catalog.addProject(actor, { ...input, spaceId });
 			},
 
 			async addProjectWithoutFolder(input) {
 				await ready;
-				const row = await projects.addWithoutFolder(input, spaceId);
-				const [added] = await withClones(spaceId, [row]);
-				if (!added) throw new Error("Could not add the project.");
-				return added;
+				return catalog.addProjectWithoutFolder(actor, { ...input, spaceId });
 			},
 
 			async useProjectFolder(projectId, repoPath) {
 				await ready;
-				const current = await projects.find(projectId, spaceId);
-				// A run here works in the folder it has: a new one waits for its end.
-				if (current.repoPath !== null) {
-					await noActiveRun(projectId, "change its folder");
-				}
-				const row = await projects.useFolder(projectId, repoPath, spaceId);
-				await deps.importClone(row.id);
-				const [used] = await withClones(spaceId, [row]);
-				if (!used) throw new Error("Could not use the folder.");
-				return used;
+				return catalog.useProjectFolder(actor, {
+					spaceId,
+					projectId,
+					repoPath,
+				});
 			},
 
 			async setUsage(enabled) {
 				await ready;
-				const document = await deps.documents.open(spaceId);
-				if (document.hostedElsewhere) {
-					throw new Refusal(
-						"conflict",
-						"Your Host keeps the settings of this Space. Change usage on your Host.",
-					);
-				}
-				await setSpaceUsage(document, enabled);
+				await deps.spaces.setSpaceUsage(actor, { spaceId, enabled });
 			},
 
-			// A rename, a move and a removal are the Space's: they need no Clone here.
 			async renameProject(projectId, name) {
 				await ready;
-				await projects.find(projectId, spaceId);
-				await projects.rename(projectId, name);
-				const [renamed] = await withClones(spaceId, [
-					await projects.find(projectId, spaceId),
-				]);
-				if (!renamed) throw new Refusal("not-found", PROJECT_NOT_FOUND);
-				return renamed;
+				return catalog.renameProject(actor, { spaceId, projectId, name });
 			},
 
 			async moveProject(projectId, toSpaceId) {
@@ -221,34 +164,12 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async removeProject(projectId) {
 				await ready;
-				await projects.find(projectId, spaceId);
-				const runIds = await noActiveRun(projectId, "remove the project");
-				for (const runId of runIds) {
-					const status = (await log.state(runId)).status;
-					if (status === "waiting") {
-						throw new Refusal(
-							"conflict",
-							"A run of this project waits at a Gate. Answer the Gate or stop the run first.",
-						);
-					}
-					if (status === "sleeping") {
-						throw new Refusal(
-							"conflict",
-							"A run of this project sleeps until a wait ends. Stop it first.",
-						);
-					}
-				}
-				// Runs, events and worktrees stay: a person may still need them.
-				await projects.remove(projectId);
+				await catalog.removeProject(actor, { spaceId, projectId });
 			},
 
 			async listBranches(projectId) {
 				await ready;
-				// A project without a folder has no branches (ADR 22).
-				const found = await projects.find(projectId, spaceId);
-				if (!found.folder) return { current: null, local: [], remote: [] };
-				const row = await projects.get(projectId, spaceId);
-				return deps.listBranches(row.repoPath);
+				return catalog.listBranches(actor, { spaceId, projectId });
 			},
 
 			// --- kept values, node memory, flows, answer costs (phase 3) ---
