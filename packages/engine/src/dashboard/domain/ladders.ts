@@ -1,5 +1,5 @@
-import type { RungBy } from "../log";
-import type { Ladder, Rung, RunRung } from "../read";
+import type { RungBy } from "../../log";
+import type { Ladder, Rung, RunRung } from "../../read";
 import type {
 	ChoiceLadderSummary,
 	FlowLadders,

@@ -6,10 +6,16 @@ export {
 	type FlowChanges,
 	MOVE_GUARDS,
 	MOVE_SETUP_CAUSES,
-} from "./changes-types";
-export { isTimeZone } from "./clock";
-export { summarizeFlow } from "./flow-health";
-export type { FlowHealthDetail } from "./flow-health-types";
+} from "./domain/changes-types";
+export { isTimeZone } from "./domain/clock";
+export { summarizeFlow } from "./domain/flow-health";
+export type { FlowHealthDetail } from "./domain/flow-health-types";
+export {
+	COST_STEADINESS,
+	SAVING_KINDS,
+	type SpaceSpend,
+} from "./domain/spend-types";
+export type { DashboardSummary } from "./domain/summary-types";
 export {
 	flowChanges,
 	flowTurnedSevere,
@@ -18,5 +24,3 @@ export {
 	spaceSpend,
 	spacesDashboard,
 } from "./spaces";
-export { COST_STEADINESS, SAVING_KINDS, type SpaceSpend } from "./spend-types";
-export type { DashboardSummary } from "./summary-types";

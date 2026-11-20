@@ -1,4 +1,4 @@
-import type { HelpAgent } from "../assistant";
+import type { HelpAgent } from "../../assistant";
 import type { NightRange, Spread } from "./measure-types";
 
 /** The Spend page: what the runs of a Space cost, how steady that is, and where a change saves. */

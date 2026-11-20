@@ -8,7 +8,7 @@ import {
 	ownEndedRuns,
 	summarizeChanges,
 	trendOf,
-} from "./changes";
+} from "./domain/changes";
 
 /*
  * Before and after for one flow: the changes of the flow, the effect of

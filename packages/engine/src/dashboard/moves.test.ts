@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { RunDetail } from "../read";
-import { nextMoves } from "./moves";
+import { nextMoves } from "./domain/moves";
 
 /*
  * The next changes to try, read from the steps of a flow's runs. Each test

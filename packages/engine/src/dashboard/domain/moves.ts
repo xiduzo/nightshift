@@ -1,4 +1,4 @@
-import type { RunDetail } from "../read";
+import type { RunDetail } from "../../read";
 
 type StepSummary = RunDetail["steps"][number];
 

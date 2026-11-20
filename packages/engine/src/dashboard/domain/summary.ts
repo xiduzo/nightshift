@@ -1,5 +1,5 @@
-import type { RunSummary } from "../read";
-import { isTestRun } from "../run-status";
+import type { RunSummary } from "../../read";
+import { isTestRun } from "../../run-status";
 import { DAY_MS, dayStart, HOUR_MS, lastDays, lastHours } from "./clock";
 import { FLOW_HEALTH_DAYS, flowHealthRows } from "./flow-health";
 import {

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
 import type { NeededYou } from "../read";
-import { DAY_MS } from "./clock";
-import { flowWatch, turnedSevere, type WatchRun } from "./watch";
+import { DAY_MS } from "./domain/clock";
+import { flowWatch, turnedSevere, type WatchRun } from "./domain/watch";
 
 /*
  * The watch over a flow: its level, how often it needed a person, and the

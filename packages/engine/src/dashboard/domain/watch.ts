@@ -3,8 +3,8 @@ import {
 	type NeededYou,
 	type NeededYouReason,
 	type RunSummary,
-} from "../read";
-import { isTestRun } from "../run-status";
+} from "../../read";
+import { isTestRun } from "../../run-status";
 import { DAY_MS } from "./clock";
 import type {
 	AttentionCause,

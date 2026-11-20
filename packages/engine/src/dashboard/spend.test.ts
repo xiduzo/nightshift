@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { parseInstant } from "@nightshift/time";
 import type { AnswerCost } from "../assistant";
 import type { RunRung, RunSummary } from "../read";
-import { steadinessOf, summarizeSpend } from "./spend";
-import { spreadOf } from "./stats";
+import { steadinessOf, summarizeSpend } from "./domain/spend";
+import { spreadOf } from "./domain/stats";
 
 /*
  * The Spend page: what the runs cost, how steady the cost of a flow is,

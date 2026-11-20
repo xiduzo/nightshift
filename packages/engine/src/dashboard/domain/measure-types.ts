@@ -1,5 +1,5 @@
-import { NIGHT_RANGES, type NightRange } from "../read";
-import type { RunStatus } from "../run-status";
+import { NIGHT_RANGES, type NightRange } from "../../read";
+import type { RunStatus } from "../../run-status";
 
 /**
  * What every part of the dashboard measures with: the ranges of days and

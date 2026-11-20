@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { iso, parseInstant } from "@nightshift/time";
 import type { RunSummary } from "../read";
-import { summarizeFlow } from "./flow-health";
+import { summarizeFlow } from "./domain/flow-health";
+import { type DashboardScope, summarizeDashboard } from "./domain/summary";
 import { projectDashboard, spacesDashboard } from "./spaces";
-import { type DashboardScope, summarizeDashboard } from "./summary";
 
 /**
  * The dashboard's numbers, from runs built for each test. The clock is UTC

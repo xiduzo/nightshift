@@ -1,5 +1,5 @@
-import { isOpenStatus, type RunSummary } from "../read";
-import { isTestRun, type RunStatus } from "../run-status";
+import { isOpenStatus, type RunSummary } from "../../read";
+import { isTestRun, type RunStatus } from "../../run-status";
 import type { LatestReport } from "./flow-health-types";
 import {
 	type DashboardRun,

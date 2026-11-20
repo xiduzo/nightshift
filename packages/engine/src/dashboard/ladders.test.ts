@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { parseInstant } from "@nightshift/time";
 import type { RunRung, RunSummary } from "../read";
-import { flowHealthRows, summarizeFlow } from "./flow-health";
-import { flowLadders, flowRangeLadders } from "./ladders";
+import { flowHealthRows, summarizeFlow } from "./domain/flow-health";
+import { flowLadders, flowRangeLadders } from "./domain/ladders";
 
 /**
  * Where the work of a flow landed: its runs' ladder rows added up per

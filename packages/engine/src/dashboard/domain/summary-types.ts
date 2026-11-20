@@ -1,5 +1,5 @@
-import type { NeededYouReason, RunSummary } from "../read";
-import type { RunStatus } from "../run-status";
+import type { NeededYouReason, RunSummary } from "../../read";
+import type { RunStatus } from "../../run-status";
 import type {
 	FlowHealthRow,
 	LatestReport,

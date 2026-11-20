@@ -1,5 +1,5 @@
-import type { RunSummary } from "../read";
-import { isTestRun } from "../run-status";
+import type { RunSummary } from "../../read";
+import { isTestRun } from "../../run-status";
 import { dayStart, lastDays } from "./clock";
 import {
 	type NightCounts,
