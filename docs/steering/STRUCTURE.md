@@ -514,11 +514,14 @@ To start a slice:
 3. The generator writes `index.ts`, `wire.ts`, `application/ports.ts` with the port `<Slice>Access`, and `adapters/out/in-memory-neighbours.ts`. It writes the first use case with its test, and the line of the capability map. Biome formats each file.
 4. Call `wire<Slice>` from the `wire.ts` of the package, and give its use cases to the door that calls them. Until then, the vertical check fails rules (b) and (q) on the barrel of the slice.
 
-To add a use case to a slice that the generator started:
+To start a sub-vertical in a vertical that exists, give `<vertical>/<folder>` as the slice: `bun run gen slice --args engine runs/pauses ...`. The generator writes the same files in the new folder, and no line of the capability map. The names come from the folder: `wirePauses`, `PausesAccess`. Call `wirePauses` from the wire of its vertical.
 
-1. Run `bun run gen use-case --args <package> <slice> <verb-object> "<what it does>"`.
-2. The generator writes the use case and its test in `application/`, and binds the use case in `wire.ts`. It checks who may act first (`access.openSpace`).
-3. Give the use case the other ports it needs. Add each one to its `<UseCase>Ports` type with `Pick<>`.
+To add a use case to a slice:
+
+1. Run `bun run gen use-case --args <package> <slice> <verb-object> "<what it does>"`. The slice may be a sub-vertical (`runs/pauses`).
+2. The generator writes the use case and its test in `application/`, and binds the use case in `wire.ts`.
+3. If the slice has the port `<Slice>Access`, the use case checks who may act first (`access.openSpace`). Else it takes the actor as `_actor` and checks no role. In `agents` and `auth` it takes the request alone.
+4. Give the use case the ports it needs. Add each one to its `<UseCase>Ports` type with `Pick<>`.
 
 To add a port with its adapters:
 
@@ -529,9 +532,9 @@ To add a port with its adapters:
 
 A generator refuses, and writes nothing, in these cases:
 
-- A package below the engine (`agents`, `auth`). Its use cases have no `Actor` yet.
-- A slice that is no capability, or a vertical that exists.
-- A use case or a port of a slice made by hand. Such a slice has no `<Slice>Access` and no `inMemory<Slice>Ports`. Write the code by hand there.
+- A new slice in a package below the engine (`agents`, `auth`). It has no `Actor` for the access port. A use case or an adapter of a slice there is fine.
+- A slice that is no capability, or a vertical that exists. A sub-vertical in no vertical, or one that exists.
+- A use case or a port of a slice that has no `inMemory<Slice>Ports` in `adapters/out/in-memory-neighbours.ts`, or whose `wire.ts` does not have the shape the generator made (`export type <Slice> = {` and the `return {` of `wire<Slice>`). Write the code by hand there.
 
 ### Bring a slice into shape
 
