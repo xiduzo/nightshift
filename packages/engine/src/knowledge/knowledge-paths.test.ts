@@ -9,8 +9,11 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { createKnowledgeFolders, indexFolder } from "./folder";
-import { scanFolder } from "./knowledge-paths";
+import {
+	fsKnowledgeFolders as createKnowledgeFolders,
+	scanFolder,
+} from "./files/adapters/out/fs-knowledge-folders";
+import { indexFolder, openView } from "./files/test-support";
 import { createStepKnowledge } from "./step-knowledge";
 
 /**
@@ -99,6 +102,7 @@ describe("a step's start", () => {
 					return { done: async () => {} };
 				},
 			},
+			files: { writeIndex: indexFolder, openView },
 			reader: { read: async () => null },
 			learnings: {
 				async *keepReported(events) {

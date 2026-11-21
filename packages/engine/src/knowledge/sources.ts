@@ -14,9 +14,11 @@ import {
 import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
 import type { RunStatus } from "../run-status";
-import { KNOWLEDGE_FILES_WARNING } from "./folder";
-import type { KnowledgeFile } from "./knowledge-paths";
-import type { KnowledgeListing } from "./knowledge-reader";
+import {
+	KNOWLEDGE_FILES_WARNING,
+	type KnowledgeFile,
+	type KnowledgeListing,
+} from "./files";
 import {
 	type FlowMap,
 	foldersOf,

@@ -5,14 +5,14 @@ import {
 	documentName,
 	type SyncedDocuments,
 } from "../documents";
-import { createKnowledgeFolders } from "../knowledge/folder";
+import { fsKnowledgeFolders } from "../knowledge/files";
+import { createKnowledge } from "../knowledge/knowledge";
+import type { KnowledgeDeps } from "../knowledge/knowledge-door";
 import {
 	createKnowledgeFolderLocks,
 	type KnowledgeFolderLocks,
-} from "../knowledge/folder-locks";
-import { createKnowledge } from "../knowledge/knowledge";
-import { createKnowledgeDocuments } from "../knowledge/knowledge-document";
-import type { KnowledgeDeps } from "../knowledge/knowledge-door";
+} from "../knowledge/sync";
+import { yjsKnowledgeDocuments } from "../knowledge/sync/adapters/out/yjs-knowledge-documents";
 
 /**
  * A computer's knowledge for a test, made as the daemon makes it:
@@ -57,7 +57,7 @@ export function testKnowledge(
 	});
 	return {
 		knowledge,
-		documents: createKnowledgeDocuments({
+		documents: yjsKnowledgeDocuments({
 			db: sandbox.db,
 			documents: synced,
 		}),
@@ -67,7 +67,7 @@ export function testKnowledge(
 		archive,
 		folderLocks,
 		folder: (projectId: string) =>
-			createKnowledgeFolders(sandbox.dataDir).folder(projectId),
+			fsKnowledgeFolders(sandbox.dataDir).folder(projectId),
 		close: () => knowledge.close(),
 	};
 }

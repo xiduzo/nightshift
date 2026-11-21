@@ -15,13 +15,17 @@ import type {
 	SessionStep,
 } from "../contract";
 import type { FolderSnapshot } from "../folder-snapshot";
-import { indexFolder, type KnowledgeFolders } from "./folder";
-import type { KnowledgeReader } from "./knowledge-reader";
+import {
+	inFolders,
+	type KnowledgeFiles,
+	type KnowledgeFolders,
+	type KnowledgeReader,
+	type KnowledgeView,
+} from "./files";
 import type { Learnings } from "./learnings";
 import type { PageReaders, ReaderSecret } from "./readers/service";
-import type { KnowledgeReconciler } from "./reconcile";
 import type { KnowledgeSearch } from "./search";
-import { createKnowledgeView, inFolders, type KnowledgeView } from "./view";
+import type { KnowledgeReconciler } from "./sync";
 
 /**
  * What a step gets of the knowledge (`Knowledge.forCommand`,
@@ -64,6 +68,8 @@ const nothing = {
 
 export function createStepKnowledge(deps: {
 	folders: Pick<KnowledgeFolders, "folder" | "ensure" | "scan">;
+	/** The index and the views of the folders. */
+	files: Pick<KnowledgeFiles, "writeIndex" | "openView">;
 	reconciler: Pick<KnowledgeReconciler, "startStep">;
 	reader: Pick<KnowledgeReader, "read">;
 	search: Pick<KnowledgeSearch, "search" | "refresh">;
@@ -71,7 +77,7 @@ export function createStepKnowledge(deps: {
 	/** The page readers: a Command step gets the project's. Without them, none. */
 	readers?: Pick<PageReaders, "forStep">;
 }) {
-	const { folders, reconciler, reader, search, learnings } = deps;
+	const { folders, files, reconciler, reader, search, learnings } = deps;
 
 	/** The step's page reader. One that cannot open leaves the step without it: the kit reads as before. */
 	async function pageReader(projectId: string, secret: ReaderSecret) {
@@ -208,7 +214,7 @@ export function createStepKnowledge(deps: {
 				try {
 					// After the reconcile, which writes the folder.
 					snapshot = await folders.scan(projectId);
-					view = await createKnowledgeView(path, snapshot.readable, only);
+					view = await files.openView(path, snapshot.readable, only);
 				} catch (error) {
 					console.warn("The knowledge was left out:", error);
 					return { ...nothing, done: hold.done };
@@ -233,7 +239,7 @@ export function createStepKnowledge(deps: {
 				// After the reconcile, which writes the folder.
 				snapshot = await folders.scan(projectId);
 				if (snapshot.readable.length === 0 && !knowledge?.always) return plain;
-				await indexFolder(snapshot);
+				await files.writeIndex(snapshot);
 			} catch (error) {
 				console.warn("The knowledge folder was left out:", error);
 				return plain;

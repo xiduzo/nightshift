@@ -3,7 +3,6 @@
  * The knowledge reads them for its index, its search and its page readers.
  */
 export {
-	type DocumentMetadata,
 	isDocument,
 	LOCAL_ONLY_BYTES,
 	loadDocument,

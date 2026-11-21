@@ -6,7 +6,7 @@
  * Device folds like any other. The text the others read:
  * - `tools.ts`: the tools' names, descriptions and fields. It keeps what the
  *   tools answer at a call, next to the code that decides that answer.
- * - the engine's `knowledge/folder.ts`: the first line of `INDEX.md`. It keeps
+ * - the engine's `knowledge/files/domain/index-text.ts`: the first line of `INDEX.md`. It keeps
  *   the format of the lines under it.
  * - `nightshift mcp` in `apps/server`: its sentences about the knowledge. It
  *   keeps the rest of what that server tells an agent in a terminal.

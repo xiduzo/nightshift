@@ -4,7 +4,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { Document } from "@langchain/core/documents";
 import { KNOWLEDGE_SEARCH_FILE } from "@nightshift/flows";
-import type { KnowledgeFile } from "./knowledge-paths";
+import type { KnowledgeFile } from "./files";
 import type { KnowledgeMeaning } from "./meaning";
 import { type SectionMetadata, sectionId } from "./sections";
 import { BunSqliteRecordManager, BunSqliteVectorStore } from "./vectors";

@@ -5,18 +5,18 @@ import { NOT_TOPICS_FILE, QUESTION_SET_FILE } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { writeWhole } from "../archive";
 import { createRunLog, knowledgeUseEvent } from "../log";
-import { collectContent } from "./collect";
 import { evaluateKnowledge } from "./evaluate";
-import { createKnowledgeFolders } from "./folder";
-import { createKnowledgeDocuments } from "./knowledge-document";
 import {
-	type Knowledge,
-	type KnowledgeDeps,
-	type KnowledgeHosts,
-	TIMERS,
+	isReadable,
+	type KnowledgeFolders,
+	type KnowledgeReader,
+	wireFiles,
+} from "./files";
+import type {
+	Knowledge,
+	KnowledgeDeps,
+	KnowledgeHosts,
 } from "./knowledge-door";
-import { isReadable } from "./knowledge-paths";
-import { createKnowledgeReader } from "./knowledge-reader";
 import { createLearnings, type ProjectLearning } from "./learnings";
 import { createMapMemo, knowledgeMapOf } from "./map";
 import { formatNotTopics, markNotTopic, parseNotTopics } from "./not-topics";
@@ -28,12 +28,16 @@ import {
 	questionKey,
 } from "./questions";
 import { createPageReaders } from "./readers/service";
-import { createKnowledgeReconciler } from "./reconcile";
 import { reviewTasks } from "./review";
 import { createKnowledgeSearch } from "./search";
 import { knowledgeSources, type SourceRun, type SourcesSpace } from "./sources";
-import { createSpaceHostStatus } from "./space-host-status";
 import { createStepKnowledge } from "./step-knowledge";
+import {
+	type KnowledgeDocuments,
+	type KnowledgeReconciler,
+	type KnowledgeSync,
+	wireSync,
+} from "./sync";
 import { askedQuestions, knowledgeFileUse } from "./use";
 
 /**
@@ -53,12 +57,13 @@ const MAP_LIMITS = {
  */
 type KnowledgeParts = {
 	deps: KnowledgeDeps;
-	folders: ReturnType<typeof createKnowledgeFolders>;
-	documents: ReturnType<typeof createKnowledgeDocuments>;
+	folders: KnowledgeFolders;
+	documents: KnowledgeDocuments;
 	search: ReturnType<typeof createKnowledgeSearch>;
 	learnings: ReturnType<typeof createLearnings>;
-	reconciler: ReturnType<typeof createKnowledgeReconciler>;
-	reader: ReturnType<typeof createKnowledgeReader>;
+	sync: KnowledgeSync;
+	reconciler: KnowledgeReconciler;
+	reader: KnowledgeReader;
 	readers: ReturnType<typeof createPageReaders>;
 	steps: ReturnType<typeof createStepKnowledge>;
 	/** What `connect` sets, and what `close` stops. */
@@ -79,21 +84,35 @@ type KnowledgeParts = {
  */
 export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 	const { db, archive, device } = deps;
-	const folders = createKnowledgeFolders(deps.dataDir);
-	const documents = createKnowledgeDocuments({
+	/** The devices runtime, made after this: until then content stays here. */
+	const late: KnowledgeParts["late"] = { hosts: null, stopTimers: () => {} };
+	// The folders are made by `wireFiles` below: the sync reads them only when it runs.
+	const sync = wireSync({
 		db,
 		documents: deps.documents,
+		folders: {
+			folder: (projectId) => folders.folder(projectId),
+			known: () => folders.known(),
+			scan: (projectId) => folders.scan(projectId),
+		},
+		archive,
+		locks: deps.folderLocks,
+		deviceId: device.id,
+		hosts: {
+			inStep: async (spaceId, names, options) =>
+				late.hosts?.inStep(spaceId, names, options),
+		},
+		listener: { reconciled: (change) => learnings.reconciled(change) },
+		...(deps.usage ? { usage: deps.usage } : {}),
 	});
+	const { documents, status, reconciler } = sync;
 	const search = createKnowledgeSearch(deps.dataDir, {
 		...(deps.meaning ? { meaning: deps.meaning } : {}),
 		meaningOn: async (projectId) =>
 			(await documents.open(projectId)).meaningOn(),
 	});
-	/** The devices runtime, made after this: until then content stays here. */
-	const late: KnowledgeParts["late"] = { hosts: null, stopTimers: () => {} };
-	const status = createSpaceHostStatus(db);
 	const learnings = createLearnings({
-		folders,
+		folders: { folder: (projectId) => folders.folder(projectId) },
 		documents,
 		archive,
 		status,
@@ -101,27 +120,17 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		notifications: deps.notifications,
 		closeNotes: search.closeNotes,
 	});
-	const reconciler = createKnowledgeReconciler({
-		folders,
-		documents,
-		archive,
-		status,
-		locks: deps.folderLocks,
+	const files = wireFiles({
+		dataDir: deps.dataDir,
 		deviceId: device.id,
-		inStep: async (spaceId, names, options) =>
-			late.hosts?.inStep(spaceId, names, options),
-		reconciled: learnings.reconciled,
-	});
-	const reader = createKnowledgeReader({
-		folders,
-		documents,
-		archive,
-		learnings,
-		status,
-		deviceId: device.id,
-		reconcileUnlessHeld: reconciler.reconcileUnlessHeld,
 		...(deps.pageWaitMs !== undefined ? { pageWaitMs: deps.pageWaitMs } : {}),
+		documents,
+		status,
+		archive,
+		notes: learnings,
+		sync: reconciler,
 	});
+	const { folders, reader } = files;
 	const readers = createPageReaders({
 		dataDir: deps.dataDir,
 		setting: async (projectId) => (await documents.open(projectId)).reader(),
@@ -130,6 +139,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 	});
 	const steps = createStepKnowledge({
 		folders,
+		files,
 		reconciler,
 		reader,
 		search,
@@ -145,6 +155,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		documents,
 		search,
 		learnings,
+		sync,
 		reconciler,
 		reader,
 		readers,
@@ -204,67 +215,15 @@ function readQuestions(
 function syncMembers(
 	parts: KnowledgeParts,
 ): Pick<Knowledge, "connect" | "listing" | "read" | "moved"> {
-	const { deps, documents, reconciler, reader, search, late } = parts;
-	const { db, archive } = deps;
-
-	function startTimers(): () => void {
-		const times = { ...TIMERS, ...deps.timers };
-		const first = setTimeout(() => {
-			reconciler.reconcileAll().catch((error) => {
-				console.warn("The knowledge was not brought in step:", error);
-			});
-		}, times.firstReconcileMs);
-		const retry = setInterval(() => {
-			reconciler.retryPending().catch(() => {});
-		}, times.retryMs);
-		const collectNow = () => {
-			const keeps = late.hosts?.keeps?.bind(late.hosts);
-			if (!keeps) return;
-			collectContent({ db, documents, archive, keeps }).catch((error) => {
-				console.warn("The old knowledge content was not removed:", error);
-			});
-		};
-		const firstCollect = setTimeout(collectNow, times.firstCollectMs);
-		const collect = setInterval(collectNow, times.collectMs);
-		const measureNow = () => {
-			documents
-				.sizes()
-				.then((sizes) => {
-					for (const size of sizes) {
-						deps.usage?.note({ kind: "knowledge-document-measured", ...size });
-					}
-				})
-				.catch((error) => {
-					console.warn("The knowledge documents were not measured:", error);
-				});
-		};
-		const firstMeasure = setTimeout(measureNow, times.firstMeasureMs);
-		const measure = setInterval(measureNow, times.measureMs);
-		for (const timer of [
-			first,
-			retry,
-			firstCollect,
-			collect,
-			firstMeasure,
-			measure,
-		]) {
-			timer.unref();
-		}
-		return () => {
-			clearTimeout(first);
-			clearInterval(retry);
-			clearTimeout(firstCollect);
-			clearInterval(collect);
-			clearTimeout(firstMeasure);
-			clearInterval(measure);
-		};
-	}
-
+	const { deps, sync, reconciler, reader, search, late } = parts;
 	return {
 		connect(runtime) {
 			late.hosts = runtime;
 			late.stopTimers();
-			late.stopTimers = startTimers();
+			late.stopTimers = sync.startTimers({
+				...(runtime.keeps ? { keeps: runtime.keeps.bind(runtime) } : {}),
+				...(deps.timers ? { times: deps.timers } : {}),
+			});
 		},
 		listing: reader.listing,
 		async read(projectId, path, { maxBytes, from, agent }) {

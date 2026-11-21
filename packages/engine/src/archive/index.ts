@@ -9,7 +9,6 @@ export {
 	type ArchiveRef,
 	createSpaceArchive,
 	type SpaceArchive,
-	sha256Of,
 	sha256OfFile,
 	type WalkFile,
 	type WalkRef,

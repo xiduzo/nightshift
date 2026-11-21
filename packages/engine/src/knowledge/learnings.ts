@@ -19,10 +19,13 @@ import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import { type SpaceArchive, writeWhole } from "../archive";
 import type { CloseNote, CloseNotes, NoteToCompare } from "./close-notes";
-import type { KnowledgeFolders } from "./folder";
-import type { KnowledgeDocuments } from "./knowledge-document";
-import type { KnowledgeReconciled, KnowledgeStepHold } from "./reconcile";
-import type { SpaceHostStatus } from "./space-host-status";
+import type { KnowledgeFolders } from "./files";
+import type {
+	KnowledgeDocuments,
+	KnowledgeReconciled,
+	KnowledgeStepHold,
+	SpaceHostStatus,
+} from "./sync";
 
 /**
  * Learnings: what agents propose to learn about a project, in its

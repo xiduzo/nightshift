@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { KnowledgeFile } from "./knowledge-paths";
+import type { KnowledgeFile } from "./files";
 import type { ProjectLearning } from "./learnings";
 import { reviewTasks } from "./review";
 import type { KnowledgeSync } from "./sources";

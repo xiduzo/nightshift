@@ -5,9 +5,7 @@ import type { SpaceArchive } from "../archive";
 import type { SyncedDocuments } from "../documents";
 import type { UsageNotes } from "../usage";
 import type { KnowledgeEvaluation } from "./evaluate";
-import type { KnowledgeText } from "./folder";
-import type { KnowledgeFolderLocks } from "./folder-locks";
-import type { KnowledgeListing } from "./knowledge-reader";
+import type { KnowledgeListing, KnowledgeText } from "./files";
 import type {
 	LearningsNotifications,
 	NotePerson,
@@ -28,6 +26,7 @@ import type {
 	SessionKnowledge,
 	SessionStep,
 } from "./step-knowledge";
+import type { KnowledgeFolderLocks, KnowledgeTimes } from "./sync";
 import type { AskedQuestion, KnowledgeUseReport } from "./use";
 
 /** The Hosts of the Spaces, once the devices runtime is up. */
@@ -294,7 +293,7 @@ export type Knowledge = {
 	 * learnings. The index catches up with the folder from now on, not at
 	 * the first search. It gets nothing when the request asks for nothing.
 	 *
-	 * With `knowledgeOnly`: a view of those folders instead (`view.ts`), even
+	 * With `knowledgeOnly`: a view of those folders instead (`openKnowledgeView`), even
 	 * when it is empty. `NS_KNOWLEDGE`, the line and the folder to read
 	 * are the view's, the tools find nothing else, and the session never
 	 * gets the folder's path. Its learnings still go to the folder's
@@ -311,20 +310,6 @@ export type Knowledge = {
 	 * under a placed step) still searches: the index opens again for it.
 	 */
 	close(): void;
-};
-
-/** When this Device keeps its folders in step on its own, from `connect` on. */
-export const TIMERS = {
-	/** Every folder, once the Links had a moment to come up: the import on upgrade (ADR 4, decision 10), and what changed while the daemon was down. */
-	firstReconcileMs: 15_000,
-	/** The folders whose content still waits for its Host. */
-	retryMs: 60_000,
-	/** The content of the Spaces this Device keeps that no document lists any more. */
-	firstCollectMs: 60 * 60_000,
-	collectMs: 24 * 60 * 60_000,
-	/** The size of each knowledge document, for the anonymous usage. */
-	firstMeasureMs: 60 * 60_000,
-	measureMs: 24 * 60 * 60_000,
 };
 
 export type KnowledgeDeps = {
@@ -350,8 +335,8 @@ export type KnowledgeDeps = {
 	usage?: UsageNotes;
 	/** Who tells the open screens that the learnings that wait changed, on any path. */
 	notifications: LearningsNotifications;
-	/** Other times for `TIMERS`. */
-	timers?: Partial<typeof TIMERS>;
+	/** Other times for the timers of `connect` (`TIMERS` of `sync`). */
+	timers?: Partial<KnowledgeTimes>;
 	/**
 	 * Whether a page reader of this computer may reach its private network:
 	 * a Host only when its Settings allow it, as for a Web request. Default: yes.

@@ -496,6 +496,11 @@ describe("the command", () => {
 		};
 		expect(checkBudgets(root, scopesOf(root), lists)).toEqual([]);
 		for (const list of ["size", "folder", "barrel", "peerPorts"] as const) {
+			// A list whose debt is all paid has no line to leave out.
+			const debt = lists[list]
+				.split("\n")
+				.some((line) => line.trim() !== "" && !line.startsWith("#"));
+			if (!debt) continue;
 			expect(
 				checkBudgets(root, scopesOf(root), { ...lists, [list]: "" }),
 			).not.toEqual([]);

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { KNOWLEDGE_SEARCH_FILE } from "@nightshift/flows";
 import { tinyDocx, tinyPdf } from "../testing/documents";
-import { createKnowledgeFolders } from "./folder";
+import { fsKnowledgeFolders as createKnowledgeFolders } from "./files";
 import {
 	createKnowledgeSearch,
 	type KnowledgeHit,

@@ -9,7 +9,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { sha256Of } from "../archive";
+import { sha256Of } from "../archive/space-archive";
 import { type FileStamp, snapshotFolder } from "./folder-snapshot";
 
 /**

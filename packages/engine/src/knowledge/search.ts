@@ -4,12 +4,13 @@ import { isDocument, loadDocument } from "../file-loaders";
 import type { FolderSnapshot } from "../folder-snapshot";
 import { createCloseNotes } from "./close-notes";
 import {
-	createKnowledgeFolders,
 	cutText,
 	describeFile,
+	fsKnowledgeFolders,
+	inFolders,
 	isText,
 	readStart,
-} from "./folder";
+} from "./files";
 import type { KnowledgeMeaning, KnowledgeMeaningReady } from "./meaning";
 import {
 	createSearchStore,
@@ -22,7 +23,6 @@ import {
 	createVectorPreparation,
 	type VectorPreparationEvent,
 } from "./vector-preparation";
-import { inFolders } from "./view";
 
 /**
  * Search over a project's knowledge folder, on this Device: by words, and
@@ -324,7 +324,7 @@ export type KnowledgeSearch = ReturnType<typeof createKnowledgeSearch>;
  * Night Shift runs: another model builds the vectors again). Without it, or
  * when it gives null, search finds by words only. `meaningOn`: whether a
  * person left search by meaning on for a project (the project's setting,
- * `knowledge-document.ts`). Off: the project is searched by words only,
+ * `sync/domain/entry.ts`). Off: the project is searched by words only,
  * and its vectors are not prepared. Default: on. `clock` and `onPreparation`:
  * the vector preparation's clock, and what hears each change of its state.
  */
@@ -346,7 +346,7 @@ export function createKnowledgeSearch(
 		options.meaningOn
 			? options.meaningOn(projectId).catch(() => true)
 			: Promise.resolve(true);
-	const folders = createKnowledgeFolders(dataDir);
+	const folders = fsKnowledgeFolders(dataDir);
 	const store = createSearchStore(dataDir, {
 		onVectorsGone: () => {
 			preparation.vectorsGone();

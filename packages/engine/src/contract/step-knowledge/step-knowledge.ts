@@ -18,7 +18,7 @@ export type KnowledgeRequest = {
 	knowledge?: { projectId: string; always?: boolean };
 	/**
 	 * The node lists folders of the knowledge (`knowledge: [...]`): the agent
-	 * gets a view of those only (`view.ts`), even when it is empty. Its search
+	 * gets a view of those only (`openKnowledgeView`), even when it is empty. Its search
 	 * and reads find nothing else. A field of its own, not part of `knowledge`:
 	 * a Device that does not know it gives no knowledge, never the whole folder.
 	 */

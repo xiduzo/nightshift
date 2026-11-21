@@ -10,14 +10,9 @@
 
 export { DEFAULT_EMBEDDING_MODEL } from "./embedding-model";
 export type { KnowledgeEvaluation } from "./evaluate";
-export type { KnowledgeText } from "./folder";
-export {
-	createKnowledgeFolderLocks,
-	type KnowledgeFolderLocks,
-} from "./folder-locks";
+export type { KnowledgeFile, KnowledgeText } from "./files";
 export { createKnowledge } from "./knowledge";
 export type { Knowledge } from "./knowledge-door";
-export type { KnowledgeFile } from "./knowledge-paths";
 export type { WaitingLearning } from "./learnings";
 export type { KnowledgeMap } from "./map";
 export { type KnowledgeMeaning, ollamaMeaning } from "./meaning";
@@ -25,6 +20,10 @@ export type { KnowledgeQuestion } from "./questions";
 export type { LinkLook } from "./readers/look";
 export { type AskLearner, createRunLearnings } from "./run-learnings";
 export type { KnowledgeHit, KnowledgeMeaningStatus } from "./search";
+export {
+	createKnowledgeFolderLocks,
+	type KnowledgeFolderLocks,
+} from "./sync";
 export {
 	type AskedQuestion,
 	type KnowledgeUseReport,

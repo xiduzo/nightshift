@@ -1,0 +1,62 @@
+import { describe, expect, test } from "bun:test";
+import { inMemorySyncPorts } from "../adapters/out/in-memory-neighbours";
+import { removeSourceFolder } from "./remove-source-folder";
+
+/** The use case removeSourceFolder, on in-memory adapters. */
+
+const entry = (char: string) => ({
+	sha256: char.repeat(64),
+	size: 1,
+	changedAt: 1,
+	deviceId: "desktop",
+});
+
+function removePorts() {
+	const ports = inMemorySyncPorts();
+	const order: string[] = [];
+	return {
+		ports,
+		order,
+		remove: removeSourceFolder({
+			...ports,
+			reconcile: async (projectId) => {
+				order.push(`reconcile ${projectId}`);
+			},
+		}),
+	};
+}
+
+describe("removeSourceFolder", () => {
+	test("removes the folder's entries between two reconciles, and counts them", async () => {
+		const { ports, order, remove } = removePorts();
+		const document = await ports.documents.open("p1");
+		await document.apply({
+			set: [
+				["web/a.md", entry("a")],
+				["web/b.md", entry("b")],
+				["website/c.md", entry("c")],
+			],
+		});
+		expect(await remove({ projectId: "p1", folder: "web/" })).toBe(2);
+		expect(order).toEqual(["reconcile p1", "reconcile p1"]);
+		expect([...document.entries().keys()]).toEqual(["website/c.md"]);
+	});
+
+	test("refuses a folder outside the knowledge and one of Night Shift's own", async () => {
+		const { remove } = removePorts();
+		for (const folder of ["../web", ".hidden", "learnings"]) {
+			await expect(remove({ projectId: "p1", folder })).rejects.toThrow(
+				"Choose a folder inside the knowledge.",
+			);
+		}
+	});
+
+	test("refuses while a run changes the knowledge", async () => {
+		const { ports, order, remove } = removePorts();
+		ports.locks.hold("/knowledge/p1");
+		await expect(remove({ projectId: "p1", folder: "web" })).rejects.toThrow(
+			"A run is changing this knowledge now. Try again when it ends.",
+		);
+		expect(order).toEqual([]);
+	});
+});

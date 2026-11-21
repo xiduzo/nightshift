@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SynonymEmbeddings } from "../testing/embeddings";
 import { watchVectorPreparation } from "../testing/vector-preparation";
-import { createKnowledgeFolders } from "./folder";
+import { fsKnowledgeFolders as createKnowledgeFolders } from "./files";
 import {
 	type KnowledgeMeaning,
 	type KnowledgeMeaningReady,

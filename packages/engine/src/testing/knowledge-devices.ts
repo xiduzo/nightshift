@@ -4,13 +4,10 @@ import { project } from "@nightshift/db/schema";
 import * as Y from "yjs";
 import { type ArchiveHost, createSpaceArchive } from "../archive";
 import { createSyncedDocuments, documentName } from "../documents";
-import { createKnowledgeFolders } from "../knowledge/folder";
-import { createKnowledgeFolderLocks } from "../knowledge/folder-locks";
-import { createKnowledgeDocuments } from "../knowledge/knowledge-document";
-import { createKnowledgeReader } from "../knowledge/knowledge-reader";
+import { fsKnowledgeFolders, wireFiles } from "../knowledge/files";
 import { createLearnings } from "../knowledge/learnings";
-import { createKnowledgeReconciler } from "../knowledge/reconcile";
-import { createSpaceHostStatus } from "../knowledge/space-host-status";
+import { createKnowledgeFolderLocks, wireSync } from "../knowledge/sync";
+import { createOlderHosts } from "../knowledge/sync/domain/older-hosts";
 import { createSandbox, type Sandbox } from "./test-support";
 
 /**
@@ -57,16 +54,30 @@ export async function knowledgeDevice(
 	await sandbox.db
 		.insert(project)
 		.values({ id: "p1", spaceId: sandbox.spaceId, name: "p1" });
-	const folders = createKnowledgeFolders(sandbox.dataDir);
+	const folders = fsKnowledgeFolders(sandbox.dataDir);
 	const synced = createSyncedDocuments({ db: sandbox.db });
-	const documents = createKnowledgeDocuments({
-		db: sandbox.db,
-		documents: synced,
-	});
 	const archive = createSpaceArchive(sandbox.dataDir);
 	if (host) archive.connect(host);
-	const status = createSpaceHostStatus(sandbox.db);
 	const locks = createKnowledgeFolderLocks();
+	/** Which Hosts run an older version: every instance of this Device shares it. */
+	const older = createOlderHosts();
+	/** One more instance over this Device's folder and documents. */
+	const newSync = (
+		options: { locks?: typeof locks; inStep?(): Promise<unknown> } = {},
+	) =>
+		wireSync({
+			db: sandbox.db,
+			documents: synced,
+			folders,
+			archive,
+			locks: options.locks ?? locks,
+			deviceId: sandbox.deviceId,
+			older,
+			listener: { reconciled: (change) => learnings.reconciled(change) },
+			...(options.inStep ? { hosts: { inStep: options.inStep } } : {}),
+		});
+	const sync = newSync();
+	const { documents, status } = sync;
 	/** Each time the open screens heard that what waits changed: the Space and the project. */
 	const told: [string, string][] = [];
 	const learnings = createLearnings({
@@ -81,30 +92,20 @@ export async function knowledgeDevice(
 			},
 		},
 	});
-	/** One more instance over this Device's folder and documents. */
+	/** One more reconciler over this Device's folder and documents. */
 	const newReconciler = (
 		options: { locks?: typeof locks; inStep?(): Promise<unknown> } = {},
-	) =>
-		createKnowledgeReconciler({
-			folders,
-			documents,
-			archive,
-			status,
-			locks: options.locks ?? locks,
-			deviceId: sandbox.deviceId,
-			reconciled: learnings.reconciled,
-			...(options.inStep ? { inStep: options.inStep } : {}),
-		});
-	const reconciler = newReconciler();
-	const reader = createKnowledgeReader({
-		folders,
-		documents,
-		archive,
-		learnings,
-		status,
+	) => newSync(options).reconciler;
+	const { reconciler } = sync;
+	const { reader } = wireFiles({
+		dataDir: sandbox.dataDir,
 		deviceId: sandbox.deviceId,
-		reconcileUnlessHeld: reconciler.reconcileUnlessHeld,
 		pageWaitMs: options.pageWaitMs ?? 5_000,
+		documents,
+		status,
+		archive,
+		notes: learnings,
+		sync: reconciler,
 	});
 	const dir = folders.folder("p1");
 	const document = () => documents.open("p1");
