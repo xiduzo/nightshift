@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import type { SecretUse } from "../../../contract";
 import {
 	PERSONAL_ON_HOST,
 	type SecretPlace,
 	type SecretScopes,
-	type SecretUse,
 	secretScopes,
 	takenOverSecrets,
 } from "./secret-scopes";

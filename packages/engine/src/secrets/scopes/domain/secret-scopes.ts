@@ -1,9 +1,9 @@
-import type { SecretUse, StepRun } from "../contract";
+import type { SecretUse, StepRun } from "../../../contract";
 
 /**
  * The Secret scope rule: which scopes one use of `${NAME}` reads, where
  * (ADR 13, decisions 3 to 5; ADR 18, decisions 1, 2 and 4). The one owner
- * of the rule. The connection store applies it when it resolves values,
+ * of the rule. The secrets slice applies it when it resolves values (`resolveSecrets`),
  * and Placement reads its words when a step moves (ADR 17).
  *
  * The scopes, most specific first: Personal, the run's Space, its
@@ -21,8 +21,6 @@ import type { SecretUse, StepRun } from "../contract";
  * Offer" from the Offer admission of `@nightshift/devices` on the call it
  * admits, "Be a Host" from the settings store. The rule itself is pure.
  */
-
-export type { ProjectRef, SecretUse, StepRun } from "../contract";
 
 /** Where a use happens. */
 export type SecretPlace = {

@@ -6,6 +6,7 @@
  * entry carries only the names another workspace imports.
  */
 
+export type { ProjectRef, SecretUse, StepRun } from "../contract";
 export type { DeviceDocument } from "../documents";
 export {
 	deviceDocumentName,
@@ -13,25 +14,21 @@ export {
 	refreshDeviceFacts,
 } from "../documents";
 export type { KeyStoreKind } from "../key-store";
-export { valueStore } from "../key-store";
+export { secretStore, valueStore } from "../key-store";
+export {
+	type PersonalSecrets,
+	type ProjectSecretName,
+	type ProjectSecrets,
+	type SecretScope,
+	type SecretSource,
+	type SecretView,
+	unreachableNote,
+} from "../secrets";
 export type { CliTool, CliToolStore } from "./cli-tools";
 export { cliToolGitSchema, cliToolInputSchema } from "./cli-tools";
 export { openConfigStores } from "./config-stores";
-export type {
-	Connection,
-	ConnectionStore,
-	PersonalSecrets,
-	ProjectSecretName,
-	ProjectSecrets,
-	SecretScope,
-	SecretSource,
-	SecretView,
-} from "./connections";
-export {
-	connectionInputSchema,
-	secretStore,
-	unreachableNote,
-} from "./connections";
+export type { Connection, ConnectionStore } from "./connections";
+export { connectionInputSchema } from "./connections";
 export {
 	createDeviceCopies,
 	type DeviceCopies,
@@ -55,7 +52,6 @@ export {
 } from "./found-programs";
 export type { ProfileStore, ProfileView } from "./profiles";
 export { profileChoice } from "./profiles";
-export type { ProjectRef, SecretUse, StepRun } from "./secret-scopes";
 export type {
 	SettingField,
 	SettingKey,

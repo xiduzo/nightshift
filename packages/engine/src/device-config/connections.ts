@@ -1,27 +1,37 @@
-import { join } from "node:path";
 import {
 	type AgentNode,
 	type McpServer,
 	mcpServerSchema,
 	nameSchema,
-	secretNameSchema,
 } from "@nightshift/flows";
-import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
 import { z } from "zod";
-import type {
-	NotRead,
-	ProjectRef,
-	SecretEnv,
-	SecretUse,
-	StepRun,
+import {
+	NIGHT_SHIFT,
+	type ProjectRef,
+	type SecretEnv,
+	type SecretUse,
 } from "../contract";
 import { type DeviceDocument, mapView } from "../documents";
-import { type KeyStoreKind, keychainValues, valueStore } from "../key-store";
+import {
+	type ComputerSecrets,
+	type ExpandedEnv,
+	notRead,
+	type PersonalSecrets,
+	type ProjectSecretName,
+	type ProjectSecrets,
+	referencesIn,
+	type SecretList,
+	type SecretScope,
+	type SecretSource,
+	unreachableNote,
+	wireSecrets,
+} from "../secrets";
 import { expandMcpServers, type McpExpansion } from "./mcp";
-import { PERSONAL_ON_HOST, secretScopes } from "./secret-scopes";
 
 export type { SecretEnv } from "../contract";
+export type { ExpandedEnv, PersonalSecrets, ProjectSecrets } from "../secrets";
+export { unreachableNote } from "../secrets";
 
 /**
  * Connections: MCP servers defined once in this Device's document, named
@@ -39,134 +49,12 @@ export type { SecretEnv } from "../contract";
  * read for one use and kept in memory for that use only.
  */
 
-/** `${NAME}`: an environment variable name, as a shell would read it. */
-const REFERENCE = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
-
 export const connectionInputSchema = z.object({
 	name: nameSchema,
 	description: z.string().trim().max(500).optional(),
 	server: mcpServerSchema,
 });
 export type ConnectionInput = z.input<typeof connectionInputSchema>;
-
-/**
- * Where a `${NAME}` gets its value: a Personal secret, this computer's
- * keychain, the environment, or nowhere. "personal" is as this computer
- * last read the Person's list: names, never values.
- */
-export type SecretSource = "personal" | "keychain" | "env" | "missing";
-
-/**
- * Where a saved secret lives (ADR 13). "computer": this computer's keychain
- * only. "personal": the Person's, for their steps on each of their
- * computers.
- */
-export type SecretScope = "computer" | "personal";
-
-/** A Project secret as Members see it: its name, when it was set and by whom. Never its value. */
-export type ProjectSecretName = {
-	name: string;
-	setAt: number;
-	/** The Person who set it last, with their name. Null: not known. */
-	setBy: { id: string; name: string } | null;
-};
-
-/**
- * The secrets of the Projects as this computer reaches them: the Host
- * that keeps the Project's Space keeps them, or this computer when it
- * keeps the Space itself (`@nightshift/devices` implements it). Each call
- * throws when they cannot be reached now, or when the keeper refuses.
- *
- * `personId` is the Person who acts here. The keeper lists the names to
- * a Member of the Space, and makes a change for a Member whose role
- * saves Flows.
- */
-export type ProjectSecrets = {
-	list(project: ProjectRef, personId: string): Promise<ProjectSecretName[]>;
-	/**
-	 * The values of these names that are secrets of the run's Project or
-	 * its Space, for one step of it. The Space's wins (ADR 18). Every value
-	 * without `names` (to take them out of the step's output). A name that
-	 * is none is left out.
-	 */
-	values(
-		run: StepRun,
-		names?: readonly string[],
-	): Promise<Record<string, string>>;
-	set(
-		project: ProjectRef,
-		name: string,
-		value: string,
-		personId: string,
-	): Promise<void>;
-	remove(project: ProjectRef, name: string, personId: string): Promise<void>;
-	/**
-	 * The value of a name, read to move it to another scope (ADR 13,
-	 * decision 7): it is never shown. Null when the Project has none.
-	 */
-	take(
-		project: ProjectRef,
-		name: string,
-		personId: string,
-	): Promise<string | null>;
-	/**
-	 * The values of the Project and its Space that this computer keeps
-	 * itself, the Space's first: all of them, or those of `names`. For an exported run, to take them out, and
-	 * for a webhook, which no step asks for. Empty when another Host keeps
-	 * them.
-	 */
-	kept(project: ProjectRef, names?: readonly string[]): Promise<string[]>;
-	/** The secrets of a Space (ADR 18): every step of a run in the Space reads them through `values`. */
-	space: SpaceSecrets;
-};
-
-/** A Space's secrets, for the screens. Same rules as a Project's, for the whole Space. */
-export type SpaceSecrets = {
-	list(spaceId: string, personId: string): Promise<ProjectSecretName[]>;
-	set(
-		spaceId: string,
-		name: string,
-		value: string,
-		personId: string,
-	): Promise<void>;
-	remove(spaceId: string, name: string, personId: string): Promise<void>;
-	/** The value of a name, read to move it to another scope: it is never shown. */
-	take(spaceId: string, name: string, personId: string): Promise<string | null>;
-};
-
-/** What a person reads when a step needs Project secrets that cannot be read now. */
-export const PROJECT_UNREACHABLE =
-	"Night Shift could not read this project's secrets now. Check that this computer is online, then try again.";
-
-/**
- * The Person's Personal secrets, as this computer reaches them: its Home
- * Host keeps them, or this computer when it has none (`@nightshift/devices`
- * implements it). Names with when each was set, and values only for a use.
- * Each call throws when they cannot be reached now.
- */
-export type PersonalSecrets = {
-	list(): Promise<{ name: string; setAt: number }[]>;
-	/** The values of these names that are Personal secrets. A name that is none is left out. */
-	values(names: readonly string[]): Promise<Record<string, string>>;
-	set(name: string, value: string): Promise<void>;
-	remove(name: string): Promise<void>;
-};
-
-/** What a person reads when a use needs Personal secrets that cannot be read now. */
-export const PERSONAL_UNREACHABLE =
-	"Night Shift could not read your Personal secrets now. Check that this computer is online, then try again.";
-
-/**
- * The sentences a missing-secret message ends with when the Project or
- * the Personal secrets could not be read.
- */
-export function unreachableNote(found: NotRead): string {
-	return [
-		found.projectUnreachable ? ` ${PROJECT_UNREACHABLE}` : "",
-		found.unreachable ? ` ${PERSONAL_UNREACHABLE}` : "",
-		found.personalHere ? ` ${PERSONAL_ON_HOST}` : "",
-	].join("");
-}
 
 export type Connection = {
 	name: string;
@@ -177,66 +65,8 @@ export type Connection = {
 	updatedAt: number;
 };
 
-export type SecretView = {
-	name: string;
-	/**
-	 * Where its saved value lives. A name that is saved nowhere (only the
-	 * environment has it, or nothing) is "computer".
-	 */
-	scope: SecretScope;
-	/** Saved in its scope: this computer's keychain, or the Person's Personal secrets. */
-	saved: boolean;
-	/** Set in the daemon's environment. */
-	inEnv: boolean;
-	/** The connections that reference it. */
-	usedBy: string[];
-	/** When a value was last saved through Night Shift (epoch ms). Null: not known, or never. */
-	setAt: number | null;
-	/** When Night Shift last read it to use it (epoch ms), to the minute. Null: never, or not since it was removed. */
-	usedAt: number | null;
-};
-
-/**
- * The secrets as the Secrets page lists them. `personal`: whether this
- * computer could read the Person's Personal secret names now. When it
- * could not, the list has this computer's secrets only.
- */
-export type SecretList = {
-	secrets: SecretView[];
-	personal: "available" | "unavailable";
-};
-
-/** A use is written at most once a minute per secret: the time is to the minute. */
-const SECRET_USE_INTERVAL_MS = 60_000;
-
-/** Where secret values live: the system keychain through `Bun.secrets`, or files on a headless computer. */
-export type SecretBackend = {
-	get(name: string): Promise<string | null>;
-	set(name: string, value: string): Promise<void>;
-	delete(name: string): Promise<void>;
-};
-
-const SECRETS_SERVICE = "nightshift";
-
-export function keychainSecrets(service = SECRETS_SERVICE): SecretBackend {
-	return keychainValues(service);
-}
-
-/**
- * The secrets saved on the Connections page: in the keychain where it
- * works, else in `<data dir>/secrets`, one file per secret, readable by
- * this user only. `prefer: "file"` skips the keychain.
- */
-export function secretStore(options: {
-	dataDir: string;
-	prefer?: KeyStoreKind;
-}): Promise<SecretBackend & { readonly kind: KeyStoreKind }> {
-	return valueStore({
-		service: SECRETS_SERVICE,
-		dir: join(options.dataDir, "secrets"),
-		prefer: options.prefer,
-	});
-}
+/** Where the values of this computer's saved secrets live (`secretStore` of `key-store`). */
+export type SecretBackend = ComputerSecrets;
 
 export type ConnectionStore = {
 	/** Reads the connections and secret names. Call once before `names`. */
@@ -391,23 +221,13 @@ export type ConnectionStore = {
 	secretEnv(names: readonly string[], use?: SecretUse): Promise<SecretEnv>;
 };
 
-/** Values with `${NAME}` expanded, and the values read for them, or the names that have none. */
-export type ExpandedEnv =
-	| { ok: true; env: Record<string, string>; values: string[] }
-	| ({ ok: false; missing: string[] } & NotRead);
-
 /** The `${NAME}` references of a server's env values and headers. */
 export function referencedVariables(server: McpServer): string[] {
-	const values = Object.values(
-		"command" in server ? (server.env ?? {}) : (server.headers ?? {}),
+	return referencesIn(
+		Object.values(
+			"command" in server ? (server.env ?? {}) : (server.headers ?? {}),
+		),
 	);
-	const names = new Set<string>();
-	for (const value of values) {
-		for (const match of value.matchAll(REFERENCE)) {
-			if (match[1]) names.add(match[1]);
-		}
-	}
-	return [...names];
 }
 
 /** A connection as the Device document holds it. */
@@ -417,34 +237,12 @@ const entrySchema = z.object({
 	updatedAt: z.number(),
 });
 
-/** A saved secret as the document's facts hold it: an older document holds bare names. */
-export const savedSecretSchema = z.union([
-	z.string().transform((name) => ({ name, setAt: null })),
-	z.object({ name: z.string(), setAt: z.number().nullable() }),
-]);
-
-/** The values read for a use, and which scopes could not be read. */
-type Resolved = {
-	vars: Record<string, string | undefined>;
-	/** The names whose value is the use's Project's. */
-	fromProject: ReadonlySet<string>;
-	unreachable: boolean;
-	projectUnreachable: boolean;
-	/** A name is a Personal secret, which works nowhere on this computer. */
-	personalHere: boolean;
-};
-
-/** The flags of `NotRead` that are set, to spread into a result. */
-const notRead = ({
-	unreachable,
-	projectUnreachable,
-	personalHere,
-}: Resolved): NotRead => ({
-	...(unreachable ? { unreachable } : {}),
-	...(projectUnreachable ? { projectUnreachable } : {}),
-	...(personalHere ? { personalHere } : {}),
-});
-
+/**
+ * The connections over this computer's Device document, and the secrets
+ * as the use cases of `secrets` give them (`wireSecrets`). The secret
+ * members only call a bound use case. The doors check the owner of this
+ * computer first, so the store acts as Night Shift.
+ */
 export function createConnectionStore(options: {
 	document: DeviceDocument;
 	env: Readonly<Record<string, string | undefined>>;
@@ -465,7 +263,7 @@ export function createConnectionStore(options: {
 	/** The clock for the set and use times. */
 	now?: () => number;
 }): ConnectionStore {
-	const { document, env, secrets, now = timeNow } = options;
+	const { document } = options;
 	const connectionView = mapView(document, document.connections, () => {
 		const out = new Map<string, Omit<Connection, "variables">>();
 		for (const [name, value] of document.connections.entries()) {
@@ -482,249 +280,36 @@ export function createConnectionStore(options: {
 		}
 		return out;
 	});
-	/**
-	 * The saved secrets, name → when it was set, are a Device fact: the
-	 * keychain cannot list them. An entry that does not parse is skipped.
-	 */
-	const secretView = mapView(document, document.facts, () => {
-		const stored = document.facts.get("secrets");
-		const out = new Map<string, number | null>();
-		for (const item of Array.isArray(stored) ? stored : []) {
-			const parsed = savedSecretSchema.safeParse(item);
-			if (parsed.success) out.set(parsed.data.name, parsed.data.setAt);
-		}
-		return out;
+	const secrets = wireSecrets({
+		document,
+		env: options.env,
+		computer: options.secrets,
+		references: {
+			usedBy() {
+				const usedBy = new Map<string, string[]>();
+				for (const c of connectionView().values()) {
+					for (const name of referencedVariables(c.server)) {
+						usedBy.set(name, [...(usedBy.get(name) ?? []), c.name]);
+					}
+				}
+				return usedBy;
+			},
+		},
+		...(options.personal ? { personal: options.personal } : {}),
+		...(options.projects ? { projects: options.projects } : {}),
+		...(options.host ? { host: options.host } : {}),
+		...(options.now ? { now: options.now } : {}),
 	});
-	/** When each secret was last used: any name, saved or from the environment. */
-	const usedView = mapView(document, document.facts, () => {
-		const parsed = z
-			.record(z.string(), z.unknown())
-			.safeParse(document.facts.get("secretsUsedAt"));
-		const out = new Map<string, number>();
-		for (const [name, at] of Object.entries(
-			parsed.success ? parsed.data : {},
-		)) {
-			if (typeof at === "number") out.set(name, at);
-		}
-		return out;
-	});
-	/**
-	 * The Personal secret names as this computer last read them, with when
-	 * each was set: names only, for `secretSource` and to fail closed on a
-	 * name that is Personal while the Personal secrets cannot be read.
-	 */
-	const personalNames = new Map<string, number>();
-	/** Listeners of a Personal change made here: the Device document tells the others. */
-	const personalListeners = new Set<() => void>();
-	const personalChanged = () => {
-		for (const listener of personalListeners) listener();
-	};
-
-	/**
-	 * The Project secret names as this computer last read them, by
-	 * Project: to fail closed on a name that is the Project's while they
-	 * cannot be read.
-	 */
-	const projectNames = new Map<string, Set<string>>();
-	const projectNamesOf = (projectId: string): Set<string> => {
-		let names = projectNames.get(projectId);
-		if (!names) {
-			names = new Set();
-			projectNames.set(projectId, names);
-		}
-		return names;
-	};
-	/** The Project secrets now, or a refusal that says they cannot be read. */
-	function projectPort(): ProjectSecrets {
-		const port = options.projects?.() ?? null;
-		if (!port) throw new Refusal("unavailable", PROJECT_UNREACHABLE);
-		return port;
-	}
-	const hasProjects = () => options.projects !== undefined;
-
-	/** The Personal secrets now, or a refusal that says they cannot be read. */
-	function personalPort(): PersonalSecrets {
-		const port = options.personal?.() ?? null;
-		if (!port) throw new Refusal("unavailable", PERSONAL_UNREACHABLE);
-		return port;
-	}
-	const hasPersonal = () => options.personal !== undefined;
-	/** The scopes a use reads here, by the one rule. */
-	const scopesOf = (use: SecretUse) =>
-		secretScopes(use, { host: options.host?.() ?? false });
-	/**
-	 * Logs why the Personal secrets could not be read, once until the
-	 * reason changes: an older or offline Home Host would log every use.
-	 */
-	let lastWarning = "";
-	function warnOnce(
-		what: "listed" | "read",
-		error: unknown,
-		scope: "Personal" | "Project" = "Personal",
-	): void {
-		const reason = `${scope} ${what}: ${error instanceof Error ? error.message : String(error)}`;
-		if (reason === lastWarning) return;
-		lastWarning = reason;
-		console.warn(`[secrets] the ${scope} secrets were not ${what}:`, error);
-	}
-
-	async function listPersonal(): Promise<
-		{ name: string; setAt: number }[] | null
-	> {
-		if (!hasPersonal()) return [];
-		try {
-			const listed = await personalPort().list();
-			lastWarning = "";
-			personalNames.clear();
-			for (const { name, setAt } of listed) personalNames.set(name, setAt);
-			return listed;
-		} catch (error) {
-			warnOnce("listed", error);
-			return null;
-		}
-	}
-
-	/** Writes the saved secrets, and the use times without `forget`. */
-	function writeSecrets(
-		saved: Map<string, number | null>,
-		forget?: string,
-	): Promise<void> {
-		return document.change(() => {
-			document.facts.set(
-				"secrets",
-				[...saved.keys()].sort().map((name) => ({
-					name,
-					setAt: saved.get(name) ?? null,
-				})),
-			);
-			if (forget !== undefined && usedView().has(forget)) {
-				const used = new Map(usedView());
-				used.delete(forget);
-				document.facts.set("secretsUsedAt", Object.fromEntries(used));
-			}
-		});
-	}
-	/**
-	 * Notes that Night Shift read these secrets to use them. Writes the
-	 * document at most once a minute per name, and never holds up the use: a
-	 * failed write is logged by the document, and a lost time is fine.
-	 */
-	function recordUse(names: Iterable<string>): void {
-		const at = now();
-		const used = usedView();
-		const due = [...new Set(names)].filter((name) => {
-			const last = used.get(name);
-			return (
-				last === undefined || Math.abs(at - last) >= SECRET_USE_INTERVAL_MS
-			);
-		});
-		if (due.length === 0) return;
-		const next = new Map(used);
-		for (const name of due) next.set(name, at);
-		document
-			.change(() => {
-				document.facts.set("secretsUsedAt", Object.fromEntries(next));
-			})
-			.catch(() => {});
-	}
-
-	function source(variable: string): SecretSource {
-		if (personalNames.has(variable)) return "personal";
-		if (secretView().has(variable)) return "keychain";
-		return env[variable] === undefined ? "missing" : "env";
-	}
+	const as = NIGHT_SHIFT;
 
 	function withVariables(c: Omit<Connection, "variables">): Connection {
 		return {
 			...c,
 			variables: referencedVariables(c.server).map((name) => ({
 				name,
-				source: source(name),
+				source: secrets.secretSource(name),
 			})),
 		};
-	}
-
-	/**
-	 * The values of `names` for one use, from the scopes the rule gives it
-	 * (`secretScopes`), the most specific last so that it wins: the
-	 * daemon's environment, this computer's keychain, the run's Space and
-	 * its Project, then Personal.
-	 *
-	 * Fails closed: when the Project or the Personal secrets cannot be
-	 * read, a name this computer last knew as one of them has no value,
-	 * rather than a value of another scope. Other names still read the
-	 * scopes that answered.
-	 */
-	async function resolve(
-		names: Iterable<string>,
-		use: SecretUse = {},
-	): Promise<Resolved> {
-		const scopes = scopesOf(use);
-		const wanted = [...new Set(names)];
-		const vars: Record<string, string | undefined> = { ...env };
-		const fromProject = new Set<string>();
-		for (const name of wanted) {
-			if (!secretView().has(name)) continue;
-			const value = await secrets.get(name);
-			if (value !== null) vars[name] = value;
-		}
-		let projectUnreachable = false;
-		if (scopes.shared && hasProjects() && wanted.length > 0) {
-			const known = projectNamesOf(scopes.shared.projectId);
-			try {
-				const found = await projectPort().values(scopes.shared, wanted);
-				for (const name of wanted) {
-					const value = found[name];
-					if (value === undefined) known.delete(name);
-					else {
-						vars[name] = value;
-						known.add(name);
-						fromProject.add(name);
-					}
-				}
-			} catch (error) {
-				projectUnreachable = true;
-				warnOnce("read", error, "Project");
-				for (const name of wanted) {
-					if (known.has(name)) delete vars[name];
-				}
-			}
-		}
-		let unreachable = false;
-		let personalHere = false;
-		if (hasPersonal() && wanted.length > 0 && scopes.personal !== "offer") {
-			if (scopes.personal === "host") {
-				// The person learns that a Personal name works nowhere here.
-				await listPersonal();
-				personalHere = wanted.some(
-					(name) => personalNames.has(name) && vars[name] === undefined,
-				);
-			} else {
-				try {
-					const found = await personalPort().values(wanted);
-					lastWarning = "";
-					for (const name of wanted) {
-						const value = found[name];
-						if (value === undefined) personalNames.delete(name);
-						else {
-							vars[name] = value;
-							fromProject.delete(name);
-							if (!personalNames.has(name)) personalNames.set(name, 0);
-						}
-					}
-				} catch (error) {
-					unreachable = true;
-					warnOnce("read", error);
-					for (const name of wanted) {
-						if (personalNames.has(name)) {
-							delete vars[name];
-							fromProject.delete(name);
-						}
-					}
-				}
-			}
-		}
-		return { vars, fromProject, unreachable, projectUnreachable, personalHere };
 	}
 
 	async function expandServers(
@@ -732,89 +317,14 @@ export function createConnectionStore(options: {
 		use?: SecretUse,
 	): Promise<McpExpansion> {
 		const names = Object.values(servers).flatMap(referencedVariables);
-		const resolved = await resolve(names, use);
+		const resolved = await secrets.resolveSecrets({ names, use });
 		const expansion = expandMcpServers(servers, resolved.vars);
-		if (expansion.ok) recordUse(names);
+		if (expansion.ok) secrets.noteSecretUse(names);
 		else {
 			const note = unreachableNote(notRead(resolved));
 			if (note) return { ...expansion, message: `${expansion.message}${note}` };
 		}
 		return expansion;
-	}
-
-	/** Saves a value in this computer's keychain. */
-	async function setHere(name: string, value: string): Promise<void> {
-		await secrets.set(name, value);
-		await writeSecrets(new Map(secretView()).set(name, now()));
-	}
-	/** Removes this computer's saved value. */
-	async function removeHere(name: string): Promise<void> {
-		await secrets.delete(name);
-		const saved = new Map(secretView());
-		saved.delete(name);
-		await writeSecrets(saved, name);
-	}
-	async function setPersonal(name: string, value: string): Promise<void> {
-		await personalPort().set(name, value);
-		personalNames.set(name, now());
-		personalChanged();
-	}
-	async function removePersonal(name: string): Promise<void> {
-		await personalPort().remove(name);
-		personalNames.delete(name);
-		personalChanged();
-	}
-	/** The value a scope of this computer's Person keeps for a name: to move it. */
-	async function valueIn(
-		scope: SecretScope,
-		name: string,
-	): Promise<string | null> {
-		if (scope === "personal") {
-			return (await personalPort().values([name]))[name] ?? null;
-		}
-		return secretView().has(name) ? await secrets.get(name) : null;
-	}
-	async function saveIn(
-		scope: SecretScope,
-		name: string,
-		value: string,
-	): Promise<void> {
-		if (scope === "personal") await setPersonal(name, value);
-		else await setHere(name, value);
-	}
-	async function removeIn(scope: SecretScope, name: string): Promise<void> {
-		if (scope === "personal") await removePersonal(name);
-		else await removeHere(name);
-	}
-
-	async function secretValues(use: SecretUse = {}): Promise<string[]> {
-		const names = new Set(secretView().keys());
-		for (const c of connectionView().values()) {
-			for (const name of referencedVariables(c.server)) names.add(name);
-		}
-		// Every Personal value, when the use reads them: not a use of any.
-		const scopes = scopesOf(use);
-		if (scopes.personal === "read") {
-			for (const { name } of (await listPersonal()) ?? []) names.add(name);
-		}
-		// The names in the wider scopes: a Project value of the same name is
-		// one more value to take out, read below.
-		const { run: _run, ...wider } = use;
-		const { vars } = await resolve(names, wider);
-		const values = [...names].flatMap((name) =>
-			vars[name] ? [vars[name]] : [],
-		);
-		// Every value of the run's Space and Project.
-		if (scopes.shared && hasProjects()) {
-			try {
-				values.push(
-					...Object.values(await projectPort().values(scopes.shared)),
-				);
-			} catch (error) {
-				warnOnce("read", error, "Project");
-			}
-		}
-		return [...new Set(values)];
 	}
 
 	return {
@@ -852,191 +362,35 @@ export function createConnectionStore(options: {
 				document.connections.delete(name);
 			});
 		},
-		async secrets(named = []) {
-			const personal = await listPersonal();
-			const usedBy = new Map<string, string[]>();
-			for (const c of connectionView().values()) {
-				for (const name of referencedVariables(c.server)) {
-					usedBy.set(name, [...(usedBy.get(name) ?? []), c.name]);
-				}
-			}
-			const saved = secretView();
-			const used = usedView();
-			const personalSet = new Map(
-				(personal ?? []).map((p) => [p.name, p.setAt]),
-			);
-			const view = (name: string, scope: SecretScope): SecretView => ({
-				name,
-				scope,
-				saved: scope === "personal" ? true : saved.has(name),
-				inEnv: env[name] !== undefined,
-				usedBy: usedBy.get(name) ?? [],
-				setAt:
-					scope === "personal"
-						? (personalSet.get(name) ?? null)
-						: (saved.get(name) ?? null),
-				usedAt: used.get(name) ?? null,
-			});
-			const names = new Set([
-				...personalSet.keys(),
-				...usedBy.keys(),
-				...saved.keys(),
-				...named,
-			]);
-			const rows: SecretView[] = [];
-			for (const name of [...names].sort()) {
-				if (personalSet.has(name)) rows.push(view(name, "personal"));
-				// A name only Personal has is listed once: as Personal.
-				if (!personalSet.has(name) || saved.has(name)) {
-					rows.push(view(name, "computer"));
-				}
-			}
-			return {
-				secrets: rows,
-				personal: personal === null ? "unavailable" : "available",
-			};
-		},
-		async secret(name, use) {
-			const value = (await resolve([name], use)).vars[name];
-			if (value !== undefined) recordUse([name]);
-			return value;
-		},
-		async webhookSecret(name, project) {
-			if (hasProjects()) {
-				try {
-					const [value] = await projectPort().kept(project, [name]);
-					if (value !== undefined) {
-						recordUse([name]);
-						return value;
-					}
-				} catch (error) {
-					warnOnce("read", error, "Project");
-					return undefined;
-				}
-			}
-			const value = (await resolve([name])).vars[name];
-			if (value !== undefined) recordUse([name]);
-			return value;
-		},
-		secretSource: source,
-		async setSecret(name, value, scope = "computer") {
-			secretNameSchema.parse(name);
-			if (value === "") throw new Refusal("invalid", "A secret needs a value.");
-			if (scope === "personal") await setPersonal(name, value);
-			else await setHere(name, value);
-		},
-		async removeSecret(name, scope = "computer") {
-			if (scope === "personal") await removePersonal(name);
-			else await removeHere(name);
-		},
-		async moveSecret(name, to) {
-			secretNameSchema.parse(name);
-			if (to === "personal") {
-				const value = secretView().has(name) ? await secrets.get(name) : null;
-				if (value === null) {
-					throw new Refusal(
-						"not-found",
-						`This computer has no saved value of ${name}.`,
-					);
-				}
-				// Saved in its new scope first: a failure there keeps this copy.
-				await setPersonal(name, value);
-				await removeHere(name);
-				return;
-			}
-			const value = (await personalPort().values([name]))[name];
-			if (value === undefined) {
-				throw new Refusal("not-found", `${name} is not a Personal secret.`);
-			}
-			await setHere(name, value);
-			await removePersonal(name);
-		},
-		async projectSecrets(project, personId) {
-			const listed = await projectPort().list(project, personId);
-			const known = projectNamesOf(project.projectId);
-			known.clear();
-			for (const { name } of listed) known.add(name);
-			return listed;
-		},
-		async setProjectSecret(project, name, value, personId) {
-			secretNameSchema.parse(name);
-			if (value === "") throw new Refusal("invalid", "A secret needs a value.");
-			await projectPort().set(project, name, value, personId);
-			projectNamesOf(project.projectId).add(name);
-		},
-		async removeProjectSecret(project, name, personId) {
-			await projectPort().remove(project, name, personId);
-			projectNamesOf(project.projectId).delete(name);
-		},
-		async moveToProject(name, from, project, personId) {
-			secretNameSchema.parse(name);
-			const value = await valueIn(from, name);
-			if (value === null) {
-				throw new Refusal(
-					"not-found",
-					from === "personal"
-						? `${name} is not a Personal secret.`
-						: `This computer has no saved value of ${name}.`,
-				);
-			}
-			// Saved in the Project first: a failure there keeps this copy.
-			await projectPort().set(project, name, value, personId);
-			projectNamesOf(project.projectId).add(name);
-			await removeIn(from, name);
-		},
-		async moveFromProject(project, name, to, personId) {
-			secretNameSchema.parse(name);
-			const value = await projectPort().take(project, name, personId);
-			if (value === null) {
-				throw new Refusal(
-					"not-found",
-					`${name} is not a secret of this project.`,
-				);
-			}
-			// Saved in its new scope first: a failure there keeps the Project's.
-			await saveIn(to, name, value);
-			await projectPort().remove(project, name, personId);
-			projectNamesOf(project.projectId).delete(name);
-		},
-		async spaceSecrets(spaceId, personId) {
-			return projectPort().space.list(spaceId, personId);
-		},
-		async setSpaceSecret(spaceId, name, value, personId) {
-			secretNameSchema.parse(name);
-			if (value === "") throw new Refusal("invalid", "A secret needs a value.");
-			await projectPort().space.set(spaceId, name, value, personId);
-		},
-		async removeSpaceSecret(spaceId, name, personId) {
-			await projectPort().space.remove(spaceId, name, personId);
-		},
-		async moveToSpace(name, from, spaceId, personId) {
-			secretNameSchema.parse(name);
-			const value = await valueIn(from, name);
-			if (value === null) {
-				throw new Refusal(
-					"not-found",
-					from === "personal"
-						? `${name} is not a Personal secret.`
-						: `This computer has no saved value of ${name}.`,
-				);
-			}
-			// Saved in the Space first: a failure there keeps this copy.
-			await projectPort().space.set(spaceId, name, value, personId);
-			await removeIn(from, name);
-		},
-		async moveFromSpace(spaceId, name, to, personId) {
-			secretNameSchema.parse(name);
-			const value = await projectPort().space.take(spaceId, name, personId);
-			if (value === null) {
-				throw new Refusal(
-					"not-found",
-					`${name} is not a secret of this Space.`,
-				);
-			}
-			// Saved in its new scope first: a failure there keeps the Space's.
-			await saveIn(to, name, value);
-			await projectPort().space.remove(spaceId, name, personId);
-		},
+		secrets: (named = []) => secrets.listSecrets(as, { named }),
+		secret: (name, use) => secrets.readSecret({ name, use }),
+		webhookSecret: (name, project) =>
+			secrets.readWebhookSecret({ name, project }),
+		secretSource: secrets.secretSource,
+		setSecret: (name, value, scope) =>
+			secrets.saveSecret(as, { name, value, scope }),
+		removeSecret: (name, scope) => secrets.removeSecret(as, { name, scope }),
+		moveSecret: (name, to) => secrets.moveSecret(as, { name, to }),
+		projectSecrets: (project, personId) =>
+			secrets.listProjectSecrets(as, { project, personId }),
+		setProjectSecret: (project, name, value, personId) =>
+			secrets.saveProjectSecret(as, { project, name, value, personId }),
+		removeProjectSecret: (project, name, personId) =>
+			secrets.removeProjectSecret(as, { project, name, personId }),
+		moveToProject: (name, from, project, personId) =>
+			secrets.moveSecretToProject(as, { name, from, project, personId }),
+		moveFromProject: (project, name, to, personId) =>
+			secrets.moveSecretFromProject(as, { project, name, to, personId }),
+		spaceSecrets: (spaceId, personId) =>
+			secrets.listSpaceSecrets(as, { spaceId, personId }),
+		setSpaceSecret: (spaceId, name, value, personId) =>
+			secrets.saveSpaceSecret(as, { spaceId, name, value, personId }),
+		removeSpaceSecret: (spaceId, name, personId) =>
+			secrets.removeSpaceSecret(as, { spaceId, name, personId }),
+		moveToSpace: (name, from, spaceId, personId) =>
+			secrets.moveSecretToSpace(as, { name, from, spaceId, personId }),
+		moveFromSpace: (spaceId, name, to, personId) =>
+			secrets.moveSecretFromSpace(as, { spaceId, name, to, personId }),
 		async mcpServersFor(node, use) {
 			const servers: Record<string, McpServer> = {};
 			for (const name of node.connections ?? []) {
@@ -1067,11 +421,11 @@ export function createConnectionStore(options: {
 				};
 			}
 			const variables = referencedVariables(server);
-			const resolved = await resolve(variables);
+			const resolved = await secrets.resolveSecrets({ names: variables });
 			const { vars } = resolved;
 			const expansion = expandMcpServers({ [name]: server }, vars);
 			// A test connects to the server with the values: a use.
-			if (expansion.ok) recordUse(variables);
+			if (expansion.ok) secrets.noteSecretUse(variables);
 			const note = expansion.ok ? "" : unreachableNote(notRead(resolved));
 			return {
 				expansion:
@@ -1081,76 +435,10 @@ export function createConnectionStore(options: {
 				values: variables.flatMap((v) => (vars[v] ? [vars[v]] : [])),
 			};
 		},
-		async expandEnv(values, use) {
-			const names = new Set<string>();
-			for (const value of Object.values(values)) {
-				for (const match of value.matchAll(REFERENCE)) {
-					if (match[1]) names.add(match[1]);
-				}
-			}
-			const resolved = await resolve(names, use);
-			const { vars } = resolved;
-			const missing = [...names].filter((name) => vars[name] === undefined);
-			if (missing.length > 0) {
-				return { ok: false, missing, ...notRead(resolved) };
-			}
-			recordUse(names);
-			return {
-				ok: true,
-				values: [...names].flatMap((name) => (vars[name] ? [vars[name]] : [])),
-				env: Object.fromEntries(
-					Object.entries(values).map(([key, value]) => [
-						key,
-						value.replace(REFERENCE, (_, name: string) => vars[name] ?? ""),
-					]),
-				),
-			};
-		},
-		async secretEnv(names, use) {
-			const resolved = await resolve(names, use);
-			const { vars } = resolved;
-			const env: Record<string, string> = {};
-			const missing: string[] = [];
-			for (const name of new Set(names)) {
-				const value = vars[name];
-				if (value === undefined) missing.push(name);
-				else env[name] = value;
-			}
-			if (missing.length > 0) {
-				return { ok: false, missing, ...notRead(resolved) };
-			}
-			recordUse(names);
-			return {
-				ok: true,
-				env,
-				...(resolved.fromProject.size > 0
-					? { fromProject: [...resolved.fromProject] }
-					: {}),
-			};
-		},
-		onSecretsChange(listener) {
-			const observer = (event: { keysChanged: Set<string> }) => {
-				if (event.keysChanged.has("secrets")) listener();
-			};
-			document.facts.observe(observer);
-			personalListeners.add(listener);
-			return () => {
-				document.facts.unobserve(observer);
-				personalListeners.delete(listener);
-			};
-		},
-		secretValues,
-		async exportValues(project) {
-			const values = await secretValues();
-			if (!hasProjects()) return values;
-			try {
-				return [
-					...new Set([...values, ...(await projectPort().kept(project))]),
-				];
-			} catch (error) {
-				warnOnce("read", error, "Project");
-				return values;
-			}
-		},
+		expandEnv: (values, use) => secrets.expandSecretReferences({ values, use }),
+		secretEnv: (names, use) => secrets.readSecretEnv({ names, use }),
+		onSecretsChange: (listener) => secrets.onSecretsChange(listener),
+		secretValues: (use) => secrets.listSecretValues({ use }),
+		exportValues: (project) => secrets.listExportValues({ project }),
 	};
 }

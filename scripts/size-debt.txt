@@ -6,7 +6,6 @@
 # fewer, remove its line: the check fails a listed file that is within the
 # limit. Add no line here.
 # `bun scripts/check-budgets.ts --tighten` lowers the numbers to today's.
-packages/engine/src/device-config/connections.ts 1156
 packages/engine/src/device/local.ts 900
 packages/engine/src/knowledge/folder.ts 691
 packages/engine/src/knowledge/reconcile.ts 632

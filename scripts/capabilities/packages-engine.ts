@@ -19,8 +19,8 @@ export const PACKAGE_ENGINE: Record<string, Place> = {
 	// request of a step runs on this computer. Not the Devices a person
 	// pairs and offers: those are `devices`.
 	device: M,
-	// This computer's configuration in its Device document. It holds the
-	// secrets of this computer too, until `secrets` has its own vertical.
+	// This computer's configuration in its Device document. Its connection
+	// store passes the secrets on to `secrets`.
 	"device-config": "settings",
 	// The synced documents (Yjs).
 	documents: M,
@@ -72,6 +72,9 @@ export const PACKAGE_ENGINE: Record<string, Place> = {
 	// person asks it for anything. Score is a word of the glossary, as
 	// Lease is: the capabilities that show Scores read the log.
 	scores: M,
+	// The secrets a use reads by the Secret scope rule: this computer's, the
+	// Personal ones and those of a run's Space and Project, in rings.
+	secrets: "secrets",
 	// The keeper of the processes a Service node starts.
 	services: M,
 	// Projects to another Space as one operation (`Engine.moveProjects`).

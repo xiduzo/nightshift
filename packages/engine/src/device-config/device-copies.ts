@@ -14,7 +14,7 @@ import {
 	type PersistedDocument,
 	type SyncedDocuments,
 } from "../documents";
-import { savedSecretSchema } from "./connections";
+import { savedSecretSchema } from "../secrets";
 import { profileChoice, readProfiles } from "./profiles";
 
 /**
