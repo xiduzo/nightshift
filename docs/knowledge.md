@@ -132,8 +132,8 @@ index lists only the accepted ones.
 
 The Map page of Knowledge shows the files, the topics they share, the links
 between them, the files close in meaning, the questions that found them and the
-learnings that name their topics. `packages/engine/src/knowledge/map.ts` draws
-it, and `topics.ts` finds the topics.
+learnings that name their topics. `packages/engine/src/knowledge/map/domain/map.ts`
+draws it, and `topics.ts` beside it finds the topics.
 
 The Map draws what this computer's search index already holds. It reads the
 sections and the stored vectors through the search store. To draw it, Night
@@ -308,8 +308,8 @@ Night Shift then:
 - saves a flow that calls the kit from one Subflow node, with your values
   (`knowledge-web-pages`, then `knowledge-web-pages-2`). A source is that
   flow ([ADR 4](adr/0004-knowledge-belongs-to-the-space.md), decision 6):
-  no other store holds it. The engine module `knowledgeSources`
-  (`packages/engine/src/knowledge/sources.ts`) owns every rule of a source:
+  no other store holds it. The engine sub-vertical
+  `packages/engine/src/knowledge/sources/` owns every rule of a source:
   the API only checks who asks.
 - gives each source its own folder in the knowledge: the kit's folder, or
   `web-2` when another flow fills `web`. A sync replaces its folder, so two
@@ -826,7 +826,7 @@ To measure again or try another model, run `close-notes.live.test.ts` with
 ### The Review page
 
 The Review page shows what the engine decides waits (`knowledge.review`,
-`knowledge/review.ts`): a source that needs a look, a step's learnings, a
+`knowledge/review/domain/review-tasks.ts`): a source that needs a look, a step's learnings, a
 question that found nothing, and the files no run used. The engine sets the
 order and the id of each task. The screen only remembers what a person put off
 or dismissed in this browser. The phone shows only the learnings, of every

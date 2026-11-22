@@ -7,19 +7,19 @@ import {
 	flowSchema,
 	type Schedule,
 } from "@nightshift/flows";
-import { NIGHT_SHIFT } from "../contract";
-import type { Engine } from "../engine";
-import type { SpaceEngine } from "../space-engine";
-import { joinSpace } from "../testing/join-space";
-import { testKnowledge } from "../testing/knowledge";
+import { NIGHT_SHIFT } from "../../contract";
+import type { Engine } from "../../engine";
+import type { SpaceEngine } from "../../space-engine";
+import { joinSpace } from "../../testing/join-space";
+import { testKnowledge } from "../../testing/knowledge";
 import {
 	createSandbox,
 	type Sandbox,
 	waitFor,
 	withDevice,
-} from "../testing/test-support";
-import { createEngine } from "../wire";
-import { knowledgeSources } from "./sources";
+} from "../../testing/test-support";
+import { createEngine } from "../../wire";
+import { knowledgeSources } from "./test-support";
 
 /**
  * Knowledge sources over a real Space: the flows, schedules and files a

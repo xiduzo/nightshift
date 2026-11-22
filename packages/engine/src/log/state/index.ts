@@ -15,7 +15,6 @@ export {
 	type DerivedSession,
 	type DerivedStep,
 	type EarlyWake,
-	type KnowledgeUseFact,
 	type OpenGateFact,
 	type RunState,
 	type SleepFact,

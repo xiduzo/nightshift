@@ -2,15 +2,12 @@ import { afterEach, describe, expect, test } from "bun:test";
 import type { KnowledgeUse } from "@nightshift/agents/knowledge";
 import { project, run } from "@nightshift/db/schema";
 import { now as timeNow } from "@nightshift/time";
-import { createRunLog, type KnowledgeUseFact, type RunLog } from "../log";
-import { knowledgeUseEvent } from "../log/events/knowledge-use";
-import { createSandbox, type Sandbox } from "../testing";
-import {
-	askedQuestions,
-	knowledgeFileUse,
-	stepSources,
-	unusedFiles,
-} from "./use";
+import { createRunLog, type RunLog } from "../../log";
+import { knowledgeUseEvent } from "../../log/events/knowledge-use";
+import type { KnowledgeUseFact } from "../../log/state/run-state";
+import { createSandbox, type Sandbox } from "../../testing";
+import { stepSources, unusedFiles } from "./domain/use";
+import { askedQuestions, knowledgeFileUse } from "./test-support";
 
 /** How agents used a project's knowledge, read back from the event log. */
 

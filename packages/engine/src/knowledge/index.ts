@@ -13,8 +13,13 @@ export { createKnowledge, createRunLearnings } from "./knowledge";
 export type { Knowledge } from "./knowledge-door";
 export type { AskLearner, WaitingLearning } from "./learnings";
 export type { KnowledgeMap } from "./map";
-export type { KnowledgeQuestion } from "./questions";
 export type { LinkLook } from "./readers";
+export {
+	type AskedQuestion,
+	type KnowledgeQuestion,
+	type KnowledgeUseReport,
+	stepSources,
+} from "./review";
 export {
 	DEFAULT_EMBEDDING_MODEL,
 	type KnowledgeEvaluation,
@@ -26,8 +31,3 @@ export {
 	createKnowledgeFolderLocks,
 	type KnowledgeFolderLocks,
 } from "./sync";
-export {
-	type AskedQuestion,
-	type KnowledgeUseReport,
-	stepSources,
-} from "./use";

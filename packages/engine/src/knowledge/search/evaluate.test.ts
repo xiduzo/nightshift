@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { SynonymEmbeddings } from "../../testing/embeddings";
 import { watchVectorPreparation } from "../../testing/vector-preparation";
 import { fsKnowledgeFolders as createKnowledgeFolders } from "../files/adapters/out/fs-knowledge-folders";
-import type { KnowledgeQuestion } from "../questions";
+import type { KnowledgeQuestion } from "../review";
 import { adviceOf, EVALUATION } from "./domain/evaluation";
 import type { KnowledgeMeaning } from "./domain/meaning";
 import type { KnowledgeHit } from "./domain/ranking";

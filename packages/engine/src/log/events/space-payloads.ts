@@ -112,7 +112,7 @@ export type SpacePayloads = {
 	 * the files it got back, best first, each at its best section. In an
 	 * Agent step: on the step and its session (`via: "step"`). Through the
 	 * nightshift MCP server (`via: "mcp"`): with no run. The Knowledge page
-	 * (`knowledge/use.ts`), the step's sources and the metrics read them.
+	 * (`knowledge/review/domain/use.ts`), the step's sources and the metrics read them.
 	 */
 	KnowledgeSearched: {
 		projectId: string;

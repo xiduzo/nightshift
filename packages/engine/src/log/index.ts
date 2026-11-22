@@ -108,7 +108,6 @@ export {
 	foldRun,
 	type Hold,
 	holdCovers,
-	type KnowledgeUseFact,
 	type LeaseHold,
 	leavingHolds,
 	NO_COST,

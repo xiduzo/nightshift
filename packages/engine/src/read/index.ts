@@ -55,7 +55,6 @@ export type {
 	RunSummary,
 	RunWalker,
 	StepDetail,
-	StepSource,
 	StepTranscript,
 } from "./views";
 export { NIGHT_RANGES } from "./views";

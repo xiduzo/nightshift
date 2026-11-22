@@ -21,8 +21,8 @@ import { Refusal } from "@nightshift/refusal";
 /**
  * A source's flow and schedule, as pure rules over a project's flows: a
  * source IS a flow (ADR 4, decision 6), one Subflow node that calls a
- * `kit:knowledge/*` kit with the person's values. `sources.ts` applies
- * them to the Space.
+ * `kit:knowledge/*` kit with the person's values. The use cases of
+ * `sources` apply them to the Space.
  */
 
 /** The project's flows by name, null for one that is not valid. */

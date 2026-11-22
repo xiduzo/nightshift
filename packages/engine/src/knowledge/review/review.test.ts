@@ -1,9 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import type { KnowledgeFile } from "./files";
-import type { ProjectLearning } from "./learnings";
-import { reviewTasks } from "./review";
-import type { KnowledgeSync } from "./sources";
-import type { AskedQuestion } from "./use";
+import type { KnowledgeFile } from "../files";
+import type { ProjectLearning } from "../learnings";
+import { learningNode, questionNode } from "../map";
+import type { KnowledgeSync } from "../sources";
+import { reviewTasks as tasksOf } from "./domain/review-tasks";
+import type { AskedQuestion } from "./domain/use";
+
+/** The rule with the Map's nodes, as `listReviewTasks` calls it. */
+const reviewTasks = (input: Parameters<typeof tasksOf>[0]) =>
+	tasksOf(input, { learning: learningNode, question: questionNode });
 
 const sync = (flow: string, health: KnowledgeSync["health"]) =>
 	({ flow, health }) as KnowledgeSync;

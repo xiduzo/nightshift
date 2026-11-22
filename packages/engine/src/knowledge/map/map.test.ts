@@ -4,12 +4,12 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { project } from "@nightshift/db/schema";
 import { applyUpdate, encodeStateAsUpdate } from "yjs";
-import type { ArchiveHost } from "../archive";
-import { createSandbox, type Sandbox, waitFor } from "../testing";
-import { SynonymEmbeddings } from "../testing/embeddings";
-import { testKnowledge } from "../testing/knowledge";
-import { knowledgeMapOf } from "./map";
-import type { KnowledgeMeaning } from "./search";
+import type { ArchiveHost } from "../../archive";
+import { createSandbox, type Sandbox, waitFor } from "../../testing";
+import { SynonymEmbeddings } from "../../testing/embeddings";
+import { testKnowledge } from "../../testing/knowledge";
+import type { KnowledgeMeaning } from "../search";
+import { knowledgeMapOf } from "./domain/map";
 
 /** The Map, through the door's `map`: what a person sees, whatever draws it. */
 

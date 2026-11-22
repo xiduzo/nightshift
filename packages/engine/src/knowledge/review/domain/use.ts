@@ -1,8 +1,3 @@
-import type { KnowledgeUseHit } from "@nightshift/agents/knowledge";
-import type { Database } from "@nightshift/db";
-import { now as timeNow } from "@nightshift/time";
-import { type KnowledgeUseFact, knowledgeUseEvents } from "../log";
-import type { StepSource } from "../read";
 import { questionKey } from "./questions";
 
 /**
@@ -11,7 +6,43 @@ import { questionKey } from "./questions";
  * Agent step logs its own on its step (`StepHandle.usedKnowledge`); the
  * nightshift MCP server's calls are logged with no run (`Knowledge.search`,
  * `Knowledge.read`).
+ *
+ * The shapes below restate what the log and the read model give (G1):
+ * `KnowledgeUseHit` of the agents, `KnowledgeUseFact` of the log and
+ * `StepSource` of the read model.
  */
+
+/** One file a search returned, at its best spot. */
+type KnowledgeUseHit = {
+	path: string;
+	section: string | null;
+	line: number;
+	page: number | null;
+	found: ("words" | "meaning")[];
+};
+
+/** Where a read started. Absent: the start of the file. */
+type KnowledgeReadFrom = { section?: string; line?: number; page?: number };
+
+/** A search or a read, as the log tells it. */
+type UsePayload =
+	| {
+			type: "KnowledgeSearched";
+			payload: { query: string; hits: KnowledgeUseHit[] };
+	  }
+	| {
+			type: "KnowledgeRead";
+			payload: { path: string; found: boolean; from?: KnowledgeReadFrom };
+	  };
+
+/** One knowledge event of a project, newest first: in a run, or through the MCP server. */
+export type KnowledgeUseRow = UsePayload & {
+	/** Epoch ms. */
+	at: number;
+	/** Null: through the nightshift MCP server. */
+	runId: string | null;
+	stepId: string | null;
+};
 
 /** A question agents asked the knowledge, and what the last asking found. */
 export type AskedQuestion = {
@@ -29,22 +60,20 @@ export type AskedQuestion = {
 };
 
 /** How many searches the questions read, newest first. */
-const ASKED_WINDOW = 2_000;
+export const ASKED_WINDOW = 2_000;
+
+/** How many questions a list holds when the request names no limit. */
+export const ASKED_LIMIT = 50;
 
 /**
  * The questions agents asked a project's knowledge, newest first, at most
  * `limit`: each question once (`questionKey`), with what its last asking
- * found. From its latest 2 000 searches, in runs and through the MCP server.
+ * found, from its latest searches (`rows`, newest first).
  */
-export async function askedQuestions(
-	db: Database,
-	projectId: string,
-	options: { limit?: number } = {},
-): Promise<AskedQuestion[]> {
-	const limit = options.limit ?? 50;
-	const rows = await knowledgeUseEvents(db, projectId, ["KnowledgeSearched"], {
-		limit: ASKED_WINDOW,
-	});
+export function askedQuestionsOf(
+	rows: readonly KnowledgeUseRow[],
+	limit: number,
+): AskedQuestion[] {
 	const asked = new Map<string, AskedQuestion>();
 	for (const row of rows) {
 		if (row.type !== "KnowledgeSearched") continue;
@@ -67,6 +96,16 @@ export async function askedQuestions(
 	return [...asked.values()];
 }
 
+/** A file a step's agents used, as the step lists it. */
+type StepSource = {
+	path: string;
+	section: string | null;
+	page: number | null;
+	line: number;
+	/** The agent read the file (`read_knowledge`). False: a search put it in its top 3. */
+	read: boolean;
+};
+
 /** The hits of each search that count as used: the top 3. */
 const SOURCE_HITS = 3;
 /** The most sources a step lists. */
@@ -78,7 +117,7 @@ const MAX_SOURCES = 10;
  * them, then the top hits of its searches that it did not read. No effort
  * of the agent: it cites nothing itself.
  */
-export function stepSources(uses: readonly KnowledgeUseFact[]): StepSource[] {
+export function stepSources(uses: readonly UsePayload[]): StepSource[] {
 	/** Where each path was last found, for a read that names no spot. */
 	const foundAt = new Map<string, KnowledgeUseHit>();
 	const read = new Map<string, StepSource>();
@@ -155,11 +194,16 @@ const DAY = 24 * 60 * 60 * 1000;
 /** How far back the use counts. */
 const USE_WINDOW_DAYS = 90;
 /** The most events the use reads, newest first. */
-const USE_EVENTS = 20_000;
+export const USE_EVENTS = 20_000;
 /** A search counts as finding a file in its top this many. */
 const FOUND_IN_TOP = 5;
 /** A file no run used for this long is marked: a source may sync it for nothing. */
 const UNUSED_DAYS = 30;
+
+/** Where the use counted at `now` starts: 90 days back. */
+export function useSince(now: number): number {
+	return now - USE_WINDOW_DAYS * DAY;
+}
 
 /**
  * Which of the listed files are not used: no run used the file lately, and
@@ -184,22 +228,16 @@ export function unusedFiles(
 
 /**
  * How often agents found and read each file of a project's knowledge in
- * the last 90 days, in runs and through the MCP server, when a run last
- * used it, and which of the `listed` files are not used (`unusedFiles`).
+ * the last 90 days (`rows`, newest first, since `useSince(now)`), in runs
+ * and through the MCP server, when a run last used it, and which of the
+ * `listed` files are not used (`unusedFiles`).
  */
-export async function knowledgeFileUse(
-	db: Database,
-	projectId: string,
+export function fileUseOf(
+	rows: readonly KnowledgeUseRow[],
 	listed: readonly { path: string; changedAt: number }[],
-	now: number = timeNow(),
-): Promise<KnowledgeUseReport> {
-	const since = now - USE_WINDOW_DAYS * DAY;
-	const rows = await knowledgeUseEvents(
-		db,
-		projectId,
-		["KnowledgeSearched", "KnowledgeRead"],
-		{ limit: USE_EVENTS, since },
-	);
+	now: number,
+): KnowledgeUseReport {
+	const since = useSince(now);
 	const files = new Map<string, KnowledgeFileUse>();
 	const use = (path: string, at: number, inRun: boolean) => {
 		let file = files.get(path);

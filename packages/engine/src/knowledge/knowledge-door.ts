@@ -14,9 +14,13 @@ import type {
 	WaitingNote,
 } from "./learnings";
 import type { KnowledgeMap } from "./map";
-import type { KnowledgeQuestion } from "./questions";
 import type { LinkLook, ReaderSecret } from "./readers";
-import type { ReviewTask } from "./review";
+import type {
+	AskedQuestion,
+	KnowledgeQuestion,
+	KnowledgeUseReport,
+	ReviewTask,
+} from "./review";
 import type {
 	KnowledgeEvaluation,
 	KnowledgeHit,
@@ -31,7 +35,6 @@ import type {
 	SessionStep,
 } from "./step-knowledge";
 import type { KnowledgeFolderLocks, KnowledgeTimes } from "./sync";
-import type { AskedQuestion, KnowledgeUseReport } from "./use";
 
 /** The Hosts of the Spaces, once the devices runtime is up. */
 export type KnowledgeHosts = {

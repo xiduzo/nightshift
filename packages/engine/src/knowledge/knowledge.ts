@@ -1,12 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type KnowledgeUse, useHit } from "@nightshift/agents/knowledge";
-import { NOT_TOPICS_FILE, QUESTION_SET_FILE } from "@nightshift/flows";
-import { now } from "@nightshift/time";
-import { writeWhole } from "../archive";
+import { QUESTION_SET_FILE } from "@nightshift/flows";
 import { createRunLog, knowledgeUseEvent } from "../log";
 import {
-	isReadable,
 	type KnowledgeFolders,
 	type KnowledgeReader,
 	wireFiles,
@@ -23,24 +20,16 @@ import {
 	type RunLearnings,
 	wireLearnings,
 } from "./learnings";
-import { createMapMemo, knowledgeMapOf } from "./map";
-import { formatNotTopics, markNotTopic, parseNotTopics } from "./not-topics";
-import {
-	formatQuestions,
-	type KnowledgeQuestion,
-	markQuestion,
-	parseQuestions,
-	questionKey,
-} from "./questions";
+import { wireMap } from "./map";
 import { type PageReaders, wireReaders } from "./readers";
-import { reviewTasks } from "./review";
+import { type KnowledgeQuestion, parseQuestions, wireReview } from "./review";
 import {
 	isMarkdown,
 	type KnowledgeSearch,
 	markdownHeadings,
 	wireSearch,
 } from "./search";
-import { knowledgeSources, type SourceRun, type SourcesSpace } from "./sources";
+import { wireSources } from "./sources";
 import { createStepKnowledge } from "./step-knowledge";
 import {
 	type KnowledgeDocuments,
@@ -48,18 +37,6 @@ import {
 	type KnowledgeSync,
 	wireSync,
 } from "./sync";
-import { askedQuestions, knowledgeFileUse } from "./use";
-
-/**
- * What the Map reads of the index, at most, at each draw it must do: it runs on
- * the daemon's one thread. See `docs/knowledge.md`, "The Map", for what this
- * costs at the limits.
- */
-const MAP_LIMITS = {
-	maxBytes: 6_000_000,
-	maxBytesPerFile: 60_000,
-	maxVectors: 4_000,
-};
 
 /**
  * What every block of `createKnowledge` reads: the parts it builds first,
@@ -369,142 +346,41 @@ function reviewMembers(
 > {
 	const { deps, folders, documents, search, learnings, reconciler, reader } =
 		parts;
-	const { db, device } = deps;
-	const mapMemo = createMapMemo();
-
-	/** The file of the words that are not topics, in this computer's folder. */
-	function notTopicsFile(projectId: string): string {
-		return join(folders.folder(projectId), ...NOT_TOPICS_FILE.split("/"));
-	}
-
-	/** The words people marked, as far as this computer's folder has them. */
-	async function notTopicsHere(projectId: string) {
-		return parseNotTopics(
-			await readFile(notTopicsFile(projectId), "utf8").catch(() => null),
-		);
-	}
-
-	/** What `sources` and `review` read: the sources in `space`, over this Device's files. */
-	function sourcesIn<Run extends SourceRun>(space: SourcesSpace<Run>) {
-		return knowledgeSources({
-			space,
-			files: { listing: reader.listing, removeFolder: reconciler.removeFolder },
-			readerReady: parts.readers.ready,
-			device,
-		});
-	}
-
-	/** How agents used the project's knowledge, and which of the files the document lists no run used lately. */
-	async function use(projectId: string) {
-		const files = await reader.files(projectId);
-		return { files, use: await knowledgeFileUse(db, projectId, files) };
-	}
-
+	const holds = {
+		startStep: (projectId: string) => reconciler.startStep(projectId),
+	};
+	const sources = wireSources({
+		files: { listing: reader.listing, removeFolder: reconciler.removeFolder },
+		readers: { ready: parts.readers.ready },
+		device: deps.device,
+	});
+	const review = wireReview({
+		db: deps.db,
+		folders,
+		holds,
+		files: { files: (projectId) => reader.files(projectId) },
+		questionSet: { questionSet: parts.questionSet },
+		syncs: {
+			syncs: (space, projectId) => sources.sourcesIn(space).syncs(projectId),
+		},
+		learnings: { learnings: parts.projectLearnings },
+	});
+	const map = wireMap({
+		folders,
+		entries: documents,
+		index: search,
+		learnings,
+		asked: { asked: review.asked },
+		holds,
+	});
 	return {
-		async review(projectId, space) {
-			const [syncs, waiting, asked, used] = await Promise.all([
-				sourcesIn(space).syncs(projectId),
-				parts.projectLearnings([projectId]),
-				askedQuestions(db, projectId),
-				use(projectId),
-			]);
-			const unused = new Set(used.use.unused);
-			return reviewTasks({
-				syncs,
-				learnings: waiting,
-				asked,
-				unused: used.files.filter((file) => unused.has(file.path)),
-			});
-		},
-		async questions(projectId, options = {}) {
-			const [asked, set] = await Promise.all([
-				askedQuestions(db, projectId, options),
-				parts.questionSet(projectId),
-			]);
-			const answers = new Map(
-				set.map((question) => [questionKey(question.query), question.answers]),
-			);
-			return {
-				asked: asked.map((question) => ({
-					...question,
-					answers: answers.get(questionKey(question.query)) ?? null,
-				})),
-				set,
-			};
-		},
-		async markQuestion(projectId, mark) {
-			const hold = await reconciler.startStep(projectId);
-			try {
-				const next = markQuestion(
-					parseQuestions(await readQuestions(folders, projectId)),
-					{
-						...mark,
-						// Only a file an agent reads can answer.
-						answers: mark.answers.filter(isReadable),
-						at: now(),
-					},
-				);
-				const file = join(
-					await folders.ensure(projectId),
-					...QUESTION_SET_FILE.split("/"),
-				);
-				await writeWhole(file, formatQuestions(next));
-				return next;
-			} finally {
-				await hold.done();
-			}
-		},
-		async map(projectId) {
-			const [listed, stamp, asked, waiting, marked] = await Promise.all([
-				documents.open(projectId).then((document) => document.entries()),
-				search.mapStamp(projectId),
-				askedQuestions(db, projectId),
-				learnings.waiting(projectId, { onlyHere: true }),
-				notTopicsHere(projectId),
-			]);
-			const spaceFiles = [...listed.keys()].filter(isReadable);
-			const notTopics = marked.map(({ word }) => word);
-			return mapMemo(
-				projectId,
-				[
-					stamp,
-					spaceFiles,
-					asked.map(({ query, hits }) => [query, hits.map((hit) => hit.path)]),
-					waiting.map(({ id, notes }) => [id, notes]),
-					notTopics,
-				],
-				async () => {
-					const index = await search.forMap(projectId, MAP_LIMITS);
-					return knowledgeMapOf({
-						// What the Space lists, and what this folder has but did not publish yet.
-						files: [...spaceFiles, ...index.files],
-						read: index.read,
-						filesLeftOut: index.filesLeftOut,
-						vectors: index.vectors,
-						closeAt: index.closeAt,
-						asked,
-						learnings: waiting,
-						notTopics,
-					});
-				},
-			);
-		},
-		async markNotTopic(projectId, mark) {
-			const hold = await reconciler.startStep(projectId);
-			try {
-				const next = markNotTopic(await notTopicsHere(projectId), {
-					...mark,
-					at: now(),
-				});
-				await folders.ensure(projectId);
-				await writeWhole(notTopicsFile(projectId), formatNotTopics(next));
-				return next.map(({ word }) => word);
-			} finally {
-				await hold.done();
-			}
-		},
-		use: async (projectId) => (await use(projectId)).use,
-		sources: sourcesIn,
+		review: review.review,
+		questions: review.questions,
+		markQuestion: review.markQuestion,
+		map: map.map,
+		markNotTopic: map.markNotTopic,
+		use: review.use,
+		sources: sources.sourcesIn,
 	};
 }
 
