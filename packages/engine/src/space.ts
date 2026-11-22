@@ -1,6 +1,6 @@
 import type { ArtifactStore } from "./artifacts";
 import type { AnswerCost } from "./assistant";
-import type { RunFilesService } from "./cleanup";
+import type { Cleanup } from "./cleanup";
 import type { Actor } from "./contract";
 import type { FlowEditing, SpaceFlows } from "./flows";
 import type { Gates } from "./gates";
@@ -53,8 +53,8 @@ export type SpacesDeps = {
 	// --- access, and the files of a run that other slices keep (R1) ---
 	/** Opens a run for an actor: the one check of who may see or act on it (`runs/access`). */
 	openRun: Access["openRun"];
-	/** The files of run folders on this computer. */
-	runFiles: Pick<RunFilesService, "list" | "file">;
+	/** The files of run folders on this computer (`cleanup/`): each use case opens the run for the actor first. */
+	runFiles: Pick<Cleanup, "listRunFiles" | "readRunFile">;
 	/** The artifacts kept on this computer. */
 	artifacts: Pick<ArtifactStore, "list" | "file">;
 	/** Hides the worktree paths of runs on Devices the actor does not own. */
@@ -267,14 +267,12 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async listRunFiles(runId) {
 				await ready;
-				await open(runId);
-				return deps.runFiles.list(runId);
+				return deps.runFiles.listRunFiles(actor, { runId, spaceId });
 			},
 
 			async runFile(runId, path) {
 				await ready;
-				await open(runId);
-				return deps.runFiles.file(runId, path);
+				return deps.runFiles.readRunFile(actor, { runId, spaceId, path });
 			},
 
 			// --- start (R3) ---

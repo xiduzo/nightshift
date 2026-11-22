@@ -1,8 +1,7 @@
-import type { RunBranchState, RunCopyState } from "../git";
-
 /**
  * What the cleanup keeps of what a run left on this computer, and when.
- * Pure: the facts come from `git/run-branches.ts`.
+ * Pure: the facts come from `git/run-branches.ts`, through the port
+ * `RunBranches`. The shapes below are the ones the cleanup reads of them.
  *
  * A run's copy of the project and its local branches go a day after the
  * run ended (`RUN_COPY_DAYS`). Work that is only on this computer stays
@@ -12,6 +11,40 @@ import type { RunBranchState, RunCopyState } from "../git";
  */
 
 const DAY_MS = 24 * 60 * 60_000;
+
+/** One local branch of a run, and how many of its commits are only here. */
+export type RunBranchState = {
+	name: string;
+	/** Its newest commit. */
+	commit: string;
+	/** Commits that are only here: deleting the branch loses them. */
+	unsaved: number;
+};
+
+/** What the run's worktree has checked out. */
+export type RunCopyHead = {
+	commit: string;
+	/** The checked-out branch, or null when HEAD is detached. */
+	branch: string | null;
+	/** Commits of HEAD that are only here. */
+	unsaved: number;
+};
+
+/** A run's worktree and branches in one clone on this computer. */
+export type RunCopyState = {
+	/** Where the run's worktree is, or was, on this computer. */
+	worktreePath: string;
+	/** The folder exists. */
+	exists: boolean;
+	/** Git lists the folder as a worktree of the clone. */
+	registered: boolean;
+	/** Changed, staged and untracked files in the worktree: 0 without one, null when git could not tell. */
+	changes: number | null;
+	/** What the worktree has checked out. Null without a worktree git knows, or when git could not tell. */
+	head: RunCopyHead | null;
+	/** Its local branches that no other worktree has checked out. */
+	branches: RunBranchState[];
+};
 
 /** How many days after a run ended its copy of the project and its branches go. */
 export const RUN_COPY_DAYS = 1;
@@ -65,6 +98,17 @@ export function cleanupTime(
 ): number {
 	return (run.endedAt ?? run.createdAt) + afterDays * DAY_MS;
 }
+
+/** What one `WorktreeRemoved` says, in the order of its fields: the log keeps that order. */
+export type WorktreeRemoved = {
+	projectId: string;
+	runId: string;
+	worktreePath: string | null;
+	branches: string[];
+	kept?: string[];
+	expired?: string[];
+	by: "person" | "cleanup";
+};
 
 /**
  * When the scheduled cleanup may remove the run folder of a run this

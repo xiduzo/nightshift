@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import type { RunCopyState } from "../git";
+import type { RunCopyState } from "./safety";
 import { cleanupTime, whyLeave, workToKeep } from "./safety";
 
 const state: RunCopyState = {

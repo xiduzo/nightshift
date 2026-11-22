@@ -6,7 +6,8 @@
  * not keep the next from its work: under `bun --hot` one unhandled error
  * stops every timer of the process. The signal (the engine's lifetime)
  * clears the timers. `swept` is told when a round ends: a sweep runs git
- * for every run, so its length depends on the load of this computer.
+ * for every run, so its length depends on the load of this computer. It
+ * imports nothing of the slice: the wire hands it the bound sweeps.
  */
 
 /** How long after the engine is ready the first sweep starts. */

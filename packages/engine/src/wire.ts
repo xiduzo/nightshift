@@ -457,6 +457,7 @@ export function createEngine(
 		db,
 		log: runLog,
 		git,
+		access,
 		projects,
 		views,
 		runner,

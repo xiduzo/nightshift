@@ -14,7 +14,6 @@ devices/placement
 devices/registry
 devices/secrets
 engine/agent-setup
-engine/cleanup
 engine/device-config
 engine/flows
 engine/knowledge
