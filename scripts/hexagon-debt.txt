@@ -7,10 +7,7 @@ agents/assistant
 agents/decider
 agents/harnesses
 agents/knowledge
-auth/access
 auth/device-keys
-auth/local-session
-auth/login
 auth/pairing
 auth/spaces
 devices/host

@@ -4,8 +4,13 @@ import { Refusal } from "@nightshift/refusal";
 
 import { TWO_FACTOR_REQUIRED } from "../host-access";
 import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
-import { requestAccess } from "./request";
-import { ROLE_REFUSAL, RoleRefusal, spaceAccess } from "./space-access";
+import { requestAccess } from "../wire-access";
+import {
+	ROLE_REFUSAL,
+	RoleRefusal,
+	spaceAccess,
+	type TwoFactorRequired,
+} from "./domain/space-access";
 
 /** The first rungs of a request in a Space: one answer for every way in. */
 
@@ -67,5 +72,12 @@ describe("RoleRefusal", () => {
 		expect(refusal.message).toBe(
 			"Your role in this Space does not allow this.",
 		);
+	});
+});
+
+describe("TwoFactorRequired", () => {
+	test("is the code of host-access", () => {
+		const code: TwoFactorRequired = TWO_FACTOR_REQUIRED;
+		expect(code).toBe("TWO_FACTOR_REQUIRED");
 	});
 });

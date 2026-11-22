@@ -8,10 +8,9 @@ import {
 } from "@nightshift/db/schema";
 import { asDate } from "@nightshift/time";
 import { eq } from "drizzle-orm";
-import { requestAccess } from "../access";
 import { type Permissions, roleAllows } from "../index";
-import { createLocalSession } from "../local-session";
 import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
+import { createLocalSession, requestAccess } from "../wire-access";
 import {
 	adoptPersonalSpaceBatch,
 	ensurePersonalSpace,

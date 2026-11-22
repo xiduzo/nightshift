@@ -1,7 +1,21 @@
 import { Refusal } from "@nightshift/refusal";
-import type { Session } from "../auth";
-import type { TWO_FACTOR_REQUIRED } from "../host-access";
-import type { RequestAccess } from "./request";
+
+/**
+ * A session as access reads it: its Person, their two-factor state, and
+ * the session's active Space. The wire names Better Auth's full type.
+ */
+export type SessionOf = {
+	user: { id: string; twoFactorEnabled?: boolean | null };
+	session: { userId: string; activeOrganizationId?: string | null };
+};
+
+/** The code of a Host that asks for two-factor sign-in (`TWO_FACTOR_REQUIRED` of `host-access/`). */
+export type TwoFactorRequired = "TWO_FACTOR_REQUIRED";
+
+/** Whether the Host lets a session in, as `host-access/` decides it (`HostAccess`). */
+export type HostDecision =
+	| { allowed: true }
+	| { allowed: false; code: TwoFactorRequired; message: string };
 
 /**
  * Why a request may not go on: the code a screen reads, the HTTP status
@@ -10,14 +24,14 @@ import type { RequestAccess } from "./request";
  */
 export type AccessRefusal = {
 	allowed: false;
-	code: "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | typeof TWO_FACTOR_REQUIRED;
+	code: "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | TwoFactorRequired;
 	status: 401 | 403 | 404;
 	message: string;
 };
 
 /** A request that works in a Space: its session and that Space. Else why not. */
-export type SpaceAccess =
-	| { allowed: true; session: Session; spaceId: string }
+export type SpaceAccessOf<S> =
+	| { allowed: true; session: S; spaceId: string }
 	| AccessRefusal;
 
 /** A request without a session. */
@@ -52,9 +66,11 @@ export class RoleRefusal extends Refusal {
  * The first rungs of every request that works in a Space: a session, in
  * a Space, that the Host lets in (`host-access/`).
  */
-export function spaceAccess(
-	access: Pick<RequestAccess, "session" | "spaceId" | "hostAccess">,
-): SpaceAccess {
+export function spaceAccess<S extends { user: unknown }>(access: {
+	session: S | null;
+	spaceId: string | null;
+	hostAccess: HostDecision;
+}): SpaceAccessOf<S> {
 	const { session, spaceId, hostAccess } = access;
 	if (!session?.user || !spaceId) return SIGNED_OUT;
 	if (!hostAccess.allowed) return { ...hostAccess, status: 403 };

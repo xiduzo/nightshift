@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { localPerson } from "../spaces";
 import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
 import { turnOnTwoFactor } from "../testing/two-factor";
-import { endSession, hasLogin, setLogin } from "./login";
+import { endSession, hasLogin, setLogin } from "../wire-access";
 
 let sandbox: AuthSandbox;
 beforeEach(async () => {

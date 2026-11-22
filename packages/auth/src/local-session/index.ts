@@ -1,1 +1,1 @@
-export { createLocalSession, type LocalSession } from "./local-session";
+export { type LocalSession, wireLocalSession } from "./wire";

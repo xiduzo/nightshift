@@ -1,14 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { createLocalSession } from "../local-session";
 import { localPerson } from "../spaces";
 import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
 import { turnOnTwoFactor } from "../testing/two-factor";
-import {
-	type DocumentOf,
-	documentAccess,
-	type SyncDeviceKey,
-} from "./document-access";
+import { createLocalSession, documentAccess } from "../wire-access";
+import type { DocumentOf, SyncDeviceKey } from "./domain/sync-access";
 
 /**
  * Who may open which synced document, at the policy's own interface: the

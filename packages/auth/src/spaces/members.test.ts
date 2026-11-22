@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { user } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
-import { requestAccess } from "../access";
 import type { MemberChange, Permissions } from "../index";
 import {
 	type AuthSandbox,
 	cookiesOf,
 	createAuthSandbox,
 } from "../testing/sandbox";
+import { requestAccess } from "../wire-access";
 import {
 	invitationView,
 	isHostAdmin,

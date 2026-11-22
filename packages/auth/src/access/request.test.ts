@@ -2,10 +2,13 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { session } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 
-import { createLocalSession } from "../local-session";
 import { localPerson } from "../spaces";
 import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
-import { authEndpointAccess, requestAccess } from "./request";
+import {
+	authEndpointAccess,
+	createLocalSession,
+	requestAccess,
+} from "../wire-access";
 
 /** The access of one request: read once, decided in memory. */
 

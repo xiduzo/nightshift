@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Refusal } from "@nightshift/refusal";
 import { APIError } from "better-auth/api";
 
-import { refusalOf } from "./auth-refusals";
+import { refusalOf } from "./domain/auth-refusals";
 
 describe("what Better Auth refuses", () => {
 	test("a code it uses gets Night Shift's words and its kind", () => {

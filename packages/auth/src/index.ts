@@ -1,15 +1,13 @@
 // The API of `@nightshift/auth`: the Better Auth instance (`auth.ts`, the
-// composition root of the package) and the verticals' barrels.
+// composition root of the package), the verticals' barrels, and the access
+// functions that wire their slice per call (`wire-access.ts`).
 
 export {
 	type AccessRefusal,
-	authEndpointAccess,
 	type DocumentOf,
-	documentAccess,
 	type RequestAccess,
 	ROLE_REFUSAL,
 	RoleRefusal,
-	requestAccess,
 	type SpaceAccess,
 	type SyncAccess,
 	type SyncAuthorize,
@@ -37,8 +35,7 @@ export {
 	type HostPolicy,
 	hostPolicyFromEnv,
 } from "./host-access";
-export { createLocalSession, type LocalSession } from "./local-session";
-export { endSession, hasLogin, liveSessionIds, setLogin } from "./login";
+export type { LocalSession } from "./local-session";
 export {
 	approvePairing,
 	denyPairing,
@@ -81,3 +78,13 @@ export {
 	splitPersonalSpaceBatch,
 } from "./spaces";
 export { TRUSTED_BROWSER_DAYS } from "./two-factor";
+export {
+	authEndpointAccess,
+	createLocalSession,
+	documentAccess,
+	endSession,
+	hasLogin,
+	liveSessionIds,
+	requestAccess,
+	setLogin,
+} from "./wire-access";
