@@ -6,7 +6,7 @@ import { type ArchiveHost, createSpaceArchive } from "../archive";
 import { createSyncedDocuments, documentName } from "../documents";
 import { wireFiles } from "../knowledge/files";
 import { fsKnowledgeFolders } from "../knowledge/files/adapters/out/fs-knowledge-folders";
-import { createLearnings } from "../knowledge/learnings";
+import { wireLearnings } from "../knowledge/learnings";
 import { isMarkdown, markdownHeadings } from "../knowledge/search";
 import { createKnowledgeFolderLocks, wireSync } from "../knowledge/sync";
 import { createOlderHosts } from "../knowledge/sync/domain/older-hosts";
@@ -82,7 +82,7 @@ export async function knowledgeDevice(
 	const { documents, status } = sync;
 	/** Each time the open screens heard that what waits changed: the Space and the project. */
 	const told: [string, string][] = [];
-	const learnings = createLearnings({
+	const learnings = wireLearnings({
 		folders,
 		documents,
 		archive,

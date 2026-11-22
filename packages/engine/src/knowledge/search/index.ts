@@ -6,7 +6,6 @@
  * the lines Night Shift measured for it.
  */
 
-export type { CloseNote, NoteToCompare } from "./domain/close-notes";
 export { DEFAULT_EMBEDDING_MODEL } from "./domain/embedding-model";
 export type { KnowledgeEvaluation } from "./domain/evaluation";
 export {

@@ -1,5 +1,5 @@
 import type { Flow } from "@nightshift/flows";
-import type { LearningRun, LearningSignal, LearningStep } from "./run-signals";
+import type { LearningRun, LearningSignal, LearningStep } from "./signals";
 
 /**
  * What the Learner reads of a run (ADR 37): Markdown, bounded in size.

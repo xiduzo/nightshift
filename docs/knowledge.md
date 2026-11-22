@@ -713,17 +713,17 @@ proposed learnings in about 680 agent steps. So Night Shift also looks back at
 a run when it ends ([ADR 37](adr/0037-night-shift-learns-from-runs-that-ended.md)).
 
 The Walker of the run does it: a Host for its own runs, a Device for the runs
-it walks. There the transcripts are. `createRunLearnings`
-(`packages/engine/src/knowledge/run-learnings.ts`) follows the landed facts.
+it walks. There the transcripts are. `followRuns` of the Knowledge
+(`packages/engine/src/knowledge/learnings/`) follows the landed facts.
 For each `run-ended` of a run walked here, it does these steps, one run at a
 time:
 
 1. It stops when the run is a test run, or when the project turned it off
    (`learnFromRuns: false` in the settings of the knowledge document).
 2. It reads the run and the run of the same flow that ended before it.
-3. `learningSignals` (`run-signals.ts`, pure) finds the signals. No signal:
+3. `learningSignals` (`domain/signals.ts`, pure) finds the signals. No signal:
    it stops. No evidence is built, and no model is asked.
-4. `learningEvidence` (`run-evidence.ts`, pure) writes the evidence: the run's
+4. `learningEvidence` (`domain/evidence.ts`, pure) writes the evidence: the run's
    facts, its signals, its steps, the answers of a person with their reason,
    what went wrong with the last 60 lines of each transcript, what worked, and
    the notes the project has (waiting and kept, this computer only). It is
@@ -838,7 +838,7 @@ at one point. The web app gives 5 seconds to undo. The phone sends at the tap,
 so Delete asks first. On both, Keep waits for notes you can read, and a role
 that may not decide does not get the buttons.
 
-The Learnings module (`packages/engine/src/knowledge/learnings.ts`) owns this
+The learnings sub-vertical (`packages/engine/src/knowledge/learnings/`) owns this
 protocol. The text of a file and the rule for its name are in
 `packages/flows/src/kits/knowledge/` (`learning-file.ts`, `layout.ts`), because
 agent reports, the web app and the kit need them too. The kit stays shell, so

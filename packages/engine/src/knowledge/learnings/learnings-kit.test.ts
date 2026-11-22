@@ -18,7 +18,7 @@ import {
 } from "@nightshift/flows";
 import { kitCommand } from "@nightshift/flows/testing";
 import { Refusal } from "@nightshift/refusal";
-import { createLearnings } from "./learnings";
+import { createLearnings } from "./test-support";
 
 /**
  * The two forms of keep and delete: the TypeScript of the Learnings module,

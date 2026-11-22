@@ -6,9 +6,11 @@ import type { SyncedDocuments } from "../documents";
 import type { UsageNotes } from "../usage";
 import type { KnowledgeListing, KnowledgeText } from "./files";
 import type {
+	FollowRunsDeps,
 	LearningsNotifications,
 	NotePerson,
 	ProjectLearning,
+	RunLearnings,
 	WaitingNote,
 } from "./learnings";
 import type { KnowledgeMap } from "./map";
@@ -220,6 +222,11 @@ export type Knowledge = {
 	learnsFromRuns(projectId: string): Promise<boolean>;
 	/** Turns the learnings from runs on or off for the project, for every Device of its Space. */
 	setLearnsFromRuns(projectId: string, on: boolean): Promise<void>;
+	/**
+	 * The look back at the runs this computer walks (ADR 37): when one ends
+	 * with a signal, the Learner proposes what to learn, one look at a time.
+	 */
+	followRuns(deps: FollowRunsDeps): RunLearnings;
 
 	// The sources, the Map and the review.
 	/**

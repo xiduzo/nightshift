@@ -4,13 +4,13 @@ import {
 	evidenceSteps,
 	learningEvidence,
 	MAX_EVIDENCE_CHARS,
-} from "./run-evidence";
+} from "./evidence";
 import {
 	failedAt,
 	type LearningRun,
 	type LearningStep,
 	learningSignals,
-} from "./run-signals";
+} from "./signals";
 
 const flow: Flow = flowSchema.parse({
 	version: FLOW_VERSION,

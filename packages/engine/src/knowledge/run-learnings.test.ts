@@ -23,7 +23,8 @@ import {
 	withDevice,
 } from "../testing/test-support";
 import { createEngine } from "../wire";
-import { type AskLearner, createRunLearnings } from "./run-learnings";
+import { createRunLearnings } from "./knowledge";
+import type { AskLearner } from "./learnings";
 
 /**
  * Learnings from runs that ended (ADR 37), end to end: a real engine walks

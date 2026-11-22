@@ -9,13 +9,12 @@
  */
 
 export type { KnowledgeFile, KnowledgeText } from "./files";
-export { createKnowledge } from "./knowledge";
+export { createKnowledge, createRunLearnings } from "./knowledge";
 export type { Knowledge } from "./knowledge-door";
-export type { WaitingLearning } from "./learnings";
+export type { AskLearner, WaitingLearning } from "./learnings";
 export type { KnowledgeMap } from "./map";
 export type { KnowledgeQuestion } from "./questions";
 export type { LinkLook } from "./readers";
-export { type AskLearner, createRunLearnings } from "./run-learnings";
 export {
 	DEFAULT_EMBEDDING_MODEL,
 	type KnowledgeEvaluation,

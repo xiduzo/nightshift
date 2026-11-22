@@ -8,7 +8,7 @@ import {
 	memoryHost,
 	removeKnowledgeDevices,
 	syncKnowledgeDocuments as syncDocuments,
-} from "../testing/knowledge-devices";
+} from "../../testing/knowledge-devices";
 
 /** The Learnings module, over a Device's folder, document and archive. */
 

@@ -16,7 +16,13 @@ import type {
 	KnowledgeDeps,
 	KnowledgeHosts,
 } from "./knowledge-door";
-import { createLearnings, type ProjectLearning } from "./learnings";
+import {
+	type FollowRunsDeps,
+	type Learnings,
+	type ProjectLearning,
+	type RunLearnings,
+	wireLearnings,
+} from "./learnings";
 import { createMapMemo, knowledgeMapOf } from "./map";
 import { formatNotTopics, markNotTopic, parseNotTopics } from "./not-topics";
 import {
@@ -64,7 +70,7 @@ type KnowledgeParts = {
 	folders: KnowledgeFolders;
 	documents: KnowledgeDocuments;
 	search: KnowledgeSearch;
-	learnings: ReturnType<typeof createLearnings>;
+	learnings: Learnings;
 	sync: KnowledgeSync;
 	reconciler: KnowledgeReconciler;
 	reader: KnowledgeReader;
@@ -117,7 +123,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		meaningOn: async (projectId) =>
 			(await documents.open(projectId)).meaningOn(),
 	});
-	const learnings = createLearnings({
+	const learnings = wireLearnings({
 		folders: { folder: (projectId) => folders.folder(projectId) },
 		documents,
 		archive,
@@ -321,8 +327,9 @@ function learningMembers(
 	| "knownLearnings"
 	| "learnsFromRuns"
 	| "setLearnsFromRuns"
+	| "followRuns"
 > {
-	const { documents, learnings } = parts;
+	const { learnings } = parts;
 	return {
 		learnings: parts.projectLearnings,
 		settleLearning: learnings.settle,
@@ -330,13 +337,21 @@ function learningMembers(
 		tellLearning: learnings.tell,
 		proposeFromRun: learnings.proposeFromRun,
 		knownLearnings: learnings.known,
-		async learnsFromRuns(projectId) {
-			return (await documents.open(projectId)).learnsFromRunsOn();
-		},
-		async setLearnsFromRuns(projectId, on) {
-			await (await documents.open(projectId)).setLearnsFromRuns(on);
-		},
+		learnsFromRuns: learnings.learnsFromRuns,
+		setLearnsFromRuns: learnings.setLearnsFromRuns,
+		followRuns: learnings.followRuns,
 	};
+}
+
+/**
+ * Learnings from runs that ended (ADR 37), over the learnings of a
+ * Knowledge: what the daemon calls until it calls `followRuns` itself.
+ */
+export function createRunLearnings(
+	deps: FollowRunsDeps & { knowledge: Pick<Knowledge, "followRuns"> },
+): RunLearnings {
+	const { knowledge, ...follow } = deps;
+	return knowledge.followRuns(follow);
 }
 
 /** The sources, the questions, the Map, how agents use the files, and the review of all of it. */
