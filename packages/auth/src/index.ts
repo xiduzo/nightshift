@@ -1,6 +1,7 @@
 // The API of `@nightshift/auth`: the Better Auth instance (`auth.ts`, the
 // composition root of the package), the verticals' barrels, and the access
-// functions that wire their slice per call (`wire-access.ts`).
+// and Device functions that wire their slice per call (`wire-access.ts`,
+// `wire-devices.ts`).
 
 export {
 	type AccessRefusal,
@@ -25,7 +26,6 @@ export {
 } from "./auth";
 export {
 	bearerDeviceKey,
-	createDeviceKeys,
 	type DeviceKeyAccess,
 	type DeviceKeyPermission,
 } from "./device-keys";
@@ -36,14 +36,7 @@ export {
 	hostPolicyFromEnv,
 } from "./host-access";
 export type { LocalSession } from "./local-session";
-export {
-	approvePairing,
-	denyPairing,
-	normalizeUserCode,
-	redeemPairing,
-	reviewPairing,
-	startPairing,
-} from "./pairing";
+export { normalizeUserCode } from "./pairing";
 // InvitationView, PendingInvitation and SpaceMember are in the API's
 // router type: its declaration must be able to name them.
 export {
@@ -88,3 +81,11 @@ export {
 	requestAccess,
 	setLogin,
 } from "./wire-access";
+export {
+	approvePairing,
+	createDeviceKeys,
+	denyPairing,
+	redeemPairing,
+	reviewPairing,
+	startPairing,
+} from "./wire-devices";

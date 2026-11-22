@@ -7,8 +7,6 @@ agents/assistant
 agents/decider
 agents/harnesses
 agents/knowledge
-auth/device-keys
-auth/pairing
 auth/spaces
 devices/host
 devices/membership

@@ -1,6 +1,7 @@
 // The Better Auth instance: the composition root of this package. Each
 // vertical gives its plugin and its rules. This file wires them together.
 
+import { apiKey } from "@better-auth/api-key";
 import { tryGetCurrentAuthEndpointContext } from "@better-auth/core/context";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import { expo } from "@better-auth/expo";
@@ -11,10 +12,11 @@ import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { createAccessControl } from "better-auth/plugins/access";
 import { admin } from "better-auth/plugins/admin";
+import { deviceAuthorization } from "better-auth/plugins/device-authorization";
 import { organization } from "better-auth/plugins/organization";
 import { twoFactor } from "better-auth/plugins/two-factor";
-import { deviceKeyPlugin } from "./device-keys";
-import { pairingPlugin } from "./pairing";
+import { DEVICE_KEY_PREFIX } from "./device-keys";
+import { PAIRING_CODE_TTL, PAIRING_POLL_INTERVAL } from "./pairing";
 import {
 	activeSpaceId,
 	ensurePersonalSpace,
@@ -55,6 +57,35 @@ function twoFactorPlugin() {
 	return twoFactor({
 		issuer: "Night Shift",
 		trustDeviceMaxAge: TRUSTED_BROWSER_DAYS * 24 * 3600,
+	});
+}
+
+/**
+ * The device authorization plugin, typed by name: its inferred type names a
+ * type `better-call` does not export, which a declaration cannot name.
+ */
+export interface PairingPlugin
+	extends ReturnType<typeof deviceAuthorization<undefined>> {}
+
+/** The device authorization plugin: how a Device pairs with a Host (`pairing/`). */
+function pairingPlugin(): PairingPlugin {
+	return deviceAuthorization({
+		expiresIn: PAIRING_CODE_TTL,
+		interval: PAIRING_POLL_INTERVAL,
+		// The client is the joining Device: its id.
+		validateClient: (clientId) => /^[\w-]{1,64}$/.test(clientId),
+	});
+}
+
+/** The API key plugin: Device keys are its keys (`device-keys/`). */
+function deviceKeyPlugin() {
+	return apiKey({
+		defaultPrefix: DEVICE_KEY_PREFIX,
+		enableMetadata: true,
+		// A Device calls its Host every few seconds; idle expiry, not a
+		// request count, ends a key nobody uses (`device-keys/`).
+		rateLimit: { enabled: false },
+		keyExpiration: { minExpiresIn: 1, maxExpiresIn: 365 },
 	});
 }
 

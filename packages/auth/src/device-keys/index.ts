@@ -1,8 +1,8 @@
 export {
 	bearerDeviceKey,
-	createDeviceKeys,
+	DEVICE_KEY_PREFIX,
 	type DeviceKeyAccess,
 	type DeviceKeyPermission,
-	deviceKeyPlugin,
 	isDeviceKey,
-} from "./device-keys";
+} from "./domain/device-keys";
+export { type DeviceKeys, wireDeviceKeys } from "./wire";
