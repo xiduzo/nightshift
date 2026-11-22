@@ -2,39 +2,31 @@ import { Database } from "bun:sqlite";
 import { rmSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { Document } from "@langchain/core/documents";
+import type { EmbeddingsInterface } from "@langchain/core/embeddings";
 import { KNOWLEDGE_SEARCH_FILE } from "@nightshift/flows";
-import type { KnowledgeFile } from "./files";
-import type { KnowledgeMeaning } from "./meaning";
-import { type SectionMetadata, sectionId } from "./sections";
+import { mapStamp, sectionTexts, storedVectors } from "./map-reads";
+import {
+	createSearchTables,
+	folderClause,
+	modelOfVectors,
+	SCHEMA_VERSION,
+	TABLES,
+	VECTOR_TABLES,
+} from "./tables";
 import { BunSqliteRecordManager, BunSqliteVectorStore } from "./vectors";
 
 /**
  * The search index on disk: `<dataDir>/knowledge/.search.sqlite`, and the
- * one module that knows its tables. It holds all the DDL and
- * `SCHEMA_VERSION`, the vector tables included, so a change of a table
- * cannot forget the bump. The file is a rebuildable cache: a version that
- * differs, or a file that does not open, builds a new one.
+ * one module that reads and writes its tables (`tables.ts`). The file is a
+ * rebuildable cache: a version that differs, or a file that does not open,
+ * builds a new one.
  *
  * Whatever needs the tables crosses this interface: the refresh writes files
  * and sections, the query reads them, and the vector preparation reads
- * sections and gets the vector store and record manager of a project.
+ * sections and gets the vector store and record manager of a project. The
+ * knowledge search decides what goes in and how it ranks.
  */
 
-/** Bump to build every index again: a new table needs no bump, since each open creates it. 2: PDF and Word files. 3: their text through LangChain loaders. 4: sections, and vectors by meaning. 5: a section's stable id, on its row and in its vector's metadata, and its heading path, which the model reads. */
-const SCHEMA_VERSION = 5;
-/** Every table of the index, for an index built again. */
-const TABLES = [
-	"files",
-	"texts",
-	"sections",
-	"meta",
-	"records",
-	"vectors",
-	"note_vectors",
-];
-/** The tables of the vectors, for another model. */
-const VECTOR_TABLES = ["records", "vectors", "note_vectors"];
 /** Words around a match in an excerpt. */
 const SNIPPET_TOKENS = 16;
 
@@ -42,65 +34,31 @@ const SNIPPET_TOKENS = 16;
 export const MATCH_OPEN = "\u0002";
 export const MATCH_CLOSE = "\u0003";
 
-/** Creates the tables of the index, when they are not there. */
-export function createSearchTables(db: Database): void {
-	db.run(
-		"CREATE TABLE IF NOT EXISTS files (id INTEGER PRIMARY KEY, project_id TEXT NOT NULL, path TEXT NOT NULL, size INTEGER NOT NULL, changed_at REAL NOT NULL, sha256 TEXT NOT NULL, title TEXT NOT NULL, UNIQUE (project_id, path))",
-	);
-	// `id` is the row, and the row of its words in `texts`: a new one at each
-	// write of the file. `section_id` is what a vector knows: see `sectionId`.
-	db.run(
-		"CREATE TABLE IF NOT EXISTS sections (id INTEGER PRIMARY KEY, file_id INTEGER NOT NULL, ord INTEGER NOT NULL, section_id TEXT NOT NULL, heading TEXT, heading_path TEXT NOT NULL, line INTEGER NOT NULL, page INTEGER, text TEXT NOT NULL)",
-	);
-	db.run("CREATE INDEX IF NOT EXISTS sections_file ON sections (file_id, ord)");
-	db.run(
-		"CREATE INDEX IF NOT EXISTS sections_id ON sections (file_id, section_id, ord)",
-	);
-	// Stemmed (deploying finds deploy), accents folded, and fast prefixes.
-	db.run(
-		"CREATE VIRTUAL TABLE IF NOT EXISTS texts USING fts5(path, title, heading, body, tokenize = 'porter unicode61 remove_diacritics 2', prefix = '2 3')",
-	);
-	// The record manager's table: which vectors `index()` stored, and when.
-	db.run(
-		"CREATE TABLE IF NOT EXISTS records (namespace TEXT NOT NULL, key TEXT NOT NULL, updated_at REAL NOT NULL, group_id TEXT, PRIMARY KEY (namespace, key))",
-	);
-	db.run(
-		"CREATE INDEX IF NOT EXISTS records_time ON records (namespace, updated_at)",
-	);
-	db.run(
-		"CREATE INDEX IF NOT EXISTS records_group ON records (namespace, group_id)",
-	);
-	// The vector store's table: one row per distinct section of a project.
-	db.run(
-		"CREATE TABLE IF NOT EXISTS vectors (project_id TEXT NOT NULL, id TEXT NOT NULL, text TEXT NOT NULL, metadata TEXT NOT NULL, vec BLOB NOT NULL, PRIMARY KEY (project_id, id))",
-	);
-	// One row per distinct text of a note: `close-notes.ts`. No section has these.
-	db.run(
-		"CREATE TABLE IF NOT EXISTS note_vectors (project_id TEXT NOT NULL, hash TEXT NOT NULL, vec BLOB NOT NULL, PRIMARY KEY (project_id, hash))",
-	);
-	db.run(
-		"CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
-	);
-}
+/** A file of the folder as a refresh found it. */
+type IndexedFileStamp = {
+	/** Relative to the folder, with `/` between its parts. */
+	path: string;
+	/** Bytes. */
+	size: number;
+	/** Epoch ms: the file's time of change. */
+	changedAt: number;
+};
 
-/**
- * The SQL that keeps a file's path (`f.path`) in `folders`, as
- * `inFolders` does: the folder itself, or a path that starts with it and
- * a `/`, in the same case. No folders: no file.
- */
-function folderClause(folders: readonly string[]): {
-	sql: string;
-	params: string[];
-} {
-	if (folders.length === 0) return { sql: "0", params: [] };
-	return {
-		sql: folders.map(() => "f.path = ? OR instr(f.path, ?) = 1").join(" OR "),
-		params: folders.flatMap((folder) => [folder, `${folder}/`]),
-	};
-}
+/** A section of a file, as the index keeps it. `id` is the caller's: what a vector knows of the section. */
+export type IndexedSection = {
+	id: string;
+	heading: string | null;
+	headingPath: string;
+	line: number;
+	page: number | null;
+	text: string;
+};
+
+/** The embedding model the vectors belong to. */
+type VectorModel = { model: string; embeddings: EmbeddingsInterface };
 
 /** A file as the index has it. */
-type IndexedFile = {
+export type IndexedFile = {
 	id: number;
 	path: string;
 	size: number;
@@ -110,18 +68,18 @@ type IndexedFile = {
 
 /** What a refresh found of a file: its content did not change, or it did. */
 export type IndexedFileWrite =
-	| { file: KnowledgeFile; row: IndexedFile; same: true }
+	| { file: IndexedFileStamp; row: IndexedFile; same: true }
 	| {
-			file: KnowledgeFile;
+			file: IndexedFileStamp;
 			row: IndexedFile | undefined;
 			same: false;
 			sha256: string;
 			title: string;
-			sections: Document<SectionMetadata>[];
+			sections: readonly IndexedSection[];
 	  };
 
 /** A section the words found. `snippet` has its matches between the marks. */
-type WordSection = {
+export type WordSection = {
 	path: string;
 	title: string;
 	heading: string | null;
@@ -131,7 +89,7 @@ type WordSection = {
 };
 
 /** A section as the embedding model reads it. */
-type SectionToEmbed = {
+export type SectionToEmbed = {
 	path: string;
 	title: string;
 	heading_path: string;
@@ -160,7 +118,7 @@ export function createSearchStore(
 	/** The vector store of each project, on the open index file. It keeps the project's vectors in memory. */
 	const vectorStores = new Map<
 		string,
-		{ embeddings: KnowledgeMeaning["embeddings"]; store: BunSqliteVectorStore }
+		{ embeddings: EmbeddingsInterface; store: BunSqliteVectorStore }
 	>();
 
 	function create(): Database {
@@ -201,15 +159,6 @@ export function createSearchStore(
 	function opened(): Database {
 		if (!db) throw new Error("The search index is closed.");
 		return db;
-	}
-
-	/** The model of the vectors the open index holds. */
-	function modelOfVectors(sqlite: Database): string | undefined {
-		return sqlite
-			.query<{ value: string }, []>(
-				"SELECT value FROM meta WHERE key = 'model'",
-			)
-			.get()?.value;
 	}
 
 	/**
@@ -366,24 +315,18 @@ export function createSearchStore(
 						dropSections(id);
 					}
 					for (const [ord, section] of item.sections.entries()) {
-						const { heading, headingPath, line, page } = section.metadata;
+						const { heading, headingPath, line, page, text } = section;
 						const added = addSection.get(
 							id,
 							ord,
-							sectionId(f.path, item.title, headingPath, section.pageContent),
+							section.id,
 							heading,
 							headingPath,
 							line,
 							page,
-							section.pageContent,
+							text,
 						) as { id: number };
-						addText.run(
-							added.id,
-							f.path,
-							item.title,
-							heading ?? "",
-							section.pageContent,
-						);
+						addText.run(added.id, f.path, item.title, heading ?? "", text);
 					}
 				}
 			})();
@@ -459,119 +402,14 @@ export function createSearchStore(
 			);
 		},
 
-		/**
-		 * The sections of the project's files with text, by path and in order,
-		 * up to `maxBytes` in all and `maxBytesPerFile` of a file, and how many
-		 * files that left out. Whole sections: the Map counts their words.
-		 */
-		sectionTexts(
+		/** The Map's reads (`map-reads.ts`). */
+		sectionTexts: (
 			projectId: string,
 			limits: { maxBytes: number; maxBytesPerFile: number },
-		): {
-			read: { path: string; sections: string[] }[];
-			filesLeftOut: number;
-		} {
-			const sqlite = opened();
-			const read: { path: string; sections: string[] }[] = [];
-			let left = limits.maxBytes;
-			let inFile = 0;
-			// Its own statement: this stops halfway, and a kept statement that
-			// stopped halfway cannot run again.
-			const sections = sqlite.prepare<{ path: string; text: string }, [string]>(
-				`SELECT f.path AS path, s.text AS text
-				FROM sections s JOIN files f ON f.id = s.file_id
-				WHERE f.project_id = ? AND s.text != ''
-				ORDER BY f.path, s.ord`,
-			);
-			try {
-				for (const row of sections.iterate(projectId)) {
-					if (read.at(-1)?.path !== row.path) {
-						// The next file does not fit: the rest stays out.
-						if (left <= 0) break;
-						read.push({ path: row.path, sections: [] });
-						inFile = 0;
-					}
-					if (inFile >= limits.maxBytesPerFile) continue;
-					const size = Buffer.byteLength(row.text);
-					inFile += size;
-					left -= size;
-					read.at(-1)?.sections.push(row.text);
-				}
-			} finally {
-				sections.finalize();
-			}
-			const all =
-				sqlite
-					.query<{ n: number }, [string]>(
-						`SELECT count(DISTINCT f.id) AS n
-						FROM sections s JOIN files f ON f.id = s.file_id
-						WHERE f.project_id = ? AND s.text != ''`,
-					)
-					.get(projectId)?.n ?? 0;
-			return { read, filesLeftOut: Math.max(0, all - read.length) };
-		},
-		/**
-		 * What changes when `sectionTexts` or `storedVectors` would read something
-		 * else: each file by its content, and which vectors there are. A section's
-		 * vector never changes while its file stays, so the vectors' count and
-		 * newest row are enough. It reads no section and no vector.
-		 */
-		mapStamp(projectId: string): string {
-			const sqlite = opened();
-			return JSON.stringify([
-				sqlite
-					.query<{ path: string; sha256: string }, [string]>(
-						"SELECT path, sha256 FROM files WHERE project_id = ? ORDER BY path",
-					)
-					.all(projectId)
-					.map(({ path, sha256 }) => [path, sha256]),
-				sqlite
-					.query<{ n: number; newest: number | null }, [string]>(
-						"SELECT count(*) AS n, max(rowid) AS newest FROM vectors WHERE project_id = ?",
-					)
-					.get(projectId),
-				sqlite
-					.query<{ value: string }, []>(
-						"SELECT value FROM meta WHERE key = 'model'",
-					)
-					.get()?.value ?? null,
-			]);
-		},
-		/**
-		 * The vectors of this model that still belong to a section of a file, at
-		 * most `limit`: the first section of each file, then the second of each,
-		 * so a cut leaves no file out. By path, from the store's own table: it
-		 * reads no model, and it changes nothing. Another model's vectors: none.
-		 */
-		storedVectors(
-			projectId: string,
-			model: string,
-			limit: number,
-		): { path: string; vector: Float32Array }[] {
-			const sqlite = opened();
-			if (modelOfVectors(sqlite) !== model) return [];
-			return sqlite
-				.query<{ path: string; vec: Uint8Array }, [string, number]>(
-					`WITH held AS (
-						SELECT v.rowid AS row, f.path AS path, min(s.ord) AS ord
-						FROM vectors v
-						JOIN files f ON f.project_id = v.project_id AND f.path = json_extract(v.metadata, '$.path')
-						JOIN sections s ON s.file_id = f.id AND s.section_id = json_extract(v.metadata, '$.section_id')
-						WHERE v.project_id = ?
-						GROUP BY v.rowid
-					), ranked AS (
-						SELECT row, path, row_number() OVER (PARTITION BY path ORDER BY ord) AS nth FROM held
-					)
-					SELECT r.path AS path, v.vec AS vec
-					FROM ranked r JOIN vectors v ON v.rowid = r.row
-					ORDER BY r.nth, r.path LIMIT ?`,
-				)
-				.all(projectId, limit)
-				.map(({ path, vec }) => ({
-					path,
-					vector: new Float32Array(vec.slice().buffer),
-				}));
-		},
+		) => sectionTexts(opened(), projectId, limits),
+		mapStamp: (projectId: string) => mapStamp(opened(), projectId),
+		storedVectors: (projectId: string, model: string, limit: number) =>
+			storedVectors(opened(), projectId, model, limit),
 
 		/** The vectors of the project's notes, by the hash of their text. It reads no model. Another model's vectors: none. */
 		noteVectors(projectId: string, model: string): Map<string, Float32Array> {
@@ -639,10 +477,7 @@ export function createSearchStore(
 		},
 
 		/** The project's vector store for this model. The vectors of another model go first. */
-		vectorsFor(
-			projectId: string,
-			model: Pick<KnowledgeMeaning, "model" | "embeddings">,
-		): BunSqliteVectorStore {
+		vectorsFor(projectId: string, model: VectorModel): BunSqliteVectorStore {
 			const sqlite = opened();
 			align(sqlite, model.model);
 			const kept = vectorStores.get(projectId);

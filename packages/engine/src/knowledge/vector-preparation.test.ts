@@ -2,11 +2,10 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Document } from "@langchain/core/documents";
+import { createSearchStore, type SearchStore } from "../search-index";
 import { SynonymEmbeddings } from "../testing/embeddings";
 import { watchVectorPreparation } from "../testing/vector-preparation";
 import type { KnowledgeMeaning, KnowledgeMeaningReady } from "./meaning";
-import { createSearchStore, type SearchStore } from "./search-store";
 import { sectionId } from "./sections";
 import { createVectorPreparation } from "./vector-preparation";
 
@@ -78,19 +77,14 @@ function write(projectId: string, path: string, texts: string[], id = 1) {
 			same: false,
 			sha256: `sha-${id}`,
 			title: path,
-			sections: texts.map(
-				(text, line) =>
-					new Document({
-						pageContent: text,
-						metadata: {
-							path,
-							heading: null,
-							headingPath: "",
-							line: line + 1,
-							page: null,
-						},
-					}),
-			),
+			sections: texts.map((text, line) => ({
+				id: sectionId(path, path, "", text),
+				heading: null,
+				headingPath: "",
+				line: line + 1,
+				page: null,
+				text,
+			})),
 		},
 	]);
 }

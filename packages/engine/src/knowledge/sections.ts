@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { extname } from "node:path";
 import { Document } from "@langchain/core/documents";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import type { IndexedSection } from "../search-index";
 
 /**
  * The sections of a knowledge file: the parts that search finds, by
@@ -80,6 +81,22 @@ export function sectionId(
 		.update("\0")
 		.update(embedText(title, headingPath, text))
 		.digest("hex");
+}
+
+/** The sections of a file as the search index keeps them, each with its id. */
+export function indexedSections(
+	path: string,
+	title: string,
+	sections: readonly Document<SectionMetadata>[],
+): IndexedSection[] {
+	return sections.map(({ pageContent: text, metadata }) => ({
+		id: sectionId(path, title, metadata.headingPath, text),
+		heading: metadata.heading,
+		headingPath: metadata.headingPath,
+		line: metadata.line,
+		page: metadata.page,
+		text,
+	}));
 }
 
 const CHUNK_SIZE = 1200;

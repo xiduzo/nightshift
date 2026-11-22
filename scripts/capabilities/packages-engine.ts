@@ -67,6 +67,10 @@ export const PACKAGE_ENGINE: Record<string, Place> = {
 	// the capabilities both read it.
 	"run-status": M,
 	schedules: "schedules",
+	// The index the knowledge search reads: words, sections and vectors in
+	// an SQLite file of its own. A rebuildable cache: the ranking stays in
+	// `knowledge`.
+	"search-index": M,
 	// The keeper of the pull request Scores: it reads what GitHub says
 	// became of a run's pull request, and writes it to the run log. No
 	// person asks it for anything. Score is a word of the glossary, as

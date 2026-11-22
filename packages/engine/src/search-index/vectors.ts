@@ -24,7 +24,7 @@ import { now as timeNow } from "@nightshift/time";
  * The vectors are float32 BLOBs, searched by an exact scan in JS: no
  * extension and no native addon. It stays fast for a project's knowledge
  * (about 50 ms over 20 000 sections of 1 024 dimensions). Their tables are
- * the search store's (`search-store.ts`).
+ * the search index's (`tables.ts`).
  */
 
 /**
@@ -45,7 +45,7 @@ export class BunSqliteRecordManager implements RecordManagerInterface {
 		private readonly namespace: string,
 	) {}
 
-	/** Nothing to do: the search store creates every table (`search-store.ts`). */
+	/** Nothing to do: the search index creates every table (`tables.ts`). */
 	async createSchema(): Promise<void> {}
 
 	async getTime(): Promise<number> {

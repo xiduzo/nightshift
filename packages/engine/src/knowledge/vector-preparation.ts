@@ -1,8 +1,8 @@
 import { Document } from "@langchain/core/documents";
 import { index } from "@langchain/core/indexing";
 import { now } from "@nightshift/time";
+import type { SearchStore } from "../search-index";
 import type { KnowledgeMeaning, KnowledgeMeaningReady } from "./meaning";
-import type { SearchStore } from "./search-store";
 import { embedText } from "./sections";
 
 /**

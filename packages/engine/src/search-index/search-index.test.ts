@@ -5,9 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Document } from "@langchain/core/documents";
 import { KNOWLEDGE_SEARCH_FILE } from "@nightshift/flows";
+import { sectionId } from "../knowledge/sections";
 import { SynonymEmbeddings } from "../testing/embeddings";
-import { createSearchStore, type SearchStore } from "./search-store";
-import { sectionId } from "./sections";
+import { createSearchStore, type SearchStore } from "./search-index";
 
 let dataDir: string;
 let store: SearchStore;
@@ -41,19 +41,14 @@ function write(path: string, texts: string[]) {
 			same: false,
 			sha256: "sha",
 			title: "Title",
-			sections: texts.map(
-				(text, line) =>
-					new Document({
-						pageContent: text,
-						metadata: {
-							path,
-							heading: null,
-							headingPath: "",
-							line: line + 1,
-							page: null,
-						},
-					}),
-			),
+			sections: texts.map((text, line) => ({
+				id: sectionId(path, "Title", "", text),
+				heading: null,
+				headingPath: "",
+				line: line + 1,
+				page: null,
+				text,
+			})),
 		},
 	]);
 }
@@ -201,13 +196,6 @@ describe("a section's row", () => {
 		const file = store.fileAt("p1", "a.md");
 		const moved = store.section(file?.id ?? 0, before[0]?.section_id ?? "");
 		expect(moved).toMatchObject({ line: 2, text: "A car." });
-	});
-
-	test("changes id with the file's path, its title and the heading path", () => {
-		const id = sectionId("a.md", "Title", "", "A car.");
-		expect(sectionId("b.md", "Title", "", "A car.")).not.toBe(id);
-		expect(sectionId("a.md", "Other", "", "A car.")).not.toBe(id);
-		expect(sectionId("a.md", "Title", "Garage", "A car.")).not.toBe(id);
 	});
 
 	test("without text gets no vector", async () => {

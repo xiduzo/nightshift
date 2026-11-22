@@ -2,6 +2,12 @@ import { join } from "node:path";
 import { Document } from "@langchain/core/documents";
 import { isDocument, loadDocument } from "../file-loaders";
 import type { FolderSnapshot } from "../folder-snapshot";
+import {
+	createSearchStore,
+	type IndexedFileWrite,
+	MATCH_CLOSE,
+	MATCH_OPEN,
+} from "../search-index";
 import { createCloseNotes } from "./close-notes";
 import {
 	cutText,
@@ -12,13 +18,7 @@ import {
 	readStart,
 } from "./files";
 import type { KnowledgeMeaning, KnowledgeMeaningReady } from "./meaning";
-import {
-	createSearchStore,
-	type IndexedFileWrite,
-	MATCH_CLOSE,
-	MATCH_OPEN,
-} from "./search-store";
-import { splitSections } from "./sections";
+import { indexedSections, splitSections } from "./sections";
 import {
 	createVectorPreparation,
 	type VectorPreparationEvent,
@@ -47,8 +47,7 @@ import {
  * part of a file. Words: an FTS5 table of the sections, ranked by BM25.
  * Meaning (`meaning.ts`): a vector per section, kept current in the
  * background (`vector-preparation.ts`), never during a search. The tables
- * are the store's (`search-store.ts`): this module is the refresh and the
- * query. A search fuses both lists by file with reciprocal rank fusion.
+ * are the `search-index` mechanism's. A search fuses both lists by file.
  * A file found by meaning alone must pass the model's floor
  * (`KnowledgeMeaning.floor`): a query no file matches finds nothing.
  * Without Ollama, or before the first vectors, it finds by words only.
@@ -414,7 +413,8 @@ export function createKnowledgeSearch(
 							content = read?.text ?? "";
 							title = describeFile(f.path, { text: content }).title;
 						}
-						const sections = await splitSections(f.path, content);
+						const split = await splitSections(f.path, content);
+						const sections = indexedSections(f.path, title, split);
 						return { file: f, row, same: false, sha256, title, sections };
 					}),
 			);

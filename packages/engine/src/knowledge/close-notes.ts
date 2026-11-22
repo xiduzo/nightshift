@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { now } from "@nightshift/time";
+import type { SearchStore } from "../search-index";
 import type { KnowledgeMeaning } from "./meaning";
-import type { SearchStore } from "./search-store";
 import { RETRY_MS } from "./vector-preparation";
 
 /**
