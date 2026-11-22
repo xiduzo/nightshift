@@ -1,14 +1,14 @@
 import { PAGE_READER_DEFAULTS } from "@nightshift/flows";
-import type { AddressRules } from "../../web-access";
-import { type Fetched, fetchGuarded } from "./fetch";
-import { nameOfAddress } from "./local";
+import type { AddressRules } from "../../../../web-access";
+import type { PageReader } from "../../application/ports";
 import {
 	absoluteLink,
 	linksOfMarkdown,
-	type PageReader,
+	nameOfAddress,
 	READER_USER_AGENT,
 	readOrUnchanged,
-} from "./reader";
+} from "../../domain/page-read";
+import { type Fetched, fetchGuarded } from "./fetch-guarded";
 
 /**
  * Firecrawl as a page reader (ADR 39), on its v2 API, the current one:

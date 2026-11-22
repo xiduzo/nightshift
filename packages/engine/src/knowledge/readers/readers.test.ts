@@ -12,11 +12,11 @@ import { join } from "node:path";
 import type { PageReaderSetting } from "@nightshift/flows";
 import { kitCommand } from "@nightshift/flows/testing";
 import { tinyPdf } from "../../testing/documents";
-import { firecrawlReader } from "./firecrawl";
-import { jinaReader } from "./jina";
-import { localReader } from "./local";
-import type { PageRead } from "./reader";
-import { createPageReaders } from "./service";
+import { firecrawlReader } from "./adapters/out/firecrawl-page-reader";
+import { jinaReader } from "./adapters/out/jina-page-reader";
+import { localReader } from "./adapters/out/local-page-reader";
+import type { PageRead } from "./domain/page-read";
+import { createPageReaders } from "./test-support";
 
 /**
  * The page readers against a small site on this computer: `Bun.serve`

@@ -1,7 +1,8 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
-import type { ReadMark } from "./reader";
+import type { ReadMarks } from "../../application/ports";
+import type { KeptRead } from "../../domain/page-read";
 
 /**
  * What the last read of each page saw, per project, on this computer: the
@@ -38,21 +39,7 @@ const entrySchema = z.object({
 
 const fileSchema = z.record(z.string(), entrySchema);
 
-export type KeptRead = z.infer<typeof entrySchema>;
-
-export type ReadMarks = {
-	get(projectId: string, reader: string, url: string): Promise<KeptRead | null>;
-	set(
-		projectId: string,
-		reader: string,
-		url: string,
-		kept: { mark: ReadMark; links: readonly string[] },
-	): Promise<void>;
-	/** Writes what waits now. */
-	flush(): Promise<void>;
-};
-
-export function createReadMarks(dataDir: string): ReadMarks {
+export function fsReadMarks(dataDir: string): ReadMarks {
 	const root = join(dataDir, "knowledge", ".reads");
 	const loaded = new Map<string, Map<string, KeptRead>>();
 	const dirty = new Set<string>();

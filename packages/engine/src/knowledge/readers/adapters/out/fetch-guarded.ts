@@ -1,5 +1,5 @@
-import { type AddressRules, checkHost } from "../../web-access";
-import { messageOf } from "./reader";
+import { type AddressRules, checkHost } from "../../../../web-access";
+import { messageOf } from "../../domain/page-read";
 
 /**
  * One request of a page reader, by the rule of every request of this

@@ -28,4 +28,3 @@
 #                             export (o)
 
 # (p) Verticals that must split, and their folders with no index.ts.
-packages/engine/src/knowledge/readers

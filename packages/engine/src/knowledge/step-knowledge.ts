@@ -23,7 +23,7 @@ import {
 	type KnowledgeView,
 } from "./files";
 import type { Learnings } from "./learnings";
-import type { PageReaders, ReaderSecret } from "./readers/service";
+import type { PageReaders, ReaderSecret } from "./readers";
 import type { KnowledgeSearch } from "./search";
 import type { KnowledgeReconciler } from "./sync";
 

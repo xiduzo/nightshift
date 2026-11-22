@@ -26,7 +26,7 @@ import {
 	parseQuestions,
 	questionKey,
 } from "./questions";
-import { createPageReaders } from "./readers/service";
+import { type PageReaders, wireReaders } from "./readers";
 import { reviewTasks } from "./review";
 import {
 	isMarkdown,
@@ -68,7 +68,7 @@ type KnowledgeParts = {
 	sync: KnowledgeSync;
 	reconciler: KnowledgeReconciler;
 	reader: KnowledgeReader;
-	readers: ReturnType<typeof createPageReaders>;
+	readers: PageReaders;
 	steps: ReturnType<typeof createStepKnowledge>;
 	/** What `connect` sets, and what `close` stops. */
 	late: { hosts: KnowledgeHosts | null; stopTimers(): void };
@@ -138,9 +138,16 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		markdown: { isMarkdown, headings: markdownHeadings },
 	});
 	const { folders, reader } = files;
-	const readers = createPageReaders({
+	const readers = wireReaders({
 		dataDir: deps.dataDir,
-		setting: async (projectId) => (await documents.open(projectId)).reader(),
+		settings: {
+			setting: async (projectId) => (await documents.open(projectId)).reader(),
+			async choose(projectId, setting) {
+				const document = await documents.open(projectId);
+				await document.setReader(setting);
+				return document.reader();
+			},
+		},
 		rules: () => ({ privateNetwork: deps.privateNetwork?.() ?? true }),
 		...(deps.secret ? { secret: deps.secret } : {}),
 	});
@@ -297,15 +304,8 @@ function searchMembers(
 function readerMembers(
 	parts: KnowledgeParts,
 ): Pick<Knowledge, "look" | "setReader"> {
-	const { documents, readers } = parts;
-	return {
-		look: readers.look,
-		async setReader(projectId, setting) {
-			const document = await documents.open(projectId);
-			await document.setReader(setting);
-			return document.reader();
-		},
-	};
+	const { readers } = parts;
+	return { look: readers.look, setReader: readers.choose };
 }
 
 /** The learnings: what waits for a person, and what a person or a run adds. */

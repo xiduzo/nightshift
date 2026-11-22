@@ -13,8 +13,7 @@ import type {
 } from "./learnings";
 import type { KnowledgeMap } from "./map";
 import type { KnowledgeQuestion } from "./questions";
-import type { LinkLook } from "./readers/look";
-import type { ReaderSecret } from "./readers/service";
+import type { LinkLook, ReaderSecret } from "./readers";
 import type { ReviewTask } from "./review";
 import type {
 	KnowledgeEvaluation,

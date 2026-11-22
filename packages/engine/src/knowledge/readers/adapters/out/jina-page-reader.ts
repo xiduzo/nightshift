@@ -1,12 +1,12 @@
-import type { AddressRules } from "../../web-access";
-import { fetchGuarded } from "./fetch";
-import { nameOfAddress } from "./local";
+import type { AddressRules } from "../../../../web-access";
+import type { PageReader } from "../../application/ports";
 import {
 	linksOfMarkdown,
-	type PageReader,
+	nameOfAddress,
 	READER_USER_AGENT,
 	readOrUnchanged,
-} from "./reader";
+} from "../../domain/page-read";
+import { fetchGuarded } from "./fetch-guarded";
 
 /**
  * Jina Reader as a page reader (ADR 39): `GET <address><url>`, at

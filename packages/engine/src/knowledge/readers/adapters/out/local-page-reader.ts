@@ -3,19 +3,21 @@ import {
 	LOCAL_ONLY_BYTES,
 	loadDocumentContent,
 	textOf,
-} from "../../file-loaders";
-import type { AddressRules } from "../../web-access";
-import { feedPage } from "./feed";
-import { type Fetched, fetchGuarded } from "./fetch";
+} from "../../../../file-loaders";
+import type { AddressRules } from "../../../../web-access";
+import type { PageReader } from "../../application/ports";
 import {
 	absoluteLink,
 	fingerprintOf,
+	type Looked,
 	messageOf,
-	type NotRead,
-	type PageReader,
+	nameOfAddress,
 	READER_USER_AGENT,
 	type ReadMark,
-} from "./reader";
+	type Seen,
+} from "../../domain/page-read";
+import { feedPage } from "./feed-page";
+import { type Fetched, fetchGuarded } from "./fetch-guarded";
 
 /**
  * Night Shift's own page reader: it reads on this computer, with no account
@@ -48,46 +50,6 @@ const SIGNIN_ADDRESS =
 const ACCEPT =
 	"text/html,application/xhtml+xml,application/rss+xml,application/atom+xml,application/feed+json,application/xml;q=0.9,application/pdf,text/plain;q=0.8,*/*;q=0.5";
 
-/** What the page is, as the reader saw it: one fetch, looked at once. */
-export type Seen =
-	| {
-			kind: "html";
-			title: string;
-			markdown: string;
-			links: string[];
-			/** The feeds the page names (`<link rel="alternate">`). */
-			feeds: string[];
-			/** The page is a video or audio player (`og:video`, `og:audio`, `og:type`). */
-			media: boolean;
-			words: number;
-	  }
-	| {
-			kind: "feed";
-			title: string;
-			markdown: string;
-			links: string[];
-			dates: number[];
-			items: number;
-	  }
-	| {
-			kind: "file";
-			type: "pdf" | "word" | "text";
-			title: string;
-			markdown: string;
-	  }
-	| NotRead;
-
-/** A fetch, as what it is and the headers that mark it. */
-export type Looked = {
-	/** Null: the server said the page did not change since `before` (304). */
-	seen: Seen | null;
-	contentType: string;
-	/** Where the page came from, after redirects. */
-	url: string;
-	etag?: string;
-	lastModified?: string;
-};
-
 /** The media type of an answer, lower case, without its parameters. */
 function mediaType(headers: Headers): string {
 	return (
@@ -107,17 +69,6 @@ function decode(body: Uint8Array, headers: Headers): string {
 		).decode(body);
 	} catch {
 		return new TextDecoder("utf-8").decode(body);
-	}
-}
-
-/** The last part of an address's path, for a title when the page gives none. */
-export function nameOfAddress(address: string): string {
-	try {
-		const url = new URL(address);
-		const last = url.pathname.split("/").filter(Boolean).at(-1);
-		return last ? decodeURIComponent(last) : url.hostname;
-	} catch {
-		return address;
 	}
 }
 
@@ -212,7 +163,7 @@ async function seeDocument(
 }
 
 /** What one answer is, as a page, a feed, a file or why it is none. */
-export async function see(
+async function see(
 	fetched: Extract<Fetched, { kind: "response" }>,
 ): Promise<Seen> {
 	const { status, headers, url, body, cut } = fetched;

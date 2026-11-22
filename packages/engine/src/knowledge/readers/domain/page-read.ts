@@ -1,11 +1,9 @@
 import { createHash } from "node:crypto";
 
 /**
- * The page reader port (ADR 39): one web page as Markdown, read by the
- * reader a person chose for the project. Night Shift's own reader works on
- * this computer (`local.ts`). Jina Reader (`jina.ts`) and Firecrawl
- * (`firecrawl.ts`) are services, at their cloud address or a self-hosted
- * one. Any later reader is one more adapter of this type.
+ * What a read of a web page gives (ADR 39), whichever reader read it: the
+ * page as Markdown, that it did not change, or why it was not read. The
+ * port is `PageReader` (`application/ports.ts`).
  */
 
 /** What the last read of a page saw: what a later read compares with. */
@@ -15,6 +13,9 @@ export type ReadMark = {
 	/** A hash of the Markdown the read gave. */
 	fingerprint: string;
 };
+
+/** What this computer keeps of the last read of a page: its mark, and its links, so a crawl that finds it unchanged still follows them. */
+export type KeptRead = { mark: ReadMark; links: string[] };
 
 /** Why a page was not read, in the words a person sees. */
 export type NotRead = {
@@ -37,18 +38,44 @@ export type PageRead =
 	| { status: "unchanged"; mark: ReadMark }
 	| NotRead;
 
-export type PageReader = {
-	kind: "nightshift" | "jina" | "firecrawl";
-	/** One page as Markdown. `before`: what the last read saw, for a check of change. */
-	read(
-		url: string,
-		options: { before?: ReadMark; signal?: AbortSignal },
-	): Promise<PageRead>;
-	/** The addresses of a site, for a reader that finds them itself (Firecrawl). */
-	map?(
-		start: string,
-		options: { limit: number; signal?: AbortSignal },
-	): Promise<string[]>;
+/** What the page is, as Night Shift's own reader saw it: one fetch, looked at once. */
+export type Seen =
+	| {
+			kind: "html";
+			title: string;
+			markdown: string;
+			links: string[];
+			/** The feeds the page names (`<link rel="alternate">`). */
+			feeds: string[];
+			/** The page is a video or audio player (`og:video`, `og:audio`, `og:type`). */
+			media: boolean;
+			words: number;
+	  }
+	| {
+			kind: "feed";
+			title: string;
+			markdown: string;
+			links: string[];
+			dates: number[];
+			items: number;
+	  }
+	| {
+			kind: "file";
+			type: "pdf" | "word" | "text";
+			title: string;
+			markdown: string;
+	  }
+	| NotRead;
+
+/** A fetch, as what it is and the headers that mark it. */
+export type Looked = {
+	/** Null: the server said the page did not change since `before` (304). */
+	seen: Seen | null;
+	contentType: string;
+	/** Where the page came from, after redirects. */
+	url: string;
+	etag?: string;
+	lastModified?: string;
 };
 
 /** The User-Agent of every request a reader of this computer sends: it names the product, never the person. */
@@ -105,4 +132,15 @@ export function absoluteLink(href: string, base?: string): string | null {
 /** The message of an error, for a reason a person reads. */
 export function messageOf(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
+}
+
+/** The last part of an address's path, for a title when the page gives none. */
+export function nameOfAddress(address: string): string {
+	try {
+		const url = new URL(address);
+		const last = url.pathname.split("/").filter(Boolean).at(-1);
+		return last ? decodeURIComponent(last) : url.hostname;
+	} catch {
+		return address;
+	}
 }
