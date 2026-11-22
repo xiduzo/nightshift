@@ -1,9 +1,11 @@
 /**
  * The session brief: what an agent is told about the project's knowledge,
- * in one module. `brief.test.ts` shows the result on each harness.
+ * in one module. `harnesses/knowledge-brief.test.ts` shows the result on
+ * each harness.
  *
- * A step gets it from `knowledgeBrief`, as a `SessionContribution` that the
- * Device folds like any other. The text the others read:
+ * A step gets it from `knowledgeBrief`, as a `SessionContribution` of the
+ * `port` that the Device folds like any other. This file declares the
+ * shape it gives, and names no type of the `port`. The text the others read:
  * - `tools.ts`: the tools' names, descriptions and fields. It keeps what the
  *   tools answer at a call, next to the code that decides that answer.
  * - the engine's `knowledge/files/domain/index-text.ts`: the first line of `INDEX.md`. It keeps
@@ -20,7 +22,6 @@
  *   sit with the field, its limit and its parse, in `session/step-report.ts`.
  */
 import { KNOWLEDGE_INDEX_FILE } from "@nightshift/flows";
-import type { BridgedTool, SessionContribution } from "../port";
 
 /** The names of the knowledge tools. */
 export const KNOWLEDGE_TOOLS = {
@@ -114,13 +115,14 @@ export function knowledgeEnv(folder: string): Record<string, string> {
 /**
  * What an agent gets when it reads the knowledge in `folder`: the folder, one
  * line that says where it is, the tools with what they are for, and the
- * `learnings` of its report when `learnings` is on.
+ * `learnings` of its report when `learnings` is on. `Tool`: the tools as the
+ * session takes them (`asBridgedTools` of `tools` makes them).
  */
-export function knowledgeBrief(input: {
+export function knowledgeBrief<Tool>(input: {
 	folder: string;
-	tools: readonly BridgedTool[];
+	tools: readonly Tool[];
 	learnings: boolean;
-}) {
+}): KnowledgeBrief<Tool> {
 	const { folder, tools, learnings } = input;
 	return {
 		env: knowledgeEnv(folder),
@@ -129,5 +131,15 @@ export function knowledgeBrief(input: {
 		tools,
 		toolsInstruction: KNOWLEDGE_TOOLS_INSTRUCTION,
 		...(learnings ? { report: { learnings: true } } : {}),
-	} satisfies SessionContribution;
+	};
 }
+
+/** What the brief gives a session: a `SessionContribution` of the `port`. */
+export type KnowledgeBrief<Tool> = {
+	env: Record<string, string>;
+	addDirs: string[];
+	instructions: string;
+	tools: readonly Tool[];
+	toolsInstruction: string;
+	report?: { learnings: true };
+};

@@ -6,7 +6,6 @@
 agents/assistant
 agents/decider
 agents/harnesses
-agents/knowledge
 auth/spaces
 devices/host
 devices/membership

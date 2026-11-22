@@ -2,9 +2,10 @@
  * The tools a session gets beyond the harness's own: MCP servers (the
  * client, and the Connections page's test) and CLI tools (programs on this
  * computer, with their help). The knowledge tools have their own entry,
- * `./knowledge`.
+ * `./knowledge`: `asBridgedTools` makes its specs the tools a session takes.
  */
 
+export { asBridgedTools } from "./bridged-tools";
 export {
 	type CliToolCheck,
 	checkCli,

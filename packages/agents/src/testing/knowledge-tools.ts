@@ -1,4 +1,5 @@
 import { knowledgeBrief, knowledgeTools } from "../knowledge";
+import { asBridgedTools } from "../tools";
 
 /**
  * The knowledge tools of an Agent step over a fake index: one file,
@@ -9,22 +10,24 @@ export function fakeKnowledgeTools() {
 	const { tools, toolsInstruction } = knowledgeBrief({
 		folder: "/data/knowledge/p1",
 		learnings: false,
-		tools: knowledgeTools(
-			{
-				searchKnowledge: async () => [
-					{
-						path: "wiki/deploy.md",
-						title: "Deploy",
-						snippet: [
-							{ text: "We ", match: false },
-							{ text: "deploy", match: true },
-							{ text: " at night.", match: false },
-						],
-					},
-				],
-				readKnowledge: async () => null,
-			},
-			{ project: { id: "p1" } },
+		tools: asBridgedTools(
+			knowledgeTools(
+				{
+					searchKnowledge: async () => [
+						{
+							path: "wiki/deploy.md",
+							title: "Deploy",
+							snippet: [
+								{ text: "We ", match: false },
+								{ text: "deploy", match: true },
+								{ text: " at night.", match: false },
+							],
+						},
+					],
+					readKnowledge: async () => null,
+				},
+				{ project: { id: "p1" } },
+			),
 		),
 	});
 	return { tools, toolsInstruction };

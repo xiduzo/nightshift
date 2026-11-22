@@ -9,14 +9,12 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-	ACP_AGENTS,
-	acpAgentHarness,
-	acpHarness,
-} from "../harnesses/acp/harness";
-import { claudeCodeHarness } from "../harnesses/claude-code/harness";
-import { codexHarness } from "../harnesses/codex/harness";
-import { grokBuildHarness } from "../harnesses/grok-build/harness";
-import { opencodeHarness } from "../harnesses/opencode/harness";
+	KNOWLEDGE_INDEX_INTRO,
+	KNOWLEDGE_TERMINAL_INSTRUCTION,
+	knowledgeBrief,
+	knowledgeEnv,
+	knowledgeTools,
+} from "../knowledge";
 import {
 	type AgentHarness,
 	type AgentSessionInput,
@@ -26,13 +24,12 @@ import {
 import { LEARNINGS_RULE, reportRules } from "../session/step-report";
 import { reportInputSchema } from "../session/step-report-tool";
 import { fakeBin } from "../testing/fixtures/bin";
-import {
-	KNOWLEDGE_INDEX_INTRO,
-	KNOWLEDGE_TERMINAL_INSTRUCTION,
-	knowledgeBrief,
-	knowledgeEnv,
-} from "./brief";
-import { knowledgeTools } from "./tools";
+import { asBridgedTools } from "../tools";
+import { ACP_AGENTS, acpAgentHarness, acpHarness } from "./acp/harness";
+import { claudeCodeHarness } from "./claude-code/harness";
+import { codexHarness } from "./codex/harness";
+import { grokBuildHarness } from "./grok-build/harness";
+import { opencodeHarness } from "./opencode/harness";
 
 const FOLDER = "/data/knowledge/p1";
 
@@ -52,9 +49,11 @@ afterEach(async () => {
 });
 
 const tools = () =>
-	knowledgeTools(
-		{ searchKnowledge: async () => [], readKnowledge: async () => null },
-		{ project: { id: "p1" } },
+	asBridgedTools(
+		knowledgeTools(
+			{ searchKnowledge: async () => [], readKnowledge: async () => null },
+			{ project: { id: "p1" } },
+		),
 	);
 
 /** A step of a run with its knowledge on, as the local Device starts it. */

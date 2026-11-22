@@ -6,6 +6,7 @@ import type { AnyTextAdapter, TextOptions } from "@tanstack/ai";
 import type { SandboxProvider } from "@tanstack/ai-sandbox";
 import { knowledgeTools } from "../knowledge";
 import type { AgentEvent, AgentSessionInput } from "../port/types";
+import { asBridgedTools } from "../tools";
 import {
 	type AdapterSetup,
 	type HarnessSpec,
@@ -156,9 +157,11 @@ describe("sessionReport", () => {
 });
 
 describe("sessionReport: Night Shift's own tools", () => {
-	const tools = knowledgeTools(
-		{ searchKnowledge: async () => [], readKnowledge: async () => null },
-		{ project: { id: "p1" } },
+	const tools = asBridgedTools(
+		knowledgeTools(
+			{ searchKnowledge: async () => [], readKnowledge: async () => null },
+			{ project: { id: "p1" } },
+		),
 	);
 	const toolsInstruction = "Call search_knowledge.";
 	const byMode = spec({

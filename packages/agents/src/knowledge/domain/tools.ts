@@ -10,9 +10,11 @@
  * - an Agent step whose knowledge is on: the tools work in the run's
  *   project only, over this Device's own index, bridged into the session
  *   like `report_step`.
+ *
+ * This file gives each tool as a spec: its name, description, fields and
+ * what it answers. `asBridgedTools` of the `tools` mechanism makes them
+ * the tools a session takes.
  */
-import { toolDefinition } from "@tanstack/ai";
-import type { BridgedTool } from "../port";
 import {
 	KNOWLEDGE_TOOLS,
 	kilobytes,
@@ -119,6 +121,15 @@ type KnowledgeScope =
 
 type ToolFields = Record<string, { type: string; description: string }>;
 
+/** One knowledge tool: what `asBridgedTools` of the `tools` mechanism takes. */
+export type KnowledgeToolSpec = {
+	name: string;
+	description: string;
+	inputSchema: { type: "object"; properties: ToolFields; required: string[] };
+	/** The answer to one call. It throws when the call gives no valid field. */
+	server(args: unknown): Promise<string>;
+};
+
 /** The spot a `read_knowledge` call names, from its `section`, `line` and `page`. Undefined: none. */
 function spotOf(args: unknown): KnowledgeReadFrom | undefined {
 	const section = field(args, "section");
@@ -183,7 +194,7 @@ export function knowledgeTools(
 	port: KnowledgePort,
 	scope: KnowledgeScope,
 	options: { onUse?: (projectId: string, use: KnowledgeUse) => void } = {},
-): BridgedTool[] {
+): KnowledgeToolSpec[] {
 	const used = (projectId: string, use: KnowledgeUse) => {
 		try {
 			options.onUse?.(projectId, use);
@@ -198,7 +209,7 @@ export function knowledgeTools(
 	const withProject = (properties: ToolFields) =>
 		chooses ? { project: PROJECT_PROPERTY, ...properties } : properties;
 	return [
-		toolDefinition({
+		{
 			name: SEARCH_KNOWLEDGE_TOOL.name,
 			description: SEARCH_KNOWLEDGE_TOOL.description,
 			inputSchema: {
@@ -206,44 +217,47 @@ export function knowledgeTools(
 				properties: withProject(SEARCH_KNOWLEDGE_TOOL.properties),
 				required: SEARCH_KNOWLEDGE_TOOL.required,
 			},
-		}).server(async (args: unknown) => {
-			const query = field(args, "query");
-			if (typeof query !== "string" || query.trim() === "") {
-				throw new Error("Give the words to look for in `query`.");
-			}
-			const limit = field(args, "limit");
-			const count =
-				typeof limit === "number" && Number.isInteger(limit) && limit > 0
-					? Math.min(limit, SEARCH_MAX)
-					: SEARCH_DEFAULT;
-			const project = await projectOf(args);
-			const words = query.trim().slice(0, 1000);
-			const hits = await port.searchKnowledge(project.id, words, count);
-			used(project.id, {
-				kind: "search",
-				query: words,
-				hits: hits.map(useHit),
-			});
-			if (hits.length === 0) {
-				return `No file in ${knowledgeOf(project)} matches ${JSON.stringify(query.trim())}. Try other words, or fewer.`;
-			}
-			return JSON.stringify(
-				hits.map((hit) => ({
-					path: hit.path,
-					title: hit.title,
-					...(hit.section ? { section: hit.section } : {}),
-					...(hit.page ? { page: hit.page } : {}),
-					...(hit.line !== undefined && hit.line > 1 ? { line: hit.line } : {}),
-					...(hit.found?.length === 1 && hit.found[0] === "meaning"
-						? { foundBy: "meaning" }
-						: {}),
-					excerpt: excerpt(hit),
-				})),
-				null,
-				2,
-			);
-		}),
-		toolDefinition({
+			server: async (args: unknown) => {
+				const query = field(args, "query");
+				if (typeof query !== "string" || query.trim() === "") {
+					throw new Error("Give the words to look for in `query`.");
+				}
+				const limit = field(args, "limit");
+				const count =
+					typeof limit === "number" && Number.isInteger(limit) && limit > 0
+						? Math.min(limit, SEARCH_MAX)
+						: SEARCH_DEFAULT;
+				const project = await projectOf(args);
+				const words = query.trim().slice(0, 1000);
+				const hits = await port.searchKnowledge(project.id, words, count);
+				used(project.id, {
+					kind: "search",
+					query: words,
+					hits: hits.map(useHit),
+				});
+				if (hits.length === 0) {
+					return `No file in ${knowledgeOf(project)} matches ${JSON.stringify(query.trim())}. Try other words, or fewer.`;
+				}
+				return JSON.stringify(
+					hits.map((hit) => ({
+						path: hit.path,
+						title: hit.title,
+						...(hit.section ? { section: hit.section } : {}),
+						...(hit.page ? { page: hit.page } : {}),
+						...(hit.line !== undefined && hit.line > 1
+							? { line: hit.line }
+							: {}),
+						...(hit.found?.length === 1 && hit.found[0] === "meaning"
+							? { foundBy: "meaning" }
+							: {}),
+						excerpt: excerpt(hit),
+					})),
+					null,
+					2,
+				);
+			},
+		},
+		{
 			name: READ_KNOWLEDGE_TOOL.name,
 			description: READ_KNOWLEDGE_TOOL.description,
 			inputSchema: {
@@ -251,47 +265,48 @@ export function knowledgeTools(
 				properties: withProject(READ_KNOWLEDGE_TOOL.properties),
 				required: READ_KNOWLEDGE_TOOL.required,
 			},
-		}).server(async (args: unknown) => {
-			const path = field(args, "path");
-			if (typeof path !== "string" || path.trim() === "") {
-				throw new Error(
-					"Give the file's path in `path`, as search_knowledge gives it.",
+			server: async (args: unknown) => {
+				const path = field(args, "path");
+				if (typeof path !== "string" || path.trim() === "") {
+					throw new Error(
+						"Give the file's path in `path`, as search_knowledge gives it.",
+					);
+				}
+				const project = await projectOf(args);
+				const from = spotOf(args);
+				const file = await port.readKnowledge(
+					project.id,
+					path.trim(),
+					READ_BYTES,
+					from,
 				);
-			}
-			const project = await projectOf(args);
-			const from = spotOf(args);
-			const file = await port.readKnowledge(
-				project.id,
-				path.trim(),
-				READ_BYTES,
-				from,
-			);
-			used(project.id, {
-				kind: "read",
-				path: file?.path ?? path.trim(),
-				found: file !== null,
-				...(from ? { from } : {}),
-			});
-			if (!file) {
-				const where = knowledgeOf(project);
-				return `${where.charAt(0).toUpperCase()}${where.slice(1)} has no file "${path.trim()}". Call ${KNOWLEDGE_TOOLS.searchKnowledge} for the paths.`;
-			}
-			const where = file.from
-				? file.truncated
-					? ` This is ${kilobytes(READ_BYTES)} from ${spotLine(file.from)}.`
-					: ` This is the text from ${spotLine(file.from)} on.`
-				: file.truncated
-					? ` This is its first ${kilobytes(READ_BYTES)}.`
-					: "";
-			const missed =
-				from && !file.from
-					? ` It has no ${from.section ? `section "${from.section}"` : "such page or line"}: this is its start.`
-					: "";
-			const head =
-				file.truncated || file.from || missed
-					? `${file.path}: ${file.title}. The file is ${kilobytes(file.size)}.${where}${missed}`
-					: `${file.path}: ${file.title}`;
-			return `${head}\n\n${file.text}`;
-		}),
+				used(project.id, {
+					kind: "read",
+					path: file?.path ?? path.trim(),
+					found: file !== null,
+					...(from ? { from } : {}),
+				});
+				if (!file) {
+					const where = knowledgeOf(project);
+					return `${where.charAt(0).toUpperCase()}${where.slice(1)} has no file "${path.trim()}". Call ${KNOWLEDGE_TOOLS.searchKnowledge} for the paths.`;
+				}
+				const where = file.from
+					? file.truncated
+						? ` This is ${kilobytes(READ_BYTES)} from ${spotLine(file.from)}.`
+						: ` This is the text from ${spotLine(file.from)} on.`
+					: file.truncated
+						? ` This is its first ${kilobytes(READ_BYTES)}.`
+						: "";
+				const missed =
+					from && !file.from
+						? ` It has no ${from.section ? `section "${from.section}"` : "such page or line"}: this is its start.`
+						: "";
+				const head =
+					file.truncated || file.from || missed
+						? `${file.path}: ${file.title}. The file is ${kilobytes(file.size)}.${where}${missed}`
+						: `${file.path}: ${file.title}`;
+				return `${head}\n\n${file.text}`;
+			},
+		},
 	];
 }

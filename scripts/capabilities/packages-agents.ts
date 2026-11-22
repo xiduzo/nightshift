@@ -21,7 +21,8 @@ export const PACKAGE_AGENTS: Record<string, Place> = {
 	// One harness session behind every adapter: the sandbox, the stream,
 	// the tool bridge. It runs a session and decides nothing about agents.
 	session: M,
-	// The MCP client and the help of a CLI program. The definitions of
+	// The MCP client, the help of a CLI program, and a tool spec as a tool
+	// a session takes (`asBridgedTools`). The definitions of
 	// the tools are `settings` (the Device document of the engine).
 	tools: M,
 };

@@ -5,6 +5,7 @@ import {
 	knowledgeEnv,
 	knowledgeTools,
 } from "@nightshift/agents/knowledge";
+import { asBridgedTools } from "@nightshift/agents/tools";
 import type { AgentEvent } from "@nightshift/agents/types";
 import { knowledgeFolderPath } from "@nightshift/flows";
 import type {
@@ -119,7 +120,9 @@ export function createStepKnowledge(deps: {
 				return reader.read(id, clean, maxBytes, from);
 			},
 		};
-		return knowledgeTools(port, { project: { id: projectId } }, { onUse });
+		return asBridgedTools(
+			knowledgeTools(port, { project: { id: projectId } }, { onUse }),
+		);
 	}
 
 	/** The index catches up with the folder from now on, not at the first search. */
