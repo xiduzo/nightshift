@@ -74,9 +74,8 @@ imports packages/engine device device-config
 imports packages/engine device projects
 # The walk reads the capabilities itself (decision 9: `graph` is a
 # mechanism).
-# Ollama reads its setting and gives the knowledge its meaning model.
+# Ollama reads its setting.
 imports packages/engine ollama device-config
-imports packages/engine ollama knowledge
 
 # --- V5: a capability vertical that imports more than 5 other capability
 # verticals of its workspace. The count only goes down.

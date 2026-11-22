@@ -4,6 +4,7 @@ import {
 	createOllama,
 	createRunLearnings,
 	createSpaceArchive,
+	measuredMeaning,
 	transcriptLines,
 } from "@nightshift/engine";
 import {
@@ -98,7 +99,7 @@ export async function wireDaemonKnowledge(deps: {
 				folderLocks,
 				device: deps.device,
 				usage: deps.usage,
-				meaning: () => ollama.meaning(),
+				meaning: () => measuredMeaning(ollama.meaning()),
 				// The page readers reach this computer's network as a Web request
 				// does, and take their key from this computer's secrets for a look.
 				privateNetwork: () => reachesPrivateNetwork(settings.current()),

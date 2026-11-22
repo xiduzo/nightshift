@@ -8,8 +8,7 @@ import { fsKnowledgeFolders as createKnowledgeFolders } from "./files";
 import {
 	type KnowledgeMeaning,
 	type KnowledgeMeaningReady,
-	ollamaMeaning,
-	PacedEmbeddings,
+	measuredMeaning,
 } from "./meaning";
 import {
 	createKnowledgeSearch,
@@ -408,32 +407,23 @@ describe("the floor of a model", () => {
 	});
 
 	test("qwen3-embedding has its floor, a model without one has none", () => {
-		const at = { address: "http://127.0.0.1:1" };
-		expect(
-			ollamaMeaning({ ...at, model: "qwen3-embedding:0.6b" }).closeAt,
-		).toBe(0.6);
-		expect(
-			ollamaMeaning({ ...at, model: "some-other-model" }).closeAt,
-		).toBeUndefined();
-		expect(
-			ollamaMeaning({ ...at, model: "qwen3-embedding:0.6b" }).closeNotesAt,
-		).toBe(0.78);
-		expect(
-			ollamaMeaning({ ...at, model: "some-other-model" }).closeNotesAt,
-		).toBeUndefined();
-		expect(ollamaMeaning({ ...at, model: "qwen3-embedding:0.6b" }).floor).toBe(
-			0.5,
-		);
+		const measured = (model: string) =>
+			measuredMeaning({
+				model,
+				embeddings,
+				ready: async () => "ready",
+			}) as KnowledgeMeaning;
+		expect(measured("qwen3-embedding:0.6b").closeAt).toBe(0.6);
+		expect(measured("some-other-model").closeAt).toBeUndefined();
+		expect(measured("qwen3-embedding:0.6b").closeNotesAt).toBe(0.78);
+		expect(measured("some-other-model").closeNotesAt).toBeUndefined();
+		expect(measured("qwen3-embedding:0.6b").floor).toBe(0.5);
 		// Another size of the model reads its instruction, but its scale was not measured.
-		const other = ollamaMeaning({ ...at, model: "qwen3-embedding:4b" });
+		const other = measured("qwen3-embedding:4b");
 		expect(other.floor).toBeUndefined();
 		expect(other.query("Why?")).toEndWith("Query:Why?");
-		expect(
-			ollamaMeaning({ ...at, model: "some-other-model" }).query("Why?"),
-		).toBe("Why?");
-		expect(
-			ollamaMeaning({ ...at, model: "some-other-model" }).floor,
-		).toBeUndefined();
+		expect(measured("some-other-model").query("Why?")).toBe("Why?");
+		expect(measured("some-other-model").floor).toBeUndefined();
 	});
 });
 
@@ -453,68 +443,4 @@ describe("reciprocal rank fusion", () => {
 		expect(fuseRanks([["a"], ["b"]]).map((f) => f.key)).toEqual(["a", "b"]);
 		expect(fuseRanks([[], []])).toEqual([]);
 	});
-});
-
-describe("Ollama", () => {
-	test("that does not answer makes search by meaning say so, without a throw", async () => {
-		const meaning = ollamaMeaning({
-			model: "qwen3-embedding:0.6b",
-			address: "http://127.0.0.1:1",
-		});
-		expect(await meaning.ready()).toBe("no-ollama");
-		expect(meaning.where).toBeNull();
-	});
-});
-
-describe("paced embeddings", () => {
-	test("send a preparation in requests of about the pace, learned from the last one", async () => {
-		let clock = 0;
-		const sizes: number[] = [];
-		const inner = new SynonymEmbeddings();
-		const slow = Object.assign(Object.create(inner), {
-			async embedDocuments(texts: string[]) {
-				sizes.push(texts.length);
-				clock += texts.length * 500; // 500 ms a section
-				return inner.embedDocuments(texts);
-			},
-		}) as SynonymEmbeddings;
-		const paced = new PacedEmbeddings(slow, 1_500, () => clock);
-		const texts = Array.from({ length: 20 }, (_, i) => `car ${i}`);
-		const vectors = await paced.embedDocuments(texts);
-		expect(vectors).toHaveLength(20);
-		expect(vectors[0]).toEqual(inner.vector("car 0"));
-		// Four first, then three a request: 3 × 500 ms is the pace.
-		expect(sizes).toEqual([4, 3, 3, 3, 3, 3, 1]);
-	});
-});
-
-test("paced embeddings let a query go before the next request", async () => {
-	const order: string[] = [];
-	let answerQuery!: () => void;
-	const inner = new SynonymEmbeddings();
-	const held = Object.assign(Object.create(inner), {
-		async embedDocuments(texts: string[]) {
-			order.push(`docs ${texts.length}`);
-			await Bun.sleep(5);
-			return inner.embedDocuments(texts);
-		},
-		embedQuery(text: string) {
-			order.push("query");
-			return new Promise<number[]>((resolve) => {
-				answerQuery = () => {
-					order.push("answer");
-					resolve(inner.vector(text));
-				};
-			});
-		},
-	}) as SynonymEmbeddings;
-	const paced = new PacedEmbeddings(held, 1_000_000);
-	const preparing = paced.embedDocuments(["a", "b", "c", "d", "e"]);
-	const query = paced.embedQuery("car");
-	await Bun.sleep(20);
-	expect(order).toEqual(["docs 4", "query"]);
-	answerQuery();
-	await query;
-	await preparing;
-	expect(order).toEqual(["docs 4", "query", "answer", "docs 1"]);
 });

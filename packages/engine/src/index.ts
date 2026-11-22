@@ -167,6 +167,7 @@ export {
 	type KnowledgeText,
 	type KnowledgeUseReport,
 	type LinkLook,
+	measuredMeaning,
 	type WaitingLearning,
 } from "./knowledge";
 export type {

@@ -10,6 +10,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { ollamaEmbedder } from "../ollama/embedder";
 import {
 	ALMOST_THE_SAME_NOTES,
 	DISAGREEING_NOTES,
@@ -17,11 +18,13 @@ import {
 	RELATED_NOTES,
 	SAME_NOTES,
 } from "../testing/fixtures/close-notes";
-import { ollamaMeaning } from "./meaning";
+import { type KnowledgeMeaning, measuredMeaning } from "./meaning";
 
 const model = process.env.OLLAMA_LIVE_MODEL ?? "";
 const address = process.env.OLLAMA_LIVE_ADDRESS ?? "http://127.0.0.1:11434";
-const meaning = ollamaMeaning({ model, address });
+const meaning = measuredMeaning(
+	ollamaEmbedder({ model, address }),
+) as KnowledgeMeaning;
 const live = model !== "" && (await meaning.ready()) === "ready";
 
 const groups = {

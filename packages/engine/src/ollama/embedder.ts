@@ -1,0 +1,160 @@
+import {
+	Embeddings,
+	type EmbeddingsInterface,
+} from "@langchain/core/embeddings";
+import { OllamaEmbeddings } from "@langchain/ollama";
+import { now as timeNow } from "@nightshift/time";
+
+/**
+ * An embedding model on one Ollama: it turns a text into a vector. The
+ * knowledge search uses it for search by meaning, with the rules of its own
+ * that say how to ask the model and how close is close.
+ */
+
+/** Whether this computer can embed now. `downloading`: the model is on its way. */
+type EmbedderReady = "ready" | "no-ollama" | "no-model" | "downloading";
+
+/** An embedding model on an Ollama, as the knowledge search reads it. */
+export type OllamaEmbedder = {
+	/** The model's name. */
+	model: string;
+	/** LangChain embeddings for the model, paced (`PacedEmbeddings`). */
+	embeddings: EmbeddingsInterface;
+	/** Whether it can embed now. Never throws. */
+	ready(): Promise<EmbedderReady>;
+	/** Where the model runs: null on this computer, else the host name of its Ollama. */
+	where: string | null;
+	/** While it is `downloading`: how far the download is, in percent. */
+	downloaded(): number | null;
+};
+
+/**
+ * Ollama's context for the model. With its default of 32K tokens the model
+ * takes 4.8 GB of memory, with 2 048 about 1 GB. A section of 1 200
+ * characters is far below 2 048 tokens.
+ */
+const NUM_CTX = 2048;
+/** How long a check of Ollama waits for an answer. */
+const PROBE_TIMEOUT_MS = 2_000;
+/** How long the answer of a check holds before the next one. */
+const PROBE_TTL_MS = 15_000;
+/** How long one request of a preparation may hold Ollama, about. */
+const PACE_MS = 1_500;
+/** Sections in one request, at most: `index()` hands over its batch of 32. */
+const PACE_MAX = 32;
+
+/**
+ * Embeddings that send a preparation's sections in requests of about
+ * `PACE_MS` each, and learn how many sections that is. Ollama answers one
+ * request at a time: a batch of 32 sections holds it for minutes on a
+ * Host's CPU (about 4 s a section with qwen3-embedding:0.6b), and a query
+ * that waits behind it times out. A query goes first: the preparation
+ * sends its next request only once the queries have their answer. A LangChain `Embeddings`, so `index()` and the vector
+ * store take it as they take any other.
+ */
+export class PacedEmbeddings extends Embeddings {
+	/** Sections in the next request. */
+	private size = 4;
+	/** Queries on their way: a preparation sends nothing new until they are answered. */
+	private queries: Promise<unknown>[] = [];
+	constructor(
+		readonly inner: EmbeddingsInterface,
+		private readonly paceMs = PACE_MS,
+		private readonly now: () => number = timeNow,
+	) {
+		super({});
+	}
+	async embedDocuments(texts: string[]): Promise<number[][]> {
+		const out: number[][] = [];
+		for (let at = 0; at < texts.length; ) {
+			while (this.queries.length > 0) await Promise.allSettled(this.queries);
+			const part = texts.slice(at, at + this.size);
+			const started = this.now();
+			out.push(...(await this.inner.embedDocuments(part)));
+			at += part.length;
+			const each = Math.max(1, (this.now() - started) / part.length);
+			this.size = Math.max(
+				1,
+				Math.min(PACE_MAX, Math.floor(this.paceMs / each)),
+			);
+		}
+		return out;
+	}
+	embedQuery(text: string): Promise<number[]> {
+		const query = this.inner.embedQuery(text);
+		this.queries.push(query);
+		const done = () => {
+			this.queries = this.queries.filter((q) => q !== query);
+		};
+		query.then(done, done);
+		return query;
+	}
+}
+
+/**
+ * An embedding model through one Ollama. The Ollama vertical decides the
+ * model, the address and its headers, and makes a new one when they change
+ * (`createOllama().meaning()`).
+ */
+export function ollamaEmbedder(options: {
+	model: string;
+	/** Ollama's address, `http://127.0.0.1:11434`. */
+	address: string;
+	/** Sent with each request, for an Ollama behind a proxy. */
+	headers?: Record<string, string>;
+	/** Null on this computer, else the host name of the address. */
+	where?: string | null;
+	/** How far a download of the model is, in percent. Null: none runs. */
+	downloading?: () => number | null;
+	fetch?: typeof fetch;
+}): OllamaEmbedder {
+	const { model, address, headers, where = null, downloading } = options;
+	const ollama = new OllamaEmbeddings({
+		model,
+		baseUrl: address,
+		...(headers && Object.keys(headers).length > 0 ? { headers } : {}),
+		keepAlive: "10m",
+		requestOptions: { numCtx: NUM_CTX },
+		// A refused connection is not tried six times: the search goes on without it.
+		maxRetries: 1,
+		...(options.fetch ? { fetch: options.fetch } : {}),
+	});
+	const embeddings = new PacedEmbeddings(ollama);
+	let checked: { at: number; ready: EmbedderReady } | null = null;
+	async function check(): Promise<EmbedderReady> {
+		try {
+			const timeout = new Promise<never>((_, reject) => {
+				setTimeout(
+					() => reject(new Error("Ollama did not answer.")),
+					PROBE_TIMEOUT_MS,
+				).unref?.();
+			});
+			const { models } = await Promise.race([ollama.client.list(), timeout]);
+			const names = new Set(models.map((m) => m.name));
+			if (names.has(model) || names.has(`${model}:latest`)) return "ready";
+			return downloading?.() != null ? "downloading" : "no-model";
+		} catch {
+			return "no-ollama";
+		}
+	}
+	return {
+		model,
+		embeddings,
+		where,
+		downloaded: () => downloading?.() ?? null,
+		async ready() {
+			const now = timeNow();
+			// A download moves on: its state is not kept.
+			if (
+				checked &&
+				checked.ready !== "downloading" &&
+				now - checked.at < PROBE_TTL_MS
+			) {
+				return checked.ready;
+			}
+			const ready = await check();
+			checked = { at: timeNow(), ready };
+			return ready;
+		},
+	};
+}

@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { findProgram } from "@nightshift/agents/types";
 import { Ollama } from "ollama";
 import type { ConnectionStore, SettingsStore } from "../device-config";
-import { type KnowledgeMeaning, ollamaMeaning } from "../knowledge";
+import { type OllamaEmbedder, ollamaEmbedder } from "./embedder";
 import {
 	knowledgeModel,
 	OLLAMA_LOCAL,
@@ -205,16 +205,16 @@ export async function createOllama(deps: {
 	const offSecrets = secrets.onSecretsChange(reapply);
 	await apply();
 
-	/** The search's model for the endpoint and model now, made again when one changes. */
-	let made: { key: string; meaning: KnowledgeMeaning } | null = null;
+	/** The embedding model for the endpoint and model now, made again when one changes. */
+	let made: { key: string; meaning: OllamaEmbedder } | null = null;
 
 	return {
 		/** Where Ollama is now, with its headers: for Decision nodes and the API. */
 		endpoint(): OllamaEndpoint {
 			return endpoint;
 		},
-		/** Search by meaning now. Null: it is off. */
-		meaning(): KnowledgeMeaning | null {
+		/** The embedding model of search by meaning now. Null: it is off. */
+		meaning(): OllamaEmbedder | null {
 			if (settings.current().ollama === "off") return null;
 			const model = knowledgeModel(settings);
 			const key = JSON.stringify([
@@ -226,7 +226,7 @@ export async function createOllama(deps: {
 			if (made?.key !== key) {
 				made = {
 					key,
-					meaning: ollamaMeaning({
+					meaning: ollamaEmbedder({
 						model,
 						address: endpoint.address,
 						headers: endpoint.headers,

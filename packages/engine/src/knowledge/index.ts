@@ -15,7 +15,7 @@ export { createKnowledge } from "./knowledge";
 export type { Knowledge } from "./knowledge-door";
 export type { WaitingLearning } from "./learnings";
 export type { KnowledgeMap } from "./map";
-export { type KnowledgeMeaning, ollamaMeaning } from "./meaning";
+export { measuredMeaning } from "./meaning";
 export type { KnowledgeQuestion } from "./questions";
 export type { LinkLook } from "./readers/look";
 export { type AskLearner, createRunLearnings } from "./run-learnings";
