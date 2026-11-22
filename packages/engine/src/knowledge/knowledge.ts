@@ -5,7 +5,6 @@ import { NOT_TOPICS_FILE, QUESTION_SET_FILE } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { writeWhole } from "../archive";
 import { createRunLog, knowledgeUseEvent } from "../log";
-import { evaluateKnowledge } from "./evaluate";
 import {
 	isReadable,
 	type KnowledgeFolders,
@@ -29,7 +28,12 @@ import {
 } from "./questions";
 import { createPageReaders } from "./readers/service";
 import { reviewTasks } from "./review";
-import { createKnowledgeSearch } from "./search";
+import {
+	isMarkdown,
+	type KnowledgeSearch,
+	markdownHeadings,
+	wireSearch,
+} from "./search";
 import { knowledgeSources, type SourceRun, type SourcesSpace } from "./sources";
 import { createStepKnowledge } from "./step-knowledge";
 import {
@@ -59,7 +63,7 @@ type KnowledgeParts = {
 	deps: KnowledgeDeps;
 	folders: KnowledgeFolders;
 	documents: KnowledgeDocuments;
-	search: ReturnType<typeof createKnowledgeSearch>;
+	search: KnowledgeSearch;
 	learnings: ReturnType<typeof createLearnings>;
 	sync: KnowledgeSync;
 	reconciler: KnowledgeReconciler;
@@ -106,7 +110,9 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		...(deps.usage ? { usage: deps.usage } : {}),
 	});
 	const { documents, status, reconciler } = sync;
-	const search = createKnowledgeSearch(deps.dataDir, {
+	const search = wireSearch({
+		dataDir: deps.dataDir,
+		folders: { scan: (projectId) => folders.scan(projectId) },
 		...(deps.meaning ? { meaning: deps.meaning } : {}),
 		meaningOn: async (projectId) =>
 			(await documents.open(projectId)).meaningOn(),
@@ -129,6 +135,7 @@ export function createKnowledge(deps: KnowledgeDeps): Knowledge {
 		archive,
 		notes: learnings,
 		sync: reconciler,
+		markdown: { isMarkdown, headings: markdownHeadings },
 	});
 	const { folders, reader } = files;
 	const readers = createPageReaders({
@@ -281,11 +288,7 @@ function searchMembers(
 			return search.meaning(projectId);
 		},
 		async evaluate(projectId) {
-			return evaluateKnowledge(
-				search,
-				projectId,
-				await parts.questionSet(projectId),
-			);
+			return search.evaluate(projectId, await parts.questionSet(projectId));
 		},
 	};
 }

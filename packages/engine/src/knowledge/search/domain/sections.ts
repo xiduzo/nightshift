@@ -1,26 +1,17 @@
 import { createHash } from "node:crypto";
-import { extname } from "node:path";
-import { Document } from "@langchain/core/documents";
-import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
-import type { IndexedSection } from "../search-index";
 
 /**
  * The sections of a knowledge file: the parts that search finds, by
  * their words and by their meaning, so a hit points at a part of a file
  * and not at the whole of it.
  *
- * LangChain's `RecursiveCharacterTextSplitter` cuts the text. Markdown is
- * cut at its headings first (`## `, then `### ` and lower), then at code
- * fences, paragraphs and lines. Other text is cut at paragraphs and lines.
- * LangChain.js has no `MarkdownHeaderTextSplitter`, so the headings of a
- * section are the ones open at the line where it starts: the last heading
- * at or above that line, and the headings above it, one per level. A
- * section's place in its file is what the embedding model reads besides its
- * text: "Limits" alone says little, its heading path says whose.
- *
- * 1 200 characters with 150 of overlap: the vectors spike
- * (`docs/research/knowledge-vectors.md` §2.1) found fewer, larger sections
- * index two times faster and find more than sections of 600.
+ * A splitter (`SectionSplitter`) cuts the text. Markdown is cut at its
+ * headings first, then at code fences, paragraphs and lines. Other text is
+ * cut at paragraphs and lines. The headings of a section are the ones open
+ * at the line where it starts: the last heading at or above that line, and
+ * the headings above it, one per level. A section's place in its file is
+ * what the embedding model reads besides its text: "Limits" alone says
+ * little, its heading path says whose.
  */
 
 /** What a section knows of where it is in its file. */
@@ -37,7 +28,27 @@ export type SectionMetadata = {
 	page: number | null;
 };
 
+/** A section of a file as a splitter gives it: its text and its place. */
+export type SplitSection = { pageContent: string; metadata: SectionMetadata };
+
+/** A page of a PDF or Word file, as its loader gives it. */
+export type SectionPage = {
+	pageContent: string;
+	metadata: { title?: string; loc?: { pageNumber: number } };
+};
+
+/** A section as the search index keeps it: `id` is what its vector knows (`sectionId`). */
+type IndexedSection = {
+	id: string;
+	heading: string | null;
+	headingPath: string;
+	line: number;
+	page: number | null;
+	text: string;
+};
+
 const PATH_SEPARATOR = " › ";
+const MARKDOWN = new Set([".md", ".markdown", ".mdx"]);
 
 /**
  * What the embedding model reads of a section: the file's title, the headings
@@ -87,7 +98,7 @@ export function sectionId(
 export function indexedSections(
 	path: string,
 	title: string,
-	sections: readonly Document<SectionMetadata>[],
+	sections: readonly SplitSection[],
 ): IndexedSection[] {
 	return sections.map(({ pageContent: text, metadata }) => ({
 		id: sectionId(path, title, metadata.headingPath, text),
@@ -99,22 +110,16 @@ export function indexedSections(
 	}));
 }
 
-const CHUNK_SIZE = 1200;
-const CHUNK_OVERLAP = 150;
-const MARKDOWN = new Set([".md", ".markdown", ".mdx"]);
-
-const markdownSplitter = RecursiveCharacterTextSplitter.fromLanguage(
-	"markdown",
-	{ chunkSize: CHUNK_SIZE, chunkOverlap: CHUNK_OVERLAP },
-);
-const textSplitter = new RecursiveCharacterTextSplitter({
-	chunkSize: CHUNK_SIZE,
-	chunkOverlap: CHUNK_OVERLAP,
-});
+/** The extension of a path's file name, with its dot, as `node:path` gives it. */
+function extensionOf(path: string): string {
+	const name = path.split("/").at(-1) ?? path;
+	const dot = name.lastIndexOf(".");
+	return dot <= 0 || name === ".." ? "" : name.slice(dot);
+}
 
 /** Whether a path is a markdown file: the only files with headings. */
 export const isMarkdown = (path: string) =>
-	MARKDOWN.has(extname(path).toLowerCase());
+	MARKDOWN.has(extensionOf(path).toLowerCase());
 
 /** A heading of a markdown text. */
 type MarkdownHeading = {
@@ -162,7 +167,7 @@ export function markdownHeadings(text: string): MarkdownHeading[] {
 }
 
 /** For each line of a markdown text, from 0: the headings open there, the top one first. */
-function headingsByLine(text: string): string[][] {
+export function headingsByLine(text: string): string[][] {
 	const at = new Map(markdownHeadings(text).map((h) => [h.line, h]));
 	const open: MarkdownHeading[] = [];
 	let current: string[] = [];
@@ -178,61 +183,56 @@ function headingsByLine(text: string): string[][] {
 }
 
 /**
- * The sections of a file, in order, as LangChain documents: of its text,
- * or of the pages a document loader gave (`documents.ts`), each section on
- * one page. A file with no text gets one empty section, so its path and
- * title still find it.
+ * The texts a file's sections are cut from, with their page: the file's
+ * text, or each page a document loader gave. Lines end in `\n`. A page with
+ * no text is left out.
  */
-export async function splitSections(
-	path: string,
-	content: string | Document[],
-): Promise<Document<SectionMetadata>[]> {
-	const markdown = isMarkdown(path);
-	const pages = (
+export function pagesOf(
+	content: string | readonly SectionPage[],
+): { text: string; page: number | null }[] {
+	const pages: readonly SectionPage[] =
 		typeof content === "string"
-			? [new Document({ pageContent: content })]
-			: content
-	)
+			? [{ pageContent: content, metadata: {} }]
+			: content;
+	return pages
 		.map((doc) => ({
 			text: doc.pageContent.replace(/\r\n?/g, "\n"),
 			page:
 				typeof content === "string"
 					? null
-					: ((doc.metadata.loc as { pageNumber?: number } | undefined)
-							?.pageNumber ?? null),
+					: (doc.metadata.loc?.pageNumber ?? null),
 		}))
 		.filter((page) => page.text.trim() !== "");
-	if (pages.length === 0) {
-		return [
-			new Document({
-				pageContent: "",
-				metadata: { path, heading: null, headingPath: "", line: 1, page: null },
-			}),
-		];
-	}
-	const splitter = markdown ? markdownSplitter : textSplitter;
-	const out: Document<SectionMetadata>[] = [];
-	for (const { text, page } of pages) {
-		const headings = markdown ? headingsByLine(text) : [];
-		for (const piece of await splitter.createDocuments([text])) {
-			const loc = piece.metadata.loc as
-				| { lines?: { from?: number } }
-				| undefined;
-			const line = Math.max(1, loc?.lines?.from ?? 1);
-			const open = headings[line - 1] ?? [];
-			out.push(
-				new Document({
-					pageContent: piece.pageContent,
-					metadata: {
-						path,
-						heading: open.at(-1) ?? null,
-						headingPath: open.join(PATH_SEPARATOR),
-						line,
-						page,
-					},
-				}),
-			);
-		}
-	}
-	return out;
+}
+
+/** The one section of a file with no text, so its path and title still find it. */
+export function emptySection(path: string): SplitSection {
+	return {
+		pageContent: "",
+		metadata: { path, heading: null, headingPath: "", line: 1, page: null },
+	};
+}
+
+/**
+ * A section cut from a page at `line`, under the headings open there.
+ * `headings`: of each line of the page (`headingsByLine`), none for a text
+ * that is not markdown.
+ */
+export function placedSection(
+	path: string,
+	text: string,
+	at: { line: number; page: number | null },
+	headings: readonly string[][],
+): SplitSection {
+	const open = headings[at.line - 1] ?? [];
+	return {
+		pageContent: text,
+		metadata: {
+			path,
+			heading: open.at(-1) ?? null,
+			headingPath: open.join(PATH_SEPARATOR),
+			line: at.line,
+			page: at.page,
+		},
+	};
 }

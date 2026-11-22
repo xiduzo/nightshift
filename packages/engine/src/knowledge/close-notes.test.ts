@@ -5,7 +5,8 @@ import { project } from "@nightshift/db/schema";
 import { createSandbox, type Sandbox, waitFor } from "../testing";
 import { SynonymEmbeddings } from "../testing/embeddings";
 import { testKnowledge } from "../testing/knowledge";
-import type { KnowledgeMeaning, KnowledgeMeaningReady } from "./meaning";
+import type { KnowledgeMeaning } from "./search";
+import type { KnowledgeMeaningReady } from "./search/domain/meaning";
 
 /**
  * Which notes that wait are close to another, through the door's `learnings`,

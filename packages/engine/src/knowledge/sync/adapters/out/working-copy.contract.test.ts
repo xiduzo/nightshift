@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fsKnowledgeFolders } from "../../../files";
+import { fsKnowledgeFolders } from "../../../files/adapters/out/fs-knowledge-folders";
 import { fsWorkingCopy } from "./fs-working-copy";
 import { inMemoryWorkingCopy } from "./in-memory-working-copy";
 import { workingCopyContract } from "./working-copy.contract";

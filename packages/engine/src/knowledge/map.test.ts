@@ -9,7 +9,7 @@ import { createSandbox, type Sandbox, waitFor } from "../testing";
 import { SynonymEmbeddings } from "../testing/embeddings";
 import { testKnowledge } from "../testing/knowledge";
 import { knowledgeMapOf } from "./map";
-import type { KnowledgeMeaning } from "./meaning";
+import type { KnowledgeMeaning } from "./search";
 
 /** The Map, through the door's `map`: what a person sees, whatever draws it. */
 

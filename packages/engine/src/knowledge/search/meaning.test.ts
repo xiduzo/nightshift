@@ -2,20 +2,17 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SynonymEmbeddings } from "../testing/embeddings";
-import { watchVectorPreparation } from "../testing/vector-preparation";
-import { fsKnowledgeFolders as createKnowledgeFolders } from "./files";
+import { SynonymEmbeddings } from "../../testing/embeddings";
+import { watchVectorPreparation } from "../../testing/vector-preparation";
+import { fsKnowledgeFolders as createKnowledgeFolders } from "../files/adapters/out/fs-knowledge-folders";
 import {
 	type KnowledgeMeaning,
 	type KnowledgeMeaningReady,
 	measuredMeaning,
-} from "./meaning";
-import {
-	createKnowledgeSearch,
-	fuseRanks,
-	type KnowledgeHit,
-	type KnowledgeSearch,
-} from "./search";
+} from "./domain/meaning";
+import { fuseRanks, type KnowledgeHit } from "./domain/ranking";
+import { createKnowledgeSearch } from "./test-support";
+import type { KnowledgeSearch } from "./wire";
 
 let dataDir: string;
 let dir: string;

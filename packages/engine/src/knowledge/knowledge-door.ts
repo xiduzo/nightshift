@@ -4,7 +4,6 @@ import type { PageReaderSetting } from "@nightshift/flows";
 import type { SpaceArchive } from "../archive";
 import type { SyncedDocuments } from "../documents";
 import type { UsageNotes } from "../usage";
-import type { KnowledgeEvaluation } from "./evaluate";
 import type { KnowledgeListing, KnowledgeText } from "./files";
 import type {
 	LearningsNotifications,
@@ -13,12 +12,16 @@ import type {
 	WaitingNote,
 } from "./learnings";
 import type { KnowledgeMap } from "./map";
-import type { KnowledgeMeaning } from "./meaning";
 import type { KnowledgeQuestion } from "./questions";
 import type { LinkLook } from "./readers/look";
 import type { ReaderSecret } from "./readers/service";
 import type { ReviewTask } from "./review";
-import type { KnowledgeHit, KnowledgeMeaningStatus } from "./search";
+import type {
+	KnowledgeEvaluation,
+	KnowledgeHit,
+	KnowledgeMeaning,
+	KnowledgeMeaningStatus,
+} from "./search";
 import type { KnowledgeSources, SourceRun, SourcesSpace } from "./sources";
 import type {
 	CommandKnowledge,

@@ -21,7 +21,7 @@ import { createSandbox, type Sandbox, waitFor } from "../testing";
 import { testKnowledge } from "../testing/knowledge";
 import { otherSpace } from "../testing/test-support";
 import type { UsageMoment } from "../usage";
-import type { KnowledgeMeaning } from "./meaning";
+import type { KnowledgeMeaning } from "./search";
 
 /**
  * A project's knowledge on a Device, through the one door the daemon hands

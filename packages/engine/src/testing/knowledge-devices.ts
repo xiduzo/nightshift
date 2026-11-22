@@ -4,8 +4,10 @@ import { project } from "@nightshift/db/schema";
 import * as Y from "yjs";
 import { type ArchiveHost, createSpaceArchive } from "../archive";
 import { createSyncedDocuments, documentName } from "../documents";
-import { fsKnowledgeFolders, wireFiles } from "../knowledge/files";
+import { wireFiles } from "../knowledge/files";
+import { fsKnowledgeFolders } from "../knowledge/files/adapters/out/fs-knowledge-folders";
 import { createLearnings } from "../knowledge/learnings";
+import { isMarkdown, markdownHeadings } from "../knowledge/search";
 import { createKnowledgeFolderLocks, wireSync } from "../knowledge/sync";
 import { createOlderHosts } from "../knowledge/sync/domain/older-hosts";
 import { createSandbox, type Sandbox } from "./test-support";
@@ -106,6 +108,7 @@ export async function knowledgeDevice(
 		archive,
 		notes: learnings,
 		sync: reconciler,
+		markdown: { isMarkdown, headings: markdownHeadings },
 	});
 	const dir = folders.folder("p1");
 	const document = () => documents.open("p1");

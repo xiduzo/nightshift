@@ -1,6 +1,6 @@
 import { KNOWLEDGE_INDEX_INTRO } from "@nightshift/agents/knowledge";
 import type { FolderSnapshot } from "../../folder-snapshot";
-import { isMarkdown, markdownHeadings } from "../sections";
+import { isMarkdown, markdownHeadings } from "../search";
 import { fsFolderIndex } from "./adapters/out/fs-folder-index";
 import { fsViewCopies } from "./adapters/out/fs-view-copies";
 import { openKnowledgeView } from "./application/open-knowledge-view";

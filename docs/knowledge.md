@@ -771,7 +771,7 @@ A cosine cannot tell a note that repeats another from a note that disagrees
 with it, because both are about one thing. So the page says that the notes are
 close. It does not say which of the two it is.
 
-`packages/engine/src/knowledge/close-notes.ts` owns this. The list of what waits
+`packages/engine/src/knowledge/search/domain/close-notes.ts` owns this. The list of what waits
 gains `nearTo`: one list per note, in the order of `notes`, with the three
 closest at most. Each has the file `id`, the text in `note`, whether it is `kept`,
 and the `similarity`. The field is additive. An older phone ignores it, and an
@@ -960,7 +960,7 @@ owner of the computer only. Its row holds:
   variable is `NIGHTSHIFT_EMBEDDING_MODEL`. Only `qwen3-embedding:0.6b`
   was measured on these docs and has a floor (below). The other models of
   the list work, with no floor. `embedding-model.ts` in
-  `packages/engine/src/knowledge` has one record per measured model: its
+  `packages/engine/src/knowledge/search/domain` has one record per measured model: its
   name, query instruction, floor, line for close files and measurement. A trial
   is one record and one floor run. Two models are watched, with no record
   until a measurement exists: `harrier-oss-v1-0.6b` and
@@ -1004,7 +1004,7 @@ and its text.
 A project prepares only when someone looks at it: a search, or the Knowledge
 page. One project prepares at a time. A preparation that fails keeps what it
 embedded. The next look at least one minute later tries again, and embeds
-only the rest. Each project has one state in `vector-preparation.ts`: `idle`,
+only the rest. Each project has one state in `vector-states.ts`: `idle`,
 `queued`, `preparing`, `failed` or `ready`.
 
 On a CPU it is much slower. In the Night Shift image under Docker Desktop
@@ -1038,7 +1038,7 @@ changed. It drops the removed ones. Thus the index stays correct, whoever
 changes the folder. For 2 000 files the first search takes about half a
 second, and a later one about 20 ms. It reads the first 1 MB of a file.
 A new embedding model builds the vectors again. So does a new version of the
-index (`SCHEMA_VERSION` in `search-store.ts`, the one module that knows its
+index (`SCHEMA_VERSION` in `packages/engine/src/search-index/tables.ts`, the one module that knows its
 tables).
 
 An agent that gets the folder can still read `INDEX.md` and grep the
@@ -1076,7 +1076,7 @@ From these events:
   both do not beat words by 10 points. The API also returns nDCG at 10 for
   each way to search, for a person who compares two models. Only the first
   number decides. The thresholds are `EVALUATION` in
-  `packages/engine/src/knowledge/evaluate.ts`. The setting is the
+  `packages/engine/src/knowledge/search/domain/evaluation.ts`. The setting is the
   project's, in the knowledge document, so every computer of the Space
   follows it. Off, search finds by words only and prepares no vectors.
 - **Use.** The file list shows how often agents found and read each file

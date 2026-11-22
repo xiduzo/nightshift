@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Document } from "@langchain/core/documents";
 import { KNOWLEDGE_SEARCH_FILE } from "@nightshift/flows";
-import { sectionId } from "../knowledge/sections";
+import { sectionId } from "../knowledge/search/domain/sections";
 import { SynonymEmbeddings } from "../testing/embeddings";
 import { createSearchStore, type SearchStore } from "./search-index";
 

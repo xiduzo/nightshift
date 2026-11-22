@@ -3,13 +3,11 @@ import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { KNOWLEDGE_SEARCH_FILE } from "@nightshift/flows";
-import { tinyDocx, tinyPdf } from "../testing/documents";
-import { fsKnowledgeFolders as createKnowledgeFolders } from "./files";
-import {
-	createKnowledgeSearch,
-	type KnowledgeHit,
-	type KnowledgeSearch,
-} from "./search";
+import { tinyDocx, tinyPdf } from "../../testing/documents";
+import { fsKnowledgeFolders as createKnowledgeFolders } from "../files/adapters/out/fs-knowledge-folders";
+import type { KnowledgeHit } from "./domain/ranking";
+import { createKnowledgeSearch } from "./test-support";
+import type { KnowledgeSearch } from "./wire";
 
 let dataDir: string;
 let dir: string;

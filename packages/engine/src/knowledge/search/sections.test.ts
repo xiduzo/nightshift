@@ -2,13 +2,14 @@ import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import { Document } from "@langchain/core/documents";
 import { index } from "@langchain/core/indexing";
-import { createSearchTables } from "../search-index/tables";
+import { createSearchTables } from "../../search-index/tables";
 import {
 	BunSqliteRecordManager,
 	BunSqliteVectorStore,
-} from "../search-index/vectors";
-import { SynonymEmbeddings } from "../testing/embeddings";
-import { embedText, sectionId, splitSections } from "./sections";
+} from "../../search-index/vectors";
+import { SynonymEmbeddings } from "../../testing/embeddings";
+import { embedText, sectionId } from "./domain/sections";
+import { splitSections } from "./test-support";
 
 const open = () => {
 	const db = new Database(":memory:");

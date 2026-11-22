@@ -4,21 +4,21 @@
  * model, so the default test run never loads a model. It prints what
  * `docs/knowledge.md` records:
  *
- *   OLLAMA_LIVE_MODEL=qwen3-embedding:0.6b bun test src/knowledge/close-notes.live.test.ts
+ *   OLLAMA_LIVE_MODEL=qwen3-embedding:0.6b bun test src/knowledge/search/close-notes.live.test.ts
  *
  * `OLLAMA_LIVE_ADDRESS`: another Ollama than the default on this computer.
  */
 
 import { describe, expect, test } from "bun:test";
-import { ollamaEmbedder } from "../ollama/embedder";
+import { ollamaEmbedder } from "../../ollama/embedder";
 import {
 	ALMOST_THE_SAME_NOTES,
 	DISAGREEING_NOTES,
 	OTHER_NOTES,
 	RELATED_NOTES,
 	SAME_NOTES,
-} from "../testing/fixtures/close-notes";
-import { type KnowledgeMeaning, measuredMeaning } from "./meaning";
+} from "../../testing/fixtures/close-notes";
+import { type KnowledgeMeaning, measuredMeaning } from "./domain/meaning";
 
 const model = process.env.OLLAMA_LIVE_MODEL ?? "";
 const address = process.env.OLLAMA_LIVE_ADDRESS ?? "http://127.0.0.1:11434";

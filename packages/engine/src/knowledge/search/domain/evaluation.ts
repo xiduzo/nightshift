@@ -1,20 +1,15 @@
-import { now as timeNow } from "@nightshift/time";
-import type { KnowledgeQuestion } from "./questions";
-import type {
-	KnowledgeMeaningStatus,
-	KnowledgeSearch,
-	KnowledgeSearchMode,
-} from "./search";
+import type { KnowledgeMeaningStatus } from "./meaning";
+import type { KnowledgeSearchMode } from "./ranking";
 
 /**
  * The evaluation of a project's knowledge search: its question set
- * (`questions.ts`) against each way to search, by words, by meaning, and
- * both fused. For each way: how many questions found a right file in the
- * top 5 (recall at 5), the rank of the first right file of each question,
- * and for a question with several right files, how many of them it found and
- * how high (all in the top 5, nDCG at 10). Recall at 5 stays the headline: the
- * advice reads only that. A plain loop over `KnowledgeSearch.search`: the same search
- * the agents get.
+ * (`questions.ts` of the knowledge) against each way to search, by words, by
+ * meaning, and both fused. For each way: how many questions found a right
+ * file in the top 5 (recall at 5), the rank of the first right file of each
+ * question, and for a question with several right files, how many of them it
+ * found and how high (all in the top 5, nDCG at 10). Recall at 5 stays the
+ * headline: the advice reads only that. A plain loop over the search
+ * (`evaluateSearch`): the same search the agents get.
  */
 
 /**
@@ -38,6 +33,9 @@ export const EVALUATION = {
 	minGainPoints: 10,
 } as const;
 
+/** A marked question: what was asked, and the files that answer it. */
+export type EvaluatedQuestion = { query: string; answers: string[] };
+
 /** How one way to search did on the question set. */
 type KnowledgeModeResult = {
 	/** Questions with a right file in the top `k`. */
@@ -53,7 +51,7 @@ type KnowledgeModeResult = {
 };
 
 /** One question of the set, and where each way to search ranked its first right file (null: not in the top `depth`). */
-type KnowledgeEvaluationRow = {
+export type KnowledgeEvaluationRow = {
 	query: string;
 	answers: string[];
 	ranks: Record<KnowledgeSearchMode, number | null>;
@@ -88,92 +86,59 @@ export type KnowledgeEvaluation = {
 	advice: KnowledgeEvaluationAdvice;
 };
 
-const MODES: readonly KnowledgeSearchMode[] = ["words", "meaning", "both"];
+export const MODES: readonly KnowledgeSearchMode[] = [
+	"words",
+	"meaning",
+	"both",
+];
 
-/** Runs the question set against each way to search the project's knowledge. */
-export async function evaluateKnowledge(
-	search: Pick<KnowledgeSearch, "search" | "meaning">,
-	projectId: string,
-	questions: readonly KnowledgeQuestion[],
-	now: () => number = timeNow,
-): Promise<KnowledgeEvaluation> {
-	const meaning = await search.meaning(projectId);
-	// Partly prepared vectors would measure part of the knowledge.
-	const measured = MODES.filter(
-		(mode) => mode === "words" || meaning.state === "on",
-	);
-	const rows: KnowledgeEvaluationRow[] = [];
-	const answerRanks: Record<KnowledgeSearchMode, number[][]> = {
-		words: [],
-		meaning: [],
-		both: [],
-	};
-	for (const question of questions) {
-		const right = new Set(question.answers);
-		const ranks: Record<KnowledgeSearchMode, number | null> = {
-			words: null,
-			meaning: null,
-			both: null,
-		};
-		for (const mode of measured) {
-			const hits = await search.search(projectId, question.query, {
-				limit: EVALUATION.depth,
-				mode,
-			});
-			const paths = hits.map((hit) => hit.path);
-			const found = [...right]
-				.map((answer) => paths.indexOf(answer) + 1)
-				.filter((rank) => rank > 0);
-			ranks[mode] = found.length > 0 ? Math.min(...found) : null;
-			answerRanks[mode].push(found);
-		}
-		rows.push({ query: question.query, answers: question.answers, ranks });
-	}
-	const result = (mode: KnowledgeSearchMode): KnowledgeModeResult | null => {
-		if (!measured.includes(mode)) return null;
-		const found = rows.filter((row) => {
-			const rank = row.ranks[mode];
-			return rank !== null && rank <= EVALUATION.k;
-		}).length;
-		const mrr =
-			rows.reduce(
-				(sum, row) => sum + 1 / (row.ranks[mode] ?? Number.POSITIVE_INFINITY),
-				0,
-			) / Math.max(rows.length, 1);
-		const allFound = rows.filter(
-			(row, i) =>
-				(answerRanks[mode][i] ?? []).filter((rank) => rank <= EVALUATION.k)
-					.length === new Set(row.answers).size,
-		).length;
-		const ndcg =
-			rows.reduce(
-				(sum, row, i) =>
-					sum + ndcgOf(answerRanks[mode][i] ?? [], new Set(row.answers).size),
-				0,
-			) / Math.max(rows.length, 1);
-		return {
-			found,
-			recall: rows.length === 0 ? 0 : found / rows.length,
-			mrr,
-			allFound,
-			ndcg,
-		};
-	};
-	const modes = {
-		words: result("words"),
-		meaning: result("meaning"),
-		both: result("both"),
-	};
+/** The ways to search the evaluation measures: partly prepared vectors would measure part of the knowledge. */
+export const measuredModes = (meaning: KnowledgeMeaningStatus) =>
+	MODES.filter((mode) => mode === "words" || meaning.state === "on");
+
+/** The ranks of a question's right files among the paths a search found, from 1. */
+export const answerRanks = (
+	answers: readonly string[],
+	paths: readonly string[],
+): number[] =>
+	[...new Set(answers)]
+		.map((answer) => paths.indexOf(answer) + 1)
+		.filter((rank) => rank > 0);
+
+/** How one way to search did: null when it was not measured. */
+export function modeResult(
+	mode: KnowledgeSearchMode,
+	measured: readonly KnowledgeSearchMode[],
+	rows: readonly KnowledgeEvaluationRow[],
+	ranksOf: Record<KnowledgeSearchMode, number[][]>,
+): KnowledgeModeResult | null {
+	if (!measured.includes(mode)) return null;
+	const found = rows.filter((row) => {
+		const rank = row.ranks[mode];
+		return rank !== null && rank <= EVALUATION.k;
+	}).length;
+	const mrr =
+		rows.reduce(
+			(sum, row) => sum + 1 / (row.ranks[mode] ?? Number.POSITIVE_INFINITY),
+			0,
+		) / Math.max(rows.length, 1);
+	const allFound = rows.filter(
+		(row, i) =>
+			(ranksOf[mode][i] ?? []).filter((rank) => rank <= EVALUATION.k).length ===
+			new Set(row.answers).size,
+	).length;
+	const ndcg =
+		rows.reduce(
+			(sum, row, i) =>
+				sum + ndcgOf(ranksOf[mode][i] ?? [], new Set(row.answers).size),
+			0,
+		) / Math.max(rows.length, 1);
 	return {
-		at: now(),
-		questions: rows.length,
-		k: EVALUATION.k,
-		minQuestions: EVALUATION.minQuestions,
-		minGainPoints: EVALUATION.minGainPoints,
-		meaning,
-		modes,
-		rows,
-		advice: adviceOf(rows.length, modes.words, modes.both),
+		found,
+		recall: rows.length === 0 ? 0 : found / rows.length,
+		mrr,
+		allFound,
+		ndcg,
 	};
 }
 

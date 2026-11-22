@@ -18,8 +18,8 @@ import {
 import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import { type SpaceArchive, writeWhole } from "../archive";
-import type { CloseNote, CloseNotes, NoteToCompare } from "./close-notes";
 import type { KnowledgeFolders } from "./files";
+import type { CloseNote, CloseNotes, NoteToCompare } from "./search";
 import type {
 	KnowledgeDocuments,
 	KnowledgeReconciled,

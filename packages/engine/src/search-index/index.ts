@@ -7,9 +7,9 @@
 
 export {
 	createSearchStore,
+	type IndexedFile,
 	type IndexedFileWrite,
-	type IndexedSection,
-	MATCH_CLOSE,
-	MATCH_OPEN,
 	type SearchStore,
+	type SectionToEmbed,
+	type WordSection,
 } from "./search-index";

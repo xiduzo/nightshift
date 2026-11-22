@@ -74,3 +74,42 @@ export function measuredMeaning(
 		...(closeNotesAt !== undefined ? { closeNotesAt } : {}),
 	};
 }
+
+/**
+ * Whether search by meaning works for a project on this computer.
+ * `off`: no model is set up. `turned-off`: a person turned it off for the
+ * project. `no-ollama`: Ollama does not answer. `no-model`: Ollama does
+ * not have the model. `downloading`: the model is on its way, `percent` of
+ * it. `preparing`: the first vectors are on their way, `done` of `total`
+ * sections. `failed`: the last preparation stopped at `done` of `total`, and
+ * it tries again. `on`: every section has its vector.
+ */
+export type KnowledgeMeaningStatus = {
+	state:
+		| "off"
+		| "turned-off"
+		| Exclude<KnowledgeMeaningReady, "ready">
+		| "preparing"
+		| "failed"
+		| "on";
+	/** The embedding model. Null when it is off. */
+	model: string | null;
+	done: number;
+	total: number;
+	/** Where the model runs: null on this computer, else the host name of its Ollama. */
+	where: string | null;
+	/** While `downloading`: how far the download of the model is, in percent. */
+	percent: number | null;
+};
+
+/**
+ * Whether a person left search by meaning on for a project, from what
+ * reads the project's setting (`sync/domain/entry.ts`). A setting that
+ * cannot be read leaves it on. No reader: on for every project.
+ */
+export function leftOn(
+	read?: (projectId: string) => Promise<boolean>,
+): (projectId: string) => Promise<boolean> {
+	return (projectId) =>
+		read ? read(projectId).catch(() => true) : Promise.resolve(true);
+}

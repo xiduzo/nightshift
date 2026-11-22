@@ -8,18 +8,21 @@
  * interface writes, and what the run's log and the Host contract share.
  */
 
-export { DEFAULT_EMBEDDING_MODEL } from "./embedding-model";
-export type { KnowledgeEvaluation } from "./evaluate";
 export type { KnowledgeFile, KnowledgeText } from "./files";
 export { createKnowledge } from "./knowledge";
 export type { Knowledge } from "./knowledge-door";
 export type { WaitingLearning } from "./learnings";
 export type { KnowledgeMap } from "./map";
-export { measuredMeaning } from "./meaning";
 export type { KnowledgeQuestion } from "./questions";
 export type { LinkLook } from "./readers/look";
 export { type AskLearner, createRunLearnings } from "./run-learnings";
-export type { KnowledgeHit, KnowledgeMeaningStatus } from "./search";
+export {
+	DEFAULT_EMBEDDING_MODEL,
+	type KnowledgeEvaluation,
+	type KnowledgeHit,
+	type KnowledgeMeaningStatus,
+	measuredMeaning,
+} from "./search";
 export {
 	createKnowledgeFolderLocks,
 	type KnowledgeFolderLocks,

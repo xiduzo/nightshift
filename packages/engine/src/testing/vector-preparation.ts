@@ -1,7 +1,7 @@
 import type {
 	VectorPreparationEvent,
 	VectorPreparationState,
-} from "../knowledge/vector-preparation";
+} from "../knowledge/search/domain/vector-states";
 
 /**
  * Hears a vector preparation's events, so a test waits on the transition it

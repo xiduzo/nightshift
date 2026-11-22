@@ -5,7 +5,7 @@ import {
 	documentName,
 	type SyncedDocuments,
 } from "../documents";
-import { fsKnowledgeFolders } from "../knowledge/files";
+import { fsKnowledgeFolders } from "../knowledge/files/adapters/out/fs-knowledge-folders";
 import { createKnowledge } from "../knowledge/knowledge";
 import type { KnowledgeDeps } from "../knowledge/knowledge-door";
 import {

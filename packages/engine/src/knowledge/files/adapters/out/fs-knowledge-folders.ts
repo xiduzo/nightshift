@@ -5,6 +5,7 @@ import {
 	isDocument,
 	LOCAL_ONLY_BYTES,
 	loadDocument,
+	readStart,
 } from "../../../../file-loaders";
 import {
 	type FolderSnapshot,
@@ -20,7 +21,6 @@ import {
 	textResultFrom,
 	tooLarge,
 } from "../../domain/text";
-import { readStart } from "./fs-read-start";
 
 /**
  * The knowledge folders over the disk: `<dataDir>/knowledge/<projectId>/`.

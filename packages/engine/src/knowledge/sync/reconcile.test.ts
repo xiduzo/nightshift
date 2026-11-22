@@ -13,7 +13,7 @@ import {
 	removeKnowledgeDevices,
 	syncKnowledgeDocuments as syncDocuments,
 } from "../../testing/knowledge-devices";
-import { createKnowledgeSearch } from "../search";
+import { createKnowledgeSearch } from "../search/test-support";
 import { createKnowledgeFolderLocks } from "./domain/folder-locks";
 
 /**

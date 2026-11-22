@@ -2,10 +2,9 @@ import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { KNOWLEDGE_INDEX_FILE } from "@nightshift/flows";
 import { writeWhole } from "../../../../archive";
-import { isDocument, loadDocument } from "../../../../file-loaders";
+import { isDocument, loadDocument, readStart } from "../../../../file-loaders";
 import type { FolderIndex } from "../../application/ports";
 import { HEAD_BYTES, isText } from "../../domain/describe";
-import { readStart } from "./fs-read-start";
 
 /** The index of a folder on the disk: `INDEX.md` at its top. */
 export function fsFolderIndex(): FolderIndex {

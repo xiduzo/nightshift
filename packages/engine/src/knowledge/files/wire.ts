@@ -1,6 +1,5 @@
 import { KNOWLEDGE_INDEX_INTRO } from "@nightshift/agents/knowledge";
 import type { FolderSnapshot } from "../../folder-snapshot";
-import { isMarkdown, markdownHeadings } from "../sections";
 import { fileLoadersContentTexts } from "./adapters/out/file-loaders-content-texts";
 import { fsFolderIndex } from "./adapters/out/fs-folder-index";
 import { fsKnowledgeFolders } from "./adapters/out/fs-knowledge-folders";
@@ -22,6 +21,7 @@ import type {
 } from "./application/ports";
 import { readKnowledgeFile } from "./application/read-knowledge-file";
 import { writeKnowledgeIndex } from "./application/write-knowledge-index";
+import type { MarkdownRules } from "./domain/index-text";
 import type { KnowledgeListing } from "./domain/listing";
 import type { KnowledgeFile } from "./domain/paths";
 import type { KnowledgeText, ReadFrom } from "./domain/text";
@@ -49,6 +49,8 @@ export type FilesDeps = {
 	notes: WaitingNotes;
 	/** The reconcile of a folder (`sync`). */
 	sync: FolderSync;
+	/** Which files are markdown, and their headings (`search`): `INDEX.md` lists them. */
+	markdown: MarkdownRules;
 };
 
 /** The read side of a Project's knowledge: what the document lists, and one file's text. It never changes the document or the folder. */
@@ -87,7 +89,7 @@ export function wireFiles(deps: FilesDeps): KnowledgeFiles {
 	const folders = fsKnowledgeFolders(deps.dataDir);
 	const writeIndex = writeKnowledgeIndex({
 		index: fsFolderIndex(),
-		markdown: { isMarkdown, headings: markdownHeadings },
+		markdown: deps.markdown,
 		intro: KNOWLEDGE_INDEX_INTRO,
 	});
 	const openView = openKnowledgeView({ views: fsViewCopies(), writeIndex });

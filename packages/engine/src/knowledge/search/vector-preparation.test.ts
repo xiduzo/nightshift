@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createSearchStore, type SearchStore } from "../search-index";
-import { SynonymEmbeddings } from "../testing/embeddings";
-import { watchVectorPreparation } from "../testing/vector-preparation";
-import type { KnowledgeMeaning, KnowledgeMeaningReady } from "./meaning";
-import { sectionId } from "./sections";
-import { createVectorPreparation } from "./vector-preparation";
+import { createSearchStore, type SearchStore } from "../../search-index";
+import { SynonymEmbeddings } from "../../testing/embeddings";
+import { watchVectorPreparation } from "../../testing/vector-preparation";
+import type { KnowledgeMeaning, KnowledgeMeaningReady } from "./domain/meaning";
+import { sectionId } from "./domain/sections";
+import { createVectorPreparation } from "./test-support";
 
 /** After a failed preparation, how long until the next try. */
 const RETRY_MS = 60_000;

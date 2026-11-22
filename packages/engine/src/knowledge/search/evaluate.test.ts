@@ -2,17 +2,15 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SynonymEmbeddings } from "../testing/embeddings";
-import { watchVectorPreparation } from "../testing/vector-preparation";
-import { adviceOf, EVALUATION, evaluateKnowledge } from "./evaluate";
-import { fsKnowledgeFolders as createKnowledgeFolders } from "./files";
-import type { KnowledgeMeaning } from "./meaning";
-import type { KnowledgeQuestion } from "./questions";
-import {
-	createKnowledgeSearch,
-	type KnowledgeHit,
-	type KnowledgeSearch,
-} from "./search";
+import { SynonymEmbeddings } from "../../testing/embeddings";
+import { watchVectorPreparation } from "../../testing/vector-preparation";
+import { fsKnowledgeFolders as createKnowledgeFolders } from "../files/adapters/out/fs-knowledge-folders";
+import type { KnowledgeQuestion } from "../questions";
+import { adviceOf, EVALUATION } from "./domain/evaluation";
+import type { KnowledgeMeaning } from "./domain/meaning";
+import type { KnowledgeHit } from "./domain/ranking";
+import { createKnowledgeSearch, evaluateKnowledge } from "./test-support";
+import type { KnowledgeSearch } from "./wire";
 
 /**
  * The evaluation over a real index with fake embeddings that know a few
