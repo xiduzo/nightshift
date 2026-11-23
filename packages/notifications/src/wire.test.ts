@@ -1,6 +1,15 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { personalSpaceId } from "@nightshift/auth";
-import { type AuthSandbox, createAuthSandbox } from "@nightshift/auth/testing";
+import {
+	type AuthSandbox,
+	createAuthSandbox,
+	testSpaces,
+} from "@nightshift/auth/testing";
+
+const personalSpaceId = (
+	db: Parameters<typeof testSpaces>[0],
+	personId: string,
+) => testSpaces(db).personal.findPersonalSpace({ personId });
+
 import { now } from "@nightshift/time";
 import { createInAppChannel } from "./channels";
 import {
@@ -28,6 +37,7 @@ beforeEach(async () => {
 	sender = fakeWebPushSender();
 	notifications = createNotifications({
 		db: sandbox.db,
+		auth: sandbox.auth,
 		events: events.source,
 		sendsFor: async () => true,
 		inApp: createInAppChannel(),
@@ -69,6 +79,7 @@ test("a browser subscribes with the public key this daemon keeps", async () => {
 
 	const withoutWebPush = createNotifications({
 		db: sandbox.db,
+		auth: sandbox.auth,
 		events: events.source,
 		sendsFor: async () => true,
 		inApp: createInAppChannel(),

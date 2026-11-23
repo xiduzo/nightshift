@@ -3,11 +3,5 @@
  * computer. `wirePersonal` binds the use cases to their ports.
  */
 
-export {
-	LOCAL_EMAIL,
-	type OwnedDevice,
-	personalSpaceName,
-	type RowBatch,
-	UNOWNED,
-} from "./domain/personal-space";
+export { type OwnedDevice, personalSpaceName } from "./domain/personal-space";
 export { type Personal, wirePersonal } from "./wire";

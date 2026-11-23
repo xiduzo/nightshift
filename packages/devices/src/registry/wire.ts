@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { personalSpaceIdBySlug } from "@nightshift/auth";
+import { wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import {
 	type DeviceRows,
@@ -152,8 +152,9 @@ export type Registry = {
 
 export function wireRegistry(deps: RegistryDeps): Registry {
 	const { db } = deps;
+	const bound = wireSpaces({ db });
 	const spaces: PersonalSpaces = {
-		idOf: (personId) => personalSpaceIdBySlug(db, personId),
+		idOf: (personId) => bound.personal.findPersonalSpaceBySlug({ personId }),
 	};
 	const ports = {
 		store: drizzleDeviceStore(db),

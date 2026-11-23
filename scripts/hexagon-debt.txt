@@ -6,5 +6,4 @@
 agents/assistant
 agents/decider
 agents/harnesses
-auth/spaces
 # Files of a package's kernel that are not pure yet: kernel <file>.

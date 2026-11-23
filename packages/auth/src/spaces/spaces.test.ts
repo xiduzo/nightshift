@@ -9,22 +9,20 @@ import {
 import { asDate } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { type Permissions, roleAllows } from "../index";
-import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
-import { createLocalSession, requestAccess } from "../wire-access";
 import {
-	adoptPersonalSpaceBatch,
-	ensurePersonalSpace,
-	LOCAL_EMAIL,
-	localPerson,
-	mirrorHostSpace,
-	personalSpaceId,
-	spacesOf,
-	splitPersonalSpaceBatch,
-} from "./facades";
+	type AuthSandbox,
+	createAuthSandbox,
+	testRequestAccess,
+	testSpaces,
+} from "../testing";
+import { testLocalPerson, testLocalSession } from "../testing/wires";
+import { LOCAL_EMAIL } from "./personal/domain/personal-space";
 
 let sandbox: AuthSandbox;
+let authSpaces: ReturnType<typeof testSpaces>;
 beforeEach(async () => {
 	sandbox = await createAuthSandbox();
+	authSpaces = testSpaces(sandbox.db);
 });
 afterEach(() => sandbox.cleanup());
 
@@ -40,7 +38,7 @@ async function sharedSpace(headers: Headers, name = "Platform") {
 describe("personal Space", () => {
 	test("every new Person gets one, and their session starts in it", async () => {
 		const ada = await sandbox.signUp("Ada");
-		const spaces = await spacesOf(sandbox.db, ada.userId);
+		const spaces = await authSpaces.listSpaces({ personId: ada.userId });
 		expect(spaces).toEqual([
 			{
 				id: expect.any(String),
@@ -57,7 +55,9 @@ describe("personal Space", () => {
 
 	test("is made with its owner membership, or not at all", async () => {
 		// No Person has this id: the membership fails, so the Space does too.
-		await expect(ensurePersonalSpace(sandbox.db, "nobody")).rejects.toThrow();
+		await expect(
+			authSpaces.personal.ensurePersonalSpace({ personId: "nobody" }),
+		).rejects.toThrow();
 		const spaces = await sandbox.db
 			.select()
 			.from(organization)
@@ -68,15 +68,19 @@ describe("personal Space", () => {
 	test("lists the personal Space first", async () => {
 		const ada = await sandbox.signUp("Ada");
 		await sharedSpace(ada.headers, "Alpha");
-		expect((await spacesOf(sandbox.db, ada.userId)).map((s) => s.name)).toEqual(
-			["Personal", "Alpha"],
-		);
+		expect(
+			(await authSpaces.listSpaces({ personId: ada.userId })).map(
+				(s) => s.name,
+			),
+		).toEqual(["Personal", "Alpha"]);
 	});
 
 	test("nobody can be invited to or added to it", async () => {
 		const ada = await sandbox.signUp("Ada");
 		const bob = await sandbox.signUp("Bob");
-		const personal = await personalSpaceId(sandbox.db, ada.userId);
+		const personal = await authSpaces.personal.findPersonalSpace({
+			personId: ada.userId,
+		});
 		await expect(
 			sandbox.auth.api.createInvitation({
 				headers: ada.headers,
@@ -111,7 +115,9 @@ describe("personal Space", () => {
 
 	test("it cannot be deleted", async () => {
 		const ada = await sandbox.signUp("Ada");
-		const personal = await personalSpaceId(sandbox.db, ada.userId);
+		const personal = await authSpaces.personal.findPersonalSpace({
+			personId: ada.userId,
+		});
 		await expect(
 			sandbox.auth.api.deleteOrganization({
 				headers: ada.headers,
@@ -136,10 +142,9 @@ describe("roles", () => {
 			});
 		}
 		const can = async (who: typeof ada, permissions: Permissions) =>
-			(await requestAccess(sandbox.auth, sandbox.db, who.headers, null)).can(
-				permissions,
-				platform,
-			);
+			(
+				await testRequestAccess(sandbox.auth, sandbox.db, who.headers, null)
+			).can(permissions, platform);
 
 		expect(await can(bob, { run: ["start"], gate: ["resolve"] })).toBe(true);
 		expect(await can(cy, { run: ["start"] })).toBe(false);
@@ -154,7 +159,7 @@ describe("roles", () => {
 
 describe("the local Person", () => {
 	test("is the owner of this computer, named after its account", async () => {
-		const local = await localPerson(sandbox.db);
+		const local = await testLocalPerson(sandbox.db);
 		const [self] = await sandbox.db
 			.select({ ownerId: device.ownerId })
 			.from(device)
@@ -167,16 +172,20 @@ describe("the local Person", () => {
 		expect(person?.email).toBe(LOCAL_EMAIL);
 		expect(person?.name).not.toBe("");
 		expect(local.spaceId).toBe(
-			(await personalSpaceId(sandbox.db, local.userId)) ?? "",
+			(await authSpaces.personal.findPersonalSpace({
+				personId: local.userId,
+			})) ?? "",
 		);
 	});
 
 	test("a database whose Person is gone gets a new one", async () => {
-		const first = await localPerson(sandbox.db);
+		const first = await testLocalPerson(sandbox.db);
 		await sandbox.db.delete(user).where(eq(user.id, first.userId));
-		const again = await localPerson(sandbox.db);
+		const again = await testLocalPerson(sandbox.db);
 		expect(again.userId).not.toBe(first.userId);
-		expect(await spacesOf(sandbox.db, again.userId)).toHaveLength(1);
+		expect(
+			await authSpaces.listSpaces({ personId: again.userId }),
+		).toHaveLength(1);
 		// The Host had no admin left: the new Person is it.
 		const [person] = await sandbox.db
 			.select({ role: user.role })
@@ -186,8 +195,8 @@ describe("the local Person", () => {
 	});
 
 	test("a request without a session acts as the local Person, in their personal Space", async () => {
-		const local = await localPerson(sandbox.db);
-		const sessions = createLocalSession(sandbox.auth, sandbox.db, local.userId);
+		const local = await testLocalPerson(sandbox.db);
+		const sessions = testLocalSession(sandbox.auth, sandbox.db, local.userId);
 
 		const first = await sessions.resolve(new Headers());
 		expect(first.session?.user.id).toBe(local.userId);
@@ -218,23 +227,42 @@ describe("creating a Space", () => {
 		});
 		try {
 			const ada = await own.signUp("Ada");
-			const access = await requestAccess(own.auth, own.db, ada.headers, null);
+			const access = await testRequestAccess(
+				own.auth,
+				own.db,
+				ada.headers,
+				null,
+			);
 			const { id } = await access.createSpace("Platform team");
 
-			expect(await spacesOf(own.db, ada.userId)).toEqual([
+			expect(
+				await testSpaces(own.db).listSpaces({ personId: ada.userId }),
+			).toEqual([
 				expect.objectContaining({ personal: true }),
 				{ id, name: "Platform team", personal: false, role: "owner" },
 			]);
-			const after = await requestAccess(own.auth, own.db, ada.headers, null);
+			const after = await testRequestAccess(
+				own.auth,
+				own.db,
+				ada.headers,
+				null,
+			);
 			expect(after.spaceId).toBe(id);
 			expect(changed).toContain(id);
 			// A permission in another Space of the Person's.
-			const personal = await personalSpaceId(own.db, ada.userId);
+			const personal = await testSpaces(own.db).personal.findPersonalSpace({
+				personId: ada.userId,
+			});
 			expect(
 				await after.can({ project: ["move"] }, personal ?? undefined),
 			).toBe(true);
 			const bob = await own.signUp("Bob");
-			const outsider = await requestAccess(own.auth, own.db, bob.headers, null);
+			const outsider = await testRequestAccess(
+				own.auth,
+				own.db,
+				bob.headers,
+				null,
+			);
 			expect(await outsider.can({ project: ["move"] }, id)).toBe(false);
 		} finally {
 			own.cleanup();
@@ -261,10 +289,12 @@ describe("adopting the personal Space of the Home Host", () => {
 	/** Ada's own personal Space, and the copy of her personal Space on her Home Host. */
 	async function setUp(options: { member: boolean }) {
 		const ada = await sandbox.signUp("Ada");
-		const own = await personalSpaceId(sandbox.db, ada.userId);
+		const own = await authSpaces.personal.findPersonalSpace({
+			personId: ada.userId,
+		});
 		if (!own) throw new Error("no personal Space");
 		const hosted = "space-on-host";
-		await mirrorHostSpace(sandbox.db, {
+		await authSpaces.mirrorHostSpace({
 			id: hosted,
 			name: "Personal on studio",
 		});
@@ -283,18 +313,20 @@ describe("adopting the personal Space of the Home Host", () => {
 	for (const withMember of [true, false]) {
 		test(`the Host's Space becomes the one personal Space, named Personal${withMember ? "" : ", also before a membership of it is here"}`, async () => {
 			const { ada, own, hosted } = await setUp({ member: withMember });
-			const statements = await adoptPersonalSpaceBatch(sandbox.db, {
+			const statements = await authSpaces.personal.adoptPersonalSpace({
 				personId: ada.userId,
 				from: own,
 				to: hosted,
 			});
 			await sandbox.db.batch(statements);
 
-			expect(await spacesOf(sandbox.db, ada.userId)).toEqual([
+			expect(await authSpaces.listSpaces({ personId: ada.userId })).toEqual([
 				{ id: hosted, name: "Personal", personal: true, role: "owner" },
 			]);
 			// No second personal Space is made for her.
-			expect(await ensurePersonalSpace(sandbox.db, ada.userId)).toBe(hosted);
+			expect(
+				await authSpaces.personal.ensurePersonalSpace({ personId: ada.userId }),
+			).toBe(hosted);
 			const [old] = await sandbox.db
 				.select()
 				.from(organization)
@@ -305,7 +337,7 @@ describe("adopting the personal Space of the Home Host", () => {
 
 	test("a session that worked in the old personal Space works in the new one", async () => {
 		const { ada, own, hosted } = await setUp({ member: true });
-		const statements = await adoptPersonalSpaceBatch(sandbox.db, {
+		const statements = await authSpaces.personal.adoptPersonalSpace({
 			personId: ada.userId,
 			from: own,
 			to: hosted,
@@ -321,16 +353,18 @@ describe("adopting the personal Space of the Home Host", () => {
 	test("only the Person's own personal Space can be adopted, into a Space this Replica has", async () => {
 		const { ada, own, hosted } = await setUp({ member: true });
 		const grace = await sandbox.signUp("Grace");
-		const theirs = await personalSpaceId(sandbox.db, grace.userId);
+		const theirs = await authSpaces.personal.findPersonalSpace({
+			personId: grace.userId,
+		});
 		await expect(
-			adoptPersonalSpaceBatch(sandbox.db, {
+			authSpaces.personal.adoptPersonalSpace({
 				personId: ada.userId,
 				from: theirs ?? "",
 				to: hosted,
 			}),
 		).rejects.toThrow("is not the personal Space");
 		await expect(
-			adoptPersonalSpaceBatch(sandbox.db, {
+			authSpaces.personal.adoptPersonalSpace({
 				personId: ada.userId,
 				from: own,
 				to: "nowhere",
@@ -343,12 +377,14 @@ describe("splitting a personal Space off the Home Host's", () => {
 	/** Ada's personal Space is the one her Home Host keeps, as after a merge. */
 	async function merged() {
 		const ada = await sandbox.signUp("Ada");
-		const own = await personalSpaceId(sandbox.db, ada.userId);
+		const own = await authSpaces.personal.findPersonalSpace({
+			personId: ada.userId,
+		});
 		if (!own) throw new Error("no personal Space");
 		const hosted = "space-on-host";
-		await mirrorHostSpace(sandbox.db, { id: hosted, name: "Personal" });
+		await authSpaces.mirrorHostSpace({ id: hosted, name: "Personal" });
 		await sandbox.db.batch(
-			await adoptPersonalSpaceBatch(sandbox.db, {
+			await authSpaces.personal.adoptPersonalSpace({
 				personId: ada.userId,
 				from: own,
 				to: hosted,
@@ -361,7 +397,7 @@ describe("splitting a personal Space off the Home Host's", () => {
 		const { ada, hosted } = await merged();
 
 		await sandbox.db.batch(
-			await splitPersonalSpaceBatch(sandbox.db, {
+			await authSpaces.personal.splitPersonalSpace({
 				personId: ada.userId,
 				from: hosted,
 				to: "space-of-her-own",
@@ -369,7 +405,7 @@ describe("splitting a personal Space off the Home Host's", () => {
 			}),
 		);
 
-		expect(await spacesOf(sandbox.db, ada.userId)).toEqual([
+		expect(await authSpaces.listSpaces({ personId: ada.userId })).toEqual([
 			{
 				id: "space-of-her-own",
 				name: "Personal",
@@ -377,9 +413,9 @@ describe("splitting a personal Space off the Home Host's", () => {
 				role: "owner",
 			},
 		]);
-		expect(await ensurePersonalSpace(sandbox.db, ada.userId)).toBe(
-			"space-of-her-own",
-		);
+		expect(
+			await authSpaces.personal.ensurePersonalSpace({ personId: ada.userId }),
+		).toBe("space-of-her-own");
 		const [kept] = await sandbox.db
 			.select()
 			.from(organization)
@@ -395,7 +431,7 @@ describe("splitting a personal Space off the Home Host's", () => {
 	test("only the Person's personal Space splits, into a Space that is not here yet", async () => {
 		const { ada, hosted } = await merged();
 		await expect(
-			splitPersonalSpaceBatch(sandbox.db, {
+			authSpaces.personal.splitPersonalSpace({
 				personId: ada.userId,
 				from: "elsewhere",
 				to: "new",
@@ -403,7 +439,7 @@ describe("splitting a personal Space off the Home Host's", () => {
 			}),
 		).rejects.toThrow("is not the personal Space");
 		await expect(
-			splitPersonalSpaceBatch(sandbox.db, {
+			authSpaces.personal.splitPersonalSpace({
 				personId: ada.userId,
 				from: hosted,
 				to: hosted,

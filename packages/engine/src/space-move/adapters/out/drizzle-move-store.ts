@@ -1,4 +1,4 @@
-import { spaceExists } from "@nightshift/auth";
+import { wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { answerCost, event, project, run } from "@nightshift/db/schema";
 import { and, eq, inArray, isNull, notExists, or } from "drizzle-orm";
@@ -52,7 +52,7 @@ export function drizzleMoveStore(db: Database): MoveStore {
 		},
 
 		spaceExists(spaceId) {
-			return spaceExists(db, spaceId);
+			return wireSpaces({ db }).hasSpace({ spaceId });
 		},
 
 		async holdsRows(spaceId) {

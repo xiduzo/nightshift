@@ -2,13 +2,16 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { session } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 
-import { localPerson } from "../spaces";
-import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
 import {
-	authEndpointAccess,
-	createLocalSession,
-	requestAccess,
-} from "../wire-access";
+	type AuthSandbox,
+	createAuthSandbox,
+	testRequestAccess,
+} from "../testing";
+import {
+	testAuthEndpointAccess,
+	testLocalPerson,
+	testLocalSession,
+} from "../testing/wires";
 
 /** The access of one request: read once, decided in memory. */
 
@@ -29,13 +32,13 @@ async function sharedSpace(headers: Headers): Promise<string> {
 
 describe("requestAccess", () => {
 	test("a request from this computer reads the session and the memberships once, and decides in memory", async () => {
-		const person = await localPerson(sandbox.db);
-		const local = createLocalSession(sandbox.auth, sandbox.db, person.userId);
+		const person = await testLocalPerson(sandbox.db);
+		const local = testLocalSession(sandbox.auth, sandbox.db, person.userId);
 		// The first request finds the local session.
-		await requestAccess(sandbox.auth, sandbox.db, new Headers(), local);
+		await testRequestAccess(sandbox.auth, sandbox.db, new Headers(), local);
 
 		const statements = sandbox.countStatements();
-		const access = await requestAccess(
+		const access = await testRequestAccess(
 			sandbox.auth,
 			sandbox.db,
 			new Headers(),
@@ -55,7 +58,7 @@ describe("requestAccess", () => {
 		await sandbox.auth.api.addMember({
 			body: { userId: bob.userId, role: "viewer", organizationId: platform },
 		});
-		const access = await requestAccess(
+		const access = await testRequestAccess(
 			sandbox.auth,
 			sandbox.db,
 			bob.headers,
@@ -67,7 +70,7 @@ describe("requestAccess", () => {
 			false,
 		);
 		const carol = await sandbox.signUp("Carol");
-		const outsider = await requestAccess(
+		const outsider = await testRequestAccess(
 			sandbox.auth,
 			sandbox.db,
 			carol.headers,
@@ -78,7 +81,7 @@ describe("requestAccess", () => {
 
 	test("a Space made through the request is the Person's at once", async () => {
 		const ada = await sandbox.signUp("Ada");
-		const access = await requestAccess(
+		const access = await testRequestAccess(
 			sandbox.auth,
 			sandbox.db,
 			ada.headers,
@@ -89,9 +92,9 @@ describe("requestAccess", () => {
 	});
 
 	test("the local session gives way to a new one when it ends", async () => {
-		const person = await localPerson(sandbox.db);
-		const local = createLocalSession(sandbox.auth, sandbox.db, person.userId);
-		const first = await requestAccess(
+		const person = await testLocalPerson(sandbox.db);
+		const local = testLocalSession(sandbox.auth, sandbox.db, person.userId);
+		const first = await testRequestAccess(
 			sandbox.auth,
 			sandbox.db,
 			new Headers(),
@@ -99,7 +102,7 @@ describe("requestAccess", () => {
 		);
 		// Signed out everywhere.
 		await sandbox.db.delete(session).where(eq(session.userId, person.userId));
-		const after = await requestAccess(
+		const after = await testRequestAccess(
 			sandbox.auth,
 			sandbox.db,
 			new Headers(),
@@ -112,13 +115,14 @@ describe("requestAccess", () => {
 
 describe("authEndpointAccess", () => {
 	test("a request from this computer gets the local cookie without a read of the session", async () => {
-		const person = await localPerson(sandbox.db);
-		const local = createLocalSession(sandbox.auth, sandbox.db, person.userId);
-		await requestAccess(sandbox.auth, sandbox.db, new Headers(), local);
+		const person = await testLocalPerson(sandbox.db);
+		const local = testLocalSession(sandbox.auth, sandbox.db, person.userId);
+		await testRequestAccess(sandbox.auth, sandbox.db, new Headers(), local);
 
 		const statements = sandbox.countStatements();
-		const { headers, hostAccess } = await authEndpointAccess(
+		const { headers, hostAccess } = await testAuthEndpointAccess(
 			sandbox.auth,
+			sandbox.db,
 			new Headers(),
 			local,
 		);

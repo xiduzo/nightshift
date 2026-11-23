@@ -15,6 +15,7 @@ export type {
 	SyncGrant,
 } from "./domain/sync-access";
 export {
+	type Access,
 	type RequestAccess,
 	type SpaceAccess,
 	type SyncSetup,

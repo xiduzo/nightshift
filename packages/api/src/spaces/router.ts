@@ -1,10 +1,4 @@
-import {
-	invitationView,
-	membersOf,
-	ROLE_REFUSAL,
-	RoleRefusal,
-	spacesOf,
-} from "@nightshift/auth";
+import { ROLE_REFUSAL, RoleRefusal, wireSpaces } from "@nightshift/auth";
 import { SpaceNotFound } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/server";
@@ -51,7 +45,9 @@ export const spaces = {
 		.output(output(spaceListSchema))
 		.handler(async ({ context }) => ({
 			active: context.spaceId,
-			spaces: await spacesOf(context.db, context.session.user.id),
+			spaces: await wireSpaces({ db: context.db }).listSpaces({
+				personId: context.session.user.id,
+			}),
 		})),
 	/** Every later call works in this Space. */
 	switch: protectedProcedure
@@ -102,9 +98,10 @@ export const members = {
 		})
 		.output(output(memberListSchema))
 		.handler(async ({ context }) => {
+			const bound = wireSpaces({ db: context.db });
 			const [listed, spaces, invite, remove, changeRole] = await Promise.all([
-				membersOf(context.db, context.spaceId),
-				spacesOf(context.db, context.session.user.id),
+				bound.members.listMembers({ spaceId: context.spaceId }),
+				bound.listSpaces({ personId: context.session.user.id }),
 				context.access.can({ member: ["invite"] }),
 				context.access.can({ member: ["remove"] }),
 				context.access.can({ member: ["role"] }),
@@ -172,7 +169,9 @@ export const invitations = {
 		.output(output(invitationViewSchema))
 		.input(z.object({ invitationId: z.string().min(1).max(128) }))
 		.handler(async ({ context, input }) => {
-			const found = await invitationView(context.db, input.invitationId);
+			const found = await wireSpaces({
+				db: context.db,
+			}).members.viewInvitation({ id: input.invitationId });
 			if (!found) {
 				throw new Refusal(
 					"not-found",

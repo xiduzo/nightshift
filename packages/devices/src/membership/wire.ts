@@ -1,10 +1,5 @@
 import { randomUUID } from "node:crypto";
-import {
-	adoptPersonalSpaceBatch,
-	personalSpaceId,
-	spaceExists,
-	splitPersonalSpaceBatch,
-} from "@nightshift/auth";
+import { wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { device } from "@nightshift/db/schema";
 import {
@@ -46,13 +41,14 @@ import { previewMerge } from "./application/preview-merge";
 export type { HomeMembership };
 
 function personalSpacesOf(db: Database): PersonalSpaces {
+	const spaces = wireSpaces({ db });
 	return {
-		personalId: (personId) => personalSpaceId(db, personId),
-		exists: (spaceId) => spaceExists(db, spaceId),
+		personalId: (personId) => spaces.personal.findPersonalSpace({ personId }),
+		exists: (spaceId) => spaces.hasSpace({ spaceId }),
 		adoptBatch: async (input) =>
-			(await adoptPersonalSpaceBatch(db, input)) as unknown as RowBatch,
+			(await spaces.personal.adoptPersonalSpace(input)) as unknown as RowBatch,
 		splitBatch: async (input) =>
-			(await splitPersonalSpaceBatch(db, input)) as unknown as RowBatch,
+			(await spaces.personal.splitPersonalSpace(input)) as unknown as RowBatch,
 	};
 }
 

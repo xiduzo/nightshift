@@ -1,11 +1,4 @@
-import {
-	endSession,
-	liveSessionIds,
-	roleAllows,
-	roleIn,
-	spaceIds,
-	spaceRoster,
-} from "@nightshift/auth";
+import { type Auth, roleAllows, wireLogin, wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { type Engine, NIGHT_SHIFT, type PersonActor } from "@nightshift/engine";
 import { now as timeNow } from "@nightshift/time";
@@ -41,6 +34,8 @@ import {
 
 export type NotificationsOptions = {
 	db: Database;
+	/** Better Auth: session end and live checks for push targets. */
+	auth: Auth;
 	events: RunEventSource;
 	/** Whether this daemon sends the pushes of the Space (`oneSenderPerSpace`). */
 	sendsFor(spaceId: string): Promise<boolean>;
@@ -153,8 +148,10 @@ export type Notifications = {
 export function createNotifications(
 	options: NotificationsOptions,
 ): Notifications {
-	const { db } = options;
+	const { db, auth } = options;
 	const now = options.now ?? timeNow;
+	const spaces = wireSpaces({ db });
+	const login = wireLogin({ auth, db });
 	const settings = wireSettings({
 		db,
 		...(options.timeZone ? { timeZone: options.timeZone } : {}),
@@ -171,9 +168,9 @@ export function createNotifications(
 		db,
 		clock: now,
 		sessions: {
-			live: (sessionIds, at) => liveSessionIds(db, sessionIds, at),
+			live: (sessionIds, at) => login.listLiveSessions({ sessionIds, at }),
 			end: async (personId, sessionId) => {
-				await endSession(db, personId, sessionId);
+				await login.endSession({ personId, sessionId });
 			},
 		},
 	});
@@ -193,16 +190,16 @@ export function createNotifications(
 	 * sees a Gate too, without its options.
 	 */
 	const audience = async (spaceId: string) =>
-		(await spaceRoster(db, spaceId)).map((member) => member.id);
+		(await spaces.members.listRoster({ spaceId })).map((member) => member.id);
 	const notifier = wireNotifier({
 		db,
 		events: options.events,
 		audience: { of: audience },
-		spaces: { all: () => spaceIds(db) },
+		spaces: { all: () => spaces.listSpaceIds() },
 		sendsFor: { sends: (spaceId) => options.sendsFor(spaceId) },
 		mayAnswer: {
 			allows: async (spaceId, personId) => {
-				const role = await roleIn(db, personId, spaceId);
+				const role = await spaces.findRole({ personId, spaceId });
 				return role !== null && roleAllows(role, { gate: ["resolve"] });
 			},
 		},

@@ -1,9 +1,4 @@
-import {
-	personalSpaceIdBySlug,
-	personNames,
-	roleAllows,
-	spacesOf,
-} from "@nightshift/auth";
+import { roleAllows, wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type {
 	Device,
@@ -197,11 +192,13 @@ export function wireOffers(ground: { now?: () => number } = {}) {
 	const now = ground.now ?? timeNow;
 
 	function membershipsOf(db: Database): Memberships {
+		const spaces = wireSpaces({ db });
 		return {
-			spacesOf: (personId) => spacesOf(db, personId),
+			spacesOf: (personId) => spaces.listSpaces({ personId }),
 			roleAllows,
-			personNames: (ids) => personNames(db, ids),
-			personalSpaceIdBySlug: (personId) => personalSpaceIdBySlug(db, personId),
+			personNames: (ids) => spaces.members.listPersonNames({ ids }),
+			personalSpaceIdBySlug: (personId) =>
+				spaces.personal.findPersonalSpaceBySlug({ personId }),
 			personInSpace: (spaceId, personId) =>
 				personInSpace(db, spaceId, personId),
 		};

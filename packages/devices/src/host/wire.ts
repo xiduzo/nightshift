@@ -1,17 +1,11 @@
 import type { DeviceKeyAccess, DeviceKeyPermission } from "@nightshift/auth";
 import {
 	type Auth,
-	approvePairing as approvePairingOn,
 	bearerDeviceKey,
-	createDeviceKeys,
-	denyPairing as denyPairingOn,
-	isHostAdmin,
-	redeemPairing as redeemPairingOn,
-	reviewPairing as reviewPairingOn,
 	roleAllows,
-	roleIn,
-	spacesOf,
-	startPairing as startPairingOn,
+	wireDeviceKeys,
+	wirePairing,
+	wireSpaces,
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { SettingsStore } from "@nightshift/engine/device-config";
@@ -75,35 +69,38 @@ export type Host = ReturnType<typeof wireHost>;
 export function wireHost(deps: HostDeps) {
 	const pending = createPendingPairings(deps.pending);
 	const now = deps.now ?? timeNow;
-	const keys = createDeviceKeys({
+	const keys = wireDeviceKeys({
 		auth: deps.auth,
 		db: deps.db,
 		idleDays: () => deps.settings.current().deviceKeyIdleDays,
 	});
+	const pairing = wirePairing({ auth: deps.auth });
+	const spacesBound = wireSpaces({ db: deps.db });
 	const settings: HostSettings = {
 		isHost: () => deps.settings.current().host,
 		hostAddresses: () => deps.settings.current().hostAddresses,
 	};
 	const spaces = {
-		of: (personId: string) => spacesOf(deps.db, personId),
-		isHostAdmin: (personId: string) => isHostAdmin(deps.db, personId),
+		of: (personId: string) => spacesBound.listSpaces({ personId }),
+		isHostAdmin: (personId: string) =>
+			spacesBound.members.isHostAdmin({ personId }),
 	};
 	const roles = {
 		roleIn: (personId: string, spaceId: string) =>
-			roleIn(deps.db, personId, spaceId),
+			spacesBound.findRole({ personId, spaceId }),
 		roleAllows,
 	};
 	const pairingPorts = {
 		pairings: {
-			startPairing: (deviceId: string) => startPairingOn(deps.auth, deviceId),
+			startPairing: (deviceId: string) => pairing.startPairing({ deviceId }),
 			redeemPairing: (input: { deviceCode: string; deviceId: string }) =>
-				redeemPairingOn(deps.auth, input),
+				pairing.redeemPairing(input),
 			reviewPairing: (headers: Headers, userCode: string) =>
-				reviewPairingOn(deps.auth, headers, userCode),
+				pairing.reviewPairing({ headers, userCode }),
 			approvePairing: (headers: Headers, userCode: string) =>
-				approvePairingOn(deps.auth, headers, userCode),
+				pairing.approvePairing({ headers, userCode }),
 			denyPairing: (headers: Headers, userCode: string) =>
-				denyPairingOn(deps.auth, headers, userCode),
+				pairing.denyPairing({ headers, userCode }),
 		},
 		keys,
 		registry: deps.registry,

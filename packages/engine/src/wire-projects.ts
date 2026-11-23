@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { spaceExists } from "@nightshift/auth";
+import { wireSpaces as wireAuthSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { DeviceDirectory } from "./contract";
 import type { SpaceDocuments } from "./documents";
@@ -72,7 +72,9 @@ export function wireEngineProjects(deps: {
 	};
 	const projects = wireClones({
 		...shared,
-		knownSpaces: { exists: (spaceId) => spaceExists(db, spaceId) },
+		knownSpaces: {
+			exists: (spaceId) => wireAuthSpaces({ db }).hasSpace({ spaceId }),
+		},
 	});
 	const catalog = wireCatalog({
 		...shared,

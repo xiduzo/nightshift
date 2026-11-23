@@ -1,4 +1,4 @@
-import { hasLogin, TRUSTED_BROWSER_DAYS } from "@nightshift/auth";
+import { TRUSTED_BROWSER_DAYS } from "@nightshift/auth";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
@@ -44,7 +44,7 @@ export const account = {
 				signedIn: true,
 				person: { name: session.user.name, email: session.user.email },
 				thisComputer: context.fromThisComputer,
-				hasPassword: await hasLogin(context.db, session.user.id),
+				hasPassword: await context.hasLogin(session.user.id),
 				twoFactor: {
 					enabled: session.user.twoFactorEnabled === true,
 					required,

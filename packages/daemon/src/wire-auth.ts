@@ -1,18 +1,17 @@
 import {
 	type AuthOptions,
 	createAuth,
-	createLocalSession,
-	hasLogin,
 	hostPolicyFromEnv,
-	localPerson,
-	spaceIds,
+	type OwnedDevice,
+	wireLocalSession,
+	wireLogin,
+	wireSpaces,
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { authOriginsOf, hostAuthOrigins } from "./http";
 import type { DaemonEnv } from "./runtime";
 
 type Auth = ReturnType<typeof createAuth>;
-type OwnedDevice = NonNullable<Parameters<typeof localPerson>[1]>;
 
 /**
  * The auth block of the daemon's composition (`daemon.ts`): the sign-in of
@@ -52,6 +51,7 @@ export function wireDaemonAuth(deps: {
 			trustedOrigins: () => hostAuthOrigins(deps.hostSettings()),
 		},
 	);
+	const spaces = wireSpaces({ db });
 
 	return {
 		auth,
@@ -61,7 +61,7 @@ export function wireDaemonAuth(deps: {
 		 */
 		hostPolicy: hostPolicyFromEnv(env),
 		/** The ids of every Space this Replica knows. */
-		spaceIds: () => spaceIds(db),
+		spaceIds: () => spaces.listSpaceIds(),
 	};
 }
 
@@ -77,10 +77,14 @@ export async function openOwner(deps: {
 		setOwner: OwnedDevice["setOwner"];
 	};
 }) {
-	const { db } = deps;
-	const person = await localPerson(db, {
-		ownerId: await deps.self.ownerId(),
-		setOwner: (personId) => deps.self.setOwner(personId),
+	const { db, auth } = deps;
+	const spaces = wireSpaces({ db });
+	const login = wireLogin({ auth, db });
+	const person = await spaces.personal.findLocalPerson({
+		self: {
+			ownerId: await deps.self.ownerId(),
+			setOwner: (personId) => deps.self.setOwner(personId),
+		},
 	});
 	return {
 		person,
@@ -89,8 +93,12 @@ export async function openOwner(deps: {
 		 * computer without a session gets the session of the Person who owns it.
 		 * It reads nothing until a request asks.
 		 */
-		localSession: createLocalSession(deps.auth, db, person.userId),
+		localSession: wireLocalSession({
+			auth,
+			db,
+			personId: person.userId,
+		}),
 		/** Whether the Person who owns this computer has a sign-in for a browser elsewhere. */
-		ownerHasLogin: () => hasLogin(db, person.userId),
+		ownerHasLogin: () => login.hasLogin({ personId: person.userId }),
 	};
 }

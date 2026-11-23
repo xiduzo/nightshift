@@ -3,15 +3,8 @@ import { apikey } from "@nightshift/db/schema";
 import { asDate, instantOrNull, now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import type { DeviceKeys } from "../device-keys";
-import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
-import {
-	approvePairing,
-	createDeviceKeys,
-	denyPairing,
-	redeemPairing,
-	reviewPairing,
-	startPairing,
-} from "../wire-devices";
+import { type AuthSandbox, createAuthSandbox } from "../testing";
+import { testDeviceKeys, testPairing } from "../testing/wires";
 
 /**
  * Pairing by device authorization, and the Device keys it ends in: through
@@ -20,9 +13,11 @@ import {
 
 let sandbox: AuthSandbox;
 let keys: DeviceKeys;
+let pairing: ReturnType<typeof testPairing>;
 beforeEach(async () => {
 	sandbox = await createAuthSandbox();
-	keys = createDeviceKeys({ auth: sandbox.auth, db: sandbox.db });
+	keys = testDeviceKeys(sandbox.auth, sandbox.db);
+	pairing = testPairing(sandbox.auth);
 });
 afterEach(() => sandbox.cleanup());
 
@@ -31,27 +26,29 @@ const DEVICE = "8d2c4c1e-device-b";
 describe("pairing", () => {
 	test("the Person who reviews a code approves it; the Device learns who", async () => {
 		const ada = await sandbox.signUp("Ada");
-		const code = await startPairing(sandbox.auth, DEVICE);
+		const code = await pairing.startPairing({ deviceId: DEVICE });
 		expect(code.userCode).toMatch(/^[A-Z0-9]{8}$/);
 
 		const pending = { deviceCode: code.deviceCode, deviceId: DEVICE };
-		expect(await redeemPairing(sandbox.auth, pending)).toEqual({
+		expect(await pairing.redeemPairing(pending)).toEqual({
 			status: "pending",
 		});
 
 		// Typed with a dash and in lower case: still the same code.
 		const typed = `${code.userCode.slice(0, 4)}-${code.userCode.slice(4)}`;
-		const review = await reviewPairing(
-			sandbox.auth,
-			ada.headers,
-			typed.toLowerCase(),
-		);
+		const review = await pairing.reviewPairing({
+			headers: ada.headers,
+			userCode: typed.toLowerCase(),
+		});
 		expect(review).toEqual({
 			userCode: code.userCode,
 			status: "pending",
 			deviceId: DEVICE,
 		});
-		await approvePairing(sandbox.auth, ada.headers, code.userCode);
+		await pairing.approvePairing({
+			headers: ada.headers,
+			userCode: code.userCode,
+		});
 
 		const answer = await redeemAfterInterval(pending);
 		expect(answer).toEqual({ status: "approved", personId: ada.userId });
@@ -61,26 +58,36 @@ describe("pairing", () => {
 			.then((list) => list.length);
 		expect(sessions).toBe(1);
 		// The device code is used up.
-		await expect(redeemPairing(sandbox.auth, pending)).rejects.toThrow(
-			/not valid/,
-		);
+		await expect(pairing.redeemPairing(pending)).rejects.toThrow(/not valid/);
 	});
 
 	test("one Person cannot approve another Person's code (CVE-2026-45337)", async () => {
 		const ada = await sandbox.signUp("Ada");
 		const mallory = await sandbox.signUp("Mallory");
-		const code = await startPairing(sandbox.auth, DEVICE);
-		await reviewPairing(sandbox.auth, ada.headers, code.userCode);
+		const code = await pairing.startPairing({ deviceId: DEVICE });
+		await pairing.reviewPairing({
+			headers: ada.headers,
+			userCode: code.userCode,
+		});
 
 		// Mallory knows the code, but Ada holds it.
 		await expect(
-			reviewPairing(sandbox.auth, mallory.headers, code.userCode),
+			pairing.reviewPairing({
+				headers: mallory.headers,
+				userCode: code.userCode,
+			}),
 		).rejects.toThrow(/Another person/);
 		await expect(
-			approvePairing(sandbox.auth, mallory.headers, code.userCode),
+			pairing.approvePairing({
+				headers: mallory.headers,
+				userCode: code.userCode,
+			}),
 		).rejects.toThrow(/Another person/);
 		await expect(
-			denyPairing(sandbox.auth, mallory.headers, code.userCode),
+			pairing.denyPairing({
+				headers: mallory.headers,
+				userCode: code.userCode,
+			}),
 		).rejects.toThrow(/Another person/);
 		expect(
 			await redeemAfterInterval({
@@ -92,20 +99,32 @@ describe("pairing", () => {
 
 	test("an approval needs a review first, and a session", async () => {
 		const ada = await sandbox.signUp("Ada");
-		const code = await startPairing(sandbox.auth, DEVICE);
+		const code = await pairing.startPairing({ deviceId: DEVICE });
 		await expect(
-			approvePairing(sandbox.auth, ada.headers, code.userCode),
+			pairing.approvePairing({
+				headers: ada.headers,
+				userCode: code.userCode,
+			}),
 		).rejects.toThrow(/Enter the code first/);
 		await expect(
-			reviewPairing(sandbox.auth, new Headers(), code.userCode),
+			pairing.reviewPairing({
+				headers: new Headers(),
+				userCode: code.userCode,
+			}),
 		).rejects.toThrow(/Another person/);
 	});
 
 	test("a denied code ends the Device's wait", async () => {
 		const ada = await sandbox.signUp("Ada");
-		const code = await startPairing(sandbox.auth, DEVICE);
-		await reviewPairing(sandbox.auth, ada.headers, code.userCode);
-		await denyPairing(sandbox.auth, ada.headers, code.userCode);
+		const code = await pairing.startPairing({ deviceId: DEVICE });
+		await pairing.reviewPairing({
+			headers: ada.headers,
+			userCode: code.userCode,
+		});
+		await pairing.denyPairing({
+			headers: ada.headers,
+			userCode: code.userCode,
+		});
 		expect(
 			await redeemAfterInterval({
 				deviceCode: code.deviceCode,
@@ -116,11 +135,17 @@ describe("pairing", () => {
 
 	test("another Device cannot redeem the code", async () => {
 		const ada = await sandbox.signUp("Ada");
-		const code = await startPairing(sandbox.auth, DEVICE);
-		await reviewPairing(sandbox.auth, ada.headers, code.userCode);
-		await approvePairing(sandbox.auth, ada.headers, code.userCode);
+		const code = await pairing.startPairing({ deviceId: DEVICE });
+		await pairing.reviewPairing({
+			headers: ada.headers,
+			userCode: code.userCode,
+		});
+		await pairing.approvePairing({
+			headers: ada.headers,
+			userCode: code.userCode,
+		});
 		await expect(
-			redeemPairing(sandbox.auth, {
+			pairing.redeemPairing({
 				deviceCode: code.deviceCode,
 				deviceId: "another-device",
 			}),
@@ -130,7 +155,10 @@ describe("pairing", () => {
 	test("an unknown code is refused in words", async () => {
 		const ada = await sandbox.signUp("Ada");
 		await expect(
-			reviewPairing(sandbox.auth, ada.headers, "ZZZZZZZZ"),
+			pairing.reviewPairing({
+				headers: ada.headers,
+				userCode: "ZZZZZZZZ",
+			}),
 		).rejects.toThrow(/No device waits with this code/);
 	});
 });
@@ -242,7 +270,7 @@ describe("Device keys", () => {
 			.update(apikey)
 			.set({ expiresAt: asDate(now() - 1_000) })
 			.where(eq(apikey.id, keyId));
-		keys = createDeviceKeys({ auth: sandbox.auth, db: sandbox.db });
+		keys = testDeviceKeys(sandbox.auth, sandbox.db);
 		expect(await keys.verify(key)).toBeNull();
 		expect(await sandbox.db.select().from(apikey)).toHaveLength(0);
 	});
@@ -254,5 +282,5 @@ async function redeemAfterInterval(input: {
 	deviceId: string;
 }) {
 	await Bun.sleep(2_050);
-	return redeemPairing(sandbox.auth, input);
+	return pairing.redeemPairing(input);
 }

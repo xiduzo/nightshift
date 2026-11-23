@@ -1,9 +1,8 @@
 // The API of `@nightshift/auth`: the Better Auth instance (`auth.ts`, the
-// composition root of the package), the verticals' barrels, and the access
-// and Device functions that wire their slice per call (`wire-access.ts`,
-// `wire-devices.ts`).
+// composition root of the package) and the verticals' barrels.
 
 export {
+	type Access,
 	type AccessRefusal,
 	type DocumentOf,
 	type RequestAccess,
@@ -14,7 +13,9 @@ export {
 	type SyncAuthorize,
 	type SyncDeviceKey,
 	type SyncGrant,
+	type SyncSetup,
 	spaceAccess,
+	wireAccess,
 } from "./access";
 export {
 	type Auth,
@@ -28,6 +29,8 @@ export {
 	bearerDeviceKey,
 	type DeviceKeyAccess,
 	type DeviceKeyPermission,
+	type DeviceKeys,
+	wireDeviceKeys,
 } from "./device-keys";
 export {
 	authEndpointAllowed,
@@ -35,56 +38,28 @@ export {
 	type HostPolicy,
 	hostPolicyFromEnv,
 } from "./host-access";
-export type { LocalSession } from "./local-session";
+export { type LocalSession, wireLocalSession } from "./local-session";
+export { type Login, type LoginInput, wireLogin } from "./login";
+export {
+	type PairingAnswer,
+	type PairingCode,
+	type PairingReview,
+	wirePairing,
+} from "./pairing";
 // InvitationView, PendingInvitation and SpaceMember are in the API's
 // router type: its declaration must be able to name them.
 export {
-	addMembership,
-	adoptPersonalSpaceBatch,
 	type InvitationView,
-	invitationView,
-	isHostAdmin,
-	localPerson,
 	type MemberChange,
-	membershipOf,
-	membersOf,
-	mirrorHostSpace,
+	type OwnedDevice,
 	type PendingInvitation,
 	type Permissions,
-	personalSpaceId,
-	personalSpaceIdBySlug,
 	personalSpaceName,
-	personContact,
-	personNames,
 	type Role,
-	removeMemberships,
 	roleAllows,
-	roleIn,
 	type Space,
 	type SpaceMember,
-	setMembershipRole,
-	spaceExists,
-	spaceIds,
-	spaceRoster,
-	spacesOf,
-	splitPersonalSpaceBatch,
+	type Spaces,
+	wireSpaces,
 } from "./spaces";
 export { TRUSTED_BROWSER_DAYS } from "./two-factor";
-export {
-	authEndpointAccess,
-	createLocalSession,
-	documentAccess,
-	endSession,
-	hasLogin,
-	liveSessionIds,
-	requestAccess,
-	setLogin,
-} from "./wire-access";
-export {
-	approvePairing,
-	createDeviceKeys,
-	denyPairing,
-	redeemPairing,
-	reviewPairing,
-	startPairing,
-} from "./wire-devices";

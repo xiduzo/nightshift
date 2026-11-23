@@ -3,8 +3,11 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Refusal } from "@nightshift/refusal";
 
 import { TWO_FACTOR_REQUIRED } from "../host-access";
-import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
-import { requestAccess } from "../wire-access";
+import {
+	type AuthSandbox,
+	createAuthSandbox,
+	testRequestAccess,
+} from "../testing";
 import {
 	ROLE_REFUSAL,
 	RoleRefusal,
@@ -22,7 +25,7 @@ afterEach(() => sandbox.cleanup());
 
 describe("spaceAccess", () => {
 	test("a request without a session is asked to sign in", async () => {
-		const access = await requestAccess(
+		const access = await testRequestAccess(
 			sandbox.auth,
 			sandbox.db,
 			new Headers(),
@@ -38,7 +41,7 @@ describe("spaceAccess", () => {
 
 	test("a session the Host does not let in gets the Host's refusal", async () => {
 		const { headers } = await sandbox.signUp("Ada");
-		const access = await requestAccess(
+		const access = await testRequestAccess(
 			sandbox.auth,
 			sandbox.db,
 			headers,
@@ -56,7 +59,12 @@ describe("spaceAccess", () => {
 
 	test("a session in a Space works there", async () => {
 		const { userId, headers } = await sandbox.signUp("Ada");
-		const access = await requestAccess(sandbox.auth, sandbox.db, headers, null);
+		const access = await testRequestAccess(
+			sandbox.auth,
+			sandbox.db,
+			headers,
+			null,
+		);
 		const answer = spaceAccess(access);
 		expect(answer.allowed && answer.session.user.id).toBe(userId);
 		expect(answer.allowed && answer.spaceId).toBe(access.spaceId ?? "");

@@ -2,7 +2,8 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fakeHarness } from "@nightshift/agents/testing";
-import { membersOf } from "@nightshift/auth";
+import { createAuth } from "@nightshift/auth";
+import { testSpaces } from "@nightshift/auth/testing";
 import { createConfigUse, createEngine, type Engine } from "@nightshift/engine";
 import {
 	createSandbox,
@@ -135,7 +136,9 @@ describe("replies of a real engine", () => {
 			mismatches.push({ path: current, mismatch }),
 		);
 		// The personal Space has one Member: this computer's owner.
-		const { members } = await membersOf(sandbox.db, sandbox.spaceId);
+		const { members } = await testSpaces(sandbox.db).members.listMembers({
+			spaceId: sandbox.spaceId,
+		});
 		const personId = members[0]?.personId ?? "";
 		const document = await sandbox.openDocument();
 		const secrets: Parameters<typeof openConfigStores>[0]["secrets"] = {
@@ -153,8 +156,17 @@ describe("replies of a real engine", () => {
 				harnesses: { "claude-code": fakeHarness() },
 			}),
 		);
+		const auth = createAuth(
+			{
+				BETTER_AUTH_URL: "http://localhost:3000",
+				BETTER_AUTH_SECRET: "a-test-secret-of-at-least-32-characters",
+				CORS_ORIGIN: "http://localhost:3001",
+			},
+			sandbox.db,
+		);
 		notifications = createNotifications({
 			db: sandbox.db,
+			auth,
 			events: engineRunEvents(engine),
 			sendsFor: async () => true,
 			inApp,

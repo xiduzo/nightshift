@@ -11,20 +11,27 @@ import {
 import {
 	type HostPolicy,
 	type Permissions,
-	personalSpaceId,
 	type Role,
 	RoleRefusal,
-	requestAccess,
 	roleAllows,
 	TRUSTED_BROWSER_DAYS,
 } from "@nightshift/auth";
+
 import {
 	type AuthSandbox,
 	createAuthSandbox,
 	OPEN_HOST,
 	TWO_FACTOR_REQUIRED,
+	testRequestAccess,
+	testSpaces,
 	turnOnTwoFactor,
 } from "@nightshift/auth/testing";
+
+const personalSpaceId = (
+	db: Parameters<typeof testSpaces>[0],
+	personId: string,
+) => testSpaces(db).personal.findPersonalSpace({ personId });
+
 import { hostRouter } from "@nightshift/devices";
 import {
 	type Engine,
@@ -388,6 +395,7 @@ function recording(
 		deviceKey,
 		requireTwoFactor: false,
 		setLogin: recorder(["setLogin"], record) as Context["setLogin"],
+		hasLogin: recorder(["hasLogin"], record) as Context["hasLogin"],
 	};
 }
 
@@ -1163,7 +1171,7 @@ async function contextFor(
 		deviceKey,
 	} = options;
 	const access = headers
-		? await requestAccess(sandbox.auth, sandbox.db, headers, null, policy)
+		? await testRequestAccess(sandbox.auth, sandbox.db, headers, null, policy)
 		: {
 				...accessAs({ personId: "nobody", spaceId: SPACE, role: "viewer" }),
 				session: null,

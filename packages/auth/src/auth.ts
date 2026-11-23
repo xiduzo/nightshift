@@ -18,14 +18,11 @@ import { twoFactor } from "better-auth/plugins/two-factor";
 import { DEVICE_KEY_PREFIX } from "./device-keys";
 import { PAIRING_CODE_TTL, PAIRING_POLL_INTERVAL } from "./pairing";
 import {
-	activeSpaceId,
-	ensurePersonalSpace,
 	HOST_ADMIN,
-	hasHostAdmin,
 	type MemberChange,
 	ROLE_PERMISSIONS,
-	signUpRefusal,
 	statements,
+	wireSpaces,
 } from "./spaces";
 import { TRUSTED_BROWSER_DAYS } from "./two-factor";
 
@@ -164,6 +161,7 @@ export function createAuth(
 		await options.onMembersChanged?.(change.spaceId);
 		await options.onMemberChange?.(change);
 	};
+	const spaces = wireSpaces({ db: database });
 	return betterAuth({
 		database: drizzleAdapter(database, {
 			provider: "sqlite",
@@ -201,7 +199,9 @@ export function createAuth(
 		hooks: {
 			before: createAuthMiddleware(async (ctx) => {
 				if (ctx.path !== "/sign-up/email") return;
-				const refusal = await signUpRefusal(database, ctx.body ?? {});
+				const refusal = await spaces.members.checkSignUp({
+					body: ctx.body ?? {},
+				});
 				if (refusal) refuse(refusal);
 			}),
 		},
@@ -212,11 +212,13 @@ export function createAuth(
 					before: async (data) => ({
 						data: {
 							...data,
-							role: (await hasHostAdmin(database)) ? "user" : HOST_ADMIN,
+							role: (await spaces.members.hasHostAdmin()) ? "user" : HOST_ADMIN,
 						},
 					}),
 					after: async (created) => {
-						await ensurePersonalSpace(database, created.id);
+						await spaces.personal.ensurePersonalSpace({
+							personId: created.id,
+						});
 					},
 				},
 			},
@@ -225,7 +227,10 @@ export function createAuth(
 					before: async (session) => ({
 						data: {
 							...session,
-							activeOrganizationId: await activeSpaceId(database, session),
+							activeOrganizationId: await spaces.findActiveSpace({
+								personId: session.userId,
+								activeSpaceId: session.activeOrganizationId,
+							}),
 						},
 					}),
 				},

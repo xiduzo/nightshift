@@ -12,14 +12,10 @@ import { setLogin } from "./application/set-login";
  * binds each use case to its ports.
  */
 
-/**
- * What the package gives login: what the real adapters stand on. Until
- * A4, a caller holds only the one it needs: `setLogin` stands on `auth`,
- * the other use cases on `db`. A use case without its own fails.
- */
+/** What the package gives login: what the real adapters stand on. */
 export type LoginDeps = {
-	auth?: Auth;
-	db?: Database;
+	auth: Auth;
+	db: Database;
 };
 
 /** The use cases of login, bound to their ports. */

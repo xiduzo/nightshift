@@ -1,6 +1,6 @@
 import { now } from "@nightshift/time";
-import { localPerson } from "../../../spaces";
-import { createAuthSandbox } from "../../../testing/sandbox";
+import { createAuthSandbox } from "../../../testing";
+import { testLocalPerson } from "../../../testing/wires";
 import { betterAuthSessions } from "./better-auth-sessions";
 import { inMemorySessions } from "./in-memory-sessions";
 import { sessionsContract } from "./sessions.contract";
@@ -24,7 +24,7 @@ sessionsContract("in memory", async () => {
 
 sessionsContract("over better-auth", async () => {
 	const sandbox = await createAuthSandbox();
-	const person = await localPerson(sandbox.db);
+	const person = await testLocalPerson(sandbox.db);
 	return {
 		sessions: betterAuthSessions(sandbox.auth, sandbox.db),
 		personId: person.userId,

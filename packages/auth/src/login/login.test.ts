@@ -1,27 +1,31 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { localPerson } from "../spaces";
-import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
+import { type AuthSandbox, createAuthSandbox } from "../testing";
 import { turnOnTwoFactor } from "../testing/two-factor";
-import { endSession, hasLogin, setLogin } from "../wire-access";
+import { testLocalPerson, testLogin } from "../testing/wires";
 
 let sandbox: AuthSandbox;
+let login: ReturnType<typeof testLogin>;
 beforeEach(async () => {
 	sandbox = await createAuthSandbox();
+	login = testLogin(sandbox.auth, sandbox.db);
 });
 afterEach(() => sandbox.cleanup());
 
 describe("a login for the Host admin of a Host without a screen", () => {
 	test("this computer's Person gets an email and a password, and signs in with them", async () => {
-		const local = await localPerson(sandbox.db);
-		expect(await hasLogin(sandbox.db, local.userId)).toBe(false);
+		const local = await testLocalPerson(sandbox.db);
+		expect(await login.hasLogin({ personId: local.userId })).toBe(false);
 		expect(
-			await setLogin(sandbox.auth, local.userId, {
-				email: " Ada@Example.com ",
-				password: "a-long-password",
-				name: "Ada",
+			await login.setLogin({
+				personId: local.userId,
+				input: {
+					email: " Ada@Example.com ",
+					password: "a-long-password",
+					name: "Ada",
+				},
 			}),
 		).toEqual({ email: "ada@example.com" });
-		expect(await hasLogin(sandbox.db, local.userId)).toBe(true);
+		expect(await login.hasLogin({ personId: local.userId })).toBe(true);
 		const headers = await sandbox.signIn("ada@example.com", "a-long-password");
 		const session = await sandbox.auth.api.getSession({ headers });
 		expect(session?.user.id).toBe(local.userId);
@@ -32,12 +36,15 @@ describe("a login for the Host admin of a Host without a screen", () => {
 	});
 
 	test("setting it again replaces the password", async () => {
-		const local = await localPerson(sandbox.db);
-		const login = { email: "ada@example.com", password: "first-password" };
-		await setLogin(sandbox.auth, local.userId, login);
-		await setLogin(sandbox.auth, local.userId, {
-			...login,
-			password: "second-password",
+		const local = await testLocalPerson(sandbox.db);
+		const creds = { email: "ada@example.com", password: "first-password" };
+		await login.setLogin({ personId: local.userId, input: creds });
+		await login.setLogin({
+			personId: local.userId,
+			input: {
+				...creds,
+				password: "second-password",
+			},
 		});
 		await expect(
 			sandbox.signIn("ada@example.com", "first-password"),
@@ -48,45 +55,57 @@ describe("a login for the Host admin of a Host without a screen", () => {
 	});
 
 	test("refuses another Person's email, a short password, and no email", async () => {
-		const local = await localPerson(sandbox.db);
+		const local = await testLocalPerson(sandbox.db);
 		await sandbox.signUp("Bob");
 		await expect(
-			setLogin(sandbox.auth, local.userId, {
-				email: "bob@example.com",
-				password: "a-long-password",
+			login.setLogin({
+				personId: local.userId,
+				input: {
+					email: "bob@example.com",
+					password: "a-long-password",
+				},
 			}),
 		).rejects.toThrow("Another Person here signs in with bob@example.com.");
 		await expect(
-			setLogin(sandbox.auth, local.userId, {
-				email: "ada@example.com",
-				password: "short",
+			login.setLogin({
+				personId: local.userId,
+				input: {
+					email: "ada@example.com",
+					password: "short",
+				},
 			}),
 		).rejects.toThrow("at least 8 characters");
 		await expect(
-			setLogin(sandbox.auth, local.userId, {
-				email: "ada",
-				password: "a-long-password",
+			login.setLogin({
+				personId: local.userId,
+				input: {
+					email: "ada",
+					password: "a-long-password",
+				},
 			}),
 		).rejects.toThrow("is not an email address");
 	});
 
 	test("--reset-two-factor: a new password signs in without the lost app", async () => {
-		const local = await localPerson(sandbox.db);
-		const login = { email: "ada@example.com", password: "a-long-password" };
-		await setLogin(sandbox.auth, local.userId, login);
+		const local = await testLocalPerson(sandbox.db);
+		const creds = { email: "ada@example.com", password: "a-long-password" };
+		await login.setLogin({ personId: local.userId, input: creds });
 		await turnOnTwoFactor(
 			sandbox.auth,
-			await sandbox.signIn(login.email, login.password),
+			await sandbox.signIn(creds.email, creds.password),
 		);
-		const asked = await sandbox.auth.api.signInEmail({ body: login });
+		const asked = await sandbox.auth.api.signInEmail({ body: creds });
 		expect(asked).toMatchObject({ twoFactorRedirect: true });
 
-		await setLogin(sandbox.auth, local.userId, {
-			...login,
-			password: "a-new-password",
-			resetTwoFactor: true,
+		await login.setLogin({
+			personId: local.userId,
+			input: {
+				...creds,
+				password: "a-new-password",
+				resetTwoFactor: true,
+			},
 		});
-		const headers = await sandbox.signIn(login.email, "a-new-password");
+		const headers = await sandbox.signIn(creds.email, "a-new-password");
 		const session = await sandbox.auth.api.getSession({ headers });
 		expect(session?.user.twoFactorEnabled).toBe(false);
 	});
@@ -99,12 +118,16 @@ describe("ending a session", () => {
 		const session = await sandbox.auth.api.getSession({ headers: ada.headers });
 		const sessionId = session?.session.id ?? "";
 
-		expect(await endSession(sandbox.db, bob.userId, sessionId)).toBe(false);
+		expect(await login.endSession({ personId: bob.userId, sessionId })).toBe(
+			false,
+		);
 		expect(
 			await sandbox.auth.api.getSession({ headers: ada.headers }),
 		).not.toBeNull();
 
-		expect(await endSession(sandbox.db, ada.userId, sessionId)).toBe(true);
+		expect(await login.endSession({ personId: ada.userId, sessionId })).toBe(
+			true,
+		);
 		expect(
 			await sandbox.auth.api.getSession({ headers: ada.headers }),
 		).toBeNull();

@@ -415,6 +415,7 @@ async function makeDaemon(
 
 	const screens = await wireDaemonNotifications({
 		db,
+		auth,
 		env,
 		engine,
 		settings,

@@ -1,13 +1,4 @@
-import {
-	addMembership,
-	membershipOf,
-	mirrorHostSpace,
-	personalSpaceId,
-	personalSpaceName,
-	removeMemberships,
-	setMembershipRole,
-	spaceExists,
-} from "@nightshift/auth";
+import { personalSpaceName, wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { hostLink, hostSpace } from "@nightshift/db/schema";
 import { asDate, instantOrNull } from "@nightshift/time";
@@ -60,13 +51,16 @@ export function createHostSpaces(db: Database) {
 			personId: string,
 		): Promise<void> {
 			const listed = spaces.map((s) => s.id);
+			const bound = wireSpaces({ db });
 			// After a merge (ADR 1), the Person's personal Space here is the
 			// Host's: it is named as their own.
-			const ownPersonal = await personalSpaceId(db, personId);
+			const ownPersonal = await bound.personal.findPersonalSpace({
+				personId,
+			});
 			// No transaction: every write is an upsert, and it runs with each
 			// answer of the Host, beside the walk's own writes.
 			for (const space of spaces) {
-				const own = await spaceExists(db, space.id);
+				const own = await bound.hasSpace({ spaceId: space.id });
 				const [kept] = await db
 					.select()
 					.from(hostSpace)
@@ -77,7 +71,10 @@ export function createHostSpaces(db: Database) {
 				const name = !space.personal
 					? space.name
 					: personalSpaceName(space.id === ownPersonal ? undefined : host.name);
-				const membership = await membershipOf(db, space.id, personId);
+				const membership = await bound.members.findMembership({
+					spaceId: space.id,
+					personId,
+				});
 				if (
 					kept?.name === name &&
 					kept.role === space.role &&
@@ -104,15 +101,18 @@ export function createHostSpaces(db: Database) {
 							updatedAt: asDate(),
 						},
 					});
-				await mirrorHostSpace(db, { id: space.id, name });
+				await bound.mirrorHostSpace({ id: space.id, name });
 				if (!membership) {
-					await addMembership(db, {
+					await bound.members.addMembership({
 						spaceId: space.id,
 						personId,
 						role: space.role,
 					});
 				} else if (membership.role !== space.role) {
-					await setMembershipRole(db, membership.id, space.role);
+					await bound.members.setMembershipRole({
+						membershipId: membership.id,
+						role: space.role,
+					});
 				}
 			}
 			const gone = await db
@@ -128,7 +128,10 @@ export function createHostSpaces(db: Database) {
 				);
 			const goneIds = gone.map((g) => g.spaceId);
 			if (goneIds.length > 0) {
-				await removeMemberships(db, goneIds, personId);
+				await bound.members.removeMemberships({
+					spaceIds: goneIds,
+					personId,
+				});
 				await db.delete(hostSpace).where(inArray(hostSpace.spaceId, goneIds));
 			}
 		},

@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { localPerson } from "../spaces";
-import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
+import { type AuthSandbox, createAuthSandbox } from "../testing";
 import { turnOnTwoFactor } from "../testing/two-factor";
-import { createLocalSession, documentAccess } from "../wire-access";
+import {
+	testDocumentAccess,
+	testLocalPerson,
+	testLocalSession,
+} from "../testing/wires";
 import type { DocumentOf, SyncDeviceKey } from "./domain/sync-access";
 
 /**
@@ -28,7 +31,7 @@ const OWN = "device:this-computer";
 
 beforeEach(async () => {
 	people = await createAuthSandbox();
-	ownerId = (await localPerson(people.db)).userId;
+	ownerId = (await testLocalPerson(people.db)).userId;
 	documents = new Map([[OWN, { kind: "device", deviceId: "this-computer" }]]);
 	deviceKeys = new Map();
 	keptOwners = new Map();
@@ -37,10 +40,8 @@ afterEach(() => people.cleanup());
 
 /** The policy as the daemon wires it, with the Host's options. */
 function policy(options: { requireTwoFactor?: boolean } = {}) {
-	return documentAccess({
-		auth: people.auth,
-		db: people.db,
-		localSession: createLocalSession(people.auth, people.db, ownerId),
+	return testDocumentAccess(people.auth, people.db, {
+		localSession: testLocalSession(people.auth, people.db, ownerId),
 		ownerId,
 		// This computer's own requests come from this address.
 		isThisComputer: (peer) => peer === "this-computer",

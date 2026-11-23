@@ -3,39 +3,13 @@
 
 export type { Space } from "./application/list-spaces";
 export {
-	activeSpaceId,
-	addMembership,
-	adoptPersonalSpaceBatch,
-	ensurePersonalSpace,
-	hasHostAdmin,
-	invitationView,
-	isHostAdmin,
-	localPerson,
-	membershipOf,
-	membersOf,
-	mirrorHostSpace,
-	personalSpaceId,
-	personalSpaceIdBySlug,
-	personContact,
-	personNames,
-	removeMemberships,
-	roleIn,
-	setMembershipRole,
-	signUpRefusal,
-	spaceExists,
-	spaceIds,
-	spaceRoster,
-	spacesOf,
-	splitPersonalSpaceBatch,
-} from "./facades";
-export {
 	HOST_ADMIN,
 	type InvitationView,
 	type MemberChange,
 	type PendingInvitation,
 	type SpaceMember,
 } from "./members";
-export { personalSpaceName } from "./personal";
+export { type OwnedDevice, personalSpaceName } from "./personal";
 export {
 	type Permissions,
 	ROLE_PERMISSIONS,
@@ -43,3 +17,4 @@ export {
 	roleAllows,
 	statements,
 } from "./roles";
+export { type Spaces, wireSpaces } from "./wire";

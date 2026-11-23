@@ -1,9 +1,4 @@
-import {
-	personNames,
-	ROLE_REFUSAL,
-	roleAllows,
-	roleIn,
-} from "@nightshift/auth";
+import { ROLE_REFUSAL, roleAllows, wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { PersonalSecrets, ProjectSecrets } from "@nightshift/engine";
 import type { WorkRelay, WorkReply, WorkRequest } from "../contract";
@@ -106,6 +101,7 @@ export function wireSecrets(deps: SecretsDeps): Secrets {
 		keep(late) {
 			linksOf = late.links;
 			const { db } = late;
+			const authSpaces = wireSpaces({ db });
 			/** The secrets this computer keeps, sealed at rest. */
 			const kept = wireKept({ db, secretsKey: late.secretsKey });
 			const personal = wirePersonal({
@@ -121,8 +117,10 @@ export function wireSecrets(deps: SecretsDeps): Secrets {
 				places: late.places,
 				spaces: { hostOf: late.hostOf },
 				members: {
-					roleIn: (personId, spaceId) => roleIn(db, personId, spaceId),
-					names: (personIds) => personNames(db, personIds),
+					roleIn: (personId, spaceId) =>
+						authSpaces.findRole({ personId, spaceId }),
+					names: (personIds) =>
+						authSpaces.members.listPersonNames({ ids: personIds }),
 				},
 				rules: {
 					savesFlows: (role) => roleAllows(role, { flow: ["save"] }),

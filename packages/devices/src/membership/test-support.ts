@@ -1,10 +1,5 @@
 import { randomUUID } from "node:crypto";
-import {
-	adoptPersonalSpaceBatch,
-	personalSpaceId,
-	spaceExists,
-	splitPersonalSpaceBatch,
-} from "@nightshift/auth";
+import { wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { device } from "@nightshift/db/schema";
 import { HostUnreachableError, NIGHT_SHIFT } from "@nightshift/engine";
@@ -46,16 +41,17 @@ export function createHomeMembershipForTest(
 	deps: LegacyHomeMembershipDeps,
 ): HomeMembership {
 	const { db, wait, ids, ...rest } = deps;
+	const spaces = wireSpaces({ db });
 	return createHomeMembership({
 		...rest,
 		record: drizzleMembershipRecord(db),
 		personalSpaces: {
-			personalId: (personId) => personalSpaceId(db, personId),
-			exists: (spaceId) => spaceExists(db, spaceId),
+			personalId: (personId) => spaces.personal.findPersonalSpace({ personId }),
+			exists: (spaceId) => spaces.hasSpace({ spaceId }),
 			adoptBatch: async (input) =>
-				(await adoptPersonalSpaceBatch(db, input)) as never,
+				(await spaces.personal.adoptPersonalSpace(input)) as never,
 			splitBatch: async (input) =>
-				(await splitPersonalSpaceBatch(db, input)) as never,
+				(await spaces.personal.splitPersonalSpace(input)) as never,
 		},
 		pairedDevices: {
 			async hasPaired() {

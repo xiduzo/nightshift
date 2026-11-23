@@ -1,4 +1,4 @@
-import { type Permissions, roleAllows, roleIn } from "@nightshift/auth";
+import { type Permissions, roleAllows, wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { SpaceMembers } from "../../application/ports";
 
@@ -23,17 +23,21 @@ function allows(role: string, need: Permissions): boolean {
 
 /**
  * What a Person's role allows, over the roles of `@nightshift/auth`. The
- * API and a Host read the `member` rows of this Replica (`roleIn`). The
- * Walker reads a Command's Person from the Members of the Space document,
- * as the exchange of `devices` did before (`door: "command"`).
+ * API and a Host read the `member` rows of this Replica. The Walker reads
+ * a Command's Person from the Members of the Space document, as the
+ * exchange of `devices` did before (`door: "command"`).
  */
 export function authSpaceMembers(deps: AuthSpaceMembersDeps): SpaceMembers {
+	const spaces = wireSpaces({ db: deps.db });
 	return {
 		async may(spaceId, person, need) {
 			const role =
 				person.door === "command"
 					? await deps.documentRole(spaceId, person.personId)
-					: await roleIn(deps.db, person.personId, spaceId);
+					: await spaces.findRole({
+							personId: person.personId,
+							spaceId,
+						});
 			if (!role) return "not-a-member";
 			return allows(role, need) ? "yes" : "no";
 		},

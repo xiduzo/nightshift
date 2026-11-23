@@ -62,6 +62,8 @@ export type Context = Services & {
 			resetTwoFactor?: boolean;
 		},
 	): Promise<{ email: string }>;
+	/** Whether the Person can sign in with an email and a password. */
+	hasLogin(personId: string): Promise<boolean>;
 };
 
 /**

@@ -26,6 +26,8 @@ export const PACKAGE_CLIENT: Record<string, Place> = {
 	projects: "projects",
 	runs: "runs",
 	schedules: "schedules",
+	/** This computer's settings and its Ollama: query keys shared with the apps. */
+	settings: "settings",
 	spaces: "spaces",
 	usage: M,
 };

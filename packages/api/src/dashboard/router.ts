@@ -1,4 +1,4 @@
-import { spacesOf } from "@nightshift/auth";
+import { wireSpaces } from "@nightshift/auth";
 import { now } from "@nightshift/time";
 import { z } from "zod";
 import { output } from "../output";
@@ -46,7 +46,11 @@ export const dashboard = {
 			}
 			const personId = context.session.user.id;
 			const spaceIds = input.everySpace
-				? (await spacesOf(context.db, personId)).map((space) => space.id)
+				? (
+						await wireSpaces({ db: context.db }).listSpaces({
+							personId,
+						})
+					).map((space) => space.id)
 				: [context.spaceId];
 			return dashboard.readSpacesDashboard(context.actor, {
 				spaceIds,

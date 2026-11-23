@@ -1,3 +1,4 @@
+import type { Auth } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { deviceDirectory } from "@nightshift/devices";
 import type { Engine } from "@nightshift/engine";
@@ -31,6 +32,7 @@ export type DesktopScreen = {
 
 export type NotificationsWiring = {
 	db: Database;
+	auth: Auth;
 	env: DaemonEnv;
 	engine: Parameters<typeof engineRunEvents>[0] &
 		Pick<Engine, "onSchedulesChanged">;
@@ -97,6 +99,7 @@ export async function wireNotifications(
 		() =>
 			createNotifications({
 				db,
+				auth: wiring.auth,
 				events: engineRunEvents(wiring.engine),
 				sendsFor: sendsPushesFor(db, settings, owner),
 				inApp,

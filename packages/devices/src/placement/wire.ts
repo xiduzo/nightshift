@@ -1,4 +1,4 @@
-import { personalSpaceIdBySlug, personNames } from "@nightshift/auth";
+import { wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import {
 	deviceNameIn,
@@ -21,10 +21,12 @@ import { planRun } from "./application/plan-run";
 import type { SpacePeople } from "./application/ports";
 
 function spacePeopleOf(db: Database): SpacePeople {
+	const spaces = wireSpaces({ db });
 	return {
 		personInSpace: (spaceId, personId) => personInSpace(db, spaceId, personId),
-		personalSpaceIdBySlug: (personId) => personalSpaceIdBySlug(db, personId),
-		personNames: (ids) => personNames(db, ids),
+		personalSpaceIdBySlug: (personId) =>
+			spaces.personal.findPersonalSpaceBySlug({ personId }),
+		personNames: (ids) => spaces.members.listPersonNames({ ids }),
 		keptByHomeHost: (spaceId) => keptByHomeHost(db, spaceId),
 	};
 }

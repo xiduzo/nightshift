@@ -1,8 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { testSpaces } from "@nightshift/auth/testing";
+
+const personalSpaceId = (
+	db: Parameters<typeof testSpaces>[0],
+	personId: string,
+) => testSpaces(db).personal.findPersonalSpace({ personId });
+
 import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { personalSpaceId } from "@nightshift/auth";
+
 import {
 	device,
 	event,

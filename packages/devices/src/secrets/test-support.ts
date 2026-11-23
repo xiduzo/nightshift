@@ -1,9 +1,4 @@
-import {
-	personNames,
-	ROLE_REFUSAL,
-	roleAllows,
-	roleIn,
-} from "@nightshift/auth";
+import { ROLE_REFUSAL, roleAllows, wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { PersonalSecrets, ProjectSecrets } from "@nightshift/engine";
 import type { DeviceLinks, HostLinks, HostSpaces } from "../links";
@@ -144,11 +139,13 @@ export type { OwnSecrets };
 
 /** The Members and the role rules, from the member rows of `db`, as the slice's wire fills them. */
 function membersOf(db: Database) {
+	const spaces = wireSpaces({ db });
 	return {
 		members: {
 			roleIn: (personId: string, spaceId: string) =>
-				roleIn(db, personId, spaceId),
-			names: (personIds: readonly string[]) => personNames(db, personIds),
+				spaces.findRole({ personId, spaceId }),
+			names: (personIds: readonly string[]) =>
+				spaces.members.listPersonNames({ ids: personIds }),
 		},
 		rules: {
 			savesFlows: (role: Parameters<typeof roleAllows>[0]) =>

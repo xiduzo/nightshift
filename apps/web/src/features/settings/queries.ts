@@ -1,6 +1,7 @@
 import {
 	createOllamaQueries,
 	createSettingsQueries,
+	createUsageQueries,
 } from "@nightshift/client";
 import { orpc } from "@/shared/api";
 
@@ -18,4 +19,12 @@ export const ollamaQueries = createOllamaQueries(orpc);
 /** Starts a download of an Ollama model. */
 export const ollamaMutations = {
 	pull: ollamaQueries.pull(),
+};
+
+/** Anonymous usage on this computer: what waits, the catalog, a new id. */
+export const usageQueries = createUsageQueries(orpc);
+
+/** Makes a new anonymous usage id. */
+export const usageMutations = {
+	resetId: usageQueries.resetId(),
 };

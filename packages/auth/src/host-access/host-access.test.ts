@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { localPerson } from "../spaces";
-import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
+import {
+	type AuthSandbox,
+	createAuthSandbox,
+	testRequestAccess,
+} from "../testing";
 import { turnOnTwoFactor } from "../testing/two-factor";
-import { createLocalSession, requestAccess } from "../wire-access";
+import { testLocalPerson, testLocalSession } from "../testing/wires";
 
 const REQUIRED = { requireTwoFactor: true };
 
@@ -15,7 +18,7 @@ describe("requestAccess on a Host that requires two-factor", () => {
 
 	test("a session from another computer is refused until its Person turns two-factor on", async () => {
 		const ada = await sandbox.signUp("Ada");
-		const before = await requestAccess(
+		const before = await testRequestAccess(
 			sandbox.auth,
 			sandbox.db,
 			ada.headers,
@@ -26,7 +29,7 @@ describe("requestAccess on a Host that requires two-factor", () => {
 		expect(before.hostAccess.allowed).toBe(false);
 
 		const { headers } = await turnOnTwoFactor(sandbox.auth, ada.headers);
-		const after = await requestAccess(
+		const after = await testRequestAccess(
 			sandbox.auth,
 			sandbox.db,
 			headers,
@@ -37,9 +40,9 @@ describe("requestAccess on a Host that requires two-factor", () => {
 	});
 
 	test("the local session of this computer is not affected", async () => {
-		const person = await localPerson(sandbox.db);
-		const local = createLocalSession(sandbox.auth, sandbox.db, person.userId);
-		const access = await requestAccess(
+		const person = await testLocalPerson(sandbox.db);
+		const local = testLocalSession(sandbox.auth, sandbox.db, person.userId);
+		const access = await testRequestAccess(
 			sandbox.auth,
 			sandbox.db,
 			new Headers(),
@@ -52,7 +55,7 @@ describe("requestAccess on a Host that requires two-factor", () => {
 
 	test("without the requirement, nothing changes", async () => {
 		const ada = await sandbox.signUp("Ada");
-		const access = await requestAccess(
+		const access = await testRequestAccess(
 			sandbox.auth,
 			sandbox.db,
 			ada.headers,

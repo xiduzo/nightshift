@@ -1,5 +1,5 @@
 import { findProgram } from "@nightshift/agents/types";
-import { membersOf, spaceIds } from "@nightshift/auth";
+import { wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { HARNESS_BIN } from "@nightshift/engine/device-config";
 
@@ -43,10 +43,11 @@ export async function usageFacts(input: {
 		personId: input.ownerId,
 		owner: true,
 	});
-	const spaces = await spaceIds(input.db);
+	const bound = wireSpaces({ db: input.db });
+	const spaces = await bound.listSpaceIds();
 	const people = new Set<string>();
 	for (const spaceId of spaces) {
-		const listed = await membersOf(input.db, spaceId);
+		const listed = await bound.members.listMembers({ spaceId });
 		for (const member of listed.members) people.add(member.personId);
 	}
 	return {

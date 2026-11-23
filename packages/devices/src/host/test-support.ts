@@ -1,5 +1,5 @@
 import type { DeviceKeyAccess, DeviceKeyPermission } from "@nightshift/auth";
-import { roleAllows, roleIn, spacesOf } from "@nightshift/auth";
+import { roleAllows, wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { ORPCError } from "@orpc/server";
 import type { DeviceRegistry } from "../registry";
@@ -36,16 +36,17 @@ export function admission(deps: {
 	key: DeviceKeyAccess | null,
 	need: DeviceKeyPermission | undefined,
 ) => ReturnType<ReturnType<typeof admitKeyedCall>> {
+	const spaces = wireSpaces({ db: deps.db });
 	return (key, need) =>
 		admitKeyedCall({
 			registry: deps.registry,
 			settings: { isHost: deps.isHost },
 			spaces: {
-				of: (personId: string) => spacesOf(deps.db, personId),
+				of: (personId: string) => spaces.listSpaces({ personId }),
 			},
 			roles: {
 				roleIn: (personId: string, spaceId: string) =>
-					roleIn(deps.db, personId, spaceId),
+					spaces.findRole({ personId, spaceId }),
 				roleAllows,
 			},
 			codes,

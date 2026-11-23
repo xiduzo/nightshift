@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
 import type { Auth, Session } from "../auth";
 import type { HostAccess, TWO_FACTOR_REQUIRED } from "../host-access";
-import { ensurePersonalSpace, roleIn, spacesOf } from "../spaces";
+import { wireSpaces } from "../spaces";
 import { betterAuthOrganizations } from "./adapters/out/better-auth-organizations";
 import { betterAuthSessionReader } from "./adapters/out/better-auth-session-reader";
 import { authorizeDocument } from "./application/authorize-document";
@@ -22,14 +22,10 @@ import type { SyncAuthorize } from "./domain/sync-access";
  * for the use cases, which take any session shape.
  */
 
-/**
- * What the package gives access: what the real adapters stand on. Until
- * A4, a caller of Better Auth's own endpoints holds no database: without
- * `db`, `openAuthEndpoint` works and a read of the memberships fails.
- */
+/** What the package gives access: what the real adapters stand on. */
 export type AccessDeps = {
 	auth: Auth;
-	db?: Database;
+	db: Database;
 };
 
 /** Who a request is, in which Space, and what they may do there (`openRequest`). */
@@ -68,19 +64,16 @@ export type Access = {
 };
 
 export function wireAccess(deps: AccessDeps): Access {
-	const rows = (): Database => {
-		if (!deps.db) throw new Error("Access was wired without a database.");
-		return deps.db;
-	};
+	const spaces = wireSpaces({ db: deps.db });
 	const ports = {
 		sessionReader: betterAuthSessionReader(deps.auth),
 		organizations: betterAuthOrganizations(deps.auth),
 		members: {
-			spacesOf: async (personId: string) => spacesOf(rows(), personId),
+			spacesOf: async (personId: string) => spaces.listSpaces({ personId }),
 			ensurePersonalSpace: async (personId: string) =>
-				ensurePersonalSpace(rows(), personId),
+				spaces.personal.ensurePersonalSpace({ personId }),
 			roleOf: async (personId: string, spaceId: string) =>
-				roleIn(rows(), personId, spaceId),
+				spaces.findRole({ personId, spaceId }),
 		},
 		newId: () => randomUUID(),
 	};

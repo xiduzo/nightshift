@@ -1,5 +1,5 @@
 import type { DocumentOf } from "@nightshift/auth";
-import { spaceIds } from "@nightshift/auth";
+import { wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { project, ydoc } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
@@ -188,7 +188,7 @@ export function createSyncedDocuments(options: {
 
 	/** Every Space this Replica has: its own, and those of its Projects. */
 	async function spaces(): Promise<string[]> {
-		const found = new Set(await spaceIds(db));
+		const found = new Set(await wireSpaces({ db }).listSpaceIds());
 		for (const row of await db
 			.selectDistinct({ id: project.spaceId })
 			.from(project)) {

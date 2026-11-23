@@ -1,4 +1,4 @@
-import { spaceIds, spaceRoster } from "@nightshift/auth";
+import { wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { clone, project } from "@nightshift/db/schema";
 import { asDate, instant, instantOrNull, now } from "@nightshift/time";
@@ -315,7 +315,7 @@ export function createSpaceDocuments(options: {
 		open,
 		async openAll() {
 			const spaces = new Set<string>();
-			for (const id of await spaceIds(db)) spaces.add(id);
+			for (const id of await wireSpaces({ db }).listSpaceIds()) spaces.add(id);
 			for (const row of await db
 				.selectDistinct({ id: project.spaceId })
 				.from(project)) {
@@ -333,7 +333,7 @@ export function createSpaceDocuments(options: {
 				.from(project)
 				.where(eq(project.spaceId, spaceId))
 				.limit(1);
-			if (kept || (await spaceIds(db)).includes(spaceId)) {
+			if (kept || (await wireSpaces({ db }).listSpaceIds()).includes(spaceId)) {
 				throw new Error(`The Space ${spaceId} is still here.`);
 			}
 			await documents.remove(spaceDocumentName(spaceId));
@@ -481,7 +481,9 @@ export async function projectSpace(
 
 /** Writes the Space's Members (id, name, role) when they differ from the mirror. */
 async function mirror(db: Database, document: SpaceDocument): Promise<void> {
-	const rows = await spaceRoster(db, document.spaceId);
+	const rows = await wireSpaces({ db }).members.listRoster({
+		spaceId: document.spaceId,
+	});
 	const members = new Map<string, SpaceMember>(
 		rows.map((row) => [row.id, { name: row.name, role: row.role }]),
 	);

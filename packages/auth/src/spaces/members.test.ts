@@ -2,22 +2,17 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { user } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 import type { MemberChange, Permissions } from "../index";
+import { testRequestAccess, testSpaces } from "../testing";
 import {
 	type AuthSandbox,
 	cookiesOf,
 	createAuthSandbox,
 } from "../testing/sandbox";
-import { requestAccess } from "../wire-access";
-import {
-	invitationView,
-	isHostAdmin,
-	LOCAL_EMAIL,
-	localPerson,
-	membersOf,
-	personalSpaceId,
-} from "./facades";
+import { testLocalPerson } from "../testing/wires";
+import { LOCAL_EMAIL } from "./personal/domain/personal-space";
 
 let sandbox: AuthSandbox;
+let spaces: ReturnType<typeof testSpaces>;
 let changes: MemberChange[];
 beforeEach(async () => {
 	changes = [];
@@ -26,6 +21,7 @@ beforeEach(async () => {
 			changes.push(change);
 		},
 	});
+	spaces = testSpaces(sandbox.db);
 });
 afterEach(() => sandbox.cleanup());
 
@@ -79,7 +75,7 @@ async function signUpEmail(body: Record<string, string>): Promise<Response> {
 
 describe("invitation-only signup", () => {
 	test("the Person of this computer is the first, and the Host admin", async () => {
-		const local = await localPerson(sandbox.db);
+		const local = await testLocalPerson(sandbox.db);
 		const [person] = await sandbox.db
 			.select({ email: user.email, role: user.role })
 			.from(user)
@@ -88,9 +84,15 @@ describe("invitation-only signup", () => {
 		// Everyone after is a user of the Host.
 		const ada = await sandbox.signUp("Ada");
 		expect(await roleOf(ada.userId)).toBe("user");
-		expect(await isHostAdmin(sandbox.db, local.userId)).toBe(true);
-		expect(await isHostAdmin(sandbox.db, ada.userId)).toBe(false);
-		expect(await isHostAdmin(sandbox.db, "nobody")).toBe(false);
+		expect(await spaces.members.isHostAdmin({ personId: local.userId })).toBe(
+			true,
+		);
+		expect(await spaces.members.isHostAdmin({ personId: ada.userId })).toBe(
+			false,
+		);
+		expect(await spaces.members.isHostAdmin({ personId: "nobody" })).toBe(
+			false,
+		);
 	});
 
 	test("on a Host without anyone, the first sign-up needs no invitation and is the admin", async () => {
@@ -132,7 +134,9 @@ describe("invitation-only signup", () => {
 			invitationId: id,
 		});
 		expect(canceled.status).toBe(403);
-		expect((await invitationView(sandbox.db, id))?.status).toBe("canceled");
+		expect((await spaces.members.viewInvitation({ id: id }))?.status).toBe(
+			"canceled",
+		);
 	});
 });
 
@@ -142,7 +146,7 @@ describe("invite, accept, member", () => {
 		const platform = await platformOf(ada.headers);
 		const id = await invite(ada.headers, platform, "Carol@Example.com");
 
-		expect(await invitationView(sandbox.db, id)).toEqual({
+		expect(await spaces.members.viewInvitation({ id: id })).toEqual({
 			id,
 			spaceName: "Platform",
 			email: "carol@example.com",
@@ -151,9 +155,9 @@ describe("invite, accept, member", () => {
 			status: "pending",
 			hasAccount: false,
 		});
-		expect((await membersOf(sandbox.db, platform)).invitations).toEqual([
-			expect.objectContaining({ id, email: "carol@example.com" }),
-		]);
+		expect(
+			(await spaces.members.listMembers({ spaceId: platform })).invitations,
+		).toEqual([expect.objectContaining({ id, email: "carol@example.com" })]);
 
 		const signedUp = await signUpEmail({
 			email: "carol@example.com",
@@ -170,18 +174,25 @@ describe("invite, accept, member", () => {
 			headers: carol,
 			body: { invitationId: id },
 		});
-		const access = await requestAccess(sandbox.auth, sandbox.db, carol, null);
+		const access = await testRequestAccess(
+			sandbox.auth,
+			sandbox.db,
+			carol,
+			null,
+		);
 		expect(access.spaceId).toBe(platform);
 		expect(await access.can({ run: ["start"] })).toBe(true);
 		expect(await access.can({ member: ["invite"] })).toBe(false);
 
-		const listed = await membersOf(sandbox.db, platform);
+		const listed = await spaces.members.listMembers({ spaceId: platform });
 		expect(listed.members.map((m) => [m.name, m.role])).toEqual([
 			["Ada", "owner"],
 			["Carol", "member"],
 		]);
 		expect(listed.invitations).toEqual([]);
-		expect((await invitationView(sandbox.db, id))?.status).toBe("accepted");
+		expect((await spaces.members.viewInvitation({ id: id }))?.status).toBe(
+			"accepted",
+		);
 		expect(changes).toContainEqual({
 			kind: "joined",
 			spaceId: platform,
@@ -201,9 +212,9 @@ describe("invite, accept, member", () => {
 			headers: bob.headers,
 			body: { invitationId: id },
 		});
-		const [membership] = (await membersOf(sandbox.db, platform)).members.filter(
-			(m) => m.personId === bob.userId,
-		);
+		const [membership] = (
+			await spaces.members.listMembers({ spaceId: platform })
+		).members.filter((m) => m.personId === bob.userId);
 
 		await sandbox.auth.api.updateMemberRole({
 			headers: ada.headers,
@@ -252,7 +263,7 @@ describe("roles in a Space", () => {
 		const { bob, platform } = await spaceWith("viewer");
 		expect(
 			await (
-				await requestAccess(sandbox.auth, sandbox.db, bob.headers, null)
+				await testRequestAccess(sandbox.auth, sandbox.db, bob.headers, null)
 			).can({ member: ["invite"] }, platform),
 		).toBe(false);
 		await expect(
@@ -263,10 +274,9 @@ describe("roles in a Space", () => {
 	test("an admin invites and changes roles, but cannot delete the Space", async () => {
 		const { bob, platform } = await spaceWith("admin");
 		const can = async (permissions: Permissions) =>
-			(await requestAccess(sandbox.auth, sandbox.db, bob.headers, null)).can(
-				permissions,
-				platform,
-			);
+			(
+				await testRequestAccess(sandbox.auth, sandbox.db, bob.headers, null)
+			).can(permissions, platform);
 		expect(await can({ member: ["invite", "remove", "role"] })).toBe(true);
 		expect(await can({ space: ["delete"] })).toBe(false);
 		await invite(bob.headers, platform, "dee@example.com");
@@ -288,7 +298,7 @@ describe("roles in a Space", () => {
 			body: { invitationId: id },
 		});
 		expect(
-			(await requestAccess(sandbox.auth, sandbox.db, bob.headers, null))
+			(await testRequestAccess(sandbox.auth, sandbox.db, bob.headers, null))
 				.spaceId,
 		).toBe(platform);
 
@@ -296,7 +306,7 @@ describe("roles in a Space", () => {
 			headers: ada.headers,
 			body: { memberIdOrEmail: "bob@example.com", organizationId: platform },
 		});
-		const after = await requestAccess(
+		const after = await testRequestAccess(
 			sandbox.auth,
 			sandbox.db,
 			bob.headers,
@@ -304,7 +314,7 @@ describe("roles in a Space", () => {
 		);
 		// Back in the personal Space; nothing of Platform is theirs.
 		expect(after.spaceId).toBe(
-			(await personalSpaceId(sandbox.db, bob.userId)) ?? "",
+			(await spaces.personal.findPersonalSpace({ personId: bob.userId })) ?? "",
 		);
 		expect(await after.can({ run: ["start"] }, platform)).toBe(false);
 		await expect(after.setActiveSpace(platform)).rejects.toThrow();

@@ -5,17 +5,11 @@ import { and, eq, gt, inArray } from "drizzle-orm";
 import type { SessionStore } from "../../application/ports";
 
 /**
- * `SessionStore` over the `session` table. `wireLogin` builds it. Until
- * A4 a caller may wire login without a database: a call then fails.
+ * `SessionStore` over the `session` table. `wireLogin` builds it.
  */
-export function drizzleSessionStore(given: Database | undefined): SessionStore {
-	const rows = () => {
-		if (!given) throw new Error("This login was wired without a database.");
-		return given;
-	};
+export function drizzleSessionStore(db: Database): SessionStore {
 	return {
 		async end(personId, sessionId) {
-			const db = rows();
 			const ended = await db
 				.delete(session)
 				.where(and(eq(session.id, sessionId), eq(session.userId, personId)))
@@ -24,7 +18,6 @@ export function drizzleSessionStore(given: Database | undefined): SessionStore {
 		},
 		async live(sessionIds, at) {
 			if (sessionIds.length === 0) return new Set();
-			const db = rows();
 			const live = await db
 				.select({ id: session.id })
 				.from(session)

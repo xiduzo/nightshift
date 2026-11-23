@@ -1,8 +1,8 @@
 import {
 	type Auth,
-	createLocalSession,
 	type DeviceKeyAccess,
 	type SyncDeviceKey,
+	wireLocalSession,
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { hostLink, user } from "@nightshift/db/schema";
@@ -180,7 +180,11 @@ export async function hostInMemory(
 			deviceKey: async (sent) => keys.get(sent) ?? null,
 			sessions: {
 				auth: noAuth,
-				localSession: createLocalSession(noAuth, a.db, personId),
+				localSession: wireLocalSession({
+					auth: noAuth,
+					db: a.db,
+					personId,
+				}),
 				ownerId: personId,
 				isThisComputer: () => false,
 			},

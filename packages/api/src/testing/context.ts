@@ -133,6 +133,11 @@ export function testContext(fields: TestContextFields = {}): Context {
 			(async () => {
 				throw new Error("This test's context has no setLogin.");
 			}),
+		hasLogin:
+			fields.hasLogin ??
+			(async () => {
+				throw new Error("This test's context has no hasLogin.");
+			}),
 	};
 }
 

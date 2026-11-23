@@ -4,12 +4,16 @@ import {
 	HocuspocusProviderWebsocket,
 } from "@hocuspocus/provider";
 import {
-	createLocalSession,
-	documentAccess,
-	localPerson,
 	type SyncDeviceKey,
+	wireAccess,
+	wireLocalSession,
+	wireSpaces,
 } from "@nightshift/auth";
-import { type AuthSandbox, createAuthSandbox } from "@nightshift/auth/testing";
+import {
+	type AuthSandbox,
+	createAuthSandbox,
+	UNOWNED,
+} from "@nightshift/auth/testing";
 import { project } from "@nightshift/db/schema";
 import { deviceDirectory } from "@nightshift/devices";
 import {
@@ -83,7 +87,9 @@ let keptRows: Map<string, Uint8Array>;
 beforeEach(async () => {
 	sandbox = await createSandbox();
 	people = await createAuthSandbox();
-	const owner = await localPerson(people.db);
+	const owner = await wireSpaces({ db: people.db }).personal.findLocalPerson({
+		self: UNOWNED,
+	});
 	ownerId = owner.userId;
 	stranger = (await people.signUp("Dee")).headers;
 	deviceKeys = new Map();
@@ -111,10 +117,15 @@ beforeEach(async () => {
 				keptRows.set(name, state);
 			},
 		},
-		authorize: documentAccess({
+		authorize: wireAccess({
 			auth: people.auth,
 			db: people.db,
-			localSession: createLocalSession(people.auth, people.db, owner.userId),
+		}).authorizeDocuments({
+			localSession: wireLocalSession({
+				auth: people.auth,
+				db: people.db,
+				personId: owner.userId,
+			}),
 			ownerId: owner.userId,
 			isThisComputer: (peer, request) =>
 				isThisComputer(peer, request, new Set([ORIGIN])),

@@ -4,11 +4,10 @@ import type {
 } from "@nightshift/api/context";
 import {
 	type Auth,
-	authEndpointAccess,
 	type HostPolicy,
 	type LocalSession,
-	requestAccess,
-	setLogin,
+	wireAccess,
+	wireLogin,
 } from "@nightshift/auth";
 import type { Context as HonoContext } from "hono";
 
@@ -37,13 +36,17 @@ export type RequestContexts = {
 	 * never this computer's Person, even from a loopback address.
 	 * `hostAccess` says whether the session may use the Host.
 	 */
-	access(context: HonoContext): ReturnType<typeof requestAccess>;
+	access(
+		context: HonoContext,
+	): ReturnType<ReturnType<typeof wireAccess>["openRequest"]>;
 	/**
 	 * What a call to Better Auth's own endpoints needs: the headers to pass
 	 * on (the local session for this computer) and whether the Host lets
 	 * the session in. Better Auth reads the session itself.
 	 */
-	authAccess(context: HonoContext): ReturnType<typeof authEndpointAccess>;
+	authAccess(
+		context: HonoContext,
+	): ReturnType<ReturnType<typeof wireAccess>["openAuthEndpoint"]>;
 	/**
 	 * The oRPC context of a request. `signedOut`: the request needs no
 	 * session (the API reference), so none is read.
@@ -64,6 +67,8 @@ export function requestContexts(services: HttpServices): RequestContexts {
 		...apiServices
 	} = services;
 	const { db } = apiServices;
+	const accessWire = wireAccess({ auth, db });
+	const login = wireLogin({ auth, db });
 
 	/** From this computer, and no Device: a Device is never this computer's Person. */
 	const isLocal = (context: HonoContext): boolean =>
@@ -71,23 +76,20 @@ export function requestContexts(services: HttpServices): RequestContexts {
 		fromThisComputer(context, trustedOrigins);
 
 	const access = (context: HonoContext) =>
-		requestAccess(
-			auth,
-			db,
-			context.req.raw.headers,
-			isLocal(context) ? localSession : null,
-			hostPolicy,
-		);
+		accessWire.openRequest({
+			headers: context.req.raw.headers,
+			local: isLocal(context) ? localSession : null,
+			policy: hostPolicy,
+		});
 
 	return {
 		access,
 		authAccess: (context) =>
-			authEndpointAccess(
-				auth,
-				context.req.raw.headers,
-				isLocal(context) ? localSession : null,
-				hostPolicy,
-			),
+			accessWire.openAuthEndpoint({
+				headers: context.req.raw.headers,
+				local: isLocal(context) ? localSession : null,
+				policy: hostPolicy,
+			}),
 		async createContext(context, options = {}) {
 			const deviceKey = options.signedOut
 				? null
@@ -96,12 +98,16 @@ export function requestContexts(services: HttpServices): RequestContexts {
 			return {
 				...apiServices,
 				access: signedOut
-					? await requestAccess(auth, db, new Headers(), null)
+					? await accessWire.openRequest({
+							headers: new Headers(),
+							local: null,
+						})
 					: await access(context),
 				deviceKey,
 				fromThisComputer: !signedOut && isLocal(context),
 				requireTwoFactor: hostPolicy.requireTwoFactor,
-				setLogin: (personId, input) => setLogin(auth, personId, input),
+				setLogin: (personId, input) => login.setLogin({ personId, input }),
+				hasLogin: (personId) => login.hasLogin({ personId }),
 			};
 		},
 	};

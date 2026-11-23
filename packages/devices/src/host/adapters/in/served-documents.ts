@@ -1,4 +1,9 @@
-import { documentAccess, type SyncAuthorize } from "@nightshift/auth";
+import {
+	type Auth,
+	type SyncAuthorize,
+	type SyncSetup,
+	wireAccess,
+} from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { SyncedDocuments } from "@nightshift/engine";
 import type * as Y from "yjs";
@@ -30,18 +35,17 @@ export type ServedDocuments = {
 	authorize: SyncAuthorize;
 };
 
-/** The options of `documentAccess` that sessions need: the daemon's, or none in memory. */
-type SessionAccess = Pick<
-	Parameters<typeof documentAccess>[0],
-	"auth" | "localSession" | "ownerId" | "isThisComputer" | "policy"
->;
+/** What sessions need for sync access: the daemon's, or none in memory. */
+type SessionAccess = {
+	auth: Auth;
+} & Pick<SyncSetup, "localSession" | "ownerId" | "isThisComputer" | "policy">;
 
 /**
  * The documents this Replica serves: every document it syncs
  * (`SyncedDocuments`), and on a Host the Device documents it keeps for
  * the Devices whose home it is, from its rows. Who may open which is
- * `documentAccess`: `sessions` decides for a browser, and a Device key
- * (`deviceKey`) for a Device.
+ * `wireAccess().authorizeDocuments`: `sessions` decides for a browser,
+ * and a Device key (`deviceKey`) for a Device.
  */
 export function servedDocuments(deps: {
 	db: Database;
@@ -50,19 +54,19 @@ export function servedDocuments(deps: {
 	rows: Omit<KeptDocuments, "has">;
 	registry: Pick<DeviceRegistry, "keptDocumentOwner">;
 	/** A Device key as the relay checks it (`Host.syncKey`). */
-	deviceKey: NonNullable<Parameters<typeof documentAccess>[0]["deviceKey"]>;
+	deviceKey: NonNullable<SyncSetup["deviceKey"]>;
 	sessions: SessionAccess;
 }): ServedDocuments {
 	const keptOwner = (name: string) => deps.registry.keptDocumentOwner(name);
+	const { auth, ...setup } = deps.sessions;
 	return {
 		document: async (name) => (await deps.documents.find(name))?.doc ?? null,
 		kept: {
 			has: async (name) => (await keptOwner(name)) !== null,
 			...deps.rows,
 		},
-		authorize: documentAccess({
-			...deps.sessions,
-			db: deps.db,
+		authorize: wireAccess({ auth, db: deps.db }).authorizeDocuments({
+			...setup,
 			documentOf: (name) => deps.documents.documentOf(name),
 			keptOwner,
 			deviceKey: deps.deviceKey,

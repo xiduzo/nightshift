@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { requestAccess } from "@nightshift/auth";
+
 import {
 	type AuthSandbox,
 	createAuthSandbox,
 	OPEN_HOST,
+	testRequestAccess,
 } from "@nightshift/auth/testing";
 import type { PhoneView } from "@nightshift/devices";
 import {
@@ -35,6 +36,7 @@ beforeEach(async () => {
 	sandbox = await createAuthSandbox();
 	notifications = createNotifications({
 		db: sandbox.db,
+		auth: sandbox.auth,
 		events: fakeRunEvents().source,
 		sendsFor: async () => true,
 		inApp: createInAppChannel(),
@@ -81,7 +83,7 @@ async function contextFor(
 		spaceId?: string;
 	},
 ): Promise<Context> {
-	const access = await requestAccess(
+	const access = await testRequestAccess(
 		sandbox.auth,
 		sandbox.db,
 		headers,

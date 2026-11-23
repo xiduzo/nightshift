@@ -1,10 +1,5 @@
 import type { DeviceKeyAccess } from "@nightshift/auth";
-import {
-	personalSpaceId,
-	personalSpaceIdBySlug,
-	roleAllows,
-	spacesOf,
-} from "@nightshift/auth";
+import { roleAllows, wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { PeerProjects } from "@nightshift/engine";
 import type { TakenProjects } from "@nightshift/engine/projects";
@@ -60,9 +55,11 @@ export async function mergePersonalHere(
 	input: PersonalMergeInput,
 ): Promise<PersonalMerge> {
 	const { db, projects: engineProjects } = deps;
+	const bound = wireSpaces({ db });
 	const spaceId =
-		(await personalSpaceIdBySlug(db, key.personId)) ??
-		(await personalSpaceId(db, key.personId));
+		(await bound.personal.findPersonalSpaceBySlug({
+			personId: key.personId,
+		})) ?? (await bound.personal.findPersonalSpace({ personId: key.personId }));
 	if (spaceId === null) {
 		throw new Refusal(
 			"not-found",
@@ -86,7 +83,10 @@ export async function mergePersonalHere(
 		known.flatMap((row) => (row.remote === null ? [] : [[row.remote, row]])),
 	);
 	const spaces = new Map(
-		(await spacesOf(db, key.personId)).map((space) => [space.id, space]),
+		(await bound.listSpaces({ personId: key.personId })).map((space) => [
+			space.id,
+			space,
+		]),
 	);
 
 	const projectMap: Record<string, string> = {};

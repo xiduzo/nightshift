@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { requestAccess } from "@nightshift/auth";
 import {
 	type AuthSandbox,
 	createAuthSandbox,
 	OPEN_HOST,
+	testRequestAccess,
 } from "@nightshift/auth/testing";
 import {
 	createInAppChannel,
@@ -55,7 +55,7 @@ afterEach(() => {
 async function contextFor(headers: Headers | null): Promise<Context> {
 	return testContext({
 		...(headers && {
-			access: await requestAccess(
+			access: await testRequestAccess(
 				sandbox.auth,
 				sandbox.db,
 				headers,

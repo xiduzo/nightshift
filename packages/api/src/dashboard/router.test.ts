@@ -6,11 +6,12 @@ import {
 	setSystemTime,
 	test,
 } from "bun:test";
-import { personalSpaceId, requestAccess } from "@nightshift/auth";
 import {
 	type AuthSandbox,
 	createAuthSandbox,
 	OPEN_HOST,
+	testRequestAccess,
+	testSpaces,
 } from "@nightshift/auth/testing";
 import type {
 	AnswerCost,
@@ -139,7 +140,7 @@ async function contextFor(
 	engine: Partial<Context["engine"]>,
 ): Promise<Context> {
 	return testContext({
-		access: await requestAccess(
+		access: await testRequestAccess(
 			sandbox.auth,
 			sandbox.db,
 			headers,
@@ -154,7 +155,10 @@ async function contextFor(
 /** Ada with her personal Space and the Space Platform, which she works in. */
 async function ada() {
 	const person = await sandbox.signUp("Ada");
-	const personal = (await personalSpaceId(sandbox.db, person.userId)) ?? "";
+	const personal =
+		(await testSpaces(sandbox.db).personal.findPersonalSpace({
+			personId: person.userId,
+		})) ?? "";
 	const platform = await sandbox.auth.api.createOrganization({
 		headers: person.headers,
 		body: { name: "Platform", slug: "platform" },

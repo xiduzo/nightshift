@@ -1,4 +1,4 @@
-import { personContact, personNames } from "@nightshift/auth";
+import { wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 
 import type { RunPerson } from "./views";
@@ -24,7 +24,9 @@ export async function namesOf(
 	member?: MemberName,
 ): Promise<ReadonlyMap<string, string>> {
 	const wanted = [...new Set(ids.filter((id): id is string => id !== null))];
-	const names = new Map(await personNames(db, wanted));
+	const names = new Map(
+		await wireSpaces({ db }).members.listPersonNames({ ids: wanted }),
+	);
 	if (!member) return names;
 	for (const id of wanted) {
 		if (names.has(id)) continue;
@@ -51,7 +53,9 @@ export async function gitAuthorOf(
 	db: Database,
 	personId: string,
 ): Promise<{ name: string; email: string } | null> {
-	const row = await personContact(db, personId);
+	const row = await wireSpaces({ db }).members.findPersonContact({
+		personId,
+	});
 	if (!row || row.email.toLowerCase().endsWith(".invalid")) return null;
 	return { name: row.name.trim() || row.email, email: row.email };
 }
