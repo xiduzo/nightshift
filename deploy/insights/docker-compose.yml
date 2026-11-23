@@ -14,7 +14,7 @@
 
 services:
   postgres:
-    image: postgres:17
+    image: postgres:18
     restart: unless-stopped
     # Enable daily backups for this Postgres service in Dokploy.
     environment:
@@ -22,7 +22,7 @@ services:
       POSTGRES_PASSWORD: ${INSIGHTS_DB_PASSWORD:?Set INSIGHTS_DB_PASSWORD}
       POSTGRES_DB: insights
     volumes:
-      - insights:/var/lib/postgresql/data
+      - insights-18:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U insights -d insights"]
       interval: 5s
@@ -65,4 +65,4 @@ services:
         condition: service_healthy
 
 volumes:
-  insights:
+  insights-18:
