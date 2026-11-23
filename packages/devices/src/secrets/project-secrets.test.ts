@@ -21,7 +21,6 @@ import { admitEvery, callerOf } from "../testing";
 import { linksTo } from "../testing/host-in-memory";
 import { inMemoryHost } from "../testing/in-memory-host";
 import { createWorkHub, serveWork } from "../work";
-import { secretsCipher } from "./cipher";
 import { deviceProjectSecrets, OWNER_ONLY } from "./project-device";
 import {
 	createProjectSecretsHost,
@@ -30,8 +29,11 @@ import {
 	NOT_IN_SPACE,
 	NOT_YOUR_STEP,
 } from "./project-host";
-import { createProjectSecretStore } from "./project-store";
-import { createSpaceSecretStore } from "./space-store";
+import {
+	createProjectSecretStore,
+	createSpaceSecretStore,
+	secretsCipher,
+} from "./test-support";
 
 const KEY = "a-secrets-key-for-these-tests-0123456789";
 

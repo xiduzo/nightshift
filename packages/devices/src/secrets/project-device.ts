@@ -5,6 +5,7 @@ import { Refusal } from "@nightshift/refusal";
 import type { HostClient } from "../contract";
 import type { DeviceLinks, HostSpaces } from "../links";
 import { askHost, PERSONAL_DEADLINE_MS } from "./device";
+import type { ProjectSecretStore, SpaceSecretStore } from "./kept";
 import {
 	type EnginePlaces,
 	keptStepValues,
@@ -14,8 +15,6 @@ import {
 	spaceAccess,
 	withNames,
 } from "./project-host";
-import type { ProjectSecretStore } from "./project-store";
-import type { SpaceSecretStore } from "./space-store";
 
 /** What a person reads when the Host of the Space does not know Project secrets yet. */
 export const OLDER_HOST_PROJECT_SECRETS =

@@ -1,6 +1,6 @@
 import { Refusal } from "@nightshift/refusal";
 import type { Caller, PersonalSecretName } from "../contract";
-import type { PersonalSecretStore } from "./store";
+import type { PersonalSecretStore } from "./kept";
 
 /** The refusal of a Device that joined this Host as a guest: its Personal secrets stay with its Home Host. */
 export const NOT_YOUR_HOME_HOST =

@@ -1,3 +1,6 @@
+import type { SecretsCipher } from "../../application/ports";
+import { SECRETS_KEY_MIN } from "../../domain/kept-secret";
+
 /**
  * How a Host keeps a Personal secret at rest (ADR 13, decision 2): AES-GCM
  * with a 256-bit key derived (HKDF-SHA-256) from this computer's secrets
@@ -6,24 +9,11 @@
  * as Bun has it: no key leaves this process.
  */
 
-/** A value as it is kept: both in base64. */
-export type Sealed = { ciphertext: string; iv: string };
-
-export type SecretsCipher = {
-	/** Encrypts `value`, bound to `bound` (who and which name it is). */
-	seal(value: string, bound: string): Promise<Sealed>;
-	/** The value, when `bound` is the one it was sealed with and the key is the same. Throws otherwise. */
-	open(sealed: Sealed, bound: string): Promise<string>;
-};
-
-/** The shortest secrets key this computer takes, in characters. */
-export const SECRETS_KEY_MIN = 32;
-
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 /** The cipher of a secrets key (`NIGHTSHIFT_SECRETS_KEY`, else the data folder's). */
-export function secretsCipher(secret: string): SecretsCipher {
+export function webcryptoSecretsCipher(secret: string): SecretsCipher {
 	if (secret.length < SECRETS_KEY_MIN) {
 		throw new Error(
 			`The secrets key is too short. Use at least ${SECRETS_KEY_MIN} characters.`,

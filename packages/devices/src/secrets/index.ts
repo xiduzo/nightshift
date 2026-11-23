@@ -10,9 +10,9 @@
  * its own value.
  */
 
-export { secretsCipher } from "./cipher";
 export { devicePersonalSecrets } from "./device";
 export { createPersonalSecretsHost, type PersonalSecretsHost } from "./host";
+export { wireKept } from "./kept";
 export {
 	createSecretMovesHost,
 	deviceSecretMoves,
@@ -26,6 +26,3 @@ export {
 	createProjectSecretsHost,
 	type ProjectSecretsHost,
 } from "./project-host";
-export { createProjectSecretStore } from "./project-store";
-export { createSpaceSecretStore } from "./space-store";
-export { createPersonalSecretStore } from "./store";

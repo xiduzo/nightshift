@@ -8,8 +8,11 @@ import type { Database } from "@nightshift/db";
 import { Refusal } from "@nightshift/refusal";
 import type { Caller, ProjectSecretName } from "../contract";
 import type { WorkHub } from "../work";
-import type { KeptProjectSecret, ProjectSecretStore } from "./project-store";
-import type { SpaceSecretStore } from "./space-store";
+import type {
+	KeptProjectSecret,
+	ProjectSecretStore,
+	SpaceSecretStore,
+} from "./kept";
 
 /** The refusal of a project this Host does not keep, or that is not in the Space named. */
 export const NOT_A_PROJECT_HERE =

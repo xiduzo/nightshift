@@ -2,7 +2,7 @@ import { HostUnreachableError } from "@nightshift/engine";
 import type { PersonalSecrets } from "@nightshift/engine/device-config";
 import type { HostClient } from "../contract";
 import type { DeviceLinks, HostLinks, Link } from "../links";
-import type { PersonalSecretStore } from "./store";
+import type { PersonalSecretStore } from "./kept";
 
 /** What a person reads when their Home Host does not know Personal secrets yet. */
 export const OLDER_HOST_SECRETS =

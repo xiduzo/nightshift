@@ -2,34 +2,11 @@ import type { Database } from "@nightshift/db";
 import { spaceSecret } from "@nightshift/db/schema";
 import { asDate, instant, now as timeNow } from "@nightshift/time";
 import { and, asc, eq, inArray } from "drizzle-orm";
-import type { SecretsCipher } from "./cipher";
-import type { KeptProjectSecret } from "./project-store";
+import type { SecretsCipher, SpaceSecretStore } from "../../application/ports";
+import { spaceBound } from "../../domain/kept-secret";
 
-/**
- * The Space secrets this computer keeps (ADR 18): for each Space it keeps,
- * as its Host or as a computer without one. Each value is sealed at rest,
- * bound to `space:<id>` and its name, so it never opens as another Space's
- * or as a secret of another scope. It knows no access rule.
- */
-export type SpaceSecretStore = {
-	list(spaceId: string): Promise<KeptProjectSecret[]>;
-	/** The values of these names, or every one without `names`. One that does not open is left out, and logged. */
-	values(
-		spaceId: string,
-		names?: readonly string[],
-	): Promise<Record<string, string>>;
-	set(
-		spaceId: string,
-		name: string,
-		value: string,
-		setBy: string,
-	): Promise<void>;
-	remove(spaceId: string, name: string): Promise<void>;
-};
-
-const boundOf = (spaceId: string, name: string) => `space:${spaceId}\n${name}`;
-
-export function createSpaceSecretStore(deps: {
+/** The Space secrets this computer keeps, in `space_secret`, each value sealed by `cipher`. */
+export function drizzleSpaceSecretStore(deps: {
 	db: Database;
 	cipher: SecretsCipher;
 	now?: () => number;
@@ -63,7 +40,7 @@ export function createSpaceSecretStore(deps: {
 			const out: Record<string, string> = {};
 			for (const row of rows) {
 				try {
-					out[row.name] = await cipher.open(row, boundOf(spaceId, row.name));
+					out[row.name] = await cipher.open(row, spaceBound(spaceId, row.name));
 				} catch (error) {
 					console.warn(
 						`[secrets] the Space secret ${row.name} does not open with this computer's secrets key:`,
@@ -74,7 +51,7 @@ export function createSpaceSecretStore(deps: {
 			return out;
 		},
 		async set(spaceId, name, value, setBy) {
-			const sealed = await cipher.seal(value, boundOf(spaceId, name));
+			const sealed = await cipher.seal(value, spaceBound(spaceId, name));
 			const values = { ...sealed, setAt: asDate(now()), setBy };
 			await db
 				.insert(spaceSecret)

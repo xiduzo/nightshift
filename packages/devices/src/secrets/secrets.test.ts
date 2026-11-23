@@ -10,10 +10,9 @@ import type { HostLink } from "../links";
 import { admitEvery, callerOf } from "../testing";
 import { linksTo } from "../testing/host-in-memory";
 import { inMemoryHost } from "../testing/in-memory-host";
-import { secretsCipher } from "./cipher";
 import { devicePersonalSecrets, OLDER_HOST_SECRETS } from "./device";
 import { createPersonalSecretsHost, NOT_YOUR_HOME_HOST } from "./host";
-import { createPersonalSecretStore } from "./store";
+import { createPersonalSecretStore, secretsCipher } from "./test-support";
 
 const KEY = "a-secrets-key-for-these-tests-0123456789";
 

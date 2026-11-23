@@ -3,17 +3,14 @@ import type { Handover } from "./handover";
 import type { createDevices } from "./host";
 import type { DeviceLinks, HostLinks } from "./links";
 import {
-	createPersonalSecretStore,
 	createPersonalSecretsHost,
-	createProjectSecretStore,
 	createProjectSecretsHost,
 	createSecretMovesHost,
-	createSpaceSecretStore,
 	devicePersonalSecrets,
 	deviceProjectSecrets,
 	deviceSecretMoves,
-	secretsCipher,
 	serveSecretCall,
+	wireKept,
 } from "./secrets";
 import type { PeerEngine } from "./wire-peers-engine";
 
@@ -59,13 +56,11 @@ export function wireSecrets(
 ) {
 	const { db, ownerId, self } = deps;
 	const { hostLinks, links, handover } = at;
-	/** The Personal secrets this computer keeps: as a Home Host, and its owner's without one. */
-	const cipher = secretsCipher(deps.secretsKey);
-	const personalStore = createPersonalSecretStore({ db, cipher });
-	/** The Project secrets this computer keeps: of the Spaces it keeps, as their Host or without one. */
-	const projectStore = createProjectSecretStore({ db, cipher });
-	/** The Space secrets this computer keeps: of the Spaces it keeps, as their Host or without one. */
-	const spaceStore = createSpaceSecretStore({ db, cipher });
+	/** The secrets this computer keeps, sealed at rest. */
+	const kept = wireKept({ db, secretsKey: deps.secretsKey });
+	const personalStore = kept.personal;
+	const projectStore = kept.projects;
+	const spaceStore = kept.spaces;
 	/** Where the engine has a Project (a removed one too) and a run. */
 	const places = {
 		spaceOf: (projectId: string) => engine.projects.spaceOf(projectId),
