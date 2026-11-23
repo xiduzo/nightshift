@@ -28,7 +28,7 @@ import type { HostClient, WorkReply, WorkRequest } from "./contract";
 import { OFFLINE_AFTER_MS } from "./contract";
 import type { DevicesRuntime } from "./devices-runtime";
 import type { KeptDevices } from "./handover";
-import { setDeviceOffer } from "./offers/offers";
+import { setDeviceOffer } from "./offers/domain/offers";
 import { type PairedReplicas, pairedReplicas, withPeers } from "./testing";
 import { startDevices } from "./wire";
 import { documentsWithHost } from "./wire-links";

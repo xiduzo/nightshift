@@ -1,41 +1,33 @@
-import type {
-	Device,
-	OfferedSessionInput,
-	SessionInput,
-} from "@nightshift/engine";
 import type { AgentProfileSettings } from "@nightshift/flows";
-import type { WorkCall } from "../contract";
+import type { WorkCall } from "../../contract";
 import {
 	clampToCap,
 	type DeviceOffer,
 	offerFor,
 	offersNothingOr,
+	type PermissionMode,
 } from "./offers";
+
+/** The refusal of a call whose run names no starter. */
+export const NO_STARTER =
+	"Night Shift does not know who started this run. Start it again to run its steps.";
+
+type Named = { name: string };
 
 /**
  * What the admission asks of one call of another Person's run: whether an
  * Offer allows it, where it works, and an offered session as this computer
- * runs it. Pure: `createOfferAdmission` (`admission.ts`) holds the checks
+ * runs it. Pure: `admitOfferedCall` holds the checks
  * that read this computer.
  */
-
-export type SnapshotInput = Parameters<
-	NonNullable<Device["snapshotWorktree"]>
->[0];
-export type RestoreInput = Parameters<
-	NonNullable<Device["restoreWorktree"]>
->[0];
-export type ChangesInput = Parameters<
-	NonNullable<Device["worktreeChanges"]>
->[0];
 
 /**
  * The snapshot calls of a Device. `deviceFor` has them only when this
  * computer has them, and its admitted path always does.
  */
-export function snapshotsOf(
-	device: Device,
-): Required<Pick<Device, "snapshotWorktree" | "worktreeChanges">> {
+export function snapshotsOf<S, C>(
+	device: Named & { snapshotWorktree?: S; worktreeChanges?: C },
+): { snapshotWorktree: S; worktreeChanges: C } {
 	const { snapshotWorktree, worktreeChanges } = device;
 	if (!snapshotWorktree || !worktreeChanges) {
 		throw new Error(`${device.name} takes no snapshots of a worktree.`);
@@ -47,9 +39,9 @@ export function snapshotsOf(
  * The run folder call of a Device. `deviceFor` has it only when this
  * computer has it, and its admitted path always does.
  */
-export function runFoldersOf(
-	device: Device,
-): Required<Pick<Device, "runFolder">> {
+export function runFoldersOf<R>(device: Named & { runFolder?: R }): {
+	runFolder: R;
+} {
 	const { runFolder } = device;
 	if (!runFolder) throw new Error(`${device.name} makes no run folders.`);
 	return { runFolder };
@@ -59,7 +51,7 @@ export function runFoldersOf(
  * The file call of a Device. `deviceFor` has it only when this computer
  * has it, and its admitted path always does.
  */
-export function filesOf(device: Device): Required<Pick<Device, "readFile">> {
+export function filesOf<R>(device: Named & { readFile?: R }): { readFile: R } {
 	const { readFile } = device;
 	if (!readFile) throw new Error(`${device.name} reads no files.`);
 	return { readFile };
@@ -158,11 +150,9 @@ export function offeredCallRefusal(
  * permission mode the node asks for, else the profile's, never wider than
  * the Offer's cap.
  */
-export function offeredSession(
-	input: Omit<OfferedSessionInput, "signal">,
-	profile: AgentProfileSettings,
-	cap: DeviceOffer["permissionCap"],
-): Omit<SessionInput, "signal"> {
+export function offeredSession<
+	T extends { offered: { permissionMode?: PermissionMode } },
+>(input: T, profile: AgentProfileSettings, cap: DeviceOffer["permissionCap"]) {
 	const { offered, ...rest } = input;
 	return {
 		...rest,

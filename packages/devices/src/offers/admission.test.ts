@@ -18,13 +18,11 @@ import { createHostSpaces } from "../links";
 import { selfOwnerId } from "../registry/test-support";
 import { deviceDirectory } from "../wire-peers-directory";
 import { serveWork } from "../work";
-import {
-	createOfferAdmission,
-	NO_STARTER,
-	type OfferAdmission,
-} from "./admission";
-import { createOfferedSessions } from "./engine-offers";
-import type { DeviceOffer } from "./offers";
+import type { OfferAdmission } from "./application/admit-offered-call";
+import { NO_STARTER } from "./domain/offered-call";
+import { createOfferedSessions } from "./domain/offered-sessions";
+import type { DeviceOffer } from "./domain/offers";
+import { createOfferAdmission } from "./test-support";
 
 /**
  * The offering Device's one admission, run against both paths a call of

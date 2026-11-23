@@ -16,15 +16,14 @@ import {
 import type { AgentProfile } from "@nightshift/flows";
 import { asDate } from "@nightshift/time";
 import { homePersonsOf, selfOwnerId } from "../registry/test-support";
-import { createEngineOffers } from "./engine-offers";
 import {
 	deviceOffers,
 	offeredProfile,
 	type SpaceOffer,
 	setDeviceOffer,
 	spaceOffers,
-} from "./offers";
-import { createOffers } from "./own-offers";
+} from "./domain/offers";
+import { createEngineOffers, createOffers } from "./test-support";
 
 /**
  * This computer's own Offers: withdrawing one, and the Devices of a Space

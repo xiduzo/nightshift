@@ -15,14 +15,11 @@ import type { HostRelay, RunCommand, WorkRelay } from "./contract";
 import { createRunHistoryExchange, type RunHistoryExchange } from "./exchange";
 import { createHostSpaces, type HostSpaces } from "./links";
 import {
-	createEngineOffers,
-	createOfferAdmission,
-	createOfferedSessions,
-	createScheduleOffers,
 	type DeviceOffer,
 	type EngineOffers,
 	type OfferAdmission,
 	type OfferUse,
+	wireOffers,
 } from "./offers";
 import { createPrivatePaths, createWalkers } from "./peers";
 import { createPlacement } from "./placement";
@@ -148,13 +145,14 @@ export function createPeers(
 	const hostSpaces = createHostSpaces(db);
 
 	/** The offered sessions running now: what withdrawing an Offer stops. */
-	const offeredSessions = createOfferedSessions();
+	const offersWire = wireOffers({ now });
+	const offeredSessions = offersWire.createOfferedSessions();
 	const work = options.work && offeredSessions.relay(options.work);
 	/**
 	 * Every call of another Person's run on this computer, walked here or
 	 * sent by a Walker elsewhere: one admission, one slot map per Offer.
 	 */
-	const admission = createOfferAdmission({
+	const admission = offersWire.createOfferAdmission({
 		db,
 		selfOwnerId: registry.selfOwnerId,
 		device,
@@ -206,7 +204,7 @@ export function createPeers(
 		...(relay?.follow ? { upstream: relay.follow.bind(relay) } : {}),
 	});
 
-	const offers = createEngineOffers({
+	const offers = offersWire.createEngineOffers({
 		ready: context.ready,
 		documents,
 		logFact: context.logFact,
@@ -228,7 +226,7 @@ export function createPeers(
 	const port: Peers = {
 		placement,
 		offers: {
-			schedulesWithOffers: createScheduleOffers({
+			schedulesWithOffers: offersWire.createScheduleOffers({
 				db,
 				documents,
 				devicesFor: placement.devicesFor,

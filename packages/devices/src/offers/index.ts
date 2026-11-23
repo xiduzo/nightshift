@@ -1,16 +1,15 @@
-/** Offers: a profile of a Device made available to a Space, its caps, and the rules that check it. */
+/**
+ * Offers: a profile of a Device made available to a Space, its caps, and
+ * the rules that check it. `wireOffers()` returns `createOffers`,
+ * `createEngineOffers`, `createOfferAdmission`, `createScheduleOffers`
+ * and `createOfferedSessions`.
+ */
 
-export {
-	createOfferAdmission,
-	NO_STARTER,
-	type OfferAdmission,
-} from "./admission";
-export {
-	createEngineOffers,
-	createOfferedSessions,
-	type EngineOffers,
-} from "./engine-offers";
-export { createOfferUse, type OfferUse } from "./offer-use";
+export type { OfferAdmission } from "./application/admit-offered-call";
+export type { OfferView } from "./application/list-offers";
+export type { SpaceDeviceView } from "./application/list-space-devices";
+export { createOfferUse, type OfferUse } from "./domain/offer-use";
+export { NO_STARTER } from "./domain/offered-call";
 export {
 	type DeviceOffer,
 	deviceOffers,
@@ -20,7 +19,5 @@ export {
 	offersNothing,
 	offerTakes,
 	spaceOffers,
-} from "./offers";
-export { createOffers } from "./own-offers";
-export { createScheduleOffers } from "./schedule-offers";
-export type { Offers, OfferView, SpaceDeviceView } from "./types";
+} from "./domain/offers";
+export { type EngineOffers, type Offers, wireOffers } from "./wire";

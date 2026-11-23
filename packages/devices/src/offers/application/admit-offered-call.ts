@@ -1,5 +1,4 @@
-import { roleAllows } from "@nightshift/auth";
-import type { Database } from "@nightshift/db";
+import type { Permissions } from "@nightshift/auth";
 import type {
 	Device,
 	PeerContext,
@@ -7,33 +6,71 @@ import type {
 	PlacedRun,
 	ReadFileInput,
 	RunRef,
-} from "@nightshift/engine";
-import {
-	memberRole,
-	type SpaceDocuments,
-	worktreeLocation,
+	SpaceDocument,
+	SpaceDocuments,
 } from "@nightshift/engine";
 import { isAgentProfile, type ProfileSettings } from "@nightshift/flows";
 import { Refusal, wordsFor } from "@nightshift/refusal";
-import type { WorkRelay, WorkReply, WorkRequest } from "../contract";
-import { createHostSpaces, personInSpace, personOnHost } from "../links";
-import { remoteDevice, serveWork } from "../work";
-import type { OfferedSessions } from "./engine-offers";
-import { createOfferUse, type OfferUse, offerKey } from "./offer-use";
+import type {
+	WorkFor,
+	WorkRelay,
+	WorkReply,
+	WorkRequest,
+} from "../../contract";
+import { createOfferUse, type OfferUse, offerKey } from "../domain/offer-use";
 import {
-	type ChangesInput,
 	cwdOf,
 	filesOf,
 	GIT_CALLS,
 	NEEDS_CLONE,
+	NO_STARTER,
 	offeredCallRefusal,
 	offeredSession,
-	type RestoreInput,
 	runFoldersOf,
-	type SnapshotInput,
 	snapshotsOf,
-} from "./offered-call";
-import { type DeviceOffer, inForce, offerFor, spaceOffers } from "./offers";
+} from "../domain/offered-call";
+import type { OfferedSessions } from "../domain/offered-sessions";
+import {
+	type DeviceOffer,
+	inForce,
+	offerFor,
+	spaceOffers,
+} from "../domain/offers";
+
+type RestoreInput = Parameters<NonNullable<Device["restoreWorktree"]>>[0];
+type SnapshotInput = Parameters<NonNullable<Device["snapshotWorktree"]>>[0];
+type ChangesInput = Parameters<NonNullable<Device["worktreeChanges"]>>[0];
+
+export type AdmitOfferedCallPorts = {
+	selfOwnerId: () => Promise<string | null>;
+	device: Device;
+	documents: SpaceDocuments;
+	hostOf(spaceId: string): Promise<string | null>;
+	personInSpace(
+		spaceId: string,
+		personId: string | null,
+	): Promise<string | null>;
+	personOnHost(spaceId: string): Promise<string | null>;
+	memberRole(document: SpaceDocument, personId: string): string | null;
+	roleAllows(role: string, need: Permissions): boolean;
+	projects: Pick<PeerProjects, "clonePath" | "find">;
+	runFolders: PeerContext["runFolders"];
+	worktreePath(repoPath: string, shortId: string): string;
+	ownOffers?: () => readonly DeviceOffer[];
+	profileFor?: (id: string) => ProfileSettings | null;
+	sessions?: Pick<OfferedSessions, "relay">;
+	use?: OfferUse;
+	serve(
+		device: Device,
+		request: WorkRequest,
+		signal: AbortSignal,
+	): AsyncGenerator<WorkReply>;
+	remote(
+		relay: WorkRelay,
+		device: { id: string; name: string },
+		forRun: WorkFor,
+	): Device;
+};
 
 /**
  * Offer admission: whether this computer, as a Device, serves one call of
@@ -68,10 +105,6 @@ import { type DeviceOffer, inForce, offerFor, spaceOffers } from "./offers";
  * starts runs, and the Clone and folder rules hold. Its owner's run that
  * this computer walks itself is this computer as is: no Offer is in play.
  */
-
-/** The refusal of a call whose run names no starter. */
-export const NO_STARTER =
-	"Night Shift does not know who started this run. Start it again to run its steps.";
 
 /** Where a call that came over the wire comes from. */
 export type CallVia =
@@ -111,39 +144,13 @@ export type OfferAdmission = {
 	withdrawn(spaceId: string, profile: string): void;
 };
 
-export function createOfferAdmission(deps: {
-	db: Database;
-	/** The Person who owns this computer, or null (`DeviceRegistry.selfOwnerId` of `registry`). */
-	selfOwnerId: () => Promise<string | null>;
-	/** This computer as a Device: it serves every admitted call. */
-	device: Device;
-	documents: SpaceDocuments;
-	/**
-	 * The folder of a project's Clone on this computer: a call that works in
-	 * it needs one. A project without a folder needs none (`find`).
-	 */
-	projects: Pick<PeerProjects, "clonePath" | "find">;
-	/** The runs' own folders here: where a run of a project without a folder works. */
-	runFolders: PeerContext["runFolders"];
-	/**
-	 * This computer's own Offers (its Device document), with the names
-	 * their profiles have now. Without it, none.
-	 */
-	ownOffers?: () => readonly DeviceOffer[];
-	/** A profile of this computer by its id, as its owner set it. */
-	profileFor?: (id: string) => ProfileSettings | null;
-	/** The offered sessions of the runs this computer walks: what withdrawing an Offer stops. */
-	sessions?: Pick<OfferedSessions, "relay">;
-	/** The Offers in use, kept across a reload (`createOfferUse`). Default: its own. */
-	use?: OfferUse;
-}): OfferAdmission {
-	const { db, device, documents } = deps;
-	const hostSpaces = createHostSpaces(db);
-	const { slots, calls } = deps.use ?? createOfferUse();
+export function admitOfferedCall(ports: AdmitOfferedCallPorts): OfferAdmission {
+	const { device, documents } = ports;
+	const { slots, calls } = ports.use ?? createOfferUse();
 
 	async function offersHere(spaceId: string): Promise<DeviceOffer[]> {
 		return inForce(
-			deps.ownOffers?.() ?? [],
+			ports.ownOffers?.() ?? [],
 			spaceOffers(await documents.open(spaceId), device.id),
 			spaceId,
 		);
@@ -151,7 +158,7 @@ export function createOfferAdmission(deps: {
 
 	/** This computer's owner, as the Space's Host knows them. */
 	async function ownerHere(spaceId: string): Promise<string | null> {
-		return personInSpace(db, spaceId, await deps.selfOwnerId());
+		return ports.personInSpace(spaceId, await ports.selfOwnerId());
 	}
 
 	/**
@@ -163,11 +170,11 @@ export function createOfferAdmission(deps: {
 		via: Via,
 	): Promise<string | null | undefined> {
 		if ("walkedHere" in via) return ownerHere(spaceId);
-		const hostOf = await hostSpaces.hostOf(spaceId);
+		const hostOf = await ports.hostOf(spaceId);
 		if ("hostId" in via) {
-			return hostOf === via.hostId ? personOnHost(db, spaceId) : undefined;
+			return hostOf === via.hostId ? ports.personOnHost(spaceId) : undefined;
 		}
-		return hostOf === null ? deps.selfOwnerId() : undefined;
+		return hostOf === null ? ports.selfOwnerId() : undefined;
 	}
 
 	/** Why a call is refused, or what it runs under: null for its owner's run, else the Offers in force. */
@@ -184,17 +191,17 @@ export function createOfferAdmission(deps: {
 				"This device does not take part in that Space through this Host.",
 			);
 		}
-		const role = memberRole(await documents.open(spaceId), personId);
+		const role = ports.memberRole(await documents.open(spaceId), personId);
 		let offers: DeviceOffer[] | null = null;
 		if (owner === personId) {
-			if (!role || !roleAllows(role, { run: ["start"] })) {
+			if (!role || !ports.roleAllows(role, { run: ["start"] })) {
 				return refuse("Your role in this Space does not let you start runs.");
 			}
 		} else {
 			if (!role) {
 				return refuse("This device runs steps for Members of this Space only.");
 			}
-			if (!roleAllows(role, { offer: ["use"] })) {
+			if (!ports.roleAllows(role, { offer: ["use"] })) {
 				return refuse(
 					"Your role in this Space does not let you use what others offer.",
 				);
@@ -238,7 +245,7 @@ export function createOfferAdmission(deps: {
 		request: WorkRequest,
 	): Promise<{ refusal: string } | { folder: string | null }> {
 		const { spaceId, projectId, runId, call } = request;
-		const project = await deps.projects
+		const project = await ports.projects
 			.find(projectId, spaceId)
 			.catch(() => null);
 		if (project?.folder === false) {
@@ -248,7 +255,7 @@ export function createOfferAdmission(deps: {
 						"This project has no folder. Its runs work in a folder of their own, without git.",
 				};
 			}
-			return { folder: runId === null ? null : deps.runFolders.path(runId) };
+			return { folder: runId === null ? null : ports.runFolders.path(runId) };
 		}
 		if (call.kind === "runFolder") {
 			return {
@@ -256,7 +263,7 @@ export function createOfferAdmission(deps: {
 					"This project has a folder. Its runs work in their own copy of the project.",
 			};
 		}
-		const repoPath = await deps.projects.clonePath(projectId, spaceId);
+		const repoPath = await ports.projects.clonePath(projectId, spaceId);
 		if (repoPath === null) {
 			return {
 				refusal:
@@ -265,9 +272,7 @@ export function createOfferAdmission(deps: {
 		}
 		return {
 			folder:
-				runId === null
-					? null
-					: worktreeLocation(repoPath, runId.slice(0, 8)).worktreePath,
+				runId === null ? null : ports.worktreePath(repoPath, runId.slice(0, 8)),
 		};
 	}
 
@@ -288,7 +293,7 @@ export function createOfferAdmission(deps: {
 				call.kind !== "session" ||
 				!("offered" in call.input)
 			) {
-				yield* serveWork(device, request, signal);
+				yield* ports.serve(device, request, signal);
 				return;
 			}
 			// Another Person's session: this computer's own profile, its caps.
@@ -297,7 +302,7 @@ export function createOfferAdmission(deps: {
 			// current: both find the offered profile, also after a rename.
 			const { profile } = call.input.offered;
 			const offer = offerFor(admitted.offers, profile);
-			const found = offer ? (deps.profileFor?.(offer.profile) ?? null) : null;
+			const found = offer ? (ports.profileFor?.(offer.profile) ?? null) : null;
 			// Only an Agent Profile runs a session.
 			const settings = found && isAgentProfile(found) ? found : null;
 			if (!offer || !settings) {
@@ -319,7 +324,7 @@ export function createOfferAdmission(deps: {
 			let release: (() => void) | null = null;
 			try {
 				release = await slots.take(key, offer.sessionCap, both);
-				for await (const reply of serveWork(
+				for await (const reply of ports.serve(
 					device,
 					{
 						...request,
@@ -365,7 +370,7 @@ export function createOfferAdmission(deps: {
 			serve(request, WALKED_HERE, signal ?? new AbortController().signal),
 		online: () => true,
 	};
-	const local = deps.sessions?.relay(walkedHere) ?? walkedHere;
+	const local = ports.sessions?.relay(walkedHere) ?? walkedHere;
 
 	return {
 		serve,
@@ -374,7 +379,7 @@ export function createOfferAdmission(deps: {
 
 		deviceFor(run) {
 			const { personId } = run.plan;
-			const admitted = remoteDevice(local, device, {
+			const admitted = ports.remote(local, device, {
 				spaceId: run.spaceId,
 				projectId: run.projectId,
 				// No starter: refused in this process, never sent.

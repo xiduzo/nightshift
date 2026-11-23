@@ -1,11 +1,4 @@
-import type { Database } from "@nightshift/db";
-import type { SpaceDocuments } from "@nightshift/engine";
-import {
-	type Actor,
-	flowsForRun,
-	type OwnDevice,
-	personOf,
-} from "@nightshift/engine";
+import type { Actor, OwnDevice } from "@nightshift/engine";
 import {
 	deviceIdOf,
 	type FlowNode,
@@ -13,23 +6,12 @@ import {
 	type Schedule,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import { personInSpace } from "../links";
-import { type DeviceOffer, offerRefusal, spaceOffers } from "./offers";
+import { type DeviceOffer, offerRefusal, spaceOffers } from "../domain/offers";
 
-/**
- * A schedule's runs run on the Replica that keeps the Space (ADR 15). When
- * that Replica is another Person's, a schedule starts the saver's runs there,
- * through its Offers: it gets the saver as its `person`, and is refused
- * unless the Offers in the Space cover what its flow runs there now. The
- * saver's own Host names no Person.
- */
-export function createScheduleOffers(deps: {
-	db: Database;
-	documents: SpaceDocuments;
-	/**
-	 * The Devices a Person may place a run of the project on: their own,
-	 * then other Persons' that offer profiles (`Placement.devicesFor`).
-	 */
+export type CheckScheduleOffersPorts = {
+	documents: {
+		open(spaceId: string): Promise<{ offers: { values(): Iterable<unknown> } }>;
+	};
 	devicesFor(
 		spaceId: string,
 		personId: string,
@@ -41,20 +23,37 @@ export function createScheduleOffers(deps: {
 	offersHere(spaceId: string): Promise<DeviceOffer[]>;
 	/** Whether the Person's role in the Space lets them use Offers. */
 	mayUseOffers?: (spaceId: string, personId: string) => Promise<boolean>;
-}) {
-	const { db } = deps;
-	return async function schedulesWithOffers(
+	personInSpace(spaceId: string, personId: string): Promise<string>;
+	flowsForRun(
+		sources: FlowSources,
+		input: { projectId: string; flowName: string },
+	): {
+		flow: { nodes: FlowNode[] };
+		calledFlows: Record<string, { nodes: FlowNode[] }>;
+	};
+};
+
+/**
+ * A schedule's runs run on the Replica that keeps the Space. When that
+ * Replica is another Person's, a schedule starts the saver's runs there,
+ * through its Offers: it gets the saver as its `person`, and is refused
+ * unless the Offers in the Space cover what its flow runs there now.
+ * The saver's own Host names no Person.
+ */
+export const checkScheduleOffers =
+	(ports: CheckScheduleOffersPorts) =>
+	async (
 		project: { id: string; flows(): Promise<FlowSources> },
 		spaceId: string,
 		actor: Actor,
 		schedules: readonly Schedule[],
-	): Promise<Schedule[]> {
-		const person = personOf(actor);
+	): Promise<Schedule[]> => {
+		const person = "personId" in actor ? actor.personId : null;
 		if (person === null || schedules.length === 0) return [...schedules];
-		const personId = await personInSpace(db, spaceId, person);
-		const devices = await deps.devicesFor(spaceId, personId, project.id);
-		const document = await deps.documents.open(spaceId);
-		const keeperId = await deps.keeper(spaceId);
+		const personId = await ports.personInSpace(spaceId, person);
+		const devices = await ports.devicesFor(spaceId, personId, project.id);
+		const document = await ports.documents.open(spaceId);
+		const keeperId = await ports.keeper(spaceId);
 		const theirs = devices.find((d) => d.deviceId === keeperId) ?? null;
 		if (theirs === null) {
 			// Another Person's Host that offers this Person nothing.
@@ -75,7 +74,7 @@ export function createScheduleOffers(deps: {
 				// A webhook that only sends a signal starts no flow: it has no nodes.
 				const flowName = schedule.flow;
 				if (flowName === undefined) throw new Error("No flow.");
-				const loaded = flowsForRun(await project.flows(), {
+				const loaded = ports.flowsForRun(await project.flows(), {
 					projectId: project.id,
 					flowName,
 				});
@@ -95,9 +94,9 @@ export function createScheduleOffers(deps: {
 			const refusal = offerRefusal(nodes, {
 				deviceName: theirs.name,
 				offers: theirs.thisDevice
-					? await deps.offersHere(spaceId)
+					? await ports.offersHere(spaceId)
 					: spaceOffers(document, theirs.deviceId),
-				mayUse: (await deps.mayUseOffers?.(spaceId, personId)) ?? false,
+				mayUse: (await ports.mayUseOffers?.(spaceId, personId)) ?? false,
 			});
 			if (refusal !== null) {
 				throw new Refusal(
@@ -109,4 +108,3 @@ export function createScheduleOffers(deps: {
 		}
 		return out;
 	};
-}

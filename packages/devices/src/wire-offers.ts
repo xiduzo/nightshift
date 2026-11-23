@@ -1,7 +1,11 @@
 import { roleAllows } from "@nightshift/auth";
 import { memberRole } from "@nightshift/engine";
 import type { DevicesDeps } from "./devices-runtime";
-import { createOffers, deviceOffers, offeredProfile } from "./offers";
+import {
+	wireOffers as bindOffers,
+	deviceOffers,
+	offeredProfile,
+} from "./offers";
 import type { PeerEngine } from "./wire-peers-engine";
 
 /**
@@ -35,7 +39,7 @@ export function wireOffers(
 	engine: PeerEngine,
 ) {
 	const { self } = deps;
-	return createOffers({
+	return bindOffers().createOffers({
 		db: deps.db,
 		engine,
 		document: deps.document,

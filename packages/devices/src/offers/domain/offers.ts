@@ -1,13 +1,3 @@
-import type {
-	DeviceDocument,
-	NodeToPlace,
-	OfferedPlacement,
-	SpaceDocument,
-} from "@nightshift/engine";
-import type {
-	ProfileStore,
-	ProfileView,
-} from "@nightshift/engine/device-config";
 import {
 	type AgentNode,
 	type FlowNode,
@@ -17,7 +7,22 @@ import {
 	touchesDevice,
 } from "@nightshift/flows";
 import { z } from "zod";
-import { offerCapsSchema } from "../contract";
+import { offerCapsSchema } from "../../contract";
+
+/** The `offers` map of a Device or Space document, as these rules read it. */
+type OfferMap = {
+	values(): Iterable<unknown>;
+	has(key: string): boolean;
+	get(key: string): unknown;
+	set(key: string, value: unknown): unknown;
+	delete(key: string): void;
+};
+
+/** A document whose `offers` map these rules read or write. */
+type OfferDocument = {
+	offers: OfferMap;
+	change(fn: () => void): Promise<void>;
+};
 
 /**
  * Offers: an Agent Profile of a Device made available to one Space, with
@@ -115,11 +120,14 @@ const spaceKey = (deviceId: string, profile: string) =>
  * before profiles had ids names the profile by its name, which is that
  * profile's id, or the name of the profile that took it over.
  */
-export function offeredProfile(
-	profiles: Pick<ProfileStore, "get" | "byName">,
+export function offeredProfile<P>(
+	profiles: {
+		get(id: string): P | null | undefined;
+		byName(name: string): P | null | undefined;
+	},
 	profile: string,
-): ProfileView | null {
-	return profiles.get(profile) ?? profiles.byName(profile);
+): P | null {
+	return profiles.get(profile) ?? profiles.byName(profile) ?? null;
 }
 
 /**
@@ -129,7 +137,7 @@ export function offeredProfile(
  * name now. An entry this version cannot read is skipped.
  */
 export function deviceOffers(
-	document: Pick<DeviceDocument, "offers">,
+	document: { offers: Pick<OfferMap, "values"> },
 	nameOf: (profile: string) => string | null,
 ): DeviceOffer[] {
 	const offers: DeviceOffer[] = [];
@@ -144,7 +152,7 @@ export function deviceOffers(
 
 /** Makes or changes one of the Device's own Offers. The Owner calls this. */
 export function setDeviceOffer(
-	document: DeviceDocument,
+	document: OfferDocument,
 	offer: DeviceOfferEntry,
 ): Promise<void> {
 	return document.change(() => {
@@ -154,7 +162,7 @@ export function setDeviceOffer(
 
 /** Removes one of the Device's own Offers. */
 export function removeDeviceOffer(
-	document: DeviceDocument,
+	document: OfferDocument,
 	spaceId: string,
 	profile: string,
 ): Promise<void> {
@@ -167,7 +175,7 @@ export function removeDeviceOffer(
 
 /** The Offers a Space document lists, of one Device or of every Device. */
 export function spaceOffers(
-	document: Pick<SpaceDocument, "offers">,
+	document: { offers: Pick<OfferMap, "values"> },
 	deviceId?: string,
 ): SpaceOffer[] {
 	const offers: SpaceOffer[] = [];
@@ -181,13 +189,16 @@ export function spaceOffers(
 }
 
 /** Publishes an Offer in the Space document, in a change of the Replica that keeps it. */
-export function publishOffer(document: SpaceDocument, offer: SpaceOffer): void {
+export function publishOffer(
+	document: { offers: Pick<OfferMap, "set"> },
+	offer: SpaceOffer,
+): void {
 	document.offers.set(spaceKey(offer.deviceId, offer.profile), offer);
 }
 
 /** Takes an Offer off the Space document, in a change. False when it was not there. */
 export function unpublishOffer(
-	document: SpaceDocument,
+	document: { offers: Pick<OfferMap, "has" | "delete"> },
 	deviceId: string,
 	profile: string,
 ): boolean {
@@ -244,7 +255,7 @@ const OWN_SETTINGS = [
  * of a node's Device; the node's other settings are checked at start.
  */
 export function offerTakes(
-	node: NodeToPlace,
+	node: { profile?: string },
 	offers: readonly string[],
 	mayUse: boolean,
 ): boolean {
@@ -287,7 +298,15 @@ export function hostOffersNothing(hostName: string, ownerName: string): string {
  */
 export function offerRefusal(
 	nodes: readonly FlowNode[],
-	placed: OfferedPlacement,
+	placed: {
+		deviceName: string;
+		offers: readonly {
+			profile: string;
+			profileName: string;
+			permissionCap: PermissionMode;
+		}[];
+		mayUse: boolean;
+	},
 ): string | null {
 	const { deviceName, offers } = placed;
 	// A flow that touches nothing there (Gates, rules, waits) needs no Offer.

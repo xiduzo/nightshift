@@ -8,6 +8,5 @@ agents/decider
 agents/harnesses
 auth/spaces
 devices/membership
-devices/offers
 devices/placement
 # Files of a package's kernel that are not pure yet: kernel <file>.

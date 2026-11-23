@@ -25,7 +25,7 @@ import { callerOf, withPeers } from "../testing";
 import { deviceDirectory } from "../wire-peers-directory";
 import { createPeerEngine, type PeerEngine } from "../wire-peers-engine";
 import { createWorkHub } from "../work";
-import { type DeviceOffer, offerRefusal, spaceOffers } from "./offers";
+import { type DeviceOffer, offerRefusal, spaceOffers } from "./domain/offers";
 
 /**
  * Offers on the engine's side: the run start's rule (`offerRefusal`), and
