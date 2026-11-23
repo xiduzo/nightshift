@@ -22,11 +22,16 @@ import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { Refusal } from "@nightshift/refusal";
 import { type AnyTextAdapter, chat } from "@tanstack/ai";
-import type {
+import {
+	defineSandbox,
+	defineWorkspace,
+	localSource,
 	mcpSkill,
-	SandboxPolicy,
-	SandboxProvider,
+	type SandboxPolicy,
+	type SandboxProvider,
+	withSandbox,
 } from "@tanstack/ai-sandbox";
+import { localProcessSandbox } from "@tanstack/ai-sandbox-local-process";
 import {
 	type AgentEvent,
 	type AgentSessionInput,
@@ -38,6 +43,7 @@ import type { HarnessProfile } from "./harness-profile";
 import { streamSession } from "./session-stream";
 import { stepReportSetup } from "./step-report-prompt";
 import { reportStepTool } from "./step-report-tool";
+import { withSharedToolBridge } from "./tool-bridge";
 import { createTranslator, type Translator } from "./translate";
 
 /** A TanStack AI server tool, as `chat({ tools })` takes it. */
@@ -231,33 +237,6 @@ function withArtifactTool(
 }
 
 /**
- * The sandbox packages and the shared tool bridge. They load on the first
- * session, not when Night Shift starts.
- */
-async function sandboxKit() {
-	const [
-		{ defineSandbox, defineWorkspace, localSource, mcpSkill, withSandbox },
-		{ localProcessSandbox },
-		{ withSharedToolBridge },
-	] = await Promise.all([
-		import("@tanstack/ai-sandbox"),
-		import("@tanstack/ai-sandbox-local-process"),
-		import("./tool-bridge"),
-	]);
-	// Only the names a session uses: a spread of the module reads every
-	// export, and one the bundle left out ends every session.
-	return {
-		defineSandbox,
-		defineWorkspace,
-		localSource,
-		mcpSkill,
-		withSandbox,
-		localProcessSandbox,
-		withSharedToolBridge,
-	};
-}
-
-/**
  * The session's MCP servers as workspace skills. Returns a problem text when
  * a server is a command: the adapter can hand over URL servers only.
  */
@@ -385,15 +364,6 @@ export function harnessSession(options: {
 		signal: input.signal,
 		translator,
 		start: async function* (abortController) {
-			const {
-				defineSandbox,
-				defineWorkspace,
-				localProcessSandbox,
-				localSource,
-				mcpSkill,
-				withSandbox,
-				withSharedToolBridge,
-			} = await sandboxKit();
 			const skills = spec.mcpAsSkills
 				? mcpSkills(mcpSkill, input.mcpServers)
 				: [];
