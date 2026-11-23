@@ -2,9 +2,11 @@ import { expect, test } from "bun:test";
 import { join } from "node:path";
 
 /**
- * The package root loads no harness adapter, decider provider, sandbox or
- * MCP SDK: each loads on its first session or call. A fresh process
- * imports the root and lists the packages it loaded.
+ * The package root loads no harness adapter, decider provider or MCP client:
+ * each loads on its first session or call. A fresh process imports the
+ * root and lists the packages it loaded. The sandbox, and the MCP server
+ * SDK it uses, load with the root: the desktop bundle left the sandbox out
+ * of its lazy namespace (94f38b59).
  */
 test("importing the package loads no adapter until a session needs it", async () => {
 	const root = join(import.meta.dir, "index.ts");
@@ -30,14 +32,11 @@ test("importing the package loads no adapter until a session needs it", async ()
 		"@tanstack/ai-grok-build",
 		"@tanstack/ai-acp",
 		"@agentclientprotocol/sdk",
-		"@tanstack/ai-sandbox",
-		"@tanstack/ai-sandbox-local-process",
 		"@tanstack/ai-openrouter",
 		"@tanstack/ai-openai",
 		"@tanstack/ai-typesafe",
 		"@tanstack/ai-ollaya",
 		"@modelcontextprotocol/client",
-		"@modelcontextprotocol/server",
 	]) {
 		expect(loaded).not.toContain(`/node_modules/${pkg}/`);
 	}
