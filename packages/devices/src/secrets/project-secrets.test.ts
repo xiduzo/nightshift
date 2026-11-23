@@ -21,17 +21,16 @@ import { admitEvery, callerOf } from "../testing";
 import { linksTo } from "../testing/host-in-memory";
 import { inMemoryHost } from "../testing/in-memory-host";
 import { createWorkHub, serveWork } from "../work";
-import { deviceProjectSecrets, OWNER_ONLY } from "./project-device";
 import {
+	createProjectSecretStore,
 	createProjectSecretsHost,
+	createSpaceSecretStore,
+	deviceProjectSecrets,
 	NOT_A_PROJECT_HERE,
 	NOT_A_SPACE_HERE,
 	NOT_IN_SPACE,
 	NOT_YOUR_STEP,
-} from "./project-host";
-import {
-	createProjectSecretStore,
-	createSpaceSecretStore,
+	OWNER_ONLY,
 	secretsCipher,
 } from "./test-support";
 

@@ -5,5 +5,4 @@ export type {
 	ProjectSecretStore,
 	SpaceSecretStore,
 } from "./application/ports";
-export type { KeptProjectSecret } from "./domain/kept-secret";
 export { wireKept } from "./wire";

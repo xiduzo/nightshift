@@ -10,17 +10,7 @@
  * its own value.
  */
 
-export { wireCalls } from "./calls";
-export { wireKept } from "./kept";
-export {
-	type OwnSecrets,
-	type SecretMoves,
-	type SecretMovesHost,
-	wireMoves,
-} from "./moves";
-export { type PersonalSecretsHost, wirePersonal } from "./personal";
-export { deviceProjectSecrets } from "./project-device";
-export {
-	createProjectSecretsHost,
-	type ProjectSecretsHost,
-} from "./project-host";
+export type { OwnSecrets, SecretMoves, SecretMovesHost } from "./moves";
+export type { PersonalSecretsHost } from "./personal";
+export type { ProjectSecretsHost } from "./projects";
+export { wireSecrets } from "./wire";

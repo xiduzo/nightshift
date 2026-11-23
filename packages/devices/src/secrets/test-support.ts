@@ -1,7 +1,22 @@
-import type { PersonalSecrets } from "@nightshift/engine/device-config";
-import type { DeviceLinks, HostLinks } from "../links";
+import {
+	personNames,
+	ROLE_REFUSAL,
+	roleAllows,
+	roleIn,
+} from "@nightshift/auth";
+import type { Database } from "@nightshift/db";
+import type {
+	PersonalSecrets,
+	ProjectSecrets,
+} from "@nightshift/engine/device-config";
+import type { DeviceLinks, HostLinks, HostSpaces } from "../links";
+import type { WorkHub } from "../work";
 import { wireCalls } from "./calls";
-import type { PersonalSecretStore } from "./kept";
+import type {
+	PersonalSecretStore,
+	ProjectSecretStore,
+	SpaceSecretStore,
+} from "./kept";
 import { drizzlePersonalSecretStore } from "./kept/adapters/out/drizzle-personal-secret-store";
 import { drizzleProjectSecretStore } from "./kept/adapters/out/drizzle-project-secret-store";
 import { drizzleSpaceSecretStore } from "./kept/adapters/out/drizzle-space-secret-store";
@@ -14,6 +29,8 @@ import {
 } from "./moves";
 import type { MoveWork, OtherDevices } from "./moves/application/ports";
 import { type PersonalSecretsHost, wirePersonal } from "./personal";
+import { type ProjectSecretsHost, wireProjects } from "./projects";
+import type { EnginePlaces } from "./projects/application/ports";
 
 /**
  * The old names of the secrets, for the database tests of this folder
@@ -127,3 +144,78 @@ export {
 	ONLY_FROM_HOME,
 } from "./moves/domain/secret-moves";
 export type { OwnSecrets };
+
+/** The Members and the role rules, from the member rows of `db`, as the slice's wire fills them. */
+function membersOf(db: Database) {
+	return {
+		members: {
+			roleIn: (personId: string, spaceId: string) =>
+				roleIn(db, personId, spaceId),
+			names: (personIds: readonly string[]) => personNames(db, personIds),
+		},
+		rules: {
+			savesFlows: (role: Parameters<typeof roleAllows>[0]) =>
+				roleAllows(role, { flow: ["save"] }),
+			refusalWords: () => ROLE_REFUSAL.message,
+		},
+	};
+}
+
+/** The half of the Host that keeps the Space, with the old arguments. */
+export function createProjectSecretsHost(deps: {
+	db: Database;
+	places: EnginePlaces;
+	store: ProjectSecretStore;
+	spaceStore: SpaceSecretStore;
+	hostOf(spaceId: string): Promise<string | null>;
+	work: Pick<WorkHub, "placed">;
+	offersInto(deviceId: string, spaceId: string): Promise<boolean>;
+}): ProjectSecretsHost {
+	return wireProjects({
+		...membersOf(deps.db),
+		store: deps.store,
+		spaceStore: deps.spaceStore,
+		calls: noHostCalls,
+		places: deps.places,
+		spaces: { hostOf: deps.hostOf },
+		work: deps.work,
+		offers: { offersInto: deps.offersInto },
+		ownerId: "",
+	}).host;
+}
+
+/** The Device's half of the Project secrets, with the old arguments. */
+export function deviceProjectSecrets(deps: {
+	db: Database;
+	places: EnginePlaces;
+	hostSpaces: Pick<HostSpaces, "hostOf">;
+	links(): Pick<DeviceLinks, "get">;
+	store: ProjectSecretStore;
+	spaceStore: SpaceSecretStore;
+	ownerId: string;
+	deadlineMs?: number;
+}): ProjectSecrets {
+	return wireProjects({
+		...membersOf(deps.db),
+		store: deps.store,
+		spaceStore: deps.spaceStore,
+		calls: wireCalls({
+			hostLinks: { home: async () => null },
+			links: deps.links,
+		}),
+		places: deps.places,
+		spaces: deps.hostSpaces,
+		work: { placed: () => false },
+		offers: { offersInto: async () => false },
+		ownerId: deps.ownerId,
+		...(deps.deadlineMs === undefined ? {} : { deadlineMs: deps.deadlineMs }),
+	}).device;
+}
+
+export {
+	NOT_A_PROJECT_HERE,
+	NOT_A_SPACE_HERE,
+	NOT_IN_SPACE,
+	NOT_YOUR_STEP,
+	OWNER_ONLY,
+} from "./projects/domain/project-secrets";
