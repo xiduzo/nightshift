@@ -4,5 +4,4 @@
 # into shape. Add no line: a new slice starts in shape. The one exception
 # is a new vertical that splits out of a listed one.
 agents/assistant
-agents/harnesses
 # Files of a package's kernel that are not pure yet: kernel <file>.

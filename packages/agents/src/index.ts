@@ -61,7 +61,7 @@ export {
 	opencodeHarness,
 	putAgentBinsOnPath,
 	runPiAcp,
-} from "./harnesses";
+} from "./harness-drivers";
 export { KNOWLEDGE_TERMINAL_INSTRUCTION } from "./knowledge";
 export type {
 	AgentErrorKind,

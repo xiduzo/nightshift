@@ -213,7 +213,7 @@ In the editor, this is the Knowledge section on the Setup tab.
 One module holds this text: `packages/agents/src/knowledge/domain/brief.ts`.
 The sentence about `learnings` is a part of the step report, in
 `packages/agents/src/session/step-report.ts`. The snapshot next to the test of
-the brief (`packages/agents/src/harnesses/knowledge-brief.test.ts`) shows what
+the brief (`packages/agents/src/harness-drivers/knowledge-brief.test.ts`) shows what
 each harness gets, in each mode. That test checks the quotes in this file
 against both modules.
 

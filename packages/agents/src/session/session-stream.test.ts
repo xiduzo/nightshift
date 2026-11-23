@@ -1,6 +1,6 @@
 import { describe, expect, spyOn, test } from "bun:test";
-import { effortEnv } from "../harnesses/claude-code/harness";
-import { CLAUDE_CODE_PROFILE } from "../harnesses/claude-code/profile";
+import { effortEnv } from "../harness-drivers/claude-code/harness";
+import { CLAUDE_CODE_PROFILE } from "../harness-drivers/claude-code/profile";
 import type { AgentEvent } from "../port/types";
 import { streamSession } from "./session-stream";
 import { createTranslator } from "./translate";

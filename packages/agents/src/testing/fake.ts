@@ -1,5 +1,5 @@
 import { defaultDeciderModel } from "../decider/domain/catalogue";
-import { harnessFacts } from "../harnesses/facts";
+import { harnessFacts } from "../harness-drivers/facts";
 import type {
 	AgentErrorKind,
 	AgentEvent,

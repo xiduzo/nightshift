@@ -3,8 +3,8 @@ import { Refusal } from "@nightshift/refusal";
 import {
 	CLAUDE_CODE_PROFILE,
 	observeSdkMessage,
-} from "../harnesses/claude-code/profile";
-import { CODEX_PROFILE } from "../harnesses/codex/harness";
+} from "../harness-drivers/claude-code/profile";
+import { CODEX_PROFILE } from "../harness-drivers/codex/harness";
 import type { AgentEvent } from "../port/types";
 import type { HarnessProfile, SdkSignals } from "./harness-profile";
 import { INVALID_DATA_TEXT } from "./step-report-parse";

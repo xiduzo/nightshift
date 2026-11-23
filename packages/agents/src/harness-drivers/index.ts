@@ -1,5 +1,5 @@
 /**
- * The harnesses: one folder per harness (`claude-code/`, `codex/`,
+ * Harness drivers (mechanism): one folder per harness (`claude-code/`, `codex/`,
  * `opencode/`, `grok-build/`, `acp/` for every agent that speaks ACP), the
  * facts of each harness as pure data (`facts-table/`), the registry of
  * one record per harness (`registry.ts`, `facts.ts`), and the skills each

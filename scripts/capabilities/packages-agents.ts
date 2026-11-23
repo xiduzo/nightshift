@@ -10,11 +10,9 @@ export const PACKAGE_AGENTS: Record<string, Place> = {
 	"decider-providers": M,
 	// Is a program on this computer, which version, whose login.
 	doctor: M,
-	// One adapter and one record of facts per harness, and the skills
-	// each harness can run. The skills were a mechanism of their own.
-	// They read the skill folders of each harness from its facts and
-	// the plugins of Claude Code, so they are rules of a harness.
-	harnesses: "agents",
+	// One adapter and one record of facts per harness, skills on disk,
+	// and PATH helpers for agent bins (O1, decision 98).
+	"harness-drivers": M,
 	knowledge: "knowledge",
 	// The contract between the engine and a harness or a decider.
 	port: M,
