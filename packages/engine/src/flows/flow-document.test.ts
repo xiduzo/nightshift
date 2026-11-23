@@ -19,7 +19,7 @@ import {
 	type FlowDocuments,
 } from "../documents";
 import { createSandbox, type Sandbox } from "../testing/test-support";
-import type { FlowMigrations } from "./flow-migration";
+import type { FlowMigrations } from "./migrations";
 import { wireStore as createProjectFlows, type ProjectFlows } from "./store";
 import {
 	flowIdOf,

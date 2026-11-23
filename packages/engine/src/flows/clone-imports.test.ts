@@ -9,12 +9,16 @@ import { eq } from "drizzle-orm";
 import { createFlowDocuments, type FlowDocuments } from "../documents";
 import { systemGit } from "../git";
 import { createSandbox, type Sandbox } from "../testing/test-support";
-import { createCloneImports } from "./clone-imports";
 import {
 	flowIdOf,
 	flowRevisions,
 	flowSources,
 } from "./store/adapters/out/yjs-flow-encoding";
+import { yjsFlowImports } from "./store/adapters/out/yjs-flow-store";
+import { drizzleClonesHere } from "./transfer/adapters/out/drizzle-clones-here";
+import { fsCloneFolders } from "./transfer/adapters/out/fs-clone-folders";
+import { importCloneFolders } from "./transfer/application/import-clone-folders";
+import { createImportRuns } from "./transfer/domain/import-runs";
 
 let sandbox: Sandbox;
 let documents: FlowDocuments;
@@ -54,14 +58,22 @@ afterEach(async () => {
 	await sandbox.cleanup();
 });
 
-const imports = () =>
-	createCloneImports({
-		db: sandbox.db,
-		documents,
-		git: systemGit(),
-		device: async () => ({ id: sandbox.deviceId, name: "laptop" }),
-		now: now,
+/** The import on upgrade as `wire-flows.ts` binds it. */
+const imports = () => {
+	const importAll = importCloneFolders({
+		documents: yjsFlowImports({ documents }),
+		folders: fsCloneFolders({ git: systemGit() }),
+		saved: documents,
+		device: { device: async () => ({ id: sandbox.deviceId, name: "laptop" }) },
+		clock: now,
+		clones: drizzleClonesHere({ db: sandbox.db }),
+		runs: createImportRuns(),
 	});
+	return {
+		all: () => importAll({}),
+		project: (projectId: string) => importAll({ projectId }),
+	};
+};
 
 test("imports every Clone of this Device, once, also when two starts ask at the same time", async () => {
 	const cloneImports = imports();

@@ -1,7 +1,7 @@
 import type { AnswerCost } from "./assistant";
 import type { Actor, LeaseHost, MemberChange } from "./contract";
 import type { Dashboard } from "./dashboard";
-import type { ProjectFlows } from "./flows";
+import type { FlowMergePlan, ProjectFlows } from "./flows";
 import type { Runner } from "./graph";
 import type { createLeaseKeeper, createLeaseStore } from "./leases";
 import {
@@ -123,10 +123,31 @@ export interface Engine {
 	 * merge of Personal). Who may see the Project is the caller's check. A
 	 * person reads and saves through `space(id).flows`.
 	 */
-	readonly flows: Pick<
-		ProjectFlows,
-		"flows" | "schedules" | "planMerge" | "merge"
-	>;
+	readonly flows: Pick<ProjectFlows, "flows" | "schedules"> & {
+		/**
+		 * The names the flows of `source` and the ids its schedules take
+		 * when they merge into `destination`, only those that change.
+		 * Changes nothing: what a preview of the merge shows. `persons`
+		 * gives a Person of the source their id in the destination.
+		 */
+		planMerge(
+			source: string,
+			destination: string,
+			persons?: Readonly<Record<string, string>>,
+		): Promise<FlowMergePlan>;
+		/**
+		 * Merges the flows of the Project `source`, their revisions and its
+		 * schedules into the flows of `destination`: both keep every flow
+		 * and every revision. Runs again safely. Returns what it renamed. A
+		 * Project that moved already merges too: it names documents, not
+		 * Projects of this Replica.
+		 */
+		merge(
+			source: string,
+			destination: string,
+			options?: { persons?: Readonly<Record<string, string>> },
+		): Promise<FlowMergePlan>;
+	};
 	/**
 	 * Whether this computer may send anonymous usage. False when any Space
 	 * it belongs to has usage turned off. Missing means on.

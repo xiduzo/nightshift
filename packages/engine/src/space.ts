@@ -35,7 +35,7 @@ export type SpacesDeps = {
 	catalog: Catalog;
 	/** The policy of the Space (`spaces/`). */
 	spaces: Pick<Spaces, "setSpaceUsage">;
-	/** The flows of the Space's projects, for the actor (`flows/space-flows.ts`). */
+	/** The flows of the Space's projects, for the actor (`flows/wire.ts`). */
 	flows(spaceId: string, actor: Actor): SpaceFlows;
 	/** The kept values and the node memory of a project's flows on this computer (`flows/editing/`): each use case checks the Space itself. */
 	editing: Pick<

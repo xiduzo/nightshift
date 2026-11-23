@@ -206,7 +206,7 @@ export function createEngine(
 	});
 
 	// --- flows (phase 3): `wire-flows.ts` ---
-	const { migrations, projectFlows, cloneImports } = wireEngineFlows({
+	const { projectFlows, cloneImports, transfer } = wireEngineFlows({
 		db,
 		log: runLog,
 		documents,
@@ -214,6 +214,7 @@ export function createEngine(
 		directory,
 		projects,
 		git,
+		ready: () => ready,
 		deviceName: device.name,
 		options,
 		now,
@@ -488,12 +489,11 @@ export function createEngine(
 	// --- the flows of the Space view (F1): `wire-flows.ts` ---
 	const spaceFlows = wireEngineSpaceFlows({
 		db,
-		log: runLog,
 		ready,
 		directory,
 		projects,
 		projectFlows,
-		migrations,
+		transfer,
 		options,
 	});
 

@@ -7,14 +7,18 @@ import type {
 } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
 import type { FlowDocuments } from "../../documents";
-import type { FlowMigrations } from "../flow-migration";
-import { yjsFlowStore } from "./adapters/out/yjs-flow-store";
+import type { FlowMigrations } from "../migrations";
+import {
+	type FlowImports,
+	yjsFlowImports,
+	yjsFlowStore,
+} from "./adapters/out/yjs-flow-store";
 import { dismissProjectFlowNotice } from "./application/dismiss-project-flow-notice";
 import { keepFlowOutputTypes } from "./application/keep-flow-output-types";
 import { keepFlowShapes } from "./application/keep-flow-shapes";
 import { listProjectFlowNotices } from "./application/list-project-flow-notices";
 import { listProjectFlowRevisions } from "./application/list-project-flow-revisions";
-import type { ProjectSpaces, ThisDevice } from "./application/ports";
+import type { FlowStore, ProjectSpaces, ThisDevice } from "./application/ports";
 import { readProjectFlows } from "./application/read-project-flows";
 import {
 	type ProjectSchedules,
@@ -28,17 +32,24 @@ import {
 import { saveProjectSchedules } from "./application/save-project-schedules";
 import { upgradeProjectFlows } from "./application/upgrade-project-flows";
 import type { FlowRevision } from "./domain/flow-json";
-import type { FlowMergePlan } from "./domain/flow-merge";
 import type { OutputType, StepShapes } from "./domain/inferred";
 import type { FlowNotice } from "./domain/notices";
+
+export type { FlowImports } from "./adapters/out/yjs-flow-store";
+
+/**
+ * The merge of one Project's flow documents into another's, as the store
+ * does it: what the merge use cases of `flows/transfer/` call.
+ */
+export type FlowMerges = Pick<FlowStore, "planMerge" | "merge">;
 
 /**
  * The flows of the Projects this Replica has, in their flow documents
  * (ADR 2): the one door the engine reads and changes them through. Every
- * read and save, the Flow revisions, the schedules, the notices, the
- * upgrade to a newer format and the merge of one Project's flows into
- * another's. Every Device reads and saves them, with or without a Clone
- * of the project.
+ * read and save, the Flow revisions, the schedules, the notices and the
+ * upgrade to a newer format. Every Device reads and saves them, with or
+ * without a Clone of the project. The merge of one Project's flows into
+ * another's is in `flows/transfer/`.
  *
  * It knows Projects, not Spaces: whether a Person may see a Project is
  * the check of the one who asks (`SpaceFlows`, for a Person in a Space).
@@ -110,34 +121,13 @@ export type ProjectFlows = {
 	 * `upgrade` by Night Shift on this Device.
 	 */
 	upgrade(keeps: (spaceId: string) => Promise<boolean>): Promise<void>;
-	/**
-	 * The names the flows of `source` and the ids its schedules take when
-	 * they merge into `destination`, only those that change. Changes
-	 * nothing: what a preview of the merge shows. `persons` gives a Person
-	 * of the source their id in the destination.
-	 */
-	planMerge(
-		source: string,
-		destination: string,
-		persons?: Readonly<Record<string, string>>,
-	): Promise<FlowMergePlan>;
-	/**
-	 * Merges the flows of the Project `source`, their revisions and its
-	 * schedules into the flows of `destination`: both keep every flow and
-	 * every revision. Runs again safely. Returns what it renamed. A Project
-	 * that moved already merges too: it names documents, not Projects of
-	 * this Replica.
-	 */
-	merge(
-		source: string,
-		destination: string,
-		options?: { persons?: Readonly<Record<string, string>> },
-	): Promise<FlowMergePlan>;
 };
 
 /**
  * The flows of the Projects over their flow documents: the Yjs
- * `FlowStore`, and the use cases of Night Shift bound to it.
+ * `FlowStore`, and the use cases of Night Shift bound to it. `imports`
+ * gives the flow documents to the import of a Clone's folder, and
+ * `merges` the merge of the documents, to `flows/transfer/`.
  */
 export function wireStore(deps: {
 	documents: Pick<FlowDocuments, "open" | "openAll">;
@@ -157,7 +147,7 @@ export function wireStore(deps: {
 	 * Device name is to choose again, and nothing upgrades.
 	 */
 	migrations?: FlowMigrations;
-}): ProjectFlows {
+}): ProjectFlows & { imports: FlowImports; merges: FlowMerges } {
 	const clock = deps.now ?? timeNow;
 	const store = yjsFlowStore({
 		documents: deps.documents,
@@ -208,13 +198,12 @@ export function wireStore(deps: {
 			dismissNotice({ projectId, noticeId }),
 		// Without migrations nothing upgrades: no document is opened.
 		upgrade: deps.migrations ? (keeps) => upgrade({ keeps }) : async () => {},
-		// What lane F2 makes the use cases of a merge (`transfer/`).
-		planMerge: (source, destination, persons = {}) =>
-			store.planMerge(source, destination, persons),
-		merge: (source, destination, options = {}) =>
-			store.merge(source, destination, {
-				...(options.persons ? { persons: options.persons } : {}),
-				at: clock(),
-			}),
+		imports: yjsFlowImports({ documents: deps.documents }),
+		merges: {
+			planMerge: (source, destination, persons) =>
+				store.planMerge(source, destination, persons),
+			merge: (source, destination, merge) =>
+				store.merge(source, destination, merge),
+		},
 	};
 }

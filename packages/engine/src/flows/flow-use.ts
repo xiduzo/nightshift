@@ -7,7 +7,7 @@ import {
 	type Schedule,
 	webhookSecretName,
 } from "@nightshift/flows";
-import type { SpaceFlows } from "./space-flows";
+import type { SpaceFlows } from "./wire";
 
 /** A flow file of a project of the Space. */
 export type FlowRef = {

@@ -1,14 +1,16 @@
 import type { Database } from "@nightshift/db";
 import type { DeviceDirectory } from "./contract";
+import { wireCopies } from "./device-config";
 import type { FlowDocuments, SpaceDocuments } from "./documents";
 import type { EngineOptions } from "./engine-options";
 import {
-	createCloneImports,
-	createFlowMigrations,
-	createSpaceFlows,
+	type FlowTransfer,
 	type ProjectFlows,
 	wireEditing,
+	wireFlows,
+	wireMigrations,
 	wireStore,
+	wireTransfer,
 } from "./flows";
 import type { Git } from "./git";
 import type { RunLog } from "./log";
@@ -19,13 +21,15 @@ import { listKeptValues, resetKeptValue } from "./variables";
 
 /**
  * The flows block of the engine's composition (`wire.ts`): the flows and
- * schedules of every project in its flow document (`flows/`), what brings
- * a flow of an older format to the current one, and the import of a
- * Clone's folder from before it. Phase 3 of the hexagon series makes
- * `flows` a slice. It comes after the projects block
+ * schedules of every project in its flow document (`flows/store/`), what
+ * brings a flow of an older format to the current one
+ * (`flows/migrations/`), and the moves of flows (`flows/transfer/`): the
+ * import of a Clone's folder from before ADR 2, and a Person's export,
+ * import and copy. It comes after the projects block
  * (`wire-projects.ts`), whose `projects` and `git` it takes.
  *
- * It gives `migrations`, `projectFlows` and `cloneImports`.
+ * It gives `projectFlows` (with the merge of Personal), `cloneImports`
+ * and `transfer`.
  */
 export function wireEngineFlows(deps: {
 	db: Database;
@@ -35,9 +39,11 @@ export function wireEngineFlows(deps: {
 	directory: DeviceDirectory;
 	projects: Pick<Projects, "find">;
 	git: Git;
+	/** The engine is ready: a Person's verb waits for it. Made after this block. */
+	ready: () => Promise<unknown>;
 	/** This Device's name. */
 	deviceName: string;
-	options: Pick<EngineOptions, "profiles">;
+	options: Pick<EngineOptions, "profiles" | "usage">;
 	now(): number;
 }) {
 	const {
@@ -47,7 +53,6 @@ export function wireEngineFlows(deps: {
 		flowDocuments,
 		directory,
 		projects,
-		git,
 		now,
 	} = deps;
 	/** What brings a flow or a schedule of an older format to the current one: its nodes name a Device's profile, and their Device, by id. */
@@ -55,63 +60,103 @@ export function wireEngineFlows(deps: {
 		id: await runLog.walkerId(),
 		name: deps.deviceName,
 	});
-	const migrations = createFlowMigrations({
-		db,
-		device: thisDevice,
+	const migrations = wireMigrations({
+		device: { device: thisDevice },
+		stored: { list: () => wireCopies({ db }).listStoredDevices() },
 		profiles: deps.options.profiles,
 		directory,
 		spaces: documents,
 	});
 	/** The flows and schedules of every project: its flow document (ADR 2). */
-	const projectFlows = wireStore({
+	const { imports, merges, ...stored } = wireStore({
 		documents: flowDocuments,
 		project: (projectId) => projects.find(projectId),
 		deviceId: () => runLog.walkerId(),
 		now,
 		migrations,
 	});
-	/** The import on upgrade: each Clone's `.nightshift/` folder, once. */
-	const cloneImports = createCloneImports({
+	const usage = deps.options.usage;
+	const transfer = wireTransfer({
 		db,
-		documents: flowDocuments,
-		git,
-		device: thisDevice,
+		git: deps.git,
+		documents: imports,
+		saved: flowDocuments,
+		device: { device: thisDevice },
+		clock: now,
+		merges,
 		profiles: deps.options.profiles,
 		migrations,
-		now,
+		projects: {
+			async inSpace(projectId, spaceId) {
+				await deps.ready();
+				await projects.find(projectId, spaceId);
+			},
+		},
+		flows: stored,
+		importMigrations: {
+			forScope: async (scope) =>
+				migrations.forDevice(await runLog.walkerId(), scope),
+		},
+		...(usage ? { usage } : {}),
 	});
-	return { migrations, projectFlows, cloneImports };
+	/** The flows of every project, and the merge of one Project's flows into another's (the merge of Personal). */
+	const projectFlows = {
+		...stored,
+		planMerge: (
+			source: string,
+			destination: string,
+			persons?: Readonly<Record<string, string>>,
+		) =>
+			transfer.planFlowMerge({
+				source,
+				destination,
+				...(persons ? { persons } : {}),
+			}),
+		merge: (
+			source: string,
+			destination: string,
+			options: { persons?: Readonly<Record<string, string>> } = {},
+		) =>
+			transfer.mergeFlows({
+				source,
+				destination,
+				...(options.persons ? { persons: options.persons } : {}),
+			}),
+	};
+	/** The import on upgrade: each Clone's `.nightshift/` folder, once. */
+	const cloneImports = {
+		all: () => transfer.importCloneFolders({}),
+		project: (projectId: string) => transfer.importCloneFolders({ projectId }),
+	};
+	return { projectFlows, cloneImports, transfer };
 }
 
 /**
  * The flows part of the Space view (`space.ts`): what a Person does with
  * the flows of a Space (`flows/editing/`, bound here once), and the
- * `SpaceFlows` of each Space over it. It comes after `ready`, which each
- * use case waits for before it checks the project's Space.
+ * `SpaceFlows` of each Space over it and the moves (`transfer`). It comes
+ * after `ready`, which each use case waits for before it checks the
+ * project's Space.
  *
  * It gives `flows` (the `SpaceFlows` of a Space for an actor) and
  * `editing` (the kept values and the node memory).
  */
 export function wireEngineSpaceFlows(deps: {
 	db: Database;
-	log: RunLog;
 	ready: Promise<unknown>;
 	directory: DeviceDirectory;
 	projects: Pick<Projects, "find">;
 	projectFlows: ProjectFlows;
-	migrations: ReturnType<typeof createFlowMigrations>;
+	transfer: FlowTransfer;
 	options: Pick<EngineOptions, "usage">;
 }) {
 	const { db, ready, projects, projectFlows } = deps;
-	const project = async (projectId: string, spaceId: string) => {
-		await projects.find(projectId, spaceId);
-	};
 	const usage = deps.options.usage;
 	const editing = wireEditing({
 		projects: {
 			async inSpace(projectId, spaceId) {
 				await ready;
-				await project(projectId, spaceId);
+				await projects.find(projectId, spaceId);
 			},
 		},
 		flows: projectFlows,
@@ -129,14 +174,6 @@ export function wireEngineSpaceFlows(deps: {
 			forget: (flow, node, scope) => forgetMemory(db, flow, node, scope),
 		},
 	});
-	const flows = createSpaceFlows({
-		ready,
-		flows: projectFlows,
-		editing,
-		...(usage ? { usage } : {}),
-		project,
-		migration: async (scope) =>
-			deps.migrations.forDevice(await deps.log.walkerId(), scope),
-	});
+	const flows = wireFlows({ editing, transfer: deps.transfer });
 	return { flows, editing };
 }

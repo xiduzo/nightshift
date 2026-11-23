@@ -17,16 +17,32 @@ import {
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { wireStore as createProjectFlows, type ProjectFlows } from "./store";
 import { addNotices } from "./store/adapters/out/yjs-notices";
+import { mergeFlows } from "./transfer/application/merge-flows";
+import { planFlowMerge } from "./transfer/application/plan-flow-merge";
+
+/** The flows of the projects with the merge of Personal, as `wire-flows.ts` binds it. */
+type MergingFlows = ProjectFlows & {
+	planMerge(
+		source: string,
+		destination: string,
+		persons?: Readonly<Record<string, string>>,
+	): ReturnType<ReturnType<typeof planFlowMerge>>;
+	merge(
+		source: string,
+		destination: string,
+		options?: { persons?: Readonly<Record<string, string>> },
+	): ReturnType<ReturnType<typeof mergeFlows>>;
+};
 
 let sandbox: Sandbox;
 let documents: FlowDocuments;
-let flows: ProjectFlows;
+let flows: MergingFlows;
 /** Whether the next change of the Host's current flows fails: what a crash in the middle leaves. */
 let crashNext = false;
 
 /** The flows over the documents, with a clock and a Project that is always there. */
-function flowsOn(over: FlowDocuments): ProjectFlows {
-	return createProjectFlows({
+function flowsOn(over: FlowDocuments): MergingFlows {
+	const { merges, ...stored } = createProjectFlows({
 		documents: {
 			openAll: () => over.openAll(),
 			open: async (projectId) => {
@@ -38,6 +54,19 @@ function flowsOn(over: FlowDocuments): ProjectFlows {
 		deviceId: sandbox.deviceId,
 		now: () => 10,
 	});
+	const plan = planFlowMerge({ merges });
+	const merge = mergeFlows({ merges, clock: () => 10 });
+	return {
+		...stored,
+		planMerge: (source, destination, persons) =>
+			plan({ source, destination, ...(persons ? { persons } : {}) }),
+		merge: (source, destination, options = {}) =>
+			merge({
+				source,
+				destination,
+				...(options.persons ? { persons: options.persons } : {}),
+			}),
+	};
 }
 
 function crashing(document: FlowDocument): FlowDocument {

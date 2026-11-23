@@ -13,6 +13,7 @@ import {
 import { now } from "@nightshift/time";
 import * as Y from "yjs";
 import type { ProfileStore } from "../device-config";
+import { wireCopies } from "../device-config";
 import {
 	createFlowDocuments,
 	type FlowDocument,
@@ -21,17 +22,62 @@ import {
 import { systemGit } from "../git";
 import { createProfileStore } from "../testing";
 import { createSandbox, mustGit, type Sandbox } from "../testing/test-support";
-import { createFlowMigrations } from "./flow-migration";
-import { type CloneImport, importClone, importMarker } from "./import";
-import { trackedState } from "./legacy-folder";
+import { wireMigrations } from "./migrations";
 import {
 	flowIdOf,
 	flowRevisions,
 	flowSources,
 } from "./store/adapters/out/yjs-flow-encoding";
 import { saveFlow } from "./store/adapters/out/yjs-flow-saves";
+import { yjsFlowImports } from "./store/adapters/out/yjs-flow-store";
 import { flowNotices, marked } from "./store/adapters/out/yjs-notices";
 import { readSchedules } from "./store/adapters/out/yjs-schedules";
+import { fsCloneFolders } from "./transfer/adapters/out/fs-clone-folders";
+import {
+	type ImportCloneFolderPorts,
+	importCloneFolder,
+} from "./transfer/application/import-clone-folder";
+import { type CloneImport, importMarker } from "./transfer/domain/clone-import";
+
+/** The migrations of the flows over this sandbox's Device documents, as the engine wires them. */
+function createFlowMigrations(deps: {
+	db: Sandbox["db"];
+	device(): Promise<{ id: string; name: string }>;
+	profiles?: Parameters<typeof wireMigrations>[0]["profiles"];
+	directory?: Parameters<typeof wireMigrations>[0]["directory"];
+	spaces?: Parameters<typeof wireMigrations>[0]["spaces"];
+}) {
+	return wireMigrations({
+		...deps,
+		device: { device: deps.device },
+		stored: { list: () => wireCopies({ db: deps.db }).listStoredDevices() },
+	});
+}
+
+/** Imports the Clone of `sandbox` into `documents` as the Device `name`, over the real adapters. */
+function importClone(
+	sandbox: Sandbox,
+	documents: FlowDocuments,
+	name: string,
+	cloneId: string,
+	ports: Partial<ImportCloneFolderPorts> = {},
+): Promise<CloneImport> {
+	return importCloneFolder({
+		documents: yjsFlowImports({ documents }),
+		folders: fsCloneFolders({ git: systemGit() }),
+		saved: { flush: () => documents.flush() },
+		device: { device: async () => ({ id: sandbox.deviceId, name }) },
+		clock: now,
+		...ports,
+	})({
+		clone: {
+			id: cloneId,
+			projectId,
+			spaceId: "space",
+			repoPath: sandbox.repoPath,
+		},
+	});
+}
 
 /** A flow of one Command node that says `word`, and calls `calls` after it when given. */
 function flow(word: string, calls?: string): Flow {
@@ -158,22 +204,17 @@ async function replica(name: string): Promise<Replica> {
 		},
 		profiles,
 		document: () => documents.open(projectId),
-		importClone: async (cloneId = `clone-${name}`) =>
-			importClone({
-				document: await documents.open(projectId),
-				clone: { id: cloneId, repoPath: sandbox.repoPath },
-				device: { id: sandbox.deviceId, name },
-				tracked: (repoPath, folder) =>
-					trackedState(systemGit(), repoPath, folder),
+		importClone: (cloneId = `clone-${name}`) =>
+			importClone(sandbox, documents, name, cloneId, {
 				profiles,
-				migration: () =>
-					createFlowMigrations({
-						db: sandbox.db,
-						device: async () => ({ id: sandbox.deviceId, name }),
-						profiles,
-					}).forDevice(sandbox.deviceId),
-				flush: () => documents.flush(),
-				at: now(),
+				migrations: {
+					forDevice: (deviceId) =>
+						createFlowMigrations({
+							db: sandbox.db,
+							device: async () => ({ id: sandbox.deviceId, name }),
+							profiles,
+						}).forDevice(deviceId),
+				},
 			}),
 		restart: async () => {
 			await documents.flush();
@@ -329,16 +370,21 @@ describe("the import on upgrade", () => {
 		await writeFolder(laptop.sandbox.repoPath, {
 			flows: { build: flow("build") },
 		});
-		const result = await importClone({
-			document: await laptop.document(),
-			clone: { id: "clone-laptop", repoPath: laptop.sandbox.repoPath },
-			device: { id: laptop.sandbox.deviceId, name: "laptop" },
-			tracked: async () => {
-				throw new Error("git is gone");
+		const folders = fsCloneFolders({ git: systemGit() });
+		const result = await importClone(
+			laptop.sandbox,
+			laptop.documents,
+			"laptop",
+			"clone-laptop",
+			{
+				folders: {
+					...folders,
+					tracked: async () => {
+						throw new Error("git is gone");
+					},
+				},
 			},
-			flush: () => laptop.documents.flush(),
-			at: now(),
-		});
+		);
 
 		expect(result).toMatchObject({ status: "imported", deleted: false });
 		expect(existsSync(join(folderOf(laptop), "flows", "build.json"))).toBe(
@@ -353,17 +399,19 @@ describe("the import on upgrade", () => {
 		await writeFolder(laptop.sandbox.repoPath, {
 			flows: { build: flow("build") },
 		});
-		const failed = importClone({
-			document: await laptop.document(),
-			clone: { id: "clone-laptop", repoPath: laptop.sandbox.repoPath },
-			device: { id: laptop.sandbox.deviceId, name: "laptop" },
-			tracked: (repoPath, folder) =>
-				trackedState(systemGit(), repoPath, folder),
-			flush: async () => {
-				throw new Error("The disk is full.");
+		const failed = importClone(
+			laptop.sandbox,
+			laptop.documents,
+			"laptop",
+			"clone-laptop",
+			{
+				saved: {
+					flush: async () => {
+						throw new Error("The disk is full.");
+					},
+				},
 			},
-			at: now(),
-		});
+		);
 
 		await expect(failed).rejects.toThrow("The disk is full.");
 		expect(existsSync(join(folderOf(laptop), "flows", "build.json"))).toBe(

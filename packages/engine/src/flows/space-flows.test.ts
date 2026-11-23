@@ -15,8 +15,12 @@ import {
 	inMemoryNodeMemory,
 } from "./editing/adapters/out/in-memory-neighbours";
 import type { Names } from "./editing/application/ports";
-import { createSpaceFlows, type SpaceFlows } from "./space-flows";
 import { wireStore as createProjectFlows } from "./store";
+import { copyFlow } from "./transfer/application/copy-flow";
+import { exportFlow } from "./transfer/application/export-flow";
+import { importFlow } from "./transfer/application/import-flow";
+import { importStarters } from "./transfer/application/import-starters";
+import { type SpaceFlows, wireFlows } from "./wire";
 
 const SPACE = "space";
 const PROJECT = "project";
@@ -66,11 +70,16 @@ function adasFlows(
 		kept: inMemoryKeptValues(),
 		memory: inMemoryNodeMemory(),
 	});
-	return createSpaceFlows({
-		ready: Promise.resolve(),
-		flows,
+	// The moves as `flows/transfer/wire.ts` binds them.
+	const moves = { projects: { inSpace: project }, flows };
+	return wireFlows({
 		editing,
-		project,
+		transfer: {
+			exportFlow: exportFlow(moves),
+			importFlow: importFlow(moves),
+			importStarters: importStarters(moves),
+			copyFlow: copyFlow(moves),
+		},
 	})(SPACE, { personId: "ada", door: "session" });
 }
 

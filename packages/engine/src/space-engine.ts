@@ -96,7 +96,7 @@ export interface SpaceEngine {
 	/**
 	 * The flows of the Space's projects, for the actor: list, read, save,
 	 * remove, their notices and revisions, a restore, export, import and
-	 * copy (`flows/space-flows.ts`). From each project's flow document:
+	 * copy (`flows/wire.ts`). From each project's flow document:
 	 * every Device has them, with or without a Clone.
 	 */
 	readonly flows: SpaceFlows;

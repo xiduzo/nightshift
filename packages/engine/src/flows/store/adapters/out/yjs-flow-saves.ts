@@ -9,7 +9,7 @@ import {
 } from "@nightshift/flows";
 import type * as Y from "yjs";
 import type { FlowDocument } from "../../../../documents";
-import type { FlowMigrations, MigrationScope } from "../../../flow-migration";
+import type { FlowMigrations, MigrationScope } from "../../../migrations";
 import {
 	type FlowRevision,
 	olderFormat,

@@ -1,9 +1,25 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Profile } from "@nightshift/flows";
+import { wireCopies } from "../device-config";
 import { openDeviceDocument } from "../documents/device-document";
 import { createProfileStore } from "../testing";
 import { createSandbox, type Sandbox } from "../testing/test-support";
-import { createFlowMigrations } from "./flow-migration";
+import { wireMigrations } from "./migrations";
+
+/** The migrations of the flows over this sandbox's Device documents, as the engine wires them. */
+function createFlowMigrations(deps: {
+	db: Sandbox["db"];
+	device(): Promise<{ id: string; name: string }>;
+	profiles?: Parameters<typeof wireMigrations>[0]["profiles"];
+	directory?: Parameters<typeof wireMigrations>[0]["directory"];
+	spaces?: Parameters<typeof wireMigrations>[0]["spaces"];
+}) {
+	return wireMigrations({
+		...deps,
+		device: { device: deps.device },
+		stored: { list: () => wireCopies({ db: deps.db }).listStoredDevices() },
+	});
+}
 
 let sandbox: Sandbox;
 beforeEach(async () => {
