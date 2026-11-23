@@ -7,13 +7,9 @@
  *
  * The MCP SDK loads on first use: the package root must not load it.
  */
-import type {
-	CallToolResult,
-	Server,
-	Transport,
-} from "@modelcontextprotocol/server";
+import type { CallToolResult, Server } from "@modelcontextprotocol/server";
 import type { BridgedTool } from "../../../port";
-import { toolAnnotations } from "../domain/builtin-tools";
+import { toolAnnotations } from "../../catalog";
 
 export type ToolServerInfo = {
 	name: string;

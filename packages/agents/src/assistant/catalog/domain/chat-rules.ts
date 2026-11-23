@@ -1,4 +1,4 @@
-import { harnessTakesTools, type AgentHarnessName } from "@nightshift/flows";
+import { type AgentHarnessName, harnessTakesTools } from "@nightshift/flows";
 
 const SWITCHES_MODEL_ON_RESUME: readonly AgentHarnessName[] = [
 	"claude-code",

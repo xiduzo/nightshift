@@ -2,13 +2,14 @@ import type { AssistantUsage } from "@nightshift/flows";
 import {
 	LEARN_OUTPUT,
 	learnFromRunPrompt,
-	reportedLearnings,
 	type RunLearnings,
-} from "../domain/learn-prompt";
-import type { AssistantVia } from "./ports";
+	reportedLearnings,
+} from "../catalog";
+import type { AssistantVia } from "../domain/session";
+import type { ReportSessions } from "./ports";
 
 export const learnFromRun =
-	(ports: { sessions: Pick<import("./ports").AssistantSessions, "runReport"> }) =>
+	(ports: { sessions: Pick<ReportSessions, "runReport"> }) =>
 	async (input: {
 		evidence: string;
 		via: AssistantVia;

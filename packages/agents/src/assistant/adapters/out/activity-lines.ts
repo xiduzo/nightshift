@@ -1,5 +1,5 @@
 import { isAbsolute, relative } from "node:path";
-import { bareToolName } from "../../domain/activity";
+import { bareToolName } from "../../catalog";
 
 function field(input: unknown, keys: readonly string[]): string | undefined {
 	if (typeof input !== "object" || input === null) return undefined;
@@ -26,11 +26,23 @@ function short(text: string, max = 48): string {
 }
 
 const READS = new Set(["read", "read_file", "view", "readfile", "open"]);
-const SEARCHES = new Set(["grep", "search", "rg", "codesearch", "search_files"]);
+const SEARCHES = new Set([
+	"grep",
+	"search",
+	"rg",
+	"codesearch",
+	"search_files",
+]);
 const FINDS = new Set(["glob", "find", "find_files", "file_search"]);
 const LISTS = new Set(["ls", "list", "list_directory", "list_dir"]);
 const WEB = new Set(["webfetch", "websearch", "web_fetch", "web_search"]);
-const QUIET = new Set(["todowrite", "todoread", "todo_write", "skill", "toolsearch"]);
+const QUIET = new Set([
+	"todowrite",
+	"todoread",
+	"todo_write",
+	"skill",
+	"toolsearch",
+]);
 
 export function activityOf(
 	name: string,

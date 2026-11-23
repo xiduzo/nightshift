@@ -15,7 +15,6 @@ import {
 	type SuggestionKind,
 	type SuggestionRequest,
 } from "@nightshift/flows";
-import { flowJson, scopeList } from "../prompts";
 import { commandKind } from "./command-kind";
 import { argumentsKind, outputKind, setKind } from "./data-kinds";
 import { descriptionKind, inputsKind } from "./flow-kinds";
@@ -24,6 +23,7 @@ import type { FlowKind, KindPrompt } from "./kind";
 import { outcomesKind } from "./outcomes-kind";
 import type { ProjectFacts } from "./project-facts";
 import { promptKind } from "./prompt-kind";
+import { flowJson, scopeList } from "./prompts";
 
 /** The prompt of each kind of a node: its own instruction and its own context. */
 const NODE_KINDS: Record<Exclude<SuggestionKind, FlowKind>, KindPrompt> = {

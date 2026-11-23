@@ -4,11 +4,23 @@
  */
 import type { AgentProfileSettings, AssistantUsage } from "@nightshift/flows";
 import { formatDateTime } from "@nightshift/time";
-import type {
-	AgentErrorKind,
-	AgentHarness,
-	ValueResult,
-} from "../../port/index";
+/** Kinds of agent failure the person may see. */
+export type AgentErrorKind =
+	| "aborted"
+	| "usage-limit"
+	| "network"
+	| "harness"
+	| "auth"
+	| "other";
+
+/** The harness handle a session needs (opaque to domain rules). */
+export type SessionHarness = {
+	name: string;
+	label?: string;
+};
+
+/** A tool the session may hand the harness. */
+export type SessionTool = { name: string };
 
 /** The most turns and the most money of one answer. */
 export type SessionLimits = { turns?: number; usd?: number };
@@ -22,12 +34,12 @@ export type AssistantReport = { summary: string; data?: unknown };
 
 export type AssistantSessionInput = {
 	/** The harness that answers, as this computer runs it. */
-	harness: AgentHarness;
+	harness: SessionHarness;
 	profile: Pick<AgentProfileSettings, "model" | "effort">;
 	cwd: string;
 	prompt: string;
 	resumeSessionId?: string;
-	tools?: readonly import("../../port").BridgedTool[];
+	tools?: readonly SessionTool[];
 	describeTool?: (name: string, input: unknown) => string | undefined;
 	report?: { output?: Record<string, unknown> };
 	limits?: SessionLimits;
@@ -92,7 +104,7 @@ export function settleUsage(
 /** An agent of this computer answers: a read-only session in a folder. */
 export type AgentVia = {
 	kind: "agent";
-	harness: AgentHarness;
+	harness: SessionHarness;
 	profile: Pick<AgentProfileSettings, "model" | "effort">;
 	cwd: string;
 	limits?: SessionLimits;
@@ -105,7 +117,7 @@ export type ModelVia = {
 		prompt: string;
 		output: Record<string, unknown>;
 		signal: AbortSignal;
-	}) => Promise<ValueResult>;
+	}) => Promise<unknown>;
 };
 
 export type AssistantVia = AgentVia | ModelVia;

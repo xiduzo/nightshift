@@ -6,11 +6,11 @@ import {
 	TOOL_TIERS,
 	toolAnnotations,
 	withinTier,
-} from "../domain/builtin-tools";
-import { HISTORY_TOOLS } from "../adapters/out/tanstack-history-tools";
-import { TERMINAL_TOOLS } from "../adapters/out/tanstack-terminal-tools";
-import { RUN_TOOLS } from "../domain/terminal-runs";
-import { AUTHORING_TOOLS } from "../adapters/out/tanstack-authoring-tools";
+} from "../../catalog/domain/builtin-tools";
+import { AUTHORING_TOOLS } from "../../domain/authoring";
+import { RUN_TOOLS } from "../../terminal";
+import { HISTORY_TOOLS } from "./tanstack-history-tools";
+import { TERMINAL_TOOLS } from "./tanstack-terminal-tools";
 
 /** Every tool Night Shift hands to an agent, in the chat or in a terminal. */
 const NAMES = [

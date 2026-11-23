@@ -1,18 +1,16 @@
+import type { BridgedTool } from "../../port";
 import type {
 	AssistantSessionEvent,
 	AssistantSessionInput,
 	AssistantVia,
 } from "../domain/session";
-import type { BridgedTool } from "../../port";
-import type { SessionLimits } from "../domain/session";
-import type { AuthoringPort } from "../domain/authoring";
+import type { ToolServerResources } from "./serve-tools";
+
 /**
  * Runs design-time assistant sessions on this computer's harnesses.
  */
 export type AssistantSessions = {
-	run(
-		input: AssistantSessionInput,
-	): AsyncGenerator<AssistantSessionEvent>;
+	run(input: AssistantSessionInput): AsyncGenerator<AssistantSessionEvent>;
 	runReport(
 		via: AssistantVia,
 		input: {
@@ -32,8 +30,8 @@ export type McpToolServer = {
 			name: string;
 			version: string;
 			instructions?: string;
-			resources?: import("./serve-tools").ToolServerResources;
+			resources?: ToolServerResources;
 		},
-		transport?: import("@modelcontextprotocol/server").Transport,
-	): Promise<import("@modelcontextprotocol/server").Server>;
+		transport?: unknown,
+	): Promise<unknown>;
 };

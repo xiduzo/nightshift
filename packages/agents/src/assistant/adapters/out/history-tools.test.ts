@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { type HistoryPort, historyTools } from "./history";
+import type { HistoryPort } from "../../domain/history-port";
+import { historyTools } from "./tanstack-history-tools";
 
 const cost = { usd: 3, estimated: false, missing: 0, calls: 2, basis: null };
 const flow = {

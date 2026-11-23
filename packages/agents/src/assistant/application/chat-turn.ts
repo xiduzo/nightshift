@@ -5,11 +5,14 @@ import {
 	chatMessage,
 	type FlowProposal,
 } from "@nightshift/flows";
-import type { AgentHarness } from "../../port";
-import { chatFollowUpPrompt, type ChatExchange, chatPrompt } from "../domain/prompts";
+import type { AgentHarness, BridgedTool } from "../../port";
+import { type ChatExchange, chatFollowUpPrompt, chatPrompt } from "../catalog";
 import type { AuthoringPort } from "../domain/authoring";
-export type HistoryPort = import("../adapters/out/tanstack-history-tools").HistoryPort;
+import type { HistoryPort } from "../domain/history-port";
+import type { SessionLimits } from "../domain/session";
 import type { AssistantSessions } from "./ports";
+
+export type { HistoryPort };
 
 export type ChatTools = {
 	forTurn(input: {
@@ -17,9 +20,9 @@ export type ChatTools = {
 		port: Omit<AuthoringPort, "propose">;
 		past?: HistoryPort;
 		proposals: { push(p: FlowProposal): void };
-	}): readonly import("../../port").BridgedTool[];
+	}): readonly BridgedTool[];
 	describeTool(name: string, input: unknown): string | undefined;
-	limits(agent: "builder" | "improver"): import("../domain/session").SessionLimits;
+	limits(agent: "builder" | "improver"): SessionLimits;
 };
 
 export type ChatTurnPorts = {
@@ -45,11 +48,8 @@ export type ChatTurnEvent =
 	| Exclude<ChatEvent, { type: "thread" }>
 	| { type: "session"; sessionId: string };
 
-export const chatTurn =
-	(ports: ChatTurnPorts) =>
-	async function* (
-		input: ChatTurnInput,
-	): AsyncGenerator<ChatTurnEvent> {
+export const chatTurn = (ports: ChatTurnPorts) =>
+	async function* (input: ChatTurnInput): AsyncGenerator<ChatTurnEvent> {
 		const { request, harness, signal } = input;
 		const message = chatMessage(request) ?? "";
 		const proposals: FlowProposal[] = [];

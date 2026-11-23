@@ -920,7 +920,14 @@ describe("the command", () => {
 		);
 		const mechanisms = mechanismsOf();
 		expect(await checkRings(root, { mechanisms, debt })).toEqual([]);
-		expect(await checkRings(root, { mechanisms, debt: "" })).not.toEqual([]);
+		const listed = debt
+			.split("\n")
+			.some((line) => line.trim() !== "" && !line.trim().startsWith("#"));
+		const withoutDebt = await checkRings(root, { mechanisms, debt: "" });
+		// With a non-empty debt list, clearing it must surface the debtors.
+		// With none left, empty debt is the green state.
+		if (listed) expect(withoutDebt).not.toEqual([]);
+		else expect(withoutDebt).toEqual([]);
 		// It reads every file of the six packages twice.
 	}, 60_000);
 });

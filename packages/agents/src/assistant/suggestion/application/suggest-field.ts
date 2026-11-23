@@ -1,18 +1,17 @@
-import type { SuggestionEvent, SuggestionRequest } from "@nightshift/flows";
-import type { FlowPlace } from "@nightshift/flows";
-import { retryPrompt } from "../../domain/prompts";
-import type { AssistantReport } from "../../domain/session";
-import type { AssistantSessions } from "../../application/ports";
+import type { AssistantUsage, SuggestionEvent } from "@nightshift/flows";
+import type { ProjectFacts } from "../domain/project-facts";
+import { retryPrompt } from "../domain/prompts";
+import { suggestionPrompt } from "../domain/suggestion-prompt";
 import {
 	cannotSuggest,
 	checkSuggestion,
 	SUGGESTION_ATTEMPTS,
+	type SuggestFieldInput,
 	suggestionDataSchema,
 } from "../domain/suggestion-rules";
-import { readProjectFacts } from "../domain/project-facts";
-import { suggestionPrompt } from "../domain/suggestion-prompt";
+import type { SuggestSessions } from "./ports";
 
-const sum = (a: import("@nightshift/flows").AssistantUsage, b: import("@nightshift/flows").AssistantUsage) => {
+const sum = (a: AssistantUsage, b: AssistantUsage) => {
 	const costUsd =
 		a.costUsd !== undefined || b.costUsd !== undefined
 			? (a.costUsd ?? 0) + (b.costUsd ?? 0)
@@ -24,11 +23,13 @@ const sum = (a: import("@nightshift/flows").AssistantUsage, b: import("@nightshi
 	};
 };
 
-export const suggestField =
-	(ports: { sessions: Pick<AssistantSessions, "runReport"> }) =>
-	async function* (
-		input: import("../domain/suggestion-rules").SuggestFieldInput,
-	): AsyncGenerator<SuggestionEvent> {
+export type ProjectFactsReader = (folder: string) => Promise<ProjectFacts>;
+
+export const suggestField = (ports: {
+	sessions: SuggestSessions;
+	readProjectFacts: ProjectFactsReader;
+}) =>
+	async function* (input: SuggestFieldInput): AsyncGenerator<SuggestionEvent> {
 		const { request, via, place, signal } = input;
 		const refusal = cannotSuggest(request);
 		if (refusal) {
@@ -38,10 +39,10 @@ export const suggestField =
 		const output = suggestionDataSchema(request.kind);
 		const facts =
 			request.kind === "command" && via.kind === "agent"
-				? await readProjectFacts(via.cwd)
+				? await ports.readProjectFacts(via.cwd)
 				: null;
 		const first = suggestionPrompt(request, facts);
-		let spent: import("@nightshift/flows").AssistantUsage | null = null;
+		let spent: AssistantUsage | null = null;
 		let sessionId: string | null = null;
 		let problems: string[] = [];
 		for (let attempt = 0; attempt < SUGGESTION_ATTEMPTS; attempt++) {
@@ -53,7 +54,7 @@ export const suggestField =
 					: resume
 						? retryPrompt(problems)
 						: `${first}\n\n${retryPrompt(problems)}`;
-			let last: import("@nightshift/flows").AssistantUsage | null = null;
+			let last: AssistantUsage | null = null;
 			let report: AssistantReport | null = null;
 			let ended = false;
 			for await (const event of ports.sessions.runReport(via, {
@@ -90,7 +91,10 @@ export const suggestField =
 			}
 			if (last) spent = spent ? sum(spent, last) : last;
 			if (!ended) {
-				yield { type: "error", message: "The agent stopped without an answer." };
+				yield {
+					type: "error",
+					message: "The agent stopped without an answer.",
+				};
 				return;
 			}
 			if (!report) {

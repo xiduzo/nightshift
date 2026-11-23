@@ -1,4 +1,4 @@
-import type { SessionLimits } from "./session";
+export type SessionLimits = { turns?: number; usd?: number };
 
 /** What the check asks. Any answer in text counts. */
 export const CHECK_PROMPT = "Answer with the one word: ready.";

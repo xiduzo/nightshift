@@ -3,8 +3,8 @@
  * variable writes, and the arguments of a tool call.
  */
 import { nodeOutcomes, typedOutput } from "@nightshift/flows";
-import { dataReaders } from "../prompts";
 import { json, type KindPrompt, quoted } from "./kind";
+import { dataReaders } from "./prompts";
 
 export const outputKind: KindPrompt = {
 	what: "an output schema",

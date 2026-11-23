@@ -3,7 +3,8 @@
  */
 import type { AgentProfileSettings } from "@nightshift/flows";
 import type { AgentHarness } from "../../port";
-import { CHECK_LIMITS, CHECK_PROMPT } from "../domain/check-limits";
+import type { AgentCheck } from "../catalog";
+import { CHECK_LIMITS, CHECK_PROMPT } from "../catalog";
 import { AT_LIMIT } from "../domain/session";
 import type { AssistantSessions } from "./ports";
 
@@ -14,7 +15,7 @@ export const checkAgent =
 		profile: Pick<AgentProfileSettings, "model" | "effort">;
 		cwd: string;
 		signal: AbortSignal;
-	}): Promise<import("../domain/check-agent").AgentCheck> => {
+	}): Promise<AgentCheck> => {
 		let text = "";
 		for await (const event of ports.sessions.run({
 			...input,

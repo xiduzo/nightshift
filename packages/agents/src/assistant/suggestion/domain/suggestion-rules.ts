@@ -5,7 +5,6 @@
  * pass is sent back once with its problems, in the same session.
  */
 import {
-	type AssistantUsage,
 	applySuggestion,
 	type FlowPlace,
 	isFlowSuggestion,
@@ -13,17 +12,13 @@ import {
 	nodeOutcomes,
 	proposalIssues,
 	type Suggestion,
-	type SuggestionEvent,
 	type SuggestionKind,
 	type SuggestionRequest,
 	suggestionSchema,
 	takesSuggestion,
 } from "@nightshift/flows";
 import { z } from "zod";
-import type { AssistantReport } from "../../domain/session";
-import type { AssistantVia } from "../../domain/session";
-import { readProjectFacts } from "../domain/project-facts";
-import { suggestionPrompt } from "../domain/suggestion-prompt";
+import type { AssistantReport, AssistantVia } from "./session";
 
 /** How many times the agent may answer: once, and once more with the problems. */
 export const SUGGESTION_ATTEMPTS = 2;

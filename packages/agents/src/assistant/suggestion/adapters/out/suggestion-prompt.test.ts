@@ -9,13 +9,13 @@ import {
 	type SuggestionRequest,
 	suggestionRequestSchema,
 } from "@nightshift/flows";
-import { readProjectFacts } from "./project-facts";
+import { suggestionPrompt } from "../../domain/suggestion-prompt";
 import {
 	cannotSuggest,
 	checkSuggestion,
 	suggestionDataSchema,
-} from "./suggest";
-import { suggestionPrompt } from "./suggestion-prompt";
+} from "../../domain/suggestion-rules";
+import { readProjectFacts } from "./project-facts";
 
 const flow: Flow = flowSchema.parse({
 	version: FLOW_VERSION,

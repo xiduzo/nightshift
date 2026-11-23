@@ -25,16 +25,10 @@ import {
 	proposalIssues,
 } from "@nightshift/flows";
 import { toolDefinition } from "@tanstack/ai";
-import { type KnowledgePort, knowledgeTools } from "../../knowledge";
-import type { BridgedTool } from "../../port";
-import { asBridgedTools } from "../../tools";
-import { flowJson } from "../../domain/prompts";
-import {
-	chooseProject,
-	projectOfFolder,
-	type TerminalProject,
-} from "../../domain/terminal-project";
-import { type TerminalRunPort, terminalRunTools } from "./tanstack-terminal-tools";
+import { type KnowledgePort, knowledgeTools } from "../../../knowledge";
+import type { BridgedTool } from "../../../port";
+import { asBridgedTools } from "../../../tools";
+import { flowJson } from "../../catalog";
 import {
 	AUTHORING_TOOLS,
 	type AuthoringCliTool,
@@ -45,7 +39,14 @@ import {
 	field,
 	flowRows,
 	issueLines,
-} from "./authoring";
+} from "../../domain/authoring";
+import type { TerminalRunPort } from "../../terminal";
+import {
+	chooseProject,
+	projectOfFolder,
+	type TerminalProject,
+} from "../../terminal";
+import { terminalRunTools } from "./terminal-run-tools";
 
 /** What the terminal tools read and write: Night Shift on this computer. */
 export type TerminalPort = TerminalRunPort &

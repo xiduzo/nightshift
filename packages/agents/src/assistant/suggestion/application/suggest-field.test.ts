@@ -1,10 +1,18 @@
 import { describe, expect, test } from "bun:test";
-import { inMemoryAssistantSessions } from "../../adapters/out/in-memory-assistant-sessions";
 import { suggestField } from "./suggest-field";
 
 describe("suggestField", () => {
 	test("binds to the session port", () => {
-		const run = suggestField({ sessions: inMemoryAssistantSessions() });
+		const run = suggestField({
+			sessions: {
+				runReport: async function* () {},
+			},
+			readProjectFacts: async () => ({
+				packageManager: null,
+				scripts: {},
+				taskFiles: [],
+			}),
+		});
 		expect(typeof run).toBe("function");
 	});
 });

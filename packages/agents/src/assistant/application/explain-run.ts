@@ -1,7 +1,8 @@
 import type { ExplanationEvent } from "@nightshift/flows";
-import { explanationPrompt } from "../domain/explain-prompt";
+import { explanationPrompt } from "../catalog";
 import type { AuthoringRun } from "../domain/authoring";
-import type { AssistantVia } from "./ports";
+import type { AssistantVia } from "../domain/session";
+import type { ReportSessions } from "./ports";
 
 const ANSWER_LIMIT = 1_200;
 
@@ -11,11 +12,10 @@ export type ExplainRunInput = {
 	signal: AbortSignal;
 };
 
-export const explainRun =
-	(ports: { sessions: Pick<import("./ports").AssistantSessions, "runReport"> }) =>
-	async function* (
-		input: ExplainRunInput,
-	): AsyncGenerator<ExplanationEvent> {
+export const explainRun = (ports: {
+	sessions: Pick<ReportSessions, "runReport">;
+}) =>
+	async function* (input: ExplainRunInput): AsyncGenerator<ExplanationEvent> {
 		for await (const event of ports.sessions.runReport(input.via, {
 			prompt: explanationPrompt(input.run),
 			report: {},

@@ -1,4 +1,40 @@
-import { type AuthoringRun, runReport } from "./authoring";
+type AuthoringRun = {
+	id: string;
+	title: string;
+	status: string;
+	reason: string | null;
+	flow?: string | null;
+	steps: {
+		id: string;
+		nodeType: string;
+		nodeId: string;
+		visit: number;
+		outcome: string | null;
+		error: string | null;
+	}[];
+};
+
+function runReport(
+	run: AuthoringRun,
+	_flowName: string | null,
+	flowLabel: string,
+): string {
+	const lines = [
+		`# ${flowLabel}`,
+		"",
+		`Run ${run.title} (${run.id.slice(0, 8)}…). Status: ${run.status}.`,
+		...(run.reason ? [`Reason: ${run.reason}`] : []),
+		"",
+		"## Steps",
+	];
+	for (const step of run.steps) {
+		lines.push(
+			`- ${step.id} (${step.nodeType} ${step.nodeId}, visit ${step.visit})${step.outcome ? `: ${step.outcome}` : ""}${step.error ? ` — ${step.error}` : ""}`,
+		);
+	}
+	const text = lines.join("\n");
+	return text.length > 12_000 ? `${text.slice(0, 12_000)}…` : text;
+}
 
 /** The prompt of one explanation: the rules of the answer, then the run. */
 export function explanationPrompt(run: AuthoringRun): string {
@@ -21,6 +57,6 @@ export function explanationPrompt(run: AuthoringRun): string {
 		'Address the person as "you". Use active voice and simple present. At most 20 words a sentence. No semicolons, no contractions.',
 		'Do not name what is inside Night Shift: no file paths, folders, worktrees, exit codes, stdout or stderr, environment variables, process names, ports, stack traces, or the daemon. Say "Night Shift" or "this computer" instead.',
 		"",
-		runReport(run, run.flow, "The flow"),
+		runReport(run, run.flow ?? null, "The flow"),
 	].join("\n");
 }

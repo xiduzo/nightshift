@@ -1,5 +1,5 @@
 import type { BridgedTool } from "../../port";
-import type { ToolServerResource } from "../domain/mcp";
+import type { ToolServerResource } from "../catalog";
 import type { McpToolServer } from "./ports";
 
 export type ToolServerResources = {
@@ -19,5 +19,6 @@ export const serveTools =
 	async (
 		tools: readonly BridgedTool[],
 		info: ToolServerInfo,
-		transport?: import("@modelcontextprotocol/server").Transport,
-	) => ports.mcp.serve(tools, info, transport);
+		transport?: unknown,
+	) =>
+		ports.mcp.serve(tools, info, transport);

@@ -12,7 +12,8 @@
  *   terminal does, with the person's rights.
  */
 import type { BuiltinAgentId } from "@nightshift/flows";
-import type { BridgedTool } from "../../port/index";
+
+type NamedTool = { name: string };
 
 export type ToolTier = "read" | "propose" | "act";
 
@@ -92,8 +93,8 @@ export function withinTier(tier: ToolTier, top: ToolTier): boolean {
 /** The tools of `tools` that the agent `id` lists, in the order of `tools`. */
 export function toolsOf(
 	id: BuiltinAgentId,
-	tools: readonly BridgedTool[],
-): BridgedTool[] {
+	tools: readonly NamedTool[],
+): NamedTool[] {
 	const listed = BUILTIN_TOOLS[id];
 	return tools.filter((tool) => listed.includes(tool.name));
 }

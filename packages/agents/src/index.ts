@@ -11,21 +11,23 @@ export {
 	type AuthoringRunStep,
 	type ChatExchange,
 	chatCanUseTools,
-	chatTurn,
-	checkAgent,
 	chooseProject,
-	explainRun,
 	type HistoryPort,
-	learnFromRun,
 	resumesOnAnotherModel,
-	type SuggestFieldInput,
-	serveTools,
-	suggestField,
 	type TerminalPort,
 	type TerminalProject,
+} from "./assistant";
+export {
+	chatTurn,
+	checkAgent,
+	explainRun,
+	learnFromRun,
+	serveTools,
+	suggestField,
 	terminalResources,
 	terminalTools,
-} from "./assistant";
+} from "./bound-assistant";
+
 export { DECIDER_SETUP } from "./decider";
 export {
 	type DeciderModels,

@@ -1,4 +1,8 @@
-import type { ToolServerResource } from "./mcp";
+export type ToolServerResource = {
+	uri: string;
+	name: string;
+	mimeType?: string;
+};
 
 const PREFIX = "nightshift://knowledge/";
 

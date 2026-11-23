@@ -8,22 +8,23 @@ import {
 	type SuggestionRequest,
 	suggestionRequestSchema,
 } from "@nightshift/flows";
+import { suggestField } from "../bound-assistant";
 import { type FakeScript, fakeHarness } from "../testing/fake";
+import { activityOf } from "./adapters/out/activity-lines";
 import { harnessAssistantSessions } from "./adapters/out/harness-assistant-sessions";
-import { activityOf, bareToolName } from "./domain/activity";
-import { dataReaders, scopeList } from "./domain/prompts";
+import { bareToolName } from "./catalog";
+import { dataReaders, scopeList } from "./catalog/domain/prompts";
 import {
 	type AssistantSessionEvent,
 	sessionErrorMessage,
 	settleUsage,
 } from "./domain/session";
-import { suggestField } from "./index";
+import { suggestionPrompt } from "./suggestion/domain/suggestion-prompt";
 import {
 	cannotSuggest,
 	checkSuggestion,
 	suggestionDataSchema,
 } from "./suggestion/domain/suggestion-rules";
-import { suggestionPrompt } from "./suggestion/domain/suggestion-prompt";
 
 const assistantSessions = harnessAssistantSessions();
 const runAssistantSession = assistantSessions.run.bind(assistantSessions);

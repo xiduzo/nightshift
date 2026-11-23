@@ -9,10 +9,12 @@ import {
 } from "@nightshift/flows";
 import { iso } from "@nightshift/time";
 import { utc } from "@nightshift/time/testing";
-import { serveTools } from "./mcp";
-import { type TerminalPort, terminalTools } from "./terminal";
-import { terminalResources } from "./terminal-resources";
-import type { TerminalGate, TerminalRunSummary } from "./terminal-runs";
+import { serveTools, terminalResources } from "../../../bound-assistant";
+import type {
+	TerminalGate,
+	TerminalRunSummary,
+} from "../terminal/domain/terminal-runs";
+import { type TerminalPort, terminalTools } from "./tanstack-terminal-tools";
 
 const flow: Flow = flowSchema.parse({
 	version: FLOW_VERSION,
