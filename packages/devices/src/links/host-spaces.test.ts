@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { testSpaces } from "@nightshift/auth/testing";
 
-const personalSpaceId = (
-	db: Parameters<typeof testSpaces>[0],
-	personId: string,
-) => testSpaces(db).personal.findPersonalSpace({ personId });
-
 import { device } from "@nightshift/db/schema";
 import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
 import { eq } from "drizzle-orm";
 import { createHostLinks } from "./host-links";
 import { createHostSpaces } from "./host-spaces";
+
+const personalSpaceId = (
+	db: Parameters<typeof testSpaces>[0],
+	personId: string,
+) => testSpaces(db).personal.findPersonalSpace({ personId });
 
 const spacesOf = (db: Parameters<typeof testSpaces>[0], personId: string) =>
 	testSpaces(db).listSpaces({ personId });

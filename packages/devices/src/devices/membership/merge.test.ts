@@ -1,15 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { testSpaces } from "@nightshift/auth/testing";
-
-const personalSpaceId = (
-	db: Parameters<typeof testSpaces>[0],
-	personId: string,
-) => testSpaces(db).personal.findPersonalSpace({ personId });
-
 import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readdir } from "node:fs/promises";
 import { join } from "node:path";
-
+import { testSpaces } from "@nightshift/auth/testing";
 import {
 	device,
 	event,
@@ -51,6 +44,11 @@ import {
 	createHomeMembershipForTest as createHomeMembership,
 	type HomeMembershipDeps,
 } from "./test-support";
+
+const personalSpaceId = (
+	db: Parameters<typeof testSpaces>[0],
+	personId: string,
+) => testSpaces(db).personal.findPersonalSpace({ personId });
 
 /**
  * The merge of a Device's own Personal into its Person's Personal on its

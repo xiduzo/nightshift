@@ -5,11 +5,6 @@ import {
 	testSpaces,
 } from "@nightshift/auth/testing";
 
-const personalSpaceId = (
-	db: Parameters<typeof testSpaces>[0],
-	personId: string,
-) => testSpaces(db).personal.findPersonalSpace({ personId });
-
 import { now } from "@nightshift/time";
 import { createInAppChannel } from "./channels";
 import {
@@ -20,6 +15,11 @@ import {
 	fakeWebPushSender,
 } from "./testing";
 import { createNotifications, type Notifications } from "./wire";
+
+const personalSpaceId = (
+	db: Parameters<typeof testSpaces>[0],
+	personId: string,
+) => testSpaces(db).personal.findPersonalSpace({ personId });
 
 /**
  * The notifications wired on a real Better Auth: Web Push with the keys

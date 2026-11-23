@@ -180,6 +180,7 @@ describe("replies of a real engine", () => {
 		context = testContext({
 			access: accessAs({ personId, spaceId: sandbox.spaceId, role: "owner" }),
 			fromThisComputer: true,
+			hasLogin: async () => true,
 			db: sandbox.db,
 			engine,
 			settings,

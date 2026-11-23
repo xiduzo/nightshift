@@ -27,11 +27,6 @@ import {
 	turnOnTwoFactor,
 } from "@nightshift/auth/testing";
 
-const personalSpaceId = (
-	db: Parameters<typeof testSpaces>[0],
-	personId: string,
-) => testSpaces(db).personal.findPersonalSpace({ personId });
-
 import { hostRouter } from "@nightshift/devices";
 import {
 	type Engine,
@@ -54,13 +49,17 @@ import {
 	type RefusalKind,
 } from "@nightshift/refusal";
 import { type AnyProcedure, call, isProcedure, ORPCError } from "@orpc/server";
-
 import type { Context, Services } from "./context";
 import { onOutputMismatch } from "./output";
 import { readable } from "./procedures";
 import { appRouter } from "./router";
 import { runAccess } from "./runs";
 import { accessAs } from "./testing";
+
+const personalSpaceId = (
+	db: Parameters<typeof testSpaces>[0],
+	personId: string,
+) => testSpaces(db).personal.findPersonalSpace({ personId });
 
 /**
  * The procedures as a table: each route needs a permission, forwards to
@@ -395,7 +394,9 @@ function recording(
 		deviceKey,
 		requireTwoFactor: false,
 		setLogin: recorder(["setLogin"], record) as Context["setLogin"],
-		hasLogin: recorder(["hasLogin"], record) as Context["hasLogin"],
+		hasLogin: recorder(["hasLogin"], record, {
+			reply: () => true,
+		}) as Context["hasLogin"],
 	};
 }
 

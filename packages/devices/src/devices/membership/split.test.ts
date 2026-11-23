@@ -1,16 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { testSpaces } from "@nightshift/auth/testing";
-
-const personalSpaceId = (
-	db: Parameters<typeof testSpaces>[0],
-	personId: string,
-) => testSpaces(db).personal.findPersonalSpace({ personId });
-const spacesOf = (db: Parameters<typeof testSpaces>[0], personId: string) =>
-	testSpaces(db).listSpaces({ personId });
-
 import { mkdir, readdir } from "node:fs/promises";
 import { join } from "node:path";
-
+import { testSpaces } from "@nightshift/auth/testing";
 import {
 	event,
 	hostLink as hostLinkTable,
@@ -48,6 +39,13 @@ import {
 	type HomeMembershipDeps,
 	LEAVE_WORDS,
 } from "./test-support";
+
+const personalSpaceId = (
+	db: Parameters<typeof testSpaces>[0],
+	personId: string,
+) => testSpaces(db).personal.findPersonalSpace({ personId });
+const spacesOf = (db: Parameters<typeof testSpaces>[0], personId: string) =>
+	testSpaces(db).listSpaces({ personId });
 
 /**
  * Leaving keeps a copy (ADR 1), through B's membership of A
