@@ -17,4 +17,4 @@ export {
 	servedDocuments,
 } from "./adapters/in/served-documents";
 export type { PendingPairings } from "./domain/pending";
-export { type Host, wireHost as createHost } from "./wire";
+export { type Host, wireHost, wireHost as createHost } from "./wire";

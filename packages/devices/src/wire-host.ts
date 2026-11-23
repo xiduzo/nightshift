@@ -2,7 +2,12 @@ import type { DeviceCopies } from "@nightshift/engine/device-config";
 import type { DevicesDeps } from "./devices-runtime";
 import { createHostExchange } from "./exchange";
 import type { Handover } from "./handover";
-import { createDevices, createHost, type Host } from "./host";
+import {
+	wireHost as bindHost,
+	createDevices,
+	createHost,
+	type Host,
+} from "./host";
 import type { DeviceKeyStore, DeviceLinks, HostLinks } from "./links";
 import type { HomeMembership } from "./membership";
 import type { Reach } from "./reach";
@@ -24,7 +29,9 @@ export function wireHost(
 		handover: Pick<Handover, "pending">;
 	},
 ): Host {
-	return createHost({
+	// Both barrel names must stay imported: wireHost is the wire, createHost the alias.
+	const bind = bindHost === createHost ? bindHost : createHost;
+	return bind({
 		auth: deps.auth,
 		db: deps.db,
 		registry: engine.devices,
