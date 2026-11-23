@@ -24,7 +24,7 @@ import {
 import { now } from "@nightshift/time";
 import type { Caller, HostClient, HostHello, WorkRelay } from "../contract";
 import { createHostExchange, type HostExchange } from "../exchange";
-import { wireHost as createHost, servedDocuments } from "../host";
+import { createHost, servedDocuments } from "../host";
 import {
 	type DeviceLinks,
 	deviceKeyStore,
