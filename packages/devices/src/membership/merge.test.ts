@@ -39,8 +39,11 @@ import type { JoinProgress } from "../links";
 import { createHostLinks, type Link } from "../links";
 import { httpsLink } from "../links/link";
 import { type PairedReplicas, pairedReplicas } from "../testing";
-import { createHomeMembership, type HomeMembershipDeps } from "./membership";
-import { MERGE_WORDS } from "./merge";
+import { MERGE_WORDS } from "./domain/words";
+import {
+	createHomeMembershipForTest as createHomeMembership,
+	type HomeMembershipDeps,
+} from "./test-support";
 
 /**
  * The merge of a Device's own Personal into its Person's Personal on its

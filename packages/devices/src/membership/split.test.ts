@@ -33,12 +33,12 @@ import { createDeviceExchange } from "../exchange";
 import { createHostLinks, type Link } from "../links";
 import { httpsLink } from "../links/link";
 import { type PairedReplicas, pairedReplicas } from "../testing";
+import { SPLIT_WORDS } from "./domain/words";
 import {
-	createHomeMembership,
+	createHomeMembershipForTest as createHomeMembership,
 	type HomeMembershipDeps,
 	LEAVE_WORDS,
-} from "./membership";
-import { SPLIT_WORDS } from "./split";
+} from "./test-support";
 
 /**
  * Leaving keeps a copy (ADR 1), through B's membership of A

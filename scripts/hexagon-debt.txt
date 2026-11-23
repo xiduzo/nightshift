@@ -7,6 +7,5 @@ agents/assistant
 agents/decider
 agents/harnesses
 auth/spaces
-devices/membership
 devices/placement
 # Files of a package's kernel that are not pure yet: kernel <file>.

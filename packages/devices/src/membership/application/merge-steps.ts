@@ -1,21 +1,11 @@
-import {
-	adoptPersonalSpaceBatch,
-	personalSpaceId,
-	spaceExists,
-} from "@nightshift/auth";
-import type { Database } from "@nightshift/db";
-import { device } from "@nightshift/db/schema";
-import {
-	type Engine,
-	type FlowDocuments,
-	HostUnreachableError,
-	NIGHT_SHIFT,
-	type PeerProjects,
-	type RowBatch,
+import type {
+	Engine,
+	FlowDocuments,
+	PeerProjects,
+	RowBatch,
 } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
-import { and, eq, isNull } from "drizzle-orm";
 import type {
 	PersonalMerge as HostAnswer,
 	MergePending,
@@ -23,11 +13,25 @@ import type {
 	MergeProjectView,
 	MergeResult,
 	MergeState,
-} from "../contract";
-import type { RunHistoryExchange } from "../exchange";
-import type { DeviceLinks, HostLinks, HostSpaces, Link } from "../links";
-import { backupDatabase } from "./backup";
-import type { MembershipRecord, MergeRow, MergeTarget } from "./record";
+} from "../../contract";
+import type { RunHistoryExchange } from "../../exchange";
+import type { DeviceLinks, HostLinks, HostSpaces, Link } from "../../links";
+import type { MergeRow, MergeTarget } from "../domain/membership-rows";
+import {
+	MERGE_WORDS,
+	type MergeHeld,
+	mergeHeld,
+	NOT_DONE,
+	notDoneHeld,
+} from "../domain/words";
+import type {
+	DatabaseCopy,
+	EngineKernel,
+	MembershipRecord,
+	PairedDevices,
+	PersonalSpaces,
+	Wait,
+} from "./ports";
 
 /**
  * The merge of this computer's own personal Space ("Personal") into its
@@ -68,33 +72,6 @@ import type { MembershipRecord, MergeRow, MergeTarget } from "./record";
  * membership runs each step (`HomeMembership`).
  */
 
-/** Why a merge cannot start now. */
-export const MERGE_WORDS = {
-	noHome: "This computer has no home Host. Join one first.",
-	merged: "Your Personal is merged with your home Host already.",
-	offline: "Your home Host does not answer now. Try again when it is online.",
-	notListed:
-		"Your home Host does not show your personal Space yet. Try again in a minute.",
-	isHost:
-		"Other devices use this computer as their Host. Its Personal stays as it is.",
-	olderHost:
-		"Your home Host runs an older version of Night Shift. Update it, then merge.",
-	busy: "Night Shift moves your Personal now. Wait until it is done.",
-} as const;
-
-/**
- * The statuses of a run that is not done: a merge and a split wait for them.
- * An interrupted run has ended, as a stopped one has: it moves along, and
- * nobody can stop it to let the merge go on.
- */
-export const NOT_DONE = ["running", "waiting", "sleeping"] as const;
-
-/** The check of a merge that failed: why it does not go on now. */
-export type MergeHeld = {
-	held: "noHome" | "isHost" | "merged" | "offline" | "notListed" | "notDone";
-	refusal: Refusal;
-};
-
 /** Every check of a merge passed: whom it merges, and how. */
 type MergeReady = {
 	held: null;
@@ -107,7 +84,6 @@ type MergeReady = {
 };
 
 export type MergeDeps = {
-	db: Database;
 	engine: Pick<Engine, "space" | "moveProjects" | "flows" | "forgetSpace"> & {
 		exchange: Pick<RunHistoryExchange, "pushed">;
 		hostSpaces: Pick<HostSpaces, "listed">;
@@ -118,6 +94,11 @@ export type MergeDeps = {
 	hostLinks: Pick<HostLinks, "home">;
 	/** The flow documents, to wait until the Host's copies arrived. */
 	flows: Pick<FlowDocuments, "open">;
+	personalSpaces: PersonalSpaces;
+	pairedDevices: PairedDevices;
+	databaseCopy: DatabaseCopy;
+	wait: Wait;
+	engineKernel: EngineKernel;
 	/** This computer's Device. */
 	self: { id: string; name: string };
 	/** The Person who owns this computer. */
@@ -134,22 +115,11 @@ export type MergeDeps = {
 
 /** The steps of a merge, for the membership: it runs one at a time. */
 export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
-	const { db, engine, self } = deps;
+	const { engine, self } = deps;
 	const now = deps.now ?? timeNow;
 	const rows = deps.record.merges;
 	const pollMs = deps.pollMs ?? 250;
-
-	function held(why: MergeHeld["held"], words?: string): MergeHeld {
-		const kind =
-			why === "offline" || why === "notListed" ? "unavailable" : "conflict";
-		return {
-			held: why,
-			refusal: new Refusal(
-				kind,
-				words ?? MERGE_WORDS[why as keyof typeof MERGE_WORDS],
-			),
-		};
-	}
+	const held = mergeHeld;
 
 	/** The link to the Host when it answers now. */
 	function online(hostId: string): Link | null {
@@ -157,36 +127,17 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 		return link?.state().status === "online" ? link : null;
 	}
 
-	/** This computer keeps Devices of its own as a Host. */
-	async function hostsDevices(): Promise<boolean> {
-		const [paired] = await db
-			.select({ id: device.id })
-			.from(device)
-			.where(and(eq(device.self, false), isNull(device.revokedAt)))
-			.limit(1);
-		return paired !== undefined;
-	}
-
 	/** The runs of Personal, and how many of them are not done. */
 	async function runsOf(spaceId: string) {
 		let total = 0;
 		let notDone = 0;
 		for (const runs of (
-			await engine.space(spaceId, NIGHT_SHIFT).projectRuns()
+			await engine.space(spaceId, deps.engineKernel.nightShift).projectRuns()
 		).values()) {
 			total += runs.total;
 			for (const status of NOT_DONE) notDone += runs.statuses[status] ?? 0;
 		}
 		return { total, notDone };
-	}
-
-	function notDoneHeld(notDone: number): MergeHeld {
-		return held(
-			"notDone",
-			notDone === 1
-				? "A run in Personal is not done yet. Let it finish or stop it, then merge."
-				: `${notDone} runs in Personal are not done yet. Let them finish or stop them, then merge.`,
-		);
 	}
 
 	/**
@@ -207,9 +158,9 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 			from = started.fromSpace;
 		} else {
 			if (!home) return held("noHome");
-			if (await hostsDevices()) return held("isHost");
+			if (await deps.pairedDevices.hasPaired()) return held("isHost");
 			host = { id: home.hostId, name: home.name };
-			const personal = await personalSpaceId(db, deps.ownerId);
+			const personal = await deps.personalSpaces.personalId(deps.ownerId);
 			listed = await engine.hostSpaces.listed(host.id);
 			if (personal === null || listed.some((space) => space.id === personal)) {
 				return held("merged");
@@ -261,7 +212,7 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 				{ olderHost: MERGE_WORDS.olderHost },
 			);
 		} catch (error) {
-			if (error instanceof HostUnreachableError) {
+			if (deps.engineKernel.isHostUnreachable(error)) {
 				throw new Refusal("unavailable", MERGE_WORDS.offline, {
 					cause: error,
 				});
@@ -304,7 +255,9 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 		const answer = await ask(link, from, input.join ?? [], true);
 		const targets = targetsOf(answer, to);
 		const projects = await engine.projects.ofSpace(from);
-		const projectRuns = await engine.space(from, NIGHT_SHIFT).projectRuns();
+		const projectRuns = await engine
+			.space(from, deps.engineKernel.nightShift)
+			.projectRuns();
 		const elsewhere = new Map(answer.elsewhere.map((e) => [e.projectId, e]));
 		const views: MergeProjectView[] = [];
 		for (const p of projects) {
@@ -353,7 +306,7 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 		while (true) {
 			if (await done()) return true;
 			if (now() >= end) return false;
-			await Bun.sleep(pollMs);
+			await deps.wait.sleep(pollMs);
 		}
 	}
 
@@ -398,12 +351,12 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 				},
 				statements: async () =>
 					[
-						...(await adoptPersonalSpaceBatch(db, {
+						...((await deps.personalSpaces.adoptBatch({
 							personId: row.personId,
 							from,
 							to,
-						})),
-						rows.moved(from),
+						})) as unknown as readonly unknown[]),
+						...(rows.moved(from) as unknown as readonly unknown[]),
 					] as unknown as RowBatch,
 			});
 			runIds.push(...moved.runIds);
@@ -427,7 +380,7 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 	 * facts of no run here, its document). Runs again safely.
 	 */
 	async function cleanUp(from: string): Promise<boolean> {
-		if (await spaceExists(db, from)) return false;
+		if (await deps.personalSpaces.exists(from)) return false;
 		return engine.forgetSpace(from);
 	}
 
@@ -488,7 +441,7 @@ export function mergeSteps(deps: MergeDeps & { record: MembershipRecord }) {
 		/** A new merge after its checks: the copy of the database, then its states. */
 		async start(input: { join?: readonly string[] }): Promise<MergeResult> {
 			const { host, from } = await ready();
-			const backup = await backupDatabase(db, deps.dataDir, now());
+			const backup = await deps.databaseCopy.copy(deps.dataDir, now());
 			const row = await rows.plan({
 				fromSpace: from,
 				hostId: host.id,

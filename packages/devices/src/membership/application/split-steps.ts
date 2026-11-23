@@ -1,10 +1,3 @@
-import { randomUUID } from "node:crypto";
-import {
-	personalSpaceId,
-	personalSpaceName,
-	splitPersonalSpaceBatch,
-} from "@nightshift/auth";
-import type { Database } from "@nightshift/db";
 import type {
 	Engine,
 	FlowDocuments,
@@ -12,73 +5,37 @@ import type {
 	RowBatch,
 	SpaceDocuments,
 } from "@nightshift/engine";
-import { NIGHT_SHIFT } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
-import type { SplitResult, SplitState } from "../contract";
-import type { HostSpaces } from "../links";
-import { backupDatabase } from "./backup";
-import { NOT_DONE } from "./merge";
-import type { MembershipRecord, SplitRow } from "./record";
+import type { SplitResult, SplitState } from "../../contract";
+import type { HostSpaces } from "../../links";
+import type { SplitRow } from "../domain/membership-rows";
+import { NOT_DONE, SPLIT_WORDS } from "../domain/words";
+import type {
+	DatabaseCopy,
+	EngineKernel,
+	Ids,
+	MembershipRecord,
+	PersonalSpaces,
+} from "./ports";
 
 /**
  * The split of a personal Space off the one this computer's home Host
  * keeps, when this computer leaves that Host (ADR 1: leaving keeps a
- * copy): its Host removed its access, or the person ran `nightshift
- * leave`. The Person gets a personal Space of this computer's own again,
- * named "Personal", with the Projects this computer has a Clone of (or
- * walked a run of), their flows with their history, their schedules and
- * kept variables, and the runs this computer walked. The Host keeps
- * everything: it loses nothing.
- *
- * The Projects keep their ids, so their flow documents stay as they are
- * here, with their history; they no longer sync with the Host. A schedule
- * of theirs that is on is paused here: the Host still fires it, and a run
- * here too would be a second run of it. When the person turns it on it
- * fires here, the one Replica of the new Space. The result counts them
- * (`unpinned`). The rows
- * that come along name the Person by their id here again. The Host's
- * Space stays on this computer with the rest of its rows, named
- * "Personal on <Host>", but the Person is no longer a Member of it here:
- * it is gone from the Space switcher.
- *
- * It rewrites this computer's database, so it goes in states that a
- * crash cannot leave half done (`space_split`, a sibling of
- * `space_merge`: a split has its own states and a new Space as its key):
- *
- * 1. Checks: the Person's personal Space is one a Host keeps, and this
- *    computer has no link with access to that Host (it left, or its
- *    access was removed). No run this computer walks there is not done.
- * 2. `planned`: a copy of the whole database in the data directory
- *    (`VACUUM INTO`), before any change.
- * 3. `moved`: one Space move (`Engine.moveProjects`) of this
- *    computer's runs only. No run becomes active in the Space from the
- *    last check for runs this computer walks through its batch. The
- *    schedules that name another Device name none and are paused first.
- *    The batch makes the new Space the Person's personal Space
- *    (`splitPersonalSpaceBatch`), moves the rows, names the Host's Space
- *    "Personal on <Host>", ends a merge that is not done, and sets this
- *    state with the count of the paused schedules.
- * 4. `done`: the new Space's document has its Projects and Clones.
- *
- * A split that stopped goes on from its state, by itself. The
- * membership runs each step (`HomeMembership`).
+ * copy).
  */
-export const SPLIT_WORDS = {
-	notDone: (count: number) =>
-		count === 1
-			? "A run on this computer is not done yet. Let it finish or stop it, then leave."
-			: `${count} runs on this computer are not done yet. Let them finish or stop them, then leave.`,
-} as const;
 
 export type SplitDeps = {
-	db: Database;
 	engine: Pick<Engine, "space" | "moveProjects"> & {
 		hostSpaces: Pick<HostSpaces, "hostOf" | "keeper" | "named">;
 		projects: Pick<PeerProjects, "ofSpace">;
 	};
 	spaces: Pick<SpaceDocuments, "open">;
 	flows: Pick<FlowDocuments, "open">;
+	personalSpaces: PersonalSpaces;
+	databaseCopy: DatabaseCopy;
+	ids: Ids;
+	engineKernel: EngineKernel;
 	/** This computer's Device. */
 	self: { id: string; name: string };
 	/** The Person who owns this computer. */
@@ -97,7 +54,7 @@ type Left = {
 
 /** The steps of a split, for the membership: it runs one at a time. */
 export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
-	const { db, engine, self } = deps;
+	const { engine, self } = deps;
 	const now = deps.now ?? timeNow;
 	const rows = deps.record.splits;
 	const merges = deps.record.merges;
@@ -108,13 +65,12 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 	 * computer's own, or the Host still has this computer.
 	 */
 	async function left(): Promise<Left | null> {
-		const from = await personalSpaceId(db, deps.ownerId);
+		const from = await deps.personalSpaces.personalId(deps.ownerId);
 		if (from === null) return null;
 		const keeper = await engine.hostSpaces.keeper(from);
 		if (keeper === null) return null;
 		const { hostId, link } = keeper;
 		if (link && link.revokedAt === null) return null;
-		// A link that a new home Host replaced is gone: the merge says who the Person was there.
 		const merged = await merges.latest();
 		const mergedAs =
 			merged?.toSpace === from ? merged.personMap[deps.ownerId] : undefined;
@@ -129,7 +85,7 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 	/** Refuses while a run this computer walks in the Space is not done. */
 	async function noRunsNotDone(spaceId: string): Promise<void> {
 		const runs = await engine
-			.space(spaceId, NIGHT_SHIFT)
+			.space(spaceId, deps.engineKernel.nightShift)
 			.listRuns({ statuses: [...NOT_DONE] });
 		const here = runs.filter((r) => r.walker.id === self.id).length;
 		if (here > 0) throw new Refusal("conflict", SPLIT_WORDS.notDone(here));
@@ -165,8 +121,6 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 						),
 						personMap: { [row.hostPersonId]: row.personId },
 						ownRunsOnly: true,
-						// The Host still fires it. Turned on, it fires here. Its Person
-						// goes: it names who the runs on the Host ran for.
 						schedule: (schedule) => {
 							if (!schedule.enabled) return schedule;
 							const { person: _person, ...rest } = schedule;
@@ -176,19 +130,19 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 				},
 				statements: async (done) =>
 					[
-						...(await splitPersonalSpaceBatch(db, {
+						...((await deps.personalSpaces.splitBatch({
 							personId: row.personId,
 							from,
 							to,
 							hostName: row.hostName,
-						})),
-						engine.hostSpaces.named(from, personalSpaceName(row.hostName)),
-						merges.abandon(),
-						rows.moved(to, {
+						})) as unknown as readonly unknown[]),
+						engine.hostSpaces.named(from, `Personal on ${row.hostName}`),
+						...(merges.abandon() as unknown as readonly unknown[]),
+						...(rows.moved(to, {
 							projects: done.projects,
 							runs: done.runIds.length,
 							unpinned: done.schedules,
-						}),
+						}) as unknown as readonly unknown[]),
 					] as unknown as RowBatch,
 			});
 			projects = moved.projects;
@@ -198,7 +152,6 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 		}
 
 		if (state === "moved") {
-			// Its first open takes the Projects and Clones from the rows.
 			await deps.spaces.open(to);
 			await rows.done(to);
 			state = "done";
@@ -215,10 +168,7 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 
 	/**
 	 * Splits Personal off when this computer left its Host, or goes on
-	 * with the split that stopped (`started`). Null: nothing to split,
-	 * because Personal is this computer's own or the Host still has this
-	 * computer. Refuses while a run this computer walks there is not
-	 * done: it waits for the person.
+	 * with the split that stopped (`started`). Null: nothing to split.
 	 */
 	async function splitOff(
 		started: SplitRow | null,
@@ -227,14 +177,13 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 		const leaving = await left();
 		if (!leaving) return null;
 		await noRunsNotDone(leaving.from);
-		const backup = await backupDatabase(
-			db,
+		const backup = await deps.databaseCopy.copy(
 			deps.dataDir,
 			now(),
 			"leaving-host",
 		);
 		const row = await rows.plan({
-			toSpace: randomUUID(),
+			toSpace: deps.ids.spaceId(),
 			fromSpace: leaving.from,
 			hostId: leaving.hostId,
 			hostName: leaving.hostName,
@@ -250,11 +199,10 @@ export function splitSteps(deps: SplitDeps & { record: MembershipRecord }) {
 
 		/**
 		 * The Space that splits off when this computer leaves its home Host
-		 * now: its personal Space when a Host keeps it, else null. Refuses
-		 * when a run this computer walks there is not done. Changes nothing.
+		 * now: its personal Space when a Host keeps it, else null.
 		 */
 		async check(): Promise<string | null> {
-			const from = await personalSpaceId(db, deps.ownerId);
+			const from = await deps.personalSpaces.personalId(deps.ownerId);
 			if (from === null || (await engine.hostSpaces.hostOf(from)) === null) {
 				return null;
 			}
