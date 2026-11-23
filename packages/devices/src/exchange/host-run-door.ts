@@ -27,7 +27,7 @@ type Command = RunCommandInput & { runId: string };
  *   words, as `Caller.may` refuses.
  * - A run the Person may not see: the engine's `not-found` (`RunNotFound`,
  *   the words of `RUN_NOT_FOUND`), a BAD_REQUEST with its kind
- *   (`readable` of `host/keyed-call.ts`).
+ *   (`readable` of `host/adapters/in/readable.ts`).
  * - A start in a Space the Person is not a Member of: FORBIDDEN too, as
  *   `Caller.may` refuses a Person who is not a Member.
  * - The Devices of a project in such a Space: the project's not-found

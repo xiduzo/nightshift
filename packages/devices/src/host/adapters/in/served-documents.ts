@@ -2,7 +2,7 @@ import { documentAccess, type SyncAuthorize } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { SyncedDocuments } from "@nightshift/engine";
 import type * as Y from "yjs";
-import type { DeviceRegistry } from "../registry";
+import type { DeviceRegistry } from "../../../registry";
 
 /**
  * Documents a Host keeps for others: the Device documents of the Devices

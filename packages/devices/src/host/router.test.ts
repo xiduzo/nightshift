@@ -1,10 +1,11 @@
 import { describe, expect, spyOn, test } from "bun:test";
+import { RoleRefusal } from "@nightshift/auth";
 import { HostUnreachableError } from "@nightshift/engine";
 import { FAILURE_MESSAGE, Refusal } from "@nightshift/refusal";
 import { createRouterClient, ORPCError } from "@orpc/server";
 
 import { admitEvery } from "../testing";
-import { type HostPeerContext, hostRouter } from "./router";
+import { type HostPeerContext, hostRouter } from "./adapters/in/host-router";
 
 /**
  * The errors a Device gets from its Host keep the codes older Devices
@@ -126,6 +127,14 @@ describe("the Host's errors on the wire", () => {
 	test("a Host out of reach keeps its own code", async () => {
 		const error = await errorOf(new HostUnreachableError());
 		expect(error).toMatchObject({ code: "HOST_UNREACHABLE", status: 503 });
+	});
+
+	test("a RoleRefusal is FORBIDDEN with its words, never a BAD_REQUEST", async () => {
+		const refusal = new RoleRefusal();
+		const error = await errorOf(refusal);
+		expect(error.code).toBe("FORBIDDEN");
+		expect(error.status).toBe(403);
+		expect(error.message).toBe(refusal.message);
 	});
 
 	test("a failure is plain words, and the Host logs its details", async () => {

@@ -1,5 +1,4 @@
 export {
-	normalizeUserCode,
 	PAIRING_CODE_TTL,
 	PAIRING_POLL_INTERVAL,
 	type PairingAnswer,

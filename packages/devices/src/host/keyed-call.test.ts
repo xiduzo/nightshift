@@ -9,7 +9,8 @@ import { ORPCError } from "@orpc/server";
 import { eq } from "drizzle-orm";
 import { NOT_A_HOST } from "../contract";
 import type { PairedDevice } from "../registry";
-import { admission, readable } from "./keyed-call";
+import { readable } from "./adapters/in/readable";
+import { admission } from "./test-support";
 
 /**
  * A keyed call is admitted once, before its procedure: the key rules of

@@ -5,7 +5,7 @@ import type {
 	SettingsStore,
 } from "@nightshift/engine/device-config";
 import { now as timeNow } from "@nightshift/time";
-import type { HostClient, PhoneView } from "../contract";
+import type { HostClient, PhoneView } from "../../../contract";
 import {
 	type DeviceKeyStore,
 	type DeviceLinks,
@@ -13,24 +13,38 @@ import {
 	type HostSpaces,
 	type JoinDeps,
 	joinHost,
-} from "../links";
-import type { HomeMembership } from "../membership";
-import { type Reach, reachFor } from "../reach";
+} from "../../../links";
+import type { HomeMembership } from "../../../membership";
+import { type Reach, reachFor } from "../../../reach";
+import type { PairedDevice } from "../../../registry";
 import type {
 	PersonalSecretsHost,
 	ProjectSecretsHost,
 	SecretMoves,
 	SecretMovesHost,
-} from "../secrets";
-import type { Host } from "./host";
-import type { Devices, DevicesOverview, OtherDeviceView } from "./types";
+} from "../../../secrets";
+import type { Devices, DevicesOverview, OtherDeviceView } from "./page-types";
+
+/** The Host methods the Devices page calls. Structural: this file imports nothing of the slice. */
+type HostOnPage = {
+	registry: { list(ownerId: string): Promise<PairedDevice[]> };
+	startPairing: Devices["startPairing"];
+	redeemPairing: Devices["redeemPairing"];
+	review: Devices["review"];
+	approve: Devices["approve"];
+	deny: Devices["deny"];
+	revoke: Devices["revoke"];
+	forget: Devices["forget"];
+	admit: Devices["admit"];
+	hello: Devices["hello"];
+};
 
 /** How long the phones a Host listed stay as they are, in milliseconds. */
 const PHONES_FOR_MS = 30_000;
 
 /** The API's `Devices`: this computer as a Host, and its own links to Hosts. */
 export function createDevices(deps: {
-	host: Host;
+	host: HostOnPage;
 	links: DeviceLinks;
 	hostLinks: HostLinks;
 	/** The Spaces this computer takes part in through each Host. */

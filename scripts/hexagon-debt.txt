@@ -7,7 +7,6 @@ agents/assistant
 agents/decider
 agents/harnesses
 auth/spaces
-devices/host
 devices/membership
 devices/offers
 devices/placement

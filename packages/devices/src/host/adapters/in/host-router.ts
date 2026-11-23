@@ -1,10 +1,14 @@
-import type { DeviceKeyAccess } from "@nightshift/auth";
+import { type DeviceKeyAccess, RoleRefusal } from "@nightshift/auth";
 import type { TranscriptEntry } from "@nightshift/engine";
-import { implement } from "@orpc/server";
-import { hostContract, type PhoneView, type WorkRequest } from "../contract";
-import type { HostExchange } from "../exchange";
-import { readable } from "./keyed-call";
-import type { Devices } from "./types";
+import { implement, ORPCError } from "@orpc/server";
+import {
+	hostContract,
+	type PhoneView,
+	type WorkRequest,
+} from "../../../contract";
+import type { HostExchange } from "../../../exchange";
+import type { Devices } from "./page-types";
+import { readable } from "./readable";
 
 /**
  * This computer as a Host, as its paired Devices call it: `hostContract`,
@@ -57,6 +61,9 @@ const peer = os.use(async ({ next, path }) => {
 	try {
 		return await next();
 	} catch (error) {
+		if (error instanceof RoleRefusal) {
+			throw new ORPCError("FORBIDDEN", { message: error.message });
+		}
 		throw readable(error, path);
 	}
 });

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { HostClient, PhoneView } from "../contract";
-import { createDevices } from "./devices";
+import { createDevices } from "./adapters/in/devices-page";
 
 /** This computer's Devices, with a link to one Host that lists `phones`, and a clock. */
 function devicesWith(listed: PhoneView[]) {

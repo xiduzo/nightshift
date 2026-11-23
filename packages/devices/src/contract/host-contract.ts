@@ -14,7 +14,7 @@ import { workProcedures } from "./work";
  * once as an oRPC contract. Each procedure has its input and output
  * schemas, the Device key permission it needs, and its refusals.
  *
- * - The Host serves it: `hostRouter` (`host/router.ts`) implements it, and
+ * - The Host serves it: `hostRouter` (`host/adapters/in/host-router.ts`) implements it, and
  *   the API mounts that router at these paths (`/rpc/sync/push`).
  * - A Device calls it: `HostClient` is its client, over HTTPS
  *   (`links/host-client.ts`), or in memory on the same router in tests

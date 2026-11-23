@@ -12,19 +12,19 @@ import type {
 	PairingStart,
 	PhoneView,
 	SecretMove,
-} from "../contract";
+} from "../../../contract";
 import type {
 	HostRole,
 	HostSpaceRef,
 	JoinProgress,
 	LinkedHost,
-} from "../links";
-import type { PairedDevice } from "../registry";
+} from "../../../links";
+import type { PairedDevice } from "../../../registry";
 import type {
 	PersonalSecretsHost,
 	ProjectSecretsHost,
 	SecretMovesHost,
-} from "../secrets";
+} from "../../../secrets";
 
 /** This computer's Devices, as the API serves them: as a Host (pairing, presence) and its links to Hosts. */
 
@@ -121,7 +121,7 @@ export type Devices = {
 	 * `need` (the procedure's meta), of a Device paired here with access,
 	 * as its Person's own, on a computer that is a Host now. The Caller is
 	 * what every keyed procedure's implementation then takes
-	 * (`host/keyed-call.ts`).
+	 * (`host/adapters/in/readable.ts`).
 	 */
 	admit(
 		key: DeviceKeyAccess | null,

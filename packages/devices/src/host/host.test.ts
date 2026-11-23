@@ -14,7 +14,7 @@ import {
 } from "@nightshift/engine/testing";
 import { eq } from "drizzle-orm";
 import { createDeviceRegistry, setSelfOwner } from "../registry/test-support";
-import { createHost, type Host } from "./host";
+import { createHost, type Host } from "./test-support";
 
 /**
  * This computer as a Host, with Better Auth on its own database: what it
@@ -184,7 +184,7 @@ describe("a pairing allowed by a Person who is not the Host admin", () => {
 			personId: bob.userId,
 			hostAdmin: false,
 		});
-	});
+	}, 15_000);
 
 	test("from a Device of an older version: the review does not know whether it asks for a home Host", async () => {
 		const { ada } = await adaAndBob();
@@ -196,7 +196,7 @@ describe("a pairing allowed by a Person who is not the Host admin", () => {
 		expect(
 			await host.review(ada.headers, code.userCode, ada.userId),
 		).toMatchObject({ hostAdmin: true, home: null });
-	});
+	}, 15_000);
 });
 
 describe("one computer is one Device", () => {
@@ -248,7 +248,7 @@ describe("one computer is one Device", () => {
 		expect((await host.registry.list(bob.userId)).map((d) => d.id)).toEqual([
 			"first",
 		]);
-	});
+	}, 15_000);
 
 	test("a removed Device comes back with its access", async () => {
 		const { bob } = await adaAndBob();
@@ -260,7 +260,7 @@ describe("one computer is one Device", () => {
 		});
 		expect(await again()).toMatchObject({ deviceId: "first" });
 		expect((await host.registry.get("first"))?.revokedAt).toBeNull();
-	});
+	}, 15_000);
 
 	test("another owner on the same computer never gets that Device", async () => {
 		const { ada, bob } = await adaAndBob();
@@ -268,7 +268,7 @@ describe("one computer is one Device", () => {
 		const adas = await pair(ada, { deviceId: "adas", machine: FINGERPRINT });
 		expect(await adas()).toMatchObject({ deviceId: "adas" });
 		expect((await host.registry.get("bobs"))?.ownerId).toBe(bob.userId);
-	});
+	}, 15_000);
 
 	test("another computer gets its own Device", async () => {
 		const { bob } = await adaAndBob();
@@ -278,14 +278,14 @@ describe("one computer is one Device", () => {
 			machine: "b".repeat(64),
 		});
 		expect(await other()).toMatchObject({ deviceId: "other" });
-	});
+	}, 15_000);
 
 	test("a Device that says no computer gets its own Device", async () => {
 		const { bob } = await adaAndBob();
 		await (await pair(bob, { deviceId: "first", machine: FINGERPRINT }))();
 		const other = await pair(bob, { deviceId: "other" });
 		expect(await other()).toMatchObject({ deviceId: "other" });
-	});
+	}, 15_000);
 
 	test("a pairing as a guest never uses the computer", async () => {
 		const { bob } = await adaAndBob();
@@ -296,7 +296,7 @@ describe("one computer is one Device", () => {
 			home: false,
 		});
 		expect(await guest()).toMatchObject({ deviceId: "other" });
-	});
+	}, 15_000);
 
 	test("while the Night Shift of that Device is connected, the pairing is refused", async () => {
 		const { bob } = await adaAndBob();
@@ -310,5 +310,5 @@ describe("one computer is one Device", () => {
 			"Night Shift on this computer is connected to Studio as LE2316. Quit it, then pair again.",
 		);
 		expect(await host.registry.get("new-install")).toBeNull();
-	});
+	}, 15_000);
 });

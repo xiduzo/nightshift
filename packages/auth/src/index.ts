@@ -36,7 +36,6 @@ export {
 	hostPolicyFromEnv,
 } from "./host-access";
 export type { LocalSession } from "./local-session";
-export { normalizeUserCode } from "./pairing";
 // InvitationView, PendingInvitation and SpaceMember are in the API's
 // router type: its declaration must be able to name them.
 export {
