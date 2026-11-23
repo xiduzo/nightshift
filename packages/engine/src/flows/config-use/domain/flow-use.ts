@@ -7,7 +7,6 @@ import {
 	type Schedule,
 	webhookSecretName,
 } from "@nightshift/flows";
-import type { SpaceFlows } from "./wire";
 
 /** A flow file of a project of the Space. */
 export type FlowRef = {
@@ -44,31 +43,56 @@ export function profileUseKey(deviceId: string, profileId: string): string {
 	return `${deviceId}/${profileId}`;
 }
 
-/** What `flowUse` reads: the Space's projects and their flow files. */
-export type FlowReader = {
+/** The schedules of a project, as `flowUse` reads them. */
+type ScheduleUse = Pick<Schedule, "flow" | "webhook">;
+
+/** What `readSpaceFlows` reads: the Space's projects and their flow files. */
+export type SpaceFlowReader = {
 	listProjects(): Promise<{ id: string; name: string }[]>;
-	flows: Pick<SpaceFlows, "map">;
+	flows: { map(projectId: string): Promise<ProjectFlowMap> };
 	listSchedules(projectId: string): Promise<{
-		schedules: readonly Pick<Schedule, "flow" | "webhook">[];
+		schedules: readonly ScheduleUse[];
 	}>;
 };
 
+/** One project of the Space as read: its schedules and its flows. */
+export type ProjectFlowFacts = {
+	project: { id: string; name: string };
+	schedules: readonly ScheduleUse[];
+	flows: ProjectFlowMap;
+};
+
 /**
- * Reads every flow of every project of the Space. A project or a flow that
- * cannot be read uses nothing.
+ * Reads every project of the Space, one after the other: its schedules,
+ * then its flows. A project whose schedules or flows cannot be read has
+ * none.
  */
-export async function flowUse(space: FlowReader): Promise<FlowUse> {
+export async function readSpaceFlows(
+	space: SpaceFlowReader,
+): Promise<ProjectFlowFacts[]> {
+	const facts: ProjectFlowFacts[] = [];
+	for (const project of await space.listProjects()) {
+		const listed = await space
+			.listSchedules(project.id)
+			.catch(() => ({ schedules: [] }));
+		const flows: ProjectFlowMap = await space.flows
+			.map(project.id)
+			.catch(() => ({}));
+		facts.push({ project, schedules: listed.schedules, flows });
+	}
+	return facts;
+}
+
+/** What every flow of the Space's projects uses. A flow that does not load uses nothing. */
+export function flowUse(projects: readonly ProjectFlowFacts[]): FlowUse {
 	const connections = new Map<string, FlowRef[]>();
 	const clis = new Map<string, FlowRef[]>();
 	const secrets = new Map<string, FlowRef[]>();
 	const profiles = new Map<string, (FlowRef & { nodeIds: string[] })[]>();
 	const profileFlows = new Map<string, FlowRef[]>();
 	const webhooks = new Map<string, FlowRef[]>();
-	for (const project of await space.listProjects()) {
-		const listed = await space
-			.listSchedules(project.id)
-			.catch(() => ({ schedules: [] }));
-		for (const { flow, webhook } of listed.schedules) {
+	for (const { project, schedules, flows } of projects) {
+		for (const { flow, webhook } of schedules) {
 			const name = webhookSecretName(webhook?.secret ?? "");
 			if (name === null || !flow) continue;
 			webhooks.set(name, [
@@ -76,9 +100,6 @@ export async function flowUse(space: FlowReader): Promise<FlowUse> {
 				{ projectId: project.id, projectName: project.name, flowName: flow },
 			]);
 		}
-		const flows: ProjectFlowMap = await space.flows
-			.map(project.id)
-			.catch(() => ({}));
 		for (const [flowName, flow] of Object.entries(flows)) {
 			if (!flow) continue;
 			const ref = {

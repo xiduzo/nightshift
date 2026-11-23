@@ -11,7 +11,7 @@ import {
 	validateFlow,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import type { StartRunInput } from "../contract";
+import type { StartRunInput } from "../../contract";
 
 /** The names of the flows a flow's Call nodes call, a cascade's tiers too. */
 function callsOf(flow: Flow): string[] {

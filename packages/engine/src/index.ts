@@ -134,9 +134,9 @@ export type {
 } from "./flows";
 export {
 	type ConfigUse,
-	createConfigUse,
 	flowsForRun,
 	revisionKinds,
+	wireConfigUse as createConfigUse,
 } from "./flows";
 export {
 	GateClosedError,

@@ -38,7 +38,7 @@ import { CONVERT, SINCE_LAST_RUN, VALUE } from "./shape";
  * transcript-event unions in `log/transcript/step-events.ts` (one per kind, typed data, no
  * switch asks them); the `WaitReason` enum in `state.ts` (it enumerates a
  * Wait node's `until` kinds and the policy's reasons, not node kinds); and
- * which flow a Call calls (`flows/run-flows.ts`, `open-work.nodesOf`):
+ * which flow a Call calls (`flows/domain/run-flows.ts`, `open-work.nodesOf`):
  * only a Call calls one, and both callers read `node.flow`.
  */
 

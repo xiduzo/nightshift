@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import type { Flow } from "@nightshift/flows";
 
-import { type FlowReader, flowUse, profileUseKey } from "./flow-use";
+import {
+	flowUse,
+	profileUseKey,
+	readSpaceFlows,
+	type SpaceFlowReader,
+} from "./flow-use";
 
 const project = (id: string, name: string) => ({ id, name });
 
@@ -43,7 +48,7 @@ describe("flowUse", () => {
 				{ id: "check", type: "command" },
 			]),
 		};
-		const reader: FlowReader = {
+		const reader: SpaceFlowReader = {
 			listProjects: async () => [project("p1", "App"), project("p2", "Site")],
 			listSchedules: async (projectId) => {
 				if (projectId === "p2") throw new Error("not on this computer");
@@ -63,7 +68,7 @@ describe("flowUse", () => {
 				},
 			},
 		};
-		const use = await flowUse(reader);
+		const use = flowUse(await readSpaceFlows(reader));
 		expect([...use.webhooks]).toEqual([
 			["HOOK", [{ projectId: "p1", projectName: "App", flowName: "night" }]],
 		]);
@@ -119,12 +124,12 @@ describe("flowUse", () => {
 			]),
 			report: flowOf([{ id: "post", type: "tool", connection: "chat" }]),
 		};
-		const reader: FlowReader = {
+		const reader: SpaceFlowReader = {
 			listProjects: async () => [project("p1", "App")],
 			listSchedules: async () => ({ schedules: [] }),
 			flows: { map: async () => flows },
 		};
-		const use = await flowUse(reader);
+		const use = flowUse(await readSpaceFlows(reader));
 		const ref = (flowName: string) => ({
 			projectId: "p1",
 			projectName: "App",
@@ -179,12 +184,12 @@ describe("flowUse", () => {
 				[{ name: "hook", type: "text" }],
 			),
 		};
-		const reader: FlowReader = {
+		const reader: SpaceFlowReader = {
 			listProjects: async () => [project("p1", "App")],
 			listSchedules: async () => ({ schedules: [] }),
 			flows: { map: async () => flows },
 		};
-		const use = await flowUse(reader);
+		const use = flowUse(await readSpaceFlows(reader));
 		const watch = { projectId: "p1", projectName: "App", flowName: "watch" };
 		expect(Object.fromEntries(use.secrets)).toEqual({
 			API_TOKEN: [watch],

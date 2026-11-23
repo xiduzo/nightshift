@@ -39,7 +39,7 @@ below it, from the bottom up:
 | `projects/` | Projects and their Clones, in rings: the shared ports (`keep/`), a person's requests (`catalog/`), what Night Shift and the Host ask (`clones/`), the setup of a project folder (`setup/`) and the copies from GitHub (`copies/`). The Space document that defines them is in `documents/space/`. Its barrel is the package entry `@nightshift/engine/projects`. |
 | `git/` | The git port (`git.ts`: every `git` and `xcode-select` process, with its adapter `systemGit`), run worktrees (`createWorktrees(git)`), the branches of ended runs (`run-branches.ts`) and what a step changed in its worktree (`worktree-changes.ts`). |
 | `github/` | The `gh` program on this computer (`GitHubCli`): the GitHub sign-in, the repositories and the pull requests, for project copies and Scores. |
-| `flows/` | The flows of the projects in their flow documents (`project-flows.ts`), what a person does with them in a Space (`space-flows.ts`), and the flows a run starts from (`run-flows.ts`). |
+| `flows/` | The flows of the projects in their flow documents (`store/`), what a person does with them in a Space (`editing/`, `transfer/`, bound in `wire.ts`), and the flows a run starts from (`domain/run-flows.ts`). |
 | `device/` | The execution port (`Device`), this computer (`local.ts`), commands and tool calls. |
 | `graph/` | The flow as a graph, below. |
 | `scores/` | The pull request scores: what became of the pull request a run opened, written as Scores of that run (`pull-request-scores.ts`, `pull-request-watch.ts`). |
@@ -1135,7 +1135,7 @@ These are not on the descriptor, on purpose:
   switch asks them)
 - the `WaitReason` enum in `state.ts` (a Wait node's `until` kinds and the
   policy's reasons, not node kinds)
-- which flow a Subflow calls (`flows/run-flows.ts`, `open-work.nodesOf`:
+- which flow a Subflow calls (`flows/domain/run-flows.ts`, `open-work.nodesOf`:
   only a Subflow calls one, and both read `node.flow`)
 - the first Agent prompt that titles a quick run
 - the resume target's "an Agent step with a harness session"

@@ -12,5 +12,4 @@ devices/membership
 devices/offers
 devices/placement
 engine/agent-setup
-engine/flows
 # Files of a package's kernel that are not pure yet: kernel <file>.
