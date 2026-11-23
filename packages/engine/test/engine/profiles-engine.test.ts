@@ -10,9 +10,9 @@ import type {
 } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { NIGHT_SHIFT } from "../../src/contract";
-import { createProfileStore } from "../../src/device-config/profiles";
 import type { RunDetail } from "../../src/read/views";
 import type { SpaceEngine } from "../../src/space-engine";
+import { createProfileStore } from "../../src/testing";
 import {
 	cliToolsOf,
 	createSandbox,

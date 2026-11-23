@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Profile } from "@nightshift/flows";
-import { createProfileStore } from "../device-config/profiles";
 import { openDeviceDocument } from "../documents/device-document";
+import { createProfileStore } from "../testing";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { createFlowMigrations } from "./flow-migration";
 

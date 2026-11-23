@@ -19,9 +19,12 @@ import {
 	setDeviceFacts,
 } from "../documents/device-document";
 import { createSandbox, type Sandbox } from "../testing/test-support";
-import { createCliToolStore } from "./cli-tools";
-import { createConnectionStore, type SecretBackend } from "./connections";
-import { createProfileStore } from "./profiles";
+import { wireCliTools as createCliToolStore } from "./cli-tools";
+import {
+	wireConnections as createConnectionStore,
+	type SecretBackend,
+} from "./connections";
+import { wireProfiles as createProfileStore } from "./profiles";
 import { wireSettings as createSettingsStore } from "./settings";
 
 let sandbox: Sandbox;

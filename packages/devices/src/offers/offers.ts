@@ -1,10 +1,10 @@
 import type {
+	DeviceDocument,
 	NodeToPlace,
 	OfferedPlacement,
 	SpaceDocument,
 } from "@nightshift/engine";
 import type {
-	DeviceDocument,
 	ProfileStore,
 	ProfileView,
 } from "@nightshift/engine/device-config";

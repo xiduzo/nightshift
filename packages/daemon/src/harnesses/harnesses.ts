@@ -17,13 +17,15 @@ import {
 } from "@nightshift/agents";
 import { findProgram } from "@nightshift/agents/types";
 import type { Context } from "@nightshift/api/context";
-import type { Harnesses } from "@nightshift/engine";
+import {
+	type Harnesses,
+	type SecretUse,
+	unreachableNote,
+} from "@nightshift/engine";
 import {
 	type ConnectionStore,
 	HARNESS_BIN,
-	type SecretUse,
 	type SettingsStore,
-	unreachableNote,
 } from "@nightshift/engine/device-config";
 import {
 	type AgentHarnessName,

@@ -62,12 +62,12 @@ export const projectSecrets = {
 		})
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.connections.setProjectSecret(
-				context.project,
-				input.name,
-				input.value,
-				context.session.user.id,
-			),
+			context.deviceConfig.saveProjectSecret(context.actor, {
+				project: context.project,
+				name: input.name,
+				value: input.value,
+				personId: context.session.user.id,
+			}),
 		),
 	removeSecret: projectProcedure(
 		projectInput.extend({ name: secretNameSchema }),
@@ -76,11 +76,11 @@ export const projectSecrets = {
 		.route({ summary: "Removes a secret of a project." })
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.connections.removeProjectSecret(
-				context.project,
-				input.name,
-				context.session.user.id,
-			),
+			context.deviceConfig.removeProjectSecret(context.actor, {
+				project: context.project,
+				name: input.name,
+				personId: context.session.user.id,
+			}),
 		),
 	/**
 	 * Moves a project secret to this computer or to the owner's Personal
@@ -97,12 +97,12 @@ export const projectSecrets = {
 		})
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.connections.moveFromProject(
-				context.project,
-				input.name,
-				input.to,
-				context.session.user.id,
-			),
+			context.deviceConfig.moveSecretFromProject(context.actor, {
+				project: context.project,
+				name: input.name,
+				to: input.to,
+				personId: context.session.user.id,
+			}),
 		),
 	/**
 	 * Moves a saved secret of this computer, or a Personal one, into a
@@ -119,12 +119,12 @@ export const projectSecrets = {
 		})
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.connections.moveToProject(
-				input.name,
-				input.from,
-				context.project,
-				context.session.user.id,
-			),
+			context.deviceConfig.moveSecretToProject(context.actor, {
+				name: input.name,
+				from: input.from,
+				project: context.project,
+				personId: context.session.user.id,
+			}),
 		),
 	/**
 	 * The secrets of the session's Space (ADR 18): every step of a run in the
@@ -153,23 +153,23 @@ export const projectSecrets = {
 		.output(output(z.void()))
 		.input(z.object({ name: secretNameSchema, value: z.string().min(1) }))
 		.handler(async ({ context, input }) =>
-			context.connections.setSpaceSecret(
-				context.spaceId,
-				input.name,
-				input.value,
-				context.session.user.id,
-			),
+			context.deviceConfig.saveSpaceSecret(context.actor, {
+				spaceId: context.spaceId,
+				name: input.name,
+				value: input.value,
+				personId: context.session.user.id,
+			}),
 		),
 	removeSpaceSecret: permitted(SAVING)
 		.route({ summary: "Removes a secret of the Space." })
 		.output(output(z.void()))
 		.input(z.object({ name: secretNameSchema }))
 		.handler(async ({ context, input }) =>
-			context.connections.removeSpaceSecret(
-				context.spaceId,
-				input.name,
-				context.session.user.id,
-			),
+			context.deviceConfig.removeSpaceSecret(context.actor, {
+				spaceId: context.spaceId,
+				name: input.name,
+				personId: context.session.user.id,
+			}),
 		),
 	/** Moves a secret of this computer, or a Personal one, into the session's Space. */
 	moveSecretToSpace: ownerSaving
@@ -180,12 +180,12 @@ export const projectSecrets = {
 		.output(output(z.void()))
 		.input(z.object({ name: secretNameSchema, from: secretScopeSchema }))
 		.handler(async ({ context, input }) =>
-			context.connections.moveToSpace(
-				input.name,
-				input.from,
-				context.spaceId,
-				context.session.user.id,
-			),
+			context.deviceConfig.moveSecretToSpace(context.actor, {
+				name: input.name,
+				from: input.from,
+				spaceId: context.spaceId,
+				personId: context.session.user.id,
+			}),
 		),
 	/** Moves a secret of the Space to this computer, or to the owner's Personal secrets. */
 	moveSecretFromSpace: ownerSaving
@@ -196,12 +196,12 @@ export const projectSecrets = {
 		.output(output(z.void()))
 		.input(z.object({ name: secretNameSchema, to: secretScopeSchema }))
 		.handler(async ({ context, input }) =>
-			context.connections.moveFromSpace(
-				context.spaceId,
-				input.name,
-				input.to,
-				context.session.user.id,
-			),
+			context.deviceConfig.moveSecretFromSpace(context.actor, {
+				spaceId: context.spaceId,
+				name: input.name,
+				to: input.to,
+				personId: context.session.user.id,
+			}),
 		),
 	/**
 	 * Moves a secret saved on another of the owner's devices into a project

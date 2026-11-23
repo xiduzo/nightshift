@@ -159,11 +159,6 @@ export const LIGHT_ENTRIES: Record<string, string> = {
 	// a harness: the barrel of harnesses imports every harness adapter.
 	"@nightshift/agents/harness-facts":
 		"the barrel of harnesses loads every harness",
-	// The barrel of this engine vertical also serves the engine's other
-	// verticals (the stores' own parts). Its entry carries only what other
-	// workspaces use.
-	"@nightshift/engine/device-config":
-		"the barrel of device-config serves the engine's other verticals too",
 	// The barrel of devices' test helpers serves its own tests; the entry
 	// carries only what tests of other workspaces use.
 	"@nightshift/devices/testing":

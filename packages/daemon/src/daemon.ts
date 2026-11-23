@@ -9,11 +9,11 @@ import {
 } from "@nightshift/db/data-dir";
 import { migrateDb } from "@nightshift/db/migrate";
 import type { HostClient, OpenDocumentChannel } from "@nightshift/devices";
-import { createSyncedDocuments } from "@nightshift/engine";
-import type {
-	PersonalSecrets,
-	ProjectSecrets,
-} from "@nightshift/engine/device-config";
+import {
+	createSyncedDocuments,
+	type PersonalSecrets,
+	type ProjectSecrets,
+} from "@nightshift/engine";
 import { createTelemetry } from "@nightshift/telemetry";
 import { instant } from "@nightshift/time";
 import { reportDeviceFacts } from "./harnesses";

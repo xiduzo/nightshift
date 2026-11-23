@@ -1,8 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { personalSpaceIdBySlug } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import type { DeviceRows, PeerContext } from "@nightshift/engine";
-import { deviceDocumentName } from "@nightshift/engine/device-config";
+import {
+	type DeviceRows,
+	deviceDocumentName,
+	type PeerContext,
+} from "@nightshift/engine";
 import { now as timeNow } from "@nightshift/time";
 import type { BatchItem } from "drizzle-orm/batch";
 import { thisComputer } from "../machine";

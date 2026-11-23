@@ -2,13 +2,8 @@ import { describe, expect, test } from "bun:test";
 import type { Flow } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 
-import type {
-	CliTool,
-	Connection,
-	ProfileView,
-	ProjectSecretName,
-	SecretView,
-} from "../device-config";
+import type { CliTool, Connection, ProfileView } from "../device-config";
+import type { ProjectSecretName, SecretView } from "../secrets";
 import { type Asker, type ConfigUseDeps, createConfigUse } from "./config-use";
 import type { FlowRef } from "./flow-use";
 

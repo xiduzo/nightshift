@@ -16,17 +16,15 @@ import {
 import {
 	createRunFolders,
 	createSpaceDocuments,
+	deviceDocumentName,
 	documentRows,
 	HostUnreachableError,
 	NIGHT_SHIFT,
 	type OwnDevice,
+	openDeviceDocument,
 	type PeerProfiles,
 	type SpaceDocuments,
 } from "@nightshift/engine";
-import {
-	deviceDocumentName,
-	openDeviceDocument,
-} from "@nightshift/engine/device-config";
 import type { ListedProject } from "@nightshift/engine/projects";
 import type { RunStatus } from "@nightshift/engine/run-status";
 import {

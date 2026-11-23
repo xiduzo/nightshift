@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { DeviceKeyAccess } from "@nightshift/auth";
-import type {
-	PersonalSecrets,
-	ProjectSecrets,
-} from "@nightshift/engine/device-config";
+import type { PersonalSecrets, ProjectSecrets } from "@nightshift/engine";
 import {
 	createConnectionStore,
 	createSandbox,

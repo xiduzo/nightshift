@@ -14,7 +14,7 @@ import { openPersistedDocument, type PersistedDocument } from "./ydoc";
  * flow document (`createFlowDocuments`), the knowledge document
  * (`createKnowledgeDocuments`), the Space document
  * (`createSpaceDocuments`), the copies of other Devices' documents
- * (`createDeviceCopies`) and this Device's document
+ * (`wireCopies` of device-config) and this Device's document
  * (`openDeviceDocument`).
  *
  * The name of a document says its kind and the id it belongs to:

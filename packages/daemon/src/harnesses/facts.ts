@@ -1,10 +1,9 @@
 import { pathPrograms } from "@nightshift/agents";
 import { findProgram } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
+import { type DeviceDocument, refreshDeviceFacts } from "@nightshift/engine";
 import {
-	type DeviceDocument,
 	HARNESS_BIN,
-	refreshDeviceFacts,
 	type SettingsStore,
 } from "@nightshift/engine/device-config";
 

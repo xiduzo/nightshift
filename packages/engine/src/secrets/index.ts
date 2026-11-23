@@ -13,5 +13,5 @@ export {
 	takenOverSecrets,
 	unreachableNote,
 } from "./scopes";
-export { type ExpandedEnv, notRead, referencesIn } from "./uses";
+export { type ExpandedEnv, notRead } from "./uses";
 export { wireSecrets } from "./wire";

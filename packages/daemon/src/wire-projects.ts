@@ -1,7 +1,7 @@
 import type { Context } from "@nightshift/api/context";
 import type { Database } from "@nightshift/db";
 import { createFlowDocuments, createSpaceDocuments } from "@nightshift/engine";
-import type { openConfigStores } from "@nightshift/engine/device-config";
+import type { SettingsStore } from "@nightshift/engine/device-config";
 import {
 	createCloneTracker,
 	wireCopies,
@@ -17,7 +17,7 @@ import {
 
 type SpaceDocumentsDeps = Parameters<typeof createSpaceDocuments>[0];
 type CopiesDeps = Parameters<typeof wireCopies>[0];
-type Settings = Awaited<ReturnType<typeof openConfigStores>>["settings"];
+type Settings = SettingsStore;
 
 /**
  * The projects block of the daemon's composition (`daemon.ts`): the Space

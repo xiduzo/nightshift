@@ -5,11 +5,9 @@ import { join } from "node:path";
 import type { HarnessName } from "@nightshift/flows";
 import { isAgentProfile } from "@nightshift/flows";
 
-import {
-	type ConfigStores,
-	openConfigStores,
-} from "../device-config/config-stores";
+import type { ConfigStores } from "../device-config";
 import type { SecretBackend } from "../device-config/connections";
+import { openConfigStores } from "../testing/config-stores";
 import { createSandbox, type Sandbox, waitFor } from "../testing/test-support";
 import {
 	type AgentSetup,

@@ -1,17 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { AgentProfile } from "@nightshift/flows";
+import { NIGHT_SHIFT } from "../contract";
+import { openConfigStores } from "../testing/config-stores";
 import { createSandbox, type Sandbox } from "../testing/test-support";
-import { type ConfigStores, openConfigStores } from "./config-stores";
 import type { SecretBackend } from "./connections";
-import {
-	addHarness,
-	removeCliTool,
-	removeConnection,
-	removeHarness,
-	saveConnection,
-	saveCustomAgent,
-	saveProfile,
-} from "./edits";
+import { saveProfile } from "./edits";
+import type { DeviceConfig } from "./wire";
 
 let sandbox: Sandbox;
 beforeEach(async () => {
@@ -27,7 +21,7 @@ const noSecrets: SecretBackend = {
 	delete: async () => {},
 };
 
-async function makeStores(): Promise<ConfigStores> {
+async function makeStores(): Promise<DeviceConfig> {
 	return openConfigStores({
 		document: await sandbox.openDocument(),
 		env: {},
@@ -160,7 +154,9 @@ describe("saveProfile", () => {
 describe("connections and CLI tools", () => {
 	test("a rename moves the profiles that name it, a removal takes it off", async () => {
 		const stores = await makeStores();
-		await saveConnection(stores, { name: "gh", server });
+		await stores.deviceConfig.saveConnection(NIGHT_SHIFT, {
+			connection: { name: "gh", server },
+		});
 		await stores.cliTools.save({ name: "jq" });
 		const fast = await saveProfile(
 			stores,
@@ -169,17 +165,25 @@ describe("connections and CLI tools", () => {
 		);
 
 		expect(
-			await errorOf(saveConnection(stores, { name: "gh", server }, "other")),
+			await errorOf(
+				stores.deviceConfig.saveConnection(NIGHT_SHIFT, {
+					connection: { name: "gh", server },
+					previousName: "other",
+				}),
+			),
 		).toBe('A connection named "gh" already exists. Pick another name.');
 
-		await saveConnection(stores, { name: "github", server }, "gh");
+		await stores.deviceConfig.saveConnection(NIGHT_SHIFT, {
+			connection: { name: "github", server },
+			previousName: "gh",
+		});
 		expect(stores.connections.list().map((c) => c.name)).toEqual(["github"]);
 		expect(stores.profiles.get(fast.id)).toMatchObject({
 			connections: ["github"],
 		});
 
-		await removeConnection(stores, "github");
-		await removeCliTool(stores, "jq");
+		await stores.deviceConfig.removeConnection(NIGHT_SHIFT, { name: "github" });
+		await stores.deviceConfig.removeCliTool(NIGHT_SHIFT, { name: "jq" });
 		expect(stores.connections.list()).toEqual([]);
 		expect(stores.cliTools.list()).toEqual([]);
 		expect(stores.profiles.get(fast.id)).toMatchObject({
@@ -193,8 +197,8 @@ describe("harnesses", () => {
 	test("adds once, and refuses to remove one a profile runs on", async () => {
 		const stores = await makeStores();
 		const before = stores.settings.current().harnesses;
-		await addHarness(stores, "gemini");
-		await addHarness(stores, "gemini");
+		await stores.deviceConfig.addHarness(NIGHT_SHIFT, { harness: "gemini" });
+		await stores.deviceConfig.addHarness(NIGHT_SHIFT, { harness: "gemini" });
 		expect(stores.settings.current().harnesses).toEqual([...before, "gemini"]);
 
 		const fast = await saveProfile(
@@ -202,11 +206,15 @@ describe("harnesses", () => {
 			profile({ harness: "gemini" }),
 			unused,
 		);
-		expect(await errorOf(removeHarness(stores, "gemini"))).toBe(
+		expect(
+			await errorOf(
+				stores.deviceConfig.removeHarness(NIGHT_SHIFT, { harness: "gemini" }),
+			),
+		).toBe(
 			"The profile fast run on Gemini CLI. Move it to another harness first.",
 		);
 		await stores.profiles.remove(fast.id);
-		await removeHarness(stores, "gemini");
+		await stores.deviceConfig.removeHarness(NIGHT_SHIFT, { harness: "gemini" });
 		expect(stores.settings.current().harnesses).toEqual(before);
 	});
 
@@ -219,20 +227,28 @@ describe("harnesses", () => {
 			args: ["acp"],
 			env: {},
 		};
-		await saveCustomAgent(stores, goose);
-		expect(await errorOf(saveCustomAgent(stores, goose))).toBe(
-			"A custom agent named acp:goose already exists. Pick another name.",
-		);
-		expect(await errorOf(saveCustomAgent(stores, goose, "gone"))).toBe(
-			"This custom agent was removed. Add it again.",
-		);
-		const saved = await saveCustomAgent(
-			stores,
-			{ ...goose, slug: "other", label: "Goose 2" },
-			"goose",
-		);
+		await stores.deviceConfig.saveCustomAgent(NIGHT_SHIFT, { agent: goose });
+		expect(
+			await errorOf(
+				stores.deviceConfig.saveCustomAgent(NIGHT_SHIFT, { agent: goose }),
+			),
+		).toBe("A custom agent named acp:goose already exists. Pick another name.");
+		expect(
+			await errorOf(
+				stores.deviceConfig.saveCustomAgent(NIGHT_SHIFT, {
+					agent: goose,
+					previousSlug: "gone",
+				}),
+			),
+		).toBe("This custom agent was removed. Add it again.");
+		const saved = await stores.deviceConfig.saveCustomAgent(NIGHT_SHIFT, {
+			agent: { ...goose, slug: "other", label: "Goose 2" },
+			previousSlug: "goose",
+		});
 		expect(saved).toEqual({ ...goose, label: "Goose 2" });
-		await removeHarness(stores, "acp:goose");
+		await stores.deviceConfig.removeHarness(NIGHT_SHIFT, {
+			harness: "acp:goose",
+		});
 		expect(stores.settings.current().customAgents).toEqual([]);
 	});
 });

@@ -1,7 +1,4 @@
-import {
-	cliToolInputSchema,
-	removeCliTool,
-} from "@nightshift/engine/device-config";
+import { cliToolInputSchema } from "@nightshift/engine/device-config";
 import { z } from "zod";
 
 import { output } from "../output";
@@ -55,7 +52,9 @@ export const cliTools = {
 		})
 		.output(output(cliToolSchema))
 		.input(cliToolInputSchema)
-		.handler(({ context, input }) => context.cliTools.save(input)),
+		.handler(({ context, input }) =>
+			context.deviceConfig.saveCliTool(context.actor, input),
+		),
 	/** Runs the sign-in command of a tool's login now. */
 	signIn: ownerProcedure
 		.route({
@@ -74,7 +73,9 @@ export const cliTools = {
 		.output(output(z.void()))
 		.input(z.object({ name: z.string() }))
 		.handler(async ({ context, input }) => {
-			await removeCliTool(context, input.name);
+			await context.deviceConfig.removeCliTool(context.actor, {
+				name: input.name,
+			});
 			await context.toolLaunchers.forget(input.name);
 		}),
 };

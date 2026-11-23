@@ -1,6 +1,6 @@
 import type { Database } from "@nightshift/db";
 import type { RowBatch } from "./contract";
-import { lastKnownProfiles, storedDeviceCopy } from "./device-config";
+import { wireCopies } from "./device-config";
 import { deviceDocumentName, documentRowDelete } from "./documents";
 import type { EngineOptions } from "./engine-options";
 import type { createRunWalks } from "./graph";
@@ -55,6 +55,7 @@ export function wireEnginePeers(deps: {
 	stop: PeerContext["runs"]["stop"];
 }) {
 	const { db, log: runLog, history, landed, walks } = deps;
+	const copies = wireCopies({ db });
 	const projects = deps.projects;
 	return deps.options.peers({
 		device: deps.device,
@@ -86,9 +87,9 @@ export function wireEnginePeers(deps: {
 		profiles: {
 			here: deps.options.profileFor ?? (() => null),
 
-			lastKnown: (deviceId) => lastKnownProfiles(db, deviceId),
+			lastKnown: (deviceId) => copies.readLastKnownProfiles({ deviceId }),
 		},
-		keptDevice: (deviceId) => storedDeviceCopy(db, deviceId),
+		keptDevice: (deviceId) => copies.readKeptDeviceCopy({ deviceId }),
 		history: {
 			...history,
 			onLanded: (listener, scope) =>

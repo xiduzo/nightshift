@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { NIGHT_SHIFT } from "../contract";
+import { openConfigStores } from "../testing/config-stores";
 import { createSandbox, type Sandbox } from "../testing/test-support";
-import { type ConfigStores, openConfigStores } from "./config-stores";
 import type { SecretBackend } from "./connections";
-import { foundPrograms, setUpProgram } from "./found-programs";
+import type { DeviceConfig } from "./wire";
 
 let sandbox: Sandbox;
 beforeEach(async () => {
@@ -18,14 +19,28 @@ const noSecrets: SecretBackend = {
 	delete: async () => {},
 };
 
+/** The programs this computer has: each call below sets them. */
+let which: (program: string) => string | null = () => null;
+
 async function makeStores(
 	env: Record<string, string> = {},
-): Promise<ConfigStores> {
+): Promise<DeviceConfig> {
 	return openConfigStores({
 		document: await sandbox.openDocument(),
 		env,
 		secrets: noSecrets,
+		programs: (program) => which(program),
 	});
+}
+
+function found(stores: DeviceConfig, on: typeof which) {
+	which = on;
+	return stores.deviceConfig.listFoundPrograms(NIGHT_SHIFT);
+}
+
+function setUp(stores: DeviceConfig, program: string, on: typeof which) {
+	which = on;
+	return stores.deviceConfig.setUpProgram(NIGHT_SHIFT, { program });
 }
 
 /** A computer with these programs, and no other. */
@@ -38,7 +53,7 @@ describe("the programs found on this computer", () => {
 	test("offers the agent CLIs and the kits' tools it finds, agents first", async () => {
 		const stores = await makeStores();
 		const which = computerWith("claude", "pi", "gh", "aws");
-		expect(foundPrograms(stores, which)).toEqual([
+		expect(found(stores, which)).toEqual([
 			{
 				kind: "agent",
 				program: "claude",
@@ -48,13 +63,13 @@ describe("the programs found on this computer", () => {
 			{ kind: "agent", program: "pi", harness: "pi", label: "pi" },
 			{ kind: "tool", program: "gh", label: "GitHub CLI" },
 		]);
-		expect(foundPrograms(stores, computerWith())).toEqual([]);
+		expect(found(stores, computerWith())).toEqual([]);
 	});
 
 	test("looks for the program the harness's setting names", async () => {
 		const stores = await makeStores({ NIGHTSHIFT_CLAUDE_BIN: "claude-beta" });
 		expect(
-			foundPrograms(stores, computerWith("claude", "claude-beta")).map(
+			found(stores, computerWith("claude", "claude-beta")).map(
 				(found) => found.program,
 			),
 		).toEqual(["claude-beta"]);
@@ -63,10 +78,10 @@ describe("the programs found on this computer", () => {
 	test("an agent CLI with a profile, and a tool that runs the program, are set up", async () => {
 		const stores = await makeStores();
 		const which = computerWith("claude", "codex", "gh", "acli");
-		await setUpProgram(stores, "claude", which);
+		await setUp(stores, "claude", which);
 		// A second account of gh counts: it runs gh.
 		await stores.cliTools.save({ name: "gh-work", program: "gh" });
-		expect(foundPrograms(stores, which).map((found) => found.program)).toEqual([
+		expect(found(stores, which).map((found) => found.program)).toEqual([
 			"codex",
 			"acli",
 		]);
@@ -76,7 +91,7 @@ describe("the programs found on this computer", () => {
 		const stores = await makeStores();
 		await stores.settings.save({ harnesses: ["claude-code"] });
 		const which = computerWith("pi", "claude");
-		expect(await setUpProgram(stores, "pi", which)).toMatchObject({
+		expect(await setUp(stores, "pi", which)).toMatchObject({
 			kind: "agent",
 			name: "pi",
 		});
@@ -90,7 +105,7 @@ describe("the programs found on this computer", () => {
 	test("a taken profile name gets a number", async () => {
 		const stores = await makeStores();
 		const which = computerWith("claude", "codex");
-		await setUpProgram(stores, "codex", which);
+		await setUp(stores, "codex", which);
 		const codex = stores.profiles.byName("codex");
 		if (!codex) throw new Error("Expected the codex profile.");
 		// Rename it to the name the claude profile wants.
@@ -100,7 +115,7 @@ describe("the programs found on this computer", () => {
 			>[0],
 			codex.id,
 		);
-		expect(await setUpProgram(stores, "claude", which)).toMatchObject({
+		expect(await setUp(stores, "claude", which)).toMatchObject({
 			kind: "agent",
 			name: "claude_2",
 		});
@@ -108,7 +123,7 @@ describe("the programs found on this computer", () => {
 
 	test("setting up a CLI tool saves a tool of its name", async () => {
 		const stores = await makeStores();
-		expect(await setUpProgram(stores, "acli", computerWith("acli"))).toEqual({
+		expect(await setUp(stores, "acli", computerWith("acli"))).toEqual({
 			kind: "tool",
 			name: "acli",
 		});
@@ -118,12 +133,10 @@ describe("the programs found on this computer", () => {
 	test("refuses a program that is not found, or is set up already", async () => {
 		const stores = await makeStores();
 		const which = computerWith("gh");
-		await expect(setUpProgram(stores, "acli", which)).rejects.toThrow(
+		await expect(setUp(stores, "acli", which)).rejects.toThrow(
 			"does not find acli",
 		);
-		await setUpProgram(stores, "gh", which);
-		await expect(setUpProgram(stores, "gh", which)).rejects.toThrow(
-			"set up already",
-		);
+		await setUp(stores, "gh", which);
+		await expect(setUp(stores, "gh", which)).rejects.toThrow("set up already");
 	});
 });

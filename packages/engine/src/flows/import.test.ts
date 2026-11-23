@@ -13,13 +13,13 @@ import {
 import { now } from "@nightshift/time";
 import * as Y from "yjs";
 import type { ProfileStore } from "../device-config";
-import { createProfileStore } from "../device-config/profiles";
 import {
 	createFlowDocuments,
 	type FlowDocument,
 	type FlowDocuments,
 } from "../documents";
 import { systemGit } from "../git";
+import { createProfileStore } from "../testing";
 import { createSandbox, mustGit, type Sandbox } from "../testing/test-support";
 import { createFlowMigrations } from "./flow-migration";
 import { type CloneImport, importClone, importMarker } from "./import";

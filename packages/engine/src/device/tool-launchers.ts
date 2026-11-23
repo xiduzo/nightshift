@@ -14,12 +14,11 @@ import { delimiter, dirname, join } from "node:path";
 import { findProgram, shellQuoteAlways } from "@nightshift/agents/types";
 import type { Login } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
+import type { SecretEnv, SecretUse } from "../contract";
 import {
 	type CliTool,
 	type CliToolStore,
 	programOf,
-	type SecretEnv,
-	type SecretUse,
 	unreachableNote,
 } from "../device-config";
 import { redactText } from "./redact";

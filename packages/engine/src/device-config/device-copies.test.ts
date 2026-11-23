@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as Y from "yjs";
 import { createSyncedDocuments } from "../documents";
 import { createSandbox, type Sandbox } from "../testing";
-import { createDeviceCopies } from "./device-copies";
-import { createProfileStore } from "./profiles";
+import { wireCopies } from "./copies";
+import { wireProfiles as createProfileStore } from "./profiles";
 
 /**
  * The copies of the owner's other Devices' documents: kept for the Devices
@@ -44,7 +44,7 @@ async function laptopDocument() {
 function copiesOf(replica: Sandbox) {
 	const documents = createSyncedDocuments({ db: replica.db });
 	return Object.assign(
-		createDeviceCopies({ db: replica.db, selfId: replica.deviceId, documents }),
+		wireCopies({ db: replica.db, documents }).forDevice(replica.deviceId),
 		{ documents },
 	);
 }

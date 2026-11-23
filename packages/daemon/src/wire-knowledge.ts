@@ -8,7 +8,7 @@ import {
 	wireKnowledge,
 } from "@nightshift/engine";
 import {
-	type openConfigStores,
+	type ConfigStores,
 	reachesPrivateNetwork,
 } from "@nightshift/engine/device-config";
 import {
@@ -20,7 +20,6 @@ import {
 } from "./runtime";
 
 type KnowledgeDeps = Parameters<typeof wireKnowledge>[0];
-type ConfigStores = Awaited<ReturnType<typeof openConfigStores>>;
 type FollowRunsDeps = Parameters<Knowledge["followRuns"]>[0];
 
 /**

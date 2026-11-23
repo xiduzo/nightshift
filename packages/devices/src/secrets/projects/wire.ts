@@ -1,4 +1,4 @@
-import type { ProjectSecrets } from "@nightshift/engine/device-config";
+import type { ProjectSecrets } from "@nightshift/engine";
 import type { Caller, ProjectSecretName } from "../../contract";
 import type { HostCalls } from "../calls";
 import type { ProjectSecretStore, SpaceSecretStore } from "../kept";

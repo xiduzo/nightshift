@@ -1,15 +1,12 @@
 import { join } from "node:path";
 import type { Database } from "@nightshift/db";
 import { hostLink } from "@nightshift/db/schema";
-import {
-	type KeyStoreKind,
-	valueStore,
-} from "@nightshift/engine/device-config";
+import { type KeyStoreKind, valueStore } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import { asDate, instant, instantOrNull } from "@nightshift/time";
 import { and, asc, eq, isNotNull, isNull, ne } from "drizzle-orm";
 
-export type { KeyStoreKind } from "@nightshift/engine/device-config";
+export type { KeyStoreKind } from "@nightshift/engine";
 
 /**
  * This computer's links to the Hosts it paired with: one home Host at

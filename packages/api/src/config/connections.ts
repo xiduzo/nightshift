@@ -2,8 +2,6 @@ import {
 	connectionInputSchema,
 	customAgentOf,
 	HARNESS_BIN,
-	removeConnection,
-	saveConnection,
 } from "@nightshift/engine/device-config";
 import {
 	customHarnessSchema,
@@ -78,7 +76,10 @@ export const connections = {
 		)
 		.handler(({ context, input }) => {
 			const { previousName, ...connection } = input;
-			return saveConnection(context, connection, previousName);
+			return context.deviceConfig.saveConnection(context.actor, {
+				connection,
+				previousName,
+			});
 		}),
 	/** Also takes it off the profiles that name it. */
 	remove: ownerProcedure
@@ -88,7 +89,11 @@ export const connections = {
 		})
 		.output(output(z.void()))
 		.input(z.object({ name: z.string() }))
-		.handler(({ context, input }) => removeConnection(context, input.name)),
+		.handler(({ context, input }) =>
+			context.deviceConfig.removeConnection(context.actor, {
+				name: input.name,
+			}),
+		),
 	/** Connects to the server, lists its tools, and disconnects. A saved connection or a draft. */
 	test: ownerProcedure
 		.route({
@@ -104,7 +109,7 @@ export const connections = {
 		)
 		.handler(async ({ context, input }) => {
 			const { expansion, values } =
-				await context.connections.expandForTest(input);
+				await context.deviceConfig.expandConnectionForTest(input);
 			if (!expansion.ok) {
 				return {
 					ok: false,
@@ -143,7 +148,11 @@ export const connections = {
 			}),
 		)
 		.handler(({ context, input }) =>
-			context.connections.setSecret(input.name, input.value, input.scope),
+			context.deviceConfig.saveSecret(context.actor, {
+				name: input.name,
+				value: input.value,
+				scope: input.scope,
+			}),
 		),
 	removeSecret: ownerProcedure
 		.route({
@@ -159,7 +168,10 @@ export const connections = {
 			}),
 		)
 		.handler(({ context, input }) =>
-			context.connections.removeSecret(input.name, input.scope),
+			context.deviceConfig.removeSecret(context.actor, {
+				name: input.name,
+				scope: input.scope,
+			}),
 		),
 	/**
 	 * Moves a saved secret to another scope (ADR 13, decision 7): this
@@ -174,7 +186,10 @@ export const connections = {
 		.output(output(z.void()))
 		.input(z.object({ name: secretNameSchema, to: secretScopeSchema }))
 		.handler(({ context, input }) =>
-			context.connections.moveSecret(input.name, input.to),
+			context.deviceConfig.moveSecret(context.actor, {
+				name: input.name,
+				to: input.to,
+			}),
 		),
 	/**
 	 * The tools of a saved connection, for a Tool node's inspector: each
@@ -190,7 +205,7 @@ export const connections = {
 		.input(z.object({ name: z.string() }))
 		.handler(async ({ context, input }) => {
 			const { expansion, values } =
-				await context.connections.expandForTest(input);
+				await context.deviceConfig.expandConnectionForTest(input);
 			if (!expansion.ok) {
 				return { ok: false, tools: [], error: expansion.message };
 			}

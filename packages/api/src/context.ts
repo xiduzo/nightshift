@@ -22,6 +22,7 @@ import type { AgentSetup, DeciderSetup } from "@nightshift/engine/agent-setup";
 import type {
 	CliToolStore,
 	ConnectionStore,
+	DeviceConfigUseCases,
 	ProfileStore,
 	SettingsStore,
 } from "@nightshift/engine/device-config";
@@ -89,6 +90,11 @@ export type Services = {
 	/** The CLI tools' logins: signing one in, when it last did, its folder. */
 	toolLaunchers: Pick<ToolLaunchers, "signIn" | "signedInAt" | "forget">;
 	profiles: ProfileStore;
+	/**
+	 * What a person asks of this computer's configuration: its settings,
+	 * edits, secrets and tests. Each takes the person who asks.
+	 */
+	deviceConfig: DeviceConfigUseCases;
 	/**
 	 * What uses this computer's connections, CLI tools, profiles and
 	 * secrets, and the secrets of a project or of the Space, in the flows of

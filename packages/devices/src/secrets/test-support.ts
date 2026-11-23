@@ -5,10 +5,7 @@ import {
 	roleIn,
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import type {
-	PersonalSecrets,
-	ProjectSecrets,
-} from "@nightshift/engine/device-config";
+import type { PersonalSecrets, ProjectSecrets } from "@nightshift/engine";
 import type { DeviceLinks, HostLinks, HostSpaces } from "../links";
 import type { WorkHub } from "../work";
 import { wireCalls } from "./calls";

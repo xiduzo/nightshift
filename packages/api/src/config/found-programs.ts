@@ -1,4 +1,3 @@
-import { foundPrograms, setUpProgram } from "@nightshift/engine/device-config";
 import { harnessNameSchema } from "@nightshift/flows";
 import { z } from "zod";
 
@@ -27,7 +26,9 @@ export const programs = {
 				"Lists the agent CLIs and the tools of the kits found on this computer that are not set up yet.",
 		})
 		.output(output(z.array(foundProgramSchema)))
-		.handler(({ context }) => foundPrograms(context)),
+		.handler(({ context }) =>
+			context.deviceConfig.listFoundPrograms(context.actor),
+		),
 	setUp: ownerProcedure
 		.route({
 			summary:
@@ -46,5 +47,9 @@ export const programs = {
 			),
 		)
 		.input(z.object({ program: z.string().min(1) }))
-		.handler(({ context, input }) => setUpProgram(context, input.program)),
+		.handler(({ context, input }) =>
+			context.deviceConfig.setUpProgram(context.actor, {
+				program: input.program,
+			}),
+		),
 };

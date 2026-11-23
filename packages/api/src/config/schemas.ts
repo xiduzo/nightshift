@@ -14,6 +14,9 @@ import type {
 	FlowRef,
 	OllamaModel,
 	OllamaStatus,
+	SecretScope,
+	SecretSource,
+	SecretView,
 	SignInResult,
 } from "@nightshift/engine";
 import type {
@@ -28,9 +31,6 @@ import {
 	type Connection,
 	cliToolGitSchema,
 	type ProfileView,
-	type SecretScope,
-	type SecretSource,
-	type SecretView,
 	type SettingField,
 	type SettingKey,
 	settingsSchema,

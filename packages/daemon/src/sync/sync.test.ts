@@ -16,14 +16,12 @@ import {
 	createFlowDocuments,
 	createSpaceDocuments,
 	createSyncedDocuments,
+	type DeviceDocument,
 	type FlowDocuments,
+	openDeviceDocument,
 	type SpaceDocuments,
 	type SyncedDocuments,
 } from "@nightshift/engine";
-import {
-	type DeviceDocument,
-	openDeviceDocument,
-} from "@nightshift/engine/device-config";
 import {
 	createCliToolStore,
 	createProjectFlows,

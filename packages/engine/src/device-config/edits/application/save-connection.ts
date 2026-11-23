@@ -1,0 +1,22 @@
+import type { Actor } from "../../../contract";
+import type { Connection, ConnectionInput } from "../../connections";
+import { saveConnection as saveConnectionStep } from "../domain/tool-edits";
+import type { EditedConnections, EditedProfiles } from "./ports";
+
+export type SaveConnectionPorts = {
+	connections: EditedConnections;
+	profiles: Pick<EditedProfiles, "list" | "save">;
+};
+
+/**
+ * Adds a connection, or changes or renames one (`previousName`). A rename
+ * moves the profiles that name the old name to the new one. Refused when
+ * another connection has the name.
+ */
+export const saveConnection =
+	(ports: SaveConnectionPorts) =>
+	(
+		_actor: Actor,
+		request: { connection: ConnectionInput; previousName?: string },
+	): Promise<Connection> =>
+		saveConnectionStep(ports, request.connection, request.previousName);

@@ -1,14 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { valueStore } from "@nightshift/engine/device-config";
+import { valueStore } from "@nightshift/engine";
 import {
 	createConnectionStore,
 	createSandbox,
 	createSettingsStore,
 	type Sandbox,
 } from "@nightshift/engine/testing";
-
 import { moveTelemetryHeaders } from "./headers-move";
 
 /**

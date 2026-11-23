@@ -25,6 +25,12 @@ export type SettingsStore = {
 	onChange(listener: () => void): () => void;
 };
 
+/** The settings, and the use cases of a person's doors. */
+export type WiredSettings = SettingsStore & {
+	viewSettings: ReturnType<typeof viewSettings>;
+	saveSettings: ReturnType<typeof saveSettings>;
+};
+
 /**
  * The settings of this computer over its Device document. Each one is
  * saved there, else read from the environment (`env`), else its default.
@@ -35,7 +41,7 @@ export type SettingsStore = {
 export function wireSettings(deps: {
 	document: DeviceDocument;
 	env: Readonly<Record<string, string | undefined>>;
-}): SettingsStore {
+}): WiredSettings {
 	const saved = yjsSavedSettings(deps.document);
 	const ground: SettingsGround = {
 		env: deps.env,
@@ -52,5 +58,7 @@ export function wireSettings(deps: {
 		save: (patch) => save(NIGHT_SHIFT, patch),
 		onChange: (listener) => saved.onChange(listener),
 		run: () => runSettingsOf(current()),
+		viewSettings: view,
+		saveSettings: save,
 	};
 }

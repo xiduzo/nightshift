@@ -301,7 +301,7 @@ describe("the settings of new Decision nodes", () => {
 							device: { id: "device", name: "test", ownerId: OWNER },
 							lease: { host: "test", pid: 1, epoch: 1, since: 0 },
 						},
-						settings,
+						deviceConfig: { viewSettings: settings.viewSettings },
 						connections: {
 							secretSource: () => (keySaved ? "keychain" : "missing"),
 						},

@@ -1,17 +1,16 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { connection } from "@nightshift/db/schema";
 import type { StepRun } from "../contract";
+import type { PersonalSecrets, ProjectSecrets } from "../secrets";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import {
 	type ConnectionInput,
 	type ConnectionStore,
-	createConnectionStore,
-	type PersonalSecrets,
-	type ProjectSecrets,
-	referencedVariables,
+	wireConnections as createConnectionStore,
 	type SecretBackend,
 	unreachableNote,
 } from "./connections";
+import { referencedVariables } from "./connections/domain/saved-connection";
 
 let sandbox: Sandbox;
 beforeEach(async () => {

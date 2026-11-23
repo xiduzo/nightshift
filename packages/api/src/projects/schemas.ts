@@ -4,8 +4,8 @@ import type {
 	GitHubRepo,
 	GitInstall,
 	ProjectRuns,
+	ProjectSecretName,
 } from "@nightshift/engine";
-import type { ProjectSecretName } from "@nightshift/engine/device-config";
 import type {
 	GitHubClone,
 	Project,

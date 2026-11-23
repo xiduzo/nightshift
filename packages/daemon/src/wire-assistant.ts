@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { tanstackDecider } from "@nightshift/agents";
 import type { Engine, SpaceEngine } from "@nightshift/engine";
-import type { openConfigStores } from "@nightshift/engine/device-config";
+import type { ConfigStores } from "@nightshift/engine/device-config";
 import {
 	createAssistant,
 	createLearner,
@@ -11,7 +11,6 @@ import {
 import { harnessLookup, type localHarnesses } from "./harnesses";
 
 type AssistantDeps = Parameters<typeof createAssistant>[0];
-type ConfigStores = Awaited<ReturnType<typeof openConfigStores>>;
 
 /**
  * The assistant block of the daemon's composition (`daemon.ts`):

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { createConnectionStore } from "../device-config/connections";
 import { wireSettings as createSettingsStore } from "../device-config/settings";
+import { createConnectionStore } from "../testing";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { createOllama, type OllamaService } from "./ollama";
 import type { OllamaChild } from "./starter";

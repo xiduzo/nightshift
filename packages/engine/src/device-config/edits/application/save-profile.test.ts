@@ -1,0 +1,77 @@
+import { describe, expect, test } from "bun:test";
+import type { AgentProfile } from "@nightshift/flows";
+import { NIGHT_SHIFT } from "../../../contract";
+import {
+	inMemoryEditedCliTools,
+	inMemoryEditedConnections,
+	inMemoryEditedProfiles,
+} from "../adapters/out/in-memory-neighbours";
+import { saveProfile } from "./save-profile";
+
+function profile(over: Partial<AgentProfile> = {}): AgentProfile {
+	return {
+		name: "fast",
+		harness: "claude-code",
+		model: "sonnet",
+		permissionMode: "acceptEdits",
+		clis: [],
+		connections: [],
+		...over,
+	} as AgentProfile;
+}
+
+function wired() {
+	const ports = {
+		connections: inMemoryEditedConnections(["gh"]),
+		cliTools: inMemoryEditedCliTools(),
+		profiles: inMemoryEditedProfiles(),
+	};
+	return { ports, save: saveProfile(ports) };
+}
+
+describe("saveProfile", () => {
+	test("refuses a connection or a CLI tool that does not exist, and saves nothing", async () => {
+		const { ports, save } = wired();
+		await expect(
+			save(NIGHT_SHIFT, { profile: profile({ connections: ["linear"] }) }),
+		).rejects.toThrow(
+			'There is no connection named "linear". Add it under Agents → Tools first.',
+		);
+		await expect(
+			save(NIGHT_SHIFT, { profile: profile({ clis: ["jq"] }) }),
+		).rejects.toThrow(
+			'There is no CLI tool named "jq". Add it under Agents → Tools first.',
+		);
+		expect(ports.profiles.list()).toEqual([]);
+	});
+
+	test("refuses a taken name and a removed profile", async () => {
+		const { save } = wired();
+		const fast = await save(NIGHT_SHIFT, { profile: profile() });
+		await save(NIGHT_SHIFT, { profile: profile({ name: "slow" }) });
+		await expect(save(NIGHT_SHIFT, { profile: profile() })).rejects.toThrow(
+			'A profile named "fast" already exists. Pick another name.',
+		);
+		await expect(
+			save(NIGHT_SHIFT, { profile: profile({ name: "slow" }), id: fast.id }),
+		).rejects.toThrow(
+			'A profile named "slow" already exists. Pick another name.',
+		);
+		await expect(
+			save(NIGHT_SHIFT, { profile: profile(), id: "p-gone" }),
+		).rejects.toThrow("This profile was removed. Add it again.");
+	});
+
+	test("a rename keeps the id", async () => {
+		const { ports, save } = wired();
+		const fast = await save(NIGHT_SHIFT, {
+			profile: profile({ connections: ["gh"] }),
+		});
+		const quick = await save(NIGHT_SHIFT, {
+			profile: profile({ name: "quick" }),
+			id: fast.id,
+		});
+		expect(quick.id).toBe(fast.id);
+		expect(ports.profiles.list().map((p) => p.name)).toEqual(["quick"]);
+	});
+});

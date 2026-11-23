@@ -1,15 +1,19 @@
 import { DECIDER_SETUP } from "@nightshift/agents";
 import type { Context } from "@nightshift/api/context";
 import { inContainer } from "@nightshift/devices";
-import { createConfigUse, createToolLaunchers } from "@nightshift/engine";
+import {
+	createConfigUse,
+	createToolLaunchers,
+	openDeviceDocument,
+	secretStore,
+} from "@nightshift/engine";
 import {
 	createAgentSetup,
 	createDeciderSetup,
 } from "@nightshift/engine/agent-setup";
 import {
-	openConfigStores,
-	openDeviceDocument,
-	secretStore,
+	type DeviceConfig,
+	wireDeviceConfig,
 } from "@nightshift/engine/device-config";
 import type { Telemetry } from "@nightshift/telemetry";
 import { programChecks } from "./harnesses";
@@ -21,8 +25,7 @@ import {
 	secretsDir,
 } from "./runtime";
 
-type ConfigOptions = Parameters<typeof openConfigStores>[0];
-type ConfigStores = Awaited<ReturnType<typeof openConfigStores>>;
+type ConfigOptions = Parameters<typeof wireDeviceConfig>[0];
 type ConfigUseDeps = Parameters<typeof createConfigUse>[0];
 type DeciderSetupDeps = Parameters<typeof createDeciderSetup>[0];
 
@@ -72,14 +75,17 @@ export async function wireDaemonConfig(deps: {
 	const keyStore =
 		env.NIGHTSHIFT_KEY_STORE === "file" ? { prefer: "file" as const } : {};
 
-	const config = await openConfigStores({
+	const config = wireDeviceConfig({
 		document: deps.document,
 		env: fallbacks,
 		secrets: await secretStore({ dataDir, ...keyStore }),
 		personal: deps.personal,
 		projects: deps.projects,
 	});
-	const { connections, cliTools } = config;
+	const { settings, connections, cliTools, profiles } = config;
+	await Promise.all(
+		[settings, connections, cliTools, profiles].map((store) => store.load()),
+	);
 	// Each CLI tool with a login runs through a launcher of its step. A
 	// login's own folder is in the data folder, so it outlives a restart.
 	const toolLaunchers = createToolLaunchers({
@@ -98,7 +104,7 @@ export async function wireDaemonConfig(deps: {
  */
 export async function wireSetups(deps: {
 	slots: Pick<HotSlots<HotRegistry>, "replace">;
-	config: ConfigStores;
+	config: DeviceConfig;
 	toolLaunchers: ConfigUseDeps["toolLaunchers"];
 	deviceId: string;
 	/** The Space view for the session's Person. */

@@ -6,12 +6,9 @@ import {
 	installedSkills,
 } from "@nightshift/agents";
 import {
-	addHarness,
 	HARNESS_BIN,
-	removeHarness,
 	type SettingField,
 	type SettingKey,
-	saveCustomAgent,
 } from "@nightshift/engine/device-config";
 import {
 	agentHarnessSchema,
@@ -86,13 +83,20 @@ export const harnesses = {
 		)
 		.handler(({ context, input }) => {
 			const { previousSlug, ...agent } = input;
-			return saveCustomAgent(context, agent, previousSlug);
+			return context.deviceConfig.saveCustomAgent(context.actor, {
+				agent,
+				previousSlug,
+			});
 		}),
 	add: ownerProcedure
 		.route({ summary: "Adds a built-in harness on this computer." })
 		.output(output(z.void()))
 		.input(z.object({ harness: harnessNameSchema }))
-		.handler(({ context, input }) => addHarness(context, input.harness)),
+		.handler(({ context, input }) =>
+			context.deviceConfig.addHarness(context.actor, {
+				harness: input.harness,
+			}),
+		),
 	/** Refused while a profile runs on it. A custom agent is gone after this. */
 	remove: ownerProcedure
 		.route({
@@ -101,7 +105,11 @@ export const harnesses = {
 		})
 		.output(output(z.void()))
 		.input(z.object({ harness: agentHarnessSchema }))
-		.handler(({ context, input }) => removeHarness(context, input.harness)),
+		.handler(({ context, input }) =>
+			context.deviceConfig.removeHarness(context.actor, {
+				harness: input.harness,
+			}),
+		),
 	/**
 	 * The adapter's models, plus what the CLI lists itself. Never throws.
 	 * A custom agent offers `default`: any other model it takes is typed.

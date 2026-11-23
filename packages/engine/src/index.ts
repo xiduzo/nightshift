@@ -41,6 +41,7 @@ export type {
 	Relay,
 	RowBatch,
 	RunCommandInput,
+	SecretUse,
 	StartRunInput,
 	TestRunRequest,
 } from "./contract";
@@ -104,6 +105,8 @@ export {
 	createFlowDocuments,
 	createSpaceDocuments,
 	createSyncedDocuments,
+	type DeviceDocument,
+	deviceDocumentName,
 	deviceNameIn,
 	documentKind,
 	documentName,
@@ -111,6 +114,8 @@ export {
 	type FlowDocuments,
 	memberName,
 	memberRole,
+	openDeviceDocument,
+	refreshDeviceFacts,
 	type SpaceDocument,
 	type SpaceDocuments,
 	type SyncedDocuments,
@@ -150,6 +155,7 @@ export {
 	type GitHubRepo,
 	systemGitHubCli,
 } from "./github";
+export { type KeyStoreKind, secretStore, valueStore } from "./key-store";
 export {
 	type AskedQuestion,
 	type AskLearner,
@@ -244,6 +250,15 @@ export type {
 	SchedulePause,
 	WebhookAnswer,
 } from "./schedules";
+export {
+	type PersonalSecrets,
+	type ProjectSecretName,
+	type ProjectSecrets,
+	type SecretScope,
+	type SecretSource,
+	type SecretView,
+	unreachableNote,
+} from "./secrets";
 export type { SpaceEngine } from "./space-engine";
 export type { MoveRows } from "./space-move";
 export type { UsageMoment, UsageNotes } from "./usage";

@@ -9,10 +9,8 @@ import type {
 	ConnectionStore,
 	ProfileStore,
 	ProfileView,
-	ProjectSecretName,
-	SecretList,
-	SecretView,
 } from "../device-config";
+import type { ProjectSecretName, SecretList, SecretView } from "../secrets";
 import {
 	type FlowReader,
 	type FlowRef,

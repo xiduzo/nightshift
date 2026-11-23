@@ -59,7 +59,7 @@ export type PeerOptions = {
 	isHost?: () => boolean;
 	/**
 	 * The copies of the documents of this computer's owner's other Devices
-	 * (`createDeviceCopies`): their names and profiles while the home Host
+	 * (`wireCopies` of device-config): their names and profiles while the home Host
 	 * cannot be reached. Without it, none.
 	 */
 	copies?: Pick<DeviceCopies, "list">;

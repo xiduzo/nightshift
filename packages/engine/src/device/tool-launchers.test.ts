@@ -11,7 +11,8 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { CliTool, SecretEnv } from "../device-config";
+import type { SecretEnv } from "../contract";
+import type { CliTool } from "../device-config";
 import { createToolLaunchers, gitEnv } from "./tool-launchers";
 
 let root: string;

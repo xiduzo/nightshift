@@ -34,7 +34,9 @@ export const settings = {
 				"Reads every setting of this computer, where each value comes from, and facts about Night Shift here.",
 		})
 		.output(output(settingsViewSchema))
-		.handler(({ context }) => shown(context.settings.view(), context)),
+		.handler(({ context }) =>
+			shown(context.deviceConfig.viewSettings(context.actor), context),
+		),
 	/**
 	 * A value saves it; null forgets it (back to the environment, then the
 	 * default).
@@ -47,6 +49,9 @@ export const settings = {
 		.output(output(settingsViewSchema))
 		.input(settingsPatchSchema)
 		.handler(async ({ context, input }) =>
-			shown(await context.settings.save(input), context),
+			shown(
+				await context.deviceConfig.saveSettings(context.actor, input),
+				context,
+			),
 		),
 };

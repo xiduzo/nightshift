@@ -6,12 +6,12 @@ import {
 	createFlowDocuments,
 	createSpaceArchive,
 	type Device,
+	type DeviceDocument,
 	type FlowDocuments,
 	NIGHT_SHIFT,
 	type SessionInput,
 	worktreeLocation,
 } from "@nightshift/engine";
-import type { DeviceDocument } from "@nightshift/engine/device-config";
 import type { RunStatus } from "@nightshift/engine/run-status";
 import {
 	createProfileStore,

@@ -5,12 +5,9 @@ import {
 	spacesOf,
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import type { Engine } from "@nightshift/engine";
+import type { DeviceDocument, Engine } from "@nightshift/engine";
 import { NIGHT_SHIFT } from "@nightshift/engine";
-import type {
-	DeviceDocument,
-	ProfileStore,
-} from "@nightshift/engine/device-config";
+import type { ProfileStore } from "@nightshift/engine/device-config";
 import { isAgentProfile } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";

@@ -6,7 +6,7 @@ import {
 	localDevice,
 } from "@nightshift/engine";
 import {
-	type openConfigStores,
+	type ConfigStores,
 	reachesPrivateNetwork,
 } from "@nightshift/engine/device-config";
 import {
@@ -19,7 +19,6 @@ import { localHarnesses } from "./harnesses";
 
 type LocalDeviceDeps = Parameters<typeof localDevice>[0];
 type Ollama = Awaited<ReturnType<typeof createOllama>>;
-type ConfigStores = Awaited<ReturnType<typeof openConfigStores>>;
 
 /**
  * The local block of the daemon's composition (`daemon.ts`): this computer

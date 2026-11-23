@@ -1,8 +1,5 @@
 import { systemGitHubCli } from "@nightshift/engine";
-import {
-	createDeviceCopies,
-	profileChoice,
-} from "@nightshift/engine/device-config";
+import { profileChoice, wireCopies } from "@nightshift/engine/device-config";
 import { OFFLINE_AFTER_MS } from "./contract";
 import type { DevicesDeps, DevicesRuntime } from "./devices-runtime";
 import { letGo, takeOver } from "./handover";
@@ -80,11 +77,9 @@ async function startNow(deps: DevicesDeps): Promise<DevicesRuntime> {
 	 * Read-only copies of the documents of this computer's owner's other
 	 * Devices, from the home Host: their names, profiles and secret names.
 	 */
-	const copies = createDeviceCopies({
-		db,
-		selfId: self.id,
-		documents: deps.documents,
-	});
+	const copies = wireCopies({ db, documents: deps.documents }).forDevice(
+		self.id,
+	);
 
 	// The actions on rows another Device owns, carried over the Links. The
 	// relays reach the engine and the Links: they read both when they are

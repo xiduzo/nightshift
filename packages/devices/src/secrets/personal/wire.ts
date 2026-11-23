@@ -1,4 +1,4 @@
-import type { PersonalSecrets } from "@nightshift/engine/device-config";
+import type { PersonalSecrets } from "@nightshift/engine";
 import type { Caller, PersonalSecretName } from "../../contract";
 import type { HostCalls } from "../calls";
 import type { PersonalSecretStore } from "../kept";

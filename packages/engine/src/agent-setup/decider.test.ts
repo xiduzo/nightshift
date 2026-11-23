@@ -2,12 +2,10 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { isAgentProfile } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 
-import {
-	type ConfigStores,
-	openConfigStores,
-} from "../device-config/config-stores";
+import type { ConfigStores } from "../device-config";
 import type { SecretBackend } from "../device-config/connections";
 import type { OllamaStatus } from "../ollama";
+import { openConfigStores } from "../testing/config-stores";
 import { createSandbox, type Sandbox, waitFor } from "../testing/test-support";
 import {
 	createDeciderSetup,

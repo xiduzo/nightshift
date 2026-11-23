@@ -54,7 +54,7 @@ export type PlacementDeps = {
 	ownProfiles?(): readonly DeviceProfile[];
 	/**
 	 * The copies of the documents of this computer's owner's other Devices,
-	 * from the home Host (`createDeviceCopies`). Default: none.
+	 * from the home Host (`wireCopies` of device-config). Default: none.
 	 */
 	copies?: Pick<DeviceCopies, "list">;
 	/** Whether a Person's role in a Space uses Offers. Default: nobody's. */

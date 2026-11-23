@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { agentProfile } from "@nightshift/db/schema";
 import { createSandbox, type Sandbox } from "../testing/test-support";
-import { cliToolsInstruction, createCliToolStore } from "./cli-tools";
-import { createProfileStore } from "./profiles";
+import {
+	cliToolsInstruction,
+	wireCliTools as createCliToolStore,
+} from "./cli-tools";
+import { wireProfiles as createProfileStore } from "./profiles";
 
 let sandbox: Sandbox;
 beforeEach(async () => {

@@ -5,11 +5,8 @@ import { fakeHarness } from "@nightshift/agents/testing";
 import { membersOf } from "@nightshift/auth";
 import { createConfigUse, createEngine, type Engine } from "@nightshift/engine";
 import {
-	createCliToolStore,
-	createConnectionStore,
-	createProfileStore,
 	createSandbox,
-	createSettingsStore,
+	openConfigStores,
 	type Sandbox,
 	waitFor,
 	withDevice,
@@ -141,13 +138,13 @@ describe("replies of a real engine", () => {
 		const { members } = await membersOf(sandbox.db, sandbox.spaceId);
 		const personId = members[0]?.personId ?? "";
 		const document = await sandbox.openDocument();
-		const secrets: Parameters<typeof createConnectionStore>[0]["secrets"] = {
+		const secrets: Parameters<typeof openConfigStores>[0]["secrets"] = {
 			get: async () => null,
 			set: async () => {},
 			delete: async () => {},
 		};
-		const settings = createSettingsStore({ document, env: {} });
-		await settings.load();
+		const { settings, connections, cliTools, profiles, deviceConfig } =
+			await openConfigStores({ document, env: {}, secrets });
 		engine = createEngine(
 			withDevice({
 				db: sandbox.db,
@@ -163,9 +160,6 @@ describe("replies of a real engine", () => {
 			inApp,
 		});
 		await notifications.start();
-		const connections = createConnectionStore({ document, env: {}, secrets });
-		const cliTools = createCliToolStore({ document });
-		const profiles = createProfileStore({ document });
 		const toolLaunchers = {
 			signIn: async () => ({ ok: false, output: "", signedInAt: null }),
 			signedInAt: async () => null,
@@ -182,6 +176,7 @@ describe("replies of a real engine", () => {
 			cliTools,
 			toolLaunchers,
 			profiles,
+			deviceConfig,
 			configUse: createConfigUse({
 				deviceId: sandbox.deviceId,
 				space: ({ spaceId, personId }) =>

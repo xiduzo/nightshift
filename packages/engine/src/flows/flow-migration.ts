@@ -1,7 +1,7 @@
 import type { Database } from "@nightshift/db";
 import type { FlowMigration } from "@nightshift/flows";
 import type { DeviceDirectory } from "../contract";
-import { type ProfileStore, storedDevices } from "../device-config";
+import { type ProfileStore, wireCopies } from "../device-config";
 import type { SpaceDocuments } from "../documents";
 
 /**
@@ -72,7 +72,9 @@ export function createFlowMigrations(deps: {
 				if (ownerId) known.ownerId = ownerId;
 				candidates.set(id, known);
 			};
-			for (const device of await storedDevices(deps.db)) {
+			for (const device of await wireCopies({
+				db: deps.db,
+			}).listStoredDevices()) {
 				profiles.set(device.deviceId, device.profiles);
 				add(device.deviceId, device.name);
 			}

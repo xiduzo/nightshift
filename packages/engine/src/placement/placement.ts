@@ -5,8 +5,8 @@ import {
 	legacyDeviceName,
 	profileOf,
 } from "@nightshift/flows";
+import type { StepRun } from "../contract";
 import type { Device } from "../device";
-import { type StepRun, takenOverSecrets } from "../device-config";
 import type { StepMove, StepPlacement } from "../graph";
 import {
 	type FallbackDevice,
@@ -18,6 +18,7 @@ import {
 	type RunRow,
 } from "../log";
 import { deriveWorktrees } from "../read";
+import { takenOverSecrets } from "../secrets";
 import { capabilitiesFor, unfit } from "./fit";
 import type { PlacementPort } from "./port";
 

@@ -1,4 +1,3 @@
-import { saveProfile } from "@nightshift/engine/device-config";
 import { agentProfileSchema, modelProfileSchema } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import { z } from "zod";
@@ -44,10 +43,9 @@ export const profiles = {
 		)
 		.handler(async ({ context, input }) => {
 			const { id, ...profile } = input;
-			const saved = await saveProfile(
-				context,
-				profile,
-				id !== undefined ? { id } : {},
+			const saved = await context.deviceConfig.saveProfile(
+				context.actor,
+				id !== undefined ? { profile, id } : { profile },
 			);
 			// The Spaces it is offered to show its new name.
 			if (id !== undefined) {
@@ -91,5 +89,7 @@ export const profiles = {
 		})
 		.output(output(z.void()))
 		.input(z.object({ id: z.string() }))
-		.handler(({ context, input }) => context.profiles.remove(input.id)),
+		.handler(({ context, input }) =>
+			context.deviceConfig.removeProfile(context.actor, { id: input.id }),
+		),
 };
