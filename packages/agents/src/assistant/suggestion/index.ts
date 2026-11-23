@@ -1,7 +1,4 @@
 /**
- * A suggestion for one field of one node, or of the flow: the session that
- * asks for it (`suggest.ts`), its prompt (`suggestion-prompt.ts`, one task
- * per kind of field), and what the prompt knows of the project
- * (`project-facts.ts`).
+ * A suggestion for one field of one node, or of the flow.
  */
-export { type SuggestFieldInput, suggestField } from "./suggest";
+export { type SuggestFieldInput, suggestField } from "./application/suggest-field";

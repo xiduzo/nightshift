@@ -9,21 +9,24 @@ import {
 	suggestionRequestSchema,
 } from "@nightshift/flows";
 import { type FakeScript, fakeHarness } from "../testing/fake";
-import { activityOf, bareToolName } from "./activity";
-import { dataReaders, scopeList } from "./prompts";
+import { harnessAssistantSessions } from "./adapters/out/harness-assistant-sessions";
+import { activityOf, bareToolName } from "./domain/activity";
+import { dataReaders, scopeList } from "./domain/prompts";
 import {
 	type AssistantSessionEvent,
-	runAssistantSession,
 	sessionErrorMessage,
 	settleUsage,
-} from "./session";
+} from "./domain/session";
+import { suggestField } from "./index";
 import {
 	cannotSuggest,
 	checkSuggestion,
-	suggestField,
 	suggestionDataSchema,
-} from "./suggestion/suggest";
-import { suggestionPrompt } from "./suggestion/suggestion-prompt";
+} from "./suggestion/domain/suggestion-rules";
+import { suggestionPrompt } from "./suggestion/domain/suggestion-prompt";
+
+const assistantSessions = harnessAssistantSessions();
+const runAssistantSession = assistantSessions.run.bind(assistantSessions);
 
 const flow: Flow = flowSchema.parse({
 	version: FLOW_VERSION,
