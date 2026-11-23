@@ -1192,9 +1192,10 @@ collection of old content must read both documents.
 
 ## The module
 
-`createKnowledge` in `packages/engine/src/knowledge` is the one door to all
-of the above. It builds the document view, the search and the reconcile
-inside, and returns one interface (`Knowledge`). A step's Device, the API
+`wireKnowledge` in `packages/engine/src/knowledge/wire.ts` builds the one
+door to all of the above. It builds the sub-verticals inside, and returns one
+interface (`Knowledge`). What a step gets is the sub-vertical
+`packages/engine/src/knowledge/steps`. A step's Device, the API
 and the daemon use only that interface. The API checks who asks and carries
 the answer.
 

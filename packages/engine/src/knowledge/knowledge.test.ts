@@ -1227,6 +1227,49 @@ describe("connect and close", () => {
 		expect(await a.paths()).toEqual(["wiki/Home.md"]);
 	});
 
+	test("the collection asks the `keeps` that `connect` gave when it started the timers; a new `connect` replaces it", async () => {
+		const a = await device(memoryHost(), {
+			timers: { firstReconcileMs: 60_000, firstCollectMs: 1, collectMs: 5 },
+		});
+		await a.put("wiki/Home.md", "# Home\n");
+		await (await a.knowledge.forCommand("p1")).done();
+		const asked: string[] = [];
+		const runtime = {
+			inStep: async () => {},
+			keeps: async (spaceId: string) => {
+				asked.push(`first ${spaceId}`);
+				return false;
+			},
+		};
+		a.knowledge.connect(runtime);
+		await waitFor(() => asked.length > 0);
+		// The runtime changes after the start: the timers keep what they read then.
+		runtime.keeps = async (spaceId) => {
+			asked.push(`changed ${spaceId}`);
+			return false;
+		};
+		await Bun.sleep(20);
+		expect(asked.filter((ask) => !ask.startsWith("first"))).toEqual([]);
+
+		a.knowledge.connect({
+			inStep: async () => {},
+			keeps: async (spaceId) => {
+				asked.push(`second ${spaceId}`);
+				return false;
+			},
+		});
+		await waitFor(() => asked.at(-1) === `second ${a.sandbox.spaceId}`);
+		expect(asked.filter((ask) => ask.startsWith("changed"))).toEqual([]);
+
+		// A runtime with no `keeps`: nothing is collected from now on.
+		a.knowledge.connect({ inStep: async () => {} });
+		// A pass that started before may still ask once.
+		await Bun.sleep(50);
+		const seen = asked.length;
+		await Bun.sleep(20);
+		expect(asked).toHaveLength(seen);
+	});
+
 	test("nothing on its own before the Hosts are connected", async () => {
 		const sandbox = await createSandbox();
 		sandboxes.push(sandbox);

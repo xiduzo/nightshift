@@ -16,11 +16,11 @@ import { markQuestion } from "./application/mark-question";
 import type {
 	FolderHolds,
 	ListedFiles,
-	QuestionSet,
 	SourceSyncs,
 	WaitingLearnings,
 } from "./application/ports";
 import { readKnowledgeUse } from "./application/read-knowledge-use";
+import { readQuestionSet } from "./application/read-question-set";
 import type { KnowledgeQuestion } from "./domain/questions";
 import type { AskedQuestion, KnowledgeUseReport } from "./domain/use";
 
@@ -40,7 +40,6 @@ export type ReviewDeps = {
 	};
 	holds: FolderHolds;
 	files: ListedFiles;
-	questionSet: QuestionSet;
 	syncs: SourceSyncs;
 	learnings: WaitingLearnings;
 	/** The clock. Default `now`. */
@@ -68,6 +67,8 @@ export type KnowledgeReview = {
 	use(projectId: string): Promise<KnowledgeUseReport>;
 	/** The questions agents asked, newest first, at most 50 (`listAskedQuestions`). */
 	asked(projectId: string): Promise<AskedQuestion[]>;
+	/** The question set as the Space has it (`readQuestionSet`). */
+	questionSet(projectId: string): Promise<KnowledgeQuestion[]>;
 };
 
 export function wireReview(deps: ReviewDeps): KnowledgeReview {
@@ -82,7 +83,8 @@ export function wireReview(deps: ReviewDeps): KnowledgeReview {
 		asked,
 		use,
 	});
-	const list = listQuestions({ asked, questionSet: deps.questionSet });
+	const questionSet = readQuestionSet({ questions, holds: deps.holds });
+	const list = listQuestions({ asked, questionSet });
 	const mark = markQuestion({ questions, holds: deps.holds, now });
 	return {
 		review: (projectId, space) => tasks({ projectId, space }),
@@ -95,5 +97,6 @@ export function wireReview(deps: ReviewDeps): KnowledgeReview {
 			mark({ projectId, query, answers, by }),
 		use: async (projectId) => (await use({ projectId })).use,
 		asked: (projectId) => asked({ projectId }),
+		questionSet: (projectId) => questionSet({ projectId }),
 	};
 }

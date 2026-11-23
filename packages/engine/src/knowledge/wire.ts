@@ -1,40 +1,66 @@
-import type { KnowledgeReadFrom } from "@nightshift/agents/knowledge";
+import {
+	type KnowledgeReadFrom,
+	type KnowledgeUse,
+	useHit,
+} from "@nightshift/agents/knowledge";
 import type { Database } from "@nightshift/db";
 import type { PageReaderSetting } from "@nightshift/flows";
 import type { SpaceArchive } from "../archive";
-import type { SyncedDocuments } from "../documents";
-import type { UsageNotes } from "../usage";
-import type { KnowledgeListing, KnowledgeText } from "./files";
-import type {
-	FollowRunsDeps,
-	LearningsNotifications,
-	NotePerson,
-	ProjectLearning,
-	RunLearnings,
-	WaitingNote,
-} from "./learnings";
-import type { KnowledgeMap } from "./map";
-import type { LinkLook, ReaderSecret } from "./readers";
-import type {
-	AskedQuestion,
-	KnowledgeQuestion,
-	KnowledgeUseReport,
-	ReviewTask,
-} from "./review";
-import type {
-	KnowledgeEvaluation,
-	KnowledgeHit,
-	KnowledgeMeaning,
-	KnowledgeMeaningStatus,
-} from "./search";
-import type { KnowledgeSources, SourceRun, SourcesSpace } from "./sources";
 import type {
 	CommandKnowledge,
 	KnowledgeRequest,
 	SessionKnowledge,
 	SessionStep,
-} from "./step-knowledge";
-import type { KnowledgeFolderLocks, KnowledgeTimes } from "./sync";
+} from "../contract";
+import type { SyncedDocuments } from "../documents";
+import { createRunLog, knowledgeUseEvent } from "../log";
+import type { UsageNotes } from "../usage";
+import { type KnowledgeListing, type KnowledgeText, wireFiles } from "./files";
+import {
+	type FollowRunsDeps,
+	type LearningsNotifications,
+	type NotePerson,
+	type ProjectLearning,
+	type RunLearnings,
+	type WaitingNote,
+	wireLearnings,
+} from "./learnings";
+import { type KnowledgeMap, wireMap } from "./map";
+import { type LinkLook, type ReaderSecret, wireReaders } from "./readers";
+import type {
+	KnowledgeQuestion,
+	KnowledgeQuestions,
+	KnowledgeUseReport,
+	ReviewTask,
+} from "./review";
+import { wireReview } from "./review";
+import {
+	isMarkdown,
+	type KnowledgeEvaluation,
+	type KnowledgeHit,
+	type KnowledgeMeaning,
+	type KnowledgeMeaningStatus,
+	markdownHeadings,
+	wireSearch,
+} from "./search";
+import {
+	type KnowledgeSources,
+	type SourceRun,
+	type SourcesSpace,
+	wireSources,
+} from "./sources";
+import { wireSteps } from "./steps";
+import {
+	type KnowledgeFolderLocks,
+	type KnowledgeTimes,
+	wireSync,
+} from "./sync";
+
+/**
+ * The wiring of the knowledge: the one door (`Knowledge`) and the one
+ * place that builds its sub-verticals, in order, and hands each the parts
+ * of the others it reads.
+ */
 
 /** The Hosts of the Spaces, once the devices runtime is up. */
 export type KnowledgeHosts = {
@@ -49,18 +75,6 @@ export type KnowledgeHosts = {
 	 * Space has none. Without it, nothing is collected.
 	 */
 	keeps?(spaceId: string): Promise<boolean>;
-};
-
-/** A question agents asked, and the files a person marked as its answer. */
-type AskedQuestionWithAnswers = AskedQuestion & {
-	/** Null: it is not in the question set. */
-	answers: string[] | null;
-};
-
-/** The questions agents asked a project's knowledge, and its question set. */
-type KnowledgeQuestions = {
-	asked: AskedQuestionWithAnswers[];
-	set: KnowledgeQuestion[];
 };
 
 /**
@@ -81,9 +95,6 @@ type KnowledgeQuestions = {
  * the devices runtime is made after the Device that takes this. `close`
  * ends it. On a `bun --hot` reload the daemon closes the one before it and
  * makes a new one: only what is on disk is kept (`daemon.ts`).
- *
- * Its members are in blocks, one per lane of the knowledge's move into
- * rings. `createKnowledge` builds them in the same blocks.
  */
 export type Knowledge = {
 	// The sync with the Space and the files.
@@ -357,3 +368,209 @@ export type KnowledgeDeps = {
 	/** A secret of this computer outside a run: the key of a page reader for the quick look. */
 	secret?: ReaderSecret;
 };
+
+export function wireKnowledge(deps: KnowledgeDeps): Knowledge {
+	const { db, archive, device } = deps;
+	/** The devices runtime, made after this: until then content stays here. */
+	const late: { hosts: KnowledgeHosts | null; stopTimers(): void } = {
+		hosts: null,
+		stopTimers: () => {},
+	};
+	// The folders are made by `wireFiles` below: the sync reads them only when it runs.
+	const sync = wireSync({
+		db,
+		documents: deps.documents,
+		folders: {
+			folder: (projectId) => folders.folder(projectId),
+			known: () => folders.known(),
+			scan: (projectId) => folders.scan(projectId),
+		},
+		archive,
+		locks: deps.folderLocks,
+		deviceId: device.id,
+		hosts: {
+			inStep: async (spaceId, names, options) =>
+				late.hosts?.inStep(spaceId, names, options),
+		},
+		listener: { reconciled: (change) => learnings.reconciled(change) },
+		...(deps.usage ? { usage: deps.usage } : {}),
+	});
+	const { documents, status, reconciler } = sync;
+	const search = wireSearch({
+		dataDir: deps.dataDir,
+		folders: { scan: (projectId) => folders.scan(projectId) },
+		...(deps.meaning ? { meaning: deps.meaning } : {}),
+		meaningOn: async (projectId) =>
+			(await documents.open(projectId)).meaningOn(),
+	});
+	const learnings = wireLearnings({
+		folders: { folder: (projectId) => folders.folder(projectId) },
+		documents,
+		archive,
+		status,
+		startStep: (projectId) => reconciler.startStep(projectId),
+		notifications: deps.notifications,
+		closeNotes: search.closeNotes,
+	});
+	const files = wireFiles({
+		dataDir: deps.dataDir,
+		deviceId: device.id,
+		...(deps.pageWaitMs !== undefined ? { pageWaitMs: deps.pageWaitMs } : {}),
+		documents,
+		status,
+		archive,
+		notes: learnings,
+		sync: reconciler,
+		markdown: { isMarkdown, headings: markdownHeadings },
+	});
+	const { folders, reader } = files;
+	const readers = wireReaders({
+		dataDir: deps.dataDir,
+		settings: {
+			setting: async (projectId) => (await documents.open(projectId)).reader(),
+			async choose(projectId, setting) {
+				const document = await documents.open(projectId);
+				await document.setReader(setting);
+				return document.reader();
+			},
+		},
+		rules: () => ({ privateNetwork: deps.privateNetwork?.() ?? true }),
+		...(deps.secret ? { secret: deps.secret } : {}),
+	});
+	const steps = wireSteps({
+		folders,
+		files,
+		reconciler,
+		reader,
+		search,
+		learnings,
+		readers,
+	});
+	/** Facts of a project with no run: an agent's use through the MCP server. No landing feed reads them. */
+	const log = createRunLog(db, { walkerId: device.id, dataDir: deps.dataDir });
+	/** Logs an agent's use. A failed write does not fail the answer. */
+	async function logged(projectId: string, use: KnowledgeUse): Promise<void> {
+		await log
+			.append(knowledgeUseEvent(projectId, use, "mcp"))
+			.catch((error) => {
+				console.warn("A use of the knowledge was not logged:", error);
+			});
+	}
+	const holds = {
+		startStep: (projectId: string) => reconciler.startStep(projectId),
+	};
+	const sources = wireSources({
+		files: { listing: reader.listing, removeFolder: reconciler.removeFolder },
+		readers: { ready: readers.ready },
+		device: deps.device,
+	});
+	const review = wireReview({
+		db,
+		folders,
+		holds,
+		files: { files: (projectId) => reader.files(projectId) },
+		syncs: {
+			syncs: (space, projectId) => sources.sourcesIn(space).syncs(projectId),
+		},
+		learnings: { learnings: learnings.ofProjects },
+	});
+	const map = wireMap({
+		folders,
+		entries: documents,
+		index: search,
+		learnings,
+		asked: { asked: review.asked },
+		holds,
+	});
+
+	return {
+		// The sync with the Space and the files.
+		connect(runtime) {
+			late.hosts = runtime;
+			late.stopTimers();
+			late.stopTimers = sync.startTimers({
+				...(runtime.keeps ? { keeps: runtime.keeps.bind(runtime) } : {}),
+				...(deps.timers ? { times: deps.timers } : {}),
+			});
+		},
+		listing: reader.listing,
+		async read(projectId, path, { maxBytes, from, agent }) {
+			const file = await reader.read(projectId, path, maxBytes, from);
+			if (agent) {
+				await logged(projectId, {
+					kind: "read",
+					path: file?.path ?? path.trim(),
+					found: file !== null,
+					...(from ? { from } : {}),
+				});
+			}
+			return file;
+		},
+		async moved(move) {
+			for (const [projectId, to] of Object.entries(move.projects)) {
+				await reconciler.move({ from: { spaceId: move.from, projectId }, to });
+				if (to.projectId === projectId) continue;
+				// The old id's folder is gone: its rows leave the index.
+				await search.refresh(projectId).catch(() => {});
+				search.refresh(to.projectId).catch(() => {});
+			}
+			for (const to of Object.values(move.projects)) {
+				reconciler.reconcile(to.projectId).catch(() => {});
+			}
+		},
+		// The search.
+		async search(projectId, query, options = {}) {
+			const { limit, agent } = options;
+			const hits = await search.search(
+				projectId,
+				query,
+				limit !== undefined ? { limit } : {},
+			);
+			if (agent) {
+				await logged(projectId, {
+					kind: "search",
+					query: query.trim(),
+					hits: hits.map(useHit),
+				});
+			}
+			return hits;
+		},
+		meaning: search.meaning,
+		async setMeaning(projectId, on) {
+			await (await documents.open(projectId)).setMeaning(on);
+			return search.meaning(projectId);
+		},
+		async evaluate(projectId) {
+			return search.evaluate(projectId, await review.questionSet(projectId));
+		},
+		// The page readers.
+		look: readers.look,
+		setReader: readers.choose,
+		// The learnings.
+		learnings: learnings.ofProjects,
+		settleLearning: learnings.settle,
+		settleNote: learnings.settleNote,
+		tellLearning: learnings.tell,
+		proposeFromRun: learnings.proposeFromRun,
+		knownLearnings: learnings.known,
+		learnsFromRuns: learnings.learnsFromRuns,
+		setLearnsFromRuns: learnings.setLearnsFromRuns,
+		followRuns: learnings.followRuns,
+		// The sources, the Map and the review.
+		review: review.review,
+		questions: review.questions,
+		markQuestion: review.markQuestion,
+		map: map.map,
+		markNotTopic: map.markNotTopic,
+		use: review.use,
+		sources: sources.sourcesIn,
+		// The steps and the end.
+		forCommand: steps.forCommand,
+		forSession: steps.forSession,
+		close() {
+			late.stopTimers();
+			search.close();
+			readers.close().catch(() => {});
+		},
+	};
+}

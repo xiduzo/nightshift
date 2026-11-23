@@ -4,8 +4,9 @@
  * event log). `wireReview` binds the use cases to their ports.
  */
 
+export type { KnowledgeQuestions } from "./application/list-questions";
 export type { ReviewTask } from "./application/list-review-tasks";
-export { type KnowledgeQuestion, parseQuestions } from "./domain/questions";
+export type { KnowledgeQuestion } from "./domain/questions";
 export {
 	type AskedQuestion,
 	type KnowledgeUseReport,

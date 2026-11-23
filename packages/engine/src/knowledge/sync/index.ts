@@ -8,7 +8,6 @@
 
 export type { KnowledgeTimes } from "./adapters/in/knowledge-timers";
 export type { KnowledgeStepHold } from "./application/hold-folder";
-export type { KnowledgeDocuments } from "./application/ports";
 export {
 	createKnowledgeFolderLocks,
 	type KnowledgeFolderLocks,
@@ -16,7 +15,6 @@ export {
 export type { KnowledgeReconciled } from "./domain/merge";
 export {
 	type KnowledgeReconciler,
-	type KnowledgeSync,
 	type SpaceHostStatus,
 	wireSync,
 } from "./wire";

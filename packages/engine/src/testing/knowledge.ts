@@ -5,14 +5,15 @@ import {
 	documentName,
 	type SyncedDocuments,
 } from "../documents";
+import { wireKnowledge } from "../knowledge";
 import { fsKnowledgeFolders } from "../knowledge/files/adapters/out/fs-knowledge-folders";
-import { createKnowledge } from "../knowledge/knowledge";
-import type { KnowledgeDeps } from "../knowledge/knowledge-door";
 import {
 	createKnowledgeFolderLocks,
 	type KnowledgeFolderLocks,
 } from "../knowledge/sync";
 import { yjsKnowledgeDocuments } from "../knowledge/sync/adapters/out/yjs-knowledge-documents";
+
+type KnowledgeDeps = Parameters<typeof wireKnowledge>[0];
 
 /**
  * A computer's knowledge for a test, made as the daemon makes it:
@@ -45,7 +46,7 @@ export function testKnowledge(
 		notifications = { learningsChanged: async () => {} },
 		...rest
 	} = options;
-	const knowledge = createKnowledge({
+	const knowledge = wireKnowledge({
 		db: sandbox.db,
 		dataDir: sandbox.dataDir,
 		documents: synced,

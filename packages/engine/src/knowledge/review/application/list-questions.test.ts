@@ -23,10 +23,9 @@ describe("listQuestions", () => {
 		const set = [
 			{ query: "deploy  at night", answers: ["a.md"], markedAt: 1, by: null },
 		];
-		ports.questionSet.sets.set("p1", set);
 		const listed = await listQuestions({
 			asked: listAskedQuestions(ports),
-			questionSet: ports.questionSet,
+			questionSet: async () => set,
 		})({ projectId: "p1", limit: 5 });
 		expect(listed.set).toEqual(set);
 		expect(listed.asked.map(({ query, answers }) => [query, answers])).toEqual([

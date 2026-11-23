@@ -4,13 +4,12 @@
  * travels by hash through the Space's Host, and each Device's folder is a
  * working copy that a reconcile keeps in step before and after each step.
  *
- * `createKnowledge` is the one door. The rest here is what the door's
- * interface writes, and what the run's log and the Host contract share.
+ * `wireKnowledge` builds the one door, `Knowledge`. The rest here is what
+ * the door's interface writes, and what the run's log and the Host
+ * contract share.
  */
 
 export type { KnowledgeFile, KnowledgeText } from "./files";
-export { createKnowledge, createRunLearnings } from "./knowledge";
-export type { Knowledge } from "./knowledge-door";
 export type { AskLearner, WaitingLearning } from "./learnings";
 export type { KnowledgeMap } from "./map";
 export type { LinkLook } from "./readers";
@@ -31,3 +30,4 @@ export {
 	createKnowledgeFolderLocks,
 	type KnowledgeFolderLocks,
 } from "./sync";
+export { type Knowledge, wireKnowledge } from "./wire";

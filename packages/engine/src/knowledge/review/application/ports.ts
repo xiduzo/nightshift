@@ -2,7 +2,6 @@ import type { KnowledgeFile } from "../../files";
 import type { ProjectLearning } from "../../learnings";
 import type { KnowledgeSync, SourcesSpace } from "../../sources";
 import type { KnowledgeStepHold } from "../../sync";
-import type { KnowledgeQuestion } from "../domain/questions";
 import type { KnowledgeUseRow } from "../domain/use";
 
 /**
@@ -35,15 +34,6 @@ export type KnowledgeUseLog = {
 		types: readonly KnowledgeUseRow["type"][],
 		options: { limit: number; since?: number },
 	): Promise<KnowledgeUseRow[]>;
-};
-
-/**
- * The question set as the Space has it: the folder is brought in step
- * first, as for a step.
- * @filledBy engine/knowledge
- */
-export type QuestionSet = {
-	questionSet(projectId: string): Promise<KnowledgeQuestion[]>;
 };
 
 /**

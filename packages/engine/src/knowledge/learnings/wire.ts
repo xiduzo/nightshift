@@ -7,6 +7,7 @@ import { countWaitingNotes } from "./application/count-waiting-notes";
 import { hearReconcile } from "./application/hear-reconcile";
 import { keepReportedLearnings } from "./application/keep-reported-learnings";
 import { listKnownLearnings } from "./application/list-known-learnings";
+import { listProjectLearnings } from "./application/list-project-learnings";
 import { listWaitingLearnings } from "./application/list-waiting-learnings";
 import { lookBackAtRun } from "./application/look-back-at-run";
 import type {
@@ -34,6 +35,7 @@ import {
 import type {
 	LearningStep,
 	NotePerson,
+	ProjectLearning,
 	WaitingLearning,
 	WaitingNote,
 } from "./domain/waiting";
@@ -108,6 +110,8 @@ export type Learnings = {
 		projectId: string,
 		options?: { onlyHere?: boolean },
 	): Promise<WaitingLearning[]>;
+	/** What waits for a person in these projects, each with its project, newest first (`listProjectLearnings`). */
+	ofProjects(projectIds: readonly string[]): Promise<ProjectLearning[]>;
 	/** How many notes wait (`countWaitingNotes`). */
 	count(projectId: string): Promise<number>;
 	/** Keeps or deletes one step's proposed learnings (`settleLearning`). */
@@ -157,6 +161,7 @@ export function wireLearnings(deps: LearningsDeps): Learnings {
 		notifications,
 		...(deps.closeNotes ? { closeNotes: deps.closeNotes } : {}),
 	});
+	const ofProjects = listProjectLearnings({ waiting });
 	const count = countWaitingNotes({ status, documents, archive });
 	const settle = settleLearning({ folder, documents, holds });
 	const settleOne = settleNote({ folder, documents, holds, now });
@@ -178,6 +183,7 @@ export function wireLearnings(deps: LearningsDeps): Learnings {
 					? { onlyHere: options.onlyHere }
 					: {}),
 			}),
+		ofProjects: (projectIds) => ofProjects({ projectIds }),
 		count: (projectId) => count({ projectId }),
 		settle: (projectId, id, decision) => settle({ projectId, id, decision }),
 		settleNote: (projectId, note, decision, by) =>

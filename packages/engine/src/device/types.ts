@@ -583,7 +583,7 @@ export type RunFolder = Pick<
 
 /**
  * What this computer's Device asks of the projects' knowledge (ADR 4): what
- * a Command step and an Agent session get. `createKnowledge` fills it.
+ * a Command step and an Agent session get. `wireKnowledge` fills it.
  */
 export type StepKnowledge = {
 	forCommand(

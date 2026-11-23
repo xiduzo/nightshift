@@ -16,7 +16,6 @@ devices/secrets
 engine/agent-setup
 engine/device-config
 engine/flows
-engine/knowledge
 engine/placement
 notifications/notifier
 # Files of a package's kernel that are not pure yet: kernel <file>.

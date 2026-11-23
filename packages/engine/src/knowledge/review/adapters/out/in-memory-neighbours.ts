@@ -4,11 +4,9 @@ import type { KnowledgeSync } from "../../../sources";
 import type {
 	FolderHolds,
 	ListedFiles,
-	QuestionSet,
 	SourceSyncs,
 	WaitingLearnings,
 } from "../../application/ports";
-import type { KnowledgeQuestion } from "../../domain/questions";
 import { inMemoryKnowledgeUseLog } from "./in-memory-knowledge-use-log";
 import { inMemoryQuestionSetFile } from "./in-memory-question-set-file";
 
@@ -18,17 +16,6 @@ import { inMemoryQuestionSetFile } from "./in-memory-question-set-file";
  * `inMemoryReviewPorts`, which gives a use-case test every port of
  * the slice at once. Test code: production code never imports this file.
  */
-
-/** The question set as the Space has it, by project. */
-export function inMemoryQuestionSet() {
-	const twin = {
-		sets: new Map<string, KnowledgeQuestion[]>(),
-		async questionSet(projectId: string) {
-			return twin.sets.get(projectId) ?? [];
-		},
-	};
-	return twin satisfies QuestionSet;
-}
 
 /** The holds of the folders: each start and end, in order. */
 export function inMemoryFolderHolds() {
@@ -85,7 +72,6 @@ export function inMemoryReviewPorts() {
 	return {
 		log: inMemoryKnowledgeUseLog(),
 		questions: inMemoryQuestionSetFile(),
-		questionSet: inMemoryQuestionSet(),
 		holds: inMemoryFolderHolds(),
 		files: inMemoryListedFiles(),
 		syncs: inMemorySourceSyncs(),

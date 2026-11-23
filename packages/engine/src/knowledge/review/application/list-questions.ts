@@ -1,12 +1,13 @@
 import { type KnowledgeQuestion, questionKey } from "../domain/questions";
 import type { AskedQuestion } from "../domain/use";
 import type { listAskedQuestions } from "./list-asked-questions";
-import type { QuestionSet } from "./ports";
+import type { readQuestionSet } from "./read-question-set";
 
 export type ListQuestionsPorts = {
 	/** `listAskedQuestions`, bound by the wire. */
 	asked: ReturnType<typeof listAskedQuestions>;
-	questionSet: QuestionSet;
+	/** `readQuestionSet`, bound by the wire. */
+	questionSet: ReturnType<typeof readQuestionSet>;
 };
 
 /** Which project's questions, and at most how many asked ones (default 50). */
@@ -36,7 +37,7 @@ export const listQuestions =
 	async ({ projectId, limit }: ListQuestions): Promise<KnowledgeQuestions> => {
 		const [asked, set] = await Promise.all([
 			ports.asked({ projectId, ...(limit !== undefined ? { limit } : {}) }),
-			ports.questionSet.questionSet(projectId),
+			ports.questionSet({ projectId }),
 		]);
 		const answers = new Map(
 			set.map((question) => [questionKey(question.query), question.answers]),

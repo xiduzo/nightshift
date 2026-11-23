@@ -153,9 +153,7 @@ export {
 export {
 	type AskedQuestion,
 	type AskLearner,
-	createKnowledge,
 	createKnowledgeFolderLocks,
-	createRunLearnings,
 	type Knowledge,
 	type KnowledgeEvaluation,
 	type KnowledgeFile,
@@ -169,6 +167,7 @@ export {
 	type LinkLook,
 	measuredMeaning,
 	type WaitingLearning,
+	wireKnowledge,
 } from "./knowledge";
 export type {
 	CopyStamp,

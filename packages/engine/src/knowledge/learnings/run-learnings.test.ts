@@ -10,21 +10,20 @@ import {
 	type FlowEdge,
 	PROPOSED_LEARNINGS_DIR,
 } from "@nightshift/flows";
-import { NIGHT_SHIFT } from "../contract";
-import type { Engine } from "../engine";
-import { createRunLog, type RunLog } from "../log/run-log/run-log";
-import { transcriptLines } from "../read/transcript-lines";
-import { testKnowledge } from "../testing/knowledge";
+import { NIGHT_SHIFT } from "../../contract";
+import type { Engine } from "../../engine";
+import { createRunLog, type RunLog } from "../../log/run-log/run-log";
+import { transcriptLines } from "../../read/transcript-lines";
+import { testKnowledge } from "../../testing/knowledge";
 import {
 	createSandbox,
 	expectRunLogsInSync,
 	type Sandbox,
 	waitFor,
 	withDevice,
-} from "../testing/test-support";
-import { createEngine } from "../wire";
-import { createRunLearnings } from "./knowledge";
-import type { AskLearner } from "./learnings";
+} from "../../testing/test-support";
+import { createEngine } from "../../wire";
+import type { AskLearner } from "./application/ports";
 
 /**
  * Learnings from runs that ended (ADR 37), end to end: a real engine walks
@@ -102,9 +101,8 @@ function setup(answer: string[]) {
 	const knowledge = testKnowledge(sandbox);
 	stops.push(() => knowledge.close());
 	const asked: Parameters<AskLearner>[0][] = [];
-	const learnings = createRunLearnings({
+	const learnings = knowledge.knowledge.followRuns({
 		runs: engine,
-		knowledge: knowledge.knowledge,
 		learn: async (input) => {
 			asked.push(input);
 			return answer;

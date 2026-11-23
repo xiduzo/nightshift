@@ -1,11 +1,11 @@
 import {
-	createKnowledge,
 	createKnowledgeFolderLocks,
 	createOllama,
-	createRunLearnings,
 	createSpaceArchive,
+	type Knowledge,
 	measuredMeaning,
 	transcriptLines,
+	wireKnowledge,
 } from "@nightshift/engine";
 import {
 	type openConfigStores,
@@ -19,9 +19,9 @@ import {
 	stopOlderKnowledge,
 } from "./runtime";
 
-type KnowledgeDeps = Parameters<typeof createKnowledge>[0];
+type KnowledgeDeps = Parameters<typeof wireKnowledge>[0];
 type ConfigStores = Awaited<ReturnType<typeof openConfigStores>>;
-type RunLearningsDeps = Parameters<typeof createRunLearnings>[0];
+type FollowRunsDeps = Parameters<Knowledge["followRuns"]>[0];
 
 /**
  * The knowledge block of the daemon's composition (`daemon.ts`): the
@@ -91,7 +91,7 @@ export async function wireDaemonKnowledge(deps: {
 	const knowledge = await slots.replace(
 		"nightshiftKnowledge",
 		() =>
-			createKnowledge({
+			wireKnowledge({
 				db: deps.db,
 				dataDir,
 				documents: deps.documents,
@@ -122,17 +122,16 @@ export async function wireDaemonKnowledge(deps: {
  */
 export async function followRunLearnings(deps: {
 	slots: Pick<HotSlots<HotRegistry>, "replace">;
-	runs: RunLearningsDeps["runs"];
-	knowledge: RunLearningsDeps["knowledge"];
+	runs: FollowRunsDeps["runs"];
+	knowledge: Pick<Knowledge, "followRuns">;
 	/** Makes the Learner, when the look back starts. */
-	learner: () => RunLearningsDeps["learn"];
+	learner: () => FollowRunsDeps["learn"];
 }) {
 	await deps.slots.replace(
 		"nightshiftRunLearnings",
 		() => {
-			const learnings = createRunLearnings({
+			const learnings = deps.knowledge.followRuns({
 				runs: deps.runs,
-				knowledge: deps.knowledge,
 				learn: deps.learner(),
 				lines: transcriptLines,
 			});

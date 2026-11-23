@@ -14,7 +14,7 @@ import {
 	scanFolder,
 } from "./files/adapters/out/fs-knowledge-folders";
 import { indexFolder, openView } from "./files/test-support";
-import { createStepKnowledge } from "./step-knowledge";
+import { wireSteps as createStepKnowledge } from "./steps";
 
 /**
  * One look at a knowledge folder: which files count and which are read, and
