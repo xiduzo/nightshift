@@ -13,7 +13,10 @@ import type {
 } from "../channels";
 // What a push service gets: only the fake reads it, past the barrel.
 import type { WebPushPayload, WebPushRequest } from "../channels/web-push";
-import type { OpenGateRef, RunEventSource, RunRef } from "../notifier/sources";
+import type { RunEventSource } from "../notifier";
+// The shapes the notifier reads of a run and a Gate: only the fakes set them, past the barrel.
+import type { RunRef } from "../notifier/domain/facts";
+import type { OpenGateRef } from "../notifier/domain/gate-tracker";
 
 /** What a fake channel got, in order. */
 export type ChannelCall =

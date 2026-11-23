@@ -11,7 +11,7 @@ import {
 	type InAppItem,
 	type PushChannels,
 } from "../channels";
-import { createDeliveryLog, type DeliveryLog } from "../deliveries";
+import { createDeliveryLog } from "../deliveries";
 import {
 	type NotificationSettings,
 	type NotificationSettingsPatch,
@@ -25,9 +25,11 @@ import {
 import { type FakeRunEvents, fakeRunEvents } from "../testing";
 import { testDatabase } from "../testing/database";
 import { type FakeChannel, fakeChannel } from "../testing/fakes";
-import { createNotifier } from "./notifier";
-import { type OpenGateRef, oneSenderPerSpace } from "./sources";
-import type { Notifier, NotifierDeps } from "./types";
+import type { DeliveryLog } from "./application/ports";
+import type { OpenGateRef } from "./domain/gate-tracker";
+import { oneSenderPerSpace } from "./domain/senders";
+import { createNotifier, type NotifierDeps } from "./test-support";
+import type { Notifier } from "./wire";
 
 /**
  * The rules of the notifier, on a real database with fake run events and

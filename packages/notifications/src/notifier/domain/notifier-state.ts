@@ -55,6 +55,9 @@ export function createBundles() {
 	};
 }
 
+/** The "N Gates wait for you" pushes of one notifier (`createBundles`). */
+export type Bundles = ReturnType<typeof createBundles>;
+
 /** When the log is pruned: at most once every `PRUNE_EVERY_MS`. */
 export function createPruneClock() {
 	let prunedAt = Number.NEGATIVE_INFINITY;
@@ -67,3 +70,6 @@ export function createPruneClock() {
 		},
 	};
 }
+
+/** The prune clock of one notifier (`createPruneClock`). */
+export type PruneClock = ReturnType<typeof createPruneClock>;

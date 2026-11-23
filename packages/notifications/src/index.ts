@@ -28,7 +28,6 @@ export {
 	systemDesktopNotifier,
 } from "./desktop";
 export {
-	engineRunEvents,
 	oneSenderPerSpace,
 	type RunEventSource,
 	type SenderFacts,
@@ -47,6 +46,7 @@ export {
 } from "./targets";
 export {
 	createNotifications,
+	engineRunEvents,
 	type Notifications,
 	type NotificationsOptions,
 } from "./wire";

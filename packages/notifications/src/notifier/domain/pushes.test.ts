@@ -10,7 +10,9 @@ import {
 	reachable,
 	seenOnScreen,
 	sendingClaim,
+	sendToEach,
 	wants,
+	withdrawFromEach,
 	withdrawnEntry,
 } from "./pushes";
 
@@ -121,5 +123,64 @@ describe("the rules of a push", () => {
 			heldFor: [],
 			withdrawnAt: 5,
 		});
+	});
+});
+
+describe("a push to each screen", () => {
+	type Target = { id: string; kind: "web" | "expo" | "desktop" };
+	const web: Target = { id: "web-1", kind: "web" };
+	const lost: Target = { id: "web-2", kind: "web" };
+	const broken: Target = { id: "expo-1", kind: "expo" };
+	const desktop: Target = { id: "desktop-1", kind: "desktop" };
+
+	test("goes one screen after the other; a lost one is forgotten at once, a broken one is told", async () => {
+		const done: string[] = [];
+		const channel = {
+			async send(target: Target) {
+				done.push(`send ${target.id}`);
+				if (target.id === broken.id) throw new Error("down");
+				return target.id === lost.id ? ("gone" as const) : ("sent" as const);
+			},
+			async withdraw() {},
+		};
+		const sent = await sendToEach(
+			[lost, web, broken, desktop],
+			"message",
+			{ web: channel, expo: channel },
+			async (id) => {
+				done.push(`forget ${id}`);
+			},
+			(message) => done.push(message),
+		);
+		expect(sent).toEqual(["web-1"]);
+		expect(done).toEqual([
+			"send web-2",
+			"forget web-2",
+			"send web-1",
+			"send expo-1",
+			"A expo push did not go out.",
+		]);
+	});
+
+	test("a withdraw goes to each screen on its own channel; a broken one is told", async () => {
+		const done: string[] = [];
+		const channel = {
+			send: async () => "sent" as const,
+			async withdraw(target: Target, key: string) {
+				done.push(`${target.id}:${key}`);
+				if (target.id === broken.id) throw new Error("down");
+			},
+		};
+		await withdrawFromEach(
+			[broken, web, desktop],
+			"run-1:step-1",
+			{ web: channel, expo: channel },
+			(message) => done.push(message),
+		);
+		expect(done).toEqual([
+			"expo-1:run-1:step-1",
+			"A expo withdraw did not go out.",
+			"web-1:run-1:step-1",
+		]);
 	});
 });

@@ -4,7 +4,8 @@ export {
 	type Claim,
 	createDeliveryLog,
 	type Delivery,
-	type DeliveryLog,
+	type DeliveryChange,
+	type DeliveryStatus,
 	type NoticeKind,
 } from "./deliveries";
 export { deliveryMoves } from "./moved";

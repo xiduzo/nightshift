@@ -4,9 +4,10 @@ import {
 	roleAllows,
 	roleIn,
 	spaceIds,
+	spaceRoster,
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { NIGHT_SHIFT, type PersonActor } from "@nightshift/engine";
+import { type Engine, NIGHT_SHIFT, type PersonActor } from "@nightshift/engine";
 import { now as timeNow } from "@nightshift/time";
 import {
 	createVapidKeyStore,
@@ -18,8 +19,7 @@ import {
 	type WatchOptions,
 	type WebPushSender,
 } from "./channels";
-import { createDeliveryLog } from "./deliveries";
-import { createNotifier, type RunEventSource, spaceAudience } from "./notifier";
+import { type RunEventSource, wireNotifier } from "./notifier";
 import {
 	type ComputerSwitches,
 	type NotificationSettings,
@@ -188,16 +188,23 @@ export function createNotifications(
 			...(options.webPush.sender ? { sender: options.webPush.sender } : {}),
 		});
 	}
-	const deliveries = createDeliveryLog(db);
-	const audience = spaceAudience(db);
-	const notifier = createNotifier({
+	/**
+	 * Who may see the runs of a Space: its Members, in every role. A viewer
+	 * sees a Gate too, without its options.
+	 */
+	const audience = async (spaceId: string) =>
+		(await spaceRoster(db, spaceId)).map((member) => member.id);
+	const notifier = wireNotifier({
+		db,
 		events: options.events,
-		audience,
-		spaces: () => spaceIds(db),
-		sendsFor: options.sendsFor,
-		mayAnswer: async (spaceId, personId) => {
-			const role = await roleIn(db, personId, spaceId);
-			return role !== null && roleAllows(role, { gate: ["resolve"] });
+		audience: { of: audience },
+		spaces: { all: () => spaceIds(db) },
+		sendsFor: { sends: (spaceId) => options.sendsFor(spaceId) },
+		mayAnswer: {
+			allows: async (spaceId, personId) => {
+				const role = await roleIn(db, personId, spaceId);
+				return role !== null && roleAllows(role, { gate: ["resolve"] });
+			},
 		},
 		settings: {
 			get: (personId) => settings.read(NIGHT_SHIFT, { personId }),
@@ -207,9 +214,8 @@ export function createNotifications(
 			byIds: (ids) => targets.findTargets({ ids }),
 			forget: (id) => targets.forgetTarget({ id }),
 		},
-		deliveries,
 		inApp: options.inApp,
-		push,
+		pushes: push,
 		now,
 		...(options.tickMs ? { tickMs: options.tickMs } : {}),
 	});
@@ -284,6 +290,48 @@ export function createNotifications(
 		stop: () => {
 			notifier.stop();
 			for (const channel of Object.values(push)) channel.stop?.();
+		},
+	};
+}
+
+/** The engine's run events, missed schedules, open Gates and flows that turn severe. */
+export function engineRunEvents(
+	engine: Pick<
+		Engine,
+		"onLandedFacts" | "onScheduleMissed" | "space" | "dashboard"
+	>,
+): RunEventSource {
+	return {
+		subscribe: (listener) => engine.onLandedFacts(listener),
+		onScheduleMissed: (listener) => engine.onScheduleMissed(listener),
+		severeTurn: (spaceId, runId) =>
+			engine.dashboard.readSevereTurn(NIGHT_SHIFT, {
+				spaceId,
+				runId,
+				now: timeNow(),
+			}),
+		async openGates(spaceId) {
+			const gates = await engine.space(spaceId, NIGHT_SHIFT).listGates();
+			return gates.map((g) => ({
+				runId: g.runId,
+				stepId: g.stepId,
+				lockScreen: g.lockScreen,
+				choices: g.choices.map((choice) => choice.name),
+				answerPending: g.answerPending,
+			}));
+		},
+		async run(spaceId, runId) {
+			const run = await engine
+				.space(spaceId, NIGHT_SHIFT)
+				.getRun(runId)
+				.catch(() => null);
+			if (!run) return null;
+			return {
+				title: run.title,
+				personId: run.startedBy?.id ?? null,
+				stopAt: run.stopAt,
+				sleeping: run.status === "sleeping",
+			};
 		},
 	};
 }

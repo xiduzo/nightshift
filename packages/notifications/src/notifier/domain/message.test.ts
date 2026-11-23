@@ -5,6 +5,7 @@ import {
 	gatesWaitingMessage,
 	keptWords,
 	noticeMessage,
+	pushMessageOf,
 } from "./message";
 
 const ids = { spaceId: "space-1", runId: "run-1", stepId: "step-1" };
@@ -80,5 +81,56 @@ describe("the message of one event", () => {
 			title: "T",
 			body: "B",
 		});
+	});
+});
+
+describe("the message of a push", () => {
+	const marked = { lockScreen: true, choices: ["ship"] };
+
+	test("a Gate's carries what its notification may show; only a marked Gate asks who may answer", async () => {
+		const asked: string[] = [];
+		const mayAnswer = async (spaceId: string, personId: string) => {
+			asked.push(`${spaceId}:${personId}`);
+			return true;
+		};
+		const gate = { kind: "gate-opened" as const, key: "run-1:step-1", ids };
+		expect(
+			await pushMessageOf(
+				{ ...gate, personId: "ada" },
+				5,
+				() => marked,
+				mayAnswer,
+			),
+		).toMatchObject({
+			alert: true,
+			at: 5,
+			gate: { lockScreen: true, options: [{ id: "ship", label: "ship" }] },
+		});
+		expect(
+			await pushMessageOf(
+				{ ...gate, personId: "bob" },
+				5,
+				() => undefined,
+				mayAnswer,
+			),
+		).toMatchObject({ gate: { lockScreen: false, options: [] } });
+		expect(asked).toEqual(["space-1:ada"]);
+	});
+
+	test("a run's end carries no Gate, and says the words it was given", async () => {
+		const message = await pushMessageOf(
+			{
+				kind: "device-wait",
+				key: "run-1:wait:step-1",
+				ids,
+				personId: "ada",
+				words: { title: "Triage waits for studio-mac" },
+			},
+			5,
+			() => marked,
+			async () => true,
+		);
+		expect(message).not.toHaveProperty("gate");
+		expect(message.title).toBe("Triage waits for studio-mac");
 	});
 });

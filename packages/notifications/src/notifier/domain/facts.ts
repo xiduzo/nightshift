@@ -32,6 +32,18 @@ export type NotifierFact = {
 	| { kind: "other" }
 );
 
+/** What a notification about a run names, and whether the run still sleeps. */
+export type RunRef = {
+	/** The flow name, or the prompt of a quick run. */
+	title: string;
+	/** The Person the run runs for. Null: a run from before every run had one. */
+	personId: string | null;
+	/** The stop time, epoch ms. Null: the run has none. */
+	stopAt: number | null;
+	/** The run sleeps now: one of its steps waits. */
+	sleeping: boolean;
+};
+
 /** The facts of one landing by Space, each Space's in their order. */
 export function factsBySpace<F extends { spaceId: string }>(
 	facts: readonly F[],

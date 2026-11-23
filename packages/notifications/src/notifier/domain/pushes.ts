@@ -220,3 +220,57 @@ export function byPerson<R extends { personId: string }>(
 	}
 	return people;
 }
+
+/** A push channel, as the notifier sends through it. */
+export type PushChannel<T, M> = {
+	send(target: T, message: M): Promise<"sent" | "gone">;
+	withdraw(target: T, key: string): Promise<void>;
+};
+
+/** The push channels by kind of screen. A kind without one is absent. */
+export type PushChannelsOf<T, M> = Partial<
+	Record<TargetKind, PushChannel<T, M>>
+>;
+
+/**
+ * Sends to each target, one after the other. Returns the ids that got it.
+ * Forgets a target its service lost. A send that throws is told, and the
+ * next target still gets it.
+ */
+export async function sendToEach<T extends { id: string; kind: TargetKind }, M>(
+	targets: readonly T[],
+	message: M,
+	channels: PushChannelsOf<T, M>,
+	forget: (id: string) => Promise<void>,
+	onError: (message: string, error: unknown) => void,
+): Promise<string[]> {
+	const sent: string[] = [];
+	for (const target of targets) {
+		const channel = channels[target.kind];
+		if (!channel) continue;
+		try {
+			const result = await channel.send(target, message);
+			if (result === "gone") await forget(target.id);
+			else sent.push(target.id);
+		} catch (error) {
+			onError(`A ${target.kind} push did not go out.`, error);
+		}
+	}
+	return sent;
+}
+
+/** Takes the push of the key back from each target. A withdraw that throws is told. */
+export async function withdrawFromEach<T extends { kind: TargetKind }, M>(
+	targets: readonly T[],
+	key: string,
+	channels: PushChannelsOf<T, M>,
+	onError: (message: string, error: unknown) => void,
+): Promise<void> {
+	for (const target of targets) {
+		try {
+			await channels[target.kind]?.withdraw(target, key);
+		} catch (error) {
+			onError(`A ${target.kind} withdraw did not go out.`, error);
+		}
+	}
+}

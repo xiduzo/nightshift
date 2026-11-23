@@ -81,6 +81,39 @@ export function gateFactsOf(
 	};
 }
 
+/**
+ * The message a push sends: a Gate's adds what its notification may show
+ * the Person. `gate` reads what the engine said of the Gate. `mayAnswer`
+ * is asked only for a Gate marked for the lock screen.
+ */
+export async function pushMessageOf(
+	notice: {
+		kind: NoticeKind;
+		key: string;
+		ids: NoticeIds;
+		personId: string;
+		words?: NoticeWords | undefined;
+	},
+	at: number,
+	gate: (
+		spaceId: string,
+		key: string,
+	) => { lockScreen?: boolean; choices?: string[] } | undefined,
+	mayAnswer: (spaceId: string, personId: string) => Promise<boolean>,
+): Promise<NoticeMessage> {
+	const { kind, key, ids, personId, words } = notice;
+	const msg = noticeMessage(kind, key, ids, true, at, words);
+	if (kind !== "gate-opened") return msg;
+	const ref = gate(ids.spaceId, key);
+	return {
+		...msg,
+		gate: gateFactsOf(
+			ref,
+			ref?.lockScreen === true && (await mayAnswer(ids.spaceId, personId)),
+		),
+	};
+}
+
 /** The claim of one push to one Person in the delivery log: once per key. It keeps the words a held push says later. */
 export function claimOf(
 	personId: string,
@@ -107,6 +140,32 @@ export function keptWords(row: {
 	return row.title === null
 		? undefined
 		: { title: row.title, ...(row.body ? { body: row.body } : {}) };
+}
+
+/** The event of a held entry, for its Person, with the words it kept: its message as it went out the first time. */
+export function keptNotice(row: {
+	kind: NoticeKind;
+	key: string;
+	spaceId: string;
+	runId: string;
+	stepId: string | null;
+	personId: string;
+	title: string | null;
+	body: string | null;
+}): {
+	kind: NoticeKind;
+	key: string;
+	ids: NoticeIds;
+	personId: string;
+	words: NoticeWords | undefined;
+} {
+	return {
+		kind: row.kind,
+		key: row.key,
+		ids: { spaceId: row.spaceId, runId: row.runId, stepId: row.stepId },
+		personId: row.personId,
+		words: keptWords(row),
+	};
 }
 
 /** The push at the end of quiet hours to a screen that held more than one Gate. */
