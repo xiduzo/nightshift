@@ -11,7 +11,7 @@ import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { DownloadIcon } from "lucide-react";
 import { toast } from "sonner";
-import { ollamaMutations, ollamaQueries } from "@/features/settings/queries";
+import { ollamaMutations, ollamaQueries } from "../queries";
 
 /** How often the status is asked again while the model downloads. */
 const DOWNLOAD_POLL_MS = 1_500;

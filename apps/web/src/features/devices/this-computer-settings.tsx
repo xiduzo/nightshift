@@ -41,10 +41,6 @@ import {
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
-import {
-	settingsMutations,
-	settingsQueries,
-} from "@/features/settings/queries";
 import { spaceQueries } from "@/features/spaces";
 import type { ThisComputer } from "@/shared/api";
 import { formatDateTime } from "@/shared/format";
@@ -52,6 +48,7 @@ import { LargerTextarea } from "@/shared/larger-window";
 import { PageSection } from "@/shared/page";
 import { LocalTime } from "@/shared/time";
 import { deviceIcon } from "./device-icon";
+import { settingsMutations, settingsQueries } from "./queries";
 import { JoinHostDialog } from "./join-host-dialog";
 import { LeaveHostButton } from "./leave-host";
 import { OpenSpaceButton } from "./open-space";

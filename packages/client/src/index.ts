@@ -393,3 +393,4 @@ export {
 	now,
 } from "./time";
 export { createUsageQueries } from "./usage";
+export { createOllamaQueries, createSettingsQueries } from "./settings";

@@ -31,14 +31,14 @@ import {
 } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-import {
-	settingsMutations,
-	settingsQueries,
-} from "@/features/settings/queries";
 import type { CheckTarget, CliCheck, SettingsView } from "@/shared/api";
 import { formatTime } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { HARNESSES, type HarnessInfo } from "../catalog";
+import {
+	settingsMutations,
+	settingsQueries,
+} from "../queries";
 import {
 	CheckBadge,
 	type CheckState,

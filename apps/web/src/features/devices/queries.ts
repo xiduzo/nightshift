@@ -12,9 +12,18 @@ import {
 	createDeviceQueries,
 	createOfferQueries,
 	createRunQueries,
+	createSettingsQueries,
 } from "@nightshift/client";
 
 import { orpc } from "@/shared/api";
+
+/** This computer's settings: Devices reads and saves its Host addresses. */
+export const settingsQueries = createSettingsQueries(orpc);
+
+/** Saves a patch of the settings. */
+export const settingsMutations = {
+	save: settingsQueries.save(),
+};
 
 export const deviceQueries = createDeviceQueries(orpc);
 

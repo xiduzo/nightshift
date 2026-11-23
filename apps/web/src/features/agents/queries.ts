@@ -5,7 +5,11 @@
  * an agent and of a decider, and the check of Night Shift's own agents.
  */
 
-import { createOfferQueries } from "@nightshift/client";
+import {
+	createOfferQueries,
+	createOllamaQueries,
+	createSettingsQueries,
+} from "@nightshift/client";
 import type { BuiltinAgentId } from "@nightshift/flows";
 import type {
 	AgentProfileRow,
@@ -19,6 +23,22 @@ import type {
 	ProfileRow,
 } from "@/shared/api";
 import { client, orpc } from "@/shared/api";
+
+/** This computer's settings: Agents reads and saves a program's path. */
+export const settingsQueries = createSettingsQueries(orpc);
+
+/** Saves a patch of the settings. */
+export const settingsMutations = {
+	save: settingsQueries.save(),
+};
+
+/** The Ollama search by meaning and Decision nodes use. */
+export const ollamaQueries = createOllamaQueries(orpc);
+
+/** Starts a download of an Ollama model. */
+export const ollamaMutations = {
+	pull: ollamaQueries.pull(),
+};
 
 export const profileQueries = {
 	/** The profiles of this computer: Agent Profiles and Model Profiles. */

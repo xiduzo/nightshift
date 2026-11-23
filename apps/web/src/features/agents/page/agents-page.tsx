@@ -21,7 +21,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useBlocker, useNavigate } from "@tanstack/react-router";
 import { CircleAlertIcon } from "lucide-react";
 import { type ReactNode, useCallback, useRef, useState } from "react";
-import { settingsQueries } from "@/features/settings/queries";
+import { settingsQueries } from "../queries";
 import type {
 	AgentProfileRow,
 	CliTool,

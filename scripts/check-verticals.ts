@@ -192,16 +192,6 @@ export const PEER_PORTS: Record<
 		// owner in the order of STRUCTURE.md section 5 that needs the owner's
 		// data reads it through that file: the owner's barrel would close a
 		// cycle, because the owner's pages import the lower vertical.
-		"features/agents": {
-			// The Agents page reads the settings and saves a program's path.
-			// The settings page shows the agent defaults with the harnesses.
-			"features/settings": "queries",
-		},
-		"features/devices": {
-			// This computer's card reads and saves its Host addresses in the
-			// settings. The settings page imports runs, and runs imports devices.
-			"features/settings": "queries",
-		},
 		"features/flows": {
 			// Start run starts a run and reads a project's runs and Devices.
 			// The Flows page shows each flow's last runs with their status.

@@ -1,60 +1,21 @@
-/**
- * The query and mutation options of the settings of this computer.
- *
- * Verticals below settings (agents, flows, devices) read and save the
- * settings too. They import this file through a peer port
- * (`scripts/check-verticals.ts`), because the settings page imports them.
- */
-
-import { createUsageQueries } from "@nightshift/client";
-
+import {
+	createOllamaQueries,
+	createSettingsQueries,
+} from "@nightshift/client";
 import { orpc } from "@/shared/api";
 
-export const settingsQueries = {
-	/** The settings view: the values, where each comes from, and the daemon facts. */
-	get: () => orpc.settings.get.queryOptions(),
-};
+/** The query options of this computer's settings. Built on the shared factory. */
+export const settingsQueries = createSettingsQueries(orpc);
 
+/** Saves a patch of the settings. A `null` value forgets the saved value. */
 export const settingsMutations = {
-	/** Saves a patch. A `null` value forgets the saved value. Answers with the new view. */
-	save: orpc.settings.save.mutationOptions,
+	save: settingsQueries.save(),
 };
 
-/** Night Shift's own agents: the Builder, the Explainer, the Decider and the others. */
-export const builtinQueries = {
-	/** Who answers for each agent on this computer now, or why nothing can. */
-	status: () => orpc.assistant.agents.queryOptions(),
-};
+/** The Ollama search by meaning and Decision nodes use. */
+export const ollamaQueries = createOllamaQueries(orpc);
 
-const usage = createUsageQueries(orpc);
-
-export const usageQueries = {
-	/** Events waiting to send, and the last batch that was sent. */
-	outbox: usage.outbox,
-	/** The events that can be sent, and the fields of each. */
-	catalog: usage.catalog,
-};
-
-export const usageMutations = {
-	/** Gives this computer a new anonymous id. */
-	resetId: usage.resetId,
-};
-
-/** The Ollama search by meaning and Decision nodes use: where it is, its models, a download. */
-export const ollamaQueries = {
-	/**
-	 * Whether it answers, has a model, and how far its download is: the
-	 * embedding model, unless `model` names another.
-	 */
-	status: (model?: string) =>
-		model
-			? orpc.ollama.status.queryOptions({ input: { model } })
-			: orpc.ollama.status.queryOptions(),
-	/** The embedding models it has. */
-	models: () => orpc.ollama.models.queryOptions(),
-};
-
+/** Starts a download of an Ollama model. */
 export const ollamaMutations = {
-	/** Starts a download of a model, in the background. */
-	pull: orpc.ollama.pull.mutationOptions,
+	pull: ollamaQueries.pull(),
 };
