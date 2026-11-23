@@ -170,8 +170,8 @@ describe("lock-screen Gates", () => {
 	});
 });
 
-describe("a push only", () => {
-	test("a missed schedule: the push waits until the open page closes", async () => {
+describe("a missed schedule", () => {
+	test("a push only: an open page gets no item, and the push waits until it closes", async () => {
 		const n = setup();
 		const ada = n.ports.targets.add("ada", "web");
 		const at = utc(2026, 9, 21, 10, 30);
@@ -183,6 +183,7 @@ describe("a push only", () => {
 			flow: "rebalance",
 			at,
 		});
+		expect(n.ports.inApp.of("ada")).toEqual([]);
 		expect(n.ports.pushes.web.calls).toEqual([]);
 
 		n.ports.inApp.setActive("ada", false);
@@ -196,8 +197,10 @@ describe("a push only", () => {
 			"rebalance was due at 10:30. Night Shift was off at that time.",
 		);
 	});
+});
 
-	test("a flow that turns severe: the push waits until the open page closes", async () => {
+describe("a flow that turns severe under Needs a look", () => {
+	test("a push only: an open page gets no item, and the push waits until it closes", async () => {
 		const n = setup();
 		const ada = n.ports.targets.add("ada", "expo");
 		n.ports.inApp.setActive("ada", true);
@@ -214,6 +217,12 @@ describe("a push only", () => {
 			},
 		});
 		await n.endRun("run-2", "failed");
+		expect(
+			n.ports.inApp
+				.messages("ada")
+				.filter((m) => m.key === "look:project-1:triage:run-2"),
+		).toEqual([]);
+		expect(n.ports.pushes.expo.calls).toEqual([]);
 
 		n.ports.inApp.setActive("ada", false);
 		n.ports.time += 2 * MINUTE;

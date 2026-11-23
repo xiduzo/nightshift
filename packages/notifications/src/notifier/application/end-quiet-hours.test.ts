@@ -154,7 +154,7 @@ describe("this computer's desktop", () => {
 	});
 });
 
-describe("held over quiet hours, with the words it kept", () => {
+describe("a step that waits for a device", () => {
 	test("a wait held over quiet hours goes out with its words when they end", async () => {
 		const n = setup();
 		n.ports.events.setRun("run-1", {
@@ -185,8 +185,10 @@ describe("held over quiet hours, with the words it kept", () => {
 			body: "The step starts when the device is back. If it is not back by 09:30, the run stops.",
 		});
 	});
+});
 
-	test("a missed schedule held over quiet hours goes out when they end", async () => {
+describe("a missed schedule", () => {
+	test("held over quiet hours, it goes out when they end", async () => {
 		const n = setup();
 		const ada = n.ports.targets.add("ada", "web");
 		const at = utc(2026, 9, 21, 22, 30);
@@ -207,8 +209,10 @@ describe("held over quiet hours, with the words it kept", () => {
 			"rebalance was due at 22:30. Night Shift was off at that time.",
 		);
 	});
+});
 
-	test("a flow that turns severe, held over quiet hours, goes out when they end", async () => {
+describe("a flow that turns severe under Needs a look", () => {
+	test("held over quiet hours, it goes out when they end", async () => {
 		const n = setup();
 		const ada = n.ports.targets.add("ada", "expo");
 		n.ports.events.setRun("run-2", {
