@@ -10,8 +10,7 @@
  * its own value.
  */
 
-export { devicePersonalSecrets } from "./device";
-export { createPersonalSecretsHost, type PersonalSecretsHost } from "./host";
+export { wireCalls } from "./calls";
 export { wireKept } from "./kept";
 export {
 	createSecretMovesHost,
@@ -21,6 +20,7 @@ export {
 	type SecretMovesHost,
 	serveSecretCall,
 } from "./moves";
+export { type PersonalSecretsHost, wirePersonal } from "./personal";
 export { deviceProjectSecrets } from "./project-device";
 export {
 	createProjectSecretsHost,

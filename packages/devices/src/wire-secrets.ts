@@ -3,14 +3,14 @@ import type { Handover } from "./handover";
 import type { createDevices } from "./host";
 import type { DeviceLinks, HostLinks } from "./links";
 import {
-	createPersonalSecretsHost,
 	createProjectSecretsHost,
 	createSecretMovesHost,
-	devicePersonalSecrets,
 	deviceProjectSecrets,
 	deviceSecretMoves,
 	serveSecretCall,
+	wireCalls,
 	wireKept,
+	wirePersonal,
 } from "./secrets";
 import type { PeerEngine } from "./wire-peers-engine";
 
@@ -75,15 +75,16 @@ export function wireSecrets(
 		spaceStore,
 		ownerId,
 	});
-	const personalSecrets = devicePersonalSecrets({
-		hostLinks,
-		links,
+	/** The Personal secrets: as a Home Host, and the owner's, at the Home Host or kept here. */
+	const personal = wirePersonal({
 		store: personalStore,
+		calls: wireCalls({ hostLinks, links }),
 		ownerId,
 		selfId: self.id,
 	});
+	const personalSecrets = personal.device;
 	const ofDevices = {
-		personalSecrets: createPersonalSecretsHost({ store: personalStore }),
+		personalSecrets: personal.host,
 		projectSecrets: createProjectSecretsHost({
 			db,
 			places,
