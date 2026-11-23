@@ -3,8 +3,8 @@
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts",
-		"./agent-setup": "./src/agent-setup/index.ts",
-		"./device-config": "./src/device-config/index.ts",
+		"./agents": "./src/agents/index.ts",
+		"./settings": "./src/settings/index.ts",
 		"./projects": "./src/projects/index.ts",
 		"./run-status": "./src/run-status/index.ts",
 		"./testing": "./src/testing/index.ts"

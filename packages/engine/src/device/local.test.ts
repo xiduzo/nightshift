@@ -11,14 +11,14 @@ import {
 import type { Decider, McpServerConfig } from "@nightshift/agents/types";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { createArtifactStore } from "../artifacts/store";
-import type { CliToolStore } from "../device-config/cli-tools";
+import { createRunFolders } from "../run-folders/run-folders";
+import type { PersonalSecrets, ProjectSecrets } from "../secrets";
+import type { CliToolStore } from "../settings/cli-tools";
 import type {
 	ConnectionInput,
 	ConnectionStore,
 	SecretBackend,
-} from "../device-config/connections";
-import { createRunFolders } from "../run-folders/run-folders";
-import type { PersonalSecrets, ProjectSecrets } from "../secrets";
+} from "../settings/connections";
 import { createCliToolStore, createConnectionStore } from "../testing";
 import { testKnowledge } from "../testing/knowledge";
 import {

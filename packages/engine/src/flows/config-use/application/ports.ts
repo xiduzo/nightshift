@@ -4,7 +4,7 @@ import type {
 	CliToolStore,
 	ConnectionStore,
 	ProfileStore,
-} from "../../../device-config";
+} from "../../../settings";
 import type { SpaceFlowReader } from "../domain/flow-use";
 import type { Asker } from "../domain/secret-users";
 
@@ -30,7 +30,7 @@ export type SpaceViews = { open(at: Asker): SpaceFlowReader };
 /**
  * This computer's connections, and the secrets of this computer, of its
  * Person, of a project and of the Space.
- * @filledBy engine/device-config
+ * @filledBy engine/settings
  */
 export type ConfiguredConnections = Pick<
 	ConnectionStore,
@@ -39,13 +39,13 @@ export type ConfiguredConnections = Pick<
 
 /**
  * This computer's CLI tools.
- * @filledBy engine/device-config
+ * @filledBy engine/settings
  */
 export type ConfiguredCliTools = Pick<CliToolStore, "list">;
 
 /**
  * This computer's profiles.
- * @filledBy engine/device-config
+ * @filledBy engine/settings
  */
 export type ConfiguredProfiles = Pick<ProfileStore, "list">;
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { SettingsStore } from "@nightshift/engine/device-config";
+import type { SettingsStore } from "@nightshift/engine/settings";
 import { harnessLookup, localHarnesses } from "./harnesses";
 
 /**

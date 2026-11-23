@@ -16,9 +16,9 @@ import {
 	type WorkRequest,
 	workRequestSchema,
 } from "../contract";
+import type { PairedDevice } from "../devices/registry";
 import type { HostExchange } from "../exchange";
 import type { HostLink } from "../links";
-import type { PairedDevice } from "../registry";
 import { admitEvery, partialHostClient } from "../testing";
 import { linksTo } from "../testing/host-in-memory";
 import { inMemoryHost } from "../testing/in-memory-host";

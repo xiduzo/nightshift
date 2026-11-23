@@ -1,5 +1,4 @@
-import { isDeviceKey } from "../../device-keys";
-import { OPEN_HOST } from "../../host-access";
+import { isDeviceKey } from "../../devices";
 import { type Permissions, roleAllows } from "../../spaces";
 import type { SessionOf } from "../domain/space-access";
 import type {
@@ -8,6 +7,7 @@ import type {
 	SyncGrant,
 	SyncRequest,
 } from "../domain/sync-access";
+import { OPEN_HOST } from "../host-access";
 import type { OpenRequest, RequestAccessOf } from "./open-request";
 import type { MemberSpaces, SyncDocuments } from "./ports";
 

@@ -28,22 +28,18 @@ export {
 	systemDesktopNotifier,
 } from "./desktop";
 export {
-	oneSenderPerSpace,
-	type RunEventSource,
-	type SenderFacts,
-} from "./notifier";
-export {
 	type NotificationSettings,
 	type NotificationSettingsPatch,
 	notificationSettingsPatchSchema,
 	notificationSettingsSchema,
-} from "./settings";
-export {
+	oneSenderPerSpace,
 	type PushTargetView,
 	pushKindSchema,
 	type RegisterTarget,
+	type RunEventSource,
 	registerScreenSchema,
-} from "./targets";
+	type SenderFacts,
+} from "./notifications";
 export {
 	createNotifications,
 	engineRunEvents,

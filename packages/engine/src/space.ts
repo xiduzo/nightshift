@@ -1,6 +1,5 @@
 import type { ArtifactStore } from "./artifacts";
 import type { AnswerCost } from "./assistant";
-import type { Cleanup } from "./cleanup";
 import type { Actor } from "./contract";
 import type { FlowEditing, SpaceFlows } from "./flows";
 import type { Gates } from "./gates";
@@ -8,7 +7,7 @@ import { type RunLog, scopeKey } from "./log";
 import type { WithPaths } from "./peers";
 import type { Catalog } from "./projects";
 import type { RunStreamItem } from "./read";
-import type { Access, Actions, Move, Start, Views } from "./runs";
+import type { Access, Actions, Cleanup, Move, Start, Views } from "./runs";
 import type { Schedules } from "./schedules";
 import { readServiceLog } from "./services";
 import type { SpaceEngine } from "./space-engine";

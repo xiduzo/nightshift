@@ -4,11 +4,11 @@ import type { Flow } from "@nightshift/flows";
 import { FAILURE_MESSAGE } from "@nightshift/refusal";
 import { now as timeNow } from "@nightshift/time";
 import { eq } from "drizzle-orm";
-import { defaultRunSettings } from "../../device-config/settings";
 import { foldRun } from "../../log";
 import { getRunRow } from "../../log/run-row/run-row";
 import { deriveSteps } from "../../read/run-views";
 import { WALKED_ELSEWHERE } from "../../run-status";
+import { defaultRunSettings } from "../../settings/settings";
 import {
 	agent,
 	command,

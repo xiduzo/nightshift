@@ -25,13 +25,6 @@ import { Refusal } from "@nightshift/refusal";
 import type { ArtifactStore } from "../artifacts";
 import type { SecretUse, StepRun } from "../contract";
 import {
-	type CliToolStore,
-	type ConnectionStore,
-	cliToolsInstruction,
-	type ProfileStore,
-	unreachableNote,
-} from "../device-config";
-import {
 	createWorktreeSnapshots,
 	createWorktrees,
 	type Git,
@@ -39,6 +32,13 @@ import {
 } from "../git";
 import { NOT_ON_THIS_COMPUTER, wireSetup } from "../projects";
 import type { RunFolders } from "../run-folders";
+import {
+	type CliToolStore,
+	type ConnectionStore,
+	cliToolsInstruction,
+	type ProfileStore,
+	unreachableNote,
+} from "../settings";
 import { spawnCommand } from "./command";
 import { ARTIFACTS_ENV, type KeptFiles, openKeptFiles } from "./kept-files";
 import { readFolderFile } from "./read-file";

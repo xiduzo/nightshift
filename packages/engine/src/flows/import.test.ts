@@ -12,14 +12,14 @@ import {
 } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import * as Y from "yjs";
-import type { ProfileStore } from "../device-config";
-import { wireCopies } from "../device-config";
 import {
 	createFlowDocuments,
 	type FlowDocument,
 	type FlowDocuments,
 } from "../documents";
 import { systemGit } from "../git";
+import type { ProfileStore } from "../settings";
+import { wireCopies } from "../settings";
 import { createProfileStore } from "../testing";
 import { createSandbox, mustGit, type Sandbox } from "../testing/test-support";
 import { wireMigrations } from "./migrations";

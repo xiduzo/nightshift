@@ -10,24 +10,22 @@ import {
 	type Peers,
 	type SpaceArchive,
 } from "@nightshift/engine";
-import type { DeviceCopies } from "@nightshift/engine/device-config";
+import type { DeviceCopies } from "@nightshift/engine/settings";
 import type { HostRelay, RunCommand, WorkRelay } from "./contract";
-import { createRunHistoryExchange, type RunHistoryExchange } from "./exchange";
-import { createHostSpaces, type HostSpaces } from "./links";
 import {
 	type DeviceOffer,
+	type DevicePresence,
+	type DeviceRegistry,
 	type EngineOffers,
 	type OfferAdmission,
 	type OfferUse,
 	wireOffers,
-} from "./offers";
-import { createPrivatePaths, createWalkers } from "./peers";
-import { wirePlacement } from "./placement";
-import {
-	type DevicePresence,
-	type DeviceRegistry,
+	wirePlacement,
 	wireRegistry,
-} from "./registry";
+} from "./devices";
+import { createRunHistoryExchange, type RunHistoryExchange } from "./exchange";
+import { createHostSpaces, type HostSpaces } from "./links";
+import { createPrivatePaths, createWalkers } from "./peers";
 
 /** What the peers take beside the engine's own parts. */
 export type PeerOptions = {

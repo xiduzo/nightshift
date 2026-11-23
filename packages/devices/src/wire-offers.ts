@@ -1,12 +1,12 @@
 import { roleAllows } from "@nightshift/auth";
 import { memberRole } from "@nightshift/engine";
-import type { DevicesDeps } from "./devices-runtime";
 import {
 	wireOffers as bindOffers,
 	createOffers,
 	deviceOffers,
 	offeredProfile,
-} from "./offers";
+} from "./devices";
+import type { DevicesDeps } from "./devices-runtime";
 import type { PeerEngine } from "./wire-peers-engine";
 
 /**

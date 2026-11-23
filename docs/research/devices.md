@@ -969,7 +969,7 @@ The ADR table of `docs/steering/TECH.md` says why each one changed.
 
    *Landed (part A, the Device document):*
    - **One Yjs document per Device**, `device:<id>`, opened by
-     `openDeviceDocument` (`packages/engine/src/device-config/device-document.ts`). Its
+     `openDeviceDocument` (`packages/engine/src/settings/device-document.ts`). Its
      maps: `profiles`, `cliTools`, `connections` (name → plain JSON entry
      with `updatedAt`), `settings` (key → saved value), `facts`, `offers`
      (empty until slice 6) and `meta`. An entry is plain JSON, so an edit
@@ -1030,7 +1030,7 @@ The ADR table of `docs/steering/TECH.md` says why each one changed.
    *Landed (part B, the Space document):*
    - **One Yjs document per Space**, `space:<id>`, in `ydoc` like the
      Device document (`packages/engine/src/projects/space-document.ts`; both open
-     through `openPersistedDocument`, `packages/engine/src/device-config/ydoc.ts`). Its
+     through `openPersistedDocument`, `packages/engine/src/settings/ydoc.ts`). Its
      maps: `projects` (id → name, remote, created, removed, updated),
      `clones` (`<project>/<device>` → that the Device has a Clone, and
      since when), `devices` (id → name, for the Devices with a Clone),
@@ -1380,7 +1380,7 @@ The ADR table of `docs/steering/TECH.md` says why each one changed.
      Host's own. Its own document stays `"write"`. A Device of another
      Person, and any Device over a Guest Host, is refused.
    - **A copy on each Device** (`createDeviceCopies`,
-     `packages/engine/src/device-config/device-copies.ts`): a row of
+     `packages/engine/src/settings/device-copies.ts`): a row of
      `ydoc` named `device-copy:<id>`, apart from the `device:<id>` rows a
      Host keeps, synced as `device:<id>` over the home link
      (`HttpsLinkOptions.deviceDocuments`). A Device the Host no longer
@@ -1915,7 +1915,7 @@ The ADR table of `docs/steering/TECH.md` says why each one changed.
      read at start, under the environment. Secrets saved on the
      Connections page go to the keychain where it works, else
      `<data dir>/secrets/<NAME>` (0600), the same choice as Device keys
-     (`packages/engine/src/device-config/keychain.ts`, `NIGHTSHIFT_KEY_STORE=file`). The
+     (`packages/engine/src/settings/keychain.ts`, `NIGHTSHIFT_KEY_STORE=file`). The
      Devices page says where: "Secrets and access to your Hosts". The key
      that encrypts the Personal secrets a computer keeps (ADR 13) is read
      the same way: `NIGHTSHIFT_SECRETS_KEY`, else the file

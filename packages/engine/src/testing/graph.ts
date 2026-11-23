@@ -17,7 +17,6 @@ import { now } from "@nightshift/time";
 import { eq } from "drizzle-orm";
 import { createArtifactStore } from "../artifacts/store";
 import type { Device } from "../device/types";
-import { defaultRunSettings } from "../device-config/settings";
 import { compileFlow } from "../graph/compile/compile";
 import type {
 	LeaseTaker,
@@ -62,6 +61,7 @@ import { gitAuthorOf } from "../read/people";
 import { parseCalledFlows, parseRunFlow } from "../read/run-summary";
 import { createRunFolders } from "../run-folders/run-folders";
 import { takenOverSecrets } from "../secrets";
+import { defaultRunSettings } from "../settings/settings";
 import { keptValues } from "../variables/kept";
 import {
 	connectionsOf,

@@ -1,7 +1,4 @@
-import {
-	isHostAddress,
-	isLoopbackHost,
-} from "@nightshift/engine/device-config";
+import { isHostAddress, isLoopbackHost } from "@nightshift/engine/settings";
 import { Refusal } from "@nightshift/refusal";
 import { now } from "@nightshift/time";
 import { hostCertificate } from "../reach";

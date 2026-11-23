@@ -7,14 +7,8 @@ import {
 	openDeviceDocument,
 	secretStore,
 } from "@nightshift/engine";
-import {
-	type DeciderSetupDeps,
-	wireAgentSetup,
-} from "@nightshift/engine/agent-setup";
-import {
-	type DeviceConfig,
-	wireDeviceConfig,
-} from "@nightshift/engine/device-config";
+import { type DeciderSetupDeps, wireAgents } from "@nightshift/engine/agents";
+import { type DeviceConfig, wireSettings } from "@nightshift/engine/settings";
 import type { Telemetry } from "@nightshift/telemetry";
 import { programChecks } from "./harnesses";
 import {
@@ -25,7 +19,7 @@ import {
 	secretsDir,
 } from "./runtime";
 
-type ConfigOptions = Parameters<typeof wireDeviceConfig>[0];
+type ConfigOptions = Parameters<typeof wireSettings>[0];
 type ConfigUseDeps = Parameters<typeof createConfigUse>[0];
 
 /**
@@ -74,7 +68,7 @@ export async function wireDaemonConfig(deps: {
 	const keyStore =
 		env.NIGHTSHIFT_KEY_STORE === "file" ? { prefer: "file" as const } : {};
 
-	const config = wireDeviceConfig({
+	const config = wireSettings({
 		document: deps.document,
 		env: fallbacks,
 		secrets: await secretStore({ dataDir, ...keyStore }),
@@ -133,7 +127,7 @@ export async function wireSetups(deps: {
 	const agentSetup = await slots.replace(
 		"nightshiftAgentSetup",
 		() =>
-			wireAgentSetup({
+			wireAgents({
 				stores: config,
 				check: (harness, bin) => checks.harness(harness, bin),
 				container: inContainer(),
@@ -148,7 +142,7 @@ export async function wireSetups(deps: {
 	const deciderSetup = await slots.replace(
 		"nightshiftDeciderSetup",
 		() =>
-			wireAgentSetup({
+			wireAgents({
 				stores: config,
 				check: async () => ({ signIn: "unknown", account: null }),
 				ollama: deps.ollama,

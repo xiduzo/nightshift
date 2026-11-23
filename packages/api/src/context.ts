@@ -18,19 +18,19 @@ import type {
 	ToolLaunchers,
 	UsageMoment,
 } from "@nightshift/engine";
-import type { AgentSetup, DeciderSetup } from "@nightshift/engine/agent-setup";
+import type { AgentSetup, DeciderSetup } from "@nightshift/engine/agents";
+import type {
+	GitHubClones,
+	ProjectCopies,
+	ProjectReadiness,
+} from "@nightshift/engine/projects";
 import type {
 	CliToolStore,
 	ConnectionStore,
 	DeviceConfigUseCases,
 	ProfileStore,
 	SettingsStore,
-} from "@nightshift/engine/device-config";
-import type {
-	GitHubClones,
-	ProjectCopies,
-	ProjectReadiness,
-} from "@nightshift/engine/projects";
+} from "@nightshift/engine/settings";
 import type { AssistantService } from "@nightshift/flows";
 import type { Notifications } from "@nightshift/notifications";
 

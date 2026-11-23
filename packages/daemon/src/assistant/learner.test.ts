@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { AnswerCost } from "@nightshift/engine";
-import type {
-	ProfileStore,
-	SettingsStore,
-} from "@nightshift/engine/device-config";
+import type { ProfileStore, SettingsStore } from "@nightshift/engine/settings";
 import type { BuiltinAnswers } from "@nightshift/flows";
 import { createLearner, type LearnerDeps } from "./learner";
 

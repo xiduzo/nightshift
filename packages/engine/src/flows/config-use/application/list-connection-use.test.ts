@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Flow } from "@nightshift/flows";
-import type { Connection } from "../../../device-config";
+import type { Connection } from "../../../settings";
 import { inMemoryConfigUsePorts } from "../adapters/out/in-memory-neighbours";
 import { listConnectionUse } from "./list-connection-use";
 

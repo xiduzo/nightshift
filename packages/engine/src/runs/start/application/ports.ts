@@ -7,8 +7,8 @@ import type {
 } from "../../../contract";
 import type { Device } from "../../../device";
 import type { RunRow, RunState } from "../../../log";
-import type { PlanInput, PlannedRun } from "../../../placement";
 import type { RunSummary } from "../../../read";
+import type { PlanInput, PlannedRun } from "../..";
 import type { NewRun } from "./start-run-here";
 
 /**

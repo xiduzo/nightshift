@@ -5,10 +5,7 @@ import type { Context } from "@nightshift/api/context";
 import { accessAs, testContext } from "@nightshift/api/testing";
 import { RoleRefusal, roleAllows } from "@nightshift/auth";
 import type { Engine } from "@nightshift/engine";
-import type {
-	ProfileStore,
-	SettingsStore,
-} from "@nightshift/engine/device-config";
+import type { ProfileStore, SettingsStore } from "@nightshift/engine/settings";
 import type {
 	AgentHarnessName,
 	AgentProfileSettings,

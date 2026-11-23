@@ -1,7 +1,7 @@
 import { findProgram } from "@nightshift/agents/types";
 import { wireSpaces } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { HARNESS_BIN } from "@nightshift/engine/device-config";
+import { HARNESS_BIN } from "@nightshift/engine/settings";
 
 /** Counts for the daily usage event. No names, paths or free text leave here. */
 export async function usageFacts(input: {

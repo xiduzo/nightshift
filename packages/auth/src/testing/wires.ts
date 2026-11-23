@@ -1,11 +1,11 @@
 import type { Database } from "@nightshift/db";
 import { type Access, type SyncSetup, wireAccess } from "../access";
+import { type HostPolicy, OPEN_HOST } from "../access/host-access";
+import { wireLocalSession } from "../access/local-session";
+import { wireLogin } from "../access/login";
 import type { Auth } from "../auth";
-import { wireDeviceKeys } from "../device-keys";
-import { type HostPolicy, OPEN_HOST } from "../host-access";
-import { wireLocalSession } from "../local-session";
-import { wireLogin } from "../login";
-import { wirePairing } from "../pairing";
+import { wireDeviceKeys } from "../devices/device-keys";
+import { wirePairing } from "../devices/pairing";
 import { wireSpaces } from "../spaces";
 import { UNOWNED as unownedDevice } from "../spaces/personal/domain/personal-space";
 

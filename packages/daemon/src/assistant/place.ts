@@ -6,7 +6,7 @@ import type { SpaceEngine, SpaceFlows } from "@nightshift/engine";
 import type {
 	CliToolStore,
 	ConnectionStore,
-} from "@nightshift/engine/device-config";
+} from "@nightshift/engine/settings";
 import type { FlowPlace } from "@nightshift/flows";
 
 export type PlaceDeps = {

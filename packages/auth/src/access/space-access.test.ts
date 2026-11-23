@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { Refusal } from "@nightshift/refusal";
-
-import { TWO_FACTOR_REQUIRED } from "../host-access";
 import {
 	type AuthSandbox,
 	createAuthSandbox,
@@ -14,6 +12,7 @@ import {
 	spaceAccess,
 	type TwoFactorRequired,
 } from "./domain/space-access";
+import { TWO_FACTOR_REQUIRED } from "./host-access";
 
 /** The first rungs of a request in a Space: one answer for every way in. */
 

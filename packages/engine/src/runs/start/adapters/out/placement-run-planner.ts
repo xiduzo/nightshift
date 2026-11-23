@@ -1,7 +1,7 @@
 import type { Database } from "@nightshift/db";
 import { capabilitiesFor, refusalOf } from "../../../../graph";
 import { lastRunDevice } from "../../../../log";
-import type { PlacementPort } from "../../../../placement";
+import type { PlacementPort } from "../../..";
 import type { RunPlanner } from "../../application/ports";
 
 /** What the planner of the start stands on: the Devices a run may use (`Peers.placement`), and the runs of each project. */

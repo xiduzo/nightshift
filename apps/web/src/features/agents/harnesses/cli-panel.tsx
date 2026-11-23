@@ -36,16 +36,16 @@ import { formatTime } from "@/shared/format";
 import { LocalTime } from "@/shared/time";
 import { HARNESSES, type HarnessInfo } from "../catalog";
 import {
-	settingsMutations,
-	settingsQueries,
-} from "../queries";
-import {
 	CheckBadge,
 	type CheckState,
 	FactList,
 	OffMachineNote,
 } from "../connections";
-import { connectionQueries } from "../queries";
+import {
+	connectionQueries,
+	settingsMutations,
+	settingsQueries,
+} from "../queries";
 import { AgentSetupButton, AgentSetupHint } from "../setup";
 
 type BinKey = HarnessInfo["setting"] & keyof SettingsView["fields"];

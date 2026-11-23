@@ -2,7 +2,7 @@ import {
 	connectionInputSchema,
 	customAgentOf,
 	HARNESS_BIN,
-} from "@nightshift/engine/device-config";
+} from "@nightshift/engine/settings";
 import {
 	customHarnessSchema,
 	harnessNameSchema,

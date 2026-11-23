@@ -11,10 +11,6 @@ export const PACKAGE_NOTIFICATIONS: Record<string, Place> = {
 	deliveries: M,
 	// The channel to this computer's own desktop.
 	desktop: M,
-	// The rules that decide whom to tell, about what, on which screen.
-	notifier: "notifications",
-	// A Person's notification settings. Not this computer's settings.
-	settings: "notifications",
-	// The push targets of each Person.
-	targets: "notifications",
+	// The rules, a Person's settings, and the push targets.
+	notifications: "notifications",
 };

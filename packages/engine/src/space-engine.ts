@@ -1,7 +1,6 @@
 import type { Schedule, ScheduleIssue } from "@nightshift/flows";
 import type { Artifact } from "./artifacts";
 import type { AnswerCost } from "./assistant";
-import type { RunFiles } from "./cleanup";
 import type {
 	NodeToPlace,
 	OwnDevice,
@@ -26,6 +25,7 @@ import type {
 	StepTranscript,
 } from "./read";
 import type { RunFile } from "./run-folders";
+import type { RunFiles } from "./runs";
 import type { ScheduleList, SchedulePause } from "./schedules";
 import type { KeptValue } from "./variables";
 

@@ -31,7 +31,7 @@ const pascal = (name: string): string =>
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
 /** Who fills a port from outside: `devices`, `engine/run`, or `engine/wire`. */
-const FILLER = /^[a-z0-9-]+(?:\/[a-z0-9-]+)?$/;
+const FILLER = /^[a-z0-9-]+(?:\/[a-z0-9-]+)*$/;
 
 /**
  * `<package>/wire` names the composition of a package: its `src/wire.ts`,
@@ -39,12 +39,23 @@ const FILLER = /^[a-z0-9-]+(?:\/[a-z0-9-]+)?$/;
  */
 const COMPOSITION = "wire";
 
-/** `filledBy` names a package, a vertical of one, or the composition of one, on disk. */
-function fillerExists(root: string, filledBy: string): boolean {
-	const [pkg, vertical] = filledBy.split("/");
+/** `filledBy` names a package, a top-level vertical of one, or the composition of one. */
+function fillerExists(
+	root: string,
+	filledBy: string,
+	map: Record<string, Record<string, string>>,
+): boolean {
+	const parts = filledBy.split("/");
+	const pkg = parts[0];
+	const rest = parts.slice(1).join("/");
+	const workspace = `packages/${pkg}`;
 	const src = join(root, "packages", pkg ?? "", "src");
-	if (vertical === COMPOSITION && existsSync(join(src, "wire.ts"))) return true;
-	return existsSync(join(src, vertical ?? ""));
+	if (rest === COMPOSITION && existsSync(join(src, "wire.ts"))) return true;
+	if (!rest) return existsSync(src);
+	const top = rest.split("/")[0] ?? "";
+	if (rest !== top) return false;
+	if (!(top in (map[workspace] ?? {}))) return false;
+	return existsSync(join(src, top));
 }
 
 const list = (names: Iterable<string>) =>
@@ -255,7 +266,11 @@ export function portsOf(slice: Slice): Port[] {
  * contract suite and the test that runs the suite on both. A port with
  * `@filledBy` has an in-memory adapter only.
  */
-export function portProblems(root: string, slice: Slice): string[] {
+export function portProblems(
+	root: string,
+	slice: Slice,
+	map: Record<string, Record<string, string>>,
+): string[] {
 	const rel = (path: string) => relative(root, path).split(sep).join("/");
 	const ports = join(slice.dir, "application", "ports.ts");
 	const out = join(slice.dir, "adapters", "out");
@@ -270,7 +285,7 @@ export function portProblems(root: string, slice: Slice): string[] {
 		const reals = files.filter((file) => real.test(file));
 
 		if (filledBy !== undefined) {
-			if (!FILLER.test(filledBy) || !fillerExists(root, filledBy)) {
+			if (!FILLER.test(filledBy) || !fillerExists(root, filledBy, map)) {
 				problems.push(
 					`${where} has @filledBy ${filledBy ? `"${filledBy}", which is no package and no vertical of one` : "without a name"}. Write who implements it: a package (@filledBy devices), a vertical (@filledBy engine/runs), or the wire.ts of a package that builds it from several things (@filledBy engine/wire).`,
 				);

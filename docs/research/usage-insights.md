@@ -22,7 +22,7 @@ This plan does three things, in this order:
 
 - `packages/telemetry` sends the runs of a computer as OTLP traces and
   metrics to an endpoint that the person chooses. It is off by default
-  (`packages/engine/src/device-config/settings.ts:396`).
+  (`packages/engine/src/settings/settings.ts:396`).
 - Spans and metrics come from the landed facts (`runs/projection.ts`).
   Span ids come from run and step ids (`conventions/ids.ts`).
 - Claude Code and Codex sessions send their own telemetry under the step's

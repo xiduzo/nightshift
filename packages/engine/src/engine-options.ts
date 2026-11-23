@@ -2,11 +2,11 @@ import type { Database } from "@nightshift/db";
 import type { ProfileSettings } from "@nightshift/flows";
 import type { DeviceDirectory } from "./contract";
 import type { Device } from "./device";
-import type { ProfileStore, RunSettings } from "./device-config";
 import type { FlowDocuments, SpaceDocuments } from "./documents";
 import type { Git } from "./git";
 import type { PeersFactory } from "./peers";
 import type { PullRequestReader } from "./scores";
+import type { ProfileStore, RunSettings } from "./settings";
 import type { MoveRows, ProjectsMoved } from "./space-move";
 import type { UsageNotes } from "./usage";
 

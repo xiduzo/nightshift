@@ -11,8 +11,8 @@ import {
 import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
 import { now } from "@nightshift/time";
 import type { WorkReply, WorkRequest } from "../contract";
+import type { DeviceOffer } from "../devices/offers";
 import { httpsLink } from "../links/link";
-import type { DeviceOffer } from "../offers";
 import { createOfferAdmission } from "../offers/test-support";
 import { selfOwnerId } from "../registry/test-support";
 import { partialHostClient, withPeers } from "../testing";

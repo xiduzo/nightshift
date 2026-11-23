@@ -6,7 +6,7 @@ import { Readable } from "node:stream";
 import type { Database } from "@nightshift/db";
 import { run } from "@nightshift/db/schema";
 import { exportRun, type RunBundleSummary } from "@nightshift/engine";
-import type { ConnectionStore } from "@nightshift/engine/device-config";
+import type { ConnectionStore } from "@nightshift/engine/settings";
 import { and, eq } from "drizzle-orm";
 
 /**

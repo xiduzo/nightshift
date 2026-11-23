@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { OPEN_HOST } from "../../host-access";
 import { inMemoryAccessPorts } from "../adapters/out/in-memory-neighbours";
+import { OPEN_HOST } from "../host-access";
 import { openRequest } from "./open-request";
 
 /** The use case openRequest, on in-memory adapters. The twins of `request.test.ts`. */

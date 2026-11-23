@@ -26,7 +26,7 @@ import { FLOW_VERSION } from "@nightshift/flows";
 import { asDate, now as timeNow } from "@nightshift/time";
 import { ORPCError } from "@orpc/server";
 import type { Caller, SyncBatch } from "../contract";
-import type { DeviceRegistry, PairedDevice } from "../registry";
+import type { DeviceRegistry, PairedDevice } from "../devices/registry";
 import { callerOf, withPeers } from "../testing";
 import { deviceDirectory } from "../wire-peers-directory";
 import { createPeerEngine, type PeerEngine } from "../wire-peers-engine";

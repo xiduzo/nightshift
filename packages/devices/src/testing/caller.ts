@@ -6,7 +6,7 @@ import {
 } from "@nightshift/auth";
 import { ORPCError } from "@orpc/server";
 import type { Caller } from "../contract";
-import type { Devices } from "../host";
+import type { Devices } from "../devices/host";
 
 /** What a test says of a Caller: its Person's role per Space, and its Device as paired. */
 export type CallerFacts = {

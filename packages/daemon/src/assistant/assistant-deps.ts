@@ -10,7 +10,7 @@ import type {
 	ConnectionStore,
 	ProfileStore,
 	SettingsStore,
-} from "@nightshift/engine/device-config";
+} from "@nightshift/engine/settings";
 import type { AgentHarnessName, AssistantScope } from "@nightshift/flows";
 import type { AuthoringSpace } from "./authoring";
 import type { ThreadStore } from "./threads";

@@ -9,7 +9,7 @@ import {
 	HARNESS_BIN,
 	type SettingField,
 	type SettingKey,
-} from "@nightshift/engine/device-config";
+} from "@nightshift/engine/settings";
 import {
 	agentHarnessSchema,
 	customAgentSchema,

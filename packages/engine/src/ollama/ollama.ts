@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { findProgram } from "@nightshift/agents/types";
 import { Ollama } from "ollama";
-import type { ConnectionStore, SettingsStore } from "../device-config";
+import type { ConnectionStore, SettingsStore } from "../settings";
 import { type OllamaEmbedder, ollamaEmbedder } from "./embedder";
 import {
 	knowledgeModel,

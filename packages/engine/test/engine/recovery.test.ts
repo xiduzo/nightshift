@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { project, run } from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
-import { defaultRunSettings } from "../../src/device-config/settings";
 import type {
 	EngineEventType,
 	EnginePayloads,
@@ -12,6 +11,7 @@ import { createRunLog } from "../../src/log/run-log/run-log";
 import { type BusItem, createRunBus } from "../../src/log/transcript/bus";
 import { wireRecovery } from "../../src/runs";
 import type { Turns } from "../../src/runs/walk";
+import { defaultRunSettings } from "../../src/settings/settings";
 import { createSandbox, type Sandbox } from "../../src/testing/test-support";
 
 /**

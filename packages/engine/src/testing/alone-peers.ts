@@ -1,7 +1,7 @@
 import { type OwnDevice, personOf } from "../contract";
 import { followOwnStep } from "../log";
 import type { PeerContext, Peers, PeersFactory } from "../peers";
-import type { PlacedDevice } from "../placement";
+import type { PlacedDevice } from "../runs/placement";
 import { planNodes } from "../wire-start";
 
 /**

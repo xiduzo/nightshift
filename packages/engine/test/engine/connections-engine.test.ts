@@ -11,13 +11,13 @@ import type {
 } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { NIGHT_SHIFT } from "../../src/contract";
-import type { McpExpansion } from "../../src/device-config/connections/domain/mcp-expansion";
+import type { EngineInternals } from "../../src/engine";
+import type { RunDetail } from "../../src/read/views";
+import type { McpExpansion } from "../../src/settings/connections/domain/mcp-expansion";
 import {
 	defaultRunSettings,
 	type RunSettings,
-} from "../../src/device-config/settings";
-import type { EngineInternals } from "../../src/engine";
-import type { RunDetail } from "../../src/read/views";
+} from "../../src/settings/settings";
 import type { SpaceEngine } from "../../src/space-engine";
 import {
 	cliToolsOf,

@@ -1,7 +1,7 @@
 import type { FlowNode } from "@nightshift/flows";
 import type { NodeToPlace, OwnDevice, Placement } from "../../../../contract";
 import type { Device } from "../../../../device";
-import type { PlanInput, PlannedRun } from "../../../../placement";
+import type { PlanInput, PlannedRun } from "../../..";
 import type { RunPlanner } from "../../application/ports";
 
 /**

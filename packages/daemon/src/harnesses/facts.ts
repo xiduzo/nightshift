@@ -2,10 +2,7 @@ import { pathPrograms } from "@nightshift/agents";
 import { findProgram } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
 import { type DeviceDocument, refreshDeviceFacts } from "@nightshift/engine";
-import {
-	HARNESS_BIN,
-	type SettingsStore,
-} from "@nightshift/engine/device-config";
+import { HARNESS_BIN, type SettingsStore } from "@nightshift/engine/settings";
 
 /** How often this computer reports its facts again. */
 const FACTS_EVERY_MS = 10 * 60_000;

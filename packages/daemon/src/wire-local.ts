@@ -8,7 +8,7 @@ import {
 import {
 	type ConfigStores,
 	reachesPrivateNetwork,
-} from "@nightshift/engine/device-config";
+} from "@nightshift/engine/settings";
 import {
 	type BuiltinAnswer,
 	builtinModel,

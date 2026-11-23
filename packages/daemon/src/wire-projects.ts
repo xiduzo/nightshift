@@ -1,13 +1,13 @@
 import type { Context } from "@nightshift/api/context";
 import type { Database } from "@nightshift/db";
 import { createFlowDocuments, createSpaceDocuments } from "@nightshift/engine";
-import type { SettingsStore } from "@nightshift/engine/device-config";
 import {
 	createCloneTracker,
 	wireCopies,
 	wireKeep,
 	wireSetup,
 } from "@nightshift/engine/projects";
+import type { SettingsStore } from "@nightshift/engine/settings";
 import {
 	canChooseFolder,
 	chooseFolder,

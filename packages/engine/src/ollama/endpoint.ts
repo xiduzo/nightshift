@@ -2,7 +2,7 @@ import {
 	type ConnectionStore,
 	isLoopbackHost,
 	type SettingsStore,
-} from "../device-config";
+} from "../settings";
 
 /** Ollama's own address on this computer: where Night Shift starts it, and looks first. */
 export const OLLAMA_LOCAL = "http://127.0.0.1:11434";

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { CliTool } from "../../../device-config";
+import type { CliTool } from "../../../settings";
 import { inMemoryConfigUsePorts } from "../adapters/out/in-memory-neighbours";
 import { listCliToolUse } from "./list-cli-tool-use";
 

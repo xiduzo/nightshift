@@ -1,11 +1,11 @@
 import type { Database } from "@nightshift/db";
 import type { DeviceDirectory } from "./contract";
-import type { RunSettings } from "./device-config";
 import type { EngineOptions } from "./engine-options";
 import type { RunLog } from "./log";
 import type { Projects } from "./projects";
 import { type ScheduleMissed, wireSchedules } from "./schedules";
 import { createPullRequestScores, createPullRequestWatch } from "./scores";
+import type { RunSettings } from "./settings";
 
 type SchedulesDeps = Parameters<typeof wireSchedules>[0];
 

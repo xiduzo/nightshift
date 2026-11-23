@@ -7,7 +7,7 @@ import type {
 	OllamaService,
 	SyncedDocuments,
 } from "@nightshift/engine";
-import type { AgentSetup, DeciderSetup } from "@nightshift/engine/agent-setup";
+import type { AgentSetup, DeciderSetup } from "@nightshift/engine/agents";
 import type { CloneTracker, ProjectCopies } from "@nightshift/engine/projects";
 import type { InAppChannel, Notifications } from "@nightshift/notifications";
 import type { Telemetry } from "@nightshift/telemetry";

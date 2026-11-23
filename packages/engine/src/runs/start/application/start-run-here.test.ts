@@ -3,7 +3,7 @@ import { FLOW_VERSION, type Flow } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { StartRunInput } from "../../../contract";
 import type { LoggedEvent, RunTrigger } from "../../../log";
-import type { PlannedRun } from "../../../placement";
+import type { PlannedRun } from "../..";
 import {
 	CAP_FULL,
 	fakeDevice,

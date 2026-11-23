@@ -1,4 +1,4 @@
-import type { ProfileView } from "../../../device-config";
+import type { ProfileView } from "../../../settings";
 import {
 	type FlowRef,
 	flowUse,

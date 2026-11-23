@@ -26,7 +26,7 @@ import {
 	type ConnectionStore,
 	HARNESS_BIN,
 	type SettingsStore,
-} from "@nightshift/engine/device-config";
+} from "@nightshift/engine/settings";
 import {
 	type AgentHarnessName,
 	type CustomHarnessName,

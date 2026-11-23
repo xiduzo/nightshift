@@ -8,7 +8,7 @@ import type {
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { Actor } from "../../../../contract";
-import type { ProfileView } from "../../../../device-config";
+import type { ProfileView } from "../../../../settings";
 import type { UsageMoment } from "../../../../usage";
 import type { FlowMergePlan } from "../../../store";
 import type {

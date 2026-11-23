@@ -9,7 +9,7 @@ import type {
 	ConnectionStore,
 	SettingsStore,
 	TelemetryProtocol,
-} from "@nightshift/engine/device-config";
+} from "@nightshift/engine/settings";
 import type { Counter, Histogram } from "@opentelemetry/api";
 import {
 	innerSpanIdOf,

@@ -48,11 +48,10 @@ import { LargerTextarea } from "@/shared/larger-window";
 import { PageSection } from "@/shared/page";
 import { LocalTime } from "@/shared/time";
 import { deviceIcon } from "./device-icon";
-import { settingsMutations, settingsQueries } from "./queries";
 import { JoinHostDialog } from "./join-host-dialog";
 import { LeaveHostButton } from "./leave-host";
 import { OpenSpaceButton } from "./open-space";
-import { deviceQueries } from "./queries";
+import { deviceQueries, settingsMutations, settingsQueries } from "./queries";
 import { HostStatus } from "./status-badges";
 
 /**

@@ -1,7 +1,7 @@
 import type { Database } from "@nightshift/db";
 import type { DeviceDirectory } from "@nightshift/engine";
+import { wireRegistry } from "./devices";
 import { createHostSpaces } from "./links";
-import { wireRegistry } from "./registry";
 
 /**
  * The engine's `DeviceDirectory`, over the Device rows this package owns:

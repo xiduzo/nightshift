@@ -18,10 +18,10 @@ import type {
 } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { itemBranchName } from "../../../contract";
-import { defaultRunSettings } from "../../../device-config/settings";
 import { type DerivedStep, foldRun } from "../../../log";
 import { readTranscriptFile } from "../../../log/transcript/transcripts";
 import { deriveSteps } from "../../../read/run-views";
+import { defaultRunSettings } from "../../../settings/settings";
 import {
 	agent,
 	command,

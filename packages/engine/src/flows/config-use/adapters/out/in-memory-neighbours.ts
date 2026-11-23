@@ -1,10 +1,6 @@
 import type { ProjectFlowMap } from "@nightshift/flows";
-import type {
-	CliTool,
-	Connection,
-	ProfileView,
-} from "../../../../device-config";
 import type { ProjectSecretName, SecretView } from "../../../../secrets";
+import type { CliTool, Connection, ProfileView } from "../../../../settings";
 import type {
 	ConfiguredCliTools,
 	ConfiguredConnections,

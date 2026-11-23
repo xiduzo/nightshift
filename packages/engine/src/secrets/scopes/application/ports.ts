@@ -52,7 +52,7 @@ export type SecretFacts = {
 /**
  * The connections that reference each `${NAME}`: the Secrets page lists
  * them, and a session's output takes out their values.
- * @filledBy engine/device-config
+ * @filledBy engine/settings
  */
 export type SecretReferences = {
 	/** Each referenced name with the connections that reference it, in the order of the connections. */

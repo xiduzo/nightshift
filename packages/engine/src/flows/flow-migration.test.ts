@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Profile } from "@nightshift/flows";
-import { wireCopies } from "../device-config";
 import { openDeviceDocument } from "../documents/device-document";
+import { wireCopies } from "../settings";
 import { createProfileStore } from "../testing";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import { wireMigrations } from "./migrations";

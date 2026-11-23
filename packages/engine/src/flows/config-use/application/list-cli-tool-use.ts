@@ -1,4 +1,4 @@
-import type { CliTool } from "../../../device-config";
+import type { CliTool } from "../../../settings";
 import { type FlowRef, flowUse, readSpaceFlows } from "../domain/flow-use";
 import {
 	type Asker,

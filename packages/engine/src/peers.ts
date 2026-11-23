@@ -2,7 +2,6 @@ import type { FlowSources, ProfileSettings } from "@nightshift/flows";
 import type { WalkFile, WalkRef } from "./archive";
 import type { Actor, OffersPort, Relay, RowBatch } from "./contract";
 import type { Device } from "./device";
-import type { DeviceCopy } from "./device-config";
 import type { SpaceDocuments } from "./documents";
 import type { WalkFiles } from "./graph";
 import type {
@@ -13,10 +12,11 @@ import type {
 	RunHistory,
 	TranscriptEntry,
 } from "./log";
-import type { PlacementPort } from "./placement";
 import type { Projects } from "./projects";
 import type { FeedStep, PendingCommand, RunWalker } from "./read";
 import type { RunFolders } from "./run-folders";
+import type { PlacementPort } from "./runs";
+import type { DeviceCopy } from "./settings";
 
 /**
  * The port of the other Devices and Hosts (`Peers`). The run engine walks

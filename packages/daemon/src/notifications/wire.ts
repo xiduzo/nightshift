@@ -2,7 +2,7 @@ import type { Auth } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { deviceDirectory } from "@nightshift/devices";
 import type { Engine } from "@nightshift/engine";
-import type { SettingsStore } from "@nightshift/engine/device-config";
+import type { SettingsStore } from "@nightshift/engine/settings";
 import {
 	createDesktopChannel,
 	createExpoChannel,

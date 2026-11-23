@@ -5,11 +5,10 @@ import {
 	type PeerProjects,
 	type SpaceArchive,
 } from "@nightshift/engine";
-import type { DeviceCopy } from "@nightshift/engine/device-config";
+import type { DeviceCopy } from "@nightshift/engine/settings";
+import type { DeviceRegistry, EngineOffers, OfferAdmission } from "./devices";
 import { commandMoves, type RunHistoryExchange } from "./exchange";
 import type { HostSpaces } from "./links";
-import type { EngineOffers, OfferAdmission } from "./offers";
-import type { DeviceRegistry } from "./registry";
 import {
 	type BuiltPeers,
 	createPeers,

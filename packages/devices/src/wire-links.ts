@@ -1,7 +1,8 @@
 import type { SyncedDocuments } from "@nightshift/engine";
-import type { DeviceCopies } from "@nightshift/engine/device-config";
+import type { DeviceCopies } from "@nightshift/engine/settings";
 import { now } from "@nightshift/time";
 import type { HostHello } from "./contract";
+import type { HomeMembership } from "./devices";
 import type { DevicesDeps } from "./devices-runtime";
 import { createDeviceExchange, shareAnswerCosts } from "./exchange";
 import type { Handover } from "./handover";
@@ -14,7 +15,6 @@ import {
 	type SyncedDocument,
 	tellClones,
 } from "./links";
-import type { HomeMembership } from "./membership";
 import type { PeerEngine } from "./wire-peers-engine";
 import type { wireSecretCalls } from "./wire-secrets";
 import { createWorkServer } from "./work";

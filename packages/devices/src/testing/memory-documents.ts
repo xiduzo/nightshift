@@ -1,5 +1,5 @@
 import * as Y from "yjs";
-import type { ServedDocuments } from "../host";
+import type { ServedDocuments } from "../devices/host";
 import type { OpenDocumentChannel, SyncedDocument } from "../links";
 
 type DocumentChannel = ReturnType<OpenDocumentChannel>;

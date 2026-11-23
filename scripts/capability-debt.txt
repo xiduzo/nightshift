@@ -22,7 +22,6 @@ rename packages/client glance
 
 # agents: profiles (harnesses → harness-drivers mechanism).
 rename packages/daemon harnesses
-rename packages/engine agent-setup
 rename packages/flows harnesses
 rename packages/flows profiles
 # assistant: the built-in agents.
@@ -32,33 +31,6 @@ rename packages/flows draft
 
 # settings: this computer's configuration.
 rename packages/api config
-rename packages/engine device-config
-
-# access: who may sign in, and how.
-rename packages/auth host-access
-rename packages/auth local-session
-rename packages/auth login
-rename packages/auth two-factor
-# devices: pairing and Device keys.
-rename packages/auth device-keys
-rename packages/auth pairing
-
-# devices: the Device rows, a Host, Offers, the home membership, and the
-# Devices a run may use.
-rename packages/devices host
-rename packages/devices membership
-rename packages/devices offers
-rename packages/devices placement
-rename packages/devices registry
-
-# runs: the plan of where the steps run, and the cleanup.
-rename packages/engine cleanup
-rename packages/engine placement
-
-# notifications: the rules, a Person's settings, the push targets.
-rename packages/notifications notifier
-rename packages/notifications settings
-rename packages/notifications targets
 
 # --- V2: a mechanism that imports a capability vertical of its workspace.
 # Let the caller pass in what the mechanism needs, or move the rule into
@@ -68,12 +40,12 @@ rename packages/notifications targets
 # them are no debt.
 
 # The execution port reads this computer's configuration and the project.
-imports packages/engine device device-config
+imports packages/engine device settings
 imports packages/engine device projects
 # The walk reads the capabilities itself (decision 9: `graph` is a
 # mechanism).
 # Ollama reads its setting.
-imports packages/engine ollama device-config
+imports packages/engine ollama settings
 
 # --- V5: a capability vertical that imports more than 5 other capability
 # verticals of its workspace. The count only goes down.

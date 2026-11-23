@@ -2,7 +2,7 @@
  * The engine's door: the Engine and the Space engine with their ports, what
  * `@nightshift/devices` exchanges with them, and the views the API and the
  * daemon read. This computer's Device document has its own entry
- * (`./device-config`), and so do the Projects and their Clones
+ * (`./settings`), and so do the Projects and their Clones
  * (`./projects`). Test helpers are on `./testing`. A type is also here when
  * the API's router type names it, because the router declaration must be
  * able to name it. Remove a name that no other workspace's code imports.
@@ -26,7 +26,6 @@ export {
 	type SentAnswerCost,
 	type ServedAnswerCost,
 } from "./assistant";
-export type { RunFiles } from "./cleanup";
 export type {
 	Actor,
 	DeviceDirectory,
@@ -206,14 +205,6 @@ export type {
 	PeerProjects,
 	Peers,
 } from "./peers";
-export {
-	type OfferedPlacement,
-	type PlacedDevice,
-	type PlanDevices,
-	type PlanInput,
-	type PlannedRun,
-	UNREACHABLE_DEVICE,
-} from "./placement";
 export type {
 	FeedStep,
 	LandedFact,
@@ -236,12 +227,19 @@ export {
 	transcriptLines,
 } from "./read";
 export { createRunFolders, noRunFolders } from "./run-folders";
+export type { RunFiles } from "./runs";
 export {
+	type OfferedPlacement,
 	PinNotHereError,
+	type PlacedDevice,
+	type PlanDevices,
+	type PlanInput,
+	type PlannedRun,
 	type RunHere,
 	RunNotFound,
 	SpaceNotFound,
 	START_DEADLINE_MS,
+	UNREACHABLE_DEVICE,
 	wireAccess,
 } from "./runs";
 export type {

@@ -1,7 +1,6 @@
+import type { DevicePresence, PendingPairings } from "./devices";
+import { createOfferUse, type OfferUse } from "./devices";
 import type { AppliedCommands } from "./exchange";
-import type { PendingPairings } from "./host";
-import { createOfferUse, type OfferUse } from "./offers";
-import type { DevicePresence } from "./registry";
 import { createWorkHub, type ServedCalls, type WorkHub } from "./work";
 
 /**

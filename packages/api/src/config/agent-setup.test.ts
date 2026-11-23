@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { wireAgentSetup } from "@nightshift/engine/agent-setup";
+import { wireAgents } from "@nightshift/engine/agents";
 import { call, ORPCError } from "@orpc/server";
 
 import type { Context } from "../context";
@@ -14,11 +14,11 @@ import { accessAs, testContext } from "../testing";
 const OWNER = "ada";
 const SPACE = "space-1";
 
-type SetupDeps = Parameters<typeof wireAgentSetup>[0];
+type SetupDeps = Parameters<typeof wireAgents>[0];
 
 /** The engine's setup on a Mac, with no CLI found and nothing it may run. */
 function engineSetup(more: Partial<SetupDeps> = {}) {
-	return wireAgentSetup({
+	return wireAgents({
 		stores: {
 			settings: {
 				current: () => ({ claudeBin: "claude", codexBin: "codex" }),

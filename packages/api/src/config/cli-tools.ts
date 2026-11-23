@@ -1,4 +1,4 @@
-import { cliToolInputSchema } from "@nightshift/engine/device-config";
+import { cliToolInputSchema } from "@nightshift/engine/settings";
 import { z } from "zod";
 
 import { output } from "../output";

@@ -1,5 +1,4 @@
 import { now as timeNow } from "@nightshift/time";
-import { defaultRunSettings, type RunSettings } from "./device-config";
 import {
 	createFlowDocuments,
 	createSpaceDocuments,
@@ -17,6 +16,7 @@ import {
 } from "./log";
 import { createRunFolders } from "./run-folders";
 import { takenOverSecrets } from "./secrets";
+import { defaultRunSettings, type RunSettings } from "./settings";
 import { createSpaces } from "./space";
 import { wireEngineAccess } from "./wire-access";
 import { wireEngineActions } from "./wire-actions";

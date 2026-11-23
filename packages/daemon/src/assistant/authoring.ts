@@ -21,8 +21,8 @@ import {
 	summarizeSpend,
 	transcriptLines,
 } from "@nightshift/engine";
-import type { ProfileStore } from "@nightshift/engine/device-config";
 import { isTestRun } from "@nightshift/engine/run-status";
+import type { ProfileStore } from "@nightshift/engine/settings";
 import { type ChatRequest, isAgentProfile } from "@nightshift/flows";
 import { now } from "@nightshift/time";
 import { flowPlace, type PlaceDeps } from "./place";

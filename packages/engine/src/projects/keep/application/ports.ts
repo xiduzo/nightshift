@@ -188,7 +188,7 @@ export type Repos = {
 
 /**
  * The names of Devices, and the Spaces a Host keeps.
- * @filledBy devices/registry
+ * @filledBy devices/devices
  */
 export type ProjectDirectory = {
 	names(deviceIds: readonly string[]): Promise<Map<string, string>>;

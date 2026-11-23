@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { ProfileView } from "@nightshift/engine/device-config";
+import type { ProfileView } from "@nightshift/engine/settings";
 import { Refusal } from "@nightshift/refusal";
 
 import { accessAs, testContext } from "../testing";

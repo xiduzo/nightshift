@@ -20,13 +20,13 @@ import type {
 } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { NIGHT_SHIFT } from "../../src/contract";
-import {
-	defaultRunSettings,
-	type RunSettings,
-} from "../../src/device-config/settings";
 import type { EngineInternals } from "../../src/engine";
 import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
 import type { RunDetail } from "../../src/read/views";
+import {
+	defaultRunSettings,
+	type RunSettings,
+} from "../../src/settings/settings";
 import type { SpaceEngine } from "../../src/space-engine";
 import {
 	createSandbox,

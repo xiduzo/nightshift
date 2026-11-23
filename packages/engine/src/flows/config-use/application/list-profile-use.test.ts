@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Flow } from "@nightshift/flows";
-import type { ProfileView } from "../../../device-config";
+import type { ProfileView } from "../../../settings";
 import { inMemoryConfigUsePorts } from "../adapters/out/in-memory-neighbours";
 import { listProfileUse } from "./list-profile-use";
 

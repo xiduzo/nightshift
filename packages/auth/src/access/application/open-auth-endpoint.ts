@@ -1,9 +1,5 @@
-import {
-	type HostAccess,
-	type HostPolicy,
-	hostAccess,
-} from "../../host-access";
 import type { SessionOf } from "../domain/space-access";
+import { type HostAccess, type HostPolicy, hostAccess } from "../host-access";
 import type { LocalSessions, SessionReader } from "./ports";
 
 export type OpenAuthEndpointPorts<S> = {

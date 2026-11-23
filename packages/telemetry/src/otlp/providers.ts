@@ -1,5 +1,5 @@
 import { arch, type } from "node:os";
-import type { TelemetryProtocol } from "@nightshift/engine/device-config";
+import type { TelemetryProtocol } from "@nightshift/engine/settings";
 import {
 	type Attributes,
 	ROOT_CONTEXT,

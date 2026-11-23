@@ -25,7 +25,7 @@ import type {
 	AgentSetupView,
 	DeciderSetupJob,
 	DeciderSetupStatus,
-} from "@nightshift/engine/agent-setup";
+} from "@nightshift/engine/agents";
 import {
 	type CliTool,
 	type Connection,
@@ -34,7 +34,7 @@ import {
 	type SettingField,
 	type SettingKey,
 	settingsSchema,
-} from "@nightshift/engine/device-config";
+} from "@nightshift/engine/settings";
 import {
 	agentHarnessSchema,
 	agentProfileSchema,

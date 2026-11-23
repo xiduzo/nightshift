@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
 import type { Auth, Session } from "../auth";
-import type { HostAccess, TWO_FACTOR_REQUIRED } from "../host-access";
 import { wireSpaces } from "../spaces";
 import { betterAuthOrganizations } from "./adapters/out/better-auth-organizations";
 import { betterAuthSessionReader } from "./adapters/out/better-auth-session-reader";
@@ -15,6 +14,7 @@ import {
 import type { SyncDocuments } from "./application/ports";
 import type { SpaceAccessOf, TwoFactorRequired } from "./domain/space-access";
 import type { SyncAuthorize } from "./domain/sync-access";
+import type { HostAccess, TWO_FACTOR_REQUIRED } from "./host-access";
 
 /**
  * The wiring of access: the one place that builds its real adapters and

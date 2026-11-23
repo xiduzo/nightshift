@@ -50,7 +50,7 @@ export type HarnessFacts = HarnessCatalogEntry & {
 /**
  * The guided setup of one harness's CLI: the vendor's own installer and the
  * CLI's own sign-in. Fixed data only: nothing of a request goes into what
- * runs (`@nightshift/engine/agent-setup` runs it).
+ * runs (`@nightshift/engine/agents` runs it).
  */
 export type HarnessSetup = {
 	/** Who publishes the CLI and its installer, for the person: "Anthropic". */

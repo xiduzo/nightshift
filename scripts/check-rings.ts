@@ -261,7 +261,7 @@ export async function checkRings(
 			...withSubs(slice).flatMap((part) => [
 				...wireProblems(root, part),
 				...useCaseProblems(root, part),
-				...portProblems(root, part),
+				...portProblems(root, part, VERTICALS),
 			]),
 			...violations.filter((v) => v.vertical === key).map((v) => v.message),
 		];

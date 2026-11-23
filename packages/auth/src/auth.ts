@@ -15,8 +15,12 @@ import { admin } from "better-auth/plugins/admin";
 import { deviceAuthorization } from "better-auth/plugins/device-authorization";
 import { organization } from "better-auth/plugins/organization";
 import { twoFactor } from "better-auth/plugins/two-factor";
-import { DEVICE_KEY_PREFIX } from "./device-keys";
-import { PAIRING_CODE_TTL, PAIRING_POLL_INTERVAL } from "./pairing";
+import { TRUSTED_BROWSER_DAYS } from "./access";
+import {
+	DEVICE_KEY_PREFIX,
+	PAIRING_CODE_TTL,
+	PAIRING_POLL_INTERVAL,
+} from "./devices";
 import {
 	HOST_ADMIN,
 	type MemberChange,
@@ -24,7 +28,6 @@ import {
 	statements,
 	wireSpaces,
 } from "./spaces";
-import { TRUSTED_BROWSER_DAYS } from "./two-factor";
 
 export type AuthConfig = {
 	BETTER_AUTH_URL: string;

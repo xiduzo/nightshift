@@ -1,4 +1,4 @@
-import type { ConnectionStore } from "@nightshift/engine/device-config";
+import type { ConnectionStore } from "@nightshift/engine/settings";
 import type { WorkRelay } from "../../../contract";
 
 /**
@@ -9,7 +9,7 @@ import type { WorkRelay } from "../../../contract";
 /**
  * The Devices paired with this Host, as a move reads them: only what it
  * asks of one.
- * @filledBy devices/registry
+ * @filledBy devices/devices
  */
 export type OtherDevices = {
 	get(id: string): Promise<{
@@ -31,7 +31,7 @@ export type MoveWork = Pick<WorkRelay, "call" | "online">;
 /**
  * This computer's own secrets, in its keychain: the moves it makes of a
  * value it has.
- * @filledBy engine/device-config
+ * @filledBy engine/settings
  */
 export type OwnSecrets = Pick<
 	ConnectionStore,

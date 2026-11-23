@@ -9,9 +9,9 @@ import type {
 	ValueResult,
 } from "@nightshift/agents/types";
 import type { DecisionNode, ValueNode } from "@nightshift/flows";
-import { defaultRunSettings } from "../../../device-config/settings";
 import { foldRun } from "../../../log";
 import { deriveSteps } from "../../../read/run-views";
+import { defaultRunSettings } from "../../../settings/settings";
 import { command, drive, flowOf, held, startRun } from "../../../testing/graph";
 import { createSandbox, type Sandbox } from "../../../testing/test-support";
 

@@ -1,5 +1,5 @@
-import type { Connection } from "../../../device-config";
 import type { SecretList, SecretView } from "../../../secrets";
+import type { Connection } from "../../../settings";
 import { type FlowRef, flowUse, readSpaceFlows } from "../domain/flow-use";
 import {
 	type Asker,

@@ -3,10 +3,15 @@ import type { DeviceDirectory, Relay, StartRunInput } from "./contract";
 import { addressKey } from "./device";
 import { capabilitiesFor, kindOf, unfit } from "./graph";
 import type { RunLog, RunTrigger } from "./log";
-import { type PlacementPort, wirePlacement } from "./placement";
 import type { Projects } from "./projects";
 import type { RunSummary } from "./read";
-import { type Access, wireStart, type wireWalk } from "./runs";
+import {
+	type Access,
+	type PlacementPort,
+	wirePlacement,
+	wireStart,
+	type wireWalk,
+} from "./runs";
 
 type StartDeps = Parameters<typeof wireStart>[0];
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { wireAgentSetup } from "@nightshift/engine/agent-setup";
+import { wireAgents } from "@nightshift/engine/agents";
 import { createSandbox, createSettingsStore } from "@nightshift/engine/testing";
 import { call, ORPCError } from "@orpc/server";
 
@@ -18,7 +18,7 @@ const OWNER = "ada";
 const SPACE = "space-1";
 const KEY = "TYPESAFE_API_KEY";
 
-type SetupDeps = Parameters<typeof wireAgentSetup>[0];
+type SetupDeps = Parameters<typeof wireAgents>[0];
 
 /** A settings view with `decisionDecider` saved or not. */
 function settingsView(saved: string | null) {
@@ -80,7 +80,7 @@ function engineSetup(
 	stores: ReturnType<typeof memoryStores>,
 	more: Partial<SetupDeps> = {},
 ) {
-	return wireAgentSetup({
+	return wireAgents({
 		stores: {
 			settings: stores.settings,
 			connections: stores.connections,

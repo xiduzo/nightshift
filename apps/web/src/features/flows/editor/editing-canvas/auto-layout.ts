@@ -114,6 +114,16 @@ export function useAutoLayout({
 				},
 			},
 		});
-	}, [flow, routes, routesKey, measured, onFlowChange, fitView, fit, store]);
+	}, [
+		flow,
+		routes,
+		routesKey,
+		measured,
+		onFlowChange,
+		fitView,
+		fit,
+		store,
+		setRoutes,
+	]);
 	return { autoLayout };
 }

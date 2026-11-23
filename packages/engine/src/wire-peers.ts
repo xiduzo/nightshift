@@ -1,6 +1,5 @@
 import type { Database } from "@nightshift/db";
 import type { RowBatch } from "./contract";
-import { wireCopies } from "./device-config";
 import { deviceDocumentName, documentRowDelete } from "./documents";
 import type { EngineOptions } from "./engine-options";
 import type { createRunWalks } from "./graph";
@@ -14,6 +13,7 @@ import {
 } from "./log";
 import type { DeviceRows, PeerContext, PeerProjects } from "./peers";
 import { landedFacts } from "./read";
+import { wireCopies } from "./settings";
 
 /** The statements of a Device's Clones (`ProjectStore` of `projects/keep`). They read nothing. */
 type CloneRows = {

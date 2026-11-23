@@ -4,14 +4,12 @@ import { MECHANISM as M } from "./kinds";
 /** The verticals of `packages/engine` (`scripts/capabilities.ts` says how to place one). */
 export const PACKAGE_ENGINE: Record<string, Place> = {
 	// The guided setup of an agent CLI and of a decider.
-	"agent-setup": "agents",
+	agents: "agents",
 	// What a Replica keeps of a Space for the other Replicas, by hash.
 	archive: M,
 	// The store of the files a run keeps.
 	artifacts: M,
 	assistant: "assistant",
-	// The removal of what ended runs left on this computer.
-	cleanup: "runs",
 	// The types the engine's ports name.
 	contract: M,
 	dashboard: "dashboard",
@@ -21,7 +19,7 @@ export const PACKAGE_ENGINE: Record<string, Place> = {
 	device: M,
 	// This computer's configuration in its Device document. Its connection
 	// store passes the secrets on to `secrets`.
-	"device-config": "settings",
+	settings: "settings",
 	// The synced documents (Yjs).
 	documents: M,
 	"file-loaders": M,
@@ -49,8 +47,6 @@ export const PACKAGE_ENGINE: Record<string, Place> = {
 	memory: M,
 	// The `ollama serve` Night Shift finds or starts, and its models.
 	ollama: M,
-	// The plan of where a run's steps run, made once at the start.
-	placement: "runs",
 	projects: "projects",
 	// The read model of a run: pure projections of the log. The walk
 	// (`graph`) reads them too, so they are machinery, not part of `runs`.

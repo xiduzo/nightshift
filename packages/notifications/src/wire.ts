@@ -12,18 +12,17 @@ import {
 	type WatchOptions,
 	type WebPushSender,
 } from "./channels";
-import { type RunEventSource, wireNotifier } from "./notifier";
 import {
 	type ComputerSwitches,
 	type NotificationSettings,
 	type NotificationSettingsPatch,
-	wireSettings,
-} from "./settings";
-import {
 	type PushTargetView,
 	type RegisterTarget,
+	type RunEventSource,
+	wireNotifier,
+	wireSettings,
 	wireTargets,
-} from "./targets";
+} from "./notifications";
 
 /**
  * The notifications of one daemon, wired: the stores on the database, the

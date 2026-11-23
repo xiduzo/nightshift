@@ -4,7 +4,14 @@
 export {
 	type Access,
 	type AccessRefusal,
+	authEndpointAllowed,
 	type DocumentOf,
+	type HostAccess,
+	type HostPolicy,
+	hostPolicyFromEnv,
+	type LocalSession,
+	type Login,
+	type LoginInput,
 	type RequestAccess,
 	ROLE_REFUSAL,
 	RoleRefusal,
@@ -15,7 +22,10 @@ export {
 	type SyncGrant,
 	type SyncSetup,
 	spaceAccess,
+	TRUSTED_BROWSER_DAYS,
 	wireAccess,
+	wireLocalSession,
+	wireLogin,
 } from "./access";
 export {
 	type Auth,
@@ -30,22 +40,12 @@ export {
 	type DeviceKeyAccess,
 	type DeviceKeyPermission,
 	type DeviceKeys,
-	wireDeviceKeys,
-} from "./device-keys";
-export {
-	authEndpointAllowed,
-	type HostAccess,
-	type HostPolicy,
-	hostPolicyFromEnv,
-} from "./host-access";
-export { type LocalSession, wireLocalSession } from "./local-session";
-export { type Login, type LoginInput, wireLogin } from "./login";
-export {
 	type PairingAnswer,
 	type PairingCode,
 	type PairingReview,
+	wireDeviceKeys,
 	wirePairing,
-} from "./pairing";
+} from "./devices";
 // InvitationView, PendingInvitation and SpaceMember are in the API's
 // router type: its declaration must be able to name them.
 export {
@@ -62,4 +62,3 @@ export {
 	type Spaces,
 	wireSpaces,
 } from "./spaces";
-export { TRUSTED_BROWSER_DAYS } from "./two-factor";

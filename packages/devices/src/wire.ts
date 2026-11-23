@@ -1,10 +1,10 @@
 import { systemGitHubCli } from "@nightshift/engine";
-import { profileChoice, wireCopies } from "@nightshift/engine/device-config";
+import { profileChoice, wireCopies } from "@nightshift/engine/settings";
 import { OFFLINE_AFTER_MS } from "./contract";
+import { wireMembership } from "./devices";
 import type { DevicesDeps, DevicesRuntime } from "./devices-runtime";
 import { letGo, takeOver } from "./handover";
 import { createHostLinks, deviceKeyStore } from "./links";
-import { wireMembership } from "./membership";
 import { listenHostname, ownCertificate, reachFor } from "./reach";
 import { createRelay, createWorkRelay } from "./relay";
 import { wireDevices, wireHost, wireHostExchange } from "./wire-host";

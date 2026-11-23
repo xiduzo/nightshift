@@ -3,7 +3,7 @@ import {
 	type SettingsStore,
 	settingsPatchSchema,
 	withEffectiveDecider,
-} from "@nightshift/engine/device-config";
+} from "@nightshift/engine/settings";
 
 import type { Context } from "../context";
 import { output } from "../output";

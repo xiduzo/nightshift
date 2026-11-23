@@ -13,16 +13,12 @@ import type {
 	SpaceDocuments,
 	SyncedDocuments,
 } from "@nightshift/engine";
-import type {
-	ProfileStore,
-	SettingsStore,
-} from "@nightshift/engine/device-config";
+import type { ProfileStore, SettingsStore } from "@nightshift/engine/settings";
 import type { HostClient, HostRelay } from "./contract";
+import type { Devices, Host, Offers } from "./devices";
 import type { HostExchange } from "./exchange";
 import type { KeptDevices } from "./handover";
-import type { Devices, Host } from "./host";
 import type { LinkOptions, OpenDocumentChannel } from "./links";
-import type { Offers } from "./offers";
 import type { Reach } from "./reach";
 import type { OwnSecrets } from "./secrets";
 import type {

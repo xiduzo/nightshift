@@ -1,6 +1,6 @@
+import type { createDevices } from "./devices";
 import type { DevicesDeps } from "./devices-runtime";
 import type { Handover } from "./handover";
-import type { createDevices } from "./host";
 import type { DeviceLinks, HostLinks } from "./links";
 import { wireSecrets as wireSecretsSlice } from "./secrets";
 import type { PeerEngine } from "./wire-peers-engine";

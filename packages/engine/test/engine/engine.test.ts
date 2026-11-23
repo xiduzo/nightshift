@@ -27,10 +27,6 @@ import {
 import { now } from "@nightshift/time";
 import { asc, eq } from "drizzle-orm";
 import { NIGHT_SHIFT } from "../../src/contract";
-import {
-	defaultRunSettings,
-	type RunSettings,
-} from "../../src/device-config/settings";
 import type { Engine, EngineInternals } from "../../src/engine";
 import { GateClosedError } from "../../src/gates";
 import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
@@ -39,6 +35,10 @@ import type { LandedFact } from "../../src/read/landed-facts";
 import type { RunDetail, RunStreamItem } from "../../src/read/views";
 import type { RunStatus } from "../../src/run-status";
 import { START_HOLD_WORDS } from "../../src/runs/walk/domain/start-holds";
+import {
+	defaultRunSettings,
+	type RunSettings,
+} from "../../src/settings/settings";
 import type { SpaceEngine } from "../../src/space-engine";
 import { seedFlowFolder } from "../../src/testing/seed-flows";
 import {

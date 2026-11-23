@@ -16,15 +16,15 @@ import {
 	NIGHT_SHIFT,
 	type Relay,
 } from "../../src/contract";
-import {
-	defaultRunSettings,
-	type RunSettings,
-} from "../../src/device-config/settings";
 import type { Engine, EngineInternals } from "../../src/engine";
 import { createLeaseStore } from "../../src/leases";
 import { createRunLog, type RunLog } from "../../src/log/run-log/run-log";
 import type { PeersFactory } from "../../src/peers";
 import type { RunDetail } from "../../src/read/views";
+import {
+	defaultRunSettings,
+	type RunSettings,
+} from "../../src/settings/settings";
 import type { SpaceEngine } from "../../src/space-engine";
 import { aloneDirectory } from "../../src/testing/alone-directory";
 import { alonePeers } from "../../src/testing/alone-peers";

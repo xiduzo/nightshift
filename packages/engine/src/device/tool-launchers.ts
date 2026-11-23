@@ -20,7 +20,7 @@ import {
 	type CliToolStore,
 	programOf,
 	unreachableNote,
-} from "../device-config";
+} from "../settings";
 import { redactText } from "./redact";
 
 /**

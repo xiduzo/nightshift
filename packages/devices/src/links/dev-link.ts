@@ -1,4 +1,4 @@
-import { isLoopbackHost } from "@nightshift/engine/device-config";
+import { isLoopbackHost } from "@nightshift/engine/settings";
 
 /**
  * A development install stays out of the Spaces of real work (ADR 20): it

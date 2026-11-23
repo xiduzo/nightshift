@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { Command } from "@langchain/langgraph";
 import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import type { DecisionNode, Flow, JoinNode } from "@nightshift/flows";
-import { defaultRunSettings } from "../../device-config/settings";
 import {
 	foldRun,
 	type LoggedEvent,
@@ -11,6 +10,7 @@ import {
 } from "../../log";
 import { listMemory } from "../../memory";
 import { parseCalledFlows, parseRunFlow } from "../../read";
+import { defaultRunSettings } from "../../settings/settings";
 import {
 	agent,
 	command,

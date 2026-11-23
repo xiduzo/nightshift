@@ -1,7 +1,7 @@
 import type { Permissions } from "@nightshift/auth";
 import type { FlowMigration } from "@nightshift/flows";
 import type { Actor } from "../../../contract";
-import type { ProfileStore } from "../../../device-config";
+import type { ProfileStore } from "../../../settings";
 import type { UsageMoment } from "../../../usage";
 import type { FlowMigrations } from "../../migrations";
 import type { FlowImports, FlowMerges, ProjectFlows } from "../../store";
@@ -74,7 +74,7 @@ export type SavedDocuments = {
 
 /**
  * This Device's profiles.
- * @filledBy engine/device-config
+ * @filledBy engine/settings
  */
 export type DeviceProfiles = Pick<ProfileStore, "list" | "save">;
 

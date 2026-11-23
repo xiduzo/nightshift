@@ -3,7 +3,7 @@ import { type KeyStoreKind, valueStore } from "@nightshift/engine";
 import type {
 	ConnectionStore,
 	SettingsStore,
-} from "@nightshift/engine/device-config";
+} from "@nightshift/engine/settings";
 
 /**
  * The export's headers used to be kept in a value store of their own: the

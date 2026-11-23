@@ -1,0 +1,880 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { testSpaces } from "@nightshift/auth/testing";
+
+const personalSpaceId = (
+	db: Parameters<typeof testSpaces>[0],
+	personId: string,
+) => testSpaces(db).personal.findPersonalSpace({ personId });
+
+import { existsSync, readdirSync } from "node:fs";
+import { mkdir, readdir } from "node:fs/promises";
+import { join } from "node:path";
+
+import {
+	device,
+	event,
+	hostSpace,
+	organization,
+	project,
+	runCommand,
+	run as runTable,
+	spaceMerge,
+	user,
+	ydoc,
+} from "@nightshift/db/schema";
+import {
+	createFlowDocuments,
+	NIGHT_SHIFT,
+	OlderHostError,
+} from "@nightshift/engine";
+import {
+	createSandbox,
+	mustGit,
+	type Sandbox,
+	seedFlows,
+	spaceDocumentName,
+	waitFor,
+} from "@nightshift/engine/testing";
+import type { Flow } from "@nightshift/flows";
+import { FLOW_VERSION } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
+import { eq } from "drizzle-orm";
+import * as Y from "yjs";
+import type { HostClient } from "../../contract";
+import { createDeviceExchange } from "../../exchange";
+import type { JoinProgress } from "../../links";
+import { createHostLinks, type Link } from "../../links";
+import { httpsLink } from "../links/link";
+import { type PairedReplicas, pairedReplicas } from "../testing";
+import { MERGE_WORDS } from "./domain/words";
+import {
+	createHomeMembershipForTest as createHomeMembership,
+	type HomeMembershipDeps,
+} from "./test-support";
+
+/**
+ * The merge of a Device's own Personal into its Person's Personal on its
+ * home Host, through its membership (`HomeMembership`), end to end in one
+ * process: B (the Device) merges into A
+ * (the Host), over a real link to A in memory, with B's real exchange
+ * pushing the moved runs. A and B have their own Persons and Spaces, as
+ * the author's laptop and Host do.
+ */
+
+let a: Sandbox;
+let b: Sandbox;
+let paired: PairedReplicas;
+/** B's own Person. A knows them as `paired.personId`. */
+let localPerson: string;
+/** The links still open: closed after each test. */
+let periods: { stop(): Promise<void> }[];
+
+beforeEach(async () => {
+	[a, b] = await Promise.all([createSandbox(), createSandbox()]);
+	paired = await pairedReplicas(a, b);
+	const [local] = await b.db.select().from(user);
+	localPerson = local?.id as string;
+	periods = [];
+});
+afterEach(async () => {
+	for (const period of periods) await period.stop();
+	await Promise.all([a.cleanup(), b.cleanup()]);
+});
+
+/** One command step: a run that ends on its own. */
+const quickFlow = {
+	version: FLOW_VERSION,
+	inputs: [],
+	outputs: [],
+	start: "hello",
+	nodes: [
+		{
+			id: "hello",
+			type: "command",
+			position: { x: 0, y: 0 },
+			command: "echo hello",
+			stdout: "text",
+		},
+	],
+	edges: [],
+} as Flow;
+
+/** B's link to A in memory, with B's exchange: it pushes what B walks. */
+function online(options: { push?: boolean; synced?: () => boolean } = {}) {
+	const client: HostClient = paired.memory.client(paired.key);
+	const link = httpsLink({
+		link: {
+			hostId: paired.hostId,
+			name: "A",
+			addresses: ["memory"],
+			certificate: null,
+			fingerprint: null,
+			role: "home",
+			personId: paired.personId,
+			keyStore: "file",
+			createdAt: 0,
+			revokedAt: null,
+		},
+		key: "memory",
+		clientFor: () => client,
+		heartbeatMs: 20,
+		firstBackoffMs: 5,
+		maxBackoffMs: 20,
+		streamBackoff: { firstMs: 5, maxMs: 20 },
+	});
+	const detach =
+		options.push === false
+			? () => {}
+			: createDeviceExchange({
+					engine: paired.device,
+					hostId: paired.hostId,
+					selfId: b.deviceId,
+					idleMs: 100,
+				}).attach(link);
+	const synced = options.synced ?? (() => true);
+	// The flow documents are in step with the Host when the test says so.
+	const merged: Link = { ...link, inStep: async () => synced() };
+	const period = {
+		link: merged,
+		async stop() {
+			detach();
+			await link.close();
+		},
+	};
+	periods.push(period);
+	return period;
+}
+
+function merger(link: Link, extra: Partial<HomeMembershipDeps> = {}) {
+	return createHomeMembership({
+		db: b.db,
+		engine: paired.device,
+		links: {
+			get: (hostId) => (hostId === paired.hostId ? link : undefined),
+			add: async () => {},
+		},
+		hostLinks: createHostLinks(b.db),
+		keys: { delete: async () => {} },
+		copies: { keep: async () => [] },
+		spaces: paired.documents,
+		flows: paired.flows,
+		self: { id: b.deviceId, name: "B" },
+		ownerId: localPerson,
+		dataDir: b.dataDir,
+		syncWaitMs: 500,
+		pushWaitMs: 5_000,
+		pollMs: 20,
+		...extra,
+	});
+}
+
+/** B's engine, with `before` called as a Space move puts its batch together. */
+function beforeBatch(before: () => void): HomeMembershipDeps["engine"] {
+	return {
+		...paired.device,
+		moveProjects: (move) =>
+			paired.device.moveProjects({
+				...move,
+				statements: async (moved) => {
+					before();
+					return (await move.statements?.(moved)) ?? [];
+				},
+			}),
+	};
+}
+
+/** Waits until the link answers. */
+async function ready(link: Link) {
+	await waitFor(async () => link.state().status === "online", {
+		label: "B's link online",
+		timeoutMs: 5_000,
+	});
+}
+
+/** A git repository in B's sandbox with `origin` at `remote`. */
+async function repoWithRemote(sandbox: Sandbox, name: string, remote: string) {
+	const path = join(sandbox.root, name);
+	await mkdir(path, { recursive: true });
+	await mustGit(path, ["init", "-q", "-b", "main"]);
+	await Bun.write(join(path, "README.md"), `# ${name}\n`);
+	await mustGit(path, ["add", "README.md"]);
+	await mustGit(path, [
+		"-c",
+		"user.name=Test",
+		"-c",
+		"user.email=test@nightshift.invalid",
+		"-c",
+		"commit.gpgsign=false",
+		"commit",
+		"-q",
+		"-m",
+		"initial",
+	]);
+	await mustGit(path, ["remote", "add", "origin", remote]);
+	return path;
+}
+
+/** A project in B's own Personal with one run that finished. */
+async function projectWithRun(repoPath: string = b.repoPath) {
+	const space = paired.device.space(b.spaceId, NIGHT_SHIFT);
+	const added = await space.addProject({ repoPath });
+	await seedFlows(space, added.id, { hello: quickFlow });
+	const run = await space.startRun({ projectId: added.id, flow: quickFlow });
+	await waitFor(
+		async () => (await space.getRun(run.id)).status === "finished",
+		{ label: "B's run finished", timeoutMs: 10_000 },
+	);
+	return { projectId: added.id, runId: run.id };
+}
+
+/** Brings A's flow documents of a project to B, as the link's document sync does. */
+async function syncFlows(projectId: string) {
+	const onA = createFlowDocuments({ db: a.db });
+	const theirs = await onA.open(projectId);
+	const ours = await paired.flows.open(projectId);
+	Y.applyUpdate(ours.current.doc, Y.encodeStateAsUpdate(theirs.current.doc));
+	Y.applyUpdate(ours.history.doc, Y.encodeStateAsUpdate(theirs.history.doc));
+	await onA.flush();
+}
+
+async function spaceOfRun(sandbox: Sandbox, runId: string) {
+	const [row] = await sandbox.db
+		.select({ spaceId: runTable.spaceId, startedBy: runTable.startedBy })
+		.from(runTable)
+		.where(eq(runTable.id, runId));
+	return row ?? null;
+}
+
+describe("the merge of Personal", () => {
+	test("end to end: Personal becomes the Host's, named Personal, and its runs reach the Host", async () => {
+		const { projectId, runId } = await projectWithRun();
+		const { link } = online();
+		await ready(link);
+
+		const result = await merger(link).merge();
+
+		expect(result).toMatchObject({ state: "pushed", projects: 1, runs: 1 });
+		expect(existsSync(result.backup)).toBe(true);
+		// One personal Space on B: the Host's, named Personal.
+		expect(await personalSpaceId(b.db, localPerson)).toBe(a.spaceId);
+		const spaces = await b.db.select().from(organization);
+		expect(spaces.map((s) => s.id)).not.toContain(b.spaceId);
+		expect(spaces.find((s) => s.id === a.spaceId)?.name).toBe("Personal");
+		// The run is in it, started by B's Person as A knows them.
+		expect(await spaceOfRun(b, runId)).toEqual({
+			spaceId: a.spaceId,
+			startedBy: paired.personId,
+		});
+		// A has the project, and the run, as B walked it.
+		expect(await spaceOfRun(a, runId)).toEqual({
+			spaceId: a.spaceId,
+			startedBy: paired.personId,
+		});
+		const [onA] = await paired.host
+			.space(a.spaceId, NIGHT_SHIFT)
+			.listProjects();
+		expect(onA?.id).toBe(projectId);
+		expect(
+			(await paired.host.space(a.spaceId, NIGHT_SHIFT).getRun(runId)).status,
+		).toBe("finished");
+		const [row] = await b.db.select().from(spaceMerge);
+		expect(row?.state).toBe("pushed");
+	});
+
+	test("a project without a folder stays one on the Host", async () => {
+		const leads = await paired.device
+			.space(b.spaceId, NIGHT_SHIFT)
+			.addProjectWithoutFolder({ name: "Leads" });
+		const { link } = online();
+		await ready(link);
+
+		const result = await merger(link).merge();
+
+		expect(result).toMatchObject({ state: "pushed", projects: 1 });
+		const [onA] = await paired.host
+			.space(a.spaceId, NIGHT_SHIFT)
+			.listProjects();
+		expect(onA).toMatchObject({ id: leads.id, folder: false, clones: [] });
+		const [onB] = await paired.device
+			.space(a.spaceId, NIGHT_SHIFT)
+			.listProjects();
+		expect(onB).toMatchObject({ id: leads.id, folder: false });
+	});
+
+	test("the commands of the moved runs move with them, in the name of the Person as the Host knows them", async () => {
+		const { runId } = await projectWithRun();
+		await b.db.insert(runCommand).values([
+			{
+				id: "command-of-moved-run",
+				spaceId: b.spaceId,
+				runId,
+				walkerId: b.deviceId,
+				kind: "run.stop",
+				payload: "{}",
+				personId: localPerson,
+			},
+			{
+				id: "command-of-other-space",
+				spaceId: "space-elsewhere",
+				runId: "run-elsewhere",
+				walkerId: b.deviceId,
+				kind: "run.stop",
+				payload: "{}",
+				personId: localPerson,
+			},
+		]);
+		const { link } = online();
+		await ready(link);
+
+		await merger(link).merge();
+
+		const commands = await b.db
+			.select({
+				id: runCommand.id,
+				spaceId: runCommand.spaceId,
+				personId: runCommand.personId,
+			})
+			.from(runCommand)
+			.orderBy(runCommand.id);
+		expect(commands).toEqual([
+			{
+				id: "command-of-moved-run",
+				spaceId: a.spaceId,
+				personId: paired.personId,
+			},
+			{
+				id: "command-of-other-space",
+				spaceId: "space-elsewhere",
+				personId: localPerson,
+			},
+		]);
+	});
+
+	test("the author's shape: two Persons, two Spaces, the Host's Personal empty", async () => {
+		const acme = await repoWithRemote(
+			b,
+			"acme-app",
+			"https://github.com/acme/acme-app.git",
+		);
+		const rpg = await repoWithRemote(
+			b,
+			"rpgdotexe",
+			"https://github.com/xiduzo/rpgdotexe.git",
+		);
+		const first = await projectWithRun(acme);
+		const second = await projectWithRun(rpg);
+		expect(localPerson).not.toBe(paired.personId);
+		expect(b.spaceId).not.toBe(a.spaceId);
+		const listed = await paired.device.hostSpaces.listed(paired.hostId);
+		expect(listed).toEqual([
+			{ id: a.spaceId, name: "Personal on A", personal: true },
+		]);
+		const { link } = online();
+		await ready(link);
+
+		const preview = await merger(link).preview();
+		expect(preview.projects.map((p) => [p.name, p.into, p.runs])).toEqual([
+			["acme-app", "new", 1],
+			["rpgdotexe", "new", 1],
+		]);
+		const result = await merger(link).merge();
+
+		expect(result.state).toBe("pushed");
+		const onA = await paired.host.space(a.spaceId, NIGHT_SHIFT).listProjects();
+		expect(onA.map((p) => [p.id, p.remote]).sort()).toEqual(
+			[
+				[first.projectId, "github.com/acme/acme-app"],
+				[second.projectId, "github.com/xiduzo/rpgdotexe"],
+			].sort(),
+		);
+		for (const { runId } of [first, second]) {
+			expect(await spaceOfRun(a, runId)).toEqual({
+				spaceId: a.spaceId,
+				startedBy: paired.personId,
+			});
+		}
+		// The next answer of the Host keeps the name: "Personal on A" is gone.
+		const hello = await paired.memory.client(paired.key).link.hello();
+		await paired.device.hostSpaces.update(
+			{ id: paired.hostId, name: "A" },
+			hello.spaces,
+			localPerson,
+		);
+		expect(await paired.device.hostSpaces.listed(paired.hostId)).toEqual([
+			{ id: a.spaceId, name: "Personal", personal: true },
+		]);
+		const [kept] = await b.db
+			.select()
+			.from(organization)
+			.where(eq(organization.id, a.spaceId));
+		expect(kept?.name).toBe("Personal");
+	});
+
+	test("a remote on both sides becomes one project with both histories", async () => {
+		const remote = "https://github.com/acme/app.git";
+		const onA = await paired.host.space(a.spaceId, NIGHT_SHIFT).addProject({
+			repoPath: await repoWithRemote(a, "app", remote),
+		});
+		await seedFlows(paired.host.space(a.spaceId, NIGHT_SHIFT), onA.id, {
+			hello: {
+				...quickFlow,
+				nodes: [{ ...quickFlow.nodes[0], command: "echo host" }],
+			},
+		});
+		const hostRun = await paired.host
+			.space(a.spaceId, NIGHT_SHIFT)
+			.startRun({ projectId: onA.id, flow: quickFlow });
+		await waitFor(
+			async () =>
+				(await paired.host.space(a.spaceId, NIGHT_SHIFT).getRun(hostRun.id))
+					.status === "finished",
+			{ label: "A's run finished", timeoutMs: 10_000 },
+		);
+		const mine = await projectWithRun(await repoWithRemote(b, "app", remote));
+		await syncFlows(onA.id);
+		const { link } = online();
+		await ready(link);
+
+		const preview = await merger(link).preview();
+		expect(preview.projects[0]).toMatchObject({
+			into: "same-remote",
+			renamedFlows: [{ from: "hello", to: "hello-2" }],
+		});
+		const result = await merger(link).merge();
+
+		expect(result.state).toBe("pushed");
+		// One project on B, with A's id: B's runs are under it.
+		const projects = await b.db
+			.select({ id: project.id, remote: project.remote })
+			.from(project)
+			.where(eq(project.remote, "github.com/acme/app"));
+		expect(projects).toEqual([{ id: onA.id, remote: "github.com/acme/app" }]);
+		const runs = await paired.host
+			.space(a.spaceId, NIGHT_SHIFT)
+			.listRuns({ projectId: onA.id });
+		expect(runs.map((r) => r.id).sort()).toEqual(
+			[hostRun.id, mine.runId].sort(),
+		);
+		// Both flows, both histories.
+		const flows = await paired.device
+			.space(a.spaceId, NIGHT_SHIFT)
+			.flows.list(onA.id);
+		expect(flows.map((f) => f.name).sort()).toEqual(["hello", "hello-2"]);
+	});
+
+	test("the preview changes nothing, here or on the Host", async () => {
+		const { runId } = await projectWithRun();
+		const { link } = online();
+		await ready(link);
+		const before = {
+			spaces: await b.db.select().from(organization),
+			projects: await b.db.select().from(project),
+			events: await b.db.select({ n: event.seq }).from(event),
+		};
+
+		const preview = await merger(link).preview();
+
+		expect(preview.runs).toBe(1);
+		expect(await b.db.select().from(organization)).toEqual(before.spaces);
+		expect(await b.db.select().from(project)).toEqual(before.projects);
+		expect(await b.db.select({ n: event.seq }).from(event)).toEqual(
+			before.events,
+		);
+		expect(await spaceOfRun(b, runId)).toMatchObject({ spaceId: b.spaceId });
+		expect(await b.db.select().from(spaceMerge)).toEqual([]);
+		expect(existsSync(join(b.dataDir, "backups"))).toBe(false);
+		expect(
+			await paired.host.space(a.spaceId, NIGHT_SHIFT).listProjects(),
+		).toEqual([]);
+	});
+
+	test("the copy of the database is there before the batch moves a row", async () => {
+		const { runId } = await projectWithRun();
+		const { link } = online();
+		await ready(link);
+		/** The copies of the database when the batch is put together. */
+		const seen: string[][] = [];
+
+		await merger(link, {
+			engine: beforeBatch(() => {
+				seen.push(readdirSync(join(b.dataDir, "backups")));
+			}),
+		}).merge();
+		const backups = await readdir(join(b.dataDir, "backups"));
+
+		expect(seen).toEqual([backups]);
+		expect(backups).toHaveLength(1);
+		expect(backups[0]).toStartWith("before-personal-merge-");
+		// The copy holds the run where it was before.
+		const { createDb } = await import("@nightshift/db");
+		const copy = createDb({
+			DATABASE_URL: `file:${join(b.dataDir, "backups", backups[0] as string)}`,
+		});
+		const [old] = await copy
+			.select({ spaceId: runTable.spaceId })
+			.from(runTable)
+			.where(eq(runTable.id, runId));
+		copy.$client.close();
+		expect(old?.spaceId).toBe(b.spaceId);
+	});
+
+	test("a merge stopped after each state goes on to the same end", async () => {
+		const { runId } = await projectWithRun();
+		// planned: the Host does not answer the first ask.
+		const { link } = online({ push: false });
+		await ready(link);
+		let refuse = true;
+		const flaky: Link = {
+			...link,
+			call: (use) => {
+				if (refuse) {
+					refuse = false;
+					return Promise.reject(new TypeError("fetch failed"));
+				}
+				return link.call(use);
+			},
+		};
+		await expect(merger(flaky).merge()).rejects.toThrow();
+		const state = async () =>
+			(await b.db.select().from(spaceMerge))[0]?.state ?? null;
+		expect(await state()).toBe("planned");
+
+		// mapped: the batch is never made.
+		await expect(
+			merger(flaky, {
+				engine: beforeBatch(() => {
+					throw new Error("Stopped before the batch.");
+				}),
+			}).merge(),
+		).rejects.toThrow("Stopped before the batch.");
+		expect(await state()).toBe("mapped");
+		expect(await spaceOfRun(b, runId)).toMatchObject({ spaceId: b.spaceId });
+
+		// moved: the runs do not reach the Host yet (no push).
+		const moved = await merger(flaky, { pushWaitMs: 100 }).merge();
+		expect(moved.state).toBe("moved");
+		expect(await state()).toBe("moved");
+		expect(await spaceOfRun(b, runId)).toMatchObject({ spaceId: a.spaceId });
+		expect(await spaceOfRun(a, runId)).toBeNull();
+
+		// The exchange is back: the merge ends.
+		const pushing = online();
+		await ready(pushing.link);
+		const done = await merger(pushing.link).merge();
+		expect(done.state).toBe("pushed");
+		expect(await spaceOfRun(a, runId)).toMatchObject({ spaceId: a.spaceId });
+		// One copy of the database: the merge made it once.
+		expect(await readdir(join(b.dataDir, "backups"))).toHaveLength(1);
+	});
+
+	test("the flows wait for the Host's copy of the project they join", async () => {
+		const remote = "https://github.com/acme/app.git";
+		const onA = await paired.host.space(a.spaceId, NIGHT_SHIFT).addProject({
+			repoPath: await repoWithRemote(a, "app", remote),
+		});
+		await projectWithRun(await repoWithRemote(b, "app", remote));
+		let synced = false;
+		const { link } = online({ synced: () => synced });
+		await ready(link);
+
+		await expect(merger(link).merge()).rejects.toBeInstanceOf(Refusal);
+		expect((await b.db.select().from(spaceMerge))[0]?.state).toBe("moved");
+		synced = true;
+		const done = await merger(link).merge();
+
+		expect(done.state).toBe("pushed");
+		const flows = await paired.device
+			.space(a.spaceId, NIGHT_SHIFT)
+			.flows.list(onA.id);
+		expect(flows.map((f) => f.name)).toEqual(["hello"]);
+	});
+
+	test("a merge that is done does not run again", async () => {
+		await projectWithRun();
+		const { link } = online();
+		await ready(link);
+		await merger(link).merge();
+
+		await expect(merger(link).merge()).rejects.toThrow(MERGE_WORDS.merged);
+		await expect(merger(link).preview()).rejects.toThrow(MERGE_WORDS.merged);
+		expect(await b.db.select().from(spaceMerge)).toHaveLength(1);
+	});
+
+	test("the old Personal leaves no document and no events behind", async () => {
+		await projectWithRun();
+		await b.db.insert(event).values({
+			spaceId: b.spaceId,
+			type: "MemberJoined",
+			payload: JSON.stringify({ personId: localPerson, role: "owner" }),
+			walkerId: b.deviceId,
+			walkerSeq: 1_000,
+		});
+		const { link } = online();
+		await ready(link);
+		await (await paired.documents.open(b.spaceId)).flush();
+
+		await merger(link).merge();
+
+		expect(
+			await b.db.select().from(event).where(eq(event.spaceId, b.spaceId)),
+		).toEqual([]);
+		expect(
+			await b.db
+				.select({ name: ydoc.name })
+				.from(ydoc)
+				.where(eq(ydoc.name, spaceDocumentName(b.spaceId))),
+		).toEqual([]);
+	});
+
+	test("at start, what a merge that is done left of the old Personal goes", async () => {
+		await projectWithRun();
+		const { link } = online();
+		await ready(link);
+		await merger(link).merge();
+		// What a merge of an older version left.
+		await b.db.insert(event).values({
+			spaceId: b.spaceId,
+			type: "MemberJoined",
+			payload: JSON.stringify({ personId: localPerson, role: "owner" }),
+			walkerId: b.deviceId,
+			walkerSeq: 1_000,
+		});
+		await b.db
+			.insert(ydoc)
+			.values({ name: spaceDocumentName(b.spaceId), state: Buffer.from([]) })
+			.onConflictDoNothing();
+		const finishing = new AbortController();
+
+		merger(link).keepFinishing(finishing.signal);
+
+		await waitFor(
+			async () =>
+				(await b.db.select().from(event).where(eq(event.spaceId, b.spaceId)))
+					.length === 0,
+			{ label: "the old events gone", timeoutMs: 5_000 },
+		);
+		finishing.abort();
+		expect(
+			await b.db
+				.select({ name: ydoc.name })
+				.from(ydoc)
+				.where(eq(ydoc.name, spaceDocumentName(b.spaceId))),
+		).toEqual([]);
+	});
+
+	test("a computer that is a Host with paired devices keeps its Personal", async () => {
+		await b.db.insert(device).values({
+			id: "phone-ish",
+			name: "C",
+			platform: "test",
+			ownerId: localPerson,
+			homeHost: "https://b.invalid",
+		});
+		const { link } = online();
+		await ready(link);
+
+		await expect(merger(link).preview()).rejects.toThrow(MERGE_WORDS.isHost);
+		await expect(merger(link).merge()).rejects.toThrow(MERGE_WORDS.isHost);
+		expect(await personalSpaceId(b.db, localPerson)).toBe(b.spaceId);
+	});
+
+	test("a run of Personal that is not done holds the merge back", async () => {
+		const space = paired.device.space(b.spaceId, NIGHT_SHIFT);
+		const added = await space.addProject({ repoPath: b.repoPath });
+		const gate = {
+			...quickFlow,
+			start: "ship",
+			nodes: [
+				{
+					id: "ship",
+					type: "decision",
+					position: { x: 0, y: 0 },
+					prompt: "Ship it?",
+					options: [{ name: "approve" }, { name: "reject" }],
+					by: "person",
+					decider: "typesafe",
+				},
+			],
+		} as Flow;
+		const waiting = await space.startRun({ projectId: added.id, flow: gate });
+		await waitFor(
+			async () => (await space.getRun(waiting.id)).status === "waiting",
+			{ label: "B's run waits", timeoutMs: 10_000 },
+		);
+		const { link } = online();
+		await ready(link);
+
+		await expect(merger(link).merge()).rejects.toThrow(
+			"A run in Personal is not done yet.",
+		);
+		expect(await b.db.select().from(spaceMerge)).toEqual([]);
+	});
+
+	test("an interrupted run has ended: it moves along and holds nothing back", async () => {
+		const { runId } = await projectWithRun();
+		// A restart that did not continue the run, as recovery ends it.
+		await b.db.insert(event).values({
+			spaceId: b.spaceId,
+			runId,
+			type: "RunEnded",
+			payload: JSON.stringify({
+				status: "interrupted",
+				reason: "Night Shift stopped while this run ran.",
+			}),
+			walkerId: b.deviceId,
+			walkerSeq: 1_000,
+		});
+		paired.deviceLog.forget([runId]);
+		expect(
+			(await paired.device.space(b.spaceId, NIGHT_SHIFT).getRun(runId)).status,
+		).toBe("interrupted");
+		const { link } = online();
+		await ready(link);
+
+		expect(await merger(link).merge()).toMatchObject({ runs: 1 });
+		expect((await spaceOfRun(b, runId))?.spaceId).toBe(a.spaceId);
+	});
+
+	test("an older Host without the merge refuses it politely", async () => {
+		const { link } = online({ push: false });
+		await ready(link);
+		// The Link says so for a Host that does not know the procedure, with
+		// the words the caller gives for it.
+		const older: Link = {
+			...link,
+			call: (_use, options) =>
+				Promise.reject(new OlderHostError(options?.olderHost)),
+		};
+
+		await expect(merger(older).preview()).rejects.toThrow(
+			MERGE_WORDS.olderHost,
+		);
+		expect(await b.db.select().from(spaceMerge)).toEqual([]);
+	});
+
+	test("an offline Host refuses before anything changes", async () => {
+		await projectWithRun();
+		const offline: Link = {
+			...online({ push: false }).link,
+			state: () => ({ status: "offline", address: null, since: 0 }),
+		};
+
+		await expect(merger(offline).merge()).rejects.toThrow(MERGE_WORDS.offline);
+		expect(await b.db.select().from(spaceMerge)).toEqual([]);
+		expect(existsSync(join(b.dataDir, "backups"))).toBe(false);
+	});
+
+	test("a device that joined before waits for the person, and never merges by itself", async () => {
+		const { runId } = await projectWithRun();
+		const { link } = online();
+		await ready(link);
+		const merge = merger(link);
+
+		expect(await merge.pending()).toEqual({
+			pending: true,
+			state: null,
+			hostName: "A",
+			blocked: null,
+		});
+		expect(await b.db.select().from(spaceMerge)).toEqual([]);
+		expect(await spaceOfRun(b, runId)).toMatchObject({ spaceId: b.spaceId });
+
+		await merge.merge();
+		expect((await merge.pending()).pending).toBe(false);
+	});
+
+	test("a waiting merge says why it cannot run now", async () => {
+		const offline: Link = {
+			...online({ push: false }).link,
+			state: () => ({ status: "offline", address: null, since: 0 }),
+		};
+
+		expect(await merger(offline).pending()).toEqual({
+			pending: true,
+			state: null,
+			hostName: "A",
+			blocked: MERGE_WORDS.offline,
+		});
+	});
+
+	test("the Host's personal Space keeps the name the Host gives it before a merge", async () => {
+		const rows = await b.db.select().from(hostSpace);
+		expect(rows.map((r) => r.name)).toEqual(["Personal on A"]);
+	});
+});
+
+describe("one step of the membership at a time", () => {
+	test("a second merge while one runs is refused, and the first goes on", async () => {
+		await projectWithRun();
+		const { link } = online();
+		await ready(link);
+		const membership = merger(link);
+
+		const [first, second] = await Promise.allSettled([
+			membership.merge(),
+			membership.merge(),
+		]);
+
+		expect(first).toMatchObject({
+			status: "fulfilled",
+			value: { state: "pushed" },
+		});
+		expect(second.status).toBe("rejected");
+		expect((second as PromiseRejectedResult).reason).toBeInstanceOf(Refusal);
+		expect((second as PromiseRejectedResult).reason.message).toBe(
+			MERGE_WORDS.busy,
+		);
+		expect(await b.db.select().from(spaceMerge)).toHaveLength(1);
+	});
+});
+
+describe("the merge on join", () => {
+	/** What the join shows after B joined A as its home Host. */
+	async function joinSteps(link: Link): Promise<JoinProgress[]> {
+		const seen: JoinProgress[] = [];
+		for await (const step of merger(link, { listedWaitMs: 100 }).joined(
+			paired.hostId,
+		)) {
+			seen.push(step);
+		}
+		return seen;
+	}
+
+	test("shows what the merge does, then how it went", async () => {
+		await projectWithRun();
+		const { link } = online();
+		await ready(link);
+
+		const steps = await joinSteps(link);
+
+		expect(steps.map((step) => step.kind)).toEqual(["merge-preview", "merged"]);
+		expect(steps[1]).toMatchObject({ result: { state: "pushed", runs: 1 } });
+		expect(await personalSpaceId(b.db, localPerson)).toBe(a.spaceId);
+	});
+
+	test("a merge that cannot run now says why, and the join stands", async () => {
+		await b.db.insert(device).values({
+			id: "phone-ish",
+			name: "C",
+			platform: "test",
+			ownerId: localPerson,
+			homeHost: "https://b.invalid",
+		});
+		const { link } = online();
+		await ready(link);
+
+		expect(await joinSteps(link)).toEqual([
+			{ kind: "merge-skipped", reason: MERGE_WORDS.isHost },
+		]);
+		expect(await b.db.select().from(spaceMerge)).toEqual([]);
+	});
+
+	test("nothing to merge: nothing more", async () => {
+		await projectWithRun();
+		const { link } = online();
+		await ready(link);
+		await merger(link).merge();
+
+		expect(await joinSteps(link)).toEqual([]);
+	});
+});

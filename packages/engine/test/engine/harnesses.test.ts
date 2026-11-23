@@ -5,8 +5,8 @@ import type { HarnessName } from "@nightshift/agents/types";
 import type { AgentNode, Flow, FlowEdge } from "@nightshift/flows";
 import { FLOW_VERSION } from "@nightshift/flows";
 import { NIGHT_SHIFT } from "../../src/contract";
-import { expandMcpServers } from "../../src/device-config/connections/domain/mcp-expansion";
 import type { RunStatus } from "../../src/run-status";
+import { expandMcpServers } from "../../src/settings/connections/domain/mcp-expansion";
 import type { SpaceEngine } from "../../src/space-engine";
 import {
 	createSandbox,

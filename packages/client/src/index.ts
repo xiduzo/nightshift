@@ -367,6 +367,7 @@ export {
 	scheduleWhen,
 	withPause,
 } from "./schedules";
+export { createOllamaQueries, createSettingsQueries } from "./settings";
 export {
 	createSpaceQueries,
 	type InvitationView,
@@ -393,4 +394,3 @@ export {
 	now,
 } from "./time";
 export { createUsageQueries } from "./usage";
-export { createOllamaQueries, createSettingsQueries } from "./settings";

@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { tanstackDecider } from "@nightshift/agents";
 import type { Engine, SpaceEngine } from "@nightshift/engine";
-import type { ConfigStores } from "@nightshift/engine/device-config";
+import type { ConfigStores } from "@nightshift/engine/settings";
 import {
 	createAssistant,
 	createLearner,

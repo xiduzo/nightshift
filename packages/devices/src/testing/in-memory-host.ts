@@ -2,13 +2,13 @@ import type { DeviceKeyAccess } from "@nightshift/auth";
 import { Refusal } from "@nightshift/refusal";
 import { createRouterClient, ORPCError } from "@orpc/server";
 import { type HostClient, type HostHello, hostContract } from "../contract";
-import type { HostExchange } from "../exchange";
 import {
 	type Devices,
 	type HostPeerContext,
 	hostRouter,
 	type ServedDocuments,
-} from "../host";
+} from "../devices/host";
+import type { HostExchange } from "../exchange";
 import type { OpenDocumentChannel } from "../links";
 import type {
 	PersonalSecretsHost,

@@ -16,7 +16,7 @@ export type ThisDevice = {
 
 /**
  * The Device documents this Replica keeps or copies (`listStoredDevices`).
- * @filledBy engine/device-config
+ * @filledBy engine/settings
  */
 export type StoredDevices = {
 	list(): Promise<
@@ -30,7 +30,7 @@ export type StoredDevices = {
 
 /**
  * This Device's profiles, fresher than its stored document.
- * @filledBy engine/device-config
+ * @filledBy engine/settings
  */
 export type DeviceProfiles = {
 	list(): readonly NamedProfile[];

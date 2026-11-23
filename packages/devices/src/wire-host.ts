@@ -1,15 +1,15 @@
-import type { DeviceCopies } from "@nightshift/engine/device-config";
-import type { DevicesDeps } from "./devices-runtime";
-import { createHostExchange } from "./exchange";
-import type { Handover } from "./handover";
+import type { DeviceCopies } from "@nightshift/engine/settings";
+import type { HomeMembership } from "./devices";
 import {
 	wireHost as bindHost,
 	createDevices,
 	createHost,
 	type Host,
-} from "./host";
+} from "./devices";
+import type { DevicesDeps } from "./devices-runtime";
+import { createHostExchange } from "./exchange";
+import type { Handover } from "./handover";
 import type { DeviceKeyStore, DeviceLinks, HostLinks } from "./links";
-import type { HomeMembership } from "./membership";
 import type { Reach } from "./reach";
 import type { PeerEngine } from "./wire-peers-engine";
 import type { SecretsOfDevices } from "./wire-secrets";

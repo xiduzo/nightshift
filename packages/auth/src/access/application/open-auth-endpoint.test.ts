@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { OPEN_HOST } from "../../host-access";
 import { inMemoryAccessPorts } from "../adapters/out/in-memory-neighbours";
 import { tokenOf } from "../adapters/out/in-memory-session-reader";
+import { OPEN_HOST } from "../host-access";
 import { openAuthEndpoint } from "./open-auth-endpoint";
 
 /** The use case openAuthEndpoint, on in-memory adapters. The twin of `request.test.ts`. */

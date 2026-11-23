@@ -4,13 +4,10 @@
  * alone, a run log and bus to write events into, and a project's flows
  * (`seedFlows`). Also the engine's own stores and readers that
  * only tests build or read directly: production code reaches them through the
- * `Engine`, `wireDeviceConfig` and the daemon's run files. Only tests
+ * `Engine`, `wireSettings` and the daemon's run files. Only tests
  * import this entry.
  */
-export { wireCliTools as createCliToolStore } from "../device-config/cli-tools";
-export { wireConnections as createConnectionStore } from "../device-config/connections";
-export { wireProfiles as createProfileStore } from "../device-config/profiles";
-export { wireSettings as createSettingsStore } from "../device-config/settings";
+
 export { spaceDocumentName } from "../documents/space/space-document";
 export { wireStore as createProjectFlows } from "../flows/store/wire";
 export { createRunHistory } from "../log/history/history";
@@ -20,6 +17,10 @@ export { placedRun } from "../log/run-row/run-row";
 export { createRunBus, type RunBus } from "../log/transcript/bus";
 export type { LandedChange } from "../read/landed-facts";
 export { openRunBundle } from "../read/run-bundle";
+export { wireCliTools as createCliToolStore } from "../settings/cli-tools";
+export { wireConnections as createConnectionStore } from "../settings/connections";
+export { wireProfiles as createProfileStore } from "../settings/profiles";
+export { wireSettings as createSettingsStore } from "../settings/settings";
 
 export { answerCostsOn } from "./answer-costs";
 export { openConfigStores } from "./config-stores";

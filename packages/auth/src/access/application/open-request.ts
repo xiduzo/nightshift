@@ -1,10 +1,5 @@
 import { Refusal } from "@nightshift/refusal";
 import {
-	type HostAccess,
-	type HostPolicy,
-	hostAccess,
-} from "../../host-access";
-import {
 	type Permissions,
 	type Role,
 	roleAllows,
@@ -12,6 +7,7 @@ import {
 } from "../../spaces";
 import { type SessionOf, SIGNED_OUT } from "../domain/space-access";
 import { spaceSlug } from "../domain/space-slug";
+import { type HostAccess, type HostPolicy, hostAccess } from "../host-access";
 import type {
 	LocalSessions,
 	MemberSpaces,

@@ -38,9 +38,7 @@ export {
 	type WorkReply,
 	type WorkRequest,
 } from "./contract";
-export type { DevicesRuntime } from "./devices-runtime";
-export type { HostExchange } from "./exchange";
-export type { KeptDevices } from "./handover";
+export type { Offers, OfferView, SpaceDeviceView } from "./devices";
 export {
 	type Devices,
 	type DevicesOverview,
@@ -48,14 +46,17 @@ export {
 	type HostPhones,
 	hostRouter,
 	type OtherDeviceView,
+	type PairedDevice,
 	type PairingReviewView,
 	type ServedDocuments,
 	servedDocuments,
-} from "./host";
+	wireRegistry,
+} from "./devices";
+export type { DevicesRuntime } from "./devices-runtime";
+export type { HostExchange } from "./exchange";
+export type { KeptDevices } from "./handover";
 export type { HostRole, JoinProgress, OpenDocumentChannel } from "./links";
 export { inContainer, machineFingerprint } from "./machine";
-export type { Offers, OfferView, SpaceDeviceView } from "./offers";
-export { type PairedDevice, wireRegistry } from "./registry";
 export { startDevices } from "./wire";
 export { deviceDirectory } from "./wire-peers-directory";
 export type { PeerEngine } from "./wire-peers-engine";

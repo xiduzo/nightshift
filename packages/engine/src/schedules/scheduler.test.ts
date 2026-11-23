@@ -8,15 +8,12 @@ import { iso } from "@nightshift/time";
 import { atLocal } from "@nightshift/time/testing";
 import { asc, eq, inArray } from "drizzle-orm";
 import { NIGHT_SHIFT } from "../contract";
-import {
-	defaultRunSettings,
-	type RunSettings,
-} from "../device-config/settings";
 import type { Engine, EngineInternals } from "../engine";
 import type { EnginePayloads } from "../log/events/events";
 import { appendEvent, parseEventRow } from "../log/run-log/append";
 import type { RunSummary } from "../read/views";
 import { START_HOLD_WORDS } from "../runs/walk/domain/start-holds";
+import { defaultRunSettings, type RunSettings } from "../settings/settings";
 import type { SpaceEngine } from "../space-engine";
 import { seedFlows } from "../testing/seed-flows";
 import {

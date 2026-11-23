@@ -1,4 +1,3 @@
-import type { HostPolicy } from "../../../host-access";
 import type { Role, Space } from "../../../spaces";
 import { openRequest } from "../../application/open-request";
 import type {
@@ -7,6 +6,7 @@ import type {
 	SyncDocuments,
 } from "../../application/ports";
 import type { DocumentOf, SyncDeviceKey } from "../../domain/sync-access";
+import type { HostPolicy } from "../../host-access";
 import { inMemoryOrganizations } from "./in-memory-organizations";
 import {
 	inMemorySessionReader,

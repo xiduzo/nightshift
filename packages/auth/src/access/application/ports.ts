@@ -1,6 +1,6 @@
-import type { HostPolicy } from "../../host-access";
 import type { Role, Space } from "../../spaces";
 import type { DocumentOf, SyncDeviceKey } from "../domain/sync-access";
+import type { HostPolicy } from "../host-access";
 
 /**
  * The driven ports of access. A port of its own has a real adapter, an
@@ -66,7 +66,7 @@ export type MemberSpaces = {
 /**
  * The local Person's session, for a request from this computer without a
  * session of its own.
- * @filledBy auth/local-session
+ * @filledBy auth
  */
 export type LocalSessions<S> = {
 	/** The request's session, else the local Person's, with the headers that carry it. */

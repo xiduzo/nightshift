@@ -1,0 +1,355 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { device, event, ydoc } from "@nightshift/db/schema";
+import {
+	createRunBus,
+	createRunHistory,
+	createRunLog,
+	createSandbox,
+	deviceRowsOn,
+	parseEventRow,
+	type Sandbox,
+} from "@nightshift/engine/testing";
+import { asc, eq } from "drizzle-orm";
+import { createHostLinks, deviceKeyStore } from "../../links";
+import { SECOND_HOME } from "../links/host-links";
+import type { DeviceRegistry } from ".";
+import { createDeviceRegistry } from "./test-support";
+
+let sandbox: Sandbox;
+let ownerId: string;
+let clock: number;
+let registry: DeviceRegistry;
+
+function newRegistry() {
+	const log = createRunLog(sandbox.db, {
+		walkerId: sandbox.deviceId,
+		dataDir: sandbox.dataDir,
+	});
+	return createDeviceRegistry({
+		db: sandbox.db,
+		deviceRows: deviceRowsOn(sandbox.db),
+		logFact: async (fact, writes) => {
+			await log.append(fact, writes);
+		},
+		history: createRunHistory({
+			db: sandbox.db,
+			dataDir: sandbox.dataDir,
+			log,
+			bus: createRunBus(),
+		}),
+		now: () => clock,
+	});
+}
+
+beforeEach(async () => {
+	sandbox = await createSandbox();
+	const [self] = await sandbox.db
+		.select({ ownerId: device.ownerId })
+		.from(device)
+		.where(eq(device.self, true));
+	ownerId = self?.ownerId ?? "";
+	clock = 1_000_000;
+	registry = newRegistry();
+});
+afterEach(async () => {
+	await sandbox.cleanup();
+});
+
+const macbook = {
+	id: "device-b",
+	name: "MacBook",
+	platform: "darwin",
+	homeHost: "https://studio.example.com",
+};
+
+async function deviceEvents() {
+	const rows = await sandbox.db.select().from(event).orderBy(asc(event.seq));
+	return rows
+		.filter((row) => row.type.startsWith("Device"))
+		.map((row) => ({ ...parseEventRow(row), spaceId: row.spaceId }));
+}
+
+describe("the Devices of a Host", () => {
+	test("a Device that pairs gets its row and DeviceJoined, in its owner's personal Space", async () => {
+		const joined = await registry.join({ ...macbook, ownerId });
+		expect(joined).toMatchObject({
+			id: "device-b",
+			name: "MacBook",
+			platform: "darwin",
+			ownerId,
+			homeHost: "https://studio.example.com",
+			online: false,
+			lastSeenAt: null,
+			revokedAt: null,
+		});
+		expect(await deviceEvents()).toMatchObject([
+			{
+				type: "DeviceJoined",
+				spaceId: sandbox.spaceId,
+				payload: {
+					deviceId: "device-b",
+					name: "MacBook",
+					ownerId,
+					home: true,
+				},
+			},
+		]);
+		expect((await registry.list(ownerId)).map((d) => d.id)).toEqual([
+			"device-b",
+		]);
+		expect(await registry.list("someone-else")).toEqual([]);
+	});
+
+	test("this computer cannot pair with itself", async () => {
+		await expect(
+			registry.join({ ...macbook, id: sandbox.deviceId, ownerId }),
+		).rejects.toThrow(/itself/);
+	});
+
+	test("online while the link answers; offline after a silence", async () => {
+		await registry.join({ ...macbook, ownerId });
+		await registry.seen("device-b");
+		clock += 15_000;
+		await registry.seen("device-b");
+		expect(await registry.get("device-b")).toMatchObject({
+			online: true,
+			lastSeenAt: clock,
+		});
+
+		clock += 30_000;
+		await registry.sweep(45_000);
+		expect((await registry.get("device-b"))?.online).toBe(true);
+		clock += 16_000;
+		await registry.sweep(45_000);
+		expect((await registry.get("device-b"))?.online).toBe(false);
+
+		expect((await deviceEvents()).map((e) => e.type)).toEqual([
+			"DeviceJoined",
+			"DeviceOnline",
+			"DeviceOffline",
+		]);
+	});
+
+	test("revoking ends access: DeviceRevoked, offline, its document no longer kept", async () => {
+		await registry.join({ ...macbook, ownerId });
+		await registry.seen("device-b");
+		expect(await registry.keptDocumentOwner("device:device-b")).toBe(ownerId);
+
+		await registry.revoke("device-b");
+		expect(await registry.get("device-b")).toMatchObject({
+			online: false,
+			revokedAt: clock,
+		});
+		expect(await registry.keptDocumentOwner("device:device-b")).toBeNull();
+		expect((await deviceEvents()).map((e) => e.type)).toEqual([
+			"DeviceJoined",
+			"DeviceOnline",
+			"DeviceRevoked",
+			"DeviceOffline",
+		]);
+
+		// Pairing again gives access back.
+		await registry.join({ ...macbook, ownerId });
+		expect((await registry.get("device-b"))?.revokedAt).toBeNull();
+	});
+
+	test("forgetting removes a revoked Device for good, its kept document too; never one with access", async () => {
+		await registry.join({ ...macbook, ownerId });
+		await sandbox.db
+			.insert(ydoc)
+			.values({ name: "device:device-b", state: Buffer.from([0]) });
+
+		await expect(registry.forget("device-b")).rejects.toThrow(
+			"Remove the access of this device first.",
+		);
+		expect(await registry.get("device-b")).not.toBeNull();
+
+		await registry.revoke("device-b");
+		await registry.forget("device-b");
+		expect(await registry.get("device-b")).toBeNull();
+		expect(await registry.list(ownerId)).toEqual([]);
+		expect(
+			await sandbox.db
+				.select()
+				.from(ydoc)
+				.where(eq(ydoc.name, "device:device-b")),
+		).toEqual([]);
+		// Again: nothing left to remove.
+		await registry.forget("device-b");
+	});
+
+	test("a guest Host keeps no Device document; nor does any Host for a name it does not know", async () => {
+		await registry.join({ ...macbook, homeHost: null, ownerId });
+		expect(await registry.keptDocumentOwner("device:device-b")).toBeNull();
+		expect(await registry.keptDocumentOwner("device:unknown")).toBeNull();
+		expect(
+			await registry.keptDocumentOwner(`device:${sandbox.deviceId}`),
+		).toBeNull();
+		expect(await registry.keptDocumentOwner("space:device-b")).toBeNull();
+	});
+
+	test("a Host that starts again starts with every Device offline", async () => {
+		await registry.join({ ...macbook, ownerId });
+		await registry.seen("device-b");
+
+		const again = newRegistry();
+		expect((await again.get("device-b"))?.online).toBe(false);
+		await again.sweep(45_000);
+		expect((await deviceEvents()).map((e) => e.type)).toEqual([
+			"DeviceJoined",
+			"DeviceOnline",
+			"DeviceOffline",
+		]);
+	});
+});
+
+describe("the links of a joining Device", () => {
+	const link = {
+		hostId: "host-a",
+		name: "studio",
+		addresses: ["https://studio.local", "https://studio.example.com"],
+		certificate: null,
+		fingerprint: null,
+		role: "home" as const,
+		personId: "person-a",
+		keyStore: "file" as const,
+	};
+
+	test("a home link is this Device's home Host; a second home is refused", async () => {
+		const links = createHostLinks(sandbox.db);
+		await links.save(link);
+		expect((await links.home())?.hostId).toBe("host-a");
+
+		await expect(
+			links.save({ ...link, hostId: "host-c", name: "other" }),
+		).rejects.toThrow(SECOND_HOME);
+		await links.save({ ...link, hostId: "host-c", role: "guest" });
+		expect((await links.list()).map((l) => [l.hostId, l.role])).toEqual([
+			["host-c", "guest"],
+			["host-a", "home"],
+		]);
+	});
+
+	test("a revoked home can be replaced, and the Device has no home meanwhile", async () => {
+		const links = createHostLinks(sandbox.db);
+		await links.save(link);
+		await links.revoked("host-a");
+		expect((await links.get("host-a"))?.revokedAt).not.toBeNull();
+		expect(await links.home()).toBeNull();
+
+		await links.save({
+			...link,
+			hostId: "host-c",
+			addresses: ["https://new.example.com"],
+		});
+		expect(await links.get("host-a")).toBeNull();
+		expect((await links.home())?.addresses).toEqual([
+			"https://new.example.com",
+		]);
+	});
+
+	test("a key kept in a file is readable by its owner only", async () => {
+		const store = await deviceKeyStore({
+			dataDir: sandbox.dataDir,
+			deviceId: sandbox.deviceId,
+			prefer: "file",
+		});
+		expect(store.kind).toBe("file");
+		expect(await store.get("host-a")).toBeNull();
+		await store.set("host-a", "nsd_secret");
+		expect(await store.get("host-a")).toBe("nsd_secret");
+		const { mode } = await import("node:fs/promises").then((fs) =>
+			fs.stat(`${sandbox.dataDir}/device-keys/host-a`),
+		);
+		expect(mode & 0o777).toBe(0o600);
+		await store.delete("host-a");
+		expect(await store.get("host-a")).toBeNull();
+	});
+});
+
+describe("the computer of a Device", () => {
+	const FINGERPRINT = "a".repeat(64);
+	const joined = (id: string, owner = ownerId) =>
+		registry.join({ ...macbook, id, ownerId: owner, machine: FINGERPRINT });
+
+	test("finds the Device of the same owner on the same computer", async () => {
+		await joined("device-b");
+		expect(
+			(await registry.sameMachine(ownerId, FINGERPRINT, "new-install"))?.id,
+		).toBe("device-b");
+	});
+
+	test("never finds the Device that asks", async () => {
+		await joined("device-b");
+		expect(
+			await registry.sameMachine(ownerId, FINGERPRINT, "device-b"),
+		).toBeNull();
+	});
+
+	test("finds a removed Device, so pairing again brings it back", async () => {
+		await joined("device-b");
+		await registry.revoke("device-b");
+		expect(
+			(await registry.sameMachine(ownerId, FINGERPRINT, "new-install"))?.id,
+		).toBe("device-b");
+	});
+
+	test("prefers the Device with access over a removed one", async () => {
+		await joined("removed");
+		await registry.revoke("removed");
+		await joined("device-b");
+		expect(
+			(await registry.sameMachine(ownerId, FINGERPRINT, "new-install"))?.id,
+		).toBe("device-b");
+	});
+
+	test("never finds this Host's own row", async () => {
+		await sandbox.db
+			.update(device)
+			.set({ machine: FINGERPRINT })
+			.where(eq(device.self, true));
+		expect(
+			await registry.sameMachine(ownerId, FINGERPRINT, "new-install"),
+		).toBeNull();
+	});
+
+	test("a Device that links says its computer, and two with one computer stay apart", async () => {
+		await registry.join({ ...macbook, id: "one", ownerId });
+		await registry.join({ ...macbook, id: "two", ownerId });
+		expect(
+			await registry.sameMachine(ownerId, FINGERPRINT, "new-install"),
+		).toBeNull();
+		for (const id of ["one", "two"]) {
+			await registry.describe(id, {
+				name: id,
+				dev: false,
+				machine: FINGERPRINT,
+			});
+		}
+		expect(await registry.get("one")).not.toBeNull();
+		expect(await registry.get("two")).not.toBeNull();
+		expect(
+			await registry.sameMachine(ownerId, FINGERPRINT, "new-install"),
+		).not.toBeNull();
+	});
+
+	test("a Device that says nothing keeps its computer", async () => {
+		await joined("device-b");
+		await registry.describe("device-b", { name: "MacBook", dev: false });
+		expect(
+			(await registry.sameMachine(ownerId, FINGERPRINT, "new-install"))?.id,
+		).toBe("device-b");
+	});
+
+	test("a development install is never the computer", async () => {
+		await joined("device-b");
+		await registry.describe("device-b", {
+			name: "MacBook (dev)",
+			dev: true,
+			machine: FINGERPRINT,
+		});
+		expect(
+			await registry.sameMachine(ownerId, FINGERPRINT, "new-install"),
+		).toBeNull();
+	});
+});

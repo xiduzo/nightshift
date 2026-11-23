@@ -23,8 +23,8 @@ import {
 } from "@nightshift/engine/testing";
 import { now } from "@nightshift/time";
 import type { Caller, HostClient, HostHello, WorkRelay } from "../contract";
+import { createHost, servedDocuments } from "../devices/host";
 import { createHostExchange, type HostExchange } from "../exchange";
-import { createHost, servedDocuments } from "../host";
 import {
 	type DeviceLinks,
 	deviceKeyStore,
