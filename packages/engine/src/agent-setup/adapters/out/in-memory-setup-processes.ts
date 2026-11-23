@@ -1,22 +1,25 @@
-import type { SetupSpawn, SetupSpawnOptions } from "./spawn";
+import type { SetupProcesses } from "../../application/ports";
+import { type SetupSpawn, setupProcessesOver } from "./bun-setup-processes";
 
 /** One program a test's fake spawn started: what it got, and its controls. */
 export type FakeProcess = {
 	argv: string[];
-	options: SetupSpawnOptions;
-	/** What the setup wrote to its input. */
+	options: {
+		cwd: string;
+		env: Readonly<Record<string, string | undefined>>;
+		io: "pipes" | "terminal";
+		input: boolean;
+		onOutput(text: string): void;
+	};
 	written: string[];
 	stopped: boolean;
-	/** Prints output, as the program would. */
 	print(text: string): void;
-	/** Ends it with an exit code. */
 	exit(code: number): void;
 };
 
 /**
  * A spawn that starts nothing: each call is a `FakeProcess` the test
- * drives. `onStart` runs as each one starts. No real installer and no real
- * sign-in ever runs in a test.
+ * drives. No real installer and no real sign-in ever runs in a test.
  */
 export function fakeSpawn(onStart: (proc: FakeProcess) => void = () => {}) {
 	const started: FakeProcess[] = [];
@@ -47,4 +50,13 @@ export function fakeSpawn(onStart: (proc: FakeProcess) => void = () => {}) {
 		};
 	};
 	return { spawn, started };
+}
+
+/** Setup processes over a fake spawn, for use-case tests and the contract. */
+export function inMemorySetupProcesses(
+	onStart: (proc: FakeProcess) => void = () => {},
+	timeouts: { installTimeoutMs?: number; signInTimeoutMs?: number } = {},
+): SetupProcesses & { started: FakeProcess[]; spawn: SetupSpawn } {
+	const { spawn, started } = fakeSpawn(onStart);
+	return { ...setupProcessesOver(spawn, timeouts), started, spawn };
 }

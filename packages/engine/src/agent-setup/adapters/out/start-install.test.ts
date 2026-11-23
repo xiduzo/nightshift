@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { harnessSetup } from "@nightshift/agents/harness-facts";
 
-import { installCommand, startInstall } from "./install";
-import { fakeSpawn } from "./test-support";
+import { installCommand } from "../../domain/setup-runs";
+import { startInstall } from "./bun-setup-processes";
+import { fakeSpawn } from "./in-memory-setup-processes";
 
 const claude = harnessSetup("claude-code");
 const codex = harnessSetup("codex");

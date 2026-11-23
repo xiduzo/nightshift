@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createDeciderSetup } from "@nightshift/engine/agent-setup";
+import { wireAgentSetup } from "@nightshift/engine/agent-setup";
 import { createSandbox, createSettingsStore } from "@nightshift/engine/testing";
 import { call, ORPCError } from "@orpc/server";
 
@@ -18,7 +18,7 @@ const OWNER = "ada";
 const SPACE = "space-1";
 const KEY = "TYPESAFE_API_KEY";
 
-type SetupDeps = Parameters<typeof createDeciderSetup>[0];
+type SetupDeps = Parameters<typeof wireAgentSetup>[0];
 
 /** A settings view with `decisionDecider` saved or not. */
 function settingsView(saved: string | null) {
@@ -80,13 +80,14 @@ function engineSetup(
 	stores: ReturnType<typeof memoryStores>,
 	more: Partial<SetupDeps> = {},
 ) {
-	return createDeciderSetup({
+	return wireAgentSetup({
 		stores: {
 			settings: stores.settings,
 			connections: stores.connections,
 			cliTools: stores.cliTools,
 			profiles: stores.profileStore,
 		} as unknown as SetupDeps["stores"],
+		check: async () => ({ signIn: "unknown", account: null }),
 		ollama: {
 			status: async (model = "qwen3-embedding:0.6b") => ({
 				where: null,
@@ -114,7 +115,7 @@ function engineSetup(
 			throw new Error("A route test runs no program.");
 		},
 		...more,
-	});
+	}).decider;
 }
 
 function contextFor(options: {

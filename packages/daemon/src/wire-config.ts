@@ -8,8 +8,8 @@ import {
 	secretStore,
 } from "@nightshift/engine";
 import {
-	createAgentSetup,
-	createDeciderSetup,
+	type DeciderSetupDeps,
+	wireAgentSetup,
 } from "@nightshift/engine/agent-setup";
 import {
 	type DeviceConfig,
@@ -27,7 +27,6 @@ import {
 
 type ConfigOptions = Parameters<typeof wireDeviceConfig>[0];
 type ConfigUseDeps = Parameters<typeof createConfigUse>[0];
-type DeciderSetupDeps = Parameters<typeof createDeciderSetup>[0];
 
 /**
  * This Device's document: its profiles, CLI tools, connections, settings
@@ -134,11 +133,11 @@ export async function wireSetups(deps: {
 	const agentSetup = await slots.replace(
 		"nightshiftAgentSetup",
 		() =>
-			createAgentSetup({
+			wireAgentSetup({
 				stores: config,
 				check: (harness, bin) => checks.harness(harness, bin),
 				container: inContainer(),
-			}),
+			}).agent,
 		(before) => before.stop(),
 	);
 	/**
@@ -149,13 +148,14 @@ export async function wireSetups(deps: {
 	const deciderSetup = await slots.replace(
 		"nightshiftDeciderSetup",
 		() =>
-			createDeciderSetup({
+			wireAgentSetup({
 				stores: config,
+				check: async () => ({ signIn: "unknown", account: null }),
 				ollama: deps.ollama,
 				localModel: DECIDER_SETUP.localModel,
 				typesafeKey: DECIDER_SETUP.typesafeKey,
 				container: inContainer(),
-			}),
+			}).decider,
 		(before) => before.stop(),
 	);
 	const { connections, cliTools, profiles } = config;

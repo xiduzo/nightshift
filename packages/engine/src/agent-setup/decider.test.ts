@@ -7,13 +7,13 @@ import type { SecretBackend } from "../device-config/connections";
 import type { OllamaStatus } from "../ollama";
 import { openConfigStores } from "../testing/config-stores";
 import { createSandbox, type Sandbox, waitFor } from "../testing/test-support";
+import { fakeSpawn } from "./adapters/out/in-memory-setup-processes";
+import type { DeciderSetupJob } from "./domain/setup-jobs";
 import {
-	createDeciderSetup,
 	type DeciderSetup,
 	type DeciderSetupDeps,
-	type DeciderSetupJob,
-} from "./decider";
-import { fakeSpawn } from "./test-support";
+	wireAgentSetup,
+} from "./wire";
 
 /**
  * The setup of a decider with a fake Ollama, a fake spawn and secrets in
@@ -118,8 +118,9 @@ function make(
 	ollama: DeciderSetupDeps["ollama"],
 	deps: Partial<DeciderSetupDeps> = {},
 ) {
-	setup = createDeciderSetup({
+	setup = wireAgentSetup({
 		stores,
+		check: async () => ({ signIn: "unknown", account: null }),
 		ollama,
 		localModel: { name: MODEL, bytes: 2_000_000_000 },
 		typesafeKey: KEY,
@@ -131,7 +132,7 @@ function make(
 		spawn: fakeSpawn().spawn,
 		pollMs: 1,
 		...deps,
-	});
+	}).decider;
 	return setup;
 }
 

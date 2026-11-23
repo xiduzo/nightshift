@@ -1,8 +1,9 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
-import { harnessSetup } from "@nightshift/agents/harness-facts";
 import { harnessNameSchema } from "@nightshift/flows";
+
+import { harnessSetup } from "./facts";
 
 /**
  * The folders the vendors' installers put an agent CLI in (`~/.local/bin`),

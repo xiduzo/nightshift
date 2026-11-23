@@ -10,13 +10,16 @@ import type { SecretBackend } from "../device-config/connections";
 import { openConfigStores } from "../testing/config-stores";
 import { createSandbox, type Sandbox, waitFor } from "../testing/test-support";
 import {
+	type FakeProcess,
+	fakeSpawn,
+} from "./adapters/out/in-memory-setup-processes";
+import type { AgentSetupJob } from "./domain/setup-jobs";
+import {
 	type AgentSetup,
 	type AgentSetupDeps,
-	type AgentSetupJob,
-	createAgentSetup,
 	type SignInCheck,
-} from "./agent-setup";
-import { type FakeProcess, fakeSpawn } from "./test-support";
+	wireAgentSetup,
+} from "./wire";
 
 /**
  * The guided setup with a fake spawn, a fake check and a temp home folder:
@@ -75,7 +78,7 @@ function checks(...answers: SignInCheck["signIn"][]) {
 function make(
 	deps: Partial<AgentSetupDeps> & { spawn: AgentSetupDeps["spawn"] },
 ) {
-	setup = createAgentSetup({
+	setup = wireAgentSetup({
 		stores,
 		check: checks("signed_out").check,
 		container: false,
@@ -84,7 +87,7 @@ function make(
 		env: { PATH: "/usr/bin", HOME: home },
 		which: computer({ curl: "/usr/bin/curl" }),
 		...deps,
-	});
+	}).agent;
 	return setup;
 }
 

@@ -11,6 +11,7 @@ export {
 	customAcpHarness,
 	runPiAcp,
 } from "./acp";
+export { putAgentBinsOnPath } from "./bin-path";
 export {
 	type ClaudeCodeHarnessOptions,
 	type ClaudeCodeProcessOptions,

@@ -1,10 +1,9 @@
 import { randomBytes } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-
+import { putAgentBinsOnPath } from "@nightshift/agents";
 import type { AuthConfig } from "@nightshift/auth";
 import { ensureDataDir, resolveDataDir } from "@nightshift/db/data-dir";
-import { putAgentBinsOnPath } from "@nightshift/engine/agent-setup";
 
 /**
  * The environment the daemon reads: `apps/server/.env.schema` documents

@@ -11,5 +11,4 @@ devices/host
 devices/membership
 devices/offers
 devices/placement
-engine/agent-setup
 # Files of a package's kernel that are not pure yet: kernel <file>.

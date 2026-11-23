@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { now } from "@nightshift/time";
 
-import { systemSpawn } from "./spawn";
+import { systemSpawn } from "./bun-setup-processes";
 
 /**
  * Bun's spawn with tiny fake CLIs in a temp folder: never a real installer

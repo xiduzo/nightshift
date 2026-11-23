@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { harnessSetup } from "@nightshift/agents/harness-facts";
 
-import { plainText } from "./plain-text";
 import {
 	asksForCode,
-	type SignInSight,
+	plainText,
 	signInAddress,
-	startSignIn,
-} from "./sign-in";
-import { fakeSpawn } from "./test-support";
+} from "../../domain/setup-output";
+import type { SignInSight } from "../../domain/setup-runs";
+import { startSignIn } from "./bun-setup-processes";
+import { fakeSpawn } from "./in-memory-setup-processes";
 
 const claude = harnessSetup("claude-code");
 const codex = harnessSetup("codex");

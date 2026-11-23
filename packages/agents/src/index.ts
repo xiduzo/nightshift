@@ -59,6 +59,7 @@ export {
 	installedSkills,
 	type OpencodeHarnessOptions,
 	opencodeHarness,
+	putAgentBinsOnPath,
 	runPiAcp,
 } from "./harnesses";
 export { KNOWLEDGE_TERMINAL_INSTRUCTION } from "./knowledge";
