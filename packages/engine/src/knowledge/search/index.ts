@@ -6,6 +6,7 @@
  * the lines Night Shift measured for it.
  */
 
+export { setMeaning } from "./application/set-meaning";
 export { DEFAULT_EMBEDDING_MODEL } from "./domain/embedding-model";
 export type { KnowledgeEvaluation } from "./domain/evaluation";
 export {

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow, flowSchema } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { NIGHT_SHIFT } from "../../../contract";
 import { inMemorySourcesPorts } from "../adapters/out/in-memory-neighbours";
 import { OWNER_ONLY } from "../domain/syncs";
 import { removeKnowledgeSource } from "./remove-knowledge-source";
@@ -48,6 +49,8 @@ describe("removeKnowledgeSource", () => {
 	test("removes the files first, then the schedules, then the flow", async () => {
 		const ports = setup();
 		const removed = await removeKnowledgeSource(ports)({
+			actor: NIGHT_SHIFT,
+			spaceId: "space-1",
 			projectId: "p1",
 			name: "web",
 			files: true,
@@ -68,6 +71,8 @@ describe("removeKnowledgeSource", () => {
 		const ports = setup();
 		const refusal = await refusalOf(
 			removeKnowledgeSource(ports)({
+				actor: NIGHT_SHIFT,
+				spaceId: "space-1",
 				projectId: "p1",
 				name: "web",
 				files: true,
@@ -86,6 +91,8 @@ describe("removeKnowledgeSource", () => {
 		expect(
 			await refusalOf(
 				removeKnowledgeSource(ports)({
+					actor: NIGHT_SHIFT,
+					spaceId: "space-1",
 					projectId: "p1",
 					name: "web",
 					files: true,
@@ -101,6 +108,8 @@ describe("removeKnowledgeSource", () => {
 		const ports = setup();
 		const refusal = await refusalOf(
 			removeKnowledgeSource(ports)({
+				actor: NIGHT_SHIFT,
+				spaceId: "space-1",
 				projectId: "p1",
 				name: "nothing",
 				files: false,

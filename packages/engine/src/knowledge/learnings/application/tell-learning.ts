@@ -1,8 +1,10 @@
+import type { Permissions } from "@nightshift/auth";
 import {
 	learningNotes,
 	proposedLearningOf,
 	toldLearningFileName,
 } from "@nightshift/flows";
+import type { Actor } from "../../../contract";
 import { acceptNote, proposedFile } from "../domain/proposed";
 import {
 	emptyNote,
@@ -11,9 +13,17 @@ import {
 	noteIn,
 	type WaitingNote,
 } from "../domain/waiting";
-import type { FolderHolds, LearningEntries, LearningFolder } from "./ports";
+import type {
+	FolderHolds,
+	LearningEntries,
+	LearningFolder,
+	LearningsAccess,
+} from "./ports";
+
+const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type TellLearningPorts = {
+	access: LearningsAccess;
 	folder: Pick<LearningFolder, "has" | "text" | "append" | "write" | "remove">;
 	documents: Pick<LearningEntries, "open">;
 	holds: FolderHolds;
@@ -22,6 +32,8 @@ export type TellLearningPorts = {
 
 /** The note a person wrote, who wrote it, and the note that waits it replaces. */
 export type TellLearning = {
+	actor: Actor;
+	spaceId: string;
 	projectId: string;
 	note: string;
 	by: NotePerson;
@@ -35,11 +47,19 @@ export type TellLearning = {
  * its proposed file as a delete does. Refuses an empty note, and a note to
  * replace that no longer waits: then nothing is kept.
  *
- * It checks no role: the `Knowledge` door has no actor yet (E-doors adds it).
+ * Refuses a Person who may not change knowledge (`access.openSpace`).
  */
 export const tellLearning =
 	(ports: TellLearningPorts) =>
-	async ({ projectId, note, by, replaces }: TellLearning): Promise<void> => {
+	async ({
+		actor,
+		spaceId,
+		projectId,
+		note,
+		by,
+		replaces,
+	}: TellLearning): Promise<void> => {
+		await ports.access.openSpace(actor, { spaceId, need: CHANGES_KNOWLEDGE });
 		if (learningNotes([note]).length === 0) throw emptyNote();
 		if (replaces && !proposedLearningOf(replaces.id)) throw learningGone();
 		const hold = await ports.holds.startStep(projectId);

@@ -1,5 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { now as timeNow } from "@nightshift/time";
+import type { Actor } from "../../contract";
 import type { SourceRun, SourcesSpace } from "../sources";
 import { drizzleKnowledgeUseLog } from "./adapters/out/drizzle-knowledge-use-log";
 import { fsQuestionSetFile } from "./adapters/out/fs-question-set-file";
@@ -16,6 +17,7 @@ import { markQuestion } from "./application/mark-question";
 import type {
 	FolderHolds,
 	ListedFiles,
+	ReviewAccess,
 	SourceSyncs,
 	WaitingLearnings,
 } from "./application/ports";
@@ -31,6 +33,7 @@ import type { AskedQuestion, KnowledgeUseReport } from "./domain/use";
 
 /** What the knowledge gives knowledge/review: the ports another part fills, and what the real adapters stand on. */
 export type ReviewDeps = {
+	access: ReviewAccess;
 	/** The event log: the searches and reads of agents. */
 	db: Database;
 	/** The knowledge folders on this computer (`files`). */
@@ -60,6 +63,8 @@ export type KnowledgeReview = {
 	): Promise<KnowledgeQuestions>;
 	/** Marks the files that answer a question (`markQuestion`). Returns the set. */
 	markQuestion(
+		actor: Actor,
+		spaceId: string,
 		projectId: string,
 		mark: { query: string; answers: readonly string[]; by: string | null },
 	): Promise<KnowledgeQuestion[]>;
@@ -85,7 +90,12 @@ export function wireReview(deps: ReviewDeps): KnowledgeReview {
 	});
 	const questionSet = readQuestionSet({ questions, holds: deps.holds });
 	const list = listQuestions({ asked, questionSet });
-	const mark = markQuestion({ questions, holds: deps.holds, now });
+	const mark = markQuestion({
+		access: deps.access,
+		questions,
+		holds: deps.holds,
+		now,
+	});
 	return {
 		review: (projectId, space) => tasks({ projectId, space }),
 		questions: (projectId, options = {}) =>
@@ -93,8 +103,8 @@ export function wireReview(deps: ReviewDeps): KnowledgeReview {
 				projectId,
 				...(options.limit !== undefined ? { limit: options.limit } : {}),
 			}),
-		markQuestion: (projectId, { query, answers, by }) =>
-			mark({ projectId, query, answers, by }),
+		markQuestion: (actor, spaceId, projectId, { query, answers, by }) =>
+			mark({ actor, spaceId, projectId, query, answers, by }),
 		use: async (projectId) => (await use({ projectId })).use,
 		asked: (projectId) => asked({ projectId }),
 		questionSet: (projectId) => questionSet({ projectId }),

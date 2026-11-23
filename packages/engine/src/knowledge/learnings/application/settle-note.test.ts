@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { formatLearnings } from "@nightshift/flows";
 import type { Refusal } from "@nightshift/refusal";
+import { NIGHT_SHIFT } from "../../../contract";
 import { inMemoryLearningsPorts } from "../adapters/out/in-memory-neighbours";
 import { settleNote } from "./settle-note";
 
@@ -31,6 +32,8 @@ describe("settleNote", () => {
 	test("keeps one note with who kept it and when, and leaves the others waiting", async () => {
 		const ports = setup();
 		await settleNote(ports)({
+			actor: NIGHT_SHIFT,
+			spaceId: "space-1",
 			projectId: "p1",
 			note: { id: "run-1.s1.md", index: 0, note: "One." },
 			decision: "keep",
@@ -46,6 +49,8 @@ describe("settleNote", () => {
 	test("a delete of the last note keeps nothing, and the proposed file goes", async () => {
 		const ports = setup(["One."]);
 		await settleNote(ports)({
+			actor: NIGHT_SHIFT,
+			spaceId: "space-1",
 			projectId: "p1",
 			note: { id: "run-1.s1.md", index: 0 },
 			decision: "delete",
@@ -57,6 +62,8 @@ describe("settleNote", () => {
 	test("finds a note that moved by its text, and refuses one that is gone", async () => {
 		const ports = setup();
 		await settleNote(ports)({
+			actor: NIGHT_SHIFT,
+			spaceId: "space-1",
 			projectId: "p1",
 			note: { id: "run-1.s1.md", index: 1, note: "One." },
 			decision: "delete",
@@ -65,6 +72,8 @@ describe("settleNote", () => {
 		expect(ports.folder.read("p1", PROPOSED)).toContain("- Two.");
 		const refusal = await refusalOf(
 			settleNote(ports)({
+				actor: NIGHT_SHIFT,
+				spaceId: "space-1",
 				projectId: "p1",
 				note: { id: "run-1.s1.md", index: 0, note: "One." },
 				decision: "keep",
@@ -82,6 +91,8 @@ describe("settleNote", () => {
 		ports.documents.list("p1", PROPOSED, { sha256: "a", changedAt: 1 });
 		const refusal = await refusalOf(
 			settleNote(ports)({
+				actor: NIGHT_SHIFT,
+				spaceId: "space-1",
 				projectId: "p1",
 				note: { id: "run-1.s1.md", index: 0 },
 				decision: "keep",

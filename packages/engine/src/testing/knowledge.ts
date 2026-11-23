@@ -3,6 +3,7 @@ import { createSpaceArchive, type SpaceArchive } from "../archive";
 import {
 	createSyncedDocuments,
 	documentName,
+	memberRole,
 	type SyncedDocuments,
 } from "../documents";
 import { wireKnowledge } from "../knowledge";
@@ -12,6 +13,7 @@ import {
 	type KnowledgeFolderLocks,
 } from "../knowledge/sync";
 import { yjsKnowledgeDocuments } from "../knowledge/sync/adapters/out/yjs-knowledge-documents";
+import { wireAccess } from "../runs";
 
 type KnowledgeDeps = Parameters<typeof wireKnowledge>[0];
 
@@ -46,8 +48,22 @@ export function testKnowledge(
 		notifications = { learningsChanged: async () => {} },
 		...rest
 	} = options;
+	const access = wireAccess({
+		log: {
+			row: async () => {
+				throw new Error("unused");
+			},
+			walkedHere: () => false,
+		},
+		members: {
+			db: sandbox.db,
+			documentRole: async (spaceId, personId) =>
+				memberRole(await synced.open(spaceId), personId),
+		},
+	});
 	const knowledge = wireKnowledge({
 		db: sandbox.db,
+		access,
 		dataDir: sandbox.dataDir,
 		documents: synced,
 		archive,

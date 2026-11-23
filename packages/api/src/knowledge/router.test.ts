@@ -476,7 +476,7 @@ describe("knowledge.questions and knowledge.markQuestion", () => {
 describe("knowledge.evaluate and knowledge.setMeaning", () => {
 	test("any Member evaluates; turning search by meaning off asks a role that may start runs", async () => {
 		await putFile("wiki/deploy.md", "# Deploy\n");
-		await built.knowledge.markQuestion(projectId, {
+		await built.knowledge.markQuestion(NIGHT_SHIFT, "space-1", projectId, {
 			query: "deploy",
 			answers: ["wiki/deploy.md"],
 			by: "member",

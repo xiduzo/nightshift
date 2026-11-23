@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { project } from "@nightshift/db/schema";
+import { NIGHT_SHIFT } from "../contract";
 import { createSandbox, type Sandbox, waitFor } from "../testing";
 import { SynonymEmbeddings } from "../testing/embeddings";
 import { testKnowledge } from "../testing/knowledge";
@@ -250,7 +251,13 @@ describe("a page's read", () => {
 		await waitFor(() => a.told.length > 0, { label: "the vectors" });
 		expect(embeddings.embedded).toBe(1);
 
-		await a.knowledge.settleLearning("p1", "run-1.s1.md", "keep");
+		await a.knowledge.settleLearning(
+			NIGHT_SHIFT,
+			"space-1",
+			"p1",
+			"run-1.s1.md",
+			"keep",
+		);
 		await a.publish({ "learnings/proposed/run-2.s1.md": `- ${VEHICLE}\n` });
 		await a.read();
 		await waitFor(() => embeddings.embedded === 2, { label: "the new note" });
@@ -347,7 +354,7 @@ describe("when the notes cannot be compared, the list is as it was", () => {
 		const { meaning, embeddings } = fakeMeaning();
 		const a = await device(meaning);
 		await a.publish(notes);
-		await a.knowledge.setMeaning("p1", false);
+		await a.knowledge.setMeaning(NIGHT_SHIFT, "space-1", "p1", false);
 		await expectPlain(a, embeddings);
 	});
 });

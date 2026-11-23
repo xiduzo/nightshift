@@ -1,9 +1,9 @@
 import { z } from "zod";
 
 import { output } from "../output";
-import { permitted, protectedProcedure } from "../procedures";
-import { projectIn, projectProcedure } from "../projects";
-import { MAY, projectInput } from "./access";
+import { protectedProcedure } from "../procedures";
+import { projectIn } from "../projects";
+import { knowledgeProcedure, MAY, projectInput } from "./access";
 import { listedLearningSchema } from "./schemas";
 
 /** One step's proposed learnings that wait, in a project of the Space. */
@@ -71,38 +71,46 @@ export const knowledgeLearnings = {
 	 * review of learnings does, it changes the knowledge, so it asks a
 	 * role that may start runs (ADR 4).
 	 */
-	keepLearning: projectProcedure(learningInput, permitted(MAY.changeKnowledge))
+	keepLearning: knowledgeProcedure(learningInput)
 		.route({
 			summary:
 				"Keeps the learnings of one step in the project's knowledge, where agents read them.",
 		})
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.knowledge.settleLearning(input.projectId, input.id, "keep"),
+			context.knowledge.settleLearning(
+				context.actor,
+				context.spaceId,
+				input.projectId,
+				input.id,
+				"keep",
+			),
 		),
 	/** Deletes one step's proposed learnings. A role that may start runs, as for keep. */
-	deleteLearning: projectProcedure(
-		learningInput,
-		permitted(MAY.changeKnowledge),
-	)
+	deleteLearning: knowledgeProcedure(learningInput)
 		.route({
 			summary: "Deletes the learnings of one step: agents never read them.",
 		})
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
-			context.knowledge.settleLearning(input.projectId, input.id, "delete"),
+			context.knowledge.settleLearning(
+				context.actor,
+				context.spaceId,
+				input.projectId,
+				input.id,
+				"delete",
+			),
 		),
 	/**
 	 * Keeps or deletes one note of a learning that waits, not the whole
 	 * step's. A kept note goes where agents read it, with who kept it and
 	 * when. A role that may start runs, as for keep.
 	 */
-	settleNote: projectProcedure(
+	settleNote: knowledgeProcedure(
 		projectInput.extend({
 			...waitingNoteSchema.shape,
 			decision: z.enum(["keep", "delete"]),
 		}),
-		permitted(MAY.changeKnowledge),
 	)
 		.route({
 			summary:
@@ -111,6 +119,8 @@ export const knowledgeLearnings = {
 		.output(output(z.void()))
 		.handler(({ context, input }) =>
 			context.knowledge.settleNote(
+				context.actor,
+				context.spaceId,
 				input.projectId,
 				waitingNote(input),
 				input.decision,
@@ -122,12 +132,11 @@ export const knowledgeLearnings = {
 	 * it in later runs. With `replaces`, it takes the place of a note that
 	 * waits ("Change it"). A role that may start runs, as for keep.
 	 */
-	tell: projectProcedure(
+	tell: knowledgeProcedure(
 		projectInput.extend({
 			note: z.string().trim().min(1).max(NOTE_MAX_CHARS),
 			replaces: waitingNoteSchema.optional(),
 		}),
-		permitted(MAY.changeKnowledge),
 	)
 		.route({
 			summary:
@@ -137,23 +146,25 @@ export const knowledgeLearnings = {
 		.handler(({ context, input }) => {
 			const { projectId, note, replaces } = input;
 			const by = notePerson(context);
+			const { actor, spaceId } = context;
 			return replaces
 				? context.knowledge.tellLearning(
+						actor,
+						spaceId,
 						projectId,
 						note,
 						by,
 						waitingNote(replaces),
 					)
-				: context.knowledge.tellLearning(projectId, note, by);
+				: context.knowledge.tellLearning(actor, spaceId, projectId, note, by);
 		}),
 	/**
 	 * Turns the learnings from runs that ended on or off for the project, on
 	 * every computer of its Space (ADR 37). It changes what waits in the
 	 * knowledge, so it asks a role that may start runs (ADR 4).
 	 */
-	setLearnsFromRuns: projectProcedure(
+	setLearnsFromRuns: knowledgeProcedure(
 		projectInput.extend({ on: z.boolean() }),
-		permitted(MAY.changeKnowledge),
 	)
 		.route({
 			summary:
@@ -161,7 +172,12 @@ export const knowledgeLearnings = {
 		})
 		.output(output(z.object({ on: z.boolean() })))
 		.handler(async ({ context, input }) => {
-			await context.knowledge.setLearnsFromRuns(input.projectId, input.on);
+			await context.knowledge.setLearnsFromRuns(
+				context.actor,
+				context.spaceId,
+				input.projectId,
+				input.on,
+			);
 			return { on: input.on };
 		}),
 };

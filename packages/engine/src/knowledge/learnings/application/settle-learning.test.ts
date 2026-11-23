@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { formatLearnings } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { NIGHT_SHIFT } from "../../../contract";
 import { inMemoryLearningsPorts } from "../adapters/out/in-memory-neighbours";
 import { settleLearning } from "./settle-learning";
 
@@ -21,6 +22,8 @@ describe("settleLearning", () => {
 		const ports = inMemoryLearningsPorts();
 		ports.folder.put("p1", PROPOSED, TEXT);
 		await settleLearning(ports)({
+			actor: NIGHT_SHIFT,
+			spaceId: "space-1",
 			projectId: "p1",
 			id: "run-1.s1.md",
 			decision: "keep",
@@ -36,6 +39,8 @@ describe("settleLearning", () => {
 		const ports = inMemoryLearningsPorts();
 		ports.folder.put("p1", PROPOSED, TEXT);
 		await settleLearning(ports)({
+			actor: NIGHT_SHIFT,
+			spaceId: "space-1",
 			projectId: "p1",
 			id: "run-1.s1.md",
 			decision: "delete",
@@ -47,6 +52,8 @@ describe("settleLearning", () => {
 		const ports = inMemoryLearningsPorts();
 		const refusal = await refusalOf(
 			settleLearning(ports)({
+				actor: NIGHT_SHIFT,
+				spaceId: "space-1",
 				projectId: "p1",
 				id: "../x.md",
 				decision: "keep",
@@ -64,6 +71,8 @@ describe("settleLearning", () => {
 		ports.documents.list("p1", PROPOSED, { sha256: "a", changedAt: 1 });
 		const refusal = await refusalOf(
 			settleLearning(ports)({
+				actor: NIGHT_SHIFT,
+				spaceId: "space-1",
 				projectId: "p1",
 				id: "run-1.s1.md",
 				decision: "keep",
@@ -73,6 +82,8 @@ describe("settleLearning", () => {
 		expect(ports.holds.log).toEqual(["hold p1", "done p1"]);
 		const gone = await refusalOf(
 			settleLearning(ports)({
+				actor: NIGHT_SHIFT,
+				spaceId: "space-1",
 				projectId: "p1",
 				id: "run-2.s1.md",
 				decision: "keep",

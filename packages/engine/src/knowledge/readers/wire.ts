@@ -1,5 +1,6 @@
 import { PAGE_READER_ENV, type PageReaderSetting } from "@nightshift/flows";
 import { now } from "@nightshift/time";
+import type { Actor } from "../../contract";
 import type { AddressRules } from "../../web-access";
 import { openReaderRoute } from "./adapters/in/reader-endpoint";
 import { stepRoute } from "./adapters/in/step-route";
@@ -10,7 +11,7 @@ import { checkReaderReady } from "./application/check-reader-ready";
 import { chooseReader } from "./application/choose-reader";
 import { lookAtLinks } from "./application/look-at-links";
 import { openStepReader } from "./application/open-step-reader";
-import type { ReaderSettings } from "./application/ports";
+import type { ReaderSettings, ReadersAccess } from "./application/ports";
 import { createLookMemo, type LinkLook } from "./domain/link-look";
 import type { ReaderSecret } from "./domain/reader-choice";
 
@@ -26,6 +27,7 @@ import type { ReaderSecret } from "./domain/reader-choice";
 
 /** What the knowledge gives knowledge/readers: the ports another part fills, and what the real adapters stand on. */
 export type ReadersDeps = {
+	access: ReadersAccess;
 	/** Where this computer keeps its data: the marks are in its `knowledge/.reads/`. */
 	dataDir: string;
 	/** The project's reader setting, as its Space has it. */
@@ -51,7 +53,12 @@ export type PageReaders = {
 		secret: ReaderSecret,
 	): Promise<{ env: Record<string, string>; close(): Promise<void> }>;
 	/** The quick look at each link, in their order, with the project's reader (`lookAtLinks`). */
-	look(projectId: string, urls: readonly string[]): Promise<LinkLook[]>;
+	look(
+		actor: Actor,
+		spaceId: string,
+		projectId: string,
+		urls: readonly string[],
+	): Promise<LinkLook[]>;
 	/**
 	 * The secret of the project's reader is saved where this computer finds
 	 * it outside a run. Always true for Night Shift's own reader, which has
@@ -60,6 +67,8 @@ export type PageReaders = {
 	ready(projectId: string): Promise<boolean>;
 	/** Chooses the page reader of the project, for every Device of its Space. Returns it (`chooseReader`). */
 	choose(
+		actor: Actor,
+		spaceId: string,
 		projectId: string,
 		setting: PageReaderSetting,
 	): Promise<PageReaderSetting>;
@@ -72,6 +81,7 @@ export function wireReaders(deps: ReadersDeps): PageReaders {
 	const marks = fsReadMarks(deps.dataDir);
 	const secret = deps.secret ? { secret: deps.secret } : {};
 	const look = lookAtLinks({
+		access: deps.access,
 		settings: deps.settings,
 		services,
 		sites: webSiteFacts({ rules: deps.rules }),
@@ -81,7 +91,7 @@ export function wireReaders(deps: ReadersDeps): PageReaders {
 	});
 	const open = openStepReader({ settings: deps.settings, services, marks });
 	const ready = checkReaderReady({ settings: deps.settings, ...secret });
-	const choose = chooseReader({ settings: deps.settings });
+	const choose = chooseReader({ access: deps.access, settings: deps.settings });
 	return {
 		async forStep(projectId, secret) {
 			const reader = await open({ projectId, secret });
@@ -97,9 +107,11 @@ export function wireReaders(deps: ReadersDeps): PageReaders {
 				},
 			};
 		},
-		look: (projectId, urls) => look({ projectId, urls }),
+		look: (actor, spaceId, projectId, urls) =>
+			look({ actor, spaceId, projectId, urls }),
 		ready: (projectId) => ready({ projectId }),
-		choose: (projectId, setting) => choose({ projectId, setting }),
+		choose: (actor, spaceId, projectId, setting) =>
+			choose({ actor, spaceId, projectId, setting }),
 		close: () => marks.flush(),
 	};
 }

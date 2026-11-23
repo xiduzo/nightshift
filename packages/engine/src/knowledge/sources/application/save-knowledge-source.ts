@@ -1,14 +1,19 @@
+import type { Permissions } from "@nightshift/auth";
 import {
 	cronError,
 	type FlowIssue,
 	type KnowledgeSource,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import type { Actor } from "../../../contract";
 import { savedSource, withSourceSchedule } from "../domain/source-flows";
 import { OWNER_ONLY, type SourceRights, savedSchedules } from "../domain/syncs";
-import type { SourcesSpace } from "./ports";
+import type { SourcesAccess, SourcesSpace } from "./ports";
+
+const SAVES_FLOWS: Permissions = { flow: ["save"] };
 
 export type SaveKnowledgeSourcePorts = {
+	access: SourcesAccess;
 	space: Pick<SourcesSpace, "flows" | "listSchedules" | "saveSchedules">;
 	/** This computer: a source that reads a folder here syncs here. */
 	device: { id: string };
@@ -16,6 +21,8 @@ export type SaveKnowledgeSourcePorts = {
 
 /** The source to save, in which project, and what the person may do. */
 export type SaveKnowledgeSource = {
+	actor: Actor;
+	spaceId: string;
 	projectId: string;
 	/** The flow's name of a source the page added. Unset: a new source. */
 	name?: string;
@@ -34,13 +41,17 @@ export type SaveKnowledgeSource = {
  * it on, on its Subflow (`savedSource`). The checks come first, then the
  * flow, then the schedule.
  *
- * It checks no role: the API checked `may` (E-doors moves it here).
+ * Refuses a Person who may not save a flow (`access.openSpace`).
  */
 export const saveKnowledgeSource =
 	(ports: SaveKnowledgeSourcePorts) =>
 	async (
 		input: SaveKnowledgeSource,
 	): Promise<{ name: string; issues: FlowIssue[] }> => {
+		await ports.access.openSpace(input.actor, {
+			spaceId: input.spaceId,
+			need: SAVES_FLOWS,
+		});
 		const { space } = ports;
 		const { projectId } = input;
 		const changesSchedule = input.keepUpToDate !== undefined;

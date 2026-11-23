@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { NIGHT_SHIFT } from "../../../contract";
 import { inMemoryMapPorts } from "../adapters/out/in-memory-neighbours";
 import { parseNotTopics } from "../domain/not-topics";
 import { markNotTopic } from "./mark-not-topic";
@@ -12,6 +13,8 @@ describe("markNotTopic", () => {
 		ports.setNow(5);
 		expect(
 			await mark({
+				actor: NIGHT_SHIFT,
+				spaceId: "space-1",
 				projectId: "p1",
 				word: "deploy",
 				notTopic: true,
@@ -21,6 +24,8 @@ describe("markNotTopic", () => {
 		ports.setNow(6);
 		expect(
 			await mark({
+				actor: NIGHT_SHIFT,
+				spaceId: "space-1",
 				projectId: "p1",
 				word: "  Night   shift ",
 				notTopic: true,
@@ -33,6 +38,8 @@ describe("markNotTopic", () => {
 		]);
 		expect(
 			await mark({
+				actor: NIGHT_SHIFT,
+				spaceId: "space-1",
 				projectId: "p1",
 				word: "DEPLOY",
 				notTopic: false,
@@ -56,6 +63,8 @@ describe("markNotTopic", () => {
 			throw failure;
 		};
 		const refusal = await markNotTopic(ports)({
+			actor: NIGHT_SHIFT,
+			spaceId: "space-1",
 			projectId: "p1",
 			word: "deploy",
 			notTopic: true,

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Refusal } from "@nightshift/refusal";
+import { NIGHT_SHIFT } from "../../../contract";
 import { inMemorySourcesPorts } from "../adapters/out/in-memory-neighbours";
 import { OWNER_ONLY } from "../domain/syncs";
 import { saveKnowledgeSource } from "./save-knowledge-source";
@@ -24,6 +25,8 @@ describe("saveKnowledgeSource", () => {
 	test("adds the flow with a free name, then its schedule", async () => {
 		const ports = inMemorySourcesPorts();
 		const saved = await saveKnowledgeSource(ports)({
+			actor: NIGHT_SHIFT,
+			spaceId: "space-1",
 			projectId: "p1",
 			source: web,
 			keepUpToDate: { cron: "0 3 * * 1" },
@@ -50,6 +53,8 @@ describe("saveKnowledgeSource", () => {
 	test("without keepUpToDate the schedules are not read", async () => {
 		const ports = inMemorySourcesPorts();
 		await saveKnowledgeSource(ports)({
+			actor: NIGHT_SHIFT,
+			spaceId: "space-1",
 			projectId: "p1",
 			source: web,
 			may: member,
@@ -65,6 +70,8 @@ describe("saveKnowledgeSource", () => {
 		const save = saveKnowledgeSource(ports);
 		const forbidden = await refusalOf(
 			save({
+				actor: NIGHT_SHIFT,
+				spaceId: "space-1",
 				projectId: "p1",
 				source: web,
 				keepUpToDate: null,
@@ -75,6 +82,8 @@ describe("saveKnowledgeSource", () => {
 		expect((forbidden as Refusal).message).toBe(OWNER_ONLY);
 		const invalid = await refusalOf(
 			save({
+				actor: NIGHT_SHIFT,
+				spaceId: "space-1",
 				projectId: "p1",
 				source: web,
 				keepUpToDate: { cron: "not a cron" },

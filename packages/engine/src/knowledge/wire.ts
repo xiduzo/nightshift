@@ -7,6 +7,7 @@ import type { Database } from "@nightshift/db";
 import type { PageReaderSetting } from "@nightshift/flows";
 import type { SpaceArchive } from "../archive";
 import type {
+	Actor,
 	CommandKnowledge,
 	KnowledgeRequest,
 	SessionKnowledge,
@@ -41,6 +42,7 @@ import {
 	type KnowledgeMeaning,
 	type KnowledgeMeaningStatus,
 	markdownHeadings,
+	setMeaning as setProjectMeaning,
 	wireSearch,
 } from "./search";
 import {
@@ -56,11 +58,7 @@ import {
 	wireSync,
 } from "./sync";
 
-/**
- * The wiring of the knowledge: the one door (`Knowledge`) and the one
- * place that builds its sub-verticals, in order, and hands each the parts
- * of the others it reads.
- */
+/** Wires knowledge: builds sub-verticals and hands each the parts it reads. */
 
 /** The Hosts of the Spaces, once the devices runtime is up. */
 export type KnowledgeHosts = {
@@ -78,85 +76,45 @@ export type KnowledgeHosts = {
 };
 
 /**
- * A project's knowledge on this Device, as one module: its folder, the
- * reconcile with the Space (ADR 4), the index and the search, the
- * learnings, the question set, the Map, how agents use it, and the order
- * between them. The one door to all of it: a step's Device, the API, the
- * daemon and the tests cross this interface and nothing else.
- *
- * A step holds the folder between `forCommand` or `forSession` and its
- * `done`: the reconcile before it brings the Space's changes in, the one
- * after it publishes what the step wrote, and nothing else reconciles the
- * folder in between. The page and the timers skip a project a step holds,
- * and removing a source's files refuses it. A reconcile that fails leaves
- * the folder as it is: the step goes on.
- *
- * One `Knowledge` per daemon. `connect` is its one late binding, because
- * the devices runtime is made after the Device that takes this. `close`
- * ends it. On a `bun --hot` reload the daemon closes the one before it and
- * makes a new one: only what is on disk is kept (`daemon.ts`).
+ * A project's knowledge on this Device: folder, reconcile, search, learnings,
+ * Map, and how agents use it. One door for Device, API, daemon and tests.
+ * A step holds the folder between `forCommand`/`forSession` and `done`.
+ * One `Knowledge` per daemon; `connect` binds Hosts late; `close` ends it.
  */
 export type Knowledge = {
 	// The sync with the Space and the files.
-	/**
-	 * The Hosts of the Spaces, from the devices runtime: from now on a
-	 * reconcile waits for the document to be in step with its Host's, and
-	 * this Device keeps its folders in step on its own: every folder a
-	 * moment after this, each minute the ones whose content waits for its
-	 * Host, and once a day it removes the content of the Spaces it keeps
-	 * that no document lists any more. Nothing of that before this call.
-	 */
+	/** Binds Hosts: from now on reconciles wait for Host step and timers keep folders. */
 	connect(hosts: KnowledgeHosts): void;
-	/**
-	 * The files as the Space lists them, after a reconcile of this folder
-	 * for a while, how many notes wait, and what the page says about the
-	 * Space. While a step holds the folder, the document as it is.
-	 */
+	/** Files as the Space lists them after a short reconcile, plus waiting notes. */
 	listing(projectId: string): Promise<KnowledgeListing>;
-	/**
-	 * One file by its path, at most `maxBytes` of its text, from `from`
-	 * when given: this computer's copy, else its content by hash from the
-	 * Space. Null: no such file. `agent`: as for `search`.
-	 */
+	/** One file by path, at most `maxBytes` of text. Null when missing. */
 	read(
 		projectId: string,
 		path: string,
 		options: { maxBytes: number; from?: KnowledgeReadFrom; agent?: boolean },
 	): Promise<KnowledgeText | null>;
-	/**
-	 * Projects moved to other Spaces (`Engine.moveProjects`): each one's
-	 * knowledge follows it, to its new id when it has one: the document,
-	 * the folder, the content and the search index. The next reconcile
-	 * copies the content to the new Space's Host.
-	 */
+	/** Projects moved to other Spaces: each one's knowledge follows it. */
 	moved(move: {
 		from: string;
 		projects: Readonly<Record<string, { spaceId: string; projectId: string }>>;
 	}): Promise<void>;
 
 	// The search.
-	/**
-	 * The files that best match the words, best first, each at its best
-	 * section: by keyword, and by meaning when this computer can.
-	 * `agent`: an agent asks through the nightshift MCP server, so the use
-	 * is logged for the Knowledge page. A failed write of it does not fail
-	 * the answer. A person's search on the page is not logged.
-	 */
+	/** Files that best match the words. `agent`: log the use for the Knowledge page. */
 	search(
 		projectId: string,
 		query: string,
 		options?: { limit?: number; agent?: boolean },
 	): Promise<KnowledgeHit[]>;
-	/**
-	 * Whether search by meaning works for the project on this computer.
-	 * Starts the preparation of its vectors when they are behind.
-	 */
+	/** Whether search by meaning works; starts vector prep when behind. */
 	meaning(projectId: string): Promise<KnowledgeMeaningStatus>;
-	/**
-	 * Turns search by meaning on or off for the project, for every Device
-	 * of its Space. Returns how it stands now.
-	 */
-	setMeaning(projectId: string, on: boolean): Promise<KnowledgeMeaningStatus>;
+	/** Turns search by meaning on or off for the project. Returns status. */
+	setMeaning(
+		actor: Actor,
+		spaceId: string,
+		projectId: string,
+		on: boolean,
+	): Promise<KnowledgeMeaningStatus>;
 	/** The question set against each way to search on this computer. */
 	evaluate(projectId: string): Promise<KnowledgeEvaluation>;
 
@@ -165,9 +123,16 @@ export type Knowledge = {
 	 * The quick look at links a person tells, before anything is saved: what
 	 * each one is, by the project's page reader (ADR 39), in their order.
 	 */
-	look(projectId: string, urls: readonly string[]): Promise<LinkLook[]>;
+	look(
+		actor: Actor,
+		spaceId: string,
+		projectId: string,
+		urls: readonly string[],
+	): Promise<LinkLook[]>;
 	/** Chooses the page reader of the project (ADR 39), for every Device of its Space. Returns it. */
 	setReader(
+		actor: Actor,
+		spaceId: string,
 		projectId: string,
 		setting: PageReaderSetting,
 	): Promise<PageReaderSetting>;
@@ -188,6 +153,8 @@ export type Knowledge = {
 	 * content cannot be fetched now.
 	 */
 	settleLearning(
+		actor: Actor,
+		spaceId: string,
 		projectId: string,
 		id: string,
 		decision: "keep" | "delete",
@@ -200,6 +167,8 @@ export type Knowledge = {
 	 * refuses, and a note that no longer waits.
 	 */
 	settleNote(
+		actor: Actor,
+		spaceId: string,
 		projectId: string,
 		note: WaitingNote,
 		decision: "keep" | "delete",
@@ -212,6 +181,8 @@ export type Knowledge = {
 	 * `settleLearning` does.
 	 */
 	tellLearning(
+		actor: Actor,
+		spaceId: string,
 		projectId: string,
 		note: string,
 		by: NotePerson,
@@ -235,7 +206,12 @@ export type Knowledge = {
 	 */
 	learnsFromRuns(projectId: string): Promise<boolean>;
 	/** Turns the learnings from runs on or off for the project, for every Device of its Space. */
-	setLearnsFromRuns(projectId: string, on: boolean): Promise<void>;
+	setLearnsFromRuns(
+		actor: Actor,
+		spaceId: string,
+		projectId: string,
+		on: boolean,
+	): Promise<void>;
 	/**
 	 * The look back at the runs this computer walks (ADR 37): when one ends
 	 * with a signal, the Learner proposes what to learn, one look at a time.
@@ -269,6 +245,8 @@ export type Knowledge = {
 	 * to the Space as a step's changes do. Returns the set.
 	 */
 	markQuestion(
+		actor: Actor,
+		spaceId: string,
 		projectId: string,
 		mark: { query: string; answers: readonly string[]; by: string | null },
 	): Promise<KnowledgeQuestion[]>;
@@ -286,6 +264,8 @@ export type Knowledge = {
 	 * list.
 	 */
 	markNotTopic(
+		actor: Actor,
+		spaceId: string,
 		projectId: string,
 		mark: { word: string; notTopic: boolean; by: string | null },
 	): Promise<string[]>;
@@ -327,43 +307,42 @@ export type Knowledge = {
 		request: KnowledgeRequest,
 		step?: SessionStep,
 	): Promise<SessionKnowledge>;
-	/**
-	 * Ends this Knowledge: the timers stop, the index file closes, and no
-	 * vectors are prepared any more. A session that outlives it (a reload,
-	 * under a placed step) still searches: the index opens again for it.
-	 */
+	/** Ends this Knowledge: timers stop and the index closes. */
 	close(): void;
+};
+
+/** Who may act in a Space. Filled by the runtime from `runs/access`. */
+export type KnowledgeAccess = {
+	openSpace(
+		actor: Actor,
+		request: { spaceId: string; need?: import("@nightshift/auth").Permissions },
+	): Promise<void>;
 };
 
 export type KnowledgeDeps = {
 	db: Database;
+	access: KnowledgeAccess;
 	/** Where this computer keeps its data: the folders and the index. */
 	dataDir: string;
-	/** This Replica's synced documents: the knowledge documents are some of them. */
+	/** This Replica's synced documents (knowledge among them). */
 	documents: SyncedDocuments;
-	/** The content by hash: here, and at the Spaces' Hosts once the devices runtime connects it. */
+	/** Content by hash here, and at Hosts once the devices runtime connects. */
 	archive: SpaceArchive;
-	/** The turns and the holds of each folder. One set per process: they must outlive this Knowledge across a reload. */
+	/** Turns and holds of each folder. One set per process across reloads. */
 	folderLocks: KnowledgeFolderLocks;
-	/** This computer: it signs what it writes, and a source that reads a folder here syncs here. */
+	/** This computer: signs writes; a source that reads a folder here syncs here. */
 	device: { id: string; name: string };
-	/**
-	 * The embedding model for search by meaning, or what gives the one to
-	 * use now. Without it, or when it gives null, search finds by words only.
-	 */
+	/** Embedding model for search by meaning, or a getter. Without it, words only. */
 	meaning?: KnowledgeMeaning | (() => KnowledgeMeaning | null);
 	/** How long a page read waits for its reconcile. Default 2 s. */
 	pageWaitMs?: number;
 	/** Where the size of each knowledge document goes, once a day. */
 	usage?: UsageNotes;
-	/** Who tells the open screens that the learnings that wait changed, on any path. */
+	/** Tells open screens that waiting learnings changed. */
 	notifications: LearningsNotifications;
 	/** Other times for the timers of `connect` (`TIMERS` of `sync`). */
 	timers?: Partial<KnowledgeTimes>;
-	/**
-	 * Whether a page reader of this computer may reach its private network:
-	 * a Host only when its Settings allow it, as for a Web request. Default: yes.
-	 */
+	/** Whether a page reader may reach the private network. Default: yes. */
 	privateNetwork?: () => boolean;
 	/** A secret of this computer outside a run: the key of a page reader for the quick look. */
 	secret?: ReaderSecret;
@@ -404,6 +383,7 @@ export function wireKnowledge(deps: KnowledgeDeps): Knowledge {
 			(await documents.open(projectId)).meaningOn(),
 	});
 	const learnings = wireLearnings({
+		access: deps.access,
 		folders: { folder: (projectId) => folders.folder(projectId) },
 		documents,
 		archive,
@@ -425,6 +405,7 @@ export function wireKnowledge(deps: KnowledgeDeps): Knowledge {
 	});
 	const { folders, reader } = files;
 	const readers = wireReaders({
+		access: deps.access,
 		dataDir: deps.dataDir,
 		settings: {
 			setting: async (projectId) => (await documents.open(projectId)).reader(),
@@ -460,11 +441,13 @@ export function wireKnowledge(deps: KnowledgeDeps): Knowledge {
 		startStep: (projectId: string) => reconciler.startStep(projectId),
 	};
 	const sources = wireSources({
+		access: deps.access,
 		files: { listing: reader.listing, removeFolder: reconciler.removeFolder },
 		readers: { ready: readers.ready },
 		device: deps.device,
 	});
 	const review = wireReview({
+		access: deps.access,
 		db,
 		folders,
 		holds,
@@ -475,6 +458,7 @@ export function wireKnowledge(deps: KnowledgeDeps): Knowledge {
 		learnings: { learnings: learnings.ofProjects },
 	});
 	const map = wireMap({
+		access: deps.access,
 		folders,
 		entries: documents,
 		index: search,
@@ -536,10 +520,12 @@ export function wireKnowledge(deps: KnowledgeDeps): Knowledge {
 			return hits;
 		},
 		meaning: search.meaning,
-		async setMeaning(projectId, on) {
-			await (await documents.open(projectId)).setMeaning(on);
-			return search.meaning(projectId);
-		},
+		setMeaning: (actor, spaceId, projectId, on) =>
+			setProjectMeaning({
+				access: deps.access,
+				documents,
+				meaning: (id) => search.meaning(id),
+			})({ actor, spaceId, projectId, on }),
 		async evaluate(projectId) {
 			return search.evaluate(projectId, await review.questionSet(projectId));
 		},

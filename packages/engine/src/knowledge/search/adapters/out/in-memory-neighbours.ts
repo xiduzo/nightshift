@@ -1,7 +1,11 @@
+import type { Permissions } from "@nightshift/auth";
+import type { Actor } from "../../../../contract";
 import type { FolderSnapshot } from "../../../../folder-snapshot";
 import type {
 	FolderLooks,
 	MeaningModel,
+	MeaningSetting,
+	SearchAccess,
 	SearchIndex,
 } from "../../application/ports";
 import type { KnowledgeMeaning } from "../../domain/meaning";
@@ -351,6 +355,46 @@ export function fakeMeaning(
 		ready: async () => "ready",
 		...overrides,
 	};
+}
+
+export type InMemorySearchAccess = SearchAccess & {
+	opened: { actor: Actor; spaceId: string; need?: Permissions }[];
+	refuse(error: unknown): void;
+};
+
+export type InMemoryMeaningSetting = MeaningSetting & {
+	written: { projectId: string; on: boolean }[];
+};
+
+/** The project's search-by-meaning setting, in memory. */
+export function inMemoryMeaningSetting(): InMemoryMeaningSetting {
+	const written: { projectId: string; on: boolean }[] = [];
+	return {
+		written,
+		async open(projectId) {
+			return {
+				async setMeaning(on) {
+					written.push({ projectId, on });
+				},
+			};
+		},
+	};
+}
+
+/** Who may act, in memory. A person is refused after `refuse`. Night Shift is not. */
+export function inMemorySearchAccess(): InMemorySearchAccess {
+	let refusal: { error: unknown } | null = null;
+	const access: InMemorySearchAccess = {
+		opened: [],
+		refuse: (error) => {
+			refusal = { error };
+		},
+		async openSpace(actor, request) {
+			access.opened.push({ actor, ...request });
+			if (refusal && "personId" in actor) throw refusal.error;
+		},
+	};
+	return access;
 }
 
 /** Every port of knowledge/search in memory at once: where each use-case test starts. */

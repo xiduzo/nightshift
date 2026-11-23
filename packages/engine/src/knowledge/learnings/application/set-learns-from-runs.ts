@@ -1,20 +1,36 @@
-import type { LearningEntries } from "./ports";
+import type { Permissions } from "@nightshift/auth";
+import type { Actor } from "../../../contract";
+import type { LearningEntries, LearningsAccess } from "./ports";
+
+const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type SetLearnsFromRunsPorts = {
+	access: LearningsAccess;
 	documents: Pick<LearningEntries, "open">;
 };
 
 /** The project, and whether Night Shift learns from its runs. */
-export type SetLearnsFromRuns = { projectId: string; on: boolean };
+export type SetLearnsFromRuns = {
+	actor: Actor;
+	spaceId: string;
+	projectId: string;
+	on: boolean;
+};
 
 /**
  * Turns the learnings from runs on or off for the project, for every
  * Device of its Space.
  *
- * It checks no role: the `Knowledge` door has no actor yet (E-doors adds it).
+ * Refuses a Person who may not change knowledge (`access.openSpace`).
  */
 export const setLearnsFromRuns =
 	(ports: SetLearnsFromRunsPorts) =>
-	async ({ projectId, on }: SetLearnsFromRuns): Promise<void> => {
+	async ({
+		actor,
+		spaceId,
+		projectId,
+		on,
+	}: SetLearnsFromRuns): Promise<void> => {
+		await ports.access.openSpace(actor, { spaceId, need: CHANGES_KNOWLEDGE });
 		await (await ports.documents.open(projectId)).setLearnsFromRuns(on);
 	};

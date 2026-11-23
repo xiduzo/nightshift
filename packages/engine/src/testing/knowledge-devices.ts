@@ -83,6 +83,7 @@ export async function knowledgeDevice(
 	/** Each time the open screens heard that what waits changed: the Space and the project. */
 	const told: [string, string][] = [];
 	const learnings = wireLearnings({
+		access: { openSpace: async () => {} },
 		folders,
 		documents,
 		archive,

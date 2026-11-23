@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PageReaderSetting } from "@nightshift/flows";
 import { kitCommand } from "@nightshift/flows/testing";
+import { NIGHT_SHIFT } from "../../contract";
 import { tinyPdf } from "../../testing/documents";
 import { firecrawlReader } from "./adapters/out/firecrawl-page-reader";
 import { jinaReader } from "./adapters/out/jina-page-reader";
@@ -510,7 +511,7 @@ describe("the quick look", () => {
 			dataDir,
 			setting: async () => setting,
 			rules: () => open,
-		}).look("p1", urls);
+		}).look(NIGHT_SHIFT, "space-1", "p1", urls);
 
 	test("a page that starts a folder the sitemap lists is a section, and names its feed", async () => {
 		site["/robots.txt"] = {

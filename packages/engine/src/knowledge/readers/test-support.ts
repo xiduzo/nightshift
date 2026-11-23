@@ -15,6 +15,7 @@ export function createPageReaders(deps: {
 	secret?: ReaderSecret;
 }): PageReaders {
 	return wireReaders({
+		access: { openSpace: async () => {} },
 		dataDir: deps.dataDir,
 		settings: {
 			setting: deps.setting,

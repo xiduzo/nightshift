@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, flowSchema } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { NIGHT_SHIFT } from "../../../contract";
 import { inMemorySourcesPorts } from "../adapters/out/in-memory-neighbours";
 import { syncKnowledgeSource } from "./sync-knowledge-source";
 
@@ -27,6 +28,8 @@ describe("syncKnowledgeSource", () => {
 			}),
 		);
 		const run = await syncKnowledgeSource(ports)({
+			actor: NIGHT_SHIFT,
+			spaceId: "space-1",
 			projectId: "p1",
 			name: "web",
 			startedBy: "person-1",
@@ -38,6 +41,8 @@ describe("syncKnowledgeSource", () => {
 	test("a flow that is no source starts nothing", async () => {
 		const ports = inMemorySourcesPorts();
 		const refusal = await syncKnowledgeSource(ports)({
+			actor: NIGHT_SHIFT,
+			spaceId: "space-1",
 			projectId: "p1",
 			name: "nothing",
 			startedBy: "person-1",

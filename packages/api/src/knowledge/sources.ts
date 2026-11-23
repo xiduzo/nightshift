@@ -1,4 +1,3 @@
-import { ROLE_REFUSAL } from "@nightshift/auth";
 import {
 	flowNameSchema,
 	isTimeZone,
@@ -9,10 +8,8 @@ import { z } from "zod";
 
 import { flowIssueSchema } from "../flows";
 import { output } from "../output";
-import { permitted, refusalError } from "../procedures";
-import { projectProcedure } from "../projects";
 import { runSummarySchema } from "../runs";
-import { MAY, projectInput, rightsOf } from "./access";
+import { knowledgeProcedure, projectInput, rightsOf } from "./access";
 import { linkLookSchema } from "./schemas";
 
 /** The clock of the person who saves a schedule, such as `Europe/Amsterdam`. */
@@ -34,7 +31,7 @@ export const knowledgeSources = {
 	 * schedule is this computer's owner's. Returns the flow's name and its
 	 * problems.
 	 */
-	saveSource: projectProcedure(
+	saveSource: knowledgeProcedure(
 		projectInput.extend({
 			/** The source to change. Unset: a new one. */
 			name: flowNameSchema.optional(),
@@ -46,7 +43,6 @@ export const knowledgeSources = {
 				.optional(),
 			timeZone: timeZoneSchema.optional(),
 		}),
-		permitted(MAY.save),
 	)
 		.route({
 			summary:
@@ -59,7 +55,13 @@ export const knowledgeSources = {
 			const { projectId, ...source } = input;
 			return context.knowledge
 				.sources(context.space)
-				.save(projectId, source, rightsOf(context));
+				.save(
+					context.actor,
+					context.spaceId,
+					projectId,
+					source,
+					rightsOf(context),
+				);
 		}),
 	/**
 	 * Removes a source the page added: its flow and its schedules, and with
@@ -68,40 +70,31 @@ export const knowledgeSources = {
 	 * files changes the knowledge, so it asks a role that may start runs
 	 * (ADR 4). Returns how many files it removed.
 	 */
-	removeSource: projectProcedure(
+	removeSource: knowledgeProcedure(
 		projectInput.extend({ name: flowNameSchema, removeFiles: z.boolean() }),
-		permitted(MAY.remove),
 	)
 		.route({
 			summary:
 				"Removes a source from a project's knowledge: its flow, its schedules and, if asked, its files.",
 		})
 		.output(output(z.object({ removedFiles: z.number() })))
-		.handler(async ({ context, input }) => {
-			// Removing files changes the knowledge: a role that may start runs (ADR 4).
-			if (
-				input.removeFiles &&
-				!(await context.access.can(MAY.changeKnowledge))
-			) {
-				throw refusalError(ROLE_REFUSAL);
-			}
-			return context.knowledge
+		.handler(({ context, input }) =>
+			context.knowledge
 				.sources(context.space)
 				.remove(
+					context.actor,
+					context.spaceId,
 					input.projectId,
 					input.name,
 					{ files: input.removeFiles },
 					rightsOf(context),
-				);
-		}),
+				),
+		),
 	/**
 	 * Syncs a source the page added now: a run of its flow. A folder
 	 * source's Subflow runs on the computer that has the folder.
 	 */
-	syncSource: projectProcedure(
-		projectInput.extend({ name: flowNameSchema }),
-		permitted(MAY.changeKnowledge),
-	)
+	syncSource: knowledgeProcedure(projectInput.extend({ name: flowNameSchema }))
 		.route({
 			summary:
 				"Syncs a knowledge source now: starts a run of its flow where its schedule runs it.",
@@ -110,7 +103,13 @@ export const knowledgeSources = {
 		.handler(({ context, input }) =>
 			context.knowledge
 				.sources(context.space)
-				.sync(input.projectId, input.name, context.session.user.id),
+				.sync(
+					context.actor,
+					context.spaceId,
+					input.projectId,
+					input.name,
+					context.session.user.id,
+				),
 		),
 	/**
 	 * Chooses the page reader of the project, on every computer of its Space
@@ -119,9 +118,8 @@ export const knowledgeSources = {
 	 * key. It changes how the knowledge fills, so it asks a role that may
 	 * start runs (ADR 4). Returns the setting.
 	 */
-	setReader: projectProcedure(
+	setReader: knowledgeProcedure(
 		projectInput.extend({ reader: pageReaderSettingSchema }),
-		permitted(MAY.changeKnowledge),
 	)
 		.route({
 			summary:
@@ -129,7 +127,12 @@ export const knowledgeSources = {
 		})
 		.output(output(pageReaderSettingSchema))
 		.handler(({ context, input }) =>
-			context.knowledge.setReader(input.projectId, input.reader),
+			context.knowledge.setReader(
+				context.actor,
+				context.spaceId,
+				input.projectId,
+				input.reader,
+			),
 		),
 	/**
 	 * The quick look at links a person tells, before anything is saved: what
@@ -137,12 +140,10 @@ export const knowledgeSources = {
 	 * read), its title, and for a page how many pages share its folder. By the
 	 * project's page reader, on this computer, within a few seconds per link.
 	 */
-	look: projectProcedure(
+	look: knowledgeProcedure(
 		projectInput.extend({
 			urls: z.array(z.string().trim().min(1).max(2000)).min(1).max(20),
 		}),
-		// A look reads the web from this computer: for a role that may add a source.
-		permitted(MAY.save),
 	)
 		.route({
 			summary:
@@ -150,6 +151,11 @@ export const knowledgeSources = {
 		})
 		.output(output(z.array(linkLookSchema)))
 		.handler(({ context, input }) =>
-			context.knowledge.look(input.projectId, input.urls),
+			context.knowledge.look(
+				context.actor,
+				context.spaceId,
+				input.projectId,
+				input.urls,
+			),
 		),
 };

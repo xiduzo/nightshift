@@ -14,6 +14,7 @@ export function knowledgeSources<Run extends SourceRun>(deps: {
 	device: { id: string; name: string };
 }) {
 	return wireSources({
+		access: { openSpace: async () => {} },
 		files: deps.files,
 		readers: { ready: deps.readerReady },
 		device: deps.device,

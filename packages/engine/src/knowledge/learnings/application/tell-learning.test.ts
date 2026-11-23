@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { formatLearnings } from "@nightshift/flows";
 import type { Refusal } from "@nightshift/refusal";
+import { NIGHT_SHIFT } from "../../../contract";
 import { inMemoryLearningsPorts } from "../adapters/out/in-memory-neighbours";
 import { tellLearning } from "./tell-learning";
 
@@ -20,7 +21,13 @@ const refusalOf = (work: Promise<unknown>) =>
 describe("tellLearning", () => {
 	test("a told note goes to the person's own file, with who told it and when", async () => {
 		const ports = inMemoryLearningsPorts();
-		await tellLearning(ports)({ projectId: "p1", note: "Ask Bo.", by: ADA });
+		await tellLearning(ports)({
+			actor: NIGHT_SHIFT,
+			spaceId: "space-1",
+			projectId: "p1",
+			note: "Ask Bo.",
+			by: ADA,
+		});
 		expect(ports.folder.read("p1", TOLD)).toContain(
 			"- Ask Bo.\n  Told by Ada on 2023-11-14.\n",
 		);
@@ -30,7 +37,13 @@ describe("tellLearning", () => {
 	test("refuses an empty note before it holds the folder", async () => {
 		const ports = inMemoryLearningsPorts();
 		const refusal = await refusalOf(
-			tellLearning(ports)({ projectId: "p1", note: "  ", by: ADA }),
+			tellLearning(ports)({
+				actor: NIGHT_SHIFT,
+				spaceId: "space-1",
+				projectId: "p1",
+				note: "  ",
+				by: ADA,
+			}),
 		);
 		expect(refusal?.kind).toBe("invalid");
 		expect(refusal?.message).toBe("Write the note first.");
@@ -46,6 +59,8 @@ describe("tellLearning", () => {
 		);
 		const replaces = { id: "run-1.s1.md", index: 0, note: "One." };
 		await tellLearning(ports)({
+			actor: NIGHT_SHIFT,
+			spaceId: "space-1",
 			projectId: "p1",
 			note: "One, better.",
 			by: ADA,
@@ -55,6 +70,8 @@ describe("tellLearning", () => {
 		expect(ports.folder.read("p1", PROPOSED)).toBeUndefined();
 		const refusal = await refusalOf(
 			tellLearning(ports)({
+				actor: NIGHT_SHIFT,
+				spaceId: "space-1",
 				projectId: "p1",
 				note: "Again.",
 				by: ADA,

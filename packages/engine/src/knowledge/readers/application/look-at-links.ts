@@ -1,3 +1,5 @@
+import type { Permissions } from "@nightshift/auth";
+import type { Actor } from "../../../contract";
 import {
 	emptyLook,
 	type LinkLook,
@@ -19,10 +21,14 @@ import type {
 	PageReader,
 	ReaderServices,
 	ReaderSettings,
+	ReadersAccess,
 	SiteFacts,
 } from "./ports";
 
+const SAVES_FLOWS: Permissions = { flow: ["save"] };
+
 export type LookAtLinksPorts = {
+	access: ReadersAccess;
 	settings: Pick<ReaderSettings, "setting">;
 	services: ReaderServices;
 	sites: SiteFacts;
@@ -34,7 +40,12 @@ export type LookAtLinksPorts = {
 };
 
 /** The project, and the links a person told, in their order. */
-export type LookAtLinks = { projectId: string; urls: readonly string[] };
+export type LookAtLinks = {
+	actor: Actor;
+	spaceId: string;
+	projectId: string;
+	urls: readonly string[];
+};
 
 /**
  * The quick look at each link, in their order, with the project's reader
@@ -48,7 +59,13 @@ export type LookAtLinks = { projectId: string; urls: readonly string[] };
  */
 export const lookAtLinks =
 	(ports: LookAtLinksPorts) =>
-	async ({ projectId, urls }: LookAtLinks): Promise<LinkLook[]> => {
+	async ({
+		actor,
+		spaceId,
+		projectId,
+		urls,
+	}: LookAtLinks): Promise<LinkLook[]> => {
+		await ports.access.openSpace(actor, { spaceId, need: SAVES_FLOWS });
 		const reader = await readerOf(
 			await ports.settings.setting(projectId),
 			ports.secret,

@@ -4,7 +4,9 @@ import {
 	createSpaceArchive,
 	type Knowledge,
 	measuredMeaning,
+	memberRole,
 	transcriptLines,
+	wireAccess,
 	wireKnowledge,
 } from "@nightshift/engine";
 import {
@@ -89,9 +91,23 @@ export async function wireDaemonKnowledge(deps: {
 	);
 	const knowledge = await slots.replace(
 		"nightshiftKnowledge",
-		() =>
-			wireKnowledge({
+		() => {
+			const access = wireAccess({
+				log: {
+					row: async () => {
+						throw new Error("unused");
+					},
+					walkedHere: () => false,
+				},
+				members: {
+					db: deps.db,
+					documentRole: async (spaceId, personId) =>
+						memberRole(await deps.documents.open(spaceId), personId),
+				},
+			});
+			return wireKnowledge({
 				db: deps.db,
+				access,
 				dataDir,
 				documents: deps.documents,
 				archive,
@@ -107,7 +123,8 @@ export async function wireDaemonKnowledge(deps: {
 					learningsChanged: (spaceId, projectId) =>
 						deps.learningsChanged(spaceId, projectId),
 				},
-			}),
+			});
+		},
 		(before) => before.close(),
 	);
 	return { ollama, archive, knowledge };

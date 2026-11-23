@@ -1,9 +1,8 @@
 import { z } from "zod";
 
 import { output } from "../output";
-import { permitted } from "../procedures";
 import { projectProcedure } from "../projects";
-import { agentSchema, MAY, projectInput } from "./access";
+import { agentSchema, knowledgeProcedure, projectInput } from "./access";
 import { knowledgeHitSchema, knowledgeMeaningSchema } from "./schemas";
 
 /**
@@ -55,16 +54,18 @@ export const knowledgeSearch = {
 	 * of its Space. It changes the knowledge, so it asks a role that may
 	 * start runs (ADR 4).
 	 */
-	setMeaning: projectProcedure(
-		projectInput.extend({ on: z.boolean() }),
-		permitted(MAY.changeKnowledge),
-	)
+	setMeaning: knowledgeProcedure(projectInput.extend({ on: z.boolean() }))
 		.route({
 			summary:
 				"Turns knowledge search by meaning on or off for a project, on every computer of its Space.",
 		})
 		.output(output(knowledgeMeaningSchema))
 		.handler(({ context, input }) =>
-			context.knowledge.setMeaning(input.projectId, input.on),
+			context.knowledge.setMeaning(
+				context.actor,
+				context.spaceId,
+				input.projectId,
+				input.on,
+			),
 		),
 };

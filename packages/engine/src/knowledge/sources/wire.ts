@@ -1,5 +1,6 @@
 import type { FlowIssue, KnowledgeSource } from "@nightshift/flows";
 import { now as timeNow } from "@nightshift/time";
+import type { Actor } from "../../contract";
 import { timerWait } from "./adapters/out/timer-wait";
 import { listFillingFlows } from "./application/list-filling-flows";
 import {
@@ -9,6 +10,7 @@ import {
 import type {
 	ReaderReady,
 	SourceFiles,
+	SourcesAccess,
 	SourcesSpace,
 } from "./application/ports";
 import { removeKnowledgeSource } from "./application/remove-knowledge-source";
@@ -28,6 +30,7 @@ import type {
 
 /** What the knowledge gives knowledge/sources: the ports another part fills. */
 export type SourcesDeps = {
+	access: SourcesAccess;
 	/** This Device's knowledge: the files, and the removal of a folder. */
 	files: SourceFiles;
 	readers: ReaderReady;
@@ -45,6 +48,8 @@ export type KnowledgeSources<Run extends SourceRun = SourceRun> = {
 	syncs(projectId: string): Promise<KnowledgeSync[]>;
 	/** Adds a source, or changes one the page added (`saveKnowledgeSource`). */
 	save(
+		actor: Actor,
+		spaceId: string,
 		projectId: string,
 		input: {
 			name?: string;
@@ -56,13 +61,21 @@ export type KnowledgeSources<Run extends SourceRun = SourceRun> = {
 	): Promise<{ name: string; issues: FlowIssue[] }>;
 	/** Removes a source the page added (`removeKnowledgeSource`). Returns how many files it removed. */
 	remove(
+		actor: Actor,
+		spaceId: string,
 		projectId: string,
 		name: string,
 		options: { files: boolean },
 		may: SourceRights,
 	): Promise<{ removedFiles: number }>;
 	/** Syncs a source now: a run of its flow (`syncKnowledgeSource`). */
-	sync(projectId: string, name: string, startedBy: string): Promise<Run>;
+	sync(
+		actor: Actor,
+		spaceId: string,
+		projectId: string,
+		name: string,
+		startedBy: string,
+	): Promise<Run>;
 };
 
 /** The knowledge sources of this Device, in the Space of each request. */
@@ -81,17 +94,29 @@ export function wireSources(deps: SourcesDeps): Sources {
 		sourcesIn<Run extends SourceRun>(space: SourcesSpace<Run>) {
 			const fillingFlows = listFillingFlows({ space, device, wait, now });
 			const list = listKnowledgeSources({ files, readers, fillingFlows });
-			const save = saveKnowledgeSource({ space, device });
-			const remove = removeKnowledgeSource({ space, files });
-			const sync = syncKnowledgeSource({ space });
+			const save = saveKnowledgeSource({ access: deps.access, space, device });
+			const remove = removeKnowledgeSource({
+				access: deps.access,
+				space,
+				files,
+			});
+			const sync = syncKnowledgeSource({ access: deps.access, space });
 			return {
 				list: (projectId, can) => list({ projectId, can }),
 				syncs: async (projectId) => (await fillingFlows({ projectId })).syncs,
-				save: (projectId, input, may) => save({ projectId, ...input, may }),
-				remove: (projectId, name, options, may) =>
-					remove({ projectId, name, files: options.files, may }),
-				sync: (projectId, name, startedBy) =>
-					sync({ projectId, name, startedBy }),
+				save: (actor, spaceId, projectId, input, may) =>
+					save({ actor, spaceId, projectId, ...input, may }),
+				remove: (actor, spaceId, projectId, name, options, may) =>
+					remove({
+						actor,
+						spaceId,
+						projectId,
+						name,
+						files: options.files,
+						may,
+					}),
+				sync: (actor, spaceId, projectId, name, startedBy) =>
+					sync({ actor, spaceId, projectId, name, startedBy }),
 			};
 		},
 	};

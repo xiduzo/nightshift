@@ -1,9 +1,12 @@
+import type { Permissions } from "@nightshift/auth";
 import type { Flow, Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import type { Actor } from "../../../../contract";
 import type { KnowledgeListing } from "../../../files";
 import type {
 	ReaderReady,
 	SourceFiles,
+	SourcesAccess,
 	SourcesSpace,
 } from "../../application/ports";
 import type { SourceRun } from "../../domain/syncs";
@@ -152,9 +155,31 @@ export function inMemoryReaderReady(): ReaderReady & { isReady: boolean } {
 }
 
 /** Every port of knowledge/sources in memory at once: where each use-case test starts. */
+
+export type InMemorySourcesAccess = SourcesAccess & {
+	opened: { actor: Actor; spaceId: string; need?: Permissions }[];
+	refuse(error: unknown): void;
+};
+
+export function inMemorySourcesAccess(): InMemorySourcesAccess {
+	let refusal: { error: unknown } | null = null;
+	const access: InMemorySourcesAccess = {
+		opened: [],
+		refuse: (error) => {
+			refusal = { error };
+		},
+		async openSpace(actor, request) {
+			access.opened.push({ actor, ...request });
+			if (refusal && "personId" in actor) throw refusal.error;
+		},
+	};
+	return access;
+}
+
 export function inMemorySourcesPorts() {
 	let clock = 1_000_000;
 	return {
+		access: inMemorySourcesAccess(),
 		space: inMemorySourcesSpace(),
 		files: inMemorySourceFiles(),
 		readers: inMemoryReaderReady(),

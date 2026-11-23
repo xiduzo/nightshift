@@ -1,9 +1,19 @@
+import type { Permissions } from "@nightshift/auth";
 import { ACCEPTED_LEARNINGS_DIR, proposedLearningOf } from "@nightshift/flows";
+import type { Actor } from "../../../contract";
 import { proposedFile } from "../domain/proposed";
 import { learningGone } from "../domain/waiting";
-import type { FolderHolds, LearningEntries, LearningFolder } from "./ports";
+import type {
+	FolderHolds,
+	LearningEntries,
+	LearningFolder,
+	LearningsAccess,
+} from "./ports";
+
+const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type SettleLearningPorts = {
+	access: LearningsAccess;
 	folder: Pick<LearningFolder, "bytes" | "append" | "remove">;
 	documents: Pick<LearningEntries, "open">;
 	holds: FolderHolds;
@@ -11,6 +21,8 @@ export type SettleLearningPorts = {
 
 /** One step's proposed learnings, by the name of its file, and what a person decided. */
 export type SettleLearning = {
+	actor: Actor;
+	spaceId: string;
 	projectId: string;
 	id: string;
 	decision: "keep" | "delete";
@@ -23,11 +35,18 @@ export type SettleLearning = {
  * ends. Refuses a name that is no proposed learning, one that no longer
  * waits, and one whose content cannot be fetched now.
  *
- * It checks no role: the `Knowledge` door has no actor yet (E-doors adds it).
+ * Refuses a Person who may not change knowledge (`access.openSpace`).
  */
 export const settleLearning =
 	(ports: SettleLearningPorts) =>
-	async ({ projectId, id, decision }: SettleLearning): Promise<void> => {
+	async ({
+		actor,
+		spaceId,
+		projectId,
+		id,
+		decision,
+	}: SettleLearning): Promise<void> => {
+		await ports.access.openSpace(actor, { spaceId, need: CHANGES_KNOWLEDGE });
 		if (!proposedLearningOf(id)) throw learningGone();
 		const hold = await ports.holds.startStep(projectId);
 		try {

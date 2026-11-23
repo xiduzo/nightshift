@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentEvent } from "@nightshift/agents/types";
 import { iso, now } from "@nightshift/time";
+import { NIGHT_SHIFT } from "../../contract";
 import {
 	knowledgeDevice as device,
 	memoryHost,
@@ -221,11 +222,11 @@ describe("settle", () => {
 		await syncDocuments(a, b);
 
 		state.down = true;
-		await expect(b.learnings.settle("p1", "run-1.md", "keep")).rejects.toThrow(
-			"Night Shift cannot get this learning now.",
-		);
+		await expect(
+			b.learnings.settle(NIGHT_SHIFT, "space-1", "p1", "run-1.md", "keep"),
+		).rejects.toThrow("Night Shift cannot get this learning now.");
 		state.down = false;
-		await b.learnings.settle("p1", "run-1.md", "keep");
+		await b.learnings.settle(NIGHT_SHIFT, "space-1", "p1", "run-1.md", "keep");
 		expect(await b.read("learnings/accepted/run-1.md")).toBe("- One.\n");
 		expect(await b.has("learnings/proposed/run-1.md")).toBe(false);
 	});
@@ -250,6 +251,8 @@ describe("one note at a time", () => {
 	test("keeps one note with who kept it and when, and leaves the others waiting", async () => {
 		const a = await waitingOne();
 		await a.learnings.settleNote(
+			NIGHT_SHIFT,
+			"space-1",
 			"p1",
 			{ id: "run-1.s1.md", index: 1, note: "Two." },
 			"keep",
@@ -270,9 +273,30 @@ describe("one note at a time", () => {
 	test("a second kept note adds to the file, and a delete keeps nothing", async () => {
 		const a = await waitingOne();
 		const at = { id: "run-1.s1.md" };
-		await a.learnings.settleNote("p1", { ...at, index: 0 }, "keep", ada);
-		await a.learnings.settleNote("p1", { ...at, index: 0 }, "delete", ada);
-		await a.learnings.settleNote("p1", { ...at, index: 0 }, "keep", ada);
+		await a.learnings.settleNote(
+			NIGHT_SHIFT,
+			"space-1",
+			"p1",
+			{ ...at, index: 0 },
+			"keep",
+			ada,
+		);
+		await a.learnings.settleNote(
+			NIGHT_SHIFT,
+			"space-1",
+			"p1",
+			{ ...at, index: 0 },
+			"delete",
+			ada,
+		);
+		await a.learnings.settleNote(
+			NIGHT_SHIFT,
+			"space-1",
+			"p1",
+			{ ...at, index: 0 },
+			"keep",
+			ada,
+		);
 		const accepted = await a.read("learnings/accepted/run-1.s1.md");
 		expect(
 			accepted.endsWith(
@@ -288,6 +312,8 @@ describe("one note at a time", () => {
 	test("finds a note that moved by its text, and refuses one that is gone", async () => {
 		const a = await waitingOne();
 		await a.learnings.settleNote(
+			NIGHT_SHIFT,
+			"space-1",
 			"p1",
 			{ id: "run-1.s1.md", index: 0, note: "One." },
 			"delete",
@@ -295,6 +321,8 @@ describe("one note at a time", () => {
 		);
 		// Seen at index 2 before "One." went: it is at 1 now.
 		await a.learnings.settleNote(
+			NIGHT_SHIFT,
+			"space-1",
 			"p1",
 			{ id: "run-1.s1.md", index: 2, note: "Three." },
 			"delete",
@@ -303,6 +331,8 @@ describe("one note at a time", () => {
 		expect((await a.learnings.waiting("p1"))[0]?.notes).toEqual(["Two."]);
 		await expect(
 			a.learnings.settleNote(
+				NIGHT_SHIFT,
+				"space-1",
 				"p1",
 				{ id: "run-1.s1.md", index: 0, note: "One." },
 				"keep",
@@ -311,6 +341,8 @@ describe("one note at a time", () => {
 		).rejects.toThrow("This note no longer waits.");
 		await expect(
 			a.learnings.settleNote(
+				NIGHT_SHIFT,
+				"space-1",
 				"p1",
 				{ id: "run-1.s1.md", index: 5 },
 				"keep",
@@ -318,7 +350,14 @@ describe("one note at a time", () => {
 			),
 		).rejects.toThrow("This note no longer waits.");
 		await expect(
-			a.learnings.settleNote("p1", { id: "../x.md", index: 0 }, "keep", ada),
+			a.learnings.settleNote(
+				NIGHT_SHIFT,
+				"space-1",
+				"p1",
+				{ id: "../x.md", index: 0 },
+				"keep",
+				ada,
+			),
 		).rejects.toThrow("This learning no longer waits.");
 		expect(await a.has("learnings/accepted")).toBe(false);
 	});
@@ -334,10 +373,17 @@ describe("one note at a time", () => {
 		state.down = true;
 		const one = { id: "run-1.s1.md", index: 0, note: "One." };
 		await expect(
-			b.learnings.settleNote("p1", one, "keep", ada),
+			b.learnings.settleNote(NIGHT_SHIFT, "space-1", "p1", one, "keep", ada),
 		).rejects.toThrow("Night Shift cannot get this learning now.");
 		state.down = false;
-		await b.learnings.settleNote("p1", one, "keep", ada);
+		await b.learnings.settleNote(
+			NIGHT_SHIFT,
+			"space-1",
+			"p1",
+			one,
+			"keep",
+			ada,
+		);
 		expect((await b.learnings.waiting("p1"))[0]?.notes).toEqual([
 			"Two.",
 			"Three.",
@@ -346,8 +392,20 @@ describe("one note at a time", () => {
 
 	test("a told note goes to the person's own file, with who told it and when", async () => {
 		const a = await waitingOne();
-		await a.learnings.tell("p1", "  Deploys wait\n for two people. ", ada);
-		await a.learnings.tell("p1", "The sweep takes 40 minutes.", ada);
+		await a.learnings.tell(
+			NIGHT_SHIFT,
+			"space-1",
+			"p1",
+			"  Deploys wait\n for two people. ",
+			ada,
+		);
+		await a.learnings.tell(
+			NIGHT_SHIFT,
+			"space-1",
+			"p1",
+			"The sweep takes 40 minutes.",
+			ada,
+		);
 		expect(await a.read("learnings/accepted/told-ada.md")).toBe(
 			`# Learnings people told\n\nWhat a person of this Space told agents about this project.\n\n- Deploys wait for two people.\n  Told by Ada Lovelace on ${today}.\n- The sweep takes 40 minutes.\n  Told by Ada Lovelace on ${today}.\n`,
 		);
@@ -359,18 +417,25 @@ describe("one note at a time", () => {
 			"Deploys wait for two people.",
 			"The sweep takes 40 minutes.",
 		]);
-		await expect(a.learnings.tell("p1", " \n", ada)).rejects.toThrow(
-			"Write the note first.",
-		);
+		await expect(
+			a.learnings.tell(NIGHT_SHIFT, "space-1", "p1", " \n", ada),
+		).rejects.toThrow("Write the note first.");
 	});
 
 	test("a told note replaces the note it changes, and keeps nothing when that note is gone", async () => {
 		const a = await waitingOne();
-		await a.learnings.tell("p1", "Two, but right.", ada, {
-			id: "run-1.s1.md",
-			index: 1,
-			note: "Two.",
-		});
+		await a.learnings.tell(
+			NIGHT_SHIFT,
+			"space-1",
+			"p1",
+			"Two, but right.",
+			ada,
+			{
+				id: "run-1.s1.md",
+				index: 1,
+				note: "Two.",
+			},
+		);
 		expect((await a.learnings.waiting("p1"))[0]?.notes).toEqual([
 			"One.",
 			"Three.",
@@ -379,7 +444,7 @@ describe("one note at a time", () => {
 			"- Two, but right.\n",
 		);
 		await expect(
-			a.learnings.tell("p1", "Again.", ada, {
+			a.learnings.tell(NIGHT_SHIFT, "space-1", "p1", "Again.", ada, {
 				id: "run-1.s1.md",
 				index: 1,
 				note: "Two.",

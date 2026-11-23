@@ -1,4 +1,6 @@
+import type { Permissions } from "@nightshift/auth";
 import type { PageReaderSetting } from "@nightshift/flows";
+import type { Actor } from "../../../contract";
 import type { KeptRead, Looked, PageRead, ReadMark } from "../domain/page-read";
 import type { Robots } from "../domain/site";
 
@@ -88,4 +90,15 @@ export type ReaderSettings = {
 		projectId: string,
 		setting: PageReaderSetting,
 	): Promise<PageReaderSetting>;
+};
+
+/**
+ * Who may act in a Space for a readers request.
+ * @filledBy engine/runs
+ */
+export type ReadersAccess = {
+	openSpace(
+		actor: Actor,
+		request: { spaceId: string; need?: Permissions },
+	): Promise<void>;
 };

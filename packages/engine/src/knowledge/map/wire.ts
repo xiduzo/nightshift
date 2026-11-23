@@ -1,10 +1,12 @@
 import { now as timeNow } from "@nightshift/time";
+import type { Actor } from "../../contract";
 import { fsNotTopicsFile } from "./adapters/out/fs-not-topics-file";
 import { drawMap } from "./application/draw-map";
 import { markNotTopic } from "./application/mark-not-topic";
 import type {
 	AskedQuestions,
 	FolderHolds,
+	MapAccess,
 	MapEntries,
 	MapIndex,
 	MapLearnings,
@@ -19,6 +21,7 @@ import { createMapMemo } from "./domain/memo";
 
 /** What the knowledge gives knowledge/map: the ports another part fills, and what the real adapter stands on. */
 export type MapDeps = {
+	access: MapAccess;
 	/** The knowledge folders on this computer (`files`). */
 	folders: {
 		folder(projectId: string): string;
@@ -39,6 +42,8 @@ export type KnowledgeMaps = {
 	map(projectId: string): Promise<KnowledgeMap>;
 	/** Marks a word as not a topic, or puts it back (`markNotTopic`). Returns the list. */
 	markNotTopic(
+		actor: Actor,
+		spaceId: string,
 		projectId: string,
 		mark: { word: string; notTopic: boolean; by: string | null },
 	): Promise<string[]>;
@@ -55,13 +60,14 @@ export function wireMap(deps: MapDeps): KnowledgeMaps {
 		memo: createMapMemo(),
 	});
 	const mark = markNotTopic({
+		access: deps.access,
 		notTopics,
 		holds: deps.holds,
 		now: deps.now ?? timeNow,
 	});
 	return {
 		map: (projectId) => draw({ projectId }),
-		markNotTopic: (projectId, { word, notTopic, by }) =>
-			mark({ projectId, word, notTopic, by }),
+		markNotTopic: (actor, spaceId, projectId, { word, notTopic, by }) =>
+			mark({ actor, spaceId, projectId, word, notTopic, by }),
 	};
 }

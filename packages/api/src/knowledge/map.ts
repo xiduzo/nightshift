@@ -1,9 +1,8 @@
 import { z } from "zod";
 
 import { output } from "../output";
-import { permitted } from "../procedures";
 import { projectProcedure } from "../projects";
-import { MAY, projectInput } from "./access";
+import { knowledgeProcedure, projectInput } from "./access";
 import { knowledgeMapSchema } from "./schemas";
 
 /** The Map of a project's knowledge, and the words a person takes off it. */
@@ -26,12 +25,11 @@ export const knowledgeMap = {
 	 * It changes the knowledge, so it asks a role that may start runs (ADR 4).
 	 * Returns the list.
 	 */
-	markNotTopic: projectProcedure(
+	markNotTopic: knowledgeProcedure(
 		projectInput.extend({
 			word: z.string().trim().min(1).max(200),
 			notTopic: z.boolean(),
 		}),
-		permitted(MAY.changeKnowledge),
 	)
 		.route({
 			summary:
@@ -39,10 +37,15 @@ export const knowledgeMap = {
 		})
 		.output(output(knowledgeMapSchema.shape.notTopics))
 		.handler(({ context, input }) =>
-			context.knowledge.markNotTopic(input.projectId, {
-				word: input.word,
-				notTopic: input.notTopic,
-				by: context.session.user.id,
-			}),
+			context.knowledge.markNotTopic(
+				context.actor,
+				context.spaceId,
+				input.projectId,
+				{
+					word: input.word,
+					notTopic: input.notTopic,
+					by: context.session.user.id,
+				},
+			),
 		),
 };

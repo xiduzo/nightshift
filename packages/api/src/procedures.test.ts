@@ -156,6 +156,38 @@ let gatesIn: Map<string, OpenGate[]>;
 let onResolve: () => void;
 /** Every call of a fake service, in order. */
 let calls: Call[];
+/**
+ * The knowledge door's role check, set for each request. A source route
+ * checks here, before `knowledge.sources` is recorded: the save, the
+ * remove and the sync each need a different role.
+ */
+let openTheSpace: (spaceId: string, need?: Permissions) => Promise<void> =
+	async () => {};
+let theSpace: string | null = null;
+
+/**
+ * `knowledge.sources`, after the role `need` allows it. The call is
+ * recorded when a member (`save`, `remove`, `sync`) runs, so a refusal
+ * records nothing. The object comes back at once: the handler calls the
+ * member on it.
+ */
+function sourcesOf(need: Permissions) {
+	return (...args: unknown[]) => {
+		const allowed = (async () => {
+			if (theSpace) await openTheSpace(theSpace, need);
+			calls.push({ method: "knowledge.sources", args });
+		})();
+		return new Proxy(() => {}, {
+			get(_, key) {
+				if (typeof key !== "string" || key === "then") return undefined;
+				return async () => {
+					await allowed;
+					return anything;
+				};
+			},
+		});
+	};
+}
 
 /** The fake daemon's facts: this computer is `OWNER`'s. */
 const OWNER = "ada";
@@ -236,6 +268,8 @@ function recording(
 ): Context {
 	const { ownerId = OWNER, given = {}, deviceKey = null } = options;
 	const checks = engineChecks(access);
+	openTheSpace = (spaceId, need) => checks.openSpace(spaceId, need);
+	theSpace = access.spaceId;
 	const space = (spaceId: string) => {
 		const record = (method: string, args: unknown[]) => {
 			calls.push({ space: spaceId, method, args });
@@ -257,6 +291,19 @@ function recording(
 					runScheduleNow: checked("runScheduleNow", START),
 					pauseScheduleTonight: checked("pauseScheduleTonight", STOP),
 					resumeScheduleTonight: checked("resumeScheduleTonight", STOP),
+					setUsage: checked("setUsage", { space: ["settings"] }),
+					addProject: checked("addProject", { project: ["add"] }),
+					addProjectWithoutFolder: checked("addProjectWithoutFolder", {
+						project: ["add"],
+					}),
+					removeProject: checked("removeProject", { project: ["remove"] }),
+					renameProject: checked("renameProject", { project: ["add"] }),
+					moveProject: async (projectId: string, to: string) => {
+						await checks.openSpace(spaceId, { project: ["move"] });
+						await checks.openSpace(to, { project: ["move"] });
+						record("moveProject", [projectId, to]);
+					},
+					flows: flowsChecked(spaceId, checks, record),
 					...given.space,
 				},
 				reply: (method) => {
@@ -272,7 +319,10 @@ function recording(
 	};
 	const services = {} as Record<keyof Services, unknown>;
 	for (const name of Object.keys(SERVICES) as (keyof Services)[]) {
-		services[name] = recorder([name], record, { given: given[name] });
+		services[name] =
+			name === "knowledge"
+				? knowledgeDoor(given.knowledge, checks.openSpace, access.spaceId)
+				: recorder([name], record, { given: given[name] });
 	}
 	const { runs: givenRuns, ...givenEngine } = given.engine ?? {};
 	const runs = new Proxy(
@@ -396,6 +446,81 @@ const screen = {
 const inEditor = { ...project, flowName: "fix", flow };
 const SAVE: Permissions = { flow: ["save"] };
 const START: Permissions = { run: ["start"] };
+
+/**
+ * What a knowledge change needs the Person's role to allow. The fake
+ * checks it before it records the call, as the engine's use case does.
+ */
+const KNOWLEDGE_NEEDS: Record<string, Permissions> = {
+	settleLearning: START,
+	settleNote: START,
+	tellLearning: START,
+	setLearnsFromRuns: START,
+	setMeaning: START,
+	markNotTopic: START,
+	markQuestion: START,
+	setReader: START,
+	look: SAVE,
+};
+
+/** The flows of a Space view: a change checks the role, then records `flows.<name>`. */
+function flowsChecked(
+	spaceId: string,
+	checks: ReturnType<typeof engineChecks>,
+	record: (method: string, args: unknown[]) => void,
+) {
+	const needs: Record<string, Permissions> = {
+		save: SAVE,
+		remove: { flow: ["remove"] },
+		restore: SAVE,
+		import: SAVE,
+		copy: SAVE,
+	};
+	return new Proxy(() => {}, {
+		get(_, key) {
+			if (typeof key !== "string" || key === "then") return undefined;
+			const need = needs[key];
+			if (!need) {
+				return (...args: unknown[]) => {
+					record(`flows.${key}`, args);
+					return key === "revisions" ? [] : anything;
+				};
+			}
+			return async (...args: unknown[]) => {
+				await checks.openSpace(spaceId, need);
+				record(`flows.${key}`, args);
+				return anything;
+			};
+		},
+	});
+}
+
+/** The knowledge service: a change checks the role, then records the call. */
+function knowledgeDoor(
+	given: Record<string, unknown> | undefined,
+	openSpace: (spaceId: string, need?: Permissions) => Promise<void>,
+	spaceId: string | null,
+) {
+	return new Proxy(() => {}, {
+		get(_, key) {
+			if (typeof key !== "string" || key === "then") return undefined;
+			if (given && key in given) return given[key];
+			const need = KNOWLEDGE_NEEDS[key];
+			// A read answers at once, as the recorder does. A change checks the role first.
+			if (!need) {
+				return (...args: unknown[]) => {
+					calls.push({ method: `knowledge.${key}`, args });
+					return anything;
+				};
+			}
+			return async (...args: unknown[]) => {
+				if (spaceId) await openSpace(spaceId, need);
+				calls.push({ method: `knowledge.${key}`, args });
+				return anything;
+			};
+		},
+	});
+}
 const STOP: Permissions = { run: ["stop"] };
 const RESUME: Permissions = { run: ["resume"] };
 const OWNER_SAVING = { owner: true as const, role: SAVE };
@@ -487,26 +612,26 @@ const ROUTES: Route[] = [
 	route("knowledge.review", project, "session", "knowledge.review", ["p1", any]),
 	route("knowledge.files", project, "session", "knowledge.listing", ["p1"]),
 	route("knowledge.learnings", project, "session", "knowledge.learnings", [["p1"]]),
-	route("knowledge.keepLearning", learning, START, "knowledge.settleLearning", ["p1", "l1", "keep"]),
-	route("knowledge.deleteLearning", learning, START, "knowledge.settleLearning", ["p1", "l1", "delete"]),
-	route("knowledge.settleNote", { ...project, learningId: "l1", index: 1, note: "One.", decision: "keep" }, START, "knowledge.settleNote", ["p1", { id: "l1", index: 1, note: "One." }, "keep", like({ id: PERSON })]),
-	route("knowledge.tell", { ...project, note: " Two. " }, START, "knowledge.tellLearning", ["p1", "Two.", like({ id: PERSON })]),
-	route("knowledge.tell", { ...project, note: "Two.", replaces: { learningId: "l1", index: 0 } }, START, "knowledge.tellLearning", ["p1", "Two.", like({ id: PERSON }), { id: "l1", index: 0 }]),
-	route("knowledge.saveSource", { ...project, source: webSource }, SAVE, "knowledge.sources", [any]),
-	route("knowledge.removeSource", { ...flowRef, removeFiles: false }, { flow: ["remove"] }, "knowledge.sources", [any]),
-	route("knowledge.syncSource", flowRef, START, "knowledge.sources", [any]),
+	route("knowledge.keepLearning", learning, START, "knowledge.settleLearning", [ASKING, SPACE, "p1", "l1", "keep"]),
+	route("knowledge.deleteLearning", learning, START, "knowledge.settleLearning", [ASKING, SPACE, "p1", "l1", "delete"]),
+	route("knowledge.settleNote", { ...project, learningId: "l1", index: 1, note: "One.", decision: "keep" }, START, "knowledge.settleNote", [ASKING, SPACE, "p1", { id: "l1", index: 1, note: "One." }, "keep", like({ id: PERSON })]),
+	route("knowledge.tell", { ...project, note: " Two. " }, START, "knowledge.tellLearning", [ASKING, SPACE, "p1", "Two.", like({ id: PERSON })]),
+	route("knowledge.tell", { ...project, note: "Two.", replaces: { learningId: "l1", index: 0 } }, START, "knowledge.tellLearning", [ASKING, SPACE, "p1", "Two.", like({ id: PERSON }), { id: "l1", index: 0 }]),
+	route("knowledge.saveSource", { ...project, source: webSource }, SAVE, "knowledge.sources", [any], { given: { knowledge: { sources: sourcesOf(SAVE) } } }),
+	route("knowledge.removeSource", { ...flowRef, removeFiles: false }, { flow: ["remove"] }, "knowledge.sources", [any], { given: { knowledge: { sources: sourcesOf({ flow: ["remove"] }) } } }),
+	route("knowledge.syncSource", flowRef, START, "knowledge.sources", [any], { given: { knowledge: { sources: sourcesOf(START) } } }),
 	route("knowledge.search", { ...project, query: "docs" }, "session", "knowledge.search", ["p1", "docs", {}]),
 	route("knowledge.meaning", project, "session", "knowledge.meaning", ["p1"]),
 	route("knowledge.read", { ...project, path: "a.md" }, "session", "knowledge.read", ["p1", "a.md", { maxBytes: 1024 * 1024 }]),
 	route("knowledge.questions", project, "session", "knowledge.questions", ["p1", {}]),
 	route("knowledge.graph", project, "session", "knowledge.map", ["p1"]),
-	route("knowledge.markNotTopic", { ...project, word: "the", notTopic: true }, START, "knowledge.markNotTopic", ["p1", { word: "the", notTopic: true, by: PERSON }]),
-	route("knowledge.markQuestion", { ...project, query: "q", answers: ["a.md"] }, START, "knowledge.markQuestion", ["p1", { query: "q", answers: ["a.md"], by: PERSON }]),
+	route("knowledge.markNotTopic", { ...project, word: "the", notTopic: true }, START, "knowledge.markNotTopic", [ASKING, SPACE, "p1", { word: "the", notTopic: true, by: PERSON }]),
+	route("knowledge.markQuestion", { ...project, query: "q", answers: ["a.md"] }, START, "knowledge.markQuestion", [ASKING, SPACE, "p1", { query: "q", answers: ["a.md"], by: PERSON }]),
 	route("knowledge.evaluate", project, "session", "knowledge.evaluate", ["p1"]),
-	route("knowledge.setMeaning", { ...project, on: true }, START, "knowledge.setMeaning", ["p1", true]),
-	route("knowledge.setLearnsFromRuns", { ...project, on: false }, START, "knowledge.setLearnsFromRuns", ["p1", false]),
-	route("knowledge.setReader", { ...project, reader: { kind: "jina" } }, START, "knowledge.setReader", ["p1", { kind: "jina" }]),
-	route("knowledge.look", { ...project, urls: ["https://example.com/docs/"] }, SAVE, "knowledge.look", ["p1", ["https://example.com/docs/"]]),
+	route("knowledge.setMeaning", { ...project, on: true }, START, "knowledge.setMeaning", [ASKING, SPACE, "p1", true]),
+	route("knowledge.setLearnsFromRuns", { ...project, on: false }, START, "knowledge.setLearnsFromRuns", [ASKING, SPACE, "p1", false]),
+	route("knowledge.setReader", { ...project, reader: { kind: "jina" } }, START, "knowledge.setReader", [ASKING, SPACE, "p1", { kind: "jina" }]),
+	route("knowledge.look", { ...project, urls: ["https://example.com/docs/"] }, SAVE, "knowledge.look", [ASKING, SPACE, "p1", ["https://example.com/docs/"]]),
 	route("knowledge.use", project, "session", "knowledge.use", ["p1"]),
 	// Flows.
 	route("flows.list", project, "session", "space.flows.list", ["p1"]),
@@ -862,8 +987,11 @@ describe("every route", () => {
 							`${route.path} should refuse ${name} with ${refusalFor(caller)}, ended in ${outcome}.`,
 						);
 					}
-					// A refused call reaches no service.
-					expect(calls, route.path).toEqual([]);
+					// A refused call reaches no service. A project's procedure reads the Space's projects first.
+					expect(
+						calls.filter((call) => call.method !== "listProjects"),
+						route.path,
+					).toEqual([]);
 				} else {
 					passed.push(`${route.path}: ${outcome}`);
 					expect(outcome, route.path).toBe(route.ends ?? "ok");
@@ -970,13 +1098,24 @@ describe("a procedure keyed by a project", () => {
 		expect(calls.filter((c) => c.method.startsWith("knowledge."))).toEqual([]);
 	});
 
-	test("checks the role before it reads anything", async () => {
+	test("the engine refuses a role after the project is known", async () => {
 		const context = contextOf(sandbox.db, viewer, { space: projects });
+		// A project the Space does not have is not found, before the role.
 		expect(
 			await errorOf(
 				call(
 					appRouter.knowledge.keepLearning,
 					{ projectId: "p2", id: "l1" },
+					{ context },
+				),
+			),
+		).toBe("NOT_FOUND");
+		// The project is known. The engine then refuses, and the change is not made.
+		expect(
+			await errorOf(
+				call(
+					appRouter.knowledge.keepLearning,
+					{ projectId: "p1", id: "l1" },
 					{ context },
 				),
 			),

@@ -1,3 +1,5 @@
+import type { Permissions } from "@nightshift/auth";
+import type { Actor } from "../../../contract";
 import { isReadable } from "../../files";
 import {
 	formatQuestions,
@@ -5,9 +7,12 @@ import {
 	markQuestion as marked,
 	parseQuestions,
 } from "../domain/questions";
-import type { FolderHolds, QuestionSetFile } from "./ports";
+import type { FolderHolds, QuestionSetFile, ReviewAccess } from "./ports";
+
+const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type MarkQuestionPorts = {
+	access: ReviewAccess;
 	questions: QuestionSetFile;
 	holds: FolderHolds;
 	now: () => number;
@@ -15,6 +20,8 @@ export type MarkQuestionPorts = {
 
 /** The question, the files that answer it, and who marks it. */
 export type MarkQuestion = {
+	actor: Actor;
+	spaceId: string;
 	projectId: string;
 	query: string;
 	answers: readonly string[];
@@ -27,14 +34,17 @@ export type MarkQuestion = {
  * a step does: the set goes to the Space when the hold ends. Returns the
  * set, newest mark first.
  *
- * It checks no role: the `Knowledge` door has no actor yet (E-doors adds it).
+ * Refuses a Person who may not change knowledge (`access.openSpace`).
  */
 export const markQuestion =
 	(ports: MarkQuestionPorts) =>
 	async ({
+		actor,
+		spaceId,
 		projectId,
 		...mark
 	}: MarkQuestion): Promise<KnowledgeQuestion[]> => {
+		await ports.access.openSpace(actor, { spaceId, need: CHANGES_KNOWLEDGE });
 		const hold = await ports.holds.startStep(projectId);
 		try {
 			const next = marked(

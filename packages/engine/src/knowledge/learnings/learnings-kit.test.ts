@@ -18,6 +18,7 @@ import {
 } from "@nightshift/flows";
 import { kitCommand } from "@nightshift/flows/testing";
 import { Refusal } from "@nightshift/refusal";
+import { NIGHT_SHIFT } from "../../contract";
 import { createLearnings } from "./test-support";
 
 /**
@@ -112,6 +113,7 @@ function learningsOver(
 	> = new Map(),
 ) {
 	return createLearnings({
+		access: { openSpace: async () => {} },
 		folders: { folder: () => knowledge },
 		documents: {
 			open: async () => ({ entries: () => listed }) as never,
@@ -269,7 +271,7 @@ describe.each(["keep", "delete"] as const)("%s, in both forms", (decision) => {
 	async function both(id: string, tree: Tree) {
 		const inTypeScript = await folderOf(tree);
 		const refusal = await learningsOver(inTypeScript)
-			.settle("p1", id, decision)
+			.settle(NIGHT_SHIFT, "space-1", "p1", id, decision)
 			.then(
 				() => null,
 				(error: unknown) => error,
@@ -420,6 +422,8 @@ describe("after one note was settled on its own", () => {
 		const byNote = async () => {
 			const knowledge = await folderOf(tree);
 			await learningsOver(knowledge).settleNote(
+				NIGHT_SHIFT,
+				"space-1",
 				"p1",
 				{ id: "run-1.s1.md", index: 0, note: "One." },
 				"keep",
@@ -429,7 +433,13 @@ describe("after one note was settled on its own", () => {
 		};
 
 		const inTypeScript = await byNote();
-		await learningsOver(inTypeScript).settle("p1", "run-1.s1.md", "keep");
+		await learningsOver(inTypeScript).settle(
+			NIGHT_SHIFT,
+			"space-1",
+			"p1",
+			"run-1.s1.md",
+			"keep",
+		);
 
 		const byShell = await byNote();
 		const list = rendered("list", "");

@@ -126,6 +126,8 @@ describe("save", () => {
 			callFlow("kit:knowledge/web", { urls: "https://example.com" }),
 		);
 		const saved = await sources().save(
+			NIGHT_SHIFT,
+			sandbox.spaceId,
 			projectId,
 			{
 				source: {
@@ -165,13 +167,21 @@ describe("save", () => {
 			inputs: { what: "The meeting notes in our shared drive." },
 		};
 		const weekly = await sources().save(
+			NIGHT_SHIFT,
+			sandbox.spaceId,
 			projectId,
 			{ source: agent, keepUpToDate: { cron: "0 6 * * 1" } },
 			owner,
 		);
 		expect(weekly).toEqual({ name: "knowledge-agent", issues: [] });
 		// Only now: no schedule.
-		const once = await sources().save(projectId, { source: agent }, owner);
+		const once = await sources().save(
+			NIGHT_SHIFT,
+			sandbox.spaceId,
+			projectId,
+			{ source: agent },
+			owner,
+		);
 		expect(once).toEqual({ name: "knowledge-agent-2", issues: [] });
 		const saved = await flows();
 		expect(saved["knowledge-agent"]?.nodes[0]).toMatchObject({
@@ -188,6 +198,8 @@ describe("save", () => {
 
 	test("a folder of this computer syncs on this computer: its Subflow names it, whoever starts the run", async () => {
 		await sources().save(
+			NIGHT_SHIFT,
+			sandbox.spaceId,
 			projectId,
 			{
 				source: { kit: "kit:knowledge/folder", inputs: { path: "~/notes" } },
@@ -201,6 +213,8 @@ describe("save", () => {
 		});
 		// Edited on another computer, it stays on the one that has the folder.
 		await sourcesOn({ id: "laptop-id", name: "laptop" }).save(
+			NIGHT_SHIFT,
+			sandbox.spaceId,
 			projectId,
 			{
 				name: "knowledge-folder",
@@ -235,6 +249,8 @@ describe("save", () => {
 		});
 		// A source of another kind runs where the run runs.
 		await sources().save(
+			NIGHT_SHIFT,
+			sandbox.spaceId,
 			projectId,
 			{ source: { kit: "kit:knowledge/web", inputs: { urls: "a" } } },
 			owner,
@@ -246,6 +262,8 @@ describe("save", () => {
 
 	test("an edit keeps the source's folder without asking for it, and its schedule's other settings", async () => {
 		const first = await sources().save(
+			NIGHT_SHIFT,
+			sandbox.spaceId,
 			projectId,
 			{
 				source: { kit: "kit:knowledge/github-wiki", inputs: { repo: "a/b" } },
@@ -264,6 +282,8 @@ describe("save", () => {
 		};
 		await space.saveSchedules(projectId, [...(await schedules()), hook]);
 		await sources().save(
+			NIGHT_SHIFT,
+			sandbox.spaceId,
 			projectId,
 			{
 				name: first.name,
@@ -295,6 +315,8 @@ describe("save", () => {
 			more: { name?: string; keepUpToDate?: { cron: string } } = {},
 		) =>
 			sources().save(
+				NIGHT_SHIFT,
+				sandbox.spaceId,
 				projectId,
 				{ source: { kit: "kit:knowledge/folder", inputs }, ...more },
 				member,
@@ -329,6 +351,8 @@ describe("save", () => {
 		).rejects.toThrow("Only the owner of this computer");
 		await expect(
 			sources().save(
+				NIGHT_SHIFT,
+				sandbox.spaceId,
 				projectId,
 				{
 					source: { kit: "kit:knowledge/folder", inputs: { path: "/x" } },
@@ -344,6 +368,8 @@ describe("save", () => {
 describe("list", () => {
 	test("the files, the flows that fill the knowledge or review its learnings, with their schedules", async () => {
 		await sources().save(
+			NIGHT_SHIFT,
+			sandbox.spaceId,
 			projectId,
 			{
 				source: { kit: "kit:knowledge/web", inputs: { urls: "a" } },
@@ -474,6 +500,8 @@ describe("list", () => {
 
 		test("a Host that does not answer in time names none, and the page does not wait for it", async () => {
 			await sources().save(
+				NIGHT_SHIFT,
+				sandbox.spaceId,
 				projectId,
 				{
 					source: {
@@ -515,6 +543,8 @@ describe("what waits on the Knowledge page", () => {
 describe("remove", () => {
 	test("removes a source's files, schedules and flow, but not a folder another flow fills", async () => {
 		const one = await sources().save(
+			NIGHT_SHIFT,
+			sandbox.spaceId,
 			projectId,
 			{
 				source: { kit: "kit:knowledge/web", inputs: { urls: "a" } },
@@ -526,7 +556,14 @@ describe("remove", () => {
 		await putFile("web/b.md", "# B\n");
 		await sources().list(projectId, all);
 		expect(
-			await sources().remove(projectId, one.name, { files: true }, owner),
+			await sources().remove(
+				NIGHT_SHIFT,
+				sandbox.spaceId,
+				projectId,
+				one.name,
+				{ files: true },
+				owner,
+			),
 		).toEqual({ removedFiles: 2 });
 		expect(await flows()).toEqual({});
 		expect(await schedules()).toEqual([]);
@@ -534,6 +571,8 @@ describe("remove", () => {
 
 		// A drawn flow fills the folder too: its files stay.
 		const two = await sources().save(
+			NIGHT_SHIFT,
+			sandbox.spaceId,
 			projectId,
 			{ source: { kit: "kit:knowledge/web", inputs: { urls: "a" } } },
 			owner,
@@ -551,13 +590,22 @@ describe("remove", () => {
 		await putFile("web/c.md", "# C\n");
 		await sources().list(projectId, all);
 		expect(
-			await sources().remove(projectId, two.name, { files: true }, owner),
+			await sources().remove(
+				NIGHT_SHIFT,
+				sandbox.spaceId,
+				projectId,
+				two.name,
+				{ files: true },
+				owner,
+			),
 		).toEqual({ removedFiles: 0 });
 		expect((await sources().list(projectId, all)).files).toHaveLength(1);
 	});
 
 	test("checks first and removes the files first: a refusal leaves the source as it was", async () => {
 		const one = await sources().save(
+			NIGHT_SHIFT,
+			sandbox.spaceId,
 			projectId,
 			{
 				source: { kit: "kit:knowledge/web", inputs: { urls: "a" } },
@@ -569,19 +617,40 @@ describe("remove", () => {
 		await sources().list(projectId, all);
 		// Someone who may not change this computer's schedules.
 		await expect(
-			sources().remove(projectId, one.name, { files: true }, member),
+			sources().remove(
+				NIGHT_SHIFT,
+				sandbox.spaceId,
+				projectId,
+				one.name,
+				{ files: true },
+				member,
+			),
 		).rejects.toThrow("Only the owner of this computer");
 		// A run writes the knowledge now.
 		const step = await built.knowledge.forCommand(projectId);
 		await expect(
-			sources().remove(projectId, one.name, { files: true }, owner),
+			sources().remove(
+				NIGHT_SHIFT,
+				sandbox.spaceId,
+				projectId,
+				one.name,
+				{ files: true },
+				owner,
+			),
 		).rejects.toThrow("A run is changing this knowledge now");
 		await step.done();
 		expect(Object.keys(await flows())).toEqual([one.name]);
 		expect(await schedules()).toHaveLength(1);
 		expect((await sources().list(projectId, all)).files).toHaveLength(1);
 		await expect(
-			sources().remove(projectId, "nope", { files: false }, owner),
+			sources().remove(
+				NIGHT_SHIFT,
+				sandbox.spaceId,
+				projectId,
+				"nope",
+				{ files: false },
+				owner,
+			),
 		).rejects.toThrow("This project has no such source.");
 	});
 });
@@ -592,6 +661,8 @@ describe("sync", () => {
 		await mkdir(notes, { recursive: true });
 		await writeFile(join(notes, "a.md"), "# A\n");
 		const local = await sources().save(
+			NIGHT_SHIFT,
+			sandbox.spaceId,
 			projectId,
 			{
 				source: { kit: "kit:knowledge/folder", inputs: { path: notes } },
@@ -599,7 +670,13 @@ describe("sync", () => {
 			},
 			owner,
 		);
-		const run = await sources().sync(projectId, local.name, "person-1");
+		const run = await sources().sync(
+			NIGHT_SHIFT,
+			sandbox.spaceId,
+			projectId,
+			local.name,
+			"person-1",
+		);
 		expect(run.flowName).toBe(local.name);
 		expect(run.device.name).toBe("test");
 		await waitFor(

@@ -1,6 +1,8 @@
+import type { Permissions } from "@nightshift/auth";
 import type { PageReaderSetting } from "@nightshift/flows";
 import { parseInstant } from "@nightshift/time";
-import type { ReaderSettings } from "../../application/ports";
+import type { Actor } from "../../../../contract";
+import type { ReaderSettings, ReadersAccess } from "../../application/ports";
 import { createLookMemo } from "../../domain/link-look";
 import { inMemoryReadMarks } from "./in-memory-read-marks";
 import { inMemoryReaderServices } from "./in-memory-reader-services";
@@ -44,6 +46,7 @@ export function testClock(at = parseInstant("2026-11-20T12:00:00Z")) {
 export function inMemoryReadersPorts() {
 	const clock = testClock();
 	return {
+		access: inMemoryReadersAccess(),
 		settings: inMemoryReaderSettings(),
 		services: inMemoryReaderServices(),
 		sites: inMemorySiteFacts(),
@@ -52,4 +55,24 @@ export function inMemoryReadersPorts() {
 		clock,
 		now: clock.now,
 	};
+}
+
+export type InMemoryReadersAccess = ReadersAccess & {
+	opened: { actor: Actor; spaceId: string; need?: Permissions }[];
+	refuse(error: unknown): void;
+};
+
+export function inMemoryReadersAccess(): InMemoryReadersAccess {
+	let refusal: { error: unknown } | null = null;
+	const access: InMemoryReadersAccess = {
+		opened: [],
+		refuse: (error) => {
+			refusal = { error };
+		},
+		async openSpace(actor, request) {
+			access.opened.push({ actor, ...request });
+			if (refusal && "personId" in actor) throw refusal.error;
+		},
+	};
+	return access;
 }

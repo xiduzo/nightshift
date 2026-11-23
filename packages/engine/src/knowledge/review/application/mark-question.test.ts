@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { NIGHT_SHIFT } from "../../../contract";
 import { inMemoryReviewPorts } from "../adapters/out/in-memory-neighbours";
 import { parseQuestions } from "../domain/questions";
 import { markQuestion } from "./mark-question";
@@ -12,6 +13,8 @@ describe("markQuestion", () => {
 		ports.setNow(5);
 		expect(
 			await mark({
+				actor: NIGHT_SHIFT,
+				spaceId: "space-1",
 				projectId: "p1",
 				query: " rollback ",
 				answers: ["ops/rollback.md", "INDEX.md"],
@@ -29,7 +32,14 @@ describe("markQuestion", () => {
 			parseQuestions(ports.questions.files.get("p1") ?? null),
 		).toHaveLength(1);
 		expect(
-			await mark({ projectId: "p1", query: "Rollback", answers: [], by: null }),
+			await mark({
+				actor: NIGHT_SHIFT,
+				spaceId: "space-1",
+				projectId: "p1",
+				query: "Rollback",
+				answers: [],
+				by: null,
+			}),
 		).toEqual([]);
 		expect(ports.holds.events).toEqual([
 			"hold p1",
@@ -46,6 +56,8 @@ describe("markQuestion", () => {
 			throw failure;
 		};
 		const error = await markQuestion(ports)({
+			actor: NIGHT_SHIFT,
+			spaceId: "space-1",
 			projectId: "p1",
 			query: "q",
 			answers: ["a.md"],

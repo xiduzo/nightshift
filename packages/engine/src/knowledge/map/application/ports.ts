@@ -1,3 +1,5 @@
+import type { Permissions } from "@nightshift/auth";
+import type { Actor } from "../../../contract";
 import type { KnowledgeSearch } from "../../search";
 import type { KnowledgeStepHold } from "../../sync";
 import type { MapLearning, MapQuestion } from "../domain/map";
@@ -62,4 +64,15 @@ export type AskedQuestions = {
  */
 export type FolderHolds = {
 	startStep(projectId: string): Promise<KnowledgeStepHold>;
+};
+
+/**
+ * Who may act in a Space for this knowledge request.
+ * @filledBy engine/runs
+ */
+export type MapAccess = {
+	openSpace(
+		actor: Actor,
+		request: { spaceId: string; need?: Permissions },
+	): Promise<void>;
 };

@@ -1,9 +1,8 @@
 import { z } from "zod";
 
 import { output } from "../output";
-import { permitted } from "../procedures";
 import { projectProcedure } from "../projects";
-import { MAY, projectInput } from "./access";
+import { knowledgeProcedure, projectInput } from "./access";
 import { knowledgeEvaluationSchema, knowledgeQuestionsSchema } from "./schemas";
 
 /**
@@ -37,12 +36,11 @@ export const knowledgeQuestions = {
 	 * No files takes it out. It changes the knowledge, so it asks a role
 	 * that may start runs (ADR 4). Returns the set.
 	 */
-	markQuestion: projectProcedure(
+	markQuestion: knowledgeProcedure(
 		projectInput.extend({
 			query: z.string().trim().min(1).max(1000),
 			answers: z.array(z.string().min(1).max(1000)).max(20),
 		}),
-		permitted(MAY.changeKnowledge),
 	)
 		.route({
 			summary:
@@ -50,11 +48,16 @@ export const knowledgeQuestions = {
 		})
 		.output(output(knowledgeQuestionsSchema.shape.set))
 		.handler(({ context, input }) =>
-			context.knowledge.markQuestion(input.projectId, {
-				query: input.query,
-				answers: input.answers,
-				by: context.session.user.id,
-			}),
+			context.knowledge.markQuestion(
+				context.actor,
+				context.spaceId,
+				input.projectId,
+				{
+					query: input.query,
+					answers: input.answers,
+					by: context.session.user.id,
+				},
+			),
 		),
 	/**
 	 * Runs the project's question set against each way to search on this

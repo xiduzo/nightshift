@@ -230,7 +230,12 @@ describe("learnings from runs that ended", () => {
 		const space = engine.space(sandbox.spaceId, NIGHT_SHIFT);
 		const projectId = (await space.addProject({ repoPath: sandbox.repoPath }))
 			.id;
-		await knowledge.knowledge.setLearnsFromRuns(projectId, false);
+		await knowledge.knowledge.setLearnsFromRuns(
+			NIGHT_SHIFT,
+			"space-1",
+			projectId,
+			false,
+		);
 		expect(await knowledge.knowledge.learnsFromRuns(projectId)).toBe(false);
 		const run = await space.startRun({
 			projectId,

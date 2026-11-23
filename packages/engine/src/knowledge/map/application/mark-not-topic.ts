@@ -1,11 +1,16 @@
+import type { Permissions } from "@nightshift/auth";
+import type { Actor } from "../../../contract";
 import {
 	formatNotTopics,
 	markNotTopic as marked,
 	parseNotTopics,
 } from "../domain/not-topics";
-import type { FolderHolds, NotTopicsFile } from "./ports";
+import type { FolderHolds, MapAccess, NotTopicsFile } from "./ports";
+
+const CHANGES_KNOWLEDGE: Permissions = { run: ["start"] };
 
 export type MarkNotTopicPorts = {
+	access: MapAccess;
 	notTopics: NotTopicsFile;
 	holds: FolderHolds;
 	now: () => number;
@@ -13,6 +18,8 @@ export type MarkNotTopicPorts = {
 
 /** The word, whether it is not a topic, and who marks it. */
 export type MarkNotTopic = {
+	actor: Actor;
+	spaceId: string;
 	projectId: string;
 	word: string;
 	notTopic: boolean;
@@ -24,11 +31,17 @@ export type MarkNotTopic = {
  * it back. It holds the folder as a step does: the list goes to the Space
  * when the hold ends. Returns the list, newest mark first.
  *
- * It checks no role: the `Knowledge` door has no actor yet (E-doors adds it).
+ * Refuses a Person who may not change knowledge (`access.openSpace`).
  */
 export const markNotTopic =
 	(ports: MarkNotTopicPorts) =>
-	async ({ projectId, ...mark }: MarkNotTopic): Promise<string[]> => {
+	async ({
+		actor,
+		spaceId,
+		projectId,
+		...mark
+	}: MarkNotTopic): Promise<string[]> => {
+		await ports.access.openSpace(actor, { spaceId, need: CHANGES_KNOWLEDGE });
 		const hold = await ports.holds.startStep(projectId);
 		try {
 			const next = marked(

@@ -1,6 +1,9 @@
+import type { Permissions } from "@nightshift/auth";
+import type { Actor } from "../../../../contract";
 import type {
 	AskedQuestions,
 	FolderHolds,
+	MapAccess,
 	MapEntries,
 	MapIndex,
 	MapLearnings,
@@ -98,6 +101,7 @@ export function inMemoryFolderHolds() {
 export function inMemoryMapPorts() {
 	let clock = 1_000;
 	return {
+		access: inMemoryMapAccess(),
 		entries: inMemoryMapEntries(),
 		index: inMemoryMapIndex(),
 		asked: inMemoryAskedQuestions(),
@@ -111,4 +115,24 @@ export function inMemoryMapPorts() {
 			clock = at;
 		},
 	};
+}
+
+export type InMemoryMapAccess = MapAccess & {
+	opened: { actor: Actor; spaceId: string; need?: Permissions }[];
+	refuse(error: unknown): void;
+};
+
+export function inMemoryMapAccess(): InMemoryMapAccess {
+	let refusal: { error: unknown } | null = null;
+	const access: InMemoryMapAccess = {
+		opened: [],
+		refuse: (error) => {
+			refusal = { error };
+		},
+		async openSpace(actor, request) {
+			access.opened.push({ actor, ...request });
+			if (refusal && "personId" in actor) throw refusal.error;
+		},
+	};
+	return access;
 }

@@ -1,5 +1,6 @@
 import type { AgentEvent } from "@nightshift/agents/types";
 import { now as timeNow } from "@nightshift/time";
+import type { Actor } from "../../contract";
 import type { TranscriptEntry } from "../../log";
 import { followEndedRuns } from "./adapters/in/follow-ended-runs";
 import { fsLearningFolder } from "./adapters/out/fs-learning-folder";
@@ -16,6 +17,7 @@ import type {
 	ContentArchive,
 	FolderHolds,
 	LearningEntries,
+	LearningsAccess,
 	LearningsNotifications,
 	RunsToLearnFrom,
 	SpaceStatus,
@@ -47,6 +49,7 @@ import type {
 
 /** What the knowledge gives knowledge/learnings: the ports another part fills, and what the real adapter stands on. */
 export type LearningsDeps = {
+	access: LearningsAccess;
 	/** The knowledge folders on this computer (`files`). */
 	folders: { folder(projectId: string): string };
 	documents: LearningEntries;
@@ -116,12 +119,16 @@ export type Learnings = {
 	count(projectId: string): Promise<number>;
 	/** Keeps or deletes one step's proposed learnings (`settleLearning`). */
 	settle(
+		actor: Actor,
+		spaceId: string,
 		projectId: string,
 		id: string,
 		decision: "keep" | "delete",
 	): Promise<void>;
 	/** Keeps or deletes one note of a learning that waits (`settleNote`). */
 	settleNote(
+		actor: Actor,
+		spaceId: string,
 		projectId: string,
 		note: WaitingNote,
 		decision: "keep" | "delete",
@@ -129,6 +136,8 @@ export type Learnings = {
 	): Promise<void>;
 	/** Keeps a note a person wrote (`tellLearning`). */
 	tell(
+		actor: Actor,
+		spaceId: string,
 		projectId: string,
 		note: string,
 		by: NotePerson,
@@ -139,7 +148,12 @@ export type Learnings = {
 	/** Whether Night Shift proposes learnings from the project's runs (`readLearnsFromRuns`). */
 	learnsFromRuns(projectId: string): Promise<boolean>;
 	/** Turns the learnings from runs on or off (`setLearnsFromRuns`). */
-	setLearnsFromRuns(projectId: string, on: boolean): Promise<void>;
+	setLearnsFromRuns(
+		actor: Actor,
+		spaceId: string,
+		projectId: string,
+		on: boolean,
+	): Promise<void>;
 	/** The look back at runs that end, over these learnings (`lookBackAtRun`). */
 	followRuns(deps: FollowRunsDeps): RunLearnings;
 };
@@ -163,11 +177,28 @@ export function wireLearnings(deps: LearningsDeps): Learnings {
 	});
 	const ofProjects = listProjectLearnings({ waiting });
 	const count = countWaitingNotes({ status, documents, archive });
-	const settle = settleLearning({ folder, documents, holds });
-	const settleOne = settleNote({ folder, documents, holds, now });
-	const tell = tellLearning({ folder, documents, holds, now });
+	const settle = settleLearning({
+		access: deps.access,
+		folder,
+		documents,
+		holds,
+	});
+	const settleOne = settleNote({
+		access: deps.access,
+		folder,
+		documents,
+		holds,
+		now,
+	});
+	const tell = tellLearning({
+		access: deps.access,
+		folder,
+		documents,
+		holds,
+		now,
+	});
 	const learnsFromRuns = readLearnsFromRuns({ documents });
-	const setLearns = setLearnsFromRuns({ documents });
+	const setLearns = setLearnsFromRuns({ access: deps.access, documents });
 
 	return {
 		propose: (projectId, step, notes) => propose({ projectId, step, notes }),
@@ -185,14 +216,23 @@ export function wireLearnings(deps: LearningsDeps): Learnings {
 			}),
 		ofProjects: (projectIds) => ofProjects({ projectIds }),
 		count: (projectId) => count({ projectId }),
-		settle: (projectId, id, decision) => settle({ projectId, id, decision }),
-		settleNote: (projectId, note, decision, by) =>
-			settleOne({ projectId, note, decision, by }),
-		tell: (projectId, note, by, replaces) =>
-			tell({ projectId, note, by, ...(replaces ? { replaces } : {}) }),
+		settle: (actor, spaceId, projectId, id, decision) =>
+			settle({ actor, spaceId, projectId, id, decision }),
+		settleNote: (actor, spaceId, projectId, note, decision, by) =>
+			settleOne({ actor, spaceId, projectId, note, decision, by }),
+		tell: (actor, spaceId, projectId, note, by, replaces) =>
+			tell({
+				actor,
+				spaceId,
+				projectId,
+				note,
+				by,
+				...(replaces ? { replaces } : {}),
+			}),
 		reconciled: hearReconcile({ notifications, known: new Map() }),
 		learnsFromRuns: (projectId) => learnsFromRuns({ projectId }),
-		setLearnsFromRuns: (projectId, on) => setLearns({ projectId, on }),
+		setLearnsFromRuns: (actor, spaceId, projectId, on) =>
+			setLearns({ actor, spaceId, projectId, on }),
 		followRuns(late) {
 			const queue = createLookQueue();
 			const lookBack = lookBackAtRun({

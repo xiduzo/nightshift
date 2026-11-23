@@ -1,3 +1,5 @@
+import type { Permissions } from "@nightshift/auth";
+import type { Actor } from "../../../../contract";
 import type { TranscriptEntry } from "../../../../log";
 import type {
 	AskLearner,
@@ -5,6 +7,7 @@ import type {
 	ContentArchive,
 	FolderHolds,
 	LearningEntries,
+	LearningsAccess,
 	LearningsNotifications,
 	RunsToLearnFrom,
 	SpaceStatus,
@@ -239,8 +242,30 @@ export function inMemoryLearner(answer: string[] = []): InMemoryLearner {
 }
 
 /** Every port of knowledge/learnings in memory at once: where each use-case test starts. */
+
+export type InMemoryLearningsAccess = LearningsAccess & {
+	opened: { actor: Actor; spaceId: string; need?: Permissions }[];
+	refuse(error: unknown): void;
+};
+
+export function inMemoryLearningsAccess(): InMemoryLearningsAccess {
+	let refusal: { error: unknown } | null = null;
+	const access: InMemoryLearningsAccess = {
+		opened: [],
+		refuse: (error) => {
+			refusal = { error };
+		},
+		async openSpace(actor, request) {
+			access.opened.push({ actor, ...request });
+			if (refusal && "personId" in actor) throw refusal.error;
+		},
+	};
+	return access;
+}
+
 export function inMemoryLearningsPorts() {
 	return {
+		access: inMemoryLearningsAccess(),
 		folder: inMemoryLearningFolder(),
 		documents: inMemoryLearningEntries(),
 		archive: inMemoryContentArchive(),

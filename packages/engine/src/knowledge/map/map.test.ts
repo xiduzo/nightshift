@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { project } from "@nightshift/db/schema";
 import { applyUpdate, encodeStateAsUpdate } from "yjs";
 import type { ArchiveHost } from "../../archive";
+import { NIGHT_SHIFT } from "../../contract";
 import { createSandbox, type Sandbox, waitFor } from "../../testing";
 import { SynonymEmbeddings } from "../../testing/embeddings";
 import { testKnowledge } from "../../testing/knowledge";
@@ -350,7 +351,7 @@ describe("not a topic", () => {
 		]);
 
 		expect(
-			await a.knowledge.markNotTopic("p1", {
+			await a.knowledge.markNotTopic(NIGHT_SHIFT, "space-1", "p1", {
 				word: " Rainbows ",
 				notTopic: true,
 				by: "ann",
@@ -361,7 +362,7 @@ describe("not a topic", () => {
 		expect(without.notTopics).toEqual(["Rainbows"]);
 
 		expect(
-			await a.knowledge.markNotTopic("p1", {
+			await a.knowledge.markNotTopic(NIGHT_SHIFT, "space-1", "p1", {
 				word: "rainbows",
 				notTopic: false,
 				by: "ann",
@@ -377,12 +378,12 @@ describe("not a topic", () => {
 			"An agent and two agents. The Sharpe ratio is here.",
 		);
 		await a.put("wiki/two.md", "More agents. The Sharpe ratio is here too.");
-		await a.knowledge.markNotTopic("p1", {
+		await a.knowledge.markNotTopic(NIGHT_SHIFT, "space-1", "p1", {
 			word: "agents",
 			notTopic: true,
 			by: null,
 		});
-		await a.knowledge.markNotTopic("p1", {
+		await a.knowledge.markNotTopic(NIGHT_SHIFT, "space-1", "p1", {
 			word: "Sharpe ratio",
 			notTopic: true,
 			by: null,
@@ -398,7 +399,7 @@ describe("not a topic", () => {
 		const a = await device(host);
 		await a.put("wiki/one.md", "The momentum and rainbows.");
 		await a.put("wiki/two.md", "More momentum and rainbows.");
-		await a.knowledge.markNotTopic("p1", {
+		await a.knowledge.markNotTopic(NIGHT_SHIFT, "space-1", "p1", {
 			word: "momentum",
 			notTopic: true,
 			by: "ann",
@@ -542,7 +543,7 @@ describe("files close in meaning", () => {
 		const a = await device(memoryHost(), { meaning });
 		await closeLibrary(a);
 		await vectorsReady(a);
-		await a.knowledge.setMeaning("p1", false);
+		await a.knowledge.setMeaning(NIGHT_SHIFT, "space-1", "p1", false);
 		expect(closeEdges(await a.map())).toEqual([]);
 	});
 });
@@ -615,7 +616,7 @@ describe("a second draw", () => {
 		await a.put("wiki/two.md", "The momentum and rainbows.");
 		expect(idsOf(await a.map(), "topic")).toContain("topic:rainbows");
 		await a.map();
-		await a.knowledge.markNotTopic("p1", {
+		await a.knowledge.markNotTopic(NIGHT_SHIFT, "space-1", "p1", {
 			word: "rainbows",
 			notTopic: true,
 			by: "ann",
@@ -623,7 +624,7 @@ describe("a second draw", () => {
 		const marked = await a.map();
 		expect(marked.notTopics).toEqual(["rainbows"]);
 		expect(idsOf(marked, "topic")).not.toContain("topic:rainbows");
-		await a.knowledge.markNotTopic("p1", {
+		await a.knowledge.markNotTopic(NIGHT_SHIFT, "space-1", "p1", {
 			word: "rainbows",
 			notTopic: false,
 			by: "ann",

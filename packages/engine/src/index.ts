@@ -242,6 +242,7 @@ export {
 	RunNotFound,
 	SpaceNotFound,
 	START_DEADLINE_MS,
+	wireAccess,
 } from "./runs";
 export type {
 	ScheduleList,
