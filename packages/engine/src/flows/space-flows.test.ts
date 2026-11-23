@@ -60,7 +60,9 @@ function adasFlows(
 		...(now ? { now } : {}),
 	});
 	// The editing use cases as `wire-flows.ts` binds them.
+	const access = { openSpace: async () => {} };
 	const editing = wireEditing({
+		access,
 		projects: { inSpace: project },
 		flows,
 		names: {
@@ -71,7 +73,7 @@ function adasFlows(
 		memory: inMemoryNodeMemory(),
 	});
 	// The moves as `flows/transfer/wire.ts` binds them.
-	const moves = { projects: { inSpace: project }, flows };
+	const moves = { access, projects: { inSpace: project }, flows };
 	return wireFlows({
 		editing,
 		transfer: {

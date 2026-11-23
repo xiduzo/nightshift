@@ -1,5 +1,6 @@
+import type { Permissions } from "@nightshift/auth";
 import type { Schedule } from "@nightshift/flows";
-import type { RowBatch } from "../../contract";
+import type { Actor, RowBatch } from "../../contract";
 import type {
 	MovedRuns,
 	ProjectRow,
@@ -161,4 +162,15 @@ export type MoveLog = {
 		from: string;
 		to: string;
 	}): Promise<void>;
+};
+
+/**
+ * Who may act in a Space for a move.
+ * @filledBy engine/runs
+ */
+export type SpaceMoveAccess = {
+	openSpace(
+		actor: Actor,
+		request: { spaceId: string; need?: Permissions },
+	): Promise<void>;
 };

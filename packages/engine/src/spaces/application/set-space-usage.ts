@@ -1,9 +1,13 @@
+import type { Permissions } from "@nightshift/auth";
 import { Refusal } from "@nightshift/refusal";
 import type { Actor } from "../../contract";
 import { USAGE_ON_HOST } from "../domain/policy";
-import type { SpacePolicies } from "./ports";
+import type { SpaceAccess, SpacePolicies } from "./ports";
+
+const SPACE_SETTINGS: Permissions = { space: ["settings"] };
 
 export type SetSpaceUsagePorts = {
+	access: SpaceAccess;
 	spacePolicies: Pick<SpacePolicies, "setUsage">;
 };
 
@@ -11,13 +15,17 @@ export type SetSpaceUsagePorts = {
 export type SetSpaceUsage = { spaceId: string; enabled: boolean };
 
 /**
- * Turns anonymous usage on or off for a Space. The door checks the
- * person's role first. A Space a Host keeps is refused: it changes on
+ * Turns anonymous usage on or off for a Space. Refuses a Person who may not change Space settings
+ * (`access.openSpace`). A Space a Host keeps is refused: it changes on
  * the Host.
  */
 export const setSpaceUsage =
 	(ports: SetSpaceUsagePorts) =>
-	async (_actor: Actor, request: SetSpaceUsage): Promise<void> => {
+	async (actor: Actor, request: SetSpaceUsage): Promise<void> => {
+		await ports.access.openSpace(actor, {
+			spaceId: request.spaceId,
+			need: SPACE_SETTINGS,
+		});
 		const changed = await ports.spacePolicies.setUsage(
 			request.spaceId,
 			request.enabled,

@@ -1,3 +1,4 @@
+import type { Permissions } from "@nightshift/auth";
 import {
 	type AgentChoice,
 	suffixedName,
@@ -6,13 +7,17 @@ import {
 import { type Actor, personOf } from "../../../contract";
 import { importedFlow, namesOf, type SavedFlow } from "../domain/flow-files";
 import type {
+	FlowTransferAccess,
 	FlowUsage,
 	ImportMigrations,
 	SavedFlows,
 	SpaceProjects,
 } from "./ports";
 
+const SAVES_FLOWS: Permissions = { flow: ["save"] };
+
 export type ImportFlowPorts = {
+	access: FlowTransferAccess;
 	projects: SpaceProjects;
 	flows: Pick<SavedFlows, "flows" | "save">;
 	/** Without them, a node keeps its profile's name and its Device's name, to pick again. */
@@ -41,6 +46,10 @@ export const importFlow =
 	): Promise<SavedFlow> => {
 		const { spaceId, projectId } = request;
 		const personId = personOf(actor) ?? undefined;
+		await ports.access.openSpace(actor, {
+			spaceId: request.spaceId,
+			need: SAVES_FLOWS,
+		});
 		await ports.projects.inSpace(projectId, spaceId);
 		const flow = withAgentProfiles(
 			importedFlow(

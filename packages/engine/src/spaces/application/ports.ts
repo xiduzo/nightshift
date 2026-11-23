@@ -1,3 +1,5 @@
+import type { Permissions } from "@nightshift/auth";
+import type { Actor } from "../../contract";
 /**
  * The driven ports of spaces. A port of its own has a real adapter,
  * an in-memory adapter and a contract suite in `adapters/out/`.
@@ -15,4 +17,15 @@ export type SpacePolicies = {
 	 * means on.
 	 */
 	usageOn(): Promise<boolean[]>;
+};
+
+/**
+ * Who may act in a Space.
+ * @filledBy engine/runs
+ */
+export type SpaceAccess = {
+	openSpace(
+		actor: Actor,
+		request: { spaceId: string; need?: Permissions },
+	): Promise<void>;
 };

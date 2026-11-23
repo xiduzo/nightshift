@@ -1,3 +1,4 @@
+import type { Permissions } from "@nightshift/auth";
 import { Refusal } from "@nightshift/refusal";
 import type { Actor } from "../../../contract";
 import {
@@ -21,9 +22,13 @@ import {
 	type ThisDevice,
 } from "../../keep";
 import { alreadyHere, folderName, HOSTED_NEEDS_REMOTE } from "../domain/words";
-import type { CloneImports, HostRelay } from "./ports";
+import type { CloneImports, HostRelay, ProjectAccess } from "./ports";
+
+/** What a role must allow for this request. */
+const ADD_PROJECTS: Permissions = { project: ["add"] };
 
 export type AddProjectPorts = {
+	access: ProjectAccess;
 	store: Pick<
 		ProjectStore,
 		"here" | "byRemote" | "row" | "keepHosted" | "addClone" | "cloneRow"
@@ -48,12 +53,15 @@ export type AddProject = { spaceId: string; repoPath: string; name?: string };
  * Adds the git repository at `repoPath` as a project of the Space: the one
  * with a Clone there, else the one with its remote, else a new one. A
  * removed project comes back. A project of another Space is refused. A
- * folder from before ADR 2 brings its flows in. The door checks the
- * person's role.
+ * folder from before ADR 2 brings its flows in. Refuses a Person who may not act (`access.openSpace`).
  */
 export const addProject =
 	(ports: AddProjectPorts) =>
-	async (_actor: Actor, request: AddProject): Promise<Project> => {
+	async (actor: Actor, request: AddProject): Promise<Project> => {
+		await ports.access.openSpace(actor, {
+			spaceId: request.spaceId,
+			need: ADD_PROJECTS,
+		});
 		const row = await addFolder(ports, request);
 		await ports.cloneImports.importClone(row.id);
 		const [added] = await asProjects(

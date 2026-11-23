@@ -35,7 +35,6 @@ import type * as Work from "../../work";
 import { hasProject, offeredChoice } from "../domain/listed-device";
 import { NO_STARTER_RELAY, UNREACHABLE } from "../domain/no-relay";
 import type { DeviceCopiesPort, SpacePeople } from "./ports";
-
 export type PlacementDeps = {
 	device: Device;
 	walkerId(): Promise<string>;
@@ -80,17 +79,11 @@ export function createPlacement(deps: PlacementDeps) {
 	} = engineFns;
 	const work = deps.work ?? UNREACHABLE;
 
-	/** Whether an id is this computer. */
 	async function isHere(id: string): Promise<boolean> {
 		return id === device.id || id === (await deps.walkerId());
 	}
 
-	/**
-	 * A Device of a run by id, as the run reaches it (`PlacementPort.deviceById`):
-	 * this computer (through its Offer admission for another Person's run),
-	 * or another Device of its plan over the work relay, named as the plan
-	 * names it, else as `name` says.
-	 */
+	/** A Device of a run by id, as the run reaches it (`PlacementPort.deviceById`): this computer (through its Offer admission for another Person's run), or another Device of its plan over the work relay, named as the plan names it, else as `name` says. */
 	function deviceById(id: string, run: PlacedRun, name?: string): Device {
 		if (id === device.id || id === run.walkerId) {
 			return deps.localFor?.(run) ?? device;
@@ -108,11 +101,7 @@ export function createPlacement(deps: PlacementDeps) {
 		);
 	}
 
-	/**
-	 * The copies of the owner's other Devices' documents that count for a
-	 * Person in a Space: only in a Space of the home Host, and only for this
-	 * computer's own Person there.
-	 */
+	/** The copies of the owner's other Devices' documents that count for a Person in a Space: only in a Space of the home Host, and only for this computer's own Person there. */
 	async function copiesFor(spaceId: string, personId: string) {
 		if (!deps.copies || !(await spacePeople.keptByHomeHost(spaceId))) return [];
 		if ((await ownerHere(spaceId)) !== personId) return [];
@@ -124,12 +113,7 @@ export function createPlacement(deps: PlacementDeps) {
 		return spacePeople.personInSpace(spaceId, await registry.selfOwnerId());
 	}
 
-	/**
-	 * A Person's Devices for a project of a Space: this computer first,
-	 * then their other Devices, each with whether it is online and has a
-	 * Clone. The Replica that keeps the Space asks its registry; a Device
-	 * in a Host's Space asks the Host.
-	 */
+	/** A Person's Devices for a project of a Space: this computer first, then their other Devices, each with whether it is online and has a Clone. */
 	async function ownDevices(
 		spaceId: string,
 		personId: string,
@@ -227,13 +211,7 @@ export function createPlacement(deps: PlacementDeps) {
 		return [here, ...own];
 	}
 
-	/**
-	 * Other Persons' Devices that offer profiles to the Space, from its
-	 * document (the keeping Replica's, or the copy a Host syncs here):
-	 * each with its offered profiles, whether it takes work and has a
-	 * Clone. This computer, for a Person who does not own it, with its own
-	 * Offers.
-	 */
+	/** Other Persons' Devices that offer profiles to the Space, from its document (the keeping Replica's, or the copy a Host syncs here): each with its offered profiles, whether it takes work and has a Clone. */
 	async function offeredDevices(
 		spaceId: string,
 		personId: string,
@@ -286,13 +264,7 @@ export function createPlacement(deps: PlacementDeps) {
 		return others;
 	}
 
-	/**
-	 * The Devices a Person may place a run's steps on: their own (this
-	 * computer first), then other Persons' that offer profiles to the
-	 * Space. This computer carries `offers` when the Person does not own it.
-	 * With `forNode`, the Devices that node may name: another Person's only
-	 * when it takes the node through its Offers (`offerTakes`).
-	 */
+	/** The Devices a Person may place a run's steps on: their own (this computer first), then other Persons' that offer profiles to the Space. */
 	async function devicesFor(
 		spaceId: string,
 		personId: string,
@@ -348,12 +320,7 @@ export function createPlacement(deps: PlacementDeps) {
 		);
 	}
 
-	/**
-	 * The Devices a run of the project may use, for the Person it runs
-	 * for: this computer (through its Offers, for another Person's run),
-	 * and the others by id, each checked first: the Person's own, or
-	 * another Person's through its Offers, online.
-	 */
+	/** The Devices a run of the project may use, for the Person it runs for: this computer (through its Offers, for another Person's run), and the others by id, each checked first: the Person's own, or another Person's through its Offers, online. */
 	async function devicesOf(
 		project: ListedProject,
 		runId: string,
@@ -390,11 +357,7 @@ export function createPlacement(deps: PlacementDeps) {
 			return listed;
 		};
 
-		/**
-		 * One of the starter's other Devices, or another Person's through its
-		 * Offers, checked. An offline one is waited for: as the run's Device
-		 * it makes the run's worktree when it is back.
-		 */
+		/** One of the starter's other Devices, or another Person's through its Offers, checked. */
 		async function other(id: string): Promise<PlacedDevice> {
 			const hostedHere = (await hostSpaces.hostOf(spaceId)) === null;
 			const found = (await list()).find((d) => d.deviceId === id);
@@ -476,11 +439,7 @@ export function createPlacement(deps: PlacementDeps) {
 		};
 	}
 
-	/**
-	 * Plans a run at its start (`PlacementPort.plan`): its Person, its
-	 * Devices and its nodes', each checked, and the flows it runs. The
-	 * nodes on another Person's Device stay within its Offers.
-	 */
+	/** Plans a run at its start (`PlacementPort.plan`): its Person, its Devices and its nodes', each checked, and the flows it runs. */
 	async function plan(input: PlanInput): Promise<PlannedRun> {
 		const { start, project, runId } = input;
 		// Every run has a starter: the Person who starts it, else this
@@ -544,11 +503,7 @@ export function createPlacement(deps: PlacementDeps) {
 		return planned;
 	}
 
-	/**
-	 * In the starter's Personal on their home Host, this computer is the
-	 * Host admin's: a refusal that says whose it is and what to do. Null
-	 * anywhere else, or when it offers something there.
-	 */
+	/** In the starter's Personal on their home Host, this computer is the Host admin's: a refusal that says whose it is and what to do. */
 	async function hostRefusal(
 		at: PlacedDevice,
 		spaceId: string,
@@ -573,12 +528,7 @@ export function createPlacement(deps: PlacementDeps) {
 		return (await spacePeople.personNames([owner])).get(owner) || undefined;
 	}
 
-	/**
-	 * The Device a run's walk moves to: one of the Person's own Devices
-	 * (as the Host of the run's Space knows them), not this computer, and
-	 * online. Null when it is not one of theirs. A move keeps the plan:
-	 * each node's Device and the Person stay, only the Walker changes.
-	 */
+	/** The Device a run's walk moves to: one of the Person's own Devices (as the Host of the run's Space knows them), not this computer, and online. */
 	async function moveTo(
 		run: PlacedRun,
 		actor: PersonActor,

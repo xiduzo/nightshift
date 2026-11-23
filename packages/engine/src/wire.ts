@@ -193,6 +193,10 @@ export function createEngine(
 	/** Where each run's steps run, as its plan says (`placement/`). */
 	const placement = createPlacement({ device, devices, takenOverSecrets });
 
+	// --- access (R1): `wire-access.ts` ---
+	// Before projects/flows so catalog and editing can openSpace (E-doors).
+	const access = wireEngineAccess({ db, log: runLog, documents });
+
 	// --- projects (phase 3): `wire-projects.ts` ---
 	const { git, projects, catalog, cloneRows, spaces } = wireEngineProjects({
 		db,
@@ -201,6 +205,7 @@ export function createEngine(
 		directory,
 		hosts,
 		options,
+		access,
 		runner: () => runner,
 		cloneImports: () => ({ importClone: (id) => cloneImports.project(id) }),
 	});
@@ -218,6 +223,7 @@ export function createEngine(
 		deviceName: device.name,
 		options,
 		now,
+		access,
 	});
 
 	// --- the lifetime of the engine ---
@@ -271,10 +277,8 @@ export function createEngine(
 		overdueSweepMs: internals.overdueSweepMs,
 	});
 
-	// --- access and walk (R1): `wire-access.ts`, `wire-walk.ts` ---
-	// gives: access (the run path, schedules, the Space view, the engine),
-	// startHolds, walk (R4 to R7)
-	const access = wireEngineAccess({ db, log: runLog, documents });
+	// --- walk (R1): `wire-walk.ts` ---
+	// Access was wired before projects (E-doors). startHolds, walk (R4 to R7)
 	const walk = wireEngineWalk({ log: runLog, bus, runner, peers });
 	const startHolds = walk.holds;
 
@@ -484,6 +488,7 @@ export function createEngine(
 		projects,
 		runner,
 		options,
+		access,
 	});
 
 	// --- the flows of the Space view (F1): `wire-flows.ts` ---
@@ -495,6 +500,7 @@ export function createEngine(
 		projectFlows,
 		transfer,
 		options,
+		access,
 	});
 
 	// --- the Space view: `space.ts` ---

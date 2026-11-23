@@ -1,10 +1,19 @@
+import type { Permissions } from "@nightshift/auth";
 import { Refusal } from "@nightshift/refusal";
 import type { Actor } from "../../contract";
 import { STILL_RUNNING } from "../domain/move";
 import { type MoveProjectsPorts, moveProjects } from "./move-projects";
-import type { MoveLog, ProjectLookup, ProjectRuns } from "./ports";
+import type {
+	MoveLog,
+	ProjectLookup,
+	ProjectRuns,
+	SpaceMoveAccess,
+} from "./ports";
+
+const MOVE_PROJECTS: Permissions = { project: ["move"] };
 
 export type MoveProjectPorts = MoveProjectsPorts & {
+	access: SpaceMoveAccess;
 	projectLookup: ProjectLookup;
 	projectRuns: ProjectRuns;
 	moveLog: MoveLog;
@@ -19,14 +28,19 @@ export type MoveProject = {
 
 /**
  * A person moves a Project of a Space to another Space, with its runs,
- * as one Space move. The door checks the person's role in both Spaces
- * first. A move to its own Space does nothing. A move while a run of the
+ * as one Space move. Refuses a Person who may not move projects in both Spaces
+ * (`access.openSpace`). A move to its own Space does nothing. A move while a run of the
  * project runs a step is refused under the hold.
  */
 export const moveProject =
 	(ports: MoveProjectPorts) =>
-	async (_actor: Actor, request: MoveProject): Promise<void> => {
+	async (actor: Actor, request: MoveProject): Promise<void> => {
 		const { spaceId, projectId, toSpaceId } = request;
+		await ports.access.openSpace(actor, { spaceId, need: MOVE_PROJECTS });
+		await ports.access.openSpace(actor, {
+			spaceId: toSpaceId,
+			need: MOVE_PROJECTS,
+		});
 		await ports.projectLookup.find(projectId, spaceId);
 		if (toSpaceId === spaceId) return;
 		await ports.projectLookup.refuseMove(projectId, spaceId, toSpaceId);

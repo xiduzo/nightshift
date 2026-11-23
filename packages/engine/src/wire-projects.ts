@@ -15,6 +15,7 @@ import {
 	wireClones,
 	wireKeep,
 } from "./projects";
+import type { Access } from "./runs";
 import { wireSpaces } from "./spaces";
 
 /**
@@ -40,6 +41,8 @@ export function wireEngineProjects(deps: {
 	runner: () => Pick<Runner, "isActive">;
 	/** The import of a Clone's flows, made after this block (`wire-flows.ts`). */
 	cloneImports: () => CloneImports;
+	/** Who may act in a Space (`runs/access`). */
+	access: Pick<Access, "openSpace">;
 }) {
 	const { db, log: runLog, documents, directory } = deps;
 	const git = deps.options.git ?? systemGit();
@@ -73,6 +76,7 @@ export function wireEngineProjects(deps: {
 	});
 	const catalog = wireCatalog({
 		...shared,
+		access: deps.access,
 		...(deps.hosts ? { relay: deps.hosts } : {}),
 		runs: {
 			runIds: (projectId) => runIdsOfProject(db, projectId),
@@ -92,6 +96,6 @@ export function wireEngineProjects(deps: {
 		projects,
 		catalog,
 		cloneRows,
-		spaces: wireSpaces({ documents }),
+		spaces: wireSpaces({ documents, access: deps.access }),
 	};
 }

@@ -14,6 +14,7 @@ import type {
 	ProjectRuns,
 	ProjectsMovedHook,
 	Reread,
+	SpaceMoveAccess,
 	ThisWalker,
 } from "./application/ports";
 
@@ -25,6 +26,7 @@ import type {
 /** What the engine gives the Space move. */
 export type SpaceMoveDeps = {
 	db: Database;
+	access: SpaceMoveAccess;
 	documents: Pick<SpaceDocuments, "open" | "remove">;
 	holds: MoveHolds;
 	walker: ThisWalker;
@@ -50,6 +52,7 @@ export type SpaceMove = {
 
 export function wireSpaceMove(deps: SpaceMoveDeps): SpaceMove {
 	const ports = {
+		access: deps.access,
 		...deps,
 		moveStore: drizzleMoveStore(deps.db),
 		spaceEntries: yjsSpaceEntries(deps.documents),

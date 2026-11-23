@@ -52,6 +52,7 @@ function projectsOf(
 		directory: { ...aloneDirectory(sandbox.db), ...more.directory },
 		hosts: more.relay,
 		options: {},
+		access: { openSpace: async () => {} },
 		runner: () => ({ isActive: () => false }),
 		cloneImports: () => ({ importClone: async () => {} }),
 	});

@@ -14,6 +14,7 @@ import type {
 	CloneDocuments,
 	DeviceProfiles,
 	DocumentMerges,
+	FlowTransferAccess,
 	FlowUsage,
 	ImportMigrations,
 	Migrations,
@@ -35,6 +36,7 @@ export type FlowTransfer = ReturnType<typeof wireTransfer>;
  * merge of Personal).
  */
 export function wireTransfer(deps: {
+	access: FlowTransferAccess;
 	db: Database;
 	git: Pick<Git, "run">;
 	/** The flow documents, for the import of a Clone's folder. */
@@ -56,6 +58,7 @@ export function wireTransfer(deps: {
 }) {
 	const { projects, flows, usage } = deps;
 	const people = {
+		access: deps.access,
 		projects,
 		flows,
 		...(deps.importMigrations
@@ -67,7 +70,12 @@ export function wireTransfer(deps: {
 		exportFlow: exportFlow({ projects, flows }),
 		importFlow: importFlow(people),
 		importStarters: importStarters(people),
-		copyFlow: copyFlow({ projects, flows, ...(usage ? { usage } : {}) }),
+		copyFlow: copyFlow({
+			access: deps.access,
+			projects,
+			flows,
+			...(usage ? { usage } : {}),
+		}),
 		importCloneFolders: importCloneFolders({
 			documents: deps.documents,
 			folders: fsCloneFolders({ git: deps.git }),

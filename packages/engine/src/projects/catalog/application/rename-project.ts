@@ -1,3 +1,4 @@
+import type { Permissions } from "@nightshift/auth";
 import { Refusal } from "@nightshift/refusal";
 import type { Actor } from "../../../contract";
 import {
@@ -10,8 +11,13 @@ import {
 	type SpaceProjects,
 	type ThisDevice,
 } from "../../keep";
+import type { ProjectAccess } from "./ports";
+
+/** What a role must allow for this request. */
+const ADD_PROJECTS: Permissions = { project: ["add"] };
 
 export type RenameProjectPorts = {
+	access: ProjectAccess;
 	store: Pick<ProjectStore, "find" | "row">;
 	spaceProjects: Pick<SpaceProjects, "define" | "clones">;
 	projectLog: Pick<ProjectLog, "append">;
@@ -27,12 +33,15 @@ export type RenameProject = {
 
 /**
  * Gives the project a new name for every Member of the Space, in its Space
- * document and its row. It needs no Clone here. The door checks the
- * person's role.
+ * document and its row. It needs no Clone here. Refuses a Person who may not act (`access.openSpace`).
  */
 export const renameProject =
 	(ports: RenameProjectPorts) =>
-	async (_actor: Actor, request: RenameProject): Promise<Project> => {
+	async (actor: Actor, request: RenameProject): Promise<Project> => {
+		await ports.access.openSpace(actor, {
+			spaceId: request.spaceId,
+			need: ADD_PROJECTS,
+		});
 		const { spaceId, projectId, name } = request;
 		const { store } = ports;
 		const notFound = () => new Refusal("not-found", PROJECT_NOT_FOUND);

@@ -1,13 +1,18 @@
 import { isAbsolute, join, relative } from "node:path";
+import { ROLE_REFUSAL, RoleRefusal } from "@nightshift/auth";
 import type { ProjectRuns } from "@nightshift/engine";
+import { SpaceNotFound } from "@nightshift/engine";
 import { now } from "@nightshift/time";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
-
 import { timeZoneSchema } from "../dashboard";
 import { agentChoices, agentChoicesSchema } from "../flows";
 import { output } from "../output";
-import { ownerProcedure, permitted, protectedProcedure } from "../procedures";
+import {
+	ownerProcedure,
+	protectedProcedure,
+	refusalError,
+} from "../procedures";
 import { projectProcedure } from "./project-space";
 import {
 	branchesSchema,
@@ -29,6 +34,27 @@ const NO_RUNS: ProjectRuns = {
 	last: null,
 	nextWakeAt: null,
 };
+
+/**
+ * A procedure on the projects of the session's Space. The engine checks
+ * the Person's role there. This says its refusals as the API said them
+ * before: a role that does not allow the request is ROLE_REFUSAL (403), a
+ * Space they are not a Member of is not found.
+ */
+const projectRoleProcedure = protectedProcedure.use(async ({ next }) => {
+	try {
+		return await next();
+	} catch (error) {
+		if (error instanceof RoleRefusal) throw refusalError(ROLE_REFUSAL);
+		if (error instanceof SpaceNotFound) {
+			throw new ORPCError("NOT_FOUND", {
+				message: error.message,
+				cause: error,
+			});
+		}
+		throw error;
+	}
+});
 
 export const projects = {
 	list: protectedProcedure
@@ -55,7 +81,7 @@ export const projects = {
 				runs: runs.get(project.id) ?? NO_RUNS,
 			}));
 		}),
-	add: permitted({ project: ["add"] })
+	add: projectRoleProcedure
 		.route({
 			summary:
 				"Adds a git repository on this computer as a project of the Space, with the starter flows when asked.",
@@ -105,7 +131,7 @@ export const projects = {
 	 * A project without a folder (ADR 22): no remote and no Clone, so no
 	 * computer needs a copy of it. In a Space a Host keeps, the Host adds it.
 	 */
-	addWithoutFolder: permitted({ project: ["add"] })
+	addWithoutFolder: projectRoleProcedure
 		.route({
 			summary:
 				"Adds a project without a folder to the Space. No computer needs a copy of it.",
@@ -289,7 +315,7 @@ export const projects = {
 		.handler(({ context, input }) =>
 			context.space.useProjectFolder(input.projectId, input.repoPath),
 		),
-	remove: permitted({ project: ["remove"] })
+	remove: projectRoleProcedure
 		.route({
 			summary: "Removes a project from the Space. Its runs and history stay.",
 		})
@@ -299,7 +325,7 @@ export const projects = {
 			context.space.removeProject(input.projectId),
 		),
 	/** A new name, for every Member of the Space. Whoever may add projects may rename them. */
-	rename: permitted({ project: ["add"] })
+	rename: projectRoleProcedure
 		.route({
 			summary: "Gives a project a new name for every Member of the Space.",
 		})
@@ -314,20 +340,15 @@ export const projects = {
 			context.space.renameProject(input.projectId, input.name),
 		),
 	/** Moves the project, its runs and their history to another Space: `project.move` in both. */
-	move: permitted({ project: ["move"] })
+	move: projectRoleProcedure
 		.route({
 			summary: "Moves a project, its runs and their history to another Space.",
 		})
 		.output(output(z.void()))
 		.input(z.object({ projectId: z.string(), spaceId: z.string().min(1) }))
-		.handler(async ({ context, input }) => {
-			if (!(await context.access.can({ project: ["move"] }, input.spaceId))) {
-				throw new ORPCError("FORBIDDEN", {
-					message: "Your role in that Space does not allow this.",
-				});
-			}
-			await context.space.moveProject(input.projectId, input.spaceId);
-		}),
+		.handler(({ context, input }) =>
+			context.space.moveProject(input.projectId, input.spaceId),
+		),
 	...projectSecrets,
 };
 

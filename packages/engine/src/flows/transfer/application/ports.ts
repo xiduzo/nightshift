@@ -1,4 +1,6 @@
+import type { Permissions } from "@nightshift/auth";
 import type { FlowMigration } from "@nightshift/flows";
+import type { Actor } from "../../../contract";
 import type { ProfileStore } from "../../../device-config";
 import type { UsageMoment } from "../../../usage";
 import type { FlowMigrations } from "../../migrations";
@@ -135,4 +137,15 @@ export type ImportMigrations = {
  */
 export type FlowUsage = {
 	note(moment: UsageMoment): void;
+};
+
+/**
+ * Who may act in a Space for a flow request.
+ * @filledBy engine/runs
+ */
+export type FlowTransferAccess = {
+	openSpace(
+		actor: Actor,
+		request: { spaceId: string; need?: Permissions },
+	): Promise<void>;
 };

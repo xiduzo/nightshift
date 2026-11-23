@@ -1,3 +1,4 @@
+import type { Permissions } from "@nightshift/auth";
 import type {
 	Flow,
 	FlowMigration,
@@ -6,6 +7,7 @@ import type {
 	Schedule,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import type { Actor } from "../../../../contract";
 import type { ProfileView } from "../../../../device-config";
 import type { UsageMoment } from "../../../../usage";
 import type { FlowMergePlan } from "../../../store";
@@ -14,6 +16,7 @@ import type {
 	CloneDocuments,
 	DeviceProfiles,
 	DocumentMerges,
+	FlowTransferAccess,
 	FlowUsage,
 	ImportMigrations,
 	Migrations,
@@ -286,8 +289,30 @@ export function inMemoryFlowUsage(): InMemoryFlowUsage {
  * `other` in the Space `space`, the Device `laptop` named `MacBook`, at
  * 1000.
  */
+
+export type InMemoryFlowTransferAccess = FlowTransferAccess & {
+	opened: { actor: Actor; spaceId: string; need?: Permissions }[];
+	refuse(error: unknown): void;
+};
+
+export function inMemoryFlowTransferAccess(): InMemoryFlowTransferAccess {
+	let refusal: { error: unknown } | null = null;
+	const access: InMemoryFlowTransferAccess = {
+		opened: [],
+		refuse: (error) => {
+			refusal = { error };
+		},
+		async openSpace(actor, request) {
+			access.opened.push({ actor, ...request });
+			if (refusal && "personId" in actor) throw refusal.error;
+		},
+	};
+	return access;
+}
+
 export function inMemoryTransferPorts() {
 	return {
+		access: inMemoryFlowTransferAccess(),
 		documents: inMemoryCloneDocuments(),
 		folders: inMemoryCloneFolders(),
 		saved: inMemorySavedDocuments(),

@@ -1,6 +1,7 @@
+import type { Permissions } from "@nightshift/auth";
 import type { Schedule } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import type { RowBatch } from "../../../contract";
+import type { Actor, RowBatch } from "../../../contract";
 import type {
 	MovedSchedules,
 	MoveHolds,
@@ -10,6 +11,7 @@ import type {
 	ProjectRuns,
 	ProjectsMovedHook,
 	Reread,
+	SpaceMoveAccess,
 	ThisWalker,
 } from "../../application/ports";
 import type { MovedRuns, ProjectsMoved } from "../../domain/move";
@@ -159,7 +161,29 @@ export function inMemoryMoveLog(steps: string[]): MoveLog {
 }
 
 /** Every port of the Space move in memory at once: where each use-case test starts. */
+
+export type InMemorySpaceMoveAccess = SpaceMoveAccess & {
+	opened: { actor: Actor; spaceId: string; need?: Permissions }[];
+	refuse(error: unknown): void;
+};
+
+export function inMemorySpaceMoveAccess(): InMemorySpaceMoveAccess {
+	let refusal: { error: unknown } | null = null;
+	const access: InMemorySpaceMoveAccess = {
+		opened: [],
+		refuse: (error) => {
+			refusal = { error };
+		},
+		async openSpace(actor, request) {
+			access.opened.push({ actor, ...request });
+			if (refusal && "personId" in actor) throw refusal.error;
+		},
+	};
+	return access;
+}
+
 export function inMemorySpaceMovePorts() {
+	const access = inMemorySpaceMoveAccess();
 	const steps: string[] = [];
 	const rows = moveRecords();
 	const entries = entryRecords();
@@ -167,6 +191,8 @@ export function inMemorySpaceMovePorts() {
 	const spaceEntries = inMemorySpaceEntries(entries);
 	const commands = inMemoryMoveRows(steps, "commands");
 	return {
+		access,
+
 		steps,
 		rows,
 		entries,

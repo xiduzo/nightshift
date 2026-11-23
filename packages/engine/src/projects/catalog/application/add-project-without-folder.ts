@@ -1,3 +1,4 @@
+import type { Permissions } from "@nightshift/auth";
 import { Refusal } from "@nightshift/refusal";
 import type { Actor } from "../../../contract";
 import {
@@ -13,9 +14,13 @@ import {
 	type SpaceProjects,
 	type ThisDevice,
 } from "../../keep";
-import type { HostRelay } from "./ports";
+import type { HostRelay, ProjectAccess } from "./ports";
+
+/** What a role must allow for this request. */
+const ADD_PROJECTS: Permissions = { project: ["add"] };
 
 export type AddProjectWithoutFolderPorts = {
+	access: ProjectAccess;
 	store: Pick<ProjectStore, "row" | "keepHostedWithoutFolder">;
 	spaceProjects: Pick<SpaceProjects, "create" | "clones">;
 	projectLog: Pick<ProjectLog, "append">;
@@ -33,11 +38,15 @@ export type AddProjectWithoutFolder = { spaceId: string; name: string };
  * Clone, on any Device. In a Space a Host keeps, the Host adds it, and its
  * row is kept here at once: the Space document brings the same entry a
  * moment later. Each call adds another project: a name may repeat. The
- * door checks the person's role.
+ * door checks the person's role (`access.openSpace`).
  */
 export const addProjectWithoutFolder =
 	(ports: AddProjectWithoutFolderPorts) =>
-	async (_actor: Actor, request: AddProjectWithoutFolder): Promise<Project> => {
+	async (actor: Actor, request: AddProjectWithoutFolder): Promise<Project> => {
+		await ports.access.openSpace(actor, {
+			spaceId: request.spaceId,
+			need: ADD_PROJECTS,
+		});
 		const { spaceId, name } = request;
 		const { store } = ports;
 		let projectId: string;

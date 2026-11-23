@@ -1,3 +1,4 @@
+import type { Permissions } from "@nightshift/auth";
 import { loadFlowSource } from "@nightshift/flows";
 import { type Actor, personOf } from "../../../contract";
 import {
@@ -6,9 +7,17 @@ import {
 	notValidFlow,
 	type SavedFlow,
 } from "../domain/flow-files";
-import type { FlowUsage, SavedFlows, SpaceProjects } from "./ports";
+import type {
+	FlowTransferAccess,
+	FlowUsage,
+	SavedFlows,
+	SpaceProjects,
+} from "./ports";
+
+const SAVES_FLOWS: Permissions = { flow: ["save"] };
 
 export type CopyFlowPorts = {
+	access: FlowTransferAccess;
 	projects: SpaceProjects;
 	flows: Pick<SavedFlows, "flows" | "save">;
 	usage?: FlowUsage | undefined;
@@ -32,6 +41,10 @@ export const copyFlow =
 		},
 	): Promise<SavedFlow> => {
 		const { spaceId, projectId, name, to } = request;
+		await ports.access.openSpace(actor, {
+			spaceId: request.spaceId,
+			need: SAVES_FLOWS,
+		});
 		await ports.projects.inSpace(projectId, spaceId);
 		await ports.projects.inSpace(to.projectId, spaceId);
 		const loaded = loadFlowSource(await ports.flows.flows(projectId), name);

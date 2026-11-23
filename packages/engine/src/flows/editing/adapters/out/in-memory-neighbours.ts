@@ -1,5 +1,7 @@
+import type { Permissions } from "@nightshift/auth";
 import type { Flow } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import type { Actor } from "../../../../contract";
 import type { MemoryFlow, NodeMemory as Remembered } from "../../../../memory";
 import type { UsageMoment } from "../../../../usage";
 import type { KeptFlow, KeptValue } from "../../../../variables";
@@ -8,6 +10,7 @@ import {
 	inMemoryFlowStore,
 } from "../../../store/adapters/out/in-memory-flow-store";
 import type {
+	FlowEditingAccess,
 	FlowUsage,
 	KeptValues,
 	Names,
@@ -161,8 +164,30 @@ export function inMemoryFlowUsage(): InMemoryFlowUsage {
 }
 
 /** Every port: the projects `project` and `other` in the Space `space`, `elsewhere` in another Space. */
+
+export type InMemoryFlowEditingAccess = FlowEditingAccess & {
+	opened: { actor: Actor; spaceId: string; need?: Permissions }[];
+	refuse(error: unknown): void;
+};
+
+export function inMemoryFlowEditingAccess(): InMemoryFlowEditingAccess {
+	let refusal: { error: unknown } | null = null;
+	const access: InMemoryFlowEditingAccess = {
+		opened: [],
+		refuse: (error) => {
+			refusal = { error };
+		},
+		async openSpace(actor, request) {
+			access.opened.push({ actor, ...request });
+			if (refusal && "personId" in actor) throw refusal.error;
+		},
+	};
+	return access;
+}
+
 export function inMemoryEditingPorts() {
 	return {
+		access: inMemoryFlowEditingAccess(),
 		projects: inMemorySpaceProjects({
 			project: "space",
 			other: "space",

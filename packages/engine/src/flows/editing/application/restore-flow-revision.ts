@@ -1,3 +1,4 @@
+import type { Permissions } from "@nightshift/auth";
 import type { FlowIssue } from "@nightshift/flows";
 import { type Actor, personOf } from "../../../contract";
 import {
@@ -5,9 +6,12 @@ import {
 	revisionNotFound,
 	revisionNotValid,
 } from "../domain/revisions";
-import type { SavedFlows, SpaceProjects } from "./ports";
+import type { FlowEditingAccess, SavedFlows, SpaceProjects } from "./ports";
+
+const SAVES_FLOWS: Permissions = { flow: ["save"] };
 
 export type RestoreFlowRevisionPorts = {
+	access: FlowEditingAccess;
 	projects: SpaceProjects;
 	flows: Pick<SavedFlows, "revisions" | "save">;
 };
@@ -28,6 +32,10 @@ export const restoreFlowRevision =
 		},
 	): Promise<FlowIssue[]> => {
 		const { projectId, name } = request;
+		await ports.access.openSpace(actor, {
+			spaceId: request.spaceId,
+			need: SAVES_FLOWS,
+		});
 		await ports.projects.inSpace(projectId, request.spaceId);
 		const revision = (await ports.flows.revisions(projectId, name)).find(
 			(candidate) => candidate.id === request.revisionId,

@@ -1,8 +1,17 @@
+import type { Permissions } from "@nightshift/auth";
 import type { Flow, FlowIssue } from "@nightshift/flows";
 import { type Actor, personOf } from "../../../contract";
-import type { FlowUsage, SavedFlows, SpaceProjects } from "./ports";
+import type {
+	FlowEditingAccess,
+	FlowUsage,
+	SavedFlows,
+	SpaceProjects,
+} from "./ports";
+
+const SAVES_FLOWS: Permissions = { flow: ["save"] };
 
 export type SaveFlowPorts = {
+	access: FlowEditingAccess;
 	projects: SpaceProjects;
 	flows: Pick<SavedFlows, "flows" | "save">;
 	usage?: FlowUsage;
@@ -25,6 +34,10 @@ export const saveFlow =
 		},
 	): Promise<FlowIssue[]> => {
 		const { projectId, name } = request;
+		await ports.access.openSpace(actor, {
+			spaceId: request.spaceId,
+			need: SAVES_FLOWS,
+		});
 		await ports.projects.inSpace(projectId, request.spaceId);
 		const existed = Object.hasOwn(await ports.flows.flows(projectId), name);
 		const issues = await ports.flows.save(projectId, name, request.flow, {

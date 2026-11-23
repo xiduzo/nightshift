@@ -1,8 +1,14 @@
+import { ROLE_REFUSAL, RoleRefusal } from "@nightshift/auth";
+import { SpaceNotFound } from "@nightshift/engine";
 import { flowNameSchema, flowSchema, nameSchema } from "@nightshift/flows";
+import { ORPCError } from "@orpc/server";
 import { z } from "zod";
-
 import { output } from "../output";
-import { ownerProcedure, permitted, protectedProcedure } from "../procedures";
+import {
+	ownerProcedure,
+	protectedProcedure,
+	refusalError,
+} from "../procedures";
 import { agentChoices, agentChoicesSchema } from "./agent-choices";
 import {
 	flowExportSchema,
@@ -21,6 +27,22 @@ const flowRef = z.object({ projectId: z.string(), name: flowNameSchema });
 
 /** The largest flow file an import takes: 5 MB. */
 const MAX_FLOW_JSON = 5_000_000;
+
+/** A flow procedure: the engine checks the role; this maps RoleRefusal and SpaceNotFound. */
+const flowRoleProcedure = protectedProcedure.use(async ({ next }) => {
+	try {
+		return await next();
+	} catch (error) {
+		if (error instanceof RoleRefusal) throw refusalError(ROLE_REFUSAL);
+		if (error instanceof SpaceNotFound) {
+			throw new ORPCError("NOT_FOUND", {
+				message: error.message,
+				cause: error,
+			});
+		}
+		throw error;
+	}
+});
 
 export const flows = {
 	list: protectedProcedure
@@ -51,7 +73,7 @@ export const flows = {
 		.input(z.object({ projectId: z.string() }))
 		.handler(({ context, input }) => context.space.flows.map(input.projectId)),
 	/** Saves drafts with errors too, as a new revision. Returns the issues. */
-	save: permitted({ flow: ["save"] })
+	save: flowRoleProcedure
 		.route({
 			summary:
 				"Saves a flow, also with errors, as a new revision, and returns its problems.",
@@ -131,7 +153,7 @@ export const flows = {
 		.handler(({ context, input }) =>
 			context.space.flows.dismissNotice(input.projectId, input.id),
 		),
-	remove: permitted({ flow: ["remove"] })
+	remove: flowRoleProcedure
 		.route({
 			summary: "Removes a flow from the project. Its revisions stay.",
 		})
@@ -171,7 +193,7 @@ export const flows = {
 				input.against,
 			),
 		),
-	restore: permitted({ flow: ["save"] })
+	restore: flowRoleProcedure
 		.route({
 			summary:
 				"Saves a revision of a flow as the flow now, as a new revision, and returns its problems.",
@@ -194,7 +216,7 @@ export const flows = {
 		.handler(({ context, input }) =>
 			context.space.flows.export(input.projectId, input.name),
 		),
-	import: permitted({ flow: ["save"] })
+	import: flowRoleProcedure
 		.route({
 			summary:
 				"Saves the flow of a JSON file as a new flow of the project, with a suffix when the name is taken, and returns its name and problems.",
@@ -213,7 +235,7 @@ export const flows = {
 				agents: agentChoices(context, input.agents),
 			}),
 		),
-	copy: permitted({ flow: ["save"] })
+	copy: flowRoleProcedure
 		.route({
 			summary:
 				"Copies a flow into a project of this space, without the flows it calls, and returns its name and problems there.",

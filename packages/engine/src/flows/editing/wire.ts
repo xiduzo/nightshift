@@ -6,6 +6,7 @@ import { listFlows } from "./application/list-flows";
 import { listKeptValues } from "./application/list-kept-values";
 import { listNodeMemory } from "./application/list-node-memory";
 import type {
+	FlowEditingAccess,
 	FlowUsage,
 	KeptValues,
 	Names,
@@ -33,6 +34,7 @@ const NO_NAMES = async () => new Map<string, string>();
  * project is in the Space first.
  */
 export function wireEditing(deps: {
+	access: FlowEditingAccess;
 	projects: SpaceProjects;
 	flows: SavedFlows;
 	/** Without them, a revision names nobody and no Device. */
@@ -51,16 +53,21 @@ export function wireEditing(deps: {
 		readFlow: readFlow({ projects, flows }),
 		readFlowMap: readFlowMap({ projects, flows }),
 		saveFlow: saveFlow({
+			access: deps.access,
 			projects,
 			flows,
 			...(deps.usage ? { usage: deps.usage } : {}),
 		}),
-		removeFlow: removeFlow({ projects, flows }),
+		removeFlow: removeFlow({ access: deps.access, projects, flows }),
 		listFlowNotices: listFlowNotices({ projects, flows }),
 		dismissFlowNotice: dismissFlowNotice({ projects, flows }),
 		listFlowRevisions: listFlowRevisions({ projects, flows, names }),
 		readFlowRevision: readFlowRevision({ projects, flows, names }),
-		restoreFlowRevision: restoreFlowRevision({ projects, flows }),
+		restoreFlowRevision: restoreFlowRevision({
+			access: deps.access,
+			projects,
+			flows,
+		}),
 		listKeptValues: listKeptValues({ projects, kept }),
 		resetKeptValue: resetKeptValue({ projects, kept }),
 		listNodeMemory: listNodeMemory({ projects, memory }),

@@ -1,9 +1,21 @@
-import { invitationView, membersOf, spacesOf } from "@nightshift/auth";
+import {
+	invitationView,
+	membersOf,
+	ROLE_REFUSAL,
+	RoleRefusal,
+	spacesOf,
+} from "@nightshift/auth";
+import { SpaceNotFound } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
+import { ORPCError } from "@orpc/server";
 import { z } from "zod";
-
 import { output } from "../output";
-import { permitted, protectedProcedure, publicProcedure } from "../procedures";
+import {
+	permitted,
+	protectedProcedure,
+	publicProcedure,
+	refusalError,
+} from "../procedures";
 import {
 	invitationViewSchema,
 	memberListSchema,
@@ -12,6 +24,23 @@ import {
 } from "./schemas";
 
 /** The Person's Spaces, and the one the session works in. */
+
+/** Space settings: the engine checks the role; this maps RoleRefusal and SpaceNotFound. */
+const spaceSettingsProcedure = protectedProcedure.use(async ({ next }) => {
+	try {
+		return await next();
+	} catch (error) {
+		if (error instanceof RoleRefusal) throw refusalError(ROLE_REFUSAL);
+		if (error instanceof SpaceNotFound) {
+			throw new ORPCError("NOT_FOUND", {
+				message: error.message,
+				cause: error,
+			});
+		}
+		throw error;
+	}
+});
+
 export const spaces = {
 	/** The personal Space first. `active` is the session's Space. */
 	list: protectedProcedure
@@ -44,7 +73,7 @@ export const spaces = {
 		.input(z.object({ name: z.string().trim().min(1).max(60) }))
 		.handler(({ context, input }) => context.access.createSpace(input.name)),
 	/** Anonymous usage for every computer in this Space. Missing means on. */
-	setUsage: permitted({ space: ["settings"] })
+	setUsage: spaceSettingsProcedure
 		.route({
 			summary:
 				"Turns anonymous usage on or off for every computer in this Space.",

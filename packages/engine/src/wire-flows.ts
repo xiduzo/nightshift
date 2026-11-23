@@ -17,6 +17,7 @@ import type { RunLog } from "./log";
 import { forgetMemory, listMemory } from "./memory";
 import type { Projects } from "./projects";
 import { namesOf } from "./read";
+import type { Access } from "./runs";
 import { listKeptValues, resetKeptValue } from "./variables";
 
 /**
@@ -45,6 +46,7 @@ export function wireEngineFlows(deps: {
 	deviceName: string;
 	options: Pick<EngineOptions, "profiles" | "usage">;
 	now(): number;
+	access: Pick<Access, "openSpace">;
 }) {
 	const {
 		db,
@@ -77,6 +79,7 @@ export function wireEngineFlows(deps: {
 	});
 	const usage = deps.options.usage;
 	const transfer = wireTransfer({
+		access: deps.access,
 		db,
 		git: deps.git,
 		documents: imports,
@@ -149,10 +152,12 @@ export function wireEngineSpaceFlows(deps: {
 	projectFlows: ProjectFlows;
 	transfer: FlowTransfer;
 	options: Pick<EngineOptions, "usage">;
+	access: Pick<Access, "openSpace">;
 }) {
 	const { db, ready, projects, projectFlows } = deps;
 	const usage = deps.options.usage;
 	const editing = wireEditing({
+		access: deps.access,
 		projects: {
 			async inSpace(projectId, spaceId) {
 				await ready;

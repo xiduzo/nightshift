@@ -5,7 +5,7 @@ import type { ProjectFlows } from "./flows";
 import type { Runner } from "./graph";
 import { type RunLog, runIdsOfProject } from "./log";
 import type { Projects } from "./projects";
-import type { StartHolds } from "./runs";
+import type { Access, StartHolds } from "./runs";
 import { wireSpaceMove } from "./space-move";
 
 /**
@@ -29,10 +29,12 @@ export function wireEngineSpaceMove(deps: {
 	projects: Pick<Projects, "find" | "refuseMove">;
 	runner: Pick<Runner, "isActive">;
 	options: Pick<EngineOptions, "moveRows" | "projectsMoved">;
+	access: Pick<Access, "openSpace">;
 }) {
 	const { db, log, options } = deps;
 	return wireSpaceMove({
 		db,
+		access: deps.access,
 		documents: deps.documents,
 		holds: {
 			holdStarts: (spaceId) => deps.startHolds.hold(spaceId),
