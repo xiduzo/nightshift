@@ -36,7 +36,7 @@ import {
 	ONLY_FROM_HOME,
 	type OwnSecrets,
 	serveSecretCall,
-} from "./moves";
+} from "./test-support";
 
 /**
  * A secret saved on another of the Person's Devices moves without anyone

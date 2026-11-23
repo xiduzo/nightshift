@@ -4,12 +4,10 @@ import type { createDevices } from "./host";
 import type { DeviceLinks, HostLinks } from "./links";
 import {
 	createProjectSecretsHost,
-	createSecretMovesHost,
 	deviceProjectSecrets,
-	deviceSecretMoves,
-	serveSecretCall,
 	wireCalls,
 	wireKept,
+	wireMoves,
 	wirePersonal,
 } from "./secrets";
 import type { PeerEngine } from "./wire-peers-engine";
@@ -31,11 +29,12 @@ export function wireSecretCalls(
 	deps: Pick<DevicesDeps, "ownSecrets" | "ownerId">,
 	hostLinks: HostLinks,
 ) {
-	return serveSecretCall({
-		hostLinks,
+	return wireMoves({
+		// Serving a call asks only for the home Host: no link is called.
+		calls: wireCalls({ hostLinks, links: () => ({ get: () => undefined }) }),
 		own: deps.ownSecrets,
 		ownerId: deps.ownerId,
-	});
+	}).serve;
 }
 
 /**
@@ -76,13 +75,21 @@ export function wireSecrets(
 		ownerId,
 	});
 	/** The Personal secrets: as a Home Host, and the owner's, at the Home Host or kept here. */
+	/** The calls of this computer's Hosts, over its links. */
+	const calls = wireCalls({ hostLinks, links });
 	const personal = wirePersonal({
 		store: personalStore,
-		calls: wireCalls({ hostLinks, links }),
+		calls,
 		ownerId,
 		selfId: self.id,
 	});
 	const personalSecrets = personal.device;
+	/** The moves of a secret saved on another of the owner's Devices. */
+	const moves = wireMoves({ calls, own: deps.ownSecrets, ownerId }).relay({
+		devices: engine.devices,
+		work: handover.hub,
+		selfId: self.id,
+	});
 	const ofDevices = {
 		personalSecrets: personal.host,
 		projectSecrets: createProjectSecretsHost({
@@ -99,19 +106,9 @@ export function wireSecrets(
 				),
 		}),
 		// As a Home Host: a paired Device asks to move a secret on another.
-		secretMoves: createSecretMovesHost({
-			registry: engine.devices,
-			work: handover.hub,
-			self: { id: self.id, ownerId, own: deps.ownSecrets },
-		}),
+		secretMoves: moves.host,
 		// The owner's moves of a secret on another of their Devices.
-		moves: deviceSecretMoves({
-			registry: engine.devices,
-			work: handover.hub,
-			hostLinks,
-			links,
-			ownerId,
-		}),
+		moves: moves.device,
 	};
 	return { projectSecrets, personalSecrets, ofDevices };
 }

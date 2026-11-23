@@ -13,12 +13,10 @@
 export { wireCalls } from "./calls";
 export { wireKept } from "./kept";
 export {
-	createSecretMovesHost,
-	deviceSecretMoves,
 	type OwnSecrets,
 	type SecretMoves,
 	type SecretMovesHost,
-	serveSecretCall,
+	wireMoves,
 } from "./moves";
 export { type PersonalSecretsHost, wirePersonal } from "./personal";
 export { deviceProjectSecrets } from "./project-device";
