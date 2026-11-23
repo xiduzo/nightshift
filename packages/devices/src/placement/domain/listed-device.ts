@@ -1,10 +1,13 @@
-import type { DeviceProfile } from "@nightshift/engine";
-import type { ListedProject } from "@nightshift/engine/projects";
-
-/** Two facts of a Device as Placement lists it for a Person: whether it can work for the project, and a profile it offers. */
+/**
+ * Two facts of a Device as Placement lists it for a Person: whether it can
+ * work for the project, and a profile it offers.
+ */
 
 /** Whether a Device can work for the project: it has a Clone, or the project needs none (ADR 22). */
-export function hasProject(project: ListedProject, hasClone: boolean): boolean {
+export function hasProject(
+	project: { folder: boolean },
+	hasClone: boolean,
+): boolean {
 	return hasClone || project.folder === false;
 }
 
@@ -12,6 +15,6 @@ export function hasProject(project: ListedProject, hasClone: boolean): boolean {
 export function offeredChoice(offer: {
 	profile: string;
 	profileName: string;
-}): DeviceProfile {
+}): { id: string; name: string; kind: "agent" } {
 	return { id: offer.profile, name: offer.profileName, kind: "agent" };
 }

@@ -1,68 +1,83 @@
-import { personalSpaceIdBySlug, personNames } from "@nightshift/auth";
-import {
-	type Device,
-	type DeviceProfile,
-	deviceNameIn,
-	HostUnreachableError,
-	type NodeToPlace,
-	type OfferedPlacement,
-	type OwnDevice,
-	type PersonActor,
-	type PlacedDevice,
-	type PlacedRun,
-	type Placement,
-	type PlanDevices,
-	type PlanInput,
-	type PlannedRun,
-	planNodes,
-	UNREACHABLE_DEVICE,
+import type * as Engine from "@nightshift/engine";
+import type {
+	Device,
+	DeviceProfile,
+	NodeToPlace,
+	OfferedPlacement,
+	OwnDevice,
+	PeerProfiles,
+	PeerProjects,
+	PersonActor,
+	PlacedDevice,
+	PlacedRun,
+	Placement,
+	PlanDevices,
+	PlanInput,
+	PlannedRun,
+	SpaceDocuments,
 } from "@nightshift/engine";
+import type { DeviceCopy } from "@nightshift/engine/device-config";
 import type { ListedProject } from "@nightshift/engine/projects";
+import type { FlowSources } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import { keptByHomeHost, personInSpace } from "../links";
+import type { HostRelay, WorkRelay } from "../../contract";
+import type { HostSpaces } from "../../links";
+import type { DeviceOffer } from "../../offers";
 import {
 	hostOffersNothing,
 	offerRefusal,
 	offersNothing,
 	offerTakes,
 	spaceOffers,
-} from "../offers";
-import { remoteDevice } from "../work";
-import { hasProject, offeredChoice } from "./listed-device";
-import { NO_STARTER_RELAY, UNREACHABLE } from "./no-relay";
-import type { PlacementDeps } from "./placement-deps";
+} from "../../offers";
+import type { DeviceRegistry } from "../../registry";
+import type * as Work from "../../work";
+import { hasProject, offeredChoice } from "../domain/listed-device";
+import { NO_STARTER_RELAY, UNREACHABLE } from "../domain/no-relay";
+import type { DeviceCopiesPort, SpacePeople } from "./ports";
 
-/**
- * The Devices Placement chooses among (the engine's `PlacementPort`): who
- * a Person's Devices are in a Space, and a run's plan over them.
- *
- * - At run start (`plan`): the Person the run runs for, as the Host of its
- *   Space knows them; the run's Device (`deviceId`, else this computer);
- *   and each node's Device, by the engine's node walk (`planNodes`: its
- *   profile's Device, else its `device`, else the run's) over this
- *   module's Devices. Each Device is checked: one of the Person's own, or
- *   another Person's through its Offers into the Space (the nodes placed
- *   there stay within them, `offerRefusal`), with a Clone where it needs
- *   one. A Device may be offline: its steps wait for it, up to the stop
- *   time. The run's Device makes the run's worktree when it is back. On the Replica that keeps the Space the registry
- *   answers; on a Device in a Host's Space the Host does
- *   (`HostRelay.devices`). Run start keeps the plan on the run's row.
- * - While the run walks (`deviceById`): a Device of the plan as the run
- *   reaches it, and nothing decided again. Another Device is a
- *   `remoteDevice` over the work relay, named as the plan names it. Which
- *   Device a step runs on is the engine's reading of the plan
- *   (`placement/` there).
- *
- * The placed Device checks every call again itself.
- *
- * A project without a folder needs no Clone (ADR 22): every Device "has"
- * it (`hasClone`), also in the list of a Host of a version before it.
- */
+export type PlacementDeps = {
+	device: Device;
+	walkerId(): Promise<string>;
+	registry: DeviceRegistry;
+	documents: SpaceDocuments;
+	hostSpaces: HostSpaces;
+	spacePeople: SpacePeople;
+	projects: Pick<PeerProjects, "find" | "clones">;
+	profiles: Pick<PeerProfiles, "here" | "lastKnown">;
+	keptDevice(deviceId: string): Promise<DeviceCopy | null>;
+	flows(projectId: string): Promise<FlowSources>;
+	work?: WorkRelay;
+	relay?: HostRelay;
+	localFor?(run: PlacedRun): Device;
+	isHost?(): boolean;
+	offersHere?(spaceId: string): Promise<DeviceOffer[]>;
+	ownProfiles?(): readonly DeviceProfile[];
+	copies?: DeviceCopiesPort;
+	mayUseOffers?(spaceId: string, personId: string): Promise<boolean>;
+	engineFns: PlacementEngineFns;
+};
+
+export type PlacementEngineFns = {
+	planNodes: typeof Engine.planNodes;
+	deviceNameIn: typeof Engine.deviceNameIn;
+	HostUnreachableError: typeof Engine.HostUnreachableError;
+	UNREACHABLE_DEVICE: typeof Engine.UNREACHABLE_DEVICE;
+	remoteDevice: typeof Work.remoteDevice;
+};
 
 export type PlacementModule = ReturnType<typeof createPlacement>;
 
 export function createPlacement(deps: PlacementDeps) {
-	const { db, device, registry, documents, hostSpaces } = deps;
+	const { device, registry, documents, hostSpaces, spacePeople, engineFns } =
+		deps;
+	const {
+		planNodes,
+		deviceNameIn,
+		HostUnreachableError,
+		UNREACHABLE_DEVICE,
+		remoteDevice,
+	} = engineFns;
 	const work = deps.work ?? UNREACHABLE;
 
 	/** Whether an id is this computer. */
@@ -99,14 +114,14 @@ export function createPlacement(deps: PlacementDeps) {
 	 * computer's own Person there.
 	 */
 	async function copiesFor(spaceId: string, personId: string) {
-		if (!deps.copies || !(await keptByHomeHost(db, spaceId))) return [];
+		if (!deps.copies || !(await spacePeople.keptByHomeHost(spaceId))) return [];
 		if ((await ownerHere(spaceId)) !== personId) return [];
 		return deps.copies.list();
 	}
 
 	/** The Person who owns this computer, as the Space's Host knows them. */
 	async function ownerHere(spaceId: string): Promise<string | null> {
-		return personInSpace(db, spaceId, await registry.selfOwnerId());
+		return spacePeople.personInSpace(spaceId, await registry.selfOwnerId());
 	}
 
 	/**
@@ -288,7 +303,7 @@ export function createPlacement(deps: PlacementDeps) {
 		const [here, ...rest] = own as [OwnDevice, ...OwnDevice[]];
 		// In a Host's Space, this computer's Person is the one who asks here.
 		const owner = await ownerHere(spaceId);
-		const asking = await personInSpace(db, spaceId, personId);
+		const asking = await spacePeople.personInSpace(spaceId, personId);
 		const offeredHere =
 			owner === asking ? [] : ((await deps.offersHere?.(spaceId)) ?? []);
 		const ownerName = owner === asking ? undefined : await nameOfOwner(owner);
@@ -475,8 +490,7 @@ export function createPlacement(deps: PlacementDeps) {
 		const personId =
 			input.scheduled && start.startedBy
 				? start.startedBy
-				: await personInSpace(
-						db,
+				: await spacePeople.personInSpace(
 						project.spaceId,
 						start.startedBy ?? (await registry.selfOwnerId()),
 					);
@@ -545,7 +559,8 @@ export function createPlacement(deps: PlacementDeps) {
 		}
 		if (personId === null || !at.offered.mayUse) return null;
 		if ((await hostSpaces.hostOf(spaceId)) !== null) return null;
-		if ((await personalSpaceIdBySlug(db, personId)) !== spaceId) return null;
+		if ((await spacePeople.personalSpaceIdBySlug(personId)) !== spaceId)
+			return null;
 		const name = await nameOfOwner(await registry.selfOwnerId());
 		return hostOffersNothing(device.name, name ?? "another person");
 	}
@@ -555,7 +570,7 @@ export function createPlacement(deps: PlacementDeps) {
 		owner: string | null,
 	): Promise<string | undefined> {
 		if (!owner) return undefined;
-		return (await personNames(db, [owner])).get(owner) || undefined;
+		return (await spacePeople.personNames([owner])).get(owner) || undefined;
 	}
 
 	/**
@@ -569,7 +584,10 @@ export function createPlacement(deps: PlacementDeps) {
 		actor: PersonActor,
 		to: string,
 	): Promise<{ id: string; name: string } | null> {
-		const personId = await personInSpace(db, run.spaceId, actor.personId);
+		const personId = await spacePeople.personInSpace(
+			run.spaceId,
+			actor.personId,
+		);
 		const target = (
 			await ownDevices(run.spaceId, personId, run.projectId)
 		).find((d) => d.deviceId === to);

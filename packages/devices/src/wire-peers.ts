@@ -22,7 +22,7 @@ import {
 	wireOffers,
 } from "./offers";
 import { createPrivatePaths, createWalkers } from "./peers";
-import { createPlacement } from "./placement";
+import { wirePlacement } from "./placement";
 import {
 	type DevicePresence,
 	type DeviceRegistry,
@@ -166,7 +166,7 @@ export function createPeers(
 	});
 
 	/** Where a run's steps run: its plan at start, read while it walks (`placement.ts`). */
-	const placement = createPlacement({
+	const placement = wirePlacement().createPlacement({
 		db,
 		device,
 		walkerId: context.walkerId,

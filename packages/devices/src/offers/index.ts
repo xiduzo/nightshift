@@ -8,7 +8,6 @@ export type { OfferAdmission } from "./application/admit-offered-call";
 export type { OfferView } from "./application/list-offers";
 export type { SpaceDeviceView } from "./application/list-space-devices";
 export { createOfferUse, type OfferUse } from "./domain/offer-use";
-export { NO_STARTER } from "./domain/offered-call";
 export {
 	type DeviceOffer,
 	deviceOffers,
